@@ -585,7 +585,7 @@ void vmx_inject_extint(int trap, uint8_t source);
 void vmx_inject_nmi(void);
 
 void ept_walk_table(struct domain *d, unsigned long gfn);
-bool_t ept_handle_misconfig(uint64_t gpa);
+bool ept_handle_misconfig(uint64_t gpa);
 int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
                        unsigned int order, bool *ipat, p2m_type_t type);
 void setup_ept_dump(void);

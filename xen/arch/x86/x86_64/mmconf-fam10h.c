@@ -142,7 +142,7 @@ out:
 void fam10h_check_enable_mmcfg(void)
 {
 	u64 val;
-	bool_t print = opt_cpu_info;
+	bool print = opt_cpu_info;
 
 	if (!(pci_probe & PCI_CHECK_ENABLE_AMD_MMCONF))
 		return;

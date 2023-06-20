@@ -32,7 +32,7 @@ static inline bool nestedhvm_enabled(const struct domain *d)
 int nestedhvm_vcpu_initialise(struct vcpu *v);
 void nestedhvm_vcpu_destroy(struct vcpu *v);
 void nestedhvm_vcpu_reset(struct vcpu *v);
-bool_t nestedhvm_vcpu_in_guestmode(struct vcpu *v);
+bool nestedhvm_vcpu_in_guestmode(struct vcpu *v);
 #define nestedhvm_vcpu_enter_guestmode(v) \
     vcpu_nestedhvm(v).nv_guestmode = 1
 #define nestedhvm_vcpu_exit_guestmode(v)  \
@@ -50,7 +50,7 @@ int nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t *L2_gpa,
                                     struct npfec npfec);
 
 /* IO permission map */
-unsigned long *nestedhvm_vcpu_iomap_get(bool_t ioport_80, bool_t ioport_ed);
+unsigned long *nestedhvm_vcpu_iomap_get(bool ioport_80, bool ioport_ed);
 
 /* Misc */
 #define nestedhvm_paging_mode_hap(v) (!!nhvm_vmcx_hap_enabled(v))

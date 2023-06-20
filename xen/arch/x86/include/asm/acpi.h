@@ -127,7 +127,7 @@ struct acpi_sleep_info {
     uint32_t sleep_state;
     uint64_t wakeup_vector;
     uint32_t vector_width;
-    bool_t sleep_extended;
+    bool sleep_extended;
 };
 
 #define MAX_MADT_ENTRIES	MAX(256, 2 * NR_CPUS)

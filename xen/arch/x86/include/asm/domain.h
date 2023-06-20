@@ -106,17 +106,17 @@ struct shadow_domain {
 
     /* Shadow hashtable */
     struct page_info **hash_table;
-    bool_t hash_walking;  /* Some function is walking the hash table */
+    bool hash_walking;  /* Some function is walking the hash table */
 
     /* Fast MMIO path heuristic */
     bool has_fast_mmio_entries;
 
 #ifdef CONFIG_HVM
     /* OOS */
-    bool_t oos_active;
+    bool oos_active;
 
     /* Has this domain ever used HVMOP_pagetable_dying? */
-    bool_t pagetable_dying_op;
+    bool pagetable_dying_op;
 #endif
 
 #ifdef CONFIG_PV
@@ -160,7 +160,7 @@ struct shadow_vcpu {
         unsigned long off[SHADOW_OOS_FIXUPS];
     } oos_fixup[SHADOW_OOS_PAGES];
 
-    bool_t pagetable_dying;
+    bool pagetable_dying;
 #endif
 #endif
 };
@@ -199,7 +199,7 @@ struct paging_domain {
     /* flags to control paging operation */
     u32                     mode;
     /* Has that pool ever run out of memory? */
-    bool_t                  p2m_alloc_failed;
+    bool                    p2m_alloc_failed;
     /* extension for shadow paging support */
     struct shadow_domain    shadow;
     /* extension for hardware-assited paging */
@@ -353,7 +353,7 @@ struct arch_domain
     mm_lock_t nested_p2m_lock;
 
     /* altp2m: allow multiple copies of host p2m */
-    bool_t altp2m_active;
+    bool altp2m_active;
     struct p2m_domain *altp2m_p2m[MAX_ALTP2M];
     mm_lock_t altp2m_list_lock;
     uint64_t *altp2m_eptp;
@@ -364,10 +364,10 @@ struct arch_domain
     struct radix_tree_root irq_pirq;
 
     /* Is shared-info page in 32-bit format? */
-    bool_t has_32bit_shinfo;
+    bool has_32bit_shinfo;
 
     /* Is PHYSDEVOP_eoi to automatically unmask the event channel? */
-    bool_t auto_unmask;
+    bool auto_unmask;
 
     /*
      * The width of the FIP/FDP register in the FPU that needs to be
@@ -399,7 +399,7 @@ struct arch_domain
 
     /* TSC management (emulation, pv, scaling, stats) */
     int tsc_mode;            /* see asm/time.h */
-    bool_t vtsc;             /* tsc is emulated (may change after migrate) */
+    bool vtsc;               /* tsc is emulated (may change after migrate) */
     s_time_t vtsc_last;      /* previous TSC value (guarantee monotonicity) */
     uint64_t vtsc_offset;    /* adjustment for save/restore/migrate */
     uint32_t tsc_khz;        /* cached guest khz for certain emulated or
@@ -452,7 +452,7 @@ struct arch_domain
     } monitor;
 
     /* Mem_access emulation control */
-    bool_t mem_access_emulate_each_rep;
+    bool mem_access_emulate_each_rep;
 
     /* Don't unconditionally inject #GP for unhandled MSRs. */
     bool msr_relaxed;
@@ -544,8 +544,8 @@ struct pv_vcpu
     unsigned long sysenter_callback_eip;
     unsigned short syscall32_callback_cs;
     unsigned short sysenter_callback_cs;
-    bool_t syscall32_disables_events;
-    bool_t sysenter_disables_events;
+    bool syscall32_disables_events;
+    bool sysenter_disables_events;
 
     /*
      * 64bit segment bases.
@@ -586,7 +586,7 @@ struct pv_vcpu
     uint32_t dr7_emul;
 
     /* Deferred VA-based update state. */
-    bool_t need_update_runstate_area;
+    bool need_update_runstate_area;
     struct vcpu_time_info pending_system_time;
 };
 
@@ -656,7 +656,7 @@ struct arch_vcpu
     uint64_t xcr0_accum;
     /* This variable determines whether nonlazy extended state has been used,
      * and thus should be saved/restored. */
-    bool_t nonlazy_xstate_used;
+    bool nonlazy_xstate_used;
 
     /* Restore all FPU state (lazy and non-lazy state) on context switch? */
     bool fully_eager_fpu;

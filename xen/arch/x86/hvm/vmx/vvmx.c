@@ -811,7 +811,7 @@ static void unmap_io_bitmap(struct vcpu *v, unsigned int idx)
     }
 }
 
-static bool_t __must_check _map_io_bitmap(struct vcpu *v, u64 vmcs_reg)
+static bool __must_check _map_io_bitmap(struct vcpu *v, u64 vmcs_reg)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     unsigned long gpa;
@@ -825,7 +825,7 @@ static bool_t __must_check _map_io_bitmap(struct vcpu *v, u64 vmcs_reg)
     return nvmx->iobitmap[index] != NULL;
 }
 
-static inline bool_t __must_check map_io_bitmap_all(struct vcpu *v)
+static inline bool __must_check map_io_bitmap_all(struct vcpu *v)
 {
    return _map_io_bitmap(v, IO_BITMAP_A) &&
           _map_io_bitmap(v, IO_BITMAP_B);
@@ -1148,7 +1148,7 @@ static uint64_t get_host_eptp(struct vcpu *v)
     return p2m_get_hostp2m(v->domain)->ept.eptp;
 }
 
-static bool_t nvmx_vpid_enabled(const struct vcpu *v)
+static bool nvmx_vpid_enabled(const struct vcpu *v)
 {
     uint32_t second_cntl;
 
@@ -1591,12 +1591,12 @@ static int nvmx_handle_vmxoff(struct cpu_user_regs *regs)
     return X86EMUL_OKAY;
 }
 
-static bool_t vvmcs_launched(struct list_head *launched_list,
-                             unsigned long vvmcs_mfn)
+static bool vvmcs_launched(struct list_head *launched_list,
+                           unsigned long vvmcs_mfn)
 {
     struct vvmcs_list *vvmcs;
     struct list_head *pos;
-    bool_t launched = 0;
+    bool launched = false;
 
     list_for_each(pos, launched_list)
     {
@@ -1679,7 +1679,7 @@ invalid_control_state:
 
 static int nvmx_handle_vmresume(struct cpu_user_regs *regs)
 {
-    bool_t launched;
+    bool launched;
     struct vcpu *v = current;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     unsigned long intr_shadow;
@@ -1715,7 +1715,7 @@ static int nvmx_handle_vmresume(struct cpu_user_regs *regs)
 
 static int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
 {
-    bool_t launched;
+    bool launched;
     struct vcpu *v = current;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     unsigned long intr_shadow;
@@ -1785,7 +1785,7 @@ static int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
 
     if ( !vvmcx_valid(v) )
     {
-        bool_t writable;
+        bool writable;
         void *vvmcx = hvm_map_guest_frame_rw(paddr_to_pfn(gpa), 1, &writable);
 
         if ( vvmcx )
@@ -1894,7 +1894,7 @@ static int nvmx_handle_vmclear(struct cpu_user_regs *regs)
     else 
     {
         /* Even if this VMCS isn't the current one, we must clear it. */
-        bool_t writable;
+        bool writable;
 
         vvmcs = hvm_map_guest_frame_rw(paddr_to_pfn(gpa), 0, &writable);
 

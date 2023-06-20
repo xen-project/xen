@@ -50,7 +50,7 @@ struct hvm_emulate_ctxt {
 
     bool is_mem_access;
 
-    bool_t set_context;
+    bool set_context;
 };
 
 enum emul_kind {

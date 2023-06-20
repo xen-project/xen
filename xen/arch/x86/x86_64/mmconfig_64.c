@@ -175,8 +175,7 @@ void pci_mmcfg_arch_disable(unsigned int idx)
            cfg->pci_segment, cfg->start_bus_number, cfg->end_bus_number);
 }
 
-bool_t pci_mmcfg_decode(unsigned long mfn, unsigned int *seg,
-                        unsigned int *bdf)
+bool pci_mmcfg_decode(unsigned long mfn, unsigned int *seg, unsigned int *bdf)
 {
     unsigned int idx;
 
@@ -197,8 +196,7 @@ bool_t pci_mmcfg_decode(unsigned long mfn, unsigned int *seg,
     return 0;
 }
 
-bool_t pci_ro_mmcfg_decode(unsigned long mfn, unsigned int *seg,
-                           unsigned int *bdf)
+bool pci_ro_mmcfg_decode(unsigned long mfn, unsigned int *seg, unsigned int *bdf)
 {
     const unsigned long *ro_map;
 

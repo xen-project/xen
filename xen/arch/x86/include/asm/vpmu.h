@@ -33,8 +33,8 @@ struct arch_vpmu_ops {
     int (*do_rdmsr)(unsigned int msr, uint64_t *msr_content);
     int (*do_interrupt)(struct cpu_user_regs *regs);
     void (*arch_vpmu_destroy)(struct vcpu *v);
-    int (*arch_vpmu_save)(struct vcpu *v, bool_t to_guest);
-    int (*arch_vpmu_load)(struct vcpu *v, bool_t from_guest);
+    int (*arch_vpmu_save)(struct vcpu *v, bool to_guest);
+    int (*arch_vpmu_load)(struct vcpu *v, bool from_guest);
     void (*arch_vpmu_dump)(const struct vcpu *v);
 
 #ifdef CONFIG_MEM_SHARING
@@ -87,12 +87,12 @@ static inline void vpmu_clear(struct vpmu_struct *vpmu)
     /* VPMU_AVAILABLE should be altered by get/put_vpmu(). */
     vpmu->flags &= VPMU_AVAILABLE;
 }
-static inline bool_t vpmu_is_set(const struct vpmu_struct *vpmu, const u32 mask)
+static inline bool vpmu_is_set(const struct vpmu_struct *vpmu, const u32 mask)
 {
     return !!(vpmu->flags & mask);
 }
-static inline bool_t vpmu_are_all_set(const struct vpmu_struct *vpmu,
-                                      const u32 mask)
+static inline bool vpmu_are_all_set(const struct vpmu_struct *vpmu,
+                                    const u32 mask)
 {
     return !!((vpmu->flags & mask) == mask);
 }
@@ -104,7 +104,7 @@ void vpmu_initialise(struct vcpu *v);
 void vpmu_destroy(struct vcpu *v);
 void vpmu_save(struct vcpu *v);
 void cf_check vpmu_save_force(void *arg);
-int vpmu_load(struct vcpu *v, bool_t from_guest);
+int vpmu_load(struct vcpu *v, bool from_guest);
 void vpmu_dump(struct vcpu *v);
 
 static inline int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)

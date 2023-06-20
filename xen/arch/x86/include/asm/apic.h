@@ -139,7 +139,7 @@ static __inline void apic_icr_write(u32 low, u32 dest)
     }
 }
 
-static __inline bool_t apic_isr_read(u8 vector)
+static __inline bool apic_isr_read(uint8_t vector)
 {
     return (apic_read(APIC_ISR + ((vector & ~0x1f) >> 1)) >>
             (vector & 0x1f)) & 1;

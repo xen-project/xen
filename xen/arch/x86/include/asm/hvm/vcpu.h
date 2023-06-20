@@ -60,7 +60,7 @@ struct hvm_vcpu_io {
      * For string instruction emulation we need to be able to signal a
      * necessary retry through other than function return codes.
      */
-    bool_t mmio_retry;
+    bool mmio_retry;
 
     unsigned long msix_unmask_address;
     unsigned long msix_snoop_address;
@@ -70,7 +70,7 @@ struct hvm_vcpu_io {
 };
 
 struct nestedvcpu {
-    bool_t nv_guestmode; /* vcpu in guestmode? */
+    bool nv_guestmode; /* vcpu in guestmode? */
     void *nv_vvmcx; /* l1 guest virtual VMCB/VMCS */
     void *nv_n1vmcx; /* VMCB/VMCS used to run l1 guest */
     void *nv_n2vmcx; /* shadow VMCB/VMCS used to run l2 guest */
@@ -85,22 +85,22 @@ struct nestedvcpu {
         struct nestedvmx nvmx;
     } u;
 
-    bool_t nv_flushp2m; /* True, when p2m table must be flushed */
+    bool nv_flushp2m; /* True, when p2m table must be flushed */
     struct p2m_domain *nv_p2m; /* used p2m table for this vcpu */
     bool stale_np2m; /* True when p2m_base in VMCx02 is no longer valid */
     uint64_t np2m_generation;
 
     struct hvm_vcpu_asid nv_n2asid;
 
-    bool_t nv_vmentry_pending;
-    bool_t nv_vmexit_pending;
-    bool_t nv_vmswitch_in_progress; /* true during vmentry/vmexit emulation */
+    bool nv_vmentry_pending;
+    bool nv_vmexit_pending;
+    bool nv_vmswitch_in_progress; /* true during vmentry/vmexit emulation */
 
     /* Does l1 guest intercept io ports 0x80 and/or 0xED ?
      * Useful to optimize io permission handling.
      */
-    bool_t nv_ioport80;
-    bool_t nv_ioportED;
+    bool nv_ioport80;
+    bool nv_ioportED;
 
     /* L2's control-resgister, just as the L2 sees them. */
     unsigned long       guest_cr[5];

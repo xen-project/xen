@@ -35,7 +35,7 @@ struct nestedvmx {
         u8            source;
     } intr;
     struct {
-        bool_t   enabled;
+        bool     enabled;
         uint32_t exit_reason;
         uint32_t exit_qual;
     } ept;

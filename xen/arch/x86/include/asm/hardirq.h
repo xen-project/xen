@@ -9,7 +9,7 @@ typedef struct {
 	unsigned int __local_irq_count;
 	unsigned int nmi_count;
 	unsigned int mce_count;
-	bool_t __mwait_wakeup;
+	bool __mwait_wakeup;
 } __cacheline_aligned irq_cpustat_t;
 
 #include <xen/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */

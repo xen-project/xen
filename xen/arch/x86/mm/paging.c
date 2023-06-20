@@ -224,7 +224,7 @@ static int paging_log_dirty_enable(struct domain *d)
     return ret;
 }
 
-static int paging_log_dirty_disable(struct domain *d, bool_t resuming)
+static int paging_log_dirty_disable(struct domain *d, bool resuming)
 {
     int ret = 1;
 
@@ -394,7 +394,7 @@ bool paging_mfn_is_dirty(const struct domain *d, mfn_t gmfn)
  * clear the bitmap and stats as well. */
 static int paging_log_dirty_op(struct domain *d,
                                struct xen_domctl_shadow_op *sc,
-                               bool_t resuming)
+                               bool resuming)
 {
     int rv = 0, clean = 0, peek = 1;
     unsigned long pages = 0;
@@ -672,7 +672,7 @@ void paging_vcpu_init(struct vcpu *v)
 #if PG_log_dirty
 int paging_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
                   XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl,
-                  bool_t resuming)
+                  bool resuming)
 {
     int rc;
 

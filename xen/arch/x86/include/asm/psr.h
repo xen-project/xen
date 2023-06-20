@@ -67,7 +67,7 @@ enum psr_type {
 
 extern struct psr_cmt *psr_cmt;
 
-static inline bool_t psr_cmt_enabled(void)
+static inline bool psr_cmt_enabled(void)
 {
     return !!psr_cmt;
 }

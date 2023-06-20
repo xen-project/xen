@@ -120,7 +120,7 @@ void __init get_mtrr_state(void)
 	rdmsrl(MSR_MTRRcap, mtrr_state.mtrr_cap);
 }
 
-static bool_t __initdata mtrr_show;
+static bool __initdata mtrr_show;
 boolean_param("mtrr.show", mtrr_show);
 
 static const char *__init mtrr_attrib_to_str(mtrr_type x)

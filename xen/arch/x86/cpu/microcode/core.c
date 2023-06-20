@@ -58,7 +58,7 @@
 
 static module_t __initdata ucode_mod;
 static signed int __initdata ucode_mod_idx;
-static bool_t __initdata ucode_mod_forced;
+static bool __initdata ucode_mod_forced;
 static unsigned int nr_cores;
 
 /*
@@ -93,7 +93,7 @@ static struct ucode_mod_blob __initdata ucode_blob;
  * By default we will NOT parse the multiboot modules to see if there is
  * cpio image with the microcode images.
  */
-static bool_t __initdata ucode_scan;
+static bool __initdata ucode_scan;
 
 /* By default, ucode loading is done in NMI handler */
 static bool ucode_in_nmi = true;

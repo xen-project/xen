@@ -150,8 +150,8 @@ void hvmemul_cancel(struct vcpu *v)
 }
 
 static int hvmemul_do_io(
-    bool_t is_mmio, paddr_t addr, unsigned long *reps, unsigned int size,
-    uint8_t dir, bool_t df, bool_t data_is_addr, uintptr_t data)
+    bool is_mmio, paddr_t addr, unsigned long *reps, unsigned int size,
+    uint8_t dir, bool df, bool data_is_addr, uintptr_t data)
 {
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
@@ -363,8 +363,8 @@ static int hvmemul_do_io(
 }
 
 static int hvmemul_do_io_buffer(
-    bool_t is_mmio, paddr_t addr, unsigned long *reps, unsigned int size,
-    uint8_t dir, bool_t df, void *buffer)
+    bool is_mmio, paddr_t addr, unsigned long *reps, unsigned int size,
+    uint8_t dir, bool df, void *buffer)
 {
     int rc;
 
@@ -421,8 +421,8 @@ static inline void hvmemul_release_page(struct page_info *page)
 }
 
 static int hvmemul_do_io_addr(
-    bool_t is_mmio, paddr_t addr, unsigned long *reps,
-    unsigned int size, uint8_t dir, bool_t df, paddr_t ram_gpa)
+    bool is_mmio, paddr_t addr, unsigned long *reps,
+    unsigned int size, uint8_t dir, bool df, paddr_t ram_gpa)
 {
     struct vcpu *v = current;
     unsigned long ram_gmfn = paddr_to_pfn(ram_gpa);
@@ -510,7 +510,7 @@ static int hvmemul_do_pio_addr(uint16_t port,
                                unsigned long *reps,
                                unsigned int size,
                                uint8_t dir,
-                               bool_t df,
+                               bool df,
                                paddr_t ram_addr)
 {
     return hvmemul_do_io_addr(0, port, reps, size, dir, df, ram_addr);
@@ -534,7 +534,7 @@ static int hvmemul_do_mmio_buffer(paddr_t mmio_gpa,
                                   unsigned long *reps,
                                   unsigned int size,
                                   uint8_t dir,
-                                  bool_t df,
+                                  bool df,
                                   void *buffer)
 {
     return hvmemul_do_io_buffer(1, mmio_gpa, reps, size, dir, df, buffer);
@@ -554,7 +554,7 @@ static int hvmemul_do_mmio_addr(paddr_t mmio_gpa,
                                 unsigned long *reps,
                                 unsigned int size,
                                 uint8_t dir,
-                                bool_t df,
+                                bool df,
                                 paddr_t ram_gpa)
 {
     return hvmemul_do_io_addr(1, mmio_gpa, reps, size, dir, df, ram_gpa);
@@ -1034,7 +1034,7 @@ static struct hvm_mmio_cache *hvmemul_find_mmio_cache(
 }
 
 static void latch_linear_to_phys(struct hvm_vcpu_io *hvio, unsigned long gla,
-                                 unsigned long gpa, bool_t write)
+                                 unsigned long gpa, bool write)
 {
     if ( hvio->mmio_access.gla_valid )
         return;
@@ -1048,7 +1048,7 @@ static void latch_linear_to_phys(struct hvm_vcpu_io *hvio, unsigned long gla,
 
 static int hvmemul_linear_mmio_access(
     unsigned long gla, unsigned int size, uint8_t dir, void *buffer,
-    uint32_t pfec, struct hvm_emulate_ctxt *hvmemul_ctxt, bool_t known_gpfn)
+    uint32_t pfec, struct hvm_emulate_ctxt *hvmemul_ctxt, bool known_gpfn)
 {
     struct hvm_vcpu_io *hvio = &current->arch.hvm.hvm_io;
     unsigned long offset = gla & ~PAGE_MASK;
@@ -1101,7 +1101,7 @@ static int hvmemul_linear_mmio_access(
 static inline int hvmemul_linear_mmio_read(
     unsigned long gla, unsigned int size, void *buffer,
     uint32_t pfec, struct hvm_emulate_ctxt *hvmemul_ctxt,
-    bool_t translate)
+    bool translate)
 {
     return hvmemul_linear_mmio_access(gla, size, IOREQ_READ, buffer,
                                       pfec, hvmemul_ctxt, translate);
@@ -1110,7 +1110,7 @@ static inline int hvmemul_linear_mmio_read(
 static inline int hvmemul_linear_mmio_write(
     unsigned long gla, unsigned int size, void *buffer,
     uint32_t pfec, struct hvm_emulate_ctxt *hvmemul_ctxt,
-    bool_t translate)
+    bool translate)
 {
     return hvmemul_linear_mmio_access(gla, size, IOREQ_WRITE, buffer,
                                       pfec, hvmemul_ctxt, translate);
@@ -1990,7 +1990,7 @@ static int cf_check hvmemul_rep_stos(
     unsigned long addr;
     paddr_t gpa;
     p2m_type_t p2mt;
-    bool_t df = !!(ctxt->regs->eflags & X86_EFLAGS_DF);
+    bool df = ctxt->regs->eflags & X86_EFLAGS_DF;
     int rc = hvmemul_virtual_to_linear(seg, offset, bytes_per_rep, reps,
                                        hvm_access_write, hvmemul_ctxt, &addr);
 

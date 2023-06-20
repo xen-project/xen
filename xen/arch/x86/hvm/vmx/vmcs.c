@@ -32,13 +32,13 @@
 #include <asm/tboot.h>
 #include <asm/apic.h>
 
-static bool_t __read_mostly opt_vpid_enabled = 1;
+static bool __read_mostly opt_vpid_enabled = true;
 boolean_param("vpid", opt_vpid_enabled);
 
-static bool_t __read_mostly opt_unrestricted_guest_enabled = 1;
+static bool __read_mostly opt_unrestricted_guest_enabled = true;
 boolean_param("unrestricted_guest", opt_unrestricted_guest_enabled);
 
-static bool_t __read_mostly opt_apicv_enabled = 1;
+static bool __read_mostly opt_apicv_enabled = true;
 boolean_param("apicv", opt_apicv_enabled);
 
 /*
@@ -168,12 +168,12 @@ u32 vmx_vmexit_control __read_mostly;
 u32 vmx_vmentry_control __read_mostly;
 u64 vmx_ept_vpid_cap __read_mostly;
 u64 vmx_vmfunc __read_mostly;
-bool_t vmx_virt_exception __read_mostly;
+bool vmx_virt_exception __read_mostly;
 
 static DEFINE_PER_CPU_READ_MOSTLY(paddr_t, vmxon_region);
 static DEFINE_PER_CPU(paddr_t, current_vmcs);
 static DEFINE_PER_CPU(struct list_head, active_vmcs_list);
-DEFINE_PER_CPU(bool_t, vmxon);
+DEFINE_PER_CPU(bool, vmxon);
 
 static u32 vmcs_revision_id __read_mostly;
 u64 __read_mostly vmx_basic_msr;
@@ -209,7 +209,7 @@ static void __init vmx_display_features(void)
 }
 
 static u32 adjust_vmx_controls(
-    const char *name, u32 ctl_min, u32 ctl_opt, u32 msr, bool_t *mismatch)
+    const char *name, u32 ctl_min, u32 ctl_opt, u32 msr, bool *mismatch)
 {
     u32 vmx_msr_low, vmx_msr_high, ctl = ctl_min | ctl_opt;
 
@@ -229,7 +229,7 @@ static u32 adjust_vmx_controls(
     return ctl;
 }
 
-static bool_t cap_check(const char *name, u32 expected, u32 saw)
+static bool cap_check(const char *name, u32 expected, u32 saw)
 {
     if ( saw != expected )
         printk("VMX %s: saw %#x expected %#x\n", name, saw, expected);
@@ -247,7 +247,7 @@ static int vmx_init_vmcs_config(bool bsp)
     u32 _vmx_vmexit_control;
     u32 _vmx_vmentry_control;
     u64 _vmx_vmfunc = 0;
-    bool_t mismatch = 0;
+    bool mismatch = false;
 
     rdmsr(MSR_IA32_VMX_BASIC, vmx_basic_msr_low, vmx_basic_msr_high);
 
@@ -802,7 +802,7 @@ struct foreign_vmcs {
 };
 static DEFINE_PER_CPU(struct foreign_vmcs, foreign_vmcs);
 
-bool_t vmx_vmcs_try_enter(struct vcpu *v)
+bool vmx_vmcs_try_enter(struct vcpu *v)
 {
     struct foreign_vmcs *fv;
 
@@ -840,7 +840,7 @@ bool_t vmx_vmcs_try_enter(struct vcpu *v)
 
 void vmx_vmcs_enter(struct vcpu *v)
 {
-    bool_t okay = vmx_vmcs_try_enter(v);
+    bool okay = vmx_vmcs_try_enter(v);
 
     ASSERT(okay);
 }
@@ -1599,10 +1599,9 @@ void vmx_clear_eoi_exit_bitmap(struct vcpu *v, u8 vector)
                 &v->arch.hvm.vmx.eoi_exitmap_changed);
 }
 
-bool_t vmx_vcpu_pml_enabled(const struct vcpu *v)
+bool vmx_vcpu_pml_enabled(const struct vcpu *v)
 {
-    return !!(v->arch.hvm.vmx.secondary_exec_control &
-              SECONDARY_EXEC_ENABLE_PML);
+    return v->arch.hvm.vmx.secondary_exec_control & SECONDARY_EXEC_ENABLE_PML;
 }
 
 int vmx_vcpu_enable_pml(struct vcpu *v)
@@ -1704,7 +1703,7 @@ void vmx_vcpu_flush_pml_buffer(struct vcpu *v)
     vmx_vmcs_exit(v);
 }
 
-bool_t vmx_domain_pml_enabled(const struct domain *d)
+bool vmx_domain_pml_enabled(const struct domain *d)
 {
     return d->arch.hvm.vmx.status & VMX_DOMAIN_PML_ENABLED;
 }
@@ -1872,7 +1871,7 @@ static void vmx_update_debug_state(struct vcpu *v)
 void cf_check vmx_do_resume(void)
 {
     struct vcpu *v = current;
-    bool_t debug_state;
+    bool debug_state;
     unsigned long host_cr4;
 
     if ( v->arch.hvm.vmx.active_cpu == smp_processor_id() )

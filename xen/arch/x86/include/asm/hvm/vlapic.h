@@ -66,7 +66,7 @@ struct vlapic {
     struct hvm_hw_lapic      hw;
     struct hvm_hw_lapic_regs *regs;
     struct {
-        bool_t               hw, regs;
+        bool                 hw, regs;
         uint32_t             id, ldr;
     }                        loaded;
     spinlock_t               esr_lock;
@@ -97,13 +97,13 @@ static inline void vlapic_set_reg(
 
 void vlapic_reg_write(struct vcpu *v, unsigned int reg, uint32_t val);
 
-bool_t is_vlapic_lvtpc_enabled(struct vlapic *vlapic);
+bool is_vlapic_lvtpc_enabled(struct vlapic *vlapic);
 
 bool vlapic_test_irq(const struct vlapic *vlapic, uint8_t vec);
 void vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig);
 
 int vlapic_has_pending_irq(struct vcpu *v);
-int vlapic_ack_pending_irq(struct vcpu *v, int vector, bool_t force_ack);
+int vlapic_ack_pending_irq(struct vcpu *v, int vector, bool force_ack);
 
 int  vlapic_init(struct vcpu *v);
 void vlapic_destroy(struct vcpu *v);
@@ -131,11 +131,11 @@ int vlapic_apicv_write(struct vcpu *v, unsigned int offset);
 
 struct vlapic *vlapic_lowest_prio(
     struct domain *d, const struct vlapic *source,
-    int short_hand, uint32_t dest, bool_t dest_mode);
+    int short_hand, uint32_t dest, bool dest_mode);
 
-bool_t vlapic_match_dest(
+bool vlapic_match_dest(
     const struct vlapic *target, const struct vlapic *source,
-    int short_hand, uint32_t dest, bool_t dest_mode);
+    int short_hand, uint32_t dest, bool dest_mode);
 
 static inline void vlapic_sync_pir_to_irr(struct vcpu *v)
 {

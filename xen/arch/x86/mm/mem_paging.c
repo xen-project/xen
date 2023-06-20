@@ -431,7 +431,7 @@ int mem_paging_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_paging_op_t) arg)
     int rc;
     xen_mem_paging_op_t mpo;
     struct domain *d;
-    bool_t copyback = 0;
+    bool copyback = false;
 
     if ( copy_from_guest(&mpo, arg, 1) )
         return -EFAULT;

@@ -39,7 +39,8 @@
 DEFINE_PERCPU_RWLOCK_GLOBAL(p2m_percpu_rwlock);
 
 /* Turn on/off host superpage page table support for hap, default on. */
-bool_t __initdata opt_hap_1gb = 1, __initdata opt_hap_2mb = 1;
+bool __initdata opt_hap_1gb = true;
+bool __initdata opt_hap_2mb = true;
 boolean_param("hap_1gb", opt_hap_1gb);
 boolean_param("hap_2mb", opt_hap_2mb);
 
@@ -272,7 +273,7 @@ void p2m_unlock_and_tlb_flush(struct p2m_domain *p2m)
 
 mfn_t p2m_get_gfn_type_access(struct p2m_domain *p2m, gfn_t gfn,
                               p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
-                              unsigned int *page_order, bool_t locked)
+                              unsigned int *page_order, bool locked)
 {
     mfn_t mfn;
 
@@ -1765,10 +1766,10 @@ void p2m_altp2m_check(struct vcpu *v, uint16_t idx)
         p2m_switch_vcpu_altp2m_by_id(v, idx);
 }
 
-bool_t p2m_switch_vcpu_altp2m_by_id(struct vcpu *v, unsigned int idx)
+bool p2m_switch_vcpu_altp2m_by_id(struct vcpu *v, unsigned int idx)
 {
     struct domain *d = v->domain;
-    bool_t rc = 0;
+    bool rc = false;
 
     if ( idx >= MAX_ALTP2M )
         return rc;

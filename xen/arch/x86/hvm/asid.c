@@ -43,7 +43,7 @@ struct hvm_asid_data {
    uint64_t core_asid_generation;
    uint32_t next_asid;
    uint32_t max_asid;
-   bool_t disabled;
+   bool disabled;
 };
 
 static DEFINE_PER_CPU(struct hvm_asid_data, hvm_asid_data);
@@ -100,7 +100,7 @@ void hvm_asid_flush_core(void)
     data->disabled = 1;
 }
 
-bool_t hvm_asid_handle_vmenter(struct hvm_vcpu_asid *asid)
+bool hvm_asid_handle_vmenter(struct hvm_vcpu_asid *asid)
 {
     struct hvm_asid_data *data = &this_cpu(hvm_asid_data);
 

@@ -59,7 +59,7 @@ static DEFINE_PER_CPU_READ_MOSTLY(paddr_t, host_vmcb);
 static DEFINE_PER_CPU(struct vmcb_struct *, host_vmcb_va);
 #endif
 
-static bool_t amd_erratum383_found __read_mostly;
+static bool amd_erratum383_found __read_mostly;
 
 /* OSVW bits */
 static uint64_t osvw_length, osvw_status;
@@ -1014,7 +1014,7 @@ static void noreturn cf_check svm_do_resume(void)
     bool debug_state = (v->domain->debugger_attached ||
                         v->domain->arch.monitor.software_breakpoint_enabled ||
                         v->domain->arch.monitor.debug_exception_enabled);
-    bool_t vcpu_guestmode = 0;
+    bool vcpu_guestmode = false;
     struct vlapic *vlapic = vcpu_vlapic(v);
 
     if ( nestedhvm_enabled(v->domain) && nestedhvm_vcpu_in_guestmode(v) )
@@ -2537,7 +2537,7 @@ static struct hvm_function_table __initdata_cf_clobber svm_function_table = {
 
 const struct hvm_function_table * __init start_svm(void)
 {
-    bool_t printed = 0;
+    bool printed = false;
 
     svm_host_osvw_reset();
 
@@ -2594,7 +2594,7 @@ void svm_vmexit_handler(void)
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     int insn_len, rc;
     vintr_t intr;
-    bool_t vcpu_guestmode = 0;
+    bool vcpu_guestmode = false;
     struct vlapic *vlapic = vcpu_vlapic(v);
 
     regs->rax = vmcb->rax;

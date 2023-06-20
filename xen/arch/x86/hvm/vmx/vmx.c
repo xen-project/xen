@@ -50,7 +50,7 @@
 #include <asm/prot-key.h>
 #include <public/arch-x86/cpuid.h>
 
-static bool_t __initdata opt_force_ept;
+static bool __initdata opt_force_ept;
 boolean_param("force-ept", opt_force_ept);
 
 static void cf_check vmx_ctxt_switch_from(struct vcpu *v);
@@ -2196,7 +2196,7 @@ static void cf_check vmx_process_isr(int isr, struct vcpu *v)
 
 static void __vmx_deliver_posted_interrupt(struct vcpu *v)
 {
-    bool_t running = v->is_running;
+    bool running = v->is_running;
 
     vcpu_unblock(v);
     /*
@@ -4793,7 +4793,7 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     struct domain *currd = curr->domain;
     u32 new_asid, old_asid;
     struct hvm_vcpu_asid *p_asid;
-    bool_t need_flush;
+    bool need_flush;
 
     ASSERT(hvmemul_cache_disabled(curr));
 

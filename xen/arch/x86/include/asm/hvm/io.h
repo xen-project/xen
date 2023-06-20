@@ -54,8 +54,8 @@ typedef int (*hvm_io_write_t)(const struct hvm_io_handler *handler,
                               uint64_t addr,
                               uint32_t size,
                               uint64_t data);
-typedef bool_t (*hvm_io_accept_t)(const struct hvm_io_handler *handler,
-                                  const ioreq_t *p);
+typedef bool (*hvm_io_accept_t)(const struct hvm_io_handler *handler,
+                                const ioreq_t *p);
 typedef void (*hvm_io_complete_t)(const struct hvm_io_handler *handler);
 
 struct hvm_io_ops {
@@ -72,7 +72,7 @@ int hvm_io_intercept(ioreq_t *p);
 
 struct hvm_io_handler *hvm_next_io_handler(struct domain *d);
 
-bool_t hvm_mmio_internal(paddr_t gpa);
+bool hvm_mmio_internal(paddr_t gpa);
 
 void register_mmio_handler(struct domain *d,
                            const struct hvm_mmio_ops *ops);
@@ -121,7 +121,7 @@ struct hvm_hw_stdvga {
     uint8_t sr[8];
     uint8_t gr_index;
     uint8_t gr[9];
-    bool_t stdvga;
+    bool stdvga;
     enum stdvga_cache_state cache;
     uint32_t latch;
     struct page_info *vram_page[64];  /* shadow of 0xa0000-0xaffff */

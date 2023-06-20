@@ -210,7 +210,7 @@ int paging_domain_init(struct domain *d);
  * manipulate the log-dirty bitmap. */
 int paging_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
                   XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl,
-                  bool_t resuming);
+                  bool resuming);
 
 /* Call when destroying a vcpu/domain */
 void paging_vcpu_teardown(struct vcpu *v);

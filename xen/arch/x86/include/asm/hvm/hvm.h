@@ -21,7 +21,7 @@ struct pirq; /* needed by pi_update_irte */
 
 #ifdef CONFIG_HVM_FEP
 /* Permit use of the Forced Emulation Prefix in HVM guests */
-extern bool_t opt_hvm_fep;
+extern bool opt_hvm_fep;
 #else
 #define opt_hvm_fep 0
 #endif
@@ -95,7 +95,7 @@ struct hvm_function_table {
     const char *name;
 
     /* Support Hardware-Assisted Paging? */
-    bool_t hap_supported;
+    bool hap_supported;
 
     /* Necessary hardware support for alternate p2m's? */
     bool altp2m_supported;
@@ -189,10 +189,10 @@ struct hvm_function_table {
     int (*nhvm_vcpu_reset)(struct vcpu *v);
     int (*nhvm_vcpu_vmexit_event)(struct vcpu *v, const struct x86_event *event);
     uint64_t (*nhvm_vcpu_p2m_base)(struct vcpu *v);
-    bool_t (*nhvm_vmcx_guest_intercepts_event)(
+    bool (*nhvm_vmcx_guest_intercepts_event)(
         struct vcpu *v, unsigned int vector, int errcode);
 
-    bool_t (*nhvm_vmcx_hap_enabled)(struct vcpu *v);
+    bool (*nhvm_vmcx_hap_enabled)(struct vcpu *v);
 
     enum hvm_intblk (*nhvm_intr_blocked)(struct vcpu *v);
     void (*nhvm_domain_relinquish_resources)(struct domain *d);
@@ -218,7 +218,7 @@ struct hvm_function_table {
     /* Alternate p2m */
     void (*altp2m_vcpu_update_p2m)(struct vcpu *v);
     void (*altp2m_vcpu_update_vmfunc_ve)(struct vcpu *v);
-    bool_t (*altp2m_vcpu_emulate_ve)(struct vcpu *v);
+    bool (*altp2m_vcpu_emulate_ve)(struct vcpu *v);
     int (*altp2m_vcpu_emulate_vmfunc)(const struct cpu_user_regs *regs);
 
     /* vmtrace */
@@ -247,7 +247,7 @@ struct hvm_function_table {
 };
 
 extern struct hvm_function_table hvm_funcs;
-extern bool_t hvm_enabled;
+extern bool hvm_enabled;
 extern s8 hvm_port80_allowed;
 
 extern const struct hvm_function_table *start_svm(void);
@@ -346,10 +346,10 @@ static inline bool hvm_virtual_to_linear_addr(
                                       access_type, active_cs, linear);
 }
 
-void *hvm_map_guest_frame_rw(unsigned long gfn, bool_t permanent,
-                             bool_t *writable);
-void *hvm_map_guest_frame_ro(unsigned long gfn, bool_t permanent);
-void hvm_unmap_guest_frame(void *p, bool_t permanent);
+void *hvm_map_guest_frame_rw(unsigned long gfn, bool permanent,
+                             bool *writable);
+void *hvm_map_guest_frame_ro(unsigned long gfn, bool permanent);
+void hvm_unmap_guest_frame(void *p, bool permanent);
 void hvm_mapped_guest_frames_mark_dirty(struct domain *d);
 
 int hvm_debug_op(struct vcpu *v, int32_t op);
@@ -616,7 +616,7 @@ static inline uint64_t nhvm_vcpu_p2m_base(struct vcpu *v)
 }
 
 /* returns true, when l1 guest intercepts the specified trap */
-static inline bool_t nhvm_vmcx_guest_intercepts_event(
+static inline bool nhvm_vmcx_guest_intercepts_event(
     struct vcpu *v, unsigned int vector, int errcode)
 {
     return alternative_call(hvm_funcs.nhvm_vmcx_guest_intercepts_event, v,
@@ -624,7 +624,7 @@ static inline bool_t nhvm_vmcx_guest_intercepts_event(
 }
 
 /* returns true when l1 guest wants to use hap to run l2 guest */
-static inline bool_t nhvm_vmcx_hap_enabled(struct vcpu *v)
+static inline bool nhvm_vmcx_hap_enabled(struct vcpu *v)
 {
     return alternative_call(hvm_funcs.nhvm_vmcx_hap_enabled, v);
 }

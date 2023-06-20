@@ -50,7 +50,7 @@ int nestedsvm_vmcb_map(struct vcpu *v, uint64_t vmcbaddr)
 
     if ( !nv->nv_vvmcx )
     {
-        bool_t writable;
+        bool writable;
         void *vvmcx = hvm_map_guest_frame_rw(paddr_to_pfn(vmcbaddr), 1,
                                              &writable);
 
@@ -346,7 +346,7 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
     return 0;
 }
 
-static int nsvm_vmrun_permissionmap(struct vcpu *v, bool_t viopm)
+static int nsvm_vmrun_permissionmap(struct vcpu *v, bool viopm)
 {
     struct svm_vcpu *arch_svm = &v->arch.hvm.svm;
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
@@ -357,7 +357,7 @@ static int nsvm_vmrun_permissionmap(struct vcpu *v, bool_t viopm)
     unsigned int i;
     enum hvm_translation_result ret;
     unsigned long *ns_viomap;
-    bool_t ioport_80 = 1, ioport_ed = 1;
+    bool ioport_80 = true, ioport_ed = true;
 
     ns_msrpm_ptr = (unsigned long *)svm->ns_cached_msrpm;
 
@@ -853,9 +853,9 @@ uint64_t cf_check nsvm_vcpu_hostcr3(struct vcpu *v)
 
 static int
 nsvm_vmcb_guest_intercepts_msr(unsigned long *msr_bitmap,
-    uint32_t msr, bool_t write)
+    uint32_t msr, bool write)
 {
-    bool_t enabled;
+    bool enabled;
     unsigned long *msr_bit;
 
     msr_bit = svm_msrbit(msr_bitmap, msr);
@@ -887,7 +887,7 @@ nsvm_vmcb_guest_intercepts_ioio(paddr_t iopm_pa, uint64_t exitinfo1)
     ioio_info_t ioinfo;
     uint16_t port;
     unsigned int size;
-    bool_t enabled;
+    bool enabled;
 
     ioinfo.bytes = exitinfo1;
     port = ioinfo.fields.port;
@@ -926,7 +926,7 @@ nsvm_vmcb_guest_intercepts_ioio(paddr_t iopm_pa, uint64_t exitinfo1)
     return NESTEDHVM_VMEXIT_INJECT;
 }
 
-static bool_t
+static bool
 nsvm_vmcb_guest_intercepts_exitcode(struct vcpu *v,
     struct cpu_user_regs *regs, uint64_t exitcode)
 {
@@ -1289,7 +1289,7 @@ enum nestedhvm_vmexits
 nestedsvm_check_intercepts(struct vcpu *v, struct cpu_user_regs *regs,
     uint64_t exitcode)
 {
-    bool_t is_intercepted;
+    bool is_intercepted;
 
     ASSERT(vcpu_nestedhvm(v).nv_vmexit_pending == 0);
     is_intercepted = nsvm_vmcb_guest_intercepts_exitcode(v, regs, exitcode);

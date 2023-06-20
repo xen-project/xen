@@ -30,7 +30,8 @@
 
 #define is_epte_present(ept_entry)      ((ept_entry)->epte & 0x7)
 #define is_epte_superpage(ept_entry)    ((ept_entry)->sp)
-static inline bool_t is_epte_valid(ept_entry_t *e)
+
+static bool is_epte_valid(const ept_entry_t *e)
 {
     /* suppress_ve alone is not considered valid, so mask it off */
     return ((e->epte & ~(1ul << 63)) != 0 && e->sa_p2mt != p2m_invalid);
@@ -239,14 +240,14 @@ static void ept_free_entry(struct p2m_domain *p2m, ept_entry_t *ept_entry, int l
     p2m_free_ptp(p2m, mfn_to_page(_mfn(ept_entry->mfn)));
 }
 
-static bool_t ept_split_super_page(struct p2m_domain *p2m,
-                                   ept_entry_t *ept_entry,
-                                   unsigned int level, unsigned int target)
+static bool ept_split_super_page(
+    struct p2m_domain *p2m, ept_entry_t *ept_entry,
+    unsigned int level, unsigned int target)
 {
     ept_entry_t new_ept, *table;
     uint64_t trunk;
     unsigned int i;
-    bool_t rv = 1;
+    bool rv = true;
 
     /* End if the entry is a leaf entry or reaches the target level. */
     if ( level <= target )
@@ -305,7 +306,7 @@ static bool_t ept_split_super_page(struct p2m_domain *p2m,
  *  GUEST_TABLE_POD:
  *   The next entry is marked populate-on-demand.
  */
-static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
+static int ept_next_level(struct p2m_domain *p2m, bool read_only,
                           ept_entry_t **table, unsigned long *gfn_remainder,
                           int next_level)
 {
@@ -678,7 +679,7 @@ static int cf_check resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
                                              _mfn(e.mfn),
                                              level * EPT_TABLE_ORDER, &ipat,
                                              e.sa_p2mt);
-                bool_t recalc = e.recalc;
+                bool recalc = e.recalc;
 
                 if ( recalc && p2m_is_changeable(e.sa_p2mt) )
                 {
@@ -760,11 +761,11 @@ static int cf_check resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
     return rc;
 }
 
-bool_t ept_handle_misconfig(uint64_t gpa)
+bool ept_handle_misconfig(uint64_t gpa)
 {
     struct vcpu *curr = current;
     struct p2m_domain *p2m = p2m_get_hostp2m(curr->domain);
-    bool_t spurious;
+    bool spurious;
     int rc;
 
     if ( altp2m_active(curr->domain) )
@@ -798,11 +799,11 @@ ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
     unsigned int i, target = order / EPT_TABLE_ORDER;
     unsigned long fn_mask = !mfn_eq(mfn, INVALID_MFN) ? (gfn | mfn_x(mfn)) : gfn;
     int ret, rc = 0;
-    bool_t entry_written = 0;
-    bool_t need_modify_vtd_table = 1;
-    bool_t vtd_pte_present = 0;
+    bool entry_written = false;
+    bool need_modify_vtd_table = true;
+    bool vtd_pte_present = false;
     unsigned int iommu_flags = p2m_get_iommu_flags(p2mt, p2ma, mfn);
-    bool_t needs_sync = 1;
+    bool needs_sync = false;
     ept_entry_t old_entry = { .epte = 0 };
     ept_entry_t new_entry = { .epte = 0 };
     struct ept_data *ept = &p2m->ept;
@@ -1007,7 +1008,7 @@ static mfn_t cf_check ept_get_entry(
     ept_entry_t *ept_entry;
     u32 index;
     int i;
-    bool_t recalc = 0;
+    bool recalc = false;
     mfn_t mfn = INVALID_MFN;
     struct ept_data *ept = &p2m->ept;
 

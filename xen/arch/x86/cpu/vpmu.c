@@ -369,7 +369,7 @@ void vpmu_save(struct vcpu *v)
     apic_write(APIC_LVTPC, PMU_APIC_VECTOR | APIC_LVT_MASKED);
 }
 
-int vpmu_load(struct vcpu *v, bool_t from_guest)
+int vpmu_load(struct vcpu *v, bool from_guest)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     int ret;

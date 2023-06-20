@@ -26,7 +26,7 @@ void hvm_asid_flush_core(void);
 
 /* Called before entry to guest context. Checks ASID allocation, returns a
  * boolean indicating whether all ASIDs must be flushed. */
-bool_t hvm_asid_handle_vmenter(struct hvm_vcpu_asid *asid);
+bool hvm_asid_handle_vmenter(struct hvm_vcpu_asid *asid);
 
 #endif /* __ASM_X86_HVM_ASID_H__ */
 

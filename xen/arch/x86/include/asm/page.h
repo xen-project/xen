@@ -378,7 +378,7 @@ static inline unsigned int cacheattr_to_pte_flags(unsigned int cacheattr)
 }
 
 /* return true if permission increased */
-static inline bool_t
+static inline bool
 perms_strictly_increased(uint32_t old_flags, uint32_t new_flags)
 /* Given the flags of two entries, are the new flags a strict
  * increase in rights over the old ones? */

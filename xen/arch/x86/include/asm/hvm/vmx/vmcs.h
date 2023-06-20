@@ -143,7 +143,7 @@ struct vmx_vcpu {
     unsigned long        host_cr0;
 
     /* Do we need to tolerate a spurious EPT_MISCONFIG VM exit? */
-    bool_t               ept_spurious_misconfig;
+    bool                 ept_spurious_misconfig;
 
     /* Processor Trace configured and enabled for the vcpu. */
     bool                 ipt_active;
@@ -183,7 +183,7 @@ struct vmx_vcpu {
 int vmx_create_vmcs(struct vcpu *v);
 void vmx_destroy_vmcs(struct vcpu *v);
 void vmx_vmcs_enter(struct vcpu *v);
-bool_t __must_check vmx_vmcs_try_enter(struct vcpu *v);
+bool __must_check vmx_vmcs_try_enter(struct vcpu *v);
 void vmx_vmcs_exit(struct vcpu *v);
 void vmx_vmcs_reload(struct vcpu *v);
 
@@ -663,13 +663,13 @@ void virtual_vmcs_vmwrite(const struct vcpu *, u32 encoding, u64 val);
 enum vmx_insn_errno virtual_vmcs_vmwrite_safe(const struct vcpu *v,
                                               u32 vmcs_encoding, u64 val);
 
-DECLARE_PER_CPU(bool_t, vmxon);
+DECLARE_PER_CPU(bool, vmxon);
 
-bool_t vmx_vcpu_pml_enabled(const struct vcpu *v);
+bool vmx_vcpu_pml_enabled(const struct vcpu *v);
 int vmx_vcpu_enable_pml(struct vcpu *v);
 void vmx_vcpu_disable_pml(struct vcpu *v);
 void vmx_vcpu_flush_pml_buffer(struct vcpu *v);
-bool_t vmx_domain_pml_enabled(const struct domain *d);
+bool vmx_domain_pml_enabled(const struct domain *d);
 int vmx_domain_enable_pml(struct domain *d);
 void vmx_domain_disable_pml(struct domain *d);
 void vmx_domain_flush_pml_buffers(struct domain *d);

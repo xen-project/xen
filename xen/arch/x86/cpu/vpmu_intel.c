@@ -52,7 +52,7 @@
 
 /* Alias registers (0x4c1) for full-width writes to PMCs */
 #define MSR_PMC_ALIAS_MASK       (~(MSR_IA32_PERFCTR0 ^ MSR_IA32_A_PERFCTR0))
-static bool_t __read_mostly full_width_write;
+static bool __read_mostly full_width_write;
 
 /*
  * MSR_CORE_PERF_FIXED_CTR_CTRL contains the configuration of all fixed
@@ -607,7 +607,7 @@ static int cf_check core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
         tmp = msr - MSR_P6_EVNTSEL(0);
         if ( tmp >= 0 && tmp < arch_pmc_cnt )
         {
-            bool_t blocked = 0;
+            bool blocked = false;
             uint64_t umaskevent = msr_content & MSR_IA32_CMT_EVTSEL_UE_MASK;
             struct xen_pmu_cntr_pair *xen_pmu_cntr_pair =
                 vpmu_reg_pointer(core2_vpmu_cxt, arch_counters);
@@ -818,7 +818,7 @@ static int cf_check core2_vpmu_initialise(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     u64 msr_content;
-    static bool_t ds_warned;
+    static bool ds_warned;
 
     if ( v->domain->arch.cpuid->basic.pmu_version <= 1 ||
          v->domain->arch.cpuid->basic.pmu_version >= 6 )

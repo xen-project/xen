@@ -324,7 +324,7 @@ bool relocate_portio_handler(struct domain *d, unsigned int old_port,
     return false;
 }
 
-bool_t hvm_mmio_internal(paddr_t gpa)
+bool hvm_mmio_internal(paddr_t gpa)
 {
     const struct hvm_io_handler *handler;
     const struct hvm_io_ops *ops;

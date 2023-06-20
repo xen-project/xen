@@ -126,7 +126,7 @@ static void stdvga_cache_disable(struct hvm_hw_stdvga *s)
     s->cache = STDVGA_CACHE_DISABLED;
 }
 
-static bool_t stdvga_cache_is_enabled(const struct hvm_hw_stdvga *s)
+static bool stdvga_cache_is_enabled(const struct hvm_hw_stdvga *s)
 {
     return s->cache == STDVGA_CACHE_ENABLED;
 }

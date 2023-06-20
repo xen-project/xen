@@ -191,10 +191,10 @@ uint32_t vlapic_set_ppr(struct vlapic *vlapic)
    return ppr;
 }
 
-static bool_t vlapic_match_logical_addr(const struct vlapic *vlapic,
-                                        uint32_t mda)
+static bool vlapic_match_logical_addr(const struct vlapic *vlapic,
+                                      uint32_t mda)
 {
-    bool_t result = 0;
+    bool result = false;
     uint32_t logical_id = vlapic_get_reg(vlapic, APIC_LDR);
 
     if ( vlapic_x2apic_mode(vlapic) )
@@ -224,9 +224,9 @@ static bool_t vlapic_match_logical_addr(const struct vlapic *vlapic,
     return result;
 }
 
-bool_t vlapic_match_dest(
+bool vlapic_match_dest(
     const struct vlapic *target, const struct vlapic *source,
-    int short_hand, uint32_t dest, bool_t dest_mode)
+    int short_hand, uint32_t dest, bool dest_mode)
 {
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "target %p, source %p, dest %#x, "
                 "dest_mode %#x, short_hand %#x",
@@ -264,7 +264,7 @@ static void vlapic_init_sipi_one(struct vcpu *target, uint32_t icr)
     switch ( icr & APIC_MODE_MASK )
     {
     case APIC_DM_INIT: {
-        bool_t fpu_initialised;
+        bool fpu_initialised;
         int rc;
 
         /* No work on INIT de-assert for P4-type APIC. */
@@ -307,7 +307,7 @@ static void cf_check vlapic_init_sipi_action(void *data)
     uint32_t icr = vcpu_vlapic(origin)->init_sipi.icr;
     uint32_t dest = vcpu_vlapic(origin)->init_sipi.dest;
     uint32_t short_hand = icr & APIC_SHORT_MASK;
-    bool_t dest_mode = !!(icr & APIC_DEST_MASK);
+    bool dest_mode = icr & APIC_DEST_MASK;
     struct vcpu *v;
 
     if ( icr == 0 )
@@ -349,7 +349,8 @@ static void vlapic_accept_irq(struct vcpu *v, uint32_t icr_low)
     case APIC_DM_NMI:
         if ( !test_and_set_bool(v->arch.nmi_pending) )
         {
-            bool_t wake = 0;
+            bool wake = false;
+
             domain_lock(v->domain);
             if ( v->is_initialised )
                 wake = test_and_clear_bit(_VPF_down, &v->pause_flags);
@@ -373,7 +374,7 @@ static void vlapic_accept_irq(struct vcpu *v, uint32_t icr_low)
 
 struct vlapic *vlapic_lowest_prio(
     struct domain *d, const struct vlapic *source,
-    int short_hand, uint32_t dest, bool_t dest_mode)
+    int short_hand, uint32_t dest, bool dest_mode)
 {
     int old = hvm_domain_irq(d)->round_robin_prev_vcpu;
     uint32_t ppr, target_ppr = UINT_MAX;
@@ -457,8 +458,8 @@ void vlapic_handle_EOI(struct vlapic *vlapic, u8 vector)
     hvm_dpci_msi_eoi(d, vector);
 }
 
-static bool_t is_multicast_dest(struct vlapic *vlapic, unsigned int short_hand,
-                                uint32_t dest, bool_t dest_mode)
+static bool is_multicast_dest(struct vlapic *vlapic, unsigned int short_hand,
+                              uint32_t dest, bool dest_mode)
 {
     if ( vlapic_domain(vlapic)->max_vcpus <= 2 )
         return 0;
@@ -482,7 +483,7 @@ void vlapic_ipi(
 {
     unsigned int dest;
     unsigned int short_hand = icr_low & APIC_SHORT_MASK;
-    bool_t dest_mode = !!(icr_low & APIC_DEST_MASK);
+    bool dest_mode = icr_low & APIC_DEST_MASK;
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "icr = 0x%08x:%08x", icr_high, icr_low);
 
@@ -523,7 +524,7 @@ void vlapic_ipi(
         /* fall through */
     default: {
         struct vcpu *v;
-        bool_t batch = is_multicast_dest(vlapic, short_hand, dest, dest_mode);
+        bool batch = is_multicast_dest(vlapic, short_hand, dest, dest_mode);
 
         if ( batch )
             cpu_raise_softirq_batch_begin();
@@ -1342,7 +1343,7 @@ int vlapic_has_pending_irq(struct vcpu *v)
     return irr;
 }
 
-int vlapic_ack_pending_irq(struct vcpu *v, int vector, bool_t force_ack)
+int vlapic_ack_pending_irq(struct vcpu *v, int vector, bool force_ack)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
     int isr;
@@ -1377,7 +1378,7 @@ int vlapic_ack_pending_irq(struct vcpu *v, int vector, bool_t force_ack)
     return 1;
 }
 
-bool_t is_vlapic_lvtpc_enabled(struct vlapic *vlapic)
+bool is_vlapic_lvtpc_enabled(struct vlapic *vlapic)
 {
     return (vlapic_enabled(vlapic) &&
             !(vlapic_get_reg(vlapic, APIC_LVTPC) & APIC_LVT_MASKED));

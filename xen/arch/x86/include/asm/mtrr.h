@@ -44,7 +44,7 @@ struct mtrr_state {
 
 	u64       mtrr_cap;
 	/* ranges in var MSRs are overlapped or not:0(no overlapped) */
-	bool_t    overlapped;
+	bool      overlapped;
 };
 extern struct mtrr_state mtrr_state;
 
@@ -68,19 +68,19 @@ extern void mtrr_aps_sync_begin(void);
 extern void mtrr_aps_sync_end(void);
 extern void mtrr_bp_restore(void);
 
-extern bool_t mtrr_var_range_msr_set(struct domain *d, struct mtrr_state *m,
-                                     uint32_t msr, uint64_t msr_content);
-extern bool_t mtrr_fix_range_msr_set(struct domain *d, struct mtrr_state *m,
-                                     uint32_t row, uint64_t msr_content);
-extern bool_t mtrr_def_type_msr_set(struct domain *d, struct mtrr_state *m,
-                                    uint64_t msr_content);
+extern bool mtrr_var_range_msr_set(struct domain *d, struct mtrr_state *m,
+                                   uint32_t msr, uint64_t msr_content);
+extern bool mtrr_fix_range_msr_set(struct domain *d, struct mtrr_state *m,
+                                   uint32_t row, uint64_t msr_content);
+extern bool mtrr_def_type_msr_set(struct domain *d, struct mtrr_state *m,
+                                  uint64_t msr_content);
 #ifdef CONFIG_HVM
 extern void memory_type_changed(struct domain *d);
 #else
 static inline void memory_type_changed(struct domain *d) {}
 #endif
 
-extern bool_t pat_msr_set(uint64_t *pat, uint64_t msr);
+extern bool pat_msr_set(uint64_t *pat, uint64_t msr);
 
 bool is_var_mtrr_overlapped(const struct mtrr_state *m);
 bool mtrr_pat_not_equal(const struct vcpu *vd, const struct vcpu *vs);

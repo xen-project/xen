@@ -31,7 +31,7 @@
 static unsigned int __read_mostly num_counters;
 static const u32 __read_mostly *counters;
 static const u32 __read_mostly *ctrls;
-static bool_t __read_mostly k7_counters_mirrored;
+static bool __read_mostly k7_counters_mirrored;
 
 #define F10H_NUM_COUNTERS   4
 #define F15H_NUM_COUNTERS   6
@@ -217,7 +217,7 @@ static int cf_check amd_vpmu_load(struct vcpu *v, bool from_guest)
 
     if ( from_guest )
     {
-        bool_t is_running = 0;
+        bool is_running = false;
         struct xen_pmu_amd_ctxt *guest_ctxt = &vpmu->xenpmu_data->pmu.c.amd;
 
         ASSERT(!has_vlapic(v->domain));

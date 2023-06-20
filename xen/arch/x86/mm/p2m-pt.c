@@ -213,7 +213,7 @@ p2m_free_entry(struct p2m_domain *p2m, l1_pgentry_t *p2m_entry, int page_order)
 static int
 p2m_next_level(struct p2m_domain *p2m, void **table,
                unsigned long *gfn_remainder, unsigned long gfn, u32 shift,
-               u32 max, unsigned int level, bool_t unmap)
+               u32 max, unsigned int level, bool unmap)
 {
     l1_pgentry_t *p2m_entry, new_entry;
     void *next;
@@ -765,7 +765,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
 static mfn_t cf_check
 p2m_pt_get_entry(struct p2m_domain *p2m, gfn_t gfn_,
                  p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
-                 unsigned int *page_order, bool_t *sve)
+                 unsigned int *page_order, bool *sve)
 {
     mfn_t mfn;
     unsigned long gfn = gfn_x(gfn_);
@@ -774,7 +774,7 @@ p2m_pt_get_entry(struct p2m_domain *p2m, gfn_t gfn_,
     l1_pgentry_t *l1e;
     unsigned int flags;
     p2m_type_t l1t;
-    bool_t recalc;
+    bool recalc;
 
     ASSERT(paging_mode_translate(p2m->domain));
 

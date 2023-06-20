@@ -16,7 +16,7 @@
 static unsigned long *shadow_io_bitmap[3];
 
 /* Nested VCPU */
-bool_t
+bool
 nestedhvm_vcpu_in_guestmode(struct vcpu *v)
 {
     return vcpu_nestedhvm(v).nv_guestmode;
@@ -155,7 +155,7 @@ static int __init cf_check nestedhvm_setup(void)
 __initcall(nestedhvm_setup);
 
 unsigned long *
-nestedhvm_vcpu_iomap_get(bool_t ioport_80, bool_t ioport_ed)
+nestedhvm_vcpu_iomap_get(bool ioport_80, bool ioport_ed)
 {
     int i;
 

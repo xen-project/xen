@@ -522,7 +522,7 @@ decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
 {
     unsigned long ret = 0, i, n;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    bool_t steal_for_cache;
+    bool steal_for_cache;
     long pod = 0, ram = 0;
 
     gfn_lock(p2m, gfn, order);

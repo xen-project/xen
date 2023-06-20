@@ -69,7 +69,7 @@
 
 #include <compat/hvm/hvm_op.h>
 
-bool_t __read_mostly hvm_enabled;
+bool __read_mostly hvm_enabled;
 
 #ifdef DBG_LEVEL_0
 unsigned int opt_hvm_debug_level __read_mostly;
@@ -87,12 +87,12 @@ unsigned long __section(".bss.page_aligned") __aligned(PAGE_SIZE)
     hvm_io_bitmap[HVM_IOBITMAP_SIZE / BYTES_PER_LONG];
 
 /* Xen command-line option to enable HAP */
-static bool_t __initdata opt_hap_enabled = 1;
+static bool __initdata opt_hap_enabled = true;
 boolean_param("hap", opt_hap_enabled);
 
 #ifndef opt_hvm_fep
 /* Permit use of the Forced Emulation Prefix in HVM guests */
-bool_t __read_mostly opt_hvm_fep;
+bool __read_mostly opt_hvm_fep;
 boolean_param("hvm_fep", opt_hvm_fep);
 #endif
 static const char __initconst warning_hvm_fep[] =
@@ -102,7 +102,7 @@ static const char __initconst warning_hvm_fep[] =
     "Please *DO NOT* use this in production.\n";
 
 /* Xen command-line option to enable altp2m */
-static bool_t __initdata opt_altp2m_enabled = 0;
+static bool __initdata opt_altp2m_enabled;
 boolean_param("altp2m", opt_altp2m_enabled);
 
 static int cf_check cpu_callback(
@@ -1857,7 +1857,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     /* Check access permissions first, then handle faults */
     if ( !mfn_eq(mfn, INVALID_MFN) )
     {
-        bool_t violation;
+        bool violation;
 
         /* If the access is against the permissions, then send to vm_event */
         switch (p2ma)
@@ -1914,7 +1914,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
             /* Should #VE be emulated for this fault? */
             if ( p2m_is_altp2m(p2m) && !cpu_has_vmx_virt_exceptions )
             {
-                bool_t sve;
+                bool sve;
 
                 p2m->get_entry(p2m, _gfn(gfn), &p2mt, &p2ma, 0, NULL, &sve);
 
@@ -2125,7 +2125,7 @@ int hvm_set_efer(uint64_t value)
 }
 
 /* Exit UC mode only if all VCPUs agree on MTRR/PAT and are not in no_fill. */
-static bool_t domain_exit_uc_mode(struct vcpu *v)
+static bool domain_exit_uc_mode(struct vcpu *v)
 {
     struct domain *d = v->domain;
     struct vcpu *vs;
@@ -2142,7 +2142,7 @@ static bool_t domain_exit_uc_mode(struct vcpu *v)
     return 1;
 }
 
-static void hvm_set_uc_mode(struct vcpu *v, bool_t is_in_uc_mode)
+static void hvm_set_uc_mode(struct vcpu *v, bool is_in_uc_mode)
 {
     v->domain->arch.hvm.is_in_uc_mode = is_in_uc_mode;
     shadow_blow_tables_per_domain(v->domain);
@@ -2705,8 +2705,8 @@ struct hvm_write_map {
 
 /* On non-NULL return, we leave this function holding an additional 
  * ref on the underlying mfn, if any */
-static void *_hvm_map_guest_frame(unsigned long gfn, bool_t permanent,
-                                  bool_t *writable)
+static void *_hvm_map_guest_frame(unsigned long gfn, bool permanent,
+                                  bool *writable)
 {
     void *map;
     p2m_type_t p2mt;
@@ -2750,19 +2750,19 @@ static void *_hvm_map_guest_frame(unsigned long gfn, bool_t permanent,
     return map;
 }
 
-void *hvm_map_guest_frame_rw(unsigned long gfn, bool_t permanent,
-                             bool_t *writable)
+void *hvm_map_guest_frame_rw(unsigned long gfn, bool permanent,
+                             bool *writable)
 {
     *writable = 1;
     return _hvm_map_guest_frame(gfn, permanent, writable);
 }
 
-void *hvm_map_guest_frame_ro(unsigned long gfn, bool_t permanent)
+void *hvm_map_guest_frame_ro(unsigned long gfn, bool permanent)
 {
     return _hvm_map_guest_frame(gfn, permanent, NULL);
 }
 
-void hvm_unmap_guest_frame(void *p, bool_t permanent)
+void hvm_unmap_guest_frame(void *p, bool permanent)
 {
     mfn_t mfn;
     struct page_info *page;
@@ -2806,7 +2806,7 @@ void hvm_mapped_guest_frames_mark_dirty(struct domain *d)
     spin_unlock(&d->arch.hvm.write_map.lock);
 }
 
-static void *hvm_map_entry(unsigned long va, bool_t *writable)
+static void *hvm_map_entry(unsigned long va, bool *writable)
 {
     unsigned long gfn;
     uint32_t pfec;
@@ -2851,7 +2851,7 @@ static int task_switch_load_seg(
     struct segment_register desctab, segr;
     seg_desc_t *pdesc = NULL, desc;
     u8 dpl, rpl;
-    bool_t writable;
+    bool writable;
     int fault_type = X86_EXC_TS;
     struct vcpu *v = current;
 
@@ -3030,7 +3030,7 @@ void hvm_task_switch(
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct segment_register gdt, tr, prev_tr, segr;
     seg_desc_t *optss_desc = NULL, *nptss_desc = NULL, tss_desc;
-    bool_t otd_writable, ntd_writable;
+    bool otd_writable, ntd_writable;
     unsigned int eflags, new_cpl;
     pagefault_info_t pfinfo;
     int exn_raised, rc;
@@ -4642,7 +4642,7 @@ static int do_altp2m_op(
     case HVMOP_altp2m_set_domain_state:
     {
         struct vcpu *v;
-        bool_t ostate;
+        bool ostate;
 
         if ( nestedhvm_enabled(d) )
         {

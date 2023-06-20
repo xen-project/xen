@@ -39,11 +39,11 @@ int pci_conf_write_intercept(unsigned int seg, unsigned int bdf,
                              uint32_t *data);
 int pci_msi_conf_write_intercept(struct pci_dev *pdev, unsigned int reg,
                                  unsigned int size, uint32_t *data);
-bool_t pci_mmcfg_decode(unsigned long mfn, unsigned int *seg,
-                        unsigned int *bdf);
+bool pci_mmcfg_decode(unsigned long mfn, unsigned int *seg,
+                      unsigned int *bdf);
 
-bool_t pci_ro_mmcfg_decode(unsigned long mfn, unsigned int *seg,
-                           unsigned int *bdf);
+bool pci_ro_mmcfg_decode(unsigned long mfn, unsigned int *seg,
+                         unsigned int *bdf);
 
 /* MMCFG external variable defines */
 extern int pci_mmcfg_config_num;

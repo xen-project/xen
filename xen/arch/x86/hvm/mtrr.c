@@ -359,7 +359,7 @@ uint32_t get_pat_flags(struct vcpu *v,
     return pat_type_2_pte_flags(pat_entry_value);
 }
 
-static inline bool_t valid_mtrr_type(uint8_t type)
+static inline bool valid_mtrr_type(uint8_t type)
 {
     switch ( type )
     {
@@ -373,8 +373,8 @@ static inline bool_t valid_mtrr_type(uint8_t type)
     return 0;
 }
 
-bool_t mtrr_def_type_msr_set(struct domain *d, struct mtrr_state *m,
-                             uint64_t msr_content)
+bool mtrr_def_type_msr_set(struct domain *d, struct mtrr_state *m,
+                           uint64_t msr_content)
 {
     uint8_t def_type = msr_content & 0xff;
     bool fixed_enabled = MASK_EXTR(msr_content, MTRRdefType_FE);
@@ -405,8 +405,8 @@ bool_t mtrr_def_type_msr_set(struct domain *d, struct mtrr_state *m,
     return 1;
 }
 
-bool_t mtrr_fix_range_msr_set(struct domain *d, struct mtrr_state *m,
-                              uint32_t row, uint64_t msr_content)
+bool mtrr_fix_range_msr_set(struct domain *d, struct mtrr_state *m,
+                            uint32_t row, uint64_t msr_content)
 {
     uint64_t *fixed_range_base = (uint64_t *)m->fixed_ranges;
 
@@ -428,7 +428,7 @@ bool_t mtrr_fix_range_msr_set(struct domain *d, struct mtrr_state *m,
     return 1;
 }
 
-bool_t mtrr_var_range_msr_set(
+bool mtrr_var_range_msr_set(
     struct domain *d, struct mtrr_state *m, uint32_t msr, uint64_t msr_content)
 {
     uint32_t index, phys_addr;

@@ -27,7 +27,7 @@
 #endif
 #define P2M_DEBUGGING 0
 
-extern bool_t opt_hap_1gb, opt_hap_2mb;
+extern bool opt_hap_1gb, opt_hap_2mb;
 
 /*
  * The upper levels of the p2m pagetable always contain full rights; all 
@@ -245,7 +245,7 @@ struct p2m_domain {
                                     p2m_access_t *p2ma,
                                     p2m_query_t q,
                                     unsigned int *page_order,
-                                    bool_t *sve);
+                                    bool *sve);
     int                (*recalc)(struct p2m_domain *p2m,
                                  unsigned long gfn);
     void               (*enable_hardware_log_dirty)(struct p2m_domain *p2m);
@@ -284,11 +284,11 @@ struct p2m_domain {
      */
     void (*tlb_flush)(struct p2m_domain *p2m);
     unsigned int defer_flush;
-    bool_t need_flush;
+    bool need_flush;
 
     /* If true, and an access fault comes in and there is no vm_event listener, 
      * pause domain.  Otherwise, remove access restrictions. */
-    bool_t       access_required;
+    bool         access_required;
 
     /* Highest guest frame that's ever been mapped in the p2m */
     unsigned long max_mapped_pfn;
@@ -420,17 +420,17 @@ void np2m_schedule(int dir);
 static inline void np2m_schedule(int dir) {}
 #endif
 
-static inline bool_t p2m_is_hostp2m(const struct p2m_domain *p2m)
+static inline bool p2m_is_hostp2m(const struct p2m_domain *p2m)
 {
     return p2m->p2m_class == p2m_host;
 }
 
-static inline bool_t p2m_is_nestedp2m(const struct p2m_domain *p2m)
+static inline bool p2m_is_nestedp2m(const struct p2m_domain *p2m)
 {
     return p2m->p2m_class == p2m_nested;
 }
 
-static inline bool_t p2m_is_altp2m(const struct p2m_domain *p2m)
+static inline bool p2m_is_altp2m(const struct p2m_domain *p2m)
 {
     return p2m->p2m_class == p2m_alternate;
 }
@@ -450,11 +450,11 @@ void p2m_unlock_and_tlb_flush(struct p2m_domain *p2m);
 
 mfn_t __nonnull(3, 4) p2m_get_gfn_type_access(
     struct p2m_domain *p2m, gfn_t gfn, p2m_type_t *t,
-    p2m_access_t *a, p2m_query_t q, unsigned int *page_order, bool_t locked);
+    p2m_access_t *a, p2m_query_t q, unsigned int *page_order, bool locked);
 
 static inline mfn_t __nonnull(3, 4) _get_gfn_type_access(
     struct p2m_domain *p2m, gfn_t gfn, p2m_type_t *t,
-    p2m_access_t *a, p2m_query_t q, unsigned int *page_order, bool_t locked)
+    p2m_access_t *a, p2m_query_t q, unsigned int *page_order, bool locked)
 {
     if ( !p2m || !paging_mode_translate(p2m->domain) )
     {
@@ -888,7 +888,7 @@ static inline bool p2m_set_altp2m(struct vcpu *v, unsigned int idx)
 }
 
 /* Switch alternate p2m for a single vcpu */
-bool_t p2m_switch_vcpu_altp2m_by_id(struct vcpu *v, unsigned int idx);
+bool p2m_switch_vcpu_altp2m_by_id(struct vcpu *v, unsigned int idx);
 
 /* Check to see if vcpu should be switched to a different p2m. */
 void p2m_altp2m_check(struct vcpu *v, uint16_t idx);
