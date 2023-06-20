@@ -91,22 +91,14 @@ static const unsigned int regs_off =
  * 1 (or another value != 0) into it.
  * There exist no errata and the real cause of this behaviour is unknown.
  */
-bool_t __read_mostly is_pmc_quirk;
-
-static void check_pmc_quirk(void)
-{
-    if ( current_cpu_data.x86 == 6 )
-        is_pmc_quirk = 1;
-    else
-        is_pmc_quirk = 0;    
-}
+static bool __ro_after_init pmc_quirk;
 
 static void handle_pmc_quirk(u64 msr_content)
 {
     int i;
     u64 val;
 
-    if ( !is_pmc_quirk )
+    if ( !pmc_quirk )
         return;
 
     val = msr_content;
@@ -791,8 +783,9 @@ static int cf_check core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
     rdmsrl(MSR_CORE_PERF_GLOBAL_STATUS, msr_content);
     if ( msr_content )
     {
-        if ( is_pmc_quirk )
+        if ( pmc_quirk )
             handle_pmc_quirk(msr_content);
+
         core2_vpmu_cxt->global_status |= msr_content;
         msr_content &= ~global_ovf_ctrl_mask;
         wrmsrl(MSR_CORE_PERF_GLOBAL_OVF_CTRL, msr_content);
@@ -967,7 +960,8 @@ const struct arch_vpmu_ops *__init core2_vpmu_init(void)
               sizeof(uint64_t) * fixed_pmc_cnt +
               sizeof(struct xen_pmu_cntr_pair) * arch_pmc_cnt;
 
-    check_pmc_quirk();
+    /* TODO: It's clearly incorrect for this to quirk all Intel Fam6 CPUs. */
+    pmc_quirk = current_cpu_data.x86 == 6;
 
     if ( sizeof(struct xen_pmu_data) + sizeof(uint64_t) * fixed_pmc_cnt +
          sizeof(struct xen_pmu_cntr_pair) * arch_pmc_cnt > PAGE_SIZE )
