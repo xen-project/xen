@@ -183,6 +183,33 @@
   variables:
     <<: *gcc
 
+.ppc64le-cross-build-tmpl:
+  <<: *build
+  variables:
+    XEN_TARGET_ARCH: ppc64
+  tags:
+    - x86_64
+
+.ppc64le-cross-build:
+  extends: .ppc64le-cross-build-tmpl
+  variables:
+    debug: n
+
+.ppc64le-cross-build-debug:
+  extends: .ppc64le-cross-build-tmpl
+  variables:
+    debug: y
+
+.gcc-ppc64le-cross-build:
+  extends: .ppc64le-cross-build
+  variables:
+    <<: *gcc
+
+.gcc-ppc64le-cross-build-debug:
+  extends: .ppc64le-cross-build-debug
+  variables:
+    <<: *gcc
+
 .yocto-test:
   stage: build
   image: registry.gitlab.com/xen-project/xen/${CONTAINER}
@@ -512,6 +539,39 @@ archlinux-current-gcc-riscv64-debug-randconfig:
   variables:
     CONTAINER: archlinux:current-riscv64
     KBUILD_DEFCONFIG: tiny64_defconfig
+    RANDCONFIG: y
+    EXTRA_FIXED_RANDCONFIG:
+      CONFIG_COVERAGE=n
+
+# Power cross-build
+debian-bullseye-gcc-ppc64le:
+  extends: .gcc-ppc64le-cross-build
+  variables:
+    CONTAINER: debian:bullseye-ppc64le
+    KBUILD_DEFCONFIG: openpower_defconfig
+    HYPERVISOR_ONLY: y
+
+debian-bullseye-gcc-ppc64le-debug:
+  extends: .gcc-ppc64le-cross-build-debug
+  variables:
+    CONTAINER: debian:bullseye-ppc64le
+    KBUILD_DEFCONFIG: openpower_defconfig
+    HYPERVISOR_ONLY: y
+
+debian-bullseye-gcc-ppc64le-randconfig:
+  extends: .gcc-ppc64le-cross-build
+  variables:
+    CONTAINER: debian:bullseye-ppc64le
+    KBUILD_DEFCONFIG: openpower_defconfig
+    RANDCONFIG: y
+    EXTRA_FIXED_RANDCONFIG:
+      CONFIG_COVERAGE=n
+
+debian-bullseye-gcc-ppc64le-debug-randconfig:
+  extends: .gcc-ppc64le-cross-build-debug
+  variables:
+    CONTAINER: debian:bullseye-ppc64le
+    KBUILD_DEFCONFIG: openpower_defconfig
     RANDCONFIG: y
     EXTRA_FIXED_RANDCONFIG:
       CONFIG_COVERAGE=n
