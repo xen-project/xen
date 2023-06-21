@@ -5,18 +5,11 @@
 
 #include <asm/types.h>
 
-#if defined(__SIZE_TYPE__)
 typedef __SIZE_TYPE__ size_t;
-#else
-typedef unsigned long size_t;
-#endif
+
 typedef signed long ssize_t;
 
-#if defined(__PTRDIFF_TYPE__)
 typedef __PTRDIFF_TYPE__ ptrdiff_t;
-#else
-typedef signed long ptrdiff_t;
-#endif
 
 #define BITS_TO_LONGS(bits) \
     (((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
