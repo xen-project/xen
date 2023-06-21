@@ -548,21 +548,21 @@ debian-bullseye-gcc-ppc64le:
   extends: .gcc-ppc64le-cross-build
   variables:
     CONTAINER: debian:bullseye-ppc64le
-    KBUILD_DEFCONFIG: openpower_defconfig
+    KBUILD_DEFCONFIG: ppc64_defconfig
     HYPERVISOR_ONLY: y
 
 debian-bullseye-gcc-ppc64le-debug:
   extends: .gcc-ppc64le-cross-build-debug
   variables:
     CONTAINER: debian:bullseye-ppc64le
-    KBUILD_DEFCONFIG: openpower_defconfig
+    KBUILD_DEFCONFIG: ppc64_defconfig
     HYPERVISOR_ONLY: y
 
 debian-bullseye-gcc-ppc64le-randconfig:
   extends: .gcc-ppc64le-cross-build
   variables:
     CONTAINER: debian:bullseye-ppc64le
-    KBUILD_DEFCONFIG: openpower_defconfig
+    KBUILD_DEFCONFIG: ppc64_defconfig
     RANDCONFIG: y
     EXTRA_FIXED_RANDCONFIG:
       CONFIG_COVERAGE=n
@@ -571,7 +571,7 @@ debian-bullseye-gcc-ppc64le-debug-randconfig:
   extends: .gcc-ppc64le-cross-build-debug
   variables:
     CONTAINER: debian:bullseye-ppc64le
-    KBUILD_DEFCONFIG: openpower_defconfig
+    KBUILD_DEFCONFIG: ppc64_defconfig
     RANDCONFIG: y
     EXTRA_FIXED_RANDCONFIG:
       CONFIG_COVERAGE=n
