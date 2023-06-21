@@ -56,17 +56,24 @@ static int cf_check handle_speaker_io(
 #define get_guest_time(v) \
    (is_hvm_vcpu(v) ? hvm_get_guest_time(v) : (u64)get_s_time())
 
-static int pit_get_count(PITState *pit, int channel)
+static uint64_t get_count(PITState *pit, unsigned int channel)
 {
-    uint64_t d;
-    int  counter;
-    struct hvm_hw_pit_channel *c = &pit->hw.channels[channel];
-    struct vcpu *v = vpit_vcpu(pit);
+    const struct hvm_hw_pit_channel *c = &pit->hw.channels[channel];
+    uint64_t d = c->gate || (c->mode & 3) == 1
+                 ? get_guest_time(vpit_vcpu(pit))
+                 : pit->count_stop_time[channel];
 
     ASSERT(spin_is_locked(&pit->lock));
 
-    d = muldiv64(get_guest_time(v) - pit->count_load_time[channel],
-                 PIT_FREQ, SYSTEM_TIME_HZ);
+    return muldiv64((d - pit->count_load_time[channel] -
+                     pit->stopped_time[channel]),
+                    PIT_FREQ, SYSTEM_TIME_HZ);
+}
+
+static unsigned int pit_get_count(PITState *pit, int channel)
+{
+    unsigned int d = get_count(pit, channel), counter;
+    struct hvm_hw_pit_channel *c = &pit->hw.channels[channel];
 
     switch ( c->mode )
     {
@@ -110,6 +117,10 @@ static void pit_load_count(PITState *pit, int channel, int val)
         pit->count_load_time[channel] = 0;
     else
         pit->count_load_time[channel] = get_guest_time(v);
+
+    pit->count_stop_time[channel] = pit->count_load_time[channel];
+    pit->stopped_time[channel] = 0;
+
     s->count = val;
     period = DIV_ROUND(val * SYSTEM_TIME_HZ, PIT_FREQ);
 
@@ -142,14 +153,8 @@ static void pit_load_count(PITState *pit, int channel, int val)
 static int pit_get_out(PITState *pit, int channel)
 {
     struct hvm_hw_pit_channel *s = &pit->hw.channels[channel];
-    uint64_t d;
+    uint64_t d = get_count(pit, channel);
     int out;
-    struct vcpu *v = vpit_vcpu(pit);
-
-    ASSERT(spin_is_locked(&pit->lock));
-
-    d = muldiv64(get_guest_time(v) - pit->count_load_time[channel], 
-                 PIT_FREQ, SYSTEM_TIME_HZ);
 
     switch ( s->mode )
     {
@@ -182,22 +187,39 @@ static void pit_set_gate(PITState *pit, int channel, int val)
 
     ASSERT(spin_is_locked(&pit->lock));
 
-    switch ( s->mode )
-    {
-    default:
-    case 0:
-    case 4:
-        /* XXX: just disable/enable counting */
-        break;
-    case 1:
-    case 5:
-    case 2:
-    case 3:
-        /* Restart counting on rising edge. */
-        if ( s->gate < val )
-            pit->count_load_time[channel] = get_guest_time(v);
-        break;
-    }
+    if ( s->gate > val )
+        switch ( s->mode )
+        {
+        case 0:
+        case 2:
+        case 3:
+        case 4:
+            /* Disable counting. */
+            if ( !channel )
+                destroy_periodic_time(&pit->pt0);
+            pit->count_stop_time[channel] = get_guest_time(v);
+            break;
+        }
+
+    if ( s->gate < val )
+        switch ( s->mode )
+        {
+        default:
+        case 0:
+        case 4:
+            /* Enable counting. */
+            pit->stopped_time[channel] += get_guest_time(v) -
+                                          pit->count_stop_time[channel];
+            break;
+
+        case 1:
+        case 5:
+        case 2:
+        case 3:
+            /* Initiate counting on rising edge. */
+            pit_load_count(pit, channel, pit->hw.channels[channel].count);
+            break;
+        }
 
     s->gate = val;
 }

@@ -48,8 +48,14 @@ struct periodic_time {
 typedef struct PITState {
     /* Hardware state */
     struct hvm_hw_pit hw;
-    /* Last time the counters read zero, for calcuating counter reads */
+
+    /* Last time the counters read zero, for calculating counter reads */
     int64_t count_load_time[3];
+    /* Last time the counters were stopped, for calculating counter reads */
+    int64_t count_stop_time[3];
+    /* Accumulate "stopped" time, since the last counter write/reload. */
+    uint64_t stopped_time[3];
+
     /* Channel 0 IRQ handling. */
     struct periodic_time pt0;
     spinlock_t lock;
