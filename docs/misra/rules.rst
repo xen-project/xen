@@ -213,6 +213,17 @@ maintainers if you want to suggest a change.
      - Types shall be explicitly specified
      -
 
+   * - `Rule 8.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_08_02.c>`_
+     - Required
+     - Function types shall be in prototype form with named parameters
+     -
+
+   * - `Rule 8.3 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_08_03.c>`_
+     - Required
+     - All declarations of an object or function shall use the same
+       names and type qualifiers
+     -
+
    * - `Rule 8.4 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_08_04.c>`_
      - Required
      - A compatible declaration shall be visible when an object or
@@ -246,6 +257,11 @@ maintainers if you want to suggest a change.
      - Required
      - Within an enumerator list the value of an implicitly-specified
        enumeration constant shall be unique
+     -
+
+   * - `Rule 8.14 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_08_14.c>`_
+     - Required
+     - The restrict type qualifier shall not be used
      -
 
    * - `Rule 9.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_09_01.c>`_
