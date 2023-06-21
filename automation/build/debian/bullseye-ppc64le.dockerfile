@@ -22,6 +22,8 @@ RUN apt-get update && \
         gcc-powerpc64le-linux-gnu \
         make \
         python3-minimal \
+        # for test phase
+        qemu-system-ppc \
         && \
         apt-get autoremove -y && \
         apt-get clean && \
