@@ -87,6 +87,58 @@ static int pit_get_count(PITState *pit, int channel)
     return counter;
 }
 
+static void cf_check pit_time_fired(struct vcpu *v, void *priv)
+{
+    uint64_t *count_load_time = priv;
+
+    TRACE_0D(TRC_HVM_EMUL_PIT_TIMER_CB);
+    *count_load_time = get_guest_time(v);
+}
+
+static void pit_load_count(PITState *pit, int channel, int val)
+{
+    uint32_t period;
+    struct hvm_hw_pit_channel *s = &pit->hw.channels[channel];
+    struct vcpu *v = vpit_vcpu(pit);
+
+    ASSERT(spin_is_locked(&pit->lock));
+
+    if ( val == 0 )
+        val = 0x10000;
+
+    if ( v == NULL )
+        pit->count_load_time[channel] = 0;
+    else
+        pit->count_load_time[channel] = get_guest_time(v);
+    s->count = val;
+    period = DIV_ROUND(val * SYSTEM_TIME_HZ, PIT_FREQ);
+
+    if ( !v || !is_hvm_vcpu(v) || channel )
+        return;
+
+    switch ( s->mode )
+    {
+    case 2:
+    case 3:
+        /* Periodic timer. */
+        TRACE_2D(TRC_HVM_EMUL_PIT_START_TIMER, period, period);
+        create_periodic_time(v, &pit->pt0, period, period, 0, pit_time_fired,
+                             &pit->count_load_time[channel], false);
+        break;
+    case 1:
+    case 4:
+        /* One-shot timer. */
+        TRACE_2D(TRC_HVM_EMUL_PIT_START_TIMER, period, 0);
+        create_periodic_time(v, &pit->pt0, period, 0, 0, pit_time_fired,
+                             &pit->count_load_time[channel], false);
+        break;
+    default:
+        TRACE_0D(TRC_HVM_EMUL_PIT_STOP_TIMER);
+        destroy_periodic_time(&pit->pt0);
+        break;
+    }
+}
+
 static int pit_get_out(PITState *pit, int channel)
 {
     struct hvm_hw_pit_channel *s = &pit->hw.channels[channel];
@@ -154,57 +206,6 @@ static int pit_get_gate(PITState *pit, int channel)
 {
     ASSERT(spin_is_locked(&pit->lock));
     return pit->hw.channels[channel].gate;
-}
-
-static void cf_check pit_time_fired(struct vcpu *v, void *priv)
-{
-    uint64_t *count_load_time = priv;
-    TRACE_0D(TRC_HVM_EMUL_PIT_TIMER_CB);
-    *count_load_time = get_guest_time(v);
-}
-
-static void pit_load_count(PITState *pit, int channel, int val)
-{
-    u32 period;
-    struct hvm_hw_pit_channel *s = &pit->hw.channels[channel];
-    struct vcpu *v = vpit_vcpu(pit);
-
-    ASSERT(spin_is_locked(&pit->lock));
-
-    if ( val == 0 )
-        val = 0x10000;
-
-    if ( v == NULL )
-        pit->count_load_time[channel] = 0;
-    else
-        pit->count_load_time[channel] = get_guest_time(v);
-    s->count = val;
-    period = DIV_ROUND(val * SYSTEM_TIME_HZ, PIT_FREQ);
-
-    if ( (v == NULL) || !is_hvm_vcpu(v) || (channel != 0) )
-        return;
-
-    switch ( s->mode )
-    {
-    case 2:
-    case 3:
-        /* Periodic timer. */
-        TRACE_2D(TRC_HVM_EMUL_PIT_START_TIMER, period, period);
-        create_periodic_time(v, &pit->pt0, period, period, 0, pit_time_fired, 
-                             &pit->count_load_time[channel], false);
-        break;
-    case 1:
-    case 4:
-        /* One-shot timer. */
-        TRACE_2D(TRC_HVM_EMUL_PIT_START_TIMER, period, 0);
-        create_periodic_time(v, &pit->pt0, period, 0, 0, pit_time_fired,
-                             &pit->count_load_time[channel], false);
-        break;
-    default:
-        TRACE_0D(TRC_HVM_EMUL_PIT_STOP_TIMER);
-        destroy_periodic_time(&pit->pt0);
-        break;
-    }
 }
 
 static void pit_latch_count(PITState *pit, int channel)
