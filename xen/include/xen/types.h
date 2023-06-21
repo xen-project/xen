@@ -2,6 +2,7 @@
 #define __TYPES_H__
 
 #include <xen/stdbool.h>
+#include <xen/stdint.h>
 
 #include <asm/types.h>
 
@@ -39,17 +40,14 @@ typedef __PTRDIFF_TYPE__ ptrdiff_t;
 #define LONG_MIN        (-LONG_MAX - 1)
 #define ULONG_MAX       (~0UL)
 
-typedef         __u8            uint8_t;
-typedef         __s8            int8_t;
-
-typedef         __u16           uint16_t;
-typedef         __s16           int16_t;
-
-typedef         __u32           uint32_t;
-typedef         __s32           int32_t;
-
-typedef         __u64           uint64_t;
-typedef         __s64           int64_t;
+typedef uint8_t         __u8;
+typedef int8_t          __s8;
+typedef uint16_t        __u16;
+typedef int16_t         __s16;
+typedef uint32_t        __u32;
+typedef int32_t         __s32;
+typedef uint64_t        __u64;
+typedef int64_t         __s64;
 
 typedef __u16 __le16;
 typedef __u16 __be16;
