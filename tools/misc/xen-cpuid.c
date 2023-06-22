@@ -172,7 +172,7 @@ static const char *const str_7d0[32] =
     [ 8] = "avx512-vp2intersect", [ 9] = "srbds-ctrl",
     [10] = "md-clear",            [11] = "rtm-always-abort",
     /* 12 */                [13] = "tsx-force-abort",
-    [14] = "serialize",
+    [14] = "serialize",     [15] = "hybrid",
     [16] = "tsxldtrk",
     [18] = "pconfig",
     [20] = "cet-ibt",
@@ -245,7 +245,8 @@ static const char *const str_m10Al[32] =
     [20] = "bhi-no",              [21] = "xapic-status",
     /* 22 */                      [23] = "ovrclk-status",
     [24] = "pbrsb-no",            [25] = "gds-ctrl",
-    [26] = "gds-no",
+    [26] = "gds-no",              [27] = "rfds-no",
+    [28] = "rfds-clear",
 };
 
 static const char *const str_m10Ah[32] =

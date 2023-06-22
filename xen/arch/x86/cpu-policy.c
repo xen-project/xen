@@ -451,6 +451,7 @@ static void __init guest_common_max_feature_adjustments(uint32_t *fs)
          */
         __set_bit(X86_FEATURE_MD_CLEAR, fs);
         __set_bit(X86_FEATURE_FB_CLEAR, fs);
+        __set_bit(X86_FEATURE_RFDS_CLEAR, fs);
 
         /*
          * The Gather Data Sampling microcode mitigation (August 2023) has an
@@ -499,6 +500,10 @@ static void __init guest_common_default_feature_adjustments(uint32_t *fs)
         __clear_bit(X86_FEATURE_FB_CLEAR, fs);
         if ( cpu_has_fb_clear )
             __set_bit(X86_FEATURE_FB_CLEAR, fs);
+
+        __clear_bit(X86_FEATURE_RFDS_CLEAR, fs);
+        if ( cpu_has_rfds_clear )
+            __set_bit(X86_FEATURE_RFDS_CLEAR, fs);
 
         /*
          * The Gather Data Sampling microcode mitigation (August 2023) has an
