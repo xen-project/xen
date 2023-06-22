@@ -24,6 +24,7 @@
 
 #include <asm/amd.h>
 #include <asm/hvm/svm/svm.h>
+#include <asm/intel-family.h>
 #include <asm/microcode.h>
 #include <asm/msr.h>
 #include <asm/pv/domain.h>
@@ -447,7 +448,7 @@ static void __init print_details(enum ind_thunk thunk)
      * Hardware read-only information, stating immunity to certain issues, or
      * suggestions of which mitigation to use.
      */
-    printk("  Hardware hints:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
+    printk("  Hardware hints:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
            (caps & ARCH_CAPS_RDCL_NO)                        ? " RDCL_NO"        : "",
            (caps & ARCH_CAPS_EIBRS)                          ? " EIBRS"          : "",
            (caps & ARCH_CAPS_RSBA)                           ? " RSBA"           : "",
@@ -463,6 +464,7 @@ static void __init print_details(enum ind_thunk thunk)
            (caps & ARCH_CAPS_FB_CLEAR)                       ? " FB_CLEAR"       : "",
            (caps & ARCH_CAPS_PBRSB_NO)                       ? " PBRSB_NO"       : "",
            (caps & ARCH_CAPS_GDS_NO)                         ? " GDS_NO"         : "",
+           (caps & ARCH_CAPS_RFDS_NO)                        ? " RFDS_NO"        : "",
            (e8b  & cpufeat_mask(X86_FEATURE_IBRS_ALWAYS))    ? " IBRS_ALWAYS"    : "",
            (e8b  & cpufeat_mask(X86_FEATURE_STIBP_ALWAYS))   ? " STIBP_ALWAYS"   : "",
            (e8b  & cpufeat_mask(X86_FEATURE_IBRS_FAST))      ? " IBRS_FAST"      : "",
@@ -473,7 +475,7 @@ static void __init print_details(enum ind_thunk thunk)
            (e21a & cpufeat_mask(X86_FEATURE_SRSO_NO))        ? " SRSO_NO"        : "");
 
     /* Hardware features which need driving to mitigate issues. */
-    printk("  Hardware features:%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
+    printk("  Hardware features:%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
            (e8b  & cpufeat_mask(X86_FEATURE_IBPB)) ||
            (_7d0 & cpufeat_mask(X86_FEATURE_IBRSB))          ? " IBPB"           : "",
            (e8b  & cpufeat_mask(X86_FEATURE_IBRS)) ||
@@ -491,6 +493,7 @@ static void __init print_details(enum ind_thunk thunk)
            (caps & ARCH_CAPS_TSX_CTRL)                       ? " TSX_CTRL"       : "",
            (caps & ARCH_CAPS_FB_CLEAR_CTRL)                  ? " FB_CLEAR_CTRL"  : "",
            (caps & ARCH_CAPS_GDS_CTRL)                       ? " GDS_CTRL"       : "",
+           (caps & ARCH_CAPS_RFDS_CLEAR)                     ? " RFDS_CLEAR"     : "",
            (e21a & cpufeat_mask(X86_FEATURE_SBPB))           ? " SBPB"           : "");
 
     /* Compiled-in support which pertains to mitigations. */
@@ -1359,6 +1362,83 @@ static __init void mds_calculations(void)
     }
 }
 
+/*
+ * Register File Data Sampling affects Atom cores from the Goldmont to
+ * Gracemont microarchitectures.  The March 2024 microcode adds RFDS_NO to
+ * some but not all unaffected parts, and RFDS_CLEAR to affected parts still
+ * in support.
+ *
+ * Alder Lake and Raptor Lake client CPUs have a mix of P cores
+ * (Golden/Raptor Cove, not vulnerable) and E cores (Gracemont,
+ * vulnerable), and both enumerate RFDS_CLEAR.
+ *
+ * Both exist in a Xeon SKU, which has the E cores (Gracemont) disabled by
+ * platform configuration, and enumerate RFDS_NO.
+ *
+ * With older parts, or with out-of-date microcode, synthesise RFDS_NO when
+ * safe to do so.
+ *
+ * https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/advisory-guidance/register-file-data-sampling.html
+ */
+static void __init rfds_calculations(void)
+{
+    /* RFDS is only known to affect Intel Family 6 processors at this time. */
+    if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
+         boot_cpu_data.x86 != 6 )
+        return;
+
+    /*
+     * If RFDS_NO or RFDS_CLEAR are visible, we've either got suitable
+     * microcode, or an RFDS-aware hypervisor is levelling us in a pool.
+     */
+    if ( cpu_has_rfds_no || cpu_has_rfds_clear )
+        return;
+
+    /* If we're virtualised, don't attempt to synthesise RFDS_NO. */
+    if ( cpu_has_hypervisor )
+        return;
+
+    /*
+     * Not all CPUs are expected to get a microcode update enumerating one of
+     * RFDS_{NO,CLEAR}, or we might have out-of-date microcode.
+     */
+    switch ( boot_cpu_data.x86_model )
+    {
+    case INTEL_FAM6_ALDERLAKE:
+    case INTEL_FAM6_RAPTORLAKE:
+        /*
+         * Alder Lake and Raptor Lake might be a client SKU (with the
+         * Gracemont cores active, and therefore vulnerable) or might be a
+         * server SKU (with the Gracemont cores disabled, and therefore not
+         * vulnerable).
+         *
+         * See if the CPU identifies as hybrid to distinguish the two cases.
+         */
+        if ( !cpu_has_hybrid )
+            break;
+        fallthrough;
+    case INTEL_FAM6_ALDERLAKE_L:
+    case INTEL_FAM6_RAPTORLAKE_P:
+    case INTEL_FAM6_RAPTORLAKE_S:
+
+    case INTEL_FAM6_ATOM_GOLDMONT:      /* Apollo Lake */
+    case INTEL_FAM6_ATOM_GOLDMONT_D:    /* Denverton */
+    case INTEL_FAM6_ATOM_GOLDMONT_PLUS: /* Gemini Lake */
+    case INTEL_FAM6_ATOM_TREMONT_D:     /* Snow Ridge / Parker Ridge */
+    case INTEL_FAM6_ATOM_TREMONT:       /* Elkhart Lake */
+    case INTEL_FAM6_ATOM_TREMONT_L:     /* Jasper Lake */
+    case INTEL_FAM6_ATOM_GRACEMONT:     /* Alder Lake N */
+        return;
+    }
+
+    /*
+     * We appear to be on an unaffected CPU which didn't enumerate RFDS_NO,
+     * perhaps because of it's age or because of out-of-date microcode.
+     * Synthesise it.
+     */
+    setup_force_cpu_cap(X86_FEATURE_RFDS_NO);
+}
+
 static bool __init cpu_has_gds(void)
 {
     /*
@@ -1872,6 +1952,7 @@ void __init init_speculation_mitigations(void)
      *
      * https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/technical-documentation/intel-analysis-microarchitectural-data-sampling.html
      * https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/technical-documentation/processor-mmio-stale-data-vulnerabilities.html
+     * https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/advisory-guidance/register-file-data-sampling.html
      *
      * Relevant ucodes:
      *
@@ -1901,8 +1982,12 @@ void __init init_speculation_mitigations(void)
      *
      *   If FB_CLEAR is enumerated, L1D_FLUSH does not have the same scrubbing
      *   side effects as VERW and cannot be used in its place.
+     *
+     * - March 2023, for RFDS.  Enumerate RFDS_CLEAR to mean that VERW now
+     *   scrubs non-architectural entries from certain register files.
      */
     mds_calculations();
+    rfds_calculations();
 
     /*
      * Parts which enumerate FB_CLEAR are those with now-updated microcode
@@ -1934,15 +2019,19 @@ void __init init_speculation_mitigations(void)
      * MLPDS/MFBDS when SMT is enabled.
      */
     if ( opt_verw_pv == -1 )
-        opt_verw_pv = cpu_has_useful_md_clear;
+        opt_verw_pv = cpu_has_useful_md_clear || cpu_has_rfds_clear;
 
     if ( opt_verw_hvm == -1 )
-        opt_verw_hvm = cpu_has_useful_md_clear;
+        opt_verw_hvm = cpu_has_useful_md_clear || cpu_has_rfds_clear;
 
     /*
      * If SMT is active, and we're protecting against MDS or MMIO stale data,
      * we need to scrub before going idle as well as on return to guest.
      * Various pipeline resources are repartitioned amongst non-idle threads.
+     *
+     * We don't need to scrub on idle for RFDS.  There are no affected cores
+     * which support SMT, despite there being affected cores in hybrid systems
+     * which have SMT elsewhere in the platform.
      */
     if ( ((cpu_has_useful_md_clear && (opt_verw_pv || opt_verw_hvm)) ||
           opt_verw_mmio) && hw_smt_enabled )
@@ -1956,7 +2045,8 @@ void __init init_speculation_mitigations(void)
      * It is only safe to use L1D_FLUSH in place of VERW when MD_CLEAR is the
      * only *_CLEAR we can see.
      */
-    if ( opt_l1d_flush && cpu_has_md_clear && !cpu_has_fb_clear )
+    if ( opt_l1d_flush && cpu_has_md_clear && !cpu_has_fb_clear &&
+         !cpu_has_rfds_clear )
         opt_verw_hvm = false;
 
     /*
