@@ -169,6 +169,13 @@
 #endif
 .endm
 
+/*
+ * Helper to improve the readibility of stack dispacements with %rsp in
+ * unusual positions.  Both @field and @top_of_stack should be constants from
+ * the same object.  @top_of_stack should be where %rsp is currently pointing.
+ */
+#define STK_REL(field, top_of_stk) ((field) - (top_of_stk))
+
 .macro DO_SPEC_CTRL_COND_VERW
 /*
  * Requires %rsp=cpuinfo
