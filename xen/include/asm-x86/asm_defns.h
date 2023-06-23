@@ -81,6 +81,14 @@ register unsigned long current_stack_pointer asm("rsp");
 
 #ifdef __ASSEMBLY__
 
+.macro BUILD_BUG_ON condstr, cond:vararg
+        .if \cond
+        .error "Condition \"\condstr\" not satisfied"
+        .endif
+.endm
+/* preprocessor macro to make error message more user friendly */
+#define BUILD_BUG_ON(cond) BUILD_BUG_ON #cond, cond
+
 #ifdef HAVE_AS_QUOTED_SYM
 #define SUBSECTION_LBL(tag)                        \
         .ifndef .L.tag;                            \
