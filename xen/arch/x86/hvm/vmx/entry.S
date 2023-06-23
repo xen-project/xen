@@ -87,17 +87,39 @@ UNLIKELY_END(realmode)
 
         /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
         /* SPEC_CTRL_EXIT_TO_VMX   Req: %rsp=regs/cpuinfo              Clob:    */
-        DO_SPEC_CTRL_COND_VERW
+        /*
+         * All speculation safety work happens to be elsewhere.  VERW is after
+         * popping the GPRs, while restoring the guest MSR_SPEC_CTRL is left
+         * to the MSR load list.
+         */
 
         mov  VCPU_hvm_guest_cr2(%rbx),%rax
+        mov  %rax, %cr2
+
+        /*
+         * We need to perform two conditional actions (VERW, and Resume vs
+         * Launch) after popping GPRs.  With some cunning, we can encode both
+         * of these in eflags together.
+         *
+         * Parity is only calculated over the bottom byte of the answer, while
+         * Sign is simply the top bit.
+         *
+         * Therefore, the final OR instruction ends up producing:
+         *   SF = VCPU_vmx_launched
+         *   PF = !SCF_verw
+         */
+        BUILD_BUG_ON(SCF_verw & ~0xff)
+        movzbl VCPU_vmx_launched(%rbx), %ecx
+        shl  $31, %ecx
+        movzbl CPUINFO_spec_ctrl_flags(%rsp), %eax
+        and  $SCF_verw, %eax
+        or   %eax, %ecx
 
         pop  %r15
         pop  %r14
         pop  %r13
         pop  %r12
         pop  %rbp
-        mov  %rax,%cr2
-        cmpb $0,VCPU_vmx_launched(%rbx)
         pop  %rbx
         pop  %r11
         pop  %r10
@@ -108,7 +130,13 @@ UNLIKELY_END(realmode)
         pop  %rdx
         pop  %rsi
         pop  %rdi
-        je   .Lvmx_launch
+
+        jpe  .L_skip_verw
+        /* VERW clobbers ZF, but preserves all others, including SF. */
+        verw STK_REL(CPUINFO_verw_sel, CPUINFO_error_code)(%rsp)
+.L_skip_verw:
+
+        jns  .Lvmx_launch
 
 /*.Lvmx_resume:*/
         VMRESUME
