@@ -22,8 +22,11 @@
 
 #include <asm/page.h>
 #include <asm/early_printk.h>
+
+#ifdef CONFIG_ARM_EFI
 #include <efi/efierr.h>
 #include <asm/arm64/efibind.h>
+#endif
 
 #define PT_PT     0xf7f /* nG=1 AF=1 SH=11 AP=01 NS=1 ATTR=111 T=1 P=1 */
 #define PT_MEM    0xf7d /* nG=1 AF=1 SH=11 AP=01 NS=1 ATTR=111 T=0 P=1 */
@@ -171,8 +174,10 @@ efi_head:
         .byte   0x52
         .byte   0x4d
         .byte   0x64
-        .long   pe_header - efi_head        /* Offset to the PE header. */
-
+#ifndef CONFIG_ARM_EFI
+        .long   0                    /* 0 means no PE header. */
+#else
+        .long   pe_header - efi_head /* Offset to the PE header. */
         /*
          * Add the PE/COFF header to the file.  The address of this header
          * is at offset 0x3c in the file, and is part of Linux "Image"
@@ -278,6 +283,8 @@ section_table:
         .short  0                /* NumberOfLineNumbers  (0 for executables) */
         .long   0xe0500020       /* Characteristics (section flags) */
         .align  5
+#endif /* CONFIG_ARM_EFI */
+
 real_start:
         /* BSS should be zeroed when booting without EFI */
         mov   x26, #0                /* x26 := skip_zero_bss */
@@ -965,6 +972,8 @@ putn:   ret
 ENTRY(lookup_processor_type)
         mov  x0, #0
         ret
+
+#ifdef CONFIG_ARM_EFI
 /*
  *  Function to transition from EFI loader in C, to Xen entry point.
  *  void noreturn efi_xen_start(void *fdt_ptr, uint32_t fdt_size);
@@ -1022,6 +1031,8 @@ ENTRY(efi_xen_start)
 
         b     real_start_efi
 ENDPROC(efi_xen_start)
+
+#endif /* CONFIG_ARM_EFI */
 
 /*
  * Local variables:
