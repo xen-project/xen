@@ -14,7 +14,6 @@
 #include <xen/hypercall.h>
 #include <xen/sched.h>
 #include <asm/regs.h>
-#include <asm/types.h>
 #include <asm/msr.h>
 #include <asm/nmi.h>
 #include <asm/p2m.h>

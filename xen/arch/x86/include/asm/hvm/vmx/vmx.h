@@ -8,7 +8,8 @@
 #define __ASM_X86_HVM_VMX_VMX_H__
 
 #include <xen/sched.h>
-#include <asm/types.h>
+#include <xen/types.h>
+
 #include <asm/regs.h>
 #include <asm/asm_defns.h>
 #include <asm/processor.h>

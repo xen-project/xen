@@ -11,7 +11,6 @@
 #include <asm/current.h>
 #include <asm/iocap.h>
 #include <asm/paging.h>
-#include <asm/types.h>
 #include <asm/domain.h>
 #include <asm/p2m.h>
 #include <asm/hvm/vmx/vmx.h>

@@ -9,7 +9,7 @@
  * 2 of the License, or (at your option) any later version.
  */
 #include <xen/bitops.h>
-#include <asm/types.h>
+
 #include <asm/byteorder.h>
 
 #ifndef find_next_bit

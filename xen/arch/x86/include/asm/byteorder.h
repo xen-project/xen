@@ -1,7 +1,7 @@
 #ifndef __ASM_X86_BYTEORDER_H__
 #define __ASM_X86_BYTEORDER_H__
 
-#include <asm/types.h>
+#include <xen/types.h>
 #include <xen/compiler.h>
 
 static inline __attribute_const__ __u32 ___arch__swab32(__u32 x)

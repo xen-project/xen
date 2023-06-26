@@ -12,7 +12,6 @@
 #include <xen/xenoprof.h>
 #include <asm/system.h>
 #include <asm/regs.h>
-#include <asm/types.h>
 #include <asm/apic.h>
 #include <asm/traps.h>
 #include <asm/msr.h>

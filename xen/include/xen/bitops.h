@@ -1,6 +1,6 @@
 #ifndef _LINUX_BITOPS_H
 #define _LINUX_BITOPS_H
-#include <asm/types.h>
+#include <xen/types.h>
 
 /*
  * Create a contiguous bitmask starting at bit position @l and ending at

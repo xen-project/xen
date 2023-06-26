@@ -2,9 +2,10 @@
 #define __SPINLOCK_H__
 
 #include <xen/time.h>
+#include <xen/types.h>
+
 #include <asm/system.h>
 #include <asm/spinlock.h>
-#include <asm/types.h>
 
 #define SPINLOCK_CPU_BITS  12
 

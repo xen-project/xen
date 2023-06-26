@@ -38,7 +38,6 @@
 #include <asm/regs.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
-#include <asm/types.h>
 #include <asm/msr.h>
 #include <asm/i387.h>
 #include <asm/xstate.h>

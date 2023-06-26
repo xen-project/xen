@@ -1,7 +1,8 @@
 #ifndef __ASM_IO_APIC_H
 #define __ASM_IO_APIC_H
 
-#include <asm/types.h>
+#include <xen/types.h>
+
 #include <asm/mpspec.h>
 #include <asm/apicdef.h>
 #include <asm/fixmap.h>

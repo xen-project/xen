@@ -9,7 +9,6 @@
 #include <xen/types.h>
 #include <xen/smp.h>
 #include <xen/percpu.h>
-#include <asm/types.h>
 #include <asm/cpufeature.h>
 #include <asm/desc.h>
 #endif

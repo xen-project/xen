@@ -7,7 +7,6 @@
 #include <xen/sched.h>
 #include <xen/smp.h>
 
-#include <asm/types.h>
 #include <asm/traps.h>
 #include <asm/atomic.h>
 

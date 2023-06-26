@@ -18,7 +18,7 @@
  */
 
 #include <asm/device.h>
-#include <asm/types.h>
+
 #include <xen/console.h>
 #include <xen/device_tree.h>
 #include <xen/param.h>

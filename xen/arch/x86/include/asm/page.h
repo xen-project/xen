@@ -9,7 +9,7 @@
 #define PAGE_ORDER_1G       18
 
 #ifndef __ASSEMBLY__
-# include <asm/types.h>
+# include <xen/types.h>
 # include <xen/lib.h>
 #endif
 

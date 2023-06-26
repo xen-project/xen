@@ -10,7 +10,6 @@
 
 #include <xen/ioreq.h>
 
-#include <asm/types.h>
 #include <asm/mtrr.h>
 #include <asm/p2m.h>
 #include <asm/hvm/support.h>
