@@ -1600,17 +1600,17 @@ int create_grant_host_mapping(unsigned long gpaddr, mfn_t frame,
         return GNTST_okay;
 }
 
-int replace_grant_host_mapping(unsigned long addr, mfn_t mfn,
-                               unsigned long new_addr, unsigned int flags)
+int replace_grant_host_mapping(unsigned long gpaddr, mfn_t frame,
+                               unsigned long new_gpaddr, unsigned int flags)
 {
-    gfn_t gfn = gaddr_to_gfn(addr);
+    gfn_t gfn = gaddr_to_gfn(gpaddr);
     struct domain *d = current->domain;
     int rc;
 
-    if ( new_addr != 0 || (flags & GNTMAP_contains_pte) )
+    if ( new_gpaddr != 0 || (flags & GNTMAP_contains_pte) )
         return GNTST_general_error;
 
-    rc = guest_physmap_remove_page(d, gfn, mfn, 0);
+    rc = guest_physmap_remove_page(d, gfn, frame, 0);
 
     return rc ? GNTST_general_error : GNTST_okay;
 }
