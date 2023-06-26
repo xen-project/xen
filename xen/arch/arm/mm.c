@@ -736,10 +736,10 @@ void *__init arch_vmap_virt_end(void)
  * This function should only be used to remap device address ranges
  * TODO: add a check to verify this assumption
  */
-void *ioremap_attr(paddr_t pa, size_t len, unsigned int attributes)
+void *ioremap_attr(paddr_t start, size_t len, unsigned int attributes)
 {
-    mfn_t mfn = _mfn(PFN_DOWN(pa));
-    unsigned int offs = pa & (PAGE_SIZE - 1);
+    mfn_t mfn = _mfn(PFN_DOWN(start));
+    unsigned int offs = start & (PAGE_SIZE - 1);
     unsigned int nr = PFN_UP(offs + len);
     void *ptr = __vmap(&mfn, nr, 1, 1, attributes, VMAP_DEFAULT);
 
@@ -1579,7 +1579,7 @@ void put_page_type(struct page_info *page)
     return;
 }
 
-int create_grant_host_mapping(unsigned long addr, mfn_t frame,
+int create_grant_host_mapping(unsigned long gpaddr, mfn_t frame,
                               unsigned int flags, unsigned int cache_flags)
 {
     int rc;
@@ -1591,7 +1591,7 @@ int create_grant_host_mapping(unsigned long addr, mfn_t frame,
     if ( flags & GNTMAP_readonly )
         t = p2m_grant_map_ro;
 
-    rc = guest_physmap_add_entry(current->domain, gaddr_to_gfn(addr),
+    rc = guest_physmap_add_entry(current->domain, gaddr_to_gfn(gpaddr),
                                  frame, 0, t);
 
     if ( rc )
