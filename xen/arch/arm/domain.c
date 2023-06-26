@@ -1155,15 +1155,15 @@ void vcpu_block_unless_event_pending(struct vcpu *v)
         vcpu_unblock(current);
 }
 
-void vcpu_kick(struct vcpu *vcpu)
+void vcpu_kick(struct vcpu *v)
 {
-    bool running = vcpu->is_running;
+    bool running = v->is_running;
 
-    vcpu_unblock(vcpu);
-    if ( running && vcpu != current )
+    vcpu_unblock(v);
+    if ( running && v != current )
     {
         perfc_incr(vcpu_kick);
-        smp_send_event_check_mask(cpumask_of(vcpu->processor));
+        smp_send_event_check_mask(cpumask_of(v->processor));
     }
 }
 
