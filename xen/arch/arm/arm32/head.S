@@ -324,7 +324,7 @@ cpu_init:
         PRINT("- Missing processor info: ")
         print_reg r4
         PRINT(" -\r\n")
-        b     fail
+        b     cpu_init_done
 1:
         /* Jump to cpu_init */
         ldr   r1, [r1, #PROCINFO_cpu_init]  /* r1 := vaddr(init func) */
