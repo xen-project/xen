@@ -196,16 +196,16 @@ int domain_vgic_init(struct domain *d, unsigned int nr_spis)
  * vcpu_vgic_init() - Register VCPU-specific KVM iodevs
  * was: kvm_vgic_vcpu_init()
  * Xen: adding vgic_vx_enable() call
- * @vcpu: pointer to the VCPU being created and initialized
+ * @v: pointer to the VCPU being created and initialized
  */
-int vcpu_vgic_init(struct vcpu *vcpu)
+int vcpu_vgic_init(struct vcpu *v)
 {
     int ret = 0;
 
-    vgic_vcpu_early_init(vcpu);
+    vgic_vcpu_early_init(v);
 
     if ( gic_hw_version() == GIC_V2 )
-        vgic_v2_enable(vcpu);
+        vgic_v2_enable(v);
     else
         ret = -ENXIO;
 
@@ -239,9 +239,9 @@ void domain_vgic_free(struct domain *d)
     dist->nr_spis = 0;
 }
 
-int vcpu_vgic_free(struct vcpu *vcpu)
+int vcpu_vgic_free(struct vcpu *v)
 {
-    struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic;
+    struct vgic_cpu *vgic_cpu = &v->arch.vgic;
 
     INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
 
