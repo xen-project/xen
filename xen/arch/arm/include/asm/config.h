@@ -209,8 +209,6 @@
 #define STACK_SIZE  (PAGE_SIZE << STACK_ORDER)
 
 #ifndef __ASSEMBLY__
-extern unsigned long xen_phys_start;
-extern unsigned long xenheap_phys_end;
 extern unsigned long frametable_virt_end;
 #endif
 
