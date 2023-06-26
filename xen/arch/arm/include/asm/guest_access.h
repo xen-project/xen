@@ -16,7 +16,7 @@ unsigned long copy_to_guest_phys_flush_dcache(struct domain *d,
                                               void *buf,
                                               unsigned int len);
 
-int access_guest_memory_by_ipa(struct domain *d, paddr_t ipa, void *buf,
+int access_guest_memory_by_gpa(struct domain *d, paddr_t gpa, void *buf,
                                uint32_t size, bool is_write);
 
 #define __raw_copy_to_guest raw_copy_to_guest

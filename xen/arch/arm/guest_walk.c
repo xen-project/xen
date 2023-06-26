@@ -85,7 +85,7 @@ static bool guest_walk_sd(const struct vcpu *v,
     paddr |= (gva & mask) >> 18;
 
     /* Access the guest's memory to read only one PTE. */
-    ret = access_guest_memory_by_ipa(d, paddr, &pte, sizeof(short_desc_t), false);
+    ret = access_guest_memory_by_gpa(d, paddr, &pte, sizeof(short_desc_t), false);
     if ( ret )
         return false;
 
@@ -110,7 +110,7 @@ static bool guest_walk_sd(const struct vcpu *v,
         paddr = ((paddr_t)pte.walk.base << 10) | ((gva & mask) >> 10);
 
         /* Access the guest's memory to read only one PTE. */
-        ret = access_guest_memory_by_ipa(d, paddr, &pte, sizeof(short_desc_t), false);
+        ret = access_guest_memory_by_gpa(d, paddr, &pte, sizeof(short_desc_t), false);
         if ( ret )
             return false;
 
@@ -481,7 +481,7 @@ static bool guest_walk_ld(const struct vcpu *v,
         paddr |= LPAE_TABLE_INDEX_GS(grainsizes[gran], level, gva) << 3;
 
         /* Access the guest's memory to read only one PTE. */
-        ret = access_guest_memory_by_ipa(d, paddr, &pte, sizeof(lpae_t), false);
+        ret = access_guest_memory_by_gpa(d, paddr, &pte, sizeof(lpae_t), false);
         if ( ret )
             return false;
 

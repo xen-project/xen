@@ -142,7 +142,7 @@ unsigned long copy_to_guest_phys_flush_dcache(struct domain *d,
                       COPY_to_guest | COPY_ipa | COPY_flush_dcache);
 }
 
-int access_guest_memory_by_ipa(struct domain *d, paddr_t gpa, void *buf,
+int access_guest_memory_by_gpa(struct domain *d, paddr_t gpa, void *buf,
                                uint32_t size, bool is_write)
 {
     unsigned long left;
