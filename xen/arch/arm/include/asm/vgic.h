@@ -355,8 +355,8 @@ bool vgic_evtchn_irq_pending(struct vcpu *v);
 int domain_vgic_register(struct domain *d, int *mmio_count);
 int domain_vgic_init(struct domain *d, unsigned int nr_spis);
 void domain_vgic_free(struct domain *d);
-int vcpu_vgic_init(struct vcpu *vcpu);
-int vcpu_vgic_free(struct vcpu *vcpu);
+int vcpu_vgic_init(struct vcpu *v);
+int vcpu_vgic_free(struct vcpu *v);
 
 void vgic_inject_irq(struct domain *d, struct vcpu *v, unsigned int virq,
                      bool level);

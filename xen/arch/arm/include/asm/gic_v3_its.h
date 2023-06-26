@@ -190,8 +190,9 @@ struct pending_irq *gicv3_its_get_event_pending_irq(struct domain *d,
                                                     uint32_t eventid);
 int gicv3_remove_guest_event(struct domain *d, paddr_t vdoorbell_address,
                                      uint32_t vdevid, uint32_t eventid);
-struct pending_irq *gicv3_assign_guest_event(struct domain *d, paddr_t doorbell,
-                                             uint32_t devid, uint32_t eventid,
+struct pending_irq *gicv3_assign_guest_event(struct domain *d,
+                                             paddr_t vdoorbell_address,
+                                             uint32_t vdevid, uint32_t eventid,
                                              uint32_t virt_lpi);
 void gicv3_lpi_update_host_entry(uint32_t host_lpi, int domain_id,
                                  uint32_t virt_lpi);

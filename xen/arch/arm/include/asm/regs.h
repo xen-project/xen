@@ -58,7 +58,7 @@ static inline bool guest_mode(const struct cpu_user_regs *r)
 }
 
 register_t get_user_reg(struct cpu_user_regs *regs, int reg);
-void set_user_reg(struct cpu_user_regs *regs, int reg, register_t val);
+void set_user_reg(struct cpu_user_regs *regs, int reg, register_t value);
 
 #endif
 

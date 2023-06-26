@@ -36,7 +36,7 @@ static inline bool gnttab_release_host_mappings(const struct domain *d)
     return true;
 }
 
-int create_grant_host_mapping(unsigned long gpaddr, mfn_t mfn,
+int create_grant_host_mapping(unsigned long gpaddr, mfn_t frame,
                               unsigned int flags, unsigned int cache_flags);
 int replace_grant_host_mapping(unsigned long gpaddr, mfn_t mfn,
                                unsigned long new_gpaddr, unsigned int flags);

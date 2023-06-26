@@ -30,7 +30,7 @@
 extern lpae_t xen_fixmap[XEN_PT_LPAE_ENTRIES];
 
 /* Map a page in a fixmap entry */
-extern void set_fixmap(unsigned int map, mfn_t mfn, unsigned int attributes);
+extern void set_fixmap(unsigned int map, mfn_t mfn, unsigned int flags);
 /* Remove a mapping from a fixmap entry */
 extern void clear_fixmap(unsigned int map);
 

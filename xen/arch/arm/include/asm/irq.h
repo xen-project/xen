@@ -76,7 +76,7 @@ void init_IRQ(void);
 
 int route_irq_to_guest(struct domain *d, unsigned int virq,
                        unsigned int irq, const char *devname);
-int release_guest_irq(struct domain *d, unsigned int irq);
+int release_guest_irq(struct domain *d, unsigned int virq);
 
 void arch_move_irqs(struct vcpu *v);
 
