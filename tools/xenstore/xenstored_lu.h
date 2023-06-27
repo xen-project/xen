@@ -43,6 +43,16 @@ struct lu_dump_state {
 
 extern struct live_update *lu_status;
 
+struct connection *lu_get_connection(void);
+bool lu_is_pending(void);
+void lu_read_state(void);
+
+/* Write the "OK" response for the live-update command */
+unsigned int lu_write_response(FILE *fp);
+
+int do_control_lu(const void *ctx, struct connection *conn, char **vec,
+		  int num);
+
 /* Live update private interfaces. */
 void lu_get_dump_state(struct lu_dump_state *state);
 void lu_close_dump_state(struct lu_dump_state *state);
@@ -53,4 +63,19 @@ const char *lu_arch(const void *ctx, struct connection *conn, char **vec,
 		    int num);
 const char *lu_begin(struct connection *conn);
 void lu_destroy_arch(void *data);
+#else
+static inline struct connection *lu_get_connection(void)
+{
+	return NULL;
+}
+
+static inline unsigned int lu_write_response(FILE *fp)
+{
+	return 0;
+}
+
+static inline bool lu_is_pending(void)
+{
+	return false;
+}
 #endif

@@ -52,6 +52,7 @@
 #include "xenstored_transaction.h"
 #include "xenstored_domain.h"
 #include "xenstored_control.h"
+#include "xenstored_lu.h"
 #include "tdb.h"
 
 #ifndef NO_SOCKETS
