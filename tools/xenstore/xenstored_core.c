@@ -42,11 +42,11 @@
 #include <setjmp.h>
 
 #include <xenevtchn.h>
+#include <xen-tools/xenstore-common.h>
 
 #include "utils.h"
 #include "list.h"
 #include "talloc.h"
-#include "xs_lib.h"
 #include "xenstored_core.h"
 #include "xenstored_watch.h"
 #include "xenstored_transaction.h"
@@ -1201,7 +1201,8 @@ static char *perms_to_strings(const void *ctx, const struct node_perms *perms,
 	char buffer[MAX_STRLEN(unsigned int) + 1];
 
 	for (*len = 0, i = 0; i < perms->num; i++) {
-		if (!xs_perm_to_string(&perms->p[i], buffer, sizeof(buffer)))
+		if (!xenstore_perm_to_string(&perms->p[i], buffer,
+					     sizeof(buffer)))
 			return NULL;
 
 		strings = talloc_realloc(ctx, strings, char,
@@ -1279,7 +1280,7 @@ static int send_directory_part(const void *ctx, struct connection *conn,
 	struct node *node;
 	char gen[24];
 
-	if (xs_count_strings(in->buffer, in->used) != 2)
+	if (xenstore_count_strings(in->buffer, in->used) != 2)
 		return EINVAL;
 
 	/* First arg is node name. */
@@ -1766,7 +1767,7 @@ static int do_set_perms(const void *ctx, struct connection *conn,
 	char *name, *permstr;
 	struct node *node;
 
-	perms.num = xs_count_strings(in->buffer, in->used);
+	perms.num = xenstore_count_strings(in->buffer, in->used);
 	if (perms.num < 2)
 		return EINVAL;
 
@@ -1779,7 +1780,7 @@ static int do_set_perms(const void *ctx, struct connection *conn,
 	perms.p = talloc_array(ctx, struct xs_permissions, perms.num);
 	if (!perms.p)
 		return ENOMEM;
-	if (!xs_strings_to_perms(perms.p, perms.num, permstr))
+	if (!xenstore_strings_to_perms(perms.p, perms.num, permstr))
 		return errno;
 
 	if (domain_alloc_permrefs(&perms) < 0)
@@ -2575,7 +2576,7 @@ static void destroy_fds(void)
 static void init_sockets(void)
 {
 	struct sockaddr_un addr;
-	const char *soc_str = xs_daemon_socket();
+	const char *soc_str = xenstore_daemon_path();
 
 	if (!soc_str)
 		barf_perror("Failed to obtain xs domain socket");
@@ -2890,7 +2891,7 @@ int main(int argc, char *argv[])
 
 	/* Make sure xenstored directory exists. */
 	/* Errors ignored here, will be reported when we open files */
-	mkdir(xs_daemon_rundir(), 0755);
+	mkdir(xenstore_daemon_rundir(), 0755);
 
 	if (dofork) {
 		openlog("xenstored", 0, LOG_DAEMON);

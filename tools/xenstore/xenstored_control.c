@@ -31,10 +31,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <xenctrl.h>
+#include <xen-tools/xenstore-common.h>
 
 #include "utils.h"
 #include "talloc.h"
-#include "xs_lib.h"
 #include "xenstored_core.h"
 #include "xenstored_control.h"
 #include "xenstored_domain.h"
@@ -560,7 +560,8 @@ static FILE *lu_dump_open(const void *ctx)
 	char *filename;
 	int fd;
 
-	filename = talloc_asprintf(ctx, "%s/state_dump", xs_daemon_rundir());
+	filename = talloc_asprintf(ctx, "%s/state_dump",
+				   xenstore_daemon_rundir());
 	if (!filename)
 		return NULL;
 
@@ -583,7 +584,7 @@ static void lu_get_dump_state(struct lu_dump_state *state)
 	state->size = 0;
 
 	state->filename = talloc_asprintf(NULL, "%s/state_dump",
-					  xs_daemon_rundir());
+					  xenstore_daemon_rundir());
 	if (!state->filename)
 		barf("Allocation failure");
 
@@ -1017,7 +1018,7 @@ int do_control(const void *ctx, struct connection *conn,
 	if (cmd == ARRAY_SIZE(cmds))
 		return EINVAL;
 
-	num = xs_count_strings(in->buffer, in->used);
+	num = xenstore_count_strings(in->buffer, in->used);
 	if (cmds[cmd].max_pars)
 		num = min(num, cmds[cmd].max_pars);
 	vec = talloc_array(ctx, char *, num);

@@ -9,7 +9,6 @@ ifeq ($(CONFIG_Linux),y)
 LDLIBS += -ldl
 endif
 
-OBJS-y   += xs_lib.o
 OBJS-y   += xs.o
 
 LIBHEADER = xenstore.h xenstore_lib.h
@@ -20,9 +19,6 @@ include ../libs.mk
 CFLAGS += -include $(XEN_ROOT)/tools/config.h
 CFLAGS += $(CFLAGS_libxentoolcore)
 CFLAGS += -DXEN_RUN_STORED="\"$(XEN_RUN_STORED)\""
-
-vpath xs_lib.c $(XEN_ROOT)/tools/xenstore
-CFLAGS += -iquote $(XEN_ROOT)/tools/xenstore
 
 xs.opic: CFLAGS += -DUSE_PTHREAD
 ifeq ($(CONFIG_Linux),y)

@@ -23,7 +23,7 @@
 
 #include <sys/ioctl.h>
 
-#include "xs_lib.h"
+#include <xen-tools/xenstore-common.h>
 
 #define PATH_SEP '/'
 #define MAX_PATH_LEN 256
@@ -361,7 +361,7 @@ static void do_ls(struct xs_handle *h, char *path, int cur_depth, int show_perms
                 for (i = 0; i < nperms; i++) {
                     if (i)
                         putchar(',');
-                    xs_perm_to_string(perms+i, buf, sizeof(buf));
+                    xenstore_perm_to_string(perms+i, buf, sizeof(buf));
                     fputs(buf, stdout);
                 }
                 putchar(')');

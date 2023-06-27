@@ -44,7 +44,7 @@ xenstored: $(XENSTORED_OBJS-y)
 $(CLIENTS): xenstore
 	ln -f xenstore $@
 
-xenstore: xenstore_client.o xs_lib.o
+xenstore: xenstore_client.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@ $(APPEND_LDFLAGS)
 
 xenstore-control: xenstore_control.o
