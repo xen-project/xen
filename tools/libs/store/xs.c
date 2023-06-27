@@ -311,6 +311,26 @@ struct xs_handle *xs_domain_open(void)
 	return xs_open(0);
 }
 
+static const char *xs_domain_dev(void)
+{
+	char *s = getenv("XENSTORED_PATH");
+	if (s)
+		return s;
+#if defined(__RUMPUSER_XEN__) || defined(__RUMPRUN__)
+	return "/dev/xen/xenbus";
+#elif defined(__linux__)
+	if (access("/dev/xen/xenbus", F_OK) == 0)
+		return "/dev/xen/xenbus";
+	return "/proc/xen/xenbus";
+#elif defined(__NetBSD__)
+	return "/kern/xen/xenbus";
+#elif defined(__FreeBSD__)
+	return "/dev/xen/xenstore";
+#else
+	return "/dev/xen/xenbus";
+#endif
+}
+
 struct xs_handle *xs_open(unsigned long flags)
 {
 	struct xs_handle *xsh = NULL;
@@ -431,6 +451,24 @@ out_false:
 #ifdef XSTEST
 #define read_all read_all_choice
 #define xs_write_all write_all_choice
+#else
+/* Simple routine for writing to sockets, etc. */
+bool xs_write_all(int fd, const void *data, unsigned int len)
+{
+	while (len) {
+		int done;
+
+		done = write(fd, data, len);
+		if (done < 0 && errno == EINTR)
+			continue;
+		if (done <= 0)
+			return false;
+		data += done;
+		len -= done;
+	}
+
+	return true;
+}
 #endif
 
 static int get_error(const char *errorstring)
@@ -1326,6 +1364,11 @@ error:
 	errno = saved_errno;
 
 	return ret;
+}
+
+const char *xs_daemon_socket_ro(void)
+{
+	return xs_daemon_socket();
 }
 
 #ifdef USE_PTHREAD

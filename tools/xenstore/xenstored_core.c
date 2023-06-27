@@ -2888,10 +2888,9 @@ int main(int argc, char *argv[])
 
 	reopen_log();
 
-	/* make sure xenstored directories exist */
+	/* Make sure xenstored directory exists. */
 	/* Errors ignored here, will be reported when we open files */
 	mkdir(xs_daemon_rundir(), 0755);
-	mkdir(xs_daemon_rootdir(), 0755);
 
 	if (dofork) {
 		openlog("xenstored", 0, LOG_DAEMON);

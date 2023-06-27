@@ -47,9 +47,6 @@ const char *xs_daemon_rundir(void);
 const char *xs_daemon_socket(void);
 const char *xs_daemon_socket_ro(void);
 
-/* Simple write function: loops for you. */
-bool xs_write_all(int fd, const void *data, unsigned int len);
-
 /* Convert strings to permissions.  False if a problem. */
 bool xs_strings_to_perms(struct xs_permissions *perms, unsigned int num,
 			 const char *strings);

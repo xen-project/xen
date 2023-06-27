@@ -8,6 +8,7 @@
  *
  */
 
+#include <assert.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -40,11 +41,139 @@ enum mode {
     MODE_watch,
 };
 
+/* Sanitising (quoting) possibly-binary strings. */
+struct expanding_buffer {
+    char *buf;
+    int avail;
+};
+
 static char *output_buf = NULL;
 static int output_pos = 0;
 static struct expanding_buffer ebuf;
 
 static int output_size = 0;
+
+/* Ensure that given expanding buffer has at least min_avail characters. */
+static char *expanding_buffer_ensure(struct expanding_buffer *ebuf,
+                                     int min_avail)
+{
+    int want;
+    char *got;
+
+    if ( ebuf->avail >= min_avail )
+        return ebuf->buf;
+
+    if ( min_avail >= INT_MAX/3 )
+        return 0;
+
+    want = ebuf->avail + min_avail + 10;
+    got = realloc(ebuf->buf, want);
+    if ( !got )
+        return 0;
+
+    ebuf->buf = got;
+    ebuf->avail = want;
+    return ebuf->buf;
+}
+
+/* sanitise_value() may return NULL if malloc fails. */
+static char *sanitise_value(struct expanding_buffer *ebuf,
+                            const char *val, unsigned len)
+{
+    int used, remain, c;
+    unsigned char *ip;
+
+#define ADD(c) (ebuf->buf[used++] = (c))
+#define ADDF(f,c) (used += sprintf(ebuf->buf+used, (f), (c)))
+
+    assert(len < INT_MAX/5);
+
+    ip = (unsigned char *)val;
+    used = 0;
+    remain = len;
+
+    if ( !expanding_buffer_ensure(ebuf, remain + 1) )
+        return NULL;
+
+    while ( remain-- > 0 )
+    {
+        c= *ip++;
+
+        if ( c >= ' ' && c <= '~' && c != '\\' )
+        {
+            ADD(c);
+            continue;
+        }
+
+        if ( !expanding_buffer_ensure(ebuf, used + remain + 5) )
+            /* for "<used>\\nnn<remain>\0" */
+            return 0;
+
+        ADD('\\');
+        switch (c)
+        {
+        case '\t':  ADD('t');   break;
+        case '\n':  ADD('n');   break;
+        case '\r':  ADD('r');   break;
+        case '\\':  ADD('\\');  break;
+        default:
+            if ( c < 010 ) ADDF("%03o", c);
+            else           ADDF("x%02x", c);
+        }
+    }
+
+    ADD(0);
+    assert(used <= ebuf->avail);
+    return ebuf->buf;
+
+#undef ADD
+#undef ADDF
+}
+
+/* *out_len_r on entry is ignored; out must be at least strlen(in)+1 bytes. */
+static void unsanitise_value(char *out, unsigned *out_len_r, const char *in)
+{
+    const char *ip;
+    char *op;
+    unsigned c;
+    int n;
+
+    for ( ip = in, op = out; (c = *ip++); *op++ = c )
+    {
+        if ( c == '\\' )
+        {
+            c = *ip++;
+
+#define GETF(f) do                   \
+{                                    \
+     n = 0;                          \
+     sscanf(ip, f "%n", &c, &n);     \
+     ip += n;                        \
+} while ( 0 )
+
+            switch ( c )
+            {
+            case 't':           c= '\t';           break;
+            case 'n':           c= '\n';           break;
+            case 'r':           c= '\r';           break;
+            case '\\':          c= '\\';           break;
+            case 'x':           GETF("%2x");       break;
+            case '0': case '4':
+            case '1': case '5':
+            case '2': case '6':
+            case '3': case '7': --ip; GETF("%3o"); break;
+            case 0:             --ip;              break;
+            default:;
+            }
+#undef GETF
+        }
+    }
+
+    *op = 0;
+
+    if ( out_len_r )
+        *out_len_r = op - out;
+}
 
 /* make sure there is at least 'len' more space in output_buf */
 static void expand_buffer(size_t len)

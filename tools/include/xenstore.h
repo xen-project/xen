@@ -113,6 +113,9 @@ void *xs_read(struct xs_handle *h, xs_transaction_t t,
 bool xs_write(struct xs_handle *h, xs_transaction_t t,
 	      const char *path, const void *data, unsigned int len);
 
+/* Simple write function: loops for you. */
+bool xs_write_all(int fd, const void *data, unsigned int len);
+
 /* Create a new directory.
  * Returns false on failure, or success if it already exists.
  */
