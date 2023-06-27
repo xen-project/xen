@@ -4,10 +4,10 @@ XENSTORED_OBJS-y := xenstored_core.o xenstored_watch.o xenstored_domain.o
 XENSTORED_OBJS-y += xenstored_transaction.o xenstored_control.o
 XENSTORED_OBJS-y += talloc.o utils.o tdb.o hashtable.o
 
-XENSTORED_OBJS-$(CONFIG_Linux) += xenstored_posix.o
-XENSTORED_OBJS-$(CONFIG_NetBSD) += xenstored_posix.o
-XENSTORED_OBJS-$(CONFIG_FreeBSD) += xenstored_posix.o
-XENSTORED_OBJS-$(CONFIG_MiniOS) += xenstored_minios.o
+XENSTORED_OBJS-$(CONFIG_Linux) += xenstored_posix.o xenstored_lu_daemon.o
+XENSTORED_OBJS-$(CONFIG_NetBSD) += xenstored_posix.o xenstored_lu_daemon.o
+XENSTORED_OBJS-$(CONFIG_FreeBSD) += xenstored_posix.o xenstored_lu_daemon.o
+XENSTORED_OBJS-$(CONFIG_MiniOS) += xenstored_minios.o xenstored_lu_minios.o
 
 # Include configure output (config.h)
 CFLAGS += -include $(XEN_ROOT)/tools/config.h

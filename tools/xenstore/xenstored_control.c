@@ -38,63 +38,21 @@
 #include "xenstored_core.h"
 #include "xenstored_control.h"
 #include "xenstored_domain.h"
+#include "xenstored_lu.h"
 #include "xenstored_watch.h"
 
-/* Mini-OS only knows about MAP_ANON. */
-#ifndef MAP_ANONYMOUS
-#define MAP_ANONYMOUS MAP_ANON
-#endif
-
 #ifndef NO_LIVE_UPDATE
-struct live_update {
-	/* For verification the correct connection is acting. */
-	struct connection *conn;
-
-	/* Pointer to the command used to request LU */
-	struct buffered_data *in;
-
-#ifdef __MINIOS__
-	void *kernel;
-	unsigned int kernel_size;
-	unsigned int kernel_off;
-
-	void *dump_state;
-	unsigned long dump_size;
-#else
-	char *filename;
-#endif
-
-	char *cmdline;
-
-	/* Start parameters. */
-	bool force;
-	unsigned int timeout;
-	time_t started_at;
-};
-
-static struct live_update *lu_status;
-
-struct lu_dump_state {
-	void *buf;
-	unsigned int size;
-#ifndef __MINIOS__
-	int fd;
-	char *filename;
-#endif
-};
+struct live_update *lu_status;
 
 static int lu_destroy(void *data)
 {
-#ifdef __MINIOS__
-	if (lu_status->dump_state)
-		munmap(lu_status->dump_state, lu_status->dump_size);
-#endif
+	lu_destroy_arch(data);
 	lu_status = NULL;
 
 	return 0;
 }
 
-static const char *lu_begin(struct connection *conn)
+const char *lu_begin(struct connection *conn)
 {
 	if (lu_status)
 		return "live-update session already active.";
@@ -430,203 +388,6 @@ static const char *lu_cmdline(const void *ctx, struct connection *conn,
 
 	return NULL;
 }
-
-#ifdef __MINIOS__
-static const char *lu_binary_alloc(const void *ctx, struct connection *conn,
-				   unsigned long size)
-{
-	const char *ret;
-
-	syslog(LOG_INFO, "live-update: binary size %lu\n", size);
-
-	ret = lu_begin(conn);
-	if (ret)
-		return ret;
-
-	lu_status->kernel = talloc_size(lu_status, size);
-	if (!lu_status->kernel)
-		return "Allocation failure.";
-
-	lu_status->kernel_size = size;
-	lu_status->kernel_off = 0;
-
-	errno = 0;
-	return NULL;
-}
-
-static const char *lu_binary_save(const void *ctx, struct connection *conn,
-				  unsigned int size, const char *data)
-{
-	if (!lu_status || lu_status->conn != conn)
-		return "Not in live-update session.";
-
-	if (lu_status->kernel_off + size > lu_status->kernel_size)
-		return "Too much kernel data.";
-
-	memcpy(lu_status->kernel + lu_status->kernel_off, data, size);
-	lu_status->kernel_off += size;
-
-	errno = 0;
-	return NULL;
-}
-
-static const char *lu_arch(const void *ctx, struct connection *conn,
-			   char **vec, int num)
-{
-	if (num == 2 && !strcmp(vec[0], "-b"))
-		return lu_binary_alloc(ctx, conn, atol(vec[1]));
-	if (num > 2 && !strcmp(vec[0], "-d"))
-		return lu_binary_save(ctx, conn, atoi(vec[1]), vec[2]);
-
-	errno = EINVAL;
-	return NULL;
-}
-
-static FILE *lu_dump_open(const void *ctx)
-{
-	lu_status->dump_size = ROUNDUP(talloc_total_size(NULL) * 2,
-				       XC_PAGE_SHIFT);
-	lu_status->dump_state = mmap(NULL, lu_status->dump_size,
-				     PROT_READ | PROT_WRITE,
-				     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	if (lu_status->dump_state == MAP_FAILED)
-		return NULL;
-
-	return fmemopen(lu_status->dump_state, lu_status->dump_size, "w");
-}
-
-static void lu_dump_close(FILE *fp)
-{
-	size_t size;
-
-	size = ftell(fp);
-	size = ROUNDUP(size, XC_PAGE_SHIFT);
-	munmap(lu_status->dump_state + size, lu_status->dump_size - size);
-	lu_status->dump_size = size;
-
-	fclose(fp);
-}
-
-static void lu_get_dump_state(struct lu_dump_state *state)
-{
-}
-
-static void lu_close_dump_state(struct lu_dump_state *state)
-{
-}
-
-static char *lu_exec(const void *ctx, int argc, char **argv)
-{
-	return "NYI";
-}
-#else
-static const char *lu_binary(const void *ctx, struct connection *conn,
-			     const char *filename)
-{
-	const char *ret;
-	struct stat statbuf;
-
-	syslog(LOG_INFO, "live-update: binary %s\n", filename);
-
-	if (stat(filename, &statbuf))
-		return "File not accessible.";
-	if (!(statbuf.st_mode & (S_IXOTH | S_IXGRP | S_IXUSR)))
-		return "File not executable.";
-
-	ret = lu_begin(conn);
-	if (ret)
-		return ret;
-
-	lu_status->filename = talloc_strdup(lu_status, filename);
-	if (!lu_status->filename)
-		return "Allocation failure.";
-
-	errno = 0;
-	return NULL;
-}
-
-static const char *lu_arch(const void *ctx, struct connection *conn,
-			   char **vec, int num)
-{
-	if (num == 2 && !strcmp(vec[0], "-f"))
-		return lu_binary(ctx, conn, vec[1]);
-
-	errno = EINVAL;
-	return NULL;
-}
-
-static FILE *lu_dump_open(const void *ctx)
-{
-	char *filename;
-	int fd;
-
-	filename = talloc_asprintf(ctx, "%s/state_dump",
-				   xenstore_daemon_rundir());
-	if (!filename)
-		return NULL;
-
-	fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-	if (fd < 0)
-		return NULL;
-
-	return fdopen(fd, "w");
-}
-
-static void lu_dump_close(FILE *fp)
-{
-	fclose(fp);
-}
-
-static void lu_get_dump_state(struct lu_dump_state *state)
-{
-	struct stat statbuf;
-
-	state->size = 0;
-
-	state->filename = talloc_asprintf(NULL, "%s/state_dump",
-					  xenstore_daemon_rundir());
-	if (!state->filename)
-		barf("Allocation failure");
-
-	state->fd = open(state->filename, O_RDONLY);
-	if (state->fd < 0)
-		return;
-	if (fstat(state->fd, &statbuf) != 0)
-		goto out_close;
-	state->size = statbuf.st_size;
-
-	state->buf = mmap(NULL, state->size, PROT_READ, MAP_PRIVATE,
-			  state->fd, 0);
-	if (state->buf == MAP_FAILED) {
-		state->size = 0;
-		goto out_close;
-	}
-
-	return;
-
- out_close:
-	close(state->fd);
-}
-
-static void lu_close_dump_state(struct lu_dump_state *state)
-{
-	assert(state->filename != NULL);
-
-	munmap(state->buf, state->size);
-	close(state->fd);
-
-	unlink(state->filename);
-	talloc_free(state->filename);
-}
-
-static char *lu_exec(const void *ctx, int argc, char **argv)
-{
-	argv[0] = lu_status->filename;
-	execvp(argv[0], argv);
-
-	return "Error activating new binary.";
-}
-#endif
 
 static bool lu_check_lu_allowed(void)
 {
