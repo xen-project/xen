@@ -90,7 +90,7 @@
  */
 #define PRINT(_s)          \
         mov   x3, lr ;     \
-        adr   x0, 98f ;    \
+        adr_l x0, 98f ;    \
         bl    puts    ;    \
         mov   lr, x3 ;     \
         RODATA_STR(98, _s)
