@@ -155,19 +155,19 @@ static int __init cf_check nestedhvm_setup(void)
 __initcall(nestedhvm_setup);
 
 unsigned long *
-nestedhvm_vcpu_iomap_get(bool_t port_80, bool_t port_ed)
+nestedhvm_vcpu_iomap_get(bool_t ioport_80, bool_t ioport_ed)
 {
     int i;
 
     if (!hvm_port80_allowed)
-        port_80 = 1;
+        ioport_80 = 1;
 
-    if (port_80 == 0) {
-        if (port_ed == 0)
+    if (ioport_80 == 0) {
+        if (ioport_ed == 0)
             return hvm_io_bitmap;
         i = 0;
     } else {
-        if (port_ed == 0)
+        if (ioport_ed == 0)
             i = 1;
         else
             i = 2;
