@@ -652,15 +652,52 @@ trampoline_setup:
         cpuid
 1:      mov     %edx, CPUINFO_FEATURE_OFFSET(X86_FEATURE_LM) + sym_esi(boot_cpu_data)
 
-        /* Check for NX. Adjust EFER setting if available. */
-        bt      $cpufeat_bit(X86_FEATURE_NX), %edx
-        jnc     1f
-        orb     $EFER_NXE >> 8, 1 + sym_esi(trampoline_efer)
-1:
-
         /* Check for availability of long mode. */
         bt      $cpufeat_bit(X86_FEATURE_LM),%edx
         jnc     .Lbad_cpu
+
+        /* Check for NX */
+        bt      $cpufeat_bit(X86_FEATURE_NX), %edx
+        jc     .Lgot_nx
+
+        /*
+         * NX appears to be unsupported, but it might be hidden.
+         *
+         * The feature is part of the AMD64 spec, but the very first Intel
+         * 64bit CPUs lacked the feature, and thereafter there was a
+         * firmware knob to disable the feature. Undo the disable if
+         * possible.
+         *
+         * All 64bit Intel CPUs support this MSR. If virtualised, expect
+         * the hypervisor to either emulate the MSR or give us NX.
+         */
+        xor     %eax, %eax
+        cpuid
+        cmp     $X86_VENDOR_INTEL_EBX, %ebx
+        jnz     .Lno_nx
+        cmp     $X86_VENDOR_INTEL_EDX, %edx
+        jnz     .Lno_nx
+        cmp     $X86_VENDOR_INTEL_ECX, %ecx
+        jnz     .Lno_nx
+
+        /* Clear the XD_DISABLE bit */
+        mov     $MSR_IA32_MISC_ENABLE, %ecx
+        rdmsr
+        btr     $2, %edx
+        jnc     .Lno_nx
+        wrmsr
+        orb     $MSR_IA32_MISC_ENABLE_XD_DISABLE >> 32, 4 + sym_esi(trampoline_misc_enable_off)
+
+        /* Check again for NX */
+        mov     $0x80000001, %eax
+        cpuid
+        bt      $cpufeat_bit(X86_FEATURE_NX), %edx
+        jnc     .Lno_nx
+
+.Lgot_nx:
+        /* Adjust EFER given that NX is present */
+        orb     $EFER_NXE >> 8, 1 + sym_esi(trampoline_efer)
+.Lno_nx:
 
         /* Stash TSC to calculate a good approximation of time-since-boot */
         rdtsc
