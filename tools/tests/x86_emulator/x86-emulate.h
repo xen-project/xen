@@ -59,9 +59,6 @@
 
 #define cf_check /* No Control Flow Integriy checking */
 
-#define AC_(n,t) (n##t)
-#define _AC(n,t) AC_(n,t)
-
 #ifdef __GCC_ASM_FLAG_OUTPUTS__
 # define ASM_FLAG_OUT(yes, no) yes
 #else

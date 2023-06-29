@@ -84,4 +84,7 @@
     (type *)((char *)mptr__ - offsetof(type, member));  \
 })
 
+#define __AC(X, Y)   (X ## Y)
+#define _AC(X, Y)    __AC(X, Y)
+
 #endif	/* __XEN_TOOLS_COMMON_MACROS__ */
