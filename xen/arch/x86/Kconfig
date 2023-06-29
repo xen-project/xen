@@ -307,6 +307,22 @@ config MEM_SHARING
 	bool "Xen memory sharing support (UNSUPPORTED)" if UNSUPPORTED
 	depends on HVM
 
+config REQUIRE_NX
+	bool "Require NX (No eXecute) support"
+	help
+	  No-eXecute (also called XD "eXecute Disable" and DEP "Data
+	  Execution Prevention") is a security feature designed originally
+	  to combat buffer overflow attacks by marking regions of memory
+	  which the CPU must not interpret as instructions.
+
+	  The NX feature exists in every 64bit CPU except for some very
+	  early Pentium 4 Prescott machines.
+
+	  Enabling this option will improve Xen's security by removing
+	  cases where Xen could be tricked into thinking that the feature
+	  was unavailable. However, if enabled, Xen will no longer boot on
+	  any CPU which is lacking NX support.
+
 endmenu
 
 source "common/Kconfig"

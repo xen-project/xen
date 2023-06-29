@@ -123,6 +123,7 @@ multiboot2_header:
 .Lbad_ldr_nih: .asciz "ERR: EFI ImageHandle is not provided by bootloader!"
 .Lbad_efi_msg: .asciz "ERR: EFI IA-32 platforms are not supported!"
 .Lbag_alg_msg: .asciz "ERR: Xen must be loaded at a 2Mb boundary!"
+.Lno_nx_msg:   .asciz "ERR: Not an NX-capable CPU!"
 
         .section .init.data, "aw", @progbits
         .align 4
@@ -153,6 +154,11 @@ early_error: /* Here to improve the disassembly. */
 .Lnot_aligned:
         add     $sym_offs(.Lbag_alg_msg), %esi
         jmp     .Lget_vtb
+#ifdef CONFIG_REQUIRE_NX
+.Lno_nx:
+        add     $sym_offs(.Lno_nx_msg), %esi
+        jmp     .Lget_vtb
+#endif
 .Lmb2_no_st:
         /*
          * Here we are on EFI platform. vga_text_buffer was zapped earlier
@@ -656,7 +662,12 @@ trampoline_setup:
         bt      $cpufeat_bit(X86_FEATURE_LM),%edx
         jnc     .Lbad_cpu
 
-        /* Check for NX */
+        /*
+         * Check for NX
+         *   - If Xen was compiled requiring it simply assert it's
+         *     supported. The trampoline already has the right constant.
+         *   - Otherwise, update the trampoline EFER mask accordingly.
+         */
         bt      $cpufeat_bit(X86_FEATURE_NX), %edx
         jc     .Lgot_nx
 
@@ -695,9 +706,11 @@ trampoline_setup:
         jnc     .Lno_nx
 
 .Lgot_nx:
+#ifndef CONFIG_REQUIRE_NX
         /* Adjust EFER given that NX is present */
         orb     $EFER_NXE >> 8, 1 + sym_esi(trampoline_efer)
 .Lno_nx:
+#endif
 
         /* Stash TSC to calculate a good approximation of time-since-boot */
         rdtsc

@@ -147,7 +147,8 @@ GLOBAL(trampoline_misc_enable_off)
 
 /* EFER OR-mask for boot paths.  SCE conditional on PV support, NX added when available. */
 GLOBAL(trampoline_efer)
-        .long   EFER_LME | (EFER_SCE * IS_ENABLED(CONFIG_PV))
+        .long   EFER_LME | (EFER_SCE * IS_ENABLED(CONFIG_PV)) | \
+                (EFER_NXE * IS_ENABLED(CONFIG_REQUIRE_NX))
 
 GLOBAL(trampoline_xen_phys_start)
         .long   0

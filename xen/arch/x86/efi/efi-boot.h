@@ -751,6 +751,15 @@ static void __init efi_arch_cpu(void)
     {
         caps[FEATURESET_e1d] = cpuid_edx(0x80000001);
 
+        /*
+         * This check purposefully doesn't use cpu_has_nx because
+         * cpu_has_nx bypasses the boot_cpu_data read if Xen was compiled
+         * with CONFIG_REQUIRE_NX
+         */
+        if ( IS_ENABLED(CONFIG_REQUIRE_NX) &&
+             !boot_cpu_has(X86_FEATURE_NX) )
+            blexit(L"This build of Xen requires NX support");
+
         if ( cpu_has_nx )
             trampoline_efer |= EFER_NXE;
     }
