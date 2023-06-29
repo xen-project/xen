@@ -959,7 +959,7 @@ int vlapic_apicv_write(struct vcpu *v, unsigned int offset)
     return X86EMUL_OKAY;
 }
 
-int guest_wrmsr_x2apic(struct vcpu *v, uint32_t msr, uint64_t msr_content)
+int guest_wrmsr_x2apic(struct vcpu *v, uint32_t msr, uint64_t val)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
     uint32_t offset = (msr - MSR_X2APIC_FIRST) << 4;
@@ -973,38 +973,38 @@ int guest_wrmsr_x2apic(struct vcpu *v, uint32_t msr, uint64_t msr_content)
     switch ( offset )
     {
     case APIC_TASKPRI:
-        if ( msr_content & ~APIC_TPRI_MASK )
+        if ( val & ~APIC_TPRI_MASK )
             return X86EMUL_EXCEPTION;
         break;
 
     case APIC_SPIV:
-        if ( msr_content & ~(APIC_VECTOR_MASK | APIC_SPIV_APIC_ENABLED |
-                             APIC_SPIV_FOCUS_DISABLED |
-                             (VLAPIC_VERSION & APIC_LVR_DIRECTED_EOI
-                              ? APIC_SPIV_DIRECTED_EOI : 0)) )
+        if ( val & ~(APIC_VECTOR_MASK | APIC_SPIV_APIC_ENABLED |
+                     APIC_SPIV_FOCUS_DISABLED |
+                     (VLAPIC_VERSION & APIC_LVR_DIRECTED_EOI
+                      ? APIC_SPIV_DIRECTED_EOI : 0)) )
             return X86EMUL_EXCEPTION;
         break;
 
     case APIC_LVTT:
-        if ( msr_content & ~(LVT_MASK | APIC_TIMER_MODE_MASK) )
+        if ( val & ~(LVT_MASK | APIC_TIMER_MODE_MASK) )
             return X86EMUL_EXCEPTION;
         break;
 
     case APIC_LVTTHMR:
     case APIC_LVTPC:
     case APIC_CMCI:
-        if ( msr_content & ~(LVT_MASK | APIC_MODE_MASK) )
+        if ( val & ~(LVT_MASK | APIC_MODE_MASK) )
             return X86EMUL_EXCEPTION;
         break;
 
     case APIC_LVT0:
     case APIC_LVT1:
-        if ( msr_content & ~LINT_MASK )
+        if ( val & ~LINT_MASK )
             return X86EMUL_EXCEPTION;
         break;
 
     case APIC_LVTERR:
-        if ( msr_content & ~LVT_MASK )
+        if ( val & ~LVT_MASK )
             return X86EMUL_EXCEPTION;
         break;
 
@@ -1012,35 +1012,35 @@ int guest_wrmsr_x2apic(struct vcpu *v, uint32_t msr, uint64_t msr_content)
         break;
 
     case APIC_TDCR:
-        if ( msr_content & ~APIC_TDR_DIV_MASK )
+        if ( val & ~APIC_TDR_DIV_MASK )
             return X86EMUL_EXCEPTION;
         break;
 
     case APIC_ICR:
-        if ( (uint32_t)msr_content & ~(APIC_VECTOR_MASK | APIC_MODE_MASK |
-                                       APIC_DEST_MASK | APIC_INT_ASSERT |
-                                       APIC_INT_LEVELTRIG | APIC_SHORT_MASK) )
+        if ( (uint32_t)val & ~(APIC_VECTOR_MASK | APIC_MODE_MASK |
+                               APIC_DEST_MASK | APIC_INT_ASSERT |
+                               APIC_INT_LEVELTRIG | APIC_SHORT_MASK) )
             return X86EMUL_EXCEPTION;
-        vlapic_set_reg(vlapic, APIC_ICR2, msr_content >> 32);
+        vlapic_set_reg(vlapic, APIC_ICR2, val >> 32);
         break;
 
     case APIC_SELF_IPI:
-        if ( msr_content & ~APIC_VECTOR_MASK )
+        if ( val & ~APIC_VECTOR_MASK )
             return X86EMUL_EXCEPTION;
         offset = APIC_ICR;
-        msr_content = APIC_DEST_SELF | (msr_content & APIC_VECTOR_MASK);
+        val = APIC_DEST_SELF | (val & APIC_VECTOR_MASK);
         break;
 
     case APIC_EOI:
     case APIC_ESR:
-        if ( msr_content )
+        if ( val )
         {
     default:
             return X86EMUL_EXCEPTION;
         }
     }
 
-    vlapic_reg_write(v, array_index_nospec(offset, PAGE_SIZE), msr_content);
+    vlapic_reg_write(v, array_index_nospec(offset, PAGE_SIZE), val);
 
     return X86EMUL_OKAY;
 }
@@ -1070,7 +1070,7 @@ static void set_x2apic_id(struct vlapic *vlapic)
     vlapic_set_reg(vlapic, APIC_LDR, ldr);
 }
 
-int guest_wrmsr_apic_base(struct vcpu *v, uint64_t value)
+int guest_wrmsr_apic_base(struct vcpu *v, uint64_t val)
 {
     const struct cpu_policy *cp = v->domain->arch.cpu_policy;
     struct vlapic *vlapic = vcpu_vlapic(v);
@@ -1079,8 +1079,8 @@ int guest_wrmsr_apic_base(struct vcpu *v, uint64_t value)
         return X86EMUL_EXCEPTION;
 
     /* Attempting to set reserved bits? */
-    if ( value & ~(APIC_BASE_ADDR_MASK | APIC_BASE_ENABLE | APIC_BASE_BSP |
-                   (cp->basic.x2apic ? APIC_BASE_EXTD : 0)) )
+    if ( val & ~(APIC_BASE_ADDR_MASK | APIC_BASE_ENABLE | APIC_BASE_BSP |
+                 (cp->basic.x2apic ? APIC_BASE_EXTD : 0)) )
         return X86EMUL_EXCEPTION;
 
     /*
@@ -1118,21 +1118,21 @@ int guest_wrmsr_apic_base(struct vcpu *v, uint64_t value)
      * fault will be far more obvious to debug than a malfunctioning MMIO
      * window.
      */
-    if ( ((value & (APIC_BASE_EXTD | APIC_BASE_ENABLE)) == APIC_BASE_ENABLE) &&
-         ((value & APIC_BASE_ADDR_MASK) != APIC_DEFAULT_PHYS_BASE) )
+    if ( ((val & (APIC_BASE_EXTD | APIC_BASE_ENABLE)) == APIC_BASE_ENABLE) &&
+         ((val & APIC_BASE_ADDR_MASK) != APIC_DEFAULT_PHYS_BASE) )
     {
         printk(XENLOG_G_INFO
                "%pv tried to move the APIC MMIO window: val 0x%08"PRIx64"\n",
-               v, value);
+               v, val);
         return X86EMUL_EXCEPTION;
     }
 
-    if ( (vlapic->hw.apic_base_msr ^ value) & APIC_BASE_ENABLE )
+    if ( (vlapic->hw.apic_base_msr ^ val) & APIC_BASE_ENABLE )
     {
-        if ( unlikely(value & APIC_BASE_EXTD) )
+        if ( unlikely(val & APIC_BASE_EXTD) )
             return X86EMUL_EXCEPTION;
 
-        if ( value & APIC_BASE_ENABLE )
+        if ( val & APIC_BASE_ENABLE )
         {
             vlapic_reset(vlapic);
             vlapic->hw.disabled &= ~VLAPIC_HW_DISABLED;
@@ -1144,11 +1144,11 @@ int guest_wrmsr_apic_base(struct vcpu *v, uint64_t value)
             pt_may_unmask_irq(vlapic_domain(vlapic), NULL);
         }
     }
-    else if ( ((vlapic->hw.apic_base_msr ^ value) & APIC_BASE_EXTD) &&
+    else if ( ((vlapic->hw.apic_base_msr ^ val) & APIC_BASE_EXTD) &&
               unlikely(!vlapic_xapic_mode(vlapic)) )
         return X86EMUL_EXCEPTION;
 
-    vlapic->hw.apic_base_msr = value;
+    vlapic->hw.apic_base_msr = val;
     memset(&vlapic->loaded, 0, sizeof(vlapic->loaded));
 
     if ( vlapic_x2apic_mode(vlapic) )
