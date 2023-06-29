@@ -4,10 +4,10 @@
 /*
  * Every invalidation operation use the following patterns:
  *
- * DSB ISHST        // Ensure prior page-tables updates have completed
- * TLBI...          // Invalidate the TLB
- * DSB ISH          // Ensure the TLB invalidation has completed
- * ISB              // See explanation below
+ * DSB ISHST        ; Ensure prior page-tables updates have completed
+ * TLBI...          ; Invalidate the TLB
+ * DSB ISH          ; Ensure the TLB invalidation has completed
+ * ISB              ; See explanation below
  *
  * ARM64_WORKAROUND_REPEAT_TLBI:
  * Modification of the translation table for a virtual address might lead to

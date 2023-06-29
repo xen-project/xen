@@ -4,10 +4,10 @@
 /*
  * Every invalidation operation use the following patterns:
  *
- * DSB ISHST        // Ensure prior page-tables updates have completed
- * TLBI...          // Invalidate the TLB
- * DSB ISH          // Ensure the TLB invalidation has completed
- * ISB              // See explanation below
+ * DSB ISHST        ; Ensure prior page-tables updates have completed
+ * TLBI...          ; Invalidate the TLB
+ * DSB ISH          ; Ensure the TLB invalidation has completed
+ * ISB              ; See explanation below
  *
  * For Xen page-tables the ISB will discard any instructions fetched
  * from the old mappings.
