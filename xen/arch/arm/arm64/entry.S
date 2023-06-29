@@ -242,13 +242,24 @@
         msr     daifclr, \iflags
         bl      enter_hypervisor_from_guest
 
+        /*
+         * CBNZ can only address an offset of +/- 1MB. This means, it is
+         * not possible to jump outside of an alternative because
+         * the .text section and .altinstr_replacement may be further
+         * apart. The easiest way is to duplicate the few instructions
+         * that need to be skipped.
+         */
         alternative_if SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT
-        cbnz    x19, 1f
-        alternative_else_nop_endif
-
-        mov     x0, sp
-        bl      do_trap_\trap
+        cbnz      x19, 1f
+        mov       x0, sp
+        bl        do_trap_\trap
 1:
+        alternative_else
+        nop
+        mov       x0, sp
+        bl        do_trap_\trap
+        alternative_endif
+
         exit    hyp=0, compat=\compat
         .endm
 
