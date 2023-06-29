@@ -451,10 +451,7 @@ ENDPROC(cpu_init)
  * Output:
  *   r12: Was a temporary mapping created?
  *
- * Clobbers r0 - r4, r6
- *
- * Register usage within this function:
- *   r6 : Identity map in place
+ * Clobbers r0 - r4
  */
 create_page_tables:
         /* Prepare the page-tables for mapping Xen */
