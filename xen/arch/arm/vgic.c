@@ -358,7 +358,7 @@ void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
     }
 }
 
-#define VGIC_ICFG_MASK(intr) (1 << ((2 * ((intr) % 16)) + 1))
+#define VGIC_ICFG_MASK(intr) (1U << ((2 * ((intr) % 16)) + 1))
 
 /* The function should be called with the rank lock taken */
 static inline unsigned int vgic_get_virq_type(struct vcpu *v, int n, int index)
