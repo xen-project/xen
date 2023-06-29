@@ -1047,10 +1047,10 @@ static int arm_smmu_atc_inv_domain(struct arm_smmu_domain *smmu_domain,
 	 * before we read 'nr_ats_masters' in case of a concurrent call to
 	 * arm_smmu_enable_ats():
 	 *
-	 *	// unmap()			// arm_smmu_enable_ats()
-	 *	TLBI+SYNC			atomic_inc(&nr_ats_masters);
-	 *	smp_mb();			[...]
-	 *	atomic_read(&nr_ats_masters);	pci_enable_ats() // writel()
+	 *	--- unmap() ---                 --- arm_smmu_enable_ats() ---
+	 *	TLBI+SYNC                       atomic_inc(&nr_ats_masters);
+	 *	smp_mb();                       [...]
+	 *	atomic_read(&nr_ats_masters);   pci_enable_ats() (see writel())
 	 *
 	 * Ensures that we always see the incremented 'nr_ats_masters' count if
 	 * ATS was enabled at the PCI device before completion of the TLBI.
