@@ -366,7 +366,7 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
                            signed int cr0_pg);
 unsigned long hvm_cr4_guest_valid_bits(const struct domain *d);
 
-int hvm_copy_context_and_params(struct domain *src, struct domain *dst);
+int hvm_copy_context_and_params(struct domain *dst, struct domain *src);
 
 int hvm_get_param(struct domain *d, uint32_t index, uint64_t *value);
 
