@@ -20,6 +20,15 @@
     .byte 0x0f, 0x01, 0xdd
 .endm
 
+/*
+ * Call a noreturn function.  This could be JMP, but CALL results in a more
+ * helpful backtrace.  BUG is to catch functions which do decide to return...
+ */
+.macro tailcall fn:req
+    call  \fn
+    BUG   /* Shouldn't return */
+.endm
+
 .macro INDIRECT_BRANCH insn:req arg:req
 /*
  * Create an indirect branch.  insn is one of call/jmp, arg is a single

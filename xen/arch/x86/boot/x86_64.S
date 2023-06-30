@@ -74,14 +74,12 @@ ENTRY(__high_start)
 .L_ap_cet_done:
 #endif /* CONFIG_XEN_SHSTK || CONFIG_XEN_IBT */
 
-        call    start_secondary
-        BUG     /* start_secondary() shouldn't return. */
+        tailcall start_secondary
 
 .L_bsp:
         /* Pass off the Multiboot info structure to C land (if applicable). */
         mov     multiboot_ptr(%rip),%edi
-        call    __start_xen
-        BUG     /* __start_xen() shouldn't return. */
+        tailcall __start_xen
 
         .section .data.page_aligned, "aw", @progbits
         .align PAGE_SIZE, 0

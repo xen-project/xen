@@ -824,8 +824,7 @@ handle_exception_saved:
         DISPATCH(X86_EXC_CP, do_entry_CP)
 #undef DISPATCH
 
-        call  do_unhandled_trap
-        BUG   /* do_unhandled_trap() shouldn't return. */
+        tailcall do_unhandled_trap
 
 .L_exn_dispatch_done:
         mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
@@ -880,8 +879,7 @@ exception_with_ints_disabled:
 FATAL_exception_with_ints_disabled:
         xorl  %esi,%esi
         movq  %rsp,%rdi
-        call  fatal_trap
-        BUG   /* fatal_trap() shouldn't return. */
+        tailcall fatal_trap
 
 ENTRY(divide_error)
         ENDBR64
@@ -989,8 +987,7 @@ ENTRY(double_fault)
 .Ldblf_cr3_okay:
 
         movq  %rsp,%rdi
-        call  do_double_fault
-        BUG   /* do_double_fault() shouldn't return. */
+        tailcall do_double_fault
 
 ENTRY(nmi)
         ENDBR64
@@ -1085,8 +1082,7 @@ handle_ist_exception:
         DISPATCH(X86_EXC_MC,  do_machine_check)
 #undef DISPATCH
 
-        call  do_unhandled_trap
-        BUG   /* do_unhandled_trap() shouldn't return. */
+        tailcall do_unhandled_trap
 
 .L_ist_dispatch_done:
         mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
