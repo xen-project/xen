@@ -987,6 +987,7 @@ enum {
     HVM_VOL_VMENTRY,
     HVM_VOL_VMEXIT,
     HVM_VOL_HANDLER,
+    HVM_VOL_EMUL,
     HVM_VOL_MAX
 };
 
@@ -1013,6 +1014,7 @@ const char *hvm_vol_name[HVM_VOL_MAX] = {
     [HVM_VOL_VMENTRY]="vmentry",
     [HVM_VOL_VMEXIT] ="vmexit",
     [HVM_VOL_HANDLER]="handler",
+    [HVM_VOL_EMUL]="emul",
 };
 
 enum {
@@ -5275,15 +5277,18 @@ void hvm_process(struct pcpu_info *p)
     if(vcpu_set_data_type(p->current, VCPU_DATA_HVM))
         return;
 
-    if(ri->evt.sub == 2)
-    {
+    switch ( ri->evt.sub ) {
+    case 2: /* HVM_HANDLER */
         UPDATE_VOLUME(p, hvm[HVM_VOL_HANDLER], ri->size);
         hvm_handler_process(ri, h);
-    }
-    else
-    {
+        break;
+    case 4: /* HVM_EMUL */
+        UPDATE_VOLUME(p, hvm[HVM_VOL_EMUL], ri->size);
+        warn_once("WARNING: We don't yet analyze HVM_EMUL events.\n");
+        /* FIXME: Collect analysis on this */
+        break;
+    default:
         switch(ri->event) {
-            /* HVM */
         case TRC_HVM_VMEXIT:
         case TRC_HVM_VMEXIT64:
             UPDATE_VOLUME(p, hvm[HVM_VOL_VMEXIT], ri->size);
