@@ -298,13 +298,9 @@ __runq_insert(struct csched_unit *svc)
      * runnable unit if we can.  The next runq_sort will bring it forward
      * within 30ms if the queue too long. */
     if ( test_bit(CSCHED_FLAG_UNIT_YIELD, &svc->flags)
-         && __runq_elem(iter)->pri > CSCHED_PRI_IDLE )
-    {
+         && __runq_elem(iter)->pri > CSCHED_PRI_IDLE
+         && iter->next != runq )
         iter=iter->next;
-
-        /* Some sanity checks */
-        BUG_ON(iter == runq);
-    }
 
     list_add_tail(&svc->runq_elem, iter);
 }
@@ -321,6 +317,11 @@ __runq_remove(struct csched_unit *svc)
 {
     BUG_ON( !__unit_on_runq(svc) );
     list_del_init(&svc->runq_elem);
+
+    /*
+     * Clear YIELD flag when scheduling back in
+     */
+    clear_bit(CSCHED_FLAG_UNIT_YIELD, &svc->flags);
 }
 
 static inline void
@@ -1637,6 +1638,13 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
         if ( speer->pri <= pri )
             break;
 
+        /*
+         * Don't steal a UNIT which has yielded; it's waiting for a
+         * reason
+         */
+        if ( test_bit(CSCHED_FLAG_UNIT_YIELD, &speer->flags) )
+            continue;
+
         /* Is this UNIT runnable on our PCPU? */
         unit = speer->unit;
         BUG_ON( is_idle_unit(unit) );
@@ -1953,11 +1961,6 @@ static void cf_check csched_schedule(
         /* Current has blocked. Update the runnable counter for this cpu. */
         dec_nr_runnable(sched_cpu);
     }
-
-    /*
-     * Clear YIELD flag before scheduling out
-     */
-    clear_bit(CSCHED_FLAG_UNIT_YIELD, &scurr->flags);
 
     do {
         snext = __runq_elem(runq->next);
