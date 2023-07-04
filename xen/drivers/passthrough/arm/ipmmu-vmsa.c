@@ -198,7 +198,7 @@ static DEFINE_SPINLOCK(ipmmu_devices_lock);
 #define IMTTBCR_TSZ0_SHIFT             0
 
 #define IMTTLBR0              0x0010
-#define IMTTLBR0_TTBR_MASK    (0xfffff << 12)
+#define IMTTLBR0_TTBR_MASK    (0xfffffU << 12)
 #define IMTTUBR0              0x0014
 #define IMTTUBR0_TTBR_MASK    (0xff << 0)
 
