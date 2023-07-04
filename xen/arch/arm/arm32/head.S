@@ -791,6 +791,11 @@ setup_fixmap:
         create_table_entry boot_second, xen_fixmap, r0, 2
         /* Ensure any page table updates made above have occurred. */
         dsb   nshst
+        /*
+         * The fixmap area will be used soon after. So ensure no hardware
+         * translation happens before the dsb completes.
+         */
+        isb
 
         mov   pc, lr
 ENDPROC(setup_fixmap)
