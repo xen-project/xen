@@ -267,15 +267,17 @@ lpae_t mfn_to_xen_entry(mfn_t mfn, unsigned int attr);
 
 /*
  * Macros to define page-tables:
- *  - DEFINE_BOOT_PAGE_TABLE is used to define page-table that are used
- *  in assembly code before BSS is zeroed.
+ *  - DEFINE_BOOT_PAGE_TABLE{,S} are used to define one or multiple
+ *  page-table that are used in assembly code before BSS is zeroed.
  *  - DEFINE_PAGE_TABLE{,S} are used to define one or multiple
  *  page-tables to be used after BSS is zeroed (typically they are only used
  *  in C).
  */
-#define DEFINE_BOOT_PAGE_TABLE(name)                                          \
+#define DEFINE_BOOT_PAGE_TABLES(name, nr)                                     \
 lpae_t __aligned(PAGE_SIZE) __section(".data.page_aligned")                   \
-    name[XEN_PT_LPAE_ENTRIES]
+    name[XEN_PT_LPAE_ENTRIES * (nr)]
+
+#define DEFINE_BOOT_PAGE_TABLE(name) DEFINE_BOOT_PAGE_TABLES(name, 1)
 
 #define DEFINE_PAGE_TABLES(name, nr)                    \
 lpae_t __aligned(PAGE_SIZE) name[XEN_PT_LPAE_ENTRIES * (nr)]

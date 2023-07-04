@@ -146,8 +146,7 @@
          *
          * This must be the very first address in the loaded image.
          * It should be linked at XEN_VIRT_START, and loaded at any
-         * 4K-aligned address.  All of text+data+bss must fit in 2MB,
-         * or the initial pagetable code below will need adjustment.
+         * 4K-aligned address.
          */
 
 GLOBAL(start)
@@ -492,6 +491,31 @@ ENDPROC(cpu_init)
 
 /*
  * Macro to create a page table entry in \ptbl to \tbl
+ * ptbl:    table symbol where the entry will be created
+ * tbl:     physical address of the table to point to
+ * virt:    virtual address
+ * lvl:     page-table level
+ * tmp1:    scratch register
+ * tmp2:    scratch register
+ *
+ * Preserves \virt
+ * Clobbers \tbl, \tmp1, \tmp2
+ *
+ * Note that all parameters using registers should be distinct.
+ */
+.macro create_table_entry_from_paddr, ptbl, tbl, virt, lvl, tmp1, tmp2
+        get_table_slot \tmp1, \virt, \lvl   /* \tmp1 := slot in \tbl */
+
+        mov   \tmp2, #PT_PT                 /* \tmp2 := right for linear PT */
+        orr   \tmp2, \tmp2, \tbl            /*          + \tbl */
+
+        adr_l \tbl, \ptbl                   /* \tbl := address(\ptbl) */
+
+        str   \tmp2, [\tbl, \tmp1, lsl #3]
+.endm
+
+/*
+ * Macro to create a page table entry in \ptbl to \tbl
  *
  * ptbl:    table symbol where the entry will be created
  * tbl:     table symbol to point to
@@ -509,15 +533,8 @@ ENDPROC(cpu_init)
  * Note that all parameters using registers should be distinct.
  */
 .macro create_table_entry, ptbl, tbl, virt, lvl, tmp1, tmp2, tmp3
-        get_table_slot \tmp1, \virt, \lvl   /* \tmp1 := slot in \tlb */
-
-        load_paddr \tmp2, \tbl
-        mov   \tmp3, #PT_PT                 /* \tmp3 := right for linear PT */
-        orr   \tmp3, \tmp3, \tmp2           /*          + \tlb paddr */
-
-        adr_l \tmp2, \ptbl
-
-        str   \tmp3, [\tmp2, \tmp1, lsl #3]
+        load_paddr \tmp1, \tbl
+        create_table_entry_from_paddr \ptbl, \tmp1, \virt, \lvl, \tmp2, \tmp3
 .endm
 
 /*
@@ -570,7 +587,20 @@ create_page_tables:
         ldr   x0, =XEN_VIRT_START
         create_table_entry boot_pgtable, boot_first, x0, 0, x1, x2, x3
         create_table_entry boot_first, boot_second, x0, 1, x1, x2, x3
-        create_table_entry boot_second, boot_third, x0, 2, x1, x2, x3
+
+        /*
+         * We need to use a stash register because
+         * create_table_entry_paddr() will clobber the register storing
+         * the physical address of the table to point to.
+         */
+        load_paddr x4, boot_third
+        ldr   x1, =XEN_VIRT_START
+.rept XEN_NR_ENTRIES(2)
+        mov   x0, x4                            /* x0 := paddr(l3 table) */
+        create_table_entry_from_paddr boot_second, x0, x1, 2, x2, x3
+        add   x1, x1, #XEN_PT_LEVEL_SIZE(2)     /* x1 := Next vaddr */
+        add   x4, x4, #PAGE_SIZE                /* x4 := Next table */
+.endr
 
         /*
          * Find the size of Xen in pages and multiply by the size of a

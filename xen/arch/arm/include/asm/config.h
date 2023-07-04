@@ -125,6 +125,7 @@
 #endif
 
 #define XEN_VIRT_SIZE           _AT(vaddr_t, MB(2))
+#define XEN_NR_ENTRIES(lvl)     (XEN_VIRT_SIZE / XEN_PT_LEVEL_SIZE(lvl))
 
 #define FIXMAP_VIRT_START       (XEN_VIRT_START + XEN_VIRT_SIZE)
 #define FIXMAP_VIRT_SIZE        _AT(vaddr_t, MB(2))

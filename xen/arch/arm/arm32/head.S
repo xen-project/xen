@@ -141,8 +141,7 @@
         /*
          * This must be the very first address in the loaded image.
          * It should be linked at XEN_VIRT_START, and loaded at any
-         * 4K-aligned address.  All of text+data+bss must fit in 2MB,
-         * or the initial pagetable code below will need adjustment.
+         * 4K-aligned address.
          */
 GLOBAL(start)
         /*
@@ -373,7 +372,35 @@ ENDPROC(cpu_init)
 .endm
 
 /*
- * Macro to create a page table entry in \ptbl to \tbl
+ * Macro to create a page table entry in \ptbl to \tbl (physical
+ * address)
+ *
+ * ptbl:    table symbol where the entry will be created
+ * tbl:     physical address of the table to point to
+ * virt:    virtual address
+ * lvl:     page-table level
+ *
+ * Preserves \virt
+ * Clobbers \tbl, r1 - r3
+ *
+ * Note that \tbl and \virt should be in a register other than r1 - r3
+ */
+.macro create_table_entry_from_paddr, ptbl, tbl, virt, lvl
+        get_table_slot r1, \virt, \lvl  /* r1 := slot in \tbl */
+        lsl   r1, r1, #3                /* r1 := slot offset in \tbl */
+
+        movw  r2, #PT_PT             /* r2:r3 := right for linear PT */
+        orr   r2, r2, \tbl           /*           + \tbl paddr */
+        mov   r3, #0
+
+        adr_l \tbl, \ptbl            /* \tbl := (v,p)addr of \ptbl */
+
+        strd  r2, r3, [\tbl, r1]
+.endm
+
+
+/*
+ * Macro to create a page table entry in \ptbl to \tbl (symbol)
  *
  * ptbl:    table symbol where the entry will be created
  * tbl:     table symbol to point to
@@ -388,19 +415,9 @@ ENDPROC(cpu_init)
  * Note that \virt should be in a register other than r1 - r4
  */
 .macro create_table_entry, ptbl, tbl, virt, lvl
-        get_table_slot r1, \virt, \lvl  /* r1 := slot in \tlb */
-        lsl   r1, r1, #3                /* r1 := slot offset in \tlb */
-
         load_paddr r4, \tbl
-
-        movw  r2, #PT_PT             /* r2:r3 := right for linear PT */
-        orr   r2, r2, r4             /*           + \tlb paddr */
-        mov   r3, #0
-
-        adr_l r4, \ptbl
-
-        strd  r2, r3, [r4, r1]
-.endm
+        create_table_entry_from_paddr \ptbl, r4, \virt, \lvl
+ .endm
 
 /*
  * Macro to create a mapping entry in \tbl to \paddr. Only mapping in 3rd
@@ -451,13 +468,26 @@ ENDPROC(cpu_init)
  * Output:
  *   r12: Was a temporary mapping created?
  *
- * Clobbers r0 - r4
+ * Clobbers r0 - r5
  */
 create_page_tables:
         /* Prepare the page-tables for mapping Xen */
         mov_w r0, XEN_VIRT_START
         create_table_entry boot_pgtable, boot_second, r0, 1
-        create_table_entry boot_second, boot_third, r0, 2
+
+        /*
+         * We need to use a stash register because
+         * create_table_entry_paddr() will clobber the register storing
+         * the physical address of the table to point to.
+         */
+        load_paddr r5, boot_third
+        mov_w r4, XEN_VIRT_START
+.rept XEN_NR_ENTRIES(2)
+        mov   r0, r5                        /* r0 := paddr(l3 table) */
+        create_table_entry_from_paddr boot_second, r0, r4, 2
+        add   r4, r4, #XEN_PT_LEVEL_SIZE(2) /* r4 := Next vaddr */
+        add   r5, r5, #PAGE_SIZE            /* r5 := Next table */
+.endr
 
         /*
          * Find the size of Xen in pages and multiply by the size of a

@@ -53,8 +53,8 @@ mm_printk(const char *fmt, ...) {}
  * to the CPUs own pagetables.
  *
  * These pagetables have a very simple structure. They include:
- *  - 2MB worth of 4K mappings of xen at XEN_VIRT_START, boot_first and
- *    boot_second are used to populate the tables down to boot_third
+ *  - XEN_VIRT_SIZE worth of L3 mappings of xen at XEN_VIRT_START, boot_first
+ *    and boot_second are used to populate the tables down to boot_third
  *    which contains the actual mapping.
  *  - a 1:1 mapping of xen at its current physical address. This uses a
  *    section mapping at whichever of boot_{pgtable,first,second}
@@ -79,7 +79,7 @@ DEFINE_BOOT_PAGE_TABLE(boot_first_id);
 DEFINE_BOOT_PAGE_TABLE(boot_second_id);
 DEFINE_BOOT_PAGE_TABLE(boot_third_id);
 DEFINE_BOOT_PAGE_TABLE(boot_second);
-DEFINE_BOOT_PAGE_TABLE(boot_third);
+DEFINE_BOOT_PAGE_TABLES(boot_third, XEN_NR_ENTRIES(2));
 
 /* Main runtime page tables */
 
@@ -115,7 +115,7 @@ DEFINE_BOOT_PAGE_TABLE(xen_fixmap);
  * Third level page table used to map Xen itself with the XN bit set
  * as appropriate.
  */
-static DEFINE_PAGE_TABLE(xen_xenmap);
+static DEFINE_PAGE_TABLES(xen_xenmap, XEN_NR_ENTRIES(2));
 
 /* Non-boot CPUs use this to find the correct pagetables. */
 uint64_t init_ttbr;
@@ -518,15 +518,15 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
     p[0].pt.table = 1;
     p[0].pt.xn = 0;
 
-    /* Break up the Xen mapping into 4k pages and protect them separately. */
-    for ( i = 0; i < XEN_PT_LPAE_ENTRIES; i++ )
+    /* Break up the Xen mapping into pages and protect them separately. */
+    for ( i = 0; i < XEN_NR_ENTRIES(3); i++ )
     {
         vaddr_t va = XEN_VIRT_START + (i << PAGE_SHIFT);
 
         if ( !is_kernel(va) )
             break;
         pte = pte_of_xenaddr(va);
-        pte.pt.table = 1; /* 4k mappings always have this bit set */
+        pte.pt.table = 1; /* third level mappings always have this bit set */
         if ( is_kernel_text(va) || is_kernel_inittext(va) )
         {
             pte.pt.xn = 0;
@@ -539,10 +539,14 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
 
     /* Initialise xen second level entries ... */
     /* ... Xen's text etc */
+    for ( i = 0; i < XEN_NR_ENTRIES(2); i++ )
+    {
+        vaddr_t va = XEN_VIRT_START + (i << XEN_PT_LEVEL_SHIFT(2));
 
-    pte = pte_of_xenaddr((vaddr_t)xen_xenmap);
-    pte.pt.table = 1;
-    xen_second[second_table_offset(XEN_VIRT_START)] = pte;
+        pte = pte_of_xenaddr((vaddr_t)(xen_xenmap + i * XEN_PT_LPAE_ENTRIES));
+        pte.pt.table = 1;
+        xen_second[second_table_offset(va)] = pte;
+    }
 
     /* ... Fixmap */
     pte = pte_of_xenaddr((vaddr_t)xen_fixmap);
