@@ -15,6 +15,11 @@ static inline void arch_pmap_map(unsigned int slot, mfn_t mfn)
     pte = mfn_to_xen_entry(mfn, PAGE_HYPERVISOR_RW);
     pte.pt.table = 1;
     write_pte(entry, pte);
+    /*
+     * The new entry will be used very soon after arch_pmap_map() returns.
+     * So ensure the DSB in write_pte() has completed before continuing.
+     */
+    isb();
 }
 
 static inline void arch_pmap_unmap(unsigned int slot)
