@@ -783,6 +783,11 @@ static int create_xen_table(lpae_t *entry)
     pte = mfn_to_xen_entry(mfn, MT_NORMAL);
     pte.pt.table = 1;
     write_pte(entry, pte);
+    /*
+     * No ISB here. It is deferred to xen_pt_update() as the new table
+     * will not be used for hardware translation table access as part of
+     * the mapping update.
+     */
 
     return 0;
 }
@@ -1021,6 +1026,10 @@ static int xen_pt_update_entry(mfn_t root, unsigned long virt,
     }
 
     write_pte(entry, pte);
+    /*
+     * No ISB or TLB flush here. They are deferred to xen_pt_update()
+     * as the entry will not be used as part of the mapping update.
+     */
 
     rc = 0;
 
@@ -1200,6 +1209,9 @@ static int xen_pt_update(unsigned long virt,
     /*
      * The TLBs flush can be safely skipped when a mapping is inserted
      * as we don't allow mapping replacement (see xen_pt_check_entry()).
+     * Although we still need an ISB to ensure any DSB in
+     * write_pte() will complete because the mapping may be used soon
+     * after.
      *
      * For all the other cases, the TLBs will be flushed unconditionally
      * even if the mapping has failed. This is because we may have
@@ -1208,6 +1220,8 @@ static int xen_pt_update(unsigned long virt,
      */
     if ( !((flags & _PAGE_PRESENT) && !mfn_eq(mfn, INVALID_MFN)) )
         flush_xen_tlb_range_va(virt, PAGE_SIZE * nr_mfns);
+    else
+        isb();
 
     spin_unlock(&xen_pt_lock);
 
