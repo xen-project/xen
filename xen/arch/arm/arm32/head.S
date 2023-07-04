@@ -459,6 +459,19 @@ create_page_tables:
         create_table_entry boot_pgtable, boot_second, r0, 1
         create_table_entry boot_second, boot_third, r0, 2
 
+        /*
+         * Find the size of Xen in pages and multiply by the size of a
+         * PTE. This will then be compared in the mapping loop below.
+         *
+         * Note the multiplication is just to avoid using an extra
+         * register/instruction per iteration.
+         */
+        mov_w r0, _start            /* r0 := vaddr(_start) */
+        mov_w r1, _end              /* r1 := vaddr(_end) */
+        sub   r0, r1, r0            /* r0 := effective size of Xen */
+        lsr   r0, r0, #PAGE_SHIFT   /* r0 := Number of pages for Xen */
+        lsl   r0, r0, #3            /* r0 := Number of pages * PTE size */
+
         /* Setup boot_third: */
         adr_l r4, boot_third
 
@@ -473,7 +486,7 @@ create_page_tables:
 1:      strd  r2, r3, [r4, r1]       /* Map vaddr(start) */
         add   r2, r2, #PAGE_SIZE     /* Next page */
         add   r1, r1, #8             /* Next slot */
-        cmp   r1, #(XEN_PT_LPAE_ENTRIES<<3) /* 512*8-byte entries per page */
+        cmp   r1, r0                 /* Loop until we map all of Xen */
         blo   1b
 
         /*
