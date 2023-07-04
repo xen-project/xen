@@ -1579,7 +1579,7 @@ void put_page_type(struct page_info *page)
     return;
 }
 
-int create_grant_host_mapping(unsigned long gpaddr, mfn_t frame,
+int create_grant_host_mapping(uint64_t gpaddr, mfn_t frame,
                               unsigned int flags, unsigned int cache_flags)
 {
     int rc;
@@ -1600,8 +1600,8 @@ int create_grant_host_mapping(unsigned long gpaddr, mfn_t frame,
         return GNTST_okay;
 }
 
-int replace_grant_host_mapping(unsigned long gpaddr, mfn_t frame,
-                               unsigned long new_gpaddr, unsigned int flags)
+int replace_grant_host_mapping(uint64_t gpaddr, mfn_t frame,
+                               uint64_t new_gpaddr, unsigned int flags)
 {
     gfn_t gfn = gaddr_to_gfn(gpaddr);
     struct domain *d = current->domain;

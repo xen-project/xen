@@ -36,10 +36,10 @@ static inline bool gnttab_release_host_mappings(const struct domain *d)
     return true;
 }
 
-int create_grant_host_mapping(unsigned long gpaddr, mfn_t frame,
+int create_grant_host_mapping(uint64_t gpaddr, mfn_t frame,
                               unsigned int flags, unsigned int cache_flags);
-int replace_grant_host_mapping(unsigned long gpaddr, mfn_t frame,
-                               unsigned long new_gpaddr, unsigned int flags);
+int replace_grant_host_mapping(uint64_t gpaddr, mfn_t frame,
+                               uint64_t new_gpaddr, unsigned int flags);
 
 /*
  * The region used by Xen on the memory will never be mapped in DOM0
