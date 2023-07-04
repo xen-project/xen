@@ -696,6 +696,11 @@ switch_to_runtime_mapping:
 
         /* Ensure any page table updates are visible before continuing */
         dsb   nsh
+        /*
+         * The function will return on the runtime mapping. So we want
+         * to prevent instruction fetch before the dsb completes.
+         */
+        isb
 
 ready_to_switch:
         mov   pc, lr
