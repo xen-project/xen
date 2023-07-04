@@ -212,6 +212,7 @@ SECTIONS
        . = ALIGN(POINTER_ALIGN);
        __bss_end = .;
   } :text
+  . = ALIGN(PAGE_SIZE);
   _end = . ;
 
   /* Section for the device tree blob (if any). */
@@ -225,6 +226,12 @@ SECTIONS
 
   ELF_DETAILS_SECTIONS
 }
+
+/*
+ * The assembly code use _start and XEN_VIRT_START interchangeably to
+ * match the context.
+ */
+ASSERT(_start == XEN_VIRT_START, "_start != XEN_VIRT_START")
 
 /*
  * We require that Xen is loaded at a page boundary, so this ensures that any
@@ -241,4 +248,6 @@ ASSERT(IS_ALIGNED(__init_begin,     4), "__init_begin is misaligned")
 ASSERT(IS_ALIGNED(__init_end,       4), "__init_end is misaligned")
 ASSERT(IS_ALIGNED(__bss_start,      POINTER_ALIGN), "__bss_start is misaligned")
 ASSERT(IS_ALIGNED(__bss_end,        POINTER_ALIGN), "__bss_end is misaligned")
+/* To simplify the logic in head.S, we want to _end to be page aligned */
+ASSERT(IS_ALIGNED(_end,             PAGE_SIZE), "_end is not page aligned")
 ASSERT((_end - _start) <= XEN_VIRT_SIZE, "Xen is too big")
