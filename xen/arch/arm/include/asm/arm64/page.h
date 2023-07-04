@@ -5,17 +5,6 @@
 
 #include <asm/alternative.h>
 
-/* Write a pagetable entry */
-static inline void write_pte(lpae_t *p, lpae_t pte)
-{
-    asm volatile (
-        /* Ensure any writes have completed with the old mappings. */
-        "dsb sy;"
-        "str %0, [%1];"         /* Write the entry */
-        "dsb sy;"
-        : : "r" (pte.bits), "r" (p) : "memory");
-}
-
 /* Inline ASM to invalidate dcache on register R (may be an inline asm operand) */
 #define __invalidate_dcache_one(R) "dc ivac, %" #R ";"
 

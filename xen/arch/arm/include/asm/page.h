@@ -126,6 +126,7 @@
 #include <xen/errno.h>
 #include <xen/types.h>
 #include <xen/lib.h>
+#include <asm/atomic.h>
 #include <asm/system.h>
 
 #if defined(CONFIG_ARM_32)
@@ -236,6 +237,22 @@ static inline int clean_and_invalidate_dcache_va_range
             "dsb sy;"   /* Finish flush before continuing */            \
             : : "r" (_p), "m" (*_p));                                   \
 } while (0)
+
+/*
+ * Write a pagetable entry.
+ *
+ * It is the responsibility of the caller to issue an ISB (if a new entry)
+ * or a TLB flush (if modified or removed) after write_pte().
+ */
+static inline void write_pte(lpae_t *p, lpae_t pte)
+{
+    /* Ensure any writes have completed with the old mappings. */
+    dsb(sy);
+    /* Safely write the entry. This should always be an atomic write. */
+    write_atomic(p, pte);
+    dsb(sy);
+}
+
 
 /* Flush the dcache for an entire page. */
 void flush_page_to_ram(unsigned long mfn, bool sync_icache);
