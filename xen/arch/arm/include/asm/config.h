@@ -74,10 +74,10 @@
 /*
  * ARM32 layout:
  *   0  -   2M   Unmapped
- *   2M -   4M   Xen text, data, bss
- *   4M -   6M   Fixmap: special-purpose 4K mapping slots
- *   6M -  10M   Early boot mapping of FDT
- *   10M - 12M   Livepatch vmap (if compiled in)
+ *   2M -  10M   Xen text, data, bss
+ *  10M -  12M   Fixmap: special-purpose 4K mapping slots
+ *  12M -  16M   Early boot mapping of FDT
+ *  16M -  18M   Livepatch vmap (if compiled in)
  *
  *  32M - 128M   Frametable: 32 bytes per page for 12GB of RAM
  * 256M -   1G   VMAP: ioremap and early_ioremap use this virtual address
@@ -94,10 +94,10 @@
  * 0x0000020000000000 - 0x0000027fffffffff (512GB, L0 slot [4])
  *  (Relative offsets)
  *   0  -   2M   Unmapped
- *   2M -   4M   Xen text, data, bss
- *   4M -   6M   Fixmap: special-purpose 4K mapping slots
- *   6M -  10M   Early boot mapping of FDT
- *  10M -  12M   Livepatch vmap (if compiled in)
+ *   2M -  10M   Xen text, data, bss
+ *  10M -  12M   Fixmap: special-purpose 4K mapping slots
+ *  12M -  16M   Early boot mapping of FDT
+ *  16M -  18M   Livepatch vmap (if compiled in)
  *
  *   1G -   2G   VMAP: ioremap and early_ioremap
  *
@@ -124,7 +124,11 @@
 #define XEN_VIRT_START          (SLOT0(4) + _AT(vaddr_t, MB(2)))
 #endif
 
-#define XEN_VIRT_SIZE           _AT(vaddr_t, MB(2))
+/*
+ * Reserve enough space so both UBSAN and GCOV can be enabled together
+ * plus some slack for future growth.
+ */
+#define XEN_VIRT_SIZE           _AT(vaddr_t, MB(8))
 #define XEN_NR_ENTRIES(lvl)     (XEN_VIRT_SIZE / XEN_PT_LEVEL_SIZE(lvl))
 
 #define FIXMAP_VIRT_START       (XEN_VIRT_START + XEN_VIRT_SIZE)
