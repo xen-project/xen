@@ -35,12 +35,6 @@ MAKEFLAGS += -rR
 
 EFI_MOUNTPOINT ?= $(BOOT_DIR)/efi
 
-ARCH=$(XEN_TARGET_ARCH)
-SRCARCH=$(shell echo $(ARCH) | \
-          sed -e 's/x86.*/x86/' -e s'/arm\(32\|64\)/arm/g' \
-              -e s'/riscv.*/riscv/g' -e s'/ppc.*/ppc/g')
-export ARCH SRCARCH
-
 # Allow someone to change their config file
 export KCONFIG_CONFIG ?= .config
 
@@ -241,6 +235,13 @@ include scripts/Kbuild.include
 include $(XEN_ROOT)/Config.mk
 
 # Set ARCH/SUBARCH appropriately.
+
+ARCH := $(XEN_TARGET_ARCH)
+SRCARCH := $(shell echo $(ARCH) | \
+    sed -e 's/x86.*/x86/' -e 's/arm\(32\|64\)/arm/g' \
+        -e 's/riscv.*/riscv/g' -e 's/ppc.*/ppc/g')
+export ARCH SRCARCH
+
 export TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
 export TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
                             sed -e 's/x86.*/x86/' -e s'/arm\(32\|64\)/arm/g' \
