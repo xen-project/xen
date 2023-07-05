@@ -234,7 +234,7 @@ include scripts/Kbuild.include
 # we need XEN_TARGET_ARCH to generate the proper config
 include $(XEN_ROOT)/Config.mk
 
-# Set ARCH/SUBARCH appropriately.
+# Set ARCH/SRCARCH appropriately.
 
 ARCH := $(XEN_TARGET_ARCH)
 SRCARCH := $(shell echo $(ARCH) | \
@@ -242,7 +242,6 @@ SRCARCH := $(shell echo $(ARCH) | \
         -e 's/riscv.*/riscv/g' -e 's/ppc.*/ppc/g')
 export ARCH SRCARCH
 
-export TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
 export TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
                             sed -e 's/x86.*/x86/' -e s'/arm\(32\|64\)/arm/g' \
                                 -e s'/riscv.*/riscv/g' -e s'/ppc.*/ppc/g')
