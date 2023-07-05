@@ -8,6 +8,8 @@
 #define pfn_to_paddr(pfn) ((paddr_t)(pfn) << PAGE_SHIFT)
 #define paddr_to_pfn(pa)  ((unsigned long)((pa) >> PAGE_SHIFT))
 
+extern unsigned char cpu0_boot_stack[];
+
 void setup_initial_pagetables(void);
 
 void enable_mmu(void);
