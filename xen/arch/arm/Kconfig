@@ -63,11 +63,11 @@ source "arch/Kconfig"
 
 config ACPI
 	bool "ACPI (Advanced Configuration and Power Interface) Support (UNSUPPORTED)" if UNSUPPORTED
-	depends on ARM_64
+	depends on ARM_64 && ARM_EFI
 	---help---
 
 	  Advanced Configuration and Power Interface (ACPI) support for Xen is
-	  an alternative to device tree on ARM64.
+	  an alternative to device tree on ARM64. This requires UEFI.
 
 config ARM_EFI
 	bool "UEFI boot service support"
