@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+
 #ifndef __EARLY_PRINTK_H__
 #define __EARLY_PRINTK_H__
 
