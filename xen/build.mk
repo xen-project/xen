@@ -41,7 +41,7 @@ include/xen/compile.h: include/xen/compile.h.in .banner FORCE
 targets += include/xen/compile.h
 
 -include $(wildcard .asm-offsets.s.d)
-asm-offsets.s: arch/$(TARGET_ARCH)/$(TARGET_SUBARCH)/asm-offsets.c
+asm-offsets.s: arch/$(TARGET_ARCH)/$(ARCH)/asm-offsets.c
 	$(CC) $(call cpp_flags,$(c_flags)) -S -g0 -o $@.new -MQ $@ $<
 	$(call move-if-changed,$@.new,$@)
 
