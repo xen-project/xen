@@ -180,7 +180,7 @@ cpp_flags = $(filter-out -Wa$(comma)% -flto,$(1))
 c_flags = -MMD -MP -MF $(depfile) $(XEN_CFLAGS)
 a_flags = -MMD -MP -MF $(depfile) $(XEN_AFLAGS)
 
-include $(srctree)/arch/$(TARGET_ARCH)/Rules.mk
+include $(srctree)/arch/$(SRCARCH)/Rules.mk
 
 c_flags += $(_c_flags)
 a_flags += $(_c_flags)
