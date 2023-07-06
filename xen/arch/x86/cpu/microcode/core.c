@@ -750,10 +750,11 @@ __initcall(microcode_init);
 /* Load a cached update to current cpu */
 int microcode_update_one(void)
 {
+    if ( ucode_ops.collect_cpu_info )
+        alternative_vcall(ucode_ops.collect_cpu_info);
+
     if ( !ucode_ops.apply_microcode )
         return -EOPNOTSUPP;
-
-    alternative_vcall(ucode_ops.collect_cpu_info);
 
     return microcode_update_cpu(NULL);
 }
