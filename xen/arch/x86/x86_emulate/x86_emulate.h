@@ -746,36 +746,36 @@ x86_decode_insn(
         struct x86_emulate_ctxt *ctxt));
 
 unsigned int
-x86_insn_opsize(const struct x86_emulate_state *state);
+x86_insn_opsize(const struct x86_emulate_state *s);
 int
-x86_insn_modrm(const struct x86_emulate_state *state,
+x86_insn_modrm(const struct x86_emulate_state *s,
                unsigned int *rm, unsigned int *reg);
 unsigned long
-x86_insn_operand_ea(const struct x86_emulate_state *state,
+x86_insn_operand_ea(const struct x86_emulate_state *s,
                     enum x86_segment *seg);
 unsigned long
-x86_insn_immediate(const struct x86_emulate_state *state,
+x86_insn_immediate(const struct x86_emulate_state *s,
                    unsigned int nr);
 unsigned int
-x86_insn_length(const struct x86_emulate_state *state,
+x86_insn_length(const struct x86_emulate_state *s,
                 const struct x86_emulate_ctxt *ctxt);
 bool cf_check
-x86_insn_is_mem_access(const struct x86_emulate_state *state,
+x86_insn_is_mem_access(const struct x86_emulate_state *s,
                        const struct x86_emulate_ctxt *ctxt);
 bool cf_check
-x86_insn_is_mem_write(const struct x86_emulate_state *state,
+x86_insn_is_mem_write(const struct x86_emulate_state *s,
                       const struct x86_emulate_ctxt *ctxt);
 bool cf_check
-x86_insn_is_portio(const struct x86_emulate_state *state,
+x86_insn_is_portio(const struct x86_emulate_state *s,
                    const struct x86_emulate_ctxt *ctxt);
 bool cf_check
-x86_insn_is_cr_access(const struct x86_emulate_state *state,
+x86_insn_is_cr_access(const struct x86_emulate_state *s,
                       const struct x86_emulate_ctxt *ctxt);
 
 #if !defined(__XEN__) || defined(NDEBUG)
-static inline void x86_emulate_free_state(struct x86_emulate_state *state) {}
+static inline void x86_emulate_free_state(struct x86_emulate_state *s) {}
 #else
-void x86_emulate_free_state(struct x86_emulate_state *state);
+void x86_emulate_free_state(struct x86_emulate_state *s);
 #endif
 
 #ifdef __XEN__
@@ -800,7 +800,7 @@ x86_emul_rmw(
     void *ptr,
     unsigned int bytes,
     uint32_t *eflags,
-    struct x86_emulate_state *state,
+    struct x86_emulate_state *s,
     struct x86_emulate_ctxt *ctxt);
 int
 x86_emul_blk(
@@ -808,7 +808,7 @@ x86_emul_blk(
     void *data,
     unsigned int bytes,
     uint32_t *eflags,
-    struct x86_emulate_state *state,
+    struct x86_emulate_state *s,
     struct x86_emulate_ctxt *ctxt);
 
 static inline void x86_emul_hw_exception(

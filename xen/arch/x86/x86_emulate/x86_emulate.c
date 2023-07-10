@@ -8446,12 +8446,12 @@ int x86_emul_rmw(
     void *ptr,
     unsigned int bytes,
     uint32_t *eflags,
-    struct x86_emulate_state *state,
+    struct x86_emulate_state *s,
     struct x86_emulate_ctxt *ctxt)
 {
     unsigned long *dst = ptr;
 
-    ASSERT(bytes == state->op_bytes);
+    ASSERT(bytes == s->op_bytes);
 
 /*
  * We cannot use Jcc below, as this code executes with the guest status flags
@@ -8469,23 +8469,23 @@ int x86_emul_rmw(
     ".L" #op "%=:\n\t" \
     #op
 
-    switch ( state->rmw )
+    switch ( s->rmw )
     {
 #define UNOP(op) \
     case rmw_##op: \
         _emulate_1op(COND_LOCK(op), dst, bytes, *eflags, \
-                     "c" ((long)state->lock_prefix) ); \
+                     "c" ((long)s->lock_prefix) ); \
         break
 #define BINOP(op, sfx) \
     case rmw_##op: \
         _emulate_2op_SrcV##sfx(COND_LOCK(op), \
-                               state->ea.val, dst, bytes, *eflags, \
-                               "c" ((long)state->lock_prefix) ); \
+                               s->ea.val, dst, bytes, *eflags, \
+                               "c" ((long)s->lock_prefix) ); \
         break
 #define SHIFT(op) \
     case rmw_##op: \
-        ASSERT(!state->lock_prefix); \
-        _emulate_2op_SrcB(#op, state->ea.val, dst, bytes, *eflags); \
+        ASSERT(!s->lock_prefix); \
+        _emulate_2op_SrcB(#op, s->ea.val, dst, bytes, *eflags); \
         break
 
     BINOP(adc, );
@@ -8514,46 +8514,46 @@ int x86_emul_rmw(
 #undef SHIFT
 
     case rmw_not:
-        switch ( state->op_bytes )
+        switch ( s->op_bytes )
         {
         case 1:
             asm ( COND_LOCK(notb) " %0"
-                  : "+m" (*dst) : "c" ((long)state->lock_prefix) );
+                  : "+m" (*dst) : "c" ((long)s->lock_prefix) );
             break;
         case 2:
             asm ( COND_LOCK(notw) " %0"
-                  : "+m" (*dst) : "c" ((long)state->lock_prefix) );
+                  : "+m" (*dst) : "c" ((long)s->lock_prefix) );
             break;
         case 4:
             asm ( COND_LOCK(notl) " %0"
-                  : "+m" (*dst) : "c" ((long)state->lock_prefix) );
+                  : "+m" (*dst) : "c" ((long)s->lock_prefix) );
             break;
 #ifdef __x86_64__
         case 8:
             asm ( COND_LOCK(notq) " %0"
-                  : "+m" (*dst) : "c" ((long)state->lock_prefix) );
+                  : "+m" (*dst) : "c" ((long)s->lock_prefix) );
             break;
 #endif
         }
         break;
 
     case rmw_shld:
-        ASSERT(!state->lock_prefix);
+        ASSERT(!s->lock_prefix);
         _emulate_2op_SrcV_nobyte("shld",
-                                 state->ea.val, dst, bytes, *eflags,
-                                 "c" (state->ea.orig_val) );
+                                 s->ea.val, dst, bytes, *eflags,
+                                 "c" (s->ea.orig_val) );
         break;
 
     case rmw_shrd:
-        ASSERT(!state->lock_prefix);
+        ASSERT(!s->lock_prefix);
         _emulate_2op_SrcV_nobyte("shrd",
-                                 state->ea.val, dst, bytes, *eflags,
-                                 "c" (state->ea.orig_val) );
+                                 s->ea.val, dst, bytes, *eflags,
+                                 "c" (s->ea.orig_val) );
         break;
 
     case rmw_xadd:
         *eflags &= ~EFLAGS_MASK;
-        switch ( state->op_bytes )
+        switch ( s->op_bytes )
         {
             unsigned long dummy;
 
@@ -8562,11 +8562,11 @@ int x86_emul_rmw(
             asm ( "" \
                   COND_LOCK(xadd) " %"#mod"[reg], %[mem]; " \
                   _POST_EFLAGS("[efl]", "[msk]", "[tmp]") \
-                  : [reg] "+" #cst (state->ea.val), \
+                  : [reg] "+" #cst (s->ea.val), \
                     [mem] "+m" (*dst), \
                     [efl] "+g" (*eflags), \
                     [tmp] "=&r" (dummy) \
-                  : "c" ((long)state->lock_prefix), \
+                  : "c" ((long)s->lock_prefix), \
                     [msk] "i" (EFLAGS_MASK) ); \
             break
         XADD(1, q, b);
@@ -8580,21 +8580,21 @@ int x86_emul_rmw(
         break;
 
     case rmw_xchg:
-        switch ( state->op_bytes )
+        switch ( s->op_bytes )
         {
         case 1:
-            asm ( "xchg %b0, %b1" : "+q" (state->ea.val), "+m" (*dst) );
+            asm ( "xchg %b0, %b1" : "+q" (s->ea.val), "+m" (*dst) );
             break;
         case 2:
-            asm ( "xchg %w0, %w1" : "+r" (state->ea.val), "+m" (*dst) );
+            asm ( "xchg %w0, %w1" : "+r" (s->ea.val), "+m" (*dst) );
             break;
         case 4:
 #ifdef __x86_64__
-            asm ( "xchg %k0, %k1" : "+r" (state->ea.val), "+m" (*dst) );
+            asm ( "xchg %k0, %k1" : "+r" (s->ea.val), "+m" (*dst) );
             break;
         case 8:
 #endif
-            asm ( "xchg %0, %1" : "+r" (state->ea.val), "+m" (*dst) );
+            asm ( "xchg %0, %1" : "+r" (s->ea.val), "+m" (*dst) );
             break;
         }
         break;
