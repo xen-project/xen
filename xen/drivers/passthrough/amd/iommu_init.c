@@ -1532,8 +1532,10 @@ int __init amd_iommu_init_late(void)
 static void invalidate_all_domain_pages(void)
 {
     struct domain *d;
+
     for_each_domain( d )
-        amd_iommu_flush_all_pages(d);
+        if ( is_iommu_enabled(d) )
+            amd_iommu_flush_all_pages(d);
 }
 
 static int cf_check _invalidate_all_devices(
