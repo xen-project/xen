@@ -277,59 +277,60 @@ static u16 rows2vmode(unsigned int rows)
 
 static void vga_parse(const char *cmdline, early_boot_opts_t *ebo)
 {
-    const char *c;
-    unsigned int tmp, vesa_depth, vesa_height, vesa_width;
-
-    c = find_opt(cmdline, "vga=", true);
-
-    if ( !c )
-        return;
+    const char *c = cmdline;
 
     ebo->boot_vid_mode = ASK_VGA;
 
-    if ( !strmaxcmp(c, "current", delim_chars_comma) )
-        ebo->boot_vid_mode = VIDEO_CURRENT_MODE;
-    else if ( !strsubcmp(c, "text-80x") )
+    while ( (c = find_opt(c, "vga=", true)) != NULL )
     {
-        c += strlen("text-80x");
-        ebo->boot_vid_mode = rows2vmode(strtoui(c, delim_chars_comma, NULL));
-    }
-    else if ( !strsubcmp(c, "gfx-") )
-    {
-        vesa_width = strtoui(c + strlen("gfx-"), "x", &c);
+        unsigned int tmp, vesa_depth, vesa_height, vesa_width;
 
-        if ( vesa_width > U16_MAX )
-            return;
+        if ( !strmaxcmp(c, "current", delim_chars_comma) )
+            ebo->boot_vid_mode = VIDEO_CURRENT_MODE;
+        else if ( !strsubcmp(c, "text-80x") )
+        {
+            c += strlen("text-80x");
+            ebo->boot_vid_mode = rows2vmode(strtoui(c, delim_chars_comma, NULL));
+        }
+        else if ( !strsubcmp(c, "gfx-") )
+        {
+            vesa_width = strtoui(c + strlen("gfx-"), "x", &c);
 
-        /*
-         * Increment c outside of strtoui() because otherwise some
-         * compiler may complain with following message:
-         * warning: operation on 'c' may be undefined.
-         */
-        ++c;
-        vesa_height = strtoui(c, "x", &c);
+            if ( vesa_width > U16_MAX )
+                return;
 
-        if ( vesa_height > U16_MAX )
-            return;
+            /*
+             * Increment c outside of strtoui() because otherwise some
+             * compiler may complain with following message:
+             * warning: operation on 'c' may be undefined.
+             */
+            ++c;
+            vesa_height = strtoui(c, "x", &c);
 
-        vesa_depth = strtoui(++c, delim_chars_comma, NULL);
+            if ( vesa_height > U16_MAX )
+                return;
 
-        if ( vesa_depth > U16_MAX )
-            return;
+            vesa_depth = strtoui(++c, delim_chars_comma, NULL);
 
-        ebo->vesa_width = vesa_width;
-        ebo->vesa_height = vesa_height;
-        ebo->vesa_depth = vesa_depth;
-        ebo->boot_vid_mode = VIDEO_VESA_BY_SIZE;
-    }
-    else if ( !strsubcmp(c, "mode-") )
-    {
-        tmp = strtoui(c + strlen("mode-"), delim_chars_comma, NULL);
+            if ( vesa_depth > U16_MAX )
+                return;
 
-        if ( tmp > U16_MAX )
-            return;
+            ebo->vesa_width = vesa_width;
+            ebo->vesa_height = vesa_height;
+            ebo->vesa_depth = vesa_depth;
+            ebo->boot_vid_mode = VIDEO_VESA_BY_SIZE;
+        }
+        else if ( !strsubcmp(c, "mode-") )
+        {
+            tmp = strtoui(c + strlen("mode-"), delim_chars_comma, NULL);
 
-        ebo->boot_vid_mode = tmp;
+            if ( tmp > U16_MAX )
+                return;
+
+            ebo->boot_vid_mode = tmp;
+        }
+        else if ( !strmaxcmp(c, "ask", delim_chars_comma) )
+            ebo->boot_vid_mode = ASK_VGA;
     }
 }
 #endif
