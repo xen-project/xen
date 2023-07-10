@@ -795,7 +795,30 @@ static bool __init efi_arch_use_config_file(EFI_SYSTEM_TABLE *SystemTable)
 
 static void __init efi_arch_flush_dcache_area(const void *vaddr, UINTN size) { }
 
-void __init efi_multiboot2(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
+/* Return a pointer to the character after the first occurrence of opt in cmd */
+static const char *__init get_option(const char *cmd, const char *opt)
+{
+    const char *s = cmd, *o = NULL;
+
+    if ( !cmd || !opt )
+        return NULL;
+
+    while ( (s = strstr(s, opt)) != NULL )
+    {
+        if ( s == cmd || *(s - 1) == ' ' || *(s - 1) == '\t' )
+        {
+            o = s + strlen(opt);
+            break;
+        }
+
+        s += strlen(opt);
+    }
+
+    return o;
+}
+
+void __init efi_multiboot2(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable,
+                           const char *cmdline)
 {
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
     EFI_HANDLE gop_handle;
@@ -816,7 +839,54 @@ void __init efi_multiboot2(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
 
     if ( gop )
     {
-        gop_mode = efi_find_gop_mode(gop, 0, 0, 0);
+        const char *cur = cmdline;
+        unsigned int width = 0, height = 0, depth = 0;
+        bool keep_current = false;
+
+        while ( (cur = get_option(cur, "vga=")) != NULL )
+        {
+#define VALID_TERMINATOR(c) \
+    (*(c) == ' ' || *(c) == '\t' || *(c) == '\0' || *(c) == ',')
+            if ( !strncmp(cur, "gfx-", 4) )
+            {
+                width = simple_strtoul(cur + 4, &cur, 10);
+
+                if ( *cur == 'x' )
+                    height = simple_strtoul(cur + 1, &cur, 10);
+                else
+                    goto error;
+
+                if ( *cur == 'x' )
+                    depth = simple_strtoul(cur + 1, &cur, 10);
+                else
+                    goto error;
+
+                if ( !VALID_TERMINATOR(cur) )
+                {
+                error:
+                    PrintErr(L"Warning: Invalid gfx- option detected\r\n");
+                    width = height = depth = 0;
+                }
+                keep_current = false;
+            }
+            else if ( !strncmp(cur, "current", 7) && VALID_TERMINATOR(cur + 7) )
+                keep_current = true;
+            else if ( !strncmp(cur, "keep", 4) && VALID_TERMINATOR(cur + 4) )
+            {
+                /* Ignore, handled in later vga= parsing. */
+            }
+            else
+            {
+                /* Fallback to defaults if unimplemented. */
+                width = height = depth = 0;
+                keep_current = false;
+                PrintErr(L"Warning: Cannot use selected vga option\r\n");
+            }
+#undef VALID_TERMINATOR
+        }
+
+        if ( !keep_current )
+            gop_mode = efi_find_gop_mode(gop, width, height, depth);
 
         efi_arch_edid(gop_handle);
     }
