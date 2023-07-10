@@ -203,6 +203,15 @@ maintainers if you want to suggest a change.
      - The lowercase character l shall not be used in a literal suffix
      -
 
+   * - `Rule 7.4 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_07_04.c>`_
+     - Required
+     - A string literal shall not be assigned to an object unless the
+       object type is pointer to const-qualified char
+     - All "character types" are permitted, as long as the string
+       element type and the character type match. (There should be no
+       casts.) Assigning a string literal to any object with type
+       "pointer to const-qualified void" is allowed.
+
    * - `Rule 8.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_08_01.c>`_
      - Required
      - Types shall be explicitly specified
@@ -273,6 +282,11 @@ maintainers if you want to suggest a change.
      - Required
      - The initializer for an aggregate or union shall be enclosed in
        braces
+     -
+
+   * - `Rule 9.4 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_09_04.c>`_
+     - Required
+     - An element of an object shall not be initialized more than once
      -
 
    * - `Rule 12.5 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_12_05.c>`_
