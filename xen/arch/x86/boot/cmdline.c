@@ -279,9 +279,13 @@ static void vga_parse(const char *cmdline, early_boot_opts_t *ebo)
 {
     const char *c = cmdline;
 
+    c = find_opt(c, "vga=", true);
+    if ( !c )
+        return;
+
     ebo->boot_vid_mode = ASK_VGA;
 
-    while ( (c = find_opt(c, "vga=", true)) != NULL )
+    do
     {
         unsigned int tmp, vesa_depth, vesa_height, vesa_width;
 
@@ -332,6 +336,7 @@ static void vga_parse(const char *cmdline, early_boot_opts_t *ebo)
         else if ( !strmaxcmp(c, "ask", delim_chars_comma) )
             ebo->boot_vid_mode = ASK_VGA;
     }
+    while ( (c = find_opt(c, "vga=", true)) != NULL );
 }
 #endif
 
