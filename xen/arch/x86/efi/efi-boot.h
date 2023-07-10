@@ -829,7 +829,13 @@ void __init efi_multiboot2(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
 
     efi_init(ImageHandle, SystemTable);
 
-    efi_console_set_mode();
+    if ( StdOut->QueryMode(StdOut, StdOut->Mode->Mode,
+                           &cols, &rows) != EFI_SUCCESS )
+        /*
+         * If active StdOut mode is invalid init ConOut (StdOut) to the max
+         * supported size.
+         */
+        efi_console_set_mode();
 
     if ( StdOut->QueryMode(StdOut, StdOut->Mode->Mode,
                            &cols, &rows) == EFI_SUCCESS )
