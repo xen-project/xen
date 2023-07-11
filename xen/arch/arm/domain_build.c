@@ -3257,14 +3257,15 @@ static int __init domain_handle_dtb_bootmodule(struct domain *d,
 }
 
 /*
- * The max size for DT is 2MB. However, the generated DT is small, 4KB
- * are enough for now, but we might have to increase it in the future.
+ * The max size for DT is 2MB. However, the generated DT is small (not including
+ * domU passthrough DT nodes whose size we account separately), 4KB are enough
+ * for now, but we might have to increase it in the future.
  */
 #define DOMU_DTB_SIZE 4096
 static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
 {
     int addrcells, sizecells;
-    int ret;
+    int ret, fdt_size = DOMU_DTB_SIZE;
 
     kinfo->phandle_gic = GUEST_PHANDLE_GIC;
     kinfo->gnttab_start = GUEST_GNTTAB_BASE;
@@ -3273,11 +3274,18 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     addrcells = GUEST_ROOT_ADDRESS_CELLS;
     sizecells = GUEST_ROOT_SIZE_CELLS;
 
-    kinfo->fdt = xmalloc_bytes(DOMU_DTB_SIZE);
+    /* Account for domU passthrough DT size */
+    if ( kinfo->dtb_bootmodule )
+        fdt_size += kinfo->dtb_bootmodule->size;
+
+    /* Cap to max DT size if needed */
+    fdt_size = min(fdt_size, SZ_2M);
+
+    kinfo->fdt = xmalloc_bytes(fdt_size);
     if ( kinfo->fdt == NULL )
         return -ENOMEM;
 
-    ret = fdt_create(kinfo->fdt, DOMU_DTB_SIZE);
+    ret = fdt_create(kinfo->fdt, fdt_size);
     if ( ret < 0 )
         goto err;
 
