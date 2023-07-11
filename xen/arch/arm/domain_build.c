@@ -3204,7 +3204,7 @@ static int __init domain_handle_dtb_bootmodule(struct domain *d,
 
     res = check_partial_fdt(pfdt, kinfo->dtb_bootmodule->size);
     if ( res < 0 )
-        return res;
+        goto out;
 
     for ( node_next = fdt_first_subnode(pfdt, 0); 
           node_next > 0;
@@ -3235,7 +3235,7 @@ static int __init domain_handle_dtb_bootmodule(struct domain *d,
                                  DT_ROOT_NODE_SIZE_CELLS_DEFAULT,
                                  false);
             if ( res )
-                return res;
+                goto out;
             continue;
         }
         if ( dt_node_cmp(name, "passthrough") == 0 )
@@ -3245,11 +3245,12 @@ static int __init domain_handle_dtb_bootmodule(struct domain *d,
                                  DT_ROOT_NODE_SIZE_CELLS_DEFAULT,
                                  true);
             if ( res )
-                return res;
+                goto out;
             continue;
         }
     }
 
+ out:
     iounmap(pfdt);
 
     return res;
@@ -3326,7 +3327,7 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     {
         ret = domain_handle_dtb_bootmodule(d, kinfo);
         if ( ret )
-            return ret;
+            goto err;
     }
 
     ret = make_gic_domU_node(kinfo);
