@@ -284,6 +284,11 @@ maintainers if you want to suggest a change.
        braces
      -
 
+   * - `Rule 9.3 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_09_03.c>`_
+     - Required
+     - Arrays shall not be partially initialized
+     - {} is also allowed to specify explicit zero-initialization
+
    * - `Rule 9.4 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_09_04.c>`_
      - Required
      - An element of an object shall not be initialized more than once
