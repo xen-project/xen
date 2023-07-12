@@ -2115,7 +2115,7 @@ static void __init __unflatten_device_tree(const void *fdt,
     /* Allocate memory for the expanded device tree */
     mem = (unsigned long)_xmalloc (size + 4, __alignof__(struct dt_device_node));
 
-    ((__be32 *)mem)[size / 4] = cpu_to_be32(0xdeadbeef);
+    ((__be32 *)mem)[size / 4] = cpu_to_be32(0xdeadbeefU);
 
     dt_dprintk("  unflattening %lx...\n", mem);
 
@@ -2125,7 +2125,7 @@ static void __init __unflatten_device_tree(const void *fdt,
     if ( be32_to_cpup((__be32 *)start) != FDT_END )
         printk(XENLOG_WARNING "Weird tag at end of tree: %08x\n",
                   *((u32 *)start));
-    if ( be32_to_cpu(((__be32 *)mem)[size / 4]) != 0xdeadbeef )
+    if ( be32_to_cpu(((__be32 *)mem)[size / 4]) != 0xdeadbeefU )
         printk(XENLOG_WARNING "End of tree marker overwritten: %08x\n",
                   be32_to_cpu(((__be32 *)mem)[size / 4]));
     *allnextp = NULL;
