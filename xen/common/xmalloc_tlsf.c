@@ -46,7 +46,7 @@
 #define BHDR_OVERHEAD   (sizeof(struct bhdr) - MIN_BLOCK_SIZE)
 
 #define PTR_MASK        (sizeof(void *) - 1)
-#define BLOCK_SIZE_MASK (0xFFFFFFFF - PTR_MASK)
+#define BLOCK_SIZE_MASK (0xFFFFFFFFU - PTR_MASK)
 
 #define GET_NEXT_BLOCK(addr, r) ((struct bhdr *) \
                                 ((char *)(addr) + (r)))

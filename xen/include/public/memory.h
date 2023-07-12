@@ -234,7 +234,7 @@ struct xen_add_to_physmap {
 
     unsigned int space; /* => enum phys_map_space */
 
-#define XENMAPIDX_grant_table_status 0x80000000
+#define XENMAPIDX_grant_table_status 0x80000000U
 
     /* Index into space being mapped. */
     xen_ulong_t idx;

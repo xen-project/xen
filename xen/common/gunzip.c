@@ -11,7 +11,7 @@ static unsigned char *__initdata window;
 static memptr __initdata free_mem_ptr;
 static memptr __initdata free_mem_end_ptr;
 
-#define WSIZE           0x80000000
+#define WSIZE           0x80000000U
 
 static unsigned char *__initdata inbuf;
 static unsigned int __initdata insize;

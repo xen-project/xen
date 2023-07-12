@@ -384,7 +384,7 @@ struct xen_sysctl_pm_op {
         struct xen_set_cpufreq_para set_para;
         uint64_aligned_t get_avgfreq;
         uint32_t                    set_sched_opt_smt;
-#define XEN_SYSCTL_CX_UNLIMITED 0xffffffff
+#define XEN_SYSCTL_CX_UNLIMITED 0xffffffffU
         uint32_t                    get_max_cstate;
         uint32_t                    set_max_cstate;
     } u;
@@ -547,7 +547,7 @@ struct xen_sysctl_numainfo {
 #define XEN_SYSCTL_CPUPOOL_OP_RMCPU                 5  /* R */
 #define XEN_SYSCTL_CPUPOOL_OP_MOVEDOMAIN            6  /* M */
 #define XEN_SYSCTL_CPUPOOL_OP_FREEINFO              7  /* F */
-#define XEN_SYSCTL_CPUPOOL_PAR_ANY     0xFFFFFFFF
+#define XEN_SYSCTL_CPUPOOL_PAR_ANY     0xFFFFFFFFU
 struct xen_sysctl_cpupool_op {
     uint32_t op;          /* IN */
     uint32_t cpupool_id;  /* IN: CDIARM OUT: CI */

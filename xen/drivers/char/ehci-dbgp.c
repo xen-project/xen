@@ -375,12 +375,12 @@ static inline u32 dbgp_pid_write_update(u32 x, u32 tok)
     static u8 data0 = USB_PID_DATA1;
 
     data0 ^= USB_PID_DATA0 ^ USB_PID_DATA1;
-    return (x & 0xffff0000) | (data0 << 8) | (tok & 0xff);
+    return (x & 0xffff0000U) | (data0 << 8) | (tok & 0xffU);
 }
 
 static inline u32 dbgp_pid_read_update(u32 x, u32 tok)
 {
-    return (x & 0xffffff00) | (tok & 0xff);
+    return (x & 0xffffff00U) | (tok & 0xffU);
 }
 
 static inline void dbgp_set_data(struct ehci_dbg_port __iomem *ehci_debug,
