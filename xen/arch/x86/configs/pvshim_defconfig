@@ -13,7 +13,6 @@ CONFIG_EXPERT=y
 # CONFIG_HYPFS is not set
 # CONFIG_BIGMEM is not set
 # CONFIG_KEXEC is not set
-# CONFIG_XENOPROF is not set
 # CONFIG_XSM is not set
 # CONFIG_UNSUPPORTED is not set
 # CONFIG_SCHED_CREDIT is not set

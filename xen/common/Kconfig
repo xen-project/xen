@@ -229,10 +229,9 @@ config EFI_SET_VIRTUAL_ADDRESS_MAP
       If unsure, say N.
 
 config XENOPROF
-	def_bool y
-	prompt "Xen Oprofile Support" if EXPERT
+	bool "Xen Oprofile Support" if EXPERT
 	depends on X86
-	---help---
+	help
 	  Xen OProfile (Xenoprof) is a system-wide profiler for Xen virtual
 	  machine environments, capable of profiling the Xen virtual machine
 	  monitor, multiple Linux guest operating systems, and applications
