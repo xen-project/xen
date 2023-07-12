@@ -990,8 +990,8 @@ bool_t __init pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func)
 
     vendor = pci_conf_read32(PCI_SBDF(seg, bus, dev, func), PCI_VENDOR_ID);
     /* some broken boards return 0 or ~0 if a slot is empty: */
-    if ( (vendor == 0xffffffff) || (vendor == 0x00000000) ||
-         (vendor == 0x0000ffff) || (vendor == 0xffff0000) )
+    if ( (vendor == 0xffffffffU) || (vendor == 0x00000000U) ||
+         (vendor == 0x0000ffffU) || (vendor == 0xffff0000U) )
         return 0;
     return 1;
 }
