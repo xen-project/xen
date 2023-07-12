@@ -5,7 +5,7 @@
 #include <public/sysctl.h>
 #include <xen/acpi.h>
 
-#define XEN_PX_INIT 0x80000000
+#define XEN_PX_INIT 0x80000000U
 
 int powernow_cpufreq_init(void);
 unsigned int powernow_register_driver(void);
