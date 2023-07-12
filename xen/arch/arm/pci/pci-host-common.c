@@ -393,20 +393,24 @@ static int is_bar_valid(const struct dt_device_node *dev,
     return 0;
 }
 
-/* TODO: Revisit this function when ACPI PCI passthrough support is added. */
+/*
+ * The MFN range [start, end] is inclusive.
+ *
+ * TODO: Revisit this function when ACPI PCI passthrough support is added.
+ */
 bool pci_check_bar(const struct pci_dev *pdev, mfn_t start, mfn_t end)
 {
     int ret;
     const struct dt_device_node *dt_node;
     paddr_t s = mfn_to_maddr(start);
-    paddr_t e = mfn_to_maddr(end);
+    paddr_t e = mfn_to_maddr(mfn_add(end, 1)) - 1; /* inclusive */
     struct pdev_bar_check bar_data =  {
         .start = s,
         .end = e,
         .is_valid = false
     };
 
-    if ( s >= e )
+    if ( s > e )
         return false;
 
     dt_node = pci_find_host_bridge_node(pdev);
