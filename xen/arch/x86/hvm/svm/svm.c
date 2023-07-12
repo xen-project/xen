@@ -269,9 +269,9 @@ svm_msrbit(unsigned long *msr_bitmap, uint32_t msr)
      */
     if ( msr <= 0x1fff )
         msr_bit = msr_bitmap + 0x0000 / BYTES_PER_LONG;
-    else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
+    else if ( (msr >= 0xc0000000U) && (msr <= 0xc0001fffU) )
         msr_bit = msr_bitmap + 0x0800 / BYTES_PER_LONG;
-    else if ( (msr >= 0xc0010000) && (msr <= 0xc0011fff) )
+    else if ( (msr >= 0xc0010000U) && (msr <= 0xc0011fffU) )
         msr_bit = msr_bitmap + 0x1000 / BYTES_PER_LONG;
 
     return msr_bit;
@@ -2539,8 +2539,8 @@ const struct hvm_function_table * __init start_svm(void)
 
     setup_vmcb_dump();
 
-    if ( boot_cpu_data.extended_cpuid_level >= 0x8000000a )
-        svm_feature_flags = cpuid_edx(0x8000000a);
+    if ( boot_cpu_data.extended_cpuid_level >= 0x8000000aU )
+        svm_feature_flags = cpuid_edx(0x8000000aU);
 
     printk("SVM: Supported advanced features:\n");
 

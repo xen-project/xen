@@ -16,7 +16,7 @@ void svm_asid_init(const struct cpuinfo_x86 *c)
 
     /* Check for erratum #170, and leave ASIDs disabled if it's present. */
     if ( !cpu_has_amd_erratum(c, AMD_ERRATUM_170) )
-        nasids = cpuid_ebx(0x8000000A);
+        nasids = cpuid_ebx(0x8000000aU);
 
     hvm_asid_init(nasids);
 }
