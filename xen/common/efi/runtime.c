@@ -698,7 +698,7 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
 #ifndef COMPAT
     op->status = status;
 #else
-    op->status = (status & 0x3fffffff) | ((status >> 32) & 0xc0000000);
+    op->status = (status & 0x3fffffffU) | ((status >> 32) & 0xc0000000U);
 #endif
 
     return rc;
