@@ -78,7 +78,7 @@ static inline void _atomic_set(atomic_t *v, int i);
  *      int old = atomic_read(&v);
  *      int new = old + 1;
  *      if ( likely(old == atomic_cmpxchg(&v, old, new)) )
- *          break; // success!
+ *          break;
  *  }
  */
 static inline int atomic_cmpxchg(atomic_t *v, int old, int new);

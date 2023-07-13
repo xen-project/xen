@@ -139,10 +139,17 @@ static inline void MAPPING_SEARCH(unsigned long *r, int *fl, int *sl)
         *r = *r + t;
         *fl = flsl(*r) - 1;
         *sl = (*r >> (*fl - MAX_LOG2_SLI)) - MAX_SLI;
-        *fl -= FLI_OFFSET;
-        /*if ((*fl -= FLI_OFFSET) < 0) // FL will be always >0!
-         *fl = *sl = 0;
+        /* 
+         * It's unclear what was the purpose of the commented-out code that now
+         * is in the #else branch. The current form is motivated by the correction
+         * of a violation MISRA:C 2012 Rule 3.1
          */
+#if 1
+        *fl -= FLI_OFFSET;
+#else
+        if ((*fl -= FLI_OFFSET) < 0) /* FL will be always >0! */
+          *fl = *sl = 0;
+#endif
         *r &= ~t;
     }
 }
