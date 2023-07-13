@@ -1412,7 +1412,7 @@ static void cf_check error_interrupt(struct cpu_user_regs *regs)
     };
     const char *entries[ARRAY_SIZE(esr_fields)];
     unsigned int v, v1;
-    int i;
+    unsigned int i;
 
     /* First tickle the hardware, only then report what went on. -- REW */
     v = apic_read(APIC_ESR);
@@ -1420,7 +1420,7 @@ static void cf_check error_interrupt(struct cpu_user_regs *regs)
     v1 = apic_read(APIC_ESR);
     ack_APIC_irq();
 
-    for ( i = 7; i >= 0; --i )
+    for ( i = 0; i < ARRAY_SIZE(entries); ++i )
         entries[i] = v1 & (1 << i) ? esr_fields[i] : "";
     printk(XENLOG_DEBUG
            "APIC error on CPU%u: %02x(%02x)%s%s%s%s%s%s%s%s\n",
