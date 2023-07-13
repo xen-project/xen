@@ -832,7 +832,7 @@ CAMLprim value physinfo_arch_caps(const xc_physinfo_t *info)
 
 	tag = 1; /* tag x86 */
 
-	arch_obj = Tag_cons;
+	arch_obj = Val_emptylist;
 
 #endif
 
