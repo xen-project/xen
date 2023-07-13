@@ -1401,14 +1401,14 @@ static void cf_check spurious_interrupt(struct cpu_user_regs *regs)
 static void cf_check error_interrupt(struct cpu_user_regs *regs)
 {
     static const char *const esr_fields[] = {
-        "Send CS error",
-        "Receive CS error",
-        "Send accept error",
-        "Receive accept error",
-        "Redirectable IPI",
-        "Send illegal vector",
-        "Received illegal vector",
-        "Illegal register address",
+        ", Send CS error",
+        ", Receive CS error",
+        ", Send accept error",
+        ", Receive accept error",
+        ", Redirectable IPI",
+        ", Send illegal vector",
+        ", Received illegal vector",
+        ", Illegal register address",
     };
     unsigned int v, v1;
     int i;
@@ -1423,7 +1423,7 @@ static void cf_check error_interrupt(struct cpu_user_regs *regs)
             smp_processor_id(), v , v1);
     for ( i = 7; i >= 0; --i )
         if ( v1 & (1 << i) )
-            printk(", %s", esr_fields[i]);
+            printk("%s", esr_fields[i]);
     printk("\n");
 }
 
