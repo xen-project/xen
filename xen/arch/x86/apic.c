@@ -1410,6 +1410,7 @@ static void cf_check error_interrupt(struct cpu_user_regs *regs)
         ", Received illegal vector",
         ", Illegal register address",
     };
+    const char *entries[ARRAY_SIZE(esr_fields)];
     unsigned int v, v1;
     int i;
 
@@ -1419,12 +1420,13 @@ static void cf_check error_interrupt(struct cpu_user_regs *regs)
     v1 = apic_read(APIC_ESR);
     ack_APIC_irq();
 
-    printk(XENLOG_DEBUG "APIC error on CPU%u: %02x(%02x)",
-            smp_processor_id(), v , v1);
     for ( i = 7; i >= 0; --i )
-        if ( v1 & (1 << i) )
-            printk("%s", esr_fields[i]);
-    printk("\n");
+        entries[i] = v1 & (1 << i) ? esr_fields[i] : "";
+    printk(XENLOG_DEBUG
+           "APIC error on CPU%u: %02x(%02x)%s%s%s%s%s%s%s%s\n",
+           smp_processor_id(), v, v1,
+           entries[7], entries[6], entries[5], entries[4],
+           entries[3], entries[2], entries[1], entries[0]);
 }
 
 /*
