@@ -69,24 +69,15 @@ acpi_status acpi_load_tables(void);
 acpi_status acpi_load_table(struct acpi_table_header *table_ptr);
 
 acpi_status
-acpi_get_table_header(acpi_string signature,
-		      acpi_native_uint instance,
-		      struct acpi_table_header *out_table_header);
-
-acpi_status
-acpi_get_table(acpi_string signature,
+acpi_get_table(const char *signature,
 	       acpi_native_uint instance, struct acpi_table_header **out_table);
 
 acpi_status
-acpi_get_table_phys(acpi_string signature, acpi_native_uint instance,
+acpi_get_table_phys(const char *signature, acpi_native_uint instance,
 		     acpi_physical_address *addr, acpi_native_uint *len);
 /*
  * Namespace and name interfaces
  */
-acpi_status
-acpi_get_handle(acpi_handle parent,
-		acpi_string pathname, acpi_handle * ret_handle);
-
 acpi_status
 acpi_debug_trace(char *name, u32 debug_level, u32 debug_layer, u32 flags);
 

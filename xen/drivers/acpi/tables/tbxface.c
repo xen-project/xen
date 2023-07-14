@@ -164,7 +164,7 @@ acpi_initialize_tables(struct acpi_table_desc * initial_table_array,
  *
  *****************************************************************************/
 acpi_status __init
-acpi_get_table(char *signature,
+acpi_get_table(const char *signature,
 	       acpi_native_uint instance, struct acpi_table_header **out_table)
 {
 	acpi_native_uint i;
@@ -220,7 +220,7 @@ acpi_get_table(char *signature,
  *
  *****************************************************************************/
 acpi_status __init
-acpi_get_table_phys(acpi_string signature, acpi_native_uint instance,
+acpi_get_table_phys(const char *signature, acpi_native_uint instance,
 		     acpi_physical_address *addr, acpi_native_uint *len)
 {
 	acpi_native_uint i, j;
