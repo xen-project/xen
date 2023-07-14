@@ -212,24 +212,3 @@ int __init acpi_numa_init(void)
 	acpi_numa_arch_fixup();
 	return 0;
 }
-
-#if 0
-int acpi_get_pxm(acpi_handle h)
-{
-	unsigned long pxm;
-	acpi_status status;
-	acpi_handle handle;
-	acpi_handle phandle = h;
-
-	do {
-		handle = phandle;
-		status = acpi_evaluate_integer(handle, "_PXM", NULL, &pxm);
-		if (ACPI_SUCCESS(status))
-			return (int)pxm;
-		status = acpi_get_parent(handle, &phandle);
-	} while (ACPI_SUCCESS(status));
-	return -1;
-}
-
-EXPORT_SYMBOL(acpi_get_pxm);
-#endif

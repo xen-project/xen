@@ -195,15 +195,6 @@ int acpi_set_pdc_bits(uint32_t acpi_id, XEN_GUEST_HANDLE(uint32));
 #endif
 int arch_acpi_set_pdc_bits(u32 acpi_id, u32 *, u32 mask);
 
-#ifdef CONFIG_ACPI_NUMA
-int acpi_get_pxm(acpi_handle handle);
-#else
-static inline int acpi_get_pxm(acpi_handle handle)
-{
-	return 0;
-}
-#endif
-
 void acpi_reboot(void);
 
 #ifdef CONFIG_INTEL_IOMMU
