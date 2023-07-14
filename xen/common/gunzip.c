@@ -52,7 +52,7 @@ typedef unsigned long   ulg;
 static long __initdata bytes_out;
 static void flush_window(void);
 
-static __init void error(char *x)
+static __init void error(const char *x)
 {
     panic("%s\n", x);
 }

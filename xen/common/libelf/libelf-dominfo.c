@@ -100,7 +100,7 @@ elf_errorstatus elf_xen_parse_note(struct elf_binary *elf,
 {
 /* *INDENT-OFF* */
     static const struct {
-        char *name;
+        const char *name;
         bool str;
     } note_desc[] = {
         [XEN_ELFNOTE_ENTRY] = { "ENTRY", 0},

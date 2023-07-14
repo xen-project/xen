@@ -501,7 +501,8 @@ static int ioreq_server_alloc_rangesets(struct ioreq_server *s,
 
     for ( i = 0; i < NR_IO_RANGE_TYPES; i++ )
     {
-        char *name, *type;
+        const char *type;
+        char *name;
 
         switch ( i )
         {
