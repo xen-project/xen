@@ -243,7 +243,7 @@ u8 acpi_tb_checksum(u8 * buffer, acpi_native_uint length)
 
 void __init
 acpi_tb_install_table(acpi_physical_address address,
-		      u8 flags, char *signature, acpi_native_uint table_index)
+		      u8 flags, const char *signature, acpi_native_uint table_index)
 {
 	struct acpi_table_header *table;
 

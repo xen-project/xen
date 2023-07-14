@@ -134,7 +134,7 @@ const char *__init acpi_ut_validate_exception(acpi_status status)
  ******************************************************************************/
 
 void ACPI_INTERNAL_VAR_XFACE __init
-acpi_ut_error(const char *module_name, u32 line_number, char *format, ...)
+acpi_ut_error(const char *module_name, u32 line_number, const char *format, ...)
 {
 	va_list args;
 
@@ -147,7 +147,7 @@ acpi_ut_error(const char *module_name, u32 line_number, char *format, ...)
 }
 
 void ACPI_INTERNAL_VAR_XFACE __init
-acpi_ut_warning(const char *module_name, u32 line_number, char *format, ...)
+acpi_ut_warning(const char *module_name, u32 line_number, const char *format, ...)
 {
 	va_list args;
 
@@ -161,7 +161,7 @@ acpi_ut_warning(const char *module_name, u32 line_number, char *format, ...)
 }
 
 void ACPI_INTERNAL_VAR_XFACE __init
-acpi_ut_info(const char *module_name, u32 line_number, char *format, ...)
+acpi_ut_info(const char *module_name, u32 line_number, const char *format, ...)
 {
 	va_list args;
 

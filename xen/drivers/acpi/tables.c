@@ -300,7 +300,7 @@ acpi_table_get_entry_madt(enum acpi_madt_type entry_id,
 }
 
 int __init
-acpi_parse_entries(char *id, unsigned long table_size,
+acpi_parse_entries(const char *id, unsigned long table_size,
 		   acpi_table_entry_handler handler,
 		   struct acpi_table_header *table_header,
 		   int entry_id, unsigned int max_entries)
@@ -359,7 +359,7 @@ acpi_parse_entries(char *id, unsigned long table_size,
 }
 
 int __init
-acpi_table_parse_entries(char *id,
+acpi_table_parse_entries(const char *id,
 			 unsigned long table_size,
 			 int entry_id,
 			 acpi_table_entry_handler handler,
@@ -405,7 +405,7 @@ acpi_table_parse_madt(enum acpi_madt_type id,
  * Scan the ACPI System Descriptor Table (STD) for a table matching @id,
  * run @handler on it.
  */
-int __init acpi_table_parse(char *id, acpi_table_handler handler)
+int __init acpi_table_parse(const char *id, acpi_table_handler handler)
 {
 	struct acpi_table_header *table = NULL;
 
