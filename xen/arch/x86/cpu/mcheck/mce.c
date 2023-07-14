@@ -1705,7 +1705,7 @@ static void mc_panic_dump(void)
     dprintk(XENLOG_ERR, "End dump mc_info, %x mcinfo dumped\n", mcinfo_dumpped);
 }
 
-void mc_panic(char *s)
+void mc_panic(const char *s)
 {
     is_mc_panic = true;
     console_force_unlock();

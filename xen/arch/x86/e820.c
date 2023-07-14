@@ -363,7 +363,7 @@ static unsigned long __init find_max_pfn(void)
     return max_pfn;
 }
 
-static void __init clip_to_limit(uint64_t limit, char *warnmsg)
+static void __init clip_to_limit(uint64_t limit, const char *warnmsg)
 {
     unsigned int i;
     char _warnmsg[160];

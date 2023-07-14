@@ -302,7 +302,7 @@ static void print_hw_residencies(uint32_t cpu)
            hw_res.cc6, hw_res.cc7);
 }
 
-static char* acpi_cstate_method_name[] =
+static const char *const acpi_cstate_method_name[] =
 {
     "NONE",
     "SYSIO",

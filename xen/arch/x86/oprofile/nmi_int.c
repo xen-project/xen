@@ -36,7 +36,7 @@ struct op_x86_model_spec const *__read_mostly model;
 static struct op_msrs cpu_msrs[NR_CPUS];
 static unsigned long saved_lvtpc[NR_CPUS];
 
-static char *cpu_type;
+static const char *cpu_type;
 
 static DEFINE_PER_CPU(struct vcpu *, nmi_cont_vcpu);
 
@@ -309,7 +309,7 @@ void nmi_stop(void)
 }
 
 
-static int __init p4_init(char ** cpu_type)
+static int __init p4_init(const char **cpu_type)
 {
 	unsigned int cpu_model = current_cpu_data.x86_model;
 
@@ -353,7 +353,7 @@ static int __init cf_check force_cpu_type(const char *str)
 }
 custom_param("cpu_type", force_cpu_type);
 
-static int __init ppro_init(char ** cpu_type)
+static int __init ppro_init(const char **cpu_type)
 {
 	if (force_arch_perfmon && cpu_has_arch_perfmon)
 		return 0;
@@ -375,7 +375,7 @@ static int __init ppro_init(char ** cpu_type)
 	return 1;
 }
 
-static int __init arch_perfmon_init(char **cpu_type)
+static int __init arch_perfmon_init(const char **cpu_type)
 {
 	if (!cpu_has_arch_perfmon)
 		return 0;

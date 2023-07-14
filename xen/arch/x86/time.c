@@ -64,8 +64,8 @@ struct cpu_time {
 };
 
 struct platform_timesource {
-    char *id;
-    char *name;
+    const char *id;
+    const char *name;
     u64 frequency;
     /* Post-init this hook may only be invoked via the read_counter() wrapper! */
     u64 (*read_counter)(void);

@@ -57,7 +57,7 @@ struct mcinfo_extended *intel_get_extended_msrs(
 bool mce_available(const struct cpuinfo_x86 *c);
 unsigned int mce_firstbank(struct cpuinfo_x86 *c);
 /* Helper functions used for collecting error telemetry */
-void noreturn mc_panic(char *s);
+void noreturn mc_panic(const char *s);
 void x86_mc_get_cpu_info(unsigned, uint32_t *, uint16_t *, uint16_t *,
                          uint32_t *, uint32_t *, uint32_t *, uint32_t *);
 

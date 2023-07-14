@@ -92,7 +92,7 @@ struct hvm_vcpu_nonreg_state {
  * supports Intel's VT-x and AMD's SVM extensions.
  */
 struct hvm_function_table {
-    char *name;
+    const char *name;
 
     /* Support Hardware-Assisted Paging? */
     bool_t hap_supported;

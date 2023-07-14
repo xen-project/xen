@@ -1949,7 +1949,7 @@ static inline unsigned long vmr(unsigned long field)
     (uint32_t)vmr(fld);                       \
 })
 
-static void vmx_dump_sel(char *name, uint32_t selector)
+static void vmx_dump_sel(const char *name, uint32_t selector)
 {
     uint32_t sel, attr, limit;
     uint64_t base;
@@ -1960,7 +1960,7 @@ static void vmx_dump_sel(char *name, uint32_t selector)
     printk("%s: %04x %05x %08x %016"PRIx64"\n", name, sel, attr, limit, base);
 }
 
-static void vmx_dump_sel2(char *name, uint32_t lim)
+static void vmx_dump_sel2(const char *name, uint32_t lim)
 {
     uint32_t limit;
     uint64_t base;

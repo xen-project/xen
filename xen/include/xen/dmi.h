@@ -20,12 +20,12 @@ enum dmi_field {
  */
 struct dmi_strmatch {
 	u8 slot;
-	char *substr;
+	const char *substr;
 };
 
 struct dmi_system_id {
 	int (*callback)(const struct dmi_system_id *);
-	char *ident;
+	const char *ident;
 	struct dmi_strmatch matches[4];
 	void *driver_data;
 };
