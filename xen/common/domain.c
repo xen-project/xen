@@ -439,6 +439,7 @@ static int domain_teardown(struct domain *d)
             PROG_none,
             PROG_gnttab_mappings,
             PROG_vcpu_teardown,
+            PROG_arch_teardown,
             PROG_done,
         };
 
@@ -458,6 +459,11 @@ static int domain_teardown(struct domain *d)
             if ( rc )
                 return rc;
         }
+
+    PROGRESS(arch_teardown):
+        rc = arch_domain_teardown(d);
+        if ( rc )
+            return rc;
 
     PROGRESS(done):
         break;

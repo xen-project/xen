@@ -81,6 +81,7 @@ int arch_domain_create(struct domain *d,
                        struct xen_domctl_createdomain *config,
                        unsigned int flags);
 
+int arch_domain_teardown(struct domain *d);
 void arch_domain_destroy(struct domain *d);
 
 void arch_domain_shutdown(struct domain *d);

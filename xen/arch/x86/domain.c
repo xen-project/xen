@@ -888,6 +888,11 @@ int arch_domain_create(struct domain *d,
     return rc;
 }
 
+int arch_domain_teardown(struct domain *d)
+{
+    return 0;
+}
+
 void arch_domain_destroy(struct domain *d)
 {
     if ( is_hvm_domain(d) )
