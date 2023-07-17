@@ -8,3 +8,14 @@ config OPTEE
 	  virtualization-enabled OP-TEE present. You can learn more
 	  about virtualization for OP-TEE at
 	  https://optee.readthedocs.io/architecture/virtualization.html
+
+config FFA
+	bool "Enable FF-A mediator support (UNSUPPORTED)" if UNSUPPORTED
+	default n
+	depends on ARM_64 && TEE
+	help
+	  This option enables a minimal FF-A mediator. The mediator is
+	  generic as it follows the FF-A specification [1], but it only
+	  implements a small subset of the specification.
+
+	  [1] https://developer.arm.com/documentation/den0077/latest

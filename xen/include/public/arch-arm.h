@@ -296,6 +296,7 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 
 #define XEN_DOMCTL_CONFIG_TEE_NONE      0
 #define XEN_DOMCTL_CONFIG_TEE_OPTEE     1
+#define XEN_DOMCTL_CONFIG_TEE_FFA       2
 
 struct xen_arch_domainconfig {
     /* IN/OUT */

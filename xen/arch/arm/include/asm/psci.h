@@ -24,6 +24,10 @@ void call_psci_cpu_off(void);
 void call_psci_system_off(void);
 void call_psci_system_reset(void);
 
+/* Range of allocated PSCI function numbers */
+#define	PSCI_FNUM_MIN_VALUE                 _AC(0,U)
+#define	PSCI_FNUM_MAX_VALUE                 _AC(0x1f,U)
+
 /* PSCI v0.2 interface */
 #define PSCI_0_2_FN32(nr) ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,             \
                                              ARM_SMCCC_CONV_32,               \
