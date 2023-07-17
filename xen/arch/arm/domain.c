@@ -795,6 +795,41 @@ fail:
 
 int arch_domain_teardown(struct domain *d)
 {
+    int ret = 0;
+
+    BUG_ON(!d->is_dying);
+
+    /* See domain_teardown() for an explanation of all of this magic. */
+    switch ( d->teardown.arch_val )
+    {
+#define PROGRESS(x)                             \
+        d->teardown.arch_val = PROG_ ## x;      \
+        fallthrough;                            \
+    case PROG_ ## x
+
+        enum {
+            PROG_none,
+            PROG_tee,
+            PROG_done,
+        };
+
+    case PROG_none:
+        BUILD_BUG_ON(PROG_none != 0);
+
+    PROGRESS(tee):
+        ret = tee_domain_teardown(d);
+        if ( ret )
+            return ret;
+
+    PROGRESS(done):
+        break;
+
+#undef PROGRESS
+
+    default:
+        BUG();
+    }
+
     return 0;
 }
 

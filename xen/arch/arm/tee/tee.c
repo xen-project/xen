@@ -52,6 +52,14 @@ int tee_domain_init(struct domain *d, uint16_t tee_type)
     return cur_mediator->ops->domain_init(d);
 }
 
+int tee_domain_teardown(struct domain *d)
+{
+    if ( !cur_mediator )
+        return 0;
+
+    return cur_mediator->ops->domain_teardown(d);
+}
+
 int tee_relinquish_resources(struct domain *d)
 {
     if ( !cur_mediator )

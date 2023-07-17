@@ -34,6 +34,7 @@ struct tee_mediator_ops {
      * guest and create own structures for the new domain.
      */
     int (*domain_init)(struct domain *d);
+    int (*domain_teardown)(struct domain *d);
 
     /*
      * Called during domain destruction to relinquish resources used
@@ -62,6 +63,7 @@ struct tee_mediator_desc {
 
 bool tee_handle_call(struct cpu_user_regs *regs);
 int tee_domain_init(struct domain *d, uint16_t tee_type);
+int tee_domain_teardown(struct domain *d);
 int tee_relinquish_resources(struct domain *d);
 uint16_t tee_get_type(void);
 
@@ -89,6 +91,11 @@ static inline int tee_domain_init(struct domain *d, uint16_t tee_type)
 }
 
 static inline int tee_relinquish_resources(struct domain *d)
+{
+    return 0;
+}
+
+static inline int tee_domain_teardown(struct domain *d)
 {
     return 0;
 }
