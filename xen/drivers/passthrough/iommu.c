@@ -598,7 +598,7 @@ int __init iommu_setup(void)
     return rc;
 }
 
-int iommu_suspend()
+int iommu_suspend(void)
 {
     if ( iommu_enabled )
         return iommu_call(iommu_get_ops(), suspend);
@@ -606,7 +606,7 @@ int iommu_suspend()
     return 0;
 }
 
-void iommu_resume()
+void iommu_resume(void)
 {
     if ( iommu_enabled )
         iommu_vcall(iommu_get_ops(), resume);

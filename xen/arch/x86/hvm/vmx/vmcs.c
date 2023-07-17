@@ -782,7 +782,7 @@ static int _vmx_cpu_up(bool bsp)
     return 0;
 }
 
-int cf_check vmx_cpu_up()
+int cf_check vmx_cpu_up(void)
 {
     return _vmx_cpu_up(false);
 }
