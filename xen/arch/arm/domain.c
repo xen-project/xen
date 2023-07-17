@@ -137,7 +137,7 @@ static void ctxt_switch_from(struct vcpu *p)
     p->arch.ttbr1 = READ_SYSREG64(TTBR1_EL1);
     if ( is_32bit_domain(p->domain) )
         p->arch.dacr = READ_SYSREG(DACR32_EL2);
-    p->arch.par = READ_SYSREG64(PAR_EL1);
+    p->arch.par = read_sysreg_par();
 #if defined(CONFIG_ARM_32)
     p->arch.mair0 = READ_CP32(MAIR0);
     p->arch.mair1 = READ_CP32(MAIR1);
