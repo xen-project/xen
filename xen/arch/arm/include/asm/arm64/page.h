@@ -48,11 +48,11 @@ static inline void invalidate_icache_local(void)
 /* Ask the MMU to translate a VA for us */
 static inline uint64_t __va_to_par(vaddr_t va)
 {
-    uint64_t par, tmp = READ_SYSREG64(PAR_EL1);
+    uint64_t par, tmp = read_sysreg_par();
 
     asm volatile ("at s1e2r, %0;" : : "r" (va));
     isb();
-    par = READ_SYSREG64(PAR_EL1);
+    par = read_sysreg_par();
     WRITE_SYSREG64(tmp, PAR_EL1);
     return par;
 }
@@ -60,28 +60,28 @@ static inline uint64_t __va_to_par(vaddr_t va)
 /* Ask the MMU to translate a Guest VA for us */
 static inline uint64_t gva_to_ma_par(vaddr_t va, unsigned int flags)
 {
-    uint64_t par, tmp = READ_SYSREG64(PAR_EL1);
+    uint64_t par, tmp = read_sysreg_par();
 
     if ( (flags & GV2M_WRITE) == GV2M_WRITE )
         asm volatile ("at s12e1w, %0;" : : "r" (va));
     else
         asm volatile ("at s12e1r, %0;" : : "r" (va));
     isb();
-    par = READ_SYSREG64(PAR_EL1);
+    par = read_sysreg_par();
     WRITE_SYSREG64(tmp, PAR_EL1);
     return par;
 }
 
 static inline uint64_t gva_to_ipa_par(vaddr_t va, unsigned int flags)
 {
-    uint64_t par, tmp = READ_SYSREG64(PAR_EL1);
+    uint64_t par, tmp = read_sysreg_par();
 
     if ( (flags & GV2M_WRITE) == GV2M_WRITE )
         asm volatile ("at s1e1w, %0;" : : "r" (va));
     else
         asm volatile ("at s1e1r, %0;" : : "r" (va));
     isb();
-    par = READ_SYSREG64(PAR_EL1);
+    par = read_sysreg_par();
     WRITE_SYSREG64(tmp, PAR_EL1);
     return par;
 }
