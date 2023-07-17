@@ -39,8 +39,10 @@ supported in this document.
 
     Status: Supported
     Status, Cortex A57 r0p0-r1p1: Supported, not security supported
+    Status, Cortex A77 r0p0-r1p0: Supported, not security supported
 
 For the Cortex A57 r0p0 - r1p1, see Errata 832075.
+For the Cortex A77 r0p0 - r1p0, see Errata 1508412.
 
 ## Host hardware support
 
