@@ -272,13 +272,13 @@ int vmce_amd_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 }
 
 enum mcheck_type
-amd_mcheck_init(struct cpuinfo_x86 *ci)
+amd_mcheck_init(const struct cpuinfo_x86 *c)
 {
     uint32_t i;
     enum mcequirk_amd_flags quirkflag = 0;
 
-    if ( ci->x86_vendor != X86_VENDOR_HYGON )
-        quirkflag = mcequirk_lookup_amd_quirkdata(ci);
+    if ( c->x86_vendor != X86_VENDOR_HYGON )
+        quirkflag = mcequirk_lookup_amd_quirkdata(c);
 
     /* Assume that machine check support is available.
      * The minimum provided support is at least the K8. */
@@ -298,14 +298,14 @@ amd_mcheck_init(struct cpuinfo_x86 *ci)
         }
     }
 
-    if ( ci->x86 == 0xf )
+    if ( c->x86 == 0xf )
         return mcheck_amd_k8;
 
     if ( quirkflag == MCEQUIRK_F10_GART )
         mcequirk_amd_apply(quirkflag);
 
-    if ( cpu_has(ci, X86_FEATURE_AMD_PPIN) &&
-         (ci == &boot_cpu_data || ppin_msr) )
+    if ( cpu_has(c, X86_FEATURE_AMD_PPIN) &&
+         (c == &boot_cpu_data || ppin_msr) )
     {
         uint64_t val;
 
@@ -320,7 +320,7 @@ amd_mcheck_init(struct cpuinfo_x86 *ci)
 
         if ( !(val & PPIN_ENABLE) )
             ppin_msr = 0;
-        else if ( ci == &boot_cpu_data )
+        else if ( c == &boot_cpu_data )
             ppin_msr = MSR_AMD_PPIN;
     }
 
@@ -328,6 +328,6 @@ amd_mcheck_init(struct cpuinfo_x86 *ci)
     mce_recoverable_register(mc_amd_recoverable_scan);
     mce_register_addrcheck(mc_amd_addrcheck);
 
-    return ci->x86_vendor == X86_VENDOR_HYGON ?
+    return c->x86_vendor == X86_VENDOR_HYGON ?
             mcheck_hygon : mcheck_amd_famXX;
 }

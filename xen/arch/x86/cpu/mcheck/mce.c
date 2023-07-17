@@ -123,7 +123,7 @@ void mce_recoverable_register(mce_recoverable_t cbfunc)
     mc_recoverable_scan = cbfunc;
 }
 
-struct mca_banks *mcabanks_alloc(unsigned int nr_mce_banks)
+struct mca_banks *mcabanks_alloc(unsigned int nr)
 {
     struct mca_banks *mb;
 
@@ -135,18 +135,17 @@ struct mca_banks *mcabanks_alloc(unsigned int nr_mce_banks)
      * For APs allocations get done by the BSP, i.e. when the bank count may
      * may not be known yet. A zero bank count is a clear indication of this.
      */
-    if ( !nr_mce_banks )
-        nr_mce_banks = MCG_CAP_COUNT;
+    if ( !nr )
+        nr = MCG_CAP_COUNT;
 
-    mb->bank_map = xzalloc_array(unsigned long,
-                                 BITS_TO_LONGS(nr_mce_banks));
+    mb->bank_map = xzalloc_array(unsigned long, BITS_TO_LONGS(nr));
     if ( !mb->bank_map )
     {
         xfree(mb);
         return NULL;
     }
 
-    mb->num = nr_mce_banks;
+    mb->num = nr;
 
     return mb;
 }

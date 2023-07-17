@@ -43,7 +43,7 @@ extern uint8_t cmci_apic_vector;
 extern bool lmce_support;
 
 /* Init functions */
-enum mcheck_type amd_mcheck_init(struct cpuinfo_x86 *c);
+enum mcheck_type amd_mcheck_init(const struct cpuinfo_x86 *c);
 enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool bsp);
 
 void amd_nonfatal_mcheck_init(struct cpuinfo_x86 *c);
