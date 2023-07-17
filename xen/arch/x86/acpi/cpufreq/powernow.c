@@ -353,7 +353,7 @@ static const struct cpufreq_driver __initconstrel powernow_cpufreq_driver = {
     .update = powernow_cpufreq_update
 };
 
-unsigned int __init powernow_register_driver()
+unsigned int __init powernow_register_driver(void)
 {
     unsigned int i, ret = 0;
 

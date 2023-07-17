@@ -774,7 +774,7 @@ static int _vmx_cpu_up(bool bsp)
     return 0;
 }
 
-int vmx_cpu_up()
+int vmx_cpu_up(void)
 {
     return _vmx_cpu_up(false);
 }

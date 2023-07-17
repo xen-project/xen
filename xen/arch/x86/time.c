@@ -1265,7 +1265,7 @@ s_time_t get_s_time_fixed(u64 at_tsc)
     return t->stamp.local_stime + scale_delta(delta, &t->tsc_scale);
 }
 
-s_time_t get_s_time()
+s_time_t get_s_time(void)
 {
     return get_s_time_fixed(0);
 }
