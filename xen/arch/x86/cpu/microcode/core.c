@@ -594,7 +594,8 @@ static long microcode_update_helper(void *data)
         printk(XENLOG_WARNING
                "CPU%u is expected to lead ucode loading (but got CPU%u)\n",
                nmi_cpu, cpumask_first(&cpu_online_map));
-        return -EPERM;
+        ret = -EPERM;
+        goto put;
     }
 
     patch = parse_blob(buffer->buffer, buffer->len);
