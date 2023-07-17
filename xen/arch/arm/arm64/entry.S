@@ -112,6 +112,16 @@
  * position on the stack before.
  */
         .macro  entry, hyp, compat, save_x0_x1=1
+
+        /*
+         * Ensure any PAR_EL1 reads complete, in case we were interrupted
+         * between the PAR_EL1 read and the memory barrier for the erratum
+         * 1508412 workaround.
+         */
+        alternative_if ARM64_WORKAROUND_1508412
+        dmb sy
+        alternative_else_nop_endif
+
         sub     sp, sp, #(UREGS_SPSR_el1 - UREGS_LR) /* CPSR, PC, SP, LR */
         push    x28, x29
         push    x26, x27
@@ -464,6 +474,15 @@ return_from_trap:
         pop     x28, x29
 
         ldr     lr, [sp], #(UREGS_SPSR_el1 - UREGS_LR) /* CPSR, PC, SP, LR */
+
+        /*
+         * Ensure any device/NC reads complete, in case we were interrupted
+         * between the memory barrier for the erratum 1508412 workaround and
+         * any PAR_EL1 read.
+         */
+        alternative_if ARM64_WORKAROUND_1508412
+        dmb sy
+        alternative_else_nop_endif
 
         eret
         sb
