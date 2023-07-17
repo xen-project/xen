@@ -1377,7 +1377,7 @@ struct hvm_data {
     tsc_t exit_tsc, arc_cycles, entry_tsc;
     unsigned long long rip;
     unsigned exit_reason, event_handler;
-    int short_summary_done:1, prealloc_unpin:1, wrmap_bf:1;
+    unsigned int short_summary_done:1, prealloc_unpin:1, wrmap_bf:1;
 
     /* Immediate processing */
     void *d;
@@ -8235,13 +8235,13 @@ void mem_set_p2m_entry_process(struct pcpu_info *p)
 
     struct {
         uint64_t gfn, mfn;
-        int p2mt;
-        int d:16,order:16;
+        uint32_t p2mt;
+        uint16_t d, order;
     } *r = (typeof(r))ri->d;
 
     if ( opt.dump_all )
     {
-        printf(" %s set_p2m_entry d%d o%d t %d g %llx m %llx\n",
+        printf(" %s set_p2m_entry d%u o%u t %u g %llx m %llx\n",
                ri->dump_header,
                r->d, r->order,
                r->p2mt,
