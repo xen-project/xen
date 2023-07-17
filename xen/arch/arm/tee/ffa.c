@@ -58,6 +58,19 @@
                                                  FFA_MY_VERSION_MINOR)
 
 /*
+ * Flags and field values used for the MSG_SEND_DIRECT_REQ/RESP:
+ * BIT(31): Framework or partition message
+ * BIT(7-0): Message type for frameworks messages
+ */
+#define FFA_MSG_FLAG_FRAMEWORK          BIT(31, U)
+#define FFA_MSG_TYPE_MASK               0xFFU;
+#define FFA_MSG_PSCI                    0x0U
+#define FFA_MSG_SEND_VM_CREATED         0x4U
+#define FFA_MSG_RESP_VM_CREATED         0x5U
+#define FFA_MSG_SEND_VM_DESTROYED       0x6U
+#define FFA_MSG_RESP_VM_DESTROYED       0x7U
+
+/*
  * Flags to determine partition properties in FFA_PARTITION_INFO_GET return
  * message:
  * BIT(0): Supports receipt of direct requests
