@@ -181,6 +181,12 @@ static bool ffa_get_version(uint32_t *vers)
     return true;
 }
 
+static uint16_t get_vm_id(const struct domain *d)
+{
+    /* +1 since 0 is reserved for the hypervisor in FF-A */
+    return d->domain_id + 1;
+}
+
 static void set_regs(struct cpu_user_regs *regs, register_t v0, register_t v1,
                      register_t v2, register_t v3, register_t v4, register_t v5,
                      register_t v6, register_t v7)
@@ -193,6 +199,12 @@ static void set_regs(struct cpu_user_regs *regs, register_t v0, register_t v1,
         set_user_reg(regs, 5, v5);
         set_user_reg(regs, 6, v6);
         set_user_reg(regs, 7, v7);
+}
+
+static void set_regs_success(struct cpu_user_regs *regs, uint32_t w2,
+                             uint32_t w3)
+{
+    set_regs(regs, FFA_SUCCESS_32, 0, w2, w3, 0, 0, 0, 0);
 }
 
 static void handle_version(struct cpu_user_regs *regs)
@@ -224,6 +236,9 @@ static bool ffa_handle_call(struct cpu_user_regs *regs)
     case FFA_VERSION:
         handle_version(regs);
         return true;
+    case FFA_ID_GET:
+        set_regs_success(regs, get_vm_id(d), 0);
+        return true;
 
     default:
         gprintk(XENLOG_ERR, "ffa: unhandled fid 0x%x\n", fid);
@@ -237,6 +252,12 @@ static int ffa_domain_init(struct domain *d)
 
     if ( !ffa_version )
         return -ENODEV;
+     /*
+      * We can't use that last possible domain ID or get_vm_id() would cause
+      * an overflow.
+      */
+    if ( d->domain_id >= UINT16_MAX)
+        return -ERANGE;
 
     ctx = xzalloc(struct ffa_ctx);
     if ( !ctx )
