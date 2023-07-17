@@ -1587,6 +1587,7 @@ void amd_iommu_crash_shutdown(void)
 void amd_iommu_resume(void)
 {
     struct amd_iommu *iommu;
+    bool invalidate_all = true;
 
     for_each_amd_iommu ( iommu )
     {
@@ -1596,10 +1597,12 @@ void amd_iommu_resume(void)
         */
         disable_iommu(iommu);
         enable_iommu(iommu);
+        if ( !iommu->features.flds.ia_sup )
+            invalidate_all = false;
     }
 
     /* flush all cache entries after iommu re-enabled */
-    if ( !iommu->features.flds.ia_sup )
+    if ( !invalidate_all )
     {
         invalidate_all_devices();
         invalidate_all_domain_pages();
