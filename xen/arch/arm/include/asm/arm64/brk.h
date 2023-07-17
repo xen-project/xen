@@ -21,7 +21,7 @@
  * BRK instruction encoding
  * The #imm16 value should be placed at bits[20:5] within BRK ins
  */
-#define AARCH64_BREAK_MON 0xd4200000
+#define AARCH64_BREAK_MON 0xd4200000U
 
 /*
  * BRK instruction for provoking a fault on purpose

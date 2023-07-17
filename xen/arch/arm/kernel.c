@@ -39,7 +39,7 @@ struct minimal_dtb_header {
     /* There are other fields but we don't use them yet. */
 };
 
-#define DTB_MAGIC 0xd00dfeed
+#define DTB_MAGIC 0xd00dfeedU
 
 /**
  * copy_from_paddr - copy data from a physical address

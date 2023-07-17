@@ -619,8 +619,8 @@ static void __init gicv3_dist_init(void)
     /* Disable/deactivate all global interrupts */
     for ( i = NR_GIC_LOCAL_IRQS; i < nr_lines; i += 32 )
     {
-        writel_relaxed(0xffffffff, GICD + GICD_ICENABLER + (i / 32) * 4);
-        writel_relaxed(0xffffffff, GICD + GICD_ICACTIVER + (i / 32) * 4);
+        writel_relaxed(0xffffffffU, GICD + GICD_ICENABLER + (i / 32) * 4);
+        writel_relaxed(0xffffffffU, GICD + GICD_ICACTIVER + (i / 32) * 4);
     }
 
     /*
@@ -832,13 +832,13 @@ static int gicv3_cpu_init(void)
      * The activate state is unknown at boot, so make sure all
      * SGIs and PPIs are de-activated.
      */
-    writel_relaxed(0xffffffff, GICD_RDIST_SGI_BASE + GICR_ICACTIVER0);
+    writel_relaxed(0xffffffffU, GICD_RDIST_SGI_BASE + GICR_ICACTIVER0);
     /*
      * Disable all PPI interrupts, ensure all SGI interrupts are
      * enabled.
      */
-    writel_relaxed(0xffff0000, GICD_RDIST_SGI_BASE + GICR_ICENABLER0);
-    writel_relaxed(0x0000ffff, GICD_RDIST_SGI_BASE + GICR_ISENABLER0);
+    writel_relaxed(0xffff0000U, GICD_RDIST_SGI_BASE + GICR_ICENABLER0);
+    writel_relaxed(0x0000ffffU, GICD_RDIST_SGI_BASE + GICR_ISENABLER0);
     /* Configure SGIs/PPIs as non-secure Group-1 */
     writel_relaxed(GENMASK(31, 0), GICD_RDIST_SGI_BASE + GICR_IGROUPR0);
 

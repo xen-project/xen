@@ -56,7 +56,7 @@ static inline bool vreg_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr,
 
     if ( ret && cp64.read )
     {
-        set_user_reg(regs, cp64.reg1, x & 0xffffffff);
+        set_user_reg(regs, cp64.reg1, x & 0xffffffffU);
         set_user_reg(regs, cp64.reg2, x >> 32);
     }
 

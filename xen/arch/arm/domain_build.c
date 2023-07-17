@@ -3760,8 +3760,8 @@ static int __init construct_domain(struct domain *d, struct kernel_info *kinfo)
          * r1 = machine nr, r2 = atags or dtb pointer.
          *...
          */
-        regs->r0 = 0; /* SBZ */
-        regs->r1 = 0xffffffff; /* We use DTB therefore no machine id */
+        regs->r0 = 0U; /* SBZ */
+        regs->r1 = 0xffffffffU; /* We use DTB therefore no machine id */
         regs->r2 = kinfo->dtb_paddr;
     }
 #ifdef CONFIG_ARM_64

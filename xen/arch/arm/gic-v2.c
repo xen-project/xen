@@ -386,9 +386,9 @@ static void gicv2_cpu_init(void)
     /* The first 32 interrupts (PPI and SGI) are banked per-cpu, so
      * even though they are controlled with GICD registers, they must
      * be set up here with the other per-cpu state. */
-    writel_gicd(0xffffffff, GICD_ICACTIVER); /* Diactivate PPIs and SGIs */
-    writel_gicd(0xffff0000, GICD_ICENABLER); /* Disable all PPI */
-    writel_gicd(0x0000ffff, GICD_ISENABLER); /* Enable all SGI */
+    writel_gicd(0xffffffffU, GICD_ICACTIVER); /* De-activate PPIs and SGIs */
+    writel_gicd(0xffff0000U, GICD_ICENABLER); /* Disable all PPI */
+    writel_gicd(0x0000ffffU, GICD_ISENABLER); /* Enable all SGI */
 
     /* Set SGI priorities */
     for ( i = 0; i < 16; i += 4 )

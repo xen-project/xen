@@ -306,7 +306,7 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
     case VREG32(GICD_SGIR):
         if ( dabt.size != DABT_WORD ) goto bad_width;
         /* Write only -- read unknown */
-        *r = 0xdeadbeef;
+        *r = 0xdeadbeefU;
         return 1;
 
     case VRANGE32(0xF04, 0xF0C):

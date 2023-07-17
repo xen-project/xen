@@ -354,7 +354,7 @@ read_reserved:
     return 1;
 
 read_unknown:
-    *r = vreg_reg64_extract(0xdeadbeafdeadbeaf, info);
+    *r = vreg_reg64_extract(0xdeadbeafdeadbeafULL, info);
     return 1;
 }
 

@@ -398,7 +398,7 @@ static vaddr_t exception_handler32(vaddr_t offset)
     register_t sctlr = READ_SYSREG(SCTLR_EL1);
 
     if ( sctlr & SCTLR_A32_EL1_V )
-        return 0xffff0000 + offset;
+        return 0xffff0000U + offset;
     else /* always have security exceptions */
         return READ_SYSREG(VBAR_EL1) + offset;
 }
@@ -809,7 +809,7 @@ static void show_registers_32(const struct cpu_user_regs *regs,
 #ifdef CONFIG_ARM_64
                (uint32_t)(ctxt->far >> 32),
                ctxt->ifsr32_el2,
-               (uint32_t)(ctxt->far & 0xffffffff),
+               (uint32_t)(ctxt->far & 0xffffffffU),
                ctxt->esr_el1
 #else
                ctxt->ifar, ctxt->ifsr, ctxt->dfar, ctxt->dfsr
@@ -1414,16 +1414,16 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, register_t *nr,
     {
         /* Deliberately corrupt parameter regs used by this hypercall. */
         switch ( hypercall_args[*nr] ) {
-        case 5: HYPERCALL_ARG5(regs) = 0xDEADBEEF;
-        case 4: HYPERCALL_ARG4(regs) = 0xDEADBEEF;
-        case 3: HYPERCALL_ARG3(regs) = 0xDEADBEEF;
-        case 2: HYPERCALL_ARG2(regs) = 0xDEADBEEF;
+        case 5: HYPERCALL_ARG5(regs) = 0xDEADBEEFU;
+        case 4: HYPERCALL_ARG4(regs) = 0xDEADBEEFU;
+        case 3: HYPERCALL_ARG3(regs) = 0xDEADBEEFU;
+        case 2: HYPERCALL_ARG2(regs) = 0xDEADBEEFU;
         case 1: /* Don't clobber x0/r0 -- it's the return value */
         case 0: /* -ENOSYS case */
             break;
         default: BUG();
         }
-        *nr = 0xDEADBEEF;
+        *nr = 0xDEADBEEFU;
     }
 #endif
 
