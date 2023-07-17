@@ -118,6 +118,7 @@ bool bogus_8259A_irq(unsigned int irq);
 int i8259A_suspend(void);
 int i8259A_resume(void);
 
+void enable_IO_APIC(void);
 void setup_IO_APIC(void);
 void disable_IO_APIC(void);
 void setup_ioapic_dest(void);

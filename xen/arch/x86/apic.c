@@ -1493,6 +1493,10 @@ int __init APIC_init_uniprocessor (void)
     physids_clear(phys_cpu_present_map);
     physid_set(boot_cpu_physical_apicid, phys_cpu_present_map);
 
+    if ( !skip_ioapic_setup && nr_ioapics )
+        /* Sanitize the IO-APIC pins before enabling the lapic LVTERR/ESR. */
+        enable_IO_APIC();
+
     setup_local_APIC(true);
 
     if (nmi_watchdog == NMI_LOCAL_APIC)

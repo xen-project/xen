@@ -1224,6 +1224,11 @@ void __init smp_prepare_cpus(void)
     verify_local_APIC();
 
     connect_bsp_APIC();
+
+    if ( !skip_ioapic_setup && nr_ioapics )
+        /* Sanitize the IO-APIC pins before enabling the lapic LVTERR/ESR. */
+        enable_IO_APIC();
+
     setup_local_APIC(true);
 
     if ( !skip_ioapic_setup && nr_ioapics )
