@@ -50,7 +50,7 @@ static int __init acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
 {
     int year;
 
-    if (cfg->address < 0xFFFFFFFF)
+    if (cfg->address == (uint32_t)cfg->address)
         return 0;
 
     if (!strncmp(mcfg->header.oem_id, "SGI", 3))
@@ -59,7 +59,7 @@ static int __init acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
     if (mcfg->header.revision >= 1 &&
         dmi_get_date(DMI_BIOS_DATE, &year, NULL, NULL) &&
         year >= 2010)
-            return 0;
+        return 0;
 
     printk(KERN_ERR "MCFG region for %04x:%02x-%02x at %#"PRIx64
                     " (above 4GB) ignored\n",
