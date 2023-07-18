@@ -47,30 +47,33 @@
  * ones.
  */
 
-/** Maximum (non-inclusive) usable pdx */
+/**
+ * Maximum (non-inclusive) usable pdx. Must be
+ * modifiable after init due to memory hotplug
+ */
 unsigned long __read_mostly max_pdx;
 
 /** Mask for the lower non-compressible bits of an mfn */
-unsigned long __read_mostly pfn_pdx_bottom_mask = ~0UL;
+unsigned long __ro_after_init pfn_pdx_bottom_mask = ~0UL;
 
 /** Mask for the lower non-compressible bits of an maddr or vaddr */
-unsigned long __read_mostly ma_va_bottom_mask = ~0UL;
+unsigned long __ro_after_init ma_va_bottom_mask = ~0UL;
 
 /** Mask for the higher non-compressible bits of an mfn */
-unsigned long __read_mostly pfn_top_mask = 0;
+unsigned long __ro_after_init pfn_top_mask = 0;
 
 /** Mask for the higher non-compressible bits of an maddr or vaddr */
-unsigned long __read_mostly ma_top_mask = 0;
+unsigned long __ro_after_init ma_top_mask = 0;
 
 /**
  * Mask for a pdx compression bit slice.
  *
  *  Invariant: valid(mfn) implies (mfn & pfn_hole_mask) == 0
  */
-unsigned long __read_mostly pfn_hole_mask = 0;
+unsigned long __ro_after_init pfn_hole_mask = 0;
 
 /** Number of bits of the "compressible" bit slice of an mfn */
-unsigned int __read_mostly pfn_pdx_hole_shift = 0;
+unsigned int __ro_after_init pfn_pdx_hole_shift = 0;
 
 unsigned long __read_mostly pdx_group_valid[BITS_TO_LONGS(
     (FRAMETABLE_NR + PDX_GROUP_COUNT - 1) / PDX_GROUP_COUNT)] = { [0] = 1 };
