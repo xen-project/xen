@@ -383,7 +383,7 @@ int hvm_inject_msi(struct domain *d, uint64_t addr, uint32_t data)
 
     if ( !vector )
     {
-        int pirq = ((addr >> 32) & 0xffffff00) | dest;
+        unsigned int pirq = ((addr >> 32) & 0xffffff00U) | dest;
 
         if ( pirq > 0 )
         {
