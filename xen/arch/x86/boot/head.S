@@ -146,17 +146,17 @@ efi_platform:
 early_error: /* Here to improve the disassembly. */
 
 .Lbad_cpu:
-        add     $sym_offs(.Lbad_cpu_msg), %esi
+        mov     $sym_offs(.Lbad_cpu_msg), %ecx
         jmp     .Lget_vtb
 .Lnot_multiboot:
-        add     $sym_offs(.Lbad_ldr_msg), %esi
+        mov     $sym_offs(.Lbad_ldr_msg), %ecx
         jmp     .Lget_vtb
 .Lnot_aligned:
-        add     $sym_offs(.Lbag_alg_msg), %esi
+        mov     $sym_offs(.Lbag_alg_msg), %ecx
         jmp     .Lget_vtb
 #ifdef CONFIG_REQUIRE_NX
 .Lno_nx:
-        add     $sym_offs(.Lno_nx_msg), %esi
+        mov     $sym_offs(.Lno_nx_msg), %ecx
         jmp     .Lget_vtb
 #endif
 .Lmb2_no_st:
@@ -164,11 +164,11 @@ early_error: /* Here to improve the disassembly. */
          * Here we are on EFI platform. vga_text_buffer was zapped earlier
          * because there is pretty good chance that VGA is unavailable.
          */
-        add     $sym_offs(.Lbad_ldr_nst), %esi
+        mov     $sym_offs(.Lbad_ldr_nst), %ecx
         jmp     .Lget_vtb
 .Lmb2_no_ih:
         /* Ditto. */
-        add     $sym_offs(.Lbad_ldr_nih), %esi
+        mov     $sym_offs(.Lbad_ldr_nih), %ecx
         jmp     .Lget_vtb
 .Lmb2_no_bs:
         /*
@@ -176,7 +176,7 @@ early_error: /* Here to improve the disassembly. */
          * via start label. Then reliable vga_text_buffer zap is impossible
          * in Multiboot2 scanning loop and we have to zero %edi below.
          */
-        add     $sym_offs(.Lbad_ldr_nbs), %esi
+        mov     $sym_offs(.Lbad_ldr_nbs), %ecx
         xor     %edi,%edi                       # No VGA text buffer
         jmp     .Lprint_err
 .Lmb2_efi_ia_32:
@@ -184,12 +184,15 @@ early_error: /* Here to improve the disassembly. */
          * Here we are on EFI IA-32 platform. Then reliable vga_text_buffer zap is
          * impossible in Multiboot2 scanning loop and we have to zero %edi below.
          */
-        add     $sym_offs(.Lbad_efi_msg), %esi
+        mov     $sym_offs(.Lbad_efi_msg), %ecx
         xor     %edi,%edi                       # No VGA text buffer
         jmp     .Lprint_err
 .Lget_vtb:
         mov     sym_esi(vga_text_buffer), %edi
 .Lprint_err:
+        add     %ecx, %esi     # Add string offset to relocation base.
+        # NOTE: No further use of sym_esi() till the end of the "function"!
+1:
         lodsb
         test    %al,%al        # Terminate on '\0' sentinel
         je      .Lhalt
@@ -202,11 +205,11 @@ early_error: /* Here to improve the disassembly. */
         mov     %bl,%al
         out     %al,%dx        # Send a character over the serial line
         test    %edi,%edi      # Is the VGA text buffer available?
-        jz      .Lprint_err
+        jz      1b
         stosb                  # Write a character to the VGA text buffer
         mov     $7,%al
         stosb                  # Write an attribute to the VGA text buffer
-        jmp     .Lprint_err
+        jmp     1b
 .Lhalt: hlt
         jmp     .Lhalt
 
