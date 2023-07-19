@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+
 #ifndef __RISCV_CONFIG_H__
 #define __RISCV_CONFIG_H__
 
