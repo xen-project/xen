@@ -564,7 +564,7 @@ int __init dom0_setup_permissions(struct domain *d)
 
 int __init construct_dom0(struct domain *d, const module_t *image,
                           unsigned long image_headroom, module_t *initrd,
-                          char *cmdline)
+                          const char *cmdline)
 {
     int rc;
 

@@ -35,7 +35,7 @@ int construct_dom0(
     struct domain *d,
     const module_t *kernel, unsigned long kernel_headroom,
     module_t *initrd,
-    char *cmdline);
+    const char *cmdline);
 void setup_io_bitmap(struct domain *d);
 
 unsigned long initial_images_nrpages(nodeid_t node);

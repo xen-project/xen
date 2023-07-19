@@ -358,7 +358,7 @@ int __init dom0_construct_pv(struct domain *d,
                              const module_t *image,
                              unsigned long image_headroom,
                              module_t *initrd,
-                             char *cmdline)
+                             const char *cmdline)
 {
     int i, rc, order, machine;
     bool compatible, compat;
