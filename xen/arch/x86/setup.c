@@ -968,7 +968,7 @@ static struct domain *__init create_dom0(const module_t *image,
 
 void __init noreturn __start_xen(unsigned long mbi_p)
 {
-    char *memmap_type = NULL;
+    const char *memmap_type = NULL;
     char *cmdline, *kextra, *loader;
     void *bsp_stack;
     struct cpu_info *info = get_cpu_info(), *bsp_info;
