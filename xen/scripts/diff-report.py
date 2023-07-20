@@ -13,6 +13,10 @@ from xen_analysis.settings import repo_dir
 from xen_analysis.utils import invoke_command
 
 
+class DiffReportError(Exception):
+    pass
+
+
 def log_info(text, end='\n'):
     # type: (str, str) -> None
     global args
@@ -97,7 +101,7 @@ def main(argv):
             git_diff = invoke_command(
                 "git --git-dir={}/.git diff -C -C {}..{}"
                 .format(repo_dir, args.baseline_rev, args.report_rev),
-                True, "Error occured invoking:\n{}\n\n{}"
+                True, DiffReportError, "Error occured invoking:\n{}\n\n{}"
             )
             diff_source = git_diff.splitlines(keepends=True)
         if diff_source:
@@ -105,7 +109,7 @@ def main(argv):
             diffs = UnifiedFormatParser(diff_source)
             debug.debug_print_parsed_diff(diffs)
             log_info(" [OK]")
-    except (ReportError, UnifiedFormatParseError) as e:
+    except (DiffReportError, ReportError, UnifiedFormatParseError) as e:
         print("ERROR: {}".format(e))
         sys.exit(1)
 
