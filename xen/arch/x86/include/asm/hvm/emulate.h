@@ -121,12 +121,12 @@ static inline void hvmemul_cache_destroy(struct vcpu *v)
 {
     XFREE(v->arch.hvm.hvm_io.cache);
 }
-bool hvmemul_read_cache(const struct vcpu *, paddr_t gpa,
+bool hvmemul_read_cache(const struct vcpu *v, paddr_t gpa,
                         void *buffer, unsigned int size);
-void hvmemul_write_cache(const struct vcpu *, paddr_t gpa,
+void hvmemul_write_cache(const struct vcpu *v, paddr_t gpa,
                          const void *buffer, unsigned int size);
-unsigned int hvmemul_cache_disable(struct vcpu *);
-void hvmemul_cache_restore(struct vcpu *, unsigned int token);
+unsigned int hvmemul_cache_disable(struct vcpu *v);
+void hvmemul_cache_restore(struct vcpu *v, unsigned int token);
 /* For use in ASSERT()s only: */
 static inline bool hvmemul_cache_disabled(struct vcpu *v)
 {

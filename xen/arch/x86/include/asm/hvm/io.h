@@ -46,17 +46,17 @@ struct hvm_io_handler {
     uint8_t type;
 };
 
-typedef int (*hvm_io_read_t)(const struct hvm_io_handler *,
+typedef int (*hvm_io_read_t)(const struct hvm_io_handler *handler,
                              uint64_t addr,
                              uint32_t size,
                              uint64_t *data);
-typedef int (*hvm_io_write_t)(const struct hvm_io_handler *,
+typedef int (*hvm_io_write_t)(const struct hvm_io_handler *handler,
                               uint64_t addr,
                               uint32_t size,
                               uint64_t data);
-typedef bool_t (*hvm_io_accept_t)(const struct hvm_io_handler *,
+typedef bool_t (*hvm_io_accept_t)(const struct hvm_io_handler *handler,
                                   const ioreq_t *p);
-typedef void (*hvm_io_complete_t)(const struct hvm_io_handler *);
+typedef void (*hvm_io_complete_t)(const struct hvm_io_handler *handler);
 
 struct hvm_io_ops {
     hvm_io_accept_t   accept;
@@ -87,11 +87,11 @@ bool relocate_portio_handler(
 
 void send_timeoffset_req(unsigned long timeoff);
 bool handle_mmio_with_translation(unsigned long gla, unsigned long gpfn,
-                                  struct npfec);
+                                  struct npfec access);
 bool handle_pio(uint16_t port, unsigned int size, int dir);
 void hvm_interrupt_post(struct vcpu *v, int vector, int type);
-void hvm_dpci_eoi(struct domain *d, unsigned int guest_irq);
-void msix_write_completion(struct vcpu *);
+void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi);
+void msix_write_completion(struct vcpu *v);
 
 #ifdef CONFIG_HVM
 void msixtbl_init(struct domain *d);
