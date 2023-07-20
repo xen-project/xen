@@ -144,6 +144,7 @@ class UnifiedFormatParser(object):
         file_linenum = 0
         hunk_a_linemax = 0
         hunk_b_linemax = 0
+        consecutive_remove = 0
         diff_elem = None
         parse_state = ParserState.FIND_DIFF_HEADER
         ChangeMode = ChangeSet.ChangeMode
@@ -210,14 +211,18 @@ class UnifiedFormatParser(object):
                 if (hunk_b_linemax > 0) and line.startswith("+"):
                     diff_elem.add_change(file_linenum, ChangeType.ADD)
                     hunk_b_linemax -= 1
+                    consecutive_remove = 0
                 elif (hunk_a_linemax > 0) and line.startswith("-"):
-                    diff_elem.add_change(file_linenum, ChangeType.REMOVE)
+                    diff_elem.add_change(file_linenum + consecutive_remove,
+                                         ChangeType.REMOVE)
                     hunk_a_linemax -= 1
                     file_linenum -= 1
+                    consecutive_remove += 1
                 elif ((hunk_a_linemax + hunk_b_linemax) > 0) and \
                         line.startswith(" "):
                     hunk_a_linemax -= 1 if (hunk_a_linemax > 0) else 0
                     hunk_b_linemax -= 1 if (hunk_b_linemax > 0) else 0
+                    consecutive_remove = 0
 
                 if (hunk_a_linemax + hunk_b_linemax) <= 0:
                     parse_state = ParserState.FIND_HUNK_OR_DIFF_HEADER
