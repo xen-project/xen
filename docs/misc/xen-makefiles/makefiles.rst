@@ -68,7 +68,7 @@ Descending down in directories
 
 	It is good practice to use a `CONFIG_` variable when assigning directory
 	names. This allows the build system to totally skip the directory if the
-	corresponding `CONFIG_` option is 'y'.
+	corresponding `CONFIG_` option is not set to 'y'.
 
 Compilation flags
 -----------------
