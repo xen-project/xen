@@ -59,9 +59,10 @@ extern int mtrr_del_page(int reg, unsigned long base, unsigned long size);
 extern int mtrr_get_type(const struct mtrr_state *m, paddr_t pa,
                          unsigned int order);
 extern void mtrr_centaur_report_mcr(int mcr, u32 lo, u32 hi);
-extern u32 get_pat_flags(struct vcpu *v, u32 gl1e_flags, paddr_t gpaddr,
-                  paddr_t spaddr, uint8_t gmtrr_mtype);
-extern unsigned char pat_type_2_pte_flags(unsigned char pat_type);
+extern uint32_t get_pat_flags(struct vcpu *v, uint32_t gl1e_flags,
+                              paddr_t gpaddr, paddr_t spaddr,
+                              uint8_t gmtrr_mtype);
+extern uint8_t pat_type_2_pte_flags(uint8_t pat_type);
 extern int hold_mtrr_updates_on_aps;
 extern void mtrr_aps_sync_begin(void);
 extern void mtrr_aps_sync_end(void);
