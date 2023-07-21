@@ -82,6 +82,14 @@ maintainers if you want to suggest a change.
      - Summary
      - Notes
 
+   * - `Rule 1.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_01_01.c>`_
+     - Required
+     - The program shall contain no violations of the standard C syntax
+       and constraints, and shall not exceed the implementation's
+       translation limits
+     - We make use of several compiler extensions as documented by
+       `C-language-toolchain.rst <docs/misra/C-language-toolchain.rst>`_
+
    * - `Rule 1.3 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_01_03.c>`_
      - Required
      - There shall be no occurrence of undefined or critical unspecified
@@ -155,6 +163,11 @@ maintainers if you want to suggest a change.
      - The Xen characters limit for macro identifiers is 40. Public
        headers (xen/include/public/) are allowed to retain longer
        identifiers for backward compatibility.
+
+   * - `Rule 5.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_05_06.c>`_
+     - Required
+     - A typedef name shall be a unique identifier
+     -
 
    * - `Rule 6.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_06_01.c>`_
      - Required
