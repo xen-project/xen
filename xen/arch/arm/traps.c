@@ -745,7 +745,7 @@ static const char *mode_string(register_t cpsr)
 
 static void show_registers_32(const struct cpu_user_regs *regs,
                               const struct reg_ctxt *ctxt,
-                              bool guest_mode,
+                              bool guest_mode_on,
                               const struct vcpu *v)
 {
 
@@ -754,7 +754,7 @@ static void show_registers_32(const struct cpu_user_regs *regs,
     printk("PC:     %08"PRIx32"\n", regs->pc32);
 #else
     printk("PC:     %08"PRIx32, regs->pc);
-    if ( !guest_mode )
+    if ( !guest_mode_on )
         printk(" %pS", _p(regs->pc));
     printk("\n");
 #endif
@@ -773,7 +773,7 @@ static void show_registers_32(const struct cpu_user_regs *regs,
 #endif
            regs->r12);
 
-    if ( guest_mode )
+    if ( guest_mode_on )
     {
         printk("USR: SP: %08"PRIx32" LR: %"PRIregister"\n",
                regs->sp_usr, regs->lr);
@@ -798,7 +798,7 @@ static void show_registers_32(const struct cpu_user_regs *regs,
 #endif
     printk("\n");
 
-    if ( guest_mode )
+    if ( guest_mode_on )
     {
         printk("     SCTLR: %"PRIregister"\n", ctxt->sctlr_el1);
         printk("       TCR: %"PRIregister"\n", ctxt->tcr_el1);
@@ -822,18 +822,18 @@ static void show_registers_32(const struct cpu_user_regs *regs,
 #ifdef CONFIG_ARM_64
 static void show_registers_64(const struct cpu_user_regs *regs,
                               const struct reg_ctxt *ctxt,
-                              bool guest_mode,
+                              bool guest_mode_on,
                               const struct vcpu *v)
 {
 
     BUG_ON( (regs->cpsr & PSR_MODE_BIT) );
 
     printk("PC:     %016"PRIx64, regs->pc);
-    if ( !guest_mode )
+    if ( !guest_mode_on )
         printk(" %pS", _p(regs->pc));
     printk("\n");
     printk("LR:     %016"PRIx64"\n", regs->lr);
-    if ( guest_mode )
+    if ( guest_mode_on )
     {
         printk("SP_EL0: %016"PRIx64"\n", regs->sp_el0);
         printk("SP_EL1: %016"PRIx64"\n", regs->sp_el1);
@@ -866,7 +866,7 @@ static void show_registers_64(const struct cpu_user_regs *regs,
            regs->x27, regs->x28, regs->fp);
     printk("\n");
 
-    if ( guest_mode )
+    if ( guest_mode_on )
     {
         printk("   ELR_EL1: %016"PRIx64"\n", regs->elr_el1);
         printk("   ESR_EL1: %08"PRIx32"\n", ctxt->esr_el1);
@@ -883,28 +883,28 @@ static void show_registers_64(const struct cpu_user_regs *regs,
 
 static void _show_registers(const struct cpu_user_regs *regs,
                             const struct reg_ctxt *ctxt,
-                            bool guest_mode,
+                            bool guest_mode_on,
                             const struct vcpu *v)
 {
     print_xen_info();
 
     printk("CPU:    %d\n", smp_processor_id());
 
-    if ( guest_mode )
+    if ( guest_mode_on )
     {
         if ( regs_mode_is_32bit(regs) )
-            show_registers_32(regs, ctxt, guest_mode, v);
+            show_registers_32(regs, ctxt, guest_mode_on, v);
 #ifdef CONFIG_ARM_64
         else
-            show_registers_64(regs, ctxt, guest_mode, v);
+            show_registers_64(regs, ctxt, guest_mode_on, v);
 #endif
     }
     else
     {
 #ifdef CONFIG_ARM_64
-        show_registers_64(regs, ctxt, guest_mode, v);
+        show_registers_64(regs, ctxt, guest_mode_on, v);
 #else
-        show_registers_32(regs, ctxt, guest_mode, v);
+        show_registers_32(regs, ctxt, guest_mode_on, v);
 #endif
     }
     printk("  VTCR_EL2: %"PRIregister"\n", READ_SYSREG(VTCR_EL2));

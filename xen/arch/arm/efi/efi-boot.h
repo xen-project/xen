@@ -13,7 +13,7 @@ typedef struct {
     unsigned int name_len;
     EFI_PHYSICAL_ADDRESS addr;
     UINTN size;
-} module_name;
+} module_info;
 
 /*
  * Binaries will be translated into bootmodules, the maximum number for them is
@@ -21,7 +21,7 @@ typedef struct {
  */
 #define MAX_UEFI_MODULES (MAX_MODULES - 2)
 static struct file __initdata module_binary;
-static module_name __initdata modules[MAX_UEFI_MODULES];
+static module_info __initdata modules[MAX_UEFI_MODULES];
 static unsigned int __initdata modules_available = MAX_UEFI_MODULES;
 static unsigned int __initdata modules_idx;
 
@@ -622,7 +622,7 @@ static int __init get_module_file_index(const char *name,
 
     for ( i = 0; i < modules_idx; i++ )
     {
-        module_name *mod = &modules[i];
+        module_info *mod = &modules[i];
         if ( (mod->name_len == name_len) &&
              (strncmp(mod->name, name, name_len) == 0) )
         {
@@ -648,7 +648,7 @@ static int __init allocate_module_file(const EFI_LOADED_IMAGE *loaded_image,
                                        const char *name,
                                        unsigned int name_len)
 {
-    module_name *file_name;
+    module_info *file_info;
     CHAR16 *fname;
     union string module_name;
     int ret;
@@ -668,18 +668,18 @@ static int __init allocate_module_file(const EFI_LOADED_IMAGE *loaded_image,
     ret = modules_idx;
 
     /* Save at this index the name of this binary */
-    file_name = &modules[ret];
+    file_info = &modules[ret];
 
     if ( efi_bs->AllocatePool(EfiLoaderData, (name_len + 1) * sizeof(char),
-                              (void**)&file_name->name) != EFI_SUCCESS )
+                              (void**)&file_info->name) != EFI_SUCCESS )
     {
         PrintMessage(L"Error allocating memory for module binary name");
         return ERROR_ALLOC_MODULE_NAME;
     }
 
     /* Save name and length of the binary in the data structure */
-    strlcpy(file_name->name, name, name_len + 1);
-    file_name->name_len = name_len;
+    strlcpy(file_info->name, name, name_len + 1);
+    file_info->name_len = name_len;
 
     /* Get the file system interface. */
     if ( !*dir_handle )
@@ -689,8 +689,8 @@ static int __init allocate_module_file(const EFI_LOADED_IMAGE *loaded_image,
     read_file(*dir_handle, s2w(&module_name), &module_binary, NULL);
 
     /* Save address and size */
-    file_name->addr = module_binary.addr;
-    file_name->size = module_binary.size;
+    file_info->addr = module_binary.addr;
+    file_info->size = module_binary.size;
 
     /* s2w(...) allocates some memory, free it */
     efi_bs->FreePool(module_name.w);
@@ -716,7 +716,7 @@ static int __init handle_module_node(const EFI_LOADED_IMAGE *loaded_image,
     const void *uefi_name_prop;
     char mod_string[24]; /* Placeholder for module@ + a 64-bit number + \0 */
     int uefi_name_len, file_idx, module_compat;
-    module_name *file;
+    module_info *file;
 
     /* Check if the node is a multiboot,module otherwise return */
     module_compat = fdt_node_check_compatible(fdt, module_node_offset,
