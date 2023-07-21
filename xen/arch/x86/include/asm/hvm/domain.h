@@ -47,7 +47,7 @@ struct hvm_pi_ops {
      * Hook into arch_vcpu_block(), which is called
      * from vcpu_block() and vcpu_do_poll().
      */
-    void (*vcpu_block)(struct vcpu *);
+    void (*vcpu_block)(struct vcpu *v);
 };
 
 struct hvm_domain {

@@ -151,8 +151,8 @@ struct hvm_function_table {
 
     void (*fpu_leave)(struct vcpu *v);
 
-    int  (*get_guest_pat)(struct vcpu *v, u64 *);
-    int  (*set_guest_pat)(struct vcpu *v, u64);
+    int  (*get_guest_pat)(struct vcpu *v, uint64_t *gpat);
+    int  (*set_guest_pat)(struct vcpu *v, uint64_t gpat);
 
     void (*set_tsc_offset)(struct vcpu *v, u64 offset, u64 at_tsc);
 
@@ -180,8 +180,8 @@ struct hvm_function_table {
     int (*msr_write_intercept)(unsigned int msr, uint64_t msr_content);
     void (*handle_cd)(struct vcpu *v, unsigned long value);
     void (*set_info_guest)(struct vcpu *v);
-    void (*set_rdtsc_exiting)(struct vcpu *v, bool_t);
-    void (*set_descriptor_access_exiting)(struct vcpu *v, bool);
+    void (*set_rdtsc_exiting)(struct vcpu *v, bool enable);
+    void (*set_descriptor_access_exiting)(struct vcpu *v, bool enable);
 
     /* Nested HVM */
     int (*nhvm_vcpu_initialise)(struct vcpu *v);
@@ -265,10 +265,10 @@ int hvm_vcpu_cacheattr_init(struct vcpu *v);
 void hvm_vcpu_cacheattr_destroy(struct vcpu *v);
 void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip);
 
-void hvm_get_guest_pat(struct vcpu *v, u64 *guest_pat);
-int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat);
+void hvm_get_guest_pat(struct vcpu *v, uint64_t *guest_pat);
+int hvm_set_guest_pat(struct vcpu *v, uint64_t guest_pat);
 
-u64 hvm_get_guest_tsc_fixed(struct vcpu *v, u64 at_tsc);
+uint64_t hvm_get_guest_tsc_fixed(struct vcpu *v, uint64_t at_tsc);
 
 u64 hvm_scale_tsc(const struct domain *d, u64 tsc);
 u64 hvm_get_tsc_scaling_ratio(u32 gtsc_khz);
@@ -282,7 +282,7 @@ int vmsi_deliver(
     uint8_t dest, uint8_t dest_mode,
     uint8_t delivery_mode, uint8_t trig_mode);
 struct hvm_pirq_dpci;
-void vmsi_deliver_pirq(struct domain *d, const struct hvm_pirq_dpci *);
+void vmsi_deliver_pirq(struct domain *d, const struct hvm_pirq_dpci *pirq_dpci);
 int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
 
 enum hvm_intblk
@@ -309,7 +309,7 @@ int hvm_event_needs_reinjection(uint8_t type, uint8_t vector);
 
 uint8_t hvm_combine_hw_exceptions(uint8_t vec1, uint8_t vec2);
 
-void hvm_set_rdtsc_exiting(struct domain *d, bool_t enable);
+void hvm_set_rdtsc_exiting(struct domain *d, bool enable);
 
 enum hvm_task_switch_reason { TSW_jmp, TSW_iret, TSW_call_or_int };
 void hvm_task_switch(
@@ -350,7 +350,7 @@ void *hvm_map_guest_frame_rw(unsigned long gfn, bool_t permanent,
                              bool_t *writable);
 void *hvm_map_guest_frame_ro(unsigned long gfn, bool_t permanent);
 void hvm_unmap_guest_frame(void *p, bool_t permanent);
-void hvm_mapped_guest_frames_mark_dirty(struct domain *);
+void hvm_mapped_guest_frames_mark_dirty(struct domain *d);
 
 int hvm_debug_op(struct vcpu *v, int32_t op);
 

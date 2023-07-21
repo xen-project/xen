@@ -837,12 +837,12 @@ nsvm_vcpu_vmexit_inject(struct vcpu *v, struct cpu_user_regs *regs,
 }
 
 int cf_check nsvm_vcpu_vmexit_event(
-    struct vcpu *v, const struct x86_event *trap)
+    struct vcpu *v, const struct x86_event *event)
 {
     ASSERT(vcpu_nestedhvm(v).nv_vvmcx != NULL);
 
-    nestedsvm_vmexit_defer(v, VMEXIT_EXCEPTION_DE + trap->vector,
-                           trap->error_code, trap->cr2);
+    nestedsvm_vmexit_defer(v, VMEXIT_EXCEPTION_DE + event->vector,
+                           event->error_code, event->cr2);
     return NESTEDHVM_VMEXIT_DONE;
 }
 
@@ -1538,7 +1538,7 @@ nestedsvm_vcpu_interrupt(struct vcpu *v, const struct hvm_intack intack)
     return NSVM_INTR_NOTINTERCEPTED;
 }
 
-bool_t
+bool
 nestedsvm_gif_isset(struct vcpu *v)
 {
     struct nestedsvm *svm = &vcpu_nestedsvm(v);

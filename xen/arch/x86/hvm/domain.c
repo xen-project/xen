@@ -100,7 +100,7 @@ static int check_segment(struct segment_register *reg, enum x86_segment seg)
 }
 
 /* Called by VCPUOP_initialise for HVM guests. */
-int arch_set_info_hvm_guest(struct vcpu *v, const vcpu_hvm_context_t *ctx)
+int arch_set_info_hvm_guest(struct vcpu *v, const struct vcpu_hvm_context *ctx)
 {
     const struct domain *d = v->domain;
     struct cpu_user_regs *uregs = &v->arch.user_regs;

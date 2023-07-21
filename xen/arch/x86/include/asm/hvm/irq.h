@@ -160,17 +160,17 @@ struct hvm_pirq_dpci {
     struct list_head softirq_list;
 };
 
-void pt_pirq_init(struct domain *, struct hvm_pirq_dpci *);
-bool pt_pirq_cleanup_check(struct hvm_pirq_dpci *);
+void pt_pirq_init(struct domain *d, struct hvm_pirq_dpci *dpci);
+bool pt_pirq_cleanup_check(struct hvm_pirq_dpci *dpci);
 int pt_pirq_iterate(struct domain *d,
-                    int (*cb)(struct domain *,
-                              struct hvm_pirq_dpci *, void *arg),
+                    int (*cb)(struct domain *d,
+                              struct hvm_pirq_dpci *dpci, void *arg),
                     void *arg);
 
 #ifdef CONFIG_HVM
-bool pt_pirq_softirq_active(struct hvm_pirq_dpci *);
+bool pt_pirq_softirq_active(struct hvm_pirq_dpci *pirq_dpci);
 #else
-static inline bool pt_pirq_softirq_active(struct hvm_pirq_dpci *dpci)
+static inline bool pt_pirq_softirq_active(struct hvm_pirq_dpci *pirq_dpci)
 {
     return false;
 }
@@ -211,6 +211,6 @@ void hvm_assert_evtchn_irq(struct vcpu *v);
 void hvm_set_callback_via(struct domain *d, uint64_t via);
 
 struct pirq;
-bool hvm_domain_use_pirq(const struct domain *, const struct pirq *);
+bool hvm_domain_use_pirq(const struct domain *d, const struct pirq *pirq);
 
 #endif /* __ASM_X86_HVM_IRQ_H__ */

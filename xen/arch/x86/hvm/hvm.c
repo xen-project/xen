@@ -272,7 +272,7 @@ uint8_t hvm_combine_hw_exceptions(uint8_t vec1, uint8_t vec2)
     return X86_EXC_DF;
 }
 
-void hvm_set_rdtsc_exiting(struct domain *d, bool_t enable)
+void hvm_set_rdtsc_exiting(struct domain *d, bool enable)
 {
     struct vcpu *v;
 
@@ -280,7 +280,7 @@ void hvm_set_rdtsc_exiting(struct domain *d, bool_t enable)
         alternative_vcall(hvm_funcs.set_rdtsc_exiting, v, enable);
 }
 
-void hvm_get_guest_pat(struct vcpu *v, u64 *guest_pat)
+void hvm_get_guest_pat(struct vcpu *v, uint64_t *guest_pat)
 {
     if ( !alternative_call(hvm_funcs.get_guest_pat, v, guest_pat) )
         *guest_pat = v->arch.hvm.pat_cr;
@@ -426,7 +426,7 @@ static void hvm_set_guest_tsc_adjust(struct vcpu *v, u64 tsc_adjust)
         update_vcpu_system_time(v);
 }
 
-u64 hvm_get_guest_tsc_fixed(struct vcpu *v, uint64_t at_tsc)
+uint64_t hvm_get_guest_tsc_fixed(struct vcpu *v, uint64_t at_tsc)
 {
     uint64_t tsc;
 

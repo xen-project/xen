@@ -36,8 +36,8 @@ void _hvm_write_entry(struct hvm_domain_context *h,
     r; })
 
 /* Unmarshalling: test an entry's size and typecode and record the instance */
-int _hvm_check_entry(struct hvm_domain_context *h, 
-                     uint16_t type, uint32_t len, bool_t strict_length);
+int _hvm_check_entry(struct hvm_domain_context *h,
+                     uint16_t type, uint32_t len, bool strict_length);
 
 /* Unmarshalling: copy the contents in a type-safe way */
 void _hvm_read_entry(struct hvm_domain_context *h,
