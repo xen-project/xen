@@ -121,7 +121,7 @@ xgprt(const char *fn, const char *fmt, ...)
  *         -1 failure, errno set.
  */
 int 
-xg_init()
+xg_init(void)
 {
     int flags, saved_errno;
 
