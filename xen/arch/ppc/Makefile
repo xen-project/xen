@@ -1,5 +1,7 @@
 obj-$(CONFIG_PPC64) += ppc64/
 
+obj-y += boot-of.init.o
+obj-$(CONFIG_EARLY_PRINTK) += early_printk.init.o
 obj-y += setup.o
 
 $(TARGET): $(TARGET)-syms

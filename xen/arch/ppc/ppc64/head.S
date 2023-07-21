@@ -18,6 +18,15 @@ ENTRY(start)
     li      %r11, 0
     stdu    %r11, -STACK_FRAME_OVERHEAD(%r1)
 
+    /* clear .bss */
+    LOAD_IMM32(%r14, __bss_start)
+    LOAD_IMM32(%r15, __bss_end)
+1:
+    std     %r11, 0(%r14)
+    addi    %r14, %r14, 8
+    cmpld   %r14, %r15
+    blt     1b
+
     /* call the C entrypoint */
     bl      start_xen
 

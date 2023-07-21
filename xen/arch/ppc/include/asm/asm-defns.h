@@ -37,4 +37,20 @@
     .long 0xa6037b7d; /* mtsrr1 r11                         */                 \
     .long 0x2400004c  /* rfid                               */
 
+/* Taken from Linux kernel source (arch/powerpc/boot/crt0.S) */
+.macro OP_REGS op, width, start, end, base, offset
+	.Lreg=\start
+	.rept (\end - \start + 1)
+	\op	.Lreg,\offset+\width*.Lreg(\base)
+	.Lreg=.Lreg+1
+	.endr
+.endm
+
+#define SAVE_GPRS(start, end, base) OP_REGS std, 8, start, end, base, 0
+#define REST_GPRS(start, end, base) OP_REGS ld, 8, start, end, base, 0
+#define SAVE_GPR(n, base)           SAVE_GPRS(n, n, base)
+#define REST_GPR(n, base)           REST_GPRS(n, n, base)
+#define SAVE_NVGPRS(base)           SAVE_GPRS(14, 31, base)
+#define REST_NVGPRS(base)           REST_GPRS(14, 31, base)
+
 #endif /* _ASM_PPC_ASM_DEFNS_H */

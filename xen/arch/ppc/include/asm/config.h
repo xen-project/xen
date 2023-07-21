@@ -52,6 +52,9 @@
 /* size of minimum stack frame; C code can write into the caller's stack */
 #define STACK_FRAME_OVERHEAD 32
 
+/* ELFv2 ABI mandates 16 byte alignment */
+#define STACK_ALIGN 16
+
 #endif /* __PPC_CONFIG_H__ */
 /*
  * Local variables:
