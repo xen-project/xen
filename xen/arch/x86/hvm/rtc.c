@@ -58,8 +58,6 @@ enum rtc_mode {
 
 static void rtc_copy_date(RTCState *s);
 static void rtc_set_time(RTCState *s);
-static inline int from_bcd(RTCState *s, int a);
-static inline int convert_hour(RTCState *s, int hour);
 
 static void rtc_update_irq(RTCState *s)
 {
@@ -244,6 +242,40 @@ static void cf_check rtc_update_timer2(void *opaque)
         check_update_timer(s);
     }
     spin_unlock(&s->lock);
+}
+
+static unsigned int to_bcd(const RTCState *s, unsigned int a)
+{
+    if ( s->hw.cmos_data[RTC_REG_B] & RTC_DM_BINARY )
+        return a;
+
+    return ((a / 10) << 4) | (a % 10);
+}
+
+static unsigned int from_bcd(const RTCState *s, unsigned int a)
+{
+    if ( s->hw.cmos_data[RTC_REG_B] & RTC_DM_BINARY )
+        return a;
+
+    return ((a >> 4) * 10) + (a & 0x0f);
+}
+
+/*
+ * Hours in 12 hour mode are in 1-12 range, not 0-11. So we need convert it
+ * before use.
+ */
+static unsigned int convert_hour(const RTCState *s, unsigned int raw)
+{
+    unsigned int hour = from_bcd(s, raw & 0x7f);
+
+    if ( !(s->hw.cmos_data[RTC_REG_B] & RTC_24H) )
+    {
+        hour %= 12;
+        if ( raw & 0x80 )
+            hour += 12;
+    }
+
+    return hour;
 }
 
 /* handle alarm timer */
@@ -539,37 +571,6 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
     spin_unlock(&s->lock);
 
     return 1;
-}
-
-static inline int to_bcd(RTCState *s, int a)
-{
-    if ( s->hw.cmos_data[RTC_REG_B] & RTC_DM_BINARY )
-        return a;
-    else
-        return ((a / 10) << 4) | (a % 10);
-}
-
-static inline int from_bcd(RTCState *s, int a)
-{
-    if ( s->hw.cmos_data[RTC_REG_B] & RTC_DM_BINARY )
-        return a;
-    else
-        return ((a >> 4) * 10) + (a & 0x0f);
-}
-
-/* Hours in 12 hour mode are in 1-12 range, not 0-11.
- * So we need convert it before using it*/
-static inline int convert_hour(RTCState *s, int raw)
-{
-    int hour = from_bcd(s, raw & 0x7f);
-
-    if (!(s->hw.cmos_data[RTC_REG_B] & RTC_24H))
-    {
-        hour %= 12;
-        if (raw & 0x80)
-            hour += 12;
-    }
-    return hour;
 }
 
 static void rtc_set_time(RTCState *s)
