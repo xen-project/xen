@@ -19,13 +19,13 @@ int __init decompress(void *inbuf, unsigned int len, void *outbuf)
     if ( len >= 3 && !memcmp(inbuf, "\x42\x5a\x68", 3) )
         return bunzip2(inbuf, len, NULL, NULL, outbuf, NULL, error);
 
-    if ( len >= 6 && !memcmp(inbuf, "\3757zXZ", 6) )
+    if ( len >= 6 && !memcmp(inbuf, "\375" "7zXZ", 6) )
         return unxz(inbuf, len, NULL, NULL, outbuf, NULL, error);
 
     if ( len >= 2 && !memcmp(inbuf, "\135\000", 2) )
         return unlzma(inbuf, len, NULL, NULL, outbuf, NULL, error);
 
-    if ( len >= 5 && !memcmp(inbuf, "\x89LZO", 5) )
+    if ( len >= 5 && !memcmp(inbuf, "\x89" "LZO", 5) )
         return unlzo(inbuf, len, NULL, NULL, outbuf, NULL, error);
 
     if ( len >= 2 && !memcmp(inbuf, "\x02\x21", 2) )

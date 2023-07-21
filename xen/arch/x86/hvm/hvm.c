@@ -3853,7 +3853,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
                                         cs, &addr) &&
              (hvm_copy_from_guest_linear(sig, addr, sizeof(sig),
                                          walk, NULL) == HVMTRANS_okay) &&
-             (memcmp(sig, "\xf\xbxen", sizeof(sig)) == 0) )
+             (memcmp(sig, "\xf\xb" "xen", sizeof(sig)) == 0) )
         {
             regs->rip += sizeof(sig);
             regs->eflags &= ~X86_EFLAGS_RF;
