@@ -1,5 +1,7 @@
 obj-$(CONFIG_PPC64) += ppc64/
 
+obj-y += setup.o
+
 $(TARGET): $(TARGET)-syms
 	cp -f $< $@
 

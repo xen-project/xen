@@ -43,7 +43,7 @@
 
 #define SMP_CACHE_BYTES (1 << 6)
 
-#define STACK_ORDER 2
+#define STACK_ORDER 0
 #define STACK_SIZE  (PAGE_SIZE << STACK_ORDER)
 
 /* 288 bytes below the stack pointer must be preserved by interrupt handlers */
