@@ -228,7 +228,6 @@ int access_node(struct connection *conn, struct node *node,
 {
 	struct accessed_node *i = NULL;
 	struct transaction *trans;
-	TDB_DATA local_key;
 	int ret;
 	bool introduce = false;
 
@@ -286,8 +285,7 @@ int access_node(struct connection *conn, struct node *node,
 			i->generation = node->generation;
 			i->check_gen = true;
 			if (node->generation != NO_GENERATION) {
-				set_tdb_key(i->trans_name, &local_key);
-				ret = write_node_raw(conn, &local_key, node,
+				ret = write_node_raw(conn, i->trans_name, node,
 						     NODE_CREATE, true);
 				if (ret)
 					goto err;
@@ -405,9 +403,9 @@ static int finalize_transaction(struct connection *conn,
 				hdr->generation = ++generation;
 				mode = (i->generation == NO_GENERATION)
 				       ? NODE_CREATE : NODE_MODIFY;
-				set_tdb_key(i->node, &key);
-				*is_corrupt |= do_tdb_write(conn, &key, &data,
-							    NULL, mode, true);
+				*is_corrupt |= db_write(conn, i->node,
+							data.dptr, data.dsize,
+							NULL, mode, true);
 				talloc_free(data.dptr);
 				if (db_delete(conn, i->trans_name, NULL))
 					*is_corrupt = true;

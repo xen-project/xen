@@ -600,23 +600,27 @@ static unsigned int get_acc_domid(struct connection *conn, TDB_DATA *key,
 	       ? domid : conn->id;
 }
 
-int do_tdb_write(struct connection *conn, TDB_DATA *key, TDB_DATA *data,
-		 struct node_account_data *acc, enum write_node_mode mode,
-		 bool no_quota_check)
+int db_write(struct connection *conn, const char *db_name, void *data,
+	     size_t size, struct node_account_data *acc,
+	     enum write_node_mode mode, bool no_quota_check)
 {
-	struct xs_tdb_record_hdr *hdr = (void *)data->dptr;
+	struct xs_tdb_record_hdr *hdr = data;
 	struct node_account_data old_acc = {};
 	unsigned int old_domid, new_domid;
 	int ret;
+	TDB_DATA key, dat;
 
+	set_tdb_key(db_name, &key);
+	dat.dptr = data;
+	dat.dsize = size;
 	if (!acc)
 		old_acc.memory = -1;
 	else
 		old_acc = *acc;
 
-	get_acc_data(key, &old_acc);
-	old_domid = get_acc_domid(conn, key, old_acc.domid);
-	new_domid = get_acc_domid(conn, key, hdr->perms[0].id);
+	get_acc_data(&key, &old_acc);
+	old_domid = get_acc_domid(conn, &key, old_acc.domid);
+	new_domid = get_acc_domid(conn, &key, hdr->perms[0].id);
 
 	/*
 	 * Don't check for ENOENT, as we want to be able to switch orphaned
@@ -624,35 +628,34 @@ int do_tdb_write(struct connection *conn, TDB_DATA *key, TDB_DATA *data,
 	 */
 	if (old_acc.memory)
 		domain_memory_add_nochk(conn, old_domid,
-					-old_acc.memory - key->dsize);
-	ret = domain_memory_add(conn, new_domid,
-				data->dsize + key->dsize, no_quota_check);
+					-old_acc.memory - key.dsize);
+	ret = domain_memory_add(conn, new_domid, size + key.dsize,
+				no_quota_check);
 	if (ret) {
 		/* Error path, so no quota check. */
 		if (old_acc.memory)
 			domain_memory_add_nochk(conn, old_domid,
-						old_acc.memory + key->dsize);
+						old_acc.memory + key.dsize);
 		return ret;
 	}
 
 	/* TDB should set errno, but doesn't even set ecode AFAICT. */
-	if (tdb_store(tdb_ctx, *key, *data,
+	if (tdb_store(tdb_ctx, key, dat,
 		      (mode == NODE_CREATE) ? TDB_INSERT : TDB_MODIFY) != 0) {
-		domain_memory_add_nochk(conn, new_domid,
-					-data->dsize - key->dsize);
+		domain_memory_add_nochk(conn, new_domid, -size - key.dsize);
 		/* Error path, so no quota check. */
 		if (old_acc.memory)
 			domain_memory_add_nochk(conn, old_domid,
-						old_acc.memory + key->dsize);
+						old_acc.memory + key.dsize);
 		errno = EIO;
 		return errno;
 	}
-	trace_tdb("store %s size %zu\n", key->dptr, data->dsize + key->dsize);
+	trace_tdb("store %s size %zu\n", db_name, size + key.dsize);
 
 	if (acc) {
 		/* Don't use new_domid, as it might be a transaction node. */
 		acc->domid = hdr->perms[0].id;
-		acc->memory = data->dsize;
+		acc->memory = size;
 	}
 
 	return 0;
@@ -780,33 +783,35 @@ static bool read_node_can_propagate_errno(void)
 	return errno == ENOMEM || errno == ENOSPC;
 }
 
-int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
-		   enum write_node_mode mode, bool no_quota_check)
+int write_node_raw(struct connection *conn, const char *db_name,
+		   struct node *node, enum write_node_mode mode,
+		   bool no_quota_check)
 {
-	TDB_DATA data;
+	void *data;
+	size_t size;
 	void *p;
 	struct xs_tdb_record_hdr *hdr;
 
 	if (domain_adjust_node_perms(node))
 		return errno;
 
-	data.dsize = sizeof(*hdr)
+	size = sizeof(*hdr)
 		+ node->perms.num * sizeof(node->perms.p[0])
 		+ node->datalen + node->childlen;
 
 	/* Call domain_max_chk() in any case in order to record max values. */
-	if (domain_max_chk(conn, ACC_NODESZ, data.dsize) && !no_quota_check) {
+	if (domain_max_chk(conn, ACC_NODESZ, size) && !no_quota_check) {
 		errno = ENOSPC;
 		return errno;
 	}
 
-	data.dptr = talloc_size(node, data.dsize);
-	if (!data.dptr) {
+	data = talloc_size(node, size);
+	if (!data) {
 		errno = ENOMEM;
 		return errno;
 	}
 
-	hdr = (void *)data.dptr;
+	hdr = data;
 	hdr->generation = node->generation;
 	hdr->num_perms = node->perms.num;
 	hdr->datalen = node->datalen;
@@ -819,7 +824,8 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
 	p += node->datalen;
 	memcpy(p, node->children, node->childlen);
 
-	if (do_tdb_write(conn, key, &data, &node->acc, mode, no_quota_check))
+	if (db_write(conn, db_name, data, size, &node->acc, mode,
+		     no_quota_check))
 		return EIO;
 
 	return 0;
@@ -833,13 +839,11 @@ static int write_node(struct connection *conn, struct node *node,
 		      enum write_node_mode mode, bool no_quota_check)
 {
 	int ret;
-	TDB_DATA key;
 
 	if (access_node(conn, node, NODE_ACCESS_WRITE, &node->db_name))
 		return errno;
 
-	set_tdb_key(node->db_name, &key);
-	ret = write_node_raw(conn, &key, node, mode, no_quota_check);
+	ret = write_node_raw(conn, node->db_name, node, mode, no_quota_check);
 	if (ret && conn && conn->transaction) {
 		/*
 		 * Reverting access_node() is hard, so just fail the
@@ -3429,7 +3433,6 @@ void read_state_node(const void *ctx, const void *state)
 {
 	const struct xs_state_node *sn = state;
 	struct node *node, *parent;
-	TDB_DATA key;
 	char *name, *parentname;
 	unsigned int i;
 	struct connection conn = { .id = priv_domid };
@@ -3482,15 +3485,12 @@ void read_state_node(const void *ctx, const void *state)
 		if (add_child(node, parent, name))
 			barf("allocation error restoring node");
 
-		set_tdb_key(parentname, &key);
-		if (write_node_raw(NULL, &key, parent, NODE_MODIFY, true))
+		if (write_node_raw(NULL, parentname, parent, NODE_MODIFY, true))
 			barf("write parent error restoring node");
 	}
 
-	set_tdb_key(name, &key);
-
 	/* The "/" node is already existing, so it can only be modified here. */
-	if (write_node_raw(NULL, &key, node,
+	if (write_node_raw(NULL, name, node,
 			   strcmp(name, "/") ? NODE_CREATE : NODE_MODIFY, true))
 		barf("write node error restoring node");
 

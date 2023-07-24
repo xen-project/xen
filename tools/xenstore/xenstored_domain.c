@@ -511,19 +511,17 @@ static int domain_tree_remove_sub(const void *ctx, struct connection *conn,
 				  struct node *node, void *arg)
 {
 	struct domain *domain = arg;
-	TDB_DATA key;
 	int ret = WALK_TREE_OK;
 
 	if (node->perms.p[0].id != domain->domid)
 		return WALK_TREE_OK;
 
 	if (keep_orphans) {
-		set_tdb_key(node->name, &key);
 		domain_nbentry_dec(NULL, domain->domid);
 		node->perms.p[0].id = priv_domid;
 		node->acc.memory = 0;
 		domain_nbentry_inc(NULL, priv_domid);
-		if (write_node_raw(NULL, &key, node, NODE_MODIFY, true)) {
+		if (write_node_raw(NULL, node->name, node, NODE_MODIFY, true)) {
 			/* That's unfortunate. We only can try to continue. */
 			syslog(LOG_ERR,
 			       "error when moving orphaned node %s to dom0\n",
