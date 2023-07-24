@@ -27,7 +27,7 @@ different than `credit2`) parameter is passed to Xen via the
 bootloader.
 
 Other parameters are available for tuning the behavior of Credit2
-(see `docs/misc/xen-command-line.markdown` for a complete list and
+(see `docs/misc/xen-command-line.pandoc` for a complete list and
 for their meaning).
 
 Once the system is live, for creating a cpupool with Credit2 as

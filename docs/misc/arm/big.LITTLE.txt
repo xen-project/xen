@@ -42,5 +42,5 @@ The following option runs one domain vcpu as big and one as LITTLE:
   cpus = ["0-3", "4-7"]
 
 
-[1] docs/misc/xen-command-line.markdown
+[1] docs/misc/xen-command-line.pandoc
 [2] docs/man/xl.cfg.pod.5

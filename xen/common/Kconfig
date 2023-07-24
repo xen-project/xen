@@ -440,7 +440,7 @@ config DOM0_MEM
 	  The specified string will be used for the dom0_mem parameter in
 	  case it was not specified on the command line.
 
-	  See docs/misc/xen-command-line.markdown for the supported syntax.
+	  See docs/misc/xen-command-line.pandoc for the supported syntax.
 
 	  Leave empty if you are not sure what to specify.
 
