@@ -473,7 +473,6 @@ ENDPROC(cpu_init)
 create_page_tables:
         /* Prepare the page-tables for mapping Xen */
         mov_w r0, XEN_VIRT_START
-        create_table_entry boot_pgtable, boot_second, r0, 1
 
         /*
          * We need to use a stash register because
@@ -520,68 +519,35 @@ create_page_tables:
         blo   1b
 
         /*
-         * If Xen is loaded at exactly XEN_VIRT_START then we don't
-         * need an additional 1:1 mapping, the virtual mapping will
-         * suffice.
-         */
-        cmp   r9, #XEN_VIRT_START
-        moveq pc, lr
-
-        /*
          * Setup the 1:1 mapping so we can turn the MMU on. Note that
          * only the first page of Xen will be part of the 1:1 mapping.
-         *
-         * In all the cases, we will link boot_third_id. So create the
-         * mapping in advance.
          */
+        create_table_entry boot_pgtable, boot_second_id, r9, 1
+        create_table_entry boot_second_id, boot_third_id, r9, 2
         create_mapping_entry boot_third_id, r9, r9
 
         /*
-         * Find the first slot used. If the slot is not XEN_FIRST_SLOT,
-         * then the 1:1 mapping will use its own set of page-tables from
-         * the second level.
+         * Find the first slot used. If the slot is not the same
+         * as TEMPORARY_AREA_FIRST_SLOT, then we will want to switch
+         * to the temporary mapping before jumping to the runtime
+         * virtual mapping.
          */
         get_table_slot r1, r9, 1     /* r1 := first slot */
-        cmp   r1, #XEN_FIRST_SLOT
-        beq   1f
-        create_table_entry boot_pgtable, boot_second_id, r9, 1
-        b     link_from_second_id
+        cmp   r1, #TEMPORARY_AREA_FIRST_SLOT
+        bne   use_temporary_mapping
 
-1:
-        /*
-         * Find the second slot used. If the slot is XEN_SECOND_SLOT, then the
-         * 1:1 mapping will use its own set of page-tables from the
-         * third level.
-         */
-        get_table_slot r1, r9, 2     /* r1 := second slot */
-        cmp   r1, #XEN_SECOND_SLOT
-        beq   virtphys_clash
-        create_table_entry boot_second, boot_third_id, r9, 2
-        b     link_from_third_id
-
-link_from_second_id:
-        create_table_entry boot_second_id, boot_third_id, r9, 2
-link_from_third_id:
-        /* Good news, we are not clashing with Xen virtual mapping */
+        mov_w r0, XEN_VIRT_START
+        create_table_entry boot_pgtable, boot_second, r0, 1
         mov   r12, #0                /* r12 := temporary mapping not created */
         mov   pc, lr
 
-virtphys_clash:
+use_temporary_mapping:
         /*
-         * The identity map clashes with boot_third. Link boot_first_id and
-         * map Xen to a temporary mapping. See switch_to_runtime_mapping
-         * for more details.
+         * The identity mapping is not using the first slot
+         * TEMPORARY_AREA_FIRST_SLOT. Create a temporary mapping.
+         * See switch_to_runtime_mapping for more details.
          */
-        PRINT("- Virt and Phys addresses clash  -\r\n")
         PRINT("- Create temporary mapping -\r\n")
-
-        /*
-         * This will override the link to boot_second in XEN_FIRST_SLOT.
-         * The page-tables are not live yet. So no need to use
-         * break-before-make.
-         */
-        create_table_entry boot_pgtable, boot_second_id, r9, 1
-        create_table_entry boot_second_id, boot_third_id, r9, 2
 
         /* Map boot_second (cover Xen mappings) to the temporary 1st slot */
         mov_w r0, TEMPORARY_XEN_VIRT_START
@@ -720,33 +686,13 @@ remove_identity_mapping:
         /* r2:r3 := invalid page-table entry */
         mov   r2, #0x0
         mov   r3, #0x0
-        /*
-         * Find the first slot used. Remove the entry for the first
-         * table if the slot is not XEN_FIRST_SLOT.
-         */
+
+        /* Find the first slot used and remove it */
         get_table_slot r1, r9, 1     /* r1 := first slot */
-        cmp   r1, #XEN_FIRST_SLOT
-        beq   1f
-        /* It is not in slot 0, remove the entry */
         mov_w r0, boot_pgtable       /* r0 := root table */
         lsl   r1, r1, #3             /* r1 := Slot offset */
         strd  r2, r3, [r0, r1]
-        b     identity_mapping_removed
 
-1:
-        /*
-         * Find the second slot used. Remove the entry for the first
-         * table if the slot is not XEN_SECOND_SLOT.
-         */
-        get_table_slot r1, r9, 2     /* r1 := second slot */
-        cmp   r1, #XEN_SECOND_SLOT
-        beq   identity_mapping_removed
-        /* It is not in slot 1, remove the entry */
-        mov_w r0, boot_second        /* r0 := second table */
-        lsl   r1, r1, #3             /* r1 := Slot offset */
-        strd  r2, r3, [r0, r1]
-
-identity_mapping_removed:
         flush_xen_tlb_local r0
         mov   pc, lr
 ENDPROC(remove_identity_mapping)
