@@ -23,8 +23,16 @@ static int libxl__device_virtio_setdefault(libxl__gc *gc, uint32_t domid,
                                            libxl_device_virtio *virtio,
                                            bool hotplug)
 {
-    return libxl__resolve_domid(gc, virtio->backend_domname,
-                                &virtio->backend_domid);
+    int rc;
+
+    rc = libxl__resolve_domid(gc, virtio->backend_domname,
+                              &virtio->backend_domid);
+    if (rc < 0) return rc;
+
+    libxl_defbool_setdefault(&virtio->grant_usage,
+                             virtio->backend_domid != LIBXL_TOOLSTACK_DOMID);
+
+    return 0;
 }
 
 static int libxl__device_from_virtio(libxl__gc *gc, uint32_t domid,
@@ -53,6 +61,8 @@ static int libxl__set_xenstore_virtio(libxl__gc *gc, uint32_t domid,
     flexarray_append_pair(back, "base", GCSPRINTF("%#"PRIx64, virtio->base));
     flexarray_append_pair(back, "type", GCSPRINTF("%s", virtio->type));
     flexarray_append_pair(back, "transport", GCSPRINTF("%s", transport));
+    flexarray_append_pair(back, "grant_usage",
+                          libxl_defbool_val(virtio->grant_usage) ? "1" : "0");
 
     return 0;
 }
@@ -102,6 +112,15 @@ static int libxl__virtio_from_xenstore(libxl__gc *gc, const char *libxl_path,
         } else {
             return ERROR_INVAL;
         }
+    }
+
+    tmp = NULL;
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/grant_usage", be_path), &tmp);
+    if (rc) goto out;
+
+    if (tmp) {
+        libxl_defbool_set(&virtio->grant_usage, strtoul(tmp, NULL, 0));
     }
 
     tmp = NULL;

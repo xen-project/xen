@@ -706,6 +706,7 @@ BackendDomid Domid
 BackendDomname string
 Type string
 Transport VirtioTransport
+GrantUsage Defbool
 Devid Devid
 Irq uint32
 Base uint64
