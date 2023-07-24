@@ -566,19 +566,20 @@ void set_tdb_key(const char *name, TDB_DATA *key)
 	key->dsize = strlen(name);
 }
 
-static void get_acc_data(TDB_DATA *key, struct node_account_data *acc)
+static void get_acc_data(const char *name, struct node_account_data *acc)
 {
-	TDB_DATA old_data;
+	TDB_DATA key, old_data;
 	struct xs_tdb_record_hdr *hdr;
 
 	if (acc->memory < 0) {
-		old_data = tdb_fetch(tdb_ctx, *key);
+		set_tdb_key(name, &key);
+		old_data = tdb_fetch(tdb_ctx, key);
 		/* No check for error, as the node might not exist. */
 		if (old_data.dptr == NULL) {
 			acc->memory = 0;
 		} else {
-			trace_tdb("read %s size %zu\n", key->dptr,
-				  old_data.dsize + key->dsize);
+			trace_tdb("read %s size %zu\n", name,
+				  old_data.dsize + key.dsize);
 			hdr = (void *)old_data.dptr;
 			acc->memory = old_data.dsize;
 			acc->domid = hdr->perms[0].id;
@@ -593,11 +594,10 @@ static void get_acc_data(TDB_DATA *key, struct node_account_data *acc)
  * count prepended (e.g. 123/local/domain/...). So testing for the node's
  * key not to start with "/" or "@" is sufficient.
  */
-static unsigned int get_acc_domid(struct connection *conn, TDB_DATA *key,
+static unsigned int get_acc_domid(struct connection *conn, const char *name,
 				  unsigned int domid)
 {
-	return (!conn || key->dptr[0] == '/' || key->dptr[0] == '@')
-	       ? domid : conn->id;
+	return (!conn || name[0] == '/' || name[0] == '@') ? domid : conn->id;
 }
 
 int db_write(struct connection *conn, const char *db_name, void *data,
@@ -618,9 +618,9 @@ int db_write(struct connection *conn, const char *db_name, void *data,
 	else
 		old_acc = *acc;
 
-	get_acc_data(&key, &old_acc);
-	old_domid = get_acc_domid(conn, &key, old_acc.domid);
-	new_domid = get_acc_domid(conn, &key, hdr->perms[0].id);
+	get_acc_data(db_name, &old_acc);
+	old_domid = get_acc_domid(conn, db_name, old_acc.domid);
+	new_domid = get_acc_domid(conn, db_name, hdr->perms[0].id);
 
 	/*
 	 * Don't check for ENOENT, as we want to be able to switch orphaned
@@ -675,7 +675,7 @@ int db_delete(struct connection *conn, const char *name,
 		acc->memory = -1;
 	}
 
-	get_acc_data(&key, acc);
+	get_acc_data(name, acc);
 
 	if (tdb_delete(tdb_ctx, key)) {
 		errno = EIO;
@@ -684,7 +684,7 @@ int db_delete(struct connection *conn, const char *name,
 	trace_tdb("delete %s\n", name);
 
 	if (acc->memory) {
-		domid = get_acc_domid(conn, &key, acc->domid);
+		domid = get_acc_domid(conn, name, acc->domid);
 		domain_memory_add_nochk(conn, domid, -acc->memory - key.dsize);
 	}
 
