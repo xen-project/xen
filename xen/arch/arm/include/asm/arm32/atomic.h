@@ -113,13 +113,13 @@ static inline void atomic_and(int m, atomic_t *v)
 	: "cc");
 }
 
-static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
+static inline int atomic_cmpxchg(atomic_t *v, int old, int new)
 {
 	int oldval;
 	unsigned long res;
 
 	smp_mb();
-	prefetchw(&ptr->counter);
+	prefetchw(&v->counter);
 
 	do {
 		__asm__ __volatile__("@ atomic_cmpxchg\n"
@@ -127,8 +127,8 @@ static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
 		"mov	%0, #0\n"
 		"teq	%1, %4\n"
 		"strexeq %0, %5, [%3]\n"
-		    : "=&r" (res), "=&r" (oldval), "+Qo" (ptr->counter)
-		    : "r" (&ptr->counter), "Ir" (old), "r" (new)
+		    : "=&r" (res), "=&r" (oldval), "+Qo" (v->counter)
+		    : "r" (&v->counter), "Ir" (old), "r" (new)
 		    : "cc");
 	} while (res);
 
