@@ -181,8 +181,8 @@ struct node_account_data {
 
 struct node {
 	const char *name;
-	/* Key used to update TDB */
-	TDB_DATA key;
+	/* Name used to access data base. */
+	const char *db_name;
 
 	/* Parent (optional) */
 	struct node *parent;

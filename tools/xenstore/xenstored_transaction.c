@@ -227,7 +227,7 @@ void transaction_prepend(struct connection *conn, const char *name,
  * to be accessed in the data base.
  */
 int access_node(struct connection *conn, struct node *node,
-		enum node_access_type type, TDB_DATA *key)
+		enum node_access_type type, const char **db_name)
 {
 	struct accessed_node *i = NULL;
 	struct transaction *trans;
@@ -243,8 +243,8 @@ int access_node(struct connection *conn, struct node *node,
 
 	if (!conn || !conn->transaction) {
 		/* They're changing the global database. */
-		if (key)
-			set_tdb_key(node->name, key);
+		if (db_name)
+			*db_name = node->name;
 		return 0;
 	}
 
@@ -308,8 +308,8 @@ int access_node(struct connection *conn, struct node *node,
 		/* Nothing to delete. */
 		return -1;
 
-	if (key) {
-		set_tdb_key(i->trans_name, key);
+	if (db_name) {
+		*db_name = i->trans_name;
 		if (type == NODE_ACCESS_WRITE)
 			i->ta_node = true;
 		if (type == NODE_ACCESS_DELETE)

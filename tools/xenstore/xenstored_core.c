@@ -821,18 +821,20 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
 }
 
 /*
- * Write the node. If the node is written, caller can find the key used in
- * node->key. This can later be used if the change needs to be reverted.
+ * Write the node. If the node is written, caller can find the DB name used in
+ * node->db_name. This can later be used if the change needs to be reverted.
  */
 static int write_node(struct connection *conn, struct node *node,
 		      enum write_node_mode mode, bool no_quota_check)
 {
 	int ret;
+	TDB_DATA key;
 
-	if (access_node(conn, node, NODE_ACCESS_WRITE, &node->key))
+	if (access_node(conn, node, NODE_ACCESS_WRITE, &node->db_name))
 		return errno;
 
-	ret = write_node_raw(conn, &node->key, node, mode, no_quota_check);
+	set_tdb_key(node->db_name, &key);
+	ret = write_node_raw(conn, &key, node, mode, no_quota_check);
 	if (ret && conn && conn->transaction) {
 		/*
 		 * Reverting access_node() is hard, so just fail the
@@ -1450,10 +1452,13 @@ nomem:
 
 static void destroy_node_rm(struct connection *conn, struct node *node)
 {
+	TDB_DATA key;
+
 	if (streq(node->name, "/"))
 		corrupt(NULL, "Destroying root node!");
 
-	do_tdb_delete(conn, &node->key, &node->acc);
+	set_tdb_key(node->db_name, &key);
+	do_tdb_delete(conn, &key, &node->acc);
 }
 
 static int destroy_node(struct connection *conn, struct node *node)
@@ -1643,10 +1648,11 @@ static int delnode_sub(const void *ctx, struct connection *conn,
 	const char *root = arg;
 	bool watch_exact;
 	int ret;
+	const char *db_name;
 	TDB_DATA key;
 
 	/* Any error here will probably be repeated for all following calls. */
-	ret = access_node(conn, node, NODE_ACCESS_DELETE, &key);
+	ret = access_node(conn, node, NODE_ACCESS_DELETE, &db_name);
 	if (ret > 0)
 		return WALK_TREE_SUCCESS_STOP;
 
@@ -1654,6 +1660,7 @@ static int delnode_sub(const void *ctx, struct connection *conn,
 		return WALK_TREE_ERROR_STOP;
 
 	/* In case of error stop the walk. */
+	set_tdb_key(db_name, &key);
 	if (!ret && do_tdb_delete(conn, &key, &node->acc))
 		return WALK_TREE_ERROR_STOP;
 

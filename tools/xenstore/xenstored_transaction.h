@@ -41,7 +41,7 @@ void ta_node_created(struct transaction *trans);
 
 /* This node was accessed. */
 int __must_check access_node(struct connection *conn, struct node *node,
-                             enum node_access_type type, TDB_DATA *key);
+                             enum node_access_type type, const char **db_name);
 
 /* Queue watches for a modified node. */
 void queue_watches(struct connection *conn, const char *name, bool watch_exact);
