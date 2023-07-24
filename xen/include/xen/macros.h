@@ -22,6 +22,40 @@
 #define __STR(...) #__VA_ARGS__
 #define STR(...) __STR(__VA_ARGS__)
 
+#ifndef __ASSEMBLY__
+
+/* All clang versions supported by Xen have _Static_assert. */
+#if defined(__clang__) || \
+    (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6))
+/* Force a compilation error if condition is true */
+#define BUILD_BUG_ON(cond) ({ _Static_assert(!(cond), "!(" #cond ")"); })
+
+/*
+ * Force a compilation error if condition is true, but also produce a
+ * result (of value 0 and type size_t), so the expression can be used
+ * e.g. in a structure initializer (or where-ever else comma expressions
+ * aren't permitted).
+ */
+#define BUILD_BUG_ON_ZERO(cond) \
+    (sizeof(struct { char c; _Static_assert(!(cond), "!(" #cond ")"); }) & 0)
+#else
+#define BUILD_BUG_ON_ZERO(cond) \
+    (sizeof(struct { unsigned u : !(cond); }) & 0)
+#define BUILD_BUG_ON(cond) ((void)BUILD_BUG_ON_ZERO(cond))
+#endif
+
+#define ABS(x) ({                              \
+    typeof(x) x_ = (x);                        \
+    (x_ < 0) ? -x_ : x_;                       \
+})
+
+#define SWAP(a, b) \
+   do { typeof(a) t_ = (a); (a) = (b); (b) = t_; } while ( 0 )
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]) + __must_be_array(x))
+
+#endif /* __ASSEMBLY__ */
+
 #endif /* __MACROS_H__ */
 
 /*

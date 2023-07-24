@@ -21,24 +21,6 @@
     unlikely(ret_warn_on_);             \
 })
 
-/* All clang versions supported by Xen have _Static_assert. */
-#if defined(__clang__) || \
-    (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6))
-/* Force a compilation error if condition is true */
-#define BUILD_BUG_ON(cond) ({ _Static_assert(!(cond), "!(" #cond ")"); })
-
-/* Force a compilation error if condition is true, but also produce a
-   result (of value 0 and type size_t), so the expression can be used
-   e.g. in a structure initializer (or where-ever else comma expressions
-   aren't permitted). */
-#define BUILD_BUG_ON_ZERO(cond) \
-    (sizeof(struct { char c; _Static_assert(!(cond), "!(" #cond ")"); }) & 0)
-#else
-#define BUILD_BUG_ON_ZERO(cond) \
-    (sizeof(struct { unsigned u : !(cond); }) & 0)
-#define BUILD_BUG_ON(cond) ((void)BUILD_BUG_ON_ZERO(cond))
-#endif
-
 #ifndef NDEBUG
 #define ASSERT(p) \
     do { if ( unlikely(!(p)) ) assert_failed(#p); } while (0)
@@ -47,16 +29,6 @@
 #define ASSERT(p) do { if ( 0 && (p) ) {} } while (0)
 #define ASSERT_UNREACHABLE() do { } while (0)
 #endif
-
-#define ABS(_x) ({                              \
-    typeof(_x) __x = (_x);                      \
-    (__x < 0) ? -__x : __x;                     \
-})
-
-#define SWAP(_a, _b) \
-   do { typeof(_a) _t = (_a); (_a) = (_b); (_b) = _t; } while ( 0 )
-
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]) + __must_be_array(x))
 
 #define __ACCESS_ONCE(x) ({                             \
             (void)(typeof(x))0; /* Scalar typecheck. */ \
