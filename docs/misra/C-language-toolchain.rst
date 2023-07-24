@@ -196,6 +196,10 @@ The table columns are as follows:
      - X86_64
      - See Section "6.9 128-bit Integers" of GCC_MANUAL.
 
+   * - Designated initializer for a range of elements
+     - ARM64, X86_64
+     - See Section "6.29 Designated Initializers" of GCC_MANUAL
+
 
 Translation Limits
 __________________
