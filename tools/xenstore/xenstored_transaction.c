@@ -356,25 +356,21 @@ static int finalize_transaction(struct connection *conn,
 				struct transaction *trans, bool *is_corrupt)
 {
 	struct accessed_node *i, *n;
-	TDB_DATA key, ta_key, data;
+	size_t size;
 	struct xs_tdb_record_hdr *hdr;
 	uint64_t gen;
 
 	list_for_each_entry_safe(i, n, &trans->accessed, list) {
 		if (i->check_gen) {
-			set_tdb_key(i->node, &key);
-			data = tdb_fetch(tdb_ctx, key);
-			hdr = (void *)data.dptr;
-			if (!data.dptr) {
-				if (tdb_error(tdb_ctx) != TDB_ERR_NOEXIST)
-					return EIO;
+			hdr = db_fetch(i->node, &size);
+			if (!hdr) {
+				if (errno != ENOENT)
+					return errno;
 				gen = NO_GENERATION;
 			} else {
-				trace_tdb("read %s size %zu\n", key.dptr,
-					  key.dsize + data.dsize);
 				gen = hdr->generation;
 			}
-			talloc_free(data.dptr);
+			talloc_free(hdr);
 			if (i->generation != gen)
 				return EAGAIN;
 		}
@@ -392,21 +388,16 @@ static int finalize_transaction(struct connection *conn,
 
 	while ((i = list_top(&trans->accessed, struct accessed_node, list))) {
 		if (i->ta_node) {
-			set_tdb_key(i->trans_name, &ta_key);
-			data = tdb_fetch(tdb_ctx, ta_key);
-			if (data.dptr) {
+			hdr = db_fetch(i->trans_name, &size);
+			if (hdr) {
 				enum write_node_mode mode;
 
-				trace_tdb("read %s size %zu\n", ta_key.dptr,
-					  ta_key.dsize + data.dsize);
-				hdr = (void *)data.dptr;
 				hdr->generation = ++generation;
 				mode = (i->generation == NO_GENERATION)
 				       ? NODE_CREATE : NODE_MODIFY;
-				*is_corrupt |= db_write(conn, i->node,
-							data.dptr, data.dsize,
-							NULL, mode, true);
-				talloc_free(data.dptr);
+				*is_corrupt |= db_write(conn, i->node, hdr,
+							size, NULL, mode, true);
+				talloc_free(hdr);
 				if (db_delete(conn, i->trans_name, NULL))
 					*is_corrupt = true;
 			} else {

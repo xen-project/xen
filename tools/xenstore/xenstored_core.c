@@ -85,7 +85,7 @@ bool keep_orphans = false;
 static int reopen_log_pipe[2];
 static int reopen_log_pipe0_pollfd_idx = -1;
 char *tracefile = NULL;
-TDB_CONTEXT *tdb_ctx = NULL;
+static TDB_CONTEXT *tdb_ctx = NULL;
 unsigned int trace_flags = TRACE_OBJ | TRACE_IO;
 
 static const char *sockmsg_string(enum xsd_sockmsg_type type);
@@ -556,7 +556,7 @@ static void initialize_fds(int *p_sock_pollfd_idx, int *ptimeout)
 	}
 }
 
-void set_tdb_key(const char *name, TDB_DATA *key)
+static void set_tdb_key(const char *name, TDB_DATA *key)
 {
 	/*
 	 * Dropping const is fine here, as the key will never be modified
@@ -566,25 +566,39 @@ void set_tdb_key(const char *name, TDB_DATA *key)
 	key->dsize = strlen(name);
 }
 
+struct xs_tdb_record_hdr *db_fetch(const char *db_name, size_t *size)
+{
+	TDB_DATA key, data;
+
+	set_tdb_key(db_name, &key);
+	data = tdb_fetch(tdb_ctx, key);
+	if (!data.dptr) {
+		errno = (tdb_error(tdb_ctx) == TDB_ERR_NOEXIST) ? ENOENT : EIO;
+		*size = 0;
+	} else {
+		*size = data.dsize;
+		trace_tdb("read %s size %zu\n", db_name,
+			  *size + strlen(db_name));
+	}
+
+	return (struct xs_tdb_record_hdr *)data.dptr;
+}
+
 static void get_acc_data(const char *name, struct node_account_data *acc)
 {
-	TDB_DATA key, old_data;
+	size_t size;
 	struct xs_tdb_record_hdr *hdr;
 
 	if (acc->memory < 0) {
-		set_tdb_key(name, &key);
-		old_data = tdb_fetch(tdb_ctx, key);
+		hdr = db_fetch(name, &size);
 		/* No check for error, as the node might not exist. */
-		if (old_data.dptr == NULL) {
+		if (hdr == NULL) {
 			acc->memory = 0;
 		} else {
-			trace_tdb("read %s size %zu\n", name,
-				  old_data.dsize + key.dsize);
-			hdr = (void *)old_data.dptr;
-			acc->memory = old_data.dsize;
+			acc->memory = size;
 			acc->domid = hdr->perms[0].id;
 		}
-		talloc_free(old_data.dptr);
+		talloc_free(hdr);
 	}
 }
 
@@ -698,7 +712,7 @@ int db_delete(struct connection *conn, const char *name,
 struct node *read_node(struct connection *conn, const void *ctx,
 		       const char *name)
 {
-	TDB_DATA key, data;
+	size_t size;
 	struct xs_tdb_record_hdr *hdr;
 	struct node *node;
 	const char *db_name;
@@ -717,29 +731,24 @@ struct node *read_node(struct connection *conn, const void *ctx,
 	}
 
 	db_name = transaction_prepend(conn, name);
-	set_tdb_key(db_name, &key);
+	hdr = db_fetch(db_name, &size);
 
-	data = tdb_fetch(tdb_ctx, key);
-
-	if (data.dptr == NULL) {
-		if (tdb_error(tdb_ctx) == TDB_ERR_NOEXIST) {
+	if (hdr == NULL) {
+		if (errno == ENOENT) {
 			node->generation = NO_GENERATION;
 			err = access_node(conn, node, NODE_ACCESS_READ, NULL);
 			errno = err ? : ENOENT;
 		} else {
-			log("TDB error on read: %s", tdb_errorstr(tdb_ctx));
+			log("DB error on read: %s", strerror(errno));
 			errno = EIO;
 		}
 		goto error;
 	}
 
-	trace_tdb("read %s size %zu\n", key.dptr, data.dsize + key.dsize);
-
 	node->parent = NULL;
-	talloc_steal(node, data.dptr);
+	talloc_steal(node, hdr);
 
 	/* Datalen, childlen, number of permissions */
-	hdr = (void *)data.dptr;
 	node->generation = hdr->generation;
 	node->perms.num = hdr->num_perms;
 	node->datalen = hdr->datalen;
@@ -748,7 +757,7 @@ struct node *read_node(struct connection *conn, const void *ctx,
 	/* Permissions are struct xs_permissions. */
 	node->perms.p = hdr->perms;
 	node->acc.domid = get_node_owner(node);
-	node->acc.memory = data.dsize;
+	node->acc.memory = size;
 	if (domain_adjust_node_perms(node))
 		goto error;
 
