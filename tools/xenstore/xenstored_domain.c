@@ -523,7 +523,7 @@ static int domain_tree_remove_sub(const void *ctx, struct connection *conn,
 		node->perms.p[0].id = priv_domid;
 		node->acc.memory = 0;
 		domain_nbentry_inc(NULL, priv_domid);
-		if (write_node_raw(NULL, &key, node, true)) {
+		if (write_node_raw(NULL, &key, node, NODE_MODIFY, true)) {
 			/* That's unfortunate. We only can try to continue. */
 			syslog(LOG_ERR,
 			       "error when moving orphaned node %s to dom0\n",

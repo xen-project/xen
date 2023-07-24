@@ -290,7 +290,8 @@ int access_node(struct connection *conn, struct node *node,
 			i->check_gen = true;
 			if (node->generation != NO_GENERATION) {
 				set_tdb_key(i->trans_name, &local_key);
-				ret = write_node_raw(conn, &local_key, node, true);
+				ret = write_node_raw(conn, &local_key, node,
+						     NODE_CREATE, true);
 				if (ret)
 					goto err;
 				i->ta_node = true;
@@ -401,12 +402,16 @@ static int finalize_transaction(struct connection *conn,
 			set_tdb_key(i->trans_name, &ta_key);
 			data = tdb_fetch(tdb_ctx, ta_key);
 			if (data.dptr) {
+				enum write_node_mode mode;
+
 				trace_tdb("read %s size %zu\n", ta_key.dptr,
 					  ta_key.dsize + data.dsize);
 				hdr = (void *)data.dptr;
 				hdr->generation = ++generation;
+				mode = (i->generation == NO_GENERATION)
+				       ? NODE_CREATE : NODE_MODIFY;
 				*is_corrupt |= do_tdb_write(conn, &key, &data,
-							    NULL, true);
+							    NULL, mode, true);
 				talloc_free(data.dptr);
 				if (do_tdb_delete(conn, &ta_key, NULL))
 					*is_corrupt = true;

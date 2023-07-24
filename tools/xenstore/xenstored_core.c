@@ -601,7 +601,8 @@ static unsigned int get_acc_domid(struct connection *conn, TDB_DATA *key,
 }
 
 int do_tdb_write(struct connection *conn, TDB_DATA *key, TDB_DATA *data,
-		 struct node_account_data *acc, bool no_quota_check)
+		 struct node_account_data *acc, enum write_node_mode mode,
+		 bool no_quota_check)
 {
 	struct xs_tdb_record_hdr *hdr = (void *)data->dptr;
 	struct node_account_data old_acc = {};
@@ -635,7 +636,8 @@ int do_tdb_write(struct connection *conn, TDB_DATA *key, TDB_DATA *data,
 	}
 
 	/* TDB should set errno, but doesn't even set ecode AFAICT. */
-	if (tdb_store(tdb_ctx, *key, *data, TDB_REPLACE) != 0) {
+	if (tdb_store(tdb_ctx, *key, *data,
+		      (mode == NODE_CREATE) ? TDB_INSERT : TDB_MODIFY) != 0) {
 		domain_memory_add_nochk(conn, new_domid,
 					-data->dsize - key->dsize);
 		/* Error path, so no quota check. */
@@ -774,7 +776,7 @@ static bool read_node_can_propagate_errno(void)
 }
 
 int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
-		   bool no_quota_check)
+		   enum write_node_mode mode, bool no_quota_check)
 {
 	TDB_DATA data;
 	void *p;
@@ -812,7 +814,7 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
 	p += node->datalen;
 	memcpy(p, node->children, node->childlen);
 
-	if (do_tdb_write(conn, key, &data, &node->acc, no_quota_check))
+	if (do_tdb_write(conn, key, &data, &node->acc, mode, no_quota_check))
 		return EIO;
 
 	return 0;
@@ -823,14 +825,14 @@ int write_node_raw(struct connection *conn, TDB_DATA *key, struct node *node,
  * node->key. This can later be used if the change needs to be reverted.
  */
 static int write_node(struct connection *conn, struct node *node,
-		      bool no_quota_check)
+		      enum write_node_mode mode, bool no_quota_check)
 {
 	int ret;
 
 	if (access_node(conn, node, NODE_ACCESS_WRITE, &node->key))
 		return errno;
 
-	ret = write_node_raw(conn, &node->key, node, no_quota_check);
+	ret = write_node_raw(conn, &node->key, node, mode, no_quota_check);
 	if (ret && conn && conn->transaction) {
 		/*
 		 * Reverting access_node() is hard, so just fail the
@@ -1500,7 +1502,8 @@ static struct node *create_node(struct connection *conn, const void *ctx,
 			goto err;
 		}
 
-		ret = write_node(conn, i, false);
+		ret = write_node(conn, i, i->parent ? NODE_CREATE : NODE_MODIFY,
+				 false);
 		if (ret)
 			goto err;
 
@@ -1564,7 +1567,7 @@ static int do_write(const void *ctx, struct connection *conn,
 	} else {
 		node->data = in->buffer + offset;
 		node->datalen = datalen;
-		if (write_node(conn, node, false))
+		if (write_node(conn, node, NODE_MODIFY, false))
 			return errno;
 	}
 
@@ -1614,7 +1617,7 @@ static int remove_child_entry(struct connection *conn, struct node *node,
 	memdel(node->children, offset, childlen + 1, node->childlen);
 	node->childlen -= childlen + 1;
 
-	return write_node(conn, node, true);
+	return write_node(conn, node, NODE_MODIFY, true);
 }
 
 static int delete_child(struct connection *conn,
@@ -1812,7 +1815,7 @@ static int do_set_perms(const void *ctx, struct connection *conn,
 	if (domain_nbentry_inc(conn, get_node_owner(node)))
 		return ENOMEM;
 
-	if (write_node(conn, node, false))
+	if (write_node(conn, node, NODE_MODIFY, false))
 		return errno;
 
 	fire_watches(conn, ctx, name, node, false, &old_perms);
@@ -2326,7 +2329,7 @@ static void manual_node(const char *name, const char *child)
 	if (child)
 		node->childlen = strlen(child) + 1;
 
-	if (write_node(NULL, node, false))
+	if (write_node(NULL, node, NODE_CREATE, false))
 		barf_perror("Could not create initial node %s", name);
 	talloc_free(node);
 }
@@ -3474,12 +3477,15 @@ void read_state_node(const void *ctx, const void *state)
 			barf("allocation error restoring node");
 
 		set_tdb_key(parentname, &key);
-		if (write_node_raw(NULL, &key, parent, true))
+		if (write_node_raw(NULL, &key, parent, NODE_MODIFY, true))
 			barf("write parent error restoring node");
 	}
 
 	set_tdb_key(name, &key);
-	if (write_node_raw(NULL, &key, node, true))
+
+	/* The "/" node is already existing, so it can only be modified here. */
+	if (write_node_raw(NULL, &key, node,
+			   strcmp(name, "/") ? NODE_CREATE : NODE_MODIFY, true))
 		barf("write node error restoring node");
 
 	if (domain_nbentry_inc(&conn, get_node_owner(node)))
