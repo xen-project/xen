@@ -362,12 +362,13 @@ extern xengnttab_handle **xgt_handle;
 
 int remember_string(struct hashtable *hash, const char *str);
 
+/* Data base access functions. */
 void set_tdb_key(const char *name, TDB_DATA *key);
 int do_tdb_write(struct connection *conn, TDB_DATA *key, TDB_DATA *data,
 		 struct node_account_data *acc, enum write_node_mode mode,
 		 bool no_quota_check);
-int do_tdb_delete(struct connection *conn, TDB_DATA *key,
-		  struct node_account_data *acc);
+int db_delete(struct connection *conn, const char *name,
+	      struct node_account_data *acc);
 
 void conn_free_buffered_data(struct connection *conn);
 

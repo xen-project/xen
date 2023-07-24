@@ -384,8 +384,7 @@ static int finalize_transaction(struct connection *conn,
 		/* Entries for unmodified nodes can be removed early. */
 		if (!i->modified) {
 			if (i->ta_node) {
-				set_tdb_key(i->trans_name, &ta_key);
-				if (do_tdb_delete(conn, &ta_key, NULL))
+				if (db_delete(conn, i->trans_name, NULL))
 					return EIO;
 			}
 			list_del(&i->list);
@@ -394,7 +393,6 @@ static int finalize_transaction(struct connection *conn,
 	}
 
 	while ((i = list_top(&trans->accessed, struct accessed_node, list))) {
-		set_tdb_key(i->node, &key);
 		if (i->ta_node) {
 			set_tdb_key(i->trans_name, &ta_key);
 			data = tdb_fetch(tdb_ctx, ta_key);
@@ -407,10 +405,11 @@ static int finalize_transaction(struct connection *conn,
 				hdr->generation = ++generation;
 				mode = (i->generation == NO_GENERATION)
 				       ? NODE_CREATE : NODE_MODIFY;
+				set_tdb_key(i->node, &key);
 				*is_corrupt |= do_tdb_write(conn, &key, &data,
 							    NULL, mode, true);
 				talloc_free(data.dptr);
-				if (do_tdb_delete(conn, &ta_key, NULL))
+				if (db_delete(conn, i->trans_name, NULL))
 					*is_corrupt = true;
 			} else {
 				*is_corrupt = true;
@@ -423,7 +422,7 @@ static int finalize_transaction(struct connection *conn,
 			 */
 			*is_corrupt |= (i->generation == NO_GENERATION)
 				       ? false
-				       : do_tdb_delete(conn, &key, NULL);
+				       : db_delete(conn, i->node, NULL);
 		}
 		if (i->fire_watch)
 			fire_watches(conn, trans, i->node, NULL, i->watch_exact,
@@ -440,15 +439,12 @@ static int destroy_transaction(void *_transaction)
 {
 	struct transaction *trans = _transaction;
 	struct accessed_node *i;
-	TDB_DATA key;
 
 	wrl_ntransactions--;
 	trace_destroy(trans, "transaction");
 	while ((i = list_top(&trans->accessed, struct accessed_node, list))) {
-		if (i->ta_node) {
-			set_tdb_key(i->trans_name, &key);
-			do_tdb_delete(trans->conn, &key, NULL);
-		}
+		if (i->ta_node)
+			db_delete(trans->conn, i->trans_name, NULL);
 		list_del(&i->list);
 		talloc_free(i);
 	}

@@ -658,28 +658,31 @@ int do_tdb_write(struct connection *conn, TDB_DATA *key, TDB_DATA *data,
 	return 0;
 }
 
-int do_tdb_delete(struct connection *conn, TDB_DATA *key,
-		  struct node_account_data *acc)
+int db_delete(struct connection *conn, const char *name,
+	      struct node_account_data *acc)
 {
 	struct node_account_data tmp_acc;
 	unsigned int domid;
+	TDB_DATA key;
+
+	set_tdb_key(name, &key);
 
 	if (!acc) {
 		acc = &tmp_acc;
 		acc->memory = -1;
 	}
 
-	get_acc_data(key, acc);
+	get_acc_data(&key, acc);
 
-	if (tdb_delete(tdb_ctx, *key)) {
+	if (tdb_delete(tdb_ctx, key)) {
 		errno = EIO;
 		return errno;
 	}
-	trace_tdb("delete %s\n", key->dptr);
+	trace_tdb("delete %s\n", name);
 
 	if (acc->memory) {
-		domid = get_acc_domid(conn, key, acc->domid);
-		domain_memory_add_nochk(conn, domid, -acc->memory - key->dsize);
+		domid = get_acc_domid(conn, &key, acc->domid);
+		domain_memory_add_nochk(conn, domid, -acc->memory - key.dsize);
 	}
 
 	return 0;
@@ -1454,13 +1457,10 @@ nomem:
 
 static void destroy_node_rm(struct connection *conn, struct node *node)
 {
-	TDB_DATA key;
-
 	if (streq(node->name, "/"))
 		corrupt(NULL, "Destroying root node!");
 
-	set_tdb_key(node->db_name, &key);
-	do_tdb_delete(conn, &key, &node->acc);
+	db_delete(conn, node->db_name, &node->acc);
 }
 
 static int destroy_node(struct connection *conn, struct node *node)
@@ -1651,7 +1651,6 @@ static int delnode_sub(const void *ctx, struct connection *conn,
 	bool watch_exact;
 	int ret;
 	const char *db_name;
-	TDB_DATA key;
 
 	/* Any error here will probably be repeated for all following calls. */
 	ret = access_node(conn, node, NODE_ACCESS_DELETE, &db_name);
@@ -1662,8 +1661,7 @@ static int delnode_sub(const void *ctx, struct connection *conn,
 		return WALK_TREE_ERROR_STOP;
 
 	/* In case of error stop the walk. */
-	set_tdb_key(db_name, &key);
-	if (!ret && do_tdb_delete(conn, &key, &node->acc))
+	if (!ret && db_delete(conn, db_name, &node->acc))
 		return WALK_TREE_ERROR_STOP;
 
 	/*
@@ -2489,9 +2487,8 @@ static int clean_store_(TDB_CONTEXT *tdb, TDB_DATA key, TDB_DATA val,
 	}
 	if (!hashtable_search(reachable, name)) {
 		log("clean_store: '%s' is orphaned!", name);
-		if (recovery) {
-			do_tdb_delete(NULL, &key, NULL);
-		}
+		if (recovery)
+			db_delete(NULL, name, NULL);
 	}
 
 	talloc_free(name);
