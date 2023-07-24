@@ -528,10 +528,10 @@ static char * __init split_string(char *s)
     return NULL;
 }
 
-static char *__init get_value(const struct file *cfg, const char *section,
+static char *__init get_value(const struct file *file, const char *section,
                               const char *item)
 {
-    char *ptr = cfg->str, *end = ptr + cfg->size;
+    char *ptr = file->str, *end = ptr + file->size;
     size_t slen = section ? strlen(section) : 0, ilen = strlen(item);
     bool match = !slen;
 
@@ -821,9 +821,9 @@ static bool __init read_section(const EFI_LOADED_IMAGE *image,
     return true;
 }
 
-static void __init pre_parse(const struct file *cfg)
+static void __init pre_parse(const struct file *file)
 {
-    char *ptr = cfg->str, *end = ptr + cfg->size;
+    char *ptr = file->str, *end = ptr + file->size;
     bool start = true, comment = false;
 
     for ( ; ptr < end; ++ptr )
@@ -844,7 +844,7 @@ static void __init pre_parse(const struct file *cfg)
         else
             start = 0;
     }
-    if ( cfg->size && end[-1] )
+    if ( file->size && end[-1] )
          PrintStr(L"No newline at end of config file,"
                    " last line will be ignored.\r\n");
 }
