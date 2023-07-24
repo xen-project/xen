@@ -196,20 +196,17 @@ static char *transaction_get_node_name(void *ctx, struct transaction *trans,
  * Prepend the transaction to name if node has been modified in the current
  * transaction.
  */
-void transaction_prepend(struct connection *conn, const char *name,
-			 TDB_DATA *key)
+const char *transaction_prepend(struct connection *conn, const char *name)
 {
 	struct accessed_node *i;
 
 	if (conn && conn->transaction) {
 		i = find_accessed_node(conn->transaction, name);
-		if (i) {
-			set_tdb_key(i->trans_name, key);
-			return;
-		}
+		if (i)
+			return i->trans_name;
 	}
 
-	set_tdb_key(name, key);
+	return name;
 }
 
 /*

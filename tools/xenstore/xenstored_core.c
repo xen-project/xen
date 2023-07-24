@@ -695,6 +695,7 @@ struct node *read_node(struct connection *conn, const void *ctx,
 	TDB_DATA key, data;
 	struct xs_tdb_record_hdr *hdr;
 	struct node *node;
+	const char *db_name;
 	int err;
 
 	node = talloc(ctx, struct node);
@@ -709,7 +710,8 @@ struct node *read_node(struct connection *conn, const void *ctx,
 		return NULL;
 	}
 
-	transaction_prepend(conn, name, &key);
+	db_name = transaction_prepend(conn, name);
+	set_tdb_key(db_name, &key);
 
 	data = tdb_fetch(tdb_ctx, key);
 
