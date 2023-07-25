@@ -69,7 +69,7 @@ int disable_nonboot_cpus(void);
 void enable_nonboot_cpus(void);
 
 /* Private arch-dependent helpers for CPU hotplug. */
-int __cpu_up(unsigned int cpunum);
+int __cpu_up(unsigned int cpu);
 void __cpu_disable(void);
 void __cpu_die(unsigned int cpu);
 
