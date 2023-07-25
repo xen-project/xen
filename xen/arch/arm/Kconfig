@@ -175,13 +175,6 @@ config ARM64_BTI
 	  Branch Target Identification support.
 	  This feature is not supported in Xen.
 
-config TEE
-	bool "Enable TEE mediators support (UNSUPPORTED)" if UNSUPPORTED
-	default n
-	help
-	  This option enables generic TEE mediators support. It allows guests
-	  to access real TEE via one of TEE mediators implemented in XEN.
-
 source "arch/arm/tee/Kconfig"
 
 config STATIC_SHM
