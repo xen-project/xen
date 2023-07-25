@@ -66,7 +66,7 @@
 })
 
 /* SAF-0-safe */
-extern char _start[], _end[], start[];
+extern char _start[], _end[];
 #define is_kernel(p) ({                         \
     char *__p = (char *)(unsigned long)(p);     \
     (__p >= _start) && (__p < _end);            \

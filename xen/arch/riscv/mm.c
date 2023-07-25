@@ -148,7 +148,7 @@ static bool __init check_pgtbl_mode_support(struct mmu_desc *mmu_desc,
 
     unsigned long aligned_load_start = load_start & level_map_mask;
     unsigned long aligned_page_size = XEN_PT_LEVEL_SIZE(page_table_level);
-    unsigned long xen_size = (unsigned long)(_end - start);
+    unsigned long xen_size = (unsigned long)(_end - _start);
 
     if ( (load_start + xen_size) > (aligned_load_start + aligned_page_size) )
     {
