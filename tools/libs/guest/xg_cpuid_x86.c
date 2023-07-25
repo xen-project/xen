@@ -425,10 +425,171 @@ static int xc_cpuid_xend_policy(
     return rc;
 }
 
+static int compare_msr(const void *l, const void *r)
+{
+    const xen_msr_entry_t *lhs = l;
+    const xen_msr_entry_t *rhs = r;
+
+    if ( lhs->idx == rhs->idx )
+        return 0;
+
+    return lhs->idx < rhs->idx ? -1 : 1;
+}
+
+static xen_msr_entry_t *find_msr(
+    xen_msr_entry_t *msrs, unsigned int nr_msrs,
+    uint32_t index)
+{
+    const xen_msr_entry_t key = { .idx = index };
+
+    return bsearch(&key, msrs, nr_msrs, sizeof(*msrs), compare_msr);
+}
+
+
+static int xc_msr_policy(xc_interface *xch, domid_t domid,
+                         const struct xc_msr *msr)
+{
+    int rc;
+    bool hvm;
+    xc_dominfo_t di;
+    unsigned int nr_leaves, nr_msrs;
+    uint32_t err_leaf = -1, err_subleaf = -1, err_msr = -1;
+    /*
+     * Three full policies.  The host, default for the domain type,
+     * and domain current.
+     */
+    xen_msr_entry_t *host = NULL, *def = NULL, *cur = NULL;
+    unsigned int nr_host, nr_def, nr_cur;
+
+    if ( xc_domain_getinfo(xch, domid, 1, &di) != 1 ||
+         di.domid != domid )
+    {
+        ERROR("Failed to obtain d%d info", domid);
+        rc = -ESRCH;
+        goto out;
+    }
+    hvm = di.hvm;
+
+    rc = xc_get_cpu_policy_size(xch, &nr_leaves, &nr_msrs);
+    if ( rc )
+    {
+        PERROR("Failed to obtain policy info size");
+        rc = -errno;
+        goto out;
+    }
+
+    if ( (host = calloc(nr_msrs, sizeof(*host))) == NULL ||
+         (def  = calloc(nr_msrs, sizeof(*def)))  == NULL ||
+         (cur  = calloc(nr_msrs, sizeof(*cur)))  == NULL )
+    {
+        ERROR("Unable to allocate memory for %u CPUID leaves", nr_leaves);
+        rc = -ENOMEM;
+        goto out;
+    }
+
+    /* Get the domain's current policy. */
+    nr_leaves = 0;
+    nr_cur = nr_msrs;
+    rc = xc_get_domain_cpu_policy(xch, domid, &nr_leaves, NULL, &nr_cur, cur);
+    if ( rc )
+    {
+        PERROR("Failed to obtain d%d current policy", domid);
+        rc = -errno;
+        goto out;
+    }
+
+    /* Get the domain type's default policy. */
+    nr_leaves = 0;
+    nr_def = nr_msrs;
+    rc = xc_get_system_cpu_policy(xch, hvm ? XEN_SYSCTL_cpu_policy_hvm_default
+                                           : XEN_SYSCTL_cpu_policy_pv_default,
+                                  &nr_leaves, NULL, &nr_def, def);
+    if ( rc )
+    {
+        PERROR("Failed to obtain %s def policy", hvm ? "hvm" : "pv");
+        rc = -errno;
+        goto out;
+    }
+
+    /* Get the host policy. */
+    nr_leaves = 0;
+    nr_host = nr_msrs;
+    rc = xc_get_system_cpu_policy(xch, XEN_SYSCTL_cpu_policy_host,
+                                  &nr_leaves, NULL, &nr_host, host);
+    if ( rc )
+    {
+        PERROR("Failed to obtain host policy");
+        rc = -errno;
+        goto out;
+    }
+
+    for ( ; msr->index != XC_MSR_INPUT_UNUSED; ++msr )
+    {
+        xen_msr_entry_t *cur_msr = find_msr(cur, nr_cur, msr->index);
+        const xen_msr_entry_t *def_msr = find_msr(def, nr_def, msr->index);
+        const xen_msr_entry_t *host_msr = find_msr(host, nr_host, msr->index);
+        unsigned int i;
+
+        if ( cur_msr == NULL || def_msr == NULL || host_msr == NULL )
+        {
+            ERROR("Missing MSR %#x", msr->index);
+            rc = -ENOENT;
+            goto out;
+        }
+
+        for ( i = 0; i < ARRAY_SIZE(msr->policy) - 1; i++ )
+        {
+            bool val;
+
+            if ( msr->policy[i] == '1' )
+                val = true;
+            else if ( msr->policy[i] == '0' )
+                val = false;
+            else if ( msr->policy[i] == 'x' )
+                val = test_bit(63 - i, &def_msr->val);
+            else if ( msr->policy[i] == 'k' )
+                val = test_bit(63 - i, &host_msr->val);
+            else
+            {
+                ERROR("MSR index %#x: bad character '%c' in policy string '%s'",
+                      msr->index, msr->policy[i], msr->policy);
+                rc = -EINVAL;
+                goto out;
+            }
+
+            if ( val )
+                set_bit(63 - i, &cur_msr->val);
+            else
+                clear_bit(63 - i, &cur_msr->val);
+        }
+    }
+
+    /* Feed the transformed policy back up to Xen. */
+    rc = xc_set_domain_cpu_policy(xch, domid, 0, NULL, nr_cur, cur,
+                                  &err_leaf, &err_subleaf, &err_msr);
+    if ( rc )
+    {
+        PERROR("Failed to set d%d's policy (err leaf %#x, subleaf %#x, msr %#x)",
+               domid, err_leaf, err_subleaf, err_msr);
+        rc = -errno;
+        goto out;
+    }
+
+    /* Success! */
+
+ out:
+    free(cur);
+    free(def);
+    free(host);
+
+    return rc;
+}
+
 int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
                           const uint32_t *featureset, unsigned int nr_features,
                           bool pae, bool itsc, bool nested_virt,
-                          const struct xc_xend_cpuid *xend)
+                          const struct xc_xend_cpuid *xend,
+                          const struct xc_msr *msr)
 {
     int rc;
     xc_dominfo_t di;
@@ -666,6 +827,13 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
 
     if ( xend && (rc = xc_cpuid_xend_policy(xch, domid, xend)) )
         goto out;
+
+    if ( msr )
+    {
+        rc = xc_msr_policy(xch, domid, msr);
+        if ( rc )
+            goto out;
+    }
 
     rc = 0;
 
