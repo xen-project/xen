@@ -96,6 +96,66 @@ static struct xc_xend_cpuid *cpuid_find_match(libxl_cpuid_policy_list *pl,
     return *list + i;
 }
 
+static int cpuid_add(libxl_cpuid_policy_list *policy,
+                     const struct cpuid_flags *flag, const char *val)
+{
+    struct xc_xend_cpuid *entry = cpuid_find_match(policy, flag->leaf,
+                                                   flag->subleaf);
+    unsigned long num;
+    char flags[33], *resstr, *endptr;
+    unsigned int i;
+
+    resstr = entry->policy[flag->reg - 1];
+    num = strtoul(val, &endptr, 0);
+    flags[flag->length] = 0;
+    if (endptr != val) {
+        /* if this was a valid number, write the binary form into the string */
+        for (i = 0; i < flag->length; i++) {
+            flags[flag->length - 1 - i] = "01"[(num >> i) & 1];
+        }
+    } else {
+        switch(val[0]) {
+        case 'x': case 'k': case 's':
+            memset(flags, val[0], flag->length);
+            break;
+        default:
+            return 3;
+        }
+    }
+
+    if (resstr == NULL) {
+        resstr = strdup("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+    }
+
+    /* the family and model entry is potentially split up across
+     * two fields in Fn0000_0001_EAX, so handle them here separately.
+     */
+    if (!strcmp(flag->name, "family")) {
+        if (num < 16) {
+            memcpy(resstr + (32 - 4) - flag->bit, flags + 4, 4);
+            memcpy(resstr + (32 - 8) - 20, "00000000", 8);
+        } else {
+            num -= 15;
+            memcpy(resstr + (32 - 4) - flag->bit, "1111", 4);
+            for (i = 0; i < 7; i++) {
+                flags[7 - i] = "01"[num & 1];
+                num >>= 1;
+            }
+            memcpy(resstr + (32 - 8) - 20, flags, 8);
+        }
+    } else if (!strcmp(flag->name, "model")) {
+        memcpy(resstr + (32 - 4) - 16, flags, 4);
+        memcpy(resstr + (32 - 4) - flag->bit, flags + 4, 4);
+    } else {
+        memcpy(resstr + (32 - flag->length) - flag->bit, flags,
+               flag->length);
+    }
+    entry->policy[flag->reg - 1] = resstr;
+
+    return 0;
+
+}
+
 /* parse a single key=value pair and translate it into the libxc
  * used interface using 32-characters strings for each register.
  * Will overwrite earlier entries and thus can be called multiple
@@ -316,12 +376,8 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *policy, const char* str)
         {NULL, 0, NA, CPUID_REG_INV, 0, 0}
     };
 #undef NA
-    char *sep, *val, *endptr;
-    int i;
+    const char *sep, *val;
     const struct cpuid_flags *flag;
-    struct xc_xend_cpuid *entry;
-    unsigned long num;
-    char flags[33], *resstr;
 
     sep = strchr(str, '=');
     if (sep == NULL) {
@@ -331,60 +387,10 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *policy, const char* str)
     }
     for (flag = cpuid_flags; flag->name != NULL; flag++) {
         if(!strncmp(str, flag->name, sep - str) && flag->name[sep - str] == 0)
-            break;
-    }
-    if (flag->name == NULL) {
-        return 2;
-    }
-    entry = cpuid_find_match(policy, flag->leaf, flag->subleaf);
-    resstr = entry->policy[flag->reg - 1];
-    num = strtoull(val, &endptr, 0);
-    flags[flag->length] = 0;
-    if (endptr != val) {
-        /* if this was a valid number, write the binary form into the string */
-        for (i = 0; i < flag->length; i++) {
-            flags[flag->length - 1 - i] = "01"[!!(num & (1 << i))];
-        }
-    } else {
-        switch(val[0]) {
-        case 'x': case 'k': case 's':
-            memset(flags, val[0], flag->length);
-            break;
-        default:
-            return 3;
-        }
+            return cpuid_add(policy, flag, val);
     }
 
-    if (resstr == NULL) {
-        resstr = strdup("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
-    }
-
-    /* the family and model entry is potentially split up across
-     * two fields in Fn0000_0001_EAX, so handle them here separately.
-     */
-    if (!strncmp(str, "family", sep - str)) {
-        if (num < 16) {
-            memcpy(resstr + (32 - 4) - flag->bit, flags + 4, 4);
-            memcpy(resstr + (32 - 8) - 20, "00000000", 8);
-        } else {
-            num -= 15;
-            memcpy(resstr + (32 - 4) - flag->bit, "1111", 4);
-            for (i = 0; i < 7; i++) {
-                flags[7 - i] = "01"[num & 1];
-                num >>= 1;
-            }
-            memcpy(resstr + (32 - 8) - 20, flags, 8);
-        }
-    } else if (!strncmp(str, "model", sep - str)) {
-        memcpy(resstr + (32 - 4) - 16, flags, 4);
-        memcpy(resstr + (32 - 4) - flag->bit, flags + 4, 4);
-    } else {
-        memcpy(resstr + (32 - flag->length) - flag->bit, flags,
-               flag->length);
-    }
-    entry->policy[flag->reg - 1] = resstr;
-
-    return 0;
+    return 2;
 }
 
 /* parse a single list item from the legacy Python xend syntax, where
