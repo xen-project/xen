@@ -4838,6 +4838,10 @@ _hidden int libxl__domain_pvcontrol(libxl__egc *egc,
 /* Check whether a domid is recent */
 int libxl__is_domid_recent(libxl__gc *gc, uint32_t domid, bool *recent);
 
+struct libxl__cpu_policy {
+    struct xc_xend_cpuid *cpuid;
+};
+
 #endif
 
 /*
