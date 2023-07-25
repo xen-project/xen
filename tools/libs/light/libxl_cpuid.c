@@ -157,6 +157,60 @@ static int cpuid_add(libxl_cpuid_policy_list *policy,
     return 0;
 }
 
+static struct xc_msr *msr_find_match(libxl_cpuid_policy_list *pl, uint32_t index)
+{
+    unsigned int i = 0;
+    libxl_cpuid_policy_list policy = *pl;
+
+    if (policy == NULL)
+        policy = *pl = calloc(1, sizeof(*policy));
+
+    if (policy->msr != NULL) {
+        for (i = 0; policy->msr[i].index != XC_MSR_INPUT_UNUSED; i++) {
+            if (policy->msr[i].index == index) {
+                return &policy->msr[i];
+            }
+        }
+    }
+
+    policy->msr = realloc(policy->msr, sizeof(struct xc_msr) * (i + 2));
+    policy->msr[i].index = index;
+    memset(policy->msr[i].policy, 'x', ARRAY_SIZE(policy->msr[0].policy) - 1);
+    policy->msr[i].policy[ARRAY_SIZE(policy->msr[0].policy) - 1] = '\0';
+    policy->msr[i + 1].index = XC_MSR_INPUT_UNUSED;
+
+    return &policy->msr[i];
+}
+
+static int msr_add(libxl_cpuid_policy_list *policy, uint32_t index, unsigned int bit,
+                   const char *val)
+{
+    struct xc_msr *entry = msr_find_match(policy, index);
+
+    /* Only allow options taking a character for MSRs, no values allowed. */
+    if (strlen(val) != 1)
+        return 3;
+
+    switch (val[0]) {
+    case '0':
+    case '1':
+    case 'x':
+    case 'k':
+        entry->policy[63 - bit] = val[0];
+        break;
+
+    case 's':
+        /* Translate s -> k as xc_msr doesn't support the deprecated 's'. */
+        entry->policy[63 - bit] = 'k';
+        break;
+
+    default:
+        return 3;
+    }
+
+    return 0;
+}
+
 struct feature_name {
     const char *name;
     unsigned int bit;
@@ -336,7 +390,15 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *policy, const char* str)
     }
 
     case FEAT_MSR:
-        return 2;
+    {
+        unsigned int bit = feat->bit % 32;
+
+        if (feature_to_policy[feat->bit / 32].msr.reg == CPUID_REG_EDX)
+            bit += 32;
+
+        return msr_add(policy, feature_to_policy[feat->bit / 32].msr.index,
+                       bit, val);
+    }
     }
 
     return 2;
