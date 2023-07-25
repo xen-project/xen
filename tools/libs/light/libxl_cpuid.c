@@ -19,22 +19,29 @@ int libxl__cpuid_policy_is_empty(libxl_cpuid_policy_list *pl)
     return !libxl_cpuid_policy_list_length(pl);
 }
 
-void libxl_cpuid_dispose(libxl_cpuid_policy_list *p_cpuid_list)
+void libxl_cpuid_dispose(libxl_cpuid_policy_list *pl)
 {
-    int i, j;
-    libxl_cpuid_policy_list cpuid_list = *p_cpuid_list;
+    libxl_cpuid_policy_list policy = *pl;
 
-    if (cpuid_list == NULL)
+    if (policy == NULL)
         return;
-    for (i = 0; cpuid_list[i].input[0] != XEN_CPUID_INPUT_UNUSED; i++) {
-        for (j = 0; j < 4; j++)
-            if (cpuid_list[i].policy[j] != NULL) {
-                free(cpuid_list[i].policy[j]);
-                cpuid_list[i].policy[j] = NULL;
+
+    if (policy->cpuid) {
+        unsigned int i, j;
+        struct xc_xend_cpuid *cpuid_list = policy->cpuid;
+
+        for (i = 0; cpuid_list[i].input[0] != XEN_CPUID_INPUT_UNUSED; i++) {
+            for (j = 0; j < 4; j++) {
+                if (cpuid_list[i].policy[j] != NULL) {
+                    free(cpuid_list[i].policy[j]);
+                }
             }
+        }
+        free(policy->cpuid);
     }
-    free(cpuid_list);
-    *p_cpuid_list = NULL;
+
+    free(policy);
+    *pl = NULL;
     return;
 }
 
@@ -62,11 +69,17 @@ struct cpuid_flags {
 /* go through the dynamic array finding the entry for a specified leaf.
  * if no entry exists, allocate one and return that.
  */
-static libxl_cpuid_policy_list cpuid_find_match(libxl_cpuid_policy_list *list,
-                                          uint32_t leaf, uint32_t subleaf)
+static struct xc_xend_cpuid *cpuid_find_match(libxl_cpuid_policy_list *pl,
+                                              uint32_t leaf, uint32_t subleaf)
 {
+    libxl_cpuid_policy_list policy = *pl;
+    struct xc_xend_cpuid **list;
     int i = 0;
 
+    if (policy == NULL)
+        policy = *pl = calloc(1, sizeof(*policy));
+
+    list = &policy->cpuid;
     if (*list != NULL) {
         for (i = 0; (*list)[i].input[0] != XEN_CPUID_INPUT_UNUSED; i++) {
             if ((*list)[i].input[0] == leaf && (*list)[i].input[1] == subleaf)
@@ -86,7 +99,7 @@ static libxl_cpuid_policy_list cpuid_find_match(libxl_cpuid_policy_list *list,
  * Will overwrite earlier entries and thus can be called multiple
  * times.
  */
-int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
+int libxl_cpuid_parse_config(libxl_cpuid_policy_list *policy, const char* str)
 {
 #define NA XEN_CPUID_INPUT_UNUSED
     static const struct cpuid_flags cpuid_flags[] = {
@@ -345,7 +358,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
     if (flag->name == NULL) {
         return 2;
     }
-    entry = cpuid_find_match(cpuid, flag->leaf, flag->subleaf);
+    entry = cpuid_find_match(policy, flag->leaf, flag->subleaf);
     resstr = entry->policy[flag->reg - 1];
     num = strtoull(val, &endptr, 0);
     flags[flag->length] = 0;
@@ -400,7 +413,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
  * the strings for each register were directly exposed to the user.
  * Used for maintaining compatibility with older config files
  */
-int libxl_cpuid_parse_config_xend(libxl_cpuid_policy_list *cpuid,
+int libxl_cpuid_parse_config_xend(libxl_cpuid_policy_list *policy,
                                   const char* str)
 {
     char *endptr;
@@ -427,7 +440,7 @@ int libxl_cpuid_parse_config_xend(libxl_cpuid_policy_list *cpuid,
         return 3;
     }
     str = endptr + 1;
-    entry = cpuid_find_match(cpuid, leaf, subleaf);
+    entry = cpuid_find_match(policy, leaf, subleaf);
     for (str = endptr + 1; *str != 0;) {
         if (str[0] != 'e' || str[2] != 'x') {
             return 4;
@@ -502,7 +515,8 @@ int libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid, bool restore,
             info->tsc_mode == LIBXL_TSC_MODE_ALWAYS_EMULATE);
 
     r = xc_cpuid_apply_policy(ctx->xch, domid, restore, NULL, 0,
-                              pae, itsc, nested_virt, info->cpuid, NULL);
+                              pae, itsc, nested_virt,
+                              info->cpuid ? info->cpuid->cpuid : NULL, NULL);
     if (r)
         LOGEVD(ERROR, -r, domid, "Failed to apply CPUID policy");
 
@@ -527,16 +541,18 @@ static const char *policy_names[4] = { "eax", "ebx", "ecx", "edx" };
  */
 
 yajl_gen_status libxl_cpuid_policy_list_gen_json(yajl_gen hand,
-                                libxl_cpuid_policy_list *pcpuid)
+                                libxl_cpuid_policy_list *pl)
 {
-    libxl_cpuid_policy_list cpuid = *pcpuid;
+    libxl_cpuid_policy_list policy = *pl;
+    struct xc_xend_cpuid *cpuid;
     yajl_gen_status s;
     int i, j;
 
     s = yajl_gen_array_open(hand);
     if (s != yajl_gen_status_ok) goto out;
 
-    if (cpuid == NULL) goto empty;
+    if (policy == NULL || policy->cpuid == NULL) goto empty;
+    cpuid = policy->cpuid;
 
     for (i = 0; cpuid[i].input[0] != XEN_CPUID_INPUT_UNUSED; i++) {
         s = yajl_gen_map_open(hand);
@@ -575,7 +591,7 @@ int libxl__cpuid_policy_list_parse_json(libxl__gc *gc,
                                         libxl_cpuid_policy_list *p)
 {
     int i, size;
-    libxl_cpuid_policy_list l;
+    struct xc_xend_cpuid *l;
     flexarray_t *array;
 
     if (!libxl__json_object_is_array(o))
@@ -586,8 +602,10 @@ int libxl__cpuid_policy_list_parse_json(libxl__gc *gc,
         return 0;
 
     size = array->count;
+    *p = libxl__calloc(NOGC, 1, sizeof(**p));
     /* need one extra slot as sentinel */
-    l = *p = libxl__calloc(NOGC, size + 1, sizeof(libxl_cpuid_policy));
+    l = (*p)->cpuid = libxl__calloc(NOGC, size + 1,
+                                    sizeof(struct xc_xend_cpuid));
 
     l[size].input[0] = XEN_CPUID_INPUT_UNUSED;
     l[size].input[1] = XEN_CPUID_INPUT_UNUSED;
@@ -630,8 +648,12 @@ int libxl__cpuid_policy_list_parse_json(libxl__gc *gc,
 int libxl_cpuid_policy_list_length(const libxl_cpuid_policy_list *pl)
 {
     int i = 0;
-    libxl_cpuid_policy_list l = *pl;
+    const struct xc_xend_cpuid *l;
 
+    if (*pl == NULL)
+        return 0;
+
+    l = (*pl)->cpuid;
     if (l) {
         while (l[i].input[0] != XEN_CPUID_INPUT_UNUSED)
             i++;
@@ -641,20 +663,25 @@ int libxl_cpuid_policy_list_length(const libxl_cpuid_policy_list *pl)
 }
 
 void libxl_cpuid_policy_list_copy(libxl_ctx *ctx,
-                                  libxl_cpuid_policy_list *dst,
-                                  const libxl_cpuid_policy_list *src)
+                                  libxl_cpuid_policy_list *pdst,
+                                  const libxl_cpuid_policy_list *psrc)
 {
+    struct xc_xend_cpuid **dst;
+    struct xc_xend_cpuid *const *src;
     GC_INIT(ctx);
     int i, j, len;
 
-    if (*src == NULL) {
-        *dst = NULL;
+    if (*psrc == NULL) {
+        *pdst = NULL;
         goto out;
     }
 
-    len = libxl_cpuid_policy_list_length(src);
+    *pdst = libxl__calloc(NOGC, 1, sizeof(**pdst));
+    dst = &(*pdst)->cpuid;
+    src = &(*psrc)->cpuid;
+    len = libxl_cpuid_policy_list_length(psrc);
     /* one extra slot for sentinel */
-    *dst = libxl__calloc(NOGC, len + 1, sizeof(libxl_cpuid_policy));
+    *dst = libxl__calloc(NOGC, len + 1, sizeof(struct xc_xend_cpuid));
     (*dst)[len].input[0] = XEN_CPUID_INPUT_UNUSED;
     (*dst)[len].input[1] = XEN_CPUID_INPUT_UNUSED;
 
