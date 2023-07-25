@@ -4859,6 +4859,10 @@ int libxl__is_domid_recent(libxl__gc *gc, uint32_t domid, bool *recent);
 /* os-specific implementation of setresuid() */
 int libxl__setresuid(uid_t ruid, uid_t euid, uid_t suid);
 
+struct libxl__cpu_policy {
+    struct xc_xend_cpuid *cpuid;
+};
+
 #endif
 
 /*
