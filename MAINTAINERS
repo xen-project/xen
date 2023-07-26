@@ -305,6 +305,12 @@ F:	xen/include/xen/libfdt/
 F:	xen/include/xen/device_tree.h
 F:	xen/drivers/passthrough/device_tree.c
 
+ECLAIR
+R:	Simone Ballarin <simone.ballarin@bugseng.com>
+S:	Supported
+F:	automation/eclair_analysis/
+F:	automation/scripts/eclair
+
 EFI
 M:	Jan Beulich <jbeulich@suse.com>
 S:	Supported
