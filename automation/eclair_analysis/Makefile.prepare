@@ -1,0 +1,6 @@
+include Makefile
+prepare:
+	$(Q)$(MAKE) $(build)=tools
+	$(Q)$(MAKE) $(build)=. include/xen/compile.h
+	$(Q)$(MAKE) $(build)=include all
+	$(Q)$(MAKE) $(build)=arch/$(SRCARCH) include
