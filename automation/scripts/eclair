@@ -1,0 +1,34 @@
+#!/bin/sh -eu
+
+ECLAIR_ANALYSIS_DIR=automation/eclair_analysis
+ECLAIR_DIR="${ECLAIR_ANALYSIS_DIR}/ECLAIR"
+ECLAIR_OUTPUT_DIR=$(realpath "${ECLAIR_OUTPUT_DIR}")
+
+if [ -z "${WTOKEN:-}" ]; then
+    echo "Failure: the WTOKEN variable is not defined." >&2
+    exit 1
+fi
+
+"${ECLAIR_ANALYSIS_DIR}/prepare.sh" "${VARIANT}"
+
+ex=0
+"${ECLAIR_DIR}/analyze.sh" "${VARIANT}" "${RULESET}" || ex=$?
+"${ECLAIR_DIR}/action_log.sh" ANALYSIS_LOG \
+                             "ECLAIR analysis log" \
+                             "${ECLAIR_OUTPUT_DIR}/ANALYSIS.log" \
+                             "${ex}"
+"${ECLAIR_DIR}/action_log.sh" REPORT_LOG \
+                             "ECLAIR report log" \
+                             "${ECLAIR_OUTPUT_DIR}/REPORT.log" \
+                             "${ex}"
+[ "${ex}" = 0 ] || exit "${ex}"
+
+# Fail in case of new reports
+"${ECLAIR_DIR}/action_clean_added.sh" "${ECLAIR_OUTPUT_DIR}" || ex=$?
+"${ECLAIR_DIR}/action_log.sh" DIFF_CHECK_LOG \
+                             "ECLAIR diff check" \
+                             "${ECLAIR_OUTPUT_DIR}/clean_added.log" \
+                             "${ex}"
+
+"${ECLAIR_DIR}/action_push.sh" "${WTOKEN}" "${ECLAIR_OUTPUT_DIR}"
+[ "${ex}" = 0 ] || exit "${ex}"

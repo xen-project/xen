@@ -1,7 +1,9 @@
 stages:
+  - analyze
   - build
   - test
 
 include:
+  - 'automation/gitlab-ci/analyze.yaml'
   - 'automation/gitlab-ci/build.yaml'
   - 'automation/gitlab-ci/test.yaml'

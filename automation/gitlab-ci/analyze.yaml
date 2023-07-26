@@ -1,0 +1,38 @@
+.eclair-analysis:
+  stage: analyze
+  tags:
+    - eclair-analysis
+  variables:
+    ECLAIR_OUTPUT_DIR: "ECLAIR_out"
+    ANALYSIS_KIND: "normal"
+    ENABLE_ECLAIR_BOT: "n"
+    AUTO_PR_BRANCH: "staging"
+    AUTO_PR_REPOSITORY: "xen-project/xen"
+  artifacts:
+    when: always
+    paths:
+      - "${ECLAIR_OUTPUT_DIR}/*.log"
+      - "${ECLAIR_OUTPUT_DIR}/*.txt"
+      - '*.log'
+    reports:
+      codequality: gl-code-quality-report.json
+
+eclair-x86_64:
+  extends: .eclair-analysis
+  variables:
+    LOGFILE: "eclair-x86_64.log"
+    VARIANT: "X86_64"
+    RULESET: "Set1"
+  script:
+    - ./automation/scripts/eclair 2>&1 | tee "${LOGFILE}"
+  allow_failure: true
+
+eclair-ARM64:
+  extends: .eclair-analysis
+  variables:
+    LOGFILE: "eclair-ARM64.log"
+    VARIANT: "ARM64"
+    RULESET: "Set1"
+  script:
+    - ./automation/scripts/eclair 2>&1 | tee "${LOGFILE}"
+  allow_failure: true
