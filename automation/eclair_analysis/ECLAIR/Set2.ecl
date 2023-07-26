@@ -1,0 +1,25 @@
+-doc_begin="Set 2 of Xen MISRA C guidelines"
+-enable=MC3R1.R10.1
+-enable=MC3R1.R10.2
+-enable=MC3R1.R10.3
+-enable=MC3R1.R10.4
+-enable=MC3R1.R10.6
+-enable=MC3R1.R10.7
+-enable=MC3R1.R10.8
+-enable=MC3R1.R11.1
+-enable=MC3R1.R11.2
+-enable=MC3R1.R11.3
+-enable=MC3R1.R11.6
+-enable=MC3R1.R11.7
+-enable=MC3R1.R11.8
+-enable=MC3R1.R11.9
+-enable=MC3R1.R12.2
+-enable=MC3R1.R13.1
+-enable=MC3R1.R13.2
+-enable=MC3R1.R13.5
+-enable=MC3R1.R13.6
+-enable=MC3R1.R14.1
+-enable=MC3R1.R14.2
+-enable=MC3R1.R14.3
+-enable=MC3R1.R14.4
+-doc_end

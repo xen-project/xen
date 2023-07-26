@@ -1,0 +1,172 @@
+variantSubDir=
+variantHeadline=
+if [ -n "${VARIANT:-}" ]; then
+    variantSubDir="/${VARIANT}"
+    variantHeadline=" [${VARIANT}]"
+fi
+
+# AUTO PR Feature
+# If the following variables are defined, then all pipelines
+# of other branches will be considered pull-requests to
+# autoPRBranch.
+# Customized
+autoPRRepository="${AUTO_PR_REPOSITORY:-}"
+# Customized
+autoPRBranch="${AUTO_PR_BRANCH:-}"
+
+# Customized
+artifactsRoot=/var/local/eclair
+
+case "${ci}" in
+github)
+    # To be customized
+    repository="${GITHUB_REPOSITORY}"
+    jobId="${GITHUB_RUN_NUMBER}"
+
+    autoPRRemoteUrl="${GITHUB_SERVER_URL}/${autoPRRepository:-}.git"
+
+    case "${GITHUB_EVENT_NAME}" in
+    pull_request*)
+        event=pull_request
+        pullRequestId="${GITHUB_EVENT_PULL_REQUEST_NUMBER}"
+        pullRequestHeadRepo="${PR_HEAD_REPO}"
+        pullRequestHeadRef="${PR_HEAD_REF}"
+        pullRequestBaseRef="${PR_BASE_REF}"
+        pullRequestUser="${PR_USER}"
+        # baseCommitId and headCommitId are the most recent merge points without conflicts
+        git fetch -q --deepen=2
+        baseCommitId=$(git show -s --pretty=%H HEAD^1)
+        headCommitId=$(git show -s --pretty=%H HEAD^2)
+        ;;
+    push | workflow_dispatch)
+        event=push
+        # Extract the branch name from "refs/heads/<branch>"
+        branch="${GITHUB_REF#refs/heads/}"
+        headCommitId="${GITHUB_SHA}"
+        pushUser="${GITHUB_ACTOR}"
+        ;;
+    *)
+        echo "Unexpected GITHUB_REF ${GITHUB_REF}" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+gitlab)
+    # Customized
+    repository="${CI_PROJECT_PATH}"
+    jobId="${CI_JOB_ID}"
+
+    gitlabApiUrl="${CI_SERVER_PROTOCOL}://${CI_SERVER_HOST}:${CI_SERVER_PORT}/api/v4"
+    autoPRRemoteUrl="${CI_SERVER_PROTOCOL}://${CI_SERVER_HOST}:${CI_SERVER_PORT}/${autoPRRepository:-}.git"
+
+    # Customized
+    gitlabBotToken="${ECLAIR_BOT_TOKEN:-}"
+
+    case "${CI_PIPELINE_SOURCE}" in
+    merge_request_event)
+        event=pull_request
+        pullRequestId="${CI_MERGE_REQUEST_IID}"
+        pullRequestHeadRef="${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}"
+        pullRequestHeadRepo="${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH}"
+        pullRequestBaseRef="${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
+        pullRequestUser="${GITLAB_USER_LOGIN}"
+        headCommitId="${CI_COMMIT_SHA}"
+        baseCommitId="${CI_MERGE_REQUEST_DIFF_BASE_SHA}"
+        ;;
+    push | pipeline | web)
+        event=push
+        branch="${CI_COMMIT_BRANCH}"
+        headCommitId="${CI_COMMIT_SHA}"
+        pushUser="${GITLAB_USER_NAME}"
+        ;;
+    *)
+        echo "Unexpected event ${CI_PIPELINE_SOURCE}" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+jenkins)
+    # To be customized
+    repository="${JOB_BASE_NAME}"
+    project="${JOB_NAME}"
+    jobId="${BUILD_NUMBER}"
+
+    jenkinsApiUrl="${JENKINS_URL}"
+    autoPRRemoteUrl="${JENKINS_URL}/${autoPRRepository:-}.git"
+
+    # To be customized
+    jenkinsBotUsername="${ECLAIR_BOT_USERNAME:-}"
+    jenkinsBotToken="${ECLAIR_BOT_TOKEN:-}"
+
+    event=push
+    branch="${GIT_BRANCH}"
+    headCommitId="${GIT_COMMIT}"
+    pushUser=$(git show --pretty='format:%aN' -s)
+    ;;
+*)
+    echo "Unexpected CI/CD context" >&2
+    exit 1
+    ;;
+esac
+
+if [ "${event}" = "push" ] && [ -n "${autoPRBranch:-}" ]; then
+    # AUTO PR Feature enabled
+    if ! [ "${branch}" = "${autoPRBranch}" ] ||
+        ! [ "${repository}" = "${autoPRRepository}" ]; then
+        event=auto_pull_request
+    fi
+fi
+
+case "${event}" in
+pull_request)
+    subDir="${pullRequestHeadRepo}.ecdf/${pullRequestBaseRef}"
+    jobHeadline="ECLAIR ${ANALYSIS_KIND} on repository ${repository}: ${pullRequestUser} wants to merge ${pullRequestHeadRepo}:${pullRequestHeadRef} (${headCommitId}) into ${pullRequestBaseRef} (${baseCommitId})"
+    ;;
+push)
+    subDir="${branch}"
+    jobHeadline="ECLAIR ${ANALYSIS_KIND} on repository ${repository}: branch ${branch} (${headCommitId})"
+    badgeLabel="ECLAIR ${ANALYSIS_KIND} ${branch}${variantHeadline} #${jobId}"
+    ;;
+auto_pull_request)
+    git remote remove autoPRRemote || true
+    git remote add autoPRRemote "${autoPRRemoteUrl}"
+    git fetch -q autoPRRemote
+    subDir="${branch}"
+    baseCommitId=$(git merge-base "autoPRRemote/${autoPRBranch}" HEAD)
+    jobHeadline="ECLAIR ${ANALYSIS_KIND} on repository ${repository}: ${pushUser} wants to merge ${repository}:${branch} (${headCommitId}) into ${autoPRRepository}/${autoPRBranch} (${baseCommitId})"
+    ;;
+*)
+    echo "Unexpected event ${event}" >&2
+    exit 1
+    ;;
+esac
+
+case "${repository}" in
+xen-project/xen)
+    # Customized
+    keepOldAnalyses=0
+    ;;
+xen-project/*)
+    # Customized
+    keepOldAnalyses=10
+    ;;
+*)
+    echo "Unexpected repository" >&2
+    exit 1
+    ;;
+esac
+
+ECLAIR_BIN_DIR=/opt/bugseng/eclair/bin/
+
+artifactsDir="${artifactsRoot}/xen-project.ecdf/${repository}/ECLAIR_${ANALYSIS_KIND}"
+subDir="${subDir}${variantSubDir}"
+jobHeadline="${jobHeadline}${variantHeadline}"
+
+# Customized
+eclairReportUrlPrefix=https://saas.eclairit.com:3787
+
+jobDir="${artifactsDir}/${subDir}/${jobId}"
+updateLog="${analysisOutputDir}/update.log"
+commentLog="${analysisOutputDir}/comment.json"
+indexHtmlUrl="${eclairReportUrlPrefix}/fs${jobDir}/index.html"
+summaryTxt="${analysisOutputDir}/summary.txt"

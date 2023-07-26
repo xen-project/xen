@@ -1,0 +1,193 @@
+if [ -n "${GITLAB_CI:-}" ]; then
+    ci=gitlab
+elif [ -n "${GITHUB_ACTION:-}" ]; then
+    ci=github
+elif [ -n "${JENKINS_HOME:-}" ]; then
+    ci=jenkins
+else
+    echo "Unexpected CI/CD context" >&2
+    exit 1
+fi
+
+esc=$(printf '\e')
+cr=$(printf '\r')
+
+open_section() {
+    id=$1
+    title=$2
+    collapsed=$3
+    echo "${esc}[0Ksection_start:$(date +%s):${id}${collapsed}${cr}${esc}[0K${esc}[1m${esc}[36m${title}${esc}[m"
+}
+
+close_section() {
+    id=$1
+    echo "${esc}[0Ksection_end:$(date +%s):${id}${cr}${esc}[0K"
+}
+
+summary() {
+    fixedReports=
+    newReports=
+    unfixedReports=
+    while read -r line; do
+        var=${line%%: *}
+        val=${line#*: }
+        eval "${var}=${val}"
+    done <"${updateLog}"
+
+    case "${ci}" in
+    github)
+        nl="\\"
+        ;;
+    gitlab)
+        nl=
+        ;;
+    jenkins)
+        nl="<br/>"
+        ;;
+    *)
+        nl=
+        ;;
+    esac
+
+    if [ -z "${newReports}" ]; then
+        fixedMsg=
+        unfixedMsg="Unfixed reports: ${unfixedReports}"
+        countsMsg="${unfixedMsg}"
+    else
+        fixedMsg="Fixed reports: ${fixedReports}"
+        unfixedMsg="Unfixed reports: ${unfixedReports} [new: ${newReports}]"
+        countsMsg="${fixedMsg}${nl}
+${unfixedMsg}"
+    fi
+    case "${ci}" in
+    jenkins)
+        cat <<EOF >"${summaryTxt}"
+${countsMsg}                                                                              ${nl}
+<a href="https://www.bugseng.com/eclair">
+  <img src="${eclairReportUrlPrefix}/rsrc/eclair.svg" width="100" />
+</a>
+<h3>${jobHeadline}</h3>
+<a href="${indexHtmlUrl}">Browse analysis results</a>
+EOF
+        ;;
+    *)
+        cat <<EOF >"${summaryTxt}"
+<a href="https://www.bugseng.com/eclair">
+  <img src="${eclairReportUrlPrefix}/rsrc/eclair.svg" width="100" />
+</a>
+Analysis Summary
+
+${jobHeadline}${nl}
+${countsMsg}${nl}
+[Browse analysis](${indexHtmlUrl})
+EOF
+        ;;
+    esac
+
+    case ${ci} in
+    github)
+        cat "${summaryTxt}" >"${GITHUB_STEP_SUMMARY}"
+        ;;
+    gitlab)
+        open_section ECLAIR_summary "ECLAIR analysis summary" ""
+        # Generate summary and print it (GitLab-specific)
+        cat <<EOF
+${jobHeadline}
+${countsMsg}
+Browse analysis: ${esc}[33m${indexHtmlUrl}${esc}[m
+EOF
+        close_section ECLAIR_summary
+        ;;
+    jenkins)
+        cat <<EOF
+${jobHeadline}
+${fixedMsg}
+${unfixedMsg}
+Browse analysis: ${indexHtmlUrl}
+EOF
+        ;;
+    *)
+        echo "Unexpected CI/CD context" >&2
+        exit 1
+        ;;
+    esac
+}
+
+log_file() {
+    section_id=$1
+    section_name=$2
+    file=$3
+    exit_code=$4
+    if [ "${exit_code}" = 0 ]; then
+        collapsed=[collapsed=true]
+    else
+        collapsed=
+    fi
+
+    case ${ci} in
+    github | jenkins)
+        echo "${section_name}"
+        ;;
+    gitlab)
+        open_section "${section_id}" "${section_name}" "${collapsed}"
+        ;;
+    *)
+        echo "Unexpected CI/CD context" >&2
+        exit 1
+        ;;
+    esac
+
+    cat "${file}"
+
+    case ${ci} in
+    github | jenkins) ;;
+    gitlab)
+        close_section "${section_id}"
+        ;;
+    *) ;;
+    esac
+}
+
+maybe_log_file_exit() {
+    section_id=$1
+    section_name=$2
+    file=$3
+    exit_code=$4
+
+    case ${ci} in
+    github | jenkins)
+        echo "${section_name}"
+        ;;
+    gitlab)
+        open_section "${section_id}" "${section_name}" ""
+        ;;
+    *)
+        echo "Unexpected CI/CD context" >&2
+        exit 1
+        ;;
+    esac
+
+    if [ "${exit_code}" != 0 ]; then
+        cat "${file}"
+    fi
+
+    case ${ci} in
+    github | jenkins) ;;
+    gitlab)
+        close_section "${section_id}"
+        ;;
+    *) ;;
+    esac
+    return "${exit_code}"
+}
+
+is_enabled() {
+    case "$1" in
+    true | TRUE | y | Y | yes | YES | 1)
+        return 0
+        ;;
+    *)
+        return 1
+        ;;
+    esac
+}
