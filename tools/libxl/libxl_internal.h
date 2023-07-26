@@ -4840,6 +4840,7 @@ int libxl__is_domid_recent(libxl__gc *gc, uint32_t domid, bool *recent);
 
 struct libxl__cpu_policy {
     struct xc_xend_cpuid *cpuid;
+    struct xc_msr *msr;
 };
 
 #endif

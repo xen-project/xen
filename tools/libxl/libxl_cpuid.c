@@ -16,7 +16,7 @@
 
 int libxl__cpuid_policy_is_empty(libxl_cpuid_policy_list *pl)
 {
-    return !libxl_cpuid_policy_list_length(pl);
+    return !*pl || (!libxl_cpuid_policy_list_length(pl) && !(*pl)->msr);
 }
 
 void libxl_cpuid_dispose(libxl_cpuid_policy_list *pl)
@@ -39,6 +39,8 @@ void libxl_cpuid_dispose(libxl_cpuid_policy_list *pl)
         }
         free(policy->cpuid);
     }
+
+    free(policy->msr);
 
     free(policy);
     *pl = NULL;
@@ -467,7 +469,8 @@ int libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid, bool restore,
 
     r = xc_cpuid_apply_policy(ctx->xch, domid, restore, NULL, 0,
                               pae,
-                              info->cpuid ? info->cpuid->cpuid : NULL, NULL);
+                              info->cpuid ? info->cpuid->cpuid : NULL,
+                              info->cpuid ? info->cpuid->msr : NULL);
     if (r)
         LOGEVD(ERROR, -r, domid, "Failed to apply CPUID policy");
 
@@ -479,16 +482,22 @@ static const char *input_names[2] = { "leaf", "subleaf" };
 static const char *policy_names[4] = { "eax", "ebx", "ecx", "edx" };
 /*
  * Aiming for:
- * [
- *     { 'leaf':    'val-eax',
- *       'subleaf': 'val-ecx',
- *       'eax':     'filter',
- *       'ebx':     'filter',
- *       'ecx':     'filter',
- *       'edx':     'filter' },
- *     { 'leaf':    'val-eax', ..., 'eax': 'filter', ... },
- *     ... etc ...
- * ]
+ * {   'cpuid': [
+ *              { 'leaf':    'val-eax',
+ *                'subleaf': 'val-ecx',
+ *                'eax':     'filter',
+ *                'ebx':     'filter',
+ *                'ecx':     'filter',
+ *                'edx':     'filter' },
+ *              { 'leaf':    'val-eax', ..., 'eax': 'filter', ... },
+ *              ... etc ...
+ *     ],
+ *     'msr': [
+ *            { 'index': 'val-index',
+ *              'policy': 'filter', },
+ *              ... etc ...
+ *     ],
+ * }
  */
 
 yajl_gen_status libxl_cpuid_policy_list_gen_json(yajl_gen hand,
@@ -496,8 +505,15 @@ yajl_gen_status libxl_cpuid_policy_list_gen_json(yajl_gen hand,
 {
     libxl_cpuid_policy_list policy = *pl;
     struct xc_xend_cpuid *cpuid;
+    const struct xc_msr *msr;
     yajl_gen_status s;
     int i, j;
+
+    s = yajl_gen_map_open(hand);
+    if (s != yajl_gen_status_ok) goto out;
+
+    s = libxl__yajl_gen_asciiz(hand, "cpuid");
+    if (s != yajl_gen_status_ok) goto out;
 
     s = yajl_gen_array_open(hand);
     if (s != yajl_gen_status_ok) goto out;
@@ -533,6 +549,39 @@ yajl_gen_status libxl_cpuid_policy_list_gen_json(yajl_gen hand,
 
 empty:
     s = yajl_gen_array_close(hand);
+    if (s != yajl_gen_status_ok) goto out;
+
+    s = libxl__yajl_gen_asciiz(hand, "msr");
+    if (s != yajl_gen_status_ok) goto out;
+
+    s = yajl_gen_array_open(hand);
+    if (s != yajl_gen_status_ok) goto out;
+
+    if (!policy || !policy->msr) goto done;
+    msr = policy->msr;
+
+    for (i = 0; msr[i].index != XC_MSR_INPUT_UNUSED; i++) {
+        s = yajl_gen_map_open(hand);
+        if (s != yajl_gen_status_ok) goto out;
+
+        s = libxl__yajl_gen_asciiz(hand, "index");
+        if (s != yajl_gen_status_ok) goto out;
+        s = yajl_gen_integer(hand, msr[i].index);
+        if (s != yajl_gen_status_ok) goto out;
+        s = libxl__yajl_gen_asciiz(hand, "policy");
+        if (s != yajl_gen_status_ok) goto out;
+        s = yajl_gen_string(hand,
+                            (const unsigned char *)msr[i].policy, 64);
+        if (s != yajl_gen_status_ok) goto out;
+
+        s = yajl_gen_map_close(hand);
+        if (s != yajl_gen_status_ok) goto out;
+    }
+
+done:
+    s = yajl_gen_array_close(hand);
+    if (s != yajl_gen_status_ok) goto out;
+    s = yajl_gen_map_close(hand);
 out:
     return s;
 }
@@ -543,17 +592,40 @@ int libxl__cpuid_policy_list_parse_json(libxl__gc *gc,
 {
     int i, size;
     struct xc_xend_cpuid *l;
+    struct xc_msr *msr;
+    const libxl__json_object *co;
     flexarray_t *array;
+    bool cpuid_only = false;
 
-    if (!libxl__json_object_is_array(o))
+    /*
+     * Old JSON field was an array with just the CPUID data.  With the addition
+     * of MSRs the object is now a map with two array fields.
+     *
+     * Use the object format to detect whether the passed data contains just
+     * CPUID leafs and thus is an array, or does also contain MSRs and is a
+     * map.
+     */
+    if (libxl__json_object_is_array(o)) {
+        co = o;
+        cpuid_only = true;
+        goto parse_cpuid;
+    }
+
+    if (!libxl__json_object_is_map(o))
         return ERROR_FAIL;
 
-    array = libxl__json_object_get_array(o);
+    co = libxl__json_map_get("cpuid", o, JSON_ARRAY);
+    if (!libxl__json_object_is_array(co))
+        return ERROR_FAIL;
+
+parse_cpuid:
+    *p = libxl__calloc(NOGC, 1, sizeof(**p));
+
+    array = libxl__json_object_get_array(co);
     if (!array->count)
-        return 0;
+        goto cpuid_empty;
 
     size = array->count;
-    *p = libxl__calloc(NOGC, 1, sizeof(**p));
     /* need one extra slot as sentinel */
     l = (*p)->cpuid = libxl__calloc(NOGC, size + 1,
                                     sizeof(struct xc_xend_cpuid));
@@ -592,6 +664,42 @@ int libxl__cpuid_policy_list_parse_json(libxl__gc *gc,
                     libxl__strdup(NOGC, libxl__json_object_get_string(r));
         }
     }
+    if (cpuid_only)
+        return 0;
+
+cpuid_empty:
+    co = libxl__json_map_get("msr", o, JSON_ARRAY);
+    if (!libxl__json_object_is_array(co))
+        return ERROR_FAIL;
+
+    array = libxl__json_object_get_array(co);
+    if (!array->count)
+        return 0;
+    size = array->count;
+    /* need one extra slot as sentinel */
+    msr = (*p)->msr = libxl__calloc(NOGC, size + 1, sizeof(struct xc_msr));
+
+    msr[size].index = XC_MSR_INPUT_UNUSED;
+
+    for (i = 0; i < size; i++) {
+        const libxl__json_object *t, *r;
+
+        if (flexarray_get(array, i, (void**)&t) != 0)
+            return ERROR_FAIL;
+
+        if (!libxl__json_object_is_map(t))
+            return ERROR_FAIL;
+
+        r = libxl__json_map_get("index", t, JSON_INTEGER);
+        if (!r) return ERROR_FAIL;
+        msr[i].index = libxl__json_object_get_integer(r);
+        r = libxl__json_map_get("policy", t, JSON_STRING);
+        if (!r) return ERROR_FAIL;
+        if (strlen(libxl__json_object_get_string(r)) !=
+            ARRAY_SIZE(msr[i].policy) - 1)
+            return ERROR_FAIL;
+        strcpy(msr[i].policy, libxl__json_object_get_string(r));
+    }
 
     return 0;
 }
@@ -628,6 +736,10 @@ void libxl_cpuid_policy_list_copy(libxl_ctx *ctx,
     }
 
     *pdst = libxl__calloc(NOGC, 1, sizeof(**pdst));
+
+    if (!(*psrc)->cpuid)
+        goto copy_msr;
+
     dst = &(*pdst)->cpuid;
     src = &(*psrc)->cpuid;
     len = libxl_cpuid_policy_list_length(psrc);
@@ -645,6 +757,22 @@ void libxl_cpuid_policy_list_copy(libxl_ctx *ctx,
                     libxl__strdup(NOGC, (*src)[i].policy[j]);
             else
                 (*dst)[i].policy[j] = NULL;
+    }
+
+copy_msr:
+    if ((*psrc)->msr) {
+        const struct xc_msr *msr = (*psrc)->msr;
+
+        for (i = 0; msr[i].index != XC_MSR_INPUT_UNUSED; i++)
+            ;
+        len = i;
+        (*pdst)->msr = libxl__calloc(NOGC, len + 1, sizeof(struct xc_msr));
+        (*pdst)->msr[len].index = XC_MSR_INPUT_UNUSED;
+
+        for (i = 0; i < len; i++) {
+            (*pdst)->msr[i].index = msr[i].index;
+            strcpy((*pdst)->msr[i].policy, msr[i].policy);
+        }
     }
 
 out:
