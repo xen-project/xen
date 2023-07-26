@@ -25,6 +25,6 @@ enum mc_disposition {
     mc_continue,
     mc_exit,
     mc_preempt,
-} arch_do_multicall_call(struct mc_state *mc);
+} arch_do_multicall_call(struct mc_state *mcs);
 
 #endif /* __XEN_MULTICALL_H__ */

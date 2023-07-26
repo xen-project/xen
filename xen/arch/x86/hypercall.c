@@ -203,15 +203,15 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int nr,
     return rc;
 }
 
-enum mc_disposition arch_do_multicall_call(struct mc_state *state)
+enum mc_disposition arch_do_multicall_call(struct mc_state *mcs)
 {
     const struct domain *currd = current->domain;
 
     if ( is_pv_domain(currd) )
-        return pv_do_multicall_call(state);
+        return pv_do_multicall_call(mcs);
 
     if ( is_hvm_domain(currd) )
-        return hvm_do_multicall_call(state);
+        return hvm_do_multicall_call(mcs);
 
     return mc_exit;
 }

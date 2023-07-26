@@ -1470,9 +1470,9 @@ static bool check_multicall_32bit_clean(struct multicall_entry *multi)
     return true;
 }
 
-enum mc_disposition arch_do_multicall_call(struct mc_state *state)
+enum mc_disposition arch_do_multicall_call(struct mc_state *mcs)
 {
-    struct multicall_entry *multi = &state->call;
+    struct multicall_entry *multi = &mcs->call;
 
     if ( multi->op >= ARRAY_SIZE(hypercall_args) )
     {
