@@ -397,9 +397,9 @@ char *print_tainted(char *str)
     return str;
 }
 
-void add_taint(unsigned int flag)
+void add_taint(unsigned int taint)
 {
-    tainted |= flag;
+    tainted |= taint;
 }
 
 extern const initcall_t __initcall_start[], __presmp_initcall_end[],
