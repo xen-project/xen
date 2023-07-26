@@ -48,10 +48,10 @@ int set_global_virq_handler(struct domain *d, uint32_t virq);
  *  @d:        Domain to which physical IRQ should be sent
  *  @pirq:     Physical IRQ number
  */
-void send_guest_pirq(struct domain *, const struct pirq *);
+void send_guest_pirq(struct domain *d, const struct pirq *pirq);
 
 /* Send a notification from a given domain's event-channel port. */
-int evtchn_send(struct domain *d, unsigned int lport);
+int evtchn_send(struct domain *ld, unsigned int lport);
 
 /* Bind a local event-channel port to the specified VCPU. */
 int evtchn_bind_vcpu(evtchn_port_t port, unsigned int vcpu_id);
@@ -69,7 +69,7 @@ int evtchn_close(struct domain *d1, int port1, bool guest);
 void evtchn_free(struct domain *d, struct evtchn *chn);
 
 /* Allocate a specific event channel port. */
-int evtchn_allocate_port(struct domain *d, unsigned int port);
+int evtchn_allocate_port(struct domain *d, evtchn_port_t port);
 
 /* Allocate a new event channel */
 int __must_check evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc,
@@ -78,7 +78,7 @@ int __must_check evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc,
 /* Bind an event channel port to interdomain */
 int __must_check evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind,
                                          struct domain *ld,
-                                         evtchn_port_t port);
+                                         evtchn_port_t lport);
 
 /* Unmask a local event-channel port. */
 int evtchn_unmask(unsigned int port);
