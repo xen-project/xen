@@ -4861,6 +4861,7 @@ int libxl__setresuid(uid_t ruid, uid_t euid, uid_t suid);
 
 struct libxl__cpu_policy {
     struct xc_xend_cpuid *cpuid;
+    struct xc_msr *msr;
 };
 
 #endif
