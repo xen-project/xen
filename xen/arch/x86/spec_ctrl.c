@@ -867,6 +867,8 @@ static bool __init should_use_eager_fpu(void)
 
 static void __init ibpb_calculations(void)
 {
+    bool def_ibpb_entry = false;
+
     /* Check we have hardware IBPB support before using it... */
     if ( !boot_cpu_has(X86_FEATURE_IBRSB) && !boot_cpu_has(X86_FEATURE_IBPB) )
     {
@@ -875,28 +877,28 @@ static void __init ibpb_calculations(void)
         return;
     }
 
-    /*
-     * AMD/Hygon CPUs to date (June 2022) don't flush the the RAS.  Future
-     * CPUs are expected to enumerate IBPB_RET when this has been fixed.
-     * Until then, cover the difference with the software sequence.
-     */
-    if ( boot_cpu_has(X86_FEATURE_IBPB) && !boot_cpu_has(X86_FEATURE_IBPB_RET) )
-        setup_force_cpu_cap(X86_BUG_IBPB_NO_RET);
+    if ( boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
+    {
+        /*
+         * AMD/Hygon CPUs to date (June 2022) don't flush the RAS.  Future
+         * CPUs are expected to enumerate IBPB_RET when this has been fixed.
+         * Until then, cover the difference with the software sequence.
+         */
+        if ( !boot_cpu_has(X86_FEATURE_IBPB_RET) )
+            setup_force_cpu_cap(X86_BUG_IBPB_NO_RET);
 
-    /*
-     * IBPB-on-entry mitigations for Branch Type Confusion.
-     *
-     * IBPB && !BTC_NO selects all AMD/Hygon hardware, not known to be safe,
-     * that we can provide some form of mitigation on.
-     */
+        /*
+         * AMD/Hygon CPUs up to and including Zen2 suffer from Branch Type
+         * Confusion.  Mitigate with IBPB-on-entry.
+         */
+        if ( !boot_cpu_has(X86_FEATURE_BTC_NO) )
+            def_ibpb_entry = true;
+    }
+
     if ( opt_ibpb_entry_pv == -1 )
-        opt_ibpb_entry_pv = (IS_ENABLED(CONFIG_PV) &&
-                             boot_cpu_has(X86_FEATURE_IBPB) &&
-                             !boot_cpu_has(X86_FEATURE_BTC_NO));
+        opt_ibpb_entry_pv = IS_ENABLED(CONFIG_PV) && def_ibpb_entry;
     if ( opt_ibpb_entry_hvm == -1 )
-        opt_ibpb_entry_hvm = (IS_ENABLED(CONFIG_HVM) &&
-                              boot_cpu_has(X86_FEATURE_IBPB) &&
-                              !boot_cpu_has(X86_FEATURE_BTC_NO));
+        opt_ibpb_entry_hvm = IS_ENABLED(CONFIG_HVM) && def_ibpb_entry;
 
     if ( opt_ibpb_entry_pv )
     {
