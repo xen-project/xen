@@ -212,7 +212,7 @@ const char *onearg(struct buffered_data *in);
 
 /* Break input into vectors, return the number, fill in up to num of them. */
 unsigned int get_strings(struct buffered_data *data,
-			 char *vec[], unsigned int num);
+			 const char *vec[], unsigned int num);
 unsigned int get_string(const struct buffered_data *data, unsigned int offset);
 
 void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
@@ -224,7 +224,8 @@ void send_event(struct buffered_data *req, struct connection *conn,
 void send_ack(struct connection *conn, enum xsd_sockmsg_type type);
 
 /* Canonicalize this path if possible. */
-char *canonicalize(struct connection *conn, const void *ctx, const char *node);
+const char *canonicalize(struct connection *conn, const void *ctx,
+			 const char *node);
 
 /* Get access permissions. */
 unsigned int perm_for_conn(struct connection *conn,

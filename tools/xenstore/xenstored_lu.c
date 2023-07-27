@@ -360,7 +360,7 @@ static const char *lu_start(const void *ctx, struct connection *conn,
 	return NULL;
 }
 
-int do_control_lu(const void *ctx, struct connection *conn, char **vec,
+int do_control_lu(const void *ctx, struct connection *conn, const char **vec,
 		  int num)
 {
 	const char *ret = NULL;

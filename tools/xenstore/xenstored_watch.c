@@ -161,7 +161,7 @@ static int destroy_watch(void *_watch)
 }
 
 static int check_watch_path(struct connection *conn, const void *ctx,
-			    char **path, bool *relative)
+			    const char **path, bool *relative)
 {
 	/* Check if valid event. */
 	if (strstarts(*path, "@")) {
@@ -184,8 +184,9 @@ static int check_watch_path(struct connection *conn, const void *ctx,
 	return errno;
 }
 
-static struct watch *add_watch(struct connection *conn, char *path, char *token,
-			       bool relative, bool no_quota_check)
+static struct watch *add_watch(struct connection *conn, const char *path,
+			       const char *token, bool relative,
+			       bool no_quota_check)
 {
 	struct watch *watch;
 
@@ -217,7 +218,7 @@ static struct watch *add_watch(struct connection *conn, char *path, char *token,
 int do_watch(const void *ctx, struct connection *conn, struct buffered_data *in)
 {
 	struct watch *watch;
-	char *vec[2];
+	const char *vec[2];
 	bool relative;
 
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
@@ -258,7 +259,8 @@ int do_unwatch(const void *ctx, struct connection *conn,
 	       struct buffered_data *in)
 {
 	struct watch *watch;
-	char *node, *vec[2];
+	const char *node;
+	const char *vec[2];
 
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
 		return EINVAL;
@@ -336,7 +338,7 @@ void read_state_watch(const void *ctx, const void *state)
 {
 	const struct xs_state_watch *sw = state;
 	struct connection *conn;
-	char *path, *token;
+	const char *path, *token;
 	bool relative;
 
 	conn = get_connection_by_id(sw->conn_id);

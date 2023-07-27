@@ -994,7 +994,7 @@ unsigned int get_string(const struct buffered_data *data, unsigned int offset)
  * ignore any data after the final nul.
  */
 unsigned int get_strings(struct buffered_data *data,
-			 char *vec[], unsigned int num)
+			 const char *vec[], unsigned int num)
 {
 	unsigned int off, i, len;
 
@@ -1216,25 +1216,26 @@ static char *perms_to_strings(const void *ctx, const struct node_perms *perms,
 	return strings;
 }
 
-char *canonicalize(struct connection *conn, const void *ctx, const char *node)
+const char *canonicalize(struct connection *conn, const void *ctx,
+			 const char *node)
 {
 	const char *prefix;
 
 	if (!node || (node[0] == '/') || (node[0] == '@'))
-		return (char *)node;
+		return node;
 	prefix = get_implicit_path(conn);
 	if (prefix)
 		return talloc_asprintf(ctx, "%s/%s", prefix, node);
-	return (char *)node;
+	return node;
 }
 
 static struct node *get_node_canonicalized(struct connection *conn,
 					   const void *ctx,
 					   const char *name,
-					   char **canonical_name,
+					   const char **canonical_name,
 					   unsigned int perm)
 {
-	char *tmp_name;
+	const char *tmp_name;
 
 	if (!canonical_name)
 		canonical_name = &tmp_name;
@@ -1249,7 +1250,7 @@ static struct node *get_node_canonicalized(struct connection *conn,
 }
 
 static struct node *get_spec_node(struct connection *conn, const void *ctx,
-				  const char *name, char **canonical_name,
+				  const char *name, const char **canonical_name,
 				  unsigned int perm)
 {
 	if (name[0] == '@')
@@ -1538,8 +1539,8 @@ static int do_write(const void *ctx, struct connection *conn,
 {
 	unsigned int offset, datalen;
 	struct node *node;
-	char *vec[1] = { NULL }; /* gcc4 + -W + -Werror fucks code. */
-	char *name;
+	const char *vec[1] = { NULL }; /* gcc4 + -W + -Werror fucks code. */
+	const char *name;
 
 	/* Extra "strings" can be created by binary data. */
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec))
@@ -1574,7 +1575,7 @@ static int do_mkdir(const void *ctx, struct connection *conn,
 		    struct buffered_data *in)
 {
 	struct node *node;
-	char *name;
+	const char *name;
 
 	node = get_node_canonicalized(conn, ctx, onearg(in), &name,
 				      XS_PERM_WRITE);
@@ -1703,7 +1704,7 @@ static int do_rm(const void *ctx, struct connection *conn,
 {
 	struct node *node;
 	int ret;
-	char *name;
+	const char *name;
 	char *parentname;
 
 	node = get_node_canonicalized(conn, ctx, onearg(in), &name,
@@ -1765,7 +1766,8 @@ static int do_set_perms(const void *ctx, struct connection *conn,
 			struct buffered_data *in)
 {
 	struct node_perms perms, old_perms;
-	char *name, *permstr;
+	const char *name;
+	char *permstr;
 	struct node *node;
 
 	perms.num = xenstore_count_strings(in->buffer, in->used);

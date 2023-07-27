@@ -50,7 +50,7 @@ void lu_read_state(void);
 /* Write the "OK" response for the live-update command */
 unsigned int lu_write_response(FILE *fp);
 
-int do_control_lu(const void *ctx, struct connection *conn, char **vec,
+int do_control_lu(const void *ctx, struct connection *conn, const char **vec,
 		  int num);
 
 /* Live update private interfaces. */
@@ -59,7 +59,7 @@ void lu_close_dump_state(struct lu_dump_state *state);
 FILE *lu_dump_open(const void *ctx);
 void lu_dump_close(FILE *fp);
 char *lu_exec(const void *ctx, int argc, char **argv);
-const char *lu_arch(const void *ctx, struct connection *conn, char **vec,
+const char *lu_arch(const void *ctx, struct connection *conn, const char **vec,
 		    int num);
 const char *lu_begin(struct connection *conn);
 void lu_destroy_arch(void *data);

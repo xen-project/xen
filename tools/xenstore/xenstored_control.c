@@ -34,7 +34,7 @@
 
 struct cmd_s {
 	char *cmd;
-	int (*func)(const void *, struct connection *, char **, int);
+	int (*func)(const void *, struct connection *, const char **, int);
 	char *pars;
 	/*
 	 * max_pars can be used to limit the size of the parameter vector,
@@ -47,7 +47,7 @@ struct cmd_s {
 };
 
 static int do_control_check(const void *ctx, struct connection *conn,
-			    char **vec, int num)
+			    const char **vec, int num)
 {
 	if (num)
 		return EINVAL;
@@ -59,7 +59,7 @@ static int do_control_check(const void *ctx, struct connection *conn,
 }
 
 static int do_control_log(const void *ctx, struct connection *conn,
-			  char **vec, int num)
+			  const char **vec, int num)
 {
 	int ret;
 
@@ -126,7 +126,7 @@ static int quota_show_current(const void *ctx, struct connection *conn,
 }
 
 static int quota_set(const void *ctx, struct connection *conn,
-		     char **vec, int num, struct quota *quotas)
+		     const char **vec, int num, struct quota *quotas)
 {
 	unsigned int i;
 	int val;
@@ -150,7 +150,7 @@ static int quota_set(const void *ctx, struct connection *conn,
 }
 
 static int quota_get(const void *ctx, struct connection *conn,
-		     char **vec, int num)
+		     const char **vec, int num)
 {
 	if (num != 1)
 		return EINVAL;
@@ -159,7 +159,7 @@ static int quota_get(const void *ctx, struct connection *conn,
 }
 
 static int quota_max(const void *ctx, struct connection *conn,
-		     char **vec, int num)
+		     const char **vec, int num)
 {
 	if (num > 1)
 		return EINVAL;
@@ -175,7 +175,7 @@ static int quota_max(const void *ctx, struct connection *conn,
 }
 
 static int do_control_quota(const void *ctx, struct connection *conn,
-			    char **vec, int num)
+			    const char **vec, int num)
 {
 	if (num == 0)
 		return quota_show_current(ctx, conn, hard_quotas);
@@ -190,7 +190,7 @@ static int do_control_quota(const void *ctx, struct connection *conn,
 }
 
 static int do_control_quota_s(const void *ctx, struct connection *conn,
-			      char **vec, int num)
+			      const char **vec, int num)
 {
 	if (num == 0)
 		return quota_show_current(ctx, conn, soft_quotas);
@@ -203,7 +203,7 @@ static int do_control_quota_s(const void *ctx, struct connection *conn,
 
 #ifdef __MINIOS__
 static int do_control_memreport(const void *ctx, struct connection *conn,
-				char **vec, int num)
+				const char **vec, int num)
 {
 	if (num)
 		return EINVAL;
@@ -215,7 +215,7 @@ static int do_control_memreport(const void *ctx, struct connection *conn,
 }
 #else
 static int do_control_logfile(const void *ctx, struct connection *conn,
-			      char **vec, int num)
+			      const char **vec, int num)
 {
 	if (num != 1)
 		return EINVAL;
@@ -230,7 +230,7 @@ static int do_control_logfile(const void *ctx, struct connection *conn,
 }
 
 static int do_control_memreport(const void *ctx, struct connection *conn,
-				char **vec, int num)
+				const char **vec, int num)
 {
 	FILE *fp;
 	int fd;
@@ -270,7 +270,7 @@ static int do_control_memreport(const void *ctx, struct connection *conn,
 #endif
 
 static int do_control_print(const void *ctx, struct connection *conn,
-			    char **vec, int num)
+			    const char **vec, int num)
 {
 	if (num != 1)
 		return EINVAL;
@@ -281,7 +281,8 @@ static int do_control_print(const void *ctx, struct connection *conn,
 	return 0;
 }
 
-static int do_control_help(const void *, struct connection *, char **, int);
+static int do_control_help(const void *, struct connection *, const char **,
+			   int);
 
 static struct cmd_s cmds[] = {
 	{ "check", do_control_check, "" },
@@ -322,7 +323,7 @@ static struct cmd_s cmds[] = {
 };
 
 static int do_control_help(const void *ctx, struct connection *conn,
-			   char **vec, int num)
+			   const char **vec, int num)
 {
 	int cmd;
 	char *resp;
@@ -348,7 +349,7 @@ int do_control(const void *ctx, struct connection *conn,
 	       struct buffered_data *in)
 {
 	unsigned int cmd, num, off;
-	char **vec = NULL;
+	const char **vec = NULL;
 
 	if (domain_is_unprivileged(conn))
 		return EACCES;
@@ -365,7 +366,7 @@ int do_control(const void *ctx, struct connection *conn,
 	num = xenstore_count_strings(in->buffer, in->used);
 	if (cmds[cmd].max_pars)
 		num = min(num, cmds[cmd].max_pars);
-	vec = talloc_array(ctx, char *, num);
+	vec = (const char **)talloc_array(ctx, char *, num);
 	if (!vec)
 		return ENOMEM;
 	if (get_strings(in, vec, num) < num)

@@ -104,7 +104,7 @@ static const char *lu_binary_save(const void *ctx, struct connection *conn,
 	return NULL;
 }
 
-const char *lu_arch(const void *ctx, struct connection *conn, char **vec,
+const char *lu_arch(const void *ctx, struct connection *conn, const char **vec,
 		    int num)
 {
 	if (num == 2 && !strcmp(vec[0], "-b"))

@@ -1014,7 +1014,7 @@ int do_introduce(const void *ctx, struct connection *conn,
 		 struct buffered_data *in)
 {
 	struct domain *domain;
-	char *vec[3];
+	const char *vec[3];
 	unsigned int domid;
 	evtchn_port_t port;
 
@@ -1055,7 +1055,7 @@ static struct domain *find_connected_domain(unsigned int domid)
 int do_set_target(const void *ctx, struct connection *conn,
 		  struct buffered_data *in)
 {
-	char *vec[2];
+	const char *vec[2];
 	unsigned int domid, tdomid;
         struct domain *domain, *tdomain;
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec))
