@@ -1253,8 +1253,11 @@ static struct node *get_spec_node(struct connection *conn, const void *ctx,
 				  const char *name, const char **canonical_name,
 				  unsigned int perm)
 {
-	if (name[0] == '@')
+	if (name[0] == '@') {
+		if (canonical_name)
+			*canonical_name = name;
 		return get_node(conn, ctx, name, perm);
+	}
 
 	return get_node_canonicalized(conn, ctx, name, canonical_name, perm);
 }
