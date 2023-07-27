@@ -17,9 +17,12 @@
  * License along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/iocap.h>
 #include <xen/sched.h>
 #include <xen/softirq.h>
 #include <xen/vpci.h>
+
+#include <xsm/xsm.h>
 
 #include <asm/event.h>
 #include <asm/p2m.h>
@@ -42,6 +45,23 @@ static int cf_check map_range(
     for ( ; ; )
     {
         unsigned long size = e - s + 1;
+
+        if ( !iomem_access_permitted(map->d, s, e) )
+        {
+            printk(XENLOG_G_WARNING
+                   "%pd denied access to MMIO range [%#lx, %#lx]\n",
+                   map->d, s, e);
+            return -EPERM;
+        }
+
+        rc = xsm_iomem_mapping(XSM_HOOK, map->d, s, e, map->map);
+        if ( rc )
+        {
+            printk(XENLOG_G_WARNING
+                   "%pd XSM denied access to MMIO range [%#lx, %#lx]: %d\n",
+                   map->d, s, e, rc);
+            return rc;
+        }
 
         /*
          * ARM TODOs:

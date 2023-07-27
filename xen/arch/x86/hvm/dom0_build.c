@@ -715,13 +715,6 @@ static int __init pvh_setup_cpus(struct domain *d, paddr_t entry,
         return rc;
     }
 
-    rc = dom0_setup_permissions(d);
-    if ( rc )
-    {
-        panic("Unable to setup Dom0 permissions: %d\n", rc);
-        return rc;
-    }
-
     update_domain_wallclock_time(d);
 
     v->is_initialised = 1;
@@ -1183,6 +1176,20 @@ int __init dom0_construct_pvh(struct domain *d, const module_t *image,
     int rc;
 
     printk(XENLOG_INFO "*** Building a PVH Dom%d ***\n", d->domain_id);
+
+    if ( is_hardware_domain(d) )
+    {
+        /*
+         * Setup permissions early so that calls to add MMIO regions to the
+         * p2m as part of vPCI setup don't fail due to permission checks.
+         */
+        rc = dom0_setup_permissions(d);
+        if ( rc )
+        {
+            printk("%pd unable to setup permissions: %d\n", d, rc);
+            return rc;
+        }
+    }
 
     /*
      * NB: MMCFG initialization needs to be performed before iommu
