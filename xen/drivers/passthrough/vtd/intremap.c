@@ -441,14 +441,14 @@ unsigned int cf_check io_apic_read_remap_rte(
 void cf_check io_apic_write_remap_rte(
     unsigned int apic, unsigned int reg, unsigned int value)
 {
-    unsigned int ioapic_pin = (reg - 0x10) / 2;
+    unsigned int pin = (reg - 0x10) / 2;
     struct IO_xAPIC_route_entry old_rte = { };
     struct IO_APIC_route_remap_entry *remap_rte;
     unsigned int rte_upper = (reg & 1) ? 1 : 0;
     struct vtd_iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
     int saved_mask;
 
-    old_rte = __ioapic_read_entry(apic, ioapic_pin, true);
+    old_rte = __ioapic_read_entry(apic, pin, true);
 
     remap_rte = (struct IO_APIC_route_remap_entry *) &old_rte;
 
@@ -458,7 +458,7 @@ void cf_check io_apic_write_remap_rte(
     __io_apic_write(apic, reg & ~1, *(u32 *)&old_rte);
     remap_rte->mask = saved_mask;
 
-    if ( ioapic_rte_to_remap_entry(iommu, apic, ioapic_pin,
+    if ( ioapic_rte_to_remap_entry(iommu, apic, pin,
                                    &old_rte, rte_upper, value) )
     {
         __io_apic_write(apic, reg, value);
@@ -468,7 +468,7 @@ void cf_check io_apic_write_remap_rte(
             __io_apic_write(apic, reg & ~1, *(u32 *)&old_rte);
     }
     else
-        __ioapic_write_entry(apic, ioapic_pin, true, old_rte);
+        __ioapic_write_entry(apic, pin, true, old_rte);
 }
 
 static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
