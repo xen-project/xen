@@ -760,8 +760,8 @@ void amd_init_spectral_chicken(void)
 void amd_check_zenbleed(void)
 {
 	const struct cpu_signature *sig = &this_cpu(cpu_sig);
-	unsigned int good_rev, chickenbit = (1 << 9);
-	uint64_t val, old_val;
+	unsigned int good_rev;
+	uint64_t val, old_val, chickenbit = (1 << 9);
 
 	/*
 	 * If we're virtualised, we can't do family/model checks safely, and
