@@ -39,11 +39,11 @@ void initialize_keytable(void);
 void register_keyhandler(unsigned char key,
                          keyhandler_fn_t *fn,
                          const char *desc,
-                         bool_t diagnostic);
+                         bool diagnostic);
 void register_irq_keyhandler(unsigned char key,
                              irq_keyhandler_fn_t *fn,
                              const char *desc,
-                             bool_t diagnostic);
+                             bool diagnostic);
 
 /* Inject a keypress into the key-handling subsystem. */
 extern void handle_keypress(unsigned char key, struct cpu_user_regs *regs);
