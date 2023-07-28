@@ -37,9 +37,9 @@ struct notifier_head {
 
 
 void notifier_chain_register(
-    struct notifier_head *nh, struct notifier_block *nb);
+    struct notifier_head *nh, struct notifier_block *n);
 void notifier_chain_unregister(
-    struct notifier_head *nh, struct notifier_block *nb);
+    struct notifier_head *nh, struct notifier_block *n);
 
 int notifier_call_chain(
     struct notifier_head *nh, unsigned long val, void *v,
