@@ -15,7 +15,7 @@
  * Clear a given page frame, or copy between two of them.
  */
 void clear_domain_page(mfn_t mfn);
-void copy_domain_page(mfn_t dst, const mfn_t src);
+void copy_domain_page(mfn_t dest, mfn_t source);
 
 #ifdef CONFIG_ARCH_MAP_DOMAIN_PAGE
 
