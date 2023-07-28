@@ -162,8 +162,8 @@ static inline void __io_apic_write(unsigned int apic, unsigned int reg, unsigned
 
 static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
 {
-    if ( ioapic_reg_remapped(reg) )
-        return iommu_update_ire_from_apic(apic, reg, value);
+    /* RTE writes must use ioapic_write_entry. */
+    BUG_ON(reg >= 0x10);
     __io_apic_write(apic, reg, value);
 }
 
@@ -173,8 +173,8 @@ static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned i
  */
 static inline void io_apic_modify(unsigned int apic, unsigned int reg, unsigned int value)
 {
-    if ( ioapic_reg_remapped(reg) )
-        return iommu_update_ire_from_apic(apic, reg, value);
+    /* RTE writes must use ioapic_write_entry. */
+    BUG_ON(reg >= 0x10);
     *(IO_APIC_BASE(apic) + 4) = value;
 }
 

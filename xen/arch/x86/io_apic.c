@@ -237,15 +237,15 @@ struct IO_APIC_route_entry __ioapic_read_entry(
 {
     union entry_union eu;
 
-    if ( raw )
+    if ( raw || !iommu_intremap )
     {
         eu.w1 = __io_apic_read(apic, 0x10 + 2 * pin);
         eu.w2 = __io_apic_read(apic, 0x11 + 2 * pin);
     }
     else
     {
-        eu.w1 = io_apic_read(apic, 0x10 + 2 * pin);
-        eu.w2 = io_apic_read(apic, 0x11 + 2 * pin);
+        eu.w1 = iommu_read_apic_from_ire(apic, 0x10 + 2 * pin);
+        eu.w2 = iommu_read_apic_from_ire(apic, 0x11 + 2 * pin);
     }
 
     return eu.entry;
@@ -269,15 +269,15 @@ void __ioapic_write_entry(
 {
     union entry_union eu = { .entry = e };
 
-    if ( raw )
+    if ( raw || !iommu_intremap )
     {
         __io_apic_write(apic, 0x11 + 2 * pin, eu.w2);
         __io_apic_write(apic, 0x10 + 2 * pin, eu.w1);
     }
     else
     {
-        io_apic_write(apic, 0x11 + 2 * pin, eu.w2);
-        io_apic_write(apic, 0x10 + 2 * pin, eu.w1);
+        iommu_update_ire_from_apic(apic, 0x11 + 2 * pin, eu.w2);
+        iommu_update_ire_from_apic(apic, 0x10 + 2 * pin, eu.w1);
     }
 }
 
@@ -433,16 +433,17 @@ static void modify_IO_APIC_irq(unsigned int irq, unsigned int enable,
                                unsigned int disable)
 {
     struct irq_pin_list *entry = irq_2_pin + irq;
-    unsigned int pin, reg;
 
     for (;;) {
-        pin = entry->pin;
+        unsigned int pin = entry->pin;
+        struct IO_APIC_route_entry rte;
+
         if (pin == -1)
             break;
-        reg = io_apic_read(entry->apic, 0x10 + pin*2);
-        reg &= ~disable;
-        reg |= enable;
-        io_apic_modify(entry->apic, 0x10 + pin*2, reg);
+        rte = __ioapic_read_entry(entry->apic, pin, false);
+        rte.raw &= ~(uint64_t)disable;
+        rte.raw |= enable;
+        __ioapic_write_entry(entry->apic, pin, false, rte);
         if (!entry->next)
             break;
         entry = irq_2_pin + entry->next;
@@ -584,16 +585,16 @@ set_ioapic_affinity_irq(struct irq_desc *desc, const cpumask_t *mask)
             dest = SET_APIC_LOGICAL_ID(dest);
         entry = irq_2_pin + irq;
         for (;;) {
-            unsigned int data;
+            struct IO_APIC_route_entry rte;
+
             pin = entry->pin;
             if (pin == -1)
                 break;
 
-            io_apic_write(entry->apic, 0x10 + 1 + pin*2, dest);
-            data = io_apic_read(entry->apic, 0x10 + pin*2);
-            data &= ~IO_APIC_REDIR_VECTOR_MASK;
-            data |= MASK_INSR(desc->arch.vector, IO_APIC_REDIR_VECTOR_MASK);
-            io_apic_modify(entry->apic, 0x10 + pin*2, data);
+            rte = __ioapic_read_entry(entry->apic, pin, false);
+            rte.dest.dest32 = dest;
+            rte.vector = desc->arch.vector;
+            __ioapic_write_entry(entry->apic, pin, false, rte);
 
             if (!entry->next)
                 break;
@@ -2127,10 +2128,8 @@ void ioapic_resume(void)
             reg_00.bits.ID = mp_ioapics[apic].mpc_apicid;
             __io_apic_write(apic, 0, reg_00.raw);
         }
-        for (i = 0; i < nr_ioapic_entries[apic]; i++, entry++) {
-            __io_apic_write(apic, 0x11+2*i, *(((int *)entry)+1));
-            __io_apic_write(apic, 0x10+2*i, *(((int *)entry)+0));
-        }
+        for (i = 0; i < nr_ioapic_entries[apic]; i++, entry++)
+            __ioapic_write_entry(apic, i, true, *entry);
     }
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
