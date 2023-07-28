@@ -352,8 +352,8 @@ static int update_intremap_entry_from_ioapic(
 void cf_check amd_iommu_ioapic_update_ire(
     unsigned int apic, unsigned int reg, unsigned int value)
 {
-    struct IO_APIC_route_entry old_rte = { 0 };
-    struct IO_APIC_route_entry new_rte = { 0 };
+    struct IO_APIC_route_entry old_rte = { };
+    struct IO_APIC_route_entry new_rte = { };
     unsigned int rte_lo = (reg & 1) ? reg - 1 : reg;
     unsigned int pin = (reg - 0x10) / 2;
     int seg, bdf, rc;

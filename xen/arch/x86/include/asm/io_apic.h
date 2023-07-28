@@ -90,35 +90,38 @@ enum ioapic_irq_destination_types {
 };
 
 struct IO_APIC_route_entry {
-    unsigned int vector:8;
-    unsigned int delivery_mode:3; /*
-                                   * 000: FIXED
-                                   * 001: lowest prio
-                                   * 111: ExtINT
-                                   */
-    unsigned int dest_mode:1;     /* 0: physical, 1: logical */
-    unsigned int delivery_status:1;
-    unsigned int polarity:1;      /* 0: low, 1: high */
-    unsigned int irr:1;
-    unsigned int trigger:1;       /* 0: edge, 1: level */
-    unsigned int mask:1;          /* 0: enabled, 1: disabled */
-    unsigned int __reserved_2:15;
-
     union {
         struct {
-            unsigned int __reserved_1:24;
-            unsigned int physical_dest:4;
-            unsigned int __reserved_2:4;
-        } physical;
+            unsigned int vector:8;
+            unsigned int delivery_mode:3; /*
+                                           * 000: FIXED
+                                           * 001: lowest prio
+                                           * 111: ExtINT
+                                           */
+            unsigned int dest_mode:1;     /* 0: physical, 1: logical */
+            unsigned int delivery_status:1;
+            unsigned int polarity:1;      /* 0: low, 1: high */
+            unsigned int irr:1;
+            unsigned int trigger:1;       /* 0: edge, 1: level */
+            unsigned int mask:1;          /* 0: enabled, 1: disabled */
+            unsigned int __reserved_2:15;
 
-        struct {
-            unsigned int __reserved_1:24;
-            unsigned int logical_dest:8;
-        } logical;
+            union {
+                struct {
+                    unsigned int __reserved_1:24;
+                    unsigned int physical_dest:4;
+                    unsigned int __reserved_2:4;
+                } physical;
 
-        /* used when Interrupt Remapping with EIM is enabled */
-        unsigned int dest32;
-    } dest;
+                struct {
+                    unsigned int __reserved_1:24;
+                    unsigned int logical_dest:8;
+                } logical;
+                unsigned int dest32;
+            } dest;
+        };
+        uint64_t raw;
+    };
 };
 
 /*
