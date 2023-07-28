@@ -238,15 +238,6 @@ static inline void ltr(unsigned int sel)
     __asm__ __volatile__ ( "ltr %w0" :: "rm" (sel) : "memory" );
 }
 
-static inline unsigned int str(void)
-{
-    unsigned int sel;
-
-    __asm__ ( "str %0" : "=r" (sel) );
-
-    return sel;
-}
-
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __ARCH_DESC_H */
