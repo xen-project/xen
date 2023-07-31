@@ -19,13 +19,17 @@ or       = $(if $(strip $(1)),$(1),$(if $(strip $(2)),$(2),$(if $(strip $(3)),$(
 
 -include $(XEN_ROOT)/.config
 
-XEN_COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/ \
+ifeq ($(origin XEN_COMPILE_ARCH), undefined)
+XEN_COMPILE_ARCH    := $(shell uname -m | sed -e s/i.86/x86_32/ \
                          -e s/i86pc/x86_32/ -e s/amd64/x86_64/ \
                          -e s/armv7.*/arm32/ -e s/armv8.*/arm64/ \
                          -e s/aarch64/arm64/)
+endif
 
 XEN_TARGET_ARCH     ?= $(XEN_COMPILE_ARCH)
-XEN_OS              ?= $(shell uname -s)
+ifeq ($(origin XEN_OS), undefined)
+XEN_OS              := $(shell uname -s)
+endif
 
 CONFIG_$(XEN_OS) := y
 
