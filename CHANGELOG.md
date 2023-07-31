@@ -24,6 +24,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - xl/libxl can customize SMBIOS strings for HVM guests.
  - Add support for AVX512-FP16 on x86.
  - On Arm, Xen supports guests running SVE/SVE2 instructions. (Tech Preview)
+ - On Arm, add suport for Firmware Framework for Arm A-profile (FF-A) Mediator
+   (Tech Preview)
 
 ### Removed
  - On x86, the "pku" command line option has been removed.  It has never

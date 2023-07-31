@@ -1656,6 +1656,21 @@ in OP-TEE.
 
 This feature is a B<technology preview>.
 
+=item B<ffa>
+
+B<Arm only.> Allow a guest to communicate via FF-A with Secure Partitions
+(SP), default false.
+
+Currently only a small subset of the FF-A specification is supported. Just
+enough to communicate with OP-TEE. In general only direct messaging and
+sharing memory with one SP. More advanced use cases where memory might be
+shared or donated to multiple SPs are not supported.
+
+See L<https://developer.arm.com/documentation/den0077/latest> for more
+information about FF-A.
+
+This feature is a B<technology preview>.
+
 =back
 
 =back
