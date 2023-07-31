@@ -13,6 +13,37 @@
  *                https://developer.arm.com/documentation/den0077/e
  * TEEC-1.0C: TEE Client API Specification version 1.0c available at
  *            https://globalplatform.org/specs-library/tee-client-api-specification/
+ *
+ * Notes on the the current implementation.
+ *
+ * Unsupported FF-A interfaces:
+ * o FFA_MSG_POLL and FFA_MSG_SEND - deprecated in FF-A-1.1-REL0
+ * o FFA_MEM_RETRIEVE_* - Used when sharing memory from an SP to a VM
+ * o FFA_MEM_DONATE_* and FFA_MEM_LEND_* - Used when tranferring ownership
+ *   or access of a memory region
+ * o FFA_MSG_SEND2 and FFA_MSG_WAIT - Used for indirect messaging
+ * o FFA_MSG_YIELD
+ * o FFA_INTERRUPT - Used to report preemption
+ * o FFA_RUN
+ *
+ * Limitations in the implemented FF-A interfaces:
+ * o FFA_RXTX_MAP_*:
+ *   - Maps only one 4k page as RX and TX buffers
+ *   - Doesn't support forwarding this call on behalf of an endpoint
+ * o FFA_MEM_SHARE_*: only supports sharing
+ *   - from a VM to an SP
+ *   - with one borrower
+ *   - with the memory transaction descriptor in the RX/TX buffer
+ *   - normal memory
+ *   - at most 512 kB large memory regions
+ *   - at most 32 shared memory regions per guest
+ * o FFA_MSG_SEND_DIRECT_REQ:
+ *   - only supported from a VM to an SP
+ *
+ * There are some large locked sections with ffa_tx_buffer_lock and
+ * ffa_rx_buffer_lock. Especially the ffa_tx_buffer_lock spinlock used
+ * around share_shm() is a very large locked section which can let one VM
+ * affect another VM.
  */
 
 #include <xen/bitops.h>
