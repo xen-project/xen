@@ -177,7 +177,7 @@ static int __init _bind_irq_vector(struct irq_desc *desc, int vector,
     return 0;
 }
 
-int __init bind_irq_vector(int irq, int vector, const cpumask_t *cpu_mask)
+int __init bind_irq_vector(int irq, int vector, const cpumask_t *mask)
 {
     struct irq_desc *desc = irq_to_desc(irq);
     unsigned long flags;
@@ -187,7 +187,7 @@ int __init bind_irq_vector(int irq, int vector, const cpumask_t *cpu_mask)
 
     spin_lock_irqsave(&desc->lock, flags);
     spin_lock(&vector_lock);
-    ret = _bind_irq_vector(desc, vector, cpu_mask);
+    ret = _bind_irq_vector(desc, vector, mask);
     spin_unlock(&vector_lock);
     spin_unlock_irqrestore(&desc->lock, flags);
 

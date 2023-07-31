@@ -107,12 +107,12 @@ void alloc_direct_apic_vector(
 
 void do_IRQ(struct cpu_user_regs *regs);
 
-void cf_check disable_8259A_irq(struct irq_desc *);
-void cf_check enable_8259A_irq(struct irq_desc *);
+void cf_check disable_8259A_irq(struct irq_desc *desc);
+void cf_check enable_8259A_irq(struct irq_desc *desc);
 int i8259A_irq_pending(unsigned int irq);
 void mask_8259A(void);
 void unmask_8259A(void);
-void init_8259A(int aeoi);
+void init_8259A(int auto_eoi);
 void make_8259A_irq(unsigned int irq);
 bool bogus_8259A_irq(unsigned int irq);
 int i8259A_suspend(void);
@@ -142,15 +142,15 @@ struct arch_pirq {
 #define pirq_dpci(pirq) ((pirq) ? &(pirq)->arch.hvm.dpci : NULL)
 #define dpci_pirq(pd) container_of(pd, struct pirq, arch.hvm.dpci)
 
-int pirq_shared(struct domain *d , int irq);
+int pirq_shared(struct domain *d , int pirq);
 
 int map_domain_pirq(struct domain *d, int pirq, int irq, int type,
                            void *data);
 int unmap_domain_pirq(struct domain *d, int pirq);
 int get_free_pirq(struct domain *d, int type);
-int get_free_pirqs(struct domain *, unsigned int nr);
+int get_free_pirqs(struct domain *d, unsigned int nr);
 void free_domain_pirqs(struct domain *d);
-int map_domain_emuirq_pirq(struct domain *d, int pirq, int irq);
+int map_domain_emuirq_pirq(struct domain *d, int pirq, int emuirq);
 int unmap_domain_pirq_emuirq(struct domain *d, int pirq);
 
 /* Reset irq affinities to match the given CPU mask. */
@@ -168,9 +168,9 @@ int irq_to_vector(int irq);
  */
 int create_irq(nodeid_t node, bool grant_access);
 void destroy_irq(unsigned int irq);
-int assign_irq_vector(int irq, const cpumask_t *);
+int assign_irq_vector(int irq, const cpumask_t *mask);
 
-void cf_check irq_complete_move(struct irq_desc *);
+void cf_check irq_complete_move(struct irq_desc *desc);
 
 extern struct irq_desc *irq_desc;
 
@@ -179,16 +179,16 @@ void unlock_vector_lock(void);
 
 void setup_vector_irq(unsigned int cpu);
 
-void move_native_irq(struct irq_desc *);
-void move_masked_irq(struct irq_desc *);
+void move_native_irq(struct irq_desc *desc);
+void move_masked_irq(struct irq_desc *desc);
 
-int bind_irq_vector(int irq, int vector, const cpumask_t *);
+int bind_irq_vector(int irq, int vector, const cpumask_t *mask);
 
-void cf_check end_nonmaskable_irq(struct irq_desc *, uint8_t vector);
-void irq_set_affinity(struct irq_desc *, const cpumask_t *mask);
+void cf_check end_nonmaskable_irq(struct irq_desc *desc, uint8_t vector);
+void irq_set_affinity(struct irq_desc *desc, const cpumask_t *mask);
 
-int init_domain_irq_mapping(struct domain *);
-void cleanup_domain_irq_mapping(struct domain *);
+int init_domain_irq_mapping(struct domain *d);
+void cleanup_domain_irq_mapping(struct domain *d);
 
 #define domain_pirq_to_irq(d, pirq) pirq_field(d, pirq, arch.irq, 0)
 #define domain_irq_to_pirq(d, irq) ({                           \
