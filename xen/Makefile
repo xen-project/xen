@@ -11,10 +11,18 @@ export XEN_FULLVERSION   = $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION)
 -include xen-version
 
 export XEN_WHOAMI	?= $(USER)
-export XEN_DOMAIN	?= $(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) || ([ -x /bin/domainname ] && /bin/domainname || echo [unknown]))
-export XEN_BUILD_DATE	?= $(shell LC_ALL=C date)
-export XEN_BUILD_TIME	?= $(shell LC_ALL=C date +%T)
-export XEN_BUILD_HOST	?= $(shell hostname)
+ifeq ($(origin XEN_DOMAIN), undefined)
+export XEN_DOMAIN	:= $(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) || ([ -x /bin/domainname ] && /bin/domainname || echo [unknown]))
+endif
+ifeq ($(origin XEN_BUILD_DATE), undefined)
+export XEN_BUILD_DATE	:= $(shell LC_ALL=C date)
+endif
+ifeq ($(origin XEN_BUILD_TIME), undefined)
+export XEN_BUILD_TIME	:= $(shell LC_ALL=C date +%T)
+endif
+ifeq ($(origin XEN_BUILD_HOST), undefined)
+export XEN_BUILD_HOST	:= $(shell hostname)
+endif
 
 # Best effort attempt to find a python interpreter, defaulting to Python 3 if
 # available.  Fall back to just `python` if `which` is nowhere to be found.
