@@ -81,6 +81,15 @@
  */
 #define LIBXL_HAVE_CONSOLE_NOTIFY_FD 1
 
+/* LIBXL_HAVE_CONSOLE_ESCAPE_CHARACTER
+ *
+ * If this is defined, libxl_console_exec and
+ * libxl_primary_console_exe take an escape_character parameter. That
+ * parameter will be used to modify the escape sequence used to exit the
+ * console.
+ */
+#define LIBXL_HAVE_CONSOLE_ESCAPE_CHARACTER 1
+
 /* LIBXL_HAVE_CONST_COPY_AND_LENGTH_FUNCTIONS
  *
  * If this is defined, the copy functions have constified src parameter and the
@@ -790,7 +799,8 @@ typedef struct libxl__ctx libxl_ctx;
 #if LIBXL_API_VERSION != 0x040200 && LIBXL_API_VERSION != 0x040300 && \
     LIBXL_API_VERSION != 0x040400 && LIBXL_API_VERSION != 0x040500 && \
     LIBXL_API_VERSION != 0x040700 && LIBXL_API_VERSION != 0x040800 && \
-    LIBXL_API_VERSION != 0x041300 && LIBXL_API_VERSION != 0x041400
+    LIBXL_API_VERSION != 0x041300 && LIBXL_API_VERSION != 0x041400 && \
+    LIBXL_API_VERSION != 0x041800
 #error Unknown LIBXL_API_VERSION
 #endif
 #endif
@@ -1954,7 +1964,8 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass);
  * the caller that it has connected to the guest console.
  */
 int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num,
-                       libxl_console_type type, int notify_fd);
+                       libxl_console_type type, int notify_fd,
+                       char* escape_character);
 /* libxl_primary_console_exec finds the domid and console number
  * corresponding to the primary console of the given vm, then calls
  * libxl_console_exec with the right arguments (domid might be different
@@ -1964,9 +1975,12 @@ int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num,
  * guests using pygrub.
  * If notify_fd is not -1, xenconsole will write 0x00 to it to nofity
  * the caller that it has connected to the guest console.
+ * If escape_character is not NULL, the provided value is used to exit
+ * the guest console.
  */
 int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm,
-                               int notify_fd);
+                               int notify_fd,
+                               char* escape_character);
 
 #if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x040800
 
@@ -1974,16 +1988,35 @@ static inline int libxl_console_exec_0x040700(libxl_ctx *ctx,
                                               uint32_t domid, int cons_num,
                                               libxl_console_type type)
 {
-    return libxl_console_exec(ctx, domid, cons_num, type, -1);
+    return libxl_console_exec(ctx, domid, cons_num, type, -1, NULL);
 }
 #define libxl_console_exec libxl_console_exec_0x040700
 
 static inline int libxl_primary_console_exec_0x040700(libxl_ctx *ctx,
                                                       uint32_t domid_vm)
 {
-    return libxl_primary_console_exec(ctx, domid_vm, -1);
+    return libxl_primary_console_exec(ctx, domid_vm, -1, NULL);
 }
 #define libxl_primary_console_exec libxl_primary_console_exec_0x040700
+
+#elif defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x041800
+
+static inline int libxl_console_exec_0x041700(libxl_ctx *ctx, uint32_t domid,
+                                              int cons_num,
+                                              libxl_console_type type,
+                                              int notify_fd)
+{
+    return libxl_console_exec(ctx, domid, cons_num, type, notify_fd, NULL);
+}
+#define libxl_console_exec libxl_console_exec_0x041700
+
+static inline int libxl_primary_console_exec_0x041700(libxl_ctx *ctx,
+                                                      uint32_t domid_vm,
+                                                      int notify_fd)
+{
+    return libxl_primary_console_exec(ctx, domid_vm, notify_fd, NULL);
+}
+#define libxl_primary_console_exec libxl_primary_console_exec_0x041700
 
 #endif
 

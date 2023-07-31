@@ -222,7 +222,8 @@ Attach to the console of a domain specified by I<domain-id>.  If you've set up
 your domains to have a traditional login console this will look much like a
 normal text login screen.
 
-Use the key combination Ctrl+] to detach from the domain console.
+Use the escape character key combination (default Ctrl+]) to detach from the
+domain console.
 
 B<OPTIONS>
 
@@ -238,6 +239,11 @@ emulated serial for HVM guests and PV console for PV guests.
 =item I<-n NUM>
 
 Connect to console number I<NUM>. Console numbers start from 0.
+
+=item I<-e escapechar>
+
+Customize the escape sequence used to detach from the domain console to
+I<escapechar>. If not specified, the value "^]" is used.
 
 =back
 
