@@ -1483,7 +1483,7 @@ x86_emulate(
     {
         enum x86_segment seg;
         struct segment_register cs, sreg;
-        struct cpuid_leaf cpuid_leaf;
+        struct cpuid_leaf leaf;
         uint64_t msr_val;
         unsigned int i, n;
         unsigned long dummy;
@@ -5024,13 +5024,13 @@ x86_emulate(
         generate_exception_if((msr_val & MSR_MISC_FEATURES_CPUID_FAULTING),
                               X86_EXC_GP, 0); /* Faulting active? (Inc. CPL test) */
 
-        rc = ops->cpuid(_regs.eax, _regs.ecx, &cpuid_leaf, ctxt);
+        rc = ops->cpuid(_regs.eax, _regs.ecx, &leaf, ctxt);
         if ( rc != X86EMUL_OKAY )
             goto done;
-        _regs.r(ax) = cpuid_leaf.a;
-        _regs.r(bx) = cpuid_leaf.b;
-        _regs.r(cx) = cpuid_leaf.c;
-        _regs.r(dx) = cpuid_leaf.d;
+        _regs.r(ax) = leaf.a;
+        _regs.r(bx) = leaf.b;
+        _regs.r(cx) = leaf.c;
+        _regs.r(dx) = leaf.d;
         break;
 
     case X86EMUL_OPC(0x0f, 0xa3): bt: /* bt */
