@@ -2439,8 +2439,6 @@ int xenmem_add_to_physmap_one(
 
     case XENMAPSPACE_gmfn:
     {
-        p2m_type_t p2mt;
-
         gfn = idx;
         mfn = get_gfn_unshare(d, gfn, &p2mt);
         /* If the page is still shared, exit early */
