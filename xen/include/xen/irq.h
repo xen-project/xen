@@ -110,22 +110,22 @@ typedef struct irq_desc {
 #define irq_to_desc(irq)    (&irq_desc[irq])
 #endif
 
-int init_one_irq_desc(struct irq_desc *);
-int arch_init_one_irq_desc(struct irq_desc *);
+int init_one_irq_desc(struct irq_desc *desc);
+int arch_init_one_irq_desc(struct irq_desc *desc);
 
 #define irq_desc_initialized(desc) ((desc)->handler != NULL)
 
 extern int setup_irq(unsigned int irq, unsigned int irqflags,
-                     struct irqaction *);
+                     struct irqaction *new);
 extern void release_irq(unsigned int irq, const void *dev_id);
 extern int request_irq(unsigned int irq, unsigned int irqflags,
                void (*handler)(int, void *, struct cpu_user_regs *),
-               const char * devname, void *dev_id);
+               const char *devname, void *dev_id);
 
 extern hw_irq_controller no_irq_type;
 void cf_check no_action(int cpl, void *dev_id, struct cpu_user_regs *regs);
-unsigned int cf_check irq_startup_none(struct irq_desc *);
-void cf_check irq_actor_none(struct irq_desc *);
+unsigned int cf_check irq_startup_none(struct irq_desc *desc);
+void cf_check irq_actor_none(struct irq_desc *desc);
 #define irq_shutdown_none irq_actor_none
 #define irq_disable_none irq_actor_none
 #define irq_enable_none irq_actor_none
@@ -146,7 +146,7 @@ struct pirq {
 #define pirq_info(d, p) ((struct pirq *)radix_tree_lookup(&(d)->pirq_tree, p))
 
 /* Use this instead of pirq_info() if the structure may need allocating. */
-extern struct pirq *pirq_get_info(struct domain *, int pirq);
+extern struct pirq *pirq_get_info(struct domain *d, int pirq);
 
 #define pirq_field(d, p, f, def) ({ \
     const struct pirq *__pi = pirq_info(d, p); \
@@ -155,30 +155,31 @@ extern struct pirq *pirq_get_info(struct domain *, int pirq);
 #define pirq_to_evtchn(d, pirq) pirq_field(d, pirq, evtchn, 0)
 #define pirq_masked(d, pirq) pirq_field(d, pirq, masked, 0)
 
-void pirq_cleanup_check(struct pirq *, struct domain *);
+void pirq_cleanup_check(struct pirq *pirq, struct domain *d);
 
 #define pirq_cleanup_check(pirq, d) \
     ((pirq)->evtchn ? pirq_cleanup_check(pirq, d) : (void)0)
 
-extern void pirq_guest_eoi(struct pirq *);
-extern void desc_guest_eoi(struct irq_desc *, struct pirq *);
+extern void pirq_guest_eoi(struct pirq *pirq);
+extern void desc_guest_eoi(struct irq_desc *desc, struct pirq *pirq);
 extern int pirq_guest_unmask(struct domain *d);
-extern int pirq_guest_bind(struct vcpu *, struct pirq *, int will_share);
-extern void pirq_guest_unbind(struct domain *d, struct pirq *);
-extern void pirq_set_affinity(struct domain *d, int irq, const cpumask_t *);
-extern irq_desc_t *domain_spin_lock_irq_desc(
-    struct domain *d, int irq, unsigned long *pflags);
-extern irq_desc_t *pirq_spin_lock_irq_desc(
-    const struct pirq *, unsigned long *pflags);
+extern int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share);
+extern void pirq_guest_unbind(struct domain *d, struct pirq *pirq);
+extern void pirq_set_affinity(struct domain *d, int pirq,
+                              const cpumask_t *mask);
+extern struct irq_desc *domain_spin_lock_irq_desc(
+    struct domain *d, int pirq, unsigned long *pflags);
+extern struct irq_desc *pirq_spin_lock_irq_desc(
+    const struct pirq *pirq, unsigned long *pflags);
 
-unsigned int set_desc_affinity(struct irq_desc *, const cpumask_t *);
+unsigned int set_desc_affinity(struct irq_desc *desc, const cpumask_t *mask);
 
 #ifndef arch_hwdom_irqs
-unsigned int arch_hwdom_irqs(domid_t);
+unsigned int arch_hwdom_irqs(domid_t domid);
 #endif
 
 #ifndef arch_evtchn_bind_pirq
-void arch_evtchn_bind_pirq(struct domain *, int pirq);
+void arch_evtchn_bind_pirq(struct domain *d, int pirq);
 #endif
 
 #endif /* __XEN_IRQ_H__ */

@@ -26,7 +26,7 @@ typedef void (*softirq_handler)(void);
 void do_softirq(void);
 void open_softirq(int nr, softirq_handler handler);
 
-void cpumask_raise_softirq(const cpumask_t *, unsigned int nr);
+void cpumask_raise_softirq(const cpumask_t *mask, unsigned int nr);
 void cpu_raise_softirq(unsigned int cpu, unsigned int nr);
 void raise_softirq(unsigned int nr);
 
