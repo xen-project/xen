@@ -363,6 +363,13 @@ struct ffa_ctx {
     struct list_head shm_list;
     /* Number of allocated shared memory object */
     unsigned int shm_count;
+    /*
+     * tx_lock is used to serialize access to tx
+     * rx_lock is used to serialize access to rx
+     * lock is used for the rest in this struct
+     */
+    spinlock_t tx_lock;
+    spinlock_t rx_lock;
     spinlock_t lock;
 };
 
@@ -768,7 +775,9 @@ static int32_t handle_partition_info_get(uint32_t w1, uint32_t w2, uint32_t w3,
     if ( !ffa_rx )
         return FFA_RET_DENIED;
 
-    spin_lock(&ctx->lock);
+    if ( !spin_trylock(&ctx->rx_lock) )
+        return FFA_RET_BUSY;
+
     if ( !ctx->page_count || !ctx->rx_is_free )
         goto out;
     spin_lock(&ffa_rx_buffer_lock);
@@ -819,7 +828,7 @@ out_rx_release:
 out_rx_buf_unlock:
     spin_unlock(&ffa_rx_buffer_lock);
 out:
-    spin_unlock(&ctx->lock);
+    spin_unlock(&ctx->rx_lock);
 
     return ret;
 }
@@ -830,13 +839,15 @@ static int32_t handle_rx_release(void)
     struct domain *d = current->domain;
     struct ffa_ctx *ctx = d->arch.tee;
 
-    spin_lock(&ctx->lock);
+    if ( !spin_trylock(&ctx->rx_lock) )
+        return FFA_RET_BUSY;
+
     if ( !ctx->page_count || ctx->rx_is_free )
         goto out;
     ret = FFA_RET_OK;
     ctx->rx_is_free = true;
 out:
-    spin_unlock(&ctx->lock);
+    spin_unlock(&ctx->rx_lock);
 
     return ret;
 }
@@ -947,21 +958,43 @@ static void put_shm_pages(struct ffa_shm_mem *shm)
     }
 }
 
+static bool inc_ctx_shm_count(struct ffa_ctx *ctx)
+{
+    bool ret = true;
+
+    spin_lock(&ctx->lock);
+    if (ctx->shm_count >= FFA_MAX_SHM_COUNT)
+        ret = false;
+    else
+        ctx->shm_count++;
+    spin_unlock(&ctx->lock);
+
+    return ret;
+}
+
+static void dec_ctx_shm_count(struct ffa_ctx *ctx)
+{
+    spin_lock(&ctx->lock);
+    ASSERT(ctx->shm_count > 0);
+    ctx->shm_count--;
+    spin_unlock(&ctx->lock);
+}
+
 static struct ffa_shm_mem *alloc_ffa_shm_mem(struct ffa_ctx *ctx,
                                              unsigned int page_count)
 {
     struct ffa_shm_mem *shm;
 
-    if ( page_count >= FFA_MAX_SHM_PAGE_COUNT ||
-         ctx->shm_count >= FFA_MAX_SHM_COUNT )
+    if ( page_count >= FFA_MAX_SHM_PAGE_COUNT )
+        return NULL;
+    if ( !inc_ctx_shm_count(ctx) )
         return NULL;
 
     shm = xzalloc_flex_struct(struct ffa_shm_mem, pages, page_count);
     if ( shm )
-    {
-        ctx->shm_count++;
         shm->page_count = page_count;
-    }
+    else
+        dec_ctx_shm_count(ctx);
 
     return shm;
 }
@@ -971,8 +1004,7 @@ static void free_ffa_shm_mem(struct ffa_ctx *ctx, struct ffa_shm_mem *shm)
     if ( !shm )
         return;
 
-    ASSERT(ctx->shm_count > 0);
-    ctx->shm_count--;
+    dec_ctx_shm_count(ctx);
     put_shm_pages(shm);
     xfree(shm);
 }
@@ -1180,7 +1212,11 @@ static void handle_mem_share(struct cpu_user_regs *regs)
         goto out_set_ret;
     }
 
-    spin_lock(&ctx->lock);
+    if ( !spin_trylock(&ctx->tx_lock) )
+    {
+        ret = FFA_RET_BUSY;
+        goto out_set_ret;
+    }
 
     if ( frag_len > ctx->page_count * FFA_PAGE_SIZE )
         goto out_unlock;
@@ -1272,7 +1308,9 @@ static void handle_mem_share(struct cpu_user_regs *regs)
     if ( ret )
         goto out;
 
+    spin_lock(&ctx->lock);
     list_add_tail(&shm->list, &ctx->shm_list);
+    spin_unlock(&ctx->lock);
 
     uint64_to_regpair(&handle_hi, &handle_lo, shm->handle);
 
@@ -1280,13 +1318,25 @@ out:
     if ( ret )
         free_ffa_shm_mem(ctx, shm);
 out_unlock:
-    spin_unlock(&ctx->lock);
+    spin_unlock(&ctx->tx_lock);
 
 out_set_ret:
     if ( ret == 0)
             set_regs_success(regs, handle_lo, handle_hi);
     else
             set_regs_error(regs, ret);
+}
+
+/* Must only be called with ctx->lock held */
+static struct ffa_shm_mem *find_shm_mem(struct ffa_ctx *ctx, uint64_t handle)
+{
+    struct ffa_shm_mem *shm;
+
+    list_for_each_entry(shm, &ctx->shm_list, list)
+        if ( shm->handle == handle )
+            return shm;
+
+    return NULL;
 }
 
 static int handle_mem_reclaim(uint64_t handle, uint32_t flags)
@@ -1299,29 +1349,26 @@ static int handle_mem_reclaim(uint64_t handle, uint32_t flags)
     int ret;
 
     spin_lock(&ctx->lock);
-    list_for_each_entry(shm, &ctx->shm_list, list)
-    {
-        if ( shm->handle == handle )
-            goto found_it;
-    }
-    shm = NULL;
-    ret = FFA_RET_INVALID_PARAMETERS;
-    goto out;
-found_it:
+    shm = find_shm_mem(ctx, handle);
+    if ( shm )
+        list_del(&shm->list);
+    spin_unlock(&ctx->lock);
+    if ( !shm )
+        return FFA_RET_INVALID_PARAMETERS;
 
     uint64_to_regpair(&handle_hi, &handle_lo, handle);
     ret = ffa_mem_reclaim(handle_lo, handle_hi, flags);
+
     if ( ret )
     {
-        shm = NULL;
-        goto out;
+        spin_lock(&ctx->lock);
+        list_add_tail(&shm->list, &ctx->shm_list);
+        spin_unlock(&ctx->lock);
     }
-
-    list_del(&shm->list);
-
-out:
-    free_ffa_shm_mem(ctx, shm);
-    spin_unlock(&ctx->lock);
+    else
+    {
+        free_ffa_shm_mem(ctx, shm);
+    }
 
     return ret;
 }
