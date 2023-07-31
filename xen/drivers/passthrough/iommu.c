@@ -25,10 +25,10 @@
 unsigned int __read_mostly iommu_dev_iotlb_timeout = 1000;
 integer_param("iommu_dev_iotlb_timeout", iommu_dev_iotlb_timeout);
 
-bool_t __initdata iommu_enable = 1;
-bool_t __read_mostly iommu_enabled;
-bool_t __read_mostly force_iommu;
-bool_t __read_mostly iommu_verbose;
+bool __initdata iommu_enable = 1;
+bool __read_mostly iommu_enabled;
+bool __read_mostly force_iommu;
+bool __read_mostly iommu_verbose;
 static bool_t __read_mostly iommu_crash_disable;
 
 #define IOMMU_quarantine_none         0 /* aka false */
@@ -57,7 +57,7 @@ int8_t __hwdom_initdata iommu_hwdom_reserved = -1;
 bool __read_mostly iommu_hap_pt_share = true;
 #endif
 
-bool_t __read_mostly iommu_debug;
+bool __read_mostly iommu_debug;
 
 DEFINE_PER_CPU(bool_t, iommu_dont_flush_iotlb);
 
