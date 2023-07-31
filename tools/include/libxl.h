@@ -293,6 +293,11 @@
 #define LIBXL_HAVE_BUILDINFO_ARCH_ARM_TEE 1
 
 /*
+ * arch_arm.tee field in libxl_domain_build_info has ffa value.
+ */
+#define LIBXL_HAVE_BUILDINFO_ARCH_ARM_TEE_FFA 1
+
+/*
  * libxl_domain_build_info has the arch_arm.sve_vl field.
  */
 #define LIBXL_HAVE_BUILDINFO_ARCH_ARM_SVE_VL 1
