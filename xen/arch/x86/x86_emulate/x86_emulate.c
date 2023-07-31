@@ -8408,8 +8408,6 @@ x86_emulate(
         generate_exception(X86_EXC_MF);
     if ( stub_exn.info.fields.trapnr == X86_EXC_XM )
     {
-        unsigned long cr4;
-
         if ( !ops->read_cr || ops->read_cr(4, &cr4, ctxt) != X86EMUL_OKAY )
             cr4 = X86_CR4_OSXMMEXCPT;
         generate_exception(cr4 & X86_CR4_OSXMMEXCPT ? X86_EXC_XM : X86_EXC_UD);
