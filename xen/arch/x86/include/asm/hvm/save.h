@@ -47,30 +47,32 @@ void _hvm_read_entry(struct hvm_domain_context *h,
  * Unmarshalling: check, then copy. Evaluates to zero on success. This load
  * function requires the save entry to be the same size as the dest structure.
  */
-#define _hvm_load_entry(_x, _h, _dst, _strict) ({                       \
-    int r;                                                              \
-    struct hvm_save_descriptor *desc                                    \
-        = (struct hvm_save_descriptor *)&(_h)->data[(_h)->cur];         \
-    if ( (r = _hvm_check_entry((_h), HVM_SAVE_CODE(_x),                 \
-               HVM_SAVE_LENGTH(_x), (_strict))) == 0 )                  \
+#define _hvm_load_entry(x, h, dst, strict) ({                           \
+    int r_;                                                             \
+    struct hvm_save_descriptor *desc_                                   \
+        = (struct hvm_save_descriptor *)&(h)->data[(h)->cur];           \
+    if ( (r_ = _hvm_check_entry(h, HVM_SAVE_CODE(x),                    \
+                                HVM_SAVE_LENGTH(x), strict)) == 0 )     \
     {                                                                   \
-        _hvm_read_entry((_h), (_dst), HVM_SAVE_LENGTH(_x));             \
-        if ( HVM_SAVE_HAS_COMPAT(_x) &&                                 \
-             desc->length != HVM_SAVE_LENGTH(_x) )                      \
-            r = HVM_SAVE_FIX_COMPAT(_x, (_dst), desc->length);          \
+        _hvm_read_entry(h, dst, HVM_SAVE_LENGTH(x));                    \
+        if ( HVM_SAVE_HAS_COMPAT(x) &&                                  \
+             desc_->length != HVM_SAVE_LENGTH(x) )                      \
+            r_ = HVM_SAVE_FIX_COMPAT(x, dst, desc_->length);            \
     }                                                                   \
-    else if (HVM_SAVE_HAS_COMPAT(_x)                                    \
-             && (r = _hvm_check_entry((_h), HVM_SAVE_CODE(_x),          \
-                       HVM_SAVE_LENGTH_COMPAT(_x), (_strict))) == 0 ) { \
-        _hvm_read_entry((_h), (_dst), HVM_SAVE_LENGTH_COMPAT(_x));      \
-        r = HVM_SAVE_FIX_COMPAT(_x, (_dst), desc->length);              \
+    else if ( HVM_SAVE_HAS_COMPAT(x) &&                                 \
+              (r_ = _hvm_check_entry(h, HVM_SAVE_CODE(x),               \
+                                     HVM_SAVE_LENGTH_COMPAT(x),         \
+                                     strict)) == 0 )                    \
+    {                                                                   \
+        _hvm_read_entry(h, dst, HVM_SAVE_LENGTH_COMPAT(x));             \
+        r_ = HVM_SAVE_FIX_COMPAT(x, dst, desc_->length);                \
     }                                                                   \
-    r; })
+    r_; })
 
-#define hvm_load_entry(_x, _h, _dst)            \
-    _hvm_load_entry(_x, _h, _dst, 1)
-#define hvm_load_entry_zeroextend(_x, _h, _dst) \
-    _hvm_load_entry(_x, _h, _dst, 0)
+#define hvm_load_entry(x, h, dst)            \
+    _hvm_load_entry(x, h, dst, true)
+#define hvm_load_entry_zeroextend(x, h, dst) \
+    _hvm_load_entry(x, h, dst, false)
 
 /* Unmarshalling: what is the instance ID of the next entry? */
 static inline unsigned int hvm_load_instance(const struct hvm_domain_context *h)
