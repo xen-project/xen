@@ -650,12 +650,12 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
     struct pci_seg *pseg;
     struct pci_dev *pdev;
     unsigned int slot = PCI_SLOT(devfn), func = PCI_FUNC(devfn);
-    const char *pdev_type;
+    const char *type;
     int ret;
     bool pf_is_extfn = false;
 
     if ( !info )
-        pdev_type = "device";
+        type = "device";
     else if ( info->is_virtfn )
     {
         pcidevs_lock();
@@ -668,12 +668,12 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
         if ( !pdev )
             pci_add_device(seg, info->physfn.bus, info->physfn.devfn,
                            NULL, node);
-        pdev_type = "virtual function";
+        type = "virtual function";
     }
     else if ( info->is_extfn )
-        pdev_type = "extended function";
+        type = "extended function";
     else
-        pdev_type = "device";
+        type = "device";
 
     ret = xsm_resource_plug_pci(XSM_PRIV, (seg << 16) | (bus << 8) | devfn);
     if ( ret )
@@ -780,7 +780,7 @@ out:
     pcidevs_unlock();
     if ( !ret )
     {
-        printk(XENLOG_DEBUG "PCI add %s %pp\n", pdev_type,  &pdev->sbdf);
+        printk(XENLOG_DEBUG "PCI add %s %pp\n", type, &pdev->sbdf);
         while ( pdev->phantom_stride )
         {
             func += pdev->phantom_stride;
