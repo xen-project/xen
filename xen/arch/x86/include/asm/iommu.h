@@ -84,7 +84,8 @@ struct iommu_init_ops {
 
 extern const struct iommu_init_ops *iommu_init_ops;
 
-void iommu_update_ire_from_apic(unsigned int apic, unsigned int reg, unsigned int value);
+void iommu_update_ire_from_apic(unsigned int apic, unsigned int pin,
+                                uint64_t rte);
 unsigned int iommu_read_apic_from_ire(unsigned int apic, unsigned int reg);
 int iommu_setup_hpet_msi(struct msi_desc *);
 

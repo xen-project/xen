@@ -158,9 +158,9 @@ int iommu_enable_x2apic(void)
 }
 
 void iommu_update_ire_from_apic(
-    unsigned int apic, unsigned int reg, unsigned int value)
+    unsigned int apic, unsigned int pin, uint64_t rte)
 {
-    iommu_vcall(&iommu_ops, update_ire_from_apic, apic, reg, value);
+    iommu_vcall(&iommu_ops, update_ire_from_apic, apic, pin, rte);
 }
 
 unsigned int iommu_read_apic_from_ire(unsigned int apic, unsigned int reg)

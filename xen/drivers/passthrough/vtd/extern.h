@@ -92,7 +92,7 @@ int cf_check intel_iommu_get_reserved_device_memory(
 unsigned int cf_check io_apic_read_remap_rte(
     unsigned int apic, unsigned int reg);
 void cf_check io_apic_write_remap_rte(
-    unsigned int apic, unsigned int reg, unsigned int value);
+    unsigned int apic, unsigned int pin, uint64_t rte);
 
 struct msi_desc;
 struct msi_msg;

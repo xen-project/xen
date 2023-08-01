@@ -275,10 +275,7 @@ void __ioapic_write_entry(
         __io_apic_write(apic, 0x10 + 2 * pin, eu.w1);
     }
     else
-    {
-        iommu_update_ire_from_apic(apic, 0x11 + 2 * pin, eu.w2);
-        iommu_update_ire_from_apic(apic, 0x10 + 2 * pin, eu.w1);
-    }
+        iommu_update_ire_from_apic(apic, pin, e.raw);
 }
 
 static void ioapic_write_entry(
