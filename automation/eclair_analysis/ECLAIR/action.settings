@@ -73,7 +73,7 @@ gitlab)
         headCommitId="${CI_COMMIT_SHA}"
         baseCommitId="${CI_MERGE_REQUEST_DIFF_BASE_SHA}"
         ;;
-    push | pipeline | web)
+    push | pipeline | web | schedule)
         event=push
         if [ -n "${CI_COMMIT_BRANCH:-}" ]; then
             ref_kind=branch
