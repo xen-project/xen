@@ -41,7 +41,7 @@ github)
     push | workflow_dispatch)
         event=push
         # Extract the branch name from "refs/heads/<branch>"
-        branch="${GITHUB_REF#refs/heads/}"
+        ref="${GITHUB_REF#refs/heads/}"
         headCommitId="${GITHUB_SHA}"
         pushUser="${GITHUB_ACTOR}"
         ;;
@@ -75,7 +75,13 @@ gitlab)
         ;;
     push | pipeline | web)
         event=push
-        branch="${CI_COMMIT_BRANCH}"
+        if [ -n "${CI_COMMIT_BRANCH:-}" ]; then
+            ref_kind=branch
+            ref="${CI_COMMIT_BRANCH}"
+        else
+            ref_kind=tag
+            ref="${CI_COMMIT_TAG}"
+        fi
         headCommitId="${CI_COMMIT_SHA}"
         pushUser="${GITLAB_USER_NAME}"
         ;;
@@ -99,7 +105,7 @@ jenkins)
     jenkinsBotToken="${ECLAIR_BOT_TOKEN:-}"
 
     event=push
-    branch="${GIT_BRANCH}"
+    ref="${GIT_BRANCH}"
     headCommitId="${GIT_COMMIT}"
     pushUser=$(git show --pretty='format:%aN' -s)
     ;;
@@ -111,7 +117,7 @@ esac
 
 if [ "${event}" = "push" ] && [ -n "${autoPRBranch:-}" ]; then
     # AUTO PR Feature enabled
-    if ! [ "${branch}" = "${autoPRBranch}" ] ||
+    if ! [ "${ref}" = "${autoPRBranch}" ] ||
         ! [ "${repository}" = "${autoPRRepository}" ]; then
         event=auto_pull_request
     fi
@@ -123,17 +129,17 @@ pull_request)
     jobHeadline="ECLAIR ${ANALYSIS_KIND} on repository ${repository}: ${pullRequestUser} wants to merge ${pullRequestHeadRepo}:${pullRequestHeadRef} (${headCommitId}) into ${pullRequestBaseRef} (${baseCommitId})"
     ;;
 push)
-    subDir="${branch}"
-    jobHeadline="ECLAIR ${ANALYSIS_KIND} on repository ${repository}: branch ${branch} (${headCommitId})"
-    badgeLabel="ECLAIR ${ANALYSIS_KIND} ${branch}${variantHeadline} #${jobId}"
+    subDir="${ref}"
+    jobHeadline="ECLAIR ${ANALYSIS_KIND} on repository ${repository}: ${ref_kind} ${ref} (${headCommitId})"
+    badgeLabel="ECLAIR ${ANALYSIS_KIND} ${ref}${variantHeadline} #${jobId}"
     ;;
 auto_pull_request)
     git remote remove autoPRRemote || true
     git remote add autoPRRemote "${autoPRRemoteUrl}"
     git fetch -q autoPRRemote
-    subDir="${branch}"
+    subDir="${ref}"
     baseCommitId=$(git merge-base "autoPRRemote/${autoPRBranch}" HEAD)
-    jobHeadline="ECLAIR ${ANALYSIS_KIND} on repository ${repository}: ${pushUser} wants to merge ${repository}:${branch} (${headCommitId}) into ${autoPRRepository}/${autoPRBranch} (${baseCommitId})"
+    jobHeadline="ECLAIR ${ANALYSIS_KIND} on repository ${repository}: ${pushUser} wants to merge ${repository}:${ref} (${headCommitId}) into ${autoPRRepository}/${autoPRBranch} (${baseCommitId})"
     ;;
 *)
     echo "Unexpected event ${event}" >&2
