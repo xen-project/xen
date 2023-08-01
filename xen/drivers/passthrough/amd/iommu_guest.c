@@ -38,12 +38,12 @@
         (reg)->hi = (val) >> 32; \
     } while (0)
 
-static unsigned int machine_bdf(struct domain *d, uint16_t guest_bdf)
+static unsigned int get_machine_bdf(struct domain *d, uint16_t guest_bdf)
 {
     return guest_bdf;
 }
 
-static uint16_t guest_bdf(struct domain *d, uint16_t machine_bdf)
+static uint16_t get_guest_bdf(struct domain *d, uint16_t machine_bdf)
 {
     return machine_bdf;
 }
@@ -195,7 +195,7 @@ void guest_iommu_add_ppr_log(struct domain *d, u32 entry[])
     log = map_domain_page(_mfn(mfn)) + (tail & ~PAGE_MASK);
 
     /* Convert physical device id back into virtual device id */
-    gdev_id = guest_bdf(d, iommu_get_devid_from_cmd(entry[0]));
+    gdev_id = get_guest_bdf(d, iommu_get_devid_from_cmd(entry[0]));
     iommu_set_devid_to_cmd(&entry[0], gdev_id);
 
     memcpy(log, entry, sizeof(ppr_entry_t));
@@ -245,7 +245,7 @@ void guest_iommu_add_event_log(struct domain *d, u32 entry[])
     log = map_domain_page(_mfn(mfn)) + (tail & ~PAGE_MASK);
 
     /* re-write physical device id into virtual device id */
-    dev_id = guest_bdf(d, iommu_get_devid_from_cmd(entry[0]));
+    dev_id = get_guest_bdf(d, iommu_get_devid_from_cmd(entry[0]));
     iommu_set_devid_to_cmd(&entry[0], dev_id);
     memcpy(log, entry, sizeof(event_entry_t));
 
@@ -268,7 +268,7 @@ static int do_complete_ppr_request(struct domain *d, cmd_entry_t *cmd)
     uint16_t dev_id;
     struct amd_iommu *iommu;
 
-    dev_id = machine_bdf(d, iommu_get_devid_from_cmd(cmd->data[0]));
+    dev_id = get_machine_bdf(d, iommu_get_devid_from_cmd(cmd->data[0]));
     iommu = find_iommu_for_device(0, dev_id);
 
     if ( !iommu )
@@ -320,7 +320,7 @@ static int do_invalidate_iotlb_pages(struct domain *d, cmd_entry_t *cmd)
     struct amd_iommu *iommu;
     uint16_t dev_id;
 
-    dev_id = machine_bdf(d, iommu_get_devid_from_cmd(cmd->data[0]));
+    dev_id = get_machine_bdf(d, iommu_get_devid_from_cmd(cmd->data[0]));
 
     iommu = find_iommu_for_device(0, dev_id);
     if ( !iommu )
@@ -396,7 +396,7 @@ static int do_invalidate_dte(struct domain *d, cmd_entry_t *cmd)
 
     g_iommu = domain_iommu(d);
     gbdf = iommu_get_devid_from_cmd(cmd->data[0]);
-    mbdf = machine_bdf(d, gbdf);
+    mbdf = get_machine_bdf(d, gbdf);
 
     /* Guest can only update DTEs for its passthru devices */
     if ( mbdf == 0 || gbdf == 0 )
