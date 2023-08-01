@@ -138,7 +138,9 @@ auto_pull_request)
     git remote add autoPRRemote "${autoPRRemoteUrl}"
     git fetch -q autoPRRemote
     subDir="${ref}"
-    baseCommitId=$(git merge-base "autoPRRemote/${autoPRBranch}" HEAD)
+    if ! baseCommitId=$(git merge-base "autoPRRemote/${autoPRBranch}" HEAD); then
+        baseCommitId=no_merge_point
+    fi
     jobHeadline="ECLAIR ${ANALYSIS_KIND} on repository ${repository}: ${pushUser} wants to merge ${repository}:${ref} (${headCommitId}) into ${autoPRRepository}/${autoPRBranch} (${baseCommitId})"
     ;;
 *)
