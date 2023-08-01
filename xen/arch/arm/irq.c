@@ -175,10 +175,10 @@ static inline struct domain *irq_get_domain(struct irq_desc *desc)
     return irq_get_guest_info(desc)->d;
 }
 
-void irq_set_affinity(struct irq_desc *desc, const cpumask_t *cpu_mask)
+void irq_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
 {
     if ( desc != NULL )
-        desc->handler->set_affinity(desc, cpu_mask);
+        desc->handler->set_affinity(desc, mask);
 }
 
 int request_irq(unsigned int irq, unsigned int irqflags,

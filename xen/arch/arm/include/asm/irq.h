@@ -91,7 +91,7 @@ int platform_get_irq(const struct dt_device_node *device, int index);
 
 int platform_get_irq_byname(const struct dt_device_node *np, const char *name);
 
-void irq_set_affinity(struct irq_desc *desc, const cpumask_t *cpu_mask);
+void irq_set_affinity(struct irq_desc *desc, const cpumask_t *mask);
 
 /*
  * Use this helper in places that need to know whether the IRQ type is
