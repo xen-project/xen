@@ -49,5 +49,5 @@ const CHAR16 *wmemchr(const CHAR16 *s, CHAR16 c, UINTN n);
 void *ebmalloc(size_t size);
 void free_ebmalloc_unused_mem(void);
 
-const void *pe_find_section(const void *image_base, const size_t image_size,
+const void *pe_find_section(const void *image, const UINTN image_size,
                             const CHAR16 *section_name, UINTN *size_out);

@@ -39,11 +39,11 @@ unsigned long efi_get_time(void);
 void efi_halt_system(void);
 void efi_reset_system(bool warm);
 #ifndef COMPAT
-int efi_get_info(uint32_t idx, union xenpf_efi_info *);
-int efi_runtime_call(struct xenpf_efi_runtime_call *);
+int efi_get_info(uint32_t idx, union xenpf_efi_info *info);
+int efi_runtime_call(struct xenpf_efi_runtime_call *op);
 #endif
-int efi_compat_get_info(uint32_t idx, union compat_pf_efi_info *);
-int efi_compat_runtime_call(struct compat_pf_efi_runtime_call *);
+int efi_compat_get_info(uint32_t idx, union compat_pf_efi_info *info);
+int efi_compat_runtime_call(struct compat_pf_efi_runtime_call *op);
 
 #endif /* !__ASSEMBLY__ */
 
