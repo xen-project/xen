@@ -1420,7 +1420,7 @@ static void cf_check svm_inject_event(const struct x86_event *event)
      */
     if ( !((vmcb_get_efer(vmcb) & EFER_LMA) && vmcb->cs.l) )
     {
-        regs->rip = regs->eip;
+        regs->rip = (uint32_t)regs->rip;
         vmcb->nextrip = (uint32_t)vmcb->nextrip;
     }
 

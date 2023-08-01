@@ -4760,7 +4760,7 @@ out:
                 regs->rip = (long)(regs->rip << (64 - VADDR_BITS)) >>
                             (64 - VADDR_BITS);
             else
-                regs->rip = regs->eip;
+                regs->rip = (uint32_t)regs->rip;
         }
         else
             domain_crash(v->domain);

@@ -3861,7 +3861,7 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
 
             /* Zero the upper 32 bits of %rip if not in 64bit mode. */
             if ( !(hvm_long_mode_active(cur) && cs->l) )
-                regs->rip = regs->eip;
+                regs->rip = (uint32_t)regs->rip;
 
             add_taint(TAINT_HVM_FEP);
 

@@ -503,8 +503,8 @@ static inline void put_loop_count(
         if ( mode_64bit() && ad_bytes == 4 )                            \
         {                                                               \
             _regs.r(cx) = 0;                                            \
-            if ( using_si ) _regs.r(si) = _regs.esi;                    \
-            if ( using_di ) _regs.r(di) = _regs.edi;                    \
+            if ( using_si ) _regs.r(si) = (uint32_t)_regs.r(si);        \
+            if ( using_di ) _regs.r(di) = (uint32_t)_regs.r(di);        \
         }                                                               \
         goto complete_insn;                                             \
     }                                                                   \
@@ -1984,9 +1984,9 @@ x86_emulate(
     case 0x98: /* cbw/cwde/cdqe */
         switch ( op_bytes )
         {
-        case 2: _regs.ax = (int8_t)_regs.al; break; /* cbw */
+        case 2: _regs.ax = (int8_t)_regs.ax; break; /* cbw */
         case 4: _regs.r(ax) = (uint32_t)(int16_t)_regs.ax; break; /* cwde */
-        case 8: _regs.r(ax) = (int32_t)_regs.eax; break; /* cdqe */
+        case 8: _regs.r(ax) = (int32_t)_regs.r(ax); break; /* cdqe */
         }
         break;
 
@@ -8377,7 +8377,7 @@ x86_emulate(
 
     /* Zero the upper 32 bits of %rip if not in 64-bit mode. */
     if ( !mode_64bit() )
-        _regs.r(ip) = _regs.eip;
+        _regs.r(ip) = (uint32_t)_regs.r(ip);
 
     /* Should a singlestep #DB be raised? */
     if ( rc == X86EMUL_OKAY && singlestep && !ctxt->retire.mov_ss )
