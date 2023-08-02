@@ -858,7 +858,7 @@ int arch_domain_create(struct domain *d,
     }
 
     /* PV/PVH guests get an emulated PIT too for video BIOSes to use. */
-    pit_init(d, cpu_khz);
+    pit_init(d);
 
     /*
      * If the FPU does not save FCS/FDS then we can always

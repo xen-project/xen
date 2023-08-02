@@ -1252,7 +1252,7 @@ static void cf_check do_write_psr_msrs(void *data)
 {
     const struct cos_write_info *info = data;
     unsigned int i, index, cos = info->cos;
-    const struct psr_socket_info *socket_info =
+    const struct psr_socket_info *sock_info =
         get_socket_info(cpu_to_socket(smp_processor_id()));
 
     /*
@@ -1261,7 +1261,7 @@ static void cf_check do_write_psr_msrs(void *data)
      */
     for ( index = i = 0; i < ARRAY_SIZE(feat_props); i++ )
     {
-        struct feat_node *feat = socket_info->features[i];
+        struct feat_node *feat = sock_info->features[i];
         const struct feat_props *props = feat_props[i];
         unsigned int cos_num, j;
 

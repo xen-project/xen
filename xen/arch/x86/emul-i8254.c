@@ -495,7 +495,7 @@ void pit_reset(struct domain *d)
     spin_unlock(&pit->lock);
 }
 
-void pit_init(struct domain *d, unsigned long cpu_khz)
+void pit_init(struct domain *d)
 {
     PITState *pit = domain_vpit(d);
 
