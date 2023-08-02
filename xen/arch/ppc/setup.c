@@ -18,8 +18,13 @@ void __init noreturn start_xen(unsigned long r3, unsigned long r4,
     }
     else
     {
-        /* kexec boot: Unimplemented */
-        __builtin_trap();
+        /*
+         * kexec boot protocol
+         *
+         * TODO: This currently assumes an OPAL/PowerNV system, but it's also
+         * possible to be kexec'd on an OF system.
+         */
+        boot_opal_init((void *)r3);
     }
 
     early_printk("Hello, ppc64le!\n");

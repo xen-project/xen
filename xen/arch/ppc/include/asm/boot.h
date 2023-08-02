@@ -4,7 +4,10 @@
 
 #include <xen/types.h>
 
-/* a collection of interfaces used during boot. */
+/*
+ * OpenFirmware boot interfaces
+ */
+
 enum {
     OF_FAILURE = -1,
     OF_SUCCESS = 0,
@@ -19,5 +22,16 @@ struct of_service {
 
 int enter_of(struct of_service *args, unsigned long entry);
 void boot_of_init(unsigned long vec);
+
+/*
+ * OPAL boot interfaces
+ */
+
+struct opal {
+    uint64_t base;
+    uint64_t entry;
+};
+
+void boot_opal_init(const void *fdt);
 
 #endif /* _ASM_PPC_BOOT_H */

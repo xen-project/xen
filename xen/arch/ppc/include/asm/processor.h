@@ -133,6 +133,17 @@ struct cpu_user_regs
     uint32_t entry_vector;
 };
 
-#endif
+/*
+ * panic() isn't available at the moment so an infinite loop will be
+ * used temporarily.
+ * TODO: change it to panic()
+ */
+static inline void noreturn die(void)
+{
+    for ( ; ; )
+        HMT_very_low();
+}
+
+#endif /* __ASSEMBLY__ */
 
 #endif /* _ASM_PPC_PROCESSOR_H */
