@@ -17,6 +17,13 @@
     ori reg, reg, (val) @l;                                                  \
 
 /*
+ * Load the address of a symbol from the TOC into the specified GPR.
+ */
+#define LOAD_REG_ADDR(reg,name)                                              \
+    addis reg, %r2, name@toc@ha;                                             \
+    addi  reg, reg, name@toc@l
+
+/*
  * Depending on how we were booted, the CPU could be running in either
  * Little Endian or Big Endian mode. The following trampoline from Linux
  * cleverly uses an instruction that encodes to a NOP if the CPU's

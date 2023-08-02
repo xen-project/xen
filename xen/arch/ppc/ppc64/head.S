@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include <asm/asm-defns.h>
+#include <asm/asm-offsets.h>
 
     .section .text.header, "ax", %progbits
 
@@ -11,16 +12,19 @@ ENTRY(start)
     FIXUP_ENDIAN
 
     /* set up the TOC pointer */
-    LOAD_IMM32(%r2, .TOC.)
+    bcl     20, 31, 1f
+1:  mflr    %r12
+    addis   %r2, %r12, .TOC.-1b@ha
+    addi    %r2, %r2, .TOC.-1b@l
 
     /* set up the initial stack */
-    LOAD_IMM32(%r1, cpu0_boot_stack)
+    LOAD_REG_ADDR(%r1, cpu0_boot_stack)
     li      %r11, 0
     stdu    %r11, -STACK_FRAME_OVERHEAD(%r1)
 
     /* clear .bss */
-    LOAD_IMM32(%r14, __bss_start)
-    LOAD_IMM32(%r15, __bss_end)
+    LOAD_REG_ADDR(%r14, __bss_start)
+    LOAD_REG_ADDR(%r15, __bss_end)
 1:
     std     %r11, 0(%r14)
     addi    %r14, %r14, 8

@@ -5,7 +5,7 @@ ppc-march-$(CONFIG_POWER_ISA_2_07B) := power8
 ppc-march-$(CONFIG_POWER_ISA_3_00) := power9
 
 CFLAGS += -m64 -mlittle-endian -mcpu=$(ppc-march-y)
-CFLAGS += -mstrict-align -mcmodel=large -mabi=elfv2 -mno-altivec -mno-vsx
+CFLAGS += -mstrict-align -mcmodel=medium -mabi=elfv2 -fPIC -mno-altivec -mno-vsx -msoft-float
 
 LDFLAGS += -m elf64lppc
 
