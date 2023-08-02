@@ -125,8 +125,9 @@ struct lock_profile_qhead {
     } while(0)
 
 void _lock_profile_register_struct(
-    int32_t, struct lock_profile_qhead *, int32_t);
-void _lock_profile_deregister_struct(int32_t, struct lock_profile_qhead *);
+    int32_t type, struct lock_profile_qhead *qhead, int32_t idx);
+void _lock_profile_deregister_struct(int32_t type,
+    struct lock_profile_qhead *qhead);
 
 #define lock_profile_register_struct(type, ptr, idx)                          \
     _lock_profile_register_struct(type, &((ptr)->profile_head), idx)
@@ -178,7 +179,7 @@ typedef struct spinlock {
 #define spin_lock_init(l) (*(l) = (spinlock_t)SPIN_LOCK_UNLOCKED)
 
 void _spin_lock(spinlock_t *lock);
-void _spin_lock_cb(spinlock_t *lock, void (*cond)(void *), void *data);
+void _spin_lock_cb(spinlock_t *lock, void (*cb)(void *), void *data);
 void _spin_lock_irq(spinlock_t *lock);
 unsigned long _spin_lock_irqsave(spinlock_t *lock);
 
