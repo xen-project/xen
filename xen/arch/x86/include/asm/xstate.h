@@ -100,7 +100,7 @@ int __must_check validate_xstate(const struct domain *d,
                                  uint64_t xcr0, uint64_t xcr0_accum,
                                  const struct xsave_hdr *hdr);
 int __must_check handle_xsetbv(u32 index, u64 new_bv);
-void expand_xsave_states(struct vcpu *v, void *dest, unsigned int size);
+void expand_xsave_states(const struct vcpu *v, void *dest, unsigned int size);
 void compress_xsave_states(struct vcpu *v, const void *src, unsigned int size);
 
 /* extended state init and cleanup functions */

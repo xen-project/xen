@@ -172,7 +172,7 @@ static void setup_xstate_comp(uint16_t *comp_offsets,
  * It is the callers responsibility to ensure that there is xsave state to
  * serialise, and that the provided buffer is exactly the right size.
  */
-void expand_xsave_states(struct vcpu *v, void *dest, unsigned int size)
+void expand_xsave_states(const struct vcpu *v, void *dest, unsigned int size)
 {
     const struct xsave_struct *xsave = v->arch.xsave_area;
     const void *src;
