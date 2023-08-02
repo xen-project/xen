@@ -6,6 +6,7 @@
 
 #include <xen/macros.h>
 #include <asm/processor.h>
+#include <asm/boot.h>
 
 #define DEFINE(_sym, _val)                                                  \
     asm volatile ( "\n.ascii\"==>#define " #_sym " %0 /* " #_val " */<==\"" \
@@ -46,6 +47,9 @@ void __dummy__(void)
     OFFSET(UREGS_cr, struct cpu_user_regs, cr);
     OFFSET(UREGS_fpscr, struct cpu_user_regs, fpscr);
     DEFINE(UREGS_sizeof, sizeof(struct cpu_user_regs));
+
+    OFFSET(OPAL_base, struct opal, base);
+    OFFSET(OPAL_entry, struct opal, entry);
 }
 
 /*

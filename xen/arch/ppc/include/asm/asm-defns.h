@@ -2,6 +2,8 @@
 #ifndef _ASM_PPC_ASM_DEFNS_H
 #define _ASM_PPC_ASM_DEFNS_H
 
+#include <asm/asm-offsets.h>
+
 /*
  * Load a 64-bit immediate value into the specified GPR.
  */
@@ -22,6 +24,18 @@
 #define LOAD_REG_ADDR(reg,name)                                              \
     addis reg, %r2, name@toc@ha;                                             \
     addi  reg, reg, name@toc@l
+
+/*
+ * Declare a global assembly function with a proper TOC setup prologue
+ */
+#define _GLOBAL_TOC(name)                                                   \
+    .balign 4;                                                              \
+    .type name, @function;                                                  \
+    .globl name;                                                            \
+name:                                                                       \
+0:  addis %r2, %r12, (.TOC.-0b)@ha;                                         \
+    addi  %r2, %r2, (.TOC.-0b)@l;                                           \
+    .localentry name, .-name
 
 /*
  * Depending on how we were booted, the CPU could be running in either
