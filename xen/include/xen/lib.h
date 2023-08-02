@@ -78,7 +78,7 @@ debugtrace_printk(const char *fmt, ...) {}
 
 /* Allows us to use '%p' as general-purpose machine-word format char. */
 #define _p(_x) ((void *)(unsigned long)(_x))
-extern void printk(const char *format, ...)
+extern void printk(const char *fmt, ...)
     __attribute__ ((format (printf, 1, 2)));
 
 #define printk_once(fmt, args...)               \
@@ -91,9 +91,9 @@ extern void printk(const char *format, ...)
     }                                           \
 })
 
-extern void guest_printk(const struct domain *d, const char *format, ...)
+extern void guest_printk(const struct domain *d, const char *fmt, ...)
     __attribute__ ((format (printf, 2, 3)));
-extern void noreturn panic(const char *format, ...)
+extern void noreturn panic(const char *fmt, ...)
     __attribute__ ((format (printf, 1, 2)));
 extern int __printk_ratelimit(int ratelimit_ms, int ratelimit_burst);
 extern int printk_ratelimit(void);
@@ -173,7 +173,7 @@ extern char *print_tainted(char *str);
 extern void add_taint(unsigned int taint);
 
 struct cpu_user_regs;
-void cf_check dump_execstate(struct cpu_user_regs *);
+void cf_check dump_execstate(struct cpu_user_regs *regs);
 
 void init_constructors(void);
 
