@@ -424,9 +424,7 @@ static void dbgp_issue_command(struct ehci_dbgp *dbgp, u32 ctrl,
          * checks to see if ACPI or some other initialization also
          * reset the EHCI debug port.
          */
-        u32 ctrl = readl(&dbgp->ehci_debug->control);
-
-        if ( ctrl & DBGP_ENABLED )
+        if ( readl(&dbgp->ehci_debug->control) & DBGP_ENABLED )
         {
             cmd |= CMD_RUN;
             writel(cmd, &dbgp->ehci_regs->command);

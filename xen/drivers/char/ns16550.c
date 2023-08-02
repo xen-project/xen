@@ -1388,7 +1388,7 @@ string_param("com1", opt_com1);
 string_param("com2", opt_com2);
 
 enum serial_param_type {
-    baud,
+    baud_rate,
     clock_hz,
     data_bits,
     io_base,
@@ -1416,7 +1416,7 @@ struct serial_param_var {
  * com_console_options for serial port com1 and com2.
  */
 static const struct serial_param_var __initconst sp_vars[] = {
-    {"baud", baud},
+    {"baud", baud_rate},
     {"clock-hz", clock_hz},
     {"data-bits", data_bits},
     {"io-base", io_base},
@@ -1596,7 +1596,7 @@ static bool __init parse_namevalue_pairs(char *str, struct ns16550 *uart)
 
         switch ( get_token(token, &param_value) )
         {
-        case baud:
+        case baud_rate:
             uart->baud = simple_strtoul(param_value, NULL, 0);
             break;
 
