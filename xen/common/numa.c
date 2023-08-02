@@ -15,7 +15,7 @@
 
 static nodemask_t __initdata processor_nodes_parsed;
 static nodemask_t __initdata memory_nodes_parsed;
-static struct node __initdata nodes[MAX_NUMNODES];
+static struct node __initdata numa_nodes[MAX_NUMNODES];
 
 static unsigned int __ro_after_init num_node_memblks;
 static struct node __ro_after_init node_memblk_range[NR_NODE_MEMBLKS];
@@ -117,7 +117,7 @@ static enum conflicts __init conflicting_memblks(
 
 static void __init cutoff_node(nodeid_t i, paddr_t start, paddr_t end)
 {
-    struct node *nd = &nodes[i];
+    struct node *nd = &numa_nodes[i];
 
     if ( nd->start < start )
     {
@@ -157,7 +157,7 @@ bool __init numa_update_node_memblks(nodeid_t node, unsigned int arch_nid,
     paddr_t end = start + size;
     paddr_t nd_start = start;
     paddr_t nd_end = end;
-    struct node *nd = &nodes[node];
+    struct node *nd = &numa_nodes[node];
 
     /*
      * For the node that already has some memory blocks, we will
@@ -292,17 +292,17 @@ static bool __init nodes_cover_memory(void)
         do {
             found = false;
             for_each_node_mask ( j, memory_nodes_parsed )
-                if ( start < nodes[j].end && end > nodes[j].start )
+                if ( start < numa_nodes[j].end && end > numa_nodes[j].start )
                 {
-                    if ( start >= nodes[j].start )
+                    if ( start >= numa_nodes[j].start )
                     {
-                        start = nodes[j].end;
+                        start = numa_nodes[j].end;
                         found = true;
                     }
 
-                    if ( end <= nodes[j].end )
+                    if ( end <= numa_nodes[j].end )
                     {
-                        end = nodes[j].start;
+                        end = numa_nodes[j].start;
                         found = true;
                     }
                 }
@@ -356,10 +356,10 @@ static bool __init numa_process_nodes(paddr_t start, paddr_t end)
     /* Finally register nodes */
     for_each_node_mask ( i, all_nodes_parsed )
     {
-        if ( nodes[i].end == nodes[i].start )
+        if ( numa_nodes[i].end == numa_nodes[i].start )
             printk(KERN_INFO "NUMA: node %u has no memory\n", i);
 
-        setup_node_bootmem(i, nodes[i].start, nodes[i].end);
+        setup_node_bootmem(i, numa_nodes[i].start, numa_nodes[i].end);
     }
 
     for ( i = 0; i < nr_cpu_ids; i++ )

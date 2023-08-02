@@ -81,6 +81,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             struct compat_memory_exchange xchg;
             struct compat_add_to_physmap atp;
             struct compat_add_to_physmap_batch atpb;
+            struct compat_remove_from_physmap xrfp;
             struct compat_vnuma_topology_info vnuma;
             struct compat_mem_access_op mao;
             struct compat_mem_acquire_resource mar;
@@ -321,12 +322,10 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
 
         case XENMEM_remove_from_physmap:
         {
-            struct compat_remove_from_physmap cmp;
-
-            if ( copy_from_guest(&cmp, compat, 1) )
+            if ( copy_from_guest(&cmp.xrfp, compat, 1) )
                 return -EFAULT;
 
-            XLAT_remove_from_physmap(nat.xrfp, &cmp);
+            XLAT_remove_from_physmap(nat.xrfp, &cmp.xrfp);
 
             break;
         }
