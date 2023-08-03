@@ -206,6 +206,8 @@
 
 #define MSR_VIRT_SPEC_CTRL                  0xc001011f /* Layout matches MSR_SPEC_CTRL */
 
+#define MSR_AMD_CSTATE_CFG                  0xc0010296
+
 /*
  * Legacy MSR constants in need of cleanup.  No new MSRs below this comment.
  */
