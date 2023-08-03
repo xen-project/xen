@@ -316,12 +316,16 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *policy, const char* str)
                 uint32_t index;
                 unsigned int reg;
             } msr;
-        };
+        } u;
     } feature_to_policy[] = {
 #define CPUID_ENTRY(l, s, r) \
-    { .type = FEAT_CPUID, .cpuid.leaf = l, .cpuid.subleaf = s, .cpuid.reg = r }
+    { .type = FEAT_CPUID, \
+      .u = { .cpuid.leaf = l, .cpuid.subleaf = s, .cpuid.reg = r } \
+    }
 #define MSR_ENTRY(i, r) \
-    { .type = FEAT_MSR, .msr.index = i, .msr.reg = r }
+    { .type = FEAT_MSR, \
+      .u = { .msr.index = i, .msr.reg = r } \
+    }
         CPUID_ENTRY(0x00000001, NA, CPUID_REG_EDX),
         CPUID_ENTRY(0x00000001, NA, CPUID_REG_ECX),
         CPUID_ENTRY(0x80000001, NA, CPUID_REG_EDX),
@@ -380,9 +384,9 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *policy, const char* str)
         struct cpuid_flags f;
 
         f.name = feat->name;
-        f.leaf = feature_to_policy[feat->bit / 32].cpuid.leaf;
-        f.subleaf = feature_to_policy[feat->bit / 32].cpuid.subleaf;
-        f.reg = feature_to_policy[feat->bit / 32].cpuid.reg;
+        f.leaf = feature_to_policy[feat->bit / 32].u.cpuid.leaf;
+        f.subleaf = feature_to_policy[feat->bit / 32].u.cpuid.subleaf;
+        f.reg = feature_to_policy[feat->bit / 32].u.cpuid.reg;
         f.bit = feat->bit % 32;
         f.length = 1;
 
@@ -393,10 +397,10 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *policy, const char* str)
     {
         unsigned int bit = feat->bit % 32;
 
-        if (feature_to_policy[feat->bit / 32].msr.reg == CPUID_REG_EDX)
+        if (feature_to_policy[feat->bit / 32].u.msr.reg == CPUID_REG_EDX)
             bit += 32;
 
-        return msr_add(policy, feature_to_policy[feat->bit / 32].msr.index,
+        return msr_add(policy, feature_to_policy[feat->bit / 32].u.msr.index,
                        bit, val);
     }
     }
