@@ -157,7 +157,7 @@ static int cpuid_add(libxl_cpuid_policy_list *policy,
     return 0;
 }
 
-static struct xc_msr *msr_find_match(libxl_cpuid_policy_list *pl, uint32_t index)
+static struct xc_msr *msr_find_match(libxl_cpuid_policy_list *pl, uint32_t idx)
 {
     unsigned int i = 0;
     libxl_cpuid_policy_list policy = *pl;
@@ -167,14 +167,14 @@ static struct xc_msr *msr_find_match(libxl_cpuid_policy_list *pl, uint32_t index
 
     if (policy->msr != NULL) {
         for (i = 0; policy->msr[i].index != XC_MSR_INPUT_UNUSED; i++) {
-            if (policy->msr[i].index == index) {
+            if (policy->msr[i].index == idx) {
                 return &policy->msr[i];
             }
         }
     }
 
     policy->msr = realloc(policy->msr, sizeof(struct xc_msr) * (i + 2));
-    policy->msr[i].index = index;
+    policy->msr[i].index = idx;
     memset(policy->msr[i].policy, 'x', ARRAY_SIZE(policy->msr[0].policy) - 1);
     policy->msr[i].policy[ARRAY_SIZE(policy->msr[0].policy) - 1] = '\0';
     policy->msr[i + 1].index = XC_MSR_INPUT_UNUSED;
@@ -182,10 +182,10 @@ static struct xc_msr *msr_find_match(libxl_cpuid_policy_list *pl, uint32_t index
     return &policy->msr[i];
 }
 
-static int msr_add(libxl_cpuid_policy_list *policy, uint32_t index, unsigned int bit,
-                   const char *val)
+static int msr_add(libxl_cpuid_policy_list *policy, uint32_t idx,
+                   unsigned int bit, const char *val)
 {
-    struct xc_msr *entry = msr_find_match(policy, index);
+    struct xc_msr *entry = msr_find_match(policy, idx);
 
     /* Only allow options taking a character for MSRs, no values allowed. */
     if (strlen(val) != 1)
