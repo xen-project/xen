@@ -1077,7 +1077,7 @@ static void svm_guest_osvw_init(struct domain *d)
      * Guests should see errata 400 and 415 as fixed (assuming that
      * HLT and IO instructions are intercepted).
      */
-    svm->osvw.length = min(max(3ul, osvw_length), 64ul);
+    svm->osvw.length = min(max(3UL, osvw_length), 64UL);
     svm->osvw.status = osvw_status & ~6;
 
     /*
@@ -1652,7 +1652,7 @@ static void svm_do_nested_pgfault(struct vcpu *v,
     else if ( pfec & NPT_PFEC_in_gpt )
         npfec.kind = npfec_kind_in_gpt;
 
-    ret = hvm_hap_nested_page_fault(gpa, ~0ul, npfec);
+    ret = hvm_hap_nested_page_fault(gpa, ~0UL, npfec);
 
     if ( tb_init_done )
     {
