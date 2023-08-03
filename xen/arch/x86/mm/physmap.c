@@ -72,7 +72,7 @@ int set_identity_p2m_entry(struct domain *d, unsigned long gfn,
         if ( !is_iommu_enabled(d) )
             return 0;
         return iommu_legacy_map(d, _dfn(gfn), _mfn(gfn),
-                                1ul << PAGE_ORDER_4K,
+                                1UL << PAGE_ORDER_4K,
                                 p2m_access_to_iommu_flags(p2ma));
     }
 
@@ -85,7 +85,7 @@ int clear_identity_p2m_entry(struct domain *d, unsigned long gfn)
     {
         if ( !is_iommu_enabled(d) )
             return 0;
-        return iommu_legacy_unmap(d, _dfn(gfn), 1ul << PAGE_ORDER_4K);
+        return iommu_legacy_unmap(d, _dfn(gfn), 1UL << PAGE_ORDER_4K);
     }
 
     return p2m_remove_identity_entry(d, gfn);

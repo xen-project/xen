@@ -392,7 +392,7 @@ int p2m_set_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
                   unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma)
 {
     bool hap = hap_enabled(p2m->domain);
-    unsigned long todo = 1ul << page_order;
+    unsigned long todo = 1UL << page_order;
     int set_rc, rc = 0;
 
     ASSERT(gfn_locked_by_me(p2m, gfn));
@@ -401,10 +401,10 @@ int p2m_set_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
     {
         unsigned long fn_mask = (!mfn_eq(mfn, INVALID_MFN) ? mfn_x(mfn) : 0) |
                                 gfn_x(gfn) | todo;
-        unsigned int order = (!(fn_mask & ((1ul << PAGE_ORDER_1G) - 1)) &&
+        unsigned int order = (!(fn_mask & ((1UL << PAGE_ORDER_1G) - 1)) &&
                               hap && hap_has_1gb)
                              ? PAGE_ORDER_1G
-                             : (!(fn_mask & ((1ul << PAGE_ORDER_2M) - 1)) &&
+                             : (!(fn_mask & ((1UL << PAGE_ORDER_2M) - 1)) &&
                                 (!hap || hap_has_2mb))
                                ? PAGE_ORDER_2M : PAGE_ORDER_4K;
 
@@ -412,10 +412,10 @@ int p2m_set_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
         if ( set_rc )
             rc = set_rc;
 
-        gfn = gfn_add(gfn, 1ul << order);
+        gfn = gfn_add(gfn, 1UL << order);
         if ( !mfn_eq(mfn, INVALID_MFN) )
-            mfn = mfn_add(mfn, 1ul << order);
-        todo -= 1ul << order;
+            mfn = mfn_add(mfn, 1UL << order);
+        todo -= 1UL << order;
     }
 
     return rc;
@@ -1407,7 +1407,7 @@ void np2m_flush_base(struct vcpu *v, unsigned long np2m_base)
     struct p2m_domain *p2m;
     unsigned int i;
 
-    np2m_base &= ~(0xfffull);
+    np2m_base &= ~(0xfffULL);
 
     nestedp2m_lock(d);
     for ( i = 0; i < MAX_NESTEDP2M; i++ )
@@ -1456,7 +1456,7 @@ p2m_get_nestedp2m_locked(struct vcpu *v)
     bool needs_flush = true;
 
     /* Mask out low bits; this avoids collisions with P2M_BASE_EADDR */
-    np2m_base &= ~(0xfffull);
+    np2m_base &= ~(0xfffULL);
 
     if (nv->nv_flushp2m && nv->nv_p2m) {
         nv->nv_p2m = NULL;
@@ -1614,8 +1614,8 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
          * Sanity check that l1_gfn can be used properly as a 4K mapping, even
          * if it mapped by a nested superpage.
          */
-        ASSERT((l2_gfn & ((1ul << l1_page_order) - 1)) ==
-               (l1_gfn & ((1ul << l1_page_order) - 1)));
+        ASSERT((l2_gfn & ((1UL << l1_page_order) - 1)) ==
+               (l1_gfn & ((1UL << l1_page_order) - 1)));
 
         return l1_gfn;
     }
