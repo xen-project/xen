@@ -838,7 +838,7 @@ int cf_check amd_iommu_quarantine_init(struct pci_dev *pdev, bool scratch_page)
 {
     struct domain_iommu *hd = dom_iommu(dom_io);
     unsigned long end_gfn =
-        1ul << (DEFAULT_DOMAIN_ADDRESS_WIDTH - PAGE_SHIFT);
+        1UL << (DEFAULT_DOMAIN_ADDRESS_WIDTH - PAGE_SHIFT);
     unsigned int level = amd_iommu_get_paging_mode(end_gfn);
     unsigned int req_id = get_dma_requestor_id(pdev->seg, pdev->sbdf.bdf);
     const struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(pdev->seg);

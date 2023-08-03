@@ -87,7 +87,7 @@ static uint64_t dte_get_gcr3_table(const struct amd_iommu_dte *dte)
 static void dte_set_gcr3_table(struct amd_iommu_dte *dte, uint16_t dom_id,
                                uint64_t addr, bool gv, uint8_t glx)
 {
-#define GCR3_MASK(hi, lo) (((1ul << ((hi) + 1)) - 1) & ~((1ul << (lo)) - 1))
+#define GCR3_MASK(hi, lo) (((1UL << ((hi) + 1)) - 1) & ~((1UL << (lo)) - 1))
 
     /* I bit must be set when gcr3 is enabled */
     dte->i = true;

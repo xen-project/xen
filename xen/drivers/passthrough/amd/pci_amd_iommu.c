@@ -368,7 +368,7 @@ static int cf_check amd_iommu_domain_init(struct domain *d)
      */
     hd->arch.amd.paging_mode = max(amd_iommu_get_paging_mode(
             is_hvm_domain(d)
-            ? 1ul << (DEFAULT_DOMAIN_ADDRESS_WIDTH - PAGE_SHIFT)
+            ? 1UL << (DEFAULT_DOMAIN_ADDRESS_WIDTH - PAGE_SHIFT)
             : get_upper_mfn_bound() + 1),
         amd_iommu_min_paging_mode);
 
