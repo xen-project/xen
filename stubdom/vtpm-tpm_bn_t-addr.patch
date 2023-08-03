@@ -1,0 +1,18 @@
+All tpm_bn_t's are a 1-element array of one form or another, meaning the code
+below is tautological and triggers -Werror=address.
+
+diff -ru tpm_emulator-x86_64.orig/crypto/rsa.c tpm_emulator-x86_64/crypto/rsa.c
+--- tpm_emulator-x86_64.orig/crypto/rsa.c	2011-12-20 18:30:06.000000000 +0000
++++ tpm_emulator-x86_64/crypto/rsa.c	2023-08-03 20:44:17.379166284 +0100
+@@ -53,10 +53,7 @@
+   tpm_bn_init2(c, key->size);
+   tpm_bn_import(p, in_len, 1, in);
+ 
+-  if (!key->p || !key->q || !key->u) {
+-    /* c = p ^ d mod n */
+-    tpm_bn_powm(c, p, key->d, key->n);
+-  } else {
++  {
+     tpm_bn_init2(m1, key->size / 2);
+     tpm_bn_init2(m2, key->size / 2);
+     tpm_bn_init2(h, key->size);
