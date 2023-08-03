@@ -60,7 +60,7 @@ int mem_access_memop(unsigned long cmd,
 
     case XENMEM_access_op_set_access:
         rc = -EINVAL;
-        if ( (mao.pfn != ~0ull) &&
+        if ( (mao.pfn != ~0ULL) &&
              (mao.nr < start_iter ||
               ((mao.pfn + mao.nr - 1) < mao.pfn) ||
               ((mao.pfn + mao.nr - 1) > domain_get_maximum_gpfn(d))) )
@@ -96,7 +96,7 @@ int mem_access_memop(unsigned long cmd,
             break;
 
         rc = -EINVAL;
-        if ( (mao.pfn > domain_get_maximum_gpfn(d)) && mao.pfn != ~0ull )
+        if ( (mao.pfn > domain_get_maximum_gpfn(d)) && mao.pfn != ~0ULL )
             break;
 
         rc = p2m_get_mem_access(d, _gfn(mao.pfn), &access, 0);
