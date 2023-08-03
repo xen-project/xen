@@ -450,7 +450,7 @@ static uint64_t __init mtrr_top_of_ram(void)
 
     /* paddr_bits must have been set at this point */
     ASSERT(paddr_bits);
-    addr_mask = ((1ull << paddr_bits) - 1) & PAGE_MASK;
+    addr_mask = ((1ULL << paddr_bits) - 1) & PAGE_MASK;
 
     rdmsrl(MSR_MTRRcap, mtrr_cap);
     rdmsrl(MSR_MTRRdefType, mtrr_def);

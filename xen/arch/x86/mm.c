@@ -3057,10 +3057,10 @@ static int _get_page_type(struct page_info *page, unsigned long type,
 
             if ( (x & PGT_type_mask) == PGT_writable_page )
                 rc = iommu_legacy_unmap(d, _dfn(mfn_x(mfn)),
-                                        1ul << PAGE_ORDER_4K);
+                                        1UL << PAGE_ORDER_4K);
             else
                 rc = iommu_legacy_map(d, _dfn(mfn_x(mfn)), mfn,
-                                      1ul << PAGE_ORDER_4K,
+                                      1UL << PAGE_ORDER_4K,
                                       IOMMUF_readable | IOMMUF_writable);
 
             if ( unlikely(rc) )

@@ -537,7 +537,7 @@ int __init dom0_setup_permissions(struct domain *d)
     for ( i = 0; i < e820.nr_map; i++ )
     {
         unsigned long sfn, efn;
-        sfn = max_t(unsigned long, paddr_to_pfn(e820.map[i].addr), 0x100ul);
+        sfn = max_t(unsigned long, paddr_to_pfn(e820.map[i].addr), 0x100UL);
         efn = paddr_to_pfn(e820.map[i].addr + e820.map[i].size - 1);
         if ( (e820.map[i].type == E820_UNUSABLE) &&
              (e820.map[i].size != 0) &&

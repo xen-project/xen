@@ -250,9 +250,9 @@ static void recalculate_xstate(struct cpu_policy *p)
     else
         xstates &= ~XSTATE_XSAVES_ONLY;
 
-    for ( i = 2; i < min(63ul, ARRAY_SIZE(p->xstate.comp)); ++i )
+    for ( i = 2; i < min(63UL, ARRAY_SIZE(p->xstate.comp)); ++i )
     {
-        uint64_t curr_xstate = 1ul << i;
+        uint64_t curr_xstate = 1UL << i;
 
         if ( !(xstates & curr_xstate) )
             continue;

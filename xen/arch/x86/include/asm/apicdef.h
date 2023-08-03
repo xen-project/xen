@@ -34,8 +34,8 @@
 #define			SET_xAPIC_LOGICAL_ID(x)	(((x)<<24))
 #define			APIC_ALL_CPUS		0xFF
 #define		APIC_DFR	0xE0
-#define			APIC_DFR_CLUSTER		0x0FFFFFFFul
-#define			APIC_DFR_FLAT			0xFFFFFFFFul
+#define			APIC_DFR_CLUSTER		0x0FFFFFFFUL
+#define			APIC_DFR_FLAT			0xFFFFFFFFUL
 #define		APIC_SPIV	0xF0
 #define			APIC_SPIV_FOCUS_DISABLED	(1<<9)
 #define			APIC_SPIV_APIC_ENABLED		(1<<8)

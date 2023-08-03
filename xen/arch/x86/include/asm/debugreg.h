@@ -21,8 +21,8 @@
 #define DR_STEP         (0x4000)        /* single-step */
 #define DR_SWITCH       (0x8000)        /* task switch */
 #define DR_NOT_RTM      (0x10000)       /* clear: #BP inside RTM region */
-#define DR_STATUS_RESERVED_ZERO (~0xffffeffful) /* Reserved, read as zero */
-#define DR_STATUS_RESERVED_ONE  0xffff0ff0ul /* Reserved, read as one */
+#define DR_STATUS_RESERVED_ZERO (~0xffffefffUL) /* Reserved, read as zero */
+#define DR_STATUS_RESERVED_ONE  0xffff0ff0UL /* Reserved, read as one */
 
 /* Now define a bunch of things for manipulating the control register.
    The top two bytes of the control register consist of 4 fields of 4
@@ -61,12 +61,12 @@
    We can slow the instruction pipeline for instructions coming via the
    gdt or the ldt if we want to.  I am not sure why this is an advantage */
 
-#define DR_CONTROL_RESERVED_ZERO (~0xffff27fful) /* Reserved, read as zero */
-#define DR_CONTROL_RESERVED_ONE  (0x00000400ul) /* Reserved, read as one */
-#define DR_LOCAL_EXACT_ENABLE    (0x00000100ul) /* Local exact enable */
-#define DR_GLOBAL_EXACT_ENABLE   (0x00000200ul) /* Global exact enable */
-#define DR_RTM_ENABLE            (0x00000800ul) /* RTM debugging enable */
-#define DR_GENERAL_DETECT        (0x00002000ul) /* General detect enable */
+#define DR_CONTROL_RESERVED_ZERO (~0xffff27ffUL) /* Reserved, read as zero */
+#define DR_CONTROL_RESERVED_ONE  (0x00000400UL) /* Reserved, read as one */
+#define DR_LOCAL_EXACT_ENABLE    (0x00000100UL) /* Local exact enable */
+#define DR_GLOBAL_EXACT_ENABLE   (0x00000200UL) /* Global exact enable */
+#define DR_RTM_ENABLE            (0x00000800UL) /* RTM debugging enable */
+#define DR_GENERAL_DETECT        (0x00002000UL) /* General detect enable */
 
 #define write_debugreg(reg, val) do {                       \
     unsigned long __val = val;                              \

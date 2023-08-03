@@ -294,7 +294,7 @@ void hvm_get_guest_pat(struct vcpu *v, uint64_t *guest_pat)
 static bool pat_valid(uint64_t val)
 {
     /* Yields a non-zero value in any lane which had value greater than 7. */
-    uint64_t any_gt_7   =  val & 0xf8f8f8f8f8f8f8f8ull;
+    uint64_t any_gt_7   =  val & 0xf8f8f8f8f8f8f8f8ULL;
 
     /*
      * With the > 7 case covered, identify lanes with the value 0-3 by finding
@@ -302,7 +302,7 @@ static bool pat_valid(uint64_t val)
      *
      * Yields bit 2 set in each lane which has a value <= 3.
      */
-    uint64_t any_le_3   = ~val & 0x0404040404040404ull;
+    uint64_t any_le_3   = ~val & 0x0404040404040404ULL;
 
     /*
      * Logically, any_2_or_3 is "any_le_3 && bit 1 set".
@@ -3626,7 +3626,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 
  gp_fault:
     ret = X86EMUL_EXCEPTION;
-    *msr_content = -1ull;
+    *msr_content = -1ULL;
     goto out;
 }
 

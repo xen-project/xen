@@ -619,7 +619,7 @@ void __init cf_check hpet_broadcast_init(void)
          * math multiplication factor for nanosecond to hpet tick conversion.
          */
         hpet_events[i].mult = div_sc((unsigned long)hpet_rate,
-                                     1000000000ul, 32);
+                                     1000000000UL, 32);
         hpet_events[i].shift = 32;
         hpet_events[i].next_event = STIME_MAX;
         spin_lock_init(&hpet_events[i].lock);

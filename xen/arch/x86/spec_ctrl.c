@@ -1047,7 +1047,7 @@ static __init void l1tf_calculations(void)
      * The address mask which the L1D cache uses, which might be wider than
      * the CPUID-reported maxphysaddr.
      */
-    l1tf_addr_mask = ((1ul << l1d_maxphysaddr) - 1) & PAGE_MASK;
+    l1tf_addr_mask = ((1UL << l1d_maxphysaddr) - 1) & PAGE_MASK;
 
     /*
      * To be safe, l1tf_safe_maddr must be above the highest cacheable entity
@@ -1087,8 +1087,8 @@ static __init void l1tf_calculations(void)
      *   information is in terms of guest physical layout.
      */
     l1tf_safe_maddr = max(l1tf_safe_maddr, ((l1d_maxphysaddr > paddr_bits)
-                                            ? (1ul << paddr_bits)
-                                            : (3ul << (paddr_bits - 2))));
+                                            ? (1UL << paddr_bits)
+                                            : (3UL << (paddr_bits - 2))));
 }
 
 /* Calculate whether this CPU is vulnerable to MDS. */

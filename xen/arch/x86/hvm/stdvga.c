@@ -305,7 +305,7 @@ static int cf_check stdvga_mem_read(
     const struct hvm_io_handler *handler, uint64_t addr, uint32_t size,
     uint64_t *p_data)
 {
-    uint64_t data = ~0ul;
+    uint64_t data = ~0UL;
 
     switch ( size )
     {

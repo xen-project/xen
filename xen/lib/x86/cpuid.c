@@ -211,7 +211,7 @@ void x86_cpu_policy_fill_native(struct cpu_policy *p)
         for ( i = 2; i < min_t(unsigned int, 63,
                                ARRAY_SIZE(p->xstate.raw)); ++i )
         {
-            if ( xstates & (1ull << i) )
+            if ( xstates & (1ULL << i) )
                 cpuid_count_leaf(0xd, i, &p->xstate.raw[i]);
         }
     }
@@ -419,7 +419,7 @@ int x86_cpuid_copy_to_buffer(const struct cpu_policy *p,
               &(struct cpuid_leaf){ p->hv2_limit });
 
     /* Extended leaves. */
-    for ( leaf = 0; leaf <= MIN(p->extd.max_leaf & 0xfffful,
+    for ( leaf = 0; leaf <= MIN(p->extd.max_leaf & 0xffffUL,
                                 ARRAY_SIZE(p->extd.raw) - 1); ++leaf )
         COPY_LEAF(0x80000000 | leaf, XEN_CPUID_NO_SUBLEAF, &p->extd.raw[leaf]);
 

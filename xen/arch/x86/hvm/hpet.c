@@ -161,7 +161,7 @@ static int cf_check hpet_read(
 
     if ( !v->domain->arch.hvm.params[HVM_PARAM_HPET_ENABLED] )
     {
-        result = ~0ul;
+        result = ~0UL;
         goto out;
     }
 
@@ -169,7 +169,7 @@ static int cf_check hpet_read(
 
     if ( hpet_check_access_length(addr, length) != 0 )
     {
-        result = ~0ul;
+        result = ~0UL;
         goto out;
     }
 
@@ -486,7 +486,7 @@ static int cf_check hpet_write(
         if ( timer_is_periodic(h, tn) &&
              !(h->hpet.timers[tn].config & HPET_TN_SETVAL) )
         {
-            uint64_t max_period = (timer_is_32bit(h, tn) ? ~0u : ~0ull) >> 1;
+            uint64_t max_period = (timer_is_32bit(h, tn) ? ~0u : ~0ULL) >> 1;
 
             /*
              * Clamp period to reasonable min/max values:

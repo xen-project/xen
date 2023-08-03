@@ -32,15 +32,15 @@ gfn_to_paddr(gfn_t gfn)
 
 /* Mask covering the reserved bits from superpage alignment. */
 #define SUPERPAGE_RSVD(bit)                                             \
-    (((1ul << (bit)) - 1) & ~(_PAGE_PSE_PAT | (_PAGE_PSE_PAT - 1ul)))
+    (((1UL << (bit)) - 1) & ~(_PAGE_PSE_PAT | (_PAGE_PSE_PAT - 1UL)))
 
 static inline uint32_t fold_pse36(uint64_t val)
 {
-    return (val & ~(0x1fful << 13)) | ((val & (0x1fful << 32)) >> (32 - 13));
+    return (val & ~(0x1ffUL << 13)) | ((val & (0x1ffUL << 32)) >> (32 - 13));
 }
 static inline uint64_t unfold_pse36(uint32_t val)
 {
-    return (val & ~(0x1fful << 13)) | ((val & (0x1fful << 13)) << (32 - 13));
+    return (val & ~(0x1ffUL << 13)) | ((val & (0x1ffUL << 13)) << (32 - 13));
 }
 
 /* Types of the guest's page tables and access functions for them */
@@ -99,10 +99,10 @@ static inline guest_l2e_t guest_l2e_from_gfn(gfn_t gfn, u32 flags)
 #define GUEST_L2_PAGETABLE_SHIFT         21
 #define GUEST_L3_PAGETABLE_SHIFT         30
 
-#define GUEST_L1_PAGETABLE_RSVD            0x7ff0000000000000ul
-#define GUEST_L2_PAGETABLE_RSVD            0x7ff0000000000000ul
+#define GUEST_L1_PAGETABLE_RSVD            0x7ff0000000000000UL
+#define GUEST_L2_PAGETABLE_RSVD            0x7ff0000000000000UL
 #define GUEST_L3_PAGETABLE_RSVD                                      \
-    (0xfff0000000000000ul | _PAGE_GLOBAL | _PAGE_PSE | _PAGE_DIRTY | \
+    (0xfff0000000000000UL | _PAGE_GLOBAL | _PAGE_PSE | _PAGE_DIRTY | \
      _PAGE_ACCESSED | _PAGE_USER | _PAGE_RW)
 
 #else /* GUEST_PAGING_LEVELS == 4 */
@@ -281,7 +281,7 @@ static always_inline bool guest_pks_enabled(const struct vcpu *v)
 static always_inline uint64_t guest_rsvd_bits(const struct vcpu *v)
 {
     return ((PADDR_MASK &
-             ~((1ul << v->domain->arch.cpuid->extd.maxphysaddr) - 1)) |
+             ~((1UL << v->domain->arch.cpuid->extd.maxphysaddr) - 1)) |
             (guest_nx_enabled(v) ? 0 : put_pte_flags(_PAGE_NX_BIT)));
 }
 
@@ -301,7 +301,7 @@ static always_inline bool guest_l2e_rsvd_bits(const struct vcpu *v,
             ((l2e.l2 & _PAGE_PSE) &&
              (l2e.l2 & ((GUEST_PAGING_LEVELS == 2 && guest_can_use_pse36(v->domain))
                           /* PSE36 tops out at 40 bits of address width. */
-                        ? (fold_pse36(rsvd_bits | (1ul << 40)))
+                        ? (fold_pse36(rsvd_bits | (1UL << 40)))
                         : SUPERPAGE_RSVD(GUEST_L2_PAGETABLE_SHIFT)))));
 }
 

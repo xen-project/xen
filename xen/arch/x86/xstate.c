@@ -150,7 +150,7 @@ static void setup_xstate_comp(uint16_t *comp_offsets,
     offset = comp_offsets[2];
     for ( i = 2; i < xstate_features; i++ )
     {
-        if ( (1ul << i) & xcomp_bv )
+        if ( (1UL << i) & xcomp_bv )
         {
             if ( test_bit(i, &xstate_align) )
                 offset = ROUNDUP(offset, 64);

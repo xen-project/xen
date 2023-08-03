@@ -93,7 +93,7 @@ static inline int pv_vcpu_initialise(struct vcpu *v) { return -EOPNOTSUPP; }
 static inline void pv_domain_destroy(struct domain *d) {}
 static inline int pv_domain_initialise(struct domain *d) { return -EOPNOTSUPP; }
 
-static inline unsigned long pv_make_cr4(const struct vcpu *v) { return ~0ul; }
+static inline unsigned long pv_make_cr4(const struct vcpu *v) { return ~0UL; }
 
 static inline uint64_t pv_get_reg(struct vcpu *v, unsigned int reg)
 {

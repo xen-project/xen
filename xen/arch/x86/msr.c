@@ -431,7 +431,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     {
         bool old_cpuid_faulting = msrs->misc_features_enables.cpuid_faulting;
 
-        rsvd = ~0ull;
+        rsvd = ~0ULL;
         if ( cp->platform_info.cpuid_faulting )
             rsvd &= ~MSR_MISC_FEATURES_CPUID_FAULTING;
 
