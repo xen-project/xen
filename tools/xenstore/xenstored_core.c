@@ -1780,7 +1780,7 @@ static int do_set_perms(const void *ctx, struct connection *conn,
 	if (!xs_strings_to_perms(perms.p, perms.num, permstr))
 		return errno;
 
-	if (domain_alloc_permrefs(&perms) < 0)
+	if (domain_alloc_permrefs(&perms))
 		return ENOMEM;
 	if (perms.p[0].perms & XS_PERM_IGNORE)
 		return ENOENT;
