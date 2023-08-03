@@ -241,6 +241,7 @@ tpm_emulator-$(XEN_TARGET_ARCH): tpm_emulator-$(TPMEMU_VERSION).tar.gz
 	patch -d $@ -p1 < vtpm_extern.patch
 	patch -d $@ -p1 < vtpm-microsecond-duration.patch
 	patch -d $@ -p1 < vtpm-command-duration.patch
+	patch -d $@ -p1 < vtpm-tpm_bn_t-addr.patch
 	mkdir $@/build
 	cd $@/build; CC=${CC} $(CMAKE) .. -DCMAKE_C_FLAGS:STRING="-std=c99 -DTPM_NO_EXTERN $(TARGET_CPPFLAGS) $(TARGET_CFLAGS) -Wno-declaration-after-statement"
 	touch $@
