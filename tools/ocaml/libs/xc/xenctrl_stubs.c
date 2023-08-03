@@ -748,7 +748,7 @@ CAMLprim value stub_xc_physinfo(value xch)
 	Store_field(physinfo, 9, Val_int(c_physinfo.max_cpu_id + 1));
 
 #if defined(__i386__) || defined(__x86_64__)
-	arch_cap_list = Tag_cons;
+	arch_cap_list = Val_emptylist;
 
 	arch_cap_flags_tag = 1; /* tag x86 */
 #else
