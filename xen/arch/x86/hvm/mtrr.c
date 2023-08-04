@@ -687,13 +687,13 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
 
 static int cf_check hvm_save_mtrr_msr(struct vcpu *v, hvm_domain_context_t *h)
 {
-    const struct mtrr_state *mtrr_state = &v->arch.hvm.mtrr;
+    const struct mtrr_state *m = &v->arch.hvm.mtrr;
     struct hvm_hw_mtrr hw_mtrr = {
-        .msr_mtrr_def_type = mtrr_state->def_type |
-                             MASK_INSR(mtrr_state->fixed_enabled,
+        .msr_mtrr_def_type = m->def_type |
+                             MASK_INSR(m->fixed_enabled,
                                        MTRRdefType_FE) |
-                            MASK_INSR(mtrr_state->enabled, MTRRdefType_E),
-        .msr_mtrr_cap      = mtrr_state->mtrr_cap,
+                            MASK_INSR(m->enabled, MTRRdefType_E),
+        .msr_mtrr_cap      = m->mtrr_cap,
     };
     unsigned int i;
 
@@ -710,14 +710,14 @@ static int cf_check hvm_save_mtrr_msr(struct vcpu *v, hvm_domain_context_t *h)
 
     for ( i = 0; i < MASK_EXTR(hw_mtrr.msr_mtrr_cap, MTRRcap_VCNT); i++ )
     {
-        hw_mtrr.msr_mtrr_var[i * 2] = mtrr_state->var_ranges->base;
-        hw_mtrr.msr_mtrr_var[i * 2 + 1] = mtrr_state->var_ranges->mask;
+        hw_mtrr.msr_mtrr_var[i * 2] = m->var_ranges->base;
+        hw_mtrr.msr_mtrr_var[i * 2 + 1] = m->var_ranges->mask;
     }
 
     BUILD_BUG_ON(sizeof(hw_mtrr.msr_mtrr_fixed) !=
-                 sizeof(mtrr_state->fixed_ranges));
+                 sizeof(m->fixed_ranges));
 
-    memcpy(hw_mtrr.msr_mtrr_fixed, mtrr_state->fixed_ranges,
+    memcpy(hw_mtrr.msr_mtrr_fixed, m->fixed_ranges,
            sizeof(hw_mtrr.msr_mtrr_fixed));
 
     return hvm_save_entry(MTRR, v->vcpu_id, h, &hw_mtrr);
@@ -727,7 +727,7 @@ static int cf_check hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
 {
     unsigned int vcpuid, i;
     struct vcpu *v;
-    struct mtrr_state *mtrr_state;
+    struct mtrr_state *m;
     struct hvm_hw_mtrr hw_mtrr;
 
     vcpuid = hvm_load_instance(h);
@@ -749,26 +749,26 @@ static int cf_check hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
-    mtrr_state = &v->arch.hvm.mtrr;
+    m = &v->arch.hvm.mtrr;
 
     hvm_set_guest_pat(v, hw_mtrr.msr_pat_cr);
 
-    mtrr_state->mtrr_cap = hw_mtrr.msr_mtrr_cap;
+    m->mtrr_cap = hw_mtrr.msr_mtrr_cap;
 
     for ( i = 0; i < NUM_FIXED_MSR; i++ )
-        mtrr_fix_range_msr_set(d, mtrr_state, i, hw_mtrr.msr_mtrr_fixed[i]);
+        mtrr_fix_range_msr_set(d, m, i, hw_mtrr.msr_mtrr_fixed[i]);
 
     for ( i = 0; i < MASK_EXTR(hw_mtrr.msr_mtrr_cap, MTRRcap_VCNT); i++ )
     {
-        mtrr_var_range_msr_set(d, mtrr_state,
+        mtrr_var_range_msr_set(d, m,
                                MSR_IA32_MTRR_PHYSBASE(i),
                                hw_mtrr.msr_mtrr_var[i * 2]);
-        mtrr_var_range_msr_set(d, mtrr_state,
+        mtrr_var_range_msr_set(d, m,
                                MSR_IA32_MTRR_PHYSMASK(i),
                                hw_mtrr.msr_mtrr_var[i * 2 + 1]);
     }
 
-    mtrr_def_type_msr_set(d, mtrr_state, hw_mtrr.msr_mtrr_def_type);
+    mtrr_def_type_msr_set(d, m, hw_mtrr.msr_mtrr_def_type);
 
     return 0;
 }
