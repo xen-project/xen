@@ -16,11 +16,11 @@ void mce_barrier_dec(struct mce_softirq_barrier *bar)
     atomic_dec(&bar->val);
 }
 
-void mce_barrier_enter(struct mce_softirq_barrier *bar, bool wait)
+void mce_barrier_enter(struct mce_softirq_barrier *bar, bool do_wait)
 {
     int gen;
 
-    if ( !wait )
+    if ( !do_wait )
         return;
     atomic_inc(&bar->ingen);
     gen = atomic_read(&bar->outgen);
@@ -34,11 +34,11 @@ void mce_barrier_enter(struct mce_softirq_barrier *bar, bool wait)
     }
 }
 
-void mce_barrier_exit(struct mce_softirq_barrier *bar, bool wait)
+void mce_barrier_exit(struct mce_softirq_barrier *bar, bool do_wait)
 {
     int gen;
 
-    if ( !wait )
+    if ( !do_wait )
         return;
     atomic_inc(&bar->outgen);
     gen = atomic_read(&bar->ingen);
