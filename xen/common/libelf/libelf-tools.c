@@ -91,10 +91,10 @@ uint64_t elf_access_unsigned(struct elf_binary * elf, elf_ptrval base,
 {
     elf_ptrval ptrval = base + moreoffset;
     bool need_swap = elf_swap(elf);
-    const uint8_t *u8;
-    const uint16_t *u16;
-    const uint32_t *u32;
-    const uint64_t *u64;
+    const uint8_t *pu8;
+    const uint16_t *pu16;
+    const uint32_t *pu32;
+    const uint64_t *pu64;
 
     if ( !elf_access_ok(elf, ptrval, size) )
         return 0;
@@ -102,17 +102,17 @@ uint64_t elf_access_unsigned(struct elf_binary * elf, elf_ptrval base,
     switch ( size )
     {
     case 1:
-        u8 = (const void*)ptrval;
-        return *u8;
+        pu8 = (const void *)ptrval;
+        return *pu8;
     case 2:
-        u16 = (const void*)ptrval;
-        return need_swap ? bswap_16(*u16) : *u16;
+        pu16 = (const void *)ptrval;
+        return need_swap ? bswap_16(*pu16) : *pu16;
     case 4:
-        u32 = (const void*)ptrval;
-        return need_swap ? bswap_32(*u32) : *u32;
+        pu32 = (const void *)ptrval;
+        return need_swap ? bswap_32(*pu32) : *pu32;
     case 8:
-        u64 = (const void*)ptrval;
-        return need_swap ? bswap_64(*u64) : *u64;
+        pu64 = (const void *)ptrval;
+        return need_swap ? bswap_64(*pu64) : *pu64;
     default:
         return 0;
     }
