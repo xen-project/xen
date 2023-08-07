@@ -58,12 +58,14 @@ bool mce_available(const struct cpuinfo_x86 *c);
 unsigned int mce_firstbank(struct cpuinfo_x86 *c);
 /* Helper functions used for collecting error telemetry */
 void noreturn mc_panic(const char *s);
-void x86_mc_get_cpu_info(unsigned, uint32_t *, uint16_t *, uint16_t *,
-                         uint32_t *, uint32_t *, uint32_t *, uint32_t *);
+void x86_mc_get_cpu_info(unsigned cpu, uint32_t *chipid, uint16_t *coreid,
+                         uint16_t *threadid, uint32_t *apicid,
+                         unsigned *ncores, unsigned *ncores_active,
+                         unsigned *nthreads);
 
 /* Register a handler for machine check exceptions. */
 typedef void (*x86_mce_vector_t)(const struct cpu_user_regs *regs);
-extern void x86_mce_vector_register(x86_mce_vector_t);
+extern void x86_mce_vector_register(x86_mce_vector_t hdlr);
 
 /*
  * Common generic MCE handler that implementations may nominate
@@ -73,12 +75,12 @@ void cf_check mcheck_cmn_handler(const struct cpu_user_regs *regs);
 
 /* Register a handler for judging whether mce is recoverable. */
 typedef bool (*mce_recoverable_t)(uint64_t status);
-extern void mce_recoverable_register(mce_recoverable_t);
+extern void mce_recoverable_register(mce_recoverable_t cbfunc);
 
 /* Read an MSR, checking for an interposed value first */
-extern struct intpose_ent *intpose_lookup(unsigned int, uint64_t,
-    uint64_t *);
-extern bool intpose_inval(unsigned int, uint64_t);
+extern struct intpose_ent *intpose_lookup(unsigned int cpu_nr, uint64_t msr,
+    uint64_t *valp);
+extern bool intpose_inval(unsigned int cpu_nr, uint64_t msr);
 
 static inline uint64_t mca_rdmsr(unsigned int msr)
 {
@@ -128,10 +130,12 @@ DECLARE_PER_CPU(struct mca_banks *, mce_clear_banks);
 extern bool cmci_support;
 extern bool is_mc_panic;
 extern bool mce_broadcast;
-extern void mcheck_mca_clearbanks(struct mca_banks *);
+extern void mcheck_mca_clearbanks(struct mca_banks *bankmask);
 
-extern mctelem_cookie_t mcheck_mca_logout(enum mca_source, struct mca_banks *,
-    struct mca_summary *, struct mca_banks *);
+extern mctelem_cookie_t mcheck_mca_logout(enum mca_source who,
+                                          struct mca_banks *bankmask,
+                                          struct mca_summary *sp,
+                                          struct mca_banks *clear_bank);
 
 /*
  * Register callbacks to be made during bank telemetry logout.
@@ -142,7 +146,7 @@ extern mctelem_cookie_t mcheck_mca_logout(enum mca_source, struct mca_banks *,
 
 /* Register a handler for judging whether the bank need to be cleared */
 typedef bool (*mce_need_clearbank_t)(enum mca_source who, u64 status);
-extern void mce_need_clearbank_register(mce_need_clearbank_t);
+extern void mce_need_clearbank_register(mce_need_clearbank_t cbfunc);
 
 /*
  * Register a callback to collect additional information (typically non-
@@ -155,7 +159,7 @@ extern void mce_need_clearbank_register(mce_need_clearbank_t);
  */
 typedef struct mcinfo_extended *(*x86_mce_callback_t)
     (struct mc_info *, uint16_t, uint64_t);
-extern void x86_mce_callback_register(x86_mce_callback_t);
+extern void x86_mce_callback_register(x86_mce_callback_t cbfunc);
 
 void *x86_mcinfo_reserve(struct mc_info *mi,
                          unsigned int size, unsigned int type);

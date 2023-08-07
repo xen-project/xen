@@ -44,7 +44,7 @@ DEFINE_PER_CPU_READ_MOSTLY(struct mca_banks *, no_cmci_banks);
 DEFINE_PER_CPU_READ_MOSTLY(struct mca_banks *, mce_clear_banks);
 
 static void intpose_init(void);
-static void mcinfo_clear(struct mc_info *);
+static void mcinfo_clear(struct mc_info *mi);
 struct mca_banks *mca_allbanks;
 
 #define SEG_PL(segsel)   ((segsel) & 0x3)
