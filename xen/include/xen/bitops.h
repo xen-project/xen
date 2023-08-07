@@ -186,12 +186,12 @@ static inline unsigned int generic_hweight64(uint64_t w)
     if ( BITS_PER_LONG < 64 )
         return generic_hweight32(w >> 32) + generic_hweight32(w);
 
-    w -= (w >> 1) & 0x5555555555555555ul;
-    w =  (w & 0x3333333333333333ul) + ((w >> 2) & 0x3333333333333333ul);
-    w =  (w + (w >> 4)) & 0x0f0f0f0f0f0f0f0ful;
+    w -= (w >> 1) & 0x5555555555555555UL;
+    w =  (w & 0x3333333333333333UL) + ((w >> 2) & 0x3333333333333333UL);
+    w =  (w + (w >> 4)) & 0x0f0f0f0f0f0f0f0fUL;
 
     if ( IS_ENABLED(CONFIG_HAS_FAST_MULTIPLY) )
-        return (w * 0x0101010101010101ul) >> 56;
+        return (w * 0x0101010101010101UL) >> 56;
 
     w += w >> 8;
     w += w >> 16;

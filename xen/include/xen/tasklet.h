@@ -37,8 +37,8 @@ struct tasklet
 DECLARE_PER_CPU(unsigned long, tasklet_work_to_do);
 #define _TASKLET_enqueued  0 /* Tasklet work is enqueued for this CPU. */
 #define _TASKLET_scheduled 1 /* Scheduler has scheduled do_tasklet(). */
-#define TASKLET_enqueued   (1ul << _TASKLET_enqueued)
-#define TASKLET_scheduled  (1ul << _TASKLET_scheduled)
+#define TASKLET_enqueued   (1UL << _TASKLET_enqueued)
+#define TASKLET_scheduled  (1UL << _TASKLET_scheduled)
 
 static inline bool tasklet_work_to_do(unsigned int cpu)
 {
