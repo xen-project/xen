@@ -18,6 +18,7 @@
       - '*.log'
     reports:
       codequality: gl-code-quality-report.json
+  needs: []
 
 eclair-x86_64:
   extends: .eclair-analysis
