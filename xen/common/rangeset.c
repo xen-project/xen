@@ -393,7 +393,7 @@ static int cf_check merge(unsigned long s, unsigned long e, void *data)
 
 int rangeset_merge(struct rangeset *r1, struct rangeset *r2)
 {
-    return rangeset_report_ranges(r2, 0, ~0ul, merge, r1);
+    return rangeset_report_ranges(r2, 0, ~0UL, merge, r1);
 }
 
 int rangeset_add_singleton(

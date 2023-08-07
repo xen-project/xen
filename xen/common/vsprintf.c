@@ -225,7 +225,7 @@ static char *print_bitmap_string(char *str, const char *end,
      */
     for ( i = ROUNDUP(nr_bits, CHUNKSZ) - CHUNKSZ; i >= 0; i -= CHUNKSZ )
     {
-        unsigned int chunkmask = (1ull << chunksz) - 1;
+        unsigned int chunkmask = (1ULL << chunksz) - 1;
         unsigned int word      = i / BITS_PER_LONG;
         unsigned int offset    = i % BITS_PER_LONG;
         unsigned long val      = (bitmap[word] >> offset) & chunkmask;

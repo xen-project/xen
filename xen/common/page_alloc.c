@@ -2380,7 +2380,7 @@ int assign_pages(
         if ( unlikely(nr > d->max_pages - tot_pages) )
         {
             gprintk(XENLOG_INFO, "Over-allocation for %pd: %Lu > %u\n",
-                    d, tot_pages + 0ull + nr, d->max_pages);
+                    d, tot_pages + 0ULL + nr, d->max_pages);
             rc = -E2BIG;
             goto out;
         }
@@ -2392,7 +2392,7 @@ int assign_pages(
         {
             gprintk(XENLOG_INFO,
                     "Excess allocation for %pd: %Lu (%u extra)\n",
-                    d, d->tot_pages + 0ull + nr, d->extra_pages);
+                    d, d->tot_pages + 0ULL + nr, d->extra_pages);
             if ( pg[0].count_info & PGC_extra )
                 d->extra_pages -= nr;
             rc = -E2BIG;
@@ -2460,7 +2460,7 @@ struct page_info *alloc_domheap_pages(
         {
             unsigned long i;
 
-            for ( i = 0; i < (1ul << order); i++ )
+            for ( i = 0; i < (1UL << order); i++ )
             {
                 ASSERT(!pg[i].count_info);
                 pg[i].count_info = PGC_extra;
