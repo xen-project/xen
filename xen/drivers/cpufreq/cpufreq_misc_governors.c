@@ -120,6 +120,9 @@ static int __init cf_check cpufreq_gov_userspace_init(void)
 {
     unsigned int cpu;
 
+    if ( cpufreq_governor_internal )
+        return 0;
+
     for_each_online_cpu(cpu)
         per_cpu(cpu_set_freq, cpu) = userspace_cmdline_freq;
     register_cpu_notifier(&cpufreq_userspace_cpu_nfb);
@@ -162,6 +165,9 @@ struct cpufreq_governor cpufreq_gov_performance = {
 
 static int __init cf_check cpufreq_gov_performance_init(void)
 {
+    if ( cpufreq_governor_internal )
+        return 0;
+
     return cpufreq_register_governor(&cpufreq_gov_performance);
 }
 __initcall(cpufreq_gov_performance_init);
@@ -201,6 +207,9 @@ struct cpufreq_governor cpufreq_gov_powersave = {
 
 static int __init cf_check cpufreq_gov_powersave_init(void)
 {
+    if ( cpufreq_governor_internal )
+        return 0;
+
     return cpufreq_register_governor(&cpufreq_gov_powersave);
 }
 __initcall(cpufreq_gov_powersave_init);

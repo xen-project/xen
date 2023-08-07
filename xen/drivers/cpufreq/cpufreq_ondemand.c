@@ -360,6 +360,9 @@ struct cpufreq_governor cpufreq_gov_dbs = {
 
 static int __init cf_check cpufreq_gov_dbs_init(void)
 {
+    if ( cpufreq_governor_internal )
+        return 0;
+
     return cpufreq_register_governor(&cpufreq_gov_dbs);
 }
 __initcall(cpufreq_gov_dbs_init);
