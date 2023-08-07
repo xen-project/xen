@@ -642,7 +642,26 @@ static int __init cf_check cpufreq_driver_init(void)
         switch ( boot_cpu_data.x86_vendor )
         {
         case X86_VENDOR_INTEL:
-            ret = cpufreq_register_driver(&acpi_cpufreq_driver);
+            ret = -ENOENT;
+
+            for ( unsigned int i = 0; i < cpufreq_xen_cnt; i++ )
+            {
+                switch ( cpufreq_xen_opts[i] )
+                {
+                case CPUFREQ_xen:
+                    ret = cpufreq_register_driver(&acpi_cpufreq_driver);
+                    break;
+                case CPUFREQ_hwp:
+                    ret = hwp_register_driver();
+                    break;
+                case CPUFREQ_none:
+                    ret = 0;
+                    break;
+                }
+
+                if ( ret != -ENODEV )
+                    break;
+            }
             break;
 
         case X86_VENDOR_AMD:

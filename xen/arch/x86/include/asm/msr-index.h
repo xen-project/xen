@@ -156,6 +156,13 @@
 
 #define MSR_PKRS                            0x000006e1
 
+#define MSR_PM_ENABLE                       0x00000770
+#define  PM_ENABLE_HWP_ENABLE               BIT(0, ULL)
+
+#define MSR_HWP_CAPABILITIES                0x00000771
+#define MSR_HWP_INTERRUPT                   0x00000773
+#define MSR_HWP_REQUEST                     0x00000774
+
 #define MSR_X2APIC_FIRST                    0x00000800
 #define MSR_X2APIC_LAST                     0x000008ff
 
@@ -169,6 +176,11 @@
 #define MSR_PASID                           0x00000d93
 #define  PASID_PASID_MASK                   0x000fffff
 #define  PASID_VALID                        (_AC(1, ULL) << 31)
+
+#define MSR_PKG_HDC_CTL                     0x00000db0
+#define  PKG_HDC_CTL_HDC_PKG_ENABLE         BIT(0, ULL)
+#define MSR_PM_CTL1                         0x00000db1
+#define  PM_CTL1_HDC_ALLOW_BLOCK            BIT(0, ULL)
 
 #define MSR_UARCH_MISC_CTRL                 0x00001b01
 #define  UARCH_CTRL_DOITM                   (_AC(1, ULL) <<  0)
@@ -473,7 +485,8 @@
 #define MSR_IA32_MISC_ENABLE_MONITOR_ENABLE (1<<18)
 #define MSR_IA32_MISC_ENABLE_LIMIT_CPUID  (1<<22)
 #define MSR_IA32_MISC_ENABLE_XTPR_DISABLE (1<<23)
-#define MSR_IA32_MISC_ENABLE_XD_DISABLE   (_AC(1, ULL) << 34)
+#define MSR_IA32_MISC_ENABLE_XD_DISABLE      (_AC(1, ULL) << 34)
+#define MSR_IA32_MISC_ENABLE_TURBO_DISENGAGE (_AC(1, ULL) << 38)
 
 #define MSR_IA32_TSC_DEADLINE		0x000006E0
 #define MSR_IA32_ENERGY_PERF_BIAS	0x000001b0

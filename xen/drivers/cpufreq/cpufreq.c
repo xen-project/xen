@@ -64,12 +64,19 @@ LIST_HEAD_READ_MOSTLY(cpufreq_governor_list);
 /* set xen as default cpufreq */
 enum cpufreq_controller cpufreq_controller = FREQCTL_xen;
 
-static int __init cpufreq_cmdline_parse(const char *s);
+enum cpufreq_xen_opt __initdata cpufreq_xen_opts[2] = { CPUFREQ_xen,
+                                                        CPUFREQ_none };
+unsigned int __initdata cpufreq_xen_cnt = 1;
+
+static int __init cpufreq_cmdline_parse(const char *s, const char *e);
 
 static int __init cf_check setup_cpufreq_option(const char *str)
 {
-    const char *arg = strpbrk(str, ",:");
+    const char *arg = strpbrk(str, ",:;");
     int choice;
+    int ret = -EINVAL;
+
+    cpufreq_xen_cnt = 0;
 
     if ( !arg )
         arg = strchr(str, '\0');
@@ -90,15 +97,45 @@ static int __init cf_check setup_cpufreq_option(const char *str)
         return 0;
     }
 
-    if ( choice > 0 || !cmdline_strcmp(str, "xen") )
+    do
     {
-        xen_processor_pmbits |= XEN_PROCESSOR_PM_PX;
-        cpufreq_controller = FREQCTL_xen;
-        if ( *arg && *(arg + 1) )
-            return cpufreq_cmdline_parse(arg + 1);
-    }
+        const char *end = strchr(str, ';');
 
-    return (choice < 0) ? -EINVAL : 0;
+        if ( end == NULL )
+            end = strchr(str, '\0');
+
+        arg = strpbrk(str, ",:");
+        if ( !arg || arg > end )
+            arg = strchr(str, '\0');
+
+        if ( cpufreq_xen_cnt == ARRAY_SIZE(cpufreq_xen_opts) )
+            return -E2BIG;
+
+        if ( choice > 0 || !cmdline_strcmp(str, "xen") )
+        {
+            xen_processor_pmbits |= XEN_PROCESSOR_PM_PX;
+            cpufreq_controller = FREQCTL_xen;
+            cpufreq_xen_opts[cpufreq_xen_cnt++] = CPUFREQ_xen;
+            ret = 0;
+            if ( arg[0] && arg[1] )
+                ret = cpufreq_cmdline_parse(arg + 1, end);
+        }
+        else if ( choice < 0 && !cmdline_strcmp(str, "hwp") )
+        {
+            xen_processor_pmbits |= XEN_PROCESSOR_PM_PX;
+            cpufreq_controller = FREQCTL_xen;
+            cpufreq_xen_opts[cpufreq_xen_cnt++] = CPUFREQ_hwp;
+            ret = 0;
+            if ( arg[0] && arg[1] )
+                ret = hwp_cmdline_parse(arg + 1, end);
+        }
+        else
+            ret = -EINVAL;
+
+        str = *end ? ++end : end;
+    } while ( choice < 0 && ret == 0 && *str );
+
+    return (choice < 0) ? ret : 0;
 }
 custom_param("cpufreq", setup_cpufreq_option);
 
@@ -577,7 +614,7 @@ static int __init cpufreq_handle_common_option(const char *name, const char *val
     return 0;
 }
 
-static int __init cpufreq_cmdline_parse(const char *s)
+static int __init cpufreq_cmdline_parse(const char *s, const char *e)
 {
     static struct cpufreq_governor *__initdata cpufreq_governors[] =
     {
@@ -593,6 +630,8 @@ static int __init cpufreq_cmdline_parse(const char *s)
     int rc = 0;
 
     strlcpy(buf, s, sizeof(buf));
+    if (e - s < sizeof(buf))
+        buf[e - s] = '\0';
     do {
         char *val, *end = strchr(str, ',');
         unsigned int i;

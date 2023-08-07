@@ -24,6 +24,13 @@ DECLARE_PER_CPU(spinlock_t, cpufreq_statistic_lock);
 
 extern bool_t cpufreq_verbose;
 
+enum cpufreq_xen_opt {
+    CPUFREQ_none,
+    CPUFREQ_xen,
+    CPUFREQ_hwp,
+};
+extern enum cpufreq_xen_opt cpufreq_xen_opts[2];
+extern unsigned int cpufreq_xen_cnt;
 struct cpufreq_governor;
 
 struct acpi_cpufreq_data {
@@ -244,5 +251,8 @@ void cpufreq_dbs_timer_suspend(void);
 void cpufreq_dbs_timer_resume(void);
 
 void intel_feature_detect(struct cpufreq_policy *policy);
+
+int hwp_cmdline_parse(const char *s, const char *e);
+int hwp_register_driver(void);
 
 #endif /* __XEN_CPUFREQ_PM_H__ */

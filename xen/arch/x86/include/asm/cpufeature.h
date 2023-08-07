@@ -52,8 +52,16 @@ static inline bool boot_cpu_has(unsigned int feat)
     return cpu_has(&boot_cpu_data, feat);
 }
 
-#define CPUID_PM_LEAF                    6
-#define CPUID6_ECX_APERFMPERF_CAPABILITY 0x1
+#define CPUID_PM_LEAF                                6
+#define CPUID6_EAX_HWP                               BIT(7, U)
+#define CPUID6_EAX_HWP_NOTIFICATION                  BIT(8, U)
+#define CPUID6_EAX_HWP_ACTIVITY_WINDOW               BIT(9, U)
+#define CPUID6_EAX_HWP_ENERGY_PERFORMANCE_PREFERENCE BIT(10, U)
+#define CPUID6_EAX_HWP_PACKAGE_LEVEL_REQUEST         BIT(11, U)
+#define CPUID6_EAX_HDC                               BIT(13, U)
+#define CPUID6_EAX_HWP_PECI                          BIT(16, U)
+#define CPUID6_EAX_HW_FEEDBACK                       BIT(19, U)
+#define CPUID6_ECX_APERFMPERF_CAPABILITY             BIT(0, U)
 
 /* CPUID level 0x00000001.edx */
 #define cpu_has_fpu             1

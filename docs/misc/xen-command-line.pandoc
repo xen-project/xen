@@ -499,7 +499,7 @@ If set, force use of the performance counters for oprofile, rather than detectin
 available support.
 
 ### cpufreq
-> `= none | {{ <boolean> | xen } [:[powersave|performance|ondemand|userspace][,<maxfreq>][,[<minfreq>][,[verbose]]]]} | dom0-kernel`
+> `= none | {{ <boolean> | xen } { [:[powersave|performance|ondemand|userspace][,[<maxfreq>]][,[<minfreq>]]] } [,verbose]} | dom0-kernel | hwp[:[<hdc>][,verbose]]`
 
 > Default: `xen`
 
@@ -510,6 +510,24 @@ choice of `dom0-kernel` is deprecated and not supported by all Dom0 kernels.
 * `<maxfreq>` and `<minfreq>` are integers which represent max and min processor frequencies
   respectively.
 * `verbose` option can be included as a string or also as `verbose=<integer>`
+  for `xen`.  It is a boolean for `hwp`.
+* `hwp` selects Hardware-Controlled Performance States (HWP) on supported Intel
+  hardware.  HWP is a Skylake+ feature which provides better CPU power
+  management.  The default is disabled.  If `hwp` is selected, but hardware
+  support is not available, Xen will fallback to cpufreq=xen.
+* `<hdc>` is a boolean to enable Hardware Duty Cycling (HDC).  HDC enables the
+  processor to autonomously force physical package components into idle state.
+  The default is enabled, but the option only applies when `hwp` is enabled.
+
+There is also support for `;`-separated fallback options:
+`cpufreq=hwp;xen,verbose`.  This first tries `hwp` and falls back to `xen` if
+unavailable.  Note: The `verbose` suboption is handled globally.  Setting it
+for either the primary or fallback option applies to both irrespective of where
+it is specified.
+
+Note: grub2 requires to escape or quote ';', so `"cpufreq=hwp;xen"` should be
+specified within double quotes inside grub.cfg.  Refer to the grub2
+documentation for more information.
 
 ### cpuid (x86)
 > `= List of comma separated booleans`
