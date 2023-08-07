@@ -3874,7 +3874,7 @@ csched2_dump(const struct scheduler *ops)
 
             lock = unit_schedule_lock(unit);
 
-            printk("\t%3d: ", ++loop);
+            printk("\t%3u: ", ++loop);
             csched2_dump_unit(prv, svc);
 
             unit_schedule_unlock(lock, unit);
@@ -3884,8 +3884,8 @@ csched2_dump(const struct scheduler *ops)
     list_for_each_entry ( rqd, &prv->rql, rql )
     {
         struct list_head *iter, *runq = &rqd->runq;
-        int loop = 0;
 
+        loop = 0;
         /* We need the lock to scan the runqueue. */
         spin_lock(&rqd->lock);
 
@@ -3901,7 +3901,7 @@ csched2_dump(const struct scheduler *ops)
 
             if ( svc )
             {
-                printk("\t%3d: ", loop++);
+                printk("\t%3u: ", loop++);
                 csched2_dump_unit(prv, svc);
             }
         }

@@ -791,7 +791,7 @@ int  sched_init_domain(struct domain *d, unsigned int poolid);
 void sched_destroy_domain(struct domain *d);
 long sched_adjust(struct domain *, struct xen_domctl_scheduler_op *);
 long sched_adjust_global(struct xen_sysctl_scheduler_op *);
-int  sched_id(void);
+int  scheduler_id(void);
 
 /*
  * sched_get_id_by_name - retrieves a scheduler id given a scheduler name

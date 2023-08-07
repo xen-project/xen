@@ -91,7 +91,7 @@ extern const struct scheduler *__start_schedulers_array[], *__end_schedulers_arr
 #define NUM_SCHEDULERS (__end_schedulers_array - __start_schedulers_array)
 #define schedulers __start_schedulers_array
 
-static struct scheduler __read_mostly ops;
+static struct scheduler __read_mostly operations;
 
 static bool scheduler_active;
 
@@ -171,7 +171,7 @@ static inline struct scheduler *dom_scheduler(const struct domain *d)
      * is the default scheduler that has been, choosen at boot.
      */
     ASSERT(is_idle_domain(d));
-    return &ops;
+    return &operations;
 }
 
 static inline struct scheduler *unit_scheduler(const struct sched_unit *unit)
@@ -2040,10 +2040,10 @@ long do_set_timer_op(s_time_t timeout)
     return 0;
 }
 
-/* sched_id - fetch ID of current scheduler */
-int sched_id(void)
+/* scheduler_id - fetch ID of current scheduler */
+int scheduler_id(void)
 {
-    return ops.sched_id;
+    return operations.sched_id;
 }
 
 /* Adjust scheduling parameter for a given domain. */
@@ -2579,7 +2579,7 @@ static void cf_check sched_slave(void)
     struct sched_unit    *prev = vprev->sched_unit, *next;
     s_time_t              now;
     spinlock_t           *lock;
-    bool                  do_softirq = false;
+    bool                  needs_softirq = false;
     unsigned int          cpu = smp_processor_id();
 
     ASSERT_NOT_IN_ATOMIC();
@@ -2604,7 +2604,7 @@ static void cf_check sched_slave(void)
             return;
         }
 
-        do_softirq = true;
+        needs_softirq = true;
     }
 
     if ( !prev->rendezvous_in_cnt )
@@ -2614,7 +2614,7 @@ static void cf_check sched_slave(void)
         rcu_read_unlock(&sched_res_rculock);
 
         /* Check for failed forced context switch. */
-        if ( do_softirq )
+        if ( needs_softirq )
             raise_softirq(SCHEDULE_SOFTIRQ);
 
         return;
@@ -3016,14 +3016,14 @@ void __init scheduler_init(void)
         BUG_ON(!scheduler);
         printk("Using '%s' (%s)\n", scheduler->name, scheduler->opt_name);
     }
-    ops = *scheduler;
+    operations = *scheduler;
 
     if ( cpu_schedule_up(0) )
         BUG();
     register_cpu_notifier(&cpu_schedule_nfb);
 
-    printk("Using scheduler: %s (%s)\n", ops.name, ops.opt_name);
-    if ( sched_init(&ops) )
+    printk("Using scheduler: %s (%s)\n", operations.name, operations.opt_name);
+    if ( sched_init(&operations) )
         panic("scheduler returned error on init\n");
 
     if ( sched_ratelimit_us &&
@@ -3363,7 +3363,7 @@ int schedule_cpu_rm(unsigned int cpu, struct cpu_rm_data *data)
 
 struct scheduler *scheduler_get_default(void)
 {
-    return &ops;
+    return &operations;
 }
 
 struct scheduler *scheduler_alloc(unsigned int sched_id)
@@ -3392,7 +3392,7 @@ struct scheduler *scheduler_alloc(unsigned int sched_id)
 
 void scheduler_free(struct scheduler *sched)
 {
-    BUG_ON(sched == &ops);
+    BUG_ON(sched == &operations);
     sched_deinit(sched);
     xfree(sched);
 }
@@ -3416,7 +3416,7 @@ void schedule_dump(struct cpupool *c)
     }
     else
     {
-        sched = &ops;
+        sched = &operations;
         cpus = &cpupool_free_cpus;
     }
 
