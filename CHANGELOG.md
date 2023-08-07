@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - On Arm, Xen supports guests running SVE/SVE2 instructions. (Tech Preview)
  - On Arm, add suport for Firmware Framework for Arm A-profile (FF-A) Mediator
    (Tech Preview)
+ - Add Intel Hardware P-States (HWP) cpufreq driver.
 
 ### Removed
  - On x86, the "pku" command line option has been removed.  It has never
