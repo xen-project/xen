@@ -339,9 +339,8 @@ static unsigned int cf_check get_cur_freq_on_cpu(unsigned int cpu)
     return extract_freq(get_cur_val(cpumask_of(cpu)), data);
 }
 
-static void cf_check feature_detect(void *info)
+void intel_feature_detect(struct cpufreq_policy *policy)
 {
-    struct cpufreq_policy *policy = info;
     unsigned int eax;
 
     eax = cpuid_eax(6);
@@ -351,6 +350,11 @@ static void cf_check feature_detect(void *info)
             printk(XENLOG_INFO "CPU%u: Turbo Mode detected and enabled\n",
                    smp_processor_id());
     }
+}
+
+static void cf_check feature_detect(void *info)
+{
+    intel_feature_detect(info);
 }
 
 static unsigned int check_freqs(const cpumask_t *mask, unsigned int freq,
