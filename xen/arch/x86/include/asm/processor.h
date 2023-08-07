@@ -96,7 +96,7 @@ extern bool probe_cpuid_faulting(void);
 extern void ctxt_switch_levelling(const struct vcpu *next);
 extern void (*ctxt_switch_masking)(const struct vcpu *next);
 
-extern bool_t opt_cpu_info;
+extern bool opt_cpu_info;
 extern u32 trampoline_efer;
 extern u64 trampoline_misc_enable_off;
 
@@ -109,17 +109,17 @@ extern unsigned int vaddr_bits;
 
 extern const struct x86_cpu_id *x86_match_cpu(const struct x86_cpu_id table[]);
 
-extern void identify_cpu(struct cpuinfo_x86 *);
-extern void setup_clear_cpu_cap(unsigned int);
-extern void setup_force_cpu_cap(unsigned int);
-extern bool is_forced_cpu_cap(unsigned int);
+extern void identify_cpu(struct cpuinfo_x86 *c);
+extern void setup_clear_cpu_cap(unsigned int cap);
+extern void setup_force_cpu_cap(unsigned int cap);
+extern bool is_forced_cpu_cap(unsigned int cap);
 extern void print_cpu_info(unsigned int cpu);
 extern void init_intel_cacheinfo(struct cpuinfo_x86 *c);
 
 #define cpu_to_core(_cpu)   (cpu_data[_cpu].cpu_core_id)
 #define cpu_to_socket(_cpu) (cpu_data[_cpu].phys_proc_id)
 
-unsigned int apicid_to_socket(unsigned int);
+unsigned int apicid_to_socket(unsigned int apicid);
 
 static inline int cpu_nr_siblings(unsigned int cpu)
 {
@@ -410,12 +410,12 @@ void show_registers(const struct cpu_user_regs *regs);
 #define dump_execution_state() \
     run_in_exception_handler(show_execution_state_nonconst)
 void show_page_walk(unsigned long addr);
-void noreturn fatal_trap(const struct cpu_user_regs *regs, bool_t show_remote);
+void noreturn fatal_trap(const struct cpu_user_regs *regs, bool show_remote);
 
 extern void mtrr_ap_init(void);
 extern void mtrr_bp_init(void);
 
-void mcheck_init(struct cpuinfo_x86 *c, bool_t bsp);
+void mcheck_init(struct cpuinfo_x86 *c, bool bsp);
 
 void do_nmi(const struct cpu_user_regs *regs);
 void do_machine_check(const struct cpu_user_regs *regs);
