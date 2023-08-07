@@ -1861,7 +1861,6 @@ static int cf_check hvmemul_rep_movs(
             return rc;
     }
 
-    bytes = PAGE_SIZE - (daddr & ~PAGE_MASK);
     if ( hvio->mmio_access.write_access &&
          (hvio->mmio_gla == (daddr & PAGE_MASK)) &&
          /* See comment above. */
@@ -1988,7 +1987,7 @@ static int cf_check hvmemul_rep_stos(
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
     struct vcpu *curr = current;
     struct hvm_vcpu_io *hvio = &curr->arch.hvm.hvm_io;
-    unsigned long addr, bytes;
+    unsigned long addr;
     paddr_t gpa;
     p2m_type_t p2mt;
     bool_t df = !!(ctxt->regs->eflags & X86_EFLAGS_DF);
@@ -1998,7 +1997,6 @@ static int cf_check hvmemul_rep_stos(
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    bytes = PAGE_SIZE - (addr & ~PAGE_MASK);
     if ( hvio->mmio_access.write_access &&
          (hvio->mmio_gla == (addr & PAGE_MASK)) &&
          /* See respective comment in MOVS processing. */
