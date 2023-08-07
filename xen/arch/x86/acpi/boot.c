@@ -87,14 +87,17 @@ acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 	if (BAD_MADT_ENTRY(processor, end))
 		return -EINVAL;
 
+	/* Ignore entries with invalid x2APIC ID */
+	if (processor->local_apic_id == 0xffffffff)
+		return 0;
+
 	/* Don't register processors that cannot be onlined. */
 	if (madt_revision >= 5 &&
 	    !(processor->lapic_flags & ACPI_MADT_ENABLED) &&
 	    !(processor->lapic_flags & ACPI_MADT_ONLINE_CAPABLE))
 		return 0;
 
-	if ((processor->lapic_flags & ACPI_MADT_ENABLED) ||
-	    processor->local_apic_id != 0xffffffff || opt_cpu_info) {
+	if ((processor->lapic_flags & ACPI_MADT_ENABLED) || opt_cpu_info) {
 		acpi_table_print_madt_entry(header);
 		log = true;
 	}
@@ -143,14 +146,17 @@ acpi_parse_lapic(struct acpi_subtable_header * header, const unsigned long end)
 	if (BAD_MADT_ENTRY(processor, end))
 		return -EINVAL;
 
+	/* Ignore entries with invalid APIC ID */
+	if (processor->id == 0xff)
+		return 0;
+
 	/* Don't register processors that cannot be onlined. */
 	if (madt_revision >= 5 &&
 	    !(processor->lapic_flags & ACPI_MADT_ENABLED) &&
 	    !(processor->lapic_flags & ACPI_MADT_ONLINE_CAPABLE))
 		return 0;
 
-	if ((processor->lapic_flags & ACPI_MADT_ENABLED) ||
-	    processor->id != 0xff || opt_cpu_info)
+	if ((processor->lapic_flags & ACPI_MADT_ENABLED) || opt_cpu_info)
 		acpi_table_print_madt_entry(header);
 
 	/* Record local apic id only when enabled */
