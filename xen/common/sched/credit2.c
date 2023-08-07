@@ -1480,7 +1480,8 @@ static inline void runq_remove(struct csched2_unit *svc)
     list_del_init(&svc->runq_elem);
 }
 
-void burn_credits(struct csched2_runqueue_data *rqd, struct csched2_unit *, s_time_t);
+void burn_credits(struct csched2_runqueue_data *rqd, struct csched2_unit *svc,
+                  s_time_t now);
 
 static inline void
 tickle_cpu(unsigned int cpu, struct csched2_runqueue_data *rqd)

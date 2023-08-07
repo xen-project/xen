@@ -629,7 +629,7 @@ int cpu_disable_scheduler(unsigned int cpu);
 int schedule_cpu_add(unsigned int cpu, struct cpupool *c);
 struct cpu_rm_data *alloc_cpu_rm_data(unsigned int cpu, bool aff_alloc);
 void free_cpu_rm_data(struct cpu_rm_data *mem, unsigned int cpu);
-int schedule_cpu_rm(unsigned int cpu, struct cpu_rm_data *mem);
+int schedule_cpu_rm(unsigned int cpu, struct cpu_rm_data *data);
 int sched_move_domain(struct domain *d, struct cpupool *c);
 void sched_migrate_timers(unsigned int cpu);
 struct cpupool *cpupool_get_by_id(unsigned int poolid);

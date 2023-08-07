@@ -789,8 +789,8 @@ int  sched_init_vcpu(struct vcpu *v);
 void sched_destroy_vcpu(struct vcpu *v);
 int  sched_init_domain(struct domain *d, unsigned int poolid);
 void sched_destroy_domain(struct domain *d);
-long sched_adjust(struct domain *, struct xen_domctl_scheduler_op *);
-long sched_adjust_global(struct xen_sysctl_scheduler_op *);
+long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op);
+long sched_adjust_global(struct xen_sysctl_scheduler_op *op);
 int  scheduler_id(void);
 
 /*
@@ -831,11 +831,11 @@ void context_switch(
 
 /*
  * As described above, context_switch() must call this function when the
- * local CPU is no longer running in @prev's context, and @prev's context is
+ * local CPU is no longer running in @vprev's context, and @vprev's context is
  * saved to memory. Alternatively, if implementing lazy context switching,
- * ensure that invoking sync_vcpu_execstate() will switch and commit @prev.
+ * ensure that invoking sync_vcpu_execstate() will switch and commit @vprev.
  */
-void sched_context_switched(struct vcpu *prev, struct vcpu *vnext);
+void sched_context_switched(struct vcpu *vprev, struct vcpu *vnext);
 
 /* Called by the scheduler to continue running the current VCPU. */
 void continue_running(
