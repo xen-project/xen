@@ -206,7 +206,7 @@ static bool vtimer_cntp_tval(struct cpu_user_regs *regs, register_t *r,
 
     if ( read )
     {
-        *r = (uint32_t)((v->arch.phys_timer.cval - cntpct) & 0xffffffffull);
+        *r = (uint32_t)((v->arch.phys_timer.cval - cntpct) & 0xffffffffULL);
     }
     else
     {
