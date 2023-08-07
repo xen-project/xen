@@ -15,6 +15,9 @@
 #include <asm/p2m.h>
 #include <asm/mce.h>
 #include <asm/apic.h>
+
+#include <acpi/cpufreq/cpufreq.h>
+
 #include "mce.h"
 #include "x86_mca.h"
 #include "barrier.h"
@@ -63,6 +66,9 @@ static void cf_check intel_thermal_interrupt(struct cpu_user_regs *regs)
     int *this_last_state;
 
     ack_APIC_irq();
+
+    if ( hwp_active() )
+        wrmsr_safe(MSR_HWP_STATUS, 0);
 
     if ( NOW() < per_cpu(next, cpu) )
         return;
