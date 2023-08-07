@@ -26,7 +26,7 @@
 #define VTDPREFIX "[VT-D]"
 
 struct pci_ats_dev;
-extern bool_t rwbf_quirk;
+extern bool rwbf_quirk;
 extern const struct iommu_init_ops intel_iommu_init_ops;
 
 void print_iommu_regs(struct acpi_drhd_unit *drhd);
@@ -111,7 +111,7 @@ int __must_check me_wifi_quirk(struct domain *domain, uint8_t bus,
 void pci_vtd_quirk(const struct pci_dev *);
 void quirk_iommu_caps(struct vtd_iommu *iommu);
 
-bool_t platform_supports_intremap(void);
-bool_t platform_supports_x2apic(void);
+bool platform_supports_intremap(void);
+bool platform_supports_x2apic(void);
 
 #endif // _VTD_EXTERN_H_

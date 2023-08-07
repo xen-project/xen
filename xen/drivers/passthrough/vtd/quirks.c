@@ -56,9 +56,9 @@ static unsigned int snb_igd_timeout;
 
 static u32 __read_mostly ioh_id;
 static u32 __initdata igd_id;
-bool_t __read_mostly rwbf_quirk;
-static bool_t __read_mostly is_cantiga_b3;
-static bool_t __read_mostly is_snb_gfx;
+bool __read_mostly rwbf_quirk;
+static bool __read_mostly is_cantiga_b3;
+static bool __read_mostly is_snb_gfx;
 static u8 *__read_mostly igd_reg_va;
 static spinlock_t igd_lock;
 
@@ -498,7 +498,7 @@ void pci_vtd_quirk(const struct pci_dev *pdev)
     int seg = pdev->seg;
     int bus = pdev->bus;
     int pos;
-    bool_t ff;
+    bool ff;
     u32 val, val2;
     u64 bar;
     paddr_t pa;

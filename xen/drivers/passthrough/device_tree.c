@@ -83,9 +83,9 @@ fail:
     return rc;
 }
 
-static bool_t iommu_dt_device_is_assigned(const struct dt_device_node *dev)
+static bool iommu_dt_device_is_assigned(const struct dt_device_node *dev)
 {
-    bool_t assigned = 0;
+    bool assigned = false;
 
     if ( !dt_device_is_protected(dev) )
         return 0;

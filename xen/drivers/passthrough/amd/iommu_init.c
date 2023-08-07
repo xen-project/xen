@@ -34,7 +34,7 @@ unsigned int __read_mostly ivrs_bdf_entries;
 u8 __read_mostly ivhd_type;
 static struct radix_tree_root ivrs_maps;
 LIST_HEAD_READ_MOSTLY(amd_iommu_head);
-bool_t iommuv2_enabled;
+bool iommuv2_enabled;
 
 bool __ro_after_init amd_iommu_perdev_intremap = true;
 
@@ -737,7 +737,7 @@ static void cf_check iommu_interrupt_handler(
     tasklet_schedule(&amd_iommu_irq_tasklet);
 }
 
-static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
+static bool __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
 {
     int irq, ret;
 
@@ -1329,7 +1329,7 @@ static int __init cf_check amd_iommu_setup_device_table(
 }
 
 /* Check whether SP5100 SATA Combined mode is on */
-static bool_t __init amd_sp5100_erratum28(void)
+static bool __init amd_sp5100_erratum28(void)
 {
     u32 bus, id;
     u16 vendor_id, dev_id;

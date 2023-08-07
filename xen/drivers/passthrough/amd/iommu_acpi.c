@@ -1063,14 +1063,14 @@ static unsigned int __initdata nr_ivmd;
 #define to_ivmd_block(hdr) \
     container_of(hdr, const struct acpi_ivrs_memory, header)
 
-static inline bool_t is_ivhd_block(u8 type)
+static inline bool is_ivhd_block(u8 type)
 {
     return (type == ACPI_IVRS_TYPE_HARDWARE ||
             ((amd_iommu_acpi_info & ACPI_IVRS_EFR_SUP) &&
              type == ACPI_IVRS_TYPE_HARDWARE_11H));
 }
 
-static inline bool_t is_ivmd_block(u8 type)
+static inline bool is_ivmd_block(u8 type)
 {
     return (type == ACPI_IVRS_TYPE_MEMORY_ALL ||
             type == ACPI_IVRS_TYPE_MEMORY_ONE ||
@@ -1102,7 +1102,7 @@ static int __init cf_check parse_ivrs_table(struct acpi_table_header *table)
     const struct acpi_ivrs_header *ivrs_block;
     unsigned long length;
     unsigned int apic, i;
-    bool_t sb_ioapic = !iommu_intremap;
+    bool sb_ioapic = !iommu_intremap;
     int error = 0;
 
     BUG_ON(!table);

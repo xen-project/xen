@@ -46,7 +46,7 @@ static inline dfn_t dfn_add(dfn_t dfn, unsigned long i)
     return _dfn(dfn_x(dfn) + i);
 }
 
-static inline bool_t dfn_eq(dfn_t x, dfn_t y)
+static inline bool dfn_eq(dfn_t x, dfn_t y)
 {
     return dfn_x(x) == dfn_x(y);
 }
@@ -193,7 +193,7 @@ enum iommu_feature
     IOMMU_FEAT_count
 };
 
-bool_t iommu_has_feature(struct domain *d, enum iommu_feature feature);
+bool iommu_has_feature(struct domain *d, enum iommu_feature feature);
 
 #ifdef CONFIG_HAS_PCI
 struct pirq;
@@ -409,7 +409,7 @@ void iommu_dev_iotlb_flush_timeout(struct domain *d, struct pci_dev *pdev);
  * iommu_iotlb_flush/iommu_iotlb_flush_all will be explicitly called by
  * the caller.
  */
-DECLARE_PER_CPU(bool_t, iommu_dont_flush_iotlb);
+DECLARE_PER_CPU(bool, iommu_dont_flush_iotlb);
 
 extern struct spinlock iommu_pt_cleanup_lock;
 extern struct page_list_head iommu_pt_cleanup_list;

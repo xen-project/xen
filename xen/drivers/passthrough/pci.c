@@ -62,7 +62,7 @@ void pcidevs_unlock(void)
     spin_unlock_recursive(&_pcidevs_lock);
 }
 
-bool_t pcidevs_locked(void)
+bool pcidevs_locked(void)
 {
     return !!spin_is_locked(&_pcidevs_lock);
 }
@@ -74,7 +74,7 @@ static inline struct pci_seg *get_pseg(u16 seg)
     return radix_tree_lookup(&pci_segments, seg);
 }
 
-bool_t pci_known_segment(u16 seg)
+bool pci_known_segment(u16 seg)
 {
     return get_pseg(seg) != NULL;
 }
@@ -984,7 +984,7 @@ out:
     return ret;
 }
 
-bool_t __init pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func)
+bool __init pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func)
 {
     u32 vendor;
 
@@ -1181,7 +1181,7 @@ static int hest_match_pci(const struct acpi_hest_aer_common *p,
            p->function               == PCI_FUNC(pdev->devfn);
 }
 
-static bool_t hest_match_type(const struct acpi_hest_header *hest_hdr,
+static bool hest_match_type(const struct acpi_hest_header *hest_hdr,
                               const struct pci_dev *pdev)
 {
     unsigned int pos = pci_find_cap_offset(pdev->seg, pdev->bus,
@@ -1207,10 +1207,10 @@ static bool_t hest_match_type(const struct acpi_hest_header *hest_hdr,
 
 struct aer_hest_parse_info {
     const struct pci_dev *pdev;
-    bool_t firmware_first;
+    bool firmware_first;
 };
 
-static bool_t hest_source_is_pcie_aer(const struct acpi_hest_header *hest_hdr)
+static bool hest_source_is_pcie_aer(const struct acpi_hest_header *hest_hdr)
 {
     if ( hest_hdr->type == ACPI_HEST_TYPE_AER_ROOT_PORT ||
          hest_hdr->type == ACPI_HEST_TYPE_AER_ENDPOINT ||
@@ -1224,7 +1224,7 @@ static int cf_check aer_hest_parse(
 {
     struct aer_hest_parse_info *info = data;
     const struct acpi_hest_aer_common *p;
-    bool_t ff;
+    bool ff;
 
     if ( !hest_source_is_pcie_aer(hest_hdr) )
         return 0;
@@ -1254,7 +1254,7 @@ static int cf_check aer_hest_parse(
     return 0;
 }
 
-bool_t pcie_aer_get_firmware_first(const struct pci_dev *pdev)
+bool pcie_aer_get_firmware_first(const struct pci_dev *pdev)
 {
     struct aer_hest_parse_info info = { .pdev = pdev };
 

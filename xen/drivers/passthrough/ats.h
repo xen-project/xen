@@ -22,7 +22,7 @@
 #define ATS_QUEUE_DEPTH_MASK     0x1f
 #define ATS_ENABLE               (1<<15)
 
-extern bool_t ats_enabled;
+extern bool ats_enabled;
 
 int enable_ats_device(struct pci_dev *pdev, struct list_head *ats_list);
 void disable_ats_device(struct pci_dev *pdev);

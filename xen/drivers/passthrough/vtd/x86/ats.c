@@ -119,7 +119,7 @@ int dev_invalidate_iotlb(struct vtd_iommu *iommu, u16 did,
 
     list_for_each_entry_safe( pdev, temp, &iommu->ats_devices, ats.list )
     {
-        bool_t sbit;
+        bool sbit;
         int rc = 0;
 
         switch ( type )

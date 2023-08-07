@@ -644,8 +644,8 @@ static int __must_check iommu_flush_iotlb_global(struct vtd_iommu *iommu,
 }
 
 static int __must_check iommu_flush_iotlb_dsi(struct vtd_iommu *iommu, u16 did,
-                                              bool_t flush_non_present_entry,
-                                              bool_t flush_dev_iotlb)
+                                              bool flush_non_present_entry,
+                                              bool flush_dev_iotlb)
 {
     int status;
 
@@ -663,8 +663,8 @@ static int __must_check iommu_flush_iotlb_dsi(struct vtd_iommu *iommu, u16 did,
 
 static int __must_check iommu_flush_iotlb_psi(struct vtd_iommu *iommu, u16 did,
                                               u64 addr, unsigned int order,
-                                              bool_t flush_non_present_entry,
-                                              bool_t flush_dev_iotlb)
+                                              bool flush_non_present_entry,
+                                              bool flush_dev_iotlb)
 {
     int status;
 
@@ -694,7 +694,7 @@ static int __must_check iommu_flush_all(void)
 {
     struct acpi_drhd_unit *drhd;
     struct vtd_iommu *iommu;
-    bool_t flush_dev_iotlb;
+    bool flush_dev_iotlb;
     int rc = 0;
 
     flush_local(FLUSH_CACHE);
@@ -736,7 +736,7 @@ static int __must_check cf_check iommu_flush_iotlb(struct domain *d, dfn_t dfn,
     struct domain_iommu *hd = dom_iommu(d);
     struct acpi_drhd_unit *drhd;
     struct vtd_iommu *iommu;
-    bool_t flush_dev_iotlb;
+    bool flush_dev_iotlb;
     int iommu_domid;
     int ret = 0;
 
@@ -1480,7 +1480,7 @@ int domain_context_mapping_one(
     uint16_t seg = iommu->drhd->segment, prev_did = 0;
     struct domain *prev_dom = NULL;
     int rc, ret;
-    bool_t flush_dev_iotlb;
+    bool flush_dev_iotlb;
 
     if ( QUARANTINE_SKIP(domain, pgd_maddr) )
         return 0;
@@ -1874,7 +1874,7 @@ int domain_context_unmap_one(
     struct context_entry *context, *context_entries;
     u64 maddr;
     int iommu_domid, rc, ret;
-    bool_t flush_dev_iotlb;
+    bool flush_dev_iotlb;
 
     ASSERT(pcidevs_locked());
     spin_lock(&iommu->lock);
@@ -2873,7 +2873,7 @@ static int cf_check intel_iommu_assign_device(
         if ( rmrr->segment == seg && bdf == PCI_BDF(bus, devfn) &&
              rmrr->scope.devices_cnt > 1 )
         {
-            bool_t relaxed = !!(flag & XEN_DOMCTL_DEV_RDM_RELAXED);
+            bool relaxed = flag & XEN_DOMCTL_DEV_RDM_RELAXED;
 
             printk(XENLOG_GUEST "%s" VTDPREFIX
                    " It's %s to assign %pp"

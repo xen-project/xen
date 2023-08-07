@@ -18,7 +18,7 @@
 #include <xen/pci_regs.h>
 #include "ats.h"
 
-bool_t __read_mostly ats_enabled = 0;
+bool __read_mostly ats_enabled;
 boolean_param("ats", ats_enabled);
 
 int enable_ats_device(struct pci_dev *pdev, struct list_head *ats_list)

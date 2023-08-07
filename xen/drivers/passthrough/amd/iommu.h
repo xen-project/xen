@@ -174,7 +174,7 @@ struct guest_iommu {
 
     struct domain          *domain;
     spinlock_t              lock;
-    bool_t                  enabled;
+    bool                    enabled;
 
     struct guest_dev_table  dev_table;
     struct guest_buffer     cmd_buffer;
@@ -194,7 +194,7 @@ struct guest_iommu {
     struct guest_iommu_msi  msi;
 };
 
-extern bool_t iommuv2_enabled;
+extern bool iommuv2_enabled;
 
 struct acpi_ivrs_hardware;
 

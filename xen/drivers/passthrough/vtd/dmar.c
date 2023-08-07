@@ -149,7 +149,7 @@ struct vtd_iommu *ioapic_to_iommu(unsigned int apic_id)
     return NULL;
 }
 
-static bool_t acpi_hpet_device_match(
+static bool acpi_hpet_device_match(
     struct list_head *list, unsigned int hpet_id)
 {
     struct acpi_hpet_unit *hpet;
@@ -1052,14 +1052,14 @@ void acpi_dmar_zap(void)
         write_atomic((uint32_t*)&dmar_table->signature[0], sig);
 }
 
-bool_t platform_supports_intremap(void)
+bool platform_supports_intremap(void)
 {
     const unsigned int mask = ACPI_DMAR_INTR_REMAP;
 
     return (dmar_flags & mask) == ACPI_DMAR_INTR_REMAP;
 }
 
-bool_t __init platform_supports_x2apic(void)
+bool __init platform_supports_x2apic(void)
 {
     const unsigned int mask = ACPI_DMAR_INTR_REMAP | ACPI_DMAR_X2APIC_OPT_OUT;
 

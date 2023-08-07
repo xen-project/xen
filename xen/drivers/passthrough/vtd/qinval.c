@@ -152,7 +152,7 @@ static int __must_check queue_invalidate_iotlb_sync(struct vtd_iommu *iommu,
 
 static int __must_check queue_invalidate_wait(struct vtd_iommu *iommu,
                                               u8 iflag, u8 sw, u8 fn,
-                                              bool_t flush_dev_iotlb)
+                                              bool flush_dev_iotlb)
 {
     static DEFINE_PER_CPU(uint32_t, poll_slot);
     unsigned int index;

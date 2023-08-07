@@ -28,7 +28,7 @@
 /* dom_io is used as a sentinel for quarantined devices */
 #define QUARANTINE_SKIP(d, p) ((d) == dom_io && !(p)->arch.amd.root_table)
 
-static bool_t __read_mostly init_done;
+static bool __read_mostly init_done;
 
 static const struct iommu_init_ops _iommu_init_ops;
 
