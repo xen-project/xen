@@ -257,5 +257,7 @@ int hwp_register_driver(void);
 bool hwp_active(void);
 int get_hwp_para(unsigned int cpu,
                  struct xen_cppc_para *cppc_para);
+int set_hwp_para(struct cpufreq_policy *policy,
+                 struct xen_set_cppc_para *set_cppc);
 
 #endif /* __XEN_CPUFREQ_PM_H__ */
