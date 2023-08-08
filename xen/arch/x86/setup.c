@@ -1577,8 +1577,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         s = map_s;
         if ( s < map_e )
         {
-            uint64_t mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
-
+            mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
             map_s = (s + mask) & ~mask;
             map_e &= ~mask;
             init_boot_pages(map_s, map_e);

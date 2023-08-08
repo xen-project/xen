@@ -33,7 +33,7 @@ static inline void vesa_init(void) {};
 
 int construct_dom0(
     struct domain *d,
-    const module_t *kernel, unsigned long kernel_headroom,
+    const module_t *image, unsigned long image_headroom,
     module_t *initrd,
     const char *cmdline);
 void setup_io_bitmap(struct domain *d);
