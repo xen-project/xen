@@ -161,6 +161,31 @@ static inline unsigned long pdx_to_pfn(unsigned long pdx)
 #define pdx_to_mfn(pdx) _mfn(pdx_to_pfn(pdx))
 
 /**
+ * Computes the offset into the direct map of an maddr
+ *
+ * @param ma Machine address
+ * @return Offset on the direct map where that
+ *         machine address can be accessed
+ */
+static inline unsigned long maddr_to_directmapoff(paddr_t ma)
+{
+    return (((ma & ma_top_mask) >> pfn_pdx_hole_shift) |
+            (ma & ma_va_bottom_mask));
+}
+
+/**
+ * Computes a machine address given a direct map offset
+ *
+ * @param offset Offset into the direct map
+ * @return Corresponding machine address of that virtual location
+ */
+static inline paddr_t directmapoff_to_maddr(unsigned long offset)
+{
+    return ((((paddr_t)offset << pfn_pdx_hole_shift) & ma_top_mask) |
+            (offset & ma_va_bottom_mask));
+}
+
+/**
  * Initializes global variables with information about the compressible
  * range of the current memory regions.
  *

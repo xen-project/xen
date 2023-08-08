@@ -319,8 +319,7 @@ static inline void *maddr_to_virt(paddr_t ma)
            (DIRECTMAP_SIZE >> PAGE_SHIFT));
     return (void *)(XENHEAP_VIRT_START -
                     (directmap_base_pdx << PAGE_SHIFT) +
-                    ((ma & ma_va_bottom_mask) |
-                     ((ma & ma_top_mask) >> pfn_pdx_hole_shift)));
+                    maddr_to_directmapoff(ma));
 }
 #endif
 
