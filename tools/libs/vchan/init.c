@@ -345,7 +345,7 @@ struct libxenvchan *libxenvchan_server_init(struct xentoollog_logger *logger,
 
 	ctrl->ring = NULL;
 	ctrl->event = NULL;
-	ctrl->is_server = 1;
+	ctrl->is_server = -1;
 	ctrl->server_persist = 0;
 
 	ctrl->read.order = min_order(left_min);
