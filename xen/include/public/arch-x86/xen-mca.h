@@ -280,39 +280,39 @@ DEFINE_XEN_GUEST_HANDLE(xen_mc_logical_cpu_t);
 /* Prototype:
  *    uint32_t x86_mcinfo_nentries(struct mc_info *mi);
  */
-#define x86_mcinfo_nentries(_mi)    \
-    (_mi)->mi_nentries
+#define x86_mcinfo_nentries(mi)    \
+    (mi)->mi_nentries
 /* Prototype:
  *    struct mcinfo_common *x86_mcinfo_first(struct mc_info *mi);
  */
-#define x86_mcinfo_first(_mi)       \
-    ((struct mcinfo_common *)(_mi)->mi_data)
+#define x86_mcinfo_first(mi)       \
+    ((struct mcinfo_common *)(mi)->mi_data)
 /* Prototype:
  *    struct mcinfo_common *x86_mcinfo_next(struct mcinfo_common *mic);
  */
-#define x86_mcinfo_next(_mic)       \
-    ((struct mcinfo_common *)((uint8_t *)(_mic) + (_mic)->size))
+#define x86_mcinfo_next(mic)       \
+    ((struct mcinfo_common *)((uint8_t *)(mic) + (mic)->size))
 
 /* Prototype:
- *    void x86_mcinfo_lookup(void *ret, struct mc_info *mi, uint16_t type);
+ *    void x86_mcinfo_lookup(void *ret, struct mc_info *mi, uint16_t mc_type);
  */
-#define x86_mcinfo_lookup(_ret, _mi, _type)    \
+#define x86_mcinfo_lookup(ret, mi, mc_type)                     \
     do {                                                        \
-        uint32_t found, i;                                      \
-        struct mcinfo_common *_mic;                             \
+        uint32_t found_, i_;                                    \
+        struct mcinfo_common *mic_;                             \
                                                                 \
-        found = 0;                                              \
-        (_ret) = NULL;                                          \
-        if (_mi == NULL) break;                                 \
-        _mic = x86_mcinfo_first(_mi);                           \
-        for (i = 0; i < x86_mcinfo_nentries(_mi); i++) {        \
-            if (_mic->type == (_type)) {                        \
-                found = 1;                                      \
+        found_ = 0;                                             \
+        (ret) = NULL;                                           \
+        if ((mi) == NULL) break;                                \
+        mic_ = x86_mcinfo_first(mi);                            \
+        for (i_ = 0; i_ < x86_mcinfo_nentries(mi); i_++) {      \
+            if (mic_->type == (mc_type)) {                      \
+                found_ = 1;                                     \
                 break;                                          \
             }                                                   \
-            _mic = x86_mcinfo_next(_mic);                       \
+            mic_ = x86_mcinfo_next(mic_);                       \
         }                                                       \
-        (_ret) = found ? _mic : NULL;                           \
+        (ret) = found_ ? mic_ : NULL;                           \
     } while (0)
 
 
