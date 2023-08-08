@@ -7,6 +7,8 @@ test_variant=$1
 # Prompt to grep for to check if dom0 booted successfully
 dom0_prompt="^/ #"
 
+serial_log="$(pwd)/smoke.serial"
+
 cd binaries
 # Use the kernel from Debian
 curl --fail --silent --show-error --location --output vmlinuz https://deb.debian.org/debian/dists/bullseye/main/installer-armhf/current/images/netboot/vmlinuz
@@ -120,7 +122,7 @@ git clone https://gitlab.com/ViryaOS/imagebuilder
 bash imagebuilder/scripts/uboot-script-gen -t tftp -d . -c config
 
 # Run the test
-rm -f smoke.serial
+rm -f ${serial_log}
 set +e
 echo "  virtio scan; dhcp; tftpb 0x40000000 boot.scr; source 0x40000000"| \
 timeout -k 1 240 \
@@ -135,8 +137,8 @@ timeout -k 1 240 \
     -no-reboot \
     -device virtio-net-pci,netdev=n0 \
     -netdev user,id=n0,tftp=./ \
-    -bios /usr/lib/u-boot/qemu_arm/u-boot.bin |& tee smoke.serial
+    -bios /usr/lib/u-boot/qemu_arm/u-boot.bin |& tee ${serial_log}
 
 set -e
-(grep -q "${dom0_prompt}" smoke.serial && grep -q "${passed}" smoke.serial) || exit 1
+(grep -q "${dom0_prompt}" ${serial_log} && grep -q "${passed}" ${serial_log}) || exit 1
 exit 0

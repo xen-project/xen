@@ -2,6 +2,8 @@
 
 set -ex
 
+serial_log="$(pwd)/smoke.serial"
+
 cd binaries
 
 mkdir rootfs
@@ -74,7 +76,7 @@ rm -rf imagebuilder
 git clone https://gitlab.com/ViryaOS/imagebuilder
 bash imagebuilder/scripts/uboot-script-gen -t tftp -d . -c config
 
-rm -f smoke.serial
+rm -f ${serial_log}
 set +e
 echo "  virtio scan; dhcp; tftpb 0x40000000 boot.scr; source 0x40000000"| \
 timeout -k 1 720 \
@@ -89,8 +91,8 @@ timeout -k 1 720 \
    -no-reboot \
    -device virtio-net-pci,netdev=n0 \
    -netdev user,id=n0,tftp=./ \
-   -bios /usr/lib/u-boot/qemu_arm/u-boot.bin |& tee smoke.serial
+   -bios /usr/lib/u-boot/qemu_arm/u-boot.bin |& tee ${serial_log}
 
 set -e
-(grep -q "Domain-0" smoke.serial && grep -q "^/ #" smoke.serial) || exit 1
+(grep -q "Domain-0" ${serial_log} && grep -q "^/ #" ${serial_log}) || exit 1
 exit 0
