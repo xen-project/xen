@@ -136,6 +136,18 @@
         add \xb, \xb, x20
 .endm
 
+/*
+ * Flush local TLBs
+ *
+ * See asm/arm64/flushtlb.h for the explanation of the sequence.
+ */
+.macro flush_xen_tlb_local
+        dsb   nshst
+        tlbi  alle2
+        dsb   nsh
+        isb
+.endm
+
         .section .text.header, "ax", %progbits
         /*.aarch64*/
 
@@ -721,8 +733,7 @@ enable_mmu:
          * The state of the TLBs is unknown before turning on the MMU.
          * Flush them to avoid stale one.
          */
-        tlbi  alle2                  /* Flush hypervisor TLBs */
-        dsb   nsh
+        flush_xen_tlb_local
 
         /* Write Xen's PT's paddr into TTBR0_EL2 */
         msr   TTBR0_EL2, x4
@@ -786,11 +797,7 @@ remove_identity_mapping:
         str   xzr, [x0, x1, lsl #3]
 
 identity_mapping_removed:
-        /* See asm/arm64/flushtlb.h for the explanation of the sequence. */
-        dsb   nshst
-        tlbi  alle2
-        dsb   nsh
-        isb
+        flush_xen_tlb_local
 
         ret
 ENDPROC(remove_identity_mapping)
@@ -872,14 +879,8 @@ ENTRY(switch_ttbr_id)
         msr    SCTLR_EL2, x1
         isb
 
-        /*
-         * 3) Flush the TLBs.
-         * See asm/arm64/flushtlb.h for the explanation of the sequence.
-         */
-        dsb   nshst
-        tlbi  alle2
-        dsb   nsh
-        isb
+        /* 3) Flush the TLBs */
+        flush_xen_tlb_local
 
         /* 4) Update the TTBR */
         msr   TTBR0_EL2, x0
