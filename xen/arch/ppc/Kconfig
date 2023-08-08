@@ -1,7 +1,6 @@
 config PPC
 	def_bool y
 	select HAS_DEVICE_TREE
-	select HAS_PDX
 
 config PPC64
 	def_bool y

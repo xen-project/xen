@@ -458,7 +458,7 @@ void domain_cpu_policy_changed(struct domain *d)
     }
 }
 
-#ifndef CONFIG_BIGMEM
+#if !defined(CONFIG_BIGMEM) && defined(CONFIG_PDX_COMPRESSION)
 /*
  * The hole may be at or above the 44-bit boundary, so we need to determine
  * the total bit count until reaching 32 significant (not squashed out) bits
@@ -485,13 +485,20 @@ static unsigned int __init noinline _domain_struct_bits(void)
 struct domain *alloc_domain_struct(void)
 {
     struct domain *d;
-#ifdef CONFIG_BIGMEM
-    const unsigned int bits = 0;
-#else
+
     /*
-     * We pack the PDX of the domain structure into a 32-bit field within
-     * the page_info structure. Hence the MEMF_bits() restriction.
+     * Without CONFIG_BIGMEM, we pack the PDX of the domain structure into
+     * a 32-bit field within the page_info structure. Hence the MEMF_bits()
+     * restriction. With PDX compression in place the number of bits must
+     * be calculated at runtime, but it's fixed otherwise.
+     *
+     * On systems with CONFIG_BIGMEM there's no packing, and so there's no
+     * such restriction.
      */
+#if defined(CONFIG_BIGMEM) || !defined(CONFIG_PDX_COMPRESSION)
+    const unsigned int bits = IS_ENABLED(CONFIG_BIGMEM) ? 0 :
+                                                          32 + PAGE_SHIFT;
+#else
     static unsigned int __read_mostly bits;
 
     if ( unlikely(!bits) )

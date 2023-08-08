@@ -67,8 +67,6 @@
  * region involved.
  */
 
-#ifdef CONFIG_HAS_PDX
-
 extern unsigned long max_pdx;
 
 #define PDX_GROUP_COUNT ((1 << PDX_GROUP_SHIFT) / \
@@ -99,6 +97,8 @@ bool __mfn_valid(unsigned long mfn);
 
 #define mfn_to_pdx(mfn) pfn_to_pdx(mfn_x(mfn))
 #define pdx_to_mfn(pdx) _mfn(pdx_to_pfn(pdx))
+
+#ifdef CONFIG_PDX_COMPRESSION
 
 extern unsigned long pfn_pdx_bottom_mask, ma_va_bottom_mask;
 extern unsigned int pfn_pdx_hole_shift;
@@ -206,7 +206,39 @@ static inline paddr_t directmapoff_to_maddr(unsigned long offset)
  */
 void pfn_pdx_hole_setup(unsigned long mask);
 
-#endif /* HAS_PDX */
+#else /* !CONFIG_PDX_COMPRESSION */
+
+/* Without PDX compression we can skip some computations */
+
+/* pdx<->pfn == identity */
+#define pdx_to_pfn(x) (x)
+#define pfn_to_pdx(x) (x)
+
+/* directmap is indexed by by maddr */
+#define maddr_to_directmapoff(x) (x)
+#define directmapoff_to_maddr(x) (x)
+
+static inline bool pdx_is_region_compressible(paddr_t base,
+                                              unsigned long npages)
+{
+    return true;
+}
+
+static inline uint64_t pdx_init_mask(uint64_t base_addr)
+{
+    return 0;
+}
+
+static inline uint64_t pdx_region_mask(uint64_t base, uint64_t len)
+{
+    return 0;
+}
+
+static inline void pfn_pdx_hole_setup(unsigned long mask)
+{
+}
+
+#endif /* CONFIG_PDX_COMPRESSION */
 #endif /* __XEN_PDX_H__ */
 
 /*

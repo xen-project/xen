@@ -31,11 +31,16 @@ unsigned long __read_mostly pdx_group_valid[BITS_TO_LONGS(
 
 bool __mfn_valid(unsigned long mfn)
 {
-    if ( unlikely(evaluate_nospec(mfn >= max_page)) )
+    bool invalid = mfn >= max_page;
+
+#ifdef CONFIG_PDX_COMPRESSION
+    invalid |= mfn & pfn_hole_mask;
+#endif
+
+    if ( unlikely(evaluate_nospec(invalid)) )
         return false;
-    return likely(!(mfn & pfn_hole_mask)) &&
-           likely(test_bit(pfn_to_pdx(mfn) / PDX_GROUP_COUNT,
-                           pdx_group_valid));
+
+    return test_bit(pfn_to_pdx(mfn) / PDX_GROUP_COUNT, pdx_group_valid);
 }
 
 void set_pdx_range(unsigned long smfn, unsigned long emfn)
@@ -48,6 +53,8 @@ void set_pdx_range(unsigned long smfn, unsigned long emfn)
     for ( ; idx < eidx; ++idx )
         __set_bit(idx, pdx_group_valid);
 }
+
+#ifdef CONFIG_PDX_COMPRESSION
 
 /*
  * Diagram to make sense of the following variables. The masks and shifts
@@ -176,6 +183,7 @@ void __init pfn_pdx_hole_setup(unsigned long mask)
     ma_top_mask         = pfn_top_mask << PAGE_SHIFT;
 }
 
+#endif /* CONFIG_PDX_COMPRESSION */
 
 /*
  * Local variables:
