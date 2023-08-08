@@ -7,7 +7,7 @@ struct cpu_dev {
 extern const struct cpu_dev intel_cpu_dev, amd_cpu_dev, centaur_cpu_dev,
     shanghai_cpu_dev, hygon_cpu_dev;
 
-extern bool_t opt_arat;
+extern bool opt_arat;
 extern unsigned int opt_cpuid_mask_ecx, opt_cpuid_mask_edx;
 extern unsigned int opt_cpuid_mask_xsave_eax;
 extern unsigned int opt_cpuid_mask_ext_ecx, opt_cpuid_mask_ext_edx;
