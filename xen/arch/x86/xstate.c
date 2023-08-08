@@ -174,10 +174,10 @@ static void setup_xstate_comp(uint16_t *comp_offsets,
  */
 void expand_xsave_states(const struct vcpu *v, void *dest, unsigned int size)
 {
-    const struct xsave_struct *xsave = v->arch.xsave_area;
+    const struct xsave_struct *xstate = v->arch.xsave_area;
     const void *src;
     uint16_t comp_offsets[sizeof(xfeature_mask)*8];
-    u64 xstate_bv = xsave->xsave_hdr.xstate_bv;
+    u64 xstate_bv = xstate->xsave_hdr.xstate_bv;
     u64 valid;
 
     /* Check there is state to serialise (i.e. at least an XSAVE_HDR) */
@@ -185,19 +185,19 @@ void expand_xsave_states(const struct vcpu *v, void *dest, unsigned int size)
     /* Check there is the correct room to decompress into. */
     BUG_ON(size != xstate_ctxt_size(v->arch.xcr0_accum));
 
-    if ( !(xsave->xsave_hdr.xcomp_bv & XSTATE_COMPACTION_ENABLED) )
+    if ( !(xstate->xsave_hdr.xcomp_bv & XSTATE_COMPACTION_ENABLED) )
     {
-        memcpy(dest, xsave, size);
+        memcpy(dest, xstate, size);
         return;
     }
 
-    ASSERT(xsave_area_compressed(xsave));
-    setup_xstate_comp(comp_offsets, xsave->xsave_hdr.xcomp_bv);
+    ASSERT(xsave_area_compressed(xstate));
+    setup_xstate_comp(comp_offsets, xstate->xsave_hdr.xcomp_bv);
 
     /*
      * Copy legacy XSAVE area and XSAVE hdr area.
      */
-    memcpy(dest, xsave, XSTATE_AREA_MIN_SIZE);
+    memcpy(dest, xstate, XSTATE_AREA_MIN_SIZE);
     memset(dest + XSTATE_AREA_MIN_SIZE, 0, size - XSTATE_AREA_MIN_SIZE);
 
     ((struct xsave_struct *)dest)->xsave_hdr.xcomp_bv =  0;
@@ -206,7 +206,7 @@ void expand_xsave_states(const struct vcpu *v, void *dest, unsigned int size)
      * Copy each region from the possibly compacted offset to the
      * non-compacted offset.
      */
-    src = xsave;
+    src = xstate;
     valid = xstate_bv & ~XSTATE_FP_SSE;
     while ( valid )
     {
@@ -239,7 +239,7 @@ void expand_xsave_states(const struct vcpu *v, void *dest, unsigned int size)
  */
 void compress_xsave_states(struct vcpu *v, const void *src, unsigned int size)
 {
-    struct xsave_struct *xsave = v->arch.xsave_area;
+    struct xsave_struct *xstate = v->arch.xsave_area;
     void *dest;
     uint16_t comp_offsets[sizeof(xfeature_mask)*8];
     u64 xstate_bv, valid;
@@ -252,7 +252,7 @@ void compress_xsave_states(struct vcpu *v, const void *src, unsigned int size)
 
     if ( !(v->arch.xcr0_accum & XSTATE_XSAVES_ONLY) )
     {
-        memcpy(xsave, src, size);
+        memcpy(xstate, src, size);
         return;
     }
 
@@ -260,19 +260,19 @@ void compress_xsave_states(struct vcpu *v, const void *src, unsigned int size)
      * Copy legacy XSAVE area, to avoid complications with CPUID
      * leaves 0 and 1 in the loop below.
      */
-    memcpy(xsave, src, FXSAVE_SIZE);
+    memcpy(xstate, src, FXSAVE_SIZE);
 
     /* Set XSTATE_BV and XCOMP_BV.  */
-    xsave->xsave_hdr.xstate_bv = xstate_bv;
-    xsave->xsave_hdr.xcomp_bv = v->arch.xcr0_accum | XSTATE_COMPACTION_ENABLED;
+    xstate->xsave_hdr.xstate_bv = xstate_bv;
+    xstate->xsave_hdr.xcomp_bv = v->arch.xcr0_accum | XSTATE_COMPACTION_ENABLED;
 
-    setup_xstate_comp(comp_offsets, xsave->xsave_hdr.xcomp_bv);
+    setup_xstate_comp(comp_offsets, xstate->xsave_hdr.xcomp_bv);
 
     /*
      * Copy each region from the non-compacted offset to the
      * possibly compacted offset.
      */
-    dest = xsave;
+    dest = xstate;
     valid = xstate_bv & ~XSTATE_FP_SSE;
     while ( valid )
     {
