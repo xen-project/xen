@@ -155,7 +155,7 @@ int main(int argc, char **argv)
 		perror("libxenvchan_*_init");
 		exit(1);
 	}
-	ctrl->blocking = 1;
+	ctrl->blocking = -1;
 
 	srand(seed);
 	fprintf(stderr, "seed=%d\n", seed);
