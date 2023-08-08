@@ -88,12 +88,18 @@ bool __mfn_valid(unsigned long mfn)
 }
 
 /* Sets all bits from the most-significant 1-bit down to the LSB */
-static uint64_t __init fill_mask(uint64_t mask)
+static uint64_t fill_mask(uint64_t mask)
 {
     while (mask & (mask + 1))
         mask |= mask + 1;
 
     return mask;
+}
+
+bool pdx_is_region_compressible(paddr_t base, unsigned long npages)
+{
+    return !(paddr_to_pfn(base) & pfn_hole_mask) &&
+           !(pdx_region_mask(base, npages * PAGE_SIZE) & ~ma_va_bottom_mask);
 }
 
 /* We don't want to compress the low MAX_ORDER bits of the addresses. */
@@ -103,7 +109,7 @@ uint64_t __init pdx_init_mask(uint64_t base_addr)
                          (uint64_t)1 << (MAX_ORDER + PAGE_SHIFT)) - 1);
 }
 
-uint64_t __init pdx_region_mask(uint64_t base, uint64_t len)
+uint64_t pdx_region_mask(uint64_t base, uint64_t len)
 {
     /*
      * We say a bit "moves" in a range if there exist 2 addresses in that

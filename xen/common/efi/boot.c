@@ -14,6 +14,7 @@
 #include <xen/multiboot.h>
 #include <xen/param.h>
 #include <xen/pci_regs.h>
+#include <xen/pdx.h>
 #include <xen/pfn.h>
 #if EFI_PAGE_SIZE != PAGE_SIZE
 # error Cannot use xen/pfn.h here!
@@ -1646,9 +1647,11 @@ static __init void copy_mapping(unsigned long mfn, unsigned long end,
 
 static bool __init cf_check ram_range_valid(unsigned long smfn, unsigned long emfn)
 {
+    paddr_t ram_base = pfn_to_paddr(smfn);
+    unsigned long ram_npages = emfn - smfn;
     unsigned long sz = pfn_to_pdx(emfn - 1) / PDX_GROUP_COUNT + 1;
 
-    return !(smfn & pfn_hole_mask) &&
+    return pdx_is_region_compressible(ram_base, ram_npages) &&
            find_next_bit(pdx_group_valid, sz,
                          pfn_to_pdx(smfn) / PDX_GROUP_COUNT) < sz;
 }
@@ -1682,6 +1685,8 @@ void __init efi_init_memory(void)
         u64 len = desc->NumberOfPages << EFI_PAGE_SHIFT;
         unsigned long smfn, emfn;
         unsigned int prot = PAGE_HYPERVISOR_RWX;
+        paddr_t mem_base;
+        unsigned long mem_npages;
 
         printk(XENLOG_INFO " %013" PRIx64 "-%013" PRIx64
                            " type=%u attr=%016" PRIx64 "\n",
@@ -1733,6 +1738,9 @@ void __init efi_init_memory(void)
         smfn = PFN_DOWN(desc->PhysicalStart);
         emfn = PFN_UP(desc->PhysicalStart + len);
 
+        mem_base = pfn_to_paddr(smfn);
+        mem_npages = emfn - smfn;
+
         if ( desc->Attribute & EFI_MEMORY_WB )
             prot |= _PAGE_WB;
         else if ( desc->Attribute & EFI_MEMORY_WT )
@@ -1760,8 +1768,7 @@ void __init efi_init_memory(void)
             prot |= _PAGE_NX;
 
         if ( pfn_to_pdx(emfn - 1) < (DIRECTMAP_SIZE >> PAGE_SHIFT) &&
-             !(smfn & pfn_hole_mask) &&
-             !((smfn ^ (emfn - 1)) & ~pfn_pdx_bottom_mask) )
+             pdx_is_region_compressible(mem_base, mem_npages) )
         {
             if ( (unsigned long)mfn_to_virt(emfn - 1) >= HYPERVISOR_VIRT_END )
                 prot &= ~_PAGE_GLOBAL;

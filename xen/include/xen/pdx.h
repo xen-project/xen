@@ -80,6 +80,15 @@ extern unsigned long pfn_top_mask, ma_top_mask;
 extern unsigned long pdx_group_valid[];
 
 /**
+ * Validate a region's compatibility with the current compression runtime
+ *
+ * @param base Base address of the region
+ * @param npages Number of PAGE_SIZE-sized pages in the region
+ * @return True iff the region can be used with the current compression
+ */
+bool pdx_is_region_compressible(paddr_t base, unsigned long npages);
+
+/**
  * Calculates a mask covering "moving" bits of all addresses of a region
  *
  * The i-th bit of the mask must be set if there's 2 different addresses
