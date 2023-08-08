@@ -70,14 +70,40 @@
 #ifdef CONFIG_HAS_PDX
 
 extern unsigned long max_pdx;
-extern unsigned long pfn_pdx_bottom_mask, ma_va_bottom_mask;
-extern unsigned int pfn_pdx_hole_shift;
-extern unsigned long pfn_hole_mask;
-extern unsigned long pfn_top_mask, ma_top_mask;
 
 #define PDX_GROUP_COUNT ((1 << PDX_GROUP_SHIFT) / \
                          (sizeof(*frame_table) & -sizeof(*frame_table)))
 extern unsigned long pdx_group_valid[];
+
+/**
+ * Mark [smfn, emfn) as allocatable in the frame table
+ *
+ * @param smfn Start mfn
+ * @param emfn End mfn
+ */
+void set_pdx_range(unsigned long smfn, unsigned long emfn);
+
+/**
+ * Invoked to determine if an mfn has an associated valid frame table entry
+ *
+ * In order for it to be legal it must pass bounds, grouping and
+ * compression sanity checks.
+ *
+ * @param mfn To-be-checked mfn
+ * @return True iff all checks pass
+ */
+bool __mfn_valid(unsigned long mfn);
+
+#define page_to_pdx(pg)  ((pg) - frame_table)
+#define pdx_to_page(pdx) gcc11_wrap(frame_table + (pdx))
+
+#define mfn_to_pdx(mfn) pfn_to_pdx(mfn_x(mfn))
+#define pdx_to_mfn(pdx) _mfn(pdx_to_pfn(pdx))
+
+extern unsigned long pfn_pdx_bottom_mask, ma_va_bottom_mask;
+extern unsigned int pfn_pdx_hole_shift;
+extern unsigned long pfn_hole_mask;
+extern unsigned long pfn_top_mask, ma_top_mask;
 
 /**
  * Validate a region's compatibility with the current compression runtime
@@ -121,28 +147,6 @@ uint64_t pdx_region_mask(uint64_t base, uint64_t len);
 uint64_t pdx_init_mask(uint64_t base_addr);
 
 /**
- * Mark [smfn, emfn) as accesible in the frame table
- *
- * @param smfn Start mfn
- * @param emfn End mfn
- */
-void set_pdx_range(unsigned long smfn, unsigned long emfn);
-
-#define page_to_pdx(pg)  ((pg) - frame_table)
-#define pdx_to_page(pdx) gcc11_wrap(frame_table + (pdx))
-
-/**
- * Invoked to determine if an mfn has an associated valid frame table entry
- *
- * In order for it to be legal it must pass bounds, grouping and
- * compression sanity checks.
- *
- * @param mfn To-be-checked mfn
- * @return True iff all checks pass
- */
-bool __mfn_valid(unsigned long mfn);
-
-/**
  * Map pfn to its corresponding pdx
  *
  * @param pfn Frame number
@@ -165,9 +169,6 @@ static inline unsigned long pdx_to_pfn(unsigned long pdx)
     return (pdx & pfn_pdx_bottom_mask) |
            ((pdx << pfn_pdx_hole_shift) & pfn_top_mask);
 }
-
-#define mfn_to_pdx(mfn) pfn_to_pdx(mfn_x(mfn))
-#define pdx_to_mfn(pdx) _mfn(pdx_to_pfn(pdx))
 
 /**
  * Computes the offset into the direct map of an maddr

@@ -20,6 +20,35 @@
 #include <xen/bitops.h>
 #include <xen/nospec.h>
 
+/**
+ * Maximum (non-inclusive) usable pdx. Must be
+ * modifiable after init due to memory hotplug
+ */
+unsigned long __read_mostly max_pdx;
+
+unsigned long __read_mostly pdx_group_valid[BITS_TO_LONGS(
+    (FRAMETABLE_NR + PDX_GROUP_COUNT - 1) / PDX_GROUP_COUNT)] = { [0] = 1 };
+
+bool __mfn_valid(unsigned long mfn)
+{
+    if ( unlikely(evaluate_nospec(mfn >= max_page)) )
+        return false;
+    return likely(!(mfn & pfn_hole_mask)) &&
+           likely(test_bit(pfn_to_pdx(mfn) / PDX_GROUP_COUNT,
+                           pdx_group_valid));
+}
+
+void set_pdx_range(unsigned long smfn, unsigned long emfn)
+{
+    unsigned long idx, eidx;
+
+    idx = pfn_to_pdx(smfn) / PDX_GROUP_COUNT;
+    eidx = (pfn_to_pdx(emfn - 1) + PDX_GROUP_COUNT) / PDX_GROUP_COUNT;
+
+    for ( ; idx < eidx; ++idx )
+        __set_bit(idx, pdx_group_valid);
+}
+
 /*
  * Diagram to make sense of the following variables. The masks and shifts
  * are done on mfn values in order to convert to/from pdx:
@@ -47,12 +76,6 @@
  * ones.
  */
 
-/**
- * Maximum (non-inclusive) usable pdx. Must be
- * modifiable after init due to memory hotplug
- */
-unsigned long __read_mostly max_pdx;
-
 /** Mask for the lower non-compressible bits of an mfn */
 unsigned long __ro_after_init pfn_pdx_bottom_mask = ~0UL;
 
@@ -74,18 +97,6 @@ unsigned long __ro_after_init pfn_hole_mask = 0;
 
 /** Number of bits of the "compressible" bit slice of an mfn */
 unsigned int __ro_after_init pfn_pdx_hole_shift = 0;
-
-unsigned long __read_mostly pdx_group_valid[BITS_TO_LONGS(
-    (FRAMETABLE_NR + PDX_GROUP_COUNT - 1) / PDX_GROUP_COUNT)] = { [0] = 1 };
-
-bool __mfn_valid(unsigned long mfn)
-{
-    if ( unlikely(evaluate_nospec(mfn >= max_page)) )
-        return false;
-    return likely(!(mfn & pfn_hole_mask)) &&
-           likely(test_bit(pfn_to_pdx(mfn) / PDX_GROUP_COUNT,
-                           pdx_group_valid));
-}
 
 /* Sets all bits from the most-significant 1-bit down to the LSB */
 static uint64_t fill_mask(uint64_t mask)
@@ -122,17 +133,6 @@ uint64_t pdx_region_mask(uint64_t base, uint64_t len)
      * positions in order to get the mask of moving bits.
      */
     return fill_mask(base ^ (base + len - 1));
-}
-
-void set_pdx_range(unsigned long smfn, unsigned long emfn)
-{
-    unsigned long idx, eidx;
-
-    idx = pfn_to_pdx(smfn) / PDX_GROUP_COUNT;
-    eidx = (pfn_to_pdx(emfn - 1) + PDX_GROUP_COUNT) / PDX_GROUP_COUNT;
-
-    for ( ; idx < eidx; ++idx )
-        __set_bit(idx, pdx_group_valid);
 }
 
 void __init pfn_pdx_hole_setup(unsigned long mask)
