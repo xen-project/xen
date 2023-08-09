@@ -198,9 +198,6 @@ extern unsigned long directmap_base_pdx;
 /* PDX of the first page in the frame table. */
 extern unsigned long frametable_base_pdx;
 
-extern unsigned long max_page;
-extern unsigned long total_pages;
-
 #define PDX_GROUP_SHIFT SECOND_SHIFT
 
 /* Boot-time pagetable setup */

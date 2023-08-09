@@ -159,6 +159,8 @@ int assign_page(
 /* Dump info to serial console */
 void arch_dump_shared_mem_info(void);
 
+extern unsigned long max_page;
+extern unsigned long total_pages;
 extern paddr_t mem_hotplug;
 
 /*

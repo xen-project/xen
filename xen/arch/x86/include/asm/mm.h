@@ -337,8 +337,6 @@ struct page_info
 #define maddr_get_owner(ma)   (page_get_owner(maddr_to_page((ma))))
 
 #define frame_table ((struct page_info *)FRAMETABLE_VIRT_START)
-extern unsigned long max_page;
-extern unsigned long total_pages;
 void init_frametable(void);
 
 #define PDX_GROUP_SHIFT L2_PAGETABLE_SHIFT

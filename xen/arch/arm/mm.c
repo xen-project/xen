@@ -134,9 +134,6 @@ unsigned long directmap_base_pdx __read_mostly;
 unsigned long frametable_base_pdx __read_mostly;
 unsigned long frametable_virt_end __read_mostly;
 
-unsigned long max_page;
-unsigned long total_pages;
-
 extern char __init_begin[], __init_end[];
 
 /* Checking VA memory layout alignment. */

@@ -162,6 +162,8 @@
 #define PGT_TYPE_INFO_INITIALIZER 0
 #endif
 
+unsigned long __read_mostly max_page;
+unsigned long __read_mostly total_pages;
 paddr_t __ro_after_init mem_hotplug;
 
 /*
