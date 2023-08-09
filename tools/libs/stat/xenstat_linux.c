@@ -169,6 +169,7 @@ static int parseNetDevLine(char *line, char *iface, unsigned long long *rxBytes,
 							matches[i].rm_so + 1) * sizeof(char));
 				for (x = matches[i].rm_so; x < matches[i].rm_eo; x++)
 					tmp[x - matches[i].rm_so] = line[x];
+				tmp[x - matches[i].rm_so] = 0;
 
 				/* We populate all the fields from /proc/net/dev line */
 				if (i > 1) {
@@ -225,15 +226,11 @@ static int parseNetDevLine(char *line, char *iface, unsigned long long *rxBytes,
 							break;
 					}
 				}
-				else
-				/* There were errors when parsing this directly in RE. strpbrk() helps */
-				if (iface != NULL) {
+				else if (iface != NULL) {
 					char *tmp2 = strpbrk(tmp, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
 					if (tmp2 != NULL)
 						strcpy(iface, tmp2);
 				}
-
-				memset(tmp, 0, matches[i].rm_eo - matches[i].rm_so);
 			}
 		}
 	}
