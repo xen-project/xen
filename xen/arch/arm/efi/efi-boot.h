@@ -227,7 +227,7 @@ static EFI_STATUS __init efi_process_memory_map_bootinfo(EFI_MEMORY_DESCRIPTOR *
  * of the System table address, the address of the final EFI memory map,
  * and memory map information.
  */
-EFI_STATUS __init fdt_add_uefi_nodes(EFI_SYSTEM_TABLE *sys_table,
+static EFI_STATUS __init fdt_add_uefi_nodes(EFI_SYSTEM_TABLE *sys_table,
                                             void *fdt,
                                             EFI_MEMORY_DESCRIPTOR *memory_map,
                                             UINTN map_size,
