@@ -1,12 +1,3 @@
-# File provided in
-# Re: Xen MISRA C: Source files in scope and out of scope
-# from:	Stefano Stabellini <stefano.stabellini@amd.com> 
-# date:	6 giu 2023, 02:53
-
-#
-# Automatically generated file; DO NOT EDIT.
-# Xen/x86 4.18-unstable Configuration
-#
 CONFIG_CC_IS_GCC=y
 CONFIG_GCC_VERSION=90400
 CONFIG_CLANG_VERSION=0
