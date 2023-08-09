@@ -14,8 +14,13 @@ Constant expressions and unreachable branches of if and switch statements are ex
 -config=MC3R1.R2.1,+reports={deliberate,"first_area(^.*is never referenced$)"}
 -doc_end
 
--doc_begin="Unreachability in the following macros are expected and safe."
--config=MC3R1.R2.1,statements+={safe,"macro(name(BUG||assert_failed||ERROR_EXIT||ERROR_EXIT_DOM||PIN_FAIL))"}
+-doc_begin="Unreachability caused by calls to the following functions or macros is deliberate and there is no risk of code being unexpectedly left out."
+-config=MC3R1.R2.1,statements+={deliberate,"macro(name(BUG||assert_failed||ERROR_EXIT||ERROR_EXIT_DOM||PIN_FAIL))"}
+-config=MC3R1.R2.1,statements+={deliberate, "call(decl(name(__builtin_unreachable||panic||do_unexpected_trap||machine_halt||machine_restart||maybe_reboot)))"}
+-doc_end
+
+-doc_begin="Unreachability of an ASSERT_UNREACHABLE() and analogous macro calls is deliberate and safe."
+-config=MC3R1.R2.1,reports+={deliberate, "any_area(any_loc(any_exp(macro(name(ASSERT_UNREACHABLE||PARSE_ERR_RET||PARSE_ERR||FAIL_MSR||FAIL_CPUID)))))"}
 -doc_end
 
 -doc_begin="Proving compliance with respect to Rule 2.2 is generally impossible:
@@ -93,25 +98,11 @@ conform to the directive."
 -doc_begin="The project adopted the rule with an exception listed in
 'docs/misra/rules.rst'"
 -config=MC3R1.R5.3,reports+={safe, "any_area(any_loc(any_exp(macro(^READ_SYSREG$))&&any_exp(macro(^WRITE_SYSREG$))))"}
--config=MC3R1.R5.3,reports+={safe, "any_area(any_loc(any_exp(macro(^max_t$))&&any_exp(macro(^min_t$))))"}
+-config=MC3R1.R5.3,reports+={safe, "any_area(any_loc(any_exp(macro(^max(_t)?$))&&any_exp(macro(^min(_t)?$))))"}
 -config=MC3R1.R5.3,reports+={safe, "any_area(any_loc(any_exp(macro(^read[bwlq]$))&&any_exp(macro(^read[bwlq]_relaxed$))))"}
 -config=MC3R1.R5.3,reports+={safe, "any_area(any_loc(any_exp(macro(^per_cpu$))&&any_exp(macro(^this_cpu$))))"}
--doc_end
-
--doc_begin="The identifier 'fdt' is a widely-used name, for which no suitable
-substitute can be found. It is understood in 'xen/arch/arm/efi-boot.h' that the
-static variable 'fdt' cannot be confused with parameter names of the function
-declarations that are present in the file."
--file_tag+={efi_boot_h, "^xen/arch/arm/efi/efi-boot\\.h$"}
--config=MC3R1.R5.3,reports+={deliberate, "any_area(decl(kind(var)&&static_storage()&&^fdt$)&&any_loc(file(efi_boot_h)))"}
--doc_end
-
--doc_begin="The identifier 'start' is a widely-used name, for which no suitable
-substitute can be found. It is understood in 'xen/include/xen/kernel.h' that the
-extern variable 'start' cannot be confused with omonymous parameter names of the
-function declarations where that variable is visible."
--file_tag+={kernel_h, "^xen/include/xen/kernel\\.h$"}
--config=MC3R1.R5.3,reports+={deliberate, "any_area(decl(kind(var)&&linkage(external)&&^start$)&&any_loc(file(kernel_h)))"}
+-config=MC3R1.R5.3,reports+={safe, "any_area(any_loc(any_exp(macro(^__emulate_2op$))&&any_exp(macro(^__emulate_2op_nobyte$))))"}
+-config=MC3R1.R5.3,reports+={safe, "any_area(any_loc(any_exp(macro(^read_debugreg$))&&any_exp(macro(^write_debugreg$))))"}
 -doc_end
 
 -doc_begin="Function-like macros cannot be confused with identifiers that are
@@ -178,6 +169,11 @@ const-qualified."
 #
 # Series 8.
 #
+
+-doc_begin="The following file is imported from Linux: ignore for now."
+-file_tag+={adopted_r8_2,"^xen/common/inflate\\.c$"}
+-config=MC3R1.R8.2,reports+={deliberate,"any_area(any_loc(file(adopted_r8_2)))"}
+-doc_end
 
 -doc_begin="The following variables are compiled in multiple translation units
 belonging to different executables and therefore are safe."
