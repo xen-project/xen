@@ -22,7 +22,6 @@
 #include <xen/rcupdate.h>
 #include <xen/symbols.h>
 #include <asm/system.h>
-#include <asm/desc.h>
 #include <asm/atomic.h>
 
 /* We program the time hardware this far behind the closest deadline. */
