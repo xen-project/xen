@@ -707,6 +707,7 @@ AS86
 ipxe
 qemu_traditional
 LINUX_BACKEND_MODULES
+pygrub
 golang
 seabios
 ovmf
@@ -811,6 +812,7 @@ enable_xsmpolicy
 enable_ovmf
 enable_seabios
 enable_golang
+enable_pygrub
 with_linux_backend_modules
 enable_qemu_traditional
 enable_ipxe
@@ -1498,6 +1500,7 @@ Optional Features:
   --enable-ovmf           Enable OVMF (default is DISABLED)
   --disable-seabios       Disable SeaBIOS (default is ENABLED)
   --disable-golang        Disable Go tools (default is ENABLED)
+  --disable-pygrub        Disable pygrub (default is ENABLED)
   --enable-qemu-traditional
                           Enable qemu traditional device model, (DEFAULT is
                           off)
@@ -4287,6 +4290,29 @@ golang=$ax_cv_golang
 
 
 
+# Check whether --enable-pygrub was given.
+if test "${enable_pygrub+set}" = set; then :
+  enableval=$enable_pygrub;
+fi
+
+
+if test "x$enable_pygrub" = "xno"; then :
+
+    ax_cv_pygrub="n"
+
+elif test "x$enable_pygrub" = "xyes"; then :
+
+    ax_cv_pygrub="y"
+
+elif test -z $ax_cv_pygrub; then :
+
+    ax_cv_pygrub="y"
+
+fi
+pygrub=$ax_cv_pygrub
+
+
+
 
 # Check whether --with-linux-backend-modules was given.
 if test "${with_linux_backend_modules+set}" = set; then :
@@ -4594,6 +4620,14 @@ else
 
 fi
 
+
+if test "x$pygrub" = "xy"; then :
+
+
+$as_echo "#define HAVE_PYGRUB 1" >>confdefs.h
+
+
+fi
 
 
 # Check whether --with-system-qemu was given.

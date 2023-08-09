@@ -89,6 +89,7 @@ AX_ARG_DEFAULT_ENABLE([xsmpolicy], [Disable XSM policy compilation])
 AX_ARG_DEFAULT_DISABLE([ovmf], [Enable OVMF])
 AX_ARG_DEFAULT_ENABLE([seabios], [Disable SeaBIOS])
 AX_ARG_DEFAULT_ENABLE([golang], [Disable Go tools])
+AX_ARG_DEFAULT_ENABLE([pygrub], [Disable pygrub])
 
 AC_ARG_WITH([linux-backend-modules],
     AS_HELP_STRING([--with-linux-backend-modules="mod1 mod2"],
@@ -183,6 +184,10 @@ AS_IF([test "x$enable_rombios" = "xyes"], [
     rombios=n
 ])
 AC_SUBST(rombios)
+
+AS_IF([test "x$pygrub" = "xy"], [
+    AC_DEFINE([HAVE_PYGRUB], [1], [pygrub enabled])
+])
 
 AC_ARG_WITH([system-qemu],
     AS_HELP_STRING([--with-system-qemu@<:@=PATH@:>@],

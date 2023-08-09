@@ -45,6 +45,9 @@
 /* ROMBIOS enabled */
 #undef HAVE_ROMBIOS
 
+/* pygrub enabled */
+#undef HAVE_PYGRUB
+
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
 
