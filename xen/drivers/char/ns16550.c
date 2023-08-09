@@ -1797,11 +1797,13 @@ static int __init ns16550_uart_dt_init(struct dt_device_node *dev,
 
     uart->dw_usr_bsy = dt_device_is_compatible(dev, "snps,dw-apb-uart");
 
+#ifdef CONFIG_ARM
     uart->vuart.base_addr = uart->io_base;
     uart->vuart.size = uart->io_size;
     uart->vuart.data_off = UART_THR <<uart->reg_shift;
     uart->vuart.status_off = UART_LSR<<uart->reg_shift;
     uart->vuart.status = UART_LSR_THRE|UART_LSR_TEMT;
+#endif
 
     /* Register with generic serial driver. */
     serial_register_uart(uart - ns16550_com, &ns16550_driver, uart);
