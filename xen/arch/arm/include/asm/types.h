@@ -1,18 +1,8 @@
 #ifndef __ARM_TYPES_H__
 #define __ARM_TYPES_H__
 
-typedef signed char s8;
-typedef unsigned char u8;
-
-typedef signed short s16;
-typedef unsigned short u16;
-
-typedef signed int s32;
-typedef unsigned int u32;
-
 #if defined(CONFIG_ARM_32)
-typedef signed long long s64;
-typedef unsigned long long u64;
+
 typedef u32 vaddr_t;
 #define PRIvaddr PRIx32
 #if defined(CONFIG_PHYS_ADDR_T_32)
@@ -34,9 +24,9 @@ typedef u64 paddr_t;
 #endif
 typedef u32 register_t;
 #define PRIregister "08x"
-#elif defined (CONFIG_ARM_64)
-typedef signed long s64;
-typedef unsigned long u64;
+
+#elif defined(CONFIG_ARM_64)
+
 typedef u64 vaddr_t;
 #define PRIvaddr PRIx64
 typedef u64 paddr_t;
@@ -44,6 +34,7 @@ typedef u64 paddr_t;
 #define PRIpaddr "016lx"
 typedef u64 register_t;
 #define PRIregister "016lx"
+
 #endif
 
 #endif /* __ARM_TYPES_H__ */
