@@ -1692,6 +1692,15 @@ void parse_config_data(const char *config_source,
     xlu_cfg_get_defbool(config, "acpi", &b_info->acpi, 0);
 
     xlu_cfg_replace_string (config, "bootloader", &b_info->bootloader, 0);
+#ifndef HAVE_PYGRUB
+    if (b_info->bootloader &&
+        (!strcmp(b_info->bootloader, "pygrub") ||
+	 !strcmp(b_info->bootloader, "/usr/bin/pygrub"))) {
+        fprintf(stderr, "ERROR: this instance of Xen has been built without support of \"pygrub\".\n");
+        exit(-ERROR_FAIL);
+    }
+#endif
+
     switch (xlu_cfg_get_list_as_string_list(config, "bootloader_args",
                                             &b_info->bootloader_args, 1)) {
     case 0:
