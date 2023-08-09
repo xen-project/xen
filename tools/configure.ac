@@ -189,6 +189,27 @@ AS_IF([test "x$pygrub" = "xy"], [
     AC_DEFINE([HAVE_PYGRUB], [1], [pygrub enabled])
 ])
 
+AC_ARG_ENABLE([libfsimage],
+    AS_HELP_STRING([--enable-libfsimage],
+                   [Enable libfsimage, (DEFAULT is on if pygrub is enabled,
+                    otherwise off)]),,[
+    AS_IF([test "x$pygrub" = "xn"], [
+        enable_libfsimage="no"
+    ], [
+        enable_libfsimage="yes"
+    ])
+])
+AS_IF([test "x$enable_libfsimage" = "xyes"], [
+    libfsimage=y
+], [
+    AS_IF([test "x$pygrub" = "xy"], [
+        AC_MSG_ERROR([pygrub needs libfsimage])
+    ], [
+        libfsimage=n
+    ])
+])
+AC_SUBST(libfsimage)
+
 AC_ARG_WITH([system-qemu],
     AS_HELP_STRING([--with-system-qemu@<:@=PATH@:>@],
        [Use system supplied qemu PATH or qemu (taken from $PATH) as qemu-xen

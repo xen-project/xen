@@ -700,6 +700,7 @@ EXTRA_QEMUU_CONFIGURE_ARGS
 qemu_xen_systemd
 qemu_xen_path
 qemu_xen
+libfsimage
 rombios
 BCC
 LD86
@@ -818,6 +819,7 @@ enable_qemu_traditional
 enable_ipxe
 with_system_ipxe
 enable_rombios
+enable_libfsimage
 with_system_qemu
 with_stubdom_qmp_proxy
 with_system_seabios
@@ -1508,6 +1510,8 @@ Optional Features:
                           --with-system-ipxe)
   --enable-rombios        Enable ROMBIOS, (DEFAULT is on if qemu-traditional
                           or ipxe is enabled, otherwise off)
+  --enable-libfsimage     Enable libfsimage, (DEFAULT is on if pygrub is
+                          enabled, otherwise off)
   --enable-systemd        Enable systemd support (default is DISABLED)
   --enable-9pfs           Explicitly enable 9pfs support in QEMU build
                           (default is to defer to QEMU configure default)
@@ -4628,6 +4632,42 @@ $as_echo "#define HAVE_PYGRUB 1" >>confdefs.h
 
 
 fi
+
+# Check whether --enable-libfsimage was given.
+if test "${enable_libfsimage+set}" = set; then :
+  enableval=$enable_libfsimage;
+else
+
+    if test "x$pygrub" = "xn"; then :
+
+        enable_libfsimage="no"
+
+else
+
+        enable_libfsimage="yes"
+
+fi
+
+fi
+
+if test "x$enable_libfsimage" = "xyes"; then :
+
+    libfsimage=y
+
+else
+
+    if test "x$pygrub" = "xy"; then :
+
+        as_fn_error $? "pygrub needs libfsimage" "$LINENO" 5
+
+else
+
+        libfsimage=n
+
+fi
+
+fi
+
 
 
 # Check whether --with-system-qemu was given.
