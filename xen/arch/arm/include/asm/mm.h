@@ -165,6 +165,9 @@ struct page_info
 #define _PGC_need_scrub   _PGC_allocated
 #define PGC_need_scrub    PGC_allocated
 
+/* Non-boot CPUs use this to find the correct pagetables. */
+extern uint64_t init_ttbr;
+
 extern mfn_t directmap_mfn_start, directmap_mfn_end;
 extern vaddr_t directmap_virt_end;
 #ifdef CONFIG_ARM_64
