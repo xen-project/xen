@@ -24,6 +24,7 @@
 #include <xen/console.h>
 #include <xen/smp.h>
 #include <xen/keyhandler.h>
+#include <xen/watchdog.h>
 #include <xen/cpu.h>
 #include <asm/current.h>
 #include <asm/mc146818rtc.h>
