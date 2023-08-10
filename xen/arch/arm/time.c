@@ -17,6 +17,7 @@
 #include <xen/softirq.h>
 #include <xen/sched.h>
 #include <xen/time.h>
+#include <xen/delay.h>
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <xen/acpi.h>

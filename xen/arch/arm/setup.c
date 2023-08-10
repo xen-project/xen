@@ -32,6 +32,7 @@
 #include <xen/libfdt/libfdt-xen.h>
 #include <xen/acpi.h>
 #include <xen/warning.h>
+#include <xen/hypercall.h>
 #include <asm/alternative.h>
 #include <asm/page.h>
 #include <asm/current.h>
