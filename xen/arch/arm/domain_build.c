@@ -2256,7 +2256,7 @@ int __init make_chosen_node(const struct kernel_info *kinfo)
 {
     int res;
     const char *bootargs = NULL;
-    const struct bootmodule *mod = kinfo->kernel_bootmodule;
+    const struct bootmodule *initrd = kinfo->initrd_bootmodule;
     void *fdt = kinfo->fdt;
 
     dt_dprintk("Create chosen node\n");
@@ -2276,7 +2276,7 @@ int __init make_chosen_node(const struct kernel_info *kinfo)
      * If the bootloader provides an initrd, we must create a placeholder
      * for the initrd properties. The values will be replaced later.
      */
-    if ( mod && mod->size )
+    if ( initrd && initrd->size )
     {
         u64 a = 0;
         res = fdt_property(kinfo->fdt, "linux,initrd-start", &a, sizeof(a));
