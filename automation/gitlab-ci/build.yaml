@@ -273,9 +273,9 @@
 
 # Arm test artifacts
 
-alpine-3.12-arm64-rootfs-export:
+alpine-3.18-arm64-rootfs-export:
   extends: .test-jobs-artifact-common
-  image: registry.gitlab.com/xen-project/xen/tests-artifacts/alpine:3.12-arm64v8
+  image: registry.gitlab.com/xen-project/xen/tests-artifacts/alpine:3.18-arm64v8
   script:
     - mkdir binaries && cp /initrd.tar.gz binaries/initrd.tar.gz
   artifacts:
@@ -319,9 +319,9 @@ qemu-system-aarch64-6.0.0-arm32-export:
 
 # x86_64 test artifacts
 
-alpine-3.12-rootfs-export:
+alpine-3.18-rootfs-export:
   extends: .test-jobs-artifact-common
-  image: registry.gitlab.com/xen-project/xen/tests-artifacts/alpine:3.12
+  image: registry.gitlab.com/xen-project/xen/tests-artifacts/alpine:3.18
   script:
     - mkdir binaries && cp /initrd.tar.gz binaries/initrd.tar.gz
   artifacts:
@@ -345,15 +345,15 @@ kernel-6.1.19-export:
 
 # Build jobs needed for tests
 
-alpine-3.12-gcc:
+alpine-3.18-gcc:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: alpine:3.12
+    CONTAINER: alpine:3.18
 
-alpine-3.12-gcc-debug:
+alpine-3.18-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: alpine:3.12
+    CONTAINER: alpine:3.18
 
 debian-stretch-gcc-debug:
   extends: .gcc-x86-64-build-debug
@@ -437,78 +437,78 @@ debian-unstable-gcc-debug-arm64-randconfig:
     CONTAINER: debian:unstable-arm64v8
     RANDCONFIG: y
 
-alpine-3.12-gcc-arm64:
+alpine-3.18-gcc-arm64:
   extends: .gcc-arm64-build
   variables:
-    CONTAINER: alpine:3.12-arm64v8
+    CONTAINER: alpine:3.18-arm64v8
 
-alpine-3.12-gcc-debug-arm64:
+alpine-3.18-gcc-debug-arm64:
   extends: .gcc-arm64-build-debug
   variables:
-    CONTAINER: alpine:3.12-arm64v8
+    CONTAINER: alpine:3.18-arm64v8
 
-alpine-3.12-gcc-arm64-randconfig:
+alpine-3.18-gcc-arm64-randconfig:
   extends: .gcc-arm64-build
   variables:
-    CONTAINER: alpine:3.12-arm64v8
+    CONTAINER: alpine:3.18-arm64v8
     RANDCONFIG: y
 
-alpine-3.12-gcc-debug-arm64-randconfig:
+alpine-3.18-gcc-debug-arm64-randconfig:
   extends: .gcc-arm64-build-debug
   variables:
-    CONTAINER: alpine:3.12-arm64v8
+    CONTAINER: alpine:3.18-arm64v8
     RANDCONFIG: y
 
-alpine-3.12-gcc-arm64-staticmem:
+alpine-3.18-gcc-arm64-staticmem:
   extends: .gcc-arm64-build
   variables:
-    CONTAINER: alpine:3.12-arm64v8
+    CONTAINER: alpine:3.18-arm64v8
     EXTRA_XEN_CONFIG: |
       CONFIG_EXPERT=y
       CONFIG_UNSUPPORTED=y
       CONFIG_STATIC_MEMORY=y
 
-alpine-3.12-gcc-debug-arm64-staticmem:
+alpine-3.18-gcc-debug-arm64-staticmem:
   extends: .gcc-arm64-build-debug
   variables:
-    CONTAINER: alpine:3.12-arm64v8
+    CONTAINER: alpine:3.18-arm64v8
     EXTRA_XEN_CONFIG: |
       CONFIG_EXPERT=y
       CONFIG_UNSUPPORTED=y
       CONFIG_STATIC_MEMORY=y
 
-alpine-3.12-gcc-arm64-static-shared-mem:
+alpine-3.18-gcc-arm64-static-shared-mem:
   extends: .gcc-arm64-build
   variables:
-    CONTAINER: alpine:3.12-arm64v8
+    CONTAINER: alpine:3.18-arm64v8
     EXTRA_XEN_CONFIG: |
       CONFIG_UNSUPPORTED=y
       CONFIG_STATIC_MEMORY=y
       CONFIG_STATIC_SHM=y
 
-alpine-3.12-gcc-debug-arm64-static-shared-mem:
+alpine-3.18-gcc-debug-arm64-static-shared-mem:
   extends: .gcc-arm64-build-debug
   variables:
-    CONTAINER: alpine:3.12-arm64v8
+    CONTAINER: alpine:3.18-arm64v8
     EXTRA_XEN_CONFIG: |
       CONFIG_UNSUPPORTED=y
       CONFIG_STATIC_MEMORY=y
       CONFIG_STATIC_SHM=y
 
-alpine-3.12-gcc-arm64-boot-cpupools:
+alpine-3.18-gcc-arm64-boot-cpupools:
   extends: .gcc-arm64-build
   variables:
-    CONTAINER: alpine:3.12-arm64v8
+    CONTAINER: alpine:3.18-arm64v8
     EXTRA_XEN_CONFIG: |
       CONFIG_EXPERT=y
       CONFIG_UNSUPPORTED=y
       CONFIG_SCHED_NULL=y
       CONFIG_BOOT_TIME_CPUPOOLS=y
 
-alpine-3.12-gcc-debug-arm64-boot-cpupools:
+alpine-3.18-gcc-debug-arm64-boot-cpupools:
   extends: .gcc-arm64-build-debug
   variables:
-    CONTAINER: alpine:3.12-arm64v8
+    CONTAINER: alpine:3.18-arm64v8
     EXTRA_XEN_CONFIG: |
       CONFIG_BOOT_TIME_CPUPOOLS=y
 
@@ -622,15 +622,15 @@ debian-unstable-gcc-arm64-cppcheck:
 
 # Build jobs not needed for tests
 
-alpine-3.12-clang:
+alpine-3.18-clang:
   extends: .clang-x86-64-build
   variables:
-    CONTAINER: alpine:3.12
+    CONTAINER: alpine:3.18
 
-alpine-3.12-clang-debug:
+alpine-3.18-clang-debug:
   extends: .clang-x86-64-build-debug
   variables:
-    CONTAINER: alpine:3.12
+    CONTAINER: alpine:3.18
 
 archlinux-gcc:
   extends: .gcc-x86-64-build
