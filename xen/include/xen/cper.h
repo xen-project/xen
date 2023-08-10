@@ -23,8 +23,7 @@
 
 #include <xen/types.h>
 #include <xen/string.h>
-
-extern unsigned long get_sec(void);
+#include <xen/time.h>
 
 typedef struct {
 	uint8_t b[16];
