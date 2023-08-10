@@ -24,8 +24,8 @@ die() {
 #
 BASE="registry.gitlab.com/xen-project/xen"
 case "_${CONTAINER}" in
-    _alpine) CONTAINER="${BASE}/alpine:3.12" ;;
-    _alpine-arm64v8) CONTAINER="${BASE}/alpine:3.12-arm64v8" ;;
+    _alpine) CONTAINER="${BASE}/alpine:3.18" ;;
+    _alpine-arm64v8) CONTAINER="${BASE}/alpine:3.18-arm64v8" ;;
     _archlinux|_arch) CONTAINER="${BASE}/archlinux:current" ;;
     _riscv64) CONTAINER="${BASE}/archlinux:current-riscv64" ;;
     _centos7) CONTAINER="${BASE}/centos:7" ;;

@@ -1,4 +1,4 @@
-FROM arm64v8/alpine:3.12
+FROM alpine:3.18
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 
@@ -15,15 +15,17 @@ RUN apk --no-cache add \
   autoconf \
   bash \
   bison \
+  clang \
   curl \
   dev86 \
-  dtc-dev \
   flex \
+  g++ \
   gcc \
   git \
+  grep \
   iasl \
   libaio-dev \
-  libfdt \
+  libc6-compat \
   linux-headers \
   make \
   musl-dev  \
@@ -42,7 +44,5 @@ RUN apk --no-cache add \
   glib-dev \
   libattr \
   libcap-ng-dev \
+  ninja \
   pixman-dev \
-  # qubes test deps
-  openssh-client \
-  fakeroot \

@@ -1,4 +1,4 @@
-FROM arm64v8/alpine:3.12
+FROM arm64v8/alpine:3.18
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 
@@ -18,7 +18,7 @@ RUN \
   apk add sudo && \
   apk add dbus && \
   apk add bash && \
-  apk add python2 && \
+  apk add python3 && \
   apk add zlib && \
   apk add ncurses && \
   apk add texinfo && \
