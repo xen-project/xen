@@ -1120,7 +1120,7 @@ static long xatp_permission_check(struct domain *d, unsigned int space)
     return xsm_add_to_physmap(XSM_TARGET, current->domain, d);
 }
 
-unsigned int ioreq_server_max_frames(const struct domain *d)
+static unsigned int ioreq_server_max_frames(const struct domain *d)
 {
     unsigned int nr = 0;
 
