@@ -404,8 +404,6 @@ static inline void invalidate_icache(void)
 
 #endif /* !__ASSEMBLY__ */
 
-#define PAGE_ALIGN(x) (((x) + PAGE_SIZE - 1) & PAGE_MASK)
-
 #endif /* __X86_PAGE_H__ */
 
 /*

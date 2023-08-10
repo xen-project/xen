@@ -303,8 +303,6 @@ static inline int gva_to_ipa(vaddr_t va, paddr_t *paddr, unsigned int flags)
 
 #endif /* __ASSEMBLY__ */
 
-#define PAGE_ALIGN(x) (((x) + PAGE_SIZE - 1) & PAGE_MASK)
-
 #endif /* __ARM_PAGE_H__ */
 
 /*
