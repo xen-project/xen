@@ -87,7 +87,7 @@ enum mc_ec_type {
     MC_EC_BUS_TYPE = 0x0800,
 };
 
-enum mc_ec_type
+static enum mc_ec_type
 mc_ec2type(uint16_t errorcode)
 {
     if ( errorcode & MC_EC_BUS_TYPE )

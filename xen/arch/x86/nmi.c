@@ -108,7 +108,7 @@ static unsigned int lapic_nmi_owner;
  *     be enabled
  * -1: the lapic NMI watchdog is disabled, but can be enabled
  */
-int nmi_active;
+static int nmi_active;
 
 #define K7_EVNTSEL_ENABLE	(1 << 22)
 #define K7_EVNTSEL_INT		(1 << 20)

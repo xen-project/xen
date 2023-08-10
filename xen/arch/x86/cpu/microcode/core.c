@@ -149,7 +149,7 @@ static int __init cf_check parse_ucode(const char *s)
 }
 custom_param("ucode", parse_ucode);
 
-void __init microcode_scan_module(
+static void __init microcode_scan_module(
     unsigned long *module_map,
     const multiboot_info_t *mbi)
 {

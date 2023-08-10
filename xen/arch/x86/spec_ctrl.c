@@ -43,9 +43,9 @@ static enum ind_thunk {
 } opt_thunk __initdata = THUNK_DEFAULT;
 
 static int8_t __initdata opt_ibrs = -1;
-int8_t __initdata opt_stibp = -1;
+static int8_t __initdata opt_stibp = -1;
 bool __ro_after_init opt_ssbd;
-int8_t __initdata opt_psfd = -1;
+static int8_t __initdata opt_psfd = -1;
 
 int8_t __ro_after_init opt_ibpb_ctxt_switch = -1;
 int8_t __read_mostly opt_eager_fpu = -1;

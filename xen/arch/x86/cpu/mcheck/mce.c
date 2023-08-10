@@ -599,7 +599,7 @@ unsigned int mce_firstbank(struct cpuinfo_x86 *c)
            c->x86_vendor == X86_VENDOR_INTEL && c->x86_model < 0x1a;
 }
 
-int show_mca_info(int inited, struct cpuinfo_x86 *c)
+static int show_mca_info(int inited, struct cpuinfo_x86 *c)
 {
     static enum mcheck_type g_type = mcheck_unset;
 
