@@ -23,7 +23,7 @@ struct cpuinfo_x86 {
     unsigned char x86_vendor;          /* CPU vendor */
     unsigned char x86_model;
     unsigned char x86_mask;
-    int cpuid_level;                   /* Maximum supported CPUID level, -1=no CPUID */
+    unsigned int cpuid_level;          /* Maximum supported CPUID level */
     unsigned int extended_cpuid_level; /* Maximum supported CPUID extended level */
     unsigned int x86_capability[NCAPINTS];
     char x86_vendor_id[16];

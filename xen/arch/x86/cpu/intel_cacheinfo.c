@@ -172,8 +172,7 @@ void init_intel_cacheinfo(struct cpuinfo_x86 *c)
 	    c->x86_vendor != X86_VENDOR_SHANGHAI)
 	{
 		/* supports eax=2  call */
-		int i, j, n;
-		int regs[4];
+		unsigned int i, j, n, regs[4];
 		unsigned char *dp = (unsigned char *)regs;
 		int only_trace = 0;
 

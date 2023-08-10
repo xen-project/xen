@@ -131,13 +131,8 @@ static inline int cpu_nr_siblings(unsigned int cpu)
  * clear %ecx since some cpus (Cyrix MII) do not set or clear %ecx
  * resulting in stale register contents being returned.
  */
-#define cpuid(_op,_eax,_ebx,_ecx,_edx)          \
-    asm volatile ( "cpuid"                      \
-          : "=a" (*(int *)(_eax)),              \
-            "=b" (*(int *)(_ebx)),              \
-            "=c" (*(int *)(_ecx)),              \
-            "=d" (*(int *)(_edx))               \
-          : "0" (_op), "2" (0) )
+#define cpuid(leaf, eax, ebx, ecx, edx)          \
+        cpuid_count(leaf, 0, eax, ebx, ecx, edx)
 
 /* Some CPUID calls want 'count' to be placed in ecx */
 static inline void cpuid_count(
