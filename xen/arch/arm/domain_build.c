@@ -2592,6 +2592,7 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
 {
     static const struct dt_device_match skip_matches[] __initconst =
     {
+        DT_MATCH_COMPATIBLE("xen,domain"),
         DT_MATCH_COMPATIBLE("xen,xen"),
         DT_MATCH_COMPATIBLE("xen,multiboot-module"),
         DT_MATCH_COMPATIBLE("multiboot,module"),
