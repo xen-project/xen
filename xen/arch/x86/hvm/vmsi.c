@@ -462,7 +462,7 @@ static void del_msixtbl_entry(struct msixtbl_entry *entry)
 
 int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
 {
-    struct irq_desc *irq_desc;
+    struct irq_desc *irqd;
     struct msi_desc *msi_desc;
     struct pci_dev *pdev;
     struct msixtbl_entry *entry, *new_entry;
@@ -482,14 +482,14 @@ int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
     if ( !new_entry )
         return -ENOMEM;
 
-    irq_desc = pirq_spin_lock_irq_desc(pirq, NULL);
-    if ( !irq_desc )
+    irqd = pirq_spin_lock_irq_desc(pirq, NULL);
+    if ( !irqd )
     {
         xfree(new_entry);
         return r;
     }
 
-    msi_desc = irq_desc->msi_desc;
+    msi_desc = irqd->msi_desc;
     if ( !msi_desc )
         goto out;
 
@@ -508,7 +508,7 @@ found:
     r = 0;
 
 out:
-    spin_unlock_irq(&irq_desc->lock);
+    spin_unlock_irq(&irqd->lock);
     xfree(new_entry);
 
     if ( !r )
@@ -533,7 +533,7 @@ out:
 
 void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq)
 {
-    struct irq_desc *irq_desc;
+    struct irq_desc *irqd;
     struct msi_desc *msi_desc;
     struct pci_dev *pdev;
     struct msixtbl_entry *entry;
@@ -544,11 +544,11 @@ void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq)
     if ( !msixtbl_initialised(d) )
         return;
 
-    irq_desc = pirq_spin_lock_irq_desc(pirq, NULL);
-    if ( !irq_desc )
+    irqd = pirq_spin_lock_irq_desc(pirq, NULL);
+    if ( !irqd )
         return;
 
-    msi_desc = irq_desc->msi_desc;
+    msi_desc = irqd->msi_desc;
     if ( !msi_desc )
         goto out;
 
@@ -559,14 +559,14 @@ void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq)
             goto found;
 
 out:
-    spin_unlock_irq(&irq_desc->lock);
+    spin_unlock_irq(&irqd->lock);
     return;
 
 found:
     if ( !atomic_dec_and_test(&entry->refcnt) )
         del_msixtbl_entry(entry);
 
-    spin_unlock_irq(&irq_desc->lock);
+    spin_unlock_irq(&irqd->lock);
 }
 
 void msixtbl_init(struct domain *d)
