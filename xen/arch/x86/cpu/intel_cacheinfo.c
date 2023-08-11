@@ -187,7 +187,8 @@ void init_intel_cacheinfo(struct cpuinfo_x86 *c)
 
 			/* If bit 31 is set, this is an unknown format */
 			for ( j = 0 ; j < 3 ; j++ ) {
-				if ( regs[j] < 0 ) regs[j] = 0;
+				if ( regs[j] >> 31 )
+					regs[j] = 0;
 			}
 
 			/* Byte 0 is level count, not a descriptor */
