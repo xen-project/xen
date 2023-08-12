@@ -1,4 +1,4 @@
-FROM arm64v8/debian:unstable
+FROM debian:bookworm
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 
@@ -27,10 +27,11 @@ RUN apt-get update && \
         flex \
         bison \
         acpica-tools \
-        libfdt-dev \
         bin86 \
         bcc \
         liblzma-dev \
+        # libc6-dev-i386 for Xen < 4.15
+        libc6-dev-i386 \
         libnl-3-dev \
         ocaml-nox \
         libfindlib-ocaml-dev \
@@ -41,13 +42,9 @@ RUN apt-get update && \
         wget \
         git \
         nasm \
-        # for test phase, qemu-smoke-* jobs
-        u-boot-qemu \
-        u-boot-tools \
-        device-tree-compiler \
-        curl \
-        cpio \
-        busybox-static \
+        gnupg \
+        apt-transport-https \
+        golang \
         && \
         apt-get autoremove -y && \
         apt-get clean && \

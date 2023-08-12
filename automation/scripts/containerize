@@ -37,11 +37,11 @@ case "_${CONTAINER}" in
     _stretch|_) CONTAINER="${BASE}/debian:stretch" ;;
     _stretch-i386) CONTAINER="${BASE}/debian:stretch-i386" ;;
     _buster-gcc-ibt) CONTAINER="${BASE}/debian:buster-gcc-ibt" ;;
-    _unstable|_) CONTAINER="${BASE}/debian:unstable" ;;
-    _unstable-i386) CONTAINER="${BASE}/debian:unstable-i386" ;;
-    _unstable-arm64v8-arm32-gcc) CONTAINER="${BASE}/debian:unstable-arm64v8-arm32-gcc" ;;
-    _unstable-arm64v8) CONTAINER="${BASE}/debian:unstable-arm64v8" ;;
-    _unstable-cppcheck) CONTAINER="${BASE}/debian:unstable-cppcheck" ;;
+    _bookworm|_) CONTAINER="${BASE}/debian:bookworm" ;;
+    _bookworm-i386) CONTAINER="${BASE}/debian:bookworm-i386" ;;
+    _bookworm-arm64v8-arm32-gcc) CONTAINER="${BASE}/debian:bookworm-arm64v8-arm32-gcc" ;;
+    _bookworm-arm64v8) CONTAINER="${BASE}/debian:bookworm-arm64v8" ;;
+    _bookworm-cppcheck) CONTAINER="${BASE}/debian:bookworm-cppcheck" ;;
     _bionic) CONTAINER="${BASE}/ubuntu:bionic" ;;
     _trusty) CONTAINER="${BASE}/ubuntu:trusty" ;;
     _xenial) CONTAINER="${BASE}/ubuntu:xenial" ;;

@@ -1,4 +1,4 @@
-FROM debian:unstable
+FROM i386/debian:bookworm
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 
@@ -7,6 +7,8 @@ ENV USER root
 
 RUN mkdir /build
 WORKDIR /build
+
+ENTRYPOINT ["linux32"]
 
 # build depends
 RUN apt-get update && \
@@ -30,8 +32,7 @@ RUN apt-get update && \
         bin86 \
         bcc \
         liblzma-dev \
-        # libc6-dev-i386 for Xen < 4.15
-        libc6-dev-i386 \
+        libc6-dev \
         libnl-3-dev \
         ocaml-nox \
         libfindlib-ocaml-dev \
@@ -42,9 +43,7 @@ RUN apt-get update && \
         wget \
         git \
         nasm \
-        gnupg \
         apt-transport-https \
-        golang \
         && \
         apt-get autoremove -y && \
         apt-get clean && \
