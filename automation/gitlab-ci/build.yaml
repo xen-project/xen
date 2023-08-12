@@ -255,47 +255,47 @@ debian-buster-gcc-ibt:
     EXTRA_FIXED_RANDCONFIG: |
       CONFIG_XEN_IBT=y
 
-debian-unstable-clang:
+debian-bookworm-clang:
   extends: .clang-x86-64-build
   variables:
-    CONTAINER: debian:unstable
+    CONTAINER: debian:bookworm
 
-debian-unstable-clang-debug:
+debian-bookworm-clang-debug:
   extends: .clang-x86-64-build-debug
   variables:
-    CONTAINER: debian:unstable
+    CONTAINER: debian:bookworm
 
-debian-unstable-gcc:
+debian-bookworm-gcc:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: debian:unstable
+    CONTAINER: debian:bookworm
 
-debian-unstable-gcc-debug:
+debian-bookworm-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: debian:unstable
+    CONTAINER: debian:bookworm
 
-debian-unstable-gcc-randconfig:
+debian-bookworm-gcc-randconfig:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: debian:unstable
+    CONTAINER: debian:bookworm
     RANDCONFIG: y
 
-debian-unstable-gcc-debug-randconfig:
+debian-bookworm-gcc-debug-randconfig:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: debian:unstable
+    CONTAINER: debian:bookworm
     RANDCONFIG: y
 
-debian-unstable-32-clang-debug:
+debian-bookworm-32-clang-debug:
   extends: .clang-x86-32-build-debug
   variables:
-    CONTAINER: debian:unstable-i386
+    CONTAINER: debian:bookworm-i386
 
-debian-unstable-32-gcc-debug:
+debian-bookworm-32-gcc-debug:
   extends: .gcc-x86-32-build-debug
   variables:
-    CONTAINER: debian:unstable-i386
+    CONTAINER: debian:bookworm-i386
 
 fedora-gcc:
   extends: .gcc-x86-64-build
@@ -445,50 +445,50 @@ alpine-3.12-clang-debug:
 
 # Arm32 cross-build
 
-debian-unstable-gcc-arm32:
+debian-bookworm-gcc-arm32:
   extends: .gcc-arm32-cross-build
   variables:
-    CONTAINER: debian:unstable-arm64v8-arm32-gcc
+    CONTAINER: debian:bookworm-arm64v8-arm32-gcc
 
-debian-unstable-gcc-arm32-debug:
+debian-bookworm-gcc-arm32-debug:
   extends: .gcc-arm32-cross-build-debug
   variables:
-    CONTAINER: debian:unstable-arm64v8-arm32-gcc
+    CONTAINER: debian:bookworm-arm64v8-arm32-gcc
 
-debian-unstable-gcc-arm32-randconfig:
+debian-bookworm-gcc-arm32-randconfig:
   extends: .gcc-arm32-cross-build
   variables:
-    CONTAINER: debian:unstable-arm64v8-arm32-gcc
+    CONTAINER: debian:bookworm-arm64v8-arm32-gcc
     RANDCONFIG: y
 
-debian-unstable-gcc-arm32-debug-randconfig:
+debian-bookworm-gcc-arm32-debug-randconfig:
   extends: .gcc-arm32-cross-build-debug
   variables:
-    CONTAINER: debian:unstable-arm64v8-arm32-gcc
+    CONTAINER: debian:bookworm-arm64v8-arm32-gcc
     RANDCONFIG: y
 
 # Arm builds
 
-debian-unstable-gcc-arm64:
+debian-bookworm-gcc-arm64:
   extends: .gcc-arm64-build
   variables:
-    CONTAINER: debian:unstable-arm64v8
+    CONTAINER: debian:bookworm-arm64v8
 
-debian-unstable-gcc-debug-arm64:
+debian-bookworm-gcc-debug-arm64:
   extends: .gcc-arm64-build-debug
   variables:
-    CONTAINER: debian:unstable-arm64v8
+    CONTAINER: debian:bookworm-arm64v8
 
-debian-unstable-gcc-arm64-randconfig:
+debian-bookworm-gcc-arm64-randconfig:
   extends: .gcc-arm64-build
   variables:
-    CONTAINER: debian:unstable-arm64v8
+    CONTAINER: debian:bookworm-arm64v8
     RANDCONFIG: y
 
-debian-unstable-gcc-debug-arm64-randconfig:
+debian-bookworm-gcc-debug-arm64-randconfig:
   extends: .gcc-arm64-build-debug
   variables:
-    CONTAINER: debian:unstable-arm64v8
+    CONTAINER: debian:bookworm-arm64v8
     RANDCONFIG: y
 
 alpine-3.12-gcc-arm64:

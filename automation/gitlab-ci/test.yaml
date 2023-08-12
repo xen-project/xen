@@ -28,7 +28,7 @@ build-each-commit-gcc:
 qemu-alpine-arm64-gcc:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:unstable-arm64v8
+    CONTAINER: debian:bookworm-arm64v8
   script:
     - ./automation/scripts/qemu-alpine-arm64.sh 2>&1 | tee qemu-smoke-arm64.log
   needs:
@@ -65,7 +65,7 @@ qemu-alpine-x86_64-gcc:
 qemu-smoke-arm64-gcc:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:unstable-arm64v8
+    CONTAINER: debian:bookworm-arm64v8
   script:
     - ./automation/scripts/qemu-smoke-arm64.sh 2>&1 | tee qemu-smoke-arm64.log
   needs:
@@ -84,7 +84,7 @@ qemu-smoke-arm64-gcc:
 qemu-smoke-arm64-gcc-staticmem:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:unstable-arm64v8
+    CONTAINER: debian:bookworm-arm64v8
   script:
     - ./automation/scripts/qemu-smoke-arm64.sh static-mem 2>&1 | tee qemu-smoke-arm64.log
   needs:
@@ -103,7 +103,7 @@ qemu-smoke-arm64-gcc-staticmem:
 qemu-smoke-arm64-gcc-boot-cpupools:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:unstable-arm64v8
+    CONTAINER: debian:bookworm-arm64v8
   script:
     - ./automation/scripts/qemu-smoke-arm64.sh boot-cpupools 2>&1 | tee qemu-smoke-arm64.log
   needs:
@@ -122,11 +122,11 @@ qemu-smoke-arm64-gcc-boot-cpupools:
 qemu-smoke-arm32-gcc:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:unstable-arm64v8
+    CONTAINER: debian:bookworm-arm64v8
   script:
     - ./automation/scripts/qemu-smoke-arm32.sh 2>&1 | tee qemu-smoke-arm32.log
   needs:
-    - debian-unstable-gcc-arm32
+    - debian-bookworm-gcc-arm32
     - qemu-system-aarch64-6.0.0-arm32-export
   artifacts:
     paths:
@@ -164,7 +164,7 @@ qemu-smoke-x86-64-clang:
       - '*.log'
     when: always
   needs:
-    - debian-unstable-clang-debug
+    - debian-bookworm-clang-debug
   tags:
     - x86_64
 
@@ -196,6 +196,6 @@ qemu-smoke-x86-64-clang-pvh:
       - '*.log'
     when: always
   needs:
-    - debian-unstable-clang-debug
+    - debian-bookworm-clang-debug
   tags:
     - x86_64
