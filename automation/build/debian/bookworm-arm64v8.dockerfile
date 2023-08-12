@@ -1,4 +1,4 @@
-FROM i386/debian:unstable
+FROM arm64v8/debian:bookworm
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 
@@ -7,8 +7,6 @@ ENV USER root
 
 RUN mkdir /build
 WORKDIR /build
-
-ENTRYPOINT ["linux32"]
 
 # build depends
 RUN apt-get update && \
@@ -31,10 +29,10 @@ RUN apt-get update && \
         # gettext for Xen < 4.13
         gettext \
         acpica-tools \
+        libfdt-dev \
         bin86 \
         bcc \
         liblzma-dev \
-        libc6-dev \
         libnl-3-dev \
         ocaml-nox \
         libfindlib-ocaml-dev \
@@ -45,7 +43,6 @@ RUN apt-get update && \
         wget \
         git \
         nasm \
-        apt-transport-https \
         && \
         apt-get autoremove -y && \
         apt-get clean && \
