@@ -22,7 +22,7 @@
 .qemu-arm64:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:unstable-arm64v8
+    CONTAINER: debian:bookworm-arm64v8
     LOGFILE: qemu-smoke-arm64.log
   artifacts:
     paths:
@@ -35,7 +35,7 @@
 .qemu-arm32:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:unstable-arm64v8
+    CONTAINER: debian:bookworm-arm64v8
     LOGFILE: qemu-smoke-arm32.log
   artifacts:
     paths:
@@ -357,7 +357,7 @@ qemu-smoke-dom0less-arm32-gcc:
     - ./automation/scripts/qemu-smoke-dom0less-arm32.sh 2>&1 | tee ${LOGFILE}
   needs:
     - *arm32-test-needs
-    - debian-unstable-gcc-arm32
+    - debian-bookworm-gcc-arm32
 
 qemu-smoke-dom0less-arm32-gcc-debug:
   extends: .qemu-arm32
@@ -365,7 +365,7 @@ qemu-smoke-dom0less-arm32-gcc-debug:
     - ./automation/scripts/qemu-smoke-dom0less-arm32.sh 2>&1 | tee ${LOGFILE}
   needs:
     - *arm32-test-needs
-    - debian-unstable-gcc-arm32-debug
+    - debian-bookworm-gcc-arm32-debug
 
 qemu-smoke-dom0less-arm32-gcc-staticmem:
   extends: .qemu-arm32
@@ -373,7 +373,7 @@ qemu-smoke-dom0less-arm32-gcc-staticmem:
     - ./automation/scripts/qemu-smoke-dom0less-arm32.sh static-mem 2>&1 | tee ${LOGFILE}
   needs:
     - *arm32-test-needs
-    - debian-unstable-gcc-arm32-staticmem
+    - debian-bookworm-gcc-arm32-staticmem
 
 qemu-smoke-dom0less-arm32-gcc-debug-staticmem:
   extends: .qemu-arm32
@@ -381,7 +381,7 @@ qemu-smoke-dom0less-arm32-gcc-debug-staticmem:
     - ./automation/scripts/qemu-smoke-dom0less-arm32.sh static-mem 2>&1 | tee ${LOGFILE}
   needs:
     - *arm32-test-needs
-    - debian-unstable-gcc-arm32-debug-staticmem
+    - debian-bookworm-gcc-arm32-debug-staticmem
 
 qemu-smoke-dom0less-arm32-gcc-gzip:
   extends: .qemu-arm32
@@ -389,7 +389,7 @@ qemu-smoke-dom0less-arm32-gcc-gzip:
     - ./automation/scripts/qemu-smoke-dom0less-arm32.sh gzip 2>&1 | tee ${LOGFILE}
   needs:
     - *arm32-test-needs
-    - debian-unstable-gcc-arm32
+    - debian-bookworm-gcc-arm32
 
 qemu-smoke-dom0less-arm32-gcc-debug-gzip:
   extends: .qemu-arm32
@@ -397,7 +397,7 @@ qemu-smoke-dom0less-arm32-gcc-debug-gzip:
     - ./automation/scripts/qemu-smoke-dom0less-arm32.sh gzip 2>&1 | tee ${LOGFILE}
   needs:
     - *arm32-test-needs
-    - debian-unstable-gcc-arm32-debug
+    - debian-bookworm-gcc-arm32-debug
 
 qemu-smoke-dom0less-arm32-gcc-without-dom0:
   extends: .qemu-arm32
@@ -405,7 +405,7 @@ qemu-smoke-dom0less-arm32-gcc-without-dom0:
     - ./automation/scripts/qemu-smoke-dom0less-arm32.sh without-dom0 2>&1 | tee ${LOGFILE}
   needs:
     - *arm32-test-needs
-    - debian-unstable-gcc-arm32
+    - debian-bookworm-gcc-arm32
 
 qemu-smoke-dom0less-arm32-gcc-debug-without-dom0:
   extends: .qemu-arm32
@@ -413,7 +413,7 @@ qemu-smoke-dom0less-arm32-gcc-debug-without-dom0:
     - ./automation/scripts/qemu-smoke-dom0less-arm32.sh without-dom0 2>&1 | tee ${LOGFILE}
   needs:
     - *arm32-test-needs
-    - debian-unstable-gcc-arm32-debug
+    - debian-bookworm-gcc-arm32-debug
 
 qemu-alpine-x86_64-gcc:
   extends: .qemu-x86-64
@@ -435,7 +435,7 @@ qemu-smoke-x86-64-clang:
   script:
     - ./automation/scripts/qemu-smoke-x86-64.sh pv 2>&1 | tee ${LOGFILE}
   needs:
-    - debian-unstable-clang-debug
+    - debian-bookworm-clang-debug
 
 qemu-smoke-x86-64-gcc-pvh:
   extends: .qemu-x86-64
@@ -449,7 +449,7 @@ qemu-smoke-x86-64-clang-pvh:
   script:
     - ./automation/scripts/qemu-smoke-x86-64.sh pvh 2>&1 | tee ${LOGFILE}
   needs:
-    - debian-unstable-clang-debug
+    - debian-bookworm-clang-debug
 
 qemu-smoke-riscv64-gcc:
   extends: .qemu-riscv64
