@@ -1,4 +1,4 @@
-FROM arm64v8/debian:unstable
+FROM arm64v8/debian:bookworm
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 
