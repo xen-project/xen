@@ -752,17 +752,17 @@ struct node *read_node(struct connection *conn, const void *ctx,
 		goto error;
 	}
 
+	/* Data is binary blob (usually ascii, no nul). */
+	node->data = node->perms + hdr->num_perms;
+	/* Children is strings, nul separated. */
+	node->children = node->data + node->hdr.datalen;
+
 	if (domain_adjust_node_perms(node))
 		goto error;
 
 	/* If owner is gone reset currently accounted memory size. */
 	if (node->acc.domid != get_node_owner(node))
 		node->acc.memory = 0;
-
-	/* Data is binary blob (usually ascii, no nul). */
-	node->data = node->perms + hdr->num_perms;
-	/* Children is strings, nul separated. */
-	node->children = node->data + node->hdr.datalen;
 
 	if (access_node(conn, node, NODE_ACCESS_READ, NULL))
 		goto error;

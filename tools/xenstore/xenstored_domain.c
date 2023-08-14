@@ -1334,13 +1334,29 @@ int domain_alloc_permrefs(struct node_perms *perms)
 int domain_adjust_node_perms(struct node *node)
 {
 	unsigned int i;
+	struct xs_permissions *perms = node->perms;
+	bool copied = false;
 
 	for (i = 1; i < node->hdr.num_perms; i++) {
-		if (node->perms[i].perms & XS_PERM_IGNORE)
+		if ((perms[i].perms & XS_PERM_IGNORE) ||
+		    chk_domain_generation(perms[i].id, node->hdr.generation))
 			continue;
-		if (!chk_domain_generation(node->perms[i].id,
-					   node->hdr.generation))
-			node->perms[i].perms |= XS_PERM_IGNORE;
+
+		/*
+		 * Don't do a in-place modification, as the node might
+		 * reference data directly in the data base, which we don't
+		 * want to modify.
+		 */
+		if (!copied) {
+			perms = talloc_memdup(node, node->perms,
+					node->hdr.num_perms * sizeof(*perms));
+			if (!perms)
+				return ENOMEM;
+			node->perms = perms;
+			copied = true;
+		}
+
+		perms[i].perms |= XS_PERM_IGNORE;
 	}
 
 	return 0;

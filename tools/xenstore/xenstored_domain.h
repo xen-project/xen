@@ -90,8 +90,14 @@ void ignore_connection(struct connection *conn, unsigned int err);
 /* Returns the implicit path of a connection (only domains have this) */
 const char *get_implicit_path(const struct connection *conn);
 
-/* Remove node permissions for no longer existing domains. */
+/*
+ * Remove node permissions for no longer existing domains.
+ * In case of a change of permissions the related array is reallocated in
+ * order to avoid a data base change when operating on a node directly
+ * referencing the data base contents.
+ */
 int domain_adjust_node_perms(struct node *node);
+
 int domain_alloc_permrefs(struct node_perms *perms);
 
 /* Quota manipulation */
