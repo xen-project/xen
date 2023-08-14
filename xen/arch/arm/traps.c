@@ -1686,63 +1686,6 @@ void handle_ro_raz(struct cpu_user_regs *regs,
     handle_ro_read_val(regs, regidx, read, hsr, min_el, 0);
 }
 
-void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
-{
-    register_t ttbcr = READ_SYSREG(TCR_EL1);
-    uint64_t ttbr0 = READ_SYSREG64(TTBR0_EL1);
-    uint32_t offset;
-    uint32_t *first = NULL, *second = NULL;
-    mfn_t mfn;
-
-    mfn = gfn_to_mfn(d, gaddr_to_gfn(ttbr0));
-
-    printk("dom%d VA 0x%08"PRIvaddr"\n", d->domain_id, addr);
-    printk("    TTBCR: 0x%"PRIregister"\n", ttbcr);
-    printk("    TTBR0: 0x%016"PRIx64" = 0x%"PRIpaddr"\n",
-           ttbr0, mfn_to_maddr(mfn));
-
-    if ( ttbcr & TTBCR_EAE )
-    {
-        printk("Cannot handle LPAE guest PT walk\n");
-        return;
-    }
-    if ( (ttbcr & TTBCR_N_MASK) != 0 )
-    {
-        printk("Cannot handle TTBR1 guest walks\n");
-        return;
-    }
-
-    if ( mfn_eq(mfn, INVALID_MFN) )
-    {
-        printk("Failed TTBR0 maddr lookup\n");
-        goto done;
-    }
-    first = map_domain_page(mfn);
-
-    offset = addr >> (12+8);
-    printk("1ST[0x%"PRIx32"] (0x%"PRIpaddr") = 0x%08"PRIx32"\n",
-           offset, mfn_to_maddr(mfn), first[offset]);
-    if ( !(first[offset] & 0x1) ||
-          (first[offset] & 0x2) )
-        goto done;
-
-    mfn = gfn_to_mfn(d, gaddr_to_gfn(first[offset]));
-
-    if ( mfn_eq(mfn, INVALID_MFN) )
-    {
-        printk("Failed L1 entry maddr lookup\n");
-        goto done;
-    }
-    second = map_domain_page(mfn);
-    offset = (addr >> 12) & 0x3FF;
-    printk("2ND[0x%"PRIx32"] (0x%"PRIpaddr") = 0x%08"PRIx32"\n",
-           offset, mfn_to_maddr(mfn), second[offset]);
-
-done:
-    if ( second ) unmap_domain_page(second);
-    if ( first ) unmap_domain_page(first);
-}
-
 /*
  * Return the value of the hypervisor fault address register.
  *
