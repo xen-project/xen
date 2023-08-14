@@ -94,7 +94,7 @@
 #define PRINT(_s)          \
         mov   x3, lr ;     \
         adr_l x0, 98f ;    \
-        bl    puts    ;    \
+        bl    asm_puts ;   \
         mov   lr, x3 ;     \
         RODATA_STR(98, _s)
 
@@ -148,21 +148,21 @@
         isb
 .endm
 
-        .section .text.header, "ax", %progbits
-        /*.aarch64*/
+.section .text.header, "ax", %progbits
+/*.aarch64*/
 
-        /*
-         * Kernel startup entry point.
-         * ---------------------------
-         *
-         * The requirements are:
-         *   MMU = off, D-cache = off, I-cache = on or off,
-         *   x0 = physical address to the FDT blob.
-         *
-         * This must be the very first address in the loaded image.
-         * It should be linked at XEN_VIRT_START, and loaded at any
-         * 4K-aligned address.
-         */
+/*
+ * Kernel startup entry point.
+ * ---------------------------
+ *
+ * The requirements are:
+ *   MMU = off, D-cache = off, I-cache = on or off,
+ *   x0 = physical address to the FDT blob.
+ *
+ * This must be the very first address in the loaded image.
+ * It should be linked at XEN_VIRT_START, and loaded at any
+ * 4K-aligned address.
+ */
 
 GLOBAL(start)
         /*
@@ -560,7 +560,7 @@ ENDPROC(cpu_init)
  * Macro to create a mapping entry in \tbl to \phys. Only mapping in 3rd
  * level table (i.e page granularity) is supported.
  *
- * ptbl:     table symbol where the entry will be created
+ * ptbl:    table symbol where the entry will be created
  * virt:    virtual address
  * phys:    physical address (should be page aligned)
  * tmp1:    scratch register
@@ -920,19 +920,22 @@ init_uart:
         ret
 ENDPROC(init_uart)
 
-/* Print early debug messages.
+/*
+ * Print early debug messages.
+ * Note: This function must be called from assembly.
  * x0: Nul-terminated string to print.
  * x23: Early UART base address
- * Clobbers x0-x1 */
-puts:
+ * Clobbers x0-x1
+ */
+ENTRY(asm_puts)
         early_uart_ready x23, 1
         ldrb  w1, [x0], #1           /* Load next char */
         cbz   w1, 1f                 /* Exit on nul */
         early_uart_transmit x23, w1
-        b     puts
+        b     asm_puts
 1:
         ret
-ENDPROC(puts)
+ENDPROC(asm_puts)
 
 /*
  * Print a 64-bit number in hex.
@@ -962,7 +965,6 @@ hex:    .ascii "0123456789abcdef"
 
 ENTRY(early_puts)
 init_uart:
-puts:
 putn:   ret
 
 #endif /* !CONFIG_EARLY_PRINTK */
