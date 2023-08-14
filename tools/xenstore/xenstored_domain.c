@@ -563,12 +563,12 @@ static void domain_tree_remove(struct domain *domain)
 static void fire_special_watches(const char *name)
 {
 	void *ctx = talloc_new(NULL);
-	struct node *node;
+	const struct node *node;
 
 	if (!ctx)
 		return;
 
-	node = read_node(NULL, ctx, name);
+	node = read_node_const(NULL, ctx, name);
 
 	if (node)
 		fire_watches(NULL, ctx, name, node, true, NULL);

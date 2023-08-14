@@ -292,6 +292,8 @@ int write_node_raw(struct connection *conn, const char *db_name,
 /* Get a node from the data base. */
 struct node *read_node(struct connection *conn, const void *ctx,
 		       const char *name);
+const struct node *read_node_const(struct connection *conn, const void *ctx,
+				   const char *name);
 
 /* Remove a node and its children. */
 int rm_node(struct connection *conn, const void *ctx, const char *name);

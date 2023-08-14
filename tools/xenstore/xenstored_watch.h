@@ -28,7 +28,8 @@ int do_unwatch(const void *ctx, struct connection *conn,
 
 /* Fire all watches: !exact means all the children are affected (ie. rm). */
 void fire_watches(struct connection *conn, const void *tmp, const char *name,
-		  struct node *node, bool exact, struct node_perms *perms);
+		  const struct node *node, bool exact,
+		  struct node_perms *perms);
 
 void conn_delete_all_watches(struct connection *conn);
 

@@ -706,11 +706,11 @@ void db_delete(struct connection *conn, const char *name,
  * If it fails, returns NULL and sets errno.
  * Temporary memory allocations will be done with ctx.
  */
-struct node *read_node(struct connection *conn, const void *ctx,
-		       const char *name)
+static struct node *read_node_alloc(struct connection *conn, const void *ctx,
+				    const char *name,
+				    const struct node_hdr **hdr)
 {
 	size_t size;
-	const struct node_hdr *hdr;
 	struct node *node;
 	const char *db_name;
 	int err;
@@ -720,17 +720,16 @@ struct node *read_node(struct connection *conn, const void *ctx,
 		errno = ENOMEM;
 		return NULL;
 	}
+
 	node->name = talloc_strdup(node, name);
 	if (!node->name) {
-		talloc_free(node);
 		errno = ENOMEM;
-		return NULL;
+		goto error;
 	}
 
 	db_name = transaction_prepend(conn, name);
-	hdr = db_fetch(db_name, &size);
-
-	if (hdr == NULL) {
+	*hdr = db_fetch(db_name, &size);
+	if (*hdr == NULL) {
 		node->hdr.generation = NO_GENERATION;
 		err = access_node(conn, node, NODE_ACCESS_READ, NULL);
 		errno = err ? : ENOENT;
@@ -740,31 +739,80 @@ struct node *read_node(struct connection *conn, const void *ctx,
 	node->parent = NULL;
 
 	/* Datalen, childlen, number of permissions */
-	node->hdr = *hdr;
-	node->acc.domid = perms_from_node_hdr(hdr)->id;
+	node->hdr = **hdr;
+	node->acc.domid = perms_from_node_hdr(*hdr)->id;
 	node->acc.memory = size;
 
-	/* Copy node data to new memory area, starting with permissions. */
-	size -= sizeof(*hdr);
-	node->perms = talloc_memdup(node, perms_from_node_hdr(hdr), size);
-	if (node->perms == NULL) {
-		errno = ENOMEM;
-		goto error;
-	}
+	return node;
 
+ error:
+	talloc_free(node);
+	return NULL;
+}
+
+static bool read_node_helper(struct connection *conn, struct node *node)
+{
 	/* Data is binary blob (usually ascii, no nul). */
-	node->data = node->perms + hdr->num_perms;
+	node->data = node->perms + node->hdr.num_perms;
 	/* Children is strings, nul separated. */
 	node->children = node->data + node->hdr.datalen;
 
 	if (domain_adjust_node_perms(node))
-		goto error;
+		return false;
 
 	/* If owner is gone reset currently accounted memory size. */
 	if (node->acc.domid != get_node_owner(node))
 		node->acc.memory = 0;
 
 	if (access_node(conn, node, NODE_ACCESS_READ, NULL))
+		return false;
+
+	return true;
+}
+
+struct node *read_node(struct connection *conn, const void *ctx,
+		       const char *name)
+{
+	size_t size;
+	const struct node_hdr *hdr;
+	struct node *node;
+
+	node = read_node_alloc(conn, ctx, name, &hdr);
+	if (!node)
+		return NULL;
+
+	/* Copy node data to new memory area, starting with permissions. */
+	size = node->acc.memory - sizeof(*hdr);
+	node->perms = talloc_memdup(node, perms_from_node_hdr(hdr), size);
+	if (node->perms == NULL) {
+		errno = ENOMEM;
+		goto error;
+	}
+
+	if (!read_node_helper(conn, node))
+		goto error;
+
+	return node;
+
+ error:
+	talloc_free(node);
+	return NULL;
+}
+
+const struct node *read_node_const(struct connection *conn, const void *ctx,
+				   const char *name)
+{
+	const struct node_hdr *hdr;
+	struct node *node;
+
+	node = read_node_alloc(conn, ctx, name, &hdr);
+	if (!node)
+		return NULL;
+
+	/* Unfortunately node->perms isn't const. */
+	node->perms = (void *)perms_from_node_hdr(hdr);
+
+	if (!read_node_helper(conn, node))
 		goto error;
 
 	return node;
@@ -900,13 +948,13 @@ char *get_parent(const void *ctx, const char *node)
 static int ask_parents(struct connection *conn, const void *ctx,
 		       const char *name, unsigned int *perm)
 {
-	struct node *node;
+	const struct node *node;
 
 	do {
 		name = get_parent(ctx, name);
 		if (!name)
 			return errno;
-		node = read_node(conn, ctx, name);
+		node = read_node_const(conn, ctx, name);
 		if (node)
 			break;
 		if (read_node_can_propagate_errno())
@@ -3197,9 +3245,8 @@ static int dump_state_node_err(struct dump_node_data *data, const char *err)
 }
 
 static int dump_state_node(const void *ctx, struct connection *conn,
-			   struct node *node, void *arg)
+			   const struct node *node, struct dump_node_data *data)
 {
-	struct dump_node_data *data = arg;
 	FILE *fp = data->fp;
 	unsigned int pathlen;
 	struct xs_state_record_header head;
@@ -3244,14 +3291,20 @@ static int dump_state_node(const void *ctx, struct connection *conn,
 	return WALK_TREE_OK;
 }
 
+static int dump_state_node_enter(const void *ctx, struct connection *conn,
+				 struct node *node, void *arg)
+{
+	return dump_state_node(ctx, conn, node, arg);
+}
+
 static int dump_state_special_node(FILE *fp, const void *ctx,
 				   struct dump_node_data *data,
 				   const char *name)
 {
-	struct node *node;
+	const struct node *node;
 	int ret;
 
-	node = read_node(NULL, ctx, name);
+	node = read_node_const(NULL, ctx, name);
 	if (!node)
 		return dump_state_node_err(data, "Dump node read node error");
 
@@ -3267,7 +3320,7 @@ const char *dump_state_nodes(FILE *fp, const void *ctx)
 		.fp = fp,
 		.err = "Dump node walk error"
 	};
-	struct walk_funcs walkfuncs = { .enter = dump_state_node };
+	struct walk_funcs walkfuncs = { .enter = dump_state_node_enter };
 
 	if (walk_node_tree(ctx, NULL, "/", &walkfuncs, &data))
 		return data.err;

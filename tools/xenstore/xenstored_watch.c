@@ -73,11 +73,11 @@ static const char *get_watch_path(const struct watch *watch, const char *name)
  * changed permissions we need to take the old permissions into account, too.
  */
 static bool watch_permitted(struct connection *conn, const void *ctx,
-			    const char *name, struct node *node,
+			    const char *name, const struct node *node,
 			    struct node_perms *perms)
 {
 	unsigned int perm;
-	struct node *parent;
+	const struct node *parent;
 	char *parent_name;
 
 	if (perms) {
@@ -87,7 +87,7 @@ static bool watch_permitted(struct connection *conn, const void *ctx,
 	}
 
 	if (!node) {
-		node = read_node(conn, ctx, name);
+		node = read_node_const(conn, ctx, name);
 		if (!node)
 			return false;
 	}
@@ -101,7 +101,7 @@ static bool watch_permitted(struct connection *conn, const void *ctx,
 		parent_name = get_parent(ctx, node->name);
 		if (!parent_name)
 			return false;
-		parent = read_node(conn, ctx, parent_name);
+		parent = read_node_const(conn, ctx, parent_name);
 		if (!parent)
 			return false;
 	}
@@ -119,7 +119,7 @@ static bool watch_permitted(struct connection *conn, const void *ctx,
  * watch event, too.
  */
 void fire_watches(struct connection *conn, const void *ctx, const char *name,
-		  struct node *node, bool exact, struct node_perms *perms)
+		  const struct node *node, bool exact, struct node_perms *perms)
 {
 	struct connection *i;
 	struct buffered_data *req;
