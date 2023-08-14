@@ -1000,23 +1000,22 @@ static int errno_from_parents(struct connection *conn, const void *ctx,
  * If it fails, returns NULL and sets errno.
  * Temporary memory allocations are done with ctx.
  */
-static struct node *get_node(struct connection *conn,
-			     const void *ctx,
-			     const char *name,
-			     unsigned int perm)
+static bool get_node_chk_perm(struct connection *conn, const void *ctx,
+			      const struct node *node, const char *name,
+			      unsigned int perm)
 {
-	struct node *node;
+	bool success = node;
 
-	node = read_node(conn, ctx, name);
 	/* If we don't have permission, we don't have node. */
 	if (node && (perm_for_conn_from_node(conn, node) & perm) != perm) {
 		errno = EACCES;
-		node = NULL;
+		success = false;
 	}
 	/* Clean up errno if they weren't supposed to know. */
-	if (!node && !read_node_can_propagate_errno())
+	if (!success && !read_node_can_propagate_errno())
 		errno = errno_from_parents(conn, ctx, name, errno, perm);
-	return node;
+
+	return success;
 }
 
 static struct buffered_data *new_buffer(void *ctx)
@@ -1298,14 +1297,12 @@ const char *canonicalize(struct connection *conn, const void *ctx,
 	return NULL;
 }
 
-static struct node *get_node_canonicalized(struct connection *conn,
-					   const void *ctx,
-					   const char *name,
-					   const char **canonical_name,
-					   unsigned int perm,
-					   bool allow_special)
+static struct node *get_node(struct connection *conn, const void *ctx,
+			     const char *name, const char **canonical_name,
+			     unsigned int perm, bool allow_special)
 {
 	const char *tmp_name;
+	struct node *node;
 
 	if (!canonical_name)
 		canonical_name = &tmp_name;
@@ -1313,7 +1310,10 @@ static struct node *get_node_canonicalized(struct connection *conn,
 	if (!*canonical_name)
 		return NULL;
 
-	return get_node(conn, ctx, *canonical_name, perm);
+	node = read_node(conn, ctx, *canonical_name);
+
+	return get_node_chk_perm(conn, ctx, node, *canonical_name, perm)
+	       ? node : NULL;
 }
 
 static int send_directory(const void *ctx, struct connection *conn,
@@ -1321,8 +1321,7 @@ static int send_directory(const void *ctx, struct connection *conn,
 {
 	struct node *node;
 
-	node = get_node_canonicalized(conn, ctx, onearg(in), NULL,
-				      XS_PERM_READ, false);
+	node = get_node(conn, ctx, onearg(in), NULL, XS_PERM_READ, false);
 	if (!node)
 		return errno;
 
@@ -1343,8 +1342,7 @@ static int send_directory_part(const void *ctx, struct connection *conn,
 		return EINVAL;
 
 	/* First arg is node name. */
-	node = get_node_canonicalized(conn, ctx, in->buffer, NULL,
-				      XS_PERM_READ, false);
+	node = get_node(conn, ctx, in->buffer, NULL, XS_PERM_READ, false);
 	if (!node)
 		return errno;
 
@@ -1393,8 +1391,7 @@ static int do_read(const void *ctx, struct connection *conn,
 {
 	struct node *node;
 
-	node = get_node_canonicalized(conn, ctx, onearg(in), NULL,
-				      XS_PERM_READ, false);
+	node = get_node(conn, ctx, onearg(in), NULL, XS_PERM_READ, false);
 	if (!node)
 		return errno;
 
@@ -1608,8 +1605,7 @@ static int do_write(const void *ctx, struct connection *conn,
 	offset = strlen(vec[0]) + 1;
 	datalen = in->used - offset;
 
-	node = get_node_canonicalized(conn, ctx, vec[0], &name, XS_PERM_WRITE,
-				      false);
+	node = get_node(conn, ctx, vec[0], &name, XS_PERM_WRITE, false);
 	if (!node) {
 		/* No permissions, invalid input? */
 		if (errno != ENOENT)
@@ -1637,8 +1633,7 @@ static int do_mkdir(const void *ctx, struct connection *conn,
 	struct node *node;
 	const char *name;
 
-	node = get_node_canonicalized(conn, ctx, onearg(in), &name,
-				      XS_PERM_WRITE, false);
+	node = get_node(conn, ctx, onearg(in), &name, XS_PERM_WRITE, false);
 
 	/* If it already exists, fine. */
 	if (!node) {
@@ -1767,8 +1762,7 @@ static int do_rm(const void *ctx, struct connection *conn,
 	const char *name;
 	char *parentname;
 
-	node = get_node_canonicalized(conn, ctx, onearg(in), &name,
-				      XS_PERM_WRITE, false);
+	node = get_node(conn, ctx, onearg(in), &name, XS_PERM_WRITE, false);
 	if (!node) {
 		/* Didn't exist already?  Fine, if parent exists. */
 		if (errno == ENOENT) {
@@ -1809,8 +1803,7 @@ static int do_get_perms(const void *ctx, struct connection *conn,
 	char *strings;
 	unsigned int len;
 
-	node = get_node_canonicalized(conn, ctx, onearg(in), NULL, XS_PERM_READ,
-				      true);
+	node = get_node(conn, ctx, onearg(in), NULL, XS_PERM_READ, true);
 	if (!node)
 		return errno;
 
@@ -1853,8 +1846,8 @@ static int do_set_perms(const void *ctx, struct connection *conn,
 		return ENOENT;
 
 	/* We must own node to do this (tools can do this too). */
-	node = get_node_canonicalized(conn, ctx, in->buffer, &name,
-				      XS_PERM_WRITE | XS_PERM_OWNER, true);
+	node = get_node(conn, ctx, in->buffer, &name,
+			XS_PERM_WRITE | XS_PERM_OWNER, true);
 	if (!node)
 		return errno;
 
