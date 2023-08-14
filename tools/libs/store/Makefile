@@ -18,7 +18,6 @@ include ../libs.mk
 # Include configure output (config.h)
 CFLAGS += -include $(XEN_ROOT)/tools/config.h
 CFLAGS += $(CFLAGS_libxentoolcore)
-CFLAGS += -DXEN_RUN_STORED="\"$(XEN_RUN_STORED)\""
 
 xs.opic: CFLAGS += -DUSE_PTHREAD
 ifeq ($(CONFIG_Linux),y)

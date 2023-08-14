@@ -2079,6 +2079,11 @@ _ACEOF
 XEN_RUN_STORED=$rundir_path/xenstored
 
 
+cat >>confdefs.h <<_ACEOF
+#define XEN_RUN_STORED "$XEN_RUN_STORED"
+_ACEOF
+
+
 XEN_LIB_DIR=$localstatedir/lib/xen
 
 

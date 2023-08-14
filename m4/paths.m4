@@ -138,6 +138,7 @@ AC_DEFINE_UNQUOTED([XEN_LOG_DIR], ["$XEN_LOG_DIR"], [Xen's log dir])
 
 XEN_RUN_STORED=$rundir_path/xenstored
 AC_SUBST(XEN_RUN_STORED)
+AC_DEFINE_UNQUOTED([XEN_RUN_STORED], ["$XEN_RUN_STORED"], [Xenstore's runstate path])
 
 XEN_LIB_DIR=$localstatedir/lib/xen
 AC_SUBST(XEN_LIB_DIR)
