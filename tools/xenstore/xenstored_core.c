@@ -1301,11 +1301,8 @@ static struct node *get_node(struct connection *conn, const void *ctx,
 			     const char *name, const char **canonical_name,
 			     unsigned int perm, bool allow_special)
 {
-	const char *tmp_name;
 	struct node *node;
 
-	if (!canonical_name)
-		canonical_name = &tmp_name;
 	*canonical_name = canonicalize(conn, ctx, name, allow_special);
 	if (!*canonical_name)
 		return NULL;
@@ -1316,12 +1313,28 @@ static struct node *get_node(struct connection *conn, const void *ctx,
 	       ? node : NULL;
 }
 
+static const struct node *get_node_const(struct connection *conn,
+					 const void *ctx, const char *name,
+					 unsigned int perm, bool allow_special)
+{
+	const char *tmp_name;
+	const struct node *node;
+
+	tmp_name = canonicalize(conn, ctx, name, allow_special);
+	if (!tmp_name)
+		return NULL;
+
+	node = read_node_const(conn, ctx, tmp_name);
+
+	return get_node_chk_perm(conn, ctx, node, tmp_name, perm) ? node : NULL;
+}
+
 static int send_directory(const void *ctx, struct connection *conn,
 			  struct buffered_data *in)
 {
-	struct node *node;
+	const struct node *node;
 
-	node = get_node(conn, ctx, onearg(in), NULL, XS_PERM_READ, false);
+	node = get_node_const(conn, ctx, onearg(in), XS_PERM_READ, false);
 	if (!node)
 		return errno;
 
@@ -1335,14 +1348,14 @@ static int send_directory_part(const void *ctx, struct connection *conn,
 {
 	unsigned int off, len, maxlen, genlen;
 	char *child, *data;
-	struct node *node;
+	const struct node *node;
 	char gen[24];
 
 	if (xenstore_count_strings(in->buffer, in->used) != 2)
 		return EINVAL;
 
 	/* First arg is node name. */
-	node = get_node(conn, ctx, in->buffer, NULL, XS_PERM_READ, false);
+	node = get_node_const(conn, ctx, in->buffer, XS_PERM_READ, false);
 	if (!node)
 		return errno;
 
@@ -1389,9 +1402,9 @@ static int send_directory_part(const void *ctx, struct connection *conn,
 static int do_read(const void *ctx, struct connection *conn,
 		   struct buffered_data *in)
 {
-	struct node *node;
+	const struct node *node;
 
-	node = get_node(conn, ctx, onearg(in), NULL, XS_PERM_READ, false);
+	node = get_node_const(conn, ctx, onearg(in), XS_PERM_READ, false);
 	if (!node)
 		return errno;
 
@@ -1799,11 +1812,11 @@ static int do_rm(const void *ctx, struct connection *conn,
 static int do_get_perms(const void *ctx, struct connection *conn,
 			struct buffered_data *in)
 {
-	struct node *node;
+	const struct node *node;
 	char *strings;
 	unsigned int len;
 
-	node = get_node(conn, ctx, onearg(in), NULL, XS_PERM_READ, true);
+	node = get_node_const(conn, ctx, onearg(in), XS_PERM_READ, true);
 	if (!node)
 		return errno;
 
