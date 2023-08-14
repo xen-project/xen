@@ -2,7 +2,7 @@
 
 XENSTORED_OBJS-y := xenstored_core.o xenstored_watch.o xenstored_domain.o
 XENSTORED_OBJS-y += xenstored_transaction.o xenstored_control.o xenstored_lu.o
-XENSTORED_OBJS-y += talloc.o utils.o tdb.o hashtable.o
+XENSTORED_OBJS-y += talloc.o utils.o hashtable.o
 
 XENSTORED_OBJS-$(CONFIG_Linux) += xenstored_posix.o xenstored_lu_daemon.o
 XENSTORED_OBJS-$(CONFIG_NetBSD) += xenstored_posix.o xenstored_lu_daemon.o
