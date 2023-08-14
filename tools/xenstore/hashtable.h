@@ -40,12 +40,6 @@ create_hashtable(const void *ctx, const char *name,
  *
  * This function will cause the table to expand if the insertion would take
  * the ratio of entries to table size over the maximum load factor.
- *
- * This function does not check for repeated insertions with a duplicate key.
- * The value returned when using a duplicate key is undefined -- when
- * the hashtable changes size, the order of retrieval of duplicate key
- * entries is reversed.
- * If in doubt, remove before insert.
  */
 
 int

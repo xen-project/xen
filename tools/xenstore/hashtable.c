@@ -141,11 +141,34 @@ static int hashtable_expand(struct hashtable *h)
     return 0;
 }
 
+static struct entry *hashtable_search_entry(const struct hashtable *h,
+                                            const void *k)
+{
+    struct entry *e;
+    unsigned int hashvalue, index;
+
+    hashvalue = hash(h, k);
+    index = indexFor(h->tablelength, hashvalue);
+    e = h->table[index];
+
+    for (e = h->table[index]; e; e = e->next)
+    {
+        /* Check hash value to short circuit heavier comparison */
+        if ((hashvalue == e->h) && (h->eqfn(k, e->k)))
+            return e;
+    }
+
+    return NULL;
+}
+
 int hashtable_add(struct hashtable *h, const void *k, void *v)
 {
-    /* This method allows duplicate keys - but they shouldn't be used */
     unsigned int index;
     struct entry *e;
+
+    if (hashtable_search_entry(h, k))
+        return EEXIST;
+
     if (++(h->entrycount) > h->loadlimit)
     {
         /* Ignore the return value. If expand fails, we should
@@ -176,17 +199,10 @@ int hashtable_add(struct hashtable *h, const void *k, void *v)
 void *hashtable_search(const struct hashtable *h, const void *k)
 {
     struct entry *e;
-    unsigned int hashvalue, index;
-    hashvalue = hash(h,k);
-    index = indexFor(h->tablelength,hashvalue);
-    e = h->table[index];
-    while (NULL != e)
-    {
-        /* Check hash value to short circuit heavier comparison */
-        if ((hashvalue == e->h) && (h->eqfn(k, e->k))) return e->v;
-        e = e->next;
-    }
-    return NULL;
+
+    e = hashtable_search_entry(h, k);
+
+    return e ? e->v : NULL;
 }
 
 void
