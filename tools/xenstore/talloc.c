@@ -319,7 +319,7 @@ static int talloc_unreference(const void *context, const void *ptr)
   remove a specific parent context from a pointer. This is a more
   controlled varient of talloc_free()
 */
-int talloc_unlink(const void *context, void *ptr)
+int talloc_unlink(const void *context, const void *ptr)
 {
 	struct talloc_chunk *tc_p, *new_p;
 	void *new_parent;
@@ -499,7 +499,7 @@ void *talloc_init(const char *fmt, ...)
   should probably not be used in new code. It's in here to keep the talloc
   code consistent across Samba 3 and 4.
 */
-static void talloc_free_children(void *ptr)
+static void talloc_free_children(const void *ptr)
 {
 	struct talloc_chunk *tc;
 
@@ -539,7 +539,7 @@ static void talloc_free_children(void *ptr)
    will not be freed if the ref_count is > 1 or the destructor (if
    any) returns non-zero
 */
-int talloc_free(void *ptr)
+int talloc_free(const void *ptr)
 {
 	int saved_errno = errno;
 	struct talloc_chunk *tc;
@@ -571,7 +571,9 @@ int talloc_free(void *ptr)
 			goto err;
 		}
 		tc->destructor = (talloc_destructor_t)-1;
-		if (d(ptr) == -1) {
+
+		/* The destructor needs to be able to change the object! */
+		if (d((void *)ptr) == -1) {
 			tc->destructor = d;
 			goto err;
 		}
