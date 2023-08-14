@@ -164,17 +164,9 @@ static int check_watch_path(struct connection *conn, const void *ctx,
 			    const char **path, bool *relative)
 {
 	*relative = !strstarts(*path, "/") && !strstarts(*path, "@");
-	*path = canonicalize(conn, ctx, *path);
-	if (!*path)
-		return errno;
-	if (!is_valid_nodename(conn, *path, true))
-		goto inval;
+	*path = canonicalize(conn, ctx, *path, true);
 
-	return 0;
-
- inval:
-	errno = EINVAL;
-	return errno;
+	return *path ? 0 : errno;
 }
 
 static struct watch *add_watch(struct connection *conn, const char *path,
@@ -258,9 +250,9 @@ int do_unwatch(const void *ctx, struct connection *conn,
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
 		return EINVAL;
 
-	node = canonicalize(conn, ctx, vec[0]);
+	node = canonicalize(conn, ctx, vec[0], true);
 	if (!node)
-		return ENOMEM;
+		return errno;
 	list_for_each_entry(watch, &conn->watches, list) {
 		if (streq(watch->node, node) && streq(watch->token, vec[1])) {
 			list_del(&watch->list);

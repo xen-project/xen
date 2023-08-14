@@ -241,7 +241,7 @@ void send_ack(struct connection *conn, enum xsd_sockmsg_type type);
 
 /* Canonicalize this path if possible. */
 const char *canonicalize(struct connection *conn, const void *ctx,
-			 const char *node);
+			 const char *node, bool allow_special);
 
 /* Get access permissions. */
 unsigned int perm_for_conn(struct connection *conn,
@@ -303,10 +303,6 @@ struct connection *new_connection(const struct interface_funcs *funcs);
 struct connection *get_connection_by_id(unsigned int conn_id);
 void check_store(void);
 void corrupt(struct connection *conn, const char *fmt, ...);
-
-/* Is this a valid node name? */
-bool is_valid_nodename(const struct connection *conn, const char *node,
-		       bool allow_special);
 
 /* Get name of parent node. */
 char *get_parent(const void *ctx, const char *node);

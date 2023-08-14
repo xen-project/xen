@@ -1219,33 +1219,6 @@ static bool valid_chars(const char *node)
 		       "0123456789-/_@") == strlen(node));
 }
 
-bool is_valid_nodename(const struct connection *conn, const char *node,
-		       bool allow_special)
-{
-	int local_off = 0;
-	unsigned int domid;
-
-	/* Must start in / or - if special nodes are allowed - in @. */
-	if (!strstarts(node, "/") && (!allow_special || !strstarts(node, "@")))
-		return false;
-
-	/* Cannot end in / (unless it's just "/"). */
-	if (strends(node, "/") && !streq(node, "/"))
-		return false;
-
-	/* No double //. */
-	if (strstr(node, "//"))
-		return false;
-
-	if (sscanf(node, "/local/domain/%5u/%n", &domid, &local_off) != 1)
-		local_off = 0;
-
-	if (domain_max_chk(conn, ACC_PATHLEN, strlen(node) - local_off))
-		return false;
-
-	return valid_chars(node);
-}
-
 /* We expect one arg in the input: return NULL otherwise.
  * The payload must contain exactly one nul, at the end.
  */
@@ -1278,16 +1251,51 @@ static char *node_perms_to_strings(const struct node *node, unsigned int *len)
 }
 
 const char *canonicalize(struct connection *conn, const void *ctx,
-			 const char *node)
+			 const char *node, bool allow_special)
 {
-	const char *prefix;
+	const char *name;
+	int local_off = 0;
+	unsigned int domid;
 
-	if (!node || (node[0] == '/') || (node[0] == '@'))
-		return node;
-	prefix = get_implicit_path(conn);
-	if (prefix)
-		return talloc_asprintf(ctx, "%s/%s", prefix, node);
-	return node;
+	/*
+	 * Invalid if any of:
+	 * - no node at all
+	 * - illegal character in node
+	 * - starts with '@' but no special node allowed
+	 */
+	errno = EINVAL;
+	if (!node ||
+	    !valid_chars(node) ||
+	    (node[0] == '@' && !allow_special))
+		return NULL;
+
+	if (node[0] != '/' && node[0] != '@') {
+		name = talloc_asprintf(ctx, "%s/%s", get_implicit_path(conn),
+				       node);
+		if (!name)
+			return NULL;
+	} else
+		name = node;
+
+	if (sscanf(name, "/local/domain/%5u/%n", &domid, &local_off) != 1)
+		local_off = 0;
+
+	/*
+	 * Only valid if:
+	 * - doesn't end in / (unless it's just "/")
+	 * - no double //
+	 * - not violating max allowed path length
+	 */
+	if (!(strends(name, "/") && !streq(name, "/")) &&
+	    !strstr(name, "//") &&
+	    !domain_max_chk(conn, ACC_PATHLEN, strlen(name) - local_off))
+		return name;
+
+	/* Release the memory if 'name' was allocated by us. */
+	if (name != node)
+		talloc_free(name);
+
+	return NULL;
 }
 
 static struct node *get_node_canonicalized(struct connection *conn,
@@ -1301,13 +1309,10 @@ static struct node *get_node_canonicalized(struct connection *conn,
 
 	if (!canonical_name)
 		canonical_name = &tmp_name;
-	*canonical_name = canonicalize(conn, ctx, name);
+	*canonical_name = canonicalize(conn, ctx, name, allow_special);
 	if (!*canonical_name)
 		return NULL;
-	if (!is_valid_nodename(conn, *canonical_name, allow_special)) {
-		errno = EINVAL;
-		return NULL;
-	}
+
 	return get_node(conn, ctx, *canonical_name, perm);
 }
 
