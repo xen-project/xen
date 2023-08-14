@@ -33,7 +33,6 @@
 #include "xenstore_lib.h"
 #include "xenstore_state.h"
 #include "list.h"
-#include "tdb.h"
 #include "hashtable.h"
 
 #ifndef O_CLOEXEC
@@ -237,7 +236,7 @@ static inline unsigned int get_node_owner(const struct node *node)
 	return node->perms.p[0].id;
 }
 
-/* Write a node to the tdb data base. */
+/* Write a node to the data base. */
 enum write_node_mode {
 	NODE_CREATE,
 	NODE_MODIFY
@@ -247,7 +246,7 @@ int write_node_raw(struct connection *conn, const char *db_name,
 		   struct node *node, enum write_node_mode mode,
 		   bool no_quota_check);
 
-/* Get a node from the tdb data base. */
+/* Get a node from the data base. */
 struct node *read_node(struct connection *conn, const void *ctx,
 		       const char *name);
 

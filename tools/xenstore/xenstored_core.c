@@ -53,7 +53,6 @@
 #include "xenstored_domain.h"
 #include "xenstored_control.h"
 #include "xenstored_lu.h"
-#include "tdb.h"
 
 #ifndef NO_SOCKETS
 #if defined(HAVE_SYSTEMD)
@@ -85,7 +84,7 @@ bool keep_orphans = false;
 static int reopen_log_pipe[2];
 static int reopen_log_pipe0_pollfd_idx = -1;
 char *tracefile = NULL;
-static TDB_CONTEXT *tdb_ctx = NULL;
+static struct hashtable *nodes;
 unsigned int trace_flags = TRACE_OBJ | TRACE_IO;
 
 static const char *sockmsg_string(enum xsd_sockmsg_type type);
@@ -556,32 +555,30 @@ static void initialize_fds(int *p_sock_pollfd_idx, int *ptimeout)
 	}
 }
 
-static void set_tdb_key(const char *name, TDB_DATA *key)
-{
-	/*
-	 * Dropping const is fine here, as the key will never be modified
-	 * by TDB.
-	 */
-	key->dptr = (char *)name;
-	key->dsize = strlen(name);
-}
-
 struct xs_tdb_record_hdr *db_fetch(const char *db_name, size_t *size)
 {
-	TDB_DATA key, data;
+	const struct xs_tdb_record_hdr *hdr;
+	struct xs_tdb_record_hdr *p;
 
-	set_tdb_key(db_name, &key);
-	data = tdb_fetch(tdb_ctx, key);
-	if (!data.dptr) {
-		errno = (tdb_error(tdb_ctx) == TDB_ERR_NOEXIST) ? ENOENT : EIO;
-		*size = 0;
-	} else {
-		*size = data.dsize;
-		trace_tdb("read %s size %zu\n", db_name,
-			  *size + strlen(db_name));
+	hdr = hashtable_search(nodes, db_name);
+	if (!hdr) {
+		errno = ENOENT;
+		return NULL;
 	}
 
-	return (struct xs_tdb_record_hdr *)data.dptr;
+	*size = sizeof(*hdr) + hdr->num_perms * sizeof(hdr->perms[0]) +
+		hdr->datalen + hdr->childlen;
+
+	/* Return a copy, avoiding a potential modification in the DB. */
+	p = talloc_memdup(NULL, hdr, *size);
+	if (!p) {
+		errno = ENOMEM;
+		return NULL;
+	}
+
+	trace_tdb("read %s size %zu\n", db_name, *size + strlen(db_name));
+
+	return p;
 }
 
 static void get_acc_data(const char *name, struct node_account_data *acc)
@@ -621,12 +618,10 @@ int db_write(struct connection *conn, const char *db_name, void *data,
 	struct xs_tdb_record_hdr *hdr = data;
 	struct node_account_data old_acc = {};
 	unsigned int old_domid, new_domid;
+	size_t name_len = strlen(db_name);
+	const char *name;
 	int ret;
-	TDB_DATA key, dat;
 
-	set_tdb_key(db_name, &key);
-	dat.dptr = data;
-	dat.dsize = size;
 	if (!acc)
 		old_acc.memory = -1;
 	else
@@ -642,29 +637,36 @@ int db_write(struct connection *conn, const char *db_name, void *data,
 	 */
 	if (old_acc.memory)
 		domain_memory_add_nochk(conn, old_domid,
-					-old_acc.memory - key.dsize);
-	ret = domain_memory_add(conn, new_domid, size + key.dsize,
+					-old_acc.memory - name_len);
+	ret = domain_memory_add(conn, new_domid, size + name_len,
 				no_quota_check);
 	if (ret) {
 		/* Error path, so no quota check. */
 		if (old_acc.memory)
 			domain_memory_add_nochk(conn, old_domid,
-						old_acc.memory + key.dsize);
+						old_acc.memory + name_len);
 		return ret;
 	}
 
-	/* TDB should set errno, but doesn't even set ecode AFAICT. */
-	if (tdb_store(tdb_ctx, key, dat,
-		      (mode == NODE_CREATE) ? TDB_INSERT : TDB_MODIFY) != 0) {
-		domain_memory_add_nochk(conn, new_domid, -size - key.dsize);
+	if (mode == NODE_CREATE) {
+		/* db_name could be modified later, so allocate a copy. */
+		name = talloc_strdup(data, db_name);
+		ret = name ? hashtable_add(nodes, name, data) : ENOMEM;
+	} else
+		ret = hashtable_replace(nodes, db_name, data);
+
+	if (ret) {
+		/* Free data, as it isn't owned by hashtable now. */
+		talloc_free(data);
+		domain_memory_add_nochk(conn, new_domid, -size - name_len);
 		/* Error path, so no quota check. */
 		if (old_acc.memory)
 			domain_memory_add_nochk(conn, old_domid,
-						old_acc.memory + key.dsize);
-		errno = EIO;
+						old_acc.memory + name_len);
+		errno = ret;
 		return errno;
 	}
-	trace_tdb("store %s size %zu\n", db_name, size + key.dsize);
+	trace_tdb("store %s size %zu\n", db_name, size + name_len);
 
 	if (acc) {
 		/* Don't use new_domid, as it might be a transaction node. */
@@ -680,9 +682,6 @@ int db_delete(struct connection *conn, const char *name,
 {
 	struct node_account_data tmp_acc;
 	unsigned int domid;
-	TDB_DATA key;
-
-	set_tdb_key(name, &key);
 
 	if (!acc) {
 		acc = &tmp_acc;
@@ -691,15 +690,13 @@ int db_delete(struct connection *conn, const char *name,
 
 	get_acc_data(name, acc);
 
-	if (tdb_delete(tdb_ctx, key)) {
-		errno = EIO;
-		return errno;
-	}
+	hashtable_remove(nodes, name);
 	trace_tdb("delete %s\n", name);
 
 	if (acc->memory) {
 		domid = get_acc_domid(conn, name, acc->domid);
-		domain_memory_add_nochk(conn, domid, -acc->memory - key.dsize);
+		domain_memory_add_nochk(conn, domid,
+					-acc->memory - strlen(name));
 	}
 
 	return 0;
@@ -2354,56 +2351,6 @@ static void manual_node(const char *name, const char *child)
 	talloc_free(node);
 }
 
-static void tdb_logger(TDB_CONTEXT *tdb, int level, const char * fmt, ...)
-{
-	va_list ap;
-	char *s;
-	int saved_errno = errno;
-
-	va_start(ap, fmt);
-	s = talloc_vasprintf(NULL, fmt, ap);
-	va_end(ap);
-
-	if (s) {
-		trace("TDB: %s\n", s);
-		syslog(LOG_ERR, "TDB: %s",  s);
-		if (verbose)
-			xprintf("TDB: %s", s);
-		talloc_free(s);
-	} else {
-		trace("talloc failure during logging\n");
-		syslog(LOG_ERR, "talloc failure during logging\n");
-	}
-
-	errno = saved_errno;
-}
-
-void setup_structure(bool live_update)
-{
-	char *tdbname;
-
-	tdbname = talloc_strdup(talloc_autofree_context(), "/dev/mem");
-	if (!tdbname)
-		barf_perror("Could not create tdbname");
-
-	tdb_ctx = tdb_open_ex(tdbname, 7919, TDB_INTERNAL | TDB_NOLOCK,
-			      O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC,
-			      0640, &tdb_logger, NULL);
-	if (!tdb_ctx)
-		barf_perror("Could not create tdb file %s", tdbname);
-
-	if (live_update)
-		manual_node("/", NULL);
-	else {
-		manual_node("/", "tool");
-		manual_node("/tool", "xenstored");
-		manual_node("/tool/xenstored", NULL);
-		manual_node("@releaseDomain", NULL);
-		manual_node("@introduceDomain", NULL);
-		domain_nbentry_fix(dom0_domid, 5, true);
-	}
-}
-
 static unsigned int hash_from_key_fn(const void *k)
 {
 	const char *str = k;
@@ -2416,10 +2363,28 @@ static unsigned int hash_from_key_fn(const void *k)
 	return hash;
 }
 
-
 static int keys_equal_fn(const void *key1, const void *key2)
 {
 	return 0 == strcmp(key1, key2);
+}
+
+void setup_structure(bool live_update)
+{
+	nodes = create_hashtable(NULL, "nodes", hash_from_key_fn, keys_equal_fn,
+				 HASHTABLE_FREE_KEY | HASHTABLE_FREE_VALUE);
+	if (!nodes)
+		barf_perror("Could not create nodes hashtable");
+
+	if (live_update)
+		manual_node("/", NULL);
+	else {
+		manual_node("/", "tool");
+		manual_node("/tool", "xenstored");
+		manual_node("/tool/xenstored", NULL);
+		manual_node("@releaseDomain", NULL);
+		manual_node("@introduceDomain", NULL);
+		domain_nbentry_fix(dom0_domid, 5, true);
+	}
 }
 
 int remember_string(struct hashtable *hash, const char *str)
@@ -2481,12 +2446,11 @@ static int check_store_enoent(const void *ctx, struct connection *conn,
 /**
  * Helper to clean_store below.
  */
-static int clean_store_(TDB_CONTEXT *tdb, TDB_DATA key, TDB_DATA val,
-			void *private)
+static int clean_store_(const void *key, void *val, void *private)
 {
 	struct hashtable *reachable = private;
 	char *slash;
-	char * name = talloc_strndup(NULL, key.dptr, key.dsize);
+	char *name = talloc_strdup(NULL, key);
 
 	if (!name) {
 		log("clean_store: ENOMEM");
@@ -2516,7 +2480,7 @@ static int clean_store_(TDB_CONTEXT *tdb, TDB_DATA key, TDB_DATA val,
  */
 static void clean_store(struct check_store_data *data)
 {
-	tdb_traverse(tdb_ctx, &clean_store_, data->reachable);
+	hashtable_iterate(nodes, clean_store_, data->reachable);
 	domain_check_acc(data->domains);
 }
 
