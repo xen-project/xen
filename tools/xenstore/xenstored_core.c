@@ -1219,13 +1219,14 @@ static bool valid_chars(const char *node)
 		       "0123456789-/_@") == strlen(node));
 }
 
-bool is_valid_nodename(const struct connection *conn, const char *node)
+bool is_valid_nodename(const struct connection *conn, const char *node,
+		       bool allow_special)
 {
 	int local_off = 0;
 	unsigned int domid;
 
-	/* Must start in /. */
-	if (!strstarts(node, "/"))
+	/* Must start in / or - if special nodes are allowed - in @. */
+	if (!strstarts(node, "/") && (!allow_special || !strstarts(node, "@")))
 		return false;
 
 	/* Cannot end in / (unless it's just "/"). */
@@ -1293,7 +1294,8 @@ static struct node *get_node_canonicalized(struct connection *conn,
 					   const void *ctx,
 					   const char *name,
 					   const char **canonical_name,
-					   unsigned int perm)
+					   unsigned int perm,
+					   bool allow_special)
 {
 	const char *tmp_name;
 
@@ -1302,24 +1304,11 @@ static struct node *get_node_canonicalized(struct connection *conn,
 	*canonical_name = canonicalize(conn, ctx, name);
 	if (!*canonical_name)
 		return NULL;
-	if (!is_valid_nodename(conn, *canonical_name)) {
+	if (!is_valid_nodename(conn, *canonical_name, allow_special)) {
 		errno = EINVAL;
 		return NULL;
 	}
 	return get_node(conn, ctx, *canonical_name, perm);
-}
-
-static struct node *get_spec_node(struct connection *conn, const void *ctx,
-				  const char *name, const char **canonical_name,
-				  unsigned int perm)
-{
-	if (name[0] == '@') {
-		if (canonical_name)
-			*canonical_name = name;
-		return get_node(conn, ctx, name, perm);
-	}
-
-	return get_node_canonicalized(conn, ctx, name, canonical_name, perm);
 }
 
 static int send_directory(const void *ctx, struct connection *conn,
@@ -1328,7 +1317,7 @@ static int send_directory(const void *ctx, struct connection *conn,
 	struct node *node;
 
 	node = get_node_canonicalized(conn, ctx, onearg(in), NULL,
-				      XS_PERM_READ);
+				      XS_PERM_READ, false);
 	if (!node)
 		return errno;
 
@@ -1350,7 +1339,7 @@ static int send_directory_part(const void *ctx, struct connection *conn,
 
 	/* First arg is node name. */
 	node = get_node_canonicalized(conn, ctx, in->buffer, NULL,
-				      XS_PERM_READ);
+				      XS_PERM_READ, false);
 	if (!node)
 		return errno;
 
@@ -1400,7 +1389,7 @@ static int do_read(const void *ctx, struct connection *conn,
 	struct node *node;
 
 	node = get_node_canonicalized(conn, ctx, onearg(in), NULL,
-				      XS_PERM_READ);
+				      XS_PERM_READ, false);
 	if (!node)
 		return errno;
 
@@ -1614,7 +1603,8 @@ static int do_write(const void *ctx, struct connection *conn,
 	offset = strlen(vec[0]) + 1;
 	datalen = in->used - offset;
 
-	node = get_node_canonicalized(conn, ctx, vec[0], &name, XS_PERM_WRITE);
+	node = get_node_canonicalized(conn, ctx, vec[0], &name, XS_PERM_WRITE,
+				      false);
 	if (!node) {
 		/* No permissions, invalid input? */
 		if (errno != ENOENT)
@@ -1643,7 +1633,7 @@ static int do_mkdir(const void *ctx, struct connection *conn,
 	const char *name;
 
 	node = get_node_canonicalized(conn, ctx, onearg(in), &name,
-				      XS_PERM_WRITE);
+				      XS_PERM_WRITE, false);
 
 	/* If it already exists, fine. */
 	if (!node) {
@@ -1773,7 +1763,7 @@ static int do_rm(const void *ctx, struct connection *conn,
 	char *parentname;
 
 	node = get_node_canonicalized(conn, ctx, onearg(in), &name,
-				      XS_PERM_WRITE);
+				      XS_PERM_WRITE, false);
 	if (!node) {
 		/* Didn't exist already?  Fine, if parent exists. */
 		if (errno == ENOENT) {
@@ -1814,7 +1804,8 @@ static int do_get_perms(const void *ctx, struct connection *conn,
 	char *strings;
 	unsigned int len;
 
-	node = get_spec_node(conn, ctx, onearg(in), NULL, XS_PERM_READ);
+	node = get_node_canonicalized(conn, ctx, onearg(in), NULL, XS_PERM_READ,
+				      true);
 	if (!node)
 		return errno;
 
@@ -1857,8 +1848,8 @@ static int do_set_perms(const void *ctx, struct connection *conn,
 		return ENOENT;
 
 	/* We must own node to do this (tools can do this too). */
-	node = get_spec_node(conn, ctx, in->buffer, &name,
-			     XS_PERM_WRITE | XS_PERM_OWNER);
+	node = get_node_canonicalized(conn, ctx, in->buffer, &name,
+				      XS_PERM_WRITE | XS_PERM_OWNER, true);
 	if (!node)
 		return errno;
 

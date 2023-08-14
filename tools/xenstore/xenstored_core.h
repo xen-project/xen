@@ -305,7 +305,8 @@ void check_store(void);
 void corrupt(struct connection *conn, const char *fmt, ...);
 
 /* Is this a valid node name? */
-bool is_valid_nodename(const struct connection *conn, const char *node);
+bool is_valid_nodename(const struct connection *conn, const char *node,
+		       bool allow_special);
 
 /* Get name of parent node. */
 char *get_parent(const void *ctx, const char *node);

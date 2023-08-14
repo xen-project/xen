@@ -163,19 +163,12 @@ static int destroy_watch(void *_watch)
 static int check_watch_path(struct connection *conn, const void *ctx,
 			    const char **path, bool *relative)
 {
-	/* Check if valid event. */
-	if (strstarts(*path, "@")) {
-		*relative = false;
-		if (strlen(*path) > XENSTORE_REL_PATH_MAX)
-			goto inval;
-	} else {
-		*relative = !strstarts(*path, "/");
-		*path = canonicalize(conn, ctx, *path);
-		if (!*path)
-			return errno;
-		if (!is_valid_nodename(conn, *path))
-			goto inval;
-	}
+	*relative = !strstarts(*path, "/") && !strstarts(*path, "@");
+	*path = canonicalize(conn, ctx, *path);
+	if (!*path)
+		return errno;
+	if (!is_valid_nodename(conn, *path, true))
+		goto inval;
 
 	return 0;
 
