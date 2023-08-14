@@ -736,7 +736,7 @@ struct node *read_node(struct connection *conn, const void *ctx,
 
 	/* Datalen, childlen, number of permissions */
 	node->generation = hdr->generation;
-	node->perms.num = hdr->num_perms;
+	node->num_perms = hdr->num_perms;
 	node->datalen = hdr->datalen;
 	node->childlen = hdr->childlen;
 	node->acc.domid = perms_from_node_hdr(hdr)->id;
@@ -744,8 +744,8 @@ struct node *read_node(struct connection *conn, const void *ctx,
 
 	/* Copy node data to new memory area, starting with permissions. */
 	size -= sizeof(*hdr);
-	node->perms.p = talloc_memdup(node, perms_from_node_hdr(hdr), size);
-	if (node->perms.p == NULL) {
+	node->perms = talloc_memdup(node, perms_from_node_hdr(hdr), size);
+	if (node->perms == NULL) {
 		errno = ENOMEM;
 		goto error;
 	}
@@ -758,7 +758,7 @@ struct node *read_node(struct connection *conn, const void *ctx,
 		node->acc.memory = 0;
 
 	/* Data is binary blob (usually ascii, no nul). */
-	node->data = node->perms.p + hdr->num_perms;
+	node->data = node->perms + hdr->num_perms;
 	/* Children is strings, nul separated. */
 	node->children = node->data + node->datalen;
 
@@ -797,7 +797,7 @@ int write_node_raw(struct connection *conn, const char *db_name,
 		return errno;
 
 	size = sizeof(*hdr)
-		+ node->perms.num * sizeof(node->perms.p[0])
+		+ node->num_perms * sizeof(node->perms[0])
 		+ node->datalen + node->childlen;
 
 	/* Call domain_max_chk() in any case in order to record max values. */
@@ -816,14 +816,14 @@ int write_node_raw(struct connection *conn, const char *db_name,
 
 	hdr = data;
 	hdr->generation = node->generation;
-	hdr->num_perms = node->perms.num;
+	hdr->num_perms = node->num_perms;
 	hdr->datalen = node->datalen;
 	hdr->childlen = node->childlen;
 
 	/* Open code perms_from_node_hdr() for the non-const case. */
 	p = hdr + 1;
-	memcpy(p, node->perms.p, node->perms.num * sizeof(*node->perms.p));
-	p += node->perms.num * sizeof(*node->perms.p);
+	memcpy(p, node->perms, node->num_perms * sizeof(*node->perms));
+	p += node->num_perms * sizeof(*node->perms);
 	memcpy(p, node->data, node->datalen);
 	p += node->datalen;
 	memcpy(p, node->children, node->childlen);
@@ -923,7 +923,8 @@ static int ask_parents(struct connection *conn, const void *ctx,
 		return 0;
 	}
 
-	*perm = perm_for_conn(conn, &node->perms);
+	*perm = perm_for_conn_from_node(conn, node);
+
 	return 0;
 }
 
@@ -963,11 +964,9 @@ static struct node *get_node(struct connection *conn,
 
 	node = read_node(conn, ctx, name);
 	/* If we don't have permission, we don't have node. */
-	if (node) {
-		if ((perm_for_conn(conn, &node->perms) & perm) != perm) {
-			errno = EACCES;
-			node = NULL;
-		}
+	if (node && (perm_for_conn_from_node(conn, node) & perm) != perm) {
+		errno = EACCES;
+		node = NULL;
 	}
 	/* Clean up errno if they weren't supposed to know. */
 	if (!node && !read_node_can_propagate_errno())
@@ -1211,19 +1210,18 @@ const char *onearg(struct buffered_data *in)
 	return in->buffer;
 }
 
-static char *perms_to_strings(const void *ctx, const struct node_perms *perms,
-			      unsigned int *len)
+static char *node_perms_to_strings(const struct node *node, unsigned int *len)
 {
 	unsigned int i;
 	char *strings = NULL;
 	char buffer[MAX_STRLEN(unsigned int) + 1];
 
-	for (*len = 0, i = 0; i < perms->num; i++) {
-		if (!xenstore_perm_to_string(&perms->p[i], buffer,
+	for (*len = 0, i = 0; i < node->num_perms; i++) {
+		if (!xenstore_perm_to_string(&node->perms[i], buffer,
 					     sizeof(buffer)))
 			return NULL;
 
-		strings = talloc_realloc(ctx, strings, char,
+		strings = talloc_realloc(node, strings, char,
 					 *len + strlen(buffer) + 1);
 		if (!strings)
 			return NULL;
@@ -1438,14 +1436,14 @@ static struct node *construct_node(struct connection *conn, const void *ctx,
 		node->name = talloc_steal(node, names[levels - 1]);
 
 		/* Inherit permissions, unpriv domains own what they create. */
-		node->perms.num = parent->perms.num;
-		node->perms.p = talloc_memdup(node, parent->perms.p,
-					      node->perms.num *
-					      sizeof(*node->perms.p));
-		if (!node->perms.p)
+		node->num_perms = parent->num_perms;
+		node->perms = talloc_memdup(node, parent->perms,
+					    node->num_perms *
+					    sizeof(*node->perms));
+		if (!node->perms)
 			goto nomem;
 		if (domain_is_unprivileged(conn))
-			node->perms.p[0].id = conn->id;
+			node->perms[0].id = conn->id;
 
 		/* No children, no data */
 		node->children = node->data = NULL;
@@ -1773,7 +1771,7 @@ static int do_get_perms(const void *ctx, struct connection *conn,
 	if (!node)
 		return errno;
 
-	strings = perms_to_strings(node, &node->perms, &len);
+	strings = node_perms_to_strings(node, &len);
 	if (!strings)
 		return errno;
 
@@ -1822,10 +1820,10 @@ static int do_set_perms(const void *ctx, struct connection *conn,
 	    perms.p[0].id != get_node_owner(node))
 		return EPERM;
 
-	old_perms = node->perms;
+	node_to_node_perms(node, &old_perms);
 	if (domain_nbentry_dec(conn, get_node_owner(node)))
 		return ENOMEM;
-	node->perms = perms;
+	node_perms_to_node(&perms, node);
 	if (domain_nbentry_inc(conn, get_node_owner(node)))
 		return ENOMEM;
 
@@ -2344,8 +2342,8 @@ static void manual_node(const char *name, const char *child)
 		barf_perror("Could not allocate initial node %s", name);
 
 	node->name = name;
-	node->perms.p = &perms;
-	node->perms.num = 1;
+	node->perms = &perms;
+	node->num_perms = 1;
 	node->children = (char *)child;
 	if (child)
 		node->childlen = strlen(child) + 1;
@@ -3216,10 +3214,10 @@ static int dump_state_node(const void *ctx, struct connection *conn,
 	sn.conn_id = 0;
 	sn.ta_id = 0;
 	sn.ta_access = 0;
-	sn.perm_n = node->perms.num;
+	sn.perm_n = node->num_perms;
 	sn.path_len = pathlen;
 	sn.data_len = node->datalen;
-	head.length += node->perms.num * sizeof(*sn.perms);
+	head.length += node->num_perms * sizeof(*sn.perms);
 	head.length += pathlen;
 	head.length += node->datalen;
 	head.length = ROUNDUP(head.length, 3);
@@ -3229,7 +3227,7 @@ static int dump_state_node(const void *ctx, struct connection *conn,
 	if (fwrite(&sn, sizeof(sn), 1, fp) != 1)
 		return dump_state_node_err(data, "Dump node state error");
 
-	ret = dump_state_node_perms(fp, node->perms.p, node->perms.num);
+	ret = dump_state_node_perms(fp, node->perms, node->num_perms);
 	if (ret)
 		return dump_state_node_err(data, ret);
 
@@ -3426,29 +3424,29 @@ void read_state_node(const void *ctx, const void *state)
 	node->data = name + sn->path_len;
 	node->childlen = 0;
 	node->children = NULL;
-	node->perms.num = sn->perm_n;
-	node->perms.p = talloc_array(node, struct xs_permissions,
-				     node->perms.num);
-	if (!node->perms.p)
+	node->num_perms = sn->perm_n;
+	node->perms = talloc_array(node, struct xs_permissions,
+				   node->num_perms);
+	if (!node->perms)
 		barf("allocation error restoring node");
-	for (i = 0; i < node->perms.num; i++) {
+	for (i = 0; i < node->num_perms; i++) {
 		switch (sn->perms[i].access) {
 		case 'r':
-			node->perms.p[i].perms = XS_PERM_READ;
+			node->perms[i].perms = XS_PERM_READ;
 			break;
 		case 'w':
-			node->perms.p[i].perms = XS_PERM_WRITE;
+			node->perms[i].perms = XS_PERM_WRITE;
 			break;
 		case 'b':
-			node->perms.p[i].perms = XS_PERM_READ | XS_PERM_WRITE;
+			node->perms[i].perms = XS_PERM_READ | XS_PERM_WRITE;
 			break;
 		default:
-			node->perms.p[i].perms = XS_PERM_NONE;
+			node->perms[i].perms = XS_PERM_NONE;
 			break;
 		}
 		if (sn->perms[i].flags & XS_STATE_NODE_PERM_IGNORE)
-			node->perms.p[i].perms |= XS_PERM_IGNORE;
-		node->perms.p[i].id = sn->perms[i].domid;
+			node->perms[i].perms |= XS_PERM_IGNORE;
+		node->perms[i].id = sn->perms[i].domid;
 	}
 
 	if (!strstarts(name, "@")) {

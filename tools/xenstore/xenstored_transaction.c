@@ -259,13 +259,13 @@ int access_node(struct connection *conn, struct node *node,
 		if (!i->trans_name)
 			goto nomem;
 		i->node = strchr(i->trans_name, '/') + 1;
-		if (node->generation != NO_GENERATION && node->perms.num) {
+		if (node->generation != NO_GENERATION && node->num_perms) {
 			i->perms.p = talloc_array(i, struct xs_permissions,
-						  node->perms.num);
+						  node->num_perms);
 			if (!i->perms.p)
 				goto nomem;
-			i->perms.num = node->perms.num;
-			memcpy(i->perms.p, node->perms.p,
+			i->perms.num = node->num_perms;
+			memcpy(i->perms.p, node->perms,
 			       i->perms.num * sizeof(*i->perms.p));
 		}
 

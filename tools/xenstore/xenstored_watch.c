@@ -92,7 +92,7 @@ static bool watch_permitted(struct connection *conn, const void *ctx,
 			return false;
 	}
 
-	perm = perm_for_conn(conn, &node->perms);
+	perm = perm_for_conn_from_node(conn, node);
 	if (perm & XS_PERM_READ)
 		return true;
 
@@ -106,7 +106,7 @@ static bool watch_permitted(struct connection *conn, const void *ctx,
 			return false;
 	}
 
-	perm = perm_for_conn(conn, &parent->perms);
+	perm = perm_for_conn_from_node(conn, parent);
 
 	return perm & XS_PERM_READ;
 }

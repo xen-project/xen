@@ -209,7 +209,8 @@ struct node {
 #define NO_GENERATION ~((uint64_t)0)
 
 	/* Permissions. */
-	struct node_perms perms;
+	unsigned int num_perms;
+	struct xs_permissions *perms;
 
 	/* Contents. */
 	unsigned int datalen;
@@ -251,7 +252,33 @@ unsigned int perm_for_conn(struct connection *conn,
 /* Get owner of a node. */
 static inline unsigned int get_node_owner(const struct node *node)
 {
-	return node->perms.p[0].id;
+	return node->perms[0].id;
+}
+
+/* Transfer permissions from node to struct node_perms. */
+static inline void node_to_node_perms(const struct node *node,
+				      struct node_perms *perms)
+{
+	perms->num = node->num_perms;
+	perms->p = node->perms;
+}
+
+static inline unsigned int perm_for_conn_from_node(struct connection *conn,
+						   const struct node *node)
+{
+	struct node_perms perms;
+
+	node_to_node_perms(node, &perms);
+
+	return perm_for_conn(conn, &perms);
+}
+
+/* Transfer permissions from struct node_perms to node. */
+static inline void node_perms_to_node(const struct node_perms *perms,
+				      struct node *node)
+{
+	node->num_perms = perms->num;
+	node->perms = perms->p;
 }
 
 /* Write a node to the data base. */

@@ -513,12 +513,12 @@ static int domain_tree_remove_sub(const void *ctx, struct connection *conn,
 	struct domain *domain = arg;
 	int ret = WALK_TREE_OK;
 
-	if (node->perms.p[0].id != domain->domid)
+	if (node->perms[0].id != domain->domid)
 		return WALK_TREE_OK;
 
 	if (keep_orphans) {
 		domain_nbentry_dec(NULL, domain->domid);
-		node->perms.p[0].id = priv_domid;
+		node->perms[0].id = priv_domid;
 		node->acc.memory = 0;
 		domain_nbentry_inc(NULL, priv_domid);
 		if (write_node_raw(NULL, node->name, node, NODE_MODIFY, true)) {
@@ -1335,12 +1335,11 @@ int domain_adjust_node_perms(struct node *node)
 {
 	unsigned int i;
 
-	for (i = 1; i < node->perms.num; i++) {
-		if (node->perms.p[i].perms & XS_PERM_IGNORE)
+	for (i = 1; i < node->num_perms; i++) {
+		if (node->perms[i].perms & XS_PERM_IGNORE)
 			continue;
-		if (!chk_domain_generation(node->perms.p[i].id,
-					   node->generation))
-			node->perms.p[i].perms |= XS_PERM_IGNORE;
+		if (!chk_domain_generation(node->perms[i].id, node->generation))
+			node->perms[i].perms |= XS_PERM_IGNORE;
 	}
 
 	return 0;
