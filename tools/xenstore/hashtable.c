@@ -11,7 +11,8 @@
 
 struct entry
 {
-    void *k, *v;
+    const void *k;
+    void *v;
     unsigned int h;
     struct entry *next;
 };
@@ -140,7 +141,7 @@ static int hashtable_expand(struct hashtable *h)
     return 0;
 }
 
-int hashtable_add(struct hashtable *h, void *k, void *v)
+int hashtable_add(struct hashtable *h, const void *k, void *v)
 {
     /* This method allows duplicate keys - but they shouldn't be used */
     unsigned int index;

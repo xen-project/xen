@@ -48,8 +48,8 @@ create_hashtable(const void *ctx, const char *name,
  * If in doubt, remove before insert.
  */
 
-int 
-hashtable_add(struct hashtable *h, void *k, void *v);
+int
+hashtable_add(struct hashtable *h, const void *k, void *v);
 
 /*****************************************************************************
  * hashtable_search
