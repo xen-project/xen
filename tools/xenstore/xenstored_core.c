@@ -555,10 +555,9 @@ static void initialize_fds(int *p_sock_pollfd_idx, int *ptimeout)
 	}
 }
 
-struct xs_tdb_record_hdr *db_fetch(const char *db_name, size_t *size)
+const struct xs_tdb_record_hdr *db_fetch(const char *db_name, size_t *size)
 {
 	const struct xs_tdb_record_hdr *hdr;
-	struct xs_tdb_record_hdr *p;
 
 	hdr = hashtable_search(nodes, db_name);
 	if (!hdr) {
@@ -569,22 +568,15 @@ struct xs_tdb_record_hdr *db_fetch(const char *db_name, size_t *size)
 	*size = sizeof(*hdr) + hdr->num_perms * sizeof(hdr->perms[0]) +
 		hdr->datalen + hdr->childlen;
 
-	/* Return a copy, avoiding a potential modification in the DB. */
-	p = talloc_memdup(NULL, hdr, *size);
-	if (!p) {
-		errno = ENOMEM;
-		return NULL;
-	}
-
 	trace_tdb("read %s size %zu\n", db_name, *size + strlen(db_name));
 
-	return p;
+	return hdr;
 }
 
 static void get_acc_data(const char *name, struct node_account_data *acc)
 {
 	size_t size;
-	struct xs_tdb_record_hdr *hdr;
+	const struct xs_tdb_record_hdr *hdr;
 
 	if (acc->memory < 0) {
 		hdr = db_fetch(name, &size);
@@ -595,7 +587,6 @@ static void get_acc_data(const char *name, struct node_account_data *acc)
 			acc->memory = size;
 			acc->domid = hdr->perms[0].id;
 		}
-		talloc_free(hdr);
 	}
 }
 
@@ -708,7 +699,7 @@ struct node *read_node(struct connection *conn, const void *ctx,
 		       const char *name)
 {
 	size_t size;
-	struct xs_tdb_record_hdr *hdr;
+	const struct xs_tdb_record_hdr *hdr;
 	struct node *node;
 	const char *db_name;
 	int err;
@@ -729,30 +720,30 @@ struct node *read_node(struct connection *conn, const void *ctx,
 	hdr = db_fetch(db_name, &size);
 
 	if (hdr == NULL) {
-		if (errno == ENOENT) {
-			node->generation = NO_GENERATION;
-			err = access_node(conn, node, NODE_ACCESS_READ, NULL);
-			errno = err ? : ENOENT;
-		} else {
-			log("DB error on read: %s", strerror(errno));
-			errno = EIO;
-		}
+		node->generation = NO_GENERATION;
+		err = access_node(conn, node, NODE_ACCESS_READ, NULL);
+		errno = err ? : ENOENT;
 		goto error;
 	}
 
 	node->parent = NULL;
-	talloc_steal(node, hdr);
 
 	/* Datalen, childlen, number of permissions */
 	node->generation = hdr->generation;
 	node->perms.num = hdr->num_perms;
 	node->datalen = hdr->datalen;
 	node->childlen = hdr->childlen;
-
-	/* Permissions are struct xs_permissions. */
-	node->perms.p = hdr->perms;
-	node->acc.domid = get_node_owner(node);
+	node->acc.domid = hdr->perms[0].id;
 	node->acc.memory = size;
+
+	/* Copy node data to new memory area, starting with permissions. */
+	size -= sizeof(*hdr);
+	node->perms.p = talloc_memdup(node, hdr->perms, size);
+	if (node->perms.p == NULL) {
+		errno = ENOMEM;
+		goto error;
+	}
+
 	if (domain_adjust_node_perms(node))
 		goto error;
 

@@ -357,20 +357,17 @@ static int finalize_transaction(struct connection *conn,
 {
 	struct accessed_node *i, *n;
 	size_t size;
-	struct xs_tdb_record_hdr *hdr;
+	const struct xs_tdb_record_hdr *hdr;
 	uint64_t gen;
 
 	list_for_each_entry_safe(i, n, &trans->accessed, list) {
 		if (i->check_gen) {
 			hdr = db_fetch(i->node, &size);
 			if (!hdr) {
-				if (errno != ENOENT)
-					return errno;
 				gen = NO_GENERATION;
 			} else {
 				gen = hdr->generation;
 			}
-			talloc_free(hdr);
 			if (i->generation != gen)
 				return EAGAIN;
 		}
@@ -388,14 +385,26 @@ static int finalize_transaction(struct connection *conn,
 		if (i->ta_node) {
 			hdr = db_fetch(i->trans_name, &size);
 			if (hdr) {
+				/*
+				 * Delete transaction entry and write it as
+				 * no-TA entry. As we only hold a reference
+				 * to the data, increment its ref count, then
+				 * delete it from the DB. Now we own it and can
+				 * drop the const attribute for changing the
+				 * generation count.
+				 */
 				enum write_node_mode mode;
+				struct xs_tdb_record_hdr *own;
 
-				hdr->generation = ++generation;
+				talloc_increase_ref_count(hdr);
+				db_delete(conn, i->trans_name, NULL);
+
+				own = (struct xs_tdb_record_hdr *)hdr;
+				own->generation = ++generation;
 				mode = (i->generation == NO_GENERATION)
 				       ? NODE_CREATE : NODE_MODIFY;
-				*is_corrupt |= db_write(conn, i->node, hdr,
+				*is_corrupt |= db_write(conn, i->node, own,
 							size, NULL, mode, true);
-				db_delete(conn, i->trans_name, NULL);
 			} else {
 				*is_corrupt = true;
 			}
