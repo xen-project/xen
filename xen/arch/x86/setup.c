@@ -688,7 +688,7 @@ static void __init parse_video_info(void)
 #endif
 }
 
-static void __init kexec_reserve_area(struct e820map *e820)
+static void __init kexec_reserve_area(void)
 {
 #ifdef CONFIG_KEXEC
     unsigned long kdump_start = kexec_crash_area.start;
@@ -702,7 +702,7 @@ static void __init kexec_reserve_area(struct e820map *e820)
 
     is_reserved = true;
 
-    if ( !reserve_e820_ram(e820, kdump_start, kdump_start + kdump_size) )
+    if ( !reserve_e820_ram(&boot_e820, kdump_start, kdump_start + kdump_size) )
     {
         printk("Kdump: DISABLED (failed to reserve %luMB (%lukB) at %#lx)"
                "\n", kdump_size >> 20, kdump_size >> 10, kdump_start);
@@ -1310,7 +1310,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         if ( e820.map[i].type == E820_RAM )
             nr_pages += e820.map[i].size >> PAGE_SHIFT;
     set_kexec_crash_area_size((u64)nr_pages << PAGE_SHIFT);
-    kexec_reserve_area(&boot_e820);
+    kexec_reserve_area();
 
     initial_images = mod;
     nr_initial_images = mbi->mods_count;
@@ -1497,7 +1497,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         reserve_e820_ram(&boot_e820, __pa(_stext), __pa(__2M_rwdata_end));
 
     /* Late kexec reservation (dynamic start address). */
-    kexec_reserve_area(&boot_e820);
+    kexec_reserve_area();
 
     setup_max_pdx(raw_max_page);
     if ( highmem_start )

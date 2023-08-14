@@ -98,17 +98,17 @@ uint64_t pv_shim_mem(uint64_t avail)
     return shim_nrpages;
 }
 
-static void __init mark_pfn_as_ram(struct e820map *e820, uint64_t pfn)
+static void __init mark_pfn_as_ram(uint64_t pfn)
 {
-    if ( !e820_add_range(e820, pfn << PAGE_SHIFT,
+    if ( !e820_add_range(pfn << PAGE_SHIFT,
                          (pfn << PAGE_SHIFT) + PAGE_SIZE, E820_RAM) &&
-         !e820_change_range_type(e820, pfn << PAGE_SHIFT,
+         !e820_change_range_type(&e820, pfn << PAGE_SHIFT,
                                  (pfn << PAGE_SHIFT) + PAGE_SIZE,
                                  E820_RESERVED, E820_RAM) )
         panic("Unable to add/change memory type of pfn %#lx to RAM\n", pfn);
 }
 
-void __init pv_shim_fixup_e820(struct e820map *e820)
+void __init pv_shim_fixup_e820(void)
 {
     uint64_t pfn = 0;
     unsigned int i = 0;
@@ -120,7 +120,7 @@ void __init pv_shim_fixup_e820(struct e820map *e820)
     rc = xen_hypercall_hvm_get_param(p, &pfn);  \
     if ( rc )                                   \
         panic("Unable to get " #p "\n");        \
-    mark_pfn_as_ram(e820, pfn);                 \
+    mark_pfn_as_ram(pfn);                       \
     ASSERT(i < ARRAY_SIZE(reserved_pages));     \
     reserved_pages[i++].mfn = pfn;              \
 })

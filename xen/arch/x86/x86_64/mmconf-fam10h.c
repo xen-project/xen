@@ -135,7 +135,7 @@ static void __init get_fam10h_pci_mmconf_base(void)
 	return;
 
 out:
-	if (e820_add_range(&e820, start, start + SIZE, E820_RESERVED))
+	if (e820_add_range(start, start + SIZE, E820_RESERVED))
 		fam10h_pci_mmconf_base = start;
 }
 

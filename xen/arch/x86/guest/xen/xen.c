@@ -306,10 +306,10 @@ static void cf_check resume(void)
         pv_console_init();
 }
 
-static void __init cf_check e820_fixup(struct e820map *e820)
+static void __init cf_check e820_fixup(void)
 {
     if ( pv_shim )
-        pv_shim_fixup_e820(e820);
+        pv_shim_fixup_e820();
 }
 
 static int cf_check flush_tlb(

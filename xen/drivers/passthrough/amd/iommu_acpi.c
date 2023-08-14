@@ -418,7 +418,7 @@ static int __init parse_ivmd_block(const struct acpi_ivrs_memory *ivmd_block)
 
             if ( type == RAM_TYPE_UNKNOWN )
             {
-                if ( e820_add_range(&e820, addr, addr + PAGE_SIZE,
+                if ( e820_add_range(addr, addr + PAGE_SIZE,
                                     E820_RESERVED) )
                     continue;
                 AMD_IOMMU_ERROR("IVMD: page at %lx couldn't be reserved\n",

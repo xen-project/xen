@@ -60,10 +60,10 @@ void hypervisor_resume(void)
         ops.resume();
 }
 
-void __init hypervisor_e820_fixup(struct e820map *e820)
+void __init hypervisor_e820_fixup(void)
 {
     if ( ops.e820_fixup )
-        ops.e820_fixup(e820);
+        ops.e820_fixup();
 }
 
 int hypervisor_flush_tlb(const cpumask_t *mask, const void *va,

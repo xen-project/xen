@@ -187,11 +187,11 @@ static int cf_check ap_setup(void)
     return setup_vp_assist();
 }
 
-static void __init cf_check e820_fixup(struct e820map *e820)
+static void __init cf_check e820_fixup(void)
 {
     uint64_t s = HV_HCALL_MFN << PAGE_SHIFT;
 
-    if ( !e820_add_range(e820, s, s + PAGE_SIZE, E820_RESERVED) )
+    if ( !e820_add_range(s, s + PAGE_SIZE, E820_RESERVED) )
         panic("Unable to reserve Hyper-V hypercall range\n");
 }
 
