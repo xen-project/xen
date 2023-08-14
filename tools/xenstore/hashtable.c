@@ -205,6 +205,25 @@ void *hashtable_search(const struct hashtable *h, const void *k)
     return e ? e->v : NULL;
 }
 
+int hashtable_replace(struct hashtable *h, const void *k, void *v)
+{
+    struct entry *e;
+
+    e = hashtable_search_entry(h, k);
+    if (!e)
+        return ENOENT;
+
+    if (h->flags & HASHTABLE_FREE_VALUE)
+    {
+        talloc_free(e->v);
+        talloc_steal(e, v);
+    }
+
+    e->v = v;
+
+    return 0;
+}
+
 void
 hashtable_remove(struct hashtable *h, const void *k)
 {

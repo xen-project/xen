@@ -46,6 +46,22 @@ int
 hashtable_add(struct hashtable *h, const void *k, void *v);
 
 /*****************************************************************************
+ * hashtable_replace
+
+ * @name        hashtable_nsert
+ * @param   h   the hashtable to insert into
+ * @param   k   the key - hashtable claims ownership and will free on removal
+ * @param   v   the value - does not claim ownership
+ * @return      zero for successful insertion
+ *
+ * This function does check for an entry being present before replacing it
+ * with a new value.
+ */
+
+int
+hashtable_replace(struct hashtable *h, const void *k, void *v);
+
+/*****************************************************************************
  * hashtable_search
    
  * @name        hashtable_search
