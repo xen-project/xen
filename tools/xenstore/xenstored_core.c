@@ -555,6 +555,12 @@ static void initialize_fds(int *p_sock_pollfd_idx, int *ptimeout)
 	}
 }
 
+static size_t calc_node_acc_size(const struct node_hdr *hdr)
+{
+	return sizeof(*hdr) + hdr->num_perms * sizeof(struct xs_permissions) +
+	       hdr->datalen + hdr->childlen;
+}
+
 const struct node_hdr *db_fetch(const char *db_name, size_t *size)
 {
 	const struct node_hdr *hdr;
@@ -565,8 +571,7 @@ const struct node_hdr *db_fetch(const char *db_name, size_t *size)
 		return NULL;
 	}
 
-	*size = sizeof(*hdr) + hdr->num_perms * sizeof(struct xs_permissions) +
-		hdr->datalen + hdr->childlen;
+	*size = calc_node_acc_size(hdr);
 
 	trace_tdb("read %s size %zu\n", db_name, *size + strlen(db_name));
 
@@ -726,7 +731,7 @@ struct node *read_node(struct connection *conn, const void *ctx,
 	hdr = db_fetch(db_name, &size);
 
 	if (hdr == NULL) {
-		node->generation = NO_GENERATION;
+		node->hdr.generation = NO_GENERATION;
 		err = access_node(conn, node, NODE_ACCESS_READ, NULL);
 		errno = err ? : ENOENT;
 		goto error;
@@ -735,10 +740,7 @@ struct node *read_node(struct connection *conn, const void *ctx,
 	node->parent = NULL;
 
 	/* Datalen, childlen, number of permissions */
-	node->generation = hdr->generation;
-	node->num_perms = hdr->num_perms;
-	node->datalen = hdr->datalen;
-	node->childlen = hdr->childlen;
+	node->hdr = *hdr;
 	node->acc.domid = perms_from_node_hdr(hdr)->id;
 	node->acc.memory = size;
 
@@ -760,7 +762,7 @@ struct node *read_node(struct connection *conn, const void *ctx,
 	/* Data is binary blob (usually ascii, no nul). */
 	node->data = node->perms + hdr->num_perms;
 	/* Children is strings, nul separated. */
-	node->children = node->data + node->datalen;
+	node->children = node->data + node->hdr.datalen;
 
 	if (access_node(conn, node, NODE_ACCESS_READ, NULL))
 		goto error;
@@ -796,9 +798,7 @@ int write_node_raw(struct connection *conn, const char *db_name,
 	if (domain_adjust_node_perms(node))
 		return errno;
 
-	size = sizeof(*hdr)
-		+ node->num_perms * sizeof(node->perms[0])
-		+ node->datalen + node->childlen;
+	size = calc_node_acc_size(&node->hdr);
 
 	/* Call domain_max_chk() in any case in order to record max values. */
 	if (domain_max_chk(conn, ACC_NODESZ, size) && !no_quota_check) {
@@ -815,18 +815,15 @@ int write_node_raw(struct connection *conn, const char *db_name,
 	BUILD_BUG_ON(XENSTORE_PAYLOAD_MAX >= (typeof(hdr->datalen))(-1));
 
 	hdr = data;
-	hdr->generation = node->generation;
-	hdr->num_perms = node->num_perms;
-	hdr->datalen = node->datalen;
-	hdr->childlen = node->childlen;
+	*hdr = node->hdr;
 
 	/* Open code perms_from_node_hdr() for the non-const case. */
 	p = hdr + 1;
-	memcpy(p, node->perms, node->num_perms * sizeof(*node->perms));
-	p += node->num_perms * sizeof(*node->perms);
-	memcpy(p, node->data, node->datalen);
-	p += node->datalen;
-	memcpy(p, node->children, node->childlen);
+	memcpy(p, node->perms, node->hdr.num_perms * sizeof(*node->perms));
+	p += node->hdr.num_perms * sizeof(*node->perms);
+	memcpy(p, node->data, node->hdr.datalen);
+	p += node->hdr.datalen;
+	memcpy(p, node->children, node->hdr.childlen);
 
 	if (db_write(conn, db_name, data, size, &node->acc, mode,
 		     no_quota_check))
@@ -1216,7 +1213,7 @@ static char *node_perms_to_strings(const struct node *node, unsigned int *len)
 	char *strings = NULL;
 	char buffer[MAX_STRLEN(unsigned int) + 1];
 
-	for (*len = 0, i = 0; i < node->num_perms; i++) {
+	for (*len = 0, i = 0; i < node->hdr.num_perms; i++) {
 		if (!xenstore_perm_to_string(&node->perms[i], buffer,
 					     sizeof(buffer)))
 			return NULL;
@@ -1287,7 +1284,7 @@ static int send_directory(const void *ctx, struct connection *conn,
 	if (!node)
 		return errno;
 
-	send_reply(conn, XS_DIRECTORY, node->children, node->childlen);
+	send_reply(conn, XS_DIRECTORY, node->children, node->hdr.childlen);
 
 	return 0;
 }
@@ -1312,10 +1309,11 @@ static int send_directory_part(const void *ctx, struct connection *conn,
 	/* Second arg is childlist offset. */
 	off = atoi(in->buffer + strlen(in->buffer) + 1);
 
-	genlen = snprintf(gen, sizeof(gen), "%"PRIu64, node->generation) + 1;
+	genlen = snprintf(gen, sizeof(gen), "%"PRIu64, node->hdr.generation) +
+		 1;
 
 	/* Offset behind list: just return a list with an empty string. */
-	if (off >= node->childlen) {
+	if (off >= node->hdr.childlen) {
 		gen[genlen] = 0;
 		send_reply(conn, XS_DIRECTORY_PART, gen, genlen + 1);
 		return 0;
@@ -1328,7 +1326,7 @@ static int send_directory_part(const void *ctx, struct connection *conn,
 	while (len + strlen(child) < maxlen) {
 		len += strlen(child) + 1;
 		child += strlen(child) + 1;
-		if (off + len == node->childlen)
+		if (off + len == node->hdr.childlen)
 			break;
 	}
 
@@ -1338,7 +1336,7 @@ static int send_directory_part(const void *ctx, struct connection *conn,
 
 	memcpy(data, gen, genlen);
 	memcpy(data + genlen, node->children + off, len);
-	if (off + len == node->childlen) {
+	if (off + len == node->hdr.childlen) {
 		data[genlen + len] = 0;
 		len++;
 	}
@@ -1358,7 +1356,7 @@ static int do_read(const void *ctx, struct connection *conn,
 	if (!node)
 		return errno;
 
-	send_reply(conn, XS_READ, node->data, node->datalen);
+	send_reply(conn, XS_READ, node->data, node->hdr.datalen);
 
 	return 0;
 }
@@ -1377,13 +1375,13 @@ static int add_child(const void *ctx, struct node *parent, const char *name)
 
 	base = basename(name);
 	baselen = strlen(base) + 1;
-	children = talloc_array(ctx, char, parent->childlen + baselen);
+	children = talloc_array(ctx, char, parent->hdr.childlen + baselen);
 	if (!children)
 		return ENOMEM;
-	memcpy(children, parent->children, parent->childlen);
-	memcpy(children + parent->childlen, base, baselen);
+	memcpy(children, parent->children, parent->hdr.childlen);
+	memcpy(children + parent->hdr.childlen, base, baselen);
 	parent->children = children;
-	parent->childlen += baselen;
+	parent->hdr.childlen += baselen;
 
 	return 0;
 }
@@ -1436,9 +1434,9 @@ static struct node *construct_node(struct connection *conn, const void *ctx,
 		node->name = talloc_steal(node, names[levels - 1]);
 
 		/* Inherit permissions, unpriv domains own what they create. */
-		node->num_perms = parent->num_perms;
+		node->hdr.num_perms = parent->hdr.num_perms;
 		node->perms = talloc_memdup(node, parent->perms,
-					    node->num_perms *
+					    node->hdr.num_perms *
 					    sizeof(*node->perms));
 		if (!node->perms)
 			goto nomem;
@@ -1447,7 +1445,7 @@ static struct node *construct_node(struct connection *conn, const void *ctx,
 
 		/* No children, no data */
 		node->children = node->data = NULL;
-		node->childlen = node->datalen = 0;
+		node->hdr.childlen = node->hdr.datalen = 0;
 		node->acc.memory = 0;
 		node->parent = parent;
 
@@ -1499,7 +1497,7 @@ static struct node *create_node(struct connection *conn, const void *ctx,
 		ta_node_created(conn->transaction);
 
 	node->data = data;
-	node->datalen = datalen;
+	node->hdr.datalen = datalen;
 
 	/*
 	 * We write out the nodes bottom up.
@@ -1579,7 +1577,7 @@ static int do_write(const void *ctx, struct connection *conn,
 			return errno;
 	} else {
 		node->data = in->buffer + offset;
-		node->datalen = datalen;
+		node->hdr.datalen = datalen;
 		if (write_node(conn, node, NODE_MODIFY, false))
 			return errno;
 	}
@@ -1627,8 +1625,8 @@ static int remove_child_entry(struct connection *conn, struct node *node,
 {
 	size_t childlen = strlen(node->children + offset);
 
-	memdel(node->children, offset, childlen + 1, node->childlen);
-	node->childlen -= childlen + 1;
+	memdel(node->children, offset, childlen + 1, node->hdr.childlen);
+	node->hdr.childlen -= childlen + 1;
 
 	return write_node(conn, node, NODE_MODIFY, true);
 }
@@ -1638,8 +1636,9 @@ static int delete_child(struct connection *conn,
 {
 	unsigned int i;
 
-	for (i = 0; i < node->childlen; i += strlen(node->children+i) + 1) {
-		if (streq(node->children+i, childname)) {
+	for (i = 0; i < node->hdr.childlen;
+	     i += strlen(node->children + i) + 1) {
+		if (streq(node->children + i, childname)) {
 			errno = remove_child_entry(conn, node, i) ? EIO : 0;
 			return errno;
 		}
@@ -1906,7 +1905,7 @@ int walk_node_tree(const void *ctx, struct connection *conn, const char *root,
 		/* node == NULL possible only for the initial loop iteration. */
 		if (node) {
 			/* Go one step up if ret or if last child finished. */
-			if (ret || node->childoff >= node->childlen) {
+			if (ret || node->childoff >= node->hdr.childlen) {
 				parent = node->parent;
 				/* Call function AFTER processing a node. */
 				ret = walk_call_func(ctx, conn, node, parent,
@@ -2343,10 +2342,10 @@ static void manual_node(const char *name, const char *child)
 
 	node->name = name;
 	node->perms = &perms;
-	node->num_perms = 1;
+	node->hdr.num_perms = 1;
 	node->children = (char *)child;
 	if (child)
-		node->childlen = strlen(child) + 1;
+		node->hdr.childlen = strlen(child) + 1;
 
 	if (write_node(NULL, node, NODE_CREATE, false))
 		barf_perror("Could not create initial node %s", name);
@@ -3214,12 +3213,12 @@ static int dump_state_node(const void *ctx, struct connection *conn,
 	sn.conn_id = 0;
 	sn.ta_id = 0;
 	sn.ta_access = 0;
-	sn.perm_n = node->num_perms;
+	sn.perm_n = node->hdr.num_perms;
 	sn.path_len = pathlen;
-	sn.data_len = node->datalen;
-	head.length += node->num_perms * sizeof(*sn.perms);
+	sn.data_len = node->hdr.datalen;
+	head.length += node->hdr.num_perms * sizeof(*sn.perms);
 	head.length += pathlen;
-	head.length += node->datalen;
+	head.length += node->hdr.datalen;
 	head.length = ROUNDUP(head.length, 3);
 
 	if (fwrite(&head, sizeof(head), 1, fp) != 1)
@@ -3227,14 +3226,15 @@ static int dump_state_node(const void *ctx, struct connection *conn,
 	if (fwrite(&sn, sizeof(sn), 1, fp) != 1)
 		return dump_state_node_err(data, "Dump node state error");
 
-	ret = dump_state_node_perms(fp, node->perms, node->num_perms);
+	ret = dump_state_node_perms(fp, node->perms, node->hdr.num_perms);
 	if (ret)
 		return dump_state_node_err(data, ret);
 
 	if (fwrite(node->name, pathlen, 1, fp) != 1)
 		return dump_state_node_err(data, "Dump node path error");
 
-	if (node->datalen && fwrite(node->data, node->datalen, 1, fp) != 1)
+	if (node->hdr.datalen &&
+	    fwrite(node->data, node->hdr.datalen, 1, fp) != 1)
 		return dump_state_node_err(data, "Dump node data error");
 
 	ret = dump_state_align(fp);
@@ -3419,17 +3419,17 @@ void read_state_node(const void *ctx, const void *state)
 
 	node->acc.memory = 0;
 	node->name = name;
-	node->generation = ++generation;
-	node->datalen = sn->data_len;
+	node->hdr.generation = ++generation;
+	node->hdr.datalen = sn->data_len;
 	node->data = name + sn->path_len;
-	node->childlen = 0;
+	node->hdr.childlen = 0;
 	node->children = NULL;
-	node->num_perms = sn->perm_n;
+	node->hdr.num_perms = sn->perm_n;
 	node->perms = talloc_array(node, struct xs_permissions,
-				   node->num_perms);
+				   node->hdr.num_perms);
 	if (!node->perms)
 		barf("allocation error restoring node");
-	for (i = 0; i < node->num_perms; i++) {
+	for (i = 0; i < node->hdr.num_perms; i++) {
 		switch (sn->perms[i].access) {
 		case 'r':
 			node->perms[i].perms = XS_PERM_READ;

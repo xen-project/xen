@@ -181,6 +181,7 @@ extern struct list_head connections;
  */
 struct node_hdr {
 	uint64_t generation;
+#define NO_GENERATION ~((uint64_t)0)
 	uint16_t num_perms;
 	uint16_t datalen;
 	uint32_t childlen;
@@ -197,6 +198,10 @@ struct node_account_data {
 };
 
 struct node {
+	/* Copied to/from data base. */
+	struct node_hdr hdr;
+
+	/* Xenstore path. */
 	const char *name;
 	/* Name used to access data base. */
 	const char *db_name;
@@ -204,20 +209,13 @@ struct node {
 	/* Parent (optional) */
 	struct node *parent;
 
-	/* Generation count. */
-	uint64_t generation;
-#define NO_GENERATION ~((uint64_t)0)
-
 	/* Permissions. */
-	unsigned int num_perms;
 	struct xs_permissions *perms;
 
 	/* Contents. */
-	unsigned int datalen;
 	void *data;
 
 	/* Children, each nul-terminated. */
-	unsigned int childlen;
 	unsigned int childoff;	/* Used by walk_node_tree() internally. */
 	char *children;
 
@@ -259,7 +257,7 @@ static inline unsigned int get_node_owner(const struct node *node)
 static inline void node_to_node_perms(const struct node *node,
 				      struct node_perms *perms)
 {
-	perms->num = node->num_perms;
+	perms->num = node->hdr.num_perms;
 	perms->p = node->perms;
 }
 
@@ -277,7 +275,7 @@ static inline unsigned int perm_for_conn_from_node(struct connection *conn,
 static inline void node_perms_to_node(const struct node_perms *perms,
 				      struct node *node)
 {
-	node->num_perms = perms->num;
+	node->hdr.num_perms = perms->num;
 	node->perms = perms->p;
 }
 

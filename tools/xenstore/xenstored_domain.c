@@ -1335,10 +1335,11 @@ int domain_adjust_node_perms(struct node *node)
 {
 	unsigned int i;
 
-	for (i = 1; i < node->num_perms; i++) {
+	for (i = 1; i < node->hdr.num_perms; i++) {
 		if (node->perms[i].perms & XS_PERM_IGNORE)
 			continue;
-		if (!chk_domain_generation(node->perms[i].id, node->generation))
+		if (!chk_domain_generation(node->perms[i].id,
+					   node->hdr.generation))
 			node->perms[i].perms |= XS_PERM_IGNORE;
 	}
 

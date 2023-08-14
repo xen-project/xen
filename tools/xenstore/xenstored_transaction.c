@@ -232,7 +232,7 @@ int access_node(struct connection *conn, struct node *node,
 	bool introduce = false;
 
 	if (type != NODE_ACCESS_READ) {
-		node->generation = ++generation;
+		node->hdr.generation = ++generation;
 		if (conn && !conn->transaction)
 			wrl_apply_debit_direct(conn);
 	}
@@ -259,12 +259,13 @@ int access_node(struct connection *conn, struct node *node,
 		if (!i->trans_name)
 			goto nomem;
 		i->node = strchr(i->trans_name, '/') + 1;
-		if (node->generation != NO_GENERATION && node->num_perms) {
+		if (node->hdr.generation != NO_GENERATION &&
+		    node->hdr.num_perms) {
 			i->perms.p = talloc_array(i, struct xs_permissions,
-						  node->num_perms);
+						  node->hdr.num_perms);
 			if (!i->perms.p)
 				goto nomem;
-			i->perms.num = node->num_perms;
+			i->perms.num = node->hdr.num_perms;
 			memcpy(i->perms.p, node->perms,
 			       i->perms.num * sizeof(*i->perms.p));
 		}
@@ -282,9 +283,9 @@ int access_node(struct connection *conn, struct node *node,
 		 * from the write types.
 		 */
 		if (type == NODE_ACCESS_READ) {
-			i->generation = node->generation;
+			i->generation = node->hdr.generation;
 			i->check_gen = true;
-			if (node->generation != NO_GENERATION) {
+			if (node->hdr.generation != NO_GENERATION) {
 				ret = write_node_raw(conn, i->trans_name, node,
 						     NODE_CREATE, true);
 				if (ret)
