@@ -555,9 +555,9 @@ static void initialize_fds(int *p_sock_pollfd_idx, int *ptimeout)
 	}
 }
 
-const struct xs_tdb_record_hdr *db_fetch(const char *db_name, size_t *size)
+const struct node_hdr *db_fetch(const char *db_name, size_t *size)
 {
-	const struct xs_tdb_record_hdr *hdr;
+	const struct node_hdr *hdr;
 
 	hdr = hashtable_search(nodes, db_name);
 	if (!hdr) {
@@ -565,7 +565,7 @@ const struct xs_tdb_record_hdr *db_fetch(const char *db_name, size_t *size)
 		return NULL;
 	}
 
-	*size = sizeof(*hdr) + hdr->num_perms * sizeof(hdr->perms[0]) +
+	*size = sizeof(*hdr) + hdr->num_perms * sizeof(struct xs_permissions) +
 		hdr->datalen + hdr->childlen;
 
 	trace_tdb("read %s size %zu\n", db_name, *size + strlen(db_name));
@@ -573,10 +573,16 @@ const struct xs_tdb_record_hdr *db_fetch(const char *db_name, size_t *size)
 	return hdr;
 }
 
+static const struct xs_permissions *perms_from_node_hdr(
+	const struct node_hdr *hdr)
+{
+	return (const struct xs_permissions *)(hdr + 1);
+}
+
 static void get_acc_data(const char *name, struct node_account_data *acc)
 {
 	size_t size;
-	const struct xs_tdb_record_hdr *hdr;
+	const struct node_hdr *hdr;
 
 	if (acc->memory < 0) {
 		hdr = db_fetch(name, &size);
@@ -585,7 +591,7 @@ static void get_acc_data(const char *name, struct node_account_data *acc)
 			acc->memory = 0;
 		} else {
 			acc->memory = size;
-			acc->domid = hdr->perms[0].id;
+			acc->domid = perms_from_node_hdr(hdr)->id;
 		}
 	}
 }
@@ -606,7 +612,7 @@ int db_write(struct connection *conn, const char *db_name, void *data,
 	     size_t size, struct node_account_data *acc,
 	     enum write_node_mode mode, bool no_quota_check)
 {
-	struct xs_tdb_record_hdr *hdr = data;
+	const struct node_hdr *hdr = data;
 	struct node_account_data old_acc = {};
 	unsigned int old_domid, new_domid;
 	size_t name_len = strlen(db_name);
@@ -620,7 +626,7 @@ int db_write(struct connection *conn, const char *db_name, void *data,
 
 	get_acc_data(db_name, &old_acc);
 	old_domid = get_acc_domid(conn, db_name, old_acc.domid);
-	new_domid = get_acc_domid(conn, db_name, hdr->perms[0].id);
+	new_domid = get_acc_domid(conn, db_name, perms_from_node_hdr(hdr)->id);
 
 	/*
 	 * Don't check for ENOENT, as we want to be able to switch orphaned
@@ -661,7 +667,7 @@ int db_write(struct connection *conn, const char *db_name, void *data,
 
 	if (acc) {
 		/* Don't use new_domid, as it might be a transaction node. */
-		acc->domid = hdr->perms[0].id;
+		acc->domid = perms_from_node_hdr(hdr)->id;
 		acc->memory = size;
 	}
 
@@ -699,7 +705,7 @@ struct node *read_node(struct connection *conn, const void *ctx,
 		       const char *name)
 {
 	size_t size;
-	const struct xs_tdb_record_hdr *hdr;
+	const struct node_hdr *hdr;
 	struct node *node;
 	const char *db_name;
 	int err;
@@ -733,12 +739,12 @@ struct node *read_node(struct connection *conn, const void *ctx,
 	node->perms.num = hdr->num_perms;
 	node->datalen = hdr->datalen;
 	node->childlen = hdr->childlen;
-	node->acc.domid = hdr->perms[0].id;
+	node->acc.domid = perms_from_node_hdr(hdr)->id;
 	node->acc.memory = size;
 
 	/* Copy node data to new memory area, starting with permissions. */
 	size -= sizeof(*hdr);
-	node->perms.p = talloc_memdup(node, hdr->perms, size);
+	node->perms.p = talloc_memdup(node, perms_from_node_hdr(hdr), size);
 	if (node->perms.p == NULL) {
 		errno = ENOMEM;
 		goto error;
@@ -785,7 +791,7 @@ int write_node_raw(struct connection *conn, const char *db_name,
 	void *data;
 	size_t size;
 	void *p;
-	struct xs_tdb_record_hdr *hdr;
+	struct node_hdr *hdr;
 
 	if (domain_adjust_node_perms(node))
 		return errno;
@@ -806,15 +812,18 @@ int write_node_raw(struct connection *conn, const char *db_name,
 		return errno;
 	}
 
+	BUILD_BUG_ON(XENSTORE_PAYLOAD_MAX >= (typeof(hdr->datalen))(-1));
+
 	hdr = data;
 	hdr->generation = node->generation;
 	hdr->num_perms = node->perms.num;
 	hdr->datalen = node->datalen;
 	hdr->childlen = node->childlen;
 
-	memcpy(hdr->perms, node->perms.p,
-	       node->perms.num * sizeof(*node->perms.p));
-	p = hdr->perms + node->perms.num;
+	/* Open code perms_from_node_hdr() for the non-const case. */
+	p = hdr + 1;
+	memcpy(p, node->perms.p, node->perms.num * sizeof(*node->perms.p));
+	p += node->perms.num * sizeof(*node->perms.p);
 	memcpy(p, node->data, node->datalen);
 	p += node->datalen;
 	memcpy(p, node->children, node->childlen);
@@ -2144,6 +2153,13 @@ static void handle_input(struct connection *conn)
 			if (in->used != sizeof(in->hdr))
 				return;
 
+			/*
+			 * The payload size is not only currently restricted by
+			 * the protocol but also the internal implementation
+			 * (see various BUILD_BUG_ON()).
+			 * Any potential change of the maximum payload size
+			 * needs to be negotiated between the involved parties.
+			 */
 			if (in->hdr.msg.len > XENSTORE_PAYLOAD_MAX) {
 				syslog(LOG_ERR, "Client tried to feed us %i",
 				       in->hdr.msg.len);

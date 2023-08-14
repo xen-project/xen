@@ -168,6 +168,24 @@ struct connection
 };
 extern struct list_head connections;
 
+/*
+ * Header of the node record in the data base.
+ * In the data base the memory of the node is a single memory chunk with the
+ * following format:
+ * struct {
+ *     node_hdr hdr;
+ *     struct xs_permissions perms[hdr.num_perms];
+ *     char data[hdr.datalen];
+ *     char children[hdr.childlen];
+ * };
+ */
+struct node_hdr {
+	uint64_t generation;
+	uint16_t num_perms;
+	uint16_t datalen;
+	uint32_t childlen;
+};
+
 struct node_perms {
 	unsigned int num;
 	struct xs_permissions *p;
@@ -362,7 +380,7 @@ extern xengnttab_handle **xgt_handle;
 int remember_string(struct hashtable *hash, const char *str);
 
 /* Data base access functions. */
-const struct xs_tdb_record_hdr *db_fetch(const char *db_name, size_t *size);
+const struct node_hdr *db_fetch(const char *db_name, size_t *size);
 int db_write(struct connection *conn, const char *db_name, void *data,
 	     size_t size, struct node_account_data *acc,
 	     enum write_node_mode mode, bool no_quota_check);

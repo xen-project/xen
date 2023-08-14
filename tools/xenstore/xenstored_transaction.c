@@ -357,7 +357,7 @@ static int finalize_transaction(struct connection *conn,
 {
 	struct accessed_node *i, *n;
 	size_t size;
-	const struct xs_tdb_record_hdr *hdr;
+	const struct node_hdr *hdr;
 	uint64_t gen;
 
 	list_for_each_entry_safe(i, n, &trans->accessed, list) {
@@ -394,12 +394,12 @@ static int finalize_transaction(struct connection *conn,
 				 * generation count.
 				 */
 				enum write_node_mode mode;
-				struct xs_tdb_record_hdr *own;
+				struct node_hdr *own;
 
 				talloc_increase_ref_count(hdr);
 				db_delete(conn, i->trans_name, NULL);
 
-				own = (struct xs_tdb_record_hdr *)hdr;
+				own = (struct node_hdr *)hdr;
 				own->generation = ++generation;
 				mode = (i->generation == NO_GENERATION)
 				       ? NODE_CREATE : NODE_MODIFY;
