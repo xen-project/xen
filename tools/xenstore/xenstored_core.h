@@ -366,8 +366,8 @@ struct xs_tdb_record_hdr *db_fetch(const char *db_name, size_t *size);
 int db_write(struct connection *conn, const char *db_name, void *data,
 	     size_t size, struct node_account_data *acc,
 	     enum write_node_mode mode, bool no_quota_check);
-int db_delete(struct connection *conn, const char *name,
-	      struct node_account_data *acc);
+void db_delete(struct connection *conn, const char *name,
+	       struct node_account_data *acc);
 
 void conn_free_buffered_data(struct connection *conn);
 

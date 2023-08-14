@@ -377,10 +377,8 @@ static int finalize_transaction(struct connection *conn,
 
 		/* Entries for unmodified nodes can be removed early. */
 		if (!i->modified) {
-			if (i->ta_node) {
-				if (db_delete(conn, i->trans_name, NULL))
-					return EIO;
-			}
+			if (i->ta_node)
+				db_delete(conn, i->trans_name, NULL);
 			list_del(&i->list);
 			talloc_free(i);
 		}
@@ -397,8 +395,7 @@ static int finalize_transaction(struct connection *conn,
 				       ? NODE_CREATE : NODE_MODIFY;
 				*is_corrupt |= db_write(conn, i->node, hdr,
 							size, NULL, mode, true);
-				if (db_delete(conn, i->trans_name, NULL))
-					*is_corrupt = true;
+				db_delete(conn, i->trans_name, NULL);
 			} else {
 				*is_corrupt = true;
 			}
@@ -408,9 +405,8 @@ static int finalize_transaction(struct connection *conn,
 			 * in this transaction will have no generation
 			 * information stored.
 			 */
-			*is_corrupt |= (i->generation == NO_GENERATION)
-				       ? false
-				       : db_delete(conn, i->node, NULL);
+			if (i->generation != NO_GENERATION)
+				db_delete(conn, i->node, NULL);
 		}
 		if (i->fire_watch)
 			fire_watches(conn, trans, i->node, NULL, i->watch_exact,

@@ -677,8 +677,8 @@ int db_write(struct connection *conn, const char *db_name, void *data,
 	return 0;
 }
 
-int db_delete(struct connection *conn, const char *name,
-	      struct node_account_data *acc)
+void db_delete(struct connection *conn, const char *name,
+	       struct node_account_data *acc)
 {
 	struct node_account_data tmp_acc;
 	unsigned int domid;
@@ -698,8 +698,6 @@ int db_delete(struct connection *conn, const char *name,
 		domain_memory_add_nochk(conn, domid,
 					-acc->memory - strlen(name));
 	}
-
-	return 0;
 }
 
 /*
@@ -1670,9 +1668,8 @@ static int delnode_sub(const void *ctx, struct connection *conn,
 	if (domain_nbentry_dec(conn, get_node_owner(node)))
 		return WALK_TREE_ERROR_STOP;
 
-	/* In case of error stop the walk. */
-	if (!ret && db_delete(conn, db_name, &node->acc))
-		return WALK_TREE_ERROR_STOP;
+	if (!ret)
+		db_delete(conn, db_name, &node->acc);
 
 	/*
 	 * Fire the watches now, when we can still see the node permissions.
