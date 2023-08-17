@@ -223,7 +223,7 @@ static void __iomem *get_table(const struct vpci *vpci, unsigned int slot)
     return msix->table[slot];
 }
 
-unsigned int get_slot(const struct vpci *vpci, unsigned long addr)
+static unsigned int get_slot(const struct vpci *vpci, unsigned long addr)
 {
     unsigned long pfn = PFN_DOWN(addr);
 
