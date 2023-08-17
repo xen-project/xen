@@ -22,6 +22,9 @@
 -file_tag+={adopted,"^xen/drivers/acpi/numa\\.c$"}
 -file_tag+={adopted,"^xen/drivers/acpi/osl\\.c$"}
 -file_tag+={adopted,"^xen/drivers/acpi/tables\\.c$"}
+-file_tag+={adopted,"^xen/include/xen/acpi\\.h$"}
+-file_tag+={adopted,"^xen/include/acpi/acpiosxf\\.h$"}
+-file_tag+={adopted,"^xen/include/acpi/acpixf\\.h$"}
 -file_tag+={adopted,"^xen/lib/list-sort\\.c$"}
 -file_tag+={adopted,"^xen/lib/rbtree\\.c$"}
 -file_tag+={adopted,"^xen/lib/xxhash.*\\.c$"}

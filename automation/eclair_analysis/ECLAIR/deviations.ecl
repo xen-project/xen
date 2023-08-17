@@ -175,6 +175,35 @@ const-qualified."
 -config=MC3R1.R8.2,reports+={deliberate,"any_area(any_loc(file(adopted_r8_2)))"}
 -doc_end
 
+-doc_begin="The type ret_t is deliberately used and defined as int or long depending on the architecture."
+-config=MC3R1.R8.3,reports+={deliberate,"any_area(any_loc(text(^.*ret_t.*$)))"}
+-doc_end
+
+-doc_begin="The following files are imported from Linux and decompress.h defines a unique and documented interface towards all the (adopted) decompress functions."
+-file_tag+={adopted_decompress_r8_3,"^xen/common/bunzip2\\.c$"}
+-file_tag+={adopted_decompress_r8_3,"^xen/common/unlz4\\.c$"}
+-file_tag+={adopted_decompress_r8_3,"^xen/common/unlzma\\.c$"}
+-file_tag+={adopted_decompress_r8_3,"^xen/common/unlzo\\.c$"}
+-file_tag+={adopted_decompress_r8_3,"^xen/common/unxz\\.c$"}
+-file_tag+={adopted_decompress_r8_3,"^xen/common/unzstd\\.c$"}
+-config=MC3R1.R8.3,reports+={deliberate,"any_area(any_loc(file(adopted_decompress_r8_3)))&&any_area(any_loc(file(^xen/include/xen/decompress\\.h$)))"}
+-doc_end
+
+-doc_begin="The following file is imported from Linux: ignore for now."
+-file_tag+={adopted_time_r8_3,"^xen/arch/x86/time\\.c$"}
+-config=MC3R1.R8.3,reports+={deliberate,"any_area(any_loc(file(adopted_time_r8_3)))&&(any_area(any_loc(file(^xen/include/xen/time\\.h$)))||any_area(any_loc(file(^xen/arch/x86/include/asm/setup\\.h$))))"}
+-doc_end
+
+-doc_begin="The following file is imported from Linux: ignore for now."
+-file_tag+={adopted_cpu_idle_r8_3,"^xen/arch/x86/acpi/cpu_idle\\.c$"}
+-config=MC3R1.R8.3,reports+={deliberate,"any_area(any_loc(file(adopted_cpu_idle_r8_3)))&&any_area(any_loc(file(^xen/include/xen/pmstat\\.h$)))"}
+-doc_end
+
+-doc_begin="The following file is imported from Linux: ignore for now."
+-file_tag+={adopted_mpparse_r8_3,"^xen/arch/x86/mpparse\\.c$"}
+-config=MC3R1.R8.3,reports+={deliberate,"any_area(any_loc(file(adopted_mpparse_r8_3)))&&any_area(any_loc(file(^xen/arch/x86/include/asm/mpspec\\.h$)))"}
+-doc_end
+
 -doc_begin="The following variables are compiled in multiple translation units
 belonging to different executables and therefore are safe."
 -config=MC3R1.R8.6,declarations+={safe, "name(current_stack_pointer||bsearch||sort)"}
