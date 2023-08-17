@@ -432,8 +432,7 @@ unsigned int cf_check io_apic_read_remap_rte(
 void cf_check io_apic_write_remap_rte(
     unsigned int apic, unsigned int pin, uint64_t rte)
 {
-    struct IO_xAPIC_route_entry new_rte = { .raw = rte };
-    struct IO_xAPIC_route_entry old_rte = { };
+    struct IO_xAPIC_route_entry old_rte = {}, new_rte;
     struct vtd_iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
     bool masked = true;
     int rc;
@@ -452,6 +451,9 @@ void cf_check io_apic_write_remap_rte(
             __ioapic_write_entry(apic, pin, true, old_rte);
         }
     }
+
+    /* Not the initializer, for old gcc to cope. */
+    new_rte.raw = rte;
 
     rc = ioapic_rte_to_remap_entry(iommu, apic, pin, &old_rte, new_rte);
     if ( rc )
