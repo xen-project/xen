@@ -354,6 +354,16 @@ void tboot_shutdown(uint32_t shutdown_type)
     }
 
     /*
+     * Disable CET - tboot may not be built with endbr, and it doesn't support
+     * shadow stacks.
+     */
+    if ( read_cr4() & X86_CR4_CET )
+    {
+        wrmsrl(MSR_S_CET, 0);
+        write_cr4(read_cr4() & ~X86_CR4_CET);
+    }
+
+    /*
      * During early boot, we can be called by panic before idle_vcpu[0] is
      * setup, but in that case we don't need to change page tables.
      */
