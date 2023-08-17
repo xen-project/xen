@@ -182,6 +182,18 @@
             "comment": "Imported from Linux, ignore for now"
         },
         {
+            "rel_path": "include/acpi/acpiosxf.h",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "include/acpi/acpixf.h",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "include/xen/acpi.h",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
             "rel_path": "lib/list-sort.c",
             "comment": "Imported from Linux, ignore for now"
         },
