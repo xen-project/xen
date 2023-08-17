@@ -424,10 +424,10 @@ static struct acpi_20_rsdp *__find_rsdp(const void *start, unsigned int len)
 struct acpi_20_rsdp *find_rsdp(void)
 {
     struct acpi_20_rsdp *rsdp;
-    uint16_t ebda_seg;
+    uint16_t *volatile /* GCC issue 99578 */ ebda_seg =
+        ADDR_FROM_SEG_OFF(0x40, 0xe);
 
-    ebda_seg = *(uint16_t *)ADDR_FROM_SEG_OFF(0x40, 0xe);
-    rsdp = __find_rsdp((void *)(ebda_seg << 16), 1024);
+    rsdp = __find_rsdp((void *)(*ebda_seg << 16), 1024);
     if (!rsdp)
         rsdp = __find_rsdp((void *)0xE0000, 0x20000);
 
