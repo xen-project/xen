@@ -259,8 +259,10 @@ OBJS := x86-emulate.o cpuid.o test_x86_emulator.o evex-disp8.o predicates.o wrap
 OBJS += x86_emulate/0f01.o x86_emulate/0fae.o x86_emulate/0fc7.o
 OBJS += x86_emulate/blk.o x86_emulate/decode.o x86_emulate/fpu.o x86_emulate/util.o
 
+WRAPPED := $(shell sed -n 's,^ *WRAP(\([[:alnum:]_]*\));,\1,p' x86-emulate.h)
+
 $(TARGET): $(OBJS)
-	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^
+	$(HOSTCC) $(HOSTCFLAGS) $(addprefix -Wl$(comma)--wrap=,$(WRAPPED)) -o $@ $^
 
 .PHONY: clean
 clean:

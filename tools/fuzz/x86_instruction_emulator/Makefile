@@ -35,6 +35,8 @@ OBJS := fuzz-emul.o x86-emulate.o
 OBJS += x86_emulate/0f01.o x86_emulate/0fae.o x86_emulate/0fc7.o
 OBJS += x86_emulate/decode.o x86_emulate/fpu.o
 
+WRAPPED = $(shell sed -n 's,^ *WRAP(\([[:alnum:]_]*\));,\1,p' x86-emulate.h)
+
 private.h := x86-emulate.h x86_emulate/x86_emulate.h x86_emulate/private.h
 
 x86-emulate.h: x86_emulate/x86_emulate.h
@@ -51,10 +53,10 @@ x86-insn-fuzzer.a: $(OBJS) cpuid.o
 	$(AR) rc $@ $^
 
 afl-harness: afl-harness.o $(OBJS) cpuid.o wrappers.o
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $(addprefix -Wl$(comma)--wrap=,$(WRAPPED)) $^ -o $@
 
 afl-harness-cov: afl-harness-cov.o $(patsubst %.o,%-cov.o,$(OBJS)) cpuid.o wrappers.o
-	$(CC) $(CFLAGS) $(GCOV_FLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $(GCOV_FLAGS) $(addprefix -Wl$(comma)--wrap=,$(WRAPPED)) $^ -o $@
 
 # Common targets
 .PHONY: all
