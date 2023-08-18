@@ -250,8 +250,10 @@ xop.h avx512f.h: simd-fma.c
 
 endif # 32-bit override
 
+WRAPPED := $(shell sed -n 's,^ *WRAP(\([[:alnum:]_]*\));,\1,p' x86-emulate.h)
+
 $(TARGET): x86-emulate.o cpuid.o test_x86_emulator.o evex-disp8.o predicates.o wrappers.o
-	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^
+	$(HOSTCC) $(HOSTCFLAGS) $(addprefix -Wl$(comma)--wrap=,$(WRAPPED)) -o $@ $^
 
 .PHONY: clean
 clean:

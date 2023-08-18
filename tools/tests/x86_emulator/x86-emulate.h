@@ -29,9 +29,7 @@
 #ifdef EOF
 # error "Must not include <stdio.h> before x86-emulate.h"
 #endif
-#ifdef WRAP
-# include <stdio.h>
-#endif
+#include <stdio.h>
 
 #include <xen/xen.h>
 
@@ -85,11 +83,7 @@ void emul_restore_fpu_state(void);
  * around the actual function.
  */
 #ifndef WRAP
-# if 0 /* This only works for explicit calls, not for compiler generated ones. */
-#  define WRAP(x) typeof(x) x asm("emul_" #x)
-# else
-# define WRAP(x) asm(".equ " #x ", emul_" #x)
-# endif
+# define WRAP(x) typeof(x) __wrap_ ## x
 #endif
 
 WRAP(fwrite);
@@ -99,6 +93,10 @@ WRAP(memset);
 WRAP(printf);
 WRAP(putchar);
 WRAP(puts);
+WRAP(snprintf);
+WRAP(strstr);
+WRAP(vprintf);
+WRAP(vsnprintf);
 
 #undef WRAP
 

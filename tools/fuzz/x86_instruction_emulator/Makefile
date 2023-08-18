@@ -29,6 +29,8 @@ GCOV_FLAGS := --coverage
 %-cov.o: %.c
 	$(CC) -c $(CFLAGS) $(GCOV_FLAGS) $< -o $@
 
+WRAPPED = $(shell sed -n 's,^ *WRAP(\([[:alnum:]_]*\));,\1,p' x86-emulate.h)
+
 x86-emulate.h: x86_emulate/x86_emulate.h
 x86-emulate.o x86-emulate-cov.o: x86-emulate.h x86_emulate/x86_emulate.c
 fuzz-emul.o fuzz-emul-cov.o wrappers.o: x86-emulate.h
@@ -37,10 +39,10 @@ x86-insn-fuzzer.a: fuzz-emul.o x86-emulate.o cpuid.o
 	$(AR) rc $@ $^
 
 afl-harness: afl-harness.o fuzz-emul.o x86-emulate.o cpuid.o wrappers.o
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $(addprefix -Wl$(comma)--wrap=,$(WRAPPED)) $^ -o $@
 
 afl-harness-cov: afl-harness-cov.o fuzz-emul-cov.o x86-emulate-cov.o cpuid.o wrappers.o
-	$(CC) $(CFLAGS) $(GCOV_FLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $(GCOV_FLAGS) $(addprefix -Wl$(comma)--wrap=,$(WRAPPED)) $^ -o $@
 
 # Common targets
 .PHONY: all
