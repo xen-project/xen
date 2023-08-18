@@ -595,7 +595,7 @@ static void tcpa_add_measurement(uint32_t pcrIndex,
 /*
  * Add measurement to log about call of int 19h
  */
-void tcpa_calling_int19h()
+void tcpa_calling_int19h(void)
 {
 	tcpa_add_measurement(4, EV_ACTION, 0);
 }
@@ -603,7 +603,7 @@ void tcpa_calling_int19h()
 /*
  * Add measurement to log about retuning from int 19h
  */
-void tcpa_returned_int19h()
+void tcpa_returned_int19h(void)
 {
 	tcpa_add_measurement(4, EV_ACTION, 1);
 }
@@ -611,7 +611,7 @@ void tcpa_returned_int19h()
 /*
  * Add event separators for PCRs 0 to 7; specs 8.2.3
  */
-void tcpa_add_event_separators()
+void tcpa_add_event_separators(void)
 {
 	uint32_t pcrIndex = 0;
 	while (pcrIndex <= 7) {
@@ -624,7 +624,7 @@ void tcpa_add_event_separators()
 /*
  * Add a wake event to the log
  */
-void tcpa_wake_event()
+void tcpa_wake_event(void)
 {
 	tcpa_add_measurement_to_log(6,
 	                            EV_ACTION,
@@ -659,7 +659,7 @@ void tcpa_add_bootdevice(uint32_t bootcd, uint32_t bootdrv)
  * Add measurement to the log about option rom scan
  * 10.4.3 : action 14
  */
-void tcpa_start_option_rom_scan()
+void tcpa_start_option_rom_scan(void)
 {
 	tcpa_add_measurement(2, EV_ACTION, 14);
 }
