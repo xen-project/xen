@@ -4,11 +4,6 @@ ECLAIR_ANALYSIS_DIR=automation/eclair_analysis
 ECLAIR_DIR="${ECLAIR_ANALYSIS_DIR}/ECLAIR"
 ECLAIR_OUTPUT_DIR=$(realpath "${ECLAIR_OUTPUT_DIR}")
 
-if [ -z "${WTOKEN:-}" ]; then
-    echo "Failure: the WTOKEN variable is not defined." >&2
-    exit 1
-fi
-
 "${ECLAIR_ANALYSIS_DIR}/prepare.sh" "${VARIANT}"
 
 ex=0
