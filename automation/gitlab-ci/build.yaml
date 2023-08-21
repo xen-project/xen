@@ -12,11 +12,6 @@
       - '*/*.log'
     when: always
   needs: []
-  except:
-    - master
-    - smoke
-    - /^coverity-tested\/.*/
-    - /^stable-.*/
 
 .gcc-tmpl:
   variables: &gcc
@@ -214,11 +209,6 @@
 .yocto-test:
   stage: build
   image: registry.gitlab.com/xen-project/xen/${CONTAINER}
-  except:
-    - master
-    - smoke
-    - /^coverity-tested\/.*/
-    - /^stable-.*/
   script:
     - ./automation/build/yocto/build-yocto.sh -v --log-dir=./logs --xen-dir=`pwd` ${YOCTO_BOARD} ${YOCTO_OUTPUT}
   variables:
@@ -269,7 +259,6 @@
 .test-jobs-artifact-common:
   stage: build
   needs: []
-  except: !reference [.test-jobs-common, except]
 
 # Arm test artifacts
 
