@@ -245,8 +245,8 @@ static void bootloader_cleanup(libxl__egc *egc, libxl__bootloader_state *bl)
 static void bootloader_setpaths(libxl__gc *gc, libxl__bootloader_state *bl)
 {
     uint32_t domid = bl->domid;
-    bl->outputdir = GCSPRINTF(XEN_RUN_DIR "/bootloader.%"PRIu32".d", domid);
-    bl->outputpath = GCSPRINTF(XEN_RUN_DIR "/bootloader.%"PRIu32".out", domid);
+    bl->outputdir = GCSPRINTF(XEN_LIB_DIR "/bootloader.%"PRIu32".d", domid);
+    bl->outputpath = GCSPRINTF(XEN_LIB_DIR "/bootloader.%"PRIu32".out", domid);
 }
 
 /* Callbacks */
