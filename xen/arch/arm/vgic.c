@@ -24,7 +24,8 @@
 #include <asm/gic.h>
 #include <asm/vgic.h>
 
-static inline struct vgic_irq_rank *vgic_get_rank(struct vcpu *v, int rank)
+static inline struct vgic_irq_rank *vgic_get_rank(struct vcpu *v,
+                                                  unsigned int rank)
 {
     if ( rank == 0 )
         return v->arch.vgic.private_irqs;
@@ -38,17 +39,17 @@ static inline struct vgic_irq_rank *vgic_get_rank(struct vcpu *v, int rank)
  * Returns rank corresponding to a GICD_<FOO><n> register for
  * GICD_<FOO> with <b>-bits-per-interrupt.
  */
-struct vgic_irq_rank *vgic_rank_offset(struct vcpu *v, int b, int n,
-                                              int s)
+struct vgic_irq_rank *vgic_rank_offset(struct vcpu *v, unsigned int b,
+                                       unsigned int n, unsigned int s)
 {
-    int rank = REG_RANK_NR(b, (n >> s));
+    unsigned int rank = REG_RANK_NR(b, (n >> s));
 
     return vgic_get_rank(v, rank);
 }
 
 struct vgic_irq_rank *vgic_rank_irq(struct vcpu *v, unsigned int irq)
 {
-    int rank = irq/32;
+    unsigned int rank = irq / 32;
 
     return vgic_get_rank(v, rank);
 }
@@ -324,14 +325,14 @@ void arch_move_irqs(struct vcpu *v)
     }
 }
 
-void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
+void vgic_disable_irqs(struct vcpu *v, uint32_t r, unsigned int n)
 {
     const unsigned long mask = r;
     struct pending_irq *p;
     struct irq_desc *desc;
     unsigned int irq;
     unsigned long flags;
-    int i = 0;
+    unsigned int i = 0;
     struct vcpu *v_target;
 
     /* LPIs will never be disabled via this function. */
@@ -361,7 +362,9 @@ void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
 #define VGIC_ICFG_MASK(intr) (1U << ((2 * ((intr) % 16)) + 1))
 
 /* The function should be called with the rank lock taken */
-static inline unsigned int vgic_get_virq_type(struct vcpu *v, int n, int index)
+static inline unsigned int vgic_get_virq_type(struct vcpu *v,
+                                              unsigned int n,
+                                              unsigned int index)
 {
     struct vgic_irq_rank *r = vgic_get_rank(v, n);
     uint32_t tr = r->icfg[index >> 4];
@@ -374,13 +377,13 @@ static inline unsigned int vgic_get_virq_type(struct vcpu *v, int n, int index)
         return IRQ_TYPE_LEVEL_HIGH;
 }
 
-void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
+void vgic_enable_irqs(struct vcpu *v, uint32_t r, unsigned int n)
 {
     const unsigned long mask = r;
     struct pending_irq *p;
     unsigned int irq;
     unsigned long flags;
-    int i = 0;
+    unsigned int i = 0;
     struct vcpu *v_target;
     struct domain *d = v->domain;
 

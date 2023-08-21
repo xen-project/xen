@@ -161,7 +161,11 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
 {
     struct hsr_dabt dabt = info->dabt;
     struct vgic_irq_rank *rank;
-    int gicd_reg = (int)(info->gpa - v->domain->arch.vgic.dbase);
+    /*
+     * gpa/dbase are paddr_t which size may be higher than 32-bit. Yet
+     * the difference will always be smaller than 32-bit.
+     */
+    unsigned int gicd_reg = info->gpa - v->domain->arch.vgic.dbase;
     unsigned long flags;
 
     perfc_incr(vgicd_reads);
@@ -403,7 +407,11 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
 {
     struct hsr_dabt dabt = info->dabt;
     struct vgic_irq_rank *rank;
-    int gicd_reg = (int)(info->gpa - v->domain->arch.vgic.dbase);
+    /*
+     * gpa/dbase are paddr_t which size may be higher than 32-bit. Yet
+     * the difference will always be smaller than 32-bit.
+     */
+    unsigned int gicd_reg = info->gpa - v->domain->arch.vgic.dbase;
     uint32_t tr;
     unsigned long flags;
 
