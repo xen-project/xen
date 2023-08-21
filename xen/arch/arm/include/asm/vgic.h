@@ -304,8 +304,8 @@ extern void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n);
 extern void vgic_set_irqs_pending(struct vcpu *v, uint32_t r,
                                   unsigned int rank);
 extern void register_vgic_ops(struct domain *d, const struct vgic_ops *ops);
-int vgic_v2_init(struct domain *d, int *mmio_count);
-int vgic_v3_init(struct domain *d, int *mmio_count);
+int vgic_v2_init(struct domain *d, unsigned int *mmio_count);
+int vgic_v3_init(struct domain *d, unsigned int *mmio_count);
 
 extern bool vgic_to_sgi(struct vcpu *v, register_t sgir,
                         enum gic_sgi_mode irqmode, int virq,
@@ -352,7 +352,7 @@ int vgic_connect_hw_irq(struct domain *d, struct vcpu *v, unsigned int virq,
 
 bool vgic_evtchn_irq_pending(struct vcpu *v);
 
-int domain_vgic_register(struct domain *d, int *mmio_count);
+int domain_vgic_register(struct domain *d, unsigned int *mmio_count);
 int domain_vgic_init(struct domain *d, unsigned int nr_spis);
 void domain_vgic_free(struct domain *d);
 int vcpu_vgic_init(struct vcpu *v);

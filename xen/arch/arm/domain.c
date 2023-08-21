@@ -694,7 +694,8 @@ int arch_domain_create(struct domain *d,
                        struct xen_domctl_createdomain *config,
                        unsigned int flags)
 {
-    int rc, count = 0;
+    unsigned int count = 0;
+    int rc;
 
     BUILD_BUG_ON(GUEST_MAX_VCPUS < MAX_VIRT_CPUS);
 

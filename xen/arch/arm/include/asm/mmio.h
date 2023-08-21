@@ -75,8 +75,8 @@ struct mmio_handler {
 };
 
 struct vmmio {
-    int num_entries;
-    int max_num_entries;
+    unsigned int num_entries;
+    unsigned int max_num_entries;
     rwlock_t lock;
     struct mmio_handler *handlers;
 };
@@ -86,7 +86,7 @@ enum io_state try_handle_mmio(struct cpu_user_regs *regs,
 void register_mmio_handler(struct domain *d,
                            const struct mmio_handler_ops *ops,
                            paddr_t addr, paddr_t size, void *priv);
-int domain_io_init(struct domain *d, int max_count);
+int domain_io_init(struct domain *d, unsigned int max_count);
 void domain_io_free(struct domain *d);
 
 void try_decode_instruction(const struct cpu_user_regs *regs,

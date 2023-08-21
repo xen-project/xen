@@ -85,7 +85,7 @@ static void vgic_rank_init(struct vgic_irq_rank *rank, uint8_t index,
         write_atomic(&rank->vcpu[i], vcpu);
 }
 
-int domain_vgic_register(struct domain *d, int *mmio_count)
+int domain_vgic_register(struct domain *d, unsigned int *mmio_count)
 {
     switch ( d->arch.vgic.version )
     {

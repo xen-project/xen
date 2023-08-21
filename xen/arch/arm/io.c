@@ -224,7 +224,7 @@ void register_mmio_handler(struct domain *d,
     write_unlock(&vmmio->lock);
 }
 
-int domain_io_init(struct domain *d, int max_count)
+int domain_io_init(struct domain *d, unsigned int max_count)
 {
     rwlock_init(&d->arch.vmmio.lock);
     d->arch.vmmio.num_entries = 0;

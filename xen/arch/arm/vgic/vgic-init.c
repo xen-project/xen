@@ -101,7 +101,7 @@ static void vgic_vcpu_early_init(struct vcpu *vcpu)
  *
  * was: kvm_vgic_create
  */
-int domain_vgic_register(struct domain *d, int *mmio_count)
+int domain_vgic_register(struct domain *d, unsigned int *mmio_count)
 {
     switch ( d->arch.vgic.version )
     {

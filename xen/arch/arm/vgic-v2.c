@@ -731,7 +731,7 @@ static const struct vgic_ops vgic_v2_ops = {
     .lpi_get_priority = vgic_v2_lpi_get_priority,
 };
 
-int vgic_v2_init(struct domain *d, int *mmio_count)
+int vgic_v2_init(struct domain *d, unsigned int *mmio_count)
 {
     if ( !vgic_v2_hw.enabled )
     {
