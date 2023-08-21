@@ -339,36 +339,36 @@ typedef uint64_t xen_callback_t;
 
 /* PSR bits (CPSR, SPSR) */
 
-#define PSR_THUMB       (1<<5)        /* Thumb Mode enable */
-#define PSR_FIQ_MASK    (1<<6)        /* Fast Interrupt mask */
-#define PSR_IRQ_MASK    (1<<7)        /* Interrupt mask */
-#define PSR_ABT_MASK    (1<<8)        /* Asynchronous Abort mask */
-#define PSR_BIG_ENDIAN  (1<<9)        /* arm32: Big Endian Mode */
-#define PSR_DBG_MASK    (1<<9)        /* arm64: Debug Exception mask */
-#define PSR_IT_MASK     (0x0600fc00)  /* Thumb If-Then Mask */
-#define PSR_JAZELLE     (1<<24)       /* Jazelle Mode */
-#define PSR_Z           (1<<30)       /* Zero condition flag */
+#define PSR_THUMB       (1U <<5)      /* Thumb Mode enable */
+#define PSR_FIQ_MASK    (1U <<6)      /* Fast Interrupt mask */
+#define PSR_IRQ_MASK    (1U <<7)      /* Interrupt mask */
+#define PSR_ABT_MASK    (1U <<8)      /* Asynchronous Abort mask */
+#define PSR_BIG_ENDIAN  (1U << 9)     /* arm32: Big Endian Mode */
+#define PSR_DBG_MASK    (1U << 9)     /* arm64: Debug Exception mask */
+#define PSR_IT_MASK     (0x0600fc00U) /* Thumb If-Then Mask */
+#define PSR_JAZELLE     (1U << 24)    /* Jazelle Mode */
+#define PSR_Z           (1U << 30)    /* Zero condition flag */
 
 /* 32 bit modes */
-#define PSR_MODE_USR 0x10
-#define PSR_MODE_FIQ 0x11
-#define PSR_MODE_IRQ 0x12
-#define PSR_MODE_SVC 0x13
-#define PSR_MODE_MON 0x16
-#define PSR_MODE_ABT 0x17
-#define PSR_MODE_HYP 0x1a
-#define PSR_MODE_UND 0x1b
-#define PSR_MODE_SYS 0x1f
+#define PSR_MODE_USR 0x10U
+#define PSR_MODE_FIQ 0x11U
+#define PSR_MODE_IRQ 0x12U
+#define PSR_MODE_SVC 0x13U
+#define PSR_MODE_MON 0x16U
+#define PSR_MODE_ABT 0x17U
+#define PSR_MODE_HYP 0x1aU
+#define PSR_MODE_UND 0x1bU
+#define PSR_MODE_SYS 0x1fU
 
 /* 64 bit modes */
-#define PSR_MODE_BIT  0x10 /* Set iff AArch32 */
-#define PSR_MODE_EL3h 0x0d
-#define PSR_MODE_EL3t 0x0c
-#define PSR_MODE_EL2h 0x09
-#define PSR_MODE_EL2t 0x08
-#define PSR_MODE_EL1h 0x05
-#define PSR_MODE_EL1t 0x04
-#define PSR_MODE_EL0t 0x00
+#define PSR_MODE_BIT  0x10U /* Set iff AArch32 */
+#define PSR_MODE_EL3h 0x0dU
+#define PSR_MODE_EL3t 0x0cU
+#define PSR_MODE_EL2h 0x09U
+#define PSR_MODE_EL2t 0x08U
+#define PSR_MODE_EL1h 0x05U
+#define PSR_MODE_EL1t 0x04U
+#define PSR_MODE_EL0t 0x00U
 
 /*
  * We set PSR_Z to be able to boot Linux kernel versions with an invalid
