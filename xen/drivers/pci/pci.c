@@ -80,7 +80,7 @@ int pci_find_ext_capability(int seg, int bus, int devfn, int cap)
 /**
  * pci_find_next_ext_capability - Find another extended capability
  * @seg/@bus/@devfn: PCI device to query
- * @pos: starting position
+ * @start: starting position
  * @cap: capability code
  *
  * Returns the address of the requested extended capability structure
