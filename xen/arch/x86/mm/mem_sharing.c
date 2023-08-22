@@ -2329,3 +2329,10 @@ int mem_sharing_domctl(struct domain *d, struct xen_domctl_mem_sharing_op *mec)
 
     return rc;
 }
+
+void arch_dump_shared_mem_info(void)
+{
+    printk("Shared frames %u -- Saved frames %u\n",
+            mem_sharing_get_nr_shared_mfns(),
+            mem_sharing_get_nr_saved_mfns());
+}

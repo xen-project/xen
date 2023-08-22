@@ -365,7 +365,9 @@ static void cf_check dump_domains(unsigned char key)
         }
     }
 
+#ifdef CONFIG_MEM_SHARING
     arch_dump_shared_mem_info();
+#endif
 
     rcu_read_unlock(&domlist_read_lock);
 }

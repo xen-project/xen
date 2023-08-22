@@ -1294,10 +1294,6 @@ void free_init_memory(void)
     printk("Freed %ldkB init memory.\n", (long)(__init_end-__init_begin)>>10);
 }
 
-void arch_dump_shared_mem_info(void)
-{
-}
-
 int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags)
 {
