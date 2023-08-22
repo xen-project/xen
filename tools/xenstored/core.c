@@ -47,12 +47,12 @@
 #include "utils.h"
 #include "list.h"
 #include "talloc.h"
-#include "xenstored_core.h"
-#include "xenstored_watch.h"
-#include "xenstored_transaction.h"
-#include "xenstored_domain.h"
-#include "xenstored_control.h"
-#include "xenstored_lu.h"
+#include "core.h"
+#include "watch.h"
+#include "transaction.h"
+#include "domain.h"
+#include "control.h"
+#include "lu.h"
 
 #ifndef NO_SOCKETS
 #if defined(HAVE_SYSTEMD)
@@ -64,7 +64,7 @@
 #include <systemd/sd-daemon.h>
 #endif
 
-extern xenevtchn_handle *xce_handle; /* in xenstored_domain.c */
+extern xenevtchn_handle *xce_handle; /* in domain.c */
 static int xce_pollfd_idx = -1;
 static struct pollfd *fds;
 static unsigned int current_array_size;

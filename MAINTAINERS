@@ -669,7 +669,8 @@ F:	tools/include/xenstore.h
 F:	tools/include/xenstore_lib.h
 F:	tools/include/xen-tools/xenstore-common.h
 F:	tools/libs/store/
-F:	tools/xenstore/
+F:	tools/xenstored/
+F:	tools/xs-clients/
 
 XENTRACE
 M:	George Dunlap <george.dunlap@citrix.com>

@@ -13,8 +13,8 @@
 #include <xen-tools/xenstore-common.h>
 
 #include "talloc.h"
-#include "xenstored_core.h"
-#include "xenstored_lu.h"
+#include "core.h"
+#include "lu.h"
 
 #ifndef NO_LIVE_UPDATE
 void lu_get_dump_state(struct lu_dump_state *state)

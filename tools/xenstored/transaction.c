@@ -30,9 +30,9 @@
 #include <unistd.h>
 #include "talloc.h"
 #include "list.h"
-#include "xenstored_transaction.h"
-#include "xenstored_watch.h"
-#include "xenstored_domain.h"
+#include "transaction.h"
+#include "watch.h"
+#include "domain.h"
 #include "xenstore_lib.h"
 #include "utils.h"
 

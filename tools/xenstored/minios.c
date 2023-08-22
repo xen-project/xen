@@ -17,7 +17,7 @@
 */
 #include <sys/types.h>
 #include <sys/mman.h>
-#include "xenstored_core.h"
+#include "core.h"
 #include <xen/grant_table.h>
 
 void write_pidfile(const char *pidfile)

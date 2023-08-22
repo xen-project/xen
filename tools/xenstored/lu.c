@@ -13,10 +13,10 @@
 #include <time.h>
 
 #include "talloc.h"
-#include "xenstored_core.h"
-#include "xenstored_domain.h"
-#include "xenstored_lu.h"
-#include "xenstored_watch.h"
+#include "core.h"
+#include "domain.h"
+#include "lu.h"
+#include "watch.h"
 
 #ifndef NO_LIVE_UPDATE
 struct live_update *lu_status;

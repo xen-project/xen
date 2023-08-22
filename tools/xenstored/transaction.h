@@ -17,7 +17,7 @@
 */
 #ifndef _XENSTORED_TRANSACTION_H
 #define _XENSTORED_TRANSACTION_H
-#include "xenstored_core.h"
+#include "core.h"
 
 enum node_access_type {
     NODE_ACCESS_READ,

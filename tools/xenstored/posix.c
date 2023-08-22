@@ -24,8 +24,8 @@
 #include <sys/mman.h>
 
 #include "utils.h"
-#include "xenstored_core.h"
-#include "xenstored_osdep.h"
+#include "core.h"
+#include "osdep.h"
 
 void write_pidfile(const char *pidfile)
 {

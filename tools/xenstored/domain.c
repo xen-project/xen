@@ -27,11 +27,11 @@
 
 #include "utils.h"
 #include "talloc.h"
-#include "xenstored_core.h"
-#include "xenstored_domain.h"
-#include "xenstored_transaction.h"
-#include "xenstored_watch.h"
-#include "xenstored_control.h"
+#include "core.h"
+#include "domain.h"
+#include "transaction.h"
+#include "watch.h"
+#include "control.h"
 
 #include <xenevtchn.h>
 #include <xenctrl.h>

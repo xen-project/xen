@@ -27,10 +27,10 @@
 
 #include "utils.h"
 #include "talloc.h"
-#include "xenstored_core.h"
-#include "xenstored_control.h"
-#include "xenstored_domain.h"
-#include "xenstored_lu.h"
+#include "core.h"
+#include "control.h"
+#include "domain.h"
+#include "lu.h"
 
 struct cmd_s {
 	char *cmd;

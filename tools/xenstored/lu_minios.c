@@ -14,7 +14,7 @@
 #include <xen-tools/common-macros.h>
 
 #include "talloc.h"
-#include "xenstored_lu.h"
+#include "lu.h"
 
 /* Mini-OS only knows about MAP_ANON. */
 #ifndef MAP_ANONYMOUS

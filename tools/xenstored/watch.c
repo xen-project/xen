@@ -25,11 +25,11 @@
 #include <assert.h>
 #include "talloc.h"
 #include "list.h"
-#include "xenstored_watch.h"
+#include "watch.h"
 #include "xenstore_lib.h"
 #include "utils.h"
-#include "xenstored_domain.h"
-#include "xenstored_transaction.h"
+#include "domain.h"
+#include "transaction.h"
 
 struct watch
 {

@@ -19,7 +19,7 @@
 #ifndef _XENSTORED_WATCH_H
 #define _XENSTORED_WATCH_H
 
-#include "xenstored_core.h"
+#include "core.h"
 
 int do_watch(const void *ctx, struct connection *conn,
 	     struct buffered_data *in);
