@@ -59,7 +59,8 @@ maintainers if you want to suggest a change.
      - Required
      - Precautions shall be taken in order to prevent the contents of a
        header file being included more than once
-     -
+     - Files that are intended to be included more than once do not need to
+       conform to the directive
 
    * - `Dir 4.11 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/D_04_11.c>`_
      - Required
@@ -117,7 +118,7 @@ maintainers if you want to suggest a change.
      - Required
      - The character sequences /* and // shall not be used within a
        comment
-     -
+     - Comments containing hyperlinks inside C-style block comments are safe
 
    * - `Rule 3.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_03_02.c>`_
      - Required
@@ -239,13 +240,15 @@ maintainers if you want to suggest a change.
      - Required
      - All declarations of an object or function shall use the same
        names and type qualifiers
-     -
+     - The type ret_t maybe be deliberately used and defined as int or
+       long depending on the type of guest to service
 
    * - `Rule 8.4 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_08_04.c>`_
      - Required
      - A compatible declaration shall be visible when an object or
        function with external linkage is defined
-     -
+     - Allowed exceptions: asm-offsets.c, definitions for asm modules
+       not called from C code, gcov_base.c
 
    * - `Rule 8.5 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_08_05_2.c>`_
      - Required
@@ -369,7 +372,9 @@ maintainers if you want to suggest a change.
      - Required
      - Expressions resulting from the expansion of macro parameters
        shall be enclosed in parentheses
-     -
+     - Extra parentheses are not required when macro parameters are used
+       as function arguments, as macro arguments, array indices, lhs in
+       assignments
 
    * - `Rule 20.13 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_20_13.c>`_
      - Required
