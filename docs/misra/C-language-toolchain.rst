@@ -200,6 +200,15 @@ The table columns are as follows:
      - ARM64, X86_64
      - See Section "6.29 Designated Initializers" of GCC_MANUAL
 
+   * - Signed << compiler-defined behavior
+     - All architectures
+     - See Section "4.5 Integers" of GCC_MANUAL. As an extension to the
+       C language, GCC does not use the latitude given in C99 and C11
+       only to treat certain aspects of signed << as undefined.
+
+   * - Signed >> acts on negative numbers by sign extension
+     - All architectures
+     - See Section "4.5 Integers" of GCC_MANUAL.
 
 Translation Limits
 __________________
