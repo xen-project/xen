@@ -2,6 +2,7 @@
 
 #include <asm/asm-defns.h>
 #include <asm/asm-offsets.h>
+#include <asm/msr.h>
 
     .section .text.header, "ax", %progbits
 
@@ -66,3 +67,17 @@ ENTRY(start)
 
     .size start, . - start
     .type start, %function
+
+ENTRY(enable_mmu)
+    mflr %r3
+    mfmsr %r4
+
+    /* enable instruction and data relocation (MMU) */
+    ori %r4, %r4, (MSR_IR | MSR_DR)
+
+    mtsrr0 %r3 /* return to caller after MMU enable */
+    mtsrr1 %r4
+    rfid
+
+    .size enable_mmu, . - enable_mmu
+    .type enable_mmu, %function

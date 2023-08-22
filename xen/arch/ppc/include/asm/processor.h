@@ -133,6 +133,40 @@ struct cpu_user_regs
     uint32_t entry_vector;
 };
 
+static inline void sync(void)
+{
+    asm volatile ( "sync" );
+}
+
+static inline void isync(void)
+{
+    asm volatile ( "isync" );
+}
+
+static inline unsigned long mfmsr(void)
+{
+    unsigned long msr;
+    asm volatile ( "mfmsr %0" : "=r" (msr) );
+    return msr;
+}
+
+static inline void mtmsrd(unsigned long msr)
+{
+    asm volatile ( "mtmsrd %0" : : "r" (msr) );
+}
+
+static inline void mtspr(uint16_t spr, unsigned long val)
+{
+    asm volatile ( "mtspr %0, %1" : : "K" (spr), "r" (val) );
+}
+
+static inline unsigned long mfspr(uint16_t spr)
+{
+    unsigned long val;
+    asm volatile ( "mfspr %0, %1" : "=r" (val) : "K" (spr) );
+    return val;
+}
+
 /*
  * panic() isn't available at the moment so an infinite loop will be
  * used temporarily.

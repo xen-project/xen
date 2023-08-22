@@ -4,6 +4,7 @@
 #define _ASM_PPC_TYPES_H
 
 typedef unsigned long paddr_t;
+typedef unsigned long vaddr_t;
 #define INVALID_PADDR (~0UL)
 #define PRIpaddr "016lx"
 

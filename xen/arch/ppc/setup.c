@@ -2,6 +2,7 @@
 #include <xen/init.h>
 #include <asm/boot.h>
 #include <asm/early_printk.h>
+#include <asm/mm.h>
 #include <asm/processor.h>
 
 /* Xen stack for bringing up the first CPU. */
@@ -26,6 +27,8 @@ void __init noreturn start_xen(unsigned long r3, unsigned long r4,
          */
         boot_opal_init((void *)r3);
     }
+
+    setup_initial_pagetables();
 
     early_printk("Hello, ppc64le!\n");
 
