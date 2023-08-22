@@ -1964,6 +1964,9 @@ static void __init check_timer(void)
 
             if ( timer_irq_works() )
             {
+                printk(XENLOG_DEBUG
+                       "IRQ test with HPET Legacy Replacement Mode worked - disabling it again\n");
+                hpet_disable_legacy_replacement_mode();
                 local_irq_restore(flags);
                 return;
             }
