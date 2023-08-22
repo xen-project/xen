@@ -8,7 +8,7 @@
  */
 
 #include <xen/sched.h>
-#include <asm/vm_event.h>
+#include <xen/vm_event.h>
 
 void vm_event_fill_regs(vm_event_request_t *req)
 {

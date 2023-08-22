@@ -25,6 +25,7 @@
 
 #include <xen/sched.h>
 #include <public/vm_event.h>
+#include <asm/vm_event.h>
 
 struct vm_event_domain
 {

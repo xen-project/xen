@@ -20,7 +20,7 @@
 
 #include <xen/sched.h>
 #include <xen/mem_access.h>
-#include <asm/vm_event.h>
+#include <xen/vm_event.h>
 
 /* Implicitly serialized by the domctl lock. */
 int vm_event_init_domain(struct domain *d)

@@ -20,7 +20,6 @@
 #define __ASM_ARM_VM_EVENT_H__
 
 #include <xen/sched.h>
-#include <xen/vm_event.h>
 #include <public/domctl.h>
 
 static inline int vm_event_init_domain(struct domain *d)
