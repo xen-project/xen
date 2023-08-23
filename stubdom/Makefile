@@ -670,7 +670,6 @@ crossclean: clean
 	rm -fr ioemu xenstore xenstorepvh
 	rm -fr gmp-$(XEN_TARGET_ARCH)
 	rm -fr polarssl-$(XEN_TARGET_ARCH)
-	rm -fr openssl-$(XEN_TARGET_ARCH)
 	rm -fr tpm_emulator-$(XEN_TARGET_ARCH)
 	rm -f mk-headers-$(XEN_TARGET_ARCH)
 	rm -fr ocaml-$(XEN_TARGET_ARCH)
@@ -682,7 +681,6 @@ patchclean: crossclean
 	rm -fr newlib-$(NEWLIB_VERSION)
 	rm -fr gmp-$(XEN_TARGET_ARCH)
 	rm -fr polarssl-$(XEN_TARGET_ARCH)
-	rm -fr openssl-$(XEN_TARGET_ARCH)
 	rm -fr tpm_emulator-$(XEN_TARGET_ARCH)
 	rm -fr lwip-$(XEN_TARGET_ARCH)
 	rm -fr grub-upstream
@@ -699,7 +697,6 @@ downloadclean: patchclean
 	rm -f lwip-$(LWIP_VERSION).tar.gz
 	rm -f ocaml-$(OCAML_VERSION).tar.gz
 	rm -f polarssl-$(POLARSSL_VERSION)-gpl.tgz
-	rm -f openssl-$(POLARSSL_VERSION)-gpl.tgz
 
 .PHONY: distclean
 distclean: downloadclean
