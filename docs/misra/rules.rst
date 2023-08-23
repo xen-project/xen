@@ -107,7 +107,16 @@ maintainers if you want to suggest a change.
    * - `Rule 2.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_02_01_1.c>`_
      - Required
      - A project shall not contain unreachable code
-     -
+     - The following are allowed:
+         - Invariantly constant conditions, e.g. if(IS_ENABLED(CONFIG_HVM)) { S; }
+         - Switch with a controlling value statically determined not to
+           match one or more case statements
+         - Functions that are intended to be referenced only from
+           assembly code (e.g. 'do_trap_fiq')
+         - asm-offsets.c, as they are not linked deliberately, because
+           they are used to generate definitions for asm modules
+         - Declarations without initializer are safe, as they are not
+           executed
 
    * - `Rule 2.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_02_06.c>`_
      - Advisory
