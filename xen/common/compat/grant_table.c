@@ -57,7 +57,7 @@ CHECK_gnttab_cache_flush;
 #undef xen_gnttab_cache_flush
 
 int compat_grant_table_op(
-    unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) cmp_uop, unsigned int count)
+    unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) uop, unsigned int count)
 {
     int rc = 0;
     unsigned int i, cmd_op;
@@ -71,7 +71,7 @@ int compat_grant_table_op(
     {
 #define CASE(name) \
     case GNTTABOP_##name: \
-        if ( unlikely(!guest_handle_okay(guest_handle_cast(cmp_uop, \
+        if ( unlikely(!guest_handle_okay(guest_handle_cast(uop, \
                                                            gnttab_##name##_compat_t), \
                                          count)) ) \
             rc = -EFAULT; \
@@ -119,7 +119,7 @@ int compat_grant_table_op(
 
 #undef CASE
     default:
-        return do_grant_table_op(cmd, cmp_uop, count);
+        return do_grant_table_op(cmd, uop, count);
     }
 
     if ( (int)count < 0 )
@@ -148,7 +148,7 @@ int compat_grant_table_op(
         case GNTTABOP_setup_table:
             if ( unlikely(count > 1) )
                 rc = -EINVAL;
-            else if ( unlikely(__copy_from_guest(&cmp.setup, cmp_uop, 1)) )
+            else if ( unlikely(__copy_from_guest(&cmp.setup, uop, 1)) )
                 rc = -EFAULT;
             else if ( unlikely(!compat_handle_okay(cmp.setup.frame_list, cmp.setup.nr_frames)) )
                 rc = -EFAULT;
@@ -193,7 +193,7 @@ int compat_grant_table_op(
                 } while (0)
                 XLAT_gnttab_setup_table(&cmp.setup, nat.setup);
 #undef XLAT_gnttab_setup_table_HNDL_frame_list
-                if ( unlikely(__copy_to_guest(cmp_uop, &cmp.setup, 1)) )
+                if ( unlikely(__copy_to_guest(uop, &cmp.setup, 1)) )
                     rc = -EFAULT;
                 else
                     i = 1;
@@ -203,7 +203,7 @@ int compat_grant_table_op(
         case GNTTABOP_transfer:
             for ( n = 0; n < COMPAT_ARG_XLAT_SIZE / sizeof(*nat.xfer) && i < count && rc == 0; ++i, ++n )
             {
-                if ( unlikely(__copy_from_guest_offset(&cmp.xfer, cmp_uop, i, 1)) )
+                if ( unlikely(__copy_from_guest_offset(&cmp.xfer, uop, i, 1)) )
                     rc = -EFAULT;
                 else
                 {
@@ -222,7 +222,7 @@ int compat_grant_table_op(
             {
                 XEN_GUEST_HANDLE_PARAM(gnttab_transfer_compat_t) xfer;
 
-                xfer = guest_handle_cast(cmp_uop, gnttab_transfer_compat_t);
+                xfer = guest_handle_cast(uop, gnttab_transfer_compat_t);
                 guest_handle_add_offset(xfer, i);
                 cnt_uop = guest_handle_cast(xfer, void);
                 while ( n-- )
@@ -237,7 +237,7 @@ int compat_grant_table_op(
         case GNTTABOP_copy:
             for ( n = 0; n < COMPAT_ARG_XLAT_SIZE / sizeof(*nat.copy) && i < count && rc == 0; ++i, ++n )
             {
-                if ( unlikely(__copy_from_guest_offset(&cmp.copy, cmp_uop, i, 1)) )
+                if ( unlikely(__copy_from_guest_offset(&cmp.copy, uop, i, 1)) )
                     rc = -EFAULT;
                 else
                 {
@@ -267,7 +267,7 @@ int compat_grant_table_op(
             {
                 XEN_GUEST_HANDLE_PARAM(gnttab_copy_compat_t) copy;
 
-                copy = guest_handle_cast(cmp_uop, gnttab_copy_compat_t);
+                copy = guest_handle_cast(uop, gnttab_copy_compat_t);
                 guest_handle_add_offset(copy, i);
                 cnt_uop = guest_handle_cast(copy, void);
                 while ( n-- )
@@ -285,7 +285,7 @@ int compat_grant_table_op(
                 rc = -EINVAL;
                 break;
             }
-            if ( unlikely(__copy_from_guest(&cmp.get_status, cmp_uop, 1) ||
+            if ( unlikely(__copy_from_guest(&cmp.get_status, uop, 1) ||
                           !compat_handle_okay(cmp.get_status.frame_list,
                                               cmp.get_status.nr_frames)) )
             {
@@ -303,7 +303,7 @@ int compat_grant_table_op(
             if ( rc >= 0 )
             {
                 XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_compat_t) get =
-                    guest_handle_cast(cmp_uop,
+                    guest_handle_cast(uop,
                                       gnttab_get_status_frames_compat_t);
 
                 if ( unlikely(__copy_field_to_guest(get, nat.get_status,
