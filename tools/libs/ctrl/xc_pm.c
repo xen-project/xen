@@ -248,45 +248,6 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
     sys_para->freq_num = user_para->freq_num;
     sys_para->gov_num  = user_para->gov_num;
 
-    /* Sanity check struct layout */
-    BUILD_BUG_ON(sizeof(*user_para) != sizeof(*sys_para));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), cpu_num) !=
-                 offsetof(typeof(*sys_para),  cpu_num));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), freq_num) !=
-                 offsetof(typeof(*sys_para),  freq_num));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), gov_num) !=
-                 offsetof(typeof(*sys_para),  gov_num));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), affected_cpus) !=
-                 offsetof(typeof(*sys_para),  affected_cpus));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), scaling_available_frequencies) !=
-                 offsetof(typeof(*sys_para),  scaling_available_frequencies));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), scaling_available_governors) !=
-                 offsetof(typeof(*sys_para),  scaling_available_governors));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), scaling_driver) !=
-                 offsetof(typeof(*sys_para),  scaling_driver));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), cpuinfo_cur_freq) !=
-                 offsetof(typeof(*sys_para),  cpuinfo_cur_freq));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), cpuinfo_max_freq) !=
-                 offsetof(typeof(*sys_para),  cpuinfo_max_freq));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), cpuinfo_min_freq) !=
-                 offsetof(typeof(*sys_para),  cpuinfo_min_freq));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), u.s.scaling_cur_freq) !=
-                 offsetof(typeof(*sys_para),  u.s.scaling_cur_freq));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), u.s.scaling_governor) !=
-                 offsetof(typeof(*sys_para),  u.s.scaling_governor));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), u.s.scaling_max_freq) !=
-                 offsetof(typeof(*sys_para),  u.s.scaling_max_freq));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), u.s.scaling_min_freq) !=
-                 offsetof(typeof(*sys_para),  u.s.scaling_min_freq));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), u.s.u.userspace) !=
-                 offsetof(typeof(*sys_para),  u.s.u.userspace));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), u.s.u.ondemand) !=
-                 offsetof(typeof(*sys_para),  u.s.u.ondemand));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), u.cppc_para) !=
-                 offsetof(typeof(*sys_para),  u.cppc_para));
-    BUILD_BUG_ON(offsetof(typeof(*user_para), turbo_enabled) !=
-                 offsetof(typeof(*sys_para),  turbo_enabled));
-
     ret = xc_sysctl(xch, &sysctl);
     if ( ret )
     {
@@ -312,9 +273,26 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
         memcpy(user_para->scaling_driver,
                 sys_para->scaling_driver, CPUFREQ_NAME_LEN);
 
-        /* copy to user_para no matter what cpufreq driver/governor */
-        BUILD_BUG_ON(sizeof(((struct xc_get_cpufreq_para *)0)->u) !=
-		     sizeof(((struct xen_get_cpufreq_para *)0)->u));
+        /*
+         * Copy to user_para no matter what cpufreq driver/governor.
+         *
+         * First sanity check layout of the union subject to memcpy() below.
+         */
+        BUILD_BUG_ON(sizeof(user_para->u) != sizeof(sys_para->u));
+
+#define CHK_FIELD(fld) \
+        BUILD_BUG_ON(offsetof(typeof(user_para->u), fld) != \
+                     offsetof(typeof(sys_para->u),  fld))
+
+        CHK_FIELD(s.scaling_cur_freq);
+        CHK_FIELD(s.scaling_governor);
+        CHK_FIELD(s.scaling_max_freq);
+        CHK_FIELD(s.scaling_min_freq);
+        CHK_FIELD(s.u.userspace);
+        CHK_FIELD(s.u.ondemand);
+        CHK_FIELD(cppc_para);
+
+#undef CHK_FIELD
 
         memcpy(&user_para->u, &sys_para->u, sizeof(sys_para->u));
     }
