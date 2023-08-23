@@ -135,6 +135,7 @@ build-each-commit-gcc:
     CC: gcc
   script:
     - BASE=${BASE_SHA:-${CI_COMMIT_BEFORE_SHA}} TIP=${TIP_SHA:-${CI_COMMIT_SHA}} ./automation/gitlab-ci/build-each-commit.sh 2>&1 | tee ../build-each-commit-gcc.log
+  after_script:
     - mv ../build-each-commit-gcc.log .
   artifacts:
     paths:
