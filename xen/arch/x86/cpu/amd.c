@@ -783,10 +783,17 @@ void amd_check_zenbleed(void)
 	case 0xa0 ... 0xaf: good_rev = 0x08a00008; break;
 	default:
 		/*
-		 * With the Fam17h check above, parts getting here are Zen1.
-		 * They're not affected.
+		 * With the Fam17h check above, most parts getting here are
+		 * Zen1.  They're not affected.  Assume Zen2 ones making it
+		 * here are affected regardless of microcode version.
+		 *
+		 * Zen1 vs Zen2 isn't a simple model number comparison, so use
+		 * STIBP as a heuristic to distinguish.
 		 */
-		return;
+		if (!boot_cpu_has(X86_FEATURE_AMD_STIBP))
+			return;
+		good_rev = ~0U;
+		break;
 	}
 
 	rdmsrl(MSR_AMD64_DE_CFG, val);
