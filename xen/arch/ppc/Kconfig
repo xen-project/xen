@@ -20,14 +20,9 @@ menu "ISA Selection"
 
 choice
 	prompt "Base ISA"
-	default POWER_ISA_2_07B
+	default POWER_ISA_3_00
 	help
 	  This selects the base ISA version that Xen will target.
-
-config POWER_ISA_2_07B
-	bool "Power ISA 2.07B (POWER8)"
-	help
-	  Target version 2.07B of the Power ISA (POWER8) or later
 
 config POWER_ISA_3_00
 	bool "Power ISA 3.00 (POWER9)"

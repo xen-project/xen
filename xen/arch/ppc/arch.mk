@@ -1,7 +1,6 @@
 ########################################
 # Power-specific definitions
 
-ppc-march-$(CONFIG_POWER_ISA_2_07B) := power8
 ppc-march-$(CONFIG_POWER_ISA_3_00) := power9
 
 CFLAGS += -m64 -mlittle-endian -mcpu=$(ppc-march-y)
