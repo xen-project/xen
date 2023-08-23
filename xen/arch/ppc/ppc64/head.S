@@ -17,6 +17,33 @@ ENTRY(start)
     addis   %r2, %r12, .TOC.-1b@ha
     addi    %r2, %r2, .TOC.-1b@l
 
+    /*
+     * Copy Xen to physical address zero and jump to XEN_VIRT_START
+     * (0xc000000000000000). This works because the hardware will ignore the top
+     * four address bits when the MMU is off.
+     */
+    LOAD_REG_ADDR(%r14, _start)
+    LOAD_IMM64(%r12, XEN_VIRT_START)
+
+    /* If we're at the correct address, skip copy */
+    cmpld   %r14, %r12
+    beq     .L_correct_address
+
+    /* Copy bytes until _end */
+    LOAD_REG_ADDR(%r11, _end)
+    addi    %r14, %r14, -8
+    li      %r13, -8
+.L_copy_xen:
+    ldu     %r10, 8(%r14)
+    stdu    %r10, 8(%r13)
+    cmpld   %r14, %r11
+    blt     .L_copy_xen
+
+    /* Jump to XEN_VIRT_START */
+    mtctr   %r12
+    bctr
+.L_correct_address:
+
     /* set up the initial stack */
     LOAD_REG_ADDR(%r1, cpu0_boot_stack)
     li      %r11, 0

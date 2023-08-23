@@ -39,7 +39,7 @@
     name:
 #endif
 
-#define XEN_VIRT_START _AT(UL, 0xc000000000000000)
+#define XEN_VIRT_START _AC(0xc000000000000000, UL)
 
 #define SMP_CACHE_BYTES (1 << 6)
 
