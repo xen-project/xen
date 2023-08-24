@@ -1706,7 +1706,7 @@ This option is available for hypervisors built with CONFIG_DEBUG_LOCKS only.
 ### loglvl
 > `= <level>[/<rate-limited level>]` where level is `none | error | warning | info | debug | all`
 
-> Default: `loglvl=warning`
+> Default: `loglvl=info`
 
 > Can be modified at runtime
 
