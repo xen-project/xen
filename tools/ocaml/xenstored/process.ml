@@ -235,6 +235,23 @@ let do_debug con t _domains cons data =
     | "watches" :: _ ->
       let watches = Connections.debug cons in
       Some (watches ^ "\000")
+    | "compact" :: _ ->
+      Gc.compact ();
+      Some "Compacted"
+    | "trim" :: _ ->
+      History.trim ();
+      Some "trimmed"
+    | "txn" :: domid :: _ ->
+      let domid = int_of_string domid in
+      let con = Connections.find_domain cons domid in
+      let b = Buffer.create 128 in
+      let () = con.transactions |> Hashtbl.iter @@ fun id tx ->
+        Printf.bprintf b "paths: %d, operations: %d, quota_reached: %b\n"
+          (List.length tx.Transaction.paths)
+          (List.length tx.Transaction.operations)
+          tx.Transaction.quota_reached
+      in
+      Some (Buffer.contents b)
     | "xenbus" :: domid :: _ ->
       let domid = int_of_string domid in
       let con = Connections.find_domain cons domid in
