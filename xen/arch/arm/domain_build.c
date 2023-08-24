@@ -1633,14 +1633,18 @@ static int __init find_unallocated_memory(const struct kernel_info *kinfo,
     }
 
     /* Remove grant table region */
-    start = kinfo->gnttab_start;
-    end = kinfo->gnttab_start + kinfo->gnttab_size;
-    res = rangeset_remove_range(unalloc_mem, PFN_DOWN(start), PFN_DOWN(end - 1));
-    if ( res )
+    if ( kinfo->gnttab_size )
     {
-        printk(XENLOG_ERR "Failed to remove: %#"PRIpaddr"->%#"PRIpaddr"\n",
-               start, end);
-        goto out;
+        start = kinfo->gnttab_start;
+        end = kinfo->gnttab_start + kinfo->gnttab_size;
+        res = rangeset_remove_range(unalloc_mem, PFN_DOWN(start),
+                                    PFN_DOWN(end - 1));
+        if ( res )
+        {
+            printk(XENLOG_ERR "Failed to remove: %#"PRIpaddr"->%#"PRIpaddr"\n",
+                   start, end);
+            goto out;
+        }
     }
 
     start = 0;
