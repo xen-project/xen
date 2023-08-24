@@ -1953,8 +1953,6 @@ static void do_pci_remove(libxl__egc *egc, pci_remove_state *prs)
     libxl_domain_type type = libxl__domain_type(gc, domid);
     libxl_device_pci *pci = &prs->pci;
     int rc, num;
-    uint32_t domainid = domid;
-
     pcis = libxl_device_pci_list(ctx, domid, &num);
     if (!pcis) {
         rc = ERROR_FAIL;
@@ -1966,7 +1964,7 @@ static void do_pci_remove(libxl__egc *egc, pci_remove_state *prs)
 
     rc = ERROR_INVAL;
     if (!attached) {
-        LOGD(ERROR, domainid, "PCI device not attached to this domain");
+        LOGD(ERROR, domid, "PCI device not attached to this domain");
         goto out_fail;
     }
 
@@ -2000,7 +1998,7 @@ static void do_pci_remove(libxl__egc *egc, pci_remove_state *prs)
         int i;
 
         if (f == NULL) {
-            LOGED(ERROR, domainid, "Couldn't open %s", sysfs_path);
+            LOGED(ERROR, domid, "Couldn't open %s", sysfs_path);
             goto skip1;
         }
         for (i = 0; i < PROC_PCI_NUM_RESOURCES; i++) {
@@ -2011,7 +2009,7 @@ static void do_pci_remove(libxl__egc *egc, pci_remove_state *prs)
                 if (flags & PCI_BAR_IO) {
                     rc = xc_domain_ioport_permission(ctx->xch, domid, start, size, 0);
                     if (rc < 0)
-                        LOGED(ERROR, domainid,
+                        LOGED(ERROR, domid,
                               "xc_domain_ioport_permission error 0x%x/0x%x",
                               start,
                               size);
@@ -2019,7 +2017,7 @@ static void do_pci_remove(libxl__egc *egc, pci_remove_state *prs)
                     rc = xc_domain_iomem_permission(ctx->xch, domid, start>>XC_PAGE_SHIFT,
                                                     (size+(XC_PAGE_SIZE-1))>>XC_PAGE_SHIFT, 0);
                     if (rc < 0)
-                        LOGED(ERROR, domainid,
+                        LOGED(ERROR, domid,
                               "xc_domain_iomem_permission error 0x%x/0x%x",
                               start,
                               size);
@@ -2034,17 +2032,17 @@ skip1:
                                pci->bus, pci->dev, pci->func);
         f = fopen(sysfs_path, "r");
         if (f == NULL) {
-            LOGED(ERROR, domainid, "Couldn't open %s", sysfs_path);
+            LOGED(ERROR, domid, "Couldn't open %s", sysfs_path);
             goto skip_irq;
         }
         if ((fscanf(f, "%u", &irq) == 1) && irq) {
             rc = xc_physdev_unmap_pirq(ctx->xch, domid, irq);
             if (rc < 0) {
-                LOGED(ERROR, domainid, "xc_physdev_unmap_pirq irq=%d", irq);
+                LOGED(ERROR, domid, "xc_physdev_unmap_pirq irq=%d", irq);
             }
             rc = xc_domain_irq_permission(ctx->xch, domid, irq, 0);
             if (rc < 0) {
-                LOGED(ERROR, domainid, "xc_domain_irq_permission irq=%d", irq);
+                LOGED(ERROR, domid, "xc_domain_irq_permission irq=%d", irq);
             }
         }
         fclose(f);
