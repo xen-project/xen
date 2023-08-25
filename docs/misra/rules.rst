@@ -310,6 +310,59 @@ maintainers if you want to suggest a change.
      - An element of an object shall not be initialized more than once
      -
 
+   * - `Rule 10.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_10_01.c>`_
+     - Required
+     - Operands shall not be of an inappropriate essential type
+     - The following are allowed:
+         - Value-preserving conversions of integer constants
+         - Bitwise and, or, xor, one's complement, bitwise and assignment,
+           bitwise or assignment, bitwise xor assignment (bitwise and, or, xor
+           are safe on non-negative integers; also Xen assumes two's complement
+           representation)
+         - Left shift, right shift, left shift assignment, right shift
+           assignment (see C-language-toolchain.rst for uses of
+           compilers' extensions)
+         - Implicit conversions to boolean for conditionals (?: if while
+           for) and logical operators (! || &&)
+
+   * - `Rule 10.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_10_02.c>`_
+     - Required
+     - Expressions of essentially character type shall not be used
+       inappropriately in addition and subtraction operations
+     -
+
+   * - `Rule 10.3 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_10_03.c>`_
+     - Required
+     - The value of an expression shall not be assigned to an object
+       with a narrower essential type or of a different essential type
+       category
+     - Please beware that this rule has many violations in the Xen
+       codebase today, and its adoption is aspirational. However, when
+       submitting new patches please try to decrease the number of
+       violations when possible.
+
+       gcc has a helpful warning that can help you spot and remove
+       violations of this kind: conversion. For instance, you can use
+       it as follows:
+
+       CFLAGS="-Wconversion -Wno-error=sign-conversion -Wno-error=conversion" make -C xen
+
+   * - `Rule 10.4 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_10_04.c>`_
+     - Required
+     - Both operands of an operator in which the usual arithmetic
+       conversions are performed shall have the same essential type
+       category
+     - Please beware that this rule has many violations in the Xen
+       codebase today, and its adoption is aspirational. However, when
+       submitting new patches please try to decrease the number of
+       violations when possible.
+
+       gcc has a helpful warning that can help you spot and remove
+       violations of this kind: arith-conversion. For instance, you
+       can use it as follows:
+
+       CFLAGS="-Warith-conversion -Wno-error=arith-conversion" make -C xen
+
    * - `Rule 12.5 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_12_05.c>`_
      - Mandatory
      - The sizeof operator shall not have an operand which is a function
