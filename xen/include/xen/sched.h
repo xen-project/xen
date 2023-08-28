@@ -21,6 +21,7 @@
 #include <xen/smp.h>
 #include <xen/perfc.h>
 #include <asm/atomic.h>
+#include <asm/current.h>
 #include <xen/vpci.h>
 #include <xen/wait.h>
 #include <public/xen.h>

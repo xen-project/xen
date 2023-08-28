@@ -28,6 +28,7 @@
 #include <asm/current.h>
 #include <asm/hardirq.h>
 #include <asm/p2m.h>
+#include <asm/page.h>
 #include <public/memory.h>
 #include <xsm/xsm.h>
 

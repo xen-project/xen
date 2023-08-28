@@ -27,6 +27,7 @@
 #include <xen/mm.h>
 #include <xen/pfn.h>
 #include <asm/time.h>
+#include <asm/page.h>
 
 #define MAX_POOL_NAME_LEN       16
 

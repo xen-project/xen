@@ -24,6 +24,7 @@
 #include <xen/page-defs.h>
 #include <xen/pci.h>
 #include <xen/spinlock.h>
+#include <xen/errno.h>
 #include <public/domctl.h>
 #include <public/hvm/ioreq.h>
 #include <asm/device.h>
