@@ -103,7 +103,7 @@ static void cf_check address_write(
     struct vpci_msi *msi = data;
 
     /* Clear low part. */
-    msi->address &= ~0xffffffffull;
+    msi->address &= ~0xffffffffULL;
     msi->address |= val;
 
     update_msi(pdev, msi);

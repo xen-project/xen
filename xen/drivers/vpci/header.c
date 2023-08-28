@@ -447,7 +447,7 @@ static void cf_check bar_write(
      * Update the cached address, so that when memory decoding is enabled
      * Xen can map the BAR into the guest p2m.
      */
-    bar->addr &= ~(0xffffffffull << (hi ? 32 : 0));
+    bar->addr &= ~(0xffffffffULL << (hi ? 32 : 0));
     bar->addr |= (uint64_t)val << (hi ? 32 : 0);
 
     /* Make sure Xen writes back the same value for the BAR RO bits. */

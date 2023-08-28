@@ -273,7 +273,7 @@ static int adjacent_read(const struct domain *d, const struct vpci_msix *msix,
     struct vpci *vpci = msix->pdev->vpci;
     unsigned int slot;
 
-    *data = ~0ul;
+    *data = ~0UL;
 
     if ( !adjacent_handle(msix, addr + len - 1) )
         return X86EMUL_OKAY;
@@ -305,13 +305,13 @@ static int adjacent_read(const struct domain *d, const struct vpci_msix *msix,
          */
         for ( i = 0; i < len; i++ )
         {
-            unsigned long partial = ~0ul;
+            unsigned long partial = ~0UL;
             int rc = adjacent_read(d, msix, addr + i, 1, &partial);
 
             if ( rc != X86EMUL_OKAY )
                 return rc;
 
-            *data &= ~(0xfful << (i * 8));
+            *data &= ~(0xffUL << (i * 8));
             *data |= (partial & 0xff) << (i * 8);
         }
 
@@ -363,7 +363,7 @@ static int cf_check msix_read(
     const struct vpci_msix_entry *entry;
     unsigned int offset;
 
-    *data = ~0ul;
+    *data = ~0UL;
 
     if ( !msix )
         return X86EMUL_RETRY;
@@ -525,7 +525,7 @@ static int cf_check msix_write(
             entry->addr = data;
             break;
         }
-        entry->addr &= ~0xffffffffull;
+        entry->addr &= ~0xffffffffULL;
         entry->addr |= data;
         break;
 
