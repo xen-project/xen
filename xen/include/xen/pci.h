@@ -75,8 +75,8 @@ struct pci_dev_info {
      * VF's 'is_extfn' field is used to indicate whether its PF is an extended
      * function.
      */
-    bool_t is_extfn;
-    bool_t is_virtfn;
+    bool is_extfn;
+    bool is_virtfn;
     struct {
         u8 bus;
         u8 devfn;
@@ -158,10 +158,10 @@ struct pci_dev {
 
 void pcidevs_lock(void);
 void pcidevs_unlock(void);
-bool_t __must_check pcidevs_locked(void);
+bool __must_check pcidevs_locked(void);
 
-bool_t pci_known_segment(u16 seg);
-bool_t pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func);
+bool pci_known_segment(u16 seg);
+bool pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func);
 int scan_pci_devices(void);
 enum pdev_type pdev_type(u16 seg, u8 bus, u8 devfn);
 int find_upstream_bridge(u16 seg, u8 *bus, u8 *devfn, u8 *secbus);
@@ -211,7 +211,7 @@ unsigned int pci_size_mem_bar(pci_sbdf_t sbdf, unsigned int pos,
                               unsigned int flags);
 
 void pci_intx(const struct pci_dev *, bool enable);
-bool_t pcie_aer_get_firmware_first(const struct pci_dev *);
+bool pcie_aer_get_firmware_first(const struct pci_dev *);
 
 struct pirq;
 int msixtbl_pt_register(struct domain *, struct pirq *, uint64_t gtable);
