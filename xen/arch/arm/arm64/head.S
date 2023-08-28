@@ -275,7 +275,6 @@ real_start_efi:
         b     enable_boot_cpu_mm
 
 primary_switched:
-        bl    setup_fixmap
 #ifdef CONFIG_EARLY_PRINTK
         /* Use a virtual address to access the UART. */
         ldr   x23, =EARLY_UART_VIRTUAL_ADDRESS
