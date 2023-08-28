@@ -531,7 +531,7 @@ static int cf_check msix_write(
 
     case PCI_MSIX_ENTRY_UPPER_ADDR_OFFSET:
         entry->updated = true;
-        entry->addr &= 0xffffffff;
+        entry->addr  = (uint32_t)entry->addr;
         entry->addr |= (uint64_t)data << 32;
         break;
 
