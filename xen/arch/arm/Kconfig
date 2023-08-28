@@ -59,6 +59,9 @@ config PADDR_BITS
 	default 40 if ARM_PA_BITS_40
 	default 48 if ARM_64
 
+config MMU
+	def_bool y
+
 source "arch/Kconfig"
 
 config ACPI
