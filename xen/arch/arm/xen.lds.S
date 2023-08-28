@@ -34,6 +34,7 @@ SECTIONS
        _stext = .;             /* Text section */
        _idmap_start = .;
        *(.text.header)
+       *(.text.idmap)
        _idmap_end = .;
 
        *(.text.cold)

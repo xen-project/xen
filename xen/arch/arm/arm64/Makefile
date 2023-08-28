@@ -1,4 +1,5 @@
 obj-y += lib/
+obj-$(CONFIG_MMU) += mmu/
 
 obj-y += cache.o
 obj-y += cpufeature.o

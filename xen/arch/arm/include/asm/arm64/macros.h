@@ -32,6 +32,42 @@
         hint    #22
     .endm
 
+#ifdef CONFIG_EARLY_PRINTK
+/*
+ * Macro to print a string to the UART, if there is one.
+ *
+ * Clobbers x0 - x3
+ */
+#define PRINT(_s)          \
+        mov   x3, lr ;     \
+        adr_l x0, 98f ;    \
+        bl    asm_puts ;   \
+        mov   lr, x3 ;     \
+        RODATA_STR(98, _s)
+
+#else /* CONFIG_EARLY_PRINTK */
+#define PRINT(s)
+
+#endif /* !CONFIG_EARLY_PRINTK */
+
+/*
+ * Pseudo-op for PC relative adr <reg>, <symbol> where <symbol> is
+ * within the range +/- 4GB of the PC.
+ *
+ * @dst: destination register (64 bit wide)
+ * @sym: name of the symbol
+ */
+.macro  adr_l, dst, sym
+        adrp \dst, \sym
+        add  \dst, \dst, :lo12:\sym
+.endm
+
+/* Load the physical address of a symbol into xb */
+.macro load_paddr xb, sym
+        ldr \xb, =\sym
+        add \xb, \xb, x20
+.endm
+
 /*
  * Register aliases.
  */
