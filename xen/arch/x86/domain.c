@@ -1074,8 +1074,27 @@ int arch_set_info_guest(
 #endif
     flags = c(flags);
 
+    if ( !compat )
+    {
+        if ( c(debugreg[6]) != (uint32_t)c(debugreg[6]) ||
+             c(debugreg[7]) != (uint32_t)c(debugreg[7]) )
+            return -EINVAL;
+    }
+
     if ( is_pv_domain(d) )
     {
+        for ( i = 0; i < ARRAY_SIZE(v->arch.dr); i++ )
+            if ( !access_ok(c(debugreg[i]), sizeof(long)) )
+                return -EINVAL;
+        /*
+         * Prior to Xen 4.11, dr5 was used to hold the emulated-only
+         * subset of dr7, and dr4 was unused.
+         *
+         * In Xen 4.11 and later, dr4/5 are written as zero, ignored for
+         * backwards compatibility, and dr7 emulation is handled
+         * internally.
+         */
+
         if ( !compat )
         {
             if ( !is_canonical_address(c.nat->user_regs.rip) ||

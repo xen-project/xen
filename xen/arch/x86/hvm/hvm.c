@@ -1032,6 +1032,14 @@ static int cf_check hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
+    if ( ctxt.dr6 != (uint32_t)ctxt.dr6 ||
+         ctxt.dr7 != (uint32_t)ctxt.dr7 )
+    {
+        printk(XENLOG_G_ERR "%pv: HVM restore: bad DR6 %#"PRIx64" or DR7 %#"PRIx64"\n",
+               v, ctxt.dr6, ctxt.dr7);
+        return -EINVAL;
+    }
+
     if ( ctxt.cr3 >> d->arch.cpuid->extd.maxphysaddr )
     {
         printk(XENLOG_G_ERR "HVM%d restore: bad CR3 %#" PRIx64 "\n",
