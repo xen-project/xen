@@ -496,14 +496,6 @@ void setup_local_APIC(bool bsp)
     unsigned long oldvalue, value, maxlvt;
     int i, j;
 
-    /* Pound the ESR really hard over the head with a big hammer - mbligh */
-    if (esr_disable) {
-        apic_write(APIC_ESR, 0);
-        apic_write(APIC_ESR, 0);
-        apic_write(APIC_ESR, 0);
-        apic_write(APIC_ESR, 0);
-    }
-
     BUILD_BUG_ON((SPURIOUS_APIC_VECTOR & 0x0f) != 0x0f);
 
     /*
@@ -628,33 +620,21 @@ void setup_local_APIC(bool bsp)
         value = APIC_DM_NMI | APIC_LVT_MASKED;
     apic_write(APIC_LVT1, value);
 
-    if (!esr_disable) {
-        maxlvt = get_maxlvt();
-        if (maxlvt > 3)     /* Due to the Pentium erratum 3AP. */
-            apic_write(APIC_ESR, 0);
-        oldvalue = apic_read(APIC_ESR);
+    maxlvt = get_maxlvt();
+    if (maxlvt > 3)     /* Due to the Pentium erratum 3AP. */
+        apic_write(APIC_ESR, 0);
+    oldvalue = apic_read(APIC_ESR);
 
-        value = ERROR_APIC_VECTOR;      // enables sending errors
-        apic_write(APIC_LVTERR, value);
-        /*
-         * spec says clear errors after enabling vector.
-         */
-        if (maxlvt > 3)
-            apic_write(APIC_ESR, 0);
-        value = apic_read(APIC_ESR);
-        if (value != oldvalue)
-            apic_printk(APIC_VERBOSE, "ESR value before enabling "
-                        "vector: %#lx  after: %#lx\n",
-                        oldvalue, value);
-    } else {
-        /*
-         * Something untraceble is creating bad interrupts on
-         * secondary quads ... for the moment, just leave the
-         * ESR disabled - we can't do anything useful with the
-         * errors anyway - mbligh
-         */
-        printk("Leaving ESR disabled.\n");
-    }
+    value = ERROR_APIC_VECTOR;      // enables sending errors
+    apic_write(APIC_LVTERR, value);
+    /* spec says clear errors after enabling vector. */
+    if (maxlvt > 3)
+        apic_write(APIC_ESR, 0);
+    value = apic_read(APIC_ESR);
+    if (value != oldvalue)
+        apic_printk(APIC_VERBOSE,
+                    "ESR value before enabling vector: %#lx  after: %#lx\n",
+                    oldvalue, value);
 
     if (nmi_watchdog == NMI_LOCAL_APIC && !bsp)
         setup_apic_nmi_watchdog();

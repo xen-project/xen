@@ -6,9 +6,6 @@
 #include <asm/genapic.h>
 #include <asm/smp.h>
 
-/* ESR was originally disabled in Linux for NUMA-Q. Do we really need to? */
-#define esr_disable (0)
-
 /* The following are dependent on APIC delivery mode (logical vs. physical). */
 #define INT_DELIVERY_MODE (genapic.int_delivery_mode)
 #define INT_DEST_MODE (genapic.int_dest_mode)
