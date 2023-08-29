@@ -77,7 +77,18 @@
     asm volatile ( "mov %%db" #reg ",%0" : "=r" (__val) );  \
     __val;                                                  \
 })
+
+struct vcpu;
 long set_debugreg(struct vcpu *, unsigned int reg, unsigned long value);
 void activate_debugregs(const struct vcpu *);
+
+struct cpu_policy;
+
+/*
+ * Architecturally dr6/7 are full GPR-width, but only the bottom 32 bits may
+ * legally be non-zero.  We avoid storing the upper bits when possible.
+ */
+unsigned int x86_adj_dr6_rsvd(const struct cpu_policy *p, unsigned int dr6);
+unsigned int x86_adj_dr7_rsvd(const struct cpu_policy *p, unsigned int dr7);
 
 #endif /* _X86_DEBUGREG_H */
