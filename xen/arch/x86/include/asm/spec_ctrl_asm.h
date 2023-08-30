@@ -177,6 +177,19 @@
 .L\@_verw_skip:
 .endm
 
+.macro DO_SPEC_CTRL_DIV
+/*
+ * Requires nothing
+ * Clobbers %rax
+ *
+ * Issue a DIV for its flushing side effect (Zen1 uarch specific).  Any
+ * non-faulting DIV will do; a byte DIV has least latency, and doesn't clobber
+ * %rdx.
+ */
+    mov $1, %eax
+    div %al
+.endm
+
 .macro DO_SPEC_CTRL_ENTRY maybexen:req
 /*
  * Requires %rsp=regs (also cpuinfo if !maybexen)
@@ -279,6 +292,8 @@
     ALTERNATIVE "", DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR_PV
 
     DO_SPEC_CTRL_COND_VERW
+
+    ALTERNATIVE "", DO_SPEC_CTRL_DIV, X86_FEATURE_SC_DIV
 .endm
 
 /*
@@ -390,6 +405,8 @@ UNLIKELY_DISPATCH_LABEL(\@_serialise):
     jz .L\@_skip_verw
     verw STACK_CPUINFO_FIELD(verw_sel)(%r14)
 .L\@_skip_verw:
+
+    ALTERNATIVE "", DO_SPEC_CTRL_DIV, X86_FEATURE_SC_DIV
 
 .L\@_skip_ist_exit:
 .endm

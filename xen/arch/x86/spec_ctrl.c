@@ -79,6 +79,7 @@ static int8_t __initdata opt_srb_lock = -1;
 static bool __initdata opt_unpriv_mmio;
 static bool __ro_after_init opt_fb_clear_mmio;
 static int8_t __initdata opt_gds_mit = -1;
+static int8_t __initdata opt_div_scrub = -1;
 
 static int __init cf_check parse_spec_ctrl(const char *s)
 {
@@ -133,6 +134,7 @@ static int __init cf_check parse_spec_ctrl(const char *s)
             opt_srb_lock = 0;
             opt_unpriv_mmio = false;
             opt_gds_mit = 0;
+            opt_div_scrub = 0;
         }
         else if ( val > 0 )
             rc = -EINVAL;
@@ -285,6 +287,8 @@ static int __init cf_check parse_spec_ctrl(const char *s)
             opt_unpriv_mmio = val;
         else if ( (val = parse_boolean("gds-mit", s, ss)) >= 0 )
             opt_gds_mit = val;
+        else if ( (val = parse_boolean("div-scrub", s, ss)) >= 0 )
+            opt_div_scrub = val;
         else
             rc = -EINVAL;
 
@@ -485,7 +489,7 @@ static void __init print_details(enum ind_thunk thunk)
                "\n");
 
     /* Settings for Xen's protection, irrespective of guests. */
-    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s%s%s%s, Other:%s%s%s%s%s\n",
+    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s%s%s%s, Other:%s%s%s%s%s%s\n",
            thunk == THUNK_NONE      ? "N/A" :
            thunk == THUNK_RETPOLINE ? "RETPOLINE" :
            thunk == THUNK_LFENCE    ? "LFENCE" :
@@ -510,6 +514,7 @@ static void __init print_details(enum ind_thunk thunk)
            opt_l1d_flush                             ? " L1D_FLUSH" : "",
            opt_md_clear_pv || opt_md_clear_hvm ||
            opt_fb_clear_mmio                         ? " VERW"  : "",
+           opt_div_scrub                             ? " DIV" : "",
            opt_branch_harden                         ? " BRANCH_HARDEN" : "");
 
     /* L1TF diagnostics, printed if vulnerable or PV shadowing is in use. */
@@ -965,6 +970,45 @@ static void __init srso_calculations(bool hw_smt_enabled)
     if ( !hw_smt_enabled &&
          (boot_cpu_data.x86 == 0x17 || boot_cpu_data.x86 == 0x18) )
         setup_force_cpu_cap(X86_FEATURE_SRSO_NO);
+}
+
+/*
+ * The Div leakage issue is specific to the AMD Zen1 microarchitecure.
+ *
+ * However, there's no $FOO_NO bit defined, so if we're virtualised we have no
+ * hope of spotting the case where we might move to vulnerable hardware.  We
+ * also can't make any useful conclusion about SMT-ness.
+ *
+ * Don't check the hypervisor bit, so at least we do the safe thing when
+ * booting on something that looks like a Zen1 CPU.
+ */
+static bool __init has_div_vuln(void)
+{
+    if ( !(boot_cpu_data.x86_vendor &
+           (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
+        return false;
+
+    if ( boot_cpu_data.x86 != 0x17 && boot_cpu_data.x86 != 0x18 )
+        return false;
+
+    return is_zen1_uarch();
+}
+
+static void __init div_calculations(bool hw_smt_enabled)
+{
+    bool cpu_bug_div = has_div_vuln();
+
+    if ( opt_div_scrub == -1 )
+        opt_div_scrub = cpu_bug_div;
+
+    if ( opt_div_scrub )
+        setup_force_cpu_cap(X86_FEATURE_SC_DIV);
+
+    if ( opt_smt == -1 && !cpu_has_hypervisor && cpu_bug_div && hw_smt_enabled )
+        warning_add(
+            "Booted on leaky-DIV hardware with SMT/Hyperthreading\n"
+            "enabled.  Please assess your configuration and choose an\n"
+            "explicit 'smt=<bool>' setting.  See XSA-439.\n");
 }
 
 static void __init ibpb_calculations(void)
@@ -1725,6 +1769,8 @@ void __init init_speculation_mitigations(void)
     srso_calculations(hw_smt_enabled);
 
     ibpb_calculations();
+
+    div_calculations(hw_smt_enabled);
 
     /* Check whether Eager FPU should be enabled by default. */
     if ( opt_eager_fpu == -1 )
