@@ -230,7 +230,10 @@
     wrmsr
 .endm
 
-/* Use after an entry from PV context (syscall/sysenter/int80/int82/etc). */
+/*
+ * Used after an entry from PV context: SYSCALL, SYSENTER, INT,
+ * etc.  There is always a guest speculation state in context.
+ */
 .macro SPEC_CTRL_ENTRY_FROM_PV
 /*
  * Requires %rsp=regs/cpuinfo, %rdx=0
@@ -245,7 +248,11 @@
         X86_FEATURE_SC_MSR_PV
 .endm
 
-/* Use in interrupt/exception context.  May interrupt Xen or PV context. */
+/*
+ * Used after an exception or maskable interrupt, hitting Xen or PV context.
+ * There will either be a guest speculation context, or (barring fatal
+ * exceptions) a well-formed Xen speculation context.
+ */
 .macro SPEC_CTRL_ENTRY_FROM_INTR
 /*
  * Requires %rsp=regs, %r14=stack_end, %rdx=0
@@ -260,7 +267,10 @@
         X86_FEATURE_SC_MSR_PV
 .endm
 
-/* Use when exiting to PV guest context. */
+/*
+ * Used when exiting from any entry context, back to PV context.  This
+ * includes from an IST entry which moved onto the primary stack.
+ */
 .macro SPEC_CTRL_EXIT_TO_PV
 /*
  * Requires %rax=spec_ctrl, %rsp=regs/info
@@ -272,7 +282,13 @@
 .endm
 
 /*
- * Use in IST interrupt/exception context.  May interrupt Xen or PV context.
+ * Used after an IST entry hitting Xen or PV context.  Special care is needed,
+ * because when hitting Xen context, there may not be a well-formed
+ * speculation context.  (i.e. it can hit in the middle of
+ * SPEC_CTRL_{ENTRY,EXIT}_* regions.)
+ *
+ * An IST entry which hits PV context moves onto the primary stack and leaves
+ * via SPEC_CTRL_EXIT_TO_PV, *not* SPEC_CTRL_EXIT_TO_XEN.
  */
 .macro SPEC_CTRL_ENTRY_FROM_INTR_IST
 /*
@@ -331,7 +347,14 @@ UNLIKELY_DISPATCH_LABEL(\@_serialise):
     UNLIKELY_END(\@_serialise)
 .endm
 
-/* Use when exiting to Xen context. */
+/*
+ * Use when exiting from any entry context, back to Xen context.  This
+ * includes returning to other SPEC_CTRL_{ENTRY,EXIT}_* regions with an
+ * incomplete speculation context.
+ *
+ * Because we might have interrupted Xen beyond SPEC_CTRL_EXIT_TO_$GUEST, we
+ * need to treat this as if it were an EXIT_TO_$GUEST case too.
+ */
 .macro SPEC_CTRL_EXIT_TO_XEN
 /*
  * Requires %rbx=stack_end
@@ -356,6 +379,9 @@ UNLIKELY_DISPATCH_LABEL(\@_serialise):
     wrmsr
 
 .L\@_skip_sc_msr:
+
+    /* TODO VERW */
+
 .endm
 
 #endif /* __ASSEMBLY__ */
