@@ -72,6 +72,7 @@ __UNLIKELY_END(nsvm_hap)
 1:          /* No Spectre v1 concerns.  Execution will hit VMRUN imminently. */
         .endm
         ALTERNATIVE "", svm_vmentry_spec_ctrl, X86_FEATURE_SC_MSR_HVM
+        ALTERNATIVE "", DO_SPEC_CTRL_DIV, X86_FEATURE_SC_DIV
 
         pop  %r15
         pop  %r14
