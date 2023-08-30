@@ -37,7 +37,7 @@ static bool _mask_and_ack_8259A_irq(unsigned int irq);
 
 bool bogus_8259A_irq(unsigned int irq)
 {
-    return _mask_and_ack_8259A_irq(irq);
+    return !_mask_and_ack_8259A_irq(irq);
 }
 
 static void cf_check mask_and_ack_8259A_irq(struct irq_desc *desc)
