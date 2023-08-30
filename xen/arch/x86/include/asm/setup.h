@@ -15,7 +15,7 @@ extern uint64_t boot_tsc_stamp;
 
 extern void *stack_start;
 
-void early_cpu_init(void);
+void early_cpu_init(bool verbose);
 void early_time_init(void);
 
 void set_nr_cpu_ids(unsigned int max_cpus);

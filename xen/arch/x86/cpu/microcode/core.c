@@ -887,5 +887,14 @@ int __init early_microcode_init(unsigned long *module_map,
     if ( ucode_mod.mod_end || ucode_blob.size )
         rc = early_microcode_update_cpu();
 
+    /*
+     * Some CPUID leaves and MSRs are only present after microcode updates
+     * on some processors. We take the chance here to make sure what little
+     * state we have already probed is re-probed in order to ensure we do
+     * not use stale values. tsx_init() in particular needs to have up to
+     * date MSR_ARCH_CAPS.
+     */
+    early_cpu_init(false);
+
     return rc;
 }

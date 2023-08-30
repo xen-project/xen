@@ -1214,7 +1214,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         panic("Bootloader provided no memory information\n");
 
     /* This must come before e820 code because it sets paddr_bits. */
-    early_cpu_init();
+    early_cpu_init(true);
 
     /* Choose shadow stack early, to set infrastructure up appropriately. */
     if ( !boot_cpu_has(X86_FEATURE_CET_SS) )
