@@ -863,7 +863,7 @@ int __init early_microcode_init(unsigned long *module_map,
 
     if ( !ucode_ops.apply_microcode )
     {
-        printk(XENLOG_WARNING "Microcode loading not available\n");
+        printk(XENLOG_INFO "Microcode loading not available\n");
         return -ENODEV;
     }
 
