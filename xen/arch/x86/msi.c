@@ -318,17 +318,12 @@ static bool msi_set_mask_bit(struct irq_desc *desc, bool host, bool guest)
 {
     struct msi_desc *entry = desc->msi_desc;
     struct pci_dev *pdev;
-    u16 seg, control;
-    u8 bus, slot, func;
+    uint16_t control;
     bool flag = host || guest, maskall;
 
     ASSERT(spin_is_locked(&desc->lock));
     BUG_ON(!entry || !entry->dev);
     pdev = entry->dev;
-    seg = pdev->seg;
-    bus = pdev->bus;
-    slot = PCI_SLOT(pdev->devfn);
-    func = PCI_FUNC(pdev->devfn);
     switch ( entry->msi_attrib.type )
     {
     case PCI_CAP_ID_MSI:
