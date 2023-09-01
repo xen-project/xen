@@ -231,26 +231,45 @@
 .endm
 
 /* Use after an entry from PV context (syscall/sysenter/int80/int82/etc). */
-#define SPEC_CTRL_ENTRY_FROM_PV                                         \
+.macro SPEC_CTRL_ENTRY_FROM_PV
+/*
+ * Requires %rsp=regs/cpuinfo, %rdx=0
+ * Clobbers %rax, %rcx, %rdx
+ */
     ALTERNATIVE "", __stringify(DO_SPEC_CTRL_COND_IBPB maybexen=0),     \
-        X86_FEATURE_IBPB_ENTRY_PV;                                      \
-    ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_PV;            \
+        X86_FEATURE_IBPB_ENTRY_PV
+
+    ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_PV
+
     ALTERNATIVE "", __stringify(DO_SPEC_CTRL_ENTRY maybexen=0),         \
         X86_FEATURE_SC_MSR_PV
+.endm
 
 /* Use in interrupt/exception context.  May interrupt Xen or PV context. */
-#define SPEC_CTRL_ENTRY_FROM_INTR                                       \
+.macro SPEC_CTRL_ENTRY_FROM_INTR
+/*
+ * Requires %rsp=regs, %r14=stack_end, %rdx=0
+ * Clobbers %rax, %rcx, %rdx
+ */
     ALTERNATIVE "", __stringify(DO_SPEC_CTRL_COND_IBPB maybexen=1),     \
-        X86_FEATURE_IBPB_ENTRY_PV;                                      \
-    ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_PV;            \
+        X86_FEATURE_IBPB_ENTRY_PV
+
+    ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_PV
+
     ALTERNATIVE "", __stringify(DO_SPEC_CTRL_ENTRY maybexen=1),         \
         X86_FEATURE_SC_MSR_PV
+.endm
 
 /* Use when exiting to PV guest context. */
-#define SPEC_CTRL_EXIT_TO_PV                                            \
-    ALTERNATIVE "",                                                     \
-        DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR_PV;              \
+.macro SPEC_CTRL_EXIT_TO_PV
+/*
+ * Requires %rax=spec_ctrl, %rsp=regs/info
+ * Clobbers %rcx, %rdx
+ */
+    ALTERNATIVE "", DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR_PV
+
     DO_SPEC_CTRL_COND_VERW
+.endm
 
 /*
  * Use in IST interrupt/exception context.  May interrupt Xen or PV context.
