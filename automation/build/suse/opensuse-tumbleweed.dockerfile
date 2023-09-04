@@ -21,6 +21,7 @@ RUN zypper install -y --no-recommends \
         diffutils \
         discount \
         flex \
+        gawk \
         gcc \
         gcc-c++ \
         git \
