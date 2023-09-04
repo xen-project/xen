@@ -9,6 +9,7 @@
 #include <xen/ioreq.h>
 
 #include <asm/traps.h>
+#include <asm/ioreq.h>
 
 #include <public/hvm/ioreq.h>
 
