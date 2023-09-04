@@ -706,7 +706,7 @@ static uint32_t handle_rxtx_map(uint32_t fid, register_t tx_addr,
     {
         printk(XENLOG_ERR "ffa: RXTX_MAP: error: %u pages requested (limit %u)\n",
                page_count, FFA_MAX_RXTX_PAGE_COUNT);
-        return FFA_RET_NOT_SUPPORTED;
+        return FFA_RET_INVALID_PARAMETERS;
     }
 
     /* Already mapped */
