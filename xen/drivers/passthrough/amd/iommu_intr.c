@@ -361,12 +361,6 @@ void cf_check amd_iommu_ioapic_update_ire(
     struct amd_iommu *iommu;
     unsigned int idx;
 
-    if ( !iommu_intremap )
-    {
-        __io_apic_write(apic, reg, value);
-        return;
-    }
-
     idx = ioapic_id_to_index(IO_APIC_ID(apic));
     if ( idx == MAX_IO_APICS )
         return;
