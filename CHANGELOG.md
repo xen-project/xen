@@ -4,6 +4,12 @@ Notable changes to Xen will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
+## [4.17.3](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.17.3)
+
+### Changed
+ - Ignore VCPUOP_set_singleshot_timer's VCPU_SSHOTTMR_future flag. The only
+   known user doesn't use it properly, leading to in-guest breakage.
+
 ## [4.17.0](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.17.0) - 2022-12-12
 
 ### Changed
