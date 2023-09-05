@@ -2360,7 +2360,7 @@ int ioapic_guest_read(unsigned long physbase, unsigned int reg, u32 *pval)
 int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 {
     int apic, pin, irq, ret, pirq;
-    struct IO_APIC_route_entry rte = { 0 };
+    struct IO_APIC_route_entry rte = { };
     unsigned long flags;
     struct irq_desc *desc;
 
