@@ -405,7 +405,7 @@ endif
 
 AFLAGS += -D__ASSEMBLY__
 
-$(call cc-option-add,AFLAGS,CC,-Wa$(comma)--noexecstack)
+$(call cc-option-add,AFLAGS,CC,-Wa$$(comma)--noexecstack)
 
 LDFLAGS-$(call ld-option,--warn-rwx-segments) += --no-warn-rwx-segments
 
