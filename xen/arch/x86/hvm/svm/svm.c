@@ -2490,7 +2490,7 @@ static bool cf_check svm_get_pending_event(
 {
     const struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
 
-    if ( vmcb->event_inj.v )
+    if ( !vmcb->event_inj.v )
         return false;
 
     info->vector = vmcb->event_inj.vector;
