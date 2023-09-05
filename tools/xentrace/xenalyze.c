@@ -6885,39 +6885,86 @@ void vcpu_next_update(struct pcpu_info *p, struct vcpu_data *next, tsc_t tsc)
     p->lost_record.seen_valid_schedule = 1;
 }
 
-/* If current is the default domain, we're fixing up from something
- * like start-of-day.  Update what we can. */
-void vcpu_start(struct pcpu_info *p, struct vcpu_data *v) {
-    /* If vcpus are created, or first show up, in a "dead zone", this will
-     * fail. */
-    if( !p->current || p->current->d->did != DEFAULT_DOMAIN) {
-        fprintf(stderr, "Strange, p->current not default domain!\n");
-        error(ERR_FILE, NULL);
+/* 
+ * If the vcpu in question is in state INIT, we're fixing up from something
+ * like start-of-day.  Update what we can.
+ */
+void vcpu_start(struct pcpu_info *p, struct vcpu_data *v,
+                int old_runstate, int new_runstate, tsc_t ri_tsc) {
+    tsc_t tsc;
+
+    /*
+     * 
+     * Cases:
+     * running -> running:
+     *  v -> running, using p->first_tsc
+     * {runnable, blocked} -> running:
+     *  v -> running, using ri->tsc
+     * running -> {runnable, blocked}:
+     *  Leave v INIT, but clear p->current in case another vcpu is scheduled
+     * blocked -> runnable:
+     *  Leave INIT, and also leave p->current, since we still don't know who's scheduled here
+     */
+
+    /* 
+     * NB that a vcpu won't come out of INIT until it starts running somewhere.  
+     * If this event is pcpu that has already seen a scheduling event, p->current
+     * should be null; if this is the first scheduling event on this pcpu, 
+     * p->current should be the default domain.
+     */
+    if( old_runstate == RUNSTATE_RUNNING ) {
+        if ( !p->current ||  p->current->d->did != DEFAULT_DOMAIN) {
+            fprintf(stderr, "Strange, p->current not default domain!\n");
+            error(ERR_FILE, NULL);
+            return;
+
+        }
+        
+        if(!p->first_tsc) {
+            fprintf(stderr, "Strange, p%d first_tsc 0!\n", p->pid);
+            error(ERR_FILE, NULL);
+        }
+
+        if(p->first_tsc <= p->current->runstate.tsc) {
+            fprintf(stderr, "Strange, first_tsc %llx < default_domain runstate tsc %llx!\n",
+                    p->first_tsc,
+                    p->current->runstate.tsc);
+            error(ERR_FILE, NULL);
+        }
+    
+        /* Change default domain to 'queued' */
+        runstate_update(p->current, RUNSTATE_QUEUED, p->first_tsc);
+
+        /* 
+         * Set current to NULL, so that if another vcpu (not in INIT)
+         * is scheduled here, we don't trip over the check in
+         * vcpu_next_update()
+         */
+        p->current = NULL;
+    }
+
+    /* TSC skew at start-of-day is hard to deal with.  Don't
+     * bring a vcpu out of INIT until it's seen to be actually
+     * running somewhere. */
+    if ( new_runstate != RUNSTATE_RUNNING ) {
+        fprintf(warn, "First schedule for d%dv%d doesn't take us into a running state; leaving INIT\n",
+                v->d->did, v->vid);
+
         return;
     }
 
-    if(!p->first_tsc) {
-        fprintf(stderr, "Strange, p%d first_tsc 0!\n", p->pid);
-        error(ERR_FILE, NULL);
+    tsc = ri_tsc;
+    if ( old_runstate == RUNSTATE_RUNNING ) {
+        /* FIXME: Copy over data from the default domain this interval */
+        fprintf(warn, "Using first_tsc for d%dv%d (%lld cycles)\n",
+                v->d->did, v->vid, p->last_tsc - p->first_tsc);
+
+        tsc = p->first_tsc;
     }
-
-    if(p->first_tsc <= p->current->runstate.tsc) {
-        fprintf(stderr, "Strange, first_tsc %llx < default_domain runstate tsc %llx!\n",
-                p->first_tsc,
-                p->current->runstate.tsc);
-        error(ERR_FILE, NULL);
-    }
-
-    /* Change default domain to 'queued' */
-    runstate_update(p->current, RUNSTATE_QUEUED, p->first_tsc);
-
-    /* FIXME: Copy over data from the default domain this interval */
-    fprintf(warn, "Using first_tsc for d%dv%d (%lld cycles)\n",
-            v->d->did, v->vid, p->last_tsc - p->first_tsc);
 
     /* Simulate the time since the first tsc */
-    runstate_update(v, RUNSTATE_RUNNING, p->first_tsc);
-    p->time.tsc = p->first_tsc;
+    runstate_update(v, RUNSTATE_RUNNING, tsc);
+    p->time.tsc = tsc;
     p->current = v;
     pcpu_string_draw(p);
     v->p = p;
@@ -7020,6 +7067,13 @@ void sched_runstate_process(struct pcpu_info *p)
      * be reset, it will be reset below. */
     last_oldstate = v->runstate.last_oldstate;
     v->runstate.last_oldstate.wrong = RUNSTATE_INIT;
+
+    /* Handle all "start-of-day" issues in one place.  This can be
+     * done before any of the other tracks or sanity checks. */
+    if ( v->runstate.state == RUNSTATE_INIT ) {
+        vcpu_start(p, v, sevt.old_runstate, sevt.new_runstate, ri->tsc);
+        return;
+    }
 
     /* Close vmexits when the putative reason for blocking / &c stops.
      * This way, we don't account cpu contention to some other overhead. */
@@ -7190,32 +7244,27 @@ update:
      * or stopping actually running on a physical cpu. */
     if ( type == CONTINUE )
     {
-        if( v->runstate.state == RUNSTATE_INIT ) {
-            /* Start-of-day; account first tsc -> now to v */
-            vcpu_start(p, v);
-        } else {
-            /* Continue running.  First, do some sanity checks */
-            if ( v->runstate.state == RUNSTATE_LOST ) {
-                fprintf(warn, "WARNING: continue with d%dv%d in RUNSTATE_LOST.  Resetting current.\n",
-                        v->d->did, v->vid);
-                if ( p->current )
-                    vcpu_prev_update(p, p->current, ri->tsc, RUNSTATE_LOST);
-                vcpu_next_update(p, v, ri->tsc);
-            }
-            else if( v->runstate.state != RUNSTATE_RUNNING ) {
-                /* This should never happen. */
-                fprintf(warn, "FATAL: sevt.old_runstate running, but d%dv%d runstate %s!\n",
-                        v->d->did, v->vid, runstate_name[v->runstate.state]);
-                error(ERR_FILE, NULL);
-            } else if ( v->p != p ) {
-                fprintf(warn, "FATAL: continue on p%d, but d%dv%d p%d!\n",
-                        p->pid, v->d->did, v->vid,
-                        v->p ? v->p->pid : -1);
-                error(ERR_FILE, NULL);
-            }
-
-            runstate_update(v, RUNSTATE_RUNNING, ri->tsc);
+        /* Continue running.  First, do some sanity checks */
+        if ( v->runstate.state == RUNSTATE_LOST ) {
+            fprintf(warn, "WARNING: continue with d%dv%d in RUNSTATE_LOST.  Resetting current.\n",
+                    v->d->did, v->vid);
+            if ( p->current )
+                vcpu_prev_update(p, p->current, ri->tsc, RUNSTATE_LOST);
+            vcpu_next_update(p, v, ri->tsc);
         }
+        else if( v->runstate.state != RUNSTATE_RUNNING ) {
+            /* This should never happen. */
+            fprintf(warn, "FATAL: sevt.old_runstate running, but d%dv%d runstate %s!\n",
+                    v->d->did, v->vid, runstate_name[v->runstate.state]);
+            error(ERR_FILE, NULL);
+        } else if ( v->p != p ) {
+            fprintf(warn, "FATAL: continue on p%d, but d%dv%d p%d!\n",
+                    p->pid, v->d->did, v->vid,
+                    v->p ? v->p->pid : -1);
+            error(ERR_FILE, NULL);
+        }
+
+        runstate_update(v, RUNSTATE_RUNNING, ri->tsc);
     }
     else if ( sevt.old_runstate == RUNSTATE_RUNNING
               || v->runstate.state == RUNSTATE_RUNNING )
@@ -7232,10 +7281,7 @@ update:
          *   # (should never happen)
          */
         if( sevt.old_runstate == RUNSTATE_RUNNING ) {
-            if( v->runstate.state == RUNSTATE_INIT ) {
-                /* Start-of-day; account first tsc -> now to v */
-                vcpu_start(p, v);
-            } else if( v->runstate.state != RUNSTATE_RUNNING
+            if( v->runstate.state != RUNSTATE_RUNNING
                        && v->runstate.state != RUNSTATE_LOST ) {
                 /* This should never happen. */
                 fprintf(warn, "FATAL: sevt.old_runstate running, but d%dv%d runstate %s!\n",
@@ -7264,11 +7310,8 @@ update:
 
         vcpu_next_update(p, v, ri->tsc);
     }
-    else if ( v->runstate.state != RUNSTATE_INIT )
+    else
     {
-        /* TSC skew at start-of-day is hard to deal with.  Don't
-         * bring a vcpu out of INIT until it's seen to be actually
-         * running somewhere. */
         runstate_update(v, sevt.new_runstate, ri->tsc);
     }
 
