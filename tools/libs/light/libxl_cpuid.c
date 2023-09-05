@@ -710,10 +710,11 @@ parse_cpuid:
                     libxl__strdup(NOGC, libxl__json_object_get_string(r));
         }
     }
+
+cpuid_empty:
     if (cpuid_only)
         return 0;
 
-cpuid_empty:
     co = libxl__json_map_get("msr", o, JSON_ARRAY);
     if (!libxl__json_object_is_array(co))
         return ERROR_FAIL;
