@@ -27,6 +27,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - On Arm, add suport for Firmware Framework for Arm A-profile (FF-A) Mediator
    (Tech Preview)
  - Add Intel Hardware P-States (HWP) cpufreq driver.
+ - On Arm, experimental support for dynamic addition/removal of Xen device tree
+   nodes using a device tree overlay binary (.dtbo).
 
 ### Removed
  - On x86, the "pku" command line option has been removed.  It has never
