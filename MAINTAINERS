@@ -301,6 +301,7 @@ M:	Julien Grall <julien@xen.org>
 S:	Supported
 F:	xen/common/libfdt/
 F:	xen/common/device_tree.c
+F:	xen/common/dt-overlay.c
 F:	xen/include/xen/libfdt/
 F:	xen/include/xen/device_tree.h
 F:	xen/drivers/passthrough/device_tree.c
