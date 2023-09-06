@@ -251,10 +251,8 @@ static int iomem_remove_cb(unsigned long s, unsigned long e, void *dom,
     rc = iomem_deny_access(d, s, e);
     if ( rc )
     {
-        printk(XENLOG_ERR "Unable to remove dom%d access to"
-               " 0x%"PRIx64" - 0x%"PRIx64"\n",
-               d->domain_id,
-               s & PAGE_MASK, PAGE_ALIGN(e) - 1);
+        printk(XENLOG_ERR "Unable to remove %pd access to %#lx - %#lx\n",
+               d, s, e);
     }
     else
         *c += e - s + 1;
