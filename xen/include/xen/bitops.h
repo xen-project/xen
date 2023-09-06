@@ -18,7 +18,7 @@
  * differs in spirit from the above ffz (man ffs).
  */
 
-static inline int generic_ffs(int x)
+static inline int generic_ffs(unsigned int x)
 {
     int r = 1;
 
@@ -51,7 +51,7 @@ static inline int generic_ffs(int x)
  * fls: find last bit set.
  */
 
-static __inline__ int generic_fls(int x)
+static inline int generic_fls(unsigned int x)
 {
     int r = 32;
 
