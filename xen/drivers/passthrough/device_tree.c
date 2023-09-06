@@ -31,6 +31,8 @@ int iommu_assign_dt_device(struct domain *d, struct dt_device_node *dev)
     int rc = -EBUSY;
     struct domain_iommu *hd = dom_iommu(d);
 
+    ASSERT(system_state < SYS_STATE_active || rw_is_locked(&dt_host_lock));
+
     if ( !is_iommu_enabled(d) )
         return -EINVAL;
 
@@ -61,6 +63,8 @@ int iommu_deassign_dt_device(struct domain *d, struct dt_device_node *dev)
 {
     const struct domain_iommu *hd = dom_iommu(d);
     int rc;
+
+    ASSERT(rw_is_locked(&dt_host_lock));
 
     if ( !is_iommu_enabled(d) )
         return -EINVAL;
@@ -113,6 +117,8 @@ int iommu_release_dt_devices(struct domain *d)
     if ( !is_iommu_enabled(d) )
         return 0;
 
+    read_lock(&dt_host_lock);
+
     list_for_each_entry_safe(dev, _dev, &hd->dt_devices, domain_list)
     {
         rc = iommu_deassign_dt_device(d, dev);
@@ -120,9 +126,13 @@ int iommu_release_dt_devices(struct domain *d)
         {
             dprintk(XENLOG_ERR, "Failed to deassign %s in domain %u\n",
                     dt_node_full_name(dev), d->domain_id);
+            read_unlock(&dt_host_lock);
+
             return rc;
         }
     }
+
+    read_unlock(&dt_host_lock);
 
     return 0;
 }
@@ -132,6 +142,8 @@ int iommu_remove_dt_device(struct dt_device_node *np)
     const struct iommu_ops *ops = iommu_get_ops();
     struct device *dev = dt_to_dev(np);
     int rc;
+
+    ASSERT(rw_is_locked(&dt_host_lock));
 
     if ( !iommu_enabled )
         return 1;
@@ -176,6 +188,8 @@ int iommu_add_dt_device(struct dt_device_node *np)
     struct dt_phandle_args iommu_spec;
     struct device *dev = dt_to_dev(np);
     int rc = 1, index = 0;
+
+    ASSERT(system_state < SYS_STATE_active || rw_is_locked(&dt_host_lock));
 
     if ( !iommu_enabled )
         return 1;
@@ -249,6 +263,8 @@ int iommu_do_dt_domctl(struct xen_domctl *domctl, struct domain *d,
     int ret;
     struct dt_device_node *dev;
 
+    read_lock(&dt_host_lock);
+
     switch ( domctl->cmd )
     {
     case XEN_DOMCTL_assign_device:
@@ -289,7 +305,10 @@ int iommu_do_dt_domctl(struct xen_domctl *domctl, struct domain *d,
         }
 
         if ( d == dom_io )
-            return -EINVAL;
+        {
+            ret = -EINVAL;
+            break;
+        }
 
         ret = iommu_add_dt_device(dev);
         if ( ret < 0 )
@@ -327,7 +346,10 @@ int iommu_do_dt_domctl(struct xen_domctl *domctl, struct domain *d,
             break;
 
         if ( d == dom_io )
-            return -EINVAL;
+        {
+            ret = -EINVAL;
+            break;
+        }
 
         ret = iommu_deassign_dt_device(d, dev);
 
@@ -341,6 +363,8 @@ int iommu_do_dt_domctl(struct xen_domctl *domctl, struct domain *d,
         ret = -ENOSYS;
         break;
     }
+
+    read_unlock(&dt_host_lock);
 
     return ret;
 }

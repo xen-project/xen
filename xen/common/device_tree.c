@@ -31,6 +31,7 @@ dt_irq_xlate_func dt_irq_xlate;
 struct dt_device_node *dt_host;
 /* Interrupt controller node*/
 const struct dt_device_node *dt_interrupt_controller;
+DEFINE_RWLOCK(dt_host_lock);
 
 /**
  * struct dt_alias_prop - Alias property in 'aliases' node

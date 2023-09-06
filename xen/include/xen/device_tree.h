@@ -18,6 +18,7 @@
 #include <xen/string.h>
 #include <xen/types.h>
 #include <xen/list.h>
+#include <xen/rwlock.h>
 
 #define DEVICE_TREE_MAX_DEPTH 16
 
@@ -217,6 +218,12 @@ extern struct dt_device_node *dt_host;
  * TODO: Handle multiple GIC
  */
 extern const struct dt_device_node *dt_interrupt_controller;
+
+/*
+ * Lock that protects r/w updates to unflattened device tree i.e. dt_host during
+ * runtime. Lock may not be taken for boot only code.
+ */
+extern rwlock_t dt_host_lock;
 
 /**
  * Find the interrupt controller
