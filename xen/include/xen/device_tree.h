@@ -179,6 +179,20 @@ int device_tree_for_each_node(const void *fdt, int node,
 void dt_unflatten_host_device_tree(void);
 
 /**
+ * unflatten_device_tree - create tree of device_nodes from flat blob
+ *
+ * unflattens a device-tree, creating the
+ * tree of struct device_node. It also fills the "name" and "type"
+ * pointers of the nodes so the normal device-tree walking functions
+ * can be used.
+ * @fdt: The fdt to expand
+ * @mynodes: The device_node tree created by the call
+ *
+ * Returns 0 on success and a negative number on error
+ */
+int unflatten_device_tree(const void *fdt, struct dt_device_node **mynodes);
+
+/**
  * IRQ translation callback
  * TODO: For the moment we assume that we only have ONE
  * interrupt-controller.
