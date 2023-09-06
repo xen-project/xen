@@ -83,16 +83,16 @@ fail:
     return rc;
 }
 
-static bool iommu_dt_device_is_assigned(const struct dt_device_node *dev)
+static bool iommu_dt_device_is_assigned_locked(const struct dt_device_node *dev)
 {
     bool assigned = false;
+
+    ASSERT(spin_is_locked(&dtdevs_lock));
 
     if ( !dt_device_is_protected(dev) )
         return 0;
 
-    spin_lock(&dtdevs_lock);
     assigned = !list_empty(&dev->domain_list);
-    spin_unlock(&dtdevs_lock);
 
     return assigned;
 }
@@ -225,12 +225,16 @@ int iommu_do_dt_domctl(struct xen_domctl *domctl, struct domain *d,
 
         if ( domctl->cmd == XEN_DOMCTL_test_assign_device )
         {
-            if ( iommu_dt_device_is_assigned(dev) )
+            spin_lock(&dtdevs_lock);
+
+            if ( iommu_dt_device_is_assigned_locked(dev) )
             {
                 printk(XENLOG_G_ERR "%s already assigned.\n",
                        dt_node_full_name(dev));
                 ret = -EINVAL;
             }
+
+            spin_unlock(&dtdevs_lock);
             break;
         }
 
