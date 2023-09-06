@@ -1265,6 +1265,7 @@ int main_create(int argc, char **argv)
     return 0;
 }
 
+#ifdef LIBXL_HAVE_DT_OVERLAY
 int main_dt_overlay(int argc, char **argv)
 {
     const char *overlay_ops = NULL;
@@ -1317,6 +1318,8 @@ int main_dt_overlay(int argc, char **argv)
 
     return rc;
 }
+#endif
+
 /*
  * Local variables:
  * mode: C

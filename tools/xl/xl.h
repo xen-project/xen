@@ -138,7 +138,9 @@ int main_shutdown(int argc, char **argv);
 int main_reboot(int argc, char **argv);
 int main_list(int argc, char **argv);
 int main_vm_list(int argc, char **argv);
+#ifdef LIBXL_HAVE_DT_OVERLAY
 int main_dt_overlay(int argc, char **argv);
+#endif
 int main_create(int argc, char **argv);
 int main_config_update(int argc, char **argv);
 int main_button_press(int argc, char **argv);

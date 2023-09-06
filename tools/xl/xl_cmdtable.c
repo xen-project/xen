@@ -631,12 +631,14 @@ const struct cmd_spec cmd_table[] = {
       "Issue a qemu monitor command to the device model of a domain",
       "<Domain> <Command>",
     },
+#ifdef LIBXL_HAVE_DT_OVERLAY
     { "dt-overlay",
       &main_dt_overlay, 0, 1,
       "Add/Remove a device tree overlay",
       "add/remove <.dtbo>"
       "-h print this help\n"
     },
+#endif
 };
 
 const int cmdtable_len = ARRAY_SIZE(cmd_table);
