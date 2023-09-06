@@ -2402,7 +2402,7 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
                "WARNING: Path %s is reserved, skip the node as we may re-use the path.\n",
                path);
 
-    res = handle_device(d, node, p2mt);
+    res = handle_device(d, node, p2mt, NULL, NULL);
     if ( res)
         return res;
 
@@ -2745,7 +2745,7 @@ static int __init handle_passthrough_prop(struct kernel_info *kinfo,
         return -EINVAL;
     }
 
-    res = map_device_irqs_to_domain(kinfo->d, node, true);
+    res = map_device_irqs_to_domain(kinfo->d, node, true, NULL);
     if ( res < 0 )
         return res;
 

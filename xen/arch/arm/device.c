@@ -165,6 +165,15 @@ int map_range_to_domain(const struct dt_device_node *dev,
     dt_dprintk("  - MMIO: %010"PRIx64" - %010"PRIx64" P2MType=%x\n",
                addr, addr + len, mr_data->p2mt);
 
+    if ( mr_data->iomem_ranges )
+    {
+        res = rangeset_add_range(mr_data->iomem_ranges,
+                                 paddr_to_pfn(addr),
+                                 paddr_to_pfn_aligned(addr + len - 1));
+        if ( res )
+            return res;
+    }
+
     return 0;
 }
 
@@ -178,10 +187,11 @@ int map_range_to_domain(const struct dt_device_node *dev,
  */
 int map_device_irqs_to_domain(struct domain *d,
                               struct dt_device_node *dev,
-                              bool need_mapping)
+                              bool need_mapping,
+                              struct rangeset *irq_ranges)
 {
     unsigned int i, nirq;
-    int res;
+    int res, irq;
     struct dt_raw_irq rirq;
 
     nirq = dt_number_of_irq(dev);
@@ -208,17 +218,24 @@ int map_device_irqs_to_domain(struct domain *d,
             continue;
         }
 
-        res = platform_get_irq(dev, i);
-        if ( res < 0 )
+        irq = platform_get_irq(dev, i);
+        if ( irq < 0 )
         {
             printk(XENLOG_ERR "Unable to get irq %u for %s\n",
                    i, dt_node_full_name(dev));
-            return res;
+            return irq;
         }
 
-        res = map_irq_to_domain(d, res, need_mapping, dt_node_name(dev));
+        res = map_irq_to_domain(d, irq, need_mapping, dt_node_name(dev));
         if ( res )
             return res;
+
+        if ( irq_ranges )
+        {
+            res = rangeset_add_singleton(irq_ranges, irq);
+            if ( res )
+                return res;
+        }
     }
 
     return 0;
@@ -249,6 +266,11 @@ static int map_dt_irq_to_domain(const struct dt_device_node *dev,
     }
 
     res = map_irq_to_domain(d, irq, !mr_data->skip_mapping, dt_node_name(dev));
+    if ( res )
+        return res;
+
+    if ( mr_data->irq_ranges )
+        res = rangeset_add_singleton(mr_data->irq_ranges, irq);
 
     return res;
 }
@@ -289,7 +311,8 @@ static int map_device_children(const struct dt_device_node *dev,
  *  - Assign the device to the guest if it's protected by an IOMMU
  *  - Map the IRQs and iomem regions to DOM0
  */
-int handle_device(struct domain *d, struct dt_device_node *dev, p2m_type_t p2mt)
+int handle_device(struct domain *d, struct dt_device_node *dev, p2m_type_t p2mt,
+                  struct rangeset *iomem_ranges, struct rangeset *irq_ranges)
 {
     unsigned int naddr;
     unsigned int i;
@@ -308,7 +331,9 @@ int handle_device(struct domain *d, struct dt_device_node *dev, p2m_type_t p2mt)
         .p2mt = p2mt,
         .skip_mapping = !own_device ||
                         (is_pci_passthrough_enabled() &&
-                        (device_get_class(dev) == DEVICE_PCI_HOSTBRIDGE))
+                        (device_get_class(dev) == DEVICE_PCI_HOSTBRIDGE)),
+        .iomem_ranges = iomem_ranges,
+        .irq_ranges = irq_ranges
     };
 
     naddr = dt_number_of_address(dev);
@@ -342,7 +367,7 @@ int handle_device(struct domain *d, struct dt_device_node *dev, p2m_type_t p2mt)
         }
     }
 
-    res = map_device_irqs_to_domain(d, dev, own_device);
+    res = map_device_irqs_to_domain(d, dev, own_device, irq_ranges);
     if ( res < 0 )
         return res;
 
