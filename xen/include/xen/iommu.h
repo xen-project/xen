@@ -235,6 +235,16 @@ int iommu_add_dt_device(struct dt_device_node *np);
 int iommu_do_dt_domctl(struct xen_domctl *domctl, struct domain *d,
                        XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl);
 
+/*
+ * Helper to remove master device from the IOMMU.
+ *
+ * Return values:
+ *  0 : device is de-registered from IOMMU.
+ * <0 : error while removing the device from IOMMU.
+ * >0 : IOMMU is not enabled/present.
+ */
+int iommu_remove_dt_device(struct dt_device_node *np);
+
 #endif /* HAS_DEVICE_TREE */
 
 struct page_info;
