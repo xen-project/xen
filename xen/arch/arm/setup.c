@@ -1077,6 +1077,7 @@ static bool __init is_dom0less_mode(void)
 size_t __read_mostly dcache_line_bytes;
 
 /* C entry point for boot CPU */
+/* SAF-1-safe */
 void __init start_xen(unsigned long boot_phys_offset,
                       unsigned long fdt_paddr)
 {

@@ -833,6 +833,7 @@ void fatal_trap(const struct cpu_user_regs *regs, bool show_remote)
           (regs->eflags & X86_EFLAGS_IF) ? "" : " IN INTERRUPT CONTEXT");
 }
 
+/* SAF-1-safe */
 void do_unhandled_trap(struct cpu_user_regs *regs)
 {
     unsigned int trapnr = regs->entry_vector;
@@ -920,6 +921,7 @@ static bool extable_fixup(struct cpu_user_regs *regs, bool print)
     return true;
 }
 
+/* SAF-1-safe */
 void do_trap(struct cpu_user_regs *regs)
 {
     unsigned int trapnr = regs->entry_vector;
@@ -1152,6 +1154,7 @@ void cpuid_hypervisor_leaves(const struct vcpu *v, uint32_t leaf,
     }
 }
 
+/* SAF-1-safe */
 void do_invalid_op(struct cpu_user_regs *regs)
 {
     u8 bug_insn[2];
@@ -1197,6 +1200,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
     panic("FATAL TRAP: vector = %d (invalid opcode)\n", X86_EXC_UD);
 }
 
+/* SAF-1-safe */
 void do_int3(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
@@ -1564,6 +1568,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     return 0;
 }
 
+/* SAF-1-safe */
 void do_page_fault(struct cpu_user_regs *regs)
 {
     unsigned long addr;
@@ -1641,6 +1646,7 @@ void do_page_fault(struct cpu_user_regs *regs)
  * during early boot (an issue was seen once, but was most likely a hardware
  * problem).
  */
+/* SAF-1-safe */
 void __init do_early_page_fault(struct cpu_user_regs *regs)
 {
     static unsigned int __initdata stuck;
@@ -1841,6 +1847,7 @@ void trigger_nmi_continuation(void)
     apic_wait_icr_idle();
 }
 
+/* SAF-1-safe */
 void do_device_not_available(struct cpu_user_regs *regs)
 {
 #ifdef CONFIG_PV
@@ -1877,6 +1884,7 @@ void do_device_not_available(struct cpu_user_regs *regs)
 #endif
 }
 
+/* SAF-1-safe */
 void do_debug(struct cpu_user_regs *regs)
 {
     unsigned long dr6;
@@ -2002,6 +2010,7 @@ void do_debug(struct cpu_user_regs *regs)
     pv_inject_hw_exception(X86_EXC_DB, X86_EVENT_NO_EC);
 }
 
+/* SAF-1-safe */
 void do_entry_CP(struct cpu_user_regs *regs)
 {
     static const char errors[][10] = {

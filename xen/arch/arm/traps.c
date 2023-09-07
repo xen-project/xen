@@ -161,6 +161,7 @@ void init_traps(void)
     isb();
 }
 
+/* SAF-1-safe */
 void __div0(void)
 {
     printk("Division by zero in hypervisor.\n");
@@ -1954,6 +1955,7 @@ static inline bool needs_ssbd_flip(struct vcpu *v)
  * Actions that needs to be done after entering the hypervisor from the
  * guest and before the interrupts are unmasked.
  */
+/* SAF-1-safe */
 void enter_hypervisor_from_guest_preirq(void)
 {
     struct vcpu *v = current;
@@ -1968,6 +1970,7 @@ void enter_hypervisor_from_guest_preirq(void)
  * guest and before we handle any request. Depending on the exception trap,
  * this may be called with interrupts unmasked.
  */
+/* SAF-1-safe */
 void enter_hypervisor_from_guest(void)
 {
     struct vcpu *v = current;
@@ -1996,6 +1999,7 @@ void enter_hypervisor_from_guest(void)
     vgic_sync_from_lrs(v);
 }
 
+/* SAF-1-safe */
 void do_trap_guest_sync(struct cpu_user_regs *regs)
 {
     const union hsr hsr = { .bits = regs->hsr };
@@ -2191,11 +2195,13 @@ void do_trap_guest_serror(struct cpu_user_regs *regs)
     __do_trap_serror(regs, true);
 }
 
+/* SAF-1-safe */
 void do_trap_irq(struct cpu_user_regs *regs)
 {
     gic_interrupt(regs, 0);
 }
 
+/* SAF-1-safe */
 void do_trap_fiq(struct cpu_user_regs *regs)
 {
     gic_interrupt(regs, 1);
@@ -2269,6 +2275,7 @@ static bool check_for_vcpu_work(void)
  *
  * The function will return with IRQ masked.
  */
+/* SAF-1-safe */
 void leave_hypervisor_to_guest(void)
 {
     local_irq_disable();

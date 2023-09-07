@@ -303,6 +303,7 @@ smp_prepare_cpus(void)
 }
 
 /* Boot the current CPU */
+/* SAF-1-safe */
 void start_secondary(void)
 {
     unsigned int cpuid = init_data.cpuid;

@@ -347,6 +347,7 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
     return mbi_out;
 }
 
+/* SAF-1-safe */
 void *__stdcall reloc(uint32_t magic, uint32_t in, uint32_t trampoline,
                       uint32_t video_info)
 {
