@@ -22,8 +22,9 @@ RUN apt-get update && \
         gcc-powerpc64le-linux-gnu \
         make \
         python3-minimal \
-        # for test phase
-        qemu-system-ppc \
+        # QEMU runtime dependencies for test phase
+        libglib2.0-0 \
+        libpixman-1-0 \
         && \
         apt-get autoremove -y && \
         apt-get clean && \

@@ -454,9 +454,10 @@ qemu-smoke-riscv64-gcc:
   needs:
     - archlinux-current-gcc-riscv64-debug
 
-qemu-smoke-ppc64le-pseries-gcc:
+qemu-smoke-ppc64le-powernv9-gcc:
   extends: .qemu-ppc64le
   script:
-    - ./automation/scripts/qemu-smoke-ppc64le.sh pseries-5.2 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qemu-smoke-ppc64le.sh powernv9 2>&1 | tee ${LOGFILE}
   needs:
+    - qemu-system-ppc64-8.1.0-ppc64-export
     - debian-bullseye-gcc-ppc64le-debug

@@ -306,6 +306,20 @@ qemu-system-aarch64-6.0.0-arm32-export:
   tags:
     - arm64
 
+# ppc64 test artifacts
+
+qemu-system-ppc64-8.1.0-ppc64-export:
+  extends: .test-jobs-artifact-common
+  image: registry.gitlab.com/xen-project/xen/tests-artifacts/qemu-system-ppc64:8.1.0-ppc64
+  script:
+    - mkdir binaries && cp /qemu-system-ppc64 /skiboot.lid binaries/
+  artifacts:
+    paths:
+      - binaries/qemu-system-ppc64
+      - binaries/skiboot.lid
+  tags:
+    - x86_64
+
 # x86_64 test artifacts
 
 alpine-3.18-rootfs-export:

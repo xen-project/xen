@@ -12,7 +12,8 @@ set +e
 touch smoke.serial
 
 timeout -k 1 20 \
-qemu-system-ppc64 \
+binaries/qemu-system-ppc64 \
+    -bios binaries/skiboot.lid \
     -M $machine \
     -m 2g \
     -smp 1 \
