@@ -199,7 +199,7 @@ extern struct IO_APIC_route_entry __ioapic_read_entry(
     unsigned int apic, unsigned int pin, bool raw);
 void __ioapic_write_entry(
     unsigned int apic, unsigned int pin, bool raw,
-    struct IO_APIC_route_entry);
+    struct IO_APIC_route_entry e);
 
 extern struct IO_APIC_route_entry **alloc_ioapic_entries(void);
 extern void free_ioapic_entries(struct IO_APIC_route_entry **ioapic_entries);
@@ -211,6 +211,6 @@ extern int restore_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries,
 unsigned highest_gsi(void);
 
 int ioapic_guest_read( unsigned long physbase, unsigned int reg, u32 *pval);
-int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 pval);
+int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val);
 
 #endif
