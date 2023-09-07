@@ -38,5 +38,8 @@ fi
     cd xen
     cp "${CONFIG_FILE}" .config
     make clean
+    find . -type f -name "*.safparse" -print -delete
     make -f ${script_dir}/Makefile.prepare prepare
+    # Translate the /* SAF-n-safe */ comments into ECLAIR CBTs
+    scripts/xen-analysis.py --run-eclair --no-build --no-clean
 )
