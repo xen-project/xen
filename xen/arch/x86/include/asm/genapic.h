@@ -43,7 +43,7 @@ void cf_check send_IPI_self_legacy(uint8_t vector);
 
 void cf_check init_apic_ldr_flat(void);
 unsigned int cf_check cpu_mask_to_apicid_flat(const cpumask_t *cpumask);
-void cf_check send_IPI_mask_flat(const cpumask_t *mask, int vector);
+void cf_check send_IPI_mask_flat(const cpumask_t *cpumask, int vector);
 const cpumask_t *cf_check vector_allocation_cpumask_flat(int cpu);
 #define GENAPIC_FLAT \
 	.int_delivery_mode = dest_LowestPrio, \
