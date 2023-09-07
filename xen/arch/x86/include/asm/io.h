@@ -51,6 +51,6 @@ __OUT(l,,int)
 #define IOEMUL_QUIRK_STUB_BYTES 9
 struct cpu_user_regs;
 extern unsigned int (*ioemul_handle_quirk)(
-    u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs);
+    uint8_t opcode, char *io_emul_stub, struct cpu_user_regs *regs);
 
 #endif
