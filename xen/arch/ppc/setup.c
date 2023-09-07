@@ -14,17 +14,12 @@ void __init noreturn start_xen(unsigned long r3, unsigned long r4,
 {
     if ( r5 )
     {
-        /* OpenFirmware boot protocol */
-        boot_of_init(r5);
+        /* Unsupported OpenFirmware boot protocol */
+        __builtin_trap();
     }
     else
     {
-        /*
-         * kexec boot protocol
-         *
-         * TODO: This currently assumes an OPAL/PowerNV system, but it's also
-         * possible to be kexec'd on an OF system.
-         */
+        /* kexec boot protocol */
         boot_opal_init((void *)r3);
     }
 
