@@ -1630,6 +1630,16 @@ wait descriptor timed out', try increasing this value.
 **WARNING: This command line option is deprecated, and superseded by
 _dom0-iommu=map-inclusive_ - using both options in combination is undefined.**
 
+### irq-max-guests (x86)
+> `= <integer>`
+
+> Default: `32`
+
+Maximum number of guests any individual IRQ could be shared between,
+i.e. a limit on the number of guests it is possible to start each having
+assigned a device sharing a common interrupt line.  Accepts values between
+1 and 255.
+
 ### irq_ratelimit (x86)
 > `= <integer>`
 
@@ -1913,16 +1923,6 @@ This option is ignored in **pv-shim** mode.
 
 ### nr_irqs (x86)
 > `= <integer>`
-
-### irq-max-guests (x86)
-> `= <integer>`
-
-> Default: `32`
-
-Maximum number of guests any individual IRQ could be shared between,
-i.e. a limit on the number of guests it is possible to start each having
-assigned a device sharing a common interrupt line.  Accepts values between
-1 and 255.
 
 ### numa (x86)
 > `= on | off | fake=<integer> | noacpi`
