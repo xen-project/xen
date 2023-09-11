@@ -26,11 +26,20 @@
 #define GCOV_COUNTERS 9
 #elif GCC_VERSION < 70000
 #define GCOV_COUNTERS 10
-#else
+#elif GCC_VERSION < 100000
 #define GCOV_COUNTERS 9
+#else
+#define GCOV_COUNTERS 8
 #endif
 
 #define GCOV_TAG_FUNCTION_LENGTH        3
+
+#if GCC_VERSION < 120000
+#define GCOV_UNIT_SIZE 1
+#else
+/* Since GCC 12, sizes are in BYTES and not in WORDS (4B). */
+#define GCOV_UNIT_SIZE 4
+#endif
 
 static struct gcov_info *gcov_info_head;
 
@@ -89,6 +98,10 @@ struct gcov_info {
     unsigned int version;
     struct gcov_info *next;
     unsigned int stamp;
+#if GCC_VERSION >= 120000
+    /*  GCC 12 introduced a checksum field */
+    unsigned int checksum;
+#endif
     const char *filename;
     void (*merge[GCOV_COUNTERS])(gcov_type *, unsigned int);
     unsigned int n_functions;
@@ -161,13 +174,18 @@ size_t gcov_info_to_gcda(char *buffer, const struct gcov_info *info)
     pos += gcov_store_uint32(buffer, pos, info->version);
     pos += gcov_store_uint32(buffer, pos, info->stamp);
 
+#if GCC_VERSION >= 120000
+    /* Use zero as checksum of the compilation unit. */
+    pos += gcov_store_uint32(buffer, pos, 0);
+#endif
+
     for ( fi_idx = 0; fi_idx < info->n_functions; fi_idx++ )
     {
         fi_ptr = info->functions[fi_idx];
 
         /* Function record. */
         pos += gcov_store_uint32(buffer, pos, GCOV_TAG_FUNCTION);
-        pos += gcov_store_uint32(buffer, pos, GCOV_TAG_FUNCTION_LENGTH);
+        pos += gcov_store_uint32(buffer, pos, GCOV_TAG_FUNCTION_LENGTH * GCOV_UNIT_SIZE);
         pos += gcov_store_uint32(buffer, pos, fi_ptr->ident);
         pos += gcov_store_uint32(buffer, pos, fi_ptr->lineno_checksum);
         pos += gcov_store_uint32(buffer, pos, fi_ptr->cfg_checksum);
@@ -182,7 +200,7 @@ size_t gcov_info_to_gcda(char *buffer, const struct gcov_info *info)
             /* Counter record. */
             pos += gcov_store_uint32(buffer, pos,
                                      GCOV_TAG_FOR_COUNTER(ct_idx));
-            pos += gcov_store_uint32(buffer, pos, ci_ptr->num * 2);
+            pos += gcov_store_uint32(buffer, pos, ci_ptr->num * 2 * GCOV_UNIT_SIZE);
 
             for ( cv_idx = 0; cv_idx < ci_ptr->num; cv_idx++ )
                 pos += gcov_store_uint64(buffer, pos, ci_ptr->values[cv_idx]);
