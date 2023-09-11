@@ -18,15 +18,16 @@
 
 #include "gcov.h"
 
-/*
- * GCOV_COUNTERS will be defined if this file is included by other
- * source files.
- */
-#ifndef GCOV_COUNTERS
-# if !(GCC_VERSION >= 40700 && GCC_VERSION < 40900)
-#  error "Wrong version of GCC used to compile gcov"
-# endif
+#if GCC_VERSION < 40700
+#error "Wrong version of GCC used to compile gcov"
+#elif GCC_VERSION < 40900
 #define GCOV_COUNTERS 8
+#elif GCC_VERSION < 50000
+#define GCOV_COUNTERS 9
+#elif GCC_VERSION < 70000
+#define GCOV_COUNTERS 10
+#else
+#define GCOV_COUNTERS 9
 #endif
 
 #define GCOV_TAG_FUNCTION_LENGTH        3
