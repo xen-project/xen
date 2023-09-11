@@ -166,14 +166,14 @@ int scan_pci_devices(void);
 enum pdev_type pdev_type(u16 seg, u8 bus, u8 devfn);
 int find_upstream_bridge(u16 seg, u8 *bus, u8 *devfn, u8 *secbus);
 
-void setup_hwdom_pci_devices(struct domain *,
-                            int (*)(u8 devfn, struct pci_dev *));
+void setup_hwdom_pci_devices(struct domain *d,
+                            int (*handler)(u8 devfn, struct pci_dev *pdev));
 int pci_release_devices(struct domain *d);
 void pci_segments_init(void);
 int pci_add_segment(u16 seg);
 const unsigned long *pci_get_ro_map(u16 seg);
 int pci_add_device(u16 seg, u8 bus, u8 devfn,
-                   const struct pci_dev_info *, nodeid_t node);
+                   const struct pci_dev_info *info, nodeid_t node);
 int pci_remove_device(u16 seg, u8 bus, u8 devfn);
 int pci_ro_device(int seg, int bus, int devfn);
 int pci_hide_device(unsigned int seg, unsigned int bus, unsigned int devfn);
@@ -198,10 +198,11 @@ int pci_find_next_cap(u16 seg, u8 bus, unsigned int devfn, u8 pos, int cap);
 int pci_find_ext_capability(int seg, int bus, int devfn, int cap);
 int pci_find_next_ext_capability(int seg, int bus, int devfn, int start,
                                  int cap);
-const char *parse_pci(const char *, unsigned int *seg, unsigned int *bus,
-                      unsigned int *dev, unsigned int *func);
-const char *parse_pci_seg(const char *, unsigned int *seg, unsigned int *bus,
-                          unsigned int *dev, unsigned int *func, bool *def_seg);
+const char *parse_pci(const char *s, unsigned int *seg_p, unsigned int *bus_p,
+                      unsigned int *dev_p, unsigned int *func_p);
+const char *parse_pci_seg(const char *s, unsigned int *seg_p,
+                          unsigned int *bus_p, unsigned int *dev_p,
+                          unsigned int *func_p, bool *def_seg);
 
 #define PCI_BAR_VF      (1u << 0)
 #define PCI_BAR_LAST    (1u << 1)
@@ -210,12 +211,12 @@ unsigned int pci_size_mem_bar(pci_sbdf_t sbdf, unsigned int pos,
                               uint64_t *paddr, uint64_t *psize,
                               unsigned int flags);
 
-void pci_intx(const struct pci_dev *, bool enable);
-bool pcie_aer_get_firmware_first(const struct pci_dev *);
+void pci_intx(const struct pci_dev *pdev, bool enable);
+bool pcie_aer_get_firmware_first(const struct pci_dev *pdev);
 
 struct pirq;
-int msixtbl_pt_register(struct domain *, struct pirq *, uint64_t gtable);
-void msixtbl_pt_unregister(struct domain *, struct pirq *);
+int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable);
+void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq);
 void msixtbl_pt_cleanup(struct domain *d);
 
 #ifdef CONFIG_HVM
