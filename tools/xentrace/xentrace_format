@@ -4,11 +4,14 @@
 
 # Program for reformatting trace buffer output according to user-supplied rules
 
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+from builtins import str
 import re, sys, string, signal, struct, os, getopt
 
 def usage():
-    print >> sys.stderr, \
-          "Usage: " + sys.argv[0] + """ defs-file
+    print("Usage: " + sys.argv[0] + """ defs-file
           Parses trace data in binary format, as output by Xentrace and
           reformats it according to the rules in a file of definitions.  The
           rules in this file should have the format ({ and } show grouping
@@ -29,7 +32,7 @@ def usage():
           this script may not be able to keep up with the output of xentrace
           if it is piped directly.  In these circumstances you should have
           xentrace output to a file for processing off-line.
-          """
+          """, file=sys.stderr)
     sys.exit(1)
 
 def read_defs(defs_file):
@@ -49,7 +52,7 @@ def read_defs(defs_file):
 
         m = reg.match(line)
 
-        if not m: print >> sys.stderr, "Bad format file" ; sys.exit(1)
+        if not m: print("Bad format file", file=sys.stderr) ; sys.exit(1)
 
         defs[str(eval(m.group(1)))] = m.group(2)
 
@@ -83,8 +86,8 @@ interrupted = 0
 
 try:
     defs = read_defs(arg[0])
-except IOError, exn:
-    print exn
+except IOError as exn:
+    print(exn)
     sys.exit(1)
 
 # structure of trace record (as output by xentrace):
@@ -117,12 +120,17 @@ TRC_PV_HYPERCALL_SUBCALL = 0x20100e
 NR_VECTORS = 256
 irq_measure = [{'count':0, 'tot_cycles':0, 'max_cycles':0}] * NR_VECTORS
 
+if sys.version_info >= (3, 0):
+    stdin_bytes = sys.stdin.buffer
+else:
+    stdin_bytes = sys.stdin
+
 i=0
 
 while not interrupted:
     try:
         i=i+1
-        line = sys.stdin.read(struct.calcsize(HDRREC))
+        line = stdin_bytes.read(struct.calcsize(HDRREC))
         if not line:
             break
         event = struct.unpack(HDRREC, line)[0]
@@ -140,43 +148,43 @@ while not interrupted:
         tsc = 0
 
         if tsc_in == 1:
-            line = sys.stdin.read(struct.calcsize(TSCREC))
+            line = stdin_bytes.read(struct.calcsize(TSCREC))
             if not line:
                 break
             tsc = struct.unpack(TSCREC, line)[0]
 
         if n_data == 1:
-            line = sys.stdin.read(struct.calcsize(D1REC))
+            line = stdin_bytes.read(struct.calcsize(D1REC))
             if not line:
                 break
             d1 = struct.unpack(D1REC, line)[0]
         if n_data == 2:
-            line = sys.stdin.read(struct.calcsize(D2REC))
+            line = stdin_bytes.read(struct.calcsize(D2REC))
             if not line:
                 break
             (d1, d2) = struct.unpack(D2REC, line)
         if n_data == 3:
-            line = sys.stdin.read(struct.calcsize(D3REC))
+            line = stdin_bytes.read(struct.calcsize(D3REC))
             if not line:
                 break
             (d1, d2, d3) = struct.unpack(D3REC, line)
         if n_data == 4:
-            line = sys.stdin.read(struct.calcsize(D4REC))
+            line = stdin_bytes.read(struct.calcsize(D4REC))
             if not line:
                 break
             (d1, d2, d3, d4) = struct.unpack(D4REC, line)
         if n_data == 5:
-            line = sys.stdin.read(struct.calcsize(D5REC))
+            line = stdin_bytes.read(struct.calcsize(D5REC))
             if not line:
                 break
             (d1, d2, d3, d4, d5) = struct.unpack(D5REC, line)
         if n_data == 6:
-            line = sys.stdin.read(struct.calcsize(D6REC))
+            line = stdin_bytes.read(struct.calcsize(D6REC))
             if not line:
                 break
             (d1, d2, d3, d4, d5, d6) = struct.unpack(D6REC, line)
         if n_data == 7:
-            line = sys.stdin.read(struct.calcsize(D7REC))
+            line = stdin_bytes.read(struct.calcsize(D7REC))
             if not line:
                 break
             (d1, d2, d3, d4, d5, d6, d7) = struct.unpack(D7REC, line)
@@ -211,7 +219,7 @@ while not interrupted:
         if cpu >= len(last_tsc):
             last_tsc += [0] * (cpu - len(last_tsc) + 1)
         elif tsc < last_tsc[cpu] and tsc_in == 1:
-            print "TSC stepped backward cpu %d !  %d %d" % (cpu,tsc,last_tsc[cpu])
+            print("TSC stepped backward cpu %d !  %d %d" % (cpu,tsc,last_tsc[cpu]))
 
         # provide relative TSC
         if last_tsc[cpu] > 0 and tsc_in == 1:
@@ -239,18 +247,18 @@ while not interrupted:
 
         try:
 
-            if defs.has_key(str(event)): 
-                print defs[str(event)] % args
+            if str(event) in defs:
+                print(defs[str(event)] % args)
             else:
-                if defs.has_key(str(0)): print defs[str(0)] % args
+                if str(0) in defs: print(defs[str(0)] % args)
         except TypeError:
-            if defs.has_key(str(event)):
-                print defs[str(event)]
-                print args
+            if str(event) in defs:
+                print(defs[str(event)])
+                print(args)
             else:
-                if defs.has_key(str(0)):
-                    print defs[str(0)]
-                    print args
+                if str(0) in defs:
+                    print(defs[str(0)])
+                    print(args)
 
 
-    except IOError, struct.error: sys.exit()
+    except (IOError, struct.error): sys.exit()
