@@ -67,7 +67,6 @@
  *  - SPEC_CTRL_ENTRY_FROM_PV
  *  - SPEC_CTRL_ENTRY_FROM_INTR
  *  - SPEC_CTRL_ENTRY_FROM_INTR_IST
- *  - SPEC_CTRL_EXIT_TO_XEN_IST
  *  - SPEC_CTRL_EXIT_TO_XEN
  *  - SPEC_CTRL_EXIT_TO_PV
  *
@@ -256,11 +255,6 @@
     ALTERNATIVE "", __stringify(DO_SPEC_CTRL_ENTRY maybexen=1),         \
         X86_FEATURE_SC_MSR_PV
 
-/* Use when exiting to Xen context. */
-#define SPEC_CTRL_EXIT_TO_XEN                                           \
-    ALTERNATIVE "",                                                     \
-        DO_SPEC_CTRL_EXIT_TO_XEN, X86_FEATURE_SC_MSR_PV
-
 /* Use when exiting to PV guest context. */
 #define SPEC_CTRL_EXIT_TO_PV                                            \
     ALTERNATIVE "",                                                     \
@@ -327,8 +321,8 @@ UNLIKELY_DISPATCH_LABEL(\@_serialise):
     UNLIKELY_END(\@_serialise)
 .endm
 
-/* Use when exiting to Xen in IST context. */
-.macro SPEC_CTRL_EXIT_TO_XEN_IST
+/* Use when exiting to Xen context. */
+.macro SPEC_CTRL_EXIT_TO_XEN
 /*
  * Requires %rbx=stack_end
  * Clobbers %rax, %rcx, %rdx
