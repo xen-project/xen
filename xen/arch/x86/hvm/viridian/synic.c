@@ -233,7 +233,7 @@ int viridian_synic_rdmsr(const struct vcpu *v, uint32_t idx, uint64_t *val)
          * should be set to. Assume everything but the bottom bit
          * should be zero.
          */
-        *val = 1ul;
+        *val = 1UL;
         break;
 
     case HV_X64_MSR_SIEFP:
