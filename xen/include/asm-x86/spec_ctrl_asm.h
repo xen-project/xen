@@ -211,27 +211,6 @@
     wrmsr
 .endm
 
-.macro DO_SPEC_CTRL_EXIT_TO_XEN
-/*
- * Requires %rbx=stack_end
- * Clobbers %rax, %rcx, %rdx
- *
- * When returning to Xen context, look to see whether SPEC_CTRL shadowing is
- * in effect, and reload the shadow value.  This covers race conditions which
- * exist with an NMI/MCE/etc hitting late in the return-to-guest path.
- */
-    xor %edx, %edx
-
-    testb $SCF_use_shadow, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%rbx)
-    jz .L\@_skip
-
-    mov STACK_CPUINFO_FIELD(shadow_spec_ctrl)(%rbx), %eax
-    mov $MSR_SPEC_CTRL, %ecx
-    wrmsr
-
-.L\@_skip:
-.endm
-
 .macro DO_SPEC_CTRL_EXIT_TO_GUEST
 /*
  * Requires %eax=spec_ctrl, %rsp=regs/cpuinfo
@@ -340,11 +319,24 @@ UNLIKELY_DISPATCH_LABEL(\@_serialise):
  * Clobbers %rax, %rcx, %rdx
  */
     testb $SCF_ist_sc_msr, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%rbx)
-    jz .L\@_skip
+    jz .L\@_skip_sc_msr
 
-    DO_SPEC_CTRL_EXIT_TO_XEN
+    /*
+     * When returning to Xen context, look to see whether SPEC_CTRL shadowing
+     * is in effect, and reload the shadow value.  This covers race conditions
+     * which exist with an NMI/MCE/etc hitting late in the return-to-guest
+     * path.
+     */
+    xor %edx, %edx
 
-.L\@_skip:
+    testb $SCF_use_shadow, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%rbx)
+    jz .L\@_skip_sc_msr
+
+    mov STACK_CPUINFO_FIELD(shadow_spec_ctrl)(%rbx), %eax
+    mov $MSR_SPEC_CTRL, %ecx
+    wrmsr
+
+.L\@_skip_sc_msr:
 .endm
 
 #endif /* __ASSEMBLY__ */
