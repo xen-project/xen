@@ -291,7 +291,7 @@ static void enable_hypercall_page(struct domain *d)
      * calling convention) to differentiate Xen and Viridian hypercalls.
      */
     *(u8  *)(p + 0) = 0x0d; /* orl $0x80000000, %eax */
-    *(u32 *)(p + 1) = 0x80000000;
+    *(u32 *)(p + 1) = 0x80000000U;
     *(u8  *)(p + 5) = 0x0f; /* vmcall/vmmcall */
     *(u8  *)(p + 6) = 0x01;
     *(u8  *)(p + 7) = (cpu_has_vmx ? 0xc1 : 0xd9);
