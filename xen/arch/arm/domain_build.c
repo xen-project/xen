@@ -1149,7 +1149,7 @@ static int __init write_properties(struct domain *d, struct kernel_info *kinfo,
          * * remember xen,dom0-bootargs if we don't already have
          *   bootargs (from module #1, above).
          * * remove bootargs,  xen,dom0-bootargs, xen,xen-bootargs,
-         *   linux,initrd-start and linux,initrd-end.
+         *   xen,static-heap, linux,initrd-start and linux,initrd-end.
          * * remove stdout-path.
          * * remove bootargs, linux,uefi-system-table,
          *   linux,uefi-mmap-start, linux,uefi-mmap-size,
@@ -1158,7 +1158,8 @@ static int __init write_properties(struct domain *d, struct kernel_info *kinfo,
          */
         if ( dt_node_path_is_equal(node, "/chosen") )
         {
-            if ( dt_property_name_is_equal(prop, "xen,xen-bootargs") ||
+            if ( dt_property_name_is_equal(prop, "xen,static-heap") ||
+                 dt_property_name_is_equal(prop, "xen,xen-bootargs") ||
                  dt_property_name_is_equal(prop, "linux,initrd-start") ||
                  dt_property_name_is_equal(prop, "linux,initrd-end") ||
                  dt_property_name_is_equal(prop, "stdout-path") ||
@@ -2304,6 +2305,8 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
     static const struct dt_device_match skip_matches[] __initconst =
     {
         DT_MATCH_COMPATIBLE("xen,domain"),
+        DT_MATCH_COMPATIBLE("xen,domain-shared-memory-v1"),
+        DT_MATCH_COMPATIBLE("xen,evtchn-v1"),
         DT_MATCH_COMPATIBLE("xen,xen"),
         DT_MATCH_COMPATIBLE("xen,multiboot-module"),
         DT_MATCH_COMPATIBLE("multiboot,module"),
