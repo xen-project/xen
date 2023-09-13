@@ -740,16 +740,16 @@ static void __init efi_arch_handle_module(const struct file *file,
 
 static void __init efi_arch_cpu(void)
 {
-    uint32_t eax = cpuid_eax(0x80000000);
+    uint32_t eax = cpuid_eax(0x80000000U);
     uint32_t *caps = boot_cpu_data.x86_capability;
 
     boot_tsc_stamp = rdtsc();
 
     caps[FEATURESET_1c] = cpuid_ecx(1);
 
-    if ( (eax >> 16) == 0x8000 && eax > 0x80000000 )
+    if ( (eax >> 16) == 0x8000 && eax > 0x80000000U )
     {
-        caps[FEATURESET_e1d] = cpuid_edx(0x80000001);
+        caps[FEATURESET_e1d] = cpuid_edx(0x80000001U);
 
         /*
          * This check purposefully doesn't use cpu_has_nx because
