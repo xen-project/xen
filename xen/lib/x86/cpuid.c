@@ -217,10 +217,10 @@ void x86_cpu_policy_fill_native(struct cpu_policy *p)
     }
 
     /* Extended leaves. */
-    cpuid_leaf(0x80000000, &p->extd.raw[0]);
+    cpuid_leaf(0x80000000U, &p->extd.raw[0]);
     for ( i = 1; i <= MIN(p->extd.max_leaf & 0xffffU,
                           ARRAY_SIZE(p->extd.raw) - 1); ++i )
-        cpuid_leaf(0x80000000 + i, &p->extd.raw[i]);
+        cpuid_leaf(0x80000000U + i, &p->extd.raw[i]);
 
     /* Don't report leaves from possible lower level hypervisor, for now. */
     p->hv_limit = 0;
@@ -421,7 +421,7 @@ int x86_cpuid_copy_to_buffer(const struct cpu_policy *p,
     /* Extended leaves. */
     for ( leaf = 0; leaf <= MIN(p->extd.max_leaf & 0xffffUL,
                                 ARRAY_SIZE(p->extd.raw) - 1); ++leaf )
-        COPY_LEAF(0x80000000 | leaf, XEN_CPUID_NO_SUBLEAF, &p->extd.raw[leaf]);
+        COPY_LEAF(0x80000000U | leaf, XEN_CPUID_NO_SUBLEAF, &p->extd.raw[leaf]);
 
 #undef COPY_LEAF
 
@@ -521,7 +521,7 @@ int x86_cpuid_copy_from_buffer(struct cpu_policy *p,
             p->hv2_limit = l.a;
             break;
 
-        case 0x80000000 ... 0x80000000 + ARRAY_SIZE(p->extd.raw) - 1:
+        case 0x80000000U ... 0x80000000U + ARRAY_SIZE(p->extd.raw) - 1:
             if ( data.subleaf != XEN_CPUID_NO_SUBLEAF )
                 goto out_of_range;
 

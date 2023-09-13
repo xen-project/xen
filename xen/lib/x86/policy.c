@@ -22,7 +22,7 @@ int x86_cpu_policies_are_compatible(const struct cpu_policy *host,
         FAIL_CPUID(7, 0);
 
     if ( guest->extd.max_leaf > host->extd.max_leaf )
-        FAIL_CPUID(0x80000000, NA);
+        FAIL_CPUID(0x80000000U, NA);
 
     /* TODO: Audit more CPUID data. */
 
