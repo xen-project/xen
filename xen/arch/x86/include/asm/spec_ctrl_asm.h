@@ -357,10 +357,10 @@ UNLIKELY_DISPATCH_LABEL(\@_serialise):
  */
 .macro SPEC_CTRL_EXIT_TO_XEN
 /*
- * Requires %rbx=stack_end
+ * Requires %r14=stack_end
  * Clobbers %rax, %rcx, %rdx
  */
-    testb $SCF_ist_sc_msr, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%rbx)
+    testb $SCF_ist_sc_msr, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14)
     jz .L\@_skip_sc_msr
 
     /*
@@ -371,10 +371,10 @@ UNLIKELY_DISPATCH_LABEL(\@_serialise):
      */
     xor %edx, %edx
 
-    testb $SCF_use_shadow, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%rbx)
+    testb $SCF_use_shadow, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14)
     jz .L\@_skip_sc_msr
 
-    mov STACK_CPUINFO_FIELD(shadow_spec_ctrl)(%rbx), %eax
+    mov STACK_CPUINFO_FIELD(shadow_spec_ctrl)(%r14), %eax
     mov $MSR_SPEC_CTRL, %ecx
     wrmsr
 
