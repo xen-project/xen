@@ -659,8 +659,15 @@ ENTRY(early_page_fault)
         .section .text.entry, "ax", @progbits
 
         ALIGN
-/* No special register assumptions. */
+/* %r12=ist_exit */
 restore_all_xen:
+
+#ifdef CONFIG_DEBUG
+        mov   %rsp, %rdi
+        mov   %r12, %rsi
+        call  check_ist_exit
+#endif
+
         /*
          * Check whether we need to switch to the per-CPU page tables, in
          * case we return to late PV exit code (from an NMI or #MC).
@@ -1091,6 +1098,10 @@ handle_ist_exception:
 .L_ist_dispatch_done:
         mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         mov   %bl, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
+
+        /* This is an IST exit */
+        mov   $1, %r12d
+
         cmpb  $TRAP_nmi,UREGS_entry_vector(%rsp)
         jne   ret_from_intr
 
