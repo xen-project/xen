@@ -599,15 +599,15 @@ restore_all_xen:
          * Check whether we need to switch to the per-CPU page tables, in
          * case we return to late PV exit code (from an NMI or #MC).
          */
-        GET_STACK_END(bx)
-        cmpb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
+        GET_STACK_END(14)
+        cmpb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
 UNLIKELY_START(ne, exit_cr3)
-        mov   STACK_CPUINFO_FIELD(pv_cr3)(%rbx), %rax
+        mov   STACK_CPUINFO_FIELD(pv_cr3)(%r14), %rax
         mov   %rax, %cr3
 UNLIKELY_END(exit_cr3)
 
         /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
-        SPEC_CTRL_EXIT_TO_XEN     /* Req: %rbx=end, Clob: acd */
+        SPEC_CTRL_EXIT_TO_XEN     /* Req: %r14=end, Clob: acd */
 
         RESTORE_ALL adj=8
         iretq
