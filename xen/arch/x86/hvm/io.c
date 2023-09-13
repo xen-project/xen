@@ -400,7 +400,7 @@ static int cf_check vpci_mmcfg_read(
     unsigned int reg;
     pci_sbdf_t sbdf;
 
-    *data = ~0ul;
+    *data = ~0UL;
 
     read_lock(&d->arch.hvm.mmcfg_lock);
     mmcfg = vpci_mmcfg_find(d, addr);

@@ -74,7 +74,7 @@ static int cf_check null_read(
     const struct hvm_io_handler *io_handler, uint64_t addr, uint32_t size,
     uint64_t *data)
 {
-    *data = ~0ul;
+    *data = ~0UL;
     return X86EMUL_OKAY;
 }
 
