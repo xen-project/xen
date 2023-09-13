@@ -117,8 +117,15 @@ compat_process_trap:
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
 
-/* %rbx: struct vcpu, interrupts disabled */
+/* %rbx: struct vcpu, %r12: ist_exit, interrupts disabled */
 ENTRY(compat_restore_all_guest)
+
+#ifdef CONFIG_DEBUG
+        mov   %rsp, %rdi
+        mov   %r12, %rsi
+        call  check_ist_exit
+#endif
+
         ASSERT_INTERRUPTS_DISABLED
         mov   $~(X86_EFLAGS_IOPL | X86_EFLAGS_VM), %r11d
         and   UREGS_eflags(%rsp),%r11d
