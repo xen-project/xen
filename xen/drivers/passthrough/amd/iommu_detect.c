@@ -27,7 +27,7 @@ static int __init get_iommu_msi_capabilities(
 {
     int pos;
 
-    pos = pci_find_cap_offset(seg, bus, dev, func, PCI_CAP_ID_MSI);
+    pos = pci_find_cap_offset(PCI_SBDF(seg, bus, dev, func), PCI_CAP_ID_MSI);
 
     if ( !pos )
         return -ENODEV;
