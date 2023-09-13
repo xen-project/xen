@@ -60,7 +60,7 @@ struct ioreq_server {
 static inline paddr_t ioreq_mmio_first_byte(const ioreq_t *p)
 {
     return unlikely(p->df) ?
-           p->addr - (p->count - 1ul) * p->size :
+           p->addr - (p->count - 1UL) * p->size :
            p->addr;
 }
 
