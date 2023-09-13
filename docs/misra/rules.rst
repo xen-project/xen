@@ -363,6 +363,16 @@ maintainers if you want to suggest a change.
 
        CFLAGS="-Warith-conversion -Wno-error=arith-conversion" make -C xen
 
+   * - `Rule 11.7 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_11_07.c>`_
+     - Required
+     - A cast shall not be performed between pointer to object and a noninteger arithmetic type
+     -
+
+   * - `Rule 11.8 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_11_08.c>`_
+     - Required
+     - A cast shall not remove any const or volatile qualification from the type pointed to by a pointer
+     -
+
    * - `Rule 12.5 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_12_05.c>`_
      - Mandatory
      - The sizeof operator shall not have an operand which is a function
