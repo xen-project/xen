@@ -357,10 +357,12 @@ UNLIKELY_DISPATCH_LABEL(\@_serialise):
  */
 .macro SPEC_CTRL_EXIT_TO_XEN
 /*
- * Requires %r14=stack_end
- * Clobbers %rax, %rcx, %rdx
+ * Requires %r12=ist_exit, %r14=stack_end
+ * Clobbers %rax, %rbx, %rcx, %rdx
  */
-    testb $SCF_ist_sc_msr, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14)
+    movzbl STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14), %ebx
+
+    testb $SCF_ist_sc_msr, %bl
     jz .L\@_skip_sc_msr
 
     /*
@@ -371,7 +373,7 @@ UNLIKELY_DISPATCH_LABEL(\@_serialise):
      */
     xor %edx, %edx
 
-    testb $SCF_use_shadow, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14)
+    testb $SCF_use_shadow, %bl
     jz .L\@_skip_sc_msr
 
     mov STACK_CPUINFO_FIELD(shadow_spec_ctrl)(%r14), %eax
@@ -380,8 +382,16 @@ UNLIKELY_DISPATCH_LABEL(\@_serialise):
 
 .L\@_skip_sc_msr:
 
-    /* TODO VERW */
+    test %r12, %r12
+    jz .L\@_skip_ist_exit
 
+    /* Logically DO_SPEC_CTRL_COND_VERW but without the %rsp=cpuinfo dependency */
+    testb $SCF_verw, %bl
+    jz .L\@_skip_verw
+    verw STACK_CPUINFO_FIELD(verw_sel)(%r14)
+.L\@_skip_verw:
+
+.L\@_skip_ist_exit:
 .endm
 
 #endif /* __ASSEMBLY__ */
