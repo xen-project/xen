@@ -674,19 +674,19 @@ static u64 read_pci_mem_bar(u16 seg, u8 bus, u8 slot, u8 func, u8 bir, int vf)
     {
         struct pci_dev *pdev = pci_get_pdev(NULL,
                                             PCI_SBDF(seg, bus, slot, func));
-        unsigned int pos = pci_find_ext_capability(PCI_SBDF(seg, bus, slot,
-                                                            func),
-                                                   PCI_EXT_CAP_ID_SRIOV);
-        uint16_t ctrl = pci_conf_read16(PCI_SBDF(seg, bus, slot, func),
-                                        pos + PCI_SRIOV_CTRL);
-        uint16_t num_vf = pci_conf_read16(PCI_SBDF(seg, bus, slot, func),
-                                          pos + PCI_SRIOV_NUM_VF);
-        uint16_t offset = pci_conf_read16(PCI_SBDF(seg, bus, slot, func),
-                                          pos + PCI_SRIOV_VF_OFFSET);
-        uint16_t stride = pci_conf_read16(PCI_SBDF(seg, bus, slot, func),
-                                          pos + PCI_SRIOV_VF_STRIDE);
+        unsigned int pos;
+        uint16_t ctrl, num_vf, offset, stride;
 
-        if ( !pdev || !pos ||
+        if ( !pdev )
+            return 0;
+
+        pos = pci_find_ext_capability(pdev->sbdf, PCI_EXT_CAP_ID_SRIOV);
+        ctrl = pci_conf_read16(pdev->sbdf, pos + PCI_SRIOV_CTRL);
+        num_vf = pci_conf_read16(pdev->sbdf, pos + PCI_SRIOV_NUM_VF);
+        offset = pci_conf_read16(pdev->sbdf, pos + PCI_SRIOV_VF_OFFSET);
+        stride = pci_conf_read16(pdev->sbdf, pos + PCI_SRIOV_VF_STRIDE);
+
+        if ( !pos ||
              !(ctrl & PCI_SRIOV_CTRL_VFE) ||
              !(ctrl & PCI_SRIOV_CTRL_MSE) ||
              !num_vf || !offset || (num_vf > 1 && !stride) ||
