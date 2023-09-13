@@ -2348,6 +2348,19 @@ void asm_domain_crash_synchronous(unsigned long addr)
         do_softirq();
 }
 
+#ifdef CONFIG_DEBUG
+void check_ist_exit(const struct cpu_user_regs *regs, bool ist_exit)
+{
+    const unsigned int ist_mask =
+        (1U << X86_EXC_NMI) | (1U << X86_EXC_DB) |
+        (1U << X86_EXC_DF)  | (1U << X86_EXC_MC);
+    uint8_t ev = regs->entry_vector;
+    bool is_ist = (ev < TRAP_nr) && ((1U << ev) & ist_mask);
+
+    ASSERT(is_ist == ist_exit);
+}
+#endif
+
 /*
  * Local variables:
  * mode: C
