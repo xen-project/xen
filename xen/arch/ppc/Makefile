@@ -4,6 +4,7 @@ obj-$(CONFIG_EARLY_PRINTK) += early_printk.init.o
 obj-y += mm-radix.o
 obj-y += opal.o
 obj-y += setup.o
+obj-y += stubs.o
 obj-y += tlb-radix.o
 
 $(TARGET): $(TARGET)-syms

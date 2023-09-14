@@ -265,3 +265,45 @@ void __init setup_initial_pagetables(void)
     /* Turn on the MMU */
     enable_mmu();
 }
+
+/*
+ * TODO: Implement the functions below
+ */
+unsigned long __read_mostly frametable_base_pdx;
+
+void put_page(struct page_info *p)
+{
+    BUG_ON("unimplemented");
+}
+
+void arch_dump_shared_mem_info(void)
+{
+    BUG_ON("unimplemented");
+}
+
+int xenmem_add_to_physmap_one(struct domain *d,
+                              unsigned int space,
+                              union add_to_physmap_extra extra,
+                              unsigned long idx,
+                              gfn_t gfn)
+{
+    BUG_ON("unimplemented");
+}
+
+int destroy_xen_mappings(unsigned long s, unsigned long e)
+{
+    BUG_ON("unimplemented");
+}
+
+int map_pages_to_xen(unsigned long virt,
+                     mfn_t mfn,
+                     unsigned long nr_mfns,
+                     unsigned int flags)
+{
+    BUG_ON("unimplemented");
+}
+
+int __init populate_pt_range(unsigned long virt, unsigned long nr_mfns)
+{
+    BUG_ON("unimplemented");
+}

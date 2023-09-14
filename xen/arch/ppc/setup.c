@@ -1,5 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include <xen/init.h>
+#include <xen/lib.h>
+#include <xen/mm.h>
+#include <public/version.h>
 #include <asm/boot.h>
 #include <asm/early_printk.h>
 #include <asm/mm.h>
@@ -32,4 +35,9 @@ void __init noreturn start_xen(unsigned long r3, unsigned long r4,
         HMT_very_low();
 
     unreachable();
+}
+
+void arch_get_xen_caps(xen_capabilities_info_t *info)
+{
+    BUG_ON("unimplemented");
 }
