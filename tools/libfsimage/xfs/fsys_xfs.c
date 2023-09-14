@@ -61,7 +61,7 @@ static struct xfs_info xfs;
 #define inode		((xfs_dinode_t *)((char *)FSYS_BUF + 8192))
 #define icore		(inode->di_core)
 
-#define	mask32lo(n)	(((xfs_uint32_t)1 << (n)) - 1)
+#define	mask32lo(n)	((xfs_uint32_t)((1ull << (n)) - 1))
 
 #define	XFS_INO_MASK(k)		((xfs_uint32_t)((1ULL << (k)) - 1))
 #define	XFS_INO_OFFSET_BITS	xfs.inopblog
