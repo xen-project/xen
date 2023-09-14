@@ -19,6 +19,7 @@
 
 #include <stdbool.h>
 #include <xenfsimage_grub.h>
+#include <xen-tools/libs.h>
 #include "xfs.h"
 
 #define MAX_LINK_COUNT	8
@@ -477,9 +478,10 @@ xfs_mount (fsi_file_t *ffi, const char *options)
 	xfs.agblklog = super.sb_agblklog;
 
 	/* Derived from sanitized parameters */
+	BUILD_BUG_ON(XFS_SB_BLOCKLOG_MIN < SECTOR_BITS);
+	xfs.bdlog = super.sb_blocklog - SECTOR_BITS;
 	xfs.bsize = 1 << super.sb_blocklog;
 	xfs.blklog = super.sb_blocklog;
-	xfs.bdlog = super.sb_blocklog - SECTOR_BITS;
 	xfs.isize = 1 << super.sb_inodelog;
 	xfs.dirbsize = 1 << (super.sb_blocklog + super.sb_dirblklog);
 	xfs.inopblog = super.sb_blocklog - super.sb_inodelog;
