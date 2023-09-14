@@ -38,7 +38,6 @@ struct xfs_info {
 	int blklog;
 	int inopblog;
 	int agblklog;
-	int agnolog;
 	unsigned int nextents;
 	xfs_daddr_t next;
 	xfs_daddr_t daddr;
@@ -66,9 +65,7 @@ static struct xfs_info xfs;
 
 #define	XFS_INO_MASK(k)		((xfs_uint32_t)((1ULL << (k)) - 1))
 #define	XFS_INO_OFFSET_BITS	xfs.inopblog
-#define	XFS_INO_AGBNO_BITS	xfs.agblklog
 #define	XFS_INO_AGINO_BITS	(xfs.agblklog + xfs.inopblog)
-#define	XFS_INO_AGNO_BITS	xfs.agnolog
 
 static inline xfs_agblock_t
 agino2agbno (xfs_agino_t agino)
@@ -148,20 +145,6 @@ static xfs_filblks_t
 xt_len (xfs_bmbt_rec_32_t *r)
 {
 	return le32(r->l3) & mask32lo(21);
-}
-
-static inline int
-xfs_highbit32(xfs_uint32_t v)
-{
-	int i;
-
-	if (--v) {
-		for (i = 0; i < 31; i++, v >>= 1) {
-			if (v == 0)
-				return i;
-		}
-	}
-	return 0;
 }
 
 static int
@@ -470,7 +453,6 @@ xfs_mount (fsi_file_t *ffi, const char *options)
 
 	xfs.inopblog = super.sb_inopblog;
 	xfs.agblklog = super.sb_agblklog;
-	xfs.agnolog = xfs_highbit32 (le32(super.sb_agcount));
 
 	xfs.btnode_ptr0_off =
 		((xfs.bsize - sizeof(xfs_btree_block_t)) /
