@@ -17,6 +17,7 @@
  *  along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdbool.h>
 #include <xenfsimage_grub.h>
 #include "xfs.h"
 
@@ -433,28 +434,55 @@ first_dentry (fsi_file_t *ffi, xfs_ino_t *ino)
 	return next_dentry (ffi, ino);
 }
 
+static bool
+xfs_sb_is_invalid (const xfs_sb_t *super)
+{
+	return (le32(super->sb_magicnum) != XFS_SB_MAGIC)
+	    || ((le16(super->sb_versionnum) & XFS_SB_VERSION_NUMBITS) !=
+	        XFS_SB_VERSION_4)
+	    || (super->sb_inodelog < XFS_SB_INODELOG_MIN)
+	    || (super->sb_inodelog > XFS_SB_INODELOG_MAX)
+	    || (super->sb_blocklog < XFS_SB_BLOCKLOG_MIN)
+	    || (super->sb_blocklog > XFS_SB_BLOCKLOG_MAX)
+	    || (super->sb_blocklog < super->sb_inodelog)
+	    || (super->sb_agblklog > XFS_SB_AGBLKLOG_MAX)
+	    || ((1ull << super->sb_agblklog) < le32(super->sb_agblocks))
+	    || (((1ull << super->sb_agblklog) >> 1) >=
+	        le32(super->sb_agblocks))
+	    || ((super->sb_blocklog + super->sb_dirblklog) >=
+	        XFS_SB_DIRBLK_NUMBITS);
+}
+
 static int
 xfs_mount (fsi_file_t *ffi, const char *options)
 {
 	xfs_sb_t super;
 
 	if (!devread (ffi, 0, 0, sizeof(super), (char *)&super)
-	    || (le32(super.sb_magicnum) != XFS_SB_MAGIC)
-	    || ((le16(super.sb_versionnum) 
-		& XFS_SB_VERSION_NUMBITS) != XFS_SB_VERSION_4) ) {
+	    || xfs_sb_is_invalid(&super)) {
 		return 0;
 	}
 
-	xfs.bsize = le32 (super.sb_blocksize);
-	xfs.blklog = super.sb_blocklog;
-	xfs.bdlog = xfs.blklog - SECTOR_BITS;
+	/*
+	 * Not sanitized. It's exclusively used to generate disk addresses,
+	 * so it's not important from a security standpoint.
+	 */
 	xfs.rootino = le64 (super.sb_rootino);
-	xfs.isize = le16 (super.sb_inodesize);
-	xfs.agblocks = le32 (super.sb_agblocks);
-	xfs.dirbsize = xfs.bsize << super.sb_dirblklog;
 
-	xfs.inopblog = super.sb_inopblog;
+	/*
+	 * Sanitized to be consistent with each other, only used to
+	 * generate disk addresses, so it's safe
+	 */
+	xfs.agblocks = le32 (super.sb_agblocks);
 	xfs.agblklog = super.sb_agblklog;
+
+	/* Derived from sanitized parameters */
+	xfs.bsize = 1 << super.sb_blocklog;
+	xfs.blklog = super.sb_blocklog;
+	xfs.bdlog = super.sb_blocklog - SECTOR_BITS;
+	xfs.isize = 1 << super.sb_inodelog;
+	xfs.dirbsize = 1 << (super.sb_blocklog + super.sb_dirblklog);
+	xfs.inopblog = super.sb_blocklog - super.sb_inodelog;
 
 	xfs.btnode_ptr0_off =
 		((xfs.bsize - sizeof(xfs_btree_block_t)) /
