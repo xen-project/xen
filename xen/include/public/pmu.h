@@ -11,6 +11,8 @@
 #include "arch-x86/pmu.h"
 #elif defined (__arm__) || defined (__aarch64__)
 #include "arch-arm.h"
+#elif defined (__powerpc64__)
+#include "arch-ppc.h"
 #else
 #error "Unsupported architecture"
 #endif

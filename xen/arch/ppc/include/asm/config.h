@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 #ifndef __PPC_CONFIG_H__
 #define __PPC_CONFIG_H__
 
@@ -40,6 +41,15 @@
 #endif
 
 #define XEN_VIRT_START _AC(0xc000000000000000, UL)
+
+#define VMAP_VIRT_START (XEN_VIRT_START + GB(1))
+#define VMAP_VIRT_SIZE  GB(1)
+
+#define FRAMETABLE_VIRT_START  (XEN_VIRT_START + GB(32))
+#define FRAMETABLE_SIZE        GB(32)
+#define FRAMETABLE_NR          (FRAMETABLE_SIZE / sizeof(*frame_table))
+
+#define HYPERVISOR_VIRT_START  XEN_VIRT_START
 
 #define SMP_CACHE_BYTES (1 << 6)
 

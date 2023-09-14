@@ -5,9 +5,9 @@
  *
  * Copyright 2015-2016, Aneesh Kumar K.V, IBM Corporation.
  */
+#include <xen/bitops.h>
 #include <xen/stringify.h>
 
-#include <asm/bitops.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
 

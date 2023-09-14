@@ -110,6 +110,10 @@
 /* Macro to adjust thread priority for hardware multithreading */
 #define HMT_very_low()  asm volatile ( "or %r31, %r31, %r31" )
 
+/* TODO: This isn't correct */
+#define cpu_to_core(cpu)   (0)
+#define cpu_to_socket(cpu) (0)
+
 /*
  * User-accessible registers: most of these need to be saved/restored
  * for every nested Xen invocation.
@@ -177,6 +181,12 @@ static inline void noreturn die(void)
     for ( ; ; )
         HMT_very_low();
 }
+
+/*
+ * Implemented on pre-POWER10 by setting HMT to low then to medium using
+ * the special OR forms. See HMT_very_low above.
+ */
+#define cpu_relax() asm volatile ( "or %r1, %r1, %r1; or %r2, %r2, %r2" )
 
 #endif /* __ASSEMBLY__ */
 

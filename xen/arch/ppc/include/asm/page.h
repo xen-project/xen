@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 #ifndef _ASM_PPC_PAGE_H
 #define _ASM_PPC_PAGE_H
 
@@ -35,6 +36,9 @@
 #define PTE_XEN_RW   (PTE_XEN_BASE | PTE_EAA_READ | PTE_EAA_WRITE | PTE_CHANGE)
 #define PTE_XEN_RO   (PTE_XEN_BASE | PTE_EAA_READ)
 #define PTE_XEN_RX   (PTE_XEN_BASE | PTE_EAA_READ | PTE_EAA_EXECUTE)
+
+/* TODO */
+#define PAGE_HYPERVISOR 0
 
 /*
  * Radix Tree layout for 64KB pages:
@@ -177,5 +181,19 @@ struct prtb_entry {
 #define RTS_FIELD ((0x2UL << 61) | (0x5UL << 5))
 
 void tlbie_all(void);
+
+static inline void invalidate_icache(void)
+{
+    BUG_ON("unimplemented");
+}
+
+#define clear_page(page) memset(page, 0, PAGE_SIZE)
+#define copy_page(dp, sp) memcpy(dp, sp, PAGE_SIZE)
+
+/* TODO: Flush the dcache for an entire page. */
+static inline void flush_page_to_ram(unsigned long mfn, bool sync_icache)
+{
+    BUG_ON("unimplemented");
+}
 
 #endif /* _ASM_PPC_PAGE_H */
