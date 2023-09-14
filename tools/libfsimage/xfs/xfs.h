@@ -134,6 +134,18 @@ typedef struct xfs_sb
         xfs_uint8_t       sb_dummy[7];    /* padding */
 } xfs_sb_t;
 
+/* Bound taken from xfs.c in GRUB2. It doesn't exist in the spec */
+#define	XFS_SB_DIRBLK_NUMBITS	27
+/* Implied by the XFS specification. The minimum block size is 512 octets */
+#define	XFS_SB_BLOCKLOG_MIN	9
+/* Implied by the XFS specification. The maximum block size is 65536 octets */
+#define	XFS_SB_BLOCKLOG_MAX	16
+/* Implied by the XFS specification. The minimum inode size is 256 octets */
+#define	XFS_SB_INODELOG_MIN	8
+/* Implied by the XFS specification. The maximum inode size is 2048 octets */
+#define	XFS_SB_INODELOG_MAX	11
+/* High bound for sb_agblklog */
+#define	XFS_SB_AGBLKLOG_MAX	32
 
 /* those are from xfs_btree.h */
 
