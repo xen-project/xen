@@ -140,6 +140,17 @@
                        AMD_MODEL_RANGE(0x11, 0x0, 0x0, 0xff, 0xf),	\
                        AMD_MODEL_RANGE(0x12, 0x0, 0x0, 0xff, 0xf))
 
+/*
+ * The Zen1 and Zen2 microarchitectures are implemented by AMD (Fam17h) and
+ * Hygon (Fam18h) but without simple model number rules.  Instead, use STIBP
+ * as a heuristic that distinguishes the two.
+ *
+ * The caller is required to perform the appropriate vendor/family checks
+ * first.
+ */
+#define is_zen1_uarch() (!boot_cpu_has(X86_FEATURE_AMD_STIBP))
+#define is_zen2_uarch()   boot_cpu_has(X86_FEATURE_AMD_STIBP)
+
 struct cpuinfo_x86;
 int cpu_has_amd_erratum(const struct cpuinfo_x86 *, int, ...);
 

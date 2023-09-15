@@ -882,15 +882,13 @@ void amd_set_legacy_ssbd(bool enable)
  * non-branch instructions to be ignored.  It is to be set unilaterally in
  * newer microcode.
  *
- * This chickenbit is something unrelated on Zen1, and Zen1 vs Zen2 isn't a
- * simple model number comparison, so use STIBP as a heuristic to separate the
- * two uarches in Fam17h(AMD)/18h(Hygon).
+ * This chickenbit is something unrelated on Zen1.
  */
 void amd_init_spectral_chicken(void)
 {
 	uint64_t val, chickenbit = 1 << 1;
 
-	if (cpu_has_hypervisor || !boot_cpu_has(X86_FEATURE_AMD_STIBP))
+	if (cpu_has_hypervisor || !is_zen2_uarch())
 		return;
 
 	if (rdmsr_safe(MSR_AMD64_DE_CFG2, val) == 0 && !(val & chickenbit))
@@ -939,11 +937,8 @@ void amd_check_zenbleed(void)
 		 * With the Fam17h check above, most parts getting here are
 		 * Zen1.  They're not affected.  Assume Zen2 ones making it
 		 * here are affected regardless of microcode version.
-		 *
-		 * Zen1 vs Zen2 isn't a simple model number comparison, so use
-		 * STIBP as a heuristic to distinguish.
 		 */
-		if (!boot_cpu_has(X86_FEATURE_AMD_STIBP))
+		if (is_zen1_uarch())
 			return;
 		good_rev = ~0U;
 		break;
@@ -1298,12 +1293,7 @@ static int __init cf_check zen2_c6_errata_check(void)
 	 */
 	s_time_t delta;
 
-	/*
-	 * Zen1 vs Zen2 isn't a simple model number comparison, so use STIBP as
-	 * a heuristic to separate the two uarches in Fam17h.
-	 */
-	if (cpu_has_hypervisor || boot_cpu_data.x86 != 0x17 ||
-	    !boot_cpu_has(X86_FEATURE_AMD_STIBP))
+	if (cpu_has_hypervisor || boot_cpu_data.x86 != 0x17 || !is_zen2_uarch())
 		return 0;
 
 	/*
