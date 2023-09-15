@@ -8652,6 +8652,12 @@ int x86_emulate_wrapper(
     rc = x86_emulate(ctxt, ops);
 
     /*
+     * X86EMUL_DONE is an internal signal in the emulator, and is not expected
+     * to ever escape out to callers.
+     */
+    ASSERT(rc != X86EMUL_DONE);
+
+    /*
      * Most retire flags should only be set for successful instruction
      * emulation.
      */
