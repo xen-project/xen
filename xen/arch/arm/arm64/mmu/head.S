@@ -329,7 +329,6 @@ ENTRY(enable_boot_cpu_mm)
         load_paddr x0, boot_pgtable
 
         bl    enable_mmu
-        mov   lr, x5
 
         /*
          * The MMU is turned on and we are in the 1:1 mapping. Switch
@@ -338,19 +337,15 @@ ENTRY(enable_boot_cpu_mm)
         ldr   x0, =1f
         br    x0
 1:
+        mov   lr, x5
         /*
          * The 1:1 map may clash with other parts of the Xen virtual memory
          * layout. As it is not used anymore, remove it completely to
          * avoid having to worry about replacing existing mapping
-         * afterwards. Function will return to primary_switched.
+         * afterwards. Function will return to the virtual address requested
+         * by the caller.
          */
         b     remove_identity_mapping
-
-        /*
-         * Below is supposed to be unreachable code, as "ret" in
-         * remove_identity_mapping will use the return address in LR in advance.
-         */
-        b     fail
 ENDPROC(enable_boot_cpu_mm)
 
 /*
