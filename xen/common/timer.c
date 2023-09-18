@@ -357,6 +357,7 @@ bool timer_expires_before(struct timer *timer, s_time_t t)
 void migrate_timer(struct timer *timer, unsigned int new_cpu)
 {
     unsigned int old_cpu;
+#if CONFIG_NR_CPUS > 1
     bool_t active;
     unsigned long flags;
 
@@ -404,6 +405,11 @@ void migrate_timer(struct timer *timer, unsigned int new_cpu)
 
     spin_unlock(&per_cpu(timers, old_cpu).lock);
     spin_unlock_irqrestore(&per_cpu(timers, new_cpu).lock, flags);
+#else /* CONFIG_NR_CPUS == 1 */
+    old_cpu = read_atomic(&timer->cpu);
+    if ( old_cpu != TIMER_CPU_status_killed )
+        WARN_ON(new_cpu != old_cpu);
+#endif /* CONFIG_NR_CPUS */
 }
 
 
