@@ -1884,6 +1884,14 @@ By default, Xen will use the INVPCID instruction for TLB management if
 it is available.  This option can be used to cause Xen to fall back to
 older mechanisms, which are generally slower.
 
+### load-balance-ratelimit
+> `= <integer>`
+
+The minimum interval between load balancing events on a given pcpu, in
+microseconds.  A value of '0' will disable rate limiting.  Maximum
+value 1 second. At the moment only credit honors this parameter.
+Default 1ms.
+
 ### noirqbalance (x86)
 > `= <boolean>`
 

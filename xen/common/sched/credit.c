@@ -50,6 +50,10 @@
 #define CSCHED_TICKS_PER_TSLICE     3
 /* Default timeslice: 30ms */
 #define CSCHED_DEFAULT_TSLICE_MS    30
+/* Default load balancing ratelimit: 1ms */
+#define CSCHED_DEFAULT_LOAD_BALANCE_RATELIMIT_US 1000
+/* Max load balancing ratelimit: 1s */
+#define CSCHED_MAX_LOAD_BALANCE_RATELIMIT_US     1000000
 #define CSCHED_CREDITS_PER_MSEC     10
 /* Never set a timer shorter than this value. */
 #define CSCHED_MIN_TIMER            XEN_SYSCTL_SCHED_RATELIMIT_MIN
@@ -153,6 +157,7 @@ struct csched_pcpu {
 
     unsigned int idle_bias;
     unsigned int nr_runnable;
+    s_time_t last_load_balance;
 
     unsigned int tick;
     struct timer ticker;
@@ -218,7 +223,7 @@ struct csched_private {
 
     /* Period of master and tick in milliseconds */
     unsigned int tick_period_us, ticks_per_tslice;
-    s_time_t ratelimit, tslice, unit_migr_delay;
+    s_time_t ratelimit, tslice, unit_migr_delay, load_balance_ratelimit;
 
     struct list_head active_sdom;
     uint32_t weight;
@@ -612,6 +617,8 @@ init_pdata(struct csched_private *prv, struct csched_pcpu *spc, int cpu)
     BUG_ON(!is_idle_unit(curr_on_cpu(cpu)));
     cpumask_set_cpu(cpu, prv->idlers);
     spc->nr_runnable = 0;
+
+    spc->last_load_balance = NOW();
 }
 
 static void cf_check
@@ -1676,9 +1683,17 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
     return NULL;
 }
 
+/*
+ * Minimum delay, in microseconds, between load balance operations.
+ * This prevents spending too much time doing load balancing, particularly
+ * when the system has a high number of YIELDs due to spinlock priority inversion.
+ */
+static unsigned int __ro_after_init load_balance_ratelimit_us = CSCHED_DEFAULT_LOAD_BALANCE_RATELIMIT_US;
+integer_param("load-balance-ratelimit", load_balance_ratelimit_us);
+
 static struct csched_unit *
 csched_load_balance(struct csched_private *prv, int cpu,
-    struct csched_unit *snext, bool *stolen)
+                    struct csched_unit *snext, bool *stolen)
 {
     const struct cpupool *c = get_sched_res(cpu)->cpupool;
     struct csched_unit *speer;
@@ -1958,15 +1973,19 @@ static void cf_check csched_schedule(
         /*
          * SMP Load balance:
          *
-         * If the next highest priority local runnable UNIT has already eaten
-         * through its credits, look on other PCPUs to see if we have more
-         * urgent work... If not, csched_load_balance() will return snext, but
-         * already removed from the runq.
+         * If the next highest priority local runnable UNIT has
+         * already eaten through its credits (and we're below the
+         * balancing ratelimit), look on other PCPUs to see if we have
+         * more urgent work... If we don't, csched_load_balance() will
+         * return snext, but already removed from the runq.
          */
-        if ( snext->pri > CSCHED_PRI_TS_OVER )
-            __runq_remove(snext);
-        else
+        if ( snext->pri <= CSCHED_PRI_TS_OVER
+             && now - spc->last_load_balance > prv->load_balance_ratelimit ) {
+            spc->last_load_balance = now;
             snext = csched_load_balance(prv, sched_cpu, snext, &migrated);
+        }
+        else
+            __runq_remove(snext);
 
     } while ( !unit_runnable_state(snext->unit) );
 
@@ -2181,6 +2200,14 @@ csched_global_init(void)
                XEN_SYSCTL_CSCHED_MGR_DLY_MAX_US, vcpu_migration_delay_us);
     }
 
+    if ( load_balance_ratelimit_us > CSCHED_MAX_LOAD_BALANCE_RATELIMIT_US )
+    {
+        load_balance_ratelimit_us = CSCHED_MAX_LOAD_BALANCE_RATELIMIT_US;
+        printk("WARNING: load-balance-ratelimit outside of valid range [0,%d]us.\n"
+               "Setting to max.\n",
+               CSCHED_MAX_LOAD_BALANCE_RATELIMIT_US);
+    }
+
     return 0;
 }
 
@@ -2222,6 +2249,8 @@ csched_init(struct scheduler *ops)
         prv->ratelimit = MICROSECS(sched_ratelimit_us);
 
     prv->unit_migr_delay = MICROSECS(vcpu_migration_delay_us);
+
+    prv->load_balance_ratelimit = MICROSECS(load_balance_ratelimit_us);
 
     return 0;
 }
