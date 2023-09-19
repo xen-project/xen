@@ -39,14 +39,14 @@
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
+/* pygrub enabled */
+#undef HAVE_PYGRUB
+
 /* Qemu traditional enabled */
 #undef HAVE_QEMU_TRADITIONAL
 
 /* ROMBIOS enabled */
 #undef HAVE_ROMBIOS
-
-/* pygrub enabled */
-#undef HAVE_PYGRUB
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
@@ -153,11 +153,11 @@
 /* Xen's runstate path */
 #undef XEN_RUN_DIR
 
-/* Xen's script dir */
-#undef XEN_SCRIPT_DIR
-
 /* Xenstore's runstate path */
 #undef XEN_RUN_STORED
+
+/* Xen's script dir */
+#undef XEN_SCRIPT_DIR
 
 /* Enable large inode numbers on Mac OS X 10.5.  */
 #ifndef _DARWIN_USE_64_BIT_INODE

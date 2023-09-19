@@ -73,8 +73,8 @@ $(PYLIB): $(PYSRC)
 python-bindings: $(PYLIB) $(PYMOD)
 
 pythonlibdir = $(shell $(PYTHON) -c \
-	       'import distutils.sysconfig as cfg; \
-	        print(cfg.get_python_lib(False, False, prefix="$(prefix)"))')
+	       'import sysconfig; \
+	        print(sysconfig.get_python_lib("platlib", vars={"platbase": "$(prefix)"}))')
 
 .PHONY: install-python-bindings
 install-python-bindings: $(PYLIB) $(PYMOD)
