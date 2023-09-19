@@ -1,5 +1,8 @@
-
-from distutils.core import setup, Extension
+# Prefer setuptools, fall back to distutils
+try:
+    from setuptools import setup, Extension
+except ImportError:
+    from distutils.core import setup, Extension
 import os, sys
 
 XEN_ROOT = "../.."

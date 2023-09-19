@@ -1,5 +1,8 @@
-from distutils.core import setup, Extension
-from distutils.ccompiler import new_compiler
+# Prefer setuptools, fall back to distutils
+try:
+    from setuptools import setup, Extension
+except ImportError:
+    from distutils.core import setup, Extension
 import os
 import sys
 
