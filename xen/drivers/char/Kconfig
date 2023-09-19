@@ -77,13 +77,13 @@ config HAS_EHCI
 
 config SERIAL_TX_BUFSIZE
 	int "Size of the transmit serial buffer"
-	default 16384
+	default 32768
 	help
 	  Controls the default size of the transmit buffer (in bytes) used by
 	  the serial driver.  Note the value provided will be rounded down to
 	  the nearest power of 2.
 
-	  Default value is 16384 (16kiB).
+	  Default value is 32768 (32KiB).
 
 config XHCI
 	bool "XHCI DbC UART driver"
