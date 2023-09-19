@@ -32,6 +32,7 @@ RUN apk --no-cache add \
   ocaml-findlib \
   patch  \
   python3-dev \
+  py3-setuptools \
   texinfo \
   util-linux-dev \
   xz-dev \

@@ -34,6 +34,7 @@ RUN pacman -S --refresh --sysupgrade --noconfirm --noprogressbar --needed \
         pixman \
         pkgconfig \
         python \
+        python-setuptools \
         sdl \
         sdl2 \
         spice \

@@ -16,6 +16,7 @@ RUN apt-get update && \
         libncurses5-dev \
         libssl-dev \
         python3-dev \
+        python3-setuptools \
         xorg-dev \
         uuid-dev \
         libyajl-dev \
