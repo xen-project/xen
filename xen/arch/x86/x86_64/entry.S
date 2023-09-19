@@ -142,15 +142,8 @@ process_trap:
 
         .section .text.entry, "ax", @progbits
 
-/* %rbx: struct vcpu, %r12: ist_exit, interrupts disabled */
+/* %rbx: struct vcpu, interrupts disabled */
 restore_all_guest:
-
-#ifdef CONFIG_DEBUG
-        mov   %rsp, %rdi
-        mov   %r12, %rsi
-        call  check_ist_exit
-#endif
-
         ASSERT_INTERRUPTS_DISABLED
 
         /* Stash guest SPEC_CTRL value while we can read struct vcpu. */
