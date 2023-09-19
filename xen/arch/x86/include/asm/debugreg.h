@@ -76,6 +76,25 @@
     __val;                                                  \
 })
 
+/*
+ * Architecturally, %dr{0..3} can have any arbitrary value.  However, Xen
+ * can't allow the guest to breakpoint the Xen address range, so we limit the
+ * guest to the lower canonical half, or above the Xen range in the higher
+ * canonical half.
+ *
+ * Breakpoint lengths are specified to mask the low order address bits,
+ * meaning all breakpoints are naturally aligned.  With %dr7, the widest
+ * breakpoint is 8 bytes.  With DBEXT, the widest breakpoint is 4G.  Both of
+ * the Xen boundaries have >4G alignment.
+ *
+ * In principle we should account for HYPERVISOR_COMPAT_VIRT_START(d), but
+ * 64bit Xen has never enforced this for compat guests, and there's no problem
+ * (to Xen) if the guest breakpoints it's alias of the M2P.  Skipping this
+ * aspect simplifies the logic, and causes us not to reject a migrating guest
+ * which operated fine on prior versions of Xen.
+ */
+#define breakpoint_addr_ok(a) __addr_ok(a)
+
 struct vcpu;
 long set_debugreg(struct vcpu *, unsigned int reg, unsigned long value);
 void activate_debugregs(const struct vcpu *);

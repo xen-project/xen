@@ -1088,7 +1088,7 @@ int arch_set_info_guest(
     if ( is_pv_domain(d) )
     {
         for ( i = 0; i < ARRAY_SIZE(v->arch.dr); i++ )
-            if ( !access_ok(c(debugreg[i]), sizeof(long)) )
+            if ( !breakpoint_addr_ok(c(debugreg[i])) )
                 return -EINVAL;
         /*
          * Prior to Xen 4.11, dr5 was used to hold the emulated-only

@@ -61,7 +61,7 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
     switch ( reg )
     {
     case 0 ... 3:
-        if ( !access_ok(value, sizeof(long)) )
+        if ( !breakpoint_addr_ok(value) )
             return -EPERM;
 
         v->arch.dr[reg] = value;
