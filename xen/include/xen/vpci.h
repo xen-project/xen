@@ -26,7 +26,7 @@ typedef int vpci_register_init_t(struct pci_dev *dev);
                __used_section(".data.vpci." p) = x
 
 /* Add vPCI handlers to device. */
-int __must_check vpci_add_handlers(struct pci_dev *dev);
+int __must_check vpci_add_handlers(struct pci_dev *pdev);
 
 /* Remove all handlers and free vpci related structures. */
 void vpci_remove_device(struct pci_dev *pdev);
