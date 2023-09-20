@@ -552,7 +552,7 @@ void audit_domains(void);
 #endif
 
 void make_cr3(struct vcpu *v, mfn_t mfn);
-void update_cr3(struct vcpu *v);
+pagetable_t update_cr3(struct vcpu *v);
 int vcpu_destroy_pagetables(struct vcpu *);
 void *do_page_walk(struct vcpu *v, unsigned long addr);
 

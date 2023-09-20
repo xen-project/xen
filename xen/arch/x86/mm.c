@@ -567,15 +567,12 @@ void write_ptbase(struct vcpu *v)
  *
  * Update ref counts to shadow tables appropriately.
  */
-void update_cr3(struct vcpu *v)
+pagetable_t update_cr3(struct vcpu *v)
 {
     mfn_t cr3_mfn;
 
     if ( paging_mode_enabled(v->domain) )
-    {
-        paging_update_cr3(v, false);
-        return;
-    }
+        return paging_update_cr3(v, false);
 
     if ( !(v->arch.flags & TF_kernel_mode) )
         cr3_mfn = pagetable_get_mfn(v->arch.guest_table_user);
@@ -583,6 +580,8 @@ void update_cr3(struct vcpu *v)
         cr3_mfn = pagetable_get_mfn(v->arch.guest_table);
 
     make_cr3(v, cr3_mfn);
+
+    return pagetable_null();
 }
 
 static inline void set_tlbflush_timestamp(struct page_info *page)
@@ -3285,6 +3284,7 @@ int new_guest_cr3(mfn_t mfn)
     struct domain *d = curr->domain;
     int rc;
     mfn_t old_base_mfn;
+    pagetable_t old_shadow;
 
     if ( is_pv_32bit_domain(d) )
     {
@@ -3352,9 +3352,22 @@ int new_guest_cr3(mfn_t mfn)
     if ( !VM_ASSIST(d, m2p_strict) )
         fill_ro_mpt(mfn);
     curr->arch.guest_table = pagetable_from_mfn(mfn);
-    update_cr3(curr);
+    old_shadow = update_cr3(curr);
 
-    write_ptbase(curr);
+    /*
+     * In shadow mode update_cr3() can fail, in which case here we're still
+     * running on the prior top-level shadow (which we're about to release).
+     * Switch to the idle page tables in such an event; the guest will have
+     * been crashed already.
+     */
+    if ( likely(!mfn_eq(pagetable_get_mfn(old_shadow),
+                        maddr_to_mfn(curr->arch.cr3 & ~X86_CR3_NOFLUSH))) )
+        write_ptbase(curr);
+    else
+        write_ptbase(idle_vcpu[curr->processor]);
+
+    if ( !pagetable_is_null(old_shadow) )
+        shadow_put_top_level(d, old_shadow);
 
     if ( likely(mfn_x(old_base_mfn) != 0) )
     {

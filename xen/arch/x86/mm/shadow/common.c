@@ -2590,13 +2590,13 @@ void cf_check shadow_update_paging_modes(struct vcpu *v)
 }
 
 /* Set up the top-level shadow and install it in slot 'slot' of shadow_table */
-void sh_set_toplevel_shadow(struct vcpu *v,
-                            unsigned int slot,
-                            mfn_t gmfn,
-                            unsigned int root_type,
-                            mfn_t (*make_shadow)(struct vcpu *v,
-                                                 mfn_t gmfn,
-                                                 uint32_t shadow_type))
+pagetable_t sh_set_toplevel_shadow(struct vcpu *v,
+                                   unsigned int slot,
+                                   mfn_t gmfn,
+                                   unsigned int root_type,
+                                   mfn_t (*make_shadow)(struct vcpu *v,
+                                                        mfn_t gmfn,
+                                                        uint32_t shadow_type))
 {
     mfn_t smfn;
     pagetable_t old_entry, new_entry;
@@ -2653,20 +2653,37 @@ void sh_set_toplevel_shadow(struct vcpu *v,
                   mfn_x(gmfn), mfn_x(pagetable_get_mfn(new_entry)));
     v->arch.paging.shadow.shadow_table[slot] = new_entry;
 
-    /* Decrement the refcount of the old contents of this slot */
-    if ( !pagetable_is_null(old_entry) )
+    /*
+     * Decrement the refcount of the old contents of this slot, unless
+     * we're still running on that shadow - in that case it'll need holding
+     * on to until the actual page table switch did occur.
+     */
+    if ( !pagetable_is_null(old_entry) && (v != current || !is_pv_domain(d)) )
     {
-        mfn_t old_smfn = pagetable_get_mfn(old_entry);
-        /* Need to repin the old toplevel shadow if it's been unpinned
-         * by shadow_prealloc(): in PV mode we're still running on this
-         * shadow and it's not safe to free it yet. */
-        if ( !mfn_to_page(old_smfn)->u.sh.pinned && !sh_pin(d, old_smfn) )
-        {
-            printk(XENLOG_G_ERR "can't re-pin %"PRI_mfn"\n", mfn_x(old_smfn));
-            domain_crash(d);
-        }
-        sh_put_ref(d, old_smfn, 0);
+        sh_put_ref(d, pagetable_get_mfn(old_entry), 0);
+        old_entry = pagetable_null();
     }
+
+    /*
+     * 2- and 3-level shadow mode is used for HVM only. Therefore we never run
+     * on such a shadow, so only call sites requesting an L4 shadow need to pay
+     * attention to the returned value.
+     */
+    ASSERT(pagetable_is_null(old_entry) || root_type == SH_type_l4_64_shadow);
+
+    return old_entry;
+}
+
+/*
+ * Helper invoked when releasing of a top-level shadow's reference was
+ * deferred in sh_set_toplevel_shadow() above.
+ */
+void shadow_put_top_level(struct domain *d, pagetable_t old_entry)
+{
+    ASSERT(!pagetable_is_null(old_entry));
+    paging_lock(d);
+    sh_put_ref(d, pagetable_get_mfn(old_entry), 0);
+    paging_unlock(d);
 }
 
 /**************************************************************************/
