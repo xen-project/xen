@@ -50,7 +50,7 @@ static unsigned long _gva_to_gfn(struct vcpu *v, struct p2m_domain *p2m,
     return gfn_x(INVALID_GFN);
 }
 
-static pagetable_t _update_cr3(struct vcpu *v, bool do_locking, bool noflush)
+static pagetable_t _update_cr3(struct vcpu *v, bool noflush)
 {
     ASSERT_UNREACHABLE();
     return pagetable_null();

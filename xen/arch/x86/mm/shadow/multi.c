@@ -2884,7 +2884,7 @@ static int sh_page_fault(struct vcpu *v,
          * In any case, in the PAE case, the ASSERT is not true; it can
          * happen because of actions the guest is taking. */
 #if GUEST_PAGING_LEVELS == 3
-        v->arch.paging.mode->update_cr3(v, 0, false);
+        v->arch.paging.mode->update_cr3(v, false);
 #else
         ASSERT(d->is_shutting_down);
 #endif
@@ -3604,17 +3604,13 @@ sh_detach_old_tables(struct vcpu *v)
     }
 }
 
-static pagetable_t
-sh_update_cr3(struct vcpu *v, bool do_locking, bool noflush)
+static pagetable_t sh_update_cr3(struct vcpu *v, bool noflush)
 /* Updates vcpu->arch.cr3 after the guest has changed CR3.
  * Paravirtual guests should set v->arch.guest_table (and guest_table_user,
  * if appropriate).
  * HVM guests should also make sure hvm_get_guest_cntl_reg(v, 3) works;
  * this function will call hvm_update_guest_cr(v, 3) to tell them where the
  * shadow tables are.
- * If do_locking != 0, assume we are being called from outside the
- * shadow code, and must take and release the paging lock; otherwise
- * that is the caller's responsibility.
  */
 {
     struct domain *d = v->domain;
@@ -3632,7 +3628,11 @@ sh_update_cr3(struct vcpu *v, bool do_locking, bool noflush)
         return old_entry;
     }
 
-    if ( do_locking ) paging_lock(v->domain);
+    /*
+     * This is used externally (with the paging lock not taken) and internally
+     * by the shadow code (with the lock already taken).
+     */
+    paging_lock_recursive(v->domain);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     /* Need to resync all the shadow entries on a TLB flush.  Resync
@@ -3870,8 +3870,7 @@ sh_update_cr3(struct vcpu *v, bool do_locking, bool noflush)
     shadow_sync_other_vcpus(v);
 #endif
 
-    /* Release the lock, if we took it (otherwise it's the caller's problem) */
-    if ( do_locking ) paging_unlock(v->domain);
+    paging_unlock(v->domain);
 
     return old_entry;
 }
