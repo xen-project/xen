@@ -2579,7 +2579,7 @@ static void sh_update_paging_modes(struct vcpu *v)
     }
 #endif /* OOS */
 
-    v->arch.paging.mode->update_cr3(v, 0, false);
+    v->arch.paging.mode->update_cr3(v, false);
 }
 
 void cf_check shadow_update_paging_modes(struct vcpu *v)
