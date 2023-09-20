@@ -97,6 +97,9 @@ void shadow_blow_tables_per_domain(struct domain *d);
 int shadow_set_allocation(struct domain *d, unsigned int pages,
                           bool *preempted);
 
+/* Helper to invoke for deferred releasing of a top-level shadow's reference. */
+void shadow_put_top_level(struct domain *d, pagetable_t old);
+
 #else /* !CONFIG_SHADOW_PAGING */
 
 #define shadow_vcpu_teardown(v) ASSERT(is_pv_vcpu(v))
@@ -117,6 +120,11 @@ static inline void shadow_prepare_page_type_change(struct domain *d,
                                                    unsigned long new_type) {}
 
 static inline void shadow_blow_tables_per_domain(struct domain *d) {}
+
+static inline void shadow_put_top_level(struct domain *d, pagetable_t old)
+{
+    ASSERT_UNREACHABLE();
+}
 
 static inline int shadow_domctl(struct domain *d,
                                 struct xen_domctl_shadow_op *sc,
