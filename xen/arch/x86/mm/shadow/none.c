@@ -55,8 +55,7 @@ static unsigned long cf_check _gva_to_gfn(
 }
 #endif
 
-static pagetable_t cf_check _update_cr3(struct vcpu *v, bool do_locking,
-                                        bool noflush)
+static pagetable_t cf_check _update_cr3(struct vcpu *v, bool noflush)
 {
     ASSERT_UNREACHABLE();
     return pagetable_null();

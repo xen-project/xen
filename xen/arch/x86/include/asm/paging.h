@@ -118,8 +118,7 @@ struct paging_mode {
                                             paddr_t ga, uint32_t *pfec,
                                             unsigned int *page_order);
 #endif
-    pagetable_t   (*update_cr3            )(struct vcpu *v, bool do_locking,
-                                            bool noflush);
+    pagetable_t   (*update_cr3            )(struct vcpu *v, bool noflush);
 
     unsigned int guest_levels;
 
@@ -296,7 +295,7 @@ static inline bool paging_flush_tlb(const unsigned long *vcpu_bitmap)
  * as the value to load into the host CR3 to schedule this vcpu */
 static inline pagetable_t paging_update_cr3(struct vcpu *v, bool noflush)
 {
-    return paging_get_hostmode(v)->update_cr3(v, 1, noflush);
+    return paging_get_hostmode(v)->update_cr3(v, noflush);
 }
 
 /* Update all the things that are derived from the guest's CR0/CR3/CR4.
