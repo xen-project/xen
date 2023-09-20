@@ -55,9 +55,11 @@ static unsigned long cf_check _gva_to_gfn(
 }
 #endif
 
-static void cf_check _update_cr3(struct vcpu *v, int do_locking, bool noflush)
+static pagetable_t cf_check _update_cr3(struct vcpu *v, bool do_locking,
+                                        bool noflush)
 {
     ASSERT_UNREACHABLE();
+    return pagetable_null();
 }
 
 static const struct paging_mode sh_paging_none = {

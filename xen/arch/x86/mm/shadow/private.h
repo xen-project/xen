@@ -383,13 +383,13 @@ mfn_t shadow_alloc(struct domain *d,
 void  shadow_free(struct domain *d, mfn_t smfn);
 
 /* Set up the top-level shadow and install it in slot 'slot' of shadow_table */
-void sh_set_toplevel_shadow(struct vcpu *v,
-                            unsigned int slot,
-                            mfn_t gmfn,
-                            unsigned int root_type,
-                            mfn_t (*make_shadow)(struct vcpu *v,
-                                                 mfn_t gmfn,
-                                                 uint32_t shadow_type));
+pagetable_t sh_set_toplevel_shadow(struct vcpu *v,
+                                   unsigned int slot,
+                                   mfn_t gmfn,
+                                   unsigned int root_type,
+                                   mfn_t (*make_shadow)(struct vcpu *v,
+                                                        mfn_t gmfn,
+                                                        uint32_t shadow_type));
 
 /* Update the shadows in response to a pagetable write from Xen */
 int sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size);
