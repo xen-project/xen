@@ -317,6 +317,10 @@ static void svm_save_dr(struct vcpu *v)
     v->arch.hvm.flag_dr_dirty = 0;
     vmcb_set_dr_intercepts(vmcb, ~0u);
 
+    /*
+     * The guest can only have changed the mask MSRs if we previous dropped
+     * intercepts.  Re-read them from hardware.
+     */
     if ( v->domain->arch.cpuid->extd.dbext )
     {
         svm_intercept_msr(v, MSR_AMD64_DR0_ADDRESS_MASK, MSR_INTERCEPT_RW);
@@ -348,17 +352,25 @@ static void __restore_debug_registers(struct vmcb_struct *vmcb, struct vcpu *v)
 
     ASSERT(v == current);
 
-    if ( v->domain->arch.cpuid->extd.dbext )
+    /*
+     * Both the PV and HVM paths leave stale DR_MASK values in hardware on
+     * context-switch-out.  If we're activating %dr7 for the guest, we must
+     * sync the DR_MASKs too, whether or not the guest can see them.
+     */
+    if ( boot_cpu_has(X86_FEATURE_DBEXT) )
     {
-        svm_intercept_msr(v, MSR_AMD64_DR0_ADDRESS_MASK, MSR_INTERCEPT_NONE);
-        svm_intercept_msr(v, MSR_AMD64_DR1_ADDRESS_MASK, MSR_INTERCEPT_NONE);
-        svm_intercept_msr(v, MSR_AMD64_DR2_ADDRESS_MASK, MSR_INTERCEPT_NONE);
-        svm_intercept_msr(v, MSR_AMD64_DR3_ADDRESS_MASK, MSR_INTERCEPT_NONE);
-
         wrmsrl(MSR_AMD64_DR0_ADDRESS_MASK, v->arch.msrs->dr_mask[0]);
         wrmsrl(MSR_AMD64_DR1_ADDRESS_MASK, v->arch.msrs->dr_mask[1]);
         wrmsrl(MSR_AMD64_DR2_ADDRESS_MASK, v->arch.msrs->dr_mask[2]);
         wrmsrl(MSR_AMD64_DR3_ADDRESS_MASK, v->arch.msrs->dr_mask[3]);
+
+        if ( v->domain->arch.cpuid->extd.dbext )
+        {
+            svm_intercept_msr(v, MSR_AMD64_DR0_ADDRESS_MASK, MSR_INTERCEPT_NONE);
+            svm_intercept_msr(v, MSR_AMD64_DR1_ADDRESS_MASK, MSR_INTERCEPT_NONE);
+            svm_intercept_msr(v, MSR_AMD64_DR2_ADDRESS_MASK, MSR_INTERCEPT_NONE);
+            svm_intercept_msr(v, MSR_AMD64_DR3_ADDRESS_MASK, MSR_INTERCEPT_NONE);
+        }
     }
 
     write_debugreg(0, v->arch.dr[0]);
