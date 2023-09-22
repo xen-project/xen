@@ -1094,10 +1094,20 @@ int domain_entry_fix(unsigned int domid, int num, bool update)
 	}
 
 	cnt = d->nbentry + num;
-	assert(cnt >= 0);
 
-	if (update)
+	if (update) {
+		assert(cnt >= 0);
 		d->nbentry = cnt;
+	} else if (cnt < 0) {
+		/*
+		 * In a transaction when a node is being added/removed AND
+		 * the same node has been added/removed outside the
+		 * transaction in parallel, the result value may be negative.
+		 * This is no problem, as the transaction will fail due to
+		 * the resulting conflict. So override 'cnt'.
+		 */
+		cnt = 0;
+	}
 
 	return domid_is_unprivileged(domid) ? cnt : 0;
 }
