@@ -685,6 +685,9 @@ int gicv3_its_map_guest_device(struct domain *d,
     if ( !itt_addr )
         goto out_unlock;
 
+    clean_and_invalidate_dcache_va_range(itt_addr,
+                                         nr_events * hw_its->itte_size);
+
     dev = xzalloc(struct its_device);
     if ( !dev )
         goto out_unlock;
