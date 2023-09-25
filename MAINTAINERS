@@ -500,7 +500,7 @@ F:	tools/hotplug/Linux/block-drbd-probe
 
 RISCV
 M:	Bob Eshleman <bobbyeshleman@gmail.com>
-M:	Alistair Francis <alistair.francis@wdc.com>
+R:	Alistair Francis <alistair.francis@wdc.com>
 R:	Connor Davis <connojdavis@gmail.com>
 S:	Supported
 F:	config/riscv64.mk
