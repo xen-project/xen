@@ -80,10 +80,10 @@ static int libxl__create_qemu_logfile(libxl__gc *gc, char *name)
  *  On error, return a libxl-style error code.
  */
 #define DEFINE_USERLOOKUP_HELPER(NAME,SPEC_TYPE,STRUCTNAME,SYSCONF)     \
-    static int userlookup_helper_##NAME(libxl__gc *gc,                  \
-                                        SPEC_TYPE spec,                 \
-                                        struct STRUCTNAME *resultbuf,   \
-                                        struct STRUCTNAME **out)        \
+    int userlookup_helper_##NAME(libxl__gc *gc,                         \
+                                 SPEC_TYPE spec,                        \
+                                 struct STRUCTNAME *resultbuf,          \
+                                 struct STRUCTNAME **out)               \
     {                                                                   \
         struct STRUCTNAME *resultp = NULL;                              \
         char *buf = NULL;                                               \
