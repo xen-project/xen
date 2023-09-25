@@ -624,6 +624,8 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("acpi",             libxl_defbool),
     ("bootloader",       string),
     ("bootloader_args",  libxl_string_list),
+    ("bootloader_restrict", libxl_defbool),
+    ("bootloader_user",  string),
     ("timer_mode",       libxl_timer_mode),
     ("nested_hvm",       libxl_defbool),
     ("apic",             libxl_defbool),

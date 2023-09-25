@@ -1700,6 +1700,13 @@ void parse_config_data(const char *config_source,
         exit(-ERROR_FAIL);
     }
 #endif
+    xlu_cfg_get_defbool(config, "bootloader_restrict",
+                        &b_info->bootloader_restrict, 0);
+    if (!libxl_defbool_is_default(bootloader_restrict))
+        libxl_defbool_setdefault(&b_info->bootloader_restrict,
+                                 libxl_defbool_val(bootloader_restrict));
+    xlu_cfg_replace_string(config, "bootloader_user",
+                           &b_info->bootloader_user, 0);
 
     switch (xlu_cfg_get_list_as_string_list(config, "bootloader_args",
                                             &b_info->bootloader_args, 1)) {

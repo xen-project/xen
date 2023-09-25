@@ -482,6 +482,17 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         return -ERROR_INVAL;
     }
 
+    /* Assume that providing a bootloader user implies enabling restrict. */
+    libxl_defbool_setdefault(&b_info->bootloader_restrict,
+                             !!b_info->bootloader_user);
+    /* ENV takes precedence over provided domain_build_info. */
+    if (getenv("LIBXL_BOOTLOADER_RESTRICT") ||
+        getenv("LIBXL_BOOTLOADER_USER"))
+        libxl_defbool_set(&b_info->bootloader_restrict, true);
+    if(getenv("LIBXL_BOOTLOADER_USER"))
+        b_info->bootloader_user =
+            libxl__strdup(gc, getenv("LIBXL_BOOTLOADER_USER"));
+
     return 0;
 }
 

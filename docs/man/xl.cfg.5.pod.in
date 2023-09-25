@@ -1694,6 +1694,28 @@ Append B<ARG>s to the arguments to the B<bootloader>
 program. Alternatively if the argument is a simple string then it will
 be split into words at whitespace B<(this second option is deprecated)>.
 
+=item B<bootloader_restrict=BOOLEAN>
+
+Attempt to restrict the bootloader after startup, to limit the
+consequences of security vulnerabilities due to parsing guest
+owned image files.
+
+See docs/features/qemu-deprivilege.pandoc for more information
+on how to setup the unprivileged users.
+
+Note that running the bootloader in restricted mode also implies using
+non-interactive mode, and the disk image must be readable by the
+restricted user.
+
+=item B<bootloader_user=USERNAME>
+
+When using bootloader_restrict, run the bootloader as this user.  If not
+set the default QEMU restrict users will be used.
+
+NOTE: Each domain MUST have a SEPARATE username.
+
+See docs/features/qemu-deprivilege.pandoc for more information.
+
 =item B<e820_host=BOOLEAN>
 
 Selects whether to expose the host e820 (memory map) to the guest via
@@ -2735,6 +2757,27 @@ for PV guests.
 Append B<ARG>s to the arguments to the B<bootloader>
 program. Alternatively if the argument is a simple string then it will
 be split into words at whitespace B<(this second option is deprecated)>.
+
+=item B<bootloader_restrict=BOOLEAN>
+
+Attempt to restrict the bootloader after startup, to limit the
+consequences of security vulnerabilities due to parsing guest
+owned image files.
+
+See docs/features/qemu-deprivilege.pandoc for more information
+on how to setup the unprivileged users.
+
+Note that running the bootloader in restricted mode also implies using
+non-interactive mode, and the disk image must be readable by the
+restricted user.
+
+=item B<bootloader_user=USERNAME>
+
+When using bootloader_restrict, run the bootloader as this user.
+
+NOTE: Each domain MUST have a SEPARATE username.
+
+See docs/features/qemu-deprivilege.pandoc for more information.
 
 =item B<timer_mode="MODE">
 

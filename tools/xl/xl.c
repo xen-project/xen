@@ -57,6 +57,7 @@ int max_grant_frames = -1;
 int max_maptrack_frames = -1;
 int max_grant_version = LIBXL_MAX_GRANT_DEFAULT;
 libxl_domid domid_policy = INVALID_DOMID;
+libxl_defbool bootloader_restrict;
 
 xentoollog_level minmsglevel = minmsglevel_default;
 
@@ -252,6 +253,9 @@ static void parse_global_config(const char *configfile,
         else
             fprintf(stderr, "invalid domid_policy option");
     }
+
+    xlu_cfg_get_defbool(config, "bootloader_restrict",
+                        &bootloader_restrict, 0);
 
     xlu_cfg_destroy(config);
 }

@@ -4874,6 +4874,14 @@ struct libxl__cpu_policy {
     struct xc_msr *msr;
 };
 
+struct passwd;
+_hidden int userlookup_helper_getpwnam(libxl__gc*, const char *user,
+                                       struct passwd *res,
+                                       struct passwd **out);
+_hidden int userlookup_helper_getpwuid(libxl__gc*, uid_t uid,
+                                       struct passwd *res,
+                                       struct passwd **out);
+
 #endif
 
 /*

@@ -220,6 +220,12 @@ Due to bug(s), these options may not interact well with other options
 concerning CPU affinity. One example is CPU pools. Users should always double
 check that the required affinity has taken effect.
 
+=item B<bootloader_restrict=BOOLEAN>
+
+System wide default for whether the bootloader should be run in a restricted
+environment.  See L<xl.cfg(5)> B<bootloader_restrict> for more information on
+how to setup and use the option.
+
 =back
 
 =head1 SEE ALSO

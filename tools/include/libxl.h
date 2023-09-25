@@ -600,6 +600,14 @@
  * first ABI incompatible change in a development branch.
  */
 
+#define LIBXL_HAVE_BOOTLOADER_RESTRICT 1
+/*
+ * LIBXL_HAVE_BOOTLOADER_RESTRICT indicates the presence of the
+ * bootloader_restrict and bootloader_user fields in libxl_domain_build_info.
+ * Such fields signal the need to pass a --runas parameter to the bootloader
+ * executable in order to not run it as the same user as libxl.
+ */
+
 /*
  * libxl memory management
  *
