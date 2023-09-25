@@ -793,7 +793,7 @@ if __name__ == "__main__":
     debug = False
     not_really = False
     output_format = "sxp"
-    output_directory = "/var/run/xen/pygrub"
+    output_directory = "/var/run/xen/pygrub/"
 
     # what was passed in
     incfg = { "kernel": None, "ramdisk": None, "args": "" }
@@ -815,7 +815,8 @@ if __name__ == "__main__":
             usage()
             sys.exit()
         elif o in ("--output",):
-            output = a
+            if a != "-":
+                output = a
         elif o in ("--kernel",):
             incfg["kernel"] = a
         elif o in ("--ramdisk",):
@@ -847,11 +848,10 @@ if __name__ == "__main__":
             if not os.path.isdir(a):
                 print("%s is not an existing directory" % a)
                 sys.exit(1)
-            output_directory = a
+            output_directory = a + '/'
 
     if debug:
         logging.basicConfig(level=logging.DEBUG)
-
 
     try:
         os.makedirs(output_directory, 0o700)
@@ -861,7 +861,7 @@ if __name__ == "__main__":
         else:
             raise
 
-    if output is None or output == "-":
+    if output is None:
         fd = sys.stdout.fileno()
     else:
         fd = os.open(output, os.O_WRONLY)
