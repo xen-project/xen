@@ -1976,6 +1976,39 @@ ignored:
 
 =back
 
+=head1 ENVIRONMENT VARIABLES
+
+The following environment variables shall affect the execution of xl:
+
+=over 4
+
+=item LIBXL_BOOTLOADER_RESTRICT
+
+Attempt to restrict the bootloader after startup, to limit the
+consequences of security vulnerabilities due to parsing guest
+owned image files.
+
+See docs/features/qemu-deprivilege.pandoc for more information
+on how to setup the unprivileged users.
+
+Note that running the bootloader in restricted mode also implies using
+non-interactive mode, and the disk image must be readable by the
+restricted user.
+
+Having this variable set is equivalent to enabling the option, even if the
+value is 0.
+
+=item LIBXL_BOOTLOADER_USER
+
+When using bootloader_restrict, run the bootloader as this user.  If
+not set the default QEMU restrict users will be used.
+
+NOTE: Each domain MUST have a SEPARATE username.
+
+See docs/features/qemu-deprivilege.pandoc for more information.
+
+=back
+
 =head1 SEE ALSO
 
 The following man pages:
