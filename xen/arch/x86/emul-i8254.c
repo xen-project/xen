@@ -48,11 +48,6 @@
 #define RW_STATE_WORD0 3
 #define RW_STATE_WORD1 4
 
-static int cf_check handle_pit_io(
-    int dir, unsigned int port, unsigned int bytes, uint32_t *val);
-static int cf_check handle_speaker_io(
-    int dir, unsigned int port, unsigned int bytes, uint32_t *val);
-
 #define get_guest_time(v) \
    (is_hvm_vcpu(v) ? hvm_get_guest_time(v) : (u64)get_s_time())
 
@@ -466,68 +461,7 @@ static int cf_check pit_load(struct domain *d, hvm_domain_context_t *h)
 HVM_REGISTER_SAVE_RESTORE(PIT, pit_save, pit_load, 1, HVMSR_PER_DOM);
 #endif
 
-void pit_reset(struct domain *d)
-{
-    PITState *pit = domain_vpit(d);
-    struct hvm_hw_pit_channel *s;
-    int i;
-
-    if ( !has_vpit(d) )
-        return;
-
-    if ( is_hvm_domain(d) )
-    {
-        TRACE_0D(TRC_HVM_EMUL_PIT_STOP_TIMER);
-        destroy_periodic_time(&pit->pt0);
-        pit->pt0.source = PTSRC_isa;
-    }
-
-    spin_lock(&pit->lock);
-
-    for ( i = 0; i < 3; i++ )
-    {
-        s = &pit->hw.channels[i];
-        s->mode = 0xff; /* the init mode */
-        s->gate = (i != 2);
-        pit_load_count(pit, i, 0);
-    }
-
-    spin_unlock(&pit->lock);
-}
-
-void pit_init(struct domain *d)
-{
-    PITState *pit = domain_vpit(d);
-
-    if ( !has_vpit(d) )
-        return;
-
-    spin_lock_init(&pit->lock);
-
-    if ( is_hvm_domain(d) )
-    {
-        register_portio_handler(d, PIT_BASE, 4, handle_pit_io);
-        register_portio_handler(d, 0x61, 1, handle_speaker_io);
-    }
-
-    pit_reset(d);
-}
-
-void pit_deinit(struct domain *d)
-{
-    PITState *pit = domain_vpit(d);
-
-    if ( !has_vpit(d) )
-        return;
-
-    if ( is_hvm_domain(d) )
-    {
-        TRACE_0D(TRC_HVM_EMUL_PIT_STOP_TIMER);
-        destroy_periodic_time(&pit->pt0);
-    }
-}
-
-/* the intercept action for PIT DM retval:0--not handled; 1--handled */  
+/* The intercept action for PIT DM retval: 0--not handled; 1--handled. */
 static int cf_check handle_pit_io(
     int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
@@ -618,6 +552,67 @@ int pv_pit_handler(int port, int data, int write)
     }
 
     return !write ? ioreq.data : 0;
+}
+
+void pit_reset(struct domain *d)
+{
+    PITState *pit = domain_vpit(d);
+    struct hvm_hw_pit_channel *s;
+    int i;
+
+    if ( !has_vpit(d) )
+        return;
+
+    if ( is_hvm_domain(d) )
+    {
+        TRACE_0D(TRC_HVM_EMUL_PIT_STOP_TIMER);
+        destroy_periodic_time(&pit->pt0);
+        pit->pt0.source = PTSRC_isa;
+    }
+
+    spin_lock(&pit->lock);
+
+    for ( i = 0; i < 3; i++ )
+    {
+        s = &pit->hw.channels[i];
+        s->mode = 0xff; /* the init mode */
+        s->gate = (i != 2);
+        pit_load_count(pit, i, 0);
+    }
+
+    spin_unlock(&pit->lock);
+}
+
+void pit_init(struct domain *d)
+{
+    PITState *pit = domain_vpit(d);
+
+    if ( !has_vpit(d) )
+        return;
+
+    spin_lock_init(&pit->lock);
+
+    if ( is_hvm_domain(d) )
+    {
+        register_portio_handler(d, PIT_BASE, 4, handle_pit_io);
+        register_portio_handler(d, 0x61, 1, handle_speaker_io);
+    }
+
+    pit_reset(d);
+}
+
+void pit_deinit(struct domain *d)
+{
+    PITState *pit = domain_vpit(d);
+
+    if ( !has_vpit(d) )
+        return;
+
+    if ( is_hvm_domain(d) )
+    {
+        TRACE_0D(TRC_HVM_EMUL_PIT_STOP_TIMER);
+        destroy_periodic_time(&pit->pt0);
+    }
 }
 
 /*
