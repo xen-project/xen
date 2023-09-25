@@ -286,6 +286,15 @@ fsimage_getbootstring(PyObject *o, PyObject *args)
 	return Py_BuildValue("s", bootstring);
 }
 
+static PyObject *
+fsimage_init(PyObject *o, PyObject *args)
+{
+	if (!PyArg_ParseTuple(args, ""))
+		return (NULL);
+
+	return Py_BuildValue("i", fsi_init());
+}
+
 PyDoc_STRVAR(fsimage_open__doc__,
     "open(name, [offset=off]) - Open the given file as a filesystem image.\n"
     "\n"
@@ -297,7 +306,13 @@ PyDoc_STRVAR(fsimage_getbootstring__doc__,
     "getbootstring(fs) - Return the boot string needed for this file system "
     "or NULL if none is needed.\n");
 
+PyDoc_STRVAR(fsimage_init__doc__,
+    "init() - Loads every dynamic library contained in xenfsimage "
+    "into memory so that it can be used in chrooted environments.\n");
+
 static struct PyMethodDef fsimage_module_methods[] = {
+	{ "init", (PyCFunction)fsimage_init,
+	    METH_VARARGS, fsimage_init__doc__ },
 	{ "open", (PyCFunction)fsimage_open,
 	    METH_VARARGS|METH_KEYWORDS, fsimage_open__doc__ },
 	{ "getbootstring", (PyCFunction)fsimage_getbootstring,
