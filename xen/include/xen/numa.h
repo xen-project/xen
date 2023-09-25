@@ -60,7 +60,7 @@ static inline void clear_node_cpumask(unsigned int cpu)
 /* Simple perfect hash to map pdx to node numbers */
 extern unsigned int memnode_shift;
 extern unsigned long memnodemapsize;
-extern uint8_t *memnodemap;
+extern nodeid_t *memnodemap;
 
 struct node_data {
     unsigned long node_start_pfn;
