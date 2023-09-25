@@ -1,6 +1,7 @@
 VERSION {
 	libfsimage.so.1.0 {
 		global:
+			fsi_init;
 			fsi_open_fsimage;
 			fsi_close_fsimage;
 			fsi_file_exists;
