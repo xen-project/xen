@@ -738,8 +738,7 @@ if __name__ == "__main__":
     def usage():
         print("Usage: %s [-q|--quiet] [-i|--interactive] [-l|--list-entries] [-n|--not-really] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] [--output-directory=] [--output-format=sxp|simple|simple0] [--offset=] <image>" %(sys.argv[0],), file=sys.stderr)
 
-    def copy_from_image(fs, file_to_read, file_type, output_directory,
-                        not_really):
+    def copy_from_image(fs, file_to_read, file_type, fd_dst, path_dst, not_really):
         if not_really:
             if fs.file_exists(file_to_read):
                 return "<%s:%s>" % (file_type, file_to_read)
@@ -750,21 +749,18 @@ if __name__ == "__main__":
         except Exception as e:
             print(e, file=sys.stderr)
             sys.exit("Error opening %s in guest" % file_to_read)
-        (tfd, ret) = tempfile.mkstemp(prefix="boot_"+file_type+".",
-                                      dir=output_directory)
         dataoff = 0
         while True:
             data = datafile.read(FS_READ_MAX, dataoff)
             if len(data) == 0:
-                os.close(tfd)
+                os.close(fd_dst)
                 del datafile
-                return ret
+                return
             try:
-                os.write(tfd, data)
+                os.write(fd_dst, data)
             except Exception as e:
                 print(e, file=sys.stderr)
-                os.close(tfd)
-                os.unlink(ret)
+                os.unlink(path_dst)
                 del datafile
                 sys.exit("Error writing temporary copy of "+file_type)
             dataoff += len(data)
@@ -861,6 +857,14 @@ if __name__ == "__main__":
         else:
             raise
 
+    if not_really:
+        fd_kernel =  path_kernel = fd_ramdisk = path_ramdisk = None
+    else:
+        (fd_kernel, path_kernel) = tempfile.mkstemp(prefix="boot_kernel.",
+                                                    dir=output_directory)
+        (fd_ramdisk, path_ramdisk) = tempfile.mkstemp(prefix="boot_ramdisk.",
+                                                      dir=output_directory)
+
     if output is None:
         fd = sys.stdout.fileno()
     else:
@@ -920,20 +924,23 @@ if __name__ == "__main__":
     if fs is None:
         raise RuntimeError("Unable to find partition containing kernel")
 
-    bootcfg["kernel"] = copy_from_image(fs, chosencfg["kernel"], "kernel",
-                                        output_directory, not_really)
+    copy_from_image(fs, chosencfg["kernel"], "kernel",
+                    fd_kernel, path_kernel, not_really)
+    bootcfg["kernel"] = path_kernel
 
     if chosencfg["ramdisk"]:
         try:
-            bootcfg["ramdisk"] = copy_from_image(fs, chosencfg["ramdisk"],
-                                                 "ramdisk", output_directory,
-                                                 not_really)
+            copy_from_image(fs, chosencfg["ramdisk"], "ramdisk",
+                            fd_ramdisk, path_ramdisk, not_really)
         except:
             if not not_really:
-                os.unlink(bootcfg["kernel"])
+                os.unlink(path_kernel)
             raise
+        bootcfg["ramdisk"] = path_ramdisk
     else:
         initrd = None
+        if not not_really:
+            os.unlink(path_ramdisk)
 
     args = None
     if chosencfg["args"]:
