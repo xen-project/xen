@@ -119,7 +119,7 @@ fail:
 	return (-1);
 }
 
-static int load_plugins(void)
+int fsi_init(void)
 {
 	const char *fsdir = getenv("XEN_FSIMAGE_FSDIR");
 	struct dirent *dp = NULL;
@@ -180,7 +180,7 @@ int find_plugin(fsi_t *fsi, const char *path, const char *options)
 	fsi_plugin_t *fp;
 	int ret = 0;
 
-	if (plugins == NULL && (ret = load_plugins()) != 0)
+	if (plugins == NULL && (ret = fsi_init()) != 0)
 		goto out;
 
 	for (fp = plugins; fp != NULL; fp = fp->fp_next) {
