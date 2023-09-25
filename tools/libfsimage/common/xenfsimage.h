@@ -35,6 +35,14 @@ extern C {
 typedef struct fsi fsi_t;
 typedef struct fsi_file fsi_file_t;
 
+/*
+ * Optional initialization function. If invoked it loads the associated
+ * dynamic libraries for the backends ahead of time. This is required if
+ * the library is to run as part of a highly deprivileged executable, as
+ * the libraries may not be reachable after depriv.
+ */
+int fsi_init(void);
+
 fsi_t *fsi_open_fsimage(const char *, uint64_t, const char *);
 void fsi_close_fsimage(fsi_t *);
 
