@@ -16,8 +16,11 @@ from __future__ import print_function
 
 import os, sys, string, struct, tempfile, re, traceback, stat, errno
 import copy
+import ctypes, ctypes.util
 import logging
 import platform
+import resource
+import subprocess
 
 import curses, _curses, curses.textpad, curses.ascii
 import getopt
@@ -27,9 +30,134 @@ import grub.GrubConf
 import grub.LiloConf
 import grub.ExtLinuxConf
 
-PYGRUB_VER = 0.6
+PYGRUB_VER = 0.7
 FS_READ_MAX = 1024 * 1024
 SECTOR_SIZE = 512
+
+# Unless provided through the env variable PYGRUB_MAX_FILE_SIZE_MB, then
+# this is the maximum filesize allowed for files written by the depriv
+# pygrub
+LIMIT_FSIZE = 128 << 20
+
+CLONE_NEWNS = 0x00020000 # mount namespace
+CLONE_NEWNET = 0x40000000 # network namespace
+CLONE_NEWIPC = 0x08000000 # IPC namespace
+
+def unshare(flags):
+    if not sys.platform.startswith("linux"):
+        print("skip_unshare reason=not_linux platform=%s", sys.platform, file=sys.stderr)
+        return
+
+    libc = ctypes.CDLL(ctypes.util.find_library('c'), use_errno=True)
+    unshare_prototype = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_int, use_errno=True)
+    unshare = unshare_prototype(('unshare', libc))
+
+    if unshare(flags) < 0:
+        raise OSError(ctypes.get_errno(), os.strerror(ctypes.get_errno()))
+
+def bind_mount(src, dst, options):
+    open(dst, "a").close() # touch
+
+    rc = subprocess.call(["mount", "--bind", "-o", options, src, dst])
+    if rc != 0:
+        raise RuntimeError("bad_mount: src=%s dst=%s opts=%s" %
+                           (src, dst, options))
+
+def downgrade_rlimits():
+    # Wipe the authority to use unrequired resources
+    resource.setrlimit(resource.RLIMIT_NPROC,    (0, 0))
+    resource.setrlimit(resource.RLIMIT_CORE,     (0, 0))
+    resource.setrlimit(resource.RLIMIT_MEMLOCK,  (0, 0))
+
+    # py2's resource module doesn't know about resource.RLIMIT_MSGQUEUE
+    #
+    # TODO: Use resource.RLIMIT_MSGQUEUE after python2 is deprecated
+    if sys.platform.startswith('linux'):
+        RLIMIT_MSGQUEUE = 12
+        resource.setrlimit(RLIMIT_MSGQUEUE, (0, 0))
+
+    # The final look of the filesystem for this process is fully RO, but
+    # note we have some file descriptor already open (notably, kernel and
+    # ramdisk). In order to avoid a compromised pygrub from filling up the
+    # filesystem we set RLIMIT_FSIZE to a high bound, so that the file
+    # write permissions are bound.
+    fsize = LIMIT_FSIZE
+    if "PYGRUB_MAX_FILE_SIZE_MB" in os.environ.keys():
+        fsize = os.environ["PYGRUB_MAX_FILE_SIZE_MB"] << 20
+
+    resource.setrlimit(resource.RLIMIT_FSIZE, (fsize, fsize))
+
+def depriv(output_directory, output, device, uid, path_kernel, path_ramdisk):
+    # The only point of this call is to force the loading of libfsimage.
+    # That way, we don't need to bind-mount it into the chroot
+    rc = xenfsimage.init()
+    if rc != 0:
+        os.unlink(path_ramdisk)
+        os.unlink(path_kernel)
+        raise RuntimeError("bad_xenfsimage: rc=%d" % rc)
+
+    # Create a temporary directory for the chroot
+    chroot = tempfile.mkdtemp(prefix=str(uid)+'-', dir=output_directory) + '/'
+    device_path = '/device'
+
+    pid = os.fork()
+    if pid:
+        # parent
+        _, rc = os.waitpid(pid, 0)
+
+        for path in [path_kernel, path_ramdisk]:
+            # If the child didn't write anything, just get rid of it,
+            # otherwise we end up consuming a 0-size file when parsing
+            # systems without a ramdisk that the ultimate caller of pygrub
+            # may just be unaware of
+            if rc != 0 or os.path.getsize(path) == 0:
+                os.unlink(path)
+
+        # Normally, unshare(CLONE_NEWNS) will ensure this is not required.
+        # However, this syscall doesn't exist in *BSD systems and doesn't
+        # auto-unmount everything on older Linux kernels (At least as of
+        # Linux 4.19, but it seems fixed in 5.15). Either way,
+        # recursively unmount everything if needed. Quietly.
+        with open('/dev/null', 'w') as devnull:
+            subprocess.call(["umount", "-f", chroot + device_path],
+                            stdout=devnull, stderr=devnull)
+            subprocess.call(["umount", "-f", chroot],
+                            stdout=devnull, stderr=devnull)
+        os.rmdir(chroot)
+
+        sys.exit(rc)
+
+    # By unsharing the namespace we're making sure it's all bulk-released
+    # at the end, when the namespaces disappear. This means the kernel does
+    # (almost) all the cleanup for us and the parent just has to remove the
+    # temporary directory.
+    unshare(CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWNET)
+
+    # Set sensible limits using the setrlimit interface
+    downgrade_rlimits()
+
+    # We'll mount tmpfs on the chroot to ensure the deprivileged child
+    # cannot affect the persistent state. It's RW now in order to
+    # bind-mount the device, but note it's remounted RO after that.
+    rc = subprocess.call(["mount", "-t", "tmpfs", "none", chroot])
+    if rc != 0:
+        raise RuntimeError("mount_tmpfs rc=%d dst=\"%s\"" % (rc, chroot))
+
+    # Bind the untrusted device RO
+    bind_mount(device, chroot + device_path, "ro,nosuid,noexec")
+
+    rc = subprocess.call(["mount", "-t", "tmpfs", "-o", "remount,ro,nosuid,noexec,nodev", "none", chroot])
+    if rc != 0:
+        raise RuntimeError("remount_tmpfs rc=%d dst=\"%s\"" % (rc, chroot))
+
+    # Drop superpowers!
+    os.chroot(chroot)
+    os.chdir('/')
+    os.setgid(uid)
+    os.setgroups([uid])
+    os.setuid(uid)
+
+    return device_path
 
 def read_size_roundup(fd, size):
     if platform.system() != 'FreeBSD':
@@ -736,7 +864,7 @@ if __name__ == "__main__":
     sel = None
     
     def usage():
-        print("Usage: %s [-q|--quiet] [-i|--interactive] [-l|--list-entries] [-n|--not-really] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] [--output-directory=] [--output-format=sxp|simple|simple0] [--offset=] <image>" %(sys.argv[0],), file=sys.stderr)
+        print("Usage: %s [-q|--quiet] [-i|--interactive] [-l|--list-entries] [-n|--not-really] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] [--output-directory=] [--output-format=sxp|simple|simple0] [--runas=] [--offset=] <image>" %(sys.argv[0],), file=sys.stderr)
 
     def copy_from_image(fs, file_to_read, file_type, fd_dst, path_dst, not_really):
         if not_really:
@@ -760,7 +888,8 @@ if __name__ == "__main__":
                 os.write(fd_dst, data)
             except Exception as e:
                 print(e, file=sys.stderr)
-                os.unlink(path_dst)
+                if path_dst:
+                    os.unlink(path_dst)
                 del datafile
                 sys.exit("Error writing temporary copy of "+file_type)
             dataoff += len(data)
@@ -769,7 +898,7 @@ if __name__ == "__main__":
         opts, args = getopt.gnu_getopt(sys.argv[1:], 'qilnh::',
                                    ["quiet", "interactive", "list-entries", "not-really", "help",
                                     "output=", "output-format=", "output-directory=", "offset=",
-                                    "entry=", "kernel=", 
+                                    "runas=", "entry=", "kernel=",
                                     "ramdisk=", "args=", "isconfig", "debug"])
     except getopt.GetoptError:
         usage()
@@ -790,6 +919,7 @@ if __name__ == "__main__":
     not_really = False
     output_format = "sxp"
     output_directory = "/var/run/xen/pygrub/"
+    uid = None
 
     # what was passed in
     incfg = { "kernel": None, "ramdisk": None, "args": "" }
@@ -813,6 +943,13 @@ if __name__ == "__main__":
         elif o in ("--output",):
             if a != "-":
                 output = a
+        elif o in ("--runas",):
+            try:
+                uid = int(a)
+            except ValueError:
+                print("runas value must be an integer user id")
+                usage()
+                sys.exit(1)
         elif o in ("--kernel",):
             incfg["kernel"] = a
         elif o in ("--ramdisk",):
@@ -849,6 +986,10 @@ if __name__ == "__main__":
     if debug:
         logging.basicConfig(level=logging.DEBUG)
 
+    if interactive and uid:
+        print("In order to use --runas, you must also set --entry or -q", file=sys.stderr)
+        sys.exit(1)
+
     try:
         os.makedirs(output_directory, 0o700)
     except OSError as e:
@@ -869,6 +1010,9 @@ if __name__ == "__main__":
         fd = sys.stdout.fileno()
     else:
         fd = os.open(output, os.O_WRONLY)
+
+    if uid:
+        file = depriv(output_directory, output, file, uid, path_kernel, path_ramdisk)
 
     # debug
     if isconfig:
@@ -925,21 +1069,21 @@ if __name__ == "__main__":
         raise RuntimeError("Unable to find partition containing kernel")
 
     copy_from_image(fs, chosencfg["kernel"], "kernel",
-                    fd_kernel, path_kernel, not_really)
+                    fd_kernel, None if uid else path_kernel, not_really)
     bootcfg["kernel"] = path_kernel
 
     if chosencfg["ramdisk"]:
         try:
             copy_from_image(fs, chosencfg["ramdisk"], "ramdisk",
-                            fd_ramdisk, path_ramdisk, not_really)
+                            fd_ramdisk, None if uid else path_ramdisk, not_really)
         except:
-            if not not_really:
-                os.unlink(path_kernel)
+            if not uid and not not_really:
+                    os.unlink(path_kernel)
             raise
         bootcfg["ramdisk"] = path_ramdisk
     else:
         initrd = None
-        if not not_really:
+        if not uid and not not_really:
             os.unlink(path_ramdisk)
 
     args = None
