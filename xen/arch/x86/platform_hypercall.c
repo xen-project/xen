@@ -14,7 +14,6 @@
 #include <xen/event.h>
 #include <xen/domain_page.h>
 #include <xen/trace.h>
-#include <xen/console.h>
 #include <xen/iocap.h>
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
@@ -24,6 +23,7 @@
 #include <xen/pmstat.h>
 #include <xen/irq.h>
 #include <xen/symbols.h>
+#include <xen/vga.h>
 #include <asm/current.h>
 #include <public/platform.h>
 #include <acpi/cpufreq/processor_perf.h>

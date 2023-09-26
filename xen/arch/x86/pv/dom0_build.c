@@ -4,7 +4,6 @@
  * Copyright (c) 2002-2005, K A Fraser
  */
 
-#include <xen/console.h>
 #include <xen/domain.h>
 #include <xen/domain_page.h>
 #include <xen/init.h>
@@ -13,6 +12,7 @@
 #include <xen/pfn.h>
 #include <xen/sched.h>
 #include <xen/softirq.h>
+#include <xen/vga.h>
 
 #include <asm/bzimage.h>
 #include <asm/dom0_build.h>

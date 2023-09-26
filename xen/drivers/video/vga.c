@@ -54,14 +54,6 @@ string_param("vga", opt_vga);
 static unsigned int columns, lines;
 #define ATTRIBUTE   7
 
-#ifdef CONFIG_X86
-void vesa_early_init(void);
-void vesa_endboot(bool_t keep);
-#else
-#define vesa_early_init() ((void)0)
-#define vesa_endboot(x)   ((void)0)
-#endif
-
 void __init video_init(void)
 {
     char *p;
