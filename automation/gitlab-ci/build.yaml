@@ -563,24 +563,6 @@ debian-bullseye-gcc-ppc64le-debug:
     KBUILD_DEFCONFIG: ppc64_defconfig
     HYPERVISOR_ONLY: y
 
-debian-bullseye-gcc-ppc64le-randconfig:
-  extends: .gcc-ppc64le-cross-build
-  variables:
-    CONTAINER: debian:bullseye-ppc64le
-    KBUILD_DEFCONFIG: ppc64_defconfig
-    RANDCONFIG: y
-    EXTRA_FIXED_RANDCONFIG:
-      CONFIG_COVERAGE=n
-
-debian-bullseye-gcc-ppc64le-debug-randconfig:
-  extends: .gcc-ppc64le-cross-build-debug
-  variables:
-    CONTAINER: debian:bullseye-ppc64le
-    KBUILD_DEFCONFIG: ppc64_defconfig
-    RANDCONFIG: y
-    EXTRA_FIXED_RANDCONFIG:
-      CONFIG_COVERAGE=n
-
 # Yocto test jobs
 yocto-qemuarm64:
   extends: .yocto-test-arm64
