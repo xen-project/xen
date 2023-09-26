@@ -22,7 +22,10 @@ if [[ "${RANDCONFIG}" == "y" ]]; then
     # RANDCONFIG implies HYPERVISOR_ONLY
     HYPERVISOR_ONLY="y"
 else
-    echo "CONFIG_DEBUG=${debug}" > xen/.config
+    # Start off with arch's defconfig
+    make -C xen defconfig
+
+    echo "CONFIG_DEBUG=${debug}" >> xen/.config
 
     if [[ -n "${EXTRA_XEN_CONFIG}" ]]; then
         echo "${EXTRA_XEN_CONFIG}" >> xen/.config
