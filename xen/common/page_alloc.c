@@ -1211,6 +1211,14 @@ static unsigned int node_to_scrub(bool get_node)
         } while ( !cpumask_empty(&node_to_cpumask(node)) &&
                   (node != local_node) );
 
+        /*
+         * In practice `node` will always be within MAX_NUMNODES, but GCC can't
+         * always see that, so an explicit check is necessary to avoid tripping
+         * its out-of-bounds array access warning (-Warray-bounds).
+         */
+        if ( node >= MAX_NUMNODES )
+            break;
+
         if ( node == local_node )
             break;
 
