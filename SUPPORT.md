@@ -46,9 +46,9 @@ For the Cortex A77 r0p0 - r1p0, see Errata 1508412.
 
 ## Host hardware support
 
-### Physical CPU Hotplug
+### ACPI CPU Hotplug
 
-    Status, x86: Supported
+    Status, x86: Experimental
 
 ### Physical Memory
 

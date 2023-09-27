@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
    known user doesn't use it properly, leading to in-guest breakage.
  - The "dom0" option is now supported on Arm and "sve=" sub-option can be used
    to enable dom0 guest to use SVE/SVE2 instructions.
+ - Physical CPU Hotplug downgraded to Experimental and renamed "ACPI CPU
+   Hotplug" for clarity
 
 ### Added
  - On x86, support for features new in Intel Sapphire Rapids CPUs:
