@@ -374,6 +374,11 @@ maintainers if you want to suggest a change.
      - A cast shall not remove any const or volatile qualification from the type pointed to by a pointer
      -
 
+   * - `Rule 11.9 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_11_09.c>`_
+     - Required
+     - The macro NULL shall be the only permitted form of null pointer constant
+     -
+
    * - `Rule 12.5 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_12_05.c>`_
      - Mandatory
      - The sizeof operator shall not have an operand which is a function
