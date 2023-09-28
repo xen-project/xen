@@ -102,6 +102,7 @@
 #define LIBXL_QMP_CMD_TIMEOUT 10
 #define LIBXL_STUBDOM_START_TIMEOUT 30
 #define LIBXL_QEMU_BODGE_TIMEOUT 2
+#define LIBXL_BOOTLOADER_TIMEOUT 120
 #define LIBXL_XENCONSOLE_LIMIT 1048576
 #define LIBXL_XENCONSOLE_PROTOCOL "vt100"
 #define LIBXL_MAXMEM_CONSTANT 1024
@@ -3744,6 +3745,7 @@ struct libxl__bootloader_state {
     libxl__openpty_state openpty;
     libxl__openpty_result ptys[2];  /* [0] is for bootloader */
     libxl__ev_child child;
+    libxl__ev_time time;
     libxl__domaindeathcheck deathcheck;
     int nargs, argsspace;
     const char **args;
