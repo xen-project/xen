@@ -1985,6 +1985,14 @@ compatibility reasons.
 
 If set takes precedence over L<xl.cfg(5)> B<bootloader_user> option.
 
+=item LIBXL_BOOTLOADER_TIMEOUT
+
+Timeout in seconds for bootloader execution when running in restricted mode.
+Otherwise the build time default in LIBXL_BOOTLOADER_TIMEOUT will be used.
+
+If defined the value must be an unsigned integer between 0 and INT_MAX,
+otherwise behavior is undefined.  Setting to 0 disables the timeout.
+
 =back
 
 =head1 SEE ALSO
