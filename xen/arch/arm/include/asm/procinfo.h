@@ -24,7 +24,7 @@
 #include <xen/sched.h>
 
 struct processor {
-    /* Initialize specific processor register for the new VPCU*/
+    /* Initialize specific processor register for the new vCPU */
     void (*vcpu_initialise)(struct vcpu *v);
 };
 
