@@ -34,6 +34,8 @@ static void bootloader_keystrokes_copyfail(libxl__egc *egc,
        libxl__datacopier_state *dc, int rc, int onwrite, int errnoval);
 static void bootloader_display_copyfail(libxl__egc *egc,
        libxl__datacopier_state *dc, int rc, int onwrite, int errnoval);
+static void bootloader_timeout(libxl__egc *egc, libxl__ev_time *ev,
+                               const struct timeval *requested_abs, int rc);
 static void bootloader_domaindeath(libxl__egc*, libxl__domaindeathcheck *dc,
                                    int rc);
 static void bootloader_finished(libxl__egc *egc, libxl__ev_child *child,
@@ -301,6 +303,7 @@ void libxl__bootloader_init(libxl__bootloader_state *bl)
     bl->ptys[0].master = bl->ptys[0].slave = 0;
     bl->ptys[1].master = bl->ptys[1].slave = 0;
     libxl__ev_child_init(&bl->child);
+    libxl__ev_time_init(&bl->time);
     libxl__domaindeathcheck_init(&bl->deathcheck);
     bl->keystrokes.ao = bl->ao;  libxl__datacopier_init(&bl->keystrokes);
     bl->display.ao = bl->ao;     libxl__datacopier_init(&bl->display);
@@ -318,6 +321,7 @@ static void bootloader_cleanup(libxl__egc *egc, libxl__bootloader_state *bl)
     libxl__domaindeathcheck_stop(gc,&bl->deathcheck);
     libxl__datacopier_kill(&bl->keystrokes);
     libxl__datacopier_kill(&bl->display);
+    libxl__ev_time_deregister(gc, &bl->time);
     for (i=0; i<2; i++) {
         libxl__carefd_close(bl->ptys[i].master);
         libxl__carefd_close(bl->ptys[i].slave);
@@ -379,6 +383,7 @@ static void bootloader_stop(libxl__egc *egc,
 
     libxl__datacopier_kill(&bl->keystrokes);
     libxl__datacopier_kill(&bl->display);
+    libxl__ev_time_deregister(gc, &bl->time);
     if (libxl__ev_child_inuse(&bl->child)) {
         r = kill(bl->child.pid, SIGTERM);
         if (r) LOGED(WARN, bl->domid, "%sfailed to kill bootloader [%lu]",
@@ -641,6 +646,25 @@ static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op)
 
     struct termios termattr;
 
+    if (getenv("LIBXL_BOOTLOADER_RESTRICT") ||
+        getenv("LIBXL_BOOTLOADER_USER")) {
+        const char *timeout_env = getenv("LIBXL_BOOTLOADER_TIMEOUT");
+        int timeout = timeout_env ? atoi(timeout_env)
+                                  : LIBXL_BOOTLOADER_TIMEOUT;
+
+        if (timeout) {
+            /* Set execution timeout */
+            rc = libxl__ev_time_register_rel(ao, &bl->time,
+                                            bootloader_timeout,
+                                            timeout * 1000);
+            if (rc) {
+                LOGED(ERROR, bl->domid,
+                      "unable to register timeout for bootloader execution");
+                goto out;
+            }
+        }
+    }
+
     pid_t pid = libxl__ev_child_fork(gc, &bl->child, bootloader_finished);
     if (pid == -1) {
         rc = ERROR_FAIL;
@@ -706,6 +730,21 @@ static void bootloader_display_copyfail(libxl__egc *egc,
     libxl__bootloader_state *bl = CONTAINER_OF(dc, *bl, display);
     bootloader_copyfail(egc, "bootloader output", bl, 1, rc,onwrite,errnoval);
 }
+static void bootloader_timeout(libxl__egc *egc, libxl__ev_time *ev,
+                               const struct timeval *requested_abs, int rc)
+{
+    libxl__bootloader_state *bl = CONTAINER_OF(ev, *bl, time);
+    STATE_AO_GC(bl->ao);
+
+    libxl__ev_time_deregister(gc, &bl->time);
+
+    assert(libxl__ev_child_inuse(&bl->child));
+    LOGD(ERROR, bl->domid, "killing bootloader because of timeout");
+
+    libxl__ev_child_kill_deregister(ao, &bl->child, SIGKILL);
+
+    bootloader_callback(egc, bl, rc);
+}
 
 static void bootloader_domaindeath(libxl__egc *egc,
                                    libxl__domaindeathcheck *dc,
@@ -722,6 +761,7 @@ static void bootloader_finished(libxl__egc *egc, libxl__ev_child *child,
     STATE_AO_GC(bl->ao);
     int rc;
 
+    libxl__ev_time_deregister(gc, &bl->time);
     libxl__datacopier_kill(&bl->keystrokes);
     libxl__datacopier_kill(&bl->display);
 
