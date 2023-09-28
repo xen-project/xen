@@ -46,7 +46,7 @@ ENTRY(start)
 .L_correct_address:
 
     /* set up the initial stack */
-    LOAD_REG_ADDR(%r1, cpu0_boot_stack)
+    LOAD_REG_ADDR(%r1, cpu0_boot_stack + STACK_SIZE)
     li      %r11, 0
     stdu    %r11, -STACK_FRAME_OVERHEAD(%r1)
 
