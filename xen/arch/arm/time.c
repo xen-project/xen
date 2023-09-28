@@ -101,6 +101,17 @@ static void __init preinit_acpi_xen_time(void)
 static void __init preinit_acpi_xen_time(void) { }
 #endif
 
+static void __init validate_timer_frequency(void)
+{
+    /*
+     * ARM ARM does not impose any strict limit on the range of allowable
+     * system counter frequencies. However, we operate under the assumption
+     * that cpu_khz must not be 0.
+     */
+    if ( !cpu_khz )
+        panic("Timer frequency is less than 1 KHz\n");
+}
+
 /* Set up the timer on the boot CPU (early init function) */
 static void __init preinit_dt_xen_time(void)
 {
@@ -122,6 +133,7 @@ static void __init preinit_dt_xen_time(void)
     if ( res )
     {
         cpu_khz = rate / 1000;
+        validate_timer_frequency();
         timer_dt_clock_frequency = rate;
     }
 }
@@ -137,7 +149,10 @@ void __init preinit_xen_time(void)
         preinit_acpi_xen_time();
 
     if ( !cpu_khz )
+    {
         cpu_khz = (READ_SYSREG(CNTFRQ_EL0) & CNTFRQ_MASK) / 1000;
+        validate_timer_frequency();
+    }
 
     res = platform_init_time();
     if ( res )
