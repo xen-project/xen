@@ -2535,18 +2535,18 @@ static void clean_store(struct check_store_data *data)
 	domain_check_acc(data->domains);
 }
 
-int check_store_path(const char *name, struct check_store_data *data)
+int check_store_path(const void *ctx, const char *name, struct check_store_data *data)
 {
 	struct node *node;
 
-	node = read_node(NULL, NULL, name);
+	node = read_node(NULL, ctx, name);
 	if (!node) {
 		log("check_store: error %d reading special node '%s'", errno,
 		    name);
 		return errno;
 	}
 
-	return check_store_step(NULL, NULL, node, data);
+	return check_store_step(ctx, NULL, node, data);
 }
 
 void check_store(void)
@@ -2556,6 +2556,7 @@ void check_store(void)
 		.enoent = check_store_enoent,
 	};
 	struct check_store_data data;
+	void *ctx;
 
 	/* Don't free values (they are all void *1) */
 	data.reachable = create_hashtable(NULL, "checkstore", hash_from_key_fn,
@@ -2571,17 +2572,19 @@ void check_store(void)
 		goto out_hash;
 	}
 
+	ctx = talloc_new(NULL);
 	log("Checking store ...");
-	if (walk_node_tree(NULL, NULL, "/", &walkfuncs, &data)) {
+	if (walk_node_tree(ctx, NULL, "/", &walkfuncs, &data)) {
 		if (errno == ENOMEM)
 			log("check_store: ENOMEM");
-	} else if (!check_store_path("@introduceDomain", &data) &&
-		   !check_store_path("@releaseDomain", &data) &&
+	} else if (!check_store_path(ctx, "@introduceDomain", &data) &&
+		   !check_store_path(ctx, "@releaseDomain", &data) &&
 		   !check_transactions(data.reachable))
 		clean_store(&data);
 	log("Checking store complete.");
 
 	hashtable_destroy(data.domains);
+	talloc_free(ctx);
  out_hash:
 	hashtable_destroy(data.reachable);
 }
