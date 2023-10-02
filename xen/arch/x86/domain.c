@@ -1024,7 +1024,10 @@ int arch_domain_soft_reset(struct domain *d)
     }
 
     for_each_vcpu ( d, v )
+    {
         set_xen_guest_handle(v->arch.time_info_guest, NULL);
+        unmap_guest_area(v, &v->arch.time_guest_area);
+    }
 
  exit_put_gfn:
     put_gfn(d, gfn_x(gfn));
@@ -2380,6 +2383,8 @@ int domain_relinquish_resources(struct domain *d)
             ret = vcpu_destroy_pagetables(v);
             if ( ret )
                 return ret;
+
+            unmap_guest_area(v, &v->arch.time_guest_area);
 
             vpmu_destroy(v);
         }

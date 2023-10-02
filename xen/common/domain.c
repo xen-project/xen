@@ -992,7 +992,10 @@ int domain_kill(struct domain *d)
         if ( cpupool_move_domain(d, cpupool0) )
             return -ERESTART;
         for_each_vcpu ( d, v )
+        {
             unmap_vcpu_info(v);
+            unmap_guest_area(v, &v->runstate_guest_area);
+        }
         d->is_dying = DOMDYING_dead;
         /* Mem event cleanup has to go here because the rings 
          * have to be put before we call put_domain. */
@@ -1446,6 +1449,7 @@ int domain_soft_reset(struct domain *d, bool resuming)
     {
         set_xen_guest_handle(runstate_guest(v), NULL);
         unmap_vcpu_info(v);
+        unmap_guest_area(v, &v->runstate_guest_area);
     }
 
     rc = arch_domain_soft_reset(d);
@@ -1595,6 +1599,19 @@ void unmap_vcpu_info(struct vcpu *v)
     vcpu_info_reset(v); /* NB: Clobbers v->vcpu_info_mfn */
 
     put_page_and_type(mfn_to_page(mfn));
+}
+
+/*
+ * This is only intended to be used for domain cleanup (or more generally only
+ * with at least the respective vCPU, if it's not the current one, reliably
+ * paused).
+ */
+void unmap_guest_area(struct vcpu *v, struct guest_area *area)
+{
+    struct domain *d = v->domain;
+
+    if ( v != current )
+        ASSERT(atomic_read(&v->pause_count) | atomic_read(&d->pause_count));
 }
 
 int default_initialise_vcpu(struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg)
