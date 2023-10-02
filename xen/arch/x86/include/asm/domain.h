@@ -692,6 +692,8 @@ void domain_cpu_policy_changed(struct domain *d);
 
 bool update_secondary_system_time(struct vcpu *,
                                   struct vcpu_time_info *);
+void force_update_secondary_system_time(struct vcpu *,
+                                        struct vcpu_time_info *);
 
 void vcpu_show_registers(const struct vcpu *);
 

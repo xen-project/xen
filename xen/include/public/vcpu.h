@@ -209,6 +209,9 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_get_physid_t);
  * segment limit).  It can then apply the normal algorithm to compute
  * system time from the tsc.
  *
+ * New code wants to prefer VCPUOP_register_vcpu_time_phys_area, and only
+ * fall back to the operation here for backwards compatibility.
+ *
  * @extra_arg == pointer to vcpu_register_time_info_memory_area structure.
  */
 #define VCPUOP_register_vcpu_time_memory_area   13
@@ -235,6 +238,7 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_register_time_memory_area_t);
  * VMASST_TYPE_runstate_update_flag engaged by the domain.
  */
 #define VCPUOP_register_runstate_phys_area      14
+#define VCPUOP_register_vcpu_time_phys_area     15
 
 #endif /* __XEN_PUBLIC_VCPU_H__ */
 
