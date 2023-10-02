@@ -1689,48 +1689,24 @@ static int copy_vcpu_settings(struct domain *cd, const struct domain *d)
     unsigned int i;
     struct p2m_domain *p2m = p2m_get_hostp2m(cd);
     int ret = -EINVAL;
+    mfn_t vcpu_info_mfn;
 
     for ( i = 0; i < cd->max_vcpus; i++ )
     {
         struct vcpu *d_vcpu = d->vcpu[i];
         struct vcpu *cd_vcpu = cd->vcpu[i];
-        mfn_t vcpu_info_mfn;
 
         if ( !d_vcpu || !cd_vcpu )
             continue;
 
-        /* Copy & map in the vcpu_info page if the guest uses one */
+        /* Map in the vcpu_info page if the guest uses one */
         vcpu_info_mfn = d_vcpu->vcpu_info_mfn;
         if ( !mfn_eq(vcpu_info_mfn, INVALID_MFN) )
         {
-            mfn_t new_vcpu_info_mfn = cd_vcpu->vcpu_info_mfn;
-
-            /* Allocate & map the page for it if it hasn't been already */
-            if ( mfn_eq(new_vcpu_info_mfn, INVALID_MFN) )
-            {
-                gfn_t gfn = mfn_to_gfn(d, vcpu_info_mfn);
-                unsigned long gfn_l = gfn_x(gfn);
-                struct page_info *page;
-
-                if ( !(page = alloc_domheap_page(cd, 0)) )
-                    return -ENOMEM;
-
-                new_vcpu_info_mfn = page_to_mfn(page);
-                set_gpfn_from_mfn(mfn_x(new_vcpu_info_mfn), gfn_l);
-
-                ret = p2m->set_entry(p2m, gfn, new_vcpu_info_mfn,
-                                     PAGE_ORDER_4K, p2m_ram_rw,
-                                     p2m->default_access, -1);
-                if ( ret )
-                    return ret;
-
-                ret = map_vcpu_info(cd_vcpu, gfn_l,
-                                    PAGE_OFFSET(d_vcpu->vcpu_info));
-                if ( ret )
-                    return ret;
-            }
-
-            copy_domain_page(new_vcpu_info_mfn, vcpu_info_mfn);
+            ret = map_vcpu_info(cd_vcpu, mfn_to_gfn(d, vcpu_info_mfn),
+                                PAGE_OFFSET(d_vcpu->vcpu_info));
+            if ( ret )
+                return ret;
         }
 
         ret = copy_vpmu(d_vcpu, cd_vcpu);
