@@ -1644,14 +1644,51 @@ bool update_runstate_area(struct vcpu *v)
     bool rc;
     struct guest_memory_policy policy = { };
     void __user *guest_handle = NULL;
-    struct vcpu_runstate_info runstate;
+    struct vcpu_runstate_info runstate = v->runstate;
+    struct vcpu_runstate_info *map = v->runstate_guest_area.map;
+
+    if ( map )
+    {
+        uint64_t *pset;
+#ifdef CONFIG_COMPAT
+        struct compat_vcpu_runstate_info *cmap = NULL;
+
+        if ( v->runstate_guest_area_compat )
+            cmap = (void *)map;
+#endif
+
+        /*
+         * NB: No VM_ASSIST(v->domain, runstate_update_flag) check here.
+         *     Always using that updating model.
+         */
+#ifdef CONFIG_COMPAT
+        if ( cmap )
+            pset = &cmap->state_entry_time;
+        else
+#endif
+            pset = &map->state_entry_time;
+        runstate.state_entry_time |= XEN_RUNSTATE_UPDATE;
+        write_atomic(pset, runstate.state_entry_time);
+        smp_wmb();
+
+#ifdef CONFIG_COMPAT
+        if ( cmap )
+            XLAT_vcpu_runstate_info(cmap, &runstate);
+        else
+#endif
+            *map = runstate;
+
+        smp_wmb();
+        runstate.state_entry_time &= ~XEN_RUNSTATE_UPDATE;
+        write_atomic(pset, runstate.state_entry_time);
+
+        return true;
+    }
 
     if ( guest_handle_is_null(runstate_guest(v)) )
         return true;
 
     update_guest_memory_policy(v, &policy);
-
-    memcpy(&runstate, &v->runstate, sizeof(runstate));
 
     if ( VM_ASSIST(v->domain, runstate_update_flag) )
     {
