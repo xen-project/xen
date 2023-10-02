@@ -26,17 +26,20 @@ static inline void arch_set_##field(struct domain *d,           \
 #define GET_SET_VCPU(type, field)                               \
 static inline type arch_get_##field(const struct vcpu *v)       \
 {                                                               \
+    const vcpu_info_t *vi = v->vcpu_info_area.map;              \
+                                                                \
     return !has_32bit_shinfo(v->domain) ?                       \
-           v->vcpu_info->native.arch.field :                    \
-           v->vcpu_info->compat.arch.field;                     \
+           vi->native.arch.field : vi->compat.arch.field;       \
 }                                                               \
 static inline void arch_set_##field(struct vcpu *v,             \
                                     type val)                   \
 {                                                               \
+    vcpu_info_t *vi = v->vcpu_info_area.map;                    \
+                                                                \
     if ( !has_32bit_shinfo(v->domain) )                         \
-        v->vcpu_info->native.arch.field = val;                  \
+        vi->native.arch.field = val;                            \
     else                                                        \
-        v->vcpu_info->compat.arch.field = val;                  \
+        vi->compat.arch.field = val;                            \
 }
 
 #else
@@ -57,12 +60,16 @@ static inline void arch_set_##field(struct domain *d,       \
 #define GET_SET_VCPU(type, field)                           \
 static inline type arch_get_##field(const struct vcpu *v)   \
 {                                                           \
-    return v->vcpu_info->arch.field;                        \
+    const vcpu_info_t *vi = v->vcpu_info_area.map;          \
+                                                            \
+    return vi->arch.field;                                  \
 }                                                           \
 static inline void arch_set_##field(struct vcpu *v,         \
                                     type val)               \
 {                                                           \
-    v->vcpu_info->arch.field = val;                         \
+    vcpu_info_t *vi = v->vcpu_info_area.map;                \
+                                                            \
+    vi->arch.field = val;                                   \
 }
 
 #endif

@@ -1705,7 +1705,6 @@ static int copy_vpmu(struct vcpu *d_vcpu, struct vcpu *cd_vcpu)
 static int copy_vcpu_settings(struct domain *cd, const struct domain *d)
 {
     unsigned int i;
-    struct p2m_domain *p2m = p2m_get_hostp2m(cd);
     int ret = -EINVAL;
     mfn_t vcpu_info_mfn;
 
@@ -1717,17 +1716,14 @@ static int copy_vcpu_settings(struct domain *cd, const struct domain *d)
         if ( !d_vcpu || !cd_vcpu )
             continue;
 
-        /* Map in the vcpu_info page if the guest uses one */
-        vcpu_info_mfn = d_vcpu->vcpu_info_mfn;
-        if ( !mfn_eq(vcpu_info_mfn, INVALID_MFN) )
-        {
-            ret = map_vcpu_info(cd_vcpu, mfn_to_gfn(d, vcpu_info_mfn),
-                                PAGE_OFFSET(d_vcpu->vcpu_info));
-            if ( ret )
-                return ret;
-        }
-
-        /* Same for the (physically registered) runstate and time info areas. */
+        /*
+         * Map the vcpu_info page and the (physically registered) runstate and
+         * time info areas.
+         */
+        ret = copy_guest_area(&cd_vcpu->vcpu_info_area,
+                              &d_vcpu->vcpu_info_area, cd_vcpu, d);
+        if ( ret )
+            return ret;
         ret = copy_guest_area(&cd_vcpu->runstate_guest_area,
                               &d_vcpu->runstate_guest_area, cd_vcpu, d);
         if ( ret )
