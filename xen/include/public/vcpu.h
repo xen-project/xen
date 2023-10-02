@@ -110,6 +110,8 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_t);
  *     runstate.state will always be RUNSTATE_running and
  *     runstate.state_entry_time will indicate the system time at which the
  *     VCPU was last scheduled to run.
+ *  3. New code wants to prefer VCPUOP_register_runstate_phys_area, and only
+ *     fall back to the operation here for backwards compatibility.
  * @extra_arg == pointer to vcpu_register_runstate_memory_area structure.
  */
 #define VCPUOP_register_runstate_memory_area 5
@@ -220,6 +222,19 @@ struct vcpu_register_time_memory_area {
 };
 typedef struct vcpu_register_time_memory_area vcpu_register_time_memory_area_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_register_time_memory_area_t);
+
+/*
+ * Like the respective VCPUOP_register_*_memory_area, just using the "addr.p"
+ * field of the supplied struct as a guest physical address (i.e. in GFN space).
+ * The respective area may not cross a page boundary.  Pass ~0 to unregister an
+ * area.  Note that as long as an area is registered by physical address, the
+ * linear address based area will not be serviced (updated) by the hypervisor.
+ *
+ * Note that the area registered via VCPUOP_register_runstate_memory_area will
+ * be updated in the same manner as the one registered via virtual address PLUS
+ * VMASST_TYPE_runstate_update_flag engaged by the domain.
+ */
+#define VCPUOP_register_runstate_phys_area      14
 
 #endif /* __XEN_PUBLIC_VCPU_H__ */
 
