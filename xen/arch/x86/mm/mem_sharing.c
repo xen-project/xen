@@ -1641,6 +1641,24 @@ static void copy_vcpu_nonreg_state(struct vcpu *d_vcpu, struct vcpu *cd_vcpu)
     hvm_set_nonreg_state(cd_vcpu, &nrs);
 }
 
+static int copy_guest_area(struct guest_area *cd_area,
+                           const struct guest_area *d_area,
+                           struct vcpu *cd_vcpu,
+                           const struct domain *d)
+{
+    unsigned int offset;
+
+    /* Check if no area to map, or already mapped. */
+    if ( !d_area->pg || cd_area->pg )
+        return 0;
+
+    offset = PAGE_OFFSET(d_area->map);
+    return map_guest_area(cd_vcpu, gfn_to_gaddr(
+                                       mfn_to_gfn(d, page_to_mfn(d_area->pg))) +
+                                   offset,
+                          PAGE_SIZE - offset, cd_area, NULL);
+}
+
 static int copy_vpmu(struct vcpu *d_vcpu, struct vcpu *cd_vcpu)
 {
     struct vpmu_struct *d_vpmu = vcpu_vpmu(d_vcpu);
@@ -1708,6 +1726,16 @@ static int copy_vcpu_settings(struct domain *cd, const struct domain *d)
             if ( ret )
                 return ret;
         }
+
+        /* Same for the (physically registered) runstate and time info areas. */
+        ret = copy_guest_area(&cd_vcpu->runstate_guest_area,
+                              &d_vcpu->runstate_guest_area, cd_vcpu, d);
+        if ( ret )
+            return ret;
+        ret = copy_guest_area(&cd_vcpu->arch.time_guest_area,
+                              &d_vcpu->arch.time_guest_area, cd_vcpu, d);
+        if ( ret )
+            return ret;
 
         ret = copy_vpmu(d_vcpu, cd_vcpu);
         if ( ret )
@@ -1950,7 +1978,15 @@ int mem_sharing_fork_reset(struct domain *d, bool reset_state,
 
  state:
     if ( reset_state )
+    {
         rc = copy_settings(d, pd);
+        if ( rc == -ERESTART )
+            /*
+             * Translate to -EAGAIN, see TODO comment at top of function about
+             * hypercall continuations.
+             */
+            rc = -EAGAIN;
+    }
 
     domain_unpause(d);
 
