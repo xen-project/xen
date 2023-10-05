@@ -8,6 +8,7 @@
  * Copyright (c) 2011 Citrix Systems.
  */
 
+#include <xen/acpi.h>
 #include <xen/lib.h>
 #include <xen/perfc.h>
 #include <xen/sched.h>
@@ -61,10 +62,22 @@ int domain_vtimer_init(struct domain *d, struct xen_arch_domainconfig *config)
 
     config->clock_frequency = timer_dt_clock_frequency;
 
-    /* At this stage vgic_reserve_virq can't fail */
+    /*
+     * Per the ACPI specification, providing a secure EL1 timer
+     * interrupt is optional and will be ignored by non-secure OS.
+     * Therefore don't reserve the interrupt number for the HW domain
+     * and ACPI.
+     *
+     * Note that we should still reserve it when using the Device-Tree
+     * because the interrupt is not optional. That said, we are not
+     * expecting any OS to use it when running on top of Xen.
+     *
+     * At this stage vgic_reserve_virq() is not meant to fail.
+     */
     if ( is_hardware_domain(d) )
     {
-        if ( !vgic_reserve_virq(d, timer_get_irq(TIMER_PHYS_SECURE_PPI)) )
+        if ( acpi_disabled &&
+             !vgic_reserve_virq(d, timer_get_irq(TIMER_PHYS_SECURE_PPI)) )
             BUG();
 
         if ( !vgic_reserve_virq(d, timer_get_irq(TIMER_PHYS_NONSECURE_PPI)) )

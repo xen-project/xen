@@ -78,10 +78,6 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *header)
     irq_set_type(gtdt->non_secure_el1_interrupt, irq_type);
     timer_irq[TIMER_PHYS_NONSECURE_PPI] = gtdt->non_secure_el1_interrupt;
 
-    irq_type = acpi_get_timer_irq_type(gtdt->secure_el1_flags);
-    irq_set_type(gtdt->secure_el1_interrupt, irq_type);
-    timer_irq[TIMER_PHYS_SECURE_PPI] = gtdt->secure_el1_interrupt;
-
     irq_type = acpi_get_timer_irq_type(gtdt->virtual_timer_flags);
     irq_set_type(gtdt->virtual_timer_interrupt, irq_type);
     timer_irq[TIMER_VIRT_PPI] = gtdt->virtual_timer_interrupt;
