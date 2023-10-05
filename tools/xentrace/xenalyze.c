@@ -4628,6 +4628,13 @@ void hvm_generic_postprocess(struct hvm_data *h)
         /* Some exits we don't expect a handler; just return */
         if(opt.svm_mode)
         {
+            switch(h->exit_reason)
+            {
+            case VMEXIT_VINTR: /* Equivalent of PENDING_VIRT_INTR */
+                return;
+            default:
+                break;
+            }
         }
         else
         {
