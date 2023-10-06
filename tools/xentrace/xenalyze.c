@@ -4631,6 +4631,7 @@ void hvm_generic_postprocess(struct hvm_data *h)
             switch(h->exit_reason)
             {
             case VMEXIT_VINTR: /* Equivalent of PENDING_VIRT_INTR */
+            case VMEXIT_PAUSE:
                 return;
             default:
                 break;
@@ -4643,6 +4644,7 @@ void hvm_generic_postprocess(struct hvm_data *h)
                 /* These just need us to go through the return path */
             case EXIT_REASON_PENDING_VIRT_INTR:
             case EXIT_REASON_TPR_BELOW_THRESHOLD:
+            case EXIT_REASON_PAUSE_INSTRUCTION:
                 /* Not much to log now; may need later */
             case EXIT_REASON_WBINVD:
                 return;
