@@ -111,6 +111,7 @@ echo \"${passed}\"
 "
 
     dom0_check="
+tail -F /var/log/xen/qemu-dm-domU.log &
 until grep -q \"^domU Welcome to Alpine Linux\" /var/log/xen/console/guest-domU.log; do
     sleep 1
 done
