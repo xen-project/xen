@@ -40,7 +40,6 @@ RUN \
   rc-update add udev && \
   rc-update add udev-trigger && \
   rc-update add udev-settle && \
-  rc-update add networking sysinit && \
   rc-update add loopback sysinit && \
   rc-update add bootmisc boot && \
   rc-update add devfs sysinit && \
@@ -48,18 +47,17 @@ RUN \
   rc-update add hostname boot && \
   rc-update add hwclock boot && \
   rc-update add hwdrivers sysinit && \
-  rc-update add killprocs shutdown && \
-  rc-update add modloop sysinit && \
   rc-update add modules boot && \
+  rc-update add killprocs shutdown && \
   rc-update add mount-ro shutdown && \
   rc-update add savecache shutdown && \
-  rc-update add sysctl boot && \
   rc-update add local default && \
   cp -a /sbin/init /init && \
   echo "ttyS0" >> /etc/securetty && \
   echo "hvc0" >> /etc/securetty && \
   echo "ttyS0::respawn:/sbin/getty -L ttyS0 115200 vt100" >> /etc/inittab && \
   echo "hvc0::respawn:/sbin/getty -L hvc0 115200 vt100" >> /etc/inittab && \
+  echo > /etc/modules && \
   passwd -d "root" root && \
   \
   # Create rootfs
