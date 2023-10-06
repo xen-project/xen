@@ -30,9 +30,11 @@ done
 echo \"${passed}\"
 "
     dom0_check="
+set +x
 until grep -q \"${passed}\" /var/log/xen/console/guest-domU.log; do
     sleep 1
 done
+set -x
 echo \"${passed}\"
 "
 if [ "${test_variant}" = "dom0pvh" ]; then
@@ -222,10 +224,12 @@ if [ -n "$wait_and_wakeup" ]; then
     ssh $CONTROLLER wake
 fi
 
+set +x
 until grep "^Welcome to Alpine Linux" smoke.serial || [ $timeout -le 0 ]; do
     sleep 1;
     : $((--timeout))
 done
+set -x
 
 tail -n 100 smoke.serial
 
