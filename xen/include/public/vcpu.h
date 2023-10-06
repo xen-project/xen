@@ -236,6 +236,9 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_register_time_memory_area_t);
  * Note that the area registered via VCPUOP_register_runstate_memory_area will
  * be updated in the same manner as the one registered via virtual address PLUS
  * VMASST_TYPE_runstate_update_flag engaged by the domain.
+ *
+ * XENFEAT_{runstate,vcpu_time}_phys_area feature bits signal the availability
+ * of these ops.
  */
 #define VCPUOP_register_runstate_phys_area      14
 #define VCPUOP_register_vcpu_time_phys_area     15

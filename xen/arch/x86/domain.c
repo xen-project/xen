@@ -1580,6 +1580,10 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
     {
         struct vcpu_register_time_memory_area area;
 
+        rc = -ENOSYS;
+        if ( 0 /* TODO: Dom's XENFEAT_vcpu_time_phys_area setting */ )
+            break;
+
         rc = -EFAULT;
         if ( copy_from_guest(&area.addr.p, arg, 1) )
             break;

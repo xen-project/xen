@@ -1998,6 +1998,10 @@ long common_vcpu_op(int cmd, struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg)
     {
         struct vcpu_register_runstate_memory_area area;
 
+        rc = -ENOSYS;
+        if ( 0 /* TODO: Dom's XENFEAT_runstate_phys_area setting */ )
+            break;
+
         rc = -EFAULT;
         if ( copy_from_guest(&area.addr.p, arg, 1) )
             break;
