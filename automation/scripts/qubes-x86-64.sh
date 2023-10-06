@@ -33,8 +33,6 @@ echo \"${passed}\"
 until grep -q \"${passed}\" /var/log/xen/console/guest-domU.log; do
     sleep 1
 done
-# get domU console content into test log
-tail -n 100 /var/log/xen/console/guest-domU.log
 echo \"${passed}\"
 "
 if [ "${test_variant}" = "dom0pvh" ]; then
@@ -59,8 +57,6 @@ echo deep > /sys/power/mem_sleep
 echo mem > /sys/power/state
 # now wait for resume
 sleep 5
-# get domU console content into test log
-tail -n 100 /var/log/xen/console/guest-domU.log
 xl list
 xl dmesg | grep 'Finishing wakeup from ACPI S3 state' || exit 1
 # check if domU is still alive
@@ -121,7 +117,6 @@ echo \"${passed}\"
 until grep -q \"^domU Welcome to Alpine Linux\" /var/log/xen/console/guest-domU.log; do
     sleep 1
 done
-tail -n 100 /var/log/xen/console/guest-domU.log
 "
 fi
 
@@ -169,6 +164,8 @@ ifconfig eth0 up
 ifconfig xenbr0 up
 ifconfig xenbr0 192.168.0.1
 
+# get domU console content into test log
+tail -F /var/log/xen/console/guest-domU.log 2>/dev/null | sed -e \"s/^/(domU) /\" &
 xl create /etc/xen/domU.cfg
 ${dom0_check}
 " > etc/local.d/xen.start
