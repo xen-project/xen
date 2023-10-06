@@ -55,8 +55,9 @@
 typedef struct mctelem_cookie *mctelem_cookie_t;
 
 typedef enum mctelem_class {
-	MC_URGENT,
-	MC_NONURGENT
+    MC_URGENT,
+    MC_NONURGENT,
+    MC_NCLASSES
 } mctelem_class_t;
 
 extern void mctelem_init(unsigned int);

@@ -64,8 +64,6 @@ struct mctelem_ent {
 
 #define MC_NENT (MC_URGENT_NENT + MC_NONURGENT_NENT)
 
-#define	MC_NCLASSES		(MC_NONURGENT + 1)
-
 #define	COOKIE2MCTE(c)		((struct mctelem_ent *)(c))
 #define	MCTE2COOKIE(tep)	((mctelem_cookie_t)(tep))
 
