@@ -92,23 +92,18 @@ on_reboot = "destroy"
 
     domU_check="
 set -x -e
-ip link set eth0 up
-timeout 30s udhcpc -i eth0
+interface=eth0
+ip link set \"\$interface\" up
+timeout 30s udhcpc -i \"\$interface\"
 pingip=\$(ip -o -4 r show default|cut -f 3 -d ' ')
 ping -c 10 \"\$pingip\"
 echo domU started
-cat /proc/interrupts
+pcidevice=\$(basename \$(readlink /sys/class/net/\$interface/device))
+lspci -vs \$pcidevice
 "
-    if [ "$PCIDEV_INTR" = "MSI-X" ]; then
+    if [ -n "$PCIDEV_INTR" ]; then
         domU_check="$domU_check
-grep -- '\\(-msi-x\\|PCI-MSI-X\\).*eth0' /proc/interrupts
-"
-    elif [ "$PCIDEV_INTR" = "MSI" ]; then
-        # depending on the kernel version and domain type, the MSI can be
-        # marked as '-msi', 'PCI-MSI', or 'PCI-MSI-<SBDF>'; be careful to not match
-        # -msi-x nor PCI-MSI-X
-        domU_check="$domU_check
-grep -- '\\(-msi \\|PCI-MSI\\( \\|-[^X]\\)\\).*eth0' /proc/interrupts
+lspci -vs \$pcidevice | fgrep '$PCIDEV_INTR: Enable+'
 "
     fi
     domU_check="$domU_check

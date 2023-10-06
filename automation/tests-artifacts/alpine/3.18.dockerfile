@@ -33,6 +33,7 @@ RUN \
   apk add pixman && \
   apk add curl && \
   apk add udev && \
+  apk add pciutils && \
   \
   # Xen
   cd / && \
