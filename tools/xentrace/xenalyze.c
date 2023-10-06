@@ -2866,7 +2866,7 @@ void dump_eip(struct eip_list_struct *head) {
 
     for(p=head; p; p=p->next)
     {
-        total += p->summary.count;
+        total += p->summary.event_count;
         N++;
     }
 
@@ -2901,8 +2901,8 @@ void dump_eip(struct eip_list_struct *head) {
                           p->eip,
                           find_symbol(p->eip));
             printf(" %7d %5.2lf%%\n",
-                   p->summary.count,
-                   ((double)p->summary.count*100)/total);
+                   p->summary.event_count,
+                   ((double)p->summary.event_count*100)/total);
         }
 
 
