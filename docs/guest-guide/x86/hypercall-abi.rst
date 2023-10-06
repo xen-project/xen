@@ -4,7 +4,7 @@ Hypercall ABI
 =============
 
 Hypercalls are system calls to Xen.  Two modes of guest operation are
-supported, and up to 6 individual parameters are supported.
+supported, and up to 5 individual parameters are supported.
 
 Hypercalls may only be issued by kernel-level software [#kern]_.
 
@@ -18,17 +18,17 @@ The registers used for hypercalls depends on the operating mode of the guest.
 
    * - ABI
      - Hypercall Index
-     - Parameters (1 - 6)
+     - Parameters (1 - 5) [#params]_
      - Result
 
    * - 64bit
      - RAX
-     - RDI RSI RDX R10 R8 R9
+     - RDI RSI RDX R10 R8
      - RAX
 
    * - 32bit
      - EAX
-     - EBX ECX EDX ESI EDI EBP
+     - EBX ECX EDX ESI EDI
      - EAX
 
 32 and 64bit PV guests have an ABI fixed by their guest type.  The ABI for an
@@ -118,6 +118,13 @@ means.
 
 .. [#kern] For HVM guests, ``HVMOP_guest_request_vm_event`` may be configured
    to be usable from userspace, but this behaviour is not default.
+
+.. [#params] Xen's ABI used to declare support for 6 hypercall arguments,
+   using ``r9`` and ``ebp``.  However, such an ABI clobbers the frame pointer
+   in the 32bit code and does not interact nicely with guest-side debugging.
+   ``V4V``, the predecessor to ``HYPERCALL_argo_op`` was a 6-argument
+   hypercall, but the ABI was intentionally altered when Argo was upstreamed
+   (Xen 4.13) to be the 5-argument hypercall it now is.
 
 .. [#mode] While it is possible to use compatibility mode segments in a 64bit
    kernel, hypercalls issues from such a mode will be interpreted with the
