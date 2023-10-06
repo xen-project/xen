@@ -4652,6 +4652,19 @@ void hvm_generic_postprocess(struct hvm_data *h)
                       ? "[clipped]"
                       : h->exit_reason_name[h->exit_reason]);
             warned[h->exit_reason]=1;
+
+            /* 
+             * NB that we don't return here; the result will be that `evt`
+             * will be "0", and there will be a "(no handler)" entry for the
+             * given VMEXIT.
+             * 
+             * This does mean that if two different exits have no HVM
+             * handlers, that only the first one will accumulate data;
+             * if accumulating a separate "(no handler)" data for more
+             * than one exit reason is needed, we'll have to make Yet
+             * Another Array.  But for now, since we try to avoid
+             * it happening, just tolerate it.
+             */ 
         }
     }
 
@@ -4664,18 +4677,19 @@ void hvm_generic_postprocess(struct hvm_data *h)
     }
 
     if(opt.summary_info) {
-        update_cycles(&h->summary.generic[evt],
-                       h->arc_cycles);
-
         /* NB that h->exit_reason may be 0, so we offset by 1 */
         if ( registered[evt] )
         {
             static unsigned warned[HVM_EXIT_REASON_MAX] = { 0 };
-            if ( registered[evt] != h->exit_reason+1 && !warned[h->exit_reason])
+            if ( registered[evt] != h->exit_reason+1 )
             {
-                fprintf(warn, "%s: HVM evt %lx in %x and %x!\n",
-                        __func__, evt, registered[evt]-1, h->exit_reason);
-                warned[h->exit_reason]=1;
+                if ( !warned[h->exit_reason] )
+                {
+                    fprintf(warn, "%s: HVM evt %lx in %x and %x!\n",
+                            __func__, evt, registered[evt]-1, h->exit_reason);
+                    warned[h->exit_reason]=1;
+                }
+                return;
             }
         }
         else
@@ -4686,7 +4700,11 @@ void hvm_generic_postprocess(struct hvm_data *h)
                         __func__, ret);
             registered[evt]=h->exit_reason+1;
         }
-        /* HLT checked at hvm_vmexit_close() */
+
+        update_cycles(&h->summary.generic[evt],
+                       h->arc_cycles);
+
+       /* HLT checked at hvm_vmexit_close() */
     }
 }
 
