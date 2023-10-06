@@ -104,6 +104,7 @@
  *   Exactly these sub-operations are supported:
  *    * HVMOP_set_param
  *    * HVMOP_get_param
+ *    * HVMOP_guest_request_vm_event
  *
  *  HYPERVISOR_grant_table_op
  *   All generic sub-operations
@@ -115,6 +116,32 @@
  *
  *  HYPERVISOR_argo_op
  *   All generic sub-operations
+ *
+ *  HYPERVISOR_hypfs_op
+ *   All generic sub-operations
+ *
+ *  HYPERVISOR_platform_op
+ *   Exactly these sub-operations are supported:
+ *    * XENPF_settime64
+ *
+ *  HYPERVISOR_vm_assist
+ *   All generic sub-operations
+ *
+ *  HYPERVISOR_dm_op
+ *   Exactly these sub-operations are supported:
+ *    * XEN_DMOP_create_ioreq_server
+ *    * XEN_DMOP_get_ioreq_server_info
+ *    * XEN_DMOP_map_io_range_to_ioreq_server
+ *    * XEN_DMOP_unmap_io_range_from_ioreq_server
+ *    * XEN_DMOP_set_ioreq_server_state
+ *    * XEN_DMOP_destroy_ioreq_server
+ *    * XEN_DMOP_set_irq_level
+ *    * XEN_DMOP_nr_vcpus
+ *
+ *  HYPERVISOR_xsm_op
+ *   All generic sub-operations
+ *
+ *  HYPERVISOR_multicall
  *
  * Other notes on the ARM ABI:
  *
