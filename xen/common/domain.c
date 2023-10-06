@@ -1601,7 +1601,7 @@ int map_guest_area(struct vcpu *v, paddr_t gaddr, unsigned int size,
  unmap:
     if ( pg )
     {
-        unmap_domain_page_global(map);
+        unmap_domain_page_global((void *)((unsigned long)map & PAGE_MASK));
         put_page_and_type(pg);
     }
 
@@ -1634,7 +1634,7 @@ void unmap_guest_area(struct vcpu *v, struct guest_area *area)
 
     if ( pg )
     {
-        unmap_domain_page_global(map);
+        unmap_domain_page_global((void *)((unsigned long)map & PAGE_MASK));
         put_page_and_type(pg);
     }
 }
