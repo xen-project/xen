@@ -1706,7 +1706,6 @@ static int copy_vcpu_settings(struct domain *cd, const struct domain *d)
 {
     unsigned int i;
     int ret = -EINVAL;
-    mfn_t vcpu_info_mfn;
 
     for ( i = 0; i < cd->max_vcpus; i++ )
     {
