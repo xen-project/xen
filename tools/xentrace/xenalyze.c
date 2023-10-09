@@ -1625,7 +1625,7 @@ struct vlapic_struct {
 struct vcpu_data {
     int vid;
     struct domain_data *d; /* up-pointer */
-    unsigned activated:1;
+    unsigned activated:1, delayed_init:1;
 
     int guest_paging_levels;
 
@@ -6979,10 +6979,17 @@ void vcpu_start(struct pcpu_info *p, struct vcpu_data *v,
      * bring a vcpu out of INIT until it's seen to be actually
      * running somewhere. */
     if ( new_runstate != RUNSTATE_RUNNING ) {
-        fprintf(warn, "First schedule for d%dv%d doesn't take us into a running state; leaving INIT\n",
-                v->d->did, v->vid);
+        if ( !v->delayed_init ) {
+            fprintf(warn, "First schedule for d%dv%d doesn't take us into a running state; leaving in INIT\n",
+                    v->d->did, v->vid);
+            v->delayed_init = 1;
+        }
 
         return;
+    } else if ( v->delayed_init ) {
+        fprintf(warn, "d%dv%d RUNSTATE_RUNNING detected, leaving INIT",
+                v->d->did, v->vid);
+        v->delayed_init = 0;
     }
 
     tsc = ri_tsc;
