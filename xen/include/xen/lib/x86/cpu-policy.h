@@ -100,13 +100,14 @@ const char *x86_cpuid_vendor_to_str(unsigned int vendor);
  * interaction with the toolstack.  (Sum of all leaves in each union, less the
  * entries in basic which sub-unions hang off of.)
  */
-#define CPUID_MAX_SERIALISED_LEAVES                     \
-    (CPUID_GUEST_NR_BASIC +                             \
-     CPUID_GUEST_NR_FEAT   - !!CPUID_GUEST_NR_FEAT +    \
-     CPUID_GUEST_NR_CACHE  - !!CPUID_GUEST_NR_CACHE +   \
-     CPUID_GUEST_NR_TOPO   - !!CPUID_GUEST_NR_TOPO +    \
-     CPUID_GUEST_NR_XSTATE - !!CPUID_GUEST_NR_XSTATE +  \
-     CPUID_GUEST_NR_EXTD + 2 /* hv_limit and hv2_limit */ )
+#define CPUID_MAX_SERIALISED_LEAVES             \
+    (CPUID_GUEST_NR_BASIC +                     \
+     CPUID_GUEST_NR_FEAT   - 1 +                \
+     CPUID_GUEST_NR_CACHE  - 1 +                \
+     CPUID_GUEST_NR_TOPO   - 1 +                \
+     CPUID_GUEST_NR_XSTATE - 1 +                \
+     CPUID_GUEST_NR_EXTD +                      \
+     2 /* hv_limit and hv2_limit */ )
 
 /* Maximum number of MSRs written when serialising a cpu_policy. */
 #define MSR_MAX_SERIALISED_ENTRIES 2
