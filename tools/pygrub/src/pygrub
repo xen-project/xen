@@ -731,7 +731,7 @@ class Grub:
 def get_entry_idx(cf, entry):
     # first, see if the given entry is numeric
     try:
-        idx = string.atoi(entry)
+        idx = int(entry)
         return idx
     except ValueError:
         pass
