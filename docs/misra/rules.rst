@@ -341,6 +341,9 @@ maintainers if you want to suggest a change.
            compilers' extensions)
          - Implicit conversions to boolean for conditionals (?: if while
            for) and logical operators (! || &&)
+         - The essential type model allows the constants defined by anonymous
+           enums (e.g., enum { A, B, C }) to be used as operands to arithmetic
+           operators, as they have a signed essential type.
 
    * - `Rule 10.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_10_02.c>`_
      - Required

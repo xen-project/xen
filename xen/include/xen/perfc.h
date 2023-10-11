@@ -39,7 +39,7 @@
 #define PERFSTATUS       PERFCOUNTER
 #define PERFSTATUS_ARRAY PERFCOUNTER_ARRAY
 
-enum perfcounter {
+enum {
 #include <xen/perfc_defn.h>
 	NUM_PERFCOUNTERS
 };
