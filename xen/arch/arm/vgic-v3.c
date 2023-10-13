@@ -360,7 +360,7 @@ read_unknown:
 
 static uint64_t vgic_sanitise_field(uint64_t reg, uint64_t field_mask,
                                     int field_shift,
-                                    uint64_t (*sanitise_fn)(uint64_t))
+                                    uint64_t (*sanitise_fn)(uint64_t field))
 {
     uint64_t field = (reg & field_mask) >> field_shift;
 
