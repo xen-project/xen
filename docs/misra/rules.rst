@@ -18,7 +18,7 @@ It is possible that in specific circumstances it is best not to follow a
 rule because it is not possible or because the alternative leads to
 better code quality. Those cases are called "deviations". They are
 permissible as long as they are documented. For details, please refer to
-docs/misra/documenting-violations.rst
+docs/misra/documenting-violations.rst and docs/misra/deviations.rst
 
 Other documentation mechanisms are work-in-progress.
 

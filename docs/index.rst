@@ -63,6 +63,7 @@ Xen hypervisor code.
    :maxdepth: 2
 
    misra/rules
+   misra/deviations
 
 
 Miscellanea
