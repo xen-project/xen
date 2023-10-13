@@ -243,8 +243,8 @@ struct arch_vcpu
 
 }  __cacheline_aligned;
 
-void vcpu_show_registers(const struct vcpu *);
-void vcpu_switch_to_aarch64_mode(struct vcpu *);
+void vcpu_show_registers(const struct vcpu *v);
+void vcpu_switch_to_aarch64_mode(struct vcpu *v);
 
 /*
  * Due to the restriction of GICv3, the number of vCPUs in AFF0 is
