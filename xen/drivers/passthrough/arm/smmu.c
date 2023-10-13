@@ -277,8 +277,8 @@ static void iommu_group_put(struct iommu_group *group)
 }
 
 static void iommu_group_set_iommudata(struct iommu_group *group,
-				      struct arm_smmu_master_cfg *cfg,
-				      void (*releasefn)(void *))
+                                      struct arm_smmu_master_cfg *cfg,
+                                      void (*releasefn)(void *data))
 {
 	/* TODO: Store the releasefn for the PCI */
 	ASSERT(releasefn == NULL);
@@ -2082,7 +2082,7 @@ static int arm_smmu_add_device(struct device *dev)
 	struct arm_smmu_device *smmu;
 	struct arm_smmu_master_cfg *cfg;
 	struct iommu_group *group;
-	void (*releasefn)(void *) = NULL;
+	void (*releasefn)(void *data) = NULL;
 	int ret;
 
 	smmu = find_smmu_for_device(dev);
