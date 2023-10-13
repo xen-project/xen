@@ -41,7 +41,8 @@ static void __init prepare_boot_identity_mapping(void)
     clear_page(boot_third_id);
 
     if ( id_offsets[0] >= IDENTITY_MAPPING_AREA_NR_L0 )
-        panic("Cannot handle ID mapping above 2TB\n");
+        panic("Cannot handle ID mapping above %uTB\n",
+              IDENTITY_MAPPING_AREA_NR_L0 >> 1);
 
     /* Link first ID table */
     pte = mfn_to_xen_entry(virt_to_mfn(boot_first_id), MT_NORMAL);
@@ -74,7 +75,8 @@ static void __init prepare_runtime_identity_mapping(void)
     DECLARE_OFFSETS(id_offsets, id_addr);
 
     if ( id_offsets[0] >= IDENTITY_MAPPING_AREA_NR_L0 )
-        panic("Cannot handle ID mapping above 2TB\n");
+        panic("Cannot handle ID mapping above %uTB\n",
+              IDENTITY_MAPPING_AREA_NR_L0 >> 1);
 
     /* Link first ID table */
     pte = pte_of_xenaddr((vaddr_t)xen_first_id);
