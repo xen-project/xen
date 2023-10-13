@@ -10,7 +10,7 @@
 #include <asm/acpi.h>
 
 struct smp_enable_ops {
-        int             (*prepare_cpu)(int);
+        int             (*prepare_cpu)(int cpu);
 };
 
 static paddr_t cpu_release_addr[NR_CPUS];
