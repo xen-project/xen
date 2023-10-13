@@ -1004,6 +1004,27 @@ static void cf_check zen2_disable_c6(void *arg)
 	wrmsrl(MSR_AMD_CSTATE_CFG, val & mask);
 }
 
+static void amd_check_erratum_1485(void)
+{
+	uint64_t val, chickenbit = (1 << 5);
+
+	if (cpu_has_hypervisor || boot_cpu_data.x86 != 0x19 || !is_zen4_uarch())
+		return;
+
+	rdmsrl(MSR_AMD64_BP_CFG, val);
+
+	if (val & chickenbit)
+		return;
+
+	/*
+	 * BP_CFG is a core-scoped MSR. There's a benign race on this write
+	 * on the case where 2 threads perform the previous check at the
+	 * same time before the chickenbit is set. It's benign because the
+	 * value being written is the same on both.
+	 */
+	wrmsrl(MSR_AMD64_BP_CFG, val | chickenbit);
+}
+
 static void cf_check init_amd(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
@@ -1271,6 +1292,7 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 		disable_c1_ramping();
 
 	amd_check_zenbleed();
+	amd_check_erratum_1485();
 
 	if (zen2_c6_disabled)
 		zen2_disable_c6(NULL);

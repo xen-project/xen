@@ -145,11 +145,16 @@
  * Hygon (Fam18h) but without simple model number rules.  Instead, use STIBP
  * as a heuristic that distinguishes the two.
  *
+ * For Zen3 and Zen4 (Fam19h) the heuristic is the presence of AutoIBRS, as
+ * it's Zen4-specific.
+ *
  * The caller is required to perform the appropriate vendor/family checks
  * first.
  */
 #define is_zen1_uarch() (!boot_cpu_has(X86_FEATURE_AMD_STIBP))
 #define is_zen2_uarch()   boot_cpu_has(X86_FEATURE_AMD_STIBP)
+#define is_zen3_uarch() (!boot_cpu_has(X86_FEATURE_AUTO_IBRS))
+#define is_zen4_uarch()   boot_cpu_has(X86_FEATURE_AUTO_IBRS)
 
 struct cpuinfo_x86;
 int cpu_has_amd_erratum(const struct cpuinfo_x86 *, int, ...);
