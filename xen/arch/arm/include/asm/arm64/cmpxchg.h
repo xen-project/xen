@@ -1,7 +1,7 @@
 #ifndef __ASM_ARM64_CMPXCHG_H
 #define __ASM_ARM64_CMPXCHG_H
 
-extern void __bad_xchg(volatile void *, int);
+extern void __bad_xchg(volatile void *ptr, int size);
 
 static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
 {
