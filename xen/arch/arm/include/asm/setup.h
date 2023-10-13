@@ -141,7 +141,8 @@ void alloc_static_evtchn(void);
 
 void discard_initial_modules(void);
 void fw_unreserved_regions(paddr_t s, paddr_t e,
-                           void (*cb)(paddr_t, paddr_t), unsigned int first);
+                           void (*cb)(paddr_t ps, paddr_t pe),
+                           unsigned int first);
 
 size_t boot_fdt_info(const void *fdt, paddr_t paddr);
 const char *boot_fdt_cmdline(const void *fdt);
@@ -189,7 +190,7 @@ extern lpae_t boot_second_id[XEN_PT_LPAE_ENTRIES];
 extern lpae_t boot_third_id[XEN_PT_LPAE_ENTRIES];
 
 /* Find where Xen will be residing at runtime and return a PT entry */
-lpae_t pte_of_xenaddr(vaddr_t);
+lpae_t pte_of_xenaddr(vaddr_t va);
 
 extern const char __ro_after_init_start[], __ro_after_init_end[];
 

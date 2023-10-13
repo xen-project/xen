@@ -207,7 +207,7 @@ static void __init processor_id(void)
 }
 
 static void __init dt_unreserved_regions(paddr_t s, paddr_t e,
-                                         void (*cb)(paddr_t, paddr_t),
+                                         void (*cb)(paddr_t ps, paddr_t pe),
                                          unsigned int first)
 {
     unsigned int i, nr;
@@ -324,7 +324,7 @@ static bool __init bootmodules_overlap_check(struct bootmodules *bootmodules,
 }
 
 void __init fw_unreserved_regions(paddr_t s, paddr_t e,
-                                  void (*cb)(paddr_t, paddr_t),
+                                  void (*cb)(paddr_t ps, paddr_t pe),
                                   unsigned int first)
 {
     if ( acpi_disabled )
