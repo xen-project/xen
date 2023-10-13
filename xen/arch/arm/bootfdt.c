@@ -16,6 +16,24 @@
 #include <xsm/xsm.h>
 #include <asm/setup.h>
 
+static bool __init device_tree_node_is_available(const void *fdt, int node)
+{
+    const char *status;
+    int len;
+
+    status = fdt_getprop(fdt, node, "status", &len);
+    if ( !status )
+        return true;
+
+    if ( len > 0 )
+    {
+        if ( !strcmp(status, "ok") || !strcmp(status, "okay") )
+            return true;
+    }
+
+    return false;
+}
+
 static bool __init device_tree_node_matches(const void *fdt, int node,
                                             const char *match)
 {
@@ -96,6 +114,9 @@ static int __init device_tree_get_meminfo(const void *fdt, int node,
     u32 reg_cells = address_cells + size_cells;
     paddr_t start, size;
     struct meminfo *mem = data;
+
+    if ( !device_tree_node_is_available(fdt, node) )
+        return 0;
 
     if ( address_cells < 1 || size_cells < 1 )
     {
