@@ -923,6 +923,7 @@ static void domain_conn_reset(struct domain *domain)
 
 	domain->interface->req_cons = domain->interface->req_prod = 0;
 	domain->interface->rsp_cons = domain->interface->rsp_prod = 0;
+	xen_wmb();
 }
 
 /*
@@ -988,12 +989,6 @@ static struct domain *introduce_domain(const void *ctx,
 		/* Now domain belongs to its connection. */
 		talloc_steal(domain->conn, domain);
 
-		if (!restore) {
-			/* Notify the domain that xenstore is available */
-			interface->connection = XENSTORE_CONNECTED;
-			xenevtchn_notify(xce_handle, domain->port);
-		}
-
 		if (!is_master_domain && !restore)
 			fire_special_watches("@introduceDomain");
 	} else {
@@ -1032,6 +1027,13 @@ int do_introduce(const void *ctx, struct connection *conn,
 		return errno;
 
 	domain_conn_reset(domain);
+
+	if (domain->interface != NULL &&
+	    domain->interface->connection == XENSTORE_RECONNECT) {
+		/* Notify the domain that xenstore is available */
+		domain->interface->connection = XENSTORE_CONNECTED;
+		xenevtchn_notify(xce_handle, domain->port);
+	}
 
 	send_ack(conn, XS_INTRODUCE);
 
