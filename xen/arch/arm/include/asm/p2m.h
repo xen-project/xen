@@ -21,7 +21,7 @@ extern unsigned int p2m_root_level;
 
 struct domain;
 
-extern void memory_type_changed(struct domain *);
+extern void memory_type_changed(struct domain *d);
 
 /* Per-p2m-table state */
 struct p2m_domain {
