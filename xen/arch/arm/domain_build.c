@@ -2872,8 +2872,11 @@ static int __init scan_pfdt_node(struct kernel_info *kinfo, const void *pfdt,
     node_next = fdt_first_subnode(pfdt, nodeoff);
     while ( node_next > 0 )
     {
-        scan_pfdt_node(kinfo, pfdt, node_next, address_cells, size_cells,
-                       scan_passthrough_prop);
+        rc = scan_pfdt_node(kinfo, pfdt, node_next, address_cells, size_cells,
+                            scan_passthrough_prop);
+        if ( rc )
+            return rc;
+
         node_next = fdt_next_subnode(pfdt, node_next);
     }
 
