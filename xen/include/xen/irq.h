@@ -18,7 +18,7 @@
     ASSERT(!in_irq() && (local_irq_is_enabled() || num_online_cpus() <= 1))
 
 struct irqaction {
-    void (*handler)(int, void *, struct cpu_user_regs *);
+    void (*handler)(int irq, void *dev_id, struct cpu_user_regs *regs);
     const char *name;
     void *dev_id;
     bool_t free_on_release;
@@ -62,17 +62,17 @@ struct irq_desc;
  */
 struct hw_interrupt_type {
     const char *typename;
-    unsigned int (*startup)(struct irq_desc *);
-    void (*shutdown)(struct irq_desc *);
-    void (*enable)(struct irq_desc *);
-    void (*disable)(struct irq_desc *);
-    void (*ack)(struct irq_desc *);
+    unsigned int (*startup)(struct irq_desc *desc);
+    void (*shutdown)(struct irq_desc *desc);
+    void (*enable)(struct irq_desc *desc);
+    void (*disable)(struct irq_desc *desc);
+    void (*ack)(struct irq_desc *desc);
 #ifdef CONFIG_X86
-    void (*end)(struct irq_desc *, u8 vector);
+    void (*end)(struct irq_desc *desc, u8 vector);
 #else
-    void (*end)(struct irq_desc *);
+    void (*end)(struct irq_desc *desc);
 #endif
-    void (*set_affinity)(struct irq_desc *, const cpumask_t *);
+    void (*set_affinity)(struct irq_desc *desc, const cpumask_t *mask);
 };
 
 typedef const struct hw_interrupt_type hw_irq_controller;
@@ -119,7 +119,8 @@ extern int setup_irq(unsigned int irq, unsigned int irqflags,
                      struct irqaction *new);
 extern void release_irq(unsigned int irq, const void *dev_id);
 extern int request_irq(unsigned int irq, unsigned int irqflags,
-               void (*handler)(int, void *, struct cpu_user_regs *),
+               void (*handler)(int irq, void *dev_id,
+                     struct cpu_user_regs *regs),
                const char *devname, void *dev_id);
 
 extern hw_irq_controller no_irq_type;

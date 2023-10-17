@@ -182,7 +182,8 @@ void irq_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
 }
 
 int request_irq(unsigned int irq, unsigned int irqflags,
-                void (*handler)(int, void *, struct cpu_user_regs *),
+                void (*handler)(int irq, void *dev_id,
+                                struct cpu_user_regs *regs),
                 const char *devname, void *dev_id)
 {
     struct irqaction *action;

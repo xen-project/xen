@@ -915,16 +915,16 @@ uint8_t alloc_hipriority_vector(void)
     return next++;
 }
 
-static void (*direct_apic_vector[X86_NR_VECTORS])(struct cpu_user_regs *);
+static void (*direct_apic_vector[X86_NR_VECTORS])(struct cpu_user_regs *regs);
 void set_direct_apic_vector(
-    uint8_t vector, void (*handler)(struct cpu_user_regs *))
+    uint8_t vector, void (*handler)(struct cpu_user_regs *regs))
 {
     BUG_ON(direct_apic_vector[vector] != NULL);
     direct_apic_vector[vector] = handler;
 }
 
 void alloc_direct_apic_vector(
-    uint8_t *vector, void (*handler)(struct cpu_user_regs *))
+    uint8_t *vector, void (*handler)(struct cpu_user_regs *regs))
 {
     static DEFINE_SPINLOCK(lock);
 
@@ -964,7 +964,7 @@ static int __init cf_check irq_ratelimit_init(void)
 __initcall(irq_ratelimit_init);
 
 int __init request_irq(unsigned int irq, unsigned int irqflags,
-        void (*handler)(int, void *, struct cpu_user_regs *),
+        void (*handler)(int irq, void *dev_id, struct cpu_user_regs *regs),
         const char * devname, void *dev_id)
 {
     struct irqaction * action;
