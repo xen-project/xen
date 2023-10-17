@@ -110,7 +110,7 @@ extern int bitmap_allocate_region(unsigned long *bitmap, int pos, int order);
 		large;							  \
 	}
 
-static inline void bitmap_zero(unsigned long *dst, int nbits)
+static inline void bitmap_zero(unsigned long *dst, unsigned int nbits)
 {
 	bitmap_switch(nbits,,
 		*dst = 0UL,
@@ -134,7 +134,7 @@ static inline void bitmap_fill(unsigned long *dst, int nbits)
 }
 
 static inline void bitmap_copy(unsigned long *dst, const unsigned long *src,
-			int nbits)
+			unsigned int nbits)
 {
 	bitmap_switch(nbits,,
 		*dst = *src,
@@ -142,7 +142,7 @@ static inline void bitmap_copy(unsigned long *dst, const unsigned long *src,
 }
 
 static inline void bitmap_and(unsigned long *dst, const unsigned long *src1,
-			const unsigned long *src2, int nbits)
+			const unsigned long *src2, unsigned int nbits)
 {
 	bitmap_switch(nbits,,
 		*dst = *src1 & *src2,
@@ -150,7 +150,7 @@ static inline void bitmap_and(unsigned long *dst, const unsigned long *src1,
 }
 
 static inline void bitmap_or(unsigned long *dst, const unsigned long *src1,
-			const unsigned long *src2, int nbits)
+			const unsigned long *src2, unsigned int nbits)
 {
 	bitmap_switch(nbits,,
 		*dst = *src1 | *src2,
@@ -158,7 +158,7 @@ static inline void bitmap_or(unsigned long *dst, const unsigned long *src1,
 }
 
 static inline void bitmap_xor(unsigned long *dst, const unsigned long *src1,
-			const unsigned long *src2, int nbits)
+			const unsigned long *src2, unsigned int nbits)
 {
 	bitmap_switch(nbits,,
 		*dst = *src1 ^ *src2,
@@ -166,7 +166,7 @@ static inline void bitmap_xor(unsigned long *dst, const unsigned long *src1,
 }
 
 static inline void bitmap_andnot(unsigned long *dst, const unsigned long *src1,
-			const unsigned long *src2, int nbits)
+			const unsigned long *src2, unsigned int nbits)
 {
 	bitmap_switch(nbits,,
 		*dst = *src1 & ~*src2,
@@ -174,7 +174,7 @@ static inline void bitmap_andnot(unsigned long *dst, const unsigned long *src1,
 }
 
 static inline void bitmap_complement(unsigned long *dst, const unsigned long *src,
-			int nbits)
+			unsigned int nbits)
 {
 	bitmap_switch(nbits,,
 		*dst = ~*src & BITMAP_LAST_WORD_MASK(nbits),
@@ -182,7 +182,7 @@ static inline void bitmap_complement(unsigned long *dst, const unsigned long *sr
 }
 
 static inline int bitmap_equal(const unsigned long *src1,
-			const unsigned long *src2, int nbits)
+			const unsigned long *src2, unsigned int nbits)
 {
 	bitmap_switch(nbits,
 		return -1,
@@ -191,7 +191,7 @@ static inline int bitmap_equal(const unsigned long *src1,
 }
 
 static inline int bitmap_intersects(const unsigned long *src1,
-			const unsigned long *src2, int nbits)
+			const unsigned long *src2, unsigned int nbits)
 {
 	bitmap_switch(nbits,
 		return -1,
@@ -200,7 +200,7 @@ static inline int bitmap_intersects(const unsigned long *src1,
 }
 
 static inline int bitmap_subset(const unsigned long *src1,
-			const unsigned long *src2, int nbits)
+			const unsigned long *src2, unsigned int nbits)
 {
 	bitmap_switch(nbits,
 		return -1,
@@ -208,7 +208,7 @@ static inline int bitmap_subset(const unsigned long *src1,
 		return __bitmap_subset(src1, src2, nbits));
 }
 
-static inline int bitmap_empty(const unsigned long *src, int nbits)
+static inline int bitmap_empty(const unsigned long *src, unsigned int nbits)
 {
 	bitmap_switch(nbits,
 		return -1,
@@ -216,7 +216,7 @@ static inline int bitmap_empty(const unsigned long *src, int nbits)
 		return __bitmap_empty(src, nbits));
 }
 
-static inline int bitmap_full(const unsigned long *src, int nbits)
+static inline int bitmap_full(const unsigned long *src, unsigned int nbits)
 {
 	bitmap_switch(nbits,
 		return -1,
