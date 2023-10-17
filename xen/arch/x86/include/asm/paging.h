@@ -245,7 +245,7 @@ paging_fault(unsigned long va, struct cpu_user_regs *regs)
 }
 
 /* Handle invlpg requests on vcpus. */
-void paging_invlpg(struct vcpu *v, unsigned long va);
+void paging_invlpg(struct vcpu *v, unsigned long linear);
 
 /*
  * Translate a guest virtual address to the frame number that the
