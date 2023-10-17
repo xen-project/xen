@@ -70,7 +70,7 @@ static int _p2m_get_mem_access(struct p2m_domain *p2m, gfn_t gfn,
 }
 
 bool p2m_mem_access_emulate_check(struct vcpu *v,
-                                  const vm_event_response_t *rsp)
+                                  const struct vm_event_st *rsp)
 {
     xenmem_access_t access;
     bool violation = true;
@@ -129,7 +129,7 @@ bool p2m_mem_access_emulate_check(struct vcpu *v,
 
 bool p2m_mem_access_check(paddr_t gpa, unsigned long gla,
                           struct npfec npfec,
-                          vm_event_request_t **req_ptr)
+                          struct vm_event_st **req_ptr)
 {
     struct vcpu *v = current;
     gfn_t gfn = gaddr_to_gfn(gpa);

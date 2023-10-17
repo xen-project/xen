@@ -39,7 +39,7 @@ int p2m_set_suppress_ve(struct domain *d, gfn_t gfn, bool suppress_ve,
 
 struct xen_hvm_altp2m_suppress_ve_multi;
 int p2m_set_suppress_ve_multi(struct domain *d,
-                              struct xen_hvm_altp2m_suppress_ve_multi *suppress_ve);
+                              struct xen_hvm_altp2m_suppress_ve_multi *sve);
 
 int p2m_get_suppress_ve(struct domain *d, gfn_t gfn, bool *suppress_ve,
                         unsigned int altp2m_idx);
