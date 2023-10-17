@@ -62,12 +62,6 @@
         add  \dst, \dst, :lo12:\sym
 .endm
 
-/* Load the physical address of a symbol into xb */
-.macro load_paddr xb, sym
-        ldr \xb, =\sym
-        add \xb, \xb, x20
-.endm
-
 /*
  * Register aliases.
  */

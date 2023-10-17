@@ -259,7 +259,7 @@ real_start_efi:
 
         /* Using the DTB in the .dtb section? */
 .ifnes CONFIG_DTB_FILE,""
-        load_paddr x21, _sdtb
+        adr_l x21, _sdtb
 .endif
 
         /* Initialize the UART if earlyprintk has been enabled. */
@@ -301,7 +301,7 @@ GLOBAL(init_secondary)
         bic   x24, x0, x13           /* Mask out flags to get CPU ID */
 
         /* Wait here until __cpu_up is ready to handle the CPU */
-        load_paddr x0, smp_up_cpu
+        adr_l x0, smp_up_cpu
         dsb   sy
 2:      ldr   x1, [x0]
         cmp   x1, x24
