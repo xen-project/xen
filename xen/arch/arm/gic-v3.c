@@ -1086,29 +1086,29 @@ static void gicv3_read_lr(int lr, struct gic_lr *lr_reg)
     }
 }
 
-static void gicv3_write_lr(int lr_reg, const struct gic_lr *lr)
+static void gicv3_write_lr(int lr, const struct gic_lr *lr_reg)
 {
     uint64_t lrv = 0;
     const enum gic_version vgic_version = current->domain->arch.vgic.version;
 
 
-    lrv = ( ((u64)(lr->virq & ICH_LR_VIRTUAL_MASK)  << ICH_LR_VIRTUAL_SHIFT) |
-        ((u64)(lr->priority & ICH_LR_PRIORITY_MASK) << ICH_LR_PRIORITY_SHIFT) );
+    lrv = ( ((u64)(lr_reg->virq & ICH_LR_VIRTUAL_MASK)  << ICH_LR_VIRTUAL_SHIFT) |
+        ((u64)(lr_reg->priority & ICH_LR_PRIORITY_MASK) << ICH_LR_PRIORITY_SHIFT) );
 
-    if ( lr->active )
+    if ( lr_reg->active )
         lrv |= ICH_LR_STATE_ACTIVE;
 
-    if ( lr->pending )
+    if ( lr_reg->pending )
         lrv |= ICH_LR_STATE_PENDING;
 
-    if ( lr->hw_status )
+    if ( lr_reg->hw_status )
     {
         lrv |= ICH_LR_HW;
-        lrv |= (uint64_t)lr->hw.pirq << ICH_LR_PHYSICAL_SHIFT;
+        lrv |= (uint64_t)lr_reg->hw.pirq << ICH_LR_PHYSICAL_SHIFT;
     }
     else
     {
-        if ( lr->virt.eoi )
+        if ( lr_reg->virt.eoi )
             lrv |= ICH_LR_MAINTENANCE_IRQ;
         /* Source is only set in GICv2 compatible mode */
         if ( vgic_version == GIC_V2 )
@@ -1117,8 +1117,8 @@ static void gicv3_write_lr(int lr_reg, const struct gic_lr *lr)
              * Source is only valid for SGIs, the caller should make
              * sure the field virt.source is always 0 for non-SGI.
              */
-            ASSERT(!lr->virt.source || lr->virq < NR_GIC_SGI);
-            lrv |= (uint64_t)lr->virt.source << ICH_LR_CPUID_SHIFT;
+            ASSERT(!lr_reg->virt.source || lr_reg->virq < NR_GIC_SGI);
+            lrv |= (uint64_t)lr_reg->virt.source << ICH_LR_CPUID_SHIFT;
         }
     }
 
@@ -1129,7 +1129,7 @@ static void gicv3_write_lr(int lr_reg, const struct gic_lr *lr)
     if ( vgic_version == GIC_V3 )
         lrv |= ICH_LR_GRP1;
 
-    gicv3_ich_write_lr(lr_reg, lrv);
+    gicv3_ich_write_lr(lr, lrv);
 }
 
 static void gicv3_hcr_status(uint32_t flag, bool status)
