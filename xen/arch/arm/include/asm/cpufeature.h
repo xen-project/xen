@@ -127,8 +127,8 @@ static inline void cpus_set_cap(unsigned int num)
 struct arm_cpu_capabilities {
     const char *desc;
     u16 capability;
-    bool (*matches)(const struct arm_cpu_capabilities *);
-    int (*enable)(void *); /* Called on every active CPUs */
+    bool (*matches)(const struct arm_cpu_capabilities *entry);
+    int (*enable)(void *data); /* Called on every active CPUs */
     union {
         struct {    /* To be used for eratum handling only */
             u32 midr_model;
@@ -448,10 +448,10 @@ struct cpuinfo_arm {
 
 extern struct cpuinfo_arm system_cpuinfo;
 
-extern void identify_cpu(struct cpuinfo_arm *);
+extern void identify_cpu(struct cpuinfo_arm *c);
 
 #ifdef CONFIG_ARM_64
-extern void update_system_features(const struct cpuinfo_arm *);
+extern void update_system_features(const struct cpuinfo_arm *new);
 #else
 static inline void update_system_features(const struct cpuinfo_arm *cpuinfo)
 {
