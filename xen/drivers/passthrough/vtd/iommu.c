@@ -1327,15 +1327,25 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
 
     /* Calculate number of pagetable levels: 3 or 4. */
     sagaw = cap_sagaw(iommu->cap);
-    if ( sagaw & 6 )
-        agaw = find_first_set_bit(sagaw & 6);
-    if ( !agaw )
+    agaw = fls(sagaw & 6) - 1;
+    if ( agaw <= 0 )
     {
         printk(XENLOG_ERR VTDPREFIX "IOMMU: unsupported sagaw %x\n", sagaw);
         print_iommu_regs(drhd);
         rc = -ENODEV;
         goto free;
     }
+
+    if ( sagaw >> 3 )
+    {
+        printk_once(XENLOG_WARNING VTDPREFIX
+                    " Unhandled bits in SAGAW %#x%s\n",
+                    sagaw,
+                    iommu_hwdom_passthrough ? ", disabling passthrough" : "");
+
+        iommu_hwdom_passthrough = false;
+    }
+
     iommu->nr_pt_levels = agaw_to_level(agaw);
     if ( min_pt_levels > iommu->nr_pt_levels )
         min_pt_levels = iommu->nr_pt_levels;
