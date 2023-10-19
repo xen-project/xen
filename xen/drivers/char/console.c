@@ -468,7 +468,7 @@ static void cf_check dump_console_ring_key(unsigned char key)
 #define switch_code (opt_conswitch[0]-'a'+1)
 /*
  * console_rx=0 => input to xen
- * console_rx=1 => input to dom0
+ * console_rx=1 => input to dom0 (or the sole shim domain)
  * console_rx=N => input to dom(N-1)
  */
 static unsigned int __read_mostly console_rx = 0;
@@ -493,6 +493,7 @@ static void switch_serial_input(void)
      */
     for ( ; ; )
     {
+        domid_t domid;
         struct domain *d;
 
         if ( next_rx++ >= max_console_rx )
@@ -502,12 +503,18 @@ static void switch_serial_input(void)
             break;
         }
 
-        d = rcu_lock_domain_by_id(next_rx - 1);
+#ifdef CONFIG_PV_SHIM
+        if ( next_rx == 1 )
+            domid = get_initial_domain_id();
+        else
+#endif
+            domid = next_rx - 1;
+        d = rcu_lock_domain_by_id(domid);
         if ( d )
         {
             rcu_unlock_domain(d);
             console_rx = next_rx;
-            printk("*** Serial input to DOM%u", next_rx - 1);
+            printk("*** Serial input to DOM%u", domid);
             break;
         }
     }
