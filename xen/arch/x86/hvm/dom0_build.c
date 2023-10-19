@@ -449,7 +449,7 @@ static int __init pvh_populate_p2m(struct domain *d)
         }
     }
 
-    /* Non-RAM regions of space below 1MB get identity mapped. */
+    /* Identity map everything below 1MB that's not already mapped. */
     for ( i = rc = 0; i < MB1_PAGES; ++i )
     {
         p2m_type_t p2mt;
@@ -459,8 +459,9 @@ static int __init pvh_populate_p2m(struct domain *d)
             rc = set_mmio_p2m_entry(d, _gfn(i), _mfn(i), PAGE_ORDER_4K);
         else
             /*
-             * If the p2m entry is already set it must belong to a RMRR and
-             * already be identity mapped, or be a RAM region.
+             * If the p2m entry is already set it must belong to a reserved
+             * region (e.g. RMRR/IVMD) and be identity mapped, or else be a
+             * RAM region.
              */
             ASSERT(p2mt == p2m_ram_rw || mfn_eq(mfn, _mfn(i)));
         put_gfn(d, i);
