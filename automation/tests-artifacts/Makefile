@@ -10,7 +10,7 @@ help:
 	@echo "To push container builds, set the env var PUSH"
 
 %: %.dockerfile ## Builds containers
-	docker build -t $(REGISTRY)/$(@D):$(@F) -f $< $(<D)
+	docker build --pull -t $(REGISTRY)/$(@D):$(@F) -f $< $(<D)
 	@if [ ! -z $${PUSH+x} ]; then \
 		docker push $(REGISTRY)/$(@D):$(@F); \
 	fi
