@@ -137,7 +137,7 @@ static inline void pi_clear_sn(struct pi_desc *pi_desc)
 /*
  * Exit Reasons
  */
-#define VMX_EXIT_REASONS_FAILED_VMENTRY 0x80000000
+#define VMX_EXIT_REASONS_FAILED_VMENTRY (1u << 31)
 #define VMX_EXIT_REASONS_BUS_LOCK       (1u << 26)
 
 #define EXIT_REASON_EXCEPTION_NMI       0
@@ -209,12 +209,12 @@ static inline void pi_clear_sn(struct pi_desc *pi_desc)
  * Note INTR_INFO_NMI_UNBLOCKED_BY_IRET is also used with Exit Qualification
  * field for EPT violations, PML full and SPP-related event vmexits.
  */
-#define INTR_INFO_VECTOR_MASK           0xff            /* 7:0 */
-#define INTR_INFO_INTR_TYPE_MASK        0x700           /* 10:8 */
-#define INTR_INFO_DELIVER_CODE_MASK     0x800           /* 11 */
-#define INTR_INFO_NMI_UNBLOCKED_BY_IRET 0x1000          /* 12 */
-#define INTR_INFO_VALID_MASK            0x80000000      /* 31 */
-#define INTR_INFO_RESVD_BITS_MASK       0x7ffff000
+#define INTR_INFO_VECTOR_MASK           0x000000ffU     /* 7:0 */
+#define INTR_INFO_INTR_TYPE_MASK        0x00000700U     /* 10:8 */
+#define INTR_INFO_DELIVER_CODE_MASK     0x00000800U     /* 11 */
+#define INTR_INFO_NMI_UNBLOCKED_BY_IRET 0x00001000U     /* 12 */
+#define INTR_INFO_VALID_MASK            0x80000000U     /* 31 */
+#define INTR_INFO_RESVD_BITS_MASK       0x7ffff000U
 
 /*
  * Exit Qualifications for NOTIFY VM EXIT
@@ -607,7 +607,7 @@ static inline void vmx_pi_hooks_assign(struct domain *d) {}
 static inline void vmx_pi_hooks_deassign(struct domain *d) {}
 #endif
 
-#define APIC_INVALID_DEST           0xffffffff
+#define APIC_INVALID_DEST           0xffffffffU
 
 /* EPT violation qualifications definitions */
 typedef union ept_qual {

@@ -263,7 +263,7 @@ uint64_t get_vvmcs_virtual(void *vvmcs, uint32_t vmcs_encoding)
             res >>= 32;
         break;
     case VVMCS_WIDTH_32:
-        res &= 0xffffffff;
+        res = (uint32_t)res;
         break;
     case VVMCS_WIDTH_NATURAL:
     default:
@@ -315,14 +315,14 @@ void set_vvmcs_virtual(void *vvmcs, uint32_t vmcs_encoding, uint64_t val)
     case VVMCS_WIDTH_64:
         if ( enc.access_type )
         {
-            res &= 0xffffffff;
+            res = (uint32_t)res;
             res |= val << 32;
         }
         else
             res = val;
         break;
     case VVMCS_WIDTH_32:
-        res = val & 0xffffffff;
+        res = (uint32_t)val;
         break;
     case VVMCS_WIDTH_NATURAL:
     default:
@@ -2306,7 +2306,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         break;
     case MSR_IA32_VMX_CR0_FIXED1:
         /* allow 0-settings for all bits */
-        data = 0xffffffff;
+        data = 0xffffffffU;
         break;
     case MSR_IA32_VMX_CR4_FIXED0:
         /* VMXE bit must be 1 in VMX operation */

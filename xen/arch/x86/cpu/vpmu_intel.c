@@ -945,7 +945,7 @@ const struct arch_vpmu_ops *__init core2_vpmu_init(void)
     fixed_counters_mask = ~((1ull << core2_get_bitwidth_fix_count()) - 1);
     global_ctrl_mask = ~((((1ULL << fixed_pmc_cnt) - 1) << 32) |
                          ((1ULL << arch_pmc_cnt) - 1));
-    global_ovf_ctrl_mask = ~(0xC000000000000000 |
+    global_ovf_ctrl_mask = ~(0xC000000000000000ULL |
                              (((1ULL << fixed_pmc_cnt) - 1) << 32) |
                              ((1ULL << arch_pmc_cnt) - 1));
     if ( version > 2 )

@@ -911,7 +911,7 @@ void vmx_clear_msr_intercept(struct vcpu *v, unsigned int msr,
         if ( type & VMX_MSR_W )
             clear_bit(msr, msr_bitmap->write_low);
     }
-    else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
+    else if ( (msr >= 0xc0000000U) && (msr <= 0xc0001fffU) )
     {
         msr &= 0x1fff;
         if ( type & VMX_MSR_R )
@@ -939,7 +939,7 @@ void vmx_set_msr_intercept(struct vcpu *v, unsigned int msr,
         if ( type & VMX_MSR_W )
             set_bit(msr, msr_bitmap->write_low);
     }
-    else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
+    else if ( (msr >= 0xc0000000U) && (msr <= 0xc0001fffU) )
     {
         msr &= 0x1fff;
         if ( type & VMX_MSR_R )
@@ -957,7 +957,7 @@ bool vmx_msr_is_intercepted(struct vmx_msr_bitmap *msr_bitmap,
     if ( msr <= 0x1fff )
         return test_bit(msr, is_write ? msr_bitmap->write_low
                                       : msr_bitmap->read_low);
-    else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
+    else if ( (msr >= 0xc0000000U) && (msr <= 0xc0001fffU) )
         return test_bit(msr & 0x1fff, is_write ? msr_bitmap->write_high
                                                : msr_bitmap->read_high);
     else
