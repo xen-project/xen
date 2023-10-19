@@ -1677,7 +1677,7 @@ void __init efi_init_memory(void)
     if ( !efi_enabled(EFI_BOOT) )
         return;
 
-    printk(XENLOG_INFO "EFI memory map:%s\n",
+    printk(XENLOG_DEBUG "EFI memory map:%s\n",
            map_bs ? " (mapping BootServices)" : "");
     for ( i = 0; i < efi_memmap_size; i += efi_mdesc_size )
     {
@@ -1688,8 +1688,8 @@ void __init efi_init_memory(void)
         paddr_t mem_base;
         unsigned long mem_npages;
 
-        printk(XENLOG_INFO " %013" PRIx64 "-%013" PRIx64
-                           " type=%u attr=%016" PRIx64 "\n",
+        printk(XENLOG_DEBUG " %013" PRIx64 "-%013" PRIx64
+                            " type=%u attr=%016" PRIx64 "\n",
                desc->PhysicalStart, desc->PhysicalStart + len - 1,
                desc->Type, desc->Attribute);
 
