@@ -321,7 +321,7 @@ static void recalculate_misc(struct cpu_policy *p)
         p->extd.vendor_edx = p->basic.vendor_edx;
 
         p->extd.raw_fms = p->basic.raw_fms;
-        p->extd.raw[0x1].b &= 0xff00ffff;
+        p->extd.raw[0x1].b &= 0xff00ffffU;
         p->extd.e1d |= p->basic._1d & CPUID_COMMON_1D_FEATURES;
 
         p->extd.raw[0x8].a &= 0x0000ffff; /* GuestMaxPhysAddr hidden. */
@@ -378,10 +378,10 @@ static void __init calculate_host_policy(void)
      * this information.
      */
     if ( cpu_has_lfence_dispatch )
-        max_extd_leaf = max(max_extd_leaf, 0x80000021);
+        max_extd_leaf = max(max_extd_leaf, 0x80000021U);
 
-    p->extd.max_leaf = 0x80000000 | min_t(uint32_t, max_extd_leaf & 0xffff,
-                                          ARRAY_SIZE(p->extd.raw) - 1);
+    p->extd.max_leaf = 0x80000000U | min_t(uint32_t, max_extd_leaf & 0xffff,
+                                           ARRAY_SIZE(p->extd.raw) - 1);
 
     x86_cpu_featureset_to_policy(boot_cpu_data.x86_capability, p);
     recalculate_xstate(p);
@@ -793,11 +793,11 @@ void recalculate_cpuid_policy(struct domain *d)
 
     p->basic.max_leaf   = min(p->basic.max_leaf,   max->basic.max_leaf);
     p->feat.max_subleaf = min(p->feat.max_subleaf, max->feat.max_subleaf);
-    p->extd.max_leaf    = 0x80000000 | min(p->extd.max_leaf & 0xffff,
-                                           ((p->x86_vendor & (X86_VENDOR_AMD |
-                                                              X86_VENDOR_HYGON))
-                                            ? CPUID_GUEST_NR_EXTD_AMD
-                                            : CPUID_GUEST_NR_EXTD_INTEL) - 1);
+    p->extd.max_leaf    = 0x80000000U | min(p->extd.max_leaf & 0xffff,
+                                            ((p->x86_vendor & (X86_VENDOR_AMD |
+                                                               X86_VENDOR_HYGON))
+                                             ? CPUID_GUEST_NR_EXTD_AMD
+                                             : CPUID_GUEST_NR_EXTD_INTEL) - 1);
 
     x86_cpu_policy_to_featureset(p, fs);
     x86_cpu_policy_to_featureset(max, max_fs);

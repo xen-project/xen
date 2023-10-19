@@ -141,7 +141,7 @@ static int __init cf_check stub_selftest(void)
           .rax = 0x0123456789abcdef,
           .res.fields.trapnr = X86_EXC_GP },
         { .opc = { endbr64, 0x02, 0x04, 0x04, 0xc3 }, /* add (%rsp,%rax),%al */
-          .rax = 0xfedcba9876543210,
+          .rax = 0xfedcba9876543210UL,
           .res.fields.trapnr = X86_EXC_SS },
         { .opc = { endbr64, 0xcc, 0xc3, 0xc3, 0xc3 }, /* int3 */
           .res.fields.trapnr = X86_EXC_BP },

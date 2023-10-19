@@ -406,10 +406,10 @@ static void __init print_details(enum ind_thunk thunk)
         cpuid_count(7, 0, &max, &tmp, &tmp, &_7d0);
     if ( max >= 2 )
         cpuid_count(7, 2, &tmp, &tmp, &tmp, &_7d2);
-    if ( boot_cpu_data.extended_cpuid_level >= 0x80000008 )
-        cpuid(0x80000008, &tmp, &e8b, &tmp, &tmp);
-    if ( boot_cpu_data.extended_cpuid_level >= 0x80000021 )
-        cpuid(0x80000021, &e21a, &tmp, &tmp, &tmp);
+    if ( boot_cpu_data.extended_cpuid_level >= 0x80000008U )
+        cpuid(0x80000008U, &tmp, &e8b, &tmp, &tmp);
+    if ( boot_cpu_data.extended_cpuid_level >= 0x80000021U )
+        cpuid(0x80000021U, &e21a, &tmp, &tmp, &tmp);
     if ( cpu_has_arch_caps )
         rdmsrl(MSR_ARCH_CAPABILITIES, caps);
 
@@ -1615,8 +1615,8 @@ void __init init_speculation_mitigations(void)
          * TODO: Adjust cpu_has_svm_spec_ctrl to be usable earlier on boot.
          */
         if ( opt_msr_sc_hvm &&
-             (boot_cpu_data.extended_cpuid_level >= 0x8000000a) &&
-             (cpuid_edx(0x8000000a) & (1u << SVM_FEATURE_SPEC_CTRL)) )
+             (boot_cpu_data.extended_cpuid_level >= 0x8000000aU) &&
+             (cpuid_edx(0x8000000aU) & (1u << SVM_FEATURE_SPEC_CTRL)) )
             setup_force_cpu_cap(X86_FEATURE_SC_MSR_HVM);
     }
 

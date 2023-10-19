@@ -191,7 +191,7 @@ static struct feat_node *feat_l2_cat;
 static struct feat_node *feat_mba;
 
 /* Common functions */
-#define cat_default_val(len) (0xffffffff >> (32 - (len)))
+#define cat_default_val(len) (0xffffffffU >> (32 - (len)))
 
 /*
  * get_cdp_data - get DATA COS register value from input COS ID.

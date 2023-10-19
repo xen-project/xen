@@ -1187,7 +1187,7 @@ static void __init calibrate_APIC_clock(void)
      * Setup the APIC counter to maximum. There is no way the lapic
      * can underflow in the 100ms detection time frame.
      */
-    __setup_APIC_LVTT(0xffffffff);
+    __setup_APIC_LVTT(0xffffffffU);
 
     bus_freq = calibrate_apic_timer();
     if ( !bus_freq )
