@@ -58,7 +58,7 @@
 #define DO_TRC_HVM_VLAPIC           DEFAULT_HVM_MISC
 
 
-#define TRC_PAR_LONG(par) ((par)&0xFFFFFFFF),((par)>>32)
+#define TRC_PAR_LONG(par) ((uint32_t)(par)), ((par) >> 32)
 
 #define TRACE_2_LONG_2D(_e, d1, d2, ...) \
     TRACE_4D(_e, d1, d2)
@@ -93,7 +93,7 @@
     HVMTRACE_ND(evt, 0, 0)
 
 #define HVMTRACE_LONG_1D(evt, d1)                  \
-                   HVMTRACE_2D(evt ## 64, (d1) & 0xFFFFFFFF, (d1) >> 32)
+                   HVMTRACE_2D(evt ## 64, (uint32_t)(d1), (d1) >> 32)
 #define HVMTRACE_LONG_2D(evt, d1, d2, ...)              \
                    HVMTRACE_3D(evt ## 64, d1, d2)
 #define HVMTRACE_LONG_3D(evt, d1, d2, d3, ...)      \

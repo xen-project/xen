@@ -237,7 +237,7 @@ bool_t vlapic_match_dest(
     case APIC_DEST_NOSHORT:
         if ( dest_mode )
             return vlapic_match_logical_addr(target, dest);
-        return (dest == _VLAPIC_ID(target, 0xffffffff)) ||
+        return (dest == _VLAPIC_ID(target, 0xffffffffU)) ||
                (dest == VLAPIC_ID(target));
 
     case APIC_DEST_SELF:
@@ -467,7 +467,7 @@ static bool_t is_multicast_dest(struct vlapic *vlapic, unsigned int short_hand,
         return short_hand != APIC_DEST_SELF;
 
     if ( vlapic_x2apic_mode(vlapic) )
-        return dest_mode ? hweight16(dest) > 1 : dest == 0xffffffff;
+        return dest_mode ? hweight16(dest) > 1 : dest == 0xffffffffU;
 
     if ( dest_mode )
         return hweight8(dest &
@@ -831,7 +831,7 @@ void vlapic_reg_write(struct vcpu *v, unsigned int reg, uint32_t val)
         break;
 
     case APIC_ICR2:
-        vlapic_set_reg(vlapic, APIC_ICR2, val & 0xff000000);
+        vlapic_set_reg(vlapic, APIC_ICR2, val & 0xff000000U);
         break;
 
     case APIC_LVTT:         /* LVT Timer Reg */

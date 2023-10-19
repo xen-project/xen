@@ -8,7 +8,7 @@
  * Ingo Molnar <mingo@redhat.com>, 1999, 2000
  */
 
-#define		APIC_DEFAULT_PHYS_BASE	0xfee00000
+#define		APIC_DEFAULT_PHYS_BASE	0xfee00000U
  
 #define		APIC_ID		0x20
 #define			APIC_ID_MASK		(0xFFu<<24)

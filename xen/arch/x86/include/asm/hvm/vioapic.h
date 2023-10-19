@@ -32,7 +32,7 @@
 #define VIOAPIC_EDGE_TRIG  0
 #define VIOAPIC_LEVEL_TRIG 1
 
-#define VIOAPIC_DEFAULT_BASE_ADDRESS  0xfec00000
+#define VIOAPIC_DEFAULT_BASE_ADDRESS  0xfec00000U
 #define VIOAPIC_MEM_LENGTH            0x100
 
 /* Direct registers. */

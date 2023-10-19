@@ -30,17 +30,17 @@
 /*
  * Intel CPU flags in CR0
  */
-#define X86_CR0_PE              0x00000001 /* Enable Protected Mode    (RW) */
-#define X86_CR0_MP              0x00000002 /* Monitor Coprocessor      (RW) */
-#define X86_CR0_EM              0x00000004 /* Require FPU Emulation    (RO) */
-#define X86_CR0_TS              0x00000008 /* Task Switched            (RW) */
-#define X86_CR0_ET              0x00000010 /* Extension type           (RO) */
-#define X86_CR0_NE              0x00000020 /* Numeric Error Reporting  (RW) */
-#define X86_CR0_WP              0x00010000 /* Supervisor Write Protect (RW) */
-#define X86_CR0_AM              0x00040000 /* Alignment Checking       (RW) */
-#define X86_CR0_NW              0x20000000 /* Not Write-Through        (RW) */
-#define X86_CR0_CD              0x40000000 /* Cache Disable            (RW) */
-#define X86_CR0_PG              0x80000000 /* Paging                   (RW) */
+#define X86_CR0_PE              _AC(0x00000001, UL) /* Enable Protected Mode    (RW) */
+#define X86_CR0_MP              _AC(0x00000002, UL) /* Monitor Coprocessor      (RW) */
+#define X86_CR0_EM              _AC(0x00000004, UL) /* Require FPU Emulation    (RO) */
+#define X86_CR0_TS              _AC(0x00000008, UL) /* Task Switched            (RW) */
+#define X86_CR0_ET              _AC(0x00000010, UL) /* Extension type           (RO) */
+#define X86_CR0_NE              _AC(0x00000020, UL) /* Numeric Error Reporting  (RW) */
+#define X86_CR0_WP              _AC(0x00010000, UL) /* Supervisor Write Protect (RW) */
+#define X86_CR0_AM              _AC(0x00040000, UL) /* Alignment Checking       (RW) */
+#define X86_CR0_NW              _AC(0x20000000, UL) /* Not Write-Through        (RW) */
+#define X86_CR0_CD              _AC(0x40000000, UL) /* Cache Disable            (RW) */
+#define X86_CR0_PG              _AC(0x80000000, UL) /* Paging                   (RW) */
 
 /*
  * Intel CPU flags in CR3

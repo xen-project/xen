@@ -129,7 +129,7 @@ int hvm_hypercall(struct cpu_user_regs *regs)
         break;
     }
 
-    if ( (eax & 0x80000000) && is_viridian_domain(currd) )
+    if ( (eax & 0x80000000U) && is_viridian_domain(currd) )
     {
         int ret;
 

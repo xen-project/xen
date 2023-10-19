@@ -3,10 +3,10 @@
 
 #include <xen/mm.h>
 
-#define CF8_BDF(cf8)     (  ((cf8) & 0x00ffff00) >> 8)
-#define CF8_ADDR_LO(cf8) (   (cf8) & 0x000000fc)
-#define CF8_ADDR_HI(cf8) (  ((cf8) & 0x0f000000) >> 16)
-#define CF8_ENABLED(cf8) (!!((cf8) & 0x80000000))
+#define CF8_BDF(cf8)     (  ((cf8) & 0x00ffff00U) >> 8)
+#define CF8_ADDR_LO(cf8) (   (cf8) & 0x000000fcU)
+#define CF8_ADDR_HI(cf8) (  ((cf8) & 0x0f000000U) >> 16)
+#define CF8_ENABLED(cf8) (!!((cf8) & 0x80000000U))
 
 #define IS_SNB_GFX(id) (id == 0x01068086 || id == 0x01168086 \
                         || id == 0x01268086 || id == 0x01028086 \

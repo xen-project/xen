@@ -37,7 +37,7 @@
  */
 
 #define MSI_ADDR_BASE_HI            0
-#define MSI_ADDR_BASE_LO            0xfee00000
+#define MSI_ADDR_BASE_LO            0xfee00000U
 #define MSI_ADDR_BASE_MASK          (~0xfffff)
 #define MSI_ADDR_HEADER             MSI_ADDR_BASE_LO
 

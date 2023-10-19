@@ -39,22 +39,22 @@
 
 #define PAT(x) (x)
 static const uint32_t mask16[16] = {
-    PAT(0x00000000),
-    PAT(0x000000ff),
-    PAT(0x0000ff00),
-    PAT(0x0000ffff),
-    PAT(0x00ff0000),
-    PAT(0x00ff00ff),
-    PAT(0x00ffff00),
-    PAT(0x00ffffff),
-    PAT(0xff000000),
-    PAT(0xff0000ff),
-    PAT(0xff00ff00),
-    PAT(0xff00ffff),
-    PAT(0xffff0000),
-    PAT(0xffff00ff),
-    PAT(0xffffff00),
-    PAT(0xffffffff),
+    PAT(0x00000000U),
+    PAT(0x000000ffU),
+    PAT(0x0000ff00U),
+    PAT(0x0000ffffU),
+    PAT(0x00ff0000U),
+    PAT(0x00ff00ffU),
+    PAT(0x00ffff00U),
+    PAT(0x00ffffffU),
+    PAT(0xff000000U),
+    PAT(0xff0000ffU),
+    PAT(0xff00ff00U),
+    PAT(0xff00ffffU),
+    PAT(0xffff0000U),
+    PAT(0xffff00ffU),
+    PAT(0xffffff00U),
+    PAT(0xffffffffU),
 };
 
 /* force some bits to zero */
