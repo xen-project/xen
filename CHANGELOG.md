@@ -33,6 +33,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
    nodes using a device tree overlay binary (.dtbo).
  - Introduce two new hypercalls to map the vCPU runstate and time areas by
    physical rather than linear/virtual addresses.
+ - On x86, support for enforcing system-wide operation in Data Operand
+   Independent Timing Mode.
 
 ### Removed
  - On x86, the "pku" command line option has been removed.  It has never

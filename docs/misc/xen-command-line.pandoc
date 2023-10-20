@@ -788,6 +788,17 @@ Specify the size of the console debug trace buffer. By specifying `cpu:`
 additionally a trace buffer of the specified size is allocated per cpu.
 The debug trace feature is only enabled in debugging builds of Xen.
 
+### dit (x86/Intel)
+> `= <boolean>`
+
+> Default: `CONFIG_DIT_DEFAULT`
+
+Specify whether Xen and guests should operate in Data Independent Timing
+mode (Intel calls this DOITM, Data Operand Independent Timing Mode). Note
+that enabling this option cannot guarantee anything beyond what underlying
+hardware guarantees (with, where available and known to Xen, respective
+tweaks applied).
+
 ### dma_bits
 > `= <integer>`
 
