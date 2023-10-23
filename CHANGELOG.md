@@ -35,6 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
    physical rather than linear/virtual addresses.
  - On x86, support for enforcing system-wide operation in Data Operand
    Independent Timing Mode.
+ - The project has now officially adopted 6 directives and 65 rules of MISRA-C.
 
 ### Removed
  - On x86, the "pku" command line option has been removed.  It has never
