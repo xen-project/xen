@@ -246,6 +246,7 @@ ARM (W/ VIRTUALISATION EXTENSIONS) ARCHITECTURE
 M:	Stefano Stabellini <sstabellini@kernel.org>
 M:	Julien Grall <julien@xen.org>
 M:	Bertrand Marquis <bertrand.marquis@arm.com>
+M:	Michal Orzel <michal.orzel@amd.com>
 R:	Volodymyr Babchuk <Volodymyr_Babchuk@epam.com>
 S:	Supported
 L:	xen-devel@lists.xenproject.org
