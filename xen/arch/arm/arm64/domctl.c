@@ -33,27 +33,31 @@ static long switch_mode(struct domain *d, enum domain_type type)
     return 0;
 }
 
+static long set_address_size(struct domain *d, uint32_t address_size)
+{
+    switch ( address_size )
+    {
+    case 32:
+        if ( !cpu_has_el1_32 )
+            return -EINVAL;
+        /* SVE is not supported for 32 bit domain */
+        if ( is_sve_domain(d) )
+            return -EINVAL;
+        return switch_mode(d, DOMAIN_32BIT);
+    case 64:
+        return switch_mode(d, DOMAIN_64BIT);
+    default:
+        return -EINVAL;
+    }
+}
+
 long subarch_do_domctl(struct xen_domctl *domctl, struct domain *d,
                        XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
     switch ( domctl->cmd )
     {
     case XEN_DOMCTL_set_address_size:
-        switch ( domctl->u.address_size.size )
-        {
-        case 32:
-            if ( !cpu_has_el1_32 )
-                return -EINVAL;
-            /* SVE is not supported for 32 bit domain */
-            if ( is_sve_domain(d) )
-                return -EINVAL;
-            return switch_mode(d, DOMAIN_32BIT);
-        case 64:
-            return switch_mode(d, DOMAIN_64BIT);
-        default:
-            return -EINVAL;
-        }
-        break;
+        return set_address_size(d, domctl->u.address_size.size);
 
     default:
         return -ENOSYS;
