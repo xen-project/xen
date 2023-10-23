@@ -632,7 +632,7 @@ void p2m_change_type_range(struct domain *d,
                            p2m_type_t ot, p2m_type_t nt);
 
 /* Compare-exchange the type of a single p2m entry */
-int p2m_change_type_one(struct domain *d, unsigned long gfn,
+int p2m_change_type_one(struct domain *d, unsigned long gfn_l,
                         p2m_type_t ot, p2m_type_t nt);
 
 /* Synchronously change the p2m type for a range of gfns */
@@ -649,7 +649,7 @@ static inline bool p2m_is_global_logdirty(const struct domain *d)
 #endif
 }
 
-int p2m_is_logdirty_range(struct p2m_domain *, unsigned long start,
+int p2m_is_logdirty_range(struct p2m_domain *p2m, unsigned long start,
                           unsigned long end);
 
 /* Set mmio addresses in the p2m table (for pass-through) */
@@ -661,9 +661,9 @@ int set_identity_p2m_entry(struct domain *d, unsigned long gfn,
                            p2m_access_t p2ma, unsigned int flag);
 int clear_identity_p2m_entry(struct domain *d, unsigned long gfn);
 /* HVM-only callers can use these directly: */
-int p2m_add_identity_entry(struct domain *d, unsigned long gfn,
+int p2m_add_identity_entry(struct domain *d, unsigned long gfn_l,
                            p2m_access_t p2ma, unsigned int flag);
-int p2m_remove_identity_entry(struct domain *d, unsigned long gfn);
+int p2m_remove_identity_entry(struct domain *d, unsigned long gfn_l);
 
 /* 
  * Populate-on-demand
@@ -924,7 +924,7 @@ int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
                                 p2m_type_t p2mt, p2m_access_t p2ma);
 
 /* Set a specific p2m view visibility */
-int p2m_set_altp2m_view_visibility(struct domain *d, unsigned int idx,
+int p2m_set_altp2m_view_visibility(struct domain *d, unsigned int altp2m_idx,
                                    uint8_t visible);
 #else /* !CONFIG_HVM */
 struct p2m_domain *p2m_get_altp2m(struct vcpu *v);
