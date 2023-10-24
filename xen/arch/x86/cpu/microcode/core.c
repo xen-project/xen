@@ -861,25 +861,19 @@ int __init early_microcode_init(unsigned long *module_map,
 {
     const struct cpuinfo_x86 *c = &boot_cpu_data;
     int rc = 0;
-    bool can_load = false;
 
     switch ( c->x86_vendor )
     {
     case X86_VENDOR_AMD:
-        if ( c->x86 >= 0x10 )
-        {
-            ucode_ops = amd_ucode_ops;
-            can_load = true;
-        }
+        ucode_probe_amd(&ucode_ops);
         break;
 
     case X86_VENDOR_INTEL:
-        ucode_ops = intel_ucode_ops;
-        can_load = intel_can_load_microcode();
+        ucode_probe_intel(&ucode_ops);
         break;
     }
 
-    if ( !ucode_ops.apply_microcode )
+    if ( !ucode_ops.collect_cpu_info )
     {
         printk(XENLOG_INFO "Microcode loading not available\n");
         return -ENODEV;
@@ -896,10 +890,10 @@ int __init early_microcode_init(unsigned long *module_map,
      *
      * Take the hint in either case and ignore the microcode interface.
      */
-    if ( this_cpu(cpu_sig).rev == ~0 || !can_load )
+    if ( !ucode_ops.apply_microcode || this_cpu(cpu_sig).rev == ~0 )
     {
         printk(XENLOG_INFO "Microcode loading disabled due to: %s\n",
-               can_load ? "rev = ~0" : "HW toggle");
+               ucode_ops.apply_microcode ? "rev = ~0" : "HW toggle");
         ucode_ops.apply_microcode = NULL;
         return -ENODEV;
     }

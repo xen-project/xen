@@ -385,7 +385,7 @@ static struct microcode_patch *cf_check cpu_request_microcode(
     return patch;
 }
 
-bool __init intel_can_load_microcode(void)
+static bool __init can_load_microcode(void)
 {
     uint64_t mcu_ctrl;
 
@@ -398,9 +398,17 @@ bool __init intel_can_load_microcode(void)
     return !(mcu_ctrl & MCU_CONTROL_DIS_MCU_LOAD);
 }
 
-const struct microcode_ops __initconst_cf_clobber intel_ucode_ops = {
+static const struct microcode_ops __initconst_cf_clobber intel_ucode_ops = {
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
     .apply_microcode                  = apply_microcode,
     .compare_patch                    = compare_patch,
 };
+
+void __init ucode_probe_intel(struct microcode_ops *ops)
+{
+    *ops = intel_ucode_ops;
+
+    if ( !can_load_microcode() )
+        ops->apply_microcode = NULL;
+}

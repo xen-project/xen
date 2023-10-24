@@ -60,13 +60,17 @@ struct microcode_ops {
         const struct microcode_patch *new, const struct microcode_patch *old);
 };
 
-/**
- * Checks whether we can perform microcode updates on this Intel system
+/*
+ * Microcode loading falls into one of 3 states.
+ *   - No support at all
+ *   - Read-only (locked by firmware, or we're virtualised)
+ *   - Loading available
  *
- * @return True iff the microcode update facilities are enabled
+ * These are encoded by (not) filling in ops->collect_cpu_info (i.e. no
+ * support available) and (not) ops->apply_microcode (i.e. read only).
+ * Otherwise, all hooks must be filled in.
  */
-bool intel_can_load_microcode(void);
-
-extern const struct microcode_ops amd_ucode_ops, intel_ucode_ops;
+void ucode_probe_amd(struct microcode_ops *ops);
+void ucode_probe_intel(struct microcode_ops *ops);
 
 #endif /* ASM_X86_MICROCODE_PRIVATE_H */
