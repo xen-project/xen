@@ -21,7 +21,9 @@ The exceptions to this on 32-bit ARM are as follows:
  zImage protocol should still be used and not the stricter "raw
  (non-zImage)" protocol described in arm/Booting.
 
-There are no exception on 64-bit ARM.
+The exceptions to this on 64-bit ARM are as follows:
+
+ Xen binary should be loaded in memory below 2 TiB.
 
 Booting Guests
 --------------
