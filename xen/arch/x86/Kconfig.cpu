@@ -1,0 +1,22 @@
+menu "Supported CPU vendors"
+	visible if EXPERT
+
+config AMD
+	bool "Support AMD CPUs"
+	default y
+	help
+	  Detection, tunings and quirks for AMD platforms.
+
+	  May be turned off in builds targetting other vendors.  Otherwise,
+	  must be enabled for Xen to work suitably on AMD platforms.
+
+config INTEL
+	bool "Support Intel CPUs"
+	default y
+	help
+	  Detection, tunings and quirks for Intel platforms.
+
+	  May be turned off in builds targetting other vendors.  Otherwise,
+	  must be enabled for Xen to work suitably on Intel platforms.
+
+endmenu

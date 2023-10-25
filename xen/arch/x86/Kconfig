@@ -51,6 +51,8 @@ config HAS_CC_CET_IBT
 
 menu "Architecture Features"
 
+source "arch/x86/Kconfig.cpu"
+
 source "arch/Kconfig"
 
 config PV

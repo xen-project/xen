@@ -70,7 +70,16 @@ struct microcode_ops {
  * support available) and (not) ops->apply_microcode (i.e. read only).
  * Otherwise, all hooks must be filled in.
  */
+#ifdef CONFIG_AMD
 void ucode_probe_amd(struct microcode_ops *ops);
+#else
+static inline void ucode_probe_amd(struct microcode_ops *ops) {}
+#endif
+
+#ifdef CONFIG_INTEL
 void ucode_probe_intel(struct microcode_ops *ops);
+#else
+static inline void ucode_probe_intel(struct microcode_ops *ops) {}
+#endif
 
 #endif /* ASM_X86_MICROCODE_PRIVATE_H */
