@@ -21,6 +21,8 @@ ENTRY(entry_int82)
         SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
+        sti
+
         CR4_PV32_RESTORE
 
         GET_CURRENT(bx)
