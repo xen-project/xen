@@ -327,7 +327,6 @@ ENTRY(sysenter_entry)
 #ifdef CONFIG_XEN_SHSTK
         ALTERNATIVE "", "setssbsy", X86_FEATURE_XEN_SHSTK
 #endif
-        /* sti could live here when we don't switch page tables below. */
         pushq $FLAT_USER_SS
         pushq $0
         pushfq
