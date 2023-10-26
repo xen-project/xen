@@ -9,7 +9,7 @@ class ExclusionFileListError(Exception):
 
 def cppcheck_exclusion_file_list(input_file):
     ret = []
-    excl_list = load_exclusion_file_list(input_file)
+    excl_list = load_exclusion_file_list(input_file, "xen-analysis")
 
     for entry in excl_list:
         # Prepending * to the relative path to match every path where the Xen
@@ -25,7 +25,7 @@ def cppcheck_exclusion_file_list(input_file):
 # If the first entry contained a wildcard '*', the second entry will have an
 # array of the solved absolute path for that entry.
 # Returns [('path',[path,path,...]), ('path',[path,path,...]), ...]
-def load_exclusion_file_list(input_file):
+def load_exclusion_file_list(input_file, checker=""):
     ret = []
     try:
         with open(input_file, "rt") as handle:
@@ -51,6 +51,18 @@ def load_exclusion_file_list(input_file):
             raise ExclusionFileListError(
                 "Malformed JSON entry: rel_path field not found!"
             )
+        # Check the checker field
+        try:
+            entry_checkers = entry['checkers']
+        except KeyError:
+            # If the field doesn't exists, assume that this entry is for every
+            # checker
+            entry_checkers = checker
+
+        # Check if this entry is for the selected checker
+        if checker not in entry_checkers:
+            continue
+
         abs_path = settings.xen_dir + "/" + path
         check_path = [abs_path]
 

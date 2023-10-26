@@ -1,17 +1,16 @@
 .. SPDX-License-Identifier: CC-BY-4.0
 
-Exclude file list for xen-analysis script
-=========================================
+Exclude file list for xen scripts
+=================================
 
-The code analysis is performed on the Xen codebase for both MISRA
-checkers and static analysis checkers, there are some files however that
-needs to be removed from the findings report for various reasons (e.g.
-they are imported from external sources, they generate too many false
-positive results, etc.).
+Different Xen scripts can perform operations on the codebase to check its
+compliance for a set of rules, however Xen contains some files that are taken
+from other projects (e.g. linux) and they can't be updated to ease backporting
+fixes from their source, for this reason the file docs/misra/exclude-list.json
+is kept as a source of all these files that are external to the Xen project.
 
-For this reason the file docs/misra/exclude-list.json is used to exclude every
-entry listed in that file from the final report.
-Currently only the cppcheck analysis will use this file.
+Every entry of the file can be linked to different checkers, so that this list
+can be used by multiple scripts selecting only the required entries.
 
 Here is an example of the exclude-list.json file::
 
@@ -20,11 +19,13 @@ Here is an example of the exclude-list.json file::
 |    "content": [
 |        {
 |            "rel_path": "relative/path/from/xen/file",
-|            "comment": "This file is originated from ..."
+|            "comment": "This file is originated from ...",
+|            "checkers": "xen-analysis"
 |        },
 |        {
 |            "rel_path": "relative/path/from/xen/folder/*",
-|            "comment": "This folder is a library"
+|            "comment": "This folder is a library",
+|            "checkers": "xen-analysis some-checker"
 |        },
 |        {
 |            "rel_path": "relative/path/from/xen/mem*.c",
@@ -39,6 +40,12 @@ Here is an explanation of the fields inside an object of the "content" array:
    match more than one file/folder at the time. This field is mandatory.
  - comment: an optional comment to explain why the file is removed from the
    analysis.
+ - checkers: an optional list of checkers that will exclude this entries from
+   their results. This field is optional and when not specified, it means every
+   checker will use that entry.
+   Current implemented values for this field are:
+    - xen-analysis: the xen-analysis.py script exclude this entry for both MISRA
+      and static analysis scan. (Implemented only for Cppcheck tool)
 
 To ease the review and the modifications of the entries, they shall be listed in
 alphabetical order referring to the rel_path field.
