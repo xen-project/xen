@@ -1884,6 +1884,8 @@ void do_device_not_available(struct cpu_user_regs *regs)
 #endif
 }
 
+void nocall sysenter_eflags_saved(void);
+
 /* SAF-1-safe */
 void do_debug(struct cpu_user_regs *regs)
 {

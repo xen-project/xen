@@ -457,9 +457,7 @@ static inline void enable_nmis(void)
                      [cs] "r" (__HYPERVISOR_CS) );
 }
 
-void sysenter_entry(void);
-void sysenter_eflags_saved(void);
-void int80_direct_trap(void);
+void nocall sysenter_entry(void);
 
 struct stubs {
     union {

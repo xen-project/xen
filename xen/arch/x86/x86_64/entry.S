@@ -385,7 +385,7 @@ UNLIKELY_END(sysenter_gpf)
 #endif
         jmp   .Lbounce_exception
 
-ENTRY(int80_direct_trap)
+ENTRY(entry_int80)
         ENDBR64
         ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
         pushq $0
