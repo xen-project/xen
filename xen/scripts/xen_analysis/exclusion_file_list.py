@@ -7,16 +7,24 @@ class ExclusionFileListError(Exception):
     pass
 
 
-def __cppcheck_path_exclude_syntax(path):
-    # Prepending * to the relative path to match every path where the Xen
-    # codebase could be
-    path = "*" + path
+def cppcheck_exclusion_file_list(input_file):
+    ret = []
+    excl_list = load_exclusion_file_list(input_file)
 
-    return path
+    for entry in excl_list:
+        # Prepending * to the relative path to match every path where the Xen
+        # codebase could be
+        ret.append("*" + entry[0])
+
+    return ret
 
 
-# Reads the exclusion file list and returns a list of relative path to be
-# excluded.
+# Reads the exclusion file list and returns an array containing a set where the
+# first entry is what was listed in the exclusion list file, and the second
+# entry is the absolute path of the first entry.
+# If the first entry contained a wildcard '*', the second entry will have an
+# array of the solved absolute path for that entry.
+# Returns [('path',[path,path,...]), ('path',[path,path,...]), ...]
 def load_exclusion_file_list(input_file):
     ret = []
     try:
@@ -58,13 +66,6 @@ def load_exclusion_file_list(input_file):
                     .format(path, filepath_object)
                 )
 
-        if settings.analysis_tool == "cppcheck":
-            path = __cppcheck_path_exclude_syntax(path)
-        else:
-            raise ExclusionFileListError(
-                "Unimplemented for {}!".format(settings.analysis_tool)
-            )
-
-        ret.append(path)
+        ret.append((path, check_path))
 
     return ret

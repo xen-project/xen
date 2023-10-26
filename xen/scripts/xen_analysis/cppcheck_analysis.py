@@ -2,7 +2,8 @@
 
 import os, re, shutil
 from . import settings, utils, cppcheck_report_utils, exclusion_file_list
-from .exclusion_file_list import ExclusionFileListError
+from .exclusion_file_list import (ExclusionFileListError,
+                                  cppcheck_exclusion_file_list)
 
 class GetMakeVarsPhaseError(Exception):
     pass
@@ -54,8 +55,7 @@ def __generate_suppression_list(out_file):
             try:
                 exclusion_file = \
                     "{}/docs/misra/exclude-list.json".format(settings.repo_dir)
-                exclusion_list = \
-                    exclusion_file_list.load_exclusion_file_list(exclusion_file)
+                exclusion_list = cppcheck_exclusion_file_list(exclusion_file)
             except ExclusionFileListError as e:
                 raise CppcheckDepsPhaseError(
                     "Issue with reading file {}: {}".format(exclusion_file, e)
