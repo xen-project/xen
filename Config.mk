@@ -223,10 +223,10 @@ OVMF_UPSTREAM_URL ?= https://xenbits.xen.org/git-http/ovmf.git
 OVMF_UPSTREAM_REVISION ?= ba91d0292e593df8528b66f99c1b0b14fadc8e16
 
 QEMU_UPSTREAM_URL ?= https://xenbits.xen.org/git-http/qemu-xen.git
-QEMU_UPSTREAM_REVISION ?= 0df9387c8983e1b1e72d8c574356f572342c03e6
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.18.0-rc5
 
 MINIOS_UPSTREAM_URL ?= https://xenbits.xen.org/git-http/mini-os.git
-MINIOS_UPSTREAM_REVISION ?= 5bcb28aaeba1c2506a82fab0cdad0201cd9b54b3
+MINIOS_UPSTREAM_REVISION ?= xen-4.18.0-rc5
 
 SEABIOS_UPSTREAM_URL ?= https://xenbits.xen.org/git-http/seabios.git
 SEABIOS_UPSTREAM_REVISION ?= rel-1.16.2
@@ -235,7 +235,7 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
 QEMU_TRADITIONAL_URL ?= https://xenbits.xen.org/git-http/qemu-xen-traditional.git
-QEMU_TRADITIONAL_REVISION ?= 3d273dd05e51e5a1ffba3d98c7437ee84e8f8764
+QEMU_TRADITIONAL_REVISION ?= xen-4.18.0-rc5
 # Wed Jul 15 10:01:40 2020 +0100
 # qemu-trad: remove Xen path dependencies
 
