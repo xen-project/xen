@@ -171,7 +171,7 @@ past_zImage:
 
         /* Using the DTB in the .dtb section? */
 .ifnes CONFIG_DTB_FILE,""
-        load_paddr r8, _sdtb
+        adr_l r8, _sdtb
 .endif
 
         /* Initialize the UART if earlyprintk has been enabled. */
@@ -213,7 +213,7 @@ GLOBAL(init_secondary)
         mrc   CP32(r1, MPIDR)
         bic   r7, r1, #(~MPIDR_HWID_MASK) /* Mask out flags to get CPU ID */
 
-        load_paddr r0, smp_up_cpu
+        adr_l r0, smp_up_cpu
         dsb
 2:      ldr   r1, [r0]
         cmp   r1, r7
@@ -479,7 +479,7 @@ create_page_tables:
          * create_table_entry_paddr() will clobber the register storing
          * the physical address of the table to point to.
          */
-        load_paddr r5, boot_third
+        adr_l r5, boot_third
         mov_w r4, XEN_VIRT_START
 .rept XEN_NR_ENTRIES(2)
         mov   r0, r5                        /* r0 := paddr(l3 table) */
@@ -578,7 +578,7 @@ enable_mmu:
         flush_xen_tlb_local r0
 
         /* Write Xen's PT's paddr into the HTTBR */
-        load_paddr r0, boot_pgtable
+        adr_l r0, boot_pgtable
         mov   r1, #0                 /* r0:r1 is paddr (boot_pagetable) */
         mcrr  CP64(r0, r1, HTTBR)
         isb
@@ -876,19 +876,16 @@ putn:   mov   pc, lr
 
 /* This provides a C-API version of __lookup_processor_type */
 ENTRY(lookup_processor_type)
-        stmfd sp!, {r4, r10, lr}
-        mov   r10, #0                   /* r10 := offset between virt&phys */
+        stmfd sp!, {r4, lr}
         bl    __lookup_processor_type
         mov r0, r1
-        ldmfd sp!, {r4, r10, pc}
+        ldmfd sp!, {r4, pc}
 
 /*
  *  Read processor ID register (CP#15, CR0), and Look up in the linker-built
  * supported processor list. Note that we can't use the absolute addresses for
  * the __proc_info lists since we aren't running with the MMU on (and therefore,
  * we are not in correct address space). We have to calculate the offset.
- *
- * r10: offset between virt&phys
  *
  * Returns:
  * r0: CPUID
@@ -897,8 +894,8 @@ ENTRY(lookup_processor_type)
  */
 __lookup_processor_type:
         mrc   CP32(r0, MIDR)                /* r0 := our cpu id */
-        load_paddr r1, __proc_info_start
-        load_paddr r2, __proc_info_end
+        adr_l r1, __proc_info_start
+        adr_l r2, __proc_info_end
 1:      ldr   r3, [r1, #PROCINFO_cpu_mask]
         and   r4, r0, r3                    /* r4 := our cpu id with mask */
         ldr   r3, [r1, #PROCINFO_cpu_val]   /* r3 := cpu val in current proc info */
