@@ -151,12 +151,18 @@ CHECK_NAME_(k, n, T)(k xen_ ## n *x, \
     return x == c; \
 }
 
-#define CHECK_SIZE(name) \
-    typedef int CHECK_NAME(name, S)[1 - (sizeof(xen_ ## name ## _t) != \
-                                         sizeof(compat_ ## name ## _t)) * 2]
+#define CHECK_SIZE(name)                                  \
+static inline void __maybe_unused CHECK_SIZE_##name(void) \
+{                                                         \
+    BUILD_BUG_ON(sizeof(xen_ ## name ## _t) !=            \
+                 sizeof(compat_ ## name ## _t));          \
+}
 #define CHECK_SIZE_(k, n) \
-    typedef int CHECK_NAME_(k, n, S)[1 - (sizeof(k xen_ ## n) != \
-                                          sizeof(k compat_ ## n)) * 2]
+static inline void __maybe_unused CHECK_SIZE_##k_##n(void) \
+{                                                          \
+    BUILD_BUG_ON(sizeof(k xen_ ## n) !=                    \
+                 sizeof(k compat_ ## n));                  \
+}
 
 #define CHECK_FIELD_COMMON(name, t, f) \
 static inline int __maybe_unused name(xen_ ## t ## _t *x, compat_ ## t ## _t *c) \
