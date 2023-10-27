@@ -20,6 +20,14 @@
         },
         {
             "id": "SAF-2-safe",
+            "analyser": {
+                "eclair": "MC3R1.R10.1"
+            },
+            "name": "MC3R1.R10.1: use of an enumeration constant in an arithmetic operation",
+            "text": "This violation can be fixed with a cast to (int) of the enumeration constant, but a deviation was chosen due to code readability (see also the comment in BITS_TO_LONGS)."
+        },
+        {
+            "id": "SAF-3-safe",
             "analyser": {},
             "name": "Sentinel",
             "text": "Next ID to be used"

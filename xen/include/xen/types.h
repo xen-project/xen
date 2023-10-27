@@ -22,6 +22,11 @@ typedef signed long ssize_t;
 
 typedef __PTRDIFF_TYPE__ ptrdiff_t;
 
+/*
+ * Users of this macro are expected to pass a positive value.
+ *
+ * XXX: should become an unsigned quantity
+ */
 #define BITS_TO_LONGS(bits) \
     (((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
 #define DECLARE_BITMAP(name,bits) \

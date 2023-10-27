@@ -360,6 +360,7 @@ struct domain_iommu {
 #endif
 
     /* Features supported by the IOMMU */
+    /* SAF-2-safe enum constant in arithmetic operation */
     DECLARE_BITMAP(features, IOMMU_FEAT_count);
 
     /* Does the guest share HAP mapping with the IOMMU? */
