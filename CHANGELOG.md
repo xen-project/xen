@@ -17,24 +17,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
    Hotplug" for clarity
 
 ### Added
- - On x86, support for features new in Intel Sapphire Rapids CPUs:
-   - PKS (Protection Key Supervisor) available to HVM/PVH guests.
-   - VM-Notify used by Xen to mitigate certain micro-architectural pipeline
-     livelocks, instead of crashing the entire server.
-   - Bus-lock detection, used by Xen to mitigate (by rate-limiting) the system
-     wide impact of a guest misusing atomic instructions.
- - xl/libxl can customize SMBIOS strings for HVM guests.
- - Add support for AVX512-FP16 on x86.
- - On Arm, Xen supports guests running SVE/SVE2 instructions. (Tech Preview)
- - On Arm, add suport for Firmware Framework for Arm A-profile (FF-A) Mediator
-   (Tech Preview)
- - Add Intel Hardware P-States (HWP) cpufreq driver.
- - On Arm, experimental support for dynamic addition/removal of Xen device tree
-   nodes using a device tree overlay binary (.dtbo).
+ - On x86:
+   - xl/libxl can customize SMBIOS strings for HVM guests.
+   - Support for enforcing system-wide operation in Data Operand Independent
+     Timing Mode.
+   - Add Intel Hardware P-States (HWP) cpufreq driver.
+   - Support for features new in Intel Sapphire Rapids CPUs:
+     - PKS (Protection Key Supervisor) available to HVM/PVH guests.
+     - VM-Notify used by Xen to mitigate certain micro-architectural pipeline
+       livelocks, instead of crashing the entire server.
+     - Bus-lock detection, used by Xen to mitigate (by rate-limiting) the
+       system wide impact of a guest misusing atomic instructions.
+   - Support for features new in Intel Granite Rapids CPUs:
+     - AVX512-FP16.
+ - On Arm:
+   - Xen supports guests running SVE/SVE2 instructions. (Tech Preview)
+   - Add suport for Firmware Framework for Arm A-profile (FF-A) Mediator (Tech
+     Preview)
+   - Experimental support for dynamic addition/removal of Xen device tree
+     nodes using a device tree overlay binary (.dtbo).
  - Introduce two new hypercalls to map the vCPU runstate and time areas by
    physical rather than linear/virtual addresses.
- - On x86, support for enforcing system-wide operation in Data Operand
-   Independent Timing Mode.
  - The project has now officially adopted 6 directives and 65 rules of MISRA-C.
 
 ### Removed
