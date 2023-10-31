@@ -1480,7 +1480,8 @@ detection of systems known to misbehave upon accesses to that port.
 > Default: `new` unless directed-EOI is supported
 
 ### iommu
-    = List of [ <bool>, verbose, debug, force, required, quarantine[=scratch-page],
+    = List of [ <bool>, verbose, debug, force, required,
+                quarantine=<bool>|scratch-page,
                 sharept, superpages, intremap, intpost, crash-disable,
                 snoop, qinval, igfx, amd-iommu-perdev-intremap,
                 dom0-{passthrough,strict} ]
@@ -1519,7 +1520,8 @@ boolean (e.g. `iommu=no`) can override this and leave the IOMMUs disabled.
     successfully.
 
 *   The `quarantine` option can be used to control Xen's behavior when
-    de-assigning devices from guests.
+    de-assigning devices from guests.  The default behaviour is chosen at
+    compile time, and is one of `CONFIG_IOMMU_QUARANTINE_{NONE,BASIC,SCRATCH_PAGE}`.
 
     When a PCI device is assigned to an untrusted domain, it is possible
     for that domain to program the device to DMA to an arbitrary address.
