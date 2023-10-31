@@ -18,10 +18,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Added
  - On x86:
+   - On all Intel systems, MSR_ARCH_CAPS is now visible in guests, and
+     controllable from the VM's config file.  For CPUs from ~2019 onwards,
+     this allows guest kernels to see details about hardware fixes for
+     speculative mitigations.  (Backported as XSA-435 to older releases).
    - xl/libxl can customize SMBIOS strings for HVM guests.
    - Support for enforcing system-wide operation in Data Operand Independent
      Timing Mode.
    - Add Intel Hardware P-States (HWP) cpufreq driver.
+   - Support for features new in AMD Genoa CPUs:
+     - CPUID_USER_DIS (CPUID Faulting) used by Xen to control PV guest's view
+       of CPUID data.
    - Support for features new in Intel Sapphire Rapids CPUs:
      - PKS (Protection Key Supervisor) available to HVM/PVH guests.
      - VM-Notify used by Xen to mitigate certain micro-architectural pipeline
