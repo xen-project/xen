@@ -74,9 +74,9 @@ void *map_domain_page_global(mfn_t mfn)
     return vmap(&mfn, 1);
 }
 
-void unmap_domain_page_global(const void *va)
+void unmap_domain_page_global(const void *ptr)
 {
-    vunmap(va);
+    vunmap(ptr);
 }
 
 /* Map a page of domheap memory */
@@ -149,13 +149,13 @@ void *map_domain_page(mfn_t mfn)
 }
 
 /* Release a mapping taken with map_domain_page() */
-void unmap_domain_page(const void *va)
+void unmap_domain_page(const void *ptr)
 {
     unsigned long flags;
     lpae_t *map = this_cpu(xen_dommap);
-    int slot = ((unsigned long) va - DOMHEAP_VIRT_START) >> SECOND_SHIFT;
+    int slot = ((unsigned long)ptr - DOMHEAP_VIRT_START) >> SECOND_SHIFT;
 
-    if ( !va )
+    if ( !ptr )
         return;
 
     local_irq_save(flags);
