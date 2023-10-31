@@ -54,11 +54,12 @@ until grep 'domU started' /var/log/xen/console/guest-domU.log; do
     sleep 1
 done
 echo \"${wait_and_wakeup}\"
+# let the above message flow to console, then suspend
+sync /dev/stdout
+sleep 5
 set -x
 echo deep > /sys/power/mem_sleep
 echo mem > /sys/power/state
-# now wait for resume
-sleep 5
 xl list
 xl dmesg | grep 'Finishing wakeup from ACPI S3 state' || exit 1
 # check if domU is still alive
