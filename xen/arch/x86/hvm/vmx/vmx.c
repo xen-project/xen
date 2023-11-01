@@ -4090,7 +4090,7 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     case EXIT_REASON_INIT:
         printk(XENLOG_ERR "Error: INIT received - ignoring\n");
-        return; /* Renter the guest without further processing */
+        break;
     }
 
     /* Now enable interrupts so it's safe to take locks. */
@@ -4692,6 +4692,7 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_EXTERNAL_INTERRUPT:  /* Handled earlier */
+    case EXIT_REASON_INIT:                /* Handled earlier */
     case EXIT_REASON_TPR_BELOW_THRESHOLD: /* Handled later in vmx_intr_assist() */
     case EXIT_REASON_BUS_LOCK:            /* Nothing to do (rate-limit only) */
         break;
