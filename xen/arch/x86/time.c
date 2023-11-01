@@ -1539,11 +1539,13 @@ static void collect_time_info(const struct vcpu *v,
 
 static void __update_vcpu_system_time(struct vcpu *v, int force)
 {
-    struct vcpu_time_info *u = &vcpu_info(v, time), _u;
+    struct vcpu_time_info *u, _u;
     const struct domain *d = v->domain;
 
     if ( !v->vcpu_info_area.map )
         return;
+
+    u = &vcpu_info(v, time);
 
     collect_time_info(v, &_u);
 
