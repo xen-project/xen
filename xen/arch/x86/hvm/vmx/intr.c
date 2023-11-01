@@ -224,7 +224,7 @@ void vmx_sync_exit_bitmap(struct vcpu *v)
     }
 }
 
-void vmx_intr_assist(void)
+void asmlinkage vmx_intr_assist(void)
 {
     struct hvm_intack intack;
     struct vcpu *v = current;

@@ -139,6 +139,13 @@ Deviations related to MISRA C:2012 Rules:
        configuration. Therefore, the absence of prior declarations is safe.
      - Tagged as `safe` for ECLAIR.
 
+   * - R8.4
+     - Functions and variables used only by asm modules are marked with
+       the `asmlinkage` macro. Existing code may use a SAF-1-safe
+       textual deviation (see safe.json), but new code should not use
+       it.
+     - Tagged as `safe` for ECLAIR.
+
    * - R8.6
      - The following variables are compiled in multiple translation units
        belonging to different executables and therefore are safe.

@@ -2267,7 +2267,7 @@ void asm_domain_crash_synchronous(unsigned long addr)
 }
 
 #ifdef CONFIG_DEBUG
-void check_ist_exit(const struct cpu_user_regs *regs, bool ist_exit)
+void asmlinkage check_ist_exit(const struct cpu_user_regs *regs, bool ist_exit)
 {
     const unsigned int ist_mask =
         (1U << X86_EXC_NMI) | (1U << X86_EXC_DB) |

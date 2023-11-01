@@ -162,6 +162,15 @@ Therefore the absence of prior declarations is safe."
 -config=MC3R1.R8.4,reports+={safe, "first_area(any_loc(file(gcov)))"}
 -doc_end
 
+-doc_begin="Recognize the occurrence of current_stack_pointer as a declaration."
+-file_tag+={asm_defns, "^xen/arch/x86/include/asm/asm_defns\\.h$"}
+-config=MC3R1.R8.4,declarations+={safe, "loc(file(asm_defns))&&^current_stack_pointer$"}
+-doc_end
+
+-doc_begin="asmlinkage is a marker to indicate that the function is only used to interface with asm modules."
+-config=MC3R1.R8.4,declarations+={safe,"loc(text(^(?s).*asmlinkage.*$, -1..0))"}
+-doc_end
+
 -doc_begin="The following variables are compiled in multiple translation units
 belonging to different executables and therefore are safe."
 -config=MC3R1.R8.6,declarations+={safe, "name(current_stack_pointer||bsearch||sort)"}

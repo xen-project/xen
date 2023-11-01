@@ -1056,7 +1056,7 @@ static void noreturn cf_check svm_do_resume(void)
     reset_stack_and_jump(svm_asm_do_resume);
 }
 
-void svm_vmenter_helper(void)
+void asmlinkage svm_vmenter_helper(void)
 {
     const struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct vcpu *curr = current;
@@ -2586,7 +2586,7 @@ const struct hvm_function_table * __init start_svm(void)
     return &svm_function_table;
 }
 
-void svm_vmexit_handler(void)
+void asmlinkage svm_vmexit_handler(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     uint64_t exit_reason;

@@ -151,6 +151,11 @@
 # define ASM_FLAG_OUT(yes, no) no
 #endif
 
+/* Mark a function or variable as being used only to interface with asm */
+#ifndef asmlinkage
+#define asmlinkage
+#endif
+
 /*
  * NB: we need to disable the gcc-compat warnings for clang in some places or
  * else it will complain with: "'break' is bound to loop, GCC binds it to

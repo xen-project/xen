@@ -1490,7 +1490,7 @@ static void nvmx_eptp_update(void)
     __vmwrite(EPT_POINTER, get_shadow_eptp(curr));
 }
 
-void nvmx_switch_guest(void)
+void asmlinkage nvmx_switch_guest(void)
 {
     struct vcpu *v = current;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
