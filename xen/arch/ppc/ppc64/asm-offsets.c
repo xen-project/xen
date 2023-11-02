@@ -46,6 +46,7 @@ void __dummy__(void)
     OFFSET(UREGS_dsisr, struct cpu_user_regs, dsisr);
     OFFSET(UREGS_cr, struct cpu_user_regs, cr);
     OFFSET(UREGS_fpscr, struct cpu_user_regs, fpscr);
+    OFFSET(UREGS_entry_vector, struct cpu_user_regs, entry_vector);
     DEFINE(UREGS_sizeof, sizeof(struct cpu_user_regs));
 
     OFFSET(OPAL_base, struct opal, base);

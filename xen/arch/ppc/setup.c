@@ -11,6 +11,15 @@
 /* Xen stack for bringing up the first CPU. */
 unsigned char __initdata cpu0_boot_stack[STACK_SIZE] __aligned(STACK_SIZE);
 
+void setup_exceptions(void)
+{
+    unsigned long lpcr;
+
+    /* Set appropriate interrupt location in LPCR */
+    lpcr = mfspr(SPRN_LPCR);
+    mtspr(SPRN_LPCR, lpcr | LPCR_AIL_3);
+}
+
 void __init noreturn start_xen(unsigned long r3, unsigned long r4,
                                unsigned long r5, unsigned long r6,
                                unsigned long r7)
@@ -25,6 +34,8 @@ void __init noreturn start_xen(unsigned long r3, unsigned long r4,
         /* kexec boot protocol */
         boot_opal_init((void *)r3);
     }
+
+    setup_exceptions();
 
     setup_initial_pagetables();
 

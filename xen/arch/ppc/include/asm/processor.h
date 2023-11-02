@@ -103,6 +103,37 @@
 #define PVR_BE        0x0070
 #define PVR_PA6T      0x0090
 
+/* Exception Definitions */
+#define EXC_SYSTEM_RESET    0x0100 /* System Reset Interrupt */
+#define EXC_MACHINE_CHECK   0x0200 /* Machine Check Interrupt */
+#define EXC_DATA_STORAGE    0x0300 /* Data Storage Interrupt */
+#define EXC_DATA_SEGMENT    0x0380 /* Data Segment Interrupt */
+#define EXC_INSN_STORAGE    0x0400 /* Instruction Storage Interrupt */
+#define EXC_INSN_SEGMENT    0x0480 /* Instruction Segment Interrupt */
+#define EXC_EXTERNAL        0x0500 /* External Interrupt */
+#define EXC_ALIGNMENT       0x0600 /* Alignment Interrupt */
+#define EXC_PROGRAM         0x0700 /* Program Interrupt */
+#define EXC_FPU_UNAVAIL     0x0800 /* Floating-Point Unavailable Interrupt */
+#define EXC_DECREMENTER     0x0900 /* Decrementer Interrupt */
+#define EXC_H_DECREMENTER   0x0980 /* Hypervisor Decrementer Interrupt */
+#define EXC_PRIV_DOORBELL   0x0A00 /* Directed Privileged Doorbell Interrupt */
+#define EXC_SYSTEM_CALL     0x0C00 /* System Call Interrupt */
+#define EXC_TRACE           0x0D00 /* Trace Interrupt */
+#define EXC_H_DATA_STORAGE  0x0E00 /* Hypervisor Data Storage Interrupt */
+#define EXC_H_INSN_STORAGE  0x0E20 /* Hypervisor Instruction Storage Interrupt */
+#define EXC_H_EMUL_ASST     0x0E40 /* Hypervisor Emulation Assistance Interrupt */
+#define EXC_H_MAINTENANCE   0x0E60 /* Hypervisor Maintenance Interrupt */
+#define EXC_H_DOORBELL      0x0E80 /* Directed Hypervisor Doorbell Interrupt */
+#define EXC_H_VIRT          0x0EA0 /* Hypervisor Virtualization Interrupt */
+#define EXC_PERF_MON        0x0F00 /* Performance Monitor Interrupt */
+#define EXC_VECTOR_UNAVAIL  0x0F20 /* Vector Unavailable Interrupt */
+#define EXC_VSX_UNAVAIL     0x0F40 /* VSX Unavailable Interrupt */
+#define EXC_FACIL_UNAVAIL   0x0F60 /* Facility Unavailable Interrupt */
+#define EXC_H_FACIL_UNAVAIL 0x0F80 /* Hypervisor Facility Unavailable Interrupt */
+
+/* Base address of interrupt vector table when LPCR[AIL]=3 */
+#define AIL_VECTOR_BASE _AC(0xc000000000004000, UL)
+
 #ifndef __ASSEMBLY__
 
 #include <xen/types.h>
