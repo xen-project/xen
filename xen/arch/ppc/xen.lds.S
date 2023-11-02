@@ -24,6 +24,10 @@ SECTIONS
         _stext = .;            /* Text section */
         *(.text.header)
 
+        . = ALIGN(256);
+        HIDDEN(_stext_exceptions = .);
+        *(.text.exceptions)
+
         *(.text.cold)
         *(.text.unlikely .text.*_unlikely .text.unlikely.*)
 
@@ -184,3 +188,6 @@ ASSERT(IS_ALIGNED(__bss_end,        POINTER_ALIGN), "__bss_end is misaligned")
 
 ASSERT(!SIZEOF(.got),      ".got non-empty")
 ASSERT(!SIZEOF(.got.plt),  ".got.plt non-empty")
+
+ASSERT(_stext_exceptions == EXCEPTION_VECTORS_START,
+       ".text.exceptions not at expected location -- .text.header too big?");

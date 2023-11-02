@@ -42,6 +42,9 @@
 
 #define XEN_VIRT_START _AC(0xc000000000000000, UL)
 
+/* Fixed address for start of the section containing exception vectors */
+#define EXCEPTION_VECTORS_START _AC(0xc000000000000100, UL)
+
 #define VMAP_VIRT_START (XEN_VIRT_START + GB(1))
 #define VMAP_VIRT_SIZE  GB(1)
 
