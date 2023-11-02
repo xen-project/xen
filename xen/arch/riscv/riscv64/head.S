@@ -29,6 +29,20 @@ ENTRY(start)
 
         jal     reset_stack
 
+        /*
+         * save hart_id ( bootcpu_id ) and dtb_base as a0 and a1 register can
+         * be used by C code
+         */
+        mv      s0, a0
+        mv      s1, a1
+
+        jal     calc_phys_offset
+        mv      s2, a0
+
+        /* restore hart_id ( bootcpu_id ) and dtb address */
+        mv      a0, s0
+        mv      a1, s1
+
         tail    start_xen
 
         .section .text, "ax", %progbits
