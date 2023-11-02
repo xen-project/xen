@@ -492,6 +492,9 @@ int __init dom0_setup_permissions(struct domain *d)
     /* INIT# and alternative A20M# control. */
     rc |= ioports_deny_access(d, 0x92, 0x92);
 
+    /* IGNNE# control. */
+    rc |= ioports_deny_access(d, 0xF0, 0xF0);
+
     /* ACPI PM Timer. */
     if ( pmtmr_ioport )
         rc |= ioports_deny_access(d, pmtmr_ioport, pmtmr_ioport + 3);
