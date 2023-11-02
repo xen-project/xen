@@ -31,6 +31,11 @@ SECTIONS
         *(.text.*)
 #endif
 
+        . = ALIGN(IDENT_AREA_SIZE);
+        _ident_start = .;
+        *(.text.ident)
+        _ident_end = .;
+
         *(.fixup)
         *(.gnu.warning)
         . = ALIGN(POINTER_ALIGN);
@@ -173,4 +178,10 @@ ASSERT(IS_ALIGNED(__bss_end,        POINTER_ALIGN), "__bss_end is misaligned")
 ASSERT(!SIZEOF(.got),      ".got non-empty")
 ASSERT(!SIZEOF(.got.plt),  ".got.plt non-empty")
 
+/*
+ * Changing the size of Xen binary can require an update of
+ * PGTBL_INITIAL_COUNT.
+ */
 ASSERT(_end - _start <= MB(2), "Xen too large for early-boot assumptions")
+
+ASSERT(_ident_end - _ident_start <= IDENT_AREA_SIZE, "identity region is too big");

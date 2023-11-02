@@ -95,6 +95,8 @@
 #define RV_STAGE1_MODE SATP_MODE_SV32
 #endif
 
+#define IDENT_AREA_SIZE 64
+
 #endif /* __RISCV_CONFIG_H__ */
 /*
  * Local variables:

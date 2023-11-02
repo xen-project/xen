@@ -39,6 +39,22 @@ ENTRY(start)
         jal     calc_phys_offset
         mv      s2, a0
 
+        jal     setup_initial_pagetables
+
+        /* Calculate proper VA after jump from 1:1 mapping */
+        la      a0, .L_primary_switched
+        sub     a0, a0, s2
+
+        jal     turn_on_mmu
+
+.L_primary_switched:
+        /*
+         * cpu0_boot_stack address is 1:1 mapping related so it should be
+         * recalculated after jump from 1:1 mapping world as 1:1 mapping
+         * will be removed soon in start_xen().
+         */
+        jal     reset_stack
+
         /* restore hart_id ( bootcpu_id ) and dtb address */
         mv      a0, s0
         mv      a1, s1
@@ -54,3 +70,17 @@ ENTRY(reset_stack)
 
         ret
 
+        .section .text.ident, "ax", %progbits
+
+ENTRY(turn_on_mmu)
+        sfence.vma
+
+        li      t0, RV_STAGE1_MODE
+        slli    t0, t0, SATP_MODE_SHIFT
+
+        la      t1, stage1_pgtbl_root
+        srli    t1, t1, PAGE_SHIFT
+        or      t1, t1, t0
+        csrw    CSR_SATP, t1
+
+        jr      a0

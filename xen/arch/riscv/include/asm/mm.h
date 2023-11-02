@@ -13,8 +13,11 @@ extern unsigned char cpu0_boot_stack[];
 void setup_initial_pagetables(void);
 
 void enable_mmu(void);
-void cont_after_mmu_is_enabled(void);
+
+void remove_identity_mapping(void);
 
 unsigned long calc_phys_offset(void);
+
+void turn_on_mmu(unsigned long ra);
 
 #endif /* _ASM_RISCV_MM_H */
