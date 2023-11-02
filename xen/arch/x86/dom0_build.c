@@ -505,6 +505,13 @@ int __init dom0_setup_permissions(struct domain *d)
 #ifdef CONFIG_HVM
     if ( is_hvm_domain(d) )
     {
+        /* ISA DMA controller, channels 0-3 (incl possible aliases). */
+        rc |= ioports_deny_access(d, 0x00, 0x1F);
+        /* ISA DMA controller, page registers (incl various reserved ones). */
+        rc |= ioports_deny_access(d, 0x80 + !!hvm_port80_allowed, 0x8F);
+        /* ISA DMA controller, channels 4-7 (incl usual aliases). */
+        rc |= ioports_deny_access(d, 0xC0, 0xDF);
+
         /* HVM debug console IO port. */
         rc |= ioports_deny_access(d, XEN_HVM_DEBUGCONS_IOPORT,
                                   XEN_HVM_DEBUGCONS_IOPORT);
