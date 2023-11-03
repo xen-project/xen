@@ -1112,6 +1112,10 @@ x.Bootloader = C.GoString(xc.bootloader)
 if err := x.BootloaderArgs.fromC(&xc.bootloader_args);err != nil {
 return fmt.Errorf("converting field BootloaderArgs: %v", err)
 }
+if err := x.BootloaderRestrict.fromC(&xc.bootloader_restrict);err != nil {
+return fmt.Errorf("converting field BootloaderRestrict: %v", err)
+}
+x.BootloaderUser = C.GoString(xc.bootloader_user)
 x.TimerMode = TimerMode(xc.timer_mode)
 if err := x.NestedHvm.fromC(&xc.nested_hvm);err != nil {
 return fmt.Errorf("converting field NestedHvm: %v", err)
@@ -1465,6 +1469,11 @@ xc.bootloader = C.CString(x.Bootloader)}
 if err := x.BootloaderArgs.toC(&xc.bootloader_args); err != nil {
 return fmt.Errorf("converting field BootloaderArgs: %v", err)
 }
+if err := x.BootloaderRestrict.toC(&xc.bootloader_restrict); err != nil {
+return fmt.Errorf("converting field BootloaderRestrict: %v", err)
+}
+if x.BootloaderUser != "" {
+xc.bootloader_user = C.CString(x.BootloaderUser)}
 xc.timer_mode = C.libxl_timer_mode(x.TimerMode)
 if err := x.NestedHvm.toC(&xc.nested_hvm); err != nil {
 return fmt.Errorf("converting field NestedHvm: %v", err)

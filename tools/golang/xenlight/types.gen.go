@@ -577,6 +577,8 @@ DeviceTree string
 Acpi Defbool
 Bootloader string
 BootloaderArgs StringList
+BootloaderRestrict Defbool
+BootloaderUser string
 TimerMode TimerMode
 NestedHvm Defbool
 Apic Defbool
