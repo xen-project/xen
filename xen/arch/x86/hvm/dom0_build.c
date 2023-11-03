@@ -557,9 +557,8 @@ static int __init pvh_load_kernel(struct domain *d, const module_t *image,
         printk("Unable to init ELF\n");
         return rc;
     }
-#ifdef VERBOSE
-    elf_set_verbose(&elf);
-#endif
+    if ( opt_dom0_verbose )
+        elf_set_verbose(&elf);
     elf_parse_binary(&elf);
     if ( (rc = elf_xen_parse(&elf, &parms, true)) != 0 )
     {
