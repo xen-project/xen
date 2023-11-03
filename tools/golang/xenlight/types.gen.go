@@ -488,6 +488,7 @@ type TeeType int
 const(
 TeeTypeNone TeeType = 0
 TeeTypeOptee TeeType = 1
+TeeTypeFfa TeeType = 2
 )
 
 type SveType int
