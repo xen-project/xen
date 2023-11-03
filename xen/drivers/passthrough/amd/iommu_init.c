@@ -26,8 +26,7 @@
 static int __initdata nr_amd_iommus;
 static bool __initdata pci_init;
 
-static void cf_check do_amd_iommu_irq(void *data);
-static DECLARE_SOFTIRQ_TASKLET(amd_iommu_irq_tasklet, do_amd_iommu_irq, NULL);
+static struct tasklet amd_iommu_irq_tasklet;
 
 unsigned int __read_mostly amd_iommu_acpi_info;
 unsigned int __read_mostly ivrs_bdf_entries;
@@ -714,6 +713,8 @@ static void cf_check do_amd_iommu_irq(void *unused)
             iommu_check_ppr_log(iommu);
     }
 }
+
+static DECLARE_SOFTIRQ_TASKLET(amd_iommu_irq_tasklet, do_amd_iommu_irq, NULL);
 
 static void cf_check iommu_interrupt_handler(
     int irq, void *dev_id, struct cpu_user_regs *regs)
