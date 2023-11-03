@@ -63,7 +63,7 @@ docs/man7/
 docs/man8/
 docs/pdf/
 docs/txt/
-extras/mini-os*
+extras/
 install/*
 stubdom/*-minios-config.mk
 stubdom/autom4te.cache/
