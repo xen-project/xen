@@ -122,7 +122,7 @@ static inline void mm_rwlock_init(mm_rwlock_t *l)
 
 static inline int mm_write_locked_by_me(mm_rwlock_t *l)
 {
-    return (l->locker == get_processor_id());
+    return (l->locker == smp_processor_id());
 }
 
 static inline void _mm_write_lock(const struct domain *d, mm_rwlock_t *l,
@@ -132,7 +132,7 @@ static inline void _mm_write_lock(const struct domain *d, mm_rwlock_t *l,
     {
         _check_lock_level(d, level);
         percpu_write_lock(p2m_percpu_rwlock, &l->lock);
-        l->locker = get_processor_id();
+        l->locker = smp_processor_id();
         l->locker_function = func;
         l->unlock_level = _get_lock_level();
         _set_lock_level(_lock_level(d, level));

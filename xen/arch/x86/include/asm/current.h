@@ -99,7 +99,7 @@ static inline struct cpu_info *get_cpu_info(void)
 #define set_current(vcpu)     (get_cpu_info()->current_vcpu = (vcpu))
 #define current               (get_current())
 
-#define get_processor_id()    (get_cpu_info()->processor_id)
+#define smp_processor_id()    (get_cpu_info()->processor_id)
 #define guest_cpu_user_regs() (&get_cpu_info()->guest_cpu_user_regs)
 
 /*

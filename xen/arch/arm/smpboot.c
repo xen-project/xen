@@ -401,7 +401,7 @@ void start_secondary(void)
 /* Shut down the current CPU */
 void __cpu_disable(void)
 {
-    unsigned int cpu = get_processor_id();
+    unsigned int cpu = smp_processor_id();
 
     local_irq_disable();
     gic_disable_cpu();

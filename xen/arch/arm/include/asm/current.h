@@ -53,7 +53,7 @@ static inline struct cpu_info *get_cpu_info(void)
 
 DECLARE_PER_CPU(unsigned int, cpu_id);
 
-#define get_processor_id()     this_cpu(cpu_id)
+#define smp_processor_id()     this_cpu(cpu_id)
 #define set_processor_id(id)                            \
 do {                                                    \
     WRITE_SYSREG(__per_cpu_offset[(id)], TPIDR_EL2);    \
