@@ -475,6 +475,7 @@ static unsigned int __read_mostly console_rx = 0;
 
 #define max_console_rx (max_init_domid + 1)
 
+#ifdef CONFIG_SBSA_VUART_CONSOLE
 /* Make sure to rcu_unlock_domain after use */
 struct domain *console_input_domain(void)
 {
@@ -482,6 +483,7 @@ struct domain *console_input_domain(void)
             return NULL;
     return rcu_lock_domain_by_id(console_rx - 1);
 }
+#endif
 
 static void switch_serial_input(void)
 {
