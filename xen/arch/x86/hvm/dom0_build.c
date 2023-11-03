@@ -515,16 +515,23 @@ static paddr_t __init find_memory(
 
         ASSERT(IS_ALIGNED(start, PAGE_SIZE) && IS_ALIGNED(end, PAGE_SIZE));
 
+        /*
+         * NB: Even better would be to use rangesets to determine a suitable
+         * range, in particular in case a kernel requests multiple heavily
+         * discontiguous regions (which right now we fold all into one big
+         * region).
+         */
         if ( end <= kernel_start || start >= kernel_end )
-            ; /* No overlap, nothing to do. */
+        {
+            /* No overlap, just check whether the region is large enough. */
+            if ( end - start >= size )
+                return start;
+        }
         /* Deal with the kernel already being loaded in the region. */
-        else if ( kernel_start - start > end - kernel_end )
-            end = kernel_start;
-        else
-            start = kernel_end;
-
-        if ( end - start >= size )
+        else if ( kernel_start > start && kernel_start - start >= size )
             return start;
+        else if ( kernel_end < end && end - kernel_end >= size )
+            return kernel_end;
     }
 
     return INVALID_PADDR;
