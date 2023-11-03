@@ -10,14 +10,14 @@
 #ifndef __XEN_XENOPROF_H__
 #define __XEN_XENOPROF_H__
 
-#include <xen/inttypes.h>
-#include <asm/xenoprof.h>
-
 #define PMU_OWNER_NONE          0
 #define PMU_OWNER_XENOPROF      1
 #define PMU_OWNER_HVM           2
 
 #ifdef CONFIG_XENOPROF
+
+#include <xen/stdint.h>
+#include <asm/xenoprof.h>
 
 struct domain;
 struct vcpu;

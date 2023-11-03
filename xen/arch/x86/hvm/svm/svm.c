@@ -12,7 +12,6 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/trace.h>
-#include <xen/xenoprof.h>
 
 #include <asm/amd.h>
 #include <asm/apic.h>
@@ -38,6 +37,7 @@
 #include <asm/processor.h>
 #include <asm/p2m.h>
 #include <asm/x86_emulate.h>
+#include <asm/xenoprof.h>
 
 #include <public/sched.h>
 
