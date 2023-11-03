@@ -132,10 +132,9 @@ safe."
 # Series 7.
 #
 
--doc_begin="Usage of the following constants is safe, since they are given as-is
-in the inflate algorithm specification and there is therefore no risk of them
-being interpreted as decimal constants."
--config=MC3R1.R7.1,literals={safe, "^0(007|37|070|213|236|300|321|330|331|332|333|334|335|337|371)$"}
+-doc_begin="It is safe to use certain octal constants the way they are defined
+in specifications, manuals, and algorithm descriptions."
+-config=MC3R1.R7.1,reports+={safe, "any_area(any_loc(any_exp(text(^.*octal-ok.*$))))"}
 -doc_end
 
 -doc_begin="Violations in files that maintainers have asked to not modify in the

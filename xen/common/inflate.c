@@ -1201,8 +1201,8 @@ static int __init gunzip(void)
     magic[1] = NEXTBYTE();
     method   = NEXTBYTE();
 
-    if (magic[0] != 037 ||
-        ((magic[1] != 0213) && (magic[1] != 0236))) {
+    if (magic[0] != 037 ||                            /* octal-ok */
+        ((magic[1] != 0213) && (magic[1] != 0236))) { /* octal-ok */
         error("bad gzip magic numbers");
         return -1;
     }

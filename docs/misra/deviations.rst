@@ -90,6 +90,12 @@ Deviations related to MISRA C:2012 Rules:
          - __emulate_2op and __emulate_2op_nobyte
          - read_debugreg and write_debugreg
 
+   * - R7.1
+     - It is safe to use certain octal constants the way they are defined
+       in specifications, manuals, and algorithm descriptions. Such places
+       are marked safe with a /\* octal-ok \*/ in-code comment.
+     - Tagged as `safe` for ECLAIR.
+
    * - R7.2
      - Violations caused by __HYPERVISOR_VIRT_START are related to the
        particular use of it done in xen_mk_ulong.
