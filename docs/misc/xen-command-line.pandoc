@@ -2804,6 +2804,15 @@ the watchdog.
 
 Permit use of x2apic setup for SMP environments.
 
+### x2apic-mode (x86)
+> `= physical | cluster | mixed`
+
+> Default: `physical` if **FADT** mandates physical mode, otherwise set at
+>          build time by CONFIG_X2APIC_{PHYSICAL,LOGICAL,MIXED}.
+
+In the case that x2apic is in use, this option switches between modes to
+address APICs in the system as interrupt destinations.
+
 ### x2apic_phys (x86)
 > `= <boolean>`
 
@@ -2813,6 +2822,9 @@ Permit use of x2apic setup for SMP environments.
 In the case that x2apic is in use, this option switches between physical and
 clustered mode.  The default, given no hint from the **FADT**, is cluster
 mode.
+
+**WARNING: `x2apic_phys` is deprecated and superseded by `x2apic-mode`.
+The latter takes precedence if both are set.**
 
 ### xenheap_megabytes (arm32)
 > `= <size>`
