@@ -39,6 +39,11 @@ SECTOR_SIZE = 512
 # pygrub
 LIMIT_FSIZE = 128 << 20
 
+# Unless provided through the env variable PYGRUB_MAX_RAM_USAGE_MB, then
+# this is the maximum amount of memory allowed to be used by the depriv
+# pygrub.
+LIMIT_AS = 2 * LIMIT_FSIZE
+
 CLONE_NEWNS = 0x00020000 # mount namespace
 CLONE_NEWNET = 0x40000000 # network namespace
 CLONE_NEWIPC = 0x08000000 # IPC namespace
@@ -74,6 +79,11 @@ def downgrade_rlimits():
     resource.setrlimit(resource.RLIMIT_NPROC,    (0, 0))
     resource.setrlimit(resource.RLIMIT_CORE,     (0, 0))
     resource.setrlimit(resource.RLIMIT_MEMLOCK,  (0, 0))
+
+    max_ram_usage = LIMIT_AS
+    if "PYGRUB_MAX_RAM_USAGE_MB" in os.environ:
+        max_ram_usage = int(os.environ["PYGRUB_MAX_RAM_USAGE_MB"]) << 20
+    resource.setrlimit(resource.RLIMIT_AS,  (max_ram_usage, max_ram_usage))
 
     # py2's resource module doesn't know about resource.RLIMIT_MSGQUEUE
     #
