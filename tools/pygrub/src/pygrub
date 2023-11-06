@@ -89,7 +89,7 @@ def downgrade_rlimits():
     # write permissions are bound.
     fsize = LIMIT_FSIZE
     if "PYGRUB_MAX_FILE_SIZE_MB" in os.environ.keys():
-        fsize = os.environ["PYGRUB_MAX_FILE_SIZE_MB"] << 20
+        fsize = int(os.environ["PYGRUB_MAX_FILE_SIZE_MB"]) << 20
 
     resource.setrlimit(resource.RLIMIT_FSIZE, (fsize, fsize))
 
