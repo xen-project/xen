@@ -55,6 +55,12 @@ def unshare(flags):
     if unshare(flags) < 0:
         raise OSError(ctypes.get_errno(), os.strerror(ctypes.get_errno()))
 
+    # It's very typical for systemd to mount / with MS_SHARED. That means
+    # any events in the new namespace get propagated back to the parent.
+    #
+    # Undo it so that every mount done in the NS stay confined within it.
+    subprocess.check_output(["mount", "--make-rprivate", "/"])
+
 def bind_mount(src, dst, options):
     open(dst, "a").close() # touch
 
@@ -113,11 +119,9 @@ def depriv(output_directory, output, device, uid, path_kernel, path_ramdisk):
             if rc != 0 or os.path.getsize(path) == 0:
                 os.unlink(path)
 
-        # Normally, unshare(CLONE_NEWNS) will ensure this is not required.
-        # However, this syscall doesn't exist in *BSD systems and doesn't
-        # auto-unmount everything on older Linux kernels (At least as of
-        # Linux 4.19, but it seems fixed in 5.15). Either way,
-        # recursively unmount everything if needed. Quietly.
+        # Unshare(CLONE_NEWNS) ensures this is not required, but that's not
+        # present on *BSD, so recursively unmount everything if needed.
+        # Quietly.
         with open('/dev/null', 'w') as devnull:
             subprocess.call(["umount", "-f", chroot + device_path],
                             stdout=devnull, stderr=devnull)
