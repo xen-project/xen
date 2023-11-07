@@ -513,7 +513,7 @@ void __ubsan_handle_pointer_overflow(struct pointer_overflow_data *data,
 	ubsan_prologue(&data->location, &flags);
 
 	pr_err("pointer operation %s %p to %p\n",
-	       base > result ? "underflowed" : "overflowed",
+	       base > result ? "overflowed" : "underflowed",
 	       _p(base), _p(result));
 
 	ubsan_epilogue(&flags);
