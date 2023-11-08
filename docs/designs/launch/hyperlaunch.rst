@@ -108,7 +108,7 @@ both modes of configuration from the same binary and when paired with its XSM
 flask, provides strong controls that enable fine grained system partitioning.
 
 Hypervisor Launch Landscape
----------
+---------------------------
 
 This comparison table presents the distinctive capabilities of Hyperlaunch with
 reference to existing launch configurations currently available in Xen and
@@ -200,11 +200,13 @@ The benefits of this structure include:
   domains.
 * Commonality: Reuses the same logic for initial basic domain building across
   diverse Xen deployments.
-	* It aligns the x86 initial domain construction with the existing Arm
-	  dom0less feature for construction of multiple domains at boot.
-	* The boot domain implementation may vary significantly with different
-	  deployment use cases, whereas the hypervisor implementation is
-	  common.
+
+  * It aligns the x86 initial domain construction with the existing Arm
+    dom0less feature for construction of multiple domains at boot.
+
+  * The boot domain implementation may vary significantly with different
+    deployment use cases, whereas the hypervisor implementation is common.
+
 * Correctness: Increases confidence in the implementation of domain
   construction, since it is performed by the hypervisor in well maintained and
   centrally tested logic.
@@ -213,8 +215,9 @@ The benefits of this structure include:
 * Capability: Supports launch of advanced configurations where a sequenced
   start of multiple domains is required, or multiple domains are involved in
   startup of the running system configuration
-	* eg. for PCI passthrough on systems where the toolstack runs in a
-	  separate domain to the hardware management.
+
+  * eg. for PCI passthrough on systems where the toolstack runs in a separate
+    domain to the hardware management.
 
 Please, see the ‘Hyperlaunch Device Tree’ design document, which describes the
 configuration module that is provided to the hypervisor by the bootloader.
