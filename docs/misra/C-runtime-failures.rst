@@ -1,3 +1,5 @@
+.. SPDX-License-Identifier: CC-BY-4.0
+
 ===================================================================
 Measures taken towards the minimization of Run-time failures in Xen
 ===================================================================
