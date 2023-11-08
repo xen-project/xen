@@ -42,5 +42,5 @@ Here is an explanation of the fields inside an object of the "content" array:
 
 To ease the review and the modifications of the entries, they shall be listed in
 alphabetical order referring to the rel_path field.
-Excluded folder paths shall end with '/*' in order to match everything on that
+Excluded folder paths shall end with ``/*`` in order to match everything on that
 folder.
