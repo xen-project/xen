@@ -44,10 +44,11 @@ Here is an explanation of the fields inside an object of the "content" array:
    their results. This field is optional and when not specified, it means every
    checker will use that entry.
    Current implemented values for this field are:
+
     - xen-analysis: the xen-analysis.py script exclude this entry for both MISRA
       and static analysis scan. (Implemented only for Cppcheck tool)
 
 To ease the review and the modifications of the entries, they shall be listed in
 alphabetical order referring to the rel_path field.
-Excluded folder paths shall end with '/*' in order to match everything on that
+Excluded folder paths shall end with ``/*`` in order to match everything on that
 folder.
