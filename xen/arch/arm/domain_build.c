@@ -550,6 +550,8 @@ static int __init write_properties(struct domain *d, struct kernel_info *kinfo,
      * should be skipped.
      */
     iommu_node = dt_parse_phandle(node, "iommus", 0);
+    if ( !iommu_node )
+        iommu_node = dt_parse_phandle(node, "iommu-map", 1);
     if ( iommu_node && device_get_class(iommu_node) != DEVICE_IOMMU )
         iommu_node = NULL;
 
