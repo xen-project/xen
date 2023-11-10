@@ -8,23 +8,23 @@
  * memmove - Copy one area of memory to another
  * @dest: Where to copy to
  * @src: Where to copy from
- * @count: The size of the area.
+ * @n: The size of the area.
  *
  * Unlike memcpy(), memmove() copes with overlapping areas.
  */
-void *(memmove)(void *dest, const void *src, size_t count)
+void *(memmove)(void *dest, const void *src, size_t n)
 {
 	char *tmp, *s;
 
 	if (dest <= src) {
 		tmp = (char *) dest;
 		s = (char *) src;
-		while (count--)
+		while (n--)
 			*tmp++ = *s++;
 	} else {
-		tmp = (char *) dest + count;
-		s = (char *) src + count;
-		while (count--)
+		tmp = (char *) dest + n;
+		s = (char *) src + n;
+		while (n--)
 			*--tmp = *--s;
 	}
 

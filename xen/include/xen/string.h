@@ -12,27 +12,27 @@
 #define strncpy __xen_has_no_strncpy__
 #define strncat __xen_has_no_strncat__
 
-size_t strlcpy(char *, const char *, size_t);
-size_t strlcat(char *, const char *, size_t);
-int strcmp(const char *, const char *);
-int strncmp(const char *, const char *, size_t);
-int strcasecmp(const char *, const char *);
-int strncasecmp(const char *, const char *, size_t);
-char *strchr(const char *, int);
-char *strrchr(const char *, int);
-char *strstr(const char *, const char *);
-size_t strlen(const char *);
-size_t strnlen(const char *, size_t);
-char *strpbrk(const char *, const char *);
-char *strsep(char **, const char *);
-size_t strspn(const char *, const char *);
+size_t strlcpy(char *dest, const char *src, size_t size);
+size_t strlcat(char *dest, const char *src, size_t size);
+int strcmp(const char *cs, const char *ct);
+int strncmp(const char *cs, const char *ct, size_t count);
+int strcasecmp(const char *s1, const char *s2);
+int strncasecmp(const char *s1, const char *s2, size_t len);
+char *strchr(const char *s, int c);
+char *strrchr(const char *s, int c);
+char *strstr(const char *s1, const char *s2);
+size_t strlen(const char *s);
+size_t strnlen(const char *s, size_t count);
+char *strpbrk(const char *cs,const char *ct);
+char *strsep(char **s, const char *ct);
+size_t strspn(const char *s, const char *accept);
 
-void *memset(void *, int, size_t);
-void *memcpy(void *, const void *, size_t);
-void *memmove(void *, const void *, size_t);
-int memcmp(const void *, const void *, size_t);
-void *memchr(const void *, int, size_t);
-void *memchr_inv(const void *, int, size_t);
+void *memset(void *s, int c, size_t n);
+void *memcpy(void *dest, const void *src, size_t n);
+void *memmove(void *dest, const void *src, size_t n);
+int memcmp(const void *cs, const void *ct, size_t count);
+void *memchr(const void *s, int c, size_t n);
+void *memchr_inv(const void *s, int c, size_t n);
 
 #include <asm/string.h>
 
