@@ -82,12 +82,12 @@ struct hw_interrupt_type;
 struct msi_desc;
 /* Helper functions */
 extern int pci_enable_msi(struct msi_info *msi, struct msi_desc **desc);
-extern void pci_disable_msi(struct msi_desc *desc);
+extern void pci_disable_msi(struct msi_desc *msi_desc);
 extern int pci_prepare_msix(u16 seg, u8 bus, u8 devfn, bool off);
 extern void pci_cleanup_msi(struct pci_dev *pdev);
-extern int setup_msi_irq(struct irq_desc *, struct msi_desc *);
-extern int __setup_msi_irq(struct irq_desc *, struct msi_desc *,
-                           const struct hw_interrupt_type *);
+extern int setup_msi_irq(struct irq_desc *desc, struct msi_desc *msidesc);
+extern int __setup_msi_irq(struct irq_desc *desc, struct msi_desc *msidesc,
+                           hw_irq_controller *handler);
 extern void teardown_msi_irq(int irq);
 extern int msi_free_vector(struct msi_desc *entry);
 extern int pci_restore_msi_state(struct pci_dev *pdev);
@@ -133,7 +133,7 @@ struct msi_desc {
 #define MSI_TYPE_HPET    1
 #define MSI_TYPE_IOMMU   2
 
-int msi_maskable_irq(const struct msi_desc *);
+int msi_maskable_irq(const struct msi_desc *entry);
 int msi_free_irq(struct msi_desc *entry);
 
 /*
@@ -220,13 +220,13 @@ struct arch_msix {
 };
 
 void early_msi_init(void);
-void msi_compose_msg(unsigned vector, const cpumask_t *mask,
+void msi_compose_msg(unsigned vector, const cpumask_t *cpu_mask,
                      struct msi_msg *msg);
 void __msi_set_enable(u16 seg, u8 bus, u8 slot, u8 func, int pos, int enable);
-void cf_check mask_msi_irq(struct irq_desc *);
-void cf_check unmask_msi_irq(struct irq_desc *);
-void guest_mask_msi_irq(struct irq_desc *, bool mask);
-void cf_check ack_nonmaskable_msi_irq(struct irq_desc *);
-void cf_check set_msi_affinity(struct irq_desc *, const cpumask_t *);
+void cf_check mask_msi_irq(struct irq_desc *desc);
+void cf_check unmask_msi_irq(struct irq_desc *desc);
+void guest_mask_msi_irq(struct irq_desc *desc, bool mask);
+void cf_check ack_nonmaskable_msi_irq(struct irq_desc *desc);
+void cf_check set_msi_affinity(struct irq_desc *desc, const cpumask_t *mask);
 
 #endif /* __ASM_MSI_H */

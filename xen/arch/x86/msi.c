@@ -37,7 +37,7 @@
 static s8 __read_mostly use_msi = -1;
 boolean_param("msi", use_msi);
 
-static void __pci_disable_msix(struct msi_desc *);
+static void __pci_disable_msix(struct msi_desc *entry);
 
 /* bitmap indicate which fixed map is free */
 static DEFINE_SPINLOCK(msix_fixmap_lock);
