@@ -30,8 +30,8 @@ CHECK_processor_px;
 
 DEFINE_XEN_GUEST_HANDLE(compat_processor_px_t);
 
-int 
-compat_set_px_pminfo(uint32_t cpu, struct compat_processor_performance *perf)
+int compat_set_px_pminfo(uint32_t acpi_id,
+                         struct compat_processor_performance *perf)
 {
     struct xen_processor_performance *xen_perf;
     unsigned long xlat_page_current;
@@ -52,5 +52,5 @@ compat_set_px_pminfo(uint32_t cpu, struct compat_processor_performance *perf)
     XLAT_processor_performance(xen_perf, perf);
 #undef XLAT_processor_performance_HNDL_states
 
-    return set_px_pminfo(cpu, xen_perf);
+    return set_px_pminfo(acpi_id, xen_perf);
 }

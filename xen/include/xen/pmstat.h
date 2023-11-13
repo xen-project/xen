@@ -5,8 +5,8 @@
 #include <public/platform.h> /* for struct xen_processor_power */
 #include <public/sysctl.h>   /* for struct pm_cx_stat */
 
-int set_px_pminfo(uint32_t cpu, struct xen_processor_performance *perf);
-long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power);
+int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *perf);
+long set_cx_pminfo(uint32_t acpi_id, struct xen_processor_power *power);
 uint32_t pmstat_get_cx_nr(uint32_t cpuid);
 int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat);
 int pmstat_reset_cx_stat(uint32_t cpuid);

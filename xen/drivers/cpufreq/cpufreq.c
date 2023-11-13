@@ -457,14 +457,14 @@ static void print_PPC(unsigned int platform_limit)
     printk("\t_PPC: %d\n", platform_limit);
 }
 
-int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_info)
+int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *perf)
 {
     int ret=0, cpuid;
     struct processor_pminfo *pmpt;
     struct processor_performance *pxpt;
 
     cpuid = get_cpu_id(acpi_id);
-    if ( cpuid < 0 || !dom0_px_info)
+    if ( cpuid < 0 || !perf )
     {
         ret = -EINVAL;
         goto out;
@@ -488,22 +488,20 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
     pmpt->acpi_id = acpi_id;
     pmpt->id = cpuid;
 
-    if ( dom0_px_info->flags & XEN_PX_PCT )
+    if ( perf->flags & XEN_PX_PCT )
     {
         /* space_id check */
-        if (dom0_px_info->control_register.space_id != 
-            dom0_px_info->status_register.space_id)
+        if ( perf->control_register.space_id !=
+             perf->status_register.space_id )
         {
             ret = -EINVAL;
             goto out;
         }
 
-        memcpy ((void *)&pxpt->control_register,
-                (void *)&dom0_px_info->control_register,
-                sizeof(struct xen_pct_register));
-        memcpy ((void *)&pxpt->status_register,
-                (void *)&dom0_px_info->status_register,
-                sizeof(struct xen_pct_register));
+        memcpy(&pxpt->control_register, &perf->control_register,
+               sizeof(struct xen_pct_register));
+        memcpy(&pxpt->status_register, &perf->status_register,
+               sizeof(struct xen_pct_register));
 
         if ( cpufreq_verbose )
         {
@@ -512,69 +510,66 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
         }
     }
 
-    if ( dom0_px_info->flags & XEN_PX_PSS ) 
+    if ( perf->flags & XEN_PX_PSS )
     {
         /* capability check */
-        if (dom0_px_info->state_count <= 1)
+        if ( perf->state_count <= 1 )
         {
             ret = -EINVAL;
             goto out;
         }
 
         if ( !(pxpt->states = xmalloc_array(struct xen_processor_px,
-                        dom0_px_info->state_count)) )
+                                            perf->state_count)) )
         {
             ret = -ENOMEM;
             goto out;
         }
-        if ( copy_from_guest(pxpt->states, dom0_px_info->states,
-                             dom0_px_info->state_count) )
+        if ( copy_from_guest(pxpt->states, perf->states, perf->state_count) )
         {
             ret = -EFAULT;
             goto out;
         }
-        pxpt->state_count = dom0_px_info->state_count;
+        pxpt->state_count = perf->state_count;
 
         if ( cpufreq_verbose )
             print_PSS(pxpt->states,pxpt->state_count);
     }
 
-    if ( dom0_px_info->flags & XEN_PX_PSD )
+    if ( perf->flags & XEN_PX_PSD )
     {
         /* check domain coordination */
-        if (dom0_px_info->shared_type != CPUFREQ_SHARED_TYPE_ALL &&
-            dom0_px_info->shared_type != CPUFREQ_SHARED_TYPE_ANY &&
-            dom0_px_info->shared_type != CPUFREQ_SHARED_TYPE_HW)
+        if ( perf->shared_type != CPUFREQ_SHARED_TYPE_ALL &&
+             perf->shared_type != CPUFREQ_SHARED_TYPE_ANY &&
+             perf->shared_type != CPUFREQ_SHARED_TYPE_HW )
         {
             ret = -EINVAL;
             goto out;
         }
 
-        pxpt->shared_type = dom0_px_info->shared_type;
-        memcpy ((void *)&pxpt->domain_info,
-                (void *)&dom0_px_info->domain_info,
-                sizeof(struct xen_psd_package));
+        pxpt->shared_type = perf->shared_type;
+        memcpy(&pxpt->domain_info, &perf->domain_info,
+               sizeof(struct xen_psd_package));
 
         if ( cpufreq_verbose )
             print_PSD(&pxpt->domain_info);
     }
 
-    if ( dom0_px_info->flags & XEN_PX_PPC )
+    if ( perf->flags & XEN_PX_PPC )
     {
-        pxpt->platform_limit = dom0_px_info->platform_limit;
+        pxpt->platform_limit = perf->platform_limit;
 
         if ( cpufreq_verbose )
             print_PPC(pxpt->platform_limit);
 
         if ( pxpt->init == XEN_PX_INIT )
         {
-            ret = cpufreq_limit_change(cpuid); 
+            ret = cpufreq_limit_change(cpuid);
             goto out;
         }
     }
 
-    if ( dom0_px_info->flags == ( XEN_PX_PCT | XEN_PX_PSS |
-                XEN_PX_PSD | XEN_PX_PPC ) )
+    if ( perf->flags == ( XEN_PX_PCT | XEN_PX_PSS | XEN_PX_PSD | XEN_PX_PPC ) )
     {
         pxpt->init = XEN_PX_INIT;
 

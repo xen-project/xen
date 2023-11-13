@@ -62,7 +62,8 @@ static int copy_from_compat_state(xen_processor_cx_t *xen_state,
     return 0;
 }
 
-long compat_set_cx_pminfo(uint32_t cpu, struct compat_processor_power *power)
+long compat_set_cx_pminfo(uint32_t acpi_id,
+                          struct compat_processor_power *power)
 {
     struct xen_processor_power *xen_power;
     unsigned long xlat_page_current;
@@ -106,5 +107,5 @@ long compat_set_cx_pminfo(uint32_t cpu, struct compat_processor_power *power)
     XLAT_processor_power(xen_power, power);
 #undef XLAT_processor_power_HNDL_states
 
-    return set_cx_pminfo(cpu, xen_power);
+    return set_cx_pminfo(acpi_id, xen_power);
 }
