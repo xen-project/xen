@@ -307,7 +307,7 @@ static void cf_check early_init_intel(struct cpuinfo_x86 *c)
 		c->x86_cache_alignment = 128;
 
 	if (c == &boot_cpu_data &&
-            bootsym(trampoline_misc_enable_off) & MSR_IA32_MISC_ENABLE_XD_DISABLE)
+	    bootsym(trampoline_misc_enable_off) & MSR_IA32_MISC_ENABLE_XD_DISABLE)
 		printk(KERN_INFO "re-enabled NX (Execute Disable) protection\n");
 
 	/* Unmask CPUID levels and NX if masked: */
