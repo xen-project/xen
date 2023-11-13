@@ -23,6 +23,7 @@
 #include <asm/kernel.h>
 #include <asm/setup.h>
 #include <asm/tee/tee.h>
+#include <asm/pci.h>
 #include <asm/platform.h>
 #include <asm/psci.h>
 #include <asm/setup.h>

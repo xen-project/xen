@@ -130,13 +130,6 @@ bool pci_check_bar(const struct pci_dev *pdev, mfn_t start, mfn_t end);
 
 #else   /*!CONFIG_HAS_PCI*/
 
-struct arch_pci_dev { };
-
-static always_inline bool is_pci_passthrough_enabled(void)
-{
-    return false;
-}
-
 struct pci_dev;
 
 static inline void arch_pci_init_pdev(struct pci_dev *pdev) {}

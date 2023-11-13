@@ -68,7 +68,18 @@ typedef union {
     };
 } pci_sbdf_t;
 
+#ifdef CONFIG_HAS_PCI
 #include <asm/pci.h>
+#else
+
+struct arch_pci_dev { };
+
+static inline bool is_pci_passthrough_enabled(void)
+{
+    return false;
+}
+
+#endif
 
 struct pci_dev_info {
     /*
