@@ -519,6 +519,28 @@ maintainers if you want to suggest a change.
        they are related
      -
 
+   * - `Rule 21.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_21_01.c>`_
+     - Required
+     - #define and #undef shall not be used on a reserved identifier or
+       reserved macro name
+     - Identifiers starting with an underscore followed by another underscore
+       or an upper-case letter are reserved. Today Xen uses many, such as
+       header guards and bitwise manipulation functions. Upon analysis it turns
+       out Xen identifiers do not clash with the identifiers used by modern
+       GCC, but that is not a guarantee that there won't be a naming clash in
+       the future or with another compiler.  For these reasons we discourage
+       the introduction of new reserved identifiers in Xen, and we see it as
+       positive the reduction of reserved identifiers. At the same time,
+       certain identifiers starting with wo underscores are also commonly used
+       in Linux (e.g. __set_bit) and we don't think it would be an improvement
+       to rename them.
+
+   * - `Rule 21.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_21_02.c>`_
+     - Required
+     - A reserved identifier or reserved macro name shall not be
+       declared
+     - See comment for Rule 21.1
+
    * - `Rule 21.13 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_21_13.c>`_
      - Mandatory
      - Any value passed to a function in <ctype.h> shall be representable as an
