@@ -247,8 +247,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_K8_HWCR:
         if ( !(cp->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
             goto gp_fault;
-        *val = get_cpu_family(cp->basic.raw_fms, NULL, NULL) >= 0x10
-               ? K8_HWCR_TSC_FREQ_SEL : 0;
+        *val = 0;
         break;
 
     case MSR_VIRT_SPEC_CTRL:
