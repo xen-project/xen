@@ -65,7 +65,7 @@ int compat_grant_table_op(
 
 #ifdef CONFIG_PV_SHIM
     if ( unlikely(pv_shim) )
-        return pv_shim_grant_table_op(cmd, uop, count);
+        return pv_shim_grant_table_op(cmd, cmp_uop, count);
 #endif
 
     set_xen_guest_handle(cnt_uop, NULL);
