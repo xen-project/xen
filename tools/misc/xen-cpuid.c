@@ -195,6 +195,7 @@ static const char *const str_e21a[32] =
 {
     [ 2] = "lfence+",
     [ 6] = "nscb",
+    [ 8] = "auto-ibrs",
 
     /* 26 */                [27] = "sbpb",
     [28] = "ibpb-brtype",   [29] = "srso-no",
