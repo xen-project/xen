@@ -63,6 +63,11 @@ int compat_grant_table_op(
     unsigned int i, cmd_op;
     XEN_GUEST_HANDLE_PARAM(void) cnt_uop;
 
+#ifdef CONFIG_PV_SHIM
+    if ( unlikely(pv_shim) )
+        return pv_shim_grant_table_op(cmd, uop, count);
+#endif
+
     set_xen_guest_handle(cnt_uop, NULL);
     cmd_op = cmd & GNTTABOP_CMD_MASK;
     if ( cmd_op != GNTTABOP_cache_flush )
