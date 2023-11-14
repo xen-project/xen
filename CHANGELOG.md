@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Ignore VCPUOP_set_singleshot_timer's VCPU_SSHOTTMR_future flag. The only
    known user doesn't use it properly, leading to in-guest breakage.
 
+### Added
+ - On x86, support for enforcing system-wide operation in Data Operand
+   Independent Timing Mode.
+
 ## [4.17.0](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.17.0) - 2022-12-12
 
 ### Changed

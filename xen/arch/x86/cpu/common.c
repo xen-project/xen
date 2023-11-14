@@ -211,6 +211,28 @@ void ctxt_switch_levelling(const struct vcpu *next)
 		alternative_vcall(ctxt_switch_masking, next);
 }
 
+static void setup_doitm(void)
+{
+    uint64_t msr;
+
+    if ( !cpu_has_doitm )
+        return;
+
+    /*
+     * We don't currently enumerate DOITM to guests.  As a conseqeuence, guest
+     * kernels will believe they're safe even when they are not.
+     *
+     * For now, set it unilaterally.  This prevents otherwise-correct crypto
+     * code from becoming vulnerable to timing sidechannels.
+     */
+
+    rdmsrl(MSR_UARCH_MISC_CTRL, msr);
+    msr |= UARCH_CTRL_DOITM;
+    if ( !opt_dit )
+        msr &= ~UARCH_CTRL_DOITM;
+    wrmsrl(MSR_UARCH_MISC_CTRL, msr);
+}
+
 bool_t opt_cpu_info;
 boolean_param("cpuinfo", opt_cpu_info);
 
@@ -596,6 +618,8 @@ void identify_cpu(struct cpuinfo_x86 *c)
 
 		mtrr_bp_init();
 	}
+
+	setup_doitm();
 }
 
 /* leaf 0xb SMT level */
