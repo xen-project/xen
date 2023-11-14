@@ -6,7 +6,7 @@ Hypercall ABI
 Hypercalls are system calls to Xen.  Two modes of guest operation are
 supported, and up to 6 individual parameters are supported.
 
-Hypercalls may only be issued by kernel-level software [1]_.
+Hypercalls may only be issued by kernel-level software [#kern]_.
 
 Registers
 ---------
@@ -33,7 +33,7 @@ The registers used for hypercalls depends on the operating mode of the guest.
 
 32 and 64bit PV guests have an ABI fixed by their guest type.  The ABI for an
 HVM guest depends on whether the vCPU is operating in a 64bit segment or not
-[2]_.
+[#mode]_.
 
 
 Parameters
@@ -87,7 +87,7 @@ written by Xen, is mapped with executable permissions so it may be used.
 Multiple hypercall pages may be created by the guest, if it wishes.
 
 The stubs are arranged by hypercall index, and start on 32-byte boundaries.
-To invoke a specific hypercall, ``call`` the relevant stub [3]_:
+To invoke a specific hypercall, ``call`` the relevant stub [#iret]_:
 
 .. code-block:: none
 
@@ -116,14 +116,14 @@ means.
 
 .. rubric:: Footnotes
 
-.. [1] For HVM guests, ``HVMOP_guest_request_vm_event`` may be configured to
-       be usable from userspace, but this behaviour is not default.
+.. [#kern] For HVM guests, ``HVMOP_guest_request_vm_event`` may be configured
+   to be usable from userspace, but this behaviour is not default.
 
-.. [2] While it is possible to use compatibility mode segments in a 64bit
-       kernel, hypercalls issues from such a mode will be interpreted with the
-       32bit ABI.  Such a setup is not expected in production scenarios.
+.. [#mode] While it is possible to use compatibility mode segments in a 64bit
+   kernel, hypercalls issues from such a mode will be interpreted with the
+   32bit ABI.  Such a setup is not expected in production scenarios.
 
-.. [3] ``HYPERCALL_iret`` is special.  It is only implemented for PV guests
-       and takes all its parameters on the stack.  This stub should be
-       ``jmp``'d to, rather than ``call``'d.  HVM guests have this stub
-       implemented as ``ud2a`` to prevent accidental use.
+.. [#iret] ``HYPERCALL_iret`` is special.  It is only implemented for PV
+   guests and takes all its parameters on the stack.  This stub should be
+   ``jmp``'d to, rather than ``call``'d.  HVM guests have this stub
+   implemented as ``ud2a`` to prevent accidental use.
