@@ -1484,15 +1484,14 @@ boolean (e.g. `iommu=no`) can override this and leave the IOMMUs disabled.
     should be enabled.  Quarantining can be done in two ways: In its basic
     form, all in-flight DMA will simply be forced to encounter IOMMU
     faults.  Since there are systems where doing so can cause host lockup,
-    an alternative form is available where writes to memory will be made
-    fault, but reads will be directed to a scratch page.  The implication
-    here is that such reads will go unnoticed, i.e. an admin may not
-    become aware of the underlying problem.
+    an alternative form is available where accesses to memory will be directed
+    to a scratch page. The implication here is that such accesses will go
+    unnoticed, i.e. an admin may not become aware of the underlying problem.
 
     Therefore, if this option is set to true (the default), Xen always
     quarantines such devices; they must be explicitly assigned back to Dom0
     before they can be used there again.  If set to "scratch-page", still
-    active DMA reads will additionally be directed to a "scratch" page.  If
+    active DMA operations will additionally be directed to a "scratch" page.  If
     set to false, Xen will only quarantine devices the toolstack has arranged
     for getting quarantined, and only in the "basic" form.
 
