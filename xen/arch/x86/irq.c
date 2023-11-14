@@ -1920,7 +1920,16 @@ void do_IRQ(struct cpu_user_regs *regs)
                 kind = "";
             if ( !(vector >= FIRST_LEGACY_VECTOR &&
                    vector <= LAST_LEGACY_VECTOR &&
-                   !smp_processor_id() &&
+                   (!smp_processor_id() ||
+                    /*
+                     * For AMD/Hygon do spurious PIC interrupt
+                     * detection on all CPUs, as it has been observed
+                     * that during unknown circumstances spurious PIC
+                     * interrupts have been delivered to CPUs
+                     * different than the BSP.
+                     */
+                    (boot_cpu_data.x86_vendor & (X86_VENDOR_AMD |
+                                                 X86_VENDOR_HYGON))) &&
                    bogus_8259A_irq(vector - FIRST_LEGACY_VECTOR)) )
             {
                 printk("CPU%u: No irq handler for vector %02x (IRQ %d%s)\n",
