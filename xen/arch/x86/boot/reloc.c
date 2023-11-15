@@ -27,10 +27,11 @@ asm (
     );
 
 #include "defs.h"
-#include "../../../include/xen/multiboot.h"
-#include "../../../include/xen/multiboot2.h"
 
-#include "../../../include/xen/kconfig.h"
+#include <xen/kconfig.h>
+#include <xen/multiboot.h>
+#include <xen/multiboot2.h>
+
 #include <public/arch-x86/hvm/start_info.h>
 
 #ifdef CONFIG_VIDEO

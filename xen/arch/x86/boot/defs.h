@@ -20,7 +20,7 @@
 #ifndef __BOOT_DEFS_H__
 #define __BOOT_DEFS_H__
 
-#include "../../../include/xen/stdbool.h"
+#include <xen/stdbool.h>
 
 #define __maybe_unused	__attribute__((__unused__))
 #define __packed	__attribute__((__packed__))
