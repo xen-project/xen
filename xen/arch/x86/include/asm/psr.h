@@ -81,7 +81,7 @@ int psr_get_info(unsigned int socket, enum psr_type type,
 int psr_get_val(struct domain *d, unsigned int socket,
                 uint32_t *val, enum psr_type type);
 int psr_set_val(struct domain *d, unsigned int socket,
-                uint64_t val, enum psr_type type);
+                uint64_t new_val, enum psr_type type);
 
 void psr_domain_init(struct domain *d);
 void psr_domain_free(struct domain *d);
