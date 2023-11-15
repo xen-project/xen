@@ -25,7 +25,7 @@
 int xc_vm_event_control(xc_interface *xch, uint32_t domain_id, unsigned int op,
                         unsigned int mode, uint32_t *port)
 {
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
     int rc;
 
     domctl.cmd = XEN_DOMCTL_vm_event_op;
@@ -158,7 +158,7 @@ void *xc_vm_event_enable(xc_interface *xch, uint32_t domain_id, int param,
 
 int xc_vm_event_get_version(xc_interface *xch)
 {
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
     int rc;
 
     domctl.cmd = XEN_DOMCTL_vm_event_op;

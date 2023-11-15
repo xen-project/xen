@@ -39,7 +39,7 @@ int xc_cpupool_create(xc_interface *xch,
                       uint32_t sched_id)
 {
     int err;
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
 
     sysctl.cmd = XEN_SYSCTL_cpupool_op;
     sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_CREATE;
@@ -56,7 +56,7 @@ int xc_cpupool_create(xc_interface *xch,
 int xc_cpupool_destroy(xc_interface *xch,
                        uint32_t poolid)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
 
     sysctl.cmd = XEN_SYSCTL_cpupool_op;
     sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_DESTROY;
@@ -70,7 +70,7 @@ xc_cpupoolinfo_t *xc_cpupool_getinfo(xc_interface *xch,
     int err = 0;
     xc_cpupoolinfo_t *info = NULL;
     int local_size;
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
     DECLARE_HYPERCALL_BUFFER(uint8_t, local);
 
     local_size = xc_get_cpumap_size(xch);
@@ -129,7 +129,7 @@ int xc_cpupool_addcpu(xc_interface *xch,
                       uint32_t poolid,
                       int cpu)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
 
     sysctl.cmd = XEN_SYSCTL_cpupool_op;
     sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_ADDCPU;
@@ -152,7 +152,7 @@ int xc_cpupool_removecpu(xc_interface *xch,
 {
     unsigned retries;
     int err = 0;
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
 
     sysctl.cmd = XEN_SYSCTL_cpupool_op;
     sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_RMCPU;
@@ -170,7 +170,7 @@ int xc_cpupool_movedomain(xc_interface *xch,
                           uint32_t poolid,
                           uint32_t domid)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
 
     sysctl.cmd = XEN_SYSCTL_cpupool_op;
     sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_MOVEDOMAIN;
@@ -184,7 +184,7 @@ xc_cpumap_t xc_cpupool_freeinfo(xc_interface *xch)
     int err = -1;
     xc_cpumap_t cpumap = NULL;
     int mapsize;
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
     DECLARE_HYPERCALL_BUFFER(uint8_t, local);
 
     mapsize = xc_get_cpumap_size(xch);

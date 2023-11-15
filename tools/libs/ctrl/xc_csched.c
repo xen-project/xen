@@ -29,7 +29,7 @@ xc_sched_credit_domain_set(
     uint32_t domid,
     struct xen_domctl_sched_credit *sdom)
 {
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
 
     domctl.cmd = XEN_DOMCTL_scheduler_op;
     domctl.domain = domid;
@@ -49,7 +49,7 @@ xc_sched_credit_domain_get(
     uint32_t domid,
     struct xen_domctl_sched_credit *sdom)
 {
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
 
     domctl.cmd = XEN_DOMCTL_scheduler_op;
     domctl.domain = domid;
@@ -70,7 +70,7 @@ xc_sched_credit_params_set(
     uint32_t cpupool_id,
     struct xen_sysctl_credit_schedule *schedule)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
 
     sysctl.cmd = XEN_SYSCTL_scheduler_op;
     sysctl.u.scheduler_op.cpupool_id = cpupool_id;
@@ -93,7 +93,7 @@ xc_sched_credit_params_get(
     uint32_t cpupool_id,
     struct xen_sysctl_credit_schedule *schedule)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
 
     sysctl.cmd = XEN_SYSCTL_scheduler_op;
     sysctl.u.scheduler_op.cpupool_id = cpupool_id;

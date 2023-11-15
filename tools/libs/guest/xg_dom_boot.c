@@ -39,7 +39,7 @@
 
 static int setup_hypercall_page(struct xc_dom_image *dom)
 {
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
     xen_pfn_t pfn;
     int rc;
 

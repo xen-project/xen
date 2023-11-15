@@ -62,12 +62,6 @@ struct iovec {
 #include <sys/uio.h>
 #endif
 
-#define DECLARE_DOMCTL struct xen_domctl domctl
-#define DECLARE_SYSCTL struct xen_sysctl sysctl
-#define DECLARE_PHYSDEV_OP struct physdev_op physdev_op
-#define DECLARE_FLASK_OP struct xen_flask_op op
-#define DECLARE_PLATFORM_OP struct xen_platform_op platform_op
-
 #undef PAGE_SHIFT
 #undef PAGE_SIZE
 #undef PAGE_MASK

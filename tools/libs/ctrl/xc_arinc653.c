@@ -33,7 +33,7 @@ xc_sched_arinc653_schedule_set(
     struct xen_sysctl_arinc653_schedule *schedule)
 {
     int rc;
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
     DECLARE_HYPERCALL_BOUNCE(
         schedule,
         sizeof(*schedule),
@@ -63,7 +63,7 @@ xc_sched_arinc653_schedule_get(
     struct xen_sysctl_arinc653_schedule *schedule)
 {
     int rc;
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
     DECLARE_HYPERCALL_BOUNCE(
         schedule,
         sizeof(*schedule),

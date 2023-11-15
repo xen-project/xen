@@ -51,7 +51,7 @@ static struct domain_info_context *dinfo = &_dinfo;
 int xc_mark_page_online(xc_interface *xch, unsigned long start,
                         unsigned long end, uint32_t *status)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
     DECLARE_HYPERCALL_BOUNCE(status, sizeof(uint32_t)*(end - start + 1), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     int ret = -1;
 
@@ -81,7 +81,7 @@ int xc_mark_page_online(xc_interface *xch, unsigned long start,
 int xc_mark_page_offline(xc_interface *xch, unsigned long start,
                           unsigned long end, uint32_t *status)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
     DECLARE_HYPERCALL_BOUNCE(status, sizeof(uint32_t)*(end - start + 1), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     int ret = -1;
 
@@ -111,7 +111,7 @@ int xc_mark_page_offline(xc_interface *xch, unsigned long start,
 int xc_query_page_offline_status(xc_interface *xch, unsigned long start,
                                  unsigned long end, uint32_t *status)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
     DECLARE_HYPERCALL_BOUNCE(status, sizeof(uint32_t)*(end - start + 1), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     int ret = -1;
 

@@ -38,7 +38,7 @@ enum {
 
 int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
     int ret;
 
     sysctl.cmd = XEN_SYSCTL_get_cpu_levelling_caps;
@@ -53,7 +53,7 @@ int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps)
 int xc_get_cpu_featureset(xc_interface *xch, uint32_t index,
                           uint32_t *nr_features, uint32_t *featureset)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
     DECLARE_HYPERCALL_BOUNCE(featureset,
                              *nr_features * sizeof(*featureset),
                              XC_HYPERCALL_BUFFER_BOUNCE_OUT);
@@ -167,7 +167,7 @@ static int get_domain_cpu_policy(xc_interface *xch, uint32_t domid,
                                  uint32_t *nr_leaves, xen_cpuid_leaf_t *leaves,
                                  uint32_t *nr_msrs, xen_msr_entry_t *msrs)
 {
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
     DECLARE_HYPERCALL_BOUNCE(leaves,
                              *nr_leaves * sizeof(*leaves),
                              XC_HYPERCALL_BUFFER_BOUNCE_OUT);
@@ -207,7 +207,7 @@ int xc_set_domain_cpu_policy(xc_interface *xch, uint32_t domid,
                              uint32_t *err_leaf_p, uint32_t *err_subleaf_p,
                              uint32_t *err_msr_p)
 {
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
     DECLARE_HYPERCALL_BOUNCE(leaves,
                              nr_leaves * sizeof(*leaves),
                              XC_HYPERCALL_BUFFER_BOUNCE_IN);

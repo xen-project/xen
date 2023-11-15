@@ -22,7 +22,7 @@
 
 int xc_cpu_online(xc_interface *xch, int cpu)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
     int ret;
 
     sysctl.cmd = XEN_SYSCTL_cpu_hotplug;
@@ -35,7 +35,7 @@ int xc_cpu_online(xc_interface *xch, int cpu)
 
 int xc_cpu_offline(xc_interface *xch, int cpu)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
     int ret;
 
     sysctl.cmd = XEN_SYSCTL_cpu_hotplug;
@@ -48,7 +48,7 @@ int xc_cpu_offline(xc_interface *xch, int cpu)
 
 int xc_smt_enable(xc_interface *xch)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
     int ret;
 
     sysctl.cmd = XEN_SYSCTL_cpu_hotplug;
@@ -61,7 +61,7 @@ int xc_smt_enable(xc_interface *xch)
 
 int xc_smt_disable(xc_interface *xch)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
     int ret;
 
     sysctl.cmd = XEN_SYSCTL_cpu_hotplug;

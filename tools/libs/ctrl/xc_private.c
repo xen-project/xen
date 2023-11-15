@@ -229,7 +229,7 @@ int xc_get_pfn_type_batch(xc_interface *xch, uint32_t dom,
                           unsigned int num, xen_pfn_t *arr)
 {
     int rc;
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
     DECLARE_HYPERCALL_BOUNCE(arr, sizeof(*arr) * num, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     if ( xc_hypercall_bounce_pre(xch, arr) )
         return -1;
@@ -398,7 +398,7 @@ int xc_maximum_ram_page(xc_interface *xch, unsigned long *max_mfn)
 
 long long xc_domain_get_cpu_usage(xc_interface *xch, uint32_t domid, int vcpu)
 {
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
 
     domctl.cmd = XEN_DOMCTL_getvcpuinfo;
     domctl.domain = domid;

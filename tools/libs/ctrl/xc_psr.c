@@ -29,7 +29,7 @@
 
 int xc_psr_cmt_attach(xc_interface *xch, uint32_t domid)
 {
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
 
     domctl.cmd = XEN_DOMCTL_psr_cmt_op;
     domctl.domain = domid;
@@ -40,7 +40,7 @@ int xc_psr_cmt_attach(xc_interface *xch, uint32_t domid)
 
 int xc_psr_cmt_detach(xc_interface *xch, uint32_t domid)
 {
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
 
     domctl.cmd = XEN_DOMCTL_psr_cmt_op;
     domctl.domain = domid;
@@ -53,7 +53,7 @@ int xc_psr_cmt_get_domain_rmid(xc_interface *xch, uint32_t domid,
                                uint32_t *rmid)
 {
     int rc;
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
 
     domctl.cmd = XEN_DOMCTL_psr_cmt_op;
     domctl.domain = domid;
@@ -71,7 +71,7 @@ int xc_psr_cmt_get_total_rmid(xc_interface *xch, uint32_t *total_rmid)
 {
     static int val = 0;
     int rc;
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
 
     if ( val )
     {
@@ -95,7 +95,7 @@ int xc_psr_cmt_get_l3_upscaling_factor(xc_interface *xch,
 {
     static int val = 0;
     int rc;
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
 
     if ( val )
     {
@@ -118,7 +118,7 @@ int xc_psr_cmt_get_l3_upscaling_factor(xc_interface *xch,
 int xc_psr_cmt_get_l3_event_mask(xc_interface *xch, uint32_t *event_mask)
 {
     int rc;
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
 
     sysctl.cmd = XEN_SYSCTL_psr_cmt_op;
     sysctl.u.psr_cmt_op.cmd =
@@ -137,7 +137,7 @@ int xc_psr_cmt_get_l3_cache_size(xc_interface *xch, uint32_t cpu,
 {
     static int val = 0;
     int rc;
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
 
     if ( val )
     {
@@ -230,7 +230,7 @@ int xc_psr_cmt_enabled(xc_interface *xch)
 {
     static int val = -1;
     int rc;
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
 
     if ( val >= 0 )
         return val;
@@ -252,7 +252,7 @@ int xc_psr_set_domain_data(xc_interface *xch, uint32_t domid,
                            xc_psr_type type, uint32_t target,
                            uint64_t data)
 {
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
     uint32_t cmd;
 
     switch ( type )
@@ -291,7 +291,7 @@ int xc_psr_get_domain_data(xc_interface *xch, uint32_t domid,
                            uint64_t *data)
 {
     int rc;
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
     uint32_t cmd;
 
     switch ( type )
@@ -333,7 +333,7 @@ int xc_psr_get_hw_info(xc_interface *xch, uint32_t socket,
                        xc_psr_feat_type type, xc_psr_hw_info *hw_info)
 {
     int rc = -1;
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
 
     if ( !hw_info )
     {

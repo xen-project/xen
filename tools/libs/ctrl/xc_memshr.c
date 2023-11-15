@@ -28,7 +28,7 @@ int xc_memshr_control(xc_interface *xch,
                       uint32_t domid,
                       int enable)
 {
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
     struct xen_domctl_mem_sharing_op *op;
 
     domctl.cmd = XEN_DOMCTL_mem_sharing_op;

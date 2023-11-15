@@ -29,7 +29,7 @@ int xc_sched_rtds_domain_set(xc_interface *xch,
                            struct xen_domctl_sched_rtds *sdom)
 {
     int rc;
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
 
     domctl.cmd = XEN_DOMCTL_scheduler_op;
     domctl.domain = domid;
@@ -48,7 +48,7 @@ int xc_sched_rtds_domain_get(xc_interface *xch,
                            struct xen_domctl_sched_rtds *sdom)
 {
     int rc;
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
 
     domctl.cmd = XEN_DOMCTL_scheduler_op;
     domctl.domain = domid;
@@ -70,7 +70,7 @@ int xc_sched_rtds_vcpu_set(xc_interface *xch,
 {
     int rc = 0;
     unsigned processed = 0;
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
     DECLARE_HYPERCALL_BOUNCE(vcpus, sizeof(*vcpus) * num_vcpus,
                              XC_HYPERCALL_BUFFER_BOUNCE_IN);
 
@@ -104,7 +104,7 @@ int xc_sched_rtds_vcpu_get(xc_interface *xch,
 {
     int rc = 0;
     unsigned processed = 0;
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
     DECLARE_HYPERCALL_BOUNCE(vcpus, sizeof(*vcpus) * num_vcpus,
                              XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 

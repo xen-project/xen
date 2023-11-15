@@ -27,7 +27,7 @@
 
 static int tbuf_enable(xc_interface *xch, int enable)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
 
     sysctl.cmd = XEN_SYSCTL_tbuf_op;
     sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
@@ -41,7 +41,7 @@ static int tbuf_enable(xc_interface *xch, int enable)
 
 int xc_tbuf_set_size(xc_interface *xch, unsigned long size)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
 
     sysctl.cmd = XEN_SYSCTL_tbuf_op;
     sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
@@ -55,7 +55,7 @@ int xc_tbuf_get_size(xc_interface *xch, unsigned long *size)
 {
     struct t_info *t_info;
     int rc;
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
 
     sysctl.cmd = XEN_SYSCTL_tbuf_op;
     sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
@@ -82,7 +82,7 @@ int xc_tbuf_get_size(xc_interface *xch, unsigned long *size)
 int xc_tbuf_enable(xc_interface *xch, unsigned long pages, unsigned long *mfn,
                    unsigned long *size)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
     int rc;
 
     /*
@@ -116,7 +116,7 @@ int xc_tbuf_disable(xc_interface *xch)
 
 int xc_tbuf_set_cpu_mask(xc_interface *xch, xc_cpumap_t mask)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
     DECLARE_HYPERCALL_BOUNCE(mask, 0, XC_HYPERCALL_BUFFER_BOUNCE_IN);
     int ret = -1;
     int bits, cpusize;
@@ -160,7 +160,7 @@ int xc_tbuf_set_cpu_mask(xc_interface *xch, xc_cpumap_t mask)
 
 int xc_tbuf_set_evt_mask(xc_interface *xch, uint32_t mask)
 {
-    DECLARE_SYSCTL;
+    struct xen_sysctl sysctl = {};
 
     sysctl.cmd = XEN_SYSCTL_tbuf_op;
     sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;

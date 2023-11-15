@@ -93,7 +93,7 @@ static int modify_returncode(xc_interface *xch, uint32_t domid)
 
 static int xc_domain_resume_cooperative(xc_interface *xch, uint32_t domid)
 {
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
     int rc;
 
     /*
@@ -111,7 +111,7 @@ static int xc_domain_resume_cooperative(xc_interface *xch, uint32_t domid)
 #if defined(__i386__) || defined(__x86_64__)
 static int xc_domain_resume_hvm(xc_interface *xch, uint32_t domid)
 {
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
 
     /*
      * The domctl XEN_DOMCTL_resumedomain unpause each vcpu. After
@@ -132,7 +132,7 @@ static int xc_domain_resume_hvm(xc_interface *xch, uint32_t domid)
 
 static int xc_domain_resume_any(xc_interface *xch, uint32_t domid)
 {
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
     xc_domaininfo_t info;
     int i, rc = -1;
 #if defined(__i386__) || defined(__x86_64__)

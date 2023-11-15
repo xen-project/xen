@@ -22,7 +22,7 @@
 static int xc_resource_op_one(xc_interface *xch, xc_resource_op_t *op)
 {
     int rc;
-    DECLARE_PLATFORM_OP;
+    struct xen_platform_op platform_op = {};
     DECLARE_NAMED_HYPERCALL_BOUNCE(entries, op->entries,
                                 op->nr_entries * sizeof(*op->entries),
                                 XC_HYPERCALL_BUFFER_BOUNCE_BOTH);

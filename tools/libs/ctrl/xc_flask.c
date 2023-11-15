@@ -64,7 +64,7 @@ int xc_flask_op(xc_interface *xch, xen_flask_op_t *op)
 int xc_flask_load(xc_interface *xch, char *buf, uint32_t size)
 {
     int err;
-    DECLARE_FLASK_OP;
+    struct xen_flask_op op = {};
     DECLARE_HYPERCALL_BOUNCE(buf, size, XC_HYPERCALL_BUFFER_BOUNCE_IN);
     if ( xc_hypercall_bounce_pre(xch, buf) )
     {
@@ -86,7 +86,7 @@ int xc_flask_load(xc_interface *xch, char *buf, uint32_t size)
 int xc_flask_context_to_sid(xc_interface *xch, char *buf, uint32_t size, uint32_t *sid)
 {
     int err;
-    DECLARE_FLASK_OP;
+    struct xen_flask_op op = {};
     DECLARE_HYPERCALL_BOUNCE(buf, size, XC_HYPERCALL_BUFFER_BOUNCE_IN);
 
     if ( xc_hypercall_bounce_pre(xch, buf) )
@@ -112,7 +112,7 @@ int xc_flask_context_to_sid(xc_interface *xch, char *buf, uint32_t size, uint32_
 int xc_flask_sid_to_context(xc_interface *xch, int sid, char *buf, uint32_t size)
 {
     int err;
-    DECLARE_FLASK_OP;
+    struct xen_flask_op op = {};
     DECLARE_HYPERCALL_BOUNCE(buf, size, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
 
     if ( xc_hypercall_bounce_pre(xch, buf) )
@@ -135,7 +135,7 @@ int xc_flask_sid_to_context(xc_interface *xch, int sid, char *buf, uint32_t size
 
 int xc_flask_getenforce(xc_interface *xch)
 {
-    DECLARE_FLASK_OP;
+    struct xen_flask_op op = {};
     op.cmd = FLASK_GETENFORCE;
     
     return xc_flask_op(xch, &op);
@@ -143,7 +143,7 @@ int xc_flask_getenforce(xc_interface *xch)
 
 int xc_flask_setenforce(xc_interface *xch, int mode)
 {
-    DECLARE_FLASK_OP;
+    struct xen_flask_op op = {};
     op.cmd = FLASK_SETENFORCE;
     op.u.enforce.enforcing = mode;
    
@@ -153,7 +153,7 @@ int xc_flask_setenforce(xc_interface *xch, int mode)
 int xc_flask_getbool_byid(xc_interface *xch, int id, char *name, uint32_t size, int *curr, int *pend)
 {
     int rv;
-    DECLARE_FLASK_OP;
+    struct xen_flask_op op = {};
     DECLARE_HYPERCALL_BOUNCE(name, size, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
 
     if ( xc_hypercall_bounce_pre(xch, name) )
@@ -185,7 +185,7 @@ int xc_flask_getbool_byid(xc_interface *xch, int id, char *name, uint32_t size, 
 int xc_flask_getbool_byname(xc_interface *xch, char *name, int *curr, int *pend)
 {
     int rv;
-    DECLARE_FLASK_OP;
+    struct xen_flask_op op = {};
     DECLARE_HYPERCALL_BOUNCE(name, strlen(name), XC_HYPERCALL_BUFFER_BOUNCE_IN);
 
     if ( xc_hypercall_bounce_pre(xch, name) )
@@ -217,7 +217,7 @@ int xc_flask_getbool_byname(xc_interface *xch, char *name, int *curr, int *pend)
 int xc_flask_setbool(xc_interface *xch, char *name, int value, int commit)
 {
     int rv;
-    DECLARE_FLASK_OP;
+    struct xen_flask_op op = {};
     DECLARE_HYPERCALL_BOUNCE(name, strlen(name), XC_HYPERCALL_BUFFER_BOUNCE_IN);
 
     if ( xc_hypercall_bounce_pre(xch, name) )
@@ -245,7 +245,7 @@ static int xc_flask_add(xc_interface *xch, uint32_t ocon, uint64_t low, uint64_t
 {
     uint32_t sid;
     int err;
-    DECLARE_FLASK_OP;
+    struct xen_flask_op op = {};
 
     err = xc_flask_context_to_sid(xch, scontext, strlen(scontext), &sid);
     if ( err )
@@ -284,7 +284,7 @@ int xc_flask_add_device(xc_interface *xch, unsigned long device, char *scontext)
 
 static int xc_flask_del(xc_interface *xch, uint32_t ocon, uint64_t low, uint64_t high)
 {
-    DECLARE_FLASK_OP;
+    struct xen_flask_op op = {};
 
     op.cmd = FLASK_DEL_OCONTEXT;
     op.u.ocontext.ocon = ocon;
@@ -320,7 +320,7 @@ int xc_flask_access(xc_interface *xch, const char *scon, const char *tcon,
                 uint32_t *auditallow, uint32_t *auditdeny,
                 uint32_t *seqno)
 {
-    DECLARE_FLASK_OP;
+    struct xen_flask_op op = {};
     int err;
 
     err = xc_flask_context_to_sid(xch, (char*)scon, strlen(scon), &op.u.access.ssid);
@@ -359,7 +359,7 @@ int xc_flask_access(xc_interface *xch, const char *scon, const char *tcon,
 int xc_flask_avc_hashstats(xc_interface *xch, char *buf, int size)
 {
     int err;
-    DECLARE_FLASK_OP;
+    struct xen_flask_op op = {};
   
     op.cmd = FLASK_AVC_HASHSTATS;
   
@@ -377,7 +377,7 @@ int xc_flask_avc_cachestats(xc_interface *xch, char *buf, int size)
 {
     int err, n;
     int i = 0;
-    DECLARE_FLASK_OP;
+    struct xen_flask_op op = {};
 
     n = snprintf(buf, size, "lookups hits misses allocations reclaims frees\n");
     buf += n;
@@ -406,7 +406,7 @@ int xc_flask_avc_cachestats(xc_interface *xch, char *buf, int size)
 
 int xc_flask_policyvers(xc_interface *xch)
 {
-    DECLARE_FLASK_OP;
+    struct xen_flask_op op = {};
     op.cmd = FLASK_POLICYVERS;
 
     return xc_flask_op(xch, &op);
@@ -414,7 +414,7 @@ int xc_flask_policyvers(xc_interface *xch)
 
 int xc_flask_getavc_threshold(xc_interface *xch)
 {
-    DECLARE_FLASK_OP;
+    struct xen_flask_op op = {};
     op.cmd = FLASK_GETAVC_THRESHOLD;
     
     return xc_flask_op(xch, &op);
@@ -422,7 +422,7 @@ int xc_flask_getavc_threshold(xc_interface *xch)
 
 int xc_flask_setavc_threshold(xc_interface *xch, int threshold)
 {
-    DECLARE_FLASK_OP;
+    struct xen_flask_op op = {};
     op.cmd = FLASK_SETAVC_THRESHOLD;
     op.u.setavc_threshold.threshold = threshold;
 
@@ -431,7 +431,7 @@ int xc_flask_setavc_threshold(xc_interface *xch, int threshold)
 
 int xc_flask_relabel_domain(xc_interface *xch, uint32_t domid, uint32_t sid)
 {
-    DECLARE_FLASK_OP;
+    struct xen_flask_op op = {};
     op.cmd = FLASK_RELABEL_DOMAIN;
     op.u.relabel.domid = domid;
     op.u.relabel.sid = sid;

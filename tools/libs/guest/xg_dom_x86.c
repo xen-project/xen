@@ -1158,7 +1158,7 @@ static int x86_compat(xc_interface *xch, uint32_t domid,
         { "xen-3.0-x86_32p", 32 },
         { "xen-3.0-x86_64",  64 },
     };
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
     int i,rc;
 
     memset(&domctl, 0, sizeof(domctl));

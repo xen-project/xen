@@ -204,7 +204,7 @@ static int set_mode(xc_interface *xch, uint32_t domid, const char *guest_type)
         { "xen-3.0-aarch64", 64 },
         { "xen-3.0-armv7l",  32 },
     };
-    DECLARE_DOMCTL;
+    struct xen_domctl domctl = {};
     int i,rc;
 
     domctl.domain = domid;
