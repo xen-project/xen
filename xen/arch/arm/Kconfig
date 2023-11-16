@@ -14,7 +14,6 @@ config ARM
 	select HAS_ALTERNATIVE
 	select HAS_DEVICE_TREE
 	select HAS_PASSTHROUGH
-	select HAS_PMAP
 	select HAS_UBSAN
 	select IOMMU_FORCE_PT_SHARE
 
@@ -60,6 +59,7 @@ config PADDR_BITS
 
 config MMU
 	def_bool y
+	select HAS_PMAP
 
 source "arch/Kconfig"
 
