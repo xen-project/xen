@@ -257,7 +257,7 @@ GLOBAL(init_secondary)
 secondary_switched:
         /*
          * Non-boot CPUs need to move on to the proper pagetables, which were
-         * setup in init_secondary_pagetables.
+         * setup in prepare_secondary_mm.
          *
          * XXX: This is not compliant with the Arm Arm.
          */

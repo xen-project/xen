@@ -448,7 +448,7 @@ int __cpu_up(unsigned int cpu)
 
     printk("Bringing up CPU%d\n", cpu);
 
-    rc = init_secondary_pagetables(cpu);
+    rc = prepare_secondary_mm(cpu);
     if ( rc < 0 )
         return rc;
 

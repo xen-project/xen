@@ -67,7 +67,7 @@ static void clear_boot_pagetables(void)
 }
 
 #ifdef CONFIG_ARM_64
-int init_secondary_pagetables(int cpu)
+int prepare_secondary_mm(int cpu)
 {
     clear_boot_pagetables();
 
@@ -80,7 +80,7 @@ int init_secondary_pagetables(int cpu)
     return 0;
 }
 #else
-int init_secondary_pagetables(int cpu)
+int prepare_secondary_mm(int cpu)
 {
     lpae_t *first;
 
