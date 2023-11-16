@@ -48,7 +48,7 @@ struct mtrr_state {
 };
 extern struct mtrr_state mtrr_state;
 
-extern void cf_check mtrr_save_fixed_ranges(void *);
+extern void cf_check mtrr_save_fixed_ranges(void *info);
 extern void mtrr_save_state(void);
 extern int mtrr_add(unsigned long base, unsigned long size,
                     unsigned int type, char increment);
@@ -68,14 +68,14 @@ extern void mtrr_aps_sync_begin(void);
 extern void mtrr_aps_sync_end(void);
 extern void mtrr_bp_restore(void);
 
-extern bool_t mtrr_var_range_msr_set(struct domain *, struct mtrr_state *,
+extern bool_t mtrr_var_range_msr_set(struct domain *d, struct mtrr_state *m,
                                      uint32_t msr, uint64_t msr_content);
-extern bool_t mtrr_fix_range_msr_set(struct domain *, struct mtrr_state *,
+extern bool_t mtrr_fix_range_msr_set(struct domain *d, struct mtrr_state *m,
                                      uint32_t row, uint64_t msr_content);
-extern bool_t mtrr_def_type_msr_set(struct domain *, struct mtrr_state *,
+extern bool_t mtrr_def_type_msr_set(struct domain *d, struct mtrr_state *m,
                                     uint64_t msr_content);
 #ifdef CONFIG_HVM
-extern void memory_type_changed(struct domain *);
+extern void memory_type_changed(struct domain *d);
 #else
 static inline void memory_type_changed(struct domain *d) {}
 #endif
