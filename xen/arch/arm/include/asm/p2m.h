@@ -14,10 +14,19 @@
 /* Holds the bit size of IPAs in p2m tables.  */
 extern unsigned int p2m_ipa_bits;
 
-extern unsigned int p2m_root_order;
-extern unsigned int p2m_root_level;
-#define P2M_ROOT_ORDER    p2m_root_order
-#define P2M_ROOT_LEVEL p2m_root_level
+#define MAX_VMID_8_BIT  (1UL << 8)
+#define MAX_VMID_16_BIT (1UL << 16)
+
+#define INVALID_VMID 0 /* VMID 0 is reserved */
+
+#ifdef CONFIG_ARM_64
+extern unsigned int max_vmid;
+/* VMID is by default 8 bit width on AArch64 */
+#define MAX_VMID       max_vmid
+#else
+/* VMID is always 8 bit width on AArch32 */
+#define MAX_VMID        MAX_VMID_8_BIT
+#endif
 
 struct domain;
 
@@ -156,6 +165,12 @@ typedef enum {
 #endif
 #include <xen/p2m-common.h>
 
+#if defined(CONFIG_MMU)
+# include <asm/mmu/p2m.h>
+#else
+# error "Unknown memory management layout"
+#endif
+
 static inline bool arch_acquire_resource_check(struct domain *d)
 {
     /*
@@ -179,6 +194,10 @@ void p2m_altp2m_check(struct vcpu *v, uint16_t idx)
  * (Stage-2 input size) it can support.
  */
 void p2m_restrict_ipa_bits(unsigned int ipa_bits);
+
+void p2m_vmid_allocator_init(void);
+int p2m_alloc_vmid(struct domain *d);
+void p2m_free_vmid(struct domain *d);
 
 /* Second stage paging setup, to be called on all CPUs */
 void setup_virt_paging(void);
@@ -242,8 +261,6 @@ static inline int p2m_is_write_locked(struct p2m_domain *p2m)
     return rw_is_write_locked(&p2m->lock);
 }
 
-void p2m_tlb_flush_sync(struct p2m_domain *p2m);
-
 /* Look up the MFN corresponding to a domain's GFN. */
 mfn_t p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t);
 
@@ -271,8 +288,7 @@ int p2m_set_entry(struct p2m_domain *p2m,
 
 bool p2m_resolve_translation_fault(struct domain *d, gfn_t gfn);
 
-void p2m_clear_root_pages(struct p2m_domain *p2m);
-void p2m_invalidate_root(struct p2m_domain *p2m);
+void p2m_domain_creation_finished(struct domain *d);
 
 /*
  * Clean & invalidate caches corresponding to a region [start,end) of guest

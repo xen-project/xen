@@ -870,16 +870,7 @@ int arch_domain_soft_reset(struct domain *d)
 
 void arch_domain_creation_finished(struct domain *d)
 {
-    /*
-     * To avoid flushing the whole guest RAM on the first Set/Way, we
-     * invalidate the P2M to track what has been accessed.
-     *
-     * This is only turned when IOMMU is not used or the page-table are
-     * not shared because bit[0] (e.g valid bit) unset will result
-     * IOMMU fault that could be not fixed-up.
-     */
-    if ( !iommu_use_hap_pt(d) )
-        p2m_invalidate_root(p2m_get_hostp2m(d));
+    p2m_domain_creation_finished(d);
 }
 
 static int is_guest_pv32_psr(uint32_t psr)
