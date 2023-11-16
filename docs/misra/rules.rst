@@ -383,6 +383,36 @@ maintainers if you want to suggest a change.
 
        CFLAGS="-Warith-conversion -Wno-error=arith-conversion" make -C xen
 
+   * - `Rule 11.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_11_01.c>`_
+     - Required
+     - Conversions shall not be performed between a pointer to a
+       function and any other type
+     - All conversions to integer types are permitted if the destination
+       type has enough bits to hold the entire value. Conversions to
+       bool and void* are permitted.
+
+   * - `Rule 11.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_11_02.c>`_
+     - Required
+     - Conversions shall not be performed between a pointer to an
+       incomplete type and any other type
+     - All conversions to integer types are permitted if the destination
+       type has enough bits to hold the entire value. Conversions to
+       bool and void* are permitted.
+
+   * - `Rule 11.3 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_11_03.c>`_
+     - Required
+     - A cast shall not be performed between a pointer to object type
+       and a pointer to a different object type
+     -
+
+   * - `Rule 11.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_11_06.c>`_
+     - Required
+     - A cast shall not be performed between pointer to void and an
+       arithmetic type
+     - All conversions to integer types are permitted if the destination
+       type has enough bits to hold the entire value. Conversions to
+       bool are permitted.
+
    * - `Rule 11.7 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_11_07.c>`_
      - Required
      - A cast shall not be performed between pointer to object and a noninteger arithmetic type
