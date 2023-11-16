@@ -264,21 +264,6 @@ static inline void write_pte(lpae_t *p, lpae_t pte)
 /* Flush the dcache for an entire page. */
 void flush_page_to_ram(unsigned long mfn, bool sync_icache);
 
-/*
- * Print a walk of a page table or p2m
- *
- * ttbr is the base address register (TTBR0_EL2 or VTTBR_EL2)
- * addr is the PA or IPA to translate
- * root_level is the starting level of the page table
- *   (e.g. TCR_EL2.SL0 or VTCR_EL2.SL0 )
- * nr_root_tables is the number of concatenated tables at the root.
- *   this can only be != 1 for P2M walks starting at the first or
- *   subsequent level.
- */
-void dump_pt_walk(paddr_t ttbr, paddr_t addr,
-                  unsigned int root_level,
-                  unsigned int nr_root_tables);
-
 /* Print a walk of the hypervisor's page tables for a virtual addr. */
 extern void dump_hyp_walk(vaddr_t addr);
 /* Print a walk of the p2m for a domain for a physical address. */

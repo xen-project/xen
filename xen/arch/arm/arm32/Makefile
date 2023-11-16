@@ -1,4 +1,5 @@
 obj-y += lib/
+obj-$(CONFIG_MMU) += mmu/
 
 obj-$(CONFIG_EARLY_PRINTK) += debug.o
 obj-y += domctl.o
