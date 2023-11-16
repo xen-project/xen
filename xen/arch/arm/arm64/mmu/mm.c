@@ -2,6 +2,7 @@
 
 #include <xen/init.h>
 #include <xen/mm.h>
+#include <xen/pfn.h>
 
 #include <asm/setup.h>
 
@@ -154,8 +155,8 @@ void __init switch_ttbr(uint64_t ttbr)
 }
 
 /* Map the region in the directmap area. */
-void __init setup_directmap_mappings(unsigned long base_mfn,
-                                     unsigned long nr_mfns)
+static void __init setup_directmap_mappings(unsigned long base_mfn,
+                                            unsigned long nr_mfns)
 {
     int rc;
 
@@ -188,6 +189,52 @@ void __init setup_directmap_mappings(unsigned long base_mfn,
                           PAGE_HYPERVISOR_RW | _PAGE_BLOCK);
     if ( rc )
         panic("Unable to setup the directmap mappings.\n");
+}
+
+void __init setup_mm(void)
+{
+    const struct meminfo *banks = &bootinfo.mem;
+    paddr_t ram_start = INVALID_PADDR;
+    paddr_t ram_end = 0;
+    paddr_t ram_size = 0;
+    unsigned int i;
+
+    init_pdx();
+
+    /*
+     * We need some memory to allocate the page-tables used for the directmap
+     * mappings. But some regions may contain memory already allocated
+     * for other uses (e.g. modules, reserved-memory...).
+     *
+     * For simplicity, add all the free regions in the boot allocator.
+     */
+    populate_boot_allocator();
+
+    total_pages = 0;
+
+    for ( i = 0; i < banks->nr_banks; i++ )
+    {
+        const struct membank *bank = &banks->bank[i];
+        paddr_t bank_end = bank->start + bank->size;
+
+        ram_size = ram_size + bank->size;
+        ram_start = min(ram_start, bank->start);
+        ram_end = max(ram_end, bank_end);
+
+        setup_directmap_mappings(PFN_DOWN(bank->start),
+                                 PFN_DOWN(bank->size));
+    }
+
+    total_pages += ram_size >> PAGE_SHIFT;
+
+    directmap_virt_end = XENHEAP_VIRT_START + ram_end - ram_start;
+    directmap_mfn_start = maddr_to_mfn(ram_start);
+    directmap_mfn_end = maddr_to_mfn(ram_end);
+
+    setup_frametable_mappings(ram_start, ram_end);
+    max_page = PFN_DOWN(ram_end);
+
+    init_staticmem_pages();
 }
 
 /*

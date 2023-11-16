@@ -31,12 +31,6 @@ void dump_pt_walk(paddr_t ttbr, paddr_t addr,
 
 /* Switch to a new root page-tables */
 extern void switch_ttbr(uint64_t ttbr);
-/*
- * For Arm32, set up the direct-mapped xenheap: up to 1GB of contiguous,
- * always-mapped memory. Base must be 32MB aligned and size a multiple of 32MB.
- * For Arm64, map the region in the directmap area.
- */
-extern void setup_directmap_mappings(unsigned long base_mfn, unsigned long nr_mfns);
 
 #endif /* __ARM_MMU_MM_H__ */
 
