@@ -208,7 +208,7 @@ void mctelem_defer(mctelem_cookie_t cookie, bool lmce)
  *  @lmce: indicate which pending list on @cpu is handled
  */
 void mctelem_process_deferred(unsigned int cpu,
-			      int (*fn)(mctelem_cookie_t),
+			      int (*fn)(mctelem_cookie_t mctc),
 			      bool lmce)
 {
 	struct mctelem_ent *tep;

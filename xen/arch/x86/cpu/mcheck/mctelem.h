@@ -60,18 +60,19 @@ typedef enum mctelem_class {
     MC_NCLASSES
 } mctelem_class_t;
 
-extern void mctelem_init(unsigned int);
-extern mctelem_cookie_t mctelem_reserve(mctelem_class_t);
-extern void *mctelem_dataptr(mctelem_cookie_t);
-extern void mctelem_commit(mctelem_cookie_t);
-extern void mctelem_dismiss(mctelem_cookie_t);
-extern mctelem_cookie_t mctelem_consume_oldest_begin(mctelem_class_t);
-extern void mctelem_consume_oldest_end(mctelem_cookie_t);
-extern void mctelem_ack(mctelem_class_t, mctelem_cookie_t);
-extern void mctelem_defer(mctelem_cookie_t, bool lmce);
-extern void mctelem_process_deferred(unsigned int,
-                                     int (*)(mctelem_cookie_t), bool lmce);
-bool mctelem_has_deferred(unsigned int);
+extern void mctelem_init(unsigned int datasz);
+extern mctelem_cookie_t mctelem_reserve(mctelem_class_t which);
+extern void *mctelem_dataptr(mctelem_cookie_t cookie);
+extern void mctelem_commit(mctelem_cookie_t cookie);
+extern void mctelem_dismiss(mctelem_cookie_t cookie);
+extern mctelem_cookie_t mctelem_consume_oldest_begin(mctelem_class_t which);
+extern void mctelem_consume_oldest_end(mctelem_cookie_t cookie);
+extern void mctelem_ack(mctelem_class_t which, mctelem_cookie_t cookie);
+extern void mctelem_defer(mctelem_cookie_t cookie, bool lmce);
+extern void mctelem_process_deferred(unsigned int cpu,
+                                     int (*fn)(mctelem_cookie_t mctc),
+                                     bool lmce);
+bool mctelem_has_deferred(unsigned int cpu);
 bool mctelem_has_deferred_lmce(unsigned int cpu);
 
 #endif
