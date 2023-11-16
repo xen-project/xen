@@ -882,10 +882,8 @@ ENTRY(lookup_processor_type)
         ldmfd sp!, {r4, pc}
 
 /*
- *  Read processor ID register (CP#15, CR0), and Look up in the linker-built
- * supported processor list. Note that we can't use the absolute addresses for
- * the __proc_info lists since we aren't running with the MMU on (and therefore,
- * we are not in correct address space). We have to calculate the offset.
+ * Read processor ID register (CP#15, CR0), and Look up in the linker-built
+ * supported processor list.
  *
  * Returns:
  * r0: CPUID
