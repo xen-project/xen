@@ -326,12 +326,6 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
 #endif
 }
 
-/* MMU setup for secondary CPUS (which already have paging enabled) */
-void mmu_init_secondary_cpu(void)
-{
-    xen_pt_enforce_wnx();
-}
-
 #ifdef CONFIG_ARM_32
 /*
  * Set up the direct-mapped xenheap:

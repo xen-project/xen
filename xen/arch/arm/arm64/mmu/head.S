@@ -269,11 +269,13 @@ ENDPROC(create_page_tables)
  *
  * Inputs:
  *   x0 : Physical address of the page tables.
+ *   x1 : Extra flags of the SCTLR.
  *
- * Clobbers x0 - x4
+ * Clobbers x0 - x5
  */
 enable_mmu:
         mov   x4, x0
+        mov   x5, x1
         PRINT("- Turning on paging -\r\n")
 
         /*
@@ -289,6 +291,7 @@ enable_mmu:
         mrs   x0, SCTLR_EL2
         orr   x0, x0, #SCTLR_Axx_ELx_M  /* Enable MMU */
         orr   x0, x0, #SCTLR_Axx_ELx_C  /* Enable D-cache */
+        orr   x0, x0, x5                /* Enable extra flags */
         dsb   sy                     /* Flush PTE writes and finish reads */
         msr   SCTLR_EL2, x0          /* now paging is enabled */
         isb                          /* Now, flush the icache */
@@ -303,16 +306,17 @@ ENDPROC(enable_mmu)
  * Inputs:
  *   lr : Virtual address to return to.
  *
- * Clobbers x0 - x5
+ * Clobbers x0 - x6
  */
 ENTRY(enable_secondary_cpu_mm)
-        mov   x5, lr
+        mov   x6, lr
 
         load_paddr x0, init_ttbr
         ldr   x0, [x0]
 
+        mov   x1, #SCTLR_Axx_ELx_WXN        /* Enable WxN from the start */
         bl    enable_mmu
-        mov   lr, x5
+        mov   lr, x6
 
         /* Return to the virtual address requested by the caller. */
         ret
@@ -326,14 +330,15 @@ ENDPROC(enable_secondary_cpu_mm)
  * Inputs:
  *   lr : Virtual address to return to.
  *
- * Clobbers x0 - x5
+ * Clobbers x0 - x6
  */
 ENTRY(enable_boot_cpu_mm)
-        mov   x5, lr
+        mov   x6, lr
 
         bl    create_page_tables
         load_paddr x0, boot_pgtable
 
+        mov   x1, #0        /* No extra SCTLR flags */
         bl    enable_mmu
 
         /*
@@ -343,7 +348,7 @@ ENTRY(enable_boot_cpu_mm)
         ldr   x0, =1f
         br    x0
 1:
-        mov   lr, x5
+        mov   lr, x6
         /*
          * The 1:1 map may clash with other parts of the Xen virtual memory
          * layout. As it is not used anymore, remove it completely to
