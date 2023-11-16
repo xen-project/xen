@@ -15,16 +15,17 @@ extern void (*lapic_timer_on)(void);
 
 extern uint64_t (*cpuidle_get_tick)(void);
 
-int mwait_idle_init(struct notifier_block *);
+int mwait_idle_init(struct notifier_block *nfb);
 int cpuidle_init_cpu(unsigned int cpu);
 void cf_check default_dead_idle(void);
 void cf_check acpi_dead_idle(void);
 void play_dead(void);
 void trace_exit_reason(u32 *irq_traced);
-void update_idle_stats(struct acpi_processor_power *,
-                       struct acpi_processor_cx *, uint64_t, uint64_t);
-void update_last_cx_stat(struct acpi_processor_power *,
-                         struct acpi_processor_cx *, uint64_t);
+void update_idle_stats(struct acpi_processor_power *power,
+                       struct acpi_processor_cx *cx,
+                       uint64_t before, uint64_t after);
+void update_last_cx_stat(struct acpi_processor_power *power,
+                         struct acpi_processor_cx *cx, uint64_t ticks);
 
 bool errata_c6_workaround(void);
 
