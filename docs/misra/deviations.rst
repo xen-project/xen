@@ -192,6 +192,14 @@ Deviations related to MISRA C:2012 Rules:
        See automation/eclair_analysis/deviations.ecl for the full explanation.
      - Tagged as `safe` for ECLAIR.
 
+   * - R10.1
+     - The macro ISOLATE_LSB encapsulates the well-known pattern (x & -x)
+       applied to unsigned integer values on 2's complement architectures
+       (i.e., all architectures supported by Xen), used to obtain a mask where
+       just the least significant nonzero bit of x is set.
+       If no bits are set, 0 is returned.
+     - Tagged as `safe` for ECLAIR.
+
    * - R13.5
      - All developers and reviewers can be safely assumed to be well aware of
        the short-circuit evaluation strategy for logical operators.

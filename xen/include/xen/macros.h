@@ -8,8 +8,14 @@
 #define DIV_ROUND(n, d) (((n) + (d) / 2) / (d))
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 
-#define MASK_EXTR(v, m) (((v) & (m)) / ((m) & -(m)))
-#define MASK_INSR(v, m) (((v) * ((m) & -(m))) & (m))
+/*
+ * Given an unsigned integer argument, expands to a mask where just the least
+ * significant nonzero bit of the argument is set, or 0 if no bits are set.
+ */
+#define ISOLATE_LSB(x) ((x) & -(x))
+
+#define MASK_EXTR(v, m) (((v) & (m)) / ISOLATE_LSB(m))
+#define MASK_INSR(v, m) (((v) * ISOLATE_LSB(m)) & (m))
 
 #define count_args_(dot, a1, a2, a3, a4, a5, a6, a7, a8, x, ...) x
 #define count_args(args...) \

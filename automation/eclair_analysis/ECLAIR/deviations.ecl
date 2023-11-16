@@ -274,6 +274,13 @@ still non-negative."
 -config=MC3R1.R10.1,etypes+={safe, "stmt(operator(logical)||node(conditional_operator||binary_conditional_operator))", "dst_type(ebool||boolean)"}
 -doc_end
 
+-doc_begin="The macro ISOLATE_LSB encapsulates a well-known pattern to obtain
+a mask where only the lowest bit set in the argument is set, if any, for unsigned
+integers arguments on two's complement architectures
+(all the architectures supported by Xen satisfy this requirement)."
+-config=MC3R1.R10.1,reports+={safe, "any_area(any_loc(any_exp(macro(^ISOLATE_LSB$))))"}
+-doc_end
+
 ### Set 3 ###
 
 #
