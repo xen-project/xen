@@ -60,7 +60,7 @@ extern int8_t opt_hpet_legacy_replacement;
  * Return value is zero if HPET is unavailable.
  */
 u64 hpet_setup(void);
-void hpet_resume(u32 *);
+void hpet_resume(uint32_t *boot_cfg);
 
 /*
  * Disable HPET hardware: restore it to boot time state.

@@ -37,7 +37,7 @@ struct hpet_event_channel
     s_time_t      next_event;
     cpumask_var_t cpumask;
     spinlock_t    lock;
-    void          (*event_handler)(struct hpet_event_channel *);
+    void          (*event_handler)(struct hpet_event_channel *ch);
 
     unsigned int idx;   /* physical channel idx */
     unsigned int cpu;   /* msi target */
@@ -906,7 +906,7 @@ u64 __init hpet_setup(void)
     return hpet_rate;
 }
 
-void hpet_resume(u32 *boot_cfg)
+void hpet_resume(uint32_t *boot_cfg)
 {
     static u32 system_reset_latch;
     u32 hpet_id, cfg;
