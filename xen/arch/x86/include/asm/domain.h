@@ -74,20 +74,20 @@ struct mapcache_domain {
     unsigned long *garbage;
 };
 
-int mapcache_domain_init(struct domain *);
-int mapcache_vcpu_init(struct vcpu *);
-void mapcache_override_current(struct vcpu *);
+int mapcache_domain_init(struct domain *d);
+int mapcache_vcpu_init(struct vcpu *v);
+void mapcache_override_current(struct vcpu *v);
 
 /* x86/64: toggle guest between kernel and user modes. */
-void toggle_guest_mode(struct vcpu *);
+void toggle_guest_mode(struct vcpu *v);
 /* x86/64: toggle guest page tables between kernel and user modes. */
-void toggle_guest_pt(struct vcpu *);
+void toggle_guest_pt(struct vcpu *v);
 
 /*
  * Initialise a hypercall-transfer page. The given pointer must be mapped
  * in Xen virtual address space (accesses are not validated or checked).
  */
-void init_hypercall_page(struct domain *d, void *);
+void init_hypercall_page(struct domain *d, void *ptr);
 
 /************************************************/
 /*          shadow paging extension             */
@@ -342,8 +342,8 @@ struct arch_domain
     struct page_list_head relmem_list;
 
     const struct arch_csw {
-        void (*from)(struct vcpu *);
-        void (*to)(struct vcpu *);
+        void (*from)(struct vcpu *v);
+        void (*to)(struct vcpu *v);
         void noreturn (*tail)(void);
     } *ctxt_switch;
 
@@ -690,12 +690,12 @@ void update_guest_memory_policy(struct vcpu *v,
 
 void domain_cpu_policy_changed(struct domain *d);
 
-bool update_secondary_system_time(struct vcpu *,
-                                  struct vcpu_time_info *);
-void force_update_secondary_system_time(struct vcpu *,
-                                        struct vcpu_time_info *);
+bool update_secondary_system_time(struct vcpu *v,
+                                  struct vcpu_time_info *u);
+void force_update_secondary_system_time(struct vcpu *v,
+                                        struct vcpu_time_info *map);
 
-void vcpu_show_registers(const struct vcpu *);
+void vcpu_show_registers(const struct vcpu *v);
 
 static inline struct vcpu_guest_context *alloc_vcpu_guest_context(void)
 {
