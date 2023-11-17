@@ -12,6 +12,14 @@ built-in checks that are present in the language.
 The presence of such documentation is requested by MISRA C:2012 Directive 4.1,
 whose headline states: "Run-time failures shall be minimized".
 
+The ECLAIR checker for MISRA C:2012 Directive 4.1 requires the documentation
+to be supplied using the following format:
+
+``Documentation for MISRA C:2012 Dir 4.1: <category> <description>``
+
+The matched categories are the ones listed below (e.g., ``overflow`` and
+``unexpected wrapping``). The content of the description is not checked and can
+span multiple lines.
 
 Documentation for MISRA C:2012 Dir 4.1: overflow
 ________________________________________________
