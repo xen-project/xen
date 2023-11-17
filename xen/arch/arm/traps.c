@@ -1236,7 +1236,7 @@ int do_bug_frame(const struct cpu_user_regs *regs, vaddr_t pc)
 
     if ( id == BUGFRAME_run_fn )
     {
-        void (*fn)(const struct cpu_user_regs *) = (void *)regs->BUG_FN_REG;
+        bug_fn_t *fn = (void *)regs->BUG_FN_REG;
 
         fn(regs);
         return 0;

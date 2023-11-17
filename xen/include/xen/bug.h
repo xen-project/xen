@@ -99,6 +99,9 @@ struct bug_frame {
 
 #endif
 
+struct cpu_user_regs;
+typedef void bug_fn_t(const struct cpu_user_regs *regs);
+
 #ifndef run_in_exception_handler
 
 /*
@@ -131,8 +134,6 @@ struct bug_frame {
 #endif
 
 #ifdef CONFIG_GENERIC_BUG_FRAME
-
-struct cpu_user_regs;
 
 /*
  * Returns a negative value in case of an error otherwise
