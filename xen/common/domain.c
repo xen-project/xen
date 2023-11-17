@@ -700,6 +700,13 @@ struct domain *domain_create(domid_t domid,
 
     if ( !is_idle_domain(d) )
     {
+        /*
+         * The assertion helps static analysis tools infer that config cannot
+         * be NULL in this branch, which in turn means that it can be safely
+         * dereferenced. Therefore, this assertion is not redundant.
+         */
+        ASSERT(config);
+
         watchdog_domain_init(d);
         init_status |= INIT_watchdog;
 
