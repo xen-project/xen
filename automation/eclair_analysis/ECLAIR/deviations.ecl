@@ -172,6 +172,17 @@ definition is compiled-out or optimized-out by the compiler)"
 -config=MC3R1.R8.6,reports+={deliberate, "first_area(^.*has no definition$)"}
 -doc_end
 
+-doc_begin="The search procedure for Unix linkers is well defined, see ld(1)
+manual: \"The linker will search an archive only once, at the location where it
+is specified on the command line. If the archive defines a symbol which was
+undefined in some object which appeared before the archive on the command line,
+the linker will include the appropriate file(s) from the archive\".
+In Xen, thanks to the order in which file names appear in the build commands,
+if arch-specific definitions are present, they get always linked in before
+searching in the lib.a archive resulting from xen/lib."
+-config=MC3R1.R8.6,declarations+={deliberate, "loc(file(^xen/lib/.*$))"}
+-doc_end
+
 -doc_begin="The gnu_inline attribute without static is deliberately allowed."
 -config=MC3R1.R8.10,declarations+={deliberate,"property(gnu_inline)"}
 -doc_end
