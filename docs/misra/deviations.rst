@@ -206,6 +206,12 @@ Deviations related to MISRA C:2012 Rules:
        If no bits are set, 0 is returned.
      - Tagged as `safe` for ECLAIR.
 
+   * - R11.9
+     - __ACCESS_ONCE uses an integer, which happens to be zero, as a
+       compile time check. The typecheck uses a cast. The usage of zero or other
+       integers for this purpose is allowed.
+     - Tagged as `deliberate` for ECLAIR.
+
    * - R13.5
      - All developers and reviewers can be safely assumed to be well aware of
        the short-circuit evaluation strategy for logical operators.

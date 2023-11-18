@@ -254,6 +254,15 @@ constant expressions are required.\""
 -doc_end
 
 #
+# Series 11
+#
+
+-doc_begin="This construct is used to check if the type is scalar, and for this purpose the use of 0 as a null pointer constant is deliberate."
+-config=MC3R1.R11.9,reports+={deliberate, "any_area(any_loc(any_exp(macro(^__ACCESS_ONCE$))))"
+}
+-doc_end
+
+#
 # Series 13
 #
 

@@ -60,6 +60,22 @@
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]) + __must_be_array(x))
 
+/**
+ * typeof_field(type, member)
+ *
+ * @type: The structure containing the field of interest
+ * @member: The field whose type is returned
+ */
+#define typeof_field(type, member) typeof(((type *)NULL)->member)
+
+/**
+ * sizeof_field(type, member)
+ *
+ * @type: The structure containing the field of interest
+ * @member: The field to return the size of
+ */
+#define sizeof_field(type, member) sizeof(((type *)NULL)->member)
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* __MACROS_H__ */
