@@ -46,9 +46,9 @@ struct resource_access {
     xenpf_resource_entry_t *entries;
 };
 
-long cf_check cpu_frequency_change_helper(void *);
-void check_resource_access(struct resource_access *);
-void cf_check resource_access(void *);
+long cf_check cpu_frequency_change_helper(void *data);
+void check_resource_access(struct resource_access *ra);
+void cf_check resource_access(void *info);
 
 #ifndef COMPAT
 typedef long ret_t;
