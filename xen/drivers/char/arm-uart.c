@@ -42,7 +42,8 @@ static void __init dt_uart_init(void)
     struct dt_device_node *dev;
     int ret;
     const char *devpath = opt_dtuart;
-    char *options;
+    const char *options;
+    char *split;
 
     if ( !console_has("dtuart") )
         return; /* Not for us */
@@ -74,9 +75,12 @@ static void __init dt_uart_init(void)
         return;
     }
 
-    options = strchr(opt_dtuart, ':');
-    if ( options != NULL )
-        *(options++) = '\0';
+    split = strchr(opt_dtuart, ':');
+    if ( split )
+    {
+        split[0] = '\0';
+        options = split + 1;
+    }
     else
         options = "";
 
