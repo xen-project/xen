@@ -35,7 +35,7 @@ struct arch_vpmu_ops {
     void (*arch_vpmu_destroy)(struct vcpu *v);
     int (*arch_vpmu_save)(struct vcpu *v, bool_t to_guest);
     int (*arch_vpmu_load)(struct vcpu *v, bool_t from_guest);
-    void (*arch_vpmu_dump)(const struct vcpu *);
+    void (*arch_vpmu_dump)(const struct vcpu *v);
 
 #ifdef CONFIG_MEM_SHARING
     int (*allocate_context)(struct vcpu *v);
