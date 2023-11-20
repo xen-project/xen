@@ -724,8 +724,8 @@ bool pt_pirq_cleanup_check(struct hvm_pirq_dpci *dpci)
 }
 
 int pt_pirq_iterate(struct domain *d,
-                    int (*cb)(struct domain *,
-                              struct hvm_pirq_dpci *, void *),
+                    int (*cb)(struct domain *d,
+                              struct hvm_pirq_dpci *pirq_dpci, void *arg),
                     void *arg)
 {
     int rc = 0;
