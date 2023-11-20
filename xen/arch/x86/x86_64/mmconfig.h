@@ -70,5 +70,5 @@ int pci_mmcfg_reserved(uint64_t address, unsigned int segment,
                        unsigned int start_bus, unsigned int end_bus,
                        unsigned int flags);
 int pci_mmcfg_arch_init(void);
-int pci_mmcfg_arch_enable(unsigned int);
-void pci_mmcfg_arch_disable(unsigned int);
+int pci_mmcfg_arch_enable(unsigned int idx);
+void pci_mmcfg_arch_disable(unsigned int idx);
