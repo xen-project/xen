@@ -839,10 +839,15 @@ static bool __init loader_is_grub2(const char *loader_name)
     return (p != NULL) && (p[5] != '0');
 }
 
-static char * __init cmdline_cook(char *p, const char *loader_name)
+/*
+ * Clean up a command line string passed to us by a bootloader.  Strip leading
+ * whitespace, and optionally strip the first parameter if our divination of
+ * the bootloader suggests that it prepended the image name.
+ *
+ * Always returns a pointer within @p.
+ */
+static const char *__init cmdline_cook(const char *p, const char *loader_name)
 {
-    p = p ? : "";
-
     /* Strip leading whitespace. */
     while ( *p == ' ' )
         p++;
@@ -971,8 +976,8 @@ static struct domain *__init create_dom0(const module_t *image,
 /* SAF-1-safe */
 void __init noreturn __start_xen(unsigned long mbi_p)
 {
-    const char *memmap_type = NULL, *loader;
-    char *cmdline, *kextra;
+    const char *memmap_type = NULL, *loader, *cmdline = "";
+    char *kextra;
     void *bsp_stack;
     struct cpu_info *info = get_cpu_info(), *bsp_info;
     unsigned int initrdidx, num_parked = 0;
@@ -1027,9 +1032,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                                            : "unknown";
 
     /* Parse the command-line options. */
-    cmdline = cmdline_cook((mbi->flags & MBI_CMDLINE) ?
-                           __va(mbi->cmdline) : NULL,
-                           loader);
+    if ( mbi->flags & MBI_CMDLINE )
+        cmdline = cmdline_cook(__va(mbi->cmdline), loader);
+
     if ( (kextra = strstr(cmdline, " -- ")) != NULL )
     {
         /*
