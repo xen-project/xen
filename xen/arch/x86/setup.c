@@ -971,8 +971,8 @@ static struct domain *__init create_dom0(const module_t *image,
 /* SAF-1-safe */
 void __init noreturn __start_xen(unsigned long mbi_p)
 {
-    const char *memmap_type = NULL;
-    char *cmdline, *kextra, *loader;
+    const char *memmap_type = NULL, *loader;
+    char *cmdline, *kextra;
     void *bsp_stack;
     struct cpu_info *info = get_cpu_info(), *bsp_info;
     unsigned int initrdidx, num_parked = 0;
@@ -1023,8 +1023,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         mod = __va(mbi->mods_addr);
     }
 
-    loader = (mbi->flags & MBI_LOADERNAME)
-        ? (char *)__va(mbi->boot_loader_name) : "unknown";
+    loader = (mbi->flags & MBI_LOADERNAME) ? __va(mbi->boot_loader_name)
+                                           : "unknown";
 
     /* Parse the command-line options. */
     cmdline = cmdline_cook((mbi->flags & MBI_CMDLINE) ?
