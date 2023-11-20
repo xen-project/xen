@@ -66,7 +66,8 @@ static void flush_command_buffer(struct amd_iommu *iommu,
                          IOMMU_COMP_WAIT_S_FLAG_MASK),
         (addr >> 32) | MASK_INSR(IOMMU_CMD_COMPLETION_WAIT,
                                  IOMMU_CMD_OPCODE_MASK),
-        CMD_COMPLETION_DONE
+        CMD_COMPLETION_DONE,
+        0
     };
     s_time_t start, timeout;
     static unsigned int __read_mostly threshold = 1;
