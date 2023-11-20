@@ -118,7 +118,7 @@ long arch_do_sysctl(
         unsigned int cpu = sysctl->u.cpu_hotplug.cpu;
         unsigned int op  = sysctl->u.cpu_hotplug.op;
         bool plug;
-        long (*fn)(void *);
+        long (*fn)(void *data);
         void *hcpu;
 
         switch ( op )
