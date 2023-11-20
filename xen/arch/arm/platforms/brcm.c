@@ -35,7 +35,7 @@ static u32 brcm_boot_continuation_pc;
 
 static struct brcm_plat_regs regs;
 
-static __init int brcm_get_dt_node(char *compat_str,
+static __init int brcm_get_dt_node(const char *compat_str,
                                    const struct dt_device_node **dn,
                                    u32 *reg_base)
 {

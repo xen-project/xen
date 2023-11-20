@@ -245,7 +245,7 @@ static int __init acpi_create_rsdp(struct domain *d, struct membank tbl_add[])
 
 static void __init acpi_xsdt_modify_entry(u64 entry[],
                                           unsigned long entry_count,
-                                          char *signature, u64 addr)
+                                          const char *signature, u64 addr)
 {
     int i;
     struct acpi_table_header *table;

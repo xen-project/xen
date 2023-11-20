@@ -96,7 +96,7 @@ static int __init exynos5_smp_init(void)
 {
     struct dt_device_node *node;
     void __iomem *sysram;
-    char *compatible;
+    const char *compatible;
     paddr_t sysram_addr;
     paddr_t size;
     paddr_t sysram_offset;
