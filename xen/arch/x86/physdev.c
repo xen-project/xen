@@ -18,9 +18,9 @@
 #include <xsm/xsm.h>
 #include <asm/p2m.h>
 
-int physdev_map_pirq(domid_t, int type, int *index, int *pirq_p,
-                     struct msi_info *);
-int physdev_unmap_pirq(domid_t, int pirq);
+int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
+                     struct msi_info *msi);
+int physdev_unmap_pirq(domid_t domid, int pirq);
 
 #include "x86_64/mmconfig.h"
 
