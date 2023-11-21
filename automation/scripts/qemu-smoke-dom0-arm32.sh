@@ -91,7 +91,8 @@ timeout -k 1 720 \
    -no-reboot \
    -device virtio-net-pci,netdev=n0 \
    -netdev user,id=n0,tftp=./ \
-   -bios /usr/lib/u-boot/qemu_arm/u-boot.bin |& tee ${serial_log}
+   -bios /usr/lib/u-boot/qemu_arm/u-boot.bin |& \
+      tee ${serial_log} | sed 's/\r//'
 
 set -e
 (grep -q "Domain-0" ${serial_log} && grep -q "^/ #" ${serial_log}) || exit 1

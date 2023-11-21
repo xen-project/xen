@@ -13,7 +13,7 @@ qemu-system-riscv64 \
     -nographic \
     -m 2g \
     -kernel binaries/xen \
-    |& tee smoke.serial
+    |& tee smoke.serial | sed 's/\r//'
 
 set -e
 (grep -q "All set up" smoke.serial) || exit 1

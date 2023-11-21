@@ -200,7 +200,7 @@ cp -f binaries/dom0-rootfs.cpio.gz $TFTP/initrd-dom0
 # the console
 mkfifo /tmp/console-stdin
 cat /tmp/console-stdin |\
-ssh $CONTROLLER console | tee smoke.serial &
+ssh $CONTROLLER console | tee smoke.serial | sed 's/\r//' &
 
 # start the system pointing at gitlab-ci predefined config
 ssh $CONTROLLER gitlabci poweron

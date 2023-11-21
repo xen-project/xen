@@ -84,7 +84,10 @@ qemu-system-x86_64 \
     -monitor none -serial stdio \
     -nographic \
     -device virtio-net-pci,netdev=n0 \
-    -netdev user,id=n0,tftp=binaries,bootfile=/pxelinux.0 |& tee smoke.serial
+    -netdev user,id=n0,tftp=binaries,bootfile=/pxelinux.0 |& \
+        # Remove carriage returns from the stdout output, as gitlab
+        # interface chokes on them
+        tee smoke.serial | sed 's/\r//'
 
 set -e
 (grep -q "Domain-0" smoke.serial && grep -q "BusyBox" smoke.serial) || exit 1

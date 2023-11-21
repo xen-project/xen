@@ -104,7 +104,8 @@ timeout -k 1 720 \
     -no-reboot \
     -device virtio-net-pci,netdev=n0 \
     -netdev user,id=n0,tftp=binaries \
-    -bios /usr/lib/u-boot/qemu_arm64/u-boot.bin |& tee smoke.serial
+    -bios /usr/lib/u-boot/qemu_arm64/u-boot.bin |& \
+        tee smoke.serial | sed 's/\r//'
 
 set -e
 (grep -q "Domain-0" smoke.serial && grep -q "BusyBox" smoke.serial) || exit 1

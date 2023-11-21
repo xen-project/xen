@@ -136,7 +136,7 @@ cd $START
 # connect to serial
 set +e
 stty -F /dev/ttyUSB0 115200
-timeout -k 1 120 nohup sh -c "cat /dev/ttyUSB0 | tee smoke.serial"
+timeout -k 1 120 nohup sh -c "cat /dev/ttyUSB0 | tee smoke.serial | sed 's/\r//'"
 
 # stop the board
 cd /scratch/gitlab-runner
