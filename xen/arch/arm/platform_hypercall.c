@@ -17,7 +17,7 @@
 #include <asm/current.h>
 #include <asm/event.h>
 
-DEFINE_SPINLOCK(xenpf_lock);
+static DEFINE_SPINLOCK(xenpf_lock);
 
 long do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
 {
