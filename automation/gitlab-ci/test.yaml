@@ -43,7 +43,7 @@
 .qemu-x86-64:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:stretch
+    CONTAINER: debian:bookworm
     LOGFILE: qemu-smoke-x86-64.log
   artifacts:
     paths:
@@ -130,7 +130,7 @@
 build-each-commit-gcc:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:stretch
+    CONTAINER: debian:bookworm
     XEN_TARGET_ARCH: x86_64
     CC: gcc
   script:
@@ -419,6 +419,8 @@ qemu-alpine-x86_64-gcc:
 
 qemu-smoke-x86-64-gcc:
   extends: .qemu-x86-64
+  variables:
+    CONTAINER: debian:stretch
   script:
     - ./automation/scripts/qemu-smoke-x86-64.sh pv 2>&1 | tee ${LOGFILE}
   needs:
@@ -426,6 +428,8 @@ qemu-smoke-x86-64-gcc:
 
 qemu-smoke-x86-64-clang:
   extends: .qemu-x86-64
+  variables:
+    CONTAINER: debian:stretch
   script:
     - ./automation/scripts/qemu-smoke-x86-64.sh pv 2>&1 | tee ${LOGFILE}
   needs:
@@ -433,6 +437,8 @@ qemu-smoke-x86-64-clang:
 
 qemu-smoke-x86-64-gcc-pvh:
   extends: .qemu-x86-64
+  variables:
+    CONTAINER: debian:stretch
   script:
     - ./automation/scripts/qemu-smoke-x86-64.sh pvh 2>&1 | tee ${LOGFILE}
   needs:
@@ -440,6 +446,8 @@ qemu-smoke-x86-64-gcc-pvh:
 
 qemu-smoke-x86-64-clang-pvh:
   extends: .qemu-x86-64
+  variables:
+    CONTAINER: debian:stretch
   script:
     - ./automation/scripts/qemu-smoke-x86-64.sh pvh 2>&1 | tee ${LOGFILE}
   needs:
