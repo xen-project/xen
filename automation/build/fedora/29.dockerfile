@@ -1,4 +1,4 @@
-FROM fedora:29
+FROM --platform=linux/amd64 fedora:29
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 

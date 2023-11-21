@@ -1,4 +1,4 @@
-FROM archlinux
+FROM --platform=linux/amd64 archlinux
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 

@@ -1,4 +1,4 @@
-FROM ubuntu:14.04
+FROM --platform=linux/amd64 ubuntu:14.04
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 

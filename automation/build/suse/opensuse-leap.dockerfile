@@ -1,4 +1,4 @@
-FROM opensuse/leap
+FROM --platform=linux/amd64 opensuse/leap
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 

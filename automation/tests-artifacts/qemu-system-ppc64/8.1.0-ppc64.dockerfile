@@ -1,4 +1,4 @@
-FROM debian:bullseye-slim
+FROM --platform=linux/amd64 debian:bullseye-slim
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 

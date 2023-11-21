@@ -1,4 +1,4 @@
-FROM debian:buster-slim AS builder
+FROM --platform=linux/amd64 debian:buster-slim AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV USER root
@@ -41,7 +41,7 @@ RUN ./configure \
 RUN make -j`nproc` && make -j`nproc` install
 
 
-FROM debian:buster-slim
+FROM --platform=linux/amd64 debian:buster-slim
 COPY --from=builder /opt/gcc-11-ibt /opt/gcc-11-ibt
 
 LABEL maintainer.name="The Xen Project" \

@@ -1,4 +1,4 @@
-FROM debian:bookworm
+FROM --platform=linux/amd64 debian:bookworm
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 

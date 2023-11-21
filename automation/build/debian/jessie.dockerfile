@@ -1,4 +1,4 @@
-FROM debian/eol:jessie
+FROM --platform=linux/amd64 debian/eol:jessie
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 

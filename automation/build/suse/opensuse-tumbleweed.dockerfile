@@ -1,4 +1,4 @@
-FROM opensuse/tumbleweed
+FROM --platform=linux/amd64 opensuse/tumbleweed
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 
