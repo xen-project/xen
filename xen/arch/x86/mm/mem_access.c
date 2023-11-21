@@ -249,9 +249,9 @@ bool p2m_mem_access_check(paddr_t gpa, unsigned long gla,
     return (p2ma != p2m_access_n2rwx);
 }
 
-int p2m_set_altp2m_mem_access(struct domain *d, struct p2m_domain *hp2m,
-                              struct p2m_domain *ap2m, p2m_access_t a,
-                              gfn_t gfn)
+static int p2m_set_altp2m_mem_access(struct domain *d, struct p2m_domain *hp2m,
+                                     struct p2m_domain *ap2m, p2m_access_t a,
+                                     gfn_t gfn)
 {
     mfn_t mfn;
     p2m_type_t t;
