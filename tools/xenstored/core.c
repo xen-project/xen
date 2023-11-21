@@ -135,7 +135,7 @@ static void trace_io(const struct connection *conn,
 	now = time(NULL);
 	tm = localtime(&now);
 
-	trace("io: %s %p (d%d) %04d%02d%02d %02d:%02d:%02d %s (",
+	trace("io: %s %p (d%u) %04d%02d%02d %02d:%02d:%02d %s (",
 	      out ? "OUT" : "IN", conn, conn->id,
 	      tm->tm_year + 1900, tm->tm_mon + 1,
 	      tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
