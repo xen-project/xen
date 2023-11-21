@@ -76,7 +76,6 @@ static int sock = -1;
 int orig_argc;
 char **orig_argv;
 
-static bool verbose = false;
 LIST_HEAD(connections);
 int tracefd = -1;
 static bool recovery = true;
@@ -329,11 +328,6 @@ static bool write_messages(struct connection *conn)
 		return true;
 
 	if (out->inhdr) {
-		if (verbose)
-			xprintf("Writing msg %s (%.*s) out to %p\n",
-				sockmsg_string(out->hdr.msg.type),
-				out->hdr.msg.len,
-				out->buffer, conn);
 		ret = conn->funcs->write(conn, out->hdr.raw + out->used,
 					 sizeof(out->hdr) - out->used);
 		if (ret < 0)
@@ -2134,11 +2128,6 @@ static bool process_delayed_message(struct delayed_request *req)
 
 static void consider_message(struct connection *conn)
 {
-	if (verbose)
-		xprintf("Got message %s len %i from %p\n",
-			sockmsg_string(conn->in->hdr.msg.type),
-			conn->in->hdr.msg.len, conn);
-
 	conn->is_stalled = false;
 	/*
 	 * Currently, Live-Update is not supported if there is active
@@ -2701,8 +2690,7 @@ static void usage(void)
 "  -R, --no-recovery       to request that no recovery should be attempted when\n"
 "                          the store is corrupted (debug only),\n"
 "  -K, --keep-orphans      don't delete nodes owned by a domain when the\n"
-"                          domain is deleted (this is a security risk!)\n"
-"  -V, --verbose           to request verbose execution.\n");
+"                          domain is deleted (this is a security risk!)\n");
 }
 
 
@@ -2726,7 +2714,6 @@ static struct option options[] = {
 	{ "timeout", 1, NULL, 'w' },
 	{ "no-recovery", 0, NULL, 'R' },
 	{ "keep-orphans", 0, NULL, 'K' },
-	{ "verbose", 0, NULL, 'V' },
 	{ "watch-nb", 1, NULL, 'W' },
 #ifndef NO_LIVE_UPDATE
 	{ "live-update", 0, NULL, 'U' },
@@ -2847,7 +2834,7 @@ int main(int argc, char *argv[])
 	orig_argv = argv;
 
 	while ((opt = getopt_long(argc, argv,
-				  "E:F:H::KNPS:t:A:M:Q:q:T:RVW:w:U",
+				  "E:F:H::KNPS:t:A:M:Q:q:T:RW:w:U",
 				  options, NULL)) != -1) {
 		switch (opt) {
 		case 'E':
@@ -2883,9 +2870,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'K':
 			keep_orphans = true;
-			break;
-		case 'V':
-			verbose = true;
 			break;
 		case 'W':
 			hard_quotas[ACC_WATCH].val = get_optval_uint(optarg);
