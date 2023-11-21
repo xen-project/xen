@@ -2653,7 +2653,6 @@ static void usage(void)
 "  -F, --pid-file <file>   giving a file for the daemon's pid to be written,\n"
 "  -H, --help              to output this message,\n"
 "  -N, --no-fork           to request that the daemon does not fork,\n"
-"  -P, --output-pid        to request that the pid of the daemon is output,\n"
 "  -T, --trace-file <file> giving the file for logging, and\n"
 "      --trace-control=+<switch> activate a specific <switch>\n"
 "      --trace-control=-<switch> deactivate a specific <switch>\n"
@@ -2702,7 +2701,6 @@ static struct option options[] = {
 	{ "help", 0, NULL, 'H' },
 	{ "no-fork", 0, NULL, 'N' },
 	{ "priv-domid", 1, NULL, 'p' },
-	{ "output-pid", 0, NULL, 'P' },
 	{ "entry-size", 1, NULL, 'S' },
 	{ "trace-file", 1, NULL, 'T' },
 	{ "trace-control", 1, NULL, 1 },
@@ -2825,7 +2823,6 @@ int main(int argc, char *argv[])
 	int opt;
 	int sock_pollfd_idx = -1;
 	bool dofork = true;
-	bool outputpid = false;
 	bool live_update = false;
 	const char *pidfile = NULL;
 	int timeout;
@@ -2834,7 +2831,7 @@ int main(int argc, char *argv[])
 	orig_argv = argv;
 
 	while ((opt = getopt_long(argc, argv,
-				  "E:F:H::KNPS:t:A:M:Q:q:T:RW:w:U",
+				  "E:F:H::KNS:t:A:M:Q:q:T:RW:w:U",
 				  options, NULL)) != -1) {
 		switch (opt) {
 		case 'E':
@@ -2848,9 +2845,6 @@ int main(int argc, char *argv[])
 			return 0;
 		case 'N':
 			dofork = false;
-			break;
-		case 'P':
-			outputpid = true;
 			break;
 		case 'R':
 			recovery = false;
@@ -2945,11 +2939,6 @@ int main(int argc, char *argv[])
 	if (!live_update) {
 		domain_init(-1);
 		dom0_init();
-	}
-
-	if (outputpid) {
-		printf("%ld\n", (long)getpid());
-		fflush(stdout);
 	}
 
 	/* redirect to /dev/null now we're ready to accept connections */
