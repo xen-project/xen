@@ -1,4 +1,4 @@
-FROM arm64v8/debian:bookworm AS builder
+FROM --platform=linux/arm64/v8 debian:bookworm AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV CPPCHECK_VERSION=2.7
@@ -24,7 +24,7 @@ RUN curl -fsSLO https://github.com/danmar/cppcheck/archive/"$CPPCHECK_VERSION".t
         FILESDIR=/usr/share/cppcheck \
         HAVE_RULES=yes CXXFLAGS="-O2 -DNDEBUG -Wall -Wno-sign-compare -Wno-unused-function"
 
-FROM arm64v8/debian:bookworm
+FROM --platform=linux/arm64/v8 debian:bookworm
 COPY --from=builder /usr/bin/cppcheck /usr/bin/cppcheck
 COPY --from=builder /usr/share/cppcheck /usr/share/cppcheck
 

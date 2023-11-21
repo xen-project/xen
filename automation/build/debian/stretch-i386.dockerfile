@@ -1,4 +1,4 @@
-FROM i386/debian:stretch
+FROM --platform=linux/i386 debian:stretch
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 
