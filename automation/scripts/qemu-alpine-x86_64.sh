@@ -68,7 +68,7 @@ cd ../..
 cat >> binaries/pxelinux.0 << EOF
 #!ipxe
 
-kernel xen console=com1
+kernel xen console=com1 console_timestamps=boot
 module bzImage console=hvc0
 module xen-rootfs.cpio.gz
 boot

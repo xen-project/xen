@@ -63,7 +63,7 @@ XEN="xen-qemuarm"
 DOM0_KERNEL="zImage"
 DOM0_RAMDISK="initrd.gz"
 DOM0_CMD="console=hvc0 earlyprintk clk_ignore_unused root=/dev/ram0 rdinit=/sbin/init"
-XEN_CMD="console=dtuart dom0_mem=1024M bootscrub=0"
+XEN_CMD="console=dtuart dom0_mem=1024M bootscrub=0 console_timestamps=boot"
 
 NUM_DOMUS=0
 

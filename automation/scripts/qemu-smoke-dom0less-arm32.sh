@@ -89,7 +89,7 @@ MEMORY_END="0xC0000000"
 
 DEVICE_TREE="virt.dtb"
 XEN="xen"
-XEN_CMD="console=dtuart dom0_mem=512M bootscrub=0"
+XEN_CMD="console=dtuart dom0_mem=512M bootscrub=0 console_timestamps=boot"
 
 DOM0_KERNEL="vmlinuz"
 DOM0_RAMDISK="initrd.gz"

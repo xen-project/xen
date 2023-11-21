@@ -79,7 +79,7 @@ DEVICE_TREE="virt-gicv2.dtb"
 XEN="xen"
 DOM0_KERNEL="Image"
 DOM0_RAMDISK="xen-rootfs.cpio.gz"
-XEN_CMD="console=dtuart dom0_mem=1024M"
+XEN_CMD="console=dtuart dom0_mem=1024M console_timestamps=boot"
 
 NUM_DOMUS=0
 

@@ -33,7 +33,7 @@ MEMORY_END="0xC0000000"
 XEN="xen"
 DEVICE_TREE="virt-gicv2.dtb"
 
-XEN_CMD="console=dtuart"
+XEN_CMD="console=dtuart console_timestamps=boot"
 
 DOMU_KERNEL[0]="xtf-test"
 DOMU_MEM[0]="128"

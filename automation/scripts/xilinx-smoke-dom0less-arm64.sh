@@ -94,7 +94,7 @@ DEVICE_TREE="mpsoc_smmu.dtb"
 XEN="xen"
 DOM0_KERNEL="Image"
 DOM0_RAMDISK="dom0-rootfs.cpio.gz"
-XEN_CMD="console=dtuart dtuart=serial0 dom0_mem=1024M"
+XEN_CMD="console=dtuart dtuart=serial0 dom0_mem=1024M console_timestamps=boot"
 
 NUM_DOMUS=1
 DOMU_KERNEL[0]="Image"
