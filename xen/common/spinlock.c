@@ -100,7 +100,7 @@ void check_lock(union lock_debug *debug, bool try)
      * every lock must be consistently observed else we can deadlock in
      * IRQ-context rendezvous functions (a rendezvous which gets every CPU
      * into IRQ context before any CPU is released from the rendezvous).
-     * 
+     *
      * If we can mix IRQ-disabled and IRQ-enabled callers, the following can
      * happen:
      *  * Lock is held by CPU A, with IRQs enabled
@@ -108,7 +108,7 @@ void check_lock(union lock_debug *debug, bool try)
      *  * Rendezvous starts -- CPU A takes interrupt and enters rendezbous spin
      *  * DEADLOCK -- CPU B will never enter rendezvous, CPU A will never exit
      *                the rendezvous, and will hence never release the lock.
-     * 
+     *
      * To guard against this subtle bug we latch the IRQ safety of every
      * spinlock in the system, on first use.
      *
@@ -151,12 +151,12 @@ static void check_barrier(union lock_debug *debug)
 
     /*
      * For a barrier, we have a relaxed IRQ-safety-consistency check.
-     * 
+     *
      * It is always safe to spin at the barrier with IRQs enabled -- that does
      * not prevent us from entering an IRQ-context rendezvous, and nor are
      * we preventing anyone else from doing so (since we do not actually
      * acquire the lock during a barrier operation).
-     * 
+     *
      * However, if we spin on an IRQ-unsafe lock with IRQs disabled then that
      * is clearly wrong, for the same reason outlined in check_lock() above.
      */
@@ -262,7 +262,7 @@ void spin_debug_disable(void)
 #ifdef CONFIG_DEBUG_LOCK_PROFILE
 
 #define LOCK_PROFILE_REL                                                     \
-    if (lock->profile)                                                       \
+    if ( lock->profile )                                                     \
     {                                                                        \
         lock->profile->time_hold += NOW() - lock->profile->time_locked;      \
         lock->profile->lock_cnt++;                                           \
@@ -270,10 +270,10 @@ void spin_debug_disable(void)
 #define LOCK_PROFILE_VAR    s_time_t block = 0
 #define LOCK_PROFILE_BLOCK  block = block ? : NOW();
 #define LOCK_PROFILE_GOT                                                     \
-    if (lock->profile)                                                       \
+    if ( lock->profile )                                                     \
     {                                                                        \
         lock->profile->time_locked = NOW();                                  \
-        if (block)                                                           \
+        if ( block )                                                         \
         {                                                                    \
             lock->profile->time_block += lock->profile->time_locked - block; \
             lock->profile->block_cnt++;                                      \
@@ -298,7 +298,7 @@ static always_inline spinlock_tickets_t observe_lock(spinlock_tickets_t *t)
     return v;
 }
 
-static always_inline u16 observe_head(spinlock_tickets_t *t)
+static always_inline uint16_t observe_head(const spinlock_tickets_t *t)
 {
     smp_rmb();
     return read_atomic(&t->head);
@@ -412,7 +412,7 @@ int _spin_trylock(spinlock_t *lock)
      */
     got_lock(&lock->debug);
 #ifdef CONFIG_DEBUG_LOCK_PROFILE
-    if (lock->profile)
+    if ( lock->profile )
         lock->profile->time_locked = NOW();
 #endif
     return 1;
@@ -616,6 +616,7 @@ int spinlock_profile_control(struct xen_sysctl_lockprof_op *pc)
     case XEN_SYSCTL_LOCKPROF_reset:
         spinlock_profile_reset('\0');
         break;
+
     case XEN_SYSCTL_LOCKPROF_query:
         pc->nr_elem = 0;
         par.rc = 0;
@@ -624,6 +625,7 @@ int spinlock_profile_control(struct xen_sysctl_lockprof_op *pc)
         pc->time = NOW() - lock_profile_start;
         rc = par.rc;
         break;
+
     default:
         rc = -EINVAL;
         break;

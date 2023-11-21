@@ -81,8 +81,8 @@ struct lock_profile {
     struct lock_profile *next;       /* forward link */
     const char          *name;       /* lock name */
     struct spinlock     *lock;       /* the lock itself */
-    u64                 lock_cnt;    /* # of complete locking ops */
-    u64                 block_cnt;   /* # of complete wait for lock */
+    uint64_t            lock_cnt;    /* # of complete locking ops */
+    uint64_t            block_cnt;   /* # of complete wait for lock */
     s_time_t            time_hold;   /* cumulated lock time */
     s_time_t            time_block;  /* cumulated wait time */
     s_time_t            time_locked; /* system time of last locking */
@@ -122,7 +122,7 @@ struct lock_profile_qhead {
         prof->lock = &(s)->l;                                                 \
         prof->next = (s)->profile_head.elem_q;                                \
         (s)->profile_head.elem_q = prof;                                      \
-    } while(0)
+    } while( 0 )
 
 void _lock_profile_register_struct(
     int32_t type, struct lock_profile_qhead *qhead, int32_t idx);
@@ -153,10 +153,10 @@ struct lock_profile_qhead { };
 #endif
 
 typedef union {
-    u32 head_tail;
+    uint32_t head_tail;
     struct {
-        u16 head;
-        u16 tail;
+        uint16_t head;
+        uint16_t tail;
     };
 } spinlock_tickets_t;
 
@@ -164,10 +164,10 @@ typedef union {
 
 typedef struct spinlock {
     spinlock_tickets_t tickets;
-    u16 recurse_cpu:SPINLOCK_CPU_BITS;
+    uint16_t recurse_cpu:SPINLOCK_CPU_BITS;
 #define SPINLOCK_NO_CPU        ((1u << SPINLOCK_CPU_BITS) - 1)
 #define SPINLOCK_RECURSE_BITS  (16 - SPINLOCK_CPU_BITS)
-    u16 recurse_cnt:SPINLOCK_RECURSE_BITS;
+    uint16_t recurse_cnt:SPINLOCK_RECURSE_BITS;
 #define SPINLOCK_MAX_RECURSE   ((1u << SPINLOCK_RECURSE_BITS) - 1)
     union lock_debug debug;
 #ifdef CONFIG_DEBUG_LOCK_PROFILE
