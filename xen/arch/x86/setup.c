@@ -875,6 +875,8 @@ static struct domain *__init create_dom0(const module_t *image,
                                          module_t *initrd, const char *kextra,
                                          const char *loader)
 {
+    static char __initdata cmdline[MAX_GUEST_CMDLINE];
+
     struct xen_domctl_createdomain dom0_cfg = {
         .flags = IS_ENABLED(CONFIG_TBOOT) ? XEN_DOMCTL_CDF_s3_integrity : 0,
         .max_evtchn_port = -1,
@@ -887,7 +889,6 @@ static struct domain *__init create_dom0(const module_t *image,
         },
     };
     struct domain *d;
-    char *cmdline;
     domid_t domid;
 
     if ( opt_dom0_pvh )
@@ -915,33 +916,30 @@ static struct domain *__init create_dom0(const module_t *image,
         panic("Error creating d%uv0\n", domid);
 
     /* Grab the DOM0 command line. */
-    cmdline = image->string ? __va(image->string) : NULL;
-    if ( cmdline || kextra )
+    if ( image->string || kextra )
     {
-        static char __initdata dom0_cmdline[MAX_GUEST_CMDLINE];
-
-        cmdline = cmdline_cook(cmdline, loader);
-        safe_strcpy(dom0_cmdline, cmdline);
+        if ( image->string )
+            safe_strcpy(cmdline, cmdline_cook(__va(image->string), loader));
 
         if ( kextra )
             /* kextra always includes exactly one leading space. */
-            safe_strcat(dom0_cmdline, kextra);
+            safe_strcat(cmdline, kextra);
 
         /* Append any extra parameters. */
-        if ( skip_ioapic_setup && !strstr(dom0_cmdline, "noapic") )
-            safe_strcat(dom0_cmdline, " noapic");
+        if ( skip_ioapic_setup && !strstr(cmdline, "noapic") )
+            safe_strcat(cmdline, " noapic");
+
         if ( (strlen(acpi_param) == 0) && acpi_disabled )
         {
             printk("ACPI is disabled, notifying Domain 0 (acpi=off)\n");
             safe_strcpy(acpi_param, "off");
         }
-        if ( (strlen(acpi_param) != 0) && !strstr(dom0_cmdline, "acpi=") )
-        {
-            safe_strcat(dom0_cmdline, " acpi=");
-            safe_strcat(dom0_cmdline, acpi_param);
-        }
 
-        cmdline = dom0_cmdline;
+        if ( (strlen(acpi_param) != 0) && !strstr(cmdline, "acpi=") )
+        {
+            safe_strcat(cmdline, " acpi=");
+            safe_strcat(cmdline, acpi_param);
+        }
     }
 
     /*
