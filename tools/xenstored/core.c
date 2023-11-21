@@ -2661,7 +2661,6 @@ static void usage(void)
 "\n"
 "where options may include:\n"
 "\n"
-"  -D, --no-domain-init    to state that xenstored should not initialise dom0,\n"
 "  -F, --pid-file <file>   giving a file for the daemon's pid to be written,\n"
 "  -H, --help              to output this message,\n"
 "  -N, --no-fork           to request that the daemon does not fork,\n"
@@ -2708,7 +2707,6 @@ static void usage(void)
 
 
 static struct option options[] = {
-	{ "no-domain-init", 0, NULL, 'D' },
 	{ "entry-nb", 1, NULL, 'E' },
 	{ "pid-file", 1, NULL, 'F' },
 	{ "event", 1, NULL, 'e' },
@@ -2841,7 +2839,6 @@ int main(int argc, char *argv[])
 	int sock_pollfd_idx = -1;
 	bool dofork = true;
 	bool outputpid = false;
-	bool no_domain_init = false;
 	bool live_update = false;
 	const char *pidfile = NULL;
 	int timeout;
@@ -2850,12 +2847,9 @@ int main(int argc, char *argv[])
 	orig_argv = argv;
 
 	while ((opt = getopt_long(argc, argv,
-				  "DE:F:H::KNPS:t:A:M:Q:q:T:RVW:w:U",
+				  "E:F:H::KNPS:t:A:M:Q:q:T:RVW:w:U",
 				  options, NULL)) != -1) {
 		switch (opt) {
-		case 'D':
-			no_domain_init = true;
-			break;
 		case 'E':
 			hard_quotas[ACC_NODES].val = get_optval_uint(optarg);
 			break;
@@ -2964,7 +2958,7 @@ int main(int argc, char *argv[])
 	init_pipe(reopen_log_pipe);
 
 	/* Listen to hypervisor. */
-	if (!no_domain_init && !live_update) {
+	if (!live_update) {
 		domain_init(-1);
 		dom0_init();
 	}
