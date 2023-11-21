@@ -461,7 +461,7 @@ static void __init efi_arch_handle_cmdline(CHAR16 *image_name,
     union string name;
     char *buf;
     EFI_STATUS status;
-    int prop_len;
+    int prop_len = 0;
     int chosen;
 
     /* locate chosen node, which is where we add Xen module info. */
@@ -472,20 +472,6 @@ static void __init efi_arch_handle_cmdline(CHAR16 *image_name,
     status = efi_bs->AllocatePool(EfiBootServicesData, EFI_PAGE_SIZE, (void **)&buf);
     if ( EFI_ERROR(status) )
         PrintErrMesg(L"Unable to allocate string buffer", status);
-
-    if ( image_name )
-    {
-        name.w = image_name;
-        w2s(&name);
-    }
-    else
-        name.s = "xen";
-
-    prop_len = 0;
-    prop_len += snprintf(buf + prop_len,
-                           EFI_PAGE_SIZE - prop_len, "%s", name.s);
-    if ( prop_len >= EFI_PAGE_SIZE )
-        blexit(L"FDT string overflow");
 
     if ( cfgfile_options )
     {
