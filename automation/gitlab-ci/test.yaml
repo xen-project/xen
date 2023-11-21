@@ -43,7 +43,7 @@
 .qemu-x86-64:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:stretch
+    CONTAINER: debian:bookworm
     LOGFILE: qemu-smoke-x86-64.log
   artifacts:
     paths:
@@ -130,7 +130,7 @@
 build-each-commit-gcc:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:stretch
+    CONTAINER: debian:bookworm
     XEN_TARGET_ARCH: x86_64
     CC: gcc
   script:

@@ -46,6 +46,11 @@ RUN apt-get update && \
         gnupg \
         apt-transport-https \
         golang \
+        # for test phase, qemu-smoke-* jobs
+        qemu-system-x86 \
+        # for test phase, qemu-alpine-* jobs
+        cpio \
+        busybox-static \
         && \
         apt-get autoremove -y && \
         apt-get clean && \
