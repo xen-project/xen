@@ -309,6 +309,7 @@ static void __init efi_arch_handle_cmdline(CHAR16 *image_name,
 {
     union string name;
 
+    /* NB place_string() prepends, so call in reverse order. */
     if ( cmdline_options )
     {
         name.w = cmdline_options;
@@ -317,15 +318,6 @@ static void __init efi_arch_handle_cmdline(CHAR16 *image_name,
     }
     if ( cfgfile_options )
         place_string(&mbi.cmdline, cfgfile_options);
-    /* Insert image name last, as it gets prefixed to the other options. */
-    if ( image_name )
-    {
-        name.w = image_name;
-        w2s(&name);
-    }
-    else
-        name.s = "xen";
-    place_string(&mbi.cmdline, name.s);
 
     if ( mbi.cmdline )
         mbi.flags |= MBI_CMDLINE;
