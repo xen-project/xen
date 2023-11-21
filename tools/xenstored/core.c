@@ -78,7 +78,6 @@ char **orig_argv;
 
 LIST_HEAD(connections);
 int tracefd = -1;
-static bool recovery = true;
 bool keep_orphans = false;
 static int reopen_log_pipe[2];
 static int reopen_log_pipe0_pollfd_idx = -1;
@@ -2443,9 +2442,6 @@ int remember_string(struct hashtable *hash, const char *str)
  * have a corresponding child node (and if so, delete them).  Each valid child
  * is then recursively checked.
  *
- * No deleting is performed if the recovery flag is cleared (i.e. -R was
- * passed on the command line).
- *
  * As we go, we record each node in the given reachable hashtable.  These
  * entries will be used later in clean_store.
  */
@@ -2462,8 +2458,7 @@ static int check_store_step(const void *ctx, struct connection *conn,
 
 	if (hashtable_search(data->reachable, (void *)node->name)) {
 		log("check_store: '%s' is duplicated!", node->name);
-		return recovery ? WALK_TREE_RM_CHILDENTRY
-				: WALK_TREE_SKIP_CHILDREN;
+		return WALK_TREE_RM_CHILDENTRY;
 	}
 
 	if (remember_string(data->reachable, node->name))
@@ -2479,7 +2474,7 @@ static int check_store_enoent(const void *ctx, struct connection *conn,
 {
 	log("check_store: node '%s' not found", name);
 
-	return recovery ? WALK_TREE_RM_CHILDENTRY : WALK_TREE_OK;
+	return WALK_TREE_RM_CHILDENTRY;
 }
 
 
@@ -2504,8 +2499,7 @@ static int clean_store_(const void *key, void *val, void *private)
 	}
 	if (!hashtable_search(reachable, name)) {
 		log("clean_store: '%s' is orphaned!", name);
-		if (recovery)
-			db_delete(NULL, name, NULL);
+		db_delete(NULL, name, NULL);
 	}
 
 	talloc_free(name);
@@ -2686,8 +2680,6 @@ static void usage(void)
 "  -w, --timeout <what>=<seconds>   set the timeout in seconds for <what>,\n"
 "                          allowed timeout candidates are:\n"
 "                          watch-event: time a watch-event is kept pending\n"
-"  -R, --no-recovery       to request that no recovery should be attempted when\n"
-"                          the store is corrupted (debug only),\n"
 "  -K, --keep-orphans      don't delete nodes owned by a domain when the\n"
 "                          domain is deleted (this is a security risk!)\n");
 }
@@ -2710,7 +2702,6 @@ static struct option options[] = {
 	{ "quota", 1, NULL, 'Q' },
 	{ "quota-soft", 1, NULL, 'q' },
 	{ "timeout", 1, NULL, 'w' },
-	{ "no-recovery", 0, NULL, 'R' },
 	{ "keep-orphans", 0, NULL, 'K' },
 	{ "watch-nb", 1, NULL, 'W' },
 #ifndef NO_LIVE_UPDATE
@@ -2831,7 +2822,7 @@ int main(int argc, char *argv[])
 	orig_argv = argv;
 
 	while ((opt = getopt_long(argc, argv,
-				  "E:F:H::KNS:t:A:M:Q:q:T:RW:w:U",
+				  "E:F:H::KNS:t:A:M:Q:q:T:W:w:U",
 				  options, NULL)) != -1) {
 		switch (opt) {
 		case 'E':
@@ -2845,9 +2836,6 @@ int main(int argc, char *argv[])
 			return 0;
 		case 'N':
 			dofork = false;
-			break;
-		case 'R':
-			recovery = false;
 			break;
 		case 'S':
 			hard_quotas[ACC_NODESZ].val = get_optval_uint(optarg);
