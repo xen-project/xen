@@ -47,7 +47,7 @@ qemu-alpine-arm64-gcc:
 qemu-alpine-x86_64-gcc:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:stretch
+    CONTAINER: debian:bookworm
   script:
     - ./automation/scripts/qemu-alpine-x86_64.sh 2>&1 | tee qemu-smoke-x86_64.log
   needs:
