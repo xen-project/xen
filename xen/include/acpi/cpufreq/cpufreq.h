@@ -148,7 +148,7 @@ extern int cpufreq_driver_getavg(unsigned int cpu, unsigned int flag);
 extern int cpufreq_update_turbo(int cpuid, int new_state);
 extern int cpufreq_get_turbo_status(int cpuid);
 
-static __inline__ int 
+static inline int
 __cpufreq_governor(struct cpufreq_policy *policy, unsigned int event)
 {
     return policy->governor->governor(policy, event);
@@ -179,7 +179,7 @@ extern struct cpufreq_driver cpufreq_driver;
 
 int cpufreq_register_driver(const struct cpufreq_driver *);
 
-static __inline__
+static inline
 void cpufreq_verify_within_limits(struct cpufreq_policy *policy,
                                   unsigned int min, unsigned int max)
 {

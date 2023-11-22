@@ -127,7 +127,7 @@ static inline int generic_fls64(__u64 x)
 # endif
 #endif
 
-static __inline__ int get_bitmask_order(unsigned int count)
+static inline int get_bitmask_order(unsigned int count)
 {
     int order;
     
@@ -135,7 +135,7 @@ static __inline__ int get_bitmask_order(unsigned int count)
     return order;   /* We could be slightly more clever with -1 here... */
 }
 
-static __inline__ int get_count_order(unsigned int count)
+static inline int get_count_order(unsigned int count)
 {
     int order;
 

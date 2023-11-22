@@ -20,9 +20,8 @@
 #define likely(x)     __builtin_expect(!!(x),1)
 #define unlikely(x)   __builtin_expect(!!(x),0)
 
-#define inline        __inline__
-#define always_inline __inline__ __attribute__ ((__always_inline__))
-#define gnu_inline    __inline__ __attribute__ ((__gnu_inline__))
+#define always_inline inline __attribute__((__always_inline__))
+#define gnu_inline    inline __attribute__((__gnu_inline__))
 #define noinline      __attribute__((__noinline__))
 
 #define noreturn      __attribute__((__noreturn__))
@@ -83,7 +82,7 @@
  * inline functions not expanded inline get placed in .init.text.
  */
 #include <xen/init.h>
-#define __inline__ __inline__ __init
+#define inline inline __init
 #endif
 
 #define __attribute_pure__  __attribute__((__pure__))
