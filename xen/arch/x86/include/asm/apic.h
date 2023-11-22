@@ -69,7 +69,7 @@ static __inline void apic_wrmsr(unsigned long reg, uint64_t msr_content)
         reg == APIC_LVR)
         return;
 
-    wrmsrl(APIC_MSR_BASE + (reg >> 4), msr_content);
+    wrmsrl(MSR_X2APIC_FIRST + (reg >> 4), msr_content);
 }
 
 static __inline uint64_t apic_rdmsr(unsigned long reg)
@@ -79,7 +79,7 @@ static __inline uint64_t apic_rdmsr(unsigned long reg)
     if (reg == APIC_DFR)
         return -1u;
 
-    rdmsrl(APIC_MSR_BASE + (reg >> 4), msr_content);
+    rdmsrl(MSR_X2APIC_FIRST + (reg >> 4), msr_content);
     return msr_content;
 }
 

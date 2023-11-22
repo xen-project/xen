@@ -124,9 +124,6 @@
 
 #define APIC_BASE __fix_to_virt(FIX_APIC_BASE)
 
-/* It's only used in x2APIC mode of an x2APIC unit. */
-#define APIC_MSR_BASE 0x800
-
 #define MAX_IO_APICS 128
 
 extern bool x2apic_enabled;
