@@ -54,11 +54,6 @@ static __inline void apic_mem_write(unsigned long reg, u32 v)
 	*((volatile u32 *)(APIC_BASE+reg)) = v;
 }
 
-static __inline void apic_mem_write_atomic(unsigned long reg, u32 v)
-{
-	(void)xchg((volatile u32 *)(APIC_BASE+reg), v);
-}
-
 static __inline u32 apic_mem_read(unsigned long reg)
 {
 	return *((volatile u32 *)(APIC_BASE+reg));
@@ -95,14 +90,6 @@ static __inline void apic_write(unsigned long reg, u32 v)
         apic_wrmsr(reg, v);
     else
         apic_mem_write(reg, v);
-}
-
-static __inline void apic_write_atomic(unsigned long reg, u32 v)
-{
-    if ( x2apic_enabled )
-        apic_wrmsr(reg, v);
-    else
-        apic_mem_write_atomic(reg, v);
 }
 
 static __inline u32 apic_read(unsigned long reg)
