@@ -2013,7 +2013,7 @@ int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg)
 
     if ( !mem_sharing_enabled(d) &&
          (rc = mem_sharing_control(d, true, 0)) )
-        return rc;
+        goto out;
 
     switch ( mso.op )
     {
