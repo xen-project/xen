@@ -803,7 +803,7 @@ ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
     bool need_modify_vtd_table = true;
     bool vtd_pte_present = false;
     unsigned int iommu_flags = p2m_get_iommu_flags(p2mt, p2ma, mfn);
-    bool needs_sync = false;
+    bool needs_sync = true;
     ept_entry_t old_entry = { .epte = 0 };
     ept_entry_t new_entry = { .epte = 0 };
     struct ept_data *ept = &p2m->ept;
