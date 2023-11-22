@@ -213,7 +213,6 @@ tools/misc/xencov
 tools/pkg-config/*
 tools/qemu-xen-build
 tools/xentrace/xenalyze
-tools/pygrub/build/*
 tools/python/build/*
 tools/tests/depriv/depriv-fd-checker
 tools/tests/x86_emulator/*.bin
