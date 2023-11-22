@@ -1123,7 +1123,7 @@ err_out:
 /*
  * This function is intended to be used for plugging a "hole" in the client's
  * physmap with a shared memory entry. Unfortunately the definition of a "hole"
- * is currently ambigious. There are two cases one can run into a "hole":
+ * is currently ambiguous. There are two cases one can run into a "hole":
  *  1) there is no pagetable entry at all
  *  2) there is a pagetable entry with a type that passes p2m_is_hole
  *
