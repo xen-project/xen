@@ -633,8 +633,8 @@ static void __init gicv3_dist_init(void)
     gicv3_dist_wait_for_rwp();
 
     /* Turn on the distributor */
-    writel_relaxed(GICD_CTL_ENABLE | GICD_CTLR_ARE_NS |
-                GICD_CTLR_ENABLE_G1A | GICD_CTLR_ENABLE_G1, GICD + GICD_CTLR);
+    writel_relaxed(GICD_CTLR_ARE_NS | GICD_CTLR_ENABLE_G1A |
+                   GICD_CTLR_ENABLE_G1, GICD + GICD_CTLR);
 
     /* Route all global IRQs to this CPU */
     affinity = gicv3_mpidr_to_affinity(smp_processor_id());
