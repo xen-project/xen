@@ -163,7 +163,6 @@ Build various stubom components, some are only example code. Its usually
 enough to specify just --enable-stubdom and leave these options alone.
   --enable-ioemu-stubdom
   --enable-c-stubdom
-  --enable-caml-stubdom
   --disable-pv-grub
   --disable-xenstore-stubdom
   --enable-vtpm-stubdom

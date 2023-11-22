@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
      for IPIs and Physical addressing mode for external interrupts.
 
 ### Removed
+- caml-stubdom.  It hasn't built since 2014, was pinned to Ocaml 4.02, and has
+  been superseded by the MirageOS/SOLO5 projects.
 
 ## [4.18.0](https://xenbits.xenproject.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.18.0) - 2023-11-16
 

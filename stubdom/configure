@@ -600,8 +600,6 @@ POLARSSL_VERSION
 POLARSSL_URL
 GMP_VERSION
 GMP_URL
-OCAML_VERSION
-OCAML_URL
 GRUB_VERSION
 GRUB_URL
 LWIP_VERSION
@@ -633,7 +631,6 @@ debug
 xenstorepvh
 xenstore
 grub
-caml
 c
 host_os
 host_vendor
@@ -687,7 +684,6 @@ ac_user_opts='
 enable_option_checking
 enable_ioemu_stubdom
 enable_c_stubdom
-enable_caml_stubdom
 enable_pv_grub
 enable_xenstore_stubdom
 enable_xenstorepvh_stubdom
@@ -711,7 +707,6 @@ LIBPCI_URL
 NEWLIB_URL
 LWIP_URL
 GRUB_URL
-OCAML_URL
 GMP_URL
 POLARSSL_URL
 TPMEMU_URL'
@@ -1341,7 +1336,6 @@ Optional Features:
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-ioemu-stubdom  Build and install ioemu-stubdom
   --enable-c-stubdom      Build and install c-stubdom (default is DISABLED)
-  --enable-caml-stubdom   Build and install caml-stubdom (default is DISABLED)
   --enable-pv-grub        Build and install pv-grub (default is DISABLED)
   --disable-xenstore-stubdom
                           Build and install xenstore-stubdom (default is
@@ -1371,7 +1365,6 @@ Some influential environment variables:
   NEWLIB_URL  Download url for newlib
   LWIP_URL    Download url for lwip
   GRUB_URL    Download url for grub
-  OCAML_URL   Download url for ocaml
   GMP_URL     Download url for libgmp
   POLARSSL_URL
               Download url for polarssl
@@ -2054,44 +2047,6 @@ else
 
 
 c=n
-
-
-fi
-
-
-
-
-# Check whether --enable-caml-stubdom was given.
-if test "${enable_caml_stubdom+set}" = set; then :
-  enableval=$enable_caml_stubdom;
-
-if test "x$enableval" = "xyes"; then :
-
-
-caml=y
-STUBDOM_TARGETS="$STUBDOM_TARGETS caml"
-STUBDOM_BUILD="$STUBDOM_BUILD caml-stubdom"
-STUBDOM_INSTALL="$STUBDOM_INSTALL install-caml"
-STUBDOM_UNINSTALL="$STUBDOM_UNINSTALL install-caml"
-
-
-else
-
-if test "x$enableval" = "xno"; then :
-
-
-caml=n
-
-
-fi
-
-fi
-
-
-else
-
-
-caml=n
 
 
 fi
@@ -3595,17 +3550,6 @@ fi
 
 fi
 GRUB_VERSION="0.97"
-
-
-
-
-
-if test "x$OCAML_URL" = "x"; then :
-
-	OCAML_URL="https://caml.inria.fr/pub/distrib/ocaml-4.02"
-
-fi
-OCAML_VERSION="4.02.0"
 
 
 
