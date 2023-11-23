@@ -22,15 +22,9 @@ install: all
 	$(setup.py) install --record $(INSTALL_LOG) $(PYTHON_PREFIX_ARG) \
 		--root="$(DESTDIR)" --force
 	$(INSTALL_PYTHON_PROG) src/pygrub $(DESTDIR)/$(LIBEXEC_BIN)/pygrub
-	set -e; if [ $(bindir) != $(LIBEXEC_BIN) -a \
-	             "`readlink -f $(DESTDIR)/$(bindir)`" != \
-	             "`readlink -f $(LIBEXEC_BIN)`" ]; then \
-	    ln -sf $(LIBEXEC_BIN)/pygrub $(DESTDIR)/$(bindir); \
-	fi
 
 .PHONY: uninstall
 uninstall:
-	rm -f $(DESTDIR)/$(bindir)/pygrub
 	if [ -e $(INSTALL_LOG) ]; then \
 		cat $(INSTALL_LOG) | xargs -i rm -f $(DESTDIR)/{}; \
 	fi
