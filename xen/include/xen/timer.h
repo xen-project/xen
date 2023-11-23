@@ -29,7 +29,7 @@ struct timer {
     };
 
     /* On expiry, '(*function)(data)' will be executed in softirq context. */
-    void (*function)(void *);
+    void (*function)(void *data);
     void *data;
 
     /* CPU on which this timer will be installed and executed. */
@@ -57,7 +57,7 @@ struct timer {
  */
 void init_timer(
     struct timer *timer,
-    void        (*function)(void *),
+    void        (*function)(void *data),
     void         *data,
     unsigned int  cpu);
 

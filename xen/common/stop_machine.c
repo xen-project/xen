@@ -46,7 +46,7 @@ struct stopmachine_data {
 
     unsigned int fn_cpu;
     int fn_result;
-    int (*fn)(void *);
+    int (*fn)(void *data);
     void *fn_data;
 };
 
@@ -73,7 +73,7 @@ static void stopmachine_wait_state(void)
  * mandatory to be called only on an idle vcpu, as otherwise active core
  * scheduling might hang.
  */
-int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
+int stop_machine_run(int (*fn)(void *data), void *data, unsigned int cpu)
 {
     unsigned int i, nr_cpus;
     unsigned int this = smp_processor_id();

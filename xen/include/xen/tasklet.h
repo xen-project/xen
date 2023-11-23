@@ -21,7 +21,7 @@ struct tasklet
     bool is_softirq;
     bool is_running;
     bool is_dead;
-    void (*func)(void *);
+    void (*func)(void *data);
     void *data;
 };
 
@@ -59,8 +59,9 @@ void tasklet_schedule_on_cpu(struct tasklet *t, unsigned int cpu);
 void tasklet_schedule(struct tasklet *t);
 void do_tasklet(void);
 void tasklet_kill(struct tasklet *t);
-void tasklet_init(struct tasklet *t, void (*func)(void *), void *data);
-void softirq_tasklet_init(struct tasklet *t, void (*func)(void *), void *data);
+void tasklet_init(struct tasklet *t, void (*func)(void *data), void *data);
+void softirq_tasklet_init(struct tasklet *t,
+                          void (*func)(void *data), void *data);
 void tasklet_subsys_init(void);
 
 #endif /* __XEN_TASKLET_H__ */

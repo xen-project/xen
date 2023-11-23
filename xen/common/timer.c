@@ -291,7 +291,7 @@ static bool active_timer(const struct timer *timer)
 
 void init_timer(
     struct timer *timer,
-    void        (*function)(void *),
+    void        (*function)(void *data),
     void         *data,
     unsigned int  cpu)
 {
@@ -441,7 +441,7 @@ void kill_timer(struct timer *timer)
 
 static void execute_timer(struct timers *ts, struct timer *t)
 {
-    void (*fn)(void *) = t->function;
+    void (*fn)(void *data) = t->function;
     void *data = t->data;
 
     t->status = TIMER_STATUS_inactive;

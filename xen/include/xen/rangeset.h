@@ -68,7 +68,7 @@ bool __must_check rangeset_overlaps_range(
     struct rangeset *r, unsigned long s, unsigned long e);
 int rangeset_report_ranges(
     struct rangeset *r, unsigned long s, unsigned long e,
-    int (*cb)(unsigned long s, unsigned long e, void *), void *ctxt);
+    int (*cb)(unsigned long s, unsigned long e, void *data), void *ctxt);
 
 /*
  * Note that the consume function can return an error value apart from
@@ -77,7 +77,7 @@ int rangeset_report_ranges(
  */
 int rangeset_consume_ranges(struct rangeset *r,
                             int (*cb)(unsigned long s, unsigned long e,
-                                      void *, unsigned long *c),
+                                      void *ctxt, unsigned long *c),
                             void *ctxt);
 
 /* Merge rangeset r2 into rangeset r1. */

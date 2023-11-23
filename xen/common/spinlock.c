@@ -305,7 +305,7 @@ static always_inline uint16_t observe_head(const spinlock_tickets_t *t)
 }
 
 static void always_inline spin_lock_common(spinlock_t *lock,
-                                           void (*cb)(void *), void *data)
+                                           void (*cb)(void *data), void *data)
 {
     spinlock_tickets_t tickets = SPINLOCK_TICKET_INC;
     LOCK_PROFILE_VAR;
@@ -331,7 +331,7 @@ void _spin_lock(spinlock_t *lock)
     spin_lock_common(lock, NULL, NULL);
 }
 
-void _spin_lock_cb(spinlock_t *lock, void (*cb)(void *), void *data)
+void _spin_lock_cb(spinlock_t *lock, void (*cb)(void *data), void *data)
 {
     spin_lock_common(lock, cb, data);
 }
@@ -498,8 +498,8 @@ struct lock_profile_anc {
     const char                *name;     /* descriptive string for print */
 };
 
-typedef void lock_profile_subfunc(
-    struct lock_profile *, int32_t, int32_t, void *);
+typedef void lock_profile_subfunc(struct lock_profile *data, int32_t type,
+    int32_t idx, void *par);
 
 extern struct lock_profile *__lock_profile_start;
 extern struct lock_profile *__lock_profile_end;

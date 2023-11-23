@@ -26,7 +26,7 @@ struct efi_rs_state {
 };
 
 struct efi_rs_state efi_rs_enter(void);
-void efi_rs_leave(struct efi_rs_state *);
+void efi_rs_leave(struct efi_rs_state *state);
 
 #ifndef COMPAT
 

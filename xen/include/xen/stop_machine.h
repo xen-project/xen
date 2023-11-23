@@ -14,6 +14,6 @@
  *
  * This can be thought of as a very heavy write lock, equivalent to
  * grabbing every spinlock in the kernel. */
-int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu);
+int stop_machine_run(int (*fn)(void *data), void *data, unsigned int cpu);
 
 #endif /* __XEN_STOP_MACHINE_H__ */

@@ -288,7 +288,7 @@ bool rangeset_overlaps_range(
 
 int rangeset_report_ranges(
     struct rangeset *r, unsigned long s, unsigned long e,
-    int (*cb)(unsigned long s, unsigned long e, void *), void *ctxt)
+    int (*cb)(unsigned long s, unsigned long e, void *data), void *ctxt)
 {
     struct range *x;
     int rc = 0;
@@ -357,8 +357,8 @@ int rangeset_claim_range(struct rangeset *r, unsigned long size,
 }
 
 int rangeset_consume_ranges(struct rangeset *r,
-                            int (*cb)(unsigned long s, unsigned long e, void *,
-                                      unsigned long *c),
+                            int (*cb)(unsigned long s, unsigned long e,
+                                      void *ctxt, unsigned long *c),
                             void *ctxt)
 {
     int rc = 0;
