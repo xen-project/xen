@@ -231,8 +231,7 @@ const struct genapic *__init apic_x2apic_probe(void)
          */
         x2apic_phys = iommu_intremap != iommu_intremap_full ||
                       (acpi_gbl_FADT.flags & ACPI_FADT_APIC_PHYSICAL) ||
-                      (IS_ENABLED(CONFIG_X2APIC_PHYSICAL) &&
-                       !(acpi_gbl_FADT.flags & ACPI_FADT_APIC_CLUSTER));
+                      IS_ENABLED(CONFIG_X2APIC_PHYSICAL);
     }
     else if ( !x2apic_phys )
         switch ( iommu_intremap )
