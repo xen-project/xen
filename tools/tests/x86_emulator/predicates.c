@@ -2189,6 +2189,13 @@ void do_test(uint8_t *instr, unsigned int len, unsigned int modrm,
     {
         s = x86_decode_insn(ctxt, fetch);
 
+        if ( !s )
+        {
+            print_insn(instr, len);
+            printf(" failed to decode\n");
+            return;
+        }
+
         if ( x86_insn_length(s, ctxt) != len )
         {
             print_insn(instr, len);
@@ -2217,6 +2224,13 @@ void do_test(uint8_t *instr, unsigned int len, unsigned int modrm,
         instr[modrm] |= 0xc0;
 
         s = x86_decode_insn(ctxt, fetch);
+
+        if ( !s )
+        {
+            print_insn(instr, len);
+            printf(" failed to decode\n");
+            return;
+        }
 
         if ( x86_insn_length(s, ctxt) != len )
         {
