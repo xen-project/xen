@@ -732,18 +732,20 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
     old_domdata = d->sched_priv;
 
     /*
-     * Temporarily move all units to same processor to make locking
-     * easier when moving the new units to the new processors.
+     * Remove all units from the old scheduler, and temporarily move them to
+     * the same processor to make locking easier when moving the new units to
+     * new processors.
      */
     new_p = cpumask_first(d->cpupool->cpu_valid);
     for_each_sched_unit ( d, unit )
     {
-        spinlock_t *lock = unit_schedule_lock_irq(unit);
-
-        sched_set_res(unit, get_sched_res(new_p));
-        spin_unlock_irq(lock);
+        spinlock_t *lock;
 
         sched_remove_unit(old_ops, unit);
+
+        lock = unit_schedule_lock_irq(unit);
+        sched_set_res(unit, get_sched_res(new_p));
+        spin_unlock_irq(lock);
     }
 
     old_units = d->sched_unit_list;
