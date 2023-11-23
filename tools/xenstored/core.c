@@ -121,7 +121,7 @@ void trace(const char *fmt, ...)
 
 static void trace_io(const struct connection *conn,
 		     const struct buffered_data *data,
-		     int out)
+		     const char *type)
 {
 	unsigned int i;
 	time_t now;
@@ -134,8 +134,7 @@ static void trace_io(const struct connection *conn,
 	tm = localtime(&now);
 
 	trace("io: %s %p (d%u) %04d%02d%02d %02d:%02d:%02d %s (",
-	      out ? "OUT" : "IN", conn, conn->id,
-	      tm->tm_year + 1900, tm->tm_mon + 1,
+	      type, conn, conn->id, tm->tm_year + 1900, tm->tm_mon + 1,
 	      tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
 	      sockmsg_string(data->hdr.msg.type));
 	
@@ -321,42 +320,53 @@ static bool write_messages(struct connection *conn)
 {
 	int ret;
 	struct buffered_data *out;
+	bool started = false;
 
 	out = list_top(&conn->out_list, struct buffered_data, list);
 	if (out == NULL)
 		return true;
 
 	if (out->inhdr) {
+		started = !out->used;
 		ret = conn->funcs->write(conn, out->hdr.raw + out->used,
 					 sizeof(out->hdr) - out->used);
 		if (ret < 0)
-			return false;
+			goto err;
 
 		out->used += ret;
 		if (out->used < sizeof(out->hdr))
-			return true;
+			goto start;
 
 		out->inhdr = false;
 		out->used = 0;
 
 		/* Second write might block if non-zero. */
 		if (out->hdr.msg.len && !conn->domain)
-			return true;
+			goto start;
 	}
 
 	ret = conn->funcs->write(conn, out->buffer + out->used,
 				 out->hdr.msg.len - out->used);
 	if (ret < 0)
-		return false;
+		goto err;
 
 	out->used += ret;
 	if (out->used != out->hdr.msg.len)
-		return true;
+		goto start;
 
-	trace_io(conn, out, 1);
+	trace_io(conn, out, started ? "OUT" : "OUT(END)");
 
 	free_buffered_data(out, conn);
 
+	return true;
+
+ err:
+	trace_io(conn, out, "OUT(ERR)");
+	return false;
+
+ start:
+	if (started)
+		trace_io(conn, out, "OUT(START)");
 	return true;
 }
 
@@ -2067,7 +2077,7 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 
 	/* At least send_error() and send_reply() expects conn->in == in */
 	assert(conn->in == in);
-	trace_io(conn, in, 0);
+	trace_io(conn, in, "IN");
 
 	if ((unsigned int)type >= XS_TYPE_COUNT || !wire_funcs[type].func) {
 		eprintf("Client unknown operation %i", type);
