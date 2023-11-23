@@ -342,7 +342,7 @@ static long cf_check enter_state_helper(void *data)
  * Dom0 issues this hypercall in place of writing pm1a_cnt. Xen then
  * takes over the control and put the system into sleep state really.
  */
-int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
+int acpi_enter_sleep(const struct xenpf_enter_acpi_sleep *sleep)
 {
     if ( sleep->sleep_state == ACPI_STATE_S3 &&
          (!acpi_sinfo.wakeup_vector || !acpi_sinfo.vector_width ||
