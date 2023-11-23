@@ -1847,6 +1847,8 @@ static int copy_special_pages(struct domain *cd, struct domain *d)
                                 p2m_ram_rw, p2m->default_access, -1);
             if ( rc )
                 return rc;
+
+            set_gpfn_from_mfn(mfn_x(new_mfn), gfn_x(old_gfn));
         }
     }
 
