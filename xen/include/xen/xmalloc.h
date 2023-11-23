@@ -63,7 +63,7 @@
     })
 
 /* Free any of the above. */
-extern void xfree(void *);
+extern void xfree(void *p);
 
 /* Free an allocation, and zero the pointer to it. */
 #define XFREE(p) do { \
