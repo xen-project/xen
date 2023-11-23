@@ -13,9 +13,9 @@ enum vmap_region {
 void vm_init_type(enum vmap_region type, void *start, void *end);
 
 void *__vmap(const mfn_t *mfn, unsigned int granularity, unsigned int nr,
-             unsigned int align, unsigned int flags, enum vmap_region);
+             unsigned int align, unsigned int flags, enum vmap_region type);
 void *vmap(const mfn_t *mfn, unsigned int nr);
-void vunmap(const void *);
+void vunmap(const void *va);
 
 void *vmalloc(size_t size);
 void *vmalloc_xen(size_t size);
@@ -23,7 +23,7 @@ void *vmalloc_xen(size_t size);
 void *vzalloc(size_t size);
 void vfree(void *va);
 
-void __iomem *ioremap(paddr_t, size_t);
+void __iomem *ioremap(paddr_t pa, size_t len);
 
 static inline void iounmap(void __iomem *va)
 {
