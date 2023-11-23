@@ -15,7 +15,7 @@
 struct cpu_user_regs;
 
 /* Register a character-receive hook on the specified COM port. */
-typedef void (*serial_rx_fn)(char, struct cpu_user_regs *);
+typedef void (*serial_rx_fn)(char c, struct cpu_user_regs *regs);
 void serial_set_rx_handler(int handle, serial_rx_fn fn);
 
 /* Number of characters we buffer for a polling receiver. */
@@ -63,31 +63,31 @@ struct serial_port {
 
 struct uart_driver {
     /* Driver initialisation (pre- and post-IRQ subsystem setup). */
-    void (*init_preirq)(struct serial_port *);
-    void (*init_irq)(struct serial_port *);
-    void (*init_postirq)(struct serial_port *);
+    void (*init_preirq)(struct serial_port *port);
+    void (*init_irq)(struct serial_port *port);
+    void (*init_postirq)(struct serial_port *port);
     /* Hook to clean up after Xen bootstrap (before domain 0 runs). */
-    void (*endboot)(struct serial_port *);
+    void (*endboot)(struct serial_port *port);
     /* Driver suspend/resume. */
-    void (*suspend)(struct serial_port *);
-    void (*resume)(struct serial_port *);
+    void (*suspend)(struct serial_port *port);
+    void (*resume)(struct serial_port *port);
     /* Return number of characters the port can hold for transmit,
      * or -EIO if port is inaccesible */
-    int (*tx_ready)(struct serial_port *);
+    int (*tx_ready)(struct serial_port *port);
     /* Put a character onto the serial line. */
-    void (*putc)(struct serial_port *, char);
+    void (*putc)(struct serial_port *port, char c);
     /* Flush accumulated characters. */
-    void (*flush)(struct serial_port *);
+    void (*flush)(struct serial_port *port);
     /* Get a character from the serial line: returns 0 if none available. */
-    int  (*getc)(struct serial_port *, char *);
+    int  (*getc)(struct serial_port *port, char *pc);
     /* Get IRQ number for this port's serial line: returns -1 if none. */
-    int  (*irq)(struct serial_port *);
+    int  (*irq)(struct serial_port *port);
     /* Unmask TX interrupt */
-    void  (*start_tx)(struct serial_port *);
+    void  (*start_tx)(struct serial_port *port);
     /* Mask TX interrupt */
-    void  (*stop_tx)(struct serial_port *);
+    void  (*stop_tx)(struct serial_port *port);
     /* Get serial information */
-    const struct vuart_info *(*vuart_info)(struct serial_port *);
+    const struct vuart_info *(*vuart_info)(struct serial_port *port);
 };
 
 /* 'Serial handles' are composed from the following fields. */
