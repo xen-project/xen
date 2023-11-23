@@ -220,6 +220,8 @@ static const char *const str_7d1[32] =
 {
     [ 4] = "avx-vnni-int8",       [ 5] = "avx-ne-convert",
 
+    [14] = "prefetchi",
+
     [18] = "cet-sss",
 };
 
