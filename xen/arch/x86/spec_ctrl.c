@@ -903,6 +903,9 @@ static bool __init should_use_eager_fpu(void)
     }
 }
 
+/*
+ * https://www.amd.com/content/dam/amd/en/documents/corporate/cr/speculative-return-stack-overflow-whitepaper.pdf
+ */
 static void __init srso_calculations(bool hw_smt_enabled)
 {
     if ( !(boot_cpu_data.x86_vendor &
