@@ -303,8 +303,7 @@ static void __init efi_arch_cfg_file_late(const EFI_LOADED_IMAGE *image,
     }
 }
 
-static void __init efi_arch_handle_cmdline(CHAR16 *image_name,
-                                           CHAR16 *cmdline_options,
+static void __init efi_arch_handle_cmdline(CHAR16 *cmdline_options,
                                            const char *cfgfile_options)
 {
     union string name;

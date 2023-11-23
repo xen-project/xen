@@ -1462,21 +1462,8 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
             }
         }
 
-        /*
-         * EFI_LOAD_OPTION does not supply an image name as first component:
-         * Make one up.
-         */
-        if ( argc && !*argv )
-        {
-            EFI_FILE_HANDLE handle = get_parent_handle(loaded_image,
-                                                       &file_name);
-
-            handle->Close(handle);
-            *argv = file_name;
-        }
-
         name.s = get_value(&cfg, section.s, "options");
-        efi_arch_handle_cmdline(argc ? *argv : NULL, options, name.s);
+        efi_arch_handle_cmdline(options, name.s);
 
         if ( !base_video )
         {

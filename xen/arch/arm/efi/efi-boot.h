@@ -454,8 +454,7 @@ static void __init efi_arch_memory_setup(void)
 {
 }
 
-static void __init efi_arch_handle_cmdline(CHAR16 *image_name,
-                                           CHAR16 *cmdline_options,
+static void __init efi_arch_handle_cmdline(CHAR16 *cmdline_options,
                                            const char *cfgfile_options)
 {
     union string name;
