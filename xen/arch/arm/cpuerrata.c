@@ -370,10 +370,9 @@ custom_param("spec-ctrl", parse_spec_ctrl);
 
 /* Arm64 only for now as for Arm32 the workaround is currently handled in C. */
 #ifdef CONFIG_ARM_64
-/* SAF-1-safe */
-void __init arm_enable_wa2_handling(const struct alt_instr *alt,
-                                    const uint32_t *origptr,
-                                    uint32_t *updptr, int nr_inst)
+void asmlinkage __init arm_enable_wa2_handling(const struct alt_instr *alt,
+                                               const uint32_t *origptr,
+                                               uint32_t *updptr, int nr_inst)
 {
     BUG_ON(nr_inst != 1);
 

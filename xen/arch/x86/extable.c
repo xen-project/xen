@@ -194,8 +194,7 @@ static int __init cf_check stub_selftest(void)
 __initcall(stub_selftest);
 #endif
 
-/* SAF-1-safe */
-unsigned long search_pre_exception_table(struct cpu_user_regs *regs)
+unsigned long asmlinkage search_pre_exception_table(struct cpu_user_regs *regs)
 {
     unsigned long addr = regs->rip;
     unsigned long fixup = search_one_extable(
