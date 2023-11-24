@@ -23,8 +23,8 @@
 extern gnu_inline
 #endif
 void sort(void *base, size_t num, size_t size,
-          int (*cmp)(const void *, const void *),
-          void (*swap)(void *, void *, size_t))
+          int (*cmp)(const void *a, const void *b),
+          void (*swap)(void *a, void *b, size_t size))
 {
     /* pre-scale counters for performance */
     size_t i = (num / 2) * size, n = num * size, c, r;
