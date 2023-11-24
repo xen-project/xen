@@ -80,6 +80,14 @@ config ARM_EFI
 	  UEFI firmware. A UEFI stub is provided to allow Xen to
 	  be booted as an EFI application.
 
+config GICV2
+	bool "GICv2 driver"
+	default y
+	select VGICV2
+	help
+	  Driver for the ARM Generic Interrupt Controller v2.
+	  If unsure, say Y
+
 config GICV3
 	bool "GICv3 driver"
 	depends on !NEW_VGIC
@@ -99,11 +107,22 @@ config OVERLAY_DTB
 	help
 	  Dynamic addition/removal of Xen device tree nodes using a dtbo.
 
+config VGICV2
+	bool "vGICv2 interface for domains"
+	default y
+	help
+	  Allow Xen to expose a Generic Interrupt Controller version 2 like to Xen
+	  domains. This can be configured at the domain creation.
+	  This option is mandatory when using GICv2.
+	  For GICv3, this allows domain to use GICv2 when the hardware supports it.
+	  If unsure say Y.
+
 config HVM
         def_bool y
 
 config NEW_VGIC
 	bool "Use new VGIC implementation"
+	select GICV2
 	---help---
 
 	This is an alternative implementation of the ARM GIC interrupt
