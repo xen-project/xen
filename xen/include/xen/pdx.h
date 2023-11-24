@@ -70,7 +70,7 @@
 extern unsigned long max_pdx;
 
 #define PDX_GROUP_COUNT ((1 << PDX_GROUP_SHIFT) / \
-                         (sizeof(*frame_table) & -sizeof(*frame_table)))
+                         (ISOLATE_LSB(sizeof(*frame_table))))
 extern unsigned long pdx_group_valid[];
 
 /**
