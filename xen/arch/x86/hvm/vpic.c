@@ -35,7 +35,7 @@
 #include <asm/hvm/save.h>
 
 #define vpic_domain(v) (container_of((v), struct domain, \
-                        arch.hvm.vpic[!vpic->is_master]))
+                                     arch.hvm.vpic[!(v)->is_master]))
 #define __vpic_lock(v) &container_of((v), struct hvm_domain, \
                                         vpic[!(v)->is_master])->irq_lock
 #define vpic_lock(v)   spin_lock(__vpic_lock(v))
