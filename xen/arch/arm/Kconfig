@@ -88,6 +88,14 @@ config GICV2
 	  Driver for the ARM Generic Interrupt Controller v2.
 	  If unsure, say Y
 
+config DOM0LESS_BOOT
+	bool "Dom0less boot support" if EXPERT
+	default y
+	help
+	  Dom0less boot support enables Xen to create and start domU guests during
+	  Xen boot without the need of a control domain (Dom0), which could be
+	  present anyway.
+
 config GICV3
 	bool "GICv3 driver"
 	depends on !NEW_VGIC

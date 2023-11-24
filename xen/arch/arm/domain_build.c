@@ -416,6 +416,7 @@ static void __init allocate_memory_11(struct domain *d,
     }
 }
 
+#ifdef CONFIG_DOM0LESS_BOOT
 bool __init allocate_bank_memory(struct domain *d, struct kernel_info *kinfo,
                                  gfn_t sgfn, paddr_t tot_size)
 {
@@ -477,6 +478,7 @@ bool __init allocate_bank_memory(struct domain *d, struct kernel_info *kinfo,
 
     return true;
 }
+#endif
 
 /*
  * When PCI passthrough is available we want to keep the
