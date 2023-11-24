@@ -68,7 +68,7 @@ XEN_CMD="console=dtuart dom0_mem=1024M bootscrub=0 console_timestamps=boot"
 NUM_DOMUS=0
 
 LOAD_CMD="tftpb"
-BOOT_CMD="bootm"
+BOOT_CMD="bootz"
 UBOOT_SOURCE="boot.source"
 UBOOT_SCRIPT="boot.scr"' > config
 

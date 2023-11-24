@@ -101,7 +101,7 @@ DOMU_MEM[0]="512"
 NUM_DOMUS=1
 
 LOAD_CMD="tftpb"
-BOOT_CMD="bootm"
+BOOT_CMD="bootz"
 UBOOT_SOURCE="boot.source"
 UBOOT_SCRIPT="boot.scr"' > config
 
