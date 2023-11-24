@@ -135,7 +135,6 @@ void acpi_create_efi_mmap_table(struct domain *d,
 
 int acpi_make_efi_nodes(void *fdt, struct membank tbl_add[]);
 
-void create_domUs(void);
 void create_dom0(void);
 void alloc_static_evtchn(void);
 
