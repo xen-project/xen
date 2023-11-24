@@ -621,30 +621,6 @@ void __init init_pdx(void)
     }
 }
 
-/* Static memory initialization */
-void __init init_staticmem_pages(void)
-{
-#ifdef CONFIG_STATIC_MEMORY
-    unsigned int bank;
-
-    for ( bank = 0 ; bank < bootinfo.reserved_mem.nr_banks; bank++ )
-    {
-        if ( bootinfo.reserved_mem.bank[bank].type == MEMBANK_STATIC_DOMAIN )
-        {
-            mfn_t bank_start = _mfn(PFN_UP(bootinfo.reserved_mem.bank[bank].start));
-            unsigned long bank_pages = PFN_DOWN(bootinfo.reserved_mem.bank[bank].size);
-            mfn_t bank_end = mfn_add(bank_start, bank_pages);
-
-            if ( mfn_x(bank_end) <= mfn_x(bank_start) )
-                return;
-
-            unprepare_staticmem_pages(mfn_to_page(bank_start),
-                                      bank_pages, false);
-        }
-    }
-#endif
-}
-
 /*
  * Populate the boot allocator.
  * If a static heap was not provided by the admin, all the RAM but the

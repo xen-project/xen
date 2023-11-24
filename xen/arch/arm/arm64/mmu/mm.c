@@ -5,6 +5,7 @@
 #include <xen/pfn.h>
 
 #include <asm/setup.h>
+#include <asm/static-memory.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef virt_to_mfn

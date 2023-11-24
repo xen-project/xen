@@ -10,8 +10,6 @@ bool allocate_bank_memory(struct domain *d, struct kernel_info *kinfo,
                           gfn_t sgfn, paddr_t tot_size);
 int construct_domain(struct domain *d, struct kernel_info *kinfo);
 int domain_fdt_begin_node(void *fdt, const char *name, uint64_t unit);
-int make_resv_memory_node(const struct domain *d, void *fdt, int addrcells,
-                          int sizecells, const struct meminfo *mem);
 int make_chosen_node(const struct kernel_info *kinfo);
 int make_cpus_node(const struct domain *d, void *fdt);
 int make_hypervisor_node(struct domain *d, const struct kernel_info *kinfo,
@@ -42,9 +40,6 @@ int handle_device_interrupts(struct domain *d, struct dt_device_node *dev,
 void set_interrupt(gic_interrupt_t interrupt, unsigned int irq,
                    unsigned int cpumask, unsigned int level);
 
-int process_shm(struct domain *d, struct kernel_info *kinfo,
-                const struct dt_device_node *node);
-
 #ifndef CONFIG_ACPI
 static inline int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
 {
@@ -54,27 +49,6 @@ static inline int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
 }
 #else
 int prepare_acpi(struct domain *d, struct kernel_info *kinfo);
-#endif
-
-#ifdef CONFIG_STATIC_MEMORY
-void allocate_static_memory(struct domain *d, struct kernel_info *kinfo,
-                            const struct dt_device_node *node);
-void assign_static_memory_11(struct domain *d, struct kernel_info *kinfo,
-                             const struct dt_device_node *node);
-#else
-static inline void allocate_static_memory(struct domain *d,
-                                          struct kernel_info *kinfo,
-                                          const struct dt_device_node *node)
-{
-    ASSERT_UNREACHABLE();
-}
-
-static inline void assign_static_memory_11(struct domain *d,
-                                           struct kernel_info *kinfo,
-                                           const struct dt_device_node *node)
-{
-    ASSERT_UNREACHABLE();
-}
 #endif
 
 #endif

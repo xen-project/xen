@@ -13,6 +13,8 @@
 #include <asm/arm64/sve.h>
 #include <asm/dom0less-build.h>
 #include <asm/domain_build.h>
+#include <asm/static-memory.h>
+#include <asm/static-shmem.h>
 
 bool __init is_dom0less_mode(void)
 {
@@ -806,11 +808,9 @@ static int __init construct_domU(struct domain *d,
     else
         assign_static_memory_11(d, &kinfo, node);
 
-#ifdef CONFIG_STATIC_SHM
     rc = process_shm(d, &kinfo, node);
     if ( rc < 0 )
         return rc;
-#endif
 
     /*
      * Base address and irq number are needed when creating vpl011 device

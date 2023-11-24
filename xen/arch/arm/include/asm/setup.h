@@ -160,7 +160,6 @@ struct bootcmdline * boot_cmdline_find_by_name(const char *name);
 const char *boot_module_kind_as_string(bootmodule_kind kind);
 
 void init_pdx(void);
-void init_staticmem_pages(void);
 void populate_boot_allocator(void);
 void setup_mm(void);
 
