@@ -67,7 +67,7 @@ struct vesa_mode_info {
 };
 #endif /* CONFIG_VIDEO */
 
-#define get_mb2_data(tag, type, member)   (((multiboot2_tag_##type##_t *)(tag))->member)
+#define get_mb2_data(tag, type, member)   (((const multiboot2_tag_##type##_t *)(tag))->member)
 #define get_mb2_string(tag, type, member) ((u32)get_mb2_data(tag, type, member))
 
 static u32 alloc;
