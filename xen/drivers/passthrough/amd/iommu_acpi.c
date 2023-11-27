@@ -1232,7 +1232,7 @@ static int __init get_last_bdf_ivhd(
     while ( ivhd_block->header.length >=
             (block_length + sizeof(struct acpi_ivrs_de_header)) )
     {
-        ivhd_device = (const void *)((u8 *)ivhd_block + block_length);
+        ivhd_device = (const void *)ivhd_block + block_length;
 
         switch ( ivhd_device->header.type )
         {
