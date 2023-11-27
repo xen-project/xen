@@ -5901,14 +5901,14 @@ int destroy_xen_mappings(unsigned long s, unsigned long e)
  * a problem.
  */
 void init_or_livepatch modify_xen_mappings_lite(
-    unsigned long s, unsigned long e, unsigned int _nf)
+    unsigned long s, unsigned long e, unsigned int nf)
 {
     unsigned long v = s, fm, flags;
 
     /* Set of valid PTE bits which may be altered. */
 #define FLAGS_MASK (_PAGE_NX|_PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_RW|_PAGE_PRESENT)
     fm = put_pte_flags(FLAGS_MASK);
-    flags = put_pte_flags(_nf & FLAGS_MASK);
+    flags = put_pte_flags(nf & FLAGS_MASK);
 #undef FLAGS_MASK
 
     ASSERT(flags & _PAGE_PRESENT);

@@ -271,7 +271,7 @@ void __init setup_initial_pagetables(void)
  */
 unsigned long __read_mostly frametable_base_pdx;
 
-void put_page(struct page_info *p)
+void put_page(struct page_info *page)
 {
     BUG_ON("unimplemented");
 }

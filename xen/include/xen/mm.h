@@ -71,9 +71,10 @@
 
 struct page_info;
 
-void put_page(struct page_info *);
-bool __must_check get_page(struct page_info *, const struct domain *);
-struct domain *__must_check page_get_owner_and_reference(struct page_info *);
+void put_page(struct page_info *page);
+bool __must_check get_page(struct page_info *page,
+                           const struct domain *domain);
+struct domain *__must_check page_get_owner_and_reference(struct page_info *page);
 
 /* Boot-time allocator. Turns into generic allocator after bootstrap. */
 void init_boot_pages(paddr_t ps, paddr_t pe);
@@ -110,8 +111,9 @@ int map_pages_to_xen(
     unsigned long nr_mfns,
     unsigned int flags);
 /* Alter the permissions of a range of Xen virtual address space. */
-int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int flags);
-void modify_xen_mappings_lite(unsigned long s, unsigned long e, unsigned int flags);
+int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf);
+void modify_xen_mappings_lite(unsigned long s, unsigned long e,
+                              unsigned int nf);
 int destroy_xen_mappings(unsigned long s, unsigned long e);
 /* Retrieve the MFN mapped by VA in Xen virtual address space. */
 mfn_t xen_map_to_mfn(unsigned long va);
@@ -135,7 +137,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order);
 unsigned long avail_domheap_pages_region(
     unsigned int node, unsigned int min_width, unsigned int max_width);
 unsigned long avail_domheap_pages(void);
-unsigned long avail_node_heap_pages(unsigned int);
+unsigned long avail_node_heap_pages(unsigned int nodeid);
 #define alloc_domheap_page(d,f) (alloc_domheap_pages(d,0,f))
 #define free_domheap_page(p)  (free_domheap_pages(p,0))
 unsigned int online_page(mfn_t mfn, uint32_t *status);
@@ -528,7 +530,7 @@ static inline unsigned int get_order_from_pages(unsigned long nr_pages)
     return order;
 }
 
-void scrub_one_page(struct page_info *);
+void scrub_one_page(struct page_info *pg);
 
 #ifndef arch_free_heap_page
 #define arch_free_heap_page(d, pg) \

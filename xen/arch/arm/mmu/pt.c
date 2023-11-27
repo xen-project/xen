@@ -718,12 +718,12 @@ int destroy_xen_mappings(unsigned long s, unsigned long e)
     return xen_pt_update(s, INVALID_MFN, (e - s) >> PAGE_SHIFT, 0);
 }
 
-int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int flags)
+int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
 {
     ASSERT(IS_ALIGNED(s, PAGE_SIZE));
     ASSERT(IS_ALIGNED(e, PAGE_SIZE));
     ASSERT(s <= e);
-    return xen_pt_update(s, INVALID_MFN, (e - s) >> PAGE_SHIFT, flags);
+    return xen_pt_update(s, INVALID_MFN, (e - s) >> PAGE_SHIFT, nf);
 }
 
 /*
