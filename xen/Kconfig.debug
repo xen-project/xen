@@ -107,6 +107,13 @@ config UBSAN
 
 	  If unsure, say N here.
 
+config UBSAN_FATAL
+	bool "Panic on UBSAN failure"
+	depends on UBSAN
+	help
+	  Enabling this option will cause Xen to panic when an undefined behavior
+	  is detected by UBSAN. If unsure, say N here.
+
 config DEBUG_TRACE
 	bool "Debug trace support"
 	---help---

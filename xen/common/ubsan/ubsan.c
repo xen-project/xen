@@ -174,6 +174,9 @@ static void ubsan_epilogue(unsigned long *flags)
 		"========================================\n");
 	spin_unlock_irqrestore(&report_lock, *flags);
 	current->in_ubsan--;
+
+	if (IS_ENABLED(CONFIG_UBSAN_FATAL))
+	    panic("UBSAN failure detected\n");
 }
 
 static void handle_overflow(struct overflow_data *data, unsigned long lhs,
