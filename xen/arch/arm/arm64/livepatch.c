@@ -15,23 +15,24 @@
 #include <asm/insn.h>
 #include <asm/livepatch.h>
 
-void arch_livepatch_apply(struct livepatch_func *func)
+void arch_livepatch_apply(const struct livepatch_func *func,
+                          struct livepatch_fstate *state)
 {
     uint32_t insn;
     uint32_t *new_ptr;
     unsigned int i, len;
 
-    BUILD_BUG_ON(ARCH_PATCH_INSN_SIZE > sizeof(func->opaque));
+    BUILD_BUG_ON(ARCH_PATCH_INSN_SIZE > sizeof(state->insn_buffer));
     BUILD_BUG_ON(ARCH_PATCH_INSN_SIZE != sizeof(insn));
 
     ASSERT(vmap_of_xen_text);
 
-    len = livepatch_insn_len(func);
+    len = livepatch_insn_len(func, state);
     if ( !len )
         return;
 
     /* Save old ones. */
-    memcpy(func->opaque, func->old_addr, len);
+    memcpy(state->insn_buffer, func->old_addr, len);
 
     if ( func->new_addr )
         insn = aarch64_insn_gen_branch_imm((unsigned long)func->old_addr,

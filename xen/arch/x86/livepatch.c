@@ -95,7 +95,7 @@ int arch_livepatch_verify_func(const struct livepatch_func *func)
     if ( !func->new_addr )
     {
         /* Only do up to maximum amount we can put in the ->opaque. */
-        if ( func->new_size > sizeof(func->opaque) )
+        if ( func->new_size > LIVEPATCH_OPAQUE_SIZE )
             return -EOPNOTSUPP;
 
         if ( func->old_size < func->new_size )
@@ -123,13 +123,14 @@ int arch_livepatch_verify_func(const struct livepatch_func *func)
  * "noinline" to cause control flow change and thus invalidate I$ and
  * cause refetch after modification.
  */
-void noinline arch_livepatch_apply(struct livepatch_func *func)
+void noinline arch_livepatch_apply(const struct livepatch_func *func,
+                                   struct livepatch_fstate *state)
 {
     uint8_t *old_ptr;
-    uint8_t insn[sizeof(func->opaque)];
+    uint8_t insn[sizeof(state->insn_buffer)];
     unsigned int len;
 
-    func->patch_offset = 0;
+    state->patch_offset = 0;
     old_ptr = func->old_addr;
 
     /*
@@ -141,14 +142,14 @@ void noinline arch_livepatch_apply(struct livepatch_func *func)
      * ENDBR64 or similar instructions).
      */
     if ( is_endbr64(old_ptr) || is_endbr64_poison(func->old_addr) )
-        func->patch_offset += ENDBR64_LEN;
+        state->patch_offset += ENDBR64_LEN;
 
     /* This call must be done with ->patch_offset already set. */
-    len = livepatch_insn_len(func);
+    len = livepatch_insn_len(func, state);
     if ( !len )
         return;
 
-    memcpy(func->opaque, old_ptr + func->patch_offset, len);
+    memcpy(state->insn_buffer, old_ptr + state->patch_offset, len);
     if ( func->new_addr )
     {
         int32_t val;
@@ -156,7 +157,7 @@ void noinline arch_livepatch_apply(struct livepatch_func *func)
         BUILD_BUG_ON(ARCH_PATCH_INSN_SIZE != (1 + sizeof(val)));
 
         insn[0] = 0xe9; /* Relative jump. */
-        val = func->new_addr - (func->old_addr + func->patch_offset +
+        val = func->new_addr - (func->old_addr + state->patch_offset +
                                 ARCH_PATCH_INSN_SIZE);
 
         memcpy(&insn[1], &val, sizeof(val));
@@ -164,17 +165,18 @@ void noinline arch_livepatch_apply(struct livepatch_func *func)
     else
         add_nops(insn, len);
 
-    memcpy(old_ptr + func->patch_offset, insn, len);
+    memcpy(old_ptr + state->patch_offset, insn, len);
 }
 
 /*
  * "noinline" to cause control flow change and thus invalidate I$ and
  * cause refetch after modification.
  */
-void noinline arch_livepatch_revert(const struct livepatch_func *func)
+void noinline arch_livepatch_revert(const struct livepatch_func *func,
+                                    struct livepatch_fstate *state)
 {
-    memcpy(func->old_addr + func->patch_offset, func->opaque,
-           livepatch_insn_len(func));
+    memcpy(func->old_addr + state->patch_offset, state->insn_buffer,
+           livepatch_insn_len(func, state));
 }
 
 /*

@@ -991,10 +991,7 @@ struct livepatch_func {
     uint32_t new_size;
     uint32_t old_size;
     uint8_t version;        /* MUST be LIVEPATCH_PAYLOAD_VERSION. */
-    uint8_t opaque[LIVEPATCH_OPAQUE_SIZE];
-    uint8_t applied;
-    uint8_t patch_offset;
-    uint8_t _pad[6];
+    uint8_t _pad[39];
     livepatch_expectation_t expect;
 };
 typedef struct livepatch_func livepatch_func_t;

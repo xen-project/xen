@@ -13,6 +13,9 @@ struct xen_sysctl_livepatch_op;
 
 #include <xen/elfstructs.h>
 #include <xen/errno.h> /* For -ENOSYS or -EOVERFLOW */
+
+#include <public/sysctl.h> /* For LIVEPATCH_OPAQUE_SIZE */
+
 #ifdef CONFIG_LIVEPATCH
 
 /*
@@ -51,6 +54,12 @@ struct livepatch_symbol {
     bool new_symbol;
 };
 
+struct livepatch_fstate {
+    unsigned int patch_offset;
+    enum livepatch_func_state applied;
+    uint8_t insn_buffer[LIVEPATCH_OPAQUE_SIZE];
+};
+
 int livepatch_op(struct xen_sysctl_livepatch_op *);
 void check_for_livepatch_work(void);
 unsigned long livepatch_symbols_lookup_by_name(const char *symname);
@@ -87,10 +96,11 @@ void arch_livepatch_init(void);
 int arch_livepatch_verify_func(const struct livepatch_func *func);
 
 static inline
-unsigned int livepatch_insn_len(const struct livepatch_func *func)
+unsigned int livepatch_insn_len(const struct livepatch_func *func,
+                                const struct livepatch_fstate *state)
 {
     if ( !func->new_addr )
-        return func->new_size - func->patch_offset;
+        return func->new_size - state->patch_offset;
 
     return ARCH_PATCH_INSN_SIZE;
 }
@@ -117,39 +127,43 @@ int arch_livepatch_safety_check(void);
 int arch_livepatch_quiesce(void);
 void arch_livepatch_revive(void);
 
-void arch_livepatch_apply(struct livepatch_func *func);
-void arch_livepatch_revert(const struct livepatch_func *func);
+void arch_livepatch_apply(const struct livepatch_func *func,
+                          struct livepatch_fstate *state);
+void arch_livepatch_revert(const struct livepatch_func *func,
+                           struct livepatch_fstate *state);
 void arch_livepatch_post_action(void);
 
 void arch_livepatch_mask(void);
 void arch_livepatch_unmask(void);
 
-static inline void common_livepatch_apply(struct livepatch_func *func)
+static inline void common_livepatch_apply(const struct livepatch_func *func,
+                                          struct livepatch_fstate *state)
 {
     /* If the action has been already executed on this function, do nothing. */
-    if ( func->applied == LIVEPATCH_FUNC_APPLIED )
+    if ( state->applied == LIVEPATCH_FUNC_APPLIED )
     {
         printk(XENLOG_WARNING LIVEPATCH "%s: %s has been already applied before\n",
                 __func__, func->name);
         return;
     }
 
-    arch_livepatch_apply(func);
-    func->applied = LIVEPATCH_FUNC_APPLIED;
+    arch_livepatch_apply(func, state);
+    state->applied = LIVEPATCH_FUNC_APPLIED;
 }
 
-static inline void common_livepatch_revert(struct livepatch_func *func)
+static inline void common_livepatch_revert(const struct livepatch_func *func,
+                                           struct livepatch_fstate *state)
 {
     /* If the apply action hasn't been executed on this function, do nothing. */
-    if ( !func->old_addr || func->applied == LIVEPATCH_FUNC_NOT_APPLIED )
+    if ( !func->old_addr || state->applied == LIVEPATCH_FUNC_NOT_APPLIED )
     {
         printk(XENLOG_WARNING LIVEPATCH "%s: %s has not been applied before\n",
                 __func__, func->name);
         return;
     }
 
-    arch_livepatch_revert(func);
-    func->applied = LIVEPATCH_FUNC_NOT_APPLIED;
+    arch_livepatch_revert(func, state);
+    state->applied = LIVEPATCH_FUNC_NOT_APPLIED;
 }
 #else
 
