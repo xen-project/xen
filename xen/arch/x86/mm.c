@@ -5903,15 +5903,15 @@ int destroy_xen_mappings(unsigned long s, unsigned long e)
 void init_or_livepatch modify_xen_mappings_lite(
     unsigned long s, unsigned long e, unsigned int _nf)
 {
-    unsigned long v = s, fm, nf;
+    unsigned long v = s, fm, flags;
 
     /* Set of valid PTE bits which may be altered. */
 #define FLAGS_MASK (_PAGE_NX|_PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_RW|_PAGE_PRESENT)
     fm = put_pte_flags(FLAGS_MASK);
-    nf = put_pte_flags(_nf & FLAGS_MASK);
+    flags = put_pte_flags(_nf & FLAGS_MASK);
 #undef FLAGS_MASK
 
-    ASSERT(nf & _PAGE_PRESENT);
+    ASSERT(flags & _PAGE_PRESENT);
     ASSERT(IS_ALIGNED(s, PAGE_SIZE) && s >= XEN_VIRT_START);
     ASSERT(IS_ALIGNED(e, PAGE_SIZE) && e <= XEN_VIRT_END);
 
@@ -5925,7 +5925,7 @@ void init_or_livepatch modify_xen_mappings_lite(
 
         if ( l2e_get_flags(l2e) & _PAGE_PSE )
         {
-            l2e_write_atomic(pl2e, l2e_from_intpte((l2e.l2 & ~fm) | nf));
+            l2e_write_atomic(pl2e, l2e_from_intpte((l2e.l2 & ~fm) | flags));
 
             v += 1UL << L2_PAGETABLE_SHIFT;
             continue;
@@ -5943,7 +5943,8 @@ void init_or_livepatch modify_xen_mappings_lite(
 
                 ASSERT(l1f & _PAGE_PRESENT);
 
-                l1e_write_atomic(pl1e, l1e_from_intpte((l1e.l1 & ~fm) | nf));
+                l1e_write_atomic(pl1e,
+                                 l1e_from_intpte((l1e.l1 & ~fm) | flags));
 
                 v += 1UL << L1_PAGETABLE_SHIFT;
 
