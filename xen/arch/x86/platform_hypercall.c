@@ -364,7 +364,7 @@ ret_t do_platform_op(
             if ( length > info->edd_device_params.length )
                 length = info->edd_device_params.length;
             if ( copy_to_compat(op->u.firmware_info.u.disk_info.edd_params,
-                                (u8 *)&info->edd_device_params,
+                                (const uint8_t *)&info->edd_device_params,
                                 length) )
                 break;
             if ( copy_to_compat(op->u.firmware_info.u.disk_info.edd_params,
