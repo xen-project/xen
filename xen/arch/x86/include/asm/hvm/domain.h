@@ -106,6 +106,9 @@ struct hvm_domain {
 
     bool                   is_s3_suspended;
 
+    /* Compatibility setting for a bug in x2APIC LDR */
+    bool bug_x2apic_ldr_vcpu_id;
+
     /* hypervisor intercepted msix table */
     struct list_head       msixtbl_list;
 

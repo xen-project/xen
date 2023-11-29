@@ -1061,13 +1061,26 @@ static const struct hvm_mmio_ops vlapic_mmio_ops = {
     .write = vlapic_mmio_write,
 };
 
+static uint32_t x2apic_ldr_from_id(uint32_t id)
+{
+    return ((id & ~0xf) << 12) | (1 << (id & 0xf));
+}
+
 static void set_x2apic_id(struct vlapic *vlapic)
 {
-    u32 id = vlapic_vcpu(vlapic)->vcpu_id;
-    u32 ldr = ((id & ~0xf) << 12) | (1 << (id & 0xf));
+    const struct vcpu *v = vlapic_vcpu(vlapic);
+    uint32_t apic_id = v->vcpu_id * 2;
+    uint32_t apic_ldr = x2apic_ldr_from_id(apic_id);
 
-    vlapic_set_reg(vlapic, APIC_ID, id * 2);
-    vlapic_set_reg(vlapic, APIC_LDR, ldr);
+    /*
+     * Workaround for migrated domains to derive LDRs as the source host
+     * would've.
+     */
+    if ( v->domain->arch.hvm.bug_x2apic_ldr_vcpu_id )
+        apic_ldr = x2apic_ldr_from_id(v->vcpu_id);
+
+    vlapic_set_reg(vlapic, APIC_ID, apic_id);
+    vlapic_set_reg(vlapic, APIC_LDR, apic_ldr);
 }
 
 int guest_wrmsr_apic_base(struct vcpu *v, uint64_t val)
@@ -1498,27 +1511,40 @@ static int cf_check lapic_save_regs(struct vcpu *v, hvm_domain_context_t *h)
  */
 static void lapic_load_fixup(struct vlapic *vlapic)
 {
-    uint32_t id = vlapic->loaded.id;
+    const struct vcpu *v = vlapic_vcpu(vlapic);
+    uint32_t good_ldr = x2apic_ldr_from_id(vlapic->loaded.id);
 
-    if ( vlapic_x2apic_mode(vlapic) && id && vlapic->loaded.ldr == 1 )
+    /* Skip fixups on xAPIC mode, or if the x2APIC LDR is already correct */
+    if ( !vlapic_x2apic_mode(vlapic) ||
+         (vlapic->loaded.ldr == good_ldr) )
+        return;
+
+    if ( vlapic->loaded.ldr == 1 )
     {
-        /*
-         * This is optional: ID != 0 contradicts LDR == 1. It's being added
-         * to aid in eventual debugging of issues arising from the fixup done
-         * here, but can be dropped as soon as it is found to conflict with
-         * other (future) changes.
-         */
-        if ( GET_xAPIC_ID(id) != vlapic_vcpu(vlapic)->vcpu_id * 2 ||
-             id != SET_xAPIC_ID(GET_xAPIC_ID(id)) )
-            printk(XENLOG_G_WARNING "%pv: bogus APIC ID %#x loaded\n",
-                   vlapic_vcpu(vlapic), id);
+       /*
+        * Xen <= 4.4 may have a bug by which all the APICs configured in
+        * x2APIC mode got LDR = 1, which is inconsistent on every vCPU
+        * except for the one with ID = 0. We'll fix the bug now and assign
+        * an LDR value consistent with the APIC ID.
+        */
         set_x2apic_id(vlapic);
     }
-    else /* Undo an eventual earlier fixup. */
+    else if ( vlapic->loaded.ldr == x2apic_ldr_from_id(v->vcpu_id) )
     {
-        vlapic_set_reg(vlapic, APIC_ID, id);
-        vlapic_set_reg(vlapic, APIC_LDR, vlapic->loaded.ldr);
+        /*
+         * Migrations from Xen 4.4 to date (4.19 dev window, Nov 2023) may
+         * have LDR drived from the vCPU ID, not the APIC ID. We must preserve
+         * LDRs so new vCPUs use consistent derivations and existing guests,
+         * which may have already read the LDR at the source host, aren't
+         * surprised when interrupts stop working the way they did at the
+         * other end.
+         */
+        v->domain->arch.hvm.bug_x2apic_ldr_vcpu_id = true;
     }
+    else
+        printk(XENLOG_G_WARNING
+               "%pv: bogus x2APIC record: ID %#x, LDR %#x, expected LDR %#x\n",
+               v, vlapic->loaded.id, vlapic->loaded.ldr, good_ldr);
 }
 
 static int cf_check lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
