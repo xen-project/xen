@@ -337,3 +337,10 @@ int __init parse_arch_dom0_param(const char *s, const char *e)
 {
     BUG_ON("unimplemented");
 }
+
+/* delay.c */
+
+void udelay(unsigned long usecs)
+{
+    BUG_ON("unimplemented");
+}

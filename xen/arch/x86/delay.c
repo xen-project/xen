@@ -15,7 +15,7 @@
 #include <asm/msr.h>
 #include <asm/processor.h>
 
-void __udelay(unsigned long usecs)
+void udelay(unsigned long usecs)
 {
     unsigned long ticks = usecs * (cpu_khz / 1000);
     unsigned long s, e;

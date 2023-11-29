@@ -3,7 +3,7 @@
 
 /* Copyright (C) 1993 Linus Torvalds */
 
-#include <asm/delay.h>
+void udelay(unsigned long usecs);
 
 static inline void mdelay(unsigned long msec)
 {

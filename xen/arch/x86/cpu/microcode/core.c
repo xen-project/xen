@@ -23,6 +23,7 @@
 
 #include <xen/alternative-call.h>
 #include <xen/cpu.h>
+#include <xen/delay.h>
 #include <xen/earlycpio.h>
 #include <xen/err.h>
 #include <xen/guest_access.h>
@@ -35,7 +36,6 @@
 
 #include <asm/apic.h>
 #include <asm/cpu-policy.h>
-#include <asm/delay.h>
 #include <asm/nmi.h>
 #include <asm/processor.h>
 #include <asm/setup.h>
