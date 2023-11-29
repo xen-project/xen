@@ -1,10 +1,11 @@
-#ifndef __X86_IOCAP_H__
-#define __X86_IOCAP_H__
+/* SPDX-License-Identifier: GPL-2.0-only */
+#ifndef __ASM_GENERIC_IOCAP_H__
+#define __ASM_GENERIC_IOCAP_H__
 
 #define cache_flush_permitted(d)                        \
     (!rangeset_is_empty((d)->iomem_caps))
 
-#endif
+#endif /* __ASM_GENERIC_IOCAP_H__ */
 
 /*
  * Local variables:
