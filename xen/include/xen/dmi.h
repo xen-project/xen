@@ -24,7 +24,7 @@ struct dmi_strmatch {
 };
 
 struct dmi_system_id {
-	int (*callback)(const struct dmi_system_id *);
+	int (*callback)(const struct dmi_system_id *d);
 	const char *ident;
 	struct dmi_strmatch matches[4];
 	void *driver_data;
