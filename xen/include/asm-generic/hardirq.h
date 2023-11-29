@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef __ASM_PPC_HARDIRQ_H__
-#define __ASM_PPC_HARDIRQ_H__
+#ifndef __ASM_GENERIC_HARDIRQ_H
+#define __ASM_GENERIC_HARDIRQ_H
 
 #include <xen/cache.h>
+#include <xen/smp.h>
 
 typedef struct {
         unsigned long __softirq_pending;
@@ -16,4 +17,13 @@ typedef struct {
 #define irq_enter()     (local_irq_count(smp_processor_id())++)
 #define irq_exit()      (local_irq_count(smp_processor_id())--)
 
-#endif /* __ASM_PPC_HARDIRQ_H__ */
+#endif /* __ASM_GENERIC_HARDIRQ_H */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
