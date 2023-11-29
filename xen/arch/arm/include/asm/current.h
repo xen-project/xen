@@ -5,6 +5,7 @@
 #include <xen/percpu.h>
 
 #include <asm/processor.h>
+#include <asm/sysregs.h>
 
 /* Tell whether the guest vCPU enabled Workaround 2 (i.e variant 4) */
 #define CPUINFO_WORKAROUND_2_FLAG_SHIFT   0
@@ -59,6 +60,8 @@ do {                                                    \
     WRITE_SYSREG(__per_cpu_offset[(id)], TPIDR_EL2);    \
     this_cpu(cpu_id) = (id);                            \
 } while ( 0 )
+
+#define get_per_cpu_offset()  READ_SYSREG(TPIDR_EL2)
 
 #endif
 

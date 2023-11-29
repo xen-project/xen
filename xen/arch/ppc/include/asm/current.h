@@ -4,6 +4,8 @@
 
 #include <xen/percpu.h>
 
+#include <asm/processor.h>
+
 #ifndef __ASSEMBLY__
 
 struct vcpu;
@@ -37,6 +39,10 @@ static inline struct cpu_info *get_cpu_info(void)
 }
 
 #define guest_cpu_user_regs() (&get_cpu_info()->guest_cpu_user_regs)
+
+#define smp_processor_id()      0 /* TODO: Fix this */
+
+#define get_per_cpu_offset()    smp_processor_id() /* TODO: Fix this */
 
 #endif /* __ASSEMBLY__ */
 

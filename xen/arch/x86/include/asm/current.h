@@ -102,6 +102,8 @@ static inline struct cpu_info *get_cpu_info(void)
 #define smp_processor_id()    (get_cpu_info()->processor_id)
 #define guest_cpu_user_regs() (&get_cpu_info()->guest_cpu_user_regs)
 
+#define get_per_cpu_offset()  (get_cpu_info()->per_cpu_offset)
+
 /*
  * Get the bottom-of-stack, as stored in the per-CPU TSS. This actually points
  * into the middle of cpu_info.guest_cpu_user_regs, at the section that

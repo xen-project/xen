@@ -1,8 +1,6 @@
 #ifndef __XEN_PERCPU_H__
 #define __XEN_PERCPU_H__
 
-#include <asm/percpu.h>
-
 #define DECLARE_PER_CPU(type, name) \
     extern __typeof__(type) per_cpu__ ## name
 
@@ -28,6 +26,8 @@
     __DEFINE_PER_CPU(__section(".bss.percpu.read_mostly"), type, _ ## name)
 
 #define get_per_cpu_var(var)  (per_cpu__##var)
+
+#include <asm/percpu.h>
 
 /* Linux compatibility. */
 #define get_cpu_var(var) this_cpu(var)
