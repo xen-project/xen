@@ -45,8 +45,23 @@
         mov   lr, x3 ;     \
         RODATA_STR(98, _s)
 
+/*
+ * Macro to print the value of register \xb
+ *
+ * Clobbers x0 - x4
+ */
+.macro print_reg xb
+        mov   x0, \xb
+        mov   x4, lr
+        bl    asm_putn
+        mov   lr, x4
+.endm
+
 #else /* CONFIG_EARLY_PRINTK */
 #define PRINT(s)
+
+.macro print_reg xb
+.endm
 
 #endif /* !CONFIG_EARLY_PRINTK */
 

@@ -74,25 +74,6 @@
  *  x30 - lr
  */
 
- #ifdef CONFIG_EARLY_PRINTK
-/*
- * Macro to print the value of register \xb
- *
- * Clobbers x0 - x4
- */
-.macro print_reg xb
-        mov   x0, \xb
-        mov   x4, lr
-        bl    putn
-        mov   lr, x4
-.endm
-
-#else /* CONFIG_EARLY_PRINTK */
-.macro print_reg xb
-.endm
-
-#endif /* !CONFIG_EARLY_PRINTK */
-
 .section .text.header, "ax", %progbits
 /*.aarch64*/
 
@@ -493,11 +474,12 @@ ENDPROC(asm_puts)
 
 /*
  * Print a 64-bit number in hex.
+ * Note: This function must be called from assembly.
  * x0: Number to print.
  * x23: Early UART base address
  * Clobbers x0-x3
  */
-putn:
+ENTRY(asm_putn)
         adr   x1, hex
         mov   x3, #16
 1:
@@ -510,18 +492,12 @@ putn:
         subs  x3, x3, #1
         b.ne  1b
         ret
-ENDPROC(putn)
+ENDPROC(asm_putn)
 
 hex:    .ascii "0123456789abcdef"
         .align 2
 
-#else  /* CONFIG_EARLY_PRINTK */
-
-ENTRY(early_puts)
-init_uart:
-putn:   ret
-
-#endif /* !CONFIG_EARLY_PRINTK */
+#endif /* CONFIG_EARLY_PRINTK */
 
 /* This provides a C-API version of __lookup_processor_type
  * TODO: For now, the implementation return NULL every time
