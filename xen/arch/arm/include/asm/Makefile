@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-only
+generic-y += altp2m.h
 generic-y += hardirq.h
 generic-y += iocap.h
 generic-y += paging.h
