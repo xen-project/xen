@@ -460,7 +460,9 @@ extern cpumask_t cpu_present_map;
 
 /* Copy to/from cpumap provided by control tools. */
 struct xenctl_bitmap;
-int cpumask_to_xenctl_bitmap(struct xenctl_bitmap *, const cpumask_t *);
-int xenctl_bitmap_to_cpumask(cpumask_var_t *, const struct xenctl_bitmap *);
+int cpumask_to_xenctl_bitmap(struct xenctl_bitmap *xenctl_cpumap,
+                             const cpumask_t *cpumask);
+int xenctl_bitmap_to_cpumask(cpumask_var_t *cpumask,
+                             const struct xenctl_bitmap *xenctl_cpumap);
 
 #endif /* __XEN_CPUMASK_H */
