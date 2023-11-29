@@ -393,9 +393,9 @@ long read_console_ring(struct xen_sysctl_readconsole *op)
 static char serial_rx_ring[SERIAL_RX_SIZE];
 static unsigned int serial_rx_cons, serial_rx_prod;
 
-static void (*serial_steal_fn)(const char *, size_t nr) = early_puts;
+static void (*serial_steal_fn)(const char *str, size_t nr) = early_puts;
 
-int console_steal(int handle, void (*fn)(const char *, size_t nr))
+int console_steal(int handle, void (*fn)(const char *str, size_t nr))
 {
     if ( (handle == -1) || (handle != sercon_handle) )
         return 0;
