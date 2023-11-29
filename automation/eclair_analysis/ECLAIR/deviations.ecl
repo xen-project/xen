@@ -85,6 +85,17 @@ conform to the directive."
 -config=MC3R1.R5.3,reports+={safe, "any_area(any_loc(any_exp(macro(^read_debugreg$))&&any_exp(macro(^write_debugreg$))))"}
 -doc_end
 
+-doc_begin="The type \"ret_t\" is deliberately defined multiple times,
+depending on the guest."
+-config=MC3R1.R5.6,reports+={deliberate,"any_area(any_loc(text(^.*ret_t.*$)))"}
+-doc_end
+
+-doc_begin="The following files are imported from the gnu-efi package."
+-file_tag+={adopted_r5_6,"^xen/include/efi/.*$"}
+-file_tag+={adopted_r5_6,"^xen/arch/.*/include/asm/.*/efibind\\.h$"}
+-config=MC3R1.R5.6,reports+={deliberate,"any_area(any_loc(file(adopted_r5_6)))"}
+-doc_end
+
 #
 # Series 7.
 #

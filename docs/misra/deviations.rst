@@ -98,6 +98,21 @@ Deviations related to MISRA C:2012 Rules:
          - __emulate_2op and __emulate_2op_nobyte
          - read_debugreg and write_debugreg
 
+   * - R5.6
+     - The type ret_t is deliberately defined multiple times depending on the
+       type of guest to service.
+     - Tagged as `deliberate` for ECLAIR.
+
+   * - R5.6
+     - Some files are not subject to respect MISRA rules at
+       the moment, but, among these out-of-scope files, there are definitions
+       of typedef names that are already defined within in-scope files and
+       therefore, ECLAIR does report a violation since not all the files
+       involved in the violation are excluded from the analysis.
+     - Tagged as `deliberate` for ECLAIR. Such excluded files are:
+         - xen/include/efi/*
+         - xen/arch/*/include/asm/*/efibind.h
+
    * - R7.1
      - It is safe to use certain octal constants the way they are defined
        in specifications, manuals, and algorithm descriptions. Such places
