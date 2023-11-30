@@ -531,7 +531,7 @@ maintainers if you want to suggest a change.
        the future or with another compiler.  For these reasons we discourage
        the introduction of new reserved identifiers in Xen, and we see it as
        positive the reduction of reserved identifiers. At the same time,
-       certain identifiers starting with wo underscores are also commonly used
+       certain identifiers starting with two underscores are also commonly used
        in Linux (e.g. __set_bit) and we don't think it would be an improvement
        to rename them.
 
