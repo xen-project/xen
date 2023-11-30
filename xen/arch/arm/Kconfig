@@ -217,6 +217,14 @@ config STATIC_SHM
 	help
 	  This option enables statically shared memory on a dom0less system.
 
+config STATIC_EVTCHN
+	bool "Static event channel support on a dom0less system"
+	depends on DOM0LESS_BOOT
+	default y
+	help
+	  This option enables establishing static event channel communication
+	  between domains on a dom0less system (domU-domU as well as domU-dom0).
+
 endmenu
 
 menu "ARM errata workaround via the alternative framework"

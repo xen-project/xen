@@ -36,6 +36,7 @@
 #include <asm/alternative.h>
 #include <asm/dom0less-build.h>
 #include <asm/page.h>
+#include <asm/static-evtchn.h>
 #include <asm/current.h>
 #include <asm/setup.h>
 #include <asm/gic.h>

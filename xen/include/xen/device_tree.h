@@ -94,8 +94,10 @@ struct dt_device_node {
     /* IOMMU specific fields */
     bool is_protected;
 
+#ifdef CONFIG_STATIC_EVTCHN
     /* HACK: Remove this if there is a need of space */
     bool static_evtchn_created;
+#endif
 
     /*
      * The main purpose of this list is to link the structure in the list
@@ -366,6 +368,7 @@ static inline bool dt_property_name_is_equal(const struct dt_property *pp,
     return !dt_prop_cmp(pp->name, name);
 }
 
+#ifdef CONFIG_STATIC_EVTCHN
 static inline void
 dt_device_set_static_evtchn_created(struct dt_device_node *device)
 {
@@ -377,6 +380,7 @@ dt_device_static_evtchn_created(const struct dt_device_node *device)
 {
     return device->static_evtchn_created;
 }
+#endif /* CONFIG_STATIC_EVTCHN */
 
 /**
  * dt_find_compatible_node - Find a node based on type and one of the
