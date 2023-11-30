@@ -134,7 +134,7 @@ push)
     badgeLabel="ECLAIR ${ANALYSIS_KIND} ${ref}${variantHeadline} #${jobId}"
     ;;
 auto_pull_request)
-    git remote remove autoPRRemote || true
+    git remote remove autoPRRemote 2>/dev/null || true
     git remote add autoPRRemote "${autoPRRemoteUrl}"
     git fetch -q autoPRRemote
     subDir="${ref}"
