@@ -17,6 +17,7 @@
 *.so.[0-9]*
 *.bin
 *.bak
+*.new
 *.tmp
 *.spot
 *.spit
@@ -277,7 +278,6 @@ xen/include/compat/*
 xen/include/config/
 xen/include/generated/
 xen/include/public/public
-xen/include/xen/*.new
 xen/include/xen/acm_policy.h
 xen/include/xen/compile.h
 xen/include/xen/hypercall-defs.h
