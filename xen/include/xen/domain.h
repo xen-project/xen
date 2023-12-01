@@ -25,7 +25,7 @@ unsigned int dom0_max_vcpus(void);
 int parse_arch_dom0_param(const char *s, const char *e);
 struct vcpu *alloc_dom0_vcpu0(struct domain *dom0);
 
-int vcpu_reset(struct vcpu *);
+int vcpu_reset(struct vcpu *v);
 int vcpu_up(struct vcpu *v);
 
 void setup_system_domains(void);
@@ -65,9 +65,9 @@ void free_vcpu_struct(struct vcpu *v);
 
 /* Allocate/free a PIRQ structure. */
 #ifndef alloc_pirq_struct
-struct pirq *alloc_pirq_struct(struct domain *);
+struct pirq *alloc_pirq_struct(struct domain *d);
 #endif
-void cf_check free_pirq_struct(void *);
+void cf_check free_pirq_struct(void *ptr);
 
 /*
  * Initialise/destroy arch-specific details of a VCPU.
@@ -103,8 +103,8 @@ void arch_domain_creation_finished(struct domain *d);
 
 void arch_p2m_set_access_required(struct domain *d, bool access_required);
 
-int arch_set_info_guest(struct vcpu *, vcpu_guest_context_u);
-void arch_get_info_guest(struct vcpu *, vcpu_guest_context_u);
+int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c);
+void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c);
 
 int arch_initialise_vcpu(struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg);
 int default_initialise_vcpu(struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg);
@@ -112,7 +112,7 @@ int default_initialise_vcpu(struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg);
 int arch_get_paging_mempool_size(struct domain *d, uint64_t *size /* bytes */);
 int arch_set_paging_mempool_size(struct domain *d, uint64_t size /* bytes */);
 
-bool update_runstate_area(struct vcpu *);
+bool update_runstate_area(struct vcpu *v);
 
 int domain_relinquish_resources(struct domain *d);
 
@@ -122,7 +122,7 @@ void arch_dump_vcpu_info(struct vcpu *v);
 
 void arch_dump_domain_info(struct domain *d);
 
-int arch_vcpu_reset(struct vcpu *);
+int arch_vcpu_reset(struct vcpu *v);
 
 bool domctl_lock_acquire(void);
 void domctl_lock_release(void);
