@@ -22,7 +22,7 @@ struct kernel_param {
     unsigned int len;
     union {
         void *var;
-        int (*func)(const char *);
+        int (*func)(const char *s);
     } par;
 };
 
