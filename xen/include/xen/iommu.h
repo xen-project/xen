@@ -262,14 +262,15 @@ struct iommu_ops {
     int (*init)(struct domain *d);
     void (*hwdom_init)(struct domain *d);
     int (*quarantine_init)(device_t *dev, bool scratch_page);
-    int (*add_device)(u8 devfn, device_t *dev);
+    int (*add_device)(uint8_t devfn, device_t *dev);
     int (*enable_device)(device_t *dev);
-    int (*remove_device)(u8 devfn, device_t *dev);
-    int (*assign_device)(struct domain *, u8 devfn, device_t *dev, u32 flag);
+    int (*remove_device)(uint8_t devfn, device_t *dev);
+    int (*assign_device)(struct domain *d, uint8_t devfn, device_t *dev,
+                         uint32_t flag);
     int (*reassign_device)(struct domain *s, struct domain *t,
-                           u8 devfn, device_t *dev);
+                           uint8_t devfn, device_t *dev);
 #ifdef CONFIG_HAS_PCI
-    int (*get_device_group_id)(u16 seg, u8 bus, u8 devfn);
+    int (*get_device_group_id)(uint16_t seg, uint8_t bus, uint8_t devfn);
 #endif /* HAS_PCI */
 
     void (*teardown)(struct domain *d);
@@ -308,7 +309,7 @@ struct iommu_ops {
     int __must_check (*iotlb_flush)(struct domain *d, dfn_t dfn,
                                     unsigned long page_count,
                                     unsigned int flush_flags);
-    int (*get_reserved_device_memory)(iommu_grdm_t *, void *);
+    int (*get_reserved_device_memory)(iommu_grdm_t *func, void *ctxt);
     void (*dump_page_tables)(struct domain *d);
 
 #ifdef CONFIG_HAS_DEVICE_TREE
