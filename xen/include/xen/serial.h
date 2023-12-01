@@ -181,7 +181,7 @@ static void inline xhci_dbc_uart_init(void) {};
 void arm_uart_init(void);
 
 struct physdev_dbgp_op;
-int dbgp_op(const struct physdev_dbgp_op *);
+int dbgp_op(const struct physdev_dbgp_op *op);
 
 /* Baud rate was pre-configured before invoking the UART driver. */
 #define BAUD_AUTO (-1)
