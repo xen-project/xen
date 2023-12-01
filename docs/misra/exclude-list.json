@@ -94,6 +94,10 @@
             "comment": "Imported from Linux, ignore for now"
         },
         {
+            "rel_path": "arch/x86/efi/check.c",
+            "comment": "The resulting code is not included in the final Xen binary, ignore for now"
+        },
+        {
             "rel_path": "common/bitmap.c",
             "comment": "Imported from Linux, ignore for now"
         },
