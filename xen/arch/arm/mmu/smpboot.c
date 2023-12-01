@@ -7,6 +7,8 @@
 
 #include <xen/domain_page.h>
 
+#include <asm/setup.h>
+
 /*
  * Static start-of-day pagetables that we use before the allocators
  * are up. These are used by all CPUs during bringup before switching

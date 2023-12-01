@@ -8,6 +8,7 @@
 #include <xen/init.h>
 #include <xen/libfdt/libfdt.h>
 #include <xen/sizes.h>
+#include <xen/vmap.h>
 
 #include <asm/fixmap.h>
 
