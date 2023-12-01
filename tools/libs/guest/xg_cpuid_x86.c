@@ -136,20 +136,20 @@ static int get_system_cpu_policy(xc_interface *xch, uint32_t index,
     DECLARE_HYPERCALL_BOUNCE(msrs,
                              *nr_msrs * sizeof(*msrs),
                              XC_HYPERCALL_BUFFER_BOUNCE_OUT);
-    int ret;
+    int ret = -1;
 
-    if ( xc_hypercall_bounce_pre(xch, leaves) ||
-         xc_hypercall_bounce_pre(xch, msrs) )
-        return -1;
+    if ( !xc_hypercall_bounce_pre(xch, leaves) &&
+         !xc_hypercall_bounce_pre(xch, msrs) )
+    {
+        sysctl.cmd = XEN_SYSCTL_get_cpu_policy;
+        sysctl.u.cpu_policy.index = index;
+        sysctl.u.cpu_policy.nr_leaves = *nr_leaves;
+        set_xen_guest_handle(sysctl.u.cpu_policy.leaves, leaves);
+        sysctl.u.cpu_policy.nr_msrs = *nr_msrs;
+        set_xen_guest_handle(sysctl.u.cpu_policy.msrs, msrs);
 
-    sysctl.cmd = XEN_SYSCTL_get_cpu_policy;
-    sysctl.u.cpu_policy.index = index;
-    sysctl.u.cpu_policy.nr_leaves = *nr_leaves;
-    set_xen_guest_handle(sysctl.u.cpu_policy.leaves, leaves);
-    sysctl.u.cpu_policy.nr_msrs = *nr_msrs;
-    set_xen_guest_handle(sysctl.u.cpu_policy.msrs, msrs);
-
-    ret = do_sysctl(xch, &sysctl);
+        ret = do_sysctl(xch, &sysctl);
+    }
 
     xc_hypercall_bounce_post(xch, leaves);
     xc_hypercall_bounce_post(xch, msrs);
@@ -174,20 +174,20 @@ static int get_domain_cpu_policy(xc_interface *xch, uint32_t domid,
     DECLARE_HYPERCALL_BOUNCE(msrs,
                              *nr_msrs * sizeof(*msrs),
                              XC_HYPERCALL_BUFFER_BOUNCE_OUT);
-    int ret;
+    int ret = -1;
 
-    if ( xc_hypercall_bounce_pre(xch, leaves) ||
-         xc_hypercall_bounce_pre(xch, msrs) )
-        return -1;
+    if ( !xc_hypercall_bounce_pre(xch, leaves) &&
+         !xc_hypercall_bounce_pre(xch, msrs) )
+    {
+        domctl.cmd = XEN_DOMCTL_get_cpu_policy;
+        domctl.domain = domid;
+        domctl.u.cpu_policy.nr_leaves = *nr_leaves;
+        set_xen_guest_handle(domctl.u.cpu_policy.leaves, leaves);
+        domctl.u.cpu_policy.nr_msrs = *nr_msrs;
+        set_xen_guest_handle(domctl.u.cpu_policy.msrs, msrs);
 
-    domctl.cmd = XEN_DOMCTL_get_cpu_policy;
-    domctl.domain = domid;
-    domctl.u.cpu_policy.nr_leaves = *nr_leaves;
-    set_xen_guest_handle(domctl.u.cpu_policy.leaves, leaves);
-    domctl.u.cpu_policy.nr_msrs = *nr_msrs;
-    set_xen_guest_handle(domctl.u.cpu_policy.msrs, msrs);
-
-    ret = do_domctl(xch, &domctl);
+        ret = do_domctl(xch, &domctl);
+    }
 
     xc_hypercall_bounce_post(xch, leaves);
     xc_hypercall_bounce_post(xch, msrs);
@@ -214,32 +214,24 @@ int xc_set_domain_cpu_policy(xc_interface *xch, uint32_t domid,
     DECLARE_HYPERCALL_BOUNCE(msrs,
                              nr_msrs * sizeof(*msrs),
                              XC_HYPERCALL_BUFFER_BOUNCE_IN);
-    int ret;
+    int ret = -1;
 
-    if ( err_leaf_p )
-        *err_leaf_p = -1;
-    if ( err_subleaf_p )
-        *err_subleaf_p = -1;
-    if ( err_msr_p )
-        *err_msr_p = -1;
-
-    if ( xc_hypercall_bounce_pre(xch, leaves) )
-        return -1;
-
-    if ( xc_hypercall_bounce_pre(xch, msrs) )
-        return -1;
-
-    domctl.cmd = XEN_DOMCTL_set_cpu_policy;
-    domctl.domain = domid;
-    domctl.u.cpu_policy.nr_leaves = nr_leaves;
-    set_xen_guest_handle(domctl.u.cpu_policy.leaves, leaves);
-    domctl.u.cpu_policy.nr_msrs = nr_msrs;
-    set_xen_guest_handle(domctl.u.cpu_policy.msrs, msrs);
     domctl.u.cpu_policy.err_leaf = -1;
     domctl.u.cpu_policy.err_subleaf = -1;
     domctl.u.cpu_policy.err_msr = -1;
 
-    ret = do_domctl(xch, &domctl);
+    if ( !xc_hypercall_bounce_pre(xch, leaves) &&
+         !xc_hypercall_bounce_pre(xch, msrs) )
+    {
+        domctl.cmd = XEN_DOMCTL_set_cpu_policy;
+        domctl.domain = domid;
+        domctl.u.cpu_policy.nr_leaves = nr_leaves;
+        set_xen_guest_handle(domctl.u.cpu_policy.leaves, leaves);
+        domctl.u.cpu_policy.nr_msrs = nr_msrs;
+        set_xen_guest_handle(domctl.u.cpu_policy.msrs, msrs);
+
+        ret = do_domctl(xch, &domctl);
+    }
 
     xc_hypercall_bounce_post(xch, leaves);
     xc_hypercall_bounce_post(xch, msrs);
