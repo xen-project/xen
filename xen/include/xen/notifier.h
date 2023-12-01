@@ -23,7 +23,8 @@
  */
 
 struct notifier_block {
-    int (*notifier_call)(struct notifier_block *, unsigned long, void *);
+    int (*notifier_call)(struct notifier_block *nfb, unsigned long action,
+                         void *hcpu);
     struct list_head chain;
     int priority;
 };
