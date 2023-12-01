@@ -112,7 +112,7 @@ struct vcpu;
 
 void show_execution_state(const struct cpu_user_regs *regs);
 void cf_check show_execution_state_nonconst(struct cpu_user_regs *regs);
-void vcpu_show_execution_state(struct vcpu *);
+void vcpu_show_execution_state(struct vcpu *v);
 
 #endif /* _LINUX_KERNEL_H */
 
