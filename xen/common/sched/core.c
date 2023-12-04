@@ -698,7 +698,7 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
     struct sched_unit *unit, *old_unit;
     struct sched_unit *new_units = NULL, *old_units;
     struct sched_unit **unit_ptr = &new_units;
-    unsigned int new_p, unit_idx;
+    unsigned int new_cpu, unit_idx;
     void *domdata;
     struct scheduler *old_ops = dom_scheduler(d);
     void *old_domdata;
@@ -748,13 +748,14 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
     domain_pause(d);
 
     old_domdata = d->sched_priv;
+    old_units = d->sched_unit_list;
 
     /*
      * Remove all units from the old scheduler, and temporarily move them to
      * the same processor to make locking easier when moving the new units to
      * new processors.
      */
-    new_p = cpumask_first(d->cpupool->cpu_valid);
+    new_cpu = cpumask_first(d->cpupool->cpu_valid);
     for_each_sched_unit ( d, unit )
     {
         spinlock_t *lock;
@@ -762,11 +763,9 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         sched_remove_unit(old_ops, unit);
 
         lock = unit_schedule_lock_irq(unit);
-        sched_set_res(unit, get_sched_res(new_p));
+        sched_set_res(unit, get_sched_res(new_cpu));
         spin_unlock_irq(lock);
     }
-
-    old_units = d->sched_unit_list;
 
     d->cpupool = c;
     d->sched_priv = domdata;
@@ -781,32 +780,32 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         unit->state_entry_time = old_unit->state_entry_time;
         unit->runstate_cnt[v->runstate.state]++;
         /* Temporarily use old resource assignment */
-        unit->res = get_sched_res(new_p);
+        unit->res = get_sched_res(new_cpu);
 
         v->sched_unit = unit;
     }
 
     d->sched_unit_list = new_units;
 
-    new_p = cpumask_first(c->cpu_valid);
+    new_cpu = cpumask_first(c->cpu_valid);
     for_each_sched_unit ( d, unit )
     {
         spinlock_t *lock;
-        unsigned int unit_p = new_p;
+        unsigned int unit_cpu = new_cpu;
 
         for_each_sched_unit_vcpu ( unit, v )
         {
-            migrate_timer(&v->periodic_timer, new_p);
-            migrate_timer(&v->singleshot_timer, new_p);
-            migrate_timer(&v->poll_timer, new_p);
-            new_p = cpumask_cycle(new_p, c->cpu_valid);
+            migrate_timer(&v->periodic_timer, new_cpu);
+            migrate_timer(&v->singleshot_timer, new_cpu);
+            migrate_timer(&v->poll_timer, new_cpu);
+            new_cpu = cpumask_cycle(new_cpu, c->cpu_valid);
         }
 
         lock = unit_schedule_lock_irq(unit);
 
         sched_set_affinity(unit, &cpumask_all, &cpumask_all);
 
-        sched_set_res(unit, get_sched_res(unit_p));
+        sched_set_res(unit, get_sched_res(unit_cpu));
         /*
          * With v->processor modified we must not
          * - make any further changes assuming we hold the scheduler lock,
@@ -818,8 +817,6 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
             sched_move_irqs(unit);
 
         sched_insert_unit(c->sched, unit);
-
-        unit_idx++;
     }
 
     domain_update_node_affinity(d);
