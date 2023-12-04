@@ -37,6 +37,10 @@ removed by the compiler, the resulting slowdown is negligible."
 -config=MC3R1.R2.2,reports+={disapplied,"any()"}
 -doc_end
 
+-doc_begin="Some labels are unused in certain build configurations, or are deliberately marked as unused, so that the compiler is entitled to remove them."
+-config=MC3R1.R2.6,reports+={deliberate, "any_area(text(^.*__maybe_unused.*$))"}
+-doc_end
+
 #
 # Series 3.
 #

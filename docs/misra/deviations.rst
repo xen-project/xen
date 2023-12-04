@@ -73,6 +73,14 @@ Deviations related to MISRA C:2012 Rules:
        resulting slowdown is negligible.
      - Project-wide deviation, tagged as `disapplied` for ECLAIR.
 
+   * - R2.6
+     - Labels deliberately marked as unused trough the pseudo-attribute
+       `__maybe_unused` are either the result of them not being in certain build
+       configurations, or as a deliberate practice (e.g., `unimplemented_insn`).
+       Given that the compiler is then entitled to remove them, the presence of
+       such labels poses no risks.
+     - Tagged as `deliberate` for ECLAIR.
+
    * - R3.1
      - Comments starting with '/\*' and containing hyperlinks are safe as they
        are not instances of commented-out code.
