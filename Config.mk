@@ -229,7 +229,7 @@ MINIOS_UPSTREAM_URL ?= https://xenbits.xen.org/git-http/mini-os.git
 MINIOS_UPSTREAM_REVISION ?= b08019f0b2fbc30c75169a160acb9fd9af5d68f4
 
 SEABIOS_UPSTREAM_URL ?= https://xenbits.xen.org/git-http/seabios.git
-SEABIOS_UPSTREAM_REVISION ?= rel-1.16.2
+SEABIOS_UPSTREAM_REVISION ?= rel-1.16.3
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
