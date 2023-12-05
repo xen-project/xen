@@ -21,10 +21,9 @@ RUN \
   apk add python3 && \
   apk add zlib && \
   apk add ncurses && \
-  apk add texinfo && \
   apk add yajl && \
   apk add libaio && \
-  apk add xz-dev && \
+  apk add xz && \
   apk add util-linux && \
   apk add argp-standalone && \
   apk add libfdt && \
