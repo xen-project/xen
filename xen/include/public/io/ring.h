@@ -25,7 +25,15 @@
  * and grant_table.h from the Xen public headers.
  */
 
+#include "../xen.h"
 #include "../xen-compat.h"
+
+/* Some PV I/O interfaces need a compatibility variant. */
+#if __XEN_INTERFACE_VERSION__ < 0x00041300
+#define XENPV_FLEX_ARRAY_DIM  1 /* variable size */
+#else
+#define XENPV_FLEX_ARRAY_DIM  XEN_FLEX_ARRAY_DIM
+#endif
 
 #if __XEN_INTERFACE_VERSION__ < 0x00030208
 #define xen_mb()  mb()
@@ -110,7 +118,7 @@ struct __name##_sring {                                                 \
         uint8_t pvt_pad[4];                                             \
     } pvt;                                                              \
     uint8_t __pad[44];                                                  \
-    union __name##_sring_entry ring[1]; /* variable-length */           \
+    union __name##_sring_entry ring[XENPV_FLEX_ARRAY_DIM];              \
 };                                                                      \
                                                                         \
 /* "Front" end's private variables */                                   \
@@ -479,7 +487,7 @@ struct name##_data_intf {                                                     \
     uint8_t pad2[56];                                                         \
                                                                               \
     RING_IDX ring_order;                                                      \
-    grant_ref_t ref[];                                                        \
+    grant_ref_t ref[XEN_FLEX_ARRAY_DIM];                                      \
 };                                                                            \
 DEFINE_XEN_FLEX_RING(name)
 

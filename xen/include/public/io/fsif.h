@@ -40,7 +40,7 @@ struct fsif_read_request {
     int32_t pad;
     uint64_t len;
     uint64_t offset;
-    grant_ref_t grefs[1];  /* Variable length */
+    grant_ref_t grefs[XENPV_FLEX_ARRAY_DIM];
 };
 
 struct fsif_write_request {
@@ -48,7 +48,7 @@ struct fsif_write_request {
     int32_t pad;
     uint64_t len;
     uint64_t offset;
-    grant_ref_t grefs[1];  /* Variable length */
+    grant_ref_t grefs[XENPV_FLEX_ARRAY_DIM];
 };
 
 struct fsif_stat_request {

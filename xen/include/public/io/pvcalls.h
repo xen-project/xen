@@ -30,7 +30,7 @@ struct pvcalls_data_intf {
     uint8_t pad2[52];
 
     RING_IDX ring_order;
-    grant_ref_t ref[];
+    grant_ref_t ref[XEN_FLEX_ARRAY_DIM];
 };
 DEFINE_XEN_FLEX_RING(pvcalls);
 
