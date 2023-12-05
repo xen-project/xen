@@ -144,6 +144,15 @@ separate lines and each line should begin with a leading '*'.
  * Note beginning and end markers on separate lines and leading '*'.
  */
 
+Naming convention for files and command line options
+----------------------------------------------------
+
+'-' should be used to separate words in commandline options and filenames.
+E.g. timer-works.
+
+Note that some of the options and filenames are using '_'. This is now
+deprecated.
+
 Emacs local variables
 ---------------------
 
