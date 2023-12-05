@@ -354,7 +354,7 @@ static int __init handle_passthrough_prop(struct kernel_info *kinfo,
     if ( node == NULL )
     {
         printk(XENLOG_ERR "Couldn't find node %s in host_dt!\n",
-               (char *)xen_path->data);
+               xen_path->data);
         return -EINVAL;
     }
 

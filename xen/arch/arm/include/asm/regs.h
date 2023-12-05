@@ -48,7 +48,7 @@ static inline bool regs_mode_is_32bit(const struct cpu_user_regs *regs)
 
 static inline bool guest_mode(const struct cpu_user_regs *r)
 {
-    unsigned long diff = (char *)guest_cpu_user_regs() - (char *)(r);
+    unsigned long diff = (uintptr_t)guest_cpu_user_regs() - (uintptr_t)(r);
     /* Frame pointer must point into current CPU stack. */
     ASSERT(diff < STACK_SIZE);
     /* If not a guest frame, it must be a hypervisor frame. */
