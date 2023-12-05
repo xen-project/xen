@@ -73,7 +73,7 @@ static struct ns16550 {
     bool msi;
     const struct ns16550_config_param *param; /* Points into .init.*! */
 #endif
-} ns16550_com[2] = { { 0 } };
+} ns16550_com[2] = {};
 
 #ifdef NS16550_PCI
 struct ns16550_config {
