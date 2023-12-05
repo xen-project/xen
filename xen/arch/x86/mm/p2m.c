@@ -2417,7 +2417,7 @@ int xenmem_add_to_physmap_one(
     gfn_t gpfn)
 {
     struct page_info *page = NULL;
-    unsigned long gfn = 0 /* gcc ... */, old_gpfn;
+    unsigned long gmfn = 0 /* gcc ... */, old_gpfn;
     mfn_t prev_mfn;
     int rc = 0;
     mfn_t mfn = INVALID_MFN;
@@ -2440,12 +2440,12 @@ int xenmem_add_to_physmap_one(
 
     case XENMAPSPACE_gmfn:
     {
-        gfn = idx;
-        mfn = get_gfn_unshare(d, gfn, &p2mt);
+        gmfn = idx;
+        mfn = get_gfn_unshare(d, gmfn, &p2mt);
         /* If the page is still shared, exit early */
         if ( p2m_is_shared(p2mt) )
         {
-            put_gfn(d, gfn);
+            put_gfn(d, gmfn);
             return -ENOMEM;
         }
         page = get_page_from_mfn(mfn, d);
@@ -2480,7 +2480,7 @@ int xenmem_add_to_physmap_one(
     /* XENMAPSPACE_gmfn: Check if the MFN is associated with another GFN. */
     old_gpfn = get_gpfn_from_mfn(mfn_x(mfn));
     ASSERT(!SHARED_M2P(old_gpfn));
-    if ( space == XENMAPSPACE_gmfn && old_gpfn != gfn )
+    if ( space == XENMAPSPACE_gmfn && old_gpfn != gmfn )
     {
         rc = -EXDEV;
         goto put_all;
@@ -2518,7 +2518,7 @@ int xenmem_add_to_physmap_one(
      */
     if ( space == XENMAPSPACE_gmfn )
     {
-        put_gfn(d, gfn);
+        put_gfn(d, gmfn);
         if ( !rc && extra.ppage )
         {
             *extra.ppage = page;
