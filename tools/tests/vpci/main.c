@@ -70,6 +70,28 @@ static void vpci_write32(const struct pci_dev *pdev, unsigned int reg,
     *(uint32_t *)data = val;
 }
 
+struct mask_data {
+    uint32_t val;
+    uint32_t rw1c_mask;
+};
+
+static uint32_t vpci_read32_mask(const struct pci_dev *pdev, unsigned int reg,
+                                 void *data)
+{
+    const struct mask_data *md = data;
+
+    return md->val;
+}
+
+static void vpci_write32_mask(const struct pci_dev *pdev, unsigned int reg,
+                              uint32_t val, void *data)
+{
+    struct mask_data *md = data;
+
+    md->val  = val | (md->val & md->rw1c_mask);
+    md->val &= ~(val & md->rw1c_mask);
+}
+
 #define VPCI_READ(reg, size, data) ({                           \
     data = vpci_read((pci_sbdf_t){ .sbdf = 0 }, reg, size);     \
 })
@@ -94,8 +116,20 @@ static void vpci_write32(const struct pci_dev *pdev, unsigned int reg,
     assert(!vpci_add_register(test_pdev.vpci, fread, fwrite, off, size,     \
                               &store))
 
+#define VPCI_ADD_REG_MASK(fread, fwrite, off, size, store,                     \
+                          ro_mask, rw1c_mask, rsvdp_mask, rsvdz_mask)          \
+    assert(!vpci_add_register_mask(test_pdev.vpci, fread, fwrite, off, size,   \
+                                   &store,                                     \
+                                   ro_mask, rw1c_mask, rsvdp_mask, rsvdz_mask))
+
 #define VPCI_ADD_INVALID_REG(fread, fwrite, off, size)                      \
     assert(vpci_add_register(test_pdev.vpci, fread, fwrite, off, size, NULL))
+
+#define VPCI_ADD_INVALID_REG_MASK(fread, fwrite, off, size,                   \
+                                  ro_mask, rw1c_mask, rsvdp_mask, rsvdz_mask) \
+    assert(vpci_add_register_mask(test_pdev.vpci, fread, fwrite, off, size,   \
+                                  NULL, ro_mask, rw1c_mask, rsvdp_mask,       \
+                                  rsvdz_mask))
 
 #define VPCI_REMOVE_REG(off, size)                                          \
     assert(!vpci_remove_register(test_pdev.vpci, off, size))
@@ -154,6 +188,7 @@ main(int argc, char **argv)
     uint16_t r20[2] = { };
     uint32_t r24 = 0;
     uint8_t r28, r30;
+    struct mask_data r32;
     unsigned int i;
     int rc;
 
@@ -212,6 +247,24 @@ main(int argc, char **argv)
 
     /* Try to add a register with missing handlers. */
     VPCI_ADD_INVALID_REG(NULL, NULL, 8, 2);
+
+    /* Try to add registers with the same bits set in multiple masks. */
+    VPCI_ADD_INVALID_REG_MASK(vpci_read32, vpci_write32, 8, 4, 1, 1, 0, 0);
+    VPCI_ADD_INVALID_REG_MASK(vpci_read32, vpci_write32, 8, 4, 1, 0, 1, 0);
+    VPCI_ADD_INVALID_REG_MASK(vpci_read32, vpci_write32, 8, 4, 1, 0, 0, 1);
+    VPCI_ADD_INVALID_REG_MASK(vpci_read32, vpci_write32, 8, 4, 0, 1, 1, 0);
+    VPCI_ADD_INVALID_REG_MASK(vpci_read32, vpci_write32, 8, 4, 0, 1, 0, 1);
+    VPCI_ADD_INVALID_REG_MASK(vpci_read32, vpci_write32, 8, 4, 0, 0, 1, 1);
+
+    /* Try to add registers with mask bits set beyond the register size */
+    VPCI_ADD_INVALID_REG_MASK(vpci_read8, vpci_write8, 8, 1, 0x100U, 0, 0, 0);
+    VPCI_ADD_INVALID_REG_MASK(vpci_read8, vpci_write8, 8, 1, 0, 0x100U, 0, 0);
+    VPCI_ADD_INVALID_REG_MASK(vpci_read8, vpci_write8, 8, 1, 0, 0, 0x100U, 0);
+    VPCI_ADD_INVALID_REG_MASK(vpci_read8, vpci_write8, 8, 1, 0, 0, 0, 0x100U);
+    VPCI_ADD_INVALID_REG_MASK(vpci_read16, vpci_write16, 8, 2, 0x10000U,0,0,0);
+    VPCI_ADD_INVALID_REG_MASK(vpci_read16, vpci_write16, 8, 2, 0,0x10000U,0,0);
+    VPCI_ADD_INVALID_REG_MASK(vpci_read16, vpci_write16, 8, 2, 0,0,0x10000U,0);
+    VPCI_ADD_INVALID_REG_MASK(vpci_read16, vpci_write16, 8, 2, 0,0,0,0x10000U);
 
     /* Read/write of unset register. */
     VPCI_READ_CHECK(8, 4, 0xffffffff);
@@ -286,6 +339,64 @@ main(int argc, char **argv)
     VPCI_ADD_REG(vpci_read8, vpci_write8, 28, 1, r28);
     VPCI_ADD_REG(vpci_read8, vpci_write8, 30, 1, r30);
     VPCI_WRITE_CHECK(28, 4, 0xffacffdc);
+
+    /*
+     * Test ro/rw1c/rsvdp/rsvdz masks.
+     *
+     * 32     24     16      8      0
+     *  +------+------+------+------+
+     *  |rsvdz |rsvdp | rw1c |  ro  | 32
+     *  +------+------+------+------+
+     *
+     */
+    r32.rw1c_mask = 0x0000ff00U;
+    VPCI_ADD_REG_MASK(vpci_read32_mask, vpci_write32_mask, 32, 4, r32,
+                      0x000000ffU   /* RO    */,
+                      r32.rw1c_mask /* RW1C  */,
+                      0x00ff0000U   /* RsvdP */,
+                      0xff000000U   /* RsvdZ */);
+
+    /* ro */
+    r32.val = 0x0f0f0f0fU;
+    VPCI_READ_CHECK(32, 1, 0x0f);
+    VPCI_WRITE(32, 1, 0x5a);
+    VPCI_READ_CHECK(32, 1, 0x0f);
+    assert(r32.val == 0x000f0f0fU);
+
+    /* rw1c */
+    r32.val = 0x0f0f0f0fU;
+    VPCI_READ_CHECK(33, 1, 0x0f);
+    VPCI_WRITE(33, 1, 0x5a);
+    VPCI_READ_CHECK(33, 1, 0x05);
+    assert(r32.val == 0x000f050fU);
+
+    /* rsvdp */
+    r32.val = 0x0f0f0f0fU;
+    VPCI_READ_CHECK(34, 1, 0);
+    VPCI_WRITE(34, 1, 0x5a);
+    VPCI_READ_CHECK(34, 1, 0);
+    assert(r32.val == 0x000f0f0fU);
+
+    /* rsvdz */
+    r32.val = 0x0f0f0f0fU;
+    VPCI_READ_CHECK(35, 1, 0);
+    VPCI_WRITE(35, 1, 0x5a);
+    VPCI_READ_CHECK(35, 1, 0);
+    assert(r32.val == 0x000f0f0fU);
+
+    /* write all 0's */
+    r32.val = 0x0f0f0f0fU;
+    VPCI_READ_CHECK(32, 4, 0x00000f0fU);
+    VPCI_WRITE(32, 4, 0);
+    VPCI_READ_CHECK(32, 4, 0x00000f0fU);
+    assert(r32.val == 0x000f0f0fU);
+
+    /* write all 1's */
+    r32.val = 0x0f0f0f0fU;
+    VPCI_READ_CHECK(32, 4, 0x00000f0fU);
+    VPCI_WRITE(32, 4, 0xffffffffU);
+    VPCI_READ_CHECK(32, 4, 0x0000000fU);
+    assert(r32.val == 0x000f000fU);
 
     /* Finally try to remove a couple of registers. */
     VPCI_REMOVE_REG(28, 1);

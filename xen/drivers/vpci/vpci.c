@@ -29,6 +29,10 @@ struct vpci_register {
     unsigned int offset;
     void *private;
     struct list_head node;
+    uint32_t ro_mask;
+    uint32_t rw1c_mask;
+    uint32_t rsvdp_mask;
+    uint32_t rsvdz_mask;
 };
 
 #ifdef __XEN__
@@ -145,9 +149,17 @@ uint32_t cf_check vpci_hw_read32(
     return pci_conf_read32(pdev->sbdf, reg);
 }
 
-int vpci_add_register(struct vpci *vpci, vpci_read_t *read_handler,
-                      vpci_write_t *write_handler, unsigned int offset,
-                      unsigned int size, void *data)
+void cf_check vpci_hw_write16(
+    const struct pci_dev *pdev, unsigned int reg, uint32_t val, void *data)
+{
+    pci_conf_write16(pdev->sbdf, reg, val);
+}
+
+int vpci_add_register_mask(struct vpci *vpci, vpci_read_t *read_handler,
+                           vpci_write_t *write_handler, unsigned int offset,
+                           unsigned int size, void *data, uint32_t ro_mask,
+                           uint32_t rw1c_mask, uint32_t rsvdp_mask,
+                           uint32_t rsvdz_mask)
 {
     struct list_head *prev;
     struct vpci_register *r;
@@ -155,7 +167,14 @@ int vpci_add_register(struct vpci *vpci, vpci_read_t *read_handler,
     /* Some sanity checks. */
     if ( (size != 1 && size != 2 && size != 4) ||
          offset >= PCI_CFG_SPACE_EXP_SIZE || (offset & (size - 1)) ||
-         (!read_handler && !write_handler) )
+         (!read_handler && !write_handler) || (ro_mask & rw1c_mask) ||
+         (ro_mask & rsvdp_mask) || (ro_mask & rsvdz_mask) ||
+         (rw1c_mask & rsvdp_mask) || (rw1c_mask & rsvdz_mask) ||
+         (rsvdp_mask & rsvdz_mask) )
+        return -EINVAL;
+
+    if ( size != 4 &&
+         ((ro_mask | rw1c_mask | rsvdp_mask | rsvdz_mask) >> (8 * size)) )
         return -EINVAL;
 
     r = xmalloc(struct vpci_register);
@@ -167,6 +186,10 @@ int vpci_add_register(struct vpci *vpci, vpci_read_t *read_handler,
     r->size = size;
     r->offset = offset;
     r->private = data;
+    r->ro_mask = ro_mask;
+    r->rw1c_mask = rw1c_mask;
+    r->rsvdp_mask = rsvdp_mask;
+    r->rsvdz_mask = rsvdz_mask;
 
     spin_lock(&vpci->lock);
 
@@ -376,6 +399,7 @@ uint32_t vpci_read(pci_sbdf_t sbdf, unsigned int reg, unsigned int size)
         }
 
         val = r->read(pdev, r->offset, r->private);
+        val &= ~(r->rsvdp_mask | r->rsvdz_mask);
 
         /* Check if the read is in the middle of a register. */
         if ( r->offset < emu.offset )
@@ -407,25 +431,25 @@ uint32_t vpci_read(pci_sbdf_t sbdf, unsigned int reg, unsigned int size)
 
 /*
  * Perform a maybe partial write to a register.
- *
- * Note that this will only work for simple registers, if Xen needs to
- * trap accesses to rw1c registers (like the status PCI header register)
- * the logic in vpci_write will have to be expanded in order to correctly
- * deal with them.
  */
 static void vpci_write_helper(const struct pci_dev *pdev,
                               const struct vpci_register *r, unsigned int size,
                               unsigned int offset, uint32_t data)
 {
+    uint32_t curval = 0;
+    uint32_t preserved_mask = r->ro_mask | r->rsvdp_mask;
+
     ASSERT(size <= r->size);
 
-    if ( size != r->size )
+    if ( (size != r->size) || preserved_mask )
     {
-        uint32_t val;
-
-        val = r->read(pdev, r->offset, r->private);
-        data = merge_result(val, data, size, offset);
+        curval = r->read(pdev, r->offset, r->private);
+        curval &= ~r->rw1c_mask;
+        data = merge_result(curval, data, size, offset);
     }
+
+    data &= ~(preserved_mask | r->rsvdz_mask);
+    data |= curval & preserved_mask;
 
     r->write(pdev, r->offset, data & (0xffffffffU >> (32 - 8 * r->size)),
              r->private);
