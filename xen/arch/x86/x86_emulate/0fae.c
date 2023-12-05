@@ -55,7 +55,10 @@ int x86emul_0fae(struct x86_emulate_state *s,
                     cr4 = X86_CR4_OSFXSR;
                 if ( !ops->read_msr ||
                      ops->read_msr(MSR_EFER, &msr_val, ctxt) != X86EMUL_OKAY )
+                {
+                    x86_emul_reset_event(ctxt);
                     msr_val = 0;
+                }
                 if ( !(cr4 & X86_CR4_OSFXSR) ||
                      (mode_64bit() && mode_ring0() && (msr_val & EFER_FFXSE)) )
                     s->op_bytes = offsetof(struct x86_fxsr, xmm[0]);

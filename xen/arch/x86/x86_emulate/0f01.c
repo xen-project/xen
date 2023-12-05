@@ -200,8 +200,10 @@ int x86emul_0f01(struct x86_emulate_state *s,
         if ( (rc = ops->write_segment(x86_seg_gs, &sreg,
                                       ctxt)) != X86EMUL_OKAY )
         {
-            /* Best effort unwind (i.e. no error checking). */
-            ops->write_msr(MSR_SHADOW_GS_BASE, msr_val, ctxt);
+            /* Best effort unwind (i.e. no real error checking). */
+            if ( ops->write_msr(MSR_SHADOW_GS_BASE, msr_val,
+                                ctxt) == X86EMUL_EXCEPTION )
+                x86_emul_reset_event(ctxt);
             goto done;
         }
         break;
