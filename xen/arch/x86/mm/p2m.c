@@ -2414,10 +2414,10 @@ int xenmem_add_to_physmap_one(
     unsigned int space,
     union add_to_physmap_extra extra,
     unsigned long idx,
-    gfn_t gpfn)
+    gfn_t gfn)
 {
     struct page_info *page = NULL;
-    unsigned long gmfn = 0 /* gcc ... */, old_gpfn;
+    unsigned long gmfn = 0 /* gcc ... */, old_gfn;
     mfn_t prev_mfn;
     int rc = 0;
     mfn_t mfn = INVALID_MFN;
@@ -2431,7 +2431,7 @@ int xenmem_add_to_physmap_one(
         break;
 
     case XENMAPSPACE_grant_table:
-        rc = gnttab_map_frame(d, idx, gpfn, &mfn);
+        rc = gnttab_map_frame(d, idx, gfn, &mfn);
         if ( rc )
             return rc;
         /* Need to take care of the reference obtained in gnttab_map_frame(). */
@@ -2455,7 +2455,7 @@ int xenmem_add_to_physmap_one(
     }
 
     case XENMAPSPACE_gmfn_foreign:
-        return p2m_add_foreign(d, idx, gfn_x(gpfn), extra.foreign_domid);
+        return p2m_add_foreign(d, idx, gfn_x(gfn), extra.foreign_domid);
     }
 
     if ( mfn_eq(mfn, INVALID_MFN) )
@@ -2475,12 +2475,12 @@ int xenmem_add_to_physmap_one(
      * Upon freeing we wouldn't be able to find other mappings in the P2M
      * (unless we did a brute force search).
      */
-    prev_mfn = get_gfn(d, gfn_x(gpfn), &p2mt);
+    prev_mfn = get_gfn(d, gfn_x(gfn), &p2mt);
 
     /* XENMAPSPACE_gmfn: Check if the MFN is associated with another GFN. */
-    old_gpfn = get_gpfn_from_mfn(mfn_x(mfn));
-    ASSERT(!SHARED_M2P(old_gpfn));
-    if ( space == XENMAPSPACE_gmfn && old_gpfn != gmfn )
+    old_gfn = get_gpfn_from_mfn(mfn_x(mfn));
+    ASSERT(!SHARED_M2P(old_gfn));
+    if ( space == XENMAPSPACE_gmfn && old_gfn != gmfn )
     {
         rc = -EXDEV;
         goto put_all;
@@ -2493,22 +2493,22 @@ int xenmem_add_to_physmap_one(
     {
         if ( is_special_page(mfn_to_page(prev_mfn)) )
             /* Special pages are simply unhooked from this phys slot. */
-            rc = p2m_remove_page(d, gpfn, prev_mfn, PAGE_ORDER_4K);
+            rc = p2m_remove_page(d, gfn, prev_mfn, PAGE_ORDER_4K);
         else if ( !mfn_eq(mfn, prev_mfn) )
             /* Normal domain memory is freed, to avoid leaking memory. */
-            rc = guest_remove_page(d, gfn_x(gpfn));
+            rc = guest_remove_page(d, gfn_x(gfn));
     }
 
     /* Unmap from old location, if any. */
-    if ( !rc && old_gpfn != INVALID_M2P_ENTRY && !gfn_eq(_gfn(old_gpfn), gpfn) )
-        rc = p2m_remove_page(d, _gfn(old_gpfn), mfn, PAGE_ORDER_4K);
+    if ( !rc && old_gfn != INVALID_M2P_ENTRY && !gfn_eq(_gfn(old_gfn), gfn) )
+        rc = p2m_remove_page(d, _gfn(old_gfn), mfn, PAGE_ORDER_4K);
 
     /* Map at new location. */
     if ( !rc )
-        rc = p2m_add_page(d, gpfn, mfn, PAGE_ORDER_4K, p2m_ram_rw);
+        rc = p2m_add_page(d, gfn, mfn, PAGE_ORDER_4K, p2m_ram_rw);
 
  put_all:
-    put_gfn(d, gfn_x(gpfn));
+    put_gfn(d, gfn_x(gfn));
 
  put_both:
     /*
