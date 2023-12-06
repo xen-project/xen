@@ -39,6 +39,21 @@ void _hvm_write_entry(struct hvm_domain_context *h,
 int _hvm_check_entry(struct hvm_domain_context *h,
                      uint16_t type, uint32_t len, bool strict_length);
 
+/*
+ * Unmarshalling: check, then return pointer. Evaluates to non-NULL on success.
+ * This macro requires the save entry to be the same size as the dest structure.
+ */
+#define hvm_get_entry(x, h) ({                                  \
+    const void *ptr = NULL;                                     \
+    BUILD_BUG_ON(HVM_SAVE_HAS_COMPAT(x));                       \
+    if ( _hvm_check_entry(h, HVM_SAVE_CODE(x),                  \
+                          HVM_SAVE_LENGTH(x), true) == 0 )      \
+    {                                                           \
+        ptr = &(h)->data[(h)->cur];                             \
+        h->cur += HVM_SAVE_LENGTH(x);                           \
+    }                                                           \
+    ptr; })
+
 /* Unmarshalling: copy the contents in a type-safe way */
 void _hvm_read_entry(struct hvm_domain_context *h,
                      void *dest, uint32_t dest_len);
@@ -126,10 +141,5 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h);
 int hvm_save_one(struct domain *d, unsigned int typecode, unsigned int instance,
                  XEN_GUEST_HANDLE_64(uint8) handle, uint64_t *bufsz);
 int hvm_load(struct domain *d, hvm_domain_context_t *h);
-
-/* Arch-specific definitions. */
-struct hvm_save_header;
-void arch_hvm_save(struct domain *d, struct hvm_save_header *hdr);
-int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr);
 
 #endif /* __XEN_HVM_SAVE_H__ */

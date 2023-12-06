@@ -15,7 +15,7 @@
 
 #include <public/hvm/save.h>
 
-void arch_hvm_save(struct domain *d, struct hvm_save_header *hdr)
+static void arch_hvm_save(struct domain *d, struct hvm_save_header *hdr)
 {
     uint32_t eax, ebx, ecx, edx;
 
@@ -30,7 +30,7 @@ void arch_hvm_save(struct domain *d, struct hvm_save_header *hdr)
     d->arch.hvm.sync_tsc = rdtsc();
 }
 
-int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
+static int arch_hvm_load(struct domain *d, const struct hvm_save_header *hdr)
 {
     uint32_t eax, ebx, ecx, edx;
 
@@ -277,7 +277,7 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
 
 int hvm_load(struct domain *d, hvm_domain_context_t *h)
 {
-    struct hvm_save_header hdr;
+    const struct hvm_save_header *hdr;
     struct hvm_save_descriptor *desc;
     hvm_load_handler handler;
     struct vcpu *v;
@@ -286,11 +286,12 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h)
     if ( d->is_dying )
         return -EINVAL;
 
-    /* Read the save header, which must be first */
-    if ( hvm_load_entry(HEADER, h, &hdr) != 0 )
+    /* Get at the save header, which must be first */
+    hdr = hvm_get_entry(HEADER, h);
+    if ( !hdr )
         return -ENODATA;
 
-    rc = arch_hvm_load(d, &hdr);
+    rc = arch_hvm_load(d, hdr);
     if ( rc )
         return rc;
 

@@ -637,7 +637,7 @@ static int cf_check hpet_save(struct vcpu *v, hvm_domain_context_t *h)
 static int cf_check hpet_load(struct domain *d, hvm_domain_context_t *h)
 {
     HPETState *hp = domain_vhpet(d);
-    struct hvm_hw_hpet *rec;
+    const struct hvm_hw_hpet *rec;
     uint64_t cmp;
     uint64_t guest_time;
     int i;
@@ -645,17 +645,12 @@ static int cf_check hpet_load(struct domain *d, hvm_domain_context_t *h)
     if ( !has_vhpet(d) )
         return -ENODEV;
 
-    write_lock(&hp->lock);
-
     /* Reload the HPET registers */
-    if ( _hvm_check_entry(h, HVM_SAVE_CODE(HPET), HVM_SAVE_LENGTH(HPET), 1) )
-    {
-        write_unlock(&hp->lock);
+    rec = hvm_get_entry(HPET, h);
+    if ( !rec )
         return -EINVAL;
-    }
 
-    rec = (struct hvm_hw_hpet *)&h->data[h->cur];
-    h->cur += HVM_SAVE_LENGTH(HPET);
+    write_lock(&hp->lock);
 
 #define C(x) hp->hpet.x = rec->x
     C(capability);
