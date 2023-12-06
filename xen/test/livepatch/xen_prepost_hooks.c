@@ -30,7 +30,7 @@ static int pre_apply_hook(livepatch_payload_t *payload)
 
     for (i = 0; i < payload->nfuncs; i++)
     {
-        struct livepatch_func *func = &payload->funcs[i];
+        const struct livepatch_func *func = &payload->funcs[i];
 
         pre_apply_cnt++;
         printk(KERN_DEBUG "%s: applying: %s\n", __func__, func->name);
@@ -49,7 +49,7 @@ static void post_apply_hook(livepatch_payload_t *payload)
 
     for (i = 0; i < payload->nfuncs; i++)
     {
-        struct livepatch_func *func = &payload->funcs[i];
+        const struct livepatch_func *func = &payload->funcs[i];
 
         post_apply_cnt++;
         printk(KERN_DEBUG "%s: applied: %s\n", __func__, func->name);
@@ -66,7 +66,7 @@ static int pre_revert_hook(livepatch_payload_t *payload)
 
     for (i = 0; i < payload->nfuncs; i++)
     {
-        struct livepatch_func *func = &payload->funcs[i];
+        const struct livepatch_func *func = &payload->funcs[i];
 
         pre_revert_cnt++;
         printk(KERN_DEBUG "%s: reverting: %s\n", __func__, func->name);
@@ -86,7 +86,7 @@ static void post_revert_hook(livepatch_payload_t *payload)
 
     for (i = 0; i < payload->nfuncs; i++)
     {
-        struct livepatch_func *func = &payload->funcs[i];
+        const struct livepatch_func *func = &payload->funcs[i];
 
         post_revert_cnt++;
         printk(KERN_DEBUG "%s: reverted: %s\n", __func__, func->name);

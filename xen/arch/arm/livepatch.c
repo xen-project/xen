@@ -69,7 +69,7 @@ void arch_livepatch_revive(void)
 int arch_livepatch_verify_func(const struct livepatch_func *func)
 {
     /* If NOPing only do up to maximum amount we can put in the ->opaque. */
-    if ( !func->new_addr && (func->new_size > sizeof(func->opaque) ||
+    if ( !func->new_addr && (func->new_size > LIVEPATCH_OPAQUE_SIZE ||
          func->new_size % ARCH_PATCH_INSN_SIZE) )
         return -EOPNOTSUPP;
 
@@ -79,15 +79,16 @@ int arch_livepatch_verify_func(const struct livepatch_func *func)
     return 0;
 }
 
-void arch_livepatch_revert(const struct livepatch_func *func)
+void arch_livepatch_revert(const struct livepatch_func *func,
+                           struct livepatch_fstate *state)
 {
     uint32_t *new_ptr;
     unsigned int len;
 
     new_ptr = func->old_addr - (void *)_start + vmap_of_xen_text;
 
-    len = livepatch_insn_len(func);
-    memcpy(new_ptr, func->opaque, len);
+    len = livepatch_insn_len(func, state);
+    memcpy(new_ptr, state->insn_buffer, len);
 
     clean_and_invalidate_dcache_va_range(new_ptr, len);
 }

@@ -24,7 +24,7 @@ static int pre_apply_hook(livepatch_payload_t *payload)
 
     for (i = 0; i < payload->nfuncs; i++)
     {
-        struct livepatch_func *func = &payload->funcs[i];
+        const struct livepatch_func *func = &payload->funcs[i];
 
         printk(KERN_DEBUG "%s: pre applying: %s\n", __func__, func->name);
     }

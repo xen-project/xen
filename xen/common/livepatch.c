@@ -260,6 +260,9 @@ static void free_payload_data(struct payload *payload)
     vfree((void *)payload->text_addr);
 
     payload->pages = 0;
+
+    /* fstate gets allocated strictly after move_payload. */
+    XFREE(payload->fstate);
 }
 
 /*
@@ -656,6 +659,7 @@ static int prepare_payload(struct payload *payload,
 {
     const struct livepatch_elf_sec *sec;
     unsigned int i;
+    struct livepatch_func *funcs;
     struct livepatch_func *f;
     struct virtual_region *region;
     const Elf_Note *n;
@@ -666,14 +670,19 @@ static int prepare_payload(struct payload *payload,
         if ( !section_ok(elf, sec, sizeof(*payload->funcs)) )
             return -EINVAL;
 
-        payload->funcs = sec->load_addr;
+        payload->funcs = funcs = sec->load_addr;
         payload->nfuncs = sec->sec->sh_size / sizeof(*payload->funcs);
+
+        payload->fstate = xzalloc_array(typeof(*payload->fstate),
+                                        payload->nfuncs);
+        if ( !payload->fstate )
+            return -ENOMEM;
 
         for ( i = 0; i < payload->nfuncs; i++ )
         {
             int rc;
 
-            f = &(payload->funcs[i]);
+            f = &(funcs[i]);
 
             if ( f->version != LIVEPATCH_PAYLOAD_VERSION )
             {
@@ -1361,7 +1370,7 @@ static int apply_payload(struct payload *data)
     ASSERT(!local_irq_is_enabled());
 
     for ( i = 0; i < data->nfuncs; i++ )
-        common_livepatch_apply(&data->funcs[i]);
+        common_livepatch_apply(&data->funcs[i], &data->fstate[i]);
 
     arch_livepatch_revive();
 
@@ -1397,7 +1406,7 @@ static int revert_payload(struct payload *data)
     }
 
     for ( i = 0; i < data->nfuncs; i++ )
-        common_livepatch_revert(&data->funcs[i]);
+        common_livepatch_revert(&data->funcs[i], &data->fstate[i]);
 
     /*
      * Since we are running with IRQs disabled and the hooks may call common
@@ -1438,9 +1447,10 @@ static inline bool was_action_consistent(const struct payload *data, livepatch_f
 
     for ( i = 0; i < data->nfuncs; i++ )
     {
-        struct livepatch_func *f = &(data->funcs[i]);
+        const struct livepatch_func *f = &(data->funcs[i]);
+        const struct livepatch_fstate *s = &(data->fstate[i]);
 
-        if ( f->applied != expected_state )
+        if ( s->applied != expected_state )
         {
             printk(XENLOG_ERR LIVEPATCH "%s: Payload has a function: '%s' with inconsistent applied state.\n",
                    data->name, f->name ?: "noname");
@@ -2157,7 +2167,8 @@ static void cf_check livepatch_printall(unsigned char key)
 
         for ( i = 0; i < data->nfuncs; i++ )
         {
-            struct livepatch_func *f = &(data->funcs[i]);
+            const struct livepatch_func *f = &(data->funcs[i]);
+
             printk("    %s patch %p(%u) with %p (%u)\n",
                    f->name, f->old_addr, f->old_size, f->new_addr, f->new_size);
 
