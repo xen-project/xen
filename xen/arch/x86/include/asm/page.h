@@ -232,8 +232,8 @@ typedef struct { u64 pfn; } pagetable_t;
 #define pagetable_from_paddr(p) pagetable_from_pfn((p)>>PAGE_SHIFT)
 #define pagetable_null()        pagetable_from_pfn(0)
 
-void clear_page_sse2(void *);
-void copy_page_sse2(void *, const void *);
+void clear_page_sse2(void *pg);
+void copy_page_sse2(void *to, const void *from);
 
 #define clear_page(_p)      clear_page_sse2(_p)
 #define copy_page(_t, _f)   copy_page_sse2(_t, _f)
@@ -303,7 +303,7 @@ extern l3_pgentry_t l3_bootmap[L3_PAGETABLE_ENTRIES];
 extern l2_pgentry_t l2_directmap[4*L2_PAGETABLE_ENTRIES];
 extern l1_pgentry_t l1_fixmap[L1_PAGETABLE_ENTRIES];
 void paging_init(void);
-void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t);
+void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t l4e);
 #endif /* !defined(__ASSEMBLY__) */
 
 #define _PAGE_NONE     _AC(0x000,U)
