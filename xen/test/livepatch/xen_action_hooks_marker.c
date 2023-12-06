@@ -23,9 +23,10 @@ static int pre_apply_hook(livepatch_payload_t *payload)
 
     for (i = 0; i < payload->nfuncs; i++)
     {
-        struct livepatch_func *func = &payload->funcs[i];
+        const struct livepatch_func *func = &payload->funcs[i];
+        struct livepatch_fstate *fstate = &payload->fstate[i];
 
-        BUG_ON(func->applied == LIVEPATCH_FUNC_APPLIED);
+        BUG_ON(fstate->applied == LIVEPATCH_FUNC_APPLIED);
         printk(KERN_DEBUG "%s: pre applied: %s\n", __func__, func->name);
     }
 
@@ -42,9 +43,10 @@ static void post_apply_hook(livepatch_payload_t *payload)
 
     for (i = 0; i < payload->nfuncs; i++)
     {
-        struct livepatch_func *func = &payload->funcs[i];
+        const struct livepatch_func *func = &payload->funcs[i];
+        struct livepatch_fstate *fstate = &payload->fstate[i];
 
-        BUG_ON(func->applied != LIVEPATCH_FUNC_APPLIED);
+        BUG_ON(fstate->applied != LIVEPATCH_FUNC_APPLIED);
         printk(KERN_DEBUG "%s: post applied: %s\n", __func__, func->name);
     }
 
@@ -59,9 +61,10 @@ static int pre_revert_hook(livepatch_payload_t *payload)
 
     for (i = 0; i < payload->nfuncs; i++)
     {
-        struct livepatch_func *func = &payload->funcs[i];
+        const struct livepatch_func *func = &payload->funcs[i];
+        struct livepatch_fstate *fstate = &payload->fstate[i];
 
-        BUG_ON(func->applied != LIVEPATCH_FUNC_APPLIED);
+        BUG_ON(fstate->applied != LIVEPATCH_FUNC_APPLIED);
         printk(KERN_DEBUG "%s: pre reverted: %s\n", __func__, func->name);
     }
 
@@ -78,9 +81,10 @@ static void post_revert_hook(livepatch_payload_t *payload)
 
     for (i = 0; i < payload->nfuncs; i++)
     {
-        struct livepatch_func *func = &payload->funcs[i];
+        const struct livepatch_func *func = &payload->funcs[i];
+        struct livepatch_fstate *fstate = &payload->fstate[i];
 
-        BUG_ON(func->applied == LIVEPATCH_FUNC_APPLIED);
+        BUG_ON(fstate->applied == LIVEPATCH_FUNC_APPLIED);
         printk(KERN_DEBUG "%s: post reverted: %s\n", __func__, func->name);
     }
 
