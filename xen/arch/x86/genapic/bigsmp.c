@@ -19,11 +19,14 @@ static int __init cf_check force_bigsmp(const struct dmi_system_id *d)
 
 
 static const struct dmi_system_id __initconstrel bigsmp_dmi_table[] = {
-	{ force_bigsmp, "UNISYS ES7000-ONE", {
-		DMI_MATCH(DMI_PRODUCT_NAME, "ES7000-ONE")
-	 }},
+	{
+	    .ident = "UNISYS ES7000-ONE",
+	    .callback = force_bigsmp,
+	    DMI_MATCH1(
+		DMI_MATCH(DMI_PRODUCT_NAME, "ES7000-ONE")),
+	},
 	
-	 { }
+	{ }
 };
 
 
