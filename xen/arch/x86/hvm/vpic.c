@@ -41,7 +41,7 @@
 #define vpic_lock(v)   spin_lock(__vpic_lock(v))
 #define vpic_unlock(v) spin_unlock(__vpic_lock(v))
 #define vpic_is_locked(v) spin_is_locked(__vpic_lock(v))
-#define vpic_elcr_mask(v) ((v)->is_master ? 0xf8 : 0xde)
+#define vpic_elcr_mask(v, mb2) ((v)->is_master ? 0xf8 | ((mb2) << 2) : 0xde)
 
 /* Return the highest priority found in mask. Return 8 if none. */
 #define VPIC_PRIO_NONE 8
@@ -387,7 +387,7 @@ static int cf_check vpic_intercept_elcr_io(
         if ( dir == IOREQ_WRITE )
         {
             /* Some IRs are always edge trig. Slave IR is always level trig. */
-            data = (*val >> shift) & vpic_elcr_mask(vpic);
+            data = (*val >> shift) & vpic_elcr_mask(vpic, 1);
             if ( vpic->is_master )
                 data |= 1 << 2;
             vpic->elcr = data;
@@ -395,7 +395,7 @@ static int cf_check vpic_intercept_elcr_io(
         else
         {
             /* Reader should not see hardcoded level-triggered slave IR. */
-            data = vpic->elcr & vpic_elcr_mask(vpic);
+            data = vpic->elcr & vpic_elcr_mask(vpic, 0);
             if ( !shift )
                 *val = data;
             else
