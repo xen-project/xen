@@ -1143,10 +1143,18 @@ static bool is_branch_step(struct x86_emulate_ctxt *ctxt,
                            const struct x86_emulate_ops *ops)
 {
     uint64_t debugctl;
+    int rc = X86EMUL_UNHANDLEABLE;
 
-    return ops->read_msr &&
-           ops->read_msr(MSR_IA32_DEBUGCTLMSR, &debugctl, ctxt) == X86EMUL_OKAY &&
-           (debugctl & IA32_DEBUGCTLMSR_BTF);
+    if ( !ops->read_msr ||
+         (rc = ops->read_msr(MSR_IA32_DEBUGCTLMSR, &debugctl,
+                             ctxt)) != X86EMUL_OKAY )
+    {
+        if ( rc == X86EMUL_EXCEPTION )
+            x86_emul_reset_event(ctxt);
+        debugctl = 0;
+    }
+
+    return debugctl & IA32_DEBUGCTLMSR_BTF;
 }
 
 static void adjust_bnd(struct x86_emulate_ctxt *ctxt,
@@ -1160,13 +1168,21 @@ static void adjust_bnd(struct x86_emulate_ctxt *ctxt,
 
     if ( !ops->read_xcr || ops->read_xcr(0, &xcr0, ctxt) != X86EMUL_OKAY ||
          !(xcr0 & X86_XCR0_BNDREGS) || !(xcr0 & X86_XCR0_BNDCSR) )
+    {
+        ASSERT(!ctxt->event_pending);
         return;
+    }
 
     if ( !mode_ring0() )
         bndcfg = read_bndcfgu();
     else if ( !ops->read_msr ||
-              ops->read_msr(MSR_IA32_BNDCFGS, &bndcfg, ctxt) != X86EMUL_OKAY )
+              (rc = ops->read_msr(MSR_IA32_BNDCFGS, &bndcfg,
+                                  ctxt)) != X86EMUL_OKAY )
+    {
+        if ( rc == X86EMUL_EXCEPTION )
+            x86_emul_reset_event(ctxt);
         return;
+    }
     if ( (bndcfg & IA32_BNDCFGS_ENABLE) && !(bndcfg & IA32_BNDCFGS_PRESERVE) )
     {
         /*
@@ -8677,7 +8693,9 @@ int x86_emulate_wrapper(
      * An event being pending should exactly match returning
      * X86EMUL_EXCEPTION.  (If this trips, the chances are a codepath has
      * called hvm_inject_hw_exception() rather than using
-     * x86_emul_hw_exception().)
+     * x86_emul_hw_exception(), or the invocation of a hook has caused an
+     * exception to be raised, while the caller was only checking for
+     * success/failure.)
      */
     ASSERT(ctxt->event_pending == (rc == X86EMUL_EXCEPTION));
 
