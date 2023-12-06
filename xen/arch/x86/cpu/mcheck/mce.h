@@ -158,7 +158,7 @@ extern void mce_need_clearbank_register(mce_need_clearbank_t cbfunc);
  * MCi_STATUS value for that bank.
  */
 typedef struct mcinfo_extended *(*x86_mce_callback_t)
-    (struct mc_info *, uint16_t, uint64_t);
+    (struct mc_info *mi, uint16_t bank, uint64_t status);
 extern void x86_mce_callback_register(x86_mce_callback_t cbfunc);
 
 void *x86_mcinfo_reserve(struct mc_info *mi,
