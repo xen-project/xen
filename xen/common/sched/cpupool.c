@@ -892,6 +892,8 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
         if ( cpu >= nr_cpu_ids )
             goto addcpu_out;
         ret = -ENODEV;
+        if ( !cpu_online(cpu) )
+            goto addcpu_out;
         cpus = sched_get_opt_cpumask(c->gran, cpu);
         if ( !cpumask_subset(cpus, &cpupool_free_cpus) ||
              cpumask_intersects(cpus, &cpupool_locked_cpus) )
