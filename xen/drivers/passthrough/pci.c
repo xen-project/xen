@@ -104,9 +104,9 @@ static struct pci_seg *alloc_pseg(u16 seg)
 }
 
 static int pci_segments_iterate(
-    int (*handler)(struct pci_seg *, void *), void *arg)
+    int (*handler)(struct pci_seg *pseg, void *arg), void *arg)
 {
-    u16 seg = 0;
+    uint16_t seg = 0;
     int rc = 0;
 
     do {
@@ -1077,7 +1077,7 @@ int __init scan_pci_devices(void)
 
 struct setup_hwdom {
     struct domain *d;
-    int (*handler)(u8 devfn, struct pci_dev *);
+    int (*handler)(uint8_t devfn, struct pci_dev *pdev);
 };
 
 static void __hwdom_init setup_one_hwdom_device(const struct setup_hwdom *ctxt,
@@ -1157,7 +1157,7 @@ static int __hwdom_init cf_check _setup_hwdom_pci_devices(
 }
 
 void __hwdom_init setup_hwdom_pci_devices(
-    struct domain *d, int (*handler)(u8 devfn, struct pci_dev *))
+    struct domain *d, int (*handler)(uint8_t devfn, struct pci_dev *pdev))
 {
     struct setup_hwdom ctxt = { .d = d, .handler = handler };
 

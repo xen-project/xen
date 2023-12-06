@@ -178,7 +178,8 @@ enum pdev_type pdev_type(u16 seg, u8 bus, u8 devfn);
 int find_upstream_bridge(u16 seg, u8 *bus, u8 *devfn, u8 *secbus);
 
 void setup_hwdom_pci_devices(struct domain *d,
-                            int (*handler)(u8 devfn, struct pci_dev *pdev));
+                             int (*handler)(uint8_t devfn,
+                                            struct pci_dev *pdev));
 int pci_release_devices(struct domain *d);
 void pci_segments_init(void);
 int pci_add_segment(u16 seg);
