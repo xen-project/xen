@@ -32,6 +32,11 @@ struct dmi_system_id {
 
 #define DMI_MATCH(a,b)	{ a, b }
 
+#define DMI_MATCH4(m1, m2, m3, m4) .matches = { m1, m2, m3, m4 }
+#define DMI_MATCH3(m1, m2, m3)     .matches = { [0] = m1, [1] = m2, [2] = m3 }
+#define DMI_MATCH2(m1, m2)         .matches = { [0] = m1, [1] = m2 }
+#define DMI_MATCH1(m1)             .matches = { [0] = m1 }
+
 extern int dmi_check_system(const struct dmi_system_id *list);
 extern void dmi_scan_machine(void);
 extern const char *dmi_get_table(paddr_t *base, u32 *len);
