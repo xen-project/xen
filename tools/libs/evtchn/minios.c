@@ -25,6 +25,7 @@
 #include <mini-os/os.h>
 #include <mini-os/lib.h>
 #include <mini-os/events.h>
+#include <mini-os/semaphore.h>
 #include <mini-os/wait.h>
 
 #include <assert.h>
@@ -40,6 +41,11 @@
 
 XEN_LIST_HEAD(port_list, struct port_info);
 
+struct ports {
+    struct port_list list;
+    struct semaphore sem;
+};
+
 struct port_info {
     XEN_LIST_ENTRY(struct port_info) list;
     evtchn_port_t port;
@@ -47,12 +53,11 @@ struct port_info {
     bool bound;
 };
 
-/* XXX Note: This is not threadsafe */
 static struct port_info *port_alloc(xenevtchn_handle *xce)
 {
     struct port_info *port_info;
     struct file *file = get_file_from_fd(xce->fd);
-    struct port_list *port_list = file->dev;
+    struct ports *ports = file->dev;
 
     port_info = malloc(sizeof(struct port_info));
     if ( port_info == NULL )
@@ -62,7 +67,9 @@ static struct port_info *port_alloc(xenevtchn_handle *xce)
     port_info->port = -1;
     port_info->bound = false;
 
-    XEN_LIST_INSERT_HEAD(port_list, port_info, list);
+    down(&ports->sem);
+    XEN_LIST_INSERT_HEAD(&ports->list, port_info, list);
+    up(&ports->sem);
 
     return port_info;
 }
@@ -79,11 +86,12 @@ static void port_dealloc(struct port_info *port_info)
 static int evtchn_close_fd(struct file *file)
 {
     struct port_info *port_info, *tmp;
-    struct port_list *port_list = file->dev;
+    struct ports *ports = file->dev;
 
-    XEN_LIST_FOREACH_SAFE(port_info, port_list, list, tmp)
+    XEN_LIST_FOREACH_SAFE(port_info, &ports->list, list, tmp)
         port_dealloc(port_info);
-    free(port_list);
+
+    free(ports);
 
     return 0;
 }
@@ -110,10 +118,10 @@ int osdep_evtchn_open(xenevtchn_handle *xce, unsigned int flags)
 {
     int fd;
     struct file *file;
-    struct port_list *list;
+    struct ports *ports;
 
-    list = malloc(sizeof(*list));
-    if ( !list )
+    ports = malloc(sizeof(*ports));
+    if ( !ports )
         return -1;
 
     fd = alloc_fd(ftype_evtchn);
@@ -121,12 +129,13 @@ int osdep_evtchn_open(xenevtchn_handle *xce, unsigned int flags)
 
     if ( !file )
     {
-        free(list);
+        free(ports);
         return -1;
     }
 
-    file->dev = list;
-    XEN_LIST_INIT(list);
+    file->dev = ports;
+    XEN_LIST_INIT(&ports->list);
+    init_SEMAPHORE(&ports->sem, 1);
     xce->fd = fd;
     printf("evtchn_open() -> %d\n", fd);
 
@@ -168,16 +177,22 @@ static void evtchn_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     xenevtchn_handle *xce = data;
     struct file *file = get_file_from_fd(xce->fd);
     struct port_info *port_info;
-    struct port_list *port_list;
+    struct ports *ports;
 
     assert(file);
-    port_list = file->dev;
+    ports = file->dev;
     mask_evtchn(port);
-    XEN_LIST_FOREACH(port_info, port_list, list)
+
+    down(&ports->sem);
+    XEN_LIST_FOREACH(port_info, &ports->list, list)
     {
         if ( port_info->port == port )
+        {
+            up(&ports->sem);
             goto found;
+        }
     }
+    up(&ports->sem);
 
     printk("Unknown port %d for handle %d\n", port, xce->fd);
     return;
@@ -188,6 +203,16 @@ static void evtchn_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     wake_up(&event_queue);
 }
 
+static void port_remove(xenevtchn_handle *xce, struct port_info *port_info)
+{
+    struct file *file = get_file_from_fd(xce->fd);
+    struct ports *ports = file->dev;
+
+    down(&ports->sem);
+    port_dealloc(port_info);
+    up(&ports->sem);
+}
+
 xenevtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle *xce,
                                                       uint32_t domid)
 {
@@ -195,7 +220,6 @@ xenevtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle *xce,
     int ret;
     evtchn_port_t port;
 
-    assert(get_current() == main_thread);
     port_info = port_alloc(xce);
     if ( port_info == NULL )
         return -1;
@@ -206,7 +230,7 @@ xenevtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle *xce,
 
     if ( ret < 0 )
     {
-        port_dealloc(port_info);
+        port_remove(xce, port_info);
         errno = -ret;
         return -1;
     }
@@ -226,7 +250,6 @@ xenevtchn_port_or_error_t xenevtchn_bind_interdomain(xenevtchn_handle *xce,
     evtchn_port_t local_port;
     int ret;
 
-    assert(get_current() == main_thread);
     port_info = port_alloc(xce);
     if ( port_info == NULL )
         return -1;
@@ -238,7 +261,7 @@ xenevtchn_port_or_error_t xenevtchn_bind_interdomain(xenevtchn_handle *xce,
 
     if ( ret < 0 )
     {
-        port_dealloc(port_info);
+        port_remove(xce, port_info);
         errno = -ret;
         return -1;
     }
@@ -255,16 +278,19 @@ int xenevtchn_unbind(xenevtchn_handle *xce, evtchn_port_t port)
     int fd = xce->fd;
     struct file *file = get_file_from_fd(fd);
     struct port_info *port_info;
-    struct port_list *port_list = file->dev;
+    struct ports *ports = file->dev;
 
-    XEN_LIST_FOREACH(port_info, port_list, list)
+    down(&ports->sem);
+    XEN_LIST_FOREACH(port_info, &ports->list, list)
     {
         if ( port_info->port == port )
         {
             port_dealloc(port_info);
+            up(&ports->sem);
             return 0;
         }
     }
+    up(&ports->sem);
 
     printf("Warning: couldn't find port %"PRId32" for xc handle %x\n",
            port, fd);
@@ -279,7 +305,6 @@ xenevtchn_port_or_error_t xenevtchn_bind_virq(xenevtchn_handle *xce,
     struct port_info *port_info;
     evtchn_port_t port;
 
-    assert(get_current() == main_thread);
     port_info = port_alloc(xce);
     if ( port_info == NULL )
         return -1;
@@ -290,7 +315,7 @@ xenevtchn_port_or_error_t xenevtchn_bind_virq(xenevtchn_handle *xce,
 
     if ( port < 0 )
     {
-        port_dealloc(port_info);
+        port_remove(xce, port_info);
         errno = -port;
         return -1;
     }
@@ -306,15 +331,17 @@ xenevtchn_port_or_error_t xenevtchn_pending(xenevtchn_handle *xce)
 {
     struct file *file = get_file_from_fd(xce->fd);
     struct port_info *port_info;
-    struct port_list *port_list = file->dev;
+    struct ports *ports = file->dev;
     unsigned long flags;
     evtchn_port_t ret = -1;
+
+    down(&ports->sem);
 
     local_irq_save(flags);
 
     file->read = false;
 
-    XEN_LIST_FOREACH(port_info, port_list, list)
+    XEN_LIST_FOREACH(port_info, &ports->list, list)
     {
         if ( port_info->port != -1 && port_info->pending )
         {
@@ -332,6 +359,8 @@ xenevtchn_port_or_error_t xenevtchn_pending(xenevtchn_handle *xce)
     }
 
     local_irq_restore(flags);
+
+    up(&ports->sem);
 
     return ret;
 }
