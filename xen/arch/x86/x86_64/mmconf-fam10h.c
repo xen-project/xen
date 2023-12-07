@@ -188,8 +188,9 @@ void fam10h_check_enable_mmcfg(void)
 static const struct dmi_system_id __initconstrel mmconf_dmi_table[] = {
 	{
 		.ident = "Sun Microsystems Machine",
-		DMI_MATCH1(
-			DMI_MATCH(DMI_SYS_VENDOR, "Sun Microsystems")),
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Sun Microsystems"),
+		},
 	},
 	{}
 };

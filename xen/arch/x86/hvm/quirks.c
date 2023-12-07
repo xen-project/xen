@@ -36,37 +36,42 @@ static int __init cf_check check_port80(void)
         {
             .callback = dmi_hvm_deny_port80,
             .ident    = "Compaq Presario V6000",
-	    DMI_MATCH2(
+            .matches  = {
                 DMI_MATCH(DMI_BOARD_VENDOR, "Quanta"),
-                DMI_MATCH(DMI_BOARD_NAME,   "30B7")),
+                DMI_MATCH(DMI_BOARD_NAME,   "30B7")
+            }
         },
         {
             .callback = dmi_hvm_deny_port80,
             .ident    = "HP Pavilion dv9000z",
-	    DMI_MATCH2(
+            .matches  = {
                 DMI_MATCH(DMI_BOARD_VENDOR, "Quanta"),
-                DMI_MATCH(DMI_BOARD_NAME,   "30B9")),
+                DMI_MATCH(DMI_BOARD_NAME,   "30B9")
+            }
         },
         {
             .callback = dmi_hvm_deny_port80,
             .ident    = "HP Pavilion dv6000",
-	    DMI_MATCH2(
+            .matches  = {
                 DMI_MATCH(DMI_BOARD_VENDOR, "Quanta"),
-                DMI_MATCH(DMI_BOARD_NAME,   "30B8")),
+                DMI_MATCH(DMI_BOARD_NAME,   "30B8")
+            }
         },
         {
             .callback = dmi_hvm_deny_port80,
             .ident    = "HP Pavilion tx1000",
-	    DMI_MATCH2(
+            .matches  = {
                 DMI_MATCH(DMI_BOARD_VENDOR, "Quanta"),
-                DMI_MATCH(DMI_BOARD_NAME,   "30BF")),
+                DMI_MATCH(DMI_BOARD_NAME,   "30BF")
+            }
         },
         {
             .callback = dmi_hvm_deny_port80,
             .ident    = "Presario F700",
-	    DMI_MATCH2(
+            .matches  = {
                 DMI_MATCH(DMI_BOARD_VENDOR, "Quanta"),
-                DMI_MATCH(DMI_BOARD_NAME,   "30D3")),
+                DMI_MATCH(DMI_BOARD_NAME,   "30D3")
+            }
         },
         { }
     };

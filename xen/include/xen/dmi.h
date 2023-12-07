@@ -30,12 +30,7 @@ struct dmi_system_id {
 	void *driver_data;
 };
 
-#define DMI_MATCH(a,b)	((struct dmi_strmatch){ a, b })
-
-#define DMI_MATCH4(m1, m2, m3, m4) .matches = { m1, m2, m3, m4 }
-#define DMI_MATCH3(m1, m2, m3) DMI_MATCH4(m1, m2, m3, DMI_MATCH(0, NULL))
-#define DMI_MATCH2(m1, m2)     DMI_MATCH3(m1, m2, DMI_MATCH(0, NULL))
-#define DMI_MATCH1(m1)         DMI_MATCH2(m1, DMI_MATCH(0, NULL))
+#define DMI_MATCH(a,b)	{ a, b }
 
 extern int dmi_check_system(const struct dmi_system_id *list);
 extern void dmi_scan_machine(void);

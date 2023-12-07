@@ -43,51 +43,59 @@ static const struct dmi_system_id __initconstrel ioport_quirks_tbl[] = {
      */
     {
         .ident = "HP ProLiant DL3xx",
-        DMI_MATCH2(
+        .matches = {
             DMI_MATCH(DMI_BIOS_VENDOR, "HP"),
-            DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant DL3")),
+            DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant DL3"),
+        },
     },
     {
         .ident = "HP ProLiant DL5xx",
-        DMI_MATCH2(
+        .matches = {
             DMI_MATCH(DMI_BIOS_VENDOR, "HP"),
-            DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant DL5")),
+            DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant DL5"),
+        },
     },
     {
         .ident = "HP ProLiant DL7xx",
-        DMI_MATCH2(
+        .matches = {
             DMI_MATCH(DMI_BIOS_VENDOR, "HP"),
-            DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant DL7")),
+            DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant DL7"),
+        },
     },
     {
         .ident = "HP ProLiant ML3xx",
-        DMI_MATCH2(
+        .matches = {
             DMI_MATCH(DMI_BIOS_VENDOR, "HP"),
-            DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant ML3")),
+            DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant ML3"),
+        },
     },
     {
         .ident = "HP ProLiant ML5xx",
-        DMI_MATCH2(
+        .matches = {
             DMI_MATCH(DMI_BIOS_VENDOR, "HP"),
-            DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant ML5")),
+            DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant ML5"),
+        },
     },
     {
         .ident = "HP ProLiant BL2xx",
-        DMI_MATCH2(
+        .matches = {
             DMI_MATCH(DMI_BIOS_VENDOR, "HP"),
-            DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant BL2")),
+            DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant BL2"),
+        },
     },
     {
         .ident = "HP ProLiant BL4xx",
-        DMI_MATCH2(
+        .matches = {
             DMI_MATCH(DMI_BIOS_VENDOR, "HP"),
-            DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant BL4")),
+            DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant BL4"),
+        },
     },
     {
         .ident = "HP ProLiant BL6xx",
-        DMI_MATCH2(
+        .matches = {
             DMI_MATCH(DMI_BIOS_VENDOR, "HP"),
-            DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant BL6")),
+            DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant BL6"),
+        },
     },
     { }
 };
