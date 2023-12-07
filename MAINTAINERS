@@ -278,7 +278,7 @@ S:	Supported
 F:	xen/drivers/passthrough/arm/smmu-v3.c
 
 Change Log
-M:	Henry Wang <Henry.Wang@arm.com>
+M:	Oleksii Kurochko <oleksii.kurochko@gmail.com>
 R:	Community Manager <community.manager@xenproject.org>
 S:	Maintained
 F:	CHANGELOG.md
