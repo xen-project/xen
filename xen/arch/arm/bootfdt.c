@@ -541,7 +541,9 @@ size_t __init boot_fdt_info(const void *fdt, paddr_t paddr)
 
     add_boot_module(BOOTMOD_FDT, paddr, fdt_totalsize(fdt), false);
 
-    device_tree_for_each_node((void *)fdt, 0, early_scan_node, NULL);
+    ret = device_tree_for_each_node((void *)fdt, 0, early_scan_node, NULL);
+    if ( ret )
+        panic("Early FDT parsing failed (%d)\n", ret);
 
     /*
      * On Arm64 setup_directmap_mappings() expects to be called with the lowest
