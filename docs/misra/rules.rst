@@ -483,6 +483,11 @@ maintainers if you want to suggest a change.
      - A switch-expression shall not have essentially Boolean type
      -
 
+   * - `Rule 17.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_17_01.c>`_
+     - Required
+     - The features of <stdarg.h> shall not be used
+     -
+
    * - `Rule 17.3 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_17_03.c>`_
      - Mandatory
      - A function shall not be declared implicitly
