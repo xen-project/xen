@@ -462,6 +462,13 @@ maintainers if you want to suggest a change.
 
        while(0) and while(1) and alike are allowed.
 
+   * - `Rule 16.3 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_16_03.c>`_
+     - Required
+     - An unconditional break statement shall terminate every
+       switch-clause
+     - In addition to break, also other unconditional flow control statements
+       such as continue, return, goto are allowed.
+
    * - `Rule 16.7 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_16_07.c>`_
      - Required
      - A switch-expression shall not have essentially Boolean type
@@ -478,11 +485,26 @@ maintainers if you want to suggest a change.
        have an explicit return statement with an expression
      -
 
+   * - `Rule 17.5 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_17_05.c>`_
+     - Advisory
+     - The function argument corresponding to a parameter declared to
+       have an array type shall have an appropriate number of elements
+     -
+
    * - `Rule 17.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_17_06.c>`_
      - Mandatory
      - The declaration of an array parameter shall not contain the
        static keyword between the [ ]
      -
+
+   * - `Rule 17.7 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_17_07.c>`_
+     - Required
+     - The value returned by a function having non-void return type
+       shall be used
+     - Please beware that this rule has many violations in the Xen
+       codebase today, and its adoption is aspirational. However, when
+       submitting new patches please try to decrease the number of
+       violations when possible.
 
    * - `Rule 18.3 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_18_03.c>`_
      - Required
@@ -498,6 +520,11 @@ maintainers if you want to suggest a change.
        instances where Eclair is unable to verify that the code is valid
        in regard to Rule 19.1. Caution reports are not violations.
 
+   * - `Rule 20.4 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_20_04.c>`_
+     - Required
+     - A macro shall not be defined with the same name as a keyword
+     -
+
    * - `Rule 20.7 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_20_07.c>`_
      - Required
      - Expressions resulting from the expansion of macro parameters
@@ -505,6 +532,13 @@ maintainers if you want to suggest a change.
      - Extra parentheses are not required when macro parameters are used
        as function arguments, as macro arguments, array indices, lhs in
        assignments
+
+   * - `Rule 20.9 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_20_09.c>`_
+     - Required
+     - All identifiers used in the controlling expression of #if or
+       #elif preprocessing directives shall be #define'd before
+       evaluation
+     -
 
    * - `Rule 20.13 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_20_13.c>`_
      - Required
