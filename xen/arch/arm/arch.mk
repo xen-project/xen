@@ -7,6 +7,7 @@ $(call cc-option-add,CFLAGS,CC,-Wnested-externs)
 # Prevent floating-point variables from creeping into Xen.
 CFLAGS-$(CONFIG_ARM_32) += -msoft-float
 CFLAGS-$(CONFIG_ARM_32) += -mcpu=cortex-a15
+CFLAGS-$(CONFIG_ARM_32) += -mno-unaligned-access
 
 CFLAGS-$(CONFIG_ARM_64) += -mcpu=generic
 CFLAGS-$(CONFIG_ARM_64) += -mgeneral-regs-only # No fp registers etc
