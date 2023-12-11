@@ -321,6 +321,12 @@ statements are deliberate"
 -config=MC3R1.R14.3,statements={deliberate , "wrapped(any(),node(if_stmt))" }
 -doc_end
 
+-doc_begin="The XEN team relies on the fact that the enum is_dying has the
+constant with assigned value 0 act as false and the other ones as true,
+therefore have the same behavior of a boolean"
+-config=MC3R1.R14.4,etypes+={deliberate, "stmt(child(cond,child(expr,ref(^<?domain>?::is_dying$))))","src_type(enum)"}
+-doc_end
+
 #
 # Series 20.
 #

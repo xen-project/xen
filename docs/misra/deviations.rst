@@ -270,6 +270,12 @@ Deviations related to MISRA C:2012 Rules:
        statements are deliberate.
      - Project-wide deviation; tagged as `disapplied` for ECLAIR.
 
+   * - R14.4
+     - The XEN team relies on the fact that the enum is_dying has the
+       constant with assigned value 0 act as false and the other ones as true,
+       therefore have the same behavior of a boolean.
+     - Project-wide deviation; tagged as `deliberate` for ECLAIR.
+
    * - R20.7
      - Code violating Rule 20.7 is safe when macro parameters are used:
        (1) as function arguments;
