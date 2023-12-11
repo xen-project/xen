@@ -82,6 +82,9 @@ export ECLAIR_PROJECT_ROOT="${PWD}"
 rm -rf "${ECLAIR_OUTPUT_DIR:?}/*"
 mkdir -p "${ECLAIR_DATA_DIR}"
 
+# Generate additional configuration files 
+"${SCRIPT_DIR}/generate_ecl.sh"
+
 # Perform the build (from scratch) in an ECLAIR environment.
 "${ECLAIR_BIN_DIR}eclair_env" \
     "-config_file='${SCRIPT_DIR}/analysis.ecl'" \

@@ -118,6 +118,10 @@
             "comment": "External library"
         },
         {
+          "rel_path": "include/xen/libfdt/*",
+          "comment": "External library"
+        },
+        {
             "rel_path": "common/livepatch_elf.c",
             "comment": "Not in scope initially as it generates many violations and it is not enabled in safety configurations"
         },

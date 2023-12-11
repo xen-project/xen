@@ -22,6 +22,9 @@ map_strings("scheduled-analysis",analysis_kind)
 -eval_file=toolchain.ecl
 -eval_file=public_APIs.ecl
 if(not(scheduled_analysis),
+    eval_file("adopted.ecl")
+)
+if(not(scheduled_analysis),
     eval_file("out_of_scope.ecl")
 )
 -eval_file=deviations.ecl

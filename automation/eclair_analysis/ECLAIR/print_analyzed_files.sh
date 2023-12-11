@@ -46,7 +46,9 @@ fi
 "${ECLAIR_BIN_DIR}eclair_report" -db="${DB}" -files_txt="${files_txt}"
 
 {
-  # Extracting out of scope code
+  # Extracting out of scope and adopted code
+  adopted_ecl="${script_dir}/adopted.ecl"
+  extrapolate_regex adopted,             "${adopted_ecl}"
   out_of_scope_ecl="${script_dir}/out_of_scope.ecl"
   extrapolate_regex adopted,             "${out_of_scope_ecl}"
   extrapolate_regex out_of_scope_tools,  "${out_of_scope_ecl}"
