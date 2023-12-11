@@ -18,7 +18,7 @@
 #include "private.h"
 
 
-void __init __maybe_unused build_assertions(void)
+static void __init __maybe_unused build_assertions(void)
 {
     BUILD_BUG_ON(sizeof(struct hv_message) != HV_MESSAGE_SIZE);
 }
