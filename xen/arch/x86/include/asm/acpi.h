@@ -81,7 +81,6 @@ extern bool acpi_lapic, acpi_ioapic, acpi_noirq;
 extern bool acpi_force, acpi_ht, acpi_disabled;
 extern u32 acpi_smi_cmd;
 extern u8 acpi_enable_value, acpi_disable_value;
-void acpi_pic_sci_set_trigger(unsigned int, u16);
 
 static inline void disable_acpi(void)
 {
