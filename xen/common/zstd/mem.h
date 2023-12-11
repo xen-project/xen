@@ -23,7 +23,7 @@
 #ifdef __XEN__
 #include <xen/string.h> /* memcpy */
 #include <xen/types.h>  /* size_t, ptrdiff_t */
-#include <asm/unaligned.h>
+#include <xen/unaligned.h>
 #endif
 
 /*-****************************************

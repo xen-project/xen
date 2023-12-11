@@ -13,7 +13,7 @@
 #ifdef __XEN__
 #include <xen/kernel.h>
 #include <asm/byteorder.h>
-#include <asm/unaligned.h>
+#include <xen/unaligned.h>
 #else
 
 static inline u32 get_unaligned_le32(const void *p)

@@ -34,7 +34,7 @@
 
 #ifdef __XEN__
 #include <asm/byteorder.h>
-#include <asm/unaligned.h>
+#include <xen/unaligned.h>
 #else
 
 static inline u16 get_unaligned_be16(const void *p)
