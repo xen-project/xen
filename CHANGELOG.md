@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Added
  - On x86, support for enforcing system-wide operation in Data Operand
    Independent Timing Mode.
+ - On x86, introduce a new x2APIC driver that uses Cluster Logical addressing
+   mode for IPIs and Physical addressing mode for external interrupts.
 
 ## [4.17.0](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.17.0) - 2022-12-12
 
