@@ -647,6 +647,24 @@ static void sched_move_irqs(const struct sched_unit *unit)
         vcpu_move_irqs(v);
 }
 
+static void sched_move_domain_cleanup(const struct scheduler *ops,
+                                      struct sched_unit *units,
+                                      void *domdata)
+{
+    struct sched_unit *unit, *old_unit;
+
+    for ( unit = units; unit; )
+    {
+        if ( unit->priv )
+            sched_free_udata(ops, unit->priv);
+        old_unit = unit;
+        unit = unit->next_in_list;
+        xfree(old_unit);
+    }
+
+    sched_free_domdata(ops, domdata);
+}
+
 /*
  * Move a domain from one cpupool to another.
  *
@@ -686,7 +704,6 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
     void *old_domdata;
     unsigned int gran = cpupool_get_granularity(c);
     unsigned int n_units = d->vcpu[0] ? DIV_ROUND_UP(d->max_vcpus, gran) : 0;
-    int ret = 0;
 
     for_each_vcpu ( d, v )
     {
@@ -699,8 +716,9 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
     domdata = sched_alloc_domdata(c->sched, d);
     if ( IS_ERR(domdata) )
     {
-        ret = PTR_ERR(domdata);
-        goto out;
+        rcu_read_unlock(&sched_res_rculock);
+
+        return PTR_ERR(domdata);
     }
 
     for ( unit_idx = 0; unit_idx < n_units; unit_idx++ )
@@ -718,10 +736,10 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
 
         if ( !unit || !unit->priv )
         {
-            old_units = new_units;
-            old_domdata = domdata;
-            ret = -ENOMEM;
-            goto out_free;
+            sched_move_domain_cleanup(c->sched, new_units, domdata);
+            rcu_read_unlock(&sched_res_rculock);
+
+            return -ENOMEM;
         }
 
         unit_ptr = &unit->next_in_list;
@@ -808,22 +826,11 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
 
     domain_unpause(d);
 
- out_free:
-    for ( unit = old_units; unit; )
-    {
-        if ( unit->priv )
-            sched_free_udata(c->sched, unit->priv);
-        old_unit = unit;
-        unit = unit->next_in_list;
-        xfree(old_unit);
-    }
+    sched_move_domain_cleanup(old_ops, old_units, old_domdata);
 
-    sched_free_domdata(old_ops, old_domdata);
-
- out:
     rcu_read_unlock(&sched_res_rculock);
 
-    return ret;
+    return 0;
 }
 
 void sched_destroy_vcpu(struct vcpu *v)
