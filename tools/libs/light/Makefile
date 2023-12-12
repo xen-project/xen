@@ -38,8 +38,7 @@ vpath static_tables.c $(ACPI_PATH)/
 
 OBJS-$(CONFIG_X86) += $(ACPI_OBJS)
 
-CFLAGS += -Wno-format-zero-length -Wmissing-declarations \
-	-Wno-declaration-after-statement -Wformat-nonliteral
+CFLAGS += -Wno-format-zero-length -Wmissing-declarations -Wformat-nonliteral
 
 CFLAGS-$(CONFIG_X86) += -DCONFIG_PCI_SUPP_LEGACY_IRQ
 
