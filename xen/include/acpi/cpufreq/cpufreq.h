@@ -177,7 +177,7 @@ struct cpufreq_driver {
 
 extern struct cpufreq_driver cpufreq_driver;
 
-int cpufreq_register_driver(const struct cpufreq_driver *);
+int cpufreq_register_driver(const struct cpufreq_driver *driver_data);
 
 static inline
 void cpufreq_verify_within_limits(struct cpufreq_policy *policy,
