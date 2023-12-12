@@ -2239,7 +2239,6 @@ static bool sched_tasklet_check_cpu(unsigned int cpu)
         /* fallthrough */
     case TASKLET_enqueued|TASKLET_scheduled:
         return true;
-        break;
     case TASKLET_scheduled:
         clear_bit(_TASKLET_scheduled, tasklet_work);
         /* fallthrough */
