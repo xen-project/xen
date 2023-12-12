@@ -138,10 +138,12 @@ struct ivrs_mappings {
 extern unsigned int ivrs_bdf_entries;
 extern u8 ivhd_type;
 
-struct ivrs_mappings *get_ivrs_mappings(u16 seg);
-int iterate_ivrs_mappings(int (*)(u16 seg, struct ivrs_mappings *));
-int iterate_ivrs_entries(int (*)(const struct amd_iommu *,
-                                 struct ivrs_mappings *, uint16_t));
+struct ivrs_mappings *get_ivrs_mappings(uint16_t seg);
+int iterate_ivrs_mappings(int (*handler)(uint16_t seg,
+                                         struct ivrs_mappings *map));
+int iterate_ivrs_entries(int (*handler)(const struct amd_iommu *iommu,
+                                        struct ivrs_mappings *map,
+                                        uint16_t bdf));
 
 /* iommu tables in guest space */
 struct mmio_reg {
@@ -226,7 +228,7 @@ struct acpi_ivrs_hardware;
 /* amd-iommu-detect functions */
 int amd_iommu_get_ivrs_dev_entries(void);
 int amd_iommu_get_supported_ivhd_type(void);
-int amd_iommu_detect_one_acpi(const struct acpi_ivrs_hardware *);
+int amd_iommu_detect_one_acpi(const struct acpi_ivrs_hardware *ivhd_block);
 int amd_iommu_detect_acpi(void);
 void get_iommu_features(struct amd_iommu *iommu);
 
@@ -295,9 +297,10 @@ struct amd_iommu *find_iommu_for_device(int seg, int bdf);
 bool cf_check iov_supports_xt(void);
 int amd_iommu_setup_ioapic_remapping(void);
 void *amd_iommu_alloc_intremap_table(
-    const struct amd_iommu *, unsigned long **, unsigned int nr);
+    const struct amd_iommu *iommu, unsigned long **inuse_map, unsigned int nr);
 int cf_check amd_iommu_free_intremap_table(
-    const struct amd_iommu *, struct ivrs_mappings *, uint16_t);
+    const struct amd_iommu *iommu, struct ivrs_mappings *ivrs_mapping,
+    uint16_t bdf);
 unsigned int amd_iommu_intremap_table_order(
     const void *irt, const struct amd_iommu *iommu);
 void cf_check amd_iommu_ioapic_update_ire(

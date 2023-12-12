@@ -300,12 +300,13 @@ static void cf_check set_iommu_ppr_log_control(
 static int iommu_read_log(struct amd_iommu *iommu,
                           struct ring_buffer *log,
                           unsigned int entry_size,
-                          void (*parse_func)(struct amd_iommu *, u32 *))
+                          void (*parse_func)(struct amd_iommu *iommu,
+                                             uint32_t *entry))
 {
     unsigned int tail, tail_offest, head_offset;
 
     BUG_ON(!iommu || ((log != &iommu->event_log) && (log != &iommu->ppr_log)));
-    
+
     spin_lock(&log->lock);
 
     /* make sure there's an entry in the log */
@@ -361,14 +362,15 @@ static int iommu_read_log(struct amd_iommu *iommu,
 
  out:
     spin_unlock(&log->lock);
-   
+
     return 0;
 }
 
 /* reset event log or ppr log when overflow */
 static void iommu_reset_log(struct amd_iommu *iommu,
                             struct ring_buffer *log,
-                            void (*ctrl_func)(struct amd_iommu *iommu, bool))
+                            void (*ctrl_func)(struct amd_iommu *iommu,
+                                              bool enable))
 {
     unsigned int entry, run_bit, loop_count = 1000;
     bool log_run;
@@ -1158,14 +1160,15 @@ static void __init amd_iommu_init_cleanup(void)
     iommuv2_enabled = 0;
 }
 
-struct ivrs_mappings *get_ivrs_mappings(u16 seg)
+struct ivrs_mappings *get_ivrs_mappings(uint16_t seg)
 {
     return radix_tree_lookup(&ivrs_maps, seg);
 }
 
-int iterate_ivrs_mappings(int (*handler)(u16 seg, struct ivrs_mappings *))
+int iterate_ivrs_mappings(int (*handler)(uint16_t seg,
+                                         struct ivrs_mappings *map))
 {
-    u16 seg = 0;
+    uint16_t seg = 0;
     int rc = 0;
 
     do {
@@ -1180,10 +1183,11 @@ int iterate_ivrs_mappings(int (*handler)(u16 seg, struct ivrs_mappings *))
     return rc;
 }
 
-int iterate_ivrs_entries(int (*handler)(const struct amd_iommu *,
-                                        struct ivrs_mappings *, uint16_t bdf))
+int iterate_ivrs_entries(int (*handler)(const struct amd_iommu *iommu,
+                                        struct ivrs_mappings *map,
+                                        uint16_t bdf))
 {
-    u16 seg = 0;
+    uint16_t seg = 0;
     int rc = 0;
 
     do {
