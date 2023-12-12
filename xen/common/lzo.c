@@ -97,7 +97,7 @@
 #ifdef __XEN__
 #include <xen/lib.h>
 #include <asm/byteorder.h>
-#include <asm/unaligned.h>
+#include <xen/unaligned.h>
 #else
 #define get_unaligned_le16(_p) (*(u16 *)(_p))
 #endif
