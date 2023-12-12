@@ -162,6 +162,13 @@ static inline size_t read_dcache_line_bytes(void)
 static inline int invalidate_dcache_va_range(const void *p, unsigned long size)
 {
     size_t cacheline_mask = dcache_line_bytes - 1;
+    unsigned long idx = 0;
+
+    if ( !size )
+        return 0;
+
+    /* Passing a region that wraps around is illegal */
+    ASSERT(((uintptr_t)p + size - 1) >= (uintptr_t)p);
 
     dsb(sy);           /* So the CPU issues all writes to the range */
 
@@ -174,11 +181,11 @@ static inline int invalidate_dcache_va_range(const void *p, unsigned long size)
     }
 
     for ( ; size >= dcache_line_bytes;
-            p += dcache_line_bytes, size -= dcache_line_bytes )
-        asm volatile (__invalidate_dcache_one(0) : : "r" (p));
+            idx += dcache_line_bytes, size -= dcache_line_bytes )
+        asm volatile (__invalidate_dcache_one(0) : : "r" (p + idx));
 
     if ( size > 0 )
-        asm volatile (__clean_and_invalidate_dcache_one(0) : : "r" (p));
+        asm volatile (__clean_and_invalidate_dcache_one(0) : : "r" (p + idx));
 
     dsb(sy);           /* So we know the flushes happen before continuing */
 
@@ -188,14 +195,21 @@ static inline int invalidate_dcache_va_range(const void *p, unsigned long size)
 static inline int clean_dcache_va_range(const void *p, unsigned long size)
 {
     size_t cacheline_mask = dcache_line_bytes - 1;
+    unsigned long idx = 0;
+
+    if ( !size )
+        return 0;
+
+    /* Passing a region that wraps around is illegal */
+    ASSERT(((uintptr_t)p + size - 1) >= (uintptr_t)p);
 
     dsb(sy);           /* So the CPU issues all writes to the range */
     size += (uintptr_t)p & cacheline_mask;
     size = (size + cacheline_mask) & ~cacheline_mask;
     p = (void *)((uintptr_t)p & ~cacheline_mask);
     for ( ; size >= dcache_line_bytes;
-            p += dcache_line_bytes, size -= dcache_line_bytes )
-        asm volatile (__clean_dcache_one(0) : : "r" (p));
+            idx += dcache_line_bytes, size -= dcache_line_bytes )
+        asm volatile (__clean_dcache_one(0) : : "r" (p + idx));
     dsb(sy);           /* So we know the flushes happen before continuing */
     /* ARM callers assume that dcache_* functions cannot fail. */
     return 0;
@@ -205,14 +219,21 @@ static inline int clean_and_invalidate_dcache_va_range
     (const void *p, unsigned long size)
 {
     size_t cacheline_mask = dcache_line_bytes - 1;
+    unsigned long idx = 0;
+
+    if ( !size )
+        return 0;
+
+    /* Passing a region that wraps around is illegal */
+    ASSERT(((uintptr_t)p + size - 1) >= (uintptr_t)p);
 
     dsb(sy);         /* So the CPU issues all writes to the range */
     size += (uintptr_t)p & cacheline_mask;
     size = (size + cacheline_mask) & ~cacheline_mask;
     p = (void *)((uintptr_t)p & ~cacheline_mask);
     for ( ; size >= dcache_line_bytes;
-            p += dcache_line_bytes, size -= dcache_line_bytes )
-        asm volatile (__clean_and_invalidate_dcache_one(0) : : "r" (p));
+            idx += dcache_line_bytes, size -= dcache_line_bytes )
+        asm volatile (__clean_and_invalidate_dcache_one(0) : : "r" (p + idx));
     dsb(sy);         /* So we know the flushes happen before continuing */
     /* ARM callers assume that dcache_* functions cannot fail. */
     return 0;
