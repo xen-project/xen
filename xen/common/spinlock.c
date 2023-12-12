@@ -267,25 +267,28 @@ void spin_debug_disable(void)
         lock->profile->time_hold += NOW() - lock->profile->time_locked;      \
         lock->profile->lock_cnt++;                                           \
     }
-#define LOCK_PROFILE_VAR    s_time_t block = 0
-#define LOCK_PROFILE_BLOCK  block = block ? : NOW();
-#define LOCK_PROFILE_GOT                                                     \
+#define LOCK_PROFILE_VAR(var, val)    s_time_t var = (val)
+#define LOCK_PROFILE_BLOCK(var)       var = var ? : NOW()
+#define LOCK_PROFILE_BLKACC(tst, val)                                        \
+    if ( tst )                                                               \
+    {                                                                        \
+        lock->profile->time_block += lock->profile->time_locked - (val);     \
+        lock->profile->block_cnt++;                                          \
+    }
+#define LOCK_PROFILE_GOT(val)                                                \
     if ( lock->profile )                                                     \
     {                                                                        \
         lock->profile->time_locked = NOW();                                  \
-        if ( block )                                                         \
-        {                                                                    \
-            lock->profile->time_block += lock->profile->time_locked - block; \
-            lock->profile->block_cnt++;                                      \
-        }                                                                    \
+        LOCK_PROFILE_BLKACC(val, val);                                       \
     }
 
 #else
 
 #define LOCK_PROFILE_REL
-#define LOCK_PROFILE_VAR
-#define LOCK_PROFILE_BLOCK
-#define LOCK_PROFILE_GOT
+#define LOCK_PROFILE_VAR(var, val)
+#define LOCK_PROFILE_BLOCK(var)
+#define LOCK_PROFILE_BLKACC(tst, val)
+#define LOCK_PROFILE_GOT(val)
 
 #endif
 
@@ -308,7 +311,7 @@ static void always_inline spin_lock_common(spinlock_t *lock,
                                            void (*cb)(void *data), void *data)
 {
     spinlock_tickets_t tickets = SPINLOCK_TICKET_INC;
-    LOCK_PROFILE_VAR;
+    LOCK_PROFILE_VAR(block, 0);
 
     check_lock(&lock->debug, false);
     preempt_disable();
@@ -316,14 +319,14 @@ static void always_inline spin_lock_common(spinlock_t *lock,
                                            tickets.head_tail);
     while ( tickets.tail != observe_head(&lock->tickets) )
     {
-        LOCK_PROFILE_BLOCK;
+        LOCK_PROFILE_BLOCK(block);
         if ( cb )
             cb(data);
         arch_lock_relax();
     }
     arch_lock_acquire_barrier();
     got_lock(&lock->debug);
-    LOCK_PROFILE_GOT;
+    LOCK_PROFILE_GOT(block);
 }
 
 void _spin_lock(spinlock_t *lock)
@@ -411,19 +414,15 @@ int _spin_trylock(spinlock_t *lock)
      * arch_lock_acquire_barrier().
      */
     got_lock(&lock->debug);
-#ifdef CONFIG_DEBUG_LOCK_PROFILE
-    if ( lock->profile )
-        lock->profile->time_locked = NOW();
-#endif
+    LOCK_PROFILE_GOT(0);
+
     return 1;
 }
 
 void _spin_barrier(spinlock_t *lock)
 {
     spinlock_tickets_t sample;
-#ifdef CONFIG_DEBUG_LOCK_PROFILE
-    s_time_t block = NOW();
-#endif
+    LOCK_PROFILE_VAR(block, NOW());
 
     check_barrier(&lock->debug);
     smp_mb();
@@ -432,13 +431,7 @@ void _spin_barrier(spinlock_t *lock)
     {
         while ( observe_head(&lock->tickets) == sample.head )
             arch_lock_relax();
-#ifdef CONFIG_DEBUG_LOCK_PROFILE
-        if ( lock->profile )
-        {
-            lock->profile->time_block += NOW() - block;
-            lock->profile->block_cnt++;
-        }
-#endif
+        LOCK_PROFILE_BLKACC(lock->profile, block);
     }
     smp_mb();
 }
