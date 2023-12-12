@@ -9,8 +9,7 @@ OBJS-y += libxlu_disk.o
 OBJS-y += libxlu_vif.o
 OBJS-y += libxlu_pci.o
 
-CFLAGS += -Wno-format-zero-length -Wmissing-declarations \
-	-Wno-declaration-after-statement -Wformat-nonliteral
+CFLAGS += -Wno-format-zero-length -Wmissing-declarations -Wformat-nonliteral
 CFLAGS += $(CFLAGS_libxenctrl)
 
 CFLAGS += $(PTHREAD_CFLAGS)

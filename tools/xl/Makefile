@@ -5,8 +5,7 @@
 XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS += -Wno-format-zero-length -Wmissing-declarations \
-	-Wno-declaration-after-statement -Wformat-nonliteral
+CFLAGS += -Wno-format-zero-length -Wmissing-declarations -Wformat-nonliteral
 CFLAGS += -fPIC
 
 CFLAGS += $(PTHREAD_CFLAGS)
