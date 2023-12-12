@@ -17,4 +17,6 @@ typedef int16_t __s16;
 typedef int32_t __s32;
 typedef int64_t __s64;
 
+typedef paddr_t phys_addr_t;
+
 #endif /* __XEN_LINUX_COMPAT_H__ */

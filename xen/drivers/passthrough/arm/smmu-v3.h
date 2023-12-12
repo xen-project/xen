@@ -377,7 +377,6 @@
 
 /* Linux compatibility functions. */
 typedef paddr_t		dma_addr_t;
-typedef paddr_t		phys_addr_t;
 typedef unsigned int		gfp_t;
 
 /* Alias to Xen lock functions */
