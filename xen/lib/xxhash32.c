@@ -42,7 +42,7 @@
 #include <xen/errno.h>
 #include <xen/string.h>
 #include <xen/xxhash.h>
-#include <xen/unaligned.h>
+#include <asm/unaligned.h>
 
 /*-*************************************
  * Macros
