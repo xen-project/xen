@@ -514,7 +514,7 @@ static int32_t ffa_rxtx_map(paddr_t tx_addr, paddr_t rx_addr,
 
 static int32_t ffa_partition_info_get(uint32_t w1, uint32_t w2, uint32_t w3,
                                       uint32_t w4, uint32_t w5,
-                                      uint32_t *count)
+                                      uint32_t *count, uint32_t *fpi_size)
 {
     const struct arm_smccc_1_2_regs arg = {
         .a0 = FFA_PARTITION_INFO_GET,
@@ -531,7 +531,10 @@ static int32_t ffa_partition_info_get(uint32_t w1, uint32_t w2, uint32_t w3,
 
     ret = get_ffa_ret_code(&resp);
     if ( !ret )
+    {
         *count = resp.a2;
+        *fpi_size = resp.a3;
+    }
 
     return ret;
 }
@@ -784,7 +787,7 @@ static uint32_t handle_rxtx_unmap(void)
 
 static int32_t handle_partition_info_get(uint32_t w1, uint32_t w2, uint32_t w3,
                                          uint32_t w4, uint32_t w5,
-                                         uint32_t *count)
+                                         uint32_t *count, uint32_t *fpi_size)
 {
     int32_t ret = FFA_RET_DENIED;
     struct domain *d = current->domain;
@@ -799,7 +802,7 @@ static int32_t handle_partition_info_get(uint32_t w1, uint32_t w2, uint32_t w3,
      */
     if ( w5 == FFA_PARTITION_INFO_GET_COUNT_FLAG &&
          ctx->guest_vers == FFA_VERSION_1_1 )
-        return ffa_partition_info_get(w1, w2, w3, w4, w5, count);
+        return ffa_partition_info_get(w1, w2, w3, w4, w5, count, fpi_size);
     if ( w5 )
         return FFA_RET_INVALID_PARAMETERS;
 
@@ -812,7 +815,7 @@ static int32_t handle_partition_info_get(uint32_t w1, uint32_t w2, uint32_t w3,
     if ( !ctx->page_count || !ctx->rx_is_free )
         goto out;
     spin_lock(&ffa_rx_buffer_lock);
-    ret = ffa_partition_info_get(w1, w2, w3, w4, w5, count);
+    ret = ffa_partition_info_get(w1, w2, w3, w4, w5, count, fpi_size);
     if ( ret )
         goto out_rx_buf_unlock;
     /*
@@ -842,7 +845,7 @@ static int32_t handle_partition_info_get(uint32_t w1, uint32_t w2, uint32_t w3,
     }
     else
     {
-        size_t sz = *count * sizeof(struct ffa_partition_info_1_1);
+        size_t sz = *count * *fpi_size;
 
         if ( ctx->page_count * FFA_PAGE_SIZE < sz )
         {
@@ -1409,6 +1412,7 @@ static bool ffa_handle_call(struct cpu_user_regs *regs)
     uint32_t fid = get_user_reg(regs, 0);
     struct domain *d = current->domain;
     struct ffa_ctx *ctx = d->arch.tee;
+    uint32_t fpi_size;
     uint32_t count;
     int e;
 
@@ -1444,11 +1448,11 @@ static bool ffa_handle_call(struct cpu_user_regs *regs)
                                       get_user_reg(regs, 2),
                                       get_user_reg(regs, 3),
                                       get_user_reg(regs, 4),
-                                      get_user_reg(regs, 5), &count);
+                                      get_user_reg(regs, 5), &count, &fpi_size);
         if ( e )
             set_regs_error(regs, e);
         else
-            set_regs_success(regs, count, 0);
+            set_regs_success(regs, count, fpi_size);
         return true;
     case FFA_RX_RELEASE:
         e = handle_rx_release();
@@ -1630,10 +1634,11 @@ static bool init_subscribers(struct ffa_partition_info_1_1 *fpi, uint16_t count)
 static bool init_sps(void)
 {
     bool ret = false;
+    uint32_t fpi_size;
     uint32_t count;
     int e;
 
-    e = ffa_partition_info_get(0, 0, 0, 0, 0, &count);
+    e = ffa_partition_info_get(0, 0, 0, 0, 0, &count, &fpi_size);
     if ( e )
     {
         printk(XENLOG_ERR "ffa: Failed to get list of SPs: %d\n", e);
