@@ -296,7 +296,7 @@ struct iommu_ops {
                                  uint64_t rte);
     unsigned int (*read_apic_from_ire)(unsigned int apic, unsigned int reg);
 
-    int (*setup_hpet_msi)(struct msi_desc *);
+    int (*setup_hpet_msi)(struct msi_desc *msi_desc);
 
     void (*adjust_irq_affinities)(void);
     void (*clear_root_pgtable)(struct domain *d);
