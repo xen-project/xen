@@ -232,9 +232,10 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int nr,
 
 /* In-place translation functons: */
 struct start_info;
-void xlat_start_info(struct start_info *, enum XLAT_start_info_console);
+void xlat_start_info(struct start_info *native,
+                     enum XLAT_start_info_console console);
 struct vcpu_runstate_info;
-void xlat_vcpu_runstate_info(struct vcpu_runstate_info *);
+void xlat_vcpu_runstate_info(struct vcpu_runstate_info *native);
 
 #else
 
