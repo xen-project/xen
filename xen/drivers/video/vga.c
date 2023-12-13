@@ -21,7 +21,7 @@ static unsigned char *video;
 
 static void cf_check vga_text_puts(const char *s, size_t nr);
 static void cf_check vga_noop_puts(const char *s, size_t nr) {}
-void (*video_puts)(const char *, size_t nr) = vga_noop_puts;
+void (*video_puts)(const char *s, size_t nr) = vga_noop_puts;
 
 /*
  * 'vga=<mode-specifier>[,keep]' where <mode-specifier> is one of:

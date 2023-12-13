@@ -13,7 +13,7 @@
 
 #ifdef CONFIG_VIDEO
 void video_init(void);
-extern void (*video_puts)(const char *, size_t nr);
+extern void (*video_puts)(const char *s, size_t nr);
 void video_endboot(void);
 #else
 #define video_init()    ((void)0)

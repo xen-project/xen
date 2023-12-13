@@ -341,7 +341,7 @@ struct ehci_dbgp {
     struct ehci_caps __iomem *ehci_caps;
 };
 
-static int ehci_dbgp_external_startup(struct ehci_dbgp *);
+static int ehci_dbgp_external_startup(struct ehci_dbgp *dbgp);
 
 static void ehci_dbgp_status(struct ehci_dbgp *dbgp, const char *str)
 {
@@ -997,7 +997,7 @@ err:
     return -ENODEV;
 }
 
-typedef void (*set_debug_port_t)(struct ehci_dbgp *, unsigned int);
+typedef void (*set_debug_port_t)(struct ehci_dbgp *dbgp, unsigned int port);
 
 static void cf_check default_set_debug_port(
     struct ehci_dbgp *dbgp, unsigned int port)
