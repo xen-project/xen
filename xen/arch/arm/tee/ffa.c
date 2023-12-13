@@ -1477,7 +1477,8 @@ static bool ffa_handle_call(struct cpu_user_regs *regs)
 
     default:
         gprintk(XENLOG_ERR, "ffa: unhandled fid 0x%x\n", fid);
-        return false;
+        set_regs_error(regs, FFA_RET_NOT_SUPPORTED);
+        return true;
     }
 }
 
