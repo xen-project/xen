@@ -141,7 +141,8 @@ unsigned int flush_area_local(const void *va, unsigned int flags);
 #define flush_local(flags) flush_area_local(NULL, flags)
 
 /* Flush specified CPUs' TLBs/caches */
-void flush_area_mask(const cpumask_t *, const void *va, unsigned int flags);
+void flush_area_mask(const cpumask_t *mask, const void *va,
+                     unsigned int flags);
 #define flush_mask(mask, flags) flush_area_mask(mask, NULL, flags)
 
 /* Flush all CPUs' TLBs/caches */

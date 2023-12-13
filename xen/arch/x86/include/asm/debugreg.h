@@ -96,8 +96,8 @@
 #define breakpoint_addr_ok(a) __addr_ok(a)
 
 struct vcpu;
-long set_debugreg(struct vcpu *, unsigned int reg, unsigned long value);
-void activate_debugregs(const struct vcpu *);
+long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value);
+void activate_debugregs(const struct vcpu *curr);
 
 struct cpu_policy;
 

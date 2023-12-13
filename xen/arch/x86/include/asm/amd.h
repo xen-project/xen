@@ -157,7 +157,7 @@
 #define is_zen4_uarch()   boot_cpu_has(X86_FEATURE_AUTO_IBRS)
 
 struct cpuinfo_x86;
-int cpu_has_amd_erratum(const struct cpuinfo_x86 *, int, ...);
+int cpu_has_amd_erratum(const struct cpuinfo_x86 *cpu, int osvw_id, ...);
 
 extern s8 opt_allow_unsafe;
 
