@@ -1144,8 +1144,7 @@ static int __init pvh_setup_acpi(struct domain *d, paddr_t start_info)
     rc = hvm_copy_to_guest_phys(start_info +
                                 offsetof(struct hvm_start_info, rsdp_paddr),
                                 &rsdp_paddr,
-                                sizeof(((struct hvm_start_info *)
-                                        0)->rsdp_paddr),
+                                sizeof_field(struct hvm_start_info, rsdp_paddr),
                                 d->vcpu[0]);
     if ( rc )
     {
