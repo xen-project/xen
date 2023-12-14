@@ -207,7 +207,7 @@ struct IO_APIC_route_entry **alloc_ioapic_entries(void)
 
     ioapic_entries = xmalloc_array(struct IO_APIC_route_entry *, nr_ioapics);
     if (!ioapic_entries)
-        return 0;
+        return NULL;
 
     for (apic = 0; apic < nr_ioapics; apic++) {
         ioapic_entries[apic] =
@@ -224,7 +224,7 @@ nomem:
         xfree(ioapic_entries[apic]);
     xfree(ioapic_entries);
 
-    return 0;
+    return NULL;
 }
 
 union entry_union {
