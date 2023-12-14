@@ -25,7 +25,6 @@
 #include <mini-os/os.h>
 #include <mini-os/lib.h>
 #include <mini-os/events.h>
-#include <mini-os/semaphore.h>
 #include <mini-os/wait.h>
 
 #include <assert.h>
@@ -43,7 +42,6 @@ XEN_LIST_HEAD(port_list, struct port_info);
 
 struct ports {
     struct port_list list;
-    struct semaphore sem;
 };
 
 struct port_info {
@@ -58,6 +56,7 @@ static struct port_info *port_alloc(xenevtchn_handle *xce)
     struct port_info *port_info;
     struct file *file = get_file_from_fd(xce->fd);
     struct ports *ports = file->dev;
+    unsigned long flags;
 
     port_info = malloc(sizeof(struct port_info));
     if ( port_info == NULL )
@@ -67,19 +66,24 @@ static struct port_info *port_alloc(xenevtchn_handle *xce)
     port_info->port = -1;
     port_info->bound = false;
 
-    down(&ports->sem);
+    local_irq_save(flags);
     XEN_LIST_INSERT_HEAD(&ports->list, port_info, list);
-    up(&ports->sem);
+    local_irq_restore(flags);
 
     return port_info;
 }
 
 static void port_dealloc(struct port_info *port_info)
 {
+    unsigned long flags;
+
     if ( port_info->bound )
         unbind_evtchn(port_info->port);
 
+    local_irq_save(flags);
     XEN_LIST_REMOVE(port_info, list);
+    local_irq_restore(flags);
+
     free(port_info);
 }
 
@@ -135,7 +139,6 @@ int osdep_evtchn_open(xenevtchn_handle *xce, unsigned int flags)
 
     file->dev = ports;
     XEN_LIST_INIT(&ports->list);
-    init_SEMAPHORE(&ports->sem, 1);
     xce->fd = fd;
     printf("evtchn_open() -> %d\n", fd);
 
@@ -183,16 +186,11 @@ static void evtchn_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     ports = file->dev;
     mask_evtchn(port);
 
-    down(&ports->sem);
     XEN_LIST_FOREACH(port_info, &ports->list, list)
     {
         if ( port_info->port == port )
-        {
-            up(&ports->sem);
             goto found;
-        }
     }
-    up(&ports->sem);
 
     printk("Unknown port %d for handle %d\n", port, xce->fd);
     return;
@@ -201,16 +199,6 @@ static void evtchn_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
     port_info->pending = true;
     file->read = true;
     wake_up(&event_queue);
-}
-
-static void port_remove(xenevtchn_handle *xce, struct port_info *port_info)
-{
-    struct file *file = get_file_from_fd(xce->fd);
-    struct ports *ports = file->dev;
-
-    down(&ports->sem);
-    port_dealloc(port_info);
-    up(&ports->sem);
 }
 
 xenevtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle *xce,
@@ -230,7 +218,7 @@ xenevtchn_port_or_error_t xenevtchn_bind_unbound_port(xenevtchn_handle *xce,
 
     if ( ret < 0 )
     {
-        port_remove(xce, port_info);
+        port_dealloc(port_info);
         errno = -ret;
         return -1;
     }
@@ -261,7 +249,7 @@ xenevtchn_port_or_error_t xenevtchn_bind_interdomain(xenevtchn_handle *xce,
 
     if ( ret < 0 )
     {
-        port_remove(xce, port_info);
+        port_dealloc(port_info);
         errno = -ret;
         return -1;
     }
@@ -279,18 +267,19 @@ int xenevtchn_unbind(xenevtchn_handle *xce, evtchn_port_t port)
     struct file *file = get_file_from_fd(fd);
     struct port_info *port_info;
     struct ports *ports = file->dev;
+    unsigned long flags;
 
-    down(&ports->sem);
+    local_irq_save(flags);
     XEN_LIST_FOREACH(port_info, &ports->list, list)
     {
         if ( port_info->port == port )
         {
             port_dealloc(port_info);
-            up(&ports->sem);
+            local_irq_restore(flags);
             return 0;
         }
     }
-    up(&ports->sem);
+    local_irq_restore(flags);
 
     printf("Warning: couldn't find port %"PRId32" for xc handle %x\n",
            port, fd);
@@ -315,7 +304,7 @@ xenevtchn_port_or_error_t xenevtchn_bind_virq(xenevtchn_handle *xce,
 
     if ( port < 0 )
     {
-        port_remove(xce, port_info);
+        port_dealloc(port_info);
         errno = -port;
         return -1;
     }
@@ -334,8 +323,6 @@ xenevtchn_port_or_error_t xenevtchn_pending(xenevtchn_handle *xce)
     struct ports *ports = file->dev;
     unsigned long flags;
     evtchn_port_t ret = -1;
-
-    down(&ports->sem);
 
     local_irq_save(flags);
 
@@ -359,8 +346,6 @@ xenevtchn_port_or_error_t xenevtchn_pending(xenevtchn_handle *xce)
     }
 
     local_irq_restore(flags);
-
-    up(&ports->sem);
 
     return ret;
 }
