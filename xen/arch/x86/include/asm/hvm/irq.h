@@ -136,7 +136,7 @@ struct hvm_girq_dpci_mapping {
 
 #define NR_ISAIRQS  16
 #define NR_LINK     4
-#define NR_HVM_DOMU_IRQS ARRAY_SIZE(((struct hvm_hw_vioapic *)0)->redirtbl)
+#define NR_HVM_DOMU_IRQS ARRAY_SIZE(((struct hvm_hw_vioapic *)NULL)->redirtbl)
 
 /* Protected by domain's event_lock */
 struct hvm_irq_dpci {

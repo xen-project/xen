@@ -65,15 +65,15 @@ struct hvm_save_descriptor {
     struct __HVM_SAVE_TYPE_##_x { _type t; char c[_code]; char cpt[1];}
 #endif
 
-#define HVM_SAVE_TYPE(_x) __typeof__ (((struct __HVM_SAVE_TYPE_##_x *)(0))->t)
+#define HVM_SAVE_TYPE(_x) __typeof__(((struct __HVM_SAVE_TYPE_##_x *)NULL)->t)
 #define HVM_SAVE_LENGTH(_x) (sizeof (HVM_SAVE_TYPE(_x)))
-#define HVM_SAVE_CODE(_x) (sizeof (((struct __HVM_SAVE_TYPE_##_x *)(0))->c))
+#define HVM_SAVE_CODE(_x) (sizeof(((struct __HVM_SAVE_TYPE_##_x *)NULL)->c))
 
 #ifdef __XEN__
-# define HVM_SAVE_TYPE_COMPAT(_x) __typeof__ (((struct __HVM_SAVE_TYPE_COMPAT_##_x *)(0))->t)
+# define HVM_SAVE_TYPE_COMPAT(_x) __typeof__(((struct __HVM_SAVE_TYPE_COMPAT_##_x *)NULL)->t)
 # define HVM_SAVE_LENGTH_COMPAT(_x) (sizeof (HVM_SAVE_TYPE_COMPAT(_x)))
 
-# define HVM_SAVE_HAS_COMPAT(_x) (sizeof (((struct __HVM_SAVE_TYPE_##_x *)(0))->cpt)-1)
+# define HVM_SAVE_HAS_COMPAT(_x) (sizeof(((struct __HVM_SAVE_TYPE_##_x *)NULL)->cpt) - 1)
 # define HVM_SAVE_FIX_COMPAT(_x, _dst, _size) __HVM_SAVE_FIX_COMPAT_##_x(_dst, _size)
 #endif
 
