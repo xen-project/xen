@@ -3,6 +3,10 @@
 
 #include <asm/smp.h>
 
+#ifndef cpu_is_offline
+#define cpu_is_offline(cpu) unlikely(!cpu_online(cpu))
+#endif
+
 /*
  * stops all CPUs but the current one:
  */
