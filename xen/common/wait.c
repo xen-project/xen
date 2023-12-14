@@ -125,7 +125,7 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
     struct vcpu *curr = current;
     unsigned long dummy;
 
-    ASSERT(wqv->esp == 0);
+    ASSERT(wqv->esp == NULL);
 
     /* Save current VCPU affinity; force wakeup on *this* CPU only. */
     if ( vcpu_temporary_affinity(curr, smp_processor_id(), VCPU_AFFINITY_WAIT) )
@@ -171,7 +171,7 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
           [sz] "i" (PAGE_SIZE)
         : "memory", "rax", "rdx", "r8", "r9", "r10", "r11" );
 
-    if ( unlikely(wqv->esp == 0) )
+    if ( unlikely(wqv->esp == NULL) )
     {
         gdprintk(XENLOG_ERR, "Stack too large in %s\n", __func__);
         domain_crash(curr->domain);
