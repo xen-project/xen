@@ -20,7 +20,8 @@
 #define BUG_DEBUGGER_TRAP_FATAL(regs) 0
 #endif
 
-#include <xen/lib.h>
+#include <xen/macros.h>
+#include <xen/types.h>
 
 #ifndef BUG_FRAME_STRUCT
 
@@ -104,14 +105,11 @@ typedef void bug_fn_t(const struct cpu_user_regs *regs);
 
 #ifndef run_in_exception_handler
 
-/*
- * TODO: untangle header dependences, break BUILD_BUG_ON() out of xen/lib.h,
- * and use a real static inline here to get proper type checking of fn().
- */
-#define run_in_exception_handler(fn) do {                   \
-    (void)((fn) == (void (*)(struct cpu_user_regs *))NULL); \
-    BUG_FRAME(BUGFRAME_run_fn, 0, fn, 0, NULL);             \
-} while ( false )
+static void always_inline run_in_exception_handler(
+    void (*fn)(struct cpu_user_regs *regs))
+{
+    BUG_FRAME(BUGFRAME_run_fn, 0, fn, 0, NULL);
+}
 
 #endif /* run_in_exception_handler */
 
