@@ -469,6 +469,15 @@ maintainers if you want to suggest a change.
      - In addition to break, also other unconditional flow control statements
        such as continue, return, goto are allowed.
 
+   * - `Rule 16.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_16_02.c>`_
+     - Required
+     - A switch label shall only be used when the most closely-enclosing
+       compound statement is the body of a switch statement
+     - The x86 emulator (xen/arch/x86/x86_emulate*) is exempt from
+       compliance with this rule. Efforts to make the x86 emulator
+       adhere to Rule 16.2 would result in increased complexity and
+       maintenance difficulty, and could potentially introduce bugs. 
+
    * - `Rule 16.7 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_16_07.c>`_
      - Required
      - A switch-expression shall not have essentially Boolean type
