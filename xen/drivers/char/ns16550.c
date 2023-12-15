@@ -233,11 +233,7 @@ out:
 static void cf_check ns16550_poll(void *data)
 {
     this_cpu(poll_port) = data;
-#ifdef run_in_exception_handler
     run_in_exception_handler(__ns16550_poll);
-#else
-    __ns16550_poll(guest_cpu_user_regs());
-#endif
 }
 
 static int cf_check ns16550_tx_ready(struct serial_port *port)

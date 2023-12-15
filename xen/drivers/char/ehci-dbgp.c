@@ -1293,11 +1293,7 @@ static void cf_check _ehci_dbgp_poll(struct cpu_user_regs *regs)
 static void cf_check ehci_dbgp_poll(void *data)
 {
     poll_port = data;
-#ifdef run_in_exception_handler
     run_in_exception_handler(_ehci_dbgp_poll);
-#else
-    _ehci_dbgp_poll(guest_cpu_user_regs());
-#endif
 }
 
 static bool ehci_dbgp_setup_preirq(struct ehci_dbgp *dbgp)
