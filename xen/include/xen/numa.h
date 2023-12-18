@@ -108,6 +108,8 @@ extern void numa_set_processor_nodes_parsed(nodeid_t node);
 
 #else
 
+extern mfn_t first_valid_mfn;
+
 static inline nodeid_t mfn_to_nid(mfn_t mfn)
 {
     return 0;

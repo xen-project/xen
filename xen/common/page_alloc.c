@@ -255,8 +255,10 @@ static PAGE_LIST_HEAD(page_broken_list);
  */
 
 /*
- * first_valid_mfn is exported because it is use in ARM specific NUMA
- * helpers. See comment in arch/arm/include/asm/numa.h.
+ * first_valid_mfn is exported because it is used when !CONFIG_NUMA.
+ *
+ * TODO: Consider if we can conditionally export first_valid_mfn based
+ * on whether NUMA is selected.
  */
 mfn_t first_valid_mfn = INVALID_MFN_INITIALIZER;
 
