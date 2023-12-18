@@ -2152,6 +2152,7 @@ void do_trap_hyp_sync(struct cpu_user_regs *regs)
     case HSR_EC_SVE:
         /* An SVE exception is a bug somewhere in hypervisor code */
         do_unexpected_trap("SVE trap at EL2", regs);
+        ASSERT_UNREACHABLE();
         break;
 #endif
     case HSR_EC_DATA_ABORT_CURR_EL:
@@ -2171,7 +2172,7 @@ void do_trap_hyp_sync(struct cpu_user_regs *regs)
             dump_hyp_walk(get_hfar(is_data));
 
         do_unexpected_trap(fault, regs);
-
+        ASSERT_UNREACHABLE();
         break;
     }
     default:
