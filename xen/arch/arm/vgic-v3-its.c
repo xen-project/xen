@@ -1409,6 +1409,7 @@ static int vgic_v3_its_mmio_write(struct vcpu *v, mmio_info_t *info,
         return 0;
     }
 
+    ASSERT_UNREACHABLE();
     return 1;
 
 write_ignore_64:

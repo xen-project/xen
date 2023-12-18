@@ -283,6 +283,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         return -ENOSYS;
     }
 
+    ASSERT_UNREACHABLE();
     return 0;
 }
 
