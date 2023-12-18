@@ -333,6 +333,34 @@ therefore have the same behavior of a boolean"
 -doc_end
 
 #
+# Series 16.
+#
+
+-doc_begin="Switch clauses ending with continue, goto, return statements are
+safe."
+-config=MC3R1.R16.3,terminals+={safe, "node(continue_stmt||goto_stmt||return_stmt)"}
+-doc_end
+
+-doc_begin="Switch clauses ending with a call to a function that does not give
+the control back (i.e., a function with attribute noreturn) are safe."
+-config=MC3R1.R16.3,terminals+={safe, "call(property(noreturn))"}
+-doc_end
+
+-doc_begin="Switch clauses ending with pseudo-keyword \"fallthrough\" are
+safe."
+-config=MC3R1.R16.3,reports+={safe, "any_area(end_loc(any_exp(text(/fallthrough;/))))"}
+-doc_end
+
+-doc_begin="Switch clauses ending with failure method \"BUG()\" are safe."
+-config=MC3R1.R16.3,reports+={safe, "any_area(end_loc(any_exp(text(/BUG\\(\\);/))))"}
+-doc_end
+
+-doc_begin="Switch clauses not ending with the break statement are safe if an
+explicit comment indicating the fallthrough intention is present."
+-config=MC3R1.R16.3,reports+={safe, "any_area(end_loc(any_exp(text(^(?s).*/\\* [fF]all ?through.? \\*/.*$,0..1))))"}
+-doc_end
+
+#
 # Series 20.
 #
 

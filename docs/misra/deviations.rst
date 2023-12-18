@@ -276,6 +276,38 @@ Deviations related to MISRA C:2012 Rules:
        therefore have the same behavior of a boolean.
      - Project-wide deviation; tagged as `deliberate` for ECLAIR.
 
+   * - R16.3
+     - Switch clauses ending with continue, goto, return statements are safe.
+     - Tagged as `safe` for ECLAIR.
+
+   * - R16.3
+     - Switch clauses ending with a call to a function that does not give
+       the control back (i.e., a function with attribute noreturn) are safe.
+     - Tagged as `safe` for ECLAIR.
+
+   * - R16.3
+     - Switch clauses ending with pseudo-keyword \"fallthrough\" are safe.
+     - Tagged as `safe` for ECLAIR.
+
+   * - R16.3
+     - Switch clauses ending with failure method \"BUG()\" are safe.
+     - Tagged as `safe` for ECLAIR.
+
+   * - R16.3
+     - Existing switch clauses not ending with the break statement are safe if
+       an explicit comment indicating the fallthrough intention is present.
+       However, the use of such comments in new code is deprecated:
+       the pseudo-keyword "fallthrough" shall be used.
+     - Tagged as `safe` for ECLAIR. The accepted comments are:
+         - /\* fall through \*/
+         - /\* fall through. \*/
+         - /\* fallthrough \*/
+         - /\* fallthrough. \*/
+         - /\* Fall through \*/
+         - /\* Fall through. \*/
+         - /\* Fallthrough \*/
+         - /\* Fallthrough. \*/
+
    * - R20.7
      - Code violating Rule 20.7 is safe when macro parameters are used:
        (1) as function arguments;
