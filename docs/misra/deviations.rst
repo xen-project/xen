@@ -104,6 +104,13 @@ Deviations related to MISRA C:2012 Rules:
      - Tagged as `deliberate` for ECLAIR.
 
    * - R5.6
+     - On X86, some types are deliberately defined multiple times, depending on
+       the number of guest paging levels.
+     - Tagged as `deliberate` for ECLAIR. Such types are:
+         - guest_intpte_t
+         - guest_l[12]e_t
+
+   * - R5.6
      - Some files are not subject to respect MISRA rules at
        the moment, but, among these out-of-scope files, there are definitions
        of typedef names that are already defined within in-scope files and
