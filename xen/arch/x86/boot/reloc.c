@@ -300,8 +300,8 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
                 const struct vesa_mode_info *mi;
 
                 video = _p(video_out);
-                ci = (void *)get_mb2_data(tag, vbe, vbe_control_info);
-                mi = (void *)get_mb2_data(tag, vbe, vbe_mode_info);
+                ci = (const void *)get_mb2_data(tag, vbe, vbe_control_info);
+                mi = (const void *)get_mb2_data(tag, vbe, vbe_mode_info);
 
                 if ( ci->version >= 0x0200 && (mi->attrib & 0x9b) == 0x9b )
                 {
