@@ -1320,7 +1320,7 @@ x86_emulate(
         ea.bytes = 2;
         goto srcmem_common;
     case SrcMem:
-        if ( state->simd_size )
+        if ( state->simd_size != simd_none )
             break;
         ea.bytes = (d & ByteOp) ? 1 : op_bytes;
     srcmem_common:
@@ -1460,7 +1460,7 @@ x86_emulate(
         /* Becomes a normal DstMem operation from here on. */
     case DstMem:
         generate_exception_if(ea.type == OP_MEM && evex.z, X86_EXC_UD);
-        if ( state->simd_size )
+        if ( state->simd_size != simd_none )
         {
             generate_exception_if(lock_prefix, X86_EXC_UD);
             break;
@@ -8176,7 +8176,7 @@ x86_emulate(
         goto done;
     }
 
-    if ( state->rmw )
+    if ( state->rmw != rmw_NONE )
     {
         ea.val = src.val;
         op_bytes = dst.bytes;
@@ -8205,7 +8205,7 @@ x86_emulate(
 
         dst.type = OP_NONE;
     }
-    else if ( state->simd_size )
+    else if ( state->simd_size != simd_none )
     {
         generate_exception_if(!op_bytes, X86_EXC_UD);
         generate_exception_if((vex.opcx && (d & TwoOp) &&
