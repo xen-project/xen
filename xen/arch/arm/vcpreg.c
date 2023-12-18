@@ -707,8 +707,14 @@ void do_cp10(struct cpu_user_regs *regs, const union hsr hsr)
         inject_undef_exception(regs, hsr);
         return;
     }
-
-    advance_pc(regs, hsr);
+    
+    /*
+     * All the cases in the switch should return. If this is not the
+     * case, then something went wrong and it is best to crash the
+     * domain.
+     */
+    ASSERT_UNREACHABLE();
+    domain_crash(current->domain);
 }
 
 void do_cp(struct cpu_user_regs *regs, const union hsr hsr)
