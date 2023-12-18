@@ -13,6 +13,8 @@
 #include "arch-arm.h"
 #elif defined (__powerpc64__)
 #include "arch-ppc.h"
+#elif defined(__riscv)
+#include "arch-riscv.h"
 #else
 #error "Unsupported architecture"
 #endif
