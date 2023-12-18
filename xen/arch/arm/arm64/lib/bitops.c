@@ -32,7 +32,8 @@
 static always_inline bool int_##name(int nr, volatile void *p, bool timeout,\
                                      unsigned int max_try)                  \
 {                                                                           \
-    volatile uint32_t *ptr = (uint32_t *)p + BITOP_WORD((unsigned int)nr);  \
+    volatile uint32_t *ptr = (volatile uint32_t *)p +                       \
+                             BITOP_WORD((unsigned int)nr);                  \
     const uint32_t mask = BITOP_MASK((unsigned int)nr);                     \
     unsigned long res, tmp;                                                 \
                                                                             \
@@ -67,7 +68,8 @@ bool name##_timeout(int nr, volatile void *p, unsigned int max_try)         \
 static always_inline bool int_##name(int nr, volatile void *p, int *oldbit, \
                                      bool timeout, unsigned int max_try)    \
 {                                                                           \
-    volatile uint32_t *ptr = (uint32_t *)p + BITOP_WORD((unsigned int)nr);  \
+    volatile uint32_t *ptr = (volatile uint32_t *)p +                       \
+                             BITOP_WORD((unsigned int)nr);                  \
     unsigned int bit = (unsigned int)nr % BITOP_BITS_PER_WORD;              \
     const uint32_t mask = BITOP_MASK(bit);                                  \
     unsigned long res, tmp;                                                 \
