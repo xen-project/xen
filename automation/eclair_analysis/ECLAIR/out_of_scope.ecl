@@ -17,11 +17,6 @@
 -file_tag+={out_of_scope,"^xen/arch/x86/include/asm/intel-family\\.h$"}
 -doc_end
 
--doc_begin="Files imported from the gnu-efi package"
--file_tag+={adopted,"^xen/include/efi/.*$"}
--file_tag+={adopted,"^xen/arch/x86/include/asm/x86_64/efibind\\.h$"}
--doc_end
-
 -doc_begin="Build tools are out of scope."
 -file_tag+={out_of_scope_tools,"^xen/tools/.*$"}
 -file_tag+={out_of_scope_tools,"^xen/arch/x86/efi/mkreloc\\.c$"}

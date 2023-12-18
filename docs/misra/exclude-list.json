@@ -2,6 +2,10 @@
     "version": "1.0",
     "content": [
         {
+            "rel_path": "arch/*/include/asm/*/efibind.h",
+            "comment": "Imported from gnu-efi package, ignore for now"
+        },
+        {
             "rel_path": "arch/arm/arm64/cpufeature.c",
             "comment": "Imported from Linux, ignore for now"
         },
@@ -96,6 +100,10 @@
         {
             "rel_path": "arch/x86/efi/check.c",
             "comment": "The resulting code is not included in the final Xen binary, ignore for now"
+        },
+        {
+            "rel_path": "common/coverage/*",
+            "comment": "Files to support gcov, ignore for now"
         },
         {
             "rel_path": "common/bitmap.c",
@@ -211,6 +219,14 @@
         },
         {
             "rel_path": "include/xen/acpi.h",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "include/efi/*",
+            "comment": "Imported from gnu-efi package, ignore for now"
+        },
+        {
+            "rel_path": "include/xen/decompress.h",
             "comment": "Imported from Linux, ignore for now"
         },
         {
