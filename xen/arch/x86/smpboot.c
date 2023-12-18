@@ -310,7 +310,7 @@ static void set_cpu_sibling_map(unsigned int cpu)
     }
 }
 
-void start_secondary(void *unused)
+void asmlinkage start_secondary(void *unused)
 {
     struct cpu_info *info = get_cpu_info();
 

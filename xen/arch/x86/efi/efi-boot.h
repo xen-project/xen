@@ -808,8 +808,9 @@ static const char *__init get_option(const char *cmd, const char *opt)
     return o;
 }
 
-void __init efi_multiboot2(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable,
-                           const char *cmdline)
+void asmlinkage __init efi_multiboot2(EFI_HANDLE ImageHandle,
+                                      EFI_SYSTEM_TABLE *SystemTable,
+                                      const char *cmdline)
 {
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
     EFI_HANDLE gop_handle;
