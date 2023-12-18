@@ -3462,7 +3462,7 @@ unsigned int copy_to_user_hvm(void *to, const void *from, unsigned int len)
         return 0;
     }
 
-    rc = hvm_copy_to_guest_linear((unsigned long)to, (void *)from, len, 0, NULL);
+    rc = hvm_copy_to_guest_linear((unsigned long)to, from, len, 0, NULL);
     return rc ? len : 0; /* fake a copy_to_user() return code */
 }
 
