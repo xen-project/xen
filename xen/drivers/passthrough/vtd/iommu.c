@@ -3162,7 +3162,7 @@ static int cf_check intel_iommu_quarantine_init(struct pci_dev *pdev,
 {
     struct domain_iommu *hd = dom_iommu(dom_io);
     struct page_info *pg;
-    unsigned int agaw = width_to_agaw(DEFAULT_DOMAIN_ADDRESS_WIDTH);
+    unsigned int agaw = hd->arch.vtd.agaw;
     unsigned int level = agaw_to_level(agaw);
     const struct acpi_drhd_unit *drhd;
     const struct acpi_rmrr_unit *rmrr;
