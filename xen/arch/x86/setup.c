@@ -1569,7 +1569,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
                 continue;
             }
             map_e = e;
-            e = (pdx_to_pfn(max_pdx - 1) + 1ULL) << PAGE_SHIFT;
+            e = pfn_to_paddr(max_page);
             printk(XENLOG_WARNING "Ignoring inaccessible memory range"
                                   " %013"PRIx64"-%013"PRIx64"\n",
                    e, map_e);
