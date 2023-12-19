@@ -303,6 +303,13 @@ constant expressions are required.\""
 # Series 11
 #
 
+-doc_begin="Violations caused by container_of are due to pointer arithmetic operations
+with the provided offset. The resulting pointer is then immediately cast back to its
+original type, which preserves the qualifier. This use is deemed safe.
+Fixing this violation would require to increase code complexity and lower readability."
+-config=MC3R1.R11.8,reports+={safe,"any_area(any_loc(any_exp(macro(^container_of$))))"}
+-doc_end
+
 -doc_begin="This construct is used to check if the type is scalar, and for this purpose the use of 0 as a null pointer constant is deliberate."
 -config=MC3R1.R11.9,reports+={deliberate, "any_area(any_loc(any_exp(macro(^__ACCESS_ONCE$))))"
 }

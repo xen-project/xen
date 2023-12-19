@@ -255,6 +255,13 @@ Deviations related to MISRA C:2012 Rules:
        If no bits are set, 0 is returned.
      - Tagged as `safe` for ECLAIR.
 
+   * - R11.8
+     - Violations caused by container_of are due to pointer arithmetic operations
+       with the provided offset. The resulting pointer is then immediately cast back to its
+       original type, which preserves the qualifier. This use is deemed safe.
+       Fixing this violation would require to increase code complexity and lower readability.
+     - Tagged as `safe` for ECLAIR.
+
    * - R11.9
      - __ACCESS_ONCE uses an integer, which happens to be zero, as a
        compile time check. The typecheck uses a cast. The usage of zero or other
