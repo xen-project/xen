@@ -377,7 +377,7 @@ static int __init process_chosen_node(const void *fdt, int node,
         printk("linux,initrd-start property has invalid length %d\n", len);
         return -EINVAL;
     }
-    start = dt_read_paddr((void *)&prop->data, dt_size_to_cells(len));
+    start = dt_read_paddr((const void *)&prop->data, dt_size_to_cells(len));
 
     prop = fdt_get_property(fdt, node, "linux,initrd-end", &len);
     if ( !prop )
@@ -390,7 +390,7 @@ static int __init process_chosen_node(const void *fdt, int node,
         printk("linux,initrd-end property has invalid length %d\n", len);
         return -EINVAL;
     }
-    end = dt_read_paddr((void *)&prop->data, dt_size_to_cells(len));
+    end = dt_read_paddr((const void *)&prop->data, dt_size_to_cells(len));
 
     if ( start >= end )
     {
@@ -541,7 +541,7 @@ size_t __init boot_fdt_info(const void *fdt, paddr_t paddr)
 
     add_boot_module(BOOTMOD_FDT, paddr, fdt_totalsize(fdt), false);
 
-    ret = device_tree_for_each_node((void *)fdt, 0, early_scan_node, NULL);
+    ret = device_tree_for_each_node(fdt, 0, early_scan_node, NULL);
     if ( ret )
         panic("Early FDT parsing failed (%d)\n", ret);
 

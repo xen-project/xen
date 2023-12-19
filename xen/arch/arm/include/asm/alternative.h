@@ -20,7 +20,7 @@ struct alt_instr {
 };
 
 /* Xen: helpers used by common code. */
-#define __ALT_PTR(a,f)		((void *)&(a)->f + (a)->f)
+#define __ALT_PTR(a,f)		((const void *)&(a)->f + (a)->f)
 #define ALT_ORIG_PTR(a)		__ALT_PTR(a, orig_offset)
 #define ALT_REPL_PTR(a)		__ALT_PTR(a, repl_offset)
 
