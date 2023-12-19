@@ -178,7 +178,7 @@ void __init xen_build_init(void)
     if ( &n[1] >= __note_gnu_build_id_end )
         return;
 
-    sz = (void *)__note_gnu_build_id_end - (void *)n;
+    sz = (uintptr_t)__note_gnu_build_id_end - (uintptr_t)n;
 
     rc = xen_build_id_check(n, sz, &build_id_p, &build_id_len);
 
