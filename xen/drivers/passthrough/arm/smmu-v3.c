@@ -2200,6 +2200,7 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
 		fallthrough;
 	case IDR0_STALL_MODEL_STALL:
 		smmu->features |= ARM_SMMU_FEAT_STALLS;
+		break;
 	}
 
 	if (reg & IDR0_S2P)
@@ -2301,6 +2302,7 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
 		fallthrough;
 	case IDR5_OAS_48_BIT:
 		smmu->oas = 48;
+		break;
 	}
 
 	smmu->oas = min_t(unsigned long, PADDR_BITS, smmu->oas);
