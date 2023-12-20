@@ -165,6 +165,8 @@ static bool guest_walk_sd(const struct vcpu *v,
             *perms |= GV2M_WRITE;
         if ( !pte.sec.xn )
             *perms |= GV2M_EXEC;
+
+        break;
     }
 
     return true;
@@ -260,6 +262,7 @@ static bool get_ttbr_and_gran_64bit(uint64_t *ttbr, unsigned int *gran,
              * fall back to 4K by default.
              */
             *gran = GRANULE_SIZE_INDEX_4K;
+            break;
         }
 
         /* Use TTBR0 for GVA to IPA translation. */
@@ -291,6 +294,7 @@ static bool get_ttbr_and_gran_64bit(uint64_t *ttbr, unsigned int *gran,
              * fall back to 4K by default.
              */
             *gran = GRANULE_SIZE_INDEX_4K;
+            break;
         }
 
         /* Use TTBR1 for GVA to IPA translation. */
