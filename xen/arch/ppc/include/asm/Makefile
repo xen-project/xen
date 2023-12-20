@@ -7,4 +7,5 @@ generic-y += iocap.h
 generic-y += paging.h
 generic-y += percpu.h
 generic-y += random.h
+generic-y += softirq.h
 generic-y += vm_event.h
