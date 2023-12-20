@@ -1414,10 +1414,18 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, register_t *nr,
     {
         /* Deliberately corrupt parameter regs used by this hypercall. */
         switch ( hypercall_args[*nr] ) {
-        case 5: HYPERCALL_ARG5(regs) = 0xDEADBEEFU;
-        case 4: HYPERCALL_ARG4(regs) = 0xDEADBEEFU;
-        case 3: HYPERCALL_ARG3(regs) = 0xDEADBEEFU;
-        case 2: HYPERCALL_ARG2(regs) = 0xDEADBEEFU;
+        case 5:
+            HYPERCALL_ARG5(regs) = 0xDEADBEEFU;
+            fallthrough;
+        case 4:
+            HYPERCALL_ARG4(regs) = 0xDEADBEEFU;
+            fallthrough;
+        case 3:
+            HYPERCALL_ARG3(regs) = 0xDEADBEEFU;
+            fallthrough;
+        case 2:
+            HYPERCALL_ARG2(regs) = 0xDEADBEEFU;
+            fallthrough;
         case 1: /* Don't clobber x0/r0 -- it's the return value */
         case 0: /* -ENOSYS case */
             break;
@@ -1929,6 +1937,7 @@ static void do_trap_stage2_abort_guest(struct cpu_user_regs *regs,
         gprintk(XENLOG_WARNING,
                 "Unsupported FSC: HSR=%#"PRIregister" DFSC=%#x\n",
                 hsr.bits, xabt.fsc);
+        break;
     }
 
 inject_abt:
@@ -2136,6 +2145,7 @@ void asmlinkage do_trap_guest_sync(struct cpu_user_regs *regs)
                 "Unknown Guest Trap. HSR=%#"PRIregister" EC=0x%x IL=%x Syndrome=0x%"PRIx32"\n",
                 hsr.bits, hsr.ec, hsr.len, hsr.iss);
         inject_undef_exception(regs, hsr);
+        break;
     }
 }
 
