@@ -65,34 +65,49 @@ static inline void gicv3_save_lrs(struct vcpu *v)
     {
     case 16:
         v->arch.gic.v3.lr[15] = READ_SYSREG_LR(15);
+        fallthrough;
     case 15:
         v->arch.gic.v3.lr[14] = READ_SYSREG_LR(14);
+        fallthrough;
     case 14:
         v->arch.gic.v3.lr[13] = READ_SYSREG_LR(13);
+        fallthrough;
     case 13:
         v->arch.gic.v3.lr[12] = READ_SYSREG_LR(12);
+        fallthrough;
     case 12:
         v->arch.gic.v3.lr[11] = READ_SYSREG_LR(11);
+        fallthrough;
     case 11:
         v->arch.gic.v3.lr[10] = READ_SYSREG_LR(10);
+        fallthrough;
     case 10:
         v->arch.gic.v3.lr[9] = READ_SYSREG_LR(9);
+        fallthrough;
     case 9:
         v->arch.gic.v3.lr[8] = READ_SYSREG_LR(8);
+        fallthrough;
     case 8:
         v->arch.gic.v3.lr[7] = READ_SYSREG_LR(7);
+        fallthrough;
     case 7:
         v->arch.gic.v3.lr[6] = READ_SYSREG_LR(6);
+        fallthrough;
     case 6:
         v->arch.gic.v3.lr[5] = READ_SYSREG_LR(5);
+        fallthrough;
     case 5:
         v->arch.gic.v3.lr[4] = READ_SYSREG_LR(4);
+        fallthrough;
     case 4:
         v->arch.gic.v3.lr[3] = READ_SYSREG_LR(3);
+        fallthrough;
     case 3:
         v->arch.gic.v3.lr[2] = READ_SYSREG_LR(2);
+        fallthrough;
     case 2:
         v->arch.gic.v3.lr[1] = READ_SYSREG_LR(1);
+        fallthrough;
     case 1:
          v->arch.gic.v3.lr[0] = READ_SYSREG_LR(0);
          break;
@@ -112,34 +127,49 @@ static inline void gicv3_restore_lrs(const struct vcpu *v)
     {
     case 16:
         WRITE_SYSREG_LR(v->arch.gic.v3.lr[15], 15);
+        fallthrough;
     case 15:
         WRITE_SYSREG_LR(v->arch.gic.v3.lr[14], 14);
+        fallthrough;
     case 14:
         WRITE_SYSREG_LR(v->arch.gic.v3.lr[13], 13);
+        fallthrough;
     case 13:
         WRITE_SYSREG_LR(v->arch.gic.v3.lr[12], 12);
+        fallthrough;
     case 12:
         WRITE_SYSREG_LR(v->arch.gic.v3.lr[11], 11);
+        fallthrough;
     case 11:
         WRITE_SYSREG_LR(v->arch.gic.v3.lr[10], 10);
+        fallthrough;
     case 10:
         WRITE_SYSREG_LR(v->arch.gic.v3.lr[9], 9);
+        fallthrough;
     case 9:
         WRITE_SYSREG_LR(v->arch.gic.v3.lr[8], 8);
+        fallthrough;
     case 8:
         WRITE_SYSREG_LR(v->arch.gic.v3.lr[7], 7);
+        fallthrough;
     case 7:
         WRITE_SYSREG_LR(v->arch.gic.v3.lr[6], 6);
+        fallthrough;
     case 6:
         WRITE_SYSREG_LR(v->arch.gic.v3.lr[5], 5);
+        fallthrough;
     case 5:
         WRITE_SYSREG_LR(v->arch.gic.v3.lr[4], 4);
+        fallthrough;
     case 4:
         WRITE_SYSREG_LR(v->arch.gic.v3.lr[3], 3);
+        fallthrough;
     case 3:
         WRITE_SYSREG_LR(v->arch.gic.v3.lr[2], 2);
+        fallthrough;
     case 2:
         WRITE_SYSREG_LR(v->arch.gic.v3.lr[1], 1);
+        fallthrough;
     case 1:
         WRITE_SYSREG_LR(v->arch.gic.v3.lr[0], 0);
         break;
