@@ -36,6 +36,7 @@
 
 #include <xen/irq.h>
 #include <xen/grant_table.h>
+#include <asm/grant_table.h>
 #include <xen/serial.h>
 
 static unsigned int __initdata opt_dom0_max_vcpus;
