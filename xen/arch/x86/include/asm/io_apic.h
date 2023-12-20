@@ -101,7 +101,7 @@ struct IO_APIC_route_entry {
                                            */
             unsigned int dest_mode:1;     /* 0: physical, 1: logical */
             unsigned int delivery_status:1;
-            unsigned int polarity:1;      /* 0: low, 1: high */
+            unsigned int polarity:1;      /* 0: high, 1: low */
             unsigned int irr:1;
             unsigned int trigger:1;       /* 0: edge, 1: level */
             unsigned int mask:1;          /* 0: enabled, 1: disabled */
