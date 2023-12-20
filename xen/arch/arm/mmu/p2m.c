@@ -657,6 +657,7 @@ static lpae_t mfn_to_p2m_entry(mfn_t mfn, p2m_type_t t, p2m_access_t a)
     default:
         e.p2m.mattr = MATTR_MEM;
         e.p2m.sh = LPAE_SH_INNER;
+        break;
     }
 
     p2m_set_permission(&e, t, a);
