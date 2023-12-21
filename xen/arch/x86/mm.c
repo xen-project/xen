@@ -4724,7 +4724,7 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         spin_unlock(&d->arch.e820_lock);
 
         rcu_unlock_domain(d);
-        return rc;
+        break;
     }
 
     case XENMEM_memory_map:
@@ -4818,7 +4818,7 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( __copy_to_guest(arg, &ctxt.map, 1) )
             return -EFAULT;
 
-        return 0;
+        break;
     }
 
     case XENMEM_machphys_mapping:
@@ -4880,7 +4880,7 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         }
 
         rcu_unlock_domain(d);
-        return rc;
+        break;
     }
 #endif
 
@@ -4888,7 +4888,7 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         return subarch_memory_op(cmd, arg);
     }
 
-    return 0;
+    return rc;
 }
 
 int cf_check mmio_ro_emulated_write(
