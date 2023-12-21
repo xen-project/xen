@@ -359,21 +359,17 @@ int __read_mostly amd_iommu_min_paging_mode = 1;
 static int cf_check amd_iommu_domain_init(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
+    int pglvl = amd_iommu_get_paging_mode(
+                    1UL << (domain_max_paddr_bits(d) - PAGE_SHIFT));
+
+    if ( pglvl < 0 )
+        return pglvl;
 
     /*
-     * Choose the number of levels for the IOMMU page tables.
-     * - PV needs 3 or 4, depending on whether there is RAM (including hotplug
-     *   RAM) above the 512G boundary.
-     * - HVM could in principle use 3 or 4 depending on how much guest
-     *   physical address space we give it, but this isn't known yet so use 4
-     *   unilaterally.
-     * - Unity maps may require an even higher number.
+     * Choose the number of levels for the IOMMU page tables, taking into
+     * account unity maps.
      */
-    hd->arch.amd.paging_mode = max(amd_iommu_get_paging_mode(
-            is_hvm_domain(d)
-            ? 1UL << (DEFAULT_DOMAIN_ADDRESS_WIDTH - PAGE_SHIFT)
-            : get_upper_mfn_bound() + 1),
-        amd_iommu_min_paging_mode);
+    hd->arch.amd.paging_mode = max(pglvl, amd_iommu_min_paging_mode);
 
     return 0;
 }
