@@ -651,6 +651,7 @@ struct domain *domain_create(domid_t domid,
 
 #ifdef CONFIG_HAS_PCI
     INIT_LIST_HEAD(&d->pdev_list);
+    rwlock_init(&d->pci_lock);
 #endif
 
     /* All error paths can depend on the above setup. */

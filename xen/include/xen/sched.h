@@ -461,6 +461,28 @@ struct domain
 
 #ifdef CONFIG_HAS_PCI
     struct list_head pdev_list;
+    /*
+     * pci_lock protects access to pdev_list.
+     *
+     * Any user *reading* from pdev_list, or from devices stored in pdev_list,
+     * should hold either pcidevs_lock() or pci_lock in read mode. Optionally,
+     * both locks may be held for reads as long as the locking order is
+     * observed.
+     *
+     * Any user *writing* to pdev_list, or to devices stored in pdev_list,
+     * should hold both pcidevs_lock() and pci_lock in write mode, and observe
+     * the locking order.
+     *
+     * The locking order is:
+     * 1. pcidevs_lock()
+     * 2. d->pci_lock
+     *
+     * Additionally, users of both pci_lock and vpci->lock should observe the
+     * following locking order:
+     * 1. d->pci_lock
+     * 2. pdev->vpci->lock
+     */
+    rwlock_t pci_lock;
 #endif
 
 #ifdef CONFIG_HAS_PASSTHROUGH

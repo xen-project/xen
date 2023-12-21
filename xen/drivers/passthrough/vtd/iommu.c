@@ -2816,8 +2816,15 @@ static int cf_check reassign_device_ownership(
 
     if ( devfn == pdev->devfn && pdev->domain != target )
     {
-        list_move(&pdev->domain_list, &target->pdev_list);
+        write_lock(&source->pci_lock);
+        list_del(&pdev->domain_list);
+        write_unlock(&source->pci_lock);
+
         pdev->domain = target;
+
+        write_lock(&target->pci_lock);
+        list_add(&pdev->domain_list, &target->pdev_list);
+        write_unlock(&target->pci_lock);
     }
 
     if ( !has_arch_pdevs(source) )
