@@ -2552,6 +2552,27 @@ static int __init cf_check init_vcpu_kick_softirq(void)
 }
 __initcall(init_vcpu_kick_softirq);
 
+unsigned int domain_max_paddr_bits(const struct domain *d)
+{
+    unsigned int bits = paging_mode_hap(d) ? hap_paddr_bits : paddr_bits;
+
+    if ( paging_mode_external(d) )
+    {
+        if ( !IS_ENABLED(CONFIG_BIGMEM) && paging_mode_shadow(d) )
+        {
+            /* Shadowed superpages store GFNs in 32-bit page_info fields. */
+            bits = min(bits, 32U + PAGE_SHIFT);
+        }
+        else
+        {
+            /* Both p2m-ept and p2m-pt only support 4-level page tables. */
+            bits = min(bits, 48U);
+        }
+    }
+
+    return bits;
+}
+
 /*
  * Local variables:
  * mode: C

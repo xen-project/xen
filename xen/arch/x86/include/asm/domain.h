@@ -777,6 +777,9 @@ static inline void pv_inject_sw_interrupt(unsigned int vector)
 struct arch_vcpu_io {
 };
 
+/* Maxphysaddr supportable by the paging infrastructure. */
+unsigned int domain_max_paddr_bits(const struct domain *d);
+
 #endif /* __ASM_DOMAIN_H__ */
 
 /*

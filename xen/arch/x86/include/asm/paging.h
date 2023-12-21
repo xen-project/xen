@@ -336,28 +336,6 @@ static inline bool gfn_valid(const struct domain *d, gfn_t gfn)
     return !(gfn_x(gfn) >> (d->arch.cpuid->extd.maxphysaddr - PAGE_SHIFT));
 }
 
-/* Maxphysaddr supportable by the paging infrastructure. */
-static always_inline unsigned int paging_max_paddr_bits(const struct domain *d)
-{
-    unsigned int bits = paging_mode_hap(d) ? hap_paddr_bits : paddr_bits;
-
-    if ( paging_mode_external(d) )
-    {
-        if ( !IS_ENABLED(CONFIG_BIGMEM) && paging_mode_shadow(d) )
-        {
-            /* Shadowed superpages store GFNs in 32-bit page_info fields. */
-            bits = min(bits, 32U + PAGE_SHIFT);
-        }
-        else
-        {
-            /* Both p2m-ept and p2m-pt only support 4-level page tables. */
-            bits = min(bits, 48U);
-        }
-    }
-
-    return bits;
-}
-
 #endif /* XEN_PAGING_H */
 
 /*
