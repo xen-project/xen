@@ -202,19 +202,11 @@
             "comment": "Imported from Linux, ignore for now"
         },
         {
-            "rel_path": "include/acpi/acpiosxf.h",
+            "rel_path": "include/acpi/ac*.h",
             "comment": "Imported from Linux, ignore for now"
         },
         {
-            "rel_path": "include/acpi/acpixf.h",
-            "comment": "Imported from Linux, ignore for now"
-        },
-        {
-          "rel_path": "include/acpi/acexcep.h",
-          "comment": "Imported from Linux, ignore for now"
-        },
-        {
-          "rel_path": "include/acpi/acglobal.h",
+          "rel_path": "include/acpi/platform/ac*.h",
           "comment": "Imported from Linux, ignore for now"
         },
         {
