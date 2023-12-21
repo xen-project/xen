@@ -54,7 +54,7 @@ bool __read_mostly amd_acpi_c1e_quirk;
 bool __ro_after_init amd_legacy_ssbd;
 bool __initdata amd_virt_spec_ctrl;
 
-static bool __read_mostly zen2_c6_disabled;
+static bool __read_mostly fam17_c6_disabled;
 
 static inline int rdmsr_amd_safe(unsigned int msr, unsigned int *lo,
 				 unsigned int *hi)
@@ -978,24 +978,24 @@ void amd_check_zenbleed(void)
 		       val & chickenbit ? "chickenbit" : "microcode");
 }
 
-static void cf_check zen2_disable_c6(void *arg)
+static void cf_check fam17_disable_c6(void *arg)
 {
 	/* Disable C6 by clearing the CCR{0,1,2}_CC6EN bits. */
 	const uint64_t mask = ~((1ul << 6) | (1ul << 14) | (1ul << 22));
 	uint64_t val;
 
-	if (!zen2_c6_disabled) {
+	if (!fam17_c6_disabled) {
 		printk(XENLOG_WARNING
     "Disabling C6 after 1000 days apparent uptime due to AMD errata 1474\n");
-		zen2_c6_disabled = true;
+		fam17_c6_disabled = true;
 		/*
 		 * Prevent CPU hotplug so that started CPUs will either see
-		 * zen2_c6_disabled set, or will be handled by
+		 * zen_c6_disabled set, or will be handled by
 		 * smp_call_function().
 		 */
 		while (!get_cpu_maps())
 			process_pending_softirqs();
-		smp_call_function(zen2_disable_c6, NULL, 0);
+		smp_call_function(fam17_disable_c6, NULL, 0);
 		put_cpu_maps();
 	}
 
@@ -1294,8 +1294,8 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 	amd_check_zenbleed();
 	amd_check_erratum_1485();
 
-	if (zen2_c6_disabled)
-		zen2_disable_c6(NULL);
+	if (fam17_c6_disabled)
+		fam17_disable_c6(NULL);
 
 	check_syscfg_dram_mod_en();
 
@@ -1307,7 +1307,7 @@ const struct cpu_dev amd_cpu_dev = {
 	.c_init		= init_amd,
 };
 
-static int __init cf_check zen2_c6_errata_check(void)
+static int __init cf_check amd_check_erratum_1474(void)
 {
 	/*
 	 * Errata #1474: A Core May Hang After About 1044 Days
@@ -1315,7 +1315,8 @@ static int __init cf_check zen2_c6_errata_check(void)
 	 */
 	s_time_t delta;
 
-	if (cpu_has_hypervisor || boot_cpu_data.x86 != 0x17 || !is_zen2_uarch())
+	if (cpu_has_hypervisor ||
+	    (boot_cpu_data.x86 != 0x17 && boot_cpu_data.x86 != 0x18))
 		return 0;
 
 	/*
@@ -1330,10 +1331,10 @@ static int __init cf_check zen2_c6_errata_check(void)
 	if (delta > 0) {
 		static struct timer errata_c6;
 
-		init_timer(&errata_c6, zen2_disable_c6, NULL, 0);
+		init_timer(&errata_c6, fam17_disable_c6, NULL, 0);
 		set_timer(&errata_c6, NOW() + delta);
 	} else
-		zen2_disable_c6(NULL);
+		fam17_disable_c6(NULL);
 
 	return 0;
 }
@@ -1341,4 +1342,4 @@ static int __init cf_check zen2_c6_errata_check(void)
  * Must be executed after early_time_init() for tsc_ticks2ns() to have been
  * calibrated.  That prevents us doing the check in init_amd().
  */
-presmp_initcall(zen2_c6_errata_check);
+presmp_initcall(amd_check_erratum_1474);
