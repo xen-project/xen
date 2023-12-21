@@ -983,13 +983,13 @@ static int msix_capability_init(struct pci_dev *dev,
  * irq or non-zero for otherwise.
  **/
 
-static int __pci_enable_msi(struct msi_info *msi, struct msi_desc **desc)
+static int __pci_enable_msi(struct pci_dev *pdev, struct msi_info *msi,
+                            struct msi_desc **desc)
 {
-    struct pci_dev *pdev;
     struct msi_desc *old_desc;
 
     ASSERT(pcidevs_locked());
-    pdev = pci_get_pdev(NULL, msi->sbdf);
+
     if ( !pdev )
         return -ENODEV;
 
@@ -1038,13 +1038,13 @@ static void __pci_disable_msi(struct msi_desc *entry)
  * of irqs available. Driver should use the returned value to re-send
  * its request.
  **/
-static int __pci_enable_msix(struct msi_info *msi, struct msi_desc **desc)
+static int __pci_enable_msix(struct pci_dev *pdev, struct msi_info *msi,
+                             struct msi_desc **desc)
 {
-    struct pci_dev *pdev;
     struct msi_desc *old_desc;
 
     ASSERT(pcidevs_locked());
-    pdev = pci_get_pdev(NULL, msi->sbdf);
+
     if ( !pdev || !pdev->msix )
         return -ENODEV;
 
@@ -1151,15 +1151,16 @@ int pci_prepare_msix(u16 seg, u8 bus, u8 devfn, bool off)
  * Notice: only construct the msi_desc
  * no change to irq_desc here, and the interrupt is masked
  */
-int pci_enable_msi(struct msi_info *msi, struct msi_desc **desc)
+int pci_enable_msi(struct pci_dev *pdev, struct msi_info *msi,
+                   struct msi_desc **desc)
 {
     ASSERT(pcidevs_locked());
 
     if ( !use_msi )
         return -EPERM;
 
-    return msi->table_base ? __pci_enable_msix(msi, desc) :
-                             __pci_enable_msi(msi, desc);
+    return msi->table_base ? __pci_enable_msix(pdev, msi, desc) :
+                             __pci_enable_msi(pdev, msi, desc);
 }
 
 /*

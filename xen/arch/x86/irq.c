@@ -2176,7 +2176,7 @@ int map_domain_pirq(
         if ( !pdev )
             goto done;
 
-        ret = pci_enable_msi(msi, &msi_desc);
+        ret = pci_enable_msi(pdev, msi, &msi_desc);
         if ( ret )
         {
             if ( ret > 0 )

@@ -448,10 +448,13 @@ static void __init cf_check ns16550_init_postirq(struct serial_port *port)
             if ( rc > 0 )
             {
                 struct msi_desc *msi_desc = NULL;
+                struct pci_dev *pdev;
 
                 pcidevs_lock();
 
-                rc = pci_enable_msi(&msi, &msi_desc);
+                pdev = pci_get_pdev(NULL, msi.sbdf);
+                rc = pdev ? pci_enable_msi(pdev, &msi, &msi_desc) : -ENODEV;
+
                 if ( !rc )
                 {
                     struct irq_desc *desc = irq_to_desc(msi.irq);
