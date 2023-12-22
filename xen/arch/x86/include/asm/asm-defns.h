@@ -20,10 +20,9 @@
     .byte 0x0f, 0x01, 0xdd
 .endm
 
-.macro INDIRECT_BRANCH insn:req arg:req
+.macro INDIRECT_CALL arg:req
 /*
- * Create an indirect branch.  insn is one of call/jmp, arg is a single
- * register.
+ * Create an indirect call.  arg is a single register.
  *
  * With no compiler support, this degrades into a plain indirect call/jmp.
  * With compiler support, dispatch to the correct __x86_indirect_thunk_*
@@ -33,7 +32,7 @@
         $done = 0
         .irp reg, ax, cx, dx, bx, bp, si, di, 8, 9, 10, 11, 12, 13, 14, 15
         .ifeqs "\arg", "%r\reg"
-            \insn __x86_indirect_thunk_r\reg
+            call __x86_indirect_thunk_r\reg
             $done = 1
            .exitm
         .endif
@@ -44,17 +43,8 @@
         .endif
 
     .else
-        \insn *\arg
+        call *\arg
     .endif
-.endm
-
-/* Convenience wrappers. */
-.macro INDIRECT_CALL arg:req
-    INDIRECT_BRANCH call \arg
-.endm
-
-.macro INDIRECT_JMP arg:req
-    INDIRECT_BRANCH jmp \arg
 .endm
 
 #ifdef CONFIG_XEN_IBT
