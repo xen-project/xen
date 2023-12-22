@@ -2108,12 +2108,12 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     /* Ensure that the vcpu has an up-to-date time base. */
     update_vcpu_system_time(next);
 
-    reset_stack_and_jump_ind(nextd->arch.ctxt_switch->tail);
+    reset_stack_and_call_ind(nextd->arch.ctxt_switch->tail);
 }
 
 void continue_running(struct vcpu *same)
 {
-    reset_stack_and_jump_ind(same->domain->arch.ctxt_switch->tail);
+    reset_stack_and_call_ind(same->domain->arch.ctxt_switch->tail);
 }
 
 int __sync_local_execstate(void)
