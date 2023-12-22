@@ -196,10 +196,10 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
     switch_stack_and_jump(fn, "jmp %c", "i")
 
 /* The constraint may only specify non-call-clobbered registers. */
-#define reset_stack_and_jump_ind(fn)                                    \
+#define reset_stack_and_call_ind(fn)                                    \
     ({                                                                  \
         (void)((fn) == (void (*)(void))NULL);                           \
-        switch_stack_and_jump(fn, "INDIRECT_JMP %", "b");               \
+        switch_stack_and_jump(fn, "INDIRECT_CALL %", "b");              \
     })
 
 /*
