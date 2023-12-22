@@ -644,6 +644,14 @@ END(create_bounce_frame)
 #ifdef CONFIG_PV
 FUNC(continue_pv_domain)
         ENDBR64
+
+        /*
+         * For speculative type confusion reasons, we're CALLed rather than
+         * JMPed to.  Drop the return address.
+         */
+        add   $8, %rsp
+        ALTERNATIVE "", "mov $2, %eax; incsspd %eax", X86_FEATURE_XEN_SHSTK
+
         call  check_wakeup_from_wait
 ret_from_intr:
         GET_CURRENT(bx)
