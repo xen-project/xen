@@ -197,8 +197,8 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
     switch_stack_and_jump(fn, "jmp %c", "i")
 
 /* The constraint may only specify non-call-clobbered registers. */
-#define reset_stack_and_jump_ind(fn)                                    \
-    switch_stack_and_jump(fn, "INDIRECT_JMP %", "b")
+#define reset_stack_and_call_ind(fn)                                    \
+    switch_stack_and_jump(fn, "INDIRECT_CALL %", "b")
 
 /*
  * Which VCPU's state is currently running on each CPU?
