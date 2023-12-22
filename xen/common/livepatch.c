@@ -1693,7 +1693,7 @@ static int livepatch_spin(atomic_t *counter, s_time_t timeout,
  * The main function which manages the work of quiescing the system and
  * patching code.
  */
-void check_for_livepatch_work(void)
+static void noinline do_livepatch_work(void)
 {
 #define ACTION(x) [LIVEPATCH_ACTION_##x] = #x
     static const char *const names[] = {
@@ -1709,10 +1709,6 @@ void check_for_livepatch_work(void)
     /* Only do any work when invoked in truly idle state. */
     if ( system_state != SYS_STATE_active ||
          !is_idle_domain(current->sched_unit->domain) )
-        return;
-
-    /* Fast path: no work to do. */
-    if ( !per_cpu(work_to_do, cpu ) )
         return;
 
     smp_rmb();
@@ -1862,6 +1858,17 @@ void check_for_livepatch_work(void)
 
         per_cpu(work_to_do, cpu) = 0;
     }
+}
+
+void check_for_livepatch_work(void)
+{
+    unsigned int cpu = smp_processor_id();
+
+    /* Fast path: no work to do. */
+    if ( likely(!per_cpu(work_to_do, cpu)) )
+        return;
+
+    do_livepatch_work();
 }
 
 /*
