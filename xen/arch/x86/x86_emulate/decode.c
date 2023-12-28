@@ -1043,27 +1043,18 @@ int x86emul_decode(struct x86_emulate_state *s,
         case 0x67: /* address-size override */
             ad_bytes = def_ad_bytes ^ (mode_64bit() ? 12 : 6);
             break;
-        case 0x2e: /* CS override / ignored in 64-bit mode */
+        case 0x26: /* ES override */
+        case 0x2e: /* CS override */
+        case 0x36: /* SS override */
+        case 0x3e: /* DS override, all ignored in 64-bit mode */
             if ( !mode_64bit() )
-                override_seg = x86_seg_cs;
-            break;
-        case 0x3e: /* DS override / ignored in 64-bit mode */
-            if ( !mode_64bit() )
-                override_seg = x86_seg_ds;
-            break;
-        case 0x26: /* ES override / ignored in 64-bit mode */
-            if ( !mode_64bit() )
-                override_seg = x86_seg_es;
+                override_seg = (b >> 3) & 3;
             break;
         case 0x64: /* FS override */
             override_seg = x86_seg_fs;
             break;
         case 0x65: /* GS override */
             override_seg = x86_seg_gs;
-            break;
-        case 0x36: /* SS override / ignored in 64-bit mode */
-            if ( !mode_64bit() )
-                override_seg = x86_seg_ss;
             break;
         case 0xf0: /* LOCK */
             s->lock_prefix = true;
