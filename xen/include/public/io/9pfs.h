@@ -71,6 +71,40 @@
  *                 created on the guest (no user ownership squash or remap)
  *         Only "none" is supported in this version of the protocol.
  *
+ *    max-files
+ *         Values:        <uint32_t>
+ *
+ *         The maximum number of files (including directories) allowed for
+ *         this device. Backend support of this node is optional. If the node
+ *         is not present or the value is zero the number of files is not
+ *         limited.
+ *
+ *    max-open-files
+ *         Values:        <uint32_t>
+ *
+ *         The maximum number of files the guest is allowed to have opened
+ *         concurrently. Multiple concurrent opens of the same file are counted
+ *         individually. Backend support of this node is optional. If the node
+ *         is not present or the value is zero a backend specific default is
+ *         applied.
+ *
+ *    max-space
+ *         Values:        <uint32_t>
+ *
+ *         The maximum file space in MiBs the guest is allowed to use for this
+ *         device. Backend support of this node is optional. If the node is
+ *         not present or the value is zero the space is not limited.
+ *
+ *    auto-delete
+ *         Values:        <bool>
+ *
+ *         When set to "1" the backend will delete the file with the oldest
+ *         modification date below <path> in case the allowed maximum file
+ *         space (see <max-space>) or file number (see <max-files>) is being
+ *         exceeded due to guest activity (creation or extension of files).
+ *         Files currently opened by the guest won't be deleted. Backend
+ *         support of this node is optional.
+ *
  ******************************************************************************
  *                            Frontend XenBus Nodes
  ******************************************************************************
