@@ -4,7 +4,7 @@
 #include <xen/types.h>
 
 #define MWAIT_SUBSTATE_MASK		0xf
-#define MWAIT_CSTATE_MASK		0xf
+#define MWAIT_CSTATE_MASK		0xfU
 #define MWAIT_SUBSTATE_SIZE		4
 
 #define CPUID_MWAIT_LEAF		5
