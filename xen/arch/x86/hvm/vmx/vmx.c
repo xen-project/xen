@@ -1454,19 +1454,12 @@ static void cf_check vmx_handle_cd(struct vcpu *v, unsigned long value)
     }
 }
 
-static void cf_check vmx_setup_tsc_scaling(struct vcpu *v)
-{
-    if ( v->domain->arch.vtsc )
-        return;
-
-    vmx_vmcs_enter(v);
-    __vmwrite(TSC_MULTIPLIER, hvm_tsc_scaling_ratio(v->domain));
-    vmx_vmcs_exit(v);
-}
-
 static void cf_check vmx_set_tsc_offset(struct vcpu *v, u64 offset, u64 at_tsc)
 {
     vmx_vmcs_enter(v);
+
+    if ( !v->domain->arch.vtsc && cpu_has_vmx_tsc_scaling )
+        __vmwrite(TSC_MULTIPLIER, hvm_tsc_scaling_ratio(v->domain));
 
     if ( nestedhvm_vcpu_in_guestmode(v) )
         offset += nvmx_get_tsc_offset(v);
@@ -3027,10 +3020,7 @@ const struct hvm_function_table * __init start_vmx(void)
     }
 
     if ( cpu_has_vmx_tsc_scaling )
-    {
         vmx_function_table.tsc_scaling.ratio_frac_bits = 48;
-        vmx_function_table.tsc_scaling.setup = vmx_setup_tsc_scaling;
-    }
 
     model_specific_lbr = get_model_specific_lbr();
     lbr_tsx_fixup_check();

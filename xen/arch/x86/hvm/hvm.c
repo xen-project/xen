@@ -1086,9 +1086,6 @@ static int cf_check hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     v->arch.hvm.guest_cr[2] = ctxt.cr2;
     hvm_update_guest_cr(v, 2);
 
-    if ( hvm_funcs.tsc_scaling.setup )
-        alternative_vcall(hvm_funcs.tsc_scaling.setup, v);
-
     v->arch.msrs->tsc_aux = ctxt.msr_tsc_aux;
 
     hvm_set_guest_tsc_fixed(v, ctxt.tsc, d->arch.hvm.sync_tsc);
@@ -4032,9 +4029,6 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     reg.attr = 0;
     hvm_set_segment_register(v, x86_seg_gdtr, &reg);
     hvm_set_segment_register(v, x86_seg_idtr, &reg);
-
-    if ( hvm_funcs.tsc_scaling.setup )
-        alternative_vcall(hvm_funcs.tsc_scaling.setup, v);
 
     /* Sync AP's TSC with BSP's. */
     v->arch.hvm.cache_tsc_offset =

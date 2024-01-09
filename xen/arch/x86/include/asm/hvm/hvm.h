@@ -240,9 +240,6 @@ struct hvm_function_table {
         uint8_t  ratio_frac_bits;
         /* maximum-allowed TSC scaling ratio */
         uint64_t max_ratio;
-
-        /* Architecture function to setup TSC scaling ratio */
-        void (*setup)(struct vcpu *v);
     } tsc_scaling;
 };
 
