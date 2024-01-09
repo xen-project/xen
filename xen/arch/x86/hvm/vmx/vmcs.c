@@ -2162,6 +2162,23 @@ int __init vmx_vmcs_init(void)
 
     if ( !ret )
         register_keyhandler('v', vmcs_dump, "dump VT-x VMCSs", 1);
+    else
+    {
+        setup_clear_cpu_cap(X86_FEATURE_VMX);
+
+        /*
+         * _vmx_vcpu_up() may have made it past feature identification.
+         * Make sure all dependent features are off as well.
+         */
+        vmx_basic_msr              = 0;
+        vmx_pin_based_exec_control = 0;
+        vmx_cpu_based_exec_control = 0;
+        vmx_secondary_exec_control = 0;
+        vmx_vmexit_control         = 0;
+        vmx_vmentry_control        = 0;
+        vmx_ept_vpid_cap           = 0;
+        vmx_vmfunc                 = 0;
+    }
 
     return ret;
 }
