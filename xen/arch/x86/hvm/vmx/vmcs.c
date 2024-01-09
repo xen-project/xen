@@ -167,8 +167,7 @@ u32 vmx_secondary_exec_control __read_mostly;
 u32 vmx_vmexit_control __read_mostly;
 u32 vmx_vmentry_control __read_mostly;
 u64 vmx_ept_vpid_cap __read_mostly;
-u64 vmx_vmfunc __read_mostly;
-bool vmx_virt_exception __read_mostly;
+static uint64_t __read_mostly vmx_vmfunc;
 
 static DEFINE_PER_CPU_READ_MOSTLY(paddr_t, vmxon_region);
 static DEFINE_PER_CPU(paddr_t, current_vmcs);
@@ -475,8 +474,7 @@ static int vmx_init_vmcs_config(bool bsp)
         vmx_basic_msr              = ((u64)vmx_basic_msr_high << 32) |
                                      vmx_basic_msr_low;
         vmx_vmfunc                 = _vmx_vmfunc;
-        vmx_virt_exception         = !!(_vmx_secondary_exec_control &
-                                       SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS);
+
         vmx_display_features();
 
         /* IA-32 SDM Vol 3B: VMCS size is never greater than 4kB. */
