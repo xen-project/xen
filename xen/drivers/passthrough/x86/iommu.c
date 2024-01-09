@@ -370,10 +370,88 @@ static unsigned int __hwdom_init hwdom_iommu_map(const struct domain *d,
     return perms;
 }
 
+struct map_data {
+    struct domain *d;
+    unsigned int flush_flags;
+    bool mmio_ro;
+};
+
+static int __hwdom_init cf_check identity_map(unsigned long s, unsigned long e,
+                                              void *data)
+{
+    struct map_data *info = data;
+    struct domain *d = info->d;
+    long rc;
+
+    if ( iommu_verbose )
+        printk(XENLOG_INFO " [%010lx, %010lx] R%c\n",
+               s, e, info->mmio_ro ? 'O' : 'W');
+
+    if ( paging_mode_translate(d) )
+    {
+        if ( info->mmio_ro )
+        {
+            ASSERT_UNREACHABLE();
+            /* End the rangeset iteration, as other regions will also fail. */
+            return -EOPNOTSUPP;
+        }
+        while ( (rc = map_mmio_regions(d, _gfn(s), e - s + 1, _mfn(s))) > 0 )
+        {
+            s += rc;
+            process_pending_softirqs();
+        }
+    }
+    else
+    {
+        const unsigned int perms = IOMMUF_readable | IOMMUF_preempt |
+                                   (info->mmio_ro ? 0 : IOMMUF_writable);
+
+        /*
+         * Read-only ranges are strictly MMIO and need an additional iomem
+         * permissions check.
+         */
+        while ( info->mmio_ro && s <= e && !iomem_access_permitted(d, s, e) )
+        {
+            /*
+             * Consume a frame per iteration until the remainder is accessible
+             * or there's nothing left to map.
+             */
+            if ( iomem_access_permitted(d, s, s) )
+            {
+                rc = iommu_map(d, _dfn(s), _mfn(s), 1, perms,
+                               &info->flush_flags);
+                if ( rc < 0 )
+                    break;
+                /* Must map a frame at least, which is what we request for. */
+                ASSERT(rc == 1);
+                process_pending_softirqs();
+            }
+            s++;
+        }
+        while ( (rc = iommu_map(d, _dfn(s), _mfn(s), e - s + 1,
+                                perms, &info->flush_flags)) > 0 )
+        {
+            s += rc;
+            process_pending_softirqs();
+        }
+    }
+    ASSERT(rc <= 0);
+    if ( rc )
+        printk(XENLOG_WARNING
+               "IOMMU identity mapping of [%lx, %lx] failed: %ld\n",
+               s, e, rc);
+
+    /* Ignore errors and attempt to map the remaining regions. */
+    return 0;
+}
+
 void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
 {
     unsigned long i, top, max_pfn, start, count;
-    unsigned int flush_flags = 0, start_perms = 0;
+    unsigned int start_perms = 0;
+    struct rangeset *map;
+    struct map_data map_data = { .d = d };
+    int rc;
 
     BUG_ON(!is_hardware_domain(d));
 
@@ -396,6 +474,10 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
 
     if ( iommu_hwdom_passthrough )
         return;
+
+    map = rangeset_new(NULL, NULL, 0);
+    if ( !map )
+        panic("IOMMU init: unable to allocate rangeset\n");
 
     max_pfn = (GB(4) >> PAGE_SHIFT) - 1;
     top = max(max_pdx, pfn_to_pdx(max_pfn) + 1);
@@ -427,7 +509,7 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
         commit:
             while ( (rc = iommu_map(d, _dfn(start), _mfn(start), count,
                                     start_perms | IOMMUF_preempt,
-                                    &flush_flags)) > 0 )
+                                    &map_data.flush_flags)) > 0 )
             {
                 start += rc;
                 count -= rc;
@@ -451,8 +533,23 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
             goto commit;
     }
 
+    if ( iommu_verbose )
+        printk(XENLOG_INFO "%pd: identity mappings for IOMMU:\n", d);
+
+    rc = rangeset_report_ranges(map, 0, ~0UL, identity_map, &map_data);
+    rangeset_destroy(map);
+    if ( !rc && is_pv_domain(d) )
+    {
+        map_data.mmio_ro = true;
+        rc = rangeset_report_ranges(mmio_ro_ranges, 0, ~0UL, identity_map,
+                                    &map_data);
+    }
+    if ( rc )
+        printk(XENLOG_WARNING "IOMMU unable to create %smappings: %d\n",
+               map_data.mmio_ro ? "read-only " : "", rc);
+
     /* Use if to avoid compiler warning */
-    if ( iommu_iotlb_flush_all(d, flush_flags) )
+    if ( iommu_iotlb_flush_all(d, map_data.flush_flags) )
         return;
 }
 
