@@ -427,11 +427,7 @@ static int remove_nodes(const struct overlay_track *tracker)
     {
         overlay_node = (struct dt_device_node *)tracker->nodes_address[j];
         if ( overlay_node == NULL )
-        {
-            printk(XENLOG_ERR "Device %s is not present in the tree. Removing nodes failed\n",
-                   overlay_node->full_name);
             return -EINVAL;
-        }
 
         rc = remove_descendant_nodes_resources(overlay_node);
         if ( rc )
