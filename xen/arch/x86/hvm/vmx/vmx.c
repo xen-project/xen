@@ -4374,9 +4374,7 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
         }
         break;
     }
-    case EXIT_REASON_EXTERNAL_INTERRUPT:
-        /* Already handled above. */
-        break;
+
     case EXIT_REASON_TRIPLE_FAULT:
         hvm_triple_fault();
         break;
@@ -4539,9 +4537,6 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
         hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
         break;
 
-    case EXIT_REASON_TPR_BELOW_THRESHOLD:
-        break;
-
     case EXIT_REASON_APIC_ACCESS:
         if ( !vmx_handle_eoi_write() && !handle_mmio() )
             hvm_inject_hw_exception(X86_EXC_GP, 0);
@@ -4680,15 +4675,6 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
         vmx_handle_descriptor_access(exit_reason);
         break;
 
-    case EXIT_REASON_BUS_LOCK:
-        /*
-         * Nothing to do: just taking a vmexit should be enough of a pause to
-         * prevent a VM from crippling the host with bus locks.  Note
-         * EXIT_REASON_BUS_LOCK will always have bit 26 set in exit_reason, and
-         * hence the perf counter is already increased.
-         */
-        break;
-
     case EXIT_REASON_NOTIFY:
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
 
@@ -4703,6 +4689,11 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
         if ( unlikely(exit_qualification & INTR_INFO_NMI_UNBLOCKED_BY_IRET) )
             undo_nmis_unblocked_by_iret();
 
+        break;
+
+    case EXIT_REASON_EXTERNAL_INTERRUPT:  /* Handled earlier */
+    case EXIT_REASON_TPR_BELOW_THRESHOLD: /* Handled later in vmx_intr_assist() */
+    case EXIT_REASON_BUS_LOCK:            /* Nothing to do (rate-limit only) */
         break;
 
     case EXIT_REASON_VMX_PREEMPTION_TIMER_EXPIRED:
