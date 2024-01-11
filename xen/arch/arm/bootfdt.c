@@ -463,7 +463,8 @@ static void __init early_print_info(void)
     struct meminfo *mem_resv = &bootinfo.reserved_mem;
     struct bootmodules *mods = &bootinfo.modules;
     struct bootcmdlines *cmds = &bootinfo.cmdlines;
-    unsigned int i, j, nr_rsvd;
+    unsigned int i, j;
+    int nr_rsvd;
 
     for ( i = 0; i < mi->nr_banks; i++ )
         printk("RAM: %"PRIpaddr" - %"PRIpaddr"\n",
@@ -478,6 +479,9 @@ static void __init early_print_info(void)
                 boot_module_kind_as_string(mods->module[i].kind));
 
     nr_rsvd = fdt_num_mem_rsv(device_tree_flattened);
+    if ( nr_rsvd < 0 )
+        panic("Parsing FDT memory reserve map failed (%d)\n", nr_rsvd);
+
     for ( i = 0; i < nr_rsvd; i++ )
     {
         paddr_t s, e;
