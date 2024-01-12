@@ -165,11 +165,6 @@
  * Rebuild the boot pagetable's first-level entries. The structure
  * is described in mm.c.
  *
- * After the CPU enables paging it will add the fixmap mapping
- * to these page tables, however this may clash with the 1:1
- * mapping. So each CPU must rebuild the page tables here with
- * the 1:1 in place.
- *
  * Inputs:
  *   r9 : paddr(start)
  *   r10: phys offset
@@ -196,6 +191,10 @@ create_page_tables:
         add   r4, r4, #XEN_PT_LEVEL_SIZE(2) /* r4 := Next vaddr */
         add   r5, r5, #PAGE_SIZE            /* r5 := Next table */
 .endr
+
+        /* Map the fixmap into boot_second */
+        mov_w r0, FIXMAP_ADDR(0)
+        create_table_entry boot_second, xen_fixmap, r0, 2
 
         /*
          * Find the size of Xen in pages and multiply by the size of a
@@ -432,6 +431,7 @@ ENDPROC(enable_secondary_cpu_mm)
  * Inputs:
  *   r9 : paddr(start)
  *   r10: phys offset
+ *   r11: UART physical address
  *   lr : Virtual address to return to.
  *
  * Output:
@@ -442,19 +442,20 @@ ENDPROC(enable_secondary_cpu_mm)
 ENTRY(enable_boot_cpu_mm)
         mov   r6, lr
 
+#ifdef CONFIG_EARLY_PRINTK
+        /*
+         * Add the UART mapping to the fixmap so the UART can be used
+         * as the MMU is on. This only needs to be done on the boot CPU.
+         */
+        mov_w r0, EARLY_UART_VIRTUAL_ADDRESS
+        create_mapping_entry xen_fixmap, r0, r11, type=PT_DEV_L3
+#endif
+
         bl    create_page_tables
 
         /* Address in the runtime mapping to jump to after the MMU is enabled */
-        mov_w lr, 1f
-        b     enable_mmu
-1:
         mov   lr, r6
-
-        /*
-         * Prepare the fixmap. The function will return to the virtual address
-         * requested by the caller.
-         */
-        b     setup_fixmap
+        b     enable_mmu
 ENDPROC(enable_boot_cpu_mm)
 
 /*
@@ -502,39 +503,6 @@ remove_temporary_mapping:
 
         mov  pc, lr
 ENDPROC(remove_temporary_mapping)
-
-/*
- * Map the UART in the fixmap (when earlyprintk is used) and hook the
- * fixmap table in the page tables.
- *
- * The fixmap cannot be mapped in create_page_tables because it may
- * clash with the 1:1 mapping.
- *
- * Inputs:
- *   r10: Physical offset
- *   r11: Early UART base physical address
- *
- * Clobbers r0 - r4
- */
-setup_fixmap:
-#if defined(CONFIG_EARLY_PRINTK)
-        /* Add UART to the fixmap table */
-        mov_w r0, EARLY_UART_VIRTUAL_ADDRESS
-        create_mapping_entry xen_fixmap, r0, r11, type=PT_DEV_L3
-#endif
-        /* Map fixmap into boot_second */
-        mov_w r0, FIXMAP_ADDR(0)
-        create_table_entry boot_second, xen_fixmap, r0, 2
-        /* Ensure any page table updates made above have occurred. */
-        dsb   nshst
-        /*
-         * The fixmap area will be used soon after. So ensure no hardware
-         * translation happens before the dsb completes.
-         */
-        isb
-
-        mov   pc, lr
-ENDPROC(setup_fixmap)
 
 /* Fail-stop */
 fail:   PRINT("- Boot failed -\r\n")
