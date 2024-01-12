@@ -98,10 +98,6 @@ past_zImage:
         b     enable_boot_cpu_mm
 
 primary_switched:
-#ifdef CONFIG_EARLY_PRINTK
-        /* Use a virtual address to access the UART. */
-        mov_w r11, EARLY_UART_VIRTUAL_ADDRESS
-#endif
         bl    zero_bss
         PRINT("- Ready -\r\n")
         /* Setup the arguments for start_xen and jump to C world */
@@ -142,12 +138,7 @@ GLOBAL(init_secondary)
 
         mov_w lr, secondary_switched
         b     enable_secondary_cpu_mm
-
 secondary_switched:
-#ifdef CONFIG_EARLY_PRINTK
-        /* Use a virtual address to access the UART. */
-        mov_w r11, EARLY_UART_VIRTUAL_ADDRESS
-#endif
         PRINT("- Ready -\r\n")
         /* Jump to C world */
         mov_w r2, start_secondary

@@ -299,6 +299,21 @@ enable_mmu:
         isb                          /* Now, flush the icache */
 
         /*
+         * At this stage, the UART address will depend on whether the
+         * temporary mapping was created or not.
+         *
+         * If it was, then the UART will be mapped in the temporary
+         * area. Otherwise, it will be mapped at runtime virtual
+         * mapping.
+         */
+#ifdef CONFIG_EARLY_PRINTK
+        teq   r12, #1               /* Was the temporary mapping created? */
+        mov_w_on_cond eq, r11, TEMPORARY_EARLY_UART_VIRTUAL_ADDRESS
+        mov_w_on_cond ne, r11, EARLY_UART_VIRTUAL_ADDRESS
+#endif
+        PRINT_ID("- Paging turned on -\r\n")
+
+        /*
          * The MMU is turned on and we are in the 1:1 mapping. Switch
          * to the runtime mapping.
          */
@@ -307,6 +322,17 @@ enable_mmu:
         b     switch_to_runtime_mapping
 1:
         mov   lr, r5                /* Restore LR */
+
+        /*
+         * Now we are running at the runtime address. The UART can
+         * be accessed using its runtime virtual address.
+         */
+#ifdef CONFIG_EARLY_PRINTK
+        mov_w r11, EARLY_UART_VIRTUAL_ADDRESS
+#endif
+
+        PRINT("- Switched to the runtime mapping -\r\n")
+
         /*
          * At this point, either the 1:1 map or the temporary mapping
          * will be present. The former may clash with other parts of the
@@ -348,12 +374,14 @@ switch_to_runtime_mapping:
         teq   r12, #0
         beq   ready_to_switch
 
+        PRINT_ID("- Switching to the temporary mapping -\r\n")
         /* We are still in the 1:1 mapping. Jump to the temporary Virtual address. */
         mov_w r0, 1f
         add   r0, r0, #XEN_TEMPORARY_OFFSET /* r0 := address in temporary mapping */
         mov   pc, r0
 
 1:
+        PRINT("- Running on the temporary mapping  -\r\n")
         /* Remove boot_second_id */
         mov   r2, #0
         mov   r3, #0
@@ -363,6 +391,8 @@ switch_to_runtime_mapping:
         strd  r2, r3, [r0, r1]
 
         flush_xen_tlb_local r0
+
+        PRINT("- 1:1 mapping removed -\r\n")
 
         /* Map boot_second into boot_pgtable */
         mov_w r0, XEN_VIRT_START
@@ -376,7 +406,10 @@ switch_to_runtime_mapping:
          */
         isb
 
+        PRINT("- Runtime mapping mapped -\r\n")
 ready_to_switch:
+        PRINT_ID("- Jumping to runtime address -\r\n")
+
         mov   pc, lr
 ENDPROC(switch_to_runtime_mapping)
 
@@ -404,6 +437,8 @@ ENTRY(enable_secondary_cpu_mm)
         mov_w lr, 1f
         b     enable_mmu
 1:
+        PRINT("- Switching to the runtime page-tables -\r\n")
+
         /*
          * Non-boot CPUs need to move on to the proper pagetables, which were
          * setup in prepare_secondary_mm.
@@ -469,6 +504,8 @@ ENDPROC(enable_boot_cpu_mm)
  * Clobbers r0 - r3
  */
 remove_identity_mapping:
+        PRINT("- Removing the identity mapping -\r\n")
+
         /* r2:r3 := invalid page-table entry */
         mov   r2, #0x0
         mov   r3, #0x0
@@ -489,6 +526,8 @@ ENDPROC(remove_identity_mapping)
  * Clobbers r0 - r3
  */
 remove_temporary_mapping:
+        PRINT("- Removing the temporary mapping -\r\n")
+
         /* r2:r3 := invalid page-table entry */
         mov   r2, #0
         mov   r3, #0
