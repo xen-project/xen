@@ -396,6 +396,7 @@ CFLAGS += -nostdinc -fno-builtin -fno-common
 CFLAGS += -Werror -Wredundant-decls -Wwrite-strings -Wno-pointer-arith
 CFLAGS += -Wdeclaration-after-statement
 $(call cc-option-add,CFLAGS,CC,-Wvla)
+$(call cc-option-add,CFLAGS,CC,-Wflex-array-member-not-at-end)
 CFLAGS += -pipe -D__XEN__ -include $(srctree)/include/xen/config.h
 CFLAGS-$(CONFIG_DEBUG_INFO) += -g
 
