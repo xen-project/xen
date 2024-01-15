@@ -374,7 +374,7 @@ static int cf_check vmce_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *
     return err ?: vmce_restore_vcpu(v, &ctxt);
 }
 
-HVM_REGISTER_SAVE_RESTORE(VMCE_VCPU, vmce_save_vcpu_ctxt,
+HVM_REGISTER_SAVE_RESTORE(VMCE_VCPU, vmce_save_vcpu_ctxt, NULL,
                           vmce_load_vcpu_ctxt, 1, HVMSR_PER_VCPU);
 #endif
 
