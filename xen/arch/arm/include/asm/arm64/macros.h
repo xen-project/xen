@@ -34,16 +34,26 @@
 
 #ifdef CONFIG_EARLY_PRINTK
 /*
- * Macro to print a string to the UART, if there is one.
+ * Macros to print a string to the UART, if there is one.
+ *
+ * There are multiple flavors:
+ *  - PRINT_SECT(section, string): The @string will be located in @section
+ *  - PRINT(): The string will be located in .rodata.str.
+ *  - PRINT_ID(): When Xen is running on the Identity Mapping, it is
+ *    only possible to have a limited amount of Xen. This will create
+ *    the string in .rodata.idmap which will always be mapped.
  *
  * Clobbers x0 - x3
  */
-#define PRINT(_s)          \
-        mov   x3, lr ;     \
-        adr_l x0, 98f ;    \
-        bl    asm_puts ;   \
-        mov   lr, x3 ;     \
-        RODATA_STR(98, _s)
+#define PRINT_SECT(section, string)         \
+        mov   x3, lr                       ;\
+        adr_l x0, 98f                      ;\
+        bl    asm_puts                     ;\
+        mov   lr, x3                       ;\
+        RODATA_SECT(section, 98, string)
+
+#define PRINT(string) PRINT_SECT(.rodata.str, string)
+#define PRINT_ID(string) PRINT_SECT(.rodata.idmap, string)
 
 /*
  * Macro to print the value of register \xb
@@ -59,6 +69,7 @@
 
 #else /* CONFIG_EARLY_PRINTK */
 #define PRINT(s)
+#define PRINT_ID(s)
 
 .macro print_reg xb
 .endm

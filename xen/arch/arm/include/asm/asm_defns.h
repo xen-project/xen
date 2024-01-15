@@ -27,8 +27,6 @@
 label:  .asciz msg;                             \
 .popsection
 
-#define RODATA_STR(label, msg) RODATA_SECT(.rodata.str, label, msg)
-
 #define ASM_INT(label, val)                 \
     .p2align 2;                             \
 label: .long (val);                         \

@@ -295,6 +295,14 @@ enable_mmu:
         dsb   sy                     /* Flush PTE writes and finish reads */
         msr   SCTLR_EL2, x0          /* now paging is enabled */
         isb                          /* Now, flush the icache */
+
+#ifdef CONFIG_EARLY_PRINTK
+        /* Use a virtual address to access the UART. */
+        ldr   x23, =EARLY_UART_VIRTUAL_ADDRESS
+#endif
+
+        PRINT_ID("- Paging turned on -\r\n")
+
         ret
 ENDPROC(enable_mmu)
 

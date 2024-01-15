@@ -256,10 +256,6 @@ real_start_efi:
         b     enable_boot_cpu_mm
 
 primary_switched:
-#ifdef CONFIG_EARLY_PRINTK
-        /* Use a virtual address to access the UART. */
-        ldr   x23, =EARLY_UART_VIRTUAL_ADDRESS
-#endif
         bl    zero_bss
         PRINT("- Ready -\r\n")
         /* Setup the arguments for start_xen and jump to C world */
@@ -304,10 +300,6 @@ GLOBAL(init_secondary)
         b     enable_secondary_cpu_mm
 
 secondary_switched:
-#ifdef CONFIG_EARLY_PRINTK
-        /* Use a virtual address to access the UART. */
-        ldr   x23, =EARLY_UART_VIRTUAL_ADDRESS
-#endif
         PRINT("- Ready -\r\n")
         /* Jump to C world */
         ldr   x2, =start_secondary
@@ -480,7 +472,7 @@ ENDPROC(asm_puts)
  * Clobbers x0-x3
  */
 ENTRY(asm_putn)
-        adr   x1, hex
+        adr_l x1, hex
         mov   x3, #16
 1:
         early_uart_ready x23, 2
@@ -494,8 +486,7 @@ ENTRY(asm_putn)
         ret
 ENDPROC(asm_putn)
 
-hex:    .ascii "0123456789abcdef"
-        .align 2
+RODATA_SECT(.rodata.idmap, hex, "0123456789abcdef")
 
 #endif /* CONFIG_EARLY_PRINTK */
 
