@@ -185,7 +185,7 @@ static const char *const str_7d0[32] =
 
 static const char *const str_7a1[32] =
 {
-    [ 0] = "sha512",
+    [ 0] = "sha512",        [ 1] = "sm3",
 
     [ 4] = "avx-vnni",      [ 5] = "avx512-bf16",
 

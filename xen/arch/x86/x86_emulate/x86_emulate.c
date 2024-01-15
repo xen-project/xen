@@ -6906,6 +6906,12 @@ x86_emulate(
         op_bytes = 16 << vex.l;
         goto simd_0f_ymm;
 
+    case X86EMUL_OPC_VEX   (0x0f38, 0xda): /* vsm3msg1 xmm/mem,xmm,xmm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0xda): /* vsm3msg2 xmm/mem,xmm,xmm */
+        generate_exception_if(vex.w || vex.l, X86_EXC_UD);
+        host_and_vcpu_must_have(sm3);
+        goto simd_0f_ymm;
+
     case X86EMUL_OPC_VEX_66(0x0f38, 0xdc):  /* vaesenc {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0xdd):  /* vaesenclast {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0xde):  /* vaesdec {x,y}mm/mem,{x,y}mm,{x,y}mm */
@@ -7777,6 +7783,12 @@ x86_emulate(
         generate_exception_if(!evex.w, X86_EXC_UD);
         fault_suppression = false;
         goto avx512f_imm8_no_sae;
+
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0xde): /* vsm3rnds2 $imm8,xmm/mem,xmm,xmm */
+        host_and_vcpu_must_have(sm3);
+        generate_exception_if(vex.w || vex.l, X86_EXC_UD);
+        op_bytes = 16;
+        goto simd_0f_imm8_ymm;
 
     case X86EMUL_OPC_66(0x0f3a, 0xdf):     /* aeskeygenassist $imm8,xmm/m128,xmm */
     case X86EMUL_OPC_VEX_66(0x0f3a, 0xdf): /* vaeskeygenassist $imm8,xmm/m128,xmm */

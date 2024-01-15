@@ -262,7 +262,7 @@ def crunch_numbers(state):
         # for the XOP prefix).  VEX/XOP-encoded GPR instructions, such as
         # those from the BMI{1,2}, TBM and LWP sets function fine in the
         # absence of any enabled xstate.
-        AVX: [FMA, FMA4, F16C, AVX2, XOP, AVX_NE_CONVERT],
+        AVX: [FMA, FMA4, F16C, AVX2, XOP, AVX_NE_CONVERT, SM3],
 
         # This dependency exists solely for the shadow pagetable code.  If the
         # host doesn't have NX support, the shadow pagetable code can't handle

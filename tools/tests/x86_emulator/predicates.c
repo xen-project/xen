@@ -1406,6 +1406,8 @@ static const struct vex {
     { { 0xd3 }, 2, T, R, pfx_no, W0, Ln }, /* vpdpwuuds */
     { { 0xd3 }, 2, T, R, pfx_66, W0, Ln }, /* vpdpwusds */
     { { 0xd3 }, 2, T, R, pfx_f3, W0, Ln }, /* vpdpwsuds */
+    { { 0xda }, 2, T, R, pfx_no, W0, L0 }, /* vsm3msg1 */
+    { { 0xda }, 2, T, R, pfx_66, W0, L0 }, /* vsm3msg2 */
     { { 0xdb }, 2, T, R, pfx_66, WIG, L0 }, /* vaesimc */
     { { 0xdc }, 2, T, R, pfx_66, WIG, Ln }, /* vaesenc */
     { { 0xdd }, 2, T, R, pfx_66, WIG, Ln }, /* vaesenclast */
@@ -1490,6 +1492,7 @@ static const struct vex {
     { { 0x7f }, 3, T, R, pfx_66, Wn, LIG }, /* vfnmsubsd */
     { { 0xce }, 3, T, R, pfx_66, W1, Ln }, /* vgf2p8affineqb */
     { { 0xcf }, 3, T, R, pfx_66, W1, Ln }, /* vgf2p8affineinvqb */
+    { { 0xde }, 3, T, R, pfx_66, W0, L0 }, /* vsm3rnds2 */
     { { 0xdf }, 3, T, R, pfx_66, WIG, Ln }, /* vaeskeygenassist */
     { { 0xf0 }, 3, T, R, pfx_f2, Wn, L0 }, /* rorx */
 };
