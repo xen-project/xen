@@ -175,7 +175,7 @@ static void amd_vpmu_unset_msr_bitmap(struct vcpu *v)
     msr_bitmap_off(vpmu);
 }
 
-static int cf_check amd_vpmu_do_interrupt(struct cpu_user_regs *regs)
+static int cf_check amd_vpmu_do_interrupt(void)
 {
     return 1;
 }

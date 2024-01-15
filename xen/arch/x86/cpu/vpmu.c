@@ -158,7 +158,7 @@ static inline struct vcpu *choose_hwdom_vcpu(void)
     return hardware_domain->vcpu[idx];
 }
 
-void vpmu_do_interrupt(struct cpu_user_regs *regs)
+void vpmu_do_interrupt(void)
 {
     struct vcpu *sampled = current, *sampling;
     struct vpmu_struct *vpmu;
@@ -239,6 +239,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
         else
 #endif
         {
+            const struct cpu_user_regs *regs = get_irq_regs();
             struct xen_pmu_regs *r = &vpmu->xenpmu_data->pmu.r.regs;
 
             if ( (vpmu_mode & XENPMU_MODE_SELF) )
@@ -301,7 +302,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
     /* We don't support (yet) HVM dom0 */
     ASSERT(sampling == sampled);
 
-    if ( !alternative_call(vpmu_ops.do_interrupt, regs) ||
+    if ( !alternative_call(vpmu_ops.do_interrupt) ||
          !is_vlapic_lvtpc_enabled(vlapic) )
         return;
 

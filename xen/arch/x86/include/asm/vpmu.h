@@ -31,7 +31,7 @@ struct arch_vpmu_ops {
     int (*initialise)(struct vcpu *v);
     int (*do_wrmsr)(unsigned int msr, uint64_t msr_content);
     int (*do_rdmsr)(unsigned int msr, uint64_t *msr_content);
-    int (*do_interrupt)(struct cpu_user_regs *regs);
+    int (*do_interrupt)(void);
     void (*arch_vpmu_destroy)(struct vcpu *v);
     int (*arch_vpmu_save)(struct vcpu *v, bool to_guest);
     int (*arch_vpmu_load)(struct vcpu *v, bool from_guest);
@@ -99,7 +99,7 @@ static inline bool vpmu_are_all_set(const struct vpmu_struct *vpmu,
 
 void vpmu_lvtpc_update(uint32_t val);
 int vpmu_do_msr(unsigned int msr, uint64_t *msr_content, bool is_write);
-void vpmu_do_interrupt(struct cpu_user_regs *regs);
+void vpmu_do_interrupt(void);
 void vpmu_initialise(struct vcpu *v);
 void vpmu_destroy(struct vcpu *v);
 void vpmu_save(struct vcpu *v);

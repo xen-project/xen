@@ -772,7 +772,7 @@ static void cf_check core2_vpmu_dump(const struct vcpu *v)
     }
 }
 
-static int cf_check core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
+static int cf_check core2_vpmu_do_interrupt(void)
 {
     struct vcpu *v = current;
     u64 msr_content;

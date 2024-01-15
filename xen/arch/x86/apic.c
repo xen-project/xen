@@ -1412,7 +1412,7 @@ static void cf_check error_interrupt(struct cpu_user_regs *regs)
 static void cf_check pmu_interrupt(struct cpu_user_regs *regs)
 {
     ack_APIC_irq();
-    vpmu_do_interrupt(regs);
+    vpmu_do_interrupt();
 }
 
 void __init apic_intr_init(void)
