@@ -320,7 +320,7 @@ ENTRY(asm_putn)
         mov   pc, lr
 ENDPROC(asm_putn)
 
-RODATA_STR(hex, "0123456789abcdef")
+RODATA_SECT(.rodata.idmap, hex, "0123456789abcdef")
 
 #endif /* CONFIG_EARLY_PRINTK */
 
