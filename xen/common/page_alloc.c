@@ -255,12 +255,10 @@ static PAGE_LIST_HEAD(page_broken_list);
  */
 
 /*
- * first_valid_mfn is exported because it is used when !CONFIG_NUMA.
- *
- * TODO: Consider if we can conditionally export first_valid_mfn based
- * on whether NUMA is selected.
+ * When !CONFIG_NUMA first_valid_mfn is non-static, for use by respective
+ * stubs.
  */
-mfn_t first_valid_mfn = INVALID_MFN_INITIALIZER;
+STATIC_IF(CONFIG_NUMA) mfn_t first_valid_mfn = INVALID_MFN_INITIALIZER;
 
 struct bootmem_region {
     unsigned long s, e; /* MFNs @s through @e-1 inclusive are free */

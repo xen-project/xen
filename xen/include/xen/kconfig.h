@@ -11,6 +11,8 @@
 /* cppcheck is failing to parse the macro so use a dummy one */
 #ifdef CPPCHECK
 #define IS_ENABLED(option) option
+#define STATIC_IF(option) option
+#define STATIC_IF_NOT(option) option
 #else
 /*
  * Getting something that works in C and CPP for an arg that may or may
@@ -31,6 +33,17 @@
  * otherwise.
  */
 #define IS_ENABLED(option) config_enabled(option)
+
+/* Use similar trickery for conditionally inserting "static". */
+#define static_if(value) _static_if(__ARG_PLACEHOLDER_##value)
+#define _static_if(arg1_or_junk) ___config_enabled(arg1_or_junk static,)
+
+#define STATIC_IF(option) static_if(option)
+
+#define static_if_not(value) _static_if_not(__ARG_PLACEHOLDER_##value)
+#define _static_if_not(arg1_or_junk) ___config_enabled(arg1_or_junk, static)
+
+#define STATIC_IF_NOT(option) static_if_not(option)
 #endif
 
 #endif /* __XEN_KCONFIG_H */
