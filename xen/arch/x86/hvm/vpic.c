@@ -429,6 +429,38 @@ static int cf_check vpic_save(struct vcpu *v, hvm_domain_context_t *h)
     return 0;
 }
 
+static int cf_check vpic_check(const struct domain *d, hvm_domain_context_t *h)
+{
+    unsigned int inst = hvm_load_instance(h);
+    const struct hvm_hw_vpic *s;
+
+    if ( !has_vpic(d) )
+        return -ENODEV;
+
+    /* Which PIC is this? */
+    if ( inst >= ARRAY_SIZE(d->arch.hvm.vpic) )
+        return -ENOENT;
+
+    s = hvm_get_entry(PIC, h);
+    if ( !s )
+        return -ENODATA;
+
+    /*
+     * Check to-be-loaded values are within valid range, for them to represent
+     * actually reachable state.  Uses of some of the values elsewhere assume
+     * this is the case.
+     */
+    if ( s->int_output > 1 )
+        return -EDOM;
+
+    if ( s->is_master != !inst ||
+         (s->int_output && s->init_state) ||
+         (s->elcr & ~vpic_elcr_mask(s, 1)) )
+        return -EINVAL;
+
+    return 0;
+}
+
 static int cf_check vpic_load(struct domain *d, hvm_domain_context_t *h)
 {
     struct hvm_hw_vpic *s;
@@ -438,18 +470,21 @@ static int cf_check vpic_load(struct domain *d, hvm_domain_context_t *h)
         return -ENODEV;
 
     /* Which PIC is this? */
-    if ( inst > 1 )
-        return -ENOENT;
+    ASSERT(inst < ARRAY_SIZE(d->arch.hvm.vpic));
     s = &d->arch.hvm.vpic[inst];
 
     /* Load the state */
     if ( hvm_load_entry(PIC, h, s) != 0 )
         return -EINVAL;
 
+    if ( s->is_master )
+        s->elcr |= 1 << 2;
+
     return 0;
 }
 
-HVM_REGISTER_SAVE_RESTORE(PIC, vpic_save, NULL, vpic_load, 2, HVMSR_PER_DOM);
+HVM_REGISTER_SAVE_RESTORE(PIC, vpic_save, vpic_check, vpic_load, 2,
+                          HVMSR_PER_DOM);
 
 void vpic_reset(struct domain *d)
 {
