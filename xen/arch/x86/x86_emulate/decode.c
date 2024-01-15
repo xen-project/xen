@@ -916,6 +916,14 @@ decode_0f38(struct x86_emulate_state *s,
     case X86EMUL_OPC_EVEX_66(0, 0x7c): /* vpbroadcast{d,q} */
         break;
 
+    case X86EMUL_OPC_VEX_F2(0, 0xcc): /* vsha512msg1 */
+    case X86EMUL_OPC_VEX_F2(0, 0xcd): /* vsha512msg2 */
+        s->desc |= TwoOp;
+        /* fallthrough */
+    case X86EMUL_OPC_VEX_F2(0, 0xcb): /* vsha512rnds2 */
+        s->simd_size = simd_other;
+        break;
+
     case 0xf0: /* movbe / crc32 */
         s->desc |= s->vex.pfx == vex_f2 ? ByteOp : Mov;
         if ( s->vex.pfx >= vex_f3 )

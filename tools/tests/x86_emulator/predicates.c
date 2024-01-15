@@ -1396,6 +1396,9 @@ static const struct vex {
     { { 0xbd }, 2, T, R, pfx_66, Wn, LIG }, /* vnmadd231s{s,d} */
     { { 0xbe }, 2, T, R, pfx_66, Wn, Ln }, /* vnmsub231p{s,d} */
     { { 0xbf }, 2, T, R, pfx_66, Wn, LIG }, /* vnmsub231s{s,d} */
+    { { 0xcb, 0xc0 }, 2, F, N, pfx_f2, W0, L1 }, /* vsha512rnds2 */
+    { { 0xcc, 0xc0 }, 2, F, N, pfx_f2, W0, L1 }, /* vsha512msg1 */
+    { { 0xcd, 0xc0 }, 2, F, N, pfx_f2, W0, L1 }, /* vsha512msg2 */
     { { 0xcf }, 2, T, R, pfx_66, W0, Ln }, /* vgf2p8mulb */
     { { 0xd2 }, 2, T, R, pfx_no, W0, Ln }, /* vpdpwuud */
     { { 0xd2 }, 2, T, R, pfx_66, W0, Ln }, /* vpdpwusd */

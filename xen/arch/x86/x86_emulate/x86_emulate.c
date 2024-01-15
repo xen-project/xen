@@ -6872,6 +6872,14 @@ x86_emulate(
         host_and_vcpu_must_have(avx512er);
         goto simd_zmm_scalar_sae;
 
+    case X86EMUL_OPC_VEX_F2(0x0f38, 0xcb): /* vsha512rnds2 xmm,ymm,ymm */
+    case X86EMUL_OPC_VEX_F2(0x0f38, 0xcc): /* vsha512msg1 xmm,ymm */
+    case X86EMUL_OPC_VEX_F2(0x0f38, 0xcd): /* vsha512msg2 ymm,ymm */
+        host_and_vcpu_must_have(sha512);
+        generate_exception_if(ea.type != OP_REG || vex.w || !vex.l, X86_EXC_UD);
+        op_bytes = 32;
+        goto simd_0f_ymm;
+
     case X86EMUL_OPC_66(0x0f38, 0xcf):      /* gf2p8mulb xmm/m128,xmm */
         host_and_vcpu_must_have(gfni);
         goto simd_0f38_common;
