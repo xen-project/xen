@@ -47,6 +47,7 @@
 #define RW_STATE_MSB 2
 #define RW_STATE_WORD0 3
 #define RW_STATE_WORD1 4
+#define RW_STATE_NUM 5
 
 #define get_guest_time(v) \
    (is_hvm_vcpu(v) ? hvm_get_guest_time(v) : (u64)get_s_time())
@@ -427,6 +428,47 @@ static int cf_check pit_save(struct vcpu *v, hvm_domain_context_t *h)
     return rc;
 }
 
+static int cf_check pit_check(const struct domain *d, hvm_domain_context_t *h)
+{
+    const struct hvm_hw_pit *hw;
+    unsigned int i;
+
+    if ( !has_vpit(d) )
+        return -ENODEV;
+
+    hw = hvm_get_entry(PIT, h);
+    if ( !hw )
+        return -ENODATA;
+
+    /*
+     * Check to-be-loaded values are within valid range, for them to represent
+     * actually reachable state.  Uses of some of the values elsewhere assume
+     * this is the case.  Note that the channels' mode fields aren't checked;
+     * Xen prior to 4.19 might save them as 0xff.
+     */
+    if ( hw->speaker_data_on > 1 || hw->pad0 )
+        return -EDOM;
+
+    for ( i = 0; i < ARRAY_SIZE(hw->channels); ++i )
+    {
+        const struct hvm_hw_pit_channel *ch = &hw->channels[i];
+
+        if ( ch->count > 0x10000 ||
+             ch->count_latched >= RW_STATE_NUM ||
+             ch->read_state >= RW_STATE_NUM ||
+             ch->write_state >= RW_STATE_NUM ||
+             ch->rw_mode > RW_STATE_WORD0 ||
+             ch->gate > 1 ||
+             ch->bcd > 1 )
+            return -EDOM;
+
+        if ( i != 2 && !ch->gate )
+            return -EINVAL;
+    }
+
+    return 0;
+}
+
 static int cf_check pit_load(struct domain *d, hvm_domain_context_t *h)
 {
     PITState *pit = domain_vpit(d);
@@ -443,6 +485,14 @@ static int cf_check pit_load(struct domain *d, hvm_domain_context_t *h)
         goto out;
     }
     
+    for ( i = 0; i < ARRAY_SIZE(pit->hw.channels); ++i )
+    {
+        struct hvm_hw_pit_channel *ch = &pit->hw.channels[i];
+
+        if ( (ch->mode &= 7) > 5 )
+            ch->mode -= 4;
+    }
+
     /*
      * Recreate platform timers from hardware state.  There will be some 
      * time jitter here, but the wall-clock will have jumped massively, so 
@@ -458,7 +508,7 @@ static int cf_check pit_load(struct domain *d, hvm_domain_context_t *h)
     return rc;
 }
 
-HVM_REGISTER_SAVE_RESTORE(PIT, pit_save, NULL, pit_load, 1, HVMSR_PER_DOM);
+HVM_REGISTER_SAVE_RESTORE(PIT, pit_save, pit_check, pit_load, 1, HVMSR_PER_DOM);
 #endif
 
 /* The intercept action for PIT DM retval: 0--not handled; 1--handled. */
@@ -575,7 +625,7 @@ void pit_reset(struct domain *d)
     for ( i = 0; i < 3; i++ )
     {
         s = &pit->hw.channels[i];
-        s->mode = 0xff; /* the init mode */
+        s->mode = 7; /* unreachable sentinel */
         s->gate = (i != 2);
         pit_load_count(pit, i, 0);
     }
