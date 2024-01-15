@@ -103,6 +103,8 @@ static inline unsigned int hvm_load_instance(const struct hvm_domain_context *h)
  * restoring.  Both return non-zero on error. */
 typedef int (*hvm_save_handler) (struct vcpu *v,
                                  hvm_domain_context_t *h);
+typedef int (*hvm_check_handler)(const struct domain *d,
+                                 hvm_domain_context_t *h);
 typedef int (*hvm_load_handler) (struct domain *d,
                                  hvm_domain_context_t *h);
 
@@ -140,6 +142,6 @@ size_t hvm_save_size(struct domain *d);
 int hvm_save(struct domain *d, hvm_domain_context_t *h);
 int hvm_save_one(struct domain *d, unsigned int typecode, unsigned int instance,
                  XEN_GUEST_HANDLE_64(uint8) handle, uint64_t *bufsz);
-int hvm_load(struct domain *d, hvm_domain_context_t *h);
+int hvm_load(struct domain *d, bool real, hvm_domain_context_t *h);
 
 #endif /* __XEN_HVM_SAVE_H__ */

@@ -30,7 +30,8 @@ static void arch_hvm_save(struct domain *d, struct hvm_save_header *hdr)
     d->arch.hvm.sync_tsc = rdtsc();
 }
 
-static int arch_hvm_load(struct domain *d, const struct hvm_save_header *hdr)
+static int arch_hvm_check(const struct domain *d,
+                          const struct hvm_save_header *hdr)
 {
     uint32_t eax, ebx, ecx, edx;
 
@@ -55,6 +56,11 @@ static int arch_hvm_load(struct domain *d, const struct hvm_save_header *hdr)
                "(%#"PRIx32") and restored on another (%#"PRIx32").\n",
                d->domain_id, hdr->cpuid, eax);
 
+    return 0;
+}
+
+static void arch_hvm_load(struct domain *d, const struct hvm_save_header *hdr)
+{
     /* Restore guest's preferred TSC frequency. */
     if ( hdr->gtsc_khz )
         d->arch.tsc_khz = hdr->gtsc_khz;
@@ -66,13 +72,12 @@ static int arch_hvm_load(struct domain *d, const struct hvm_save_header *hdr)
 
     /* VGA state is not saved/restored, so we nobble the cache. */
     d->arch.hvm.stdvga.cache = STDVGA_CACHE_DISABLED;
-
-    return 0;
 }
 
 /* List of handlers for various HVM save and restore types */
 static struct {
     hvm_save_handler save;
+    hvm_check_handler check;
     hvm_load_handler load;
     const char *name;
     size_t size;
@@ -88,6 +93,7 @@ void __init hvm_register_savevm(uint16_t typecode,
 {
     ASSERT(typecode <= HVM_SAVE_CODE_MAX);
     ASSERT(hvm_sr_handlers[typecode].save == NULL);
+    ASSERT(hvm_sr_handlers[typecode].check == NULL);
     ASSERT(hvm_sr_handlers[typecode].load == NULL);
     hvm_sr_handlers[typecode].save = save_state;
     hvm_sr_handlers[typecode].load = load_state;
@@ -275,12 +281,15 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-int hvm_load(struct domain *d, hvm_domain_context_t *h)
+/*
+ * @real = false requests checking of the incoming state, while @real = true
+ * requests actual loading, which will then assume that checking was already
+ * done or is unnecessary.
+ */
+int hvm_load(struct domain *d, bool real, hvm_domain_context_t *h)
 {
     const struct hvm_save_header *hdr;
     struct hvm_save_descriptor *desc;
-    hvm_load_handler handler;
-    struct vcpu *v;
     int rc;
 
     if ( d->is_dying )
@@ -291,50 +300,92 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h)
     if ( !hdr )
         return -ENODATA;
 
-    rc = arch_hvm_load(d, hdr);
-    if ( rc )
-        return rc;
+    rc = arch_hvm_check(d, hdr);
+    if ( real )
+    {
+        struct vcpu *v;
 
-    /* Down all the vcpus: we only re-enable the ones that had state saved. */
-    for_each_vcpu(d, v)
-        if ( !test_and_set_bit(_VPF_down, &v->pause_flags) )
-            vcpu_sleep_nosync(v);
+        ASSERT(!rc);
+
+        /*
+         * Down all the vcpus: we only re-enable the ones that had state
+         * saved.
+         */
+        for_each_vcpu(d, v)
+            if ( !test_and_set_bit(_VPF_down, &v->pause_flags) )
+                vcpu_sleep_nosync(v);
+
+        arch_hvm_load(d, hdr);
+    }
+    else if ( rc )
+        return rc;
 
     for ( ; ; )
     {
+        const char *name;
+        hvm_load_handler load;
+
         if ( h->size - h->cur < sizeof(struct hvm_save_descriptor) )
         {
             /* Run out of data */
             printk(XENLOG_G_ERR
                    "HVM%d restore: save did not end with a null entry\n",
                    d->domain_id);
+            ASSERT(!real);
             return -ENODATA;
         }
 
         /* Read the typecode of the next entry  and check for the end-marker */
         desc = (struct hvm_save_descriptor *)(&h->data[h->cur]);
-        if ( desc->typecode == 0 )
+        if ( desc->typecode == HVM_SAVE_CODE(END) )
+        {
+            /* Reset cursor for hvm_load(, true, ). */
+            if ( !real )
+                h->cur = 0;
             return 0;
+        }
 
         /* Find the handler for this entry */
-        if ( (desc->typecode > HVM_SAVE_CODE_MAX) ||
-             ((handler = hvm_sr_handlers[desc->typecode].load) == NULL) )
+        if ( desc->typecode >= ARRAY_SIZE(hvm_sr_handlers) ||
+             !(name = hvm_sr_handlers[desc->typecode].name) ||
+             !(load = hvm_sr_handlers[desc->typecode].load) )
         {
             printk(XENLOG_G_ERR "HVM%d restore: unknown entry typecode %u\n",
                    d->domain_id, desc->typecode);
+            ASSERT(!real);
             return -EINVAL;
         }
 
-        /* Load the entry */
-        printk(XENLOG_G_INFO "HVM%d restore: %s %"PRIu16"\n", d->domain_id,
-               hvm_sr_handlers[desc->typecode].name, desc->instance);
-        rc = handler(d, h);
+        if ( real )
+        {
+            /* Load the entry */
+            printk(XENLOG_G_INFO "HVM restore %pd: %s %"PRIu16"\n", d,
+                   name, desc->instance);
+            rc = load(d, h);
+        }
+        else
+        {
+            /* Check the entry. */
+            hvm_check_handler check = hvm_sr_handlers[desc->typecode].check;
+
+            if ( !check )
+            {
+                if ( desc->length > h->size - h->cur - sizeof(*desc) )
+                    return -ENODATA;
+                h->cur += sizeof(*desc) + desc->length;
+                rc = 0;
+            }
+            else
+                rc = check(d, h);
+        }
+
         if ( rc )
         {
-            printk(XENLOG_G_ERR "HVM%d restore: failed to load entry %u/%u rc %d\n",
-                   d->domain_id, desc->typecode, desc->instance, rc);
+            printk(XENLOG_G_ERR "HVM restore %pd: failed to %s %s:%u rc %d\n",
+                   d, real ? "load" : "check", name, desc->instance, rc);
             return rc;
         }
+
         process_pending_softirqs();
     }
 

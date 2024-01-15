@@ -5391,7 +5391,7 @@ int hvm_copy_context_and_params(struct domain *dst, struct domain *src)
     }
 
     c.cur = 0;
-    rc = hvm_load(dst, &c);
+    rc = hvm_load(dst, true, &c);
 
  out:
     vfree(c.data);
