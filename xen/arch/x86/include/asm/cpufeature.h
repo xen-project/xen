@@ -191,6 +191,7 @@ static inline bool boot_cpu_has(unsigned int feat)
 /* CPUID level 0x00000007:1.edx */
 #define cpu_has_avx_vnni_int8   boot_cpu_has(X86_FEATURE_AVX_VNNI_INT8)
 #define cpu_has_avx_ne_convert  boot_cpu_has(X86_FEATURE_AVX_NE_CONVERT)
+#define cpu_has_avx_vnni_int16  boot_cpu_has(X86_FEATURE_AVX_VNNI_INT16)
 
 /* MSR_ARCH_CAPS */
 #define cpu_has_rdcl_no         boot_cpu_has(X86_FEATURE_RDCL_NO)

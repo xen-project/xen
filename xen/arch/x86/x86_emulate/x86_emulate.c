@@ -6887,6 +6887,17 @@ x86_emulate(
         elem_bytes = 1;
         goto avx512f_no_sae;
 
+    case X86EMUL_OPC_VEX   (0x0f38, 0xd2): /* vpdpwuud [xy]mm/mem,[xy]mm,[xy]mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0xd2): /* vpdpwusd [xy]mm/mem,[xy]mm,[xy]mm */
+    case X86EMUL_OPC_VEX_F3(0x0f38, 0xd2): /* vpdpwsud [xy]mm/mem,[xy]mm,[xy]mm */
+    case X86EMUL_OPC_VEX   (0x0f38, 0xd3): /* vpdpwuuds [xy]mm/mem,[xy]mm,[xy]mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0xd3): /* vpdpwusds [xy]mm/mem,[xy]mm,[xy]mm */
+    case X86EMUL_OPC_VEX_F3(0x0f38, 0xd3): /* vpdpwsuds [xy]mm/mem,[xy]mm,[xy]mm */
+        host_and_vcpu_must_have(avx_vnni_int16);
+        generate_exception_if(vex.w, X86_EXC_UD);
+        op_bytes = 16 << vex.l;
+        goto simd_0f_ymm;
+
     case X86EMUL_OPC_VEX_66(0x0f38, 0xdc):  /* vaesenc {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0xdd):  /* vaesenclast {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0xde):  /* vaesdec {x,y}mm/mem,{x,y}mm,{x,y}mm */

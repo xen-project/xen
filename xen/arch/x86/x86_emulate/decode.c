@@ -435,6 +435,8 @@ static const struct ext0f38_table {
     [0xcc] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_vl },
     [0xcd] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
     [0xcf] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
+    [0xd2] = { .simd_size = simd_other },
+    [0xd3] = { .simd_size = simd_other },
     [0xd6] = { .simd_size = simd_other, .d8s = d8s_vl },
     [0xd7] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
     [0xdb] = { .simd_size = simd_packed_int, .two_op = 1 },
