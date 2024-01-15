@@ -749,6 +749,30 @@ static int cf_check irq_load_isa(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
+static int cf_check irq_check_link(const struct domain *d,
+                                   hvm_domain_context_t *h)
+{
+    const struct hvm_hw_pci_link *pci_link = hvm_get_entry(PCI_LINK, h);
+    unsigned int link;
+
+    if ( !pci_link )
+        return -ENODATA;
+
+    for ( link = 0; link < ARRAY_SIZE(pci_link->pad0); link++ )
+        if ( pci_link->pad0[link] )
+            return -EINVAL;
+
+    for ( link = 0; link < ARRAY_SIZE(pci_link->route); link++ )
+        if ( pci_link->route[link] > 15 )
+        {
+            printk(XENLOG_G_ERR
+                   "HVM restore: PCI-ISA link %u out of range (%u)\n",
+                   link, pci_link->route[link]);
+            return -EINVAL;
+        }
+
+    return 0;
+}
 
 static int cf_check irq_load_link(struct domain *d, hvm_domain_context_t *h)
 {
@@ -758,16 +782,6 @@ static int cf_check irq_load_link(struct domain *d, hvm_domain_context_t *h)
     /* Load the PCI-ISA IRQ link routing table */
     if ( hvm_load_entry(PCI_LINK, h, &hvm_irq->pci_link) != 0 )
         return -EINVAL;
-
-    /* Sanity check */
-    for ( link = 0; link < 4; link++ )
-        if ( hvm_irq->pci_link.route[link] > 15 )
-        {
-            printk(XENLOG_G_ERR
-                   "HVM restore: PCI-ISA link %u out of range (%u)\n",
-                   link, hvm_irq->pci_link.route[link]);
-            return -EINVAL;
-        }
 
     /* Adjust the GSI assert counts for the link outputs.
      * This relies on the PCI and ISA IRQ state being loaded first */
@@ -788,5 +802,5 @@ HVM_REGISTER_SAVE_RESTORE(PCI_IRQ, irq_save_pci, NULL, irq_load_pci,
                           1, HVMSR_PER_DOM);
 HVM_REGISTER_SAVE_RESTORE(ISA_IRQ, irq_save_isa, NULL, irq_load_isa,
                           1, HVMSR_PER_DOM);
-HVM_REGISTER_SAVE_RESTORE(PCI_LINK, irq_save_link, NULL, irq_load_link,
-                          1, HVMSR_PER_DOM);
+HVM_REGISTER_SAVE_RESTORE(PCI_LINK, irq_save_link, irq_check_link,
+                          irq_load_link, 1, HVMSR_PER_DOM);
