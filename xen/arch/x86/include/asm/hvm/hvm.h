@@ -61,14 +61,6 @@ enum hvm_intblk {
 #define HVM_INTR_SHADOW_SMI    0x00000004
 #define HVM_INTR_SHADOW_NMI    0x00000008
 
-/*
- * HAP super page capabilities:
- * bit0: if 2MB super page is allowed?
- * bit1: if 1GB super page is allowed?
- */
-#define HVM_HAP_SUPERPAGE_2MB   0x00000001
-#define HVM_HAP_SUPERPAGE_1GB   0x00000002
-
 #define HVM_EVENT_VECTOR_UNSET    (-1)
 #define HVM_EVENT_VECTOR_UPDATING (-2)
 
@@ -104,8 +96,11 @@ struct hvm_function_table {
     /* Hardware virtual interrupt delivery enable? */
     bool virtual_intr_delivery_enabled;
 
-    /* Indicate HAP capabilities. */
-    unsigned int hap_capabilities;
+    struct {
+        /* Indicate HAP capabilities. */
+        bool hap_superpage_1gb:1,
+             hap_superpage_2mb:1;
+    } caps;
 
     /*
      * Initialise/destroy HVM domain/vcpu resources
@@ -402,8 +397,8 @@ int hvm_get_param(struct domain *d, uint32_t index, uint64_t *value);
     (hvm_paging_enabled(v) && ((v)->arch.hvm.guest_cr[4] & X86_CR4_PKS))
 
 /* Can we use superpages in the HAP p2m table? */
-#define hap_has_1gb (!!(hvm_funcs.hap_capabilities & HVM_HAP_SUPERPAGE_1GB))
-#define hap_has_2mb (!!(hvm_funcs.hap_capabilities & HVM_HAP_SUPERPAGE_2MB))
+#define hap_has_1gb hvm_funcs.caps.hap_superpage_1gb
+#define hap_has_2mb hvm_funcs.caps.hap_superpage_2mb
 
 #define hvm_long_mode_active(v) (!!((v)->arch.hvm.guest_efer & EFER_LMA))
 

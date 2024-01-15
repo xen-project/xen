@@ -2995,12 +2995,8 @@ const struct hvm_function_table * __init start_vmx(void)
         vmx_function_table.hap_supported = 1;
         vmx_function_table.altp2m_supported = 1;
 
-        vmx_function_table.hap_capabilities = 0;
-
-        if ( cpu_has_vmx_ept_2mb )
-            vmx_function_table.hap_capabilities |= HVM_HAP_SUPERPAGE_2MB;
-        if ( cpu_has_vmx_ept_1gb )
-            vmx_function_table.hap_capabilities |= HVM_HAP_SUPERPAGE_1GB;
+        vmx_function_table.caps.hap_superpage_2mb = cpu_has_vmx_ept_2mb;
+        vmx_function_table.caps.hap_superpage_1gb = cpu_has_vmx_ept_1gb;
 
         setup_ept_dump();
     }

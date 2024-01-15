@@ -174,17 +174,17 @@ static int __init cf_check hvm_enable(void)
     {
         printk("HVM: Hardware Assisted Paging (HAP) detected\n");
         printk("HVM: HAP page sizes: 4kB");
-        if ( fns->hap_capabilities & HVM_HAP_SUPERPAGE_2MB )
+        if ( fns->caps.hap_superpage_2mb )
         {
             printk(", 2MB%s", opt_hap_2mb ? "" : " [disabled]");
             if ( !opt_hap_2mb )
-                hvm_funcs.hap_capabilities &= ~HVM_HAP_SUPERPAGE_2MB;
+                hvm_funcs.caps.hap_superpage_2mb = false;
         }
-        if ( fns->hap_capabilities & HVM_HAP_SUPERPAGE_1GB )
+        if ( fns->caps.hap_superpage_1gb )
         {
             printk(", 1GB%s", opt_hap_1gb ? "" : " [disabled]");
             if ( !opt_hap_1gb )
-                hvm_funcs.hap_capabilities &= ~HVM_HAP_SUPERPAGE_1GB;
+                hvm_funcs.caps.hap_superpage_1gb = false;
         }
         printk("\n");
     }

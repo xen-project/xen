@@ -2581,8 +2581,8 @@ const struct hvm_function_table * __init start_svm(void)
         printk(" - none\n");
 
     svm_function_table.hap_supported = !!cpu_has_svm_npt;
-    svm_function_table.hap_capabilities = HVM_HAP_SUPERPAGE_2MB |
-        (cpu_has_page1gb ? HVM_HAP_SUPERPAGE_1GB : 0);
+    svm_function_table.caps.hap_superpage_2mb = true;
+    svm_function_table.caps.hap_superpage_1gb = cpu_has_page1gb;
 
     return &svm_function_table;
 }
