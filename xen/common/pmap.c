@@ -32,8 +32,8 @@ void *__init pmap_map(mfn_t mfn)
 
     __set_bit(idx, inuse);
 
-    slot = idx + FIXMAP_PMAP_BEGIN;
-    ASSERT(slot >= FIXMAP_PMAP_BEGIN && slot <= FIXMAP_PMAP_END);
+    slot = idx + FIX_PMAP_BEGIN;
+    ASSERT(slot >= FIX_PMAP_BEGIN && slot <= FIX_PMAP_END);
 
     /*
      * We cannot use set_fixmap() here. We use PMAP when the domain map
@@ -53,10 +53,10 @@ void __init pmap_unmap(const void *p)
     unsigned int slot = virt_to_fix((unsigned long)p);
 
     ASSERT(system_state < SYS_STATE_smp_boot);
-    ASSERT(slot >= FIXMAP_PMAP_BEGIN && slot <= FIXMAP_PMAP_END);
+    ASSERT(slot >= FIX_PMAP_BEGIN && slot <= FIX_PMAP_END);
     ASSERT(!in_irq());
 
-    idx = slot - FIXMAP_PMAP_BEGIN;
+    idx = slot - FIX_PMAP_BEGIN;
 
     __clear_bit(idx, inuse);
     arch_pmap_unmap(slot);

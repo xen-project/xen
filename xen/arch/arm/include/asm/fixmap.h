@@ -8,17 +8,17 @@
 #include <xen/pmap.h>
 
 /* Fixmap slots */
-#define FIXMAP_CONSOLE  0  /* The primary UART */
-#define FIXMAP_MISC     1  /* Ephemeral mappings of hardware */
-#define FIXMAP_ACPI_BEGIN  2  /* Start mappings of ACPI tables */
-#define FIXMAP_ACPI_END    (FIXMAP_ACPI_BEGIN + NUM_FIXMAP_ACPI_PAGES - 1)  /* End mappings of ACPI tables */
-#define FIXMAP_PMAP_BEGIN (FIXMAP_ACPI_END + 1) /* Start of PMAP */
-#define FIXMAP_PMAP_END (FIXMAP_PMAP_BEGIN + NUM_FIX_PMAP - 1) /* End of PMAP */
+#define FIX_CONSOLE  0  /* The primary UART */
+#define FIX_MISC     1  /* Ephemeral mappings of hardware */
+#define FIX_ACPI_BEGIN  2  /* Start mappings of ACPI tables */
+#define FIX_ACPI_END    (FIX_ACPI_BEGIN + NUM_FIXMAP_ACPI_PAGES - 1)  /* End mappings of ACPI tables */
+#define FIX_PMAP_BEGIN (FIX_ACPI_END + 1) /* Start of PMAP */
+#define FIX_PMAP_END (FIX_PMAP_BEGIN + NUM_FIX_PMAP - 1) /* End of PMAP */
 
-#define FIXMAP_LAST FIXMAP_PMAP_END
+#define FIX_LAST FIX_PMAP_END
 
 #define FIXADDR_START FIXMAP_ADDR(0)
-#define FIXADDR_TOP FIXMAP_ADDR(FIXMAP_LAST)
+#define FIXADDR_TOP FIXMAP_ADDR(FIX_LAST)
 
 #ifndef __ASSEMBLY__
 

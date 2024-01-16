@@ -351,7 +351,7 @@ void free_init_memory(void)
  */
 void __init copy_from_paddr(void *dst, paddr_t paddr, unsigned long len)
 {
-    void *src = (void *)FIXMAP_ADDR(FIXMAP_MISC);
+    void *src = (void *)FIXMAP_ADDR(FIX_MISC);
 
     while (len) {
         unsigned long l, s;
@@ -359,10 +359,10 @@ void __init copy_from_paddr(void *dst, paddr_t paddr, unsigned long len)
         s = paddr & (PAGE_SIZE - 1);
         l = min(PAGE_SIZE - s, len);
 
-        set_fixmap(FIXMAP_MISC, maddr_to_mfn(paddr), PAGE_HYPERVISOR_WC);
+        set_fixmap(FIX_MISC, maddr_to_mfn(paddr), PAGE_HYPERVISOR_WC);
         memcpy(dst, src + s, l);
         clean_dcache_va_range(dst, l);
-        clear_fixmap(FIXMAP_MISC);
+        clear_fixmap(FIX_MISC);
 
         paddr += l;
         dst += l;
