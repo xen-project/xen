@@ -126,14 +126,6 @@ static inline int cpu_nr_siblings(unsigned int cpu)
     return cpu_data[cpu].x86_num_siblings;
 }
 
-/*
- * Generic CPUID function
- * clear %ecx since some cpus (Cyrix MII) do not set or clear %ecx
- * resulting in stale register contents being returned.
- */
-#define cpuid(leaf, eax, ebx, ecx, edx)          \
-        cpuid_count(leaf, 0, eax, ebx, ecx, edx)
-
 /* Some CPUID calls want 'count' to be placed in ecx */
 static inline void cpuid_count(
     unsigned int op,
@@ -146,6 +138,21 @@ static inline void cpuid_count(
     asm volatile ( "cpuid"
           : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
           : "0" (op), "c" (count) );
+}
+
+/*
+ * Generic CPUID function
+ * clear %ecx since some cpus (Cyrix MII) do not set or clear %ecx
+ * resulting in stale register contents being returned.
+ */
+static inline void cpuid(
+    unsigned int leaf,
+    unsigned int *eax,
+    unsigned int *ebx,
+    unsigned int *ecx,
+    unsigned int *edx)
+{
+    cpuid_count(leaf, 0, eax, ebx, ecx, edx);
 }
 
 /*
