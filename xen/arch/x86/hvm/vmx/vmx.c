@@ -2969,7 +2969,7 @@ const struct hvm_function_table * __init start_vmx(void)
         return NULL;
     }
 
-    vmx_function_table.singlestep_supported = cpu_has_monitor_trap_flag;
+    vmx_function_table.caps.singlestep = cpu_has_monitor_trap_flag;
 
     if ( cpu_has_vmx_dt_exiting )
         vmx_function_table.set_descriptor_access_exiting =
@@ -2992,8 +2992,8 @@ const struct hvm_function_table * __init start_vmx(void)
                 printk("VMX: Disabling executable EPT superpages due to CVE-2018-12207\n");
         }
 
-        vmx_function_table.hap_supported = 1;
-        vmx_function_table.altp2m_supported = 1;
+        vmx_function_table.caps.hap = true;
+        vmx_function_table.caps.altp2m = true;
 
         vmx_function_table.caps.hap_superpage_2mb = cpu_has_vmx_ept_2mb;
         vmx_function_table.caps.hap_superpage_1gb = cpu_has_vmx_ept_1gb;
@@ -3006,7 +3006,7 @@ const struct hvm_function_table * __init start_vmx(void)
         vmx_function_table.update_eoi_exit_bitmap = vmx_update_eoi_exit_bitmap;
         vmx_function_table.process_isr = vmx_process_isr;
         vmx_function_table.handle_eoi = vmx_handle_eoi;
-        vmx_function_table.virtual_intr_delivery_enabled = true;
+        vmx_function_table.caps.virtual_intr_delivery = true;
     }
 
     if ( cpu_has_vmx_posted_intr_processing )

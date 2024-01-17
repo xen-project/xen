@@ -136,7 +136,7 @@ static struct notifier_block cpu_nfb = {
 
 static bool __init hap_supported(struct hvm_function_table *fns)
 {
-    if ( !fns->hap_supported )
+    if ( !fns->caps.hap )
     {
         printk("HVM: Hardware Assisted Paging (HAP) not detected\n");
         return false;
@@ -144,7 +144,7 @@ static bool __init hap_supported(struct hvm_function_table *fns)
 
     if ( !opt_hap_enabled )
     {
-        fns->hap_supported = 0;
+        fns->caps.hap = false;
         printk("HVM: Hardware Assisted Paging (HAP) detected but disabled\n");
         return false;
     }
@@ -190,7 +190,7 @@ static int __init cf_check hvm_enable(void)
     }
 
     if ( !opt_altp2m_enabled )
-        hvm_funcs.altp2m_supported = 0;
+        hvm_funcs.caps.altp2m = false;
 
     if ( opt_hvm_fep )
         warning_add(warning_hvm_fep);

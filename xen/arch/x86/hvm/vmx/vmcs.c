@@ -112,7 +112,7 @@ static int cf_check parse_ept_param_runtime(const char *s)
     struct domain *d;
     int val;
 
-    if ( !cpu_has_vmx_ept || !hvm_funcs.hap_supported ||
+    if ( !cpu_has_vmx_ept || !hvm_funcs.caps.hap ||
          !(hvm_funcs.caps.hap_superpage_2mb ||
            hvm_funcs.caps.hap_superpage_1gb) )
     {

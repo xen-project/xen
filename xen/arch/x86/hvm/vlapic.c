@@ -1326,7 +1326,7 @@ int vlapic_has_pending_irq(struct vcpu *v)
     if ( irr == -1 )
         return -1;
 
-    if ( hvm_funcs.virtual_intr_delivery_enabled &&
+    if ( hvm_funcs.caps.virtual_intr_delivery &&
          !nestedhvm_vcpu_in_guestmode(v) )
         return irr;
 
@@ -1361,7 +1361,7 @@ int vlapic_ack_pending_irq(struct vcpu *v, int vector, bool force_ack)
     int isr;
 
     if ( !force_ack &&
-         hvm_funcs.virtual_intr_delivery_enabled )
+         hvm_funcs.caps.virtual_intr_delivery )
         return 1;
 
     /* If there's no chance of using APIC assist then bail now. */

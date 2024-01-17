@@ -86,20 +86,18 @@ struct hvm_vcpu_nonreg_state {
 struct hvm_function_table {
     const char *name;
 
-    /* Support Hardware-Assisted Paging? */
-    bool hap_supported;
-
-    /* Necessary hardware support for alternate p2m's? */
-    bool altp2m_supported;
-    bool singlestep_supported;
-
-    /* Hardware virtual interrupt delivery enable? */
-    bool virtual_intr_delivery_enabled;
-
     struct {
         /* Indicate HAP capabilities. */
-        bool hap_superpage_1gb:1,
-             hap_superpage_2mb:1;
+        bool hap:1,
+             hap_superpage_1gb:1,
+             hap_superpage_2mb:1,
+
+             /* Altp2m capabilities */
+             altp2m:1,
+             singlestep:1,
+            
+             /* Hardware virtual interrupt delivery enable? */
+             virtual_intr_delivery:1;
     } caps;
 
     /*
@@ -642,18 +640,18 @@ static inline void hvm_enable_msr_interception(struct domain *d, uint32_t msr)
 
 static inline bool hvm_is_singlestep_supported(void)
 {
-    return hvm_funcs.singlestep_supported;
+    return hvm_funcs.caps.singlestep;
 }
 
 static inline bool hvm_hap_supported(void)
 {
-    return hvm_funcs.hap_supported;
+    return hvm_funcs.caps.hap;
 }
 
 /* returns true if hardware supports alternate p2m's */
 static inline bool hvm_altp2m_supported(void)
 {
-    return hvm_funcs.altp2m_supported;
+    return hvm_funcs.caps.altp2m;
 }
 
 /* updates the current hardware p2m */

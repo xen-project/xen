@@ -2580,7 +2580,7 @@ const struct hvm_function_table * __init start_svm(void)
     if ( !printed )
         printk(" - none\n");
 
-    svm_function_table.hap_supported = cpu_has_svm_npt;
+    svm_function_table.caps.hap = cpu_has_svm_npt;
     svm_function_table.caps.hap_superpage_2mb = true;
     svm_function_table.caps.hap_superpage_1gb = cpu_has_page1gb;
 
