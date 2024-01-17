@@ -158,7 +158,7 @@ static void cf_check send_IPI_mask_x2apic_cluster(
     local_irq_restore(flags);
 }
 
-static const struct genapic __initconstrel apic_x2apic_phys = {
+static const struct genapic __initconst_cf_clobber apic_x2apic_phys = {
     APIC_INIT("x2apic_phys", NULL),
     .int_delivery_mode = dest_Fixed,
     .int_dest_mode = 0 /* physical delivery */,
@@ -169,7 +169,7 @@ static const struct genapic __initconstrel apic_x2apic_phys = {
     .send_IPI_self = send_IPI_self_x2apic
 };
 
-static const struct genapic __initconstrel apic_x2apic_cluster = {
+static const struct genapic __initconst_cf_clobber apic_x2apic_cluster = {
     APIC_INIT("x2apic_cluster", NULL),
     .int_delivery_mode = dest_LowestPrio,
     .int_dest_mode = 1 /* logical delivery */,
@@ -187,7 +187,7 @@ static const struct genapic __initconstrel apic_x2apic_cluster = {
  * IPIs to be more efficiently delivered by not having to perform an ICR write
  * for each target CPU.
  */
-static const struct genapic __initconstrel apic_x2apic_mixed = {
+static const struct genapic __initconst_cf_clobber apic_x2apic_mixed = {
     APIC_INIT("x2apic_mixed", NULL),
 
     /*
