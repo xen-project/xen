@@ -255,7 +255,8 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
         return ret;
 
     op->u.get_para.cpuinfo_cur_freq =
-        cpufreq_driver.get ? cpufreq_driver.get(op->cpuid) : policy->cur;
+        cpufreq_driver.get ? alternative_call(cpufreq_driver.get, op->cpuid)
+                           : policy->cur;
     op->u.get_para.cpuinfo_max_freq = policy->cpuinfo.max_freq;
     op->u.get_para.cpuinfo_min_freq = policy->cpuinfo.min_freq;
     op->u.get_para.scaling_cur_freq = policy->cur;

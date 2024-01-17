@@ -240,7 +240,7 @@ int cpufreq_add_cpu(unsigned int cpu)
         policy->cpu = cpu;
         per_cpu(cpufreq_cpu_policy, cpu) = policy;
 
-        ret = cpufreq_driver.init(policy);
+        ret = alternative_call(cpufreq_driver.init, policy);
         if (ret) {
             free_cpumask_var(policy->cpus);
             xfree(policy);
@@ -299,7 +299,7 @@ err1:
     cpumask_clear_cpu(cpu, cpufreq_dom->map);
 
     if (cpumask_empty(policy->cpus)) {
-        cpufreq_driver.exit(policy);
+        alternative_call(cpufreq_driver.exit, policy);
         free_cpumask_var(policy->cpus);
         xfree(policy);
     }
@@ -363,7 +363,7 @@ int cpufreq_del_cpu(unsigned int cpu)
     cpumask_clear_cpu(cpu, cpufreq_dom->map);
 
     if (cpumask_empty(policy->cpus)) {
-        cpufreq_driver.exit(policy);
+        alternative_call(cpufreq_driver.exit, policy);
         free_cpumask_var(policy->cpus);
         xfree(policy);
     }
