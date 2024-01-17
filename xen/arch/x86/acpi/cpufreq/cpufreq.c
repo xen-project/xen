@@ -625,12 +625,14 @@ static int cf_check acpi_cpufreq_cpu_exit(struct cpufreq_policy *policy)
     return 0;
 }
 
-static const struct cpufreq_driver __initconstrel acpi_cpufreq_driver = {
+static const struct cpufreq_driver __initconst_cf_clobber
+acpi_cpufreq_driver = {
     .name   = "acpi-cpufreq",
     .verify = acpi_cpufreq_verify,
     .target = acpi_cpufreq_target,
     .init   = acpi_cpufreq_cpu_init,
     .exit   = acpi_cpufreq_cpu_exit,
+    .get    = get_cur_freq_on_cpu,
 };
 
 static int __init cf_check cpufreq_driver_init(void)
@@ -674,6 +676,19 @@ static int __init cf_check cpufreq_driver_init(void)
     return ret;
 }
 presmp_initcall(cpufreq_driver_init);
+
+static int __init cf_check cpufreq_driver_late_init(void)
+{
+    /*
+     * While acpi_cpufreq_driver wants to unconditionally have all hooks
+     * populated for __initconst_cf_clobber to have as much of an effect as
+     * possible, zap the .get hook here (but not in cpufreq_driver_init()),
+     * until acpi_cpufreq_cpu_init() knows whether it's wanted / needed.
+     */
+    cpufreq_driver.get = NULL;
+    return 0;
+}
+__initcall(cpufreq_driver_late_init);
 
 int cpufreq_cpu_init(unsigned int cpuid)
 {

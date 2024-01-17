@@ -317,7 +317,8 @@ static int cf_check powernow_cpufreq_cpu_exit(struct cpufreq_policy *policy)
     return 0;
 }
 
-static const struct cpufreq_driver __initconstrel powernow_cpufreq_driver = {
+static const struct cpufreq_driver __initconst_cf_clobber
+powernow_cpufreq_driver = {
     .name   = "powernow",
     .verify = powernow_cpufreq_verify,
     .target = powernow_cpufreq_target,
