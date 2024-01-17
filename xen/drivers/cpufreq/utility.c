@@ -413,7 +413,7 @@ int cpufreq_update_turbo(int cpuid, int new_state)
     policy->turbo = new_state;
     if (cpufreq_driver.update)
     {
-        ret = cpufreq_driver.update(cpuid, policy);
+        ret = alternative_call(cpufreq_driver.update, cpuid, policy);
         if (ret)
             policy->turbo = curr_state;
     }
@@ -449,7 +449,7 @@ int __cpufreq_set_policy(struct cpufreq_policy *data,
         return -EINVAL;
 
     /* verify the cpu speed can be set within this limit */
-    ret = cpufreq_driver.verify(policy);
+    ret = alternative_call(cpufreq_driver.verify, policy);
     if (ret)
         return ret;
 
@@ -457,7 +457,7 @@ int __cpufreq_set_policy(struct cpufreq_policy *data,
     data->max = policy->max;
     data->limits = policy->limits;
     if (cpufreq_driver.setpolicy)
-        return cpufreq_driver.setpolicy(data);
+        return alternative_call(cpufreq_driver.setpolicy, data);
 
     if (policy->governor != data->governor) {
         /* save old, working values */

@@ -513,8 +513,8 @@ static int cf_check hwp_cpufreq_update(int cpuid, struct cpufreq_policy *policy)
     return per_cpu(hwp_drv_data, cpuid)->ret;
 }
 
-static const struct cpufreq_driver __initconstrel hwp_cpufreq_driver =
-{
+static const struct cpufreq_driver __initconst_cf_clobber
+hwp_cpufreq_driver = {
     .name   = XEN_HWP_DRIVER_NAME,
     .verify = hwp_cpufreq_verify,
     .target = hwp_cpufreq_target,
