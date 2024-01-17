@@ -14,7 +14,7 @@
 #include <asm/io_apic.h>
 
 /* should be called last. */
-const struct genapic __initconstrel apic_default = {
+const struct genapic __initconst_cf_clobber apic_default = {
 	APIC_INIT("default", NULL),
 	GENAPIC_FLAT
 };

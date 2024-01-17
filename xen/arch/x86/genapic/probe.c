@@ -16,7 +16,7 @@
 #include <asm/mach-generic/mach_apic.h>
 #include <asm/setup.h>
 
-struct genapic __read_mostly genapic;
+struct genapic __ro_after_init genapic;
 
 static const struct genapic *const __initconstrel apic_probe[] = {
 	&apic_bigsmp, 
