@@ -2427,7 +2427,7 @@ void __init early_time_init(void)
 }
 
 /* keep pit enabled for pit_broadcast working while cpuidle enabled */
-static int _disable_pit_irq(void(*hpet_broadcast_setup)(void))
+static int _disable_pit_irq(bool init)
 {
     int ret = 1;
 
@@ -2442,13 +2442,13 @@ static int _disable_pit_irq(void(*hpet_broadcast_setup)(void))
      */
     if ( cpuidle_using_deep_cstate() && !boot_cpu_has(X86_FEATURE_ARAT) )
     {
-        hpet_broadcast_setup();
+        init ? hpet_broadcast_init() : hpet_broadcast_resume();
         if ( !hpet_broadcast_is_available() )
         {
             if ( xen_cpuidle > 0 )
             {
-                printk("%ps() failed, turning to PIT broadcast\n",
-                       hpet_broadcast_setup);
+                printk("hpet_broadcast_%s() failed, turning to PIT broadcast\n",
+                       init ? "init" : "resume");
                 return -1;
             }
             ret = 0;
@@ -2465,7 +2465,7 @@ static int _disable_pit_irq(void(*hpet_broadcast_setup)(void))
 
 static int __init cf_check disable_pit_irq(void)
 {
-    if ( !_disable_pit_irq(hpet_broadcast_init) )
+    if ( !_disable_pit_irq(true) )
     {
         xen_cpuidle = 0;
         printk("CPUIDLE: disabled due to no HPET. "
@@ -2526,7 +2526,7 @@ int time_resume(void)
 
     resume_platform_timer();
 
-    if ( !_disable_pit_irq(hpet_broadcast_resume) )
+    if ( !_disable_pit_irq(false) )
         BUG();
 
     init_percpu_time();

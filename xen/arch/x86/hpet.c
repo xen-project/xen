@@ -563,7 +563,7 @@ static void cf_check handle_rtc_once(uint8_t index, uint8_t value)
     }
 }
 
-void __init cf_check hpet_broadcast_init(void)
+void __init hpet_broadcast_init(void)
 {
     u64 hpet_rate = hpet_setup();
     u32 hpet_id, cfg;
@@ -634,7 +634,7 @@ void __init cf_check hpet_broadcast_init(void)
         hpet_events->flags = HPET_EVT_LEGACY;
 }
 
-void cf_check hpet_broadcast_resume(void)
+void hpet_broadcast_resume(void)
 {
     u32 cfg;
     unsigned int i, n;
