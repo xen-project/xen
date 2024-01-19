@@ -146,8 +146,6 @@ int cf_check nsvm_vcpu_reset(struct vcpu *v)
     svm->ns_msr_hsavepa = INVALID_PADDR;
     svm->ns_ovvmcb_pa = INVALID_PADDR;
 
-    svm->ns_tscratio = DEFAULT_TSC_RATIO;
-
     svm->ns_cr_intercepts = 0;
     svm->ns_dr_intercepts = 0;
     svm->ns_exception_intercepts = 0;

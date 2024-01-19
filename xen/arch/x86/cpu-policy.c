@@ -741,8 +741,7 @@ static void __init calculate_hvm_max_policy(void)
                                (1u << SVM_FEATURE_PAUSEFILTER) |
                                (1u << SVM_FEATURE_DECODEASSISTS));
         /* Enable features which are always emulated. */
-        p->extd.raw[0xa].d |= ((1u << SVM_FEATURE_VMCBCLEAN) |
-                               (1u << SVM_FEATURE_TSCRATEMSR));
+        p->extd.raw[0xa].d |= (1u << SVM_FEATURE_VMCBCLEAN);
     }
     
     guest_common_max_feature_adjustments(fs);

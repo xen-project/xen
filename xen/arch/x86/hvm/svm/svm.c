@@ -777,43 +777,6 @@ static int cf_check svm_get_guest_pat(struct vcpu *v, u64 *gpat)
     return 1;
 }
 
-static uint64_t scale_tsc(uint64_t host_tsc, uint64_t ratio)
-{
-    uint64_t mult, frac, scaled_host_tsc;
-
-    if ( ratio == DEFAULT_TSC_RATIO )
-        return host_tsc;
-
-    /*
-     * Suppose the most significant 32 bits of host_tsc and ratio are
-     * tsc_h and mult, and the least 32 bits of them are tsc_l and frac,
-     * then
-     *     host_tsc * ratio * 2^-32
-     *     = host_tsc * (mult * 2^32 + frac) * 2^-32
-     *     = host_tsc * mult + (tsc_h * 2^32 + tsc_l) * frac * 2^-32
-     *     = host_tsc * mult + tsc_h * frac + ((tsc_l * frac) >> 32)
-     *
-     * Multiplications in the last two terms are between 32-bit integers,
-     * so both of them can fit in 64-bit integers.
-     *
-     * Because mult is usually less than 10 in practice, it's very rare
-     * that host_tsc * mult can overflow a 64-bit integer.
-     */
-    mult = ratio >> 32;
-    frac = ratio & ((1ULL << 32) - 1);
-    scaled_host_tsc  = host_tsc * mult;
-    scaled_host_tsc += (host_tsc >> 32) * frac;
-    scaled_host_tsc += ((host_tsc & ((1ULL << 32) - 1)) * frac) >> 32;
-
-    return scaled_host_tsc;
-}
-
-static uint64_t svm_get_tsc_offset(uint64_t host_tsc, uint64_t guest_tsc,
-    uint64_t ratio)
-{
-    return guest_tsc - scale_tsc(host_tsc, ratio);
-}
-
 static void cf_check svm_set_tsc_offset(struct vcpu *v, u64 offset, u64 at_tsc)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
@@ -832,18 +795,8 @@ static void cf_check svm_set_tsc_offset(struct vcpu *v, u64 offset, u64 at_tsc)
 
     if ( nestedhvm_vcpu_in_guestmode(v) )
     {
-        struct nestedsvm *svm = &vcpu_nestedsvm(v);
-
         n2_tsc_offset = vmcb_get_tsc_offset(n2vmcb) -
                         vmcb_get_tsc_offset(n1vmcb);
-        if ( svm->ns_tscratio != DEFAULT_TSC_RATIO )
-        {
-            uint64_t guest_tsc = hvm_get_guest_tsc_fixed(v, at_tsc);
-
-            n2_tsc_offset = svm_get_tsc_offset(guest_tsc,
-                                               guest_tsc + n2_tsc_offset,
-                                               svm->ns_tscratio);
-        }
         vmcb_set_tsc_offset(n1vmcb, offset);
     }
 
@@ -1921,10 +1874,6 @@ static int cf_check svm_msr_read_intercept(
         *msr_content = nsvm->ns_msr_hsavepa;
         break;
 
-    case MSR_AMD64_TSC_RATIO:
-        *msr_content = nsvm->ns_tscratio;
-        break;
-
     case MSR_AMD_OSVW_ID_LENGTH:
     case MSR_AMD_OSVW_STATUS:
         if ( !d->arch.cpuid->extd.osvw )
@@ -2101,12 +2050,6 @@ static int cf_check svm_msr_write_intercept(
     case MSR_F10_BU_CFG2:
         if ( rdmsr_safe(msr, msr_content) )
             goto gpf;
-        break;
-
-    case MSR_AMD64_TSC_RATIO:
-        if ( msr_content & TSC_RATIO_RSVD_BITS )
-            goto gpf;
-        nsvm->ns_tscratio = msr_content;
         break;
 
     case MSR_IA32_MCx_MISC(4): /* Threshold register */
