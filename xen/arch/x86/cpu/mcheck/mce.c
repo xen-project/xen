@@ -82,45 +82,19 @@ static void cf_check unexpected_machine_check(const struct cpu_user_regs *regs)
     fatal_trap(regs, 1);
 }
 
-static x86_mce_vector_t _machine_check_vector = unexpected_machine_check;
-
-void __init x86_mce_vector_register(x86_mce_vector_t hdlr)
-{
-    _machine_check_vector = hdlr;
-}
+struct mce_callbacks __ro_after_init mce_callbacks = {
+    .handler = unexpected_machine_check,
+};
+static const typeof(mce_callbacks.handler) __initconst_cf_clobber __used
+    default_handler = unexpected_machine_check;
 
 /* Call the installed machine check handler for this CPU setup. */
 
 void do_machine_check(const struct cpu_user_regs *regs)
 {
     mce_enter();
-    _machine_check_vector(regs);
+    alternative_vcall(mce_callbacks.handler, regs);
     mce_exit();
-}
-
-/*
- * Init machine check callback handler
- * It is used to collect additional information provided by newer
- * CPU families/models without the need to duplicate the whole handler.
- * This avoids having many handlers doing almost nearly the same and each
- * with its own tweaks ands bugs.
- */
-static x86_mce_callback_t mc_callback_bank_extended = NULL;
-
-void __init x86_mce_callback_register(x86_mce_callback_t cbfunc)
-{
-    mc_callback_bank_extended = cbfunc;
-}
-
-/*
- * Machine check recoverable judgement callback handler
- * It is used to judge whether an UC error is recoverable by software
- */
-static mce_recoverable_t mc_recoverable_scan = NULL;
-
-void __init mce_recoverable_register(mce_recoverable_t cbfunc)
-{
-    mc_recoverable_scan = cbfunc;
 }
 
 struct mca_banks *mcabanks_alloc(unsigned int nr)
@@ -174,19 +148,6 @@ static void mcabank_clear(int banknum)
 }
 
 /*
- * Judging whether to Clear Machine Check error bank callback handler
- * According to Intel latest MCA OS Recovery Writer's Guide,
- * whether the error MCA bank needs to be cleared is decided by the mca_source
- * and MCi_status bit value.
- */
-static mce_need_clearbank_t mc_need_clearbank_scan = NULL;
-
-void __init mce_need_clearbank_register(mce_need_clearbank_t cbfunc)
-{
-    mc_need_clearbank_scan = cbfunc;
-}
-
-/*
  * mce_logout_lock should only be used in the trap handler,
  * while MCIP has not been cleared yet in the global status
  * register. Other use is not safe, since an MCE trap can
@@ -226,7 +187,8 @@ static void mca_init_bank(enum mca_source who, struct mc_info *mi, int bank)
 
     if ( (mib->mc_status & MCi_STATUS_MISCV) &&
          (mib->mc_status & MCi_STATUS_ADDRV) &&
-         (mc_check_addr(mib->mc_status, mib->mc_misc, MC_ADDR_PHYSICAL)) &&
+         alternative_call(mce_callbacks.check_addr, mib->mc_status,
+                          mib->mc_misc, MC_ADDR_PHYSICAL) &&
          (who == MCA_POLLER || who == MCA_CMCI_HANDLER) &&
          (mfn_valid(_mfn(paddr_to_pfn(mib->mc_addr)))) )
     {
@@ -326,7 +288,7 @@ mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
      * If no mc_recovery_scan callback handler registered,
      * this error is not recoverable
      */
-    recover = mc_recoverable_scan ? 1 : 0;
+    recover = mce_callbacks.recoverable_scan;
 
     for ( i = 0; i < this_cpu(nr_mce_banks); i++ )
     {
@@ -343,8 +305,9 @@ mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
          * decide whether to clear bank by MCi_STATUS bit value such as
          * OVER/UC/EN/PCC/S/AR
          */
-        if ( mc_need_clearbank_scan )
-            need_clear = mc_need_clearbank_scan(who, status);
+        if ( mce_callbacks.need_clearbank_scan )
+            need_clear = alternative_call(mce_callbacks.need_clearbank_scan,
+                                          who, status);
 
         /*
          * If this is the first bank with valid MCA DATA, then
@@ -380,12 +343,12 @@ mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
 
         if ( recover && uc )
             /* uc = true, recover = true, we need not panic. */
-            recover = mc_recoverable_scan(status);
+            recover = alternative_call(mce_callbacks.recoverable_scan, status);
 
         mca_init_bank(who, mci, i);
 
-        if ( mc_callback_bank_extended )
-            mc_callback_bank_extended(mci, i, status);
+        if ( mce_callbacks.info_collect )
+            alternative_vcall(mce_callbacks.info_collect, mci, i, status);
 
         /* By default, need_clear = true */
         if ( who != MCA_MCE_SCAN && need_clear )
@@ -1913,9 +1876,11 @@ static void cf_check mce_softirq(void)
  * will help to collect and log those MCE errors.
  * Round2: Do all MCE processing logic as normal.
  */
-void __init mce_handler_init(void)
+void __init mce_handler_init(const struct mce_callbacks *cb)
 {
     /* callback register, do we really need so many callback? */
+    mce_callbacks = *cb;
+
     /* mce handler data initialization */
     spin_lock_init(&mce_logout_lock);
     open_softirq(MACHINE_CHECK_SOFTIRQ, mce_softirq);
