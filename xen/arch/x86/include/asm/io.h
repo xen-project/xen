@@ -47,10 +47,14 @@ __OUT(b,"b",char)
 __OUT(w,"w",short)
 __OUT(l,,int)
 
-/* Function pointer used to handle platform specific I/O port emulation. */
+/*
+ * Boolean indicator and function used to handle platform specific I/O port
+ * emulation.
+ */
 #define IOEMUL_QUIRK_STUB_BYTES 9
+extern bool ioemul_handle_quirk;
 struct cpu_user_regs;
-extern unsigned int (*ioemul_handle_quirk)(
-    uint8_t opcode, char *io_emul_stub, struct cpu_user_regs *regs);
+unsigned int ioemul_handle_proliant_quirk(
+    uint8_t opcode, char *io_emul_stub, const struct cpu_user_regs *regs);
 
 #endif
