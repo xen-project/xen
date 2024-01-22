@@ -42,7 +42,7 @@
  * Clobbered regs: xl, ip
  */
 
-ENTRY(__do_div64)
+FUNC(__do_div64)
 UNWIND(.fnstart)
 
 	@ Test for easy paths first.
@@ -206,4 +206,4 @@ Ldiv0_64:
 	ldr	pc, [sp], #8
 
 UNWIND(.fnend)
-ENDPROC(__do_div64)
+END(__do_div64)

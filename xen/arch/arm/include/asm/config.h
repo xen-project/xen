@@ -53,7 +53,8 @@
 
 /* Linkage for ARM */
 #ifdef __ASSEMBLY__
-#define ALIGN .align 2
+#define CODE_ALIGN 4
+#define ALIGN .balign CODE_ALIGN
 #define ENTRY(name)                             \
   .globl name;                                  \
   ALIGN;                                        \
@@ -61,8 +62,6 @@
 #define GLOBAL(name)                            \
   .globl name;                                  \
   name:
-#define END(name) \
-  .size name, .-name
 #define ENDPROC(name) \
   .type name, %function; \
   END(name)

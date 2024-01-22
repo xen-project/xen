@@ -5,6 +5,7 @@
 /* NB. Auto-generated from arch/.../asm-offsets.c */
 #include <asm/asm-offsets.h>
 #endif
+#include <xen/linkage.h>
 #include <asm/processor.h>
 
 /* Macros for generic assembly code */
@@ -28,10 +29,7 @@ label:  .asciz msg;                             \
 .popsection
 
 #define ASM_INT(label, val)                 \
-    .p2align 2;                             \
-label: .long (val);                         \
-    .size label, . - label;                 \
-    .type label, %object
+    DATA(label, 4) .long (val); END(label)
 
 #endif /* __ARM_ASM_DEFNS_H__ */
 /*

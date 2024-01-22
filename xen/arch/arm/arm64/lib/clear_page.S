@@ -22,7 +22,7 @@
  * Parameters:
  *	x0 - dest
  */
-ENTRY(clear_page)
+FUNC(clear_page)
 	mrs	x1, dczid_el0
 	and	w1, w1, #0xf
 	mov	x2, #4
@@ -33,4 +33,4 @@ ENTRY(clear_page)
 	tst	x0, #(PAGE_SIZE - 1)
 	b.ne	1b
 	ret
-ENDPROC(clear_page)
+END(clear_page)
