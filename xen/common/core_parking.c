@@ -30,10 +30,11 @@ static DEFINE_SPINLOCK(accounting_lock);
 static uint32_t cur_idle_nums;
 static unsigned int core_parking_cpunum[NR_CPUS] = {[0 ... NR_CPUS-1] = -1};
 
-static const struct cp_policy {
+struct cp_policy {
     char name[30];
     unsigned int (*next)(unsigned int event);
-} *__read_mostly core_parking_policy;
+};
+static struct cp_policy __ro_after_init core_parking_policy;
 
 static enum core_parking_controller {
     POWER_FIRST,
@@ -175,12 +176,13 @@ long cf_check core_parking_helper(void *data)
     unsigned int cpu;
     int ret = 0;
 
-    if ( !core_parking_policy )
+    if ( !core_parking_policy.next )
         return -EINVAL;
 
     while ( cur_idle_nums < idle_nums )
     {
-        cpu = core_parking_policy->next(CORE_PARKING_INCREMENT);
+        cpu = alternative_call(core_parking_policy.next,
+                               CORE_PARKING_INCREMENT);
         ret = cpu_down(cpu);
         if ( ret )
             return ret;
@@ -193,7 +195,8 @@ long cf_check core_parking_helper(void *data)
 
     while ( cur_idle_nums > idle_nums )
     {
-        cpu = core_parking_policy->next(CORE_PARKING_DECREMENT);
+        cpu = alternative_call(core_parking_policy.next,
+                               CORE_PARKING_DECREMENT);
         ret = cpu_up(cpu);
         if ( ret )
             return ret;
@@ -239,12 +242,12 @@ uint32_t get_cur_idle_nums(void)
     return cur_idle_nums;
 }
 
-static const struct cp_policy power_first = {
+static const struct cp_policy __initconst_cf_clobber power_first = {
     .name = "power",
     .next = core_parking_power,
 };
 
-static const struct cp_policy performance_first = {
+static const struct cp_policy __initconst_cf_clobber performance_first = {
     .name = "performance",
     .next = core_parking_performance,
 };
@@ -254,7 +257,7 @@ static int __init register_core_parking_policy(const struct cp_policy *policy)
     if ( !policy || !policy->next )
         return -EINVAL;
 
-    core_parking_policy = policy;
+    core_parking_policy = *policy;
     return 0;
 }
 
@@ -269,4 +272,4 @@ static int __init cf_check core_parking_init(void)
 
     return ret;
 }
-__initcall(core_parking_init);
+presmp_initcall(core_parking_init);
