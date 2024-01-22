@@ -5,7 +5,7 @@
 #include <asm/traps.h>
 
 /* WIP: only works while interrupting Xen context */
-ENTRY(handle_trap)
+FUNC(handle_trap)
 
     /* Exceptions from xen */
 save_to_stack:
@@ -92,3 +92,4 @@ restore_registers:
         REG_L   sp, CPU_USER_REGS_SP(sp)
 
         sret
+END(handle_trap)

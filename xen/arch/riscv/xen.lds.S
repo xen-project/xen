@@ -1,9 +1,6 @@
 #include <xen/lib.h>
 #include <xen/xen.lds.h>
 
-#undef ENTRY
-#undef ALIGN
-
 OUTPUT_ARCH(riscv)
 ENTRY(start)
 

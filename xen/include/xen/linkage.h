@@ -35,17 +35,28 @@
 
 #define END(name) .size name, . - name
 
+/*
+ * CODE_FILL in particular may need to expand to nothing (e.g. for RISC-V), in
+ * which case we also need to get rid of the comma in the .balign directive.
+ */
+#define count_args_exp(args...) count_args(args)
+#if count_args_exp(CODE_FILL)
+# define DO_CODE_ALIGN(align...) LASTARG(CODE_ALIGN, ## align), CODE_FILL
+#else
+# define DO_CODE_ALIGN(align...) LASTARG(CODE_ALIGN, ## align)
+#endif
+
 #define FUNC(name, align...) \
-        SYM(name, FUNC, GLOBAL, LASTARG(CODE_ALIGN, ## align), CODE_FILL)
+        SYM(name, FUNC, GLOBAL, DO_CODE_ALIGN(align))
 #define LABEL(name, align...) \
-        SYM(name, NONE, GLOBAL, LASTARG(CODE_ALIGN, ## align), CODE_FILL)
+        SYM(name, NONE, GLOBAL, DO_CODE_ALIGN(align))
 #define DATA(name, align...) \
         SYM(name, DATA, GLOBAL, LASTARG(DATA_ALIGN, ## align), DATA_FILL)
 
 #define FUNC_LOCAL(name, align...) \
-        SYM(name, FUNC, LOCAL, LASTARG(CODE_ALIGN, ## align), CODE_FILL)
+        SYM(name, FUNC, LOCAL, DO_CODE_ALIGN(align))
 #define LABEL_LOCAL(name, align...) \
-        SYM(name, NONE, LOCAL, LASTARG(CODE_ALIGN, ## align), CODE_FILL)
+        SYM(name, NONE, LOCAL, DO_CODE_ALIGN(align))
 #define DATA_LOCAL(name, align...) \
         SYM(name, DATA, LOCAL, LASTARG(DATA_ALIGN, ## align), DATA_FILL)
 

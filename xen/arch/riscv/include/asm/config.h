@@ -69,12 +69,8 @@
 
 /* Linkage for RISCV */
 #ifdef __ASSEMBLY__
-#define ALIGN .align 4
-
-#define ENTRY(name)                                \
-  .globl name;                                     \
-  ALIGN;                                           \
-  name:
+#define CODE_ALIGN 16
+#define CODE_FILL /* empty */
 #endif
 
 #ifdef CONFIG_RISCV_64

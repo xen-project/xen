@@ -8,7 +8,7 @@
          *   a0 -> hart_id ( bootcpu_id )
          *   a1 -> dtb_base 
          */
-ENTRY(start)
+FUNC(start)
         /* Mask all interrupts */
         csrw    CSR_SIE, zero
 
@@ -60,19 +60,21 @@ ENTRY(start)
         mv      a1, s1
 
         tail    start_xen
+END(start)
 
         .section .text, "ax", %progbits
 
-ENTRY(reset_stack)
+FUNC(reset_stack)
         la      sp, cpu0_boot_stack
         li      t0, STACK_SIZE
         add     sp, sp, t0
 
         ret
+END(reset_stack)
 
         .section .text.ident, "ax", %progbits
 
-ENTRY(turn_on_mmu)
+FUNC(turn_on_mmu)
         sfence.vma
 
         li      t0, RV_STAGE1_MODE
@@ -84,3 +86,4 @@ ENTRY(turn_on_mmu)
         csrw    CSR_SATP, t1
 
         jr      a0
+END(turn_on_mmu)
