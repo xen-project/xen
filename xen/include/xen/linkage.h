@@ -19,7 +19,7 @@
 
 #define SYM_ALIGN(align...) .balign align
 
-#define SYM_L_GLOBAL(name) .globl name
+#define SYM_L_GLOBAL(name) .globl name; .hidden name
 #define SYM_L_WEAK(name)   .weak name
 #define SYM_L_LOCAL(name)  /* nothing */
 

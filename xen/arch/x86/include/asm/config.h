@@ -47,11 +47,11 @@
 #define CODE_FILL 0x90
 #define ALIGN .align CODE_ALIGN, CODE_FILL
 #define ENTRY(name)                             \
-  .globl name;                                  \
   ALIGN;                                        \
-  name:
+  GLOBAL(name)
 #define GLOBAL(name)                            \
   .globl name;                                  \
+  .hidden name;                                 \
   name:
 #endif
 
