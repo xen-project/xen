@@ -84,7 +84,7 @@ static void cf_check unexpected_machine_check(const struct cpu_user_regs *regs)
 
 static x86_mce_vector_t _machine_check_vector = unexpected_machine_check;
 
-void x86_mce_vector_register(x86_mce_vector_t hdlr)
+void __init x86_mce_vector_register(x86_mce_vector_t hdlr)
 {
     _machine_check_vector = hdlr;
 }
@@ -107,7 +107,7 @@ void do_machine_check(const struct cpu_user_regs *regs)
  */
 static x86_mce_callback_t mc_callback_bank_extended = NULL;
 
-void x86_mce_callback_register(x86_mce_callback_t cbfunc)
+void __init x86_mce_callback_register(x86_mce_callback_t cbfunc)
 {
     mc_callback_bank_extended = cbfunc;
 }
@@ -118,7 +118,7 @@ void x86_mce_callback_register(x86_mce_callback_t cbfunc)
  */
 static mce_recoverable_t mc_recoverable_scan = NULL;
 
-void mce_recoverable_register(mce_recoverable_t cbfunc)
+void __init mce_recoverable_register(mce_recoverable_t cbfunc)
 {
     mc_recoverable_scan = cbfunc;
 }
@@ -182,7 +182,7 @@ static void mcabank_clear(int banknum)
  */
 static mce_need_clearbank_t mc_need_clearbank_scan = NULL;
 
-void mce_need_clearbank_register(mce_need_clearbank_t cbfunc)
+void __init mce_need_clearbank_register(mce_need_clearbank_t cbfunc)
 {
     mc_need_clearbank_scan = cbfunc;
 }
@@ -799,7 +799,7 @@ void mcheck_init(struct cpuinfo_x86 *c, bool bsp)
     {
     case X86_VENDOR_AMD:
     case X86_VENDOR_HYGON:
-        inited = amd_mcheck_init(c);
+        inited = amd_mcheck_init(c, bsp);
         break;
 
     case X86_VENDOR_INTEL:
@@ -1913,11 +1913,8 @@ static void cf_check mce_softirq(void)
  * will help to collect and log those MCE errors.
  * Round2: Do all MCE processing logic as normal.
  */
-void mce_handler_init(void)
+void __init mce_handler_init(void)
 {
-    if ( smp_processor_id() != 0 )
-        return;
-
     /* callback register, do we really need so many callback? */
     /* mce handler data initialization */
     spin_lock_init(&mce_logout_lock);

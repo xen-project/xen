@@ -284,7 +284,7 @@ int vmce_amd_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 }
 
 enum mcheck_type
-amd_mcheck_init(struct cpuinfo_x86 *ci)
+amd_mcheck_init(const struct cpuinfo_x86 *ci, bool bsp)
 {
     uint32_t i;
     enum mcequirk_amd_flags quirkflag = 0;
@@ -294,9 +294,12 @@ amd_mcheck_init(struct cpuinfo_x86 *ci)
 
     /* Assume that machine check support is available.
      * The minimum provided support is at least the K8. */
-    mce_handler_init();
-    x86_mce_vector_register(mcheck_cmn_handler);
-    mce_need_clearbank_register(amd_need_clearbank_scan);
+    if ( bsp )
+    {
+        mce_handler_init();
+        x86_mce_vector_register(mcheck_cmn_handler);
+        mce_need_clearbank_register(amd_need_clearbank_scan);
+    }
 
     for ( i = 0; i < this_cpu(nr_mce_banks); i++ )
     {
@@ -336,9 +339,12 @@ amd_mcheck_init(struct cpuinfo_x86 *ci)
             ppin_msr = MSR_AMD_PPIN;
     }
 
-    x86_mce_callback_register(amd_f10_handler);
-    mce_recoverable_register(mc_amd_recoverable_scan);
-    mce_register_addrcheck(mc_amd_addrcheck);
+    if ( bsp )
+    {
+        x86_mce_callback_register(amd_f10_handler);
+        mce_recoverable_register(mc_amd_recoverable_scan);
+        mce_register_addrcheck(mc_amd_addrcheck);
+    }
 
     return ci->x86_vendor == X86_VENDOR_HYGON ?
             mcheck_hygon : mcheck_amd_famXX;
