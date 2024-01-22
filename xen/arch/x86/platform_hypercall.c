@@ -299,7 +299,7 @@ ret_t do_platform_op(
         ret = -EINVAL;
         if ( op->u.read_memtype.reg < num_var_ranges )
         {
-            mtrr_if->get(op->u.read_memtype.reg, &mfn, &nr_mfns, &type);
+            mtrr_get(op->u.read_memtype.reg, &mfn, &nr_mfns, &type);
             op->u.read_memtype.mfn     = mfn;
             op->u.read_memtype.nr_mfns = nr_mfns;
             op->u.read_memtype.type    = type;
