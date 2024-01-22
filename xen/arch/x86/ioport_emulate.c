@@ -8,11 +8,10 @@
 #include <xen/sched.h>
 #include <xen/dmi.h>
 
-unsigned int (*__read_mostly ioemul_handle_quirk)(
-    uint8_t opcode, char *io_emul_stub, struct cpu_user_regs *regs);
+bool __ro_after_init ioemul_handle_quirk;
 
-static unsigned int cf_check ioemul_handle_proliant_quirk(
-    u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs)
+unsigned int ioemul_handle_proliant_quirk(
+    uint8_t opcode, char *io_emul_stub, const struct cpu_user_regs *regs)
 {
     static const char stub[] = {
         0x9c,       /*    pushf           */
@@ -103,7 +102,7 @@ static const struct dmi_system_id __initconstrel ioport_quirks_tbl[] = {
 static int __init cf_check ioport_quirks_init(void)
 {
     if ( dmi_check_system(ioport_quirks_tbl) )
-        ioemul_handle_quirk = ioemul_handle_proliant_quirk;
+        ioemul_handle_quirk = true;
 
     return 0;
 }

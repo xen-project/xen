@@ -112,7 +112,7 @@ static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
     /* Some platforms might need to quirk the stub for specific inputs. */
     if ( unlikely(ioemul_handle_quirk) )
     {
-        quirk_bytes = ioemul_handle_quirk(opcode, p, ctxt->ctxt.regs);
+        quirk_bytes = ioemul_handle_proliant_quirk(opcode, p, ctxt->ctxt.regs);
         p += quirk_bytes;
     }
 
