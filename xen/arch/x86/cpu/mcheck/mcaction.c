@@ -29,7 +29,7 @@ mci_action_add_pageoffline(int bank, struct mc_info *mi,
 
 mce_check_addr_t mc_check_addr = NULL;
 
-void mce_register_addrcheck(mce_check_addr_t cbfunc)
+void __init mce_register_addrcheck(mce_check_addr_t cbfunc)
 {
     mc_check_addr = cbfunc;
 }

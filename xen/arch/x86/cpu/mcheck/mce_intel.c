@@ -820,7 +820,7 @@ static void intel_mce_post_reset(void)
     return;
 }
 
-static void intel_init_mce(void)
+static void intel_init_mce(bool bsp)
 {
     uint64_t msr_content;
     int i;
@@ -845,6 +845,9 @@ static void intel_init_mce(void)
     }
     if ( firstbank ) /* if cmci enabled, firstbank = 0 */
         wrmsrl(MSR_IA32_MC0_STATUS, 0x0ULL);
+
+    if ( !bsp )
+        return;
 
     x86_mce_vector_register(mcheck_cmn_handler);
     mce_recoverable_register(intel_recoverable_scan);
@@ -985,9 +988,10 @@ enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool bsp)
 
     intel_init_mca(c);
 
-    mce_handler_init();
+    if ( bsp )
+        mce_handler_init();
 
-    intel_init_mce();
+    intel_init_mce(bsp);
 
     intel_init_cmci(c);
 
