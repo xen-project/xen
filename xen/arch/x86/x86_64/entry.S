@@ -1023,7 +1023,9 @@ FUNC(entry_NMI)
         ENDBR64
         pushq $0
         movl  $X86_EXC_NMI, 4(%rsp)
-handle_ist_exception:
+END(entry_NMI)
+
+FUNC(handle_ist_exception)
         ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
         SAVE_ALL
 
@@ -1150,7 +1152,7 @@ handle_ist_exception:
         ASSERT_CONTEXT_IS_XEN
         jmp   restore_all_xen
 #endif
-END(entry_NMI)
+END(handle_ist_exception)
 
 FUNC(entry_MC)
         ENDBR64
