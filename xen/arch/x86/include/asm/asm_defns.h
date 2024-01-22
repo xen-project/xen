@@ -13,6 +13,7 @@
 #include <asm/alternative.h>
 
 #ifdef __ASSEMBLY__
+#include <xen/linkage.h>
 #include <asm/asm-defns.h>
 #ifndef CONFIG_INDIRECT_THUNK
 .equ CONFIG_INDIRECT_THUNK, 0
@@ -343,10 +344,7 @@ static always_inline void stac(void)
     .popsection
 
 #define ASM_INT(label, val)                 \
-    .p2align 2;                             \
-label: .long (val);                         \
-    .size label, . - label;                 \
-    .type label, @object
+    DATA(label, 4) .long (val); END(label)
 
 #define ASM_CONSTANT(name, value)                \
     asm ( ".equ " #name ", %P0; .global " #name  \

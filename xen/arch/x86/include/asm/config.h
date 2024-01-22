@@ -43,7 +43,9 @@
 
 /* Linkage for x86 */
 #ifdef __ASSEMBLY__
-#define ALIGN .align 16,0x90
+#define CODE_ALIGN 16
+#define CODE_FILL 0x90
+#define ALIGN .align CODE_ALIGN, CODE_FILL
 #define ENTRY(name)                             \
   .globl name;                                  \
   ALIGN;                                        \

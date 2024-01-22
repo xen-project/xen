@@ -11,7 +11,7 @@
 #include <public/xen.h>
 #include <irq_vectors.h>
 
-ENTRY(entry_int82)
+FUNC(entry_int82)
         ENDBR64
         ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
         pushq $0
@@ -29,9 +29,10 @@ ENTRY(entry_int82)
 
         mov   %rsp, %rdi
         call  do_entry_int82
+END(entry_int82)
 
 /* %rbx: struct vcpu */
-ENTRY(compat_test_all_events)
+FUNC(compat_test_all_events)
         ASSERT_NOT_IN_ATOMIC
         cli                             # tests must not race interrupts
 /*compat_test_softirqs:*/
@@ -68,24 +69,21 @@ compat_test_guest_events:
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
 
-        ALIGN
 /* %rbx: struct vcpu */
-compat_process_softirqs:
+LABEL_LOCAL(compat_process_softirqs)
         sti
         call  do_softirq
         jmp   compat_test_all_events
 
-        ALIGN
 /* %rbx: struct vcpu, %rdx: struct trap_bounce */
-.Lcompat_process_trapbounce:
+LABEL_LOCAL(.Lcompat_process_trapbounce)
         sti
 .Lcompat_bounce_exception:
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
 
-	ALIGN
 /* %rbx: struct vcpu */
-compat_process_mce:
+LABEL_LOCAL(compat_process_mce)
         testb $1 << VCPU_TRAP_MCE,VCPU_async_exception_mask(%rbx)
         jnz   .Lcompat_test_guest_nmi
         sti
@@ -99,9 +97,8 @@ compat_process_mce:
         movb %dl,VCPU_async_exception_mask(%rbx)
         jmp   compat_process_trap
 
-	ALIGN
 /* %rbx: struct vcpu */
-compat_process_nmi:
+LABEL_LOCAL(compat_process_nmi)
         testb $1 << VCPU_TRAP_NMI,VCPU_async_exception_mask(%rbx)
         jnz   compat_test_guest_events
         sti
@@ -118,9 +115,10 @@ compat_process_trap:
         leaq  VCPU_trap_bounce(%rbx),%rdx
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
+END(compat_test_all_events)
 
 /* %rbx: struct vcpu, interrupts disabled */
-ENTRY(compat_restore_all_guest)
+FUNC(compat_restore_all_guest)
         ASSERT_INTERRUPTS_DISABLED
         mov   $~(X86_EFLAGS_IOPL | X86_EFLAGS_VM), %r11d
         and   UREGS_eflags(%rsp),%r11d
@@ -163,9 +161,10 @@ ENTRY(compat_restore_all_guest)
         RESTORE_ALL adj=8 compat=1
 .Lft0:  iretq
         _ASM_PRE_EXTABLE(.Lft0, handle_exception)
+END(compat_restore_all_guest)
 
 /* This mustn't modify registers other than %rax. */
-ENTRY(cr4_pv32_restore)
+FUNC(cr4_pv32_restore)
         push  %rdx
         GET_CPUINFO_FIELD(cr4, dx)
         mov   (%rdx), %rax
@@ -195,8 +194,9 @@ ENTRY(cr4_pv32_restore)
         pop   %rdx
         xor   %eax, %eax
         ret
+END(cr4_pv32_restore)
 
-ENTRY(compat_syscall)
+FUNC(compat_syscall)
         /* Fix up reported %cs/%ss for compat domains. */
         movl  $FLAT_COMPAT_USER_SS, UREGS_ss(%rsp)
         movl  $FLAT_COMPAT_USER_CS, UREGS_cs(%rsp)
@@ -224,8 +224,9 @@ UNLIKELY_END(compat_syscall_gpf)
         movw  %si,TRAPBOUNCE_cs(%rdx)
         movb  %cl,TRAPBOUNCE_flags(%rdx)
         jmp   .Lcompat_bounce_exception
+END(compat_syscall)
 
-ENTRY(compat_sysenter)
+FUNC(compat_sysenter)
         CR4_PV32_RESTORE
         movq  VCPU_trap_ctxt(%rbx),%rcx
         cmpb  $X86_EXC_GP, UREGS_entry_vector(%rsp)
@@ -238,17 +239,19 @@ ENTRY(compat_sysenter)
         movw  %ax,TRAPBOUNCE_cs(%rdx)
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
+END(compat_sysenter)
 
-ENTRY(compat_int80_direct_trap)
+FUNC(compat_int80_direct_trap)
         CR4_PV32_RESTORE
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
+END(compat_int80_direct_trap)
 
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS (RING-1) STACK:            */
 /*   {[ERRCODE,] EIP, CS, EFLAGS, [ESP, SS]}                             */
 /* %rdx: trap_bounce, %rbx: struct vcpu                                  */
 /* On return only %rbx and %rdx are guaranteed non-clobbered.            */
-compat_create_bounce_frame:
+FUNC_LOCAL(compat_create_bounce_frame)
         ASSERT_INTERRUPTS_ENABLED
         mov   %fs,%edi
         ALTERNATIVE "", stac, X86_FEATURE_XEN_SMAP
@@ -354,3 +357,4 @@ compat_crash_page_fault:
         jmp   .Lft14
 .previous
         _ASM_EXTABLE(.Lft14, .Lfx14)
+END(compat_create_bounce_frame)
