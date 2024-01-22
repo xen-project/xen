@@ -29,15 +29,10 @@ cat <<EOF >$target
 
         .section $section.rodata, "a", %progbits
 
-        .p2align $align
-        .global $varname
-$varname:
+DATA($varname, 1 << $align)
         .incbin "$binsource"
 .Lend:
+END($varname)
 
-        .type $varname, %object
-        .size $varname, .Lend - $varname
-
-        .global ${varname}_size
         ASM_INT(${varname}_size, .Lend - $varname)
 EOF
