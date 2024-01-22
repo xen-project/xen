@@ -1294,6 +1294,10 @@ nestedsvm_check_intercepts(struct vcpu *v, struct cpu_user_regs *regs,
     ASSERT(vcpu_nestedhvm(v).nv_vmexit_pending == 0);
     is_intercepted = nsvm_vmcb_guest_intercepts_exitcode(v, regs, exitcode);
 
+    /* 
+     * Handle specific interactions between things the guest and host
+     * may both want to intercept
+     */
     switch ( exitcode )
     {
     case VMEXIT_INVALID:
@@ -1349,8 +1353,6 @@ nestedsvm_check_intercepts(struct vcpu *v, struct cpu_user_regs *regs,
         /* Always let the guest handle VMMCALL/VMCALL */
         return NESTEDHVM_VMEXIT_INJECT;
     default:
-        gprintk(XENLOG_ERR, "Unexpected nested vmexit: reason %#"PRIx64"\n",
-                exitcode);
         break;
     }
 
