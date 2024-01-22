@@ -21,6 +21,15 @@
 #define count_args(args...) \
     count_args_(., ## args, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 
+#define ARG1_(x, y...) (x)
+#define ARG2_(x, y...) ARG1_(y)
+#define ARG3_(x, y...) ARG2_(y)
+#define ARG4_(x, y...) ARG3_(y)
+
+#define ARG__(nr) ARG ## nr ## _
+#define ARG_(nr)  ARG__(nr)
+#define LASTARG(x, y...) ARG_(count_args(x, ## y))(x, ## y)
+
 /* Indirect macros required for expanded argument pasting. */
 #define PASTE_(a, b) a ## b
 #define PASTE(a, b) PASTE_(a, b)
