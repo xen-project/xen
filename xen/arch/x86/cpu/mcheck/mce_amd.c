@@ -271,6 +271,19 @@ int vmce_amd_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
     return 1;
 }
 
+static const struct mce_callbacks __initconst_cf_clobber k8_callbacks = {
+    .handler = mcheck_cmn_handler,
+    .need_clearbank_scan = amd_need_clearbank_scan,
+};
+
+static const struct mce_callbacks __initconst_cf_clobber k10_callbacks = {
+    .handler = mcheck_cmn_handler,
+    .check_addr = mc_amd_addrcheck,
+    .recoverable_scan = mc_amd_recoverable_scan,
+    .need_clearbank_scan = amd_need_clearbank_scan,
+    .info_collect = amd_f10_handler,
+};
+
 enum mcheck_type
 amd_mcheck_init(const struct cpuinfo_x86 *c, bool bsp)
 {
@@ -283,11 +296,7 @@ amd_mcheck_init(const struct cpuinfo_x86 *c, bool bsp)
     /* Assume that machine check support is available.
      * The minimum provided support is at least the K8. */
     if ( bsp )
-    {
-        mce_handler_init();
-        x86_mce_vector_register(mcheck_cmn_handler);
-        mce_need_clearbank_register(amd_need_clearbank_scan);
-    }
+        mce_handler_init(c->x86 == 0xf ? &k8_callbacks : &k10_callbacks);
 
     for ( i = 0; i < this_cpu(nr_mce_banks); i++ )
     {
@@ -325,13 +334,6 @@ amd_mcheck_init(const struct cpuinfo_x86 *c, bool bsp)
             ppin_msr = 0;
         else if ( c == &boot_cpu_data )
             ppin_msr = MSR_AMD_PPIN;
-    }
-
-    if ( bsp )
-    {
-        x86_mce_callback_register(amd_f10_handler);
-        mce_recoverable_register(mc_amd_recoverable_scan);
-        mce_register_addrcheck(mc_amd_addrcheck);
     }
 
     return c->x86_vendor == X86_VENDOR_HYGON ?

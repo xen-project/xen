@@ -63,19 +63,11 @@ void x86_mc_get_cpu_info(unsigned cpu, uint32_t *chipid, uint16_t *coreid,
                          unsigned *ncores, unsigned *ncores_active,
                          unsigned *nthreads);
 
-/* Register a handler for machine check exceptions. */
-typedef void (*x86_mce_vector_t)(const struct cpu_user_regs *regs);
-extern void x86_mce_vector_register(x86_mce_vector_t hdlr);
-
 /*
  * Common generic MCE handler that implementations may nominate
  * via x86_mce_vector_register.
  */
 void cf_check mcheck_cmn_handler(const struct cpu_user_regs *regs);
-
-/* Register a handler for judging whether mce is recoverable. */
-typedef bool (*mce_recoverable_t)(uint64_t status);
-extern void mce_recoverable_register(mce_recoverable_t cbfunc);
 
 /* Read an MSR, checking for an interposed value first */
 extern struct intpose_ent *intpose_lookup(unsigned int cpu_nr, uint64_t msr,
@@ -137,30 +129,6 @@ extern mctelem_cookie_t mcheck_mca_logout(enum mca_source who,
                                           struct mca_summary *sp,
                                           struct mca_banks *clear_bank);
 
-/*
- * Register callbacks to be made during bank telemetry logout.
- * Those callbacks are only available to those machine check handlers
- * that call to the common mcheck_cmn_handler or who use the common
- * telemetry logout function mcheck_mca_logout in error polling.
- */
-
-/* Register a handler for judging whether the bank need to be cleared */
-typedef bool (*mce_need_clearbank_t)(enum mca_source who, u64 status);
-extern void mce_need_clearbank_register(mce_need_clearbank_t cbfunc);
-
-/*
- * Register a callback to collect additional information (typically non-
- * architectural) provided by newer CPU families/models without the need
- * to duplicate the whole handler resulting in various handlers each with
- * its own tweaks and bugs. The callback receives an struct mc_info pointer
- * which it can use with x86_mcinfo_reserve to add additional telemetry,
- * the current MCA bank number we are reading telemetry from, and the
- * MCi_STATUS value for that bank.
- */
-typedef struct mcinfo_extended *(*x86_mce_callback_t)
-    (struct mc_info *, uint16_t, uint64_t);
-extern void x86_mce_callback_register(x86_mce_callback_t cbfunc);
-
 void *x86_mcinfo_reserve(struct mc_info *mi,
                          unsigned int size, unsigned int type);
 void x86_mcinfo_dump(struct mc_info *mi);
@@ -201,8 +169,44 @@ static inline int mce_bank_msr(const struct vcpu *v, uint32_t msr)
     return 0;
 }
 
-/* MC softirq */
-void mce_handler_init(void);
+struct mce_callbacks {
+    void (*handler)(const struct cpu_user_regs *regs);
+    bool (*check_addr)(uint64_t status, uint64_t misc, int addr_type);
+
+    /* Handler for judging whether mce is recoverable. */
+    bool (*recoverable_scan)(uint64_t status);
+
+    /*
+     * Callbacks to be made during bank telemetry logout.
+     * They are only available to those machine check handlers
+     * that call to the common mcheck_cmn_handler or who use the common
+     * telemetry logout function mcheck_mca_logout in error polling.
+     */
+
+    /*
+     * Judging whether to Clear Machine Check error bank callback handler.
+     * According to Intel latest MCA OS Recovery Writer's Guide, whether
+     * the error MCA bank needs to be cleared is decided by the mca_source
+     * and MCi_status bit value.
+     */
+    bool (*need_clearbank_scan)(enum mca_source who, u64 status);
+
+    /*
+     * Callback to collect additional information (typically non-
+     * architectural) provided by newer CPU families/models without the need
+     * to duplicate the whole handler resulting in various handlers each with
+     * its own tweaks and bugs. The callback receives an struct mc_info pointer
+     * which it can use with x86_mcinfo_reserve to add additional telemetry,
+     * the current MCA bank number we are reading telemetry from, and the
+     * MCi_STATUS value for that bank.
+     */
+    struct mcinfo_extended *(*info_collect)
+        (struct mc_info *mi, uint16_t bank, uint64_t status);
+};
+
+extern struct mce_callbacks mce_callbacks;
+
+void mce_handler_init(const struct mce_callbacks *cb);
 
 extern const struct mca_error_handler *mce_dhandlers;
 extern const struct mca_error_handler *mce_uhandlers;
