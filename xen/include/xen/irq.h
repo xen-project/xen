@@ -131,6 +131,27 @@ void cf_check irq_actor_none(struct irq_desc *desc);
 #define irq_disable_none irq_actor_none
 #define irq_enable_none irq_actor_none
 
+/*
+ * Per-cpu interrupted context register state - the inner-most interrupt frame
+ * on the stack.
+ */
+DECLARE_PER_CPU(struct cpu_user_regs *, irq_regs);
+
+static inline struct cpu_user_regs *get_irq_regs(void)
+{
+	return this_cpu(irq_regs);
+}
+
+static inline struct cpu_user_regs *set_irq_regs(struct cpu_user_regs *new_regs)
+{
+	struct cpu_user_regs *old_regs, **pp_regs = &this_cpu(irq_regs);
+
+	old_regs = *pp_regs;
+	*pp_regs = new_regs;
+
+	return old_regs;
+}
+
 struct domain;
 struct vcpu;
 
