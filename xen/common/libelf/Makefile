@@ -13,4 +13,4 @@ $(obj)/libelf.o: $(obj)/libelf-temp.o FORCE
 $(obj)/libelf-temp.o: $(addprefix $(obj)/,$(libelf-objs)) FORCE
 	$(call if_changed,ld)
 
-extra-y += libelf-temp.o $(libelf-objs)
+targets += libelf-temp.o $(libelf-objs)
