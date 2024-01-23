@@ -6,7 +6,7 @@
     .section .text.exceptions, "ax", %progbits
 
     /* Helper to dump CPU state to struct cpu_user_regs pointed to by r1. */
-ENTRY(exception_common)
+FUNC(exception_common)
     /*
      * Save GPRs 1-31. TODO: The value of %r1 has already been modified by the
      * ISR, so the value we save isn't the exact value we had on entry.
@@ -45,11 +45,10 @@ ENTRY(exception_common)
     stdu    %r0, -STACK_FRAME_OVERHEAD(%r1)
     bl      exception_handler
 
-    .size exception_common, . - exception_common
-    .type exception_common, %function
+    END(exception_common)
 
     /* Same as exception_common, but for exceptions that set HSRR{0,1} */
-ENTRY(h_exception_common)
+FUNC(h_exception_common)
     /*
      * Save GPRs 1-31. TODO: The value of %r1 has already been modified by the
      * ISR, so the value we save isn't the exact value we had on entry.
@@ -89,15 +88,14 @@ ENTRY(h_exception_common)
     stdu    %r0, -STACK_FRAME_OVERHEAD(%r1)
     bl      exception_handler
 
-    .size h_exception_common, . - h_exception_common
-    .type h_exception_common, %function
+    END(h_exception_common)
 
 /*
  * Declare an ISR for the provided exception that jumps to the specified handler
  */
 .macro ISR name, exc, handler
     . = (AIL_VECTOR_BASE - EXCEPTION_VECTORS_START) + \exc
-    ENTRY(\name)
+    FUNC(\name)
     /* TODO: switch stack */
 
     /* Reserve space for struct cpu_user_regs */
@@ -113,8 +111,7 @@ ENTRY(h_exception_common)
     /* Branch to common code */
     b       \handler
 
-    .size \name, . - \name
-    .type \name, %function
+    END(\name)
 .endm
 
 /*

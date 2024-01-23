@@ -32,12 +32,7 @@
 
 /* Linkage for PPC */
 #ifdef __ASSEMBLY__
-#define ALIGN .p2align 2
-
-#define ENTRY(name)                                                            \
-    .globl name;                                                               \
-    ALIGN;                                                                     \
-    name:
+#define CODE_ALIGN 4
 #endif
 
 #define XEN_VIRT_START _AC(0xc000000000000000, UL)

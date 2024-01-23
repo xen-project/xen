@@ -3,6 +3,7 @@
 #define _ASM_PPC_ASM_DEFNS_H
 
 #include <asm/asm-offsets.h>
+#include <xen/linkage.h>
 
 /*
  * Load a 64-bit immediate value into the specified GPR.

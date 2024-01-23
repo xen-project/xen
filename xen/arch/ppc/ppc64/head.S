@@ -6,7 +6,7 @@
 
     .section .text.header, "ax", %progbits
 
-ENTRY(start)
+FUNC(start)
     /*
      * NOTE: argument registers (r3-r9) must be preserved until the C entrypoint
      */
@@ -64,11 +64,9 @@ ENTRY(start)
 
     /* should never return */
     trap
+END(start)
 
-    .size start, . - start
-    .type start, %function
-
-ENTRY(enable_mmu)
+FUNC(enable_mmu)
     mflr %r3
     mfmsr %r4
 
@@ -78,6 +76,4 @@ ENTRY(enable_mmu)
     mtsrr0 %r3 /* return to caller after MMU enable */
     mtsrr1 %r4
     rfid
-
-    .size enable_mmu, . - enable_mmu
-    .type enable_mmu, %function
+END(enable_mmu)
