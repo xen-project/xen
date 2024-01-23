@@ -353,6 +353,13 @@ void calculate_raw_cpu_policy(void)
     /* Nothing good will come from Xen and libx86 disagreeing on vendor. */
     ASSERT(p->x86_vendor == boot_cpu_data.x86_vendor);
 
+    /*
+     * Clear the truly dynamic fields.  These vary with the in-context XCR0
+     * and MSR_XSS, and aren't interesting fields in the raw policy.
+     */
+    p->xstate.raw[0].b = 0;
+    p->xstate.raw[1].b = 0;
+
     /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
     /* Was already added by probe_cpuid_faulting() */
 }
