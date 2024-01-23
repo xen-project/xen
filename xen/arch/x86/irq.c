@@ -53,8 +53,6 @@ static DEFINE_SPINLOCK(vector_lock);
 
 DEFINE_PER_CPU(vector_irq_t, vector_irq);
 
-DEFINE_PER_CPU(struct cpu_user_regs *, __irq_regs);
-
 static LIST_HEAD(irq_ratelimit_list);
 static DEFINE_SPINLOCK(irq_ratelimit_lock);
 static struct timer irq_ratelimit_timer;
