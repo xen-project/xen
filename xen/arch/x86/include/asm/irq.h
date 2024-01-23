@@ -70,27 +70,6 @@ extern bool opt_noirqbalance;
 
 extern int opt_irq_vector_map;
 
-/*
- * Per-cpu current frame pointer - the location of the last exception frame on
- * the stack
- */
-DECLARE_PER_CPU(struct cpu_user_regs *, __irq_regs);
-
-static inline struct cpu_user_regs *get_irq_regs(void)
-{
-	return this_cpu(__irq_regs);
-}
-
-static inline struct cpu_user_regs *set_irq_regs(struct cpu_user_regs *new_regs)
-{
-	struct cpu_user_regs *old_regs, **pp_regs = &this_cpu(__irq_regs);
-
-	old_regs = *pp_regs;
-	*pp_regs = new_regs;
-	return old_regs;
-}
-
-
 #define platform_legacy_irq(irq)	((irq) < 16)
 
 void cf_check event_check_interrupt(struct cpu_user_regs *regs);

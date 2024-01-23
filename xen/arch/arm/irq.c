@@ -229,6 +229,7 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
 {
     struct irq_desc *desc = irq_to_desc(irq);
     struct irqaction *action;
+    struct cpu_user_regs *old_regs = set_irq_regs(regs);
 
     perfc_incr(irqs);
 
@@ -296,6 +297,7 @@ out:
 out_no_end:
     spin_unlock(&desc->lock);
     irq_exit();
+    set_irq_regs(old_regs);
 }
 
 void release_irq(unsigned int irq, const void *dev_id)
