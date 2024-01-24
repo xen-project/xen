@@ -321,7 +321,7 @@ void tboot_shutdown(uint32_t shutdown_type)
 
         /*
          * Xen regions for tboot to MAC. This needs to remain in sync with
-         * xen_in_range().
+         * remove_xen_ranges().
          */
         g_tboot_shared->num_mac_regions = 3;
         /* S3 resume code (and other real mode trampoline code) */

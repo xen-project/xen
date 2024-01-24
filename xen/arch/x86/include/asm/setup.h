@@ -36,7 +36,6 @@ unsigned long initial_images_nrpages(nodeid_t node);
 void discard_initial_images(void);
 void *bootstrap_map(const module_t *mod);
 
-int xen_in_range(unsigned long mfn);
 int remove_xen_ranges(struct rangeset *r);
 
 extern uint8_t kbd_shift_flags;

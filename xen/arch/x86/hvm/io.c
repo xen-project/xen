@@ -364,11 +364,6 @@ static const struct hvm_mmcfg *vpci_mmcfg_find(const struct domain *d,
     return NULL;
 }
 
-bool vpci_is_mmcfg_address(const struct domain *d, paddr_t addr)
-{
-    return vpci_mmcfg_find(d, addr);
-}
-
 int __hwdom_init vpci_subtract_mmcfg(const struct domain *d, struct rangeset *r)
 {
     const struct hvm_mmcfg *mmcfg;
