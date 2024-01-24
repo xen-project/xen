@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
    use "1" as the number of array elements.
  - On x86:
    - HVM PIRQs are disabled by default.
+   - Reduce IOMMU setup time for hardware domain.
 
 ### Added
  - On x86:
