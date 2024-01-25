@@ -289,9 +289,9 @@ GLOBAL(init_secondary)
 
 #ifdef CONFIG_EARLY_PRINTK
         ldr   x23, =CONFIG_EARLY_UART_BASE_ADDRESS /* x23 := UART base address */
-        PRINT("- CPU ")
+        PRINT_ID("- CPU ")
         print_reg x24
-        PRINT(" booting -\r\n")
+        PRINT_ID(" booting -\r\n")
 #endif
         bl    check_cpu_mode
         bl    cpu_init
@@ -314,10 +314,10 @@ ENDPROC(init_secondary)
  * Clobbers x0 - x5
  */
 check_cpu_mode:
-        PRINT("- Current EL ")
+        PRINT_ID("- Current EL ")
         mrs   x5, CurrentEL
         print_reg x5
-        PRINT(" -\r\n")
+        PRINT_ID(" -\r\n")
 
         /* Are we in EL2 */
         cmp   x5, #PSR_MODE_EL2t
@@ -326,8 +326,8 @@ check_cpu_mode:
         ret
 1:
         /* OK, we're boned. */
-        PRINT("- Xen must be entered in NS EL2 mode -\r\n")
-        PRINT("- Please update the bootloader -\r\n")
+        PRINT_ID("- Xen must be entered in NS EL2 mode -\r\n")
+        PRINT_ID("- Please update the bootloader -\r\n")
         b fail
 ENDPROC(check_cpu_mode)
 
@@ -361,7 +361,7 @@ ENDPROC(zero_bss)
  * Clobbers x0 - x3
  */
 cpu_init:
-        PRINT("- Initialize CPU -\r\n")
+        PRINT_ID("- Initialize CPU -\r\n")
 
         /* Set up memory attribute type tables */
         ldr   x0, =MAIRVAL
@@ -424,7 +424,7 @@ launch:
 ENDPROC(launch)
 
 /* Fail-stop */
-fail:   PRINT("- Boot failed -\r\n")
+fail:   PRINT_ID("- Boot failed -\r\n")
 1:      wfe
         b     1b
 ENDPROC(fail)

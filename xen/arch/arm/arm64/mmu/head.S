@@ -276,7 +276,7 @@ ENDPROC(create_page_tables)
 enable_mmu:
         mov   x4, x0
         mov   x5, x1
-        PRINT("- Turning on paging -\r\n")
+        PRINT_ID("- Turning on paging -\r\n")
 
         /*
          * The state of the TLBs is unknown before turning on the MMU.

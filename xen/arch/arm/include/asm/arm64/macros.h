@@ -39,9 +39,12 @@
  * There are multiple flavors:
  *  - PRINT_SECT(section, string): The @string will be located in @section
  *  - PRINT(): The string will be located in .rodata.str.
- *  - PRINT_ID(): When Xen is running on the Identity Mapping, it is
- *    only possible to have a limited amount of Xen. This will create
- *    the string in .rodata.idmap which will always be mapped.
+ *  - PRINT_ID(): This will create the string in .rodata.idmap which
+ *    will always be accessible. This is used when:
+ *      - Xen is running on the identity mapping because not all of Xen is mapped
+ *      - Running with the MMU-off on secondary CPUs as Xen may not be
+ *        physically contiguous in memory (e.g. in the case of cache
+ *        coloring).
  *
  * Clobbers x0 - x3
  */
