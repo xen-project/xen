@@ -36,6 +36,7 @@ SECTIONS
        *(.text.header)
        *(.text.idmap)
        *(.rodata.idmap)
+       *(.data.idmap)
        _idmap_end = .;
 
        *(.text.cold)

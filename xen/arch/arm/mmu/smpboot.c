@@ -9,6 +9,10 @@
 
 #include <asm/setup.h>
 
+/* Override macros from asm/page.h to make them work with mfn_t */
+#undef virt_to_mfn
+#define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
+
 /*
  * Static start-of-day pagetables that we use before the allocators
  * are up. These are used by all CPUs during bringup before switching
@@ -44,7 +48,7 @@ DEFINE_BOOT_PAGE_TABLE(boot_second);
 DEFINE_BOOT_PAGE_TABLES(boot_third, XEN_NR_ENTRIES(2));
 
 /* Non-boot CPUs use this to find the correct pagetables. */
-uint64_t init_ttbr;
+uint64_t __section(".data.idmap") init_ttbr;
 
 /* Clear a translation table and clean & invalidate the cache */
 static void clear_table(void *table)
@@ -68,6 +72,27 @@ static void clear_boot_pagetables(void)
     clear_table(boot_third);
 }
 
+static void set_init_ttbr(lpae_t *root)
+{
+    /*
+     * init_ttbr is part of the identity mapping which is read-only. So
+     * we need to re-map the region so it can be updated.
+     */
+    void *ptr = map_domain_page(virt_to_mfn(&init_ttbr));
+
+    ptr += PAGE_OFFSET(&init_ttbr);
+
+    *(uint64_t *)ptr = virt_to_maddr(root);
+
+    /*
+     * init_ttbr will be accessed with the MMU off, so ensure the update
+     * is visible by cleaning the cache.
+     */
+    clean_dcache(ptr);
+
+    unmap_domain_page(ptr);
+}
+
 #ifdef CONFIG_ARM_64
 int prepare_secondary_mm(int cpu)
 {
@@ -77,8 +102,8 @@ int prepare_secondary_mm(int cpu)
      * Set init_ttbr for this CPU coming up. All CPUs share a single setof
      * pagetables, but rewrite it each time for consistency with 32 bit.
      */
-    init_ttbr = virt_to_maddr(xen_pgtable);
-    clean_dcache(init_ttbr);
+    set_init_ttbr(xen_pgtable);
+
     return 0;
 }
 #else
@@ -109,8 +134,7 @@ int prepare_secondary_mm(int cpu)
     clear_boot_pagetables();
 
     /* Set init_ttbr for this CPU coming up */
-    init_ttbr = __pa(first);
-    clean_dcache(init_ttbr);
+    set_init_ttbr(first);
 
     return 0;
 }
