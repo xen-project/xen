@@ -167,13 +167,14 @@ static void __init cf_check wait_for_nmis(void *p)
 void __init check_nmi_watchdog(void)
 {
     static unsigned int __initdata prev_nmi_count[NR_CPUS];
-    int cpu;
+    unsigned int cpu;
+    char sep = '{';
     bool ok = true;
 
     if ( nmi_watchdog == NMI_NONE )
         return;
 
-    printk("Testing NMI watchdog on all CPUs:");
+    printk("Testing NMI watchdog on all CPUs: ");
 
     for_each_online_cpu ( cpu )
         prev_nmi_count[cpu] = per_cpu(nmi_count, cpu);
@@ -189,12 +190,13 @@ void __init check_nmi_watchdog(void)
     {
         if ( per_cpu(nmi_count, cpu) - prev_nmi_count[cpu] < 2 )
         {
-            printk(" %d", cpu);
+            printk("%c%u", sep, cpu);
+            sep = ',';
             ok = false;
         }
     }
 
-    printk(" %s\n", ok ? "ok" : "stuck");
+    printk("%s\n", ok ? "ok" : "} stuck");
 
     /*
      * Now that we know it works we can reduce NMI frequency to
