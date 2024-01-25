@@ -749,7 +749,7 @@ FUNC(handle_exception, 0)
 .Lxcpt_cr3_okay:
 
 handle_exception_saved:
-        GET_CURRENT(bx)
+        mov   STACK_CPUINFO_FIELD(current_vcpu)(%r14), %rbx
         testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%rsp)
         jz    exception_with_ints_disabled
 
@@ -1130,9 +1130,8 @@ FUNC(handle_ist_exception)
 #ifdef CONFIG_PV
         testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen
-        GET_CURRENT(bx)
         /* Send an IPI to ourselves to cover for the lack of event checking. */
-        movl  VCPU_processor(%rbx),%eax
+        mov   STACK_CPUINFO_FIELD(processor_id)(%r14), %eax
         shll  $IRQSTAT_shift,%eax
         leaq  irq_stat+IRQSTAT_softirq_pending(%rip),%rcx
         cmpl  $0,(%rcx,%rax,1)
@@ -1141,6 +1140,7 @@ FUNC(handle_ist_exception)
         call  send_IPI_self
 1:
 #ifdef CONFIG_PV32
+        mov   STACK_CPUINFO_FIELD(current_vcpu)(%r14), %rbx
         movq  VCPU_domain(%rbx),%rax
         cmpb  $0,DOMAIN_is_32bit_pv(%rax)
         je    restore_all_guest
