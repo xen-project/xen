@@ -66,6 +66,8 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
             return -ENODEV;
         if ( !cpufreq_driver.init )
             return -ENODEV;
+        if ( hwp_active() )
+            return -EOPNOTSUPP;
         if ( !pmpt || !(pmpt->perf.init & XEN_PX_INIT) )
             return -EINVAL;
         break;
@@ -329,6 +331,9 @@ static int set_cpufreq_para(struct xen_sysctl_pm_op *op)
 
     if ( !policy || !policy->governor )
         return -EINVAL;
+
+    if ( hwp_active() )
+        return -EOPNOTSUPP;
 
     switch(op->u.set_para.ctrl_type)
     {
