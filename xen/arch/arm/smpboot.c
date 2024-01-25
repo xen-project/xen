@@ -29,6 +29,10 @@
 #include <asm/psci.h>
 #include <asm/acpi.h>
 
+/* Override macros from asm/page.h to make them work with mfn_t */
+#undef virt_to_mfn
+#define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
+
 cpumask_t cpu_online_map;
 cpumask_t cpu_present_map;
 cpumask_t cpu_possible_map;
@@ -56,7 +60,7 @@ struct init_info init_data =
 };
 
 /* Shared state for coordinating CPU bringup */
-unsigned long smp_up_cpu = MPIDR_INVALID;
+unsigned long __section(".data.idmap") smp_up_cpu = MPIDR_INVALID;
 /* Shared state for coordinating CPU teardown */
 static bool cpu_is_dead;
 
@@ -429,6 +433,28 @@ void stop_cpu(void)
         wfi();
 }
 
+static void set_smp_up_cpu(unsigned long mpidr)
+{
+    /*
+     * smp_up_cpu is part of the identity mapping which is read-only. So
+     * We need to re-map the region so it can be updated.
+     */
+    void *ptr = map_domain_page(virt_to_mfn(&smp_up_cpu));
+
+    ptr += PAGE_OFFSET(&smp_up_cpu);
+
+    *(unsigned long *)ptr = mpidr;
+
+    /*
+     * smp_up_cpu will be accessed with the MMU off, so ensure the update
+     * is visible by cleaning the cache.
+     */
+    clean_dcache(ptr);
+
+    unmap_domain_page(ptr);
+
+}
+
 int __init cpu_up_send_sgi(int cpu)
 {
     /* We don't know the GIC ID of the CPU until it has woken up, so just
@@ -460,8 +486,7 @@ int __cpu_up(unsigned int cpu)
     init_data.cpuid = cpu;
 
     /* Open the gate for this CPU */
-    smp_up_cpu = cpu_logical_map(cpu);
-    clean_dcache(smp_up_cpu);
+    set_smp_up_cpu(cpu_logical_map(cpu));
 
     rc = arch_cpu_up(cpu);
 
@@ -497,8 +522,9 @@ int __cpu_up(unsigned int cpu)
      */
     init_data.stack = NULL;
     init_data.cpuid = ~0;
-    smp_up_cpu = MPIDR_INVALID;
-    clean_dcache(smp_up_cpu);
+
+    set_smp_up_cpu(MPIDR_INVALID);
+
     arch_cpu_up_finish();
 
     if ( !cpu_online(cpu) )
