@@ -552,7 +552,7 @@ static void check_entry(mfn_t mfn, p2m_type_t new, p2m_type_t old,
     if ( new == p2m_mmio_direct )
         ASSERT(!mfn_eq(mfn, INVALID_MFN) &&
                !rangeset_overlaps_range(mmio_ro_ranges, mfn_x(mfn),
-                                        mfn_x(mfn) + (1UL << order)));
+                                        mfn_x(mfn) + (1UL << order) - 1));
     else if ( p2m_allows_invalid_mfn(new) || new == p2m_invalid ||
               new == p2m_mmio_dm )
         ASSERT(mfn_valid(mfn) || mfn_eq(mfn, INVALID_MFN));
