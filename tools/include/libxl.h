@@ -609,6 +609,13 @@
  */
 
 /*
+ * LIBXL_HAVE_HVM_PIRQ indicates the presence of the u.hvm.pirq filed in
+ * libxl_domain_build_info that signals whether an HVM guest has accesses to
+ * the XENFEAT_hvm_pirqs feature.
+ */
+#define LIBXL_HAVE_HVM_PIRQ 1
+
+/*
  * libxl memory management
  *
  * From the point of view of the application (ie, libxl's caller),

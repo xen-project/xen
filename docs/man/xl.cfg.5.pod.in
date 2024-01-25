@@ -2460,6 +2460,13 @@ The viridian option can be specified as a boolean. A value of true (1)
 is equivalent to the list [ "defaults" ], and a value of false (0) is
 equivalent to an empty list.
 
+=item B<hvm_pirq=BOOLEAN>
+
+Select whether the guest is allowed to route interrupts from devices (either
+emulated or passed through) over event channels.
+
+This option is disabled by default.
+
 =back
 
 =head3 Emulated VGA Graphics Device

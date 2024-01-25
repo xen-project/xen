@@ -9,6 +9,8 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
     switch(d_config->c_info.type) {
     case LIBXL_DOMAIN_TYPE_HVM:
         config->arch.emulation_flags = (XEN_X86_EMU_ALL & ~XEN_X86_EMU_VPCI);
+        if (!libxl_defbool_val(d_config->b_info.u.hvm.pirq))
+            config->arch.emulation_flags &= ~XEN_X86_EMU_USE_PIRQ;
         break;
     case LIBXL_DOMAIN_TYPE_PVH:
         config->arch.emulation_flags = XEN_X86_EMU_LAPIC;
@@ -864,15 +866,19 @@ void libxl__arch_update_domain_config(libxl__gc *gc,
                                       const libxl_domain_config *src)
 {
     /*
-     * Force MSR relaxed to be set (either to true or false) so it's part of
-     * the domain configuration when saving or performing a live-migration.
+     * Force MSR relaxed and HVM pirq to be set (either to true or false) so
+     * it's part of the domain configuration when saving or performing a
+     * live-migration.
      *
-     * Doing so allows the recovery side to figure out whether the flag should
+     * Doing so allows the recovery side to figure out whether the flags should
      * be set to true in order to keep backwards compatibility with already
      * started domains.
      */
     libxl_defbool_setdefault(&dst->b_info.arch_x86.msr_relaxed,
                     libxl_defbool_val(src->b_info.arch_x86.msr_relaxed));
+    if (src->c_info.type == LIBXL_DOMAIN_TYPE_HVM )
+        libxl_defbool_setdefault(&dst->b_info.u.hvm.pirq,
+                                 libxl_defbool_val(src->b_info.u.hvm.pirq));
 }
 
 /*
