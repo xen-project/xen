@@ -15,7 +15,6 @@
 #include <xen/init.h>
 #include <xen/event.h>
 #include <xen/console.h>
-#include <xen/debugger.h>
 #include <xen/param.h>
 #include <xen/serial.h>
 #include <xen/softirq.h>
@@ -1296,8 +1295,6 @@ void panic(const char *fmt, ...)
 #endif
 
     spin_unlock_irqrestore(&lock, flags);
-
-    debugger_trap_immediate();
 
     kexec_crash(CRASHREASON_PANIC);
 

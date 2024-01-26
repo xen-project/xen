@@ -1,23 +1,4 @@
 #include <xen/bug.h>
-/*
- * Ideally <xen/debugger.h> should be included in <asm/bug.h>
- * but an issue with compilation can occur as <xen/debugger.h> uses
- * BUG/ASSERT/etc macros inside but they will be defined later in
- * <xen/bug.h> after return from inclusion of <asm/bug.h>:
- * 
- * <xen/bug.h>:
- *  ...
- *   <asm/bug.h>:
- *     ...
- *     <xen/debugger.h> -> some of included header in it uses BUG/ASSERT/etc
- *     ...
- *  ...
- *  #define BUG() ...
- *  ...
- *  #define ASSERT() ...
- *  ...
- */
-#include <xen/debugger.h>
 #include <xen/errno.h>
 #include <xen/kernel.h>
 #include <xen/livepatch.h>
@@ -96,10 +77,6 @@ int do_bug_frame(struct cpu_user_regs *regs, unsigned long pc)
 
     case BUGFRAME_bug:
         printk("Xen BUG at %s%s:%d\n", prefix, filename, lineno);
-
-        if ( BUG_DEBUGGER_TRAP_FATAL(regs) )
-            break;
-
         show_execution_state(regs);
         panic("Xen BUG at %s%s:%d\n", prefix, filename, lineno);
 
@@ -111,10 +88,6 @@ int do_bug_frame(struct cpu_user_regs *regs, unsigned long pc)
 
         printk("Assertion '%s' failed at %s%s:%d\n",
                predicate, prefix, filename, lineno);
-
-        if ( BUG_DEBUGGER_TRAP_FATAL(regs) )
-            break;
-
         show_execution_state(regs);
         panic("Assertion '%s' failed at %s%s:%d\n",
               predicate, prefix, filename, lineno);

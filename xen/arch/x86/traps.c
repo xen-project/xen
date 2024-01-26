@@ -25,7 +25,6 @@
 #include <xen/shutdown.h>
 #include <xen/guest_access.h>
 #include <asm/regs.h>
-#include <xen/debugger.h>
 #include <xen/delay.h>
 #include <xen/event.h>
 #include <xen/spinlock.h>
@@ -835,11 +834,6 @@ void fatal_trap(const struct cpu_user_regs *regs, bool show_remote)
 
 void asmlinkage do_unhandled_trap(struct cpu_user_regs *regs)
 {
-    unsigned int trapnr = regs->entry_vector;
-
-    if ( debugger_trap_fatal(trapnr, regs) )
-        return;
-
     fatal_trap(regs, false);
 }
 
@@ -941,9 +935,6 @@ void asmlinkage do_trap(struct cpu_user_regs *regs)
         return;
 
  hardware_trap:
-    if ( debugger_trap_fatal(trapnr, regs) )
-        return;
-
     fatal_trap(regs, false);
 }
 
@@ -1190,9 +1181,6 @@ void asmlinkage do_invalid_op(struct cpu_user_regs *regs)
     if ( likely(extable_fixup(regs, true)) )
         return;
 
-    if ( debugger_trap_fatal(X86_EXC_UD, regs) )
-        return;
-
     show_execution_state(regs);
     panic("FATAL TRAP: vector = %d (invalid opcode)\n", X86_EXC_UD);
 }
@@ -1206,9 +1194,8 @@ void asmlinkage do_int3(struct cpu_user_regs *regs)
         if ( likely(extable_fixup(regs, true)) )
             return;
 
-        if ( !debugger_trap_fatal(X86_EXC_BP, regs) )
-            printk(XENLOG_DEBUG "Hit embedded breakpoint at %p [%ps]\n",
-                   _p(regs->rip), _p(regs->rip));
+        printk(XENLOG_DEBUG "Hit embedded breakpoint at %p [%ps]\n",
+               _p(regs->rip), _p(regs->rip));
 
         return;
     }
@@ -1294,9 +1281,6 @@ void do_general_protection(struct cpu_user_regs *regs)
         return;
 
  hardware_gp:
-    if ( debugger_trap_fatal(X86_EXC_GP, regs) )
-        return;
-
     show_execution_state(regs);
     panic("GENERAL PROTECTION FAULT\n[error_code=%04x]\n", regs->error_code);
 }
@@ -1620,9 +1604,6 @@ void asmlinkage do_page_fault(struct cpu_user_regs *regs)
         }
 
     fatal:
-        if ( debugger_trap_fatal(X86_EXC_PF, regs) )
-            return;
-
         show_execution_state(regs);
         show_page_walk(addr);
         panic("FATAL PAGE FAULT\n"
@@ -1933,11 +1914,8 @@ void asmlinkage do_debug(struct cpu_user_regs *regs)
                 return;
             }
 #endif
-            if ( !debugger_trap_fatal(X86_EXC_DB, regs) )
-            {
-                WARN();
-                regs->eflags &= ~X86_EFLAGS_TF;
-            }
+            WARN();
+            regs->eflags &= ~X86_EFLAGS_TF;
         }
 
         /*

@@ -2,7 +2,6 @@
 #include <xen/lib.h>
 #include <xen/param.h>
 #include <xen/sched.h>
-#include <xen/debugger.h>
 #include <xen/domain.h>
 #include <xen/delay.h>
 #include <xen/watchdog.h>
@@ -40,7 +39,6 @@ void hwdom_shutdown(u8 reason)
         machine_halt();
 
     case SHUTDOWN_crash:
-        debugger_trap_immediate();
         printk("Hardware Dom%u crashed: ", hardware_domain->domain_id);
         kexec_crash(CRASHREASON_HWDOM);
         reboot_or_halt();

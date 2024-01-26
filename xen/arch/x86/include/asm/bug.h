@@ -21,8 +21,6 @@
 
 #ifndef __ASSEMBLY__
 
-#define BUG_DEBUGGER_TRAP_FATAL(regs) debugger_trap_fatal(X86_EXC_GP,regs)
-
 #define BUG_INSTR       "ud2"
 #define BUG_ASM_CONST   "c"
 

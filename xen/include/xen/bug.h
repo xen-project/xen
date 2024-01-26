@@ -16,10 +16,6 @@
 
 #ifndef __ASSEMBLY__
 
-#ifndef BUG_DEBUGGER_TRAP_FATAL
-#define BUG_DEBUGGER_TRAP_FATAL(regs) 0
-#endif
-
 #include <xen/macros.h>
 #include <xen/types.h>
 
