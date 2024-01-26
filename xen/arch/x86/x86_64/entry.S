@@ -1139,8 +1139,9 @@ FUNC(handle_ist_exception)
         movl  $EVENT_CHECK_VECTOR,%edi
         call  send_IPI_self
 1:
-#ifdef CONFIG_PV32
+        /* For restore_all_guest. */
         mov   STACK_CPUINFO_FIELD(current_vcpu)(%r14), %rbx
+#ifdef CONFIG_PV32
         movq  VCPU_domain(%rbx),%rax
         cmpb  $0,DOMAIN_is_32bit_pv(%rax)
         je    restore_all_guest
