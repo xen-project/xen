@@ -13,13 +13,6 @@ config DEBUG
 
 if DEBUG || EXPERT
 
-config CRASH_DEBUG
-	bool "Crash Debugging Support"
-	depends on X86
-	---help---
-	  If you want to attach gdb to Xen to debug Xen if it crashes
-	  then say Y.
-
 config GDBSX
 	bool "Guest debugging with gdbsx"
 	depends on X86

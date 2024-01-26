@@ -35,7 +35,6 @@ obj-y += e820.o
 obj-y += emul-i8254.o
 obj-y += extable.o
 obj-y += flushtlb.o
-obj-$(CONFIG_CRASH_DEBUG) += gdbstub.o
 obj-$(CONFIG_GDBSX) += gdbsx.o
 obj-y += hypercall.o
 obj-y += i387.o

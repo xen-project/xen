@@ -1242,13 +1242,6 @@ requirement can be relaxed.  This option is particularly useful for nested
 virtualization, to allow the L1 hypervisor to use EPT even if the L0 hypervisor
 does not provide `VM_ENTRY_LOAD_GUEST_PAT`.
 
-### gdb
-> `= com1[H,L] | com2[H,L] | dbgp`
-
-> Default: ``
-
-Specify which console gdbstub should use. See **console**.
-
 ### gnttab
 > `= List of [ max-ver:<integer>, transitive=<bool>, transfer=<bool> ]`
 
