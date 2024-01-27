@@ -15,7 +15,7 @@ FUNC(entry_int82)
         ENDBR64
         ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
         pushq $0
-        movb  $HYPERCALL_VECTOR, 4(%rsp)
+        movb  $HYPERCALL_VECTOR, EFRAME_entry_vector(%rsp)
         SAVE_ALL compat=1 /* DPL1 gate, restricted to 32bit PV guests only. */
 
         SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */

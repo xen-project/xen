@@ -51,6 +51,23 @@ void __dummy__(void)
     OFFSET(UREGS_kernel_sizeof, struct cpu_user_regs, es);
     BLANK();
 
+    /*
+     * EFRAME_* is for the entry/exit logic where %rsp is pointing at
+     * UREGS_error_code and GPRs are still/already guest values.
+     */
+#define OFFSET_EF(sym, mem)                                             \
+    DEFINE(sym, offsetof(struct cpu_user_regs, mem) -                   \
+                offsetof(struct cpu_user_regs, error_code))
+
+    OFFSET_EF(EFRAME_entry_vector,    entry_vector);
+    OFFSET_EF(EFRAME_rip,             rip);
+    OFFSET_EF(EFRAME_cs,              cs);
+    OFFSET_EF(EFRAME_eflags,          eflags);
+    OFFSET_EF(EFRAME_rsp,             rsp);
+    BLANK();
+
+#undef OFFSET_EF
+
     OFFSET(VCPU_processor, struct vcpu, processor);
     OFFSET(VCPU_domain, struct vcpu, domain);
     OFFSET(VCPU_vcpu_info, struct vcpu, vcpu_info_area.map);
