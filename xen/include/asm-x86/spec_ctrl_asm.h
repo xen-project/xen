@@ -171,16 +171,23 @@
  */
 #define STK_REL(field, top_of_stk) ((field) - (top_of_stk))
 
-.macro DO_SPEC_CTRL_COND_VERW
+.macro SPEC_CTRL_COND_VERW \
+    scf=STK_REL(CPUINFO_spec_ctrl_flags, CPUINFO_error_code), \
+    sel=STK_REL(CPUINFO_verw_sel,        CPUINFO_error_code)
 /*
- * Requires %rsp=cpuinfo
+ * Requires \scf and \sel as %rsp-relative expressions
+ * Clobbers eflags
+ *
+ * VERW needs to run after guest GPRs have been restored, where only %rsp is
+ * good to use.  Default to expecting %rsp pointing at CPUINFO_error_code.
+ * Contexts where this is not true must provide an alternative \scf and \sel.
  *
  * Issue a VERW for its flushing side effect, if indicated.  This is a Spectre
  * v1 gadget, but the IRET/VMEntry is serialising.
  */
-    testb $SCF_verw, CPUINFO_spec_ctrl_flags(%rsp)
+    testb $SCF_verw, \scf(%rsp)
     jz .L\@_verw_skip
-    verw CPUINFO_verw_sel(%rsp)
+    verw \sel(%rsp)
 .L\@_verw_skip:
 .endm
 
@@ -298,8 +305,6 @@
  */
     ALTERNATIVE "", DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR_PV
 
-    DO_SPEC_CTRL_COND_VERW
-
     ALTERNATIVE "", DO_SPEC_CTRL_DIV, X86_FEATURE_SC_DIV
 .endm
 
@@ -379,7 +384,7 @@ UNLIKELY_DISPATCH_LABEL(\@_serialise):
  */
 .macro SPEC_CTRL_EXIT_TO_XEN
 /*
- * Requires %r12=ist_exit, %r14=stack_end
+ * Requires %r12=ist_exit, %r14=stack_end, %rsp=regs
  * Clobbers %rax, %rbx, %rcx, %rdx
  */
     movzbl STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14), %ebx
@@ -407,11 +412,18 @@ UNLIKELY_DISPATCH_LABEL(\@_serialise):
     test %r12, %r12
     jz .L\@_skip_ist_exit
 
-    /* Logically DO_SPEC_CTRL_COND_VERW but without the %rsp=cpuinfo dependency */
-    testb $SCF_verw, %bl
-    jz .L\@_skip_verw
-    verw STACK_CPUINFO_FIELD(verw_sel)(%r14)
-.L\@_skip_verw:
+    /*
+     * Stash SCF and verw_sel above eflags in the case of an IST_exit.  The
+     * VERW logic needs to run after guest GPRs have been restored; i.e. where
+     * we cannot use %r12 or %r14 for the purposes they have here.
+     *
+     * When the CPU pushed this exception frame, it zero-extended eflags.
+     * Therefore it is safe for the VERW logic to look at the stashed SCF
+     * outside of the ist_exit condition.  Also, this stashing won't influence
+     * any other restore_all_guest() paths.
+     */
+    or $(__HYPERVISOR_DS32 << 16), %ebx
+    mov %ebx, UREGS_eflags + 4(%rsp) /* EFRAME_shadow_scf/sel */
 
     ALTERNATIVE "", DO_SPEC_CTRL_DIV, X86_FEATURE_SC_DIV
 
