@@ -212,6 +212,9 @@ FUNC_LOCAL(restore_all_guest)
 #endif
 
         mov   EFRAME_rip(%rsp), %rcx
+
+        SPEC_CTRL_COND_VERW     /* Req: %rsp=eframe                    Clob: efl */
+
         cmpw  $FLAT_USER_CS32, EFRAME_cs(%rsp)
         mov   EFRAME_rsp(%rsp), %rsp
         je    1f
@@ -224,6 +227,9 @@ LABEL_LOCAL(.Lrestore_rcx_iret_exit_to_guest)
 iret_exit_to_guest:
         andl  $~(X86_EFLAGS_IOPL | X86_EFLAGS_VM), EFRAME_eflags(%rsp)
         orl   $X86_EFLAGS_IF, EFRAME_eflags(%rsp)
+
+        SPEC_CTRL_COND_VERW     /* Req: %rsp=eframe                    Clob: efl */
+
         addq  $8,%rsp
 .Lft0:  iretq
         _ASM_PRE_EXTABLE(.Lft0, handle_exception)
@@ -688,9 +694,22 @@ UNLIKELY_START(ne, exit_cr3)
 UNLIKELY_END(exit_cr3)
 
         /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
-        SPEC_CTRL_EXIT_TO_XEN     /* Req: %r12=ist_exit %r14=end, Clob: abcd */
+        SPEC_CTRL_EXIT_TO_XEN /* Req: %r12=ist_exit %r14=end %rsp=regs, Clob: abcd */
 
         RESTORE_ALL adj=8
+
+        /*
+         * When the CPU pushed this exception frame, it zero-extended eflags.
+         * For an IST exit, SPEC_CTRL_EXIT_TO_XEN stashed shadow copies of
+         * spec_ctrl_flags and ver_sel above eflags, as we can't use any GPRs,
+         * and we're at a random place on the stack, not in a CPUFINFO block.
+         *
+         * Account for ev/ec having already been popped off the stack.
+         */
+        SPEC_CTRL_COND_VERW \
+            scf=STK_REL(EFRAME_shadow_scf, EFRAME_rip), \
+            sel=STK_REL(EFRAME_shadow_sel, EFRAME_rip)
+
         iretq
 END(restore_all_xen)
 
