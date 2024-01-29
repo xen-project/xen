@@ -2004,11 +2004,6 @@ static void __init check_timer(void)
     }
     printk(" failed.\n");
 
-    if (nmi_watchdog == NMI_IO_APIC) {
-        printk(KERN_WARNING "timer doesn't work through the IO-APIC - disabling NMI Watchdog!\n");
-        nmi_watchdog = 0;
-    }
-
     printk(KERN_INFO "...trying to set up timer as Virtual Wire IRQ...");
 
     disable_8259A_irq(irq_to_desc(0));
