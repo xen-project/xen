@@ -11,10 +11,10 @@
 #include <xen/list.h>
 #include <xen/spinlock.h>
 #include <xen/irq.h>
+#include <xen/numa.h>
 #include <xen/pci_regs.h>
 #include <xen/pfn.h>
 #include <asm/device.h>
-#include <asm/numa.h>
 
 /*
  * The PCI interface treats multi-function devices as independent

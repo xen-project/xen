@@ -138,7 +138,6 @@
 #include <xen/spinlock.h>
 
 #include <asm/flushtlb.h>
-#include <asm/numa.h>
 #include <asm/page.h>
 
 #include <public/sysctl.h>

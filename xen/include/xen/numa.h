@@ -2,7 +2,13 @@
 #define _XEN_NUMA_H
 
 #include <xen/mm-frame.h>
+
+#ifdef CONFIG_NUMA
+#include <xen/pdx.h>
 #include <asm/numa.h>
+#else
+typedef uint8_t nodeid_t;
+#endif
 
 #define NUMA_NO_NODE     0xFF
 #define NUMA_NO_DISTANCE 0xFF
@@ -108,7 +114,17 @@ extern void numa_set_processor_nodes_parsed(nodeid_t node);
 
 #else
 
+/* Fake one node for now. See also node_online_map. */
+#define cpu_to_node(cpu) 0
+#define node_to_cpumask(node)   cpu_online_map
+
+#define arch_want_default_dmazone() false
+
 extern mfn_t first_valid_mfn;
+
+#define node_spanned_pages(nid) (max_page - mfn_x(first_valid_mfn))
+#define node_start_pfn(nid) mfn_x(first_valid_mfn)
+#define __node_distance(a, b) 20
 
 static inline nodeid_t mfn_to_nid(mfn_t mfn)
 {

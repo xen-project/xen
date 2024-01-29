@@ -2,6 +2,7 @@
 #ifndef __XEN_DOMAIN_H__
 #define __XEN_DOMAIN_H__
 
+#include <xen/numa.h>
 #include <xen/types.h>
 
 #include <public/xen.h>
@@ -12,7 +13,6 @@ struct guest_area {
 };
 
 #include <asm/domain.h>
-#include <asm/numa.h>
 
 typedef union {
     struct vcpu_guest_context *nat;

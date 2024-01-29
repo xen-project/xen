@@ -22,8 +22,8 @@
 #include <asm/current.h>
 #include <xen/hypercall.h>
 #include <public/sysctl.h>
-#include <asm/numa.h>
 #include <xen/nodemask.h>
+#include <xen/numa.h>
 #include <xsm/xsm.h>
 #include <xen/pmstat.h>
 #include <xen/livepatch.h>
