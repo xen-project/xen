@@ -308,12 +308,12 @@ void vpmu_do_interrupt(void)
 
     vlapic_lvtpc = vlapic_get_reg(vlapic, APIC_LVTPC);
 
-    switch ( GET_APIC_DELIVERY_MODE(vlapic_lvtpc) )
+    switch ( vlapic_lvtpc & APIC_DM_MASK )
     {
-    case APIC_MODE_FIXED:
+    case APIC_DM_FIXED:
         vlapic_set_irq(vlapic, vlapic_lvtpc & APIC_VECTOR_MASK, 0);
         break;
-    case APIC_MODE_NMI:
+    case APIC_DM_NMI:
         sampling->arch.nmi_pending = true;
         break;
     }

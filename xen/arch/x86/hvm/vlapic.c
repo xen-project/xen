@@ -39,7 +39,7 @@
     (APIC_LVT_MASKED | APIC_SEND_PENDING | APIC_VECTOR_MASK)
 
 #define LINT_MASK   \
-    (LVT_MASK | APIC_MODE_MASK | APIC_INPUT_POLARITY |\
+    (LVT_MASK | APIC_DM_MASK | APIC_INPUT_POLARITY |\
     APIC_LVT_REMOTE_IRR | APIC_LVT_LEVEL_TRIGGER)
 
 static const unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
@@ -47,9 +47,9 @@ static const unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
      /* LVTT */
      LVT_MASK | APIC_TIMER_MODE_MASK,
      /* LVTTHMR */
-     LVT_MASK | APIC_MODE_MASK,
+     LVT_MASK | APIC_DM_MASK,
      /* LVTPC */
-     LVT_MASK | APIC_MODE_MASK,
+     LVT_MASK | APIC_DM_MASK,
      /* LVT0-1 */
      LINT_MASK, LINT_MASK,
      /* LVTERR */
@@ -260,7 +260,7 @@ static void vlapic_init_sipi_one(struct vcpu *target, uint32_t icr)
 {
     vcpu_pause(target);
 
-    switch ( icr & APIC_MODE_MASK )
+    switch ( icr & APIC_DM_MASK )
     {
     case APIC_DM_INIT: {
         bool fpu_initialised;
@@ -329,7 +329,7 @@ static void vlapic_accept_irq(struct vcpu *v, uint32_t icr_low)
     struct vlapic *vlapic = vcpu_vlapic(v);
     uint8_t vector = (uint8_t)icr_low;
 
-    switch ( icr_low & APIC_MODE_MASK )
+    switch ( icr_low & APIC_DM_MASK )
     {
     case APIC_DM_FIXED:
     case APIC_DM_LOWEST:
@@ -488,7 +488,7 @@ void vlapic_ipi(
 
     dest = _VLAPIC_ID(vlapic, icr_high);
 
-    switch ( icr_low & APIC_MODE_MASK )
+    switch ( icr_low & APIC_DM_MASK )
     {
     case APIC_DM_INIT:
     case APIC_DM_STARTUP:
@@ -993,7 +993,7 @@ int guest_wrmsr_x2apic(struct vcpu *v, uint32_t msr, uint64_t val)
     case APIC_LVTTHMR:
     case APIC_LVTPC:
     case APIC_CMCI:
-        if ( val & ~(LVT_MASK | APIC_MODE_MASK) )
+        if ( val & ~(LVT_MASK | APIC_DM_MASK) )
             return X86EMUL_EXCEPTION;
         break;
 
@@ -1017,7 +1017,7 @@ int guest_wrmsr_x2apic(struct vcpu *v, uint32_t msr, uint64_t val)
         break;
 
     case APIC_ICR:
-        if ( (uint32_t)val & ~(APIC_VECTOR_MASK | APIC_MODE_MASK |
+        if ( (uint32_t)val & ~(APIC_VECTOR_MASK | APIC_DM_MASK |
                                APIC_DEST_MASK | APIC_INT_ASSERT |
                                APIC_INT_LEVELTRIG | APIC_SHORT_MASK) )
             return X86EMUL_EXCEPTION;
@@ -1266,7 +1266,7 @@ static int __vlapic_accept_pic_intr(struct vcpu *v)
               redir0.fields.dest_id == VLAPIC_ID(vlapic) &&
               !vlapic_disabled(vlapic)) ||
              /* LAPIC has LVT0 unmasked for ExtInts? */
-             ((lvt0 & (APIC_MODE_MASK|APIC_LVT_MASKED)) == APIC_DM_EXTINT) ||
+             ((lvt0 & (APIC_DM_MASK | APIC_LVT_MASKED)) == APIC_DM_EXTINT) ||
              /* LAPIC is fully disabled? */
              vlapic_hw_disabled(vlapic)));
 }

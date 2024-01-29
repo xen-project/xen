@@ -68,6 +68,7 @@
 #define			APIC_DEST_MASK		0x00800
 #define			APIC_DEST_LOGICAL	0x00800
 #define			APIC_DEST_PHYSICAL	0x00000
+#define			APIC_DM_MASK		0x00700
 #define			APIC_DM_FIXED		0x00000
 #define			APIC_DM_LOWEST		0x00100
 #define			APIC_DM_SMI		0x00200
@@ -95,12 +96,6 @@
 #define			APIC_LVT_REMOTE_IRR		(1<<14)
 #define			APIC_INPUT_POLARITY		(1<<13)
 #define			APIC_SEND_PENDING		(1<<12)
-#define			APIC_MODE_MASK			0x700
-#define			GET_APIC_DELIVERY_MODE(x)	(((x)>>8)&0x7)
-#define			SET_APIC_DELIVERY_MODE(x,y)	(((x)&~0x700)|((y)<<8))
-#define				APIC_MODE_FIXED		0x0
-#define				APIC_MODE_NMI		0x4
-#define				APIC_MODE_EXTINT	0x7
 #define 	APIC_LVT1	0x360
 #define		APIC_LVTERR	0x370
 #define		APIC_TMICT	0x380

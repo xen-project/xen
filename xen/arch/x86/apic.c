@@ -263,22 +263,20 @@ void disconnect_bsp_APIC(int virt_wire_setup)
         if (!virt_wire_setup) {
             /* For LVT0 make it edge triggered, active high, external and enabled */
             value = apic_read(APIC_LVT0);
-            value &= ~(APIC_MODE_MASK | APIC_SEND_PENDING |
+            value &= ~(APIC_DM_MASK | APIC_SEND_PENDING |
                        APIC_INPUT_POLARITY | APIC_LVT_REMOTE_IRR |
                        APIC_LVT_LEVEL_TRIGGER | APIC_LVT_MASKED );
-            value |= APIC_LVT_REMOTE_IRR | APIC_SEND_PENDING;
-            value = SET_APIC_DELIVERY_MODE(value, APIC_MODE_EXTINT);
+            value |= APIC_LVT_REMOTE_IRR | APIC_SEND_PENDING | APIC_DM_EXTINT;
             apic_write(APIC_LVT0, value);
         }
 
         /* For LVT1 make it edge triggered, active high, nmi and enabled */
         value = apic_read(APIC_LVT1);
         value &= ~(
-            APIC_MODE_MASK | APIC_SEND_PENDING |
+            APIC_DM_MASK | APIC_SEND_PENDING |
             APIC_INPUT_POLARITY | APIC_LVT_REMOTE_IRR |
             APIC_LVT_LEVEL_TRIGGER | APIC_LVT_MASKED);
-        value |= APIC_LVT_REMOTE_IRR | APIC_SEND_PENDING;
-        value = SET_APIC_DELIVERY_MODE(value, APIC_MODE_NMI);
+        value |= APIC_LVT_REMOTE_IRR | APIC_SEND_PENDING | APIC_DM_NMI;
         apic_write(APIC_LVT1, value);
     }
 }
