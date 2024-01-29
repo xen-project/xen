@@ -35,8 +35,11 @@ void __init vm_init_type(enum vmap_region type, void *start, void *end)
     for ( i = 0, va = (unsigned long)vm_bitmap(type); i < nr; ++i, va += PAGE_SIZE )
     {
         struct page_info *pg = alloc_domheap_page(NULL, 0);
+        int rc;
 
-        map_pages_to_xen(va, page_to_mfn(pg), 1, PAGE_HYPERVISOR);
+        rc = map_pages_to_xen(va, page_to_mfn(pg), 1, PAGE_HYPERVISOR);
+        BUG_ON(rc);
+
         clear_page((void *)va);
     }
     bitmap_fill(vm_bitmap(type), vm_low[type]);
