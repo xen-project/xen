@@ -4,16 +4,15 @@
 #include <xen/types.h>
 
 #define DEFINE(_sym, _val)                                                 \
-    asm volatile ("\n.ascii\"==>#define " #_sym " %0 /* " #_val " */<==\"" \
-                  : : "i" (_val) )
+    asm volatile ( "\n.ascii\"==>#define " #_sym " %0 /* " #_val " */<==\""\
+                   :: "i" (_val) )
 #define BLANK()                                                            \
-    asm volatile ( "\n.ascii\"==><==\"" : : )
+    asm volatile ( "\n.ascii\"==><==\"" )
 #define OFFSET(_sym, _str, _mem)                                           \
-    DEFINE(_sym, offsetof(_str, _mem));
+    DEFINE(_sym, offsetof(_str, _mem))
 
 void asm_offsets(void)
 {
-    BLANK();
     DEFINE(CPU_USER_REGS_SIZE, sizeof(struct cpu_user_regs));
     OFFSET(CPU_USER_REGS_ZERO, struct cpu_user_regs, zero);
     OFFSET(CPU_USER_REGS_RA, struct cpu_user_regs, ra);
@@ -50,4 +49,5 @@ void asm_offsets(void)
     OFFSET(CPU_USER_REGS_SEPC, struct cpu_user_regs, sepc);
     OFFSET(CPU_USER_REGS_SSTATUS, struct cpu_user_regs, sstatus);
     OFFSET(CPU_USER_REGS_PREGS, struct cpu_user_regs, pregs);
+    BLANK();
 }

@@ -17,12 +17,12 @@
 #include <xen/multiboot2.h>
 
 #define DEFINE(_sym, _val)                                                 \
-    asm volatile ("\n.ascii\"==>#define " #_sym " %0 /* " #_val " */<==\"" \
-                  : : "i" (_val) )
+    asm volatile ( "\n.ascii\"==>#define " #_sym " %0 /* " #_val " */<==\""\
+                   :: "i" (_val) )
 #define BLANK()                                                            \
-    asm volatile ( "\n.ascii\"==><==\"" : : )
+    asm volatile ( "\n.ascii\"==><==\"" )
 #define OFFSET(_sym, _str, _mem)                                           \
-    DEFINE(_sym, offsetof(_str, _mem));
+    DEFINE(_sym, offsetof(_str, _mem))
 
 void __dummy__(void)
 {
@@ -180,4 +180,5 @@ void __dummy__(void)
     BLANK();
 
     OFFSET(DOMAIN_vm_assist, struct domain, vm_assist);
+    BLANK();
 }

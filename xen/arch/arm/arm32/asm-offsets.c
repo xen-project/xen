@@ -14,12 +14,12 @@
 #include <asm/setup.h>
 
 #define DEFINE(_sym, _val)                                                 \
-    asm volatile ("\n.ascii\"==>#define " #_sym " %0 /* " #_val " */<==\"" \
-                  : : "i" (_val) )
+    asm volatile ( "\n.ascii\"==>#define " #_sym " %0 /* " #_val " */<==\""\
+                   :: "i" (_val) )
 #define BLANK()                                                            \
-    asm volatile ( "\n.ascii\"==><==\"" : : )
+    asm volatile ( "\n.ascii\"==><==\"" )
 #define OFFSET(_sym, _str, _mem)                                           \
-    DEFINE(_sym, offsetof(_str, _mem));
+    DEFINE(_sym, offsetof(_str, _mem))
 
 void __dummy__(void)
 {
@@ -62,18 +62,19 @@ void __dummy__(void)
    BLANK();
 
    DEFINE(CPUINFO_sizeof, sizeof(struct cpu_info));
+   BLANK();
 
    OFFSET(VCPU_arch_saved_context, struct vcpu, arch.saved_context);
-
    BLANK();
+
    DEFINE(PROCINFO_sizeof, sizeof(struct proc_info_list));
    OFFSET(PROCINFO_cpu_val, struct proc_info_list, cpu_val);
    OFFSET(PROCINFO_cpu_mask, struct proc_info_list, cpu_mask);
    OFFSET(PROCINFO_cpu_init, struct proc_info_list, cpu_init);
-
    BLANK();
-   OFFSET(INITINFO_stack, struct init_info, stack);
 
+   OFFSET(INITINFO_stack, struct init_info, stack);
+   BLANK();
 }
 
 /*

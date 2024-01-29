@@ -14,12 +14,12 @@
 #include <asm/smccc.h>
 
 #define DEFINE(_sym, _val)                                                 \
-    asm volatile ("\n.ascii\"==>#define " #_sym " %0 /* " #_val " */<==\"" \
-                  : : "i" (_val) )
+    asm volatile ( "\n.ascii\"==>#define " #_sym " %0 /* " #_val " */<==\""\
+                   :: "i" (_val) )
 #define BLANK()                                                            \
-    asm volatile ( "\n.ascii\"==><==\"" : : )
+    asm volatile ( "\n.ascii\"==><==\"" )
 #define OFFSET(_sym, _str, _mem)                                           \
-    DEFINE(_sym, offsetof(_str, _mem));
+    DEFINE(_sym, offsetof(_str, _mem))
 
 void __dummy__(void)
 {
@@ -48,13 +48,14 @@ void __dummy__(void)
 
    DEFINE(CPUINFO_sizeof, sizeof(struct cpu_info));
    OFFSET(CPUINFO_flags, struct cpu_info, flags);
+   BLANK();
 
    OFFSET(VCPU_arch_saved_context, struct vcpu, arch.saved_context);
-
    BLANK();
+
    OFFSET(INITINFO_stack, struct init_info, stack);
-
    BLANK();
+
    OFFSET(SMCCC_RES_a0, struct arm_smccc_res, a0);
    OFFSET(SMCCC_RES_a2, struct arm_smccc_res, a2);
    OFFSET(ARM_SMCCC_1_2_REGS_X0_OFFS, struct arm_smccc_1_2_regs, a0);
@@ -66,6 +67,7 @@ void __dummy__(void)
    OFFSET(ARM_SMCCC_1_2_REGS_X12_OFFS, struct arm_smccc_1_2_regs, a12);
    OFFSET(ARM_SMCCC_1_2_REGS_X14_OFFS, struct arm_smccc_1_2_regs, a14);
    OFFSET(ARM_SMCCC_1_2_REGS_X16_OFFS, struct arm_smccc_1_2_regs, a16);
+   BLANK();
 }
 
 /*

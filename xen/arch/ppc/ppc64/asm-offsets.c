@@ -10,11 +10,11 @@
 
 #define DEFINE(_sym, _val)                                                  \
     asm volatile ( "\n.ascii\"==>#define " #_sym " %0 /* " #_val " */<==\"" \
-                   : : "i" (_val) )
+                   :: "i" (_val) )
 #define BLANK()                                                             \
-    asm volatile ( "\n.ascii\"==><==\"" : : )
+    asm volatile ( "\n.ascii\"==><==\"" )
 #define OFFSET(_sym, _str, _mem)                                            \
-    DEFINE(_sym, offsetof(_str, _mem));
+    DEFINE(_sym, offsetof(_str, _mem))
 
 /* base-2 logarithm */
 #define __L2(_x)  (((_x) & 0x00000002) ?   1 : 0)
@@ -29,6 +29,7 @@ void __dummy__(void)
 
     DEFINE(GPR_WIDTH, sizeof(unsigned long));
     DEFINE(FPR_WIDTH, sizeof(double));
+    BLANK();
 
     OFFSET(UREGS_gprs, struct cpu_user_regs, gprs);
     OFFSET(UREGS_r0, struct cpu_user_regs, gprs[0]);
@@ -48,9 +49,11 @@ void __dummy__(void)
     OFFSET(UREGS_fpscr, struct cpu_user_regs, fpscr);
     OFFSET(UREGS_entry_vector, struct cpu_user_regs, entry_vector);
     DEFINE(UREGS_sizeof, sizeof(struct cpu_user_regs));
+    BLANK();
 
     OFFSET(OPAL_base, struct opal, base);
     OFFSET(OPAL_entry, struct opal, entry);
+    BLANK();
 }
 
 /*
