@@ -38,6 +38,8 @@
 #define  SPEC_CTRL_SSBD                     (_AC(1, ULL) <<  2)
 #define  SPEC_CTRL_IPRED_DIS_U              (_AC(1, ULL) <<  3)
 #define  SPEC_CTRL_IPRED_DIS_S              (_AC(1, ULL) <<  4)
+#define  SPEC_CTRL_RRSBA_DIS_U              (_AC(1, ULL) <<  5)
+#define  SPEC_CTRL_RRSBA_DIS_S              (_AC(1, ULL) <<  6)
 #define  SPEC_CTRL_PSFD                     (_AC(1, ULL) <<  7)
 
 #define MSR_PRED_CMD                        0x00000049
