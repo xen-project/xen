@@ -435,7 +435,14 @@ static inline bool_t p2m_is_altp2m(const struct p2m_domain *p2m)
     return p2m->p2m_class == p2m_alternate;
 }
 
-#define p2m_get_pagetable(p2m)  ((p2m)->phys_table)
+#ifdef CONFIG_HVM
+static inline pagetable_t p2m_get_pagetable(const struct p2m_domain *p2m)
+{
+    return p2m->phys_table;
+}
+#else
+pagetable_t p2m_get_pagetable(const struct p2m_domain *p2m);
+#endif
 
 /*
  * Ensure any deferred p2m TLB flush has been completed on all VCPUs.
