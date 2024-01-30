@@ -333,8 +333,8 @@ static unsigned int write_stub_trampoline(
 
 DEFINE_PER_CPU(struct stubs, stubs);
 
-void lstar_enter(void);
-void cstar_enter(void);
+void nocall lstar_enter(void);
+void nocall cstar_enter(void);
 
 void subarch_percpu_traps_init(void)
 {
