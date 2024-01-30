@@ -306,8 +306,8 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
 
 /*
  * Caller to confirm that MSR_SPEC_CTRL is available.  Intel and AMD have
- * separate CPUID features for this functionality, but only set will be
- * active.
+ * separate CPUID features for some of this functionality, but only one
+ * vendors-worth will be active on a single host.
  */
 uint64_t msr_spec_ctrl_valid_bits(const struct cpu_policy *cp)
 {
@@ -321,6 +321,8 @@ uint64_t msr_spec_ctrl_valid_bits(const struct cpu_policy *cp)
     return (SPEC_CTRL_IBRS | SPEC_CTRL_STIBP |
             (ssbd       ? SPEC_CTRL_SSBD       : 0) |
             (psfd       ? SPEC_CTRL_PSFD       : 0) |
+            (cp->feat.ipred_ctrl
+             ? (SPEC_CTRL_IPRED_DIS_U | SPEC_CTRL_IPRED_DIS_S) : 0) |
             0);
 }
 

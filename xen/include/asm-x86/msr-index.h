@@ -36,6 +36,8 @@
 #define  SPEC_CTRL_IBRS                     (_AC(1, ULL) <<  0)
 #define  SPEC_CTRL_STIBP                    (_AC(1, ULL) <<  1)
 #define  SPEC_CTRL_SSBD                     (_AC(1, ULL) <<  2)
+#define  SPEC_CTRL_IPRED_DIS_U              (_AC(1, ULL) <<  3)
+#define  SPEC_CTRL_IPRED_DIS_S              (_AC(1, ULL) <<  4)
 #define  SPEC_CTRL_PSFD                     (_AC(1, ULL) <<  7)
 
 #define MSR_PRED_CMD                        0x00000049
