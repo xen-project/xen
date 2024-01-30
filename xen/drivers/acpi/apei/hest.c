@@ -86,7 +86,7 @@ static int hest_esrc_len(const struct acpi_hest_header *hest_hdr)
 	BUG_ON(len == -1);
 
 	return len;
-};
+}
 
 int apei_hest_parse(apei_hest_func_t func, void *data)
 {

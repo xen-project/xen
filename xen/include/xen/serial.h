@@ -175,7 +175,7 @@ void ehci_dbgp_init(void);
 #ifdef CONFIG_XHCI
 void xhci_dbc_uart_init(void);
 #else
-static void inline xhci_dbc_uart_init(void) {};
+static void inline xhci_dbc_uart_init(void) {}
 #endif
 
 void arm_uart_init(void);

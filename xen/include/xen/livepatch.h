@@ -182,7 +182,7 @@ static inline int livepatch_op(struct xen_sysctl_livepatch_op *op)
     return -ENOSYS;
 }
 
-static inline void check_for_livepatch_work(void) { };
+static inline void check_for_livepatch_work(void) {}
 static inline bool is_patch(const void *addr)
 {
     return 0;
