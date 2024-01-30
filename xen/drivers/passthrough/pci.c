@@ -1444,11 +1444,10 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
 
     pdev->fault.count = 0;
 
-    if ( (rc = iommu_call(hd->platform_ops, assign_device, d, devfn,
-                          pci_to_dev(pdev), flag)) )
-        goto done;
+    rc = iommu_call(hd->platform_ops, assign_device, d, devfn, pci_to_dev(pdev),
+                    flag);
 
-    for ( ; pdev->phantom_stride; rc = 0 )
+    while ( pdev->phantom_stride && !rc )
     {
         devfn += pdev->phantom_stride;
         if ( PCI_SLOT(devfn) != PCI_SLOT(pdev->devfn) )
@@ -1459,8 +1458,24 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
 
  done:
     if ( rc )
-        printk(XENLOG_G_WARNING "%pd: assign (%pp) failed (%d)\n",
-               d, &PCI_SBDF(seg, bus, devfn), rc);
+    {
+        printk(XENLOG_G_WARNING "%pd: assign %s(%pp) failed (%d)\n",
+               d, devfn != pdev->devfn ? "phantom function " : "",
+               &PCI_SBDF(seg, bus, devfn), rc);
+
+        if ( devfn != pdev->devfn && deassign_device(d, seg, bus, pdev->devfn) )
+        {
+            /*
+             * Device with phantom functions that failed to both assign and
+             * rollback.  Mark the device as broken and crash the target domain,
+             * as the state of the functions at this point is unknown and Xen
+             * has no way to assert consistent context assignment among them.
+             */
+            pdev->broken = true;
+            if ( !is_hardware_domain(d) && d != dom_io )
+                domain_crash(d);
+        }
+    }
     /* The device is assigned to dom_io so mark it as quarantined */
     else if ( d == dom_io )
         pdev->quarantine = true;
