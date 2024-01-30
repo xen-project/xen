@@ -230,6 +230,7 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
     /* Put all needed data into mbi_out. */
     for ( tag = _p(ptr); (u32)tag - mbi_in < mbi_fix->total_size;
           tag = _p(ALIGN_UP((u32)tag + tag->size, MULTIBOOT2_TAG_ALIGN)) )
+    {
         switch ( tag->type )
         {
         case MULTIBOOT2_TAG_TYPE_BOOT_LOADER_NAME:
@@ -332,11 +333,12 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
 #endif /* CONFIG_VIDEO */
 
         case MULTIBOOT2_TAG_TYPE_END:
-            goto end; /* Cannot "break;" here. */
+            goto end;
 
         default:
             break;
         }
+    }
 
  end:
 
