@@ -319,7 +319,8 @@ def crunch_numbers(state):
         # IBRSB/IBRS, and we pass this MSR directly to guests.  Treating them
         # as dependent features simplifies Xen's logic, and prevents the guest
         # from seeing implausible configurations.
-        IBRSB: [STIBP, SSBD, INTEL_PSFD, EIBRS],
+        IBRSB: [STIBP, SSBD, INTEL_PSFD, EIBRS,
+                IPRED_CTRL],
         IBRS: [AMD_STIBP, AMD_SSBD, PSFD, AUTO_IBRS,
                IBRS_ALWAYS, IBRS_FAST, IBRS_SAME_MODE],
         IBPB: [IBPB_RET, SBPB, IBPB_BRTYPE],
