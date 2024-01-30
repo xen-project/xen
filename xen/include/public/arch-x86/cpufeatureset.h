@@ -303,6 +303,7 @@ XEN_CPUFEATURE(SRSO_NO,            11*32+29) /*A  Hardware not vulenrable to Spe
 XEN_CPUFEATURE(INTEL_PSFD,         13*32+ 0) /*A  MSR_SPEC_CTRL.PSFD */
 XEN_CPUFEATURE(IPRED_CTRL,         13*32+ 1) /*A  MSR_SPEC_CTRL.IPRED_DIS_* */
 XEN_CPUFEATURE(RRSBA_CTRL,         13*32+ 2) /*A  MSR_SPEC_CTRL.RRSBA_DIS_* */
+XEN_CPUFEATURE(BHI_CTRL,           13*32+ 4) /*A  MSR_SPEC_CTRL.BHI_DIS_S */
 
 /* Intel-defined CPU features, CPUID level 0x00000007:1.ecx, word 14 */
 
