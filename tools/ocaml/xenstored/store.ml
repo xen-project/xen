@@ -85,7 +85,9 @@ module Node = struct
       raise Define.Permission_denied;
     end
 
-  let rec recurse fct node = fct node; SymbolMap.iter (fun _ -> recurse fct) node.children
+  let rec recurse fct node acc =
+    let acc = fct node acc in
+    SymbolMap.fold (fun _ -> recurse fct) node.children acc
 
   (** [recurse_filter_map f tree] applies [f] on each node in the tree recursively,
       possibly removing some nodes.
@@ -408,7 +410,7 @@ let dump_buffer store = dump_store_buf store.root
 let set_node store path node orig_quota mod_quota =
   let root = Path.set_node store.root path node in
   store.root <- root;
-  Quota.merge orig_quota mod_quota store.quota
+  store.quota <- Quota.merge orig_quota mod_quota store.quota
 
 let write store perm path value =
   let node, existing = get_deepest_existing_node store path in
@@ -422,7 +424,7 @@ let write store perm path value =
   let root, node_created = path_write store perm path value in
   store.root <- root;
   if node_created
-  then Quota.add_entry store.quota owner
+  then store.quota <- Quota.add_entry store.quota owner
 
 let mkdir store perm path =
   let node, existing = get_deepest_existing_node store path in
@@ -431,7 +433,7 @@ let mkdir store perm path =
   if not (existing || (Perms.Connection.is_dom0 perm)) then Quota.check store.quota owner 0;
   store.root <- path_mkdir store perm path;
   if not existing then
-    Quota.add_entry store.quota owner
+    store.quota <- Quota.add_entry store.quota owner
 
 let rm store perm path =
   let rmed_node = Path.get_node store.root path in
@@ -439,7 +441,7 @@ let rm store perm path =
   | None -> raise Define.Doesnt_exist
   | Some rmed_node ->
     store.root <- path_rm store perm path;
-    Node.recurse (fun node -> Quota.del_entry store.quota (Node.get_owner node)) rmed_node
+    store.quota <- Node.recurse (fun node quota -> Quota.del_entry quota (Node.get_owner node)) rmed_node store.quota
 
 let setperms store perm path nperms =
   match Path.get_node store.root path with
@@ -450,8 +452,9 @@ let setperms store perm path nperms =
     if not ((old_owner = new_owner) || (Perms.Connection.is_dom0 perm)) then
       raise Define.Permission_denied;
     store.root <- path_setperms store perm path nperms;
-    Quota.del_entry store.quota old_owner;
-    Quota.add_entry store.quota new_owner
+    store.quota <-
+      let quota = Quota.del_entry store.quota old_owner in
+      Quota.add_entry quota new_owner
 
 let reset_permissions store domid =
   Logging.info "store|node" "Cleaning up xenstore ACLs for domid %d" domid;
