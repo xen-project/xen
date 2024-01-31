@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Changed
  - Changed flexible array definitions in public I/O interface headers to not
    use "1" as the number of array elements.
+ - The minimum supported OCaml toolchain version is now 4.05
  - On x86:
    - HVM PIRQs are disabled by default.
    - Reduce IOMMU setup time for hardware domain.

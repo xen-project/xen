@@ -30,7 +30,7 @@ let undec c =
   | _          -> raise (Failure "undecify")
 
 let unhex c =
-  let c = Char.lowercase c in
+  let c = Char.lowercase_ascii c in
   match c with
   | '0' .. '9' -> (Char.code c) - (Char.code '0')
   | 'a' .. 'f' -> (Char.code c) - (Char.code 'a') + 10
