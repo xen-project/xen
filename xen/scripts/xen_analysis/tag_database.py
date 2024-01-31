@@ -16,14 +16,18 @@ tool_syntax = {
     "eclair":"-E> hide VID 1 \"\""
 }
 
+def get_xen_tag_regex(tool):
+    return rf'(?P<tag>SAF-(?P<id>\d+)-(?P<type>safe|false-positive-{tool}))'
+
 
 def get_xen_tag_index_type_regex(tool):
-    return rf'^SAF-(?P<id>\d+)-(?P<type>safe|false-positive-{tool})$'
+    return rf'^{get_xen_tag_regex(tool)}$'
 
 
 def get_xen_tag_comment_regex(tool):
-    tag=rf'(?P<tag>SAF-\d+-(?:safe|false-positive-{tool}))'
-    return rf'^[ \t]*/\* +{tag}.*\*/$'
+    before_comment = r'(?P<before>[ \t]*)'
+    comment = rf'(?P<comment>/\* +{get_xen_tag_regex(tool)}.*\*/)'
+    return rf'^(?P<full_line>{before_comment}{comment})$'
 
 
 # Returns a data structure containing dictionaries for safe and false-positive-*
@@ -66,7 +70,7 @@ def load_tag_database(tool, input_files, data_struct = None, schema = "safe"):
                 # Save in safe or false-positive-* the key {#id: "comment"}
                 id_number = int(xen_tag.group('id'))
                 key = xen_tag.group('type')
-                ret[key][id_number] = "/* {} */\n".format(comment)
+                ret[key][id_number] = "/* {} */".format(comment)
             else:
                 raise TagDatabaseError(
                         "Error in database file, entry {} has unexpected "
@@ -101,7 +105,11 @@ def substitute_tags(tool, input_file, grep_struct, subs_rules):
                 id_number = int(xen_tag_regex_obj.group('id'))
                 key = xen_tag_regex_obj.group('type')
                 if id_number in subs_rules[key]:
-                    parsed_content[line_number-1] = subs_rules[key][id_number]
+                    comment_in = grep_struct["matches"][line_number]['comment']
+                    comment_out = subs_rules[key][id_number]
+                    parsed_content[line_number-1] = re.sub(
+                        re.escape(comment_in), comment_out,
+                        parsed_content[line_number-1])
 
             outfile.writelines(parsed_content)
     except Exception as e:
