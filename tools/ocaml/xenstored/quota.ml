@@ -33,7 +33,7 @@ module DomidMap = Map.Make(Domid)
 type t = {
   maxent: int;               (* max entities per domU *)
   maxsize: int;              (* max size of data store in one node *)
-  mutable cur: int DomidMap.t; (* current domains quota *)
+  cur: int DomidMap.t; (* current domains quota *)
 }
 
 let to_string quota domid =
@@ -76,10 +76,10 @@ let update_entry quota_cur id diff =
   else DomidMap.add id nb quota_cur
 
 let del_entry quota id =
-  quota.cur <- update_entry quota.cur id (-1)
+  {quota with cur = update_entry quota.cur id (-1)}
 
 let add_entry quota id =
-  quota.cur <- update_entry quota.cur id (+1)
+  {quota with cur = update_entry quota.cur id (+1)}
 
 let merge orig_quota mod_quota dest_quota =
   let fold_merge id nb dest =
@@ -87,5 +87,5 @@ let merge orig_quota mod_quota dest_quota =
     | 0 -> dest (* not modified *)
     | diff -> update_entry dest id diff (* update with [x=x+diff] *)
   in
-  dest_quota.cur <- DomidMap.fold fold_merge mod_quota.cur dest_quota.cur
+  {dest_quota with cur = DomidMap.fold fold_merge mod_quota.cur dest_quota.cur}
   (* dest_quota = dest_quota + (mod_quota - orig_quota) *)
