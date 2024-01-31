@@ -18,11 +18,12 @@ tool_syntax = {
 
 
 def get_xen_tag_index_type_regex(tool):
-    return r'^SAF-(\d+)-(safe|false-positive-' + tool + ')$'
+    return rf'^SAF-(?P<id>\d+)-(?P<type>safe|false-positive-{tool})$'
 
 
 def get_xen_tag_comment_regex(tool):
-    return r'^[ \t]*/\* +(SAF-\d+-(?:safe|false-positive-' + tool + ')).*\*/$'
+    tag=rf'(?P<tag>SAF-\d+-(?:safe|false-positive-{tool}))'
+    return rf'^[ \t]*/\* +{tag}.*\*/$'
 
 
 # Returns a data structure containing dictionaries for safe and false-positive-*
@@ -60,12 +61,11 @@ def load_tag_database(tool, input_files, data_struct = None, schema = "safe"):
         if proprietary_id != "":
             comment=tool_syntax[tool].replace("VID",proprietary_id)
             # Regex to capture the index of the Xen tag and the schema
-            xen_tag = re.compile(get_xen_tag_index_type_regex(tool))\
-                            .match(entry["id"])
-            if xen_tag and xen_tag.group(1) and xen_tag.group(2):
+            xen_tag = re.match(get_xen_tag_index_type_regex(tool), entry["id"])
+            if xen_tag and xen_tag.group('id') and xen_tag.group('type'):
                 # Save in safe or false-positive-* the key {#id: "comment"}
-                id_number = int(xen_tag.group(1))
-                key = xen_tag.group(2)
+                id_number = int(xen_tag.group('id'))
+                key = xen_tag.group('type')
                 ret[key][id_number] = "/* {} */\n".format(comment)
             else:
                 raise TagDatabaseError(
@@ -95,11 +95,11 @@ def substitute_tags(tool, input_file, grep_struct, subs_rules):
             # information access the subs_rules dictionary to see if there is
             # a match
             for line_number in grep_struct["matches"]:
-                xen_tag = grep_struct["matches"][line_number][0]
-                xen_tag_regex_obj = re.compile(
-                            get_xen_tag_index_type_regex(tool)).match(xen_tag)
-                id_number = int(xen_tag_regex_obj.group(1))
-                key = xen_tag_regex_obj.group(2)
+                xen_tag = grep_struct["matches"][line_number]['tag']
+                xen_tag_regex_obj = re.match(get_xen_tag_index_type_regex(tool),
+                                             xen_tag)
+                id_number = int(xen_tag_regex_obj.group('id'))
+                key = xen_tag_regex_obj.group('type')
                 if id_number in subs_rules[key]:
                     parsed_content[line_number-1] = subs_rules[key][id_number]
 

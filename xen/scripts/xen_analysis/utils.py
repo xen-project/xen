@@ -12,7 +12,7 @@ def grep(filepath, regex):
             for line in f:
                 match = regObj.match(line)
                 if match:
-                    res["matches"][line_number] = match.groups()
+                    res["matches"][line_number] = match
                 line_number = line_number + 1
     except Exception as e:
         print("WARNING: Can't open {}: {}".format(filepath, e))

@@ -41,7 +41,7 @@ def __generate_suppression_list(out_file):
     # The following lambda function will return a file if it contains lines with
     # a comment containing "cppcheck-suppress[*]" on a single line.
     grep_action = lambda x: utils.grep(x,
-                    r'^[ \t]*/\* cppcheck-suppress\[(.*)\] \*/$')
+                    r'^[ \t]*/\* cppcheck-suppress\[(?P<id>.*)\] \*/$')
     # Look for a list of .h files that matches the condition above
     headers = utils.recursive_find_file(settings.xen_dir, r'.*\.h$',
                                         grep_action)
@@ -97,7 +97,7 @@ def __generate_suppression_list(out_file):
                         if (not comment_section) and comment_line_starts:
                             comment_section = True
                         if (len(line.strip()) != 0) and (not comment_section):
-                            cppcheck_violation_id = entry["matches"][line_num][0]
+                            cppcheck_violation_id = entry["matches"][line_num]['id']
                             break
                         if comment_section and comment_line_stops:
                             comment_section = False
