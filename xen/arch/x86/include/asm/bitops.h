@@ -418,7 +418,7 @@ static inline int ffsl(unsigned long x)
     return (int)r+1;
 }
 
-static inline int ffs(unsigned int x)
+static always_inline unsigned int arch_ffs(unsigned int x)
 {
     int r;
 
@@ -428,6 +428,7 @@ static inline int ffs(unsigned int x)
           "1:" : "=r" (r) : "rm" (x));
     return r + 1;
 }
+#define arch_ffs arch_ffs
 
 /**
  * fls - find last bit set

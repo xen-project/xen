@@ -31,6 +31,23 @@ unsigned int __pure generic_flsl(unsigned long x);
 
 #include <asm/bitops.h>
 
+/*
+ * Find First/Last Set bit (all forms).
+ *
+ * Bits are labelled from 1.  Returns 0 if given 0.
+ */
+static always_inline __pure unsigned int ffs(unsigned int x)
+{
+    if ( __builtin_constant_p(x) )
+        return __builtin_ffs(x);
+
+#ifdef arch_ffs
+    return arch_ffs(x);
+#else
+    return generic_ffsl(x);
+#endif
+}
+
 /* --------------------- Please tidy below here --------------------- */
 
 #ifndef find_next_bit

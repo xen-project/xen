@@ -157,7 +157,7 @@ static inline int fls(unsigned int x)
 }
 
 
-#define ffs(x) ({ unsigned int __t = (x); fls(ISOLATE_LSB(__t)); })
+#define arch_ffs(x)  ((x) ? 1 + __builtin_ctz(x) : 0)
 #define ffsl(x) ({ unsigned long __t = (x); flsl(ISOLATE_LSB(__t)); })
 
 /**
