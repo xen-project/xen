@@ -401,23 +401,6 @@ static always_inline unsigned int __scanbit(unsigned long val, unsigned int max)
     r__;                                                                    \
 })
 
-/**
- * ffs - find first bit set
- * @x: the word to search
- *
- * This is defined the same way as the libc and compiler builtin ffs routines.
- */
-static inline int ffsl(unsigned long x)
-{
-    long r;
-
-    asm ( "bsf %1,%0\n\t"
-          "jnz 1f\n\t"
-          "mov $-1,%0\n"
-          "1:" : "=r" (r) : "rm" (x));
-    return (int)r+1;
-}
-
 static always_inline unsigned int arch_ffs(unsigned int x)
 {
     unsigned int r;
@@ -456,6 +439,24 @@ static always_inline unsigned int arch_ffs(unsigned int x)
     return r + 1;
 }
 #define arch_ffs arch_ffs
+
+static always_inline unsigned int arch_ffsl(unsigned long x)
+{
+    unsigned int r;
+
+    /* See arch_ffs() for safety discussions. */
+    if ( __builtin_constant_p(x > 0) && x > 0 )
+        asm ( "bsf %[val], %q[res]"
+              : [res] "=r" (r)
+              : [val] "rm" (x) );
+    else
+        asm ( "bsf %[val], %q[res]"
+              : [res] "=r" (r)
+              : [val] "rm" (x), "[res]" (-1) );
+
+    return r + 1;
+}
+#define arch_ffsl arch_ffsl
 
 /**
  * fls - find last bit set

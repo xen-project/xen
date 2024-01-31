@@ -48,6 +48,18 @@ static always_inline __pure unsigned int ffs(unsigned int x)
 #endif
 }
 
+static always_inline __pure unsigned int ffsl(unsigned long x)
+{
+    if ( __builtin_constant_p(x) )
+        return __builtin_ffsl(x);
+
+#ifdef arch_ffs
+    return arch_ffsl(x);
+#else
+    return generic_ffsl(x);
+#endif
+}
+
 /* --------------------- Please tidy below here --------------------- */
 
 #ifndef find_next_bit

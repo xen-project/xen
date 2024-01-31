@@ -174,7 +174,7 @@ static inline int __test_and_clear_bit(int nr, volatile void *addr)
 #define flsl(x) generic_flsl(x)
 #define fls(x) generic_flsl(x)
 #define arch_ffs(x)  ((x) ? 1 + __builtin_ctz(x) : 0)
-#define ffsl(x) ({ unsigned long t_ = (x); flsl(t_ & -t_); })
+#define arch_ffsl(x) ((x) ? 1 + __builtin_ctzl(x) : 0)
 
 /**
  * hweightN - returns the hamming weight of a N-bit word

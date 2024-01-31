@@ -158,7 +158,7 @@ static inline int fls(unsigned int x)
 
 
 #define arch_ffs(x)  ((x) ? 1 + __builtin_ctz(x) : 0)
-#define ffsl(x) ({ unsigned long __t = (x); flsl(ISOLATE_LSB(__t)); })
+#define arch_ffsl(x) ((x) ? 1 + __builtin_ctzl(x) : 0)
 
 /**
  * hweightN - returns the hamming weight of a N-bit word
