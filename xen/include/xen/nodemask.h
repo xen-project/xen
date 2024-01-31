@@ -53,7 +53,6 @@
  * for_each_online_node(node)		for-loop node over node_online_map
  */
 
-#include <xen/kernel.h>
 #include <xen/bitmap.h>
 #include <xen/numa.h>
 

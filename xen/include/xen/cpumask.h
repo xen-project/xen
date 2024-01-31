@@ -57,7 +57,6 @@
 
 #include <xen/bitmap.h>
 #include <xen/bug.h>
-#include <xen/kernel.h>
 #include <xen/random.h>
 
 typedef struct cpumask{ DECLARE_BITMAP(bits, NR_CPUS); } cpumask_t;

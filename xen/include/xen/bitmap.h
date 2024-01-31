@@ -3,9 +3,9 @@
 
 #ifndef __ASSEMBLER__
 
-#include <xen/lib.h>
-#include <xen/types.h>
 #include <xen/bitops.h>
+#include <xen/macros.h>
+#include <xen/string.h>
 
 /*
  * bitmaps provide bit arrays that consume one or more unsigned

@@ -22,6 +22,7 @@
  *
  */
 #include <xen/init.h>
+#include <xen/lib.h>
 #include <xen/types.h>
 #include <xen/errno.h>
 #include <xen/acpi.h>
