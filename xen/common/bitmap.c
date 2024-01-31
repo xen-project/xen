@@ -55,7 +55,7 @@ static void clamp_last_byte(uint8_t *bp, unsigned int nbits)
 		bp[nbits/8] &= (1U << remainder) - 1;
 }
 
-int __bitmap_empty(const unsigned long *bitmap, int bits)
+int __bitmap_empty(const unsigned long *bitmap, unsigned int bits)
 {
 	int k, lim = bits/BITS_PER_LONG;
 	for (k = 0; k < lim; ++k)
@@ -70,7 +70,7 @@ int __bitmap_empty(const unsigned long *bitmap, int bits)
 }
 EXPORT_SYMBOL(__bitmap_empty);
 
-int __bitmap_full(const unsigned long *bitmap, int bits)
+int __bitmap_full(const unsigned long *bitmap, unsigned int bits)
 {
 	int k, lim = bits/BITS_PER_LONG;
 	for (k = 0; k < lim; ++k)
@@ -86,7 +86,7 @@ int __bitmap_full(const unsigned long *bitmap, int bits)
 EXPORT_SYMBOL(__bitmap_full);
 
 int __bitmap_equal(const unsigned long *bitmap1,
-		const unsigned long *bitmap2, int bits)
+                   const unsigned long *bitmap2, unsigned int bits)
 {
 	int k, lim = bits/BITS_PER_LONG;
 	for (k = 0; k < lim; ++k)
@@ -101,7 +101,7 @@ int __bitmap_equal(const unsigned long *bitmap1,
 }
 EXPORT_SYMBOL(__bitmap_equal);
 
-void __bitmap_complement(unsigned long *dst, const unsigned long *src, int bits)
+void __bitmap_complement(unsigned long *dst, const unsigned long *src, unsigned int bits)
 {
 	int k, lim = bits/BITS_PER_LONG;
 	for (k = 0; k < lim; ++k)
@@ -113,7 +113,7 @@ void __bitmap_complement(unsigned long *dst, const unsigned long *src, int bits)
 EXPORT_SYMBOL(__bitmap_complement);
 
 void __bitmap_and(unsigned long *dst, const unsigned long *bitmap1,
-				const unsigned long *bitmap2, int bits)
+                  const unsigned long *bitmap2, unsigned int bits)
 {
 	int k;
 	int nr = BITS_TO_LONGS(bits);
@@ -124,7 +124,7 @@ void __bitmap_and(unsigned long *dst, const unsigned long *bitmap1,
 EXPORT_SYMBOL(__bitmap_and);
 
 void __bitmap_or(unsigned long *dst, const unsigned long *bitmap1,
-				const unsigned long *bitmap2, int bits)
+                 const unsigned long *bitmap2, unsigned int bits)
 {
 	int k;
 	int nr = BITS_TO_LONGS(bits);
@@ -135,7 +135,7 @@ void __bitmap_or(unsigned long *dst, const unsigned long *bitmap1,
 EXPORT_SYMBOL(__bitmap_or);
 
 void __bitmap_xor(unsigned long *dst, const unsigned long *bitmap1,
-				const unsigned long *bitmap2, int bits)
+                  const unsigned long *bitmap2, unsigned int bits)
 {
 	int k;
 	int nr = BITS_TO_LONGS(bits);
@@ -146,7 +146,7 @@ void __bitmap_xor(unsigned long *dst, const unsigned long *bitmap1,
 EXPORT_SYMBOL(__bitmap_xor);
 
 void __bitmap_andnot(unsigned long *dst, const unsigned long *bitmap1,
-				const unsigned long *bitmap2, int bits)
+                     const unsigned long *bitmap2, unsigned int bits)
 {
 	int k;
 	int nr = BITS_TO_LONGS(bits);
@@ -157,7 +157,7 @@ void __bitmap_andnot(unsigned long *dst, const unsigned long *bitmap1,
 EXPORT_SYMBOL(__bitmap_andnot);
 
 int __bitmap_intersects(const unsigned long *bitmap1,
-				const unsigned long *bitmap2, int bits)
+                        const unsigned long *bitmap2, unsigned int bits)
 {
 	int k, lim = bits/BITS_PER_LONG;
 	for (k = 0; k < lim; ++k)
@@ -172,7 +172,7 @@ int __bitmap_intersects(const unsigned long *bitmap1,
 EXPORT_SYMBOL(__bitmap_intersects);
 
 int __bitmap_subset(const unsigned long *bitmap1,
-				const unsigned long *bitmap2, int bits)
+                    const unsigned long *bitmap2, unsigned int bits)
 {
 	int k, lim = bits/BITS_PER_LONG;
 	for (k = 0; k < lim; ++k)
@@ -187,7 +187,7 @@ int __bitmap_subset(const unsigned long *bitmap1,
 EXPORT_SYMBOL(__bitmap_subset);
 
 #if BITS_PER_LONG == 32
-int __bitmap_weight(const unsigned long *bitmap, int bits)
+unsigned int __bitmap_weight(const unsigned long *bitmap, unsigned int bits)
 {
 	int k, w = 0, lim = bits/BITS_PER_LONG;
 
@@ -200,7 +200,7 @@ int __bitmap_weight(const unsigned long *bitmap, int bits)
 	return w;
 }
 #else
-int __bitmap_weight(const unsigned long *bitmap, int bits)
+unsigned int __bitmap_weight(const unsigned long *bitmap, unsigned int bits)
 {
 	int k, w = 0, lim = bits/BITS_PER_LONG;
 

@@ -66,25 +66,25 @@
  * lib/bitmap.c provides these functions:
  */
 
-extern int __bitmap_empty(const unsigned long *bitmap, int bits);
-extern int __bitmap_full(const unsigned long *bitmap, int bits);
-extern int __bitmap_equal(const unsigned long *bitmap1,
-                	const unsigned long *bitmap2, int bits);
-extern void __bitmap_complement(unsigned long *dst, const unsigned long *src,
-			int bits);
-extern void __bitmap_and(unsigned long *dst, const unsigned long *bitmap1,
-			const unsigned long *bitmap2, int bits);
-extern void __bitmap_or(unsigned long *dst, const unsigned long *bitmap1,
-			const unsigned long *bitmap2, int bits);
-extern void __bitmap_xor(unsigned long *dst, const unsigned long *bitmap1,
-			const unsigned long *bitmap2, int bits);
-extern void __bitmap_andnot(unsigned long *dst, const unsigned long *bitmap1,
-			const unsigned long *bitmap2, int bits);
-extern int __bitmap_intersects(const unsigned long *bitmap1,
-			const unsigned long *bitmap2, int bits);
-extern int __bitmap_subset(const unsigned long *bitmap1,
-			const unsigned long *bitmap2, int bits);
-extern int __bitmap_weight(const unsigned long *bitmap, int bits);
+int __bitmap_empty(const unsigned long *bitmap, unsigned int bits);
+int __bitmap_full(const unsigned long *bitmap, unsigned int bits);
+int __bitmap_equal(const unsigned long *bitmap1,
+                   const unsigned long *bitmap2, unsigned int bits);
+void __bitmap_complement(unsigned long *dst, const unsigned long *src,
+                         unsigned int bits);
+void __bitmap_and(unsigned long *dst, const unsigned long *bitmap1,
+                  const unsigned long *bitmap2, unsigned int bits);
+void __bitmap_or(unsigned long *dst, const unsigned long *bitmap1,
+                 const unsigned long *bitmap2, unsigned int bits);
+void __bitmap_xor(unsigned long *dst, const unsigned long *bitmap1,
+                  const unsigned long *bitmap2, unsigned int bits);
+void __bitmap_andnot(unsigned long *dst, const unsigned long *bitmap1,
+                     const unsigned long *bitmap2, unsigned int bits);
+int __bitmap_intersects(const unsigned long *bitmap1,
+                        const unsigned long *bitmap2, unsigned int bits);
+int __bitmap_subset(const unsigned long *bitmap1,
+                    const unsigned long *bitmap2, unsigned int bits);
+unsigned int __bitmap_weight(const unsigned long *bitmap, unsigned int bits);
 extern void __bitmap_set(unsigned long *map, unsigned int start, int len);
 extern void __bitmap_clear(unsigned long *map, unsigned int start, int len);
 
@@ -117,7 +117,7 @@ static inline void bitmap_zero(unsigned long *dst, unsigned int nbits)
 		memset(dst, 0, bitmap_bytes(nbits)));
 }
 
-static inline void bitmap_fill(unsigned long *dst, int nbits)
+static inline void bitmap_fill(unsigned long *dst, unsigned int nbits)
 {
 	size_t nlongs = BITS_TO_LONGS(nbits);
 
@@ -224,7 +224,8 @@ static inline int bitmap_full(const unsigned long *src, unsigned int nbits)
 		return __bitmap_full(src, nbits));
 }
 
-static inline int bitmap_weight(const unsigned long *src, int nbits)
+static inline unsigned int bitmap_weight(const unsigned long *src,
+                                         unsigned int nbits)
 {
 	return __bitmap_weight(src, nbits);
 }
