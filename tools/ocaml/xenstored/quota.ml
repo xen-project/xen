@@ -23,66 +23,69 @@ let activate = ref true
 let maxent = ref (1000)
 let maxsize = ref (2048)
 
+module Domid = struct
+  type t = Xenctrl.domid
+  let compare (a:t) (b:t) = compare a b
+end
+
+module DomidMap = Map.Make(Domid)
+
 type t = {
   maxent: int;               (* max entities per domU *)
   maxsize: int;              (* max size of data store in one node *)
-  cur: (Xenctrl.domid, int) Hashtbl.t; (* current domains quota *)
+  mutable cur: int DomidMap.t; (* current domains quota *)
 }
 
 let to_string quota domid =
-  if Hashtbl.mem quota.cur domid
-  then Printf.sprintf "dom%i quota: %i/%i" domid (Hashtbl.find quota.cur domid) quota.maxent
-  else Printf.sprintf "dom%i quota: not set" domid
+  try
+    Printf.sprintf "dom%i quota: %i/%i" domid (DomidMap.find domid quota.cur) quota.maxent
+  with Not_found ->
+    Printf.sprintf "dom%i quota: not set" domid
 
 let create () =
-  { maxent = !maxent; maxsize = !maxsize; cur = Hashtbl.create 100; }
+  { maxent = !maxent; maxsize = !maxsize; cur = DomidMap.empty; }
 
-let copy quota = { quota with cur = (Hashtbl.copy quota.cur) }
+let copy quota = { quota with cur = quota.cur }
 
-let del quota id = Hashtbl.remove quota.cur id
+let del quota id = { quota with cur = DomidMap.remove id quota.cur }
 
 let _check quota id size =
   if size > quota.maxsize then (
     warn "domain %u err create entry: data too big %d" id size;
     raise Data_too_big
   );
-  if id > 0 && Hashtbl.mem quota.cur id then
-    let entry = Hashtbl.find quota.cur id in
+  if id > 0 then
+  try
+    let entry = DomidMap.find id quota.cur in
     if entry >= quota.maxent then (
       warn "domain %u cannot create entry: quota reached" id;
       raise Limit_reached
     )
+  with Not_found -> ()
 
 let check quota id size =
   if !activate then
     _check quota id size
 
-let get_entry quota id = Hashtbl.find quota.cur id
+let find_or_zero quota_cur id =
+  try DomidMap.find id quota_cur with Not_found -> 0
 
-let set_entry quota id nb =
-  if nb = 0
-  then Hashtbl.remove quota.cur id
-  else begin
-    if Hashtbl.mem quota.cur id then
-      Hashtbl.replace quota.cur id nb
-    else
-      Hashtbl.add quota.cur id nb
-  end
+let update_entry quota_cur id diff =
+  let nb = diff + find_or_zero quota_cur id in
+  if nb = 0 then DomidMap.remove id quota_cur
+  else DomidMap.add id nb quota_cur
 
 let del_entry quota id =
-  try
-    let nb = get_entry quota id in
-    set_entry quota id (nb - 1)
-  with Not_found -> ()
+  quota.cur <- update_entry quota.cur id (-1)
 
 let add_entry quota id =
-  let nb = try get_entry quota id with Not_found -> 0 in
-  set_entry quota id (nb + 1)
-
-let add quota diff =
-  Hashtbl.iter (fun id nb -> set_entry quota id (get_entry quota id + nb)) diff.cur
+  quota.cur <- update_entry quota.cur id (+1)
 
 let merge orig_quota mod_quota dest_quota =
-  Hashtbl.iter (fun id nb -> let diff = nb - (try get_entry orig_quota id with Not_found -> 0) in
-      if diff <> 0 then
-        set_entry dest_quota id ((try get_entry dest_quota id with Not_found -> 0) + diff)) mod_quota.cur
+  let fold_merge id nb dest =
+    match nb - find_or_zero orig_quota.cur id with
+    | 0 -> dest (* not modified *)
+    | diff -> update_entry dest id diff (* update with [x=x+diff] *)
+  in
+  dest_quota.cur <- DomidMap.fold fold_merge mod_quota.cur dest_quota.cur
+  (* dest_quota = dest_quota + (mod_quota - orig_quota) *)
