@@ -25,7 +25,7 @@ def get_xen_tag_index_type_regex(tool):
 
 
 def get_xen_tag_comment_regex(tool):
-    before_comment = r'(?P<before>[ \t]*)'
+    before_comment = r'(?P<before>.*)'
     comment = rf'(?P<comment>/\* +{get_xen_tag_regex(tool)}.*\*/)'
     return rf'^(?P<full_line>{before_comment}{comment})$'
 
@@ -106,7 +106,30 @@ def substitute_tags(tool, input_file, grep_struct, subs_rules):
                 key = xen_tag_regex_obj.group('type')
                 if id_number in subs_rules[key]:
                     comment_in = grep_struct["matches"][line_number]['comment']
+                    before = grep_struct["matches"][line_number]['before']
                     comment_out = subs_rules[key][id_number]
+                    if before != '' and not re.match(r'^[ \t]+$', before):
+                        # The comment is at the end of some line with some code
+                        if tool == "eclair":
+                            # Eclair supports comment at the end of the line, so
+                            # the only thing to do is use the right syntax in
+                            # the comment, the default version of it is
+                            # deviating the current line and the next one
+                            comment_out = re.sub(r'\d+ ""', '0 ""', comment_out)
+                        else:
+                            # Other tool does not support deviating the same
+                            # line of the comment, so we use a trick and we use
+                            # the comment at the end of the previous line
+                            if line_number-2 < 0:
+                                raise TagDatabaseError(
+                                    "The comment {} using the tool '{}' can't "
+                                    "stay at the end of the line 1."
+                                    .format(comment_in, tool)
+                                )
+                            parsed_content[line_number-2] = \
+                                parsed_content[line_number-2].replace("\n",
+                                    comment_out + '\n')
+                            comment_out = ''
                     parsed_content[line_number-1] = re.sub(
                         re.escape(comment_in), comment_out,
                         parsed_content[line_number-1])

@@ -210,3 +210,13 @@ will be an entry like the following and the violation id will be in the column
 
 Given the violation id "misra-c2012-20.7", the procedure above can be followed
 to justify this finding.
+
+Another way to justify the above violation is to put the in-code comment tag
+at the end of the affected line::
+
+| extern char _start[], _end[], start[]; /* SAF-1-safe [...] */
+
+This way of deviating violations needs however to be used only when placing the
+tag above the line can't be done. This option suffers from some limitation on
+cppcheck and coverity tool that don't support natively the suppression comment
+at the end of the line.

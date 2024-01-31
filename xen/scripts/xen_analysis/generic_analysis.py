@@ -52,11 +52,15 @@ def parse_xen_tags():
         os.rename(file, bkp_file)
         time_bkp_file = os.stat(bkp_file)
         # Create <file> from <file>.safparse but with the Xen tag parsed
-        tag_database.substitute_tags(settings.analysis_tool, bkp_file, entry,
-                                     subs_list)
-        # Set timestamp for file equal to bkp_file, so that if the file is
-        # modified during the process by the user, we can catch it
-        os.utime(file, (time_bkp_file.st_atime, time_bkp_file.st_mtime))
+        try:
+            tag_database.substitute_tags(settings.analysis_tool, bkp_file, entry,
+                                         subs_list)
+        except Exception as e:
+            raise ParseTagPhaseError("{}".format(e))
+        finally:
+            # Set timestamp for file equal to bkp_file, so that if the file is
+            # modified during the process by the user, we can catch it
+            os.utime(file, (time_bkp_file.st_atime, time_bkp_file.st_mtime))
 
 
 def build_xen():
