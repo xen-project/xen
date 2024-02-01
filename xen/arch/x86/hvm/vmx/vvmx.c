@@ -899,7 +899,10 @@ static const u16 vmcs_gstate_field[] = {
     GUEST_LDTR_AR_BYTES,
     GUEST_TR_AR_BYTES,
     GUEST_INTERRUPTIBILITY_INFO,
+    /*
+     * ACTIVITY_STATE is handled specially.
     GUEST_ACTIVITY_STATE,
+     */
     GUEST_SYSENTER_CS,
     GUEST_PREEMPTION_TIMER,
     /* natural */
@@ -1199,6 +1202,8 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
     nestedhvm_vcpu_enter_guestmode(v);
     nvcpu->nv_vmentry_pending = 0;
     nvcpu->nv_vmswitch_in_progress = 1;
+
+    /* TODO: Fail VMentry for GUEST_ACTIVITY_STATE != 0 */
 
     /*
      * EFER handling:
@@ -2316,8 +2321,8 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         data = hvm_cr4_guest_valid_bits(d);
         break;
     case MSR_IA32_VMX_MISC:
-        /* Do not support CR3-target feature now */
-        data = host_data & ~VMX_MISC_CR3_TARGET;
+        /* Do not support CR3-targets or activity states. */
+        data = host_data & ~(VMX_MISC_CR3_TARGET | VMX_MISC_ACTIVITY_MASK);
         break;
     case MSR_IA32_VMX_EPT_VPID_CAP:
         data = nept_get_ept_vpid_cap();
