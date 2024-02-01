@@ -381,7 +381,8 @@ struct domain_iommu {
 #define iommu_clear_feature(d, f) clear_bit(f, dom_iommu(d)->features)
 
 /* Are we using the domain P2M table as its IOMMU pagetable? */
-#define iommu_use_hap_pt(d)       (dom_iommu(d)->hap_pt_share)
+#define iommu_use_hap_pt(d)       (IS_ENABLED(CONFIG_HVM) && \
+                                   dom_iommu(d)->hap_pt_share)
 
 /* Does the IOMMU pagetable need to be kept synchronized with the P2M */
 #ifdef CONFIG_HAS_PASSTHROUGH

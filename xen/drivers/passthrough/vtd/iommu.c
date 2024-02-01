@@ -438,7 +438,7 @@ static paddr_t domain_pgd_maddr(struct domain *d, paddr_t pgd_maddr,
 
     if ( pgd_maddr )
         /* nothing */;
-    else if ( IS_ENABLED(CONFIG_HVM) && iommu_use_hap_pt(d) )
+    else if ( iommu_use_hap_pt(d) )
     {
         pagetable_t pgt = p2m_get_pagetable(p2m_get_hostp2m(d));
 
