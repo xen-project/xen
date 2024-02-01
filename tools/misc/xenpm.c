@@ -362,7 +362,15 @@ static int show_pxstat_by_cpuid(xc_interface *xc_handle, int cpuid)
 
     ret = get_pxstat_by_cpuid(xc_handle, cpuid, &pxstatinfo);
     if ( ret )
+    {
+        if ( ret == -ENODEV )
+            fprintf(stderr,
+                    "Either Xen cpufreq is disabled or no valid information is registered!\n");
+        else if ( ret == -EOPNOTSUPP )
+            fprintf(stderr,
+                    "P-State information not supported.  Try 'get-cpufreq-average' or 'start'.\n");
         return ret;
+    }
 
     print_pxstat(cpuid, &pxstatinfo);
 
@@ -383,8 +391,12 @@ void pxstat_func(int argc, char *argv[])
         /* show pxstates on all cpus */
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
-            if ( show_pxstat_by_cpuid(xc_handle, i) == -ENODEV )
+        {
+            int ret = show_pxstat_by_cpuid(xc_handle, i);
+
+            if ( ret == -ENODEV || ret == -EOPNOTSUPP )
                 break;
+        }
     }
     else
         show_pxstat_by_cpuid(xc_handle, cpuid);
@@ -432,7 +444,7 @@ static uint64_t *sum, *sum_cx, *sum_px;
 
 static void signal_int_handler(int signo)
 {
-    int i, j, k;
+    int i, j, k, ret;
     struct timeval tv;
     int cx_cap = 0, px_cap = 0;
     xc_cputopo_t *cputopo = NULL;
@@ -473,7 +485,8 @@ static void signal_int_handler(int signo)
                 }
     }
 
-    if ( get_pxstat_by_cpuid(xc_handle, 0, NULL) != -ENODEV )
+    ret = get_pxstat_by_cpuid(xc_handle, 0, NULL);
+    if ( ret != -ENODEV && ret != -EOPNOTSUPP )
     {
         px_cap = 1;
         for ( i = 0; i < max_cpu_nr; i++ )
