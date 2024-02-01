@@ -48,34 +48,27 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
                   unsigned int order)
 {
     unsigned long i;
-    struct page_info *p;
     struct domain *d = p2m->domain;
+    mfn_t mfn = page_to_mfn(page);
 
 #ifndef NDEBUG
-    mfn_t mfn;
-
-    mfn = page_to_mfn(page);
-
     /* Check to make sure this is a contiguous region */
     if ( mfn_x(mfn) & ((1UL << order) - 1) )
     {
         printk("%s: mfn %lx not aligned order %u! (mask %lx)\n",
                __func__, mfn_x(mfn), order, ((1UL << order) - 1));
-        return -1;
+        return -EINVAL;
     }
 
-    for ( i = 0; i < 1UL << order ; i++)
+    for ( i = 0; i < (1UL << order); i++)
     {
-        struct domain * od;
+        const struct domain *od = page_get_owner(page + i);
 
-        p = mfn_to_page(mfn_add(mfn, i));
-        od = page_get_owner(p);
         if ( od != d )
         {
-            printk("%s: mfn %lx expected owner d%d, got owner d%d!\n",
-                   __func__, mfn_x(mfn), d->domain_id,
-                   od ? od->domain_id : -1);
-            return -1;
+            printk("%s: mfn %lx owner: expected %pd, got %pd\n",
+                   __func__, mfn_x(mfn) + i, d, od);
+            return -EACCES;
         }
     }
 #endif
@@ -88,16 +81,12 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
      * promise to provide zero pages. So we scrub pages before using.
      */
     for ( i = 0; i < (1UL << order); i++ )
-        clear_domain_page(mfn_add(page_to_mfn(page), i));
+        clear_domain_page(mfn_add(mfn, i));
 
     /* First, take all pages off the domain list */
     lock_page_alloc(p2m);
-    for ( i = 0; i < 1UL << order ; i++ )
-    {
-        p = page + i;
-        page_list_del(p, &d->page_list);
-    }
-
+    for ( i = 0; i < (1UL << order); i++ )
+        page_list_del(page + i, &d->page_list);
     unlock_page_alloc(p2m);
 
     /* Then add to the appropriate populate-on-demand list. */
