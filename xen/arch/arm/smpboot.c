@@ -449,7 +449,7 @@ static void set_smp_up_cpu(unsigned long mpidr)
      * smp_up_cpu will be accessed with the MMU off, so ensure the update
      * is visible by cleaning the cache.
      */
-    clean_dcache(ptr);
+    clean_dcache_va_range(ptr, sizeof(unsigned long));
 
     unmap_domain_page(ptr);
 

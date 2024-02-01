@@ -88,7 +88,7 @@ static void set_init_ttbr(lpae_t *root)
      * init_ttbr will be accessed with the MMU off, so ensure the update
      * is visible by cleaning the cache.
      */
-    clean_dcache(ptr);
+    clean_dcache_va_range(ptr, sizeof(uint64_t));
 
     unmap_domain_page(ptr);
 }
