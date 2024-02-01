@@ -680,8 +680,18 @@ static long cf_check microcode_update_helper(void *data)
         microcode_update_cache(patch);
         spin_unlock(&microcode_mutex);
 
-        /* Refresh the raw CPU policy, in case the features have changed. */
+        /*
+         * Refresh the raw CPU policy, in case the features have changed.
+         * Disable CPUID masking if in use, to avoid having current's
+         * cpu_policy affect the rescan.
+         */
+	if ( ctxt_switch_masking )
+            alternative_vcall(ctxt_switch_masking, NULL);
+
         calculate_raw_cpu_policy();
+
+	if ( ctxt_switch_masking )
+            alternative_vcall(ctxt_switch_masking, current);
     }
     else
         microcode_free_patch(patch);
@@ -721,8 +731,12 @@ int microcode_update(XEN_GUEST_HANDLE(const_void) buf, unsigned long len)
     }
     buffer->len = len;
 
-    return continue_hypercall_on_cpu(smp_processor_id(),
-                                     microcode_update_helper, buffer);
+    /*
+     * Always queue microcode_update_helper() on CPU0.  Most of the logic
+     * won't care, but the update of the Raw CPU policy wants to (re)run on
+     * the BSP.
+     */
+    return continue_hypercall_on_cpu(0, microcode_update_helper, buffer);
 }
 
 static int __init cf_check microcode_init(void)
