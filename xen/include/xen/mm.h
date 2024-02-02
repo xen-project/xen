@@ -91,8 +91,9 @@ bool scrub_free_pages(void);
 
 /* Free an allocation, and zero the pointer to it. */
 #define FREE_XENHEAP_PAGES(p, o) do { \
-    free_xenheap_pages(p, o);         \
+    void *_ptr_ = (p);                \
     (p) = NULL;                       \
+    free_xenheap_pages(_ptr_, o);     \
 } while ( false )
 #define FREE_XENHEAP_PAGE(p) FREE_XENHEAP_PAGES(p, 0)
 
