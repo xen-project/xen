@@ -199,7 +199,7 @@ static inline unsigned int generic_hweight64(uint64_t w)
     return (w + (w >> 32)) & 0xFF;
 }
 
-static inline unsigned long hweight_long(unsigned long w)
+static inline unsigned int hweight_long(unsigned long w)
 {
     return sizeof(w) == 4 ? generic_hweight32(w) : generic_hweight64(w);
 }
