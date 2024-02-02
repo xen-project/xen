@@ -1499,7 +1499,13 @@ static void cf_check vmx_set_nonreg_state(struct vcpu *v,
 {
     vmx_vmcs_enter(v);
 
-    __vmwrite(GUEST_ACTIVITY_STATE, nrs->vmx.activity_state);
+    if ( nrs->vmx.activity_state )
+    {
+        printk("Attempt to set %pv activity_state %#lx\n",
+               v, nrs->vmx.activity_state);
+        domain_crash(v->domain);
+    }
+
     __vmwrite(GUEST_INTERRUPTIBILITY_INFO, nrs->vmx.interruptibility_info);
     __vmwrite(GUEST_PENDING_DBG_EXCEPTIONS, nrs->vmx.pending_dbg);
 
