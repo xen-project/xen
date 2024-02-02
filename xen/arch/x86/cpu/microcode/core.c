@@ -685,12 +685,12 @@ static long cf_check microcode_update_helper(void *data)
          * Disable CPUID masking if in use, to avoid having current's
          * cpu_policy affect the rescan.
          */
-	if ( ctxt_switch_masking )
+        if ( ctxt_switch_masking )
             alternative_vcall(ctxt_switch_masking, NULL);
 
         calculate_raw_cpu_policy();
 
-	if ( ctxt_switch_masking )
+        if ( ctxt_switch_masking )
             alternative_vcall(ctxt_switch_masking, current);
     }
     else
