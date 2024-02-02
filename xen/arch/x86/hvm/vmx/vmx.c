@@ -4037,7 +4037,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     case EXIT_REASON_INIT:
         printk(XENLOG_ERR "Error: INIT received - ignoring\n");
-        return; /* Renter the guest without further processing */
+        break;
     }
 
     /* Now enable interrupts so it's safe to take locks. */
@@ -4323,6 +4323,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     }
     case EXIT_REASON_EXTERNAL_INTERRUPT:
+    case EXIT_REASON_INIT:
         /* Already handled above. */
         break;
     case EXIT_REASON_TRIPLE_FAULT:
