@@ -497,14 +497,20 @@ static const struct interface_funcs domain_funcs = {
 
 static void *map_interface(domid_t domid)
 {
+	if (domid == xenbus_master_domid())
+		return xenbus_map();
+
 	return xengnttab_map_grant_ref(*xgt_handle, domid,
 				       GNTTAB_RESERVED_XENSTORE,
 				       PROT_READ|PROT_WRITE);
 }
 
-static void unmap_interface(void *interface)
+static void unmap_interface(domid_t domid, void *interface)
 {
-	xengnttab_unmap(*xgt_handle, interface, 1);
+	if (domid == xenbus_master_domid())
+		unmap_xenbus(interface);
+	else
+		xengnttab_unmap(*xgt_handle, interface, 1);
 }
 
 static int domain_tree_remove_sub(const void *ctx, struct connection *conn,
@@ -594,14 +600,8 @@ static int destroy_domain(void *_domain)
 			eprintf("> Unbinding port %i failed!\n", domain->port);
 	}
 
-	if (domain->interface) {
-		/* Domain 0 was mapped by dom0_init, so it must be unmapped
-		   using munmap() and not the grant unmap call. */
-		if (domain->domid == dom0_domid)
-			unmap_xenbus(domain->interface);
-		else
-			unmap_interface(domain->interface);
-	}
+	if (domain->interface)
+		unmap_interface(domain->domid, domain->interface);
 
 	fire_special_watches("@releaseDomain");
 
@@ -966,18 +966,13 @@ static struct domain *introduce_domain(const void *ctx,
 		return NULL;
 
 	if (!domain->introduced) {
-		interface = is_master_domain ? xenbus_map()
-					     : map_interface(domid);
+		interface = map_interface(domid);
 		if (!interface && !restore)
 			return NULL;
 		if (new_domain(domain, port, restore)) {
 			rc = errno;
-			if (interface) {
-				if (is_master_domain)
-					unmap_xenbus(interface);
-				else
-					unmap_interface(interface);
-			}
+			if (interface)
+				unmap_interface(domid, interface);
 			errno = rc;
 			return NULL;
 		}
