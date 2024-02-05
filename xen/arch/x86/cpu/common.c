@@ -121,7 +121,7 @@ static const struct cpu_dev default_cpu = {
 static const struct cpu_dev *this_cpu = &default_cpu;
 
 static DEFINE_PER_CPU(uint64_t, msr_misc_features);
-void (* __read_mostly ctxt_switch_masking)(const struct vcpu *next);
+void (* __ro_after_init ctxt_switch_masking)(const struct vcpu *next);
 
 bool __init probe_cpuid_faulting(void)
 {
