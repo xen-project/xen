@@ -20,14 +20,17 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdlib.h>
+#include <syslog.h>
 #include <sys/mman.h>
+#include <xen-tools/xenstore-common.h>
 
 #include "utils.h"
 #include "core.h"
 #include "osdep.h"
 
-void write_pidfile(const char *pidfile)
+static void write_pidfile(const char *pidfile)
 {
 	char buf[100];
 	int len;
@@ -49,7 +52,7 @@ void write_pidfile(const char *pidfile)
 }
 
 /* Stevens. */
-void daemonize(void)
+static void daemonize(void)
 {
 	pid_t pid;
 
@@ -156,4 +159,28 @@ void *xenbus_map(void)
 	close(fd);
 
 	return addr;
+}
+
+void early_init(bool live_update, bool dofork, const char *pidfile)
+{
+	reopen_log();
+
+	/* Make sure xenstored directory exists. */
+	/* Errors ignored here, will be reported when we open files */
+	mkdir(xenstore_daemon_rundir(), 0755);
+
+	if (dofork) {
+		openlog("xenstored", 0, LOG_DAEMON);
+		if (!live_update)
+			daemonize();
+	}
+
+	if (pidfile)
+		write_pidfile(pidfile);
+
+	/* Don't kill us with SIGPIPE. */
+	signal(SIGPIPE, SIG_IGN);
+
+	if (!live_update)
+		init_sockets();
 }

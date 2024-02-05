@@ -20,14 +20,6 @@
 #include "core.h"
 #include <xen/grant_table.h>
 
-void write_pidfile(const char *pidfile)
-{
-}
-
-void daemonize(void)
-{
-}
-
 void finish_daemonize(void)
 {
 }
@@ -54,3 +46,6 @@ void unmap_xenbus(void *interface)
 	xengnttab_unmap(*xgt_handle, interface, 1);
 }
 
+void early_init(bool live_update, bool dofork, const char *pidfile)
+{
+}

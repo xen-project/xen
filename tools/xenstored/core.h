@@ -384,12 +384,11 @@ static inline bool domain_is_unprivileged(const struct connection *conn)
 
 /* Return the event channel used by xenbus. */
 evtchn_port_t get_xenbus_evtchn(void);
+void early_init(bool live_update, bool dofork, const char *pidfile);
 
-/* Write out the pidfile */
-void write_pidfile(const char *pidfile);
+void init_sockets(void);
+extern int reopen_log_pipe[2];
 
-/* Fork but do not close terminal FDs */
-void daemonize(void);
 /* Close stdin/stdout/stderr to complete daemonize */
 void finish_daemonize(void);
 

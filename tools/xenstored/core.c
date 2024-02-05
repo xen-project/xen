@@ -79,7 +79,7 @@ char **orig_argv;
 LIST_HEAD(connections);
 int tracefd = -1;
 bool keep_orphans = false;
-static int reopen_log_pipe[2];
+int reopen_log_pipe[2];
 static int reopen_log_pipe0_pollfd_idx = -1;
 char *tracefile = NULL;
 static struct hashtable *nodes;
@@ -2612,7 +2612,7 @@ static void destroy_fds(void)
 		close(sock);
 }
 
-static void init_sockets(void)
+void init_sockets(void)
 {
 	struct sockaddr_un addr;
 	const char *soc_str = xenstore_daemon_path();
@@ -2903,33 +2903,9 @@ int main(int argc, char *argv[])
 	if (optind != argc)
 		barf("%s: No arguments desired", argv[0]);
 
-	reopen_log();
-
-	/* Make sure xenstored directory exists. */
-	/* Errors ignored here, will be reported when we open files */
-	mkdir(xenstore_daemon_rundir(), 0755);
-
-	if (dofork) {
-		openlog("xenstored", 0, LOG_DAEMON);
-		if (!live_update)
-			daemonize();
-	}
-	if (pidfile)
-		write_pidfile(pidfile);
-
-	/* Talloc leak reports go to stderr, which is closed if we fork. */
-	if (!dofork)
-		talloc_enable_leak_report_full();
-
-	/* Don't kill us with SIGPIPE. */
-	signal(SIGPIPE, SIG_IGN);
+	early_init(live_update, dofork, pidfile);
 
 	talloc_enable_null_tracking();
-
-#ifndef NO_SOCKETS
-	if (!live_update)
-		init_sockets();
-#endif
 
 	init_pipe(reopen_log_pipe);
 
