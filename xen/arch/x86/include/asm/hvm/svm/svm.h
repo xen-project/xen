@@ -38,7 +38,10 @@ extern u32 svm_feature_flags;
 #define SVM_FEATURE_SSS           19 /* NPT Supervisor Shadow Stacks */
 #define SVM_FEATURE_SPEC_CTRL     20 /* MSR_SPEC_CTRL virtualisation */
 
-#define cpu_has_svm_feature(f) (svm_feature_flags & (1u << (f)))
+static inline bool cpu_has_svm_feature(unsigned int feat)
+{
+    return svm_feature_flags & (1u << feat);
+}
 #define cpu_has_svm_npt       cpu_has_svm_feature(SVM_FEATURE_NPT)
 #define cpu_has_svm_lbrv      cpu_has_svm_feature(SVM_FEATURE_LBRV)
 #define cpu_has_svm_svml      cpu_has_svm_feature(SVM_FEATURE_SVML)
