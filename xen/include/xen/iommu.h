@@ -337,7 +337,9 @@ extern int iommu_add_extra_reserved_device_memory(unsigned long start,
 extern int iommu_get_extra_reserved_device_memory(iommu_grdm_t *func,
                                                   void *ctxt);
 
+#ifdef CONFIG_HAS_PASSTHROUGH
 #include <asm/iommu.h>
+#endif
 
 #ifndef iommu_call
 # define iommu_call(ops, fn, args...) ((ops)->fn(args))
@@ -345,7 +347,9 @@ extern int iommu_get_extra_reserved_device_memory(iommu_grdm_t *func,
 #endif
 
 struct domain_iommu {
+#ifdef CONFIG_HAS_PASSTHROUGH
     struct arch_iommu arch;
+#endif
 
     /* iommu_ops */
     const struct iommu_ops *platform_ops;
