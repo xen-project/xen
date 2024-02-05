@@ -54,6 +54,6 @@ static void cf_check init_centaur(struct cpuinfo_x86 *c)
 		init_c3(c);
 }
 
-const struct cpu_dev centaur_cpu_dev = {
+const struct cpu_dev __initconst_cf_clobber centaur_cpu_dev = {
 	.c_init		= init_centaur,
 };

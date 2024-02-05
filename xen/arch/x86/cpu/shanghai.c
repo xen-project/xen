@@ -15,6 +15,6 @@ static void cf_check init_shanghai(struct cpuinfo_x86 *c)
     init_intel_cacheinfo(c);
 }
 
-const struct cpu_dev shanghai_cpu_dev = {
+const struct cpu_dev __initconst_cf_clobber shanghai_cpu_dev = {
     .c_init     = init_shanghai,
 };

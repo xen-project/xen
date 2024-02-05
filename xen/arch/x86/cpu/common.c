@@ -115,10 +115,10 @@ static void cf_check default_init(struct cpuinfo_x86 * c)
 	__clear_bit(X86_FEATURE_SEP, c->x86_capability);
 }
 
-static const struct cpu_dev default_cpu = {
+static const struct cpu_dev __initconst_cf_clobber __used default_cpu = {
 	.c_init	= default_init,
 };
-static const struct cpu_dev *this_cpu = &default_cpu;
+static struct cpu_dev __ro_after_init actual_cpu;
 
 static DEFINE_PER_CPU(uint64_t, msr_misc_features);
 void (* __ro_after_init ctxt_switch_masking)(const struct vcpu *next);
@@ -343,12 +343,13 @@ void __init early_cpu_init(void)
 
 	c->x86_vendor = x86_cpuid_lookup_vendor(ebx, ecx, edx);
 	switch (c->x86_vendor) {
-	case X86_VENDOR_INTEL:	  this_cpu = &intel_cpu_dev;    break;
-	case X86_VENDOR_AMD:	  this_cpu = &amd_cpu_dev;      break;
-	case X86_VENDOR_CENTAUR:  this_cpu = &centaur_cpu_dev;  break;
-	case X86_VENDOR_SHANGHAI: this_cpu = &shanghai_cpu_dev; break;
-	case X86_VENDOR_HYGON:    this_cpu = &hygon_cpu_dev;    break;
+	case X86_VENDOR_INTEL:	  actual_cpu = intel_cpu_dev;    break;
+	case X86_VENDOR_AMD:	  actual_cpu = amd_cpu_dev;      break;
+	case X86_VENDOR_CENTAUR:  actual_cpu = centaur_cpu_dev;  break;
+	case X86_VENDOR_SHANGHAI: actual_cpu = shanghai_cpu_dev; break;
+	case X86_VENDOR_HYGON:    actual_cpu = hygon_cpu_dev;    break;
 	default:
+		actual_cpu = default_cpu;
 		printk(XENLOG_ERR
 		       "Unrecognised or unsupported CPU vendor '%.12s'\n",
 		       c->x86_vendor_id);
@@ -434,8 +435,8 @@ static void generic_identify(struct cpuinfo_x86 *c)
 	c->apicid = phys_pkg_id((ebx >> 24) & 0xFF, 0);
 	c->phys_proc_id = c->apicid;
 
-	if (this_cpu->c_early_init)
-		this_cpu->c_early_init(c);
+	if (actual_cpu.c_early_init)
+		alternative_vcall(actual_cpu.c_early_init, c);
 
 	/* c_early_init() may have adjusted cpuid levels/features.  Reread. */
 	c->cpuid_level = cpuid_eax(0);
@@ -540,9 +541,8 @@ void identify_cpu(struct cpuinfo_x86 *c)
 	 * At the end of this section, c->x86_capability better
 	 * indicate the features this CPU genuinely supports!
 	 */
-	if (this_cpu->c_init)
-		this_cpu->c_init(c);
-
+	if (actual_cpu.c_init)
+		alternative_vcall(actual_cpu.c_init, c);
 
    	if (c == &boot_cpu_data && !opt_pku)
 		setup_clear_cpu_cap(X86_FEATURE_PKU);
