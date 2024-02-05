@@ -25,7 +25,7 @@
 #include <asm/cache.h>
 #include <asm/guest.h>
 
-static struct hypervisor_ops __read_mostly ops;
+static struct hypervisor_ops __ro_after_init ops;
 
 const char *__init hypervisor_probe(void)
 {
@@ -61,7 +61,7 @@ void __init hypervisor_setup(void)
 int hypervisor_ap_setup(void)
 {
     if ( ops.ap_setup )
-        return ops.ap_setup();
+        return alternative_call(ops.ap_setup);
 
     return 0;
 }
@@ -69,7 +69,7 @@ int hypervisor_ap_setup(void)
 void hypervisor_resume(void)
 {
     if ( ops.resume )
-        ops.resume();
+        alternative_vcall(ops.resume);
 }
 
 void __init hypervisor_e820_fixup(struct e820map *e820)
