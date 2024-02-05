@@ -37,6 +37,10 @@
 #include <xenctrl.h>
 #include <xen/grant_table.h>
 
+#ifdef __MINIOS__
+#include <mini-os/xenbus.h>
+#endif
+
 static xc_interface **xc_handle;
 xengnttab_handle **xgt_handle;
 static evtchn_port_t virq_port;
@@ -500,6 +504,11 @@ static void *map_interface(domid_t domid)
 	if (domid == xenbus_master_domid())
 		return xenbus_map();
 
+#ifdef __MINIOS__
+	if (domid == stub_domid)
+		return xenstore_buf;
+#endif
+
 	return xengnttab_map_grant_ref(*xgt_handle, domid,
 				       GNTTAB_RESERVED_XENSTORE,
 				       PROT_READ|PROT_WRITE);
@@ -509,7 +518,7 @@ static void unmap_interface(domid_t domid, void *interface)
 {
 	if (domid == xenbus_master_domid())
 		unmap_xenbus(interface);
-	else
+	else if (domid != stub_domid)
 		xengnttab_unmap(*xgt_handle, interface, 1);
 }
 
@@ -1212,6 +1221,22 @@ void dom0_init(void)
 		barf_perror("Failed to initialize dom0");
 
 	xenevtchn_notify(xce_handle, dom0->port);
+}
+
+void stubdom_init(void)
+{
+#ifdef __MINIOS__
+	struct domain *stubdom;
+
+	if (stub_domid < 0)
+		return;
+
+	stubdom = introduce_domain(NULL, stub_domid, xenbus_evtchn, false);
+	if (!stubdom)
+		barf_perror("Failed to initialize stubdom");
+
+	xenevtchn_notify(xce_handle, stubdom->port);
+#endif
 }
 
 static unsigned int domhash_fn(const void *k)

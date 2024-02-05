@@ -2767,6 +2767,8 @@ int main(int argc, char *argv[])
 		lu_read_state();
 #endif
 
+	stubdom_init();
+
 	check_store();
 
 	/* Get ready to listen to the tools. */
