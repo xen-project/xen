@@ -18,10 +18,16 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 #include "core.h"
+#include "utils.h"
 #include <xen/grant_table.h>
 
 void finish_daemonize(void)
 {
+}
+
+struct connection *add_socket_connection(int fd)
+{
+	barf("socket based connection without sockets");
 }
 
 evtchn_port_t get_xenbus_evtchn(void)
@@ -53,5 +59,14 @@ void set_special_fds(void)
 }
 
 void handle_special_fds(void)
+{
+}
+
+int get_socket_fd(void)
+{
+	return -1;
+}
+
+void set_socket_fd(int fd)
 {
 }

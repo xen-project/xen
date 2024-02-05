@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include <syslog.h>
 #include <sys/mman.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #if defined(HAVE_SYSTEMD)
 #include <systemd/sd-daemon.h>
 #endif
@@ -32,9 +34,13 @@
 #include "utils.h"
 #include "core.h"
 #include "osdep.h"
+#include "talloc.h"
 
 static int reopen_log_pipe0_pollfd_idx = -1;
 static int reopen_log_pipe[2];
+
+static int sock_pollfd_idx = -1;
+static int sock = -1;
 
 static void write_pidfile(const char *pidfile)
 {
@@ -180,6 +186,142 @@ void *xenbus_map(void)
 	return addr;
 }
 
+static int writefd(struct connection *conn, const void *data, unsigned int len)
+{
+	int rc;
+
+	while ((rc = write(conn->fd, data, len)) < 0) {
+		if (errno == EAGAIN) {
+			rc = 0;
+			break;
+		}
+		if (errno != EINTR)
+			break;
+	}
+
+	return rc;
+}
+
+static int readfd(struct connection *conn, void *data, unsigned int len)
+{
+	int rc;
+
+	while ((rc = read(conn->fd, data, len)) < 0) {
+		if (errno == EAGAIN) {
+			rc = 0;
+			break;
+		}
+		if (errno != EINTR)
+			break;
+	}
+
+	/* Reading zero length means we're done with this connection. */
+	if ((rc == 0) && (len != 0)) {
+		errno = EBADF;
+		rc = -1;
+	}
+
+	return rc;
+}
+
+static bool socket_can_process(struct connection *conn, int mask)
+{
+	if (conn->pollfd_idx == -1)
+		return false;
+
+	if (poll_fds[conn->pollfd_idx].revents & ~(POLLIN | POLLOUT)) {
+		talloc_free(conn);
+		return false;
+	}
+
+	return (poll_fds[conn->pollfd_idx].revents & mask);
+}
+
+static bool socket_can_write(struct connection *conn)
+{
+	return socket_can_process(conn, POLLOUT);
+}
+
+static bool socket_can_read(struct connection *conn)
+{
+	return socket_can_process(conn, POLLIN);
+}
+
+static const struct interface_funcs socket_funcs = {
+	.write = writefd,
+	.read = readfd,
+	.can_write = socket_can_write,
+	.can_read = socket_can_read,
+};
+
+static void accept_connection(int sock)
+{
+	int fd;
+	struct connection *conn;
+
+	fd = accept(sock, NULL, NULL);
+	if (fd < 0)
+		return;
+
+	conn = new_connection(&socket_funcs);
+	if (conn) {
+		conn->fd = fd;
+		conn->id = dom0_domid;
+	} else
+		close(fd);
+}
+
+static void destroy_fds(void)
+{
+	if (sock >= 0)
+		close(sock);
+}
+
+static void init_sockets(void)
+{
+	struct sockaddr_un addr;
+	const char *soc_str = xenstore_daemon_path();
+
+	if (!soc_str)
+		barf_perror("Failed to obtain xs domain socket");
+
+	/* Create sockets for them to listen to. */
+	atexit(destroy_fds);
+	sock = socket(PF_UNIX, SOCK_STREAM, 0);
+	if (sock < 0)
+		barf_perror("Could not create socket");
+
+	/* FIXME: Be more sophisticated, don't mug running daemon. */
+	unlink(soc_str);
+
+	addr.sun_family = AF_UNIX;
+
+	if (strlen(soc_str) >= sizeof(addr.sun_path))
+		barf_perror("socket string '%s' too long", soc_str);
+	strcpy(addr.sun_path, soc_str);
+	if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
+		barf_perror("Could not bind socket to %s", soc_str);
+
+	if (chmod(soc_str, 0600) != 0)
+		barf_perror("Could not chmod sockets");
+
+	if (listen(sock, 1) != 0)
+		barf_perror("Could not listen on sockets");
+}
+
+
+struct connection *add_socket_connection(int fd)
+{
+	struct connection *conn;
+
+	conn = new_connection(&socket_funcs);
+	if (!conn)
+		barf("error restoring connection");
+	conn->fd = fd;
+
+	return conn;
+}
+
 void early_init(bool live_update, bool dofork, const char *pidfile)
 {
 	reopen_log();
@@ -212,6 +354,9 @@ void set_special_fds(void)
 	if (reopen_log_pipe[0] != -1)
 		reopen_log_pipe0_pollfd_idx =
 			set_fd(reopen_log_pipe[0], POLLIN|POLLPRI);
+
+	if (sock != -1)
+		sock_pollfd_idx = set_fd(sock, POLLIN|POLLPRI);
 }
 
 void handle_special_fds(void)
@@ -231,6 +376,15 @@ void handle_special_fds(void)
 		}
 		reopen_log_pipe0_pollfd_idx = -1;
 	}
+
+	if (sock_pollfd_idx != -1) {
+		if (poll_fds[sock_pollfd_idx].revents & ~POLLIN) {
+			barf_perror("sock poll failed");
+		} else if (poll_fds[sock_pollfd_idx].revents & POLLIN) {
+			accept_connection(sock);
+			sock_pollfd_idx = -1;
+		}
+	}
 }
 
 void late_init(bool live_update)
@@ -241,4 +395,14 @@ void late_init(bool live_update)
 		fprintf(stderr, SD_NOTICE "xenstored is ready\n");
 	}
 #endif
+}
+
+int get_socket_fd(void)
+{
+	return sock;
+}
+
+void set_socket_fd(int fd)
+{
+	sock = fd;
 }

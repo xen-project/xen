@@ -20,10 +20,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <poll.h>
-#ifndef NO_SOCKETS
-#include <sys/socket.h>
-#include <sys/un.h>
-#endif
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
@@ -60,8 +56,6 @@ struct pollfd *poll_fds;
 static unsigned int current_array_size;
 static unsigned int nr_fds;
 static unsigned int delayed_requests;
-
-static int sock = -1;
 
 int orig_argc;
 char **orig_argv;
@@ -486,7 +480,7 @@ fail:
 	return -1;
 }
 
-static void initialize_fds(int *p_sock_pollfd_idx, int *ptimeout)
+static void initialize_fds(int *ptimeout)
 {
 	struct connection *conn;
 	uint64_t msecs;
@@ -499,8 +493,6 @@ static void initialize_fds(int *p_sock_pollfd_idx, int *ptimeout)
 	*ptimeout = delayed_requests ? 1000 : -1;
 
 	set_special_fds();
-	if (sock != -1)
-		*p_sock_pollfd_idx = set_fd(sock, POLLIN|POLLPRI);
 
 	if (xce_handle != NULL)
 		xce_pollfd_idx = set_fd(xenevtchn_fd(xce_handle),
@@ -2260,97 +2252,6 @@ struct connection *get_connection_by_id(unsigned int conn_id)
 	return NULL;
 }
 
-#ifdef NO_SOCKETS
-static void accept_connection(int sock)
-{
-}
-#else
-static int writefd(struct connection *conn, const void *data, unsigned int len)
-{
-	int rc;
-
-	while ((rc = write(conn->fd, data, len)) < 0) {
-		if (errno == EAGAIN) {
-			rc = 0;
-			break;
-		}
-		if (errno != EINTR)
-			break;
-	}
-
-	return rc;
-}
-
-static int readfd(struct connection *conn, void *data, unsigned int len)
-{
-	int rc;
-
-	while ((rc = read(conn->fd, data, len)) < 0) {
-		if (errno == EAGAIN) {
-			rc = 0;
-			break;
-		}
-		if (errno != EINTR)
-			break;
-	}
-
-	/* Reading zero length means we're done with this connection. */
-	if ((rc == 0) && (len != 0)) {
-		errno = EBADF;
-		rc = -1;
-	}
-
-	return rc;
-}
-
-static bool socket_can_process(struct connection *conn, int mask)
-{
-	if (conn->pollfd_idx == -1)
-		return false;
-
-	if (poll_fds[conn->pollfd_idx].revents & ~(POLLIN | POLLOUT)) {
-		talloc_free(conn);
-		return false;
-	}
-
-	return (poll_fds[conn->pollfd_idx].revents & mask);
-}
-
-static bool socket_can_write(struct connection *conn)
-{
-	return socket_can_process(conn, POLLOUT);
-}
-
-static bool socket_can_read(struct connection *conn)
-{
-	return socket_can_process(conn, POLLIN);
-}
-
-const struct interface_funcs socket_funcs = {
-	.write = writefd,
-	.read = readfd,
-	.can_write = socket_can_write,
-	.can_read = socket_can_read,
-};
-
-static void accept_connection(int sock)
-{
-	int fd;
-	struct connection *conn;
-
-	fd = accept(sock, NULL, NULL);
-	if (fd < 0)
-		return;
-
-	conn = new_connection(&socket_funcs);
-	if (conn) {
-		conn->fd = fd;
-		conn->id = dom0_domid;
-	} else
-		close(fd);
-}
-#endif
-
 /* We create initial nodes manually. */
 static void manual_node(const char *name, const char *child)
 {
@@ -2579,46 +2480,6 @@ void corrupt(struct connection *conn, const char *fmt, ...)
 	errno = saved_errno;
 }
 
-#ifndef NO_SOCKETS
-static void destroy_fds(void)
-{
-	if (sock >= 0)
-		close(sock);
-}
-
-void init_sockets(void)
-{
-	struct sockaddr_un addr;
-	const char *soc_str = xenstore_daemon_path();
-
-	if (!soc_str)
-		barf_perror("Failed to obtain xs domain socket");
-
-	/* Create sockets for them to listen to. */
-	atexit(destroy_fds);
-	sock = socket(PF_UNIX, SOCK_STREAM, 0);
-	if (sock < 0)
-		barf_perror("Could not create socket");
-
-	/* FIXME: Be more sophisticated, don't mug running daemon. */
-	unlink(soc_str);
-
-	addr.sun_family = AF_UNIX;
-
-	if(strlen(soc_str) >= sizeof(addr.sun_path))
-		barf_perror("socket string '%s' too long", soc_str);
-	strcpy(addr.sun_path, soc_str);
-	if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
-		barf_perror("Could not bind socket to %s", soc_str);
-
-	if (chmod(soc_str, 0600) != 0)
-		barf_perror("Could not chmod sockets");
-
-	if (listen(sock, 1) != 0)
-		barf_perror("Could not listen on sockets");
-}
-#endif
-
 static void usage(void)
 {
 	fprintf(stderr,
@@ -2796,7 +2657,6 @@ int set_trace_switch(const char *arg)
 int main(int argc, char *argv[])
 {
 	int opt;
-	int sock_pollfd_idx = -1;
 	bool dofork = true;
 	bool live_update = false;
 	const char *pidfile = NULL;
@@ -2907,7 +2767,7 @@ int main(int argc, char *argv[])
 	check_store();
 
 	/* Get ready to listen to the tools. */
-	initialize_fds(&sock_pollfd_idx, &timeout);
+	initialize_fds(&timeout);
 
 	late_init(live_update);
 
@@ -2922,16 +2782,6 @@ int main(int argc, char *argv[])
 		}
 
 		handle_special_fds();
-
-		if (sock_pollfd_idx != -1) {
-			if (poll_fds[sock_pollfd_idx].revents & ~POLLIN) {
-				barf_perror("sock poll failed");
-				break;
-			} else if (poll_fds[sock_pollfd_idx].revents & POLLIN) {
-				accept_connection(sock);
-				sock_pollfd_idx = -1;
-			}
-		}
 
 		if (xce_pollfd_idx != -1) {
 			if (poll_fds[xce_pollfd_idx].revents & ~POLLIN) {
@@ -2986,7 +2836,7 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		initialize_fds(&sock_pollfd_idx, &timeout);
+		initialize_fds(&timeout);
 	}
 }
 
@@ -2999,7 +2849,7 @@ const char *dump_state_global(FILE *fp)
 	head.length = sizeof(glb);
 	if (fwrite(&head, sizeof(head), 1, fp) != 1)
 		return "Dump global state error";
-	glb.socket_fd = sock;
+	glb.socket_fd = get_socket_fd();
 	glb.evtchn_fd = xenevtchn_fd(xce_handle);
 	if (fwrite(&glb, sizeof(glb), 1, fp) != 1)
 		return "Dump global state error";
@@ -3235,7 +3085,7 @@ void read_state_global(const void *ctx, const void *state)
 {
 	const struct xs_state_global *glb = state;
 
-	sock = glb->socket_fd;
+	set_socket_fd(glb->socket_fd);
 
 	domain_init(glb->evtchn_fd);
 }

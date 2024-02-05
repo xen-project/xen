@@ -1739,14 +1739,7 @@ void read_state_connection(const void *ctx, const void *state)
 	struct domain *domain, *tdomain;
 
 	if (sc->conn_type == XS_STATE_CONN_TYPE_SOCKET) {
-#ifdef NO_SOCKETS
-		barf("socket based connection without sockets");
-#else
-		conn = new_connection(&socket_funcs);
-		if (!conn)
-			barf("error restoring connection");
-		conn->fd = sc->spec.socket_fd;
-#endif
+		conn = add_socket_connection(sc->spec.socket_fd);
 	} else {
 		domain = introduce_domain(ctx, sc->spec.ring.domid,
 					  sc->spec.ring.evtchn, true);

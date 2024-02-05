@@ -301,6 +301,7 @@ int rm_node(struct connection *conn, const void *ctx, const char *name);
 
 void setup_structure(bool live_update);
 struct connection *new_connection(const struct interface_funcs *funcs);
+struct connection *add_socket_connection(int fd);
 struct connection *get_connection_by_id(unsigned int conn_id);
 void check_store(void);
 void corrupt(struct connection *conn, const char *fmt, ...);
@@ -394,14 +395,12 @@ int set_fd(int fd, short events);
 void set_special_fds(void);
 void handle_special_fds(void);
 
-void init_sockets(void);
+int get_socket_fd(void);
+void set_socket_fd(int fd);
 
 /* Close stdin/stdout/stderr to complete daemonize */
 void finish_daemonize(void);
 
-#ifndef NO_SOCKETS
-extern const struct interface_funcs socket_funcs;
-#endif
 extern xengnttab_handle **xgt_handle;
 
 int remember_string(struct hashtable *hash, const char *str);

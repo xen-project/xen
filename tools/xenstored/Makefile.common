@@ -16,10 +16,6 @@ CFLAGS += $(CFLAGS_libxenctrl)
 CFLAGS += $(CFLAGS_libxenguest)
 CFLAGS += $(CFLAGS_libxentoolcore)
 
-ifdef CONFIG_STUBDOM
-CFLAGS += -DNO_SOCKETS=1
-endif
-
 $(XENSTORED_OBJS-y): CFLAGS += $(CFLAGS_libxengnttab)
 
 xenstored.a: $(XENSTORED_OBJS-y)
