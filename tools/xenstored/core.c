@@ -56,7 +56,7 @@
 
 extern xenevtchn_handle *xce_handle; /* in domain.c */
 static int xce_pollfd_idx = -1;
-static struct pollfd *fds;
+struct pollfd *poll_fds;
 static unsigned int current_array_size;
 static unsigned int nr_fds;
 static unsigned int delayed_requests;
@@ -69,8 +69,6 @@ char **orig_argv;
 LIST_HEAD(connections);
 int tracefd = -1;
 bool keep_orphans = false;
-int reopen_log_pipe[2];
-static int reopen_log_pipe0_pollfd_idx = -1;
 char *tracefile = NULL;
 static struct hashtable *nodes;
 unsigned int trace_flags = TRACE_OBJ | TRACE_IO;
@@ -143,18 +141,6 @@ void trace_destroy(const void *data, const char *type)
 {
 	if (trace_flags & TRACE_OBJ)
 		trace("obj: DESTROY %s %p\n", type, data);
-}
-
-/**
- * Signal handler for SIGHUP, which requests that the trace log is reopened
- * (in the main loop).  A single byte is written to reopen_log_pipe, to awaken
- * the poll() in the main loop.
- */
-static void trigger_reopen_log(int signal __attribute__((unused)))
-{
-	char c = 'A';
-	int dummy;
-	dummy = write(reopen_log_pipe[1], &c, 1);
 }
 
 void close_log(void)
@@ -467,7 +453,7 @@ static bool conn_can_write(struct connection *conn)
 }
 
 /* This function returns index inside the array if succeed, -1 if fail */
-static int set_fd(int fd, short events)
+int set_fd(int fd, short events)
 {
 	int ret;
 	if (current_array_size < nr_fds + 1) {
@@ -479,18 +465,18 @@ static int set_fd(int fd, short events)
 		 */
 		newsize = ROUNDUP(nr_fds + 1, 8);
 
-		new_fds = realloc(fds, sizeof(struct pollfd)*newsize);
+		new_fds = realloc(poll_fds, sizeof(struct pollfd)*newsize);
 		if (!new_fds)
 			goto fail;
-		fds = new_fds;
+		poll_fds = new_fds;
 
-		memset(&fds[0] + current_array_size, 0,
+		memset(&poll_fds[0] + current_array_size, 0,
 		       sizeof(struct pollfd ) * (newsize-current_array_size));
 		current_array_size = newsize;
 	}
 
-	fds[nr_fds].fd = fd;
-	fds[nr_fds].events = events;
+	poll_fds[nr_fds].fd = fd;
+	poll_fds[nr_fds].events = events;
 	ret = nr_fds;
 	nr_fds++;
 
@@ -505,18 +491,16 @@ static void initialize_fds(int *p_sock_pollfd_idx, int *ptimeout)
 	struct connection *conn;
 	uint64_t msecs;
 
-	if (fds)
-		memset(fds, 0, sizeof(struct pollfd) * current_array_size);
+	if (poll_fds)
+		memset(poll_fds, 0, sizeof(struct pollfd) * current_array_size);
 	nr_fds = 0;
 
 	/* In case of delayed requests pause for max 1 second. */
 	*ptimeout = delayed_requests ? 1000 : -1;
 
+	set_special_fds();
 	if (sock != -1)
 		*p_sock_pollfd_idx = set_fd(sock, POLLIN|POLLPRI);
-	if (reopen_log_pipe[0] != -1)
-		reopen_log_pipe0_pollfd_idx =
-			set_fd(reopen_log_pipe[0], POLLIN|POLLPRI);
 
 	if (xce_handle != NULL)
 		xce_pollfd_idx = set_fd(xenevtchn_fd(xce_handle),
@@ -2324,12 +2308,12 @@ static bool socket_can_process(struct connection *conn, int mask)
 	if (conn->pollfd_idx == -1)
 		return false;
 
-	if (fds[conn->pollfd_idx].revents & ~(POLLIN | POLLOUT)) {
+	if (poll_fds[conn->pollfd_idx].revents & ~(POLLIN | POLLOUT)) {
 		talloc_free(conn);
 		return false;
 	}
 
-	return (fds[conn->pollfd_idx].revents & mask);
+	return (poll_fds[conn->pollfd_idx].revents & mask);
 }
 
 static bool socket_can_write(struct connection *conn)
@@ -2897,8 +2881,6 @@ int main(int argc, char *argv[])
 
 	talloc_enable_null_tracking();
 
-	init_pipe(reopen_log_pipe);
-
 	/* Listen to hypervisor. */
 	if (!live_update) {
 		domain_init(-1);
@@ -2913,7 +2895,6 @@ int main(int argc, char *argv[])
 		xprintf = trace;
 #endif
 
-	signal(SIGHUP, trigger_reopen_log);
 	if (tracefile)
 		tracefile = talloc_strdup(NULL, tracefile);
 
@@ -2934,43 +2915,29 @@ int main(int argc, char *argv[])
 	for (;;) {
 		struct connection *conn, *next;
 
-		if (poll(fds, nr_fds, timeout) < 0) {
+		if (poll(poll_fds, nr_fds, timeout) < 0) {
 			if (errno == EINTR)
 				continue;
 			barf_perror("Poll failed");
 		}
 
-		if (reopen_log_pipe0_pollfd_idx != -1) {
-			if (fds[reopen_log_pipe0_pollfd_idx].revents
-			    & ~POLLIN) {
-				close(reopen_log_pipe[0]);
-				close(reopen_log_pipe[1]);
-				init_pipe(reopen_log_pipe);
-			} else if (fds[reopen_log_pipe0_pollfd_idx].revents
-				   & POLLIN) {
-				char c;
-				if (read(reopen_log_pipe[0], &c, 1) != 1)
-					barf_perror("read failed");
-				reopen_log();
-			}
-			reopen_log_pipe0_pollfd_idx = -1;
-		}
+		handle_special_fds();
 
 		if (sock_pollfd_idx != -1) {
-			if (fds[sock_pollfd_idx].revents & ~POLLIN) {
+			if (poll_fds[sock_pollfd_idx].revents & ~POLLIN) {
 				barf_perror("sock poll failed");
 				break;
-			} else if (fds[sock_pollfd_idx].revents & POLLIN) {
+			} else if (poll_fds[sock_pollfd_idx].revents & POLLIN) {
 				accept_connection(sock);
 				sock_pollfd_idx = -1;
 			}
 		}
 
 		if (xce_pollfd_idx != -1) {
-			if (fds[xce_pollfd_idx].revents & ~POLLIN) {
+			if (poll_fds[xce_pollfd_idx].revents & ~POLLIN) {
 				barf_perror("xce_handle poll failed");
 				break;
-			} else if (fds[xce_pollfd_idx].revents & POLLIN) {
+			} else if (poll_fds[xce_pollfd_idx].revents & POLLIN) {
 				handle_event();
 				xce_pollfd_idx = -1;
 			}

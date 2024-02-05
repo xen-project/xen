@@ -24,12 +24,6 @@ void finish_daemonize(void)
 {
 }
 
-void init_pipe(int reopen_log_pipe[2])
-{
-	reopen_log_pipe[0] = -1;
-	reopen_log_pipe[1] = -1;
-}
-
 evtchn_port_t get_xenbus_evtchn(void)
 {
 	return dom0_event;
@@ -51,5 +45,13 @@ void early_init(bool live_update, bool dofork, const char *pidfile)
 }
 
 void late_init(bool live_update)
+{
+}
+
+void set_special_fds(void)
+{
+}
+
+void handle_special_fds(void)
 {
 }

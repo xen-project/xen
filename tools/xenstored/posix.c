@@ -33,6 +33,9 @@
 #include "core.h"
 #include "osdep.h"
 
+static int reopen_log_pipe0_pollfd_idx = -1;
+static int reopen_log_pipe[2];
+
 static void write_pidfile(const char *pidfile)
 {
 	char buf[100];
@@ -82,6 +85,19 @@ static void daemonize(void)
 	umask(0);
 }
 
+/*
+ * Signal handler for SIGHUP, which requests that the trace log is reopened
+ * (in the main loop).  A single byte is written to reopen_log_pipe, to awaken
+ * the poll() in the main loop.
+ */
+static void trigger_reopen_log(int signal __attribute__((unused)))
+{
+	char c = 'A';
+	int dummy;
+
+	dummy = write(reopen_log_pipe[1], &c, 1);
+}
+
 void finish_daemonize(void)
 {
 	int devnull = open("/dev/null", O_RDWR);
@@ -93,7 +109,7 @@ void finish_daemonize(void)
 	close(devnull);
 }
 
-void init_pipe(int reopen_log_pipe[2])
+static void init_pipe(void)
 {
 	int flags;
 	unsigned int i;
@@ -183,9 +199,38 @@ void early_init(bool live_update, bool dofork, const char *pidfile)
 
 	/* Don't kill us with SIGPIPE. */
 	signal(SIGPIPE, SIG_IGN);
+	signal(SIGHUP, trigger_reopen_log);
 
 	if (!live_update)
 		init_sockets();
+
+	init_pipe();
+}
+
+void set_special_fds(void)
+{
+	if (reopen_log_pipe[0] != -1)
+		reopen_log_pipe0_pollfd_idx =
+			set_fd(reopen_log_pipe[0], POLLIN|POLLPRI);
+}
+
+void handle_special_fds(void)
+{
+	if (reopen_log_pipe0_pollfd_idx != -1) {
+		if (poll_fds[reopen_log_pipe0_pollfd_idx].revents & ~POLLIN) {
+			close(reopen_log_pipe[0]);
+			close(reopen_log_pipe[1]);
+			init_pipe();
+		} else if (poll_fds[reopen_log_pipe0_pollfd_idx].revents &
+			   POLLIN) {
+			char c;
+
+			if (read(reopen_log_pipe[0], &c, 1) != 1)
+				barf_perror("read failed");
+			reopen_log();
+		}
+		reopen_log_pipe0_pollfd_idx = -1;
+	}
 }
 
 void late_init(bool live_update)

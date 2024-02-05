@@ -25,6 +25,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
@@ -361,6 +362,8 @@ extern int dom0_event;
 extern int priv_domid;
 extern bool keep_orphans;
 
+extern struct pollfd *poll_fds;
+
 extern unsigned int timeout_watch_event_msec;
 
 /* Get internal time in milliseconds. */
@@ -387,14 +390,14 @@ evtchn_port_t get_xenbus_evtchn(void);
 void early_init(bool live_update, bool dofork, const char *pidfile);
 void late_init(bool live_update);
 
+int set_fd(int fd, short events);
+void set_special_fds(void);
+void handle_special_fds(void);
+
 void init_sockets(void);
-extern int reopen_log_pipe[2];
 
 /* Close stdin/stdout/stderr to complete daemonize */
 void finish_daemonize(void);
-
-/* Open a pipe for signal handling */
-void init_pipe(int reopen_log_pipe[2]);
 
 #ifndef NO_SOCKETS
 extern const struct interface_funcs socket_funcs;
