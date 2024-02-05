@@ -87,7 +87,7 @@ static void cf_check init_hygon(struct cpuinfo_x86 *c)
 	amd_log_freq(c);
 }
 
-const struct cpu_dev hygon_cpu_dev = {
+const struct cpu_dev __initconst_cf_clobber hygon_cpu_dev = {
 	.c_early_init	= early_init_amd,
 	.c_init		= init_hygon,
 };
