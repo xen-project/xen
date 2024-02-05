@@ -385,6 +385,7 @@ static inline bool domain_is_unprivileged(const struct connection *conn)
 /* Return the event channel used by xenbus. */
 evtchn_port_t get_xenbus_evtchn(void);
 void early_init(bool live_update, bool dofork, const char *pidfile);
+void late_init(bool live_update);
 
 void init_sockets(void);
 extern int reopen_log_pipe[2];

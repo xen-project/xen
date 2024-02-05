@@ -49,3 +49,7 @@ void unmap_xenbus(void *interface)
 void early_init(bool live_update, bool dofork, const char *pidfile)
 {
 }
+
+void late_init(bool live_update)
+{
+}

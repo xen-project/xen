@@ -24,6 +24,9 @@
 #include <stdlib.h>
 #include <syslog.h>
 #include <sys/mman.h>
+#if defined(HAVE_SYSTEMD)
+#include <systemd/sd-daemon.h>
+#endif
 #include <xen-tools/xenstore-common.h>
 
 #include "utils.h"
@@ -183,4 +186,14 @@ void early_init(bool live_update, bool dofork, const char *pidfile)
 
 	if (!live_update)
 		init_sockets();
+}
+
+void late_init(bool live_update)
+{
+#if defined(HAVE_SYSTEMD)
+	if (!live_update) {
+		sd_notify(1, "READY=1");
+		fprintf(stderr, SD_NOTICE "xenstored is ready\n");
+	}
+#endif
 }

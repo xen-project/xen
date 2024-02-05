@@ -54,16 +54,6 @@
 #include "control.h"
 #include "lu.h"
 
-#ifndef NO_SOCKETS
-#if defined(HAVE_SYSTEMD)
-#define XEN_SYSTEMD_ENABLED 1
-#endif
-#endif
-
-#if defined(XEN_SYSTEMD_ENABLED)
-#include <systemd/sd-daemon.h>
-#endif
-
 extern xenevtchn_handle *xce_handle; /* in domain.c */
 static int xce_pollfd_idx = -1;
 static struct pollfd *fds;
@@ -2938,12 +2928,7 @@ int main(int argc, char *argv[])
 	/* Get ready to listen to the tools. */
 	initialize_fds(&sock_pollfd_idx, &timeout);
 
-#if defined(XEN_SYSTEMD_ENABLED)
-	if (!live_update) {
-		sd_notify(1, "READY=1");
-		fprintf(stderr, SD_NOTICE "xenstored is ready\n");
-	}
-#endif
+	late_init(live_update);
 
 	/* Main loop. */
 	for (;;) {
