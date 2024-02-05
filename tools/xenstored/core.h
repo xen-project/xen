@@ -383,7 +383,7 @@ static inline bool domain_is_unprivileged(const struct connection *conn)
 }
 
 /* Return the event channel used by xenbus. */
-evtchn_port_t xenbus_evtchn(void);
+evtchn_port_t get_xenbus_evtchn(void);
 
 /* Write out the pidfile */
 void write_pidfile(const char *pidfile);

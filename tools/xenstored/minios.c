@@ -38,7 +38,7 @@ void init_pipe(int reopen_log_pipe[2])
 	reopen_log_pipe[1] = -1;
 }
 
-evtchn_port_t xenbus_evtchn(void)
+evtchn_port_t get_xenbus_evtchn(void)
 {
 	return dom0_event;
 }

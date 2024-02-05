@@ -1208,7 +1208,7 @@ void dom0_init(void)
 	evtchn_port_t port;
 	struct domain *dom0;
 
-	port = xenbus_evtchn();
+	port = get_xenbus_evtchn();
 	if (port == -1)
 		barf_perror("Failed to initialize dom0 port");
 
