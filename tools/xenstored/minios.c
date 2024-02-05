@@ -20,6 +20,7 @@
 #include "core.h"
 #include "utils.h"
 #include <xen/grant_table.h>
+#include <mini-os/lib.h>
 
 void finish_daemonize(void)
 {
@@ -48,6 +49,9 @@ void unmap_xenbus(void *interface)
 
 void early_init(bool live_update, bool dofork, const char *pidfile)
 {
+	stub_domid = get_domid();
+	if (stub_domid == DOMID_INVALID)
+		barf("could not get own domid");
 }
 
 void late_init(bool live_update)

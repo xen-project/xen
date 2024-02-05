@@ -361,6 +361,7 @@ do {						\
 extern int dom0_domid;
 extern int dom0_event;
 extern int priv_domid;
+extern domid_t stub_domid;
 extern bool keep_orphans;
 
 extern struct pollfd *poll_fds;

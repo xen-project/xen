@@ -2557,6 +2557,7 @@ static struct option options[] = {
 int dom0_domid = 0;
 int dom0_event = 0;
 int priv_domid = 0;
+domid_t stub_domid = DOMID_INVALID;
 
 static unsigned int get_optval_uint(const char *arg)
 {
