@@ -82,6 +82,7 @@ int do_get_domain_path(const void *ctx, struct connection *conn,
 int do_reset_watches(const void *ctx, struct connection *conn,
 		     struct buffered_data *in);
 
+void domain_early_init(void);
 void domain_init(int evtfd);
 void dom0_init(void);
 void domain_deinit(void);

@@ -1224,10 +1224,8 @@ static int domeq_fn(const void *key1, const void *key2)
 	return *(const unsigned int *)key1 == *(const unsigned int *)key2;
 }
 
-void domain_init(int evtfd)
+void domain_early_init(void)
 {
-	int rc;
-
 	/* Start with a random rather low domain count for the hashtable. */
 	domhash = create_hashtable(NULL, "domains", domhash_fn, domeq_fn, 0);
 	if (!domhash)
@@ -1258,6 +1256,11 @@ void domain_init(int evtfd)
 	xengnttab_set_max_grants(*xgt_handle, DOMID_FIRST_RESERVED);
 
 	talloc_set_destructor(xgt_handle, close_xgt_handle);
+}
+
+void domain_init(int evtfd)
+{
+	int rc;
 
 	if (evtfd < 0)
 		xce_handle = xenevtchn_open(NULL, XENEVTCHN_NO_CLOEXEC);
@@ -1290,9 +1293,6 @@ void domain_deinit(void)
 static bool chk_domain_generation(unsigned int domid, uint64_t gen)
 {
 	struct domain *d;
-
-	if (!xc_handle && domid == dom0_domid)
-		return true;
 
 	d = find_domain_struct(domid);
 

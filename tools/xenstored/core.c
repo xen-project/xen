@@ -2742,6 +2742,8 @@ int main(int argc, char *argv[])
 
 	talloc_enable_null_tracking();
 
+	domain_early_init();
+
 	/* Listen to hypervisor. */
 	if (!live_update) {
 		domain_init(-1);
