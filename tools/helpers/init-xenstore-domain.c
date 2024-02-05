@@ -248,6 +248,13 @@ static int build(xc_interface *xch)
     dom->cmdline = xc_dom_strdup(dom, cmdline);
     dom->xenstore_domid = domid;
     dom->console_evtchn = console_evtchn;
+    rv = xc_evtchn_alloc_unbound(xch, domid, domid);
+    if ( rv < 0 )
+    {
+        fprintf(stderr, "xc_evtchn_alloc_unbound failed\n");
+        goto err;
+    }
+    dom->xenstore_evtchn = rv;
 
     rv = xc_dom_mem_init(dom, memory);
     if ( rv )
