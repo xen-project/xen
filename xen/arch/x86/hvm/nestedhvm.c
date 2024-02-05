@@ -150,6 +150,16 @@ static int __init cf_check nestedhvm_setup(void)
     __clear_bit(0x80, shadow_io_bitmap[0]);
     __clear_bit(0xed, shadow_io_bitmap[1]);
 
+    /* 
+     * NB this must be called after all command-line processing has been
+     * done, so that if (for example) HAP is disabled, nested virt is
+     * disabled as well.
+     */
+    if ( cpu_has_vmx )
+        start_nested_vmx(&hvm_funcs);
+    else if ( cpu_has_svm )
+        start_nested_svm(&hvm_funcs);
+
     return 0;
 }
 __initcall(nestedhvm_setup);

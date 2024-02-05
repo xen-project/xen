@@ -97,7 +97,10 @@ struct hvm_function_table {
              singlestep:1,
             
              /* Hardware virtual interrupt delivery enable? */
-             virtual_intr_delivery:1;
+             virtual_intr_delivery:1,
+
+             /* Nested virt capabilities */
+             nested_virt:1;
     } caps;
 
     /*
@@ -670,6 +673,12 @@ static inline bool hvm_altp2m_supported(void)
     return hvm_funcs.caps.altp2m;
 }
 
+/* Returns true if we have the minimum hardware requirements for nested virt */
+static inline bool hvm_nested_virt_supported(void)
+{
+    return hvm_funcs.caps.nested_virt;
+}
+
 /* updates the current hardware p2m */
 static inline void altp2m_vcpu_update_p2m(struct vcpu *v)
 {
@@ -809,6 +818,11 @@ static inline bool hvm_is_singlestep_supported(void)
 }
 
 static inline bool hvm_hap_supported(void)
+{
+    return false;
+}
+
+static inline bool hvm_nested_virt_supported(void)
 {
     return false;
 }

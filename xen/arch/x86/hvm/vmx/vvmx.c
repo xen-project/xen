@@ -2816,6 +2816,13 @@ void nvmx_set_cr_read_shadow(struct vcpu *v, unsigned int cr)
     __vmwrite(read_shadow_field, v->arch.hvm.nvcpu.guest_cr[cr]);
 }
 
+void __init start_nested_vmx(struct hvm_function_table *hvm_function_table)
+{
+    /* TODO: Require hardware support before enabling nested virt */
+    hvm_function_table->caps.nested_virt =
+        hvm_function_table->caps.hap;
+}
+
 /*
  * Local variables:
  * mode: C

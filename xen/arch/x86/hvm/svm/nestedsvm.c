@@ -1666,3 +1666,17 @@ void svm_nested_features_on_efer_update(struct vcpu *v)
         }
     }
 }
+
+void __init start_nested_svm(struct hvm_function_table *hvm_function_table)
+{
+    /* 
+     * Required host functionality to support nested virt.  See
+     * docs/designs/nested-svm-cpu-features.md for rationale.
+     */
+    hvm_function_table->caps.nested_virt =
+        hvm_function_table->caps.hap && 
+        cpu_has_svm_lbrv &&
+        cpu_has_svm_nrips &&
+        cpu_has_svm_flushbyasid &&
+        cpu_has_svm_decode;
+}

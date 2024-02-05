@@ -82,4 +82,8 @@ static inline bool vvmcx_valid(const struct vcpu *v)
     return vcpu_nestedhvm(v).nv_vvmcxaddr != INVALID_PADDR;
 }
 
+
+void start_nested_svm(struct hvm_function_table *);
+void start_nested_vmx(struct hvm_function_table *);
+
 #endif /* _HVM_NESTEDHVM_H */

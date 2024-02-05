@@ -673,6 +673,12 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
          */
         config->flags |= XEN_DOMCTL_CDF_oos_off;
 
+    if ( nested_virt && !hvm_nested_virt_supported() )
+    {
+        dprintk(XENLOG_INFO, "Nested virt requested but not available\n");
+        return -EINVAL;        
+    }
+
     if ( nested_virt && !hap )
     {
         dprintk(XENLOG_INFO, "Nested virt not supported without HAP\n");
