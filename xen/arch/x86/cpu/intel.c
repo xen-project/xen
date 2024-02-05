@@ -603,7 +603,7 @@ static void cf_check init_intel(struct cpuinfo_x86 *c)
 		setup_clear_cpu_cap(X86_FEATURE_CLWB);
 }
 
-const struct cpu_dev intel_cpu_dev = {
+const struct cpu_dev __initconst_cf_clobber intel_cpu_dev = {
 	.c_early_init	= early_init_intel,
 	.c_init		= init_intel,
 };
