@@ -318,7 +318,7 @@ static int cf_check flush_tlb(
     return xen_hypercall_hvm_op(HVMOP_flush_tlbs, NULL);
 }
 
-static const struct hypervisor_ops __initconstrel ops = {
+static const struct hypervisor_ops __initconst_cf_clobber ops = {
     .name = "Xen",
     .setup = setup,
     .ap_setup = ap_setup,

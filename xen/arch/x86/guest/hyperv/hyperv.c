@@ -207,7 +207,7 @@ static int cf_check flush_tlb(
     return hyperv_flush_tlb(mask, va, flags);
 }
 
-static const struct hypervisor_ops __initconstrel ops = {
+static const struct hypervisor_ops __initconst_cf_clobber ops = {
     .name = "Hyper-V",
     .setup = setup,
     .ap_setup = ap_setup,
