@@ -135,7 +135,9 @@ void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
 		return;
 	}
 	mfn = alloc_boot_pages(PFN_UP(slit->header.length), 1);
-	acpi_slit = mfn_to_virt(mfn_x(mfn));
+	acpi_slit = vmap_contig(mfn, PFN_UP(slit->header.length));
+	if ( !acpi_slit )
+		panic("Unable to map the ACPI SLIT. Retry with numa=off");
 	memcpy(acpi_slit, slit, slit->header.length);
 }
 
