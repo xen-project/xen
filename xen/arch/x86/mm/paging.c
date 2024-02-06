@@ -783,7 +783,7 @@ long do_paging_domctl_cont(
     rcu_unlock_domain(d);
 
     if ( ret == -ERESTART )
-        ret = hypercall_create_continuation(__HYPERVISOR_arch_1,
+        ret = hypercall_create_continuation(__HYPERVISOR_paging_domctl_cont,
                                             "h", u_domctl);
     else if ( __copy_field_to_guest(u_domctl, &op, u.shadow_op) )
         ret = -EFAULT;
