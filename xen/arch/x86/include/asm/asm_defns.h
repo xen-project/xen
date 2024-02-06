@@ -136,7 +136,7 @@ register unsigned long current_stack_pointer asm("rsp");
 #define STACK_CPUINFO_FIELD(field) (1 - CPUINFO_sizeof + CPUINFO_##field)
 #define GET_STACK_END(reg)                        \
         .if .Lr##reg >= 8;                        \
-        movq $STACK_SIZE-1, %r##reg;              \
+        movl $STACK_SIZE-1, %r##reg##d;           \
         .else;                                    \
         movl $STACK_SIZE-1, %e##reg;              \
         .endif;                                   \
