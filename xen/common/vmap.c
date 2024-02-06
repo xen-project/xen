@@ -34,10 +34,19 @@ void __init vm_init_type(enum vmap_region type, void *start, void *end)
 
     for ( i = 0, va = (unsigned long)vm_bitmap(type); i < nr; ++i, va += PAGE_SIZE )
     {
-        struct page_info *pg = alloc_domheap_page(NULL, 0);
+        mfn_t mfn;
         int rc;
 
-        rc = map_pages_to_xen(va, page_to_mfn(pg), 1, PAGE_HYPERVISOR);
+        if ( system_state == SYS_STATE_early_boot )
+            mfn = alloc_boot_pages(1, 1);
+        else
+        {
+            struct page_info *pg = alloc_domheap_page(NULL, 0);
+
+            BUG_ON(!pg);
+            mfn = page_to_mfn(pg);
+        }
+        rc = map_pages_to_xen(va, mfn, 1, PAGE_HYPERVISOR);
         BUG_ON(rc);
 
         clear_page((void *)va);
@@ -65,7 +74,7 @@ static void *vm_alloc(unsigned int nr, unsigned int align,
     spin_lock(&vm_lock);
     for ( ; ; )
     {
-        struct page_info *pg;
+        mfn_t mfn;
 
         ASSERT(vm_low[t] == vm_top[t] || !test_bit(vm_low[t], vm_bitmap(t)));
         for ( start = vm_low[t]; start < vm_top[t]; )
@@ -100,9 +109,16 @@ static void *vm_alloc(unsigned int nr, unsigned int align,
         if ( vm_top[t] >= vm_end[t] )
             return NULL;
 
-        pg = alloc_domheap_page(NULL, 0);
-        if ( !pg )
-            return NULL;
+        if ( system_state == SYS_STATE_early_boot )
+            mfn = alloc_boot_pages(1, 1);
+        else
+        {
+            struct page_info *pg = alloc_domheap_page(NULL, 0);
+
+            if ( !pg )
+                return NULL;
+            mfn = page_to_mfn(pg);
+        }
 
         spin_lock(&vm_lock);
 
@@ -110,7 +126,7 @@ static void *vm_alloc(unsigned int nr, unsigned int align,
         {
             unsigned long va = (unsigned long)vm_bitmap(t) + vm_top[t] / 8;
 
-            if ( !map_pages_to_xen(va, page_to_mfn(pg), 1, PAGE_HYPERVISOR) )
+            if ( !map_pages_to_xen(va, mfn, 1, PAGE_HYPERVISOR) )
             {
                 clear_page((void *)va);
                 vm_top[t] += PAGE_SIZE * 8;
@@ -120,7 +136,10 @@ static void *vm_alloc(unsigned int nr, unsigned int align,
             }
         }
 
-        free_domheap_page(pg);
+        if ( system_state == SYS_STATE_early_boot )
+            init_boot_pages(mfn_to_maddr(mfn), mfn_to_maddr(mfn) + PAGE_SIZE);
+        else
+            free_domheap_page(mfn_to_page(mfn));
 
         if ( start >= vm_top[t] )
         {
