@@ -1280,6 +1280,9 @@ return fmt.Errorf("converting field Rdm: %v", err)
 }
 x.RdmMemBoundaryMemkb = uint64(tmp.rdm_mem_boundary_memkb)
 x.McaCaps = uint64(tmp.mca_caps)
+if err := x.Pirq.fromC(&tmp.pirq);err != nil {
+return fmt.Errorf("converting field Pirq: %v", err)
+}
 return nil
 }
 
@@ -1613,6 +1616,9 @@ return fmt.Errorf("converting field Rdm: %v", err)
 }
 hvm.rdm_mem_boundary_memkb = C.uint64_t(tmp.RdmMemBoundaryMemkb)
 hvm.mca_caps = C.uint64_t(tmp.McaCaps)
+if err := tmp.Pirq.toC(&hvm.pirq); err != nil {
+return fmt.Errorf("converting field Pirq: %v", err)
+}
 hvmBytes := C.GoBytes(unsafe.Pointer(&hvm),C.sizeof_libxl_domain_build_info_type_union_hvm)
 copy(xc.u[:],hvmBytes)
 case DomainTypePv:

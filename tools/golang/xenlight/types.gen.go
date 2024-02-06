@@ -651,6 +651,7 @@ SerialList StringList
 Rdm RdmReserve
 RdmMemBoundaryMemkb uint64
 McaCaps uint64
+Pirq Defbool
 }
 
 func (x DomainBuildInfoTypeUnionHvm) isDomainBuildInfoTypeUnion(){}
