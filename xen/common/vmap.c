@@ -245,13 +245,20 @@ void *vmap(const mfn_t *mfn, unsigned int nr)
     return __vmap(mfn, 1, nr, 1, PAGE_HYPERVISOR, VMAP_DEFAULT);
 }
 
-void vunmap(const void *va)
+unsigned int vmap_size(const void *va)
 {
-    unsigned long addr = (unsigned long)va;
     unsigned int pages = vm_size(va, VMAP_DEFAULT);
 
     if ( !pages )
         pages = vm_size(va, VMAP_XEN);
+
+    return pages;
+}
+
+void vunmap(const void *va)
+{
+    unsigned long addr = (unsigned long)va;
+    unsigned pages = vmap_size(va);
 
 #ifndef _PAGE_NONE
     destroy_xen_mappings(addr, addr + PAGE_SIZE * pages);
@@ -328,17 +335,11 @@ void vfree(void *va)
     unsigned int i, pages;
     struct page_info *pg;
     PAGE_LIST_HEAD(pg_list);
-    enum vmap_region type = VMAP_DEFAULT;
 
     if ( !va )
         return;
 
-    pages = vm_size(va, type);
-    if ( !pages )
-    {
-        type = VMAP_XEN;
-        pages = vm_size(va, type);
-    }
+    pages = vmap_size(va);
     ASSERT(pages);
 
     for ( i = 0; i < pages; i++ )

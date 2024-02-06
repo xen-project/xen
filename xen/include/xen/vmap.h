@@ -25,6 +25,9 @@ void vfree(void *va);
 
 void __iomem *ioremap(paddr_t pa, size_t len);
 
+/* Return the number of pages in the mapping starting at address 'va' */
+unsigned int vmap_size(const void *va);
+
 static inline void iounmap(void __iomem *va)
 {
     unsigned long addr = (unsigned long)(void __force *)va;
