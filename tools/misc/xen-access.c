@@ -517,9 +517,6 @@ int main(int argc, char *argv[])
     /* With altp2m we just create a new, restricted view of the memory */
     if ( memaccess && altp2m )
     {
-        xen_pfn_t gfn = 0;
-        unsigned long perm_set = 0;
-
         if( altp2m_write_no_gpt )
         {
             rc = xc_monitor_inguest_pagefault(xch, domain_id, 1);
@@ -551,17 +548,6 @@ int main(int argc, char *argv[])
         }
 
         DPRINTF("altp2m view created with id %u\n", altp2m_view_id);
-        DPRINTF("Setting altp2m mem_access permissions.. ");
-
-        for(; gfn < xenaccess->max_gpfn; ++gfn)
-        {
-            rc = xc_altp2m_set_mem_access( xch, domain_id, altp2m_view_id, gfn,
-                                           default_access);
-            if ( !rc )
-                perm_set++;
-        }
-
-        DPRINTF("done! Permissions set on %lu pages.\n", perm_set);
 
         rc = xc_altp2m_switch_to_view( xch, domain_id, altp2m_view_id );
         if ( rc < 0 )
