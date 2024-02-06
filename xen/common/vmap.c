@@ -245,6 +245,11 @@ void *vmap(const mfn_t *mfn, unsigned int nr)
     return __vmap(mfn, 1, nr, 1, PAGE_HYPERVISOR, VMAP_DEFAULT);
 }
 
+void *vmap_contig(mfn_t mfn, unsigned int nr)
+{
+    return __vmap(&mfn, nr, 1, 1, PAGE_HYPERVISOR, VMAP_DEFAULT);
+}
+
 unsigned int vmap_size(const void *va)
 {
     unsigned int pages = vm_size(va, VMAP_DEFAULT);
