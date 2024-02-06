@@ -18,11 +18,13 @@ YOCTO_TARGETS = qemuarm64 qemuarm qemux86-64
 YOCTO_ARCHS = amd64 arm64v8
 
 # Architecture we want to use in gitlab CI (depends on runners arch).
-CI_ARCH = arm64v8
+CI_ARCH-qemuarm64 = arm64v8
+CI_ARCH-qemuarm = arm64v8
+CI_ARCH-qemux86-64 = amd64
 
 define GEN_DOCKER
 # Make all is generating architecture we use in the CI.
-ifeq ($(CI_ARCH),$(3))
+ifeq ($(CI_ARCH-$(2)),$(3))
 CONTAINERS += yocto/$(1)-$(2)$(4)
 else
 CONTAINERS_EXTRA += yocto/$(1)-$(2)$(4)
