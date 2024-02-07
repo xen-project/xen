@@ -1,0 +1,841 @@
+{
+   "version": "1.0",
+   "content": [
+      {
+         "type": "function",
+         "value": "^printk.*$",
+         "properties":{
+            "pointee_write": "1..=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^debugtrace_printk.*$",
+         "properties":{
+            "pointee_write": "1..=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^panic.*$",
+         "properties":{
+            "pointee_write": "1..=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "macro",
+         "value": "^domain_crash$",
+         "properties":{
+            "pointee_write": "2..=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "macro",
+         "value": "^(g?d|mm_)?printk$",
+         "properties":{
+            "pointee_write": "2..=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "macro",
+         "value": "^guest_bug_on_failed$",
+         "properties":{
+            "pointee_write": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "macro",
+         "value": "^spin_lock_init_prof$",
+         "properties":{
+            "pointee_write": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "macro",
+         "value": "^sched_test_func$",
+         "properties":{
+            "pointee_write": "1..=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "macro",
+         "value": "^dev_(info|warn)$",
+         "properties":{
+            "pointee_write": "1..=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "macro",
+         "value": "^PAGING_DEBUG$",
+         "properties":{
+            "pointee_write": "1..=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "macro",
+         "value": "^ACPI_(WARNING|ERROR|INFO)$",
+         "properties":{
+            "pointee_write": "1..=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^fdt_get_property_by_offset_.*$",
+         "properties":{
+            "pointee_write": "3=always",
+            "pointee_read": "3=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^read_atomic_size.*$",
+         "properties":{
+            "pointee_write": "2=always",
+            "pointee_read": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^device_tree_get_reg.*$",
+         "properties":{
+            "pointee_write": "4..=always",
+            "pointee_read": "4..=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^dt_get_range.*$",
+         "properties":{
+            "pointee_write": "3..=always",
+            "pointee_read": "3..=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^parse_static_mem_prop.*$",
+         "properties":{
+            "pointee_write": "2..=always",
+            "pointee_read": "2..=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^get_ttbr_and_gran_64bit.*$",
+         "properties":{
+            "pointee_write": "1..2=always",
+            "pointee_read": "1..2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^hvm_emulate_init_once.*$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^__vmread.*$",
+         "properties":{
+            "pointee_write": "2=always",
+            "pointee_read": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^hvm_pci_decode_addr.*$",
+         "properties":{
+            "pointee_write": "3=always",
+            "pointee_read": "3=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^vpci_mmcfg_decode_addr.*$",
+         "properties":{
+            "pointee_write": "3=always",
+            "pointee_read": "3=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^x86emul_decode.*$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^unmap_grant_ref.*$",
+         "properties":{
+            "pointee_write": "2=always",
+            "pointee_read": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^arm_smmu_cmdq_build_cmd.*$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^pci_size_mem_bar.*$",
+         "properties":{
+            "pointee_write": "4=always",
+            "pointee_read": "4=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^_hvm_read_entry.*$",
+         "properties":{
+            "pointee_write": "2=always",
+            "pointee_read": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^hvm_map_guest_frame_rw.*$",
+         "properties":{
+            "pointee_write": "3=always",
+            "pointee_read": "3=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^guest_cpuid.*$",
+         "properties":{
+            "pointee_write": "4=always",
+            "pointee_read": "4=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^epte_get_entry_emt.*$",
+         "properties":{
+            "pointee_write": "5=always",
+            "pointee_read": "5=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^mcheck_mca_logout.*$",
+         "properties":{
+            "pointee_write": "3=always",
+            "pointee_read": "3=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^set_field_in_reg_u32.*$",
+         "properties":{
+            "pointee_write": "5=always",
+            "pointee_read": "5=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^alloc_affinity_masks.*$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^xasprintf.*$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^find_non_smt.*$",
+         "properties":{
+            "pointee_write": "2=always",
+            "pointee_read": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^call_rcu.*$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^getdomaininfo.*$",
+         "properties":{
+            "pointee_write": "2=always",
+            "pointee_read": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^MAPPING_(INSERT|SEARCH)\\(.*$",
+         "properties":{
+            "pointee_write": "2..=always",
+            "pointee_read": "2..=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^FormatDec.*$",
+         "properties":{
+            "pointee_write": "2=always",
+            "pointee_read": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^FormatHex.*$",
+         "properties":{
+            "pointee_write": "3=always",
+            "pointee_read": "3=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^p2m_get_ioreq_server.*$",
+         "properties":{
+            "pointee_write": "2=always",
+            "pointee_read": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^elf_memset_unchecked.*$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^set_iommu_pte_present.*$",
+         "properties":{
+            "pointee_write": "7=always",
+            "pointee_read": "7=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^clear_iommu_pte_present.*$",
+         "properties":{
+            "pointee_write": "4=always",
+            "pointee_read": "4=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^vcpu_runstate_get.*$",
+         "properties":{
+            "pointee_write": "2=always",
+            "pointee_read": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^va_start.*$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^sgi_target_init.*$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^get_hw_residencies.*$",
+         "properties":{
+            "pointee_write": "2=always",
+            "pointee_read": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^x86_cpu_policy_to_featureset.*$",
+         "properties":{
+            "pointee_write": "2=always",
+            "pointee_read": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^simple_strtou?ll?\\(.*$",
+         "properties":{
+            "pointee_write": "2=always",
+            "pointee_read": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^msi_compose_msg.*$",
+         "properties":{
+            "pointee_write": "3=always",
+            "pointee_read": "3=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^print_tainted.*$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^get_hvm_registers.*$",
+         "properties":{
+            "pointee_write": "3=always",
+            "pointee_read": "3=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^x86_insn_modrm.*$",
+         "properties":{
+            "pointee_write": "2..3=always",
+            "pointee_read": "2..3=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^cpuid_count_leaf.*$",
+         "properties":{
+            "pointee_write": "3=always",
+            "pointee_read": "3=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^rcu_lock_remote_domain_by_id.*$",
+         "properties":{
+            "pointee_write": "2=always",
+            "pointee_read": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^cpuid_count.*$",
+         "properties":{
+            "pointee_write": "3..=always",
+            "pointee_read": "3..=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^.*efi_boot_mem_unused.*$",
+         "properties":{
+            "pointee_write": "1..=always",
+            "pointee_read": "1..=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^collect_time_info.*$",
+         "properties":{
+            "pointee_write": "2=always",
+            "pointee_read": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^setup_xstate_comp.*$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^map_domain_gfn.*$",
+         "properties":{
+            "pointee_read": "5=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^fdt_getprop.*$",
+         "properties":{
+            "pointee_read": "4=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^fdt_get_name.*$",
+         "properties":{
+            "pointee_read": "3=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^fdt_get_property.*$",
+         "properties":{
+            "pointee_read": "4=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^pci_get_host_bridge_segment.*$",
+         "properties":{
+            "pointee_read": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^dt_get_property.*$",
+         "properties":{
+            "pointee_read": "3=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^dt_property_read_u32.*$",
+         "properties":{
+            "pointee_read": "3=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^dt_device_get_paddr.*$",
+         "properties":{
+            "pointee_read": "3..4=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^get_evtchn_dt_property.*$",
+         "properties":{
+            "pointee_write": "2..3=maybe",
+            "pointee_read": "2..3=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^setup_chosen_node.*$",
+         "properties":{
+            "pointee_write": "2..3=maybe",
+            "pointee_read": "2..3=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^queue_remove_raw.*$",
+         "properties":{
+            "pointee_read": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "macro",
+         "value": "^memset$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "macro",
+         "value": "^va_start$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "macro",
+         "value": "^memcmp$",
+         "properties":{
+            "pointee_write": "1..2=never",
+            "taken": ""
+         }
+      },
+      {
+         "type": "macro",
+         "value": "^memcpy$",
+         "properties":{
+            "pointee_write": "1=always&&2..=never",
+            "pointee_read": "1=never&&2..=always",
+            "taken": ""
+         }
+      },
+      {
+         "type": "function",
+         "value": "^get_cpu_info.*$",
+         "properties":{
+            "attribute": "pure"
+         }
+      },
+      {
+         "type": "function",
+         "value": "^pdx_to_pfn.*$",
+         "properties":{
+            "attribute": "pure"
+         }
+      },
+      {
+         "type": "function",
+         "value": "^is_pci_passthrough_enabled.*$",
+         "properties":{
+            "attribute": "const"
+         }
+      },
+      {
+         "type": "function",
+         "value": "^get_cycles.*$",
+         "properties":{
+            "attribute": "noeffect"
+         }
+      },
+      {
+         "type": "function",
+         "value": "^msi_gflags.*$",
+         "properties":{
+            "attribute": "const"
+         }
+      },
+      {
+         "type": "function",
+         "value": "^hvm_save_size.*$",
+         "properties":{
+            "attribute": "pure"
+         }
+      },
+      {
+         "type": "function",
+         "value": "^cpu_has.*$",
+         "properties":{
+            "attribute": "pure"
+         }
+      },
+      {
+         "type": "function",
+         "value": "^boot_cpu_has.*$",
+         "properties":{
+            "attribute": "pure"
+         }
+      },
+      {
+         "type": "function",
+         "value": "^get_cpu_info.*$",
+         "properties":{
+            "attribute": "pure"
+         }
+      },
+      {
+         "type": "function",
+         "value": "^put_pte_flags.*$",
+         "properties":{
+            "attribute": "const"
+         }
+      },
+      {
+         "type": "function",
+         "value": "^is_pv_cpu.*$",
+         "properties":{
+            "attribute": "pure"
+         }
+      },
+      {
+         "description": "Property inferred as a consequence of the semantics of device_tree_get_reg",
+         "type": "function",
+         "value": "^acquire_static_memory_bank.*$",
+         "properties":{
+            "pointee_write": "4..=always",
+            "pointee_read": "4..=never",
+            "taken": ""
+         }
+      },
+      {
+         "description": "Property inferred as a consequence of the semantics of dt_set_cell",
+         "type": "function",
+         "value": "^set_interrupt.*$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "description":"Property inferred as a consequence of the semantics of __p2m_get_mem_access",
+         "type": "function",
+         "value": "^p2m_get_mem_access.*$",
+         "properties":{
+            "pointee_write": "3=always",
+            "pointee_read": "3=never",
+            "taken": ""
+         }
+      },
+      {
+         "description": "This function has alternative definitions with props {write=always,read=never} and {write=never,read=never}",
+         "type": "function",
+         "value": "^alloc_cpumask_var.*$",
+         "properties":{
+            "pointee_write": "1=maybe",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "description": "Property inferred as a consequence of the semantics of alloc_cpumask_var",
+         "type": "function",
+         "value": "^xenctl_bitmap_to_cpumask.*$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "description": "The call to bitmap_and causes the pointee of dstp to be always written",
+         "type": "function",
+         "value": "^cpumask_(and|andnot|clear|copy|complement).*$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "description": "The call to bitmap_and causes the pointee of dstp to be always written",
+         "type": "function",
+         "value": "^bitmap_(andnot|complement|fill).*$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "description": "The .*copy_(to|from).* helpers all have a memcpy-like expectation that the destination is a copy of the source. Furthermore, their uses do initialize the involved variables as needed by futher uses in the caller.",
+         "type": "macro",
+         "value": "^(__)?(raw_)?copy_from_(paddr|guest|compat)(_offset)?$",
+         "properties":{
+            "pointee_write": "1=always",
+            "pointee_read": "1=never",
+            "taken": ""
+         }
+      },
+      {
+         "description":"The .*copy_(to|from).* helpers all have a memcpy-like expectation that the destination is a copy of the source. Furthermore, their uses do initialize the involved variables as needed by futher uses in the caller.",
+         "type": "macro",
+         "value": "^(__)?copy_to_(guest|compat)(_offset)?$",
+         "properties":{
+            "pointee_write": "2=always",
+            "pointee_read": "2=never",
+            "taken": ""
+         }
+      },
+      {
+         "description": "Functions generated by build_atomic_read cannot be considered pure since the input pointer is volatile, but they do not produce any persistent side effect.",
+         "type": "function",
+         "value": "^read_u(8|16|32|64|int)_atomic.*$",
+         "properties":{
+            "attribute": "noeffect"
+         }
+      },
+      {
+         "description": "Functions generated by TYPE_SAFE are const.",
+         "type": "function",
+         "value": "^(mfn|gfn|pfn)_x\\(.*$",
+         "properties":{
+            "attribute": "const"
+         }
+      },
+      {
+         "description": "Functions generated by TYPE_SAFE are const.",
+         "type": "function",
+         "value": "^_(mfn|gfn|pfn)\\(.*$",
+         "properties":{
+            "attribute": "const"
+         }
+      }
+   ]
+}

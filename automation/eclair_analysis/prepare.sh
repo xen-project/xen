@@ -43,4 +43,6 @@ fi
     make -f "${script_dir}/Makefile.prepare" prepare
     # Translate the /* SAF-n-safe */ comments into ECLAIR CBTs
     scripts/xen-analysis.py --run-eclair --no-build --no-clean
+    # Translate function-properties.json into ECLAIR properties
+    python3 ${script_dir}/propertyparser.py
 )

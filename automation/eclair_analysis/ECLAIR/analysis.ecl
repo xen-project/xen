@@ -30,6 +30,7 @@ if(not(scheduled_analysis),
 -eval_file=deviations.ecl
 -eval_file=call_properties.ecl
 -eval_file=tagging.ecl
+-eval_file=properties.ecl
 -eval_file=concat(set,".ecl")
 
 -doc="Hide reports in external code."
