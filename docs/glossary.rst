@@ -28,6 +28,21 @@ Glossary
      single instance of Xen, used as the identifier in various APIs, and is
      typically allocated sequentially from 0.
 
+   CET
+     Control-flow Enforcement Technology is a facility in x86 CPUs for
+     defending against memory safety vulnerabilities.  It is formed of two
+     independent features:
+
+     * CET-SS, Shadow Stacks, are designed to protect against Return Oriented
+       Programming (ROP) attacks.
+
+     * CET-IBT, Indirect Branch Tracking, is designed to protect against Call
+       or Jump Oriented Programming (COP/JOP) attacks.
+
+     Intel support CET-SS and CET-IBT from the Tiger Lake (Client, 2020) and
+     Sapphire Rapids (Server, 2023) CPUs.  AMD support only CET-SS, starting
+     with Zen3 (Both client and server, 2020) CPUs.
+
    guest
      The term 'guest' has two different meanings, depending on context, and
      should not be confused with :term:`domain`.

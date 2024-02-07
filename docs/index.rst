@@ -72,4 +72,5 @@ Miscellanea
 
 .. toctree::
 
+   faq
    glossary
