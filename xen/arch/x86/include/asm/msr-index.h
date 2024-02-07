@@ -349,6 +349,7 @@
 #define MSR_IA32_VMX_TRUE_EXIT_CTLS             0x48f
 #define MSR_IA32_VMX_TRUE_ENTRY_CTLS            0x490
 #define MSR_IA32_VMX_VMFUNC                     0x491
+#define MSR_IA32_VMX_PROCBASED_CTLS3            0x492
 
 /* K7/K8 MSRs. Not complete. See the architecture manual for a more
    complete list. */
