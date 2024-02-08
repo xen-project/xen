@@ -102,6 +102,10 @@
             "comment": "The resulting code is not included in the final Xen binary, ignore for now"
         },
         {
+            "rel_path": "arch/*/*/asm-offsets.c",
+            "comment": "The resulting code is not included in the final Xen binary, ignore for now"
+        },
+        {
             "rel_path": "common/coverage/*",
             "comment": "Files to support gcov, ignore for now"
         },
