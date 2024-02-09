@@ -196,36 +196,6 @@ static void __serial_putc(struct serial_port *port, char c)
     }
 }
 
-void serial_putc(int handle, char c)
-{
-    struct serial_port *port;
-    unsigned long flags;
-
-    if ( handle == -1 )
-        return;
-
-    port = &com[handle & SERHND_IDX];
-    if ( !port->driver || !port->driver->putc )
-        return;
-
-    spin_lock_irqsave(&port->tx_lock, flags);
-
-    if ( (c == '\n') && (handle & SERHND_COOKED) )
-        __serial_putc(port, '\r' | ((handle & SERHND_HI) ? 0x80 : 0x00));
-
-    if ( handle & SERHND_HI )
-        c |= 0x80;
-    else if ( handle & SERHND_LO )
-        c &= 0x7f;
-
-    __serial_putc(port, c);
-
-    if ( port->driver->flush )
-        port->driver->flush(port);
-
-    spin_unlock_irqrestore(&port->tx_lock, flags);
-}
-
 void serial_puts(int handle, const char *s, size_t nr)
 {
     struct serial_port *port;
@@ -259,48 +229,6 @@ void serial_puts(int handle, const char *s, size_t nr)
         port->driver->flush(port);
 
     spin_unlock_irqrestore(&port->tx_lock, flags);
-}
-
-char serial_getc(int handle)
-{
-    struct serial_port *port;
-    char c;
-    unsigned long flags;
-
-    if ( handle == -1 )
-        return '\0';
-
-    port = &com[handle & SERHND_IDX];
-    if ( !port->driver || !port->driver->getc )
-        return '\0';
-
-    do {
-        for ( ; ; )
-        {
-            spin_lock_irqsave(&port->rx_lock, flags);
-            
-            if ( port->rxbufp != port->rxbufc )
-            {
-                c = port->rxbuf[mask_serial_rxbuf_idx(port->rxbufc++)];
-                spin_unlock_irqrestore(&port->rx_lock, flags);
-                break;
-            }
-            
-            if ( port->driver->getc(port, &c) )
-            {
-                spin_unlock_irqrestore(&port->rx_lock, flags);
-                break;
-            }
-
-            spin_unlock_irqrestore(&port->rx_lock, flags);
-
-            cpu_relax();
-            udelay(100);
-        }
-    } while ( ((handle & SERHND_LO) &&  (c & 0x80)) ||
-              ((handle & SERHND_HI) && !(c & 0x80)) );
-    
-    return c & 0x7f;
 }
 
 int __init serial_parse_handle(const char *conf)

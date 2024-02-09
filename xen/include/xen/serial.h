@@ -112,18 +112,8 @@ void serial_endboot(void);
 /* Takes a config string and creates a numeric handle on the COM port. */
 int serial_parse_handle(const char *conf);
 
-/* Transmit a single character via the specified COM port. */
-void serial_putc(int handle, char c);
-
 /* Transmit a string via the specified COM port. */
 void serial_puts(int handle, const char *s, size_t nr);
-
-/*
- * An alternative to registering a character-receive hook. This function
- * will not return until a character is available. It can safely be
- * called with interrupts disabled.
- */
-char serial_getc(int handle);
 
 /* Forcibly prevent serial lockup when the system is in a bad way. */
 /* (NB. This also forces an implicit serial_start_sync()). */
