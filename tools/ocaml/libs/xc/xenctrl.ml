@@ -85,6 +85,7 @@ type domctl_create_config =
     max_grant_frames: int;
     max_maptrack_frames: int;
     max_grant_version: int;
+    vmtrace_buf_kb: int32;
     cpupool_id: int32;
     arch: arch_domainconfig;
   }

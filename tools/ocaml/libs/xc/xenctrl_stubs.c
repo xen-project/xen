@@ -210,10 +210,17 @@ CAMLprim value stub_xc_domain_create(value xch_val, value wanted_domid, value co
 #define VAL_MAX_GRANT_FRAMES    Field(config, 6)
 #define VAL_MAX_MAPTRACK_FRAMES Field(config, 7)
 #define VAL_MAX_GRANT_VERSION   Field(config, 8)
-#define VAL_CPUPOOL_ID          Field(config, 9)
-#define VAL_ARCH                Field(config, 10)
+#define VAL_VMTRACE_BUF_KB      Field(config, 9)
+#define VAL_CPUPOOL_ID          Field(config, 10)
+#define VAL_ARCH                Field(config, 11)
 
 	uint32_t domid = Int_val(wanted_domid);
+	uint64_t vmtrace_size = Int32_val(VAL_VMTRACE_BUF_KB);
+
+	vmtrace_size = ROUNDUP(vmtrace_size << 10, XC_PAGE_SHIFT);
+	if ( vmtrace_size != (uint32_t)vmtrace_size )
+		caml_invalid_argument("vmtrace_buf_kb");
+
 	int result;
 	struct xen_domctl_createdomain cfg = {
 		.ssidref = Int32_val(VAL_SSIDREF),
@@ -223,6 +230,7 @@ CAMLprim value stub_xc_domain_create(value xch_val, value wanted_domid, value co
 		.max_maptrack_frames = Int_val(VAL_MAX_MAPTRACK_FRAMES),
 		.grant_opts =
 		    XEN_DOMCTL_GRANT_version(Int_val(VAL_MAX_GRANT_VERSION)),
+		.vmtrace_size = vmtrace_size,
 		.cpupool_id = Int32_val(VAL_CPUPOOL_ID),
 	};
 
@@ -279,6 +287,7 @@ CAMLprim value stub_xc_domain_create(value xch_val, value wanted_domid, value co
 
 #undef VAL_ARCH
 #undef VAL_CPUPOOL_ID
+#undef VAL_VMTRACE_BUF_KB
 #undef VAL_MAX_GRANT_VERSION
 #undef VAL_MAX_MAPTRACK_FRAMES
 #undef VAL_MAX_GRANT_FRAMES
