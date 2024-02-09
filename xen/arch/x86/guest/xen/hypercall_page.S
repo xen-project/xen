@@ -3,13 +3,11 @@
 #include <public/xen.h>
 
         .section ".text.page_aligned", "ax", @progbits
-        .p2align PAGE_SHIFT
 
-GLOBAL(hypercall_page)
+DATA(hypercall_page, PAGE_SIZE)
          /* Poisoned with `ret` for safety before hypercalls are set up. */
         .fill PAGE_SIZE, 1, 0xc3
-        .type hypercall_page, STT_OBJECT
-        .size hypercall_page, PAGE_SIZE
+END(hypercall_page)
 
 /*
  * Identify a specific hypercall in the hypercall page

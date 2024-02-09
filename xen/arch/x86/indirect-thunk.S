@@ -35,15 +35,13 @@
 .macro GEN_INDIRECT_THUNK reg:req
         .section .text.__x86_indirect_thunk_\reg, "ax", @progbits
 
-ENTRY(__x86_indirect_thunk_\reg)
+FUNC(__x86_indirect_thunk_\reg)
         ALTERNATIVE_2 __stringify(IND_THUNK_RETPOLINE \reg),              \
         __stringify(IND_THUNK_LFENCE \reg), X86_FEATURE_IND_THUNK_LFENCE, \
         __stringify(IND_THUNK_JMP \reg),    X86_FEATURE_IND_THUNK_JMP
 
         int3 /* Halt straight-line speculation */
-
-        .size __x86_indirect_thunk_\reg, . - __x86_indirect_thunk_\reg
-        .type __x86_indirect_thunk_\reg, @function
+END(__x86_indirect_thunk_\reg)
 .endm
 
 /* Instantiate GEN_INDIRECT_THUNK for each register except %rsp. */
