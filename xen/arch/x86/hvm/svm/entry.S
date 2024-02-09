@@ -24,7 +24,7 @@
 #include <asm/asm_defns.h>
 #include <asm/page.h>
 
-ENTRY(svm_asm_do_resume)
+FUNC(svm_asm_do_resume)
         GET_CURRENT(bx)
 .Lsvm_do_resume:
         call svm_intr_assist
@@ -132,7 +132,7 @@ __UNLIKELY_END(nsvm_hap)
          * to safely resolve any Spectre-v1 concerns in the above logic.
          */
         stgi
-GLOBAL(svm_stgi_label)
+LABEL(svm_stgi_label, 0)
         call svm_vmexit_handler
         jmp  .Lsvm_do_resume
 
@@ -140,6 +140,4 @@ GLOBAL(svm_stgi_label)
         sti
         call do_softirq
         jmp  .Lsvm_do_resume
-
-        .type svm_asm_do_resume, @function
-        .size svm_asm_do_resume, . - svm_asm_do_resume
+END(svm_asm_do_resume)
