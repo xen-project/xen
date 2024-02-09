@@ -14,10 +14,6 @@
             "comment": "Imported on Linux, ignore for now"
         },
         {
-            "rel_path": "arch/arm/arm64/lib/find_next_bit.c",
-            "comment": "Imported from Linux, ignore for now"
-        },
-        {
             "rel_path": "arch/x86/acpi/boot.c",
             "comment": "Imported from Linux, ignore for now"
         },
@@ -223,6 +219,10 @@
         },
         {
             "rel_path": "include/xen/decompress.h",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "lib/find-next-bit.c",
             "comment": "Imported from Linux, ignore for now"
         },
         {

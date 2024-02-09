@@ -3,6 +3,7 @@ obj-$(CONFIG_X86) += x86/
 lib-y += bsearch.o
 lib-y += ctors.o
 lib-y += ctype.o
+lib-y += find-next-bit.o
 lib-y += list-sort.o
 lib-y += memchr.o
 lib-y += memchr_inv.o
