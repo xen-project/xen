@@ -1504,6 +1504,23 @@ static int promote_l3_table(struct page_info *page)
     unsigned int   partial_flags = page->partial_flags;
     l3_pgentry_t   l3e = l3e_empty();
 
+    /*
+     * PAE pgdirs above 4GB are unacceptable if a 32-bit guest does not
+     * understand the weird 'extended cr3' format for dealing with high-order
+     * address bits. We cut some slack for control tools (before vcpu0 is
+     * initialised).
+     */
+    if ( is_pv_32bit_domain(d) &&
+         unlikely(!VM_ASSIST(d, pae_extended_cr3)) &&
+         mfn_x(l3mfn) >= PFN_DOWN(GB(4)) &&
+         d->vcpu[0] && d->vcpu[0]->is_initialised )
+    {
+        gdprintk(XENLOG_WARNING,
+                 "PAE pgd must be below 4GB (%#lx >= 0x100000)",
+                 mfn_x(l3mfn));
+        return -ERANGE;
+    }
+
     pl3e = map_domain_page(l3mfn);
 
     /*

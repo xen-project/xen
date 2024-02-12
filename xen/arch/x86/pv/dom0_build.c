@@ -495,12 +495,12 @@ int __init dom0_construct_pv(struct domain *d,
 
     nr_pages = dom0_compute_nr_pages(d, &parms, initrd_len);
 
-    if ( parms.pae == XEN_PAE_EXTCR3 )
-            set_bit(VMASST_TYPE_pae_extended_cr3, &d->vm_assist);
-
 #ifdef CONFIG_PV32
     if ( elf_32bit(&elf) )
     {
+        if ( parms.pae == XEN_PAE_EXTCR3 )
+            __set_bit(VMASST_TYPE_pae_extended_cr3, &d->vm_assist);
+
         if ( !pv_shim && (parms.virt_hv_start_low != UNSET_ADDR) )
         {
             unsigned long value = ROUNDUP(parms.virt_hv_start_low,
@@ -599,7 +599,10 @@ int __init dom0_construct_pv(struct domain *d,
         vphysmap_start = parms.p2m_base;
         vphysmap_end   = vphysmap_start + nr_pages * sizeof(unsigned long);
     }
-    page = alloc_domheap_pages(d, order, MEMF_no_scrub);
+    page = alloc_domheap_pages(d, order,
+                               MEMF_no_scrub |
+                               (VM_ASSIST(d, pae_extended_cr3) ||
+                                !compat ? 0 : MEMF_bits(32)));
     if ( page == NULL )
         panic("Not enough RAM for domain 0 allocation\n");
     alloc_spfn = mfn_x(page_to_mfn(page));
