@@ -37,8 +37,8 @@ static bool __initdata opt_msr_sc_pv = true;
 static bool __initdata opt_msr_sc_hvm = true;
 static bool __initdata opt_rsb_pv = true;
 static bool __initdata opt_rsb_hvm = true;
-static int8_t __read_mostly opt_md_clear_pv = -1;
-static int8_t __read_mostly opt_md_clear_hvm = -1;
+static int8_t __read_mostly opt_verw_pv = -1;
+static int8_t __read_mostly opt_verw_hvm = -1;
 
 static int8_t __read_mostly opt_ibpb_entry_pv = -1;
 static int8_t __read_mostly opt_ibpb_entry_hvm = -1;
@@ -77,7 +77,7 @@ static bool __initdata cpu_has_bug_mds; /* Any other M{LP,SB,FB}DS combination. 
 
 static int8_t __initdata opt_srb_lock = -1;
 static bool __initdata opt_unpriv_mmio;
-static bool __read_mostly opt_fb_clear_mmio;
+static bool __read_mostly opt_verw_mmio;
 static int8_t __initdata opt_gds_mit = -1;
 static int8_t __initdata opt_div_scrub = -1;
 
@@ -119,8 +119,8 @@ static int __init parse_spec_ctrl(const char *s)
         disable_common:
             opt_rsb_pv = false;
             opt_rsb_hvm = false;
-            opt_md_clear_pv = 0;
-            opt_md_clear_hvm = 0;
+            opt_verw_pv = 0;
+            opt_verw_hvm = 0;
             opt_ibpb_entry_pv = 0;
             opt_ibpb_entry_hvm = 0;
             opt_ibpb_entry_dom0 = false;
@@ -151,14 +151,14 @@ static int __init parse_spec_ctrl(const char *s)
         {
             opt_msr_sc_pv = val;
             opt_rsb_pv = val;
-            opt_md_clear_pv = val;
+            opt_verw_pv = val;
             opt_ibpb_entry_pv = val;
         }
         else if ( (val = parse_boolean("hvm", s, ss)) >= 0 )
         {
             opt_msr_sc_hvm = val;
             opt_rsb_hvm = val;
-            opt_md_clear_hvm = val;
+            opt_verw_hvm = val;
             opt_ibpb_entry_hvm = val;
         }
         else if ( (val = parse_boolean("msr-sc", s, ss)) != -1 )
@@ -203,21 +203,22 @@ static int __init parse_spec_ctrl(const char *s)
                 break;
             }
         }
-        else if ( (val = parse_boolean("md-clear", s, ss)) != -1 )
+        else if ( (val = parse_boolean("verw", s, ss)) != -1 ||
+                  (val = parse_boolean("md-clear", s, ss)) != -1 )
         {
             switch ( val )
             {
             case 0:
             case 1:
-                opt_md_clear_pv = opt_md_clear_hvm = val;
+                opt_verw_pv = opt_verw_hvm = val;
                 break;
 
             case -2:
-                s += strlen("md-clear=");
+                s += (*s == 'v') ? strlen("verw=") : strlen("md-clear=");
                 if ( (val = parse_boolean("pv", s, ss)) >= 0 )
-                    opt_md_clear_pv = val;
+                    opt_verw_pv = val;
                 else if ( (val = parse_boolean("hvm", s, ss)) >= 0 )
-                    opt_md_clear_hvm = val;
+                    opt_verw_hvm = val;
                 else
             default:
                     rc = -EINVAL;
@@ -512,8 +513,8 @@ static void __init print_details(enum ind_thunk thunk)
            opt_srb_lock                              ? " SRB_LOCK+" : " SRB_LOCK-",
            opt_ibpb_ctxt_switch                      ? " IBPB-ctxt" : "",
            opt_l1d_flush                             ? " L1D_FLUSH" : "",
-           opt_md_clear_pv || opt_md_clear_hvm ||
-           opt_fb_clear_mmio                         ? " VERW"  : "",
+           opt_verw_pv || opt_verw_hvm ||
+           opt_verw_mmio                             ? " VERW"  : "",
            opt_div_scrub                             ? " DIV" : "",
            opt_branch_harden                         ? " BRANCH_HARDEN" : "");
 
@@ -533,11 +534,11 @@ static void __init print_details(enum ind_thunk thunk)
            (boot_cpu_has(X86_FEATURE_SC_MSR_HVM) ||
             boot_cpu_has(X86_FEATURE_SC_RSB_HVM) ||
             boot_cpu_has(X86_FEATURE_IBPB_ENTRY_HVM) ||
-            opt_eager_fpu || opt_md_clear_hvm)       ? ""               : " None",
+            opt_eager_fpu || opt_verw_hvm)           ? ""               : " None",
            boot_cpu_has(X86_FEATURE_SC_MSR_HVM)      ? " MSR_SPEC_CTRL" : "",
            boot_cpu_has(X86_FEATURE_SC_RSB_HVM)      ? " RSB"           : "",
            opt_eager_fpu                             ? " EAGER_FPU"     : "",
-           opt_md_clear_hvm                          ? " MD_CLEAR"      : "",
+           opt_verw_hvm                              ? " VERW"          : "",
            boot_cpu_has(X86_FEATURE_IBPB_ENTRY_HVM)  ? " IBPB-entry"    : "");
 
 #endif
@@ -546,11 +547,11 @@ static void __init print_details(enum ind_thunk thunk)
            (boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
             boot_cpu_has(X86_FEATURE_SC_RSB_PV) ||
             boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV) ||
-            opt_eager_fpu || opt_md_clear_pv)        ? ""               : " None",
+            opt_eager_fpu || opt_verw_pv)            ? ""               : " None",
            boot_cpu_has(X86_FEATURE_SC_MSR_PV)       ? " MSR_SPEC_CTRL" : "",
            boot_cpu_has(X86_FEATURE_SC_RSB_PV)       ? " RSB"           : "",
            opt_eager_fpu                             ? " EAGER_FPU"     : "",
-           opt_md_clear_pv                           ? " MD_CLEAR"      : "",
+           opt_verw_pv                               ? " VERW"          : "",
            boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV)   ? " IBPB-entry"    : "");
 
     printk("  XPTI (64-bit PV only): Dom0 %s, DomU %s (with%s PCID)\n",
@@ -1450,8 +1451,8 @@ void spec_ctrl_init_domain(struct domain *d)
 {
     bool pv = is_pv_domain(d);
 
-    bool verw = ((pv ? opt_md_clear_pv : opt_md_clear_hvm) ||
-                 (opt_fb_clear_mmio && is_iommu_enabled(d)));
+    bool verw = ((pv ? opt_verw_pv : opt_verw_hvm) ||
+                 (opt_verw_mmio && is_iommu_enabled(d)));
 
     bool ibpb = ((pv ? opt_ibpb_entry_pv : opt_ibpb_entry_hvm) &&
                  (d->domain_id != 0 || opt_ibpb_entry_dom0));
@@ -1765,19 +1766,20 @@ void __init init_speculation_mitigations(void)
      * the return-to-guest path.
      */
     if ( opt_unpriv_mmio )
-        opt_fb_clear_mmio = cpu_has_fb_clear;
+        opt_verw_mmio = cpu_has_fb_clear;
 
     /*
      * By default, enable PV and HVM mitigations on MDS-vulnerable hardware.
      * This will only be a token effort for MLPDS/MFBDS when HT is enabled,
      * but it is somewhat better than nothing.
      */
-    if ( opt_md_clear_pv == -1 )
-        opt_md_clear_pv = ((cpu_has_bug_mds || cpu_has_bug_msbds_only) &&
-                           boot_cpu_has(X86_FEATURE_MD_CLEAR));
-    if ( opt_md_clear_hvm == -1 )
-        opt_md_clear_hvm = ((cpu_has_bug_mds || cpu_has_bug_msbds_only) &&
-                            boot_cpu_has(X86_FEATURE_MD_CLEAR));
+    if ( opt_verw_pv == -1 )
+        opt_verw_pv = ((cpu_has_bug_mds || cpu_has_bug_msbds_only) &&
+                       cpu_has_md_clear);
+
+    if ( opt_verw_hvm == -1 )
+        opt_verw_hvm = ((cpu_has_bug_mds || cpu_has_bug_msbds_only) &&
+                        cpu_has_md_clear);
 
     /*
      * Enable MDS/MMIO defences as applicable.  The Idle blocks need using if
@@ -1790,12 +1792,12 @@ void __init init_speculation_mitigations(void)
      * MDS mitigations.  L1D_FLUSH is not safe for MMIO mitigations.)
      *
      * After calculating the appropriate idle setting, simplify
-     * opt_md_clear_hvm to mean just "should we VERW on the way into HVM
+     * opt_verw_hvm to mean just "should we VERW on the way into HVM
      * guests", so spec_ctrl_init_domain() can calculate suitable settings.
      */
-    if ( opt_md_clear_pv || opt_md_clear_hvm || opt_fb_clear_mmio )
+    if ( opt_verw_pv || opt_verw_hvm || opt_verw_mmio )
         setup_force_cpu_cap(X86_FEATURE_SC_VERW_IDLE);
-    opt_md_clear_hvm &= !cpu_has_skip_l1dfl && !opt_l1d_flush;
+    opt_verw_hvm &= !cpu_has_skip_l1dfl && !opt_l1d_flush;
 
     /*
      * Warn the user if they are on MLPDS/MFBDS-vulnerable hardware with HT
