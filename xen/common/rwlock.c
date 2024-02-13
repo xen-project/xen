@@ -129,8 +129,12 @@ void _percpu_write_lock(percpu_rwlock_t **per_cpudata,
     /*
      * First take the write lock to protect against other writers or slow
      * path readers.
+     *
+     * Note we use the speculation unsafe variant of write_lock(), as the
+     * calling wrapper already adds a speculation barrier after the lock has
+     * been taken.
      */
-    write_lock(&percpu_rwlock->rwlock);
+    _write_lock(&percpu_rwlock->rwlock);
 
     /* Now set the global variable so that readers start using read_lock. */
     percpu_rwlock->writer_activating = 1;
