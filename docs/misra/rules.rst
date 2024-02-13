@@ -462,6 +462,15 @@ maintainers if you want to suggest a change.
 
        while(0) and while(1) and alike are allowed.
 
+   * - `Rule 14.4 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_14_04.c>`_
+     - Required
+     - The controlling expression of an if-statement and the controlling
+       expression of an iteration-statement shall have essentially
+       Boolean type
+     - Automatic conversions of integer types to bool are permitted.
+       Automatic conversions of pointer types to bool are permitted.
+       This rule still applies to enum types.
+
    * - `Rule 16.3 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_16_03.c>`_
      - Required
      - An unconditional break statement shall terminate every
