@@ -326,8 +326,8 @@ static inline void _percpu_rwlock_owner_check(percpu_rwlock_t **per_cpudata,
 #define percpu_rwlock_resource_init(l, owner) \
     (*(l) = (percpu_rwlock_t)PERCPU_RW_LOCK_UNLOCKED(&get_per_cpu_var(owner)))
 
-static inline void _percpu_read_lock(percpu_rwlock_t **per_cpudata,
-                                         percpu_rwlock_t *percpu_rwlock)
+static always_inline void _percpu_read_lock(percpu_rwlock_t **per_cpudata,
+                                            percpu_rwlock_t *percpu_rwlock)
 {
     /* Validate the correct per_cpudata variable has been provided. */
     _percpu_rwlock_owner_check(per_cpudata, percpu_rwlock);
@@ -362,6 +362,8 @@ static inline void _percpu_read_lock(percpu_rwlock_t **per_cpudata,
     }
     else
     {
+        /* Other branch already has a speculation barrier in read_lock(). */
+        block_lock_speculation();
         /* All other paths have implicit check_lock() calls via read_lock(). */
         check_lock(&percpu_rwlock->rwlock.lock.debug, false);
     }
@@ -410,8 +412,12 @@ static inline void _percpu_write_unlock(percpu_rwlock_t **per_cpudata,
     _percpu_read_lock(&get_per_cpu_var(percpu), lock)
 #define percpu_read_unlock(percpu, lock) \
     _percpu_read_unlock(&get_per_cpu_var(percpu), lock)
-#define percpu_write_lock(percpu, lock) \
-    _percpu_write_lock(&get_per_cpu_var(percpu), lock)
+
+#define percpu_write_lock(percpu, lock)                 \
+({                                                      \
+    _percpu_write_lock(&get_per_cpu_var(percpu), lock); \
+    block_lock_speculation();                           \
+})
 #define percpu_write_unlock(percpu, lock) \
     _percpu_write_unlock(&get_per_cpu_var(percpu), lock)
 
