@@ -642,17 +642,9 @@ acpi_parse_one_rmrr(struct acpi_dmar_header *header)
            return -EEXIST;
        }
 
-    /* This check is here simply to detect when RMRR values are
-     * not properly represented in the system memory map and
-     * inform the user
-     */
-    if ( !e820_all_mapped(base_addr, end_addr + 1, E820_RESERVED) &&
-         !e820_all_mapped(base_addr, end_addr + 1, E820_NVS) &&
-         !e820_all_mapped(base_addr, end_addr + 1, E820_ACPI) )
-        printk(XENLOG_WARNING VTDPREFIX
-               " RMRR [%"PRIx64",%"PRIx64"] not in reserved memory;"
-               " need \"iommu_inclusive_mapping=1\"?\n",
-                base_addr, end_addr);
+    if ( !iommu_unity_region_ok("RMRR", maddr_to_mfn(base_addr),
+                                maddr_to_mfn(end_addr)) )
+        return -EIO;
 
     rmrru = xzalloc(struct acpi_rmrr_unit);
     if ( !rmrru )
