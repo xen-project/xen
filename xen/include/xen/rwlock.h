@@ -259,27 +259,49 @@ static inline int _rw_is_write_locked(const rwlock_t *lock)
     return (atomic_read(&lock->cnts) & _QW_WMASK) == _QW_LOCKED;
 }
 
-#define read_lock(l)                  _read_lock(l)
-#define read_lock_irq(l)              _read_lock_irq(l)
+static always_inline void read_lock(rwlock_t *l)
+{
+    _read_lock(l);
+    block_lock_speculation();
+}
+
+static always_inline void read_lock_irq(rwlock_t *l)
+{
+    _read_lock_irq(l);
+    block_lock_speculation();
+}
+
 #define read_lock_irqsave(l, f)                                 \
     ({                                                          \
         BUILD_BUG_ON(sizeof(f) != sizeof(unsigned long));       \
         ((f) = _read_lock_irqsave(l));                          \
+        block_lock_speculation();                               \
     })
 
 #define read_unlock(l)                _read_unlock(l)
 #define read_unlock_irq(l)            _read_unlock_irq(l)
 #define read_unlock_irqrestore(l, f)  _read_unlock_irqrestore(l, f)
-#define read_trylock(l)               _read_trylock(l)
+#define read_trylock(l)               lock_evaluate_nospec(_read_trylock(l))
 
-#define write_lock(l)                 _write_lock(l)
-#define write_lock_irq(l)             _write_lock_irq(l)
+static always_inline void write_lock(rwlock_t *l)
+{
+    _write_lock(l);
+    block_lock_speculation();
+}
+
+static always_inline void write_lock_irq(rwlock_t *l)
+{
+    _write_lock_irq(l);
+    block_lock_speculation();
+}
+
 #define write_lock_irqsave(l, f)                                \
     ({                                                          \
         BUILD_BUG_ON(sizeof(f) != sizeof(unsigned long));       \
         ((f) = _write_lock_irqsave(l));                         \
+        block_lock_speculation();                               \
     })
-#define write_trylock(l)              _write_trylock(l)
+#define write_trylock(l)              lock_evaluate_nospec(_write_trylock(l))
 
 #define write_unlock(l)               _write_unlock(l)
 #define write_unlock_irq(l)           _write_unlock_irq(l)
