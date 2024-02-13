@@ -696,7 +696,12 @@ static void *hvmemul_map_linear_addr(
  out:
     /* Drop all held references. */
     while ( mfn-- > hvmemul_ctxt->mfn )
+    {
         put_page(mfn_to_page(*mfn));
+#ifndef NDEBUG /* Clean slot for a subsequent map()'s error checking. */
+        *mfn = _mfn(0);
+#endif
+    }
 
     return err;
 }
@@ -718,7 +723,7 @@ static void hvmemul_unmap_linear_addr(
 
     for ( i = 0; i < nr_frames; i++ )
     {
-        ASSERT(mfn_valid(*mfn));
+        ASSERT(mfn_x(*mfn) && mfn_valid(*mfn));
         paging_mark_dirty(currd, *mfn);
         put_page(mfn_to_page(*mfn));
 
