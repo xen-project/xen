@@ -478,6 +478,12 @@ maintainers if you want to suggest a change.
        adhere to Rule 16.2 would result in increased complexity and
        maintenance difficulty, and could potentially introduce bugs. 
 
+   * - `Rule 16.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_16_06.c>`_
+     - Required
+     - Every switch statement shall have at least two switch-clauses
+     - Single-clause switches are allowed when they do not involve a
+       default label.
+
    * - `Rule 16.7 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_16_07.c>`_
      - Required
      - A switch-expression shall not have essentially Boolean type
@@ -553,6 +559,13 @@ maintainers if you want to suggest a change.
        #elif preprocessing directives shall be #define'd before
        evaluation
      -
+
+   * - `Rule 20.12 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_20_12.c>`_
+     - A macro parameter used as an operand to the # or ## operators,
+       which is itself subject to further macro replacement, shall only
+       be used as an operand to these operators
+     - Required
+     - Variadic macros are allowed to violate the rule.
 
    * - `Rule 20.13 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_20_13.c>`_
      - Required
