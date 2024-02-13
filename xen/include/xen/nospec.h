@@ -70,6 +70,21 @@ static inline unsigned long array_index_mask_nospec(unsigned long index,
 #define array_access_nospec(array, index)                               \
     (array)[array_index_nospec(index, ARRAY_SIZE(array))]
 
+static always_inline void block_lock_speculation(void)
+{
+#ifdef CONFIG_SPECULATIVE_HARDEN_LOCK
+    arch_block_lock_speculation();
+#endif
+}
+
+static always_inline bool lock_evaluate_nospec(bool condition)
+{
+#ifdef CONFIG_SPECULATIVE_HARDEN_LOCK
+    return arch_lock_evaluate_nospec(condition);
+#endif
+    return condition;
+}
+
 #endif /* XEN_NOSPEC_H */
 
 /*

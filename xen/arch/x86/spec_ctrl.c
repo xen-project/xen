@@ -65,6 +65,7 @@ int8_t __read_mostly opt_eager_fpu = -1;
 int8_t __read_mostly opt_l1d_flush = -1;
 static bool __initdata opt_branch_harden =
     IS_ENABLED(CONFIG_SPECULATIVE_HARDEN_BRANCH);
+static bool __initdata opt_lock_harden;
 
 bool __initdata bsp_delay_spec_ctrl;
 uint8_t __read_mostly default_xen_spec_ctrl;
@@ -133,6 +134,7 @@ static int __init cf_check parse_spec_ctrl(const char *s)
             opt_ssbd = false;
             opt_l1d_flush = 0;
             opt_branch_harden = false;
+            opt_lock_harden = false;
             opt_srb_lock = 0;
             opt_unpriv_mmio = false;
             opt_gds_mit = 0;
@@ -295,6 +297,16 @@ static int __init cf_check parse_spec_ctrl(const char *s)
             {
                 no_config_param("SPECULATIVE_HARDEN_BRANCH", "spec-ctrl", s,
                                 ss);
+                rc = -EINVAL;
+            }
+        }
+        else if ( (val = parse_boolean("lock-harden", s, ss)) >= 0 )
+        {
+            if ( IS_ENABLED(CONFIG_SPECULATIVE_HARDEN_LOCK) )
+                opt_lock_harden = val;
+            else
+            {
+                no_config_param("SPECULATIVE_HARDEN_LOCK", "spec-ctrl", s, ss);
                 rc = -EINVAL;
             }
         }
@@ -500,7 +512,8 @@ static void __init print_details(enum ind_thunk thunk)
     if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) || IS_ENABLED(CONFIG_SHADOW_PAGING) ||
          IS_ENABLED(CONFIG_SPECULATIVE_HARDEN_ARRAY) ||
          IS_ENABLED(CONFIG_SPECULATIVE_HARDEN_BRANCH) ||
-         IS_ENABLED(CONFIG_SPECULATIVE_HARDEN_GUEST_ACCESS) )
+         IS_ENABLED(CONFIG_SPECULATIVE_HARDEN_GUEST_ACCESS) ||
+         IS_ENABLED(CONFIG_SPECULATIVE_HARDEN_LOCK) )
         printk("  Compiled-in support:"
 #ifdef CONFIG_INDIRECT_THUNK
                " INDIRECT_THUNK"
@@ -517,10 +530,13 @@ static void __init print_details(enum ind_thunk thunk)
 #ifdef CONFIG_SPECULATIVE_HARDEN_GUEST_ACCESS
                " HARDEN_GUEST_ACCESS"
 #endif
+#ifdef CONFIG_SPECULATIVE_HARDEN_LOCK
+               " HARDEN_LOCK"
+#endif
                "\n");
 
     /* Settings for Xen's protection, irrespective of guests. */
-    printk("  Xen settings: %s%sSPEC_CTRL: %s%s%s%s%s, Other:%s%s%s%s%s%s\n",
+    printk("  Xen settings: %s%sSPEC_CTRL: %s%s%s%s%s, Other:%s%s%s%s%s%s%s\n",
            thunk != THUNK_NONE      ? "BTI-Thunk: " : "",
            thunk == THUNK_NONE      ? "" :
            thunk == THUNK_RETPOLINE ? "RETPOLINE, " :
@@ -547,7 +563,8 @@ static void __init print_details(enum ind_thunk thunk)
            opt_verw_pv || opt_verw_hvm ||
            opt_verw_mmio                             ? " VERW"  : "",
            opt_div_scrub                             ? " DIV" : "",
-           opt_branch_harden                         ? " BRANCH_HARDEN" : "");
+           opt_branch_harden                         ? " BRANCH_HARDEN" : "",
+           opt_lock_harden                           ? " LOCK_HARDEN" : "");
 
     /* L1TF diagnostics, printed if vulnerable or PV shadowing is in use. */
     if ( cpu_has_bug_l1tf || opt_pv_l1tf_hwdom || opt_pv_l1tf_domu )
@@ -1929,6 +1946,9 @@ void __init init_speculation_mitigations(void)
     /* We compile lfence's in by default, and nop them out if requested. */
     if ( !opt_branch_harden )
         setup_force_cpu_cap(X86_FEATURE_SC_NO_BRANCH_HARDEN);
+
+    if ( !opt_lock_harden )
+        setup_force_cpu_cap(X86_FEATURE_SC_NO_LOCK_HARDEN);
 
     /*
      * We do not disable HT by default on affected hardware.
