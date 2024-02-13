@@ -405,41 +405,9 @@ static int __init parse_ivmd_block(const struct acpi_ivrs_memory *ivmd_block)
         return 0;
     }
 
-    if ( !e820_all_mapped(base, limit + PAGE_SIZE, E820_RESERVED) )
-    {
-        paddr_t addr;
-
-        AMD_IOMMU_WARN("IVMD: [%lx,%lx) is not (entirely) in reserved memory\n",
-                       base, limit + PAGE_SIZE);
-
-        for ( addr = base; addr <= limit; addr += PAGE_SIZE )
-        {
-            unsigned int type = page_get_ram_type(maddr_to_mfn(addr));
-
-            if ( type == RAM_TYPE_UNKNOWN )
-            {
-                if ( e820_add_range(addr, addr + PAGE_SIZE,
-                                    E820_RESERVED) )
-                    continue;
-                AMD_IOMMU_ERROR("IVMD: page at %lx couldn't be reserved\n",
-                                addr);
-                return -EIO;
-            }
-
-            /*
-             * Types which aren't RAM are considered good enough.
-             * Note that a page being partially RESERVED, ACPI or UNUSABLE will
-             * force Xen into assuming the whole page as having that type in
-             * practice.
-             */
-            if ( type & (RAM_TYPE_RESERVED | RAM_TYPE_ACPI |
-                         RAM_TYPE_UNUSABLE) )
-                continue;
-
-            AMD_IOMMU_ERROR("IVMD: page at %lx can't be converted\n", addr);
-            return -EIO;
-        }
-    }
+    if ( !iommu_unity_region_ok("IVMD", maddr_to_mfn(base),
+                                maddr_to_mfn(limit)) )
+        return -EIO;
 
     if ( ivmd_block->header.flags & ACPI_IVMD_EXCLUSION_RANGE )
         exclusion = true;

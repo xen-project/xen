@@ -792,6 +792,52 @@ static int __init cf_check adjust_irq_affinities(void)
 }
 __initcall(adjust_irq_affinities);
 
+bool __init iommu_unity_region_ok(const char *prefix, mfn_t start, mfn_t end)
+{
+    mfn_t addr;
+
+    if ( e820_all_mapped(mfn_to_maddr(start), mfn_to_maddr(end) + PAGE_SIZE,
+                         E820_RESERVED) )
+        return true;
+
+    printk(XENLOG_WARNING
+           "%s: [%#" PRI_mfn " ,%#" PRI_mfn "] is not (entirely) in reserved memory\n",
+           prefix, mfn_x(start), mfn_x(end));
+
+    for ( addr = start; mfn_x(addr) <= mfn_x(end); mfn_add(addr, 1) )
+    {
+        unsigned int type = page_get_ram_type(addr);
+
+        if ( type == RAM_TYPE_UNKNOWN )
+        {
+            if ( e820_add_range(mfn_to_maddr(addr),
+                                mfn_to_maddr(addr) + PAGE_SIZE, E820_RESERVED) )
+                continue;
+            printk(XENLOG_ERR
+                   "%s: page at %#" PRI_mfn " couldn't be reserved\n",
+                   prefix, mfn_x(addr));
+            return false;
+        }
+
+        /*
+         * Types which aren't RAM are considered good enough.
+         * Note that a page being partially RESERVED, ACPI or UNUSABLE will
+         * force Xen into assuming the whole page as having that type in
+         * practice.
+         */
+        if ( type & (RAM_TYPE_RESERVED | RAM_TYPE_ACPI |
+                     RAM_TYPE_UNUSABLE) )
+            continue;
+
+        printk(XENLOG_ERR
+               "%s: page at %#" PRI_mfn " can't be converted\n",
+               prefix, mfn_x(addr));
+        return false;
+    }
+
+    return true;
+}
+
 /*
  * Local variables:
  * mode: C

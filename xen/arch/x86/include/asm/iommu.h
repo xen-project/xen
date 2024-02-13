@@ -135,6 +135,9 @@ struct page_info *__must_check iommu_alloc_pgtable(struct domain_iommu *hd,
                                                    uint64_t contig_mask);
 void iommu_queue_free_pgtable(struct domain_iommu *hd, struct page_info *pg);
 
+/* Check [start, end] unity map range for correctness. */
+bool iommu_unity_region_ok(const char *prefix, mfn_t start, mfn_t end);
+
 #endif /* !__ARCH_X86_IOMMU_H__ */
 /*
  * Local variables:
