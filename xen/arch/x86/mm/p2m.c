@@ -346,11 +346,11 @@ struct page_info *p2m_get_page_from_gfn(
              && !((q & P2M_UNSHARE) && p2m_is_shared(*t)) )
         {
             page = mfn_to_page(mfn);
-            if ( unlikely(p2m_is_foreign(*t)) )
+            if ( unlikely(p2m_is_foreign(*t)) || unlikely(p2m_is_grant(*t)) )
             {
                 struct domain *fdom = page_get_owner_and_reference(page);
 
-                ASSERT(fdom != p2m->domain);
+                ASSERT(!p2m_is_foreign(*t) || fdom != p2m->domain);
                 if ( fdom == NULL )
                     page = NULL;
             }
