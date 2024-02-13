@@ -232,7 +232,7 @@ Specifies the backend implementation to use
 
 =item Supported values
 
-phy, qdisk, standalone
+phy, qdisk, standalone, tap
 
 =item Mandatory
 
@@ -253,6 +253,8 @@ For example, "phy" and "standalone" do not support formats other than "raw"
 and "standalone" does not support specifications other than "virtio".
 Normally this option should not be specified, in which case libxl will
 automatically determine the most suitable backend.
+
+"tap" needs blktap's tapback to be running.
 
 
 =item B<script>=I<SCRIPT>

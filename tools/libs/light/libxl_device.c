@@ -328,9 +328,15 @@ static int disk_try_backend(disk_try_backend_args *a,
         return 0;
 
     case LIBXL_DISK_BACKEND_TAP:
-        LOG(DEBUG, "Disk vdev=%s, backend tap unsuitable because blktap "
-                   "not available", a->disk->vdev);
-        return 0;
+        if (a->disk->format != LIBXL_DISK_FORMAT_RAW &&
+            a->disk->format != LIBXL_DISK_FORMAT_VHD)
+            goto bad_format;
+
+        if (libxl_defbool_val(a->disk->colo_enable))
+            goto bad_colo;
+
+        LOG(DEBUG, "Disk vdev=%s, returning blktap", a->disk->vdev);
+        return backend;
 
     case LIBXL_DISK_BACKEND_QDISK:
         if (a->disk->script) goto bad_script;
@@ -478,7 +484,7 @@ char *libxl__device_disk_string_of_backend(libxl_disk_backend backend)
 {
     switch (backend) {
         case LIBXL_DISK_BACKEND_QDISK: return "qdisk";
-        case LIBXL_DISK_BACKEND_TAP: return "phy";
+        case LIBXL_DISK_BACKEND_TAP: return "vbd3";
         case LIBXL_DISK_BACKEND_PHY: return "phy";
         case LIBXL_DISK_BACKEND_STANDALONE: return "standalone";
         default: return NULL;

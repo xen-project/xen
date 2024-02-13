@@ -207,6 +207,7 @@ int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
 
     switch (dev->backend_kind) {
     case LIBXL__DEVICE_KIND_VBD:
+    case LIBXL__DEVICE_KIND_VBD3:
         if (num_exec != 0) {
             LOGD(DEBUG, dev->domid,
                  "num_exec %d, not running hotplug scripts", num_exec);

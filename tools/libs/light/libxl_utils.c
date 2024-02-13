@@ -295,6 +295,8 @@ int libxl_string_to_backend(libxl_ctx *ctx, char *s, libxl_disk_backend *backend
         *backend = LIBXL_DISK_BACKEND_PHY;
     } else if (!strcmp(s, "file")) {
         *backend = LIBXL_DISK_BACKEND_TAP;
+    } else if (!strcmp(s, "vbd3")) {
+        *backend = LIBXL_DISK_BACKEND_TAP;
     } else if (!strcmp(s, "qdisk")) {
         *backend = LIBXL_DISK_BACKEND_QDISK;
     } else if (!strcmp(s, "standalone")) {

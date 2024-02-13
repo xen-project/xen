@@ -56,7 +56,9 @@ static void disk_eject_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
             "/local/domain/%d/backend/%" TOSTRING(BACKEND_STRING_SIZE)
            "[a-z]/%*d/%*d",
            &disk->backend_domid, backend_type);
-    if (!strcmp(backend_type, "tap") || !strcmp(backend_type, "vbd")) {
+    if (!strcmp(backend_type, "tap") ||
+        !strcmp(backend_type, "vbd") ||
+        !strcmp(backend_type, "vbd3")) {
         disk->backend = LIBXL_DISK_BACKEND_TAP;
     } else if (!strcmp(backend_type, "qdisk")) {
         disk->backend = LIBXL_DISK_BACKEND_QDISK;
@@ -224,7 +226,7 @@ static int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
             device->backend_kind = LIBXL__DEVICE_KIND_VBD;
             break;
         case LIBXL_DISK_BACKEND_TAP:
-            device->backend_kind = LIBXL__DEVICE_KIND_VBD;
+            device->backend_kind = LIBXL__DEVICE_KIND_VBD3;
             break;
         case LIBXL_DISK_BACKEND_QDISK:
             device->backend_kind = LIBXL__DEVICE_KIND_QDISK;
@@ -368,9 +370,17 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
                 assert(device->backend_kind == LIBXL__DEVICE_KIND_VIRTIO_DISK);
                 break;
             case LIBXL_DISK_BACKEND_TAP:
-                LOG(ERROR, "blktap is not supported");
-                rc = ERROR_FAIL;
-                goto out;
+                flexarray_append(back, "params");
+                flexarray_append(back, GCSPRINTF("%s:%s",
+                              libxl__device_disk_string_of_format(disk->format),
+                              disk->pdev_path ? : ""));
+
+                script = libxl__abs_path(gc, disk->script?: "block-tap",
+                                         libxl__xen_script_dir_path());
+                flexarray_append_pair(back, "script", script);
+
+                assert(device->backend_kind == LIBXL__DEVICE_KIND_VBD3);
+                break;
             case LIBXL_DISK_BACKEND_QDISK:
                 flexarray_append(back, "params");
                 flexarray_append(back, GCSPRINTF("%s:%s",
