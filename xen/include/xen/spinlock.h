@@ -1,6 +1,7 @@
 #ifndef __SPINLOCK_H__
 #define __SPINLOCK_H__
 
+#include <xen/nospec.h>
 #include <xen/time.h>
 #include <xen/types.h>
 
@@ -202,13 +203,30 @@ int _spin_trylock_recursive(spinlock_t *lock);
 void _spin_lock_recursive(spinlock_t *lock);
 void _spin_unlock_recursive(spinlock_t *lock);
 
-#define spin_lock(l)                  _spin_lock(l)
-#define spin_lock_cb(l, c, d)         _spin_lock_cb(l, c, d)
-#define spin_lock_irq(l)              _spin_lock_irq(l)
+static always_inline void spin_lock(spinlock_t *l)
+{
+    _spin_lock(l);
+    block_lock_speculation();
+}
+
+static always_inline void spin_lock_cb(spinlock_t *l, void (*c)(void *data),
+                                       void *d)
+{
+    _spin_lock_cb(l, c, d);
+    block_lock_speculation();
+}
+
+static always_inline void spin_lock_irq(spinlock_t *l)
+{
+    _spin_lock_irq(l);
+    block_lock_speculation();
+}
+
 #define spin_lock_irqsave(l, f)                                 \
     ({                                                          \
         BUILD_BUG_ON(sizeof(f) != sizeof(unsigned long));       \
         ((f) = _spin_lock_irqsave(l));                          \
+        block_lock_speculation();                               \
     })
 
 #define spin_unlock(l)                _spin_unlock(l)
@@ -216,7 +234,7 @@ void _spin_unlock_recursive(spinlock_t *lock);
 #define spin_unlock_irqrestore(l, f)  _spin_unlock_irqrestore(l, f)
 
 #define spin_is_locked(l)             _spin_is_locked(l)
-#define spin_trylock(l)               _spin_trylock(l)
+#define spin_trylock(l)               lock_evaluate_nospec(_spin_trylock(l))
 
 #define spin_trylock_irqsave(lock, flags)       \
 ({                                              \
@@ -237,8 +255,15 @@ void _spin_unlock_recursive(spinlock_t *lock);
  * are any critical regions that cannot form part of such a set, they can use
  * standard spin_[un]lock().
  */
-#define spin_trylock_recursive(l)     _spin_trylock_recursive(l)
-#define spin_lock_recursive(l)        _spin_lock_recursive(l)
+#define spin_trylock_recursive(l) \
+    lock_evaluate_nospec(_spin_trylock_recursive(l))
+
+static always_inline void spin_lock_recursive(spinlock_t *l)
+{
+    _spin_lock_recursive(l);
+    block_lock_speculation();
+}
+
 #define spin_unlock_recursive(l)      _spin_unlock_recursive(l)
 
 #endif /* __SPINLOCK_H__ */
