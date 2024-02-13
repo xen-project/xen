@@ -63,6 +63,7 @@ int8_t __read_mostly opt_ibpb_ctxt_switch = -1;
 int8_t __read_mostly opt_eager_fpu = -1;
 int8_t __read_mostly opt_l1d_flush = -1;
 bool __read_mostly opt_branch_harden = true;
+static bool __initdata opt_lock_harden;
 
 bool __initdata bsp_delay_spec_ctrl;
 uint8_t __read_mostly default_xen_spec_ctrl;
@@ -131,6 +132,7 @@ static int __init parse_spec_ctrl(const char *s)
             opt_ssbd = false;
             opt_l1d_flush = 0;
             opt_branch_harden = false;
+            opt_lock_harden = false;
             opt_srb_lock = 0;
             opt_unpriv_mmio = false;
             opt_gds_mit = 0;
@@ -282,6 +284,16 @@ static int __init parse_spec_ctrl(const char *s)
             opt_l1d_flush = val;
         else if ( (val = parse_boolean("branch-harden", s, ss)) >= 0 )
             opt_branch_harden = val;
+        else if ( (val = parse_boolean("lock-harden", s, ss)) >= 0 )
+        {
+            if ( IS_ENABLED(CONFIG_SPECULATIVE_HARDEN_LOCK) )
+                opt_lock_harden = val;
+            else
+            {
+                no_config_param("SPECULATIVE_HARDEN_LOCK", "spec-ctrl", s, ss);
+                rc = -EINVAL;
+            }
+        }
         else if ( (val = parse_boolean("srb-lock", s, ss)) >= 0 )
             opt_srb_lock = val;
         else if ( (val = parse_boolean("unpriv-mmio", s, ss)) >= 0 )
@@ -481,7 +493,8 @@ static void __init print_details(enum ind_thunk thunk)
            (e21a & cpufeat_mask(X86_FEATURE_SBPB))           ? " SBPB"           : "");
 
     /* Compiled-in support which pertains to mitigations. */
-    if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) || IS_ENABLED(CONFIG_SHADOW_PAGING) )
+    if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) || IS_ENABLED(CONFIG_SHADOW_PAGING) ||
+         IS_ENABLED(CONFIG_SPECULATIVE_HARDEN_LOCK) )
         printk("  Compiled-in support:"
 #ifdef CONFIG_INDIRECT_THUNK
                " INDIRECT_THUNK"
@@ -489,10 +502,13 @@ static void __init print_details(enum ind_thunk thunk)
 #ifdef CONFIG_SHADOW_PAGING
                " SHADOW_PAGING"
 #endif
+#ifdef CONFIG_SPECULATIVE_HARDEN_LOCK
+               " HARDEN_LOCK"
+#endif
                "\n");
 
     /* Settings for Xen's protection, irrespective of guests. */
-    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s%s%s%s, Other:%s%s%s%s%s%s\n",
+    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s%s%s%s, Other:%s%s%s%s%s%s%s\n",
            thunk == THUNK_NONE      ? "N/A" :
            thunk == THUNK_RETPOLINE ? "RETPOLINE" :
            thunk == THUNK_LFENCE    ? "LFENCE" :
@@ -518,7 +534,8 @@ static void __init print_details(enum ind_thunk thunk)
            opt_verw_pv || opt_verw_hvm ||
            opt_verw_mmio                             ? " VERW"  : "",
            opt_div_scrub                             ? " DIV" : "",
-           opt_branch_harden                         ? " BRANCH_HARDEN" : "");
+           opt_branch_harden                         ? " BRANCH_HARDEN" : "",
+           opt_lock_harden                           ? " LOCK_HARDEN" : "");
 
     /* L1TF diagnostics, printed if vulnerable or PV shadowing is in use. */
     if ( cpu_has_bug_l1tf || opt_pv_l1tf_hwdom || opt_pv_l1tf_domu )
@@ -1815,6 +1832,9 @@ void __init init_speculation_mitigations(void)
 
     if ( opt_branch_harden )
         setup_force_cpu_cap(X86_FEATURE_SC_BRANCH_HARDEN);
+
+    if ( !opt_lock_harden )
+        setup_force_cpu_cap(X86_FEATURE_SC_NO_LOCK_HARDEN);
 
     /*
      * We do not disable HT by default on affected hardware.
