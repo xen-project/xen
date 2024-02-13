@@ -38,6 +38,32 @@ static always_inline void block_speculation(void)
     barrier_nospec_true();
 }
 
+static always_inline void arch_block_lock_speculation(void)
+{
+    alternative("lfence", "", X86_FEATURE_SC_NO_LOCK_HARDEN);
+}
+
+/* Allow to insert a read memory barrier into conditionals */
+static always_inline bool barrier_lock_true(void)
+{
+    alternative("lfence #nospec-true", "", X86_FEATURE_SC_NO_LOCK_HARDEN);
+    return true;
+}
+
+static always_inline bool barrier_lock_false(void)
+{
+    alternative("lfence #nospec-false", "", X86_FEATURE_SC_NO_LOCK_HARDEN);
+    return false;
+}
+
+static always_inline bool arch_lock_evaluate_nospec(bool condition)
+{
+    if ( condition )
+        return barrier_lock_true();
+    else
+        return barrier_lock_false();
+}
+
 #endif /* _ASM_X86_NOSPEC_H */
 
 /*
