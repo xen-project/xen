@@ -188,6 +188,23 @@ config SPECULATIVE_HARDEN_GUEST_ACCESS
 
 	  If unsure, say Y.
 
+config SPECULATIVE_HARDEN_LOCK
+	bool "Speculative lock context hardening"
+	default y
+	depends on X86
+	help
+	  Contemporary processors may use speculative execution as a
+	  performance optimisation, but this can potentially be abused by an
+	  attacker to leak data via speculative sidechannels.
+
+	  One source of data leakage is via speculative accesses to lock
+	  critical regions.
+
+	  This option is disabled by default at run time, and needs to be
+	  enabled on the command line.
+
+	  If unsure, say Y.
+
 endmenu
 
 config DIT_DEFAULT
