@@ -6,6 +6,16 @@
 #include <xen/const.h>
 #include <xen/page-size.h>
 
+#include <asm/riscv_encoding.h>
+
+#ifdef CONFIG_RISCV_64
+#define CONFIG_PAGING_LEVELS 3
+#define RV_STAGE1_MODE SATP_MODE_SV39
+#else
+#define CONFIG_PAGING_LEVELS 2
+#define RV_STAGE1_MODE SATP_MODE_SV32
+#endif
+
 /*
  * RISC-V64 Layout:
  *
@@ -23,24 +33,77 @@
  * It means that:
  *   top VA bits are simply ignored for the purpose of translating to PA.
  *
- * ============================================================================
- *    Start addr    |   End addr        |  Size  | Slot       |area description
- * ============================================================================
- * FFFFFFFFC0800000 |  FFFFFFFFFFFFFFFF |1016 MB | L2 511     | Unused
- * FFFFFFFFC0600000 |  FFFFFFFFC0800000 |  2 MB  | L2 511     | Fixmap
- * FFFFFFFFC0200000 |  FFFFFFFFC0600000 |  4 MB  | L2 511     | FDT
- * FFFFFFFFC0000000 |  FFFFFFFFC0200000 |  2 MB  | L2 511     | Xen
- *                 ...                  |  1 GB  | L2 510     | Unused
- * 0000003200000000 |  0000007F80000000 | 309 GB | L2 200-509 | Direct map
- *                 ...                  |  1 GB  | L2 199     | Unused
- * 0000003100000000 |  00000031C0000000 |  3 GB  | L2 196-198 | Frametable
- *                 ...                  |  1 GB  | L2 195     | Unused
- * 0000003080000000 |  00000030C0000000 |  1 GB  | L2 194     | VMAP
- *                 ...                  | 194 GB | L2 0 - 193 | Unused
- * ============================================================================
+ * Amount of slots for Frametable were calculated base on
+ * sizeof(struct page_info) = 48. If the 'struct page_info' is changed,
+ * the table below must be updated.
  *
+ * ============================================================================
+ * Start addr          | End addr         | Slot       | area description
+ * ============================================================================
+ *                   .....                 L2 511          Unused
+ *  0xffffffffc0600000  0xffffffffc0800000 L2 511          Fixmap
+ *  0xffffffffc0200000  0xffffffffc0600000 L2 511          FDT
+ *  0xffffffffc0000000  0xffffffffc0200000 L2 511          Xen
+ *                   .....                 L2 510          Unused
+ *  0x3200000000        0x7f40000000       L2 200-509      Direct map
+ *                   .....                 L2 199          Unused
+ *  0x30c0000000        0x31c0000000       L2 195-198      Frametable
+ *                   .....                 L2 194          Unused
+ *  0x3040000000        0x3080000000       L2 193          VMAP
+ *                   .....                 L2 0-192        Unused
+#elif RV_STAGE1_MODE == SATP_MODE_SV48
+ * Memory layout is the same as for SV39 in terms of slots, so only start and
+ * end addresses should be shifted by 9
 #endif
  */
+
+#define HYP_PT_ROOT_LEVEL (CONFIG_PAGING_LEVELS - 1)
+
+#ifdef CONFIG_RISCV_64
+
+#define VPN_BITS (9)
+
+#define SLOTN_ENTRY_BITS        (HYP_PT_ROOT_LEVEL * VPN_BITS + PAGE_SHIFT)
+#define SLOTN(slot)             (_AT(vaddr_t, slot) << SLOTN_ENTRY_BITS)
+
+#if RV_STAGE1_MODE == SATP_MODE_SV39
+#define XEN_VIRT_START 0xFFFFFFFFC0000000
+#elif RV_STAGE1_MODE == SATP_MODE_SV48
+#define XEN_VIRT_START 0xFFFFFF8000000000
+#else
+#error "unsupported RV_STAGE1_MODE"
+#endif
+
+#define DIRECTMAP_SLOT_END      509
+#define DIRECTMAP_SLOT_START    200
+#define DIRECTMAP_VIRT_START    SLOTN(DIRECTMAP_SLOT_START)
+#define DIRECTMAP_SIZE          (SLOTN(DIRECTMAP_SLOT_END) - SLOTN(DIRECTMAP_SLOT_START))
+
+#define FRAMETABLE_SCALE_FACTOR  (PAGE_SIZE/sizeof(struct page_info))
+#define FRAMETABLE_SIZE_IN_SLOTS (((DIRECTMAP_SIZE / SLOTN(1)) / FRAMETABLE_SCALE_FACTOR) + 1)
+
+/*
+ * We have to skip Unused slot between DIRECTMAP and FRAMETABLE (look at mem.
+ * layout), so -1 is needed
+ */
+#define FRAMETABLE_SLOT_START   (DIRECTMAP_SLOT_START - FRAMETABLE_SIZE_IN_SLOTS - 1)
+#define FRAMETABLE_SIZE         (FRAMETABLE_SIZE_IN_SLOTS * SLOTN(1))
+#define FRAMETABLE_VIRT_START   SLOTN(FRAMETABLE_SLOT_START)
+#define FRAMETABLE_NR           (FRAMETABLE_SIZE / sizeof(*frame_table))
+#define FRAMETABLE_VIRT_END     (FRAMETABLE_VIRT_START + FRAMETABLE_SIZE - 1)
+
+/*
+ * We have to skip Unused slot between Frametable and VMAP (look at mem.
+ * layout), so an additional -1 is needed */
+#define VMAP_SLOT_START         (FRAMETABLE_SLOT_START - 1 - 1)
+#define VMAP_VIRT_START         SLOTN(VMAP_SLOT_START)
+#define VMAP_VIRT_SIZE          GB(1)
+
+#else
+#error "RV32 isn't supported"
+#endif
+
+#define HYPERVISOR_VIRT_START XEN_VIRT_START
 
 #if defined(CONFIG_RISCV_64)
 # define LONG_BYTEORDER 3
@@ -73,23 +136,9 @@
 #define CODE_FILL /* empty */
 #endif
 
-#ifdef CONFIG_RISCV_64
-#define XEN_VIRT_START 0xFFFFFFFFC0000000 /* (_AC(-1, UL) + 1 - GB(1)) */
-#else
-#error "RV32 isn't supported"
-#endif
-
 #define SMP_CACHE_BYTES (1 << 6)
 
 #define STACK_SIZE PAGE_SIZE
-
-#ifdef CONFIG_RISCV_64
-#define CONFIG_PAGING_LEVELS 3
-#define RV_STAGE1_MODE SATP_MODE_SV39
-#else
-#define CONFIG_PAGING_LEVELS 2
-#define RV_STAGE1_MODE SATP_MODE_SV32
-#endif
 
 #define IDENT_AREA_SIZE 64
 
