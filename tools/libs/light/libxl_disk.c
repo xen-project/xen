@@ -201,6 +201,32 @@ static int libxl__device_disk_setdefault(libxl__gc *gc, uint32_t domid,
         disk->backend = LIBXL_DISK_BACKEND_QDISK;
     }
 
+    if (disk->is_cdrom &&
+        disk->format == LIBXL_DISK_FORMAT_EMPTY &&
+        disk->backend == LIBXL_DISK_BACKEND_PHY &&
+        disk->backend_domid == LIBXL_TOOLSTACK_DOMID) {
+        uint32_t target_domid;
+        int fd;
+
+        if (libxl_is_stubdom(CTX, domid, &target_domid)) {
+            LOGED(DEBUG, domid, "Using target_domid %u", target_domid);
+        } else {
+            target_domid = domid;
+        }
+        free(disk->pdev_path);
+        disk->pdev_path =
+            libxl__sprintf(NOGC, LIBXL_STUBDOM_EMPTY_CDROM ".%u",
+                           target_domid);
+        fd = creat(disk->pdev_path, 0400);
+        if (fd < 0) {
+            LOGED(ERROR, domid, "Failed to create empty cdrom \"%s\"",
+                  disk->pdev_path);
+            return ERROR_FAIL;
+        }
+
+        close(fd);
+    }
+
     rc = libxl__device_disk_set_backend(gc, disk);
     return rc;
 }
@@ -998,7 +1024,7 @@ static void cdrom_insert_ejected(libxl__egc *egc,
     empty = flexarray_make(gc, 4, 1);
     flexarray_append_pair(empty, "type",
                           libxl__device_disk_string_of_backend(disk->backend));
-    flexarray_append_pair(empty, "params", "");
+    flexarray_append_pair(empty, "params", disk->pdev_path ?: "");
 
     for (;;) {
         rc = libxl__xs_transaction_start(gc, &t);
@@ -1174,13 +1200,15 @@ static void cdrom_insert_inserted(libxl__egc *egc,
     insert = flexarray_make(gc, 4, 1);
     flexarray_append_pair(insert, "type",
                       libxl__device_disk_string_of_backend(disk->backend));
-    if (disk->format != LIBXL_DISK_FORMAT_EMPTY)
+    if (disk->backend == LIBXL_DISK_BACKEND_QDISK &&
+        disk->format != LIBXL_DISK_FORMAT_EMPTY) {
         flexarray_append_pair(insert, "params",
                     GCSPRINTF("%s:%s",
                         libxl__device_disk_string_of_format(disk->format),
                         disk->pdev_path));
-    else
-        flexarray_append_pair(insert, "params", "");
+    } else {
+        flexarray_append_pair(insert, "params", disk->pdev_path ?: "");
+    }
 
     for (;;) {
         rc = libxl__xs_transaction_start(gc, &t);

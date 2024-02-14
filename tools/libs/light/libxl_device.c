@@ -427,7 +427,10 @@ int libxl__device_disk_set_backend(libxl__gc *gc, libxl_device_disk *disk) {
             LOG(ERROR, "Disk vdev=%s is empty but not cdrom", disk->vdev);
             return ERROR_INVAL;
         }
-        if (disk->pdev_path != NULL && strcmp(disk->pdev_path, "")) {
+        if (disk->pdev_path != NULL &&
+            (strcmp(disk->pdev_path, "") &&
+             strncmp(disk->pdev_path, LIBXL_STUBDOM_EMPTY_CDROM,
+                     strlen(LIBXL_STUBDOM_EMPTY_CDROM)))) {
             LOG(ERROR,
                 "Disk vdev=%s is empty but an image has been provided: %s",
                 disk->vdev, disk->pdev_path);

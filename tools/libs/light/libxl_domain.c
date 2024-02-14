@@ -1525,6 +1525,10 @@ static void devices_destroy_cb(libxl__egc *egc,
     if (rc < 0)
         LOGD(ERROR, domid, "libxl__devices_destroy failed");
 
+    /* Remove the file after the hotplug scripts have run.  The scripts won't
+     * run if the file doesn't exist when they are run.  */
+    libxl__remove_file(gc, GCSPRINTF(LIBXL_STUBDOM_EMPTY_CDROM ".%u", domid));
+
     vm_path = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/vm", dom_path));
     if (vm_path)
         if (!xs_rm(ctx->xsh, XBT_NULL, vm_path))

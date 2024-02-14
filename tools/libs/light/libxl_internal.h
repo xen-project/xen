@@ -120,6 +120,7 @@
 #define STUBDOM_CONSOLE_SERIAL 3
 #define STUBDOM_SPECIAL_CONSOLES 3
 #define LIBXL_LINUX_STUBDOM_MEM 128
+#define LIBXL_STUBDOM_EMPTY_CDROM XEN_RUN_DIR "/empty-cdrom" /* .$domid */
 #define TAP_DEVICE_SUFFIX "-emu"
 #define DOMID_XS_PATH "domid"
 #define PVSHIM_BASENAME "xen-shim"
