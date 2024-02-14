@@ -301,12 +301,16 @@ static int disk_try_backend(disk_try_backend_args *a,
 
     switch (backend) {
     case LIBXL_DISK_BACKEND_PHY:
-        if (a->disk->format != LIBXL_DISK_FORMAT_RAW) {
-            goto bad_format;
-        }
-
         if (libxl_defbool_val(a->disk->colo_enable))
             goto bad_colo;
+
+        if (a->disk->is_cdrom && a->disk->format == LIBXL_DISK_FORMAT_EMPTY) {
+            LOG(DEBUG, "Disk vdev=%s is an empty cdrom", a->disk->vdev);
+            return backend;
+        }
+
+        if (a->disk->format != LIBXL_DISK_FORMAT_RAW)
+            goto bad_format;
 
         if (a->disk->backend_domid != LIBXL_TOOLSTACK_DOMID) {
             LOG(DEBUG, "Disk vdev=%s, is using a storage driver domain, "
