@@ -519,7 +519,7 @@
 #define LIBXL_HAVE_PHYSINFO_CAP_VMTRACE 1
 
 /*
- * LIBXL_HAVE_VMTRACE_BUF_KB indicates that libxl_domain_create_info has a
+ * LIBXL_HAVE_VMTRACE_BUF_KB indicates that libxl_domain_build_info has a
  * vmtrace_buf_kb parameter, which allows to enable pre-allocation of
  * processor tracing buffers of given size.
  */
