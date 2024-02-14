@@ -5,7 +5,7 @@ xentop - displays real-time information about a Xen system and domains
 =head1 SYNOPSIS
 
 B<xentop> [B<-h>] [B<-V>] [B<-d>SECONDS] [B<-n>] [B<-r>] [B<-v>] [B<-f>]
-[B<-b>] [B<-i>ITERATIONS]
+[B<-b>] [B<-i>ITERATIONS] [B<-z>]
 
 =head1 DESCRIPTION
 
@@ -56,6 +56,10 @@ output data in batch mode (to stdout)
 =item B<-i>, B<--iterations>=I<ITERATIONS>
 
 maximum number of iterations xentop should produce before ending
+
+=item B<-z>, B<--dom0-first>
+
+display dom0 first, ignoring interactive sorting
 
 =back
 

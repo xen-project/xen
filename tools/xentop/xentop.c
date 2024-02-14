@@ -211,6 +211,7 @@ int show_networks = 0;
 int show_vbds = 0;
 int repeat_header = 0;
 int show_full_name = 0;
+int dom0_first = 0;
 #define PROMPT_VAL_LEN 80
 const char *prompt = NULL;
 char prompt_val[PROMPT_VAL_LEN];
@@ -240,6 +241,7 @@ static void usage(const char *program)
 	       "-b, --batch	     output in batch mode, no user input accepted\n"
 	       "-i, --iterations     number of iterations before exiting\n"
 	       "-f, --full-name      output the full domain name (not truncated)\n"
+	       "-z, --dom0-first     display dom0 first (ignore sorting)\n"
 	       "\n" XENTOP_BUGSTO,
 	       program);
 	return;
@@ -1163,6 +1165,8 @@ static void top(void)
 {
 	xenstat_domain **domains;
 	unsigned int i, num_domains = 0;
+	int dom0_index = -1;
+	int sort_start = 0, sort_count = 0;
 
 	/* Now get the node information */
 	if (prev_node != NULL)
@@ -1183,11 +1187,27 @@ static void top(void)
 	if(domains == NULL)
 		fail("Failed to allocate memory\n");
 
-	for (i=0; i < num_domains; i++)
+	for (i=0; i < num_domains; i++) {
 		domains[i] = xenstat_node_domain_by_index(cur_node, i);
+		if ( strcmp(xenstat_domain_name(domains[i]), "Domain-0") == 0 )
+			dom0_index = i;
+	}
+
+	/* Handle dom0 position, not for dom0-less */
+	if ( dom0_first == 1 && dom0_index != -1 ){
+		/* if dom0 is not first in domains, swap it there */
+		if ( dom0_index != 0 ){
+			xenstat_domain *tmp;
+			tmp = domains[0];
+			domains[0] = domains[dom0_index];
+			domains[dom0_index] = tmp;
+		}
+		sort_start = 1;
+		sort_count = 1;
+	}
 
 	/* Sort */
-	qsort(domains, num_domains, sizeof(xenstat_domain *),
+	qsort((domains+sort_start), (num_domains-sort_count), sizeof(xenstat_domain *),
 	      (int(*)(const void *, const void *))compare_domains);
 
 	if(first_domain_index >= num_domains)
@@ -1242,9 +1262,10 @@ int main(int argc, char **argv)
 		{ "batch",	   no_argument,	      NULL, 'b' },
 		{ "iterations",	   required_argument, NULL, 'i' },
 		{ "full-name",     no_argument,       NULL, 'f' },
+		{ "dom0-first",    no_argument,       NULL, 'z' },
 		{ 0, 0, 0, 0 },
 	};
-	const char *sopts = "hVnxrvd:bi:f";
+	const char *sopts = "hVnxrvd:bi:fz";
 
 	if (atexit(cleanup) != 0)
 		fail("Failed to install cleanup handler.\n");
@@ -1285,6 +1306,9 @@ int main(int argc, char **argv)
 			break;
 		case 'f':
 			show_full_name = 1;
+			break;
+		case 'z':
+			dom0_first = 1;
 			break;
 		}
 	}
