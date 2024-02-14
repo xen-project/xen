@@ -804,7 +804,7 @@ bool __init iommu_unity_region_ok(const char *prefix, mfn_t start, mfn_t end)
            "%s: [%#" PRI_mfn " ,%#" PRI_mfn "] is not (entirely) in reserved memory\n",
            prefix, mfn_x(start), mfn_x(end));
 
-    for ( addr = start; mfn_x(addr) <= mfn_x(end); mfn_add(addr, 1) )
+    for ( addr = start; mfn_x(addr) <= mfn_x(end); addr = mfn_add(addr, 1) )
     {
         unsigned int type = page_get_ram_type(addr);
 
