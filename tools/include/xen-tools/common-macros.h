@@ -79,6 +79,10 @@
 #define __must_check __attribute__((__warn_unused_result__))
 #endif
 
+#ifndef __packed
+#define __packed __attribute__((__packed__))
+#endif
+
 #define container_of(ptr, type, member) ({              \
     typeof(((type *)0)->member) *mptr__ = (ptr);        \
     (type *)((char *)mptr__ - offsetof(type, member));  \
@@ -86,5 +90,18 @@
 
 #define __AC(X, Y)   (X ## Y)
 #define _AC(X, Y)    __AC(X, Y)
+
+#define get_unaligned_t(type, ptr) ({                               \
+    const struct { type x; } __packed *ptr_ = (typeof(ptr_))(ptr);  \
+    ptr_->x;                                                        \
+})
+
+#define put_unaligned_t(type, val, ptr) do {                        \
+    struct { type x; } __packed *ptr_ = (typeof(ptr_))(ptr);        \
+    ptr_->x = val;                                                  \
+} while (0)
+
+#define get_unaligned(ptr)      get_unaligned_t(typeof(*(ptr)), ptr)
+#define put_unaligned(val, ptr) put_unaligned_t(typeof(*(ptr)), val, ptr)
 
 #endif	/* __XEN_TOOLS_COMMON_MACROS__ */
