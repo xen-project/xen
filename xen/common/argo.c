@@ -1421,15 +1421,24 @@ find_ring_mfn(struct domain *d, gfn_t gfn, mfn_t *mfn)
         return ret;
 
     *mfn = page_to_mfn(page);
-    if ( !mfn_valid(*mfn) )
-        ret = -EINVAL;
+
+    switch ( p2mt )
+    {
+    case p2m_ram_rw:
+        if ( !get_page_and_type(page, d, PGT_writable_page) )
+            ret = -EINVAL;
+        break;
+
 #ifdef CONFIG_X86
-    else if ( p2mt == p2m_ram_logdirty )
+    case p2m_ram_logdirty:
         ret = -EAGAIN;
+        break;
 #endif
-    else if ( (p2mt != p2m_ram_rw) ||
-              !get_page_and_type(page, d, PGT_writable_page) )
+
+    default:
         ret = -EINVAL;
+        break;
+    }
 
     put_page(page);
 
