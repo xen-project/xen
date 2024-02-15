@@ -10,7 +10,7 @@ LDFLAGS += $(PTHREAD_LDFLAGS)
 
 TARGETS := xen-9pfsd
 
-XEN-9PFSD_OBJS = xen-9pfsd.o
+XEN-9PFSD_OBJS = xen-9pfsd.o io.o
 $(XEN-9PFSD_OBJS): CFLAGS += $(CFLAGS_libxenstore)
 $(XEN-9PFSD_OBJS): CFLAGS += $(CFLAGS_libxenevtchn)
 $(XEN-9PFSD_OBJS): CFLAGS += $(CFLAGS_libxengnttab)
