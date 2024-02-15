@@ -33,6 +33,7 @@
 #define P9_CMD_WALK       110
 #define P9_CMD_OPEN       112
 #define P9_CMD_CREATE     114
+#define P9_CMD_READ       116
 #define P9_CMD_WRITE      118
 #define P9_CMD_CLUNK      120
 #define P9_CMD_STAT       124
@@ -1245,6 +1246,94 @@ static void p9_stat(struct ring *ring, struct p9_header *hdr)
     free_fid(device, fidp);
 }
 
+static void p9_read(struct ring *ring, struct p9_header *hdr)
+{
+    device *device = ring->device;
+    uint32_t fid;
+    uint64_t off;
+    unsigned int len;
+    uint32_t count;
+    void *buf;
+    struct p9_fid *fidp;
+    int ret;
+
+    ret = fill_data(ring, "ULU", &fid, &off, &count);
+    if ( ret != 3 )
+    {
+        p9_error(ring, hdr->tag, EINVAL);
+        return;
+    }
+
+    fidp = get_fid_ref(device, fid);
+    if ( !fidp || !fidp->opened )
+    {
+        errno = EBADF;
+        goto err;
+    }
+
+    len = count;
+    buf = ring->buffer + sizeof(*hdr) + sizeof(uint32_t);
+
+    if ( fidp->isdir )
+    {
+        struct dirent *dirent;
+        struct stat st;
+        struct p9_stat p9s;
+
+        if ( off == 0 )
+            rewinddir(fidp->data);
+
+        while ( len != 0 )
+        {
+            errno = 0;
+            dirent = readdir(fidp->data);
+            if ( !dirent )
+            {
+                if ( errno )
+                    goto err;
+                break;
+            }
+            if ( fstatat(fidp->fd, dirent->d_name, &st, 0) < 0 )
+                goto err;
+            fill_p9_stat(device, &p9s, &st, dirent->d_name);
+            if ( p9s.size + sizeof(p9s.size) > len )
+            {
+                seekdir(fidp->data, dirent->d_off);
+                break;
+            }
+            fill_buffer_at(&buf, "s", &p9s);
+            len -= p9s.size + sizeof(p9s.size);
+        }
+    }
+    else
+    {
+        while ( len != 0 )
+        {
+            ret = pread(fidp->fd, buf, len, off);
+            if ( ret <= 0 )
+                break;
+            len -= ret;
+            buf += ret;
+            off += ret;
+        }
+        if ( ret < 0 && len == count )
+            goto err;
+    }
+
+    buf = ring->buffer + sizeof(*hdr) + sizeof(uint32_t);
+    len = count - len;
+    fill_buffer(ring, hdr->cmd + 1, hdr->tag, "D", &len, buf);
+
+ out:
+    free_fid(device, fidp);
+
+    return;
+
+ err:
+    p9_error(ring, hdr->tag, errno);
+    goto out;
+}
+
 static void p9_write(struct ring *ring, struct p9_header *hdr)
 {
     device *device = ring->device;
@@ -1367,6 +1456,10 @@ void *io_thread(void *arg)
 
             case P9_CMD_CREATE:
                 p9_create(ring, &hdr);
+                break;
+
+            case P9_CMD_READ:
+                p9_read(ring, &hdr);
                 break;
 
             case P9_CMD_WRITE:
