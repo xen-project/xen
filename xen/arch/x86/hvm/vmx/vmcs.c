@@ -215,6 +215,7 @@ static void __init vmx_display_features(void)
     P(cpu_has_vmx_tsc_scaling, "TSC Scaling");
     P(cpu_has_vmx_bus_lock_detection, "Bus Lock Detection");
     P(cpu_has_vmx_notify_vm_exiting, "Notify VM Exit");
+    P(cpu_has_vmx_virt_spec_ctrl, "Virtualize SPEC_CTRL");
 #undef P
 
     if ( !printed )
@@ -378,7 +379,7 @@ static int vmx_init_vmcs_config(bool bsp)
 
     if ( _vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_TERTIARY_CONTROLS )
     {
-        uint64_t opt = 0;
+        uint64_t opt = TERTIARY_EXEC_VIRT_SPEC_CTRL;
 
         _vmx_tertiary_exec_control = adjust_vmx_controls2(
             "Tertiary Exec Control", 0, opt,
@@ -1377,6 +1378,12 @@ static int construct_vmcs(struct vcpu *v)
     if ( cpu_has_vmx_tsc_scaling )
         __vmwrite(TSC_MULTIPLIER, d->arch.hvm.tsc_scaling_ratio);
 
+    if ( cpu_has_vmx_virt_spec_ctrl )
+    {
+        __vmwrite(SPEC_CTRL_MASK, 0);
+        __vmwrite(SPEC_CTRL_SHADOW, 0);
+    }
+
     /* will update HOST & GUEST_CR3 as reqd */
     paging_update_paging_modes(v);
 
@@ -2087,6 +2094,9 @@ void vmcs_dump_vcpu(struct vcpu *v)
     if ( v->arch.hvm.vmx.secondary_exec_control &
          SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY )
         printk("InterruptStatus = %04x\n", vmr16(GUEST_INTR_STATUS));
+    if ( cpu_has_vmx_virt_spec_ctrl )
+        printk("SPEC_CTRL mask = 0x%016lx  shadow = 0x%016lx\n",
+               vmr(SPEC_CTRL_MASK), vmr(SPEC_CTRL_SHADOW));
 
     printk("*** Host State ***\n");
     printk("RIP = 0x%016lx (%ps)  RSP = 0x%016lx\n",
