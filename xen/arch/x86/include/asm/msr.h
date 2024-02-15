@@ -302,8 +302,11 @@ struct vcpu_msrs
      * For PV guests, this holds the guest kernel value.  It is accessed on
      * every entry/exit path.
      *
-     * For VT-x guests, the guest value is held in the MSR guest load/save
-     * list.
+     * For VT-x guests, one of two situations exist:
+     *
+     * - If hardware supports virtualized MSR_SPEC_CTRL, it is active by
+     *   default and the guest value lives in the VMCS.
+     * - Otherwise, the guest value is held in the MSR load/save list.
      *
      * For SVM, the guest value lives in the VMCB, and hardware saves/restores
      * the host value automatically.  However, guests run with the OR of the

@@ -818,23 +818,28 @@ static void cf_check vmx_cpuid_policy_changed(struct vcpu *v)
     /*
      * We can safely pass MSR_SPEC_CTRL through to the guest, even if STIBP
      * isn't enumerated in hardware, as SPEC_CTRL_STIBP is ignored.
+     *
+     * If VMX_VIRT_SPEC_CTRL is available, it is activated by default and the
+     * guest MSR_SPEC_CTRL value lives in the VMCS.  Otherwise, it lives in
+     * the MSR load/save list.
      */
     if ( cp->feat.ibrsb )
     {
         vmx_clear_msr_intercept(v, MSR_SPEC_CTRL, VMX_MSR_RW);
 
-        rc = vmx_add_guest_msr(v, MSR_SPEC_CTRL, 0);
-        if ( rc )
-            goto out;
+        if ( !cpu_has_vmx_virt_spec_ctrl )
+        {
+            rc = vmx_add_guest_msr(v, MSR_SPEC_CTRL, 0);
+            if ( rc )
+                goto out;
+        }
     }
     else
     {
         vmx_set_msr_intercept(v, MSR_SPEC_CTRL, VMX_MSR_RW);
 
-        rc = vmx_del_msr(v, MSR_SPEC_CTRL, VMX_MSR_GUEST);
-        if ( rc && rc != -ESRCH )
-            goto out;
-        rc = 0; /* Tolerate -ESRCH */
+        if ( !cpu_has_vmx_virt_spec_ctrl )
+            vmx_del_msr(v, MSR_SPEC_CTRL, VMX_MSR_GUEST);
     }
 
     /* MSR_PRED_CMD is safe to pass through if the guest knows about it. */
@@ -2629,6 +2634,10 @@ static uint64_t cf_check vmx_get_reg(struct vcpu *v, unsigned int reg)
     switch ( reg )
     {
     case MSR_SPEC_CTRL:
+        if ( cpu_has_vmx_virt_spec_ctrl )
+            /* Guest value in VMCS - fetched below. */
+            break;
+
         rc = vmx_read_guest_msr(v, reg, &val);
         if ( rc )
         {
@@ -2652,6 +2661,11 @@ static uint64_t cf_check vmx_get_reg(struct vcpu *v, unsigned int reg)
     vmx_vmcs_enter(v);
     switch ( reg )
     {
+    case MSR_SPEC_CTRL:
+        ASSERT(cpu_has_vmx_virt_spec_ctrl);
+        __vmread(SPEC_CTRL_SHADOW, &val);
+        break;
+
     case MSR_IA32_BNDCFGS:
         __vmread(GUEST_BNDCFGS, &val);
         break;
@@ -2678,6 +2692,10 @@ static void cf_check vmx_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
     switch ( reg )
     {
     case MSR_SPEC_CTRL:
+        if ( cpu_has_vmx_virt_spec_ctrl )
+            /* Guest value in VMCS - set below. */
+            break;
+
         rc = vmx_write_guest_msr(v, reg, val);
         if ( rc )
         {
@@ -2698,6 +2716,11 @@ static void cf_check vmx_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
     vmx_vmcs_enter(v);
     switch ( reg )
     {
+    case MSR_SPEC_CTRL:
+        ASSERT(cpu_has_vmx_virt_spec_ctrl);
+        __vmwrite(SPEC_CTRL_SHADOW, val);
+        break;
+
     case MSR_IA32_BNDCFGS:
         __vmwrite(GUEST_BNDCFGS, val);
         break;

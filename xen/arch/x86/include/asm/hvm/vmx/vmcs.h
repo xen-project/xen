@@ -270,6 +270,9 @@ extern u32 vmx_secondary_exec_control;
 #define TERTIARY_EXEC_VIRT_SPEC_CTRL            BIT(7, UL)
 extern uint64_t vmx_tertiary_exec_control;
 
+#define cpu_has_vmx_virt_spec_ctrl \
+     (vmx_tertiary_exec_control & TERTIARY_EXEC_VIRT_SPEC_CTRL)
+
 #define VMX_EPT_EXEC_ONLY_SUPPORTED                         0x00000001
 #define VMX_EPT_WALK_LENGTH_4_SUPPORTED                     0x00000040
 #define VMX_EPT_MEMORY_TYPE_UC                              0x00000100
@@ -436,6 +439,8 @@ enum vmcs_field {
     XSS_EXIT_BITMAP                 = 0x0000202c,
     TSC_MULTIPLIER                  = 0x00002032,
     TERTIARY_VM_EXEC_CONTROL        = 0x00002034,
+    SPEC_CTRL_MASK                  = 0x0000204a,
+    SPEC_CTRL_SHADOW                = 0x0000204c,
     GUEST_PHYSICAL_ADDRESS          = 0x00002400,
     VMCS_LINK_POINTER               = 0x00002800,
     GUEST_IA32_DEBUGCTL             = 0x00002802,
