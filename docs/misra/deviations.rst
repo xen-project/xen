@@ -336,6 +336,28 @@ Deviations related to MISRA C:2012 Rules:
        (4) as lhs in assignments.
      - Tagged as `safe` for ECLAIR.
 
+   * - R20.12
+     - Variadic macros that use token pasting often employ the gcc extension
+       `ext_paste_comma`, as detailed in `C-language-toolchain.rst`, which is
+       not easily replaceable; macros that in addition perform regular argument
+       expansion on the same argument subject to the # or ## operators violate
+       the Rule if the argument is a macro. 
+     - Tagged as `deliberate` for ECLAIR.
+
+   * - R20.12
+     - Macros that are used for runtime or build-time assertions contain
+       deliberate uses of an argument as both a regular argument and a
+       stringification token, to provide useful diagnostic messages.
+     - Tagged as `deliberate` for ECLAIR.
+
+   * - R20.12
+     - GENERATE_CASE is a local helper macro that allows some selected switch
+       statements to be more compact and readable. As such, the risk of
+       developer confusion in using such macro is deemed negligible. This
+       construct is deviated only in Translation Units that present a violation
+       of the Rule due to uses of this macro.
+     - Tagged as `deliberate` for ECLAIR.
+
 Other deviations:
 -----------------
 

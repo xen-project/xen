@@ -405,6 +405,26 @@ in assignments."
 {safe, "left_right(^[(,\\[]$,^[),\\]]$)"}
 -doc_end
 
+-doc_begin="Uses of variadic macros that have one of their arguments defined as
+a macro and used within the body for both ordinary parameter expansion and as an
+operand to the # or ## operators have a behavior that is well-understood and
+deliberate."
+-config=MC3R1.R20.12,macros+={deliberate, "variadic()"}
+-doc_end
+
+-doc_begin="Uses of a macro parameter for ordinary expansion and as an operand
+to the # or ## operators within the following macros are deliberate, to provide
+useful diagnostic messages to the user."
+-config=MC3R1.R20.12,macros+={deliberate, "name(ASSERT||BUILD_BUG_ON||BUILD_BUG_ON_ZERO)"}
+-doc_end
+
+-doc_begin="The helper macro GENERATE_CASE may use a macro parameter for ordinary
+expansion and token pasting to improve readability. Only instances where this
+leads to a violation of the Rule are deviated."
+-file_tag+={deliberate_generate_case, "^xen/arch/arm/vcpreg\\.c$"}
+-config=MC3R1.R20.12,macros+={deliberate, "name(GENERATE_CASE)&&loc(file(deliberate_generate_case))"}
+-doc_end
+
 #
 # General
 #
