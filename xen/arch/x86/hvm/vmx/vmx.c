@@ -618,23 +618,28 @@ static void vmx_cpuid_policy_changed(struct vcpu *v)
     /*
      * We can safely pass MSR_SPEC_CTRL through to the guest, even if STIBP
      * isn't enumerated in hardware, as SPEC_CTRL_STIBP is ignored.
+     *
+     * If VMX_VIRT_SPEC_CTRL is available, it is activated by default and the
+     * guest MSR_SPEC_CTRL value lives in the VMCS.  Otherwise, it lives in
+     * the MSR load/save list.
      */
     if ( cp->feat.ibrsb )
     {
         vmx_clear_msr_intercept(v, MSR_SPEC_CTRL, VMX_MSR_RW);
 
-        rc = vmx_add_guest_msr(v, MSR_SPEC_CTRL, 0);
-        if ( rc )
-            goto out;
+        if ( !cpu_has_vmx_virt_spec_ctrl )
+        {
+            rc = vmx_add_guest_msr(v, MSR_SPEC_CTRL, 0);
+            if ( rc )
+                goto out;
+        }
     }
     else
     {
         vmx_set_msr_intercept(v, MSR_SPEC_CTRL, VMX_MSR_RW);
 
-        rc = vmx_del_msr(v, MSR_SPEC_CTRL, VMX_MSR_GUEST);
-        if ( rc && rc != -ESRCH )
-            goto out;
-        rc = 0; /* Tolerate -ESRCH */
+        if ( !cpu_has_vmx_virt_spec_ctrl )
+            vmx_del_msr(v, MSR_SPEC_CTRL, VMX_MSR_GUEST);
     }
 
     /* MSR_PRED_CMD is safe to pass through if the guest knows about it. */
@@ -2444,9 +2449,14 @@ static uint64_t vmx_get_reg(struct vcpu *v, unsigned int reg)
     uint64_t val = 0;
     int rc;
 
+    /* Logic which doesn't require remote VMCS acquisition. */
     switch ( reg )
     {
     case MSR_SPEC_CTRL:
+        if ( cpu_has_vmx_virt_spec_ctrl )
+            /* Guest value in VMCS - fetched below. */
+            break;
+
         rc = vmx_read_guest_msr(v, reg, &val);
         if ( rc )
         {
@@ -2455,13 +2465,26 @@ static uint64_t vmx_get_reg(struct vcpu *v, unsigned int reg)
             domain_crash(d);
         }
         return val;
+    }
+
+    /* Logic which maybe requires remote VMCS acquisition. */
+    vmx_vmcs_enter(v);
+    switch ( reg )
+    {
+    case MSR_SPEC_CTRL:
+        ASSERT(cpu_has_vmx_virt_spec_ctrl);
+        __vmread(SPEC_CTRL_SHADOW, &val);
+        break;
 
     default:
         printk(XENLOG_G_ERR "%s(%pv, 0x%08x) Bad register\n",
                __func__, v, reg);
         domain_crash(d);
-        return 0;
+        break;
     }
+    vmx_vmcs_exit(v);
+
+    return val;
 }
 
 static void vmx_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
@@ -2469,9 +2492,14 @@ static void vmx_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
     struct domain *d = v->domain;
     int rc;
 
+    /* Logic which doesn't require remote VMCS acquisition. */
     switch ( reg )
     {
     case MSR_SPEC_CTRL:
+        if ( cpu_has_vmx_virt_spec_ctrl )
+            /* Guest value in VMCS - set below. */
+            break;
+
         rc = vmx_write_guest_msr(v, reg, val);
         if ( rc )
         {
@@ -2480,12 +2508,23 @@ static void vmx_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
             domain_crash(d);
         }
         break;
+    }
+
+    /* Logic which maybe requires remote VMCS acquisition. */
+    vmx_vmcs_enter(v);
+    switch ( reg )
+    {
+    case MSR_SPEC_CTRL:
+        ASSERT(cpu_has_vmx_virt_spec_ctrl);
+        __vmwrite(SPEC_CTRL_SHADOW, val);
+        break;
 
     default:
         printk(XENLOG_G_ERR "%s(%pv, 0x%08x, 0x%016"PRIx64") Bad register\n",
                __func__, v, reg, val);
         domain_crash(d);
     }
+    vmx_vmcs_exit(v);
 }
 
 static struct hvm_function_table __initdata vmx_function_table = {
