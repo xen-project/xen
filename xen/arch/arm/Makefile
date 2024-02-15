@@ -71,7 +71,7 @@ obj-y += vtimer.o
 obj-$(CONFIG_SBSA_VUART_CONSOLE) += vpl011.o
 obj-y += vsmc.o
 obj-y += vpsci.o
-obj-y += vuart.o
+obj-$(CONFIG_HWDOM_VUART) += vuart.o
 
 extra-y += xen.lds
 

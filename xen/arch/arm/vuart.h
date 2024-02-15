@@ -20,8 +20,27 @@
 #ifndef __ARCH_ARM_VUART_H__
 #define __ARCH_ARM_VUART_H__
 
+struct domain;
+
+#ifdef CONFIG_HWDOM_VUART
+
 int domain_vuart_init(struct domain *d);
 void domain_vuart_free(struct domain *d);
+
+#else
+
+static inline int domain_vuart_init(struct domain *d)
+{
+    /*
+     * The vUART is unconditionally inialized for the hw domain. So we
+     * can't return an error.
+     */
+    return 0;
+}
+
+static inline void domain_vuart_free(struct domain *d) {};
+
+#endif /* CONFIG_HWDOM_VUART */
 
 #endif /* __ARCH_ARM_VUART_H__ */
 

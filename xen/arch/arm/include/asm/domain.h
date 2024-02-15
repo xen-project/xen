@@ -91,6 +91,7 @@ struct arch_domain
 
     struct vgic_dist vgic;
 
+#ifdef CONFIG_HWDOM_VUART
     struct vuart {
 #define VUART_BUF_SIZE 128
         char                        *buf;
@@ -98,6 +99,7 @@ struct arch_domain
         const struct vuart_info     *info;
         spinlock_t                  lock;
     } vuart;
+#endif
 
     unsigned int evtchn_irq;
 #ifdef CONFIG_ACPI

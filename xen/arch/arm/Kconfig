@@ -150,6 +150,14 @@ config SBSA_VUART_CONSOLE
 	  Allows a guest to use SBSA Generic UART as a console. The
 	  SBSA Generic UART implements a subset of ARM PL011 UART.
 
+config HWDOM_VUART
+	bool "Emulated UART for hardware domain"
+	default y
+	help
+	  Allows a hardware domain to use a minimalistic UART (single transmit
+	  and status register) which takes information from dtuart. Note that this
+	  UART is not intended to be exposed (e.g. via device-tree) to a domain.
+
 config ARM_SSBD
 	bool "Speculative Store Bypass Disable" if EXPERT
 	depends on HAS_ALTERNATIVE
