@@ -20,6 +20,24 @@
 static int libxl__device_p9_setdefault(libxl__gc *gc, uint32_t domid,
                                        libxl_device_p9 *p9, bool hotplug)
 {
+    if (p9->type == LIBXL_P9_TYPE_UNKNOWN) {
+        p9->type = LIBXL_P9_TYPE_QEMU;
+    }
+    if (p9->type == LIBXL_P9_TYPE_QEMU &&
+        (p9->max_files || p9->max_open_files || p9->max_space ||
+         p9->auto_delete)) {
+        LOGD(ERROR, domid, "Illegal 9pfs parameter combination");
+        return ERROR_INVAL;
+    }
+    if (p9->type == LIBXL_P9_TYPE_XEN_9PFSD && !p9->tag) {
+        p9->tag = libxl__strdup(NOGC, "Xen");
+    }
+
+    if (!p9->path || !p9->security_model || !p9->tag) {
+        LOGD(ERROR, domid, "9pfs spec missing required field!");
+        return ERROR_INVAL;
+    }
+
     return libxl__resolve_domid(gc, p9->backend_domname, &p9->backend_domid);
 }
 
