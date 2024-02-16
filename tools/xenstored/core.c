@@ -63,7 +63,7 @@ char **orig_argv;
 LIST_HEAD(connections);
 int tracefd = -1;
 bool keep_orphans = false;
-char *tracefile = NULL;
+const char *tracefile = NULL;
 static struct hashtable *nodes;
 unsigned int trace_flags = TRACE_OBJ | TRACE_IO;
 
@@ -135,6 +135,17 @@ void trace_destroy(const void *data, const char *type)
 {
 	if (trace_flags & TRACE_OBJ)
 		trace("obj: DESTROY %s %p\n", type, data);
+}
+
+/*
+ * Return an absolute filename.
+ * In case of a relative filename given as input, prepend XENSTORE_LIB_DIR.
+ */
+const char *absolute_filename(const void *ctx, const char *filename)
+{
+	if (filename[0] != '/')
+		return talloc_asprintf(ctx, XENSTORE_LIB_DIR "/%s", filename);
+	return talloc_strdup(ctx, filename);
 }
 
 void close_log(void)
@@ -2759,7 +2770,7 @@ int main(int argc, char *argv[])
 #endif
 
 	if (tracefile)
-		tracefile = talloc_strdup(NULL, tracefile);
+		tracefile = absolute_filename(NULL, tracefile);
 
 #ifndef NO_LIVE_UPDATE
 	/* Read state in case of live update. */
