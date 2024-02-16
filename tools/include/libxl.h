@@ -623,6 +623,13 @@
 #define LIBXL_HAVE_HVM_PIRQ 1
 
 /*
+ * LIBXL_HAVE_XEN_9PFS indicates the presence of the xen-9pfsd related
+ * fields in libxl_device_p9: type, max_space, max_files, max_open_files and
+ * auto_delete.
+ */
+#define LIBXL_HAVE_XEN_9PFS 1
+
+/*
  * libxl memory management
  *
  * From the point of view of the application (ie, libxl's caller),

@@ -2446,6 +2446,11 @@ x.Tag = C.GoString(xc.tag)
 x.Path = C.GoString(xc.path)
 x.SecurityModel = C.GoString(xc.security_model)
 x.Devid = Devid(xc.devid)
+x.Type = P9Type(xc._type)
+x.MaxSpace = int(xc.max_space)
+x.MaxFiles = int(xc.max_files)
+x.MaxOpenFiles = int(xc.max_open_files)
+x.AutoDelete = bool(xc.auto_delete)
 
  return nil}
 
@@ -2464,6 +2469,11 @@ xc.path = C.CString(x.Path)}
 if x.SecurityModel != "" {
 xc.security_model = C.CString(x.SecurityModel)}
 xc.devid = C.libxl_devid(x.Devid)
+xc._type = C.libxl_p9_type(x.Type)
+xc.max_space = C.int(x.MaxSpace)
+xc.max_files = C.int(x.MaxFiles)
+xc.max_open_files = C.int(x.MaxOpenFiles)
+xc.auto_delete = C.bool(x.AutoDelete)
 
  return nil
  }
