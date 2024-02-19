@@ -22,6 +22,14 @@
 #endif
 .endm
 
+.macro BUILD_BUG_ON condstr cond:vararg
+        .if \cond
+        .error "Condition \"\condstr\" not satisfied"
+        .endif
+.endm
+/* preprocessor macro to make error message more user friendly */
+#define BUILD_BUG_ON(cond) BUILD_BUG_ON #cond cond
+
 #ifdef CONFIG_PV
 /* %rbx: struct vcpu */
 FUNC_LOCAL(switch_to_kernel)
@@ -187,7 +195,8 @@ FUNC_LOCAL(restore_all_guest)
         SPEC_CTRL_EXIT_TO_PV    /* Req: a=spec_ctrl %rsp=regs/cpuinfo, Clob: cd */
 
         RESTORE_ALL
-        testw $TRAP_syscall,4(%rsp)
+        BUILD_BUG_ON(TRAP_syscall & 0xff)
+        testb $TRAP_syscall >> 8, 4+1(%rsp)
         jz    iret_exit_to_guest
 
         movq  24(%rsp),%r11           # RFLAGS
@@ -254,7 +263,8 @@ FUNC(lstar_enter)
         pushq $FLAT_KERNEL_CS64
         pushq %rcx
         pushq $0
-        movl  $TRAP_syscall, 4(%rsp)
+        BUILD_BUG_ON(TRAP_syscall & 0xff)
+        movb  $TRAP_syscall >> 8, 4+1(%rsp)
         SAVE_ALL
 
         SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
@@ -292,7 +302,8 @@ FUNC(cstar_enter)
         pushq $FLAT_USER_CS32
         pushq %rcx
         pushq $0
-        movl  $TRAP_syscall, 4(%rsp)
+        BUILD_BUG_ON(TRAP_syscall & 0xff)
+        movb  $TRAP_syscall >> 8, 4+1(%rsp)
         SAVE_ALL
 
         SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
@@ -334,7 +345,8 @@ LABEL(sysenter_eflags_saved, 0)
         pushq $3 /* ring 3 null cs */
         pushq $0 /* null rip */
         pushq $0
-        movl  $TRAP_syscall, 4(%rsp)
+        BUILD_BUG_ON(TRAP_syscall & 0xff)
+        movb  $TRAP_syscall >> 8, 4+1(%rsp)
         SAVE_ALL
 
         SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
@@ -389,7 +401,7 @@ FUNC(entry_int80)
         ENDBR64
         ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
         pushq $0
-        movl  $0x80, 4(%rsp)
+        movb  $0x80, 4(%rsp)
         SAVE_ALL
 
         SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
@@ -561,7 +573,8 @@ __UNLIKELY_END(create_bounce_frame_bad_sp)
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
         /* Also clear AC: alignment checks shouldn't trigger in kernel mode. */
-        orl   $TRAP_syscall,UREGS_entry_vector+8(%rsp)
+        BUILD_BUG_ON(TRAP_syscall & 0xff)
+        orb   $TRAP_syscall >> 8, UREGS_entry_vector+8+1(%rsp)
         andl  $~(X86_EFLAGS_AC|X86_EFLAGS_VM|X86_EFLAGS_RF|\
                  X86_EFLAGS_NT|X86_EFLAGS_TF),UREGS_eflags+8(%rsp)
         movq  $FLAT_KERNEL_SS,UREGS_ss+8(%rsp)
@@ -653,7 +666,7 @@ END(ret_from_intr)
         .section .init.text, "ax", @progbits
 FUNC(early_page_fault)
         ENDBR64
-        movl  $X86_EXC_PF, 4(%rsp)
+        movb  $X86_EXC_PF, 4(%rsp)
         SAVE_ALL
         movq  %rsp, %rdi
         call  do_early_page_fault
@@ -722,7 +735,7 @@ END(common_interrupt)
 
 FUNC(entry_PF)
         ENDBR64
-        movl  $X86_EXC_PF, 4(%rsp)
+        movb  $X86_EXC_PF, 4(%rsp)
 END(entry_PF)
 /* No special register assumptions. */
 FUNC(handle_exception, 0)
@@ -898,105 +911,106 @@ END(handle_exception)
 FUNC(entry_DE)
         ENDBR64
         pushq $0
-        movl  $X86_EXC_DE, 4(%rsp)
+        /* no need to update exception type, already 0 */
+        BUILD_BUG_ON(X86_EXC_DE)
         jmp   handle_exception
 END(entry_DE)
 
 FUNC(entry_MF)
         ENDBR64
         pushq $0
-        movl  $X86_EXC_MF, 4(%rsp)
+        movb  $X86_EXC_MF, 4(%rsp)
         jmp   handle_exception
 END(entry_MF)
 
 FUNC(entry_XM)
         ENDBR64
         pushq $0
-        movl  $X86_EXC_XM, 4(%rsp)
+        movb  $X86_EXC_XM, 4(%rsp)
         jmp   handle_exception
 END(entry_XM)
 
 FUNC(entry_NM)
         ENDBR64
         pushq $0
-        movl  $X86_EXC_NM, 4(%rsp)
+        movb  $X86_EXC_NM, 4(%rsp)
         jmp   handle_exception
 END(entry_NM)
 
 FUNC(entry_DB)
         ENDBR64
         pushq $0
-        movl  $X86_EXC_DB, 4(%rsp)
+        movb  $X86_EXC_DB, 4(%rsp)
         jmp   handle_ist_exception
 END(entry_DB)
 
 FUNC(entry_BP)
         ENDBR64
         pushq $0
-        movl  $X86_EXC_BP, 4(%rsp)
+        movb  $X86_EXC_BP, 4(%rsp)
         jmp   handle_exception
 END(entry_BP)
 
 FUNC(entry_OF)
         ENDBR64
         pushq $0
-        movl  $X86_EXC_OF, 4(%rsp)
+        movb  $X86_EXC_OF, 4(%rsp)
         jmp   handle_exception
 END(entry_OF)
 
 FUNC(entry_BR)
         ENDBR64
         pushq $0
-        movl  $X86_EXC_BR, 4(%rsp)
+        movb  $X86_EXC_BR, 4(%rsp)
         jmp   handle_exception
 END(entry_BR)
 
 FUNC(entry_UD)
         ENDBR64
         pushq $0
-        movl  $X86_EXC_UD, 4(%rsp)
+        movb  $X86_EXC_UD, 4(%rsp)
         jmp   handle_exception
 END(entry_UD)
 
 FUNC(entry_TS)
         ENDBR64
-        movl  $X86_EXC_TS, 4(%rsp)
+        movb  $X86_EXC_TS, 4(%rsp)
         jmp   handle_exception
 END(entry_TS)
 
 FUNC(entry_NP)
         ENDBR64
-        movl  $X86_EXC_NP, 4(%rsp)
+        movb  $X86_EXC_NP, 4(%rsp)
         jmp   handle_exception
 END(entry_NP)
 
 FUNC(entry_SS)
         ENDBR64
-        movl  $X86_EXC_SS, 4(%rsp)
+        movb  $X86_EXC_SS, 4(%rsp)
         jmp   handle_exception
 END(entry_SS)
 
 FUNC(entry_GP)
         ENDBR64
-        movl  $X86_EXC_GP, 4(%rsp)
+        movb  $X86_EXC_GP, 4(%rsp)
         jmp   handle_exception
 END(entry_GP)
 
 FUNC(entry_AC)
         ENDBR64
-        movl  $X86_EXC_AC, 4(%rsp)
+        movb  $X86_EXC_AC, 4(%rsp)
         jmp   handle_exception
 END(entry_AC)
 
 FUNC(entry_CP)
         ENDBR64
-        movl  $X86_EXC_CP, 4(%rsp)
+        movb  $X86_EXC_CP, 4(%rsp)
         jmp   handle_exception
 END(entry_CP)
 
 FUNC(entry_DF)
         ENDBR64
-        movl  $X86_EXC_DF, 4(%rsp)
+        movb  $X86_EXC_DF, 4(%rsp)
         /* Set AC to reduce chance of further SMAP faults */
         ALTERNATIVE "", stac, X86_FEATURE_XEN_SMAP
         SAVE_ALL
@@ -1022,7 +1036,7 @@ END(entry_DF)
 FUNC(entry_NMI)
         ENDBR64
         pushq $0
-        movl  $X86_EXC_NMI, 4(%rsp)
+        movb  $X86_EXC_NMI, 4(%rsp)
 END(entry_NMI)
 
 FUNC(handle_ist_exception)
@@ -1158,7 +1172,7 @@ END(handle_ist_exception)
 FUNC(entry_MC)
         ENDBR64
         pushq $0
-        movl  $X86_EXC_MC, 4(%rsp)
+        movb  $X86_EXC_MC, 4(%rsp)
         jmp   handle_ist_exception
 END(entry_MC)
 
