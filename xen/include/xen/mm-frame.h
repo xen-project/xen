@@ -23,7 +23,7 @@ TYPE_SAFE(unsigned long, mfn);
 #undef mfn_x
 #endif
 
-static inline mfn_t mfn_add(mfn_t mfn, unsigned long i)
+static inline mfn_t __must_check mfn_add(mfn_t mfn, unsigned long i)
 {
     return _mfn(mfn_x(mfn) + i);
 }
@@ -62,7 +62,7 @@ TYPE_SAFE(unsigned long, gfn);
 #undef gfn_x
 #endif
 
-static inline gfn_t gfn_add(gfn_t gfn, unsigned long i)
+static inline gfn_t __must_check gfn_add(gfn_t gfn, unsigned long i)
 {
     return _gfn(gfn_x(gfn) + i);
 }

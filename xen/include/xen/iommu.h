@@ -42,7 +42,7 @@ TYPE_SAFE(uint64_t, dfn);
 #undef dfn_x
 #endif
 
-static inline dfn_t dfn_add(dfn_t dfn, unsigned long i)
+static inline dfn_t __must_check dfn_add(dfn_t dfn, unsigned long i)
 {
     return _dfn(dfn_x(dfn) + i);
 }
