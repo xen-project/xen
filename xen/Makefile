@@ -25,8 +25,8 @@ export XEN_BUILD_HOST	:= $(shell hostname)
 endif
 
 # Best effort attempt to find a python interpreter, defaulting to Python 3 if
-# available.  Fall back to just `python` if `which` is nowhere to be found.
-PYTHON_INTERPRETER	:= $(word 1,$(shell which python3 python python2 2>/dev/null) python)
+# available.  Fall back to just `python`.
+PYTHON_INTERPRETER	:= $(word 1,$(shell command -v python3 || command -v python || command -v python2) python)
 export PYTHON		?= $(PYTHON_INTERPRETER)
 
 export CHECKPOLICY	?= checkpolicy
