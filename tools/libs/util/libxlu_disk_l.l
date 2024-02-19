@@ -220,6 +220,9 @@ hidden-disk=[^,]*,?	{ STRIP(','); SAVESTRING("hidden-disk", hidden_disk, FROMEQU
 trusted,?		{ libxl_defbool_set(&DPC->disk->trusted, true); }
 untrusted,?		{ libxl_defbool_set(&DPC->disk->trusted, false); }
 
+grant_usage=1,?		{ libxl_defbool_set(&DPC->disk->grant_usage, true); }
+grant_usage=0,?		{ libxl_defbool_set(&DPC->disk->grant_usage, false); }
+
  /* the target magic parameter, eats the rest of the string */
 
 target=.*	{ STRIP(','); SAVESTRING("target", pdev_path, FROMEQUALS); }

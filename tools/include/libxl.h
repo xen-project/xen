@@ -579,6 +579,13 @@
 #define LIBXL_HAVE_DEVICE_DISK_SPECIFICATION 1
 
 /*
+ * LIBXL_HAVE_DISK_GRANT_USAGE indicates that the libxl_device_disk
+ * has 'grant_usage' field to specify the usage of Xen grants for
+ * the specification 'virtio'.
+ */
+#define LIBXL_HAVE_DISK_GRANT_USAGE 1
+
+/*
  * LIBXL_HAVE_CONSOLE_ADD_XENSTORE indicates presence of the function
  * libxl_console_add_xenstore() in libxl.
  */

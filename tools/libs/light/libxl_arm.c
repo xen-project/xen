@@ -1372,12 +1372,12 @@ next_resize:
             libxl_device_disk *disk = &d_config->disks[i];
 
             if (disk->specification == LIBXL_DISK_SPECIFICATION_VIRTIO) {
-                if (disk->backend_domid != LIBXL_TOOLSTACK_DOMID)
+                if (libxl_defbool_val(disk->grant_usage))
                     iommu_needed = true;
 
                 FDT( make_virtio_mmio_node(gc, fdt, disk->base, disk->irq,
                                            disk->backend_domid,
-                                           disk->backend_domid != LIBXL_TOOLSTACK_DOMID) );
+                                           libxl_defbool_val(disk->grant_usage)) );
             }
         }
 

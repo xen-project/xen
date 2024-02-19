@@ -803,6 +803,7 @@ libxl_device_disk = Struct("device_disk", [
     ("active_disk", string),
     ("hidden_disk", string),
     ("trusted", libxl_defbool),
+    ("grant_usage", libxl_defbool),
     ])
 
 libxl_device_nic = Struct("device_nic", [

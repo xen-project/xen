@@ -406,6 +406,30 @@ Virtio frontend driver (virtio-blk) to be used. Please note, the virtual
 device (vdev) is not passed to the guest in that case, but it still must be
 specified for the internal purposes.
 
+=item B<grant_usage=BOOLEAN>
+
+=over 4
+
+=item Description
+
+Specifies the usage of Xen grants for accessing guest memory. Only applicable
+to specification "virtio".
+
+=item Supported values
+
+1, 0
+
+=item Mandatory
+
+No
+
+=item Default value
+
+If this option is missing, then the default grant setting will be used,
+i.e. "grant_usage=1" if backend-domid != 0 or "grant_usage=0" otherwise.
+
+=back
+
 =back
 
 =head1 COLO Parameters

@@ -183,6 +183,9 @@ static int libxl__device_disk_setdefault(libxl__gc *gc, uint32_t domid,
             return ERROR_INVAL;
         }
         disk->transport = LIBXL_DISK_TRANSPORT_MMIO;
+
+        libxl_defbool_setdefault(&disk->grant_usage,
+                                 disk->backend_domid != LIBXL_TOOLSTACK_DOMID);
     }
 
     if (hotplug && disk->specification == LIBXL_DISK_SPECIFICATION_VIRTIO) {
@@ -468,6 +471,8 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
             flexarray_append(back, libxl__device_disk_string_of_transport(disk->transport));
             flexarray_append_pair(back, "base", GCSPRINTF("%"PRIu64, disk->base));
             flexarray_append_pair(back, "irq", GCSPRINTF("%u", disk->irq));
+            flexarray_append_pair(back, "grant_usage",
+                                  libxl_defbool_val(disk->grant_usage) ? "1" : "0");
         }
 
         flexarray_append(front, "backend-id");
@@ -662,6 +667,14 @@ static int libxl__disk_from_xenstore(libxl__gc *gc, const char *libxl_path,
             goto cleanup;
         }
         disk->irq = strtoul(tmp, NULL, 10);
+
+        tmp = libxl__xs_read(gc, XBT_NULL,
+                             GCSPRINTF("%s/grant_usage", libxl_path));
+        if (!tmp)
+            libxl_defbool_set(&disk->grant_usage,
+                              disk->backend_domid != LIBXL_TOOLSTACK_DOMID);
+        else
+            libxl_defbool_set(&disk->grant_usage, strtoul(tmp, NULL, 0));
     }
 
     disk->vdev = xs_read(ctx->xsh, XBT_NULL,
