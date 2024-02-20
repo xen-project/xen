@@ -138,12 +138,14 @@ SECTIONS
       _edevice = .;
   } :text
 
+#ifdef CONFIG_ACPI
   . = ALIGN(8);
   .adev.info : {
       _asdevice = .;
       *(.adev.info)
       _aedevice = .;
   } :text
+#endif
 
   . = ALIGN(8);
   .teemediator.info : {
