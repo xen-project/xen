@@ -20,19 +20,24 @@
 # First column indicator:
 # ! - needs translation
 # ? - needs checking
+
 ?	dom0_vga_console_info		xen.h
 ?	xenctl_bitmap			xen.h
 ?	mmu_update			xen.h
 !	mmuext_op			xen.h
 !	start_info			xen.h
 ?	vcpu_time_info			xen.h
+
 ?	pmu_amd_ctxt			arch-x86/pmu.h
 ?	pmu_arch			arch-x86/pmu.h
 ?	pmu_cntr_pair			arch-x86/pmu.h
 ?	pmu_intel_ctxt			arch-x86/pmu.h
 ?	pmu_regs			arch-x86/pmu.h
+
 !	cpu_user_regs			arch-x86/xen-@arch@.h
+
 !	trap_info			arch-x86/xen.h
+
 ?	cpu_offline_action		arch-x86/xen-mca.h
 ?	mc				arch-x86/xen-mca.h
 ?	mcinfo_bank			arch-x86/xen-mca.h
@@ -50,6 +55,7 @@
 ?	mc_notifydomain			arch-x86/xen-mca.h
 !	mc_physcpuinfo			arch-x86/xen-mca.h
 ?	page_offline_action		arch-x86/xen-mca.h
+
 ?	argo_addr			argo.h
 !	argo_iov			argo.h
 ?	argo_register_ring		argo.h
@@ -59,6 +65,7 @@
 ?	argo_ring_message_header	argo.h
 ?	argo_send_addr			argo.h
 ?	argo_unregister_ring		argo.h
+
 ?	evtchn_alloc_unbound		event_channel.h
 ?	evtchn_bind_interdomain		event_channel.h
 ?	evtchn_bind_ipi			event_channel.h
@@ -74,6 +81,7 @@
 ?	evtchn_set_priority		event_channel.h
 ?	evtchn_status			event_channel.h
 ?	evtchn_unmask			event_channel.h
+
 ?	gnttab_cache_flush		grant_table.h
 !	gnttab_copy			grant_table.h
 ?	gnttab_dump_table		grant_table.h
@@ -86,9 +94,10 @@
 ?	gnttab_get_version		grant_table.h
 !	gnttab_get_status_frames	grant_table.h
 ?	grant_entry_v1			grant_table.h
-?       grant_entry_header              grant_table.h
+?	grant_entry_header		grant_table.h
 ?	grant_entry_v2			grant_table.h
 ?	gnttab_swap_grant_ref		grant_table.h
+
 !	dm_op_buf			hvm/dm_op.h
 ?	dm_op_create_ioreq_server	hvm/dm_op.h
 ?	dm_op_destroy_ioreq_server	hvm/dm_op.h
@@ -108,15 +117,20 @@
 ?	dm_op_set_pci_intx_level	hvm/dm_op.h
 ?	dm_op_set_pci_link_route	hvm/dm_op.h
 ?	dm_op_track_dirty_vram		hvm/dm_op.h
+
 !	hvm_altp2m_set_mem_access_multi	hvm/hvm_op.h
+
 ?	vcpu_hvm_context		hvm/hvm_vcpu.h
 ?	vcpu_hvm_x86_32			hvm/hvm_vcpu.h
 ?	vcpu_hvm_x86_64			hvm/hvm_vcpu.h
+
 ?	hypfs_direntry			hypfs.h
 ?	hypfs_dirlistentry		hypfs.h
+
 ?	kexec_exec			kexec.h
 !	kexec_image			kexec.h
 !	kexec_range			kexec.h
+
 !	add_to_physmap			memory.h
 !	add_to_physmap_batch		memory.h
 !	foreign_memory_map		memory.h
@@ -130,6 +144,7 @@
 !	reserved_device_memory_map	memory.h
 ?	vmemrange			memory.h
 !	vnuma_topology_info		memory.h
+
 ?	physdev_eoi			physdev.h
 ?	physdev_get_free_pirq		physdev.h
 ?	physdev_irq			physdev.h
@@ -143,6 +158,7 @@
 ?	physdev_restore_msi		physdev.h
 ?	physdev_set_iopl		physdev.h
 ?	physdev_setup_gsi		physdev.h
+
 !	pct_register			platform.h
 !	power_register			platform.h
 ?	processor_csd			platform.h
@@ -158,23 +174,30 @@
 ?	xenpf_pcpu_version		platform.h
 ?	xenpf_resource_entry		platform.h
 ?	xenpf_ucode_revision		platform.h
+
 ?	pmu_data			pmu.h
 ?	pmu_params			pmu.h
+
 !	sched_poll			sched.h
 ?	sched_pin_override		sched.h
 ?	sched_remote_shutdown		sched.h
 ?	sched_shutdown			sched.h
+
 ?	t_buf				trace.h
+
 ?	vcpu_get_physid			vcpu.h
 ?	vcpu_register_vcpu_info		vcpu.h
 !	vcpu_runstate_info		vcpu.h
 ?	vcpu_set_periodic_timer		vcpu.h
 !	vcpu_set_singleshot_timer	vcpu.h
-?	build_id                        version.h
-?	compile_info                    version.h
-?	feature_info                    version.h
+
+?	build_id			version.h
+?	compile_info			version.h
+?	feature_info			version.h
+
 ?	xenoprof_init			xenoprof.h
 ?	xenoprof_passive		xenoprof.h
+
 ?	flask_access			xsm/flask_op.h
 ?	flask_cache_stats		xsm/flask_op.h
 ?	flask_hash_stats		xsm/flask_op.h
