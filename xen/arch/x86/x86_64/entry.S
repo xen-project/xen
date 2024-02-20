@@ -22,14 +22,6 @@
 #endif
 .endm
 
-.macro BUILD_BUG_ON condstr cond:vararg
-        .if \cond
-        .error "Condition \"\condstr\" not satisfied"
-        .endif
-.endm
-/* preprocessor macro to make error message more user friendly */
-#define BUILD_BUG_ON(cond) BUILD_BUG_ON #cond cond
-
 #ifdef CONFIG_PV
 /* %rbx: struct vcpu */
 FUNC_LOCAL(switch_to_kernel)
