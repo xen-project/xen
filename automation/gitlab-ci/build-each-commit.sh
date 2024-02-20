@@ -15,4 +15,4 @@ fi
 echo "Building ${BASE}..${TIP}"
 
 NON_SYMBOLIC_REF=1 ./automation/scripts/build-test.sh ${BASE} ${TIP} \
-    bash -c "git clean -ffdx && ./automation/scripts/build"
+    bash -c "git clean -ffdx -e '/build-*.log' && ./automation/scripts/build"
