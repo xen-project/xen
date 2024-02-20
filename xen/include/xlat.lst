@@ -22,11 +22,11 @@
 # ? - needs checking
 
 ?	dom0_vga_console_info		xen.h
-?	xenctl_bitmap			xen.h
 ?	mmu_update			xen.h
 !	mmuext_op			xen.h
 !	start_info			xen.h
 ?	vcpu_time_info			xen.h
+?	xenctl_bitmap			xen.h
 
 ?	pmu_amd_ctxt			arch-x86/pmu.h
 ?	pmu_arch			arch-x86/pmu.h
@@ -36,17 +36,8 @@
 
 !	cpu_user_regs			arch-x86/xen-@arch@.h
 
-!	trap_info			arch-x86/xen.h
-
 ?	cpu_offline_action		arch-x86/xen-mca.h
 ?	mc				arch-x86/xen-mca.h
-?	mcinfo_bank			arch-x86/xen-mca.h
-?	mcinfo_common			arch-x86/xen-mca.h
-?	mcinfo_extended			arch-x86/xen-mca.h
-?	mcinfo_global			arch-x86/xen-mca.h
-?	mcinfo_logical_cpu		arch-x86/xen-mca.h
-?	mcinfo_msr			arch-x86/xen-mca.h
-?	mcinfo_recovery			arch-x86/xen-mca.h
 !	mc_fetch			arch-x86/xen-mca.h
 ?	mc_info				arch-x86/xen-mca.h
 ?	mc_inject_v2			arch-x86/xen-mca.h
@@ -54,7 +45,16 @@
 ?	mc_msrinject			arch-x86/xen-mca.h
 ?	mc_notifydomain			arch-x86/xen-mca.h
 !	mc_physcpuinfo			arch-x86/xen-mca.h
+?	mcinfo_bank			arch-x86/xen-mca.h
+?	mcinfo_common			arch-x86/xen-mca.h
+?	mcinfo_extended			arch-x86/xen-mca.h
+?	mcinfo_global			arch-x86/xen-mca.h
+?	mcinfo_logical_cpu		arch-x86/xen-mca.h
+?	mcinfo_msr			arch-x86/xen-mca.h
+?	mcinfo_recovery			arch-x86/xen-mca.h
 ?	page_offline_action		arch-x86/xen-mca.h
+
+!	trap_info			arch-x86/xen.h
 
 ?	argo_addr			argo.h
 !	argo_iov			argo.h
@@ -85,18 +85,18 @@
 ?	gnttab_cache_flush		grant_table.h
 !	gnttab_copy			grant_table.h
 ?	gnttab_dump_table		grant_table.h
-?	gnttab_map_grant_ref		grant_table.h
-!	gnttab_setup_table		grant_table.h
-!	gnttab_transfer			grant_table.h
-?	gnttab_unmap_grant_ref		grant_table.h
-?	gnttab_unmap_and_replace	grant_table.h
-?	gnttab_set_version		grant_table.h
-?	gnttab_get_version		grant_table.h
 !	gnttab_get_status_frames	grant_table.h
-?	grant_entry_v1			grant_table.h
-?	grant_entry_header		grant_table.h
-?	grant_entry_v2			grant_table.h
+?	gnttab_get_version		grant_table.h
+?	gnttab_map_grant_ref		grant_table.h
+?	gnttab_set_version		grant_table.h
+!	gnttab_setup_table		grant_table.h
 ?	gnttab_swap_grant_ref		grant_table.h
+!	gnttab_transfer			grant_table.h
+?	gnttab_unmap_and_replace	grant_table.h
+?	gnttab_unmap_grant_ref		grant_table.h
+?	grant_entry_header		grant_table.h
+?	grant_entry_v1			grant_table.h
+?	grant_entry_v2			grant_table.h
 
 !	dm_op_buf			hvm/dm_op.h
 ?	dm_op_create_ioreq_server	hvm/dm_op.h
@@ -134,11 +134,11 @@
 !	add_to_physmap			memory.h
 !	add_to_physmap_batch		memory.h
 !	foreign_memory_map		memory.h
+!	mem_access_op			memory.h
+!	mem_acquire_resource		memory.h
 !	memory_exchange			memory.h
 !	memory_map			memory.h
 !	memory_reservation		memory.h
-!	mem_access_op			memory.h
-!	mem_acquire_resource		memory.h
 !	pod_target			memory.h
 !	remove_from_physmap		memory.h
 !	reserved_device_memory_map	memory.h
@@ -154,10 +154,10 @@
 ?	physdev_pci_device		physdev.h
 ?	physdev_pci_device_add		physdev.h
 ?	physdev_pci_mmcfg_reserved	physdev.h
-?	physdev_unmap_pirq		physdev.h
 ?	physdev_restore_msi		physdev.h
 ?	physdev_set_iopl		physdev.h
 ?	physdev_setup_gsi		physdev.h
+?	physdev_unmap_pirq		physdev.h
 
 !	pct_register			platform.h
 !	power_register			platform.h
@@ -169,17 +169,17 @@
 ?	processor_px			platform.h
 !	psd_package			platform.h
 ?	xenpf_enter_acpi_sleep		platform.h
-!	xenpf_symdata			platform.h
-?	xenpf_pcpuinfo			platform.h
 ?	xenpf_pcpu_version		platform.h
+?	xenpf_pcpuinfo			platform.h
 ?	xenpf_resource_entry		platform.h
+!	xenpf_symdata			platform.h
 ?	xenpf_ucode_revision		platform.h
 
 ?	pmu_data			pmu.h
 ?	pmu_params			pmu.h
 
-!	sched_poll			sched.h
 ?	sched_pin_override		sched.h
+!	sched_poll			sched.h
 ?	sched_remote_shutdown		sched.h
 ?	sched_shutdown			sched.h
 
