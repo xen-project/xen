@@ -22,12 +22,6 @@ enum device_class
     DEVICE_UNKNOWN,
 };
 
-struct dev_archdata {
-#ifdef CONFIG_HAS_PASSTHROUGH
-    void *iommu;    /* IOMMU private data */
-#endif
-};
-
 /* struct device - The basic device structure */
 struct device
 {
@@ -35,8 +29,8 @@ struct device
 #ifdef CONFIG_HAS_DEVICE_TREE
     struct dt_device_node *of_node; /* Used by drivers imported from Linux */
 #endif
-    struct dev_archdata archdata;
 #ifdef CONFIG_HAS_PASSTHROUGH
+    void *iommu; /* IOMMU private data */;
     struct iommu_fwspec *iommu_fwspec; /* per-device IOMMU instance data */
 #endif
 };

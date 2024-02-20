@@ -227,9 +227,9 @@ struct arm_smmu_xen_domain {
 };
 
 /*
- * Xen: Information about each device stored in dev->archdata.iommu
+ * Xen: Information about each device stored in dev->iommu
  *
- * Initially dev->archdata.iommu only stores the iommu_domain (runtime
+ * Initially dev->iommu only stores the iommu_domain (runtime
  * configuration of the SMMU) but, on Xen, we also have to store the
  * iommu_group (list of streamIDs associated to the device).
  *
@@ -242,7 +242,7 @@ struct arm_smmu_xen_device {
 	struct iommu_group *group;
 };
 
-#define dev_archdata(dev) ((struct arm_smmu_xen_device *)dev->archdata.iommu)
+#define dev_archdata(dev) ((struct arm_smmu_xen_device *)dev->iommu)
 #define dev_iommu_domain(dev) (dev_archdata(dev)->domain)
 #define dev_iommu_group(dev) (dev_archdata(dev)->group)
 
@@ -2777,9 +2777,9 @@ static int arm_smmu_assign_dev(struct domain *d, u8 devfn,
 
 	xen_domain = dom_iommu(d)->arch.priv;
 
-	if (!dev->archdata.iommu) {
-		dev->archdata.iommu = xzalloc(struct arm_smmu_xen_device);
-		if (!dev->archdata.iommu)
+	if (!dev->iommu) {
+		dev->iommu = xzalloc(struct arm_smmu_xen_device);
+		if (!dev->iommu)
 			return -ENOMEM;
 	}
 
