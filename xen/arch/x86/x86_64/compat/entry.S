@@ -117,19 +117,19 @@ compat_process_trap:
         jmp   compat_test_all_events
 END(compat_test_all_events)
 
-/* %rbx: struct vcpu, interrupts disabled */
+/* %rbx: struct vcpu, interrupts disabled, %rsp=regs/cpuinfo */
 FUNC(compat_restore_all_guest)
         ASSERT_INTERRUPTS_DISABLED
         mov   $~(X86_EFLAGS_IOPL | X86_EFLAGS_VM), %r11d
         and   UREGS_eflags(%rsp),%r11d
 
-.macro alt_cr4_pv32
+.macro alt_cr4_pv32 /* %rsp=regs/cpuinfo */
         testb $3,UREGS_cs(%rsp)
         jpe   2f
-        mov   CPUINFO_cr4-CPUINFO_guest_cpu_user_regs(%rsp), %rax
+        mov   CPUINFO_cr4(%rsp), %rax
         and   $~XEN_CR4_PV32_BITS, %rax
 1:
-        mov   %rax, CPUINFO_cr4-CPUINFO_guest_cpu_user_regs(%rsp)
+        mov   %rax, CPUINFO_cr4(%rsp)
         mov   %rax, %cr4
         /*
          * An NMI or MCE may have occurred between the previous two
@@ -141,7 +141,7 @@ FUNC(compat_restore_all_guest)
          * loop to cause a live lock: If NMIs/MCEs occurred at that
          * high a rate, we'd be live locked anyway.
          */
-        cmp   %rax, CPUINFO_cr4-CPUINFO_guest_cpu_user_regs(%rsp)
+        cmp   %rax, CPUINFO_cr4(%rsp)
         jne   1b
 2:
 .endm
