@@ -88,6 +88,7 @@
 !	gnttab_get_status_frames	grant_table.h
 ?	gnttab_get_version		grant_table.h
 ?	gnttab_map_grant_ref		grant_table.h
+?	gnttab_query_size		grant_table.h
 ?	gnttab_set_version		grant_table.h
 !	gnttab_setup_table		grant_table.h
 ?	gnttab_swap_grant_ref		grant_table.h
