@@ -1176,9 +1176,10 @@ static void cf_check dbc_uart_poll(void *data)
     }
 
     while ( dbc_work_ring_size(&dbc->dbc_iwork) )
-        serial_rx_interrupt(port, guest_cpu_user_regs());
+        serial_rx_interrupt(port);
 
-    serial_tx_interrupt(port, guest_cpu_user_regs());
+    serial_tx_interrupt(port);
+
     set_timer(&uart->timer, NOW() + MICROSECS(DBC_POLL_INTERVAL));
 }
 

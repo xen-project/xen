@@ -119,11 +119,11 @@ static void scif_uart_interrupt(int irq, void *data, struct cpu_user_regs *regs)
     {
         /* TX Interrupt */
         if ( status & SCFSR_TDFE )
-            serial_tx_interrupt(port, regs);
+            serial_tx_interrupt(port);
 
         /* RX Interrupt */
         if ( status & (SCFSR_RDF | SCFSR_DR) )
-            serial_rx_interrupt(port, regs);
+            serial_rx_interrupt(port);
 
         /* Error Interrupt */
         if ( status & params->error_mask )

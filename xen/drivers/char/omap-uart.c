@@ -70,9 +70,9 @@ static void omap_uart_interrupt(int irq, void *data, struct cpu_user_regs *regs)
     {
         lsr = omap_read(uart, UART_LSR) & 0xff;
 	if ( lsr & UART_LSR_THRE )
-            serial_tx_interrupt(port, regs);
+            serial_tx_interrupt(port);
 	if ( lsr & UART_LSR_DR )
-            serial_rx_interrupt(port, regs);
+            serial_rx_interrupt(port);
 
         if ( port->txbufc == port->txbufp ) {
             reg = omap_read(uart, UART_IER);

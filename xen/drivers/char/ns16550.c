@@ -188,9 +188,9 @@ static void cf_check ns16550_interrupt(
         u8 lsr = ns_read_reg(uart, UART_LSR);
 
         if ( (lsr & uart->lsr_mask) == uart->lsr_mask )
-            serial_tx_interrupt(port, regs);
+            serial_tx_interrupt(port);
         if ( lsr & UART_LSR_DR )
-            serial_rx_interrupt(port, regs);
+            serial_rx_interrupt(port);
 
         /* A "busy-detect" condition is observed on Allwinner/sunxi UART
          * after LCR is written during setup. It needs to be cleared at
@@ -224,11 +224,11 @@ static void cf_check __ns16550_poll(struct cpu_user_regs *regs)
         if ( ns16550_ioport_invalid(uart) )
             goto out;
 
-        serial_rx_interrupt(port, regs);
+        serial_rx_interrupt(port);
     }
 
     if ( ( ns_read_reg(uart, UART_LSR) & uart->lsr_mask ) == uart->lsr_mask )
-        serial_tx_interrupt(port, regs);
+        serial_tx_interrupt(port);
 
 out:
     set_irq_regs(old_regs);

@@ -69,10 +69,10 @@ static void meson_uart_interrupt(int irq, void *data,
     uint32_t st = readl(uart->regs + AML_UART_STATUS_REG);
 
     if ( !(st & AML_UART_RX_FIFO_EMPTY) )
-        serial_rx_interrupt(port, regs);
+        serial_rx_interrupt(port);
 
     if ( !(st & AML_UART_TX_FIFO_FULL) )
-        serial_tx_interrupt(port, regs);
+        serial_tx_interrupt(port);
 }
 
 static void __init meson_uart_init_preirq(struct serial_port *port)

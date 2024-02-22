@@ -12,8 +12,6 @@
 #include <xen/init.h>
 #include <xen/spinlock.h>
 
-struct cpu_user_regs;
-
 /* Register a character-receive hook on the specified COM port. */
 typedef void (*serial_rx_fn)(char c);
 void serial_set_rx_handler(int handle, serial_rx_fn fn);
@@ -145,8 +143,8 @@ void serial_register_uart(int idx, struct uart_driver *driver, void *uart);
 /* Place the serial port into asynchronous transmit mode. */
 void serial_async_transmit(struct serial_port *port);
 /* Process work in interrupt context. */
-void serial_rx_interrupt(struct serial_port *port, struct cpu_user_regs *regs);
-void serial_tx_interrupt(struct serial_port *port, struct cpu_user_regs *regs);
+void serial_rx_interrupt(struct serial_port *port);
+void serial_tx_interrupt(struct serial_port *port);
 
 /*
  * Initialisers for individual uart drivers.

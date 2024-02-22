@@ -95,7 +95,7 @@ static void pl011_interrupt(int irq, void *data, struct cpu_user_regs *regs)
             pl011_write(uart, ICR, status & ~(TXI|RTI|RXI));
 
             if ( status & (RTI|RXI) )
-                serial_rx_interrupt(port, regs);
+                serial_rx_interrupt(port);
 
             /* TODO
                 if ( status & (DSRMI|DCDMI|CTSMI|RIMI) )
@@ -103,7 +103,7 @@ static void pl011_interrupt(int irq, void *data, struct cpu_user_regs *regs)
             */
 
             if ( status & (TXI) )
-                serial_tx_interrupt(port, regs);
+                serial_tx_interrupt(port);
 
             status = pl011_intr_status(uart);
         } while (status != 0);

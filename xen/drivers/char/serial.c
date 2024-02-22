@@ -45,7 +45,7 @@ static inline void serial_stop_tx(struct serial_port *port)
         port->driver->stop_tx(port);
 }
 
-void serial_rx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
+void serial_rx_interrupt(struct serial_port *port)
 {
     char c;
     serial_rx_fn fn = NULL;
@@ -71,7 +71,7 @@ void serial_rx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
         fn(c & 0x7f);
 }
 
-void serial_tx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
+void serial_tx_interrupt(struct serial_port *port)
 {
     int i, n;
     unsigned long flags;

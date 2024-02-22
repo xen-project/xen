@@ -1273,10 +1273,10 @@ static void cf_check _ehci_dbgp_poll(struct cpu_user_regs *regs)
     old_regs = set_irq_regs(regs);
 
     if ( dbgp->in.chunk )
-        serial_rx_interrupt(port, regs);
+        serial_rx_interrupt(port);
 
     if ( empty )
-        serial_tx_interrupt(port, regs);
+        serial_tx_interrupt(port);
 
     set_irq_regs(old_regs);
 
