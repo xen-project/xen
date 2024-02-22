@@ -68,7 +68,7 @@ void serial_rx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
     spin_unlock_irqrestore(&port->rx_lock, flags);
 
     if ( fn != NULL )
-        (*fn)(c & 0x7f, regs);
+        fn(c & 0x7f);
 }
 
 void serial_tx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
