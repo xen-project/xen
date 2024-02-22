@@ -158,7 +158,7 @@ static void __init init_memmap(void)
     }
 }
 
-static void cf_check xen_evtchn_upcall(struct cpu_user_regs *regs)
+static void cf_check xen_evtchn_upcall(void)
 {
     struct vcpu_info *vcpu_info = this_cpu(vcpu_info);
     unsigned long pending;

@@ -72,17 +72,15 @@ extern int opt_irq_vector_map;
 
 #define platform_legacy_irq(irq)	((irq) < 16)
 
-void cf_check event_check_interrupt(struct cpu_user_regs *regs);
-void cf_check invalidate_interrupt(struct cpu_user_regs *regs);
-void cf_check call_function_interrupt(struct cpu_user_regs *regs);
-void cf_check irq_move_cleanup_interrupt(struct cpu_user_regs *regs);
+void cf_check event_check_interrupt(void);
+void cf_check invalidate_interrupt(void);
+void cf_check call_function_interrupt(void);
+void cf_check irq_move_cleanup_interrupt(void);
 
 uint8_t alloc_hipriority_vector(void);
 
-void set_direct_apic_vector(
-    uint8_t vector, void (*handler)(struct cpu_user_regs *regs));
-void alloc_direct_apic_vector(
-    uint8_t *vector, void (*handler)(struct cpu_user_regs *regs));
+void set_direct_apic_vector(uint8_t vector, void (*handler)(void));
+void alloc_direct_apic_vector(uint8_t *vector, void (*handler)(void));
 
 void do_IRQ(struct cpu_user_regs *regs);
 

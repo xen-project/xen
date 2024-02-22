@@ -1322,7 +1322,7 @@ int reprogram_timer(s_time_t timeout)
     return apic_tmict || !timeout;
 }
 
-static void cf_check apic_timer_interrupt(struct cpu_user_regs *regs)
+static void cf_check apic_timer_interrupt(void)
 {
     ack_APIC_irq();
     perfc_incr(apic_timer);
@@ -1341,7 +1341,7 @@ void smp_send_state_dump(unsigned int cpu)
 /*
  * Spurious interrupts should _never_ happen with our APIC/SMP architecture.
  */
-static void cf_check spurious_interrupt(struct cpu_user_regs *regs)
+static void cf_check spurious_interrupt(void)
 {
     /*
      * Check if this is a vectored interrupt (most likely, as this is probably
@@ -1355,7 +1355,7 @@ static void cf_check spurious_interrupt(struct cpu_user_regs *regs)
         is_spurious = !nmi_check_continuation();
         if (this_cpu(state_dump_pending)) {
             this_cpu(state_dump_pending) = false;
-            dump_execstate(regs);
+            dump_execstate(get_irq_regs());
             is_spurious = false;
         }
 
@@ -1372,7 +1372,7 @@ static void cf_check spurious_interrupt(struct cpu_user_regs *regs)
  * This interrupt should never happen with our APIC/SMP architecture
  */
 
-static void cf_check error_interrupt(struct cpu_user_regs *regs)
+static void cf_check error_interrupt(void)
 {
     static const char *const esr_fields[] = {
         ", Send CS error",
@@ -1407,7 +1407,7 @@ static void cf_check error_interrupt(struct cpu_user_regs *regs)
  * This interrupt handles performance counters interrupt
  */
 
-static void cf_check pmu_interrupt(struct cpu_user_regs *regs)
+static void cf_check pmu_interrupt(void)
 {
     ack_APIC_irq();
     vpmu_do_interrupt();

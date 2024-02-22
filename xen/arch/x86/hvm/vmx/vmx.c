@@ -2782,7 +2782,7 @@ static struct hvm_function_table __initdata_cf_clobber vmx_function_table = {
 };
 
 /* Handle VT-d posted-interrupt when VCPU is blocked. */
-static void cf_check pi_wakeup_interrupt(struct cpu_user_regs *regs)
+static void cf_check pi_wakeup_interrupt(void)
 {
     struct vmx_vcpu *vmx, *tmp;
     spinlock_t *lock = &per_cpu(vmx_pi_blocking, smp_processor_id()).lock;
@@ -2814,7 +2814,7 @@ static void cf_check pi_wakeup_interrupt(struct cpu_user_regs *regs)
 }
 
 /* Handle VT-d posted-interrupt when VCPU is running. */
-static void cf_check pi_notification_interrupt(struct cpu_user_regs *regs)
+static void cf_check pi_notification_interrupt(void)
 {
     ack_APIC_irq();
     this_cpu(irq_count)++;
