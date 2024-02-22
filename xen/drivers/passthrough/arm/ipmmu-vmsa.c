@@ -642,7 +642,7 @@ static void ipmmu_domain_irq(struct ipmmu_vmsa_domain *domain)
                         domain->d, status, iova);
 }
 
-static void ipmmu_irq(int irq, void *dev, struct cpu_user_regs *regs)
+static void ipmmu_irq(int irq, void *dev)
 {
     struct ipmmu_vmsa_device *mmu = dev;
     unsigned int i;

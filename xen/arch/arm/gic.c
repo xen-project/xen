@@ -397,7 +397,7 @@ void gic_interrupt(struct cpu_user_regs *regs, int is_fiq)
     } while (1);
 }
 
-static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
+static void maintenance_interrupt(int irq, void *dev_id)
 {
     /*
      * This is a dummy interrupt handler.
