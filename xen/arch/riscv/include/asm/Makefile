@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-2.0-only
+generic-y += altp2m.h
+generic-y += device.h
+generic-y += div64.h
+generic-y += hardirq.h
+generic-y += hypercall.h
+generic-y += iocap.h
+generic-y += paging.h
+generic-y += percpu.h
+generic-y += random.h
+generic-y += softirq.h
+generic-y += vm_event.h
