@@ -1253,6 +1253,7 @@ static void cf_check _ehci_dbgp_poll(struct cpu_user_regs *regs)
     unsigned long flags;
     unsigned int timeout = MICROSECS(DBGP_CHECK_INTERVAL);
     bool empty = false;
+    struct cpu_user_regs *old_regs;
 
     if ( !dbgp->ehci_debug )
         return;
@@ -1268,11 +1269,16 @@ static void cf_check _ehci_dbgp_poll(struct cpu_user_regs *regs)
         spin_unlock_irqrestore(&port->tx_lock, flags);
     }
 
+    /* Mimic interrupt context. */
+    old_regs = set_irq_regs(regs);
+
     if ( dbgp->in.chunk )
         serial_rx_interrupt(port, regs);
 
     if ( empty )
         serial_tx_interrupt(port, regs);
+
+    set_irq_regs(old_regs);
 
     if ( spin_trylock_irqsave(&port->tx_lock, flags) )
     {
