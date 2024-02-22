@@ -24,9 +24,8 @@ typedef void (keyhandler_fn_t)(unsigned char key);
  *
  * Called in hardirq context with interrupts disabled.
  */
-struct cpu_user_regs;
 typedef void (irq_keyhandler_fn_t)(unsigned char key,
-                                   struct cpu_user_regs *regs);
+                                   bool need_context);
 
 /* Initialize keytable with default handlers. */
 void initialize_keytable(void);
@@ -46,7 +45,7 @@ void register_irq_keyhandler(unsigned char key,
                              bool diagnostic);
 
 /* Inject a keypress into the key-handling subsystem. */
-extern void handle_keypress(unsigned char key, struct cpu_user_regs *regs);
+extern void handle_keypress(unsigned char key, bool need_context);
 
 enum crash_reason {
     CRASHREASON_PANIC,

@@ -279,7 +279,7 @@ static int *__read_mostly upper_thresh_adj = &xenlog_upper_thresh;
 static int *__read_mostly lower_thresh_adj = &xenlog_lower_thresh;
 static const char *__read_mostly thresh_adj = "standard";
 
-static void cf_check do_toggle_guest(unsigned char key, struct cpu_user_regs *regs)
+static void cf_check do_toggle_guest(unsigned char key, bool unused)
 {
     if ( upper_thresh_adj == &xenlog_upper_thresh )
     {
@@ -306,13 +306,13 @@ static void do_adj_thresh(unsigned char key)
            loglvl_str(*upper_thresh_adj));
 }
 
-static void cf_check do_inc_thresh(unsigned char key, struct cpu_user_regs *regs)
+static void cf_check do_inc_thresh(unsigned char key, bool unused)
 {
     ++*lower_thresh_adj;
     do_adj_thresh(key);
 }
 
-static void cf_check do_dec_thresh(unsigned char key, struct cpu_user_regs *regs)
+static void cf_check do_dec_thresh(unsigned char key, bool unused)
 {
     if ( *lower_thresh_adj )
         --*lower_thresh_adj;
@@ -531,7 +531,7 @@ static void __serial_rx(char c, struct cpu_user_regs *regs)
     switch ( console_rx )
     {
     case 0:
-        return handle_keypress(c, regs);
+        return handle_keypress(c, false);
 
     case 1:
         /*

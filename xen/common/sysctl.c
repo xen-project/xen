@@ -134,7 +134,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         {
             if ( copy_from_guest_offset(&c, op->u.debug_keys.keys, i, 1) )
                 goto out;
-            handle_keypress(c, guest_cpu_user_regs());
+            handle_keypress(c, false);
         }
         ret = 0;
         copyback = 0;
