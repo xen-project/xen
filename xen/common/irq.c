@@ -1,7 +1,7 @@
 #include <xen/irq.h>
 #include <xen/errno.h>
 
-DEFINE_PER_CPU(struct cpu_user_regs *, irq_regs);
+DEFINE_PER_CPU(const struct cpu_user_regs *, irq_regs);
 
 int init_one_irq_desc(struct irq_desc *desc)
 {

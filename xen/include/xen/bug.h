@@ -101,8 +101,7 @@ typedef void bug_fn_t(const struct cpu_user_regs *regs);
 
 #ifndef run_in_exception_handler
 
-static void always_inline run_in_exception_handler(
-    void (*fn)(struct cpu_user_regs *regs))
+static void always_inline run_in_exception_handler(bug_fn_t *fn)
 {
     BUG_FRAME(BUGFRAME_run_fn, 0, fn, 0, NULL);
 }
@@ -133,7 +132,7 @@ static void always_inline run_in_exception_handler(
  * Returns a negative value in case of an error otherwise
  * BUGFRAME_{run_fn, warn, bug, assert}
  */
-int do_bug_frame(struct cpu_user_regs *regs, unsigned long pc);
+int do_bug_frame(const struct cpu_user_regs *regs, unsigned long pc);
 
 #endif /* CONFIG_GENERIC_BUG_FRAME */
 

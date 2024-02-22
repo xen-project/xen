@@ -1896,7 +1896,7 @@ void do_IRQ(struct cpu_user_regs *regs)
     struct irq_desc  *desc;
     unsigned int      vector = (uint8_t)regs->entry_vector;
     int               irq = this_cpu(vector_irq)[vector];
-    struct cpu_user_regs *old_regs = set_irq_regs(regs);
+    const struct cpu_user_regs *old_regs = set_irq_regs(regs);
 
     perfc_incr(irqs);
     this_cpu(irq_count)++;

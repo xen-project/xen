@@ -220,7 +220,7 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
 {
     struct irq_desc *desc = irq_to_desc(irq);
     struct irqaction *action;
-    struct cpu_user_regs *old_regs = set_irq_regs(regs);
+    const struct cpu_user_regs *old_regs = set_irq_regs(regs);
 
     perfc_incr(irqs);
 

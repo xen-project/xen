@@ -135,7 +135,7 @@ static void cf_check show_handlers(unsigned char key)
 
 static cpumask_t dump_execstate_mask;
 
-void cf_check dump_execstate(struct cpu_user_regs *regs)
+void cf_check dump_execstate(const struct cpu_user_regs *regs)
 {
     unsigned int cpu = smp_processor_id();
 

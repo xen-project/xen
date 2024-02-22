@@ -206,11 +206,11 @@ static void cf_check ns16550_interrupt(int irq, void *dev_id)
 /* Safe: ns16550_poll() runs as softirq so not reentrant on a given CPU. */
 static DEFINE_PER_CPU(struct serial_port *, poll_port);
 
-static void cf_check __ns16550_poll(struct cpu_user_regs *regs)
+static void cf_check __ns16550_poll(const struct cpu_user_regs *regs)
 {
     struct serial_port *port = this_cpu(poll_port);
     struct ns16550 *uart = port->uart;
-    struct cpu_user_regs *old_regs;
+    const struct cpu_user_regs *old_regs;
 
     if ( uart->intr_works )
         return; /* Interrupts work - no more polling */

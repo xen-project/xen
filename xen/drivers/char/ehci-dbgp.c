@@ -1246,14 +1246,14 @@ static int cf_check ehci_dbgp_getc(struct serial_port *port, char *pc)
 /* Safe: ehci_dbgp_poll() runs as timer handler, so not reentrant. */
 static struct serial_port *poll_port;
 
-static void cf_check _ehci_dbgp_poll(struct cpu_user_regs *regs)
+static void cf_check _ehci_dbgp_poll(const struct cpu_user_regs *regs)
 {
     struct serial_port *port = poll_port;
     struct ehci_dbgp *dbgp = port->uart;
     unsigned long flags;
     unsigned int timeout = MICROSECS(DBGP_CHECK_INTERVAL);
     bool empty = false;
-    struct cpu_user_regs *old_regs;
+    const struct cpu_user_regs *old_regs;
 
     if ( !dbgp->ehci_debug )
         return;

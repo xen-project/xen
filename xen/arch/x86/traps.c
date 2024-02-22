@@ -643,7 +643,7 @@ void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs)
     printk("\n");
 }
 
-void show_execution_state(const struct cpu_user_regs *regs)
+void cf_check show_execution_state(const struct cpu_user_regs *regs)
 {
     /* Prevent interleaving of output. */
     unsigned long flags = console_lock_recursive_irqsave();
@@ -653,11 +653,6 @@ void show_execution_state(const struct cpu_user_regs *regs)
     show_stack(regs);
 
     console_unlock_recursive_irqrestore(flags);
-}
-
-void cf_check show_execution_state_nonconst(struct cpu_user_regs *regs)
-{
-    show_execution_state(regs);
 }
 
 void vcpu_show_execution_state(struct vcpu *v)
