@@ -3061,6 +3061,9 @@ static int gnttab_copy_one(const struct gnttab_copy *op,
 {
     int rc;
 
+    if ( unlikely(!op->len) )
+        return GNTST_okay;
+
     if ( !src->domain || op->source.domid != src->ptr.domid ||
          !dest->domain || op->dest.domid != dest->ptr.domid )
     {
