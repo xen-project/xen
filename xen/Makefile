@@ -375,6 +375,7 @@ $(KCONFIG_CONFIG): tools_fixdep
 # This exploits the 'multi-target pattern rule' trick.
 # The syncconfig should be executed only once to make all the targets.
 include/config/%.conf include/config/%.conf.cmd: $(KCONFIG_CONFIG)
+	$(Q)rm -f include/config/auto.conf
 	$(Q)$(MAKE) $(build)=tools/kconfig syncconfig
 
 ifeq ($(CONFIG_DEBUG),y)
