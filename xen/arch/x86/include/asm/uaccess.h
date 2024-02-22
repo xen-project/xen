@@ -21,8 +21,8 @@ unsigned int copy_from_guest_ll(void *to, const void __user *from, unsigned int 
 unsigned int copy_to_unsafe_ll(void *to, const void *from, unsigned int n);
 unsigned int copy_from_unsafe_ll(void *to, const void *from, unsigned int n);
 
-extern long __get_user_bad(void);
-extern void __put_user_bad(void);
+void noreturn __get_user_bad(void);
+void noreturn __put_user_bad(void);
 
 #define UA_KEEP(args...) args
 #define UA_DROP(args...)
