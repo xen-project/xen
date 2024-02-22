@@ -445,7 +445,7 @@ static int fill_data(struct ring *ring, const char *fmt, ...)
             if ( !*f || array_sz )
                 fmt_err(fmt);
             if ( !chk_data(ring, data, sizeof(uint16_t)) )
-                return pars;
+                goto out;
             array_sz = get_unaligned((uint16_t *)data);
             data += sizeof(uint16_t);
             *(unsigned int *)par = array_sz;
@@ -455,10 +455,10 @@ static int fill_data(struct ring *ring, const char *fmt, ...)
 
         case 'b':
             if ( !chk_data(ring, data, sizeof(uint8_t)) )
-                return pars;
+                goto out;
             if ( !fill_data_elem(&par, array, &array_sz, sizeof(uint8_t),
                                  data) )
-                return pars;
+                goto out;
             data += sizeof(uint8_t);
             break;
 
@@ -466,48 +466,48 @@ static int fill_data(struct ring *ring, const char *fmt, ...)
             if ( array_sz )
                 fmt_err(fmt);
             if ( !chk_data(ring, data, sizeof(uint32_t)) )
-                return pars;
+                goto out;
             len = get_unaligned((uint32_t *)data);
             data += sizeof(uint32_t);
             *(unsigned int *)par = len;
             par = va_arg(ap, void *);
             if ( !chk_data(ring, data, len) )
-                return pars;
+                goto out;
             memcpy(par, data, len);
             data += len;
             break;
 
         case 'L':
             if ( !chk_data(ring, data, sizeof(uint64_t)) )
-                return pars;
+                goto out;
             if ( !fill_data_elem(&par, array, &array_sz, sizeof(uint64_t),
                                  data) )
-                return pars;
+                goto out;
             data += sizeof(uint64_t);
             break;
 
         case 'S':
             if ( !chk_data(ring, data, sizeof(uint16_t)) )
-                return pars;
+                goto out;
             len = get_unaligned((uint16_t *)data);
             data += sizeof(uint16_t);
             if ( !chk_data(ring, data, len) )
-                return pars;
+                goto out;
             str_off = add_string(ring, data, len);
             if ( str_off == ~0 )
-                return pars;
+                goto out;
             if ( !fill_data_elem(&par, array, &array_sz, sizeof(unsigned int),
                                  &str_off) )
-                return pars;
+                goto out;
             data += len;
             break;
 
         case 'U':
             if ( !chk_data(ring, data, sizeof(uint32_t)) )
-                return pars;
+                goto out;
             if ( !fill_data_elem(&par, array, &array_sz, sizeof(uint32_t),
                                  data) )
-                return pars;
+                goto out;
             data += sizeof(uint32_t);
             break;
 
@@ -519,6 +519,9 @@ static int fill_data(struct ring *ring, const char *fmt, ...)
             f--;
         pars++;
     }
+
+ out:
+    va_end(ap);
 
     return pars;
 }
