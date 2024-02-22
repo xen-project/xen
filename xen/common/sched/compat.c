@@ -26,7 +26,7 @@ CHECK_sched_shutdown;
 CHECK_sched_remote_shutdown;
 #undef xen_sched_remote_shutdown
 
-static int compat_poll(struct compat_sched_poll *compat)
+static int compat_poll(const struct compat_sched_poll *compat)
 {
     struct sched_poll native;
 

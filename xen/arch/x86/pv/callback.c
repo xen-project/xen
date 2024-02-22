@@ -48,7 +48,7 @@ static void unregister_guest_nmi_callback(void)
     memset(t, 0, sizeof(*t));
 }
 
-static long register_guest_callback(struct callback_register *reg)
+static long register_guest_callback(const struct callback_register *reg)
 {
     long ret = 0;
     struct vcpu *curr = current;
@@ -102,7 +102,7 @@ static long register_guest_callback(struct callback_register *reg)
     return ret;
 }
 
-static long unregister_guest_callback(struct callback_unregister *unreg)
+static long unregister_guest_callback(const struct callback_unregister *unreg)
 {
     long ret;
 

@@ -1431,7 +1431,7 @@ static void vcpu_block_enable_events(void)
     vcpu_block();
 }
 
-static long do_poll(struct sched_poll *sched_poll)
+static long do_poll(const struct sched_poll *sched_poll)
 {
     struct vcpu   *v = current;
     struct domain *d = v->domain;
