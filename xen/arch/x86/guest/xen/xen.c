@@ -181,7 +181,7 @@ static void cf_check xen_evtchn_upcall(struct cpu_user_regs *regs)
             port += l1 * BITS_PER_LONG;
 
             if ( pv_console && port == pv_console_evtchn() )
-                pv_console_rx(regs);
+                pv_console_rx();
             else if ( pv_shim )
                 pv_shim_inject_evtchn(port);
         }
