@@ -1236,8 +1236,6 @@ void stubdom_init(void)
 		barf_perror("Failed to initialize stubdom");
 
 	xenevtchn_notify(xce_handle, stubdom->port);
-
-	mount_9pfs();
 #endif
 }
 

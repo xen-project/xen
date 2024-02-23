@@ -326,10 +326,9 @@ void early_init(bool live_update, bool dofork, const char *pidfile)
 {
 	reopen_log();
 
-	/* Make sure xenstored directories exist. */
+	/* Make sure xenstored directory exists. */
 	/* Errors ignored here, will be reported when we open files */
 	mkdir(xenstore_daemon_rundir(), 0755);
-	mkdir(XENSTORE_LIB_DIR, 0755);
 
 	if (dofork) {
 		openlog("xenstored", 0, LOG_DAEMON);
@@ -406,9 +405,4 @@ int get_socket_fd(void)
 void set_socket_fd(int fd)
 {
 	sock = fd;
-}
-
-const char *xenstore_rundir(void)
-{
-	return xenstore_daemon_rundir();
 }

@@ -36,8 +36,6 @@
 #include "list.h"
 #include "hashtable.h"
 
-#define XENSTORE_LIB_DIR	XEN_LIB_DIR "/xenstore"
-
 #ifndef O_CLOEXEC
 #define O_CLOEXEC 0
 /* O_CLOEXEC support is needed for Live Update in the daemon case. */
@@ -341,7 +339,7 @@ void close_log(void);
 extern int orig_argc;
 extern char **orig_argv;
 
-extern const char *tracefile;
+extern char *tracefile;
 extern int tracefd;
 
 /* Trace flag values must be kept in sync with trace_switches[] contents. */
@@ -400,13 +398,6 @@ void handle_special_fds(void);
 
 int get_socket_fd(void);
 void set_socket_fd(int fd);
-
-#ifdef __MINIOS__
-void mount_9pfs(void);
-#endif
-
-const char *xenstore_rundir(void);
-const char *absolute_filename(const void *ctx, const char *filename);
 
 /* Close stdin/stdout/stderr to complete daemonize */
 void finish_daemonize(void);

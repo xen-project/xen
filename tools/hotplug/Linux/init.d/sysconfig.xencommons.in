@@ -58,6 +58,7 @@ XENSTORED_ARGS=
 ## Default: Not defined, tracing off
 #
 # Log xenstored messages
+# Only evaluated if XENSTORETYPE is "daemon".
 #XENSTORED_TRACE=[yes|on|1]
 
 ## Type: integer

@@ -17,20 +17,10 @@
 */
 #include <sys/types.h>
 #include <sys/mman.h>
-#include <syslog.h>
-#include "talloc.h"
 #include "core.h"
 #include "utils.h"
 #include <xen/grant_table.h>
 #include <mini-os/lib.h>
-#include <mini-os/9pfront.h>
-#include <mini-os/sched.h>
-#include <mini-os/xenbus.h>
-#include <mini-os/xmalloc.h>
-
-#define P9_STATE_PATH	"device/9pfs/0/state"
-
-static void *p9_device;
 
 void finish_daemonize(void)
 {
@@ -83,56 +73,4 @@ int get_socket_fd(void)
 
 void set_socket_fd(int fd)
 {
-}
-
-static void mount_thread(void *p)
-{
-	xenbus_event_queue events = NULL;
-	char *err;
-	char *dummy;
-
-	err = xenbus_watch_path_token(XBT_NIL, P9_STATE_PATH, "9pfs", &events);
-	if (err) {
-		log("error \"%s\" when setting watch on \"%s\"\n", err,
-		    P9_STATE_PATH);
-		free(err);
-		return;
-	}
-
-	for (;;) {
-		xenbus_wait_for_watch(&events);
-
-		/*
-		 * We only care for existence of the state node.
-		 * State changes are handled in init_9pfront().
-		 */
-		err = xenbus_read(XBT_NIL, P9_STATE_PATH, &dummy);
-		if (!err)
-			break;
-		free(err);
-	}
-
-	free(dummy);
-
-	err = xenbus_unwatch_path_token(XBT_NIL, P9_STATE_PATH, "9pfs");
-	if (err) {
-		log("error \"%s\" when unwatching \"%s\", leaking watch\n",
-		    err, P9_STATE_PATH);
-		free(err);
-	}
-
-	p9_device = init_9pfront(0, XENSTORE_LIB_DIR);
-
-	/* Start logging if selected. */
-	reopen_log();
-}
-
-void mount_9pfs(void)
-{
-	create_thread("mount-9pfs", mount_thread, NULL);
-}
-
-const char *xenstore_rundir(void)
-{
-	return XENSTORE_LIB_DIR;
 }
