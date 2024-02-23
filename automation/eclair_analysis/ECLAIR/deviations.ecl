@@ -107,6 +107,11 @@ number of guest paging levels."
 -config=MC3R1.R5.6,reports+={deliberate,"any_area(any_loc(file(adopted_r5_6)))"}
 -doc_end
 
+-doc_begin="The project intentionally reuses tag names in order to have identifiers matching the applicable external specifications as well as established internal conventions.
+As there is little possibility for developer confusion not resulting into compilation errors, the risk of renaming outweighs the potential advantages of compliance."
+-config=MC3R1.R5.7,reports+={deliberate,"any()"}
+-doc_end
+
 #
 # Series 7.
 #
@@ -371,6 +376,15 @@ safe."
 -doc_begin="Switch clauses not ending with the break statement are safe if an
 explicit comment indicating the fallthrough intention is present."
 -config=MC3R1.R16.3,reports+={safe, "any_area(end_loc(any_exp(text(^(?s).*/\\* [fF]all ?through.? \\*/.*$,0..1))))"}
+-doc_end
+
+#
+# Series 18.
+#
+
+-doc_begin="Flexible array members are deliberately used and XEN developers are aware of the dangers related to them:
+unexpected result when the structure is given as argument to a sizeof() operator and the truncation in assignment between structures."
+-config=MC3R1.R18.7,reports+={deliberate, "any()"}
 -doc_end
 
 #
