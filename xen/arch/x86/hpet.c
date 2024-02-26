@@ -457,11 +457,7 @@ static struct hpet_event_channel *hpet_get_channel(unsigned int cpu)
     if ( num_hpets_used >= nr_cpu_ids )
         return &hpet_events[cpu];
 
-    do {
-        next = next_channel;
-        if ( (i = next + 1) == num_hpets_used )
-            i = 0;
-    } while ( cmpxchg(&next_channel, next, i) != next );
+    next = arch_fetch_and_add(&next_channel, 1) % num_hpets_used;
 
     /* try unused channel first */
     for ( i = next; i < next + num_hpets_used; i++ )
