@@ -398,19 +398,6 @@ static void __init calculate_host_policy(void)
     if ( vpmu_mode == XENPMU_MODE_OFF )
         p->basic.raw[0xa] = EMPTY_LEAF;
 
-    if ( p->extd.svm )
-    {
-        /* Clamp to implemented features which require hardware support. */
-        p->extd.raw[0xa].d &= ((1u << SVM_FEATURE_NPT) |
-                               (1u << SVM_FEATURE_LBRV) |
-                               (1u << SVM_FEATURE_NRIPS) |
-                               (1u << SVM_FEATURE_PAUSEFILTER) |
-                               (1u << SVM_FEATURE_DECODEASSISTS));
-        /* Enable features which are always emulated. */
-        p->extd.raw[0xa].d |= ((1u << SVM_FEATURE_VMCBCLEAN) |
-                               (1u << SVM_FEATURE_TSCRATEMSR));
-    }
-
     /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
     /* probe_cpuid_faulting() sanity checks presence of MISC_FEATURES_ENABLES */
     p->platform_info.cpuid_faulting = cpu_has_cpuid_faulting;
@@ -741,6 +728,23 @@ static void __init calculate_hvm_max_policy(void)
     if ( !cpu_has_vmx )
         __clear_bit(X86_FEATURE_PKS, fs);
 
+    /* 
+     * Make adjustments to possible (nested) virtualization features exposed
+     * to the guest
+     */
+    if ( p->extd.svm )
+    {
+        /* Clamp to implemented features which require hardware support. */
+        p->extd.raw[0xa].d &= ((1u << SVM_FEATURE_NPT) |
+                               (1u << SVM_FEATURE_LBRV) |
+                               (1u << SVM_FEATURE_NRIPS) |
+                               (1u << SVM_FEATURE_PAUSEFILTER) |
+                               (1u << SVM_FEATURE_DECODEASSISTS));
+        /* Enable features which are always emulated. */
+        p->extd.raw[0xa].d |= ((1u << SVM_FEATURE_VMCBCLEAN) |
+                               (1u << SVM_FEATURE_TSCRATEMSR));
+    }
+    
     guest_common_max_feature_adjustments(fs);
     guest_common_feature_adjustments(fs);
 
