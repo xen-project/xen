@@ -4125,7 +4125,15 @@ static int hvmop_set_evtchn_upcall_vector(
     if ( (v = domain_vcpu(d, op.vcpu)) == NULL )
         return -ENOENT;
 
-    printk(XENLOG_G_INFO "%pv: upcall vector %02x\n", v, op.vector);
+    /*
+     * Avoid logging all-identical messages for every vCPU, but make sure to
+     * log unusual events like the vector differing from vCPU 0's, or it
+     * changing after it was once set
+     */
+    if ( op.vector != d->vcpu[0]->arch.hvm.evtchn_upcall_vector ||
+         (v->arch.hvm.evtchn_upcall_vector &&
+          op.vector != v->arch.hvm.evtchn_upcall_vector) )
+        printk(XENLOG_G_INFO "%pv: upcall vector %02x\n", v, op.vector);
 
     v->arch.hvm.evtchn_upcall_vector = op.vector;
     hvm_assert_evtchn_irq(v);
