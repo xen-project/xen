@@ -191,7 +191,7 @@ static inline void no_config_param(const char *cfg, const char *param,
 {
     int len = e ? ({ ASSERT(e >= s); e - s; }) : strlen(s);
 
-    printk(XENLOG_INFO "CONFIG_%s disabled - ignoring '%s=%*s' setting\n",
+    printk(XENLOG_INFO "CONFIG_%s disabled - ignoring '%s=%.*s' setting\n",
            cfg, param, len, s);
 }
 
