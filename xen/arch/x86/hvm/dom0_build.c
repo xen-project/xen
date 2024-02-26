@@ -570,6 +570,8 @@ static int __init pvh_load_kernel(struct domain *d, const module_t *image,
     if ( (rc = elf_xen_parse(&elf, &parms, true)) != 0 )
     {
         printk("Unable to parse kernel for ELFNOTES\n");
+        if ( elf_check_broken(&elf) )
+            printk("%pd kernel: broken ELF: %s\n", d, elf_check_broken(&elf));
         return rc;
     }
 
@@ -588,7 +590,8 @@ static int __init pvh_load_kernel(struct domain *d, const module_t *image,
     if ( rc < 0 )
     {
         printk("Failed to load kernel: %d\n", rc);
-        printk("Xen dom0 kernel broken ELF: %s\n", elf_check_broken(&elf));
+        if ( elf_check_broken(&elf) )
+            printk("%pd kernel: broken ELF: %s\n", d, elf_check_broken(&elf));
         return rc;
     }
 

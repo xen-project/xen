@@ -1044,8 +1044,7 @@ int __init dom0_construct_pv(struct domain *d,
 
 out:
     if ( elf_check_broken(&elf) )
-        printk(XENLOG_WARNING "Dom0 kernel broken ELF: %s\n",
-               elf_check_broken(&elf));
+        printk("%pd kernel: broken ELF: %s\n", d, elf_check_broken(&elf));
 
     return rc;
 }
