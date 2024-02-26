@@ -13,8 +13,9 @@
   * You should have received a copy of the GNU General Public License
   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
   */
-#include <xen/lib.h>
 #include <xen/bitops.h>
+#include <xen/bug.h>
+#include <xen/lib.h>
 #include <xen/sizes.h>
 #include <asm/insn.h>
 

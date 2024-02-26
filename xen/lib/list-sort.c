@@ -15,6 +15,7 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/lib.h>
 #include <xen/list.h>
 #include <xen/list_sort.h>
 

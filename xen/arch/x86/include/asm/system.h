@@ -1,8 +1,8 @@
 #ifndef __ASM_SYSTEM_H
 #define __ASM_SYSTEM_H
 
-#include <xen/lib.h>
 #include <xen/bitops.h>
+#include <xen/bug.h>
 #include <asm/cpufeature.h>
 #include <asm/x86-defns.h>
 

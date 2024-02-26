@@ -22,6 +22,7 @@
 #include <asm/new_vgic.h>
 #else
 
+#include <xen/bug.h>
 #include <xen/radix-tree.h>
 #include <xen/rbtree.h>
 

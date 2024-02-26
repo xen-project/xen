@@ -61,6 +61,7 @@
 #ifndef __XEN_MM_H__
 #define __XEN_MM_H__
 
+#include <xen/bug.h>
 #include <xen/compiler.h>
 #include <xen/mm-frame.h>
 #include <xen/types.h>

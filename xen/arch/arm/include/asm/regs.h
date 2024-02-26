@@ -5,7 +5,7 @@
 
 #ifndef __ASSEMBLY__
 
-#include <xen/lib.h>
+#include <xen/bug.h>
 #include <xen/types.h>
 #include <public/xen.h>
 #include <asm/current.h>

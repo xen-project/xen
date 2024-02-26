@@ -69,6 +69,7 @@
  *   KVM guests.
  */
 
+#include <xen/bug.h>
 #include <xen/types.h>
 #include <xen/kernel.h>
 #include <asm/sysregs.h>

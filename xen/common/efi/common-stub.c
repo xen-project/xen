@@ -1,6 +1,6 @@
+#include <xen/bug.h>
 #include <xen/efi.h>
 #include <xen/errno.h>
-#include <xen/lib.h>
 
 bool efi_enabled(unsigned int feature)
 {

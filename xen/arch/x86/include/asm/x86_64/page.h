@@ -19,6 +19,8 @@ static inline unsigned long canonicalise_addr(unsigned long addr)
         return addr & ~CANONICAL_MASK;
 }
 
+#include <xen/bug.h>
+
 #include <xen/types.h>
 
 #include <xen/pdx.h>

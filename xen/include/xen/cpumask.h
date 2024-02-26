@@ -56,6 +56,7 @@
  */
 
 #include <xen/bitmap.h>
+#include <xen/bug.h>
 #include <xen/kernel.h>
 #include <xen/random.h>
 

@@ -8,6 +8,7 @@
 
 #ifdef __XEN__
 
+# include <xen/bug.h>
 # include <xen/kernel.h>
 # include <asm/endbr.h>
 # include <asm/msr-index.h>

@@ -14,6 +14,7 @@
 #include <asm/device.h>
 #include <public/xen.h>
 #include <public/device_tree_defs.h>
+#include <xen/bug.h>
 #include <xen/kernel.h>
 #include <xen/string.h>
 #include <xen/types.h>

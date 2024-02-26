@@ -1,3 +1,4 @@
+#include <xen/bug.h>
 #include <xen/compile.h>
 #include <xen/init.h>
 #include <xen/errno.h>

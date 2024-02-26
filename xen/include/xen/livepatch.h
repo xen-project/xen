@@ -18,6 +18,8 @@ struct xen_sysctl_livepatch_op;
 
 #ifdef CONFIG_LIVEPATCH
 
+#include <xen/lib.h>
+
 /*
  * We use alternative and exception table code - which by default are __init
  * only, however we need them during runtime. These macros allows us to build

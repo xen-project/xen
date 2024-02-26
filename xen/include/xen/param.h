@@ -1,6 +1,7 @@
 #ifndef _XEN_PARAM_H
 #define _XEN_PARAM_H
 
+#include <xen/bug.h>
 #include <xen/hypfs.h>
 #include <xen/init.h>
 #include <xen/lib.h>

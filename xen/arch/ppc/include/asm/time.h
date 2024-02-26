@@ -2,7 +2,7 @@
 #ifndef __ASM_PPC_TIME_H__
 #define __ASM_PPC_TIME_H__
 
-#include <xen/lib.h>
+#include <xen/bug.h>
 #include <asm/processor.h>
 #include <asm/regs.h>
 

@@ -6,6 +6,7 @@
 #ifndef __ASM_I386_CPUFEATURE_H
 #define __ASM_I386_CPUFEATURE_H
 
+#include <xen/cache.h>
 #include <xen/const.h>
 #include <asm/cpuid.h>
 

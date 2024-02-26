@@ -16,6 +16,7 @@
 
 #ifndef __ASSEMBLY__
 
+#include <xen/compiler.h>
 #include <xen/macros.h>
 #include <xen/types.h>
 
@@ -124,6 +125,24 @@ static void always_inline run_in_exception_handler(bug_fn_t *fn)
     BUG_FRAME(BUGFRAME_assert, __LINE__, __FILE__, 1, msg);     \
     unreachable();                                              \
 } while ( false )
+#endif
+
+#define BUG_ON(p)  do { if (unlikely(p)) BUG();  } while (0)
+#define WARN_ON(p)  ({                  \
+    bool ret_warn_on_ = (p);            \
+                                        \
+    if ( unlikely(ret_warn_on_) )       \
+        WARN();                         \
+    unlikely(ret_warn_on_);             \
+})
+
+#ifndef NDEBUG
+#define ASSERT(p) \
+    do { if ( unlikely(!(p)) ) assert_failed(#p); } while (0)
+#define ASSERT_UNREACHABLE() assert_failed("unreachable")
+#else
+#define ASSERT(p) do { if ( 0 && (p) ) {} } while (0)
+#define ASSERT_UNREACHABLE() do { } while (0)
 #endif
 
 #ifdef CONFIG_GENERIC_BUG_FRAME

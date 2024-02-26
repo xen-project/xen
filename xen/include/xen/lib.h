@@ -5,30 +5,11 @@
 
 #ifndef __ASSEMBLY__
 
-#include <xen/bug.h>
 #include <xen/inttypes.h>
 #include <xen/stdarg.h>
 #include <xen/types.h>
 #include <xen/xmalloc.h>
 #include <xen/string.h>
-
-#define BUG_ON(p)  do { if (unlikely(p)) BUG();  } while (0)
-#define WARN_ON(p)  ({                  \
-    bool ret_warn_on_ = (p);            \
-                                        \
-    if ( unlikely(ret_warn_on_) )       \
-        WARN();                         \
-    unlikely(ret_warn_on_);             \
-})
-
-#ifndef NDEBUG
-#define ASSERT(p) \
-    do { if ( unlikely(!(p)) ) assert_failed(#p); } while (0)
-#define ASSERT_UNREACHABLE() assert_failed("unreachable")
-#else
-#define ASSERT(p) do { if ( 0 && (p) ) {} } while (0)
-#define ASSERT_UNREACHABLE() do { } while (0)
-#endif
 
 #define __ACCESS_ONCE(x) ({                             \
             (void)(typeof(x))0; /* Scalar typecheck. */ \

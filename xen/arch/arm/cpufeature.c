@@ -5,6 +5,7 @@
  * Copyright (C) 2015 ARM Ltd.
  */
 
+#include <xen/bug.h>
 #include <xen/types.h>
 #include <xen/init.h>
 #include <xen/smp.h>

@@ -1,6 +1,6 @@
 
 #include <xen/bitops.h>
-#include <xen/lib.h>
+#include <xen/bug.h>
 
 unsigned int __find_first_bit(
     const unsigned long *addr, unsigned int size)

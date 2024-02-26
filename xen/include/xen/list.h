@@ -7,7 +7,7 @@
 #ifndef __XEN_LIST_H__
 #define __XEN_LIST_H__
 
-#include <xen/lib.h>
+#include <xen/bug.h>
 #include <asm/system.h>
 
 /*

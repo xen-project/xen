@@ -1,6 +1,7 @@
 #ifndef __ASM_ARM32_CMPXCHG_H
 #define __ASM_ARM32_CMPXCHG_H
 
+#include <xen/bug.h>
 #include <xen/prefetch.h>
 
 extern void __bad_xchg(volatile void *ptr, int size);
