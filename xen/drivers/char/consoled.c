@@ -43,13 +43,13 @@ struct xencons_interface *consoled_get_ring_addr(void)
 static char buf[BUF_SZ + 1];
 
 /* Receives characters from a domain's PV console */
-size_t consoled_guest_rx(void)
+void consoled_guest_rx(void)
 {
-    size_t recv = 0, idx = 0;
+    size_t idx = 0;
     XENCONS_RING_IDX cons, prod;
 
     if ( !cons_ring )
-        return 0;
+        return;
 
     spin_lock(&rx_lock);
 
@@ -73,7 +73,6 @@ size_t consoled_guest_rx(void)
         char c = cons_ring->out[MASK_XENCONS_IDX(cons++, cons_ring->out)];
 
         buf[idx++] = c;
-        recv++;
 
         if ( idx >= BUF_SZ )
         {
@@ -92,18 +91,15 @@ size_t consoled_guest_rx(void)
 
  out:
     spin_unlock(&rx_lock);
-
-    return recv;
 }
 
 /* Sends a character into a domain's PV console */
-size_t consoled_guest_tx(char c)
+void consoled_guest_tx(char c)
 {
-    size_t sent = 0;
     XENCONS_RING_IDX cons, prod;
 
     if ( !cons_ring )
-        return 0;
+        return;
 
     cons = ACCESS_ONCE(cons_ring->in_cons);
     prod = cons_ring->in_prod;
@@ -121,7 +117,6 @@ size_t consoled_guest_tx(char c)
         goto notify;
 
     cons_ring->in[MASK_XENCONS_IDX(prod++, cons_ring->in)] = c;
-    sent++;
 
     /* Write to the ring before updating the pointer */
     smp_wmb();
@@ -130,8 +125,6 @@ size_t consoled_guest_tx(char c)
  notify:
     /* Always notify the guest: prevents receive path from getting stuck. */
     pv_shim_inject_evtchn(pv_console_evtchn());
-
-    return sent;
 }
 
 /*

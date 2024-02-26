@@ -5,8 +5,8 @@
 
 void consoled_set_ring_addr(struct xencons_interface *ring);
 struct xencons_interface *consoled_get_ring_addr(void);
-size_t consoled_guest_rx(void);
-size_t consoled_guest_tx(char c);
+void consoled_guest_rx(void);
+void consoled_guest_tx(char c);
 
 #endif /* __XEN_CONSOLED_H__ */
 /*
