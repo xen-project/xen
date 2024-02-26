@@ -55,13 +55,13 @@ let _check quota id size =
     raise Data_too_big
   );
   if id > 0 then
-  try
-    let entry = DomidMap.find id quota.cur in
-    if entry >= quota.maxent then (
-      warn "domain %u cannot create entry: quota reached" id;
-      raise Limit_reached
-    )
-  with Not_found -> ()
+    try
+      let entry = DomidMap.find id quota.cur in
+      if entry >= quota.maxent then (
+        warn "domain %u cannot create entry: quota reached" id;
+        raise Limit_reached
+      )
+    with Not_found -> ()
 
 let check quota id size =
   if !activate then
@@ -88,4 +88,4 @@ let merge orig_quota mod_quota dest_quota =
     | diff -> update_entry dest id diff (* update with [x=x+diff] *)
   in
   {dest_quota with cur = DomidMap.fold fold_merge mod_quota.cur dest_quota.cur}
-  (* dest_quota = dest_quota + (mod_quota - orig_quota) *)
+(* dest_quota = dest_quota + (mod_quota - orig_quota) *)
