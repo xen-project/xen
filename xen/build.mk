@@ -1,6 +1,6 @@
 quiet_cmd_banner = BANNER  $@
 define cmd_banner
-    if which figlet >/dev/null 2>&1 ; then \
+    if command -v figlet >/dev/null 2>&1 ; then \
 	echo " Xen $(XEN_FULLVERSION)" | figlet -f $< > $@.tmp; \
     else \
 	echo " Xen $(XEN_FULLVERSION)" > $@.tmp; \
