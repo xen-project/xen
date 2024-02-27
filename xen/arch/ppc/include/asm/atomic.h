@@ -16,7 +16,7 @@
 
 static inline int atomic_read(const atomic_t *v)
 {
-    return *(volatile int *)&v->counter;
+    return *(const volatile int *)&v->counter;
 }
 
 static inline int _atomic_read(atomic_t v)
