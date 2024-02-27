@@ -5153,25 +5153,39 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
 int hvm_debug_op(struct vcpu *v, int32_t op)
 {
-    int rc;
+    int rc = 0;
 
     switch ( op )
     {
         case XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON:
         case XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF:
-            rc = -EOPNOTSUPP;
             if ( !cpu_has_monitor_trap_flag )
-                break;
-            rc = 0;
-            vcpu_pause(v);
-            v->arch.hvm.single_step =
-                (op == XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON);
-            vcpu_unpause(v); /* guest will latch new state */
+                return -EOPNOTSUPP;
             break;
         default:
-            rc = -ENOSYS;
-            break;
+            return -ENOSYS;
     }
+
+    vcpu_pause(v);
+
+    switch ( op )
+    {
+    case XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON:
+        v->arch.hvm.single_step = true;
+        break;
+
+    case XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF:
+        v->arch.hvm.single_step = false;
+        v->arch.hvm.fast_single_step.enabled = false;
+        v->arch.hvm.fast_single_step.p2midx = 0;
+        break;
+
+    default: /* Excluded above */
+        ASSERT_UNREACHABLE();
+        return -ENOSYS;
+    }
+
+    vcpu_unpause(v); /* guest will latch new state */
 
     return rc;
 }
