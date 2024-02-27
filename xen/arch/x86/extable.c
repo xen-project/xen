@@ -144,10 +144,11 @@ search_exception_table(const struct cpu_user_regs *regs, unsigned long *stub_ra)
     return 0;
 }
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
+#include <asm/setup.h>
 #include <asm/traps.h>
 
-static int __init cf_check stub_selftest(void)
+int __init cf_check stub_selftest(void)
 {
     static const struct {
         uint8_t opc[8];
@@ -171,7 +172,8 @@ static int __init cf_check stub_selftest(void)
     unsigned int i;
     bool fail = false;
 
-    printk("Running stub recovery selftests...\n");
+    printk("%s stub recovery selftests...\n",
+           system_state < SYS_STATE_active ? "Running" : "Re-running");
 
     for ( i = 0; i < ARRAY_SIZE(tests); ++i )
     {
