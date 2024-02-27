@@ -138,35 +138,11 @@ void arch_livepatch_post_action(void);
 void arch_livepatch_mask(void);
 void arch_livepatch_unmask(void);
 
-static inline void common_livepatch_apply(const struct livepatch_func *func,
-                                          struct livepatch_fstate *state)
-{
-    /* If the action has been already executed on this function, do nothing. */
-    if ( state->applied == LIVEPATCH_FUNC_APPLIED )
-    {
-        printk(XENLOG_WARNING LIVEPATCH "%s: %s has been already applied before\n",
-                __func__, func->name);
-        return;
-    }
+/* Only for testing purposes. */
+struct payload;
+int revert_payload(struct payload *data);
+void revert_payload_tail(struct payload *data);
 
-    arch_livepatch_apply(func, state);
-    state->applied = LIVEPATCH_FUNC_APPLIED;
-}
-
-static inline void common_livepatch_revert(const struct livepatch_func *func,
-                                           struct livepatch_fstate *state)
-{
-    /* If the apply action hasn't been executed on this function, do nothing. */
-    if ( !func->old_addr || state->applied == LIVEPATCH_FUNC_NOT_APPLIED )
-    {
-        printk(XENLOG_WARNING LIVEPATCH "%s: %s has not been applied before\n",
-                __func__, func->name);
-        return;
-    }
-
-    arch_livepatch_revert(func, state);
-    state->applied = LIVEPATCH_FUNC_NOT_APPLIED;
-}
 #else
 
 /*

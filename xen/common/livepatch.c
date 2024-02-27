@@ -1366,7 +1366,22 @@ static int apply_payload(struct payload *data)
     ASSERT(!local_irq_is_enabled());
 
     for ( i = 0; i < data->nfuncs; i++ )
-        common_livepatch_apply(&data->funcs[i], &data->fstate[i]);
+    {
+        const struct livepatch_func *func = &data->funcs[i];
+        struct livepatch_fstate *state = &data->fstate[i];
+
+        /* If the action has been already executed on this function, do nothing. */
+        if ( state->applied == LIVEPATCH_FUNC_APPLIED )
+        {
+            printk(XENLOG_WARNING LIVEPATCH
+                   "%s: %s has been already applied before\n",
+                   __func__, func->name);
+            continue;
+        }
+
+        arch_livepatch_apply(func, state);
+        state->applied = LIVEPATCH_FUNC_APPLIED;
+    }
 
     arch_livepatch_revive();
 
@@ -1382,7 +1397,7 @@ static inline void apply_payload_tail(struct payload *data)
     data->state = LIVEPATCH_STATE_APPLIED;
 }
 
-static int revert_payload(struct payload *data)
+int revert_payload(struct payload *data)
 {
     unsigned int i;
     int rc;
@@ -1397,7 +1412,25 @@ static int revert_payload(struct payload *data)
     }
 
     for ( i = 0; i < data->nfuncs; i++ )
-        common_livepatch_revert(&data->funcs[i], &data->fstate[i]);
+    {
+        const struct livepatch_func *func = &data->funcs[i];
+        struct livepatch_fstate *state = &data->fstate[i];
+
+        /*
+         * If the apply action hasn't been executed on this function, do
+         * nothing.
+         */
+        if ( !func->old_addr || state->applied == LIVEPATCH_FUNC_NOT_APPLIED )
+        {
+            printk(XENLOG_WARNING LIVEPATCH
+                   "%s: %s has not been applied before\n",
+                   __func__, func->name);
+            continue;
+        }
+
+        arch_livepatch_revert(func, state);
+        state->applied = LIVEPATCH_FUNC_NOT_APPLIED;
+    }
 
     /*
      * Since we are running with IRQs disabled and the hooks may call common
@@ -1415,7 +1448,7 @@ static int revert_payload(struct payload *data)
     return 0;
 }
 
-static inline void revert_payload_tail(struct payload *data)
+void revert_payload_tail(struct payload *data)
 {
     list_del(&data->applied_list);
 
