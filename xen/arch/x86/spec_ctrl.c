@@ -62,7 +62,8 @@ int8_t __initdata opt_psfd = -1;
 int8_t __ro_after_init opt_ibpb_ctxt_switch = -1;
 int8_t __read_mostly opt_eager_fpu = -1;
 int8_t __read_mostly opt_l1d_flush = -1;
-static bool __initdata opt_branch_harden = true;
+static bool __initdata opt_branch_harden =
+    IS_ENABLED(CONFIG_SPECULATIVE_HARDEN_BRANCH);
 
 bool __initdata bsp_delay_spec_ctrl;
 uint8_t __read_mostly default_xen_spec_ctrl;
@@ -280,7 +281,16 @@ static int __init cf_check parse_spec_ctrl(const char *s)
         else if ( (val = parse_boolean("l1d-flush", s, ss)) >= 0 )
             opt_l1d_flush = val;
         else if ( (val = parse_boolean("branch-harden", s, ss)) >= 0 )
-            opt_branch_harden = val;
+        {
+            if ( IS_ENABLED(CONFIG_SPECULATIVE_HARDEN_BRANCH) )
+                opt_branch_harden = val;
+            else
+            {
+                no_config_param("SPECULATIVE_HARDEN_BRANCH", "spec-ctrl", s,
+                                ss);
+                rc = -EINVAL;
+            }
+        }
         else if ( (val = parse_boolean("srb-lock", s, ss)) >= 0 )
             opt_srb_lock = val;
         else if ( (val = parse_boolean("unpriv-mmio", s, ss)) >= 0 )
