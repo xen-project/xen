@@ -37,7 +37,10 @@
 
 #include "list.h"
 
+typedef bool rwlock_t;
+
 struct domain {
+    rwlock_t pci_lock;
 };
 
 struct pci_dev {
@@ -46,7 +49,7 @@ struct pci_dev {
 
 struct vcpu
 {
-    const struct domain *domain;
+    struct domain *domain;
 };
 
 extern const struct vcpu *current;
@@ -56,6 +59,10 @@ typedef bool spinlock_t;
 #define spin_lock_init(l) (*(l) = false)
 #define spin_lock(l) (*(l) = true)
 #define spin_unlock(l) (*(l) = false)
+#define read_lock(l) (*(l) = true)
+#define read_unlock(l) (*(l) = false)
+#define write_lock(l) (*(l) = true)
+#define write_unlock(l) (*(l) = false)
 
 typedef union {
     uint32_t sbdf;

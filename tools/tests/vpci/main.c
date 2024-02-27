@@ -21,7 +21,7 @@
 /* Single vcpu (current), and single domain with a single PCI device. */
 static struct vpci vpci;
 
-const static struct domain d;
+static struct domain d;
 
 const struct pci_dev test_pdev = {
     .vpci = &vpci,
