@@ -845,7 +845,7 @@ void do_unhandled_trap(struct cpu_user_regs *regs)
 }
 
 static void fixup_exception_return(struct cpu_user_regs *regs,
-                                   unsigned long fixup)
+                                   unsigned long fixup, unsigned long stub_ra)
 {
     if ( IS_ENABLED(CONFIG_XEN_SHSTK) )
     {
@@ -862,7 +862,8 @@ static void fixup_exception_return(struct cpu_user_regs *regs,
             /*
              * Search for %rip.  The shstk currently looks like this:
              *
-             *   ...  [Likely pointed to by SSP]
+             *   tok  [Supervisor token, == &tok | BUSY, only with FRED inactive]
+             *   ...  [Pointed to by SSP for most exceptions, empty in IST cases]
              *   %cs  [== regs->cs]
              *   %rip [== regs->rip]
              *   SSP  [Likely points to 3 slots higher, above %cs]
@@ -880,7 +881,56 @@ static void fixup_exception_return(struct cpu_user_regs *regs,
              */
             if ( ptr[0] == regs->rip && ptr[1] == regs->cs )
             {
+                unsigned long primary_shstk =
+                    (ssp & ~(STACK_SIZE - 1)) +
+                    (PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8;
+
                 wrss(fixup, ptr);
+
+                if ( !stub_ra )
+                    goto shstk_done;
+
+                /*
+                 * Stub recovery ought to happen only when the outer context
+                 * was on the main shadow stack.  We need to also "pop" the
+                 * stub's return address from the interrupted context's shadow
+                 * stack.  That is,
+                 * - if we're still on the main stack, we need to move the
+                 *   entire stack (up to and including the exception frame)
+                 *   up by one slot, incrementing the original SSP in the
+                 *   exception frame,
+                 * - if we're on an IST stack, we need to increment the
+                 *   original SSP.
+                 */
+                BUG_ON((ptr[-1] ^ primary_shstk) >> PAGE_SHIFT);
+
+                if ( (ssp ^ primary_shstk) >> PAGE_SHIFT )
+                {
+                    /*
+                     * We're on an IST stack.  First make sure the two return
+                     * addresses actually match.  Then increment the interrupted
+                     * context's SSP.
+                     */
+                    BUG_ON(stub_ra != *(unsigned long*)ptr[-1]);
+                    wrss(ptr[-1] + 8, &ptr[-1]);
+                    goto shstk_done;
+                }
+
+                /* Make sure the two return addresses actually match. */
+                BUG_ON(stub_ra != ptr[2]);
+
+                /* Move exception frame, updating SSP there. */
+                wrss(ptr[1], &ptr[2]); /* %cs */
+                wrss(ptr[0], &ptr[1]); /* %rip */
+                wrss(ptr[-1] + 8, &ptr[0]); /* SSP */
+
+                /* Move all newer entries. */
+                while ( --ptr != _p(ssp) )
+                    wrss(ptr[-1], &ptr[0]);
+
+                /* Finally account for our own stack having shifted up. */
+                asm volatile ( "incsspd %0" :: "r" (2) );
+
                 goto shstk_done;
             }
         }
@@ -901,7 +951,8 @@ static void fixup_exception_return(struct cpu_user_regs *regs,
 
 static bool extable_fixup(struct cpu_user_regs *regs, bool print)
 {
-    unsigned long fixup = search_exception_table(regs);
+    unsigned long stub_ra = 0;
+    unsigned long fixup = search_exception_table(regs, &stub_ra);
 
     if ( unlikely(fixup == 0) )
         return false;
@@ -915,7 +966,7 @@ static bool extable_fixup(struct cpu_user_regs *regs, bool print)
                vector_name(regs->entry_vector), regs->error_code,
                _p(regs->rip), _p(regs->rip), _p(fixup));
 
-    fixup_exception_return(regs, fixup);
+    fixup_exception_return(regs, fixup, stub_ra);
     this_cpu(last_extable_addr) = regs->rip;
 
     return true;
@@ -1183,7 +1234,8 @@ void do_invalid_op(struct cpu_user_regs *regs)
     {
     case BUGFRAME_run_fn:
     case BUGFRAME_warn:
-        fixup_exception_return(regs, (unsigned long)eip);
+        fixup_exception_return(regs, (unsigned long)eip, 0);
+        fallthrough;
     case BUGFRAME_bug:
     case BUGFRAME_assert:
         return;
