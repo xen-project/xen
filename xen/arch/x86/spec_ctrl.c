@@ -476,13 +476,25 @@ static void __init print_details(enum ind_thunk thunk)
            (e21a & cpufeat_mask(X86_FEATURE_SBPB))           ? " SBPB"           : "");
 
     /* Compiled-in support which pertains to mitigations. */
-    if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) || IS_ENABLED(CONFIG_SHADOW_PAGING) )
+    if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) || IS_ENABLED(CONFIG_SHADOW_PAGING) ||
+         IS_ENABLED(CONFIG_SPECULATIVE_HARDEN_ARRAY) ||
+         IS_ENABLED(CONFIG_SPECULATIVE_HARDEN_BRANCH) ||
+         IS_ENABLED(CONFIG_SPECULATIVE_HARDEN_GUEST_ACCESS) )
         printk("  Compiled-in support:"
 #ifdef CONFIG_INDIRECT_THUNK
                " INDIRECT_THUNK"
 #endif
 #ifdef CONFIG_SHADOW_PAGING
                " SHADOW_PAGING"
+#endif
+#ifdef CONFIG_SPECULATIVE_HARDEN_ARRAY
+               " HARDEN_ARRAY"
+#endif
+#ifdef CONFIG_SPECULATIVE_HARDEN_BRANCH
+               " HARDEN_BRANCH"
+#endif
+#ifdef CONFIG_SPECULATIVE_HARDEN_GUEST_ACCESS
+               " HARDEN_GUEST_ACCESS"
 #endif
                "\n");
 
