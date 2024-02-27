@@ -6829,7 +6829,8 @@ x86_emulate(
     CASE_SIMD_SCALAR_FP(_EVEX, 0x0f, 0x2d): /* vcvts{s,d}2si xmm/mem,reg */
     CASE_SIMD_SCALAR_FP(_EVEX, 0x0f, 0x78): /* vcvtts{s,d}2usi xmm/mem,reg */
     CASE_SIMD_SCALAR_FP(_EVEX, 0x0f, 0x79): /* vcvts{s,d}2usi xmm/mem,reg */
-        generate_exception_if((evex.reg != 0xf || !evex.RX || evex.opmsk ||
+        generate_exception_if((evex.reg != 0xf || !evex.RX || !evex.R ||
+                               evex.opmsk ||
                                (ea.type != OP_REG && evex.brs)),
                               EXC_UD);
         host_and_vcpu_must_have(avx512f);
@@ -10705,7 +10706,7 @@ x86_emulate(
         goto pextr;
 
     case X86EMUL_OPC_EVEX_66(0x0f, 0xc5):   /* vpextrw $imm8,xmm,reg */
-        generate_exception_if(ea.type != OP_REG, EXC_UD);
+        generate_exception_if(ea.type != OP_REG || !evex.R, EXC_UD);
         /* Convert to alternative encoding: We want to use a memory operand. */
         evex.opcx = ext_0f3a;
         b = 0x15;
