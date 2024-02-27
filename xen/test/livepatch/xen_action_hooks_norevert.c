@@ -120,7 +120,7 @@ static void post_revert_hook(livepatch_payload_t *payload)
     printk(KERN_DEBUG "%s: Hook done.\n", __func__);
 }
 
-LIVEPATCH_APPLY_HOOK(revert_hook);
+LIVEPATCH_REVERT_HOOK(revert_hook);
 
 LIVEPATCH_PREAPPLY_HOOK(pre_apply_hook);
 LIVEPATCH_POSTAPPLY_HOOK(post_apply_hook);
