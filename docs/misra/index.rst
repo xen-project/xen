@@ -16,3 +16,4 @@ Xen hypervisor code and related documents.
    documenting-violations
    exclude-list
    xen-static-analysis
+   function-macro-properties

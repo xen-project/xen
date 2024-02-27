@@ -2,7 +2,7 @@ import json
 import os
 
 script_dir = os.path.dirname(__file__)
-properties_path = os.path.join(script_dir, "../../docs/function_macro_properties.json")
+properties_path = os.path.join(script_dir, "../../docs/misra/function-macro-properties.json")
 output_path   = os.path.join(script_dir, "ECLAIR/call_properties.ecl")
 
 with open(properties_path) as fp:
