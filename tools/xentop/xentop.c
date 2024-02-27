@@ -684,7 +684,7 @@ static int compare_vbd_oo(xenstat_domain *domain1, xenstat_domain *domain2)
 	unsigned long long dom1_vbd_oo = 0, dom2_vbd_oo = 0;
 
 	tot_vbd_reqs(domain1, FIELD_VBD_OO, &dom1_vbd_oo);
-	tot_vbd_reqs(domain1, FIELD_VBD_OO, &dom2_vbd_oo);
+	tot_vbd_reqs(domain2, FIELD_VBD_OO, &dom2_vbd_oo);
 
 	return -compare(dom1_vbd_oo, dom2_vbd_oo);
 }
@@ -711,9 +711,9 @@ static int compare_vbd_rd(xenstat_domain *domain1, xenstat_domain *domain2)
 	unsigned long long dom1_vbd_rd = 0, dom2_vbd_rd = 0;
 
 	tot_vbd_reqs(domain1, FIELD_VBD_RD, &dom1_vbd_rd);
-	tot_vbd_reqs(domain1, FIELD_VBD_RD, &dom2_vbd_rd);
+	tot_vbd_reqs(domain2, FIELD_VBD_RD, &dom2_vbd_rd);
 
-	return -compare(dom1_vbd_rd, dom1_vbd_rd);
+	return -compare(dom1_vbd_rd, dom2_vbd_rd);
 }
 
 /* Prints number of total VBD READ requests statistic */
@@ -738,7 +738,7 @@ static int compare_vbd_wr(xenstat_domain *domain1, xenstat_domain *domain2)
 	unsigned long long dom1_vbd_wr = 0, dom2_vbd_wr = 0;
 
 	tot_vbd_reqs(domain1, FIELD_VBD_WR, &dom1_vbd_wr);
-	tot_vbd_reqs(domain1, FIELD_VBD_WR, &dom2_vbd_wr);
+	tot_vbd_reqs(domain2, FIELD_VBD_WR, &dom2_vbd_wr);
 
 	return -compare(dom1_vbd_wr, dom2_vbd_wr);
 }
@@ -765,7 +765,7 @@ static int compare_vbd_rsect(xenstat_domain *domain1, xenstat_domain *domain2)
 	unsigned long long dom1_vbd_rsect = 0, dom2_vbd_rsect = 0;
 
 	tot_vbd_reqs(domain1, FIELD_VBD_RSECT, &dom1_vbd_rsect);
-	tot_vbd_reqs(domain1, FIELD_VBD_RSECT, &dom2_vbd_rsect);
+	tot_vbd_reqs(domain2, FIELD_VBD_RSECT, &dom2_vbd_rsect);
 
 	return -compare(dom1_vbd_rsect, dom2_vbd_rsect);
 }
