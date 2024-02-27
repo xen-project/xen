@@ -171,6 +171,19 @@ void pcidevs_lock(void);
 void pcidevs_unlock(void);
 bool __must_check pcidevs_locked(void);
 
+#ifndef NDEBUG
+/*
+ * Check to ensure there will be no changes to the entries in d->pdev_list (but
+ * not the contents of each entry).
+ * This check is not suitable for protecting other state or critical regions.
+ */
+#define ASSERT_PDEV_LIST_IS_READ_LOCKED(d)                               \
+        /* NB: d may be evaluated multiple times, or not at all */       \
+        ASSERT(pcidevs_locked() || ((d) && rw_is_locked(&(d)->pci_lock)))
+#else
+#define ASSERT_PDEV_LIST_IS_READ_LOCKED(d) ((void)(d))
+#endif
+
 bool pci_known_segment(u16 seg);
 bool pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func);
 int scan_pci_devices(void);

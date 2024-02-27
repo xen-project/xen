@@ -468,7 +468,7 @@ int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
     struct msixtbl_entry *entry, *new_entry;
     int r = -EINVAL;
 
-    ASSERT(pcidevs_locked());
+    ASSERT_PDEV_LIST_IS_READ_LOCKED(d);
     ASSERT(rw_is_write_locked(&d->event_lock));
 
     if ( !msixtbl_initialised(d) )
@@ -538,7 +538,7 @@ void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq)
     struct pci_dev *pdev;
     struct msixtbl_entry *entry;
 
-    ASSERT(pcidevs_locked());
+    ASSERT_PDEV_LIST_IS_READ_LOCKED(d);
     ASSERT(rw_is_write_locked(&d->event_lock));
 
     if ( !msixtbl_initialised(d) )
@@ -684,7 +684,7 @@ static int vpci_msi_update(const struct pci_dev *pdev, uint32_t data,
 {
     unsigned int i;
 
-    ASSERT(pcidevs_locked());
+    ASSERT_PDEV_LIST_IS_READ_LOCKED(pdev->domain);
 
     if ( (address & MSI_ADDR_BASE_MASK) != MSI_ADDR_HEADER )
     {
@@ -725,8 +725,8 @@ void vpci_msi_arch_update(struct vpci_msi *msi, const struct pci_dev *pdev)
     int rc;
 
     ASSERT(msi->arch.pirq != INVALID_PIRQ);
+    ASSERT_PDEV_LIST_IS_READ_LOCKED(pdev->domain);
 
-    pcidevs_lock();
     for ( i = 0; i < msi->vectors && msi->arch.bound; i++ )
     {
         struct xen_domctl_bind_pt_irq unbind = {
@@ -745,7 +745,6 @@ void vpci_msi_arch_update(struct vpci_msi *msi, const struct pci_dev *pdev)
 
     msi->arch.bound = !vpci_msi_update(pdev, msi->data, msi->address,
                                        msi->vectors, msi->arch.pirq, msi->mask);
-    pcidevs_unlock();
 }
 
 static int vpci_msi_enable(const struct pci_dev *pdev, unsigned int nr,
@@ -778,15 +777,14 @@ int vpci_msi_arch_enable(struct vpci_msi *msi, const struct pci_dev *pdev,
     int rc;
 
     ASSERT(msi->arch.pirq == INVALID_PIRQ);
+    ASSERT_PDEV_LIST_IS_READ_LOCKED(pdev->domain);
     rc = vpci_msi_enable(pdev, vectors, 0);
     if ( rc < 0 )
         return rc;
     msi->arch.pirq = rc;
 
-    pcidevs_lock();
     msi->arch.bound = !vpci_msi_update(pdev, msi->data, msi->address, vectors,
                                        msi->arch.pirq, msi->mask);
-    pcidevs_unlock();
 
     return 0;
 }
@@ -797,8 +795,8 @@ static void vpci_msi_disable(const struct pci_dev *pdev, int pirq,
     unsigned int i;
 
     ASSERT(pirq != INVALID_PIRQ);
+    ASSERT_PDEV_LIST_IS_READ_LOCKED(pdev->domain);
 
-    pcidevs_lock();
     for ( i = 0; i < nr && bound; i++ )
     {
         struct xen_domctl_bind_pt_irq bind = {
@@ -814,7 +812,6 @@ static void vpci_msi_disable(const struct pci_dev *pdev, int pirq,
     write_lock(&pdev->domain->event_lock);
     unmap_domain_pirq(pdev->domain, pirq);
     write_unlock(&pdev->domain->event_lock);
-    pcidevs_unlock();
 }
 
 void vpci_msi_arch_disable(struct vpci_msi *msi, const struct pci_dev *pdev)
@@ -854,6 +851,7 @@ int vpci_msix_arch_enable_entry(struct vpci_msix_entry *entry,
     int rc;
 
     ASSERT(entry->arch.pirq == INVALID_PIRQ);
+    ASSERT_PDEV_LIST_IS_READ_LOCKED(pdev->domain);
     rc = vpci_msi_enable(pdev, vmsix_entry_nr(pdev->vpci->msix, entry),
                          table_base);
     if ( rc < 0 )
@@ -861,7 +859,6 @@ int vpci_msix_arch_enable_entry(struct vpci_msix_entry *entry,
 
     entry->arch.pirq = rc;
 
-    pcidevs_lock();
     rc = vpci_msi_update(pdev, entry->data, entry->addr, 1, entry->arch.pirq,
                          entry->masked);
     if ( rc )
@@ -869,7 +866,6 @@ int vpci_msix_arch_enable_entry(struct vpci_msix_entry *entry,
         vpci_msi_disable(pdev, entry->arch.pirq, 1, false);
         entry->arch.pirq = INVALID_PIRQ;
     }
-    pcidevs_unlock();
 
     return rc;
 }
@@ -895,6 +891,15 @@ int vpci_msix_arch_print(const struct vpci_msix *msix)
 {
     unsigned int i;
 
+    /*
+     * Assert that pdev_list doesn't change. ASSERT_PDEV_LIST_IS_READ_LOCKED
+     * is not suitable here because it allows either pcidevs_lock() or
+     * pci_lock to be held, but here we rely on pci_lock being held, not
+     * pcidevs_lock() (see the transient lock dropping further down).
+     */
+    ASSERT(rw_is_locked(&msix->pdev->domain->pci_lock));
+    ASSERT(spin_is_locked(&msix->pdev->vpci->lock));
+
     for ( i = 0; i < msix->max_entries; i++ )
     {
         const struct vpci_msix_entry *entry = &msix->entries[i];
@@ -913,13 +918,23 @@ int vpci_msix_arch_print(const struct vpci_msix *msix)
             struct pci_dev *pdev = msix->pdev;
 
             spin_unlock(&msix->pdev->vpci->lock);
+            read_unlock(&pdev->domain->pci_lock);
             process_pending_softirqs();
+
+            if ( !read_trylock(&pdev->domain->pci_lock) )
+                return -EBUSY;
+
             /* NB: we assume that pdev cannot go away for an alive domain. */
             if ( !pdev->vpci || !spin_trylock(&pdev->vpci->lock) )
+            {
+                read_unlock(&pdev->domain->pci_lock);
                 return -EBUSY;
+            }
+
             if ( pdev->vpci->msix != msix )
             {
                 spin_unlock(&pdev->vpci->lock);
+                read_unlock(&pdev->domain->pci_lock);
                 return -EAGAIN;
             }
         }

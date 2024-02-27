@@ -2162,7 +2162,7 @@ int map_domain_pirq(
         struct pci_dev *pdev;
         unsigned int nr = 0;
 
-        ASSERT(pcidevs_locked());
+        ASSERT_PDEV_LIST_IS_READ_LOCKED(d);
 
         ret = -ENODEV;
         if ( !cpu_has_apic )
@@ -2319,7 +2319,7 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     if ( (pirq < 0) || (pirq >= d->nr_pirqs) )
         return -EINVAL;
 
-    ASSERT(pcidevs_locked());
+    ASSERT_PDEV_LIST_IS_READ_LOCKED(d);
     ASSERT(rw_is_write_locked(&d->event_lock));
 
     info = pirq_info(d, pirq);
@@ -2884,6 +2884,8 @@ int allocate_and_map_msi_pirq(struct domain *d, int index, int *pirq_p,
 {
     int irq, pirq, ret;
 
+    ASSERT_PDEV_LIST_IS_READ_LOCKED(d);
+
     switch ( type )
     {
     case MAP_PIRQ_TYPE_MSI:
@@ -2913,7 +2915,6 @@ int allocate_and_map_msi_pirq(struct domain *d, int index, int *pirq_p,
 
     msi->irq = irq;
 
-    pcidevs_lock();
     /* Verify or get pirq. */
     write_lock(&d->event_lock);
     pirq = allocate_pirq(d, index, *pirq_p, irq, type, &msi->entry_nr);
@@ -2929,7 +2930,6 @@ int allocate_and_map_msi_pirq(struct domain *d, int index, int *pirq_p,
 
  done:
     write_unlock(&d->event_lock);
-    pcidevs_unlock();
     if ( ret )
     {
         switch ( type )

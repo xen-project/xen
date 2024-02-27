@@ -462,7 +462,8 @@ struct domain
 #ifdef CONFIG_HAS_PCI
     struct list_head pdev_list;
     /*
-     * pci_lock protects access to pdev_list.
+     * pci_lock protects access to pdev_list. pci_lock also protects pdev->vpci
+     * structure from being removed.
      *
      * Any user *reading* from pdev_list, or from devices stored in pdev_list,
      * should hold either pcidevs_lock() or pci_lock in read mode. Optionally,

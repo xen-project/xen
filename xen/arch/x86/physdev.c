@@ -123,7 +123,9 @@ int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
 
     case MAP_PIRQ_TYPE_MSI:
     case MAP_PIRQ_TYPE_MULTI_MSI:
+        read_lock(&d->pci_lock);
         ret = allocate_and_map_msi_pirq(d, *index, pirq_p, type, msi);
+        read_unlock(&d->pci_lock);
         break;
 
     default:

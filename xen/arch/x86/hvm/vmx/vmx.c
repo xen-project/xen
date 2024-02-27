@@ -413,7 +413,7 @@ static int cf_check vmx_pi_update_irte(const struct vcpu *v,
 
     spin_unlock_irq(&desc->lock);
 
-    ASSERT(pcidevs_locked());
+    ASSERT_PDEV_LIST_IS_READ_LOCKED(msi_desc->dev->domain);
 
     return iommu_update_ire_from_msi(msi_desc, &msi_desc->msg);
 
