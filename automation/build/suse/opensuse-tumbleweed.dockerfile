@@ -11,13 +11,11 @@ RUN zypper ref && zypper dup -y --no-recommends
 RUN zypper install -y --no-recommends \
         acpica \
         bc \
-        bin86 \
         bison \
         bzip2 \
         checkpolicy \
         clang \
         cmake \
-        dev86 \
         diffutils \
         discount \
         flex \
