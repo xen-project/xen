@@ -448,11 +448,20 @@ struct rangeset *rangeset_new(
     return r;
 }
 
-void rangeset_destroy(
-    struct rangeset *r)
+void rangeset_purge(struct rangeset *r)
 {
     struct range *x;
 
+    if ( r == NULL )
+        return;
+
+    while ( (x = first_range(r)) != NULL )
+        destroy_range(r, x);
+}
+
+void rangeset_destroy(
+    struct rangeset *r)
+{
     if ( r == NULL )
         return;
 
@@ -463,8 +472,7 @@ void rangeset_destroy(
         spin_unlock(&r->domain->rangesets_lock);
     }
 
-    while ( (x = first_range(r)) != NULL )
-        destroy_range(r, x);
+    rangeset_purge(r);
 
     xfree(r);
 }
