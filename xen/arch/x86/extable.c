@@ -94,6 +94,22 @@ search_exception_table(const struct cpu_user_regs *regs)
     if ( region && region->ex )
         return search_one_extable(region->ex, region->ex_end, regs->rip);
 
+    /*
+     * Emulation stubs (which are per-CPU) are constructed with a RET at the
+     * end, and are CALLed by the invoking code.
+     *
+     * An exception in the stubs may occur anywhere, so we first match any
+     * %rip in the correct stub, with a sanity check on %rsp too.  But, an
+     * entry in ex_table[] needs to be compile-time constant, so we register
+     * the fixup address using the invoking CALL's return address.
+     *
+     * To recover, we:
+     * 1) Emulate a pseudo-RET to get out of the stub.  We POP the return
+     *    address off the stack(s), use it to look up the fixup address, and
+     *    JMP there, then
+     * 2) Emulate a PUSH of 'token' onto the data stack to pass information
+     *    about the exception back to the invoking code.
+     */
     if ( regs->rip >= stub + STUB_BUF_SIZE / 2 &&
          regs->rip < stub + STUB_BUF_SIZE &&
          regs->rsp > (unsigned long)regs &&
