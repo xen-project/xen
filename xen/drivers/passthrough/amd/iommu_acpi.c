@@ -426,9 +426,14 @@ static int __init parse_ivmd_block(const struct acpi_ivrs_memory *ivmd_block)
                 return -EIO;
             }
 
-            /* Types which won't be handed out are considered good enough. */
-            if ( !(type & (RAM_TYPE_RESERVED | RAM_TYPE_ACPI |
-                           RAM_TYPE_UNUSABLE)) )
+            /*
+             * Types which aren't RAM are considered good enough.
+             * Note that a page being partially RESERVED, ACPI or UNUSABLE will
+             * force Xen into assuming the whole page as having that type in
+             * practice.
+             */
+            if ( type & (RAM_TYPE_RESERVED | RAM_TYPE_ACPI |
+                         RAM_TYPE_UNUSABLE) )
                 continue;
 
             AMD_IOMMU_ERROR("IVMD: page at %lx can't be converted\n", addr);
