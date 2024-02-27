@@ -1,5 +1,6 @@
 config RISCV
 	def_bool y
+	select FUNCTION_ALIGNMENT_16B
 
 config RISCV_64
 	def_bool y

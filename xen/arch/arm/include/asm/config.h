@@ -53,8 +53,7 @@
 
 /* Linkage for ARM */
 #ifdef __ASSEMBLY__
-#define CODE_ALIGN 4
-#define ALIGN .balign CODE_ALIGN
+#define ALIGN .balign CONFIG_FUNCTION_ALIGNMENT
 #define ENTRY(name)                             \
   .globl name;                                  \
   ALIGN;                                        \

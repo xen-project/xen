@@ -132,7 +132,6 @@
 
 /* Linkage for RISCV */
 #ifdef __ASSEMBLY__
-#define CODE_ALIGN 16
 #define CODE_FILL /* empty */
 #endif
 

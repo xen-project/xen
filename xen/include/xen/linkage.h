@@ -5,7 +5,6 @@
 
 #include <xen/macros.h>
 
-/* CODE_ALIGN needs to be specified by every architecture. */
 #ifndef CODE_FILL
 # define CODE_FILL ~0
 #endif
@@ -41,9 +40,10 @@
  */
 #define count_args_exp(args...) count_args(args)
 #if count_args_exp(CODE_FILL)
-# define DO_CODE_ALIGN(align...) LASTARG(CODE_ALIGN, ## align), CODE_FILL
+# define DO_CODE_ALIGN(align...) LASTARG(CONFIG_FUNCTION_ALIGNMENT, ## align), \
+                                 CODE_FILL
 #else
-# define DO_CODE_ALIGN(align...) LASTARG(CODE_ALIGN, ## align)
+# define DO_CODE_ALIGN(align...) LASTARG(CONFIG_FUNCTION_ALIGNMENT, ## align)
 #endif
 
 #define FUNC(name, align...) \

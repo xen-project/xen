@@ -43,9 +43,8 @@
 
 /* Linkage for x86 */
 #ifdef __ASSEMBLY__
-#define CODE_ALIGN 16
 #define CODE_FILL 0x90
-#define ALIGN .align CODE_ALIGN, CODE_FILL
+#define ALIGN .align CONFIG_FUNCTION_ALIGNMENT, CODE_FILL
 #define ENTRY(name)                             \
   ALIGN;                                        \
   GLOBAL(name)

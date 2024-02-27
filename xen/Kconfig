@@ -37,6 +37,23 @@ config CC_HAS_VISIBILITY_ATTRIBUTE
 config CC_SPLIT_SECTIONS
 	bool
 
+# Set code alignment.
+#
+# Allow setting on a boolean basis, and then convert such selection to an
+# integer for the build system and code to consume more easily.
+config FUNCTION_ALIGNMENT_4B
+	bool
+config FUNCTION_ALIGNMENT_8B
+	bool
+config FUNCTION_ALIGNMENT_16B
+	bool
+config FUNCTION_ALIGNMENT
+	int
+	default 16 if FUNCTION_ALIGNMENT_16B
+	default  8 if  FUNCTION_ALIGNMENT_8B
+	default  4 if  FUNCTION_ALIGNMENT_4B
+	default  0
+
 source "arch/$(SRCARCH)/Kconfig"
 
 config DEFCONFIG_LIST

@@ -1,5 +1,6 @@
 config PPC
 	def_bool y
+	select FUNCTION_ALIGNMENT_4B
 	select HAS_DEVICE_TREE
 
 config PPC64
