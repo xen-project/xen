@@ -15,7 +15,9 @@ srcdir := $(srctree)/$(src)
 PHONY := __build
 __build:
 
--include $(objtree)/include/config/auto.conf
+ifneq ($(firstword $(subst /, ,$(obj))),tools)
+include $(objtree)/include/config/auto.conf
+endif
 
 include $(XEN_ROOT)/Config.mk
 include $(srctree)/scripts/Kbuild.include
