@@ -421,7 +421,8 @@ union stub_exception_token {
     unsigned long raw;
 };
 
-extern unsigned long search_exception_table(const struct cpu_user_regs *regs);
+extern unsigned long search_exception_table(const struct cpu_user_regs *regs,
+                                            unsigned long *stub_ra);
 extern void sort_exception_tables(void);
 extern void sort_exception_table(struct exception_table_entry *start,
                                  const struct exception_table_entry *stop);

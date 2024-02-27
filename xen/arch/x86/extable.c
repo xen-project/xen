@@ -86,13 +86,16 @@ search_one_extable(const struct exception_table_entry *first,
 }
 
 unsigned long
-search_exception_table(const struct cpu_user_regs *regs)
+search_exception_table(const struct cpu_user_regs *regs, unsigned long *stub_ra)
 {
     const struct virtual_region *region = find_text_region(regs->rip);
     unsigned long stub = this_cpu(stubs.addr);
 
     if ( region && region->ex )
+    {
+        *stub_ra = 0;
         return search_one_extable(region->ex, region->ex_end, regs->rip);
+    }
 
     /*
      * Emulation stubs (which are per-CPU) are constructed with a RET at the
@@ -115,13 +118,13 @@ search_exception_table(const struct cpu_user_regs *regs)
          regs->rsp > (unsigned long)regs &&
          regs->rsp < (unsigned long)get_cpu_info() )
     {
-        unsigned long retptr = *(unsigned long *)regs->rsp;
+        unsigned long retaddr = *(unsigned long *)regs->rsp, fixup;
 
-        region = find_text_region(retptr);
-        retptr = region && region->ex
-                 ? search_one_extable(region->ex, region->ex_end, retptr)
-                 : 0;
-        if ( retptr )
+        region = find_text_region(retaddr);
+        fixup = region && region->ex
+                ? search_one_extable(region->ex, region->ex_end, retaddr)
+                : 0;
+        if ( fixup )
         {
             /*
              * Put trap number and error code on the stack (in place of the
@@ -133,7 +136,8 @@ search_exception_table(const struct cpu_user_regs *regs)
             };
 
             *(unsigned long *)regs->rsp = token.raw;
-            return retptr;
+            *stub_ra = retaddr;
+            return fixup;
         }
     }
 
