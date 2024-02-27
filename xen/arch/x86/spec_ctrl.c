@@ -504,11 +504,12 @@ static void __init print_details(enum ind_thunk thunk)
                "\n");
 
     /* Settings for Xen's protection, irrespective of guests. */
-    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s%s%s%s, Other:%s%s%s%s%s%s\n",
-           thunk == THUNK_NONE      ? "N/A" :
-           thunk == THUNK_RETPOLINE ? "RETPOLINE" :
-           thunk == THUNK_LFENCE    ? "LFENCE" :
-           thunk == THUNK_JMP       ? "JMP" : "?",
+    printk("  Xen settings: %s%sSPEC_CTRL: %s%s%s%s%s, Other:%s%s%s%s%s%s\n",
+           thunk != THUNK_NONE      ? "BTI-Thunk: " : "",
+           thunk == THUNK_NONE      ? "" :
+           thunk == THUNK_RETPOLINE ? "RETPOLINE, " :
+           thunk == THUNK_LFENCE    ? "LFENCE, " :
+           thunk == THUNK_JMP       ? "JMP, " : "?, ",
            (!boot_cpu_has(X86_FEATURE_IBRSB) &&
             !boot_cpu_has(X86_FEATURE_IBRS))         ? "No" :
            (default_xen_spec_ctrl & SPEC_CTRL_IBRS)  ? "IBRS+" :  "IBRS-",
