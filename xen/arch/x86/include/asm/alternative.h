@@ -167,9 +167,34 @@ extern void alternative_branches(void);
 #define ALT_CALL_arg5 "r8"
 #define ALT_CALL_arg6 "r9"
 
+#ifdef CONFIG_CC_IS_CLANG
+/*
+ * Use a union with an unsigned long in order to prevent clang from
+ * skipping a possible truncation of the value.  By using the union any
+ * truncation is carried before the call instruction, in turn covering
+ * for ABI-non-compliance in that the necessary clipping / extension of
+ * the value is supposed to be carried out in the callee.
+ *
+ * Note this behavior is not mandated by the standard, and hence could
+ * stop being a viable workaround, or worse, could cause a different set
+ * of code-generation issues in future clang versions.
+ *
+ * This has been reported upstream:
+ * https://github.com/llvm/llvm-project/issues/12579
+ * https://github.com/llvm/llvm-project/issues/82598
+ */
+#define ALT_CALL_ARG(arg, n)                                            \
+    register union {                                                    \
+        typeof(arg) e;                                                  \
+        unsigned long r;                                                \
+    } a ## n ## _ asm ( ALT_CALL_arg ## n ) = {                         \
+        .e = ({ BUILD_BUG_ON(sizeof(arg) > sizeof(void *)); (arg); })   \
+    }
+#else
 #define ALT_CALL_ARG(arg, n) \
     register typeof(arg) a ## n ## _ asm ( ALT_CALL_arg ## n ) = \
         ({ BUILD_BUG_ON(sizeof(arg) > sizeof(void *)); (arg); })
+#endif
 #define ALT_CALL_NO_ARG(n) \
     register unsigned long a ## n ## _ asm ( ALT_CALL_arg ## n )
 
