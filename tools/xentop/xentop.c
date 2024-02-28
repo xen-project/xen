@@ -1124,6 +1124,7 @@ void do_vbd(xenstat_domain *domain)
 		"Unidentified",           /* number 0 */
 		"BlkBack",           /* number 1 */
 		"BlkTap",            /* number 2 */
+		"Tapdisk3"           /* number 3 */
 	};
 
 	num_vbds = xenstat_domain_num_vbds(domain);

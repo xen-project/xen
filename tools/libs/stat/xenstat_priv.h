@@ -98,6 +98,23 @@ struct xenstat_vbd {
 	unsigned long long wr_sects;
 };
 
+/* Interface provided by https://github.com/xapi-project/blktap */
+struct vbd3_stats {
+	uint32_t version;
+	uint32_t __pad;
+	uint64_t oo_reqs;
+	uint64_t read_reqs_submitted;
+	uint64_t read_reqs_completed;
+	uint64_t read_sectors;
+	uint64_t read_total_ticks;
+	uint64_t write_reqs_submitted;
+	uint64_t write_reqs_completed;
+	uint64_t write_sectors;
+	uint64_t write_total_ticks;
+	uint64_t io_errors;
+	uint64_t flags;
+};
+
 extern int xenstat_collect_networks(xenstat_node * node);
 extern void xenstat_uninit_networks(xenstat_handle * handle);
 extern int xenstat_collect_vbds(xenstat_node * node);

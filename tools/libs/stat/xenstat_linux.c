@@ -35,6 +35,7 @@
 #include "xenstat_priv.h"
 
 #define SYSFS_VBD_PATH "/sys/bus/xen-backend/devices"
+#define XENSTAT_VBD_TYPE_VBD3 3
 
 struct priv_data {
 	FILE *procnetdev;
@@ -390,6 +391,38 @@ void xenstat_uninit_networks(xenstat_handle * handle)
 		fclose(priv->procnetdev);
 }
 
+static int read_attributes_vbd3(const char *vbd3_path, xenstat_vbd *vbd)
+{
+	FILE *fp;
+	struct vbd3_stats vbd3_stats;
+
+	fp = fopen(vbd3_path, "rb");
+
+	if (fp == NULL) {
+		return -1;
+	}
+
+	if (fread(&vbd3_stats, sizeof(struct vbd3_stats), 1, fp) != 1) {
+		fclose(fp);
+		return -1;
+	}
+
+	if (vbd3_stats.version != 1) {
+		fclose(fp);
+		return -1;
+	}
+
+	vbd->oo_reqs = vbd3_stats.oo_reqs;
+	vbd->rd_reqs = vbd3_stats.read_reqs_submitted;
+	vbd->rd_sects = vbd3_stats.read_sectors;
+	vbd->wr_reqs = vbd3_stats.write_reqs_submitted;
+	vbd->wr_sects = vbd3_stats.write_sectors;
+
+	fclose(fp);
+
+	return 0;
+}
+
 static int read_attributes_vbd(const char *vbd_directory, const char *what, char *ret, int cap)
 {
 	static char file_name[80];
@@ -438,7 +471,7 @@ int xenstat_collect_vbds(xenstat_node * node)
 		int ret;
 		char buf[256];
 
-		ret = sscanf(dp->d_name, "%3s-%u-%u", buf, &domid, &vbd.dev);
+		ret = sscanf(dp->d_name, "%255[^-]-%u-%u", buf, &domid, &vbd.dev);
 		if (ret != 3)
 			continue;
 		if (!(strstr(buf, "vbd")) && !(strstr(buf, "tap")))
@@ -448,6 +481,8 @@ int xenstat_collect_vbds(xenstat_node * node)
 			vbd.back_type = 1;
 		else if (strcmp(buf,"tap") == 0)
 			vbd.back_type = 2;
+		else if (strcmp(buf,"vbd3") == 0)
+			vbd.back_type = XENSTAT_VBD_TYPE_VBD3;
 		else
 			vbd.back_type = 0;
 
@@ -478,6 +513,34 @@ int xenstat_collect_vbds(xenstat_node * node)
 			{
 				vbd.error = 1;
 			}
+		}
+		else if (vbd.back_type == XENSTAT_VBD_TYPE_VBD3)
+		{
+			char *td3_pid;
+			char *path;
+
+			vbd.error = 0;
+
+			if (asprintf(&path, "/local/domain/0/backend/vbd3/%u/%u/kthread-pid", domid, vbd.dev) < 0)
+				continue;
+
+			td3_pid = xs_read(node->handle->xshandle, XBT_NULL, path, NULL);
+
+			free(path);
+
+			if (td3_pid == NULL)
+				continue;
+
+			if (asprintf(&path, "/dev/shm/td3-%s/vbd-%u-%u", td3_pid, domid, vbd.dev) < 0) {
+				free(td3_pid);
+				continue;
+			}
+
+			if (read_attributes_vbd3(path, &vbd) < 0)
+				vbd.error = 1;
+
+			free(td3_pid);
+			free(path);
 		}
 		else
 		{
