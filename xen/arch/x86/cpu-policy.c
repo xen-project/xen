@@ -454,6 +454,16 @@ static void __init guest_common_max_feature_adjustments(uint32_t *fs)
              raw_cpu_policy.feat.clwb )
             __set_bit(X86_FEATURE_CLWB, fs);
     }
+
+    /*
+     * Topology information inside the guest is entirely at the toolstack's
+     * discretion, and bears no relationship to the host we're running on.
+     *
+     * HTT identifies p->basic.lppp as valid
+     * CMP_LEGACY identifies p->extd.nc as valid
+     */
+    __set_bit(X86_FEATURE_HTT, fs);
+    __set_bit(X86_FEATURE_CMP_LEGACY, fs);
 }
 
 static void __init guest_common_default_feature_adjustments(uint32_t *fs)
@@ -489,6 +499,18 @@ static void __init guest_common_default_feature_adjustments(uint32_t *fs)
              raw_cpu_policy.feat.clwb )
             __clear_bit(X86_FEATURE_CLWB, fs);
     }
+
+    /*
+     * Topology information is at the toolstack's discretion so these are
+     * unconditionally set in max, but pick a default which matches the host.
+     */
+    __clear_bit(X86_FEATURE_HTT, fs);
+    if ( cpu_has_htt )
+        __set_bit(X86_FEATURE_HTT, fs);
+
+    __clear_bit(X86_FEATURE_CMP_LEGACY, fs);
+    if ( cpu_has_cmp_legacy )
+        __set_bit(X86_FEATURE_CMP_LEGACY, fs);
 
     /*
      * On certain hardware, speculative or errata workarounds can result in
@@ -836,13 +858,6 @@ void recalculate_cpuid_policy(struct domain *d)
             __clear_bit(X86_FEATURE_SVM, max_fs);
         }
     }
-
-    /*
-     * Allow the toolstack to set HTT and CMP_LEGACY.  These bits
-     * affect how to interpret topology information in other cpuid leaves.
-     */
-    __set_bit(X86_FEATURE_HTT, max_fs);
-    __set_bit(X86_FEATURE_CMP_LEGACY, max_fs);
 
     /*
      * 32bit PV domains can't use any Long Mode features, and cannot use
