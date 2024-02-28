@@ -538,6 +538,14 @@ static void __init calculate_pv_max_policy(void)
         fs[i] &= pv_max_featuremask[i];
 
     /*
+     * Xen at the time of writing (Feb 2024, 4.19 dev cycle) used to leak the
+     * host x2APIC capability into PV guests, but never supported the guest
+     * trying to turn x2APIC mode on.  Tolerate an incoming VM which saw the
+     * x2APIC CPUID bit and is alive enough to migrate.
+     */
+    __set_bit(X86_FEATURE_X2APIC, fs);
+
+    /*
      * If Xen isn't virtualising MSR_SPEC_CTRL for PV guests (functional
      * availability, or admin choice), hide the feature.
      */
@@ -830,11 +838,10 @@ void recalculate_cpuid_policy(struct domain *d)
     }
 
     /*
-     * Allow the toolstack to set HTT, X2APIC and CMP_LEGACY.  These bits
+     * Allow the toolstack to set HTT and CMP_LEGACY.  These bits
      * affect how to interpret topology information in other cpuid leaves.
      */
     __set_bit(X86_FEATURE_HTT, max_fs);
-    __set_bit(X86_FEATURE_X2APIC, max_fs);
     __set_bit(X86_FEATURE_CMP_LEGACY, max_fs);
 
     /*
