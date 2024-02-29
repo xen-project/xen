@@ -179,13 +179,7 @@ static void mem_sharing_page_unlock(struct page_info *pg)
 
 static shr_handle_t get_next_handle(void)
 {
-    /* Get the next handle get_page style */
-    uint64_t x, y = next_handle;
-    do {
-        x = y;
-    }
-    while ( (y = cmpxchg(&next_handle, x, x + 1)) != x );
-    return x + 1;
+    return arch_fetch_and_add(&next_handle, 1) + 1;
 }
 
 static atomic_t nr_saved_mfns   = ATOMIC_INIT(0);
