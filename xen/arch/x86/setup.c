@@ -810,7 +810,7 @@ static void __init noreturn reinit_bsp_stack(void)
     if ( rc )
         panic("Error %d setting up PV root page table\n", rc);
 
-    if ( IS_ENABLED(CONFIG_XEN_SHSTK) && cpu_has_xen_shstk )
+    if ( cpu_has_xen_shstk )
     {
         wrmsrl(MSR_PL0_SSP,
                (unsigned long)stack + (PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8);
