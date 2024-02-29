@@ -817,15 +817,15 @@ int pci_remove_device(u16 seg, u8 bus, u8 devfn)
     list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
         if ( pdev->bus == bus && pdev->devfn == devfn )
         {
-            vpci_deassign_device(pdev);
-            pci_cleanup_msi(pdev);
-            ret = iommu_remove_device(pdev);
             if ( pdev->domain )
             {
                 write_lock(&pdev->domain->pci_lock);
+                vpci_deassign_device(pdev);
                 list_del(&pdev->domain_list);
                 write_unlock(&pdev->domain->pci_lock);
             }
+            pci_cleanup_msi(pdev);
+            ret = iommu_remove_device(pdev);
             printk(XENLOG_DEBUG "PCI remove device %pp\n", &pdev->sbdf);
             free_pdev(pseg, pdev);
             break;
