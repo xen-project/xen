@@ -435,6 +435,16 @@ static void __init guest_common_max_feature_adjustments(uint32_t *fs)
         __set_bit(X86_FEATURE_RRSBA, fs);
 
         /*
+         * These bits indicate that the VERW instruction may have gained
+         * scrubbing side effects.  With pooling, they mean "you might migrate
+         * somewhere where scrubbing is necessary", and may need exposing on
+         * unaffected hardware.  This is fine, because the VERW instruction
+         * has been around since the 286.
+         */
+        __set_bit(X86_FEATURE_MD_CLEAR, fs);
+        __set_bit(X86_FEATURE_FB_CLEAR, fs);
+
+        /*
          * The Gather Data Sampling microcode mitigation (August 2023) has an
          * adverse performance impact on the CLWB instruction on SKX/CLX/CPX.
          *
@@ -467,6 +477,20 @@ static void __init guest_common_default_feature_adjustments(uint32_t *fs)
              boot_cpu_data.x86_model == 0x3a /* INTEL_FAM6_IVYBRIDGE */ &&
              cpu_has_rdrand && !is_forced_cpu_cap(X86_FEATURE_RDRAND) )
             __clear_bit(X86_FEATURE_RDRAND, fs);
+
+        /*
+         * These bits indicate that the VERW instruction may have gained
+         * scrubbing side effects.  The max policy has them set for migration
+         * reasons, so reset the default policy back to the host values in
+         * case we're unaffected.
+         */
+        __clear_bit(X86_FEATURE_MD_CLEAR, fs);
+        if ( cpu_has_md_clear )
+            __set_bit(X86_FEATURE_MD_CLEAR, fs);
+
+        __clear_bit(X86_FEATURE_FB_CLEAR, fs);
+        if ( cpu_has_fb_clear )
+            __set_bit(X86_FEATURE_FB_CLEAR, fs);
 
         /*
          * The Gather Data Sampling microcode mitigation (August 2023) has an
