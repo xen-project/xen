@@ -341,7 +341,7 @@ void close_log(void);
 extern int orig_argc;
 extern char **orig_argv;
 
-extern char *tracefile;
+extern const char *tracefile;
 extern int tracefd;
 
 /* Trace flag values must be kept in sync with trace_switches[] contents. */
@@ -404,6 +404,9 @@ void set_socket_fd(int fd);
 #ifdef __MINIOS__
 void mount_9pfs(void);
 #endif
+
+const char *xenstore_rundir(void);
+const char *absolute_filename(const void *ctx, const char *filename);
 
 /* Close stdin/stdout/stderr to complete daemonize */
 void finish_daemonize(void);
