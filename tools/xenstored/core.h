@@ -36,6 +36,8 @@
 #include "list.h"
 #include "hashtable.h"
 
+#define XENSTORE_LIB_DIR	XEN_LIB_DIR "/xenstore"
+
 #ifndef O_CLOEXEC
 #define O_CLOEXEC 0
 /* O_CLOEXEC support is needed for Live Update in the daemon case. */
@@ -398,6 +400,10 @@ void handle_special_fds(void);
 
 int get_socket_fd(void);
 void set_socket_fd(int fd);
+
+#ifdef __MINIOS__
+void mount_9pfs(void);
+#endif
 
 /* Close stdin/stdout/stderr to complete daemonize */
 void finish_daemonize(void);
