@@ -201,6 +201,21 @@ static int do_control_quota_s(const void *ctx, struct connection *conn,
 	return EINVAL;
 }
 
+static int do_control_logfile(const void *ctx, struct connection *conn,
+			      const char **vec, int num)
+{
+	if (num != 1)
+		return EINVAL;
+
+	close_log();
+	talloc_free(tracefile);
+	tracefile = absolute_filename(NULL, vec[0]);
+	reopen_log();
+
+	send_ack(conn, XS_CONTROL);
+	return 0;
+}
+
 #ifdef __MINIOS__
 static int do_control_memreport(const void *ctx, struct connection *conn,
 				const char **vec, int num)
@@ -214,21 +229,6 @@ static int do_control_memreport(const void *ctx, struct connection *conn,
 	return 0;
 }
 #else
-static int do_control_logfile(const void *ctx, struct connection *conn,
-			      const char **vec, int num)
-{
-	if (num != 1)
-		return EINVAL;
-
-	close_log();
-	talloc_free(tracefile);
-	tracefile = talloc_strdup(NULL, vec[0]);
-	reopen_log();
-
-	send_ack(conn, XS_CONTROL);
-	return 0;
-}
-
 static int do_control_memreport(const void *ctx, struct connection *conn,
 				const char **vec, int num)
 {
@@ -309,10 +309,10 @@ static struct cmd_s cmds[] = {
 		"[-c <cmdline>] [-F] [-t <timeout>] <file>\n"
 		"    Default timeout is 60 seconds.", 5 },
 #endif
+	{ "logfile", do_control_logfile, "<file>" },
 #ifdef __MINIOS__
 	{ "memreport", do_control_memreport, "" },
 #else
-	{ "logfile", do_control_logfile, "<file>" },
 	{ "memreport", do_control_memreport, "[<file>]" },
 #endif
 	{ "print", do_control_print, "<string>" },
