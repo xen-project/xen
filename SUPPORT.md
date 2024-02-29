@@ -37,7 +37,8 @@ supported in this document.
 
 ### ARM v8
 
-    Status: Supported
+    Status, Xen in AArch64 mode: Supported
+    Status, Xen in AArch32 mode: Tech Preview
     Status, Cortex A57 r0p0-r1p1: Supported, not security supported
     Status, Cortex A77 r0p0-r1p0: Supported, not security supported
 
