@@ -561,10 +561,10 @@ maintainers if you want to suggest a change.
      -
 
    * - `Rule 20.12 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_20_12.c>`_
+     - Required
      - A macro parameter used as an operand to the # or ## operators,
        which is itself subject to further macro replacement, shall only
        be used as an operand to these operators
-     - Required
      - Variadic macros are allowed to violate the rule.
 
    * - `Rule 20.13 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_20_13.c>`_
