@@ -3,7 +3,7 @@
 
 #ifndef __ASSEMBLY__
 
-#define XEN_ERRNO(name, value) name = value,
+#define XEN_ERRNO(name, value) name = (value),
 enum {
 #include <public/errno.h>
 };
