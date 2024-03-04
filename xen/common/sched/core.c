@@ -348,23 +348,28 @@ uint64_t get_cpu_idle_time(unsigned int cpu)
  * This avoids dead- or live-locks when this code is running on both
  * cpus at the same time.
  */
-static void sched_spin_lock_double(spinlock_t *lock1, spinlock_t *lock2,
-                                   unsigned long *flags)
+static always_inline void sched_spin_lock_double(
+    spinlock_t *lock1, spinlock_t *lock2, unsigned long *flags)
 {
+    /*
+     * In order to avoid extra overhead, use the locking primitives without the
+     * speculation barrier, and introduce a single barrier here.
+     */
     if ( lock1 == lock2 )
     {
-        spin_lock_irqsave(lock1, *flags);
+        *flags = _spin_lock_irqsave(lock1);
     }
     else if ( lock1 < lock2 )
     {
-        spin_lock_irqsave(lock1, *flags);
-        spin_lock(lock2);
+        *flags = _spin_lock_irqsave(lock1);
+        _spin_lock(lock2);
     }
     else
     {
-        spin_lock_irqsave(lock2, *flags);
-        spin_lock(lock1);
+        *flags = _spin_lock_irqsave(lock2);
+        _spin_lock(lock1);
     }
+    block_lock_speculation();
 }
 
 static void sched_spin_unlock_double(spinlock_t *lock1, spinlock_t *lock2,

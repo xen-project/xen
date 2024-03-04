@@ -177,6 +177,7 @@ extern void irq_complete_move(struct irq_desc *);
 
 extern struct irq_desc *irq_desc;
 
+/* Not speculation safe, only used for AP bringup. */
 void lock_vector_lock(void);
 void unlock_vector_lock(void);
 
