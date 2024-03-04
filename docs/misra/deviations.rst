@@ -322,6 +322,12 @@ Deviations related to MISRA C:2012 Rules:
          - /\* Fallthrough \*/
          - /\* Fallthrough. \*/
 
+   * - R16.6
+     - A switch statement with a single switch clause and no default label may
+       be used in place of an equivalent if statement if it is considered to
+       improve readability.
+     - Tagged as `deliberate` for ECLAIR.
+
    * - R20.7
      - Code violating Rule 20.7 is safe when macro parameters are used:
        (1) as function arguments;

@@ -378,6 +378,10 @@ explicit comment indicating the fallthrough intention is present."
 -config=MC3R1.R16.3,reports+={safe, "any_area(end_loc(any_exp(text(^(?s).*/\\* [fF]all ?through.? \\*/.*$,0..1))))"}
 -doc_end
 
+-doc_begin="A switch statement with a single switch clause and no default label may be used in place of an equivalent if statement if it is considered to improve readability."
+-config=MC3R1.R16.6,switch_clauses+={deliberate, "default(0)"}
+-doc_end
+
 #
 # Series 18.
 #
