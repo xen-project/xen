@@ -27,7 +27,7 @@ struct tasklet
 
 #define _DECLARE_TASKLET(name, func, data, softirq)                     \
     struct tasklet name = {                                             \
-        LIST_HEAD_INIT(name.list), -1, softirq, 0, 0, func, data }
+        LIST_HEAD_INIT((name).list), -1, softirq, 0, 0, func, data }
 #define DECLARE_TASKLET(name, func, data)               \
     _DECLARE_TASKLET(name, func, data, 0)
 #define DECLARE_SOFTIRQ_TASKLET(name, func, data)       \
