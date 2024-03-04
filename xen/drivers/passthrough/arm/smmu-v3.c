@@ -111,7 +111,7 @@
 #define GFP_KERNEL		0
 
 /* Device logger functions */
-#define dev_name(dev)	dt_node_full_name(dev->of_node)
+#define dev_name(dev)	dt_node_full_name((dev)->of_node)
 #define dev_dbg(dev, fmt, ...)			\
 	printk(XENLOG_DEBUG "SMMUv3: %s: " fmt, dev_name(dev), ## __VA_ARGS__)
 #define dev_notice(dev, fmt, ...)		\
