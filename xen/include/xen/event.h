@@ -114,12 +114,12 @@ void notify_via_xen_event_channel(struct domain *ld, int lport);
 #define bucket_from_port(d, p) \
     ((group_from_port(d, p))[((p) % EVTCHNS_PER_GROUP) / EVTCHNS_PER_BUCKET])
 
-static inline void evtchn_read_lock(struct evtchn *evtchn)
+static always_inline void evtchn_read_lock(struct evtchn *evtchn)
 {
     read_lock(&evtchn->lock);
 }
 
-static inline bool evtchn_read_trylock(struct evtchn *evtchn)
+static always_inline bool evtchn_read_trylock(struct evtchn *evtchn)
 {
     return read_trylock(&evtchn->lock);
 }

@@ -150,7 +150,7 @@ static int pt_irq_masked(struct periodic_time *pt)
  * pt->vcpu field, because another thread holding the pt_migrate lock
  * may already be spinning waiting for your vcpu lock.
  */
-static void pt_vcpu_lock(struct vcpu *v)
+static always_inline void pt_vcpu_lock(struct vcpu *v)
 {
     spin_lock(&v->arch.hvm.tm_lock);
 }
@@ -169,9 +169,13 @@ static void pt_vcpu_unlock(struct vcpu *v)
  * need to take an additional lock that protects against pt->vcpu
  * changing.
  */
-static void pt_lock(struct periodic_time *pt)
+static always_inline void pt_lock(struct periodic_time *pt)
 {
-    read_lock(&pt->vcpu->domain->arch.hvm.pl_time->pt_migrate);
+    /*
+     * Use the speculation unsafe variant for the first lock, as the following
+     * lock taking helper already includes a speculation barrier.
+     */
+    _read_lock(&pt->vcpu->domain->arch.hvm.pl_time->pt_migrate);
     spin_lock(&pt->vcpu->arch.hvm.tm_lock);
 }
 

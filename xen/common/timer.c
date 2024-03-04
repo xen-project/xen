@@ -239,7 +239,7 @@ static inline void deactivate_timer(struct timer *timer)
     list_add(&timer->inactive, &per_cpu(timers, timer->cpu).inactive);
 }
 
-static inline bool_t timer_lock(struct timer *timer)
+static inline bool_t timer_lock_unsafe(struct timer *timer)
 {
     unsigned int cpu;
 
@@ -253,7 +253,8 @@ static inline bool_t timer_lock(struct timer *timer)
             rcu_read_unlock(&timer_cpu_read_lock);
             return 0;
         }
-        spin_lock(&per_cpu(timers, cpu).lock);
+        /* Use the speculation unsafe variant, the wrapper has the barrier. */
+        _spin_lock(&per_cpu(timers, cpu).lock);
         if ( likely(timer->cpu == cpu) )
             break;
         spin_unlock(&per_cpu(timers, cpu).lock);
@@ -266,8 +267,9 @@ static inline bool_t timer_lock(struct timer *timer)
 #define timer_lock_irqsave(t, flags) ({         \
     bool_t __x;                                 \
     local_irq_save(flags);                      \
-    if ( !(__x = timer_lock(t)) )               \
+    if ( !(__x = timer_lock_unsafe(t)) )        \
         local_irq_restore(flags);               \
+    block_lock_speculation();                   \
     __x;                                        \
 })
 

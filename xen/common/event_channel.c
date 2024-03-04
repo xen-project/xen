@@ -45,7 +45,7 @@
  * just assume the event channel is free or unbound at the moment when the
  * evtchn_read_trylock() returns false.
  */
-static inline void evtchn_write_lock(struct evtchn *evtchn)
+static always_inline void evtchn_write_lock(struct evtchn *evtchn)
 {
     write_lock(&evtchn->lock);
 
@@ -351,7 +351,8 @@ int evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc, evtchn_port_t port)
     return rc;
 }
 
-static void double_evtchn_lock(struct evtchn *lchn, struct evtchn *rchn)
+static always_inline void double_evtchn_lock(struct evtchn *lchn,
+                                             struct evtchn *rchn)
 {
     ASSERT(lchn != rchn);
 
