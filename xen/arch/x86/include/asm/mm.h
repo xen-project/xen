@@ -399,7 +399,9 @@ const struct platform_bad_page *get_platform_badpages(unsigned int *array_size);
  * The use of PGT_locked in mem_sharing does not collide, since mem_sharing is
  * only supported for hvm guests, which do not have PV PTEs updated.
  */
-int page_lock(struct page_info *page);
+int page_lock_unsafe(struct page_info *page);
+#define page_lock(pg)   lock_evaluate_nospec(page_lock_unsafe(pg))
+
 void page_unlock(struct page_info *page);
 
 void put_page_type(struct page_info *page);
