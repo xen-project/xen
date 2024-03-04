@@ -224,30 +224,6 @@ static always_inline unsigned long __xadd(
 #define smp_mb__before_atomic()    do { } while (0)
 #define smp_mb__after_atomic()     do { } while (0)
 
-/**
- * array_index_mask_nospec() - generate a mask that is ~0UL when the
- *      bounds check succeeds and 0 otherwise
- * @index: array element index
- * @size: number of elements in array
- *
- * Returns:
- *     0 - (index < size)
- */
-static inline unsigned long array_index_mask_nospec(unsigned long index,
-                                                    unsigned long size)
-{
-    unsigned long mask;
-
-    asm volatile ( "cmp %[size], %[index]; sbb %[mask], %[mask];"
-                   : [mask] "=r" (mask)
-                   : [size] "g" (size), [index] "r" (index) );
-
-    return mask;
-}
-
-/* Override default implementation in nospec.h. */
-#define array_index_mask_nospec array_index_mask_nospec
-
 #define local_irq_disable()     asm volatile ( "cli" : : : "memory" )
 #define local_irq_enable()      asm volatile ( "sti" : : : "memory" )
 

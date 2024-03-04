@@ -15,6 +15,7 @@
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <asm/regs.h>
+#include <asm/x86-defns.h>
 
 #include "../../x86_emulate/x86_emulate.h"
 
