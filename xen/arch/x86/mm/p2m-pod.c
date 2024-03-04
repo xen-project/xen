@@ -35,7 +35,7 @@
 #define superpage_aligned(_x)  (((_x)&(SUPERPAGE_PAGES-1))==0)
 
 /* Enforce lock ordering when grabbing the "external" page_alloc lock */
-static inline void lock_page_alloc(struct p2m_domain *p2m)
+static always_inline void lock_page_alloc(struct p2m_domain *p2m)
 {
     page_alloc_mm_pre_lock(p2m->domain);
     spin_lock(&(p2m->domain->page_alloc_lock));
