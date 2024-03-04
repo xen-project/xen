@@ -229,6 +229,14 @@ static always_inline void spin_lock_irq(spinlock_t *l)
         block_lock_speculation();                               \
     })
 
+/* Conditionally take a spinlock in a speculation safe way. */
+static always_inline void spin_lock_if(bool condition, spinlock_t *l)
+{
+    if ( condition )
+        _spin_lock(l);
+    block_lock_speculation();
+}
+
 #define spin_unlock(l)                _spin_unlock(l)
 #define spin_unlock_irq(l)            _spin_unlock_irq(l)
 #define spin_unlock_irqrestore(l, f)  _spin_unlock_irqrestore(l, f)

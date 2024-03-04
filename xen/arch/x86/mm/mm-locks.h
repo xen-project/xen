@@ -335,6 +335,15 @@ static inline void p2m_unlock(struct p2m_domain *p)
 #define p2m_locked_by_me(p)   mm_write_locked_by_me(&(p)->lock)
 #define gfn_locked_by_me(p,g) p2m_locked_by_me(p)
 
+static always_inline void gfn_lock_if(bool condition, struct p2m_domain *p2m,
+                                      gfn_t gfn, unsigned int order)
+{
+    if ( condition )
+        gfn_lock(p2m, gfn, order);
+    else
+        block_lock_speculation();
+}
+
 /* PoD lock (per-p2m-table)
  *
  * Protects private PoD data structs: entry and cache
