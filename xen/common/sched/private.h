@@ -208,8 +208,24 @@ DECLARE_PER_CPU(cpumask_t, cpumask_scratch);
 #define cpumask_scratch        (&this_cpu(cpumask_scratch))
 #define cpumask_scratch_cpu(c) (&per_cpu(cpumask_scratch, c))
 
+/*
+ * Deal with _spin_lock_irqsave() returning the flags value instead of storing
+ * it in a passed parameter.
+ */
+#define _sched_spinlock0(lock, irq) _spin_lock##irq(lock)
+#define _sched_spinlock1(lock, irq, arg) ({ \
+    BUILD_BUG_ON(sizeof(arg) != sizeof(unsigned long)); \
+    (arg) = _spin_lock##irq(lock); \
+})
+
+#define _sched_spinlock__(nr) _sched_spinlock ## nr
+#define _sched_spinlock_(nr)  _sched_spinlock__(nr)
+#define _sched_spinlock(lock, irq, args...) \
+    _sched_spinlock_(count_args(args))(lock, irq, ## args)
+
 #define sched_lock(kind, param, cpu, irq, arg...) \
-static inline spinlock_t *kind##_schedule_lock##irq(param EXTRA_TYPE(arg)) \
+static always_inline spinlock_t \
+*kind##_schedule_lock##irq(param EXTRA_TYPE(arg)) \
 { \
     for ( ; ; ) \
     { \
@@ -221,10 +237,16 @@ static inline spinlock_t *kind##_schedule_lock##irq(param EXTRA_TYPE(arg)) \
          * \
          * It may also be the case that v->processor may change but the \
          * lock may be the same; this will succeed in that case. \
+         * \
+         * Use the speculation unsafe locking helper, there's a speculation \
+         * barrier before returning to the caller. \
          */ \
-        spin_lock##irq(lock, ## arg); \
+        _sched_spinlock(lock, irq, ## arg); \
         if ( likely(lock == get_sched_res(cpu)->schedule_lock) ) \
+        { \
+            block_lock_speculation(); \
             return lock; \
+        } \
         spin_unlock##irq(lock, ## arg); \
     } \
 }

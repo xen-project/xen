@@ -403,7 +403,7 @@ static inline void act_set_gfn(struct active_grant_entry *act, gfn_t gfn)
 
 static DEFINE_PERCPU_RWLOCK_GLOBAL(grant_rwlock);
 
-static inline void grant_read_lock(struct grant_table *gt)
+static always_inline void grant_read_lock(struct grant_table *gt)
 {
     percpu_read_lock(grant_rwlock, &gt->lock);
 }
@@ -413,7 +413,7 @@ static inline void grant_read_unlock(struct grant_table *gt)
     percpu_read_unlock(grant_rwlock, &gt->lock);
 }
 
-static inline void grant_write_lock(struct grant_table *gt)
+static always_inline void grant_write_lock(struct grant_table *gt)
 {
     percpu_write_lock(grant_rwlock, &gt->lock);
 }
@@ -450,7 +450,7 @@ nr_active_grant_frames(struct grant_table *gt)
     return num_act_frames_from_sha_frames(nr_grant_frames(gt));
 }
 
-static inline struct active_grant_entry *
+static always_inline struct active_grant_entry *
 active_entry_acquire(struct grant_table *t, grant_ref_t e)
 {
     struct active_grant_entry *act;
