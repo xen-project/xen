@@ -2005,7 +2005,7 @@ static inline bool current_locked_page_ne_check(struct page_info *page) {
 #define current_locked_page_ne_check(x) true
 #endif
 
-int page_lock(struct page_info *page)
+int page_lock_unsafe(struct page_info *page)
 {
     unsigned long x, nx;
 
@@ -2066,7 +2066,7 @@ void page_unlock(struct page_info *page)
  * l3t_lock(), so to avoid deadlock we must avoid grabbing them in
  * reverse order.
  */
-static void l3t_lock(struct page_info *page)
+static always_inline void l3t_lock(struct page_info *page)
 {
     unsigned long x, nx;
 
@@ -2075,6 +2075,8 @@ static void l3t_lock(struct page_info *page)
             cpu_relax();
         nx = x | PGT_locked;
     } while ( cmpxchg(&page->u.inuse.type_info, x, nx) != x );
+
+    block_lock_speculation();
 }
 
 static void l3t_unlock(struct page_info *page)
