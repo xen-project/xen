@@ -253,7 +253,12 @@ static int __init cf_check parse_spec_ctrl(const char *s)
         {
             s += 10;
 
-            if ( !cmdline_strcmp(s, "retpoline") )
+            if ( !IS_ENABLED(CONFIG_INDIRECT_THUNK) )
+            {
+                no_config_param("INDIRECT_THUNK", "spec-ctrl", s - 10, ss);
+                rc = -EINVAL;
+            }
+            else if ( !cmdline_strcmp(s, "retpoline") )
                 opt_thunk = THUNK_RETPOLINE;
             else if ( !cmdline_strcmp(s, "lfence") )
                 opt_thunk = THUNK_LFENCE;
