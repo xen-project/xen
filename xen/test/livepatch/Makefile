@@ -118,12 +118,12 @@ xen_action_hooks_marker-objs := xen_action_hooks_marker.o xen_hello_world_func.o
 $(obj)/xen_action_hooks_noapply.o: $(obj)/config.h
 
 extra-y += xen_action_hooks_noapply.livepatch
-xen_action_hooks_noapply-objs := xen_action_hooks_marker.o xen_hello_world_func.o note.o xen_note.o
+xen_action_hooks_noapply-objs := xen_action_hooks_noapply.o xen_hello_world_func.o note.o xen_note.o
 
 $(obj)/xen_action_hooks_norevert.o: $(obj)/config.h
 
 extra-y += xen_action_hooks_norevert.livepatch
-xen_action_hooks_norevert-objs := xen_action_hooks_marker.o xen_hello_world_func.o note.o xen_note.o
+xen_action_hooks_norevert-objs := xen_action_hooks_norevert.o xen_hello_world_func.o note.o xen_note.o
 
 EXPECT_BYTES_COUNT := 8
 CODE_GET_EXPECT=$(shell $(OBJDUMP) -d --insn-width=1 $(1) | sed -n -e '/<'$(2)'>:$$/,/^$$/ p' | tail -n +2 | head -n $(EXPECT_BYTES_COUNT) | awk '{$$0=$$2; printf "%s", substr($$0,length-1)}' | sed 's/.\{2\}/0x&,/g' | sed 's/^/{/;s/,$$/}/g')
