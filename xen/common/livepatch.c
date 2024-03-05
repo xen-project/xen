@@ -1015,6 +1015,7 @@ static int build_symbol_table(struct payload *payload,
 static void free_payload(struct payload *data)
 {
     ASSERT(spin_is_locked(&payload_lock));
+    unregister_virtual_region(&data->region);
     list_del(&data->list);
     payload_cnt--;
     payload_version++;
@@ -1114,6 +1115,7 @@ static int livepatch_upload(struct xen_sysctl_livepatch_upload *upload)
         INIT_LIST_HEAD(&data->list);
         INIT_LIST_HEAD(&data->applied_list);
 
+        register_virtual_region(&data->region);
         list_add_tail(&data->list, &payload_list);
         payload_cnt++;
         payload_version++;
@@ -1330,7 +1332,6 @@ static inline void apply_payload_tail(struct payload *data)
      * The applied_list is iterated by the trap code.
      */
     list_add_tail_rcu(&data->applied_list, &applied_list);
-    register_virtual_region(&data->region);
 
     data->state = LIVEPATCH_STATE_APPLIED;
 }
@@ -1376,7 +1377,6 @@ static inline void revert_payload_tail(struct payload *data)
      * The applied_list is iterated by the trap code.
      */
     list_del_rcu(&data->applied_list);
-    unregister_virtual_region(&data->region);
 
     data->reverted = true;
     data->state = LIVEPATCH_STATE_CHECKED;
