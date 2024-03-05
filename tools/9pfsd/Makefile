@@ -5,7 +5,7 @@
 XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS += $(PTHREAD_CFLAGS)
+CFLAGS += $(PTHREAD_CFLAGS) -D_GNU_SOURCE
 LDFLAGS += $(PTHREAD_LDFLAGS)
 
 TARGETS := xen-9pfsd
