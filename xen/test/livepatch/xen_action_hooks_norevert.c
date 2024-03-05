@@ -96,26 +96,14 @@ static int revert_hook(livepatch_payload_t *payload)
 
 static void post_revert_hook(livepatch_payload_t *payload)
 {
-    int i;
+    unsigned long flags;
 
     printk(KERN_DEBUG "%s: Hook starting.\n", __func__);
 
-    for (i = 0; i < payload->nfuncs; i++)
-    {
-        const struct livepatch_func *func = &payload->funcs[i];
-        struct livepatch_fstate *fstate = &payload->fstate[i];
-
-        BUG_ON(revert_cnt != 1);
-        BUG_ON(fstate->applied != LIVEPATCH_FUNC_APPLIED);
-
-        /* Outside of quiesce zone: MAY TRIGGER HOST CRASH/UNDEFINED BEHAVIOR */
-        arch_livepatch_quiesce();
-        common_livepatch_revert(payload);
-        arch_livepatch_revive();
-        BUG_ON(fstate->applied == LIVEPATCH_FUNC_APPLIED);
-
-        printk(KERN_DEBUG "%s: post reverted: %s\n", __func__, func->name);
-    }
+    local_irq_save(flags);
+    BUG_ON(revert_payload(payload));
+    revert_payload_tail(payload);
+    local_irq_restore(flags);
 
     printk(KERN_DEBUG "%s: Hook done.\n", __func__);
 }
