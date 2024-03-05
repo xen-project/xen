@@ -134,7 +134,7 @@ xenoprof_op(int op, void *arg)
 
 #ifdef CONFIG_COMPAT
 prefix: compat
-set_timer_op(uint32_t lo, int32_t hi)
+set_timer_op(uint32_t lo, uint32_t hi)
 multicall(multicall_entry_compat_t *call_list, uint32_t nr_calls)
 memory_op(unsigned int cmd, void *arg)
 #ifdef CONFIG_IOREQ_SERVER
