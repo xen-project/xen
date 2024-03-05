@@ -3172,8 +3172,8 @@ static void device_model_spawn_outcome(libxl__egc *egc,
 
     /* Check if spawn failed */
     if (rc) goto out;
-
-    if (d_config->b_info.device_model_version
+    /* d_config is NULL for xl devd/libxl__spawn_qemu_xenpv_backend(). */
+    if (d_config && d_config->b_info.device_model_version
             == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
         rc = libxl__ev_time_register_rel(ao, &dmss->timeout,
                                          devise_model_postconfig_timeout,
