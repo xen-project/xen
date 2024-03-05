@@ -60,7 +60,6 @@ SECTIONS
         VPCI_ARRAY
 
         . = ALIGN(POINTER_ALIGN);
-        _erodata = .;        /* End of read-only data */
     } :text
 
     #if defined(BUILD_ID)
