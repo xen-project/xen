@@ -1531,7 +1531,7 @@ void __init init_speculation_mitigations(void)
 {
     enum ind_thunk thunk = THUNK_DEFAULT;
     bool has_spec_ctrl, ibrs = false, hw_smt_enabled;
-    bool cpu_has_bug_taa, retpoline_safe;
+    bool cpu_has_bug_taa, cpu_has_useful_md_clear, retpoline_safe;
 
     hw_smt_enabled = check_smt_enabled();
 
@@ -1867,50 +1867,97 @@ void __init init_speculation_mitigations(void)
             "enabled.  Please assess your configuration and choose an\n"
             "explicit 'smt=<bool>' setting.  See XSA-273.\n");
 
+    /*
+     * A brief summary of VERW-related changes.
+     *
+     * https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/technical-documentation/intel-analysis-microarchitectural-data-sampling.html
+     * https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/technical-documentation/processor-mmio-stale-data-vulnerabilities.html
+     *
+     * Relevant ucodes:
+     *
+     * - May 2019, for MDS.  Introduces the MD_CLEAR CPUID bit and VERW side
+     *   effects to scrub Store/Load/Fill buffers as applicable.  MD_CLEAR
+     *   exists architecturally, even when the side effects have been removed.
+     *
+     *   Use VERW to scrub on return-to-guest.  Parts with L1D_FLUSH to
+     *   mitigate L1TF have the same side effect, so no need to do both.
+     *
+     *   Various Atoms suffer from Store-buffer sampling only.  Store buffers
+     *   are statically partitioned between non-idle threads, so scrubbing is
+     *   wanted when going idle too.
+     *
+     *   Load ports and Fill buffers are competitively shared between threads.
+     *   SMT must be disabled for VERW scrubbing to be fully effective.
+     *
+     * - November 2019, for TAA.  Extended VERW side effects to TSX-enabled
+     *   MDS_NO parts.
+     *
+     * - February 2022, for Client TSX de-feature.  Removed VERW side effects
+     *   from Client CPUs only.
+     *
+     * - May 2022, for MMIO Stale Data.  (Re)introduced Fill Buffer scrubbing
+     *   on all MMIO-affected parts which didn't already have it for MDS
+     *   reasons, enumerating FB_CLEAR on those parts only.
+     *
+     *   If FB_CLEAR is enumerated, L1D_FLUSH does not have the same scrubbing
+     *   side effects as VERW and cannot be used in its place.
+     */
     mds_calculations();
 
     /*
-     * Parts which enumerate FB_CLEAR are those which are post-MDS_NO and have
-     * reintroduced the VERW fill buffer flushing side effect because of a
-     * susceptibility to FBSDP.
+     * Parts which enumerate FB_CLEAR are those with now-updated microcode
+     * which weren't susceptible to the original MFBDS (and therefore didn't
+     * have Fill Buffer scrubbing side effects to begin with, or were Client
+     * MDS_NO non-TAA_NO parts where the scrubbing was removed), but have had
+     * the scrubbing reintroduced because of a susceptibility to FBSDP.
      *
      * If unprivileged guests have (or will have) MMIO mappings, we can
      * mitigate cross-domain leakage of fill buffer data by issuing VERW on
-     * the return-to-guest path.
+     * the return-to-guest path.  This is only a token effort if SMT is
+     * active.
      */
     if ( opt_unpriv_mmio )
         opt_verw_mmio = cpu_has_fb_clear;
 
     /*
-     * By default, enable PV and HVM mitigations on MDS-vulnerable hardware.
-     * This will only be a token effort for MLPDS/MFBDS when HT is enabled,
-     * but it is somewhat better than nothing.
+     * MD_CLEAR is enumerated architecturally forevermore, even after the
+     * scrubbing side effects have been removed.  Create ourselves an version
+     * which expressed whether we think MD_CLEAR is having any useful side
+     * effect.
      */
-    if ( opt_verw_pv == -1 )
-        opt_verw_pv = ((cpu_has_bug_mds || cpu_has_bug_msbds_only) &&
-                       cpu_has_md_clear);
-
-    if ( opt_verw_hvm == -1 )
-        opt_verw_hvm = ((cpu_has_bug_mds || cpu_has_bug_msbds_only) &&
-                        cpu_has_md_clear);
+    cpu_has_useful_md_clear = (cpu_has_md_clear &&
+                               (cpu_has_bug_mds || cpu_has_bug_msbds_only));
 
     /*
-     * Enable MDS/MMIO defences as applicable.  The Idle blocks need using if
-     * either the PV or HVM MDS defences are used, or if we may give MMIO
-     * access to untrusted guests.
-     *
-     * HVM is more complicated.  The MD_CLEAR microcode extends L1D_FLUSH with
-     * equivalent semantics to avoid needing to perform both flushes on the
-     * HVM path.  Therefore, we don't need VERW in addition to L1D_FLUSH (for
-     * MDS mitigations.  L1D_FLUSH is not safe for MMIO mitigations.)
-     *
-     * After calculating the appropriate idle setting, simplify
-     * opt_verw_hvm to mean just "should we VERW on the way into HVM
-     * guests", so spec_ctrl_init_domain() can calculate suitable settings.
+     * By default, use VERW scrubbing on applicable hardware, if we think it's
+     * going to have an effect.  This will only be a token effort for
+     * MLPDS/MFBDS when SMT is enabled.
      */
-    if ( opt_verw_pv || opt_verw_hvm || opt_verw_mmio )
+    if ( opt_verw_pv == -1 )
+        opt_verw_pv = cpu_has_useful_md_clear;
+
+    if ( opt_verw_hvm == -1 )
+        opt_verw_hvm = cpu_has_useful_md_clear;
+
+    /*
+     * If SMT is active, and we're protecting against MDS or MMIO stale data,
+     * we need to scrub before going idle as well as on return to guest.
+     * Various pipeline resources are repartitioned amongst non-idle threads.
+     */
+    if ( ((cpu_has_useful_md_clear && (opt_verw_pv || opt_verw_hvm)) ||
+          opt_verw_mmio) && hw_smt_enabled )
         setup_force_cpu_cap(X86_FEATURE_SC_VERW_IDLE);
-    opt_verw_hvm &= !cpu_has_skip_l1dfl && !opt_l1d_flush;
+
+    /*
+     * After calculating the appropriate idle setting, simplify opt_verw_hvm
+     * to mean just "should we VERW on the way into HVM guests", so
+     * spec_ctrl_init_domain() can calculate suitable settings.
+     *
+     * It is only safe to use L1D_FLUSH in place of VERW when MD_CLEAR is the
+     * only *_CLEAR we can see.
+     */
+    if ( opt_l1d_flush && cpu_has_md_clear && !cpu_has_fb_clear )
+        opt_verw_hvm = false;
 
     /*
      * Warn the user if they are on MLPDS/MFBDS-vulnerable hardware with HT
