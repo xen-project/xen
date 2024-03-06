@@ -206,6 +206,12 @@ Maintainers List (try to look for most precise areas first)
 
 		-----------------------------------
 
+9PFSD
+M:	Juergen Gross <jgross@suse.com>
+M:	Anthony PERARD <anthony.perard@citrix.com>
+S:	Supported
+F:	tools/9pfsd/
+
 ACPI
 M:	Jan Beulich <jbeulich@suse.com>
 S:	Supported
