@@ -26,7 +26,7 @@ static inline void fpu_xrstor(struct vcpu *v, uint64_t mask)
 
     ASSERT(v->arch.xsave_area);
     /*
-     * XCR0 normally represents what guest OS set. In case of Xen itself, 
+     * XCR0 normally represents what guest OS set. In case of Xen itself,
      * we set the accumulated feature mask before doing save/restore.
      */
     ok = set_xcr0(v->arch.xcr0_accum | XSTATE_FP_SSE);
@@ -36,7 +36,7 @@ static inline void fpu_xrstor(struct vcpu *v, uint64_t mask)
     ASSERT(ok);
 }
 
-/* Restor x87 FPU, MMX, SSE and SSE2 state */
+/* Restore x87 FPU, MMX, SSE and SSE2 state */
 static inline void fpu_fxrstor(struct vcpu *v)
 {
     const typeof(v->arch.xsave_area->fpu_sse) *fpu_ctxt = v->arch.fpu_ctxt;
@@ -307,7 +307,7 @@ void save_fpu_enable(void)
 int vcpu_init_fpu(struct vcpu *v)
 {
     int rc;
-    
+
     v->arch.fully_eager_fpu = opt_eager_fpu;
 
     if ( (rc = xstate_alloc_save_area(v)) != 0 )
