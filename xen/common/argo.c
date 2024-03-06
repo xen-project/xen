@@ -1425,7 +1425,7 @@ find_ring_mfn(struct domain *d, gfn_t gfn, mfn_t *mfn)
     switch ( p2mt )
     {
     case p2m_ram_rw:
-        if ( !get_page_and_type(page, d, PGT_writable_page) )
+        if ( !get_page_type(page, PGT_writable_page) )
             ret = -EINVAL;
         break;
 
@@ -1440,7 +1440,8 @@ find_ring_mfn(struct domain *d, gfn_t gfn, mfn_t *mfn)
         break;
     }
 
-    put_page(page);
+    if ( unlikely(ret) )
+        put_page(page);
 
     return ret;
 }
