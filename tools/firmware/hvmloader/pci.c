@@ -33,6 +33,13 @@ uint32_t pci_mem_start = HVM_BELOW_4G_MMIO_START;
 const uint32_t pci_mem_end = RESERVED_MEMBASE;
 uint64_t pci_hi_mem_start = 0, pci_hi_mem_end = 0;
 
+/*
+ * BARs larger than this value are put in 64-bit space unconditionally.  That
+ * is, such BARs also don't play into the determination of how big the lowmem
+ * MMIO hole needs to be.
+ */
+#define BAR_RELOC_THRESH GB(1)
+
 enum virtual_vga virtual_vga = VGA_none;
 unsigned long igd_opregion_pgbase = 0;
 
@@ -286,9 +293,11 @@ void pci_setup(void)
             bars[i].bar_reg = bar_reg;
             bars[i].bar_sz  = bar_sz;
 
-            if ( ((bar_data & PCI_BASE_ADDRESS_SPACE) ==
-                  PCI_BASE_ADDRESS_SPACE_MEMORY) ||
-                 (bar_reg == PCI_ROM_ADDRESS) )
+            if ( is_64bar && bar_sz > BAR_RELOC_THRESH )
+                bar64_relocate = 1;
+            else if ( ((bar_data & PCI_BASE_ADDRESS_SPACE) ==
+                       PCI_BASE_ADDRESS_SPACE_MEMORY) ||
+                      (bar_reg == PCI_ROM_ADDRESS) )
                 mmio_total += bar_sz;
 
             nr_bars++;
@@ -367,7 +376,7 @@ void pci_setup(void)
             pci_mem_start = hvm_info->low_mem_pgend << PAGE_SHIFT;
     }
 
-    if ( mmio_total > (pci_mem_end - pci_mem_start) )
+    if ( mmio_total > (pci_mem_end - pci_mem_start) || bar64_relocate )
     {
         printf("Low MMIO hole not large enough for all devices,"
                " relocating some BARs to 64-bit\n");
@@ -430,7 +439,8 @@ void pci_setup(void)
 
         /*
          * Relocate to high memory if the total amount of MMIO needed
-         * is more than the low MMIO available.  Because devices are
+         * is more than the low MMIO available or BARs bigger than
+         * BAR_RELOC_THRESH are present.  Because devices are
          * processed in order of bar_sz, this will preferentially
          * relocate larger devices to high memory first.
          *
@@ -446,8 +456,9 @@ void pci_setup(void)
          *   the code here assumes it to be.)
          * Should either of those two conditions change, this code will break.
          */
-        using_64bar = bars[i].is_64bar && bar64_relocate
-            && (mmio_total > (mem_resource.max - mem_resource.base));
+        using_64bar = bars[i].is_64bar && bar64_relocate &&
+            (mmio_total > (mem_resource.max - mem_resource.base) ||
+             bar_sz > BAR_RELOC_THRESH);
         bar_data = pci_readl(devfn, bar_reg);
 
         if ( (bar_data & PCI_BASE_ADDRESS_SPACE) ==
@@ -467,7 +478,8 @@ void pci_setup(void)
                 resource = &mem_resource;
                 bar_data &= ~PCI_BASE_ADDRESS_MEM_MASK;
             }
-            mmio_total -= bar_sz;
+            if ( bar_sz <= BAR_RELOC_THRESH )
+                mmio_total -= bar_sz;
         }
         else
         {
