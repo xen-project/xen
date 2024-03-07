@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - On x86:
    - Introduce a new x2APIC driver that uses Cluster Logical addressing mode
      for IPIs and Physical addressing mode for external interrupts.
+ - Add a new 9pfs backend running as a daemon in dom0. First user is
+   Xenstore-stubdom now being able to support full Xenstore trace capability.
 
 ### Removed
 - caml-stubdom.  It hasn't built since 2014, was pinned to Ocaml 4.02, and has
