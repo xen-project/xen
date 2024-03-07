@@ -104,7 +104,7 @@
 .L\@_done:
 .endm
 
-.macro DO_OVERWRITE_RSB tmp=rax xu
+.macro DO_OVERWRITE_RSB tmp=rax, xu
 /*
  * Requires nothing
  * Clobbers \tmp (%rax by default), %rcx

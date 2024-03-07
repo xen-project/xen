@@ -281,7 +281,7 @@ static always_inline void stac(void)
  * @compat: R8-R15 don't need reloading, but they are clobbered for added
  *          safety against information leaks.
  */
-.macro RESTORE_ALL adj=0 compat=0
+.macro RESTORE_ALL adj=0, compat=0
 .if !\compat
         movq  UREGS_r15(%rsp), %r15
         movq  UREGS_r14(%rsp), %r14

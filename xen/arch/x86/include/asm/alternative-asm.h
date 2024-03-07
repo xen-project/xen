@@ -11,7 +11,7 @@
  * enough information for the alternatives patching code to patch an
  * instruction. See apply_alternatives().
  */
-.macro altinstruction_entry orig repl feature orig_len repl_len pad_len
+.macro altinstruction_entry orig, repl, feature, orig_len, repl_len, pad_len
     .long \orig - .
     .long \repl - .
     .word \feature

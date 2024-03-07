@@ -29,7 +29,7 @@
     BUG   /* Shouldn't return */
 .endm
 
-.macro INDIRECT_BRANCH insn:req arg:req
+.macro INDIRECT_BRANCH insn:req, arg:req
 /*
  * Create an indirect branch.  insn is one of call/jmp, arg is a single
  * register.
@@ -59,11 +59,11 @@
 
 /* Convenience wrappers. */
 .macro INDIRECT_CALL arg:req
-    INDIRECT_BRANCH call \arg
+    INDIRECT_BRANCH call, \arg
 .endm
 
 .macro INDIRECT_JMP arg:req
-    INDIRECT_BRANCH jmp \arg
+    INDIRECT_BRANCH jmp, \arg
 .endm
 
 #ifdef CONFIG_XEN_IBT
