@@ -59,7 +59,7 @@ endef
 # as-insn: Check whether assembler supports an instruction.
 # Usage: cflags-y += $(call as-insn,CC FLAGS,"insn",option-yes,option-no)
 as-insn = $(if $(shell echo 'void _(void) { asm volatile ( $(2) ); }' \
-                       | $(filter-out -M% %.d -include %/include/xen/config.h,$(1)) \
+                       | $(filter-out -include %/include/xen/config.h,$(1)) \
                               -c -x c -o /dev/null - 2>&1),$(4),$(3))
 
 # as-option-add: Conditionally add options to flags
