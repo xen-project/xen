@@ -87,7 +87,8 @@ efi-check := arch/x86/efi/check
 $(shell mkdir -p $(dir $(efi-check)))
 
 # Check if the compiler supports the MS ABI.
-XEN_BUILD_EFI := $(call if-success,$(CC) $(CFLAGS) -c $(srctree)/$(efi-check).c -o $(efi-check).o,y)
+XEN_BUILD_EFI := $(call if-success,$(CC) $(filter-out -include %/include/xen/config.h,$(CFLAGS)) \
+                                         -c $(srctree)/$(efi-check).c -o $(efi-check).o,y)
 
 # Check if the linker supports PE.
 EFI_LDFLAGS := $(patsubst -m%,-mi386pep,$(LDFLAGS)) --subsystem=10
