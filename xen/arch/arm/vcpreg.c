@@ -494,11 +494,12 @@ void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
      * ARMv8 (DDI 0487A.d): D1-1509 Table D1-58
      *
      * Unhandled:
-     *    DBGOSLSR
      *    DBGPRCR
      */
     case HSR_CPREG32(DBGOSLAR):
         return handle_wo_wi(regs, regidx, cp32.read, hsr, 1);
+    case HSR_CPREG32(DBGOSLSR):
+        return handle_ro_read_val(regs, regidx, cp32.read, hsr, 1, 1U << 3);
     case HSR_CPREG32(DBGOSDLR):
         return handle_raz_wi(regs, regidx, cp32.read, hsr, 1);
 
@@ -510,8 +511,6 @@ void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
      *
      * Unhandled:
      *    DBGDCCINT
-     *    DBGDTRRXint
-     *    DBGDTRTXint
      *    DBGWFAR
      *    DBGDTRTXext
      *    DBGDTRRXext,
@@ -549,12 +548,27 @@ void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
         break;
     }
 
+    /*
+     * Xen doesn't expose a real (or emulated) Debug Communications Channel
+     * (DCC) to a domain. Yet the Arm ARM implies this is not an optional
+     * feature. So some domains may start to probe it. For instance, the
+     * HVC_DCC driver in Linux (since f377775dc083 and at least up to v6.7),
+     * will try to write some characters and check if the transmit buffer has
+     * emptied.
+     */
     case HSR_CPREG32(DBGDSCRINT):
         /*
-         * Read-only register. Accessible by EL0 if DBGDSCRext.UDCCdis
-         * is set to 0, which we emulated below.
+         * By setting TX status bit (only if partial emulation is enabled) to
+         * indicate the transmit buffer is full, we would hint the OS that the
+         * DCC is probably not working.
+         *
+         * Bit 29: TX full
+         *
+         * Accessible at EL0 only if DBGDSCRext.UDCCdis is set to 0. We emulate
+         * this as RAZ/WI in the next case. So RO at both EL0 and EL1.
          */
-        return handle_ro_raz(regs, regidx, cp32.read, hsr, 1);
+        return handle_ro_read_val(regs, regidx, cp32.read, hsr, 0,
+                                  partial_emulation ? (1U << 29) : 0);
 
     case HSR_CPREG32(DBGDSCREXT):
         /*
@@ -562,6 +576,18 @@ void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
          * The OS won't use Hardware debug if MDBGen not set.
          */
         return handle_raz_wi(regs, regidx, cp32.read, hsr, 1);
+
+    /* DBGDTR[TR]XINT share the same encoding */
+    case HSR_CPREG32(DBGDTRTXINT):
+        /*
+         * Emulate as RAZ/WI (only if partial emulation is enabled) to prevent
+         * injecting undefined exception.
+         * Accessible at EL0 only if DBGDSCREXT is set to 0. We emulate that
+         * register as RAZ/WI.
+         */
+        if ( !partial_emulation )
+            goto fail;
+        return handle_raz_wi(regs, regidx, cp32.read, hsr, 0);
 
     case HSR_CPREG32(DBGVCR):
     case HSR_CPREG32(DBGBVR0):
@@ -592,17 +618,20 @@ void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
      * And all other unknown registers.
      */
     default:
-        gdprintk(XENLOG_ERR,
-                 "%s p14, %d, r%d, cr%d, cr%d, %d @ 0x%"PRIregister"\n",
-                  cp32.read ? "mrc" : "mcr",
-                  cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
-        gdprintk(XENLOG_ERR, "unhandled 32-bit cp14 access %#"PRIregister"\n",
-                 hsr.bits & HSR_CP32_REGS_MASK);
-        inject_undef_exception(regs, hsr);
-        return;
+        goto fail;
     }
 
     advance_pc(regs, hsr);
+    return;
+
+ fail:
+    gdprintk(XENLOG_ERR,
+             "%s p14, %d, r%d, cr%d, cr%d, %d @ 0x%"PRIregister"\n",
+             cp32.read ? "mrc" : "mcr",
+             cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
+    gdprintk(XENLOG_ERR, "unhandled 32-bit cp14 access %#"PRIregister"\n",
+             hsr.bits & HSR_CP32_REGS_MASK);
+    inject_undef_exception(regs, hsr);
 }
 
 void do_cp14_64(struct cpu_user_regs *regs, const union hsr hsr)
@@ -660,10 +689,7 @@ void do_cp14_dbg(struct cpu_user_regs *regs, const union hsr hsr)
      * ARMv8 (DDI 0487A.d): D1-1509 Table D1-58
      *
      * Unhandled:
-     *    DBGDTRTXint
-     *    DBGDTRRXint
-     *
-     * And all other unknown registers.
+     * All unknown registers.
      */
     gdprintk(XENLOG_ERR,
              "%s p14, %d, r%d, r%d, cr%d @ 0x%"PRIregister"\n",

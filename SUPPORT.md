@@ -115,6 +115,9 @@ Only the following system registers are security supported:
     DBGDTR_EL0
     DBGDTRTX_EL0
     DBGDTRRX_EL0
+    DBGDSCRINT
+    DBGDTRTXINT
+    DBGDTRRXINT
 
 ### ARM Scalable Vector Extension (SVE/SVE2)
 
