@@ -677,11 +677,28 @@ static bool name_ok(const char *str)
     return true;
 }
 
+/* Including the '\0' */
+#define MAX_ERRSTR_LEN 80
 static void p9_error(struct ring *ring, uint16_t tag, uint32_t err)
 {
     unsigned int erroff;
+    static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+    char *str;
+    size_t len = 0;
 
-    strerror_r(err, ring->buffer, ring->ring_size);
+    /*
+     * While strerror_r() exists, it comes in a POSIX and a GNU flavor.
+     * Let's try to avoid trying to be clever with determining which
+     * one it is that the underlying C library offers, when really we
+     * don't expect this function to be called very often.
+     */
+    pthread_mutex_lock(&mutex);
+    str = strerror(err);
+    len = min(strlen(str), (size_t)(MAX_ERRSTR_LEN - 1));
+    memcpy(ring->buffer, str, len);
+    ((char *)ring->buffer)[len] = '\0';
+    pthread_mutex_unlock(&mutex);
+
     erroff = add_string(ring, ring->buffer, strlen(ring->buffer));
     fill_buffer(ring, P9_CMD_ERROR, tag, "SU",
                 erroff != ~0 ? ring->str + erroff : "cannot allocate memory",
