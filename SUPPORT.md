@@ -665,6 +665,7 @@ there is currently no xl support.
 ### PV 9pfs (backend)
 
     Status, QEMU: Tech Preview
+    Status, xen-9pfsd: Experimental
 
 ### PVCalls (backend)
 
