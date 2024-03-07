@@ -234,6 +234,15 @@ config STATIC_EVTCHN
 	  This option enables establishing static event channel communication
 	  between domains on a dom0less system (domU-domU as well as domU-dom0).
 
+config PARTIAL_EMULATION
+	bool "Enable partial emulation of system/coprocessor registers"
+	default y
+	help
+	  This option enables partial emulation of registers to prevent possible
+	  guests crashing when accessing registers which are not optional but have
+	  not been emulated to their complete functionality. Enabling this might
+	  result in unwanted/non-spec compliant behavior.
+
 endmenu
 
 menu "ARM errata workaround via the alternative framework"

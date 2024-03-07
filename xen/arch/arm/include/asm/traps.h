@@ -10,6 +10,12 @@
 # include <asm/arm64/traps.h>
 #endif
 
+#ifdef CONFIG_PARTIAL_EMULATION
+extern bool partial_emulation;
+#else
+#define partial_emulation false
+#endif
+
 /*
  * GUEST_BUG_ON is intended for checking that the guest state has not been
  * corrupted in hardware and/or that the hardware behaves as we

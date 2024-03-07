@@ -1942,6 +1942,17 @@ This option is ignored in **pv-shim** mode.
 
 > Default: `on`
 
+### partial-emulation (arm)
+> `= <boolean>`
+
+> Default: `false`
+
+Flag to enable or disable partial emulation of system/coprocessor registers.
+Only effective if CONFIG_PARTIAL_EMULATION is enabled.
+
+**WARNING: Enabling this option might result in unwanted/non-spec compliant
+behavior.**
+
 ### pci
     = List of [ serr=<bool>, perr=<bool> ]
 

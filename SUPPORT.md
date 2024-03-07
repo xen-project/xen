@@ -102,6 +102,15 @@ Extension to the GICv3 interrupt controller to support MSI.
 
     Status: Experimental
 
+### ARM/Partial Emulation
+
+Enable partial emulation of registers, otherwise considered unimplemented,
+that would normally trigger a fault injection.
+
+    Status: Supported, with caveats
+
+Only the following system registers are security supported:
+
 ### ARM Scalable Vector Extension (SVE/SVE2)
 
 Arm64 domains can use Scalable Vector Extension (SVE/SVE2).

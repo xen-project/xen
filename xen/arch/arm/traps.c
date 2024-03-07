@@ -43,6 +43,15 @@
 #include <asm/vgic.h>
 #include <asm/vtimer.h>
 
+/*
+ * partial_emulation: If true, partial emulation for system/coprocessor
+ * registers will be enabled.
+ */
+#ifdef CONFIG_PARTIAL_EMULATION
+bool __ro_after_init partial_emulation = false;
+boolean_param("partial-emulation", partial_emulation);
+#endif
+
 /* The base of the stack must always be double-word aligned, which means
  * that both the kernel half of struct cpu_user_regs (which is pushed in
  * entry.S) and struct cpu_info (which lives at the bottom of a Xen
