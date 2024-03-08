@@ -59,6 +59,14 @@
 #define BUILD_BUG_ON(cond) ((void)BUILD_BUG_ON_ZERO(cond))
 #endif
 
+/* Hide a value from the optimiser. */
+#define HIDE(x)                                 \
+    ({                                          \
+        typeof(x) _x = (x);                     \
+        asm volatile ( "" : "+r" (_x) );        \
+        _x;                                     \
+    })
+
 #define ABS(x) ({                              \
     typeof(x) x_ = (x);                        \
     (x_ < 0) ? -x_ : x_;                       \

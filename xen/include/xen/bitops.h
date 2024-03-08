@@ -1,5 +1,7 @@
-#ifndef _LINUX_BITOPS_H
-#define _LINUX_BITOPS_H
+#ifndef XEN_BITOPS_H
+#define XEN_BITOPS_H
+
+#include <xen/compiler.h>
 #include <xen/types.h>
 
 /*
@@ -103,7 +105,12 @@ static inline int generic_flsl(unsigned long x)
  * Include this here because some architectures need generic_ffs/fls in
  * scope
  */
+
+/* --------------------- Please tidy above here --------------------- */
+
 #include <asm/bitops.h>
+
+/* --------------------- Please tidy below here --------------------- */
 
 #ifndef find_next_bit
 /**
@@ -294,4 +301,4 @@ static inline __u32 ror32(__u32 word, unsigned int shift)
 
 #define BIT_WORD(nr) ((nr) / BITS_PER_LONG)
 
-#endif
+#endif /* XEN_BITOPS_H */
