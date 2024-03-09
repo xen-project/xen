@@ -26,6 +26,22 @@ static void __init test_ffs(void)
     CHECK(ffsl, 1UL << 32, 33);
     CHECK(ffsl, 1UL << 63, 64);
 #endif
+
+    /*
+     * unsigned int ffs64(uint64_t)
+     *
+     * 32-bit builds of Xen have to split this into two adjacent operations,
+     * so test all interesting bit positions across the divide.
+     */
+    CHECK(ffs64, 0, 0);
+    CHECK(ffs64, 1, 1);
+    CHECK(ffs64, 3, 1);
+    CHECK(ffs64, 7, 1);
+    CHECK(ffs64, 6, 2);
+
+    CHECK(ffs64, 0x8000000080000000ULL, 32);
+    CHECK(ffs64, 0x8000000100000000ULL, 33);
+    CHECK(ffs64, 0x8000000000000000ULL, 64);
 }
 
 static void __init test_fls(void)
@@ -50,6 +66,22 @@ static void __init test_fls(void)
     CHECK(flsl, 1 | (1UL << 32), 33);
     CHECK(flsl, 1 | (1UL << 63), 64);
 #endif
+
+    /*
+     * unsigned int fls64(uint64_t)
+     *
+     * 32-bit builds of Xen have to split this into two adjacent operations,
+     * so test all interesting bit positions across the divide.
+     */
+    CHECK(fls64, 0, 0);
+    CHECK(fls64, 1, 1);
+    CHECK(fls64, 3, 2);
+    CHECK(fls64, 7, 3);
+    CHECK(fls64, 6, 3);
+
+    CHECK(fls64, 0x0000000080000001ULL, 32);
+    CHECK(fls64, 0x0000000100000001ULL, 33);
+    CHECK(fls64, 0x8000000000000001ULL, 64);
 }
 
 static void __init __constructor test_bitops(void)

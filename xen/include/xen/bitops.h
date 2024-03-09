@@ -60,6 +60,14 @@ static always_inline __pure unsigned int ffsl(unsigned long x)
 #endif
 }
 
+static always_inline __pure unsigned int ffs64(uint64_t x)
+{
+    if ( BITS_PER_LONG == 64 )
+        return ffsl(x);
+    else
+        return !x || (uint32_t)x ? ffs(x) : ffs(x >> 32) + 32;
+}
+
 static always_inline __pure unsigned int fls(unsigned int x)
 {
     if ( __builtin_constant_p(x) )
@@ -82,6 +90,18 @@ static always_inline __pure unsigned int flsl(unsigned long x)
 #else
     return generic_flsl(x);
 #endif
+}
+
+static always_inline __pure unsigned int fls64(uint64_t x)
+{
+    if ( BITS_PER_LONG == 64 )
+        return flsl(x);
+    else
+    {
+        uint32_t h = x >> 32;
+
+        return h ? fls(h) + 32 : fls(x);
+    }
 }
 
 /* --------------------- Please tidy below here --------------------- */
@@ -132,28 +152,6 @@ extern unsigned long find_first_bit(const unsigned long *addr,
  */
 extern unsigned long find_first_zero_bit(const unsigned long *addr,
                                          unsigned long size);
-#endif
-
-#if BITS_PER_LONG == 64
-# define fls64 flsl
-# define ffs64 ffsl
-#else
-# ifndef ffs64
-static inline int generic_ffs64(__u64 x)
-{
-    return !x || (__u32)x ? ffs(x) : ffs(x >> 32) + 32;
-}
-#  define ffs64 generic_ffs64
-# endif
-# ifndef fls64
-static inline int generic_fls64(__u64 x)
-{
-    __u32 h = x >> 32;
-
-    return h ? fls(h) + 32 : fls(x);
-}
-#  define fls64 generic_fls64
-# endif
 #endif
 
 static inline int get_bitmask_order(unsigned int count)
