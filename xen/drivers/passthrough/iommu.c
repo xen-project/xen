@@ -305,7 +305,7 @@ static unsigned int mapping_order(const struct domain_iommu *hd,
 {
     unsigned long res = dfn_x(dfn) | mfn_x(mfn);
     unsigned long sizes = hd->platform_ops->page_sizes;
-    unsigned int bit = find_first_set_bit(sizes), order = 0;
+    unsigned int bit = ffsl(sizes) - 1, order = 0;
 
     ASSERT(bit == PAGE_SHIFT);
 
@@ -313,7 +313,7 @@ static unsigned int mapping_order(const struct domain_iommu *hd,
     {
         unsigned long mask;
 
-        bit = find_first_set_bit(sizes);
+        bit = ffsl(sizes) - 1;
         mask = (1UL << bit) - 1;
         if ( nr <= mask || (res & mask) )
             break;

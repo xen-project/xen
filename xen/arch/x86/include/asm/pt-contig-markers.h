@@ -60,7 +60,7 @@ static bool pt_update_contig_markers(uint64_t *pt, unsigned int idx,
     /* Step 1: Reduce markers in lower numbered entries. */
     while ( i )
     {
-        b = find_first_set_bit(i);
+        b = ffs(i) - 1;
         i &= ~(1U << b);
         if ( GET_MARKER(pt[i]) <= b )
             break;

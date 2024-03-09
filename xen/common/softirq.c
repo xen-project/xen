@@ -48,7 +48,7 @@ static void __do_softirq(unsigned long ignore_mask)
              || cpu_is_offline(cpu) )
             break;
 
-        i = find_first_set_bit(pending);
+        i = ffsl(pending) - 1;
         clear_bit(i, &softirq_pending(cpu));
         (*softirq_handlers[i])();
     }

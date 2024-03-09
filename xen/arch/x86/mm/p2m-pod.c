@@ -684,7 +684,7 @@ unsigned long
 p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
 {
     unsigned long left = 1UL << order, ret = 0;
-    unsigned int chunk_order = find_first_set_bit(gfn_x(gfn) | left);
+    unsigned int chunk_order = ffsl(gfn_x(gfn) | left) - 1;
 
     do {
         ret += decrease_reservation(d, gfn, chunk_order);
@@ -1393,7 +1393,7 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
                                       unsigned int order)
 {
     unsigned long left = 1UL << order;
-    unsigned int chunk_order = find_first_set_bit(gfn | left);
+    unsigned int chunk_order = ffsl(gfn | left) - 1;
     int rc;
 
     if ( !paging_mode_translate(d) )

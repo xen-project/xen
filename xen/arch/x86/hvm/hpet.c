@@ -335,7 +335,7 @@ static void timer_sanitize_int_route(HPETState *h, unsigned int tn)
      * enabled pick the first irq.
      */
     timer_config(h, tn) |=
-        MASK_INSR(find_first_set_bit(timer_int_route_cap(h, tn)),
+        MASK_INSR(ffs(timer_int_route_cap(h, tn)) - 1,
                   HPET_TN_ROUTE);
 }
 
@@ -409,7 +409,7 @@ static int cf_check hpet_write(
         {
             bool active;
 
-            i = find_first_set_bit(new_val);
+            i = ffsl(new_val) - 1;
             if ( i >= HPET_TIMER_NUM )
                 break;
             __clear_bit(i, &new_val);
@@ -535,14 +535,14 @@ static int cf_check hpet_write(
     /* stop/start timers whos state was changed by this write. */
     while (stop_timers)
     {
-        i = find_first_set_bit(stop_timers);
+        i = ffsl(stop_timers) - 1;
         __clear_bit(i, &stop_timers);
         hpet_stop_timer(h, i, guest_time);
     }
 
     while (start_timers)
     {
-        i = find_first_set_bit(start_timers);
+        i = ffsl(start_timers) - 1;
         __clear_bit(i, &start_timers);
         hpet_set_timer(h, i, guest_time);
     }

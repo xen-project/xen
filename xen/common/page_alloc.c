@@ -1819,7 +1819,7 @@ static void _init_heap_pages(const struct page_info *pg,
     if ( unlikely(!avail[nid]) )
     {
         bool use_tail = IS_ALIGNED(s, 1UL << MAX_ORDER) &&
-                        (find_first_set_bit(e) <= find_first_set_bit(s));
+                        (ffsl(e) <= ffsl(s));
         unsigned long n;
 
         n = init_node_heap(nid, s, nr_pages, &use_tail);

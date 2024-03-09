@@ -168,14 +168,14 @@ static void cf_check xen_evtchn_upcall(void)
 
     while ( pending )
     {
-        unsigned int l1 = find_first_set_bit(pending);
+        unsigned int l1 = ffsl(pending) - 1;
         unsigned long evtchn = xchg(&XEN_shared_info->evtchn_pending[l1], 0);
 
         __clear_bit(l1, &pending);
         evtchn &= ~XEN_shared_info->evtchn_mask[l1];
         while ( evtchn )
         {
-            unsigned int port = find_first_set_bit(evtchn);
+            unsigned int port = ffsl(evtchn) - 1;
 
             __clear_bit(port, &evtchn);
             port += l1 * BITS_PER_LONG;

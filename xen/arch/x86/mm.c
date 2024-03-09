@@ -3424,7 +3424,7 @@ static int vcpumask_to_pcpumask(
         {
             unsigned int cpu;
 
-            vcpu_id = find_first_set_bit(vmask);
+            vcpu_id = ffsl(vmask) - 1;
             vmask &= ~(1UL << vcpu_id);
             vcpu_id += vcpu_bias;
             if ( (vcpu_id >= d->max_vcpus) )

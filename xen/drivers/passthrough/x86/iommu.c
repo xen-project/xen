@@ -641,7 +641,7 @@ struct page_info *iommu_alloc_pgtable(struct domain_iommu *hd,
     if ( contig_mask )
     {
         /* See pt-contig-markers.h for a description of the marker scheme. */
-        unsigned int i, shift = find_first_set_bit(contig_mask);
+        unsigned int i, shift = ffsl(contig_mask) - 1;
 
         ASSERT((CONTIG_LEVEL_SHIFT & (contig_mask >> shift)) == CONTIG_LEVEL_SHIFT);
 
@@ -652,7 +652,7 @@ struct page_info *iommu_alloc_pgtable(struct domain_iommu *hd,
 
         for ( i = 4; i < PAGE_SIZE / sizeof(*p); i += 4 )
         {
-            p[i + 0] = (find_first_set_bit(i) + 0ULL) << shift;
+            p[i + 0] = (ffsl(i) - 1ULL) << shift;
             p[i + 1] = 0;
             p[i + 2] = 1ULL << shift;
             p[i + 3] = 0;

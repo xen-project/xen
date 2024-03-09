@@ -137,7 +137,7 @@ static void set_iommu_ptes_present(unsigned long pt_mfn,
         ASSERT(!pde->u);
 
         if ( pde > table )
-            ASSERT(pde->ign0 == find_first_set_bit(pde - table));
+            ASSERT(pde->ign0 == ffs(pde - table) - 1);
         else
             ASSERT(pde->ign0 == CONTIG_LEVEL_SHIFT);
 
