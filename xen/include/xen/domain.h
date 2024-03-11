@@ -41,6 +41,8 @@ void arch_get_domain_info(const struct domain *d,
 #ifdef CONFIG_ARM
 /* Should domain memory be directly mapped? */
 #define CDF_directmap            (1U << 1)
+#else
+#define CDF_directmap            0
 #endif
 /* Is domain memory on static allocation? */
 #ifdef CONFIG_STATIC_MEMORY
@@ -49,6 +51,7 @@ void arch_get_domain_info(const struct domain *d,
 #define CDF_staticmem            0
 #endif
 
+#define is_domain_direct_mapped(d) ((d)->cdf & CDF_directmap)
 #define is_domain_using_staticmem(d) ((d)->cdf & CDF_staticmem)
 
 /*

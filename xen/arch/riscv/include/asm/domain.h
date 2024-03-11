@@ -10,8 +10,6 @@ struct hvm_domain
     uint64_t              params[HVM_NR_PARAMS];
 };
 
-#define is_domain_direct_mapped(d) ((void)(d), 0)
-
 struct arch_vcpu_io {
 };
 
