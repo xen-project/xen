@@ -117,8 +117,8 @@
  * VCPUOP_register_runstate_phys_area
  * VCPUOP_register_vcpu_time_phys_area
  */
-#define XENFEAT_runstate_phys_area	  18
-#define XENFEAT_vcpu_time_phys_area	  19
+#define XENFEAT_runstate_phys_area        18
+#define XENFEAT_vcpu_time_phys_area       19
 
 #define XENFEAT_NR_SUBMAPS 1
 
