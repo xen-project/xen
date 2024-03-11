@@ -226,13 +226,6 @@ M:	Andrew Cooper <andrew.cooper3@citrix.com>
 S:	Maintained
 F:	xen/drivers/passthrough/amd/
 
-AMD SVM
-M:	Jan Beulich <jbeulich@suse.com>
-M:	Andrew Cooper <andrew.cooper3@citrix.com>
-S:	Supported
-F:	xen/arch/x86/hvm/svm/
-F:	xen/arch/x86/cpu/vpmu_amd.c
-
 ARGO
 M:	Christopher Clark <christopher.w.clark@gmail.com>
 S:	Maintained
@@ -362,15 +355,6 @@ INTEL(R) VT FOR DIRECTED I/O (VT-D)
 M:	Kevin Tian <kevin.tian@intel.com>
 S:	Supported
 F:	xen/drivers/passthrough/vtd/
-
-INTEL(R) VT FOR X86 (VT-X)
-M:	Jun Nakajima <jun.nakajima@intel.com>
-M:	Kevin Tian <kevin.tian@intel.com>
-S:	Supported
-F:	xen/arch/x86/cpu/vpmu_intel.c
-F:	xen/arch/x86/hvm/vmx/
-F:	xen/arch/x86/include/asm/hvm/vmx/
-F:	xen/arch/x86/mm/p2m-ept.c
 
 IOMMU VENDOR INDEPENDENT CODE
 M:	Jan Beulich <jbeulich@suse.com>
