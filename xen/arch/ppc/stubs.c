@@ -95,14 +95,6 @@ void arch_get_domain_info(const struct domain *d,
     BUG_ON("unimplemented");
 }
 
-/* monitor.c */
-
-int arch_monitor_domctl_event(struct domain *d,
-                              struct xen_domctl_monitor_op *mop)
-{
-    BUG_ON("unimplemented");
-}
-
 /* smp.c */
 
 void arch_flush_tlb_mask(const cpumask_t *mask)
