@@ -172,16 +172,16 @@ void cleanup_domain_irq_mapping(struct domain *d);
     void *__ret = radix_tree_lookup(&(d)->arch.irq_pirq, irq);  \
     __ret ? radix_tree_ptr_to_int(__ret) : 0;                   \
 })
-#define PIRQ_ALLOCATED -1
+#define PIRQ_ALLOCATED (-1)
 #define domain_pirq_to_emuirq(d, pirq) pirq_field(d, pirq,              \
     arch.hvm.emuirq, IRQ_UNBOUND)
 #define domain_emuirq_to_pirq(d, emuirq) ({                             \
     void *__ret = radix_tree_lookup(&(d)->arch.hvm.emuirq_pirq, emuirq);\
     __ret ? radix_tree_ptr_to_int(__ret) : IRQ_UNBOUND;                 \
 })
-#define IRQ_UNBOUND -1
-#define IRQ_PT -2
-#define IRQ_MSI_EMU -3
+#define IRQ_UNBOUND (-1)
+#define IRQ_PT      (-2)
+#define IRQ_MSI_EMU (-3)
 
 bool cpu_has_pending_apic_eoi(void);
 
