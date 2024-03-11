@@ -94,7 +94,7 @@ struct lock_profile_qhead {
     int32_t                   idx;     /* index for printout */
 };
 
-#define _LOCK_PROFILE(lockname) { .name = #lockname, .lock = &lockname, }
+#define _LOCK_PROFILE(lockname) { .name = #lockname, .lock = &(lockname), }
 #define _LOCK_PROFILE_PTR(name)                                               \
     static struct lock_profile * const __lock_profile_##name                  \
     __used_section(".lockprofile.data") =                                     \
