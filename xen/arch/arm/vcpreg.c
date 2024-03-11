@@ -39,7 +39,8 @@
  */
 
 #ifdef CONFIG_ARM_64
-#define WRITE_SYSREG_SZ(sz, val, sysreg) WRITE_SYSREG((uint##sz##_t)val, sysreg)
+#define WRITE_SYSREG_SZ(sz, val, sysreg) \
+    WRITE_SYSREG((uint##sz##_t)(val), sysreg)
 #else
 /*
  * WRITE_SYSREG{32/64} on arm32 is defined as variadic macro which imposes
@@ -64,7 +65,7 @@ static bool func(struct cpu_user_regs *regs, type##sz##_t *r, bool read)    \
     bool cache_enabled = vcpu_has_cache_enabled(v);                         \
                                                                             \
     GUEST_BUG_ON(read);                                                     \
-    WRITE_SYSREG_SZ(sz, *r, reg);                                           \
+    WRITE_SYSREG_SZ(sz, *(r), reg);                                         \
                                                                             \
     p2m_toggle_cache(v, cache_enabled);                                     \
                                                                             \

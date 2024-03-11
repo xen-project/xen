@@ -461,13 +461,13 @@ static bool has_ssbd_mitigation(const struct arm_cpu_capabilities *entry)
 
 #define MIDR_RANGE(model, min, max)     \
     .matches = is_affected_midr_range,  \
-    .midr_model = model,                \
-    .midr_range_min = min,              \
-    .midr_range_max = max
+    .midr_model = (model),              \
+    .midr_range_min = (min),            \
+    .midr_range_max = (max)
 
 #define MIDR_ALL_VERSIONS(model)        \
     .matches = is_affected_midr_range,  \
-    .midr_model = model,                \
+    .midr_model = (model),              \
     .midr_range_min = 0,                \
     .midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
 

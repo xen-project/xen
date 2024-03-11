@@ -6,11 +6,11 @@
  * a range of registers
  */
 
-#define VREG32(reg) reg ... reg + 3
-#define VREG64(reg) reg ... reg + 7
+#define VREG32(reg) (reg) ... ((reg) + 3)
+#define VREG64(reg) (reg) ... ((reg) + 7)
 
-#define VRANGE32(start, end) start ... end + 3
-#define VRANGE64(start, end) start ... end + 7
+#define VRANGE32(start, end) (start) ... ((end) + 3)
+#define VRANGE64(start, end) (start) ... ((end) + 7)
 
 /*
  * 64 bits registers can be accessible using 32-bit and 64-bit unless

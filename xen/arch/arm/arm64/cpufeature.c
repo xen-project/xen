@@ -78,13 +78,13 @@
 
 #define __ARM64_FTR_BITS(SIGNED, VISIBLE, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
 	{						\
-		.sign = SIGNED,				\
-		.visible = VISIBLE,			\
-		.strict = STRICT,			\
-		.type = TYPE,				\
-		.shift = SHIFT,				\
-		.width = WIDTH,				\
-		.safe_val = SAFE_VAL,			\
+		.sign = (SIGNED),				\
+		.visible = (VISIBLE),			\
+		.strict = (STRICT),			\
+		.type = (TYPE),				\
+		.shift = (SHIFT),				\
+		.width = (WIDTH),				\
+		.safe_val = (SAFE_VAL),			\
 	}
 
 /* Define a feature with unsigned values */
