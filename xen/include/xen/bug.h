@@ -80,7 +80,7 @@ struct bug_frame {
     [bf_type]    "i" (type),                                                 \
     [bf_ptr]     "i" (ptr),                                                  \
     [bf_msg]     "i" (msg),                                                  \
-    [bf_line_lo] "i" ((line & ((1 << BUG_LINE_LO_WIDTH) - 1))                \
+    [bf_line_lo] "i" (((line) & ((1 << BUG_LINE_LO_WIDTH) - 1))              \
                       << BUG_DISP_WIDTH),                                    \
     [bf_line_hi] "i" (((line) >> BUG_LINE_LO_WIDTH) << BUG_DISP_WIDTH)
 
