@@ -45,42 +45,42 @@ extern const struct kernel_param __setup_start[], __setup_end[];
 #define TEMP_NAME(base) _TEMP_NAME(base, __LINE__)
 
 #define custom_param(_name, _var) \
-    __setup_str __setup_str_##_var[] = _name; \
+    __setup_str __setup_str_##_var[] = (_name); \
     __kparam __setup_##_var = \
         { .name = __setup_str_##_var, \
           .type = OPT_CUSTOM, \
-          .par.func = _var }
+          .par.func = (_var) }
 #define boolean_param(_name, _var) \
-    __setup_str __setup_str_##_var[] = _name; \
+    __setup_str __setup_str_##_var[] = (_name); \
     __kparam __setup_##_var = \
         { .name = __setup_str_##_var, \
           .type = OPT_BOOL, \
           .len = sizeof(_var) + \
                  BUILD_BUG_ON_ZERO(sizeof(_var) != sizeof(bool)), \
-          .par.var = &_var }
+          .par.var = &(_var) }
 #define integer_param(_name, _var) \
-    __setup_str __setup_str_##_var[] = _name; \
+    __setup_str __setup_str_##_var[] = (_name); \
     __kparam __setup_##_var = \
         { .name = __setup_str_##_var, \
           .type = OPT_UINT, \
           .len = sizeof(_var), \
-          .par.var = &_var }
+          .par.var = &(_var) }
 #define size_param(_name, _var) \
-    __setup_str __setup_str_##_var[] = _name; \
+    __setup_str __setup_str_##_var[] = (_name); \
     __kparam __setup_##_var = \
         { .name = __setup_str_##_var, \
           .type = OPT_SIZE, \
           .len = sizeof(_var), \
-          .par.var = &_var }
+          .par.var = &(_var) }
 #define string_param(_name, _var) \
-    __setup_str __setup_str_##_var[] = _name; \
+    __setup_str __setup_str_##_var[] = (_name); \
     __kparam __setup_##_var = \
         { .name = __setup_str_##_var, \
           .type = OPT_STR, \
           .len = sizeof(_var), \
-          .par.var = &_var }
+          .par.var = &(_var) }
 #define ignore_param(_name)                 \
-    __setup_str TEMP_NAME(__setup_str_ign)[] = _name;    \
+    __setup_str TEMP_NAME(__setup_str_ign)[] = (_name);  \
     __kparam TEMP_NAME(__setup_ign) =                    \
         { .name = TEMP_NAME(__setup_str_ign),            \
           .type = OPT_IGNORE }
