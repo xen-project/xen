@@ -242,7 +242,7 @@ struct arm_smmu_xen_device {
 	struct iommu_group *group;
 };
 
-#define dev_archdata(dev) ((struct arm_smmu_xen_device *)dev->iommu)
+#define dev_archdata(dev) ((struct arm_smmu_xen_device *)(dev)->iommu)
 #define dev_iommu_domain(dev) (dev_archdata(dev)->domain)
 #define dev_iommu_group(dev) (dev_archdata(dev)->group)
 
@@ -627,7 +627,7 @@ struct arm_smmu_master_cfg {
 };
 #define INVALID_SMENDX			-1
 #define for_each_cfg_sme(cfg, i, idx, num) \
-	for (i = 0; idx = cfg->smendx[i], i < num; ++i)
+	for (i = 0; idx = (cfg)->smendx[i], (i) < (num); ++(i))
 
 struct arm_smmu_master {
 	struct device_node		*of_node;
