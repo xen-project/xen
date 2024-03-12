@@ -5947,7 +5947,7 @@ void init_or_livepatch modify_xen_mappings_lite(
 
                 v += 1UL << L1_PAGETABLE_SHIFT;
 
-                if ( l2_table_offset(v) == 0 )
+                if ( l1_table_offset(v) == 0 )
                     break;
             }
 
