@@ -1,6 +1,8 @@
 /*
  * local mtrr defines.
  */
+#ifndef X86_CPU_MTRR_MTRR_H
+#define X86_CPU_MTRR_MTRR_H
 
 #define MTRR_CHANGE_MASK_FIXED     0x01
 #define MTRR_CHANGE_MASK_VARIABLE  0x02
@@ -25,3 +27,5 @@ extern u64 size_or_mask, size_and_mask;
 extern unsigned int num_var_ranges;
 
 void mtrr_state_warn(void);
+
+#endif /* X86_CPU_MTRR_MTRR_H */
