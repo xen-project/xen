@@ -33,13 +33,10 @@ TYPE_SAFE(uint64_t, dfn);
 #define PRI_dfn     PRIx64
 #define INVALID_DFN _dfn(~0ULL)
 
-#ifndef dfn_t
+#if 0
 #define dfn_t /* Grep fodder: dfn_t, _dfn() and dfn_x() are defined above */
 #define _dfn
 #define dfn_x
-#undef dfn_t
-#undef _dfn
-#undef dfn_x
 #endif
 
 static inline dfn_t __must_check dfn_add(dfn_t dfn, unsigned long i)
