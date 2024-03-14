@@ -187,13 +187,4 @@ static inline int __test_and_clear_bit(int nr, volatile void *addr)
 #define hweight16(x) __builtin_popcount((uint16_t)(x))
 #define hweight8(x)  __builtin_popcount((uint8_t)(x))
 
-/**
- * find_first_set_bit - find the first set bit in @word
- * @word: the word to search
- *
- * Returns the bit-number of the first set bit (first bit being 0).
- * The input must *not* be zero.
- */
-#define find_first_set_bit(x) (ffsl(x) - 1)
-
 #endif /* _ASM_PPC_BITOPS_H */

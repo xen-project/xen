@@ -161,18 +161,6 @@ static inline int fls(unsigned int x)
 #define ffsl(x) ({ unsigned long __t = (x); flsl(ISOLATE_LSB(__t)); })
 
 /**
- * find_first_set_bit - find the first set bit in @word
- * @word: the word to search
- *
- * Returns the bit-number of the first set bit (first bit being 0).
- * The input must *not* be zero.
- */
-static inline unsigned int find_first_set_bit(unsigned long word)
-{
-        return ffsl(word) - 1;
-}
-
-/**
  * hweightN - returns the hamming weight of a N-bit word
  * @x: the word to weigh
  *

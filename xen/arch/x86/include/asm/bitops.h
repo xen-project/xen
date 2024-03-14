@@ -402,18 +402,6 @@ static always_inline unsigned int __scanbit(unsigned long val, unsigned int max)
 })
 
 /**
- * find_first_set_bit - find the first set bit in @word
- * @word: the word to search
- * 
- * Returns the bit-number of the first set bit. The input must *not* be zero.
- */
-static inline unsigned int find_first_set_bit(unsigned long word)
-{
-    asm ( "rep; bsf %1,%0" : "=r" (word) : "rm" (word) );
-    return (unsigned int)word;
-}
-
-/**
  * ffs - find first bit set
  * @x: the word to search
  *
