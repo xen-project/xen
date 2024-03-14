@@ -358,7 +358,6 @@ F:	xen/drivers/passthrough/vtd/
 
 IOMMU VENDOR INDEPENDENT CODE
 M:	Jan Beulich <jbeulich@suse.com>
-M:	Paul Durrant <paul@xen.org>
 R:	Roger Pau Monné <roger.pau@citrix.com>
 S:	Supported
 F:	xen/drivers/passthrough/
@@ -367,13 +366,6 @@ X:	xen/drivers/passthrough/arm/
 X:	xen/drivers/passthrough/vtd/
 X:	xen/drivers/passthrough/device_tree.c
 F:	xen/include/xen/iommu.h
-
-I/O EMULATION (IOREQ)
-M:	Paul Durrant <paul@xen.org>
-S:	Supported
-F:	xen/common/ioreq.c
-F:	xen/include/xen/ioreq.h
-F:	xen/include/public/hvm/ioreq.h
 
 KCONFIG
 M:	Doug Goldstein <cardoe@cardoe.com>
@@ -607,18 +599,6 @@ F:	tools/fuzz/x86_instruction_emulator/
 F:	tools/misc/xen-cpuid.c
 F:	tools/tests/cpu-policy/
 F:	tools/tests/x86_emulator/
-
-X86 I/O EMULATION
-M:	Paul Durrant <paul@xen.org>
-S:	Supported
-F:	xen/arch/x86/hvm/emulate.c
-F:	xen/arch/x86/hvm/intercept.c
-F:	xen/arch/x86/hvm/io.c
-F:	xen/arch/x86/hvm/ioreq.c
-F:	xen/arch/x86/include/asm/hvm/emulate.h
-F:	xen/arch/x86/include/asm/hvm/io.h
-F:	xen/arch/x86/include/asm/hvm/ioreq.h
-F:	xen/arch/x86/include/asm/ioreq.h
 
 X86 MEMORY MANAGEMENT
 M:	Jan Beulich <jbeulich@suse.com>
