@@ -494,6 +494,31 @@ maintainers if you want to suggest a change.
      - In addition to break, also other unconditional flow control statements
        such as continue, return, goto are allowed.
 
+   * - `Rule 16.4 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_16_04.c>`_
+     - Required
+     - Every switch statement shall have a default label
+     - Switch statements with enums as controlling expression don't need
+       a default label as gcc -Wall enables -Wswitch which warns (and
+       breaks the build as we use -Werror) if one of the enum labels is
+       missing from the switch.
+
+       Switch statements with integer types as controlling expression
+       should have a default label:
+
+       - if the switch is expected to handle all possible cases
+         explicitly, then a default label shall be added to handle
+         unexpected error conditions, using BUG(), ASSERT(), WARN(),
+         domain_crash(), or other appropriate methods;
+
+       - if the switch is expected to handle a subset of all possible
+         cases, then an empty default label shall be added with an
+         in-code comment on top of the default label with a reason and
+         when possible a more detailed explanation. Example::
+
+             default:
+                 /* Notifier pattern */
+                 break;
+
    * - `Rule 16.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_16_02.c>`_
      - Required
      - A switch label shall only be used when the most closely-enclosing
