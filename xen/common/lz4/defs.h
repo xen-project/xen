@@ -8,6 +8,9 @@
  * published by the Free Software Foundation.
  */
 
+#ifndef COMMON_LZ4_DEFS_H
+#define COMMON_LZ4_DEFS_H
+
 #ifdef __XEN__
 #include <asm/byteorder.h>
 #include <xen/unaligned.h>
@@ -166,3 +169,5 @@ typedef struct _U64_S { u64 v; } U64_S;
 		LZ4_WILDCOPY(s, d, e);	\
 		d = e;	\
 	} while (0)
+
+#endif /* COMMON_LZ4_DEFS_H */
