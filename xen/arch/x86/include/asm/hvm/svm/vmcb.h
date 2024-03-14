@@ -385,7 +385,7 @@ typedef union
         bool iopm:1;       /* 1:  iopm_base_pa, msrpm_base_pa */
         bool asid:1;       /* 2:  guest_asid */
         bool tpr:1;        /* 3:  vintr */
-        bool np:1;         /* 4:  np_enable, h_cr3, g_pat */
+        bool np:1;         /* 4:  np, h_cr3, g_pat */
         bool cr:1;         /* 5:  cr0, cr3, cr4, efer */
         bool dr:1;         /* 6:  dr6, dr7 */
         bool dt:1;         /* 7:  gdtr, idtr */
@@ -473,12 +473,12 @@ struct vmcb_struct {
     intinfo_t exit_int_info;    /* offset 0x88 */
     union {                     /* offset 0x90 - cleanbit 4 */
         struct {
-            bool _np_enable     :1;
-            bool _sev_enable    :1;
-            bool _sev_es_enable :1;
-            bool _gmet          :1;
-            bool _np_sss        :1;
-            bool _vte           :1;
+            bool _np        :1;
+            bool _sev       :1;
+            bool _sev_es    :1;
+            bool _gmet      :1;
+            bool _np_sss    :1;
+            bool _vte       :1;
         };
         uint64_t _np_ctrl;
     };
@@ -645,9 +645,9 @@ VMCB_ACCESSORS(msrpm_base_pa, iopm)
 VMCB_ACCESSORS(guest_asid, asid)
 VMCB_ACCESSORS(vintr, tpr)
 VMCB_ACCESSORS(np_ctrl, np)
-VMCB_ACCESSORS_(np_enable, bool, np)
-VMCB_ACCESSORS_(sev_enable, bool, np)
-VMCB_ACCESSORS_(sev_es_enable, bool, np)
+VMCB_ACCESSORS_(np, bool, np)
+VMCB_ACCESSORS_(sev, bool, np)
+VMCB_ACCESSORS_(sev_es, bool, np)
 VMCB_ACCESSORS_(gmet, bool, np)
 VMCB_ACCESSORS_(vte, bool, np)
 VMCB_ACCESSORS(h_cr3, np)

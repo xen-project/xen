@@ -571,7 +571,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     if ( nestedhvm_paging_mode_hap(v) )
     {
         /* host nested paging + guest nested paging. */
-        n2vmcb->_np_enable = 1;
+        vmcb_set_np(n2vmcb, true);
 
         nestedsvm_vmcb_set_nestedp2m(v, ns_vmcb, n2vmcb);
 
@@ -585,7 +585,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     else if ( paging_mode_hap(v->domain) )
     {
         /* host nested paging + guest shadow paging. */
-        n2vmcb->_np_enable = 1;
+        vmcb_set_np(n2vmcb, true);
         /* Keep h_cr3 as it is. */
         n2vmcb->_h_cr3 = n1vmcb->_h_cr3;
         /* When l1 guest does shadow paging
@@ -601,7 +601,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     else
     {
         /* host shadow paging + guest shadow paging. */
-        n2vmcb->_np_enable = 0;
+        vmcb_set_np(n2vmcb, false);
         n2vmcb->_h_cr3 = 0x0;
 
         /* TODO: Once shadow-shadow paging is in place come back to here
@@ -706,7 +706,7 @@ nsvm_vcpu_vmentry(struct vcpu *v, struct cpu_user_regs *regs,
     }
 
     /* nested paging for the guest */
-    svm->ns_hap_enabled = !!ns_vmcb->_np_enable;
+    svm->ns_hap_enabled = vmcb_get_np(ns_vmcb);
 
     /* Remember the V_INTR_MASK in hostflags */
     svm->ns_hostflags.fields.vintrmask = !!ns_vmcb->_vintr.fields.intr_masking;
@@ -1084,7 +1084,7 @@ nsvm_vmcb_prepare4vmexit(struct vcpu *v, struct cpu_user_regs *regs)
     if ( nestedhvm_paging_mode_hap(v) )
     {
         /* host nested paging + guest nested paging. */
-        ns_vmcb->_np_enable = n2vmcb->_np_enable;
+        vmcb_set_np(ns_vmcb, vmcb_get_np(n2vmcb));
         ns_vmcb->_cr3 = n2vmcb->_cr3;
         /* The vmcb->h_cr3 is the shadowed h_cr3. The original
          * unshadowed guest h_cr3 is kept in ns_vmcb->h_cr3,
@@ -1093,7 +1093,7 @@ nsvm_vmcb_prepare4vmexit(struct vcpu *v, struct cpu_user_regs *regs)
     else if ( paging_mode_hap(v->domain) )
     {
         /* host nested paging + guest shadow paging. */
-        ns_vmcb->_np_enable = 0;
+        vmcb_set_np(ns_vmcb, false);
         /* Throw h_cr3 away. Guest is not allowed to set it or
          * it can break out, otherwise (security hole!) */
         ns_vmcb->_h_cr3 = 0x0;
@@ -1104,7 +1104,7 @@ nsvm_vmcb_prepare4vmexit(struct vcpu *v, struct cpu_user_regs *regs)
     else
     {
         /* host shadow paging + guest shadow paging. */
-        ns_vmcb->_np_enable = 0;
+        vmcb_set_np(ns_vmcb, false);
         ns_vmcb->_h_cr3 = 0x0;
         /* The vmcb->_cr3 is the shadowed cr3. The original
          * unshadowed guest cr3 is kept in ns_vmcb->_cr3,
