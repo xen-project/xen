@@ -328,6 +328,12 @@ Deviations related to MISRA C:2012 Rules:
        improve readability.
      - Tagged as `deliberate` for ECLAIR.
 
+   * - R20.4
+     - The override of the keyword \"inline\" in xen/compiler.h is present so
+       that section contents checks pass when the compiler chooses not to
+       inline a particular function.
+     - Comment-based deviation.
+
    * - R20.7
      - Code violating Rule 20.7 is safe when macro parameters are used:
        (1) as function arguments;

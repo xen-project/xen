@@ -82,6 +82,7 @@
  * inline functions not expanded inline get placed in .init.text.
  */
 #include <xen/init.h>
+/* SAF-3-safe MISRA C Rule 20.4: allow section checks to pass when not inlined */
 #define inline inline __init
 #endif
 

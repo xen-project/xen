@@ -28,6 +28,14 @@
         },
         {
             "id": "SAF-3-safe",
+            "analyser": {
+                "eclair": "MC3R1.R20.4"
+            },
+            "name": "MC3R1.R20.4: allow the definition of a macro with the same name as a keyword in some special cases",
+            "text": "The definition of a macro with the same name as a keyword can be useful in certain configurations to improve the guarantees that can be provided by Xen. See docs/misra/deviations.rst for a precise rationale for all such cases."
+        },
+        {
+            "id": "SAF-4-safe",
             "analyser": {},
             "name": "Sentinel",
             "text": "Next ID to be used"
