@@ -350,6 +350,8 @@ static int late_hwdom_init(struct domain *d)
 #endif
 }
 
+#ifdef CONFIG_HAS_PIRQ
+
 static unsigned int __read_mostly extra_hwdom_irqs;
 static unsigned int __read_mostly extra_domU_irqs = 32;
 
@@ -363,6 +365,8 @@ static int __init cf_check parse_extra_guest_irqs(const char *s)
     return *s ? -EINVAL : 0;
 }
 custom_param("extra_guest_irqs", parse_extra_guest_irqs);
+
+#endif /* CONFIG_HAS_PIRQ */
 
 static int __init cf_check parse_dom0_param(const char *s)
 {
@@ -683,6 +687,7 @@ struct domain *domain_create(domid_t domid,
     if ( is_system_domain(d) && !is_idle_domain(d) )
         return d;
 
+#ifdef CONFIG_HAS_PIRQ
     if ( !is_idle_domain(d) )
     {
         if ( !is_hardware_domain(d) )
@@ -694,6 +699,7 @@ struct domain *domain_create(domid_t domid,
 
         radix_tree_init(&d->pirq_tree);
     }
+#endif
 
     if ( (err = arch_domain_create(d, config, flags)) != 0 )
         goto fail;
@@ -793,7 +799,9 @@ struct domain *domain_create(domid_t domid,
     {
         evtchn_destroy(d);
         evtchn_destroy_final(d);
+#ifdef CONFIG_HAS_PIRQ
         radix_tree_destroy(&d->pirq_tree, free_pirq_struct);
+#endif
     }
     if ( init_status & INIT_watchdog )
         watchdog_domain_destroy(d);
@@ -1192,7 +1200,9 @@ static void cf_check complete_domain_destroy(struct rcu_head *head)
 
     evtchn_destroy_final(d);
 
+#ifdef CONFIG_HAS_PIRQ
     radix_tree_destroy(&d->pirq_tree, free_pirq_struct);
+#endif
 
     xfree(d->vcpu);
 
@@ -2058,6 +2068,8 @@ long do_vm_assist(unsigned int cmd, unsigned int type)
 }
 #endif
 
+#ifdef CONFIG_HAS_PIRQ
+
 struct pirq *pirq_get_info(struct domain *d, int pirq)
 {
     struct pirq *info = pirq_info(d, pirq);
@@ -2086,6 +2098,8 @@ void cf_check free_pirq_struct(void *ptr)
 
     call_rcu(&pirq->rcu_head, _free_pirq_struct);
 }
+
+#endif /* CONFIG_HAS_PIRQ */
 
 struct migrate_info {
     long (*func)(void *data);

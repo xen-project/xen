@@ -1165,7 +1165,7 @@ introduced with the Nehalem architecture.
       intended as an emergency option for people who first chose fast, then
       change their minds to secure, and wish not to reboot.**
 
-### extra_guest_irqs
+### extra_guest_irqs (x86)
 > `= [<domU number>][,<dom0 number>]`
 
 > Default: `32,<variable>`

@@ -648,6 +648,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         }
         break;
 
+#ifdef CONFIG_HAS_PIRQ
     case XEN_DOMCTL_irq_permission:
     {
         unsigned int pirq = op->u.irq_permission.pirq, irq;
@@ -667,6 +668,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             ret = irq_deny_access(d, irq);
         break;
     }
+#endif
 
     case XEN_DOMCTL_iomem_permission:
     {

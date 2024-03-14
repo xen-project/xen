@@ -566,6 +566,7 @@ static int evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
     return rc;
 }
 
+#ifdef CONFIG_HAS_PIRQ
 
 static void link_pirq_port(int port, struct evtchn *chn, struct vcpu *v)
 {
@@ -591,9 +592,11 @@ static void unlink_pirq_port(struct evtchn *chn, struct vcpu *v)
             chn->u.pirq.prev_port;
 }
 
+#endif /* CONFIG_HAS_PIRQ */
 
 static int evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 {
+#ifdef CONFIG_HAS_PIRQ
     struct evtchn *chn;
     struct domain *d = current->domain;
     struct vcpu   *v = d->vcpu[0];
@@ -663,6 +666,9 @@ static int evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     write_unlock(&d->event_lock);
 
     return rc;
+#else /* !CONFIG_HAS_PIRQ */
+    return -EOPNOTSUPP;
+#endif
 }
 
 
@@ -695,6 +701,7 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
     case ECS_UNBOUND:
         break;
 
+#ifdef CONFIG_HAS_PIRQ
     case ECS_PIRQ: {
         struct pirq *pirq = pirq_info(d1, chn1->u.pirq.irq);
 
@@ -704,14 +711,13 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
                 pirq_guest_unbind(d1, pirq);
             pirq->evtchn = 0;
             pirq_cleanup_check(pirq, d1);
-#ifdef CONFIG_X86
             if ( is_hvm_domain(d1) && domain_pirq_to_irq(d1, pirq->pirq) > 0 )
                 unmap_domain_pirq_emuirq(d1, pirq->pirq);
-#endif
         }
         unlink_pirq_port(chn1, d1->vcpu[chn1->notify_vcpu_id]);
         break;
     }
+#endif
 
     case ECS_VIRQ: {
         struct vcpu *v;
@@ -1121,6 +1127,8 @@ int evtchn_bind_vcpu(evtchn_port_t port, unsigned int vcpu_id)
     case ECS_INTERDOMAIN:
         chn->notify_vcpu_id = v->vcpu_id;
         break;
+
+#ifdef CONFIG_HAS_PIRQ
     case ECS_PIRQ:
         if ( chn->notify_vcpu_id == v->vcpu_id )
             break;
@@ -1130,6 +1138,8 @@ int evtchn_bind_vcpu(evtchn_port_t port, unsigned int vcpu_id)
                           cpumask_of(v->processor));
         link_pirq_port(port, chn, v);
         break;
+#endif
+
     default:
         rc = -EINVAL;
         break;

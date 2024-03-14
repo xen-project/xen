@@ -52,7 +52,6 @@ struct arch_irq_desc {
 
 extern const unsigned int nr_irqs;
 #define nr_static_irqs NR_IRQS
-#define arch_hwdom_irqs(domid) NR_IRQS
 
 struct irq_desc;
 struct irqaction;

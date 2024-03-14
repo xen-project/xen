@@ -439,12 +439,14 @@ struct domain
 
     struct grant_table *grant_table;
 
+#ifdef CONFIG_HAS_PIRQ
     /*
      * Interrupt to event-channel mappings and other per-guest-pirq data.
      * Protected by the domain's event-channel spinlock.
      */
     struct radix_tree_root pirq_tree;
     unsigned int     nr_pirqs;
+#endif
 
     unsigned int     options;         /* copy of createdomain flags */
 

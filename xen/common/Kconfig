@@ -71,6 +71,9 @@ config HAS_IOPORTS
 config HAS_KEXEC
 	bool
 
+config HAS_PIRQ
+	bool
+
 config HAS_PMAP
 	bool
 
