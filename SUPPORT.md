@@ -111,13 +111,13 @@ that would normally trigger a fault injection.
 
 Only the following system registers are security supported:
 
-    MDCCSR_EL0
-    DBGDTR_EL0
-    DBGDTRTX_EL0
-    DBGDTRRX_EL0
-    DBGDSCRINT
-    DBGDTRTXINT
-    DBGDTRRXINT
+  * MDCCSR_EL0
+  * DBGDTR_EL0
+  * DBGDTRTX_EL0
+  * DBGDTRRX_EL0
+  * DBGDSCRINT
+  * DBGDTRTXINT
+  * DBGDTRRXINT
 
 ### ARM Scalable Vector Extension (SVE/SVE2)
 
