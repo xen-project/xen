@@ -45,16 +45,9 @@ SECTIONS
     . = ALIGN(PAGE_SIZE);
     DECL_SECTION(.rodata) {
         _srodata = .;          /* Read-only data */
-        /* Bug frames table */
-        __start_bug_frames = .;
-        *(.bug_frames.0)
-        __stop_bug_frames_0 = .;
-        *(.bug_frames.1)
-        __stop_bug_frames_1 = .;
-        *(.bug_frames.2)
-        __stop_bug_frames_2 = .;
-        *(.bug_frames.3)
-        __stop_bug_frames_3 = .;
+
+        BUGFRAMES
+
         *(.rodata)
         *(.rodata.*)
         *(.data.rel.ro)
