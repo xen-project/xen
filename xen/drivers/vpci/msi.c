@@ -169,13 +169,15 @@ static void cf_check mask_write(
 
     if ( msi->enabled )
     {
-        unsigned int i;
+        /* Skip changes to vectors which aren't enabled. */
+        dmask &= (~0U >> (32 - msi->vectors));
 
-        for ( i = ffs(dmask) - 1; dmask && i < msi->vectors;
-              i = ffs(dmask) - 1 )
+        while ( dmask )
         {
+            unsigned int i = ffs(dmask) - 1;
+
             vpci_msi_arch_mask(msi, pdev, i, (val >> i) & 1);
-            __clear_bit(i, &dmask);
+            dmask &= (dmask - 1);
         }
     }
 
