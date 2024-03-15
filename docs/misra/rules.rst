@@ -181,6 +181,21 @@ maintainers if you want to suggest a change.
        headers (xen/include/public/) are allowed to retain longer
        identifiers for backward compatibility.
 
+   * - `Rule 5.5 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_05_05.c>`_
+     - Required
+     - Identifiers shall be distinct from macro names
+     - Macros expanding to their own name are allowed, e.g.::
+
+           #define x x
+
+       Clashes between names of function-like macros and identifiers of
+       non-callable entities are allowed. Callable entities having an
+       identifier that is the same of the name of a
+       function-like macro are not allowed. Example (not allowed)::
+
+           #define f(x, y) f(x, y)
+           void f(int x, int y);
+
    * - `Rule 5.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_05_06.c>`_
      - Required
      - A typedef name shall be a unique identifier
