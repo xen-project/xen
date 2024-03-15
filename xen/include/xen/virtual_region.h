@@ -29,8 +29,7 @@ struct virtual_region
     symbols_lookup_t *symbols_lookup;
 
     struct {
-        const struct bug_frame *bugs; /* The pointer to array of bug frames. */
-        size_t n_bugs;          /* The number of them. */
+        const struct bug_frame *start, *stop; /* Pointers to array of bug frames. */
     } frame[BUGFRAME_NR];
 
     const struct exception_table_entry *ex;

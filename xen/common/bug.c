@@ -25,10 +25,9 @@ int do_bug_frame(const struct cpu_user_regs *regs, unsigned long pc)
     for ( id = 0; id < BUGFRAME_NR; id++ )
     {
         const struct bug_frame *b;
-        size_t i;
 
-        for ( i = 0, b = region->frame[id].bugs;
-              i < region->frame[id].n_bugs; b++, i++ )
+        for ( b = region->frame[id].start;
+              b < region->frame[id].stop; b++ )
         {
             if ( bug_loc(b) == pc )
             {

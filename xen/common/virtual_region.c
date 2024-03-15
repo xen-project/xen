@@ -9,12 +9,25 @@
 #include <xen/spinlock.h>
 #include <xen/virtual_region.h>
 
+extern const struct bug_frame
+    __start_bug_frames_0[], __stop_bug_frames_0[],
+    __start_bug_frames_1[], __stop_bug_frames_1[],
+    __start_bug_frames_2[], __stop_bug_frames_2[],
+    __start_bug_frames_3[], __stop_bug_frames_3[];
+
 static struct virtual_region core = {
     .list = LIST_HEAD_INIT(core.list),
     .text_start = _stext,
     .text_end = _etext,
     .rodata_start = _srodata,
     .rodata_end = _erodata,
+
+    .frame = {
+        { __start_bug_frames_0, __stop_bug_frames_0 },
+        { __start_bug_frames_1, __stop_bug_frames_1 },
+        { __start_bug_frames_2, __stop_bug_frames_2 },
+        { __start_bug_frames_3, __stop_bug_frames_3 },
+    },
 };
 
 /* Becomes irrelevant when __init sections are cleared. */
@@ -22,6 +35,13 @@ static struct virtual_region core_init __initdata = {
     .list = LIST_HEAD_INIT(core_init.list),
     .text_start = _sinittext,
     .text_end = _einittext,
+
+    .frame = {
+        { __start_bug_frames_0, __stop_bug_frames_0 },
+        { __start_bug_frames_1, __stop_bug_frames_1 },
+        { __start_bug_frames_2, __stop_bug_frames_2 },
+        { __start_bug_frames_3, __stop_bug_frames_3 },
+    },
 };
 
 /*
@@ -133,31 +153,6 @@ void __init unregister_init_virtual_region(void)
 void __init setup_virtual_regions(const struct exception_table_entry *start,
                                   const struct exception_table_entry *end)
 {
-    size_t sz;
-    unsigned int i;
-    static const struct bug_frame *const __initconstrel bug_frames[] = {
-        __start_bug_frames,
-        __stop_bug_frames_0,
-        __stop_bug_frames_1,
-        __stop_bug_frames_2,
-        __stop_bug_frames_3,
-        NULL
-    };
-
-    for ( i = 1; bug_frames[i]; i++ )
-    {
-        const struct bug_frame *s;
-
-        s = bug_frames[i - 1];
-        sz = bug_frames[i] - s;
-
-        core.frame[i - 1].n_bugs = sz;
-        core.frame[i - 1].bugs = s;
-
-        core_init.frame[i - 1].n_bugs = sz;
-        core_init.frame[i - 1].bugs = s;
-    }
-
     core_init.ex = core.ex = start;
     core_init.ex_end = core.ex_end = end;
 

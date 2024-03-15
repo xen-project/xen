@@ -804,12 +804,11 @@ static int prepare_payload(struct payload *payload,
         if ( !sec )
             continue;
 
-        if ( !section_ok(elf, sec, sizeof(*region->frame[i].bugs)) )
+        if ( !section_ok(elf, sec, sizeof(*region->frame[i].start)) )
             return -EINVAL;
 
-        region->frame[i].bugs = sec->load_addr;
-        region->frame[i].n_bugs = sec->sec->sh_size /
-                                  sizeof(*region->frame[i].bugs);
+        region->frame[i].start = sec->load_addr;
+        region->frame[i].stop  = sec->load_addr + sec->sec->sh_size;
     }
 
     sec = livepatch_elf_sec_by_name(elf, ".altinstructions");
