@@ -1014,8 +1014,6 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
     smp_prepare_boot_cpu();
     sort_exception_tables();
 
-    setup_virtual_regions(__start___ex_table, __stop___ex_table);
-
     /* Full exception support from here on in. */
 
     rdmsrl(MSR_EFER, this_cpu(efer));

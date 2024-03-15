@@ -26,7 +26,7 @@ static struct virtual_region core, core_init;
 #define LIST_ENTRY_CORE() { .next = &core_init.list,      .prev = &virtual_region_list }
 #define LIST_ENTRY_INIT() { .next = &virtual_region_list, .prev = &core.list }
 
-static struct virtual_region core = {
+static struct virtual_region core __read_mostly = {
     .list = LIST_ENTRY_CORE(),
     .text_start = _stext,
     .text_end = _etext,
@@ -39,6 +39,11 @@ static struct virtual_region core = {
         { __start_bug_frames_2, __stop_bug_frames_2 },
         { __start_bug_frames_3, __stop_bug_frames_3 },
     },
+
+#ifdef CONFIG_HAS_EX_TABLE
+    .ex = __start___ex_table,
+    .ex_end = __stop___ex_table,
+#endif
 };
 
 /* Becomes irrelevant when __init sections are cleared. */
@@ -53,6 +58,11 @@ static struct virtual_region core_init __initdata = {
         { __start_bug_frames_2, __stop_bug_frames_2 },
         { __start_bug_frames_3, __stop_bug_frames_3 },
     },
+
+#ifdef CONFIG_HAS_EX_TABLE
+    .ex = __start___ex_table,
+    .ex_end = __stop___ex_table,
+#endif
 };
 
 /*
@@ -159,13 +169,6 @@ void __init unregister_init_virtual_region(void)
     BUG_ON(system_state != SYS_STATE_active);
 
     remove_virtual_region(&core_init);
-}
-
-void __init setup_virtual_regions(const struct exception_table_entry *start,
-                                  const struct exception_table_entry *end)
-{
-    core_init.ex = core.ex = start;
-    core_init.ex_end = core.ex_end = end;
 }
 
 /*

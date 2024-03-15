@@ -719,7 +719,6 @@ void asmlinkage __init start_xen(unsigned long boot_phys_offset,
     percpu_init_areas();
     set_processor_id(0); /* needed early, for smp_processor_id() */
 
-    setup_virtual_regions(NULL, NULL);
     /* Initialize traps early allow us to get backtrace when an error occurred */
     init_traps();
 
