@@ -151,6 +151,8 @@ static int nmi_active;
 
 static void __init cf_check wait_for_nmis(void *p)
 {
+    cpumask_t *stuck_cpus = p;
+    unsigned int cpu = smp_processor_id();
     unsigned int start_count = this_cpu(nmi_count);
     unsigned long ticks = 10 * 1000 * cpu_khz / nmi_hz;
     unsigned long s, e;
@@ -159,44 +161,35 @@ static void __init cf_check wait_for_nmis(void *p)
     do {
         cpu_relax();
         if ( this_cpu(nmi_count) >= start_count + 2 )
-            break;
+            return;
+
         e = rdtsc();
-    } while( e - s < ticks );
+    } while ( e - s < ticks );
+
+    /* Timeout.  Mark ourselves as stuck. */
+    cpumask_set_cpu(cpu, stuck_cpus);
 }
 
 void __init check_nmi_watchdog(void)
 {
-    static unsigned int __initdata prev_nmi_count[NR_CPUS];
-    unsigned int cpu;
-    char sep = '{';
-    bool ok = true;
+    static cpumask_t __initdata stuck_cpus;
 
     if ( nmi_watchdog == NMI_NONE )
         return;
 
     printk("Testing NMI watchdog on all CPUs: ");
 
-    for_each_online_cpu ( cpu )
-        prev_nmi_count[cpu] = per_cpu(nmi_count, cpu);
-
     /*
      * Wait at most 10 ticks for 2 watchdog NMIs on each CPU.
      * Busy-wait on all CPUs: the LAPIC counter that the NMI watchdog
      * uses only runs while the core's not halted
      */
-    on_selected_cpus(&cpu_online_map, wait_for_nmis, NULL, 1);
+    on_selected_cpus(&cpu_online_map, wait_for_nmis, &stuck_cpus, 1);
 
-    for_each_online_cpu ( cpu )
-    {
-        if ( per_cpu(nmi_count, cpu) - prev_nmi_count[cpu] < 2 )
-        {
-            printk("%c%u", sep, cpu);
-            sep = ',';
-            ok = false;
-        }
-    }
-
-    printk("%s\n", ok ? "ok" : "} stuck");
+    if ( cpumask_empty(&stuck_cpus) )
+        printk("ok\n");
+    else
+        printk("{%*pbl} stuck\n", CPUMASK_PR(&stuck_cpus));
 
     /*
      * Now that we know it works we can reduce NMI frequency to
