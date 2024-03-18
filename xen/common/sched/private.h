@@ -540,7 +540,7 @@ static inline void sched_unit_unpause(const struct sched_unit *unit)
 }
 
 #define REGISTER_SCHEDULER(x) static const struct scheduler *x##_entry \
-  __used_section(".data.schedulers") = &x
+  __used_section(".data.schedulers") = &(x)
 
 struct cpupool
 {
