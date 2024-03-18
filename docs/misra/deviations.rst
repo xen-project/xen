@@ -157,6 +157,12 @@ Deviations related to MISRA C:2012 Rules:
          - xen/common/unxz.c
          - xen/common/unzstd.c
 
+   * - R8.3
+     - Parameter name "unused" (with an optional numeric suffix) is deliberate
+       and makes explicit the intention of not using such parameter within the
+       function.
+     - Tagged as `deliberate` for ECLAIR.
+
    * - R8.4
      - The definitions present in the files 'asm-offsets.c' for any architecture
        are used to generate definitions for asm modules, and are not called by

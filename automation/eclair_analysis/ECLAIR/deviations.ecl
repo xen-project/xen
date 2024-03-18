@@ -167,6 +167,10 @@ const-qualified."
 -config=MC3R1.R8.3,reports+={deliberate,"any_area(any_loc(file(adopted_decompress_r8_3)))&&any_area(any_loc(file(^xen/include/xen/decompress\\.h$)))"}
 -doc_end
 
+-doc_begin="Parameter name \"unused\" (with an optional numeric suffix) is deliberate and makes explicit the intention of not using such parameter within the function."
+-config=MC3R1.R8.3,reports+={deliberate, "any_area(^.*parameter `unused[0-9]*'.*$)"}
+-doc_end
+
 -doc_begin="The following file is imported from Linux: ignore for now."
 -file_tag+={adopted_time_r8_3,"^xen/arch/x86/time\\.c$"}
 -config=MC3R1.R8.3,reports+={deliberate,"any_area(any_loc(file(adopted_time_r8_3)))&&(any_area(any_loc(file(^xen/include/xen/time\\.h$)))||any_area(any_loc(file(^xen/arch/x86/include/asm/setup\\.h$))))"}
