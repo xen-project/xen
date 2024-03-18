@@ -383,7 +383,7 @@ typedef union
         bool intercepts:1; /* 0:  cr/dr/exception/general intercepts,
                             *     pause_filter_count, tsc_offset */
         bool iopm:1;       /* 1:  iopm_base_pa, msrpm_base_pa */
-        bool asid:1;       /* 2:  guest_asid */
+        bool asid:1;       /* 2:  asid */
         bool tpr:1;        /* 3:  vintr */
         bool np:1;         /* 4:  np, h_cr3, g_pat */
         bool cr:1;         /* 5:  cr0, cr3, cr4, efer */
@@ -413,7 +413,7 @@ struct vmcb_struct {
     u64 _iopm_base_pa;          /* offset 0x40 - cleanbit 1 */
     u64 _msrpm_base_pa;         /* offset 0x48 - cleanbit 1 */
     u64 _tsc_offset;            /* offset 0x50 - cleanbit 0 */
-    u32 _guest_asid;            /* offset 0x58 - cleanbit 2 */
+    u32 _asid;                  /* offset 0x58 - cleanbit 2 */
     u8  tlb_control;            /* offset 0x5C - TLB_CTRL_* */
     u8  res07[3];
     vintr_t _vintr;             /* offset 0x60 - cleanbit 3 */
@@ -642,7 +642,7 @@ VMCB_ACCESSORS(pause_filter_thresh, intercepts)
 VMCB_ACCESSORS(tsc_offset, intercepts)
 VMCB_ACCESSORS(iopm_base_pa, iopm)
 VMCB_ACCESSORS(msrpm_base_pa, iopm)
-VMCB_ACCESSORS(guest_asid, asid)
+VMCB_ACCESSORS(asid, asid)
 VMCB_ACCESSORS(vintr, tpr)
 VMCB_ACCESSORS(np_ctrl, np)
 VMCB_ACCESSORS_(np, bool, np)

@@ -51,7 +51,7 @@ struct nestedsvm {
      *     the l1 guest nested page table
      */
     uint64_t ns_vmcb_guestcr3, ns_vmcb_hostcr3;
-    uint32_t ns_guest_asid;
+    uint32_t ns_asid;
 
     bool ns_hap_enabled;
 

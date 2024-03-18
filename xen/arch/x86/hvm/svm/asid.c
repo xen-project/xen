@@ -37,14 +37,14 @@ void svm_asid_handle_vmrun(void)
     /* ASID 0 indicates that ASIDs are disabled. */
     if ( p_asid->asid == 0 )
     {
-        vmcb_set_guest_asid(vmcb, 1);
+        vmcb_set_asid(vmcb, true);
         vmcb->tlb_control =
             cpu_has_svm_flushbyasid ? TLB_CTRL_FLUSH_ASID : TLB_CTRL_FLUSH_ALL;
         return;
     }
 
-    if ( vmcb_get_guest_asid(vmcb) != p_asid->asid )
-        vmcb_set_guest_asid(vmcb, p_asid->asid);
+    if ( vmcb_get_asid(vmcb) != p_asid->asid )
+        vmcb_set_asid(vmcb, p_asid->asid);
 
     vmcb->tlb_control =
         !need_flush ? TLB_CTRL_NO_FLUSH :

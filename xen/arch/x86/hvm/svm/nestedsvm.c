@@ -157,7 +157,7 @@ int cf_check nsvm_vcpu_reset(struct vcpu *v)
     svm->ns_hap_enabled = 0;
     svm->ns_vmcb_guestcr3 = 0;
     svm->ns_vmcb_hostcr3 = 0;
-    svm->ns_guest_asid = 0;
+    svm->ns_asid = 0;
     svm->ns_hostflags.bytes = 0;
     svm->ns_vmexit.exitinfo1 = 0;
     svm->ns_vmexit.exitinfo2 = 0;
@@ -698,11 +698,11 @@ nsvm_vcpu_vmentry(struct vcpu *v, struct cpu_user_regs *regs,
     /* Convert explicitely to boolean. Deals with l1 guests
      * that use flush-by-asid w/o checking the cpuid bits */
     nv->nv_flushp2m = !!ns_vmcb->tlb_control;
-    if ( svm->ns_guest_asid != ns_vmcb->_guest_asid )
+    if ( svm->ns_asid != vmcb_get_asid(ns_vmcb))
     {
         nv->nv_flushp2m = 1;
         hvm_asid_flush_vcpu_asid(&vcpu_nestedhvm(v).nv_n2asid);
-        svm->ns_guest_asid = ns_vmcb->_guest_asid;
+        svm->ns_asid = vmcb_get_asid(ns_vmcb);
     }
 
     /* nested paging for the guest */
@@ -1046,7 +1046,7 @@ nsvm_vmcb_prepare4vmexit(struct vcpu *v, struct cpu_user_regs *regs)
     /* Keep it. It's maintainted by the l1 guest. */
 
     /* ASID */
-    /* ns_vmcb->_guest_asid = n2vmcb->_guest_asid; */
+    /* vmcb_set_asid(ns_vmcb, vmcb_get_asid(n2vmcb)); */
 
     /* TLB control */
     ns_vmcb->tlb_control = 0;
