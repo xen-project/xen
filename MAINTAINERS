@@ -376,7 +376,6 @@ F:	xen/arch/x86/machine_kexec.c
 F:	xen/arch/x86/x86_64/kexec_reloc.S
 
 LIBS
-M:	Wei Liu <wl@xen.org>
 M:	Anthony PERARD <anthony.perard@citrix.com>
 R:	Juergen Gross <jgross@suse.com>
 S:	Supported
@@ -411,7 +410,6 @@ F:	xen/test/livepatch/*
 MINI-OS
 M:	Samuel Thibault <samuel.thibault@ens-lyon.org>
 M:	Juergen Gross <jgross@suse.com>
-R:	Wei Liu <wl@xen.org>
 S:	Supported
 L:	minios-devel@lists.xenproject.org
 T:	git https://xenbits.xenproject.org/git-http/mini-os.git
@@ -425,7 +423,6 @@ F:	tools/ocaml/
 
 OVMF UPSTREAM
 M:	Anthony PERARD <anthony.perard@citrix.com>
-M:	Wei Liu <wl@xen.org>
 S:	Supported
 T:	git https://xenbits.xenproject.org/git-http/ovmf.git
 
@@ -510,7 +507,6 @@ F:	xen/arch/arm/include/asm/tee
 F:	xen/arch/arm/tee/
 
 TOOLSTACK
-M:	Wei Liu <wl@xen.org>
 M:	Anthony PERARD <anthony.perard@citrix.com>
 S:	Supported
 F:	autogen.sh
@@ -572,7 +568,6 @@ X86 ARCHITECTURE
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Andrew Cooper <andrew.cooper3@citrix.com>
 M:	Roger Pau Monné <roger.pau@citrix.com>
-R:	Wei Liu <wl@xen.org>
 S:	Supported
 L:	xen-devel@lists.xenproject.org
 F:	xen/arch/x86/
@@ -617,7 +612,6 @@ F:	xen/arch/x86/mm/shadow/
 
 X86 VIRIDIAN ENLIGHTENMENTS
 M:	Paul Durrant <paul@xen.org>
-M:	Wei Liu <wl@xen.org>
 S:	Supported
 F:	xen/arch/x86/guest/hyperv/
 F:	xen/arch/x86/hvm/viridian/
@@ -627,7 +621,6 @@ F:	xen/arch/x86/include/asm/guest/hyperv-tlfs.h
 F:	xen/arch/x86/include/asm/hvm/viridian.h
 
 XENSTORE
-M:	Wei Liu <wl@xen.org>
 M:	Juergen Gross <jgross@suse.com>
 R:	Julien Grall <julien@xen.org>
 S:	Supported
@@ -673,7 +666,6 @@ M:	George Dunlap <george.dunlap@citrix.com>
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Julien Grall <julien@xen.org>
 M:	Stefano Stabellini <sstabellini@kernel.org>
-M:	Wei Liu <wl@xen.org>
 L:	xen-devel@lists.xenproject.org
 S:	Supported
 F:	*
