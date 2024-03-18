@@ -168,6 +168,7 @@ XEN_CPUFEATURE(TBM,           3*32+21) /*A  trailing bit manipulations */
 XEN_CPUFEATURE(TOPOEXT,       3*32+22) /*   topology extensions CPUID leafs */
 XEN_CPUFEATURE(DBEXT,         3*32+26) /*A  data breakpoint extension */
 XEN_CPUFEATURE(MONITORX,      3*32+29) /*   MONITOR extension (MONITORX/MWAITX) */
+XEN_CPUFEATURE(ADDR_MSK_EXT,  3*32+30) /*A  Address Mask Extentions */
 
 /* Intel-defined CPU features, CPUID level 0x0000000D:1.eax, word 4 */
 XEN_CPUFEATURE(XSAVEOPT,      4*32+ 0) /*A  XSAVEOPT instruction */
@@ -290,10 +291,17 @@ XEN_CPUFEATURE(WRMSRNS,      10*32+19) /*S  WRMSR Non-Serialising */
 XEN_CPUFEATURE(AVX_IFMA,     10*32+23) /*A  AVX-IFMA Instructions */
 
 /* AMD-defined CPU features, CPUID level 0x80000021.eax, word 11 */
+XEN_CPUFEATURE(NO_NEST_BP,         11*32+ 0) /*A  No Nested Data Breakpoints */
+XEN_CPUFEATURE(FS_GS_NS,           11*32+ 1) /*S  FS/GS base MSRs non-serialising */
 XEN_CPUFEATURE(LFENCE_DISPATCH,    11*32+ 2) /*A  LFENCE always serializing */
 XEN_CPUFEATURE(NSCB,               11*32+ 6) /*A  Null Selector Clears Base (and limit too) */
 XEN_CPUFEATURE(AUTO_IBRS,          11*32+ 8) /*S  Automatic IBRS */
+XEN_CPUFEATURE(AMD_FSRS,           11*32+10) /*A  Fast Short REP STOSB */
+XEN_CPUFEATURE(AMD_FSRC,           11*32+11) /*A  Fast Short REP CMPSB */
 XEN_CPUFEATURE(CPUID_USER_DIS,     11*32+17) /*   CPUID disable for CPL > 0 software */
+XEN_CPUFEATURE(EPSF,               11*32+18) /*A  Enhanced Predictive Store Forwarding */
+XEN_CPUFEATURE(FSRSC,              11*32+19) /*A  Fast Short REP SCASB */
+XEN_CPUFEATURE(AMD_PREFETCHI,      11*32+20) /*A  PREFETCHIT{0,1} Instructions */
 XEN_CPUFEATURE(SBPB,               11*32+27) /*A  Selective Branch Predictor Barrier */
 XEN_CPUFEATURE(IBPB_BRTYPE,        11*32+28) /*A  IBPB flushes Branch Type predictions too */
 XEN_CPUFEATURE(SRSO_NO,            11*32+29) /*A  Hardware not vulenrable to Speculative Return Stack Overflow */

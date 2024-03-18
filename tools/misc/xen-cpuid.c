@@ -91,6 +91,7 @@ static const char *const str_e1c[32] =
     [24] = "perfctr-nb", /* [25] */
     [26] = "dbx",        [27] = "perftsc",
     [28] = "pcx-l2i",    [29] = "monitorx",
+    [30] = "addr-msk-ext",
 };
 
 static const char *const str_7b0[32] =
@@ -199,11 +200,15 @@ static const char *const str_7a1[32] =
 
 static const char *const str_e21a[32] =
 {
+    [ 0] = "no-nest-bp",    [ 1] = "fs-gs-ns",
     [ 2] = "lfence+",
     [ 6] = "nscb",
     [ 8] = "auto-ibrs",
+    [10] = "amd-fsrs",      [11] = "amd-fsrc",
 
     /* 16 */                [17] = "cpuid-user-dis",
+    [18] = "epsf",          [19] = "fsrsc",
+    [20] = "amd-prefetchi",
 
     /* 26 */                [27] = "sbpb",
     [28] = "ibpb-brtype",   [29] = "srso-no",
