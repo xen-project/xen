@@ -134,6 +134,7 @@ void cf_check perfc_reset(unsigned char key)
         case TYPE_SINGLE:
             for_each_online_cpu ( cpu )
                 per_cpu(perfcounters, cpu)[j] = 0;
+            fallthrough;
         case TYPE_S_SINGLE:
             ++j;
             break;
@@ -141,6 +142,7 @@ void cf_check perfc_reset(unsigned char key)
             for_each_online_cpu ( cpu )
                 memset(per_cpu(perfcounters, cpu) + j, 0,
                        perfc_info[i].nr_elements * sizeof(perfc_t));
+            fallthrough;
         case TYPE_S_ARRAY:
             j += perfc_info[i].nr_elements;
             break;
