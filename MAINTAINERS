@@ -220,12 +220,6 @@ F:	xen/drivers/acpi/
 F:	xen/include/acpi/
 F:	tools/libacpi/
 
-AMD IOMMU
-M:	Jan Beulich <jbeulich@suse.com>
-M:	Andrew Cooper <andrew.cooper3@citrix.com>
-S:	Maintained
-F:	xen/drivers/passthrough/amd/
-
 ARGO
 M:	Christopher Clark <christopher.w.clark@gmail.com>
 S:	Maintained
@@ -350,11 +344,6 @@ R:	Mateusz Mówka <mateusz.mowka@intel.com>
 S:	Odd Fixes
 F:	xen/arch/x86/include/asm/tboot.h
 F:	xen/arch/x86/tboot.c
-
-INTEL(R) VT FOR DIRECTED I/O (VT-D)
-M:	Kevin Tian <kevin.tian@intel.com>
-S:	Supported
-F:	xen/drivers/passthrough/vtd/
 
 IOMMU VENDOR INDEPENDENT CODE
 M:	Jan Beulich <jbeulich@suse.com>
@@ -587,9 +576,11 @@ R:	Wei Liu <wl@xen.org>
 S:	Supported
 L:	xen-devel@lists.xenproject.org
 F:	xen/arch/x86/
+F:	xen/drivers/passthrough/amd/
+F:	xen/drivers/passthrough/vtd/
 F:	xen/include/public/arch-x86/
-F:	xen/include/xen/lib/x86
-F:	xen/lib/x86
+F:	xen/include/xen/lib/x86/
+F:	xen/lib/x86/
 F:	xen/tools/gen-cpuid.py
 F:	tools/firmware/hvmloader/
 F:	tools/firmware/rombios/
