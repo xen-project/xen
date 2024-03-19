@@ -1158,11 +1158,7 @@ void console_end_log_everything(void)
 
 unsigned long console_lock_recursive_irqsave(void)
 {
-    unsigned long flags;
-
-    rspin_lock_irqsave(&console_lock, flags);
-
-    return flags;
+    return rspin_lock_irqsave(&console_lock);
 }
 
 void console_unlock_recursive_irqrestore(unsigned long flags)

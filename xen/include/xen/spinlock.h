@@ -303,12 +303,6 @@ static always_inline void spin_lock_if(bool condition, spinlock_t *l)
  */
 bool _rspin_trylock(rspinlock_t *lock);
 void _rspin_lock(rspinlock_t *lock);
-#define rspin_lock_irqsave(l, f)                                \
-    ({                                                          \
-        BUILD_BUG_ON(sizeof(f) != sizeof(unsigned long));       \
-        (f) = _rspin_lock_irqsave(l);                           \
-        block_lock_speculation();                               \
-    })
 unsigned long _rspin_lock_irqsave(rspinlock_t *lock);
 void _rspin_unlock(rspinlock_t *lock);
 void _rspin_unlock_irqrestore(rspinlock_t *lock, unsigned long flags);
@@ -319,6 +313,14 @@ static always_inline void rspin_lock(rspinlock_t *lock)
 {
     _rspin_lock(lock);
     block_lock_speculation();
+}
+
+static always_inline unsigned long rspin_lock_irqsave(rspinlock_t *lock)
+{
+    unsigned long flags = _rspin_lock_irqsave(lock);
+
+    block_lock_speculation();
+    return flags;
 }
 
 #define rspin_trylock(l)              lock_evaluate_nospec(_rspin_trylock(l))
