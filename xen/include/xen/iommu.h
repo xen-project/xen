@@ -326,7 +326,8 @@ struct iommu_ops {
  */
 extern int iommu_add_extra_reserved_device_memory(unsigned long start,
                                                   unsigned long nr,
-                                                  pci_sbdf_t sbdf);
+                                                  pci_sbdf_t sbdf,
+                                                  const char *name);
 /*
  * To be called by specific IOMMU driver during initialization,
  * to fetch ranges registered with iommu_add_extra_reserved_device_memory().

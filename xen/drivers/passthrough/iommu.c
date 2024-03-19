@@ -682,6 +682,7 @@ struct extra_reserved_range {
     unsigned long start;
     unsigned long nr;
     pci_sbdf_t sbdf;
+    const char *name;
 };
 static unsigned int __initdata nr_extra_reserved_ranges;
 static struct extra_reserved_range __initdata
@@ -689,7 +690,8 @@ static struct extra_reserved_range __initdata
 
 int __init iommu_add_extra_reserved_device_memory(unsigned long start,
                                                   unsigned long nr,
-                                                  pci_sbdf_t sbdf)
+                                                  pci_sbdf_t sbdf,
+                                                  const char *name)
 {
     unsigned int idx;
 
@@ -700,6 +702,7 @@ int __init iommu_add_extra_reserved_device_memory(unsigned long start,
     extra_reserved_ranges[idx].start = start;
     extra_reserved_ranges[idx].nr = nr;
     extra_reserved_ranges[idx].sbdf = sbdf;
+    extra_reserved_ranges[idx].name = name;
 
     return 0;
 }

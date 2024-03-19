@@ -1421,7 +1421,8 @@ void __init xhci_dbc_uart_init(void)
         iommu_add_extra_reserved_device_memory(
                 PFN_DOWN(virt_to_maddr(&dbc_dma_bufs)),
                 PFN_UP(sizeof(dbc_dma_bufs)),
-                uart->dbc.sbdf);
+                uart->dbc.sbdf,
+                "XHCI console");
         serial_register_uart(SERHND_XHCI, &dbc_uart_driver, &dbc_uart);
     }
 }
