@@ -387,15 +387,12 @@ void setup_apic_nmi_watchdog(void)
     if ( nmi_watchdog == NMI_NONE )
         return;
 
-    switch (boot_cpu_data.x86_vendor) {
+    switch ( boot_cpu_data.x86_vendor )
+    {
     case X86_VENDOR_AMD:
-        switch (boot_cpu_data.x86) {
-        case 6:
-        case 0xf ... 0x19:
-            setup_k7_watchdog();
-            break;
-        }
+        setup_k7_watchdog();
         break;
+
     case X86_VENDOR_INTEL:
         switch (boot_cpu_data.x86) {
         case 6:
