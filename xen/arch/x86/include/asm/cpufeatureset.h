@@ -5,7 +5,7 @@
 
 #include <xen/stringify.h>
 
-#define XEN_CPUFEATURE(name, value) X86_FEATURE_##name = value,
+#define XEN_CPUFEATURE(name, value) X86_FEATURE_##name = (value),
 enum {
 #include <public/arch-x86/cpufeatureset.h>
 #include <asm/cpufeatures.h>
