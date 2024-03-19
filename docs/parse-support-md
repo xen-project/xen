@@ -218,6 +218,13 @@ sub ri_DefinitionList {
     }
 }
 
+sub ri_BulletList {
+    # Assume a paragraph introduce this bullet list, which would mean that
+    # ri_Para() has already been called, and there's nothing else to do about
+    # the caveat.
+    return;
+}
+
 sub process_unknown {
     my ($c, $e) = @_;
     $had_unknown = Dumper($e);
