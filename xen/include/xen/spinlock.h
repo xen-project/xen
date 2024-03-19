@@ -77,13 +77,19 @@ union lock_debug { };
 */
 
 struct spinlock;
+/* Temporary hack until a dedicated struct rspinlock is existing. */
+#define rspinlock spinlock
 
 struct lock_profile {
     struct lock_profile *next;       /* forward link */
     const char          *name;       /* lock name */
-    struct spinlock     *lock;       /* the lock itself */
+    union {
+        struct spinlock *lock;       /* the lock itself */
+        struct rspinlock *rlock;     /* the recursive lock itself */
+    } ptr;
     uint64_t            lock_cnt;    /* # of complete locking ops */
-    uint64_t            block_cnt;   /* # of complete wait for lock */
+    uint64_t            block_cnt:63; /* # of complete wait for lock */
+    bool                is_rlock:1;  /* use rlock pointer */
     s_time_t            time_hold;   /* cumulated lock time */
     s_time_t            time_block;  /* cumulated wait time */
     s_time_t            time_locked; /* system time of last locking */
@@ -95,7 +101,7 @@ struct lock_profile_qhead {
     int32_t                   idx;     /* index for printout */
 };
 
-#define LOCK_PROFILE_(lockname) { .name = #lockname, .lock = &(lockname), }
+#define LOCK_PROFILE_(lockname) { .name = #lockname, .ptr.lock = &(lockname), }
 #define LOCK_PROFILE_PTR_(name)                                               \
     static struct lock_profile * const lock_profile__##name                   \
     __used_section(".lockprofile.data") =                                     \
@@ -128,7 +134,7 @@ struct lock_profile_qhead {
             break;                                                            \
         }                                                                     \
         prof->name = #l;                                                      \
-        prof->lock = &(s)->l;                                                 \
+        prof->ptr.lock = &(s)->l;                                             \
         prof->next = (s)->profile_head.elem_q;                                \
         (s)->profile_head.elem_q = prof;                                      \
     } while( 0 )

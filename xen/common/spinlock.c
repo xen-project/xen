@@ -538,19 +538,31 @@ static void spinlock_profile_iterate(lock_profile_subfunc *sub, void *par)
 static void cf_check spinlock_profile_print_elem(struct lock_profile *data,
     int32_t type, int32_t idx, void *par)
 {
-    struct spinlock *lock = data->lock;
+    unsigned int cpu;
+    unsigned int lockval;
+
+    if ( data->is_rlock )
+    {
+        cpu = data->ptr.rlock->debug.cpu;
+        lockval = data->ptr.rlock->tickets.head_tail;
+    }
+    else
+    {
+        cpu = data->ptr.lock->debug.cpu;
+        lockval = data->ptr.lock->tickets.head_tail;
+    }
 
     printk("%s ", lock_profile_ancs[type].name);
     if ( type != LOCKPROF_TYPE_GLOBAL )
         printk("%d ", idx);
-    printk("%s: addr=%p, lockval=%08x, ", data->name, lock,
-           lock->tickets.head_tail);
-    if ( lock->debug.cpu == SPINLOCK_NO_CPU )
+    printk("%s: addr=%p, lockval=%08x, ", data->name, data->ptr.lock, lockval);
+    if ( cpu == SPINLOCK_NO_CPU )
         printk("not locked\n");
     else
-        printk("cpu=%d\n", lock->debug.cpu);
-    printk("  lock:%" PRId64 "(%" PRI_stime "), block:%" PRId64 "(%" PRI_stime ")\n",
-           data->lock_cnt, data->time_hold, data->block_cnt, data->time_block);
+        printk("cpu=%u\n", cpu);
+    printk("  lock:%" PRIu64 "(%" PRI_stime "), block:%" PRIu64 "(%" PRI_stime ")\n",
+           data->lock_cnt, data->time_hold, (uint64_t)data->block_cnt,
+           data->time_block);
 }
 
 void cf_check spinlock_profile_printall(unsigned char key)
@@ -680,7 +692,7 @@ static int __init cf_check lock_prof_init(void)
     {
         (*q)->next = lock_profile_glb_q.elem_q;
         lock_profile_glb_q.elem_q = *q;
-        (*q)->lock->profile = *q;
+        (*q)->ptr.lock->profile = *q;
     }
 
     _lock_profile_register_struct(LOCKPROF_TYPE_GLOBAL,
