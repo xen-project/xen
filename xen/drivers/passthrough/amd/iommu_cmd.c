@@ -389,10 +389,3 @@ void amd_iommu_flush_all_caches(struct amd_iommu *iommu)
     invalidate_iommu_all(iommu);
     flush_command_buffer(iommu, 0);
 }
-
-void amd_iommu_send_guest_cmd(struct amd_iommu *iommu, u32 cmd[])
-{
-    send_iommu_command(iommu, cmd);
-    /* TBD: Timeout selection may require peeking into cmd[]. */
-    flush_command_buffer(iommu, 0);
-}

@@ -346,12 +346,7 @@ void cf_check amd_iommu_crash_shutdown(void);
 
 /* guest iommu support */
 #ifdef CONFIG_HVM
-void amd_iommu_send_guest_cmd(struct amd_iommu *iommu, u32 cmd[]);
-void guest_iommu_add_ppr_log(struct domain *d, u32 entry[]);
-void guest_iommu_add_event_log(struct domain *d, u32 entry[]);
-int guest_iommu_init(struct domain* d);
-void guest_iommu_destroy(struct domain *d);
-int guest_iommu_set_base(struct domain *d, uint64_t base);
+void guest_iommu_add_ppr_log(struct domain *d, uint32_t entry[]);
 #else
 static inline void guest_iommu_add_ppr_log(struct domain *d, uint32_t entry[]) {}
 #endif
