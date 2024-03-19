@@ -40,12 +40,12 @@ do {                                            \
     if ( condition )                            \
         break;                                  \
     for ( ; ; ) {                               \
-        prepare_to_wait(&wq);                   \
+        prepare_to_wait(&(wq));                 \
         if ( condition )                        \
             break;                              \
         wait();                                 \
     }                                           \
-    finish_wait(&wq);                           \
+    finish_wait(&(wq));                         \
 } while (0)
 
 /* Private functions. */
