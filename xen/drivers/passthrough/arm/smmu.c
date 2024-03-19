@@ -326,7 +326,7 @@ static struct iommu_group *iommu_group_get(struct device *dev)
  */
 #define ARM_SMMU_GR0_NS(smmu)						\
 	((smmu)->base +							\
-		((smmu->options & ARM_SMMU_OPT_SECURE_CFG_ACCESS)	\
+		(((smmu)->options & ARM_SMMU_OPT_SECURE_CFG_ACCESS)	\
 			? 0x400 : 0))
 
 /* Page table bits */
