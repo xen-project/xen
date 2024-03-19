@@ -329,7 +329,7 @@ bool is_ioreq_server_page(struct domain *d, const struct page_info *page)
     unsigned int id;
     bool found = false;
 
-    spin_lock_recursive(&d->ioreq_server.lock);
+    rspin_lock(&d->ioreq_server.lock);
 
     FOR_EACH_IOREQ_SERVER(d, id, s)
     {
@@ -340,7 +340,7 @@ bool is_ioreq_server_page(struct domain *d, const struct page_info *page)
         }
     }
 
-    spin_unlock_recursive(&d->ioreq_server.lock);
+    rspin_unlock(&d->ioreq_server.lock);
 
     return found;
 }
@@ -658,7 +658,7 @@ static int ioreq_server_create(struct domain *d, int bufioreq_handling,
         return -ENOMEM;
 
     domain_pause(d);
-    spin_lock_recursive(&d->ioreq_server.lock);
+    rspin_lock(&d->ioreq_server.lock);
 
     for ( i = 0; i < MAX_NR_IOREQ_SERVERS; i++ )
     {
@@ -686,13 +686,13 @@ static int ioreq_server_create(struct domain *d, int bufioreq_handling,
     if ( id )
         *id = i;
 
-    spin_unlock_recursive(&d->ioreq_server.lock);
+    rspin_unlock(&d->ioreq_server.lock);
     domain_unpause(d);
 
     return 0;
 
  fail:
-    spin_unlock_recursive(&d->ioreq_server.lock);
+    rspin_unlock(&d->ioreq_server.lock);
     domain_unpause(d);
 
     xfree(s);
@@ -704,7 +704,7 @@ static int ioreq_server_destroy(struct domain *d, ioservid_t id)
     struct ioreq_server *s;
     int rc;
 
-    spin_lock_recursive(&d->ioreq_server.lock);
+    rspin_lock(&d->ioreq_server.lock);
 
     s = get_ioreq_server(d, id);
 
@@ -736,7 +736,7 @@ static int ioreq_server_destroy(struct domain *d, ioservid_t id)
     rc = 0;
 
  out:
-    spin_unlock_recursive(&d->ioreq_server.lock);
+    rspin_unlock(&d->ioreq_server.lock);
 
     return rc;
 }
@@ -749,7 +749,7 @@ static int ioreq_server_get_info(struct domain *d, ioservid_t id,
     struct ioreq_server *s;
     int rc;
 
-    spin_lock_recursive(&d->ioreq_server.lock);
+    rspin_lock(&d->ioreq_server.lock);
 
     s = get_ioreq_server(d, id);
 
@@ -783,7 +783,7 @@ static int ioreq_server_get_info(struct domain *d, ioservid_t id,
     rc = 0;
 
  out:
-    spin_unlock_recursive(&d->ioreq_server.lock);
+    rspin_unlock(&d->ioreq_server.lock);
 
     return rc;
 }
@@ -796,7 +796,7 @@ int ioreq_server_get_frame(struct domain *d, ioservid_t id,
 
     ASSERT(is_hvm_domain(d));
 
-    spin_lock_recursive(&d->ioreq_server.lock);
+    rspin_lock(&d->ioreq_server.lock);
 
     s = get_ioreq_server(d, id);
 
@@ -834,7 +834,7 @@ int ioreq_server_get_frame(struct domain *d, ioservid_t id,
     }
 
  out:
-    spin_unlock_recursive(&d->ioreq_server.lock);
+    rspin_unlock(&d->ioreq_server.lock);
 
     return rc;
 }
@@ -850,7 +850,7 @@ static int ioreq_server_map_io_range(struct domain *d, ioservid_t id,
     if ( start > end )
         return -EINVAL;
 
-    spin_lock_recursive(&d->ioreq_server.lock);
+    rspin_lock(&d->ioreq_server.lock);
 
     s = get_ioreq_server(d, id);
 
@@ -886,7 +886,7 @@ static int ioreq_server_map_io_range(struct domain *d, ioservid_t id,
     rc = rangeset_add_range(r, start, end);
 
  out:
-    spin_unlock_recursive(&d->ioreq_server.lock);
+    rspin_unlock(&d->ioreq_server.lock);
 
     return rc;
 }
@@ -902,7 +902,7 @@ static int ioreq_server_unmap_io_range(struct domain *d, ioservid_t id,
     if ( start > end )
         return -EINVAL;
 
-    spin_lock_recursive(&d->ioreq_server.lock);
+    rspin_lock(&d->ioreq_server.lock);
 
     s = get_ioreq_server(d, id);
 
@@ -938,7 +938,7 @@ static int ioreq_server_unmap_io_range(struct domain *d, ioservid_t id,
     rc = rangeset_remove_range(r, start, end);
 
  out:
-    spin_unlock_recursive(&d->ioreq_server.lock);
+    rspin_unlock(&d->ioreq_server.lock);
 
     return rc;
 }
@@ -963,7 +963,7 @@ int ioreq_server_map_mem_type(struct domain *d, ioservid_t id,
     if ( flags & ~XEN_DMOP_IOREQ_MEM_ACCESS_WRITE )
         return -EINVAL;
 
-    spin_lock_recursive(&d->ioreq_server.lock);
+    rspin_lock(&d->ioreq_server.lock);
 
     s = get_ioreq_server(d, id);
 
@@ -978,7 +978,7 @@ int ioreq_server_map_mem_type(struct domain *d, ioservid_t id,
     rc = arch_ioreq_server_map_mem_type(d, s, flags);
 
  out:
-    spin_unlock_recursive(&d->ioreq_server.lock);
+    rspin_unlock(&d->ioreq_server.lock);
 
     if ( rc == 0 )
         arch_ioreq_server_map_mem_type_completed(d, s, flags);
@@ -992,7 +992,7 @@ static int ioreq_server_set_state(struct domain *d, ioservid_t id,
     struct ioreq_server *s;
     int rc;
 
-    spin_lock_recursive(&d->ioreq_server.lock);
+    rspin_lock(&d->ioreq_server.lock);
 
     s = get_ioreq_server(d, id);
 
@@ -1016,7 +1016,7 @@ static int ioreq_server_set_state(struct domain *d, ioservid_t id,
     rc = 0;
 
  out:
-    spin_unlock_recursive(&d->ioreq_server.lock);
+    rspin_unlock(&d->ioreq_server.lock);
     return rc;
 }
 
@@ -1026,7 +1026,7 @@ int ioreq_server_add_vcpu_all(struct domain *d, struct vcpu *v)
     unsigned int id;
     int rc;
 
-    spin_lock_recursive(&d->ioreq_server.lock);
+    rspin_lock(&d->ioreq_server.lock);
 
     FOR_EACH_IOREQ_SERVER(d, id, s)
     {
@@ -1035,7 +1035,7 @@ int ioreq_server_add_vcpu_all(struct domain *d, struct vcpu *v)
             goto fail;
     }
 
-    spin_unlock_recursive(&d->ioreq_server.lock);
+    rspin_unlock(&d->ioreq_server.lock);
 
     return 0;
 
@@ -1050,7 +1050,7 @@ int ioreq_server_add_vcpu_all(struct domain *d, struct vcpu *v)
         ioreq_server_remove_vcpu(s, v);
     }
 
-    spin_unlock_recursive(&d->ioreq_server.lock);
+    rspin_unlock(&d->ioreq_server.lock);
 
     return rc;
 }
@@ -1060,12 +1060,12 @@ void ioreq_server_remove_vcpu_all(struct domain *d, struct vcpu *v)
     struct ioreq_server *s;
     unsigned int id;
 
-    spin_lock_recursive(&d->ioreq_server.lock);
+    rspin_lock(&d->ioreq_server.lock);
 
     FOR_EACH_IOREQ_SERVER(d, id, s)
         ioreq_server_remove_vcpu(s, v);
 
-    spin_unlock_recursive(&d->ioreq_server.lock);
+    rspin_unlock(&d->ioreq_server.lock);
 }
 
 void ioreq_server_destroy_all(struct domain *d)
@@ -1076,7 +1076,7 @@ void ioreq_server_destroy_all(struct domain *d)
     if ( !arch_ioreq_server_destroy_all(d) )
         return;
 
-    spin_lock_recursive(&d->ioreq_server.lock);
+    rspin_lock(&d->ioreq_server.lock);
 
     /* No need to domain_pause() as the domain is being torn down */
 
@@ -1094,7 +1094,7 @@ void ioreq_server_destroy_all(struct domain *d)
         xfree(s);
     }
 
-    spin_unlock_recursive(&d->ioreq_server.lock);
+    rspin_unlock(&d->ioreq_server.lock);
 }
 
 struct ioreq_server *ioreq_server_select(struct domain *d,

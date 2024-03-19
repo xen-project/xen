@@ -2500,7 +2500,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
     if ( unlikely(is_xen_heap_page(pg)) )
     {
         /* NB. May recursively lock from relinquish_memory(). */
-        spin_lock_recursive(&d->page_alloc_lock);
+        rspin_lock(&d->page_alloc_lock);
 
         for ( i = 0; i < (1 << order); i++ )
             arch_free_heap_page(d, &pg[i]);
@@ -2508,7 +2508,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
         d->xenheap_pages -= 1 << order;
         drop_dom_ref = (d->xenheap_pages == 0);
 
-        spin_unlock_recursive(&d->page_alloc_lock);
+        rspin_unlock(&d->page_alloc_lock);
     }
     else
     {
@@ -2517,7 +2517,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
         if ( likely(d) && likely(d != dom_cow) )
         {
             /* NB. May recursively lock from relinquish_memory(). */
-            spin_lock_recursive(&d->page_alloc_lock);
+            rspin_lock(&d->page_alloc_lock);
 
             for ( i = 0; i < (1 << order); i++ )
             {
@@ -2540,7 +2540,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
 
             drop_dom_ref = !domain_adjust_tot_pages(d, -(1 << order));
 
-            spin_unlock_recursive(&d->page_alloc_lock);
+            rspin_unlock(&d->page_alloc_lock);
 
             /*
              * Normally we expect a domain to clear pages before freeing them,
@@ -2756,7 +2756,7 @@ void free_domstatic_page(struct page_info *page)
     ASSERT_ALLOC_CONTEXT();
 
     /* NB. May recursively lock from relinquish_memory(). */
-    spin_lock_recursive(&d->page_alloc_lock);
+    rspin_lock(&d->page_alloc_lock);
 
     arch_free_heap_page(d, page);
 
@@ -2767,7 +2767,7 @@ void free_domstatic_page(struct page_info *page)
     /* Add page on the resv_page_list *after* it has been freed. */
     page_list_add_tail(page, &d->resv_page_list);
 
-    spin_unlock_recursive(&d->page_alloc_lock);
+    rspin_unlock(&d->page_alloc_lock);
 
     if ( drop_dom_ref )
         put_domain(d);

@@ -358,8 +358,8 @@ struct sched_unit {
           (v) = (v)->next_in_list )
 
 /* Per-domain lock can be recursively acquired in fault handlers. */
-#define domain_lock(d) spin_lock_recursive(&(d)->domain_lock)
-#define domain_unlock(d) spin_unlock_recursive(&(d)->domain_lock)
+#define domain_lock(d) rspin_lock(&(d)->domain_lock)
+#define domain_unlock(d) rspin_unlock(&(d)->domain_lock)
 
 struct evtchn_port_ops;
 

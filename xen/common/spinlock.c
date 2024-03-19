@@ -436,7 +436,7 @@ void _spin_barrier(spinlock_t *lock)
     smp_mb();
 }
 
-int _spin_trylock_recursive(spinlock_t *lock)
+bool _rspin_trylock(rspinlock_t *lock)
 {
     unsigned int cpu = smp_processor_id();
 
@@ -448,8 +448,8 @@ int _spin_trylock_recursive(spinlock_t *lock)
 
     if ( likely(lock->recurse_cpu != cpu) )
     {
-        if ( !spin_trylock(lock) )
-            return 0;
+        if ( !_spin_trylock(lock) )
+            return false;
         lock->recurse_cpu = cpu;
     }
 
@@ -457,10 +457,10 @@ int _spin_trylock_recursive(spinlock_t *lock)
     ASSERT(lock->recurse_cnt < SPINLOCK_MAX_RECURSE);
     lock->recurse_cnt++;
 
-    return 1;
+    return true;
 }
 
-void _spin_lock_recursive(spinlock_t *lock)
+void _rspin_lock(rspinlock_t *lock)
 {
     unsigned int cpu = smp_processor_id();
 
@@ -475,7 +475,7 @@ void _spin_lock_recursive(spinlock_t *lock)
     lock->recurse_cnt++;
 }
 
-void _spin_unlock_recursive(spinlock_t *lock)
+void _rspin_unlock(rspinlock_t *lock)
 {
     if ( likely(--lock->recurse_cnt == 0) )
     {

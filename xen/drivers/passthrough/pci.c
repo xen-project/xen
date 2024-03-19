@@ -55,12 +55,12 @@ static DEFINE_RSPINLOCK(_pcidevs_lock);
 /* Do not use, as it has no speculation barrier, use pcidevs_lock() instead. */
 void pcidevs_lock_unsafe(void)
 {
-    _spin_lock_recursive(&_pcidevs_lock);
+    _rspin_lock(&_pcidevs_lock);
 }
 
 void pcidevs_unlock(void)
 {
-    spin_unlock_recursive(&_pcidevs_lock);
+    rspin_unlock(&_pcidevs_lock);
 }
 
 bool pcidevs_locked(void)

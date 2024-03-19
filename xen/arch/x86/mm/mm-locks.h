@@ -79,7 +79,7 @@ static always_inline void _mm_lock(const struct domain *d, mm_lock_t *l,
 {
     if ( !((mm_locked_by_me(l)) && rec) )
         _check_lock_level(d, level);
-    spin_lock_recursive(&l->lock);
+    rspin_lock(&l->lock);
     if ( l->lock.recurse_cnt == 1 )
     {
         l->locker_function = func;
@@ -202,7 +202,7 @@ static inline void mm_unlock(mm_lock_t *l)
         l->locker_function = "nobody";
         _set_lock_level(l->unlock_level);
     }
-    spin_unlock_recursive(&l->lock);
+    rspin_unlock(&l->lock);
 }
 
 static inline void mm_enforce_order_unlock(int unlock_level,

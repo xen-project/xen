@@ -682,7 +682,7 @@ static int page_make_sharable(struct domain *d,
     int rc = 0;
     bool drop_dom_ref = false;
 
-    spin_lock_recursive(&d->page_alloc_lock);
+    rspin_lock(&d->page_alloc_lock);
 
     if ( d->is_dying )
     {
@@ -725,7 +725,7 @@ static int page_make_sharable(struct domain *d,
     }
 
 out:
-    spin_unlock_recursive(&d->page_alloc_lock);
+    rspin_unlock(&d->page_alloc_lock);
 
     if ( drop_dom_ref )
         put_domain(d);
@@ -1936,7 +1936,7 @@ int mem_sharing_fork_reset(struct domain *d, bool reset_state,
         goto state;
 
     /* need recursive lock because we will free pages */
-    spin_lock_recursive(&d->page_alloc_lock);
+    rspin_lock(&d->page_alloc_lock);
     page_list_for_each_safe(page, tmp, &d->page_list)
     {
         shr_handle_t sh;
@@ -1965,7 +1965,7 @@ int mem_sharing_fork_reset(struct domain *d, bool reset_state,
         put_page_alloc_ref(page);
         put_page_and_type(page);
     }
-    spin_unlock_recursive(&d->page_alloc_lock);
+    rspin_unlock(&d->page_alloc_lock);
 
  state:
     if ( reset_state )

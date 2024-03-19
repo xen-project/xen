@@ -919,7 +919,7 @@ static void vprintk_common(const char *prefix, const char *fmt, va_list args)
 
     /* console_lock can be acquired recursively from __printk_ratelimit(). */
     local_irq_save(flags);
-    spin_lock_recursive(&console_lock);
+    rspin_lock(&console_lock);
     state = &this_cpu(state);
 
     (void)vsnprintf(buf, sizeof(buf), fmt, args);
@@ -955,7 +955,7 @@ static void vprintk_common(const char *prefix, const char *fmt, va_list args)
         state->continued = 1;
     }
 
-    spin_unlock_recursive(&console_lock);
+    rspin_unlock(&console_lock);
     local_irq_restore(flags);
 }
 
@@ -1162,14 +1162,14 @@ unsigned long console_lock_recursive_irqsave(void)
     unsigned long flags;
 
     local_irq_save(flags);
-    spin_lock_recursive(&console_lock);
+    rspin_lock(&console_lock);
 
     return flags;
 }
 
 void console_unlock_recursive_irqrestore(unsigned long flags)
 {
-    spin_unlock_recursive(&console_lock);
+    rspin_unlock(&console_lock);
     local_irq_restore(flags);
 }
 
@@ -1230,12 +1230,12 @@ int __printk_ratelimit(int ratelimit_ms, int ratelimit_burst)
             char lost_str[8];
             snprintf(lost_str, sizeof(lost_str), "%d", lost);
             /* console_lock may already be acquired by printk(). */
-            spin_lock_recursive(&console_lock);
+            rspin_lock(&console_lock);
             printk_start_of_line("(XEN) ");
             __putstr("printk: ");
             __putstr(lost_str);
             __putstr(" messages suppressed.\n");
-            spin_unlock_recursive(&console_lock);
+            rspin_unlock(&console_lock);
         }
         local_irq_restore(flags);
         return 1;

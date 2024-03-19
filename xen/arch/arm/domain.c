@@ -987,7 +987,7 @@ static int relinquish_memory(struct domain *d, struct page_list_head *list)
     int               ret = 0;
 
     /* Use a recursive lock, as we may enter 'free_domheap_page'. */
-    spin_lock_recursive(&d->page_alloc_lock);
+    rspin_lock(&d->page_alloc_lock);
 
     page_list_for_each_safe( page, tmp, list )
     {
@@ -1014,7 +1014,7 @@ static int relinquish_memory(struct domain *d, struct page_list_head *list)
     }
 
   out:
-    spin_unlock_recursive(&d->page_alloc_lock);
+    rspin_unlock(&d->page_alloc_lock);
     return ret;
 }
 

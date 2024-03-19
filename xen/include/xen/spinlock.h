@@ -210,10 +210,6 @@ int _spin_is_locked(const spinlock_t *lock);
 int _spin_trylock(spinlock_t *lock);
 void _spin_barrier(spinlock_t *lock);
 
-int _spin_trylock_recursive(spinlock_t *lock);
-void _spin_lock_recursive(spinlock_t *lock);
-void _spin_unlock_recursive(spinlock_t *lock);
-
 static always_inline void spin_lock(spinlock_t *l)
 {
     _spin_lock(l);
@@ -268,21 +264,23 @@ static always_inline void spin_lock_if(bool condition, spinlock_t *l)
 #define spin_barrier(l)               _spin_barrier(l)
 
 /*
- * spin_[un]lock_recursive(): Use these forms when the lock can (safely!) be
+ * rspin_[un]lock(): Use these forms when the lock can (safely!) be
  * reentered recursively on the same CPU. All critical regions that may form
  * part of a recursively-nested set must be protected by these forms. If there
  * are any critical regions that cannot form part of such a set, they can use
  * standard spin_[un]lock().
  */
-#define spin_trylock_recursive(l) \
-    lock_evaluate_nospec(_spin_trylock_recursive(l))
+bool _rspin_trylock(rspinlock_t *lock);
+void _rspin_lock(rspinlock_t *lock);
+void _rspin_unlock(rspinlock_t *lock);
 
-static always_inline void spin_lock_recursive(spinlock_t *l)
+static always_inline void rspin_lock(rspinlock_t *lock)
 {
-    _spin_lock_recursive(l);
+    _rspin_lock(lock);
     block_lock_speculation();
 }
 
-#define spin_unlock_recursive(l)      _spin_unlock_recursive(l)
+#define rspin_trylock(l)              lock_evaluate_nospec(_rspin_trylock(l))
+#define rspin_unlock(l)               _rspin_unlock(l)
 
 #endif /* __SPINLOCK_H__ */

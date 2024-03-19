@@ -1323,7 +1323,7 @@ int arch_set_info_guest(
         {
             bool done = false;
 
-            spin_lock_recursive(&d->page_alloc_lock);
+            rspin_lock(&d->page_alloc_lock);
 
             for ( i = 0; ; )
             {
@@ -1344,7 +1344,7 @@ int arch_set_info_guest(
                     break;
             }
 
-            spin_unlock_recursive(&d->page_alloc_lock);
+            rspin_unlock(&d->page_alloc_lock);
 
             if ( !done )
                 return -ERESTART;
@@ -2183,7 +2183,7 @@ static int relinquish_memory(
     int               ret = 0;
 
     /* Use a recursive lock, as we may enter 'free_domheap_page'. */
-    spin_lock_recursive(&d->page_alloc_lock);
+    rspin_lock(&d->page_alloc_lock);
 
     while ( (page = page_list_remove_head(list)) )
     {
@@ -2324,7 +2324,7 @@ static int relinquish_memory(
     page_list_move(list, &d->arch.relmem_list);
 
  out:
-    spin_unlock_recursive(&d->page_alloc_lock);
+    rspin_unlock(&d->page_alloc_lock);
     return ret;
 }
 
