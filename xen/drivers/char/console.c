@@ -1161,16 +1161,14 @@ unsigned long console_lock_recursive_irqsave(void)
 {
     unsigned long flags;
 
-    local_irq_save(flags);
-    rspin_lock(&console_lock);
+    rspin_lock_irqsave(&console_lock, flags);
 
     return flags;
 }
 
 void console_unlock_recursive_irqrestore(unsigned long flags)
 {
-    rspin_unlock(&console_lock);
-    local_irq_restore(flags);
+    rspin_unlock_irqrestore(&console_lock, flags);
 }
 
 void console_force_unlock(void)

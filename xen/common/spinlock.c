@@ -475,6 +475,16 @@ void _rspin_lock(rspinlock_t *lock)
     lock->recurse_cnt++;
 }
 
+unsigned long _rspin_lock_irqsave(rspinlock_t *lock)
+{
+    unsigned long flags;
+
+    local_irq_save(flags);
+    _rspin_lock(lock);
+
+    return flags;
+}
+
 void _rspin_unlock(rspinlock_t *lock)
 {
     if ( likely(--lock->recurse_cnt == 0) )
@@ -482,6 +492,12 @@ void _rspin_unlock(rspinlock_t *lock)
         lock->recurse_cpu = SPINLOCK_NO_CPU;
         spin_unlock(lock);
     }
+}
+
+void _rspin_unlock_irqrestore(rspinlock_t *lock, unsigned long flags)
+{
+    _rspin_unlock(lock);
+    local_irq_restore(flags);
 }
 
 #ifdef CONFIG_DEBUG_LOCK_PROFILE
