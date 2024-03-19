@@ -34,7 +34,7 @@ struct notifier_head {
 };
 
 #define NOTIFIER_HEAD(name) \
-    struct notifier_head name = { .head = LIST_HEAD_INIT(name.head) }
+    struct notifier_head name = { .head = LIST_HEAD_INIT((name).head) }
 
 
 void notifier_chain_register(
