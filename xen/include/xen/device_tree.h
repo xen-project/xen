@@ -250,7 +250,7 @@ dt_find_interrupt_controller(const struct dt_device_match *matches);
     for ( pp = (dn)->properties; (pp) != NULL; pp = (pp)->next )
 
 #define dt_for_each_device_node(dt, dn)                     \
-    for ( dn = dt; (dn) != NULL; dn = (dn)->allnext )
+    for ( dn = (dt); (dn) != NULL; dn = (dn)->allnext )
 
 #define dt_for_each_child_node(dt, dn)                      \
     for ( dn = (dt)->child; (dn) != NULL; dn = (dn)->sibling )
