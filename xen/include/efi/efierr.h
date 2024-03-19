@@ -22,7 +22,7 @@ Revision History
 
 
 #define EFIWARN(a)                            (a)
-#define EFI_ERROR(a)              (((INTN) a) < 0)
+#define EFI_ERROR(a)              ((INTN)(a) < 0)
 
 
 #define EFI_SUCCESS                             0
