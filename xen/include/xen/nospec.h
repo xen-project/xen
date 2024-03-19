@@ -7,6 +7,8 @@
 #ifndef XEN_NOSPEC_H
 #define XEN_NOSPEC_H
 
+#include <xen/stdbool.h>
+
 #include <asm/nospec.h>
 
 /**
