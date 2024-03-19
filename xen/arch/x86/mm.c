@@ -5900,9 +5900,10 @@ int destroy_xen_mappings(unsigned long s, unsigned long e)
  *
  * Must be limited to XEN_VIRT_{START,END}, i.e. over l2_xenmap[].
  * Must be called with present flags, and over present mappings.
- * It is the callers responsibility to not pass s or e in the middle of
- * superpages if changing the permission on the whole superpage is going to be
- * a problem.
+ * Must be called with 's' on a page/superpage boundary.
+ *
+ * 'e' has no alignment requirements, but the whole page/superpage containing
+ * the non-inclusive boundary will be updated.
  */
 void init_or_livepatch modify_xen_mappings_lite(
     unsigned long s, unsigned long e, unsigned int nf)
@@ -5917,7 +5918,7 @@ void init_or_livepatch modify_xen_mappings_lite(
 
     ASSERT(flags & _PAGE_PRESENT);
     ASSERT(IS_ALIGNED(s, PAGE_SIZE) && s >= XEN_VIRT_START);
-    ASSERT(IS_ALIGNED(e, PAGE_SIZE) && e <= XEN_VIRT_END);
+    ASSERT(e <= XEN_VIRT_END);
 
     while ( v < e )
     {
@@ -5929,6 +5930,8 @@ void init_or_livepatch modify_xen_mappings_lite(
 
         if ( l2e_get_flags(l2e) & _PAGE_PSE )
         {
+            ASSERT(IS_ALIGNED(v, 1UL << L2_PAGETABLE_SHIFT));
+
             l2e_write_atomic(pl2e, l2e_from_intpte((l2e.l2 & ~fm) | flags));
 
             v += 1UL << L2_PAGETABLE_SHIFT;
