@@ -1331,7 +1331,7 @@ unsigned int ioreq_broadcast(ioreq_t *p, bool buffered)
 
 void ioreq_domain_init(struct domain *d)
 {
-    spin_lock_init(&d->ioreq_server.lock);
+    rspin_lock_init(&d->ioreq_server.lock);
 
     arch_ioreq_domain_init(d);
 }

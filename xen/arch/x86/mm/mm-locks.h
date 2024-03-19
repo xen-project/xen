@@ -20,7 +20,7 @@ DECLARE_PERCPU_RWLOCK_GLOBAL(p2m_percpu_rwlock);
 
 static inline void mm_lock_init(mm_lock_t *l)
 {
-    spin_lock_init(&l->lock);
+    rspin_lock_init(&l->lock);
     l->locker = -1;
     l->locker_function = "nobody";
     l->unlock_level = 0;

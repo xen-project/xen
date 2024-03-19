@@ -46,7 +46,7 @@ union lock_debug { };
     lock profiling on:
 
     Global locks which should be subject to profiling must be declared via
-    DEFINE_SPINLOCK.
+    DEFINE_[R]SPINLOCK.
 
     For locks in structures further measures are necessary:
     - the structure definition must include a profile_head with exactly this
@@ -57,7 +57,7 @@ union lock_debug { };
     - the single locks which are subject to profiling have to be initialized
       via
 
-      spin_lock_init_prof(ptr, lock);
+      [r]spin_lock_init_prof(ptr, lock);
 
       with ptr being the main structure pointer and lock the spinlock field
 
@@ -110,12 +110,16 @@ struct lock_profile_qhead {
     spinlock_t l = SPIN_LOCK_UNLOCKED_(NULL);                                 \
     static struct lock_profile lock_profile_data__##l = LOCK_PROFILE_(l);     \
     LOCK_PROFILE_PTR_(l)
+#define DEFINE_RSPINLOCK(l)                                                   \
+    rspinlock_t l = SPIN_LOCK_UNLOCKED_(NULL);                                \
+    static struct lock_profile lock_profile_data__##l = LOCK_PROFILE_(l);     \
+    LOCK_PROFILE_PTR_(l)
 
-#define spin_lock_init_prof(s, l)                                             \
+#define spin_lock_init_prof__(s, l, locktype)                                 \
     do {                                                                      \
         struct lock_profile *prof;                                            \
         prof = xzalloc(struct lock_profile);                                  \
-        (s)->l = (spinlock_t)SPIN_LOCK_UNLOCKED_(prof);                       \
+        (s)->l = (locktype)SPIN_LOCK_UNLOCKED_(prof);                         \
         if ( !prof )                                                          \
         {                                                                     \
             printk(XENLOG_WARNING                                             \
@@ -128,6 +132,9 @@ struct lock_profile_qhead {
         prof->next = (s)->profile_head.elem_q;                                \
         (s)->profile_head.elem_q = prof;                                      \
     } while( 0 )
+
+#define spin_lock_init_prof(s, l) spin_lock_init_prof__(s, l, spinlock_t)
+#define rspin_lock_init_prof(s, l) spin_lock_init_prof__(s, l, rspinlock_t)
 
 void _lock_profile_register_struct(
     int32_t type, struct lock_profile_qhead *qhead, int32_t idx);
@@ -152,8 +159,10 @@ struct lock_profile_qhead { };
     .debug = LOCK_DEBUG_,                                                     \
 }
 #define DEFINE_SPINLOCK(l) spinlock_t l = SPIN_LOCK_UNLOCKED
+#define DEFINE_RSPINLOCK(l) rspinlock_t l = SPIN_LOCK_UNLOCKED
 
 #define spin_lock_init_prof(s, l) spin_lock_init(&((s)->l))
+#define rspin_lock_init_prof(s, l) rspin_lock_init(&((s)->l))
 #define lock_profile_register_struct(type, ptr, idx)
 #define lock_profile_deregister_struct(type, ptr)
 #define spinlock_profile_printall(key)
@@ -183,8 +192,10 @@ typedef struct spinlock {
 #endif
 } spinlock_t;
 
+typedef spinlock_t rspinlock_t;
 
 #define spin_lock_init(l) (*(l) = (spinlock_t)SPIN_LOCK_UNLOCKED)
+#define rspin_lock_init(l) (*(l) = (rspinlock_t)SPIN_LOCK_UNLOCKED)
 
 void _spin_lock(spinlock_t *lock);
 void _spin_lock_cb(spinlock_t *lock, void (*cb)(void *data), void *data);

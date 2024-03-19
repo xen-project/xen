@@ -50,7 +50,7 @@ struct pci_seg {
     } bus2bridge[MAX_BUSES];
 };
 
-static spinlock_t _pcidevs_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_RSPINLOCK(_pcidevs_lock);
 
 /* Do not use, as it has no speculation barrier, use pcidevs_lock() instead. */
 void pcidevs_lock_unsafe(void)

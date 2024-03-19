@@ -376,9 +376,9 @@ struct domain
 
     rcu_read_lock_t  rcu_lock;
 
-    spinlock_t       domain_lock;
+    rspinlock_t      domain_lock;
 
-    spinlock_t       page_alloc_lock; /* protects all the following fields  */
+    rspinlock_t      page_alloc_lock; /* protects all the following fields  */
     struct page_list_head page_list;  /* linked list */
     struct page_list_head extra_page_list; /* linked list (size extra_pages) */
     struct page_list_head xenpage_list; /* linked list (size xenheap_pages) */
@@ -622,7 +622,7 @@ struct domain
 #ifdef CONFIG_IOREQ_SERVER
     /* Lock protects all other values in the sub-struct */
     struct {
-        spinlock_t              lock;
+        rspinlock_t             lock;
         struct ioreq_server     *server[MAX_NR_IOREQ_SERVERS];
     } ioreq_server;
 #endif
