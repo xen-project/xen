@@ -158,6 +158,7 @@
 #endif
 
 #define PGC_preserved (PGC_extra | PGC_static)
+#define PGC_no_buddy_merge PGC_static
 
 #ifndef PGT_TYPE_INFO_INITIALIZER
 #define PGT_TYPE_INFO_INITIALIZER 0
@@ -1503,7 +1504,7 @@ static void free_heap_pages(
             /* Merge with predecessor block? */
             if ( !mfn_valid(page_to_mfn(predecessor)) ||
                  !page_state_is(predecessor, free) ||
-                 (predecessor->count_info & PGC_static) ||
+                 (predecessor->count_info & PGC_no_buddy_merge) ||
                  (PFN_ORDER(predecessor) != order) ||
                  (page_to_nid(predecessor) != node) )
                 break;
@@ -1527,7 +1528,7 @@ static void free_heap_pages(
             /* Merge with successor block? */
             if ( !mfn_valid(page_to_mfn(successor)) ||
                  !page_state_is(successor, free) ||
-                 (successor->count_info & PGC_static) ||
+                 (successor->count_info & PGC_no_buddy_merge) ||
                  (PFN_ORDER(successor) != order) ||
                  (page_to_nid(successor) != node) )
                 break;
