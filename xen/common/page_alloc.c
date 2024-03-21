@@ -157,6 +157,8 @@
 #define PGC_static 0
 #endif
 
+#define PGC_preserved (PGC_extra | PGC_static)
+
 #ifndef PGT_TYPE_INFO_INITIALIZER
 #define PGT_TYPE_INFO_INITIALIZER 0
 #endif
@@ -1423,11 +1425,11 @@ static bool mark_page_free(struct page_info *pg, mfn_t mfn)
     {
     case PGC_state_inuse:
         BUG_ON(pg->count_info & PGC_broken);
-        pg->count_info = PGC_state_free;
+        pg->count_info = PGC_state_free | (pg->count_info & PGC_preserved);
         break;
 
     case PGC_state_offlining:
-        pg->count_info = (pg->count_info & PGC_broken) |
+        pg->count_info = (pg->count_info & (PGC_broken | PGC_preserved)) |
                          PGC_state_offlined;
         pg_offlined = true;
         break;
@@ -2362,7 +2364,7 @@ int assign_pages(
 
         for ( i = 0; i < nr; i++ )
         {
-            ASSERT(!(pg[i].count_info & ~(PGC_extra | PGC_static)));
+            ASSERT(!(pg[i].count_info & ~PGC_preserved));
             if ( pg[i].count_info & PGC_extra )
                 extra_pages++;
         }
@@ -2422,7 +2424,7 @@ int assign_pages(
         page_set_owner(&pg[i], d);
         smp_wmb(); /* Domain pointer must be visible before updating refcnt. */
         pg[i].count_info =
-            (pg[i].count_info & (PGC_extra | PGC_static)) | PGC_allocated | 1;
+            (pg[i].count_info & PGC_preserved) | PGC_allocated | 1;
 
         page_list_add_tail(&pg[i], page_to_list(d, &pg[i]));
     }
