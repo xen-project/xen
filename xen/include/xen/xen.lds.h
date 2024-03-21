@@ -6,6 +6,16 @@
  */
 
 /*
+ * Declare a section whose load address is based at PA 0 rather than
+ * Xen's virtual base address.
+ */
+#ifdef CONFIG_LD_IS_GNU
+# define DECL_SECTION(x) x : AT(ADDR(#x) - __XEN_VIRT_START)
+#else
+# define DECL_SECTION(x) x : AT(ADDR(x) - __XEN_VIRT_START)
+#endif
+
+/*
  * To avoid any confusion, please note that the EFI macro does not correspond
  * to EFI support and is used when linking a native EFI (i.e. PE/COFF) binary,
  * hence its usage in this header.

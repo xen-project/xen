@@ -4,6 +4,9 @@
 OUTPUT_ARCH(powerpc:common64)
 ENTRY(start)
 
+/* Used by the DECL_SECTION() macro to calculate physical load addresses */
+#define __XEN_VIRT_START XEN_VIRT_START
+
 PHDRS
 {
     text PT_LOAD ;
@@ -17,7 +20,7 @@ SECTIONS
     . = XEN_VIRT_START;
     _start = .;
 
-    .text : {
+    DECL_SECTION(.text) {
         _stext = .;            /* Text section */
         *(.text.header)
 
@@ -40,7 +43,7 @@ SECTIONS
     } :text
 
     . = ALIGN(PAGE_SIZE);
-    .rodata : {
+    DECL_SECTION(.rodata) {
         _srodata = .;          /* Read-only data */
         /* Bug frames table */
         __start_bug_frames = .;
@@ -64,7 +67,7 @@ SECTIONS
 
     #if defined(BUILD_ID)
     . = ALIGN(4);
-    .note.gnu.build-id : {
+    DECL_SECTION(.note.gnu.build-id) {
         __note_gnu_build_id_start = .;
         *(.note.gnu.build-id)
         __note_gnu_build_id_end = .;
@@ -73,19 +76,19 @@ SECTIONS
     _erodata = .;                /* End of read-only data */
 
     . = ALIGN(PAGE_SIZE);
-    .data.ro_after_init : {
+    DECL_SECTION(.data.ro_after_init) {
         __ro_after_init_start = .;
         *(.data.ro_after_init)
         . = ALIGN(PAGE_SIZE);
         __ro_after_init_end = .;
     } :text
 
-    .data.read_mostly : {
+    DECL_SECTION(.data.read_mostly) {
         *(.data.read_mostly)
     } :text
 
     . = ALIGN(PAGE_SIZE);
-    .data : {                    /* Data */
+    DECL_SECTION(.data) {                    /* Data */
         *(.data.page_aligned)
         . = ALIGN(8);
         __start_schedulers_array = .;
@@ -100,7 +103,7 @@ SECTIONS
 
     . = ALIGN(PAGE_SIZE);             /* Init code and data */
     __init_begin = .;
-    .init.text : {
+    DECL_SECTION(.init.text) {
         _sinittext = .;
         *(.init.text)
         _einittext = .;
@@ -108,7 +111,7 @@ SECTIONS
     } :text
 
     . = ALIGN(PAGE_SIZE);
-    .init.data : {
+    DECL_SECTION(init.data) {
         *(.init.rodata)
         *(.init.rodata.*)
 
@@ -137,18 +140,18 @@ SECTIONS
         __ctors_end = .;
     } :text
 
-    .got : {
+    DECL_SECTION(.got) {
         *(.got .toc)
     } :text
 
-    .got.plt : {
+    DECL_SECTION(.got.plt) {
         *(.got.plt)
     } :text
 
     . = ALIGN(POINTER_ALIGN);
     __init_end = .;
 
-    .bss : {                     /* BSS */
+    DECL_SECTION(.bss) {                     /* BSS */
         __bss_start = .;
         *(.bss.stack_aligned)
         *(.bss.page_aligned)
@@ -168,7 +171,7 @@ SECTIONS
     _end = . ;
 
     /* Section for the device tree blob (if any). */
-    .dtb : { *(.dtb) } :text
+    DECL_SECTION(.dtb) { *(.dtb) } :text
 
     DWARF2_DEBUG_SECTIONS
 

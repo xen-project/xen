@@ -12,6 +12,7 @@
 
 #define FORMAT "pei-x86-64"
 #undef __XEN_VIRT_START
+#undef DECL_SECTION
 #define __XEN_VIRT_START __image_base__
 #define DECL_SECTION(x) x :
 
@@ -20,11 +21,6 @@ ENTRY(efi_start)
 #else /* !EFI */
 
 #define FORMAT "elf64-x86-64"
-#ifdef CONFIG_LD_IS_GNU
-# define DECL_SECTION(x) x : AT(ADDR(#x) - __XEN_VIRT_START)
-#else
-# define DECL_SECTION(x) x : AT(ADDR(x) - __XEN_VIRT_START)
-#endif
 
 ENTRY(start_pa)
 
