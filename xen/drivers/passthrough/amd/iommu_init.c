@@ -646,7 +646,7 @@ static void cf_check parse_ppr_log_entry(struct amd_iommu *iommu, u32 entry[])
     pcidevs_unlock();
 
     if ( pdev )
-        guest_iommu_add_ppr_log(pdev->domain, entry);
+        /* guest_iommu_add_ppr_log(pdev->domain, entry) */;
 }
 
 static void iommu_check_ppr_log(struct amd_iommu *iommu)

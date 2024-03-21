@@ -52,7 +52,6 @@ struct arch_iommu
         struct {
             unsigned int paging_mode;
             struct page_info *root_table;
-            struct guest_iommu *g_iommu;
         } amd;
     };
 };
