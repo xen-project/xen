@@ -1660,7 +1660,6 @@ void parse_config_data(const char *config_source,
         }
         b_info->tsc_mode = l;
     } else if (!xlu_cfg_get_string(config, "tsc_mode", &buf, 0)) {
-        fprintf(stderr, "got a tsc mode string: \"%s\"\n", buf);
         if (libxl_tsc_mode_from_string(buf, &b_info->tsc_mode)) {
             fprintf(stderr, "ERROR: invalid value \"%s\" for \"tsc_mode\"\n",
                     buf);
