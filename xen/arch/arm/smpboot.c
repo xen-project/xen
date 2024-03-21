@@ -67,7 +67,11 @@ static bool cpu_is_dead;
 
 /* ID of the PCPU we're running on */
 DEFINE_PER_CPU(unsigned int, cpu_id);
-/* XXX these seem awfully x86ish... */
+/*
+ * Although multithread is part of the Arm spec, there are not many
+ * processors supporting multithread and current Xen on Arm assumes there
+ * is no multithread.
+ */
 /* representing HT siblings of each logical CPU */
 DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_sibling_mask);
 /* representing HT and core siblings of each logical CPU */
@@ -86,9 +90,13 @@ static int setup_cpu_sibling_map(int cpu)
          !zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)) )
         return -ENOMEM;
 
-    /* A CPU is a sibling with itself and is always on its own core. */
+    /*
+     * Currently we assume there is no multithread and NUMA, so
+     * a CPU is a sibling with itself, and the all possible CPUs
+     * are supposed to belong to the same socket (NUMA node).
+     */
     cpumask_set_cpu(cpu, per_cpu(cpu_sibling_mask, cpu));
-    cpumask_set_cpu(cpu, per_cpu(cpu_core_mask, cpu));
+    cpumask_copy(per_cpu(cpu_core_mask, cpu), &cpu_possible_map);
 
     return 0;
 }
@@ -278,6 +286,10 @@ void __init smp_init_cpus(void)
         warning_add("WARNING: HMP COMPUTING HAS BEEN ENABLED.\n"
                     "It has implications on the security and stability of the system,\n"
                     "unless the cpu affinity of all domains is specified.\n");
+
+    if ( system_cpuinfo.mpidr.mt == 1 )
+        warning_add("WARNING: MULTITHREADING HAS BEEN DETECTED ON THE PROCESSOR.\n"
+                    "It might impact the security of the system.\n");
 }
 
 unsigned int __init smp_get_max_cpus(void)
