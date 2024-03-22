@@ -18,6 +18,8 @@ ENTRY(entry_int82)
         movl  $HYPERCALL_VECTOR, EFRAME_entry_vector(%rsp)
         SAVE_ALL compat=1 /* DPL1 gate, restricted to 32bit PV guests only. */
 
+        GET_STACK_END(14)
+
         SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
@@ -25,7 +27,7 @@ ENTRY(entry_int82)
 
         CR4_PV32_RESTORE
 
-        GET_CURRENT(bx)
+        movq STACK_CPUINFO_FIELD(current_vcpu)(%r14), %rbx
 
         mov   %rsp, %rdi
         call  do_entry_int82
