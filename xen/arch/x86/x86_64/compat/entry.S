@@ -20,6 +20,8 @@ ENTRY(entry_int82)
         movl  $HYPERCALL_VECTOR, EFRAME_entry_vector(%rsp)
         SAVE_ALL compat=1 /* DPL1 gate, restricted to 32bit PV guests only. */
 
+        GET_STACK_END(14)
+
         SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
@@ -27,7 +29,7 @@ ENTRY(entry_int82)
 
         CR4_PV32_RESTORE
 
-        GET_CURRENT(bx)
+        movq STACK_CPUINFO_FIELD(current_vcpu)(%r14), %rbx
 
         mov   %rsp, %rdi
         call  do_entry_int82
@@ -223,23 +225,24 @@ ENTRY(cstar_enter)
         movl  $TRAP_syscall, EFRAME_entry_vector(%rsp)
         SAVE_ALL
 
+        GET_STACK_END(14)
+
         SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
-        GET_STACK_END(bx)
-        mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
+        mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
         test  %rcx, %rcx
         jz    .Lcstar_cr3_okay
-        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
+        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         mov   %rcx, %cr3
         /* %r12 is still zero at this point. */
-        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
+        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
 .Lcstar_cr3_okay:
         sti
 
         CR4_PV32_RESTORE
 
-        movq  STACK_CPUINFO_FIELD(current_vcpu)(%rbx), %rbx
+        movq  STACK_CPUINFO_FIELD(current_vcpu)(%r14), %rbx
         movq  VCPU_domain(%rbx),%rcx
         cmpb  $0,DOMAIN_is_32bit_pv(%rcx)
         je    switch_to_kernel
