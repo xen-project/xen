@@ -265,21 +265,22 @@ FUNC(lstar_enter)
         movb  $TRAP_syscall >> 8, EFRAME_entry_vector + 1(%rsp)
         SAVE_ALL
 
+        GET_STACK_END(14)
+
         SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
-        GET_STACK_END(bx)
-        mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
+        mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
         test  %rcx, %rcx
         jz    .Llstar_cr3_okay
-        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
+        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         mov   %rcx, %cr3
         /* %r12 is still zero at this point. */
-        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
+        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
 .Llstar_cr3_okay:
         sti
 
-        movq  STACK_CPUINFO_FIELD(current_vcpu)(%rbx), %rbx
+        movq  STACK_CPUINFO_FIELD(current_vcpu)(%r14), %rbx
         testb $TF_kernel_mode,VCPU_thread_flags(%rbx)
         jz    switch_to_kernel
 
@@ -304,23 +305,24 @@ FUNC(cstar_enter)
         movb  $TRAP_syscall >> 8, EFRAME_entry_vector + 1(%rsp)
         SAVE_ALL
 
+        GET_STACK_END(14)
+
         SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
-        GET_STACK_END(bx)
-        mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
+        mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
         test  %rcx, %rcx
         jz    .Lcstar_cr3_okay
-        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
+        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         mov   %rcx, %cr3
         /* %r12 is still zero at this point. */
-        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
+        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
 .Lcstar_cr3_okay:
         sti
 
         CR4_PV32_RESTORE /* Clob: ac */
 
-        movq  STACK_CPUINFO_FIELD(current_vcpu)(%rbx), %rbx
+        movq  STACK_CPUINFO_FIELD(current_vcpu)(%r14), %rbx
 
 #ifdef CONFIG_PV32
         movq  VCPU_domain(%rbx), %rcx
@@ -347,23 +349,24 @@ LABEL(sysenter_eflags_saved, 0)
         movb  $TRAP_syscall >> 8, EFRAME_entry_vector + 1(%rsp)
         SAVE_ALL
 
+        GET_STACK_END(14)
+
         SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
-        GET_STACK_END(bx)
         /* PUSHF above has saved EFLAGS.IF clear (the caller had it set). */
         orl   $X86_EFLAGS_IF, UREGS_eflags(%rsp)
-        mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
+        mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
         test  %rcx, %rcx
         jz    .Lsyse_cr3_okay
-        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
+        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         mov   %rcx, %cr3
         /* %r12 is still zero at this point. */
-        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
+        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
 .Lsyse_cr3_okay:
         sti
 
-        movq  STACK_CPUINFO_FIELD(current_vcpu)(%rbx), %rbx
+        movq  STACK_CPUINFO_FIELD(current_vcpu)(%r14), %rbx
         cmpb  $0,VCPU_sysenter_disables_events(%rbx)
         movq  VCPU_sysenter_addr(%rbx),%rax
         setne %cl
@@ -402,17 +405,18 @@ FUNC(entry_int80)
         movb  $0x80, EFRAME_entry_vector(%rsp)
         SAVE_ALL
 
+        GET_STACK_END(14)
+
         SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
-        GET_STACK_END(bx)
-        mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
+        mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
         test  %rcx, %rcx
         jz    .Lint80_cr3_okay
-        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
+        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         mov   %rcx, %cr3
         /* %r12 is still zero at this point. */
-        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
+        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
 .Lint80_cr3_okay:
         sti
 
@@ -422,7 +426,7 @@ UNLIKELY_START(ne, msi_check)
         call  check_for_unexpected_msi
 UNLIKELY_END(msi_check)
 
-        movq  STACK_CPUINFO_FIELD(current_vcpu)(%rbx), %rbx
+        movq  STACK_CPUINFO_FIELD(current_vcpu)(%r14), %rbx
 
         mov   VCPU_trap_ctxt(%rbx), %rsi
         mov   VCPU_domain(%rbx), %rax
