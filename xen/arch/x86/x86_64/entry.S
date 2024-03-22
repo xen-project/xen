@@ -268,7 +268,7 @@ ENTRY(lstar_enter)
 
         GET_STACK_END(14)
 
-        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
+        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %r14=end, %rdx=0, Clob: abcd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
@@ -306,7 +306,7 @@ ENTRY(cstar_enter)
 
         GET_STACK_END(14)
 
-        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
+        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %r14=end, %rdx=0, Clob: abcd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
@@ -348,7 +348,7 @@ GLOBAL(sysenter_eflags_saved)
 
         GET_STACK_END(14)
 
-        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
+        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %r14=end, %rdx=0, Clob: abcd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         /* PUSHF above has saved EFLAGS.IF clear (the caller had it set). */
@@ -403,7 +403,7 @@ ENTRY(int80_direct_trap)
 
         GET_STACK_END(14)
 
-        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
+        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %r14=end, %rdx=0, Clob: abcd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
@@ -704,7 +704,7 @@ ENTRY(common_interrupt)
 
         GET_STACK_END(14)
 
-        SPEC_CTRL_ENTRY_FROM_INTR /* Req: %rsp=regs, %r14=end, %rdx=0, Clob: acd */
+        SPEC_CTRL_ENTRY_FROM_INTR /* Req: %rsp=regs, %r14=end, %rdx=0, Clob: abcd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
@@ -738,7 +738,7 @@ GLOBAL(handle_exception)
 
         GET_STACK_END(14)
 
-        SPEC_CTRL_ENTRY_FROM_INTR /* Req: %rsp=regs, %r14=end, %rdx=0, Clob: acd */
+        SPEC_CTRL_ENTRY_FROM_INTR /* Req: %rsp=regs, %r14=end, %rdx=0, Clob: abcd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
