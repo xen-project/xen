@@ -58,6 +58,7 @@ XEN_CPUFEATURE(IBPB_ENTRY_HVM,    X86_SYNTH(29)) /* MSR_PRED_CMD used by Xen for
 
 #define X86_SPEC_BHB_TSX          X86_BUG(19) /* Use clear_bhb_tsx for BHI mitigation. */
 #define X86_SPEC_BHB_LOOPS        X86_BUG(20) /* Use clear_bhb_loops for BHI mitigation.*/
+#define X86_SPEC_BHB_LOOPS_LONG   X86_BUG(21) /* Upgrade clear_bhb_loops to the "long" sequence. */
 
 /* Total number of capability words, inc synth and bug words. */
 #define NCAPINTS (FSCAPINTS + X86_NR_SYNTH + X86_NR_BUG) /* N 32-bit words worth of info */
