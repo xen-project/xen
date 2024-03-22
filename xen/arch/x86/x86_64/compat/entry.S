@@ -22,7 +22,7 @@ ENTRY(entry_int82)
 
         GET_STACK_END(14)
 
-        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
+        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %r14=end, %rdx=0, Clob: abcd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         sti
@@ -227,7 +227,7 @@ ENTRY(cstar_enter)
 
         GET_STACK_END(14)
 
-        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %rdx=0, Clob: acd */
+        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, %r14=end, %rdx=0, Clob: abcd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
