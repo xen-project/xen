@@ -54,9 +54,13 @@ END(clear_bhb_tsx)
  *
  * The "short" sequence (5 and 5) is for CPUs prior to Alder Lake / Sapphire
  * Rapids (i.e. Cores prior to Golden Cove and/or Gracemont).
+ *
+ * The "long" sequence (12 and 7) is for Alder Lake / Sapphire Rapids
+ * (i.e. Golden Cove and/or Gracemont cores).  However, such CPUs are expected
+ * to use BHI_DIS_S in preference.
  */
 FUNC(clear_bhb_loops)
-        mov     $5, %ecx
+        ALTERNATIVE "mov $5, %ecx", "mov $12, %ecx", X86_SPEC_BHB_LOOPS_LONG
 
         call    1f
         jmp     5f
@@ -68,7 +72,7 @@ FUNC(clear_bhb_loops)
         int3
 
         .align 64
-2:      mov     $5, %eax
+2:      ALTERNATIVE "mov $5, %eax", "mov $7, %eax", X86_SPEC_BHB_LOOPS_LONG
 
 3:      jmp     4f
         int3
