@@ -75,33 +75,21 @@
  *  - SPEC_CTRL_EXIT_TO_{SVM,VMX}
  */
 
-.macro DO_SPEC_CTRL_COND_IBPB maybexen:req
+.macro DO_COND_IBPB
 /*
- * Requires %rsp=regs (also cpuinfo if !maybexen)
- * Requires %r14=stack_end (if maybexen), %rdx=0
- * Clobbers %rax, %rcx, %rdx
+ * Requires %rbx=SCF, %rdx=0
+ * Clobbers %rax, %rcx
  *
- * Conditionally issue IBPB if SCF_entry_ibpb is active.  In the maybexen
- * case, we can safely look at UREGS_cs to skip taking the hit when
- * interrupting Xen.
+ * Conditionally issue IBPB if SCF_entry_ibpb is active.
  */
-    .if \maybexen
-        testb  $SCF_entry_ibpb, STACK_CPUINFO_FIELD(scf)(%r14)
-        jz     .L\@_skip
-        testb  $3, UREGS_cs(%rsp)
-    .else
-        testb  $SCF_entry_ibpb, CPUINFO_scf(%rsp)
-    .endif
+    testb  $SCF_entry_ibpb, %bl
     jz     .L\@_skip
 
     mov     $MSR_PRED_CMD, %ecx
     mov     $PRED_CMD_IBPB, %eax
     wrmsr
-    jmp     .L\@_done
 
 .L\@_skip:
-    lfence
-.L\@_done:
 .endm
 
 .macro DO_OVERWRITE_RSB tmp=rax xu
@@ -256,8 +244,7 @@
  */
     movzbl STACK_CPUINFO_FIELD(scf)(%r14), %ebx
 
-    ALTERNATIVE "", __stringify(DO_SPEC_CTRL_COND_IBPB maybexen=0),     \
-        X86_FEATURE_IBPB_ENTRY_PV
+    ALTERNATIVE "", DO_COND_IBPB, X86_FEATURE_IBPB_ENTRY_PV
 
     ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_PV
 
@@ -286,8 +273,7 @@
     testb $3, UREGS_cs(%rsp)
     jz .L\@_skip
 
-    ALTERNATIVE "", __stringify(DO_SPEC_CTRL_COND_IBPB maybexen=1),     \
-        X86_FEATURE_IBPB_ENTRY_PV
+    ALTERNATIVE "", DO_COND_IBPB, X86_FEATURE_IBPB_ENTRY_PV
 
     ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_PV
 
@@ -327,7 +313,7 @@
  * Clobbers %rax, %rbx, %rcx, %rdx
  *
  * This is logical merge of:
- *    DO_SPEC_CTRL_COND_IBPB maybexen=0
+ *    DO_COND_IBPB
  *    DO_OVERWRITE_RSB
  *    DO_SPEC_CTRL_ENTRY maybexen=1
  * but with conditionals rather than alternatives.
