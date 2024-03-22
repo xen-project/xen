@@ -278,25 +278,37 @@
 
     ALTERNATIVE "", __stringify(DO_SPEC_CTRL_ENTRY maybexen=0),         \
         X86_FEATURE_SC_MSR_PV
+
+    ALTERNATIVE "lfence", "", X86_SPEC_NO_LFENCE_ENTRY_PV
 .endm
 
 /*
  * Used after an exception or maskable interrupt, hitting Xen or PV context.
- * There will either be a guest speculation context, or (barring fatal
- * exceptions) a well-formed Xen speculation context.
+ * There will either be a guest speculation context, or a well-formed Xen
+ * speculation context, with the exception of one case.  IRET #GP handling may
+ * have a guest choice of MSR_SPEC_CTRL.
+ *
+ * Therefore, we can skip the flush/barrier-like protections when hitting Xen,
+ * but we must still run the mode-based protections.
  */
 .macro SPEC_CTRL_ENTRY_FROM_INTR
 /*
  * Requires %rsp=regs, %r14=stack_end, %rdx=0
  * Clobbers %rax, %rcx, %rdx
  */
+    testb $3, UREGS_cs(%rsp)
+    jz .L\@_skip
+
     ALTERNATIVE "", __stringify(DO_SPEC_CTRL_COND_IBPB maybexen=1),     \
         X86_FEATURE_IBPB_ENTRY_PV
 
     ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_PV
 
+.L\@_skip:
     ALTERNATIVE "", __stringify(DO_SPEC_CTRL_ENTRY maybexen=1),         \
         X86_FEATURE_SC_MSR_PV
+
+    ALTERNATIVE "lfence", "", X86_SPEC_NO_LFENCE_ENTRY_INTR
 .endm
 
 /*
@@ -365,18 +377,9 @@
     movzbl STACK_CPUINFO_FIELD(xen_spec_ctrl)(%r14), %eax
     wrmsr
 
-    /* Opencoded UNLIKELY_START() with no condition. */
-UNLIKELY_DISPATCH_LABEL(\@_serialise):
-    .subsection 1
-    /*
-     * In the case that we might need to set SPEC_CTRL.IBRS for safety, we
-     * need to ensure that an attacker can't poison the `jz .L\@_skip_wrmsr`
-     * to speculate around the WRMSR.  As a result, we need a dispatch
-     * serialising instruction in the else clause.
-     */
 .L\@_skip_msr_spec_ctrl:
+
     lfence
-    UNLIKELY_END(\@_serialise)
 .endm
 
 /*
