@@ -263,9 +263,11 @@
  */
 .macro SPEC_CTRL_ENTRY_FROM_PV
 /*
- * Requires %rsp=regs/cpuinfo, %rdx=0
- * Clobbers %rax, %rcx, %rdx
+ * Requires %rsp=regs/cpuinfo, %r14=stack_end, %rdx=0
+ * Clobbers %rax, %rbx, %rcx, %rdx
  */
+    movzbl STACK_CPUINFO_FIELD(scf)(%r14), %ebx
+
     ALTERNATIVE "", __stringify(DO_SPEC_CTRL_COND_IBPB maybexen=0),     \
         X86_FEATURE_IBPB_ENTRY_PV
 
@@ -289,8 +291,10 @@
 .macro SPEC_CTRL_ENTRY_FROM_INTR
 /*
  * Requires %rsp=regs, %r14=stack_end, %rdx=0
- * Clobbers %rax, %rcx, %rdx
+ * Clobbers %rax, %rbx, %rcx, %rdx
  */
+    movzbl STACK_CPUINFO_FIELD(scf)(%r14), %ebx
+
     testb $3, UREGS_cs(%rsp)
     jz .L\@_skip
 
