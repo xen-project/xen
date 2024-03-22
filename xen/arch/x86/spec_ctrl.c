@@ -52,6 +52,7 @@ static enum bhb_thunk {
     BHB_NONE,
     BHB_TSX,
     BHB_SHORT,
+    BHB_LONG,
 } opt_bhb_seq __initdata;
 
 /* Cmdline controls for Xen's speculative settings. */
@@ -313,6 +314,8 @@ static int __init parse_spec_ctrl(const char *s)
                 opt_bhb_seq = BHB_TSX;
             else if ( !cmdline_strcmp(s, "short") )
                 opt_bhb_seq = BHB_SHORT;
+            else if ( !cmdline_strcmp(s, "long") )
+                opt_bhb_seq = BHB_LONG;
             else
                 rc = -EINVAL;
         }
@@ -570,7 +573,8 @@ static void __init print_details(enum ind_thunk thunk)
            opt_bhb_seq != BHB_NONE    ? "BHB-Seq: " : "",
            opt_bhb_seq == BHB_NONE    ? "" :
            opt_bhb_seq == BHB_TSX     ? "TSX, " :
-           opt_bhb_seq == BHB_SHORT   ? "SHORT, " : "?, ",
+           opt_bhb_seq == BHB_SHORT   ? "SHORT, " :
+           opt_bhb_seq == BHB_LONG    ? "LONG, " : "?, ",
            (!boot_cpu_has(X86_FEATURE_IBRSB) &&
             !boot_cpu_has(X86_FEATURE_IBRS))         ? "No" :
            (default_xen_spec_ctrl & SPEC_CTRL_IBRS)  ? "IBRS+" :  "IBRS-",
@@ -1707,6 +1711,10 @@ static void __init bhi_calculations(void)
 
     switch ( opt_bhb_seq )
     {
+    case BHB_LONG:
+        setup_force_cpu_cap(X86_SPEC_BHB_LOOPS_LONG);
+        fallthrough;
+
     case BHB_SHORT:
         setup_force_cpu_cap(X86_SPEC_BHB_LOOPS);
         break;
