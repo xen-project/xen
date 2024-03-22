@@ -2143,6 +2143,58 @@ void __init init_speculation_mitigations(void)
     print_details(thunk);
 
     /*
+     * With the alternative blocks now chosen, see if we need any other
+     * adjustments for safety.
+     *
+     * We compile the LFENCE in, and patch it out if it's not needed.
+     *
+     * Notes:
+     *  - SPEC_CTRL_ENTRY_FROM_SVM doesn't need an LFENCE because it has an
+     *    unconditional STGI.
+     *  - SPEC_CTRL_ENTRY_FROM_IST handles its own safety, without the use of
+     *    alternatives.
+     *  - DO_OVERWRITE_RSB has conditional branches in it, but it's an inline
+     *    sequence.  It is considered safe for uarch reasons.
+     */
+    {
+        /*
+         * SPEC_CTRL_ENTRY_FROM_PV conditional safety
+         *
+         * DO_SPEC_CTRL_ENTRY (X86_FEATURE_SC_MSR_PV if used) is an
+         * unconditional WRMSR as the last action.
+         *
+         * If we have it, or we're not using any prior conditional mitigation,
+         * then it's safe to drop the LFENCE.
+         */
+        if ( boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
+             !boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV) )
+            setup_force_cpu_cap(X86_SPEC_NO_LFENCE_ENTRY_PV);
+
+        /*
+         * SPEC_CTRL_ENTRY_FROM_INTR conditional safety
+         *
+         * DO_SPEC_CTRL_ENTRY (X86_FEATURE_SC_MSR_PV if used) is an
+         * unconditional WRMSR as the last action.
+         *
+         * If we have it, or we have no protections active in the block that
+         * is skipped when interrupting guest context, then it's safe to drop
+         * the LFENCE.
+         */
+        if ( boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
+             (!boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV) &&
+              !boot_cpu_has(X86_FEATURE_SC_RSB_PV)) )
+            setup_force_cpu_cap(X86_SPEC_NO_LFENCE_ENTRY_INTR);
+
+        /*
+         * SPEC_CTRL_ENTRY_FROM_VMX conditional safety
+         *
+         * Currently there are no safety actions with conditional branches, so
+         * no need for the extra safety LFENCE.
+         */
+        setup_force_cpu_cap(X86_SPEC_NO_LFENCE_ENTRY_VMX);
+    }
+
+    /*
      * If MSR_SPEC_CTRL is available, apply Xen's default setting and discard
      * any firmware settings.  For performance reasons, when safe to do so, we
      * delay applying non-zero settings until after dom0 has been constructed.

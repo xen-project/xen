@@ -43,6 +43,7 @@ ENTRY(vmx_asm_vmexit_handler)
             wrmsr
         .endm
         ALTERNATIVE "", restore_spec_ctrl, X86_FEATURE_SC_MSR_HVM
+        ALTERNATIVE "lfence", "", X86_SPEC_NO_LFENCE_ENTRY_VMX
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         /* Hardware clears MSR_DEBUGCTL on VMExit.  Reinstate it if debugging Xen. */
