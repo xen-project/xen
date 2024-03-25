@@ -102,6 +102,11 @@ __UNLIKELY_END(nsvm_hap)
 
         /* SPEC_CTRL_ENTRY_FROM_SVM    Req: %rsp=regs/cpuinfo, %rdx=0 Clob: acd */
 
+        /*
+         * IBPB is to mitigate BTC/SRSO on AMD/Hygon parts, in particular
+         * making type-confused RETs safe to use.  This is not needed on Zen5
+         * and later parts when SRSO_MSR_FIX (BP-SPEC-REDUCE) is in use.
+         */
         .macro svm_vmexit_cond_ibpb
             testb  $SCF_entry_ibpb, CPUINFO_scf(%rsp)
             jz     .L_skip_ibpb
@@ -113,8 +118,17 @@ __UNLIKELY_END(nsvm_hap)
 	.endm
         ALTERNATIVE "", svm_vmexit_cond_ibpb, X86_FEATURE_IBPB_ENTRY_HVM
 
+        /*
+         * RSB (RAS/RAP) stuffing is to prevents RET predictions following guest
+         * entries.  This is not needed on Zen4 and later, when AutoIBRS is in
+         * use.
+         */
         ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_HVM
 
+        /*
+         * Restore Xen's MSR_SPEC_CTRL setting, making indirect CALLs/JMPs
+         * safe to use.  The guest's setting resides in the VMCB.
+         */
         .macro svm_vmexit_spec_ctrl
             movzbl CPUINFO_xen_spec_ctrl(%rsp), %eax
             movzbl CPUINFO_last_spec_ctrl(%rsp), %edx
