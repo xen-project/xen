@@ -261,10 +261,32 @@
  */
     movzbl STACK_CPUINFO_FIELD(scf)(%r14), %ebx
 
+    /*
+     * For all safety notes, 32bit PV guest kernels run in Ring 1 and are
+     * therefore supervisor (== Xen) in the architecture.  As a result, most
+     * hardware isolation techniques do not work.
+     */
+
+    /*
+     * IBPB is to mitigate BTC/SRSO on AMD/Hygon parts, in particular making
+     * type-confused RETs safe to use.  This is not needed on Zen5 and later
+     * parts when SRSO_U/S_NO is enumerated.
+     */
     ALTERNATIVE "", DO_COND_IBPB, X86_FEATURE_IBPB_ENTRY_PV
 
+    /*
+     * RSB stuffing is to prevent RET predictions following guest entries.
+     * This is not needed if SMEP is active and the RSB is full-width.
+     */
     ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_PV
 
+    /*
+     * Only used on Intel parts.  Restore Xen's MSR_SPEC_CTRL setting.  The
+     * guest can't change it's value behind Xen's back.  For Legacy IBRS, this
+     * flushes/inhibits indirect predictions and does not flush the RSB.  For
+     * eIBRS, this prevents CALLs/JMPs using predictions learnt at a lower
+     * predictor mode, and it flushes the RSB.
+     */
     ALTERNATIVE "", __stringify(DO_SPEC_CTRL_ENTRY maybexen=0),         \
         X86_FEATURE_SC_MSR_PV
 
@@ -286,6 +308,14 @@
  * Clobbers %rax, %rbx, %rcx, %rdx
  */
     movzbl STACK_CPUINFO_FIELD(scf)(%r14), %ebx
+
+    /*
+     * All safety notes the same as SPEC_CTRL_ENTRY_FROM_PV, although there is
+     * a conditional jump skipping some actions when interrupting Xen.
+     *
+     * On Intel parts, the IRET #GP path ends up here with the guest's choice
+     * of MSR_SPEC_CTRL.
+     */
 
     testb $3, UREGS_cs(%rsp)
     jz .L\@_skip
@@ -337,6 +367,19 @@
  */
     movzbl STACK_CPUINFO_FIELD(scf)(%r14), %ebx
 
+    /*
+     * For all safety notes, 32bit PV guest kernels run in Ring 1 and are
+     * therefore supervisor (== Xen) in the architecture.  As a result, most
+     * hardware isolation techniques do not work.
+     */
+
+    /*
+     * IBPB is to mitigate BTC/SRSO on AMD/Hygon parts, in particular making
+     * type-confused RETs safe to use.  This is not needed on Zen5 and later
+     * parts when SRSO_U/S_NO is enumerated.  The SVM path takes care of
+     * Host/Guest interactions prior to clearing GIF, and it's not used on the
+     * VMX path.
+     */
     test    $SCF_ist_ibpb, %bl
     jz      .L\@_skip_ibpb
 
@@ -346,6 +389,12 @@
 
 .L\@_skip_ibpb:
 
+    /*
+     * RSB stuffing is to prevent RET predictions following guest entries.
+     * SCF_ist_rsb is active if either PV or HVM protections are needed.  The
+     * VMX path cannot guarantee to make the RSB safe ahead of taking an IST
+     * vector.
+     */
     test $SCF_ist_rsb, %bl
     jz .L\@_skip_rsb
 
@@ -353,6 +402,16 @@
 
 .L\@_skip_rsb:
 
+    /*
+     * Only used on Intel parts.  Restore Xen's MSR_SPEC_CTRL setting.  PV
+     * guests can't change their value behind Xen's back.  HVM guests have
+     * their value stored in the MSR load/save list.  For Legacy IBRS, this
+     * flushes/inhibits indirect predictions and does not flush the RSB.  For
+     * eIBRS, this prevents CALLs/JMPs using predictions learnt at a lower
+     * predictor mode, and it flushes the RSB.  On eIBRS parts that also
+     * suffer from PBRSB, the prior RSB stuffing suffices to make the RSB
+     * safe.
+     */
     test $SCF_ist_sc_msr, %bl
     jz .L\@_skip_msr_spec_ctrl
 
