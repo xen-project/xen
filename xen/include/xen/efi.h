@@ -31,7 +31,15 @@ union compat_pf_efi_info;
 struct xenpf_efi_runtime_call;
 struct compat_pf_efi_runtime_call;
 
+#if defined(CONFIG_X86) || defined(CONFIG_ARM)
 bool efi_enabled(unsigned int feature);
+#else
+static inline bool efi_enabled(unsigned int feature)
+{
+    return false;
+}
+#endif
+
 void efi_init_memory(void);
 bool efi_boot_mem_unused(unsigned long *start, unsigned long *end);
 bool efi_rs_using_pgtables(void);
