@@ -247,6 +247,16 @@ struct ffa_ctx {
     unsigned long vm_destroy_bitmap[];
 };
 
+extern void *ffa_rx;
+extern void *ffa_tx;
+extern spinlock_t ffa_rx_buffer_lock;
+extern spinlock_t ffa_tx_buffer_lock;
+
+bool ffa_shm_domain_destroy(struct domain *d);
+void ffa_handle_mem_share(struct cpu_user_regs *regs);
+int ffa_handle_mem_reclaim(uint64_t handle, uint32_t flags);
+
+
 static inline uint16_t ffa_get_vm_id(const struct domain *d)
 {
     /* +1 since 0 is reserved for the hypervisor in FF-A */
