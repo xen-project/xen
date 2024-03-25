@@ -34,8 +34,22 @@ ENTRY(vmx_asm_vmexit_handler)
         mov  %rax,VCPU_hvm_guest_cr2(%rbx)
 
         /* SPEC_CTRL_ENTRY_FROM_VMX    Req: b=curr %rsp=regs/cpuinfo, Clob: acd */
+        /*
+         * RSB stuffing is to prevents RET predictions following guest
+         * entries.  This is *not* sufficient to flush all RSB entries on
+         * parts enumerating eIBRS, although the following restore_spec_ctrl
+         * does covers us.
+         */
         ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_HVM
 
+        /*
+         * Restore Xen's MSR_SPEC_CTRL setting.  The guest's value resides in
+         * the MSR load/save list.  For Legacy IBRS, this flushes/inhibits
+         * indirect predictions and does not flush the RSB.  For eIBRS, this
+         * prevents CALLs/JMPs using predictions learnt at a lower predictor
+         * mode, and it flushes the RSB.  On eIBRS parts that also suffer from
+         * PBRSB, the prior RSB stuffing suffices to make the RSB safe.
+         */
         .macro restore_spec_ctrl
             mov    $MSR_SPEC_CTRL, %ecx
             movzbl CPUINFO_xen_spec_ctrl(%rsp), %eax
