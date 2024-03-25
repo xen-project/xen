@@ -58,7 +58,7 @@ void __xsm_action_mismatch_detected(void);
 
 #define XSM_DEFAULT_ARG /* */
 #define XSM_DEFAULT_VOID void
-#define XSM_ASSERT_ACTION(def) xsm_default_t action = def; (void)action
+#define XSM_ASSERT_ACTION(def) xsm_default_t action = (def); (void)action
 
 #else /* CONFIG_XSM */
 
@@ -71,7 +71,7 @@ void __xsm_action_mismatch_detected(void);
 #define XSM_INLINE always_inline
 #define XSM_DEFAULT_ARG xsm_default_t action,
 #define XSM_DEFAULT_VOID xsm_default_t action
-#define XSM_ASSERT_ACTION(def) LINKER_BUG_ON(def != action)
+#define XSM_ASSERT_ACTION(def) LINKER_BUG_ON((def) != action)
 
 #endif /* CONFIG_XSM */
 
