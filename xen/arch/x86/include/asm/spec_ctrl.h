@@ -90,6 +90,7 @@ extern int8_t opt_xpti_hwdom, opt_xpti_domu;
 
 extern bool cpu_has_bug_l1tf;
 extern int8_t opt_pv_l1tf_hwdom, opt_pv_l1tf_domu;
+extern bool opt_bp_spec_reduce;
 
 /*
  * The L1D address mask, which might be wider than reported in CPUID, and the

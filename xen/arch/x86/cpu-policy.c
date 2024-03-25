@@ -14,6 +14,7 @@
 #include <asm/msr-index.h>
 #include <asm/paging.h>
 #include <asm/setup.h>
+#include <asm/spec_ctrl.h>
 #include <asm/xstate.h>
 
 struct cpu_policy __read_mostly       raw_cpu_policy;
@@ -624,6 +625,26 @@ static void __init calculate_pv_max_policy(void)
         __clear_bit(X86_FEATURE_IBRSB, fs);
         __clear_bit(X86_FEATURE_IBRS, fs);
     }
+
+    /*
+     * SRSO_U/S_NO means that the CPU is not vulnerable to SRSO attacks across
+     * the User (CPL3) / Supervisor (CPL<3) boundary.
+     *
+     * PV32 guests are unsupported for speculative issues, and excluded from
+     * consideration for simplicity.
+     *
+     * The PV64 user/kernel boundary is CPL3 on both sides, so SRSO_U/S_NO
+     * won't convey the meaning that a PV kernel expects.
+     *
+     * After discussions with AMD, an implementation detail of having
+     * BP_SPEC_REDUCE active causes the PV64 user/kernel boundary to have a
+     * property compatible with the meaning of SRSO_U/S_NO.
+     *
+     * If BP_SPEC_REDUCE isn't active, remove SRSO_U/S_NO from the PV max
+     * policy, which will cause it to filter out of PV default too.
+     */
+    if ( !boot_cpu_has(X86_FEATURE_SRSO_MSR_FIX) || !opt_bp_spec_reduce )
+        __clear_bit(X86_FEATURE_SRSO_US_NO, fs);
 
     guest_common_max_feature_adjustments(fs);
     guest_common_feature_adjustments(fs);

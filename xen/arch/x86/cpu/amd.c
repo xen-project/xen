@@ -1009,16 +1009,33 @@ static void cf_check fam17_disable_c6(void *arg)
 	wrmsrl(MSR_AMD_CSTATE_CFG, val & mask);
 }
 
-static void amd_check_erratum_1485(void)
+static void amd_check_bp_cfg(void)
 {
-	uint64_t val, chickenbit = (1 << 5);
+	uint64_t val, new = 0;
 
-	if (cpu_has_hypervisor || boot_cpu_data.x86 != 0x19 || !is_zen4_uarch())
+	/*
+	 * AMD Erratum #1485.  Set bit 5, as instructed.
+	 */
+	if (!cpu_has_hypervisor && boot_cpu_data.x86 == 0x19 && is_zen4_uarch())
+		new |= (1 << 5);
+
+	/*
+	 * On hardware supporting SRSO_MSR_FIX, activate BP_SPEC_REDUCE by
+	 * default.  This lets us do two things:
+	 *
+	 * 1) Avoid IBPB-on-entry to mitigate SRSO attacks from HVM guests.
+	 * 2) Advertise SRSO_US_NO to PV guests.
+	 */
+	if (boot_cpu_has(X86_FEATURE_SRSO_MSR_FIX) && opt_bp_spec_reduce)
+		new |= BP_CFG_SPEC_REDUCE;
+
+	/* Avoid reading BP_CFG if we don't intend to change anything. */
+	if (!new)
 		return;
 
 	rdmsrl(MSR_AMD64_BP_CFG, val);
 
-	if (val & chickenbit)
+	if ((val & new) == new)
 		return;
 
 	/*
@@ -1027,7 +1044,7 @@ static void amd_check_erratum_1485(void)
 	 * same time before the chickenbit is set. It's benign because the
 	 * value being written is the same on both.
 	 */
-	wrmsrl(MSR_AMD64_BP_CFG, val | chickenbit);
+	wrmsrl(MSR_AMD64_BP_CFG, val | new);
 }
 
 static void cf_check init_amd(struct cpuinfo_x86 *c)
@@ -1297,7 +1314,7 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 		disable_c1_ramping();
 
 	amd_check_zenbleed();
-	amd_check_erratum_1485();
+	amd_check_bp_cfg();
 
 	if (fam17_c6_disabled)
 		fam17_disable_c6(NULL);
