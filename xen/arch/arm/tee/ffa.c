@@ -192,6 +192,60 @@ out:
                  resp.a7 & mask);
 }
 
+static void handle_features(struct cpu_user_regs *regs)
+{
+    uint32_t a1 = get_user_reg(regs, 1);
+    unsigned int n;
+
+    for ( n = 2; n <= 7; n++ )
+    {
+        if ( get_user_reg(regs, n) )
+        {
+            ffa_set_regs_error(regs, FFA_RET_NOT_SUPPORTED);
+            return;
+        }
+    }
+
+    switch ( a1 )
+    {
+    case FFA_ERROR:
+    case FFA_VERSION:
+    case FFA_SUCCESS_32:
+    case FFA_SUCCESS_64:
+    case FFA_FEATURES:
+    case FFA_ID_GET:
+    case FFA_RX_RELEASE:
+    case FFA_RXTX_UNMAP:
+    case FFA_MEM_RECLAIM:
+    case FFA_PARTITION_INFO_GET:
+    case FFA_MSG_SEND_DIRECT_REQ_32:
+    case FFA_MSG_SEND_DIRECT_REQ_64:
+        ffa_set_regs_success(regs, 0, 0);
+        break;
+    case FFA_MEM_SHARE_64:
+    case FFA_MEM_SHARE_32:
+        /*
+         * We currently don't support dynamically allocated buffers. Report
+         * that with 0 in bit[0] of w2.
+         */
+        ffa_set_regs_success(regs, 0, 0);
+        break;
+    case FFA_RXTX_MAP_64:
+    case FFA_RXTX_MAP_32:
+        /*
+         * We currently support 4k pages only, report that as 00 in
+         * bit[0:1] in w0. This needs to be revised if Xen page size
+         * differs from FFA_PAGE_SIZE (SZ_4K).
+         */
+        BUILD_BUG_ON(PAGE_SIZE != FFA_PAGE_SIZE);
+        ffa_set_regs_success(regs, 0, 0);
+        break;
+    default:
+        ffa_set_regs_error(regs, FFA_RET_NOT_SUPPORTED);
+        break;
+    }
+}
+
 static bool ffa_handle_call(struct cpu_user_regs *regs)
 {
     uint32_t fid = get_user_reg(regs, 0);
@@ -211,6 +265,9 @@ static bool ffa_handle_call(struct cpu_user_regs *regs)
         return true;
     case FFA_ID_GET:
         ffa_set_regs_success(regs, ffa_get_vm_id(d), 0);
+        return true;
+    case FFA_FEATURES:
+        handle_features(regs);
         return true;
     case FFA_RXTX_MAP_32:
     case FFA_RXTX_MAP_64:
