@@ -49,7 +49,7 @@ int compat_common_vcpu_op(int cmd, struct vcpu *v,
     {
     case VCPUOP_initialise:
     {
-        if ( v->vcpu_info_area.map == &dummy_vcpu_info )
+        if ( is_pv_domain(d) && v->vcpu_info_area.map == &dummy_vcpu_info )
             return -EINVAL;
 
 #ifdef CONFIG_HVM
