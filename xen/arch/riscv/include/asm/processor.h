@@ -12,6 +12,9 @@
 
 #ifndef __ASSEMBLY__
 
+/* TODO: need to be implemeted */
+#define smp_processor_id() 0
+
 /* On stack VCPU state */
 struct cpu_user_regs
 {
@@ -52,6 +55,23 @@ struct cpu_user_regs
     /* pointer to previous stack_cpu_regs */
     unsigned long pregs;
 };
+
+/* TODO: need to implement */
+#define cpu_to_core(cpu)   0
+#define cpu_to_socket(cpu) 0
+
+static inline void cpu_relax(void)
+{
+#ifdef __riscv_zihintpause
+    /* Reduce instruction retirement. */
+    __asm__ __volatile__ ( "pause" );
+#else
+    /* Encoding of the pause instruction */
+    __asm__ __volatile__ ( ".insn 0x0100000F" );
+#endif
+
+    barrier();
+}
 
 static inline void wfi(void)
 {
