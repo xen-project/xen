@@ -59,6 +59,7 @@ static int8_t __initdata opt_ibrs = -1;
 int8_t __initdata opt_stibp = -1;
 bool __ro_after_init opt_ssbd;
 int8_t __initdata opt_psfd = -1;
+int8_t __ro_after_init opt_bhi_dis_s = -1;
 
 int8_t __ro_after_init opt_ibpb_ctxt_switch = -1;
 int8_t __ro_after_init opt_eager_fpu = -1;
@@ -281,6 +282,8 @@ static int __init cf_check parse_spec_ctrl(const char *s)
             opt_ssbd = val;
         else if ( (val = parse_boolean("psfd", s, ss)) >= 0 )
             opt_psfd = val;
+        else if ( (val = parse_boolean("bhi-dis-s", s, ss)) >= 0 )
+            opt_bhi_dis_s = val;
 
         /* Misc settings. */
         else if ( (val = parse_boolean("ibpb", s, ss)) >= 0 )
@@ -536,7 +539,7 @@ static void __init print_details(enum ind_thunk thunk)
                "\n");
 
     /* Settings for Xen's protection, irrespective of guests. */
-    printk("  Xen settings: %s%sSPEC_CTRL: %s%s%s%s%s, Other:%s%s%s%s%s%s%s\n",
+    printk("  Xen settings: %s%sSPEC_CTRL: %s%s%s%s%s%s, Other:%s%s%s%s%s%s%s\n",
            thunk != THUNK_NONE      ? "BTI-Thunk: " : "",
            thunk == THUNK_NONE      ? "" :
            thunk == THUNK_RETPOLINE ? "RETPOLINE, " :
@@ -554,6 +557,8 @@ static void __init print_details(enum ind_thunk thunk)
            (!boot_cpu_has(X86_FEATURE_PSFD) &&
             !boot_cpu_has(X86_FEATURE_INTEL_PSFD))   ? "" :
            (default_xen_spec_ctrl & SPEC_CTRL_PSFD)  ? " PSFD+" : " PSFD-",
+           !boot_cpu_has(X86_FEATURE_BHI_CTRL)       ? "" :
+           (default_xen_spec_ctrl & SPEC_CTRL_BHI_DIS_S) ? " BHI_DIS_S+" : " BHI_DIS_S-",
            !(caps & ARCH_CAPS_TSX_CTRL)              ? "" :
            (opt_tsx & 1)                             ? " TSX+" : " TSX-",
            !cpu_has_srbds_ctrl                       ? "" :
@@ -1608,6 +1613,21 @@ static void __init gds_calculations(void)
     }
 }
 
+/*
+ * https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/technical-documentation/branch-history-injection.html
+ */
+static void __init bhi_calculations(void)
+{
+    if ( opt_bhi_dis_s == -1 )
+        opt_bhi_dis_s = !boot_cpu_has(X86_FEATURE_BHI_NO);
+
+    if ( !boot_cpu_has(X86_FEATURE_BHI_CTRL) )
+        opt_bhi_dis_s = false;
+
+    if ( opt_bhi_dis_s )
+        default_xen_spec_ctrl |= SPEC_CTRL_BHI_DIS_S;
+}
+
 void spec_ctrl_init_domain(struct domain *d)
 {
     bool pv = is_pv_domain(d);
@@ -2151,6 +2171,8 @@ void __init init_speculation_mitigations(void)
     }
 
     gds_calculations();
+
+    bhi_calculations();
 
     print_details(thunk);
 
