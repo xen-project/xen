@@ -94,7 +94,7 @@ extern int8_t opt_l1d_flush;
 extern bool opt_branch_harden;
 
 extern bool bsp_delay_spec_ctrl;
-extern uint8_t default_xen_spec_ctrl;
+extern unsigned int default_xen_spec_ctrl;
 extern uint8_t default_scf;
 
 extern int8_t opt_xpti_hwdom, opt_xpti_domu;
