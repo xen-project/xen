@@ -61,14 +61,14 @@ __UNLIKELY_END(nsvm_hap)
         /* SPEC_CTRL_EXIT_TO_SVM       Req: b=curr %rsp=regs/cpuinfo, Clob: acd */
         .macro svm_vmentry_spec_ctrl
             mov    VCPU_arch_msrs(%rbx), %rax
-            movzbl CPUINFO_last_spec_ctrl(%rsp), %edx
+            mov    CPUINFO_last_spec_ctrl(%rsp), %edx
             mov    VCPUMSR_spec_ctrl_raw(%rax), %eax
             cmp    %edx, %eax
             je     1f /* Skip write if value is correct. */
             mov    $MSR_SPEC_CTRL, %ecx
             xor    %edx, %edx
             wrmsr
-            mov    %al, CPUINFO_last_spec_ctrl(%rsp)
+            mov    %eax, CPUINFO_last_spec_ctrl(%rsp)
 1:          /* No Spectre v1 concerns.  Execution will hit VMRUN imminently. */
         .endm
         ALTERNATIVE "", svm_vmentry_spec_ctrl, X86_FEATURE_SC_MSR_HVM
@@ -128,14 +128,14 @@ __UNLIKELY_END(nsvm_hap)
          * safe to use.  The guest's setting resides in the VMCB.
          */
         .macro svm_vmexit_spec_ctrl
-            movzbl CPUINFO_xen_spec_ctrl(%rsp), %eax
-            movzbl CPUINFO_last_spec_ctrl(%rsp), %edx
+            mov    CPUINFO_xen_spec_ctrl(%rsp), %eax
+            mov    CPUINFO_last_spec_ctrl(%rsp), %edx
             cmp    %edx, %eax
             je     1f /* Skip write if value is correct. */
             mov    $MSR_SPEC_CTRL, %ecx
             xor    %edx, %edx
             wrmsr
-            mov    %al, CPUINFO_last_spec_ctrl(%rsp)
+            mov    %eax, CPUINFO_last_spec_ctrl(%rsp)
 1:
         .endm
         ALTERNATIVE "", svm_vmexit_spec_ctrl, X86_FEATURE_SC_MSR_HVM

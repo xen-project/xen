@@ -205,10 +205,10 @@
         setnz %al
         not %eax
         and %al, STACK_CPUINFO_FIELD(scf)(%r14)
-        movzbl STACK_CPUINFO_FIELD(xen_spec_ctrl)(%r14), %eax
+        mov STACK_CPUINFO_FIELD(xen_spec_ctrl)(%r14), %eax
     .else
         andb $~SCF_use_shadow, CPUINFO_scf(%rsp)
-        movzbl CPUINFO_xen_spec_ctrl(%rsp), %eax
+        mov  CPUINFO_xen_spec_ctrl(%rsp), %eax
     .endif
 
     wrmsr
@@ -406,7 +406,7 @@
 
     /* Load Xen's intended value. */
     mov $MSR_SPEC_CTRL, %ecx
-    movzbl STACK_CPUINFO_FIELD(xen_spec_ctrl)(%r14), %eax
+    mov STACK_CPUINFO_FIELD(xen_spec_ctrl)(%r14), %eax
     wrmsr
 
 .L\@_skip_msr_spec_ctrl:

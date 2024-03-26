@@ -56,7 +56,7 @@ static bool __initdata opt_branch_harden =
 static bool __initdata opt_lock_harden;
 
 bool __initdata bsp_delay_spec_ctrl;
-uint8_t __ro_after_init default_xen_spec_ctrl;
+unsigned int __ro_after_init default_xen_spec_ctrl;
 uint8_t __ro_after_init default_scf;
 
 paddr_t __ro_after_init l1tf_addr_mask, __ro_after_init l1tf_safe_maddr;

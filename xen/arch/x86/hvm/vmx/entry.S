@@ -52,7 +52,7 @@ ENTRY(vmx_asm_vmexit_handler)
          */
         .macro restore_spec_ctrl
             mov    $MSR_SPEC_CTRL, %ecx
-            movzbl CPUINFO_xen_spec_ctrl(%rsp), %eax
+            mov    CPUINFO_xen_spec_ctrl(%rsp), %eax
             xor    %edx, %edx
             wrmsr
         .endm
