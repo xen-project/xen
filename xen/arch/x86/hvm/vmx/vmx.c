@@ -48,6 +48,7 @@
 #include <asm/mce.h>
 #include <asm/monitor.h>
 #include <asm/prot-key.h>
+#include <asm/spec_ctrl.h>
 #include <public/arch-x86/cpuid.h>
 
 static bool_t __initdata opt_force_ept;
@@ -840,6 +841,22 @@ static void cf_check vmx_cpuid_policy_changed(struct vcpu *v)
 
         if ( !cpu_has_vmx_virt_spec_ctrl )
             vmx_del_msr(v, MSR_SPEC_CTRL, VMX_MSR_GUEST);
+    }
+
+    if ( cpu_has_vmx_virt_spec_ctrl )
+    {
+        /*
+         * If we're on BHI_DIS_S capable hardware, the short loop sequence is
+         * not sufficient to mitigate Native-BHI.  If the VM can't see it
+         * (i.e. it's levelled with older hardware), force it behind the
+         * guests back for safey.
+         *
+         * Because there's not a real Host/Guest split of the MSR_SPEC_CTRL
+         * value, this only works as expected when Xen is using BHI_DIS_S too.
+         */
+        bool force_bhi_dis_s = opt_bhi_dis_s && !cp->feat.bhi_ctrl;
+
+        __vmwrite(SPEC_CTRL_MASK, force_bhi_dis_s ? SPEC_CTRL_BHI_DIS_S : 0);
     }
 
     /* MSR_PRED_CMD is safe to pass through if the guest knows about it. */
