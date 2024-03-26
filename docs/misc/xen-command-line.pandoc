@@ -2377,7 +2377,8 @@ By default SSBD will be mitigated at runtime (i.e `ssbd=runtime`).
 >              {msr-sc,rsb,verw,ibpb-entry}=<bool>|{pv,hvm}=<bool>,
 >              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb,ssbd,psfd,
 >              eager-fpu,l1d-flush,branch-harden,srb-lock,
->              unpriv-mmio,gds-mit,div-scrub,lock-harden}=<bool> ]`
+>              unpriv-mmio,gds-mit,div-scrub,lock-harden,
+>              bhi-dis-s}=<bool> ]`
 
 Controls for speculative execution sidechannel mitigations.  By default, Xen
 will pick the most appropriate mitigations based on compiled in support,
@@ -2457,6 +2458,11 @@ On hardware supporting PSFD (Predictive Store Forwarding Disable), the `psfd=`
 option can be used to force or prevent Xen using the feature itself.  By
 default, Xen will not use PSFD.  PSFD is implied by SSBD, and SSBD is off by
 default.
+
+On hardware supporting BHI_DIS_S (Branch History Injection Disable
+Supervisor), the `bhi-dis-s=` option can be used to force or prevent Xen using
+the feature itself.  By default Xen will use BHI_DIS_S on hardware susceptible
+to Branch History Injection.
 
 On hardware supporting IBPB (Indirect Branch Prediction Barrier), the `ibpb=`
 option can be used to force (the default) or prevent Xen from issuing branch
