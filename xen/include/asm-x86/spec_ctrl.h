@@ -89,6 +89,7 @@ static always_inline void spec_ctrl_new_guest_context(void)
 
 extern int8_t opt_ibpb_ctxt_switch;
 extern bool opt_ssbd;
+extern int8_t opt_bhi_dis_s;
 extern int8_t opt_eager_fpu;
 extern int8_t opt_l1d_flush;
 extern bool opt_branch_harden;
