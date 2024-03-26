@@ -102,7 +102,7 @@
         jz     .L\@_skip
         testb  $3, UREGS_cs(%rsp)
     .else
-        testb  $SCF_entry_ibpb, CPUINFO_xen_spec_ctrl(%rsp)
+        testb  $SCF_entry_ibpb, CPUINFO_spec_ctrl_flags(%rsp)
     .endif
     jz     .L\@_skip
 
