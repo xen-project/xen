@@ -83,25 +83,27 @@ let validate cf expected other =
   let err = ref [] in
   let append x = err := x :: !err in
   List.iter (fun (k, v) ->
+      let parse ~err_msg parser v f =
+        match parser v with
+        | None -> append (k, err_msg)
+        | Some r -> f r
+      in
       try
         if not (List.mem_assoc k expected) then
           other k v
         else let ty = List.assoc k expected in
           match ty with
           | Unit f       -> f ()
-          | Bool f       -> f (bool_of_string v)
+          | Bool f       -> parse ~err_msg:"expect bool arg" bool_of_string_opt v f
           | String f     -> f v
-          | Int f        -> f (int_of_string v)
-          | Float f      -> f (float_of_string v)
-          | Set_bool r   -> r := (bool_of_string v)
+          | Int f        -> parse ~err_msg:"expect int arg" int_of_string_opt v f
+          | Float f      -> parse ~err_msg:"expect float arg" float_of_string_opt v f
+          | Set_bool r   -> parse ~err_msg:"expect bool arg" bool_of_string_opt v (fun x -> r := x)
           | Set_string r -> r := v
-          | Set_int r    -> r := int_of_string v
-          | Set_float r  -> r := (float_of_string v)
+          | Set_int r    -> parse ~err_msg:"expect int arg" int_of_string_opt v (fun x -> r:= x)
+          | Set_float r  -> parse ~err_msg:"expect float arg" float_of_string_opt v (fun x -> r := x)
       with
       | Not_found                 -> append (k, "unknown key")
-      | Failure "int_of_string"   -> append (k, "expect int arg")
-      | Failure "bool_of_string"  -> append (k, "expect bool arg")
-      | Failure "float_of_string" -> append (k, "expect float arg")
       | exn                       -> append (k, Printexc.to_string exn)
     ) cf;
   if !err != [] then raise (Error !err)
