@@ -67,7 +67,7 @@
 #define TRC_SCHED_CLASS_EVT(_c, _e) \
   ( ( TRC_SCHED_CLASS | \
       ((TRC_SCHED_##_c << TRC_SCHED_ID_SHIFT) & TRC_SCHED_ID_MASK) ) + \
-    (_e & TRC_SCHED_EVT_MASK) )
+    ((_e) & TRC_SCHED_EVT_MASK) )
 
 /* Trace classes for DOM0 operations */
 #define TRC_DOM0_DOMOPS     0x00041000   /* Domains manipulations */
