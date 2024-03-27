@@ -324,8 +324,6 @@ static void setup_p6_watchdog(unsigned counter)
 {
     unsigned int evntsel;
 
-    nmi_perfctr_msr = MSR_P6_PERFCTR(0);
-
     if ( !nmi_p6_event_width && current_cpu_data.cpuid_level >= 0xa )
         nmi_p6_event_width = MASK_EXTR(cpuid_eax(0xa), P6_EVENT_WIDTH_MASK);
     if ( !nmi_p6_event_width )
@@ -334,6 +332,8 @@ static void setup_p6_watchdog(unsigned counter)
     if ( nmi_p6_event_width < P6_EVENT_WIDTH_MIN ||
          nmi_p6_event_width > BITS_PER_LONG )
         return;
+
+    nmi_perfctr_msr = MSR_P6_PERFCTR(0);
 
     clear_msr_range(MSR_P6_EVNTSEL(0), 2);
     clear_msr_range(MSR_P6_PERFCTR(0), 2);
@@ -350,13 +350,13 @@ static void setup_p6_watchdog(unsigned counter)
     wrmsr(MSR_P6_EVNTSEL(0), evntsel, 0);
 }
 
-static int setup_p4_watchdog(void)
+static void setup_p4_watchdog(void)
 {
     uint64_t misc_enable;
 
     rdmsrl(MSR_IA32_MISC_ENABLE, misc_enable);
     if (!(misc_enable & MSR_IA32_MISC_ENABLE_PERF_AVAIL))
-        return 0;
+        return;
 
     nmi_perfctr_msr = MSR_P4_IQ_PERFCTR0;
     nmi_p4_cccr_val = P4_NMI_IQ_CCCR0;
@@ -379,13 +379,12 @@ static int setup_p4_watchdog(void)
     clear_msr_range(0x3E0, 2);
     clear_msr_range(MSR_P4_BPU_CCCR0, 18);
     clear_msr_range(MSR_P4_BPU_PERFCTR0, 18);
-        
+
     wrmsrl(MSR_P4_CRU_ESCR0, P4_NMI_CRU_ESCR0);
     wrmsrl(MSR_P4_IQ_CCCR0, P4_NMI_IQ_CCCR0 & ~P4_CCCR_ENABLE);
     write_watchdog_counter("P4_IQ_COUNTER0");
     apic_write(APIC_LVTPC, APIC_DM_NMI);
     wrmsrl(MSR_P4_IQ_CCCR0, nmi_p4_cccr_val);
-    return 1;
 }
 
 void setup_apic_nmi_watchdog(void)
@@ -400,8 +399,6 @@ void setup_apic_nmi_watchdog(void)
         case 0xf ... 0x19:
             setup_k7_watchdog();
             break;
-        default:
-            return;
         }
         break;
     case X86_VENDOR_INTEL:
@@ -412,14 +409,16 @@ void setup_apic_nmi_watchdog(void)
                               : CORE_EVENT_CPU_CLOCKS_NOT_HALTED);
             break;
         case 15:
-            if (!setup_p4_watchdog())
-                return;
+            setup_p4_watchdog();
             break;
-        default:
-            return;
         }
         break;
-    default:
+    }
+
+    if ( nmi_perfctr_msr == 0 )
+    {
+        printk(XENLOG_WARNING "Failed to configure NMI watchdog\n");
+        nmi_watchdog = NMI_NONE;
         return;
     }
 
