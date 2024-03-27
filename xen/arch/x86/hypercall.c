@@ -211,8 +211,13 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int nr,
                 cval = va_arg(args, unsigned int);
                 if ( cval == nval )
                     mask &= ~1U;
-                else
-                    BUG_ON(nval == (unsigned int)nval);
+                else if ( nval == (unsigned int)nval )
+                {
+                    printk(XENLOG_G_ERR
+                           "multicall (op %lu) bogus continuation arg%u (%#lx)\n",
+                           mcs->call.op, i, nval);
+                    domain_crash(current->domain);
+                }
             }
             else if ( id && *id == i )
             {
@@ -224,8 +229,13 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int nr,
                 mcs->call.args[i] = cval;
                 ++rc;
             }
-            else
-                BUG_ON(mcs->call.args[i] != (unsigned int)mcs->call.args[i]);
+            else if ( mcs->call.args[i] != (unsigned int)mcs->call.args[i] )
+            {
+                printk(XENLOG_G_ERR
+                       "multicall (op %lu) bad continuation arg%u (%#lx)\n",
+                       mcs->call.op, i, mcs->call.args[i]);
+                domain_crash(current->domain);
+            }
         }
     }
     else
@@ -251,8 +261,13 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int nr,
                 cval = va_arg(args, unsigned int);
                 if ( cval == nval )
                     mask &= ~1U;
-                else
-                    BUG_ON(nval == (unsigned int)nval);
+                else if ( nval == (unsigned int)nval )
+                {
+                    printk(XENLOG_G_ERR
+                           "hypercall (op %u) bogus continuation arg%u (%#lx)\n",
+                           regs->eax, i, nval);
+                    domain_crash(current->domain);
+                }
             }
             else if ( id && *id == i )
             {
@@ -264,8 +279,13 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int nr,
                 *reg = cval;
                 ++rc;
             }
-            else
-                BUG_ON(*reg != (unsigned int)*reg);
+            else if ( *reg != (unsigned int)*reg )
+            {
+                printk(XENLOG_G_ERR
+                       "hypercall (op %u) bad continuation arg%u (%#lx)\n",
+                       regs->eax, i, *reg);
+                domain_crash(current->domain);
+            }
         }
     }
 
