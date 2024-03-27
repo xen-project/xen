@@ -22,9 +22,9 @@ Revision History
 #pragma pack()
 #endif
 
-#define EFIERR(a)           (0x8000000000000000ULL | a)
+#define EFIERR(a)           (0x8000000000000000ULL | (a))
 #define EFI_ERROR_MASK      0x8000000000000000ULL
-#define EFIERR_OEM(a)       (0xc000000000000000ULL | a)
+#define EFIERR_OEM(a)       (0xc000000000000000ULL | (a))
 
 #define BAD_POINTER         0xFBFBFBFBFBFBFBFBULL
 #define MAX_ADDRESS         0xFFFFFFFFFFFFFFFFULL

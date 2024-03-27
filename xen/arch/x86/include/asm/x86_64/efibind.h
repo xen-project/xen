@@ -117,9 +117,9 @@ typedef uint64_t   UINTN;
     #endif
 #endif
 
-#define EFIERR(a)           (0x8000000000000000 | a)
+#define EFIERR(a)           (0x8000000000000000 | (a))
 #define EFI_ERROR_MASK      0x8000000000000000
-#define EFIERR_OEM(a)       (0xc000000000000000 | a)
+#define EFIERR_OEM(a)       (0xc000000000000000 | (a))
 
 
 #define BAD_POINTER         0xFBFBFBFBFBFBFBFB
