@@ -150,7 +150,7 @@
 #include <asm/paging.h>
 #else
 #define p2m_pod_offline_or_broken_hit(pg) 0
-#define p2m_pod_offline_or_broken_replace(pg) BUG_ON(pg != NULL)
+#define p2m_pod_offline_or_broken_replace(pg) BUG_ON(pg)
 #endif
 
 #ifndef PGC_static
