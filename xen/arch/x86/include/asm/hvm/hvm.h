@@ -579,8 +579,24 @@ static inline unsigned int hvm_get_insn_bytes(struct vcpu *v, uint8_t *buf)
             ? alternative_call(hvm_funcs.get_insn_bytes, v, buf) : 0);
 }
 
-static inline void hvm_invalidate_regs_fields(struct cpu_user_regs *regs)
+static inline void hvm_sanitize_regs_fields(struct cpu_user_regs *regs,
+                                            bool compat)
 {
+    if ( compat )
+    {
+        /* Clear GPR upper halves, to counteract guests playing games. */
+        regs->rbp = (uint32_t)regs->ebp;
+        regs->rbx = (uint32_t)regs->ebx;
+        regs->rax = (uint32_t)regs->eax;
+        regs->rcx = (uint32_t)regs->ecx;
+        regs->rdx = (uint32_t)regs->edx;
+        regs->rsi = (uint32_t)regs->esi;
+        regs->rdi = (uint32_t)regs->edi;
+        regs->rip = (uint32_t)regs->eip;
+        regs->rflags = (uint32_t)regs->eflags;
+        regs->rsp = (uint32_t)regs->esp;
+    }
+
 #ifndef NDEBUG
     regs->error_code = 0xbeef;
     regs->entry_vector = 0xbeef;

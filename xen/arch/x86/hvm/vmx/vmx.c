@@ -4041,6 +4041,7 @@ static void undo_nmis_unblocked_by_iret(void)
 void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned long exit_qualification, exit_reason, idtv_info, intr_info = 0;
+    unsigned long cs_ar_bytes = 0;
     unsigned int vector = 0;
     struct vcpu *v = current;
     struct domain *currd = v->domain;
@@ -4049,7 +4050,10 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     __vmread(GUEST_RSP,    &regs->rsp);
     __vmread(GUEST_RFLAGS, &regs->rflags);
 
-    hvm_invalidate_regs_fields(regs);
+    if ( hvm_long_mode_active(v) )
+        __vmread(GUEST_CS_AR_BYTES, &cs_ar_bytes);
+
+    hvm_sanitize_regs_fields(regs, !(cs_ar_bytes & X86_SEG_AR_CS_LM_ACTIVE));
 
     if ( paging_mode_hap(v->domain) )
     {
