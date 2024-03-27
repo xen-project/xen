@@ -277,7 +277,7 @@ END {
                         if (call[i] == ca && call_prio[i] == p_list[pl]) {
                             fnd++;
                             if (fnd == 1)
-                                printf("        if ( num == __HYPERVISOR_%s ) \\\n", fn[call_fn[i]]);
+                                printf("        if ( (num) == __HYPERVISOR_%s ) \\\n", fn[call_fn[i]]);
                             else
                                 printf("        else \\\n");
                             do_call(call_fn[i], call_p[i]);
@@ -290,7 +290,7 @@ END {
             } else {
                 for (i = 1; i <= nc; i++)
                     if (call[i] == ca && call_prio[i] == p_list[pl]) {
-                        printf("if ( likely(num == __HYPERVISOR_%s) ) \\\n", fn[call_fn[i]]);
+                        printf("if ( likely((num) == __HYPERVISOR_%s) ) \\\n", fn[call_fn[i]]);
                         do_call(call_fn[i], call_p[i]);
                     }
             }
