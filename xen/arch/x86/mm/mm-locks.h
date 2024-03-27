@@ -138,7 +138,7 @@ static always_inline void _mm_write_lock(const struct domain *d, mm_rwlock_t *l,
         _set_lock_level(_lock_level(d, level));
     }
     else
-        block_speculation();
+        block_lock_speculation();
     l->recurse_count++;
 }
 
