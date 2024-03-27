@@ -1066,9 +1066,9 @@ static int cf_check hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     /* Older Xen versions used to save the segment arbytes directly 
      * from the VMCS on Intel hosts.  Detect this and rearrange them
      * into the struct segment_register format. */
-#define UNFOLD_ARBYTES(_r)                          \
-    if ( (_r & 0xf000) && !(_r & 0x0f00) )          \
-        _r = ((_r & 0xff) | ((_r >> 4) & 0xf00))
+#define UNFOLD_ARBYTES(_r)                              \
+    if ( ((_r) & 0xf000) && !((_r) & 0x0f00) )          \
+        (_r) = (((_r) & 0xff) | (((_r) >> 4) & 0xf00))
     UNFOLD_ARBYTES(ctxt.cs_arbytes);
     UNFOLD_ARBYTES(ctxt.ds_arbytes);
     UNFOLD_ARBYTES(ctxt.es_arbytes);

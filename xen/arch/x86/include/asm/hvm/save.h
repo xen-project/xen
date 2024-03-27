@@ -128,9 +128,9 @@ static int __init cf_check __hvm_register_##_x##_save_and_restore(void)   \
 {                                                                         \
     hvm_register_savevm(HVM_SAVE_CODE(_x),                                \
                         #_x,                                              \
-                        &_save,                                           \
+                        _save,                                            \
                         check,                                            \
-                        &_load,                                           \
+                        _load,                                            \
                         (_num) * (HVM_SAVE_LENGTH(_x)                     \
                                   + sizeof (struct hvm_save_descriptor)), \
                         _k);                                              \
