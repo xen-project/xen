@@ -36,6 +36,14 @@
         },
         {
             "id": "SAF-4-safe",
+            "analyser": {
+                "eclair": "MC3R1.R17.1"
+            },
+            "name": "Rule 17.1: internal helper functions made to break long running hypercalls into multiple calls.",
+            "text": "They need to take a variable number of arguments depending on the original hypercall they are trying to continue."
+        },
+        {
+            "id": "SAF-5-safe",
             "analyser": {},
             "name": "Sentinel",
             "text": "Next ID to be used"

@@ -382,6 +382,7 @@ unsigned long hypercall_create_continuation(
     const char *p = format;
     unsigned long arg, rc;
     unsigned int i;
+    /* SAF-4-safe allowed variadic function */
     va_list args;
 
     current->hcall_preempted = true;

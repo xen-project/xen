@@ -31,6 +31,7 @@ unsigned long hypercall_create_continuation(
     const char *p = format;
     unsigned long arg;
     unsigned int i;
+    /* SAF-4-safe allowed variadic function */
     va_list args;
 
     curr->hcall_preempted = true;
@@ -115,6 +116,7 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int nr,
     struct cpu_user_regs *regs;
     unsigned int i, cval = 0;
     unsigned long nval = 0;
+    /* SAF-4-safe allowed variadic function */
     va_list args;
 
     ASSERT(nr <= ARRAY_SIZE(mcs->call.args));
