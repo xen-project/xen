@@ -57,7 +57,7 @@ struct cpu_info {
     unsigned int shadow_spec_ctrl;
     uint8_t      xen_spec_ctrl;
     uint8_t      last_spec_ctrl;
-    uint8_t      spec_ctrl_flags;
+    uint8_t      scf; /* SCF_* */
 
     /*
      * The following field controls copying of the L4 page table of 64-bit

@@ -111,7 +111,7 @@ UNLIKELY_END(realmode)
         BUILD_BUG_ON(SCF_verw & ~0xff)
         movzbl VCPU_vmx_launched(%rbx), %ecx
         shl  $31, %ecx
-        movzbl CPUINFO_spec_ctrl_flags(%rsp), %eax
+        movzbl CPUINFO_scf(%rsp), %eax
         and  $SCF_verw, %eax
         or   %eax, %ecx
 
