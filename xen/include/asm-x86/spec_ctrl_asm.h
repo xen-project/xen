@@ -51,7 +51,7 @@
  *     shadowing logic.
  *
  * Factor 2 is harder.  We maintain a shadow_spec_ctrl value, and a use_shadow
- * boolean in the per cpu spec_ctrl_flags.  The synchronous use is:
+ * boolean in the per cpu scf.  The synchronous use is:
  *
  *  1) Store guest value in shadow_spec_ctrl
  *  2) Set the use_shadow boolean
@@ -98,11 +98,11 @@
  * interrupting Xen.
  */
     .if \maybexen
-        testb  $SCF_entry_ibpb, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14)
+        testb  $SCF_entry_ibpb, STACK_CPUINFO_FIELD(scf)(%r14)
         jz     .L\@_skip
         testb  $3, UREGS_cs(%rsp)
     .else
-        testb  $SCF_entry_ibpb, CPUINFO_spec_ctrl_flags(%rsp)
+        testb  $SCF_entry_ibpb, CPUINFO_scf(%rsp)
     .endif
     jz     .L\@_skip
 
@@ -177,8 +177,8 @@
 #define STK_REL(field, top_of_stk) ((field) - (top_of_stk))
 
 .macro SPEC_CTRL_COND_VERW \
-    scf=STK_REL(CPUINFO_spec_ctrl_flags, CPUINFO_error_code), \
-    sel=STK_REL(CPUINFO_verw_sel,        CPUINFO_error_code)
+    scf=STK_REL(CPUINFO_scf,      CPUINFO_error_code), \
+    sel=STK_REL(CPUINFO_verw_sel, CPUINFO_error_code)
 /*
  * Requires \scf and \sel as %rsp-relative expressions
  * Clobbers eflags
@@ -233,10 +233,10 @@
         testb $3, UREGS_cs(%rsp)
         setnz %al
         not %eax
-        and %al, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14)
+        and %al, STACK_CPUINFO_FIELD(scf)(%r14)
         movzbl STACK_CPUINFO_FIELD(xen_spec_ctrl)(%r14), %eax
     .else
-        andb $~SCF_use_shadow, CPUINFO_spec_ctrl_flags(%rsp)
+        andb $~SCF_use_shadow, CPUINFO_scf(%rsp)
         movzbl CPUINFO_xen_spec_ctrl(%rsp), %eax
     .endif
 
@@ -255,7 +255,7 @@
     mov %eax, CPUINFO_shadow_spec_ctrl(%rsp)
 
     /* Set SPEC_CTRL shadowing *before* loading the guest value. */
-    orb $SCF_use_shadow, CPUINFO_spec_ctrl_flags(%rsp)
+    orb $SCF_use_shadow, CPUINFO_scf(%rsp)
 
     mov $MSR_SPEC_CTRL, %ecx
     xor %edx, %edx
@@ -333,7 +333,7 @@
  *    DO_SPEC_CTRL_ENTRY maybexen=1
  * but with conditionals rather than alternatives.
  */
-    movzbl STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14), %ebx
+    movzbl STACK_CPUINFO_FIELD(scf)(%r14), %ebx
 
     test    $SCF_ist_ibpb, %bl
     jz      .L\@_skip_ibpb
@@ -358,7 +358,7 @@
     testb $3, UREGS_cs(%rsp)
     setnz %al
     not %eax
-    and %al, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14)
+    and %al, STACK_CPUINFO_FIELD(scf)(%r14)
 
     /* Load Xen's intended value. */
     mov $MSR_SPEC_CTRL, %ecx
@@ -392,7 +392,7 @@ UNLIKELY_DISPATCH_LABEL(\@_serialise):
  * Requires %r12=ist_exit, %r14=stack_end, %rsp=regs
  * Clobbers %rax, %rbx, %rcx, %rdx
  */
-    movzbl STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14), %ebx
+    movzbl STACK_CPUINFO_FIELD(scf)(%r14), %ebx
 
     testb $SCF_ist_sc_msr, %bl
     jz .L\@_skip_sc_msr

@@ -67,7 +67,7 @@ static bool __initdata opt_lock_harden;
 
 bool __initdata bsp_delay_spec_ctrl;
 uint8_t __read_mostly default_xen_spec_ctrl;
-uint8_t __read_mostly default_spec_ctrl_flags;
+uint8_t __read_mostly default_scf;
 
 paddr_t __read_mostly l1tf_addr_mask, __read_mostly l1tf_safe_maddr;
 bool __read_mostly cpu_has_bug_l1tf;
@@ -1081,7 +1081,7 @@ static void __init ibpb_calculations(void)
          * NMI/#MC, so can't interrupt Xen ahead of having already flushed the
          * BTB.
          */
-        default_spec_ctrl_flags |= SCF_ist_ibpb;
+        default_scf |= SCF_ist_ibpb;
     }
     if ( opt_ibpb_entry_hvm )
         setup_force_cpu_cap(X86_FEATURE_IBPB_ENTRY_HVM);
@@ -1582,7 +1582,7 @@ void spec_ctrl_init_domain(struct domain *d)
     bool ibpb = ((pv ? opt_ibpb_entry_pv : opt_ibpb_entry_hvm) &&
                  (d->domain_id != 0 || opt_ibpb_entry_dom0));
 
-    d->arch.spec_ctrl_flags =
+    d->arch.scf =
         (verw   ? SCF_verw         : 0) |
         (ibpb   ? SCF_entry_ibpb   : 0) |
         0;
@@ -1687,7 +1687,7 @@ void __init init_speculation_mitigations(void)
     {
         if ( opt_msr_sc_pv )
         {
-            default_spec_ctrl_flags |= SCF_ist_sc_msr;
+            default_scf |= SCF_ist_sc_msr;
             setup_force_cpu_cap(X86_FEATURE_SC_MSR_PV);
         }
 
@@ -1698,7 +1698,7 @@ void __init init_speculation_mitigations(void)
              * Xen's value is not restored atomically.  An early NMI hitting
              * the VMExit path needs to restore Xen's value for safety.
              */
-            default_spec_ctrl_flags |= SCF_ist_sc_msr;
+            default_scf |= SCF_ist_sc_msr;
             setup_force_cpu_cap(X86_FEATURE_SC_MSR_HVM);
         }
     }
@@ -1828,7 +1828,7 @@ void __init init_speculation_mitigations(void)
     if ( opt_rsb_pv )
     {
         setup_force_cpu_cap(X86_FEATURE_SC_RSB_PV);
-        default_spec_ctrl_flags |= SCF_ist_rsb;
+        default_scf |= SCF_ist_rsb;
     }
 
     /*
@@ -1851,7 +1851,7 @@ void __init init_speculation_mitigations(void)
          * possible rogue RSB speculation.
          */
         if ( !cpu_has_svm )
-            default_spec_ctrl_flags |= SCF_ist_rsb;
+            default_scf |= SCF_ist_rsb;
     }
 
     srso_calculations(hw_smt_enabled);
@@ -1864,7 +1864,7 @@ void __init init_speculation_mitigations(void)
     if ( opt_eager_fpu == -1 )
         opt_eager_fpu = should_use_eager_fpu();
 
-    /* (Re)init BSP state now that default_spec_ctrl_flags has been calculated. */
+    /* (Re)init BSP state now that default_scf has been calculated. */
     init_shadow_spec_ctrl_state();
 
     /*
@@ -2137,7 +2137,7 @@ void __init init_speculation_mitigations(void)
         {
             info->shadow_spec_ctrl = 0;
             barrier();
-            info->spec_ctrl_flags |= SCF_use_shadow;
+            info->scf |= SCF_use_shadow;
             barrier();
         }
 

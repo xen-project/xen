@@ -683,7 +683,7 @@ UNLIKELY_END(exit_cr3)
         /*
          * When the CPU pushed this exception frame, it zero-extended eflags.
          * For an IST exit, SPEC_CTRL_EXIT_TO_XEN stashed shadow copies of
-         * spec_ctrl_flags and ver_sel above eflags, as we can't use any GPRs,
+         * scf and ver_sel above eflags, as we can't use any GPRs,
          * and we're at a random place on the stack, not in a CPUFINFO block.
          *
          * Account for ev/ec having already been popped off the stack.
