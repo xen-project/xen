@@ -49,18 +49,18 @@ bool __ro_after_init opt_ssbd;
 static int8_t __initdata opt_psfd = -1;
 
 int8_t __ro_after_init opt_ibpb_ctxt_switch = -1;
-int8_t __read_mostly opt_eager_fpu = -1;
-int8_t __read_mostly opt_l1d_flush = -1;
+int8_t __ro_after_init opt_eager_fpu = -1;
+int8_t __ro_after_init opt_l1d_flush = -1;
 static bool __initdata opt_branch_harden =
     IS_ENABLED(CONFIG_SPECULATIVE_HARDEN_BRANCH);
 static bool __initdata opt_lock_harden;
 
 bool __initdata bsp_delay_spec_ctrl;
-uint8_t __read_mostly default_xen_spec_ctrl;
-uint8_t __read_mostly default_spec_ctrl_flags;
+uint8_t __ro_after_init default_xen_spec_ctrl;
+uint8_t __ro_after_init default_spec_ctrl_flags;
 
-paddr_t __read_mostly l1tf_addr_mask, __read_mostly l1tf_safe_maddr;
-bool __read_mostly cpu_has_bug_l1tf;
+paddr_t __ro_after_init l1tf_addr_mask, __ro_after_init l1tf_safe_maddr;
+bool __ro_after_init cpu_has_bug_l1tf;
 static unsigned int __initdata l1d_maxphysaddr;
 
 static bool __initdata cpu_has_bug_msbds_only; /* => minimal HT impact. */
@@ -316,8 +316,8 @@ static int __init cf_check parse_spec_ctrl(const char *s)
 }
 custom_param("spec-ctrl", parse_spec_ctrl);
 
-int8_t __read_mostly opt_xpti_hwdom = -1;
-int8_t __read_mostly opt_xpti_domu = -1;
+int8_t __ro_after_init opt_xpti_hwdom = -1;
+int8_t __ro_after_init opt_xpti_domu = -1;
 
 static __init void xpti_init_default(void)
 {
@@ -381,8 +381,8 @@ static int __init cf_check parse_xpti(const char *s)
 }
 custom_param("xpti", parse_xpti);
 
-int8_t __read_mostly opt_pv_l1tf_hwdom = -1;
-int8_t __read_mostly opt_pv_l1tf_domu = -1;
+int8_t __ro_after_init opt_pv_l1tf_hwdom = -1;
+int8_t __ro_after_init opt_pv_l1tf_domu = -1;
 
 static int __init cf_check parse_pv_l1tf(const char *s)
 {
