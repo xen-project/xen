@@ -103,7 +103,7 @@ __UNLIKELY_END(nsvm_hap)
         /* SPEC_CTRL_ENTRY_FROM_SVM    Req: %rsp=regs/cpuinfo, %rdx=0 Clob: acd */
 
         .macro svm_vmexit_cond_ibpb
-            testb  $SCF_entry_ibpb, CPUINFO_spec_ctrl_flags(%rsp)
+            testb  $SCF_entry_ibpb, CPUINFO_scf(%rsp)
             jz     .L_skip_ibpb
 
             mov    $MSR_PRED_CMD, %ecx

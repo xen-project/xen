@@ -164,8 +164,8 @@ ENTRY(compat_restore_all_guest)
 
         /* Account for ev/ec having already been popped off the stack. */
         SPEC_CTRL_COND_VERW \
-            scf=STK_REL(CPUINFO_spec_ctrl_flags, CPUINFO_rip), \
-            sel=STK_REL(CPUINFO_verw_sel,        CPUINFO_rip)
+            scf=STK_REL(CPUINFO_scf,      CPUINFO_rip), \
+            sel=STK_REL(CPUINFO_verw_sel, CPUINFO_rip)
 
 .Lft0:  iretq
         _ASM_PRE_EXTABLE(.Lft0, handle_exception)
