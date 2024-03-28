@@ -334,6 +334,11 @@ Deviations related to MISRA C:2012 Rules:
        improve readability.
      - Tagged as `deliberate` for ECLAIR.
 
+   * - R17.1
+     - printf()-like functions  are allowed to use the variadic features provided
+       by `stdarg.h`.
+     - Tagged as `deliberate` for ECLAIR.
+
    * - R20.4
      - The override of the keyword \"inline\" in xen/compiler.h is present so
        that section contents checks pass when the compiler chooses not to
