@@ -209,7 +209,7 @@
     do {                                                    \
         __typeof__(&(hnd)) _sxghr_tmp = &(hnd);             \
         _sxghr_tmp->q = 0;                                  \
-        _sxghr_tmp->p = val;                                \
+        _sxghr_tmp->p = (val);                              \
     } while ( 0 )
 #define set_xen_guest_handle(hnd, val) set_xen_guest_handle_raw(hnd, val)
 
