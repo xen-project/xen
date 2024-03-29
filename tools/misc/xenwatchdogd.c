@@ -9,9 +9,11 @@
 #include <unistd.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 xc_interface *h;
-int id = 0;
+static volatile bool safeexit = false;
+static volatile bool done = false;
 
 void daemonize(void)
 {
@@ -38,20 +40,18 @@ void daemonize(void)
 
 void catch_exit(int sig)
 {
-    if (id)
-        xc_watchdog(h, id, 300);
-    exit(EXIT_SUCCESS);
+    done = true;
 }
 
 void catch_usr1(int sig)
 {
-    if (id)
-        xc_watchdog(h, id, 0);
-    exit(EXIT_SUCCESS);
+    safeexit = true;
+    done = true;
 }
 
 int main(int argc, char **argv)
 {
+    int id;
     int t, s;
     int ret;
 
@@ -90,10 +90,14 @@ int main(int argc, char **argv)
     if (id <= 0)
         err(EXIT_FAILURE, "xc_watchdog setup");
 
-    for (;;) {
+    while (!done) {
         sleep(s);
         ret = xc_watchdog(h, id, t);
         if (ret != 0)
             err(EXIT_FAILURE, "xc_watchdog");
     }
+
+    // Zero seconds timeout will disarm the watchdog timer
+    xc_watchdog(h, id, safeexit ? 0 : 300);
+    return 0;
 }
