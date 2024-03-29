@@ -11,11 +11,11 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-xc_interface *h;
+static xc_interface *h;
 static volatile bool safeexit = false;
 static volatile bool done = false;
 
-void daemonize(void)
+static void daemonize(void)
 {
     switch (fork()) {
     case -1:
@@ -38,12 +38,12 @@ void daemonize(void)
         err(EXIT_FAILURE, "reopen stderr");
 }
 
-void catch_exit(int sig)
+static void catch_exit(int sig)
 {
     done = true;
 }
 
-void catch_usr1(int sig)
+static void catch_usr1(int sig)
 {
     safeexit = true;
     done = true;
