@@ -561,7 +561,7 @@ maintainers if you want to suggest a change.
        shall be enclosed in parentheses
      - Extra parentheses are not required when macro parameters are used
        as function arguments, as macro arguments, array indices, lhs in
-       assignments
+       assignments or as initializers in initalizer lists.
 
    * - `Rule 20.9 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_20_09.c>`_
      - Required

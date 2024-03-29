@@ -345,7 +345,19 @@ Deviations related to MISRA C:2012 Rules:
        (1) as function arguments;
        (2) as macro arguments;
        (3) as array indices;
-       (4) as lhs in assignments.
+       (4) as lhs in assignments;
+       (5) as initializers, possibly designated, in initalizer lists.
+     - Tagged as `safe` for ECLAIR.
+
+   * - R20.7
+     - Violations due to the use of macros defined in files that are not
+       in scope for compliance are allowed, as that is imported code.
+     - Tagged as `safe` for ECLAIR.
+
+   * - R20.7
+     - To avoid compromising readability, the macros `alternative_(v)?call[0-9]`
+       are allowed not to parenthesize their arguments, as there are already
+       sanity checks in place.
      - Tagged as `safe` for ECLAIR.
 
    * - R20.12

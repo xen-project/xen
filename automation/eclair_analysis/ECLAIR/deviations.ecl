@@ -401,12 +401,33 @@ unexpected result when the structure is given as argument to a sizeof() operator
 
 -doc_begin="Code violating Rule 20.7 is safe when macro parameters are used: (1)
 as function arguments; (2) as macro arguments; (3) as array indices; (4) as lhs
-in assignments."
+in assignments; (5) as initializers, possibly designated, in initalizer lists."
 -config=MC3R1.R20.7,expansion_context=
 {safe, "context(__call_expr_arg_contexts)"},
+{safe, "left_right(^[(,\\[]$,^[),\\]]$)"},
 {safe, "context(skip_to(__expr_non_syntactic_contexts, stmt_child(node(array_subscript_expr), subscript)))"},
 {safe, "context(skip_to(__expr_non_syntactic_contexts, stmt_child(operator(assign), lhs)))"},
-{safe, "left_right(^[(,\\[]$,^[),\\]]$)"}
+{safe, "context(skip_to(__expr_non_syntactic_contexts, stmt_child(node(init_list_expr||designated_init_expr), init)))"}
+-doc_end
+
+-doc_begin="Violations involving the __config_enabled macros cannot be fixed without
+breaking the macro's logic; futhermore, the macro is only ever used in the context
+of the IS_ENABLED or STATIC_IF/STATIC_IF_NOT macros, so it always receives a literal
+0 or 1 as input, posing no risk to safety."
+-config=MC3R1.R20.7,reports+={safe, "any_area(any_loc(any_exp(macro(^___config_enabled$))))"}
+-doc_end
+
+-doc_begin="Violations due to the use of macros defined in files that are
+not in scope for compliance are allowed, as that is imported code."
+-file_tag+={gnu_efi_include, "^xen/include/efi/.*$"}
+-file_tag+={acpi_cpu_idle, "^xen/arch/x86/acpi/cpu_idle\\.c$"}
+-config=MC3R1.R20.7,reports+={safe, "any_area(any_loc(file(gnu_efi_include)))"}
+-config=MC3R1.R20.7,reports+={safe, "any_area(any_loc(file(acpi_cpu_idle)))"}
+-doc_end
+
+-doc_begin="To avoid compromising readability, the macros alternative_(v)?call[0-9] are allowed
+not to parenthesize their arguments."
+-config=MC3R1.R20.7,reports+={safe, "any_area(any_loc(any_exp(macro(^alternative_(v)?call[0-9]$))))"}
 -doc_end
 
 -doc_begin="Uses of variadic macros that have one of their arguments defined as
