@@ -434,16 +434,17 @@ maintainers if you want to suggest a change.
        parameter declared as "array of type"
      -
 
-   * - `Rule 13.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_13_06.c>`_
-     - Mandatory
-     - The operand of the sizeof operator shall not contain any
-       expression which has potential side effects
-     -
-
    * - `Rule 13.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_13_01_1.c>`_
      - Required
      - Initializer lists shall not contain persistent side effects
      -
+
+   * - `Rule 13.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_13_06.c>`_
+     - Required
+     - The operand of the sizeof operator shall not contain any
+       expression which has potential side effects
+     - In addition to sizeof, we also want to apply the rule to typeof
+       and alignof
 
    * - `Rule 14.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_14_01.c>`_
      - Required
