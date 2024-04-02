@@ -13,6 +13,8 @@ static struct virtual_region core = {
     .list = LIST_HEAD_INIT(core.list),
     .text_start = _stext,
     .text_end = _etext,
+    .rodata_start = _srodata,
+    .rodata_end = _erodata,
 };
 
 /* Becomes irrelevant when __init sections are cleared. */
