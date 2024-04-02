@@ -1041,12 +1041,6 @@ int evtchn_status(evtchn_status_t *status)
 
     read_lock(&d->event_lock);
 
-    if ( consumer_is_xen(chn) )
-    {
-        rc = -EACCES;
-        goto out;
-    }
-
     rc = xsm_evtchn_status(XSM_TARGET, d, chn);
     if ( rc )
         goto out;
