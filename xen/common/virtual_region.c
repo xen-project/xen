@@ -11,15 +11,15 @@
 
 static struct virtual_region core = {
     .list = LIST_HEAD_INIT(core.list),
-    .start = _stext,
-    .end = _etext,
+    .text_start = _stext,
+    .text_end = _etext,
 };
 
 /* Becomes irrelevant when __init sections are cleared. */
 static struct virtual_region core_init __initdata = {
     .list = LIST_HEAD_INIT(core_init.list),
-    .start = _sinittext,
-    .end = _einittext,
+    .text_start = _sinittext,
+    .text_end = _einittext,
 };
 
 /*
@@ -39,7 +39,8 @@ const struct virtual_region *find_text_region(unsigned long addr)
     rcu_read_lock(&rcu_virtual_region_lock);
     list_for_each_entry_rcu( region, &virtual_region_list, list )
     {
-        if ( (void *)addr >= region->start && (void *)addr < region->end )
+        if ( (void *)addr >= region->text_start &&
+             (void *)addr <  region->text_end )
         {
             rcu_read_unlock(&rcu_virtual_region_lock);
             return region;
@@ -88,8 +89,8 @@ void relax_virtual_region_perms(void)
 
     rcu_read_lock(&rcu_virtual_region_lock);
     list_for_each_entry_rcu( region, &virtual_region_list, list )
-        modify_xen_mappings_lite((unsigned long)region->start,
-                                 ROUNDUP((unsigned long)region->end, PAGE_SIZE),
+        modify_xen_mappings_lite((unsigned long)region->text_start,
+                                 PAGE_ALIGN((unsigned long)region->text_end),
                                  PAGE_HYPERVISOR_RWX);
     rcu_read_unlock(&rcu_virtual_region_lock);
 }
@@ -100,8 +101,8 @@ void tighten_virtual_region_perms(void)
 
     rcu_read_lock(&rcu_virtual_region_lock);
     list_for_each_entry_rcu( region, &virtual_region_list, list )
-        modify_xen_mappings_lite((unsigned long)region->start,
-                                 ROUNDUP((unsigned long)region->end, PAGE_SIZE),
+        modify_xen_mappings_lite((unsigned long)region->text_start,
+                                 PAGE_ALIGN((unsigned long)region->text_end),
                                  PAGE_HYPERVISOR_RX);
     rcu_read_unlock(&rcu_virtual_region_lock);
 }
