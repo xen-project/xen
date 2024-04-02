@@ -183,6 +183,7 @@ static void free_intremap_entry(const struct amd_iommu *iommu,
                                 unsigned int bdf, unsigned int index)
 {
     union irte_ptr entry = get_intremap_entry(iommu, bdf, index);
+    struct ivrs_mappings *ivrs = get_ivrs_mappings(iommu->seg);
 
     if ( iommu->ctrl.ga_en )
     {
@@ -201,7 +202,7 @@ static void free_intremap_entry(const struct amd_iommu *iommu,
     else
         ACCESS_ONCE(entry.ptr32->raw) = 0;
 
-    __clear_bit(index, get_ivrs_mappings(iommu->seg)[bdf].intremap_inuse);
+    __clear_bit(index, ivrs[bdf].intremap_inuse);
 }
 
 static void update_intremap_entry(const struct amd_iommu *iommu,

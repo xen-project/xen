@@ -1149,9 +1149,9 @@ static void cf_check irq_guest_eoi_timer_fn(void *data)
     for ( i = 0; i < action->nr_guests; i++ )
     {
         struct domain *d = action->guest[i];
-        unsigned int pirq = domain_irq_to_pirq(d, irq);
+        struct pirq *pirq = pirq_info(d, domain_irq_to_pirq(d, irq));
 
-        if ( test_and_clear_bool(pirq_info(d, pirq)->masked) )
+        if ( test_and_clear_bool(pirq->masked) )
             action->in_flight--;
     }
 

@@ -2503,7 +2503,9 @@ static long cmos_utc_offset; /* in seconds */
 
 int time_suspend(void)
 {
-    if ( smp_processor_id() == 0 )
+    unsigned int cpu = smp_processor_id();
+
+    if ( cpu == 0 )
     {
         cmos_utc_offset = -get_wallclock_time();
         cmos_utc_offset += get_sec();
@@ -2514,7 +2516,7 @@ int time_suspend(void)
     }
 
     /* Better to cancel calibration timer for accuracy. */
-    clear_bit(TIME_CALIBRATE_SOFTIRQ, &softirq_pending(smp_processor_id()));
+    clear_bit(TIME_CALIBRATE_SOFTIRQ, &softirq_pending(cpu));
 
     return 0;
 }
