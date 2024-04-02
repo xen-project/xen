@@ -785,8 +785,8 @@ static int prepare_payload(struct payload *payload,
     region = &payload->region;
 
     region->symbols_lookup = livepatch_symbols_lookup;
-    region->start = payload->text_addr;
-    region->end = payload->text_addr + payload->text_size;
+    region->text_start = payload->text_addr;
+    region->text_end = payload->text_addr + payload->text_size;
 
     /* Optional sections. */
     for ( i = 0; i < BUGFRAME_NR; i++ )
@@ -823,8 +823,9 @@ static int prepare_payload(struct payload *payload,
             const void *instr = ALT_ORIG_PTR(a);
             const void *replacement = ALT_REPL_PTR(a);
 
-            if ( (instr < region->start && instr >= region->end) ||
-                 (replacement < region->start && replacement >= region->end) )
+            if ( (instr < region->text_start && instr >= region->text_end) ||
+                 (replacement < region->text_start &&
+                  replacement >= region->text_end) )
             {
                 printk(XENLOG_ERR LIVEPATCH "%s Alt patching outside payload: %p\n",
                        elf->name, instr);
