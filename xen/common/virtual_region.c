@@ -91,9 +91,15 @@ void relax_virtual_region_perms(void)
 
     rcu_read_lock(&rcu_virtual_region_lock);
     list_for_each_entry_rcu( region, &virtual_region_list, list )
+    {
         modify_xen_mappings_lite((unsigned long)region->text_start,
                                  PAGE_ALIGN((unsigned long)region->text_end),
                                  PAGE_HYPERVISOR_RWX);
+        if ( region->rodata_start )
+            modify_xen_mappings_lite((unsigned long)region->rodata_start,
+                                     PAGE_ALIGN((unsigned long)region->rodata_end),
+                                     PAGE_HYPERVISOR_RW);
+    }
     rcu_read_unlock(&rcu_virtual_region_lock);
 }
 
@@ -103,9 +109,15 @@ void tighten_virtual_region_perms(void)
 
     rcu_read_lock(&rcu_virtual_region_lock);
     list_for_each_entry_rcu( region, &virtual_region_list, list )
+    {
         modify_xen_mappings_lite((unsigned long)region->text_start,
                                  PAGE_ALIGN((unsigned long)region->text_end),
                                  PAGE_HYPERVISOR_RX);
+        if ( region->rodata_start )
+            modify_xen_mappings_lite((unsigned long)region->rodata_start,
+                                     PAGE_ALIGN((unsigned long)region->rodata_end),
+                                     PAGE_HYPERVISOR_RO);
+    }
     rcu_read_unlock(&rcu_virtual_region_lock);
 }
 #endif /* CONFIG_X86 */
