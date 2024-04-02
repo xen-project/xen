@@ -123,7 +123,7 @@ XEN_CPUFEATURE(PCID,          1*32+17) /*H  Process Context ID */
 XEN_CPUFEATURE(DCA,           1*32+18) /*   Direct Cache Access */
 XEN_CPUFEATURE(SSE4_1,        1*32+19) /*A  Streaming SIMD Extensions 4.1 */
 XEN_CPUFEATURE(SSE4_2,        1*32+20) /*A  Streaming SIMD Extensions 4.2 */
-XEN_CPUFEATURE(X2APIC,        1*32+21) /*!A Extended xAPIC */
+XEN_CPUFEATURE(X2APIC,        1*32+21) /*!S Extended xAPIC */
 XEN_CPUFEATURE(MOVBE,         1*32+22) /*A  movbe instruction */
 XEN_CPUFEATURE(POPCNT,        1*32+23) /*A  POPCNT instruction */
 XEN_CPUFEATURE(TSC_DEADLINE,  1*32+24) /*S  TSC Deadline Timer */
