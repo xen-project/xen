@@ -22,6 +22,10 @@
 #include <xen/keyhandler.h>
 #include <xsm/xsm.h>
 
+#ifdef CONFIG_X86
+#include <asm/e820.h>
+#endif
+
 unsigned int __read_mostly iommu_dev_iotlb_timeout = 1000;
 integer_param("iommu_dev_iotlb_timeout", iommu_dev_iotlb_timeout);
 
@@ -715,6 +719,19 @@ int __init iommu_get_extra_reserved_device_memory(iommu_grdm_t *func,
 
     for ( idx = 0; idx < nr_extra_reserved_ranges; idx++ )
     {
+#ifdef CONFIG_X86
+        paddr_t start = pfn_to_paddr(extra_reserved_ranges[idx].start);
+        paddr_t end = pfn_to_paddr(extra_reserved_ranges[idx].start +
+                                   extra_reserved_ranges[idx].nr);
+
+        if ( !reserve_e820_ram(&e820, start, end) )
+        {
+            printk(XENLOG_ERR "Failed to reserve [%"PRIx64"-%"PRIx64") for %s, "
+                   "skipping IOMMU mapping for it, some functionality may be broken\n",
+                   start, end, extra_reserved_ranges[idx].name);
+            continue;
+        }
+#endif
         ret = func(extra_reserved_ranges[idx].start,
                    extra_reserved_ranges[idx].nr,
                    extra_reserved_ranges[idx].sbdf.sbdf,
