@@ -415,15 +415,15 @@ page_list_splice(struct page_list_head *list, struct page_list_head *head)
 }
 
 #define page_list_for_each(pos, head) \
-    for ( pos = (head)->next; pos; pos = page_list_next(pos, head) )
+    for ( (pos) = (head)->next; (pos); (pos) = page_list_next(pos, head) )
 #define page_list_for_each_safe(pos, tmp, head) \
-    for ( pos = (head)->next; \
-          pos ? (tmp = page_list_next(pos, head), 1) : 0; \
-          pos = tmp )
+    for ( (pos) = (head)->next; \
+          (pos) ? ((tmp) = page_list_next(pos, head), 1) : 0; \
+          (pos) = (tmp) )
 #define page_list_for_each_safe_reverse(pos, tmp, head) \
-    for ( pos = (head)->tail; \
-          pos ? (tmp = page_list_prev(pos, head), 1) : 0; \
-          pos = tmp )
+    for ( (pos) = (head)->tail; \
+          (pos) ? ((tmp) = page_list_prev(pos, head), 1) : 0; \
+          (pos) = (tmp) )
 #else
 # define page_list_head                  list_head
 # define PAGE_LIST_HEAD_INIT             LIST_HEAD_INIT
