@@ -25,7 +25,7 @@ binsource=$2
 varname=$3
 
 cat <<EOF >$target
-#include <asm/asm_defns.h>
+#include <xen/linkage.h>
 
         .section $section.rodata, "a", %progbits
 

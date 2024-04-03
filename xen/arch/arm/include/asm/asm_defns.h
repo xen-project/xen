@@ -28,9 +28,6 @@
 label:  .asciz msg;                             \
 .popsection
 
-#define ASM_INT(label, val)                 \
-    DATA(label, 4) .long (val); END(label)
-
 #endif /* __ARM_ASM_DEFNS_H__ */
 /*
  * Local variables:

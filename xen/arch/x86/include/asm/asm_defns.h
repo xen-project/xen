@@ -351,9 +351,6 @@ static always_inline void stac(void)
 4:  .p2align 2                            ; \
     .popsection
 
-#define ASM_INT(label, val)                 \
-    DATA(label, 4) .long (val); END(label)
-
 #define ASM_CONSTANT(name, value)                \
     asm ( ".equ " #name ", %P0; .global " #name  \
           :: "i" ((value)) );

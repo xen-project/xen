@@ -60,6 +60,8 @@
 #define DATA_LOCAL(name, align...) \
         SYM(name, DATA, LOCAL, LASTARG(DATA_ALIGN, ## align), DATA_FILL)
 
+#define ASM_INT(label, val)    DATA(label, 4) .long (val); END(label)
+
 #endif /*  __ASSEMBLY__ */
 
 #endif /* __LINKAGE_H__ */
