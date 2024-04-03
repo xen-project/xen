@@ -1,5 +1,6 @@
 #include <xen/init.h>
 #include <xen/param.h>
+#include <asm/microcode.h>
 #include <asm/msr.h>
 
 /*
@@ -9,6 +10,7 @@
  *  -1 => Default, altered to 0/1 (if unspecified) by:
  *                 - TAA heuristics/settings for speculative safety
  *                 - "TSX vs PCR3" select for TSX memory ordering safety
+ *  -2 => Implicit tsx=0 (from RTM_ALWAYS_ABORT vs RTM mismatch)
  *  -3 => Implicit tsx=1 (feed-through from spec-ctrl=0)
  *
  * This is arranged such that the bottom bit encodes whether TSX is actually
@@ -114,10 +116,49 @@ void tsx_init(void)
 
         if ( cpu_has_tsx_force_abort )
         {
+            uint64_t val;
+
             /*
-             * On an early TSX-enable Skylake part subject to the memory
+             * On an early TSX-enabled Skylake part subject to the memory
              * ordering erratum, with at least the March 2019 microcode.
              */
+
+            rdmsrl(MSR_TSX_FORCE_ABORT, val);
+
+            /*
+             * At the time of writing (April 2024), it was discovered that
+             * some parts (e.g. CoffeeLake 8th Gen, 06-9e-0a, ucode 0xf6)
+             * advertise RTM_ALWAYS_ABORT, but XBEGIN instructions #UD.  Other
+             * similar parts (e.g. KabyLake Xeon-E3, 06-9e-09, ucode 0xf8)
+             * operate as expected.
+             *
+             * In this case:
+             *  - RTM_ALWAYS_ABORT and MSR_TSX_FORCE_ABORT are enumerated.
+             *  - XBEGIN instructions genuinely #UD.
+             *  - MSR_TSX_FORCE_ABORT appears to be write-discard and fails to
+             *    hold its value.
+             *  - HLE and RTM are not enumerated, despite
+             *    MSR_TSX_FORCE_ABORT.TSX_CPUID_CLEAR being clear.
+             *
+             * Spot RTM being unavailable without CLEAR_CPUID being set, and
+             * treat it as if no TSX is available at all.  This will prevent
+             * Xen from thinking it's safe to offer HLE/RTM to VMs.
+             */
+            if ( val == 0 && cpu_has_rtm_always_abort && !cpu_has_rtm )
+            {
+                printk(XENLOG_ERR
+                       "FIRMWARE BUG: CPU %02x-%02x-%02x, ucode 0x%08x: RTM_ALWAYS_ABORT vs RTM mismatch\n",
+                       boot_cpu_data.x86, boot_cpu_data.x86_model,
+                       boot_cpu_data.x86_mask, this_cpu(cpu_sig).rev);
+
+                setup_clear_cpu_cap(X86_FEATURE_RTM_ALWAYS_ABORT);
+                setup_clear_cpu_cap(X86_FEATURE_TSX_FORCE_ABORT);
+
+                if ( opt_tsx < 0 )
+                    opt_tsx = -2;
+
+                goto done_probe;
+            }
 
             /*
              * Probe for the June 2021 microcode which de-features TSX on
@@ -128,15 +169,8 @@ void tsx_init(void)
              * read as zero if TSX_FORCE_ABORT.ENABLE_RTM has been set before
              * we run.
              */
-            if ( !has_rtm_always_abort )
-            {
-                uint64_t val;
-
-                rdmsrl(MSR_TSX_FORCE_ABORT, val);
-
-                if ( val & TSX_ENABLE_RTM )
-                    has_rtm_always_abort = true;
-            }
+            if ( val & TSX_ENABLE_RTM )
+                has_rtm_always_abort = true;
 
             /*
              * If no explicit tsx= option is provided, pick a default.
@@ -191,6 +225,7 @@ void tsx_init(void)
             setup_force_cpu_cap(X86_FEATURE_RTM);
         }
     }
+ done_probe:
 
     /*
      * Note: MSR_TSX_CTRL is enumerated on TSX-enabled MDS_NO and later parts.
