@@ -568,6 +568,8 @@ static void __serial_rx(char c)
 
         if ( d != NULL )
             rcu_unlock_domain(d);
+
+        break;
     }
 #endif
     }
