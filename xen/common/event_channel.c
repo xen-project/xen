@@ -853,6 +853,7 @@ int evtchn_send(struct domain *ld, unsigned int lport)
         break;
     default:
         ret = -EINVAL;
+        break;
     }
 
 out:
