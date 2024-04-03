@@ -770,6 +770,7 @@ int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec)
 
     default:
         rc = -ENOSYS;
+        break;
     }
 
     return rc;
