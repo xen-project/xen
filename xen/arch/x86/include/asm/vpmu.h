@@ -23,8 +23,8 @@
 #define MSR_TYPE_ARCH_CTRL          4
 
 /* Start of PMU register bank */
-#define vpmu_reg_pointer(ctxt, offset) ((void *)((uintptr_t)ctxt + \
-                                                 (uintptr_t)ctxt->offset))
+#define vpmu_reg_pointer(ctxt, offset) ((void *)((uintptr_t)(ctxt) + \
+                                                 (uintptr_t)(ctxt)->offset))
 
 /* Arch specific operations shared by all vpmus */
 struct arch_vpmu_ops {
