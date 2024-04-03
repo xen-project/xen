@@ -316,6 +316,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         d = rcu_lock_domain_by_id(op->domain);
         if ( !d )
             return -ESRCH;
+        break;
     }
 
     ret = xsm_domctl(XSM_OTHER, d, op->cmd);
