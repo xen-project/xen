@@ -1,0 +1,16 @@
+System requirements
+===================
+
+The following extensions are expected to be supported by a system on which
+Xen is run:
+- Zbb:
+  RISC-V doesn't have a CLZ instruction in the base ISA.
+  As a consequence, __builtin_ffs() emits a library call to ffs() on GCC,
+  or a de Bruijn sequence on Clang.
+  Zbb extension adds a CLZ instruction, after which __builtin_ffs() emits
+  a very simple sequence.
+  The similar issue occurs with other __builtin_<bitop>, so it is needed to
+  provide a generic version of bitops in RISC-V bitops.h
+- Zihintpause:
+  On a system that doesn't have this extension, cpu_relax() should be
+  implemented properly.
