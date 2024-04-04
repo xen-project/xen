@@ -20,7 +20,6 @@
 #include "init-dom-json.h"
 
 #define LAPIC_BASE_ADDRESS  0xfee00000UL
-#define MB(x)               ((uint64_t)x << 20)
 #define GB(x)               ((uint64_t)x << 30)
 
 static uint32_t domid = ~0;
@@ -35,6 +34,11 @@ static xen_pfn_t console_gfn;
 static xc_evtchn_port_or_error_t console_evtchn;
 static xentoollog_level minmsglevel = XTL_PROGRESS;
 static void *logger;
+
+static inline uint64_t mb_to_bytes(int mem)
+{
+    return (uint64_t)mem << 20;
+}
 
 static struct option options[] = {
     { "kernel", 1, NULL, 'k' },
@@ -76,8 +80,8 @@ static int build(xc_interface *xch)
     int rv, xs_fd;
     struct xc_dom_image *dom = NULL;
     int limit_kb = (maxmem ? : memory) * 1024 + X86_HVM_NR_SPECIAL_PAGES * 4;
-    uint64_t mem_size = MB(memory);
-    uint64_t max_size = MB(maxmem ? : memory);
+    uint64_t mem_size = mb_to_bytes(memory);
+    uint64_t max_size = mb_to_bytes(maxmem ? : memory);
     struct e820entry e820[3];
     struct xen_domctl_createdomain config = {
         .ssidref = SECINITSID_DOMU,
