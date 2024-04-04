@@ -377,7 +377,7 @@ static char *pointer(char *str, const char *end, const char **fmt_ptr,
             str = number(str, end, hex_buffer[i], 16, 2, -1, ZEROPAD);
 
             if ( ++i == field_width )
-                return str;
+                break;
 
             if ( sep )
             {
@@ -386,6 +386,8 @@ static char *pointer(char *str, const char *end, const char **fmt_ptr,
                 ++str;
             }
         }
+
+        return str;
     }
 
     case 'p': /* PCI SBDF. */
@@ -619,6 +621,7 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 
         case 'X':
             flags |= LARGE;
+            fallthrough;
         case 'x':
             base = 16;
             break;
@@ -626,6 +629,7 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
         case 'd':
         case 'i':
             flags |= SIGN;
+            fallthrough;
         case 'u':
             break;
 
