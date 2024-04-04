@@ -30,7 +30,6 @@
 #define imx_lpuart_write(uart, off, val) writel((val), (uart)->regs + (off))
 
 static struct imx_lpuart {
-    uint32_t baud, clock_hz, data_bits, parity, stop_bits, fifo_size;
     uint32_t irq;
     char __iomem *regs;
     struct irqaction irqaction;
@@ -196,11 +195,6 @@ static int __init imx_lpuart_init(struct dt_device_node *dev,
         printk("WARNING: UART configuration is not supported\n");
 
     uart = &imx8_com;
-
-    uart->baud = 115200;
-    uart->data_bits = 8;
-    uart->parity = 0;
-    uart->stop_bits = 1;
 
     res = dt_device_get_paddr(dev, 0, &addr, &size);
     if ( res )
