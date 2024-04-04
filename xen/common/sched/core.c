@@ -2007,6 +2007,7 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     default:
         ret = -ENOSYS;
+        break;
     }
 
     return ret;

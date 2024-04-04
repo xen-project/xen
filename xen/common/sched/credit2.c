@@ -3152,8 +3152,8 @@ static int cf_check csched2_sys_cntl(
             printk(XENLOG_INFO "Disabling context switch rate limiting\n");
         prv->ratelimit_us = params->ratelimit_us;
         write_unlock_irqrestore(&prv->lock, flags);
+        fallthrough;
 
-    /* FALLTHRU */
     case XEN_SYSCTL_SCHEDOP_getinfo:
         params->ratelimit_us = prv->ratelimit_us;
         break;
