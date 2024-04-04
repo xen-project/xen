@@ -91,6 +91,10 @@
 #define __AC(X, Y)   (X ## Y)
 #define _AC(X, Y)    __AC(X, Y)
 
+/* Size macros. */
+#define MB(_mb)     (_AC(_mb, ULL) << 20)
+#define GB(_gb)     (_AC(_gb, ULL) << 30)
+
 #define get_unaligned_t(type, ptr) ({                               \
     const struct { type x; } __packed *ptr_ = (typeof(ptr_))(ptr);  \
     ptr_->x;                                                        \

@@ -126,10 +126,6 @@
 #define PVSHIM_BASENAME "xen-shim"
 #define PVSHIM_CMDLINE "pv-shim console=xen,pv"
 
-/* Size macros. */
-#define MB(_mb)     (_AC(_mb, ULL) << 20)
-#define GB(_gb)     (_AC(_gb, ULL) << 30)
-
 #define DIV_ROUNDUP(n, d) (((n) + (d) - 1) / (d))
 
 #define LIBXL__LOGGING_ENABLED

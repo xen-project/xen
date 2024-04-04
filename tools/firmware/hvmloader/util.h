@@ -38,9 +38,6 @@ void __bug(const char *file, int line) __attribute__((noreturn));
 #define BUG() __bug(__FILE__, __LINE__)
 #define BUG_ON(p) do { if (p) BUG(); } while (0)
 
-#define MB(mb) (mb##ULL << 20)
-#define GB(gb) (gb##ULL << 30)
-
 static inline int test_bit(unsigned int b, const void *p)
 {
     return !!(((const uint8_t *)p)[b>>3] & (1u<<(b&7)));
