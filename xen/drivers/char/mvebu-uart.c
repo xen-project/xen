@@ -125,16 +125,6 @@ static void __init mvebu3700_uart_init_postirq(struct serial_port *port)
     mvebu3700_write(uart, UART_CTRL_REG, reg);
 }
 
-static void mvebu3700_uart_suspend(struct serial_port *port)
-{
-    BUG();
-}
-
-static void mvebu3700_uart_resume(struct serial_port *port)
-{
-    BUG();
-}
-
 static void mvebu3700_uart_putc(struct serial_port *port, char c)
 {
     struct mvebu3700_uart *uart = port->uart;
@@ -213,9 +203,6 @@ static int mvebu3700_uart_tx_ready(struct serial_port *port)
 static struct uart_driver __read_mostly mvebu3700_uart_driver = {
     .init_preirq  = mvebu3700_uart_init_preirq,
     .init_postirq = mvebu3700_uart_init_postirq,
-    .endboot      = NULL,
-    .suspend      = mvebu3700_uart_suspend,
-    .resume       = mvebu3700_uart_resume,
     .putc         = mvebu3700_uart_putc,
     .getc         = mvebu3700_uart_getc,
     .tx_ready     = mvebu3700_uart_tx_ready,

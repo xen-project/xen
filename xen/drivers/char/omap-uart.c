@@ -242,16 +242,6 @@ static void __init omap_uart_init_postirq(struct serial_port *port)
     omap_write(uart, UART_IER, UART_IER_ERDAI|UART_IER_ETHREI|UART_IER_ELSI);
 }
 
-static void omap_uart_suspend(struct serial_port *port)
-{
-    BUG();
-}
-
-static void omap_uart_resume(struct serial_port *port)
-{
-    BUG();
-}
-
 static int omap_uart_tx_ready(struct serial_port *port)
 {
     struct omap_uart *uart = port->uart;
@@ -307,9 +297,6 @@ static const struct vuart_info *omap_vuart_info(struct serial_port *port)
 static struct uart_driver __read_mostly omap_uart_driver = {
     .init_preirq = omap_uart_init_preirq,
     .init_postirq = omap_uart_init_postirq,
-    .endboot = NULL,
-    .suspend = omap_uart_suspend,
-    .resume = omap_uart_resume,
     .tx_ready = omap_uart_tx_ready,
     .putc = omap_uart_putc,
     .getc = omap_uart_getc,

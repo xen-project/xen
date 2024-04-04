@@ -166,16 +166,6 @@ static void __init pl011_init_postirq(struct serial_port *port)
     pl011_write(uart, IMSC, RTI|OEI|BEI|PEI|FEI|TXI|RXI);
 }
 
-static void pl011_suspend(struct serial_port *port)
-{
-    BUG(); // XXX
-}
-
-static void pl011_resume(struct serial_port *port)
-{
-    BUG(); // XXX
-}
-
 static int pl011_tx_ready(struct serial_port *port)
 {
     struct pl011 *uart = port->uart;
@@ -232,9 +222,6 @@ static void pl011_tx_start(struct serial_port *port)
 static struct uart_driver __read_mostly pl011_driver = {
     .init_preirq  = pl011_init_preirq,
     .init_postirq = pl011_init_postirq,
-    .endboot      = NULL,
-    .suspend      = pl011_suspend,
-    .resume       = pl011_resume,
     .tx_ready     = pl011_tx_ready,
     .putc         = pl011_putc,
     .getc         = pl011_getc,

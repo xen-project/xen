@@ -116,16 +116,6 @@ static void __init meson_uart_init_postirq(struct serial_port *port)
             (AML_UART_RX_INT_EN | AML_UART_TX_INT_EN));
 }
 
-static void meson_uart_suspend(struct serial_port *port)
-{
-    BUG();
-}
-
-static void meson_uart_resume(struct serial_port *port)
-{
-    BUG();
-}
-
 static void meson_uart_putc(struct serial_port *port, char c)
 {
     struct meson_uart *uart = port->uart;
@@ -191,9 +181,6 @@ static int meson_uart_tx_ready(struct serial_port *port)
 static struct uart_driver __read_mostly meson_uart_driver = {
     .init_preirq  = meson_uart_init_preirq,
     .init_postirq = meson_uart_init_postirq,
-    .endboot      = NULL,
-    .suspend      = meson_uart_suspend,
-    .resume       = meson_uart_resume,
     .putc         = meson_uart_putc,
     .getc         = meson_uart_getc,
     .tx_ready     = meson_uart_tx_ready,

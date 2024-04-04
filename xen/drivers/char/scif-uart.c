@@ -195,16 +195,6 @@ static void __init scif_uart_init_postirq(struct serial_port *port)
                 params->irq_flags);
 }
 
-static void scif_uart_suspend(struct serial_port *port)
-{
-    BUG();
-}
-
-static void scif_uart_resume(struct serial_port *port)
-{
-    BUG();
-}
-
 static int scif_uart_tx_ready(struct serial_port *port)
 {
     struct scif_uart *uart = port->uart;
@@ -284,9 +274,6 @@ static void scif_uart_stop_tx(struct serial_port *port)
 static struct uart_driver __read_mostly scif_uart_driver = {
     .init_preirq  = scif_uart_init_preirq,
     .init_postirq = scif_uart_init_postirq,
-    .endboot      = NULL,
-    .suspend      = scif_uart_suspend,
-    .resume       = scif_uart_resume,
     .tx_ready     = scif_uart_tx_ready,
     .putc         = scif_uart_putc,
     .getc         = scif_uart_getc,

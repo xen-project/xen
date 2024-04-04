@@ -101,16 +101,6 @@ static void __init imx_lpuart_init_postirq(struct serial_port *port)
     imx_lpuart_write(uart, UARTCTRL, temp);
 }
 
-static void imx_lpuart_suspend(struct serial_port *port)
-{
-    BUG();
-}
-
-static void imx_lpuart_resume(struct serial_port *port)
-{
-    BUG();
-}
-
 static int imx_lpuart_tx_ready(struct serial_port *port)
 {
     struct imx_lpuart *uart = port->uart;
@@ -185,9 +175,6 @@ static void imx_lpuart_stop_tx(struct serial_port *port)
 static struct uart_driver __read_mostly imx_lpuart_driver = {
     .init_preirq = imx_lpuart_init_preirq,
     .init_postirq = imx_lpuart_init_postirq,
-    .endboot = NULL,
-    .suspend = imx_lpuart_suspend,
-    .resume = imx_lpuart_resume,
     .tx_ready = imx_lpuart_tx_ready,
     .putc = imx_lpuart_putc,
     .getc = imx_lpuart_getc,

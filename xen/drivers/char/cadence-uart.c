@@ -90,16 +90,6 @@ static void __init cuart_init_postirq(struct serial_port *port)
     cuart_write(uart, R_UART_IER, UART_SR_INTR_RTRIG);
 }
 
-static void cuart_suspend(struct serial_port *port)
-{
-    BUG();
-}
-
-static void cuart_resume(struct serial_port *port)
-{
-    BUG();
-}
-
 static int cuart_tx_ready(struct serial_port *port)
 {
     struct cuart *uart = port->uart;
@@ -143,9 +133,6 @@ static const struct vuart_info *cuart_vuart(struct serial_port *port)
 static struct uart_driver __read_mostly cuart_driver = {
     .init_preirq  = cuart_init_preirq,
     .init_postirq = cuart_init_postirq,
-    .endboot      = NULL,
-    .suspend      = cuart_suspend,
-    .resume       = cuart_resume,
     .tx_ready     = cuart_tx_ready,
     .putc         = cuart_putc,
     .getc         = cuart_getc,

@@ -212,16 +212,6 @@ static void __init exynos4210_uart_init_postirq(struct serial_port *port)
     exynos4210_write(uart, UMCON, exynos4210_read(uart, UMCON) | UMCON_INT_EN);
 }
 
-static void exynos4210_uart_suspend(struct serial_port *port)
-{
-    BUG(); // XXX
-}
-
-static void exynos4210_uart_resume(struct serial_port *port)
-{
-    BUG(); // XXX
-}
-
 static int exynos4210_uart_tx_ready(struct serial_port *port)
 {
     struct exynos4210_uart *uart = port->uart;
@@ -286,9 +276,6 @@ static const struct vuart_info *exynos4210_vuart_info(struct serial_port *port)
 static struct uart_driver __read_mostly exynos4210_uart_driver = {
     .init_preirq  = exynos4210_uart_init_preirq,
     .init_postirq = exynos4210_uart_init_postirq,
-    .endboot      = NULL,
-    .suspend      = exynos4210_uart_suspend,
-    .resume       = exynos4210_uart_resume,
     .tx_ready     = exynos4210_uart_tx_ready,
     .putc         = exynos4210_uart_putc,
     .getc         = exynos4210_uart_getc,
