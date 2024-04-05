@@ -83,17 +83,17 @@ static always_inline int xsm_default_action(
         return 0;
     case XSM_TARGET:
         if ( evaluate_nospec(src == target) )
-        {
             return 0;
+        fallthrough;
     case XSM_XS_PRIV:
-            if ( evaluate_nospec(is_xenstore_domain(src)) )
-                return 0;
-        }
-        /* fall through */
+        if ( action == XSM_XS_PRIV &&
+             evaluate_nospec(is_xenstore_domain(src)) )
+            return 0;
+        fallthrough;
     case XSM_DM_PRIV:
         if ( target && evaluate_nospec(src->target == target) )
             return 0;
-        /* fall through */
+        fallthrough;
     case XSM_PRIV:
         if ( is_control_domain(src) )
             return 0;
