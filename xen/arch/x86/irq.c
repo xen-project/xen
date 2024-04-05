@@ -2882,7 +2882,7 @@ int allocate_and_map_gsi_pirq(struct domain *d, int index, int *pirq_p)
 int allocate_and_map_msi_pirq(struct domain *d, int index, int *pirq_p,
                               int type, struct msi_info *msi)
 {
-    int irq, pirq, ret;
+    int irq = -1, pirq, ret;
 
     ASSERT_PDEV_LIST_IS_READ_LOCKED(d);
 
@@ -2892,11 +2892,10 @@ int allocate_and_map_msi_pirq(struct domain *d, int index, int *pirq_p,
         if ( !msi->table_base )
             msi->entry_nr = 1;
         irq = index;
-        if ( irq == -1 )
-        {
+        fallthrough;
     case MAP_PIRQ_TYPE_MULTI_MSI:
+        if( irq == -1 )
             irq = create_irq(NUMA_NO_NODE, true);
-        }
 
         if ( irq < nr_irqs_gsi || irq >= nr_irqs )
         {
