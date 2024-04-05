@@ -7,8 +7,8 @@
  * Copyright (C) 2022 Arm Ltd.
  */
 
+#include <xen/acpi.h>
 #include <xen/sched.h>
-#include <asm/acpi.h>
 
 /*
  * pool_cpu_map:   Index is logical cpu number, content is cpupool id, (-1) for

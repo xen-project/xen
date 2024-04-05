@@ -74,7 +74,6 @@ static inline void enable_acpi(void)
     acpi_disabled = false;
 }
 #else
-#define acpi_disabled (true)
 #define disable_acpi()
 #define enable_acpi()
 #endif

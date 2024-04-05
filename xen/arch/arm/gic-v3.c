@@ -25,8 +25,6 @@
 #include <xen/sched.h>
 #include <xen/sizes.h>
 
-#include <acpi/actables.h>
-
 #include <asm/cpufeature.h>
 #include <asm/device.h>
 #include <asm/gic.h>

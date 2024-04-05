@@ -22,7 +22,6 @@
 #include <xen/libfdt/libfdt.h>
 #include <xen/sizes.h>
 #include <xen/acpi.h>
-#include <acpi/actables.h>
 #include <asm/p2m.h>
 #include <asm/domain.h>
 #include <asm/platform.h>

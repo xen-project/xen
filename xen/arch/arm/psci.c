@@ -9,6 +9,7 @@
  */
 
 
+#include <xen/acpi.h>
 #include <xen/types.h>
 #include <xen/init.h>
 #include <xen/mm.h>

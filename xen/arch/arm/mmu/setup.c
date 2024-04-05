@@ -10,6 +10,7 @@
 #include <xen/sizes.h>
 #include <xen/vmap.h>
 
+#include <asm/setup.h>
 #include <asm/fixmap.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */

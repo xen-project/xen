@@ -3,6 +3,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/libfdt/libfdt-xen.h>
+#include <xen/mm.h>
 #include <xen/param.h>
 #include <xen/pfn.h>
 #include <asm/fixmap.h>

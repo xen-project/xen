@@ -1,4 +1,6 @@
+#include <xen/acpi.h>
 #include <xen/cpu.h>
+#include <xen/device_tree.h>
 #include <xen/lib.h>
 #include <xen/init.h>
 #include <xen/errno.h>
@@ -7,7 +9,6 @@
 #include <xen/vmap.h>
 #include <asm/io.h>
 #include <asm/psci.h>
-#include <asm/acpi.h>
 
 struct smp_enable_ops {
         int             (*prepare_cpu)(int cpu);

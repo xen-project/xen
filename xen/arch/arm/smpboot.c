@@ -7,6 +7,7 @@
  * Copyright (c) 2011 Citrix Systems.
  */
 
+#include <xen/acpi.h>
 #include <xen/cpu.h>
 #include <xen/cpumask.h>
 #include <xen/delay.h>

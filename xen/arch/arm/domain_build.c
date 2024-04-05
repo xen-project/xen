@@ -18,7 +18,6 @@
 #include <xen/acpi.h>
 #include <xen/vmap.h>
 #include <xen/warning.h>
-#include <acpi/actables.h>
 #include <asm/device.h>
 #include <asm/kernel.h>
 #include <asm/setup.h>

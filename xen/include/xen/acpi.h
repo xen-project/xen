@@ -37,10 +37,10 @@
 
 #ifndef __ASSEMBLY__
 
+#include <xen/errno.h>
 #include <xen/list.h>
 
-#include <acpi/acpi.h>
-#include <asm/acpi.h>
+#include <public/xen.h>
 
 #define ACPI_MADT_GET_(fld, x) (((x) & ACPI_MADT_##fld##_MASK) / \
 	(ACPI_MADT_##fld##_MASK & -ACPI_MADT_##fld##_MASK))
@@ -53,6 +53,9 @@
                 (entry)->header.length < sizeof(*(entry)))
 
 #ifdef CONFIG_ACPI
+
+#include <acpi/acpi.h>
+#include <asm/acpi.h>
 
 extern acpi_physical_address rsdp_hint;
 
@@ -118,6 +121,7 @@ extern u32 pci_mmcfg_base_addr;
 #else	/*!CONFIG_ACPI*/
 
 #define acpi_mp_config	0
+#define acpi_disabled true
 
 static inline int acpi_boot_init(void)
 {

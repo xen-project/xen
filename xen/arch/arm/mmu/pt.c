@@ -11,6 +11,7 @@
 #include <xen/sizes.h>
 #include <xen/vmap.h>
 
+#include <asm/current.h>
 #include <asm/fixmap.h>
 
 #ifdef NDEBUG

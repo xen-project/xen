@@ -7,6 +7,7 @@
  * Copyright (c) 2011 Citrix Systems.
  */
 
+#include <xen/acpi.h>
 #include <xen/domain_page.h>
 #include <xen/errno.h>
 #include <xen/hypercall.h>
@@ -30,7 +31,6 @@
 #include <public/sched.h>
 #include <public/xen.h>
 
-#include <asm/acpi.h>
 #include <asm/cpuerrata.h>
 #include <asm/cpufeature.h>
 #include <asm/event.h>
@@ -38,6 +38,7 @@
 #include <asm/mem_access.h>
 #include <asm/mmio.h>
 #include <asm/regs.h>
+#include <asm/setup.h>
 #include <asm/smccc.h>
 #include <asm/traps.h>
 #include <asm/vgic.h>
