@@ -293,6 +293,10 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     switch ( op->cmd )
     {
+    case XEN_DOMCTL_createdomain:
+        d = NULL;
+        break;
+
     case XEN_DOMCTL_assign_device:
     case XEN_DOMCTL_deassign_device:
         if ( op->domain == DOMID_IO )
@@ -302,16 +306,15 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         }
         else if ( op->domain == DOMID_INVALID )
             return -ESRCH;
-        /* fall through */
+        fallthrough;
     case XEN_DOMCTL_test_assign_device:
     case XEN_DOMCTL_vm_event_op:
         if ( op->domain == DOMID_INVALID )
         {
-    case XEN_DOMCTL_createdomain:
             d = NULL;
             break;
         }
-        /* fall through */
+        fallthrough;
     default:
         d = rcu_lock_domain_by_id(op->domain);
         if ( !d )
