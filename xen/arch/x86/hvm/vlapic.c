@@ -1033,11 +1033,11 @@ int guest_wrmsr_x2apic(struct vcpu *v, uint32_t msr, uint64_t val)
 
     case APIC_EOI:
     case APIC_ESR:
-        if ( val )
-        {
+        if ( !val )
+            break;
+        fallthrough;
     default:
             return X86EMUL_EXCEPTION;
-        }
     }
 
     vlapic_reg_write(v, array_index_nospec(offset, PAGE_SIZE), val);
