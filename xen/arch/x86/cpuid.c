@@ -331,23 +331,22 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         switch ( subleaf )
         {
         case 1:
-            if ( p->xstate.xsavec || p->xstate.xsaves )
-            {
-                /*
-                 * TODO: Figure out what to do for XSS state.  VT-x manages
-                 * host vs guest MSR_XSS automatically, so as soon as we start
-                 * supporting any XSS states, the wrong XSS will be in
-                 * context.
-                 */
-                BUILD_BUG_ON(XSTATE_XSAVES_ONLY != 0);
+            if ( !p->xstate.xsavec && !p->xstate.xsaves )
+                break;
 
-                /*
-                 * Read CPUID[0xD,0/1].EBX from hardware.  They vary with
-                 * enabled XSTATE, and appropraite XCR0|XSS are in context.
-                 */
+            /*
+             * TODO: Figure out what to do for XSS state.  VT-x manages host
+             * vs guest MSR_XSS automatically, so as soon as we start
+             * supporting any XSS states, the wrong XSS will be in context.
+             */
+            BUILD_BUG_ON(XSTATE_XSAVES_ONLY != 0);
+            fallthrough;
         case 0:
-                res->b = cpuid_count_ebx(leaf, subleaf);
-            }
+            /*
+             * Read CPUID[0xD,0/1].EBX from hardware.  They vary with enabled
+             * XSTATE, and appropriate XCR0|XSS are in context.
+             */
+            res->b = cpuid_count_ebx(leaf, subleaf);
             break;
         }
         break;
