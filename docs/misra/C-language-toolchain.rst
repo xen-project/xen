@@ -480,4 +480,77 @@ The table columns are as follows:
      - See Section "4.13 Preprocessing Directives" of GCC_MANUAL and Section "11.1 Implementation-defined behavior" of CPP_MANUAL.
 
 
+Sizes of Integer types
+______________________
+
+Xen expects System V ABI on x86_64:
+  https://gitlab.com/x86-psABIs/x86-64-ABI
+
+Xen expects AAPCS32 on ARMv8-A AArch32 and ARMv7-A:
+  https://github.com/ARM-software/abi-aa/blob/main/aapcs32/aapcs32.rst
+
+Xen expects AAPCS64 LP64 on ARMv8-A AArch64:
+  https://github.com/ARM-software/abi-aa/blob/main/aapcs64/aapcs64.rst
+
+A summary table of data types, sizes and alignment is below:
+
+.. list-table::
+   :widths: 10 10 10 45
+   :header-rows: 1
+
+   * - Type
+     - Size
+     - Alignment
+     - Architectures
+
+   * - char 
+     - 8 bits
+     - 8 bits
+     - x86_32, ARMv8-A AArch32, ARMv8-R AArch32, ARMv7-A, x86_64,
+       ARMv8-A AArch64, RV64, PPC64
+
+   * - short
+     - 16 bits
+     - 16 bits
+     - x86_32, ARMv8-A AArch32, ARMv8-R AArch32, ARMv7-A, x86_64,
+       ARMv8-A AArch64, RV64, PPC64
+
+   * - int
+     - 32 bits
+     - 32 bits
+     - x86_32, ARMv8-A AArch32, ARMv8-R AArch32, ARMv7-A, x86_64,
+       ARMv8-A AArch64, RV64, PPC64
+
+   * - long
+     - 32 bits
+     - 32 bits 
+     - x86_32, ARMv8-A AArch32, ARMv8-R AArch32, ARMv7-A
+
+   * - long
+     - 64 bits
+     - 64 bits 
+     - x86_64, ARMv8-A AArch64, RV64, PPC64
+
+   * - long long
+     - 64-bit
+     - 32-bit
+     - x86_32
+
+   * - long long
+     - 64-bit
+     - 64-bit
+     - x86_64, ARMv8-A AArch64, RV64, PPC64, ARMv8-A AArch32, ARMv8-R
+       AArch32, ARMv7-A
+
+   * - pointer
+     - 32-bit
+     - 32-bit
+     - x86_32, ARMv8-A AArch32, ARMv8-R AArch32, ARMv7-A
+
+   * - pointer
+     - 64-bit
+     - 64-bit
+     - x86_64, ARMv8-A AArch64, RV64, PPC64
+
+
 END OF DOCUMENT.
