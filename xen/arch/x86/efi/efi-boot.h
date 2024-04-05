@@ -169,20 +169,23 @@ static void __init efi_arch_process_memory_map(EFI_SYSTEM_TABLE *SystemTable,
 
         switch ( desc->Type )
         {
+        default:
+            type = E820_RESERVED;
+            break;
+
         case EfiBootServicesCode:
         case EfiBootServicesData:
             if ( map_bs )
             {
-        default:
                 type = E820_RESERVED;
                 break;
             }
-            /* fall through */
+            fallthrough;
         case EfiConventionalMemory:
             if ( !trampoline_phys && desc->PhysicalStart + len <= 0x100000 &&
                  len >= cfg.size && desc->PhysicalStart + len > cfg.addr )
                 cfg.addr = (desc->PhysicalStart + len - cfg.size) & PAGE_MASK;
-            /* fall through */
+            fallthrough;
         case EfiLoaderCode:
         case EfiLoaderData:
             if ( desc->Attribute & EFI_MEMORY_RUNTIME )
@@ -190,9 +193,13 @@ static void __init efi_arch_process_memory_map(EFI_SYSTEM_TABLE *SystemTable,
             else if ( desc->Attribute & EFI_MEMORY_WB )
                 type = E820_RAM;
             else
-        case EfiUnusableMemory:
                 type = E820_UNUSABLE;
             break;
+
+        case EfiUnusableMemory:
+            type = E820_UNUSABLE;
+            break;
+
         case EfiACPIReclaimMemory:
             type = E820_ACPI;
             break;
