@@ -119,12 +119,12 @@ int hvm_hypercall(struct cpu_user_regs *regs)
             (mode == 8 ? regs->rdi : regs->ebx) == HVMOP_guest_request_vm_event )
             break;
 
-        if ( unlikely(hvm_get_cpl(curr)) )
-        {
+        if ( likely(!hvm_get_cpl(curr)) )
+            break;
+        fallthrough;
     default:
-            regs->rax = -EPERM;
-            return HVM_HCALL_completed;
-        }
+        regs->rax = -EPERM;
+        return HVM_HCALL_completed;
     case 0:
         break;
     }
