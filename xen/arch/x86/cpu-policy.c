@@ -475,6 +475,21 @@ static void __init guest_common_max_feature_adjustments(uint32_t *fs)
      */
     __set_bit(X86_FEATURE_HTT, fs);
     __set_bit(X86_FEATURE_CMP_LEGACY, fs);
+
+    /*
+     * To mitigate Native-BHI, one option is to use a TSX Abort on capable
+     * systems.  This is safe even if RTM has been disabled for other reasons
+     * via MSR_TSX_{CTRL,FORCE_ABORT}.  However, a guest kernel doesn't get to
+     * know this type of information.
+     *
+     * Therefore the meaning of RTM_ALWAYS_ABORT has been adjusted, to instead
+     * mean "XBEGIN won't fault".  This is enough for a guest kernel to make
+     * an informed choice WRT mitigating Native-BHI.
+     *
+     * If RTM-capable, we can run a VM which has seen RTM_ALWAYS_ABORT.
+     */
+    if ( test_bit(X86_FEATURE_RTM, fs) )
+        __set_bit(X86_FEATURE_RTM_ALWAYS_ABORT, fs);
 }
 
 static void __init guest_common_default_feature_adjustments(uint32_t *fs)
@@ -547,9 +562,14 @@ static void __init guest_common_default_feature_adjustments(uint32_t *fs)
      * function as expected, but is technically compatible with the ISA.
      *
      * Do not advertise RTM to guests by default if it won't actually work.
+     * Instead, advertise RTM_ALWAYS_ABORT indicating that TSX Aborts are safe
+     * to use, e.g. for mitigating Native-BHI.
      */
     if ( rtm_disabled )
+    {
         __clear_bit(X86_FEATURE_RTM, fs);
+        __set_bit(X86_FEATURE_RTM_ALWAYS_ABORT, fs);
+    }
 }
 
 static void __init guest_common_feature_adjustments(uint32_t *fs)
