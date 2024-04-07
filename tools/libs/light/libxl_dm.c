@@ -3381,7 +3381,8 @@ static void device_model_postconfig_done(libxl__egc *egc,
     dmss->callback(egc, dmss, rc);
 }
 
-void libxl__spawn_qdisk_backend(libxl__egc *egc, libxl__dm_spawn_state *dmss)
+void libxl__spawn_qemu_xenpv_backend(libxl__egc *egc,
+                                     libxl__dm_spawn_state *dmss)
 {
     STATE_AO_GC(dmss->spawn.ao);
     flexarray_t *dm_args, *dm_envs;
@@ -3471,7 +3472,7 @@ static int kill_device_model(libxl__gc *gc, const char *xs_path_pid)
 }
 
 /* Helper to destroy a Qdisk backend */
-int libxl__destroy_qdisk_backend(libxl__gc *gc, uint32_t domid)
+int libxl__destroy_qemu_xenpv_backend(libxl__gc *gc, uint32_t domid)
 {
     char *pid_path;
     int rc;

@@ -1524,12 +1524,12 @@ static void device_complete(libxl__egc *egc, libxl__ao_device *aodev)
     libxl__nested_ao_free(aodev->ao);
 }
 
-static void qdisk_spawn_outcome(libxl__egc *egc, libxl__dm_spawn_state *dmss,
-                                int rc)
+static void qemu_xenpv_spawn_outcome(libxl__egc *egc,
+                                     libxl__dm_spawn_state *dmss, int rc)
 {
     STATE_AO_GC(dmss->spawn.ao);
 
-    LOGD(DEBUG, dmss->guest_domid, "qdisk backend spawn %s",
+    LOGD(DEBUG, dmss->guest_domid, "qemu xenpv backend spawn %s",
                 rc ? "failed" : "succeed");
 
     libxl__nested_ao_free(dmss->spawn.ao);
@@ -1552,7 +1552,7 @@ typedef struct libxl__ddomain_device {
  */
 typedef struct libxl__ddomain_guest {
     uint32_t domid;
-    int num_qdisks;
+    int pvqemu_refcnt;
     XEN_SLIST_HEAD(, struct libxl__ddomain_device) devices;
     XEN_SLIST_ENTRY(struct libxl__ddomain_guest) next;
 } libxl__ddomain_guest;
@@ -1646,15 +1646,16 @@ static int add_device(libxl__egc *egc, libxl__ao *ao,
 
     switch(dev->backend_kind) {
     case LIBXL__DEVICE_KIND_QDISK:
-        if (dguest->num_qdisks == 0) {
+    case LIBXL__DEVICE_KIND_9PFS:
+        if (dguest->pvqemu_refcnt == 0) {
             GCNEW(dmss);
             dmss->guest_domid = dev->domid;
             dmss->spawn.ao = ao;
-            dmss->callback = qdisk_spawn_outcome;
+            dmss->callback = qemu_xenpv_spawn_outcome;
 
-            libxl__spawn_qdisk_backend(egc, dmss);
+            libxl__spawn_qemu_xenpv_backend(egc, dmss);
         }
-        dguest->num_qdisks++;
+        dguest->pvqemu_refcnt++;
         break;
     default:
         GCNEW(aodev);
@@ -1685,8 +1686,9 @@ static int remove_device(libxl__egc *egc, libxl__ao *ao,
 
     switch(ddev->dev->backend_kind) {
     case LIBXL__DEVICE_KIND_QDISK:
-        if (--dguest->num_qdisks == 0) {
-            rc = libxl__destroy_qdisk_backend(gc, dev->domid);
+    case LIBXL__DEVICE_KIND_9PFS:
+        if (--dguest->pvqemu_refcnt == 0) {
+            rc = libxl__destroy_qemu_xenpv_backend(gc, dev->domid);
             if (rc)
                 goto out;
         }

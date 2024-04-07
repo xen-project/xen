@@ -4192,9 +4192,9 @@ _hidden char *libxl__stub_dm_name(libxl__gc *gc, const char * guest_name);
 
 /* Qdisk backend launch helpers */
 
-_hidden void libxl__spawn_qdisk_backend(libxl__egc *egc,
+_hidden void libxl__spawn_qemu_xenpv_backend(libxl__egc *egc,
                                         libxl__dm_spawn_state *dmss);
-_hidden int libxl__destroy_qdisk_backend(libxl__gc *gc, uint32_t domid);
+_hidden int libxl__destroy_qemu_xenpv_backend(libxl__gc *gc, uint32_t domid);
 
 /*----- Domain creation -----*/
 
