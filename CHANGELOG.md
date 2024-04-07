@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - On x86:
    - HVM PIRQs are disabled by default.
    - Reduce IOMMU setup time for hardware domain.
+ - xl/libxl configures vkb=[] for HVM domains with priority over vkb_device.
 
 ### Added
  - On x86:

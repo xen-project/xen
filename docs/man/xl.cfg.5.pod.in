@@ -2710,6 +2710,8 @@ device.
 
 Specifies that the HVM guest gets a vkdb. The default is true (1).
 
+This option is only used when B<vkb=[]> is unset.
+
 =item B<usb=BOOLEAN>
 
 Enables or disables an emulated USB bus in the guest.

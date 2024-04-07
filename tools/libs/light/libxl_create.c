@@ -1769,23 +1769,31 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
         libxl__device_add(gc, domid, &libxl__virtio_devtype,
                           &d_config->virtios[i]);
 
+    if (d_config->num_vkbs) {
+        for (i = 0; i < d_config->num_vkbs; i++) {
+            ret = libxl__device_add(gc, domid, &libxl__vkb_devtype,
+                                    &d_config->vkbs[i]);
+            if (ret) goto error_out;
+        }
+    } else if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM &&
+               libxl_defbool_val(d_config->b_info.u.hvm.vkb_device)) {
+        libxl_device_vkb vkb;
+
+        libxl_device_vkb_init(&vkb);
+        libxl__device_add(gc, domid, &libxl__vkb_devtype, &vkb);
+        libxl_device_vkb_dispose(&vkb);
+    }
+
     switch (d_config->c_info.type) {
     case LIBXL_DOMAIN_TYPE_HVM:
     {
         libxl__device_console console;
         libxl__device device;
-        libxl_device_vkb vkb;
 
         init_console_info(gc, &console, 0);
         console.backend_domid = state->console_domid;
         libxl__device_console_add(gc, domid, &console, state, &device);
         libxl__device_console_dispose(&console);
-
-        if (libxl_defbool_val(d_config->b_info.u.hvm.vkb_device)) {
-            libxl_device_vkb_init(&vkb);
-            libxl__device_add(gc, domid, &libxl__vkb_devtype, &vkb);
-            libxl_device_vkb_dispose(&vkb);
-        }
 
         dcs->sdss.dm.guest_domid = domid;
         if (libxl_defbool_val(d_config->b_info.device_model_stubdomain))
@@ -1812,11 +1820,6 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
         for (i = 0; i < d_config->num_vfbs; i++) {
             libxl__device_add(gc, domid, &libxl__vfb_devtype,
                               &d_config->vfbs[i]);
-        }
-
-        for (i = 0; i < d_config->num_vkbs; i++) {
-            libxl__device_add(gc, domid, &libxl__vkb_devtype,
-                              &d_config->vkbs[i]);
         }
 
         if (d_config->b_info.arch_arm.vuart == LIBXL_VUART_TYPE_SBSA_UART) {
