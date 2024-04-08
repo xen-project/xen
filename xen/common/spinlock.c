@@ -396,13 +396,10 @@ static bool always_inline spin_is_locked_common(const spinlock_tickets_t *t)
 int _spin_is_locked(const spinlock_t *lock)
 {
     /*
-     * Recursive locks may be locked by another CPU, yet we return
-     * "false" here, making this function suitable only for use in
-     * ASSERT()s and alike.
+     * This function is suitable only for use in ASSERT()s and alike, as it
+     * doesn't tell _who_ is holding the lock.
      */
-    return lock->recurse_cpu == SPINLOCK_NO_CPU
-           ? spin_is_locked_common(&lock->tickets)
-           : lock->recurse_cpu == smp_processor_id();
+    return spin_is_locked_common(&lock->tickets);
 }
 
 static bool always_inline spin_trylock_common(spinlock_tickets_t *t,
@@ -461,6 +458,23 @@ static void always_inline spin_barrier_common(spinlock_tickets_t *t,
 }
 
 void _spin_barrier(spinlock_t *lock)
+{
+    spin_barrier_common(&lock->tickets, &lock->debug, LOCK_PROFILE_PAR);
+}
+
+bool _rspin_is_locked(const rspinlock_t *lock)
+{
+    /*
+     * Recursive locks may be locked by another CPU, yet we return
+     * "false" here, making this function suitable only for use in
+     * ASSERT()s and alike.
+     */
+    return lock->recurse_cpu == SPINLOCK_NO_CPU
+           ? spin_is_locked_common(&lock->tickets)
+           : lock->recurse_cpu == smp_processor_id();
+}
+
+void _rspin_barrier(rspinlock_t *lock)
 {
     spin_barrier_common(&lock->tickets, &lock->debug, LOCK_PROFILE_PAR);
 }

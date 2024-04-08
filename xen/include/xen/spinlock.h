@@ -297,6 +297,8 @@ void _rspin_lock(rspinlock_t *lock);
 unsigned long _rspin_lock_irqsave(rspinlock_t *lock);
 void _rspin_unlock(rspinlock_t *lock);
 void _rspin_unlock_irqrestore(rspinlock_t *lock, unsigned long flags);
+bool _rspin_is_locked(const rspinlock_t *lock);
+void _rspin_barrier(rspinlock_t *lock);
 
 static always_inline void rspin_lock(rspinlock_t *lock)
 {
@@ -307,6 +309,8 @@ static always_inline void rspin_lock(rspinlock_t *lock)
 #define rspin_trylock(l)              lock_evaluate_nospec(_rspin_trylock(l))
 #define rspin_unlock(l)               _rspin_unlock(l)
 #define rspin_unlock_irqrestore(l, f) _rspin_unlock_irqrestore(l, f)
+#define rspin_barrier(l)              _rspin_barrier(l)
+#define rspin_is_locked(l)            _rspin_is_locked(l)
 
 #define nrspin_trylock(l)    spin_trylock(l)
 #define nrspin_lock(l)       spin_lock(l)
