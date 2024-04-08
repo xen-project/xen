@@ -8,16 +8,16 @@
 #include <asm/system.h>
 #include <asm/spinlock.h>
 
-#define SPINLOCK_CPU_BITS  12
+#define SPINLOCK_CPU_BITS  16
 
 #ifdef CONFIG_DEBUG_LOCKS
 union lock_debug {
-    uint16_t val;
-#define LOCK_DEBUG_INITVAL 0xffff
+    uint32_t val;
+#define LOCK_DEBUG_INITVAL 0xffffffff
     struct {
-        uint16_t cpu:SPINLOCK_CPU_BITS;
-#define LOCK_DEBUG_PAD_BITS (14 - SPINLOCK_CPU_BITS)
-        uint16_t :LOCK_DEBUG_PAD_BITS;
+        unsigned int cpu:SPINLOCK_CPU_BITS;
+#define LOCK_DEBUG_PAD_BITS (30 - SPINLOCK_CPU_BITS)
+        unsigned int :LOCK_DEBUG_PAD_BITS;
         bool irq_safe:1;
         bool unseen:1;
     };
@@ -211,11 +211,11 @@ typedef struct spinlock {
 
 typedef struct rspinlock {
     spinlock_tickets_t tickets;
-    uint16_t recurse_cpu:SPINLOCK_CPU_BITS;
+    uint16_t recurse_cpu;
 #define SPINLOCK_NO_CPU        ((1u << SPINLOCK_CPU_BITS) - 1)
-#define SPINLOCK_RECURSE_BITS  (16 - SPINLOCK_CPU_BITS)
-    uint16_t recurse_cnt:SPINLOCK_RECURSE_BITS;
-#define SPINLOCK_MAX_RECURSE   ((1u << SPINLOCK_RECURSE_BITS) - 1)
+#define SPINLOCK_RECURSE_BITS  8
+    uint8_t recurse_cnt;
+#define SPINLOCK_MAX_RECURSE   15
     union lock_debug debug;
 #ifdef CONFIG_DEBUG_LOCK_PROFILE
     struct lock_profile *profile;
