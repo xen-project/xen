@@ -71,6 +71,7 @@
 #endif
 #include <xen/elfnote.h>
 #include <xen/libelf/libelf.h>
+#include <xen-tools/common-macros.h>
 
 #ifndef FUZZ_NO_LIBXC
 #include "xenctrl.h"

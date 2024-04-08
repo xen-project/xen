@@ -426,6 +426,7 @@ struct elf_dom_parms {
     enum xen_pae_type pae;
     bool bsd_symtab;
     bool unmapped_initrd;
+    bool phys_reloc;
     uint64_t virt_base;
     uint64_t virt_entry;
     uint64_t virt_hypercall;
@@ -435,6 +436,9 @@ struct elf_dom_parms {
     uint32_t f_supported[XENFEAT_NR_SUBMAPS];
     uint32_t f_required[XENFEAT_NR_SUBMAPS];
     uint32_t phys_entry;
+    uint32_t phys_align;
+    uint32_t phys_min;
+    uint32_t phys_max;
 
     /* calculated */
     uint64_t virt_kstart;

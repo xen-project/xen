@@ -17,6 +17,14 @@
 
 #include "libelf-private.h"
 
+#if defined(__i386__) || defined(__x86_64__)
+#define ARCH_PHYS_MIN_DEFAULT   0
+#define ARCH_PHYS_MAX_DEFAULT   (GB(4) - 1)
+#else
+#define ARCH_PHYS_MIN_DEFAULT   0
+#define ARCH_PHYS_MAX_DEFAULT   0
+#endif
+
 /* ------------------------------------------------------------------------ */
 /* xen features                                                             */
 
@@ -125,6 +133,7 @@ elf_errorstatus elf_xen_parse_note(struct elf_binary *elf,
         [XEN_ELFNOTE_SUSPEND_CANCEL] = { "SUSPEND_CANCEL", ELFNOTE_INT },
         [XEN_ELFNOTE_MOD_START_PFN] = { "MOD_START_PFN", ELFNOTE_INT },
         [XEN_ELFNOTE_PHYS32_ENTRY] = { "PHYS32_ENTRY", ELFNOTE_INT },
+        [XEN_ELFNOTE_PHYS32_RELOC] = { "PHYS32_RELOC", ELFNOTE_NAME },
     };
 /* *INDENT-ON* */
 
@@ -132,6 +141,7 @@ elf_errorstatus elf_xen_parse_note(struct elf_binary *elf,
     uint64_t val = 0;
     unsigned int i;
     unsigned type = elf_uval(elf, note, type);
+    unsigned descsz = elf_uval(elf, note, descsz);
 
     if ( (type >= sizeof(note_desc) / sizeof(note_desc[0])) ||
          (note_desc[type].name == NULL) )
@@ -227,6 +237,27 @@ elf_errorstatus elf_xen_parse_note(struct elf_binary *elf,
 
     case XEN_ELFNOTE_PHYS32_ENTRY:
         parms->phys_entry = val;
+        break;
+
+    case XEN_ELFNOTE_PHYS32_RELOC:
+        parms->phys_reloc = true;
+
+        if ( descsz >= 4 )
+        {
+            parms->phys_align = elf_note_numeric_array(elf, note, 4, 0);
+            elf_msg(elf, " align: %#"PRIx32, parms->phys_align);
+        }
+        if ( descsz >= 8 )
+        {
+            parms->phys_min = elf_note_numeric_array(elf, note, 4, 1);
+            elf_msg(elf, " min: %#"PRIx32, parms->phys_min);
+        }
+        if ( descsz >= 12 )
+        {
+            parms->phys_max = elf_note_numeric_array(elf, note, 4, 2);
+            elf_msg(elf, " max: %#"PRIx32, parms->phys_max);
+        }
+
         break;
     }
 
@@ -543,6 +574,10 @@ elf_errorstatus elf_xen_parse(struct elf_binary *elf,
     parms->p2m_base = UNSET_ADDR;
     parms->elf_paddr_offset = UNSET_ADDR;
     parms->phys_entry = UNSET_ADDR32;
+    parms->phys_align = UNSET_ADDR32;
+    parms->phys_min = ARCH_PHYS_MIN_DEFAULT;
+    parms->phys_max = ARCH_PHYS_MAX_DEFAULT;
+    parms->phys_reloc = false;
 
     /* Find and parse elf notes. */
     count = elf_phdr_count(elf);
