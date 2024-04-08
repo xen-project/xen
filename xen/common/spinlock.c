@@ -545,6 +545,56 @@ void _rspin_unlock_irqrestore(rspinlock_t *lock, unsigned long flags)
     local_irq_restore(flags);
 }
 
+bool _nrspin_trylock(rspinlock_t *lock)
+{
+    check_lock(&lock->debug, true);
+
+    if ( unlikely(lock->recurse_cpu != SPINLOCK_NO_CPU) )
+        return false;
+
+    return spin_trylock_common(&lock->tickets, &lock->debug, LOCK_PROFILE_PAR);
+}
+
+void _nrspin_lock(rspinlock_t *lock)
+{
+    spin_lock_common(&lock->tickets, &lock->debug, LOCK_PROFILE_PAR, NULL,
+                     NULL);
+}
+
+void _nrspin_unlock(rspinlock_t *lock)
+{
+    spin_unlock_common(&lock->tickets, &lock->debug, LOCK_PROFILE_PAR);
+}
+
+void _nrspin_lock_irq(rspinlock_t *lock)
+{
+    ASSERT(local_irq_is_enabled());
+    local_irq_disable();
+    _nrspin_lock(lock);
+}
+
+void _nrspin_unlock_irq(rspinlock_t *lock)
+{
+    _nrspin_unlock(lock);
+    local_irq_enable();
+}
+
+unsigned long _nrspin_lock_irqsave(rspinlock_t *lock)
+{
+    unsigned long flags;
+
+    local_irq_save(flags);
+    _nrspin_lock(lock);
+
+    return flags;
+}
+
+void _nrspin_unlock_irqrestore(rspinlock_t *lock, unsigned long flags)
+{
+    _nrspin_unlock(lock);
+    local_irq_restore(flags);
+}
+
 #ifdef CONFIG_DEBUG_LOCK_PROFILE
 
 struct lock_profile_anc {

@@ -77,8 +77,6 @@ union lock_debug { };
 */
 
 struct spinlock;
-/* Temporary hack until a dedicated struct rspinlock is existing. */
-#define rspinlock spinlock
 
 struct lock_profile {
     struct lock_profile *next;       /* forward link */
@@ -110,6 +108,10 @@ struct lock_profile_qhead {
     __used_section(".lockprofile.data") =                                     \
     &lock_profile_data__##name
 #define SPIN_LOCK_UNLOCKED_(x) {                                              \
+    .debug = LOCK_DEBUG_,                                                     \
+    .profile = x,                                                             \
+}
+#define RSPIN_LOCK_UNLOCKED_(x) {                                             \
     .recurse_cpu = SPINLOCK_NO_CPU,                                           \
     .debug = LOCK_DEBUG_,                                                     \
     .profile = x,                                                             \
@@ -119,8 +121,9 @@ struct lock_profile_qhead {
     spinlock_t l = SPIN_LOCK_UNLOCKED_(NULL);                                 \
     static struct lock_profile lock_profile_data__##l = LOCK_PROFILE_(l);     \
     LOCK_PROFILE_PTR_(l)
+#define RSPIN_LOCK_UNLOCKED RSPIN_LOCK_UNLOCKED_(NULL)
 #define DEFINE_RSPINLOCK(l)                                                   \
-    rspinlock_t l = SPIN_LOCK_UNLOCKED_(NULL);                                \
+    rspinlock_t l = RSPIN_LOCK_UNLOCKED_(NULL);                               \
     static struct lock_profile lock_profile_data__##l = RLOCK_PROFILE_(l);    \
     LOCK_PROFILE_PTR_(l)
 
@@ -145,8 +148,11 @@ struct lock_profile_qhead {
 
 #define spin_lock_init_prof(s, l)                                             \
     spin_lock_init_prof__(s, l, lock, spinlock_t, false)
-#define rspin_lock_init_prof(s, l)                                            \
-    spin_lock_init_prof__(s, l, rlock, rspinlock_t, true)
+#define rspin_lock_init_prof(s, l) do {                                       \
+        spin_lock_init_prof__(s, l, rlock, rspinlock_t, true);                \
+        (s)->l.recurse_cpu = SPINLOCK_NO_CPU;                                 \
+        (s)->l.recurse_cnt = 0;                                               \
+    } while (0)
 
 void _lock_profile_register_struct(
     int32_t type, struct lock_profile_qhead *qhead, int32_t idx);
@@ -168,11 +174,14 @@ struct lock_profile_qhead { };
 struct lock_profile { };
 
 #define SPIN_LOCK_UNLOCKED {                                                  \
+    .debug = LOCK_DEBUG_,                                                     \
+}
+#define RSPIN_LOCK_UNLOCKED {                                                 \
     .recurse_cpu = SPINLOCK_NO_CPU,                                           \
     .debug = LOCK_DEBUG_,                                                     \
 }
 #define DEFINE_SPINLOCK(l) spinlock_t l = SPIN_LOCK_UNLOCKED
-#define DEFINE_RSPINLOCK(l) rspinlock_t l = SPIN_LOCK_UNLOCKED
+#define DEFINE_RSPINLOCK(l) rspinlock_t l = RSPIN_LOCK_UNLOCKED
 
 #define spin_lock_init_prof(s, l) spin_lock_init(&((s)->l))
 #define rspin_lock_init_prof(s, l) rspin_lock_init(&((s)->l))
@@ -194,6 +203,14 @@ typedef union {
 
 typedef struct spinlock {
     spinlock_tickets_t tickets;
+    union lock_debug debug;
+#ifdef CONFIG_DEBUG_LOCK_PROFILE
+    struct lock_profile *profile;
+#endif
+} spinlock_t;
+
+typedef struct rspinlock {
+    spinlock_tickets_t tickets;
     uint16_t recurse_cpu:SPINLOCK_CPU_BITS;
 #define SPINLOCK_NO_CPU        ((1u << SPINLOCK_CPU_BITS) - 1)
 #define SPINLOCK_RECURSE_BITS  (16 - SPINLOCK_CPU_BITS)
@@ -203,12 +220,10 @@ typedef struct spinlock {
 #ifdef CONFIG_DEBUG_LOCK_PROFILE
     struct lock_profile *profile;
 #endif
-} spinlock_t;
-
-typedef spinlock_t rspinlock_t;
+} rspinlock_t;
 
 #define spin_lock_init(l) (*(l) = (spinlock_t)SPIN_LOCK_UNLOCKED)
-#define rspin_lock_init(l) (*(l) = (rspinlock_t)SPIN_LOCK_UNLOCKED)
+#define rspin_lock_init(l) (*(l) = (rspinlock_t)RSPIN_LOCK_UNLOCKED)
 
 void _spin_lock(spinlock_t *lock);
 void _spin_lock_cb(spinlock_t *lock, void (*cb)(void *data), void *data);
@@ -312,12 +327,35 @@ static always_inline void rspin_lock(rspinlock_t *lock)
 #define rspin_barrier(l)              _rspin_barrier(l)
 #define rspin_is_locked(l)            _rspin_is_locked(l)
 
-#define nrspin_trylock(l)    spin_trylock(l)
-#define nrspin_lock(l)       spin_lock(l)
-#define nrspin_unlock(l)     spin_unlock(l)
-#define nrspin_lock_irq(l)   spin_lock_irq(l)
-#define nrspin_unlock_irq(l) spin_unlock_irq(l)
-#define nrspin_lock_irqsave(l, f)      spin_lock_irqsave(l, f)
-#define nrspin_unlock_irqrestore(l, f) spin_unlock_irqrestore(l, f)
+bool _nrspin_trylock(rspinlock_t *lock);
+void _nrspin_lock(rspinlock_t *lock);
+#define nrspin_lock_irqsave(l, f)                               \
+    ({                                                          \
+        BUILD_BUG_ON(sizeof(f) != sizeof(unsigned long));       \
+        (f) = _nrspin_lock_irqsave(l);                         \
+        block_lock_speculation();                               \
+    })
+unsigned long _nrspin_lock_irqsave(rspinlock_t *lock);
+void _nrspin_unlock(rspinlock_t *lock);
+void _nrspin_lock_irq(rspinlock_t *lock);
+void _nrspin_unlock_irq(rspinlock_t *lock);
+void _nrspin_unlock_irqrestore(rspinlock_t *lock, unsigned long flags);
+
+static always_inline void nrspin_lock(rspinlock_t *lock)
+{
+    _nrspin_lock(lock);
+    block_lock_speculation();
+}
+
+static always_inline void nrspin_lock_irq(rspinlock_t *l)
+{
+    _nrspin_lock_irq(l);
+    block_lock_speculation();
+}
+
+#define nrspin_trylock(l)              lock_evaluate_nospec(_nrspin_trylock(l))
+#define nrspin_unlock(l)               _nrspin_unlock(l)
+#define nrspin_unlock_irqrestore(l, f) _nrspin_unlock_irqrestore(l, f)
+#define nrspin_unlock_irq(l)           _nrspin_unlock_irq(l)
 
 #endif /* __SPINLOCK_H__ */
