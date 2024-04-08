@@ -102,6 +102,9 @@ struct lock_profile_qhead {
 };
 
 #define LOCK_PROFILE_(lockname) { .name = #lockname, .ptr.lock = &(lockname), }
+#define RLOCK_PROFILE_(lockname) { .name = #lockname,                         \
+                                   .ptr.rlock = &(lockname),                  \
+                                   .is_rlock = true, }
 #define LOCK_PROFILE_PTR_(name)                                               \
     static struct lock_profile * const lock_profile__##name                   \
     __used_section(".lockprofile.data") =                                     \
@@ -118,10 +121,10 @@ struct lock_profile_qhead {
     LOCK_PROFILE_PTR_(l)
 #define DEFINE_RSPINLOCK(l)                                                   \
     rspinlock_t l = SPIN_LOCK_UNLOCKED_(NULL);                                \
-    static struct lock_profile lock_profile_data__##l = LOCK_PROFILE_(l);     \
+    static struct lock_profile lock_profile_data__##l = RLOCK_PROFILE_(l);    \
     LOCK_PROFILE_PTR_(l)
 
-#define spin_lock_init_prof__(s, l, locktype)                                 \
+#define spin_lock_init_prof__(s, l, lockptr, locktype, isr)                   \
     do {                                                                      \
         struct lock_profile *prof;                                            \
         prof = xzalloc(struct lock_profile);                                  \
@@ -134,13 +137,16 @@ struct lock_profile_qhead {
             break;                                                            \
         }                                                                     \
         prof->name = #l;                                                      \
-        prof->ptr.lock = &(s)->l;                                             \
+        prof->ptr.lockptr = &(s)->l;                                          \
+        prof->is_rlock = isr;                                                 \
         prof->next = (s)->profile_head.elem_q;                                \
         (s)->profile_head.elem_q = prof;                                      \
     } while( 0 )
 
-#define spin_lock_init_prof(s, l) spin_lock_init_prof__(s, l, spinlock_t)
-#define rspin_lock_init_prof(s, l) spin_lock_init_prof__(s, l, rspinlock_t)
+#define spin_lock_init_prof(s, l)                                             \
+    spin_lock_init_prof__(s, l, lock, spinlock_t, false)
+#define rspin_lock_init_prof(s, l)                                            \
+    spin_lock_init_prof__(s, l, rlock, rspinlock_t, true)
 
 void _lock_profile_register_struct(
     int32_t type, struct lock_profile_qhead *qhead, int32_t idx);
@@ -274,7 +280,10 @@ static always_inline void spin_lock_if(bool condition, spinlock_t *l)
  * reentered recursively on the same CPU. All critical regions that may form
  * part of a recursively-nested set must be protected by these forms. If there
  * are any critical regions that cannot form part of such a set, they can use
- * standard spin_[un]lock().
+ * nrspin_[un]lock().
+ * The nrspin_[un]lock() forms act the same way as normal spin_[un]lock()
+ * calls, but operate on rspinlock_t locks. nrspin_lock() and rspin_lock()
+ * calls are blocking to each other for a specific lock even on the same cpu.
  */
 bool _rspin_trylock(rspinlock_t *lock);
 void _rspin_lock(rspinlock_t *lock);
@@ -297,5 +306,13 @@ static always_inline void rspin_lock(rspinlock_t *lock)
 #define rspin_trylock(l)              lock_evaluate_nospec(_rspin_trylock(l))
 #define rspin_unlock(l)               _rspin_unlock(l)
 #define rspin_unlock_irqrestore(l, f) _rspin_unlock_irqrestore(l, f)
+
+#define nrspin_trylock(l)    spin_trylock(l)
+#define nrspin_lock(l)       spin_lock(l)
+#define nrspin_unlock(l)     spin_unlock(l)
+#define nrspin_lock_irq(l)   spin_lock_irq(l)
+#define nrspin_unlock_irq(l) spin_unlock_irq(l)
+#define nrspin_lock_irqsave(l, f)      spin_lock_irqsave(l, f)
+#define nrspin_unlock_irqrestore(l, f) spin_unlock_irqrestore(l, f)
 
 #endif /* __SPINLOCK_H__ */

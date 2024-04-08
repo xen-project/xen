@@ -27,7 +27,7 @@
 static always_inline void lock_page_alloc(struct p2m_domain *p2m)
 {
     page_alloc_mm_pre_lock(p2m->domain);
-    spin_lock(&(p2m->domain->page_alloc_lock));
+    nrspin_lock(&(p2m->domain->page_alloc_lock));
     page_alloc_mm_post_lock(p2m->domain,
                             p2m->domain->arch.page_alloc_unlock_level);
 }
@@ -35,7 +35,7 @@ static always_inline void lock_page_alloc(struct p2m_domain *p2m)
 static inline void unlock_page_alloc(struct p2m_domain *p2m)
 {
     page_alloc_mm_unlock(p2m->domain->arch.page_alloc_unlock_level);
-    spin_unlock(&(p2m->domain->page_alloc_lock));
+    nrspin_unlock(&(p2m->domain->page_alloc_lock));
 }
 
 /*

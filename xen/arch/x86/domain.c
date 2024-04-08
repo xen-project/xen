@@ -212,7 +212,7 @@ void dump_pageframe_info(struct domain *d)
     {
         unsigned long total[MASK_EXTR(PGT_type_mask, PGT_type_mask) + 1] = {};
 
-        spin_lock(&d->page_alloc_lock);
+        nrspin_lock(&d->page_alloc_lock);
         page_list_for_each ( page, &d->page_list )
         {
             unsigned int index = MASK_EXTR(page->u.inuse.type_info,
@@ -231,13 +231,13 @@ void dump_pageframe_info(struct domain *d)
                    _p(mfn_x(page_to_mfn(page))),
                    page->count_info, page->u.inuse.type_info);
         }
-        spin_unlock(&d->page_alloc_lock);
+        nrspin_unlock(&d->page_alloc_lock);
     }
 
     if ( is_hvm_domain(d) )
         p2m_pod_dump_data(d);
 
-    spin_lock(&d->page_alloc_lock);
+    nrspin_lock(&d->page_alloc_lock);
 
     page_list_for_each ( page, &d->xenpage_list )
     {
@@ -253,7 +253,7 @@ void dump_pageframe_info(struct domain *d)
                page->count_info, page->u.inuse.type_info);
     }
 
-    spin_unlock(&d->page_alloc_lock);
+    nrspin_unlock(&d->page_alloc_lock);
 }
 
 void update_guest_memory_policy(struct vcpu *v,
@@ -2448,10 +2448,10 @@ int domain_relinquish_resources(struct domain *d)
             d->arch.auto_unmask = 0;
         }
 
-        spin_lock(&d->page_alloc_lock);
+        nrspin_lock(&d->page_alloc_lock);
         page_list_splice(&d->arch.relmem_list, &d->page_list);
         INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
-        spin_unlock(&d->page_alloc_lock);
+        nrspin_unlock(&d->page_alloc_lock);
 
     PROGRESS(xen):
 

@@ -2376,7 +2376,7 @@ gnttab_transfer(
             mfn = page_to_mfn(page);
         }
 
-        spin_lock(&e->page_alloc_lock);
+        nrspin_lock(&e->page_alloc_lock);
 
         /*
          * Check that 'e' will accept the page and has reservation
@@ -2387,7 +2387,7 @@ gnttab_transfer(
              unlikely(domain_tot_pages(e) >= e->max_pages) ||
              unlikely(!(e->tot_pages + 1)) )
         {
-            spin_unlock(&e->page_alloc_lock);
+            nrspin_unlock(&e->page_alloc_lock);
 
             if ( e->is_dying )
                 gdprintk(XENLOG_INFO, "Transferee d%d is dying\n",
@@ -2411,7 +2411,7 @@ gnttab_transfer(
          * safely drop the lock and re-aquire it later to add page to the
          * pagelist.
          */
-        spin_unlock(&e->page_alloc_lock);
+        nrspin_unlock(&e->page_alloc_lock);
         okay = gnttab_prepare_for_transfer(e, d, gop.ref);
 
         /*
@@ -2427,9 +2427,9 @@ gnttab_transfer(
              * Need to grab this again to safely free our "reserved"
              * page in the page total
              */
-            spin_lock(&e->page_alloc_lock);
+            nrspin_lock(&e->page_alloc_lock);
             drop_dom_ref = !domain_adjust_tot_pages(e, -1);
-            spin_unlock(&e->page_alloc_lock);
+            nrspin_unlock(&e->page_alloc_lock);
 
             if ( okay /* i.e. e->is_dying due to the surrounding if() */ )
                 gdprintk(XENLOG_INFO, "Transferee d%d is now dying\n",

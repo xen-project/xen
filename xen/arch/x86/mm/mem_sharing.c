@@ -740,11 +740,11 @@ static int page_make_private(struct domain *d, struct page_info *page)
     if ( !get_page(page, dom_cow) )
         return -EINVAL;
 
-    spin_lock(&d->page_alloc_lock);
+    nrspin_lock(&d->page_alloc_lock);
 
     if ( d->is_dying )
     {
-        spin_unlock(&d->page_alloc_lock);
+        nrspin_unlock(&d->page_alloc_lock);
         put_page(page);
         return -EBUSY;
     }
@@ -752,7 +752,7 @@ static int page_make_private(struct domain *d, struct page_info *page)
     expected_type = (PGT_shared_page | PGT_validated | PGT_locked | 2);
     if ( page->u.inuse.type_info != expected_type )
     {
-        spin_unlock(&d->page_alloc_lock);
+        nrspin_unlock(&d->page_alloc_lock);
         put_page(page);
         return -EEXIST;
     }
@@ -769,7 +769,7 @@ static int page_make_private(struct domain *d, struct page_info *page)
     if ( domain_adjust_tot_pages(d, 1) == 1 )
         get_knownalive_domain(d);
     page_list_add_tail(page, &d->page_list);
-    spin_unlock(&d->page_alloc_lock);
+    nrspin_unlock(&d->page_alloc_lock);
 
     put_page(page);
 

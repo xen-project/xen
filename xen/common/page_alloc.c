@@ -516,7 +516,7 @@ int domain_set_outstanding_pages(struct domain *d, unsigned long pages)
      * must always take the global heap_lock rather than only in the much
      * rarer case that d->outstanding_pages is non-zero
      */
-    spin_lock(&d->page_alloc_lock);
+    nrspin_lock(&d->page_alloc_lock);
     spin_lock(&heap_lock);
 
     /* pages==0 means "unset" the claim. */
@@ -562,7 +562,7 @@ int domain_set_outstanding_pages(struct domain *d, unsigned long pages)
 
 out:
     spin_unlock(&heap_lock);
-    spin_unlock(&d->page_alloc_lock);
+    nrspin_unlock(&d->page_alloc_lock);
     return ret;
 }
 
@@ -2348,7 +2348,7 @@ int assign_pages(
     int rc = 0;
     unsigned int i;
 
-    spin_lock(&d->page_alloc_lock);
+    nrspin_lock(&d->page_alloc_lock);
 
     if ( unlikely(d->is_dying) )
     {
@@ -2430,7 +2430,7 @@ int assign_pages(
     }
 
  out:
-    spin_unlock(&d->page_alloc_lock);
+    nrspin_unlock(&d->page_alloc_lock);
     return rc;
 }
 
@@ -2909,9 +2909,9 @@ mfn_t acquire_reserved_page(struct domain *d, unsigned int memflags)
     ASSERT_ALLOC_CONTEXT();
 
     /* Acquire a page from reserved page list(resv_page_list). */
-    spin_lock(&d->page_alloc_lock);
+    nrspin_lock(&d->page_alloc_lock);
     page = page_list_remove_head(&d->resv_page_list);
-    spin_unlock(&d->page_alloc_lock);
+    nrspin_unlock(&d->page_alloc_lock);
     if ( unlikely(!page) )
         return INVALID_MFN;
 
@@ -2930,9 +2930,9 @@ mfn_t acquire_reserved_page(struct domain *d, unsigned int memflags)
      */
     unprepare_staticmem_pages(page, 1, false);
  fail:
-    spin_lock(&d->page_alloc_lock);
+    nrspin_lock(&d->page_alloc_lock);
     page_list_add_tail(page, &d->resv_page_list);
-    spin_unlock(&d->page_alloc_lock);
+    nrspin_unlock(&d->page_alloc_lock);
     return INVALID_MFN;
 }
 #endif

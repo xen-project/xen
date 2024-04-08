@@ -105,7 +105,7 @@ void share_xen_page_with_guest(struct page_info *page, struct domain *d,
     if ( page_get_owner(page) == d )
         return;
 
-    spin_lock(&d->page_alloc_lock);
+    nrspin_lock(&d->page_alloc_lock);
 
     /*
      * The incremented type count pins as writable or read-only.
@@ -136,7 +136,7 @@ void share_xen_page_with_guest(struct page_info *page, struct domain *d,
         page_list_add_tail(page, &d->xenpage_list);
     }
 
-    spin_unlock(&d->page_alloc_lock);
+    nrspin_unlock(&d->page_alloc_lock);
 }
 
 int xenmem_add_to_physmap_one(

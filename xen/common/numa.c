@@ -719,13 +719,13 @@ static void cf_check dump_numa(unsigned char key)
 
         memset(page_num_node, 0, sizeof(page_num_node));
 
-        spin_lock(&d->page_alloc_lock);
+        nrspin_lock(&d->page_alloc_lock);
         page_list_for_each ( page, &d->page_list )
         {
             i = page_to_nid(page);
             page_num_node[i]++;
         }
-        spin_unlock(&d->page_alloc_lock);
+        nrspin_unlock(&d->page_alloc_lock);
 
         for_each_online_node ( i )
             printk("    Node %u: %u\n", i, page_num_node[i]);

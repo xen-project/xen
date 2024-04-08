@@ -622,14 +622,14 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     {
         uint64_t new_max = op->u.max_mem.max_memkb >> (PAGE_SHIFT - 10);
 
-        spin_lock(&d->page_alloc_lock);
+        nrspin_lock(&d->page_alloc_lock);
         /*
          * NB. We removed a check that new_max >= current tot_pages; this means
          * that the domain will now be allowed to "ratchet" down to new_max. In
          * the meantime, while tot > max, all new allocations are disallowed.
          */
         d->max_pages = min(new_max, (uint64_t)(typeof(d->max_pages))-1);
-        spin_unlock(&d->page_alloc_lock);
+        nrspin_unlock(&d->page_alloc_lock);
         break;
     }
 

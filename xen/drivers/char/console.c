@@ -368,9 +368,9 @@ long read_console_ring(struct xen_sysctl_readconsole *op)
 
     if ( op->clear )
     {
-        spin_lock_irq(&console_lock);
+        nrspin_lock_irq(&console_lock);
         conringc = p - c > conring_size ? p - conring_size : c;
-        spin_unlock_irq(&console_lock);
+        nrspin_unlock_irq(&console_lock);
     }
 
     op->count = sofar;
@@ -640,7 +640,7 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer,
         if ( is_hardware_domain(cd) )
         {
             /* Use direct console output as it could be interactive */
-            spin_lock_irq(&console_lock);
+            nrspin_lock_irq(&console_lock);
 
             console_serial_puts(kbuf, kcount);
             video_puts(kbuf, kcount);
@@ -661,7 +661,7 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer,
                 tasklet_schedule(&notify_dom0_con_ring_tasklet);
             }
 
-            spin_unlock_irq(&console_lock);
+            nrspin_unlock_irq(&console_lock);
         }
         else
         {
@@ -1028,9 +1028,9 @@ void __init console_init_preirq(void)
     pv_console_set_rx_handler(serial_rx);
 
     /* HELLO WORLD --- start-of-day banner text. */
-    spin_lock(&console_lock);
+    nrspin_lock(&console_lock);
     __putstr(xen_banner());
-    spin_unlock(&console_lock);
+    nrspin_unlock(&console_lock);
     printk("Xen version %d.%d%s (%s@%s) (%s) %s %s\n",
            xen_major_version(), xen_minor_version(), xen_extra_version(),
            xen_compile_by(), xen_compile_domain(), xen_compiler(),
@@ -1067,13 +1067,13 @@ void __init console_init_ring(void)
     }
     opt_conring_size = PAGE_SIZE << order;
 
-    spin_lock_irqsave(&console_lock, flags);
+    nrspin_lock_irqsave(&console_lock, flags);
     for ( i = conringc ; i != conringp; i++ )
         ring[i & (opt_conring_size - 1)] = conring[i & (conring_size - 1)];
     conring = ring;
     smp_wmb(); /* Allow users of console_force_unlock() to see larger buffer. */
     conring_size = opt_conring_size;
-    spin_unlock_irqrestore(&console_lock, flags);
+    nrspin_unlock_irqrestore(&console_lock, flags);
 
     printk("Allocated console ring of %u KiB.\n", opt_conring_size >> 10);
 }

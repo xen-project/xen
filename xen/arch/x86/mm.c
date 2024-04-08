@@ -482,7 +482,7 @@ void share_xen_page_with_guest(struct page_info *page, struct domain *d,
 
     set_gpfn_from_mfn(mfn_x(page_to_mfn(page)), INVALID_M2P_ENTRY);
 
-    spin_lock(&d->page_alloc_lock);
+    nrspin_lock(&d->page_alloc_lock);
 
     /* The incremented type count pins as writable or read-only. */
     page->u.inuse.type_info =
@@ -502,7 +502,7 @@ void share_xen_page_with_guest(struct page_info *page, struct domain *d,
         page_list_add_tail(page, &d->xenpage_list);
     }
 
-    spin_unlock(&d->page_alloc_lock);
+    nrspin_unlock(&d->page_alloc_lock);
 }
 
 void make_cr3(struct vcpu *v, mfn_t mfn)
@@ -3597,11 +3597,11 @@ long do_mmuext_op(
             {
                 bool drop_ref;
 
-                spin_lock(&pg_owner->page_alloc_lock);
+                nrspin_lock(&pg_owner->page_alloc_lock);
                 drop_ref = (pg_owner->is_dying &&
                             test_and_clear_bit(_PGT_pinned,
                                                &page->u.inuse.type_info));
-                spin_unlock(&pg_owner->page_alloc_lock);
+                nrspin_unlock(&pg_owner->page_alloc_lock);
                 if ( drop_ref )
                 {
         pin_drop:
@@ -4424,7 +4424,7 @@ int steal_page(
      * that it might be upon return from alloc_domheap_pages with
      * MEMF_no_owner set.
      */
-    spin_lock(&d->page_alloc_lock);
+    nrspin_lock(&d->page_alloc_lock);
 
     BUG_ON(page->u.inuse.type_info & (PGT_count_mask | PGT_locked |
                                       PGT_pinned));
@@ -4436,7 +4436,7 @@ int steal_page(
     if ( !(memflags & MEMF_no_refcount) && !domain_adjust_tot_pages(d, -1) )
         drop_dom_ref = true;
 
-    spin_unlock(&d->page_alloc_lock);
+    nrspin_unlock(&d->page_alloc_lock);
 
     if ( unlikely(drop_dom_ref) )
         put_domain(d);

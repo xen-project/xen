@@ -2234,7 +2234,7 @@ void audit_p2m(struct domain *d,
 
     /* Audit part two: walk the domain's page allocation list, checking
      * the m2p entries. */
-    spin_lock(&d->page_alloc_lock);
+    nrspin_lock(&d->page_alloc_lock);
     page_list_for_each ( page, &d->page_list )
     {
         mfn = mfn_x(page_to_mfn(page));
@@ -2286,7 +2286,7 @@ void audit_p2m(struct domain *d,
         P2M_PRINTK("OK: mfn=%#lx, gfn=%#lx, p2mfn=%#lx\n",
                    mfn, gfn, mfn_x(p2mfn));
     }
-    spin_unlock(&d->page_alloc_lock);
+    nrspin_unlock(&d->page_alloc_lock);
 
     pod_unlock(p2m);
     p2m_unlock(p2m);

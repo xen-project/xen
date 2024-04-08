@@ -205,14 +205,14 @@ static void tboot_gen_domain_integrity(const uint8_t key[TB_KEY_SIZE],
             continue;
         printk("MACing Domain %u\n", d->domain_id);
 
-        spin_lock(&d->page_alloc_lock);
+        nrspin_lock(&d->page_alloc_lock);
         page_list_for_each(page, &d->page_list)
         {
             void *pg = __map_domain_page(page);
             vmac_update(pg, PAGE_SIZE, &ctx);
             unmap_domain_page(pg);
         }
-        spin_unlock(&d->page_alloc_lock);
+        nrspin_unlock(&d->page_alloc_lock);
 
         if ( is_iommu_enabled(d) && is_vtd )
         {
