@@ -393,7 +393,7 @@ static bool always_inline spin_is_locked_common(const spinlock_tickets_t *t)
     return t->head != t->tail;
 }
 
-int _spin_is_locked(const spinlock_t *lock)
+bool _spin_is_locked(const spinlock_t *lock)
 {
     /*
      * This function is suitable only for use in ASSERT()s and alike, as it
@@ -433,7 +433,7 @@ static bool always_inline spin_trylock_common(spinlock_tickets_t *t,
     return true;
 }
 
-int _spin_trylock(spinlock_t *lock)
+bool _spin_trylock(spinlock_t *lock)
 {
     return spin_trylock_common(&lock->tickets, &lock->debug, LOCK_PROFILE_PAR);
 }
