@@ -372,6 +372,7 @@ static int __init omap_uart_init(struct dt_device_node *dev,
 static const struct dt_device_match omap_uart_dt_match[] __initconst =
 {
     DT_MATCH_COMPATIBLE("ti,omap4-uart"),
+    DT_MATCH_COMPATIBLE("ti,am654-uart"),
     { /* sentinel */ },
 };
 
