@@ -23,12 +23,12 @@ typedef struct {
 #define rwlock_init(l) (*(l) = (rwlock_t)RW_LOCK_UNLOCKED)
 
 /* Writer states & reader shift and bias. */
-#define    _QW_CPUMASK  0xfffU             /* Writer CPU mask */
-#define    _QW_SHIFT    12                 /* Writer flags shift */
-#define    _QW_WAITING  (1U << _QW_SHIFT)  /* A writer is waiting */
-#define    _QW_LOCKED   (3U << _QW_SHIFT)  /* A writer holds the lock */
-#define    _QW_WMASK    (3U << _QW_SHIFT)  /* Writer mask */
-#define    _QR_SHIFT    14                 /* Reader count shift */
+#define    _QW_SHIFT    14                      /* Writer flags shift */
+#define    _QW_CPUMASK  ((1U << _QW_SHIFT) - 1) /* Writer CPU mask */
+#define    _QW_WAITING  (1U << _QW_SHIFT)       /* A writer is waiting */
+#define    _QW_LOCKED   (3U << _QW_SHIFT)       /* A writer holds the lock */
+#define    _QW_WMASK    (3U << _QW_SHIFT)       /* Writer mask */
+#define    _QR_SHIFT    (_QW_SHIFT + 2)         /* Reader count shift */
 #define    _QR_BIAS     (1U << _QR_SHIFT)
 
 void queue_read_lock_slowpath(rwlock_t *lock);
@@ -36,14 +36,21 @@ void queue_write_lock_slowpath(rwlock_t *lock);
 
 static inline bool _is_write_locked_by_me(unsigned int cnts)
 {
-    BUILD_BUG_ON(_QW_CPUMASK < NR_CPUS);
+    BUILD_BUG_ON((_QW_CPUMASK + 1) < NR_CPUS);
+    BUILD_BUG_ON(NR_CPUS * _QR_BIAS > INT_MAX);
     return (cnts & _QW_WMASK) == _QW_LOCKED &&
            (cnts & _QW_CPUMASK) == smp_processor_id();
 }
 
 static inline bool _can_read_lock(unsigned int cnts)
 {
-    return !(cnts & _QW_WMASK) || _is_write_locked_by_me(cnts);
+    /*
+     * If write locked by the caller, no other readers are possible.
+     * Not allowing the lock holder to read_lock() another
+     * INT_MAX >> _QR_SHIFT times ought to be fine.
+     */
+    return cnts <= INT_MAX &&
+           (!(cnts & _QW_WMASK) || _is_write_locked_by_me(cnts));
 }
 
 /*
