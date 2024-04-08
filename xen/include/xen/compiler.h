@@ -30,7 +30,7 @@
 
 #define __weak        __attribute__((__weak__))
 
-#if !CONFIG_CC_IS_CLANG || CONFIG_CLANG_VERSION >= 140000
+#if !defined(CONFIG_CC_IS_CLANG) || CONFIG_CLANG_VERSION >= 140000
 # define nocall       __attribute__((__error__("Nonstandard ABI")))
 #else
 # define nocall
