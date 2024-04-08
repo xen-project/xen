@@ -236,7 +236,7 @@ static int __init imx_lpuart_init(struct dt_device_node *dev,
 
 static const struct dt_device_match imx_lpuart_dt_compat[] __initconst =
 {
-    DT_MATCH_COMPATIBLE("fsl,imx8qm-lpuart"),
+    DT_MATCH_COMPATIBLE("fsl,imx8qxp-lpuart"),
     { /* sentinel */ },
 };
 
