@@ -337,6 +337,11 @@ F:	tools/misc/xenhypfs.c
 F:	xen/common/hypfs.c
 F:	xen/include/xen/hypfs.h
 
+IMX8QM/QXP SUPPORT
+R:	John Ernberg <john.ernberg@actia.se>
+F:	xen/arch/arm/platforms/imx8qm.c
+F:	xen/drivers/char/imx-lpuart.c
+
 INTEL(R) TRUSTED EXECUTION TECHNOLOGY (TXT)
 R:	Lukasz Hawrylko <lukasz@hawrylko.pl>
 R:	Daniel P. Smith <dpsmith@apertussolutions.com>
