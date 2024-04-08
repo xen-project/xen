@@ -165,6 +165,7 @@ extern void cf_check spinlock_profile_reset(unsigned char key);
 #else
 
 struct lock_profile_qhead { };
+struct lock_profile { };
 
 #define SPIN_LOCK_UNLOCKED {                                                  \
     .recurse_cpu = SPINLOCK_NO_CPU,                                           \
