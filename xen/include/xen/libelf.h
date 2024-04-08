@@ -196,6 +196,7 @@ struct elf_binary {
     size_t dest_size;
     uint64_t pstart;
     uint64_t pend;
+    uint64_t palign;
     uint64_t reloc_offset;
 
     uint64_t bsd_symtab_pstart;

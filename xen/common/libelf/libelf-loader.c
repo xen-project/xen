@@ -468,6 +468,7 @@ void elf_parse_binary(struct elf_binary *elf)
 {
     ELF_HANDLE_DECL(elf_phdr) phdr;
     uint64_t low = -1, high = 0, paddr, memsz;
+    uint64_t max_align = 0, palign;
     unsigned i, count;
 
     count = elf_phdr_count(elf);
@@ -481,15 +482,19 @@ void elf_parse_binary(struct elf_binary *elf)
             continue;
         paddr = elf_uval(elf, phdr, p_paddr);
         memsz = elf_uval(elf, phdr, p_memsz);
+        palign = elf_uval(elf, phdr, p_align);
         elf_msg(elf, "ELF: phdr: paddr=%#" PRIx64 " memsz=%#" PRIx64 "\n",
                 paddr, memsz);
         if ( low > paddr )
             low = paddr;
         if ( high < paddr + memsz )
             high = paddr + memsz;
+        if ( max_align < palign )
+            max_align = palign;
     }
     elf->pstart = low;
     elf->pend = high;
+    elf->palign = max_align;
     elf_msg(elf, "ELF: memory: %#" PRIx64 " -> %#" PRIx64 "\n",
             elf->pstart, elf->pend);
 }
