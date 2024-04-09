@@ -105,7 +105,7 @@ typedef struct xen_kexec_image {
  */
 #define KEXEC_CMD_kexec                 0
 typedef struct xen_kexec_exec {
-    int type;
+    int32_t type;
 } xen_kexec_exec_t;
 
 /*
@@ -116,7 +116,7 @@ typedef struct xen_kexec_exec {
 #define KEXEC_CMD_kexec_load_v1         1 /* obsolete since 0x00040400 */
 #define KEXEC_CMD_kexec_unload_v1       2 /* obsolete since 0x00040400 */
 typedef struct xen_kexec_load_v1 {
-    int type;
+    int32_t type;
     xen_kexec_image_t image;
 } xen_kexec_load_v1_t;
 
@@ -143,8 +143,8 @@ typedef struct xen_kexec_load_v1 {
  */
 #define KEXEC_CMD_kexec_get_range       3
 typedef struct xen_kexec_range {
-    int range;
-    int nr;
+    int32_t range;
+    int32_t nr;
     unsigned long size;
     unsigned long start;
 } xen_kexec_range_t;

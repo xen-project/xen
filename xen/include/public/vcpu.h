@@ -63,7 +63,7 @@
 #define VCPUOP_get_runstate_info     4
 struct vcpu_runstate_info {
     /* VCPU's current state (RUNSTATE_*). */
-    int      state;
+    int32_t  state;
     /* When was current state entered (system time, ns)? */
     uint64_t state_entry_time;
     /*
