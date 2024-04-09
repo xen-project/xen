@@ -589,7 +589,9 @@ ENTRY(continue_pv_domain)
          * JMPed to.  Drop the return address.
          */
         add   $8, %rsp
+#ifdef CONFIG_XEN_SHSTK
         ALTERNATIVE "", "mov $2, %eax; incsspd %eax", X86_FEATURE_XEN_SHSTK
+#endif
 
         call  check_wakeup_from_wait
 ret_from_intr:
