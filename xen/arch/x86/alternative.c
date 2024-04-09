@@ -326,7 +326,7 @@ static void init_or_livepatch _apply_alternatives(struct alt_instr *start,
      * Clobber endbr64 instructions now that altcall has finished optimising
      * all indirect branches to direct ones.
      */
-    if ( force && cpu_has_xen_ibt )
+    if ( force && cpu_has_xen_ibt && system_state < SYS_STATE_active )
     {
         void *const *val;
         unsigned int clobbered = 0;
