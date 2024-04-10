@@ -13,7 +13,7 @@
 #ifdef CONFIG_DEBUG_LOCKS
 union lock_debug {
     uint32_t val;
-#define LOCK_DEBUG_INITVAL 0xffffffff
+#define LOCK_DEBUG_INITVAL 0xffffffffU
     struct {
         unsigned int cpu:SPINLOCK_CPU_BITS;
 #define LOCK_DEBUG_PAD_BITS (30 - SPINLOCK_CPU_BITS)
