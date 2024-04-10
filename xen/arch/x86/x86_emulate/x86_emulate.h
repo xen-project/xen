@@ -620,7 +620,7 @@ struct x86_emulate_ctxt
  * below).
  * Hence no separate #define-s get added.
  */
-#define X86EMUL_OPC_EXT_MASK         0xffff0000
+#define X86EMUL_OPC_EXT_MASK         0xffff0000U
 #define X86EMUL_OPC(ext, byte)       ((uint8_t)(byte) | \
                                       MASK_INSR((ext), X86EMUL_OPC_EXT_MASK))
 /*
