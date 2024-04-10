@@ -82,8 +82,9 @@ static always_inline bool lock_evaluate_nospec(bool condition)
 {
 #ifdef CONFIG_SPECULATIVE_HARDEN_LOCK
     return arch_lock_evaluate_nospec(condition);
-#endif
+#else
     return condition;
+#endif
 }
 
 #endif /* XEN_NOSPEC_H */
