@@ -62,8 +62,6 @@ void vpci_deassign_device(struct pci_dev *pdev)
     spin_unlock(&pdev->vpci->lock);
     if ( pdev->vpci->msix )
     {
-        unsigned int i;
-
         list_del(&pdev->vpci->msix->next);
         for ( i = 0; i < ARRAY_SIZE(pdev->vpci->msix->table); i++ )
             if ( pdev->vpci->msix->table[i] )
