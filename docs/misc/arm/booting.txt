@@ -23,7 +23,7 @@ The exceptions to this on 32-bit ARM are as follows:
 
 The exceptions to this on 64-bit ARM are as follows:
 
- Xen binary should be loaded in memory below 2 TiB.
+ Xen binary should be loaded in memory below 10 TiB.
 
 Booting Guests
 --------------
@@ -64,10 +64,10 @@ Xen relies on some settings the firmware has to configure in EL3 before starting
 
 
 [1] linux/Documentation/arm/booting.rst
-Latest version: http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arm/booting.rst
+Latest version: http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arch/arm/booting.rst
 
 [2] linux/Documentation/arm64/booting.rst
-Latest version: http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arm64/booting.rst
+Latest version: http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arch/arm64/booting.rst
 
 [3] legacy format header
 Latest version: https://source.denx.de/u-boot/u-boot/-/blob/master/include/image.h#L315
