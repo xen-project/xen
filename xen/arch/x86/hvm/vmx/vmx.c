@@ -2663,7 +2663,7 @@ static void vmx_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
                    __func__, v, reg, rc);
             domain_crash(d);
         }
-        break;
+        return;
     }
 
     /* Logic which maybe requires remote VMCS acquisition. */
