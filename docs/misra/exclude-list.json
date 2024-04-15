@@ -118,7 +118,7 @@
             "comment": "Imported from Linux, ignore for now"
         },
         {
-            "rel_path": "common/gzip/inflate.c",
+            "rel_path": "common/gzip/*",
             "comment": "Imported from Linux, ignore for now"
         },
         {

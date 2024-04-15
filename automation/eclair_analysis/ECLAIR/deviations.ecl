@@ -148,11 +148,6 @@ const-qualified."
 # Series 8.
 #
 
--doc_begin="The following file is imported from Linux: ignore for now."
--file_tag+={adopted_r8_2,"^xen/common/inflate\\.c$"}
--config=MC3R1.R8.2,reports+={deliberate,"any_area(any_loc(file(adopted_r8_2)))"}
--doc_end
-
 -doc_begin="The type ret_t is deliberately used and defined as int or long depending on the architecture."
 -config=MC3R1.R8.3,reports+={deliberate,"any_area(any_loc(text(^.*ret_t.*$)))"}
 -doc_end
