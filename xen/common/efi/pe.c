@@ -111,7 +111,8 @@ const void *__init pe_find_section(const void *image, const UINTN image_size,
     UINTN offset, i;
 
     if ( image_size < sizeof(*dos) ||
-         memcmp(dos->Magic, "MZ", 2) != 0 )
+         dos->Magic[0] != 'M' ||
+         dos->Magic[1] != 'Z' )
         return NULL;
 
     offset = dos->ExeHeader;
@@ -119,7 +120,10 @@ const void *__init pe_find_section(const void *image, const UINTN image_size,
 
     offset += sizeof(*pe);
     if ( image_size < offset ||
-         memcmp(pe->Magic, "PE\0\0", 4) != 0 )
+         pe->Magic[0] != 'P' ||
+         pe->Magic[1] != 'E' ||
+         pe->Magic[2] != '\0' ||
+         pe->Magic[3] != '\0' )
         return NULL;
 
     if ( pe->FileHeader.Machine != PE_HEADER_MACHINE )
