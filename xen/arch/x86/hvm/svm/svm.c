@@ -2510,6 +2510,7 @@ const struct hvm_function_table * __init start_svm(void)
     P(cpu_has_svm_lbrv, "Last Branch Record (LBR) Virtualisation");
     P(cpu_has_svm_nrips, "Next-RIP Saved on #VMEXIT");
     P(cpu_has_svm_cleanbits, "VMCB Clean Bits");
+    P(cpu_has_svm_flushbyasid, "TLB flush by ASID");
     P(cpu_has_svm_decode, "DecodeAssists");
     P(cpu_has_svm_vloadsave, "Virtual VMLOAD/VMSAVE");
     P(cpu_has_svm_vgif, "Virtual GIF");
