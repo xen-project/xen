@@ -225,52 +225,6 @@ static const ush mask_bits[] = {
 #define NEEDBITS(n) {while(k<(n)){b|=((ulg)NEXTBYTE())<<k;k+=8;}}
 #define DUMPBITS(n) {b>>=(n);k-=(n);}
 
-#ifndef NO_INFLATE_MALLOC
-/* A trivial malloc implementation, adapted from
- *  malloc by Hannu Savolainen 1993 and Matthias Urlichs 1994
- */
-
-static unsigned long __initdata malloc_ptr;
-static int __initdata malloc_count;
-
-static void __init init_allocator(void)
-{
-    malloc_ptr = free_mem_ptr;
-    malloc_count = 0;
-}
-
-static void *__init malloc(int size)
-{
-    void *p;
-
-    if (size < 0)
-        error("Malloc error");
-    if (!malloc_ptr)
-        malloc_ptr = free_mem_ptr;
-
-    malloc_ptr = (malloc_ptr + 3) & ~3;     /* Align */
-
-    p = (void *)malloc_ptr;
-    malloc_ptr += size;
-
-    if (free_mem_end_ptr && malloc_ptr >= free_mem_end_ptr)
-        error("Out of memory");
-
-    malloc_count++;
-    return p;
-}
-
-static void __init free(void *where)
-{
-    malloc_count--;
-    if (!malloc_count)
-        malloc_ptr = free_mem_ptr;
-}
-#else
-#define malloc(a) kmalloc(a, GFP_KERNEL)
-#define free(a) kfree(a)
-#endif
-
 /*
    Huffman code decoding is performed using a multi-level table lookup.
    The fastest way to decode is to simply build a lookup table whose

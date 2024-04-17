@@ -4,12 +4,7 @@
 #include <xen/lib.h>
 #include <xen/mm.h>
 
-#define HEAPORDER 3
-
 static unsigned char *__initdata window;
-#define memptr long
-static memptr __initdata free_mem_ptr;
-static memptr __initdata free_mem_end_ptr;
 
 #define WSIZE           0x80000000U
 
@@ -22,6 +17,8 @@ static unsigned int __initdata inptr;
 /* Bytes in output buffer: */
 static unsigned int __initdata outcnt;
 
+#define malloc(a)       xmalloc_bytes(a)
+#define free(a)         xfree(a)
 #define memzero(s, n)   memset((s), 0, (n))
 
 typedef unsigned char   uch;
@@ -107,14 +104,6 @@ __init int perform_gunzip(char *output, char *image, unsigned long image_len)
         return 1;
 
     window = (unsigned char *)output;
-
-    free_mem_ptr = (unsigned long)alloc_xenheap_pages(HEAPORDER, 0);
-    if ( !free_mem_ptr )
-        return -ENOMEM;
-
-    free_mem_end_ptr = free_mem_ptr + (PAGE_SIZE << HEAPORDER);
-    init_allocator();
-
     inbuf = (unsigned char *)image;
     insize = image_len;
     inptr = 0;
@@ -130,8 +119,6 @@ __init int perform_gunzip(char *output, char *image, unsigned long image_len)
     {
         rc = 0;
     }
-
-    free_xenheap_pages((void *)free_mem_ptr, HEAPORDER);
 
     return rc;
 }
