@@ -142,17 +142,17 @@ DEFINE_XEN_GUEST_HANDLE(physdev_irq_t);
 struct physdev_map_pirq {
     domid_t domid;
     /* IN */
-    int32_t type;
+    int type;
     /* IN (ignored for ..._MULTI_MSI) */
-    int32_t index;
+    int index;
     /* IN or OUT */
-    int32_t pirq;
+    int pirq;
     /* IN - high 16 bits hold segment for ..._MSI_SEG and ..._MULTI_MSI */
-    int32_t bus;
+    int bus;
     /* IN */
-    int32_t devfn;
+    int devfn;
     /* IN (also OUT for ..._MULTI_MSI) */
-    int32_t entry_nr;
+    int entry_nr;
     /* IN */
     uint64_t table_base;
 };
@@ -163,7 +163,7 @@ DEFINE_XEN_GUEST_HANDLE(physdev_map_pirq_t);
 struct physdev_unmap_pirq {
     domid_t domid;
     /* IN */
-    int32_t pirq;
+    int pirq;
 };
 
 typedef struct physdev_unmap_pirq physdev_unmap_pirq_t;
@@ -224,7 +224,7 @@ DEFINE_XEN_GUEST_HANDLE(physdev_op_t);
 
 #define PHYSDEVOP_setup_gsi    21
 struct physdev_setup_gsi {
-    int32_t gsi;
+    int gsi;
     /* IN */
     uint8_t triggering;
     /* IN */
@@ -242,7 +242,7 @@ DEFINE_XEN_GUEST_HANDLE(physdev_setup_gsi_t);
 #define PHYSDEVOP_get_free_pirq    23
 struct physdev_get_free_pirq {
     /* IN */
-    int32_t type;
+    int type;
     /* OUT */
     uint32_t pirq;
 };

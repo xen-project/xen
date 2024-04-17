@@ -61,13 +61,13 @@ struct xen_memory_reservation {
 
     /* Number of extents, and size/alignment of each (2^extent_order pages). */
     xen_ulong_t    nr_extents;
-    uint32_t       extent_order;
+    unsigned int   extent_order;
 
 #if __XEN_INTERFACE_VERSION__ >= 0x00030209
     /* XENMEMF flags. */
-    uint32_t       mem_flags;
+    unsigned int   mem_flags;
 #else
-    uint32_t       address_bits;
+    unsigned int   address_bits;
 #endif
 
     /*
@@ -163,7 +163,7 @@ struct xen_machphys_mfn_list {
      * Size of the 'extent_start' array. Fewer entries will be filled if the
      * machphys table is smaller than max_extents * 2MB.
      */
-    uint32_t max_extents;
+    unsigned int max_extents;
 
     /*
      * Pointer to buffer to fill with list of extent starts. If there are
@@ -176,7 +176,7 @@ struct xen_machphys_mfn_list {
      * Number of extents written to the above array. This will be smaller
      * than 'max_extents' if the machphys table is smaller than max_e * 2MB.
      */
-    uint32_t nr_extents;
+    unsigned int nr_extents;
 };
 typedef struct xen_machphys_mfn_list xen_machphys_mfn_list_t;
 DEFINE_XEN_GUEST_HANDLE(xen_machphys_mfn_list_t);
@@ -232,7 +232,7 @@ struct xen_add_to_physmap {
     /* Number of pages to go through for gmfn_range */
     uint16_t    size;
 
-    uint32_t    space; /* => enum phys_map_space */
+    unsigned int space; /* => enum phys_map_space */
 
 #define XENMAPIDX_grant_table_status 0x80000000U
 
@@ -274,7 +274,7 @@ struct xen_add_to_physmap_batch {
     /* OUT */
 
     /* Per index error code. */
-    XEN_GUEST_HANDLE(int32_t) errs;
+    XEN_GUEST_HANDLE(int) errs;
 };
 typedef struct xen_add_to_physmap_batch xen_add_to_physmap_batch_t;
 DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_batch_t);
@@ -317,7 +317,7 @@ struct xen_memory_map {
      * return the number of entries which have been stored in
      * buffer.
      */
-    uint32_t nr_entries;
+    unsigned int nr_entries;
 
     /*
      * Entries in the buffer are in the same format as returned by the
@@ -591,7 +591,7 @@ struct xen_reserved_device_memory_map {
      * Gets set to the required number of entries when too low,
      * signaled by error code -ERANGE.
      */
-    uint32_t nr_entries;
+    unsigned int nr_entries;
     /* OUT */
     XEN_GUEST_HANDLE(xen_reserved_device_memory_t) buffer;
     /* IN */
@@ -711,9 +711,9 @@ struct xen_vnuma_topology_info {
     domid_t domid;
     uint16_t pad;
     /* IN/OUT */
-    uint32_t nr_vnodes;
-    uint32_t nr_vcpus;
-    uint32_t nr_vmemranges;
+    unsigned int nr_vnodes;
+    unsigned int nr_vcpus;
+    unsigned int nr_vmemranges;
     /* OUT */
     union {
         XEN_GUEST_HANDLE(uint) h;
