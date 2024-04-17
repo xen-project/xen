@@ -266,10 +266,6 @@ static const int dbits = 6;          /* bits in base distance lookup table */
 #define BMAX 16         /* maximum bit length of any code (16 for explode) */
 #define N_MAX 288       /* maximum number of codes in any set */
 
-
-static unsigned __initdata hufts;      /* track memory usage */
-
-
 static int __init huft_build(
     unsigned *b,            /* code lengths in bits (all assumed <= BMAX) */
     unsigned n,             /* number of codes (assumed <= N_MAX) */
@@ -445,7 +441,6 @@ static int __init huft_build(
                     goto out;
                 }
                 DEBG1("4 ");
-                hufts += z + 1;         /* track memory usage */
                 *t = q + 1;             /* link to list for huft_free() */
                 *(t = &(q->v.t)) = (struct huft *)NULL;
                 u[h] = ++q;             /* table starts after link */
@@ -1023,7 +1018,6 @@ static int __init inflate(void)
 {
     int e;                /* last block flag */
     int r;                /* result code */
-    unsigned h;           /* maximum struct huft's malloc'ed */
 
     /* initialize window, bit buffer */
     wp = 0;
@@ -1032,14 +1026,10 @@ static int __init inflate(void)
 
 
     /* decompress until the last block */
-    h = 0;
     do {
-        hufts = 0;
         r = inflate_block(&e);
         if (r)
             return r;
-        if (hufts > h)
-            h = hufts;
     } while (!e);
 
     /* Undo too much lookahead. The next read will be byte aligned so we
@@ -1055,9 +1045,6 @@ static int __init inflate(void)
 
 
     /* return success */
-#ifdef DEBUG
-    fprintf(stderr, "<%u> ", h);
-#endif /* DEBUG */
     return 0;
 }
 
