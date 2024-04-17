@@ -22,8 +22,6 @@ static unsigned int __initdata inptr;
 /* Bytes in output buffer: */
 static unsigned int __initdata outcnt;
 
-#define OF(args)        args
-
 #define memzero(s, n)   memset((s), 0, (n))
 
 typedef unsigned char   uch;

@@ -138,15 +138,15 @@ struct huft {
 
 
 /* Function prototypes */
-static int huft_build OF((unsigned *, unsigned, unsigned,
-                          const ush *, const ush *, struct huft **, int *));
-static int huft_free OF((struct huft *));
-static int inflate_codes OF((struct huft *, struct huft *, int, int));
-static int inflate_stored OF((void));
-static int inflate_fixed OF((void));
-static int inflate_dynamic OF((void));
-static int inflate_block OF((int *));
-static int inflate OF((void));
+static int huft_build(unsigned *, unsigned, unsigned,
+                      const ush *, const ush *, struct huft **, int *);
+static int huft_free(struct huft *);
+static int inflate_codes(struct huft *, struct huft *, int, int);
+static int inflate_stored(void);
+static int inflate_fixed(void);
+static int inflate_dynamic(void);
+static int inflate_block(int *);
+static int inflate(void);
 
 
 /* The inflate algorithm uses a sliding 32 K byte window on the uncompressed
@@ -661,7 +661,6 @@ static int __init inflate_codes(
                 /* do the copy */
                 do {
                     n -= (e = (e = WSIZE - ((d &= WSIZE-1) > w ? d : w)) > n ? n : e);
-#if !defined(NOMEMCPY) && !defined(DEBUG)
                     if (w - d >= e)         /* (this test assumes unsigned comparison) */
                     {
                         memcpy(slide + w, slide + d, e);
@@ -669,7 +668,6 @@ static int __init inflate_codes(
                         d += e;
                     }
                     else                      /* do it slow to avoid memcpy() overlap */
-#endif /* !NOMEMCPY */
                         do {
                             slide[w++] = slide[d++];
                             Tracevv((stderr, "%c", slide[w-1]));
@@ -845,11 +843,7 @@ static int noinline __init inflate_dynamic(void)
 
     DEBG("<dyn");
 
-#ifdef PKZIP_BUG_WORKAROUND
-    ll = malloc(sizeof(*ll) * (288+32));  /* literal/length and distance code lengths */
-#else
     ll = malloc(sizeof(*ll) * (286+30));  /* literal/length and distance code lengths */
-#endif
 
     if (ll == NULL)
         return 1;
@@ -869,11 +863,7 @@ static int noinline __init inflate_dynamic(void)
         NEEDBITS(4)
         nb = 4 + ((unsigned)b & 0xf);         /* number of bit length codes */
     DUMPBITS(4)
-#ifdef PKZIP_BUG_WORKAROUND
-        if (nl > 288 || nd > 32)
-#else
             if (nl > 286 || nd > 30)
-#endif
             {
                 ret = 1;             /* bad lengths */
                 goto out;
@@ -989,16 +979,11 @@ static int noinline __init inflate_dynamic(void)
         DEBG("dyn5d ");
         if (i == 1) {
             error("incomplete distance tree");
-#ifdef PKZIP_BUG_WORKAROUND
-            i = 0;
-        }
-#else
         huft_free(td);
     }
     huft_free(tl);
     ret = i;                   /* incomplete code set */
     goto out;
-#endif
 }
 
 DEBG("dyn6 ");
@@ -1096,9 +1081,6 @@ static int __init inflate(void)
     h = 0;
     do {
         hufts = 0;
-#ifdef ARCH_HAS_DECOMP_WDOG
-        arch_decomp_wdog();
-#endif
         r = inflate_block(&e);
         if (r)
             return r;
