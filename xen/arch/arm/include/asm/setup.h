@@ -56,8 +56,14 @@ struct membank {
 #endif
 };
 
-struct meminfo {
+struct membanks {
     unsigned int nr_banks;
+    unsigned int max_banks;
+    struct membank bank[];
+};
+
+struct meminfo {
+    struct membanks common;
     struct membank bank[NR_MEM_BANKS];
 };
 
@@ -107,6 +113,19 @@ struct bootinfo {
     bool static_heap;
 };
 
+#ifdef CONFIG_ACPI
+#define BOOTINFO_ACPI_INIT .acpi.common.max_banks = NR_MEM_BANKS,
+#else
+#define BOOTINFO_ACPI_INIT
+#endif
+
+#define BOOTINFO_INIT                               \
+{                                                   \
+    .mem.common.max_banks = NR_MEM_BANKS,           \
+    .reserved_mem.common.max_banks = NR_MEM_BANKS,  \
+    BOOTINFO_ACPI_INIT                              \
+}
+
 struct map_range_data
 {
     struct domain *d;
@@ -122,6 +141,23 @@ extern struct bootinfo bootinfo;
 
 extern domid_t max_init_domid;
 
+static inline struct membanks *bootinfo_get_mem(void)
+{
+    return &bootinfo.mem.common;
+}
+
+static inline struct membanks *bootinfo_get_reserved_mem(void)
+{
+    return &bootinfo.reserved_mem.common;
+}
+
+#ifdef CONFIG_ACPI
+static inline struct membanks *bootinfo_get_acpi(void)
+{
+    return &bootinfo.acpi.common;
+}
+#endif
+
 void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len);
 
 size_t estimate_efi_size(unsigned int mem_nr_banks);
@@ -130,7 +166,7 @@ void acpi_create_efi_system_table(struct domain *d,
                                   struct membank tbl_add[]);
 
 void acpi_create_efi_mmap_table(struct domain *d,
-                                const struct meminfo *mem,
+                                const struct membanks *mem,
                                 struct membank tbl_add[]);
 
 int acpi_make_efi_nodes(void *fdt, struct membank tbl_add[]);

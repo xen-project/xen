@@ -17,6 +17,18 @@
 #include <asm/setup.h>
 #include <asm/static-shmem.h>
 
+static void __init __maybe_unused build_assertions(void)
+{
+    /*
+     * Check that no padding is between struct membanks "bank" flexible array
+     * member and struct meminfo "bank" member
+     */
+    BUILD_BUG_ON((offsetof(struct membanks, bank) !=
+                 offsetof(struct meminfo, bank)));
+    /* Ensure "struct membanks" is 8-byte aligned */
+    BUILD_BUG_ON(alignof(struct membanks) != 8);
+}
+
 static bool __init device_tree_node_is_available(const void *fdt, int node)
 {
     const char *status;
@@ -107,14 +119,14 @@ void __init device_tree_get_reg(const __be32 **cell, uint32_t address_cells,
 static int __init device_tree_get_meminfo(const void *fdt, int node,
                                           const char *prop_name,
                                           u32 address_cells, u32 size_cells,
-                                          void *data, enum membank_type type)
+                                          struct membanks *mem,
+                                          enum membank_type type)
 {
     const struct fdt_property *prop;
     unsigned int i, banks;
     const __be32 *cell;
     u32 reg_cells = address_cells + size_cells;
     paddr_t start, size;
-    struct meminfo *mem = data;
 
     if ( !device_tree_node_is_available(fdt, node) )
         return 0;
@@ -133,10 +145,10 @@ static int __init device_tree_get_meminfo(const void *fdt, int node,
     cell = (const __be32 *)prop->data;
     banks = fdt32_to_cpu(prop->len) / (reg_cells * sizeof (u32));
 
-    for ( i = 0; i < banks && mem->nr_banks < NR_MEM_BANKS; i++ )
+    for ( i = 0; i < banks && mem->nr_banks < mem->max_banks; i++ )
     {
         device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
-        if ( mem == &bootinfo.reserved_mem &&
+        if ( mem == bootinfo_get_reserved_mem() &&
              check_reserved_regions_overlap(start, size) )
             return -EINVAL;
         /* Some DT may describe empty bank, ignore them */
@@ -231,10 +243,10 @@ int __init device_tree_for_each_node(const void *fdt, int node,
 static int __init process_memory_node(const void *fdt, int node,
                                       const char *name, int depth,
                                       u32 address_cells, u32 size_cells,
-                                      void *data)
+                                      struct membanks *mem)
 {
     return device_tree_get_meminfo(fdt, node, "reg", address_cells, size_cells,
-                                   data, MEMBANK_DEFAULT);
+                                   mem, MEMBANK_DEFAULT);
 }
 
 static int __init process_reserved_memory_node(const void *fdt, int node,
@@ -259,7 +271,7 @@ static int __init process_reserved_memory(const void *fdt, int node,
 {
     return device_tree_for_each_node(fdt, node,
                                      process_reserved_memory_node,
-                                     &bootinfo.reserved_mem);
+                                     bootinfo_get_reserved_mem());
 }
 
 static void __init process_multiboot_node(const void *fdt, int node,
@@ -358,7 +370,7 @@ static int __init process_chosen_node(const void *fdt, int node,
 
         rc = device_tree_get_meminfo(fdt, node, "xen,static-heap",
                                      address_cells, size_cells,
-                                     &bootinfo.reserved_mem,
+                                     bootinfo_get_reserved_mem(),
                                      MEMBANK_STATIC_HEAP);
         if ( rc )
             return rc;
@@ -420,7 +432,7 @@ static int __init process_domain_node(const void *fdt, int node,
         return 0;
 
     return device_tree_get_meminfo(fdt, node, "xen,static-mem", address_cells,
-                                   size_cells, &bootinfo.reserved_mem,
+                                   size_cells, bootinfo_get_reserved_mem(),
                                    MEMBANK_STATIC_DOMAIN);
 }
 
@@ -438,7 +450,7 @@ static int __init early_scan_node(const void *fdt,
     if ( !efi_enabled(EFI_BOOT) &&
          device_tree_node_matches(fdt, node, "memory") )
         rc = process_memory_node(fdt, node, name, depth,
-                                 address_cells, size_cells, &bootinfo.mem);
+                                 address_cells, size_cells, bootinfo_get_mem());
     else if ( depth == 1 && !dt_node_cmp(name, "reserved-memory") )
         rc = process_reserved_memory(fdt, node, name, depth,
                                      address_cells, size_cells);
@@ -459,8 +471,8 @@ static int __init early_scan_node(const void *fdt,
 
 static void __init early_print_info(void)
 {
-    struct meminfo *mi = &bootinfo.mem;
-    struct meminfo *mem_resv = &bootinfo.reserved_mem;
+    const struct membanks *mi = bootinfo_get_mem();
+    const struct membanks *mem_resv = bootinfo_get_reserved_mem();
     struct bootmodules *mods = &bootinfo.modules;
     struct bootcmdlines *cmds = &bootinfo.cmdlines;
     unsigned int i, j;
@@ -537,6 +549,7 @@ static void __init swap_memory_node(void *_a, void *_b, size_t size)
  */
 size_t __init boot_fdt_info(const void *fdt, paddr_t paddr)
 {
+    struct membanks *mem = bootinfo_get_mem();
     int ret;
 
     ret = fdt_check_header(fdt);
@@ -554,7 +567,7 @@ size_t __init boot_fdt_info(const void *fdt, paddr_t paddr)
      * bank in memory first. There is no requirement that the DT will provide
      * the banks sorted in ascending order. So sort them through.
      */
-    sort(bootinfo.mem.bank, bootinfo.mem.nr_banks, sizeof(struct membank),
+    sort(mem->bank, mem->nr_banks, sizeof(struct membank),
          cmp_memory_node, swap_memory_node);
 
     early_print_info();

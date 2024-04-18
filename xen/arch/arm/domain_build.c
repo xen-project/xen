@@ -141,6 +141,7 @@ static bool __init insert_11_bank(struct domain *d,
                                   struct page_info *pg,
                                   unsigned int order)
 {
+    struct membanks *mem = kernel_info_get_mem(kinfo);
     unsigned int i;
     int res;
     mfn_t smfn;
@@ -157,9 +158,9 @@ static bool __init insert_11_bank(struct domain *d,
              (unsigned long)(kinfo->unassigned_mem >> 20),
              order);
 
-    if ( kinfo->mem.nr_banks > 0 &&
+    if ( mem->nr_banks > 0 &&
          size < MB(128) &&
-         start + size < kinfo->mem.bank[0].start )
+         start + size < mem->bank[0].start )
     {
         D11PRINT("Allocation below bank 0 is too small, not using\n");
         goto fail;
@@ -171,17 +172,17 @@ static bool __init insert_11_bank(struct domain *d,
 
     kinfo->unassigned_mem -= size;
 
-    if ( kinfo->mem.nr_banks == 0 )
+    if ( mem->nr_banks == 0 )
     {
-        kinfo->mem.bank[0].start = start;
-        kinfo->mem.bank[0].size = size;
-        kinfo->mem.nr_banks = 1;
+        mem->bank[0].start = start;
+        mem->bank[0].size = size;
+        mem->nr_banks = 1;
         return true;
     }
 
-    for( i = 0; i < kinfo->mem.nr_banks; i++ )
+    for( i = 0; i < mem->nr_banks; i++ )
     {
-        struct membank *bank = &kinfo->mem.bank[i];
+        struct membank *bank = &mem->bank[i];
 
         /* If possible merge new memory into the start of the bank */
         if ( bank->start == start+size )
@@ -204,24 +205,24 @@ static bool __init insert_11_bank(struct domain *d,
          * could have inserted the memory into/before we would already
          * have done so, so this must be the right place.
          */
-        if ( start + size < bank->start && kinfo->mem.nr_banks < NR_MEM_BANKS )
+        if ( start + size < bank->start && mem->nr_banks < mem->max_banks )
         {
             memmove(bank + 1, bank,
-                    sizeof(*bank) * (kinfo->mem.nr_banks - i));
-            kinfo->mem.nr_banks++;
+                    sizeof(*bank) * (mem->nr_banks - i));
+            mem->nr_banks++;
             bank->start = start;
             bank->size = size;
             return true;
         }
     }
 
-    if ( i == kinfo->mem.nr_banks && kinfo->mem.nr_banks < NR_MEM_BANKS )
+    if ( i == mem->nr_banks && mem->nr_banks < mem->max_banks )
     {
-        struct membank *bank = &kinfo->mem.bank[kinfo->mem.nr_banks];
+        struct membank *bank = &mem->bank[mem->nr_banks];
 
         bank->start = start;
         bank->size = size;
-        kinfo->mem.nr_banks++;
+        mem->nr_banks++;
         return true;
     }
 
@@ -293,6 +294,7 @@ static void __init allocate_memory_11(struct domain *d,
     const unsigned int min_low_order =
         get_order_from_bytes(min_t(paddr_t, dom0_mem, MB(128)));
     const unsigned int min_order = get_order_from_bytes(MB(4));
+    struct membanks *mem = kernel_info_get_mem(kinfo);
     struct page_info *pg;
     unsigned int order = get_allocation_size(kinfo->unassigned_mem);
     unsigned int i;
@@ -311,7 +313,7 @@ static void __init allocate_memory_11(struct domain *d,
            /* Don't want format this as PRIpaddr (16 digit hex) */
            (unsigned long)(kinfo->unassigned_mem >> 20));
 
-    kinfo->mem.nr_banks = 0;
+    mem->nr_banks = 0;
 
     /*
      * First try and allocate the largest thing we can as low as
@@ -349,7 +351,7 @@ static void __init allocate_memory_11(struct domain *d,
      * continue allocating from above the lowmem and fill in banks.
      */
     order = get_allocation_size(kinfo->unassigned_mem);
-    while ( kinfo->unassigned_mem && kinfo->mem.nr_banks < NR_MEM_BANKS )
+    while ( kinfo->unassigned_mem && mem->nr_banks < mem->max_banks )
     {
         pg = alloc_domheap_pages(d, order,
                                  lowmem ? MEMF_bits(lowmem_bitsize) : 0);
@@ -373,7 +375,7 @@ static void __init allocate_memory_11(struct domain *d,
 
         if ( !insert_11_bank(d, kinfo, pg, order) )
         {
-            if ( kinfo->mem.nr_banks == NR_MEM_BANKS )
+            if ( mem->nr_banks == mem->max_banks )
                 /* Nothing more we can do. */
                 break;
 
@@ -403,14 +405,14 @@ static void __init allocate_memory_11(struct domain *d,
         panic("Failed to allocate requested dom0 memory. %ldMB unallocated\n",
               (unsigned long)kinfo->unassigned_mem >> 20);
 
-    for( i = 0; i < kinfo->mem.nr_banks; i++ )
+    for( i = 0; i < mem->nr_banks; i++ )
     {
         printk("BANK[%d] %#"PRIpaddr"-%#"PRIpaddr" (%ldMB)\n",
                i,
-               kinfo->mem.bank[i].start,
-               kinfo->mem.bank[i].start + kinfo->mem.bank[i].size,
+               mem->bank[i].start,
+               mem->bank[i].start + mem->bank[i].size,
                /* Don't want format this as PRIpaddr (16 digit hex) */
-               (unsigned long)(kinfo->mem.bank[i].size >> 20));
+               (unsigned long)(mem->bank[i].size >> 20));
     }
 }
 
@@ -418,6 +420,7 @@ static void __init allocate_memory_11(struct domain *d,
 bool __init allocate_bank_memory(struct domain *d, struct kernel_info *kinfo,
                                  gfn_t sgfn, paddr_t tot_size)
 {
+    struct membanks *mem = kernel_info_get_mem(kinfo);
     int res;
     struct page_info *pg;
     struct membank *bank;
@@ -431,7 +434,7 @@ bool __init allocate_bank_memory(struct domain *d, struct kernel_info *kinfo,
     if ( tot_size == 0 )
         return true;
 
-    bank = &kinfo->mem.bank[kinfo->mem.nr_banks];
+    bank = &mem->bank[mem->nr_banks];
     bank->start = gfn_to_gaddr(sgfn);
     bank->size = tot_size;
 
@@ -471,7 +474,7 @@ bool __init allocate_bank_memory(struct domain *d, struct kernel_info *kinfo,
         tot_size -= (1ULL << (PAGE_SHIFT + order));
     }
 
-    kinfo->mem.nr_banks++;
+    mem->nr_banks++;
     kinfo->unassigned_mem -= bank->size;
 
     return true;
@@ -756,7 +759,7 @@ int __init domain_fdt_begin_node(void *fdt, const char *name, uint64_t unit)
 int __init make_memory_node(const struct domain *d,
                             void *fdt,
                             int addrcells, int sizecells,
-                            struct meminfo *mem)
+                            const struct membanks *mem)
 {
     unsigned int i;
     int res, reg_size = addrcells + sizecells;
@@ -816,12 +819,12 @@ int __init make_memory_node(const struct domain *d,
 static int __init add_ext_regions(unsigned long s_gfn, unsigned long e_gfn,
                                   void *data)
 {
-    struct meminfo *ext_regions = data;
+    struct membanks *ext_regions = data;
     paddr_t start, size;
     paddr_t s = pfn_to_paddr(s_gfn);
     paddr_t e = pfn_to_paddr(e_gfn);
 
-    if ( ext_regions->nr_banks >= ARRAY_SIZE(ext_regions->bank) )
+    if ( ext_regions->nr_banks >= ext_regions->max_banks )
         return 0;
 
     /*
@@ -863,9 +866,11 @@ static int __init add_ext_regions(unsigned long s_gfn, unsigned long e_gfn,
  * - grant table space
  */
 static int __init find_unallocated_memory(const struct kernel_info *kinfo,
-                                          struct meminfo *ext_regions)
+                                          struct membanks *ext_regions)
 {
-    const struct meminfo *assign_mem = &kinfo->mem;
+    const struct membanks *kinfo_mem = kernel_info_get_mem(kinfo);
+    const struct membanks *mem = bootinfo_get_mem();
+    const struct membanks *reserved_mem = bootinfo_get_reserved_mem();
     struct rangeset *unalloc_mem;
     paddr_t start, end;
     unsigned int i;
@@ -878,10 +883,10 @@ static int __init find_unallocated_memory(const struct kernel_info *kinfo,
         return -ENOMEM;
 
     /* Start with all available RAM */
-    for ( i = 0; i < bootinfo.mem.nr_banks; i++ )
+    for ( i = 0; i < mem->nr_banks; i++ )
     {
-        start = bootinfo.mem.bank[i].start;
-        end = bootinfo.mem.bank[i].start + bootinfo.mem.bank[i].size;
+        start = mem->bank[i].start;
+        end = mem->bank[i].start + mem->bank[i].size;
         res = rangeset_add_range(unalloc_mem, PFN_DOWN(start),
                                  PFN_DOWN(end - 1));
         if ( res )
@@ -893,10 +898,10 @@ static int __init find_unallocated_memory(const struct kernel_info *kinfo,
     }
 
     /* Remove RAM assigned to Dom0 */
-    for ( i = 0; i < assign_mem->nr_banks; i++ )
+    for ( i = 0; i < kinfo_mem->nr_banks; i++ )
     {
-        start = assign_mem->bank[i].start;
-        end = assign_mem->bank[i].start + assign_mem->bank[i].size;
+        start = kinfo_mem->bank[i].start;
+        end = kinfo_mem->bank[i].start + kinfo_mem->bank[i].size;
         res = rangeset_remove_range(unalloc_mem, PFN_DOWN(start),
                                     PFN_DOWN(end - 1));
         if ( res )
@@ -908,11 +913,10 @@ static int __init find_unallocated_memory(const struct kernel_info *kinfo,
     }
 
     /* Remove reserved-memory regions */
-    for ( i = 0; i < bootinfo.reserved_mem.nr_banks; i++ )
+    for ( i = 0; i < reserved_mem->nr_banks; i++ )
     {
-        start = bootinfo.reserved_mem.bank[i].start;
-        end = bootinfo.reserved_mem.bank[i].start +
-            bootinfo.reserved_mem.bank[i].size;
+        start = reserved_mem->bank[i].start;
+        end = reserved_mem->bank[i].start + reserved_mem->bank[i].size;
         res = rangeset_remove_range(unalloc_mem, PFN_DOWN(start),
                                     PFN_DOWN(end - 1));
         if ( res )
@@ -990,7 +994,7 @@ static int __init handle_pci_range(const struct dt_device_node *dev,
  * - PCI aperture
  */
 static int __init find_memory_holes(const struct kernel_info *kinfo,
-                                    struct meminfo *ext_regions)
+                                    struct membanks *ext_regions)
 {
     struct dt_device_node *np;
     struct rangeset *mem_holes;
@@ -1080,19 +1084,20 @@ out:
 }
 
 static int __init find_domU_holes(const struct kernel_info *kinfo,
-                                  struct meminfo *ext_regions)
+                                  struct membanks *ext_regions)
 {
     unsigned int i;
     uint64_t bankend;
     const uint64_t bankbase[] = GUEST_RAM_BANK_BASES;
     const uint64_t banksize[] = GUEST_RAM_BANK_SIZES;
+    const struct membanks *kinfo_mem = kernel_info_get_mem(kinfo);
     int res = -ENOENT;
 
     for ( i = 0; i < GUEST_RAM_BANKS; i++ )
     {
         struct membank *ext_bank = &(ext_regions->bank[ext_regions->nr_banks]);
 
-        ext_bank->start = ROUNDUP(bankbase[i] + kinfo->mem.bank[i].size, SZ_2M);
+        ext_bank->start = ROUNDUP(bankbase[i] + kinfo_mem->bank[i].size, SZ_2M);
 
         bankend = ~0ULL >> (64 - p2m_ipa_bits);
         bankend = min(bankend, bankbase[i] + banksize[i] - 1);
@@ -1120,7 +1125,7 @@ int __init make_hypervisor_node(struct domain *d,
     gic_interrupt_t intr;
     int res;
     void *fdt = kinfo->fdt;
-    struct meminfo *ext_regions = NULL;
+    struct membanks *ext_regions = NULL;
     unsigned int i, nr_ext_regions;
 
     dt_dprintk("Create hypervisor node\n");
@@ -1156,9 +1161,11 @@ int __init make_hypervisor_node(struct domain *d,
     }
     else
     {
-        ext_regions = xzalloc(struct meminfo);
+        ext_regions = xzalloc_flex_struct(struct membanks, bank, NR_MEM_BANKS);
         if ( !ext_regions )
             return -ENOMEM;
+
+        ext_regions->max_banks = NR_MEM_BANKS;
 
         if ( is_domain_direct_mapped(d) )
         {
@@ -1728,6 +1735,7 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
 
     if ( node == dt_host )
     {
+        const struct membanks *reserved_mem = bootinfo_get_reserved_mem();
         int addrcells = dt_child_n_addr_cells(node);
         int sizecells = dt_child_n_size_cells(node);
 
@@ -1753,7 +1761,8 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
         if ( res )
             return res;
 
-        res = make_memory_node(d, kinfo->fdt, addrcells, sizecells, &kinfo->mem);
+        res = make_memory_node(d, kinfo->fdt, addrcells, sizecells,
+                               kernel_info_get_mem(kinfo));
         if ( res )
             return res;
 
@@ -1761,10 +1770,10 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
          * Create a second memory node to store the ranges covering
          * reserved-memory regions.
          */
-        if ( bootinfo.reserved_mem.nr_banks > 0 )
+        if ( reserved_mem->nr_banks > 0 )
         {
             res = make_memory_node(d, kinfo->fdt, addrcells, sizecells,
-                                   &bootinfo.reserved_mem);
+                                   reserved_mem);
             if ( res )
                 return res;
         }
@@ -2038,7 +2047,7 @@ int __init construct_domain(struct domain *d, struct kernel_info *kinfo)
 
 static int __init construct_dom0(struct domain *d)
 {
-    struct kernel_info kinfo = {};
+    struct kernel_info kinfo = KERNEL_INFO_INIT;
     int rc;
 
     /* Sanity! */

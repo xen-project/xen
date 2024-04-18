@@ -444,14 +444,14 @@ static int __init acpi_create_fadt(struct domain *d, struct membank tbl_add[])
 }
 
 static int __init estimate_acpi_efi_size(struct domain *d,
-                                         struct kernel_info *kinfo)
+                                         const struct kernel_info *kinfo)
 {
     size_t efi_size, acpi_size, madt_size;
     u64 addr;
     struct acpi_table_rsdp *rsdp_tbl;
     struct acpi_table_header *table;
 
-    efi_size = estimate_efi_size(kinfo->mem.nr_banks);
+    efi_size = estimate_efi_size(kernel_info_get_mem(kinfo)->nr_banks);
 
     acpi_size = ROUNDUP(sizeof(struct acpi_table_fadt), 8);
     acpi_size += ROUNDUP(sizeof(struct acpi_table_stao), 8);
@@ -546,7 +546,7 @@ int __init prepare_acpi(struct domain *d, struct kernel_info *kinfo)
 
     acpi_map_other_tables(d);
     acpi_create_efi_system_table(d, tbl_add);
-    acpi_create_efi_mmap_table(d, &kinfo->mem, tbl_add);
+    acpi_create_efi_mmap_table(d, kernel_info_get_mem(kinfo), tbl_add);
 
     /* Map the EFI and ACPI tables to Dom0 */
     rc = map_regions_p2mt(d,

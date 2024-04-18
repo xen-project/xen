@@ -194,7 +194,7 @@ static void __init setup_directmap_mappings(unsigned long base_mfn,
 
 void __init setup_mm(void)
 {
-    const struct meminfo *banks = &bootinfo.mem;
+    const struct membanks *banks = bootinfo_get_mem();
     paddr_t ram_start = INVALID_PADDR;
     paddr_t ram_end = 0;
     paddr_t ram_size = 0;

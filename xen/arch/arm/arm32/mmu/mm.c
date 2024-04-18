@@ -42,6 +42,7 @@ static paddr_t __init consider_modules(paddr_t s, paddr_t e,
                                        uint32_t size, paddr_t align,
                                        int first_mod)
 {
+    const struct membanks *reserved_mem = bootinfo_get_reserved_mem();
     const struct bootmodules *mi = &bootinfo.modules;
     int i;
     int nr;
@@ -100,15 +101,14 @@ static paddr_t __init consider_modules(paddr_t s, paddr_t e,
      * possible kinds of bootmodules.
      *
      * When retrieving the corresponding reserved-memory addresses, we
-     * need to index the bootinfo.reserved_mem bank starting from 0, and
-     * only counting the reserved-memory modules. Hence, we need to use
-     * i - nr.
+     * need to index the reserved_mem bank starting from 0, and only counting
+     * the reserved-memory modules. Hence, we need to use i - nr.
      */
     nr += mi->nr_mods;
-    for ( ; i - nr < bootinfo.reserved_mem.nr_banks; i++ )
+    for ( ; i - nr < reserved_mem->nr_banks; i++ )
     {
-        paddr_t r_s = bootinfo.reserved_mem.bank[i - nr].start;
-        paddr_t r_e = r_s + bootinfo.reserved_mem.bank[i - nr].size;
+        paddr_t r_s = reserved_mem->bank[i - nr].start;
+        paddr_t r_e = r_s + reserved_mem->bank[i - nr].size;
 
         if ( s < r_e && r_s < e )
         {
@@ -129,17 +129,18 @@ static paddr_t __init consider_modules(paddr_t s, paddr_t e,
  */
 static paddr_t __init fit_xenheap_in_static_heap(uint32_t size, paddr_t align)
 {
+    const struct membanks *reserved_mem = bootinfo_get_reserved_mem();
     unsigned int i;
     paddr_t end = 0, aligned_start, aligned_end;
     paddr_t bank_start, bank_size, bank_end;
 
-    for ( i = 0 ; i < bootinfo.reserved_mem.nr_banks; i++ )
+    for ( i = 0 ; i < reserved_mem->nr_banks; i++ )
     {
-        if ( bootinfo.reserved_mem.bank[i].type != MEMBANK_STATIC_HEAP )
+        if ( reserved_mem->bank[i].type != MEMBANK_STATIC_HEAP )
             continue;
 
-        bank_start = bootinfo.reserved_mem.bank[i].start;
-        bank_size = bootinfo.reserved_mem.bank[i].size;
+        bank_start = reserved_mem->bank[i].start;
+        bank_size = reserved_mem->bank[i].size;
         bank_end = bank_start + bank_size;
 
         if ( bank_size < size )
@@ -162,13 +163,14 @@ static paddr_t __init fit_xenheap_in_static_heap(uint32_t size, paddr_t align)
 
 void __init setup_mm(void)
 {
+    const struct membanks *mem = bootinfo_get_mem();
     paddr_t ram_start, ram_end, ram_size, e, bank_start, bank_end, bank_size;
     paddr_t static_heap_end = 0, static_heap_size = 0;
     unsigned long heap_pages, xenheap_pages, domheap_pages;
     unsigned int i;
     const uint32_t ctr = READ_CP32(CTR);
 
-    if ( !bootinfo.mem.nr_banks )
+    if ( !mem->nr_banks )
         panic("No memory bank\n");
 
     /* We only supports instruction caches implementing the IVIPT extension. */
@@ -177,14 +179,14 @@ void __init setup_mm(void)
 
     init_pdx();
 
-    ram_start = bootinfo.mem.bank[0].start;
-    ram_size  = bootinfo.mem.bank[0].size;
+    ram_start = mem->bank[0].start;
+    ram_size  = mem->bank[0].size;
     ram_end   = ram_start + ram_size;
 
-    for ( i = 1; i < bootinfo.mem.nr_banks; i++ )
+    for ( i = 1; i < mem->nr_banks; i++ )
     {
-        bank_start = bootinfo.mem.bank[i].start;
-        bank_size = bootinfo.mem.bank[i].size;
+        bank_start = mem->bank[i].start;
+        bank_size = mem->bank[i].size;
         bank_end = bank_start + bank_size;
 
         ram_size  = ram_size + bank_size;
@@ -196,13 +198,15 @@ void __init setup_mm(void)
 
     if ( bootinfo.static_heap )
     {
-        for ( i = 0 ; i < bootinfo.reserved_mem.nr_banks; i++ )
+        const struct membanks *reserved_mem = bootinfo_get_reserved_mem();
+
+        for ( i = 0 ; i < reserved_mem->nr_banks; i++ )
         {
-            if ( bootinfo.reserved_mem.bank[i].type != MEMBANK_STATIC_HEAP )
+            if ( reserved_mem->bank[i].type != MEMBANK_STATIC_HEAP )
                 continue;
 
-            bank_start = bootinfo.reserved_mem.bank[i].start;
-            bank_size = bootinfo.reserved_mem.bank[i].size;
+            bank_start = reserved_mem->bank[i].start;
+            bank_size = reserved_mem->bank[i].size;
             bank_end = bank_start + bank_size;
 
             static_heap_size += bank_size;

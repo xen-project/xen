@@ -50,6 +50,7 @@ bool __init is_dom0less_mode(void)
 
 static void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
 {
+    struct membanks *mem = kernel_info_get_mem(kinfo);
     unsigned int i;
     paddr_t bank_size;
 
@@ -57,7 +58,7 @@ static void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
            /* Don't want format this as PRIpaddr (16 digit hex) */
            (unsigned long)(kinfo->unassigned_mem >> 20), d);
 
-    kinfo->mem.nr_banks = 0;
+    mem->nr_banks = 0;
     bank_size = MIN(GUEST_RAM0_SIZE, kinfo->unassigned_mem);
     if ( !allocate_bank_memory(d, kinfo, gaddr_to_gfn(GUEST_RAM0_BASE),
                                bank_size) )
@@ -71,15 +72,15 @@ static void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
     if ( kinfo->unassigned_mem )
         goto fail;
 
-    for( i = 0; i < kinfo->mem.nr_banks; i++ )
+    for( i = 0; i < mem->nr_banks; i++ )
     {
         printk(XENLOG_INFO "%pd BANK[%d] %#"PRIpaddr"-%#"PRIpaddr" (%ldMB)\n",
                d,
                i,
-               kinfo->mem.bank[i].start,
-               kinfo->mem.bank[i].start + kinfo->mem.bank[i].size,
+               mem->bank[i].start,
+               mem->bank[i].start + mem->bank[i].size,
                /* Don't want format this as PRIpaddr (16 digit hex) */
-               (unsigned long)(kinfo->mem.bank[i].size >> 20));
+               (unsigned long)(mem->bank[i].size >> 20));
     }
 
     return;
@@ -641,7 +642,8 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     if ( ret )
         goto err;
 
-    ret = make_memory_node(d, kinfo->fdt, addrcells, sizecells, &kinfo->mem);
+    ret = make_memory_node(d, kinfo->fdt, addrcells, sizecells,
+                           kernel_info_get_mem(kinfo));
     if ( ret )
         goto err;
 
@@ -740,7 +742,7 @@ static int __init alloc_xenstore_evtchn(struct domain *d)
 static int __init construct_domU(struct domain *d,
                                  const struct dt_device_node *node)
 {
-    struct kernel_info kinfo = {};
+    struct kernel_info kinfo = KERNEL_INFO_INIT;
     const char *dom0less_enhanced;
     int rc;
     u64 mem;

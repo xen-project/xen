@@ -78,6 +78,14 @@ struct kernel_info {
     };
 };
 
+#define kernel_info_get_mem(kinfo) (&(kinfo)->mem.common)
+
+#define KERNEL_INFO_INIT                        \
+{                                               \
+    .mem.common.max_banks = NR_MEM_BANKS,       \
+    .shm_mem.common.max_banks = NR_MEM_BANKS,   \
+}
+
 /*
  * Probe the kernel to detemine its type and select a loader.
  *

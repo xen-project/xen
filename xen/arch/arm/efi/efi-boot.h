@@ -157,14 +157,14 @@ static void __init *lookup_fdt_config_table(EFI_SYSTEM_TABLE *sys_table)
     return fdt;
 }
 
-static bool __init meminfo_add_bank(struct meminfo *mem,
+static bool __init meminfo_add_bank(struct membanks *mem,
                                     EFI_MEMORY_DESCRIPTOR *desc)
 {
     struct membank *bank;
     paddr_t start = desc->PhysicalStart;
     paddr_t size = desc->NumberOfPages * EFI_PAGE_SIZE;
 
-    if ( mem->nr_banks >= NR_MEM_BANKS )
+    if ( mem->nr_banks >= mem->max_banks )
         return false;
 #ifdef CONFIG_ACPI
     if ( check_reserved_regions_overlap(start, size) )
@@ -198,7 +198,7 @@ static EFI_STATUS __init efi_process_memory_map_bootinfo(EFI_MEMORY_DESCRIPTOR *
                (desc_ptr->Type == EfiBootServicesCode ||
                 desc_ptr->Type == EfiBootServicesData))) )
         {
-            if ( !meminfo_add_bank(&bootinfo.mem, desc_ptr) )
+            if ( !meminfo_add_bank(bootinfo_get_mem(), desc_ptr) )
             {
                 PrintStr(L"Warning: All " __stringify(NR_MEM_BANKS)
                           " bootinfo mem banks exhausted.\r\n");
@@ -208,7 +208,7 @@ static EFI_STATUS __init efi_process_memory_map_bootinfo(EFI_MEMORY_DESCRIPTOR *
 #ifdef CONFIG_ACPI
         else if ( desc_ptr->Type == EfiACPIReclaimMemory )
         {
-            if ( !meminfo_add_bank(&bootinfo.acpi, desc_ptr) )
+            if ( !meminfo_add_bank(bootinfo_get_acpi(), desc_ptr) )
             {
                 PrintStr(L"Error: All " __stringify(NR_MEM_BANKS)
                           " acpi meminfo mem banks exhausted.\r\n");

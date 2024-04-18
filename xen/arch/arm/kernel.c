@@ -45,13 +45,14 @@ static void __init place_modules(struct kernel_info *info,
 {
     /* Align DTB and initrd size to 2Mb. Linux only requires 4 byte alignment */
     const struct bootmodule *mod = info->initrd_bootmodule;
+    const struct membanks *mem = kernel_info_get_mem(info);
     const paddr_t initrd_len = ROUNDUP(mod ? mod->size : 0, MB(2));
     const paddr_t dtb_len = ROUNDUP(fdt_totalsize(info->fdt), MB(2));
     const paddr_t modsize = initrd_len + dtb_len;
 
     /* Convenient */
-    const paddr_t rambase = info->mem.bank[0].start;
-    const paddr_t ramsize = info->mem.bank[0].size;
+    const paddr_t rambase = mem->bank[0].start;
+    const paddr_t ramsize = mem->bank[0].size;
     const paddr_t ramend = rambase + ramsize;
     const paddr_t kernsize = ROUNDUP(kernend, MB(2)) - kernbase;
     const paddr_t ram128mb = rambase + MB(128);
@@ -96,11 +97,12 @@ static void __init place_modules(struct kernel_info *info,
 
 static paddr_t __init kernel_zimage_place(struct kernel_info *info)
 {
+    const struct membanks *mem = kernel_info_get_mem(info);
     paddr_t load_addr;
 
 #ifdef CONFIG_ARM_64
     if ( (info->type == DOMAIN_64BIT) && (info->zimage.start == 0) )
-        return info->mem.bank[0].start + info->zimage.text_offset;
+        return mem->bank[0].start + info->zimage.text_offset;
 #endif
 
     /*
@@ -113,8 +115,8 @@ static paddr_t __init kernel_zimage_place(struct kernel_info *info)
     {
         paddr_t load_end;
 
-        load_end = info->mem.bank[0].start + info->mem.bank[0].size;
-        load_end = MIN(info->mem.bank[0].start + MB(128), load_end);
+        load_end = mem->bank[0].start + mem->bank[0].size;
+        load_end = MIN(mem->bank[0].start + MB(128), load_end);
 
         load_addr = load_end - info->zimage.len;
         /* Align to 2MB */

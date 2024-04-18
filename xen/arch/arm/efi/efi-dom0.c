@@ -44,7 +44,7 @@ size_t __init estimate_efi_size(unsigned int mem_nr_banks)
     unsigned int acpi_mem_nr_banks = 0;
 
     if ( !acpi_disabled )
-        acpi_mem_nr_banks = bootinfo.acpi.nr_banks;
+        acpi_mem_nr_banks = bootinfo_get_acpi()->nr_banks;
 
     size = ROUNDUP(est_size + ect_size + fw_vendor_size, 8);
     /* plus 1 for new created tables */
@@ -107,9 +107,10 @@ static void __init fill_efi_memory_descriptor(EFI_MEMORY_DESCRIPTOR *desc,
 }
 
 void __init acpi_create_efi_mmap_table(struct domain *d,
-                                       const struct meminfo *mem,
+                                       const struct membanks *mem,
                                        struct membank tbl_add[])
 {
+    const struct membanks *acpi = bootinfo_get_acpi();
     EFI_MEMORY_DESCRIPTOR *desc;
     unsigned int i;
     u8 *base_ptr;
@@ -122,10 +123,10 @@ void __init acpi_create_efi_mmap_table(struct domain *d,
         fill_efi_memory_descriptor(desc, EfiConventionalMemory,
                                    mem->bank[i].start, mem->bank[i].size);
 
-    for ( i = 0; i < bootinfo.acpi.nr_banks; i++, desc++ )
+    for ( i = 0; i < acpi->nr_banks; i++, desc++ )
         fill_efi_memory_descriptor(desc, EfiACPIReclaimMemory,
-                                   bootinfo.acpi.bank[i].start,
-                                   bootinfo.acpi.bank[i].size);
+                                   acpi->bank[i].start,
+                                   acpi->bank[i].size);
 
     fill_efi_memory_descriptor(desc, EfiACPIReclaimMemory,
                                d->arch.efi_acpi_gpa, d->arch.efi_acpi_len);
@@ -133,7 +134,7 @@ void __init acpi_create_efi_mmap_table(struct domain *d,
     tbl_add[TBL_MMAP].start = d->arch.efi_acpi_gpa
                               + acpi_get_table_offset(tbl_add, TBL_MMAP);
     tbl_add[TBL_MMAP].size = sizeof(EFI_MEMORY_DESCRIPTOR)
-                             * (mem->nr_banks + bootinfo.acpi.nr_banks + 1);
+                             * (mem->nr_banks + acpi->nr_banks + 1);
 }
 
 /* Create /hypervisor/uefi node for efi properties. */

@@ -48,7 +48,7 @@
 #include <xsm/xsm.h>
 #include <asm/acpi.h>
 
-struct bootinfo __initdata bootinfo;
+struct bootinfo __initdata bootinfo = BOOTINFO_INIT;
 
 /*
  * Sanitized version of cpuinfo containing only features available on all
@@ -207,6 +207,7 @@ static void __init dt_unreserved_regions(paddr_t s, paddr_t e,
                                          void (*cb)(paddr_t ps, paddr_t pe),
                                          unsigned int first)
 {
+    const struct membanks *reserved_mem = bootinfo_get_reserved_mem();
     unsigned int i, nr;
     int rc;
 
@@ -240,14 +241,14 @@ static void __init dt_unreserved_regions(paddr_t s, paddr_t e,
      * kinds.
      *
      * When retrieving the corresponding reserved-memory addresses
-     * below, we need to index the bootinfo.reserved_mem bank starting
+     * below, we need to index the reserved_mem->bank starting
      * from 0, and only counting the reserved-memory modules. Hence,
      * we need to use i - nr.
      */
-    for ( ; i - nr < bootinfo.reserved_mem.nr_banks; i++ )
+    for ( ; i - nr < reserved_mem->nr_banks; i++ )
     {
-        paddr_t r_s = bootinfo.reserved_mem.bank[i - nr].start;
-        paddr_t r_e = r_s + bootinfo.reserved_mem.bank[i - nr].size;
+        paddr_t r_s = reserved_mem->bank[i - nr].start;
+        paddr_t r_e = r_s + reserved_mem->bank[i - nr].size;
 
         if ( s < r_e && r_s < e )
         {
@@ -264,18 +265,18 @@ static void __init dt_unreserved_regions(paddr_t s, paddr_t e,
  * TODO: '*_end' could be 0 if the bank/region is at the end of the physical
  * address space. This is for now not handled as it requires more rework.
  */
-static bool __init meminfo_overlap_check(struct meminfo *meminfo,
+static bool __init meminfo_overlap_check(const struct membanks *mem,
                                          paddr_t region_start,
                                          paddr_t region_size)
 {
     paddr_t bank_start = INVALID_PADDR, bank_end = 0;
     paddr_t region_end = region_start + region_size;
-    unsigned int i, bank_num = meminfo->nr_banks;
+    unsigned int i, bank_num = mem->nr_banks;
 
     for ( i = 0; i < bank_num; i++ )
     {
-        bank_start = meminfo->bank[i].start;
-        bank_end = bank_start + meminfo->bank[i].size;
+        bank_start = mem->bank[i].start;
+        bank_end = bank_start + mem->bank[i].size;
 
         if ( region_end <= bank_start || region_start >= bank_end )
             continue;
@@ -339,8 +340,11 @@ void __init fw_unreserved_regions(paddr_t s, paddr_t e,
 bool __init check_reserved_regions_overlap(paddr_t region_start,
                                            paddr_t region_size)
 {
-    /* Check if input region is overlapping with bootinfo.reserved_mem banks */
-    if ( meminfo_overlap_check(&bootinfo.reserved_mem,
+    /*
+     * Check if input region is overlapping with bootinfo_get_reserved_mem()
+     * banks
+     */
+    if ( meminfo_overlap_check(bootinfo_get_reserved_mem(),
                                region_start, region_size) )
         return true;
 
@@ -351,7 +355,7 @@ bool __init check_reserved_regions_overlap(paddr_t region_start,
 
 #ifdef CONFIG_ACPI
     /* Check if input region is overlapping with ACPI EfiACPIReclaimMemory */
-    if ( meminfo_overlap_check(&bootinfo.acpi, region_start, region_size) )
+    if ( meminfo_overlap_check(bootinfo_get_acpi(), region_start, region_size) )
         return true;
 #endif
 
@@ -580,6 +584,7 @@ static paddr_t __init next_module(paddr_t s, paddr_t *end)
 
 void __init init_pdx(void)
 {
+    const struct membanks *mem = bootinfo_get_mem();
     paddr_t bank_start, bank_size, bank_end;
 
     /*
@@ -592,18 +597,18 @@ void __init init_pdx(void)
     uint64_t mask = pdx_init_mask(0x0);
     int bank;
 
-    for ( bank = 0 ; bank < bootinfo.mem.nr_banks; bank++ )
+    for ( bank = 0 ; bank < mem->nr_banks; bank++ )
     {
-        bank_start = bootinfo.mem.bank[bank].start;
-        bank_size = bootinfo.mem.bank[bank].size;
+        bank_start = mem->bank[bank].start;
+        bank_size = mem->bank[bank].size;
 
         mask |= bank_start | pdx_region_mask(bank_start, bank_size);
     }
 
-    for ( bank = 0 ; bank < bootinfo.mem.nr_banks; bank++ )
+    for ( bank = 0 ; bank < mem->nr_banks; bank++ )
     {
-        bank_start = bootinfo.mem.bank[bank].start;
-        bank_size = bootinfo.mem.bank[bank].size;
+        bank_start = mem->bank[bank].start;
+        bank_size = mem->bank[bank].size;
 
         if (~mask & pdx_region_mask(bank_start, bank_size))
             mask = 0;
@@ -611,10 +616,10 @@ void __init init_pdx(void)
 
     pfn_pdx_hole_setup(mask >> PAGE_SHIFT);
 
-    for ( bank = 0 ; bank < bootinfo.mem.nr_banks; bank++ )
+    for ( bank = 0 ; bank < mem->nr_banks; bank++ )
     {
-        bank_start = bootinfo.mem.bank[bank].start;
-        bank_size = bootinfo.mem.bank[bank].size;
+        bank_start = mem->bank[bank].start;
+        bank_size = mem->bank[bank].size;
         bank_end = bank_start + bank_size;
 
         set_pdx_range(paddr_to_pfn(bank_start),
@@ -636,18 +641,19 @@ void __init init_pdx(void)
 void __init populate_boot_allocator(void)
 {
     unsigned int i;
-    const struct meminfo *banks = &bootinfo.mem;
+    const struct membanks *banks = bootinfo_get_mem();
+    const struct membanks *reserved_mem = bootinfo_get_reserved_mem();
     paddr_t s, e;
 
     if ( bootinfo.static_heap )
     {
-        for ( i = 0 ; i < bootinfo.reserved_mem.nr_banks; i++ )
+        for ( i = 0 ; i < reserved_mem->nr_banks; i++ )
         {
-            if ( bootinfo.reserved_mem.bank[i].type != MEMBANK_STATIC_HEAP )
+            if ( reserved_mem->bank[i].type != MEMBANK_STATIC_HEAP )
                 continue;
 
-            s = bootinfo.reserved_mem.bank[i].start;
-            e = s + bootinfo.reserved_mem.bank[i].size;
+            s = reserved_mem->bank[i].start;
+            e = s + reserved_mem->bank[i].size;
 #ifdef CONFIG_ARM_32
             /* Avoid the xenheap, note that the xenheap cannot across a bank */
             if ( s <= mfn_to_maddr(directmap_mfn_start) &&

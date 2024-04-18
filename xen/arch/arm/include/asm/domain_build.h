@@ -15,7 +15,7 @@ int make_cpus_node(const struct domain *d, void *fdt);
 int make_hypervisor_node(struct domain *d, const struct kernel_info *kinfo,
                          int addrcells, int sizecells);
 int make_memory_node(const struct domain *d, void *fdt, int addrcells,
-                     int sizecells, struct meminfo *mem);
+                     int sizecells, const struct membanks *mem);
 int make_psci_node(void *fdt);
 int make_timer_node(const struct kernel_info *kinfo);
 void evtchn_allocate(struct domain *d);

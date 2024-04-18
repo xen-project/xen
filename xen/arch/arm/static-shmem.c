@@ -10,22 +10,23 @@ static int __init acquire_nr_borrower_domain(struct domain *d,
                                              paddr_t pbase, paddr_t psize,
                                              unsigned long *nr_borrowers)
 {
+    const struct membanks *reserved_mem = bootinfo_get_reserved_mem();
     unsigned int bank;
 
     /* Iterate reserved memory to find requested shm bank. */
-    for ( bank = 0 ; bank < bootinfo.reserved_mem.nr_banks; bank++ )
+    for ( bank = 0 ; bank < reserved_mem->nr_banks; bank++ )
     {
-        paddr_t bank_start = bootinfo.reserved_mem.bank[bank].start;
-        paddr_t bank_size = bootinfo.reserved_mem.bank[bank].size;
+        paddr_t bank_start = reserved_mem->bank[bank].start;
+        paddr_t bank_size = reserved_mem->bank[bank].size;
 
         if ( (pbase == bank_start) && (psize == bank_size) )
             break;
     }
 
-    if ( bank == bootinfo.reserved_mem.nr_banks )
+    if ( bank == reserved_mem->nr_banks )
         return -ENOENT;
 
-    *nr_borrowers = bootinfo.reserved_mem.bank[bank].nr_shm_borrowers;
+    *nr_borrowers = reserved_mem->bank[bank].nr_shm_borrowers;
 
     return 0;
 }
@@ -157,17 +158,17 @@ static int __init assign_shared_memory(struct domain *d,
     return ret;
 }
 
-static int __init append_shm_bank_to_domain(struct kernel_info *kinfo,
+static int __init append_shm_bank_to_domain(struct membanks *shm_mem,
                                             paddr_t start, paddr_t size,
                                             const char *shm_id)
 {
-    if ( kinfo->shm_mem.nr_banks >= NR_MEM_BANKS )
+    if ( shm_mem->nr_banks >= shm_mem->max_banks )
         return -ENOMEM;
 
-    kinfo->shm_mem.bank[kinfo->shm_mem.nr_banks].start = start;
-    kinfo->shm_mem.bank[kinfo->shm_mem.nr_banks].size = size;
-    safe_strcpy(kinfo->shm_mem.bank[kinfo->shm_mem.nr_banks].shm_id, shm_id);
-    kinfo->shm_mem.nr_banks++;
+    shm_mem->bank[shm_mem->nr_banks].start = start;
+    shm_mem->bank[shm_mem->nr_banks].size = size;
+    safe_strcpy(shm_mem->bank[shm_mem->nr_banks].shm_id, shm_id);
+    shm_mem->nr_banks++;
 
     return 0;
 }
@@ -269,7 +270,8 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
          * Record static shared memory region info for later setting
          * up shm-node in guest device tree.
          */
-        ret = append_shm_bank_to_domain(kinfo, gbase, psize, shm_id);
+        ret = append_shm_bank_to_domain(&kinfo->shm_mem.common, gbase, psize,
+                                        shm_id);
         if ( ret )
             return ret;
     }
@@ -280,7 +282,7 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
 static int __init make_shm_memory_node(const struct kernel_info *kinfo,
                                        int addrcells, int sizecells)
 {
-    const struct meminfo *mem = &kinfo->shm_mem;
+    const struct membanks *mem = &kinfo->shm_mem.common;
     void *fdt = kinfo->fdt;
     unsigned int i = 0;
     int res = 0;
@@ -351,7 +353,7 @@ int __init process_shm_node(const void *fdt, int node, uint32_t address_cells,
     const struct fdt_property *prop, *prop_id, *prop_role;
     const __be32 *cell;
     paddr_t paddr, gaddr, size, end;
-    struct meminfo *mem = &bootinfo.reserved_mem;
+    struct membanks *mem = bootinfo_get_reserved_mem();
     unsigned int i;
     int len;
     bool owner = false;
@@ -461,7 +463,7 @@ int __init process_shm_node(const void *fdt, int node, uint32_t address_cells,
 
     if ( i == mem->nr_banks )
     {
-        if ( i < NR_MEM_BANKS )
+        if (i < mem->max_banks)
         {
             if ( check_reserved_regions_overlap(paddr, size) )
                 return -EINVAL;
@@ -492,7 +494,7 @@ int __init process_shm_node(const void *fdt, int node, uint32_t address_cells,
 int __init make_resv_memory_node(const struct kernel_info *kinfo, int addrcells,
                                  int sizecells)
 {
-    const struct meminfo *mem = &kinfo->shm_mem;
+    const struct membanks *mem = &kinfo->shm_mem.common;
     void *fdt = kinfo->fdt;
     int res = 0;
     /* Placeholder for reserved-memory\0 */

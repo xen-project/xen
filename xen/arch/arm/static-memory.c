@@ -85,6 +85,7 @@ static int __init parse_static_mem_prop(const struct dt_device_node *node,
 void __init allocate_static_memory(struct domain *d, struct kernel_info *kinfo,
                                    const struct dt_device_node *node)
 {
+    struct membanks *mem = kernel_info_get_mem(kinfo);
     u32 addr_cells, size_cells, reg_cells;
     unsigned int nr_banks, gbank, bank = 0;
     const uint64_t rambase[] = GUEST_RAM_BANK_BASES;
@@ -106,7 +107,7 @@ void __init allocate_static_memory(struct domain *d, struct kernel_info *kinfo,
      */
     gbank = 0;
     gsize = ramsize[gbank];
-    kinfo->mem.bank[gbank].start = rambase[gbank];
+    mem->bank[gbank].start = rambase[gbank];
     nr_banks = length / (reg_cells * sizeof (u32));
 
     for ( ; bank < nr_banks; bank++ )
@@ -122,7 +123,7 @@ void __init allocate_static_memory(struct domain *d, struct kernel_info *kinfo,
         while ( 1 )
         {
             /* Map as much as possible the static range to the guest bank */
-            if ( !append_static_memory_to_bank(d, &kinfo->mem.bank[gbank], smfn,
+            if ( !append_static_memory_to_bank(d, &mem->bank[gbank], smfn,
                                                min(psize, gsize)) )
                 goto fail;
 
@@ -153,14 +154,14 @@ void __init allocate_static_memory(struct domain *d, struct kernel_info *kinfo,
                 /* Update to the next guest bank. */
                 gbank++;
                 gsize = ramsize[gbank];
-                kinfo->mem.bank[gbank].start = rambase[gbank];
+                mem->bank[gbank].start = rambase[gbank];
             }
         }
 
         tot_size += psize;
     }
 
-    kinfo->mem.nr_banks = ++gbank;
+    mem->nr_banks = ++gbank;
 
     kinfo->unassigned_mem -= tot_size;
     /*
@@ -190,6 +191,7 @@ void __init allocate_static_memory(struct domain *d, struct kernel_info *kinfo,
 void __init assign_static_memory_11(struct domain *d, struct kernel_info *kinfo,
                                     const struct dt_device_node *node)
 {
+    struct membanks *mem = kernel_info_get_mem(kinfo);
     u32 addr_cells, size_cells, reg_cells;
     unsigned int nr_banks, bank = 0;
     const __be32 *cell;
@@ -206,7 +208,7 @@ void __init assign_static_memory_11(struct domain *d, struct kernel_info *kinfo,
     reg_cells = addr_cells + size_cells;
     nr_banks = length / (reg_cells * sizeof(u32));
 
-    if ( nr_banks > NR_MEM_BANKS )
+    if ( nr_banks > mem->max_banks )
     {
         printk(XENLOG_ERR
                "%pd: exceed max number of supported guest memory banks.\n", d);
@@ -224,15 +226,15 @@ void __init assign_static_memory_11(struct domain *d, struct kernel_info *kinfo,
                d, bank, pbase, pbase + psize);
 
         /* One guest memory bank is matched with one physical memory bank. */
-        kinfo->mem.bank[bank].start = pbase;
-        if ( !append_static_memory_to_bank(d, &kinfo->mem.bank[bank],
+        mem->bank[bank].start = pbase;
+        if ( !append_static_memory_to_bank(d, &mem->bank[bank],
                                            smfn, psize) )
             goto fail;
 
         kinfo->unassigned_mem -= psize;
     }
 
-    kinfo->mem.nr_banks = nr_banks;
+    mem->nr_banks = nr_banks;
 
     /*
      * The property 'memory' should match the amount of memory given to
@@ -257,14 +259,15 @@ void __init assign_static_memory_11(struct domain *d, struct kernel_info *kinfo,
 /* Static memory initialization */
 void __init init_staticmem_pages(void)
 {
+    const struct membanks *reserved_mem = bootinfo_get_reserved_mem();
     unsigned int bank;
 
-    for ( bank = 0 ; bank < bootinfo.reserved_mem.nr_banks; bank++ )
+    for ( bank = 0 ; bank < reserved_mem->nr_banks; bank++ )
     {
-        if ( bootinfo.reserved_mem.bank[bank].type == MEMBANK_STATIC_DOMAIN )
+        if ( reserved_mem->bank[bank].type == MEMBANK_STATIC_DOMAIN )
         {
-            mfn_t bank_start = _mfn(PFN_UP(bootinfo.reserved_mem.bank[bank].start));
-            unsigned long bank_pages = PFN_DOWN(bootinfo.reserved_mem.bank[bank].size);
+            mfn_t bank_start = _mfn(PFN_UP(reserved_mem->bank[bank].start));
+            unsigned long bank_pages = PFN_DOWN(reserved_mem->bank[bank].size);
             mfn_t bank_end = mfn_add(bank_start, bank_pages);
 
             if ( mfn_x(bank_end) <= mfn_x(bank_start) )
