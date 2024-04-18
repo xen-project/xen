@@ -265,17 +265,7 @@ void __init init_staticmem_pages(void)
     for ( bank = 0 ; bank < reserved_mem->nr_banks; bank++ )
     {
         if ( reserved_mem->bank[bank].type == MEMBANK_STATIC_DOMAIN )
-        {
-            mfn_t bank_start = _mfn(PFN_UP(reserved_mem->bank[bank].start));
-            unsigned long bank_pages = PFN_DOWN(reserved_mem->bank[bank].size);
-            mfn_t bank_end = mfn_add(bank_start, bank_pages);
-
-            if ( mfn_x(bank_end) <= mfn_x(bank_start) )
-                return;
-
-            unprepare_staticmem_pages(mfn_to_page(bank_start),
-                                      bank_pages, false);
-        }
+            init_staticmem_bank(&reserved_mem->bank[bank]);
     }
 }
 
