@@ -7,8 +7,8 @@
 
 #ifdef CONFIG_STATIC_SHM
 
-int make_resv_memory_node(const struct domain *d, void *fdt, int addrcells,
-                          int sizecells, const struct meminfo *mem);
+int make_resv_memory_node(const struct kernel_info *kinfo, int addrcells,
+                          int sizecells);
 
 int process_shm(struct domain *d, struct kernel_info *kinfo,
                 const struct dt_device_node *node);
@@ -26,9 +26,8 @@ int process_shm_node(const void *fdt, int node, uint32_t address_cells,
 
 #else /* !CONFIG_STATIC_SHM */
 
-static inline int make_resv_memory_node(const struct domain *d, void *fdt,
-                                        int addrcells, int sizecells,
-                                        const struct meminfo *mem)
+static inline int make_resv_memory_node(const struct kernel_info *kinfo,
+                                        int addrcells, int sizecells)
 {
     return 0;
 }

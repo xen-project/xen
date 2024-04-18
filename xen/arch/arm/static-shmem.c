@@ -277,10 +277,11 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
     return 0;
 }
 
-static int __init make_shm_memory_node(const struct domain *d, void *fdt,
-                                       int addrcells, int sizecells,
-                                       const struct meminfo *mem)
+static int __init make_shm_memory_node(const struct kernel_info *kinfo,
+                                       int addrcells, int sizecells)
 {
+    const struct meminfo *mem = &kinfo->shm_mem;
+    void *fdt = kinfo->fdt;
     unsigned int i = 0;
     int res = 0;
 
@@ -488,10 +489,11 @@ int __init process_shm_node(const void *fdt, int node, uint32_t address_cells,
     return 0;
 }
 
-int __init make_resv_memory_node(const struct domain *d, void *fdt,
-                                 int addrcells, int sizecells,
-                                 const struct meminfo *mem)
+int __init make_resv_memory_node(const struct kernel_info *kinfo, int addrcells,
+                                 int sizecells)
 {
+    const struct meminfo *mem = &kinfo->shm_mem;
+    void *fdt = kinfo->fdt;
     int res = 0;
     /* Placeholder for reserved-memory\0 */
     const char resvbuf[16] = "reserved-memory";
@@ -518,7 +520,7 @@ int __init make_resv_memory_node(const struct domain *d, void *fdt,
     if ( res )
         return res;
 
-    res = make_shm_memory_node(d, fdt, addrcells, sizecells, mem);
+    res = make_shm_memory_node(kinfo, addrcells, sizecells);
     if ( res )
         return res;
 
