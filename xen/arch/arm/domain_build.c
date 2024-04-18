@@ -868,12 +868,14 @@ static int __init add_ext_regions(unsigned long s_gfn, unsigned long e_gfn,
 static int __init find_unallocated_memory(const struct kernel_info *kinfo,
                                           struct membanks *ext_regions)
 {
-    const struct membanks *kinfo_mem = kernel_info_get_mem(kinfo);
     const struct membanks *mem = bootinfo_get_mem();
-    const struct membanks *reserved_mem = bootinfo_get_reserved_mem();
+    const struct membanks *mem_banks[] = {
+        kernel_info_get_mem(kinfo),
+        bootinfo_get_reserved_mem(),
+    };
     struct rangeset *unalloc_mem;
     paddr_t start, end;
-    unsigned int i;
+    unsigned int i, j;
     int res;
 
     dt_dprintk("Find unallocated memory for extended regions\n");
@@ -897,35 +899,26 @@ static int __init find_unallocated_memory(const struct kernel_info *kinfo,
         }
     }
 
-    /* Remove RAM assigned to Dom0 */
-    for ( i = 0; i < kinfo_mem->nr_banks; i++ )
-    {
-        start = kinfo_mem->bank[i].start;
-        end = kinfo_mem->bank[i].start + kinfo_mem->bank[i].size;
-        res = rangeset_remove_range(unalloc_mem, PFN_DOWN(start),
-                                    PFN_DOWN(end - 1));
-        if ( res )
+    /*
+     * Exclude the following regions:
+     * 1) Remove RAM assigned to Dom0
+     * 2) Remove reserved memory
+     */
+    for ( i = 0; i < ARRAY_SIZE(mem_banks); i++ )
+        for ( j = 0; j < mem_banks[i]->nr_banks; j++ )
         {
-            printk(XENLOG_ERR "Failed to remove: %#"PRIpaddr"->%#"PRIpaddr"\n",
-                   start, end);
-            goto out;
+            start = mem_banks[i]->bank[j].start;
+            end = mem_banks[i]->bank[j].start + mem_banks[i]->bank[j].size;
+            res = rangeset_remove_range(unalloc_mem, PFN_DOWN(start),
+                                        PFN_DOWN(end - 1));
+            if ( res )
+            {
+                printk(XENLOG_ERR
+                       "Failed to add: %#"PRIpaddr"->%#"PRIpaddr", error %d\n",
+                       start, end, res);
+                goto out;
+            }
         }
-    }
-
-    /* Remove reserved-memory regions */
-    for ( i = 0; i < reserved_mem->nr_banks; i++ )
-    {
-        start = reserved_mem->bank[i].start;
-        end = reserved_mem->bank[i].start + reserved_mem->bank[i].size;
-        res = rangeset_remove_range(unalloc_mem, PFN_DOWN(start),
-                                    PFN_DOWN(end - 1));
-        if ( res )
-        {
-            printk(XENLOG_ERR "Failed to remove: %#"PRIpaddr"->%#"PRIpaddr"\n",
-                   start, end);
-            goto out;
-        }
-    }
 
     /* Remove grant table region */
     if ( kinfo->gnttab_size )
