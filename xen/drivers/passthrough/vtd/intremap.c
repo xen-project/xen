@@ -184,49 +184,26 @@ bool __init cf_check intel_iommu_supports_eim(void)
 
 /*
  * Assume iremap_lock has been acquired. It is to make sure software will not
- * change the same IRTE behind us. With this assumption, if only high qword or
- * low qword in IRTE is to be updated, this function's atomic variant can
- * present an atomic update to VT-d hardware even when cmpxchg16b
- * instruction is not supported.
+ * change the same IRTE behind us.
  */
 static void update_irte(struct vtd_iommu *iommu, struct iremap_entry *entry,
                         const struct iremap_entry *new_ire, bool atomic)
 {
+    __uint128_t ret;
+    struct iremap_entry old_ire;
+
     ASSERT(spin_is_locked(&iommu->intremap.lock));
 
-    if ( cpu_has_cx16 )
-    {
-        __uint128_t ret;
-        struct iremap_entry old_ire;
+    old_ire = *entry;
+    ret = cmpxchg16b(entry, &old_ire, new_ire);
 
-        old_ire = *entry;
-        ret = cmpxchg16b(entry, &old_ire, new_ire);
-
-        /*
-         * In the above, we use cmpxchg16 to atomically update the 128-bit
-         * IRTE, and the hardware cannot update the IRTE behind us, so
-         * the return value of cmpxchg16 should be the same as old_ire.
-         * This ASSERT validate it.
-         */
-        ASSERT(ret == old_ire.val);
-    }
-    else
-    {
-        /*
-         * VT-d hardware doesn't update IRTEs behind us, nor the software
-         * since we hold iremap_lock. If the caller wants VT-d hardware to
-         * always see a consistent entry, but we can't meet it, a bug will
-         * be raised.
-         */
-        if ( entry->lo == new_ire->lo )
-            write_atomic(&entry->hi, new_ire->hi);
-        else if ( entry->hi == new_ire->hi )
-            write_atomic(&entry->lo, new_ire->lo);
-        else if ( !atomic )
-            *entry = *new_ire;
-        else
-            BUG();
-    }
+    /*
+     * In the above, we use cmpxchg16 to atomically update the 128-bit
+     * IRTE, and the hardware cannot update the IRTE behind us, so
+     * the return value of cmpxchg16 should be the same as old_ire.
+     * This ASSERT validate it.
+     */
+    ASSERT(ret == old_ire.val);
 }
 
 /* Mark specified intr remap entry as free */
@@ -408,7 +385,6 @@ static int ioapic_rte_to_remap_entry(struct vtd_iommu *iommu,
     /* Indicate remap format. */
     remap_rte->format = 1;
 
-    /* If cmpxchg16b is not available the caller must mask the IO-APIC pin. */
     update_irte(iommu, iremap_entry, &new_ire, !init && !masked);
     iommu_sync_cache(iremap_entry, sizeof(*iremap_entry));
     iommu_flush_iec_index(iommu, 0, index);
@@ -447,38 +423,15 @@ void cf_check io_apic_write_remap_rte(
 {
     struct IO_xAPIC_route_entry old_rte = {}, new_rte;
     struct vtd_iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
-    bool masked = true;
     int rc;
-
-    if ( !cpu_has_cx16 )
-    {
-       /*
-        * Cannot atomically update the IRTE entry: mask the IO-APIC pin to
-        * avoid interrupts seeing an inconsistent IRTE entry.
-        */
-        old_rte = __ioapic_read_entry(apic, pin, true);
-        if ( !old_rte.mask )
-        {
-            masked = false;
-            old_rte.mask = 1;
-            __ioapic_write_entry(apic, pin, true, old_rte);
-        }
-    }
 
     /* Not the initializer, for old gcc to cope. */
     new_rte.raw = rte;
 
     rc = ioapic_rte_to_remap_entry(iommu, apic, pin, &old_rte, new_rte);
     if ( rc )
-    {
-        if ( !masked )
-        {
-            /* Recover the original value of 'mask' bit */
-            old_rte.mask = 0;
-            __ioapic_write_entry(apic, pin, true, old_rte);
-        }
         return;
-    }
+
     /* old_rte will contain the updated IO-APIC RTE on success. */
     __ioapic_write_entry(apic, pin, true, old_rte);
 }
