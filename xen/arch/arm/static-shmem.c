@@ -349,7 +349,7 @@ int __init process_shm_node(const void *fdt, int node, uint32_t address_cells,
 {
     const struct fdt_property *prop, *prop_id, *prop_role;
     const __be32 *cell;
-    paddr_t paddr, gaddr, size;
+    paddr_t paddr, gaddr, size, end;
     struct meminfo *mem = &bootinfo.reserved_mem;
     unsigned int i;
     int len;
@@ -422,6 +422,13 @@ int __init process_shm_node(const void *fdt, int node, uint32_t address_cells,
         return -EINVAL;
     }
 
+    end = paddr + size;
+    if ( end <= paddr )
+    {
+        printk("fdt: static shared memory region %s overflow\n", shm_id);
+        return -EINVAL;
+    }
+
     for ( i = 0; i < mem->nr_banks; i++ )
     {
         /*
@@ -441,30 +448,13 @@ int __init process_shm_node(const void *fdt, int node, uint32_t address_cells,
                 return -EINVAL;
             }
         }
+        else if ( strncmp(shm_id, mem->bank[i].shm_id, MAX_SHM_ID_LENGTH) != 0 )
+            continue;
         else
         {
-            paddr_t end = paddr + size;
-            paddr_t bank_end = mem->bank[i].start + mem->bank[i].size;
-
-            if ( (end <= paddr) || (bank_end <= mem->bank[i].start) )
-            {
-                printk("fdt: static shared memory region %s overflow\n", shm_id);
-                return -EINVAL;
-            }
-
-            if ( check_reserved_regions_overlap(paddr, size) )
-                return -EINVAL;
-            else
-            {
-                if ( strcmp(shm_id, mem->bank[i].shm_id) != 0 )
-                    continue;
-                else
-                {
-                    printk("fdt: different shared memory region could not share the same shm ID %s\n",
-                           shm_id);
-                    return -EINVAL;
-                }
-            }
+            printk("fdt: different shared memory region could not share the same shm ID %s\n",
+                   shm_id);
+            return -EINVAL;
         }
     }
 
@@ -472,6 +462,9 @@ int __init process_shm_node(const void *fdt, int node, uint32_t address_cells,
     {
         if ( i < NR_MEM_BANKS )
         {
+            if ( check_reserved_regions_overlap(paddr, size) )
+                return -EINVAL;
+
             /* Static shared memory shall be reserved from any other use. */
             safe_strcpy(mem->bank[mem->nr_banks].shm_id, shm_id);
             mem->bank[mem->nr_banks].start = paddr;
