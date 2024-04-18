@@ -28,6 +28,12 @@ void early_print_info_shmem(void);
 
 void init_sharedmem_pages(void);
 
+int remove_shm_from_rangeset(const struct kernel_info *kinfo,
+                             struct rangeset *rangeset);
+
+int remove_shm_holes_for_domU(const struct kernel_info *kinfo,
+                              struct membanks *ext_regions);
+
 #else /* !CONFIG_STATIC_SHM */
 
 static inline int make_resv_memory_node(const struct kernel_info *kinfo,
@@ -58,6 +64,18 @@ static inline int process_shm_node(const void *fdt, int node,
 static inline void early_print_info_shmem(void) {};
 
 static inline void init_sharedmem_pages(void) {};
+
+static inline int remove_shm_from_rangeset(const struct kernel_info *kinfo,
+                                           struct rangeset *rangeset)
+{
+    return 0;
+}
+
+static inline int remove_shm_holes_for_domU(const struct kernel_info *kinfo,
+                                            struct membanks *ext_regions)
+{
+    return 0;
+}
 
 #endif /* CONFIG_STATIC_SHM */
 

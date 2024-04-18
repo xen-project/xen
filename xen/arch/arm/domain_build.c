@@ -816,8 +816,8 @@ int __init make_memory_node(const struct domain *d,
     return res;
 }
 
-static int __init add_ext_regions(unsigned long s_gfn, unsigned long e_gfn,
-                                  void *data)
+int __init add_ext_regions(unsigned long s_gfn, unsigned long e_gfn,
+                           void *data)
 {
     struct membanks *ext_regions = data;
     paddr_t start, size;
@@ -990,6 +990,8 @@ static int __init handle_pci_range(const struct dt_device_node *dev,
  * - MMIO
  * - Host RAM
  * - PCI aperture
+ * - Static shared memory regions, which are described by special property
+ *   "xen,shared-mem"
  */
 static int __init find_memory_holes(const struct kernel_info *kinfo,
                                     struct membanks *ext_regions)
@@ -1016,6 +1018,11 @@ static int __init find_memory_holes(const struct kernel_info *kinfo,
                start, end);
         goto out;
     }
+
+    /* Remove static shared memory regions */
+    res = remove_shm_from_rangeset(kinfo, mem_holes);
+    if ( res )
+        goto out;
 
     /*
      * Remove regions described by "reg" and "ranges" properties where
@@ -1109,7 +1116,10 @@ static int __init find_domU_holes(const struct kernel_info *kinfo,
         res = 0;
     }
 
-    return res;
+    if ( res )
+        return res;
+
+    return remove_shm_holes_for_domU(kinfo, ext_regions);
 }
 
 int __init make_hypervisor_node(struct domain *d,

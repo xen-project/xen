@@ -51,6 +51,8 @@ static inline int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
 int prepare_acpi(struct domain *d, struct kernel_info *kinfo);
 #endif
 
+int add_ext_regions(unsigned long s_gfn, unsigned long e_gfn, void *data);
+
 #endif
 
 /*
