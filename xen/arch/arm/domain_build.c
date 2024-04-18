@@ -1640,6 +1640,7 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
         DT_MATCH_PATH("/hypervisor"),
         { /* sentinel */ },
     };
+    static __initdata bool res_mem_node_found = false;
     struct dt_device_node *child;
     int res, i, nirq, irq_id;
     const char *name;
@@ -1734,6 +1735,19 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
     if ( res )
         return res;
 
+    if ( dt_node_path_is_equal(node, "/reserved-memory") )
+    {
+        res_mem_node_found = true;
+        /*
+         * Avoid duplicate /reserved-memory nodes in Device Tree, so add the
+         * static shared memory nodes there.
+         */
+        res = make_shm_resv_memory_node(kinfo, dt_n_addr_cells(node),
+                                        dt_n_size_cells(node));
+        if ( res )
+            return res;
+    }
+
     for ( child = node->child; child != NULL; child = child->sibling )
     {
         res = handle_node(d, kinfo, child, p2mt);
@@ -1786,9 +1800,12 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
                 return res;
         }
 
-        res = make_resv_memory_node(kinfo, addrcells, sizecells);
-        if ( res )
-            return res;
+        if ( !res_mem_node_found )
+        {
+            res = make_resv_memory_node(kinfo, addrcells, sizecells);
+            if ( res )
+                return res;
+        }
     }
 
     res = fdt_end_node(kinfo->fdt);

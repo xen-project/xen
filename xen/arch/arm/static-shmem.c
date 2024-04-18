@@ -297,8 +297,8 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
     return 0;
 }
 
-static int __init make_shm_memory_node(const struct kernel_info *kinfo,
-                                       int addrcells, int sizecells)
+int __init make_shm_resv_memory_node(const struct kernel_info *kinfo,
+                                     int addrcells, int sizecells)
 {
     const struct membanks *mem = &kinfo->shm_mem.common;
     void *fdt = kinfo->fdt;
@@ -306,7 +306,7 @@ static int __init make_shm_memory_node(const struct kernel_info *kinfo,
     int res = 0;
 
     if ( mem->nr_banks == 0 )
-        return -ENOENT;
+        return 0;
 
     /*
      * For each shared memory region, a range is exposed under
@@ -544,7 +544,7 @@ int __init make_resv_memory_node(const struct kernel_info *kinfo, int addrcells,
     if ( res )
         return res;
 
-    res = make_shm_memory_node(kinfo, addrcells, sizecells);
+    res = make_shm_resv_memory_node(kinfo, addrcells, sizecells);
     if ( res )
         return res;
 

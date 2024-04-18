@@ -34,6 +34,9 @@ int remove_shm_from_rangeset(const struct kernel_info *kinfo,
 int remove_shm_holes_for_domU(const struct kernel_info *kinfo,
                               struct membanks *ext_regions);
 
+int make_shm_resv_memory_node(const struct kernel_info *kinfo, int addrcells,
+                              int sizecells);
+
 #else /* !CONFIG_STATIC_SHM */
 
 static inline int make_resv_memory_node(const struct kernel_info *kinfo,
@@ -73,6 +76,12 @@ static inline int remove_shm_from_rangeset(const struct kernel_info *kinfo,
 
 static inline int remove_shm_holes_for_domU(const struct kernel_info *kinfo,
                                             struct membanks *ext_regions)
+{
+    return 0;
+}
+
+static inline int make_shm_resv_memory_node(const struct kernel_info *kinfo,
+                                            int addrcells, int sizecells)
 {
     return 0;
 }
