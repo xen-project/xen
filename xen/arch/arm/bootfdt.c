@@ -511,6 +511,7 @@ static void __init early_print_info(void)
                mem_resv->bank[j].start,
                mem_resv->bank[j].start + mem_resv->bank[j].size - 1);
     }
+    early_print_info_shmem();
     printk("\n");
     for ( i = 0 ; i < cmds->nr_mods; i++ )
         printk("CMDLINE[%"PRIpaddr"]:%s %s\n", cmds->cmdline[i].start,

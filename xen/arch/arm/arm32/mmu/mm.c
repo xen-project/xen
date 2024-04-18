@@ -8,6 +8,7 @@
 #include <xen/pfn.h>
 #include <asm/fixmap.h>
 #include <asm/static-memory.h>
+#include <asm/static-shmem.h>
 
 static unsigned long opt_xenheap_megabytes __initdata;
 integer_param("xenheap_megabytes", opt_xenheap_megabytes);
@@ -43,6 +44,9 @@ static paddr_t __init consider_modules(paddr_t s, paddr_t e,
                                        int first_mod)
 {
     const struct membanks *reserved_mem = bootinfo_get_reserved_mem();
+#ifdef CONFIG_STATIC_SHM
+    const struct membanks *shmem = bootinfo_get_shmem();
+#endif
     const struct bootmodules *mi = &bootinfo.modules;
     int i;
     int nr;
@@ -119,6 +123,25 @@ static paddr_t __init consider_modules(paddr_t s, paddr_t e,
             return consider_modules(s, r_s, size, align, i + 1);
         }
     }
+
+#ifdef CONFIG_STATIC_SHM
+    nr += reserved_mem->nr_banks;
+    for ( ; i - nr < shmem->nr_banks; i++ )
+    {
+        paddr_t r_s = shmem->bank[i - nr].start;
+        paddr_t r_e = r_s + shmem->bank[i - nr].size;
+
+        if ( s < r_e && r_s < e )
+        {
+            r_e = consider_modules(r_e, e, size, align, i + 1);
+            if ( r_e )
+                return r_e;
+
+            return consider_modules(s, r_s, size, align, i + 1);
+        }
+    }
+#endif
+
     return e;
 }
 
@@ -295,6 +318,7 @@ void __init setup_mm(void)
                        mfn_to_maddr(directmap_mfn_end));
 
     init_staticmem_pages();
+    init_sharedmem_pages();
 }
 
 /*

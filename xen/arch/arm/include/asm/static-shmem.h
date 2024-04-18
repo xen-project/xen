@@ -24,6 +24,10 @@ static inline int process_shm_chosen(struct domain *d,
 int process_shm_node(const void *fdt, int node, uint32_t address_cells,
                      uint32_t size_cells);
 
+void early_print_info_shmem(void);
+
+void init_sharedmem_pages(void);
+
 #else /* !CONFIG_STATIC_SHM */
 
 static inline int make_resv_memory_node(const struct kernel_info *kinfo,
@@ -50,6 +54,10 @@ static inline int process_shm_node(const void *fdt, int node,
     printk("CONFIG_STATIC_SHM must be enabled for parsing static shared memory nodes\n");
     return -EINVAL;
 }
+
+static inline void early_print_info_shmem(void) {};
+
+static inline void init_sharedmem_pages(void) {};
 
 #endif /* CONFIG_STATIC_SHM */
 

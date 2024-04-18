@@ -40,7 +40,7 @@ struct kernel_info {
     paddr_t unassigned_mem; /* RAM not (yet) assigned to a bank */
     struct meminfo mem;
 #ifdef CONFIG_STATIC_SHM
-    struct meminfo shm_mem;
+    struct shared_meminfo shm_mem;
 #endif
 
     /* kernel entry point */
@@ -83,7 +83,7 @@ struct kernel_info {
 #define kernel_info_get_mem(kinfo) (&(kinfo)->mem.common)
 
 #ifdef CONFIG_STATIC_SHM
-#define KERNEL_INFO_SHM_MEM_INIT .shm_mem.common.max_banks = NR_MEM_BANKS,
+#define KERNEL_INFO_SHM_MEM_INIT .shm_mem.common.max_banks = NR_SHMEM_BANKS,
 #else
 #define KERNEL_INFO_SHM_MEM_INIT
 #endif

@@ -863,6 +863,7 @@ static int __init add_ext_regions(unsigned long s_gfn, unsigned long e_gfn,
  * regions we exclude every region assigned to Dom0 from the Host RAM:
  * - domain RAM
  * - reserved-memory
+ * - static shared memory
  * - grant table space
  */
 static int __init find_unallocated_memory(const struct kernel_info *kinfo,
@@ -872,6 +873,9 @@ static int __init find_unallocated_memory(const struct kernel_info *kinfo,
     const struct membanks *mem_banks[] = {
         kernel_info_get_mem(kinfo),
         bootinfo_get_reserved_mem(),
+#ifdef CONFIG_STATIC_SHM
+        bootinfo_get_shmem(),
+#endif
     };
     struct rangeset *unalloc_mem;
     paddr_t start, end;
@@ -903,6 +907,7 @@ static int __init find_unallocated_memory(const struct kernel_info *kinfo,
      * Exclude the following regions:
      * 1) Remove RAM assigned to Dom0
      * 2) Remove reserved memory
+     * 3) Remove static shared memory (when the feature is enabled)
      */
     for ( i = 0; i < ARRAY_SIZE(mem_banks); i++ )
         for ( j = 0; j < mem_banks[i]->nr_banks; j++ )

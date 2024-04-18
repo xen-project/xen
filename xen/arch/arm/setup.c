@@ -208,6 +208,9 @@ static void __init dt_unreserved_regions(paddr_t s, paddr_t e,
                                          unsigned int first)
 {
     const struct membanks *reserved_mem = bootinfo_get_reserved_mem();
+#ifdef CONFIG_STATIC_SHM
+    const struct membanks *shmem = bootinfo_get_shmem();
+#endif
     unsigned int i, nr;
     int rc;
 
@@ -257,6 +260,22 @@ static void __init dt_unreserved_regions(paddr_t s, paddr_t e,
             return;
         }
     }
+
+#ifdef CONFIG_STATIC_SHM
+    nr += reserved_mem->nr_banks;
+    for ( ; i - nr < shmem->nr_banks; i++ )
+    {
+        paddr_t r_s = shmem->bank[i - nr].start;
+        paddr_t r_e = r_s + shmem->bank[i - nr].size;
+
+        if ( s < r_e && r_s < e )
+        {
+            dt_unreserved_regions(r_e, e, cb, i + 1);
+            dt_unreserved_regions(s, r_s, cb, i + 1);
+            return;
+        }
+    }
+#endif
 
     cb(s, e);
 }
@@ -345,12 +364,16 @@ bool __init check_reserved_regions_overlap(paddr_t region_start,
 #ifdef CONFIG_ACPI
         bootinfo_get_acpi(),
 #endif
+#ifdef CONFIG_STATIC_SHM
+        bootinfo_get_shmem(),
+#endif
     };
     unsigned int i;
 
     /*
      * Check if input region is overlapping with reserved memory banks or
-     * ACPI EfiACPIReclaimMemory (when ACPI feature is enabled)
+     * ACPI EfiACPIReclaimMemory (when ACPI feature is enabled) or static
+     * shared memory banks (when static shared memory feature is enabled)
      */
     for ( i = 0; i < ARRAY_SIZE(mem_banks); i++ )
         if ( meminfo_overlap_check(mem_banks[i], region_start, region_size) )

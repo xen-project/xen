@@ -6,6 +6,7 @@
 
 #include <asm/setup.h>
 #include <asm/static-memory.h>
+#include <asm/static-shmem.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef virt_to_mfn
@@ -236,6 +237,7 @@ void __init setup_mm(void)
     max_page = PFN_DOWN(ram_end);
 
     init_staticmem_pages();
+    init_sharedmem_pages();
 }
 
 /*

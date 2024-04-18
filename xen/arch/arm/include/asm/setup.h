@@ -9,6 +9,7 @@
 #define MAX_FDT_SIZE SZ_2M
 
 #define NR_MEM_BANKS 256
+#define NR_SHMEM_BANKS 32
 
 #define MAX_MODULES 32 /* Current maximum useful modules */
 
@@ -46,14 +47,20 @@ enum membank_type {
 /* Indicates the maximum number of characters(\0 included) for shm_id */
 #define MAX_SHM_ID_LENGTH 16
 
+struct shmem_membank_extra {
+    char shm_id[MAX_SHM_ID_LENGTH];
+    unsigned int nr_shm_borrowers;
+};
+
 struct membank {
     paddr_t start;
     paddr_t size;
-    enum membank_type type;
+    union {
+        enum membank_type type;
 #ifdef CONFIG_STATIC_SHM
-    char shm_id[MAX_SHM_ID_LENGTH];
-    unsigned int nr_shm_borrowers;
+        struct shmem_membank_extra *shmem_extra;
 #endif
+    };
 };
 
 struct membanks {
@@ -65,6 +72,12 @@ struct membanks {
 struct meminfo {
     struct membanks common;
     struct membank bank[NR_MEM_BANKS];
+};
+
+struct shared_meminfo {
+    struct membanks common;
+    struct membank bank[NR_SHMEM_BANKS];
+    struct shmem_membank_extra extra[NR_SHMEM_BANKS];
 };
 
 /*
@@ -110,6 +123,9 @@ struct bootinfo {
 #ifdef CONFIG_ACPI
     struct meminfo acpi;
 #endif
+#ifdef CONFIG_STATIC_SHM
+    struct shared_meminfo shmem;
+#endif
     bool static_heap;
 };
 
@@ -119,11 +135,18 @@ struct bootinfo {
 #define BOOTINFO_ACPI_INIT
 #endif
 
+#ifdef CONFIG_STATIC_SHM
+#define BOOTINFO_SHMEM_INIT .shmem.common.max_banks = NR_SHMEM_BANKS,
+#else
+#define BOOTINFO_SHMEM_INIT
+#endif
+
 #define BOOTINFO_INIT                               \
 {                                                   \
     .mem.common.max_banks = NR_MEM_BANKS,           \
     .reserved_mem.common.max_banks = NR_MEM_BANKS,  \
     BOOTINFO_ACPI_INIT                              \
+    BOOTINFO_SHMEM_INIT                             \
 }
 
 struct map_range_data
@@ -155,6 +178,18 @@ static inline struct membanks *bootinfo_get_reserved_mem(void)
 static inline struct membanks *bootinfo_get_acpi(void)
 {
     return &bootinfo.acpi.common;
+}
+#endif
+
+#ifdef CONFIG_STATIC_SHM
+static inline struct membanks *bootinfo_get_shmem(void)
+{
+    return &bootinfo.shmem.common;
+}
+
+static inline struct shmem_membank_extra *bootinfo_get_shmem_extra(void)
+{
+    return bootinfo.shmem.extra;
 }
 #endif
 
