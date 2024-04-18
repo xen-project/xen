@@ -340,24 +340,26 @@ void __init fw_unreserved_regions(paddr_t s, paddr_t e,
 bool __init check_reserved_regions_overlap(paddr_t region_start,
                                            paddr_t region_size)
 {
+    const struct membanks *mem_banks[] = {
+        bootinfo_get_reserved_mem(),
+#ifdef CONFIG_ACPI
+        bootinfo_get_acpi(),
+#endif
+    };
+    unsigned int i;
+
     /*
-     * Check if input region is overlapping with bootinfo_get_reserved_mem()
-     * banks
+     * Check if input region is overlapping with reserved memory banks or
+     * ACPI EfiACPIReclaimMemory (when ACPI feature is enabled)
      */
-    if ( meminfo_overlap_check(bootinfo_get_reserved_mem(),
-                               region_start, region_size) )
-        return true;
+    for ( i = 0; i < ARRAY_SIZE(mem_banks); i++ )
+        if ( meminfo_overlap_check(mem_banks[i], region_start, region_size) )
+            return true;
 
     /* Check if input region is overlapping with bootmodules */
     if ( bootmodules_overlap_check(&bootinfo.modules,
                                    region_start, region_size) )
         return true;
-
-#ifdef CONFIG_ACPI
-    /* Check if input region is overlapping with ACPI EfiACPIReclaimMemory */
-    if ( meminfo_overlap_check(bootinfo_get_acpi(), region_start, region_size) )
-        return true;
-#endif
 
     return false;
 }
