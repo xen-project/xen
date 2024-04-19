@@ -296,6 +296,12 @@ Deviations related to MISRA C:2012 Rules:
        therefore have the same behavior of a boolean.
      - Project-wide deviation; tagged as `deliberate` for ECLAIR.
 
+   * - R16.2
+     - Complying with the Rule would entail a lot of code duplication in the
+       implementation of the x86 emulator, therefore it is deemed better to
+       leave such files as is.
+     - Tagged as `deliberate` for ECLAIR.
+
    * - R16.3
      - Switch clauses ending with continue, goto, return statements are safe.
      - Tagged as `safe` for ECLAIR.

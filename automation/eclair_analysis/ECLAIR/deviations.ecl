@@ -353,6 +353,13 @@ therefore have the same behavior of a boolean"
 # Series 16.
 #
 
+-doc_begin="Complying with the Rule would entail a lot of code duplication in the implementation of the x86 emulator,
+therefore it is deemed better to leave such files as is."
+-file_tag+={x86_emulate,"^xen/arch/x86/x86_emulate/.*$"}
+-file_tag+={x86_svm_emulate,"^xen/arch/x86/hvm/svm/emulate\\.c$"}
+-config=MC3R1.R16.2,reports+={deliberate, "any_area(any_loc(file(x86_emulate||x86_svm_emulate)))"}
+-doc_end
+
 -doc_begin="Switch clauses ending with continue, goto, return statements are
 safe."
 -config=MC3R1.R16.3,terminals+={safe, "node(continue_stmt||goto_stmt||return_stmt)"}
