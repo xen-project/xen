@@ -562,6 +562,7 @@ func (dt DomainType) String() (str string) {
 }
 
 // const char *libxl_scheduler_to_string(libxl_scheduler p);
+
 func (s Scheduler) String() string {
 	cs := C.libxl_scheduler_to_string(C.libxl_scheduler(s))
 	// No need to free const return value
@@ -570,6 +571,7 @@ func (s Scheduler) String() string {
 }
 
 // int libxl_scheduler_from_string(const char *s, libxl_scheduler *e);
+
 func (s *Scheduler) FromString(gstr string) (err error) {
 	*s, err = SchedulerFromString(gstr)
 	return
@@ -594,6 +596,7 @@ func SchedulerFromString(name string) (s Scheduler, err error) {
 
 // libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx*, int *nb_pool_out);
 // void libxl_cpupoolinfo_list_free(libxl_cpupoolinfo *list, int nb_pool);
+
 func (ctx *Context) ListCpupool() (list []Cpupoolinfo) {
 	var nbPool C.int
 
@@ -617,6 +620,7 @@ func (ctx *Context) ListCpupool() (list []Cpupoolinfo) {
 }
 
 // int libxl_cpupool_info(libxl_ctx *ctx, libxl_cpupoolinfo *info, uint32_t poolid);
+
 func (ctx *Context) CpupoolInfo(Poolid uint32) (pool Cpupoolinfo, err error) {
 	var c_cpupool C.libxl_cpupoolinfo
 
@@ -638,6 +642,7 @@ func (ctx *Context) CpupoolInfo(Poolid uint32) (pool Cpupoolinfo, err error) {
 //                          uint32_t *poolid);
 // FIXME: uuid
 // FIXME: Setting poolid
+
 func (ctx *Context) CpupoolCreate(Name string, Scheduler Scheduler, Cpumap Bitmap) (err error, Poolid uint32) {
 	poolid := C.uint32_t(C.LIBXL_CPUPOOL_POOLID_ANY)
 	name := C.CString(Name)
@@ -666,6 +671,7 @@ func (ctx *Context) CpupoolCreate(Name string, Scheduler Scheduler, Cpumap Bitma
 }
 
 // int libxl_cpupool_destroy(libxl_ctx *ctx, uint32_t poolid);
+
 func (ctx *Context) CpupoolDestroy(Poolid uint32) (err error) {
 	ret := C.libxl_cpupool_destroy(ctx.ctx, C.uint32_t(Poolid))
 	if ret != 0 {
@@ -677,6 +683,7 @@ func (ctx *Context) CpupoolDestroy(Poolid uint32) (err error) {
 }
 
 // int libxl_cpupool_cpuadd(libxl_ctx *ctx, uint32_t poolid, int cpu);
+
 func (ctx *Context) CpupoolCpuadd(Poolid uint32, Cpu int) (err error) {
 	ret := C.libxl_cpupool_cpuadd(ctx.ctx, C.uint32_t(Poolid), C.int(Cpu))
 	if ret != 0 {
@@ -689,6 +696,7 @@ func (ctx *Context) CpupoolCpuadd(Poolid uint32, Cpu int) (err error) {
 
 // int libxl_cpupool_cpuadd_cpumap(libxl_ctx *ctx, uint32_t poolid,
 //                                 const libxl_bitmap *cpumap);
+
 func (ctx *Context) CpupoolCpuaddCpumap(Poolid uint32, Cpumap Bitmap) (err error) {
 	var cbm C.libxl_bitmap
 	if err = Cpumap.toC(&cbm); err != nil {
@@ -706,6 +714,7 @@ func (ctx *Context) CpupoolCpuaddCpumap(Poolid uint32, Cpumap Bitmap) (err error
 }
 
 // int libxl_cpupool_cpuremove(libxl_ctx *ctx, uint32_t poolid, int cpu);
+
 func (ctx *Context) CpupoolCpuremove(Poolid uint32, Cpu int) (err error) {
 	ret := C.libxl_cpupool_cpuremove(ctx.ctx, C.uint32_t(Poolid), C.int(Cpu))
 	if ret != 0 {
@@ -718,6 +727,7 @@ func (ctx *Context) CpupoolCpuremove(Poolid uint32, Cpu int) (err error) {
 
 // int libxl_cpupool_cpuremove_cpumap(libxl_ctx *ctx, uint32_t poolid,
 //                                    const libxl_bitmap *cpumap);
+
 func (ctx *Context) CpupoolCpuremoveCpumap(Poolid uint32, Cpumap Bitmap) (err error) {
 	var cbm C.libxl_bitmap
 	if err = Cpumap.toC(&cbm); err != nil {
@@ -735,6 +745,7 @@ func (ctx *Context) CpupoolCpuremoveCpumap(Poolid uint32, Cpumap Bitmap) (err er
 }
 
 // int libxl_cpupool_rename(libxl_ctx *ctx, const char *name, uint32_t poolid);
+
 func (ctx *Context) CpupoolRename(Name string, Poolid uint32) (err error) {
 	name := C.CString(Name)
 	defer C.free(unsafe.Pointer(name))
@@ -749,6 +760,7 @@ func (ctx *Context) CpupoolRename(Name string, Poolid uint32) (err error) {
 }
 
 // int libxl_cpupool_cpuadd_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus);
+
 func (ctx *Context) CpupoolCpuaddNode(Poolid uint32, Node int) (Cpus int, err error) {
 	ccpus := C.int(0)
 
@@ -764,6 +776,7 @@ func (ctx *Context) CpupoolCpuaddNode(Poolid uint32, Node int) (Cpus int, err er
 }
 
 // int libxl_cpupool_cpuremove_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus);
+
 func (ctx *Context) CpupoolCpuremoveNode(Poolid uint32, Node int) (Cpus int, err error) {
 	ccpus := C.int(0)
 
@@ -779,6 +792,7 @@ func (ctx *Context) CpupoolCpuremoveNode(Poolid uint32, Node int) (Cpus int, err
 }
 
 // int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid);
+
 func (ctx *Context) CpupoolMovedomain(Poolid uint32, Id Domid) (err error) {
 	ret := C.libxl_cpupool_movedomain(ctx.ctx, C.uint32_t(Poolid), C.uint32_t(Id))
 	if ret != 0 {
@@ -792,6 +806,7 @@ func (ctx *Context) CpupoolMovedomain(Poolid uint32, Id Domid) (err error) {
 //
 // Utility functions
 //
+
 func (ctx *Context) CpupoolFindByName(name string) (info Cpupoolinfo, found bool) {
 	plist := ctx.ListCpupool()
 
@@ -940,6 +955,7 @@ func (bm Bitmap) String() (s string) {
 }
 
 //int libxl_get_max_cpus(libxl_ctx *ctx);
+
 func (ctx *Context) GetMaxCpus() (maxCpus int, err error) {
 	ret := C.libxl_get_max_cpus(ctx.ctx)
 	if ret < 0 {
@@ -951,6 +967,7 @@ func (ctx *Context) GetMaxCpus() (maxCpus int, err error) {
 }
 
 //int libxl_get_online_cpus(libxl_ctx *ctx);
+
 func (ctx *Context) GetOnlineCpus() (onCpus int, err error) {
 	ret := C.libxl_get_online_cpus(ctx.ctx)
 	if ret < 0 {
@@ -962,6 +979,7 @@ func (ctx *Context) GetOnlineCpus() (onCpus int, err error) {
 }
 
 //int libxl_get_max_nodes(libxl_ctx *ctx);
+
 func (ctx *Context) GetMaxNodes() (maxNodes int, err error) {
 	ret := C.libxl_get_max_nodes(ctx.ctx)
 	if ret < 0 {
@@ -973,6 +991,7 @@ func (ctx *Context) GetMaxNodes() (maxNodes int, err error) {
 }
 
 //int libxl_get_free_memory(libxl_ctx *ctx, uint64_t *memkb);
+
 func (ctx *Context) GetFreeMemory() (memkb uint64, err error) {
 	var cmem C.uint64_t
 	ret := C.libxl_get_free_memory(ctx.ctx, &cmem)
@@ -988,6 +1007,7 @@ func (ctx *Context) GetFreeMemory() (memkb uint64, err error) {
 }
 
 //int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
+
 func (ctx *Context) GetPhysinfo() (physinfo *Physinfo, err error) {
 	var cphys C.libxl_physinfo
 	C.libxl_physinfo_init(&cphys)
@@ -1006,6 +1026,7 @@ func (ctx *Context) GetPhysinfo() (physinfo *Physinfo, err error) {
 }
 
 //const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx);
+
 func (ctx *Context) GetVersionInfo() (info *VersionInfo, err error) {
 	var cinfo *C.libxl_version_info
 
@@ -1045,6 +1066,7 @@ func (ctx *Context) DomainUnpause(Id Domid) (err error) {
 }
 
 //int libxl_domain_pause(libxl_ctx *ctx, uint32_t domain);
+
 func (ctx *Context) DomainPause(id Domid) (err error) {
 	ret := C.libxl_domain_pause(ctx.ctx, C.uint32_t(id), nil)
 
@@ -1055,6 +1077,7 @@ func (ctx *Context) DomainPause(id Domid) (err error) {
 }
 
 //int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid);
+
 func (ctx *Context) DomainShutdown(id Domid) (err error) {
 	ret := C.libxl_domain_shutdown(ctx.ctx, C.uint32_t(id), nil)
 
@@ -1065,6 +1088,7 @@ func (ctx *Context) DomainShutdown(id Domid) (err error) {
 }
 
 //int libxl_domain_reboot(libxl_ctx *ctx, uint32_t domid);
+
 func (ctx *Context) DomainReboot(id Domid) (err error) {
 	ret := C.libxl_domain_reboot(ctx.ctx, C.uint32_t(id), nil)
 
@@ -1076,6 +1100,7 @@ func (ctx *Context) DomainReboot(id Domid) (err error) {
 
 //libxl_dominfo * libxl_list_domain(libxl_ctx*, int *nb_domain_out);
 //void libxl_dominfo_list_free(libxl_dominfo *list, int nb_domain);
+
 func (ctx *Context) ListDomain() (glist []Dominfo) {
 	var nbDomain C.int
 	clist := C.libxl_list_domain(ctx.ctx, &nbDomain)
@@ -1098,6 +1123,7 @@ func (ctx *Context) ListDomain() (glist []Dominfo) {
 //libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
 //				int *nb_vcpu, int *nr_cpus_out);
 //void libxl_vcpuinfo_list_free(libxl_vcpuinfo *, int nr_vcpus);
+
 func (ctx *Context) ListVcpu(id Domid) (glist []Vcpuinfo) {
 	var nbVcpu C.int
 	var nrCpu C.int
@@ -1128,6 +1154,7 @@ func (ct ConsoleType) String() (str string) {
 
 //int libxl_console_get_tty(libxl_ctx *ctx, uint32_t domid, int cons_num,
 //libxl_console_type type, char **path);
+
 func (ctx *Context) ConsoleGetTty(id Domid, consNum int, conType ConsoleType) (path string, err error) {
 	var cpath *C.char
 	ret := C.libxl_console_get_tty(ctx.ctx, C.uint32_t(id), C.int(consNum), C.libxl_console_type(conType), &cpath)
@@ -1143,6 +1170,7 @@ func (ctx *Context) ConsoleGetTty(id Domid, consNum int, conType ConsoleType) (p
 
 //int libxl_primary_console_get_tty(libxl_ctx *ctx, uint32_t domid_vm,
 //					char **path);
+
 func (ctx *Context) PrimaryConsoleGetTty(domid uint32) (path string, err error) {
 	var cpath *C.char
 	ret := C.libxl_primary_console_get_tty(ctx.ctx, C.uint32_t(domid), &cpath)
