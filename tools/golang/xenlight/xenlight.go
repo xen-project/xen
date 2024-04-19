@@ -999,6 +999,7 @@ func (ctx *Context) GetPhysinfo() (physinfo *Physinfo, err error) {
 		err = Error(ret)
 		return
 	}
+	physinfo = &Physinfo{}
 	err = physinfo.fromC(&cphys)
 
 	return
@@ -1010,6 +1011,7 @@ func (ctx *Context) GetVersionInfo() (info *VersionInfo, err error) {
 
 	cinfo = C.libxl_get_version_info(ctx.ctx)
 
+	info = &VersionInfo{}
 	err = info.fromC(cinfo)
 
 	return
@@ -1027,6 +1029,7 @@ func (ctx *Context) DomainInfo(Id Domid) (di *Dominfo, err error) {
 		return
 	}
 
+	di = &Dominfo{}
 	err = di.fromC(&cdi)
 
 	return
