@@ -47,6 +47,7 @@ enum mcheck_type amd_mcheck_init(const struct cpuinfo_x86 *c, bool bsp);
 enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool bsp);
 
 void amd_nonfatal_mcheck_init(struct cpuinfo_x86 *c);
+void intel_nonfatal_mcheck_init(struct cpuinfo_x86 *c);
 
 extern unsigned int firstbank;
 extern unsigned int ppin_msr;

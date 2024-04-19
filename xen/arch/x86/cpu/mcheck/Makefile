@@ -2,6 +2,7 @@ obj-y += amd_nonfatal.o
 obj-y += mce_amd.o
 obj-y += mcaction.o
 obj-y += barrier.o
+obj-y += intel-nonfatal.o
 obj-y += mctelem.o
 obj-y += mce.o
 obj-y += mce-apei.o
