@@ -15,6 +15,12 @@
 
 void enable_mmu(void);
 
+#ifdef CONFIG_DEBUG
+#define radix_dprintk(msg, ...) printk(XENLOG_DEBUG msg, ## __VA_ARGS__)
+#else
+#define radix_dprintk(...)
+#endif
+
 #define INITIAL_LVL1_PD_COUNT      1
 #define INITIAL_LVL2_LVL3_PD_COUNT 2
 #define INITIAL_LVL4_PT_COUNT      256
@@ -78,45 +84,6 @@ static __init struct lvl4_pt *lvl4_pt_pool_alloc(void)
     }
 
     return &initial_lvl4_pt_pool[initial_lvl4_pt_pool_used++];
-}
-
-#ifndef NDEBUG
-/* TODO: Remove once we get common/ building */
-static char *__init itoa64_hex(uint64_t val, char *out_buf, size_t buf_len)
-{
-    uint64_t cur;
-    size_t i = buf_len - 1;
-
-    /* Null terminate buffer */
-    out_buf[i] = '\0';
-
-    /* Add digits in reverse */
-    cur = val;
-    while ( cur && i > 0 )
-    {
-        out_buf[--i] = "0123456789ABCDEF"[cur % 16];
-        cur /= 16;
-    }
-
-    /* Pad to 16 digits */
-    while ( i > 0 )
-        out_buf[--i] = '0';
-
-    return out_buf + i;
-}
-#endif
-
-static void __init radix_dprint(uint64_t addr, const char *msg)
-{
-#ifndef NDEBUG
-    char buf[sizeof("DEADBEEFCAFEBABA")];
-    char *addr_s = itoa64_hex(addr, buf, sizeof(buf));
-
-    early_printk("(0x");
-    early_printk(addr_s);
-    early_printk(") ");
-    early_printk(msg);
-#endif
 }
 
 static void __init setup_initial_mapping(struct lvl1_pd *lvl1,
@@ -186,27 +153,26 @@ static void __init setup_initial_mapping(struct lvl1_pd *lvl1,
             unsigned long paddr = (page_addr - map_start) + phys_base;
             unsigned long flags;
 
-            radix_dprint(paddr, "being mapped to ");
-            radix_dprint(page_addr, "!\n");
+            radix_dprintk("%016lx being mapped to %016lx\n", paddr, page_addr);
             if ( is_kernel_text(page_addr) || is_kernel_inittext(page_addr) )
             {
-                radix_dprint(page_addr, "being marked as TEXT (RX)\n");
+                radix_dprintk("%016lx being marked as TEXT (RX)\n", page_addr);
                 flags = PTE_XEN_RX;
             }
             else if ( is_kernel_rodata(page_addr) )
             {
-                radix_dprint(page_addr, "being marked as RODATA (RO)\n");
+                radix_dprintk("%016lx being marked as RODATA (RO)\n", page_addr);
                 flags = PTE_XEN_RO;
             }
             else
             {
-                radix_dprint(page_addr, "being marked as DEFAULT (RW)\n");
+                radix_dprintk("%016lx being marked as DEFAULT (RW)\n", page_addr);
                 flags = PTE_XEN_RW;
             }
 
             *pte = paddr_to_pte(paddr, flags);
-            radix_dprint(paddr_to_pte(paddr, flags).pte,
-                             "is result of PTE map!\n");
+            radix_dprintk("%016lx is the result of PTE map\n",
+                paddr_to_pte(paddr, flags).pte);
         }
         else
         {
