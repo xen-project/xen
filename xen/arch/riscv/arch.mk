@@ -11,9 +11,14 @@ riscv-march-$(CONFIG_RISCV_ISA_C)       := $(riscv-march-y)c
 
 riscv-generic-flags := $(riscv-abi-y) -march=$(riscv-march-y)
 
-zbb := $(call as-insn,$(CC) $(riscv-generic-flags)_zbb,"",_zbb)
-zihintpause := $(call as-insn, \
-                      $(CC) $(riscv-generic-flags)_zihintpause,"pause",_zihintpause)
+# check-extension: Check whether extenstion is supported by a compiler and
+#                  an assembler.
+# Usage: $(call check-extension,extension_name,"instr")
+check-extension = $(call as-insn,$(CC) $(riscv-generic-flags)_$(1),$(2),_$(1))
+
+zbb-insn := "andn t0, t0, t0"
+zbb := $(call check-extension,zbb,$(zbb-insn))
+zihintpause := $(call check-extension,zihintpause,"pause")
 
 extensions := $(zbb) $(zihintpause)
 
