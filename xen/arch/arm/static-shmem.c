@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
+#include <xen/device_tree.h>
 #include <xen/libfdt/libfdt.h>
 #include <xen/rangeset.h>
 #include <xen/sched.h>
@@ -666,6 +667,28 @@ int __init remove_shm_holes_for_domU(const struct kernel_info *kinfo,
     rangeset_destroy(guest_holes);
 
     return res;
+}
+
+void __init shm_mem_node_fill_reg_range(const struct kernel_info *kinfo,
+                                        __be32 *reg, int *nr_cells,
+                                        int addrcells, int sizecells)
+{
+    const struct membanks *mem = &kinfo->shm_mem.common;
+    unsigned int i;
+    __be32 *cells;
+
+    BUG_ON(!nr_cells || !reg);
+
+    cells = &reg[*nr_cells];
+    for ( i = 0; i < mem->nr_banks; i++ )
+    {
+        paddr_t start = mem->bank[i].start;
+        paddr_t size = mem->bank[i].size;
+
+        *nr_cells += addrcells + sizecells;
+        BUG_ON(*nr_cells >= DT_MEM_NODE_REG_RANGE_SIZE);
+        dt_child_set_range(&cells, addrcells, sizecells, start, size);
+    }
 }
 
 /*

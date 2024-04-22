@@ -3,9 +3,14 @@
 #ifndef __ASM_STATIC_SHMEM_H_
 #define __ASM_STATIC_SHMEM_H_
 
+#include <xen/types.h>
 #include <asm/kernel.h>
+#include <asm/setup.h>
 
 #ifdef CONFIG_STATIC_SHM
+
+/* Worst case /memory node reg element: (addrcells + sizecells) */
+#define DT_MEM_NODE_REG_RANGE_SIZE ((NR_MEM_BANKS + NR_SHMEM_BANKS) * 4)
 
 int make_resv_memory_node(const struct kernel_info *kinfo, int addrcells,
                           int sizecells);
@@ -37,7 +42,13 @@ int remove_shm_holes_for_domU(const struct kernel_info *kinfo,
 int make_shm_resv_memory_node(const struct kernel_info *kinfo, int addrcells,
                               int sizecells);
 
+void shm_mem_node_fill_reg_range(const struct kernel_info *kinfo, __be32 *reg,
+                                 int *nr_cells, int addrcells, int sizecells);
+
 #else /* !CONFIG_STATIC_SHM */
+
+/* Worst case /memory node reg element: (addrcells + sizecells) */
+#define DT_MEM_NODE_REG_RANGE_SIZE (NR_MEM_BANKS * 4)
 
 static inline int make_resv_memory_node(const struct kernel_info *kinfo,
                                         int addrcells, int sizecells)
@@ -85,6 +96,10 @@ static inline int make_shm_resv_memory_node(const struct kernel_info *kinfo,
 {
     return 0;
 }
+
+static inline void shm_mem_node_fill_reg_range(const struct kernel_info *kinfo,
+                                               __be32 *reg, int *nr_cells,
+                                               int addrcells, int sizecells) {};
 
 #endif /* CONFIG_STATIC_SHM */
 

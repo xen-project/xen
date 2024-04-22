@@ -756,15 +756,14 @@ int __init domain_fdt_begin_node(void *fdt, const char *name, uint64_t unit)
     return fdt_begin_node(fdt, buf);
 }
 
-int __init make_memory_node(const struct domain *d,
-                            void *fdt,
-                            int addrcells, int sizecells,
-                            const struct membanks *mem)
+int __init make_memory_node(const struct kernel_info *kinfo, int addrcells,
+                            int sizecells, const struct membanks *mem)
 {
+    void *fdt = kinfo->fdt;
     unsigned int i;
     int res, reg_size = addrcells + sizecells;
     int nr_cells = 0;
-    __be32 reg[NR_MEM_BANKS * 4 /* Worst case addrcells + sizecells */];
+    __be32 reg[DT_MEM_NODE_REG_RANGE_SIZE];
     __be32 *cells;
 
     if ( mem->nr_banks == 0 )
@@ -797,12 +796,26 @@ int __init make_memory_node(const struct domain *d,
         if ( mem->bank[i].type == MEMBANK_STATIC_DOMAIN )
             continue;
 
-        dt_dprintk("  Bank %d: %#"PRIx64"->%#"PRIx64"\n",
-                   i, start, start + size);
-
         nr_cells += reg_size;
         BUG_ON(nr_cells >= ARRAY_SIZE(reg));
         dt_child_set_range(&cells, addrcells, sizecells, start, size);
+    }
+
+    /*
+     * static shared memory banks need to be listed as /memory node, so when
+     * this function is handling the normal memory, add the banks.
+     */
+    if ( mem == kernel_info_get_mem(kinfo) )
+        shm_mem_node_fill_reg_range(kinfo, reg, &nr_cells, addrcells,
+                                    sizecells);
+
+    for ( cells = reg, i = 0; cells < reg + nr_cells; i++, cells += reg_size )
+    {
+        uint64_t start = dt_read_number(cells, addrcells);
+        uint64_t size = dt_read_number(cells + addrcells, sizecells);
+
+        dt_dprintk("  Bank %u: %#"PRIx64"->%#"PRIx64"\n",
+                   i, start, start + size);
     }
 
     dt_dprintk("(reg size %d, nr cells %d)\n", reg_size, nr_cells);
@@ -1783,7 +1796,7 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
         if ( res )
             return res;
 
-        res = make_memory_node(d, kinfo->fdt, addrcells, sizecells,
+        res = make_memory_node(kinfo, addrcells, sizecells,
                                kernel_info_get_mem(kinfo));
         if ( res )
             return res;
@@ -1794,8 +1807,7 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
          */
         if ( reserved_mem->nr_banks > 0 )
         {
-            res = make_memory_node(d, kinfo->fdt, addrcells, sizecells,
-                                   reserved_mem);
+            res = make_memory_node(kinfo, addrcells, sizecells, reserved_mem);
             if ( res )
                 return res;
         }

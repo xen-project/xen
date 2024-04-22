@@ -642,7 +642,7 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     if ( ret )
         goto err;
 
-    ret = make_memory_node(d, kinfo->fdt, addrcells, sizecells,
+    ret = make_memory_node(kinfo, addrcells, sizecells,
                            kernel_info_get_mem(kinfo));
     if ( ret )
         goto err;
