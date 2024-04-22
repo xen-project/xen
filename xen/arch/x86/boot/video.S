@@ -26,32 +26,13 @@
 /* Force 400 scan lines for standard modes (hack to fix bad BIOS behaviour */
 #undef CONFIG_VIDEO_400_HACK
 
-/* Positions of various video parameters passed to the kernel */
-/* (see also include/linux/tty.h) */
-#define PARAM_CURSOR_POS        0x00
-#define PARAM_VIDEO_MODE        0x02
-#define PARAM_VIDEO_COLS        0x03
-#define PARAM_VIDEO_LINES       0x04
-#define PARAM_HAVE_VGA          0x05
-#define PARAM_FONT_POINTS       0x06
-#define PARAM_CAPABILITIES      0x08
-#define PARAM_LFB_LINELENGTH    0x0c
-#define PARAM_LFB_WIDTH         0x0e
-#define PARAM_LFB_HEIGHT        0x10
-#define PARAM_LFB_DEPTH         0x12
-#define PARAM_LFB_BASE          0x14
-#define PARAM_LFB_SIZE          0x18
-#define PARAM_LFB_COLORS        0x1c
-#define PARAM_VESAPM_SEG        0x24
-#define PARAM_VESAPM_OFF        0x26
-#define PARAM_VESA_ATTRIB       0x28
 #define _param(param) bootsym(boot_vid_info)+(param)
 
 video:  xorw    %ax, %ax
         movw    %ax, %gs        # GS is zero
         cld
         call    basic_detect    # Basic adapter type testing (EGA/VGA/MDA/CGA)
-        cmpb    $0,_param(PARAM_HAVE_VGA)
+        cmpb    $0, _param(BVI_have_vga)
         je      1f                # Bail if there's no VGA
         movw    bootsym(boot_vid_mode), %ax     # User selected video mode
         cmpw    $ASK_VGA, %ax                   # Bring up the menu
@@ -69,7 +50,7 @@ vid1:   call    store_edid
 
 # Detect if we have CGA, MDA, EGA or VGA and pass it to the kernel.
 basic_detect:
-        movb    $0, _param(PARAM_HAVE_VGA)
+        movb    $0, _param(BVI_have_vga)
         movb    $0x12, %ah                      # Check EGA/VGA
         movb    $0x10, %bl
         int     $0x10
@@ -79,7 +60,7 @@ basic_detect:
         int     $0x10
         cmpb    $0x1a, %al                      # 1a means VGA...
         jne     basret                          # anything else is EGA.
-        incb    _param(PARAM_HAVE_VGA)          # We've detected a VGA
+        incb    _param(BVI_have_vga)            # We've detected a VGA
 basret: ret
 
 # Store the video mode parameters for later usage by the kernel.
@@ -92,57 +73,57 @@ mode_params:
         movb    $0x03, %ah                      # Read cursor position
         xorb    %bh, %bh
         int     $0x10
-        movw    %dx, _param(PARAM_CURSOR_POS)
+        movw    %dx, _param(BVI_cursor_pos)
         movb    $0x0f, %ah                      # Read page/mode/width
         int     $0x10
-        movw    %ax, _param(PARAM_VIDEO_MODE)   # Video mode and screen width
+        movw    %ax, _param(BVI_video_mode)     # Video mode and screen width
         movw    %gs:(0x485), %ax                # Font size
-        movw    %ax, _param(PARAM_FONT_POINTS)  # (valid only on EGA/VGA)
+        movw    %ax, _param(BVI_font_points)    # (valid only on EGA/VGA)
         movw    bootsym(force_size), %ax        # Forced size?
         orw     %ax, %ax
         jz      mopar1
 
-        movb    %ah, _param(PARAM_VIDEO_COLS)
-        movb    %al, _param(PARAM_VIDEO_LINES)
+        movb    %ah, _param(BVI_video_cols)
+        movb    %al, _param(BVI_video_lines)
         ret
 
 mopar1: movb    %gs:(0x484), %al                # On EGA/VGA, use the EGA+ BIOS
         incb    %al                             # location of max lines.
-mopar2: movb    %al, _param(PARAM_VIDEO_LINES)
+mopar2: movb    %al, _param(BVI_video_lines)
         ret
 
 # Fetching of VESA frame buffer parameters
 mopar_gr:
         movw    $vesa_mode_info, %di
-        movb    $0x23, _param(PARAM_HAVE_VGA)
+        movb    $0x23, _param(BVI_have_vga)
         movw    16(%di), %ax
-        movw    %ax, _param(PARAM_LFB_LINELENGTH)
+        movw    %ax, _param(BVI_lfb_linelength)
         movw    18(%di), %ax
-        movw    %ax, _param(PARAM_LFB_WIDTH)
+        movw    %ax, _param(BVI_lfb_width)
         movw    20(%di), %ax
-        movw    %ax, _param(PARAM_LFB_HEIGHT)
+        movw    %ax, _param(BVI_lfb_height)
         movzbw  25(%di), %ax
-        movw    %ax, _param(PARAM_LFB_DEPTH)
+        movw    %ax, _param(BVI_lfb_depth)
         movl    40(%di), %eax
-        movl    %eax, _param(PARAM_LFB_BASE)
+        movl    %eax, _param(BVI_lfb_base)
         movl    31(%di), %eax
-        movl    %eax, _param(PARAM_LFB_COLORS)
+        movl    %eax, _param(BVI_lfb_colors)
         movl    35(%di), %eax
-        movl    %eax, _param(PARAM_LFB_COLORS+4)
+        movl    %eax, _param(BVI_lfb_colors+4)
         movw    0(%di), %ax
-        movw    %ax, _param(PARAM_VESA_ATTRIB)
+        movw    %ax, _param(BVI_vesa_attrib)
 
 # get video mem size
         movw    $vesa_glob_info, %di
         movzwl  18(%di), %eax
-        movl    %eax, _param(PARAM_LFB_SIZE)
+        movl    %eax, _param(BVI_lfb_size)
 
 # store mode capabilities
         movl    10(%di), %eax
-        movl    %eax, _param(PARAM_CAPABILITIES)
+        movl    %eax, _param(BVI_capabilities)
 
 # switching the DAC to 8-bit is for <= 8 bpp only
-        cmpw    $8, _param(PARAM_LFB_DEPTH)
+        cmpw    $8, _param(BVI_lfb_depth)
         jg      dac_done
 
 # get DAC switching capability
@@ -160,16 +141,16 @@ mopar_gr:
 dac_set:
 # set color size to DAC size
         movzbw  bootsym(dac_size), %ax
-        movb    %al, _param(PARAM_LFB_COLORS+0)
-        movb    %al, _param(PARAM_LFB_COLORS+2)
-        movb    %al, _param(PARAM_LFB_COLORS+4)
-        movb    %al, _param(PARAM_LFB_COLORS+6)
+        movb    %al, _param(BVI_lfb_colors + 0)
+        movb    %al, _param(BVI_lfb_colors + 2)
+        movb    %al, _param(BVI_lfb_colors + 4)
+        movb    %al, _param(BVI_lfb_colors + 6)
 
 # set color offsets to 0
-        movb    %ah, _param(PARAM_LFB_COLORS+1)
-        movb    %ah, _param(PARAM_LFB_COLORS+3)
-        movb    %ah, _param(PARAM_LFB_COLORS+5)
-        movb    %ah, _param(PARAM_LFB_COLORS+7)
+        movb    %ah, _param(BVI_lfb_colors + 1)
+        movb    %ah, _param(BVI_lfb_colors + 3)
+        movb    %ah, _param(BVI_lfb_colors + 5)
+        movb    %ah, _param(BVI_lfb_colors + 7)
 
 dac_done:
 # get protected mode interface information
@@ -180,8 +161,8 @@ dac_done:
         cmp     $0x004f, %ax
         jnz     no_pm
 
-        movw    %es, _param(PARAM_VESAPM_SEG)
-        movw    %di, _param(PARAM_VESAPM_OFF)
+        movw    %es, _param(BVI_vesapm_seg)
+        movw    %di, _param(BVI_vesapm_off)
 
 no_pm:  pushw   %ds
         popw    %es
@@ -1018,7 +999,7 @@ GLOBAL(boot_vid_info)
         .byte   80, 25  /* 80x25          */
         .byte   1       /* isVGA          */
         .word   16      /* 8x16 font      */
-        .fill   0x28,1,0
+        .space  BVI_size - (. - boot_vid_info)
 GLOBAL(boot_edid_info)
         .fill   128,1,0x13
 GLOBAL(boot_edid_caps)

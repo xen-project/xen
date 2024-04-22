@@ -16,6 +16,10 @@
 #include <xen/multiboot.h>
 #include <xen/multiboot2.h>
 
+#ifdef CONFIG_VIDEO
+# include "../boot/video.h"
+#endif
+
 #define DEFINE(_sym, _val)                                                 \
     asm volatile ( "\n.ascii\"==>#define " #_sym " %0 /* " #_val " */<==\""\
                    :: "i" (_val) )
@@ -208,4 +212,26 @@ void __dummy__(void)
 
     OFFSET(DOMAIN_vm_assist, struct domain, vm_assist);
     BLANK();
+
+#ifdef CONFIG_VIDEO
+    OFFSET(BVI_cursor_pos,      struct boot_video_info, orig_x);
+    OFFSET(BVI_video_mode,      struct boot_video_info, orig_video_mode);
+    OFFSET(BVI_video_cols,      struct boot_video_info, orig_video_cols);
+    OFFSET(BVI_video_lines,     struct boot_video_info, orig_video_lines);
+    OFFSET(BVI_have_vga,        struct boot_video_info, orig_video_isVGA);
+    OFFSET(BVI_font_points,     struct boot_video_info, orig_video_points);
+    OFFSET(BVI_capabilities,    struct boot_video_info, capabilities);
+    OFFSET(BVI_lfb_linelength,  struct boot_video_info, lfb_linelength);
+    OFFSET(BVI_lfb_width,       struct boot_video_info, lfb_width);
+    OFFSET(BVI_lfb_height,      struct boot_video_info, lfb_height);
+    OFFSET(BVI_lfb_depth,       struct boot_video_info, lfb_depth);
+    OFFSET(BVI_lfb_base,        struct boot_video_info, lfb_base);
+    OFFSET(BVI_lfb_size,        struct boot_video_info, lfb_size);
+    OFFSET(BVI_lfb_colors,      struct boot_video_info, colors);
+    OFFSET(BVI_vesapm_seg,      struct boot_video_info, vesapm.seg);
+    OFFSET(BVI_vesapm_off,      struct boot_video_info, vesapm.off);
+    OFFSET(BVI_vesa_attrib,     struct boot_video_info, vesa_attrib);
+    DEFINE(BVI_size,            sizeof(struct boot_video_info));
+    BLANK();
+#endif /* CONFIG_VIDEO */
 }
