@@ -569,7 +569,7 @@ static paddr_t __init find_kernel_memory(
 {
     paddr_t kernel_size = elf->dest_size;
     unsigned int align;
-    int i;
+    unsigned int i;
 
     if ( parms->phys_align != UNSET_ADDR32 )
         align = parms->phys_align;
@@ -579,7 +579,7 @@ static paddr_t __init find_kernel_memory(
         align = MB(2);
 
     /* Search backwards to find the highest address. */
-    for ( i = d->arch.nr_e820 - 1; i >= 0 ; i-- )
+    for ( i = d->arch.nr_e820; i--; )
     {
         paddr_t start = d->arch.e820[i].addr;
         paddr_t end = start + d->arch.e820[i].size;
