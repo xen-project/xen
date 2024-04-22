@@ -15,6 +15,10 @@
 
 #include <public/arch-x86/hvm/start_info.h>
 
+#ifdef CONFIG_VIDEO
+# include "../../boot/video.h"
+#endif
+
 /* Initialised in head.S, before .bss is zeroed. */
 bool __initdata pvh_boot;
 uint32_t __initdata pvh_start_info_pa;
@@ -95,6 +99,11 @@ void __init pvh_init(multiboot_info_t **mbi, module_t **mod)
     ASSERT(xen_guest);
 
     get_memory_map();
+
+#ifdef CONFIG_VIDEO
+    /* No VGA available when booted from the PVH entry point. */
+    memset(&bootsym(boot_vid_info), 0, sizeof(boot_vid_info));
+#endif
 }
 
 void __init pvh_print_info(void)

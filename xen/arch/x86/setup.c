@@ -646,7 +646,6 @@ static struct e820map __initdata boot_e820;
 
 #ifdef CONFIG_VIDEO
 # include "boot/video.h"
-extern struct boot_video_info boot_vid_info;
 #endif
 
 static void __init parse_video_info(void)

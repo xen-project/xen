@@ -67,6 +67,8 @@ struct boot_video_info {
     } vesapm;
     uint16_t vesa_attrib;        /* 0x28 */
 };
+
+extern struct boot_video_info boot_vid_info;
 #endif /* __ASSEMBLY__ */
 
 #endif /* __BOOT_VIDEO_H__ */
