@@ -44,6 +44,14 @@
         },
         {
             "id": "SAF-5-safe",
+            "analyser": {
+                "eclair": "MC3R1.R16.2"
+            },
+            "name": "MC3R1.R16.2: using a case label when the most closely-enclosing compound statement is not a switch statement",
+            "text": "A switch label enclosed by some compound statement that is not the body of a switch is permitted within local helper macros that are unlikely to be misused or misunderstood."
+        },
+        {
+            "id": "SAF-6-safe",
             "analyser": {},
             "name": "Sentinel",
             "text": "Next ID to be used"

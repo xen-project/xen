@@ -457,6 +457,7 @@ static int domain_teardown(struct domain *d)
 
         for_each_vcpu ( d, v )
         {
+            /* SAF-5-safe MISRA C Rule 16.2: switch label enclosed by for loop */
             PROGRESS_VCPU(teardown);
 
             rc = vcpu_teardown(v);
