@@ -44,8 +44,8 @@
 -doc_end
 
 -doc_begin="See Section \"6.19 Structures with No Members\" of "GCC_MANUAL"."
--config=STD.emptrecd,behavior+={c99,GCC_ARM64,specified}
--config=STD.emptrecd,behavior+={c99,GCC_X86_64,specified}
+-config=STD.anonstct,behavior+={c99,GCC_ARM64,specified}
+-config=STD.anonstct,behavior+={c99,GCC_X86_64,specified}
 -doc_end
 
 -doc_begin="See Section \"6.18 Arrays of Length Zero\" of "GCC_MANUAL"."
