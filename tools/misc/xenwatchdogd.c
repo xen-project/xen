@@ -1,3 +1,13 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+/*
+ * xenwatchdogd.c
+ *
+ * Watchdog based on Xen hypercall watchdog interface.
+ *
+ * Copyright 2010 Citrix Ltd
+ * Copyright 2024 Leigh Brown <leigh@solinno.co.uk>
+ *
+ */
 
 #include <err.h>
 #include <limits.h>
