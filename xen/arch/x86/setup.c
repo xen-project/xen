@@ -5,6 +5,7 @@
 #include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/domain.h>
+#include <xen/sections.h>
 #include <xen/serial.h>
 #include <xen/softirq.h>
 #include <xen/acpi.h>
@@ -308,8 +309,6 @@ void __init discard_initial_images(void)
     nr_initial_images = 0;
     initial_images = NULL;
 }
-
-extern unsigned char __init_begin[], __init_end[];
 
 static void __init init_idle_domain(void)
 {

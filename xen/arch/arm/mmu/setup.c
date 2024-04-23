@@ -7,6 +7,7 @@
 
 #include <xen/init.h>
 #include <xen/libfdt/libfdt.h>
+#include <xen/sections.h>
 #include <xen/sizes.h>
 #include <xen/vmap.h>
 
@@ -61,8 +62,6 @@ vaddr_t directmap_virt_end __read_mostly;
 vaddr_t directmap_virt_start __read_mostly;
 unsigned long directmap_base_pdx __read_mostly;
 #endif
-
-extern char __init_begin[], __init_end[];
 
 /* Checking VA memory layout alignment. */
 static void __init __maybe_unused build_assertions(void)
