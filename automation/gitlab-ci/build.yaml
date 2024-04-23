@@ -392,16 +392,6 @@ debian-bookworm-gcc-arm32-debug-randconfig:
     HYPERVISOR_ONLY: y
     RANDCONFIG: y
 
-debian-bookworm-gcc-arm32-staticmem:
-  extends: .gcc-arm32-cross-build
-  variables:
-    CONTAINER: debian:bookworm-arm64v8-arm32-gcc
-    HYPERVISOR_ONLY: y
-    EXTRA_XEN_CONFIG: |
-      CONFIG_EXPERT=y
-      CONFIG_UNSUPPORTED=y
-      CONFIG_STATIC_MEMORY=y
-
 debian-bookworm-gcc-arm32-debug-staticmem:
   extends: .gcc-arm32-cross-build-debug
   variables:
@@ -458,15 +448,6 @@ alpine-3.18-gcc-debug-arm64-randconfig:
     CONTAINER: alpine:3.18-arm64v8
     RANDCONFIG: y
 
-alpine-3.18-gcc-arm64-staticmem:
-  extends: .gcc-arm64-build
-  variables:
-    CONTAINER: alpine:3.18-arm64v8
-    EXTRA_XEN_CONFIG: |
-      CONFIG_EXPERT=y
-      CONFIG_UNSUPPORTED=y
-      CONFIG_STATIC_MEMORY=y
-
 alpine-3.18-gcc-debug-arm64-staticmem:
   extends: .gcc-arm64-build-debug
   variables:
@@ -476,15 +457,6 @@ alpine-3.18-gcc-debug-arm64-staticmem:
       CONFIG_UNSUPPORTED=y
       CONFIG_STATIC_MEMORY=y
 
-alpine-3.18-gcc-arm64-static-shared-mem:
-  extends: .gcc-arm64-build
-  variables:
-    CONTAINER: alpine:3.18-arm64v8
-    EXTRA_XEN_CONFIG: |
-      CONFIG_UNSUPPORTED=y
-      CONFIG_STATIC_MEMORY=y
-      CONFIG_STATIC_SHM=y
-
 alpine-3.18-gcc-debug-arm64-static-shared-mem:
   extends: .gcc-arm64-build-debug
   variables:
@@ -493,16 +465,6 @@ alpine-3.18-gcc-debug-arm64-static-shared-mem:
       CONFIG_UNSUPPORTED=y
       CONFIG_STATIC_MEMORY=y
       CONFIG_STATIC_SHM=y
-
-alpine-3.18-gcc-arm64-boot-cpupools:
-  extends: .gcc-arm64-build
-  variables:
-    CONTAINER: alpine:3.18-arm64v8
-    EXTRA_XEN_CONFIG: |
-      CONFIG_EXPERT=y
-      CONFIG_UNSUPPORTED=y
-      CONFIG_SCHED_NULL=y
-      CONFIG_BOOT_TIME_CPUPOOLS=y
 
 alpine-3.18-gcc-debug-arm64-boot-cpupools:
   extends: .gcc-arm64-build-debug

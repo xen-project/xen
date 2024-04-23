@@ -255,14 +255,6 @@ qemu-smoke-dom0less-arm64-gcc-debug:
     - *arm64-test-needs
     - alpine-3.18-gcc-debug-arm64
 
-qemu-smoke-dom0less-arm64-gcc-staticmem:
-  extends: .qemu-arm64
-  script:
-    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh static-mem 2>&1 | tee ${LOGFILE}
-  needs:
-    - *arm64-test-needs
-    - alpine-3.18-gcc-arm64-staticmem
-
 qemu-smoke-dom0less-arm64-gcc-debug-staticmem:
   extends: .qemu-arm64
   script:
@@ -270,14 +262,6 @@ qemu-smoke-dom0less-arm64-gcc-debug-staticmem:
   needs:
     - *arm64-test-needs
     - alpine-3.18-gcc-debug-arm64-staticmem
-
-qemu-smoke-dom0less-arm64-gcc-staticheap:
- extends: .qemu-arm64
- script:
-   - ./automation/scripts/qemu-smoke-dom0less-arm64.sh static-heap 2>&1 | tee ${LOGFILE}
- needs:
-   - *arm64-test-needs
-   - alpine-3.18-gcc-arm64
 
 qemu-smoke-dom0less-arm64-gcc-debug-staticheap:
  extends: .qemu-arm64
@@ -287,14 +271,6 @@ qemu-smoke-dom0less-arm64-gcc-debug-staticheap:
    - *arm64-test-needs
    - alpine-3.18-gcc-debug-arm64
 
-qemu-smoke-dom0less-arm64-gcc-static-shared-mem:
-  extends: .qemu-arm64
-  script:
-    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh static-shared-mem 2>&1 | tee ${LOGFILE}
-  needs:
-    - *arm64-test-needs
-    - alpine-3.18-gcc-arm64-static-shared-mem
-
 qemu-smoke-dom0less-arm64-gcc-debug-static-shared-mem:
   extends: .qemu-arm64
   script:
@@ -302,14 +278,6 @@ qemu-smoke-dom0less-arm64-gcc-debug-static-shared-mem:
   needs:
     - *arm64-test-needs
     - alpine-3.18-gcc-debug-arm64-static-shared-mem
-
-qemu-smoke-dom0less-arm64-gcc-boot-cpupools:
-  extends: .qemu-arm64
-  script:
-    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh boot-cpupools 2>&1 | tee ${LOGFILE}
-  needs:
-    - *arm64-test-needs
-    - alpine-3.18-gcc-arm64-boot-cpupools
 
 qemu-smoke-dom0less-arm64-gcc-debug-boot-cpupools:
   extends: .qemu-arm64
@@ -359,14 +327,6 @@ qemu-smoke-dom0less-arm32-gcc-debug:
     - *arm32-test-needs
     - debian-bookworm-gcc-arm32-debug
 
-qemu-smoke-dom0less-arm32-gcc-staticmem:
-  extends: .qemu-arm32
-  script:
-    - ./automation/scripts/qemu-smoke-dom0less-arm32.sh static-mem 2>&1 | tee ${LOGFILE}
-  needs:
-    - *arm32-test-needs
-    - debian-bookworm-gcc-arm32-staticmem
-
 qemu-smoke-dom0less-arm32-gcc-debug-staticmem:
   extends: .qemu-arm32
   script:
@@ -374,14 +334,6 @@ qemu-smoke-dom0less-arm32-gcc-debug-staticmem:
   needs:
     - *arm32-test-needs
     - debian-bookworm-gcc-arm32-debug-staticmem
-
-qemu-smoke-dom0less-arm32-gcc-gzip:
-  extends: .qemu-arm32
-  script:
-    - ./automation/scripts/qemu-smoke-dom0less-arm32.sh gzip 2>&1 | tee ${LOGFILE}
-  needs:
-    - *arm32-test-needs
-    - debian-bookworm-gcc-arm32
 
 qemu-smoke-dom0less-arm32-gcc-debug-gzip:
   extends: .qemu-arm32
