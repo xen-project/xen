@@ -49,6 +49,18 @@ static void catch_usr1(int sig)
     done = true;
 }
 
+static int parse_secs(const char *arg, const char *what)
+{
+    char *endptr;
+    unsigned long val;
+
+    val = strtoul(arg, &endptr, 0);
+    if (val > INT_MAX || *endptr)
+	errx(EXIT_FAILURE, "invalid %s: '%s'", what, arg);
+
+    return val;
+}
+
 int main(int argc, char **argv)
 {
     int id;
@@ -64,16 +76,11 @@ int main(int argc, char **argv)
     if (h == NULL)
 	err(EXIT_FAILURE, "xc_interface_open");
 
-    t = strtoul(argv[1], NULL, 0);
-    if (t == ULONG_MAX)
-	err(EXIT_FAILURE, "strtoul");
+    t = parse_secs(argv[1], "timeout");
 
     s = t / 2;
-    if (argc == 3) {
-	s = strtoul(argv[2], NULL, 0);
-	if (s == ULONG_MAX)
-	    err(EXIT_FAILURE, "strtoul");
-    }
+    if (argc == 3)
+	s = parse_secs(argv[2], "sleep");
 
     if (signal(SIGHUP, &catch_exit) == SIG_ERR)
 	err(EXIT_FAILURE, "signal");
