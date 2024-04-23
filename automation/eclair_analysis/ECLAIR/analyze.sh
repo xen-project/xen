@@ -52,7 +52,7 @@ VARIANT="${XEN_TARGET_ARCH}"
 
 # Used in analysis.ecl
 case "$2" in
-Set0|Set1|Set2|Set3)
+accepted|monitored)
   export SET="$2"
   ;;
 *)

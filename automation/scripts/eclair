@@ -18,12 +18,8 @@ ex=0
                              "${ex}"
 [ "${ex}" = 0 ] || exit "${ex}"
 
-# Fail in case of new reports
-"${ECLAIR_DIR}/action_clean_added.sh" "${ECLAIR_OUTPUT_DIR}" || ex=$?
-"${ECLAIR_DIR}/action_log.sh" DIFF_CHECK_LOG \
-                             "ECLAIR diff check" \
-                             "${ECLAIR_OUTPUT_DIR}/clean_added.log" \
-                             "${ex}"
+# Fail in case of new reports for clean guidelines
+"${ECLAIR_DIR}/action_check_clean_regressions.sh" "${ECLAIR_OUTPUT_DIR}" || ex=$?
 
 "${ECLAIR_DIR}/action_push.sh" "${WTOKEN}" "${ECLAIR_OUTPUT_DIR}"
 [ "${ex}" = 0 ] || exit "${ex}"

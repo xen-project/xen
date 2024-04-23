@@ -39,14 +39,14 @@ eclair-x86_64:
   variables:
     LOGFILE: "eclair-x86_64.log"
     VARIANT: "X86_64"
-    RULESET: "Set1"
+    RULESET: "monitored"
 
 eclair-ARM64:
   extends: .eclair-analysis:triggered
   variables:
     LOGFILE: "eclair-ARM64.log"
     VARIANT: "ARM64"
-    RULESET: "Set1"
+    RULESET: "monitored"
 
 .eclair-analysis:on-schedule:
   extends: .eclair-analysis
@@ -55,56 +55,20 @@ eclair-ARM64:
       when: never
     - !reference [.eclair-analysis, rules]
 
-eclair-x86_64-Set1:on-schedule:
+eclair-x86_64:on-schedule:
   extends: .eclair-analysis:on-schedule
   variables:
     VARIANT: "X86_64"
-    RULESET: "Set1"
+    RULESET: "accepted"
     ANALYSIS_KIND: "${RULESET}-scheduled"
     LOGFILE: "eclair-${VARIANT}-${RULESET}.log"
   allow_failure: true
 
-eclair-x86_64-Set2:on-schedule:
-  extends: .eclair-analysis:on-schedule
-  variables:
-    VARIANT: "X86_64"
-    RULESET: "Set2"
-    ANALYSIS_KIND: "${RULESET}-scheduled"
-    LOGFILE: "eclair-${VARIANT}-${RULESET}.log"
-  allow_failure: true
-
-eclair-x86_64-Set3:on-schedule:
-  extends: .eclair-analysis:on-schedule
-  variables:
-    VARIANT: "X86_64"
-    RULESET: "Set3"
-    ANALYSIS_KIND: "${RULESET}-scheduled"
-    LOGFILE: "eclair-${VARIANT}-${RULESET}.log"
-  allow_failure: true
-
-eclair-ARM64-Set1:on-schedule:
+eclair-ARM64:on-schedule:
   extends: .eclair-analysis:on-schedule
   variables:
     VARIANT: "ARM64"
-    RULESET: "Set1"
-    ANALYSIS_KIND: "${RULESET}-scheduled"
-    LOGFILE: "eclair-${VARIANT}-${RULESET}.log"
-  allow_failure: true
-
-eclair-ARM64-Set2:on-schedule:
-  extends: .eclair-analysis:on-schedule
-  variables:
-    VARIANT: "ARM64"
-    RULESET: "Set2"
-    ANALYSIS_KIND: "${RULESET}-scheduled"
-    LOGFILE: "eclair-${VARIANT}-${RULESET}.log"
-  allow_failure: true
-
-eclair-ARM64-Set3:on-schedule:
-  extends: .eclair-analysis:on-schedule
-  variables:
-    VARIANT: "ARM64"
-    RULESET: "Set3"
+    RULESET: "accepted"
     ANALYSIS_KIND: "${RULESET}-scheduled"
     LOGFILE: "eclair-${VARIANT}-${RULESET}.log"
   allow_failure: true

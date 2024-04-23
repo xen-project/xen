@@ -127,7 +127,7 @@ EOF
     fi
     case ${ci} in
     github)
-        cat "${summaryTxt}" >"${GITHUB_STEP_SUMMARY}"
+        cat "${summaryTxt}" "${cleanRegressionsLog}" >"${GITHUB_STEP_SUMMARY}"
         ;;
     gitlab)
         open_section ECLAIR_summary "ECLAIR analysis summary" ""
@@ -140,6 +140,7 @@ ${analysisSummaryMsgLog}
 ${currentReportsMsgLog}
 ${referenceReportsMsgLog}
 EOF
+        cat ${cleanRegressionsLog}
         close_section ECLAIR_summary
         ;;
     jenkins)
