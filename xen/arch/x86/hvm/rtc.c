@@ -202,6 +202,7 @@ static void check_update_timer(RTCState *s)
         }
         else
         {
+            s->hw.cmos_data[RTC_REG_A] &= ~RTC_UIP;
             next_update_time = (USEC_PER_SEC - guest_usec - 244) * NS_PER_USEC;
             expire_time = NOW() + next_update_time;
             s->next_update_time = expire_time;
