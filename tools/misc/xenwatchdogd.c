@@ -10,6 +10,11 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <getopt.h>
+
+#define WDOG_MIN_TIMEOUT 2
+#define WDOG_MIN_SLEEP 1
+#define WDOG_EXIT_TIMEOUT 300
 
 static xc_interface *h;
 static volatile bool safeexit = false;
@@ -49,6 +54,26 @@ static void catch_usr1(int sig)
     done = true;
 }
 
+static void __attribute__((noreturn)) usage(int exit_code)
+{
+    FILE *out = exit_code ? stderr : stdout;
+
+    fprintf(out,
+	"Usage: xenwatchdog [OPTION]... <timeout> [<sleep>]\n"
+	"  -h, --help\t\tDisplay this help text and exit.\n"
+	"  -F, --foreground\tRun in foreground.\n"
+	"  -x, --safe-exit\tDisable watchdog on orderly exit.\n"
+	"\t\t\tNote: default is to set a %d second timeout on exit.\n\n"
+	"  timeout\t\tInteger seconds to arm the watchdog each time.\n"
+	"\t\t\tNote: minimum timeout is %d seconds.\n\n"
+	"  sleep\t\t\tInteger seconds to sleep between arming the watchdog.\n"
+	"\t\t\tNote: sleep must be at least %d and less than timeout.\n"
+	"\t\t\tIf not specified then set to half the timeout.\n",
+	WDOG_EXIT_TIMEOUT, WDOG_MIN_TIMEOUT, WDOG_MIN_SLEEP
+	);
+    exit(exit_code);
+}
+
 static int parse_secs(const char *arg, const char *what)
 {
     char *endptr;
@@ -66,21 +91,70 @@ int main(int argc, char **argv)
     int id;
     int t, s;
     int ret;
+    bool daemon = true;
 
-    if (argc < 2)
-	errx(EXIT_FAILURE, "usage: %s <timeout> <sleep>", argv[0]);
+    for ( ;; )
+    {
+	int option_index = 0, c;
+	static const struct option long_options[] =
+	{
+	    { "help", no_argument, NULL, 'h' },
+	    { "foreground", no_argument, NULL, 'F' },
+	    { "safe-exit", no_argument, NULL, 'x' },
+	    { NULL, 0, NULL, 0 },
+	};
 
-    daemonize();
+	c = getopt_long(argc, argv, "hFxD", long_options, &option_index);
+	if (c == -1)
+	    break;
+
+	switch (c)
+	{
+	case 'h':
+	    usage(EXIT_SUCCESS);
+
+	case 'F':
+	    daemon = false;
+	    break;
+
+	case 'x':
+	    safeexit = true;
+	    break;
+
+	default:
+	    usage(EXIT_FAILURE);
+	}
+    }
+
+    if (argc - optind < 1)
+	errx(EXIT_FAILURE, "timeout must be specified");
+
+    if (argc - optind > 2)
+	errx(EXIT_FAILURE, "too many arguments");
+
+    t = parse_secs(argv[optind], "timeout");
+    if (t < WDOG_MIN_TIMEOUT)
+	errx(EXIT_FAILURE, "Error: timeout must be at least %d seconds",
+			   WDOG_MIN_TIMEOUT);
+
+    ++optind;
+    if (optind < argc) {
+	s = parse_secs(argv[optind], "sleep");
+	if (s < WDOG_MIN_SLEEP)
+	    errx(EXIT_FAILURE, "Error: sleep must be no less than %d",
+			       WDOG_MIN_SLEEP);
+	if (s >= t)
+	    errx(EXIT_FAILURE, "Error: sleep must be less than timeout");
+    }
+    else
+	s = t / 2;
+
+    if (daemon)
+	daemonize();
 
     h = xc_interface_open(NULL, NULL, 0);
     if (h == NULL)
 	err(EXIT_FAILURE, "xc_interface_open");
-
-    t = parse_secs(argv[1], "timeout");
-
-    s = t / 2;
-    if (argc == 3)
-	s = parse_secs(argv[2], "sleep");
 
     if (signal(SIGHUP, &catch_exit) == SIG_ERR)
 	err(EXIT_FAILURE, "signal");
@@ -105,6 +179,6 @@ int main(int argc, char **argv)
     }
 
     // Zero seconds timeout will disarm the watchdog timer
-    xc_watchdog(h, id, safeexit ? 0 : 300);
+    xc_watchdog(h, id, safeexit ? 0 : WDOG_EXIT_TIMEOUT);
     return 0;
 }
