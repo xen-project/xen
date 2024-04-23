@@ -1,0 +1,55 @@
+=head1 NAME
+
+xenwatchdogd - Xen hypercall based watchdog daemon
+
+=head1 SYNOPSIS
+
+B<xenwatchdogd> [ I<OPTIONS> ] <I<TIMEOUT>> [ <I<SLEEP>> ]
+
+=head1 DESCRIPTION
+
+B<xenwatchdogd> arms the Xen watchdog timer to I<TIMEOUT> every I<SLEEP>
+seconds. If the xenwatchdogd process dies or is delayed for more than
+I<TIMEOUT> seconds, then Xen will take the B<on_watchdog> action
+specified in the domain configuration (see xl.cfg(5)). If B<xenwatchdogd>
+is running in dom0, the whole system will reboot.
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-h>, B<--help>
+
+Display a help message.
+
+=item B<-F>, B<--foreground>
+
+Run in the foreground. The default behaviour is to daemonize.
+
+=item B<-x>, B<--safe-exit>
+
+Disable watchdog on orderly exit. The default behaviour is to arm the
+watchdog to 300 seconds to allow time for the domain to shutdown.  See 
+also the B<SIGNALS> section.
+
+=item B<timeout>
+
+The number of seconds to arm the Xen watchdog timer. This must be set to
+a minimum of two.
+
+=item B<sleep>
+
+The number of seconds to sleep in between calls to arm the Xen watchdog
+timer. This must be at least one second, and less than the I<timeout>
+value. If not specified, it defaults to half the I<timeout> value.
+
+=back
+
+=head1 SIGNALS
+
+B<SIGUSR1> Will cause the program to disarm the watchdog timer and exit,
+regardless of whether the B<--safe-exit> option was passed.
+
+=head1 AUTHOR
+
+Citrix Ltd and other contributors.
