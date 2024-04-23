@@ -4,6 +4,9 @@ set -ex
 
 test_variant=$1
 
+# Default GIC version
+gic_version="2"
+
 if [ -z "${test_variant}" ]; then
     passed="ping test passed"
     domU_check="
@@ -66,16 +69,22 @@ if [[ "${test_variant}" == "earlyprintk" ]]; then
     passed="\- Ready \-"
 fi
 
+if [[ "${test_variant}" == "gicv3" ]]; then
+    gic_version=3
+    passed="${test_variant} test passed"
+    domU_check="echo \"${passed}\""
+fi
+
 # XXX QEMU looks for "efi-virtio.rom" even if it is unneeded
 curl -fsSLO https://github.com/qemu/qemu/raw/v5.2.0/pc-bios/efi-virtio.rom
 ./binaries/qemu-system-aarch64 \
    -machine virtualization=true \
-   -cpu cortex-a57 -machine type=virt \
+   -cpu cortex-a57 -machine type=virt,gic-version=$gic_version \
    -m 2048 -smp 2 -display none \
-   -machine dumpdtb=binaries/virt-gicv2.dtb
+   -machine dumpdtb=binaries/virt.dtb
 
 # XXX disable pl061 to avoid Linux crash
-fdtput binaries/virt-gicv2.dtb -p -t s /pl061@9030000 status disabled
+fdtput binaries/virt.dtb -p -t s /pl061@9030000 status disabled
 
 # Busybox
 mkdir -p initrd
@@ -138,7 +147,7 @@ cd ..
 echo 'MEMORY_START="0x40000000"
 MEMORY_END="0x50000000"
 
-DEVICE_TREE="virt-gicv2.dtb"
+DEVICE_TREE="virt.dtb"
 XEN="xen"
 DOM0_KERNEL="Image"
 DOM0_RAMDISK="dom0-rootfs.cpio.gz"
@@ -200,7 +209,7 @@ echo "  virtio scan; dhcp; tftpb 0x40000000 boot.scr; source 0x40000000"| \
 timeout -k 1 240 \
 ./binaries/qemu-system-aarch64 \
     -machine virtualization=true \
-    -cpu cortex-a57 -machine type=virt \
+    -cpu cortex-a57 -machine type=virt,gic-version=$gic_version \
     -m 2048 -monitor none -serial stdio \
     -smp 2 \
     -no-reboot \
