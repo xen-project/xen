@@ -650,6 +650,7 @@ static int __init pvh_load_kernel(struct domain *d, const module_t *image,
 {
     void *image_start = image_base + image_headroom;
     unsigned long image_len = image->mod_end;
+    unsigned long initrd_len = initrd ? initrd->mod_end : 0;
     struct elf_binary elf;
     struct elf_dom_parms parms;
     paddr_t last_addr;
@@ -710,7 +711,7 @@ static int __init pvh_load_kernel(struct domain *d, const module_t *image,
      * simplify it.
      */
     last_addr = find_memory(d, &elf, sizeof(start_info) +
-                            (initrd ? ROUNDUP(initrd->mod_end, PAGE_SIZE) +
+                            (initrd ? ROUNDUP(initrd_len, PAGE_SIZE) +
                                       sizeof(mod)
                                     : 0) +
                             (cmdline ? ROUNDUP(strlen(cmdline) + 1,
@@ -725,7 +726,7 @@ static int __init pvh_load_kernel(struct domain *d, const module_t *image,
     if ( initrd != NULL )
     {
         rc = hvm_copy_to_guest_phys(last_addr, mfn_to_virt(initrd->mod_start),
-                                    initrd->mod_end, v);
+                                    initrd_len, v);
         if ( rc )
         {
             printk("Unable to copy initrd to guest\n");
@@ -733,8 +734,8 @@ static int __init pvh_load_kernel(struct domain *d, const module_t *image,
         }
 
         mod.paddr = last_addr;
-        mod.size = initrd->mod_end;
-        last_addr += ROUNDUP(initrd->mod_end, elf_64bit(&elf) ? 8 : 4);
+        mod.size = initrd_len;
+        last_addr += ROUNDUP(initrd_len, elf_64bit(&elf) ? 8 : 4);
         if ( initrd->string )
         {
             char *str = __va(initrd->string);
