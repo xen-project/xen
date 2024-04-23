@@ -61,6 +61,11 @@ fi
 "
 fi
 
+if [[ "${test_variant}" == "earlyprintk" ]]; then
+    # Last early printk message before entering C world
+    passed="\- Ready \-"
+fi
+
 # XXX QEMU looks for "efi-virtio.rom" even if it is unneeded
 curl -fsSLO https://github.com/qemu/qemu/raw/v5.2.0/pc-bios/efi-virtio.rom
 ./binaries/qemu-system-aarch64 \

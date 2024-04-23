@@ -53,6 +53,13 @@ echo \"${passed}\"
 "
 fi
 
+if [[ "${test_variant}" == "earlyprintk" ]]; then
+    # Clear dom0 prompt
+    dom0_prompt=""
+    # Last early printk message before entering C world
+    passed="\- Ready \-"
+fi
+
 # dom0/domU rootfs
 # We are using the same rootfs for dom0 and domU. The only difference is
 # that for the former, we set explictly rdinit to /bin/sh, whereas for the

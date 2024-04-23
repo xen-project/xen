@@ -287,6 +287,14 @@ qemu-smoke-dom0less-arm64-gcc-debug-boot-cpupools:
     - *arm64-test-needs
     - alpine-3.18-gcc-debug-arm64-boot-cpupools
 
+qemu-smoke-dom0less-arm64-gcc-debug-earlyprintk:
+  extends: .qemu-arm64
+  script:
+    - ./automation/scripts/qemu-smoke-dom0less-arm64.sh earlyprintk 2>&1 | tee ${LOGFILE}
+  needs:
+    - *arm64-test-needs
+    - alpine-3.18-gcc-debug-arm64-earlyprintk
+
 qemu-xtf-dom0less-arm64-gcc-hyp-xen-version:
   extends: .qemu-arm64
   script:
@@ -358,6 +366,14 @@ qemu-smoke-dom0less-arm32-gcc-debug-without-dom0:
   needs:
     - *arm32-test-needs
     - debian-bookworm-gcc-arm32-debug
+
+qemu-smoke-dom0less-arm32-gcc-debug-earlyprintk:
+  extends: .qemu-arm32
+  script:
+    - ./automation/scripts/qemu-smoke-dom0less-arm32.sh earlyprintk 2>&1 | tee ${LOGFILE}
+  needs:
+    - *arm32-test-needs
+    - debian-bookworm-gcc-arm32-debug-earlyprintk
 
 qemu-alpine-x86_64-gcc:
   extends: .qemu-x86-64

@@ -402,6 +402,15 @@ debian-bookworm-gcc-arm32-debug-staticmem:
       CONFIG_UNSUPPORTED=y
       CONFIG_STATIC_MEMORY=y
 
+debian-bookworm-gcc-arm32-debug-earlyprintk:
+  extends: .gcc-arm32-cross-build-debug
+  variables:
+    CONTAINER: debian:bookworm-arm64v8-arm32-gcc
+    HYPERVISOR_ONLY: y
+    EXTRA_XEN_CONFIG: |
+      CONFIG_EARLY_UART_CHOICE_PL011=y
+      CONFIG_EARLY_UART_BASE_ADDRESS=0x9000000
+
 # Arm builds
 
 debian-bookworm-gcc-arm64:
@@ -472,6 +481,14 @@ alpine-3.18-gcc-debug-arm64-boot-cpupools:
     CONTAINER: alpine:3.18-arm64v8
     EXTRA_XEN_CONFIG: |
       CONFIG_BOOT_TIME_CPUPOOLS=y
+
+alpine-3.18-gcc-debug-arm64-earlyprintk:
+  extends: .gcc-arm64-build-debug
+  variables:
+    CONTAINER: alpine:3.18-arm64v8
+    EXTRA_XEN_CONFIG: |
+      CONFIG_EARLY_UART_CHOICE_PL011=y
+      CONFIG_EARLY_UART_BASE_ADDRESS=0x9000000
 
 # RISC-V 64 cross-build
 .riscv-fixed-randconfig:
