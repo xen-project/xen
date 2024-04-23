@@ -457,6 +457,12 @@ not to parenthesize their arguments."
 -config=MC3R1.R20.7,reports+={safe, "any_area(any_loc(any_exp(macro(^alternative_(v)?call[0-9]$))))"}
 -doc_end
 
+-doc_begin="The argument 'x' of the count_args_ macro can't be parenthesized as
+the rule would require, without breaking the functionality of the macro. The uses
+of this macro do not lead to developer confusion, and can thus be deviated."
+-config=MC3R1.R20.7,reports+={safe, "any_area(any_loc(any_exp(macro(^count_args_$))))"}
+-doc_end
+
 -doc_begin="Uses of variadic macros that have one of their arguments defined as
 a macro and used within the body for both ordinary parameter expansion and as an
 operand to the # or ## operators have a behavior that is well-understood and

@@ -390,6 +390,12 @@ Deviations related to MISRA C:2012 Rules:
        sanity checks in place.
      - Tagged as `safe` for ECLAIR.
 
+   * - R20.7
+     - The macro `count_args_` is not compliant with the rule, but is not likely
+       to incur in the risk of being misused or lead to developer confusion, and
+       refactoring it to add parentheses breaks its functionality.
+     - Tagged as `safe` for ECLAIR.
+
    * - R20.12
      - Variadic macros that use token pasting often employ the gcc extension
        `ext_paste_comma`, as detailed in `C-language-toolchain.rst`, which is
