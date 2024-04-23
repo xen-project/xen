@@ -1432,6 +1432,11 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
         /* Is the region suitable for relocating the multiboot modules? */
         for ( j = mbi->mods_count - 1; j >= 0; j-- )
         {
+            /*
+             * 'headroom' is a guess for the decompressed size and
+             * decompressor overheads of mod[0] (the dom0 kernel).  When we
+             * move mod[0], we incorporate this as extra space at the start.
+             */
             unsigned long headroom = j ? 0 : modules_headroom;
             unsigned long size = PAGE_ALIGN(headroom + mod[j].mod_end);
 
