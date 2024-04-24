@@ -16,6 +16,8 @@ struct gunzip_state {
     unsigned int insize;
     /* Index of next byte to be processed in inbuf: */
     unsigned int inptr;
+
+    unsigned long bytes_out;
 };
 
 #define malloc(a)       xmalloc_bytes(a)
@@ -43,7 +45,6 @@ typedef unsigned long   ulg;
 #  define Tracecv(c, x)
 #endif
 
-static long __initdata bytes_out;
 static void flush_window(struct gunzip_state *s);
 
 static __init void error(const char *x)
@@ -82,7 +83,7 @@ static __init void flush_window(struct gunzip_state *s)
     }
     crc = c;
 
-    bytes_out += s->wp;
+    s->bytes_out += s->wp;
     s->wp = 0;
 }
 
@@ -115,7 +116,7 @@ __init int perform_gunzip(char *output, char *image, unsigned long image_len)
     s->inbuf = (unsigned char *)image;
     s->insize = image_len;
     s->inptr = 0;
-    bytes_out = 0;
+    s->bytes_out = 0;
 
     makecrc();
 

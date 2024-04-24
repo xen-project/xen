@@ -1210,7 +1210,9 @@ static int __init gunzip(struct gunzip_state *s)
         error("crc error");
         return -1;
     }
-    if (orig_len != bytes_out) {
+
+    if ( orig_len != s->bytes_out )
+    {
         error("length error");
         return -1;
     }
