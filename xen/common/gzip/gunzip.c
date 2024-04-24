@@ -8,6 +8,9 @@
 
 struct gunzip_state {
     unsigned char *window;
+
+    /* window position */
+    unsigned int wp;
 };
 
 static unsigned char *__initdata inbuf;
@@ -15,9 +18,6 @@ static unsigned int __initdata insize;
 
 /* Index of next byte to be processed in inbuf: */
 static unsigned int __initdata inptr;
-
-/* Bytes in output buffer: */
-static unsigned int __initdata outcnt;
 
 #define malloc(a)       xmalloc_bytes(a)
 #define free(a)         xfree(a)
@@ -73,15 +73,15 @@ static __init void flush_window(struct gunzip_state *s)
     unsigned char *in, ch;
 
     in = s->window;
-    for ( n = 0; n < outcnt; n++ )
+    for ( n = 0; n < s->wp; n++ )
     {
         ch = *in++;
         c = crc_32_tab[((int)c ^ ch) & 0xff] ^ (c >> 8);
     }
     crc = c;
 
-    bytes_out += (unsigned long)outcnt;
-    outcnt = 0;
+    bytes_out += s->wp;
+    s->wp = 0;
 }
 
 __init int gzip_check(char *image, unsigned long image_len)

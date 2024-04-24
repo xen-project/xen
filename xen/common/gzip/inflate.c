@@ -160,8 +160,6 @@ static int inflate(struct gunzip_state *s);
  * "uch *slide;" and then malloc'ed in the latter case.  The definition
  * must be in unzip.h, included above.
  */
-/* unsigned wp;             current position in slide */
-#define wp outcnt
 
 /* Tables for deflate from PKZIP's appnote.txt. */
 static const unsigned border[] = {    /* Order of the bit length code lengths */
@@ -557,7 +555,7 @@ static int __init inflate_codes(
     /* make local copies of globals */
     b = bb;                       /* initialize bit buffer */
     k = bk;
-    w = wp;                       /* initialize window position */
+    w = s->wp;                    /* initialize window position */
 
     /* inflate the coded data */
     ml = mask_bits[bl];           /* precompute masks for speed */
@@ -580,7 +578,7 @@ static int __init inflate_codes(
             Tracevv((stderr, "%c", s->window[w-1]));
             if (w == WSIZE)
             {
-                wp = w;
+                s->wp = w;
                 flush_window(s);
                 w = 0;
             }
@@ -628,7 +626,7 @@ static int __init inflate_codes(
                     } while (--e);
                 if (w == WSIZE)
                 {
-                    wp = w;
+                    s->wp = w;
                     flush_window(s);
                     w = 0;
                 }
@@ -637,7 +635,7 @@ static int __init inflate_codes(
     }
 
     /* restore the globals from the locals */
-    wp = w;                       /* restore global window pointer */
+    s->wp = w;                    /* restore global window position */
     bb = b;                       /* restore global bit buffer */
     bk = k;
 
@@ -661,7 +659,7 @@ static int __init inflate_stored(struct gunzip_state *s)
     /* make local copies of globals */
     b = bb;                       /* initialize bit buffer */
     k = bk;
-    w = wp;                       /* initialize window position */
+    w = s->wp;                    /* initialize window position */
 
 
     /* go to byte boundary */
@@ -685,7 +683,7 @@ static int __init inflate_stored(struct gunzip_state *s)
         s->window[w++] = (uch)b;
         if (w == WSIZE)
         {
-            wp = w;
+            s->wp = w;
             flush_window(s);
             w = 0;
         }
@@ -693,7 +691,7 @@ static int __init inflate_stored(struct gunzip_state *s)
     }
 
     /* restore the globals from the locals */
-    wp = w;                       /* restore global window pointer */
+    s->wp = w;                    /* restore global window position */
     bb = b;                       /* restore global bit buffer */
     bk = k;
 
@@ -1014,7 +1012,7 @@ static int __init inflate(struct gunzip_state *s)
     int r;                /* result code */
 
     /* initialize window, bit buffer */
-    wp = 0;
+    s->wp = 0;
     bk = 0;
     bb = 0;
 
