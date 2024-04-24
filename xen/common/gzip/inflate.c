@@ -119,8 +119,6 @@ static char rcsid[] = "#Id: inflate.c,v 0.14 1993/06/10 13:27:04 jloup Exp #";
 
 #endif /* !__XEN__ */
 
-#define slide window
-
 /*
  * Huffman code lookup table entry--this entry is four bytes for machines
  * that have 16-bit pointers (e.g. PC's in the small or medium model).
@@ -143,12 +141,13 @@ struct huft {
 static int huft_build(unsigned *, unsigned, unsigned,
                       const ush *, const ush *, struct huft **, int *);
 static int huft_free(struct huft *);
-static int inflate_codes(struct huft *, struct huft *, int, int);
-static int inflate_stored(void);
-static int inflate_fixed(void);
-static int inflate_dynamic(void);
-static int inflate_block(int *);
-static int inflate(void);
+static int inflate_codes(
+    struct gunzip_state *s, struct huft *tl, struct huft *td, int bl, int bd);
+static int inflate_stored(struct gunzip_state *s);
+static int inflate_fixed(struct gunzip_state *s);
+static int inflate_dynamic(struct gunzip_state *s);
+static int inflate_block(struct gunzip_state *s, int *e);
+static int inflate(struct gunzip_state *s);
 
 /*
  * The inflate algorithm uses a sliding 32 K byte window on the uncompressed
@@ -163,7 +162,6 @@ static int inflate(void);
  */
 /* unsigned wp;             current position in slide */
 #define wp outcnt
-#define flush_output(w) (wp=(w),flush_window())
 
 /* Tables for deflate from PKZIP's appnote.txt. */
 static const unsigned border[] = {    /* Order of the bit length code lengths */
@@ -545,7 +543,7 @@ static int __init huft_free(struct huft *t)
  * @param bd  Number of bits decoded by td[]
  */
 static int __init inflate_codes(
-    struct huft *tl, struct huft *td, int bl, int bd)
+    struct gunzip_state *s, struct huft *tl, struct huft *td, int bl, int bd)
 {
     register unsigned e;  /* table entry flag/number of extra bits */
     unsigned n, d;        /* length and index for copy */
@@ -578,11 +576,12 @@ static int __init inflate_codes(
         DUMPBITS(t->b);
         if (e == 16)                /* then it's a literal */
         {
-            slide[w++] = (uch)t->v.n;
-            Tracevv((stderr, "%c", slide[w-1]));
+            s->window[w++] = (uch)t->v.n;
+            Tracevv((stderr, "%c", s->window[w-1]));
             if (w == WSIZE)
             {
-                flush_output(w);
+                wp = w;
+                flush_window(s);
                 w = 0;
             }
         }
@@ -618,18 +617,19 @@ static int __init inflate_codes(
                 n -= (e = (e = WSIZE - ((d &= WSIZE-1) > w ? d : w)) > n ? n : e);
                 if (w - d >= e)         /* (this test assumes unsigned comparison) */
                 {
-                    memcpy(slide + w, slide + d, e);
+                    memcpy(s->window + w, s->window + d, e);
                     w += e;
                     d += e;
                 }
                 else                      /* do it slow to avoid memcpy() overlap */
                     do {
-                        slide[w++] = slide[d++];
-                        Tracevv((stderr, "%c", slide[w-1]));
+                        s->window[w++] = s->window[d++];
+                        Tracevv((stderr, "%c", s->window[w-1]));
                     } while (--e);
                 if (w == WSIZE)
                 {
-                    flush_output(w);
+                    wp = w;
+                    flush_window(s);
                     w = 0;
                 }
             } while (n);
@@ -649,7 +649,7 @@ static int __init inflate_codes(
 }
 
 /* "decompress" an inflated type 0 (stored) block. */
-static int __init inflate_stored(void)
+static int __init inflate_stored(struct gunzip_state *s)
 {
     unsigned n;           /* number of bytes in block */
     unsigned w;           /* current window position */
@@ -682,10 +682,11 @@ static int __init inflate_stored(void)
     while (n--)
     {
         NEEDBITS(8);
-        slide[w++] = (uch)b;
+        s->window[w++] = (uch)b;
         if (w == WSIZE)
         {
-            flush_output(w);
+            wp = w;
+            flush_window(s);
             w = 0;
         }
         DUMPBITS(8);
@@ -713,7 +714,7 @@ static int __init inflate_stored(void)
  * either replace this with a custom decoder, or at least precompute the
  * Huffman tables.
  */
-static int noinline __init inflate_fixed(void)
+static int noinline __init inflate_fixed(struct gunzip_state *s)
 {
     int i;                /* temporary variable */
     struct huft *tl;      /* literal/length code table */
@@ -757,7 +758,7 @@ static int noinline __init inflate_fixed(void)
     }
 
     /* decompress until an end-of-block code */
-    i = inflate_codes(tl, td, bl, bd);
+    i = inflate_codes(s, tl, td, bl, bd);
 
     /* free the decoding tables, return */
     free(l);
@@ -772,7 +773,7 @@ static int noinline __init inflate_fixed(void)
  */
 
 /* decompress an inflated type 2 (dynamic Huffman codes) block. */
-static int noinline __init inflate_dynamic(void)
+static int noinline __init inflate_dynamic(struct gunzip_state *s)
 {
     int i;                /* temporary variables */
     unsigned j;
@@ -938,7 +939,7 @@ static int noinline __init inflate_dynamic(void)
     DEBG("dyn6 ");
 
     /* decompress until an end-of-block code */
-    ret = !!inflate_codes(tl, td, bl, bd);
+    ret = !!inflate_codes(s, tl, td, bl, bd);
 
     if ( !ret )
        DEBG("dyn7 ");
@@ -963,7 +964,7 @@ static int noinline __init inflate_dynamic(void)
  *
  * @param e Last block flag
  */
-static int __init inflate_block(int *e)
+static int __init inflate_block(struct gunzip_state *s, int *e)
 {
     unsigned t;           /* block type */
     register ulg b;       /* bit buffer */
@@ -991,11 +992,11 @@ static int __init inflate_block(int *e)
 
     /* inflate that block type */
     if (t == 2)
-        return inflate_dynamic();
+        return inflate_dynamic(s);
     if (t == 0)
-        return inflate_stored();
+        return inflate_stored(s);
     if (t == 1)
-        return inflate_fixed();
+        return inflate_fixed(s);
 
     DEBG(">");
 
@@ -1007,7 +1008,7 @@ static int __init inflate_block(int *e)
 }
 
 /* decompress an inflated entry */
-static int __init inflate(void)
+static int __init inflate(struct gunzip_state *s)
 {
     int e;                /* last block flag */
     int r;                /* result code */
@@ -1019,7 +1020,7 @@ static int __init inflate(void)
 
     /* decompress until the last block */
     do {
-        r = inflate_block(&e);
+        r = inflate_block(s, &e);
         if (r)
             return r;
     } while (!e);
@@ -1032,8 +1033,7 @@ static int __init inflate(void)
         inptr--;
     }
 
-    /* flush out slide */
-    flush_output(wp);
+    flush_window(s);
 
     /* return success */
     return 0;
@@ -1101,7 +1101,7 @@ static void __init makecrc(void)
 /*
  * Do the uncompression!
  */
-static int __init gunzip(void)
+static int __init gunzip(struct gunzip_state *s)
 {
     uch flags;
     unsigned char magic[2]; /* magic header */
@@ -1165,7 +1165,8 @@ static int __init gunzip(void)
     }
 
     /* Decompress */
-    if ((res = inflate())) {
+    if ( (res = inflate(s)) )
+    {
         switch (res) {
         case 0:
             break;

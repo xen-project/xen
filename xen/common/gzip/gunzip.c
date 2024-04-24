@@ -4,9 +4,11 @@
 #include <xen/lib.h>
 #include <xen/mm.h>
 
-static unsigned char *__initdata window;
-
 #define WSIZE           0x80000000U
+
+struct gunzip_state {
+    unsigned char *window;
+};
 
 static unsigned char *__initdata inbuf;
 static unsigned int __initdata insize;
@@ -45,7 +47,7 @@ typedef unsigned long   ulg;
 #endif
 
 static long __initdata bytes_out;
-static void flush_window(void);
+static void flush_window(struct gunzip_state *s);
 
 static __init void error(const char *x)
 {
@@ -60,7 +62,7 @@ static __init int fill_inbuf(void)
 
 #include "inflate.c"
 
-static __init void flush_window(void)
+static __init void flush_window(struct gunzip_state *s)
 {
     /*
      * The window is equal to the output buffer therefore only need to
@@ -70,7 +72,7 @@ static __init void flush_window(void)
     unsigned int n;
     unsigned char *in, ch;
 
-    in = window;
+    in = s->window;
     for ( n = 0; n < outcnt; n++ )
     {
         ch = *in++;
@@ -97,12 +99,17 @@ __init int gzip_check(char *image, unsigned long image_len)
 
 __init int perform_gunzip(char *output, char *image, unsigned long image_len)
 {
+    struct gunzip_state *s;
     int rc;
 
     if ( !gzip_check(image, image_len) )
         return 1;
 
-    window = (unsigned char *)output;
+    s = malloc(sizeof(struct gunzip_state));
+    if ( !s )
+        return -ENOMEM;
+
+    s->window = (unsigned char *)output;
     inbuf = (unsigned char *)image;
     insize = image_len;
     inptr = 0;
@@ -110,7 +117,7 @@ __init int perform_gunzip(char *output, char *image, unsigned long image_len)
 
     makecrc();
 
-    if ( gunzip() < 0 )
+    if ( gunzip(s) < 0 )
     {
         rc = -EINVAL;
     }
@@ -118,6 +125,8 @@ __init int perform_gunzip(char *output, char *image, unsigned long image_len)
     {
         rc = 0;
     }
+
+    free(s);
 
     return rc;
 }
