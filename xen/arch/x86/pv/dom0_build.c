@@ -641,6 +641,15 @@ static int __init dom0_construct(struct domain *d,
                 if ( assign_pages(mfn_to_page(_mfn(mfn++)), 1, d, 0) )
                     BUG();
         }
+
+        /*
+         * We have either:
+         * - Mapped the initrd directly into dom0, or
+         * - Copied it and freed the module.
+         *
+         * Either way, tell discard_initial_images() to not free it a second
+         * time.
+         */
         initrd->mod_end = 0;
 
         iommu_memory_setup(d, "initrd", mfn_to_page(_mfn(initrd_mfn)),

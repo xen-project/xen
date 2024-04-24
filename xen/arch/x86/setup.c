@@ -340,7 +340,7 @@ unsigned long __init initial_images_nrpages(nodeid_t node)
     return nr;
 }
 
-void __init discard_initial_images(void)
+void __init discard_initial_images(void) /* a.k.a. Free boot modules */
 {
     struct boot_info *bi = &xen_boot_info;
     unsigned int i;
@@ -348,9 +348,16 @@ void __init discard_initial_images(void)
     for ( i = 0; i < bi->nr_modules; ++i )
     {
         uint64_t start = pfn_to_paddr(bi->mods[i].mod->mod_start);
+        uint64_t size  = bi->mods[i].mod->mod_end;
 
-        init_domheap_pages(start,
-                           start + PAGE_ALIGN(bi->mods[i].mod->mod_end));
+        /*
+         * Sometimes the initrd is mapped, rather than copied, into dom0.
+         * Size being 0 is how we're instructed to leave the module alone.
+         */
+        if ( size == 0 )
+            continue;
+
+        init_domheap_pages(start, start + PAGE_ALIGN(size));
     }
 
     bi->nr_modules = 0;
