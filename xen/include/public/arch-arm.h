@@ -487,7 +487,7 @@ typedef uint64_t xen_callback_t;
 #define GUEST_RAM0_SIZE   xen_mk_ullong(0xc0000000)
 
 /* 4GB @ 4GB Prefetch Memory for VPCI */
-#define GUEST_VPCI_ADDR_TYPE_PREFETCH_MEM   xen_mk_ullong(0x42000000)
+#define GUEST_VPCI_ADDR_TYPE_PREFETCH_MEM   xen_mk_ullong(0x43000000)
 #define GUEST_VPCI_PREFETCH_MEM_ADDR        xen_mk_ullong(0x100000000)
 #define GUEST_VPCI_PREFETCH_MEM_SIZE        xen_mk_ullong(0x100000000)
 
