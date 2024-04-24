@@ -11,13 +11,12 @@ struct gunzip_state {
 
     /* window position */
     unsigned int wp;
+
+    unsigned char *inbuf;
+    unsigned int insize;
+    /* Index of next byte to be processed in inbuf: */
+    unsigned int inptr;
 };
-
-static unsigned char *__initdata inbuf;
-static unsigned int __initdata insize;
-
-/* Index of next byte to be processed in inbuf: */
-static unsigned int __initdata inptr;
 
 #define malloc(a)       xmalloc_bytes(a)
 #define free(a)         xfree(a)
@@ -26,8 +25,6 @@ static unsigned int __initdata inptr;
 typedef unsigned char   uch;
 typedef unsigned short  ush;
 typedef unsigned long   ulg;
-
-#define get_byte()      (inptr < insize ? inbuf[inptr++] : fill_inbuf())
 
 /* Diagnostic functions */
 #ifdef DEBUG
@@ -54,10 +51,15 @@ static __init void error(const char *x)
     panic("%s\n", x);
 }
 
-static __init int fill_inbuf(void)
+static __init int get_byte(struct gunzip_state *s)
 {
-    error("ran out of input data");
-    return 0;
+    if ( s->inptr >= s->insize )
+    {
+        error("ran out of input data");
+        return -1;
+    }
+
+    return s->inbuf[s->inptr++];
 }
 
 #include "inflate.c"
@@ -110,9 +112,9 @@ __init int perform_gunzip(char *output, char *image, unsigned long image_len)
         return -ENOMEM;
 
     s->window = (unsigned char *)output;
-    inbuf = (unsigned char *)image;
-    insize = image_len;
-    inptr = 0;
+    s->inbuf = (unsigned char *)image;
+    s->insize = image_len;
+    s->inptr = 0;
     bytes_out = 0;
 
     makecrc();

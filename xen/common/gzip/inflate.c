@@ -220,8 +220,8 @@ static const ush mask_bits[] = {
     0x01ff, 0x03ff, 0x07ff, 0x0fff, 0x1fff, 0x3fff, 0x7fff, 0xffff
 };
 
-#define NEXTBYTE()  ({ int v = get_byte(); if (v < 0) goto underrun; (uch)v; })
-#define NEEDBITS(n) {while(k<(n)){b|=((ulg)NEXTBYTE())<<k;k+=8;}}
+#define NEXTBYTE(s)  ({ int v = get_byte(s); if (v < 0) goto underrun; (uch)v; })
+#define NEEDBITS(s, n) {while(k<(n)){b|=((ulg)NEXTBYTE(s))<<k;k+=8;}}
 #define DUMPBITS(n) {b>>=(n);k-=(n);}
 
 /*
@@ -562,14 +562,14 @@ static int __init inflate_codes(
     md = mask_bits[bd];
     for (;;)                      /* do until end of block */
     {
-        NEEDBITS((unsigned)bl);
+        NEEDBITS(s, (unsigned)bl);
         if ((e = (t = tl + ((unsigned)b & ml))->e) > 16)
             do {
                 if (e == 99)
                     return 1;
                 DUMPBITS(t->b);
                 e -= 16;
-                NEEDBITS(e);
+                NEEDBITS(s, e);
             } while ((e = (t = t->v.t + ((unsigned)b & mask_bits[e]))->e) > 16);
         DUMPBITS(t->b);
         if (e == 16)                /* then it's a literal */
@@ -590,22 +590,22 @@ static int __init inflate_codes(
                 break;
 
             /* get length of block to copy */
-            NEEDBITS(e);
+            NEEDBITS(s, e);
             n = t->v.n + ((unsigned)b & mask_bits[e]);
             DUMPBITS(e);
 
             /* decode distance of block to copy */
-            NEEDBITS((unsigned)bd);
+            NEEDBITS(s, (unsigned)bd);
             if ((e = (t = td + ((unsigned)b & md))->e) > 16)
                 do {
                     if (e == 99)
                         return 1;
                     DUMPBITS(t->b);
                     e -= 16;
-                    NEEDBITS(e);
+                    NEEDBITS(s, e);
                 } while ((e = (t = t->v.t + ((unsigned)b & mask_bits[e]))->e) > 16);
             DUMPBITS(t->b);
-            NEEDBITS(e);
+            NEEDBITS(s, e);
             d = w - t->v.n - ((unsigned)b & mask_bits[e]);
             DUMPBITS(e);
             Tracevv((stderr,"\\[%d,%d]", w-d, n));
@@ -668,10 +668,10 @@ static int __init inflate_stored(struct gunzip_state *s)
 
 
     /* get the length and its complement */
-    NEEDBITS(16);
+    NEEDBITS(s, 16);
     n = ((unsigned)b & 0xffff);
     DUMPBITS(16);
-    NEEDBITS(16);
+    NEEDBITS(s, 16);
     if (n != (unsigned)((~b) & 0xffff))
         return 1;                   /* error in compressed data */
     DUMPBITS(16);
@@ -679,7 +679,7 @@ static int __init inflate_stored(struct gunzip_state *s)
     /* read and output the compressed data */
     while (n--)
     {
-        NEEDBITS(8);
+        NEEDBITS(s, 8);
         s->window[w++] = (uch)b;
         if (w == WSIZE)
         {
@@ -802,13 +802,13 @@ static int noinline __init inflate_dynamic(struct gunzip_state *s)
     k = bk;
 
     /* read in table lengths */
-    NEEDBITS(5);
+    NEEDBITS(s, 5);
     nl = 257 + ((unsigned)b & 0x1f);      /* number of literal/length codes */
     DUMPBITS(5);
-    NEEDBITS(5);
+    NEEDBITS(s, 5);
     nd = 1 + ((unsigned)b & 0x1f);        /* number of distance codes */
     DUMPBITS(5);
-    NEEDBITS(4);
+    NEEDBITS(s, 4);
     nb = 4 + ((unsigned)b & 0xf);         /* number of bit length codes */
     DUMPBITS(4);
     if (nl > 286 || nd > 30)
@@ -822,7 +822,7 @@ static int noinline __init inflate_dynamic(struct gunzip_state *s)
     /* read in bit-length-code lengths */
     for (j = 0; j < nb; j++)
     {
-        NEEDBITS(3);
+        NEEDBITS(s, 3);
         ll[border[j]] = (unsigned)b & 7;
         DUMPBITS(3);
     }
@@ -849,7 +849,7 @@ static int noinline __init inflate_dynamic(struct gunzip_state *s)
     i = l = 0;
     while ((unsigned)i < n)
     {
-        NEEDBITS((unsigned)bl);
+        NEEDBITS(s, (unsigned)bl);
         j = (td = tl + ((unsigned)b & m))->b;
         DUMPBITS(j);
         j = td->v.n;
@@ -857,7 +857,7 @@ static int noinline __init inflate_dynamic(struct gunzip_state *s)
             ll[i++] = l = j;          /* save last length in l */
         else if (j == 16)           /* repeat last length 3 to 6 times */
         {
-            NEEDBITS(2);
+            NEEDBITS(s, 2);
             j = 3 + ((unsigned)b & 3);
             DUMPBITS(2);
             if ((unsigned)i + j > n) {
@@ -869,7 +869,7 @@ static int noinline __init inflate_dynamic(struct gunzip_state *s)
         }
         else if (j == 17)           /* 3 to 10 zero length codes */
         {
-            NEEDBITS(3);
+            NEEDBITS(s, 3);
             j = 3 + ((unsigned)b & 7);
             DUMPBITS(3);
             if ((unsigned)i + j > n) {
@@ -882,7 +882,7 @@ static int noinline __init inflate_dynamic(struct gunzip_state *s)
         }
         else                        /* j == 18: 11 to 138 zero length codes */
         {
-            NEEDBITS(7);
+            NEEDBITS(s, 7);
             j = 11 + ((unsigned)b & 0x7f);
             DUMPBITS(7);
             if ((unsigned)i + j > n) {
@@ -975,12 +975,12 @@ static int __init inflate_block(struct gunzip_state *s, int *e)
     k = bk;
 
     /* read in last block bit */
-    NEEDBITS(1);
+    NEEDBITS(s, 1);
     *e = (int)b & 1;
     DUMPBITS(1);
 
     /* read in block type */
-    NEEDBITS(2);
+    NEEDBITS(s, 2);
     t = (unsigned)b & 3;
     DUMPBITS(2);
 
@@ -1028,7 +1028,7 @@ static int __init inflate(struct gunzip_state *s)
      */
     while (bk >= 8) {
         bk -= 8;
-        inptr--;
+        s->inptr--;
     }
 
     flush_window(s);
@@ -1108,9 +1108,9 @@ static int __init gunzip(struct gunzip_state *s)
     ulg orig_len = 0;       /* original uncompressed length */
     int res;
 
-    magic[0] = NEXTBYTE();
-    magic[1] = NEXTBYTE();
-    method   = NEXTBYTE();
+    magic[0] = NEXTBYTE(s);
+    magic[1] = NEXTBYTE(s);
+    method   = NEXTBYTE(s);
 
     if (magic[0] != 037 ||                            /* octal-ok */
         ((magic[1] != 0213) && (magic[1] != 0236))) { /* octal-ok */
@@ -1124,7 +1124,7 @@ static int __init gunzip(struct gunzip_state *s)
         return -1;
     }
 
-    flags  = (uch)get_byte();
+    flags  = (uch)get_byte(s);
     if ((flags & ENCRYPTED) != 0) {
         error("Input is encrypted");
         return -1;
@@ -1137,29 +1137,34 @@ static int __init gunzip(struct gunzip_state *s)
         error("Input has invalid flags");
         return -1;
     }
-    NEXTBYTE(); /* Get timestamp */
-    NEXTBYTE();
-    NEXTBYTE();
-    NEXTBYTE();
+    NEXTBYTE(s); /* Get timestamp */
+    NEXTBYTE(s);
+    NEXTBYTE(s);
+    NEXTBYTE(s);
 
-    (void)NEXTBYTE();  /* Ignore extra flags for the moment */
-    (void)NEXTBYTE();  /* Ignore OS type for the moment */
+    NEXTBYTE(s); /* Ignore extra flags for the moment */
+    NEXTBYTE(s); /* Ignore OS type for the moment */
 
     if ((flags & EXTRA_FIELD) != 0) {
-        unsigned len = (unsigned)NEXTBYTE();
-        len |= ((unsigned)NEXTBYTE())<<8;
-        while (len--) (void)NEXTBYTE();
+        unsigned int len = NEXTBYTE(s);
+
+        len |= (unsigned int)NEXTBYTE(s) << 8;
+
+        while ( len-- )
+            NEXTBYTE(s);
     }
 
     /* Get original file name if it was truncated */
     if ((flags & ORIG_NAME) != 0) {
         /* Discard the old name */
-        while (NEXTBYTE() != 0) /* null */ ;
+        while ( NEXTBYTE(s) != 0) /* null */
+            ;
     }
 
     /* Discard file comment if any */
     if ((flags & COMMENT) != 0) {
-        while (NEXTBYTE() != 0) /* null */ ;
+        while ( NEXTBYTE(s) != 0 ) /* null */
+            ;
     }
 
     /* Decompress */
@@ -1190,15 +1195,15 @@ static int __init gunzip(struct gunzip_state *s)
     /* crc32  (see algorithm.doc)
      * uncompressed input size modulo 2^32
      */
-    orig_crc = (ulg) NEXTBYTE();
-    orig_crc |= (ulg) NEXTBYTE() << 8;
-    orig_crc |= (ulg) NEXTBYTE() << 16;
-    orig_crc |= (ulg) NEXTBYTE() << 24;
+    orig_crc  = (ulg) NEXTBYTE(s);
+    orig_crc |= (ulg) NEXTBYTE(s) << 8;
+    orig_crc |= (ulg) NEXTBYTE(s) << 16;
+    orig_crc |= (ulg) NEXTBYTE(s) << 24;
 
-    orig_len = (ulg) NEXTBYTE();
-    orig_len |= (ulg) NEXTBYTE() << 8;
-    orig_len |= (ulg) NEXTBYTE() << 16;
-    orig_len |= (ulg) NEXTBYTE() << 24;
+    orig_len  = (ulg) NEXTBYTE(s);
+    orig_len |= (ulg) NEXTBYTE(s) << 8;
+    orig_len |= (ulg) NEXTBYTE(s) << 16;
+    orig_len |= (ulg) NEXTBYTE(s) << 24;
 
     /* Validate decompression */
     if (orig_crc != CRC_VALUE) {
