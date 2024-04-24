@@ -21,6 +21,9 @@ struct gunzip_state {
 
     unsigned long bb;      /* bit buffer */
     unsigned int  bk;      /* bits in bit buffer */
+
+    uint32_t crc_32_tab[256];
+    uint32_t crc;
 };
 
 #define malloc(a)       xmalloc_bytes(a)
@@ -74,7 +77,7 @@ static __init void flush_window(struct gunzip_state *s)
      * The window is equal to the output buffer therefore only need to
      * compute the crc.
      */
-    unsigned long c = crc;
+    uint32_t c = ~s->crc;
     unsigned int n;
     unsigned char *in, ch;
 
@@ -82,9 +85,9 @@ static __init void flush_window(struct gunzip_state *s)
     for ( n = 0; n < s->wp; n++ )
     {
         ch = *in++;
-        c = crc_32_tab[((int)c ^ ch) & 0xff] ^ (c >> 8);
+        c = s->crc_32_tab[(c ^ ch) & 0xff] ^ (c >> 8);
     }
-    crc = c;
+    s->crc = ~c;
 
     s->bytes_out += s->wp;
     s->wp = 0;
@@ -121,7 +124,7 @@ __init int perform_gunzip(char *output, char *image, unsigned long image_len)
     s->inptr = 0;
     s->bytes_out = 0;
 
-    makecrc();
+    makecrc(s);
 
     if ( gunzip(s) < 0 )
     {
