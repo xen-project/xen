@@ -211,9 +211,6 @@ static const ush cpdext[] = {         /* Extra bits for distance codes */
  * the stream.
  */
 
-static ulg __initdata bb;                /* bit buffer */
-static unsigned __initdata bk;           /* bits in bit buffer */
-
 static const ush mask_bits[] = {
     0x0000,
     0x0001, 0x0003, 0x0007, 0x000f, 0x001f, 0x003f, 0x007f, 0x00ff,
@@ -553,8 +550,8 @@ static int __init inflate_codes(
 
 
     /* make local copies of globals */
-    b = bb;                       /* initialize bit buffer */
-    k = bk;
+    b = s->bb;                    /* initialize bit buffer */
+    k = s->bk;
     w = s->wp;                    /* initialize window position */
 
     /* inflate the coded data */
@@ -636,8 +633,8 @@ static int __init inflate_codes(
 
     /* restore the globals from the locals */
     s->wp = w;                    /* restore global window position */
-    bb = b;                       /* restore global bit buffer */
-    bk = k;
+    s->bb = b;                    /* restore global bit buffer */
+    s->bk = k;
 
     /* done */
     return 0;
@@ -657,8 +654,8 @@ static int __init inflate_stored(struct gunzip_state *s)
     DEBG("<stor");
 
     /* make local copies of globals */
-    b = bb;                       /* initialize bit buffer */
-    k = bk;
+    b = s->bb;                    /* initialize bit buffer */
+    k = s->bk;
     w = s->wp;                    /* initialize window position */
 
 
@@ -692,8 +689,8 @@ static int __init inflate_stored(struct gunzip_state *s)
 
     /* restore the globals from the locals */
     s->wp = w;                    /* restore global window position */
-    bb = b;                       /* restore global bit buffer */
-    bk = k;
+    s->bb = b;                    /* restore global bit buffer */
+    s->bk = k;
 
     DEBG(">");
     return 0;
@@ -798,8 +795,8 @@ static int noinline __init inflate_dynamic(struct gunzip_state *s)
         return 1;
 
     /* make local bit buffer */
-    b = bb;
-    k = bk;
+    b = s->bb;
+    k = s->bk;
 
     /* read in table lengths */
     NEEDBITS(s, 5);
@@ -903,8 +900,8 @@ static int noinline __init inflate_dynamic(struct gunzip_state *s)
     DEBG("dyn5 ");
 
     /* restore the global bit buffer */
-    bb = b;
-    bk = k;
+    s->bb = b;
+    s->bk = k;
 
     DEBG("dyn5a ");
 
@@ -971,8 +968,8 @@ static int __init inflate_block(struct gunzip_state *s, int *e)
     DEBG("<blk");
 
     /* make local bit buffer */
-    b = bb;
-    k = bk;
+    b = s->bb;
+    k = s->bk;
 
     /* read in last block bit */
     NEEDBITS(s, 1);
@@ -985,8 +982,8 @@ static int __init inflate_block(struct gunzip_state *s, int *e)
     DUMPBITS(2);
 
     /* restore the global bit buffer */
-    bb = b;
-    bk = k;
+    s->bb = b;
+    s->bk = k;
 
     /* inflate that block type */
     if (t == 2)
@@ -1013,8 +1010,8 @@ static int __init inflate(struct gunzip_state *s)
 
     /* initialize window, bit buffer */
     s->wp = 0;
-    bk = 0;
-    bb = 0;
+    s->bk = 0;
+    s->bb = 0;
 
     /* decompress until the last block */
     do {
@@ -1026,8 +1023,9 @@ static int __init inflate(struct gunzip_state *s)
     /* Undo too much lookahead. The next read will be byte aligned so we
      * can discard unused bits in the last meaningful byte.
      */
-    while (bk >= 8) {
-        bk -= 8;
+    while ( s->bk >= 8 )
+    {
+        s->bk -= 8;
         s->inptr--;
     }
 

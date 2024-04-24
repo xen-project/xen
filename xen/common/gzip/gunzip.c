@@ -18,6 +18,9 @@ struct gunzip_state {
     unsigned int inptr;
 
     unsigned long bytes_out;
+
+    unsigned long bb;      /* bit buffer */
+    unsigned int  bk;      /* bits in bit buffer */
 };
 
 #define malloc(a)       xmalloc_bytes(a)
