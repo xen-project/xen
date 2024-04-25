@@ -67,7 +67,7 @@
 #define DR_GENERAL_DETECT        (0x00002000UL) /* General detect enable */
 
 #define write_debugreg(reg, val) do {                       \
-    unsigned long __val = val;                              \
+    unsigned long __val = (val);                            \
     asm volatile ( "mov %0,%%db" #reg : : "r" (__val) );    \
 } while (0)
 #define read_debugreg(reg) ({                               \
