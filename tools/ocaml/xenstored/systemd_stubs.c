@@ -25,7 +25,7 @@
 
 #if defined(HAVE_SYSTEMD)
 
-#include <systemd/sd-daemon.h>
+#include <xen-sd-notify.h>
 
 CAMLprim value ocaml_sd_notify_ready(value ignore)
 {

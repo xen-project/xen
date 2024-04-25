@@ -27,7 +27,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #if defined(HAVE_SYSTEMD)
-#include <systemd/sd-daemon.h>
+#include <xen-sd-notify.h>
 #endif
 #include <xen-tools/xenstore-common.h>
 
@@ -393,7 +393,7 @@ void late_init(bool live_update)
 #if defined(HAVE_SYSTEMD)
 	if (!live_update) {
 		sd_notify(1, "READY=1");
-		fprintf(stderr, SD_NOTICE "xenstored is ready\n");
+		fprintf(stderr, "xenstored is ready\n");
 	}
 #endif
 }
