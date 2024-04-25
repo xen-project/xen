@@ -43,11 +43,11 @@
     ((s_time_t)((((tick) > (h)->hpet_to_ns_limit) ?     \
         ~0ULL : (tick) * (h)->hpet_to_ns_scale) >> 10))
 
-#define timer_config(h, n)       (h->hpet.timers[n].config)
+#define timer_config(h, n)       ((h)->hpet.timers[n].config)
 #define timer_enabled(h, n)      (timer_config(h, n) & HPET_TN_ENABLE)
 #define timer_is_periodic(h, n)  (timer_config(h, n) & HPET_TN_PERIODIC)
 #define timer_is_32bit(h, n)     (timer_config(h, n) & HPET_TN_32BIT)
-#define hpet_enabled(h)          (h->hpet.config & HPET_CFG_ENABLE)
+#define hpet_enabled(h)          ((h)->hpet.config & HPET_CFG_ENABLE)
 #define timer_level(h, n)        (timer_config(h, n) & HPET_TN_LEVEL)
 
 #define timer_int_route(h, n)    MASK_EXTR(timer_config(h, n), HPET_TN_ROUTE)
