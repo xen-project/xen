@@ -99,11 +99,12 @@ int shadow_domain_init(struct domain *d)
     return 0;
 }
 
-/* Setup the shadow-specfic parts of a vcpu struct. Note: The most important
- * job is to initialize the update_paging_modes() function pointer, which is
- * used to initialized the rest of resources. Therefore, it really does not
- * matter to have v->arch.paging.mode pointing to any mode, as long as it can
- * be compiled.
+/*
+ * Setup the shadow-specific parts of a vcpu struct. Note: The
+ * update_paging_modes() function pointer, which is used to initialize other
+ * resources, was already set during domain creation. Therefore it really does
+ * not matter to have v->arch.paging.mode pointing to any (legitimate) mode,
+ * as long as it can be compiled.
  */
 void shadow_vcpu_init(struct vcpu *v)
 {
