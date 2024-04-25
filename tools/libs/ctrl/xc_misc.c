@@ -576,7 +576,8 @@ int xc_getcpuinfo(xc_interface *xch, int max_cpus,
 int xc_livepatch_upload(xc_interface *xch,
                         char *name,
                         unsigned char *payload,
-                        uint32_t size)
+                        uint32_t size,
+                        bool force)
 {
     int rc;
     struct xen_sysctl sysctl = {};
@@ -612,7 +613,7 @@ int xc_livepatch_upload(xc_interface *xch,
 
     sysctl.cmd = XEN_SYSCTL_livepatch_op;
     sysctl.u.livepatch.cmd = XEN_SYSCTL_LIVEPATCH_UPLOAD;
-    sysctl.u.livepatch.pad = 0;
+    sysctl.u.livepatch.flags = force ? LIVEPATCH_FLAG_FORCE : 0;
     sysctl.u.livepatch.u.upload.size = size;
     set_xen_guest_handle(sysctl.u.livepatch.u.upload.payload, local);
 
@@ -656,7 +657,6 @@ int xc_livepatch_get(xc_interface *xch,
 
     sysctl.cmd = XEN_SYSCTL_livepatch_op;
     sysctl.u.livepatch.cmd = XEN_SYSCTL_LIVEPATCH_GET;
-    sysctl.u.livepatch.pad = 0;
 
     sysctl.u.livepatch.u.get.status.state = 0;
     sysctl.u.livepatch.u.get.status.rc = 0;
@@ -985,7 +985,6 @@ static int _xc_livepatch_action(xc_interface *xch,
 
     sysctl.cmd = XEN_SYSCTL_livepatch_op;
     sysctl.u.livepatch.cmd = XEN_SYSCTL_LIVEPATCH_ACTION;
-    sysctl.u.livepatch.pad = 0;
     sysctl.u.livepatch.u.action.cmd = action;
     sysctl.u.livepatch.u.action.timeout = timeout;
     sysctl.u.livepatch.u.action.flags = flags;

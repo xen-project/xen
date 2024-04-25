@@ -2125,7 +2125,8 @@ int livepatch_op(struct xen_sysctl_livepatch_op *livepatch)
 {
     int rc;
 
-    if ( livepatch->pad )
+    if ( (livepatch->flags & ~LIVEPATCH_FLAGS_MASK) &&
+         !(livepatch->flags & LIVEPATCH_FLAG_FORCE) )
         return -EINVAL;
 
     switch ( livepatch->cmd )

@@ -2555,7 +2555,8 @@ int xc_psr_get_hw_info(xc_interface *xch, uint32_t socket,
 #endif
 
 int xc_livepatch_upload(xc_interface *xch,
-                        char *name, unsigned char *payload, uint32_t size);
+                        char *name, unsigned char *payload, uint32_t size,
+                        bool force);
 
 int xc_livepatch_get(xc_interface *xch,
                      char *name,

@@ -1139,7 +1139,9 @@ struct xen_sysctl_livepatch_action {
 
 struct xen_sysctl_livepatch_op {
     uint32_t cmd;                           /* IN: XEN_SYSCTL_LIVEPATCH_*. */
-    uint32_t pad;                           /* IN: Always zero. */
+    uint32_t flags;                         /* IN, flags. */
+#define LIVEPATCH_FLAG_FORCE      (1u << 0) /* Skip some checks. */
+#define LIVEPATCH_FLAGS_MASK      LIVEPATCH_FLAG_FORCE
     union {
         struct xen_sysctl_livepatch_upload upload;
         struct xen_sysctl_livepatch_list list;
