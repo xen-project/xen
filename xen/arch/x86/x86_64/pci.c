@@ -9,7 +9,7 @@
 #include <asm/io.h>
 
 #define PCI_CONF_ADDRESS(sbdf, reg) \
-    (0x80000000 | ((sbdf).bdf << 8) | ((reg) & ~3))
+    (0x80000000U | ((sbdf).bdf << 8) | ((reg) & ~3))
 
 uint8_t pci_conf_read8(pci_sbdf_t sbdf, unsigned int reg)
 {
