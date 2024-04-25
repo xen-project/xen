@@ -1192,7 +1192,7 @@ unsigned int vmx_get_cpl(void)
 
     __vmread(GUEST_SS_AR_BYTES, &attr);
 
-    return (attr >> 5) & 3;
+    return MASK_EXTR(attr, X86_SEG_AR_DPL);
 }
 
 static unsigned int cf_check _vmx_get_cpl(struct vcpu *v)
