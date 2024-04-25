@@ -937,19 +937,12 @@ void paging_dump_vcpu_info(struct vcpu *v)
     {
         printk("    paging assistance: ");
         if ( paging_mode_shadow(v->domain) )
-        {
-            if ( paging_get_hostmode(v) )
-                printk("shadowed %u-on-%u\n",
-                       paging_get_hostmode(v)->guest_levels,
-                       paging_get_hostmode(v)->shadow.shadow_levels);
-            else
-                printk("not shadowed\n");
-        }
-        else if ( paging_mode_hap(v->domain) && paging_get_hostmode(v) )
+            printk("shadowed %u-on-%u\n",
+                   paging_get_hostmode(v)->guest_levels,
+                   paging_get_hostmode(v)->shadow.shadow_levels);
+        else
             printk("hap, %u levels\n",
                    paging_get_hostmode(v)->guest_levels);
-        else
-            printk("none\n");
     }
 }
 
