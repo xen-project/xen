@@ -4,7 +4,8 @@
 /* Helpers for different page granularities. */
 #define PAGE_SIZE_GRAN(gran)        ((paddr_t)1 << PAGE_SHIFT_##gran)
 #define PAGE_MASK_GRAN(gran)        (-PAGE_SIZE_GRAN(gran))
-#define PAGE_ALIGN_GRAN(gran, addr) ((addr + ~PAGE_MASK_##gran) & PAGE_MASK_##gran)
+#define PAGE_ALIGN_GRAN(gran, addr) (((addr) + ~PAGE_MASK_##gran) & \
+                                     PAGE_MASK_##gran)
 
 #define PAGE_SHIFT_4K               12
 #define PAGE_SIZE_4K                PAGE_SIZE_GRAN(4K)
