@@ -572,13 +572,13 @@ int main(int argc, char *argv[])
         return 0;
     }
     for ( i = 0; i < ARRAY_SIZE(main_options); i++ )
-        if (!strncmp(main_options[i].name, argv[1], strlen(argv[1])))
+        if (!strcmp(main_options[i].name, argv[1]))
             break;
 
     if ( i == ARRAY_SIZE(main_options) )
     {
         for ( j = 0; j < ARRAY_SIZE(action_options); j++ )
-            if (!strncmp(action_options[j].name, argv[1], strlen(argv[1])))
+            if (!strcmp(action_options[j].name, argv[1]))
                 break;
 
         if ( j == ARRAY_SIZE(action_options) )
