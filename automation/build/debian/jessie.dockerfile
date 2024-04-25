@@ -37,8 +37,6 @@ RUN apt-get update && \
         bin86 \
         bcc \
         liblzma-dev \
-        # libc6-dev-i386 for Xen < 4.15
-        libc6-dev-i386 \
         libnl-3-dev \
         ocaml-nox \
         libfindlib-ocaml-dev \

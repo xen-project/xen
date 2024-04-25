@@ -21,8 +21,6 @@ RUN dnf -y install \
         yajl-devel \
         pixman-devel \
         glibc-devel \
-        # glibc-devel.i686 for Xen < 4.15
-        glibc-devel.i686 \
         make \
         binutils \
         git \
