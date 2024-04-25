@@ -59,6 +59,7 @@ RUN zypper install -y --no-recommends \
         'pkgconfig(sdl2)' \
         python3-devel \
         python3-setuptools \
+        # systemd-devel for Xen < 4.19
         systemd-devel \
         tar \
         transfig \

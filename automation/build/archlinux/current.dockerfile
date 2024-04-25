@@ -37,6 +37,7 @@ RUN pacman -S --refresh --sysupgrade --noconfirm --noprogressbar --needed \
         sdl2 \
         spice \
         spice-protocol \
+        # systemd for Xen < 4.19
         systemd \
         transfig \
         usbredir \

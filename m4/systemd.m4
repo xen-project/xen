@@ -41,15 +41,6 @@ AC_DEFUN([AX_ALLOW_SYSTEMD_OPTS], [
 ])
 
 AC_DEFUN([AX_CHECK_SYSTEMD_LIBS], [
-	PKG_CHECK_MODULES([SYSTEMD], [libsystemd-daemon],,
-		[PKG_CHECK_MODULES([SYSTEMD], [libsystemd >= 209])]
-        )
-	dnl pkg-config older than 0.24 does not set these for
-	dnl PKG_CHECK_MODULES() worth also noting is that as of version 208
-	dnl of systemd pkg-config --cflags currently yields no extra flags yet.
-	AC_SUBST([SYSTEMD_CFLAGS])
-	AC_SUBST([SYSTEMD_LIBS])
-
 	AS_IF([test "x$SYSTEMD_DIR" = x], [
 	    dnl In order to use the line below we need to fix upstream systemd
 	    dnl to properly ${prefix} for child variables in
