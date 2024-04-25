@@ -4105,9 +4105,9 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
     __vmread(VM_EXIT_REASON, &exit_reason);
 
     if ( hvm_long_mode_active(v) )
-        TRACE_TIME(TRC_HVM_VMEXIT64, exit_reason, regs->rip, regs->rip >> 32);
+        TRACE_TIME(TRC_HVM_VMX_EXIT64, exit_reason, regs->rip, regs->rip >> 32);
     else
-        TRACE_TIME(TRC_HVM_VMEXIT, exit_reason, regs->eip);
+        TRACE_TIME(TRC_HVM_VMX_EXIT, exit_reason, regs->eip);
 
     perfc_incra(vmexits, (uint16_t)exit_reason);
 

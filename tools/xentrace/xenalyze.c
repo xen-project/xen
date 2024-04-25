@@ -1437,14 +1437,6 @@ void init_hvm_data(struct hvm_data *h, struct vcpu_data *v) {
 
     h->init = 1;
 
-    if(opt.svm_mode) {
-        h->exit_reason_max = HVM_SVM_EXIT_REASON_MAX;
-        h->exit_reason_name = hvm_svm_exit_reason_name;
-    } else {
-        h->exit_reason_max = HVM_VMX_EXIT_REASON_MAX;
-        h->exit_reason_name = hvm_vmx_exit_reason_name;
-    }
-
     if(opt.histogram_interrupt_eip) {
         int count = ((1ULL<<ADDR_SPACE_BITS)/opt.histogram_interrupt_increment);
         size_t size = count * sizeof(int);
@@ -1460,6 +1452,18 @@ void init_hvm_data(struct hvm_data *h, struct vcpu_data *v) {
     }
     for(i=0; i<GUEST_INTERRUPT_MAX+1; i++)
         h->summary.guest_interrupt[i].count=0;
+}
+
+void set_hvm_exit_reason_data(struct hvm_data *h, unsigned event) {
+    if (((event & ~TRC_64_FLAG) == TRC_HVM_SVM_EXIT) ||
+        opt.svm_mode) {
+        opt.svm_mode = 1;
+        h->exit_reason_max = HVM_SVM_EXIT_REASON_MAX;
+        h->exit_reason_name = hvm_svm_exit_reason_name;
+    } else {
+        h->exit_reason_max = HVM_VMX_EXIT_REASON_MAX;
+        h->exit_reason_name = hvm_vmx_exit_reason_name;
+    }
 }
 
 /* PV data */
@@ -5088,13 +5092,13 @@ void hvm_vmexit_process(struct record_info *ri, struct hvm_data *h,
 
     r = (typeof(r))ri->d;
 
-    if(!h->init)
-        init_hvm_data(h, v);
+    if(!h->exit_reason_name)
+        set_hvm_exit_reason_data(h, ri->event);
 
     h->vmexit_valid=1;
     bzero(&h->inflight, sizeof(h->inflight));
 
-    if(ri->event == TRC_HVM_VMEXIT64) {
+    if(ri->event & TRC_64_FLAG) {
         if(v->guest_paging_levels != 4)
         {
             if ( verbosity >= 6 )
@@ -5316,8 +5320,10 @@ void hvm_process(struct pcpu_info *p)
         break;
     default:
         switch(ri->event) {
-        case TRC_HVM_VMEXIT:
-        case TRC_HVM_VMEXIT64:
+        case TRC_HVM_VMX_EXIT:
+        case TRC_HVM_VMX_EXIT64:
+        case TRC_HVM_SVM_EXIT:
+        case TRC_HVM_SVM_EXIT64:
             UPDATE_VOLUME(p, hvm[HVM_VOL_VMEXIT], ri->size);
             hvm_vmexit_process(ri, h, v);
             break;
@@ -10883,11 +10889,6 @@ const struct argp_option cmd_opts[] =  {
       .group = OPT_GROUP_HARDWARE,
       .arg = "HZ",
       .doc = "Cpu speed of the tracing host, used to convert tsc into seconds.", },
-
-    { .name = "svm-mode",
-      .key = OPT_SVM_MODE,
-      .group = OPT_GROUP_HARDWARE,
-      .doc = "Assume AMD SVM-style vmexit error codes.  (Default is Intel VMX.)", },
 
     { .name = "progress",
       .key = OPT_PROGRESS,

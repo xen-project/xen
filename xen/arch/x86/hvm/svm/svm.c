@@ -2571,10 +2571,10 @@ void asmlinkage svm_vmexit_handler(void)
     exit_reason = vmcb->exitcode;
 
     if ( hvm_long_mode_active(v) )
-        TRACE_TIME(TRC_HVM_VMEXIT64 | (vcpu_guestmode ? TRC_HVM_NESTEDFLAG : 0),
+        TRACE_TIME(TRC_HVM_SVM_EXIT64 | (vcpu_guestmode ? TRC_HVM_NESTEDFLAG : 0),
                    exit_reason, regs->rip, regs->rip >> 32);
     else
-        TRACE_TIME(TRC_HVM_VMEXIT | (vcpu_guestmode ? TRC_HVM_NESTEDFLAG : 0),
+        TRACE_TIME(TRC_HVM_SVM_EXIT | (vcpu_guestmode ? TRC_HVM_NESTEDFLAG : 0),
                    exit_reason, regs->eip);
 
     if ( vcpu_guestmode )
