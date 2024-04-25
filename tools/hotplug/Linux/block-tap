@@ -18,11 +18,11 @@
 #
 # Usage:
 #
-# Target should be specified using the following syntax:
+# Disks should be specified using the following syntax:
 #
-# script=block-tap,vdev=xvda,target=<type>:<file>
+# vdev=xvda,backendtype=tap,format=vhd,target=/srv/target.vhd
 #
-# Type is either "aio" (for raw files), or "vhd"
+# format is either "aio" (for raw files), or "vhd"
 
 dir=$(dirname "$0")
 . "$dir/block-common.sh"
@@ -36,10 +36,6 @@ check_tools()
 {
     if ! command -v tap-ctl > /dev/null 2>&1; then
         fatal "Unable to find tap-ctl tool"
-    fi
-    modprobe blktap
-    if ! tap-ctl check >& /dev/null ; then
-	fatal "Blocktap kernel module not available"
     fi
 }
 
@@ -81,7 +77,109 @@ find_device()
     done
 
     if [ -z "$pid" ] || [ -z "$minor" ]; then
-        fatal "cannot find required parameters"
+        return 1
+    fi
+
+    return 0
+}
+
+count_using()
+{
+    local file="$1"
+    local dom
+    local dev
+    local f
+
+    local i=0
+    local base_path="$XENBUS_BASE_PATH/$XENBUS_TYPE"
+    for dom in $(xenstore-list "$base_path")
+    do
+        for dev in $(xenstore-list "$base_path/$dom")
+        do
+            f=$(xenstore_read_default "$base_path/$dom/$dev/params" "")
+            f=$(echo "$f" | cut -d ":" -f 2)
+
+            if [ -n "$f" ] && [ "$file" = $f ] ; then
+                i=$(( i + 1 ))
+            fi
+        done
+    done
+
+    echo "$i"
+}
+
+# tap_shared is used to determine if a shared tap can be closed
+# Since a stubdom and a guest both use the same tap, it can only
+# be freed when there is a single one left.
+tap_shared() {
+    [ $( count_using "$file" ) -gt 1 ]
+}
+
+check_tap_sharing()
+{
+    local file="$1"
+    local mode="$2"
+    local dom
+    local dev
+
+    local base_path="$XENBUS_BASE_PATH/$XENBUS_TYPE"
+    for dom in $(xenstore-list "$base_path") ; do
+        for dev in $(xenstore-list "$base_path/$dom") ; do
+            local f=$(xenstore_read_default "$base_path/$dom/$dev/params" "")
+            f=$(echo "$f" | cut -d ":" -f 2)
+
+            if [ -n "$f" ] && [ "$file" = "$f" ] ; then
+                if [ "$mode" = 'w' ] ; then
+                    if ! same_vm $dom ; then
+                        echo "guest $f"
+                        return
+                    fi
+                else
+                    local m=$(xenstore_read_default "$base_path/$dom/$dev/mode"
+                                                    "")
+                    m=$(canonicalise_mode "$m")
+
+                    if [ "$m" = 'w' ] ; then
+                        if ! same_vm $dom ; then
+                            echo "guest $f"
+                            return
+                        fi
+                    fi
+                fi
+            fi
+        done
+    done
+
+    echo 'ok'
+}
+
+tap_create()
+{
+    if ! minor=$( tap-ctl allocate ) ; then
+        fatal "Could not allocate minor"
+    fi
+
+    # Handle with or without kernel blktap
+    minor=${minor#/run/blktap-control/tapdisk/tapdisk-}
+    minor=${minor#/dev/xen/blktap-2/tapdev}
+
+    # tap-ctl is spawning tapdisk which would hold the _lockfd open.
+    # Ensure it is closed before running tap-ctl spawn, which needs to be
+    # done in a subshell to continue holding the lock in the parent.
+    if ! pid=$( ( eval "exec $_lockfd>&-" ; tap-ctl spawn ) ) ; then
+        tap-ctl free -m "$minor"
+        fatal "Could not spawn tapdisk for $minor"
+    fi
+
+    if ! tap-ctl attach -p "$pid" -m "$minor" ; then
+        tap-ctl free -m "$minor"
+        fatal "Could not attach $pid and $minor"
+    fi
+
+    if ! tap-ctl open -p "$pid" -m "$minor" -a "$target" ; then
+        tap-ctl detach -p "$pid" -m "$minor"
+        tap-ctl free -m "$minor"
+        fatal "Could not open \"$target\""
     fi
 }
 
@@ -89,15 +187,54 @@ find_device()
 # the device
 add()
 {
-    dev=$(tap-ctl create -a $target)
-    write_dev $dev
+    local result
+
+    claim_lock "block"
+
+    if find_device; then
+        result=$( check_tap_sharing "$file" "$mode" )
+        if [ "$result" != "ok" ] ; then
+            do_ebusy "tap $type file $file in use " "$mode" "${result%% *}"
+        fi
+    else
+        tap_create
+    fi
+
+    # Create nbd unix path.  find_device/tap_create set pid & minor
+    dev=$( printf "/run/blktap-control/nbd%ld.%d" "$pid" "$minor" )
+
+    xenstore_write "$XENBUS_PATH/pid" "$pid"
+    xenstore_write "$XENBUS_PATH/minor" "$minor"
+    # dev, as a unix socket, would end up with major:minor 0:0 in
+    # physical-device if write_dev were used.  tapback would be thrown off by
+    # that incorrect minor, so just skip writing physical-device.
+    xenstore_write "$XENBUS_PATH/physical-device-path" "$dev"
+
+    success
+
+    release_lock "block"
 }
 
 # Disconnects the device
 remove()
 {
-    find_device
-    do_or_die tap-ctl destroy -p ${pid} -m ${minor} > /dev/null
+    local minor
+    local pid
+
+    claim_lock "block"
+
+    if tap_shared ; then
+        return
+    fi
+
+    minor=$( xenstore_read "$XENBUS_PATH/minor" )
+    pid=$( xenstore_read "$XENBUS_PATH/pid" )
+
+    [ -n "$minor" ] || fatal "minor missing"
+    [ -n "$pid" ] || fatal "pid missing"
+    do_or_die tap-ctl destroy -p "$pid" -m "$minor" > /dev/null
+
+    release_lock "block"
 }
 
 command=$1
@@ -109,6 +246,14 @@ fi
 parse_target "$target"
 
 check_tools || exit 1
+
+mode=$( xenstore_read $XENBUS_PATH/mode )
+mode=$( canonicalise_mode $mode )
+
+# needed for same_vm
+FRONTEND_ID=$(xenstore_read "$XENBUS_PATH/frontend-id")
+FRONTEND_UUID=$(xenstore_read_default \
+                    "/local/domain/$FRONTEND_ID/vm" 'unknown')
 
 case $command in
 add)
