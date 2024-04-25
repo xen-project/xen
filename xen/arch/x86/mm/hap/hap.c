@@ -522,7 +522,7 @@ int hap_enable(struct domain *d, u32 mode)
                goto out;
         }
 
-        d->arch.altp2m_active = 0;
+        d->arch.altp2m_active = false;
     }
 
     /* Now let other users see the new mode */
@@ -585,7 +585,7 @@ void hap_teardown(struct domain *d, bool *preempted)
             for_each_vcpu ( d, v )
                 altp2m_vcpu_disable_ve(v);
 
-        d->arch.altp2m_active = 0;
+        d->arch.altp2m_active = false;
 
         FREE_XENHEAP_PAGE(d->arch.altp2m_eptp);
         FREE_XENHEAP_PAGE(d->arch.altp2m_visible_eptp);
