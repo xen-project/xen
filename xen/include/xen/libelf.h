@@ -288,7 +288,7 @@ bool elf_access_ok(struct elf_binary * elf,
 #define elf_store_val(elf, type, ptr, val)                              \
     ({                                                                  \
         typeof(type) elf_store__val = (val);                            \
-        elf_ptrval elf_store__targ = ptr;                               \
+        elf_ptrval elf_store__targ = (ptr);                             \
         if (elf_access_ok((elf), elf_store__targ,                       \
                           sizeof(elf_store__val))) {			\
             elf_memcpy_unchecked((void*)elf_store__targ, &elf_store__val, \
