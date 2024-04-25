@@ -1915,7 +1915,6 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                     continue;
                 }
 
-                assert(disks[i].backend != LIBXL_DISK_BACKEND_TAP);
                 target_path = libxl__device_disk_find_local_path(gc,
                                     guest_domid, &disks[i], true);
 

@@ -1361,7 +1361,8 @@ char *libxl__device_disk_find_local_path(libxl__gc *gc,
      * If the format isn't raw and / or we're using a script, then see
      * if the script has written a path to the "cooked" node
      */
-    if (disk->script && guest_domid != INVALID_DOMID) {
+    if ((disk->script && guest_domid != INVALID_DOMID) ||
+        disk->backend == LIBXL_DISK_BACKEND_TAP) {
         libxl__device device;
         char *be_path, *pdpath;
         int rc;
@@ -1381,10 +1382,19 @@ char *libxl__device_disk_find_local_path(libxl__gc *gc,
         LOGD(DEBUG, guest_domid, "Attempting to read node %s", pdpath);
         path = libxl__xs_read(gc, XBT_NULL, pdpath);
 
-        if (path)
+        if (path) {
             LOGD(DEBUG, guest_domid, "Accessing cooked block device %s", path);
-        else
-            LOGD(DEBUG, guest_domid, "No physical-device-path, can't access locally.");
+
+            /* tapdisk exposes disks locally over UNIX socket NBD. */
+            if (disk->backend == LIBXL_DISK_BACKEND_TAP) {
+                path = libxl__sprintf(gc, "nbd+unix:///?socket=%s", path);
+                LOGD(DEBUG, guest_domid,
+                     "Directly accessing local TAP target %s", path);
+            }
+        } else {
+            LOGD(DEBUG, guest_domid,
+                "No physical-device-path, can't access locally.");
+        }
 
         goto out;
     }
