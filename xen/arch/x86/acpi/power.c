@@ -422,12 +422,12 @@ static void tboot_sleep(u8 sleep_state)
 {
     uint32_t shutdown_type;
 
-#define TB_COPY_GAS(tbg, g)             \
-    tbg.space_id = g.space_id;          \
-    tbg.bit_width = g.bit_width;        \
-    tbg.bit_offset = g.bit_offset;      \
-    tbg.access_width = g.access_width;  \
-    tbg.address = g.address;
+#define TB_COPY_GAS(tbg, g)                 \
+    (tbg).space_id = (g).space_id;          \
+    (tbg).bit_width = (g).bit_width;        \
+    (tbg).bit_offset = (g).bit_offset;      \
+    (tbg).access_width = (g).access_width;  \
+    (tbg).address = (g).address;
 
     /* sizes are not same (due to packing) so copy each one */
     TB_COPY_GAS(g_tboot_shared->acpi_sinfo.pm1a_cnt_blk,
