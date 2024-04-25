@@ -42,6 +42,11 @@ enum membank_type {
      * in reserved_mem.
      */
     MEMBANK_STATIC_HEAP,
+    /*
+     * The MEMBANK_FDT_RESVMEM type is used to indicate whether the memory
+     * bank is from the FDT reserve map.
+     */
+    MEMBANK_FDT_RESVMEM,
 };
 
 /* Indicates the maximum number of characters(\0 included) for shm_id */

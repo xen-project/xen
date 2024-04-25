@@ -73,33 +73,6 @@ static paddr_t __init consider_modules(paddr_t s, paddr_t e,
         }
     }
 
-    /* Now check any fdt reserved areas. */
-
-    nr = fdt_num_mem_rsv(device_tree_flattened);
-
-    for ( ; i < mi->nr_mods + nr; i++ )
-    {
-        paddr_t mod_s, mod_e;
-
-        if ( fdt_get_mem_rsv_paddr(device_tree_flattened,
-                                   i - mi->nr_mods,
-                                   &mod_s, &mod_e ) < 0 )
-            /* If we can't read it, pretend it doesn't exist... */
-            continue;
-
-        /* fdt_get_mem_rsv_paddr returns length */
-        mod_e += mod_s;
-
-        if ( s < mod_e && mod_s < e )
-        {
-            mod_e = consider_modules(mod_e, e, size, align, i+1);
-            if ( mod_e )
-                return mod_e;
-
-            return consider_modules(s, mod_s, size, align, i+1);
-        }
-    }
-
     /*
      * i is the current bootmodule we are evaluating, across all
      * possible kinds of bootmodules.
@@ -108,7 +81,7 @@ static paddr_t __init consider_modules(paddr_t s, paddr_t e,
      * need to index the reserved_mem bank starting from 0, and only counting
      * the reserved-memory modules. Hence, we need to use i - nr.
      */
-    nr += mi->nr_mods;
+    nr = mi->nr_mods;
     for ( ; i - nr < reserved_mem->nr_banks; i++ )
     {
         paddr_t r_s = reserved_mem->bank[i - nr].start;

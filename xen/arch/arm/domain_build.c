@@ -793,7 +793,8 @@ int __init make_memory_node(const struct kernel_info *kinfo, int addrcells,
         u64 start = mem->bank[i].start;
         u64 size = mem->bank[i].size;
 
-        if ( mem->bank[i].type == MEMBANK_STATIC_DOMAIN )
+        if ( (mem->bank[i].type == MEMBANK_STATIC_DOMAIN) ||
+             (mem->bank[i].type == MEMBANK_FDT_RESVMEM) )
             continue;
 
         nr_cells += reg_size;

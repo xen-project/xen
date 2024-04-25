@@ -210,48 +210,18 @@ static void __init dt_unreserved_regions(paddr_t s, paddr_t e,
     const struct membanks *reserved_mem = bootinfo_get_reserved_mem();
 #ifdef CONFIG_STATIC_SHM
     const struct membanks *shmem = bootinfo_get_shmem();
+    unsigned int offset;
 #endif
-    unsigned int i, nr;
-    int rc;
-
-    rc = fdt_num_mem_rsv(device_tree_flattened);
-    if ( rc < 0 )
-        panic("Unable to retrieve the number of reserved regions (rc=%d)\n",
-              rc);
-
-    nr = rc;
-
-    for ( i = first; i < nr ; i++ )
-    {
-        paddr_t r_s, r_e;
-
-        if ( fdt_get_mem_rsv_paddr(device_tree_flattened, i, &r_s, &r_e ) < 0 )
-            /* If we can't read it, pretend it doesn't exist... */
-            continue;
-
-        r_e += r_s; /* fdt_get_mem_rsv_paddr returns length */
-
-        if ( s < r_e && r_s < e )
-        {
-            dt_unreserved_regions(r_e, e, cb, i+1);
-            dt_unreserved_regions(s, r_s, cb, i+1);
-            return;
-        }
-    }
+    unsigned int i;
 
     /*
      * i is the current bootmodule we are evaluating across all possible
      * kinds.
-     *
-     * When retrieving the corresponding reserved-memory addresses
-     * below, we need to index the reserved_mem->bank starting
-     * from 0, and only counting the reserved-memory modules. Hence,
-     * we need to use i - nr.
      */
-    for ( ; i - nr < reserved_mem->nr_banks; i++ )
+    for ( i = first; i < reserved_mem->nr_banks; i++ )
     {
-        paddr_t r_s = reserved_mem->bank[i - nr].start;
-        paddr_t r_e = r_s + reserved_mem->bank[i - nr].size;
+        paddr_t r_s = reserved_mem->bank[i].start;
+        paddr_t r_e = r_s + reserved_mem->bank[i].size;
 
         if ( s < r_e && r_s < e )
         {
@@ -262,11 +232,16 @@ static void __init dt_unreserved_regions(paddr_t s, paddr_t e,
     }
 
 #ifdef CONFIG_STATIC_SHM
-    nr += reserved_mem->nr_banks;
-    for ( ; i - nr < shmem->nr_banks; i++ )
+    /*
+     * When retrieving the corresponding shared memory addresses
+     * below, we need to index the shmem->bank starting from 0, hence
+     * we need to use i - reserved_mem->nr_banks.
+    */
+    offset = reserved_mem->nr_banks;
+    for ( ; i - offset < shmem->nr_banks; i++ )
     {
-        paddr_t r_s = shmem->bank[i - nr].start;
-        paddr_t r_e = r_s + shmem->bank[i - nr].size;
+        paddr_t r_s = shmem->bank[i - offset].start;
+        paddr_t r_e = r_s + shmem->bank[i - offset].size;
 
         if ( s < r_e && r_s < e )
         {

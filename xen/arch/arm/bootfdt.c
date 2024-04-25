@@ -475,8 +475,7 @@ static void __init early_print_info(void)
     const struct membanks *mem_resv = bootinfo_get_reserved_mem();
     struct bootmodules *mods = &bootinfo.modules;
     struct bootcmdlines *cmds = &bootinfo.cmdlines;
-    unsigned int i, j;
-    int nr_rsvd;
+    unsigned int i;
 
     for ( i = 0; i < mi->nr_banks; i++ )
         printk("RAM: %"PRIpaddr" - %"PRIpaddr"\n",
@@ -490,26 +489,11 @@ static void __init early_print_info(void)
                 mods->module[i].start + mods->module[i].size,
                 boot_module_kind_as_string(mods->module[i].kind));
 
-    nr_rsvd = fdt_num_mem_rsv(device_tree_flattened);
-    if ( nr_rsvd < 0 )
-        panic("Parsing FDT memory reserve map failed (%d)\n", nr_rsvd);
-
-    for ( i = 0; i < nr_rsvd; i++ )
-    {
-        paddr_t s, e;
-
-        if ( fdt_get_mem_rsv_paddr(device_tree_flattened, i, &s, &e) < 0 )
-            continue;
-
-        /* fdt_get_mem_rsv_paddr returns length */
-        e += s;
-        printk(" RESVD[%u]: %"PRIpaddr" - %"PRIpaddr"\n", i, s, e);
-    }
-    for ( j = 0; j < mem_resv->nr_banks; j++, i++ )
+    for ( i = 0; i < mem_resv->nr_banks; i++ )
     {
         printk(" RESVD[%u]: %"PRIpaddr" - %"PRIpaddr"\n", i,
-               mem_resv->bank[j].start,
-               mem_resv->bank[j].start + mem_resv->bank[j].size - 1);
+               mem_resv->bank[i].start,
+               mem_resv->bank[i].start + mem_resv->bank[i].size - 1);
     }
     early_print_info_shmem();
     printk("\n");
@@ -550,7 +534,10 @@ static void __init swap_memory_node(void *_a, void *_b, size_t size)
  */
 size_t __init boot_fdt_info(const void *fdt, paddr_t paddr)
 {
+    struct membanks *reserved_mem = bootinfo_get_reserved_mem();
     struct membanks *mem = bootinfo_get_mem();
+    unsigned int i;
+    int nr_rsvd;
     int ret;
 
     ret = fdt_check_header(fdt);
@@ -558,6 +545,30 @@ size_t __init boot_fdt_info(const void *fdt, paddr_t paddr)
         panic("No valid device tree\n");
 
     add_boot_module(BOOTMOD_FDT, paddr, fdt_totalsize(fdt), false);
+
+    nr_rsvd = fdt_num_mem_rsv(fdt);
+    if ( nr_rsvd < 0 )
+        panic("Parsing FDT memory reserve map failed (%d)\n", nr_rsvd);
+
+    for ( i = 0; i < nr_rsvd; i++ )
+    {
+        struct membank *bank;
+        paddr_t s, sz;
+
+        if ( fdt_get_mem_rsv_paddr(device_tree_flattened, i, &s, &sz) < 0 )
+            continue;
+
+        if ( reserved_mem->nr_banks < reserved_mem->max_banks )
+        {
+            bank = &reserved_mem->bank[reserved_mem->nr_banks];
+            bank->start = s;
+            bank->size = sz;
+            bank->type = MEMBANK_FDT_RESVMEM;
+            reserved_mem->nr_banks++;
+        }
+        else
+            panic("Cannot allocate reserved memory bank\n");
+    }
 
     ret = device_tree_for_each_node(fdt, 0, early_scan_node, NULL);
     if ( ret )
