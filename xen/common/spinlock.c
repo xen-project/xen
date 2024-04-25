@@ -269,7 +269,7 @@ void spin_debug_disable(void)
         profile->lock_cnt++;                                                 \
     }
 #define LOCK_PROFILE_VAR(var, val)    s_time_t var = (val)
-#define LOCK_PROFILE_BLOCK(var)       var = var ? : NOW()
+#define LOCK_PROFILE_BLOCK(var)       (var) = (var) ? : NOW()
 #define LOCK_PROFILE_BLKACC(tst, val)                                        \
     if ( tst )                                                               \
     {                                                                        \

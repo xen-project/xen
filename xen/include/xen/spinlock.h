@@ -141,7 +141,7 @@ struct lock_profile_qhead {
         }                                                                     \
         prof->name = #l;                                                      \
         prof->ptr.lockptr = &(s)->l;                                          \
-        prof->is_rlock = isr;                                                 \
+        prof->is_rlock = (isr);                                               \
         prof->next = (s)->profile_head.elem_q;                                \
         (s)->profile_head.elem_q = prof;                                      \
     } while( 0 )
