@@ -634,7 +634,7 @@ static void __init print_details(enum ind_thunk thunk)
            (boot_cpu_has(X86_FEATURE_SC_MSR_HVM) ||
             boot_cpu_has(X86_FEATURE_SC_RSB_HVM) ||
             boot_cpu_has(X86_FEATURE_IBPB_ENTRY_HVM) ||
-            cpu_has_bhb_seq || amd_virt_spec_ctrl ||
+            opt_bhb_entry_hvm || amd_virt_spec_ctrl ||
             opt_eager_fpu || opt_verw_hvm)           ? ""               : " None",
            boot_cpu_has(X86_FEATURE_SC_MSR_HVM)      ? " MSR_SPEC_CTRL" : "",
            (boot_cpu_has(X86_FEATURE_SC_MSR_HVM) ||
@@ -643,7 +643,7 @@ static void __init print_details(enum ind_thunk thunk)
            opt_eager_fpu                             ? " EAGER_FPU"     : "",
            opt_verw_hvm                              ? " VERW"          : "",
            boot_cpu_has(X86_FEATURE_IBPB_ENTRY_HVM)  ? " IBPB-entry"    : "",
-           cpu_has_bhb_seq                           ? " BHB-entry"     : "");
+           opt_bhb_entry_hvm                         ? " BHB-entry"     : "");
 
 #endif
 #ifdef CONFIG_PV
@@ -651,14 +651,14 @@ static void __init print_details(enum ind_thunk thunk)
            (boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
             boot_cpu_has(X86_FEATURE_SC_RSB_PV) ||
             boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV) ||
-            cpu_has_bhb_seq ||
+            opt_bhb_entry_pv ||
             opt_eager_fpu || opt_verw_pv)            ? ""               : " None",
            boot_cpu_has(X86_FEATURE_SC_MSR_PV)       ? " MSR_SPEC_CTRL" : "",
            boot_cpu_has(X86_FEATURE_SC_RSB_PV)       ? " RSB"           : "",
            opt_eager_fpu                             ? " EAGER_FPU"     : "",
            opt_verw_pv                               ? " VERW"          : "",
            boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV)   ? " IBPB-entry"    : "",
-           cpu_has_bhb_seq                           ? " BHB-entry"     : "");
+           opt_bhb_entry_pv                          ? " BHB-entry"     : "");
 
     printk("  XPTI (64-bit PV only): Dom0 %s, DomU %s (with%s PCID)\n",
            opt_xpti_hwdom ? "enabled" : "disabled",
