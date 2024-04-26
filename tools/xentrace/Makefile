@@ -10,7 +10,6 @@ LDLIBS += $(ARGP_LDFLAGS)
 BIN     := xenalyze
 SBIN    := xentrace xentrace_setsize
 LIBBIN  := xenctx
-SCRIPTS := xentrace_format
 
 TARGETS := $(BIN) $(SBIN) $(LIBBIN)
 
@@ -24,13 +23,11 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
 	$(INSTALL_PROG) $(BIN) $(DESTDIR)$(bindir)
 	$(INSTALL_PROG) $(SBIN) $(DESTDIR)$(sbindir)
-	$(INSTALL_PYTHON_PROG) $(SCRIPTS) $(DESTDIR)$(bindir)
 	$(INSTALL_PROG) $(LIBBIN) $(DESTDIR)$(LIBEXEC_BIN)
 
 .PHONY: uninstall
 uninstall:
 	rm -f $(addprefix $(DESTDIR)$(LIBEXEC_BIN)/, $(LIBBIN))
-	rm -f $(addprefix $(DESTDIR)$(bindir)/, $(SCRIPTS))
 	rm -f $(addprefix $(DESTDIR)$(sbindir)/, $(SBIN))
 	rm -f $(addprefix $(DESTDIR)$(bindir)/, $(BIN))
 

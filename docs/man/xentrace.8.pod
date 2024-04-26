@@ -20,7 +20,7 @@ D1...D5 are the trace data.
 Data is dumped onto the standard output (which must not be a TTY) or a
 I<FILE> specified on the command line.
 
-The output should be parsed using the tool xentrace_format, which can
+The output should be parsed using the tool xenalyze, which can
 produce human-readable output in ASCII format.
 
 
@@ -157,6 +157,3 @@ B<xentrace> collects the following events from the trace buffer:
 
 Mark A. Williamson <mark.a.williamson@intel.com>
 
-=head1 SEE ALSO
-
-xentrace_format(1)

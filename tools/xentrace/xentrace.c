@@ -848,7 +848,7 @@ static void usage(int status)
 "\n" \
 "  CPU(uint) TSC(uint64_t) EVENT(uint32_t) D1 D2 D3 D4 D5 (all uint32_t)\n" \
 "\n" \
-"The output should be parsed using the tool xentrace_format,\n" \
+"The output should be parsed using the tool xenalyze,\n" \
 "which can produce human-readable output in ASCII format.\n" 
 
     printf(USAGE_STR);
