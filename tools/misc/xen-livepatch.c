@@ -576,7 +576,7 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    if ( strcmp("--force", argv[1]) )
+    if ( !strcmp("--force", argv[1]) )
     {
         if ( argc <= 2 )
         {
