@@ -21,6 +21,7 @@
 #define _XOPEN_SOURCE 600
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <argp.h>
 #include <inttypes.h>
 #include <limits.h>
@@ -5305,8 +5306,11 @@ void hvm_process(struct pcpu_info *p)
 
     assert(p->current);
 
-    if(vcpu_set_data_type(p->current, VCPU_DATA_HVM))
-        return;
+    /* HVM_EMUL types show up in all contexts */
+    if(ri->evt.sub != 0x4) {
+        if(vcpu_set_data_type(p->current, VCPU_DATA_HVM))
+            return;
+    }
 
     switch ( ri->evt.sub ) {
     case 2: /* HVM_HANDLER */
@@ -9447,9 +9451,10 @@ static struct tl_assert_mask tl_assert_checks[TOPLEVEL_MAX] = {
 /* There are a lot of common assumptions for the various processing
  * routines.  Check them all in one place, doing something else if
  * they don't pass. */
-int toplevel_assert_check(int toplevel, struct pcpu_info *p)
+int toplevel_assert_check(int toplevel, struct record_info *ri, struct pcpu_info *p)
 {
     struct tl_assert_mask mask;
+    bool is_hvm_emul = (toplevel == TOPLEVEL_HVM) && (ri->evt.sub == 0x4);
 
     mask = tl_assert_checks[toplevel];
 
@@ -9459,7 +9464,7 @@ int toplevel_assert_check(int toplevel, struct pcpu_info *p)
         goto fail;
     }
 
-    if( mask.not_idle_domain )
+    if( mask.not_idle_domain && !is_hvm_emul)
     {
         /* Can't do this check w/o first doing above check */
         assert(mask.p_current);
@@ -9478,7 +9483,8 @@ int toplevel_assert_check(int toplevel, struct pcpu_info *p)
         v = p->current;
 
         if ( ! (v->data_type == VCPU_DATA_NONE
-                || v->data_type == mask.vcpu_data_mode) )
+                || v->data_type == mask.vcpu_data_mode
+                || is_hvm_emul) )
         {
             /* This may happen for track_dirty_vram, which causes a SHADOW_WRMAP_BF trace f/ dom0 */
             fprintf(warn, "WARNING: Unexpected vcpu data type for d%dv%d on proc %d! Expected %d got %d. Not processing\n",
@@ -9525,7 +9531,7 @@ void process_record(struct pcpu_info *p) {
         return;
 
     /* Unify toplevel assertions */
-    if ( toplevel_assert_check(toplevel, p) )
+    if ( toplevel_assert_check(toplevel, ri, p) )
     {
         switch(toplevel) {
         case TRC_GEN_MAIN:
