@@ -54,10 +54,9 @@ static __init void error(const char *x)
 
 static __init int fill_inbuf(void)
 {
-        error("ran out of input data");
-        return 0;
+    error("ran out of input data");
+    return 0;
 }
-
 
 #include "inflate.c"
 
@@ -122,3 +121,12 @@ __init int perform_gunzip(char *output, char *image, unsigned long image_len)
 
     return rc;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
