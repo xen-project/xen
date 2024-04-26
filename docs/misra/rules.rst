@@ -651,11 +651,47 @@ maintainers if you want to suggest a change.
        declared
      - See comment for Rule 21.1
 
+   * - `Rule 21.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_21_06.c>`_
+     - Required
+     - The Standard Library input/output routines shall not be used
+     - Xen doesn't provide, use, or link against a Standard Library [#xen-stdlib]_
+
+   * - `Rule 21.9 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_21_09.c>`_
+     - Required
+     - The library functions bsearch and qsort of <stdlib.h> shall not be used
+     - Xen doesn't provide, use, or link against a Standard Library [#xen-stdlib]_
+
+   * - `Rule 21.10 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_21_10.c>`_
+     - Required
+     - The Standard Library time and date routines shall not be used
+     - Xen doesn't provide, use, or link against a Standard Library [#xen-stdlib]_
+
    * - `Rule 21.13 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_21_13.c>`_
      - Mandatory
      - Any value passed to a function in <ctype.h> shall be representable as an
        unsigned char or be the value EOF
      -
+
+   * - `Rule 21.14 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_21_14.c>`_
+     - Required
+     - The Standard Library function memcmp shall not be used to compare
+       null terminated strings
+     -
+
+   * - `Rule 21.15 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_21_15.c>`_
+     - Required
+     - The pointer arguments to the Standard Library functions memcpy,
+       memmove and memcmp shall be pointers to qualified or unqualified
+       versions of compatible types
+     -
+
+   * - `Rule 21.16 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_21_16.c>`_
+     - Required
+     - The pointer arguments to the Standard Library function memcmp
+       shall point to either a pointer type, an essentially signed type,
+       an essentially unsigned type, an essentially Boolean type or an
+       essentially enum type
+     - void* arguments are allowed
 
    * - `Rule 21.17 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_21_17.c>`_
      - Mandatory
@@ -722,3 +758,10 @@ A *switch clause* can be defined as:
 case/default labels".
 A formal definition is available within the amplification of MISRA C:2012
 Rule 16.1.
+
+.. rubric:: Footnotes
+
+.. [#xen-stdlib] Xen implements itself a few functions with names that match
+   the corresponding function names of the Standard Library for developers'
+   convenience. These functions are part of the Xen code and subject to
+   analysis.
