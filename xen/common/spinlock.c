@@ -789,7 +789,11 @@ static int __init cf_check lock_prof_init(void)
     {
         (*q)->next = lock_profile_glb_q.elem_q;
         lock_profile_glb_q.elem_q = *q;
-        (*q)->ptr.lock->profile = *q;
+
+        if ( (*q)->is_rlock )
+            (*q)->ptr.rlock->profile = *q;
+        else
+            (*q)->ptr.lock->profile = *q;
     }
 
     _lock_profile_register_struct(LOCKPROF_TYPE_GLOBAL,
