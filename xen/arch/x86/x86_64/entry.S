@@ -226,7 +226,7 @@ LABEL_LOCAL(.Lrestore_rcx_iret_exit_to_guest)
 /* No special register assumptions. */
 iret_exit_to_guest:
         andl  $~(X86_EFLAGS_IOPL | X86_EFLAGS_VM), EFRAME_eflags(%rsp)
-        orl   $X86_EFLAGS_IF, EFRAME_eflags(%rsp)
+        orb   $X86_EFLAGS_IF >> 8, EFRAME_eflags + 1(%rsp)
 
         SPEC_CTRL_COND_VERW     /* Req: %rsp=eframe                    Clob: efl */
 
@@ -355,7 +355,7 @@ LABEL(sysenter_eflags_saved, 0)
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         /* PUSHF above has saved EFLAGS.IF clear (the caller had it set). */
-        orl   $X86_EFLAGS_IF, UREGS_eflags(%rsp)
+        orb   $X86_EFLAGS_IF >> 8, UREGS_eflags + 1(%rsp)
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
         test  %rcx, %rcx
         jz    .Lsyse_cr3_okay
@@ -370,11 +370,11 @@ LABEL(sysenter_eflags_saved, 0)
         cmpb  $0,VCPU_sysenter_disables_events(%rbx)
         movq  VCPU_sysenter_addr(%rbx),%rax
         setne %cl
-        testl $X86_EFLAGS_NT,UREGS_eflags(%rsp)
+        testb $X86_EFLAGS_NT >> 8, UREGS_eflags + 1(%rsp)
         leaq  VCPU_trap_bounce(%rbx),%rdx
 UNLIKELY_START(nz, sysenter_nt_set)
         pushfq
-        andl  $~X86_EFLAGS_NT,(%rsp)
+        andb  $~(X86_EFLAGS_NT >> 8), 1(%rsp)
         popfq
 UNLIKELY_END(sysenter_nt_set)
         testq %rax,%rax
