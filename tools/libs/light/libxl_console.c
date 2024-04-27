@@ -351,11 +351,10 @@ int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
         flexarray_append(front, "protocol");
         flexarray_append(front, LIBXL_XENCONSOLE_PROTOCOL);
     }
-    libxl__device_generic_add(gc, XBT_NULL, device,
-                              libxl__xs_kvs_of_flexarray(gc, back),
-                              libxl__xs_kvs_of_flexarray(gc, front),
-                              libxl__xs_kvs_of_flexarray(gc, ro_front));
-    rc = 0;
+    rc = libxl__device_generic_add(gc, XBT_NULL, device,
+                                   libxl__xs_kvs_of_flexarray(gc, back),
+                                   libxl__xs_kvs_of_flexarray(gc, front),
+                                   libxl__xs_kvs_of_flexarray(gc, ro_front));
 out:
     return rc;
 }
@@ -665,6 +664,8 @@ int libxl_device_channel_getinfo(libxl_ctx *ctx, uint32_t domid,
               */
              if (!val) val = "/NO-SUCH-PATH";
              channelinfo->u.pty.path = strdup(val);
+             if (channelinfo->u.pty.path == NULL)
+                 abort();
              break;
          default:
              break;

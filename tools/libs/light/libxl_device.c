@@ -177,8 +177,13 @@ int libxl__device_generic_add(libxl__gc *gc, xs_transaction_t t,
     ro_frontend_perms[1].perms = backend_perms[1].perms = XS_PERM_READ;
 
 retry_transaction:
-    if (create_transaction)
+    if (create_transaction) {
         t = xs_transaction_start(ctx->xsh);
+        if (t == XBT_NULL) {
+            LOGED(ERROR, device->domid, "xs_transaction_start failed");
+            return ERROR_FAIL;
+        }
+    }
 
     /* FIXME: read frontend_path and check state before removing stuff */
 
@@ -195,42 +200,55 @@ retry_transaction:
         if (rc) goto out;
     }
 
-    /* xxx much of this function lacks error checks! */
-
     if (fents || ro_fents) {
-        xs_rm(ctx->xsh, t, frontend_path);
-        xs_mkdir(ctx->xsh, t, frontend_path);
+        if (!xs_rm(ctx->xsh, t, frontend_path) && errno != ENOENT)
+            goto out;
+        if (!xs_mkdir(ctx->xsh, t, frontend_path))
+            goto out;
         /* Console 0 is a special case. It doesn't use the regular PV
          * state machine but also the frontend directory has
          * historically contained other information, such as the
          * vnc-port, which we don't want the guest fiddling with.
          */
         if ((device->kind == LIBXL__DEVICE_KIND_CONSOLE && device->devid == 0) ||
-            (device->kind == LIBXL__DEVICE_KIND_VUART))
-            xs_set_permissions(ctx->xsh, t, frontend_path,
-                               ro_frontend_perms, ARRAY_SIZE(ro_frontend_perms));
-        else
-            xs_set_permissions(ctx->xsh, t, frontend_path,
-                               frontend_perms, ARRAY_SIZE(frontend_perms));
-        xs_write(ctx->xsh, t, GCSPRINTF("%s/backend", frontend_path),
-                 backend_path, strlen(backend_path));
-        if (fents)
-            libxl__xs_writev_perms(gc, t, frontend_path, fents,
-                                   frontend_perms, ARRAY_SIZE(frontend_perms));
-        if (ro_fents)
-            libxl__xs_writev_perms(gc, t, frontend_path, ro_fents,
-                                   ro_frontend_perms, ARRAY_SIZE(ro_frontend_perms));
+            (device->kind == LIBXL__DEVICE_KIND_VUART)) {
+            if (!xs_set_permissions(ctx->xsh, t, frontend_path,
+                                    ro_frontend_perms, ARRAY_SIZE(ro_frontend_perms)))
+                goto out;
+        } else {
+            if (!xs_set_permissions(ctx->xsh, t, frontend_path,
+                                    frontend_perms, ARRAY_SIZE(frontend_perms)))
+                goto out;
+        }
+        if (!xs_write(ctx->xsh, t, GCSPRINTF("%s/backend", frontend_path),
+                      backend_path, strlen(backend_path)))
+            goto out;
+        if (fents) {
+            rc = libxl__xs_writev_perms(gc, t, frontend_path, fents,
+                                        frontend_perms, ARRAY_SIZE(frontend_perms));
+            if (rc) goto out;
+        }
+        if (ro_fents) {
+            rc = libxl__xs_writev_perms(gc, t, frontend_path, ro_fents,
+                                        ro_frontend_perms, ARRAY_SIZE(ro_frontend_perms));
+            if (rc) goto out;
+        }
     }
 
     if (bents) {
         if (!libxl_only) {
-            xs_rm(ctx->xsh, t, backend_path);
-            xs_mkdir(ctx->xsh, t, backend_path);
-            xs_set_permissions(ctx->xsh, t, backend_path, backend_perms,
-                               ARRAY_SIZE(backend_perms));
-            xs_write(ctx->xsh, t, GCSPRINTF("%s/frontend", backend_path),
-                     frontend_path, strlen(frontend_path));
-            libxl__xs_writev(gc, t, backend_path, bents);
+            if (!xs_rm(ctx->xsh, t, backend_path) && errno != ENOENT)
+                goto out;
+            if (!xs_mkdir(ctx->xsh, t, backend_path))
+                goto out;
+            if (!xs_set_permissions(ctx->xsh, t, backend_path, backend_perms,
+                                    ARRAY_SIZE(backend_perms)))
+                goto out;
+            if (!xs_write(ctx->xsh, t, GCSPRINTF("%s/frontend", backend_path),
+                          frontend_path, strlen(frontend_path)))
+                goto out;
+            rc = libxl__xs_writev(gc, t, backend_path, bents);
+            if (rc) goto out;
         }
 
         /*
@@ -276,7 +294,7 @@ retry_transaction:
  out:
     if (create_transaction && t)
         libxl__xs_transaction_abort(gc, &t);
-    return rc;
+    return rc != 0 ? rc : ERROR_FAIL;
 }
 
 typedef struct {
