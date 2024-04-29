@@ -316,7 +316,7 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 	}
 
 	/*  If the type is WC, check that this processor supports it  */
-	if ((type == X86_MT_WC) && mtrr_have_wrcomb()) {
+	if ((type == X86_MT_WC) && !mtrr_have_wrcomb()) {
 		printk(KERN_WARNING
 		       "mtrr: your processor doesn't support write-combining\n");
 		return -EOPNOTSUPP;
