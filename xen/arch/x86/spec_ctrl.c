@@ -2328,7 +2328,7 @@ void __init init_speculation_mitigations(void)
          * unconditional WRMSR.  If we do have it, or we're not using any
          * prior conditional block, then it's safe to drop the LFENCE.
          */
-        if ( !cpu_has_bhb_seq &&
+        if ( !opt_bhb_entry_pv &&
              (boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
               !boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV)) )
             setup_force_cpu_cap(X86_SPEC_NO_LFENCE_ENTRY_PV);
@@ -2344,7 +2344,7 @@ void __init init_speculation_mitigations(void)
          * active in the block that is skipped when interrupting guest
          * context, then it's safe to drop the LFENCE.
          */
-        if ( !cpu_has_bhb_seq &&
+        if ( !opt_bhb_entry_pv &&
              (boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
               (!boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV) &&
                !boot_cpu_has(X86_FEATURE_SC_RSB_PV))) )
@@ -2356,7 +2356,7 @@ void __init init_speculation_mitigations(void)
          * A BHB sequence, if used, is the only conditional action, so if we
          * don't have it, we don't need the safety LFENCE.
          */
-        if ( !cpu_has_bhb_seq )
+        if ( !opt_bhb_entry_hvm )
             setup_force_cpu_cap(X86_SPEC_NO_LFENCE_ENTRY_VMX);
     }
 
