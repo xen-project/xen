@@ -21,6 +21,10 @@ map_strings("scheduled-analysis",analysis_kind)
 
 -eval_file=toolchain.ecl
 -eval_file=public_APIs.ecl
+
+-doc="Initially, there are no files tagged as adopted."
+-file_tag+={adopted,"none()"}
+
 if(not(scheduled_analysis),
     eval_file("adopted.ecl")
 )
