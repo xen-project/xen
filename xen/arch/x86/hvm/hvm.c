@@ -1197,12 +1197,13 @@ static int cf_check hvm_save_cpu_xsave_states(
     struct vcpu *v, hvm_domain_context_t *h)
 {
     struct hvm_hw_cpu_xsave *ctxt;
-    unsigned int size = HVM_CPU_XSAVE_SIZE(v->arch.xcr0_accum);
+    unsigned int size;
     int err;
 
-    if ( !cpu_has_xsave || !xsave_enabled(v) )
+    if ( !xsave_enabled(v) )
         return 0;   /* do nothing */
 
+    size = HVM_CPU_XSAVE_SIZE(v->arch.xcr0_accum);
     err = _hvm_init_entry(h, CPU_XSAVE_CODE, v->vcpu_id, size);
     if ( err )
         return err;
@@ -1254,6 +1255,11 @@ static int cf_check hvm_load_cpu_xsave_states(
     /* Fails since we can't restore an img saved on xsave-capable host. */
     if ( !cpu_has_xsave )
         return -EOPNOTSUPP;
+
+    /*
+     * Note: Xen prior to 4.12 would write out empty XSAVE records for VMs
+     * running on XSAVE-capable hardware but without XSAVE active.
+     */
 
     /* Customized checking for entry since our entry is of variable length */
     desc = (struct hvm_save_descriptor *)&h->data[h->cur];

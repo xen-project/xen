@@ -573,7 +573,7 @@ unsigned int xstate_ctxt_size(u64 xcr0)
     if ( xcr0 == xfeature_mask )
         return xsave_cntxt_size;
 
-    if ( xcr0 == 0 )
+    if ( xcr0 == 0 ) /* TODO: clean up paths passing 0 in here. */
         return 0;
 
     return hw_uncompressed_size(xcr0);
