@@ -26,7 +26,6 @@
 
 .eclair-analysis:triggered:
   extends: .eclair-analysis
-  allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
       when: never
