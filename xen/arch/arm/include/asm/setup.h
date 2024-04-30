@@ -64,18 +64,20 @@ struct membank {
 };
 
 struct membanks {
-    unsigned int nr_banks;
-    unsigned int max_banks;
+    __struct_group(membanks_hdr, common, ,
+        unsigned int nr_banks;
+        unsigned int max_banks;
+    );
     struct membank bank[];
 };
 
 struct meminfo {
-    struct membanks common;
+    struct membanks_hdr common;
     struct membank bank[NR_MEM_BANKS];
 };
 
 struct shared_meminfo {
-    struct membanks common;
+    struct membanks_hdr common;
     struct membank bank[NR_SHMEM_BANKS];
     struct shmem_membank_extra extra[NR_SHMEM_BANKS];
 };
@@ -166,25 +168,25 @@ extern domid_t max_init_domid;
 
 static inline struct membanks *bootinfo_get_mem(void)
 {
-    return &bootinfo.mem.common;
+    return container_of(&bootinfo.mem.common, struct membanks, common);
 }
 
 static inline struct membanks *bootinfo_get_reserved_mem(void)
 {
-    return &bootinfo.reserved_mem.common;
+    return container_of(&bootinfo.reserved_mem.common, struct membanks, common);
 }
 
 #ifdef CONFIG_ACPI
 static inline struct membanks *bootinfo_get_acpi(void)
 {
-    return &bootinfo.acpi.common;
+    return container_of(&bootinfo.acpi.common, struct membanks, common);
 }
 #endif
 
 #ifdef CONFIG_STATIC_SHM
 static inline struct membanks *bootinfo_get_shmem(void)
 {
-    return &bootinfo.shmem.common;
+    return container_of(&bootinfo.shmem.common, struct membanks, common);
 }
 
 static inline struct shmem_membank_extra *bootinfo_get_shmem_extra(void)

@@ -172,16 +172,16 @@ static int __init assign_shared_memory(struct domain *d,
 }
 
 static int __init
-append_shm_bank_to_domain(struct shared_meminfo *kinfo_shm_mem, paddr_t start,
+append_shm_bank_to_domain(struct kernel_info *kinfo, paddr_t start,
                           paddr_t size, const char *shm_id)
 {
-    struct membanks *shm_mem = &kinfo_shm_mem->common;
+    struct membanks *shm_mem = kernel_info_get_shm_mem(kinfo);
     struct shmem_membank_extra *shm_mem_extra;
 
     if ( shm_mem->nr_banks >= shm_mem->max_banks )
         return -ENOMEM;
 
-    shm_mem_extra = &kinfo_shm_mem->extra[shm_mem->nr_banks];
+    shm_mem_extra = &kinfo->shm_mem.extra[shm_mem->nr_banks];
 
     shm_mem->bank[shm_mem->nr_banks].start = start;
     shm_mem->bank[shm_mem->nr_banks].size = size;
@@ -289,8 +289,7 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
          * Record static shared memory region info for later setting
          * up shm-node in guest device tree.
          */
-        ret = append_shm_bank_to_domain(&kinfo->shm_mem, gbase, psize,
-                                        shm_id);
+        ret = append_shm_bank_to_domain(kinfo, gbase, psize, shm_id);
         if ( ret )
             return ret;
     }
@@ -301,7 +300,7 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
 int __init make_shm_resv_memory_node(const struct kernel_info *kinfo,
                                      int addrcells, int sizecells)
 {
-    const struct membanks *mem = &kinfo->shm_mem.common;
+    const struct membanks *mem = kernel_info_get_shm_mem_const(kinfo);
     void *fdt = kinfo->fdt;
     unsigned int i = 0;
     int res = 0;
@@ -517,7 +516,7 @@ int __init process_shm_node(const void *fdt, int node, uint32_t address_cells,
 int __init make_resv_memory_node(const struct kernel_info *kinfo, int addrcells,
                                  int sizecells)
 {
-    const struct membanks *mem = &kinfo->shm_mem.common;
+    const struct membanks *mem = kernel_info_get_shm_mem_const(kinfo);
     void *fdt = kinfo->fdt;
     int res = 0;
     /* Placeholder for reserved-memory\0 */
@@ -579,7 +578,7 @@ void __init init_sharedmem_pages(void)
 int __init remove_shm_from_rangeset(const struct kernel_info *kinfo,
                                     struct rangeset *rangeset)
 {
-    const struct membanks *shm_mem = &kinfo->shm_mem.common;
+    const struct membanks *shm_mem = kernel_info_get_shm_mem_const(kinfo);
     unsigned int i;
 
     /* Remove static shared memory regions */
@@ -607,7 +606,7 @@ int __init remove_shm_from_rangeset(const struct kernel_info *kinfo,
 int __init remove_shm_holes_for_domU(const struct kernel_info *kinfo,
                                      struct membanks *ext_regions)
 {
-    const struct membanks *shm_mem = &kinfo->shm_mem.common;
+    const struct membanks *shm_mem = kernel_info_get_shm_mem_const(kinfo);
     struct rangeset *guest_holes;
     unsigned int i;
     paddr_t start;
@@ -673,7 +672,7 @@ void __init shm_mem_node_fill_reg_range(const struct kernel_info *kinfo,
                                         __be32 *reg, int *nr_cells,
                                         int addrcells, int sizecells)
 {
-    const struct membanks *mem = &kinfo->shm_mem.common;
+    const struct membanks *mem = kernel_info_get_shm_mem_const(kinfo);
     unsigned int i;
     __be32 *cells;
 

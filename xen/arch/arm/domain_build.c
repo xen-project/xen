@@ -805,7 +805,7 @@ int __init make_memory_node(const struct kernel_info *kinfo, int addrcells,
      * static shared memory banks need to be listed as /memory node, so when
      * this function is handling the normal memory, add the banks.
      */
-    if ( mem == kernel_info_get_mem(kinfo) )
+    if ( mem == kernel_info_get_mem_const(kinfo) )
         shm_mem_node_fill_reg_range(kinfo, reg, &nr_cells, addrcells,
                                     sizecells);
 
@@ -884,7 +884,7 @@ static int __init find_unallocated_memory(const struct kernel_info *kinfo,
 {
     const struct membanks *mem = bootinfo_get_mem();
     const struct membanks *mem_banks[] = {
-        kernel_info_get_mem(kinfo),
+        kernel_info_get_mem_const(kinfo),
         bootinfo_get_reserved_mem(),
 #ifdef CONFIG_STATIC_SHM
         bootinfo_get_shmem(),
@@ -1108,7 +1108,7 @@ static int __init find_domU_holes(const struct kernel_info *kinfo,
     uint64_t bankend;
     const uint64_t bankbase[] = GUEST_RAM_BANK_BASES;
     const uint64_t banksize[] = GUEST_RAM_BANK_SIZES;
-    const struct membanks *kinfo_mem = kernel_info_get_mem(kinfo);
+    const struct membanks *kinfo_mem = kernel_info_get_mem_const(kinfo);
     int res = -ENOENT;
 
     for ( i = 0; i < GUEST_RAM_BANKS; i++ )

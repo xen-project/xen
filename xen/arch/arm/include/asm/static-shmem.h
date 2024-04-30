@@ -45,6 +45,18 @@ int make_shm_resv_memory_node(const struct kernel_info *kinfo, int addrcells,
 void shm_mem_node_fill_reg_range(const struct kernel_info *kinfo, __be32 *reg,
                                  int *nr_cells, int addrcells, int sizecells);
 
+static inline struct membanks *
+kernel_info_get_shm_mem(struct kernel_info *kinfo)
+{
+    return container_of(&kinfo->shm_mem.common, struct membanks, common);
+}
+
+static inline const struct membanks *
+kernel_info_get_shm_mem_const(const struct kernel_info *kinfo)
+{
+    return container_of(&kinfo->shm_mem.common, const struct membanks, common);
+}
+
 #else /* !CONFIG_STATIC_SHM */
 
 /* Worst case /memory node reg element: (addrcells + sizecells) */

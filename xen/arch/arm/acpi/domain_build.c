@@ -451,7 +451,7 @@ static int __init estimate_acpi_efi_size(struct domain *d,
     struct acpi_table_rsdp *rsdp_tbl;
     struct acpi_table_header *table;
 
-    efi_size = estimate_efi_size(kernel_info_get_mem(kinfo)->nr_banks);
+    efi_size = estimate_efi_size(kernel_info_get_mem_const(kinfo)->nr_banks);
 
     acpi_size = ROUNDUP(sizeof(struct acpi_table_fadt), 8);
     acpi_size += ROUNDUP(sizeof(struct acpi_table_stao), 8);

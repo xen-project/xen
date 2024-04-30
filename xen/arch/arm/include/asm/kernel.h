@@ -80,7 +80,16 @@ struct kernel_info {
     };
 };
 
-#define kernel_info_get_mem(kinfo) (&(kinfo)->mem.common)
+static inline struct membanks *kernel_info_get_mem(struct kernel_info *kinfo)
+{
+    return container_of(&kinfo->mem.common, struct membanks, common);
+}
+
+static inline const struct membanks *
+kernel_info_get_mem_const(const struct kernel_info *kinfo)
+{
+    return container_of(&kinfo->mem.common, const struct membanks, common);
+}
 
 #ifdef CONFIG_STATIC_SHM
 #define KERNEL_INFO_SHM_MEM_INIT .shm_mem.common.max_banks = NR_SHMEM_BANKS,
