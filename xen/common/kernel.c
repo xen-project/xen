@@ -637,6 +637,7 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
                 fi.submap |= (1U << XENFEAT_hvm_safe_pvclock) |
                              (1U << XENFEAT_hvm_callback_vector) |
                              (has_pirq(d) ? (1U << XENFEAT_hvm_pirqs) : 0);
+            fi.submap |= (1U << XENFEAT_dm_msix_all_writes);
 #endif
             if ( !paging_mode_translate(d) || is_domain_direct_mapped(d) )
                 fi.submap |= (1U << XENFEAT_direct_mapped);

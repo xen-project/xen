@@ -283,8 +283,8 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     unsigned long flags;
     struct irq_desc *desc;
 
-    if ( (len != 4 && len != 8) || (address & (len - 1)) )
-        return r;
+    if ( !IS_ALIGNED(address, len) )
+        return X86EMUL_OKAY;
 
     rcu_read_lock(&msixtbl_rcu_lock);
 
@@ -345,8 +345,7 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
 
 unlock:
     spin_unlock_irqrestore(&desc->lock, flags);
-    if ( len == 4 )
-        r = X86EMUL_OKAY;
+    r = X86EMUL_OKAY;
 
 out:
     rcu_read_unlock(&msixtbl_rcu_lock);
@@ -357,7 +356,17 @@ static int cf_check _msixtbl_write(
     const struct hvm_io_handler *handler, uint64_t address, uint32_t len,
     uint64_t val)
 {
-    return msixtbl_write(current, address, len, val);
+    /* Ignore invalid length or unaligned writes. */
+    if ( (len != 4 && len != 8) || !IS_ALIGNED(address, len) )
+        return X86EMUL_OKAY;
+
+    /*
+     * This function returns X86EMUL_UNHANDLEABLE even if write is properly
+     * handled, to propagate it to the device model (so it can keep its
+     * internal state in sync).
+     */
+    msixtbl_write(current, address, len, val);
+    return X86EMUL_UNHANDLEABLE;
 }
 
 static bool cf_check msixtbl_range(
