@@ -2582,10 +2582,16 @@ bool get_page(struct page_info *page, const struct domain *domain)
  */
 static void get_page_light(struct page_info *page)
 {
-    unsigned long old_pgc = arch_fetch_and_add(&page->count_info, 1);
+    unsigned long x, nx, y = page->count_info;
 
-    BUG_ON(!(old_pgc & PGC_count_mask)); /* Not allocated? */
-    BUG_ON(!((old_pgc + 1) & PGC_count_mask)); /* Overflow? */
+    do {
+        x  = y;
+        nx = x + 1;
+        BUG_ON(!(x & PGC_count_mask)); /* Not allocated? */
+        BUG_ON(!(nx & PGC_count_mask)); /* Overflow? */
+        y = cmpxchg(&page->count_info, x, nx);
+    }
+    while ( unlikely(y != x) );
 }
 
 static int validate_page(struct page_info *page, unsigned long type,
