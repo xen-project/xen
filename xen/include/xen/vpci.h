@@ -23,7 +23,7 @@ typedef int vpci_register_init_t(struct pci_dev *dev);
 
 #define REGISTER_VPCI_INIT(x, p)                \
   static vpci_register_init_t *const x##_entry  \
-               __used_section(".data.vpci." p) = x
+               __used_section(".data.vpci." p) = (x)
 
 /* Assign vPCI to device by adding handlers. */
 int __must_check vpci_assign_device(struct pci_dev *pdev);

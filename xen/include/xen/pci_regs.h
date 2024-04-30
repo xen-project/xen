@@ -445,9 +445,9 @@
 #define PCI_EXP_RTSTA		32	/* Root Status */
 
 /* Extended Capabilities (PCI-X 2.0 and Express) */
-#define PCI_EXT_CAP_ID(header)		(header & 0x0000ffff)
-#define PCI_EXT_CAP_VER(header)		((header >> 16) & 0xf)
-#define PCI_EXT_CAP_NEXT(header)	((header >> 20) & 0xffc)
+#define PCI_EXT_CAP_ID(header)		((header) & 0x0000ffff)
+#define PCI_EXT_CAP_VER(header)		(((header) >> 16) & 0xf)
+#define PCI_EXT_CAP_NEXT(header)	(((header) >> 20) & 0xffc)
 
 #define PCI_EXT_CAP_ID_ERR	1
 #define PCI_EXT_CAP_ID_VC	2
