@@ -13,12 +13,21 @@ riscv-generic-flags := $(riscv-abi-y) -march=$(riscv-march-y)
 
 # check-extension: Check whether extenstion is supported by a compiler and
 #                  an assembler.
-# Usage: $(call check-extension,extension_name,"instr")
-check-extension = $(call as-insn,$(CC) $(riscv-generic-flags)_$(1),$(2),_$(1))
+# Usage: $(call check-extension,extension_name).
+#        it should be defined variable with following name:
+#          <extension name>-insn := "insn"
+#        which represents an instruction of extension support of which is
+#        going to be checked.
+define check-extension =
+$(eval $(1) := \
+	$(call as-insn,$(CC) $(riscv-generic-flags)_$(1),$(value $(1)-insn),_$(1)))
+endef
 
-zbb-insn := "andn t0, t0, t0"
-zbb := $(call check-extension,zbb,$(zbb-insn))
-zihintpause := $(call check-extension,zihintpause,"pause")
+zbb-insn := "andn t0$(comma)t0$(comma)t0"
+$(call check-extension,zbb)
+
+zihintpause-insn := "pause"
+$(call check-extension,zihintpause)
 
 extensions := $(zbb) $(zihintpause)
 
