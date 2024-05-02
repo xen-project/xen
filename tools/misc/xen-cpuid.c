@@ -268,8 +268,7 @@ static const struct {
     const char *name;
     const char *abbr;
     const char *const *strs;
-} decodes[] =
-{
+} leaf_info[] = {
     { "CPUID 0x00000001.edx",        "1d", str_1d },
     { "CPUID 0x00000001.ecx",        "1c", str_1c },
     { "CPUID 0x80000001.edx",       "e1d", str_e1d },
@@ -336,11 +335,11 @@ static void decode_featureset(const uint32_t *features,
     if ( !detail )
         return;
 
-    for ( i = 0; i < length && i < ARRAY_SIZE(decodes); ++i )
+    for ( i = 0; i < length && i < ARRAY_SIZE(leaf_info); ++i )
     {
-        printf("  [%02u] %-"COL_ALIGN"s", i, decodes[i].name ?: "<UNKNOWN>");
-        if ( decodes[i].name )
-            dump_leaf(features[i], decodes[i].strs);
+        printf("  [%02u] %-"COL_ALIGN"s", i, leaf_info[i].name ?: "<UNKNOWN>");
+        if ( leaf_info[i].name )
+            dump_leaf(features[i], leaf_info[i].strs);
         printf("\n");
     }
 }
@@ -355,8 +354,8 @@ static void dump_info(xc_interface *xch, bool detail)
     if ( !detail )
     {
         printf("       %"COL_ALIGN"s ", "KEY");
-        for ( i = 0; i < ARRAY_SIZE(decodes); ++i )
-            printf("%-8s ", decodes[i].abbr ?: "???");
+        for ( i = 0; i < ARRAY_SIZE(leaf_info); ++i )
+            printf("%-8s ", leaf_info[i].abbr ?: "???");
         printf("\n");
     }
 
