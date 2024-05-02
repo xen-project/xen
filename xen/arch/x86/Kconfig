@@ -58,7 +58,7 @@ source "arch/Kconfig"
 config PV
 	def_bool y
 	prompt "PV support"
-	---help---
+	help
 	  Interfaces to support PV domains. These require guest kernel support
 	  to run as a PV guest, but don't require any specific hardware support.
 
@@ -71,7 +71,7 @@ config PV32
 	depends on PV
 	default PV_SHIM
 	select COMPAT
-	---help---
+	help
 	  The 32bit PV ABI uses Ring1, an area of the x86 architecture which
 	  was deprecated and mostly removed in the AMD64 spec.  As a result,
 	  it occasionally conflicts with newer x86 hardware features, causing
@@ -90,7 +90,7 @@ config PV_LINEAR_PT
        bool "Support for PV linear pagetables"
        depends on PV
        default y
-       ---help---
+       help
          Linear pagetables (also called "recursive pagetables") refers
          to the practice of a guest operating system having pagetable
          entries pointing to other pagetables of the same level (i.e.,
@@ -113,7 +113,7 @@ config HVM
 	select COMPAT
 	select IOREQ_SERVER
 	select MEM_ACCESS_ALWAYS_ON
-	---help---
+	help
 	  Interfaces to support HVM domains.  HVM domains require hardware
 	  virtualisation extensions (e.g. Intel VT-x, AMD SVM), but can boot
 	  guests which have no specific Xen knowledge.
@@ -126,7 +126,7 @@ config XEN_SHSTK
 	bool "Supervisor Shadow Stacks"
 	depends on HAS_AS_CET_SS
 	default y
-	---help---
+	help
 	  Control-flow Enforcement Technology (CET) is a set of features in
 	  hardware designed to combat Return-oriented Programming (ROP, also
 	  call/jump COP/JOP) attacks.  Shadow Stacks are one CET feature
@@ -152,7 +152,7 @@ config SHADOW_PAGING
 	bool "Shadow Paging"
 	default !PV_SHIM_EXCLUSIVE
 	depends on PV || HVM
-	---help---
+	help
 
           Shadow paging is a software alternative to hardware paging support
           (Intel EPT, AMD NPT).
@@ -171,7 +171,7 @@ config SHADOW_PAGING
 config BIGMEM
 	bool "big memory support"
 	default n
-	---help---
+	help
 	  Allows Xen to support up to 123Tb of memory.
 
 	  This requires enlarging struct page_info as well as shrinking
@@ -183,7 +183,7 @@ config HVM_FEP
 	bool "HVM Forced Emulation Prefix support (UNSUPPORTED)" if UNSUPPORTED
 	default DEBUG
 	depends on HVM
-	---help---
+	help
 
 	  Compiles in a feature that allows HVM guest to arbitrarily
 	  exercise the instruction emulator.
@@ -203,7 +203,7 @@ config TBOOT
 	depends on UNSUPPORTED
 	default !PV_SHIM_EXCLUSIVE
 	select CRYPTO
-	---help---
+	help
 	  Allows support for Trusted Boot using the Intel(R) Trusted Execution
 	  Technology (TXT)
 
@@ -213,14 +213,14 @@ choice
 	prompt "Alignment of Xen image"
 	default XEN_ALIGN_2M if PV_SHIM_EXCLUSIVE
 	default XEN_ALIGN_DEFAULT
-	---help---
+	help
 	  Specify alignment for Xen image.
 
 	  If unsure, choose "default".
 
 config XEN_ALIGN_DEFAULT
 	bool "Default alignment"
-	---help---
+	help
 	  Pick alignment according to build variants.
 
 	  For EFI build the default alignment is 2M. For ELF build
@@ -281,7 +281,7 @@ config GUEST
 config XEN_GUEST
 	bool "Xen Guest"
 	select GUEST
-	---help---
+	help
 	  Support for Xen detecting when it is running under Xen.
 
 	  If unsure, say N.
@@ -290,7 +290,7 @@ config PVH_GUEST
 	def_bool y
 	prompt "PVH Guest"
 	depends on XEN_GUEST
-	---help---
+	help
 	  Support booting using the PVH ABI.
 
 	  If unsure, say Y.
@@ -299,7 +299,7 @@ config PV_SHIM
 	def_bool y
 	prompt "PV Shim"
 	depends on PV && XEN_GUEST
-	---help---
+	help
 	  Build Xen with a mode which acts as a shim to allow PV guest to run
 	  in an HVM/PVH container. This mode can only be enabled with command
 	  line option.
@@ -309,7 +309,7 @@ config PV_SHIM
 config PV_SHIM_EXCLUSIVE
 	bool "PV Shim Exclusive"
 	depends on PV_SHIM
-	---help---
+	help
 	  Build Xen in a way which unconditionally assumes PV_SHIM mode.  This
 	  option is only intended for use when building a dedicated PV Shim
 	  firmware, and will not function correctly in other scenarios.
@@ -321,7 +321,7 @@ if !PV_SHIM_EXCLUSIVE
 config HYPERV_GUEST
 	bool "Hyper-V Guest"
 	select GUEST
-	---help---
+	help
 	  Support for Xen detecting when it is running under Hyper-V.
 
 	  If unsure, say N.

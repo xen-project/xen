@@ -84,7 +84,7 @@ config UNSUPPORTED
 config LTO
 	bool "Link Time Optimisation"
 	depends on BROKEN
-	---help---
+	help
 	  Enable Link Time Optimisation.
 
 	  If unsure, say N.

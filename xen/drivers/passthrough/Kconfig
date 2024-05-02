@@ -6,7 +6,7 @@ if ARM
 config ARM_SMMU
 	bool "ARM SMMUv1 and v2 driver"
 	default y
-	---help---
+	help
 	  Support for implementations of the ARM System MMU architecture
 	  versions 1 and 2.
 
@@ -16,7 +16,7 @@ config ARM_SMMU
 config ARM_SMMU_V3
 	bool "ARM Ltd. System MMU Version 3 (SMMUv3) Support" if EXPERT
 	depends on ARM_64 && (!ACPI || BROKEN)
-	---help---
+	help
 	 Support for implementations of the ARM System MMU architecture
 	 version 3. Driver is in experimental stage and should not be used in
 	 production.
@@ -27,7 +27,7 @@ config ARM_SMMU_V3
 config IPMMU_VMSA
 	bool "Renesas IPMMU-VMSA found in R-Car Gen3/Gen4 SoCs"
 	depends on ARM_64
-	---help---
+	help
 	  Support for implementations of the Renesas IPMMU-VMSA found
 	  in R-Car Gen3/Gen4 SoCs.
 
@@ -68,7 +68,7 @@ choice
 	prompt "IOMMU device quarantining default behavior"
 	depends on HAS_PCI
 	default IOMMU_QUARANTINE_BASIC
-	---help---
+	help
 	  When a PCI device is assigned to an untrusted domain, it is possible
 	  for that domain to program the device to DMA to an arbitrary address.
 	  The IOMMU is used to protect the host from malicious DMA by making

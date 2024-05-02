@@ -67,7 +67,7 @@ source "arch/Kconfig"
 config ACPI
 	bool "ACPI (Advanced Configuration and Power Interface) Support (UNSUPPORTED)" if UNSUPPORTED
 	depends on ARM_64 && ARM_EFI
-	---help---
+	help
 
 	  Advanced Configuration and Power Interface (ACPI) support for Xen is
 	  an alternative to device tree on ARM64. This requires UEFI.
@@ -102,7 +102,7 @@ config GICV3
 	depends on !NEW_VGIC
 	default n if ARM_32
 	default y if ARM_64
-	---help---
+	help
 
 	  Driver for the ARM Generic Interrupt Controller v3.
 	  If unsure, use the default setting.
@@ -132,7 +132,7 @@ config HVM
 config NEW_VGIC
 	bool "Use new VGIC implementation"
 	select GICV2
-	---help---
+	help
 
 	This is an alternative implementation of the ARM GIC interrupt
 	controller emulation, based on the Linux/KVM VGIC. It has a better
@@ -147,7 +147,7 @@ config NEW_VGIC
 config SBSA_VUART_CONSOLE
 	bool "Emulated SBSA UART console support"
 	default y
-	---help---
+	help
 	  Allows a guest to use SBSA Generic UART as a console. The
 	  SBSA Generic UART implements a subset of ARM PL011 UART.
 

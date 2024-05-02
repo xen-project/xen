@@ -4,20 +4,20 @@ menu "Schedulers"
 config SCHED_CREDIT
 	bool "Credit scheduler support"
 	default y
-	---help---
+	help
 	  The traditional credit scheduler is a general purpose scheduler.
 
 config SCHED_CREDIT2
 	bool "Credit2 scheduler support"
 	default y
-	---help---
+	help
 	  The credit2 scheduler is a general purpose scheduler that is
 	  optimized for lower latency and higher VM density.
 
 config SCHED_RTDS
 	bool "RTDS scheduler support (UNSUPPORTED)" if UNSUPPORTED
 	default DEBUG
-	---help---
+	help
 	  The RTDS scheduler is a soft and firm real-time scheduler for
 	  multicore, targeted for embedded, automotive, graphics and gaming
 	  in the cloud, and general low-latency workloads.
@@ -25,14 +25,14 @@ config SCHED_RTDS
 config SCHED_ARINC653
 	bool "ARINC653 scheduler support (UNSUPPORTED)" if UNSUPPORTED
 	default DEBUG
-	---help---
+	help
 	  The ARINC653 scheduler is a hard real-time scheduler for single
 	  cores, targeted for avionics, drones, and medical devices.
 
 config SCHED_NULL
 	bool "Null scheduler support (UNSUPPORTED)" if UNSUPPORTED
 	default PV_SHIM || DEBUG
-	---help---
+	help
 	  The null scheduler is a static, zero overhead scheduler,
 	  for when there always are less vCPUs than pCPUs, typically
 	  in embedded or HPC scenarios.

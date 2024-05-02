@@ -1,14 +1,14 @@
 choice
 	prompt "Platform Support"
 	default ALL_PLAT
-	---help---
+	help
 	Choose which hardware platform to enable in Xen.
 
 	If unsure, choose ALL_PLAT.
 
 config ALL_PLAT
 	bool "All Platforms"
-	---help---
+	help
 	Enable support for all available hardware platforms. It doesn't
 	automatically select any of the related drivers.
 
@@ -17,7 +17,7 @@ config QEMU
 	depends on ARM_64
 	select GICV3
 	select HAS_PL011
-	---help---
+	help
 	Enable all the required drivers for QEMU aarch64 virt emulated
 	machine.
 
@@ -26,7 +26,7 @@ config RCAR3
 	depends on ARM_64
 	select HAS_SCIF
 	select IPMMU_VMSA
-	---help---
+	help
 	Enable all the required drivers for Renesas RCar3
 
 config MPSOC
@@ -34,12 +34,12 @@ config MPSOC
 	depends on ARM_64
 	select HAS_CADENCE_UART
 	select ARM_SMMU
-	---help---
+	help
 	Enable all the required drivers for Xilinx Ultrascale+ MPSoC
 
 config NO_PLAT
 	bool "No Platforms"
-	---help---
+	help
 	Do not enable specific support for any platform.
 
 endchoice
