@@ -343,6 +343,10 @@ statements are deliberate"
 -config=MC3R1.R14.3,statements={deliberate , "wrapped(any(),node(if_stmt))" }
 -doc_end
 
+-doc_begin="A controlling expression of 'if' and iteration statements having integer, character or pointer type has a semantics that is well-known to all Xen developers."
+-config=MC3R1.R14.4,etypes+={deliberate, "any()", "src_type(integer||character)||src_expr(type(desugar(pointer(any()))))"}
+-doc_end
+
 -doc_begin="The XEN team relies on the fact that the enum is_dying has the
 constant with assigned value 0 act as false and the other ones as true,
 therefore have the same behavior of a boolean"

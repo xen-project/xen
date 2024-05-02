@@ -291,10 +291,16 @@ Deviations related to MISRA C:2012 Rules:
      - Project-wide deviation; tagged as `disapplied` for ECLAIR.
 
    * - R14.4
+     - A controlling expression of 'if' and iteration statements having
+       integer, character or pointer type has a semantics that is well-known to
+       all Xen developers.
+     - Tagged as `deliberate` for ECLAIR.
+
+   * - R14.4
      - The XEN team relies on the fact that the enum is_dying has the
        constant with assigned value 0 act as false and the other ones as true,
        therefore have the same behavior of a boolean.
-     - Project-wide deviation; tagged as `deliberate` for ECLAIR.
+     - Tagged as `deliberate` for ECLAIR.
 
    * - R16.2
      - Complying with the Rule would entail a lot of code duplication in the
