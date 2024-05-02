@@ -472,6 +472,35 @@ def write_results(state):
 
 """)
 
+    state.output.write(
+"""
+#define INIT_FEATURE_VAL_TO_NAME { \\
+""")
+
+    for name, bit in sorted(state.values.items()):
+        state.output.write(
+            '    [%s] = "%s",\\\n' % (bit, name)
+            )
+
+        # Add the other alias for 1d/e1d common bits.  64 is the difference
+        # between 1d and e1d.
+        if bit in state.common_1d:
+            state.output.write(
+                '    [%s] = "%s",\\\n' % (64 + bit, name)
+            )
+
+    # Pad to an exact multiple of FEATURESET_SIZE if necessary
+    pad_feat = state.nr_entries * 32 - 1
+    if not state.names.get(pad_feat):
+        state.output.write(
+            '    [%s] = NULL,\\\n' % (pad_feat, )
+        )
+
+    state.output.write(
+"""}
+
+""")
+
     for idx, text in enumerate(state.bitfields):
         state.output.write(
             "#define CPUID_BITFIELD_%d \\\n    %s\n\n"

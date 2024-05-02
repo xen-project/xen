@@ -11,6 +11,7 @@
 #include <xenguest.h>
 
 #include <xen-tools/common-macros.h>
+#include <xen/lib/x86/cpuid-autogen.h>
 
 static uint32_t nr_features;
 
@@ -291,6 +292,8 @@ static const struct {
 
 #define COL_ALIGN "24"
 
+static const char *const feature_names[] = INIT_FEATURE_VAL_TO_NAME;
+
 static const char *const fs_names[] = {
     [XEN_SYSCTL_cpu_featureset_raw]     = "Raw",
     [XEN_SYSCTL_cpu_featureset_host]    = "Host",
@@ -303,12 +306,6 @@ static const char *const fs_names[] = {
 static void dump_leaf(uint32_t leaf, const char *const *strs)
 {
     unsigned i;
-
-    if ( !strs )
-    {
-        printf(" ???");
-        return;
-    }
 
     for ( i = 0; i < 32; ++i )
         if ( leaf & (1u << i) )
@@ -327,6 +324,10 @@ static void decode_featureset(const uint32_t *features,
 {
     unsigned int i;
 
+    /* If this trips, you probably need to extend leaf_info[] above. */
+    BUILD_BUG_ON(ARRAY_SIZE(leaf_info) != FEATURESET_NR_ENTRIES);
+    BUILD_BUG_ON(ARRAY_SIZE(feature_names) != FEATURESET_NR_ENTRIES * 32);
+
     printf("%-"COL_ALIGN"s        ", name);
     for ( i = 0; i < length; ++i )
         printf("%08x%c", features[i],
@@ -338,8 +339,7 @@ static void decode_featureset(const uint32_t *features,
     for ( i = 0; i < length && i < ARRAY_SIZE(leaf_info); ++i )
     {
         printf("  [%02u] %-"COL_ALIGN"s", i, leaf_info[i].name ?: "<UNKNOWN>");
-        if ( leaf_info[i].name )
-            dump_leaf(features[i], leaf_info[i].strs);
+        dump_leaf(features[i], &feature_names[i * 32]);
         printf("\n");
     }
 }
