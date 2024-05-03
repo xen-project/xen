@@ -4,11 +4,11 @@
 
 setq(data_dir,getenv("ECLAIR_DATA_DIR"))
 setq(analysis_kind,getenv("ANALYSIS_KIND"))
-setq(scheduled_analysis,nil)
+# setq(scheduled_analysis,nil)
 
-strings_map("scheduled-analysis",500,"","^.*scheduled$",0,setq(scheduled_analysis,t))
-strings_map("scheduled-analysis",500,"","^.*$",0)
-map_strings("scheduled-analysis",analysis_kind)
+# strings_map("scheduled-analysis",500,"","^.*scheduled$",0,setq(scheduled_analysis,t))
+# strings_map("scheduled-analysis",500,"","^.*$",0)
+# map_strings("scheduled-analysis",analysis_kind)
 
 -verbose
 
@@ -42,12 +42,16 @@ their Standard Library equivalents."
 -doc="Initially, there are no files tagged as adopted."
 -file_tag+={adopted,"none()"}
 
-if(not(scheduled_analysis),
-    eval_file("adopted.ecl")
-)
-if(not(scheduled_analysis),
-    eval_file("out_of_scope.ecl")
-)
+# if(not(scheduled_analysis),
+#     eval_file("adopted.ecl")
+# )
+# if(not(scheduled_analysis),
+#     eval_file("out_of_scope.ecl")
+# )
+
+-eval_file=adopted.ecl
+-eval_file=out_of_scope.ecl
+
 -eval_file=deviations.ecl
 -eval_file=call_properties.ecl
 -eval_file=tagging.ecl
