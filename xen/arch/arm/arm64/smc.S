@@ -19,7 +19,7 @@
  *                          register_t a6, register_t a7,
  *                          struct arm_smccc_res *res)
  */
-ENTRY(__arm_smccc_1_0_smc)
+FUNC(__arm_smccc_1_0_smc)
         smc     #0
         ldr     x4, [sp]
         cbz     x4, 1f          /* No need to store the result */
@@ -27,12 +27,13 @@ ENTRY(__arm_smccc_1_0_smc)
         stp     x2, x3, [x4, #SMCCC_RES_a2]
 1:
         ret
+END(__arm_smccc_1_0_smc)
 
 /*
  * void arm_smccc_1_2_smc(const struct arm_smccc_1_2_regs *args,
  *                        struct arm_smccc_1_2_regs *res)
  */
-ENTRY(arm_smccc_1_2_smc)
+FUNC(arm_smccc_1_2_smc)
     /* Save `res` and free a GPR that won't be clobbered by SMC call */
     stp     x1, x19, [sp, #-16]!
 
@@ -69,3 +70,4 @@ ENTRY(arm_smccc_1_2_smc)
     /* Restore original x19 */
     ldp     xzr, x19, [sp], #16
     ret
+END(arm_smccc_1_2_smc)
