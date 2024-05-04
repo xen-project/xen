@@ -161,9 +161,10 @@
 .endm
 
 /* Gets the current vector register size in bytes */
-GLOBAL(sve_get_hw_vl)
+FUNC(sve_get_hw_vl)
     _sve_rdvl 0, 1
     ret
+END(sve_get_hw_vl)
 
 /*
  * Save the SVE context
@@ -172,9 +173,10 @@ GLOBAL(sve_get_hw_vl)
  * x1 - pointer to buffer for P0-15
  * x2 - Save FFR if non-zero
  */
-GLOBAL(sve_save_ctx)
+FUNC(sve_save_ctx)
     sve_save 0, 1, x2
     ret
+END(sve_save_ctx)
 
 /*
  * Load the SVE context
@@ -183,9 +185,10 @@ GLOBAL(sve_save_ctx)
  * x1 - pointer to buffer for P0-15
  * x2 - Restore FFR if non-zero
  */
-GLOBAL(sve_load_ctx)
+FUNC(sve_load_ctx)
     sve_load 0, 1, x2
     ret
+END(sve_load_ctx)
 
 /*
  * Local variables:
