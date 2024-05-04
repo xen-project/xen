@@ -40,7 +40,7 @@
  *	- kaddr   - kernel address
  *	- size    - size in question
  */
-ENTRY(__flush_dcache_area)
+FUNC(__flush_dcache_area)
 	dcache_line_size x2, x3
 	add	x1, x0, x1
 	sub	x3, x2, #1
@@ -51,4 +51,4 @@ ENTRY(__flush_dcache_area)
 	b.lo	1b
 	dsb	sy
 	ret
-ENDPROC(__flush_dcache_area)
+END(__flush_dcache_area)
