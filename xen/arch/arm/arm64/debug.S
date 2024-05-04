@@ -27,17 +27,19 @@
  * Print a character on the UART - this function is called by C
  * x0: character to print
  */
-GLOBAL(early_putch)
+FUNC(early_putch)
         ldr   x15, =EARLY_UART_VIRTUAL_ADDRESS
         early_uart_ready x15, 1
         early_uart_transmit x15, w0
         ret
+END(early_putch)
 
 /* Flush the UART - this function is called by C */
-GLOBAL(early_flush)
+FUNC(early_flush)
         ldr   x15, =EARLY_UART_VIRTUAL_ADDRESS  /* x15 := VA UART base address */
         early_uart_ready x15, 1
         ret
+END(early_flush)
 
 /*
  * Local variables:
