@@ -55,7 +55,7 @@ C_h	.req	x12
 D_l	.req	x13
 D_h	.req	x14
 
-ENTRY(memcpy)
+FUNC(memcpy)
 	mov	dst, dstin
 	cmp	count, #16
 	/*When memory length is less than 16, the accessed are not aligned.*/
@@ -197,4 +197,4 @@ ENTRY(memcpy)
 	tst	count, #0x3f
 	b.ne	.Ltail63
 	ret
-ENDPROC(memcpy)
+END(memcpy)

@@ -56,7 +56,7 @@ C_h	.req	x12
 D_l	.req	x13
 D_h	.req	x14
 
-ENTRY(memmove)
+FUNC(memmove)
 	cmp	dstin, src
 	b.lo	memcpy
 	add	tmp1, src, count
@@ -193,4 +193,4 @@ ENTRY(memmove)
 	tst	count, #0x3f
 	b.ne	.Ltail63
 	ret
-ENDPROC(memmove)
+END(memmove)
