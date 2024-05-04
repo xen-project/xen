@@ -138,7 +138,7 @@
  *
  * Clobbers x0 - x4
  */
-create_page_tables:
+FUNC_LOCAL(create_page_tables)
         /* Prepare the page-tables for mapping Xen */
         ldr   x0, =XEN_VIRT_START
         create_table_entry boot_pgtable, boot_first, x0, 0, x1, x2, x3
@@ -260,7 +260,7 @@ virtphys_clash:
         /* Identity map clashes with boot_third, which we cannot handle yet */
         PRINT("- Unable to build boot page tables - virt and phys addresses clash. -\r\n")
         b     fail
-ENDPROC(create_page_tables)
+END(create_page_tables)
 
 /*
  * Turn on the Data Cache and the MMU. The function will return on the 1:1
@@ -273,7 +273,7 @@ ENDPROC(create_page_tables)
  *
  * Clobbers x0 - x5
  */
-enable_mmu:
+FUNC_LOCAL(enable_mmu)
         mov   x4, x0
         mov   x5, x1
         PRINT_ID("- Turning on paging -\r\n")
@@ -304,7 +304,7 @@ enable_mmu:
         PRINT_ID("- Paging turned on -\r\n")
 
         ret
-ENDPROC(enable_mmu)
+END(enable_mmu)
 
 /*
  * Enable mm (turn on the data cache and the MMU) for secondary CPUs.
@@ -316,7 +316,7 @@ ENDPROC(enable_mmu)
  *
  * Clobbers x0 - x6
  */
-ENTRY(enable_secondary_cpu_mm)
+FUNC(enable_secondary_cpu_mm)
         mov   x6, lr
 
         load_paddr x0, init_ttbr
@@ -328,7 +328,7 @@ ENTRY(enable_secondary_cpu_mm)
 
         /* Return to the virtual address requested by the caller. */
         ret
-ENDPROC(enable_secondary_cpu_mm)
+END(enable_secondary_cpu_mm)
 
 /*
  * Enable mm (turn on the data cache and the MMU) for the boot CPU.
@@ -340,7 +340,7 @@ ENDPROC(enable_secondary_cpu_mm)
  *
  * Clobbers x0 - x6
  */
-ENTRY(enable_boot_cpu_mm)
+FUNC(enable_boot_cpu_mm)
         mov   x6, lr
 
         bl    create_page_tables
@@ -365,7 +365,7 @@ ENTRY(enable_boot_cpu_mm)
          * by the caller.
          */
         b     remove_identity_mapping
-ENDPROC(enable_boot_cpu_mm)
+END(enable_boot_cpu_mm)
 
 /*
  * Remove the 1:1 map from the page-tables. It is not easy to keep track
@@ -377,7 +377,7 @@ ENDPROC(enable_boot_cpu_mm)
  *
  * Clobbers x0 - x1
  */
-remove_identity_mapping:
+FUNC_LOCAL(remove_identity_mapping)
         /*
          * Find the zeroeth slot used. Remove the entry from zeroeth
          * table if the slot is not XEN_ZEROETH_SLOT.
@@ -419,20 +419,21 @@ identity_mapping_removed:
         flush_xen_tlb_local
 
         ret
-ENDPROC(remove_identity_mapping)
+END(remove_identity_mapping)
 
 /* Fail-stop */
-fail:   PRINT("- Boot failed -\r\n")
+FUNC_LOCAL(fail)
+        PRINT("- Boot failed -\r\n")
 1:      wfe
         b     1b
-ENDPROC(fail)
+END(fail)
 
 /*
  * Switch TTBR
  *
  * x0    ttbr
  */
-ENTRY(switch_ttbr_id)
+FUNC(switch_ttbr_id)
         /* 1) Ensure any previous read/write have completed */
         dsb    ish
         isb
@@ -464,7 +465,7 @@ ENTRY(switch_ttbr_id)
         isb
 
         ret
-ENDPROC(switch_ttbr_id)
+END(switch_ttbr_id)
 
 /*
  * Local variables:
