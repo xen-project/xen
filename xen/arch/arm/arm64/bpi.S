@@ -52,14 +52,15 @@
  * micro-architectures in a system.
  */
     .align	11
-ENTRY(__bp_harden_hyp_vecs_start)
+FUNC(__bp_harden_hyp_vecs_start)
     .rept 4
     vectors hyp_traps_vector
     .endr
-ENTRY(__bp_harden_hyp_vecs_end)
+LABEL(__bp_harden_hyp_vecs_end)
+END(__bp_harden_hyp_vecs_start)
 
 .macro mitigate_spectre_bhb_loop count
-ENTRY(__mitigate_spectre_bhb_loop_start_\count)
+FUNC(__mitigate_spectre_bhb_loop_start_\count)
     stp     x0, x1, [sp, #-16]!
     mov     x0, \count
 .Lspectre_bhb_loop\@:
@@ -68,11 +69,12 @@ ENTRY(__mitigate_spectre_bhb_loop_start_\count)
     b.ne    .Lspectre_bhb_loop\@
     sb
     ldp     x0, x1, [sp], #16
-ENTRY(__mitigate_spectre_bhb_loop_end_\count)
+LABEL(__mitigate_spectre_bhb_loop_end_\count)
+END(__mitigate_spectre_bhb_loop_start_\count)
 .endm
 
 .macro smccc_workaround num smcc_id
-ENTRY(__smccc_workaround_smc_start_\num)
+FUNC(__smccc_workaround_smc_start_\num)
     sub     sp, sp, #(8 * 4)
     stp     x0, x1, [sp, #(8 * 2)]
     stp     x2, x3, [sp, #(8 * 0)]
@@ -81,13 +83,15 @@ ENTRY(__smccc_workaround_smc_start_\num)
     ldp     x2, x3, [sp, #(8 * 0)]
     ldp     x0, x1, [sp, #(8 * 2)]
     add     sp, sp, #(8 * 4)
-ENTRY(__smccc_workaround_smc_end_\num)
+LABEL(__smccc_workaround_smc_end_\num)
+END(__smccc_workaround_smc_start_\num)
 .endm
 
-ENTRY(__mitigate_spectre_bhb_clear_insn_start)
+FUNC(__mitigate_spectre_bhb_clear_insn_start)
     clearbhb
     isb
-ENTRY(__mitigate_spectre_bhb_clear_insn_end)
+LABEL(__mitigate_spectre_bhb_clear_insn_end)
+END(__mitigate_spectre_bhb_clear_insn_start)
 
 mitigate_spectre_bhb_loop 8
 mitigate_spectre_bhb_loop 24
