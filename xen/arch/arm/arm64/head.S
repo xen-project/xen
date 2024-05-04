@@ -90,7 +90,7 @@
  * 4K-aligned address.
  */
 
-GLOBAL(start)
+FUNC(start)
         /*
          * DO NOT MODIFY. Image header expected by Linux boot-loaders.
          */
@@ -102,6 +102,7 @@ efi_head:
          */
         add     x13, x18, #0x16
         b       real_start           /* branch to kernel start */
+END(start)
         .quad   0                    /* Image load offset from start of RAM */
         .quad   _end - start         /* Effective size of kernel image, little-endian */
         .quad   __HEAD_FLAGS         /* Informative flags, little-endian */
@@ -223,7 +224,7 @@ section_table:
         .align  5
 #endif /* CONFIG_ARM_EFI */
 
-real_start:
+FUNC_LOCAL(real_start)
         /* BSS should be zeroed when booting without EFI */
         mov   x26, #0                /* x26 := skip_zero_bss */
 
@@ -263,9 +264,9 @@ primary_switched:
         mov   x1, x21                /* x1 := paddr(FDT) */
         ldr   x2, =start_xen
         b     launch
-ENDPROC(real_start)
+END(real_start)
 
-GLOBAL(init_secondary)
+FUNC(init_secondary)
         msr   DAIFSet, 0xf           /* Disable all interrupts */
 
         /* Find out where we are */
@@ -304,7 +305,7 @@ secondary_switched:
         /* Jump to C world */
         ldr   x2, =start_secondary
         b     launch
-ENDPROC(init_secondary)
+END(init_secondary)
 
 /*
  * Check if the CPU has been booted in Hypervisor mode.
@@ -313,7 +314,7 @@ ENDPROC(init_secondary)
  *
  * Clobbers x0 - x5
  */
-check_cpu_mode:
+FUNC_LOCAL(check_cpu_mode)
         PRINT_ID("- Current EL ")
         mrs   x5, CurrentEL
         print_reg x5
@@ -329,7 +330,7 @@ check_cpu_mode:
         PRINT_ID("- Xen must be entered in NS EL2 mode -\r\n")
         PRINT_ID("- Please update the bootloader -\r\n")
         b fail
-ENDPROC(check_cpu_mode)
+END(check_cpu_mode)
 
 /*
  * Zero BSS
@@ -339,7 +340,7 @@ ENDPROC(check_cpu_mode)
  *
  * Clobbers x0 - x3
  */
-zero_bss:
+FUNC_LOCAL(zero_bss)
         /* Zero BSS only when requested */
         cbnz  x26, skip_bss
 
@@ -353,14 +354,14 @@ zero_bss:
 
 skip_bss:
         ret
-ENDPROC(zero_bss)
+END(zero_bss)
 
 /*
  * Initialize the processor for turning the MMU on.
  *
  * Clobbers x0 - x3
  */
-cpu_init:
+FUNC_LOCAL(cpu_init)
         PRINT_ID("- Initialize CPU -\r\n")
 
         /* Set up memory attribute type tables */
@@ -399,7 +400,7 @@ cpu_init:
          */
         msr spsel, #1
         ret
-ENDPROC(cpu_init)
+END(cpu_init)
 
 /*
  * Setup the initial stack and jump to the C world
@@ -411,7 +412,7 @@ ENDPROC(cpu_init)
  *
  * Clobbers x3
  */
-launch:
+FUNC_LOCAL(launch)
         ldr   x3, =init_data
         add   x3, x3, #INITINFO_stack /* Find the boot-time stack */
         ldr   x3, [x3]
@@ -421,13 +422,14 @@ launch:
 
         /* Jump to C world */
         br    x2
-ENDPROC(launch)
+END(launch)
 
 /* Fail-stop */
-fail:   PRINT_ID("- Boot failed -\r\n")
+FUNC_LOCAL(fail)
+        PRINT_ID("- Boot failed -\r\n")
 1:      wfe
         b     1b
-ENDPROC(fail)
+END(fail)
 
 #ifdef CONFIG_EARLY_PRINTK
 /*
@@ -438,14 +440,14 @@ ENDPROC(fail)
  *
  * Clobbers x0 - x1
  */
-init_uart:
+FUNC_LOCAL(init_uart)
         ldr   x23, =CONFIG_EARLY_UART_BASE_ADDRESS
 #ifdef CONFIG_EARLY_UART_INIT
         early_uart_init x23, 0
 #endif
         PRINT("- UART enabled -\r\n")
         ret
-ENDPROC(init_uart)
+END(init_uart)
 
 /*
  * Print early debug messages.
@@ -454,7 +456,7 @@ ENDPROC(init_uart)
  * x23: Early UART base address
  * Clobbers x0-x1
  */
-ENTRY(asm_puts)
+FUNC(asm_puts)
         early_uart_ready x23, 1
         ldrb  w1, [x0], #1           /* Load next char */
         cbz   w1, 1f                 /* Exit on nul */
@@ -462,7 +464,7 @@ ENTRY(asm_puts)
         b     asm_puts
 1:
         ret
-ENDPROC(asm_puts)
+END(asm_puts)
 
 /*
  * Print a 64-bit number in hex.
@@ -471,7 +473,7 @@ ENDPROC(asm_puts)
  * x23: Early UART base address
  * Clobbers x0-x3
  */
-ENTRY(asm_putn)
+FUNC(asm_putn)
         adr_l x1, hex
         mov   x3, #16
 1:
@@ -484,7 +486,7 @@ ENTRY(asm_putn)
         subs  x3, x3, #1
         b.ne  1b
         ret
-ENDPROC(asm_putn)
+END(asm_putn)
 
 RODATA_SECT(.rodata.idmap, hex, "0123456789abcdef")
 
@@ -493,16 +495,17 @@ RODATA_SECT(.rodata.idmap, hex, "0123456789abcdef")
 /* This provides a C-API version of __lookup_processor_type
  * TODO: For now, the implementation return NULL every time
  */
-ENTRY(lookup_processor_type)
+FUNC(lookup_processor_type)
         mov  x0, #0
         ret
+END(lookup_processor_type)
 
 #ifdef CONFIG_ARM_EFI
 /*
  *  Function to transition from EFI loader in C, to Xen entry point.
  *  void noreturn efi_xen_start(void *fdt_ptr, uint32_t fdt_size);
  */
-ENTRY(efi_xen_start)
+FUNC(efi_xen_start)
         /*
          * Preserve x0 (fdt pointer) across call to __flush_dcache_area,
          * restore for entry into Xen.
@@ -554,7 +557,7 @@ ENTRY(efi_xen_start)
         mov   x26, #1               /* x26 := skip_zero_bss */
 
         b     real_start_efi
-ENDPROC(efi_xen_start)
+END(efi_xen_start)
 
 #endif /* CONFIG_ARM_EFI */
 
