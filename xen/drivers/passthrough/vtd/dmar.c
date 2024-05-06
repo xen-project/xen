@@ -47,6 +47,7 @@ LIST_HEAD_READ_MOSTLY(acpi_drhd_units);
 LIST_HEAD_READ_MOSTLY(acpi_rmrr_units);
 static LIST_HEAD_READ_MOSTLY(acpi_atsr_units);
 static LIST_HEAD_READ_MOSTLY(acpi_rhsa_units);
+static LIST_HEAD_READ_MOSTLY(acpi_satc_units);
 
 static struct acpi_table_header *__read_mostly dmar_table;
 static int __read_mostly dmar_flags;
@@ -750,6 +751,93 @@ acpi_parse_one_rhsa(struct acpi_dmar_header *header)
     return ret;
 }
 
+static int __init register_one_satc(struct acpi_satc_unit *satcu)
+{
+    bool ignore = false;
+    unsigned int i = 0;
+    int ret = 0;
+
+    /* Skip checking if segment is not accessible yet. */
+    if ( !pci_known_segment(satcu->segment) )
+        i = UINT_MAX;
+
+    for ( ; i < satcu->scope.devices_cnt; i++ )
+    {
+        uint8_t b = PCI_BUS(satcu->scope.devices[i]);
+        uint8_t d = PCI_SLOT(satcu->scope.devices[i]);
+        uint8_t f = PCI_FUNC(satcu->scope.devices[i]);
+
+        if ( !pci_device_detect(satcu->segment, b, d, f) )
+        {
+            dprintk(XENLOG_WARNING VTDPREFIX,
+                    " Non-existent device (%pp) is reported in SATC scope!\n",
+                    &PCI_SBDF(satcu->segment, b, d, f));
+            ignore = true;
+        }
+        else
+        {
+            ignore = false;
+            break;
+        }
+    }
+
+    if ( ignore )
+    {
+        dprintk(XENLOG_WARNING VTDPREFIX,
+                " Ignore SATC for seg %04x as no device under its scope is PCI discoverable\n",
+                satcu->segment);
+        return 1;
+    }
+
+    if ( iommu_verbose )
+        printk(VTDPREFIX " ATC required: %d\n", satcu->atc_required);
+
+    list_add(&satcu->list, &acpi_satc_units);
+
+    return ret;
+}
+
+static int __init
+acpi_parse_one_satc(const struct acpi_dmar_header *header)
+{
+    const struct acpi_dmar_satc *satc =
+        container_of(header, const struct acpi_dmar_satc, header);
+    struct acpi_satc_unit *satcu;
+    const void *dev_scope_start, *dev_scope_end;
+    int ret = acpi_dmar_check_length(header, sizeof(*satc));
+
+    if ( ret )
+        return ret;
+
+    satcu = xzalloc(struct acpi_satc_unit);
+    if ( !satcu )
+        return -ENOMEM;
+
+    satcu->segment = satc->segment;
+    satcu->atc_required = satc->flags & ACPI_SATC_ATC_REQUIRED;
+
+    dev_scope_start = (const void *)(satc + 1);
+    dev_scope_end   = (const void *)satc + header->length;
+    ret = acpi_parse_dev_scope(dev_scope_start, dev_scope_end,
+                               &satcu->scope, SATC_TYPE, satc->segment);
+
+    if ( !ret && satcu->scope.devices_cnt )
+        ret = register_one_satc(satcu);
+
+    if ( ret )
+    {
+        scope_devices_free(&satcu->scope);
+        xfree(satcu);
+    }
+
+    /*
+     * register_one_satc() returns greater than 0 when a specified PCIe
+     * device cannot be detected. To prevent VT-d from being disabled in
+     * such cases, make the return value 0 here.
+     */
+    return ret > 0 ? 0 : ret;
+}
+
 static int __init cf_check acpi_parse_dmar(struct acpi_table_header *table)
 {
     struct acpi_table_dmar *dmar;
@@ -803,6 +891,13 @@ static int __init cf_check acpi_parse_dmar(struct acpi_table_header *table)
                 printk(VTDPREFIX "found ACPI_DMAR_RHSA:\n");
             ret = acpi_parse_one_rhsa(entry_header);
             break;
+
+        case ACPI_DMAR_TYPE_SATC:
+            if ( iommu_verbose )
+                printk(VTDPREFIX "found ACPI_DMAR_SATC:\n");
+            ret = acpi_parse_one_satc(entry_header);
+            break;
+
         default:
             dprintk(XENLOG_WARNING VTDPREFIX,
                     "Ignore unknown DMAR structure type (%#x)\n",

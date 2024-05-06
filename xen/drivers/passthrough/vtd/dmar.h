@@ -91,6 +91,16 @@ struct acpi_rhsa_unit {
     u32    proximity_domain;
 };
 
+struct acpi_satc_unit {
+    struct dmar_scope scope;
+    struct list_head list;
+    uint16_t segment;
+    bool atc_required:1;
+};
+
+/* In lieu of a definition in actbl2.h. */
+#define ACPI_SATC_ATC_REQUIRED (1U << 0)
+
 #define for_each_drhd_unit(drhd) \
     list_for_each_entry(drhd, &acpi_drhd_units, list)
 
@@ -106,6 +116,7 @@ struct acpi_atsr_unit *acpi_find_matched_atsr_unit(const struct pci_dev *);
 #define DMAR_TYPE 1
 #define RMRR_TYPE 2
 #define ATSR_TYPE 3
+#define SATC_TYPE 4
 
 #define DMAR_OPERATION_TIMEOUT MILLISECS(1000)
 

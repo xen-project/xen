@@ -345,7 +345,8 @@ enum acpi_dmar_type {
 	ACPI_DMAR_TYPE_RESERVED_MEMORY = 1,
 	ACPI_DMAR_TYPE_ATSR = 2,
 	ACPI_DMAR_HARDWARE_AFFINITY = 3,
-	ACPI_DMAR_TYPE_RESERVED = 4	/* 4 and greater are reserved */
+	ACPI_DMAR_TYPE_SATC = 5,
+	ACPI_DMAR_TYPE_RESERVED = 7	/* 7 and greater are reserved */
 };
 
 /* DMAR Device Scope structure */
@@ -425,6 +426,15 @@ struct acpi_dmar_rhsa {
 	u32 reserved;
 	u64 base_address;
 	u32 proximity_domain;
+};
+
+/* 5: SOC Integrated Address Translation Cache Reporting Structure */
+
+struct acpi_dmar_satc {
+	struct acpi_dmar_header header;
+	uint8_t flags;
+	uint8_t reserved;
+	uint16_t segment;
 };
 
 /*******************************************************************************
