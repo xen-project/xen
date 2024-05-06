@@ -81,10 +81,11 @@ static inline mfn_t gfn_to_mfn(struct domain *d, gfn_t gfn)
 static inline bool arch_acquire_resource_check(struct domain *d)
 {
     /*
-     * The reference counting of foreign entries in set_foreign_p2m_entry()
-     * is supported on PPC.
+     * Requires refcounting the foreign mappings and walking the p2m on
+     * teardown in order to remove foreign pages from the p2m and drop the
+     * extra reference counts.
      */
-    return true;
+    return false;
 }
 
 static inline void p2m_altp2m_check(struct vcpu *v, uint16_t idx)
