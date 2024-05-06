@@ -757,16 +757,14 @@ static int noinline __init inflate_fixed(void)
     }
 
     /* decompress until an end-of-block code */
-    if (inflate_codes(tl, td, bl, bd)) {
-        free(l);
-        return 1;
-    }
+    i = inflate_codes(tl, td, bl, bd);
 
     /* free the decoding tables, return */
     free(l);
     huft_free(tl);
     huft_free(td);
-    return 0;
+
+    return !!i;
 }
 
 /*
@@ -940,19 +938,17 @@ static int noinline __init inflate_dynamic(void)
     DEBG("dyn6 ");
 
     /* decompress until an end-of-block code */
-    if (inflate_codes(tl, td, bl, bd)) {
-        ret = 1;
-        goto out;
-    }
+    ret = !!inflate_codes(tl, td, bl, bd);
 
-    DEBG("dyn7 ");
+    if ( !ret )
+       DEBG("dyn7 ");
 
     /* free the decoding tables, return */
     huft_free(tl);
     huft_free(td);
 
-    DEBG(">");
-    ret = 0;
+    if ( !ret )
+       DEBG(">");
  out:
     free(ll);
     return ret;
