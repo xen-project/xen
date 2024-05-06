@@ -341,9 +341,9 @@ static inline void __free_amd_iommu_tables(void *table, unsigned int order)
     free_xenheap_pages(table, order);
 }
 
-static inline int iommu_has_cap(struct amd_iommu *iommu, uint32_t bit)
+static inline bool iommu_has_cap(const struct amd_iommu *iommu, unsigned int bit)
 {
-    return !!(iommu->cap.header & (1u << bit));
+    return iommu->cap.header & (1u << bit);
 }
 
 /* access device id field from iommu cmd */

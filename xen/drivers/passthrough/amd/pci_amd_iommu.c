@@ -114,6 +114,16 @@ static bool any_pdev_behind_iommu(const struct domain *d,
     return false;
 }
 
+static bool use_ats(
+    const struct pci_dev *pdev,
+    const struct amd_iommu *iommu,
+    const struct ivrs_mappings *ivrs_dev)
+{
+    return !ivrs_dev->block_ats &&
+           iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) &&
+           pci_ats_device(iommu->seg, pdev->bus, pdev->devfn);
+}
+
 static int __must_check amd_iommu_setup_domain_device(
     struct domain *domain, struct amd_iommu *iommu,
     uint8_t devfn, struct pci_dev *pdev)
@@ -185,9 +195,7 @@ static int __must_check amd_iommu_setup_domain_device(
         dte->ex = ivrs_dev->dte_allow_exclusion;
         dte->sys_mgt = MASK_EXTR(ivrs_dev->device_flags, ACPI_IVHD_SYSTEM_MGMT);
 
-        if ( pci_ats_device(iommu->seg, bus, pdev->devfn) &&
-             !ivrs_dev->block_ats &&
-             iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) )
+        if ( use_ats(pdev, iommu, ivrs_dev) )
             dte->i = ats_enabled;
 
         spin_unlock_irqrestore(&iommu->lock, flags);
@@ -248,9 +256,7 @@ static int __must_check amd_iommu_setup_domain_device(
         ASSERT(dte->sys_mgt == MASK_EXTR(ivrs_dev->device_flags,
                                          ACPI_IVHD_SYSTEM_MGMT));
 
-        if ( pci_ats_device(iommu->seg, bus, pdev->devfn) &&
-             !ivrs_dev->block_ats &&
-             iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) )
+        if ( use_ats(pdev, iommu, ivrs_dev) )
             ASSERT(dte->i == ats_enabled);
 
         spin_unlock_irqrestore(&iommu->lock, flags);
@@ -268,9 +274,7 @@ static int __must_check amd_iommu_setup_domain_device(
 
     ASSERT(pcidevs_locked());
 
-    if ( pci_ats_device(iommu->seg, bus, pdev->devfn) &&
-         !ivrs_dev->block_ats &&
-         iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) &&
+    if ( use_ats(pdev, iommu, ivrs_dev) &&
          !pci_ats_enabled(iommu->seg, bus, pdev->devfn) )
     {
         if ( devfn == pdev->devfn )
