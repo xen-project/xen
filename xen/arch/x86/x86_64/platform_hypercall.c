@@ -30,7 +30,7 @@ CHECK_pf_pcpu_version;
 
 #define xen_pf_ucode_revision xenpf_ucode_revision
 CHECK_pf_ucode_revision;
-#undef xen_pf_pucode_revision
+#undef xen_pf_ucode_revision
 
 #define xen_pf_enter_acpi_sleep xenpf_enter_acpi_sleep
 CHECK_pf_enter_acpi_sleep;
