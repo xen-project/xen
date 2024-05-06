@@ -48,8 +48,9 @@
 /* System configuration register */
 #define UART_OMAP_SYSC_DEF_CONF   0x0d   /* autoidle mode, wakeup is enabled */
 
-#define omap_read(uart, off)       readl((uart)->regs + (off<<REG_SHIFT))
-#define omap_write(uart, off, val) writel((val), (uart)->regs + (off<<REG_SHIFT))
+#define omap_read(uart, off)       readl((uart)->regs + ((off) << REG_SHIFT))
+#define omap_write(uart, off, val) writel(val, \
+                                          (uart)->regs + ((off) << REG_SHIFT))
 
 static struct omap_uart {
     u32 baud, clock_hz, data_bits, parity, stop_bits, fifo_size;
