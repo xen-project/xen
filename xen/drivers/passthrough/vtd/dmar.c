@@ -82,14 +82,13 @@ static int __init acpi_register_rmrr_unit(struct acpi_rmrr_unit *rmrr)
     return 0;
 }
 
-static void scope_devices_free(struct dmar_scope *scope)
+static void __init scope_devices_free(struct dmar_scope *scope)
 {
     if ( !scope )
         return;
 
     scope->devices_cnt = 0;
-    xfree(scope->devices);
-    scope->devices = NULL;
+    XFREE(scope->devices);
 }
 
 static void __init disable_all_dmar_units(void)
@@ -557,7 +556,7 @@ out:
     return ret;
 }
 
-static int register_one_rmrr(struct acpi_rmrr_unit *rmrru)
+static int __init register_one_rmrr(struct acpi_rmrr_unit *rmrru)
 {
     bool ignore = false;
     unsigned int i = 0;
@@ -595,17 +594,13 @@ static int register_one_rmrr(struct acpi_rmrr_unit *rmrru)
                 " Ignore RMRR [%"PRIx64",%"PRIx64"] as no device"
                 " under its scope is PCI discoverable!\n",
                 rmrru->base_address, rmrru->end_address);
-        scope_devices_free(&rmrru->scope);
-        xfree(rmrru);
-        return 1;
+        ret = 1;
     }
     else if ( rmrru->base_address > rmrru->end_address )
     {
         dprintk(XENLOG_WARNING VTDPREFIX,
                 " RMRR [%"PRIx64",%"PRIx64"] is incorrect!\n",
                 rmrru->base_address, rmrru->end_address);
-        scope_devices_free(&rmrru->scope);
-        xfree(rmrru);
         ret = -EFAULT;
     }
     else
@@ -660,21 +655,20 @@ acpi_parse_one_rmrr(struct acpi_dmar_header *header)
                                &rmrru->scope, RMRR_TYPE, rmrr->segment);
 
     if ( !ret && (rmrru->scope.devices_cnt != 0) )
-    {
         ret = register_one_rmrr(rmrru);
-        /*
-         * register_one_rmrr() returns greater than 0 when a specified
-         * PCIe device cannot be detected. To prevent VT-d from being
-         * disabled in such cases, reset the return value to 0 here.
-         */
-        if ( ret > 0 )
-            ret = 0;
 
-    }
-    else
+    if ( ret )
+    {
+        scope_devices_free(&rmrru->scope);
         xfree(rmrru);
+    }
 
-    return ret;
+    /*
+     * register_one_rmrr() returns greater than 0 when a specified PCIe
+     * device cannot be detected. To prevent VT-d from being disabled in
+     * such cases, make the return value 0 here.
+     */
+    return ret > 0 ? 0 : ret;
 }
 
 static int __init
@@ -945,9 +939,13 @@ static int __init add_one_user_rmrr(unsigned long base_pfn,
     rmrr->scope.devices_cnt = dev_count;
 
     if ( register_one_rmrr(rmrr) )
+    {
         printk(XENLOG_ERR VTDPREFIX
                "Could not register RMMR range "ERMRRU_FMT"\n",
                ERMRRU_ARG);
+        scope_devices_free(&rmrr->scope);
+        xfree(rmrr);
+    }
 
     return 1;
 }
