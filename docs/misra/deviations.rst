@@ -334,6 +334,19 @@ Deviations related to MISRA C:2012 Rules:
          - /\* Fallthrough \*/
          - /\* Fallthrough. \*/
 
+   * - R16.4
+     - Switch statements having a controlling expression of enum type
+       deliberately do not have a default case: gcc -Wall enables -Wswitch
+       which warns (and breaks the build as we use -Werror) if one of the enum
+       labels is missing from the switch.
+     - Tagged as `deliberate` for ECLAIR.
+
+   * - R16.4
+     - A switch statement with a single switch clause and no default label may
+       be used in place of an equivalent if statement if it is considered to
+       improve readability.
+     - Tagged as `deliberate` for ECLAIR.
+
    * - R16.6
      - A switch statement with a single switch clause and no default label may
        be used in place of an equivalent if statement if it is considered to
