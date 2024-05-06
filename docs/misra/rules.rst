@@ -489,8 +489,7 @@ maintainers if you want to suggest a change.
 
    * - `Rule 16.3 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_16_03.c>`_
      - Required
-     - An unconditional break statement shall terminate every
-       switch-clause
+     - An unconditional break statement shall terminate every switch-clause_
      - In addition to break, also other unconditional flow control statements
        such as continue, return, goto are allowed.
 
@@ -712,3 +711,14 @@ maintainers if you want to suggest a change.
      - The value of a pointer to a FILE shall not be used after the associated
        stream has been closed
      -
+
+Terms & Definitions
+-------------------
+
+.. _switch-clause:
+
+A *switch clause* can be defined as:
+"the non-empty list of statements which follows a non-empty list of
+case/default labels".
+A formal definition is available within the amplification of MISRA C:2012
+Rule 16.1.
