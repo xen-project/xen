@@ -590,6 +590,13 @@ static void __init calculate_pv_max_policy(void)
     unsigned int i;
 
     *p = host_cpu_policy;
+
+    /*
+     * Some VMs may have a larger-than-necessary feat max_subleaf.  Allow them
+     * to migrate in.
+     */
+    p->feat.max_subleaf = ARRAY_SIZE(p->feat.raw) - 1;
+
     x86_cpu_policy_to_featureset(p, fs);
 
     for ( i = 0; i < ARRAY_SIZE(fs); ++i )
@@ -630,6 +637,10 @@ static void __init calculate_pv_def_policy(void)
     unsigned int i;
 
     *p = pv_max_cpu_policy;
+
+    /* Default to the same max_subleaf as the host. */
+    p->feat.max_subleaf = host_cpu_policy.feat.max_subleaf;
+
     x86_cpu_policy_to_featureset(p, fs);
 
     for ( i = 0; i < ARRAY_SIZE(fs); ++i )
@@ -666,6 +677,13 @@ static void __init calculate_hvm_max_policy(void)
     const uint32_t *mask;
 
     *p = host_cpu_policy;
+
+    /*
+     * Some VMs may have a larger-than-necessary feat max_subleaf.  Allow them
+     * to migrate in.
+     */
+    p->feat.max_subleaf = ARRAY_SIZE(p->feat.raw) - 1;
+
     x86_cpu_policy_to_featureset(p, fs);
 
     mask = hvm_hap_supported() ?
@@ -783,6 +801,10 @@ static void __init calculate_hvm_def_policy(void)
     const uint32_t *mask;
 
     *p = hvm_max_cpu_policy;
+
+    /* Default to the same max_subleaf as the host. */
+    p->feat.max_subleaf = host_cpu_policy.feat.max_subleaf;
+
     x86_cpu_policy_to_featureset(p, fs);
 
     mask = hvm_hap_supported() ?
