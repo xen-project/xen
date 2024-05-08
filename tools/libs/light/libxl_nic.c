@@ -233,6 +233,11 @@ static int libxl__set_xenstore_nic(libxl__gc *gc, uint32_t domid,
         flexarray_append(back, GCSPRINTF("%u", nic->mtu));
     }
     
+    if (nic->vlan) {
+        flexarray_append(back, "vlan");
+        flexarray_append(back, libxl__strdup(gc, nic->vlan));
+    }
+
     flexarray_append(back, "bridge");
     flexarray_append(back, libxl__strdup(gc, nic->bridge));
     flexarray_append(back, "handle");
@@ -312,6 +317,11 @@ static int libxl__nic_from_xenstore(libxl__gc *gc, const char *libxl_path,
     } else {
         nic->mtu = LIBXL_DEVICE_NIC_MTU_DEFAULT;
     }
+
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/vlan", libxl_path),
+				(const char **)(&nic->vlan));
+    if (rc) goto out;
 
     rc = libxl__xs_read_checked(gc, XBT_NULL,
                                 GCSPRINTF("%s/mac", libxl_path), &tmp);

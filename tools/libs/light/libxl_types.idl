@@ -817,6 +817,7 @@ libxl_device_nic = Struct("device_nic", [
     ("backend_domname", string),
     ("devid", libxl_devid),
     ("mtu", integer),
+    ("vlan", string),
     ("model", string),
     ("mac", libxl_mac),
     ("ip", string),
