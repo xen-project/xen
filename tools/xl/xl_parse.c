@@ -565,6 +565,8 @@ int parse_nic_config(libxl_device_nic *nic, XLU_Config **config, char *token)
         nic->devid = parse_ulong(oparg);
     } else if (MATCH_OPTION("mtu", token, oparg)) {
         nic->mtu = parse_ulong(oparg);
+    } else if (MATCH_OPTION("vlan", token, oparg)) {
+        replace_string(&nic->vlan, oparg);
     } else if (!strcmp("trusted", token)) {
         libxl_defbool_set(&nic->trusted, true);
     } else if (!strcmp("untrusted", token)) {

@@ -259,6 +259,44 @@ Specifies the MTU (i.e. the maximum size of an IP payload, exclusing headers). T
 default value is 1500 but, if the VIF is attached to a bridge, it will be set to match
 unless overridden by this parameter.
 
+=head2 vlan
+
+Specifies the VLAN configuration. The format of this parameter is one or more
+VLAN IDs or ranges separated by forward slashes. Each term can be:
+
+=over
+
+=item *
+
+B<vlan> - a single VLAN ID in the range 1 to 4094. This can optionally followed
+by a B<p> to indicate the PVID or by a B<u> to indicate an untagged VLAN. C<p>
+implies B<u>.
+
+=item *
+
+B<vlan1>-B<vlan2> - a range of VLAN IDs from B<vlan1> to B<vlan2>, both between
+1 and 4094 and B<vlan1> being less than or equal to B<vlan2>. This can be
+optionally followed by a B<u> to indicate that the range of VLANs are untagged.
+
+=item *
+
+B<vlan>+B<offset>xB<count> - describing a range of VLAN IDs starting at B<vlan>
+with B<count> additional entries, each incremented by B<offset>. This can be
+optionally followed by a B<u> to indicate that the range of VLANs are untagged.
+
+=back
+
+Note, one VLAN ID must be marked as the PVID. In the case of a vlan
+specification consisting of a single VLAN ID (e.g. C<vlan=10>), the B<p> suffix
+may be omitted. Specifying more than one untagged VLAN ID is an advanced
+configuration - use with caution.
+
+For example:
+
+        'vlan=10' -- meaning a single VLAN that is the PVID.
+        'vlan=10p/20' -- VLAN 10 is the PVID and VLAN 20 is tagged.
+        'vlan=10p/100+10x4' -- VLANs 10, 100, 110, 120, 130, 140, 150.
+
 =head2 trusted / untrusted
 
 An advisory setting for the frontend driver on whether the backend should be
