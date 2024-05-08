@@ -125,8 +125,11 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    errno = 0;
     ret = xc_microcode_update(xch, buf, len);
-    if ( ret )
+    if ( ret == -1 && errno == EEXIST )
+        printf("Microcode already up to date\n");
+    else if ( ret )
     {
         fprintf(stderr, "Failed to update microcode. (err: %s)\n",
                 strerror(errno));

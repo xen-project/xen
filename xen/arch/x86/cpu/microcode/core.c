@@ -640,7 +640,7 @@ static long cf_check microcode_update_helper(void *data)
                    "microcode: couldn't find any newer%s revision in the provided blob!\n",
                    opt_ucode_allow_same ? " (or the same)" : "");
             microcode_free_patch(patch);
-            ret = -ENOENT;
+            ret = -EEXIST;
 
             goto put;
         }
