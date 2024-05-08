@@ -189,7 +189,7 @@ static int write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
 {
     entry->msg = *msg;
 
-    if ( iommu_intremap )
+    if ( iommu_intremap != iommu_intremap_off )
     {
         int rc;
 
@@ -555,7 +555,7 @@ int msi_free_irq(struct msi_desc *entry)
             destroy_irq(entry[nr].irq);
 
         /* Free the unused IRTE if intr remap enabled */
-        if ( iommu_intremap )
+        if ( iommu_intremap != iommu_intremap_off )
             iommu_update_ire_from_msi(entry + nr, NULL);
     }
 

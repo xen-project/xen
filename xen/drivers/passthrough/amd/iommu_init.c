@@ -1483,7 +1483,7 @@ int __init amd_iommu_init(bool xt)
             goto error_out;
     }
 
-    if ( iommu_intremap )
+    if ( iommu_intremap != iommu_intremap_off )
         register_keyhandler('V', &amd_iommu_dump_intremap_tables,
                             "dump IOMMU intremap tables", 0);
 
@@ -1501,7 +1501,7 @@ int __init amd_iommu_init_late(void)
 
     /* Further initialize the device table(s). */
     pci_init = true;
-    if ( iommu_intremap )
+    if ( iommu_intremap != iommu_intremap_off )
         rc = iterate_ivrs_mappings(amd_iommu_setup_device_table);
 
     for_each_amd_iommu ( iommu )

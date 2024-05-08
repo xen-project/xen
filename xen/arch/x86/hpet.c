@@ -278,7 +278,7 @@ static int hpet_msi_write(struct hpet_event_channel *ch, struct msi_msg *msg)
 {
     ch->msi.msg = *msg;
 
-    if ( iommu_intremap )
+    if ( iommu_intremap != iommu_intremap_off )
     {
         int rc = iommu_update_ire_from_msi(&ch->msi, msg);
 
@@ -352,7 +352,7 @@ static int __init hpet_setup_msi_irq(struct hpet_event_channel *ch)
     u32 cfg = hpet_read32(HPET_Tn_CFG(ch->idx));
     irq_desc_t *desc = irq_to_desc(ch->msi.irq);
 
-    if ( iommu_intremap )
+    if ( iommu_intremap != iommu_intremap_off )
     {
         ch->msi.hpet_id = hpet_blockid;
         ret = iommu_setup_hpet_msi(&ch->msi);
@@ -371,7 +371,7 @@ static int __init hpet_setup_msi_irq(struct hpet_event_channel *ch)
         ret = __hpet_setup_msi_irq(desc);
     if ( ret < 0 )
     {
-        if ( iommu_intremap )
+        if ( iommu_intremap != iommu_intremap_off )
             iommu_update_ire_from_msi(&ch->msi, NULL);
         return ret;
     }

@@ -392,7 +392,7 @@ void __init platform_quirks_init(void)
     map_igd_reg();
 
     /* Tylersburg interrupt remap quirk */
-    if ( iommu_intremap )
+    if ( iommu_intremap != iommu_intremap_off )
         tylersburg_intremap_quirk();
 }
 

@@ -2540,7 +2540,7 @@ static int __must_check init_vtd_hw(bool resume)
     /*
      * Enable interrupt remapping
      */  
-    if ( iommu_intremap )
+    if ( iommu_intremap != iommu_intremap_off )
     {
         int apic;
         for ( apic = 0; apic < nr_ioapics; apic++ )
@@ -2556,7 +2556,7 @@ static int __must_check init_vtd_hw(bool resume)
             }
         }
     }
-    if ( iommu_intremap )
+    if ( iommu_intremap != iommu_intremap_off )
     {
         for_each_drhd_unit ( drhd )
         {

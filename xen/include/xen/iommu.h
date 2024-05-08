@@ -60,10 +60,6 @@ extern uint8_t iommu_quarantine;
 
 #ifdef CONFIG_X86
 extern enum __packed iommu_intremap {
-   /*
-    * In order to allow traditional boolean uses of the iommu_intremap
-    * variable, the "off" value has to come first (yielding a value of zero).
-    */
    iommu_intremap_off,
    /*
     * Interrupt remapping enabled, but only able to generate interrupts
