@@ -25,7 +25,7 @@ ld-option = $(shell if $(LD) -v $(1) >/dev/null 2>&1; then echo y; else echo n; 
 # SMBIOS spec requires format mm/dd/yyyy
 SMBIOS_REL_DATE ?= $(shell date +%m/%d/%Y)
 
-CFLAGS += $(CFLAGS_xeninclude) -fno-pic
+CFLAGS += $(CFLAGS_xeninclude) -fno-pic -mregparm=3
 
 # We mustn't use tools-only public interfaces.
 CFLAGS += -D__XEN_INTERFACE_VERSION__=__XEN_LATEST_INTERFACE_VERSION__

@@ -31,7 +31,7 @@
 
 static int ap_callin;
 
-static void __attribute__((regparm(1))) cpu_setup(unsigned int cpu)
+static void cpu_setup(unsigned int cpu)
 {
     printf(" - CPU%d ... ", cpu);
     cacheattr_init();
