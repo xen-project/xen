@@ -29,15 +29,15 @@
 
 #include <xen/vcpu.h>
 
-static int ap_callin, ap_cpuid;
+static int ap_callin;
 
-static void ap_start(void)
+static void __attribute__((regparm(1))) cpu_setup(unsigned int cpu)
 {
-    printf(" - CPU%d ... ", ap_cpuid);
+    printf(" - CPU%d ... ", cpu);
     cacheattr_init();
     printf("done.\n");
 
-    if ( !ap_cpuid ) /* Used on the BSP too */
+    if ( !cpu ) /* Used on the BSP too */
         return;
 
     wmb();
@@ -55,7 +55,6 @@ static void boot_cpu(unsigned int cpu)
     static struct vcpu_hvm_context ap;
 
     /* Initialise shared variables. */
-    ap_cpuid = cpu;
     ap_callin = 0;
     wmb();
 
@@ -63,8 +62,10 @@ static void boot_cpu(unsigned int cpu)
     ap = (struct vcpu_hvm_context) {
         .mode = VCPU_HVM_MODE_32B,
         .cpu_regs.x86_32 = {
-            .eip = (unsigned long)ap_start,
+            .eip = (unsigned long)cpu_setup,
             .esp = (unsigned long)ap_stack + ARRAY_SIZE(ap_stack),
+
+            .eax = cpu,
 
             /* Protected Mode, no paging. */
             .cr0 = X86_CR0_PE,
@@ -105,7 +106,7 @@ void smp_initialise(void)
     unsigned int i, nr_cpus = hvm_info->nr_vcpus;
 
     printf("Multiprocessor initialisation:\n");
-    ap_start();
+    cpu_setup(0);
     for ( i = 1; i < nr_cpus; i++ )
         boot_cpu(i);
 }
