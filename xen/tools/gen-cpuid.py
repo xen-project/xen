@@ -51,7 +51,7 @@ def parse_definitions(state):
         r"\s+/\*([\w!]*) .*$")
 
     word_regex = re.compile(
-        r"^/\* .* word (\d*) \*/$")
+        r"^/\* .* word (\d*) .*\*/$")
     last_word = -1
 
     this = sys.modules[__name__]

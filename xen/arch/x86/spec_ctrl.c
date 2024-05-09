@@ -1766,6 +1766,90 @@ static void __init bhi_calculations(void)
     }
 }
 
+/*
+ * https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/advisory-guidance/indirect-target-selection.html
+ */
+static void __init its_calculations(void)
+{
+    /*
+     * Indirect Target Selection is a Branch Prediction bug whereby certain
+     * indirect branches (including RETs) get predicted using a direct branch
+     * target, rather than a suitable indirect target, bypassing hardware
+     * isolation protections.
+     *
+     * ITS affects Core (but not Atom) processors starting from the
+     * introduction of eIBRS, up to but not including Golden Cove cores
+     * (checked here with BHI_CTRL).
+     *
+     * The ITS_NO feature is not expected to be enumerated by hardware, and is
+     * only for VMMs to synthesise for guests.
+     *
+     * ITS comes in 3 flavours:
+     *
+     *   1) Across-IBPB.  Indirect branches after the IBPB can be controlled
+     *      by direct targets which existed prior to the IBPB.  This is
+     *      addressed in the IPU 2025.1 microcode drop, and has no other
+     *      software interaction.
+     *
+     *   2) Guest/Host.  Indirect branches in the VMM can be controlled by
+     *      direct targets from the guest.  This applies equally to PV guests
+     *      (Ring3) and HVM guests (VMX), and applies to all Skylake-uarch
+     *      cores with eIBRS.
+     *
+     *   3) Intra-mode.  Indirect branches in the VMM can be controlled by
+     *      other execution in the same mode.
+     */
+
+    /*
+     * If we can see ITS_NO, or we're virtualised, do nothing.  We are or may
+     * migrate somewhere unsafe.
+     */
+    if ( cpu_has_its_no || cpu_has_hypervisor )
+        return;
+
+    /* ITS is only known to affect Intel processors at this time. */
+    if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
+        return;
+
+    /*
+     * ITS does not exist on:
+     *  - non-Family 6 CPUs
+     *  - those without eIBRS
+     *  - those with BHI_CTRL
+     * but we still need to synthesise ITS_NO.
+     */
+    if ( boot_cpu_data.x86 != 6 || !cpu_has_eibrs ||
+         boot_cpu_has(X86_FEATURE_BHI_CTRL) )
+        goto synthesise;
+
+    switch ( boot_cpu_data.x86_model )
+    {
+        /* These Skylake-uarch cores suffer cases #2 and #3. */
+    case INTEL_FAM6_SKYLAKE_X:
+    case INTEL_FAM6_KABYLAKE_L:
+    case INTEL_FAM6_KABYLAKE:
+    case INTEL_FAM6_COMETLAKE:
+    case INTEL_FAM6_COMETLAKE_L:
+        return;
+
+        /* These Sunny/Willow/Cypress Cove cores suffer case #3. */
+    case INTEL_FAM6_ICELAKE_X:
+    case INTEL_FAM6_ICELAKE_D:
+    case INTEL_FAM6_ICELAKE_L:
+    case INTEL_FAM6_TIGERLAKE_L:
+    case INTEL_FAM6_TIGERLAKE:
+    case INTEL_FAM6_ROCKETLAKE:
+        return;
+
+    default:
+        break;
+    }
+
+    /* Platforms remaining are not believed to be vulnerable to ITS. */
+ synthesise:
+    setup_force_cpu_cap(X86_FEATURE_ITS_NO);
+}
+
 void spec_ctrl_init_domain(struct domain *d)
 {
     bool pv = is_pv_domain(d);
@@ -2315,6 +2399,8 @@ void __init init_speculation_mitigations(void)
     gds_calculations();
 
     bhi_calculations();
+
+    its_calculations();
 
     print_details(thunk);
 
