@@ -218,6 +218,7 @@ static inline bool boot_cpu_has(unsigned int feat)
 #define cpu_has_gds_no          boot_cpu_has(X86_FEATURE_GDS_NO)
 #define cpu_has_rfds_no         boot_cpu_has(X86_FEATURE_RFDS_NO)
 #define cpu_has_rfds_clear      boot_cpu_has(X86_FEATURE_RFDS_CLEAR)
+#define cpu_has_its_no          boot_cpu_has(X86_FEATURE_ITS_NO)
 
 /* Synthesized. */
 #define cpu_has_arch_perfmon    boot_cpu_has(X86_FEATURE_ARCH_PERFMON)
