@@ -391,7 +391,8 @@ XEN_CPUFEATURE(RFDS_CLEAR,         16*32+28) /*!A| Register File(s) cleared by V
 XEN_CPUFEATURE(IGN_UMONITOR,       16*32+29) /*   MCU_OPT_CTRL.IGN_UMONITOR */
 XEN_CPUFEATURE(MON_UMON_MITG,      16*32+30) /*   MCU_OPT_CTRL.MON_UMON_MITG */
 
-/* Intel-defined CPU features, MSR_ARCH_CAPS 0x10a.edx, word 17 */
+/* Intel-defined CPU features, MSR_ARCH_CAPS 0x10a.edx, word 17 (express in terms of word 16) */
+XEN_CPUFEATURE(ITS_NO,             16*32+62) /*!A No Indirect Target Selection */
 
 #endif /* XEN_CPUFEATURE */
 
