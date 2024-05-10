@@ -364,13 +364,10 @@ static bool msi_set_mask_bit(struct irq_desc *desc, bool host, bool guest)
             domid_t domid = pdev->domain->domain_id;
 
             maskall = true;
-            if ( pdev->msix->warned != domid )
-            {
-                pdev->msix->warned = domid;
+            if ( MSIX_CHECK_WARN(pdev->msix, domid, maskall) )
                 printk(XENLOG_G_WARNING
                        "cannot mask IRQ %d: masking MSI-X on Dom%d's %pp\n",
                        desc->irq, domid, &pdev->sbdf);
-            }
         }
         pdev->msix->host_maskall = maskall;
         if ( maskall || pdev->msix->guest_maskall )

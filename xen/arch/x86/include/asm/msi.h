@@ -208,6 +208,16 @@ struct msg_address {
                                        PCI_MSIX_ENTRY_SIZE + \
                                        (~PCI_MSIX_BIRMASK & (PAGE_SIZE - 1)))
 
+#define MSIX_CHECK_WARN(msix, domid, which)                             \
+    ({                                                                  \
+        if ( (msix)->warned_domid != (domid) )                          \
+        {                                                               \
+            (msix)->warned_domid = (domid);                             \
+            (msix)->warned_kind.all = 0;                                \
+        }                                                               \
+        (msix)->warned_kind.which ? false : ((msix)->warned_kind.which = true); \
+    })
+
 struct arch_msix {
     unsigned int nr_entries, used_entries;
     struct {
@@ -217,7 +227,13 @@ struct arch_msix {
     int table_idx[MAX_MSIX_TABLE_PAGES];
     spinlock_t table_lock;
     bool host_maskall, guest_maskall;
-    domid_t warned;
+    domid_t warned_domid;
+    union {
+        uint8_t all;
+        struct {
+            bool maskall                   : 1;
+        };
+    } warned_kind;
 };
 
 void early_msi_init(void);
