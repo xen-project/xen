@@ -49,7 +49,7 @@ string_param("console", opt_console);
 /* Char 1: CTRL+<char1> is used to switch console input between Xen and DOM0 */
 /* Char 2: If this character is 'x', then do not auto-switch to DOM0 when it */
 /*         boots. Any other value, or omitting the char, enables auto-switch */
-static unsigned char __read_mostly opt_conswitch[3] = "a";
+static char __read_mostly opt_conswitch[3] = "a";
 string_runtime_param("conswitch", opt_conswitch);
 
 /* sync_console: force synchronous console output (useful for debugging). */
