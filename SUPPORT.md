@@ -61,6 +61,11 @@ For the Cortex A77 r0p0 - r1p0, see Errata 1508412.
 
     Status, x86: Supported
 
+### Physical CPUs
+
+    Status, x86: Supported up to 4096
+    Status, ARM: Supported up to 128
+
 ### Host ACPI (via Domain 0)
 
     Status, x86 PV: Supported
