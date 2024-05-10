@@ -19,6 +19,23 @@ map_strings("scheduled-analysis",analysis_kind)
 
 -enable=B.EXPLAIN
 
+-doc_begin="These configurations serve the purpose of recognizing the 'mem*' macros as
+their Standard Library equivalents."
+
+-config=MC3R1.R21.14,call_select+=
+{"macro(^memcmp$)&&any_arg(1..2, skip(__non_syntactic_paren_cast_stmts, node(string_literal)))",
+ "any()", violation, "%{__callslct_any_base_fmt()}", {{arg, "%{__callslct_arg_fmt()}"}}}
+
+-config=MC3R1.R21.15,call_args+=
+{"macro(^mem(cmp|move|cpy)$)", {1, 2}, "unqual_pointee_compatible",
+ "%{__argscmpr_culprit_fmt()}", "%{__argscmpr_evidence_fmt()}"}
+
+-config=MC3R1.R21.16,call_select+=
+{"macro(^memcmp$)&&any_arg(1..2, skip(__non_syntactic_paren_stmts, type(canonical(__memcmp_pte_types))))",
+ "any()", violation, "%{__callslct_any_base_fmt()}", {{arg,"%{__callslct_arg_type_fmt()}"}}}
+
+-doc_end
+
 -eval_file=toolchain.ecl
 -eval_file=public_APIs.ecl
 
