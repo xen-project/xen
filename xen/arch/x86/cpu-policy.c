@@ -43,7 +43,7 @@ static const uint32_t deep_features[] = INIT_DEEP_FEATURES;
 static const struct feature_name {
     const char *name;
     unsigned int bit;
-} feature_names[] __initconstrel = INIT_FEATURE_NAMES;
+} feature_names[] __initconstrel = INIT_FEATURE_NAME_TO_VAL;
 
 /*
  * Parse a list of cpuid feature names -> bool, calling the callback for any

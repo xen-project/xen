@@ -459,15 +459,10 @@ def write_results(state):
     state.output.write(
 """}
 
-#define INIT_FEATURE_NAMES { \\
+#define INIT_FEATURE_NAME_TO_VAL { \\
 """)
 
-    try:
-        _tmp = state.values.iteritems()
-    except AttributeError:
-        _tmp = state.values.items()
-
-    for name, bit in sorted(_tmp):
+    for name, bit in sorted(state.values.items()):
         state.output.write(
             '    { "%s", %sU },\\\n' % (name, bit)
             )

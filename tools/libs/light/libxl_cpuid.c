@@ -296,7 +296,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *policy, const char* str)
 
         {NULL, 0, NA, CPUID_REG_INV, 0, 0}
     };
-    static const struct feature_name features[] = INIT_FEATURE_NAMES;
+    static const struct feature_name features[] = INIT_FEATURE_NAME_TO_VAL;
     /*
      * NB: if we switch to using a cpu_policy derived object instead of a
      * libxl_cpuid_policy_list we could get rid of the featureset -> cpuid leaf
