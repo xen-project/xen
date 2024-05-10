@@ -180,6 +180,10 @@ static bool msixtbl_initialised(const struct domain *d)
     return d->arch.hvm.msixtbl_list.next;
 }
 
+/*
+ * Lookup an msixtbl_entry on the same page as given addr. It's up to the
+ * caller to check if address is strictly part of the table - if relevant.
+ */
 static struct msixtbl_entry *msixtbl_find_entry(
     struct vcpu *v, unsigned long addr)
 {
@@ -187,8 +191,8 @@ static struct msixtbl_entry *msixtbl_find_entry(
     struct domain *d = v->domain;
 
     list_for_each_entry( entry, &d->arch.hvm.msixtbl_list, list )
-        if ( addr >= entry->gtable &&
-             addr < entry->gtable + entry->table_len )
+        if ( PFN_DOWN(addr) >= PFN_DOWN(entry->gtable) &&
+             PFN_DOWN(addr) <= PFN_DOWN(entry->gtable + entry->table_len - 1) )
             return entry;
 
     return NULL;
@@ -203,6 +207,10 @@ static struct msi_desc *msixtbl_addr_to_desc(
     if ( !entry || !entry->pdev )
         return NULL;
 
+    if ( addr <  entry->gtable ||
+         addr >= entry->gtable + entry->table_len )
+        return NULL;
+
     nr_entry = (addr - entry->gtable) / PCI_MSIX_ENTRY_SIZE;
 
     list_for_each_entry( desc, &entry->pdev->msi_list, list )
@@ -211,6 +219,153 @@ static struct msi_desc *msixtbl_addr_to_desc(
             return desc;
 
     return NULL;
+}
+
+/*
+ * Returns:
+ *  - 0 (FIX_RESERVED) if no handling should be done
+ *  - a fixmap idx to use for handling
+ */
+static unsigned int get_adjacent_idx(
+    const struct msixtbl_entry *entry, unsigned long addr, bool write)
+{
+    unsigned int adj_type;
+    struct arch_msix *msix;
+
+    if ( !entry || !entry->pdev )
+    {
+        ASSERT_UNREACHABLE();
+        return 0;
+    }
+
+    if ( PFN_DOWN(addr) == PFN_DOWN(entry->gtable) && addr < entry->gtable )
+        adj_type = ADJ_IDX_FIRST;
+    else if ( PFN_DOWN(addr) == PFN_DOWN(entry->gtable + entry->table_len - 1) &&
+              addr >= entry->gtable + entry->table_len )
+        adj_type = ADJ_IDX_LAST;
+    else
+    {
+        /* All callers should already do equivalent range checking. */
+        ASSERT_UNREACHABLE();
+        return 0;
+    }
+
+    msix = entry->pdev->msix;
+    if ( !msix )
+    {
+        ASSERT_UNREACHABLE();
+        return 0;
+    }
+
+    if ( !msix->adj_access_idx[adj_type] )
+    {
+        if ( MSIX_CHECK_WARN(msix, entry->pdev->domain->domain_id,
+                             adjacent_not_initialized) )
+            gprintk(XENLOG_WARNING,
+                    "%pp: Page for adjacent(%d) MSI-X table access not initialized (addr %#lx, gtable %#lx)\n",
+                    &entry->pdev->sbdf, adj_type, addr, entry->gtable);
+        return 0;
+    }
+
+    /* If PBA lives on the same page too, discard writes. */
+    if ( write &&
+         ((adj_type == ADJ_IDX_LAST &&
+           msix->table.last == msix->pba.first) ||
+          (adj_type == ADJ_IDX_FIRST &&
+           msix->table.first == msix->pba.last)) )
+    {
+        if ( MSIX_CHECK_WARN(msix, entry->pdev->domain->domain_id,
+                             adjacent_pba) )
+            gprintk(XENLOG_WARNING,
+                    "%pp: MSI-X table and PBA share a page, "
+                    "discard write to adjacent memory (%#lx)\n",
+                    &entry->pdev->sbdf, addr);
+        return 0;
+    }
+
+    return msix->adj_access_idx[adj_type];
+}
+
+static void adjacent_read(
+    const struct msixtbl_entry *entry,
+    paddr_t address, unsigned int len, uint64_t *pval)
+{
+    const void __iomem *hwaddr;
+    unsigned int fixmap_idx;
+
+    ASSERT(IS_ALIGNED(address, len));
+
+    *pval = ~0UL;
+
+    fixmap_idx = get_adjacent_idx(entry, address, false);
+
+    if ( !fixmap_idx )
+        return;
+
+    hwaddr = fix_to_virt(fixmap_idx) + PAGE_OFFSET(address);
+
+    switch ( len )
+    {
+    case 1:
+        *pval = readb(hwaddr);
+        break;
+
+    case 2:
+        *pval = readw(hwaddr);
+        break;
+
+    case 4:
+        *pval = readl(hwaddr);
+        break;
+
+    case 8:
+        *pval = readq(hwaddr);
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        break;
+    }
+}
+
+static void adjacent_write(
+    const struct msixtbl_entry *entry,
+    paddr_t address, unsigned int len, uint64_t val)
+{
+    void __iomem *hwaddr;
+    unsigned int fixmap_idx;
+
+    ASSERT(IS_ALIGNED(address, len));
+
+    fixmap_idx = get_adjacent_idx(entry, address, true);
+
+    if ( !fixmap_idx )
+        return;
+
+    hwaddr = fix_to_virt(fixmap_idx) + PAGE_OFFSET(address);
+
+    switch ( len )
+    {
+    case 1:
+        writeb(val, hwaddr);
+        break;
+
+    case 2:
+        writew(val, hwaddr);
+        break;
+
+    case 4:
+        writel(val, hwaddr);
+        break;
+
+    case 8:
+        writeq(val, hwaddr);
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        break;
+    }
 }
 
 static int cf_check msixtbl_read(
@@ -222,7 +377,7 @@ static int cf_check msixtbl_read(
     unsigned int nr_entry, index;
     int r = X86EMUL_UNHANDLEABLE;
 
-    if ( (len != 4 && len != 8) || (address & (len - 1)) )
+    if ( !IS_ALIGNED(address, len) )
         return r;
 
     rcu_read_lock(&msixtbl_rcu_lock);
@@ -230,6 +385,18 @@ static int cf_check msixtbl_read(
     entry = msixtbl_find_entry(current, address);
     if ( !entry )
         goto out;
+
+    if ( address <  entry->gtable ||
+         address >= entry->gtable + entry->table_len )
+    {
+        adjacent_read(entry, address, len, pval);
+        r = X86EMUL_OKAY;
+        goto out;
+    }
+
+    if ( len != 4 && len != 8 )
+        goto out;
+
     offset = address & (PCI_MSIX_ENTRY_SIZE - 1);
 
     if ( offset != PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET )
@@ -291,6 +458,18 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     entry = msixtbl_find_entry(v, address);
     if ( !entry )
         goto out;
+
+    if ( address <  entry->gtable ||
+         address >= entry->gtable + entry->table_len )
+    {
+        adjacent_write(entry, address, len, val);
+        r = X86EMUL_OKAY;
+        goto out;
+    }
+
+    if ( len != 4 && len != 8 )
+        goto out;
+
     nr_entry = array_index_nospec(((address - entry->gtable) /
                                    PCI_MSIX_ENTRY_SIZE),
                                   MAX_MSIX_TABLE_ENTRIES);
@@ -356,8 +535,8 @@ static int cf_check _msixtbl_write(
     const struct hvm_io_handler *handler, uint64_t address, uint32_t len,
     uint64_t val)
 {
-    /* Ignore invalid length or unaligned writes. */
-    if ( (len != 4 && len != 8) || !IS_ALIGNED(address, len) )
+    /* Ignore unaligned writes. */
+    if ( !IS_ALIGNED(address, len) )
         return X86EMUL_OKAY;
 
     /*
@@ -374,16 +553,23 @@ static bool cf_check msixtbl_range(
 {
     struct vcpu *curr = current;
     unsigned long addr = r->addr;
-    const struct msi_desc *desc;
+    const struct msixtbl_entry *entry;
+    bool ret = false;
 
     ASSERT(r->type == IOREQ_TYPE_COPY);
 
     rcu_read_lock(&msixtbl_rcu_lock);
-    desc = msixtbl_addr_to_desc(msixtbl_find_entry(curr, addr), addr);
+    entry = msixtbl_find_entry(curr, addr);
+    if ( entry &&
+          /* Adjacent access. */
+         (addr < entry->gtable || addr >= entry->gtable + entry->table_len ||
+          /* Otherwise check if there is a matching msi_desc. */
+          msixtbl_addr_to_desc(entry, addr)) )
+        ret = true;
     rcu_read_unlock(&msixtbl_rcu_lock);
 
-    if ( desc )
-        return 1;
+    if ( ret )
+        return ret;
 
     if ( r->state == STATE_IOREQ_READY && r->dir == IOREQ_WRITE )
     {
@@ -429,7 +615,7 @@ static bool cf_check msixtbl_range(
         }
     }
 
-    return 0;
+    return false;
 }
 
 static const struct hvm_io_ops msixtbl_mmio_ops = {

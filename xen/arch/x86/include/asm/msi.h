@@ -225,6 +225,9 @@ struct arch_msix {
     } table, pba;
     int table_refcnt[MAX_MSIX_TABLE_PAGES];
     int table_idx[MAX_MSIX_TABLE_PAGES];
+#define ADJ_IDX_FIRST 0
+#define ADJ_IDX_LAST  1
+    unsigned int adj_access_idx[2];
     spinlock_t table_lock;
     bool host_maskall, guest_maskall;
     domid_t warned_domid;
@@ -232,6 +235,8 @@ struct arch_msix {
         uint8_t all;
         struct {
             bool maskall                   : 1;
+            bool adjacent_not_initialized  : 1;
+            bool adjacent_pba              : 1;
         };
     } warned_kind;
 };
