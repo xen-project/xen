@@ -4,10 +4,10 @@
 #include <xen/vmap.h>
 #include <xen/types.h>
 
-#define readb(x) (*(volatile uint8_t  *)(x))
-#define readw(x) (*(volatile uint16_t *)(x))
-#define readl(x) (*(volatile uint32_t *)(x))
-#define readq(x) (*(volatile uint64_t *)(x))
+#define readb(x) (*(const volatile uint8_t  *)(x))
+#define readw(x) (*(const volatile uint16_t *)(x))
+#define readl(x) (*(const volatile uint32_t *)(x))
+#define readq(x) (*(const volatile uint64_t *)(x))
 #define writeb(d,x) (*(volatile uint8_t  *)(x) = (d))
 #define writew(d,x) (*(volatile uint16_t *)(x) = (d))
 #define writel(d,x) (*(volatile uint32_t *)(x) = (d))
