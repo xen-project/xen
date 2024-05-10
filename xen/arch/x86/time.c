@@ -293,7 +293,7 @@ static uint32_t __init read_pt_and_tsc(uint64_t *tsc,
                                        const struct platform_timesource *pts)
 {
     uint64_t tsc_prev = *tsc = rdtsc_ordered(), tsc_min = ~0;
-    uint32_t best = best;
+    uint32_t best = ~0;
     unsigned int i;
 
     for ( i = 0; ; ++i )
@@ -1018,7 +1018,7 @@ static u64 __init init_platform_timer(void)
 static uint64_t __init read_pt_and_tmcct(uint32_t *tmcct)
 {
     uint32_t tmcct_prev = *tmcct = apic_tmcct_read(), tmcct_min = ~0;
-    uint64_t best = best;
+    uint64_t best = ~0;
     unsigned int i;
 
     for ( i = 0; ; ++i )
