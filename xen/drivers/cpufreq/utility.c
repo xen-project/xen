@@ -86,13 +86,12 @@ void cpufreq_statistic_update(unsigned int cpu, uint8_t from, uint8_t to)
     spin_unlock(cpufreq_statistic_lock);
 }
 
-int cpufreq_statistic_init(unsigned int cpuid)
+int cpufreq_statistic_init(unsigned int cpu)
 {
     uint32_t i, count;
     struct pm_px *pxpt;
-    const struct processor_pminfo *pmpt = processor_pminfo[cpuid];
-    spinlock_t *cpufreq_statistic_lock = 
-                          &per_cpu(cpufreq_statistic_lock, cpuid);
+    const struct processor_pminfo *pmpt = processor_pminfo[cpu];
+    spinlock_t *cpufreq_statistic_lock = &per_cpu(cpufreq_statistic_lock, cpu);
 
     spin_lock_init(cpufreq_statistic_lock);
 
@@ -101,7 +100,7 @@ int cpufreq_statistic_init(unsigned int cpuid)
 
     spin_lock(cpufreq_statistic_lock);
 
-    pxpt = per_cpu(cpufreq_statistic_data, cpuid);
+    pxpt = per_cpu(cpufreq_statistic_data, cpu);
     if ( pxpt ) {
         spin_unlock(cpufreq_statistic_lock);
         return 0;
@@ -114,7 +113,7 @@ int cpufreq_statistic_init(unsigned int cpuid)
         spin_unlock(cpufreq_statistic_lock);
         return -ENOMEM;
     }
-    per_cpu(cpufreq_statistic_data, cpuid) = pxpt;
+    per_cpu(cpufreq_statistic_data, cpu) = pxpt;
 
     pxpt->u.trans_pt = xzalloc_array(uint64_t, count * count);
     if (!pxpt->u.trans_pt) {
@@ -138,22 +137,21 @@ int cpufreq_statistic_init(unsigned int cpuid)
         pxpt->u.pt[i].freq = pmpt->perf.states[i].core_frequency;
 
     pxpt->prev_state_wall = NOW();
-    pxpt->prev_idle_wall = get_cpu_idle_time(cpuid);
+    pxpt->prev_idle_wall = get_cpu_idle_time(cpu);
 
     spin_unlock(cpufreq_statistic_lock);
 
     return 0;
 }
 
-void cpufreq_statistic_exit(unsigned int cpuid)
+void cpufreq_statistic_exit(unsigned int cpu)
 {
     struct pm_px *pxpt;
-    spinlock_t *cpufreq_statistic_lock = 
-               &per_cpu(cpufreq_statistic_lock, cpuid);
+    spinlock_t *cpufreq_statistic_lock = &per_cpu(cpufreq_statistic_lock, cpu);
 
     spin_lock(cpufreq_statistic_lock);
 
-    pxpt = per_cpu(cpufreq_statistic_data, cpuid);
+    pxpt = per_cpu(cpufreq_statistic_data, cpu);
     if (!pxpt) {
         spin_unlock(cpufreq_statistic_lock);
         return;
@@ -162,22 +160,21 @@ void cpufreq_statistic_exit(unsigned int cpuid)
     xfree(pxpt->u.trans_pt);
     xfree(pxpt->u.pt);
     xfree(pxpt);
-    per_cpu(cpufreq_statistic_data, cpuid) = NULL;
+    per_cpu(cpufreq_statistic_data, cpu) = NULL;
 
     spin_unlock(cpufreq_statistic_lock);
 }
 
-void cpufreq_statistic_reset(unsigned int cpuid)
+void cpufreq_statistic_reset(unsigned int cpu)
 {
     uint32_t i, j, count;
     struct pm_px *pxpt;
-    const struct processor_pminfo *pmpt = processor_pminfo[cpuid];
-    spinlock_t *cpufreq_statistic_lock = 
-               &per_cpu(cpufreq_statistic_lock, cpuid);
+    const struct processor_pminfo *pmpt = processor_pminfo[cpu];
+    spinlock_t *cpufreq_statistic_lock = &per_cpu(cpufreq_statistic_lock, cpu);
 
     spin_lock(cpufreq_statistic_lock);
 
-    pxpt = per_cpu(cpufreq_statistic_data, cpuid);
+    pxpt = per_cpu(cpufreq_statistic_data, cpu);
     if ( !pmpt || !pxpt || !pxpt->u.pt || !pxpt->u.trans_pt ) {
         spin_unlock(cpufreq_statistic_lock);
         return;
@@ -194,7 +191,7 @@ void cpufreq_statistic_reset(unsigned int cpuid)
     }
 
     pxpt->prev_state_wall = NOW();
-    pxpt->prev_idle_wall = get_cpu_idle_time(cpuid);
+    pxpt->prev_idle_wall = get_cpu_idle_time(cpu);
 
     spin_unlock(cpufreq_statistic_lock);
 }
@@ -389,7 +386,7 @@ int cpufreq_driver_getavg(unsigned int cpu, unsigned int flag)
     return policy->cur;
 }
 
-int cpufreq_update_turbo(int cpuid, int new_state)
+int cpufreq_update_turbo(unsigned int cpu, int new_state)
 {
     struct cpufreq_policy *policy;
     int curr_state;
@@ -399,7 +396,7 @@ int cpufreq_update_turbo(int cpuid, int new_state)
         new_state != CPUFREQ_TURBO_DISABLED)
         return -EINVAL;
 
-    policy = per_cpu(cpufreq_cpu_policy, cpuid);
+    policy = per_cpu(cpufreq_cpu_policy, cpu);
     if (!policy)
         return -EACCES;
 
@@ -413,7 +410,7 @@ int cpufreq_update_turbo(int cpuid, int new_state)
     policy->turbo = new_state;
     if (cpufreq_driver.update)
     {
-        ret = alternative_call(cpufreq_driver.update, cpuid, policy);
+        ret = alternative_call(cpufreq_driver.update, cpu, policy);
         if (ret)
             policy->turbo = curr_state;
     }
@@ -422,11 +419,11 @@ int cpufreq_update_turbo(int cpuid, int new_state)
 }
 
 
-int cpufreq_get_turbo_status(int cpuid)
+int cpufreq_get_turbo_status(unsigned int cpu)
 {
     struct cpufreq_policy *policy;
 
-    policy = per_cpu(cpufreq_cpu_policy, cpuid);
+    policy = per_cpu(cpufreq_cpu_policy, cpu);
     return policy && policy->turbo == CPUFREQ_TURBO_ENABLED;
 }
 

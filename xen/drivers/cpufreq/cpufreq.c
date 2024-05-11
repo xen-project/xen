@@ -459,21 +459,21 @@ static void print_PPC(unsigned int platform_limit)
 
 int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *perf)
 {
-    int ret=0, cpuid;
+    int ret = 0, cpu;
     struct processor_pminfo *pmpt;
     struct processor_performance *pxpt;
 
-    cpuid = get_cpu_id(acpi_id);
-    if ( cpuid < 0 || !perf )
+    cpu = get_cpu_id(acpi_id);
+    if ( cpu < 0 || !perf )
     {
         ret = -EINVAL;
         goto out;
     }
     if ( cpufreq_verbose )
-        printk("Set CPU acpi_id(%d) cpuid(%d) Px State info:\n",
-               acpi_id, cpuid);
+        printk("Set CPU acpi_id(%d) cpu(%d) Px State info:\n",
+               acpi_id, cpu);
 
-    pmpt = processor_pminfo[cpuid];
+    pmpt = processor_pminfo[cpu];
     if ( !pmpt )
     {
         pmpt = xzalloc(struct processor_pminfo);
@@ -482,11 +482,11 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *perf)
             ret = -ENOMEM;
             goto out;
         }
-        processor_pminfo[cpuid] = pmpt;
+        processor_pminfo[cpu] = pmpt;
     }
     pxpt = &pmpt->perf;
     pmpt->acpi_id = acpi_id;
-    pmpt->id = cpuid;
+    pmpt->id = cpu;
 
     if ( perf->flags & XEN_PX_PCT )
     {
@@ -564,7 +564,7 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *perf)
 
         if ( pxpt->init == XEN_PX_INIT )
         {
-            ret = cpufreq_limit_change(cpuid);
+            ret = cpufreq_limit_change(cpu);
             goto out;
         }
     }
@@ -573,7 +573,7 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *perf)
     {
         pxpt->init = XEN_PX_INIT;
 
-        ret = cpufreq_cpu_init(cpuid);
+        ret = cpufreq_cpu_init(cpu);
         goto out;
     }
 

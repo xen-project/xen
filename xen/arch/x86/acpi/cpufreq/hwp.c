@@ -506,11 +506,11 @@ static void cf_check hwp_set_misc_turbo(void *info)
     }
 }
 
-static int cf_check hwp_cpufreq_update(int cpuid, struct cpufreq_policy *policy)
+static int cf_check hwp_cpufreq_update(unsigned int cpu, struct cpufreq_policy *policy)
 {
-    on_selected_cpus(cpumask_of(cpuid), hwp_set_misc_turbo, policy, 1);
+    on_selected_cpus(cpumask_of(cpu), hwp_set_misc_turbo, policy, 1);
 
-    return per_cpu(hwp_drv_data, cpuid)->ret;
+    return per_cpu(hwp_drv_data, cpu)->ret;
 }
 
 static const struct cpufreq_driver __initconst_cf_clobber

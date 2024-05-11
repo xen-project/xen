@@ -12,9 +12,9 @@ unsigned int powernow_register_driver(void);
 unsigned int get_measured_perf(unsigned int cpu, unsigned int flag);
 void cpufreq_residency_update(unsigned int cpu, uint8_t state);
 void cpufreq_statistic_update(unsigned int cpu, uint8_t from, uint8_t to);
-int  cpufreq_statistic_init(unsigned int cpuid);
-void cpufreq_statistic_exit(unsigned int cpuid);
-void cpufreq_statistic_reset(unsigned int cpuid);
+int  cpufreq_statistic_init(unsigned int cpu);
+void cpufreq_statistic_exit(unsigned int cpu);
+void cpufreq_statistic_reset(unsigned int cpu);
 
 int  cpufreq_limit_change(unsigned int cpu);
 
@@ -59,5 +59,5 @@ struct pm_px {
 
 DECLARE_PER_CPU(struct pm_px *, cpufreq_statistic_data);
 
-int cpufreq_cpu_init(unsigned int cpuid);
+int cpufreq_cpu_init(unsigned int cpu);
 #endif /* __XEN_PROCESSOR_PM_H__ */

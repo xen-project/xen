@@ -1498,14 +1498,14 @@ static void amd_cpuidle_init(struct acpi_processor_power *power)
         vendor_override = -1;
 }
 
-uint32_t pmstat_get_cx_nr(uint32_t cpuid)
+uint32_t pmstat_get_cx_nr(unsigned int cpu)
 {
-    return processor_powers[cpuid] ? processor_powers[cpuid]->count : 0;
+    return processor_powers[cpu] ? processor_powers[cpu]->count : 0;
 }
 
-int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
+int pmstat_get_cx_stat(unsigned int cpu, struct pm_cx_stat *stat)
 {
-    struct acpi_processor_power *power = processor_powers[cpuid];
+    struct acpi_processor_power *power = processor_powers[cpu];
     uint64_t idle_usage = 0, idle_res = 0;
     uint64_t last_state_update_tick, current_stime, current_tick;
     uint64_t usage[ACPI_PROCESSOR_MAX_POWER] = { 0 };
@@ -1522,7 +1522,7 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
         return 0;
     }
 
-    stat->idle_time = get_cpu_idle_time(cpuid);
+    stat->idle_time = get_cpu_idle_time(cpu);
     nr = min(stat->nr, power->count);
 
     /* mimic the stat when detail info hasn't been registered by dom0 */
@@ -1572,7 +1572,7 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
             idle_res += res[i];
         }
 
-        get_hw_residencies(cpuid, &hw_res);
+        get_hw_residencies(cpu, &hw_res);
 
 #define PUT_xC(what, n) do { \
         if ( stat->nr_##what >= n && \
@@ -1613,7 +1613,7 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
     return 0;
 }
 
-int pmstat_reset_cx_stat(uint32_t cpuid)
+int pmstat_reset_cx_stat(unsigned int cpu)
 {
     return 0;
 }

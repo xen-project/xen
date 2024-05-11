@@ -68,12 +68,12 @@ static void cf_check update_cpb(void *data)
 }
 
 static int cf_check powernow_cpufreq_update(
-    int cpuid, struct cpufreq_policy *policy)
+    unsigned int cpu, struct cpufreq_policy *policy)
 {
-    if (!cpumask_test_cpu(cpuid, &cpu_online_map))
+    if ( !cpu_online(cpu) )
         return -EINVAL;
 
-    on_selected_cpus(cpumask_of(cpuid), update_cpb, policy, 1);
+    on_selected_cpus(cpumask_of(cpu), update_cpb, policy, 1);
 
     return 0;
 }

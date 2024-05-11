@@ -55,17 +55,6 @@ struct acpi_cpufreq_data *cpufreq_drv_data[NR_CPUS];
 static bool __read_mostly acpi_pstate_strict;
 boolean_param("acpi_pstate_strict", acpi_pstate_strict);
 
-static int check_est_cpu(unsigned int cpuid)
-{
-    struct cpuinfo_x86 *cpu = &cpu_data[cpuid];
-
-    if (cpu->x86_vendor != X86_VENDOR_INTEL ||
-        !cpu_has(cpu, X86_FEATURE_EIST))
-        return 0;
-
-    return 1;
-}
-
 static unsigned extract_io(u32 value, struct acpi_cpufreq_data *data)
 {
     struct processor_performance *perf;
@@ -530,7 +519,7 @@ static int cf_check acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
         if (cpufreq_verbose)
             printk("xen_pminfo: @acpi_cpufreq_cpu_init,"
                    "HARDWARE addr space\n");
-        if (!check_est_cpu(cpu)) {
+        if (!cpu_has(c, X86_FEATURE_EIST)) {
             result = -ENODEV;
             goto err_unreg;
         }
@@ -690,15 +679,12 @@ static int __init cf_check cpufreq_driver_late_init(void)
 }
 __initcall(cpufreq_driver_late_init);
 
-int cpufreq_cpu_init(unsigned int cpuid)
+int cpufreq_cpu_init(unsigned int cpu)
 {
-    int ret;
-
     /* Currently we only handle Intel, AMD and Hygon processor */
     if ( boot_cpu_data.x86_vendor &
          (X86_VENDOR_INTEL | X86_VENDOR_AMD | X86_VENDOR_HYGON) )
-        ret = cpufreq_add_cpu(cpuid);
-    else
-        ret = -EFAULT;
-    return ret;
+        return cpufreq_add_cpu(cpu);
+
+    return -EOPNOTSUPP;
 }
