@@ -573,14 +573,15 @@ void mtrr_ap_init(void)
 	if (!mtrr_if || hold_mtrr_updates_on_aps)
 		return;
 	/*
-	 * Ideally we should hold mtrr_mutex here to avoid mtrr entries changed,
-	 * but this routine will be called in cpu boot time, holding the lock
-	 * breaks it. This routine is called in two cases: 1.very earily time
-	 * of software resume, when there absolutely isn't mtrr entry changes;
-	 * 2.cpu hotadd time. We let mtrr_add/del_page hold cpuhotplug lock to
-	 * prevent mtrr entry changes
+	 * hold_mtrr_updates_on_aps takes care of preventing unnecessary MTRR
+	 * updates when batch starting the CPUs (see
+	 * mtrr_aps_sync_{begin,end}()).
+	 *
+	 * Otherwise just apply the current system wide MTRR values to this AP.
+	 * Note this doesn't require synchronization with the other CPUs, as
+	 * there are strictly no modifications of the current MTRR values.
 	 */
-	set_mtrr(~0U, 0, 0, 0);
+	mtrr_set_all();
 }
 
 /**
