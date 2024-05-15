@@ -478,6 +478,20 @@ leads to a violation of the Rule are deviated."
 -doc_end
 
 #
+# Series 21.
+#
+
+-doc_begin="Xen does not use the functions provided by the Standard Library, but
+implements a set of functions that share the same names as their Standard Library equivalent.
+The implementation of these functions is available in source form, so the undefined, unspecified
+or implementation-defined behaviors contemplated by the C Standard do not apply.
+If some undefined or unspecified behavior does arise in the implementation, it
+falls under the jurisdiction of other MISRA rules."
+-config=MC3R1.R21.9,reports+={deliberate, "any()"}
+-config=MC3R1.R21.10,reports+={deliberate, "any()"}
+-doc_end
+
+#
 # General
 #
 

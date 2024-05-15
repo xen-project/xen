@@ -36,12 +36,14 @@
 -enable=MC3R1.R20.4
 -enable=MC3R1.R20.9
 -enable=MC3R1.R2.1
+-enable=MC3R1.R21.10
 -enable=MC3R1.R21.13
 -enable=MC3R1.R21.17
 -enable=MC3R1.R21.18
 -enable=MC3R1.R21.19
 -enable=MC3R1.R21.20
 -enable=MC3R1.R21.21
+-enable=MC3R1.R21.9
 -enable=MC3R1.R2.2
 -enable=MC3R1.R22.2
 -enable=MC3R1.R22.4
