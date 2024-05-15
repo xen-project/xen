@@ -48,7 +48,7 @@ static inline unsigned char __toupper(unsigned char c)
 	return c;
 }
 
-#define tolower(c) __tolower(c)
-#define toupper(c) __toupper(c)
+#define tolower(c) ((char)__tolower(c))
+#define toupper(c) ((char)__toupper(c))
 
 #endif
