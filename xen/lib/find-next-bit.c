@@ -12,6 +12,9 @@
 
 #include <asm/byteorder.h>
 
+#define __ffs(x) (ffsl(x) - 1)
+#define ffz(x) __ffs(~(x))
+
 #ifndef find_next_bit
 /*
  * Find the next set bit in a memory region.

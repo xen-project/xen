@@ -19,4 +19,6 @@ typedef int64_t __s64;
 
 typedef paddr_t phys_addr_t;
 
+#define __ffs(x) (ffsl(x) - 1UL)
+
 #endif /* __XEN_LINUX_COMPAT_H__ */

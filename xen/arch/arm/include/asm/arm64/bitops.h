@@ -1,27 +1,6 @@
 #ifndef _ARM_ARM64_BITOPS_H
 #define _ARM_ARM64_BITOPS_H
 
-/* Based on linux/include/asm-generic/bitops/builtin-__ffs.h */
-/**
- * __ffs - find first bit in word.
- * @word: The word to search
- *
- * Undefined if no bit exists, so code should check against 0 first.
- */
-static /*__*/always_inline unsigned long __ffs(unsigned long word)
-{
-        return __builtin_ctzl(word);
-}
-
-/* Based on linux/include/asm-generic/bitops/ffz.h */
-/*
- * ffz - find first zero in word.
- * @word: The word to search
- *
- * Undefined if no zero exists, so code should check against ~0UL first.
- */
-#define ffz(x)  __ffs(~(x))
-
 static inline int flsl(unsigned long x)
 {
         uint64_t ret;

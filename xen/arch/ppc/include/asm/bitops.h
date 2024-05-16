@@ -176,15 +176,6 @@ static inline int __test_and_clear_bit(int nr, volatile void *addr)
 #define ffs(x) ({ unsigned int t_ = (x); fls(t_ & -t_); })
 #define ffsl(x) ({ unsigned long t_ = (x); flsl(t_ & -t_); })
 
-/* Based on linux/include/asm-generic/bitops/ffz.h */
-/*
- * ffz - find first zero in word.
- * @word: The word to search
- *
- * Undefined if no zero exists, so code should check against ~0UL first.
- */
-#define ffz(x) __ffs(~(x))
-
 /**
  * hweightN - returns the hamming weight of a N-bit word
  * @x: the word to weigh
@@ -195,18 +186,6 @@ static inline int __test_and_clear_bit(int nr, volatile void *addr)
 #define hweight32(x) __builtin_popcount(x)
 #define hweight16(x) __builtin_popcount((uint16_t)(x))
 #define hweight8(x)  __builtin_popcount((uint8_t)(x))
-
-/* Based on linux/include/asm-generic/bitops/builtin-__ffs.h */
-/**
- * __ffs - find first bit in word.
- * @word: The word to search
- *
- * Undefined if no bit exists, so code should check against 0 first.
- */
-static always_inline unsigned long __ffs(unsigned long word)
-{
-    return __builtin_ctzl(word);
-}
 
 /**
  * find_first_set_bit - find the first set bit in @word
