@@ -827,6 +827,7 @@ static int __init cf_check vpmu_init(void)
 
     switch ( vendor )
     {
+#ifdef CONFIG_AMD
     case X86_VENDOR_AMD:
         ops = amd_vpmu_init();
         break;
@@ -834,10 +835,13 @@ static int __init cf_check vpmu_init(void)
     case X86_VENDOR_HYGON:
         ops = hygon_vpmu_init();
         break;
+#endif
 
+#ifdef CONFIG_INTEL
     case X86_VENDOR_INTEL:
         ops = core2_vpmu_init();
         break;
+#endif
 
     default:
         printk(XENLOG_WARNING "VPMU: Unknown CPU vendor: %d. "
