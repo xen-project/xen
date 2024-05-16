@@ -19,6 +19,7 @@
 #include <xen/delay.h>
 #include <asm/apic.h>
 #include <asm/asm_defns.h>
+#include <asm/setup.h>
 #include <io_ports.h>
 #include <irq_vectors.h>
 
@@ -333,6 +334,58 @@ void __init make_8259A_irq(unsigned int irq)
     irq_to_desc(irq)->handler = &i8259A_irq_type;
 }
 
+unsigned int __initdata i8259A_alias_mask;
+
+static void __init probe_8259A_alias(void)
+{
+    unsigned int mask = 0x1e;
+    uint8_t val = 0;
+
+    if ( !opt_probe_port_aliases )
+        return;
+
+    /*
+     * The only properly r/w register is OCW1.  While keeping the master
+     * fully masked (thus also masking anything coming through the slave),
+     * write all possible 256 values to the slave's base port, and check
+     * whether the same value can then be read back through any of the
+     * possible alias ports.  Probing just the slave of course builds on the
+     * assumption that aliasing is identical for master and slave.
+     */
+
+    outb(0xff, 0x21); /* Fully mask master. */
+
+    do {
+        unsigned int offs;
+
+        outb(val, 0xa1);
+
+        /* Try to make sure we're actually having a PIC here. */
+        if ( inb(0xa1) != val )
+        {
+            mask = 0;
+            break;
+        }
+
+        for ( offs = ISOLATE_LSB(mask); offs <= mask; offs <<= 1 )
+        {
+            if ( !(mask & offs) )
+                continue;
+            if ( inb(0xa1 + offs) != val )
+                mask &= ~offs;
+        }
+    } while ( mask && (val += 0x0d) );  /* Arbitrary uneven number. */
+
+    outb(cached_A1, 0xa1); /* Restore slave IRQ mask. */
+    outb(cached_21, 0x21); /* Restore master IRQ mask. */
+
+    if ( mask )
+    {
+        dprintk(XENLOG_INFO, "PIC aliasing mask: %02x\n", mask);
+        i8259A_alias_mask = mask;
+    }
+}
+
 static struct irqaction __read_mostly cascade = { no_action, "cascade", NULL};
 
 void __init init_IRQ(void)
@@ -342,6 +395,8 @@ void __init init_IRQ(void)
     init_bsp_APIC();
 
     init_8259A(0);
+
+    probe_8259A_alias();
 
     for (irq = 0; platform_legacy_irq(irq); irq++) {
         struct irq_desc *desc = irq_to_desc(irq);

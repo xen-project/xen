@@ -467,7 +467,7 @@ static void __init process_dom0_ioports_disable(struct domain *dom0)
 int __init dom0_setup_permissions(struct domain *d)
 {
     unsigned long mfn;
-    unsigned int i;
+    unsigned int i, offs;
     int rc;
 
     if ( pv_shim )
@@ -480,10 +480,16 @@ int __init dom0_setup_permissions(struct domain *d)
 
     /* Modify I/O port access permissions. */
 
-    /* Master Interrupt Controller (PIC). */
-    rc |= ioports_deny_access(d, 0x20, 0x21);
-    /* Slave Interrupt Controller (PIC). */
-    rc |= ioports_deny_access(d, 0xA0, 0xA1);
+    for ( offs = 0, i = ISOLATE_LSB(i8259A_alias_mask) ?: 2;
+          offs <= i8259A_alias_mask; offs += i )
+    {
+        if ( offs & ~i8259A_alias_mask )
+            continue;
+        /* Master Interrupt Controller (PIC). */
+        rc |= ioports_deny_access(d, 0x20 + offs, 0x21 + offs);
+        /* Slave Interrupt Controller (PIC). */
+        rc |= ioports_deny_access(d, 0xA0 + offs, 0xA1 + offs);
+    }
 
     /* ELCR of both PICs. */
     rc |= ioports_deny_access(d, 0x4D0, 0x4D1);
