@@ -138,16 +138,20 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
     default:
         switch ( boot_cpu_data.x86_vendor )
         {
+#ifdef CONFIG_INTEL
         case X86_VENDOR_CENTAUR:
         case X86_VENDOR_SHANGHAI:
         case X86_VENDOR_INTEL:
             ret = vmce_intel_rdmsr(v, msr, val);
             break;
+#endif
 
+#ifdef CONFIG_AMD
         case X86_VENDOR_AMD:
         case X86_VENDOR_HYGON:
             ret = vmce_amd_rdmsr(v, msr, val);
             break;
+#endif
 
         default:
             ret = 0;
@@ -271,14 +275,18 @@ static int bank_mce_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     default:
         switch ( boot_cpu_data.x86_vendor )
         {
+#ifdef CONFIG_INTEL
         case X86_VENDOR_INTEL:
             ret = vmce_intel_wrmsr(v, msr, val);
             break;
+#endif
 
+#ifdef CONFIG_AMD
         case X86_VENDOR_AMD:
         case X86_VENDOR_HYGON:
             ret = vmce_amd_wrmsr(v, msr, val);
             break;
+#endif
 
         default:
             ret = 0;
