@@ -266,8 +266,15 @@ clean:
 .PHONY: distclean
 distclean: clean
 
-.PHONY: install uninstall
-install uninstall:
+.PHONY: install
+install: all
+	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC)/tests
+	$(if $(TARGET-y),$(INSTALL_PROG) $(TARGET-y) $(DESTDIR)$(LIBEXEC)/tests)
+
+.PHONY: uninstall
+uninstall:
+	$(RM) -- $(addprefix $(DESTDIR)$(LIBEXEC)/tests/,$(TARGET-y))
+
 
 .PHONY: run32 clean32
 ifeq ($(XEN_COMPILE_ARCH),x86_64)
