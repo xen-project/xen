@@ -76,6 +76,9 @@ static bool __initdata opt_invpcid = true;
 boolean_param("invpcid", opt_invpcid);
 bool __read_mostly use_invpcid;
 
+int8_t __initdata opt_probe_port_aliases = -1;
+boolean_param("probe-port-aliases", opt_probe_port_aliases);
+
 /* Only used in asm code and within this source file */
 unsigned long asmlinkage __read_mostly cr4_pv32_mask;
 
@@ -1859,6 +1862,9 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
 
     /* Low mappings were only needed for some BIOS table parsing. */
     zap_low_mappings();
+
+    if ( opt_probe_port_aliases < 0 )
+        opt_probe_port_aliases = !pv_shim;
 
     init_apic_mappings();
 

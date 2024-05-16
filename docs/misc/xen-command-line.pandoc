@@ -2004,6 +2004,17 @@ INVPCID is supported and not disabled via `invpcid=false`.
 This is a mask of C-states which are to be used preferably.  This option is
 applicable only on hardware were certain C-states are exclusive of one another.
 
+### probe-port-aliases (x86)
+> `= <boolean>`
+
+> Default: `true` outside of shim mode, `false` in shim mode
+
+Certain devices accessible by I/O ports may be accessible also through "alias"
+ports (originally a result of incomplete address decoding).  When such devices
+are solely under Xen's control, Xen disallows even Dom0 access to the "primary"
+ports.  When alias probing is active and aliases are detected, "alias" ports
+would then be treated similar to the "primary" ones.
+
 ### psr (Intel)
 > `= List of ( cmt:<boolean> | rmid_max:<integer> | cat:<boolean> | cos_max:<integer> | cdp:<boolean> )`
 

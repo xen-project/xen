@@ -49,6 +49,7 @@ extern unsigned long highmem_start;
 #endif
 
 extern int8_t opt_smt;
+extern int8_t opt_probe_port_aliases;
 
 #ifdef CONFIG_SHADOW_PAGING
 extern bool opt_dom0_shadow;

@@ -1252,7 +1252,8 @@ static int __init cf_check probe_cmos_alias(void)
 {
     unsigned int offs;
 
-    if ( acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_CMOS_RTC )
+    if ( (acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_CMOS_RTC) ||
+         !opt_probe_port_aliases )
         return 0;
 
     for ( offs = 2; offs < 8; offs <<= 1 )
