@@ -1,0 +1,16 @@
+[Match]
+Name=enp0s0
+
+[Network]
+Bridge=br0
+
+# If Jumbo frames are required
+#[Link]
+#MTUBytes=9000
+
+[BridgeVLAN]
+VLAN=10
+
+[BridgeVLAN]
+VLAN=20
+

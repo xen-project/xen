@@ -1,0 +1,7 @@
+[NetDev]
+Name=br0
+Kind=bridge
+MACAddress=xx:xx:xx:xx:xx:xx
+
+[Bridge]
+VLANFiltering=on

@@ -1,0 +1,8 @@
+[Match]
+Name=br0
+
+[Network]
+DNS=8.8.8.8
+#Domains=example.com
+Address=10.1.1.10/24
+Gateway=10.1.1.1

@@ -1,0 +1,68 @@
+Linux Xen Dom0 single bridge multiple VLAN configuration with systemd
+=====================================================================
+
+Introduction
+------------
+
+This directory contains example files to be placed in /etc/systemd/network
+to enable a single bridge with multiple VLAN support.
+
+The example is to support the scenario where the Xen host network interface
+is connected to an Ethernet switch configured as a trunk port. Each domain
+VIF can then be configured with one or more VLAN IDs, one of which will be
+the PVID.
+
+The example files create a bridge device called br0, with a physical interface 
+called enp0s0. You will need to update this with your system's device name.
+
+Key points of the configuration are:
+
+1. In br0.netdev, VLANFiltering=on is set. This is required to ensure the
+   VLAN tags are handled correctly.  If it is not set then the packets
+   from the VIF interfaces will not have the correct VLAN tags set.
+
+2. In br0.network, a system IPv4 address is configured that can be updated
+   according to your local network settings.
+
+3. In enp0s0.network, Bridge=br0 sets the bridge device to connect to. There
+   is also a [BridgeVLAN] section for each VLAN allowed on the external
+   interface. Note, if you want to create an internal VLAN private to the
+   host, do not include its VLAN ID in this file.
+
+
+Domain configuration
+--------------------
+
+Add the vlan= keyword to the vif definition in the domain. The simplest
+and most common example is a domain that wishes to connect to a single VLAN:
+
+vif = [ 'mac=xx:xx:xx:xx:xx:xx, bridge=br0, vlan=10' ]
+
+If you wish to configure a domain to route between two VLANs, you have two
+options. Option 1 is to create multiple interfaces on different VLANs:
+
+vif = [ 'mac=xx:xx:xx:xx:xx:xx, bridge=br0, vlan=10',
+        'max=xx:xx:xx:xx:xx:xx, bridge=br0, vlan=20' ]
+
+Alternatively, you can create single interface:
+
+vif = [ 'mac=xx:xx:xx:xx:xx:xx, bridge=br0, vlan=10p/20' ]
+
+In the domain, you would, for example, use enX0 for VLAN 10 and enX0.20 for 
+VLAN 20.
+
+
+Hints and tips
+--------------
+
+You can run the following commands on dom0 or a driver domain:
+
+1. To check if vlan_filtering is enabled:
+   # cat /sys/devices/virtual/net/<name>/bridge/vlan_filtering
+
+2. To check the bridge port VLAN assignments:
+   # bridge vlan
+
+3. To check the vlan setting in the xenstore (dom0 only):
+   # xenstore-ls -f | grep 'vlan ='
+
