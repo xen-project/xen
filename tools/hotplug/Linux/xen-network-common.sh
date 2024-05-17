@@ -111,10 +111,111 @@ create_bridge () {
     fi
 }
 
+_vif_vlan_add() {
+    # References vlans and pvid variables from the calling function
+    local -i vid=$1
+    local flag=${2:-}
+
+    if (( vid < 1 || vid > 4094 )) ;then
+        fatal "vlan id $vid not between 1 and 4094"
+    fi
+    if [[ -n "${vlans[$vid]}" ]] ;then
+        fatal "vlan id $vid specified more than once"
+    fi
+    case $flag in
+     p) if (( pvid != 0 )) ;then
+            fatal "more than one pvid specified ($vid and $pvid)"
+        fi
+        pvid=$vid
+        vlans[$vid]=p ;;
+     u) vlans[$vid]=u ;;
+     *) vlans[$vid]=t ;;
+    esac
+}
+
+_vif_vlan_parse_term() {
+    local vid incr last term=${1:-}
+
+    if [[ $term =~ ^([0-9]+)([pu])?$ ]] ;then
+        _vif_vlan_add ${BASH_REMATCH[1]} ${BASH_REMATCH[2]}
+    elif [[ $term =~ ^([0-9]+)-([0-9]+)(u)?$ ]] ;then
+        vid=${BASH_REMATCH[1]}
+        last=${BASH_REMATCH[2]}
+        if (( last >= vid )) ;then
+            for (( ; vid<=last; vid++ )) ;do
+                _vif_vlan_add $vid ${BASH_REMATCH[3]}
+            done
+        else
+            fatal "invalid vlan id range: $term"
+        fi
+    elif [[ $term =~ ^([0-9]+)\+([0-9]+)x([0-9]+)(u)?$ ]] ;then
+        vid=${BASH_REMATCH[1]}
+        incr=${BASH_REMATCH[2]}
+        for (( j=${BASH_REMATCH[3]}; j>0; --j, vid+=incr ))
+        do
+            _vif_vlan_add $vid ${BASH_REMATCH[4]}
+        done
+    else
+        fatal "invalid vlan specification: $term"
+    fi
+}
+
+_vif_vlan_validate_pvid() {
+    # References vlans and pvid variables from the calling function
+    if (( pvid == 0 )) ;then
+        if (( ${#vlans[@]} == 1 )) ;then
+            vlans[${!vlans[*]}]=p
+        else
+            fatal "pvid required when using multiple vlan ids"
+        fi
+    fi
+}
+
+_vif_vlan_setup() {
+    # References vlans and dev variable from the calling function
+    local -i vid
+    local -a args
+
+    # Remove the default vlan id automatically added to the vif
+    bridge vlan del dev $dev vid 1
+
+    # Add the required vlans
+    for vid in ${!vlans[@]} ;do
+        case ${vlans[$vid]} in
+             p) args=(pvid untagged) ;;
+             u) args=(untagged) ;;
+             t) args=() ;;
+        esac
+        bridge vlan add dev $dev vid $vid ${args[@]}
+    done
+}
+
+_vif_vlan_membership() {
+    # The vlans, pvid and dev variables are used by sub-functions
+    local -A vlans=()
+    local -a terms=()
+    local -i i pvid=0
+    local dev=$1 term
+
+    # Split the vlan specification string into its terms, removing the newline
+    # that readarray adds to the last element
+    readarray -d / -t terms <<<$2
+    terms[-1]=${terms[-1]%%[[:space:]]}
+
+    for term in ${terms[@]} ;do
+        _vif_vlan_parse_term $term
+    done
+
+    _vif_vlan_validate_pvid
+    _vif_vlan_setup
+    return 0
+}
+
 # Usage: add_to_bridge bridge dev
 add_to_bridge () {
     local bridge=$1
     local dev=$2
+    local vlan=$(xenstore_read_default "$XENBUS_PATH/vlan" "")
 
     # Don't add $dev to $bridge if it's already on the bridge.
     if [ ! -e "/sys/class/net/${bridge}/brif/${dev}" ]; then
@@ -123,6 +224,14 @@ add_to_bridge () {
             brctl addif ${bridge} ${dev}
         else
             ip link set ${dev} master ${bridge}
+        fi
+        if [ -n "${vlan}" ] ;then
+            log debug "configuring vlans for ${dev} on ${bridge}"
+            if which bridge >&/dev/null; then
+                _vif_vlan_membership "${dev}" "${vlan}"
+            else
+                fatal "vlan configuration failed: bridge command not found"
+            fi
         fi
     else
         log debug "$dev already on bridge $bridge"
