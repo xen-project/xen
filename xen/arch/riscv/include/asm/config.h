@@ -119,6 +119,8 @@
 
 #define BITS_PER_LLONG 64
 
+#define BITS_PER_BYTE 8
+
 /* xen_ulong_t is always 64 bits */
 #define BITS_PER_XEN_ULONG 64
 
