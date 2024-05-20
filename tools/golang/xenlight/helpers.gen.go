@@ -1963,6 +1963,7 @@ func (x *DeviceNic) fromC(xc *C.libxl_device_nic) error {
 x.BackendDomname = C.GoString(xc.backend_domname)
 x.Devid = Devid(xc.devid)
 x.Mtu = int(xc.mtu)
+x.Vlan = C.GoString(xc.vlan)
 x.Model = C.GoString(xc.model)
 if err := x.Mac.fromC(&xc.mac);err != nil {
 return fmt.Errorf("converting field Mac: %v", err)
@@ -2040,6 +2041,8 @@ if x.BackendDomname != "" {
 xc.backend_domname = C.CString(x.BackendDomname)}
 xc.devid = C.libxl_devid(x.Devid)
 xc.mtu = C.int(x.Mtu)
+if x.Vlan != "" {
+xc.vlan = C.CString(x.Vlan)}
 if x.Model != "" {
 xc.model = C.CString(x.Model)}
 if err := x.Mac.toC(&xc.mac); err != nil {

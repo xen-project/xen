@@ -756,6 +756,7 @@ BackendDomid Domid
 BackendDomname string
 Devid Devid
 Mtu int
+Vlan string
 Model string
 Mac Mac
 Ip string
