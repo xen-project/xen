@@ -1932,10 +1932,10 @@ void do_IRQ(struct cpu_user_regs *regs)
                 if ( ~irq < nr_irqs && irq_desc_initialized(desc) )
                 {
                     spin_lock(&desc->lock);
-                    printk("IRQ%d a=%04lx[%04lx,%04lx] v=%02x[%02x] t=%s s=%08x\n",
-                           ~irq, *cpumask_bits(desc->affinity),
-                           *cpumask_bits(desc->arch.cpu_mask),
-                           *cpumask_bits(desc->arch.old_cpu_mask),
+                    printk("IRQ%d a={%*pbl}[{%*pbl},{%*pbl}] v=%02x[%02x] t=%s s=%08x\n",
+                           ~irq, CPUMASK_PR(desc->affinity),
+                           CPUMASK_PR(desc->arch.cpu_mask),
+                           CPUMASK_PR(desc->arch.old_cpu_mask),
                            desc->arch.vector, desc->arch.old_vector,
                            desc->handler->typename, desc->status);
                     spin_unlock(&desc->lock);
@@ -2636,7 +2636,7 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
         if ( !set_affinity )
             printk("Cannot set affinity for IRQ%u\n", irq);
         else if ( break_affinity )
-            printk("Broke affinity for IRQ%u, new: %*pb\n",
+            printk("Broke affinity for IRQ%u, new: {%*pbl}\n",
                    irq, CPUMASK_PR(affinity));
     }
 
