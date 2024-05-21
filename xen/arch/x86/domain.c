@@ -850,7 +850,8 @@ int arch_domain_create(struct domain *d,
     }
     else if ( is_pv_domain(d) )
     {
-        mapcache_domain_init(d);
+        if ( (rc = mapcache_domain_init(d)) != 0 )
+            goto fail;
 
         if ( (rc = pv_domain_initialise(d)) != 0 )
             goto fail;
