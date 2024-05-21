@@ -85,6 +85,7 @@ static void set_delay(const char *value);
 static void set_prompt(const char *new_prompt, void (*func)(const char *));
 static int handle_key(int);
 static int compare(unsigned long long, unsigned long long);
+static int compare_dbl(double, double);
 static int compare_domains(xenstat_domain **, xenstat_domain **);
 static unsigned long long tot_net_bytes( xenstat_domain *, int);
 static bool tot_vbd_reqs(xenstat_domain *, int, unsigned long long *);
@@ -422,6 +423,16 @@ static int compare(unsigned long long i1, unsigned long long i2)
 	return 0;
 }
 
+/* Compares two double precision numbers, returning -1,0,1 for <,=,> */
+static int compare_dbl(double d1, double d2)
+{
+	if (d1 < d2)
+		return -1;
+	if (d1 > d2)
+		return 1;
+	return 0;
+}
+
 /* Comparison function for use with qsort.  Compares two domains using the
  * current sort field. */
 static int compare_domains(xenstat_domain **domain1, xenstat_domain **domain2)
@@ -523,7 +534,7 @@ static double get_cpu_pct(xenstat_domain *domain)
 
 static int compare_cpu_pct(xenstat_domain *domain1, xenstat_domain *domain2)
 {
-	return -compare(get_cpu_pct(domain1), get_cpu_pct(domain2));
+	return -compare_dbl(get_cpu_pct(domain1), get_cpu_pct(domain2));
 }
 
 /* Prints cpu percentage statistic */
