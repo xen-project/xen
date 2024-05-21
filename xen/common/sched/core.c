@@ -3179,6 +3179,8 @@ int schedule_cpu_add(unsigned int cpu, struct cpupool *c)
 
     sr->scheduler = new_ops;
     sr->sched_priv = ppriv;
+    sr->granularity = cpupool_get_granularity(c);
+    sr->cpupool = c;
 
     /*
      * Reroute the lock to the per pCPU lock as /last/ thing. In fact,
@@ -3191,8 +3193,6 @@ int schedule_cpu_add(unsigned int cpu, struct cpupool *c)
     /* _Not_ pcpu_schedule_unlock(): schedule_lock has changed! */
     spin_unlock_irqrestore(old_lock, flags);
 
-    sr->granularity = cpupool_get_granularity(c);
-    sr->cpupool = c;
     /* The  cpu is added to a pool, trigger it to go pick up some work */
     cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
 
