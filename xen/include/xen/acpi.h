@@ -140,15 +140,6 @@ int get_cpu_id(u32 acpi_id);
 unsigned int acpi_register_gsi (u32 gsi, int edge_level, int active_high_low);
 int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
 
-/*
- * This function undoes the effect of one call to acpi_register_gsi().
- * If this matches the last registration, any IRQ resources for gsi
- * are freed.
- */
-#ifdef CONFIG_ACPI_DEALLOCATE_IRQ
-void acpi_unregister_gsi (u32 gsi);
-#endif
-
 #ifdef	CONFIG_ACPI_CSTATE
 /*
  * max_cstate sets the highest legal C-state.
