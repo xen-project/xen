@@ -44,7 +44,7 @@ struct acpi_drhd_unit *find_ats_dev_drhd(struct vtd_iommu *iommu)
 int ats_device(const struct pci_dev *pdev, const struct acpi_drhd_unit *drhd)
 {
     struct acpi_drhd_unit *ats_drhd;
-    int pos;
+    unsigned int pos, expfl = 0;
 
     if ( !ats_enabled || !iommu_qinval )
         return 0;
@@ -53,7 +53,12 @@ int ats_device(const struct pci_dev *pdev, const struct acpi_drhd_unit *drhd)
          !ecap_dev_iotlb(drhd->iommu->ecap) )
         return 0;
 
-    if ( !acpi_find_matched_atsr_unit(pdev) )
+    pos = pci_find_cap_offset(pdev->sbdf, PCI_CAP_ID_EXP);
+    if ( pos )
+        expfl = pci_conf_read16(pdev->sbdf, pos + PCI_EXP_FLAGS);
+
+    if ( MASK_EXTR(expfl, PCI_EXP_FLAGS_TYPE) != PCI_EXP_TYPE_RC_END &&
+         !acpi_find_matched_atsr_unit(pdev) )
         return 0;
 
     ats_drhd = find_ats_dev_drhd(drhd->iommu);
