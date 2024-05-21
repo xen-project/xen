@@ -93,7 +93,7 @@ long compat_set_cx_pminfo(uint32_t acpi_id,
             return -EFAULT; \
         guest_from_compat_handle(states, (_s_)->states); \
 \
-        for ( i = 0; i < _s_->count; i++ ) \
+        for ( i = 0; i < (_s_)->count; i++ ) \
         { \
            if ( unlikely(copy_from_guest_offset(&state, states, i, 1)) ) \
                return -EFAULT; \
