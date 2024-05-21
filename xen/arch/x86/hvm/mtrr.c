@@ -16,7 +16,7 @@
 #include <public/hvm/e820.h>
 
 /* Get page attribute fields (PAn) from PAT MSR. */
-#define pat_cr_2_paf(pat_cr,n)  ((((uint64_t)pat_cr) >> ((n)<<3)) & 0xff)
+#define pat_cr_2_paf(pat_cr, n) (((uint64_t)(pat_cr) >> ((n) << 3)) & 0xff)
 
 /* Effective mm type lookup table, according to MTRR and PAT. */
 static const uint8_t mm_type_tbl[MTRR_NUM_TYPES][X86_NUM_MT] = {

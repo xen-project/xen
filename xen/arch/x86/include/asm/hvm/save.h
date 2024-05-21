@@ -50,7 +50,7 @@ int _hvm_check_entry(struct hvm_domain_context *h,
                           HVM_SAVE_LENGTH(x), true) == 0 )      \
     {                                                           \
         ptr = &(h)->data[(h)->cur];                             \
-        h->cur += HVM_SAVE_LENGTH(x);                           \
+        (h)->cur += HVM_SAVE_LENGTH(x);                         \
     }                                                           \
     ptr; })
 
