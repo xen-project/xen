@@ -429,17 +429,23 @@ static int remove_nodes(const struct overlay_track *tracker)
         if ( overlay_node == NULL )
             return -EINVAL;
 
+        write_lock(&dt_host_lock);
+
         rc = remove_descendant_nodes_resources(overlay_node);
         if ( rc )
+        {
+            write_unlock(&dt_host_lock);
             return rc;
+        }
 
         rc = remove_node_resources(overlay_node);
         if ( rc )
+        {
+            write_unlock(&dt_host_lock);
             return rc;
+        }
 
         dt_dprintk("Removing node: %s\n", overlay_node->full_name);
-
-        write_lock(&dt_host_lock);
 
         rc = dt_overlay_remove_node(overlay_node);
         if ( rc )
@@ -604,8 +610,6 @@ static long add_nodes(struct overlay_track *tr, char **nodes_full_path)
             return rc;
         }
 
-        write_unlock(&dt_host_lock);
-
         prev_node->allnext = next_node;
 
         overlay_node = dt_find_node_by_path(overlay_node->full_name);
@@ -619,6 +623,7 @@ static long add_nodes(struct overlay_track *tr, char **nodes_full_path)
         rc = handle_device(hardware_domain, overlay_node, p2m_mmio_direct_c,
                            tr->iomem_ranges,
                            tr->irq_ranges);
+        write_unlock(&dt_host_lock);
         if ( rc )
         {
             printk(XENLOG_ERR "Adding IRQ and IOMMU failed\n");
