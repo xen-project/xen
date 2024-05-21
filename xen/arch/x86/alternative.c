@@ -155,10 +155,10 @@ void init_or_livepatch add_nops(void *insns, unsigned int len)
  * "noinline" to cause control flow change and thus invalidate I$ and
  * cause refetch after modification.
  */
-static void *init_or_livepatch noinline
+static void init_or_livepatch noinline
 text_poke(void *addr, const void *opcode, size_t len)
 {
-    return memcpy(addr, opcode, len);
+    memcpy(addr, opcode, len);
 }
 
 extern void *const __initdata_cf_clobber_start[];

@@ -464,12 +464,12 @@ bool watchdog_enabled(void)
     return !atomic_read(&watchdog_disable_count);
 }
 
-int __init watchdog_setup(void)
+void __init watchdog_setup(void)
 {
     unsigned int cpu;
 
     /*
-     * Activate periodic heartbeats. We cannot do this earlier during 
+     * Activate periodic heartbeats. We cannot do this earlier during
      * setup because the timer infrastructure is not available.
      */
     for_each_online_cpu ( cpu )
@@ -477,7 +477,6 @@ int __init watchdog_setup(void)
     register_cpu_notifier(&cpu_nmi_nfb);
 
     watchdog_enable();
-    return 0;
 }
 
 /* Returns false if this was not a watchdog NMI, true otherwise */

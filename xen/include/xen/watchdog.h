@@ -12,7 +12,7 @@
 #ifdef CONFIG_WATCHDOG
 
 /* Try to set up a watchdog. */
-int watchdog_setup(void);
+void watchdog_setup(void);
 
 /* Enable the watchdog. */
 void watchdog_enable(void);
