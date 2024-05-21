@@ -60,10 +60,15 @@ int libxl__xs_writev_perms(libxl__gc *gc, xs_transaction_t t,
     for (i = 0; kvs[i] != NULL; i += 2) {
         path = GCSPRINTF("%s/%s", dir, kvs[i]);
         if (path && kvs[i + 1]) {
-            int length = strlen(kvs[i + 1]);
-            xs_write(ctx->xsh, t, path, kvs[i + 1], length);
-            if (perms)
-                xs_set_permissions(ctx->xsh, t, path, perms, num_perms);
+            size_t length = strlen(kvs[i + 1]);
+            if (length > UINT_MAX)
+                return ERROR_FAIL;
+            if (!xs_write(ctx->xsh, t, path, kvs[i + 1], length))
+                return ERROR_FAIL;
+            if (perms) {
+                if (!xs_set_permissions(ctx->xsh, t, path, perms, num_perms))
+                    return ERROR_FAIL;
+            }
         }
     }
     return 0;
