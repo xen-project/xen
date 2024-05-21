@@ -99,6 +99,8 @@ class xen2
     livepatch_op
 # XEN_SYSCTL_coverage_op
     coverage_op
+# XENPF_get_dom0_console
+    get_dom0_console
 }
 
 # Classes domain and domain2 consist of operations that a domain performs on
