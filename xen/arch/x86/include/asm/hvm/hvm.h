@@ -589,16 +589,16 @@ static inline void hvm_sanitize_regs_fields(struct cpu_user_regs *regs,
     if ( compat )
     {
         /* Clear GPR upper halves, to counteract guests playing games. */
-        regs->rbp = (uint32_t)regs->ebp;
-        regs->rbx = (uint32_t)regs->ebx;
-        regs->rax = (uint32_t)regs->eax;
-        regs->rcx = (uint32_t)regs->ecx;
-        regs->rdx = (uint32_t)regs->edx;
-        regs->rsi = (uint32_t)regs->esi;
-        regs->rdi = (uint32_t)regs->edi;
-        regs->rip = (uint32_t)regs->eip;
-        regs->rflags = (uint32_t)regs->eflags;
-        regs->rsp = (uint32_t)regs->esp;
+        regs->rbp = (uint32_t)regs->rbp;
+        regs->rbx = (uint32_t)regs->rbx;
+        regs->rax = (uint32_t)regs->rax;
+        regs->rcx = (uint32_t)regs->rcx;
+        regs->rdx = (uint32_t)regs->rdx;
+        regs->rsi = (uint32_t)regs->rsi;
+        regs->rdi = (uint32_t)regs->rdi;
+        regs->rip = (uint32_t)regs->rip;
+        regs->rflags = (uint32_t)regs->rflags;
+        regs->rsp = (uint32_t)regs->rsp;
     }
 
 #ifndef NDEBUG
