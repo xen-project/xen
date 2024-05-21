@@ -47,8 +47,8 @@ def parse_definitions(state):
     """
     feat_regex = re.compile(
         r"^XEN_CPUFEATURE\(([A-Z0-9_]+),"
-        "\s+([\s\d]+\*[\s\d]+\+[\s\d]+)\)"
-        "\s+/\*([\w!]*) .*$")
+        r"\s+([\s\d]+\*[\s\d]+\+[\s\d]+)\)"
+        r"\s+/\*([\w!]*) .*$")
 
     word_regex = re.compile(
         r"^/\* .* word (\d*) \*/$")
