@@ -54,6 +54,10 @@ struct xs_stored_msg {
 #include <dlfcn.h>
 #endif
 
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
 struct xs_handle {
 	/* Communications channel to xenstore daemon. */
 	int fd;
@@ -227,7 +231,7 @@ error:
 static int get_dev(const char *connect_to)
 {
 	/* We cannot open read-only because requests are writes */
-	return open(connect_to, O_RDWR);
+	return open(connect_to, O_RDWR | O_CLOEXEC);
 }
 
 static int all_restrict_cb(Xentoolcore__Active_Handle *ah, domid_t domid) {
