@@ -1558,6 +1558,10 @@ static int cf_check flask_platform_op(uint32_t op)
         return avc_has_perm(domain_sid(current->domain), SECINITSID_XEN,
                             SECCLASS_XEN2, XEN2__GET_SYMBOL, NULL);
 
+    case XENPF_get_dom0_console:
+        return avc_has_perm(domain_sid(current->domain), SECINITSID_XEN,
+                            SECCLASS_XEN2, XEN2__GET_DOM0_CONSOLE, NULL);
+
     default:
         return avc_unknown_permission("platform_op", op);
     }
