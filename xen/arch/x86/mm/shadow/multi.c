@@ -1987,51 +1987,26 @@ static void sh_trace_va(uint32_t event, guest_va_t va)
         sh_trace(event, sizeof(va), &va);
 }
 
-static inline void trace_shadow_fixup(guest_l1e_t gl1e,
-                                      guest_va_t va)
+/* Shadow trace event with a gl1e, linear address and flags. */
+static void sh_trace_gl1e_va(uint32_t event, guest_l1e_t gl1e, guest_va_t va)
 {
     if ( tb_init_done )
     {
         struct __packed {
-            /* for PAE, guest_l1e may be 64 while guest_va may be 32;
-               so put it first for alignment sake. */
+            /*
+             * For GUEST_PAGING_LEVELS=3 (PAE paging), guest_l1e is 64 while
+             * guest_va is 32.  Put it first to avoid padding.
+             */
             guest_l1e_t gl1e;
             guest_va_t va;
-            u32 flags;
-        } d;
-        u32 event;
+            uint32_t flags;
+        } d = {
+            .gl1e  = gl1e,
+            .va    = va,
+            .flags = this_cpu(trace_shadow_path_flags),
+        };
 
-        event = TRC_SHADOW_FIXUP | ((GUEST_PAGING_LEVELS-2)<<8);
-
-        d.gl1e = gl1e;
-        d.va = va;
-        d.flags = this_cpu(trace_shadow_path_flags);
-
-        trace(event, sizeof(d), &d);
-    }
-}
-
-static inline void trace_not_shadow_fault(guest_l1e_t gl1e,
-                                          guest_va_t va)
-{
-    if ( tb_init_done )
-    {
-        struct __packed {
-            /* for PAE, guest_l1e may be 64 while guest_va may be 32;
-               so put it first for alignment sake. */
-            guest_l1e_t gl1e;
-            guest_va_t va;
-            u32 flags;
-        } d;
-        u32 event;
-
-        event = TRC_SHADOW_NOT_SHADOW | ((GUEST_PAGING_LEVELS-2)<<8);
-
-        d.gl1e = gl1e;
-        d.va = va;
-        d.flags = this_cpu(trace_shadow_path_flags);
-
-        trace(event, sizeof(d), &d);
+        sh_trace(event, sizeof(d), &d);
     }
 }
 
@@ -2603,7 +2578,7 @@ static int cf_check sh_page_fault(
     d->arch.paging.log_dirty.fault_count++;
     sh_reset_early_unshadow(v);
 
-    trace_shadow_fixup(gw.l1e, va);
+    sh_trace_gl1e_va(TRC_SHADOW_FIXUP, gw.l1e, va);
  done: __maybe_unused;
     sh_audit_gw(v, &gw);
     SHADOW_PRINTK("fixed\n");
@@ -2857,7 +2832,7 @@ static int cf_check sh_page_fault(
     put_gfn(d, gfn_x(gfn));
 
 propagate:
-    trace_not_shadow_fault(gw.l1e, va);
+    sh_trace_gl1e_va(TRC_SHADOW_NOT_SHADOW, gw.l1e, va);
 
     return 0;
 }
