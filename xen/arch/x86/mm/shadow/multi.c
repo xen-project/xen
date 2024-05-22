@@ -2010,29 +2010,31 @@ static void sh_trace_gl1e_va(uint32_t event, guest_l1e_t gl1e, guest_va_t va)
     }
 }
 
-static inline void trace_shadow_emulate_other(u32 event,
-                                                 guest_va_t va,
-                                                 gfn_t gfn)
+/* Shadow trace event with a gfn, linear address and flags. */
+static void __maybe_unused sh_trace_gfn_va(uint32_t event, gfn_t gfn,
+                                           guest_va_t va)
 {
     if ( tb_init_done )
     {
         struct __packed {
-            /* for PAE, guest_l1e may be 64 while guest_va may be 32;
-               so put it first for alignment sake. */
+            /*
+             * For GUEST_PAGING_LEVELS=3 (PAE paging), gfn is 64 while
+             * guest_va is 32.  Put it first to avoid padding.
+             */
 #if GUEST_PAGING_LEVELS == 2
-            u32 gfn;
+            uint32_t gfn;
 #else
-            u64 gfn;
+            uint64_t gfn;
 #endif
             guest_va_t va;
-        } d;
+            uint32_t flags;
+        } d = {
+            .gfn   = gfn_x(gfn),
+            .va    = va,
+            .flags = this_cpu(trace_shadow_path_flags),
+        };
 
-        event |= ((GUEST_PAGING_LEVELS-2)<<8);
-
-        d.gfn=gfn_x(gfn);
-        d.va = va;
-
-        trace(event, sizeof(d), &d);
+        sh_trace(event, sizeof(d), &d);
     }
 }
 
@@ -2603,8 +2605,7 @@ static int cf_check sh_page_fault(
                       mfn_x(gmfn));
         perfc_incr(shadow_fault_emulate_failed);
         shadow_remove_all_shadows(d, gmfn);
-        trace_shadow_emulate_other(TRC_SHADOW_EMULATE_UNSHADOW_USER,
-                                      va, gfn);
+        sh_trace_gfn_va(TRC_SHADOW_EMULATE_UNSHADOW_USER, gfn, va);
         goto done;
     }
 
@@ -2683,8 +2684,7 @@ static int cf_check sh_page_fault(
         }
 #endif
         shadow_remove_all_shadows(d, gmfn);
-        trace_shadow_emulate_other(TRC_SHADOW_EMULATE_UNSHADOW_EVTINJ,
-                                   va, gfn);
+        sh_trace_gfn_va(TRC_SHADOW_EMULATE_UNSHADOW_EVTINJ, gfn, va);
         return EXCRET_fault_fixed;
     }
 
@@ -2739,8 +2739,7 @@ static int cf_check sh_page_fault(
          * though, this is a hint that this page should not be shadowed. */
         shadow_remove_all_shadows(d, gmfn);
 
-        trace_shadow_emulate_other(TRC_SHADOW_EMULATE_UNSHADOW_UNHANDLED,
-                                   va, gfn);
+        sh_trace_gfn_va(TRC_SHADOW_EMULATE_UNSHADOW_UNHANDLED, gfn, va);
         goto emulate_done;
     }
 
