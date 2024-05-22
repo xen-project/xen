@@ -2064,30 +2064,29 @@ static void cf_check trace_emulate_write_val(
 #endif
 }
 
-static inline void trace_shadow_emulate(guest_l1e_t gl1e, unsigned long va)
+static inline void sh_trace_emulate(guest_l1e_t gl1e, unsigned long va)
 {
     if ( tb_init_done )
     {
         struct __packed {
-            /* for PAE, guest_l1e may be 64 while guest_va may be 32;
-               so put it first for alignment sake. */
+            /*
+             * For GUEST_PAGING_LEVELS=3 (PAE paging), guest_l1e is 64 while
+             * guest_va is 32.  Put it first to avoid padding.
+             */
             guest_l1e_t gl1e, write_val;
             guest_va_t va;
             uint32_t flags:29, emulation_count:3;
-        } d;
-        u32 event;
-
-        event = TRC_SHADOW_EMULATE | ((GUEST_PAGING_LEVELS-2)<<8);
-
-        d.gl1e = gl1e;
-        d.write_val.l1 = this_cpu(trace_emulate_write_val);
-        d.va = va;
+        } d = {
+            .gl1e            = gl1e,
+            .write_val.l1    = this_cpu(trace_emulate_write_val),
+            .va              = va,
 #if GUEST_PAGING_LEVELS == 3
-        d.emulation_count = this_cpu(trace_extra_emulation_count);
+            .emulation_count = this_cpu(trace_extra_emulation_count),
 #endif
-        d.flags = this_cpu(trace_shadow_path_flags);
+            .flags           = this_cpu(trace_shadow_path_flags),
+        };
 
-        trace(event, sizeof(d), &d);
+        sh_trace(TRC_SHADOW_EMULATE, sizeof(d), &d);
     }
 }
 #endif /* CONFIG_HVM */
@@ -2816,7 +2815,7 @@ static int cf_check sh_page_fault(
     }
 #endif /* PAE guest */
 
-    trace_shadow_emulate(gw.l1e, va);
+    sh_trace_emulate(gw.l1e, va);
  emulate_done:
     SHADOW_PRINTK("emulated\n");
     return EXCRET_fault_fixed;
