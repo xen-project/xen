@@ -1545,7 +1545,7 @@ static int arm_smmu_dt_xlate(struct device *dev,
 }
 
 /* Probing and initialisation functions */
-static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
+static int __init arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
 				   struct arm_smmu_queue *q,
 				   void __iomem *page,
 				   unsigned long prod_off,
@@ -1588,7 +1588,7 @@ static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
 	return 0;
 }
 
-static int arm_smmu_init_queues(struct arm_smmu_device *smmu)
+static int __init arm_smmu_init_queues(struct arm_smmu_device *smmu)
 {
 	int ret;
 
@@ -1724,7 +1724,7 @@ static int arm_smmu_init_strtab(struct arm_smmu_device *smmu)
 	return 0;
 }
 
-static int arm_smmu_init_structures(struct arm_smmu_device *smmu)
+static int __init arm_smmu_init_structures(struct arm_smmu_device *smmu)
 {
 	int ret;
 
@@ -1746,7 +1746,8 @@ static int arm_smmu_write_reg_sync(struct arm_smmu_device *smmu, u32 val,
 }
 
 /* GBPA is "special" */
-static int arm_smmu_update_gbpa(struct arm_smmu_device *smmu, u32 set, u32 clr)
+static int __init arm_smmu_update_gbpa(struct arm_smmu_device *smmu,
+                                       u32 set, u32 clr)
 {
 	int ret;
 	u32 reg, __iomem *gbpa = smmu->base + ARM_SMMU_GBPA;
@@ -1842,7 +1843,7 @@ static void arm_smmu_setup_msis(struct arm_smmu_device *smmu)
 static inline void arm_smmu_setup_msis(struct arm_smmu_device *smmu) { }
 #endif /* CONFIG_MSI */
 
-static void arm_smmu_free_irqs(struct arm_smmu_device *smmu)
+static void __init arm_smmu_free_irqs(struct arm_smmu_device *smmu)
 {
 	int irq;
 
@@ -1926,7 +1927,7 @@ err_free_evtq_irq:
 	return ret;
 }
 
-static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+static int __init arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
 {
 	int ret, irq;
 	u32 irqen_flags = IRQ_CTRL_EVTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
@@ -1988,7 +1989,7 @@ static int arm_smmu_device_disable(struct arm_smmu_device *smmu)
 	return ret;
 }
 
-static int arm_smmu_device_reset(struct arm_smmu_device *smmu)
+static int __init arm_smmu_device_reset(struct arm_smmu_device *smmu)
 {
 	int ret;
 	u32 reg, enables;
@@ -2405,7 +2406,7 @@ static void arm_smmu_free_structures(struct arm_smmu_device *smmu)
 		xfree(smmu->strtab_cfg.l1_desc);
 }
 
-static int arm_smmu_device_probe(struct platform_device *pdev)
+static int __init arm_smmu_device_probe(struct platform_device *pdev)
 {
 	int irq, ret;
 	paddr_t ioaddr, iosize;
