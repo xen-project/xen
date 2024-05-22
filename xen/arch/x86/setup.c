@@ -1888,7 +1888,9 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
 
     tsx_init(); /* Needs microcode.  May change HLE/RTM feature bits. */
 
-    identify_cpu(&boot_cpu_data);
+    calculate_raw_cpu_policy(); /* Needs microcode.  No other dependenices. */
+
+    identify_cpu(&boot_cpu_data); /* Needs microcode and raw policy. */
 
     set_in_cr4(X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT);
 
