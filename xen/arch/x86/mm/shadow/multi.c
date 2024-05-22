@@ -1974,13 +1974,17 @@ typedef u32 guest_va_t;
 typedef u32 guest_pa_t;
 #endif
 
-static inline void trace_shadow_gen(u32 event, guest_va_t va)
+/* Shadow trace event with GUEST_PAGING_LEVELS folded into the event field. */
+static void sh_trace(uint32_t event, unsigned int extra, const void *extra_data)
+{
+    trace(event | ((GUEST_PAGING_LEVELS - 2) << 8), extra, extra_data);
+}
+
+/* Shadow trace event with the guest's linear address. */
+static void sh_trace_va(uint32_t event, guest_va_t va)
 {
     if ( tb_init_done )
-    {
-        event |= (GUEST_PAGING_LEVELS-2)<<8;
-        trace(event, sizeof(va), &va);
-    }
+        sh_trace(event, sizeof(va), &va);
 }
 
 static inline void trace_shadow_fixup(guest_l1e_t gl1e,
@@ -2239,7 +2243,7 @@ static int cf_check sh_page_fault(
                 sh_reset_early_unshadow(v);
                 perfc_incr(shadow_fault_fast_gnp);
                 SHADOW_PRINTK("fast path not-present\n");
-                trace_shadow_gen(TRC_SHADOW_FAST_PROPAGATE, va);
+                sh_trace_va(TRC_SHADOW_FAST_PROPAGATE, va);
                 return 0;
             }
 #ifdef CONFIG_HVM
@@ -2250,7 +2254,7 @@ static int cf_check sh_page_fault(
             perfc_incr(shadow_fault_fast_mmio);
             SHADOW_PRINTK("fast path mmio %#"PRIpaddr"\n", gpa);
             sh_reset_early_unshadow(v);
-            trace_shadow_gen(TRC_SHADOW_FAST_MMIO, va);
+            sh_trace_va(TRC_SHADOW_FAST_MMIO, va);
             return handle_mmio_with_translation(va, gpa >> PAGE_SHIFT, access)
                    ? EXCRET_fault_fixed : 0;
 #else
@@ -2265,7 +2269,7 @@ static int cf_check sh_page_fault(
              * Retry and let the hardware give us the right fault next time. */
             perfc_incr(shadow_fault_fast_fail);
             SHADOW_PRINTK("fast path false alarm!\n");
-            trace_shadow_gen(TRC_SHADOW_FALSE_FAST_PATH, va);
+            sh_trace_va(TRC_SHADOW_FALSE_FAST_PATH, va);
             return EXCRET_fault_fixed;
         }
     }
@@ -2481,7 +2485,7 @@ static int cf_check sh_page_fault(
 #endif
         paging_unlock(d);
         put_gfn(d, gfn_x(gfn));
-        trace_shadow_gen(TRC_SHADOW_DOMF_DYING, va);
+        sh_trace_va(TRC_SHADOW_DOMF_DYING, va);
         return 0;
     }
 
@@ -2569,7 +2573,7 @@ static int cf_check sh_page_fault(
         put_gfn(d, gfn_x(gfn));
 
         perfc_incr(shadow_fault_mmio);
-        trace_shadow_gen(TRC_SHADOW_MMIO, va);
+        sh_trace_va(TRC_SHADOW_MMIO, va);
 
         return handle_mmio_with_translation(va, gpa >> PAGE_SHIFT, access)
                ? EXCRET_fault_fixed : 0;
