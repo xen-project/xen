@@ -309,6 +309,11 @@
 #define LIBXL_HAVE_BUILDINFO_ARCH_ARM_SVE_VL 1
 
 /*
+ * libxl_domain_build_info has the arch_arm.nr_spis field
+ */
+#define LIBXL_HAVE_BUILDINFO_ARCH_NR_SPIS 1
+
+/*
  * LIBXL_HAVE_SOFT_RESET indicates that libxl supports performing
  * 'soft reset' for domains and there is 'soft_reset' shutdown reason
  * in enum libxl_shutdown_reason.
