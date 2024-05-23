@@ -801,8 +801,8 @@ bool __init iommu_unity_region_ok(const char *prefix, mfn_t start, mfn_t end)
         return true;
 
     printk(XENLOG_WARNING
-           "%s: [%#" PRI_mfn " ,%#" PRI_mfn "] is not (entirely) in reserved memory\n",
-           prefix, mfn_x(start), mfn_x(end));
+           "%s: [%#lx, %#lx] is not (entirely) in reserved memory\n",
+           prefix, mfn_to_maddr(start), mfn_to_maddr(end));
 
     for ( addr = start; mfn_x(addr) <= mfn_x(end); addr = mfn_add(addr, 1) )
     {
