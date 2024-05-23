@@ -486,7 +486,15 @@ struct domain
      * 2. pdev->vpci->lock
      */
     rwlock_t pci_lock;
-#endif
+#ifdef CONFIG_HAS_VPCI_GUEST_SUPPORT
+    /*
+     * The bitmap which shows which device numbers are already used by the
+     * virtual PCI bus topology and is used to assign a unique SBDF to the
+     * next passed through virtual PCI device.
+     */
+    DECLARE_BITMAP(vpci_dev_assigned_map, VPCI_MAX_VIRT_DEV);
+#endif /* CONFIG_HAS_VPCI_GUEST_SUPPORT */
+#endif /* CONFIG_HAS_PCI */
 
 #ifdef CONFIG_HAS_PASSTHROUGH
     struct domain_iommu iommu;
