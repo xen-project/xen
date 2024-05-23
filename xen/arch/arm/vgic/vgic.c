@@ -876,8 +876,11 @@ int vgic_connect_hw_irq(struct domain *d, struct vcpu *vcpu,
 
     if ( connect )                      /* assign a mapped IRQ */
     {
-        /* The VIRQ should not be already enabled by the guest */
-        if ( !irq->hw && !irq->enabled )
+        /*
+         * The VIRQ should not be already enabled by the guest nor
+         * active/pending in the guest.
+         */
+        if ( !irq->hw && !irq->enabled && !irq->active && !irq->pending_latch )
         {
             irq->hw = true;
             irq->hwintid = desc->irq;
