@@ -983,7 +983,7 @@ static unsigned int __init get_8254_timer_count(void)
 
     /*spin_lock_irqsave(&i8253_lock, flags);*/
 
-    outb_p(0x00, PIT_MODE);
+    outb_p(PIT_LTCH_CH(0), PIT_MODE);
     count = inb_p(PIT_CH0);
     count |= inb_p(PIT_CH0) << 8;
 

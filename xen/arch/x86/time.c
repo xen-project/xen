@@ -222,7 +222,7 @@ static void cf_check timer_interrupt(int irq, void *dev_id)
 
         spin_lock_irq(&pit_lock);
 
-        outb(0x80, PIT_MODE);
+        outb(PIT_LTCH_CH(2), PIT_MODE);
         count  = inb(PIT_CH2);
         count |= inb(PIT_CH2) << 8;
 
@@ -245,7 +245,8 @@ static void preinit_pit(void)
 {
     /* Set PIT channel 0 to HZ Hz. */
 #define LATCH (((CLOCK_TICK_RATE)+(HZ/2))/HZ)
-    outb_p(0x34, PIT_MODE);        /* binary, mode 2, LSB/MSB, ch 0 */
+    outb_p(PIT_TCW_CH(0) | PIT_RW_LSB_MSB | PIT_MODE_RATE_GEN | PIT_BINARY,
+           PIT_MODE);
     outb_p(LATCH & 0xff, PIT_CH0); /* LSB */
     outb(LATCH >> 8, PIT_CH0);     /* MSB */
 #undef LATCH
@@ -356,7 +357,7 @@ static u64 cf_check read_pit_count(void)
 
     spin_lock_irqsave(&pit_lock, flags);
 
-    outb(0x80, PIT_MODE);
+    outb(PIT_LTCH_CH(2), PIT_MODE);
     count16  = inb(PIT_CH2);
     count16 |= inb(PIT_CH2) << 8;
 
@@ -383,7 +384,8 @@ static s64 __init cf_check init_pit(struct platform_timesource *pts)
      */
 #define CALIBRATE_LATCH CALIBRATE_VALUE(CLOCK_TICK_RATE)
     BUILD_BUG_ON(CALIBRATE_LATCH >> 16);
-    outb(0xb0, PIT_MODE);                  /* binary, mode 0, LSB/MSB, Ch 2 */
+    outb(PIT_TCW_CH(2) | PIT_RW_LSB_MSB | PIT_MODE_EOC | PIT_BINARY,
+         PIT_MODE);
     outb(CALIBRATE_LATCH & 0xff, PIT_CH2); /* LSB of count */
     outb(CALIBRATE_LATCH >> 8, PIT_CH2);   /* MSB of count */
 #undef CALIBRATE_LATCH
@@ -408,7 +410,8 @@ static s64 __init cf_check init_pit(struct platform_timesource *pts)
 static void cf_check resume_pit(struct platform_timesource *pts)
 {
     /* Set CTC channel 2 to mode 0 again; initial value does not matter. */
-    outb(0xb0, PIT_MODE); /* binary, mode 0, LSB/MSB, Ch 2 */
+    outb(PIT_TCW_CH(2) | PIT_RW_LSB_MSB | PIT_MODE_EOC | PIT_BINARY,
+         PIT_MODE);
     outb(0, PIT_CH2);     /* LSB of count */
     outb(0, PIT_CH2);     /* MSB of count */
 }
@@ -2456,7 +2459,8 @@ static int _disable_pit_irq(bool init)
     }
 
     /* Disable PIT CH0 timer interrupt. */
-    outb_p(0x30, PIT_MODE);
+    outb_p(PIT_TCW_CH(0) | PIT_RW_LSB_MSB | PIT_MODE_EOC | PIT_BINARY,
+           PIT_MODE);
     outb_p(0, PIT_CH0);
     outb_p(0, PIT_CH0);
 
@@ -2562,17 +2566,18 @@ int hwdom_pit_access(struct ioreq *ioreq)
     case PIT_MODE:
         if ( ioreq->dir == IOREQ_READ )
             return 0; /* urk! */
-        switch ( ioreq->data & 0xc0 )
+        switch ( ioreq->data & PIT_TCW_CH(3) )
         {
-        case 0xc0: /* Read Back */
-            if ( ioreq->data & 0x08 )    /* Select Channel 2? */
-                outb(ioreq->data & 0xf8, PIT_MODE);
-            if ( !(ioreq->data & 0x06) ) /* Select Channel 0/1? */
+        case PIT_RDB: /* Read Back */
+            if ( ioreq->data & PIT_RDB_CH2 )
+                outb(ioreq->data & ~(PIT_RDB_CH1 | PIT_RDB_CH0 | PIT_RDB_RSVD),
+                     PIT_MODE);
+            if ( !(ioreq->data & (PIT_RDB_CH0 | PIT_RDB_CH1)) )
                 return 1; /* no - we're done */
             /* Filter Channel 2 and reserved bit 0. */
-            ioreq->data &= ~0x09;
+            ioreq->data &= ~(PIT_RDB_CH2 | PIT_RDB_RSVD);
             return 0; /* emulate ch0/1 readback */
-        case 0x80: /* Select Counter 2 */
+        case PIT_TCW_CH(2):
             outb(ioreq->data, PIT_MODE);
             return 1;
         }
