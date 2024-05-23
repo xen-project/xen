@@ -427,6 +427,74 @@ static struct platform_timesource __initdata_cf_clobber plt_pit =
     .resume = resume_pit,
 };
 
+unsigned int __initdata pit_alias_mask;
+
+static void __init probe_pit_alias(void)
+{
+    unsigned int mask = 0x1c;
+    uint8_t val = 0;
+
+    if ( !opt_probe_port_aliases )
+        return;
+
+    /*
+     * Use channel 2 in mode 0 for probing.  In this mode even a non-initial
+     * count is loaded independent of counting being / becoming enabled.  Thus
+     * we have a 16-bit value fully under our control, to write and then check
+     * whether we can also read it back unaltered.
+     */
+
+    /* Turn off speaker output and disable channel 2 counting. */
+    outb(inb(0x61) & 0x0c, 0x61);
+
+    outb(PIT_TCW_CH(2) | PIT_RW_LSB_MSB | PIT_MODE_EOC | PIT_BINARY,
+         PIT_MODE);
+
+    do {
+        uint8_t val2;
+        unsigned int offs;
+
+        outb(val, PIT_CH2);
+        outb(val ^ 0xff, PIT_CH2);
+
+        /* Wait for the Null Count bit to clear. */
+        do {
+            /* Latch status. */
+            outb(PIT_RDB | PIT_RDB_NO_COUNT | PIT_RDB_CH2, PIT_MODE);
+
+            /* Try to make sure we're actually having a PIT here. */
+            val2 = inb(PIT_CH2);
+            if ( (val2 & ~(PIT_STATUS_OUT_PIN | PIT_STATUS_NULL_COUNT)) !=
+                 (PIT_RW_LSB_MSB | PIT_MODE_EOC | PIT_BINARY) )
+                return;
+        } while ( val2 & PIT_STATUS_NULL_COUNT );
+
+        /*
+         * Try to further make sure we're actually having a PIT here.
+         *
+         * NB: Deliberately |, not ||, as we always want both reads.
+         */
+        val2 = inb(PIT_CH2);
+        if ( (val2 ^ val) | (inb(PIT_CH2) ^ val ^ 0xff) )
+            return;
+
+        for ( offs = ISOLATE_LSB(mask); offs <= mask; offs <<= 1 )
+        {
+            if ( !(mask & offs) )
+                continue;
+            val2 = inb(PIT_CH2 + offs);
+            if ( (val2 ^ val) | (inb(PIT_CH2 + offs) ^ val ^ 0xff) )
+                mask &= ~offs;
+        }
+    } while ( mask && (val += 0x0b) );  /* Arbitrary uneven number. */
+
+    if ( mask )
+    {
+        dprintk(XENLOG_INFO, "PIT aliasing mask: %02x\n", mask);
+        pit_alias_mask = mask;
+    }
+}
+
 /************************************************************
  * PLATFORM TIMER 2: HIGH PRECISION EVENT TIMER (HPET)
  */
@@ -2416,6 +2484,8 @@ void __init early_time_init(void)
     }
 
     preinit_pit();
+    probe_pit_alias();
+
     tmp = init_platform_timer();
     plt_tsc.frequency = tmp;
 

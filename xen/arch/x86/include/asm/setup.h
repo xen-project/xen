@@ -49,6 +49,7 @@ extern unsigned long highmem_start;
 #endif
 
 extern unsigned int i8259A_alias_mask;
+extern unsigned int pit_alias_mask;
 
 extern int8_t opt_smt;
 extern int8_t opt_probe_port_aliases;

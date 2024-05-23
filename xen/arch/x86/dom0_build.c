@@ -20,6 +20,7 @@
 #include <asm/p2m.h>
 #include <asm/setup.h>
 #include <asm/spec_ctrl.h>
+#include <io_ports.h>
 
 struct memsize {
     long nr_pages;
@@ -495,7 +496,11 @@ int __init dom0_setup_permissions(struct domain *d)
     rc |= ioports_deny_access(d, 0x4D0, 0x4D1);
 
     /* Interval Timer (PIT). */
-    rc |= ioports_deny_access(d, 0x40, 0x43);
+    for ( offs = 0, i = ISOLATE_LSB(pit_alias_mask) ?: 4;
+          offs <= pit_alias_mask; offs += i )
+        if ( !(offs & ~pit_alias_mask) )
+            rc |= ioports_deny_access(d, PIT_CH0 + offs, PIT_MODE + offs);
+
     /* PIT Channel 2 / PC Speaker Control. */
     rc |= ioports_deny_access(d, 0x61, 0x61);
 
