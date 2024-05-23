@@ -1,0 +1,82 @@
+# Device Tree Overlays support in Xen
+
+Xen experimentally supports dynamic device assignment to running
+domains, i.e. adding/removing nodes (using .dtbo) to/from Xen device
+tree, and attaching them to a running domain with given $domid.
+
+Dynamic node assignment works in two steps:
+
+## Add/Remove device tree overlay to/from Xen device tree
+
+1. Xen tools check the dtbo given and parse all other user provided arguments
+2. Xen tools pass the dtbo to Xen hypervisor via hypercall.
+3. Xen hypervisor applies/removes the dtbo to/from Xen device tree.
+
+## Attach device from the DT overlay to domain
+
+1. Xen tools check the dtbo given and parse all other user provided arguments
+2. Xen tools pass the dtbo to Xen hypervisor via hypercall.
+3. Xen hypervisor attach the device to the user-provided $domid by
+   mapping node resources in the DT overlay.
+
+# Examples
+
+Here are a few examples on how to use it.
+
+## Dom0 device add
+
+For assigning a device tree overlay to Dom0, user should firstly properly
+prepare the DT overlay. More information about device tree overlays can be
+found in [1]. Then, in Dom0, enter the following:
+
+    (dom0) xl dt-overlay add overlay.dtbo
+
+This will allocate the devices mentioned in overlay.dtbo to Xen device tree.
+
+To assign the newly added device from the dtbo to Dom0:
+
+    (dom0) xl dt-overlay attach overlay.dtbo 0
+
+Next, if the user wants to add the same device tree overlay to dom0
+Linux, execute the following:
+
+    (dom0) mkdir -p /sys/kernel/config/device-tree/overlays/new_overlay
+    (dom0) cat overlay.dtbo > /sys/kernel/config/device-tree/overlays/new_overlay/dtbo
+
+Finally if needed, the relevant Linux kernel drive can be loaded using:
+
+    (dom0) modprobe module_name.ko
+
+## DomU device add/remove
+
+All the nodes in dtbo will be assigned to one domain. The user will need
+to prepare a different dtbo for the domU. For example, the
+`interrupt-parent` property of the DomU overlay should be changed to the
+Xen hardcoded value `0xfde8` and the xen,reg property should be added to
+specify the address mappings. If the domain is not 1:1 mapped, xen,reg
+must be present. See the xen,reg format description in
+docs/misc/arm/passthrough.txt. Below assumes the properly written DomU
+dtbo is `overlay_domu.dtbo`.
+
+The user needs to set the `passthrough` property in the xl config file
+if you plan to use DT overlay and devices requiring an IOMMU.
+
+User will also need to modprobe the relevant drivers. For already
+running domains, the user can use the xl dt-overlay attach command,
+example:
+
+    (dom0) xl dt-overlay add overlay.dtbo            # If not executed before
+    (dom0) xl dt-overlay attach overlay_domu.dtbo $domid
+    (dom0) xl console $domid                         # To access $domid console
+
+Next, if the user needs to modify/prepare the overlay.dtbo suitable for
+the domU:
+
+    (domU) mkdir -p /sys/kernel/config/device-tree/overlays/new_overlay
+    (domU) cat overlay_domu.dtbo > /sys/kernel/config/device-tree/overlays/new_overlay/dtbo
+
+Finally, if needed, the relevant Linux kernel drive can be probed:
+
+    (domU) modprobe module_name.ko
+
+[1] https://www.kernel.org/doc/Documentation/devicetree/overlay-notes.txt
