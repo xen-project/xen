@@ -69,3 +69,31 @@ out:
     return rc;
 }
 
+int libxl_dt_overlay_domain(libxl_ctx *ctx, uint32_t domain_id,
+                            void *overlay_dt, uint32_t overlay_dt_size,
+                            uint8_t overlay_op)
+{
+    int rc;
+    int r;
+    GC_INIT(ctx);
+
+    if (check_overlay_fdt(gc, overlay_dt, overlay_dt_size)) {
+        LOG(ERROR, "Overlay DTB check failed");
+        rc = ERROR_FAIL;
+        goto out;
+    } else {
+        LOG(DEBUG, "Overlay DTB check passed");
+        rc = 0;
+    }
+
+    r = xc_dt_overlay_domain(ctx->xch, overlay_dt, overlay_dt_size, overlay_op,
+                             domain_id);
+    if (r) {
+        LOG(ERROR, "%s: Attaching/Detaching overlay dtb failed.", __func__);
+        rc = ERROR_FAIL;
+    }
+
+out:
+    GC_FREE;
+    return rc;
+}

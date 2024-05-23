@@ -642,6 +642,12 @@
 #define LIBXL_HAVE_XEN_9PFS 1
 
 /*
+ * LIBXL_HAVE_DT_OVERLAY_DOMAIN indicates the presence of
+ * libxl_dt_overlay_domain.
+ */
+#define LIBXL_HAVE_DT_OVERLAY_DOMAIN 1
+
+/*
  * libxl memory management
  *
  * From the point of view of the application (ie, libxl's caller),
@@ -2554,8 +2560,17 @@ libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid,
 void libxl_device_pci_list_free(libxl_device_pci* list, int num);
 
 #if defined(__arm__) || defined(__aarch64__)
+/* Values should keep consistent with the op from XEN_SYSCTL_dt_overlay */
+#define LIBXL_DT_OVERLAY_ADD                   1
+#define LIBXL_DT_OVERLAY_REMOVE                2
 int libxl_dt_overlay(libxl_ctx *ctx, void *overlay,
                      uint32_t overlay_size, uint8_t overlay_op);
+
+/* Values should keep consistent with the op from XEN_DOMCTL_dt_overlay */
+#define LIBXL_DT_OVERLAY_DOMAIN_ATTACH         1
+int libxl_dt_overlay_domain(libxl_ctx *ctx, uint32_t domain_id,
+                            void *overlay_dt, uint32_t overlay_dt_size,
+                            uint8_t overlay_op);
 #endif
 
 /*
