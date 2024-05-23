@@ -57,6 +57,8 @@ static void cf_check control_write(
 
     if ( new_enabled )
     {
+        bool old_enabled = msi->enabled;
+
         /*
          * If the device is already enabled it means the number of
          * enabled messages has changed. Disable and re-enable the
@@ -70,6 +72,13 @@ static void cf_check control_write(
 
         if ( vpci_msi_arch_enable(msi, pdev, vectors) )
             return;
+
+        /* Make sure domU doesn't enable INTx while enabling MSI. */
+        if ( !old_enabled && !is_hardware_domain(pdev->domain) )
+        {
+            pci_intx(pdev, false);
+            pdev->vpci->header.guest_cmd |= PCI_COMMAND_INTX_DISABLE;
+        }
     }
     else
         vpci_msi_arch_disable(msi, pdev);
