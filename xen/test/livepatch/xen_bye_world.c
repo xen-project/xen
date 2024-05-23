@@ -14,7 +14,8 @@
 static const char bye_world_patch_this_fnc[] = "xen_extra_version";
 extern const char *xen_bye_world(void);
 
-struct livepatch_func __section(".livepatch.funcs") livepatch_xen_bye_world = {
+const struct livepatch_func __section(".livepatch.funcs")
+livepatch_xen_bye_world = {
     .version = LIVEPATCH_PAYLOAD_VERSION,
     .name = bye_world_patch_this_fnc,
     .new_addr = xen_bye_world,

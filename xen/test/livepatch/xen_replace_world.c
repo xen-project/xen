@@ -13,7 +13,8 @@
 static const char xen_replace_world_name[] = "xen_extra_version";
 extern const char *xen_replace_world(void);
 
-struct livepatch_func __section(".livepatch.funcs") livepatch_xen_replace_world = {
+const struct livepatch_func __section(".livepatch.funcs")
+livepatch_xen_replace_world = {
     .version = LIVEPATCH_PAYLOAD_VERSION,
     .name = xen_replace_world_name,
     .old_addr = 0, /* Forces the hypervisor to lookup .name */

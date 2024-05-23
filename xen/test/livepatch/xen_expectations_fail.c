@@ -16,7 +16,8 @@ extern const char *xen_hello_world(void);
 
 #define EXPECT_BYTES_COUNT 6
 
-struct livepatch_func __section(".livepatch.funcs") livepatch_exceptions = {
+const struct livepatch_func __section(".livepatch.funcs")
+livepatch_exceptions = {
     .version = LIVEPATCH_PAYLOAD_VERSION,
     .name = livepatch_exceptions_str,
     .new_addr = xen_hello_world,

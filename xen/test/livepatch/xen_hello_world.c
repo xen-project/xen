@@ -47,7 +47,8 @@ LIVEPATCH_UNLOAD_HOOK(hi_func);
 
 LIVEPATCH_UNLOAD_HOOK(check_fnc);
 
-struct livepatch_func __section(".livepatch.funcs") livepatch_xen_hello_world = {
+const struct livepatch_func __section(".livepatch.funcs")
+livepatch_xen_hello_world = {
     .version = LIVEPATCH_PAYLOAD_VERSION,
     .name = hello_world_patch_this_fnc,
     .new_addr = xen_hello_world,

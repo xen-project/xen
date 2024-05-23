@@ -142,7 +142,10 @@ xen_expectations_fail-objs := xen_expectations_fail.o xen_hello_world_func.o not
 
 
 quiet_cmd_livepatch = LD      $@
-cmd_livepatch = $(LD) $(XEN_LDFLAGS) $(build_id_linker) -r -o $@ $(real-prereqs)
+define cmd_livepatch
+    $(LD) $(XEN_LDFLAGS) $(build_id_linker) -r -o $@ $(real-prereqs); \
+    $(OBJCOPY) --set-section-flags ".livepatch.funcs=alloc,readonly" $@
+endef
 
 $(obj)/%.livepatch: FORCE
 	$(call if_changed,livepatch)

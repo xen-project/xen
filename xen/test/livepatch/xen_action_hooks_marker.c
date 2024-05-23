@@ -96,7 +96,8 @@ LIVEPATCH_POSTAPPLY_HOOK(post_apply_hook);
 LIVEPATCH_PREREVERT_HOOK(pre_revert_hook);
 LIVEPATCH_POSTREVERT_HOOK(post_revert_hook);
 
-struct livepatch_func __section(".livepatch.funcs") livepatch_xen_hello_world = {
+const struct livepatch_func __section(".livepatch.funcs")
+livepatch_xen_hello_world = {
     .version = LIVEPATCH_PAYLOAD_VERSION,
     .name = hello_world_patch_this_fnc,
     .new_addr = xen_hello_world,

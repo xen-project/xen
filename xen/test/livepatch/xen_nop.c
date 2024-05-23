@@ -14,7 +14,7 @@
  * running this test-case you MUST verify that the assumptions are
  * correct (Hint: make debug and look in xen.s).
  */
-struct livepatch_func __section(".livepatch.funcs") livepatch_nop = {
+const struct livepatch_func __section(".livepatch.funcs") livepatch_nop = {
     .version = LIVEPATCH_PAYLOAD_VERSION,
     .old_size = MINOR_VERSION_SZ,
 
