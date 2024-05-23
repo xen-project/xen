@@ -15,6 +15,8 @@
 #include <xen/libfdt/libfdt.h>
 #include <xen/xmalloc.h>
 
+#define DT_OVERLAY_MAX_SIZE KB(500)
+
 static LIST_HEAD(overlay_tracker);
 static DEFINE_SPINLOCK(overlay_lock);
 
@@ -356,6 +358,42 @@ static int overlay_get_nodes_info(const void *fdto, char **nodes_full_path)
     return 0;
 }
 
+/* This function should be called with the overlay_lock taken */
+static struct overlay_track *
+find_track_entry_from_tracker(const void *overlay_fdt,
+                              uint32_t overlay_fdt_size)
+{
+    struct overlay_track *entry, *temp;
+    bool found_entry = false;
+
+    ASSERT(spin_is_locked(&overlay_lock));
+
+    /*
+     * First check if dtbo is correct i.e. it should one of the dtbo which was
+     * used when dynamically adding the node.
+     * Limitation: Cases with same node names but different property are not
+     * supported currently. We are relying on user to provide the same dtbo
+     * as it was used when adding the nodes.
+     */
+    list_for_each_entry_safe( entry, temp, &overlay_tracker, entry )
+    {
+        if ( memcmp(entry->overlay_fdt, overlay_fdt, overlay_fdt_size) == 0 )
+        {
+            found_entry = true;
+            break;
+        }
+    }
+
+    if ( !found_entry )
+    {
+        printk(XENLOG_ERR "Cannot find any matching tracker with input dtbo."
+               " Operation is supported only for prior added dtbo.\n");
+        return NULL;
+    }
+
+    return entry;
+}
+
 /* Check if node itself can be removed and remove node from IOMMU. */
 static int remove_node_resources(struct dt_device_node *device_node)
 {
@@ -485,8 +523,7 @@ static long handle_remove_overlay_nodes(const void *overlay_fdt,
                                         uint32_t overlay_fdt_size)
 {
     int rc;
-    struct overlay_track *entry, *temp, *track;
-    bool found_entry = false;
+    struct overlay_track *entry;
 
     rc = check_overlay_fdt(overlay_fdt, overlay_fdt_size);
     if ( rc )
@@ -494,29 +531,10 @@ static long handle_remove_overlay_nodes(const void *overlay_fdt,
 
     spin_lock(&overlay_lock);
 
-    /*
-     * First check if dtbo is correct i.e. it should one of the dtbo which was
-     * used when dynamically adding the node.
-     * Limitation: Cases with same node names but different property are not
-     * supported currently. We are relying on user to provide the same dtbo
-     * as it was used when adding the nodes.
-     */
-    list_for_each_entry_safe( entry, temp, &overlay_tracker, entry )
-    {
-        if ( memcmp(entry->overlay_fdt, overlay_fdt, overlay_fdt_size) == 0 )
-        {
-            track = entry;
-            found_entry = true;
-            break;
-        }
-    }
-
-    if ( !found_entry )
+    entry = find_track_entry_from_tracker(overlay_fdt, overlay_fdt_size);
+    if ( entry == NULL )
     {
         rc = -EINVAL;
-
-        printk(XENLOG_ERR "Cannot find any matching tracker with input dtbo."
-               " Removing nodes is supported only for prior added dtbo.\n");
         goto out;
 
     }
@@ -620,15 +638,7 @@ static long add_nodes(struct overlay_track *tr, char **nodes_full_path)
             return -EFAULT;
         }
 
-        rc = handle_device(hardware_domain, overlay_node, p2m_mmio_direct_c,
-                           tr->iomem_ranges,
-                           tr->irq_ranges);
         write_unlock(&dt_host_lock);
-        if ( rc )
-        {
-            printk(XENLOG_ERR "Adding IRQ and IOMMU failed\n");
-            return rc;
-        }
 
         /* Keep overlay_node address in tracker. */
         tr->nodes_address[j] = (unsigned long)overlay_node;
@@ -638,9 +648,7 @@ static long add_nodes(struct overlay_track *tr, char **nodes_full_path)
 }
 /*
  * Adds device tree nodes under target node.
- * We use tr->dt_host_new to unflatten the updated device_tree_flattened. This
- * is done to avoid the removal of device_tree generation, iomem regions mapping
- * to hardware domain done by handle_node().
+ * We use tr->dt_host_new to unflatten the updated device_tree_flattened.
  */
 static long handle_add_overlay_nodes(void *overlay_fdt,
                                      uint32_t overlay_fdt_size)
@@ -774,20 +782,6 @@ static long handle_add_overlay_nodes(void *overlay_fdt,
         goto err;
     }
 
-    tr->irq_ranges = rangeset_new(hardware_domain, "Overlays: Interrupts", 0);
-    if (tr->irq_ranges == NULL)
-    {
-        printk(XENLOG_ERR "Creating IRQ rangeset failed");
-        goto err;
-    }
-
-    tr->iomem_ranges = rangeset_new(hardware_domain, "Overlay: I/O Memory", 0);
-    if (tr->iomem_ranges == NULL)
-    {
-        printk(XENLOG_ERR "Creating IOMMU rangeset failed");
-        goto err;
-    }
-
     rc = add_nodes(tr, nodes_full_path);
     if ( rc )
     {
@@ -843,10 +837,79 @@ static long handle_add_overlay_nodes(void *overlay_fdt,
     xfree(tr->nodes_address);
     xfree(tr->fdt);
 
-    rangeset_destroy(tr->irq_ranges);
-    rangeset_destroy(tr->iomem_ranges);
-
     xfree(tr);
+
+    return rc;
+}
+
+static long handle_attach_overlay_nodes(struct domain *d,
+                                        const void *overlay_fdt,
+                                        uint32_t overlay_fdt_size)
+{
+    int rc;
+    unsigned int j;
+    struct overlay_track *entry;
+
+    rc = check_overlay_fdt(overlay_fdt, overlay_fdt_size);
+    if ( rc )
+        return rc;
+
+    spin_lock(&overlay_lock);
+
+    entry = find_track_entry_from_tracker(overlay_fdt, overlay_fdt_size);
+    if ( entry == NULL )
+    {
+        rc = -EINVAL;
+        goto out;
+    }
+
+    entry->irq_ranges = rangeset_new(d, "Overlays: Interrupts", 0);
+    if (entry->irq_ranges == NULL)
+    {
+        rc = -ENOMEM;
+        printk(XENLOG_ERR "Creating IRQ rangeset failed");
+        goto out;
+    }
+
+    entry->iomem_ranges = rangeset_new(d, "Overlay: I/O Memory", 0);
+    if (entry->iomem_ranges == NULL)
+    {
+        rc = -ENOMEM;
+        printk(XENLOG_ERR "Creating IOMMU rangeset failed");
+        goto out;
+    }
+
+    for ( j = 0; j < entry->num_nodes; j++ )
+    {
+        struct dt_device_node *overlay_node;
+
+        overlay_node = (struct dt_device_node *)entry->nodes_address[j];
+        if ( overlay_node == NULL )
+        {
+            rc = -EINVAL;
+            goto out;
+        }
+
+        write_lock(&dt_host_lock);
+        rc = handle_device(d, overlay_node, p2m_mmio_direct_c,
+                           entry->iomem_ranges, entry->irq_ranges);
+        write_unlock(&dt_host_lock);
+        if ( rc )
+        {
+            printk(XENLOG_ERR "Adding IRQ and IOMMU failed\n");
+            goto out;
+        }
+    }
+
+    spin_unlock(&overlay_lock);
+
+    return 0;
+
+ out:
+    spin_unlock(&overlay_lock);
+
+    rangeset_destroy(entry->irq_ranges);
+    rangeset_destroy(entry->iomem_ranges);
 
     return rc;
 }
@@ -860,7 +923,8 @@ long dt_overlay_sysctl(struct xen_sysctl_dt_overlay *op)
          op->overlay_op != XEN_SYSCTL_DT_OVERLAY_REMOVE )
         return -EOPNOTSUPP;
 
-    if ( op->overlay_fdt_size == 0 || op->overlay_fdt_size > KB(500) )
+    if ( op->overlay_fdt_size == 0 ||
+         op->overlay_fdt_size > DT_OVERLAY_MAX_SIZE )
         return -EINVAL;
 
     if ( op->pad[0] || op->pad[1] || op->pad[2] )
@@ -884,6 +948,49 @@ long dt_overlay_sysctl(struct xen_sysctl_dt_overlay *op)
         ret = handle_remove_overlay_nodes(overlay_fdt, op->overlay_fdt_size);
     else
         ret = handle_add_overlay_nodes(overlay_fdt, op->overlay_fdt_size);
+
+    xfree(overlay_fdt);
+
+    return ret;
+}
+
+long dt_overlay_domctl(struct domain *d, struct xen_domctl_dt_overlay *op)
+{
+    long ret;
+    void *overlay_fdt;
+
+    if ( op->overlay_op != XEN_DOMCTL_DT_OVERLAY_ATTACH )
+        return -EOPNOTSUPP;
+
+    if ( op->overlay_fdt_size == 0 ||
+         op->overlay_fdt_size > DT_OVERLAY_MAX_SIZE )
+        return -EINVAL;
+
+    if ( op->pad[0] || op->pad[1] || op->pad[2] )
+        return -EINVAL;
+
+    /* TODO: add support for non-1:1 domains using xen,reg */
+    if ( !is_domain_direct_mapped(d) )
+        return -EOPNOTSUPP;
+
+    overlay_fdt = xmalloc_bytes(op->overlay_fdt_size);
+
+    if ( overlay_fdt == NULL )
+        return -ENOMEM;
+
+    ret = copy_from_guest(overlay_fdt, op->overlay_fdt, op->overlay_fdt_size);
+    if ( ret )
+    {
+        gprintk(XENLOG_ERR, "copy from guest failed\n");
+        xfree(overlay_fdt);
+
+        return -EFAULT;
+    }
+
+    if ( op->overlay_op == XEN_DOMCTL_DT_OVERLAY_ATTACH )
+        ret = handle_attach_overlay_nodes(d, overlay_fdt, op->overlay_fdt_size);
+    else
+        ret = -EOPNOTSUPP;
 
     xfree(overlay_fdt);
 

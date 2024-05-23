@@ -39,12 +39,20 @@ struct overlay_track {
 };
 
 struct xen_sysctl_dt_overlay;
+struct xen_domctl_dt_overlay;
 
 #ifdef CONFIG_OVERLAY_DTB
 long dt_overlay_sysctl(struct xen_sysctl_dt_overlay *op);
+long dt_overlay_domctl(struct domain *d, struct xen_domctl_dt_overlay *op);
 #else
 #include <xen/errno.h>
 static inline long dt_overlay_sysctl(struct xen_sysctl_dt_overlay *op)
+{
+    return -EOPNOTSUPP;
+}
+
+static inline long dt_overlay_domctl(struct domain *d,
+                                     struct xen_domctl_dt_overlay *op)
 {
     return -EOPNOTSUPP;
 }
