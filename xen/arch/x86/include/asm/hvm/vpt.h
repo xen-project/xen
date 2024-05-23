@@ -11,7 +11,6 @@
 #include <xen/timer.h>
 #include <xen/list.h>
 #include <xen/rwlock.h>
-#include <asm/hvm/hvm.h>
 
 /*
  * Abstract layer of periodic time, one short time.

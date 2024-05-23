@@ -797,6 +797,12 @@ static inline void hvm_update_vlapic_mode(struct vcpu *v)
         alternative_vcall(hvm_funcs.update_vlapic_mode, v);
 }
 
+static inline void hvm_sync_pir_to_irr(struct vcpu *v)
+{
+    if ( hvm_funcs.sync_pir_to_irr )
+        alternative_vcall(hvm_funcs.sync_pir_to_irr, v);
+}
+
 #else  /* CONFIG_HVM */
 
 #define hvm_enabled false
