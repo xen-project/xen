@@ -15,91 +15,12 @@
     (((~0ULL) << (l)) & (~0ULL >> (BITS_PER_LLONG - 1 - (h))))
 
 /*
- * ffs: find first bit set. This is defined the same way as
- * the libc and compiler builtin ffs routines, therefore
- * differs in spirit from the above ffz (man ffs).
+ * Find First/Last Set bit (all forms).
+ *
+ * Bits are labelled from 1.  Returns 0 if given 0.
  */
-
-static inline int generic_ffs(unsigned int x)
-{
-    int r = 1;
-
-    if (!x)
-        return 0;
-    if (!(x & 0xffff)) {
-        x >>= 16;
-        r += 16;
-    }
-    if (!(x & 0xff)) {
-        x >>= 8;
-        r += 8;
-    }
-    if (!(x & 0xf)) {
-        x >>= 4;
-        r += 4;
-    }
-    if (!(x & 3)) {
-        x >>= 2;
-        r += 2;
-    }
-    if (!(x & 1)) {
-        x >>= 1;
-        r += 1;
-    }
-    return r;
-}
-
-/*
- * fls: find last bit set.
- */
-
-static inline int generic_fls(unsigned int x)
-{
-    int r = 32;
-
-    if (!x)
-        return 0;
-    if (!(x & 0xffff0000u)) {
-        x <<= 16;
-        r -= 16;
-    }
-    if (!(x & 0xff000000u)) {
-        x <<= 8;
-        r -= 8;
-    }
-    if (!(x & 0xf0000000u)) {
-        x <<= 4;
-        r -= 4;
-    }
-    if (!(x & 0xc0000000u)) {
-        x <<= 2;
-        r -= 2;
-    }
-    if (!(x & 0x80000000u)) {
-        x <<= 1;
-        r -= 1;
-    }
-    return r;
-}
-
-#if BITS_PER_LONG == 64
-
-static inline int generic_ffsl(unsigned long x)
-{
-    return !x || (u32)x ? generic_ffs(x) : generic_ffs(x >> 32) + 32;
-}
-
-static inline int generic_flsl(unsigned long x)
-{
-    u32 h = x >> 32;
-
-    return h ? generic_fls(h) + 32 : generic_fls(x);
-}
-
-#else
-# define generic_ffsl generic_ffs
-# define generic_flsl generic_fls
-#endif
+unsigned int __pure generic_ffsl(unsigned long x);
+unsigned int __pure generic_flsl(unsigned long x);
 
 /*
  * Include this here because some architectures need generic_ffs/fls in

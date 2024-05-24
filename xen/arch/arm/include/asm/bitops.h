@@ -150,7 +150,7 @@ static inline int fls(unsigned int x)
         int ret;
 
         if (__builtin_constant_p(x))
-               return generic_fls(x);
+               return generic_flsl(x);
 
         asm("clz\t%"__OP32"0, %"__OP32"1" : "=r" (ret) : "r" (x));
         return 32 - ret;
