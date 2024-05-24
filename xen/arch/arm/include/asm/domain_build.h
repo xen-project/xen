@@ -5,9 +5,12 @@
 #include <asm/kernel.h>
 
 typedef __be32 gic_interrupt_t[3];
-
-bool allocate_bank_memory(struct domain *d, struct kernel_info *kinfo,
-                          gfn_t sgfn, paddr_t tot_size);
+typedef bool (*alloc_domheap_mem_cb)(struct domain *d, struct page_info *pg,
+                                     unsigned int order, void *extra);
+bool allocate_domheap_memory(struct domain *d, paddr_t tot_size,
+                             alloc_domheap_mem_cb cb, void *extra);
+bool allocate_bank_memory(struct kernel_info *kinfo, gfn_t sgfn,
+                          paddr_t tot_size);
 int construct_domain(struct domain *d, struct kernel_info *kinfo);
 int domain_fdt_begin_node(void *fdt, const char *name, uint64_t unit);
 int make_chosen_node(const struct kernel_info *kinfo);
