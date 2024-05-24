@@ -1842,7 +1842,7 @@ static void _init_heap_pages(const struct page_info *pg,
          * Note that the value of ffsl() and flsl() starts from 1 so we need
          * to decrement it by 1.
          */
-        unsigned int inc_order = min(MAX_ORDER, flsl(e - s) - 1);
+        unsigned int inc_order = min(MAX_ORDER + 0U, flsl(e - s) - 1U);
 
         if ( s )
             inc_order = min(inc_order, ffsl(s) - 1U);
@@ -2266,7 +2266,7 @@ void __init xenheap_max_mfn(unsigned long mfn)
     ASSERT(!first_node_initialised);
     ASSERT(!xenheap_bits);
     BUILD_BUG_ON((PADDR_BITS - PAGE_SHIFT) >= BITS_PER_LONG);
-    xenheap_bits = min(flsl(mfn + 1) - 1 + PAGE_SHIFT, PADDR_BITS);
+    xenheap_bits = min(flsl(mfn + 1) - 1U + PAGE_SHIFT, PADDR_BITS + 0U);
     printk(XENLOG_INFO "Xen heap: %u bits\n", xenheap_bits);
 }
 
