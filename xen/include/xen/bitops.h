@@ -4,6 +4,8 @@
 #include <xen/compiler.h>
 #include <xen/types.h>
 
+#include <asm/bitops.h>
+
 /*
  * Create a contiguous bitmask starting at bit position @l and ending at
  * position @h. For example GENMASK(30, 21) gives us 0x7fe00000ul.
@@ -22,20 +24,6 @@
 unsigned int __pure generic_ffsl(unsigned long x);
 unsigned int __pure generic_flsl(unsigned long x);
 
-/*
- * Include this here because some architectures need generic_ffs/fls in
- * scope
- */
-
-/* --------------------- Please tidy above here --------------------- */
-
-#include <asm/bitops.h>
-
-/*
- * Find First/Last Set bit (all forms).
- *
- * Bits are labelled from 1.  Returns 0 if given 0.
- */
 static always_inline __pure unsigned int ffs(unsigned int x)
 {
     if ( __builtin_constant_p(x) )
