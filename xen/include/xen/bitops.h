@@ -60,6 +60,30 @@ static always_inline __pure unsigned int ffsl(unsigned long x)
 #endif
 }
 
+static always_inline __pure unsigned int fls(unsigned int x)
+{
+    if ( __builtin_constant_p(x) )
+        return x ? 32 - __builtin_clz(x) : 0;
+
+#ifdef arch_fls
+    return arch_fls(x);
+#else
+    return generic_flsl(x);
+#endif
+}
+
+static always_inline __pure unsigned int flsl(unsigned long x)
+{
+    if ( __builtin_constant_p(x) )
+        return x ? BITS_PER_LONG - __builtin_clzl(x) : 0;
+
+#ifdef arch_fls
+    return arch_flsl(x);
+#else
+    return generic_flsl(x);
+#endif
+}
+
 /* --------------------- Please tidy below here --------------------- */
 
 #ifndef find_next_bit

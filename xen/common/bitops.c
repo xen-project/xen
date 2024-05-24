@@ -28,7 +28,32 @@ static void __init test_ffs(void)
 #endif
 }
 
+static void __init test_fls(void)
+{
+    /* unsigned int fls(unsigned int) */
+    CHECK(fls, 0, 0);
+    CHECK(fls, 1, 1);
+    CHECK(fls, 3, 2);
+    CHECK(fls, 7, 3);
+    CHECK(fls, 6, 3);
+    CHECK(fls, 0x80000000U, 32);
+
+    /* unsigned int flsl(unsigned long) */
+    CHECK(flsl, 0, 0);
+    CHECK(flsl, 1, 1);
+    CHECK(flsl, 3, 2);
+    CHECK(flsl, 7, 3);
+    CHECK(flsl, 6, 3);
+
+    CHECK(flsl, 1 | (1UL << (BITS_PER_LONG - 1)), BITS_PER_LONG);
+#if BITS_PER_LONG > 32
+    CHECK(flsl, 1 | (1UL << 32), 33);
+    CHECK(flsl, 1 | (1UL << 63), 64);
+#endif
+}
+
 static void __init __constructor test_bitops(void)
 {
     test_ffs();
+    test_fls();
 }

@@ -1,8 +1,6 @@
 #ifndef _ARM_ARM32_BITOPS_H
 #define _ARM_ARM32_BITOPS_H
 
-#define flsl fls
-
 /*
  * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
  */

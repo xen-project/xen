@@ -458,33 +458,41 @@ static always_inline unsigned int arch_ffsl(unsigned long x)
 }
 #define arch_ffsl arch_ffsl
 
-/**
- * fls - find last bit set
- * @x: the word to search
- *
- * This is defined the same way as ffs.
- */
-static inline int flsl(unsigned long x)
+static always_inline unsigned int arch_fls(unsigned int x)
 {
-    long r;
+    unsigned int r;
 
-    asm ( "bsr %1,%0\n\t"
-          "jnz 1f\n\t"
-          "mov $-1,%0\n"
-          "1:" : "=r" (r) : "rm" (x));
-    return (int)r+1;
-}
+    /* See arch_ffs() for safety discussions. */
+    if ( __builtin_constant_p(x > 0) && x > 0 )
+        asm ( "bsr %[val], %[res]"
+              : [res] "=r" (r)
+              : [val] "rm" (x) );
+    else
+        asm ( "bsr %[val], %[res]"
+              : [res] "=r" (r)
+              : [val] "rm" (x), "[res]" (-1) );
 
-static inline int fls(unsigned int x)
-{
-    int r;
-
-    asm ( "bsr %1,%0\n\t"
-          "jnz 1f\n\t"
-          "mov $-1,%0\n"
-          "1:" : "=r" (r) : "rm" (x));
     return r + 1;
 }
+#define arch_fls arch_fls
+
+static always_inline unsigned int arch_flsl(unsigned long x)
+{
+    unsigned int r;
+
+    /* See arch_ffs() for safety discussions. */
+    if ( __builtin_constant_p(x > 0) && x > 0 )
+        asm ( "bsr %[val], %q[res]"
+              : [res] "=r" (r)
+              : [val] "rm" (x) );
+    else
+        asm ( "bsr %[val], %q[res]"
+              : [res] "=r" (r)
+              : [val] "rm" (x), "[res]" (-1) );
+
+    return r + 1;
+}
+#define arch_flsl arch_flsl
 
 /**
  * hweightN - returns the hamming weight of a N-bit word

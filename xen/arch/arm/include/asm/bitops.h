@@ -140,25 +140,10 @@ static inline int test_bit(int nr, const volatile void *addr)
         return 1UL & (p[BITOP_WORD(nr)] >> (nr & (BITOP_BITS_PER_WORD-1)));
 }
 
-/*
- * On ARMv5 and above those functions can be implemented around
- * the clz instruction for much better code efficiency.
- */
-
-static inline int fls(unsigned int x)
-{
-        int ret;
-
-        if (__builtin_constant_p(x))
-               return generic_flsl(x);
-
-        asm("clz\t%"__OP32"0, %"__OP32"1" : "=r" (ret) : "r" (x));
-        return 32 - ret;
-}
-
-
 #define arch_ffs(x)  ((x) ? 1 + __builtin_ctz(x) : 0)
 #define arch_ffsl(x) ((x) ? 1 + __builtin_ctzl(x) : 0)
+#define arch_fls(x)  ((x) ? 32 - __builtin_clz(x) : 0)
+#define arch_flsl(x) ((x) ? BITS_PER_LONG - __builtin_clzl(x) : 0)
 
 /**
  * hweightN - returns the hamming weight of a N-bit word
