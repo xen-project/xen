@@ -927,6 +927,11 @@ static int __init find_unallocated_memory(const struct kernel_info *kinfo,
         for ( j = 0; j < mem_banks[i]->nr_banks; j++ )
         {
             start = mem_banks[i]->bank[j].start;
+
+            /* Shared memory banks can contain INVALID_PADDR as start */
+            if ( INVALID_PADDR == start )
+                continue;
+
             end = mem_banks[i]->bank[j].start + mem_banks[i]->bank[j].size;
             res = rangeset_remove_range(unalloc_mem, PFN_DOWN(start),
                                         PFN_DOWN(end - 1));

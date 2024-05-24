@@ -264,6 +264,12 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
         pbase = boot_shm_bank->start;
         psize = boot_shm_bank->size;
 
+        if ( INVALID_PADDR == pbase )
+        {
+            printk("%pd: host physical address must be chosen by users at the moment", d);
+            return -EINVAL;
+        }
+
         /*
          * xen,shared-mem = <pbase, gbase, size>;
          * TODO: pbase is optional.
@@ -377,7 +383,8 @@ int __init process_shm_node(const void *fdt, int node, uint32_t address_cells,
 {
     const struct fdt_property *prop, *prop_id, *prop_role;
     const __be32 *cell;
-    paddr_t paddr, gaddr, size, end;
+    paddr_t paddr = INVALID_PADDR;
+    paddr_t gaddr, size, end;
     struct membanks *mem = bootinfo_get_shmem();
     struct shmem_membank_extra *shmem_extra = bootinfo_get_shmem_extra();
     unsigned int i;
@@ -432,24 +439,37 @@ int __init process_shm_node(const void *fdt, int node, uint32_t address_cells,
     if ( !prop )
         return -ENOENT;
 
+    cell = (const __be32 *)prop->data;
     if ( len != dt_cells_to_size(address_cells + size_cells + address_cells) )
     {
-        if ( len == dt_cells_to_size(size_cells + address_cells) )
-            printk("fdt: host physical address must be chosen by users at the moment.\n");
-
-        printk("fdt: invalid `xen,shared-mem` property.\n");
-        return -EINVAL;
+        if ( len == dt_cells_to_size(address_cells + size_cells) )
+            device_tree_get_reg(&cell, address_cells, size_cells, &gaddr,
+                                &size);
+        else
+        {
+            printk("fdt: invalid `xen,shared-mem` property.\n");
+            return -EINVAL;
+        }
     }
-
-    cell = (const __be32 *)prop->data;
-    device_tree_get_reg(&cell, address_cells, address_cells, &paddr, &gaddr);
-    size = dt_next_cell(size_cells, &cell);
-
-    if ( !IS_ALIGNED(paddr, PAGE_SIZE) )
+    else
     {
-        printk("fdt: physical address 0x%"PRIpaddr" is not suitably aligned.\n",
-               paddr);
-        return -EINVAL;
+        device_tree_get_reg(&cell, address_cells, address_cells, &paddr,
+                            &gaddr);
+        size = dt_next_cell(size_cells, &cell);
+
+        if ( !IS_ALIGNED(paddr, PAGE_SIZE) )
+        {
+            printk("fdt: physical address 0x%"PRIpaddr" is not suitably aligned.\n",
+                paddr);
+            return -EINVAL;
+        }
+
+        end = paddr + size;
+        if ( end <= paddr )
+        {
+            printk("fdt: static shared memory region %s overflow\n", shm_id);
+            return -EINVAL;
+        }
     }
 
     if ( !IS_ALIGNED(gaddr, PAGE_SIZE) )
@@ -471,39 +491,64 @@ int __init process_shm_node(const void *fdt, int node, uint32_t address_cells,
         return -EINVAL;
     }
 
-    end = paddr + size;
-    if ( end <= paddr )
-    {
-        printk("fdt: static shared memory region %s overflow\n", shm_id);
-        return -EINVAL;
-    }
-
     for ( i = 0; i < mem->nr_banks; i++ )
     {
         /*
          * Meet the following check:
-         * 1) The shm ID matches and the region exactly match
-         * 2) The shm ID doesn't match and the region doesn't overlap
-         * with an existing one
+         * - when host address is provided:
+         *   1) The shm ID matches and the region exactly match
+         *   2) The shm ID doesn't match and the region doesn't overlap
+         *      with an existing one
+         * - when host address is not provided:
+         *   1) The shm ID matches and the region size exactly match
          */
-        if ( paddr == mem->bank[i].start && size == mem->bank[i].size )
+        bool paddr_assigned = (INVALID_PADDR != paddr);
+
+        if ( strncmp(shm_id, shmem_extra[i].shm_id, MAX_SHM_ID_LENGTH) == 0 )
         {
-            if ( strncmp(shm_id, shmem_extra[i].shm_id,
-                         MAX_SHM_ID_LENGTH) == 0  )
+            /*
+             * Regions have same shm_id (cases):
+             * 1) physical host address is supplied:
+             *    - OK:   paddr is equal and size is equal (same region)
+             *    - Fail: paddr doesn't match or size doesn't match (there
+             *            cannot exists two shmem regions with same shm_id)
+             * 2) physical host address is NOT supplied:
+             *    - OK:   size is equal (same region)
+             *    - Fail: size is not equal (same shm_id must identify only one
+             *            region, there can't be two different regions with same
+             *            shm_id)
+             */
+            bool start_match = paddr_assigned ? (paddr == mem->bank[i].start) :
+                                                true;
+
+            if ( start_match && (size == mem->bank[i].size) )
                 break;
             else
             {
-                printk("fdt: xen,shm-id %s does not match for all the nodes using the same region.\n",
+                printk("fdt: different shared memory region could not share the same shm ID %s\n",
                        shm_id);
                 return -EINVAL;
             }
         }
-        else if ( strncmp(shm_id, shmem_extra[i].shm_id,
-                          MAX_SHM_ID_LENGTH) != 0 )
+
+        /*
+         * Regions have different shm_id (cases):
+         * 1) physical host address is supplied:
+         *    - OK:   paddr different, or size different (case where paddr
+         *            is equal but psize is different are wrong, but they
+         *            are handled later when checking for overlapping)
+         *    - Fail: paddr equal and size equal (the same region can't be
+         *            identified with different shm_id)
+         * 2) physical host address is NOT supplied:
+         *    - OK:   Both have different shm_id so even with same size they
+         *            can exists
+         */
+        if ( !paddr_assigned || (paddr != mem->bank[i].start) ||
+             (size != mem->bank[i].size) )
             continue;
         else
         {
-            printk("fdt: different shared memory region could not share the same shm ID %s\n",
+            printk("fdt: xen,shm-id %s does not match for all the nodes using the same region\n",
                    shm_id);
             return -EINVAL;
         }
@@ -513,7 +558,8 @@ int __init process_shm_node(const void *fdt, int node, uint32_t address_cells,
     {
         if (i < mem->max_banks)
         {
-            if ( check_reserved_regions_overlap(paddr, size) )
+            if ( (paddr != INVALID_PADDR) &&
+                 check_reserved_regions_overlap(paddr, size) )
                 return -EINVAL;
 
             /* Static shared memory shall be reserved from any other use. */
@@ -583,13 +629,13 @@ void __init early_print_info_shmem(void)
 {
     const struct membanks *shmem = bootinfo_get_shmem();
     unsigned int bank;
+    unsigned int printed = 0;
 
-    for ( bank = 0; bank < shmem->nr_banks; bank++ )
-    {
-        printk(" SHMEM[%u]: %"PRIpaddr" - %"PRIpaddr"\n", bank,
-               shmem->bank[bank].start,
-               shmem->bank[bank].start + shmem->bank[bank].size - 1);
-    }
+    for ( bank = 0; bank < shmem->nr_banks; bank++, printed++ )
+        if ( shmem->bank[bank].start != INVALID_PADDR )
+            printk(" SHMEM[%u]: %"PRIpaddr" - %"PRIpaddr"\n", printed,
+                shmem->bank[bank].start,
+                shmem->bank[bank].start + shmem->bank[bank].size - 1);
 }
 
 void __init init_sharedmem_pages(void)
@@ -598,7 +644,8 @@ void __init init_sharedmem_pages(void)
     unsigned int bank;
 
     for ( bank = 0 ; bank < shmem->nr_banks; bank++ )
-        init_staticmem_bank(&shmem->bank[bank]);
+        if ( shmem->bank[bank].start != INVALID_PADDR )
+            init_staticmem_bank(&shmem->bank[bank]);
 }
 
 int __init remove_shm_from_rangeset(const struct kernel_info *kinfo,

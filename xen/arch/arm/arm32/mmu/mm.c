@@ -101,8 +101,15 @@ static paddr_t __init consider_modules(paddr_t s, paddr_t e,
     nr += reserved_mem->nr_banks;
     for ( ; i - nr < shmem->nr_banks; i++ )
     {
-        paddr_t r_s = shmem->bank[i - nr].start;
-        paddr_t r_e = r_s + shmem->bank[i - nr].size;
+        paddr_t r_s, r_e;
+
+        r_s = shmem->bank[i - nr].start;
+
+        /* Shared memory banks can contain INVALID_PADDR as start */
+        if ( INVALID_PADDR == r_s )
+            continue;
+
+        r_e = r_s + shmem->bank[i - nr].size;
 
         if ( s < r_e && r_s < e )
         {

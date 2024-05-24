@@ -240,8 +240,15 @@ static void __init dt_unreserved_regions(paddr_t s, paddr_t e,
     offset = reserved_mem->nr_banks;
     for ( ; i - offset < shmem->nr_banks; i++ )
     {
-        paddr_t r_s = shmem->bank[i - offset].start;
-        paddr_t r_e = r_s + shmem->bank[i - offset].size;
+        paddr_t r_s, r_e;
+
+        r_s = shmem->bank[i - offset].start;
+
+        /* Shared memory banks can contain INVALID_PADDR as start */
+        if ( INVALID_PADDR == r_s )
+            continue;
+
+        r_e = r_s + shmem->bank[i - offset].size;
 
         if ( s < r_e && r_s < e )
         {
@@ -272,7 +279,8 @@ static bool __init meminfo_overlap_check(const struct membanks *mem,
         bank_start = mem->bank[i].start;
         bank_end = bank_start + mem->bank[i].size;
 
-        if ( region_end <= bank_start || region_start >= bank_end )
+        if ( INVALID_PADDR == bank_start || region_end <= bank_start ||
+             region_start >= bank_end )
             continue;
         else
         {
