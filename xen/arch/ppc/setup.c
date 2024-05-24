@@ -39,6 +39,8 @@ void __init noreturn start_xen(unsigned long r3, unsigned long r4,
 
     setup_initial_pagetables();
 
+    init_constructors();
+
     early_printk("Hello, ppc64le!\n");
 
     for ( ; ; )
