@@ -110,9 +110,10 @@ hotplug PV drivers to dom0less guests. E.g. xl network-attach domU.
 The implementation works as follows:
 - Xen allocates the xenstore event channel for each dom0less domU that
   has the "xen,enhanced" property, and sets HVM_PARAM_STORE_EVTCHN
-- Xen does *not* allocate the xenstore page and sets HVM_PARAM_STORE_PFN
-  to ~0ULL (invalid)
-- Dom0less domU kernels check that HVM_PARAM_STORE_PFN is set to invalid
+- Xen allocates the xenstore page and sets HVM_PARAM_STORE_PFN as well
+  as the connection status to XENSTORE_RECONNECT.
+- Dom0less domU kernels check that HVM_PARAM_STORE_PFN is set to
+  ~0ULL (invalid) or the connection status is *not* XENSTORE_CONNECTED.
     - Old kernels will continue without xenstore support (Note: some old
       buggy kernels might crash because they don't check the validity of
       HVM_PARAM_STORE_PFN before using it! Disable "xen,enhanced" in
@@ -121,13 +122,14 @@ The implementation works as follows:
       channel (HVM_PARAM_STORE_EVTCHN) before continuing with the
       initialization
 - Once dom0 is booted, init-dom0less is executed:
-    - it allocates the xenstore shared page and sets HVM_PARAM_STORE_PFN
+    - it gets the xenstore shared page from HVM_PARAM_STORE_PFN
     - it calls xs_introduce_domain
 - Xenstored notices the new domain, initializes interfaces as usual, and
   sends an event channel notification to the domain using the xenstore
   event channel (HVM_PARAM_STORE_EVTCHN)
 - The Linux domU kernel receives the event channel notification, checks
-  HVM_PARAM_STORE_PFN again and continue with the initialization
+  HVM_PARAM_STORE_PFN and the connection status again and continue with
+  the initialization
 
 
 Limitations
