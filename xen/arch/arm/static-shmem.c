@@ -9,6 +9,25 @@
 #include <asm/static-memory.h>
 #include <asm/static-shmem.h>
 
+typedef struct {
+    struct domain *d;
+    const char *role_str;
+    paddr_t gbase;
+    struct shmem_membank_extra *bank_extra_info;
+} alloc_heap_pages_cb_extra;
+
+static struct {
+    struct membanks_hdr common;
+    struct membank bank[NR_SHMEM_BANKS];
+} shm_heap_banks __initdata = {
+    .common.max_banks = NR_SHMEM_BANKS
+};
+
+static inline struct membanks *get_shmem_heap_banks(void)
+{
+    return container_of(&shm_heap_banks.common, struct membanks, common);
+}
+
 static void __init __maybe_unused build_assertions(void)
 {
     /*
@@ -63,7 +82,8 @@ static bool __init is_shm_allocated_to_domio(paddr_t pbase)
 }
 
 static mfn_t __init acquire_shared_memory_bank(struct domain *d,
-                                               paddr_t pbase, paddr_t psize)
+                                               paddr_t pbase, paddr_t psize,
+                                               bool bank_from_heap)
 {
     mfn_t smfn;
     unsigned long nr_pfns;
@@ -83,19 +103,31 @@ static mfn_t __init acquire_shared_memory_bank(struct domain *d,
     d->max_pages += nr_pfns;
 
     smfn = maddr_to_mfn(pbase);
-    res = acquire_domstatic_pages(d, smfn, nr_pfns, 0);
+    if ( bank_from_heap )
+        /*
+         * When host address is not provided, static shared memory is
+         * allocated from heap and shall be assigned to owner domain.
+         */
+        res = assign_pages(maddr_to_page(pbase), nr_pfns, d, 0);
+    else
+        res = acquire_domstatic_pages(d, smfn, nr_pfns, 0);
+
     if ( res )
     {
-        printk(XENLOG_ERR
-               "%pd: failed to acquire static memory: %d.\n", d, res);
-        d->max_pages -= nr_pfns;
-        return INVALID_MFN;
+        printk(XENLOG_ERR "%pd: failed to %s static memory: %d.\n", d,
+               bank_from_heap ? "assign" : "acquire", res);
+        goto fail;
     }
 
     return smfn;
+
+ fail:
+    d->max_pages -= nr_pfns;
+    return INVALID_MFN;
 }
 
 static int __init assign_shared_memory(struct domain *d, paddr_t gbase,
+                                       bool bank_from_heap,
                                        const struct membank *shm_bank)
 {
     mfn_t smfn;
@@ -108,10 +140,7 @@ static int __init assign_shared_memory(struct domain *d, paddr_t gbase,
     psize = shm_bank->size;
     nr_borrowers = shm_bank->shmem_extra->nr_shm_borrowers;
 
-    printk("%pd: allocate static shared memory BANK %#"PRIpaddr"-%#"PRIpaddr".\n",
-           d, pbase, pbase + psize);
-
-    smfn = acquire_shared_memory_bank(d, pbase, psize);
+    smfn = acquire_shared_memory_bank(d, pbase, psize, bank_from_heap);
     if ( mfn_eq(smfn, INVALID_MFN) )
         return -EINVAL;
 
@@ -182,6 +211,7 @@ append_shm_bank_to_domain(struct kernel_info *kinfo, paddr_t start,
 
 static int __init handle_shared_mem_bank(struct domain *d, paddr_t gbase,
                                          const char *role_str,
+                                         bool bank_from_heap,
                                          const struct membank *shm_bank)
 {
     bool owner_dom_io = true;
@@ -210,7 +240,8 @@ static int __init handle_shared_mem_bank(struct domain *d, paddr_t gbase,
          * We found the first borrower of the region, the owner was not
          * specified, so they should be assigned to dom_io.
          */
-        ret = assign_shared_memory(owner_dom_io ? dom_io : d, gbase, shm_bank);
+        ret = assign_shared_memory(owner_dom_io ? dom_io : d, gbase,
+                                   bank_from_heap, shm_bank);
         if ( ret )
             return ret;
     }
@@ -225,6 +256,39 @@ static int __init handle_shared_mem_bank(struct domain *d, paddr_t gbase,
     }
 
     return 0;
+}
+
+static bool __init save_map_heap_pages(struct domain *d, struct page_info *pg,
+                                       unsigned int order, void *extra)
+{
+    alloc_heap_pages_cb_extra *b_extra = (alloc_heap_pages_cb_extra *)extra;
+    int idx = shm_heap_banks.common.nr_banks;
+    int ret = -ENOSPC;
+
+    BUG_ON(!b_extra);
+
+    if ( idx < shm_heap_banks.common.max_banks )
+    {
+        shm_heap_banks.bank[idx].start = page_to_maddr(pg);
+        shm_heap_banks.bank[idx].size = (1ULL << (PAGE_SHIFT + order));
+        shm_heap_banks.bank[idx].shmem_extra = b_extra->bank_extra_info;
+        shm_heap_banks.common.nr_banks++;
+
+        ret = handle_shared_mem_bank(b_extra->d, b_extra->gbase,
+                                     b_extra->role_str, true,
+                                     &shm_heap_banks.bank[idx]);
+        if ( !ret )
+        {
+            /* Increment guest physical address for next mapping */
+            b_extra->gbase += shm_heap_banks.bank[idx].size;
+            return true;
+        }
+    }
+
+    printk("Failed to allocate static shared memory from Xen heap: (%d)\n",
+           ret);
+
+    return false;
 }
 
 int __init process_shm(struct domain *d, struct kernel_info *kinfo,
@@ -264,38 +328,97 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
         pbase = boot_shm_bank->start;
         psize = boot_shm_bank->size;
 
-        if ( INVALID_PADDR == pbase )
-        {
-            printk("%pd: host physical address must be chosen by users at the moment", d);
-            return -EINVAL;
-        }
+        /* "role" property is optional */
+        if ( dt_property_read_string(shm_node, "role", &role_str) != 0 )
+            role_str = NULL;
 
         /*
-         * xen,shared-mem = <pbase, gbase, size>;
-         * TODO: pbase is optional.
+         * xen,shared-mem = <[pbase,] gbase, size>;
+         * pbase is optional.
          */
         addr_cells = dt_n_addr_cells(shm_node);
         size_cells = dt_n_size_cells(shm_node);
         prop = dt_find_property(shm_node, "xen,shared-mem", NULL);
         BUG_ON(!prop);
         cells = (const __be32 *)prop->value;
-        gbase = dt_read_paddr(cells + addr_cells, addr_cells);
 
-        for ( i = 0; i < PFN_DOWN(psize); i++ )
-            if ( !mfn_valid(mfn_add(maddr_to_mfn(pbase), i)) )
+        if ( pbase != INVALID_PADDR )
+        {
+            /* guest phys address is after host phys address */
+            gbase = dt_read_paddr(cells + addr_cells, addr_cells);
+
+            for ( i = 0; i < PFN_DOWN(psize); i++ )
+                if ( !mfn_valid(mfn_add(maddr_to_mfn(pbase), i)) )
+                {
+                    printk("%pd: invalid physical address 0x%"PRI_mfn"\n",
+                        d, mfn_x(mfn_add(maddr_to_mfn(pbase), i)));
+                    return -EINVAL;
+                }
+
+            /* The host physical address is supplied by the user */
+            ret = handle_shared_mem_bank(d, gbase, role_str, false,
+                                         boot_shm_bank);
+            if ( ret )
+                return ret;
+        }
+        else
+        {
+            /*
+             * The host physical address is not supplied by the user, so it
+             * means that the banks needs to be allocated from the Xen heap,
+             * look into the already allocated banks from the heap.
+             */
+            const struct membank *alloc_bank =
+                find_shm_bank_by_id(get_shmem_heap_banks(), shm_id);
+
+            /* guest phys address is right at the beginning */
+            gbase = dt_read_paddr(cells, addr_cells);
+
+            if ( !alloc_bank )
             {
-                printk("%pd: invalid physical address 0x%"PRI_mfn"\n",
-                       d, mfn_x(mfn_add(maddr_to_mfn(pbase), i)));
-                return -EINVAL;
+                alloc_heap_pages_cb_extra cb_arg = { d, role_str, gbase,
+                    boot_shm_bank->shmem_extra };
+
+                /* shm_id identified bank is not yet allocated */
+                if ( !allocate_domheap_memory(NULL, psize, save_map_heap_pages,
+                                              &cb_arg) )
+                {
+                    printk(XENLOG_ERR
+                           "Failed to allocate (%"PRIpaddr"KB) pages as static shared memory from heap\n",
+                           psize >> 10);
+                    return -EINVAL;
+                }
             }
+            else
+            {
+                /* shm_id identified bank is already allocated */
+                const struct membank *end_bank =
+                        &shm_heap_banks.bank[shm_heap_banks.common.nr_banks];
+                paddr_t gbase_bank = gbase;
 
-        /* "role" property is optional */
-        if ( dt_property_read_string(shm_node, "role", &role_str) != 0 )
-            role_str = NULL;
+                /*
+                 * Static shared memory banks that are taken from the Xen heap
+                 * are allocated sequentially in shm_heap_banks, so starting
+                 * from the first bank found identified by shm_id, the code can
+                 * just advance by one bank at the time until it reaches the end
+                 * of the array or it finds another bank NOT identified by
+                 * shm_id
+                 */
+                for ( ; alloc_bank < end_bank; alloc_bank++ )
+                {
+                    if ( strcmp(shm_id, alloc_bank->shmem_extra->shm_id) != 0 )
+                        break;
 
-        ret = handle_shared_mem_bank(d, gbase, role_str, boot_shm_bank);
-        if ( ret )
-            return ret;
+                    ret = handle_shared_mem_bank(d, gbase_bank, role_str, true,
+                                                 alloc_bank);
+                    if ( ret )
+                        return ret;
+
+                    /* Increment guest physical address for next mapping */
+                    gbase_bank += alloc_bank->size;
+                }
+            }
+        }
 
         /*
          * Record static shared memory region info for later setting
