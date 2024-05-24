@@ -19,29 +19,21 @@ static void __init __maybe_unused build_assertions(void)
                  offsetof(struct shared_meminfo, bank)));
 }
 
-static int __init acquire_nr_borrower_domain(struct domain *d,
-                                             paddr_t pbase, paddr_t psize,
-                                             unsigned long *nr_borrowers)
+static const struct membank __init *
+find_shm_bank_by_id(const struct membanks *shmem, const char *shm_id)
 {
-    const struct membanks *shmem = bootinfo_get_shmem();
     unsigned int bank;
 
-    /* Iterate reserved memory to find requested shm bank. */
     for ( bank = 0 ; bank < shmem->nr_banks; bank++ )
     {
-        paddr_t bank_start = shmem->bank[bank].start;
-        paddr_t bank_size = shmem->bank[bank].size;
-
-        if ( (pbase == bank_start) && (psize == bank_size) )
+        if ( strcmp(shm_id, shmem->bank[bank].shmem_extra->shm_id) == 0 )
             break;
     }
 
     if ( bank == shmem->nr_banks )
-        return -ENOENT;
+        return NULL;
 
-    *nr_borrowers = shmem->bank[bank].shmem_extra->nr_shm_borrowers;
-
-    return 0;
+    return &shmem->bank[bank];
 }
 
 /*
@@ -103,14 +95,18 @@ static mfn_t __init acquire_shared_memory_bank(struct domain *d,
     return smfn;
 }
 
-static int __init assign_shared_memory(struct domain *d,
-                                       paddr_t pbase, paddr_t psize,
-                                       paddr_t gbase)
+static int __init assign_shared_memory(struct domain *d, paddr_t gbase,
+                                       const struct membank *shm_bank)
 {
     mfn_t smfn;
     int ret = 0;
     unsigned long nr_pages, nr_borrowers, i;
     struct page_info *page;
+    paddr_t pbase, psize;
+
+    pbase = shm_bank->start;
+    psize = shm_bank->size;
+    nr_borrowers = shm_bank->shmem_extra->nr_shm_borrowers;
 
     printk("%pd: allocate static shared memory BANK %#"PRIpaddr"-%#"PRIpaddr".\n",
            d, pbase, pbase + psize);
@@ -134,14 +130,6 @@ static int __init assign_shared_memory(struct domain *d,
             return ret;
         }
     }
-
-    /*
-     * Get the right amount of references per page, which is the number of
-     * borrower domains.
-     */
-    ret = acquire_nr_borrower_domain(d, pbase, psize, &nr_borrowers);
-    if ( ret )
-        return ret;
 
     /*
      * Instead of letting borrower domain get a page ref, we add as many
@@ -199,6 +187,7 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
 
     dt_for_each_child_node(node, shm_node)
     {
+        const struct membank *boot_shm_bank;
         const struct dt_property *prop;
         const __be32 *cells;
         uint32_t addr_cells, size_cells;
@@ -212,6 +201,23 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
         if ( !dt_device_is_compatible(shm_node, "xen,domain-shared-memory-v1") )
             continue;
 
+        if ( dt_property_read_string(shm_node, "xen,shm-id", &shm_id) )
+        {
+            printk("%pd: invalid \"xen,shm-id\" property", d);
+            return -EINVAL;
+        }
+        BUG_ON((strlen(shm_id) <= 0) || (strlen(shm_id) >= MAX_SHM_ID_LENGTH));
+
+        boot_shm_bank = find_shm_bank_by_id(bootinfo_get_shmem(), shm_id);
+        if ( !boot_shm_bank )
+        {
+            printk("%pd: static shared memory bank not found: '%s'", d, shm_id);
+            return -ENOENT;
+        }
+
+        pbase = boot_shm_bank->start;
+        psize = boot_shm_bank->size;
+
         /*
          * xen,shared-mem = <pbase, gbase, size>;
          * TODO: pbase is optional.
@@ -221,20 +227,7 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
         prop = dt_find_property(shm_node, "xen,shared-mem", NULL);
         BUG_ON(!prop);
         cells = (const __be32 *)prop->value;
-        device_tree_get_reg(&cells, addr_cells, addr_cells, &pbase, &gbase);
-        psize = dt_read_paddr(cells, size_cells);
-        if ( !IS_ALIGNED(pbase, PAGE_SIZE) || !IS_ALIGNED(gbase, PAGE_SIZE) )
-        {
-            printk("%pd: physical address 0x%"PRIpaddr", or guest address 0x%"PRIpaddr" is not suitably aligned.\n",
-                   d, pbase, gbase);
-            return -EINVAL;
-        }
-        if ( !IS_ALIGNED(psize, PAGE_SIZE) )
-        {
-            printk("%pd: size 0x%"PRIpaddr" is not suitably aligned\n",
-                   d, psize);
-            return -EINVAL;
-        }
+        gbase = dt_read_paddr(cells + addr_cells, addr_cells);
 
         for ( i = 0; i < PFN_DOWN(psize); i++ )
             if ( !mfn_valid(mfn_add(maddr_to_mfn(pbase), i)) )
@@ -251,13 +244,6 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
         if ( dt_property_read_string(shm_node, "role", &role_str) == 0 )
             owner_dom_io = false;
 
-        if ( dt_property_read_string(shm_node, "xen,shm-id", &shm_id) )
-        {
-            printk("%pd: invalid \"xen,shm-id\" property", d);
-            return -EINVAL;
-        }
-        BUG_ON((strlen(shm_id) <= 0) || (strlen(shm_id) >= MAX_SHM_ID_LENGTH));
-
         /*
          * DOMID_IO is a fake domain and is not described in the Device-Tree.
          * Therefore when the owner of the shared region is DOMID_IO, we will
@@ -270,8 +256,8 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
              * We found the first borrower of the region, the owner was not
              * specified, so they should be assigned to dom_io.
              */
-            ret = assign_shared_memory(owner_dom_io ? dom_io : d,
-                                       pbase, psize, gbase);
+            ret = assign_shared_memory(owner_dom_io ? dom_io : d, gbase,
+                                       boot_shm_bank);
             if ( ret )
                 return ret;
         }
@@ -439,9 +425,29 @@ int __init process_shm_node(const void *fdt, int node, uint32_t address_cells,
     device_tree_get_reg(&cell, address_cells, address_cells, &paddr, &gaddr);
     size = dt_next_cell(size_cells, &cell);
 
+    if ( !IS_ALIGNED(paddr, PAGE_SIZE) )
+    {
+        printk("fdt: physical address 0x%"PRIpaddr" is not suitably aligned.\n",
+               paddr);
+        return -EINVAL;
+    }
+
+    if ( !IS_ALIGNED(gaddr, PAGE_SIZE) )
+    {
+        printk("fdt: guest address 0x%"PRIpaddr" is not suitably aligned.\n",
+               gaddr);
+        return -EINVAL;
+    }
+
     if ( !size )
     {
         printk("fdt: the size for static shared memory region can not be zero\n");
+        return -EINVAL;
+    }
+
+    if ( !IS_ALIGNED(size, PAGE_SIZE) )
+    {
+        printk("fdt: size 0x%"PRIpaddr" is not suitably aligned\n", size);
         return -EINVAL;
     }
 
