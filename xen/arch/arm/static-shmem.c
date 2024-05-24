@@ -180,6 +180,53 @@ append_shm_bank_to_domain(struct kernel_info *kinfo, paddr_t start,
     return 0;
 }
 
+static int __init handle_shared_mem_bank(struct domain *d, paddr_t gbase,
+                                         const char *role_str,
+                                         const struct membank *shm_bank)
+{
+    bool owner_dom_io = true;
+    paddr_t pbase, psize;
+    int ret;
+
+    pbase = shm_bank->start;
+    psize = shm_bank->size;
+
+    /*
+     * "role" property is optional and if it is defined explicitly,
+     * then the owner domain is not the default "dom_io" domain.
+     */
+    if ( role_str != NULL )
+        owner_dom_io = false;
+
+    /*
+     * DOMID_IO is a fake domain and is not described in the Device-Tree.
+     * Therefore when the owner of the shared region is DOMID_IO, we will
+     * only find the borrowers.
+     */
+    if ( (owner_dom_io && !is_shm_allocated_to_domio(pbase)) ||
+         (!owner_dom_io && strcmp(role_str, "owner") == 0) )
+    {
+        /*
+         * We found the first borrower of the region, the owner was not
+         * specified, so they should be assigned to dom_io.
+         */
+        ret = assign_shared_memory(owner_dom_io ? dom_io : d, gbase, shm_bank);
+        if ( ret )
+            return ret;
+    }
+
+    if ( owner_dom_io || (strcmp(role_str, "borrower") == 0) )
+    {
+        /* Set up P2M foreign mapping for borrower domain. */
+        ret = map_regions_p2mt(d, _gfn(PFN_UP(gbase)), PFN_DOWN(psize),
+                               _mfn(PFN_UP(pbase)), p2m_map_foreign_rw);
+        if ( ret )
+            return ret;
+    }
+
+    return 0;
+}
+
 int __init process_shm(struct domain *d, struct kernel_info *kinfo,
                        const struct dt_device_node *node)
 {
@@ -196,7 +243,6 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
         unsigned int i;
         const char *role_str;
         const char *shm_id;
-        bool owner_dom_io = true;
 
         if ( !dt_device_is_compatible(shm_node, "xen,domain-shared-memory-v1") )
             continue;
@@ -237,39 +283,13 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
                 return -EINVAL;
             }
 
-        /*
-         * "role" property is optional and if it is defined explicitly,
-         * then the owner domain is not the default "dom_io" domain.
-         */
-        if ( dt_property_read_string(shm_node, "role", &role_str) == 0 )
-            owner_dom_io = false;
+        /* "role" property is optional */
+        if ( dt_property_read_string(shm_node, "role", &role_str) != 0 )
+            role_str = NULL;
 
-        /*
-         * DOMID_IO is a fake domain and is not described in the Device-Tree.
-         * Therefore when the owner of the shared region is DOMID_IO, we will
-         * only find the borrowers.
-         */
-        if ( (owner_dom_io && !is_shm_allocated_to_domio(pbase)) ||
-             (!owner_dom_io && strcmp(role_str, "owner") == 0) )
-        {
-            /*
-             * We found the first borrower of the region, the owner was not
-             * specified, so they should be assigned to dom_io.
-             */
-            ret = assign_shared_memory(owner_dom_io ? dom_io : d, gbase,
-                                       boot_shm_bank);
-            if ( ret )
-                return ret;
-        }
-
-        if ( owner_dom_io || (strcmp(role_str, "borrower") == 0) )
-        {
-            /* Set up P2M foreign mapping for borrower domain. */
-            ret = map_regions_p2mt(d, _gfn(PFN_UP(gbase)), PFN_DOWN(psize),
-                                   _mfn(PFN_UP(pbase)), p2m_map_foreign_rw);
-            if ( ret )
-                return ret;
-        }
+        ret = handle_shared_mem_bank(d, gbase, role_str, boot_shm_bank);
+        if ( ret )
+            return ret;
 
         /*
          * Record static shared memory region info for later setting
