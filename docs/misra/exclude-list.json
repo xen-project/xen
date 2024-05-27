@@ -78,6 +78,14 @@
             "comment": "Imported from Linux, ignore for now"
         },
         {
+            "rel_path": "arch/x86/gdbsx.c",
+            "comment": "Used for debugging Xen, ignore for now"
+        },
+        {
+            "rel_path": "arch/x86/include/asm/gdbsx.h",
+            "comment": "Used for debugging Xen, ignore for now"
+        },
+        {
             "rel_path": "arch/x86/mpparse.c",
             "comment": "Imported from Linux, ignore for now"
         },
