@@ -630,7 +630,7 @@ vmcb_get_ ## name(const struct vmcb_struct *vmcb) \
 }
 
 #define VMCB_ACCESSORS(name, cleanbit) \
-        VMCB_ACCESSORS_(name, typeof(alloc_vmcb()->_ ## name), cleanbit)
+    VMCB_ACCESSORS_(name, typeof(((struct vmcb_struct){})._ ## name), cleanbit)
 
 VMCB_ACCESSORS(cr_intercepts, intercepts)
 VMCB_ACCESSORS(dr_intercepts, intercepts)
