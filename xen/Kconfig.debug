@@ -29,6 +29,12 @@ config FRAME_POINTER
 	  maybe slower, but it gives very useful debugging information
 	  in case of any Xen bugs.
 
+config SELF_TESTS
+	bool "Extra self-testing"
+	default DEBUG
+	help
+	  Enable extra unit and functional testing.
+
 config COVERAGE
 	bool "Code coverage support"
 	depends on !LIVEPATCH

@@ -144,7 +144,7 @@ search_exception_table(const struct cpu_user_regs *regs, unsigned long *stub_ra)
     return 0;
 }
 
-#ifdef CONFIG_DEBUG
+#ifdef CONFIG_SELF_TESTS
 #include <asm/setup.h>
 #include <asm/traps.h>
 
@@ -214,7 +214,7 @@ int __init cf_check stub_selftest(void)
     return 0;
 }
 __initcall(stub_selftest);
-#endif
+#endif /* CONFIG_SELF_TESTS */
 
 unsigned long asmlinkage search_pre_exception_table(struct cpu_user_regs *regs)
 {

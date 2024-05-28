@@ -742,7 +742,7 @@ static void noreturn init_done(void)
     system_state = SYS_STATE_active;
 
     /* Re-run stub recovery self-tests with CET-SS active. */
-    if ( IS_ENABLED(CONFIG_DEBUG) && cpu_has_xen_shstk )
+    if ( IS_ENABLED(CONFIG_SELF_TESTS) && cpu_has_xen_shstk )
         stub_selftest();
 
     domain_unpause_by_systemcontroller(dom0);
