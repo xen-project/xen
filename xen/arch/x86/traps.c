@@ -1257,6 +1257,7 @@ void asmlinkage do_int3(struct cpu_user_regs *regs)
     pv_inject_hw_exception(X86_EXC_BP, X86_EVENT_NO_EC);
 }
 
+/* SAF-1-safe */
 void do_general_protection(struct cpu_user_regs *regs)
 {
 #ifdef CONFIG_PV
