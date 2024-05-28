@@ -753,32 +753,70 @@ static int p2m_mem_access_radix_set(struct p2m_domain *p2m, gfn_t gfn,
     return rc;
 }
 
-/*
- * Put any references on the single 4K page referenced by pte.
- * TODO: Handle superpages, for now we only take special references for leaf
- * pages (specifically foreign ones, which can't be super mapped today).
- */
-static void p2m_put_l3_page(const lpae_t pte)
+static void p2m_put_foreign_page(struct page_info *pg)
+{
+    /*
+     * It's safe to do the put_page here because page_alloc will
+     * flush the TLBs if the page is reallocated before the end of
+     * this loop.
+     */
+    put_page(pg);
+}
+
+/* Put any references on the single 4K page referenced by mfn. */
+static void p2m_put_l3_page(mfn_t mfn, p2m_type_t type)
+{
+    /* TODO: Handle other p2m types */
+    if ( p2m_is_foreign(type) )
+    {
+        ASSERT(mfn_valid(mfn));
+        p2m_put_foreign_page(mfn_to_page(mfn));
+    }
+    /* Detect the xenheap page and mark the stored GFN as invalid. */
+    else if ( p2m_is_ram(type) && is_xen_heap_mfn(mfn) )
+        page_set_xenheap_gfn(mfn_to_page(mfn), INVALID_GFN);
+}
+
+/* Put any references on the superpage referenced by mfn. */
+static void p2m_put_l2_superpage(mfn_t mfn, p2m_type_t type)
+{
+    struct page_info *pg;
+    unsigned int i;
+
+    /*
+     * TODO: Handle other p2m types, but be aware that any changes to handle
+     * different types should require an update on the relinquish code to handle
+     * preemption.
+     */
+    if ( !p2m_is_foreign(type) )
+        return;
+
+    ASSERT(mfn_valid(mfn));
+
+    pg = mfn_to_page(mfn);
+
+    for ( i = 0; i < XEN_PT_LPAE_ENTRIES; i++, pg++ )
+        p2m_put_foreign_page(pg);
+}
+
+/* Put any references on the page referenced by pte. */
+static void p2m_put_page(const lpae_t pte, unsigned int level)
 {
     mfn_t mfn = lpae_get_mfn(pte);
 
     ASSERT(p2m_is_valid(pte));
 
     /*
-     * TODO: Handle other p2m types
-     *
-     * It's safe to do the put_page here because page_alloc will
-     * flush the TLBs if the page is reallocated before the end of
-     * this loop.
+     * TODO: Currently we don't handle level 1 super-page, Xen is not
+     * preemptible and therefore some work is needed to handle such
+     * superpages, for which at some point Xen might end up freeing memory
+     * and therefore for such a big mapping it could end up in a very long
+     * operation.
      */
-    if ( p2m_is_foreign(pte.p2m.type) )
-    {
-        ASSERT(mfn_valid(mfn));
-        put_page(mfn_to_page(mfn));
-    }
-    /* Detect the xenheap page and mark the stored GFN as invalid. */
-    else if ( p2m_is_ram(pte.p2m.type) && is_xen_heap_mfn(mfn) )
-        page_set_xenheap_gfn(mfn_to_page(mfn), INVALID_GFN);
+    if ( level == 2 )
+        return p2m_put_l2_superpage(mfn, pte.p2m.type);
+    else if ( level == 3 )
+        return p2m_put_l3_page(mfn, pte.p2m.type);
 }
 
 /* Free lpae sub-tree behind an entry */
@@ -809,9 +847,9 @@ static void p2m_free_entry(struct p2m_domain *p2m,
 #endif
 
         p2m->stats.mappings[level]--;
-        /* Nothing to do if the entry is a super-page. */
-        if ( level == 3 )
-            p2m_put_l3_page(entry);
+
+        p2m_put_page(entry, level);
+
         return;
     }
 
@@ -1558,9 +1596,12 @@ int relinquish_p2m_mapping(struct domain *d)
 
         count++;
         /*
-         * Arbitrarily preempt every 512 iterations.
+         * Arbitrarily preempt every 512 iterations or when we have a level-2
+         * foreign mapping.
          */
-        if ( !(count % 512) && hypercall_preempt_check() )
+        if ( (!(count % 512) ||
+              (p2m_is_foreign(t) && (order > XEN_PT_LEVEL_ORDER(2)))) &&
+             hypercall_preempt_check() )
         {
             rc = -ERESTART;
             break;
