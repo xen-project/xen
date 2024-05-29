@@ -2,14 +2,14 @@
 
 set -ex
 
+serial_log="$(pwd)/smoke.serial"
+
 # machine type from first arg passed directly to qemu -M
 machine=$1
 
 # Run the test
-rm -f smoke.serial
+rm -f ${serial_log}
 set +e
-
-touch smoke.serial
 
 timeout -k 1 20 \
 binaries/qemu-system-ppc64 \
@@ -20,9 +20,10 @@ binaries/qemu-system-ppc64 \
     -vga none \
     -monitor none \
     -nographic \
-    -serial file:smoke.serial \
-    -kernel binaries/xen
+    -serial stdio \
+    -kernel binaries/xen \
+    |& tee ${serial_log} | sed 's/\r//'
 
 set -e
-(grep -q "Hello, ppc64le!" smoke.serial) || exit 1
+(grep -q "Hello, ppc64le!" ${serial_log}) || exit 1
 exit 0
