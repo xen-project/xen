@@ -658,6 +658,22 @@ int hvm_domain_initialise(struct domain *d,
 
     d->arch.hvm.params[HVM_PARAM_TRIPLE_FAULT_REASON] = SHUTDOWN_reboot;
 
+    /* Set altp2m based on domctl flags. */
+    switch ( MASK_EXTR(config->altp2m_opts, XEN_DOMCTL_ALTP2M_mode_mask) )
+    {
+    case XEN_DOMCTL_ALTP2M_mixed:
+        d->arch.hvm.params[HVM_PARAM_ALTP2M] = XEN_ALTP2M_mixed;
+        break;
+
+    case XEN_DOMCTL_ALTP2M_external:
+        d->arch.hvm.params[HVM_PARAM_ALTP2M] = XEN_ALTP2M_external;
+        break;
+
+    case XEN_DOMCTL_ALTP2M_limited:
+        d->arch.hvm.params[HVM_PARAM_ALTP2M] = XEN_ALTP2M_limited;
+        break;
+    }
+
     vpic_init(d);
 
     rc = vioapic_init(d);
@@ -4166,6 +4182,12 @@ static int hvm_allow_set_param(struct domain *d,
     case HVM_PARAM_CONSOLE_EVTCHN:
     case HVM_PARAM_X87_FIP_WIDTH:
         break;
+
+    /* The following parameters are read-only. */
+    case HVM_PARAM_ALTP2M:
+        rc = -EEXIST;
+        break;
+
     /* The following parameters are deprecated. */
     case HVM_PARAM_PAE_ENABLED:
     case HVM_PARAM_DM_DOMAIN:
@@ -4207,7 +4229,6 @@ static int hvm_allow_set_param(struct domain *d,
     case HVM_PARAM_BUFIOREQ_PFN:
     case HVM_PARAM_IOREQ_SERVER_PFN:
     case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
-    case HVM_PARAM_ALTP2M:
     case HVM_PARAM_MCA_CAP:
         if ( value != 0 && new_value != value )
             rc = -EEXIST;

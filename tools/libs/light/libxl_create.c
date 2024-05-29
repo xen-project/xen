@@ -372,7 +372,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         libxl_defbool_setdefault(&b_info->u.hvm.viridian,           false);
         libxl_defbool_setdefault(&b_info->u.hvm.hpet,               true);
         libxl_defbool_setdefault(&b_info->u.hvm.vpt_align,          true);
-        libxl_defbool_setdefault(&b_info->u.hvm.altp2m,             false);
         libxl_defbool_setdefault(&b_info->u.hvm.usb,                false);
         libxl_defbool_setdefault(&b_info->u.hvm.vkb_device,         true);
         libxl_defbool_setdefault(&b_info->u.hvm.xen_platform_pci,   true);
@@ -677,6 +676,28 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
 
         if (info->passthrough == LIBXL_PASSTHROUGH_SYNC_PT)
             create.iommu_opts |= XEN_DOMCTL_IOMMU_no_sharept;
+
+        LOG(DETAIL, "altp2m: %s", libxl_altp2m_mode_to_string(b_info->altp2m));
+        switch(b_info->altp2m) {
+        case LIBXL_ALTP2M_MODE_MIXED:
+            create.altp2m_opts |=
+                XEN_DOMCTL_ALTP2M_mode(XEN_DOMCTL_ALTP2M_mixed);
+            break;
+
+        case LIBXL_ALTP2M_MODE_EXTERNAL:
+            create.altp2m_opts |=
+                XEN_DOMCTL_ALTP2M_mode(XEN_DOMCTL_ALTP2M_external);
+            break;
+
+        case LIBXL_ALTP2M_MODE_LIMITED:
+            create.altp2m_opts |=
+                XEN_DOMCTL_ALTP2M_mode(XEN_DOMCTL_ALTP2M_limited);
+            break;
+
+        case LIBXL_ALTP2M_MODE_DISABLED:
+            /* Nothing to do - altp2m disabled is signaled as mode == 0. */
+            break;
+        }
 
         /* Ultimately, handle is an array of 16 uint8_t, same as uuid */
         libxl_uuid_copy(ctx, (libxl_uuid *)&create.handle, &info->uuid);

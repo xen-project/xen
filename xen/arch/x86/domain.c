@@ -637,6 +637,8 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
     bool hap = config->flags & XEN_DOMCTL_CDF_hap;
     bool nested_virt = config->flags & XEN_DOMCTL_CDF_nested_virt;
     unsigned int max_vcpus;
+    unsigned int altp2m_mode = MASK_EXTR(config->altp2m_opts,
+                                         XEN_DOMCTL_ALTP2M_mode_mask);
 
     if ( hvm ? !hvm_enabled : !IS_ENABLED(CONFIG_PV) )
     {
@@ -712,6 +714,26 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
     {
         dprintk(XENLOG_INFO, "Invalid arch misc flags %#x\n",
                 config->arch.misc_flags);
+        return -EINVAL;
+    }
+
+    if ( config->altp2m_opts & ~XEN_DOMCTL_ALTP2M_mode_mask )
+    {
+        dprintk(XENLOG_INFO, "Invalid altp2m options selected: %#x\n",
+                config->flags);
+        return -EINVAL;
+    }
+
+    if ( altp2m_mode && nested_virt )
+    {
+        dprintk(XENLOG_INFO,
+                "Nested virt and altp2m are not supported together\n");
+        return -EINVAL;
+    }
+
+    if ( altp2m_mode && !hap )
+    {
+        dprintk(XENLOG_INFO, "altp2m is only supported with HAP\n");
         return -EINVAL;
     }
 

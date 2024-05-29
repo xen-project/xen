@@ -407,19 +407,9 @@ static int hvm_set_conf_params(libxl__gc *gc, uint32_t domid,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     xc_interface *xch = ctx->xch;
     int ret = ERROR_FAIL;
-    unsigned int altp2m = info->altp2m;
 
     switch(info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
-        /* The config parameter "altp2m" replaces the parameter "altp2mhvm". For
-         * legacy reasons, both parameters are accepted on x86 HVM guests.
-         *
-         * If the legacy field info->u.hvm.altp2m is set, activate altp2m.
-         * Otherwise set altp2m based on the field info->altp2m. */
-        if (info->altp2m == LIBXL_ALTP2M_MODE_DISABLED &&
-            libxl_defbool_val(info->u.hvm.altp2m))
-            altp2m = libxl_defbool_val(info->u.hvm.altp2m);
-
         if (xc_hvm_param_set(xch, domid, HVM_PARAM_HPET_ENABLED,
                              libxl_defbool_val(info->u.hvm.hpet))) {
             LOG(ERROR, "Couldn't set HVM_PARAM_HPET_ENABLED");
@@ -442,10 +432,6 @@ static int hvm_set_conf_params(libxl__gc *gc, uint32_t domid,
         if (xc_hvm_param_set(xch, domid, HVM_PARAM_TIMER_MODE,
                              timer_mode(info))) {
             LOG(ERROR, "Couldn't set HVM_PARAM_TIMER_MODE");
-            goto out;
-        }
-        if (xc_hvm_param_set(xch, domid, HVM_PARAM_ALTP2M, altp2m)) {
-            LOG(ERROR, "Couldn't set HVM_PARAM_ALTP2M");
             goto out;
         }
         break;
@@ -817,6 +803,18 @@ int libxl__arch_domain_build_info_setdefault(libxl__gc *gc,
 {
     libxl_defbool_setdefault(&b_info->acpi, true);
     libxl_defbool_setdefault(&b_info->arch_x86.msr_relaxed, false);
+
+    /*
+     * The config parameter "altp2m" replaces the parameter "altp2mhvm".
+     * For legacy reasons, both parameters are accepted on x86 HVM guests.
+     *
+     * If the legacy field info->u.hvm.altp2m is set, activate altp2m.
+     * Otherwise set altp2m based on the field info->altp2m.
+     */
+    libxl_defbool_setdefault(&b_info->u.hvm.altp2m, false);
+    if (b_info->altp2m == LIBXL_ALTP2M_MODE_DISABLED &&
+        libxl_defbool_val(b_info->u.hvm.altp2m))
+        b_info->altp2m = libxl_defbool_val(b_info->u.hvm.altp2m);
 
     return 0;
 }
