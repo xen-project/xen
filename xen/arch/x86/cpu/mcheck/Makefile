@@ -1,12 +1,12 @@
-obj-y += amd_nonfatal.o
-obj-y += mce_amd.o
+obj-$(CONFIG_AMD) += amd_nonfatal.o
+obj-$(CONFIG_AMD) += mce_amd.o
 obj-y += mcaction.o
 obj-y += barrier.o
-obj-y += intel-nonfatal.o
+obj-$(CONFIG_INTEL) += intel-nonfatal.o
 obj-y += mctelem.o
 obj-y += mce.o
 obj-y += mce-apei.o
-obj-y += mce_intel.o
+obj-$(CONFIG_INTEL) += mce_intel.o
 obj-y += non-fatal.o
 obj-y += util.o
 obj-y += vmce.o

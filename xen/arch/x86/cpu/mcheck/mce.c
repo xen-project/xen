@@ -38,6 +38,10 @@ DEFINE_PER_CPU_READ_MOSTLY(unsigned int, nr_mce_banks);
 unsigned int __read_mostly firstbank;
 unsigned int __read_mostly ppin_msr;
 uint8_t __read_mostly cmci_apic_vector;
+bool __ro_after_init cmci_support;
+
+/* If mce_force_broadcast == 1, lmce_support will be disabled forcibly. */
+bool __ro_after_init lmce_support;
 
 DEFINE_PER_CPU_READ_MOSTLY(struct mca_banks *, poll_bankmask);
 DEFINE_PER_CPU_READ_MOSTLY(struct mca_banks *, no_cmci_banks);

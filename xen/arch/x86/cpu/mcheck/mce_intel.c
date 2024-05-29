@@ -26,15 +26,11 @@
 #include "mcaction.h"
 
 static DEFINE_PER_CPU_READ_MOSTLY(struct mca_banks *, mce_banks_owned);
-bool __read_mostly cmci_support;
 static bool __read_mostly ser_support;
 static bool __read_mostly mce_force_broadcast;
 boolean_param("mce_fb", mce_force_broadcast);
 
 static int __read_mostly nr_intel_ext_msrs;
-
-/* If mce_force_broadcast == 1, lmce_support will be disabled forcibly. */
-bool __read_mostly lmce_support;
 
 /* Intel SDM define bit15~bit0 of IA32_MCi_STATUS as the MC error code */
 #define INTEL_MCCOD_MASK 0xFFFF
