@@ -144,7 +144,7 @@
 l1_pgentry_t __section(".bss.page_aligned") __aligned(PAGE_SIZE)
     l1_fixmap[L1_PAGETABLE_ENTRIES];
 l1_pgentry_t __section(".bss.page_aligned") __aligned(PAGE_SIZE)
-    l1_fixmap_x[L1_PAGETABLE_ENTRIES];
+    l1_fixmap_x[L1_PAGETABLE_ENTRIES]; /* SAF-1-safe */
 
 bool __read_mostly machine_to_phys_mapping_valid;
 
