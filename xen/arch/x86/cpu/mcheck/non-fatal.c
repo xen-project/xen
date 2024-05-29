@@ -29,9 +29,14 @@ static int __init cf_check init_nonfatal_mce_checker(void)
 		/* Assume we are on K8 or newer AMD or Hygon CPU here */
 		amd_nonfatal_mcheck_init(c);
 		break;
+
 	case X86_VENDOR_INTEL:
 		intel_nonfatal_mcheck_init(c);
 		break;
+
+	default:
+		/* unhandled vendor isn't really an error */
+		return 0;
 	}
 	printk(KERN_INFO "mcheck_poll: Machine check polling timer started.\n");
 	return 0;
