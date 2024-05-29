@@ -2387,6 +2387,7 @@ int domain_relinquish_resources(struct domain *d)
         enum {
             PROG_iommu_pagetables = 1,
             PROG_shared,
+            PROG_mappings,
             PROG_paging,
             PROG_vcpu_pagetables,
             PROG_xen,
@@ -2434,6 +2435,11 @@ int domain_relinquish_resources(struct domain *d)
             }
         }
 #endif
+
+    PROGRESS(mappings):
+        ret = relinquish_p2m_mapping(d);
+        if ( ret )
+            return ret;
 
     PROGRESS(paging):
 

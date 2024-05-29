@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - On x86:
    - HVM PIRQs are disabled by default.
    - Reduce IOMMU setup time for hardware domain.
+   - Allow HVM/PVH domains to map foreign pages.
  - xl/libxl configures vkb=[] for HVM domains with priority over vkb_device.
  - Increase the maximum number of CPUs Xen can be built for from 4095 to
    16383.

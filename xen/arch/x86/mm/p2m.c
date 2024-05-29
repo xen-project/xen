@@ -1862,10 +1862,6 @@ static int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
     int rc;
     struct domain *fdom;
 
-    /*
-     * hvm fixme: until support is added to p2m teardown code to cleanup any
-     * foreign entries, limit this to hardware domain only.
-     */
     if ( !arch_acquire_resource_check(tdom) )
         return -EPERM;
 
@@ -2065,6 +2061,70 @@ int xenmem_add_to_physmap_one(
 
     if ( page )
         put_page(page);
+
+    return rc;
+}
+
+/*
+ * Remove foreign mappings from the p2m, as that drops the page reference taken
+ * when mapped.
+ */
+int relinquish_p2m_mapping(struct domain *d)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    unsigned long gfn, count = 0;
+    int rc = 0;
+
+    if ( !paging_mode_translate(d) )
+        return 0;
+
+    BUG_ON(!d->is_dying);
+
+    p2m_lock(p2m);
+
+    gfn = p2m->teardown_gfn;
+
+    /* Iterate over the whole p2m on debug builds to ensure correctness. */
+    while ( gfn <= p2m->max_mapped_pfn &&
+            (IS_ENABLED(CONFIG_DEBUG) || p2m->nr_foreign) )
+    {
+        unsigned int order;
+        p2m_type_t t;
+        p2m_access_t a;
+
+        _get_gfn_type_access(p2m, _gfn(gfn), &t, &a, 0, &order, 0);
+        ASSERT(IS_ALIGNED(gfn, 1UL << order));
+
+        if ( t == p2m_map_foreign )
+        {
+            ASSERT(p2m->nr_foreign);
+            ASSERT(order == 0);
+
+            rc = p2m_set_entry(p2m, _gfn(gfn), INVALID_MFN, order, p2m_invalid,
+                               p2m->default_access);
+            if ( rc )
+            {
+                printk(XENLOG_ERR
+                       "%pd: failed to unmap foreign page %" PRI_gfn " order %u error %d\n",
+                       d, gfn, order, rc);
+                ASSERT_UNREACHABLE();
+                break;
+            }
+        }
+
+        gfn += 1UL << order;
+
+        if ( !(++count & 0xff) && hypercall_preempt_check() )
+        {
+            rc = -ERESTART;
+            break;
+        }
+    }
+
+    ASSERT(gfn <= p2m->max_mapped_pfn || !p2m->nr_foreign);
+    p2m->teardown_gfn = gfn;
+
+    p2m_unlock(p2m);
 
     return rc;
 }

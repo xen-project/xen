@@ -383,6 +383,8 @@ struct p2m_domain {
 
     /* Number of foreign mappings. */
     unsigned long      nr_foreign;
+    /* Cursor for iterating over the p2m on teardown. */
+    unsigned long      teardown_gfn;
 #endif /* CONFIG_HVM */
 };
 
@@ -395,16 +397,7 @@ struct p2m_domain {
 #endif
 #include <xen/p2m-common.h>
 
-static inline bool arch_acquire_resource_check(struct domain *d)
-{
-    /*
-     * FIXME: Until foreign pages inserted into the P2M are properly
-     * reference counted, it is unsafe to allow mapping of
-     * resource pages unless the caller is the hardware domain
-     * (see set_foreign_p2m_entry()).
-     */
-    return !paging_mode_translate(d) || is_hardware_domain(d);
-}
+bool arch_acquire_resource_check(const struct domain *d);
 
 /*
  * Updates vCPU's n2pm to match its np2m_base in VMCx12 and returns that np2m.
@@ -720,6 +713,10 @@ p2m_pod_offline_or_broken_hit(struct page_info *p);
 void
 p2m_pod_offline_or_broken_replace(struct page_info *p);
 
+/* Perform cleanup of p2m mappings ahead of teardown. */
+int
+relinquish_p2m_mapping(struct domain *d);
+
 #else
 
 static inline bool
@@ -746,6 +743,11 @@ static inline int p2m_pod_offline_or_broken_hit(struct page_info *p)
 static inline void p2m_pod_offline_or_broken_replace(struct page_info *p)
 {
     ASSERT_UNREACHABLE();
+}
+
+static inline int relinquish_p2m_mapping(struct domain *d)
+{
+    return 0;
 }
 
 #endif
@@ -1043,7 +1045,7 @@ static inline int p2m_entry_modify(struct p2m_domain *p2m, p2m_type_t nt,
         break;
 
     case p2m_map_foreign:
-        if ( !mfn_valid(nfn) )
+        if ( !mfn_valid(nfn) || p2m != p2m_get_hostp2m(p2m->domain) )
         {
             ASSERT_UNREACHABLE();
             return -EINVAL;
@@ -1068,7 +1070,7 @@ static inline int p2m_entry_modify(struct p2m_domain *p2m, p2m_type_t nt,
         break;
 
     case p2m_map_foreign:
-        if ( !mfn_valid(ofn) )
+        if ( !mfn_valid(ofn) || p2m != p2m_get_hostp2m(p2m->domain) )
         {
             ASSERT_UNREACHABLE();
             return -EINVAL;

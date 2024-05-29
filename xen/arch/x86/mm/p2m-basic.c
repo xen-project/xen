@@ -13,6 +13,8 @@
 
 #include <xen/event.h>
 #include <xen/types.h>
+#include <asm/altp2m.h>
+#include <asm/hvm/nestedhvm.h>
 #include <asm/p2m.h>
 #include "mm-locks.h"
 #include "p2m.h"
@@ -205,6 +207,22 @@ void p2m_final_teardown(struct domain *d)
 
     /* Iterate over all p2m tables per domain */
     p2m_teardown_hostp2m(d);
+}
+
+bool arch_acquire_resource_check(const struct domain *d)
+{
+    /*
+     * altp2m is not supported as we would otherwise also need to walk the
+     * altp2m tables and drop any foreign map entries in order to drop the page
+     * reference.
+     *
+     * The same applies to nestedhvm nested p2m tables, as the type from the L0
+     * p2m is replicated into the L1 p2m, and there's no filtering that
+     * prevents foreign mappings from being created in nestedp2m.
+     */
+    return is_pv_domain(d) ||
+           (d->arch.hvm.params[HVM_PARAM_ALTP2M] == XEN_ALTP2M_disabled &&
+            !nestedhvm_enabled(d));
 }
 
 /*
