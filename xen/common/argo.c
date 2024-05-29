@@ -26,7 +26,10 @@
 #include <xen/param.h>
 #include <xen/sched.h>
 #include <xen/time.h>
+
 #include <xsm/xsm.h>
+
+#include <asm/p2m.h>
 
 #include <public/argo.h>
 
