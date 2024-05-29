@@ -143,21 +143,21 @@ build-each-commit-gcc:
   tags:
     - x86_64
 
-xilinx-smoke-dom0less-arm64-gcc:
+xilinx-smoke-dom0less-arm64-gcc-debug:
   extends: .xilinx-arm64
   script:
     - ./automation/scripts/xilinx-smoke-dom0less-arm64.sh 2>&1 | tee ${LOGFILE}
   needs:
     - *arm64-test-needs
-    - alpine-3.18-gcc-arm64
+    - alpine-3.18-gcc-debug-arm64
 
-xilinx-smoke-dom0less-arm64-gcc-gem-passthrough:
+xilinx-smoke-dom0less-arm64-gcc-debug-gem-passthrough:
   extends: .xilinx-arm64
   script:
     - ./automation/scripts/xilinx-smoke-dom0less-arm64.sh gem-passthrough 2>&1 | tee ${LOGFILE}
   needs:
     - *arm64-test-needs
-    - alpine-3.18-gcc-arm64
+    - alpine-3.18-gcc-debug-arm64
 
 adl-smoke-x86-64-gcc-debug:
   extends: .adl-x86-64
