@@ -380,6 +380,9 @@ struct p2m_domain {
         unsigned int flags;
         unsigned long entry_count;
     } ioreq;
+
+    /* Number of foreign mappings. */
+    unsigned long      nr_foreign;
 #endif /* CONFIG_HVM */
 };
 
@@ -1049,6 +1052,8 @@ static inline int p2m_entry_modify(struct p2m_domain *p2m, p2m_type_t nt,
         if ( !page_get_owner_and_reference(mfn_to_page(nfn)) )
             return -EBUSY;
 
+        p2m->nr_foreign++;
+
         break;
 
     default:
@@ -1069,6 +1074,7 @@ static inline int p2m_entry_modify(struct p2m_domain *p2m, p2m_type_t nt,
             return -EINVAL;
         }
         put_page(mfn_to_page(ofn));
+        p2m->nr_foreign--;
         break;
 
     default:
