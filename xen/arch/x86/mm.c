@@ -3411,7 +3411,7 @@ int new_guest_cr3(mfn_t mfn)
 static int vcpumask_to_pcpumask(
     struct domain *d, XEN_GUEST_HANDLE_PARAM(const_void) bmap, cpumask_t *pmask)
 {
-    unsigned int vcpu_id, vcpu_bias, offs;
+    unsigned int vcpu_bias, offs;
     unsigned long vmask;
     struct vcpu *v;
     bool is_native = !is_pv_32bit_domain(d);
@@ -3432,12 +3432,10 @@ static int vcpumask_to_pcpumask(
             return -EFAULT;
         }
 
-        while ( vmask )
+        for_each_set_bit ( vcpu_id, vmask )
         {
             unsigned int cpu;
 
-            vcpu_id = ffsl(vmask) - 1;
-            vmask &= ~(1UL << vcpu_id);
             vcpu_id += vcpu_bias;
             if ( (vcpu_id >= d->max_vcpus) )
                 return 0;
