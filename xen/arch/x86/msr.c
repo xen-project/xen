@@ -24,6 +24,8 @@
 
 #include <public/hvm/params.h>
 
+#include "cpu/mcheck/mce.h" /* for vmce_has_lmce() */
+
 DEFINE_PER_CPU(uint32_t, tsc_aux);
 
 int init_vcpu_msr_policy(struct vcpu *v)

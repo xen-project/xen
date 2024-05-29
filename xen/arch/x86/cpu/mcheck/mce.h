@@ -170,6 +170,11 @@ static inline int mce_bank_msr(const struct vcpu *v, uint32_t msr)
     return 0;
 }
 
+static inline bool vmce_has_lmce(const struct vcpu *v)
+{
+    return v->arch.vmce.mcg_cap & MCG_LMCE_P;
+}
+
 struct mce_callbacks {
     void (*handler)(const struct cpu_user_regs *regs);
     bool (*check_addr)(uint64_t status, uint64_t misc, int addr_type);

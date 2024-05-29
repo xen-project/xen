@@ -203,7 +203,7 @@ int vmce_rdmsr(uint32_t msr, uint64_t *val)
          * bits are always set in guest MSR_IA32_FEATURE_CONTROL by Xen, so it
          * does not need to check them here.
          */
-        if ( cur->arch.vmce.mcg_cap & MCG_LMCE_P )
+        if ( vmce_has_lmce(cur) )
         {
             *val = cur->arch.vmce.mcg_ext_ctl;
             mce_printk(MCE_VERBOSE, "MCE: %pv: rd MCG_EXT_CTL %#"PRIx64"\n",
@@ -332,8 +332,7 @@ int vmce_wrmsr(uint32_t msr, uint64_t val)
         break;
 
     case MSR_IA32_MCG_EXT_CTL:
-        if ( (cur->arch.vmce.mcg_cap & MCG_LMCE_P) &&
-             !(val & ~MCG_EXT_CTL_LMCE_EN) )
+        if ( vmce_has_lmce(cur) && !(val & ~MCG_EXT_CTL_LMCE_EN) )
             cur->arch.vmce.mcg_ext_ctl = val;
         else
             ret = -1;
