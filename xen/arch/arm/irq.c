@@ -31,12 +31,12 @@ struct irq_guest
     unsigned int virq;
 };
 
-static void ack_none(struct irq_desc *irq)
+void irq_ack_none(struct irq_desc *irq)
 {
     printk("unexpected IRQ trap at irq %02x\n", irq->irq);
 }
 
-static void end_none(struct irq_desc *irq)
+void irq_end_none(struct irq_desc *irq)
 {
     /*
      * Still allow a CPU to end an interrupt if we receive a spurious
@@ -51,8 +51,8 @@ hw_irq_controller no_irq_type = {
     .shutdown = irq_shutdown_none,
     .enable = irq_enable_none,
     .disable = irq_disable_none,
-    .ack = ack_none,
-    .end = end_none
+    .ack = irq_ack_none,
+    .end = irq_end_none
 };
 
 static irq_desc_t irq_desc[NR_IRQS];
