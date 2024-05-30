@@ -31,7 +31,6 @@
 #ifndef __XEN_RCUPDATE_H
 #define __XEN_RCUPDATE_H
 
-#include <xen/cache.h>
 #include <xen/compiler.h>
 #include <xen/spinlock.h>
 #include <xen/cpumask.h>
