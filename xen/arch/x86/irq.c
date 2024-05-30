@@ -472,15 +472,6 @@ void cf_check irq_ack_none(struct irq_desc *desc)
     ack_bad_irq(desc->irq);
 }
 
-hw_irq_controller no_irq_type = {
-    "none",
-    irq_startup_none,
-    irq_shutdown_none,
-    irq_enable_none,
-    irq_disable_none,
-    irq_ack_none,
-};
-
 static vmask_t *irq_get_used_vector_mask(int irq)
 {
     vmask_t *ret = NULL;

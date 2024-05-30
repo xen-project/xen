@@ -139,15 +139,6 @@ void irq_ack_none(struct irq_desc *desc)
     BUG_ON("unimplemented");
 }
 
-hw_irq_controller no_irq_type = {
-    .typename = "none",
-    .startup = irq_startup_none,
-    .shutdown = irq_shutdown_none,
-    .enable = irq_enable_none,
-    .disable = irq_disable_none,
-    .ack = irq_ack_none,
-};
-
 int arch_init_one_irq_desc(struct irq_desc *desc)
 {
     BUG_ON("unimplemented");

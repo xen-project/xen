@@ -45,16 +45,6 @@ void irq_end_none(struct irq_desc *irq)
     gic_hw_ops->gic_host_irq_type->end(irq);
 }
 
-hw_irq_controller no_irq_type = {
-    .typename = "none",
-    .startup = irq_startup_none,
-    .shutdown = irq_shutdown_none,
-    .enable = irq_enable_none,
-    .disable = irq_disable_none,
-    .ack = irq_ack_none,
-    .end = irq_end_none
-};
-
 static irq_desc_t irq_desc[NR_IRQS];
 static DEFINE_PER_CPU(irq_desc_t[NR_LOCAL_IRQS], local_irq_desc);
 

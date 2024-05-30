@@ -122,7 +122,7 @@ extern int request_irq(unsigned int irq, unsigned int irqflags,
                void (*handler)(int irq, void *dev_id),
                const char *devname, void *dev_id);
 
-extern hw_irq_controller no_irq_type;
+extern const hw_irq_controller no_irq_type;
 void cf_check no_action(int cpl, void *dev_id);
 unsigned int cf_check irq_startup_none(struct irq_desc *desc);
 void cf_check irq_actor_none(struct irq_desc *desc);

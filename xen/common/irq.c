@@ -3,6 +3,19 @@
 
 DEFINE_PER_CPU(const struct cpu_user_regs *, irq_regs);
 
+const hw_irq_controller no_irq_type = {
+    .typename  = "none",
+    .startup   = irq_startup_none,
+    .shutdown  = irq_shutdown_none,
+    .enable    = irq_enable_none,
+    .disable   = irq_disable_none,
+    .ack       = irq_ack_none,
+
+#ifdef irq_end_none /* Hook is optional per arch */
+    .end       = irq_end_none,
+#endif
+};
+
 int init_one_irq_desc(struct irq_desc *desc)
 {
     int err;
