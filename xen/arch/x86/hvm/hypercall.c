@@ -25,7 +25,6 @@ long hvm_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     switch ( cmd & MEMOP_CMD_MASK )
     {
-    case XENMEM_machine_memory_map:
     case XENMEM_machphys_mapping:
         return -ENOSYS;
     }
