@@ -86,13 +86,6 @@ AC_DEFUN([AX_CHECK_SYSTEMD], [
 	],[systemd=n])
 ])
 
-AC_DEFUN([AX_CHECK_SYSTEMD_ENABLE_AVAILABLE], [
-	PKG_CHECK_MODULES([SYSTEMD], [libsystemd-daemon], [systemd="y"],[
-		PKG_CHECK_MODULES([SYSTEMD], [libsystemd >= 209],
-				  [systemd="y"],[systemd="n"])
-	])
-])
-
 dnl Enables systemd by default and requires a --disable-systemd option flag
 dnl to configure if you want to disable.
 AC_DEFUN([AX_ENABLE_SYSTEMD], [
@@ -112,6 +105,5 @@ dnl to have systemd build libraries it will be enabled. You can always force
 dnl disable with --disable-systemd
 AC_DEFUN([AX_AVAILABLE_SYSTEMD], [
 	AX_ALLOW_SYSTEMD_OPTS()
-	AX_CHECK_SYSTEMD_ENABLE_AVAILABLE()
 	AX_CHECK_SYSTEMD()
 ])
