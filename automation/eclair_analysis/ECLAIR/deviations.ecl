@@ -473,7 +473,7 @@ deliberate."
 -doc_begin="Uses of a macro parameter for ordinary expansion and as an operand
 to the # or ## operators within the following macros are deliberate, to provide
 useful diagnostic messages to the user."
--config=MC3R1.R20.12,macros+={deliberate, "name(ASSERT||BUILD_BUG_ON||BUILD_BUG_ON_ZERO)"}
+-config=MC3R1.R20.12,macros+={deliberate, "name(ASSERT||BUILD_BUG_ON||BUILD_BUG_ON_ZERO||RUNTIME_CHECK)"}
 -doc_end
 
 -doc_begin="The helper macro GENERATE_CASE may use a macro parameter for ordinary

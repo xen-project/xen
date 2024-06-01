@@ -16,7 +16,7 @@
  * Clang < 8 can't fold constants through static inlines, causing this to
  * fail.  Simply skip it for incredibly old compilers.
  */
-#if !CONFIG_CC_IS_CLANG || CONFIG_CLANG_VERSION >= 80000
+#if !defined(CONFIG_CC_IS_CLANG) || CONFIG_CLANG_VERSION >= 80000
 #define COMPILE_CHECK(fn, val, res)                                     \
     do {                                                                \
         typeof(fn(val)) real = fn(val);                                 \
