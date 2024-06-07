@@ -483,6 +483,12 @@ leads to a violation of the Rule are deviated."
 -config=MC3R1.R20.12,macros+={deliberate, "name(GENERATE_CASE)&&loc(file(deliberate_generate_case))"}
 -doc_end
 
+-doc_begin="The macro DEFINE is defined and used in excluded files asm-offsets.c.
+This may still cause violations if entities outside these files are referred to
+in the expansion."
+-config=MC3R1.R20.12,macros+={deliberate, "name(DEFINE)&&loc(file(asm_offsets))"}
+-doc_end
+
 #
 # Series 21.
 #
