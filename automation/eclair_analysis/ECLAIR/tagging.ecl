@@ -60,6 +60,7 @@ MC3R1.R11.7||
 MC3R1.R11.9||
 MC3R1.R12.5||
 MC3R1.R14.1||
+MC3R1.R14.4||
 MC3R1.R16.7||
 MC3R1.R17.1||
 MC3R1.R17.3||
@@ -73,6 +74,7 @@ MC3R1.R20.4||
 MC3R1.R20.6||
 MC3R1.R20.9||
 MC3R1.R20.11||
+MC3R1.R20.12||
 MC3R1.R20.13||
 MC3R1.R20.14||
 MC3R1.R21.3||
@@ -105,7 +107,7 @@ if(string_equal(target,"x86_64"),
 )
 
 if(string_equal(target,"arm64"),
-    service_selector({"additional_clean_guidelines","MC3R1.R14.4||MC3R1.R16.6||MC3R1.R20.12||MC3R1.R2.1||MC3R1.R5.3||MC3R1.R7.2||MC3R1.R7.3||MC3R1.R8.6||MC3R1.R9.3"})
+    service_selector({"additional_clean_guidelines","MC3R1.R16.6||MC3R1.R2.1||MC3R1.R5.3||MC3R1.R7.3"})
 )
 
 -reports+={clean:added,"service(clean_guidelines_common||additional_clean_guidelines)"}
