@@ -28,6 +28,9 @@ struct tee_mediator_ops {
      */
     bool (*probe)(void);
 
+    /* Initialize secondary CPUs */
+    void (*init_secondary)(void);
+
     /*
      * Called during domain construction if toolstack requests to enable
      * TEE support so mediator can inform TEE about new
@@ -66,6 +69,7 @@ int tee_domain_init(struct domain *d, uint16_t tee_type);
 int tee_domain_teardown(struct domain *d);
 int tee_relinquish_resources(struct domain *d);
 uint16_t tee_get_type(void);
+void init_tee_secondary(void);
 
 #define REGISTER_TEE_MEDIATOR(_name, _namestr, _type, _ops)         \
 static const struct tee_mediator_desc __tee_desc_##_name __used     \
@@ -103,6 +107,10 @@ static inline int tee_domain_teardown(struct domain *d)
 static inline uint16_t tee_get_type(void)
 {
     return XEN_DOMCTL_CONFIG_TEE_NONE;
+}
+
+static inline void init_tee_secondary(void)
+{
 }
 
 #endif  /* CONFIG_TEE */

@@ -29,6 +29,7 @@
 #include <asm/procinfo.h>
 #include <asm/psci.h>
 #include <asm/acpi.h>
+#include <asm/tee/tee.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef virt_to_mfn
@@ -401,6 +402,7 @@ void asmlinkage start_secondary(void)
      */
     init_maintenance_interrupt();
     init_timer_interrupt();
+    init_tee_secondary();
 
     local_abort_enable();
 
