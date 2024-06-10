@@ -161,7 +161,20 @@ Requires hardware virtualisation support (Intel VMX / AMD SVM).
 Dom0 support requires an IOMMU (Intel VT-d / AMD IOMMU).
 
     Status, domU: Supported
-    Status, dom0: Experimental
+    Status, dom0: Supported, with caveats
+
+PVH dom0 hasn't received the same test coverage as PV dom0, so it can exhibit
+unexpected behavior or issues on some hardware.
+
+At least the following features are missing on a PVH dom0:
+
+  * PCI SR-IOV and Resizable BARs.
+
+  * Native NMI forwarding (nmi=dom0 command line option).
+
+  * MCE handling.
+
+  * PCI Passthrough to any kind of domUs.
 
 ### ARM
 
