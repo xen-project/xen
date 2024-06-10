@@ -505,6 +505,7 @@ typedef uint64_t xen_callback_t;
 #define GUEST_MAX_VCPUS 128
 
 /* Interrupts */
+
 #define GUEST_TIMER_VIRT_PPI    27
 #define GUEST_TIMER_PHYS_S_PPI  29
 #define GUEST_TIMER_PHYS_NS_PPI 30
@@ -514,6 +515,19 @@ typedef uint64_t xen_callback_t;
 
 #define GUEST_VIRTIO_MMIO_SPI_FIRST   33
 #define GUEST_VIRTIO_MMIO_SPI_LAST    43
+
+/*
+ * SGI is the preferred delivery mechanism of FF-A pending notifications or
+ * schedule recveive interrupt. SGIs 8-15 are normally not used by a guest
+ * as they in a non-virtualized system typically are assigned to the secure
+ * world. Here we're free to use SGI 8-15 since they are virtual and have
+ * nothing to do with the secure world.
+ *
+ * For partitioning of SGIs see also Arm Base System Architecture v1.0C,
+ * https://developer.arm.com/documentation/den0094/
+ */
+#define GUEST_FFA_NOTIF_PEND_INTR_ID      8
+#define GUEST_FFA_SCHEDULE_RECV_INTR_ID   9
 
 /* PSCI functions */
 #define PSCI_cpu_suspend 0

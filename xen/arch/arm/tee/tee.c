@@ -94,7 +94,7 @@ static int __init tee_init(void)
     return 0;
 }
 
-__initcall(tee_init);
+presmp_initcall(tee_init);
 
 void __init init_tee_secondary(void)
 {
