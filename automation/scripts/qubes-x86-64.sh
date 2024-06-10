@@ -19,8 +19,8 @@ vif = [ "bridge=xenbr0", ]
 disk = [ ]
 '
 
-### test: smoke test & smoke test PVH
-if [ -z "${test_variant}" ] || [ "${test_variant}" = "dom0pvh" ]; then
+### test: smoke test & smoke test PVH & smoke test HVM
+if [ -z "${test_variant}" ] || [ "${test_variant}" = "dom0pvh" ] || [ "${test_variant}" = "dom0pvh-hvm" ]; then
     passed="ping test passed"
     domU_check="
 ifconfig eth0 192.168.0.2
@@ -37,8 +37,21 @@ done
 set -x
 echo \"${passed}\"
 "
-if [ "${test_variant}" = "dom0pvh" ]; then
+if [ "${test_variant}" = "dom0pvh" ] || [ "${test_variant}" = "dom0pvh-hvm" ]; then
     extra_xen_opts="dom0=pvh"
+fi
+
+if [ "${test_variant}" = "dom0pvh-hvm" ]; then
+    domU_config='
+type = "hvm"
+name = "domU"
+kernel = "/boot/vmlinuz"
+ramdisk = "/boot/initrd-domU"
+extra = "root=/dev/ram0 console=hvc0"
+memory = 512
+vif = [ "bridge=xenbr0", ]
+disk = [ ]
+'
 fi
 
 ### test: S3
