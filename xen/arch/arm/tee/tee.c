@@ -102,6 +102,12 @@ void __init init_tee_secondary(void)
         cur_mediator->ops->init_secondary();
 }
 
+void tee_free_domain_ctx(struct domain *d)
+{
+    if ( cur_mediator && cur_mediator->ops->free_domain_ctx)
+        cur_mediator->ops->free_domain_ctx(d);
+}
+
 /*
  * Local variables:
  * mode: C

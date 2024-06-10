@@ -843,6 +843,7 @@ int arch_domain_teardown(struct domain *d)
 
 void arch_domain_destroy(struct domain *d)
 {
+    tee_free_domain_ctx(d);
     /* IOMMU page table is shared with P2M, always call
      * iommu_domain_destroy() before p2m_final_teardown().
      */

@@ -38,6 +38,7 @@ struct tee_mediator_ops {
      */
     int (*domain_init)(struct domain *d);
     int (*domain_teardown)(struct domain *d);
+    void (*free_domain_ctx)(struct domain *d);
 
     /*
      * Called during domain destruction to relinquish resources used
@@ -70,6 +71,7 @@ int tee_domain_teardown(struct domain *d);
 int tee_relinquish_resources(struct domain *d);
 uint16_t tee_get_type(void);
 void init_tee_secondary(void);
+void tee_free_domain_ctx(struct domain *d);
 
 #define REGISTER_TEE_MEDIATOR(_name, _namestr, _type, _ops)         \
 static const struct tee_mediator_desc __tee_desc_##_name __used     \
@@ -110,6 +112,10 @@ static inline uint16_t tee_get_type(void)
 }
 
 static inline void init_tee_secondary(void)
+{
+}
+
+static inline void tee_free_domain_ctx(struct domain *d)
 {
 }
 
