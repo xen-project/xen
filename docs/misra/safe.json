@@ -52,6 +52,14 @@
         },
         {
             "id": "SAF-6-safe",
+            "analyser": {
+                "eclair": "MC3R1.R20.12"
+            },
+            "name": "MC3R1.R20.12: use of a macro argument that deliberately violates the Rule",
+            "text": "A macro parameter that is itself a macro is intentionally used within the macro both as a regular parameter and for text replacement."
+        },
+        {
+            "id": "SAF-7-safe",
             "analyser": {},
             "name": "Sentinel",
             "text": "Next ID to be used"
