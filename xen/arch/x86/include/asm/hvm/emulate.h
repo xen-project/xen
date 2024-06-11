@@ -37,8 +37,8 @@ struct hvm_emulate_ctxt {
     unsigned int insn_buf_bytes;
 
     struct segment_register seg_reg[10];
-    unsigned long seg_reg_accessed;
-    unsigned long seg_reg_dirty;
+    unsigned int seg_reg_accessed;
+    unsigned int seg_reg_dirty;
 
     /*
      * MFNs behind temporary mappings in the write callback.  The length is
