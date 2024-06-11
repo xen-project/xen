@@ -1517,9 +1517,7 @@ void evtchn_check_pollers(struct domain *d, unsigned int port)
         return;
 
     /* Wake any interested (or potentially interested) pollers. */
-    for ( vcpuid = find_first_bit(d->poll_mask, d->max_vcpus);
-          vcpuid < d->max_vcpus;
-          vcpuid = find_next_bit(d->poll_mask, d->max_vcpus, vcpuid+1) )
+    bitmap_for_each ( vcpuid, d->poll_mask, d->max_vcpus )
     {
         v = d->vcpu[vcpuid];
         if ( ((v->poll_evtchn <= 0) || (v->poll_evtchn == port)) &&
