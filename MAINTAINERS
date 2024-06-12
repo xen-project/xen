@@ -490,6 +490,7 @@ F:	xen/common/sched/rt.c
 SCHEDULING
 M:	George Dunlap <george.dunlap@citrix.com>
 M:	Dario Faggioli <dfaggioli@suse.com>
+M:	Juergen Gross <jgross@suse.com>
 S:	Supported
 F:	xen/common/sched/
 
