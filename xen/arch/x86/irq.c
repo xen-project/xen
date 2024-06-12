@@ -2516,7 +2516,7 @@ static int __init cf_check setup_dump_irqs(void)
 }
 __initcall(setup_dump_irqs);
 
-/* Reset irq affinities to match the given CPU mask. */
+/* Evacuate interrupts assigned to CPUs not present in the input CPU mask. */
 void fixup_irqs(const cpumask_t *mask, bool verbose)
 {
     unsigned int irq;
@@ -2540,19 +2540,15 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
 
         vector = irq_to_vector(irq);
         if ( vector >= FIRST_HIPRIORITY_VECTOR &&
-             vector <= LAST_HIPRIORITY_VECTOR )
+             vector <= LAST_HIPRIORITY_VECTOR &&
+             desc->handler == &no_irq_type )
         {
-            cpumask_and(desc->arch.cpu_mask, desc->arch.cpu_mask, mask);
-
             /*
              * This can in particular happen when parking secondary threads
              * during boot and when the serial console wants to use a PCI IRQ.
              */
-            if ( desc->handler == &no_irq_type )
-            {
-                spin_unlock(&desc->lock);
-                continue;
-            }
+            spin_unlock(&desc->lock);
+            continue;
         }
 
         if ( desc->arch.move_cleanup_count )
@@ -2573,7 +2569,12 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
                                affinity);
         }
 
-        if ( !desc->action || cpumask_subset(desc->affinity, mask) )
+        /*
+         * Avoid shuffling the interrupt around as long as current target CPUs
+         * are a subset of the input mask.  What fixup_irqs() cares about is
+         * evacuating interrupts from CPUs not in the input mask.
+         */
+        if ( !desc->action || cpumask_subset(desc->arch.cpu_mask, mask) )
         {
             spin_unlock(&desc->lock);
             continue;

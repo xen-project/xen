@@ -168,7 +168,7 @@ void free_domain_pirqs(struct domain *d);
 int map_domain_emuirq_pirq(struct domain *d, int pirq, int emuirq);
 int unmap_domain_pirq_emuirq(struct domain *d, int pirq);
 
-/* Reset irq affinities to match the given CPU mask. */
+/* Evacuate interrupts assigned to CPUs not present in the input CPU mask. */
 void fixup_irqs(const cpumask_t *mask, bool verbose);
 void fixup_eoi(void);
 
