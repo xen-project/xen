@@ -316,6 +316,8 @@ static always_inline void write_lock_irq(rwlock_t *l)
 
 #define rw_is_locked(l)               _rw_is_locked(l)
 #define rw_is_write_locked(l)         _rw_is_write_locked(l)
+#define rw_is_write_locked_by_me(l) \
+    lock_evaluate_nospec(_is_write_locked_by_me(atomic_read(&(l)->cnts)))
 
 
 typedef struct percpu_rwlock percpu_rwlock_t;
