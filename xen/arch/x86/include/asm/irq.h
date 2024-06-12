@@ -28,6 +28,44 @@ typedef struct {
 
 struct irq_desc;
 
+/*
+ * Xen logic for moving interrupts around CPUs allows manipulating interrupts
+ * that target remote CPUs.  The logic to move an interrupt from CPU(s) is as
+ * follows:
+ *
+ * 1. irq_set_affinity() is called with the new destination mask, such mask is
+ *    copied into pending_mask and IRQ_MOVE_PENDING is set in status to notice
+ *    an affinity change has been requested.
+ * 2. An interrupt acked with the IRQ_MOVE_PENDING will trigger the logic to
+ *    migrate it to a destination in pending_mask as long as the mask contains
+ *    any online CPUs.
+ * 3. cpu_mask and vector is copied to old_cpu_mask and old_vector.
+ * 4. New cpu_mask and vector are set, vector is setup at the new destination.
+ * 5. move_in_progress is set.
+ * 6. Interrupt source is updated to target new CPU and vector.
+ * 7. Interrupts arriving at old_cpu_mask are processed normally.
+ * 8. When the first interrupt is delivered at the new destination (cpu_mask) as
+ *    part of acking the interrupt the cleanup of the old destination(s) is
+ *    engaged.  move_in_progress is cleared and old_cpu_mask is
+ *    reduced to the online CPUs.  If the result is empty the old vector is
+ *    released.  Otherwise move_cleanup_count is set to the weight of online
+ *    CPUs in old_cpu_mask and IRQ_MOVE_CLEANUP_VECTOR is sent to them.
+ * 9. When receiving IRQ_MOVE_CLEANUP_VECTOR CPUs in old_cpu_mask clean the
+ *    vector entry and decrease the count in move_cleanup_count.  The CPU that
+ *    sets move_cleanup_count to 0 releases the vector.
+ *
+ * Note that when interrupt movement (either move_in_progress or
+ * move_cleanup_count set) is in progress it's not possible to move the
+ * interrupt to yet a different CPU.
+ *
+ * Interrupt movements done by fixup_irqs() skip setting IRQ_MOVE_PENDING and
+ * pending_mask as the movement must be performed right away, and so start
+ * directly from step 3.
+ *
+ * By keeping the vector in the old CPU(s) configured until the interrupt is
+ * acked on the new destination Xen allows draining any pending interrupts at
+ * the old destinations.
+ */
 struct arch_irq_desc {
         s16 vector;                  /* vector itself is only 8 bits, */
         s16 old_vector;              /* but we use -1 for unassigned  */
