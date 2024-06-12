@@ -18,9 +18,9 @@
 #include <xsm/xsm.h>
 #include <asm/p2m.h>
 
-int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
+int physdev_map_pirq(struct domain *d, int type, int *index, int *pirq_p,
                      struct msi_info *msi);
-int physdev_unmap_pirq(domid_t domid, int pirq);
+int physdev_unmap_pirq(struct domain *d, int pirq);
 
 #include "x86_64/mmconfig.h"
 
@@ -88,13 +88,12 @@ static int physdev_hvm_map_pirq(
     return ret;
 }
 
-int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
+int physdev_map_pirq(struct domain *d, int type, int *index, int *pirq_p,
                      struct msi_info *msi)
 {
-    struct domain *d = current->domain;
     int ret;
 
-    if ( domid == DOMID_SELF && is_hvm_domain(d) && has_pirq(d) )
+    if ( d == current->domain && is_hvm_domain(d) && has_pirq(d) )
     {
         /*
          * Only makes sense for vector-based callback, else HVM-IRQ logic
@@ -106,13 +105,9 @@ int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
         return physdev_hvm_map_pirq(d, type, index, pirq_p);
     }
 
-    d = rcu_lock_domain_by_any_id(domid);
-    if ( d == NULL )
-        return -ESRCH;
-
     ret = xsm_map_domain_pirq(XSM_DM_PRIV, d);
     if ( ret )
-        goto free_domain;
+        return ret;
 
     /* Verify or get irq. */
     switch ( type )
@@ -135,24 +130,17 @@ int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
         break;
     }
 
- free_domain:
-    rcu_unlock_domain(d);
     return ret;
 }
 
-int physdev_unmap_pirq(domid_t domid, int pirq)
+int physdev_unmap_pirq(struct domain *d, int pirq)
 {
-    struct domain *d;
     int ret = 0;
 
-    d = rcu_lock_domain_by_any_id(domid);
-    if ( d == NULL )
-        return -ESRCH;
-
-    if ( domid != DOMID_SELF || !is_hvm_domain(d) || !has_pirq(d) )
+    if ( d != current->domain || !is_hvm_domain(d) || !has_pirq(d) )
         ret = xsm_unmap_domain_pirq(XSM_DM_PRIV, d);
     if ( ret )
-        goto free_domain;
+        return ret;
 
     if ( is_hvm_domain(d) && has_pirq(d) )
     {
@@ -160,8 +148,8 @@ int physdev_unmap_pirq(domid_t domid, int pirq)
         if ( domain_pirq_to_emuirq(d, pirq) != IRQ_UNBOUND )
             ret = unmap_domain_pirq_emuirq(d, pirq);
         write_unlock(&d->event_lock);
-        if ( domid == DOMID_SELF || ret )
-            goto free_domain;
+        if ( d == current->domain || ret )
+            return ret;
     }
 
     pcidevs_lock();
@@ -170,8 +158,6 @@ int physdev_unmap_pirq(domid_t domid, int pirq)
     write_unlock(&d->event_lock);
     pcidevs_unlock();
 
- free_domain:
-    rcu_unlock_domain(d);
     return ret;
 }
 #endif /* COMPAT */
@@ -180,7 +166,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     int irq;
     ret_t ret;
-    struct domain *currd = current->domain;
+    struct domain *d, *currd = current->domain;
 
     switch ( cmd )
     {
@@ -331,8 +317,15 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         msi.sbdf.devfn = map.devfn;
         msi.entry_nr = map.entry_nr;
         msi.table_base = map.table_base;
-        ret = physdev_map_pirq(map.domid, map.type, &map.index, &map.pirq,
-                               &msi);
+
+        d = rcu_lock_domain_by_any_id(map.domid);
+        ret = -ESRCH;
+        if ( !d )
+            break;
+
+        ret = physdev_map_pirq(d, map.type, &map.index, &map.pirq, &msi);
+
+        rcu_unlock_domain(d);
 
         if ( map.type == MAP_PIRQ_TYPE_MULTI_MSI )
             map.entry_nr = msi.entry_nr;
@@ -348,7 +341,15 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&unmap, arg, 1) != 0 )
             break;
 
-        ret = physdev_unmap_pirq(unmap.domid, unmap.pirq);
+        d = rcu_lock_domain_by_any_id(unmap.domid);
+        ret = -ESRCH;
+        if ( !d )
+            break;
+
+        ret = physdev_unmap_pirq(d, unmap.pirq);
+
+        rcu_unlock_domain(d);
+
         break;
     }
 
