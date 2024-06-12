@@ -308,7 +308,9 @@ F:	automation/eclair_analysis/
 F:	automation/scripts/eclair
 
 EFI
-M:	Jan Beulich <jbeulich@suse.com>
+M:	Daniel P. Smith <dpsmith@apertussolutions.com>
+M:	Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>
+R:	Jan Beulich <jbeulich@suse.com>
 S:	Supported
 F:	xen/arch/x86/efi/
 F:	xen/arch/x86/include/asm/efi*.h
