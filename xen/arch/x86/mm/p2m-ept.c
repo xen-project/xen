@@ -519,8 +519,12 @@ int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
     }
 
     for ( special_pgs = i = 0; i < (1ul << order); i++ )
-        if ( is_special_page(mfn_to_page(mfn_add(mfn, i))) )
+    {
+        mfn_t cur = mfn_add(mfn, i);
+
+        if ( mfn_valid(cur) && is_special_page(mfn_to_page(cur)) )
             special_pgs++;
+    }
 
     if ( special_pgs )
     {
