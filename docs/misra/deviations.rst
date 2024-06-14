@@ -364,6 +364,15 @@ Deviations related to MISRA C:2012 Rules:
        by `stdarg.h`.
      - Tagged as `deliberate` for ECLAIR.
 
+   * - R17.7
+     - Not using the return value of a function does not endanger safety if it
+       coincides with an actual argument.
+     - Tagged as `safe` for ECLAIR. Such functions are:
+         - __builtin_memcpy()
+         - __builtin_memmove()
+         - __builtin_memset()
+         - cpumask_check()
+
    * - R20.4
      - The override of the keyword \"inline\" in xen/compiler.h is present so
        that section contents checks pass when the compiler chooses not to

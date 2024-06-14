@@ -413,6 +413,10 @@ explicit comment indicating the fallthrough intention is present."
 -config=MC3R1.R17.1,macros+={hide , "^va_(arg|start|copy|end)$"}
 -doc_end
 
+-doc_begin="Not using the return value of a function does not endanger safety if it coincides with an actual argument."
+-config=MC3R1.R17.7,calls+={safe, "any()", "decl(name(__builtin_memcpy||__builtin_memmove||__builtin_memset||cpumask_check))"}
+-doc_end
+
 #
 # Series 18.
 #
