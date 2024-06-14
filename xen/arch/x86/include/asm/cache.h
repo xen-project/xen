@@ -9,6 +9,7 @@
 #define L1_CACHE_SHIFT	(CONFIG_X86_L1_CACHE_SHIFT)
 #define L1_CACHE_BYTES	(1 << L1_CACHE_SHIFT)
 
+/* TODO: Phase out the use of this via cache.h */
 #define __read_mostly __section(".data.read_mostly")
 
 #ifndef __ASSEMBLY__
