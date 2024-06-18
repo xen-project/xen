@@ -544,7 +544,58 @@ static int _assign_irq_vector(struct irq_desc *desc, const cpumask_t *mask)
     }
 
     if ( desc->arch.move_in_progress || desc->arch.move_cleanup_count )
-        return -EAGAIN;
+    {
+        /*
+         * If the current destination is online refuse to shuffle.  Retry after
+         * the in-progress movement has finished.
+         */
+        if ( cpumask_intersects(desc->arch.cpu_mask, &cpu_online_map) )
+            return -EAGAIN;
+
+        /*
+         * Due to the logic in fixup_irqs() that clears offlined CPUs from
+         * ->arch.old_cpu_mask it shouldn't be possible to get here with
+         * ->arch.move_{in_progress,cleanup_count} set and no online CPUs in
+         * ->arch.old_cpu_mask.
+         */
+        ASSERT(valid_irq_vector(desc->arch.old_vector));
+        ASSERT(cpumask_intersects(desc->arch.old_cpu_mask, &cpu_online_map));
+
+        if ( cpumask_intersects(desc->arch.old_cpu_mask, mask) )
+        {
+            /*
+             * Fallback to the old destination if moving is in progress and the
+             * current destination is to be offlined.  This is only possible if
+             * the CPUs in old_cpu_mask intersect with the affinity mask passed
+             * in the 'mask' parameter.
+             */
+            desc->arch.vector = desc->arch.old_vector;
+            cpumask_and(desc->arch.cpu_mask, desc->arch.old_cpu_mask, mask);
+
+            /* Undo any possibly done cleanup. */
+            for_each_cpu(cpu, desc->arch.cpu_mask)
+                per_cpu(vector_irq, cpu)[desc->arch.vector] = irq;
+
+            /* Cancel the pending move and release the current vector. */
+            desc->arch.old_vector = IRQ_VECTOR_UNASSIGNED;
+            cpumask_clear(desc->arch.old_cpu_mask);
+            desc->arch.move_in_progress = 0;
+            desc->arch.move_cleanup_count = 0;
+            if ( desc->arch.used_vectors )
+            {
+                ASSERT(test_bit(old_vector, desc->arch.used_vectors));
+                clear_bit(old_vector, desc->arch.used_vectors);
+            }
+
+            return 0;
+        }
+
+        /*
+         * There's an interrupt movement in progress but the destination(s) in
+         * ->arch.old_cpu_mask are not suitable given the 'mask' parameter, go
+         * through the full logic to find a new vector in a suitable CPU.
+         */
+    }
 
     err = -ENOSPC;
 
@@ -600,7 +651,22 @@ next:
         current_vector = vector;
         current_offset = offset;
 
-        if ( valid_irq_vector(old_vector) )
+        if ( desc->arch.move_in_progress || desc->arch.move_cleanup_count )
+        {
+            ASSERT(!cpumask_intersects(desc->arch.cpu_mask, &cpu_online_map));
+            /*
+             * Special case when evacuating an interrupt from a CPU to be
+             * offlined and the interrupt was already in the process of being
+             * moved.  Leave ->arch.old_{vector,cpu_mask} as-is and just
+             * replace ->arch.{cpu_mask,vector} with the new destination.
+             * Cleanup will be done normally for the old fields, just release
+             * the current vector here.
+             */
+            if ( desc->arch.used_vectors &&
+                 !test_and_clear_bit(old_vector, desc->arch.used_vectors) )
+                ASSERT_UNREACHABLE();
+        }
+        else if ( valid_irq_vector(old_vector) )
         {
             cpumask_and(desc->arch.old_cpu_mask, desc->arch.cpu_mask,
                         &cpu_online_map);
@@ -2605,33 +2671,6 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
         {
             spin_unlock(&desc->lock);
             continue;
-        }
-
-        /*
-         * In order for the affinity adjustment below to be successful, we
-         * need _assign_irq_vector() to succeed. This in particular means
-         * clearing desc->arch.move_in_progress if this would otherwise
-         * prevent the function from succeeding. Since there's no way for the
-         * flag to get cleared anymore when there's no possible destination
-         * left (the only possibility then would be the IRQs enabled window
-         * after this loop), there's then also no race with us doing it here.
-         *
-         * Therefore the logic here and there need to remain in sync.
-         */
-        if ( desc->arch.move_in_progress &&
-             !cpumask_intersects(mask, desc->arch.cpu_mask) )
-        {
-            unsigned int cpu;
-
-            cpumask_and(affinity, desc->arch.old_cpu_mask, &cpu_online_map);
-
-            spin_lock(&vector_lock);
-            for_each_cpu(cpu, affinity)
-                per_cpu(vector_irq, cpu)[desc->arch.old_vector] = ~irq;
-            spin_unlock(&vector_lock);
-
-            release_old_vec(desc);
-            desc->arch.move_in_progress = 0;
         }
 
         if ( !cpumask_intersects(mask, desc->affinity) )
