@@ -2327,7 +2327,7 @@ static void cf_check vmx_sync_pir_to_irr(struct vcpu *v)
     for ( group = 0; group < ARRAY_SIZE(pending_intr); group++ )
         pending_intr[group] = pi_get_pir(&v->arch.hvm.vmx.pi_desc, group);
 
-    for_each_set_bit(i, pending_intr, X86_NR_VECTORS)
+    bitmap_for_each ( i, pending_intr, X86_NR_VECTORS )
         vlapic_set_vector(i, &vlapic->regs->data[APIC_IRR]);
 }
 

@@ -429,7 +429,7 @@ void vgic_set_irqs_pending(struct vcpu *v, uint32_t r, unsigned int rank)
     /* LPIs will never be set pending via this function */
     ASSERT(!is_lpi(32 * rank + 31));
 
-    for_each_set_bit( i, &mask, 32 )
+    bitmap_for_each ( i, &mask, 32 )
     {
         unsigned int irq = i + 32 * rank;
 
@@ -483,7 +483,7 @@ bool vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode,
         perfc_incr(vgic_sgi_list);
         base = target->aff1 << 4;
         bitmap = target->list;
-        for_each_set_bit( i, &bitmap, sizeof(target->list) * 8 )
+        bitmap_for_each ( i, &bitmap, sizeof(target->list) * 8 )
         {
             vcpuid = base + i;
             if ( vcpuid >= d->max_vcpus || d->vcpu[vcpuid] == NULL ||
@@ -728,7 +728,7 @@ void vgic_check_inflight_irqs_pending(struct domain *d, struct vcpu *v,
     const unsigned long mask = r;
     unsigned int i;
 
-    for_each_set_bit( i, &mask, 32 )
+    bitmap_for_each ( i, &mask, 32 )
     {
         struct pending_irq *p;
         struct vcpu *v_target;

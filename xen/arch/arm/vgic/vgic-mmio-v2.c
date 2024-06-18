@@ -108,7 +108,7 @@ static void vgic_mmio_write_sgir(struct vcpu *source_vcpu,
         return;
     }
 
-    for_each_set_bit( vcpu_id, &targets, 8 )
+    bitmap_for_each ( vcpu_id, &targets, 8 )
     {
         struct vcpu *vcpu = d->vcpu[vcpu_id];
         struct vgic_irq *irq = vgic_get_irq(d, vcpu, intid);

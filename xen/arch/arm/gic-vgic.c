@@ -111,7 +111,7 @@ static unsigned int gic_find_unused_lr(struct vcpu *v,
     {
         unsigned int used_lr;
 
-        for_each_set_bit(used_lr, lr_mask, nr_lrs)
+        bitmap_for_each ( used_lr, lr_mask, nr_lrs )
         {
             gic_hw_ops->read_lr(used_lr, &lr_val);
             if ( lr_val.virq == p->irq )

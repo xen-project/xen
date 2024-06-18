@@ -71,7 +71,7 @@ void vgic_mmio_write_senable(struct vcpu *vcpu,
     uint32_t intid = VGIC_ADDR_TO_INTID(addr, 1);
     unsigned int i;
 
-    for_each_set_bit( i, &val, len * 8 )
+    bitmap_for_each ( i, &val, len * 8 )
     {
         struct vgic_irq *irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
         unsigned long flags;
@@ -116,7 +116,7 @@ void vgic_mmio_write_cenable(struct vcpu *vcpu,
     uint32_t intid = VGIC_ADDR_TO_INTID(addr, 1);
     unsigned int i;
 
-    for_each_set_bit( i, &val, len * 8 )
+    bitmap_for_each ( i, &val, len * 8 )
     {
         struct vgic_irq *irq;
         unsigned long flags;
@@ -186,7 +186,7 @@ void vgic_mmio_write_spending(struct vcpu *vcpu,
     unsigned long flags;
     irq_desc_t *desc;
 
-    for_each_set_bit( i, &val, len * 8 )
+    bitmap_for_each ( i, &val, len * 8 )
     {
         struct vgic_irq *irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
 
@@ -234,7 +234,7 @@ void vgic_mmio_write_cpending(struct vcpu *vcpu,
     unsigned long flags;
     irq_desc_t *desc;
 
-    for_each_set_bit( i, &val, len * 8 )
+    bitmap_for_each ( i, &val, len * 8 )
     {
         struct vgic_irq *irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
 
@@ -328,7 +328,7 @@ void vgic_mmio_write_cactive(struct vcpu *vcpu,
     uint32_t intid = VGIC_ADDR_TO_INTID(addr, 1);
     unsigned int i;
 
-    for_each_set_bit( i, &val, len * 8 )
+    bitmap_for_each ( i, &val, len * 8 )
     {
         struct vgic_irq *irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
 
@@ -358,7 +358,7 @@ void vgic_mmio_write_sactive(struct vcpu *vcpu,
     uint32_t intid = VGIC_ADDR_TO_INTID(addr, 1);
     unsigned int i;
 
-    for_each_set_bit( i, &val, len * 8 )
+    bitmap_for_each ( i, &val, len * 8 )
     {
         struct vgic_irq *irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
 

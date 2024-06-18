@@ -606,7 +606,7 @@ unsigned int xstate_uncompressed_size(uint64_t xcr0)
      * with respect their index.
      */
     xcr0 &= ~(X86_XCR0_SSE | X86_XCR0_X87);
-    for_each_set_bit ( i, &xcr0, 63 )
+    bitmap_for_each ( i, &xcr0, 63 )
     {
         const struct xstate_component *c = &raw_cpu_policy.xstate.comp[i];
         unsigned int s = c->offset + c->size;
@@ -634,7 +634,7 @@ unsigned int xstate_compressed_size(uint64_t xstates)
      * componenets require aligning to 64 first.
      */
     xstates &= ~(X86_XCR0_SSE | X86_XCR0_X87);
-    for_each_set_bit ( i, &xstates, 63 )
+    bitmap_for_each ( i, &xstates, 63 )
     {
         const struct xstate_component *c = &raw_cpu_policy.xstate.comp[i];
 

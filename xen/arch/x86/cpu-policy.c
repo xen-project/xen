@@ -157,7 +157,7 @@ static void zero_leaves(struct cpuid_leaf *l,
 
 static void sanitise_featureset(uint32_t *fs)
 {
-    /* for_each_set_bit() uses unsigned longs.  Extend with zeroes. */
+    /* bitmap_for_each() uses unsigned longs.  Extend with zeroes. */
     uint32_t disabled_features[
         ROUNDUP(FSCAPINTS, sizeof(unsigned long)/sizeof(uint32_t))] = {};
     unsigned int i;
@@ -174,8 +174,8 @@ static void sanitise_featureset(uint32_t *fs)
         disabled_features[i] = ~fs[i] & deep_features[i];
     }
 
-    for_each_set_bit(i, (void *)disabled_features,
-                     sizeof(disabled_features) * 8)
+    bitmap_for_each ( i, (void *)disabled_features,
+                      sizeof(disabled_features) * 8 )
     {
         const uint32_t *dfs = x86_cpu_policy_lookup_deep_deps(i);
         unsigned int j;
@@ -237,7 +237,7 @@ static void recalculate_xstate(struct cpu_policy *p)
     /* Subleafs 2+ */
     xstates &= ~XSTATE_FP_SSE;
     BUILD_BUG_ON(ARRAY_SIZE(p->xstate.comp) < 63);
-    for_each_set_bit ( i, &xstates, 63 )
+    bitmap_for_each ( i, &xstates, 63 )
     {
         /*
          * Pass through size (eax) and offset (ebx) directly.  Visbility of
