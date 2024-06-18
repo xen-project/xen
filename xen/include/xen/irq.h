@@ -134,7 +134,7 @@ void cf_check irq_actor_none(struct irq_desc *desc);
  * irq_ack_none() must be provided by the architecture.
  * irq_end_none() is optional, and opted into using a define.
  */
-void cf_check irq_ack_none(struct irq_desc *irq);
+void cf_check irq_ack_none(struct irq_desc *desc);
 
 /*
  * Per-cpu interrupted context register state - the inner-most interrupt frame

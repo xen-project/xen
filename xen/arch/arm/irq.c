@@ -31,9 +31,9 @@ struct irq_guest
     unsigned int virq;
 };
 
-void irq_ack_none(struct irq_desc *irq)
+void irq_ack_none(struct irq_desc *desc)
 {
-    printk("unexpected IRQ trap at irq %02x\n", irq->irq);
+    printk("unexpected IRQ trap at irq %02x\n", desc->irq);
 }
 
 void irq_end_none(struct irq_desc *irq)
