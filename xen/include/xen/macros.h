@@ -59,6 +59,14 @@
 #define BUILD_BUG_ON(cond) ((void)BUILD_BUG_ON_ZERO(cond))
 #endif
 
+/*
+ * Force a compilation error.  This is for code which, in the normal case,
+ * should be Dead Code Eliminated, but a failure to eliminate constitutes an
+ * error.  e.g. behind a __builtin_constant_p(), or an illegal case within a
+ * switch(sizeof(...)) construct.
+ */
+#define BUILD_ERROR(msg) asm ( ".error \"" msg "\"" )
+
 /* Hide a value from the optimiser. */
 #define HIDE(x)                                 \
     ({                                          \

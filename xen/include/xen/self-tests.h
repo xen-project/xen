@@ -22,9 +22,9 @@
         typeof((fn)(val)) real = (fn)(val);                             \
                                                                         \
         if ( !__builtin_constant_p(real) )                              \
-            asm ( ".error \"'" STR(fn(val)) "' not compile-time constant\"" ); \
+            BUILD_ERROR("'" STR(fn(val)) "' not compile-time constant"); \
         else if ( real != (res) )                                       \
-            asm ( ".error \"Compile time check '" STR(fn(val) == res) "' failed\"" ); \
+            BUILD_ERROR("Compile time check '" STR(fn(val) == res) "' failed"); \
     } while ( 0 )
 #else
 #define COMPILE_CHECK(fn, val, res)
