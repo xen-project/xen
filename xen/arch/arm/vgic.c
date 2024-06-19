@@ -720,13 +720,9 @@ unsigned int vgic_max_vcpus(unsigned int domctl_vgic_version)
     }
 }
 
-void vgic_check_inflight_irqs_pending(struct domain *d, struct vcpu *v,
-                                      unsigned int rank, uint32_t r)
+void vgic_check_inflight_irqs_pending(struct vcpu *v, unsigned int rank, uint32_t r)
 {
-    const unsigned long mask = r;
-    unsigned int i;
-
-    bitmap_for_each ( i, &mask, 32 )
+    for_each_set_bit ( i, r )
     {
         struct pending_irq *p;
         struct vcpu *v_target;

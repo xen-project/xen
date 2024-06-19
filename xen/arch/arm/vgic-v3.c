@@ -820,7 +820,7 @@ static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
         rank = vgic_rank_offset(v, 1, reg - GICD_ICPENDR, DABT_WORD);
         if ( rank == NULL ) goto write_ignore;
 
-        vgic_check_inflight_irqs_pending(v->domain, v, rank->index, r);
+        vgic_check_inflight_irqs_pending(v, rank->index, r);
 
         goto write_ignore;
 
