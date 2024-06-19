@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 #include <xen/device_tree.h>
-#include <xen/domain_page.h>
 #include <xen/err.h>
 #include <xen/event.h>
 #include <xen/grant_table.h>
@@ -10,8 +9,6 @@
 #include <xen/serial.h>
 #include <xen/sizes.h>
 #include <xen/vmap.h>
-
-#include <public/io/xs_wire.h>
 
 #include <asm/arm64/sve.h>
 #include <asm/dom0less-build.h>
@@ -742,56 +739,6 @@ static int __init alloc_xenstore_evtchn(struct domain *d)
     return 0;
 }
 
-#define XENSTORE_PFN_OFFSET 1
-static int __init alloc_xenstore_page(struct domain *d)
-{
-    struct page_info *xenstore_pg;
-    struct xenstore_domain_interface *interface;
-    mfn_t mfn;
-    gfn_t gfn;
-    int rc;
-
-    if ( (UINT_MAX - d->max_pages) < 1 )
-    {
-        printk(XENLOG_ERR "%pd: Over-allocation for d->max_pages by 1 page.\n",
-               d);
-        return -EINVAL;
-    }
-    d->max_pages += 1;
-    xenstore_pg = alloc_domheap_page(d, MEMF_bits(32));
-    if ( xenstore_pg == NULL && is_64bit_domain(d) )
-        xenstore_pg = alloc_domheap_page(d, 0);
-    if ( xenstore_pg == NULL )
-        return -ENOMEM;
-
-    mfn = page_to_mfn(xenstore_pg);
-    if ( !mfn_x(mfn) )
-    {
-        free_domheap_page(xenstore_pg);
-        return -ENOMEM;
-    }
-
-    if ( !is_domain_direct_mapped(d) )
-        gfn = gaddr_to_gfn(GUEST_MAGIC_BASE +
-                           (XENSTORE_PFN_OFFSET << PAGE_SHIFT));
-    else
-        gfn = gaddr_to_gfn(mfn_to_maddr(mfn));
-
-    rc = guest_physmap_add_page(d, gfn, mfn, 0);
-    if ( rc )
-    {
-        free_domheap_page(xenstore_pg);
-        return rc;
-    }
-
-    d->arch.hvm.params[HVM_PARAM_STORE_PFN] = gfn_x(gfn);
-    interface = map_domain_page(mfn);
-    interface->connection = XENSTORE_RECONNECT;
-    unmap_domain_page(interface);
-
-    return 0;
-}
-
 static int __init construct_domU(struct domain *d,
                                  const struct dt_device_node *node)
 {
@@ -892,10 +839,7 @@ static int __init construct_domU(struct domain *d,
         rc = alloc_xenstore_evtchn(d);
         if ( rc < 0 )
             return rc;
-
-        rc = alloc_xenstore_page(d);
-        if ( rc < 0 )
-            return rc;
+        d->arch.hvm.params[HVM_PARAM_STORE_PFN] = ~0ULL;
     }
 
     return rc;
