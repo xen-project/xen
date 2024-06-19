@@ -324,12 +324,6 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
             printk("%pd: static shared memory bank not found: '%s'", d, shm_id);
             return -ENOENT;
         }
-        if ( is_domain_direct_mapped(d) && (pbase != gbase) )
-        {
-            printk("%pd: physical address 0x%"PRIpaddr" and guest address 0x%"PRIpaddr" are not direct-mapped.\n",
-                   d, pbase, gbase);
-            return -EINVAL;
-        }
 
         pbase = boot_shm_bank->start;
         psize = boot_shm_bank->size;
@@ -352,6 +346,13 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
         {
             /* guest phys address is after host phys address */
             gbase = dt_read_paddr(cells + addr_cells, addr_cells);
+
+            if ( is_domain_direct_mapped(d) && (pbase != gbase) )
+            {
+                printk("%pd: physical address 0x%"PRIpaddr" and guest address 0x%"PRIpaddr" are not direct-mapped.\n",
+                       d, pbase, gbase);
+                return -EINVAL;
+            }
 
             for ( i = 0; i < PFN_DOWN(psize); i++ )
                 if ( !mfn_valid(mfn_add(maddr_to_mfn(pbase), i)) )
