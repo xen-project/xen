@@ -43,7 +43,7 @@
      array_access_ok((hnd).p, (nr), sizeof(*(hnd).p)))
 #define guest_handle_subrange_okay(hnd, first, last)    \
     (paging_mode_external(current->domain) ||           \
-     array_access_ok((hnd).p + (first),                 \
+     array_access_ok((unsigned long)(hnd).p + (first) * sizeof(*(hnd).p), \
                      (last)-(first)+1,                  \
                      sizeof(*(hnd).p)))
 

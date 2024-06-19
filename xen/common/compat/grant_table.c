@@ -232,7 +232,7 @@ int compat_grant_table_op(
                 cnt_uop = guest_handle_cast(xfer, void);
                 while ( n-- )
                 {
-                    guest_handle_add_offset(xfer, -1);
+                    guest_handle_subtract_offset(xfer, 1);
                     if ( __copy_field_to_guest(xfer, nat.xfer + n, status) )
                         rc = -EFAULT;
                 }
@@ -277,7 +277,7 @@ int compat_grant_table_op(
                 cnt_uop = guest_handle_cast(copy, void);
                 while ( n-- )
                 {
-                    guest_handle_add_offset(copy, -1);
+                    guest_handle_subtract_offset(copy, 1);
                     if ( __copy_field_to_guest(copy, nat.copy + n, status) )
                         rc = -EFAULT;
                 }
