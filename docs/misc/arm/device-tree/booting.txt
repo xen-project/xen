@@ -607,6 +607,9 @@ communication.
     shared memory region in host physical address space, a size, and a guest
     physical address, as the target address of the mapping.
     e.g. xen,shared-mem = < [host physical address] [guest address] [size] >;
+    Note that if a domain is direct-mapped, i.e. the Dom0 and the Dom0less
+    DomUs with `direct-map` device tree property, the static shared memory
+    should also be direct-mapped (host physical address == guest address).
 
     It shall also meet the following criteria:
     1) If the SHM ID matches with an existing region, the address range of the

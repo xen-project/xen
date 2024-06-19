@@ -324,6 +324,12 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
             printk("%pd: static shared memory bank not found: '%s'", d, shm_id);
             return -ENOENT;
         }
+        if ( is_domain_direct_mapped(d) && (pbase != gbase) )
+        {
+            printk("%pd: physical address 0x%"PRIpaddr" and guest address 0x%"PRIpaddr" are not direct-mapped.\n",
+                   d, pbase, gbase);
+            return -EINVAL;
+        }
 
         pbase = boot_shm_bank->start;
         psize = boot_shm_bank->size;
