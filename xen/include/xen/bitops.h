@@ -236,6 +236,16 @@ static always_inline __pure unsigned int ffs64(uint64_t x)
         return !x || (uint32_t)x ? ffs(x) : ffs(x >> 32) + 32;
 }
 
+/*
+ * A type-generic ffs() which picks the appropriate ffs{,l,64}() based on it's
+ * argument.
+ */
+#define ffs_g(x)                                        \
+    (sizeof(x) <= sizeof(int)      ? ffs(x) :           \
+     sizeof(x) <= sizeof(long)     ? ffsl(x) :          \
+     sizeof(x) <= sizeof(uint64_t) ? ffs64(x) :         \
+     ({ BUILD_ERROR("ffs_g() Bad input type"); 0; }))
+
 static always_inline __pure unsigned int fls(unsigned int x)
 {
     if ( __builtin_constant_p(x) )
@@ -271,6 +281,20 @@ static always_inline __pure unsigned int fls64(uint64_t x)
         return h ? fls(h) + 32 : fls(x);
     }
 }
+
+/*
+ * for_each_set_bit() - Iterate over all set bits in a scalar value.
+ *
+ * @iter An iterator name.  Scoped is within the loop only.
+ * @val  A scalar value to iterate over.
+ *
+ * A copy of @val is taken internally.
+ */
+#define for_each_set_bit(iter, val)                     \
+    for ( typeof(val) __v = (val); __v; )               \
+        for ( unsigned int (iter);                      \
+              __v && ((iter) = ffs_g(__v) - 1, true);   \
+              __v &= __v - 1 )
 
 /* --------------------- Please tidy below here --------------------- */
 
