@@ -193,7 +193,7 @@ static void sanitise_featureset(uint32_t *fs)
 static void recalculate_xstate(struct cpu_policy *p)
 {
     uint64_t xstates = XSTATE_FP_SSE;
-    unsigned int i, ecx_mask = 0, Da1 = p->xstate.Da1;
+    unsigned int ecx_mask = 0, Da1 = p->xstate.Da1;
 
     /*
      * The Da1 leaf is the only piece of information preserved in the common
@@ -237,7 +237,7 @@ static void recalculate_xstate(struct cpu_policy *p)
     /* Subleafs 2+ */
     xstates &= ~XSTATE_FP_SSE;
     BUILD_BUG_ON(ARRAY_SIZE(p->xstate.comp) < 63);
-    bitmap_for_each ( i, &xstates, 63 )
+    for_each_set_bit ( i, xstates )
     {
         /*
          * Pass through size (eax) and offset (ebx) directly.  Visbility of

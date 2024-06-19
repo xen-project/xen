@@ -589,7 +589,7 @@ static bool valid_xcr0(uint64_t xcr0)
 
 unsigned int xstate_uncompressed_size(uint64_t xcr0)
 {
-    unsigned int size = XSTATE_AREA_MIN_SIZE, i;
+    unsigned int size = XSTATE_AREA_MIN_SIZE;
 
     /* Non-XCR0 states don't exist in an uncompressed image. */
     ASSERT((xcr0 & ~X86_XCR0_STATES) == 0);
@@ -606,7 +606,7 @@ unsigned int xstate_uncompressed_size(uint64_t xcr0)
      * with respect their index.
      */
     xcr0 &= ~(X86_XCR0_SSE | X86_XCR0_X87);
-    bitmap_for_each ( i, &xcr0, 63 )
+    for_each_set_bit ( i, xcr0 )
     {
         const struct xstate_component *c = &raw_cpu_policy.xstate.comp[i];
         unsigned int s = c->offset + c->size;
@@ -621,7 +621,9 @@ unsigned int xstate_uncompressed_size(uint64_t xcr0)
 
 unsigned int xstate_compressed_size(uint64_t xstates)
 {
-    unsigned int i, size = XSTATE_AREA_MIN_SIZE;
+    unsigned int size = XSTATE_AREA_MIN_SIZE;
+
+    ASSERT((xstates & ~(X86_XCR0_STATES | X86_XSS_STATES)) == 0);
 
     if ( xstates == 0 )
         return 0;
@@ -634,7 +636,7 @@ unsigned int xstate_compressed_size(uint64_t xstates)
      * componenets require aligning to 64 first.
      */
     xstates &= ~(X86_XCR0_SSE | X86_XCR0_X87);
-    bitmap_for_each ( i, &xstates, 63 )
+    for_each_set_bit ( i, xstates )
     {
         const struct xstate_component *c = &raw_cpu_policy.xstate.comp[i];
 
