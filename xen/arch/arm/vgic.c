@@ -421,15 +421,13 @@ void vgic_enable_irqs(struct vcpu *v, uint32_t r, unsigned int n)
 
 void vgic_set_irqs_pending(struct vcpu *v, uint32_t r, unsigned int rank)
 {
-    const unsigned long mask = r;
-    unsigned int i;
     /* The first rank is always per-vCPU */
     bool private = rank == 0;
 
     /* LPIs will never be set pending via this function */
     ASSERT(!is_lpi(32 * rank + 31));
 
-    bitmap_for_each ( i, &mask, 32 )
+    for_each_set_bit ( i, r )
     {
         unsigned int irq = i + 32 * rank;
 
