@@ -445,13 +445,13 @@ struct elf_dom_parms {
     uint64_t virt_kend;
 };
 
-static inline void elf_xen_feature_set(int nr, uint32_t * addr)
+static inline void elf_xen_feature_set(unsigned int nr, uint32_t *addr)
 {
-    addr[nr >> 5] |= 1 << (nr & 31);
+    addr[nr >> 5] |= 1U << (nr & 31);
 }
-static inline int elf_xen_feature_get(int nr, uint32_t * addr)
+static inline bool elf_xen_feature_get(unsigned int nr, const uint32_t *addr)
 {
-    return !!(addr[nr >> 5] & (1 << (nr & 31)));
+    return addr[nr >> 5] & (1U << (nr & 31));
 }
 
 elf_errorstatus elf_xen_parse_features(const char *features,
