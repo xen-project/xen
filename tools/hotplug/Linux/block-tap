@@ -20,9 +20,13 @@
 #
 # Disks should be specified using the following syntax:
 #
+# For use with tapback (vbd3) (preferred):
 # vdev=xvda,backendtype=tap,format=vhd,target=/srv/target.vhd
 #
-# format is either "aio" (for raw files), or "vhd"
+# For use with blkback and the blktap2 kernel module:
+# script=block-tap,vdev=xvda,target=<type>:<file>
+#
+# format/<type> is either "aio" (for raw files), or "vhd"
 
 dir=$(dirname "$0")
 . "$dir/block-common.sh"
@@ -205,12 +209,17 @@ add()
 
     xenstore_write "$XENBUS_PATH/pid" "$pid"
     xenstore_write "$XENBUS_PATH/minor" "$minor"
-    # dev, as a unix socket, would end up with major:minor 0:0 in
-    # physical-device if write_dev were used.  tapback would be thrown off by
-    # that incorrect minor, so just skip writing physical-device.
-    xenstore_write "$XENBUS_PATH/physical-device-path" "$dev"
 
-    success
+    if [ "$XENBUS_TYPE" = "vbd3" ] ; then
+        # $dev, as a unix socket, has major:minor 0:0.  If write_dev writes
+        # physical-device, tapback would use that incorrect minor 0.  So don't
+        # write physical-device.
+        xenstore_write "$XENBUS_PATH/physical-device-path" "$dev"
+
+        success
+    else
+        write_dev "$dev"
+    fi
 
     release_lock "block"
 }
