@@ -319,11 +319,6 @@ static int libxl__nic_from_xenstore(libxl__gc *gc, const char *libxl_path,
     }
 
     rc = libxl__xs_read_checked(gc, XBT_NULL,
-                                GCSPRINTF("%s/vlan", libxl_path),
-				(const char **)(&nic->vlan));
-    if (rc) goto out;
-
-    rc = libxl__xs_read_checked(gc, XBT_NULL,
                                 GCSPRINTF("%s/mac", libxl_path), &tmp);
     if (rc) goto out;
     if (tmp) {
@@ -344,6 +339,10 @@ static int libxl__nic_from_xenstore(libxl__gc *gc, const char *libxl_path,
     rc = libxl__xs_read_checked(NOGC, XBT_NULL,
                                 GCSPRINTF("%s/script", libxl_path),
                                 (const char **)(&nic->script));
+    if (rc) goto out;
+    rc = libxl__xs_read_checked(NOGC, XBT_NULL,
+                                GCSPRINTF("%s/vlan", libxl_path),
+                                (const char **)(&nic->vlan));
     if (rc) goto out;
     rc = libxl__xs_read_checked(NOGC, XBT_NULL,
                                 GCSPRINTF("%s/forwarddev", libxl_path),
