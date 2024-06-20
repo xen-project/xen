@@ -90,6 +90,22 @@ conform to the directive."
 -config=MC3R1.R5.3,reports+={safe, "any_area(any_loc(any_exp(macro(^read_debugreg$))&&any_exp(macro(^write_debugreg$))))"}
 -doc_end
 
+-doc_begin="Macros expanding to their own identifier (e.g., \"#define x x\") are deliberate."
+-config=MC3R1.R5.5,reports+={deliberate, "all_area(macro(same_id_body())||!macro(!same_id_body()))"}
+-doc_end
+
+-doc_begin="There is no clash between function like macros and not callable objects."
+-config=MC3R1.R5.5,reports+={deliberate, "all_area(macro(function_like())||decl(any()))&&all_area(macro(any())||!decl(kind(function))&&!decl(__function_pointer_decls))"}
+-doc_end
+
+-doc_begin="Clashes between function names and macros are deliberate for string handling functions since some architectures may want to use their own arch-specific implementation."
+-config=MC3R1.R5.5,reports+={deliberate, "all_area(all_loc(file(^xen/arch/x86/string\\.c|xen/include/xen/string\\.h|xen/lib/.*$)))"}
+-doc_end
+
+-doc_begin="In libelf, clashes between macros and function names are deliberate and needed to prevent the use of undecorated versions of memcpy, memset and memmove."
+-config=MC3R1.R5.5,reports+={deliberate, "any_area(decl(kind(function))||any_loc(macro(name(memcpy||memset||memmove))))&&any_area(any_loc(file(^xen/common/libelf/libelf-private\\.h$)))"}
+-doc_end
+
 -doc_begin="The type \"ret_t\" is deliberately defined multiple times,
 depending on the guest."
 -config=MC3R1.R5.6,reports+={deliberate,"any_area(any_loc(text(^.*ret_t.*$)))"}

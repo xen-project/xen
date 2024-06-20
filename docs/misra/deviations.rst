@@ -98,6 +98,27 @@ Deviations related to MISRA C:2012 Rules:
          - __emulate_2op and __emulate_2op_nobyte
          - read_debugreg and write_debugreg
 
+   * - R5.5
+     - Macros expanding to their own name are allowed.
+     - Tagged as `deliberate` for ECLAIR.
+
+   * - R5.5
+     - Clashes between names of function-like macros and identifiers of
+       non-callable entities are allowed.
+     - Tagged as `deliberate` for ECLAIR.
+
+   * - R5.5
+     - Clashes between function names and macros are deliberate for string
+       handling functions since some architectures may want to use their own
+       arch-specific implementation.
+     - Tagged as `deliberate` for ECLAIR.
+
+   * - R5.5
+     - In libelf, clashes between macros and function names are deliberate and
+       needed to prevent the use of undecorated versions of memcpy, memset and
+       memmove.
+     - Tagged as `deliberate` for ECLAIR.
+
    * - R5.6
      - The type ret_t is deliberately defined multiple times depending on the
        type of guest to service.
