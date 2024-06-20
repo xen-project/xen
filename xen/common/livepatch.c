@@ -1252,7 +1252,7 @@ static int livepatch_list(struct xen_sysctl_livepatch_list *list)
     list->metadata_total_size = 0;
     if ( list->nr )
     {
-        uint64_t name_offset = 0, metadata_offset = 0;
+        size_t name_offset = 0, metadata_offset = 0;
 
         list_for_each_entry( data, &payload_list, list )
         {
