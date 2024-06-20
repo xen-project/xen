@@ -2591,7 +2591,7 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
 
     for ( irq = 0; irq < nr_irqs; irq++ )
     {
-        bool break_affinity = false, set_affinity = true;
+        bool break_affinity = false, set_affinity = true, check_irr = false;
         unsigned int vector, cpu = smp_processor_id();
         cpumask_t *affinity = this_cpu(scratch_cpumask);
 
@@ -2645,6 +2645,25 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
              cpumask_test_cpu(cpu, desc->arch.old_cpu_mask) )
         {
             /*
+             * This to be offlined CPU was the target of an interrupt that's
+             * been moved, and the new destination target hasn't yet
+             * acknowledged any interrupt from it.
+             *
+             * We know the interrupt is configured to target the new CPU at
+             * this point, so we can check IRR for any pending vectors and
+             * forward them to the new destination.
+             *
+             * Note that for the other case of an interrupt movement being in
+             * progress (move_cleanup_count being non-zero) we know the new
+             * destination has already acked at least one interrupt from this
+             * source, and hence there's no need to forward any stale
+             * interrupts.
+             */
+            if ( apic_irr_read(desc->arch.old_vector) )
+                send_IPI_mask(cpumask_of(cpumask_any(desc->arch.cpu_mask)),
+                              desc->arch.vector);
+
+            /*
              * This CPU is going offline, remove it from ->arch.old_cpu_mask
              * and possibly release the old vector if the old mask becomes
              * empty.
@@ -2684,6 +2703,14 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
         if ( desc->handler->disable )
             desc->handler->disable(desc);
 
+        /*
+         * If the current CPU is going offline and is (one of) the target(s) of
+         * the interrupt, signal to check whether there are any pending vectors
+         * to be handled in the local APIC after the interrupt has been moved.
+         */
+        if ( !cpu_online(cpu) && cpumask_test_cpu(cpu, desc->arch.cpu_mask) )
+            check_irr = true;
+
         if ( desc->handler->set_affinity )
             desc->handler->set_affinity(desc, affinity);
         else if ( !(warned++) )
@@ -2693,6 +2720,18 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
             desc->handler->enable(desc);
 
         cpumask_copy(affinity, desc->affinity);
+
+        if ( check_irr && apic_irr_read(vector) )
+            /*
+             * Forward pending interrupt to the new destination, this CPU is
+             * going offline and otherwise the interrupt would be lost.
+             *
+             * Do the IRR check as late as possible before releasing the irq
+             * desc in order for any in-flight interrupts to be delivered to
+             * the lapic.
+             */
+            send_IPI_mask(cpumask_of(cpumask_any(desc->arch.cpu_mask)),
+                          desc->arch.vector);
 
         spin_unlock(&desc->lock);
 
@@ -2705,11 +2744,6 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
             printk("Broke affinity for IRQ%u, new: {%*pbl}\n",
                    irq, CPUMASK_PR(affinity));
     }
-
-    /* That doesn't seem sufficient.  Give it 1ms. */
-    local_irq_enable();
-    mdelay(1);
-    local_irq_disable();
 }
 
 void fixup_eoi(void)
