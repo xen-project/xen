@@ -18,10 +18,13 @@
 -enable=MC3R1.R12.5
 -enable=MC3R1.R1.3
 -enable=MC3R1.R13.6
+-enable=MC3R1.R13.1
 -enable=MC3R1.R1.4
 -enable=MC3R1.R14.1
 -enable=MC3R1.R14.4
 -enable=MC3R1.R16.2
+-enable=MC3R1.R16.3
+-enable=MC3R1.R16.4
 -enable=MC3R1.R16.6
 -enable=MC3R1.R16.7
 -enable=MC3R1.R17.1
@@ -34,6 +37,7 @@
 -enable=MC3R1.R20.13
 -enable=MC3R1.R20.14
 -enable=MC3R1.R20.4
+-enable=MC3R1.R20.7
 -enable=MC3R1.R20.9
 -enable=MC3R1.R2.1
 -enable=MC3R1.R21.10
@@ -58,6 +62,7 @@
 -enable=MC3R1.R5.2
 -enable=MC3R1.R5.3
 -enable=MC3R1.R5.4
+-enable=MC3R1.R5.5
 -enable=MC3R1.R5.6
 -enable=MC3R1.R6.1
 -enable=MC3R1.R6.2
