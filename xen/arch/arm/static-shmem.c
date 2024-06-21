@@ -378,6 +378,13 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
             const struct membank *alloc_bank =
                 find_shm_bank_by_id(get_shmem_heap_banks(), shm_id);
 
+            if ( is_domain_direct_mapped(d) )
+            {
+                printk("%pd: host and guest physical address must be supplied for direct-mapped domains\n",
+                       d);
+                return -EINVAL;
+            }
+
             /* guest phys address is right at the beginning */
             gbase = dt_read_paddr(cells, addr_cells);
 
