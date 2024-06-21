@@ -1,11 +1,11 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#include <xen/cache.h>
 #include <xen/compiler.h>
 #include <xen/init.h>
 #include <xen/kernel.h>
 #include <xen/macros.h>
 #include <xen/pfn.h>
+#include <xen/sections.h>
 
 #include <asm/early_printk.h>
 #include <asm/csr.h>
