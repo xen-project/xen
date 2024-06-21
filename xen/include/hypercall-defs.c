@@ -135,7 +135,7 @@ xenoprof_op(int op, void *arg)
 #ifdef CONFIG_COMPAT
 prefix: compat
 set_timer_op(uint32_t lo, uint32_t hi)
-multicall(multicall_entry_compat_t *call_list, uint32_t nr_calls)
+multicall(multicall_entry_compat_t *call_list, unsigned long nr_calls)
 memory_op(unsigned int cmd, void *arg)
 #ifdef CONFIG_IOREQ_SERVER
 dm_op(domid_t domid, unsigned int nr_bufs, void *bufs)
@@ -172,7 +172,7 @@ console_io(unsigned int cmd, unsigned int count, char *buffer)
 vm_assist(unsigned int cmd, unsigned int type)
 event_channel_op(int cmd, void *arg)
 mmuext_op(mmuext_op_t *uops, unsigned int count, unsigned int *pdone, unsigned int foreigndom)
-multicall(multicall_entry_t *call_list, unsigned int nr_calls)
+multicall(multicall_entry_t *call_list, unsigned long nr_calls)
 #ifdef CONFIG_PV
 mmu_update(mmu_update_t *ureqs, unsigned int count, unsigned int *pdone, unsigned int foreigndom)
 stack_switch(unsigned long ss, unsigned long esp)

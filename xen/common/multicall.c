@@ -34,11 +34,11 @@ static void trace_multicall_call(multicall_entry_t *call)
 }
 
 ret_t do_multicall(
-    XEN_GUEST_HANDLE_PARAM(multicall_entry_t) call_list, uint32_t nr_calls)
+    XEN_GUEST_HANDLE_PARAM(multicall_entry_t) call_list, unsigned long nr_calls)
 {
     struct vcpu *curr = current;
     struct mc_state *mcs = &curr->mc_state;
-    uint32_t         i;
+    unsigned long    i;
     int              rc = 0;
     enum mc_disposition disp = mc_continue;
 
