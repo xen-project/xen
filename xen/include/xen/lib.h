@@ -10,6 +10,7 @@
 #include <xen/types.h>
 #include <xen/xmalloc.h>
 #include <xen/string.h>
+#include <xen/sections.h>
 
 #define __ACCESS_ONCE(x) ({                             \
             (void)(typeof(x))0; /* Scalar typecheck. */ \
