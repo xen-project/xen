@@ -15,7 +15,7 @@
 #define __cacheline_aligned __attribute__((__aligned__(SMP_CACHE_BYTES)))
 #endif
 
-#if defined(CONFIG_ARM) || defined(CONFIG_X86) || defined(CONFIG_PPC64)
+#if defined(CONFIG_ARM) || defined(CONFIG_X86)
 /* TODO: Phase out the use of this via cache.h */
 #define __ro_after_init __section(".data.ro_after_init")
 #endif

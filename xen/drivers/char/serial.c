@@ -10,8 +10,8 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/param.h>
+#include <xen/sections.h>
 #include <xen/serial.h>
-#include <xen/cache.h>
 
 #include <asm/processor.h>
 

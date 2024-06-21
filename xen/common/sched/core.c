@@ -18,6 +18,7 @@
 #include <xen/lib.h>
 #include <xen/param.h>
 #include <xen/sched.h>
+#include <xen/sections.h>
 #include <xen/domain.h>
 #include <xen/delay.h>
 #include <xen/event.h>

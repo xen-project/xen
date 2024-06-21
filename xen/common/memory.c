@@ -23,6 +23,7 @@
 #include <xen/param.h>
 #include <xen/perfc.h>
 #include <xen/sched.h>
+#include <xen/sections.h>
 #include <xen/trace.h>
 #include <xen/types.h>
 #include <asm/current.h>

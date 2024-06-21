@@ -6,6 +6,7 @@
 #include <xen/delay.h>
 #include <xen/keyhandler.h>
 #include <xen/param.h>
+#include <xen/sections.h>
 #include <xen/shutdown.h>
 #include <xen/event.h>
 #include <xen/console.h>

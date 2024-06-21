@@ -134,6 +134,7 @@
 #include <xen/pfn.h>
 #include <xen/types.h>
 #include <xen/sched.h>
+#include <xen/sections.h>
 #include <xen/softirq.h>
 #include <xen/spinlock.h>
 

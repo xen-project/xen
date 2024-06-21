@@ -4,6 +4,7 @@
 #ifdef CONFIG_HYPFS
 #include <xen/lib.h>
 #include <xen/list.h>
+#include <xen/sections.h>
 #include <xen/string.h>
 #include <public/hypfs.h>
 

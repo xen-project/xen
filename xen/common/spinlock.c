@@ -5,6 +5,7 @@
 #include <xen/param.h>
 #include <xen/smp.h>
 #include <xen/time.h>
+#include <xen/sections.h>
 #include <xen/spinlock.h>
 #include <xen/guest_access.h>
 #include <xen/preempt.h>

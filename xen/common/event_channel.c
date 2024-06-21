@@ -26,6 +26,8 @@
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
 #include <xen/keyhandler.h>
+#include <xen/sections.h>
+
 #include <asm/current.h>
 
 #include <public/xen.h>

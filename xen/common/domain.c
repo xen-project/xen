@@ -11,6 +11,7 @@
 #include <xen/err.h>
 #include <xen/param.h>
 #include <xen/sched.h>
+#include <xen/sections.h>
 #include <xen/domain.h>
 #include <xen/mm.h>
 #include <xen/event.h>

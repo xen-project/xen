@@ -6,6 +6,7 @@
 #include <xen/kernel.h>
 #include <xen/mm.h>
 #include <xen/rcupdate.h>
+#include <xen/sections.h>
 #include <xen/spinlock.h>
 #include <xen/virtual_region.h>
 

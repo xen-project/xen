@@ -1,6 +1,6 @@
 #ifdef VMAP_VIRT_START
 #include <xen/bitmap.h>
-#include <xen/cache.h>
+#include <xen/sections.h>
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/pfn.h>

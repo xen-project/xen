@@ -32,6 +32,7 @@
 #include <xen/warning.h>
 #include <xen/pv_console.h>
 #include <asm/setup.h>
+#include <xen/sections.h>
 
 #ifdef CONFIG_X86
 #include <xen/consoled.h>

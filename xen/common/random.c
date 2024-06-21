@@ -1,6 +1,6 @@
-#include <xen/cache.h>
 #include <xen/init.h>
 #include <xen/percpu.h>
+#include <xen/sections.h>
 #include <xen/random.h>
 #include <xen/time.h>
 #include <asm/random.h>

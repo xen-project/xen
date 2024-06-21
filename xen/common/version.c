@@ -3,13 +3,12 @@
 #include <xen/init.h>
 #include <xen/errno.h>
 #include <xen/lib.h>
+#include <xen/sections.h>
 #include <xen/string.h>
 #include <xen/types.h>
 #include <xen/efi.h>
 #include <xen/elf.h>
 #include <xen/version.h>
-
-#include <asm/cache.h>
 
 const char *xen_compile_date(void)
 {

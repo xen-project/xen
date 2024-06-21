@@ -13,6 +13,7 @@
 #include <xen/mm.h>
 #include <xen/param.h>
 #include <xen/percpu.h>
+#include <xen/sections.h>
 #include <xen/serial.h>
 #include <xen/smp.h>
 #include <xen/spinlock.h>

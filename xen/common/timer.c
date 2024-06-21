@@ -11,6 +11,7 @@
 #include <xen/sched.h>
 #include <xen/lib.h>
 #include <xen/param.h>
+#include <xen/sections.h>
 #include <xen/smp.h>
 #include <xen/perfc.h>
 #include <xen/time.h>

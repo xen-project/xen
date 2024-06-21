@@ -22,6 +22,7 @@
 #include <xen/param.h>
 #include <xen/percpu.h>
 #include <xen/sched.h>
+#include <xen/sections.h>
 #include <xen/warning.h>
 
 #include "private.h"

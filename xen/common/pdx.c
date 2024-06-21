@@ -19,6 +19,7 @@
 #include <xen/mm.h>
 #include <xen/bitops.h>
 #include <xen/nospec.h>
+#include <xen/sections.h>
 
 /**
  * Maximum (non-inclusive) usable pdx. Must be

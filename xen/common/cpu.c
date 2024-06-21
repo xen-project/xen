@@ -3,6 +3,7 @@
 #include <xen/event.h>
 #include <xen/init.h>
 #include <xen/sched.h>
+#include <xen/sections.h>
 #include <xen/stop_machine.h>
 #include <xen/rcupdate.h>
 

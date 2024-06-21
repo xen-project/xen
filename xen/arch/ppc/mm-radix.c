@@ -2,6 +2,7 @@
 #include <xen/init.h>
 #include <xen/kernel.h>
 #include <xen/mm.h>
+#include <xen/sections.h>
 #include <xen/types.h>
 #include <xen/lib.h>
 

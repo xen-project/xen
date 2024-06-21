@@ -3,6 +3,7 @@
 #include <xen/domain.h>
 #include <xen/irq.h>
 #include <xen/nodemask.h>
+#include <xen/sections.h>
 #include <xen/time.h>
 #include <public/domctl.h>
 #include <public/vm_event.h>
