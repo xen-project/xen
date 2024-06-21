@@ -52,7 +52,7 @@ static inline u32 get_unaligned_be32(const void *p)
 static const unsigned char lzop_magic[] = {
 	0x89, 0x4c, 0x5a, 0x4f, 0x00, 0x0d, 0x0a, 0x1a, 0x0a };
 
-#define LZO_BLOCK_SIZE        (256*1024l)
+#define LZO_BLOCK_SIZE        (256*1024L)
 #define HEADER_HAS_FILTER      0x00000800L
 #define HEADER_SIZE_MIN       (9 + 7     + 4 + 8     + 1       + 4)
 #define HEADER_SIZE_MAX       (9 + 7 + 1 + 8 + 8 + 4 + 1 + 255 + 4)
