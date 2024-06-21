@@ -322,3 +322,9 @@ void udelay(unsigned long usecs)
 {
     BUG_ON("unimplemented");
 }
+
+void share_xen_page_with_guest(struct page_info *page, struct domain *d,
+                               enum XENSHARE_flags flags)
+{
+    BUG_ON("unimplemented");
+}
