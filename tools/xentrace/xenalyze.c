@@ -10920,9 +10920,6 @@ const struct argp parser_def = {
     .doc = "",
 };
 
-const char *argp_program_bug_address = "George Dunlap <george.dunlap@eu.citrix.com>";
-
-
 int main(int argc, char *argv[]) {
     /* Start with warn at stderr. */
     warn = stderr;
