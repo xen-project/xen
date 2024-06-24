@@ -31,12 +31,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - libxl support for backendtype=tap with tapback.
 
 ### Removed
-- caml-stubdom.  It hasn't built since 2014, was pinned to Ocaml 4.02, and has
-  been superseded by the MirageOS/SOLO5 projects.
-- /usr/bin/pygrub symlink.  This was deprecated in Xen 4.2 (2012) but left for
-  compatibility reasons.  VMs configured with bootloader="/usr/bin/pygrub"
-  should be updated to just bootloader="pygrub".
-- The Xen gdbstub on x86.
+ - caml-stubdom.  It hasn't built since 2014, was pinned to Ocaml 4.02, and has
+   been superseded by the MirageOS/SOLO5 projects.
+ - /usr/bin/pygrub symlink.  This was deprecated in Xen 4.2 (2012) but left for
+   compatibility reasons.  VMs configured with bootloader="/usr/bin/pygrub"
+   should be updated to just bootloader="pygrub".
+ - The Xen gdbstub on x86.
 
 ## [4.18.0](https://xenbits.xenproject.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.18.0) - 2023-11-16
 
