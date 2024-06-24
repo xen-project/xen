@@ -52,6 +52,7 @@ their Standard Library equivalents."
 -eval_file=adopted.ecl
 -eval_file=out_of_scope.ecl
 
+-eval_file=B.UNEVALEFF.ecl
 -eval_file=deviations.ecl
 -eval_file=call_properties.ecl
 -eval_file=tagging.ecl

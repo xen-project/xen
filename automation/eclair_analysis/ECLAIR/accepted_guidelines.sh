@@ -11,3 +11,5 @@ accepted_rst=$1
 
 grep -Eo "\`(Dir|Rule) [0-9]+\.[0-9]+" ${accepted_rst} \
      | sed -e 's/`Rule /MC3R1.R/' -e  's/`Dir /MC3R1.D/' -e 's/.*/-enable=&/' > ${script_dir}/accepted.ecl
+
+echo "-enable=B.UNEVALEFF" >> ${script_dir}/accepted.ecl

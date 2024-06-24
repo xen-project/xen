@@ -300,6 +300,16 @@ Deviations related to MISRA C:2012 Rules:
        the short-circuit evaluation strategy for logical operators.
      - Project-wide deviation; tagged as `disapplied` for ECLAIR.
 
+   * - R13.6
+     - On x86, macros alternative_v?call[0-9] use sizeof and typeof to check
+       that the argument types match the corresponding parameter ones.
+     - Tagged as `deliberate` for ECLAIR.
+
+   * - R13.6
+     - Anything, no matter how complicated, inside the BUILD_BUG_ON macro is
+       subject to a compile-time evaluation without relevant side effects."
+     - Tagged as `safe` for ECLAIR.
+
    * - R14.2
      - The severe restrictions imposed by this rule on the use of 'for'
        statements are not counterbalanced by the presumed facilitation of the
