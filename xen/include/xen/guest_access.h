@@ -86,6 +86,7 @@
 #define copy_from_guest_offset(ptr, hnd, off, nr) ({    \
     unsigned long s_ = (unsigned long)(hnd).p;          \
     typeof(*(ptr)) *_d = (ptr);                         \
+    (void)((hnd).p == _d);                              \
     raw_copy_from_guest(_d,                             \
                         (const void *)(s_ + (off) * sizeof(*_d)), \
                         (nr) * sizeof(*_d));            \
@@ -140,6 +141,7 @@
 #define __copy_from_guest_offset(ptr, hnd, off, nr) ({          \
     unsigned long s_ = (unsigned long)(hnd).p;                  \
     typeof(*(ptr)) *_d = (ptr);                                 \
+    (void)((hnd).p == _d);                                      \
     __raw_copy_from_guest(_d,                                   \
                           (const void *)(s_ + (off) * sizeof(*_d)), \
                           (nr) * sizeof(*_d));                  \
