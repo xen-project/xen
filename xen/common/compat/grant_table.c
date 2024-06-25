@@ -33,7 +33,6 @@ CHECK_gnttab_unmap_and_replace;
 #define xen_gnttab_query_size gnttab_query_size
 CHECK_gnttab_query_size;
 #undef xen_gnttab_query_size
-DEFINE_XEN_GUEST_HANDLE(gnttab_query_size_compat_t);
 
 DEFINE_XEN_GUEST_HANDLE(gnttab_setup_table_compat_t);
 DEFINE_XEN_GUEST_HANDLE(gnttab_transfer_compat_t);
@@ -111,7 +110,7 @@ int compat_grant_table_op(
     CASE(copy);
 #endif
 
-#ifndef CHECK_query_size
+#ifndef CHECK_gnttab_query_size
     CASE(query_size);
 #endif
 
