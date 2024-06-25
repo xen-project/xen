@@ -523,6 +523,12 @@ in the expansion."
 # Series 21.
 #
 
+-doc_begin="or, and and xor are reserved identifiers because they constitute alternate
+spellings for the corresponding operators (they are defined as macros by iso646.h).
+However, Xen doesn't use standard library headers, so there is no risk of overlap."
+-config=MC3R1.R21.2,reports+={safe, "any_area(stmt(ref(kind(label)&&^(or|and|xor|not)$)))"}
+-doc_end
+
 -doc_begin="Xen does not use the functions provided by the Standard Library, but
 implements a set of functions that share the same names as their Standard Library equivalent.
 The implementation of these functions is available in source form, so the undefined, unspecified
