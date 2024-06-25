@@ -183,13 +183,14 @@ static bool evtchn_usable(const struct evtchn *evtchn)
 /* Wait on a Xen-attached event channel. */
 #define wait_on_xen_event_channel(port, condition)                      \
     do {                                                                \
+        struct vcpu *v = current;                                       \
         if ( condition )                                                \
             break;                                                      \
-        set_bit(_VPF_blocked_in_xen, &current->pause_flags);            \
+        set_bit(_VPF_blocked_in_xen, &v->pause_flags);                  \
         smp_mb(); /* set blocked status /then/ re-evaluate condition */ \
         if ( condition )                                                \
         {                                                               \
-            clear_bit(_VPF_blocked_in_xen, &current->pause_flags);      \
+            clear_bit(_VPF_blocked_in_xen, &v->pause_flags);            \
             break;                                                      \
         }                                                               \
         raise_softirq(SCHEDULE_SOFTIRQ);                                \
@@ -198,7 +199,8 @@ static bool evtchn_usable(const struct evtchn *evtchn)
 
 #define prepare_wait_on_xen_event_channel(port)                         \
     do {                                                                \
-        set_bit(_VPF_blocked_in_xen, &current->pause_flags);            \
+        struct vcpu *v = current;                                       \
+        set_bit(_VPF_blocked_in_xen, &v->pause_flags);                  \
         raise_softirq(SCHEDULE_SOFTIRQ);                                \
         smp_mb(); /* set blocked status /then/ caller does his work */  \
     } while ( 0 )
