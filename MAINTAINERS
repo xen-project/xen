@@ -208,7 +208,7 @@ Maintainers List (try to look for most precise areas first)
 
 9PFSD
 M:	Juergen Gross <jgross@suse.com>
-M:	Anthony PERARD <anthony@xenproject.org>
+M:	Anthony PERARD <anthony.perard@vates.tech>
 S:	Supported
 F:	tools/9pfsd/
 
@@ -383,7 +383,7 @@ F:	xen/arch/x86/machine_kexec.c
 F:	xen/arch/x86/x86_64/kexec_reloc.S
 
 LIBS
-M:	Anthony PERARD <anthony@xenproject.org>
+M:	Anthony PERARD <anthony.perard@vates.tech>
 R:	Juergen Gross <jgross@suse.com>
 S:	Supported
 F:	tools/include/libxenvchan.h
@@ -429,7 +429,7 @@ S:	Supported
 F:	tools/ocaml/
 
 OVMF UPSTREAM
-M:	Anthony PERARD <anthony@xenproject.org>
+M:	Anthony PERARD <anthony.perard@vates.tech>
 S:	Supported
 T:	git https://xenbits.xenproject.org/git-http/ovmf.git
 
@@ -462,7 +462,7 @@ T:	git https://xenbits.xenproject.org/git-http/qemu-xen-traditional.git
 
 QEMU UPSTREAM
 M:	Stefano Stabellini <sstabellini@kernel.org>
-M:	Anthony Perard <anthony@xenproject.org>
+M:	Anthony Perard <anthony.perard@vates.tech>
 S:	Supported
 T:	git https://xenbits.xenproject.org/git-http/qemu-xen.git
 
@@ -515,7 +515,7 @@ F:	xen/arch/arm/include/asm/tee
 F:	xen/arch/arm/tee/
 
 TOOLSTACK
-M:	Anthony PERARD <anthony@xenproject.org>
+M:	Anthony PERARD <anthony.perard@vates.tech>
 S:	Supported
 F:	autogen.sh
 F:	config/*.in
