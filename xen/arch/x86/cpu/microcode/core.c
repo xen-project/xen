@@ -887,6 +887,8 @@ int __init early_microcode_init(unsigned long *module_map,
 
     ucode_ops.collect_cpu_info();
 
+    printk(XENLOG_INFO "BSP microcode revision: 0x%08x\n", this_cpu(cpu_sig).rev);
+
     /*
      * Some hypervisors deliberately report a microcode revision of -1 to
      * mean that they will not accept microcode updates.
