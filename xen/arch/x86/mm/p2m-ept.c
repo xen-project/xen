@@ -662,6 +662,8 @@ static int cf_check resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
             if ( e.emt != MTRR_NUM_TYPES )
                 break;
 
+            ASSERT(is_epte_present(&e));
+
             if ( level == 0 )
             {
                 for ( gfn -= i, i = 0; i < EPT_PAGETABLE_ENTRIES; ++i )
@@ -927,17 +929,6 @@ ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
 
     if ( mfn_valid(mfn) || p2m_allows_invalid_mfn(p2mt) )
     {
-        bool ipat;
-        int emt = epte_get_entry_emt(p2m->domain, _gfn(gfn), mfn,
-                                     i * EPT_TABLE_ORDER, &ipat,
-                                     p2mt);
-
-        if ( emt >= 0 )
-            new_entry.emt = emt;
-        else /* ept_handle_misconfig() will need to take care of this. */
-            new_entry.emt = MTRR_NUM_TYPES;
-
-        new_entry.ipat = ipat;
         new_entry.sp = !!i;
         new_entry.sa_p2mt = p2mt;
         new_entry.access = p2ma;
@@ -953,6 +944,22 @@ ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
             need_modify_vtd_table = 0;
 
         ept_p2m_type_to_flags(p2m, &new_entry);
+
+        if ( is_epte_present(&new_entry) )
+        {
+            bool ipat;
+            int emt = epte_get_entry_emt(p2m->domain, _gfn(gfn), mfn,
+                                         i * EPT_TABLE_ORDER, &ipat,
+                                         p2mt);
+
+            BUG_ON(mfn_eq(mfn, INVALID_MFN));
+
+            if ( emt >= 0 )
+                new_entry.emt = emt;
+            else /* ept_handle_misconfig() will need to take care of this. */
+                new_entry.emt = MTRR_NUM_TYPES;
+            new_entry.ipat = ipat;
+        }
     }
 
     if ( sve != -1 )
