@@ -642,13 +642,6 @@ void xstate_init(struct cpuinfo_x86 *c)
         return;
     }
 
-    /*
-     * Zap the cached values to make set_xcr0() and set_msr_xss() really
-     * write it.
-     */
-    this_cpu(xcr0) = 0;
-    this_cpu(xss) = ~0;
-
     cpuid_count(XSTATE_CPUID, 0, &eax, &ebx, &ecx, &edx);
     feature_mask = (((u64)edx << 32) | eax) & XCNTXT_MASK;
     BUG_ON(!valid_xcr0(feature_mask));
@@ -658,8 +651,19 @@ void xstate_init(struct cpuinfo_x86 *c)
      * Set CR4_OSXSAVE and run "cpuid" to get xsave_cntxt_size.
      */
     set_in_cr4(X86_CR4_OSXSAVE);
+
+    /*
+     * Zap the cached values to make set_xcr0() and set_msr_xss() really write
+     * the hardware register.
+     */
+    this_cpu(xcr0) = 0;
     if ( !set_xcr0(feature_mask) )
         BUG();
+    if ( cpu_has_xsaves )
+    {
+        this_cpu(xss) = ~0;
+        set_msr_xss(0);
+    }
 
     if ( bsp )
     {
