@@ -325,8 +325,8 @@ F:	xen/arch/x86/debug.c
 F:	tools/debugger/gdbsx/
 
 GOLANG BINDINGS
-M:	George Dunlap <george.dunlap@citrix.com>
 M:	Nick Rosbrook <rosbrookn@gmail.com>
+R:	George Dunlap <gwd@xenproject.org>
 S:	Maintained
 F:	tools/golang
 
@@ -490,9 +490,9 @@ S:	Supported
 F:	xen/common/sched/rt.c
 
 SCHEDULING
-M:	George Dunlap <george.dunlap@citrix.com>
 M:	Dario Faggioli <dfaggioli@suse.com>
 M:	Juergen Gross <jgross@suse.com>
+R:	George Dunlap <gwd@xenproject.org>
 S:	Supported
 F:	xen/common/sched/
 
@@ -597,7 +597,6 @@ F:	tools/tests/x86_emulator/
 X86 MEMORY MANAGEMENT
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Andrew Cooper <andrew.cooper3@citrix.com>
-R:	George Dunlap <george.dunlap@citrix.com>
 S:	Supported
 F:	xen/arch/x86/mm/
 
@@ -641,13 +640,6 @@ F:	tools/libs/store/
 F:	tools/xenstored/
 F:	tools/xs-clients/
 
-XENTRACE
-M:	George Dunlap <george.dunlap@citrix.com>
-S:	Supported
-F:	tools/xentrace/
-F:	xen/common/trace.c
-F:	xen/include/xen/trace.h
-
 XEN MISRA ANALYSIS TOOLS
 M:	Luca Fancellu <luca.fancellu@arm.com>
 S:	Supported
@@ -670,7 +662,6 @@ K:	\b(xsm|XSM)\b
 
 THE REST
 M:	Andrew Cooper <andrew.cooper3@citrix.com>
-M:	George Dunlap <george.dunlap@citrix.com>
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Julien Grall <julien@xen.org>
 M:	Stefano Stabellini <sstabellini@kernel.org>
