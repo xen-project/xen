@@ -294,9 +294,12 @@ static int cf_check apply_microcode(const struct microcode_patch *patch)
 
     result = microcode_update_match(patch);
 
-    if ( result != NEW_UCODE &&
-         !(opt_ucode_allow_same && result == SAME_UCODE) )
+    if ( result == MIS_UCODE )
         return -EINVAL;
+
+    if ( result == OLD_UCODE ||
+         (result == SAME_UCODE && !opt_ucode_allow_same) )
+        return -EEXIST;
 
     wbinvd();
 

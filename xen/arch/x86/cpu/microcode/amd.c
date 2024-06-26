@@ -222,12 +222,15 @@ static int cf_check apply_microcode(const struct microcode_patch *patch)
     uint32_t rev, old_rev = sig->rev;
     enum microcode_match_result result = microcode_fits(patch);
 
+    if ( result == MIS_UCODE )
+        return -EINVAL;
+
     /*
      * Allow application of the same revision to pick up SMT-specific changes
      * even if the revision of the other SMT thread is already up-to-date.
      */
-    if ( result != NEW_UCODE && result != SAME_UCODE )
-        return -EINVAL;
+    if ( result == OLD_UCODE )
+        return -EEXIST;
 
     if ( check_final_patch_levels(sig) )
     {
