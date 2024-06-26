@@ -500,12 +500,6 @@ int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
         return -1;
     }
 
-    if ( !mfn_valid(mfn) )
-    {
-        *ipat = true;
-        return X86_MT_UC;
-    }
-
     /*
      * Conditional must be kept in sync with the code in
      * {iomem,ioports}_{permit,deny}_access().
