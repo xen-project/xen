@@ -63,6 +63,11 @@ Deviations related to MISRA C:2012 Rules:
        switch statement.
      - ECLAIR has been configured to ignore those statements.
 
+   * - R2.1
+     - The asm-offset files are not linked deliberately, since they are used to
+       generate definitions for asm modules.
+     - Tagged as `deliberate` for ECLAIR.
+
    * - R2.2
      - Proving compliance with respect to Rule 2.2 is generally impossible:
        see `<https://arxiv.org/abs/2212.13933>`_ for details. Moreover, peer
@@ -203,6 +208,26 @@ Deviations related to MISRA C:2012 Rules:
        it.
      - Tagged as `safe` for ECLAIR.
 
+   * - R8.4
+     - Some functions are excluded from non-debug build, therefore the absence
+       of declaration is safe.
+     - Tagged as `safe` for ECLAIR, such functions are:
+         - apei_read_mce()
+         - apei_check_mce()
+         - apei_clear_mce()
+
+   * - R8.4
+     - Given that bsearch and sort are defined with the attribute 'gnu_inline',
+       it's deliberate not to have a prior declaration.
+       See Section \"6.33.1 Common Function Attributes\" of \"GCC_MANUAL\" for
+       a full explanation of gnu_inline.
+     - Tagged as `deliberate` for ECLAIR.
+
+   * - R8.4
+     - first_valid_mfn is defined in this way because the current lack of NUMA
+       support in Arm and PPC requires it.
+     - Tagged as `deliberate` for ECLAIR.
+
    * - R8.6
      - The following variables are compiled in multiple translation units
        belonging to different executables and therefore are safe.
@@ -282,6 +307,39 @@ Deviations related to MISRA C:2012 Rules:
        If no bits are set, 0 is returned.
      - Tagged as `safe` for ECLAIR.
 
+   * - R11.1
+     - The conversion from a function pointer to unsigned long or (void \*) does
+       not lose any information, provided that the target type has enough bits
+       to store it.
+     - Tagged as `safe` for ECLAIR.
+
+   * - R11.1
+     - The conversion from a function pointer to a boolean has a well-known
+       semantics that do not lead to unexpected behaviour.
+     - Tagged as `safe` for ECLAIR.
+
+   * - R11.2
+     - The conversion from a pointer to an incomplete type to unsigned long
+       does not lose any information, provided that the target type has enough
+       bits to store it.
+     - Tagged as `safe` for ECLAIR.
+
+   * - R11.3
+     - Conversions to object pointers that have a pointee type with a smaller
+       (i.e., less strict) alignment requirement are safe.
+     - Tagged as `safe` for ECLAIR.
+
+   * - R11.6
+     - Conversions from and to integral types are safe, in the assumption that
+       the target type has enough bits to store the value.
+       See also Section \"4.7 Arrays and Pointers\" of \"GCC_MANUAL\"
+     - Tagged as `safe` for ECLAIR.
+
+   * - R11.6
+     - The conversion from a pointer to a boolean has a well-known semantics
+       that do not lead to unexpected behaviour.
+     - Tagged as `safe` for ECLAIR.
+
    * - R11.8
      - Violations caused by container_of are due to pointer arithmetic operations
        with the provided offset. The resulting pointer is then immediately cast back to its
@@ -318,8 +376,19 @@ Deviations related to MISRA C:2012 Rules:
 
    * - R14.3
      - The Xen team relies on the fact that invariant conditions of 'if'
-       statements are deliberate.
-     - Project-wide deviation; tagged as `disapplied` for ECLAIR.
+       statements and conditional operators are deliberate.
+     - Tagged as `deliberate` for ECLAIR.
+
+   * - R14.3
+     - Switches having a 'sizeof' operator as the condition are deliberate and
+       have limited scope.
+     - Tagged as `deliberate` for ECLAIR.
+
+   * - R14.3
+     - The use of an invariant size argument in {put,get}_unsafe_size and
+       array_access_ok, as defined in arch/x86(_64)?/include/asm/uaccess.h is
+       deliberate and is deemed safe.
+     - Tagged as `deliberate` for ECLAIR.
 
    * - R14.4
      - A controlling expression of 'if' and iteration statements having
@@ -486,10 +555,10 @@ Other deviations:
    * - Deviation
      - Justification
 
-   * - do-while-0 loops
-     - The do-while-0 is a well-recognized loop idiom used by the Xen community
-       and can therefore be used, even though it would cause a number of
-       violations in some instances.
+   * - do-while-0 and do-while-1 loops
+     - The do-while-0 and do-while-1 loops are well-recognized loop idioms used
+       by the Xen community and can therefore be used, even though they would
+       cause a number of violations in some instances.
 
    * - while-0 and while-1 loops
      - while-0 and while-1 are well-recognized loop idioms used by the Xen
