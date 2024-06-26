@@ -2576,6 +2576,14 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
             desc->arch.move_cleanup_count -= cpumask_weight(affinity);
             if ( !desc->arch.move_cleanup_count )
                 release_old_vec(desc);
+            else
+                /*
+                 * Adjust old_cpu_mask to account for the offline CPUs,
+                 * otherwise further calls to fixup_irqs() could subtract those
+                 * again and possibly underflow the counter.
+                 */
+                cpumask_andnot(desc->arch.old_cpu_mask, desc->arch.old_cpu_mask,
+                               affinity);
         }
 
         if ( !desc->action || cpumask_subset(desc->affinity, mask) )
