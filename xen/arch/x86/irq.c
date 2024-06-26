@@ -2539,7 +2539,7 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
     for ( irq = 0; irq < nr_irqs; irq++ )
     {
         bool break_affinity = false, set_affinity = true;
-        unsigned int vector;
+        unsigned int vector, cpu = smp_processor_id();
         cpumask_t *affinity = this_cpu(scratch_cpumask);
 
         if ( irq == 2 )
@@ -2580,6 +2580,33 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
                  */
                 cpumask_andnot(desc->arch.old_cpu_mask, desc->arch.old_cpu_mask,
                                affinity);
+        }
+
+        if ( desc->arch.move_in_progress &&
+             /*
+              * Only attempt to adjust the mask if the current CPU is going
+              * offline, otherwise the whole system is going down and leaving
+              * stale data in the masks is fine.
+              */
+             !cpu_online(cpu) &&
+             cpumask_test_cpu(cpu, desc->arch.old_cpu_mask) )
+        {
+            /*
+             * This CPU is going offline, remove it from ->arch.old_cpu_mask
+             * and possibly release the old vector if the old mask becomes
+             * empty.
+             *
+             * Note cleaning ->arch.old_cpu_mask is required if the CPU is
+             * brought offline and then online again, as when re-onlined the
+             * per-cpu vector table will no longer have ->arch.old_vector
+             * setup, and hence ->arch.old_cpu_mask would be stale.
+             */
+            cpumask_clear_cpu(cpu, desc->arch.old_cpu_mask);
+            if ( cpumask_empty(desc->arch.old_cpu_mask) )
+            {
+                desc->arch.move_in_progress = 0;
+                release_old_vec(desc);
+            }
         }
 
         /*
