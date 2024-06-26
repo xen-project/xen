@@ -343,7 +343,8 @@ void __init early_cpu_init(void)
 
 	c->x86_vendor = x86_cpuid_lookup_vendor(ebx, ecx, edx);
 	switch (c->x86_vendor) {
-	case X86_VENDOR_INTEL:	  actual_cpu = intel_cpu_dev;    break;
+	case X86_VENDOR_INTEL:	  intel_unlock_cpuid_leaves(c);
+				  actual_cpu = intel_cpu_dev;    break;
 	case X86_VENDOR_AMD:	  actual_cpu = amd_cpu_dev;      break;
 	case X86_VENDOR_CENTAUR:  actual_cpu = centaur_cpu_dev;  break;
 	case X86_VENDOR_SHANGHAI: actual_cpu = shanghai_cpu_dev; break;

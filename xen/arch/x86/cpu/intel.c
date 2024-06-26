@@ -293,15 +293,11 @@ static void __init noinline intel_init_levelling(void)
 		ctxt_switch_masking = intel_ctxt_switch_masking;
 }
 
-static void cf_check early_init_intel(struct cpuinfo_x86 *c)
+/* Unmask CPUID levels (and NX) if masked. */
+void intel_unlock_cpuid_leaves(struct cpuinfo_x86 *c)
 {
-	u64 misc_enable, disable;
+	uint64_t misc_enable, disable;
 
-	/* Netburst reports 64 bytes clflush size, but does IO in 128 bytes */
-	if (c->x86 == 15 && c->x86_cache_alignment == 64)
-		c->x86_cache_alignment = 128;
-
-	/* Unmask CPUID levels and NX if masked: */
 	rdmsrl(MSR_IA32_MISC_ENABLE, misc_enable);
 
 	disable = misc_enable & (MSR_IA32_MISC_ENABLE_LIMIT_CPUID |
@@ -309,17 +305,26 @@ static void cf_check early_init_intel(struct cpuinfo_x86 *c)
 	if (disable) {
 		wrmsrl(MSR_IA32_MISC_ENABLE, misc_enable & ~disable);
 		bootsym(trampoline_misc_enable_off) |= disable;
-		bootsym(trampoline_efer) |= EFER_NXE;
 	}
-
-	if (disable & MSR_IA32_MISC_ENABLE_LIMIT_CPUID)
-		printk(KERN_INFO "revised cpuid level: %d\n",
-		       cpuid_eax(0));
+	if (disable & MSR_IA32_MISC_ENABLE_LIMIT_CPUID) {
+		c->cpuid_level = cpuid_eax(0);
+		printk(KERN_INFO "revised cpuid level: %u\n", c->cpuid_level);
+	}
 	if (disable & MSR_IA32_MISC_ENABLE_XD_DISABLE) {
+		bootsym(trampoline_efer) |= EFER_NXE;
 		write_efer(read_efer() | EFER_NXE);
 		printk(KERN_INFO
 		       "re-enabled NX (Execute Disable) protection\n");
 	}
+}
+
+static void cf_check early_init_intel(struct cpuinfo_x86 *c)
+{
+	/* Netburst reports 64 bytes clflush size, but does IO in 128 bytes */
+	if (c->x86 == 15 && c->x86_cache_alignment == 64)
+		c->x86_cache_alignment = 128;
+
+	intel_unlock_cpuid_leaves(c);
 
 	/* CPUID workaround for Intel 0F33/0F34 CPU */
 	if (boot_cpu_data.x86 == 0xF && boot_cpu_data.x86_model == 3 &&
