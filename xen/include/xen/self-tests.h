@@ -19,11 +19,11 @@
 #if !defined(CONFIG_CC_IS_CLANG) || CONFIG_CLANG_VERSION >= 80000
 #define COMPILE_CHECK(fn, val, res)                                     \
     do {                                                                \
-        typeof(fn(val)) real = fn(val);                                 \
+        typeof((fn)(val)) real = (fn)(val);                             \
                                                                         \
         if ( !__builtin_constant_p(real) )                              \
             asm ( ".error \"'" STR(fn(val)) "' not compile-time constant\"" ); \
-        else if ( real != res )                                         \
+        else if ( real != (res) )                                       \
             asm ( ".error \"Compile time check '" STR(fn(val) == res) "' failed\"" ); \
     } while ( 0 )
 #else
@@ -37,9 +37,9 @@
  */
 #define RUNTIME_CHECK(fn, val, res)                     \
     do {                                                \
-        typeof(fn(val)) real = fn(HIDE(val));           \
+        typeof((fn)(val)) real = (fn)(HIDE(val));       \
                                                         \
-        if ( real != res )                              \
+        if ( real != (res) )                            \
             panic("%s: %s(%s) expected %u, got %u\n",   \
                   __func__, #fn, #val, real, res);      \
     } while ( 0 )
