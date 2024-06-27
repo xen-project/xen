@@ -980,37 +980,24 @@ int xc_dom_mem_init(struct xc_dom_image *dom, unsigned int mem_mb)
 
 static int xc_dom_build_module(struct xc_dom_image *dom, unsigned int mod)
 {
-    size_t unziplen, modulelen;
+    size_t modulelen;
     void *modulemap;
     char name[10];
 
-    if ( !dom->modules[mod].seg.vstart )
-        unziplen = xc_dom_check_gzip(dom->xch,
-                                     dom->modules[mod].blob, dom->modules[mod].size);
-    else
-        unziplen = 0;
+    modulelen = dom->modules[mod].size;
 
-    modulelen = max(unziplen, dom->modules[mod].size);
-    if ( dom->max_module_size )
+    if ( dom->max_module_size && modulelen > dom->max_module_size )
     {
-        if ( unziplen && modulelen > dom->max_module_size )
-        {
-            modulelen = min(unziplen, dom->modules[mod].size);
-            if ( unziplen > modulelen )
-                unziplen = 0;
-        }
-        if ( modulelen > dom->max_module_size )
-        {
-            xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
-                         "module %u image too large", mod);
-            goto err;
-        }
+        xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
+                     "module %u image too large", mod);
+        goto err;
     }
 
     snprintf(name, sizeof(name), "module%u", mod);
     if ( xc_dom_alloc_segment(dom, &dom->modules[mod].seg, name,
                               dom->modules[mod].seg.vstart, modulelen) != 0 )
         goto err;
+
     modulemap = xc_dom_seg_to_ptr(dom, &dom->modules[mod].seg);
     if ( modulemap == NULL )
     {
@@ -1018,21 +1005,8 @@ static int xc_dom_build_module(struct xc_dom_image *dom, unsigned int mod)
                   __FUNCTION__, mod);
         goto err;
     }
-    if ( unziplen )
-    {
-        if ( xc_dom_do_gunzip(dom->xch, dom->modules[mod].blob, dom->modules[mod].size,
-                              modulemap, unziplen) != -1 )
-            return 0;
-        if ( dom->modules[mod].size > modulelen )
-            goto err;
-    }
 
-    /* Fall back to handing over the raw blob. */
     memcpy(modulemap, dom->modules[mod].blob, dom->modules[mod].size);
-    /* If an unzip attempt was made, the buffer may no longer be all zero. */
-    if ( unziplen > dom->modules[mod].size )
-        memset(modulemap + dom->modules[mod].size, 0,
-               unziplen - dom->modules[mod].size);
 
     return 0;
 

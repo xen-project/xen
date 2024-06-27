@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Changed
  - Fixed blkif protocol specification for sector sizes different than 512b.
+ - The dombuilder in libxenguest no longer un-gzips secondary modules, instead
+   leaving this to the guest kernel to do in guest context.
  - On x86:
    - Prefer ACPI reboot over UEFI ResetSystem() run time service call.
    - Switched the xAPIC flat driver to use physical destination mode for external
