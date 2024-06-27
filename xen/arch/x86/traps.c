@@ -123,7 +123,7 @@ unsigned int __ro_after_init ler_msr;
 const unsigned int nmi_cpu;
 
 #define stack_words_per_line 4
-#define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)regs->rsp)
+#define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)(regs)->rsp)
 
 void show_code(const struct cpu_user_regs *regs)
 {
