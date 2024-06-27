@@ -416,7 +416,8 @@ Deviations related to MISRA C:2012 Rules:
        (2) as macro arguments;
        (3) as array indices;
        (4) as lhs in assignments;
-       (5) as initializers, possibly designated, in initalizer lists.
+       (5) as initializers, possibly designated, in initalizer lists;
+       (6) as constant expressions of switch case labels.
      - Tagged as `safe` for ECLAIR.
 
    * - R20.7
