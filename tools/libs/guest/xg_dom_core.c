@@ -601,7 +601,7 @@ int xc_dom_alloc_segment(struct xc_dom_image *dom,
     memset(ptr, 0, pages * page_size);
 
     seg->vstart = start;
-    seg->vend = dom->virt_alloc_end;
+    seg->vend = start + size;
 
     DOMPRINTF("%-20s:   %-12s : 0x%" PRIx64 " -> 0x%" PRIx64
               "  (pfn 0x%" PRIpfn " + 0x%" PRIpfn " pages)",
