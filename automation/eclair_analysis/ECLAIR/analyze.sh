@@ -11,7 +11,7 @@ fatal() {
 }
 
 usage() {
-  fatal "Usage: ${script_name} <ARM64|X86_64> <Set0|Set1|Set2|Set3>"
+  fatal "Usage: ${script_name} <ARM64|X86_64> <accepted|monitored>"
 }
 
 if [[ $# -ne 2 ]]; then
@@ -40,7 +40,6 @@ ECLAIR_REPORT_LOG=${ECLAIR_OUTPUT_DIR}/REPORT.log
 if [[ "$1" = "X86_64" ]]; then
   export CROSS_COMPILE=
   export XEN_TARGET_ARCH=x86_64
-  EXTRA_ECLAIR_ENV_OPTIONS=-disable=MC3R1.R20.7
 elif [[ "$1" = "ARM64" ]]; then
   export CROSS_COMPILE=aarch64-linux-gnu-
   export XEN_TARGET_ARCH=arm64
