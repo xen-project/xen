@@ -103,10 +103,13 @@ extern int bitmap_allocate_region(unsigned long *bitmap, int pos, int order);
 #define bitmap_switch(nbits, zero, small, large)			  \
 	unsigned int n__ = (nbits);					  \
 	if (__builtin_constant_p(nbits) && !n__) {			  \
+		/* SAF-7-safe Rule 20.7 non-parenthesized macro argument */ \
 		zero;							  \
 	} else if (__builtin_constant_p(nbits) && n__ <= BITS_PER_LONG) { \
+		/* SAF-7-safe Rule 20.7 non-parenthesized macro argument */ \
 		small;							  \
 	} else {							  \
+		/* SAF-7-safe Rule 20.7 non-parenthesized macro argument */ \
 		large;							  \
 	}
 
