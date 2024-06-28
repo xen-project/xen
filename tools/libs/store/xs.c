@@ -1,4 +1,4 @@
-/* 
+/*
     Xen Store Daemon interface providing simple tree-like database.
     Copyright (C) 2005 Rusty Russell IBM Corporation
 
@@ -164,8 +164,10 @@ static void *read_thread(void *arg);
 
 static int read_message(struct xs_handle *h, int nonblocking);
 
-static bool setnonblock(int fd, int nonblock) {
+static bool setnonblock(int fd, int nonblock)
+{
 	int flags = fcntl(fd, F_GETFL);
+
 	if (flags == -1)
 		return false;
 
@@ -236,7 +238,7 @@ static int get_socket(const char *connect_to)
 		goto error;
 
 	addr.sun_family = AF_UNIX;
-	if(strlen(connect_to) >= sizeof(addr.sun_path)) {
+	if (strlen(connect_to) >= sizeof(addr.sun_path)) {
 		errno = EINVAL;
 		goto error;
 	}
@@ -276,9 +278,11 @@ error:
 	return -1;
 }
 
-static int all_restrict_cb(Xentoolcore__Active_Handle *ah, domid_t domid) {
-    struct xs_handle *h = CONTAINER_OF(ah, *h, tc_ah);
-    return xentoolcore__restrict_by_dup2_null(h->fd);
+static int all_restrict_cb(Xentoolcore__Active_Handle *ah, domid_t domid)
+{
+	struct xs_handle *h = CONTAINER_OF(ah, *h, tc_ah);
+
+	return xentoolcore__restrict_by_dup2_null(h->fd);
 }
 
 static struct xs_handle *get_handle(const char *connect_to)
@@ -362,8 +366,10 @@ struct xs_handle *xs_domain_open(void)
 static const char *xs_domain_dev(void)
 {
 	char *s = getenv("XENSTORED_PATH");
+
 	if (s)
 		return s;
+
 #if defined(__RUMPUSER_XEN__) || defined(__RUMPRUN__)
 	return "/dev/xen/xenbus";
 #elif defined(__linux__)
@@ -394,7 +400,8 @@ struct xs_handle *xs_open(unsigned long flags)
 	return xsh;
 }
 
-static void close_free_msgs(struct xs_handle *h) {
+static void close_free_msgs(struct xs_handle *h)
+{
 	struct xs_stored_msg *msg, *tmsg;
 
 	XEN_TAILQ_FOREACH_SAFE(msg, &h->reply_list, list, tmsg) {
@@ -408,7 +415,8 @@ static void close_free_msgs(struct xs_handle *h) {
 	}
 }
 
-static void close_fds_free(struct xs_handle *h) {
+static void close_fds_free(struct xs_handle *h)
+{
 	if (h->watch_pipe[0] != -1) {
 		close(h->watch_pipe[0]);
 		close(h->watch_pipe[1]);
@@ -416,7 +424,7 @@ static void close_fds_free(struct xs_handle *h) {
 
 	xentoolcore__deregister_active_handle(&h->tc_ah);
         close(h->fd);
-        
+
 	free(h);
 }
 
@@ -448,7 +456,7 @@ void xs_daemon_close(struct xs_handle *h)
         close_fds_free(h);
 }
 
-void xs_close(struct xs_handle* xsh)
+void xs_close(struct xs_handle *xsh)
 {
 	if (xsh)
 		xs_daemon_close(xsh);
@@ -995,7 +1003,7 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token)
 
 #define READ_THREAD_STACKSIZE 					\
 	((DEFAULT_THREAD_STACKSIZE < PTHREAD_STACK_MIN) ? 	\
-	PTHREAD_STACK_MIN : DEFAULT_THREAD_STACKSIZE)
+	 PTHREAD_STACK_MIN : DEFAULT_THREAD_STACKSIZE)
 
 	/* We dynamically create a reader thread on demand. */
 	mutex_lock(&h->request_mutex);
@@ -1258,7 +1266,7 @@ bool xs_transaction_end(struct xs_handle *h, xs_transaction_t t,
 		strcpy(abortstr, "F");
 	else
 		strcpy(abortstr, "T");
-	
+
 	return xs_bool(xs_single(h, t, XS_TRANSACTION_END, abortstr, NULL));
 }
 
@@ -1293,7 +1301,7 @@ bool xs_introduce_domain(struct xs_handle *h,
 }
 
 bool xs_set_target(struct xs_handle *h,
-			 unsigned int domid, unsigned int target)
+		   unsigned int domid, unsigned int target)
 {
 	struct xsd_sockmsg msg = { .type = XS_SET_TARGET };
 	char domid_str[MAX_STRLEN(domid)];
@@ -1377,30 +1385,30 @@ bool xs_is_domain_introduced(struct xs_handle *h, unsigned int domid)
 
 int xs_suspend_evtchn_port(int domid)
 {
-    char path[128];
-    char *portstr;
-    int port;
-    unsigned int plen;
-    struct xs_handle *xs;
+	char path[128];
+	char *portstr;
+	int port;
+	unsigned int plen;
+	struct xs_handle *xs;
 
-    xs = xs_daemon_open();
-    if (!xs)
-        return -1;
+	xs = xs_daemon_open();
+	if (!xs)
+		return -1;
 
-    sprintf(path, "/local/domain/%d/device/suspend/event-channel", domid);
-    portstr = xs_read(xs, XBT_NULL, path, &plen);
-    xs_daemon_close(xs);
+	sprintf(path, "/local/domain/%d/device/suspend/event-channel", domid);
+	portstr = xs_read(xs, XBT_NULL, path, &plen);
+	xs_daemon_close(xs);
 
-    if (!portstr || !plen) {
-        port = -1;
-        goto out;
-    }
+	if (!portstr || !plen) {
+		port = -1;
+		goto out;
+	}
 
-    port = atoi(portstr);
+	port = atoi(portstr);
 
 out:
-    free(portstr);
-    return port;
+	free(portstr);
+	return port;
 }
 
 char *xs_control_command(struct xs_handle *h, const char *cmd,
@@ -1436,7 +1444,7 @@ static int read_message(struct xs_handle *h, int nonblocking)
 	 * whole amount requested.  Ie as soon as we have the start of
 	 * the message we block until we get all of it.
 	 */
-         
+
 	struct xs_stored_msg *msg = NULL;
 	char *body = NULL;
 	int saved_errno = 0;
