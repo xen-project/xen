@@ -40,6 +40,10 @@
 #include <xentoolcore_internal.h>
 #include <xen_list.h>
 
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
 struct xs_stored_msg {
 	XEN_TAILQ_ENTRY(struct xs_stored_msg) list;
 	struct xsd_sockmsg hdr;
@@ -52,10 +56,6 @@ struct xs_stored_msg {
 
 #ifdef USE_DLSYM
 #include <dlfcn.h>
-#endif
-
-#ifndef O_CLOEXEC
-#define O_CLOEXEC 0
 #endif
 
 struct xs_handle {
@@ -176,6 +176,16 @@ static bool setnonblock(int fd, int nonblock) {
 	return true;
 }
 
+static bool set_cloexec(int fd)
+{
+	int flags = fcntl(fd, F_GETFL);
+
+	if (flags < 0)
+		return false;
+
+	return fcntl(fd, flags | FD_CLOEXEC) >= 0;
+}
+
 int xs_fileno(struct xs_handle *h)
 {
 	char c = 0;
@@ -230,8 +240,24 @@ error:
 
 static int get_dev(const char *connect_to)
 {
-	/* We cannot open read-only because requests are writes */
-	return open(connect_to, O_RDWR | O_CLOEXEC);
+	int fd, saved_errno;
+
+	fd = open(connect_to, O_RDWR | O_CLOEXEC);
+	if (fd < 0)
+		return -1;
+
+	/* Compat for non-O_CLOEXEC environments.  Racy. */
+	if (!O_CLOEXEC && !set_cloexec(fd))
+		goto error;
+
+	return fd;
+
+error:
+	saved_errno = errno;
+	close(fd);
+	errno = saved_errno;
+
+	return -1;
 }
 
 static int all_restrict_cb(Xentoolcore__Active_Handle *ah, domid_t domid) {
