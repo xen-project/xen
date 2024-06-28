@@ -65,6 +65,9 @@ struct xs_stored_msg {
 struct xs_handle {
 	/* Communications channel to xenstore daemon. */
 	int fd;
+
+	bool is_socket; /* is @fd a file or socket? */
+
 	Xentoolcore__Active_Handle tc_ah; /* for restrict */
 
 	/*
@@ -297,7 +300,9 @@ static struct xs_handle *get_handle(const char *connect_to)
 	if (stat(connect_to, &buf) != 0)
 		goto err;
 
-	if (S_ISSOCK(buf.st_mode))
+	h->is_socket = S_ISSOCK(buf.st_mode);
+
+	if (h->is_socket)
 		h->fd = get_socket(connect_to);
 	else
 		h->fd = get_dev(connect_to);
