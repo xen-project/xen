@@ -494,10 +494,6 @@ out_false:
 	return false;
 }
 
-#ifdef XSTEST
-#define read_all read_all_choice
-#define xs_write_all write_all_choice
-#else
 /* Simple routine for writing to sockets, etc. */
 bool xs_write_all(int fd, const void *data, unsigned int len)
 {
@@ -515,7 +511,6 @@ bool xs_write_all(int fd, const void *data, unsigned int len)
 
 	return true;
 }
-#endif
 
 static int get_error(const char *errorstring)
 {
