@@ -9751,6 +9751,18 @@ if test "$ax_found" = "0"; then :
 fi
 
 
+for ac_func in pipe2
+do :
+  ac_fn_c_check_func "$LINENO" "pipe2" "ac_cv_func_pipe2"
+if test "x$ac_cv_func_pipe2" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_PIPE2 1
+_ACEOF
+
+fi
+done
+
+
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
 # tests run on this system so they can be shared between configure
