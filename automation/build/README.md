@@ -81,7 +81,14 @@ Building a container
 
 There is a makefile to make this process easier. You should be
 able to run `make DISTRO/VERSION` to have Docker build the container
-for you. If you define the `PUSH` environment variable when running the
+for you.
+
+Xen's dockerfiles use heredocs, which depend on the standardised dockerfile
+syntax introduced by [BuiltKit].  This should work by default starting with
+docker 23.0, or podman/buildah v1.33.  For older versions of docker, it can be
+activated with `DOCKER_BUILDKIT=1` in the environment.
+
+If you define the `PUSH` environment variable when running the
 former `make` command, it will push the container to the [registry] if
 you have access to do so and have your Docker logged into the registry.
 
@@ -101,6 +108,7 @@ env CONTAINER_NO_PULL=1 \
 make -C automation/build suse/opensuse-tumbleweed PUSH=1
 ```
 
+[BuildKit]: https://docs.docker.com/build/buildkit/
 [registry]: https://gitlab.com/xen-project/xen/container_registry
 [registry help]: https://gitlab.com/help/user/project/container_registry
 

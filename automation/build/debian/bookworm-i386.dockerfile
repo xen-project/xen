@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM --platform=linux/i386 debian:bookworm
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"

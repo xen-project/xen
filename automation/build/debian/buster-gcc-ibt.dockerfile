@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM --platform=linux/amd64 debian:buster-slim AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive

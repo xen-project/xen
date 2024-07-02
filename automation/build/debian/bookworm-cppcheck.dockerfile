@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM --platform=linux/arm64/v8 debian:bookworm AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive

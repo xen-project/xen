@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM --platform=linux/arm64/v8 alpine:3.18
 LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
