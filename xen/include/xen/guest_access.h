@@ -95,16 +95,23 @@
 /* Copy sub-field of a structure to guest context via a guest handle. */
 #define copy_field_to_guest(hnd, ptr, field) ({         \
     const typeof(&(ptr)->field) _s = &(ptr)->field;     \
-    void *_d = &(hnd).p->field;                         \
-    (void)(&(hnd).p->field == _s);                      \
-    raw_copy_to_guest(_d, _s, sizeof(*_s));             \
+    unsigned long d_ = (unsigned long)(hnd).p;          \
+    /* Check that the handle is not for a const type */ \
+    void *__maybe_unused _t = (hnd).p;                  \
+    (void)((typeof_field(typeof(*(hnd).p), field) *)NULL == _s); \
+    raw_copy_to_guest((void *)(d_ + offsetof(typeof(*(hnd).p), field)), \
+                      _s, sizeof(*_s));                 \
 })
 
 /* Copy sub-field of a structure from guest context via a guest handle. */
 #define copy_field_from_guest(ptr, hnd, field) ({       \
-    const typeof(&(ptr)->field) _s = &(hnd).p->field;   \
+    unsigned long s_ = (unsigned long)(hnd).p;          \
     typeof(&(ptr)->field) _d = &(ptr)->field;           \
-    raw_copy_from_guest(_d, _s, sizeof(*_d));           \
+    (void)((typeof_field(typeof(*(hnd).p), field) *)NULL == _d); \
+    raw_copy_from_guest(_d,                             \
+                        (const void *)(s_ +             \
+                            offsetof(typeof(*(hnd).p), field)), \
+                        sizeof(*_d));                   \
 })
 
 #define copy_to_guest(hnd, ptr, nr)                     \
@@ -149,15 +156,22 @@
 
 #define __copy_field_to_guest(hnd, ptr, field) ({       \
     const typeof(&(ptr)->field) _s = &(ptr)->field;     \
-    void *_d = &(hnd).p->field;                         \
-    (void)(&(hnd).p->field == _s);                      \
-    __raw_copy_to_guest(_d, _s, sizeof(*_s));           \
+    unsigned long d_ = (unsigned long)(hnd).p;          \
+    /* Check that the handle is not for a const type */ \
+    void *__maybe_unused _t = (hnd).p;                  \
+    (void)((typeof_field(typeof(*(hnd).p), field) *)NULL == _s); \
+    __raw_copy_to_guest((void *)(d_ + offsetof(typeof(*(hnd).p), field)), \
+                        _s, sizeof(*_s));               \
 })
 
 #define __copy_field_from_guest(ptr, hnd, field) ({     \
-    const typeof(&(ptr)->field) _s = &(hnd).p->field;   \
+    unsigned long s_ = (unsigned long)(hnd).p;          \
     typeof(&(ptr)->field) _d = &(ptr)->field;           \
-    __raw_copy_from_guest(_d, _s, sizeof(*_d));         \
+    (void)((typeof_field(typeof(*(hnd).p), field) *)NULL == _d); \
+    __raw_copy_from_guest(_d,                           \
+                          (const void *)(s_ +           \
+                              offsetof(typeof(*(hnd).p), field)), \
+                          sizeof(*_d));                 \
 })
 
 #define __copy_to_guest(hnd, ptr, nr)                   \
