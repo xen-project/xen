@@ -6,10 +6,8 @@ LABEL maintainer.name="The Xen Project" \
 RUN pacman-key --init
 
 RUN pacman -S --refresh --sysupgrade --noconfirm --noprogressbar --needed \
-        bin86 \
         bridge-utils \
         bzip2 \
-        dev86 \
         discount \
         dtc \
         e2fsprogs \
