@@ -1400,6 +1400,7 @@ void (pirq_cleanup_check)(struct pirq *pirq, struct domain *d)
 
     if ( radix_tree_delete(&d->pirq_tree, pirq->pirq) != pirq )
         BUG();
+    free_pirq_struct(pirq);
 }
 
 /* Flush all ready EOIs from the top of this CPU's pending-EOI stack. */

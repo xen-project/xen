@@ -710,9 +710,14 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
             if ( !is_hvm_domain(d1) )
                 pirq_guest_unbind(d1, pirq);
             pirq->evtchn = 0;
-            pirq_cleanup_check(pirq, d1);
-            if ( is_hvm_domain(d1) && domain_pirq_to_irq(d1, pirq->pirq) > 0 )
-                unmap_domain_pirq_emuirq(d1, pirq->pirq);
+            if ( !is_hvm_domain(d1) ||
+                 domain_pirq_to_irq(d1, pirq->pirq) <= 0 ||
+                 unmap_domain_pirq_emuirq(d1, pirq->pirq) < 0 )
+                /*
+                 * The successful path of unmap_domain_pirq_emuirq() will have
+                 * called pirq_cleanup_check() already.
+                 */
+                pirq_cleanup_check(pirq, d1);
         }
         unlink_pirq_port(chn1, d1->vcpu[chn1->notify_vcpu_id]);
         break;
