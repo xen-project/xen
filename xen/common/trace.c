@@ -29,6 +29,7 @@
 #include <xen/mm.h>
 #include <xen/percpu.h>
 #include <xen/pfn.h>
+#include <xen/sections.h>
 #include <xen/cpu.h>
 #include <asm/atomic.h>
 #include <public/sysctl.h>
