@@ -2660,18 +2660,20 @@ void __init ioapic_init(void)
            nr_irqs_gsi, nr_irqs - nr_irqs_gsi);
 }
 
-unsigned int arch_hwdom_irqs(domid_t domid)
+unsigned int __hwdom_init arch_hwdom_irqs(const struct domain *d)
 {
     unsigned int n = fls(num_present_cpus());
+    /* Bounded by the domain pirq EOI bitmap gfn. */
+    const unsigned int max_irqs = PAGE_SIZE * BITS_PER_BYTE;
 
-    if ( !domid )
+    if ( is_system_domain(d) )
+        return max_irqs;
+
+    if ( !d->domain_id )
         n = min(n, dom0_max_vcpus());
-    n = min(nr_irqs_gsi + n * NR_DYNAMIC_VECTORS, nr_irqs);
+    n = min(nr_irqs_gsi + n * NR_DYNAMIC_VECTORS, min(nr_irqs, max_irqs));
 
-    /* Bounded by the domain pirq eoi bitmap gfn. */
-    n = min_t(unsigned int, n, PAGE_SIZE * BITS_PER_BYTE);
-
-    printk("Dom%d has maximum %u PIRQs\n", domid, n);
+    printk("%pd has maximum %u PIRQs\n", d, n);
 
     return n;
 }
