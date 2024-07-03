@@ -159,7 +159,7 @@ defined = {}
 # add defines to output
 for line in re.findall("#define[^\n]+", input):
     for define in defines:
-        regex = "#define\s+%s\\b" % define
+        regex = r"#define\s+%s\b" % define
         match = re.search(regex, line)
         if None == match:
             continue
@@ -168,18 +168,18 @@ for line in re.findall("#define[^\n]+", input):
             replace = define + "_" + arch.upper()
         else:
             replace = define + "_" + arch
-        regex = "\\b%s\\b" % define
+        regex = r"\b%s\b" % define
         output += re.sub(regex, replace, line) + "\n"
 output += "\n"
 
 # delete defines, comments, empty lines
 input = re.sub("#define[^\n]+\n", "", input)
-input = re.compile("/\*(.*?)\*/", re.S).sub("", input)
-input = re.compile("\n\s*\n", re.S).sub("\n", input)
+input = re.compile(r"/\*(.*?)\*/", re.S).sub("", input)
+input = re.compile(r"\n\s*\n", re.S).sub("\n", input)
 
 # add unions to output
 for union in unions:
-    regex = "union\s+%s\s*\{(.*?)\n\};" % union
+    regex = r"union\s+%s\s*\{(.*?)\n\};" % union
     match = re.search(regex, input, re.S)
     if None == match:
         output += "#define %s_has_no_%s 1\n" % (arch, union)
@@ -189,7 +189,7 @@ for union in unions:
 
 # add structs to output
 for struct in structs:
-    regex = "(?:#ifdef ([A-Z_]+))?\nstruct\s+%s\s*\{(.*?)\n\};" % struct
+    regex = r"(?:#ifdef ([A-Z_]+))?\nstruct\s+%s\s*\{(.*?)\n\};" % struct
     match = re.search(regex, input, re.S)
     if None == match or \
            (match.group(1) is not None and match.group(1) not in defined):
@@ -211,20 +211,20 @@ for define in defines:
         replace = define + "_" + arch.upper()
     else:
         replace = define + "_" + arch
-    output = re.sub("\\b%s\\b" % define, replace, output)
+    output = re.sub(r"\b%s\b" % define, replace, output)
 
 # replace: unions
 for union in unions:
-    output = re.sub("\\b(union\s+%s)\\b" % union, "\\1_%s" % arch, output)
+    output = re.sub(r"\b(union\s+%s)\b" % union, r"\1_%s" % arch, output)
 
 # replace: structs + struct typedefs
 for struct in structs:
-    output = re.sub("\\b(struct\s+%s)\\b" % struct, "\\1_%s" % arch, output)
-    output = re.sub("\\b(%s)_t\\b" % struct, "\\1_%s_t" % arch, output)
+    output = re.sub(r"\b(struct\s+%s)\b" % struct, r"\1_%s" % arch, output)
+    output = re.sub(r"\b(%s)_t\b" % struct, r"\1_%s_t" % arch, output)
 
 # replace: integer types
 for old, new in inttypes[arch]:
-    output = re.sub("\\b%s\\b" % old, new, output)
+    output = re.sub(r"\b%s\b" % old, new, output)
 
 # print results
 with open(outfile, "w") as f:
