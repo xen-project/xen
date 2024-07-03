@@ -38,8 +38,8 @@ xenstore-control: xenstore_control.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@ $(APPEND_LDFLAGS)
 
 .PHONY: clean
-clean::
-	$(RM) $(TARGETS) $(DEPS_RM)
+clean:
+	$(RM) *.o $(TARGETS) $(DEPS_RM)
 
 .PHONY: distclean
 distclean: clean
