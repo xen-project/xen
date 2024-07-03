@@ -1178,7 +1178,8 @@ versa.  For example to change dom0 without changing domU, use
 hardware domain is architecture dependent.  The upper limit for both values on
 x86 is such that the resulting total number of IRQs can't be higher than 32768.
 Note that specifying zero as domU value means zero, while for dom0 it means
-to use the default.
+to use the default.  Note further that the Dom0 setting has no useful meaning
+for the PVH case; use of the option may have an adverse effect there, though.
 
 ### ext_regions (Arm)
 > `= <boolean>`
