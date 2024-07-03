@@ -353,7 +353,8 @@ static int late_hwdom_init(struct domain *d)
 #ifdef CONFIG_HAS_PIRQ
 
 static unsigned int __read_mostly extra_hwdom_irqs;
-static unsigned int __read_mostly extra_domU_irqs = 32;
+#define DEFAULT_EXTRA_DOMU_IRQS 32U
+static unsigned int __read_mostly extra_domU_irqs = DEFAULT_EXTRA_DOMU_IRQS;
 
 static int __init cf_check parse_extra_guest_irqs(const char *s)
 {
@@ -839,7 +840,8 @@ void __init setup_system_domains(void)
             extra_hwdom_irqs = n - nr_static_irqs;
             printk(XENLOG_WARNING "hwdom IRQs bounded to %u\n", n);
         }
-        if ( extra_domU_irqs > max(32U, n - nr_static_irqs) )
+        if ( extra_domU_irqs >
+             max(DEFAULT_EXTRA_DOMU_IRQS, n - nr_static_irqs) )
         {
             extra_domU_irqs = n - nr_static_irqs;
             printk(XENLOG_WARNING "domU IRQs bounded to %u\n", n);
