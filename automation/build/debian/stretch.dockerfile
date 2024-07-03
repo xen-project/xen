@@ -10,7 +10,7 @@ RUN mkdir /build
 WORKDIR /build
 
 # replace repos in archive as release is EOL
-RUN cat <<"END" > /etc/apt/sources.list
+COPY <<"END" /etc/apt/sources.list
 deb http://archive.debian.org/debian/ stretch main contrib non-free
 deb http://archive.debian.org/debian/ stretch-backports main contrib non-free
 deb http://archive.debian.org/debian-security/ stretch/updates main contrib non-free
