@@ -10,7 +10,6 @@ RUN dnf -y install \
         gcc-c++ \
         ncurses-devel \
         zlib-devel \
-        openssl-devel \
         python-devel \
         python3-devel \
         libuuid-devel \

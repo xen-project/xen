@@ -14,7 +14,6 @@ WORKDIR /build
 RUN apt-get update && \
     apt-get --quiet --yes install \
         build-essential \
-        libssl-dev \
         bc \
         curl \
         flex \

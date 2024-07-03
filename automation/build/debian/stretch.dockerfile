@@ -22,7 +22,6 @@ RUN apt-get update && \
         build-essential \
         zlib1g-dev \
         libncurses5-dev \
-        libssl-dev \
         python-dev \
         python3-dev \
         xorg-dev \
