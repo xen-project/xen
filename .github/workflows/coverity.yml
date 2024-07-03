@@ -8,27 +8,39 @@ on:
 
 jobs:
   coverity:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
     - name: Install build dependencies
       run: |
-        sudo apt-get install -y wget git gawk \
-          libbz2-dev build-essential \
-          zlib1g-dev libncurses5-dev iasl \
-          libbz2-dev e2fslibs-dev uuid-dev ocaml \
-          ocaml-findlib libyajl-dev \
-          autoconf libtool liblzma-dev \
-          python3-dev golang libsystemd-dev
+        sudo apt-get install -y \
+          build-essential \
+          git-core \
+          golang \
+          iasl \
+          libbz2-dev \
+          libext2fs-dev \
+          liblzma-dev \
+          libncurses5-dev \
+          libyajl-dev \
+          libzstd-dev \
+          ocaml \
+          ocaml-findlib \
+          python3-dev \
+          uuid-dev \
+          zlib1g-dev \
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         ref: staging
 
     - name: Configure Xen
       run: |
-        ./configure --with-system-qemu=/bin/true \
-                    --with-system-seabios=/bin/true \
-                    --with-system-ovmf=/bin/true
+        ./configure \
+          --disable-docs \
+          --disable-stubdom \
+          --with-system-qemu=/bin/true \
+          --with-system-seabios=/bin/true \
+          --with-system-ovmf=/bin/true \
 
     - name: Pre build stuff
       run: |
