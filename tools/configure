@@ -659,7 +659,6 @@ libnl
 LIBNL3_LIBS
 LIBNL3_CFLAGS
 argp_ldflags
-libiconv
 PTHREAD_LIBS
 PTHREAD_LDFLAGS
 PTHREAD_CFLAGS
@@ -9740,49 +9739,6 @@ then :
 else $as_nop
   as_fn_error $? "Could not find zlib" "$LINENO" 5
 fi
-
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for libiconv_open in -liconv" >&5
-printf %s "checking for libiconv_open in -liconv... " >&6; }
-if test ${ac_cv_lib_iconv_libiconv_open+y}
-then :
-  printf %s "(cached) " >&6
-else $as_nop
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-liconv  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-char libiconv_open ();
-int
-main (void)
-{
-return libiconv_open ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"
-then :
-  ac_cv_lib_iconv_libiconv_open=yes
-else $as_nop
-  ac_cv_lib_iconv_libiconv_open=no
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.beam \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_iconv_libiconv_open" >&5
-printf "%s\n" "$ac_cv_lib_iconv_libiconv_open" >&6; }
-if test "x$ac_cv_lib_iconv_libiconv_open" = xyes
-then :
-  libiconv="y"
-else $as_nop
-  libiconv="n"
-fi
-
 
 ac_fn_c_check_header_compile "$LINENO" "argp.h" "ac_cv_header_argp_h" "$ac_includes_default"
 if test "x$ac_cv_header_argp_h" = xyes

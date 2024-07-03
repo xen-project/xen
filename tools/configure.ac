@@ -444,8 +444,6 @@ AX_CHECK_PTHREAD
 AC_CHECK_LIB([yajl], [yajl_alloc], [],
     [AC_MSG_ERROR([Could not find yajl])])
 AC_CHECK_LIB([z], [deflateCopy], [], [AC_MSG_ERROR([Could not find zlib])])
-AC_CHECK_LIB([iconv], [libiconv_open], [libiconv="y"], [libiconv="n"])
-AC_SUBST(libiconv)
 AC_CHECK_HEADER([argp.h], [
 AC_CHECK_LIB([argp], [argp_usage], [argp_ldflags="-largp"])
 ], [AC_MSG_ERROR([Could not find argp])])

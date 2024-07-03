@@ -5,7 +5,7 @@ freebsd_template: &FREEBSD_TEMPLATE
     APPEND_INCLUDES: /usr/local/include
 
   install_script: pkg install -y seabios gmake ninja bash
-                                 pkgconf python libiconv bison perl5
+                                 pkgconf python bison perl5
                                  yajl lzo2 pixman argp-standalone
                                  libxml2 glib git
 
