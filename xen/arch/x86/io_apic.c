@@ -1692,7 +1692,8 @@ static void cf_check mask_and_ack_level_ioapic_irq(struct irq_desc *desc)
        !io_apic_level_ack_pending(desc->irq))
         move_masked_irq(desc);
 
-    if ( !(v & (1 << (i & 0x1f))) ) {
+    if ( !(v & (1U << (i & 0x1f))) )
+    {
         spin_lock(&ioapic_lock);
         __edge_IO_APIC_irq(desc->irq);
         __level_IO_APIC_irq(desc->irq);
@@ -1756,7 +1757,8 @@ static void cf_check end_level_ioapic_irq_new(struct irq_desc *desc, u8 vector)
          !io_apic_level_ack_pending(desc->irq) )
         move_native_irq(desc);
 
-    if (!(v & (1 << (i & 0x1f)))) {
+    if ( !(v & (1U << (i & 0x1f))) )
+    {
         spin_lock(&ioapic_lock);
         __mask_IO_APIC_irq(desc->irq);
         __edge_IO_APIC_irq(desc->irq);
