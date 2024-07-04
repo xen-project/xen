@@ -67,7 +67,7 @@ static inline void cpu_relax(void)
     __asm__ __volatile__ ( "pause" );
 #else
     /* Encoding of the pause instruction */
-    __asm__ __volatile__ ( ".insn 0x0100000F" );
+    __asm__ __volatile__ ( ".insn r MISC_MEM, 0, 0, x0, x0, x16" );
 #endif
 
     barrier();
