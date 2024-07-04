@@ -38,6 +38,14 @@ switch_to_kernel:
         setc  %cl
         leal  (,%rcx,TBF_INTERRUPT),%ecx
 
+        /*
+         * The PV ABI hardcodes the (guest-inaccessible and virtual)
+         * SYSCALL_MASK MSR such that DF (and nothing else) would be cleared.
+         * Note that the equivalent of IF (VGCF_syscall_disables_events) is
+         * dealt with separately above.
+         */
+        mov   $~X86_EFLAGS_DF, %esi
+
         test  %rax, %rax
 UNLIKELY_START(z, syscall_no_callback) /* TB_eip == 0 => #UD */
         mov   VCPU_trap_ctxt(%rbx), %rdi
@@ -47,12 +55,14 @@ UNLIKELY_START(z, syscall_no_callback) /* TB_eip == 0 => #UD */
         testb $4, X86_EXC_UD * TRAPINFO_sizeof + TRAPINFO_flags(%rdi)
         setnz %cl
         lea   TBF_EXCEPTION(, %rcx, TBF_INTERRUPT), %ecx
+        or    $~0, %esi                 /* Don't clear DF */
 UNLIKELY_END(syscall_no_callback)
 
         movq  %rax,TRAPBOUNCE_eip(%rdx)
         movb  %cl,TRAPBOUNCE_flags(%rdx)
         call  create_bounce_frame
-        andl  $~X86_EFLAGS_DF,UREGS_eflags(%rsp)
+        /* Conditionally clear DF */
+        and   %esi, UREGS_eflags(%rsp)
 /* %rbx: struct vcpu */
 test_all_events:
         ASSERT_NOT_IN_ATOMIC
