@@ -44,6 +44,10 @@
 #define O_CLOEXEC 0
 #endif
 
+#ifndef SOCK_CLOEXEC
+#define SOCK_CLOEXEC 0
+#endif
+
 struct xs_stored_msg {
 	XEN_TAILQ_ENTRY(struct xs_stored_msg) list;
 	struct xsd_sockmsg hdr;
@@ -207,16 +211,14 @@ int xs_fileno(struct xs_handle *h)
 static int get_socket(const char *connect_to)
 {
 	struct sockaddr_un addr;
-	int sock, saved_errno, flags;
+	int sock, saved_errno;
 
-	sock = socket(PF_UNIX, SOCK_STREAM, 0);
+	sock = socket(PF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
 	if (sock < 0)
 		return -1;
 
-	if ((flags = fcntl(sock, F_GETFD)) < 0)
-		goto error;
-	flags |= FD_CLOEXEC;
-	if (fcntl(sock, F_SETFD, flags) < 0)
+	/* Compat for non-SOCK_CLOEXEC environments.  Racy. */
+	if (!SOCK_CLOEXEC && !set_cloexec(sock))
 		goto error;
 
 	addr.sun_family = AF_UNIX;
