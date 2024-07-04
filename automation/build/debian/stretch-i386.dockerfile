@@ -26,7 +26,6 @@ RUN apt-get update && \
         libncurses5-dev \
         python-dev \
         python3-dev \
-        xorg-dev \
         uuid-dev \
         libyajl-dev \
         libaio-dev \

@@ -23,7 +23,6 @@ RUN apt-get update && \
         zlib1g-dev \
         libncurses5-dev \
         python-dev \
-        xorg-dev \
         uuid-dev \
         libyajl-dev \
         libaio-dev \
