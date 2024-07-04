@@ -543,4 +543,6 @@ AS_IF([test "x$pvshim" = "xy"], [
 
 AX_FIND_HEADER([INCLUDE_ENDIAN_H], [endian.h sys/endian.h])
 
+AC_CHECK_FUNCS([pipe2])
+
 AC_OUTPUT()
