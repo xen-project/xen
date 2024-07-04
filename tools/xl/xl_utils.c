@@ -27,6 +27,10 @@
 #include "xl.h"
 #include "xl_utils.h"
 
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
 void dolog(const char *file, int line, const char *func, const char *fmt, ...)
 {
     va_list ap;
@@ -270,7 +274,7 @@ int do_daemonize(const char *name, const char *pidfile)
         exit(-1);
     }
 
-    CHK_SYSCALL(logfile = open(fullname, O_WRONLY|O_CREAT|O_APPEND, 0644));
+    CHK_SYSCALL(logfile = open(fullname, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644));
     free(fullname);
     assert(logfile >= 3);
 
