@@ -643,7 +643,9 @@ static int evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     if ( rc != 0 )
     {
         info->evtchn = 0;
+#ifdef CONFIG_X86
         pirq_cleanup_check(info, d);
+#endif
         goto out;
     }
 
@@ -713,8 +715,8 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
                  * The successful path of unmap_domain_pirq_emuirq() will have
                  * called pirq_cleanup_check() already.
                  */
-#endif
                 pirq_cleanup_check(pirq, d1);
+#endif
         }
         unlink_pirq_port(chn1, d1->vcpu[chn1->notify_vcpu_id]);
         break;
