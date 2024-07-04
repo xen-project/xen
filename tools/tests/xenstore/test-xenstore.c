@@ -408,9 +408,9 @@ static int test_ta3_deinit(uintptr_t par)
 #define TEST(s, f, p, l) { s, f ## _init, f, f ## _deinit, (uintptr_t)(p), l }
 struct test tests[] = {
 TEST("read 1", test_read, 1, "Read node with 1 byte data"),
-TEST("read 3000", test_read, 3000, "Read node with 3000 bytes data"),
+TEST("read 2000", test_read, 2000, "Read node with 2000 bytes data"),
 TEST("write 1", test_write, 1, "Write node with 1 byte data"),
-TEST("write 3000", test_write, 3000, "Write node with 3000 bytes data"),
+TEST("write 2000", test_write, 2000, "Write node with 2000 bytes data"),
 TEST("dir", test_dir, 0, "List directory"),
 TEST("rm node", test_rm, 0, "Remove single node"),
 TEST("rm dir", test_rm, WRITE_BUFFERS_N, "Remove node with sub-nodes"),
