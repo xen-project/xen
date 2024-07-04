@@ -190,13 +190,27 @@ static bool set_cloexec(int fd)
 	return fcntl(fd, flags | FD_CLOEXEC) >= 0;
 }
 
+static int pipe_cloexec(int fds[2])
+{
+#if HAVE_PIPE2
+	return pipe2(fds, O_CLOEXEC);
+#else
+	if (pipe(fds) < 0)
+		return -1;
+	/* Best effort to set CLOEXEC.  Racy. */
+	set_cloexec(fds[0]);
+	set_cloexec(fds[1]);
+	return 0;
+#endif
+}
+
 int xs_fileno(struct xs_handle *h)
 {
 	char c = 0;
 
 	mutex_lock(&h->watch_mutex);
 
-	if ((h->watch_pipe[0] == -1) && (pipe(h->watch_pipe) != -1)) {
+	if ((h->watch_pipe[0] == -1) && (pipe_cloexec(h->watch_pipe) != -1)) {
 		/* Kick things off if the watch list is already non-empty. */
 		if (!list_empty(&h->watch_list))
 			while (write(h->watch_pipe[1], &c, 1) != 1)
