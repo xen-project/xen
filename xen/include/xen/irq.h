@@ -194,8 +194,9 @@ extern irq_desc_t *pirq_spin_lock_irq_desc(
 
 unsigned int set_desc_affinity(struct irq_desc *, const cpumask_t *);
 
+/* When passed a system domain, this returns the maximum permissible value. */
 #ifndef arch_hwdom_irqs
-unsigned int arch_hwdom_irqs(domid_t);
+unsigned int arch_hwdom_irqs(const struct domain *);
 #endif
 
 #ifndef arch_evtchn_bind_pirq
