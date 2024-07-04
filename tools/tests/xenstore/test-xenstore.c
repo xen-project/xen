@@ -506,14 +506,14 @@ int main(int argc, char *argv[])
         stop = time(NULL) + randtime;
         srandom((unsigned int)stop);
 
-        while ( time(NULL) < stop )
+        while ( time(NULL) < stop && !ret )
         {
             t = random() % ARRAY_SIZE(tests);
             ret = call_test(tests + t, iters, true);
         }
     }
     else
-        for ( t = 0; t < ARRAY_SIZE(tests); t++ )
+        for ( t = 0; t < ARRAY_SIZE(tests) && !ret; t++ )
         {
             if ( !test || !strcmp(test, tests[t].name) )
                 ret = call_test(tests + t, iters, false);
@@ -525,10 +525,10 @@ int main(int argc, char *argv[])
     xs_close(xsh);
 
     if ( ta_loops )
-        printf("Exhaustive transaction retries (%d) occurrred %d times.\n",
+        printf("Exhaustive transaction retries (%d) occurred %d times.\n",
                MAX_TA_LOOPS, ta_loops);
 
-    return 0;
+    return ret ? 3 : 0;
 }
 
 /*
