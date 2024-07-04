@@ -176,6 +176,11 @@ static int __init make_gicv3_domU_node(struct kernel_info *kinfo)
     if ( res )
         return res;
 
+    res = fdt_property_cell(fdt, "#redistributor-regions",
+                            d->arch.vgic.nr_regions);
+    if ( res )
+        return res;
+
     /* reg specifies all re-distributors and Distributor. */
     len = (GUEST_ROOT_ADDRESS_CELLS + GUEST_ROOT_SIZE_CELLS) *
           (d->arch.vgic.nr_regions + 1) * sizeof(__be32);
