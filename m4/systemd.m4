@@ -41,15 +41,6 @@ AC_DEFUN([AX_ALLOW_SYSTEMD_OPTS], [
 ])
 
 AC_DEFUN([AX_CHECK_SYSTEMD_LIBS], [
-	PKG_CHECK_MODULES([SYSTEMD], [libsystemd-daemon],,
-		[PKG_CHECK_MODULES([SYSTEMD], [libsystemd >= 209])]
-        )
-	dnl pkg-config older than 0.24 does not set these for
-	dnl PKG_CHECK_MODULES() worth also noting is that as of version 208
-	dnl of systemd pkg-config --cflags currently yields no extra flags yet.
-	AC_SUBST([SYSTEMD_CFLAGS])
-	AC_SUBST([SYSTEMD_LIBS])
-
 	AS_IF([test "x$SYSTEMD_DIR" = x], [
 	    dnl In order to use the line below we need to fix upstream systemd
 	    dnl to properly ${prefix} for child variables in
@@ -95,13 +86,6 @@ AC_DEFUN([AX_CHECK_SYSTEMD], [
 	],[systemd=n])
 ])
 
-AC_DEFUN([AX_CHECK_SYSTEMD_ENABLE_AVAILABLE], [
-	PKG_CHECK_MODULES([SYSTEMD], [libsystemd-daemon], [systemd="y"],[
-		PKG_CHECK_MODULES([SYSTEMD], [libsystemd >= 209],
-				  [systemd="y"],[systemd="n"])
-	])
-])
-
 dnl Enables systemd by default and requires a --disable-systemd option flag
 dnl to configure if you want to disable.
 AC_DEFUN([AX_ENABLE_SYSTEMD], [
@@ -121,6 +105,5 @@ dnl to have systemd build libraries it will be enabled. You can always force
 dnl disable with --disable-systemd
 AC_DEFUN([AX_AVAILABLE_SYSTEMD], [
 	AX_ALLOW_SYSTEMD_OPTS()
-	AX_CHECK_SYSTEMD_ENABLE_AVAILABLE()
 	AX_CHECK_SYSTEMD()
 ])

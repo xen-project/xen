@@ -4,7 +4,12 @@ Notable changes to Xen will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
-## [4.18.2](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.18.2)
+## [4.18.3](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.18.3)
+
+### Changed
+ - When building with Systemd support (./configure --enable-systemd), remove
+   libsystemd as a build dependency.  Systemd Notify support is retained, now
+   using a standalone library implementation.
 
 ## [4.18.1](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.18.1)
 
