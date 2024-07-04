@@ -9,11 +9,6 @@ xenstored: LDLIBS += $(LDLIBS_libxenctrl)
 xenstored: LDLIBS += -lrt
 xenstored: LDLIBS += $(SOCKET_LIBS)
 
-ifeq ($(CONFIG_SYSTEMD),y)
-$(XENSTORED_OBJS-y): CFLAGS += $(SYSTEMD_CFLAGS)
-xenstored: LDLIBS += $(SYSTEMD_LIBS)
-endif
-
 xenstore: LDLIBS += $(LDLIBS_libxenstore)
 xenstore: LDLIBS += $(LDLIBS_libxentoolcore)
 xenstore: LDLIBS += $(SOCKET_LIBS)

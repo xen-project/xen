@@ -4,8 +4,7 @@ include $(OCAML_TOPLEVEL)/common.make
 
 # Include configure output (config.h)
 CFLAGS += -include $(XEN_ROOT)/tools/config.h
-CFLAGS-$(CONFIG_SYSTEMD)  += $(SYSTEMD_CFLAGS)
-LDFLAGS-$(CONFIG_SYSTEMD) += $(SYSTEMD_LIBS)
+CFLAGS-$(CONFIG_SYSTEMD)  += $(CFLAGS_xeninclude)
 
 CFLAGS  += $(CFLAGS-y)
 CFLAGS  += $(APPEND_CFLAGS)

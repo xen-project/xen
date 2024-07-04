@@ -61,7 +61,7 @@
 #endif
 
 #if defined(XEN_SYSTEMD_ENABLED)
-#include <systemd/sd-daemon.h>
+#include <xen-sd-notify.h>
 #endif
 
 extern xenevtchn_handle *xce_handle; /* in xenstored_domain.c */
@@ -2888,7 +2888,7 @@ int main(int argc, char *argv[])
 #if defined(XEN_SYSTEMD_ENABLED)
 	if (!live_update) {
 		sd_notify(1, "READY=1");
-		fprintf(stderr, SD_NOTICE "xenstored is ready\n");
+		fprintf(stderr, "xenstored is ready\n");
 	}
 #endif
 
