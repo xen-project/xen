@@ -48,6 +48,8 @@ int xen_in_range(unsigned long mfn);
 void microcode_grab_module(
     unsigned long *, const multiboot_info_t *);
 
+int cf_check stub_selftest(void);
+
 extern uint8_t kbd_shift_flags;
 
 #ifdef NDEBUG
