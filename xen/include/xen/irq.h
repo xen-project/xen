@@ -180,7 +180,7 @@ extern struct pirq *pirq_get_info(struct domain *d, int pirq);
 void pirq_cleanup_check(struct pirq *pirq, struct domain *d);
 
 #define pirq_cleanup_check(pirq, d) \
-    ((pirq)->evtchn ? pirq_cleanup_check(pirq, d) : (void)0)
+    (!(pirq)->evtchn ? pirq_cleanup_check(pirq, d) : (void)0)
 
 extern void pirq_guest_eoi(struct pirq *pirq);
 extern void desc_guest_eoi(struct irq_desc *desc, struct pirq *pirq);
