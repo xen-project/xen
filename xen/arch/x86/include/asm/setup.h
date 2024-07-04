@@ -38,6 +38,8 @@ void *bootstrap_map(const module_t *mod);
 
 int xen_in_range(unsigned long mfn);
 
+int cf_check stub_selftest(void);
+
 extern uint8_t kbd_shift_flags;
 
 #ifdef NDEBUG
