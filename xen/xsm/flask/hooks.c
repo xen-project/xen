@@ -663,12 +663,22 @@ static int cf_check flask_set_target(struct domain *d, struct domain *t)
     return rc;
 }
 
-static int cf_check flask_domctl(struct domain *d, int cmd)
+static int cf_check flask_domctl(struct domain *d, unsigned int cmd,
+                                 uint32_t ssidref)
 {
     switch ( cmd )
     {
-    /* These have individual XSM hooks (common/domctl.c) */
     case XEN_DOMCTL_createdomain:
+        /*
+         * There is a later hook too, but at this early point simply check
+         * that the calling domain is privileged enough to create a domain.
+         *
+         * Note that d is NULL because we haven't even allocated memory for it
+         * this early in XEN_DOMCTL_createdomain.
+         */
+        return avc_current_has_perm(ssidref, SECCLASS_DOMAIN, DOMAIN__CREATE, NULL);
+
+    /* These have individual XSM hooks (common/domctl.c) */
     case XEN_DOMCTL_getdomaininfo:
     case XEN_DOMCTL_scheduler_op:
     case XEN_DOMCTL_irq_permission:
