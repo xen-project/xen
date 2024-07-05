@@ -60,18 +60,6 @@ void vcpu_show_execution_state(struct vcpu *v)
     BUG_ON("unimplemented");
 }
 
-/* shutdown.c */
-
-void machine_restart(unsigned int delay_millisecs)
-{
-    BUG_ON("unimplemented");
-}
-
-void machine_halt(void)
-{
-    BUG_ON("unimplemented");
-}
-
 /* vm_event.c */
 
 void vm_event_fill_regs(vm_event_request_t *req)

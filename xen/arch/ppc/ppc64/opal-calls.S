@@ -79,3 +79,7 @@ opal_return_mmu:
 OPAL_CALL(opal_console_write, OPAL_CONSOLE_WRITE)
 OPAL_CALL(opal_console_flush, OPAL_CONSOLE_FLUSH)
 OPAL_CALL(opal_reinit_cpus, OPAL_REINIT_CPUS)
+
+OPAL_CALL(opal_cec_power_down, OPAL_CEC_POWER_DOWN)
+OPAL_CALL(opal_cec_reboot, OPAL_CEC_REBOOT)
+OPAL_CALL(opal_poll_events, OPAL_POLL_EVENTS)
