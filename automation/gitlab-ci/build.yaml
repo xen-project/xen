@@ -364,6 +364,13 @@ debian-bookworm-clang-debug:
   variables:
     CONTAINER: debian:bookworm
 
+debian-12-ppc64le-gcc-debug:
+  extends: .gcc-ppc64le-cross-build-debug
+  variables:
+    CONTAINER: debian:12-ppc64le
+    KBUILD_DEFCONFIG: ppc64_defconfig
+    HYPERVISOR_ONLY: y
+
 # Arm32 cross-build
 
 debian-bookworm-gcc-arm32:
@@ -738,3 +745,11 @@ opensuse-tumbleweed-gcc-debug:
   variables:
     CONTAINER: suse:opensuse-tumbleweed
   allow_failure: true
+
+# PowerPC builds (x86 cross)
+debian-12-ppc64le-gcc:
+  extends: .gcc-ppc64le-cross-build
+  variables:
+    CONTAINER: debian:12-ppc64le
+    KBUILD_DEFCONFIG: ppc64_defconfig
+    HYPERVISOR_ONLY: y

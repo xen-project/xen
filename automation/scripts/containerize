@@ -32,6 +32,7 @@ case "_${CONTAINER}" in
     _fedora) CONTAINER="${BASE}/fedora:29";;
     _focal) CONTAINER="${BASE}/ubuntu:focal" ;;
     _bullseye-ppc64le) CONTAINER="${BASE}/debian:bullseye-ppc64le" ;;
+    _bookworm-ppc64le) CONTAINER="${BASE}/debian:12-ppc64le" ;;
     _buster-gcc-ibt) CONTAINER="${BASE}/debian:buster-gcc-ibt" ;;
     _bookworm|_) CONTAINER="${BASE}/debian:bookworm" ;;
     _bookworm-i386) CONTAINER="${BASE}/debian:bookworm-i386" ;;
