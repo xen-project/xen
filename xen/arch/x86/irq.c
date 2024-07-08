@@ -2898,6 +2898,7 @@ static int allocate_pirq(struct domain *d, int index, int pirq, int irq,
                     d->domain_id, index, pirq, current_pirq);
             if ( current_pirq < 0 )
                 return -EBUSY;
+            pirq = current_pirq;
         }
         else if ( type == MAP_PIRQ_TYPE_MULTI_MSI )
         {
