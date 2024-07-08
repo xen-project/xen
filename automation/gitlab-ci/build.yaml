@@ -493,21 +493,6 @@ archlinux-current-gcc-riscv64-randconfig:
     RANDCONFIG: y
     <<: *riscv-fixed-randconfig
 
-# Power cross-build
-debian-bullseye-gcc-ppc64le:
-  extends: .gcc-ppc64le-cross-build
-  variables:
-    CONTAINER: debian:bullseye-ppc64le
-    KBUILD_DEFCONFIG: ppc64_defconfig
-    HYPERVISOR_ONLY: y
-
-debian-bullseye-gcc-ppc64le-debug:
-  extends: .gcc-ppc64le-cross-build-debug
-  variables:
-    CONTAINER: debian:bullseye-ppc64le
-    KBUILD_DEFCONFIG: ppc64_defconfig
-    HYPERVISOR_ONLY: y
-
 # Yocto test jobs
 yocto-qemuarm64:
   extends: .yocto-test-arm64
@@ -733,6 +718,20 @@ opensuse-tumbleweed-gcc-debug:
   allow_failure: true
 
 # PowerPC builds (x86 cross)
+debian-11-ppc64le-gcc:
+  extends: .gcc-ppc64le-cross-build
+  variables:
+    CONTAINER: debian:11-ppc64le
+    KBUILD_DEFCONFIG: ppc64_defconfig
+    HYPERVISOR_ONLY: y
+
+debian-11-ppc64le-gcc-debug:
+  extends: .gcc-ppc64le-cross-build-debug
+  variables:
+    CONTAINER: debian:11-ppc64le
+    KBUILD_DEFCONFIG: ppc64_defconfig
+    HYPERVISOR_ONLY: y
+
 debian-12-ppc64le-gcc:
   extends: .gcc-ppc64le-cross-build
   variables:
