@@ -51,7 +51,7 @@ esac
 
 # Use this variable to control whether root should be used
 case "_${CONTAINER_UID0}" in
-    _1)   userarg= ;;
+    _1)   userarg="-u 0" ;;
     _0|_) userarg="-u $(id -u) $userns_podman" ;;
 esac
 
