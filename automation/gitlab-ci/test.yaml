@@ -69,7 +69,7 @@
 .qemu-ppc64le:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:bullseye-ppc64le
+    CONTAINER: debian:12-ppc64le
     LOGFILE: qemu-smoke-ppc64le.log
   artifacts:
     paths:
@@ -447,5 +447,4 @@ qemu-smoke-ppc64le-powernv9-gcc:
   script:
     - ./automation/scripts/qemu-smoke-ppc64le.sh powernv9 2>&1 | tee ${LOGFILE}
   needs:
-    - qemu-system-ppc64-8.1.0-ppc64-export
-    - debian-bullseye-gcc-ppc64le-debug
+    - debian-12-ppc64le-gcc-debug

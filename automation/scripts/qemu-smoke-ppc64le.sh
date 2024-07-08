@@ -12,8 +12,8 @@ rm -f ${serial_log}
 set +e
 
 timeout -k 1 20 \
-binaries/qemu-system-ppc64 \
-    -bios binaries/skiboot.lid \
+qemu-system-ppc64 \
+    -bios skiboot.lid \
     -M $machine \
     -m 2g \
     -smp 1 \
