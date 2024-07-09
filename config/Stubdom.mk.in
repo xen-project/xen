@@ -26,9 +26,6 @@ LWIP_URL            := @LWIP_URL@
 GRUB_VERSION        := @GRUB_VERSION@
 GRUB_URL            := @GRUB_URL@
 
-OCAML_VERSION       := @OCAML_VERSION@
-OCAML_URL           := @OCAML_URL@
-
 GMP_VERSION         := @GMP_VERSION@
 GMP_URL             := @GMP_URL@
 
