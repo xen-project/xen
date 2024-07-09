@@ -354,10 +354,10 @@ alpine-3.18-gcc-debug:
   variables:
     CONTAINER: alpine:3.18
 
-debian-stretch-gcc-debug:
+debian-bookworm-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: debian:stretch
+    CONTAINER: debian:bookworm
 
 debian-bookworm-clang-debug:
   extends: .clang-x86-64-build-debug
@@ -589,31 +589,6 @@ centos-7-gcc-debug:
   variables:
     CONTAINER: centos:7
 
-debian-stretch-gcc:
-  extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: debian:stretch
-
-debian-stretch-clang:
-  extends: .clang-x86-64-build
-  variables:
-    CONTAINER: debian:stretch
-
-debian-stretch-clang-debug:
-  extends: .clang-x86-64-build-debug
-  variables:
-    CONTAINER: debian:stretch
-
-debian-stretch-32-clang-debug:
-  extends: .clang-x86-32-build-debug
-  variables:
-    CONTAINER: debian:stretch-i386
-
-debian-stretch-32-gcc-debug:
-  extends: .gcc-x86-32-build-debug
-  variables:
-    CONTAINER: debian:stretch-i386
-
 debian-buster-gcc-ibt:
   extends: .gcc-x86-64-build
   variables:
@@ -629,11 +604,6 @@ debian-bookworm-clang:
 
 debian-bookworm-gcc:
   extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: debian:bookworm
-
-debian-bookworm-gcc-debug:
-  extends: .gcc-x86-64-build-debug
   variables:
     CONTAINER: debian:bookworm
 

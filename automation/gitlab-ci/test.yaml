@@ -412,7 +412,7 @@ qemu-smoke-x86-64-gcc:
   script:
     - ./automation/scripts/qemu-smoke-x86-64.sh pv 2>&1 | tee ${LOGFILE}
   needs:
-    - debian-stretch-gcc-debug
+    - debian-bookworm-gcc-debug
 
 qemu-smoke-x86-64-clang:
   extends: .qemu-x86-64
@@ -426,7 +426,7 @@ qemu-smoke-x86-64-gcc-pvh:
   script:
     - ./automation/scripts/qemu-smoke-x86-64.sh pvh 2>&1 | tee ${LOGFILE}
   needs:
-    - debian-stretch-gcc-debug
+    - debian-bookworm-gcc-debug
 
 qemu-smoke-x86-64-clang-pvh:
   extends: .qemu-x86-64
