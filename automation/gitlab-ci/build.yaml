@@ -357,6 +357,13 @@ debian-12-ppc64le-gcc-debug:
     KBUILD_DEFCONFIG: ppc64_defconfig
     HYPERVISOR_ONLY: y
 
+debian-12-riscv64-gcc-debug:
+  extends: .gcc-riscv64-cross-build-debug
+  variables:
+    CONTAINER: debian:12-riscv64
+    KBUILD_DEFCONFIG: tiny64_defconfig
+    HYPERVISOR_ONLY: y
+
 # Arm32 cross-build
 
 debian-bookworm-gcc-arm32:
@@ -457,41 +464,6 @@ alpine-3.18-gcc-debug-arm64-earlyprintk:
     EXTRA_XEN_CONFIG: |
       CONFIG_EARLY_UART_CHOICE_PL011=y
       CONFIG_EARLY_UART_BASE_ADDRESS=0x9000000
-
-# RISC-V 64 cross-build
-.riscv-fixed-randconfig:
-  variables: &riscv-fixed-randconfig
-    EXTRA_FIXED_RANDCONFIG: |
-      CONFIG_BOOT_TIME_CPUPOOLS=n
-      CONFIG_COVERAGE=n
-      CONFIG_EXPERT=y
-      CONFIG_GRANT_TABLE=n
-      CONFIG_MEM_ACCESS=n
-      CONFIG_PERF_COUNTERS=n
-      CONFIG_LIVEPATCH=n
-      CONFIG_XSM=n
-
-archlinux-current-gcc-riscv64:
-  extends: .gcc-riscv64-cross-build
-  variables:
-    CONTAINER: archlinux:current-riscv64
-    KBUILD_DEFCONFIG: tiny64_defconfig
-    HYPERVISOR_ONLY: y
-
-archlinux-current-gcc-riscv64-debug:
-  extends: .gcc-riscv64-cross-build-debug
-  variables:
-    CONTAINER: archlinux:current-riscv64
-    KBUILD_DEFCONFIG: tiny64_defconfig
-    HYPERVISOR_ONLY: y
-
-archlinux-current-gcc-riscv64-randconfig:
-  extends: .gcc-riscv64-cross-build
-  variables:
-    CONTAINER: archlinux:current-riscv64
-    KBUILD_DEFCONFIG: tiny64_defconfig
-    RANDCONFIG: y
-    <<: *riscv-fixed-randconfig
 
 # Yocto test jobs
 yocto-qemuarm64:
@@ -738,3 +710,45 @@ debian-12-ppc64le-gcc:
     CONTAINER: debian:12-ppc64le
     KBUILD_DEFCONFIG: ppc64_defconfig
     HYPERVISOR_ONLY: y
+
+# RISC-V 64 cross-build
+debian-11-riscv64-gcc:
+  extends: .gcc-riscv64-cross-build
+  variables:
+    CONTAINER: debian:11-riscv64
+    KBUILD_DEFCONFIG: tiny64_defconfig
+    HYPERVISOR_ONLY: y
+
+debian-11-riscv64-gcc-debug:
+  extends: .gcc-riscv64-cross-build-debug
+  variables:
+    CONTAINER: debian:11-riscv64
+    KBUILD_DEFCONFIG: tiny64_defconfig
+    HYPERVISOR_ONLY: y
+
+debian-12-riscv64-gcc:
+  extends: .gcc-riscv64-cross-build
+  variables:
+    CONTAINER: debian:12-riscv64
+    KBUILD_DEFCONFIG: tiny64_defconfig
+    HYPERVISOR_ONLY: y
+
+.riscv-fixed-randconfig:
+  variables: &riscv-fixed-randconfig
+    EXTRA_FIXED_RANDCONFIG: |
+      CONFIG_BOOT_TIME_CPUPOOLS=n
+      CONFIG_COVERAGE=n
+      CONFIG_EXPERT=y
+      CONFIG_GRANT_TABLE=n
+      CONFIG_MEM_ACCESS=n
+      CONFIG_PERF_COUNTERS=n
+      CONFIG_LIVEPATCH=n
+      CONFIG_XSM=n
+
+debian-12-riscv64-gcc-randconfig:
+  extends: .gcc-riscv64-cross-build
+  variables:
+    CONTAINER: debian:12-riscv64
+    KBUILD_DEFCONFIG: tiny64_defconfig
+    RANDCONFIG: y
+    <<: *riscv-fixed-randconfig
