@@ -541,10 +541,10 @@ centos-7-gcc-debug:
   variables:
     CONTAINER: centos:7
 
-debian-buster-gcc-ibt:
+debian-12-x86_64-gcc-ibt:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: debian:buster-gcc-ibt
+    CONTAINER: debian:12-x86_64-gcc-ibt
     RANDCONFIG: y
     EXTRA_FIXED_RANDCONFIG: |
       CONFIG_XEN_IBT=y
