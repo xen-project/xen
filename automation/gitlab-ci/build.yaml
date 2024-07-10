@@ -385,13 +385,6 @@ debian-bookworm-gcc-arm32-randconfig:
     HYPERVISOR_ONLY: y
     RANDCONFIG: y
 
-debian-bookworm-gcc-arm32-debug-randconfig:
-  extends: .gcc-arm32-cross-build-debug
-  variables:
-    CONTAINER: debian:bookworm-arm64v8-arm32-gcc
-    HYPERVISOR_ONLY: y
-    RANDCONFIG: y
-
 debian-bookworm-gcc-arm32-debug-staticmem:
   extends: .gcc-arm32-cross-build-debug
   variables:
@@ -423,18 +416,6 @@ debian-bookworm-gcc-debug-arm64:
   variables:
     CONTAINER: debian:bookworm-arm64v8
 
-debian-bookworm-gcc-arm64-randconfig:
-  extends: .gcc-arm64-build
-  variables:
-    CONTAINER: debian:bookworm-arm64v8
-    RANDCONFIG: y
-
-debian-bookworm-gcc-debug-arm64-randconfig:
-  extends: .gcc-arm64-build-debug
-  variables:
-    CONTAINER: debian:bookworm-arm64v8
-    RANDCONFIG: y
-
 alpine-3.18-gcc-arm64:
   extends: .gcc-arm64-build
   variables:
@@ -447,12 +428,6 @@ alpine-3.18-gcc-debug-arm64:
 
 alpine-3.18-gcc-arm64-randconfig:
   extends: .gcc-arm64-build
-  variables:
-    CONTAINER: alpine:3.18-arm64v8
-    RANDCONFIG: y
-
-alpine-3.18-gcc-debug-arm64-randconfig:
-  extends: .gcc-arm64-build-debug
   variables:
     CONTAINER: alpine:3.18-arm64v8
     RANDCONFIG: y
@@ -519,14 +494,6 @@ archlinux-current-gcc-riscv64-debug:
 
 archlinux-current-gcc-riscv64-randconfig:
   extends: .gcc-riscv64-cross-build
-  variables:
-    CONTAINER: archlinux:current-riscv64
-    KBUILD_DEFCONFIG: tiny64_defconfig
-    RANDCONFIG: y
-    <<: *riscv-fixed-randconfig
-
-archlinux-current-gcc-riscv64-debug-randconfig:
-  extends: .gcc-riscv64-cross-build-debug
   variables:
     CONTAINER: archlinux:current-riscv64
     KBUILD_DEFCONFIG: tiny64_defconfig
@@ -672,12 +639,6 @@ debian-bookworm-gcc-debug:
 
 debian-bookworm-gcc-randconfig:
   extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: debian:bookworm
-    RANDCONFIG: y
-
-debian-bookworm-gcc-debug-randconfig:
-  extends: .gcc-x86-64-build-debug
   variables:
     CONTAINER: debian:bookworm
     RANDCONFIG: y
