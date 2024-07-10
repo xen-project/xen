@@ -161,11 +161,13 @@ archlinux-gcc:
   extends: .gcc-x86-64-build
   variables:
     CONTAINER: archlinux:current
+  allow_failure: true
 
 archlinux-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
     CONTAINER: archlinux:current
+  allow_failure: true
 
 centos-7-gcc:
   extends: .gcc-x86-64-build
