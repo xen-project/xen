@@ -43,7 +43,7 @@ case "_${CONTAINER}" in
     _bionic) CONTAINER="${BASE}/ubuntu:bionic" ;;
     _xenial) CONTAINER="${BASE}/ubuntu:xenial" ;;
     _opensuse-leap|_leap) CONTAINER="${BASE}/suse:opensuse-leap" ;;
-    _opensuse-tumbleweed|_tumbleweed) CONTAINER="${BASE}/suse:opensuse-tumbleweed" ;;
+    _opensuse-tumbleweed|_tumbleweed) CONTAINER="${BASE}/opensuse:tumbleweed-x86_64" ;;
 esac
 
 # Use this variable to control whether root should be used
