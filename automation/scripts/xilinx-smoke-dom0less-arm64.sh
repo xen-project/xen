@@ -122,7 +122,7 @@ if [[ "${test_variant}" == "gem-passthrough" ]]; then
 fi
 
 rm -rf imagebuilder
-git clone https://gitlab.com/ViryaOS/imagebuilder
+git clone --depth 1 https://gitlab.com/xen-project/imagebuilder.git
 bash imagebuilder/scripts/uboot-script-gen -t tftp -d $TFTP/ -c $TFTP/config
 
 # restart the board

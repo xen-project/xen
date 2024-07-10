@@ -45,7 +45,7 @@ UBOOT_SOURCE="boot.source"
 UBOOT_SCRIPT="boot.scr"' > binaries/config
 
 rm -rf imagebuilder
-git clone https://gitlab.com/ViryaOS/imagebuilder
+git clone --depth 1 https://gitlab.com/xen-project/imagebuilder.git
 bash imagebuilder/scripts/uboot-script-gen -t tftp -d binaries/ -c binaries/config
 
 # Run the test

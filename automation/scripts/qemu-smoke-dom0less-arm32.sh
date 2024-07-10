@@ -125,7 +125,7 @@ if [[ "${test_variant}" == "without-dom0" ]]; then
 fi
 
 rm -rf imagebuilder
-git clone https://gitlab.com/ViryaOS/imagebuilder
+git clone --depth 1 https://gitlab.com/xen-project/imagebuilder.git
 bash imagebuilder/scripts/uboot-script-gen -t tftp -d . -c config
 
 # Run the test
