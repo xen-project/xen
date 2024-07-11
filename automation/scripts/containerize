@@ -44,6 +44,8 @@ case "_${CONTAINER}" in
     _xenial) CONTAINER="${BASE}/ubuntu:16.04-x86_64" ;;
     _bionic) CONTAINER="${BASE}/ubuntu:18.04-x86_64" ;;
     _focal)  CONTAINER="${BASE}/ubuntu:20.04-x86_64" ;;
+    _jammy)  CONTAINER="${BASE}/ubuntu:22.04-x86_64" ;;
+    _noble)  CONTAINER="${BASE}/ubuntu:24.04-x86_64" ;;
 esac
 
 # Use this variable to control whether root should be used

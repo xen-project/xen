@@ -605,23 +605,8 @@ ubuntu-16.04-x86_64-gcc-debug:
   variables:
     CONTAINER: ubuntu:16.04-x86_64
 
-ubuntu-18.04-x86_64-clang:
-  extends: .clang-x86-64-build
-  variables:
-    CONTAINER: ubuntu:18.04-x86_64
-
-ubuntu-18.04-x86_64-clang-debug:
-  extends: .clang-x86-64-build-debug
-  variables:
-    CONTAINER: ubuntu:18.04-x86_64
-
 ubuntu-18.04-x86_64-gcc:
   extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: ubuntu:18.04-x86_64
-
-ubuntu-18.04-x86_64-gcc-debug:
-  extends: .gcc-x86-64-build-debug
   variables:
     CONTAINER: ubuntu:18.04-x86_64
 
@@ -630,20 +615,30 @@ ubuntu-20.04-x86_64-gcc:
   variables:
     CONTAINER: ubuntu:20.04-x86_64
 
-ubuntu-20.04-x86_64-gcc-debug:
-  extends: .gcc-x86-64-build-debug
+ubuntu-22.04-x86_64-gcc:
+  extends: .gcc-x86-64-build
   variables:
-    CONTAINER: ubuntu:20.04-x86_64
+    CONTAINER: ubuntu:22.04-x86_64
 
-ubuntu-20.04-x86_64-clang:
+ubuntu-24.04-x86_64-clang:
   extends: .clang-x86-64-build
   variables:
-    CONTAINER: ubuntu:20.04-x86_64
+    CONTAINER: ubuntu:24.04-x86_64
 
-ubuntu-20.04-x86_64-clang-debug:
+ubuntu-24.04-x86_64-clang-debug:
   extends: .clang-x86-64-build-debug
   variables:
-    CONTAINER: ubuntu:20.04-x86_64
+    CONTAINER: ubuntu:24.04-x86_64
+
+ubuntu-24.04-x86_64-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: ubuntu:24.04-x86_64
+
+ubuntu-24.04-x86_64-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:24.04-x86_64
 
 opensuse-leap-15.6-clang:
   extends: .clang-x86-64-build
