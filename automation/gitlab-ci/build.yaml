@@ -605,25 +605,25 @@ ubuntu-16.04-x86_64-gcc-debug:
   variables:
     CONTAINER: ubuntu:16.04-x86_64
 
-ubuntu-bionic-clang:
+ubuntu-18.04-x86_64-clang:
   extends: .clang-x86-64-build
   variables:
-    CONTAINER: ubuntu:bionic
+    CONTAINER: ubuntu:18.04-x86_64
 
-ubuntu-bionic-clang-debug:
+ubuntu-18.04-x86_64-clang-debug:
   extends: .clang-x86-64-build-debug
   variables:
-    CONTAINER: ubuntu:bionic
+    CONTAINER: ubuntu:18.04-x86_64
 
-ubuntu-bionic-gcc:
+ubuntu-18.04-x86_64-gcc:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: ubuntu:bionic
+    CONTAINER: ubuntu:18.04-x86_64
 
-ubuntu-bionic-gcc-debug:
+ubuntu-18.04-x86_64-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: ubuntu:bionic
+    CONTAINER: ubuntu:18.04-x86_64
 
 ubuntu-focal-gcc:
   extends: .gcc-x86-64-build
