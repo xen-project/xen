@@ -625,25 +625,25 @@ ubuntu-18.04-x86_64-gcc-debug:
   variables:
     CONTAINER: ubuntu:18.04-x86_64
 
-ubuntu-focal-gcc:
+ubuntu-20.04-x86_64-gcc:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: ubuntu:focal
+    CONTAINER: ubuntu:20.04-x86_64
 
-ubuntu-focal-gcc-debug:
+ubuntu-20.04-x86_64-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: ubuntu:focal
+    CONTAINER: ubuntu:20.04-x86_64
 
-ubuntu-focal-clang:
+ubuntu-20.04-x86_64-clang:
   extends: .clang-x86-64-build
   variables:
-    CONTAINER: ubuntu:focal
+    CONTAINER: ubuntu:20.04-x86_64
 
-ubuntu-focal-clang-debug:
+ubuntu-20.04-x86_64-clang-debug:
   extends: .clang-x86-64-build-debug
   variables:
-    CONTAINER: ubuntu:focal
+    CONTAINER: ubuntu:20.04-x86_64
 
 opensuse-leap-15.6-clang:
   extends: .clang-x86-64-build

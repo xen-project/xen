@@ -29,7 +29,6 @@ case "_${CONTAINER}" in
     _archlinux|_arch) CONTAINER="${BASE}/archlinux:current" ;;
     _centos7) CONTAINER="${BASE}/centos:7" ;;
     _fedora) CONTAINER="${BASE}/fedora:29";;
-    _focal) CONTAINER="${BASE}/ubuntu:focal" ;;
     _bullseye-ppc64le) CONTAINER="${BASE}/debian:11-ppc64le" ;;
     _bookworm-ppc64le) CONTAINER="${BASE}/debian:12-ppc64le" ;;
     _bullseye-riscv64) CONTAINER="${BASE}/debian:11-riscv64" ;;
@@ -44,6 +43,7 @@ case "_${CONTAINER}" in
     _opensuse-tumbleweed|_tumbleweed) CONTAINER="${BASE}/opensuse:tumbleweed-x86_64" ;;
     _xenial) CONTAINER="${BASE}/ubuntu:16.04-x86_64" ;;
     _bionic) CONTAINER="${BASE}/ubuntu:18.04-x86_64" ;;
+    _focal)  CONTAINER="${BASE}/ubuntu:20.04-x86_64" ;;
 esac
 
 # Use this variable to control whether root should be used
