@@ -443,6 +443,14 @@ maintainers if you want to suggest a change.
      - The macro NULL shall be the only permitted form of null pointer constant
      -
 
+   * - `Rule 12.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_12_02.c>`_
+     - Required
+     - The right hand operand of a shift operator shall lie in the range
+       zero to one less than the width in bits of the essential type of
+       the left hand operand
+     - We rely on gcc -fsanitize=undefined to check for dangerious
+       violations to this rule and to ensure compliance
+
    * - `Rule 12.5 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_12_05.c>`_
      - Mandatory
      - The sizeof operator shall not have an operand which is a function
