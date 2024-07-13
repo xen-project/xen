@@ -151,7 +151,7 @@ man$(1)-pages: $$(DOC_MAN$(1))
 .PHONY: install-man$(1)-pages
 install-man$(1)-pages: man$(1)-pages
 	$(INSTALL_DIR) $(DESTDIR)$(mandir)
-	cp -r man$(1) $(DESTDIR)$(mandir)
+	[ ! -d man$(1) ] || cp -r man$(1) $(DESTDIR)$(mandir)
 
 # Clean
 .PHONY: clean-man$(1)-pages
