@@ -1,5 +1,0 @@
-# Configuration lines to go in /etc/X11/xdm/Xservers to
-# start Xvnc and connect back to a vncviewer in domain-0.
-# See 'man xdm' under 'LOCAL SERVER SPECIFICATION' for format details.
-
-:1 Xvnc local /usr/X11R6/bin/Xvnc-xen :1
