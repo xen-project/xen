@@ -2215,6 +2215,7 @@ int map_domain_pirq(
 
             set_domain_irq_pirq(d, irq, info);
             spin_unlock_irqrestore(&desc->lock, flags);
+            desc = NULL;
 
             info = NULL;
             irq = create_irq(NUMA_NO_NODE, true);
@@ -2250,7 +2251,9 @@ int map_domain_pirq(
 
         if ( ret )
         {
-            spin_unlock_irqrestore(&desc->lock, flags);
+            if ( desc )
+                spin_unlock_irqrestore(&desc->lock, flags);
+
             pci_disable_msi(msi_desc);
             if ( nr )
             {
