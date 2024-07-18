@@ -768,6 +768,17 @@ static bool emulation_flags_ok(const struct domain *d, uint32_t emflags)
     return true;
 }
 
+void __init arch_init_idle_domain(struct domain *d)
+{
+    static const struct arch_csw idle_csw = {
+        .from = paravirt_ctxt_switch_from,
+        .to   = paravirt_ctxt_switch_to,
+        .tail = idle_loop,
+    };
+
+    d->arch.ctxt_switch = &idle_csw;
+}
+
 int arch_domain_create(struct domain *d,
                        struct xen_domctl_createdomain *config,
                        unsigned int flags)
@@ -783,16 +794,6 @@ int arch_domain_create(struct domain *d,
     /* Minimal initialisation for the idle domain. */
     if ( unlikely(is_idle_domain(d)) )
     {
-        static const struct arch_csw idle_csw = {
-            .from = paravirt_ctxt_switch_from,
-            .to   = paravirt_ctxt_switch_to,
-            .tail = idle_loop,
-        };
-
-        d->arch.ctxt_switch = &idle_csw;
-
-        d->arch.cpu_policy = ZERO_BLOCK_PTR; /* Catch stray misuses. */
-
         return 0;
     }
 

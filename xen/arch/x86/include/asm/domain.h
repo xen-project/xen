@@ -779,6 +779,9 @@ struct arch_vcpu_io {
 /* Maxphysaddr supportable by the paging infrastructure. */
 unsigned int domain_max_paddr_bits(const struct domain *d);
 
+#define arch_init_idle_domain arch_init_idle_domain
+void arch_init_idle_domain(struct domain *d);
+
 #endif /* __ASM_DOMAIN_H__ */
 
 /*
