@@ -689,95 +689,88 @@ struct domain *domain_create(domid_t domid,
     if ( is_idle_domain(d) )
         arch_init_idle_domain(d);
 
-    /* DOMID_{XEN,IO,etc} (other than IDLE) are sufficiently constructed. */
-    if ( is_system_domain(d) && !is_idle_domain(d) )
+    /* DOMID_{XEN,IO,IDLE,etc} are sufficiently constructed. */
+    if ( is_system_domain(d) )
         return d;
 
-#ifdef CONFIG_HAS_PIRQ
-    if ( !is_idle_domain(d) )
-    {
-        if ( !is_hardware_domain(d) )
-            d->nr_pirqs = nr_static_irqs + extra_domU_irqs;
-        else
-            d->nr_pirqs = extra_hwdom_irqs ? nr_static_irqs + extra_hwdom_irqs
-                                           : arch_hwdom_irqs(d);
-        d->nr_pirqs = min(d->nr_pirqs, nr_irqs);
+    /*
+     * This assertion helps static analysis tools infer that config cannot be
+     * NULL in this branch, which in turn means that it can be safely
+     * dereferenced. Therefore, this assertion is not redundant.
+     */
+    ASSERT(config);
 
-        radix_tree_init(&d->pirq_tree);
-    }
+#ifdef CONFIG_HAS_PIRQ
+    if ( !is_hardware_domain(d) )
+        d->nr_pirqs = nr_static_irqs + extra_domU_irqs;
+    else
+        d->nr_pirqs = extra_hwdom_irqs ? nr_static_irqs + extra_hwdom_irqs
+                                       : arch_hwdom_irqs(d);
+    d->nr_pirqs = min(d->nr_pirqs, nr_irqs);
+
+    radix_tree_init(&d->pirq_tree);
 #endif
 
     if ( (err = arch_domain_create(d, config, flags)) != 0 )
         goto fail;
     init_status |= INIT_arch;
 
-    if ( !is_idle_domain(d) )
-    {
-        /*
-         * The assertion helps static analysis tools infer that config cannot
-         * be NULL in this branch, which in turn means that it can be safely
-         * dereferenced. Therefore, this assertion is not redundant.
-         */
-        ASSERT(config);
+    watchdog_domain_init(d);
+    init_status |= INIT_watchdog;
 
-        watchdog_domain_init(d);
-        init_status |= INIT_watchdog;
+    err = -ENOMEM;
+    d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
+    d->irq_caps   = rangeset_new(d, "Interrupts", 0);
+    if ( !d->iomem_caps || !d->irq_caps )
+        goto fail;
 
-        err = -ENOMEM;
-        d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
-        d->irq_caps   = rangeset_new(d, "Interrupts", 0);
-        if ( !d->iomem_caps || !d->irq_caps )
-            goto fail;
+    if ( (err = xsm_domain_create(XSM_HOOK, d, config->ssidref)) != 0 )
+        goto fail;
 
-        if ( (err = xsm_domain_create(XSM_HOOK, d, config->ssidref)) != 0 )
-            goto fail;
+    d->controller_pause_count = 1;
+    atomic_inc(&d->pause_count);
 
-        d->controller_pause_count = 1;
-        atomic_inc(&d->pause_count);
+    if ( (err = evtchn_init(d, config->max_evtchn_port)) != 0 )
+        goto fail;
+    init_status |= INIT_evtchn;
 
-        if ( (err = evtchn_init(d, config->max_evtchn_port)) != 0 )
-            goto fail;
-        init_status |= INIT_evtchn;
+    if ( (err = grant_table_init(d, config->max_grant_frames,
+                                 config->max_maptrack_frames,
+                                 config->grant_opts)) != 0 )
+        goto fail;
+    init_status |= INIT_gnttab;
 
-        if ( (err = grant_table_init(d, config->max_grant_frames,
-                                     config->max_maptrack_frames,
-                                     config->grant_opts)) != 0 )
-            goto fail;
-        init_status |= INIT_gnttab;
+    if ( (err = argo_init(d)) != 0 )
+        goto fail;
 
-        if ( (err = argo_init(d)) != 0 )
-            goto fail;
+    err = -ENOMEM;
+    d->pbuf = xzalloc_array(char, DOMAIN_PBUF_SIZE);
+    if ( !d->pbuf )
+        goto fail;
 
-        err = -ENOMEM;
+    if ( (err = sched_init_domain(d, config->cpupool_id)) != 0 )
+        goto fail;
 
-        d->pbuf = xzalloc_array(char, DOMAIN_PBUF_SIZE);
-        if ( !d->pbuf )
-            goto fail;
+    if ( (err = late_hwdom_init(d)) != 0 )
+        goto fail;
 
-        if ( (err = sched_init_domain(d, config->cpupool_id)) != 0 )
-            goto fail;
+    /*
+     * Must not fail beyond this point, as our caller doesn't know whether
+     * the domain has been entered into domain_list or not.
+     */
 
-        if ( (err = late_hwdom_init(d)) != 0 )
-            goto fail;
+    spin_lock(&domlist_update_lock);
+    pd = &domain_list; /* NB. domain_list maintained in order of domid. */
+    for ( pd = &domain_list; *pd != NULL; pd = &(*pd)->next_in_list )
+        if ( (*pd)->domain_id > d->domain_id )
+            break;
+    d->next_in_list = *pd;
+    d->next_in_hashbucket = domain_hash[DOMAIN_HASH(domid)];
+    rcu_assign_pointer(*pd, d);
+    rcu_assign_pointer(domain_hash[DOMAIN_HASH(domid)], d);
+    spin_unlock(&domlist_update_lock);
 
-        /*
-         * Must not fail beyond this point, as our caller doesn't know whether
-         * the domain has been entered into domain_list or not.
-         */
-
-        spin_lock(&domlist_update_lock);
-        pd = &domain_list; /* NB. domain_list maintained in order of domid. */
-        for ( pd = &domain_list; *pd != NULL; pd = &(*pd)->next_in_list )
-            if ( (*pd)->domain_id > d->domain_id )
-                break;
-        d->next_in_list = *pd;
-        d->next_in_hashbucket = domain_hash[DOMAIN_HASH(domid)];
-        rcu_assign_pointer(*pd, d);
-        rcu_assign_pointer(domain_hash[DOMAIN_HASH(domid)], d);
-        spin_unlock(&domlist_update_lock);
-
-        memcpy(d->handle, config->handle, sizeof(d->handle));
-    }
+    memcpy(d->handle, config->handle, sizeof(d->handle));
 
     return d;
 
