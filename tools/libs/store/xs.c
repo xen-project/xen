@@ -40,6 +40,14 @@
 #include <xentoolcore_internal.h>
 #include <xen_list.h>
 
+#ifdef USE_PTHREAD
+# include <pthread.h>
+#endif
+
+#ifdef USE_DLSYM
+# include <dlfcn.h>
+#endif
+
 #ifndef O_CLOEXEC
 #define O_CLOEXEC 0
 #endif
@@ -54,14 +62,6 @@ struct xs_stored_msg {
 	char *body;
 };
 
-#ifdef USE_PTHREAD
-
-#include <pthread.h>
-
-#ifdef USE_DLSYM
-#include <dlfcn.h>
-#endif
-
 struct xs_handle {
 	/* Communications channel to xenstore daemon. */
 	int fd;
@@ -71,16 +71,20 @@ struct xs_handle {
          * A read thread which pulls messages off the comms channel and
          * signals waiters.
          */
+#ifdef USE_PTHREAD
 	pthread_t read_thr;
 	int read_thr_exists;
+#endif
 
 	/*
          * A list of fired watch messages, protected by a mutex. Users can
          * wait on the conditional variable until a watch is pending.
          */
 	XEN_TAILQ_HEAD(, struct xs_stored_msg) watch_list;
+#ifdef USE_PTHREAD
 	pthread_mutex_t watch_mutex;
 	pthread_cond_t watch_condvar;
+#endif
 
 	/* Clients can select() on this pipe to wait for a watch to fire. */
 	int watch_pipe[2];
@@ -93,6 +97,7 @@ struct xs_handle {
          * conditional variable for its response.
          */
 	XEN_TAILQ_HEAD(, struct xs_stored_msg) reply_list;
+#ifdef USE_PTHREAD
 	pthread_mutex_t reply_mutex;
 	pthread_cond_t reply_condvar;
 
@@ -112,55 +117,47 @@ struct xs_handle {
 	 *     reply_mutex
 	 *     watch_mutex
 	 */
+#endif
 };
 
-#define mutex_lock(m)		pthread_mutex_lock(m)
-#define mutex_unlock(m)		pthread_mutex_unlock(m)
-#define condvar_signal(c)	pthread_cond_signal(c)
-#define condvar_wait(c,m)	pthread_cond_wait(c,m)
-#define cleanup_push(f, a)	\
-    pthread_cleanup_push((void (*)(void *))(f), (void *)(a))
+
+#ifdef USE_PTHREAD
+
+# define mutex_lock(m)             pthread_mutex_lock(m)
+# define mutex_unlock(m)           pthread_mutex_unlock(m)
+# define condvar_signal(c)         pthread_cond_signal(c)
+# define condvar_wait(c, m)        pthread_cond_wait(c, m)
+# define cleanup_push(f, a)        pthread_cleanup_push((void (*)(void *))(f), (void *)(a))
 /*
  * Some definitions of pthread_cleanup_pop() are a macro starting with an
  * end-brace. GCC then complains if we immediately precede that with a label.
  * Hence we insert a dummy statement to appease the compiler in this situation.
  */
-#define cleanup_pop(run)        ((void)0); pthread_cleanup_pop(run)
+# define cleanup_pop(run)          ((void)0); pthread_cleanup_pop(run)
 
-#define read_thread_exists(h)	(h->read_thr_exists)
+# define read_thread_exists(h)     ((h)->read_thr_exists)
 
 /* Because pthread_cleanup_p* are not available when USE_PTHREAD is
  * disabled, use these macros which convert appropriately. */
-#define cleanup_push_heap(p)        cleanup_push(free, p)
-#define cleanup_pop_heap(run, p)    cleanup_pop((run))
+# define cleanup_push_heap(p)      cleanup_push(free, p)
+# define cleanup_pop_heap(run, p)  cleanup_pop((run))
 
 static void *read_thread(void *arg);
 
-#else /* !defined(USE_PTHREAD) */
+#else /* USE_PTHREAD */
 
-struct xs_handle {
-	int fd;
-	Xentoolcore__Active_Handle tc_ah; /* for restrict */
-	XEN_TAILQ_HEAD(, struct xs_stored_msg) reply_list;
-	XEN_TAILQ_HEAD(, struct xs_stored_msg) watch_list;
-	/* Clients can select() on this pipe to wait for a watch to fire. */
-	int watch_pipe[2];
-	/* Filtering watch event in unwatch function? */
-	bool unwatch_filter;
-};
+# define mutex_lock(m)               ((void)0)
+# define mutex_unlock(m)             ((void)0)
+# define condvar_signal(c)           ((void)0)
+# define condvar_wait(c, m)          ((void)0)
+# define cleanup_push(f, a)          ((void)0)
+# define cleanup_pop(run)            ((void)0)
+# define read_thread_exists(h)       (0)
+# define cleanup_push_heap(p)        ((void)0)
+# define cleanup_pop_heap(run, p)    do { if ((run)) free(p); } while(0)
 
-#define mutex_lock(m)		((void)0)
-#define mutex_unlock(m)		((void)0)
-#define condvar_signal(c)	((void)0)
-#define condvar_wait(c,m)	((void)0)
-#define cleanup_push(f, a)	((void)0)
-#define cleanup_pop(run)	((void)0)
-#define read_thread_exists(h)	(0)
+#endif /* !USE_PTHREAD */
 
-#define cleanup_push_heap(p)        ((void)0)
-#define cleanup_pop_heap(run, p)    do { if ((run)) free(p); } while(0)
-
-#endif
 
 static int read_message(struct xs_handle *h, int nonblocking);
 
