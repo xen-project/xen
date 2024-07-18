@@ -561,25 +561,32 @@ static void *read_reply(
 	return body;
 }
 
-/* Send message to xs, get malloc'ed reply.  NULL and set errno on error. */
-static void *xs_talkv(struct xs_handle *h, xs_transaction_t t,
-		      enum xsd_sockmsg_type type,
-		      const struct iovec *iovec,
+/*
+ * Send message to xenstore, get malloc'ed reply.  NULL and set errno on error.
+ *
+ * @iovec describes the entire outgoing message, starting with the xsd_sockmsg
+ * header.  xs_talkv() calculates the outgoing message length, updating
+ * xsd_sockmsg in element 0.  xs_talkv() might edit the iovec structure in
+ * place (e.g. following short writes).
+ */
+static void *xs_talkv(struct xs_handle *h,
+		      struct iovec *iovec,
 		      unsigned int num_vecs,
 		      unsigned int *len)
 {
-	struct xsd_sockmsg msg;
+	struct xsd_sockmsg *msg = iovec[0].iov_base;
+	enum xsd_sockmsg_type reply_type;
 	void *ret = NULL;
 	int saved_errno;
 	unsigned int i, msg_len;
 	struct sigaction ignorepipe, oldact;
 
-	msg.tx_id = t;
-	msg.req_id = 0;
-	msg.type = type;
+	/* Element 0 must be xsd_sockmsg */
+	assert(num_vecs >= 1);
+	assert(iovec[0].iov_len == sizeof(*msg));
 
 	/* Calculate the payload length by summing iovec elements */
-	for (i = 0, msg_len = 0; i < num_vecs; i++) {
+	for (i = 1, msg_len = 0; i < num_vecs; i++) {
 		if ((iovec[i].iov_len > XENSTORE_PAYLOAD_MAX) ||
 		    ((msg_len += iovec[i].iov_len) > XENSTORE_PAYLOAD_MAX)) {
 			errno = E2BIG;
@@ -587,7 +594,7 @@ static void *xs_talkv(struct xs_handle *h, xs_transaction_t t,
 		}
 	}
 
-	msg.len = msg_len;
+	msg->len = msg_len;
 
 	ignorepipe.sa_handler = SIG_IGN;
 	sigemptyset(&ignorepipe.sa_mask);
@@ -596,28 +603,25 @@ static void *xs_talkv(struct xs_handle *h, xs_transaction_t t,
 
 	mutex_lock(&h->request_mutex);
 
-	if (!xs_write_all(h->fd, &msg, sizeof(msg)))
-		goto fail;
-
 	for (i = 0; i < num_vecs; i++)
 		if (!xs_write_all(h->fd, iovec[i].iov_base, iovec[i].iov_len))
 			goto fail;
 
-	ret = read_reply(h, &msg.type, len);
+	ret = read_reply(h, &reply_type, len);
 	if (!ret)
 		goto fail;
 
 	mutex_unlock(&h->request_mutex);
 
 	sigaction(SIGPIPE, &oldact, NULL);
-	if (msg.type == XS_ERROR) {
+	if (reply_type == XS_ERROR) {
 		saved_errno = get_error(ret);
 		free(ret);
 		errno = saved_errno;
 		return NULL;
 	}
 
-	if (msg.type != type) {
+	if (reply_type != msg->type) {
 		free(ret);
 		saved_errno = EBADF;
 		goto close_fd;
@@ -650,11 +654,15 @@ static void *xs_single(struct xs_handle *h, xs_transaction_t t,
 		       const char *string,
 		       unsigned int *len)
 {
-	struct iovec iovec;
+	struct xsd_sockmsg msg = { .type = type, .tx_id = t };
+	struct iovec iov[2];
 
-	iovec.iov_base = (void *)string;
-	iovec.iov_len = strlen(string) + 1;
-	return xs_talkv(h, t, type, &iovec, 1, len);
+	iov[0].iov_base = &msg;
+	iov[0].iov_len  = sizeof(msg);
+	iov[1].iov_base = (void *)string;
+	iov[1].iov_len  = strlen(string) + 1;
+
+	return xs_talkv(h, iov, ARRAY_SIZE(iov), len);
 }
 
 static bool xs_bool(char *reply)
@@ -691,21 +699,25 @@ static char **xs_directory_common(char *strings, unsigned int len,
 static char **xs_directory_part(struct xs_handle *h, xs_transaction_t t,
 				const char *path, unsigned int *num)
 {
+	struct xsd_sockmsg msg = { .type = XS_DIRECTORY_PART, .tx_id = t };
 	unsigned int off, result_len;
 	char gen[24], offstr[8];
-	struct iovec iovec[2];
+	struct iovec iov[3];
 	char *result = NULL, *strings = NULL;
 
 	memset(gen, 0, sizeof(gen));
-	iovec[0].iov_base = (void *)path;
-	iovec[0].iov_len = strlen(path) + 1;
 
 	for (off = 0;;) {
 		snprintf(offstr, sizeof(offstr), "%u", off);
-		iovec[1].iov_base = (void *)offstr;
-		iovec[1].iov_len = strlen(offstr) + 1;
-		result = xs_talkv(h, t, XS_DIRECTORY_PART, iovec, 2,
-				  &result_len);
+
+		iov[0].iov_base = &msg;
+		iov[0].iov_len  = sizeof(msg);
+		iov[1].iov_base = (void *)path;
+		iov[1].iov_len  = strlen(path) + 1;
+		iov[2].iov_base = (void *)offstr;
+		iov[2].iov_len  = strlen(offstr) + 1;
+
+		result = xs_talkv(h, iov, ARRAY_SIZE(iov), &result_len);
 
 		/* If XS_DIRECTORY_PART isn't supported return E2BIG. */
 		if (!result) {
@@ -774,15 +786,17 @@ void *xs_read(struct xs_handle *h, xs_transaction_t t,
 bool xs_write(struct xs_handle *h, xs_transaction_t t,
 	      const char *path, const void *data, unsigned int len)
 {
-	struct iovec iovec[2];
+	struct xsd_sockmsg msg = { .type = XS_WRITE, .tx_id = t };
+	struct iovec iov[3];
 
-	iovec[0].iov_base = (void *)path;
-	iovec[0].iov_len = strlen(path) + 1;
-	iovec[1].iov_base = (void *)data;
-	iovec[1].iov_len = len;
+	iov[0].iov_base = &msg;
+	iov[0].iov_len  = sizeof(msg);
+	iov[1].iov_base = (void *)path;
+	iov[1].iov_len  = strlen(path) + 1;
+	iov[2].iov_base = (void *)data;
+	iov[2].iov_len  = len;
 
-	return xs_bool(xs_talkv(h, t, XS_WRITE, iovec,
-				ARRAY_SIZE(iovec), NULL));
+	return xs_bool(xs_talkv(h, iov, ARRAY_SIZE(iov), NULL));
 }
 
 /* Create a new directory.
@@ -846,34 +860,37 @@ bool xs_set_permissions(struct xs_handle *h,
 			struct xs_permissions *perms,
 			unsigned int num_perms)
 {
+	struct xsd_sockmsg msg = { .type = XS_SET_PERMS, .tx_id = t };
 	unsigned int i;
-	struct iovec iov[1+num_perms];
+	struct iovec iov[2 + num_perms];
 
-	iov[0].iov_base = (void *)path;
-	iov[0].iov_len = strlen(path) + 1;
-	
+	iov[0].iov_base = &msg;
+	iov[0].iov_len  = sizeof(msg);
+	iov[1].iov_base = (void *)path;
+	iov[1].iov_len  = strlen(path) + 1;
+
 	for (i = 0; i < num_perms; i++) {
 		char buffer[MAX_STRLEN(unsigned int)+1];
 
 		if (!xenstore_perm_to_string(&perms[i], buffer, sizeof(buffer)))
 			goto unwind;
 
-		iov[i+1].iov_base = strdup(buffer);
-		iov[i+1].iov_len = strlen(buffer) + 1;
+		iov[i + 2].iov_base = strdup(buffer);
+		iov[i + 2].iov_len  = strlen(buffer) + 1;
 		if (!iov[i+1].iov_base)
 			goto unwind;
 	}
 
-	if (!xs_bool(xs_talkv(h, t, XS_SET_PERMS, iov, 1+num_perms, NULL)))
+	if (!xs_bool(xs_talkv(h, iov, ARRAY_SIZE(iov), NULL)))
 		goto unwind;
 	for (i = 0; i < num_perms; i++)
-		free(iov[i+1].iov_base);
+		free(iov[i + 2].iov_base);
 	return true;
 
 unwind:
 	num_perms = i;
 	for (i = 0; i < num_perms; i++)
-		free_no_errno(iov[i+1].iov_base);
+		free_no_errno(iov[i + 2].iov_base);
 	return false;
 }
 
@@ -890,7 +907,8 @@ bool xs_restrict(struct xs_handle *h, unsigned domid)
  */
 bool xs_watch(struct xs_handle *h, const char *path, const char *token)
 {
-	struct iovec iov[2];
+	struct xsd_sockmsg msg = { .type = XS_WATCH };
+	struct iovec iov[3];
 
 #ifdef USE_PTHREAD
 #define DEFAULT_THREAD_STACKSIZE (16 * 1024)
@@ -948,13 +966,14 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token)
 	mutex_unlock(&h->request_mutex);
 #endif
 
-	iov[0].iov_base = (void *)path;
-	iov[0].iov_len = strlen(path) + 1;
-	iov[1].iov_base = (void *)token;
-	iov[1].iov_len = strlen(token) + 1;
+	iov[0].iov_base = &msg;
+	iov[0].iov_len  = sizeof(msg);
+	iov[1].iov_base = (void *)path;
+	iov[1].iov_len  = strlen(path) + 1;
+	iov[2].iov_base = (void *)token;
+	iov[2].iov_len  = strlen(token) + 1;
 
-	return xs_bool(xs_talkv(h, XBT_NULL, XS_WATCH, iov,
-				ARRAY_SIZE(iov), NULL));
+	return xs_bool(xs_talkv(h, iov, ARRAY_SIZE(iov), NULL));
 }
 
 
@@ -1067,20 +1086,22 @@ char **xs_read_watch(struct xs_handle *h, unsigned int *num)
  */
 bool xs_unwatch(struct xs_handle *h, const char *path, const char *token)
 {
-	struct iovec iov[2];
+	struct xsd_sockmsg sockmsg = { .type = XS_UNWATCH };
+	struct iovec iov[3];
 	struct xs_stored_msg *msg, *tmsg;
 	bool res;
 	char *s, *p;
 	unsigned int i;
 	char *l_token, *l_path;
 
-	iov[0].iov_base = (char *)path;
-	iov[0].iov_len = strlen(path) + 1;
-	iov[1].iov_base = (char *)token;
-	iov[1].iov_len = strlen(token) + 1;
+	iov[0].iov_base = &sockmsg;
+	iov[0].iov_len  = sizeof(sockmsg);
+	iov[1].iov_base = (char *)path;
+	iov[1].iov_len  = strlen(path) + 1;
+	iov[2].iov_base = (char *)token;
+	iov[2].iov_len  = strlen(token) + 1;
 
-	res = xs_bool(xs_talkv(h, XBT_NULL, XS_UNWATCH, iov,
-			       ARRAY_SIZE(iov), NULL));
+	res = xs_bool(xs_talkv(h, iov, ARRAY_SIZE(iov), NULL));
 
 	if (!h->unwatch_filter) /* Don't filter the watch list */
 		return res;
@@ -1173,43 +1194,47 @@ bool xs_introduce_domain(struct xs_handle *h,
 			 unsigned int domid, unsigned long mfn,
 			 unsigned int eventchn)
 {
+	struct xsd_sockmsg msg = { .type = XS_INTRODUCE };
 	char domid_str[MAX_STRLEN(domid)];
 	char mfn_str[MAX_STRLEN(mfn)];
 	char eventchn_str[MAX_STRLEN(eventchn)];
-	struct iovec iov[3];
+	struct iovec iov[4];
 
 	snprintf(domid_str, sizeof(domid_str), "%u", domid);
 	snprintf(mfn_str, sizeof(mfn_str), "%lu", mfn);
 	snprintf(eventchn_str, sizeof(eventchn_str), "%u", eventchn);
 
-	iov[0].iov_base = domid_str;
-	iov[0].iov_len = strlen(domid_str) + 1;
-	iov[1].iov_base = mfn_str;
-	iov[1].iov_len = strlen(mfn_str) + 1;
-	iov[2].iov_base = eventchn_str;
-	iov[2].iov_len = strlen(eventchn_str) + 1;
+	iov[0].iov_base = &msg;
+	iov[0].iov_len  = sizeof(msg);
+	iov[1].iov_base = domid_str;
+	iov[1].iov_len  = strlen(domid_str) + 1;
+	iov[2].iov_base = mfn_str;
+	iov[2].iov_len  = strlen(mfn_str) + 1;
+	iov[3].iov_base = eventchn_str;
+	iov[3].iov_len  = strlen(eventchn_str) + 1;
 
-	return xs_bool(xs_talkv(h, XBT_NULL, XS_INTRODUCE, iov,
-				ARRAY_SIZE(iov), NULL));
+	return xs_bool(xs_talkv(h, iov, ARRAY_SIZE(iov), NULL));
 }
 
 bool xs_set_target(struct xs_handle *h,
 			 unsigned int domid, unsigned int target)
 {
+	struct xsd_sockmsg msg = { .type = XS_SET_TARGET };
 	char domid_str[MAX_STRLEN(domid)];
 	char target_str[MAX_STRLEN(target)];
-	struct iovec iov[2];
+	struct iovec iov[3];
 
 	snprintf(domid_str, sizeof(domid_str), "%u", domid);
 	snprintf(target_str, sizeof(target_str), "%u", target);
 
-	iov[0].iov_base = domid_str;
-	iov[0].iov_len = strlen(domid_str) + 1;
-	iov[1].iov_base = target_str;
-	iov[1].iov_len = strlen(target_str) + 1;
+	iov[0].iov_base = &msg;
+	iov[0].iov_len  = sizeof(msg);
+	iov[1].iov_base = domid_str;
+	iov[1].iov_len  = strlen(domid_str) + 1;
+	iov[2].iov_base = target_str;
+	iov[2].iov_len  = strlen(target_str) + 1;
 
-	return xs_bool(xs_talkv(h, XBT_NULL, XS_SET_TARGET, iov,
-				ARRAY_SIZE(iov), NULL));
+	return xs_bool(xs_talkv(h, iov, ARRAY_SIZE(iov), NULL));
 }
 
 static void * single_with_domid(struct xs_handle *h,
@@ -1305,15 +1330,17 @@ out:
 char *xs_control_command(struct xs_handle *h, const char *cmd,
 			 void *data, unsigned int len)
 {
-	struct iovec iov[2];
+	struct xsd_sockmsg msg = { .type = XS_CONTROL };
+	struct iovec iov[3];
 
-	iov[0].iov_base = (void *)cmd;
-	iov[0].iov_len = strlen(cmd) + 1;
-	iov[1].iov_base = data;
-	iov[1].iov_len = len;
+	iov[0].iov_base = &msg;
+	iov[0].iov_len  = sizeof(msg);
+	iov[1].iov_base = (void *)cmd;
+	iov[1].iov_len  = strlen(cmd) + 1;
+	iov[2].iov_base = data;
+	iov[2].iov_len  = len;
 
-	return xs_talkv(h, XBT_NULL, XS_CONTROL, iov,
-			ARRAY_SIZE(iov), NULL);
+	return xs_talkv(h, iov, ARRAY_SIZE(iov), NULL);
 }
 
 char *xs_debug_command(struct xs_handle *h, const char *cmd,
