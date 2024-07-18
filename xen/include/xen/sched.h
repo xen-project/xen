@@ -728,6 +728,11 @@ struct domain *domain_create(domid_t domid,
                              struct xen_domctl_createdomain *config,
                              unsigned int flags);
 
+#ifndef arch_init_idle_domain
+/* Optional, if there's any construction necessary for DOMID_IDLE */
+static inline void arch_init_idle_domain(struct domain *d) {}
+#endif
+
 /*
  * rcu_lock_domain_by_id() is more efficient than get_domain_by_id().
  * This is the preferred function if the returned domain reference

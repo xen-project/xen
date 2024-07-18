@@ -686,6 +686,9 @@ struct domain *domain_create(domid_t domid,
 
     rangeset_domain_initialise(d);
 
+    if ( is_idle_domain(d) )
+        arch_init_idle_domain(d);
+
     /* DOMID_{XEN,IO,etc} (other than IDLE) are sufficiently constructed. */
     if ( is_system_domain(d) && !is_idle_domain(d) )
         return d;
