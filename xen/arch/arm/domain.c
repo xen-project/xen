@@ -706,12 +706,6 @@ int arch_domain_create(struct domain *d,
 
     BUILD_BUG_ON(GUEST_MAX_VCPUS < MAX_VIRT_CPUS);
 
-    /* Idle domains do not need this setup */
-    if ( is_idle_domain(d) )
-        return 0;
-
-    ASSERT(config != NULL);
-
 #ifdef CONFIG_IOREQ_SERVER
     ioreq_domain_init(d);
 #endif
