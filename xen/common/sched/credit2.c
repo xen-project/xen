@@ -1476,8 +1476,8 @@ static inline void runq_remove(struct csched2_unit *svc)
     list_del_init(&svc->runq_elem);
 }
 
-void burn_credits(struct csched2_runqueue_data *rqd, struct csched2_unit *svc,
-                  s_time_t now);
+static void burn_credits(struct csched2_runqueue_data *rqd,
+                         struct csched2_unit *svc, s_time_t now);
 
 static inline void
 tickle_cpu(unsigned int cpu, struct csched2_runqueue_data *rqd)
@@ -1855,8 +1855,8 @@ static void reset_credit(int cpu, s_time_t now, struct csched2_unit *snext)
     /* No need to resort runqueue, as everyone's order should be the same. */
 }
 
-void burn_credits(struct csched2_runqueue_data *rqd,
-                  struct csched2_unit *svc, s_time_t now)
+static void burn_credits(struct csched2_runqueue_data *rqd,
+                         struct csched2_unit *svc, s_time_t now)
 {
     s_time_t delta;
 
