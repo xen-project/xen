@@ -7,7 +7,6 @@
 
 #define XEN_PX_INIT 0x80000000U
 
-int powernow_cpufreq_init(void);
 unsigned int powernow_register_driver(void);
 unsigned int get_measured_perf(unsigned int cpu, unsigned int flag);
 void cpufreq_residency_update(unsigned int cpu, uint8_t state);
