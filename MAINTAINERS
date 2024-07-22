@@ -594,12 +594,6 @@ F:	tools/misc/xen-cpuid.c
 F:	tools/tests/cpu-policy/
 F:	tools/tests/x86_emulator/
 
-X86 MEMORY MANAGEMENT
-M:	Jan Beulich <jbeulich@suse.com>
-M:	Andrew Cooper <andrew.cooper3@citrix.com>
-S:	Supported
-F:	xen/arch/x86/mm/
-
 X86 MEMORY PAGING
 S:	Orphaned
 F:	xen/arch/x86/mm/mem_paging.c
