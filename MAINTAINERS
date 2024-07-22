@@ -284,12 +284,6 @@ S:	Supported
 F:	.gitlab-ci.yml
 F:	automation/
 
-CPU POOLS
-M:	Juergen Gross <jgross@suse.com>
-M:	Dario Faggioli <dfaggioli@suse.com>
-S:	Supported
-F:	xen/common/sched/*cpupool.c
-
 DEVICE TREE
 M:	Stefano Stabellini <sstabellini@kernel.org>
 M:	Julien Grall <julien@xen.org>
