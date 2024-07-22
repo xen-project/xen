@@ -906,14 +906,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size)
 
     if ( size <= DATA_OFFSET )
     {
-        printf("Input too small\n");
-        return 1;
+        return -1;
     }
 
     if ( size > FUZZ_CORPUS_SIZE )
     {
-        printf("Input too large\n");
-        return 1;
+        return -1;
     }
 
     memcpy(&input, data_p, size);
