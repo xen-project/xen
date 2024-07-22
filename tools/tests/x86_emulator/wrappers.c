@@ -91,17 +91,6 @@ int __wrap_snprintf(char *buf, size_t n, const char *fmt, ...)
     return rc;
 }
 
-int __wrap_vsnprintf(char *buf, size_t n, const char *fmt, va_list varg)
-{
-    int rc;
-
-    emul_save_fpu_state();
-    rc = __real_vsnprintf(buf, n, fmt, varg);
-    emul_restore_fpu_state();
-
-    return rc;
-}
-
 char *__wrap_strstr(const char *s1, const char *s2)
 {
     char *s;
