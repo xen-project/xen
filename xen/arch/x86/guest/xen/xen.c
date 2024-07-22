@@ -73,7 +73,7 @@ static void map_shared_info(void)
     if ( rc )
         panic("failed to map shared_info page: %ld\n", rc);
 
-    set_fixmap(FIX_XEN_SHARED_INFO, mfn_x(mfn) << PAGE_SHIFT);
+    set_fixmap(FIX_XEN_SHARED_INFO, mfn_to_maddr(mfn));
 
     /* Mask all upcalls */
     for ( i = 0; i < ARRAY_SIZE(XEN_shared_info->evtchn_mask); i++ )

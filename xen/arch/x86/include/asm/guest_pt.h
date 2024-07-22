@@ -371,7 +371,7 @@ static inline paddr_t guest_walk_to_gpa(const walk_t *gw)
     if ( gfn_eq(gfn, INVALID_GFN) )
         return INVALID_PADDR;
 
-    return (gfn_x(gfn) << PAGE_SHIFT) | (gw->va & ~PAGE_MASK);
+    return gfn_to_gaddr(gfn) | (gw->va & ~PAGE_MASK);
 }
 
 /* Given a walk_t from a successful walk, return the page-order of the

@@ -565,11 +565,10 @@ int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
     if ( gmtrr_mtype == -EADDRNOTAVAIL )
         return -1;
 
-    gmtrr_mtype = v ? mtrr_get_type(&v->arch.hvm.mtrr,
-                                    gfn_x(gfn) << PAGE_SHIFT, order)
+    gmtrr_mtype = v ? mtrr_get_type(&v->arch.hvm.mtrr, gfn_to_gaddr(gfn),
+                                    order)
                     : X86_MT_WB;
-    hmtrr_mtype = mtrr_get_type(&mtrr_state, mfn_x(mfn) << PAGE_SHIFT,
-                                order);
+    hmtrr_mtype = mtrr_get_type(&mtrr_state, mfn_to_maddr(mfn), order);
     if ( gmtrr_mtype < 0 || hmtrr_mtype < 0 )
         return -1;
 
