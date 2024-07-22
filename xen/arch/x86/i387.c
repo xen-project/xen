@@ -64,13 +64,12 @@ static inline void fpu_fxrstor(struct vcpu *v)
     {
     default:
         asm volatile (
-            /* See below for why the operands/constraints are this way. */
-            "1: " REX64_PREFIX "fxrstor (%2)\n"
+            "1: fxrstorq %0\n"
             ".section .fixup,\"ax\"   \n"
             "2: push %%"__OP"ax       \n"
             "   push %%"__OP"cx       \n"
             "   push %%"__OP"di       \n"
-            "   mov  %2,%%"__OP"di    \n"
+            "   lea  %0,%%"__OP"di    \n"
             "   mov  %1,%%ecx         \n"
             "   xor  %%eax,%%eax      \n"
             "   rep ; stosl           \n"
@@ -81,7 +80,7 @@ static inline void fpu_fxrstor(struct vcpu *v)
             ".previous                \n"
             _ASM_EXTABLE(1b, 2b)
             :
-            : "m" (*fpu_ctxt), "i" (sizeof(*fpu_ctxt) / 4), "R" (fpu_ctxt) );
+            : "m" (*fpu_ctxt), "i" (sizeof(*fpu_ctxt) / 4) );
         break;
     case 4: case 2:
         asm volatile (
@@ -157,13 +156,7 @@ static inline void fpu_fxsave(struct vcpu *v)
 
     if ( fip_width != 4 )
     {
-        /*
-         * The only way to force fxsaveq on a wide range of gas versions.
-         * On older versions the rex64 prefix works only if we force an
-         * addressing mode that doesn't require extended registers.
-         */
-        asm volatile ( REX64_PREFIX "fxsave (%1)"
-                       : "=m" (*fpu_ctxt) : "R" (fpu_ctxt) );
+        asm volatile ( "fxsaveq %0" : "=m" (*fpu_ctxt) );
 
         /*
          * Some CPUs don't save/restore FDP/FIP/FOP unless an exception is

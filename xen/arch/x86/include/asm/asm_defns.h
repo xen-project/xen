@@ -331,14 +331,6 @@ static always_inline void stac(void)
 #define safe_swapgs                             \
         "mfence; swapgs;"
 
-#ifdef __sun__
-#define REX64_PREFIX "rex64\\"
-#elif defined(__clang__)
-#define REX64_PREFIX ".byte 0x48; "
-#else
-#define REX64_PREFIX "rex64/"
-#endif
-
 #define ELFNOTE(name, type, desc)           \
     .pushsection .note.name, "a", @note   ; \
     .p2align 2                            ; \
