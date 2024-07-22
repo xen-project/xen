@@ -20,12 +20,6 @@
 #error GUEST_PAGING_LEVELS not defined
 #endif
 
-static inline paddr_t
-gfn_to_paddr(gfn_t gfn)
-{
-    return ((paddr_t)gfn_x(gfn)) << PAGE_SHIFT;
-}
-
 /* Override get_gfn to work with gfn_t */
 #undef get_gfn
 #define get_gfn(d, g, t) get_gfn_type((d), gfn_x(g), (t), P2M_ALLOC)
