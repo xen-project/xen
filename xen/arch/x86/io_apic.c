@@ -1652,8 +1652,7 @@ static bool io_apic_level_ack_pending(unsigned int irq)
 
 static void cf_check mask_and_ack_level_ioapic_irq(struct irq_desc *desc)
 {
-    unsigned long v;
-    int i;
+    bool is_level;
 
     irq_complete_move(desc);
 
@@ -1679,9 +1678,8 @@ static void cf_check mask_and_ack_level_ioapic_irq(struct irq_desc *desc)
  * operation to prevent an edge-triggered interrupt escaping meanwhile.
  * The idea is from Manfred Spraul.  --macro
  */
-    i = desc->arch.vector;
 
-    v = apic_read(APIC_TMR + ((i & ~0x1f) >> 1));
+    is_level = apic_tmr_read(desc->arch.vector);
 
     ack_APIC_irq();
     
@@ -1692,7 +1690,7 @@ static void cf_check mask_and_ack_level_ioapic_irq(struct irq_desc *desc)
        !io_apic_level_ack_pending(desc->irq))
         move_masked_irq(desc);
 
-    if ( !(v & (1U << (i & 0x1f))) )
+    if ( !is_level )
     {
         spin_lock(&ioapic_lock);
         __edge_IO_APIC_irq(desc->irq);
@@ -1743,13 +1741,14 @@ static void cf_check end_level_ioapic_irq_new(struct irq_desc *desc, u8 vector)
  * operation to prevent an edge-triggered interrupt escaping meanwhile.
  * The idea is from Manfred Spraul.  --macro
  */
-    unsigned int v, i = desc->arch.vector;
+    unsigned int i = desc->arch.vector;
+    bool is_level;
 
     /* Manually EOI the old vector if we are moving to the new */
     if ( vector && i != vector )
         eoi_IO_APIC_irq(desc);
 
-    v = apic_read(APIC_TMR + ((i & ~0x1f) >> 1));
+    is_level = apic_tmr_read(i);
 
     end_nonmaskable_irq(desc, vector);
 
@@ -1757,7 +1756,7 @@ static void cf_check end_level_ioapic_irq_new(struct irq_desc *desc, u8 vector)
          !io_apic_level_ack_pending(desc->irq) )
         move_native_irq(desc);
 
-    if ( !(v & (1U << (i & 0x1f))) )
+    if ( !is_level )
     {
         spin_lock(&ioapic_lock);
         __mask_IO_APIC_irq(desc->irq);

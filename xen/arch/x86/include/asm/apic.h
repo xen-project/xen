@@ -132,6 +132,11 @@ static inline bool apic_isr_read(uint8_t vector)
             (vector & 0x1f)) & 1;
 }
 
+static inline bool apic_tmr_read(unsigned int vector)
+{
+    return apic_read(APIC_TMR + (vector / 32 * 0x10)) & (1U << (vector % 32));
+}
+
 static inline bool apic_irr_read(unsigned int vector)
 {
     return apic_read(APIC_IRR + (vector / 32 * 0x10)) & (1U << (vector % 32));
