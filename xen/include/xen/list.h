@@ -42,6 +42,9 @@ struct list_head {
 #define LIST_HEAD_READ_MOSTLY(name) \
     struct list_head __read_mostly name = LIST_HEAD_INIT(name)
 
+#define LIST_HEAD_RO_AFTER_INIT(name) \
+    struct list_head __ro_after_init name = LIST_HEAD_INIT(name)
+
 static inline void INIT_LIST_HEAD(struct list_head *list)
 {
     list->next = list;
