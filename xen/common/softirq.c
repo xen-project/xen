@@ -139,7 +139,9 @@ void cpu_raise_softirq_batch_finish(void)
 
 void raise_softirq(unsigned int nr)
 {
-    set_bit(nr, &softirq_pending(smp_processor_id()));
+    unsigned int cpu = smp_processor_id();
+
+    set_bit(nr, &softirq_pending(cpu));
 }
 
 /*
