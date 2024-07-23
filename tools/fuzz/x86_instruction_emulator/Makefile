@@ -58,6 +58,9 @@ afl-harness: afl-harness.o $(OBJS) cpuid.o wrappers.o
 afl-harness-cov: afl-harness-cov.o $(patsubst %.o,%-cov.o,$(OBJS)) cpuid.o wrappers.o
 	$(CC) $(CFLAGS) $(GCOV_FLAGS) $(addprefix -Wl$(comma)--wrap=,$(WRAPPED)) $^ -o $@
 
+libfuzzer-harness: $(OBJS) cpuid.o wrappers.o
+	$(CC) $(CFLAGS) $(LIB_FUZZING_ENGINE) -fsanitize=fuzzer $(addprefix -Wl$(comma)--wrap=,$(WRAPPED)) $^ -o $@
+
 # Common targets
 .PHONY: all
 all: x86-insn-fuzz-all
@@ -67,7 +70,8 @@ distclean: clean
 
 .PHONY: clean
 clean:
-	rm -f *.a *.o $(DEPS_RM) afl-harness afl-harness-cov *.gcda *.gcno *.gcov
+	rm -f *.a *.o $(DEPS_RM) *.gcda *.gcno *.gcov
+	rm -f afl-harness afl-harness-cov libfuzzer-harness
 	rm -rf x86_emulate x86-emulate.c x86-emulate.h wrappers.c cpuid.c
 
 .PHONY: install
