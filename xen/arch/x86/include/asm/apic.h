@@ -49,12 +49,12 @@ const struct genapic *apic_x2apic_probe(void);
  * Basic functions accessing APICs.
  */
 
-static inline void apic_mem_write(unsigned long reg, u32 v)
+static inline void apic_mem_write(unsigned int reg, uint32_t v)
 {
 	*((volatile u32 *)(APIC_BASE+reg)) = v;
 }
 
-static inline u32 apic_mem_read(unsigned long reg)
+static inline u32 apic_mem_read(unsigned int reg)
 {
 	return *((volatile u32 *)(APIC_BASE+reg));
 }
@@ -63,7 +63,7 @@ static inline u32 apic_mem_read(unsigned long reg)
  * access the 64-bit ICR register.
  */
 
-static inline void apic_wrmsr(unsigned long reg, uint64_t msr_content)
+static inline void apic_wrmsr(unsigned int reg, uint64_t msr_content)
 {
     if (reg == APIC_DFR || reg == APIC_ID || reg == APIC_LDR ||
         reg == APIC_LVR)
@@ -72,7 +72,7 @@ static inline void apic_wrmsr(unsigned long reg, uint64_t msr_content)
     wrmsrl(MSR_X2APIC_FIRST + (reg >> 4), msr_content);
 }
 
-static inline uint64_t apic_rdmsr(unsigned long reg)
+static inline uint64_t apic_rdmsr(unsigned int reg)
 {
     uint64_t msr_content;
 
@@ -83,7 +83,7 @@ static inline uint64_t apic_rdmsr(unsigned long reg)
     return msr_content;
 }
 
-static inline void apic_write(unsigned long reg, u32 v)
+static inline void apic_write(unsigned int reg, uint32_t v)
 {
 
     if ( x2apic_enabled )
@@ -92,7 +92,7 @@ static inline void apic_write(unsigned long reg, u32 v)
         apic_mem_write(reg, v);
 }
 
-static inline u32 apic_read(unsigned long reg)
+static inline u32 apic_read(unsigned int reg)
 {
     if ( x2apic_enabled )
         return apic_rdmsr(reg);
