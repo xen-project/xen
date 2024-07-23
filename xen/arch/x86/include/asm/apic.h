@@ -126,10 +126,9 @@ static inline void apic_icr_write(u32 low, u32 dest)
     }
 }
 
-static inline bool apic_isr_read(uint8_t vector)
+static inline bool apic_isr_read(unsigned int vector)
 {
-    return (apic_read(APIC_ISR + ((vector & ~0x1f) >> 1)) >>
-            (vector & 0x1f)) & 1;
+    return apic_read(APIC_ISR + (vector / 32 * 0x10)) & (1U << (vector % 32));
 }
 
 static inline bool apic_tmr_read(unsigned int vector)
