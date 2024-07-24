@@ -593,6 +593,13 @@ maintainers if you want to suggest a change.
      - Variable-length array types shall not be used
      -
 
+   * - `Rule 18.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_18_06_1.c>`_
+     - Required
+     - The address of an object with automatic storage shall not be
+       copied to another object that persists after the first object has
+       ceased to exist
+     -
+
    * - `Rule 19.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_19_01.c>`_
      - Mandatory
      - An object shall not be assigned or copied to an overlapping
