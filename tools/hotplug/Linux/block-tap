@@ -204,13 +204,13 @@ add()
         tap_create
     fi
 
-    # Create nbd unix path.  find_device/tap_create set pid & minor
-    dev=$( printf "/run/blktap-control/nbd%ld.%d" "$pid" "$minor" )
-
     xenstore_write "$XENBUS_PATH/pid" "$pid"
     xenstore_write "$XENBUS_PATH/minor" "$minor"
 
     if [ "$XENBUS_TYPE" = "vbd3" ] ; then
+        # Create nbd unix path.  find_device/tap_create set pid & minor
+        dev=$( printf "/run/blktap-control/nbd%ld.%d" "$pid" "$minor" )
+
         # $dev, as a unix socket, has major:minor 0:0.  If write_dev writes
         # physical-device, tapback would use that incorrect minor 0.  So don't
         # write physical-device.
@@ -218,6 +218,9 @@ add()
 
         success
     else
+        # Construct dev path from minor
+        dev="/dev/xen/blktap-2/tapdev$minor"
+        [ -b "$dev" ] || fatal "blktap \"$dev\" is not a block dev"
         write_dev "$dev"
     fi
 
