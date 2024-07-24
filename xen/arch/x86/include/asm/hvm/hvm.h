@@ -828,6 +828,11 @@ static inline bool hvm_hap_supported(void)
     return false;
 }
 
+static inline bool hvm_altp2m_supported(void)
+{
+    return false;
+}
+
 static inline bool hvm_nested_virt_supported(void)
 {
     return false;

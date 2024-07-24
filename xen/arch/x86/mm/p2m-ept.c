@@ -990,7 +990,7 @@ out:
     if ( is_epte_present(&old_entry) )
         ept_free_entry(p2m, &old_entry, target);
 
-    if ( entry_written && p2m_is_hostp2m(p2m) )
+    if ( hvm_altp2m_supported() && entry_written && p2m_is_hostp2m(p2m) )
     {
         ret = p2m_altp2m_propagate_change(d, _gfn(gfn), mfn, order, p2mt, p2ma);
         if ( !rc )
