@@ -122,6 +122,12 @@ static inline uint64_t xgetbv(unsigned int index)
     return lo | ((uint64_t)hi << 32);
 }
 
+static inline bool __nonnull(1)
+xsave_area_compressed(const struct xsave_struct *xsave_area)
+{
+    return xsave_area->xsave_hdr.xcomp_bv & XSTATE_COMPACTION_ENABLED;
+}
+
 static inline bool xstate_all(const struct vcpu *v)
 {
     /*
@@ -129,15 +135,8 @@ static inline bool xstate_all(const struct vcpu *v)
      * (in the legacy region of xsave area) are fixed, so saving
      * XSTATE_FP_SSE will not cause overwriting problem with XSAVES/XSAVEC.
      */
-    return (v->arch.xsave_area->xsave_hdr.xcomp_bv &
-            XSTATE_COMPACTION_ENABLED) &&
+    return xsave_area_compressed(v->arch.xsave_area) &&
            (v->arch.xcr0_accum & XSTATE_LAZY & ~XSTATE_FP_SSE);
-}
-
-static inline bool __nonnull(1)
-xsave_area_compressed(const struct xsave_struct *xsave_area)
-{
-    return xsave_area->xsave_hdr.xcomp_bv & XSTATE_COMPACTION_ENABLED;
 }
 
 #endif /* __ASM_XSTATE_H */
