@@ -287,6 +287,8 @@ F:	automation/
 DEVICE TREE
 M:	Stefano Stabellini <sstabellini@kernel.org>
 M:	Julien Grall <julien@xen.org>
+M:	Bertrand Marquis <bertrand.marquis@arm.com>
+M:	Michal Orzel <michal.orzel@amd.com>
 S:	Supported
 F:	xen/common/libfdt/
 F:	xen/common/device_tree.c
