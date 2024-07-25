@@ -182,12 +182,12 @@ static bool setnonblock(int fd, int nonblock) {
 
 static bool set_cloexec(int fd)
 {
-	int flags = fcntl(fd, F_GETFL);
+	int flags = fcntl(fd, F_GETFD);
 
 	if (flags < 0)
 		return false;
 
-	return fcntl(fd, flags | FD_CLOEXEC) >= 0;
+	return fcntl(fd, F_SETFD, flags | FD_CLOEXEC) >= 0;
 }
 
 static int pipe_cloexec(int fds[2])
