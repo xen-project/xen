@@ -517,13 +517,14 @@ void make_cr3(struct vcpu *v, mfn_t mfn)
 
 void write_ptbase(struct vcpu *v)
 {
+    const struct domain *d = v->domain;
     struct cpu_info *cpu_info = get_cpu_info();
     unsigned long new_cr4;
 
-    new_cr4 = (is_pv_vcpu(v) && !is_idle_vcpu(v))
+    new_cr4 = (is_pv_domain(d) && !is_idle_domain(d))
               ? pv_make_cr4(v) : mmu_cr4_features;
 
-    if ( is_pv_vcpu(v) && v->domain->arch.pv.xpti )
+    if ( is_pv_domain(d) && d->arch.pv.xpti )
     {
         cpu_info->root_pgt_changed = true;
         cpu_info->pv_cr3 = __pa(this_cpu(root_pgt));
