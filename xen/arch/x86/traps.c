@@ -1451,7 +1451,7 @@ static enum pf_type __page_fault_type(unsigned long addr,
     mfn = cr3 >> PAGE_SHIFT;
 
     l4t = map_domain_page(_mfn(mfn));
-    l4e = l4e_read_atomic(&l4t[l4_table_offset(addr)]);
+    l4e = l4e_read(&l4t[l4_table_offset(addr)]);
     mfn = l4e_get_pfn(l4e);
     unmap_domain_page(l4t);
     if ( ((l4e_get_flags(l4e) & required_flags) != required_flags) ||
@@ -1460,7 +1460,7 @@ static enum pf_type __page_fault_type(unsigned long addr,
     page_user &= l4e_get_flags(l4e);
 
     l3t  = map_domain_page(_mfn(mfn));
-    l3e = l3e_read_atomic(&l3t[l3_table_offset(addr)]);
+    l3e = l3e_read(&l3t[l3_table_offset(addr)]);
     mfn = l3e_get_pfn(l3e);
     unmap_domain_page(l3t);
     if ( ((l3e_get_flags(l3e) & required_flags) != required_flags) ||
@@ -1471,7 +1471,7 @@ static enum pf_type __page_fault_type(unsigned long addr,
         goto leaf;
 
     l2t = map_domain_page(_mfn(mfn));
-    l2e = l2e_read_atomic(&l2t[l2_table_offset(addr)]);
+    l2e = l2e_read(&l2t[l2_table_offset(addr)]);
     mfn = l2e_get_pfn(l2e);
     unmap_domain_page(l2t);
     if ( ((l2e_get_flags(l2e) & required_flags) != required_flags) ||
@@ -1482,7 +1482,7 @@ static enum pf_type __page_fault_type(unsigned long addr,
         goto leaf;
 
     l1t = map_domain_page(_mfn(mfn));
-    l1e = l1e_read_atomic(&l1t[l1_table_offset(addr)]);
+    l1e = l1e_read(&l1t[l1_table_offset(addr)]);
     mfn = l1e_get_pfn(l1e);
     unmap_domain_page(l1t);
     if ( ((l1e_get_flags(l1e) & required_flags) != required_flags) ||

@@ -2147,7 +2147,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
                         struct vcpu *pt_vcpu, struct domain *pg_dom)
 {
     bool preserve_ad = (cmd == MMU_PT_UPDATE_PRESERVE_AD);
-    l1_pgentry_t ol1e = l1e_read_atomic(pl1e);
+    l1_pgentry_t ol1e = l1e_read(pl1e);
     struct domain *pt_dom = pt_vcpu->domain;
     int rc = 0;
 
@@ -2270,7 +2270,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         return -EPERM;
     }
 
-    ol2e = l2e_read_atomic(pl2e);
+    ol2e = l2e_read(pl2e);
 
     if ( l2e_get_flags(nl2e) & _PAGE_PRESENT )
     {
@@ -2332,7 +2332,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
     if ( pgentry_ptr_to_slot(pl3e) >= 3 && is_pv_32bit_domain(d) )
         return -EINVAL;
 
-    ol3e = l3e_read_atomic(pl3e);
+    ol3e = l3e_read(pl3e);
 
     if ( l3e_get_flags(nl3e) & _PAGE_PRESENT )
     {
@@ -2394,7 +2394,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
         return -EINVAL;
     }
 
-    ol4e = l4e_read_atomic(pl4e);
+    ol4e = l4e_read(pl4e);
 
     if ( l4e_get_flags(nl4e) & _PAGE_PRESENT )
     {
@@ -5925,7 +5925,7 @@ void init_or_livepatch modify_xen_mappings_lite(
     while ( v < e )
     {
         l2_pgentry_t *pl2e = &l2_xenmap[l2_table_offset(v)];
-        l2_pgentry_t l2e = l2e_read_atomic(pl2e);
+        l2_pgentry_t l2e = l2e_read(pl2e);
         unsigned int l2f = l2e_get_flags(l2e);
 
         ASSERT(l2f & _PAGE_PRESENT);
@@ -5947,7 +5947,7 @@ void init_or_livepatch modify_xen_mappings_lite(
             while ( v < e )
             {
                 l1_pgentry_t *pl1e = &pl1t[l1_table_offset(v)];
-                l1_pgentry_t l1e = l1e_read_atomic(pl1e);
+                l1_pgentry_t l1e = l1e_read(pl1e);
                 unsigned int l1f = l1e_get_flags(l1e);
 
                 ASSERT(l1f & _PAGE_PRESENT);

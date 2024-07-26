@@ -16,14 +16,14 @@
 #include <asm/x86_64/page.h>
 
 /* Read a pte atomically from memory. */
-#define l1e_read_atomic(l1ep) \
-    l1e_from_intpte(pte_read_atomic(&l1e_get_intpte(*(l1ep))))
-#define l2e_read_atomic(l2ep) \
-    l2e_from_intpte(pte_read_atomic(&l2e_get_intpte(*(l2ep))))
-#define l3e_read_atomic(l3ep) \
-    l3e_from_intpte(pte_read_atomic(&l3e_get_intpte(*(l3ep))))
-#define l4e_read_atomic(l4ep) \
-    l4e_from_intpte(pte_read_atomic(&l4e_get_intpte(*(l4ep))))
+#define l1e_read(l1ep) \
+    l1e_from_intpte(read_atomic(&l1e_get_intpte(*(l1ep))))
+#define l2e_read(l2ep) \
+    l2e_from_intpte(read_atomic(&l2e_get_intpte(*(l2ep))))
+#define l3e_read(l3ep) \
+    l3e_from_intpte(read_atomic(&l3e_get_intpte(*(l3ep))))
+#define l4e_read(l4ep) \
+    l4e_from_intpte(read_atomic(&l4e_get_intpte(*(l4ep))))
 
 /* Write a pte atomically to memory. */
 #define l1e_write(l1ep, l1e) \
