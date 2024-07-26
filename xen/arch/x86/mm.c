@@ -5253,7 +5253,7 @@ int map_pages_to_xen(
              !(flags & (_PAGE_PAT | MAP_SMALL_PAGES)) )
         {
             /* 1GB-page mapping. */
-            l3e_write_atomic(pl3e, l3e_from_mfn(mfn, l1f_to_lNf(flags)));
+            l3e_write(pl3e, l3e_from_mfn(mfn, l1f_to_lNf(flags)));
 
             if ( (l3e_get_flags(ol3e) & _PAGE_PRESENT) )
             {
@@ -5353,8 +5353,7 @@ int map_pages_to_xen(
             if ( (l3e_get_flags(*pl3e) & _PAGE_PRESENT) &&
                  (l3e_get_flags(*pl3e) & _PAGE_PSE) )
             {
-                l3e_write_atomic(pl3e,
-                                 l3e_from_mfn(l2mfn, __PAGE_HYPERVISOR));
+                l3e_write(pl3e, l3e_from_mfn(l2mfn, __PAGE_HYPERVISOR));
                 l2mfn = INVALID_MFN;
             }
             if ( locking )
@@ -5375,7 +5374,7 @@ int map_pages_to_xen(
         {
             /* Super-page mapping. */
             ol2e = *pl2e;
-            l2e_write_atomic(pl2e, l2e_from_mfn(mfn, l1f_to_lNf(flags)));
+            l2e_write(pl2e, l2e_from_mfn(mfn, l1f_to_lNf(flags)));
 
             if ( (l2e_get_flags(ol2e) & _PAGE_PRESENT) )
             {
@@ -5457,8 +5456,7 @@ int map_pages_to_xen(
                 if ( (l2e_get_flags(*pl2e) & _PAGE_PRESENT) &&
                      (l2e_get_flags(*pl2e) & _PAGE_PSE) )
                 {
-                    l2e_write_atomic(pl2e, l2e_from_mfn(l1mfn,
-                                                        __PAGE_HYPERVISOR));
+                    l2e_write(pl2e, l2e_from_mfn(l1mfn, __PAGE_HYPERVISOR));
                     l1mfn = INVALID_MFN;
                 }
                 if ( locking )
@@ -5471,7 +5469,7 @@ int map_pages_to_xen(
             if ( !pl1e )
                 pl1e = map_l1t_from_l2e(*pl2e) + l1_table_offset(virt);
             ol1e  = *pl1e;
-            l1e_write_atomic(pl1e, l1e_from_mfn(mfn, flags));
+            l1e_write(pl1e, l1e_from_mfn(mfn, flags));
             UNMAP_DOMAIN_PAGE(pl1e);
             if ( (l1e_get_flags(ol1e) & _PAGE_PRESENT) )
             {
@@ -5524,8 +5522,7 @@ int map_pages_to_xen(
                 UNMAP_DOMAIN_PAGE(l1t);
                 if ( i == L1_PAGETABLE_ENTRIES )
                 {
-                    l2e_write_atomic(pl2e, l2e_from_pfn(base_mfn,
-                                                        l1f_to_lNf(flags)));
+                    l2e_write(pl2e, l2e_from_pfn(base_mfn, l1f_to_lNf(flags)));
                     if ( locking )
                         spin_unlock(&map_pgdir_lock);
                     flush_area(virt - PAGE_SIZE,
@@ -5574,8 +5571,7 @@ int map_pages_to_xen(
             UNMAP_DOMAIN_PAGE(l2t);
             if ( i == L2_PAGETABLE_ENTRIES )
             {
-                l3e_write_atomic(pl3e, l3e_from_pfn(base_mfn,
-                                                    l1f_to_lNf(flags)));
+                l3e_write(pl3e, l3e_from_pfn(base_mfn, l1f_to_lNf(flags)));
                 if ( locking )
                     spin_unlock(&map_pgdir_lock);
                 flush_area(virt - PAGE_SIZE,
@@ -5674,7 +5670,7 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
                     : l3e_from_pfn(l3e_get_pfn(*pl3e),
                                    (l3e_get_flags(*pl3e) & ~FLAGS_MASK) | nf);
 
-                l3e_write_atomic(pl3e, nl3e);
+                l3e_write(pl3e, nl3e);
                 v += 1UL << L3_PAGETABLE_SHIFT;
                 continue;
             }
@@ -5696,8 +5692,7 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
             if ( (l3e_get_flags(*pl3e) & _PAGE_PRESENT) &&
                  (l3e_get_flags(*pl3e) & _PAGE_PSE) )
             {
-                l3e_write_atomic(pl3e,
-                                 l3e_from_mfn(l2mfn, __PAGE_HYPERVISOR));
+                l3e_write(pl3e, l3e_from_mfn(l2mfn, __PAGE_HYPERVISOR));
                 l2mfn = INVALID_MFN;
             }
             if ( locking )
@@ -5732,7 +5727,7 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
                     : l2e_from_pfn(l2e_get_pfn(*pl2e),
                                    (l2e_get_flags(*pl2e) & ~FLAGS_MASK) | nf);
 
-                l2e_write_atomic(pl2e, nl2e);
+                l2e_write(pl2e, nl2e);
                 v += 1UL << L2_PAGETABLE_SHIFT;
             }
             else
@@ -5755,8 +5750,7 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
                 if ( (l2e_get_flags(*pl2e) & _PAGE_PRESENT) &&
                      (l2e_get_flags(*pl2e) & _PAGE_PSE) )
                 {
-                    l2e_write_atomic(pl2e, l2e_from_mfn(l1mfn,
-                                                        __PAGE_HYPERVISOR));
+                    l2e_write(pl2e, l2e_from_mfn(l1mfn, __PAGE_HYPERVISOR));
                     l1mfn = INVALID_MFN;
                 }
                 if ( locking )
@@ -5785,7 +5779,7 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
                 : l1e_from_pfn(l1e_get_pfn(*pl1e),
                                (l1e_get_flags(*pl1e) & ~FLAGS_MASK) | nf);
 
-            l1e_write_atomic(pl1e, nl1e);
+            l1e_write(pl1e, nl1e);
             UNMAP_DOMAIN_PAGE(pl1e);
             v += PAGE_SIZE;
 
@@ -5824,7 +5818,7 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
             if ( i == L1_PAGETABLE_ENTRIES )
             {
                 /* Empty: zap the L2E and free the L1 page. */
-                l2e_write_atomic(pl2e, l2e_empty());
+                l2e_write(pl2e, l2e_empty());
                 if ( locking )
                     spin_unlock(&map_pgdir_lock);
                 flush_area(NULL, FLUSH_TLB_GLOBAL); /* flush before free */
@@ -5868,7 +5862,7 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
             if ( i == L2_PAGETABLE_ENTRIES )
             {
                 /* Empty: zap the L3E and free the L2 page. */
-                l3e_write_atomic(pl3e, l3e_empty());
+                l3e_write(pl3e, l3e_empty());
                 if ( locking )
                     spin_unlock(&map_pgdir_lock);
                 flush_area(NULL, FLUSH_TLB_GLOBAL); /* flush before free */
@@ -5940,7 +5934,7 @@ void init_or_livepatch modify_xen_mappings_lite(
         {
             ASSERT(IS_ALIGNED(v, 1UL << L2_PAGETABLE_SHIFT));
 
-            l2e_write_atomic(pl2e, l2e_from_intpte((l2e.l2 & ~fm) | flags));
+            l2e_write(pl2e, l2e_from_intpte((l2e.l2 & ~fm) | flags));
 
             v += 1UL << L2_PAGETABLE_SHIFT;
             continue;
@@ -5958,8 +5952,7 @@ void init_or_livepatch modify_xen_mappings_lite(
 
                 ASSERT(l1f & _PAGE_PRESENT);
 
-                l1e_write_atomic(pl1e,
-                                 l1e_from_intpte((l1e.l1 & ~fm) | flags));
+                l1e_write(pl1e, l1e_from_intpte((l1e.l1 & ~fm) | flags));
 
                 v += 1UL << L1_PAGETABLE_SHIFT;
 

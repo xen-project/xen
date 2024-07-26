@@ -26,27 +26,14 @@
     l4e_from_intpte(pte_read_atomic(&l4e_get_intpte(*(l4ep))))
 
 /* Write a pte atomically to memory. */
-#define l1e_write_atomic(l1ep, l1e) \
-    pte_write_atomic(&l1e_get_intpte(*(l1ep)), l1e_get_intpte(l1e))
-#define l2e_write_atomic(l2ep, l2e) \
-    pte_write_atomic(&l2e_get_intpte(*(l2ep)), l2e_get_intpte(l2e))
-#define l3e_write_atomic(l3ep, l3e) \
-    pte_write_atomic(&l3e_get_intpte(*(l3ep)), l3e_get_intpte(l3e))
-#define l4e_write_atomic(l4ep, l4e) \
-    pte_write_atomic(&l4e_get_intpte(*(l4ep)), l4e_get_intpte(l4e))
-
-/*
- * Write a pte safely but non-atomically to memory.
- * The PTE may become temporarily not-present during the update.
- */
 #define l1e_write(l1ep, l1e) \
-    pte_write(&l1e_get_intpte(*(l1ep)), l1e_get_intpte(l1e))
+    write_atomic(&l1e_get_intpte(*(l1ep)), l1e_get_intpte(l1e))
 #define l2e_write(l2ep, l2e) \
-    pte_write(&l2e_get_intpte(*(l2ep)), l2e_get_intpte(l2e))
+    write_atomic(&l2e_get_intpte(*(l2ep)), l2e_get_intpte(l2e))
 #define l3e_write(l3ep, l3e) \
-    pte_write(&l3e_get_intpte(*(l3ep)), l3e_get_intpte(l3e))
+    write_atomic(&l3e_get_intpte(*(l3ep)), l3e_get_intpte(l3e))
 #define l4e_write(l4ep, l4e) \
-    pte_write(&l4e_get_intpte(*(l4ep)), l4e_get_intpte(l4e))
+    write_atomic(&l4e_get_intpte(*(l4ep)), l4e_get_intpte(l4e))
 
 /* Get direct integer representation of a pte's contents (intpte_t). */
 #define l1e_get_intpte(x)          ((x).l1)
