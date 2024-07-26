@@ -333,8 +333,10 @@ static int mmio_ro_do_page_fault(struct x86_emulate_ctxt *ctxt,
     ctxt->data = &mmio_ro_ctxt;
     if ( pci_ro_mmcfg_decode(mfn_x(mfn), &mmio_ro_ctxt.seg, &mmio_ro_ctxt.bdf) )
         return x86_emulate(ctxt, &mmcfg_intercept_ops);
-    else
-        return x86_emulate(ctxt, &mmio_ro_emulate_ops);
+
+    mmio_ro_ctxt.mfn = mfn;
+
+    return x86_emulate(ctxt, &mmio_ro_emulate_ops);
 }
 
 int pv_ro_page_fault(unsigned long addr, struct cpu_user_regs *regs)
