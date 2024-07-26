@@ -567,8 +567,6 @@ mfn_t alloc_xen_pagetable(void);
 void free_xen_pagetable(mfn_t mfn);
 void *alloc_mapped_pagetable(mfn_t *pmfn);
 
-l1_pgentry_t *virt_to_xen_l1e(unsigned long v);
-
 int __sync_local_execstate(void);
 
 /* Arch-specific portion of memory_op hypercall. */
