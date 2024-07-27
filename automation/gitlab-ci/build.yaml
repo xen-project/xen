@@ -212,7 +212,7 @@
   script:
     - ./automation/build/yocto/build-yocto.sh -v --log-dir=./logs --xen-dir=`pwd` ${YOCTO_BOARD} ${YOCTO_OUTPUT}
   variables:
-    YOCTO_VERSION: kirkstone
+    YOCTO_VERSION: scarthgap
     CONTAINER: yocto:${YOCTO_VERSION}-${YOCTO_BOARD}${YOCTO_HOST}
   artifacts:
     paths:

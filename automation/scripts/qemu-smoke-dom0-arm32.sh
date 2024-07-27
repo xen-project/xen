@@ -8,7 +8,7 @@ cd binaries
 
 mkdir rootfs
 cd rootfs
-tar xvf ../xen-image-minimal-qemuarm.tar.bz2
+tar xvf ../xen-image-minimal-qemuarm.rootfs.tar.bz2
 mkdir -p ./root
 echo "name=\"test\"
 memory=400

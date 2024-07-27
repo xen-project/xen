@@ -6,10 +6,10 @@
 # YOCTOVERSION-TARGET for x86_64 hosts
 # YOCTOVERSION-TARGET-arm64v8 for arm64 hosts
 # For example you can build an arm64 container with the following command:
-# make yocto/kirkstone-qemuarm64-arm64v8
+# make yocto/scarthgap-qemuarm64-arm64v8
 
 # Yocto versions we are currently using.
-YOCTO_VERSION = kirkstone
+YOCTO_VERSION = scarthgap
 
 # Yocto BSPs we want to build for.
 YOCTO_TARGETS = qemuarm64 qemuarm qemux86-64

@@ -25,6 +25,7 @@ TARGET_SUPPORTED="qemuarm qemuarm64 qemux86-64"
 VERBOSE="n"
 TARGETLIST=""
 BUILDJOBS="8"
+IMAGE_FMT=""
 
 # actions to do
 do_clean="n"
@@ -38,8 +39,9 @@ build_result=0
 # layers to include in the project
 build_layerlist="poky/meta poky/meta-poky poky/meta-yocto-bsp \
                  meta-openembedded/meta-oe meta-openembedded/meta-python \
+                 meta-openembedded/meta-networking \
                  meta-openembedded/meta-filesystems \
-                 meta-openembedded/meta-networking meta-virtualization"
+                 meta-virtualization"
 
 # yocto image to build
 build_image="xen-image-minimal"
@@ -175,7 +177,7 @@ function project_build() {
                 mkdir -p $OUTPUTDIR
                 cp $BUILDDIR/tmp/deploy/images/qemuarm/zImage $OUTPUTDIR
                 cp $BUILDDIR/tmp/deploy/images/qemuarm/xen-qemuarm $OUTPUTDIR
-                cp $BUILDDIR/tmp/deploy/images/qemuarm/xen-image-minimal-qemuarm.tar.bz2 $OUTPUTDIR
+                cp $BUILDDIR/tmp/deploy/images/qemuarm/xen-image-minimal-qemuarm.rootfs.tar.bz2 $OUTPUTDIR
             fi
         fi
     ) || return 1
@@ -196,7 +198,7 @@ function project_run() {
 
         /usr/bin/expect <<EOF
 set timeout 1000
-spawn bash -c "runqemu serialstdio nographic slirp"
+spawn bash -c "runqemu serialstdio nographic slirp ${IMAGE_FMT}"
 
 expect_after {
     -re "(.*)\r" {
@@ -356,6 +358,13 @@ for f in ${TARGETLIST}; do
         run_task project_create "${f}"
     fi
     if [ -f "${BUILDDIR}/${f}/conf/local.conf" ]; then
+        # Set the right image target
+        if [ "$f" = "qemux86-64" ]; then
+            IMAGE_FMT=""
+        else
+            IMAGE_FMT="ext4"
+        fi
+
         if [ "${do_build}" = "y" ]; then
             run_task project_build "${f}"
         fi
