@@ -96,6 +96,22 @@
   tags:
     - xilinx
 
+.xilinx-x86_64:
+  extends: .test-jobs-common
+  variables:
+    CONTAINER: ubuntu:xenial-xilinx
+    LOGFILE: xilinx-smoke-x86_64.log
+  artifacts:
+    paths:
+      - smoke.serial
+      - '*.log'
+    when: always
+  only:
+    variables:
+      - $XILINX_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
+  tags:
+    - xilinx
+
 .adl-x86-64:
   extends: .test-jobs-common
   variables:
@@ -158,6 +174,14 @@ xilinx-smoke-dom0less-arm64-gcc-debug-gem-passthrough:
   needs:
     - *arm64-test-needs
     - alpine-3.18-gcc-debug-arm64
+
+xilinx-smoke-dom0-x86_64-gcc-debug:
+  extends: .xilinx-x86_64
+  script:
+    - ./automation/scripts/xilinx-smoke-dom0-x86_64.sh ping 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
 
 adl-smoke-x86-64-gcc-debug:
   extends: .adl-x86-64
