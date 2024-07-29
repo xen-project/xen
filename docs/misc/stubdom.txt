@@ -127,6 +127,16 @@ Limitations:
  - at most 26 emulated disks are supported (more are still available as PV disks)
  - graphics output (VNC/SDL/Spice) not supported
 
+CD-ROM changing:
+
+To change the CD-ROM medium, libxl will:
+ - QMP eject the medium from QEMU
+ - block-detach the old PV disk
+ - block-attach the new PV disk
+ - QMP change the medium to the new PV disk by fdset-id
+
+The stubdom must internally add /dev/xvdc to an fdset in QEMU with opaque set
+to "stub-devid:$devid".  libxl will lookup the fdset with that string.
 
                                    PV-GRUB
                                    =======
