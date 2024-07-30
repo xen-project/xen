@@ -117,8 +117,6 @@
 /* Applicable to vectors, TPR, and PPR. */
 #define		APIC_PRIO_CLASS(v)	((v) & 0xF0)
 
-#define APIC_BASE __fix_to_virt(FIX_APIC_BASE)
-
 #define MAX_IO_APICS 128
 
 extern bool x2apic_enabled;

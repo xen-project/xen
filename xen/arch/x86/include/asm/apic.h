@@ -51,12 +51,16 @@ const struct genapic *apic_x2apic_probe(void);
 
 static inline void apic_mem_write(unsigned int reg, uint32_t v)
 {
-	*((volatile u32 *)(APIC_BASE+reg)) = v;
+    volatile uint32_t *addr = fix_to_virt(FIX_APIC_BASE) + reg;
+
+    *addr = v;
 }
 
-static inline u32 apic_mem_read(unsigned int reg)
+static inline uint32_t apic_mem_read(unsigned int reg)
 {
-	return *((volatile u32 *)(APIC_BASE+reg));
+    const volatile uint32_t *addr = fix_to_virt(FIX_APIC_BASE) + reg;
+
+    return *addr;
 }
 
 /* NOTE: in x2APIC mode, we should use apic_icr_write()/apic_icr_read() to
