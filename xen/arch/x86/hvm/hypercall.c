@@ -71,14 +71,8 @@ long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     switch ( cmd )
     {
-        /*
-        * Only being permitted for management of other domains.
-        * Further restrictions are enforced in do_physdev_op.
-        */
     case PHYSDEVOP_map_pirq:
     case PHYSDEVOP_unmap_pirq:
-        break;
-
     case PHYSDEVOP_eoi:
     case PHYSDEVOP_irq_status_query:
     case PHYSDEVOP_get_free_pirq:

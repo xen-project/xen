@@ -323,11 +323,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( !d )
             break;
 
-        /* Only mapping when the subject domain has a notion of PIRQ */
-        if ( !is_hvm_domain(d) || has_pirq(d) )
-            ret = physdev_map_pirq(d, map.type, &map.index, &map.pirq, &msi);
-        else
-            ret = -EOPNOTSUPP;
+        ret = physdev_map_pirq(d, map.type, &map.index, &map.pirq, &msi);
 
         rcu_unlock_domain(d);
 
@@ -350,11 +346,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( !d )
             break;
 
-        /* Only unmapping when the subject domain has a notion of PIRQ */
-        if ( !is_hvm_domain(d) || has_pirq(d) )
-            ret = physdev_unmap_pirq(d, unmap.pirq);
-        else
-            ret = -EOPNOTSUPP;
+        ret = physdev_unmap_pirq(d, unmap.pirq);
 
         rcu_unlock_domain(d);
 
