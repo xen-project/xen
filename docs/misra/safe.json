@@ -76,6 +76,14 @@
         },
         {
             "id": "SAF-9-safe",
+            "analyser": {
+                "eclair": "MC3R1.D4.10"
+            },
+            "name": "Dir 4.10: empty headers",
+            "text": "Empty headers pose no risk if included more than once."
+        },
+        {
+            "id": "SAF-10-safe",
             "analyser": {},
             "name": "Sentinel",
             "text": "Next ID to be used"

@@ -53,7 +53,7 @@ cmd_compat_h = \
     mv -f $@.new $@
 
 quiet_cmd_stub_h = GEN     $@
-cmd_stub_h = echo '/* empty */' >$@
+cmd_stub_h = echo '/* SAF-9-safe empty header */' >$@
 
 quiet_cmd_compat_i = CPP     $@
 cmd_compat_i = $(CPP) $(filter-out -Wa$(comma)% -include %/include/xen/config.h,$(XEN_CFLAGS)) $(cppflags-y) -o $@ $<
