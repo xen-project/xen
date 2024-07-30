@@ -1,3 +1,4 @@
+/* SAF-10-safe direct inclusion guard before */
 #ifndef __XEN_HYPERCALL_H__
 #error "asm/hypercall.h should not be included directly - include xen/hypercall.h instead"
 #endif

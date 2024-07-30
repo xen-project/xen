@@ -84,6 +84,14 @@
         },
         {
             "id": "SAF-10-safe",
+            "analyser": {
+                "eclair": "MC3R1.D4.10"
+            },
+            "name": "Dir 4.10: direct inclusion guard before",
+            "text": "Headers with just the direct inclusion guard before the inclusion guard are safe."
+        },
+        {
+            "id": "SAF-11-safe",
             "analyser": {},
             "name": "Sentinel",
             "text": "Next ID to be used"
