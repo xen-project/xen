@@ -23,6 +23,7 @@
  * their XEN_CPUFEATURE() being appropriate in the included context.
  */
 
+/* SAF-8-safe inclusion procedure left to caller */
 #ifndef XEN_CPUFEATURE
 
 /*

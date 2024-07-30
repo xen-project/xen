@@ -68,6 +68,14 @@
         },
         {
             "id": "SAF-8-safe",
+            "analyser": {
+                "eclair": "MC3R1.D4.10"
+            },
+            "name": "Dir 4.10: headers that leave it up to the caller to include them correctly",
+            "text": "Headers that deliberatively leave the responsability of their correct inclusion to the caller are allowed."
+        },
+        {
+            "id": "SAF-9-safe",
             "analyser": {},
             "name": "Sentinel",
             "text": "Next ID to be used"

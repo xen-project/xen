@@ -17,6 +17,7 @@
  * will unilaterally #undef XEN_ERRNO().
  */
 
+/* SAF-8-safe inclusion procedure left to caller */
 #ifndef XEN_ERRNO
 
 /*
