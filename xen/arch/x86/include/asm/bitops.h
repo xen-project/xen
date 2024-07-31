@@ -277,12 +277,6 @@ static inline int test_and_change_bit(int nr, volatile void *addr)
     test_and_change_bit(nr, addr);                      \
 })
 
-static inline int constant_test_bit(int nr, const volatile void *addr)
-{
-    return ((1U << (nr & 31)) &
-            (((const volatile unsigned int *)addr)[nr >> 5])) != 0;
-}
-
 static inline int variable_test_bit(int nr, const volatile void *addr)
 {
     int oldbit;
@@ -297,7 +291,7 @@ static inline int variable_test_bit(int nr, const volatile void *addr)
 
 #define arch_test_bit(nr, addr) ({                      \
     __builtin_constant_p(nr) ?                          \
-        constant_test_bit(nr, addr) :                   \
+        generic_test_bit(nr, addr) :                    \
         variable_test_bit(nr, addr);                    \
 })
 
