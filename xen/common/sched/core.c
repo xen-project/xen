@@ -2756,6 +2756,36 @@ static struct sched_resource *sched_alloc_res(void)
     return sr;
 }
 
+static void cf_check sched_res_free(struct rcu_head *head)
+{
+    struct sched_resource *sr = container_of(head, struct sched_resource, rcu);
+
+    free_cpumask_var(sr->cpus);
+    if ( sr->sched_unit_idle )
+        sched_free_unit_mem(sr->sched_unit_idle);
+    xfree(sr);
+}
+
+static void cpu_schedule_down(unsigned int cpu)
+{
+    struct sched_resource *sr;
+
+    rcu_read_lock(&sched_res_rculock);
+
+    sr = get_sched_res(cpu);
+
+    kill_timer(&sr->s_timer);
+
+    cpumask_clear_cpu(cpu, &sched_res_mask);
+    set_sched_res(cpu, NULL);
+
+    /* Keep idle unit. */
+    sr->sched_unit_idle = NULL;
+    call_rcu(&sr->rcu, sched_res_free);
+
+    rcu_read_unlock(&sched_res_rculock);
+}
+
 static int cpu_schedule_up(unsigned int cpu)
 {
     struct sched_resource *sr;
@@ -2795,7 +2825,10 @@ static int cpu_schedule_up(unsigned int cpu)
         idle_vcpu[cpu]->sched_unit->res = sr;
 
     if ( idle_vcpu[cpu] == NULL )
+    {
+        cpu_schedule_down(cpu);
         return -ENOMEM;
+    }
 
     idle_vcpu[cpu]->sched_unit->rendezvous_in_cnt = 0;
 
@@ -2811,36 +2844,6 @@ static int cpu_schedule_up(unsigned int cpu)
     sr->sched_priv = NULL;
 
     return 0;
-}
-
-static void cf_check sched_res_free(struct rcu_head *head)
-{
-    struct sched_resource *sr = container_of(head, struct sched_resource, rcu);
-
-    free_cpumask_var(sr->cpus);
-    if ( sr->sched_unit_idle )
-        sched_free_unit_mem(sr->sched_unit_idle);
-    xfree(sr);
-}
-
-static void cpu_schedule_down(unsigned int cpu)
-{
-    struct sched_resource *sr;
-
-    rcu_read_lock(&sched_res_rculock);
-
-    sr = get_sched_res(cpu);
-
-    kill_timer(&sr->s_timer);
-
-    cpumask_clear_cpu(cpu, &sched_res_mask);
-    set_sched_res(cpu, NULL);
-
-    /* Keep idle unit. */
-    sr->sched_unit_idle = NULL;
-    call_rcu(&sr->rcu, sched_res_free);
-
-    rcu_read_unlock(&sched_res_rculock);
 }
 
 void sched_rm_cpu(unsigned int cpu)
