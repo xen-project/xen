@@ -439,7 +439,7 @@ void x86_cpu_policy_fill_native(struct cpu_policy *p);
 void x86_cpu_policy_clear_out_of_range_leaves(struct cpu_policy *p);
 
 #ifdef __XEN__
-#include <public/arch-x86/xen.h>
+#include <public/xen.h>
 typedef XEN_GUEST_HANDLE_64(xen_cpuid_leaf_t) cpuid_leaf_buffer_t;
 typedef XEN_GUEST_HANDLE_64(xen_msr_entry_t) msr_entry_buffer_t;
 #else
