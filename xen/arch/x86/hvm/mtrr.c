@@ -271,6 +271,8 @@ int mtrr_get_type(const struct mtrr_state *m, paddr_t pa, unsigned int order)
    return overlap_mtrr_pos;
 }
 
+#ifdef CONFIG_SHADOW_PAGING
+
 /*
  * return the memory type from PAT.
  * NOTE: valid only when paging is enabled.
@@ -358,6 +360,8 @@ uint32_t get_pat_flags(struct vcpu *v,
     /* 4. Get the pte flags */
     return pat_type_2_pte_flags(pat_entry_value);
 }
+
+#endif /* CONFIG_SHADOW_PAGING */
 
 static inline bool valid_mtrr_type(uint8_t type)
 {
