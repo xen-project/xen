@@ -381,6 +381,12 @@ int arch_get_paging_mempool_size(struct domain *d, uint64_t *size)
     BUG_ON("unimplemented");
 }
 
+int guest_physmap_remove_page(struct domain *d, gfn_t gfn, mfn_t mfn,
+                              unsigned int page_order)
+{
+    BUG_ON("unimplemented");
+}
+
 /* delay.c */
 
 void udelay(unsigned long usecs)
