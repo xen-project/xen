@@ -119,8 +119,7 @@ static int pt_irq_masked(struct periodic_time *pt)
 
         gsi = hvm_isa_irq_to_gsi(pt->irq);
     }
-
-    /* Fallthrough to check if the interrupt is masked on the IO APIC. */
+        fallthrough;
     case PTSRC_ioapic:
     {
         int mask = vioapic_get_mask(v->domain, gsi);

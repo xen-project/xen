@@ -5283,6 +5283,7 @@ void hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
          * %cs and %tr are unconditionally present.  SVM ignores these present
          * bits and will happily run without them set.
          */
+        fallthrough;
     case x86_seg_cs:
         reg->p = 1;
         break;

@@ -339,7 +339,7 @@ static int hvmemul_do_io(
     }
     case X86EMUL_UNIMPLEMENTED:
         ASSERT_UNREACHABLE();
-        /* Fall-through */
+        fallthrough;
     default:
         BUG();
     }
@@ -396,8 +396,7 @@ static int hvmemul_acquire_page(unsigned long gmfn, struct page_info **page)
 
     default:
         ASSERT_UNREACHABLE();
-        /* Fallthrough */
-
+        fallthrough;
     case -EINVAL:
         return X86EMUL_UNHANDLEABLE;
     }
@@ -2764,6 +2763,7 @@ int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
         /* fallthrough */
     default:
         hvm_emulate_writeback(&ctxt);
+        break;
     }
 
     return rc;
@@ -2799,10 +2799,11 @@ void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
         memcpy(hvio->mmio_insn, curr->arch.vm_event->emul.insn.data,
                hvio->mmio_insn_bytes);
     }
-    /* Fall-through */
+        fallthrough;
     default:
         ctx.set_context = (kind == EMUL_KIND_SET_CONTEXT_DATA);
         rc = hvm_emulate_one(&ctx, VIO_no_completion);
+        break;
     }
 
     switch ( rc )
@@ -2818,7 +2819,7 @@ void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
     case X86EMUL_UNIMPLEMENTED:
         if ( hvm_monitor_emul_unimplemented() )
             return;
-        /* fall-through */
+        fallthrough;
     case X86EMUL_UNHANDLEABLE:
         hvm_dump_emulation_state(XENLOG_G_DEBUG, "Mem event", &ctx, rc);
         hvm_inject_hw_exception(trapnr, errcode);

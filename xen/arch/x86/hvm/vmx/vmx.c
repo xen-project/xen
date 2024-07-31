@@ -2745,6 +2745,7 @@ static void cf_check vmx_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
         printk(XENLOG_G_ERR "%s(%pv, 0x%08x, 0x%016"PRIx64") Bad register\n",
                __func__, v, reg, val);
         domain_crash(d);
+        break;
     }
     vmx_vmcs_exit(v);
 }
@@ -3393,7 +3394,7 @@ static int cf_check vmx_msr_read_intercept(
         *msr_content |= MSR_IA32_MISC_ENABLE_BTS_UNAVAIL |
                        MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
         /* Perhaps vpmu will change some bits. */
-        /* FALLTHROUGH */
+        fallthrough;
     case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR(7):
     case MSR_P6_EVNTSEL(0)...MSR_P6_EVNTSEL(3):
     case MSR_CORE_PERF_FIXED_CTR0...MSR_CORE_PERF_FIXED_CTR2:

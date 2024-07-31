@@ -110,7 +110,7 @@ int hvm_hypercall(struct cpu_user_regs *regs)
     {
     case 8:
         eax = regs->rax;
-        /* Fallthrough to permission check. */
+        fallthrough;
     case 4:
     case 2:
         if ( currd->arch.monitor.guest_request_userspace_enabled &&

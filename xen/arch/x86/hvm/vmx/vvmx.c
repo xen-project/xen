@@ -2768,6 +2768,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
         gprintk(XENLOG_ERR, "Unhandled nested vmexit: reason %u\n",
                 exit_reason);
         domain_crash(v->domain);
+        break;
     }
 
     return ( nvcpu->nv_vmexit_pending == 1 );

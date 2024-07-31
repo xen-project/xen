@@ -681,6 +681,7 @@ static void cf_check svm_get_segment_register(
         ASSERT_UNREACHABLE();
         domain_crash(v->domain);
         *reg = (struct segment_register){};
+        break;
     }
 }
 
@@ -2416,6 +2417,7 @@ static void cf_check svm_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
         printk(XENLOG_G_ERR "%s(%pv, 0x%08x, 0x%016"PRIx64") Bad register\n",
                __func__, v, reg, val);
         domain_crash(d);
+        break;
     }
 }
 
