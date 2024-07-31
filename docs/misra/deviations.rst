@@ -30,6 +30,12 @@ Deviations related to MISRA C:2012 Directives:
        not to add an additional encapsulation layer.
      - Tagged as `deliberate` for ECLAIR.
 
+   * - D4.10
+     - Including multiple times a .c file is safe because every function or data item
+       it defines would in (the common case) be already defined.
+       Peer reviewed by the community.
+     - Tagged as `safe` for ECLAIR.
+
 Deviations related to MISRA C:2012 Rules:
 -----------------------------------------
 

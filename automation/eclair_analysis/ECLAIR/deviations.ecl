@@ -78,6 +78,11 @@ conform to the directive."
 -config=MC3R1.D4.10,reports+={safe, "first_area(text(^/\\* Generated file, do not edit! \\*/$, begin-3))"}
 -doc_end
 
+-doc_begin="Including multiple times a .c file is safe because every function or data item
+it defines would (in the common case) be already defined. Peer reviewed by the community."
+-config=MC3R1.D4.10,reports+={safe, "all_area(all_loc(^.*\\.c$))"}
+-doc_end
+
 #
 # Series 5.
 #
