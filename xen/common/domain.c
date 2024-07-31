@@ -70,7 +70,7 @@ struct domain *domain_list;
  */
 static void domlist_insert(struct domain *d)
 {
-    struct domain **pd, *bucket;
+    struct domain **pd;
 
     spin_lock(&domlist_update_lock);
 
@@ -79,12 +79,12 @@ static void domlist_insert(struct domain *d)
         if ( (*pd)->domain_id > d->domain_id )
             break;
 
-    bucket = domain_hash[DOMAIN_HASH(d->domain_id)];
-
     d->next_in_list = *pd;
-    d->next_in_hashbucket = bucket;
     rcu_assign_pointer(*pd, d);
-    rcu_assign_pointer(bucket, d);
+
+    pd = &domain_hash[DOMAIN_HASH(d->domain_id)];
+    d->next_in_hashbucket = *pd;
+    rcu_assign_pointer(*pd, d);
 
     spin_unlock(&domlist_update_lock);
 }
