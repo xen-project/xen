@@ -593,79 +593,79 @@ int __init e820_add_range(uint64_t s, uint64_t e, uint32_t type)
 }
 
 int __init e820_change_range_type(
-    struct e820map *e820, uint64_t s, uint64_t e,
+    struct e820map *map, uint64_t s, uint64_t e,
     uint32_t orig_type, uint32_t new_type)
 {
     uint64_t rs = 0, re = 0;
     unsigned int i;
 
-    for ( i = 0; i < e820->nr_map; i++ )
+    for ( i = 0; i < map->nr_map; i++ )
     {
         /* Have we found the e820 region that includes the specified range? */
-        rs = e820->map[i].addr;
-        re = rs + e820->map[i].size;
+        rs = map->map[i].addr;
+        re = rs + map->map[i].size;
         if ( (s >= rs) && (e <= re) )
             break;
     }
 
-    if ( (i == e820->nr_map) || (e820->map[i].type != orig_type) )
+    if ( (i == map->nr_map) || (map->map[i].type != orig_type) )
         return 0;
 
     if ( (s == rs) && (e == re) )
     {
-        e820->map[i].type = new_type;
+        map->map[i].type = new_type;
     }
     else if ( (s == rs) || (e == re) )
     {
-        if ( (e820->nr_map + 1) > ARRAY_SIZE(e820->map) )
+        if ( (map->nr_map + 1) > ARRAY_SIZE(map->map) )
             goto overflow;
 
-        memmove(&e820->map[i+1], &e820->map[i],
-                (e820->nr_map-i) * sizeof(e820->map[0]));
-        e820->nr_map++;
+        memmove(&map->map[i+1], &map->map[i],
+                (map->nr_map-i) * sizeof(map->map[0]));
+        map->nr_map++;
 
         if ( s == rs )
         {
-            e820->map[i].size = e - s;
-            e820->map[i].type = new_type;
-            e820->map[i+1].addr = e;
-            e820->map[i+1].size = re - e;
+            map->map[i].size = e - s;
+            map->map[i].type = new_type;
+            map->map[i+1].addr = e;
+            map->map[i+1].size = re - e;
         }
         else
         {
-            e820->map[i].size = s - rs;
-            e820->map[i+1].addr = s;
-            e820->map[i+1].size = e - s;
-            e820->map[i+1].type = new_type;
+            map->map[i].size = s - rs;
+            map->map[i+1].addr = s;
+            map->map[i+1].size = e - s;
+            map->map[i+1].type = new_type;
         }
     }
     else
     {
-        if ( (e820->nr_map + 2) > ARRAY_SIZE(e820->map) )
+        if ( (map->nr_map + 2) > ARRAY_SIZE(map->map) )
             goto overflow;
 
-        memmove(&e820->map[i+2], &e820->map[i],
-                (e820->nr_map-i) * sizeof(e820->map[0]));
-        e820->nr_map += 2;
+        memmove(&map->map[i+2], &map->map[i],
+                (map->nr_map-i) * sizeof(map->map[0]));
+        map->nr_map += 2;
 
-        e820->map[i].size = s - rs;
-        e820->map[i+1].addr = s;
-        e820->map[i+1].size = e - s;
-        e820->map[i+1].type = new_type;
-        e820->map[i+2].addr = e;
-        e820->map[i+2].size = re - e;
+        map->map[i].size = s - rs;
+        map->map[i+1].addr = s;
+        map->map[i+1].size = e - s;
+        map->map[i+1].type = new_type;
+        map->map[i+2].addr = e;
+        map->map[i+2].size = re - e;
     }
 
     /* Finally, look for any opportunities to merge adjacent e820 entries. */
-    for ( i = 0; i < (e820->nr_map - 1); i++ )
+    for ( i = 0; i < (map->nr_map - 1); i++ )
     {
-        if ( (e820->map[i].type != e820->map[i+1].type) ||
-             ((e820->map[i].addr + e820->map[i].size) != e820->map[i+1].addr) )
+        if ( (map->map[i].type != map->map[i+1].type) ||
+             ((map->map[i].addr + map->map[i].size) != map->map[i+1].addr) )
             continue;
-        e820->map[i].size += e820->map[i+1].size;
-        memmove(&e820->map[i+1], &e820->map[i+2],
-                (e820->nr_map-i-2) * sizeof(e820->map[0]));
-        e820->nr_map--;
+        map->map[i].size += map->map[i+1].size;
+        memmove(&map->map[i+1], &map->map[i+2],
+                (map->nr_map-i-2) * sizeof(map->map[0]));
+        map->nr_map--;
         i--;
     }
 
@@ -678,9 +678,9 @@ int __init e820_change_range_type(
 }
 
 /* Set E820_RAM area (@s,@e) as RESERVED in specified e820 map. */
-int __init reserve_e820_ram(struct e820map *e820, uint64_t s, uint64_t e)
+int __init reserve_e820_ram(struct e820map *map, uint64_t s, uint64_t e)
 {
-    return e820_change_range_type(e820, s, e, E820_RAM, E820_RESERVED);
+    return e820_change_range_type(map, s, e, E820_RAM, E820_RESERVED);
 }
 
 unsigned long __init init_e820(const char *str, struct e820map *raw)
