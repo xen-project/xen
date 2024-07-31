@@ -125,7 +125,7 @@ static int __init cf_check nestedhvm_setup(void)
     /* shadow_io_bitmaps can't be declared static because
      *   they must fulfill hw requirements (page aligned section)
      *   and doing so triggers the ASSERT(va >= XEN_VIRT_START)
-     *   in __virt_to_maddr()
+     *   in virt_to_maddr()
      *
      * So as a compromise pre-allocate them when xen boots.
      * This function must be called from within start_xen() when
