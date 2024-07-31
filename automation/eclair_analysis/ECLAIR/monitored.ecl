@@ -32,6 +32,7 @@
 -enable=MC3R1.R17.4
 -enable=MC3R1.R17.5
 -enable=MC3R1.R17.6
+-enable=MC3R1.R18.6
 -enable=MC3R1.R19.1
 -enable=MC3R1.R20.12
 -enable=MC3R1.R20.13
