@@ -1446,6 +1446,7 @@ struct vmx_msr_entry *vmx_find_msr(const struct vcpu *v, uint32_t msr,
 
     default:
         ASSERT_UNREACHABLE();
+        break;
     }
 
     if ( !start )
@@ -1598,6 +1599,7 @@ int vmx_del_msr(struct vcpu *v, uint32_t msr, enum vmx_msr_list_type type)
 
     default:
         ASSERT_UNREACHABLE();
+        return -EINVAL;
     }
 
     if ( !start )

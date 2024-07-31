@@ -2673,6 +2673,7 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
 
     default:
         ASSERT_UNREACHABLE();
+        return X86EMUL_UNHANDLEABLE;
     }
 
     if ( hvmemul_ctxt->ctxt.retire.singlestep )
