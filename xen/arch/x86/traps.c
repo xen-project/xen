@@ -676,7 +676,6 @@ void vcpu_show_execution_state(struct vcpu *v)
 
     vcpu_pause(v); /* acceptably dangerous */
 
-#ifdef CONFIG_HVM
     /*
      * For VMX special care is needed: Reading some of the register state will
      * require VMCS accesses. Engaging foreign VMCSes involves acquiring of a
@@ -684,12 +683,11 @@ void vcpu_show_execution_state(struct vcpu *v)
      * region. Despite this being a layering violation, engage the VMCS right
      * here. This then also avoids doing so several times in close succession.
      */
-    if ( cpu_has_vmx && is_hvm_vcpu(v) )
+    if ( using_vmx() && is_hvm_vcpu(v) )
     {
         ASSERT(!in_irq());
         vmx_vmcs_enter(v);
     }
-#endif
 
     /* Prevent interleaving of output. */
     flags = console_lock_recursive_irqsave();
@@ -714,10 +712,8 @@ void vcpu_show_execution_state(struct vcpu *v)
         console_unlock_recursive_irqrestore(flags);
     }
 
-#ifdef CONFIG_HVM
-    if ( cpu_has_vmx && is_hvm_vcpu(v) )
+    if ( using_vmx() && is_hvm_vcpu(v) )
         vmx_vmcs_exit(v);
-#endif
 
     vcpu_unpause(v);
 }
