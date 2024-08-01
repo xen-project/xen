@@ -320,7 +320,7 @@ static int cf_check athlon_check_ctrs(
 	struct vcpu *v = current;
 	unsigned int const nr_ctrs = model->num_counters;
 
-#if CONFIG_HVM
+#ifdef CONFIG_AMD_SVM
 	struct cpu_user_regs *guest_regs = guest_cpu_user_regs();
 
 	if (!guest_mode(regs) &&
