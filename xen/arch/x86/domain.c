@@ -1720,11 +1720,9 @@ static void load_segments(struct vcpu *n)
         if ( !(n->arch.flags & TF_kernel_mode) )
             SWAP(gsb, gss);
 
-#ifdef CONFIG_HVM
-        if ( cpu_has_svm && (uregs->fs | uregs->gs) <= 3 )
+        if ( using_svm() && (uregs->fs | uregs->gs) <= 3 )
             fs_gs_done = svm_load_segs(n->arch.pv.ldt_ents, LDT_VIRT_START(n),
                                        n->arch.pv.fs_base, gsb, gss);
-#endif
     }
 
     if ( !fs_gs_done )
@@ -2037,9 +2035,9 @@ static void __context_switch(void)
 
     write_ptbase(n);
 
-#if defined(CONFIG_PV) && defined(CONFIG_HVM)
+#ifdef CONFIG_PV
     /* Prefetch the VMCB if we expect to use it later in the context switch */
-    if ( cpu_has_svm && is_pv_64bit_domain(nd) && !is_idle_domain(nd) )
+    if ( using_svm() && is_pv_64bit_domain(nd) && !is_idle_domain(nd) )
         svm_load_segs_prefetch();
 #endif
 
