@@ -503,9 +503,15 @@ static inline uint8_t get_cpu_family(uint32_t raw, uint8_t *model,
     return fam;
 }
 
+#ifdef CONFIG_INTEL
 extern int8_t opt_tsx;
 extern bool rtm_disabled;
 void tsx_init(void);
+#else
+#define opt_tsx      0     /* explicitly indicate TSX is off */
+#define rtm_disabled false /* RTM was not force-disabled */
+static inline void tsx_init(void) {}
+#endif
 
 void update_mcu_opt_ctrl(void);
 void set_in_mcu_opt_ctrl(uint32_t mask, uint32_t val);

@@ -2586,7 +2586,7 @@ pages) must also be specified via the tbuf_size parameter.
 ### tsx
     = <bool>
 
-    Applicability: x86
+    Applicability: x86 with CONFIG_INTEL active
     Default: false on parts vulnerable to TAA, true otherwise
 
 Controls for the use of Transactional Synchronization eXtensions.

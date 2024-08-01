@@ -116,8 +116,10 @@ static int __init cf_check parse_spec_ctrl(const char *s)
             if ( opt_pv_l1tf_domu < 0 )
                 opt_pv_l1tf_domu = 0;
 
+#ifdef CONFIG_INTEL
             if ( opt_tsx == -1 )
                 opt_tsx = -3;
+#endif
 
         disable_common:
             opt_rsb_pv = false;
@@ -2264,6 +2266,7 @@ void __init init_speculation_mitigations(void)
      * plausibly value TSX higher than Hyperthreading...), disable TSX to
      * mitigate TAA.
      */
+#ifdef CONFIG_INTEL
     if ( opt_tsx == -1 && cpu_has_bug_taa && cpu_has_tsx_ctrl &&
          ((hw_smt_enabled && opt_smt) ||
           !boot_cpu_has(X86_FEATURE_SC_VERW_IDLE)) )
@@ -2271,6 +2274,7 @@ void __init init_speculation_mitigations(void)
         opt_tsx = 0;
         tsx_init();
     }
+#endif
 
     /*
      * On some SRBDS-affected hardware, it may be safe to relax srb-lock by
