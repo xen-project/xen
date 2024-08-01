@@ -599,7 +599,7 @@ void vmx_pi_desc_fixup(unsigned int cpu);
 
 void vmx_sync_exit_bitmap(struct vcpu *v);
 
-#ifdef CONFIG_HVM
+#ifdef CONFIG_INTEL_VMX
 void vmx_pi_hooks_assign(struct domain *d);
 void vmx_pi_hooks_deassign(struct domain *d);
 #else
