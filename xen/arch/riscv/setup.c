@@ -8,6 +8,7 @@
 #include <public/version.h>
 
 #include <asm/early_printk.h>
+#include <asm/traps.h>
 
 void arch_get_xen_caps(xen_capabilities_info_t *info)
 {
@@ -22,6 +23,8 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
                                paddr_t dtb_addr)
 {
     remove_identity_mapping();
+
+    trap_init();
 
     printk("All set up\n");
 
