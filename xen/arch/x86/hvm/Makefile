@@ -1,5 +1,5 @@
-obj-y += svm/
-obj-y += vmx/
+obj-$(CONFIG_AMD_SVM) += svm/
+obj-$(CONFIG_INTEL_VMX) += vmx/
 obj-y += viridian/
 
 obj-y += asid.o
