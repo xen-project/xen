@@ -260,4 +260,6 @@ int get_hwp_para(unsigned int cpu,
 int set_hwp_para(struct cpufreq_policy *policy,
                  struct xen_set_cppc_para *set_cppc);
 
+int acpi_cpufreq_register(void);
+
 #endif /* __XEN_CPUFREQ_PM_H__ */
