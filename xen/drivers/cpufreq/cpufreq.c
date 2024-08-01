@@ -120,7 +120,8 @@ static int __init cf_check setup_cpufreq_option(const char *str)
             if ( arg[0] && arg[1] )
                 ret = cpufreq_cmdline_parse(arg + 1, end);
         }
-        else if ( choice < 0 && !cmdline_strcmp(str, "hwp") )
+        else if ( IS_ENABLED(CONFIG_INTEL) && choice < 0 &&
+                  !cmdline_strcmp(str, "hwp") )
         {
             xen_processor_pmbits |= XEN_PROCESSOR_PM_PX;
             cpufreq_controller = FREQCTL_xen;

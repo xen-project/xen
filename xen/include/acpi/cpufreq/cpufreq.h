@@ -254,7 +254,12 @@ void intel_feature_detect(struct cpufreq_policy *policy);
 
 int hwp_cmdline_parse(const char *s, const char *e);
 int hwp_register_driver(void);
+#ifdef CONFIG_INTEL
 bool hwp_active(void);
+#else
+static inline bool hwp_active(void) { return false; }
+#endif
+
 int get_hwp_para(unsigned int cpu,
                  struct xen_cppc_para *cppc_para);
 int set_hwp_para(struct cpufreq_policy *policy,
