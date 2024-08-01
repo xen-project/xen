@@ -358,6 +358,17 @@ config REQUIRE_NX
 	  was unavailable. However, if enabled, Xen will no longer boot on
 	  any CPU which is lacking NX support.
 
+config ALTP2M
+	bool "Alternate P2M support" if EXPERT
+	depends on INTEL_VMX
+	default y
+	help
+	  Alternate-p2m allows a guest to manage multiple p2m guest physical
+	  "memory views" (as opposed to a single p2m).
+	  Useful for memory introspection.
+
+	  If unsure, stay with defaults.
+
 endmenu
 
 source "common/Kconfig"

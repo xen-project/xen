@@ -577,7 +577,7 @@ static inline gfn_t mfn_to_gfn(const struct domain *d, mfn_t mfn)
         return _gfn(mfn_x(mfn));
 }
 
-#ifdef CONFIG_HVM
+#ifdef CONFIG_ALTP2M
 #define AP2MGET_prepopulate true
 #define AP2MGET_query false
 
@@ -589,6 +589,16 @@ static inline gfn_t mfn_to_gfn(const struct domain *d, mfn_t mfn)
 int altp2m_get_effective_entry(struct p2m_domain *ap2m, gfn_t gfn, mfn_t *mfn,
                                p2m_type_t *t, p2m_access_t *a,
                                bool prepopulate);
+#else
+static inline int _altp2m_get_effective_entry(struct p2m_domain *ap2m,
+                                             gfn_t gfn, mfn_t *mfn,
+                                             p2m_type_t *t, p2m_access_t *a)
+{
+    ASSERT_UNREACHABLE();
+    return -EOPNOTSUPP;
+}
+#define altp2m_get_effective_entry(ap2m, gfn, mfn, t, a, prepopulate) \
+        _altp2m_get_effective_entry(ap2m, gfn, mfn, t, a)
 #endif
 
 /* Init the datastructures for later use by the p2m code */
@@ -914,9 +924,6 @@ static inline bool p2m_set_altp2m(struct vcpu *v, unsigned int idx)
 /* Switch alternate p2m for a single vcpu */
 bool p2m_switch_vcpu_altp2m_by_id(struct vcpu *v, unsigned int idx);
 
-/* Check to see if vcpu should be switched to a different p2m. */
-void p2m_altp2m_check(struct vcpu *v, uint16_t idx);
-
 /* Flush all the alternate p2m's for a domain */
 void p2m_flush_altp2m(struct domain *d);
 
@@ -952,8 +959,14 @@ int p2m_set_altp2m_view_visibility(struct domain *d, unsigned int altp2m_idx,
                                    uint8_t visible);
 #else /* !CONFIG_HVM */
 struct p2m_domain *p2m_get_altp2m(struct vcpu *v);
-static inline void p2m_altp2m_check(struct vcpu *v, uint16_t idx) {}
 #endif /* CONFIG_HVM */
+
+#ifdef CONFIG_ALTP2M
+/* Check to see if vcpu should be switched to a different p2m. */
+void p2m_altp2m_check(struct vcpu *v, uint16_t idx);
+#else
+static inline void p2m_altp2m_check(struct vcpu *v, uint16_t idx) {}
+#endif
 
 /* p2m access to IOMMU flags */
 static inline unsigned int p2m_access_to_iommu_flags(p2m_access_t p2ma)
