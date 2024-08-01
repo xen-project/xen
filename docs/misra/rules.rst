@@ -462,6 +462,16 @@ maintainers if you want to suggest a change.
      - Initializer lists shall not contain persistent side effects
      -
 
+   * - `Rule 13.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_13_02.c>`_
+     - Required
+     - The value of an expression and its persistent side-effects shall
+       be the same under all permitted evaluation orders
+     - Be aware that the static analysis tool Eclair might report
+       several findings for Rule 13.2 of type "caution". These are
+       instances where Eclair is unable to verify that the code is valid
+       in regard to Rule 13.2. Caution reports might not be violations.
+       The rule should be followed in any case in new code submitted.
+
    * - `Rule 13.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_13_06.c>`_
      - Required
      - The operand of the sizeof operator shall not contain any
@@ -582,6 +592,16 @@ maintainers if you want to suggest a change.
        codebase today, and its adoption is aspirational. However, when
        submitting new patches please try to decrease the number of
        violations when possible.
+
+   * - `Rule 18.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_18_02.c>`_
+     - Required
+     - Subtraction between pointers shall only be applied to pointers
+       that address elements of the same array
+     - Be aware that the static analysis tool Eclair might report
+       several findings for Rule 18.2 of type "caution". These are
+       instances where Eclair is unable to verify that the code is valid
+       in regard to Rule 18.2. Caution reports might not be violations.
+       The rule should be followed in any case in new code submitted.
 
    * - `Rule 18.3 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_18_03.c>`_
      - Required
