@@ -262,6 +262,8 @@ bool hvm_monitor_check_p2m(unsigned long gla, gfn_t gfn, uint32_t pfec,
     struct vcpu *curr = current;
     vm_event_request_t req = {};
     paddr_t gpa = (gfn_to_gaddr(gfn) | (gla & ~PAGE_MASK));
+    unsigned int altp2m_idx = altp2m_active(curr->domain) ?
+                              altp2m_vcpu_idx(curr) : 0;
     int rc;
 
     ASSERT(curr->arch.vm_event->send_event);
@@ -270,7 +272,7 @@ bool hvm_monitor_check_p2m(unsigned long gla, gfn_t gfn, uint32_t pfec,
      * p2m_get_mem_access() can fail from a invalid MFN and return -ESRCH
      * in which case access must be restricted.
      */
-    rc = p2m_get_mem_access(curr->domain, gfn, &access, altp2m_vcpu_idx(curr));
+    rc = p2m_get_mem_access(curr->domain, gfn, &access, altp2m_idx);
 
     if ( rc == -ESRCH )
         access = XENMEM_access_n;
