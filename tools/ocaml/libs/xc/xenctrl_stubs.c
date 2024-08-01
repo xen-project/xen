@@ -138,12 +138,12 @@ static void domain_handle_of_uuid_string(xen_domain_handle_t h,
  * integers in the Ocaml ABI for more idiomatic handling.
  */
 static value c_bitmap_to_ocaml_list
-             /* ! */
-             /*
+	     /* ! */
+	     /*
 	      * All calls to this function must be in a form suitable
 	      * for xenctrl_abi_check.  The parsing there is ad-hoc.
 	      */
-             (unsigned int bitmap)
+	         (unsigned int bitmap)
 {
 	CAMLparam0();
 	CAMLlocal2(list, tmp);
@@ -180,8 +180,8 @@ static value c_bitmap_to_ocaml_list
 }
 
 static unsigned int ocaml_list_to_c_bitmap(value l)
-             /* ! */
-             /*
+	     /* ! */
+	     /*
 	      * All calls to this function must be in a form suitable
 	      * for xenctrl_abi_check.  The parsing there is ad-hoc.
 	      */
@@ -259,7 +259,7 @@ CAMLprim value stub_xc_domain_create(value xch_val, value wanted_domid, value co
 		/* Quick & dirty check for ABI changes. */
 		BUILD_BUG_ON(sizeof(cfg) != 68);
 
-        /* Mnemonics for the named fields inside xen_x86_arch_domainconfig */
+		/* Mnemonics for the named fields inside xen_x86_arch_domainconfig */
 #define VAL_EMUL_FLAGS          Field(arch_domconfig, 0)
 #define VAL_MISC_FLAGS          Field(arch_domconfig, 1)
 
@@ -351,7 +351,7 @@ static value dom_op(value xch_val, value domid,
 	caml_enter_blocking_section();
 	result = fn(xch, c_domid);
 	caml_leave_blocking_section();
-        if (result)
+	if (result)
 		failwith_xc(xch);
 	CAMLreturn(Val_unit);
 }
@@ -383,7 +383,7 @@ CAMLprim value stub_xc_domain_resume_fast(value xch_val, value domid)
 	caml_enter_blocking_section();
 	result = xc_domain_resume(xch, c_domid, 1);
 	caml_leave_blocking_section();
-        if (result)
+	if (result)
 		failwith_xc(xch);
 	CAMLreturn(Val_unit);
 }
@@ -426,7 +426,7 @@ static value alloc_domaininfo(xc_domaininfo_t * info)
 	Store_field(result, 13, Val_int(info->max_vcpu_id));
 	Store_field(result, 14, caml_copy_int32(info->ssidref));
 
-        tmp = caml_alloc_small(16, 0);
+	tmp = caml_alloc_small(16, 0);
 	for (i = 0; i < 16; i++) {
 		Field(tmp, i) = Val_int(info->handle[i]);
 	}
