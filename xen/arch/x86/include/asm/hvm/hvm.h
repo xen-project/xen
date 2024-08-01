@@ -363,6 +363,16 @@ int hvm_copy_context_and_params(struct domain *dst, struct domain *src);
 
 int hvm_get_param(struct domain *d, uint32_t index, uint64_t *value);
 
+static inline bool using_vmx(void)
+{
+    return IS_ENABLED(CONFIG_INTEL_VMX) && cpu_has_vmx;
+}
+
+static inline bool using_svm(void)
+{
+    return IS_ENABLED(CONFIG_AMD_SVM) && cpu_has_svm;
+}
+
 #ifdef CONFIG_HVM
 
 #define hvm_get_guest_tsc(v) hvm_get_guest_tsc_fixed(v, 0)

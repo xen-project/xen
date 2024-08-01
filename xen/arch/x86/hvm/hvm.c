@@ -155,9 +155,9 @@ static int __init cf_check hvm_enable(void)
 {
     const struct hvm_function_table *fns = NULL;
 
-    if ( cpu_has_vmx )
+    if ( using_vmx() )
         fns = start_vmx();
-    else if ( cpu_has_svm )
+    else if ( using_svm() )
         fns = start_svm();
 
     if ( fns == NULL )

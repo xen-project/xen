@@ -155,9 +155,9 @@ static int __init cf_check nestedhvm_setup(void)
      * done, so that if (for example) HAP is disabled, nested virt is
      * disabled as well.
      */
-    if ( cpu_has_vmx )
+    if ( using_vmx() )
         start_nested_vmx(&hvm_funcs);
-    else if ( cpu_has_svm )
+    else if ( using_svm() )
         start_nested_svm(&hvm_funcs);
 
     return 0;
