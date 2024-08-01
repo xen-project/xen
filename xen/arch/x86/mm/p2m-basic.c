@@ -40,7 +40,7 @@ static int p2m_initialise(struct domain *d, struct p2m_domain *p2m)
     p2m_pod_init(p2m);
     p2m_nestedp2m_init(p2m);
 
-    if ( hap_enabled(d) && cpu_has_vmx )
+    if ( hap_enabled(d) && using_vmx() )
         ret = ept_p2m_init(p2m);
     else
         p2m_pt_init(p2m);
@@ -72,7 +72,7 @@ struct p2m_domain *p2m_init_one(struct domain *d)
 void p2m_free_one(struct p2m_domain *p2m)
 {
     p2m_free_logdirty(p2m);
-    if ( hap_enabled(p2m->domain) && cpu_has_vmx )
+    if ( hap_enabled(p2m->domain) && using_vmx() )
         ept_p2m_uninit(p2m);
     free_cpumask_var(p2m->dirty_cpumask);
     xfree(p2m);
