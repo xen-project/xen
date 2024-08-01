@@ -23,9 +23,7 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
 {
     remove_identity_mapping();
 
-    early_printk("Hello from C env\n");
-
-    early_printk("All set up\n");
+    printk("All set up\n");
 
     for ( ;; )
         asm volatile ("wfi");
