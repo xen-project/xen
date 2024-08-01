@@ -846,7 +846,7 @@ void xstate_init(struct cpuinfo_x86 *c)
 
     if ( bsp )
     {
-        static typeof(current->arch.xsave_area->fpu_sse) __initdata ctxt;
+        static fpusse_t __initdata ctxt;
 
         asm ( "fxsave %0" : "=m" (ctxt) );
         if ( ctxt.mxcsr_mask )

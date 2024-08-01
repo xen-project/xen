@@ -39,7 +39,7 @@ static inline void fpu_xrstor(struct vcpu *v, uint64_t mask)
 /* Restore x87 FPU, MMX, SSE and SSE2 state */
 static inline void fpu_fxrstor(struct vcpu *v)
 {
-    const typeof(v->arch.xsave_area->fpu_sse) *fpu_ctxt = v->arch.fpu_ctxt;
+    const fpusse_t *fpu_ctxt = v->arch.fpu_ctxt;
 
     /*
      * Some CPUs don't save/restore FDP/FIP/FOP unless an exception
@@ -151,7 +151,7 @@ static inline void fpu_xsave(struct vcpu *v)
 /* Save x87 FPU, MMX, SSE and SSE2 state */
 static inline void fpu_fxsave(struct vcpu *v)
 {
-    typeof(v->arch.xsave_area->fpu_sse) *fpu_ctxt = v->arch.fpu_ctxt;
+    fpusse_t *fpu_ctxt = v->arch.fpu_ctxt;
     unsigned int fip_width = v->domain->arch.x87_fip_width;
 
     if ( fip_width != 4 )
@@ -315,7 +315,7 @@ int vcpu_init_fpu(struct vcpu *v)
                                     __alignof(v->arch.xsave_area->fpu_sse));
         if ( v->arch.fpu_ctxt )
         {
-            typeof(v->arch.xsave_area->fpu_sse) *fpu_sse = v->arch.fpu_ctxt;
+            fpusse_t *fpu_sse = v->arch.fpu_ctxt;
 
             fpu_sse->fcw = FCW_DEFAULT;
             fpu_sse->mxcsr = MXCSR_DEFAULT;
@@ -336,7 +336,7 @@ void vcpu_setup_fpu(struct vcpu *v, struct xsave_struct *xsave_area,
      * accesses through both pointers alias one another, and the shorter form
      * is used here.
      */
-    typeof(xsave_area->fpu_sse) *fpu_sse = v->arch.fpu_ctxt;
+    fpusse_t *fpu_sse = v->arch.fpu_ctxt;
 
     ASSERT(!xsave_area || xsave_area == v->arch.xsave_area);
 

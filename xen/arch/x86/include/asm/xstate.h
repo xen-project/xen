@@ -82,6 +82,8 @@ struct __attribute__((aligned (64))) xsave_struct
     char data[];                             /* Variable layout states */
 };
 
+typedef typeof(((struct xsave_struct){}).fpu_sse) fpusse_t;
+
 struct xstate_bndcsr {
     uint64_t bndcfgu;
     uint64_t bndstatus;
