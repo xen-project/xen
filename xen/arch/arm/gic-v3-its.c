@@ -951,6 +951,10 @@ int gicv3_its_make_hwdom_dt_nodes(const struct domain *d,
         if ( res )
             return res;
 
+        res = fdt_property_cell(fdt, "#msi-cells", 1);
+        if ( res )
+            return res;
+
         if ( its->phandle )
         {
             res = fdt_property_cell(fdt, "phandle", its->phandle);
