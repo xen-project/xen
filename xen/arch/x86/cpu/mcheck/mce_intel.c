@@ -875,10 +875,8 @@ static void intel_init_ppin(const struct cpuinfo_x86 *c)
     case 0x4f: /* Broadwell X */
     case 0x55: /* Skylake X */
     case 0x56: /* Broadwell Xeon D */
-    case 0x57: /* Knights Landing */
     case 0x6a: /* Icelake X */
     case 0x6c: /* Icelake D */
-    case 0x85: /* Knights Mill */
     case 0x8f: /* Sapphire Rapids X */
 
         if ( (c != &boot_cpu_data && !ppin_msr) ||

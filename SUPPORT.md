@@ -30,6 +30,7 @@ supported in this document.
 ### x86-64
 
     Status: Supported
+    Status, Xeon Phi: Not supported.
 
 ### ARM v7 + Virtualization Extensions
 

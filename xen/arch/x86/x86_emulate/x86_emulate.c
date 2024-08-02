@@ -6029,7 +6029,6 @@ x86_emulate(
     case X86EMUL_OPC_EVEX_66(0x0f38, 0xbd): /* vfnmadd231s{s,d} xmm/mem,xmm,xmm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0xbf): /* vfnmsub231s{s,d} xmm/mem,xmm,xmm{k} */
         host_and_vcpu_must_have(avx512f);
-    simd_zmm_scalar_sae:
         generate_exception_if(ea.type != OP_REG && evex.brs, X86_EXC_UD);
         if ( !evex.brs )
             avx512_vlen_check(true);
@@ -6121,15 +6120,6 @@ x86_emulate(
         host_and_vcpu_must_have(avx512f);
         generate_exception_if(evex.brs, X86_EXC_UD);
         avx512_vlen_check(true);
-        goto simd_zmm;
-
-    case X86EMUL_OPC_EVEX_F2(0x0f38, 0x52): /* vp4dpwssd m128,zmm+3,zmm{k} */
-    case X86EMUL_OPC_EVEX_F2(0x0f38, 0x53): /* vp4dpwssds m128,zmm+3,zmm{k} */
-        host_and_vcpu_must_have(avx512_4vnniw);
-        generate_exception_if((ea.type != OP_MEM || evex.w || evex.brs ||
-                               evex.lr != 2),
-                              X86_EXC_UD);
-        op_mask = op_mask & 0xffff ? 0xf : 0;
         goto simd_zmm;
 
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x8f): /* vpshufbitqmb [xyz]mm/mem,[xyz]mm,k{k} */
@@ -6601,24 +6591,6 @@ x86_emulate(
         host_and_vcpu_must_have(fma);
         goto simd_0f_ymm;
 
-    case X86EMUL_OPC_EVEX_F2(0x0f38, 0x9a): /* v4fmaddps m128,zmm+3,zmm{k} */
-    case X86EMUL_OPC_EVEX_F2(0x0f38, 0xaa): /* v4fnmaddps m128,zmm+3,zmm{k} */
-        host_and_vcpu_must_have(avx512_4fmaps);
-        generate_exception_if((ea.type != OP_MEM || evex.w || evex.brs ||
-                               evex.lr != 2),
-                              X86_EXC_UD);
-        op_mask = op_mask & 0xffff ? 0xf : 0;
-        goto simd_zmm;
-
-    case X86EMUL_OPC_EVEX_F2(0x0f38, 0x9b): /* v4fmaddss m128,xmm+3,xmm{k} */
-    case X86EMUL_OPC_EVEX_F2(0x0f38, 0xab): /* v4fnmaddss m128,xmm+3,xmm{k} */
-        host_and_vcpu_must_have(avx512_4fmaps);
-        generate_exception_if((ea.type != OP_MEM || evex.w || evex.brs ||
-                               evex.lr == 3),
-                              X86_EXC_UD);
-        op_mask = op_mask & 1 ? 0xf : 0;
-        goto simd_zmm;
-
     case X86EMUL_OPC_EVEX_66(0x0f38, 0xa0): /* vpscatterd{d,q} [xyz]mm,mem{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0xa1): /* vpscatterq{d,q} [xyz]mm,mem{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0xa2): /* vscatterdp{s,d} [xyz]mm,mem{k} */
@@ -6759,97 +6731,6 @@ x86_emulate(
         generate_exception_if(!evex.w, X86_EXC_UD);
         goto avx512f_no_sae;
 
-    case X86EMUL_OPC_EVEX_66(0x0f38, 0xc6):
-    case X86EMUL_OPC_EVEX_66(0x0f38, 0xc7):
-    {
-#ifndef __XEN__
-        typeof(evex) *pevex;
-        union {
-            int32_t dw[16];
-            int64_t qw[8];
-        } index;
-#endif
-
-        ASSERT(ea.type == OP_MEM);
-        generate_exception_if((!cpu_has_avx512f || !evex.opmsk || evex.brs ||
-                               evex.z || evex.reg != 0xf || evex.lr != 2),
-                              X86_EXC_UD);
-
-        switch ( modrm_reg & 7 )
-        {
-        case 1: /* vgatherpf0{d,q}p{s,d} mem{k} */
-        case 2: /* vgatherpf1{d,q}p{s,d} mem{k} */
-        case 5: /* vscatterpf0{d,q}p{s,d} mem{k} */
-        case 6: /* vscatterpf1{d,q}p{s,d} mem{k} */
-            vcpu_must_have(avx512pf);
-            break;
-        default:
-            generate_exception(X86_EXC_UD);
-        }
-
-        get_fpu(X86EMUL_FPU_zmm);
-
-#ifndef __XEN__
-        /*
-         * For the test harness perform zero byte memory accesses, such that
-         * in particular correct Disp8 scaling can be verified.
-         */
-        fail_if((modrm_reg & 4) && !ops->write);
-
-        /* Read index register. */
-        opc = init_evex(stub);
-        pevex = copy_EVEX(opc, evex);
-        pevex->opcx = vex_0f;
-        /* vmovdqu{32,64} */
-        opc[0] = 0x7f;
-        pevex->pfx = vex_f3;
-        pevex->w = b & 1;
-        /* Use (%rax) as destination and sib_index as source. */
-        pevex->b = 1;
-        opc[1] = (state->sib_index & 7) << 3;
-        pevex->r = !mode_64bit() || !(state->sib_index & 0x08);
-        pevex->R = !mode_64bit() || !(state->sib_index & 0x10);
-        pevex->RX = 1;
-        opc[2] = 0xc3;
-
-        invoke_stub("", "", "=m" (index) : "a" (&index));
-        put_stub(stub);
-
-        /* Clear untouched parts of the mask value. */
-        n = 1 << (4 - ((b & 1) | evex.w));
-        op_mask &= (1 << n) - 1;
-
-        for ( i = 0; rc == X86EMUL_OKAY && op_mask; ++i )
-        {
-            long idx = b & 1 ? index.qw[i] : index.dw[i];
-
-            if ( !(op_mask & (1 << i)) )
-                continue;
-
-            rc = (modrm_reg & 4
-                  ? ops->write
-                  : ops->read)(ea.mem.seg,
-                               truncate_ea(ea.mem.off +
-                                           idx * (1 << state->sib_scale)),
-                               NULL, 0, ctxt);
-            if ( rc == X86EMUL_EXCEPTION )
-            {
-                /* Squash memory access related exceptions. */
-                x86_emul_reset_event(ctxt);
-                rc = X86EMUL_OKAY;
-            }
-
-            op_mask &= ~(1 << i);
-        }
-
-        if ( rc != X86EMUL_OKAY )
-            goto done;
-#endif
-
-        state->simd_size = simd_none;
-        break;
-    }
-
     case X86EMUL_OPC(0x0f38, 0xc8):     /* sha1nexte xmm/m128,xmm */
     case X86EMUL_OPC(0x0f38, 0xc9):     /* sha1msg1 xmm/m128,xmm */
     case X86EMUL_OPC(0x0f38, 0xca):     /* sha1msg2 xmm/m128,xmm */
@@ -6859,19 +6740,6 @@ x86_emulate(
         host_and_vcpu_must_have(sha);
         op_bytes = 16;
         goto simd_0f38_common;
-
-    case X86EMUL_OPC_EVEX_66(0x0f38, 0xc8): /* vexp2p{s,d} zmm/mem,zmm{k} */
-    case X86EMUL_OPC_EVEX_66(0x0f38, 0xca): /* vrcp28p{s,d} zmm/mem,zmm{k} */
-    case X86EMUL_OPC_EVEX_66(0x0f38, 0xcc): /* vrsqrt28p{s,d} zmm/mem,zmm{k} */
-        host_and_vcpu_must_have(avx512er);
-        generate_exception_if((ea.type != OP_REG || !evex.brs) && evex.lr != 2,
-                              X86_EXC_UD);
-        goto simd_zmm;
-
-    case X86EMUL_OPC_EVEX_66(0x0f38, 0xcb): /* vrcp28s{s,d} xmm/mem,xmm,xmm{k} */
-    case X86EMUL_OPC_EVEX_66(0x0f38, 0xcd): /* vrsqrt28s{s,d} xmm/mem,xmm,xmm{k} */
-        host_and_vcpu_must_have(avx512er);
-        goto simd_zmm_scalar_sae;
 
     case X86EMUL_OPC_VEX_F2(0x0f38, 0xcb): /* vsha512rnds2 xmm,ymm,ymm */
     case X86EMUL_OPC_VEX_F2(0x0f38, 0xcc): /* vsha512msg1 xmm,ymm */

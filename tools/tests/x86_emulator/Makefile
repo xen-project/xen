@@ -16,7 +16,7 @@ vpath %.c $(XEN_ROOT)/xen/lib/x86
 
 CFLAGS += $(CFLAGS_xeninclude)
 
-SIMD := 3dnow sse sse2 sse4 avx avx2 xop avx512f avx512bw avx512dq avx512er avx512vbmi avx512fp16
+SIMD := 3dnow sse sse2 sse4 avx avx2 xop avx512f avx512bw avx512dq avx512vbmi avx512fp16
 FMA := fma4 fma
 SG := avx2-sg avx512f-sg
 AES := ssse3-aes avx-aes avx2-vaes avx512bw-vaes
@@ -80,9 +80,6 @@ avx512bw-flts :=
 avx512dq-vecs := $(avx512f-vecs)
 avx512dq-ints := $(avx512f-ints)
 avx512dq-flts := $(avx512f-flts)
-avx512er-vecs := 64
-avx512er-ints :=
-avx512er-flts := 4 8
 avx512vbmi-vecs := $(avx512bw-vecs)
 avx512vbmi-ints := $(avx512bw-ints)
 avx512vbmi-flts := $(avx512bw-flts)

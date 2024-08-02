@@ -13,8 +13,8 @@
  *	INTEL_FAM6{OPTFAMILY}_{MICROARCH}{OPTDIFF}
  * where:
  * OPTFAMILY	Describes the family of CPUs that this belongs to. Default
- *		is assumed to be "_CORE" (and should be omitted). Other values
- *		currently in use are _ATOM and _XEON_PHI
+ *		is assumed to be "_CORE" (and should be omitted). The other
+ *		value currently in use is _ATOM.
  * MICROARCH	Is the code name for the micro-architecture for this core.
  *		N.B. Not the platform name.
  * OPTDIFF	If needed, a short string to differentiate by market segment.
@@ -163,11 +163,6 @@
 #define INTEL_FAM6_ATOM_CRESTMONT	0xB6 /* Grand Ridge */
 
 #define INTEL_FAM6_ATOM_DARKMONT_X	0xDD /* Clearwater Forest */
-
-/* Xeon Phi */
-
-#define INTEL_FAM6_XEON_PHI_KNL		0x57 /* Knights Landing */
-#define INTEL_FAM6_XEON_PHI_KNM		0x85 /* Knights Mill */
 
 /* Family 5 */
 #define INTEL_FAM5_QUARK_X1000		0x09 /* Quark X1000 SoC */

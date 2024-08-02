@@ -156,7 +156,6 @@ void wrpkru(unsigned int val);
 #define cpu_has_avx512f   (cp.feat.avx512f  && xcr0_mask(0xe6))
 #define cpu_has_avx512dq  (cp.feat.avx512dq && xcr0_mask(0xe6))
 #define cpu_has_avx512_ifma (cp.feat.avx512_ifma && xcr0_mask(0xe6))
-#define cpu_has_avx512er  (cp.feat.avx512er && xcr0_mask(0xe6))
 #define cpu_has_avx512cd  (cp.feat.avx512cd && xcr0_mask(0xe6))
 #define cpu_has_sha        cp.feat.sha
 #define cpu_has_avx512bw  (cp.feat.avx512bw && xcr0_mask(0xe6))
@@ -171,8 +170,6 @@ void wrpkru(unsigned int val);
 #define cpu_has_avx512_vpopcntdq (cp.feat.avx512_vpopcntdq && xcr0_mask(0xe6))
 #define cpu_has_movdiri    cp.feat.movdiri
 #define cpu_has_movdir64b  cp.feat.movdir64b
-#define cpu_has_avx512_4vnniw (cp.feat.avx512_4vnniw && xcr0_mask(0xe6))
-#define cpu_has_avx512_4fmaps (cp.feat.avx512_4fmaps && xcr0_mask(0xe6))
 #define cpu_has_avx512_vp2intersect (cp.feat.avx512_vp2intersect && xcr0_mask(0xe6))
 #define cpu_has_serialize  cp.feat.serialize
 #define cpu_has_avx512_fp16 (cp.feat.avx512_fp16 && xcr0_mask(0xe6))

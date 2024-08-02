@@ -73,7 +73,6 @@
 #define GET_CC3_RES(val)  GET_HW_RES_IN_NS(0x3FC, val)
 #define GET_CC6_RES(val)  GET_HW_RES_IN_NS(0x3FD, val)
 #define GET_CC7_RES(val)  GET_HW_RES_IN_NS(0x3FE, val) /* SNB onwards */
-#define PHI_CC6_RES(val)  GET_HW_RES_IN_NS(0x3FF, val) /* Xeon Phi only */
 
 static void cf_check lapic_timer_nop(void) { }
 void (*__read_mostly lapic_timer_off)(void);
@@ -221,18 +220,6 @@ static void cf_check do_get_hw_residencies(void *arg)
         GET_CC1_RES(hw_res->cc1);
         GET_CC6_RES(hw_res->cc6);
         GET_CC7_RES(hw_res->cc7);
-        break;
-    /* Xeon Phi Knights Landing */
-    case 0x57:
-    /* Xeon Phi Knights Mill */
-    case 0x85:
-        GET_CC3_RES(hw_res->mc0); /* abusing GET_CC3_RES */
-        GET_CC6_RES(hw_res->mc6); /* abusing GET_CC6_RES */
-        GET_PC2_RES(hw_res->pc2);
-        GET_PC3_RES(hw_res->pc3);
-        GET_PC6_RES(hw_res->pc6);
-        GET_PC7_RES(hw_res->pc7);
-        PHI_CC6_RES(hw_res->cc6);
         break;
     /* various Atoms */
     case 0x27:

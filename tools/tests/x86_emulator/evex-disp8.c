@@ -524,37 +524,6 @@ static const struct test avx512dq_512[] = {
     INSN(inserti32x8,    66, 0f3a, 3a, el_8, d, vl),
 };
 
-static const struct test avx512er_512[] = {
-    INSN(exp2,    66, 0f38, c8, vl, sd, vl),
-    INSN(rcp28,   66, 0f38, ca, vl, sd, vl),
-    INSN(rcp28,   66, 0f38, cb, el, sd, el),
-    INSN(rsqrt28, 66, 0f38, cc, vl, sd, vl),
-    INSN(rsqrt28, 66, 0f38, cd, el, sd, el),
-};
-
-static const struct test avx512pf_512[] = {
-    INSNX(gatherpf0d,  66, 0f38, c6, 1, vl, sd, el),
-    INSNX(gatherpf0q,  66, 0f38, c7, 1, vl, sd, el),
-    INSNX(gatherpf1d,  66, 0f38, c6, 2, vl, sd, el),
-    INSNX(gatherpf1q,  66, 0f38, c7, 2, vl, sd, el),
-    INSNX(scatterpf0d, 66, 0f38, c6, 5, vl, sd, el),
-    INSNX(scatterpf0q, 66, 0f38, c7, 5, vl, sd, el),
-    INSNX(scatterpf1d, 66, 0f38, c6, 6, vl, sd, el),
-    INSNX(scatterpf1q, 66, 0f38, c7, 6, vl, sd, el),
-};
-
-static const struct test avx512_4fmaps_512[] = {
-    INSN(4fmaddps,  f2, 0f38, 9a, el_4, d, vl),
-    INSN(4fmaddss,  f2, 0f38, 9b, el_4, d, vl),
-    INSN(4fnmaddps, f2, 0f38, aa, el_4, d, vl),
-    INSN(4fnmaddss, f2, 0f38, ab, el_4, d, vl),
-};
-
-static const struct test avx512_4vnniw_512[] = {
-    INSN(p4dpwssd,  f2, 0f38, 52, el_4, d, vl),
-    INSN(p4dpwssds, f2, 0f38, 53, el_4, d, vl),
-};
-
 static const struct test avx512_bf16_all[] = {
     INSN(cvtne2ps2bf16, f2, 0f38, 72, vl, d, vl),
     INSN(cvtneps2bf16,  f3, 0f38, 72, vl, d, vl),
@@ -1110,11 +1079,6 @@ void evex_disp8_test(void *instr, struct x86_emulate_ctxt *ctxt,
     RUN(avx512dq, 128);
     RUN(avx512dq, no128);
     RUN(avx512dq, 512);
-    RUN(avx512er, 512);
-#define cpu_has_avx512pf cpu_has_avx512f
-    RUN(avx512pf, 512);
-    RUN(avx512_4fmaps, 512);
-    RUN(avx512_4vnniw, 512);
     RUN(avx512_bf16, all);
     RUN(avx512_bitalg, all);
     RUN(avx512_ifma, all);

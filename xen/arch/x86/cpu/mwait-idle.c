@@ -778,22 +778,6 @@ static const struct cpuidle_state avn_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state knl_cstates[] = {
-	{
-		.name = "C1",
-		.flags = MWAIT2flg(0x00),
-		.exit_latency = 1,
-		.target_residency = 2,
-	},
-	{
-		.name = "C6",
-		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
-		.exit_latency = 120,
-		.target_residency = 500,
-	},
-	{}
-};
-
 static struct cpuidle_state __read_mostly bxt_cstates[] = {
 	{
 		.name = "C1",
@@ -1121,10 +1105,6 @@ static const struct idle_cpu idle_cpu_avn = {
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_knl = {
-	.state_table = knl_cstates,
-};
-
 static const struct idle_cpu idle_cpu_bxt = {
 	.state_table = bxt_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
@@ -1181,8 +1161,6 @@ static const struct x86_cpu_id intel_idle_ids[] __initconstrel = {
 	ICPU(ALDERLAKE,			adl),
 	ICPU(ALDERLAKE_L,		adl_l),
 	ICPU(SAPPHIRERAPIDS_X,		spr),
-	ICPU(XEON_PHI_KNL,		knl),
-	ICPU(XEON_PHI_KNM,		knl),
 	ICPU(ATOM_GOLDMONT,		bxt),
 	ICPU(ATOM_GOLDMONT_PLUS,	bxt),
 	ICPU(ATOM_GOLDMONT_D,		dnv),

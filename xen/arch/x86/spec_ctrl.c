@@ -889,11 +889,9 @@ static bool __init retpoline_calculations(void)
     case 0x4d: /* Avaton / Rangely (Silvermont) */
     case 0x4c: /* Cherrytrail / Brasswell */
     case 0x4a: /* Merrifield */
-    case 0x57: /* Knights Landing */
     case 0x5a: /* Moorefield */
     case 0x5c: /* Goldmont */
     case 0x5f: /* Denverton */
-    case 0x85: /* Knights Mill */
         safe = true;
         break;
 
@@ -1005,13 +1003,6 @@ static bool __init should_use_eager_fpu(void)
     case 0x5c: /* Goldmont */
     case 0x5f: /* Denverton */
     case 0x7a: /* Gemini Lake */
-        return false;
-
-        /*
-         * Knights processors are not vulnerable.
-         */
-    case 0x57: /* Knights Landing */
-    case 0x85: /* Knights Mill */
         return false;
 
     default:
@@ -1261,13 +1252,6 @@ static __init void l1tf_calculations(void)
         case 0x7a: /* Gemini Lake */
             break;
 
-            /*
-             * Knights processors are not vulnerable.
-             */
-        case 0x57: /* Knights Landing */
-        case 0x85: /* Knights Mill */
-            break;
-
         default:
             /* Defer printk() until we've accounted for RDCL_NO. */
             hit_default = true;
@@ -1418,13 +1402,6 @@ static __init void mds_calculations(void)
     case 0x65: /* SoFIA LTE AOSP */
     case 0x6e: /* Cougar Mountain */
     case 0x75: /* Lightning Mountain */
-        /*
-         * Knights processors (which are based on the Silvermont/Airmont
-         * microarchitecture) are similarly only affected by the Store Buffer
-         * aspect.
-         */
-    case 0x57: /* Knights Landing */
-    case 0x85: /* Knights Mill */
         cpu_has_bug_msbds_only = true;
         break;
 

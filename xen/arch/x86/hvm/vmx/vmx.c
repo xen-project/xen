@@ -533,10 +533,6 @@ static const struct lbr_info *__init get_model_specific_lbr(void)
             return at_lbr;
         /* Silvermont */
         case 0x37: case 0x4a: case 0x4d: case 0x5a: case 0x5d:
-        /* Xeon Phi Knights Landing */
-        case 0x57:
-        /* Xeon Phi Knights Mill */
-        case 0x85:
         /* Airmont */
         case 0x4c:
             return sm_lbr;
@@ -2984,13 +2980,6 @@ static bool __init has_if_pschange_mc(void)
     case 0x75: /* Lightning Mountain */
     case 0x7a: /* Gemini Lake */
     case 0x86: /* Jacobsville */
-
-        /*
-         * Knights processors are not vulnerable.
-         */
-    case 0x57: /* Knights Landing */
-    case 0x85: /* Knights Mill */
-        return false;
 
     default:
         printk("Unrecognised CPU model %#x - assuming vulnerable to IF_PSCHANGE_MC\n",
