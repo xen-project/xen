@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
 
 #include <xenctrl.h>
 
@@ -24,7 +25,23 @@ int main(int argc, char **argv)
         status.port = port;
         rc = xc_evtchn_status(xch, &status);
         if ( rc < 0 )
-            break;
+        {
+            switch ( errno )
+            {
+            case EACCES: /* Xen-owned evtchn */
+                continue;
+
+            case EINVAL: /* Port enumeration has ended */
+                rc = 0;
+                break;
+
+            default:
+                perror("xc_evtchn_status");
+                rc = 1;
+                break;
+            }
+            goto out;
+        }
 
         if ( status.status == EVTCHNSTAT_closed )
             continue;
@@ -58,7 +75,8 @@ int main(int argc, char **argv)
         printf("\n");
     }
 
+ out:
     xc_interface_close(xch);
 
-    return 0;
+    return rc;
 }
