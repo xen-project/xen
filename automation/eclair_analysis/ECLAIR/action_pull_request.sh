@@ -3,7 +3,7 @@
 set -eu
 
 usage() {
-    echo "Usage: $0 WTOKEN ANALYSIS_OUTPUT_DIR COMMIT_ID" >&2
+    echo "Usage: $0 WTOKEN ANALYSIS_OUTPUT_DIR" >&2
     exit 2
 }
 

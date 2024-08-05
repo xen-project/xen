@@ -21,5 +21,16 @@ ex=0
 # Fail in case of new reports for clean guidelines
 "${ECLAIR_DIR}/action_check_clean_regressions.sh" "${ECLAIR_OUTPUT_DIR}" || ex=$?
 
-"${ECLAIR_DIR}/action_push.sh" "${WTOKEN}" "${ECLAIR_OUTPUT_DIR}"
+case "${CI_PIPELINE_SOURCE}" in
+merge_request_event)
+    "${ECLAIR_DIR}/action_pull_request.sh" "${WTOKEN}" "${ECLAIR_OUTPUT_DIR}"
+    ;;
+push | pipeline | web | schedule)
+    "${ECLAIR_DIR}/action_push.sh" "${WTOKEN}" "${ECLAIR_OUTPUT_DIR}"
+    ;;
+*)
+    echo "Unexpected event ${CI_PIPELINE_SOURCE}" >&2
+    ex=1
+    ;;
+esac
 [ "${ex}" = 0 ] || exit "${ex}"
