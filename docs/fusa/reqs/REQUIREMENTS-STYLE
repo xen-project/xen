@@ -1,0 +1,34 @@
+Requirements writing style for the Xen Hypervisor
+=================================================
+
+The requirements writing style described below is the style used for writing the
+requirements of the Xen hypervisor to enable functional safety certification.
+
+The requirements writing style is inspired from the ANSI/IEEE guide to Software
+Requirements Standard. Specifically, the requirements should satisfy the
+following validation checklist.
+(Source - https://www.nasa.gov/reference/appendix-c-how-to-write-a-good-requirement)
+
+Clarity -
+The requirements should be clear, unambiguous, consise and simple. Each
+requirement should express a single thought. Each requirement stated should have
+a single interpretation.
+
+Consistency -
+Any requirement shouldn't contradict with any other requirement. The requirements
+should be categorized correctly (the categories have been explained in the
+README). The tone of each requirement should be definitive (ie "Xen shall ..."
+should be present in each requirement).
+
+Traceability -
+Any market requirement should be linked to the product requirement/s and
+vice versa. Any product requirement should be linked to the design requirement/s
+and vice versa. Full bi-directional traceability should be maintained between
+market, product and design requirements.
+
+Correctness -
+The requirements should be feasible and technically correct (at the time of
+writing). However, it is not expected that the requirements will be kept upto
+date with the code.
+
+The requirements follow the same license and line length as the code.
