@@ -80,15 +80,6 @@ static inline int process_shm_chosen(struct domain *d,
     return 0;
 }
 
-static inline int process_shm_node(const void *fdt, int node,
-                                   uint32_t address_cells, uint32_t size_cells)
-{
-    printk("CONFIG_STATIC_SHM must be enabled for parsing static shared memory nodes\n");
-    return -EINVAL;
-}
-
-static inline void early_print_info_shmem(void) {};
-
 static inline void init_sharedmem_pages(void) {};
 
 static inline int remove_shm_from_rangeset(const struct kernel_info *kinfo,

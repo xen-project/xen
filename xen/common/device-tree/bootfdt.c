@@ -4,18 +4,20 @@
  *
  * Copyright (C) 2012-2014 Citrix Systems, Inc.
  */
-#include <xen/types.h>
-#include <xen/lib.h>
-#include <xen/kernel.h>
-#include <xen/init.h>
-#include <xen/efi.h>
+
+#include <xen/bootfdt.h>
 #include <xen/device_tree.h>
+#include <xen/efi.h>
+#include <xen/init.h>
+#include <xen/kernel.h>
 #include <xen/lib.h>
 #include <xen/libfdt/libfdt-xen.h>
 #include <xen/sort.h>
 #include <xsm/xsm.h>
 #include <asm/setup.h>
+#ifdef CONFIG_STATIC_SHM
 #include <asm/static-shmem.h>
+#endif
 
 static void __init __maybe_unused build_assertions(void)
 {
@@ -462,6 +464,16 @@ static int __init process_domain_node(const void *fdt, int node,
                                    MEMBANK_STATIC_DOMAIN);
 }
 
+#ifndef CONFIG_STATIC_SHM
+static inline int process_shm_node(const void *fdt, int node,
+                                   uint32_t address_cells, uint32_t size_cells)
+{
+    printk("CONFIG_STATIC_SHM must be enabled for parsing static shared"
+            " memory nodes\n");
+    return -EINVAL;
+}
+#endif
+
 static int __init early_scan_node(const void *fdt,
                                   int node, const char *name, int depth,
                                   u32 address_cells, u32 size_cells,
@@ -521,7 +533,9 @@ static void __init early_print_info(void)
                mem_resv->bank[i].start,
                mem_resv->bank[i].start + mem_resv->bank[i].size - 1);
     }
+#ifdef CONFIG_STATIC_SHM
     early_print_info_shmem();
+#endif
     printk("\n");
     for ( i = 0 ; i < cmds->nr_mods; i++ )
         printk("CMDLINE[%"PRIpaddr"]:%s %s\n", cmds->cmdline[i].start,
