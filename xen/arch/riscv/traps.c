@@ -6,6 +6,7 @@
  */
 
 #include <xen/lib.h>
+#include <xen/nospec.h>
 #include <xen/sched.h>
 
 #include <asm/processor.h>
@@ -47,9 +48,11 @@ static const char *decode_trap_cause(unsigned long cause)
         [CAUSE_STORE_GUEST_PAGE_FAULT] = "Guest Store/AMO Page Fault",
     };
 
-    if ( cause < ARRAY_SIZE(trap_causes) && trap_causes[cause] )
-        return trap_causes[cause];
-    return "UNKNOWN";
+    const char *res = cause < ARRAY_SIZE(trap_causes)
+                      ? array_access_nospec(trap_causes, cause)
+                      : NULL;
+
+    return res ?: "UNKNOWN";
 }
 
 static const char *decode_reserved_interrupt_cause(unsigned long irq_cause)
