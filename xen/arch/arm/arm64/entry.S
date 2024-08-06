@@ -259,7 +259,7 @@
          * apart. The easiest way is to duplicate the few instructions
          * that need to be skipped.
          */
-        alternative_if SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT
+        alternative_if_not SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT
         cbnz      x19, 1f
         mov       x0, sp
         bl        do_trap_\trap
