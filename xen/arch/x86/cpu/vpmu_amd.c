@@ -27,6 +27,7 @@
 #define is_pmu_enabled(msr) ((msr) & (1ULL << MSR_F10H_EVNTSEL_EN_SHIFT))
 #define set_guest_mode(msr) ((msr) |= (1ULL << MSR_F10H_EVNTSEL_GO_SHIFT))
 #define is_overflowed(msr) (!((msr) & (1ULL << (MSR_F10H_COUNTER_LENGTH - 1))))
+#define is_svm_vcpu(v) (IS_ENABLED(CONFIG_AMD_SVM) && is_hvm_vcpu(v))
 
 static unsigned int __read_mostly num_counters;
 static const u32 __read_mostly *counters;
@@ -289,7 +290,7 @@ static int cf_check amd_vpmu_save(struct vcpu *v,  bool to_guest)
 
     context_save(v);
 
-    if ( !vpmu_is_set(vpmu, VPMU_RUNNING) && is_hvm_vcpu(v) &&
+    if ( !vpmu_is_set(vpmu, VPMU_RUNNING) && is_svm_vcpu(v) &&
          is_msr_bitmap_on(vpmu) )
         amd_vpmu_unset_msr_bitmap(v);
 
@@ -349,7 +350,7 @@ static int cf_check amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
         return -EINVAL;
 
     /* For all counters, enable guest only mode for HVM guest */
-    if ( is_hvm_vcpu(v) && (type == MSR_TYPE_CTRL) &&
+    if ( is_svm_vcpu(v) && (type == MSR_TYPE_CTRL) &&
          !is_guest_mode(msr_content) )
     {
         set_guest_mode(msr_content);
@@ -363,7 +364,7 @@ static int cf_check amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
             return 0;
         vpmu_set(vpmu, VPMU_RUNNING);
 
-        if ( is_hvm_vcpu(v) && is_msr_bitmap_on(vpmu) )
+        if ( is_svm_vcpu(v) && is_msr_bitmap_on(vpmu) )
              amd_vpmu_set_msr_bitmap(v);
     }
 
@@ -372,7 +373,7 @@ static int cf_check amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
         (is_pmu_enabled(msr_content) == 0) && vpmu_is_set(vpmu, VPMU_RUNNING) )
     {
         vpmu_reset(vpmu, VPMU_RUNNING);
-        if ( is_hvm_vcpu(v) && is_msr_bitmap_on(vpmu) )
+        if ( is_svm_vcpu(v) && is_msr_bitmap_on(vpmu) )
              amd_vpmu_unset_msr_bitmap(v);
         release_pmu_ownership(PMU_OWNER_HVM);
     }
@@ -415,7 +416,7 @@ static void cf_check amd_vpmu_destroy(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
-    if ( is_hvm_vcpu(v) && is_msr_bitmap_on(vpmu) )
+    if ( is_svm_vcpu(v) && is_msr_bitmap_on(vpmu) )
         amd_vpmu_unset_msr_bitmap(v);
 
     xfree(vpmu->context);
