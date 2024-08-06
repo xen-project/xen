@@ -315,6 +315,15 @@ F:	xen/arch/x86/include/asm/x86_*/efi*.h
 F:	xen/common/efi/
 F:	xen/include/efi/
 
+FUSA
+M:	Stefano Stabellini <sstabellini@kernel.org>
+M:	Bertrand Marquis <bertrand.marquis@arm.com>
+M:	Michal Orzel <michal.orzel@amd.com>
+M:	Ayan Kumar Halder <ayan.kumar.halder@amd.com>
+M:	Artem Mygaiev <artem_mygaiev@epam.com>
+S:	Supported
+F:	docs/fusa/
+
 GDBSX DEBUGGER
 M:	Elena Ufimtseva <elena.ufimtseva@oracle.com>
 S:	Supported
