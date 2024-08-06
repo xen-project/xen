@@ -498,10 +498,9 @@ static const struct dmi_system_id __initconstrel reboot_dmi_table[] = {
         .callback = override_reboot,
         .driver_data = (void *)(long)BOOT_EFI,
         .ident = "Acer TravelMate X514-51T",
-        .matches = {
+        DMI_MATCH2(
             DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
-            DMI_MATCH(DMI_PRODUCT_NAME, "TravelMate X514-51T"),
-        },
+            DMI_MATCH(DMI_PRODUCT_NAME, "TravelMate X514-51T")),
     },
     { }
 };
