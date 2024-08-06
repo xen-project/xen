@@ -291,9 +291,10 @@ M:	Bertrand Marquis <bertrand.marquis@arm.com>
 M:	Michal Orzel <michal.orzel@amd.com>
 S:	Supported
 F:	xen/common/libfdt/
-F:	xen/common/device_tree.c
+F:	xen/common/device-tree/
 F:	xen/common/dt-overlay.c
 F:	xen/include/xen/libfdt/
+F:	xen/include/xen/bootfdt.h
 F:	xen/include/xen/device_tree.h
 F:	xen/drivers/passthrough/device_tree.c
 
