@@ -169,27 +169,25 @@ extern void alternative_branches(void);
 
 #ifdef CONFIG_CC_IS_CLANG
 /*
- * Use a union with an unsigned long in order to prevent clang from
- * skipping a possible truncation of the value.  By using the union any
- * truncation is carried before the call instruction, in turn covering
- * for ABI-non-compliance in that the necessary clipping / extension of
- * the value is supposed to be carried out in the callee.
+ * Clang doesn't follow the psABI and doesn't truncate parameter values at the
+ * callee.  This can lead to bad code being generated when using alternative
+ * calls.
  *
- * Note this behavior is not mandated by the standard, and hence could
- * stop being a viable workaround, or worse, could cause a different set
- * of code-generation issues in future clang versions.
+ * Workaround it by using a temporary intermediate variable that's zeroed
+ * before being assigned the parameter value, as that forces clang to zero the
+ * register at the caller.
  *
  * This has been reported upstream:
  * https://github.com/llvm/llvm-project/issues/12579
  * https://github.com/llvm/llvm-project/issues/82598
  */
 #define ALT_CALL_ARG(arg, n)                                            \
-    register union {                                                    \
-        typeof(arg) e[sizeof(long) / sizeof(arg)];                      \
-        unsigned long r;                                                \
-    } a ## n ## _ asm ( ALT_CALL_arg ## n ) = {                         \
-        .e[0] = ({ BUILD_BUG_ON(sizeof(arg) > sizeof(void *)); (arg); })\
-    }
+    register unsigned long a ## n ## _ asm ( ALT_CALL_arg ## n ) = ({   \
+        unsigned long tmp = 0;                                          \
+        BUILD_BUG_ON(sizeof(arg) > sizeof(unsigned long));              \
+        *(typeof(arg) *)&tmp = (arg);                                   \
+        tmp;                                                            \
+    })
 #else
 #define ALT_CALL_ARG(arg, n) \
     register typeof(arg) a ## n ## _ asm ( ALT_CALL_arg ## n ) = \
