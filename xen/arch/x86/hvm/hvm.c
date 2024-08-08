@@ -3524,7 +3524,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     fixed_range_base = (uint64_t *)v->arch.hvm.mtrr.fixed_ranges;
 
     if ( (ret = guest_rdmsr(v, msr, msr_content)) != X86EMUL_UNHANDLEABLE )
-        return ret;
+        goto out;
 
     ret = X86EMUL_OKAY;
 
