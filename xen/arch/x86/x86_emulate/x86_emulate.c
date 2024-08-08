@@ -5788,7 +5788,7 @@ x86_emulate(
             d = DstMem | SrcReg | TwoOp;
         }
         generate_exception_if(evex.brs, X86_EXC_UD);
-        op_bytes = 32 >> (pmov_convert_delta[b & 7] + 1 - evex.lr);
+        op_bytes = 64 >> (pmov_convert_delta[b & 7] + 2 - evex.lr);
         elem_bytes = (b & 7) < 3 ? 1 : (b & 7) != 5 ? 2 : 4;
         goto avx512f_no_sae;
 
