@@ -196,7 +196,7 @@ static void fill_buffer_at(void **data, const char *fmt, ...);
 static void vfill_buffer_at(void **data, const char *fmt, va_list ap)
 {
     const char *f;
-    const void *par;
+    const void *par = NULL; /* old gcc */
     const char *str_val;
     const struct p9_qid *qid;
     const struct p9_stat *stat;
