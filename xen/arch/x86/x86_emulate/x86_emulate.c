@@ -607,9 +607,9 @@ static bool div_dbl(unsigned long u[2], unsigned long v)
  * NB. We don't use idiv directly as it's moderately hard to work out
  *     ahead of time whether it will #DE, which we cannot allow to happen.
  */
-static bool idiv_dbl(unsigned long u[2], long v)
+static bool idiv_dbl(unsigned long u[2], unsigned long v)
 {
-    bool negu = (long)u[1] < 0, negv = v < 0;
+    bool negu = (long)u[1] < 0, negv = (long)v < 0;
 
     /* u = abs(u) */
     if ( negu )
