@@ -779,7 +779,7 @@ long do_paging_domctl_cont(
     if ( d == NULL )
         return -ESRCH;
 
-    ret = xsm_domctl(XSM_OTHER, d, op.cmd);
+    ret = xsm_domctl(XSM_OTHER, d, op.cmd, 0 /* SSIDref not applicable */);
     if ( !ret )
     {
         if ( domctl_lock_acquire() )
