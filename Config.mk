@@ -234,8 +234,6 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 
 QEMU_TRADITIONAL_URL ?= https://xenbits.xen.org/git-http/qemu-xen-traditional.git
 QEMU_TRADITIONAL_REVISION ?= xen-4.19.0
-# Wed Jul 15 10:01:40 2020 +0100
-# qemu-trad: remove Xen path dependencies
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
