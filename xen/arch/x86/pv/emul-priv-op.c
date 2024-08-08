@@ -346,6 +346,8 @@ static unsigned int check_guest_io_breakpoint(struct vcpu *v,
         case DR_LEN_8: width = 8; break;
         }
 
+        start &= ~(width - 1UL);
+
         if ( (start < (port + len)) && ((start + width) > port) )
             match |= 1u << i;
     }
