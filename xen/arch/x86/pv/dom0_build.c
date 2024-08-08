@@ -825,6 +825,8 @@ int __init dom0_construct_pv(struct domain *d,
     rc = elf_load_binary(&elf);
     if ( rc < 0 )
     {
+        mapcache_override_current(NULL);
+        switch_cr3_cr4(current->arch.cr3, read_cr4());
         printk("Failed to load the kernel binary\n");
         goto out;
     }
