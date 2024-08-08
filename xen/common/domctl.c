@@ -318,7 +318,9 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             return -ESRCH;
     }
 
-    ret = xsm_domctl(XSM_OTHER, d, op->cmd);
+    ret = xsm_domctl(XSM_OTHER, d, op->cmd,
+                     /* SSIDRef only applicable for cmd == createdomain */
+                     op->u.createdomain.ssidref);
     if ( ret )
         goto domctl_out_unlock_domonly;
 
