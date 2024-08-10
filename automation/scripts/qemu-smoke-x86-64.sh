@@ -16,11 +16,12 @@ esac
 
 rm -f smoke.serial
 set +e
-timeout -k 1 30 \
-qemu-system-x86_64 -nographic -kernel binaries/xen \
+export QEMU_CMD="qemu-system-x86_64 -nographic -kernel binaries/xen \
         -initrd xtf/tests/example/$k \
-        -append "loglvl=all console=com1 noreboot console_timestamps=boot $extra" \
-        -m 512 -monitor none -serial file:smoke.serial
-set -e
-grep -q 'Test result: SUCCESS' smoke.serial || exit 1
-exit 0
+        -append \"loglvl=all console=com1 noreboot console_timestamps=boot $extra\" \
+        -m 512 -monitor none -serial stdio"
+
+export QEMU_LOG="smoke.serial"
+export PASSED="Test result: SUCCESS"
+
+./automation/scripts/qemu-key.exp

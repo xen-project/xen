@@ -6,15 +6,14 @@ set -ex
 rm -f smoke.serial
 set +e
 
-timeout -k 1 2 \
-qemu-system-riscv64 \
+export QEMU_CMD="qemu-system-riscv64 \
     -M virt \
     -smp 1 \
     -nographic \
     -m 2g \
-    -kernel binaries/xen \
-    |& tee smoke.serial | sed 's/\r//'
+    -kernel binaries/xen"
 
-set -e
-(grep -q "All set up" smoke.serial) || exit 1
-exit 0
+export QEMU_LOG="smoke.serial"
+export PASSED="All set up"
+
+./automation/scripts/qemu-key.exp

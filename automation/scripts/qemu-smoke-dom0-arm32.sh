@@ -78,9 +78,7 @@ bash imagebuilder/scripts/uboot-script-gen -t tftp -d . -c config
 
 rm -f ${serial_log}
 set +e
-echo "  virtio scan; dhcp; tftpb 0x40000000 boot.scr; source 0x40000000"| \
-timeout -k 1 720 \
-./qemu-system-arm \
+export QEMU_CMD="./qemu-system-arm \
    -machine virt \
    -machine virtualization=true \
    -smp 4 \
@@ -91,9 +89,11 @@ timeout -k 1 720 \
    -no-reboot \
    -device virtio-net-pci,netdev=n0 \
    -netdev user,id=n0,tftp=./ \
-   -bios /usr/lib/u-boot/qemu_arm/u-boot.bin |& \
-      tee ${serial_log} | sed 's/\r//'
+   -bios /usr/lib/u-boot/qemu_arm/u-boot.bin"
 
-set -e
-(grep -q "Domain-0" ${serial_log} && grep -q "^/ #" ${serial_log}) || exit 1
-exit 0
+export UBOOT_CMD="virtio scan; dhcp; tftpb 0x40000000 boot.scr; source 0x40000000"
+export QEMU_LOG="${serial_log}"
+export LOG_MSG="Domain-0"
+export PASSED="/ #"
+
+../automation/scripts/qemu-key.exp
