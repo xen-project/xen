@@ -48,6 +48,7 @@ RUN apt-get update && \
         curl \
         cpio \
         busybox-static \
+        expect \
         && \
         apt-get autoremove -y && \
         apt-get clean && \

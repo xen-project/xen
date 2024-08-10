@@ -45,6 +45,7 @@ RUN apt-get update && \
         golang \
         # for test phase, qemu-smoke-* jobs
         qemu-system-x86 \
+        expect \
         # for test phase, qemu-alpine-* jobs
         cpio \
         busybox-static \

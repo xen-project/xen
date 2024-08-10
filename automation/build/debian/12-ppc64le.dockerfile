@@ -26,6 +26,7 @@ RUN <<EOF
 
         # Qemu for test phase
         qemu-system-ppc
+        expect
     )
 
     apt-get -y --no-install-recommends install "${DEPS[@]}"
