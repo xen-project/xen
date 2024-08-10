@@ -11,8 +11,7 @@ machine=$1
 rm -f ${serial_log}
 set +e
 
-timeout -k 1 20 \
-qemu-system-ppc64 \
+export QEMU_CMD="qemu-system-ppc64 \
     -bios skiboot.lid \
     -M $machine \
     -m 2g \
@@ -21,9 +20,9 @@ qemu-system-ppc64 \
     -monitor none \
     -nographic \
     -serial stdio \
-    -kernel binaries/xen \
-    |& tee ${serial_log} | sed 's/\r//'
+    -kernel binaries/xen"
 
-set -e
-(grep -q "Hello, ppc64le!" ${serial_log}) || exit 1
-exit 0
+export QEMU_LOG="${serial_log}"
+export PASSED="Hello, ppc64le!"
+
+./automation/scripts/qemu-key.exp
