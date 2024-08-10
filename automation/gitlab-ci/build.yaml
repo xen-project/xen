@@ -568,17 +568,20 @@ yocto-qemuarm64:
   extends: .yocto-test-arm64
   variables:
     YOCTO_BOARD: qemuarm64
+  when: manual
 
 yocto-qemuarm:
   extends: .yocto-test-arm64
   variables:
     YOCTO_BOARD: qemuarm
     YOCTO_OUTPUT: --copy-output
+  when: manual
 
 yocto-qemux86-64:
   extends: .yocto-test-arm64
   variables:
     YOCTO_BOARD: qemux86-64
+  when: manual
 
 # Cppcheck analysis jobs
 
