@@ -5,6 +5,8 @@
  * RISC-V Trap handlers
  */
 
+#include <xen/bug.h>
+#include <xen/compiler.h>
 #include <xen/lib.h>
 #include <xen/nospec.h>
 #include <xen/sched.h>
@@ -106,7 +108,29 @@ static void do_unexpected_trap(const struct cpu_user_regs *regs)
 
 void do_trap(struct cpu_user_regs *cpu_regs)
 {
-    do_unexpected_trap(cpu_regs);
+    register_t pc = cpu_regs->sepc;
+    unsigned long cause = csr_read(CSR_SCAUSE);
+
+    switch ( cause )
+    {
+    case CAUSE_ILLEGAL_INSTRUCTION:
+        if ( do_bug_frame(cpu_regs, pc) >= 0 )
+        {
+            if ( !(is_kernel_text(pc) || is_kernel_inittext(pc)) )
+            {
+                printk("Something wrong with PC: %#lx\n", pc);
+                die();
+            }
+
+            cpu_regs->sepc += GET_INSN_LENGTH(*(uint16_t *)pc);
+
+            break;
+        }
+        fallthrough;
+    default:
+        do_unexpected_trap(cpu_regs);
+        break;
+    }
 }
 
 void vcpu_show_execution_state(struct vcpu *v)

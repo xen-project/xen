@@ -9,7 +9,7 @@
 
 #ifndef __ASSEMBLY__
 
-#define BUG_INSTR "ebreak"
+#define BUG_INSTR "unimp"
 
 /*
  * The base instruction set has a fixed length of 32-bit naturally aligned
@@ -18,15 +18,13 @@
  * There are extensions of variable length ( where each instruction can be
  * any number of 16-bit parcels in length ).
  *
- * Compressed ISA is used now where the instruction length is 16 bit  and
- * 'ebreak' instruction, in this case, can be either 16 or 32 bit (
+ * Compressed ISA is used now where the instruction length is 16 bit and
+ * 'unimp' instruction, in this case, can be either 16 or 32 bit (
  * depending on if compressed ISA is used or not )
  */
 #define INSN_LENGTH_MASK        _UL(0x3)
 #define INSN_LENGTH_32          _UL(0x3)
 
-#define BUG_INSN_32             _UL(0x00100073) /* ebreak */
-#define BUG_INSN_16             _UL(0x9002)     /* c.ebreak */
 #define COMPRESSED_INSN_MASK    _UL(0xffff)
 
 #define GET_INSN_LENGTH(insn)                               \
