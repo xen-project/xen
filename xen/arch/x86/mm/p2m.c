@@ -1618,9 +1618,11 @@ int clear_identity_p2m_entry(struct domain *d, unsigned long gfn_l)
     else
     {
         gfn_unlock(p2m, gfn, 0);
-        printk(XENLOG_G_WARNING
-               "non-identity map d%d:%lx not cleared (mapped to %lx)\n",
-               d->domain_id, gfn_l, mfn_x(mfn));
+        if ( (p2mt != p2m_invalid && p2mt != p2m_mmio_dm) ||
+             a != p2m_access_n || !mfn_eq(mfn, INVALID_MFN) )
+           printk(XENLOG_G_WARNING
+                  "non-identity map %pd:%lx not cleared (mapped to %lx)\n",
+                  d, gfn_l, mfn_x(mfn));
         ret = 0;
     }
 
