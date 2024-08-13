@@ -267,23 +267,35 @@ int iommu_identity_mapping(struct domain *d, p2m_access_t p2ma,
     if ( p2ma == p2m_access_x )
         return -ENOENT;
 
-    while ( base_pfn < end_pfn )
-    {
-        int err = set_identity_p2m_entry(d, base_pfn, p2ma, flag);
-
-        if ( err )
-            return err;
-        base_pfn++;
-    }
-
     map = xmalloc(struct identity_map);
     if ( !map )
         return -ENOMEM;
+
     map->base = base;
     map->end = end;
     map->access = p2ma;
     map->count = 1;
+
+    /*
+     * Insert into list ahead of mapping, so the range can be found when
+     * trying to clean up.
+     */
     list_add_tail(&map->list, &hd->arch.identity_maps);
+
+    for ( ; base_pfn < end_pfn; ++base_pfn )
+    {
+        int err = set_identity_p2m_entry(d, base_pfn, p2ma, flag);
+
+        if ( !err )
+            continue;
+
+        if ( (map->base >> PAGE_SHIFT_4K) == base_pfn )
+        {
+            list_del(&map->list);
+            xfree(map);
+        }
+        return err;
+    }
 
     return 0;
 }
