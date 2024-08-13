@@ -775,6 +775,11 @@ This feature is not security supported: see https://xenbits.xen.org/xsa/advisory
 
 Only systems using IOMMUs are supported.
 
+Passing through of devices sharing resources with another device is not
+security supported.  Such sharing could e.g. be the same line interrupt being
+used by multiple devices, one of which is to be passed through, or two such
+devices having memory BARs within the same 4k page.
+
 Not compatible with migration, populate-on-demand, altp2m,
 introspection, memory sharing, or memory paging.
 
