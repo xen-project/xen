@@ -128,6 +128,12 @@ static void __init __maybe_unused build_assertions(void)
 
 #undef CHECK_SAME_SLOT
 #undef CHECK_DIFFERENT_SLOT
+
+    /*
+     * Fixmaps must not overlap with boot FDT mapping area. Make sure there's
+     * at least one guard page in between.
+     */
+    BUILD_BUG_ON(FIXADDR_TOP >= BOOT_FDT_VIRT_START);
 }
 
 lpae_t __init pte_of_xenaddr(vaddr_t va)
