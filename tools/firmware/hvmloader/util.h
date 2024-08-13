@@ -184,9 +184,30 @@ int uart_exists(uint16_t uart_base);
 int lpt_exists(uint16_t lpt_base);
 int hpet_exists(unsigned long hpet_base);
 
-/* Do cpuid instruction, with operation 'idx' */
-void cpuid(uint32_t idx, uint32_t *eax, uint32_t *ebx,
-           uint32_t *ecx, uint32_t *edx);
+/* Some CPUID calls want 'count' to be placed in ecx */
+static inline void cpuid_count(
+    uint32_t leaf,
+    uint32_t subleaf,
+    uint32_t *eax,
+    uint32_t *ebx,
+    uint32_t *ecx,
+    uint32_t *edx)
+{
+    asm volatile ( "cpuid"
+                   : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
+                   : "a" (leaf), "c" (subleaf) );
+}
+
+/* Generic CPUID function (subleaf 0) */
+static inline void cpuid(
+    uint32_t leaf,
+    uint32_t *eax,
+    uint32_t *ebx,
+    uint32_t *ecx,
+    uint32_t *edx)
+{
+    cpuid_count(leaf, 0, eax, ebx, ecx, edx);
+}
 
 /* Read the TSC register. */
 static inline uint64_t rdtsc(void)
