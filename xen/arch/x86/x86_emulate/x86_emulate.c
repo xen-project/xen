@@ -6369,11 +6369,11 @@ x86_emulate(
         {
             if ( (vex.w ? mask.qw[i] : mask.dw[i]) < 0 )
             {
-                signed long idx = b & 1 ? index.qw[i] : index.dw[i];
+                unsigned long idx = b & 1 ? index.qw[i] : index.dw[i];
 
                 rc = ops->read(ea.mem.seg,
                                truncate_ea(ea.mem.off +
-                                           idx * (1 << state->sib_scale)),
+                                           (idx << state->sib_scale)),
                                (void *)mmvalp + i * op_bytes, op_bytes, ctxt);
                 if ( rc != X86EMUL_OKAY )
                 {
@@ -6489,14 +6489,14 @@ x86_emulate(
 
         for ( i = 0; op_mask; ++i )
         {
-            long idx = b & 1 ? index.qw[i] : index.dw[i];
+            unsigned long idx = b & 1 ? index.qw[i] : index.dw[i];
 
             if ( !(op_mask & (1 << i)) )
                 continue;
 
             rc = ops->read(ea.mem.seg,
                            truncate_ea(ea.mem.off +
-                                       idx * (1 << state->sib_scale)),
+                                       (idx << state->sib_scale)),
                            (void *)mmvalp + i * op_bytes, op_bytes, ctxt);
             if ( rc != X86EMUL_OKAY )
             {
@@ -6643,9 +6643,9 @@ x86_emulate(
 
         for ( i = 0; op_mask; ++i )
         {
-            long idx = (b & 1 ? index.qw[i]
-                              : index.dw[i]) * (1 << state->sib_scale);
-            unsigned long offs = truncate_ea(ea.mem.off + idx);
+            unsigned long idx = b & 1 ? index.qw[i] : index.dw[i];
+            unsigned long offs = truncate_ea(ea.mem.off +
+                                             (idx << state->sib_scale));
             unsigned int j, slot;
 
             if ( !(op_mask & (1 << i)) )
@@ -6663,11 +6663,10 @@ x86_emulate(
              */
             for ( j = (slot = i) + 1; j < n; ++j )
             {
-                long idx2 = (b & 1 ? index.qw[j]
-                                   : index.dw[j]) * (1 << state->sib_scale);
-
+                idx = b & 1 ? index.qw[j] : index.dw[j];
                 if ( (op_mask & (1 << j)) &&
-                     truncate_ea(ea.mem.off + idx2) == offs )
+                     truncate_ea(ea.mem.off +
+                                 (idx << state->sib_scale)) == offs )
                     slot = j;
             }
 
