@@ -935,7 +935,7 @@ static void cdrom_insert_stubdom_disk_add_cb(libxl__egc *egc,
                                              libxl__ao_device *aodev);
 static void cdrom_insert_stubdom_query_fdset(libxl__egc *egc,
                                              libxl__ev_time *ev,
-                                             const struct timeval *abs,
+                                             const struct timeval *requested_abs,
                                              int rc);
 static void cdrom_insert_stubdom_parse_fdset(libxl__egc *egc,
                                              libxl__ev_qmp *qmp,
@@ -1259,7 +1259,7 @@ static void cdrom_insert_stubdom_disk_add_cb(libxl__egc *egc,
 
 static void cdrom_insert_stubdom_query_fdset(libxl__egc *egc,
                                              libxl__ev_time *ev,
-                                             const struct timeval *abs,
+                                             const struct timeval *requested_abs,
                                              int rc)
 {
     EGC_GC;
