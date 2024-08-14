@@ -839,7 +839,8 @@ protmode_load_seg(
         case x86_seg_tr:
             goto raise_exn;
         }
-        if ( !_amd_like(cp) || vcpu_has_nscb() || !ops->read_segment ||
+        if ( seg == x86_seg_none || !_amd_like(cp) || vcpu_has_nscb() ||
+             !ops->read_segment ||
              ops->read_segment(seg, sreg, ctxt) != X86EMUL_OKAY )
             memset(sreg, 0, sizeof(*sreg));
         else
@@ -2852,7 +2853,7 @@ x86_emulate(
                                             &sreg, ctxt, ops) )
             {
             case X86EMUL_OKAY:
-                if ( sreg.s &&
+                if ( sreg.s /* Excludes NUL selectors too. */ &&
                      ((modrm_reg & 1) ? ((sreg.type & 0xa) == 0x2)
                                       : ((sreg.type & 0xa) != 0x8)) )
                     _regs.eflags |= X86_EFLAGS_ZF;
