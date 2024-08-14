@@ -17,6 +17,8 @@
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef mfn_to_virt
 #define mfn_to_virt(mfn) __mfn_to_virt(mfn_x(mfn))
+#undef virt_to_mfn
+#define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
 
 /* Main runtime page tables */
 
@@ -51,8 +53,6 @@ DEFINE_BOOT_PAGE_TABLE(xen_fixmap);
  * as appropriate.
  */
 static DEFINE_PAGE_TABLES(xen_xenmap, XEN_NR_ENTRIES(2));
-
-static paddr_t phys_offset;
 
 /* Limits of the Xen heap */
 mfn_t directmap_mfn_start __read_mostly = INVALID_MFN_INITIALIZER;
@@ -138,9 +138,7 @@ static void __init __maybe_unused build_assertions(void)
 
 lpae_t __init pte_of_xenaddr(vaddr_t va)
 {
-    paddr_t ma = va + phys_offset;
-
-    return mfn_to_xen_entry(maddr_to_mfn(ma), MT_NORMAL);
+    return mfn_to_xen_entry(virt_to_mfn(va), MT_NORMAL);
 }
 
 void * __init early_fdt_map(paddr_t fdt_paddr)
@@ -228,13 +226,11 @@ static void xen_pt_enforce_wnx(void)
  * Boot-time pagetable setup.
  * Changes here may need matching changes in head.S
  */
-void __init setup_pagetables(unsigned long boot_phys_offset)
+void __init setup_pagetables(void)
 {
     uint64_t ttbr;
     lpae_t pte, *p;
     int i;
-
-    phys_offset = boot_phys_offset;
 
     arch_setup_page_tables();
 
@@ -290,9 +286,9 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
     xen_second[second_table_offset(FIXMAP_ADDR(0))] = pte;
 
 #ifdef CONFIG_ARM_64
-    ttbr = (uintptr_t) xen_pgtable + phys_offset;
+    ttbr = virt_to_maddr(xen_pgtable);
 #else
-    ttbr = (uintptr_t) cpu0_pgtable + phys_offset;
+    ttbr = virt_to_maddr(cpu0_pgtable);
 #endif
 
     switch_ttbr(ttbr);

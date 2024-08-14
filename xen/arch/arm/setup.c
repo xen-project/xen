@@ -304,7 +304,7 @@ void asmlinkage __init start_xen(unsigned long boot_phys_offset,
     /* Initialize traps early allow us to get backtrace when an error occurred */
     init_traps();
 
-    setup_pagetables(boot_phys_offset);
+    setup_pagetables();
 
     smp_clear_cpu_maps();
 
