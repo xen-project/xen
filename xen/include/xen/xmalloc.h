@@ -7,6 +7,9 @@
 
 /*
  * Xen malloc/free-style interface.
+ *
+ * NOTE: Unless physically contiguous memory space is required, the interfaces
+ *       in xvmalloc.h are to be used in preference to the ones here.
  */
 
 /* Allocate space for typed object. */
