@@ -207,7 +207,9 @@ struct cpuinfo_arm {
             unsigned long mte:4;
             unsigned long ras_frac:4;
             unsigned long mpam_frac:4;
-            unsigned long __res1:44;
+            unsigned long __res1:4;
+            unsigned long sme:4;
+            unsigned long __res2:36;
         };
     } pfr64;
 
