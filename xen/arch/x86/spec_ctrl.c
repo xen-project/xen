@@ -1748,6 +1748,10 @@ void spec_ctrl_init_domain(struct domain *d)
         (ibpb   ? SCF_entry_ibpb   : 0) |
         (bhb    ? SCF_entry_bhb    : 0) |
         0;
+
+    if ( pv )
+        d->arch.pv.xpti = is_hardware_domain(d) ? opt_xpti_hwdom
+                                                : opt_xpti_domu;
 }
 
 void __init init_speculation_mitigations(void)

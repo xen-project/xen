@@ -830,6 +830,8 @@ int arch_domain_create(struct domain *d,
         is_pv_domain(d) ? __HYPERVISOR_COMPAT_VIRT_START : ~0u;
 #endif
 
+    spec_ctrl_init_domain(d);
+
     if ( (rc = paging_domain_init(d)) != 0 )
         goto fail;
     paging_initialised = true;
@@ -895,8 +897,6 @@ int arch_domain_create(struct domain *d,
     domain_cpu_policy_changed(d);
 
     d->arch.msr_relaxed = config->arch.misc_flags & XEN_X86_MSR_RELAXED;
-
-    spec_ctrl_init_domain(d);
 
     return 0;
 
