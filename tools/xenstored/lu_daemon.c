@@ -5,92 +5,20 @@
  * Copyright (C) 2022 Juergen Gross, SUSE LLC
  */
 
-#include <assert.h>
-#include <stdio.h>
 #include <syslog.h>
 #include <sys/stat.h>
-#include <sys/mman.h>
-#include <xen-tools/xenstore-common.h>
 
 #include "talloc.h"
 #include "core.h"
 #include "lu.h"
 
 #ifndef NO_LIVE_UPDATE
-void lu_get_dump_state(struct lu_dump_state *state)
-{
-	struct stat statbuf;
-
-	state->size = 0;
-
-	state->filename = talloc_asprintf(NULL, "%s/state_dump",
-					  xenstore_rundir());
-	if (!state->filename)
-		barf("Allocation failure");
-
-	state->fd = open(state->filename, O_RDONLY);
-	if (state->fd < 0)
-		return;
-	if (fstat(state->fd, &statbuf) != 0)
-		goto out_close;
-	state->size = statbuf.st_size;
-
-	state->buf = mmap(NULL, state->size, PROT_READ, MAP_PRIVATE,
-			  state->fd, 0);
-	if (state->buf == MAP_FAILED) {
-		state->size = 0;
-		goto out_close;
-	}
-
-	return;
-
- out_close:
-	close(state->fd);
-}
-
-void lu_close_dump_state(struct lu_dump_state *state)
-{
-	assert(state->filename != NULL);
-
-	munmap(state->buf, state->size);
-	close(state->fd);
-
-	unlink(state->filename);
-	talloc_free(state->filename);
-}
-
-FILE *lu_dump_open(const void *ctx)
-{
-	char *filename;
-	int fd;
-
-	filename = talloc_asprintf(ctx, "%s/state_dump",
-				   xenstore_rundir());
-	if (!filename)
-		return NULL;
-
-	fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-	if (fd < 0)
-		return NULL;
-
-	return fdopen(fd, "w");
-}
-
-void lu_dump_close(FILE *fp)
-{
-	fclose(fp);
-}
-
 char *lu_exec(const void *ctx, int argc, char **argv)
 {
 	argv[0] = lu_status->filename;
 	execvp(argv[0], argv);
 
 	return "Error activating new binary.";
-}
-
-void lu_destroy_arch(void *data)
-{
 }
 
 static const char *lu_binary(const void *ctx, struct connection *conn,
