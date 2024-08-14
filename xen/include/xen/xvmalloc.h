@@ -41,7 +41,7 @@
                              __alignof__(typeof(*(ptr)))))
 
 /* Free any of the above. */
-void xvfree(void *);
+void xvfree(void *va);
 
 /* Free an allocation, and zero the pointer to it. */
 #define XVFREE(p) do { \
