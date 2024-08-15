@@ -51,9 +51,7 @@ bash imagebuilder/scripts/uboot-script-gen -t tftp -d binaries/ -c binaries/conf
 # Run the test
 rm -f smoke.serial
 set +e
-echo "  virtio scan; dhcp; tftpb 0x40000000 boot.scr; source 0x40000000"| \
-timeout -k 1 120 \
-./binaries/qemu-system-aarch64 \
+export QEMU_CMD="./binaries/qemu-system-aarch64 \
     -machine virtualization=true \
     -cpu cortex-a57 -machine type=virt \
     -m 2048 -monitor none -serial stdio \
@@ -61,8 +59,10 @@ timeout -k 1 120 \
     -no-reboot \
     -device virtio-net-pci,netdev=n0 \
     -netdev user,id=n0,tftp=binaries \
-    -bios /usr/lib/u-boot/qemu_arm64/u-boot.bin |& tee smoke.serial
+    -bios /usr/lib/u-boot/qemu_arm64/u-boot.bin"
 
-set -e
-(grep -q "${passed}" smoke.serial) || exit 1
-exit 0
+export UBOOT_CMD="virtio scan; dhcp; tftpb 0x40000000 boot.scr; source 0x40000000"
+export QEMU_LOG="smoke.serial"
+export PASSED="${passed}"
+
+./automation/scripts/qemu-key.exp
