@@ -55,8 +55,7 @@ dtc -I dts -O dtb virt.dts > virt.dtb
 
 rm -f smoke.serial
 set +e
-timeout -k 1 240 \
-./qemu-system-arm \
+export QEMU_CMD="./qemu-system-arm \
    -machine virt \
    -machine virtualization=true \
    -smp 4 \
@@ -68,8 +67,9 @@ timeout -k 1 240 \
    -no-reboot \
    -kernel ./xen \
    -device loader,file=./vmlinuz,addr=0x1000000 \
-   -device loader,file=./initrd.gz,addr=0x3200000 |& tee smoke.serial
+   -device loader,file=./initrd.gz,addr=0x3200000"
 
-set -e
-(grep -q "^/ #" smoke.serial) || exit 1
-exit 0
+export QEMU_LOG="smoke.serial"
+export PASSED="/ #"
+
+../automation/scripts/qemu-key.exp

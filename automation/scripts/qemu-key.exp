@@ -1,0 +1,45 @@
+#!/usr/bin/expect -f
+
+set timeout $env(QEMU_TIMEOUT)
+
+log_file -a $env(QEMU_LOG)
+
+match_max 10000
+
+eval spawn $env(QEMU_CMD)
+
+expect_after {
+    -re "(.*)\r" {
+        exp_continue
+    }
+    timeout {send_error "ERROR-Timeout!\n"; exit 1}
+    eof {send_error "ERROR-EOF!\n"; exit 1}
+}
+
+if {[info exists env(UBOOT_CMD)]} {
+    expect "=>"
+
+    send "$env(UBOOT_CMD)\r"
+}
+
+if {[info exists env(LOG_MSG)]} {
+    expect {
+        "$env(PASSED)" {
+            expect "$env(LOG_MSG)"
+            exit 0
+        }
+        "$env(LOG_MSG)" {
+            expect "$env(PASSED)"
+            exit 0
+        }
+    }
+}
+
+expect {
+    "$env(PASSED)" {
+        exit 0
+    }
+}
+
+expect eof
+
