@@ -1,6 +1,10 @@
 #!/usr/bin/expect -f
 
-set timeout $env(QEMU_TIMEOUT)
+if {[info exists env(QEMU_TIMEOUT)]} {
+    set timeout $env(QEMU_TIMEOUT)
+} else {
+    set timeout 1500
+}
 
 log_file -a $env(QEMU_LOG)
 
