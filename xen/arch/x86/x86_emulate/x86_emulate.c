@@ -7852,8 +7852,8 @@ x86_emulate(
         generate_exception_if(modrm_reg == src1 ||
                               (ea.type != OP_MEM && modrm_reg == modrm_rm),
                               X86_EXC_UD);
-        if ( ea.type != OP_REG || (b & 1) || !evex.brs )
-            avx512_vlen_check(!(b & 1));
+        if ( ea.type != OP_REG || !evex.brs )
+            avx512_vlen_check(b & 1);
         goto simd_zmm;
     }
 
