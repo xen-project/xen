@@ -48,6 +48,9 @@
 /* System configuration register */
 #define UART_OMAP_SYSC_DEF_CONF   0x0d   /* autoidle mode, wakeup is enabled */
 
+/* default clock frequency in hz */
+#define UART_OMAP_DEFAULT_CLK_SPEED 48000000
+
 #define omap_read(uart, off)       readl((uart)->regs + ((off) << REG_SHIFT))
 #define omap_write(uart, off, val) writel(val, \
                                           (uart)->regs + ((off) << REG_SHIFT))
@@ -322,8 +325,9 @@ static int __init omap_uart_init(struct dt_device_node *dev,
     res = dt_property_read_u32(dev, "clock-frequency", &clkspec);
     if ( !res )
     {
-        printk("omap-uart: Unable to retrieve the clock frequency\n");
-        return -EINVAL;
+        printk("omap-uart: Unable to retrieve the clock frequency, defaulting to %uHz\n",
+               UART_OMAP_DEFAULT_CLK_SPEED);
+        clkspec = UART_OMAP_DEFAULT_CLK_SPEED;
     }
 
     uart->clock_hz = clkspec;
