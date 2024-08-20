@@ -415,12 +415,34 @@ Deviations related to MISRA C:2012 Rules:
      - Tagged as `deliberate` for ECLAIR.
 
    * - R16.3
-     - Switch clauses ending with continue, goto, return statements are safe.
+     - Statements that change the control flow (i.e., break, continue, goto,
+       return) and calls to functions that do not return the control back are
+       \"allowed terminal statements\".
      - Tagged as `safe` for ECLAIR.
 
    * - R16.3
-     - Switch clauses ending with a call to a function that does not give
-       the control back (i.e., a function with attribute noreturn) are safe.
+     - An if-else statement having both branches ending with one of the allowed
+       terminal statemets is itself an allowed terminal statements.
+     - Tagged as `safe` for ECLAIR.
+
+   * - R16.3
+     - An if-else statement having an always true condition and the true
+       branch ending with an allowed terminal statement is itself an allowed
+       terminal statement.
+     - Tagged as `safe` for ECLAIR.
+
+   * - R16.3
+     - A switch clause ending with a statement expression which, in turn, ends
+       with an allowed terminal statement (e.g., the expansion of
+       generate_exception()) is safe.
+     - Tagged as `safe` for ECLAIR.
+
+   * - R16.3
+     - A switch clause ending with a do-while-false the body of which, in turn,
+       ends with an allowed terminal statement (e.g., PARSE_ERR_RET()) is safe.
+       An exception to that is the macro ASSERT_UNREACHABLE() which is
+       effective in debug build only: a switch clause ending with
+       ASSERT_UNREACHABLE() is not considered safe.
      - Tagged as `safe` for ECLAIR.
 
    * - R16.3
