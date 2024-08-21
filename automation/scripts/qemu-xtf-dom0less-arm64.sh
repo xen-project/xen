@@ -65,4 +65,4 @@ export UBOOT_CMD="virtio scan; dhcp; tftpb 0x40000000 boot.scr; source 0x4000000
 export QEMU_LOG="smoke.serial"
 export PASSED="${passed}"
 
-./automation/scripts/qemu-key.exp
+./automation/scripts/qemu-key.exp | sed 's/\r\+$//'
