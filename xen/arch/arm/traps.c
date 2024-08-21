@@ -720,8 +720,10 @@ struct reg_ctxt {
     uint32_t ifsr32_el2;
 #endif
 
+#ifdef CONFIG_MMU
     /* Hypervisor-side state */
     uint64_t vttbr_el2;
+#endif
 };
 
 static const char *mode_string(register_t cpsr)
@@ -919,12 +921,16 @@ static void _show_registers(const struct cpu_user_regs *regs,
 #endif
     }
     printk("  VTCR_EL2: %"PRIregister"\n", READ_SYSREG(VTCR_EL2));
+#ifdef CONFIG_MMU
     printk(" VTTBR_EL2: %016"PRIx64"\n", ctxt->vttbr_el2);
+#endif
     printk("\n");
 
     printk(" SCTLR_EL2: %"PRIregister"\n", READ_SYSREG(SCTLR_EL2));
     printk("   HCR_EL2: %"PRIregister"\n", READ_SYSREG(HCR_EL2));
+#ifdef CONFIG_MMU
     printk(" TTBR0_EL2: %016"PRIx64"\n", READ_SYSREG64(TTBR0_EL2));
+#endif
     printk("\n");
     printk("   ESR_EL2: %"PRIregister"\n", regs->hsr);
     printk(" HPFAR_EL2: %"PRIregister"\n", READ_SYSREG(HPFAR_EL2));
@@ -956,7 +962,9 @@ void show_registers(const struct cpu_user_regs *regs)
     if ( guest_mode(regs) && is_32bit_domain(current->domain) )
         ctxt.ifsr32_el2 = READ_SYSREG(IFSR32_EL2);
 #endif
+#ifdef CONFIG_MMU
     ctxt.vttbr_el2 = READ_SYSREG64(VTTBR_EL2);
+#endif
 
     _show_registers(regs, &ctxt, guest_mode(regs), current);
 }
@@ -979,7 +987,9 @@ void vcpu_show_registers(const struct vcpu *v)
     ctxt.ifsr32_el2 = v->arch.ifsr;
 #endif
 
+#ifdef CONFIG_MMU
     ctxt.vttbr_el2 = v->domain->arch.p2m.vttbr;
+#endif
 
     _show_registers(&v->arch.cpu_info->guest_cpu_user_regs, &ctxt, 1, v);
 }
