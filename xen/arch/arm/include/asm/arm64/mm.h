@@ -14,14 +14,7 @@ static inline bool arch_mfns_in_directmap(unsigned long mfn, unsigned long nr)
 
 void arch_setup_page_tables(void);
 
-/*
- * Enable/disable the identity mapping in the live page-tables (i.e.
- * the one pointed by TTBR_EL2).
- *
- * Note that nested call (e.g. enable=true, enable=true) is not
- * supported.
- */
-void update_identity_mapping(bool enable);
+void update_boot_mapping(bool enable);
 
 #endif /* __ARM_ARM64_MM_H__ */
 

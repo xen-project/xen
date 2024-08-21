@@ -111,7 +111,14 @@ void __init arch_setup_page_tables(void)
     prepare_runtime_identity_mapping();
 }
 
-void update_identity_mapping(bool enable)
+/*
+ * Enable/disable the identity mapping in the live page-tables (i.e.
+ * the one pointed by TTBR_EL2).
+ *
+ * Note that nested call (e.g. enable=true, enable=true) is not
+ * supported.
+ */
+static void update_identity_mapping(bool enable)
 {
     paddr_t id_addr = virt_to_maddr(_start);
     int rc;
@@ -123,6 +130,11 @@ void update_identity_mapping(bool enable)
         rc = destroy_xen_mappings(id_addr, id_addr + PAGE_SIZE);
 
     BUG_ON(rc);
+}
+
+void update_boot_mapping(bool enable)
+{
+    update_identity_mapping(enable);
 }
 
 extern void switch_ttbr_id(uint64_t ttbr);
