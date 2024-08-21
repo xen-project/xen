@@ -25,4 +25,4 @@ export QEMU_CMD="qemu-system-ppc64 \
 export QEMU_LOG="${serial_log}"
 export PASSED="Hello, ppc64le!"
 
-./automation/scripts/qemu-key.exp
+./automation/scripts/qemu-key.exp | sed 's/\r\+$//'

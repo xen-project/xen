@@ -149,4 +149,4 @@ export QEMU_LOG="${serial_log}"
 export LOG_MSG="${dom0_prompt}"
 export PASSED="${passed}"
 
-../automation/scripts/qemu-key.exp
+../automation/scripts/qemu-key.exp | sed 's/\r\+$//'

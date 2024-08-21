@@ -109,4 +109,4 @@ export QEMU_LOG="smoke.serial"
 export LOG_MSG="Domain-0"
 export PASSED="BusyBox"
 
-./automation/scripts/qemu-key.exp
+./automation/scripts/qemu-key.exp | sed 's/\r\+$//'

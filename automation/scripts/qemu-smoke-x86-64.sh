@@ -24,4 +24,4 @@ export QEMU_CMD="qemu-system-x86_64 -nographic -kernel binaries/xen \
 export QEMU_LOG="smoke.serial"
 export PASSED="Test result: SUCCESS"
 
-./automation/scripts/qemu-key.exp
+./automation/scripts/qemu-key.exp | sed 's/\r\+$//'
