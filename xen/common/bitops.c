@@ -133,6 +133,19 @@ static void __init test_multiple_bits_set(void)
     CHECK(multiple_bits_set, 0xc000000000000000ULL, true);
 }
 
+static void __init test_hweight(void)
+{
+    /* unsigned int hweightl(unsigned long) */
+    CHECK(hweightl, 0, 0);
+    CHECK(hweightl, 1, 1);
+    CHECK(hweightl, 3, 2);
+    CHECK(hweightl, 7, 3);
+    CHECK(hweightl, 0xff, 8);
+
+    CHECK(hweightl, 1 | (1UL << (BITS_PER_LONG - 1)), 2);
+    CHECK(hweightl, -1UL, BITS_PER_LONG);
+}
+
 static void __init __constructor test_bitops(void)
 {
     test_ffs();
@@ -140,4 +153,5 @@ static void __init __constructor test_bitops(void)
     test_for_each_set_bit();
 
     test_multiple_bits_set();
+    test_hweight();
 }

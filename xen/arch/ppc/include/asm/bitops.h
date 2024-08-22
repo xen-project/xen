@@ -124,6 +124,8 @@ static inline int test_and_set_bit(unsigned int nr, volatile void *addr)
 #define arch_fls(x)  ((x) ? 32 - __builtin_clz(x) : 0)
 #define arch_flsl(x) ((x) ? BITS_PER_LONG - __builtin_clzl(x) : 0)
 
+#define arch_hweightl(x) __builtin_popcountl(x)
+
 /**
  * hweightN - returns the hamming weight of a N-bit word
  * @x: the word to weigh

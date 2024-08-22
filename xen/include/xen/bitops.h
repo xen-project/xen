@@ -35,6 +35,12 @@ extern void __bitop_bad_size(void);
 unsigned int attr_const generic_ffsl(unsigned long x);
 unsigned int attr_const generic_flsl(unsigned long x);
 
+/*
+ * Hamming Weight, also called Population Count.  Returns the number of set
+ * bits in @x.
+ */
+unsigned int attr_const generic_hweightl(unsigned long x);
+
 /**
  * generic__test_and_set_bit - Set a bit and return its old value
  * @nr: Bit to set
@@ -305,6 +311,18 @@ static always_inline attr_const unsigned int fls64(uint64_t x)
         typeof(x) _v = (x);                     \
         (_v & (_v - 1)) != 0;                   \
     })
+
+static always_inline attr_const unsigned int hweightl(unsigned long x)
+{
+    if ( __builtin_constant_p(x) )
+        return __builtin_popcountl(x);
+
+#ifdef arch_hweightl
+    return arch_hweightl(x);
+#else
+    return generic_hweightl(x);
+#endif
+}
 
 /* --------------------- Please tidy below here --------------------- */
 
