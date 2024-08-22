@@ -414,16 +414,22 @@ __pvh_start:
         cli
 
         /*
-         * We need one push/pop to determine load address.  Use the same
-         * absolute stack address as the native path, for lack of a better
-         * alternative.
+         * We need one call (i.e. push) to determine the load address.  See
+         * __start for a discussion on how to do this safely using the PVH
+         * info structure.
          */
-        mov     $0x1000, %esp
+
+        /* Preserve the field we're about to clobber. */
+        mov     (%ebx), %edx
+        lea     4(%ebx), %esp
 
         /* Calculate the load base address. */
         call    1f
 1:      pop     %esi
         sub     $sym_offs(1b), %esi
+
+        /* Restore the clobbered field. */
+        mov     %edx, (%ebx)
 
         /* Set up stack. */
         lea     STACK_SIZE - CPUINFO_sizeof + sym_esi(cpu0_stack), %esp
@@ -460,20 +466,25 @@ __start:
         /*
          * Multiboot (both 1 and 2) specify the stack pointer as undefined
          * when entering in BIOS circumstances.  This is unhelpful for
-         * relocatable images, where one push/pop is required to calculate
-         * images load address.
+         * relocatable images, where one call (i.e. push) is required to
+         * calculate the image's load address.
          *
-         * On a BIOS-based system, the IVT and BDA occupy the first 5/16ths of
-         * the first page of RAM, with the rest free for use.  Use the top of
-         * this page for a temporary stack, being one of the safest locations
-         * to clobber.
+         * This early in boot, there is one area of memory we know about with
+         * reasonable confidence that it isn't overlapped by Xen, and that's
+         * the Multiboot info structure in %ebx.  Use it as a temporary stack.
          */
-        mov     $0x1000, %esp
+
+        /* Preserve the field we're about to clobber. */
+        mov     (%ebx), %edx
+        lea     4(%ebx), %esp
 
         /* Calculate the load base address. */
         call    1f
 1:      pop     %esi
         sub     $sym_offs(1b), %esi
+
+        /* Restore the clobbered field. */
+        mov     %edx, (%ebx)
 
         /* Set up stack. */
         lea     STACK_SIZE - CPUINFO_sizeof + sym_esi(cpu0_stack), %esp

@@ -96,6 +96,12 @@ Xen, once loaded into memory, identifies its position in order to relocate
 system structures.  For 32bit entrypoints, this necessarily requires a call
 instruction, and therefore a stack, but none of the ABIs provide one.
 
-Overall, given that on a BIOS-based system, the IVT and BDA occupy the first
-5/16ths of the first page of RAM, with the rest free to use, Xen assumes the
-top of the page is safe to use.
+In each supported 32bit entry protocol, ``%ebx`` is a pointer to an info
+structure, and it is highly likely that this structure does not overlap with
+Xen.  Therefore we use this as a temporary stack, preserving the prior value,
+in order to calculate Xen's position in memory.
+
+If this heuristic happens to be wrong (most likely because we were booted by
+some other protocol), the calculation stills works as long as ``%ebx`` points
+at RAM and does not alias the currently-executing instructions.  This is
+reasonably likely, and the best we can manage given no other information.
