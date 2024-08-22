@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <xenctrl.h>
+#include <getopt.h>
 
 static xc_interface *xch;
 
@@ -71,12 +72,31 @@ static void show_curr_cpu(FILE *f)
     }
 }
 
+static void usage(FILE *stream, const char *name)
+{
+    fprintf(stream,
+            "%s: Xen microcode updating tool\n"
+            "Usage: %s [options] [<microcode file> | show-cpu-info]\n"
+            "options:\n"
+            "  -h, --help               display this help\n"
+            "  -s, --show-cpu-info      show CPU information\n",
+            name, name);
+    show_curr_cpu(stream);
+}
+
 int main(int argc, char *argv[])
 {
+    static const struct option options[] = {
+        { "help",          no_argument, NULL, 'h' },
+        { "show-cpu-info", no_argument, NULL, 's' },
+        {}
+    };
+
     int fd, ret;
     char *filename, *buf;
     size_t len;
     struct stat st;
+    int opt;
 
     xch = xc_interface_open(NULL, NULL, 0);
     if ( xch == NULL )
@@ -86,22 +106,38 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    if ( argc < 2 )
+    while ( (opt = getopt_long(argc, argv, "hs", options, NULL)) != -1 )
     {
-        fprintf(stderr,
-                "xen-ucode: Xen microcode updating tool\n"
-                "Usage: %s [<microcode file> | show-cpu-info]\n", argv[0]);
-        show_curr_cpu(stderr);
-        exit(2);
+        switch ( opt )
+        {
+        case 'h':
+            usage(stdout, argv[0]);
+            exit(EXIT_SUCCESS);
+
+        case 's':
+            show_curr_cpu(stdout);
+            exit(EXIT_SUCCESS);
+
+        default:
+            fprintf(stderr, "%s: unknown option\n", argv[0]);
+            goto ext_err;
+        }
     }
 
-    if ( !strcmp(argv[1], "show-cpu-info") )
+    if ( optind == argc )
+    {
+        fprintf(stderr, "%s: missing microcode file\n", argv[0]);
+        goto ext_err;
+    }
+
+    /* For backwards compatibility to the pre-getopt() cmdline handling */
+    if ( !strcmp(argv[optind], "show-cpu-info") )
     {
         show_curr_cpu(stdout);
         return 0;
     }
 
-    filename = argv[1];
+    filename = argv[optind];
     fd = open(filename, O_RDONLY);
     if ( fd < 0 )
     {
@@ -146,4 +182,8 @@ int main(int argc, char *argv[])
     close(fd);
 
     return 0;
+
+ ext_err:
+    usage(stderr, argv[0]);
+    exit(EXIT_FAILURE);
 }
