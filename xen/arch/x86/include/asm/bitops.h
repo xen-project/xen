@@ -6,6 +6,7 @@
  */
 
 #include <asm/alternative.h>
+#include <asm/asm_defns.h>
 #include <asm/cpufeatureset.h>
 
 /*
@@ -474,5 +475,27 @@ static always_inline unsigned int arch_flsl(unsigned long x)
     return r + 1;
 }
 #define arch_flsl arch_flsl
+
+unsigned int arch_generic_hweightl(unsigned long x);
+
+static always_inline unsigned int arch_hweightl(unsigned long x)
+{
+    unsigned int r;
+
+    /*
+     * arch_generic_hweightl() is written in ASM in order to preserve all
+     * registers, as the compiler can't see the call.
+     *
+     * This limits the POPCNT instruction to using the same ABI as a function
+     * call (input in %rdi, output in %eax) but that's fine.
+     */
+    alternative_io("call arch_generic_hweightl",
+                   "popcnt %[val], %q[res]", X86_FEATURE_POPCNT,
+                   ASM_OUTPUT2([res] "=a" (r) ASM_CALL_CONSTRAINT),
+                   [val] "D" (x));
+
+    return r;
+}
+#define arch_hweightl arch_hweightl
 
 #endif /* _X86_BITOPS_H */
