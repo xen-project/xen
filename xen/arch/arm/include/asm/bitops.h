@@ -86,8 +86,6 @@ bool clear_mask16_timeout(uint16_t mask, volatile void *p,
  */
 #define hweight64(x) generic_hweight64(x)
 #define hweight32(x) generic_hweight32(x)
-#define hweight16(x) generic_hweight16(x)
-#define hweight8(x) generic_hweight8(x)
 
 #endif /* _ARM_BITOPS_H */
 /*

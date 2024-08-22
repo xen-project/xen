@@ -134,7 +134,5 @@ static inline int test_and_set_bit(unsigned int nr, volatile void *addr)
  */
 #define hweight64(x) __builtin_popcountll(x)
 #define hweight32(x) __builtin_popcount(x)
-#define hweight16(x) __builtin_popcount((uint16_t)(x))
-#define hweight8(x)  __builtin_popcount((uint8_t)(x))
 
 #endif /* _ASM_PPC_BITOPS_H */

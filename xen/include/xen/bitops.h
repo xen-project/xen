@@ -413,23 +413,6 @@ static inline unsigned int generic_hweight32(unsigned int w)
     return (w + (w >> 16)) & 0xff;
 }
 
-static inline unsigned int generic_hweight16(unsigned int w)
-{
-    w -= ((w >> 1) & 0x5555);
-    w =  (w & 0x3333) + ((w >> 2) & 0x3333);
-    w =  (w + (w >> 4)) & 0x0f0f;
-
-    return (w + (w >> 8)) & 0xff;
-}
-
-static inline unsigned int generic_hweight8(unsigned int w)
-{
-    w -= ((w >> 1) & 0x55);
-    w =  (w & 0x33) + ((w >> 2) & 0x33);
-
-    return (w + (w >> 4)) & 0x0f;
-}
-
 static inline unsigned int generic_hweight64(uint64_t w)
 {
     if ( BITS_PER_LONG < 64 )
