@@ -673,7 +673,7 @@ long do_xenpmu_op(
     {
         if ( (pmu_params.val &
               ~(XENPMU_MODE_SELF | XENPMU_MODE_HV | XENPMU_MODE_ALL)) ||
-             (hweight64(pmu_params.val) > 1) )
+             multiple_bits_set(pmu_params.val) )
             return -EINVAL;
 
         /* 32-bit dom0 can only sample itself. */

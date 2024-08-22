@@ -467,12 +467,14 @@ static bool is_multicast_dest(struct vlapic *vlapic, unsigned int short_hand,
         return short_hand != APIC_DEST_SELF;
 
     if ( vlapic_x2apic_mode(vlapic) )
-        return dest_mode ? hweight16(dest) > 1 : dest == 0xffffffffU;
+        return dest_mode ? multiple_bits_set((uint16_t)dest)
+                         : dest == 0xffffffffU;
 
     if ( dest_mode )
-        return hweight8(dest &
-                        GET_xAPIC_DEST_FIELD(vlapic_get_reg(vlapic,
-                                                            APIC_DFR))) > 1;
+    {
+        dest &= GET_xAPIC_DEST_FIELD(vlapic_get_reg(vlapic, APIC_DFR));
+        return multiple_bits_set((uint8_t)dest);
+    }
 
     return dest == 0xff;
 }

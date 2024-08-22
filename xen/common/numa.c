@@ -546,7 +546,7 @@ static int __init numa_emulation(unsigned long start_pfn,
     uint64_t sz = pfn_to_paddr(end_pfn - start_pfn) / numa_fake;
 
     /* Kludge needed for the hash function */
-    if ( hweight64(sz) > 1 )
+    if ( multiple_bits_set(sz) )
     {
         uint64_t x = 1;
 
