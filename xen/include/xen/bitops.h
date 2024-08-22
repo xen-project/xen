@@ -326,6 +326,11 @@ static always_inline attr_const unsigned int hweightl(unsigned long x)
 #endif
 }
 
+static always_inline attr_const unsigned int hweight32(uint32_t x)
+{
+    return hweightl(x);
+}
+
 /* --------------------- Please tidy below here --------------------- */
 
 #ifndef find_next_bit

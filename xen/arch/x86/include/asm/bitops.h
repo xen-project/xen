@@ -482,6 +482,5 @@ static always_inline unsigned int arch_flsl(unsigned long x)
  * The Hamming Weight of a number is the total number of bits set in it.
  */
 #define hweight64(x) generic_hweight64(x)
-#define hweight32(x) generic_hweight32(x)
 
 #endif /* _X86_BITOPS_H */
