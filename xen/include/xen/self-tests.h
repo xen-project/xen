@@ -15,11 +15,14 @@
  *
  * Clang < 8 can't fold constants through static inlines, causing this to
  * fail.  Simply skip it for incredibly old compilers.
+ *
+ * N.B. fn is intentionally not bracketed to allow us to test function-like
+ * macros too.
  */
 #if !defined(CONFIG_CC_IS_CLANG) || CONFIG_CLANG_VERSION >= 80000
 #define COMPILE_CHECK(fn, val, res)                                     \
     do {                                                                \
-        typeof((fn)(val)) real = (fn)(val);                             \
+        typeof(fn(val)) real = fn(val);                                 \
                                                                         \
         if ( !__builtin_constant_p(real) )                              \
             BUILD_ERROR("'" STR(fn(val)) "' not compile-time constant"); \
@@ -34,10 +37,13 @@
  * Check that Xen's runtime logic for fn(val) gives the expected answer.  This
  * requires using HIDE() to prevent the optimiser from collapsing the logic
  * into a constant.
+ *
+ * N.B. fn is intentionally not bracketed to allow us to test function-like
+ * macros too.
  */
 #define RUNTIME_CHECK(fn, val, res)                     \
     do {                                                \
-        typeof((fn)(val)) real = (fn)(HIDE(val));       \
+        typeof(fn(val)) real = fn(HIDE(val));           \
                                                         \
         if ( real != (res) )                            \
             panic("%s: %s(%s) expected %u, got %u\n",   \

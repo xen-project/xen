@@ -112,9 +112,32 @@ static void __init test_for_each_set_bit(void)
         panic("for_each_set_bit(uint64) expected %#"PRIx64", got %#"PRIx64"\n", ull, ull_res);
 }
 
+static void __init test_multiple_bits_set(void)
+{
+    /*
+     * multiple_bits_set() is generic on the type of it's parameter, as the
+     * internal expression is so simple.
+     */
+
+    CHECK(multiple_bits_set, 0, false);
+    CHECK(multiple_bits_set, 1, false);
+    CHECK(multiple_bits_set, 2, false);
+    CHECK(multiple_bits_set, 3, true);
+
+    CHECK(multiple_bits_set, 1 | (1UL << (BITS_PER_LONG - 1)), true);
+#if BITS_PER_LONG > 32
+    CHECK(multiple_bits_set, 1 | (1UL << 32), true);
+#endif
+
+    CHECK(multiple_bits_set, 0x8000000000000001ULL, true);
+    CHECK(multiple_bits_set, 0xc000000000000000ULL, true);
+}
+
 static void __init __constructor test_bitops(void)
 {
     test_ffs();
     test_fls();
     test_for_each_set_bit();
+
+    test_multiple_bits_set();
 }

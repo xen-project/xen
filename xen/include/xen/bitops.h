@@ -296,6 +296,16 @@ static always_inline attr_const unsigned int fls64(uint64_t x)
               __v && ((iter) = ffs_g(__v) - 1, true);   \
               __v &= __v - 1 )
 
+/*
+ * Calculate if a value has two or more bits set.  Always use this in
+ * preference to an expression of the form 'hweight(x) > 1'.
+ */
+#define multiple_bits_set(x)                    \
+    ({                                          \
+        typeof(x) _v = (x);                     \
+        (_v & (_v - 1)) != 0;                   \
+    })
+
 /* --------------------- Please tidy below here --------------------- */
 
 #ifndef find_next_bit
