@@ -90,6 +90,11 @@ struct ucode_mod_blob {
     size_t size;
 };
 
+struct patch_with_flags {
+    unsigned int flags;
+    const struct microcode_patch *patch;
+};
+
 static struct ucode_mod_blob __initdata ucode_blob;
 /*
  * By default we will NOT parse the multiboot modules to see if there is
@@ -100,10 +105,8 @@ static bool __initdata ucode_scan;
 /* By default, ucode loading is done in NMI handler */
 static bool ucode_in_nmi = true;
 
-bool __read_mostly opt_ucode_allow_same;
-
 /* Protected by microcode_mutex */
-static struct microcode_patch *microcode_cache;
+static const struct microcode_patch *microcode_cache;
 
 void __init microcode_set_module(unsigned int idx)
 {
@@ -128,8 +131,6 @@ static int __init cf_check parse_ucode(const char *s)
 
         if ( (val = parse_boolean("nmi", s, ss)) >= 0 )
             ucode_in_nmi = val;
-        else if ( (val = parse_boolean("allow-same", s, ss)) >= 0 )
-            opt_ucode_allow_same = val;
         else if ( !ucode_mod_forced ) /* Not forced by EFI */
         {
             if ( (val = parse_boolean("scan", s, ss)) >= 0 )
@@ -237,7 +238,10 @@ static DEFINE_PER_CPU(int, loading_err);
  */
 static cpumask_t cpu_callin_map;
 static atomic_t cpu_out, cpu_updated;
-static const struct microcode_patch *nmi_patch = ZERO_BLOCK_PTR;
+static struct patch_with_flags nmi_patch =
+{
+    .patch  = ZERO_BLOCK_PTR,
+};
 
 /*
  * Return a patch that covers current CPU. If there are multiple patches,
@@ -252,13 +256,13 @@ static struct microcode_patch *parse_blob(const char *buf, size_t len)
     return alternative_call(ucode_ops.cpu_request_microcode, buf, len, true);
 }
 
-static void microcode_free_patch(struct microcode_patch *patch)
+static void microcode_free_patch(const struct microcode_patch *patch)
 {
-    xfree(patch);
+    xfree((struct microcode_patch *)patch);
 }
 
 /* Return true if cache gets updated. Otherwise, return false */
-static bool microcode_update_cache(struct microcode_patch *patch)
+static bool microcode_update_cache(const struct microcode_patch *patch)
 {
     ASSERT(spin_is_locked(&microcode_mutex));
 
@@ -327,7 +331,8 @@ static bool cf_check wait_cpu_callout(unsigned int nr)
  * If no patch is provided, the cached patch will be loaded. Microcode update
  * during APs bringup and CPU resuming falls into this case.
  */
-static int microcode_update_cpu(const struct microcode_patch *patch)
+static int microcode_update_cpu(const struct microcode_patch *patch,
+                                unsigned int flags)
 {
     int err;
 
@@ -335,10 +340,11 @@ static int microcode_update_cpu(const struct microcode_patch *patch)
 
     spin_lock(&microcode_mutex);
     if ( patch )
-        err = alternative_call(ucode_ops.apply_microcode, patch);
+        err = alternative_call(ucode_ops.apply_microcode, patch, flags);
     else if ( microcode_cache )
     {
-        err = alternative_call(ucode_ops.apply_microcode, microcode_cache);
+        err = alternative_call(ucode_ops.apply_microcode, microcode_cache,
+                               flags);
         if ( err == -EIO )
         {
             microcode_free_patch(microcode_cache);
@@ -379,7 +385,8 @@ static int secondary_nmi_work(void)
     return wait_for_state(LOADING_EXIT) ? 0 : -EBUSY;
 }
 
-static int primary_thread_work(const struct microcode_patch *patch)
+static int primary_thread_work(const struct microcode_patch *patch,
+                               unsigned int flags)
 {
     int ret;
 
@@ -388,7 +395,7 @@ static int primary_thread_work(const struct microcode_patch *patch)
     if ( !wait_for_state(LOADING_ENTER) )
         return -EBUSY;
 
-    ret = alternative_call(ucode_ops.apply_microcode, patch);
+    ret = alternative_call(ucode_ops.apply_microcode, patch, flags);
     if ( !ret )
         atomic_inc(&cpu_updated);
     atomic_inc(&cpu_out);
@@ -416,7 +423,8 @@ static int cf_check microcode_nmi_callback(
         return 0;
 
     if ( primary_cpu )
-        ret = primary_thread_work(nmi_patch);
+        ret = primary_thread_work(nmi_patch.patch,
+                                  nmi_patch.flags);
     else
         ret = secondary_nmi_work();
     this_cpu(loading_err) = ret;
@@ -446,7 +454,8 @@ static int secondary_thread_fn(void)
     return this_cpu(loading_err);
 }
 
-static int primary_thread_fn(const struct microcode_patch *patch)
+static int primary_thread_fn(const struct microcode_patch *patch,
+                             unsigned int flags)
 {
     if ( !wait_for_state(LOADING_CALLIN) )
         return -EBUSY;
@@ -466,10 +475,11 @@ static int primary_thread_fn(const struct microcode_patch *patch)
         return this_cpu(loading_err);
     }
 
-    return primary_thread_work(patch);
+    return primary_thread_work(patch, flags);
 }
 
-static int control_thread_fn(const struct microcode_patch *patch)
+static int control_thread_fn(const struct microcode_patch *patch,
+                             unsigned int flags)
 {
     unsigned int cpu = smp_processor_id(), done;
     unsigned long tick;
@@ -482,7 +492,8 @@ static int control_thread_fn(const struct microcode_patch *patch)
      */
     watchdog_disable();
 
-    nmi_patch = patch;
+    nmi_patch.patch = patch;
+    nmi_patch.flags = flags;
     smp_wmb();
     saved_nmi_callback = set_nmi_callback(microcode_nmi_callback);
 
@@ -498,7 +509,7 @@ static int control_thread_fn(const struct microcode_patch *patch)
         goto out;
 
     /* Control thread loads ucode first while others are in NMI handler. */
-    ret = alternative_call(ucode_ops.apply_microcode, patch);
+    ret = alternative_call(ucode_ops.apply_microcode, patch, flags);
     if ( !ret )
         atomic_inc(&cpu_updated);
     atomic_inc(&cpu_out);
@@ -544,17 +555,19 @@ static int control_thread_fn(const struct microcode_patch *patch)
 
     set_nmi_callback(saved_nmi_callback);
     smp_wmb();
-    nmi_patch = ZERO_BLOCK_PTR;
+    nmi_patch.patch = ZERO_BLOCK_PTR;
+    nmi_patch.flags = 0;
 
     watchdog_enable();
 
     return ret;
 }
 
-static int cf_check do_microcode_update(void *patch)
+static int cf_check do_microcode_update(void *_patch_with_flags)
 {
     unsigned int cpu = smp_processor_id();
     int ret;
+    struct patch_with_flags *patch_with_flags = _patch_with_flags;
 
     /*
      * The control thread set state to coordinate ucode loading. Primary
@@ -562,9 +575,11 @@ static int cf_check do_microcode_update(void *patch)
      * the completion of the ucode loading process.
      */
     if ( cpu == cpumask_first(&cpu_online_map) )
-        ret = control_thread_fn(patch);
+        ret = control_thread_fn(patch_with_flags->patch,
+                                patch_with_flags->flags);
     else if ( is_cpu_primary(cpu) )
-        ret = primary_thread_fn(patch);
+        ret = primary_thread_fn(patch_with_flags->patch,
+                                patch_with_flags->flags);
     else
         ret = secondary_thread_fn();
 
@@ -582,7 +597,8 @@ static long cf_check microcode_update_helper(void *data)
     int ret;
     struct ucode_buf *buffer = data;
     unsigned int cpu, updated;
-    struct microcode_patch *patch;
+    struct patch_with_flags patch_with_flags;
+    bool ucode_force = buffer->flags & XENPF_UCODE_FORCE;
 
     /* cpu_online_map must not change during update */
     if ( !get_cpu_maps() )
@@ -606,16 +622,17 @@ static long cf_check microcode_update_helper(void *data)
         goto put;
     }
 
-    patch = parse_blob(buffer->buffer, buffer->len);
+    patch_with_flags.patch = parse_blob(buffer->buffer, buffer->len);
+    patch_with_flags.flags = buffer->flags;
     xfree(buffer);
-    if ( IS_ERR(patch) )
+    if ( IS_ERR(patch_with_flags.patch) )
     {
-        ret = PTR_ERR(patch);
+        ret = PTR_ERR(patch_with_flags.patch);
         printk(XENLOG_WARNING "Parsing microcode blob error %d\n", ret);
         goto put;
     }
 
-    if ( !patch )
+    if ( !patch_with_flags.patch )
     {
         printk(XENLOG_WARNING "microcode: couldn't find any matching ucode in "
                               "the provided blob!\n");
@@ -632,17 +649,17 @@ static long cf_check microcode_update_helper(void *data)
     {
         enum microcode_match_result result;
 
-        result = alternative_call(ucode_ops.compare_patch, patch,
-                                  microcode_cache);
+        result = alternative_call(ucode_ops.compare_patch,
+                                  patch_with_flags.patch, microcode_cache);
 
         if ( result != NEW_UCODE &&
-             !(opt_ucode_allow_same && result == SAME_UCODE) )
+             !(ucode_force && (result == OLD_UCODE || result == SAME_UCODE)) )
         {
             spin_unlock(&microcode_mutex);
             printk(XENLOG_WARNING
                    "microcode: couldn't find any newer%s revision in the provided blob!\n",
-                   opt_ucode_allow_same ? " (or the same)" : "");
-            microcode_free_patch(patch);
+                   ucode_force ? " (or a valid)" : "");
+            microcode_free_patch(patch_with_flags.patch);
             ret = -EEXIST;
 
             goto put;
@@ -674,13 +691,13 @@ static long cf_check microcode_update_helper(void *data)
      *   this requirement can be relaxed in the future. Right now, this is
      *   conservative and good.
      */
-    ret = stop_machine_run(do_microcode_update, patch, NR_CPUS);
+    ret = stop_machine_run(do_microcode_update, &patch_with_flags, NR_CPUS);
 
     updated = atomic_read(&cpu_updated);
     if ( updated > 0 )
     {
         spin_lock(&microcode_mutex);
-        microcode_update_cache(patch);
+        microcode_update_cache(patch_with_flags.patch);
         spin_unlock(&microcode_mutex);
 
         /*
@@ -697,7 +714,7 @@ static long cf_check microcode_update_helper(void *data)
             alternative_vcall(ctxt_switch_masking, current);
     }
     else
-        microcode_free_patch(patch);
+        microcode_free_patch(patch_with_flags.patch);
 
     if ( updated && updated != nr_cores )
         printk(XENLOG_ERR "ERROR: Updating microcode succeeded on %u cores and failed\n"
@@ -775,7 +792,7 @@ int microcode_update_one(void)
     if ( !ucode_ops.apply_microcode )
         return -EOPNOTSUPP;
 
-    return microcode_update_cpu(NULL);
+    return microcode_update_cpu(NULL, 0);
 }
 
 static int __init early_update_cache(const void *data, size_t len)
@@ -858,7 +875,7 @@ static int __init early_microcode_update_cpu(void)
     if ( !patch )
         return -ENOENT;
 
-    return microcode_update_cpu(patch);
+    return microcode_update_cpu(patch, 0);
 }
 
 int __init early_microcode_init(unsigned long *module_map,

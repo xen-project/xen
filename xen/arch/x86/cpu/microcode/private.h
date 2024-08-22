@@ -1,9 +1,9 @@
 #ifndef ASM_X86_MICROCODE_PRIVATE_H
 #define ASM_X86_MICROCODE_PRIVATE_H
 
-#include <asm/microcode.h>
+#include <public/platform.h>
 
-extern bool opt_ucode_allow_same;
+#include <asm/microcode.h>
 
 enum microcode_match_result {
     OLD_UCODE, /* signature matched, but revision id is older */
@@ -50,7 +50,8 @@ struct microcode_ops {
      * Attempt to load the provided patch into the CPU.  Returns an error if
      * anything didn't go as expected.
      */
-    int (*apply_microcode)(const struct microcode_patch *patch);
+    int (*apply_microcode)(const struct microcode_patch *patch,
+                           unsigned int flags);
 
     /*
      * Given two patches, are they both applicable to the current CPU, and is

@@ -214,13 +214,15 @@ static enum microcode_match_result cf_check compare_patch(
     return compare_header(new, old);
 }
 
-static int cf_check apply_microcode(const struct microcode_patch *patch)
+static int cf_check apply_microcode(const struct microcode_patch *patch,
+                                    unsigned int flags)
 {
     int hw_err;
     unsigned int cpu = smp_processor_id();
     struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
     uint32_t rev, old_rev = sig->rev;
     enum microcode_match_result result = microcode_fits(patch);
+    bool ucode_force = flags & XENPF_UCODE_FORCE;
 
     if ( result == MIS_UCODE )
         return -EINVAL;
@@ -229,7 +231,7 @@ static int cf_check apply_microcode(const struct microcode_patch *patch)
      * Allow application of the same revision to pick up SMT-specific changes
      * even if the revision of the other SMT thread is already up-to-date.
      */
-    if ( result == OLD_UCODE )
+    if ( !ucode_force && (result == SAME_UCODE || result == OLD_UCODE) )
         return -EEXIST;
 
     if ( check_final_patch_levels(sig) )
