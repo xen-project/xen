@@ -446,11 +446,6 @@ static inline unsigned int generic_hweight64(uint64_t w)
     return (w + (w >> 32)) & 0xFF;
 }
 
-static inline unsigned int hweight_long(unsigned long w)
-{
-    return sizeof(w) == 4 ? generic_hweight32(w) : generic_hweight64(w);
-}
-
 /*
  * rol32 - rotate a 32-bit value left
  *
