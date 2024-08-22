@@ -475,12 +475,4 @@ static always_inline unsigned int arch_flsl(unsigned long x)
 }
 #define arch_flsl arch_flsl
 
-/**
- * hweightN - returns the hamming weight of a N-bit word
- * @x: the word to weigh
- *
- * The Hamming Weight of a number is the total number of bits set in it.
- */
-#define hweight64(x) generic_hweight64(x)
-
 #endif /* _X86_BITOPS_H */

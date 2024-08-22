@@ -78,14 +78,6 @@ bool clear_mask16_timeout(uint16_t mask, volatile void *p,
 #define arch_fls(x)  ((x) ? 32 - __builtin_clz(x) : 0)
 #define arch_flsl(x) ((x) ? BITS_PER_LONG - __builtin_clzl(x) : 0)
 
-/**
- * hweightN - returns the hamming weight of a N-bit word
- * @x: the word to weigh
- *
- * The Hamming Weight of a number is the total number of bits set in it.
- */
-#define hweight64(x) generic_hweight64(x)
-
 #endif /* _ARM_BITOPS_H */
 /*
  * Local variables:

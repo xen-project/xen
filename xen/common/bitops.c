@@ -144,6 +144,9 @@ static void __init test_hweight(void)
 
     CHECK(hweightl, 1 | (1UL << (BITS_PER_LONG - 1)), 2);
     CHECK(hweightl, -1UL, BITS_PER_LONG);
+
+    /* unsigned int hweight64(uint64_t) */
+    CHECK(hweight64, -1ULL, 64);
 }
 
 static void __init __constructor test_bitops(void)

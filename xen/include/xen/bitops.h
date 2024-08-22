@@ -331,6 +331,14 @@ static always_inline attr_const unsigned int hweight32(uint32_t x)
     return hweightl(x);
 }
 
+static always_inline attr_const unsigned int hweight64(uint64_t x)
+{
+    if ( BITS_PER_LONG >= 64 )
+        return hweightl(x);
+    else
+        return hweight32(x >> 32) + hweight32(x);
+}
+
 /* --------------------- Please tidy below here --------------------- */
 
 #ifndef find_next_bit
@@ -397,43 +405,6 @@ static inline int get_count_order(unsigned int count)
     if (count & (count - 1))
         order++;
     return order;
-}
-
-/*
- * hweightN: returns the hamming weight (i.e. the number
- * of bits set) of a N-bit word
- */
-
-static inline unsigned int generic_hweight32(unsigned int w)
-{
-    w -= (w >> 1) & 0x55555555;
-    w =  (w & 0x33333333) + ((w >> 2) & 0x33333333);
-    w =  (w + (w >> 4)) & 0x0f0f0f0f;
-
-    if ( IS_ENABLED(CONFIG_HAS_FAST_MULTIPLY) )
-        return (w * 0x01010101) >> 24;
-
-    w += w >> 8;
-
-    return (w + (w >> 16)) & 0xff;
-}
-
-static inline unsigned int generic_hweight64(uint64_t w)
-{
-    if ( BITS_PER_LONG < 64 )
-        return generic_hweight32(w >> 32) + generic_hweight32(w);
-
-    w -= (w >> 1) & 0x5555555555555555UL;
-    w =  (w & 0x3333333333333333UL) + ((w >> 2) & 0x3333333333333333UL);
-    w =  (w + (w >> 4)) & 0x0f0f0f0f0f0f0f0fUL;
-
-    if ( IS_ENABLED(CONFIG_HAS_FAST_MULTIPLY) )
-        return (w * 0x0101010101010101UL) >> 56;
-
-    w += w >> 8;
-    w += w >> 16;
-
-    return (w + (w >> 32)) & 0xFF;
 }
 
 /*
