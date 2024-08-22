@@ -210,6 +210,8 @@ static always_inline bool test_bit(int nr, const volatile void *addr)
     test_bit(nr, addr);                                 \
 })
 
+/* --------------------- Please tidy above here --------------------- */
+
 static always_inline attr_const unsigned int ffs(unsigned int x)
 {
     if ( __builtin_constant_p(x) )
