@@ -13,6 +13,8 @@
 #include <xenctrl.h>
 #include <getopt.h>
 
+#include <xen/platform.h>
+
 static xc_interface *xch;
 
 static const char intel_id[] = "GenuineIntel";
@@ -79,7 +81,10 @@ static void usage(FILE *stream, const char *name)
             "Usage: %s [options] [<microcode file> | show-cpu-info]\n"
             "options:\n"
             "  -h, --help               display this help\n"
-            "  -s, --show-cpu-info      show CPU information\n",
+            "  -s, --show-cpu-info      show CPU information\n"
+            "  -f, --force              skip certain checks when applying\n"
+            "                           microcode; do not use unless you know\n"
+            "                           exactly what you are doing\n",
             name, name);
     show_curr_cpu(stream);
 }
@@ -89,6 +94,7 @@ int main(int argc, char *argv[])
     static const struct option options[] = {
         { "help",          no_argument, NULL, 'h' },
         { "show-cpu-info", no_argument, NULL, 's' },
+        { "force",         no_argument, NULL, 'f' },
         {}
     };
 
@@ -97,6 +103,7 @@ int main(int argc, char *argv[])
     size_t len;
     struct stat st;
     int opt;
+    uint32_t ucode_flags = 0;
 
     xch = xc_interface_open(NULL, NULL, 0);
     if ( xch == NULL )
@@ -106,7 +113,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    while ( (opt = getopt_long(argc, argv, "hs", options, NULL)) != -1 )
+    while ( (opt = getopt_long(argc, argv, "hsf", options, NULL)) != -1 )
     {
         switch ( opt )
         {
@@ -117,6 +124,10 @@ int main(int argc, char *argv[])
         case 's':
             show_curr_cpu(stdout);
             exit(EXIT_SUCCESS);
+
+        case 'f':
+            ucode_flags |= XENPF_UCODE_FORCE;
+            break;
 
         default:
             fprintf(stderr, "%s: unknown option\n", argv[0]);
@@ -162,7 +173,7 @@ int main(int argc, char *argv[])
     }
 
     errno = 0;
-    ret = xc_microcode_update(xch, buf, len);
+    ret = xc_microcode_update(xch, buf, len, ucode_flags);
     if ( ret == -1 && errno == EEXIST )
         printf("Microcode already up to date\n");
     else if ( ret )
