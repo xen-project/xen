@@ -310,8 +310,8 @@ static bool check_min_rev(const struct microcode_patch *patch)
     return this_cpu(cpu_sig).rev >= patch->min_rev;
 }
 
-static int cf_check apply_microcode(const struct microcode_patch *patch,
-                                    unsigned int flags)
+static int cf_check amd_ucode_load(const struct microcode_patch *patch,
+                                   unsigned int flags)
 {
     int hw_err, result;
     unsigned int cpu = smp_processor_id();
@@ -563,7 +563,7 @@ static const char __initconst amd_cpio_path[] =
 static const struct microcode_ops __initconst_cf_clobber amd_ucode_ops = {
     .collect_cpu_info                 = collect_cpu_info,
     .parse                            = MICROCODE_OP(amd_ucode_parse),
-    .apply_microcode                  = MICROCODE_OP(apply_microcode),
+    .load                             = MICROCODE_OP(amd_ucode_load),
     .compare                          = MICROCODE_OP(amd_compare),
     .cpio_path                        = MICROCODE_OP(amd_cpio_path),
 };

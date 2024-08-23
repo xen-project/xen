@@ -46,8 +46,7 @@ struct microcode_ops {
      * Attempt to load the provided patch into the CPU.  Returns an error if
      * anything didn't go as expected.
      */
-    int (*apply_microcode)(const struct microcode_patch *patch,
-                           unsigned int flags);
+    int (*load)(const struct microcode_patch *patch, unsigned int flags);
 
     /*
      * Given a current patch, and a proposed new patch, order them based on revision.
@@ -79,8 +78,8 @@ extern bool opt_digest_check;
  *   - Loading available
  *
  * These are encoded by (not) filling in ops->collect_cpu_info (i.e. no
- * support available) and (not) ops->apply_microcode (i.e. read only).
- * Otherwise, all hooks must be filled in.
+ * support available) and (not) ops->load (i.e. read only).  Otherwise, all
+ * hooks must be filled in.
  */
 #ifdef CONFIG_AMD
 void ucode_probe_amd(struct microcode_ops *ops);

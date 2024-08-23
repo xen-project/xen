@@ -187,6 +187,12 @@ static const struct microcode_patch *__init ucode_parse(const char *buf, size_t 
     return ucode_ops.parse(buf, len, false);
 }
 
+/* Load a ucode blob.  Returns -errno. */
+static int ucode_load(const struct microcode_patch *patch, unsigned int flags)
+{
+    return alternative_call(ucode_ops.load, patch, flags);
+}
+
 static DEFINE_SPINLOCK(microcode_mutex);
 
 DEFINE_PER_CPU(struct cpu_signature, cpu_sig);
@@ -287,7 +293,7 @@ static int primary_thread_work(const struct microcode_patch *patch,
     if ( !wait_for_state(LOADING_ENTER) )
         return 0;
 
-    ret = alternative_call(ucode_ops.apply_microcode, patch, flags);
+    ret = ucode_load(patch, flags);
     if ( !ret )
         atomic_inc(&cpu_updated);
     atomic_inc(&cpu_out);
@@ -397,7 +403,7 @@ static int control_thread_fn(const struct microcode_patch *patch,
         goto out;
 
     /* Control thread loads ucode first while others are in NMI handler. */
-    ret = alternative_call(ucode_ops.apply_microcode, patch, flags);
+    ret = ucode_load(patch, flags);
     if ( !ret )
         atomic_inc(&cpu_updated);
     atomic_inc(&cpu_out);
@@ -634,7 +640,7 @@ int ucode_update_hcall(XEN_GUEST_HANDLE(const_void) buf,
     if ( flags & ~XENPF_UCODE_FORCE )
         return -EINVAL;
 
-    if ( !ucode_ops.apply_microcode )
+    if ( !ucode_ops.load )
         return -EINVAL;
 
     buffer = xmalloc_flex_struct(struct ucode_buf, buffer, len);
@@ -671,12 +677,12 @@ int microcode_update_one(void)
     if ( ucode_ops.collect_cpu_info )
         alternative_vcall(ucode_ops.collect_cpu_info);
 
-    if ( !IS_ENABLED(CONFIG_MICROCODE_LOADING) || !ucode_ops.apply_microcode )
+    if ( !IS_ENABLED(CONFIG_MICROCODE_LOADING) || !ucode_ops.load )
         return -EOPNOTSUPP;
 
     spin_lock(&microcode_mutex);
     if ( microcode_cache )
-        rc = alternative_call(ucode_ops.apply_microcode, microcode_cache, 0);
+        rc = ucode_load(microcode_cache, 0);
     else
         rc = -ENOENT;
     spin_unlock(&microcode_mutex);
@@ -876,7 +882,7 @@ static int __init early_microcode_load(struct boot_info *bi)
      */
     early_mod_idx = idx;
 
-    rc = ucode_ops.apply_microcode(patch, 0);
+    rc = ucode_load(patch, 0);
 
     if ( rc == 0 )
         /* Rescan CPUID/MSR features, which may have changed after a load. */
@@ -925,11 +931,11 @@ int __init early_microcode_init(struct boot_info *bi)
      *
      * Take the hint in either case and ignore the microcode interface.
      */
-    if ( !ucode_ops.apply_microcode || this_cpu(cpu_sig).rev == ~0 )
+    if ( !ucode_ops.load || this_cpu(cpu_sig).rev == ~0 )
     {
         printk(XENLOG_INFO "Microcode loading disabled due to: %s\n",
-               ucode_ops.apply_microcode ? "rev = ~0" : "HW toggle");
-        ucode_ops.apply_microcode = NULL;
+               ucode_ops.load ? "rev = ~0" : "HW toggle");
+        ucode_ops.load = NULL;
         return -ENODEV;
     }
 

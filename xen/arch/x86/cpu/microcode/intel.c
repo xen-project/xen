@@ -286,8 +286,8 @@ static int cf_check intel_compare(
     return compare_revisions(old->rev, new->rev);
 }
 
-static int cf_check apply_microcode(const struct microcode_patch *patch,
-                                    unsigned int flags)
+static int cf_check intel_ucode_load(const struct microcode_patch *patch,
+                                     unsigned int flags)
 {
     uint64_t msr_content;
     unsigned int cpu = smp_processor_id();
@@ -410,7 +410,7 @@ static const char __initconst intel_cpio_path[] =
 static const struct microcode_ops __initconst_cf_clobber intel_ucode_ops = {
     .collect_cpu_info                 = collect_cpu_info,
     .parse                            = MICROCODE_OP(intel_ucode_parse),
-    .apply_microcode                  = MICROCODE_OP(apply_microcode),
+    .load                             = MICROCODE_OP(intel_ucode_load),
     .compare                          = MICROCODE_OP(intel_compare),
     .cpio_path                        = MICROCODE_OP(intel_cpio_path),
 };
@@ -423,5 +423,5 @@ void __init ucode_probe_intel(struct microcode_ops *ops)
         return;
 
     if ( !can_load_microcode() )
-        ops->apply_microcode = NULL;
+        ops->load = NULL;
 }
