@@ -470,8 +470,7 @@ bool vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode,
     struct domain *d = v->domain;
     int vcpuid;
     int i;
-    unsigned int base;
-    unsigned long int bitmap;
+    unsigned int base, bitmap;
 
     ASSERT( virq < 16 );
 
@@ -481,15 +480,16 @@ bool vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode,
         perfc_incr(vgic_sgi_list);
         base = target->aff1 << 4;
         bitmap = target->list;
-        bitmap_for_each ( i, &bitmap, sizeof(target->list) * 8 )
+
+        for_each_set_bit ( i, bitmap )
         {
             vcpuid = base + i;
             if ( vcpuid >= d->max_vcpus || d->vcpu[vcpuid] == NULL ||
                  !is_vcpu_online(d->vcpu[vcpuid]) )
             {
-                gprintk(XENLOG_WARNING, "VGIC: write r=%"PRIregister" \
-                        target->list=%hx, wrong CPUTargetList \n",
-                        sgir, target->list);
+                gprintk(XENLOG_WARNING,
+                        "vGIC: write %#"PRIregister", target->list=%#x, bad target vcpu%d\n",
+                        sgir, target->list, vcpuid);
                 continue;
             }
             vgic_inject_irq(d, d->vcpu[vcpuid], virq, true);
@@ -510,8 +510,8 @@ bool vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode,
         break;
     default:
         gprintk(XENLOG_WARNING,
-                "vGICD:unhandled GICD_SGIR write %"PRIregister" \
-                 with wrong mode\n", sgir);
+                "vGICD: GICD_SGIR write %#"PRIregister" with unhandled mode %d\n",
+                sgir, irqmode);
         return false;
     }
 
