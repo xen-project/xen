@@ -40,13 +40,14 @@ ALL_OCAML_OBJS ?= $(OBJS)
 	$(call quiet-command, $(CC) $(CFLAGS) -c -o $@ $<,CC,$@)
 
 META: META.in
-	sed 's/@VERSION@/$(VERSION)/g' < $< $o
+	sed 's/@VERSION@/$(VERSION)/g' < $< > $@.tmp
+	$(call move-if-changed,$@.tmp,$@)
 
 ALL_OCAML_OBJ_SOURCES=$(addsuffix .ml, $(ALL_OCAML_OBJS))
 
 ifneq ($(MAKECMDGOALS),clean)
 .ocamldep.make: $(ALL_OCAML_OBJ_SOURCES) Makefile $(OCAML_TOPLEVEL)/Makefile.rules
-	$(call quiet-command, $(OCAMLDEP) $(ALL_OCAML_OBJ_SOURCES) *.mli $o,MLDEP,)
+	$(call quiet-command, $(OCAMLDEP) $(ALL_OCAML_OBJ_SOURCES) *.mli > $@.tmp; $(call move-if-changed,$@.tmp,$@),MLDEP,)
 endif
 
 clean: $(CLEAN_HOOKS)

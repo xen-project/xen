@@ -17,5 +17,3 @@ OCAMLCFLAGS += -g $(OCAMLINCLUDE) -w F -warn-error F
 VERSION := 4.1
 
 OCAMLDESTDIR ?= $(DESTDIR)$(shell $(OCAMLFIND) printconf destdir)
-
-o= >$@.new && mv -f $@.new $@
