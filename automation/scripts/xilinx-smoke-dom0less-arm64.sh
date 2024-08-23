@@ -134,9 +134,10 @@ sleep 5
 cd $START
 
 # connect to serial
+SERIAL_DEV="/dev/serial/zynq"
 set +e
-stty -F /dev/ttyUSB0 115200
-timeout -k 1 120 nohup sh -c "cat /dev/ttyUSB0 | tee smoke.serial"
+stty -F ${SERIAL_DEV} 115200
+timeout -k 1 120 nohup sh -c "cat ${SERIAL_DEV} | tee smoke.serial"
 
 # stop the board
 cd /scratch/gitlab-runner
