@@ -175,6 +175,18 @@ custom_param("ucode", parse_ucode);
 
 static struct microcode_ops __ro_after_init ucode_ops;
 
+/* Parse a ucode blob.  Returns a pointer to a heap-allocated copy, or PTR_ERR. */
+static struct microcode_patch *ucode_parse_dup(const char *buf, size_t len)
+{
+    return alternative_call(ucode_ops.parse, buf, len, true);
+}
+
+/* Parse a ucode blob.  Returns a pointer into @buf, or PTR_ERR. */
+static const struct microcode_patch *__init ucode_parse(const char *buf, size_t len)
+{
+    return ucode_ops.parse(buf, len, false);
+}
+
 static DEFINE_SPINLOCK(microcode_mutex);
 
 DEFINE_PER_CPU(struct cpu_signature, cpu_sig);
@@ -499,8 +511,7 @@ static long cf_check __maybe_unused ucode_update_hcall_cont(void *data)
         goto put;
     }
 
-    patch = alternative_call(ucode_ops.cpu_request_microcode,
-                             (const void *)buffer->buffer, buffer->len, true);
+    patch = ucode_parse_dup(buffer->buffer, buffer->len);
     patch_with_flags.flags = buffer->flags;
 
     xfree(buffer);
@@ -715,7 +726,7 @@ static int __init cf_check microcode_init_cache(void)
         size = cd.size;
     }
 
-    patch = alternative_call(ucode_ops.cpu_request_microcode, data, size, true);
+    patch = ucode_parse_dup(data, size);
     if ( IS_ERR(patch) )
     {
         rc = PTR_ERR(patch);
@@ -749,7 +760,7 @@ static int __init early_microcode_load(struct boot_info *bi)
 {
     void *data = NULL;
     size_t size;
-    struct microcode_patch *patch;
+    const struct microcode_patch *patch;
     int idx = opt_mod_idx;
     int rc;
 
@@ -841,7 +852,7 @@ static int __init early_microcode_load(struct boot_info *bi)
     return 0;
 
  found:
-    patch = ucode_ops.cpu_request_microcode(data, size, false);
+    patch = ucode_parse(data, size);
     if ( IS_ERR(patch) )
     {
         rc = PTR_ERR(patch);

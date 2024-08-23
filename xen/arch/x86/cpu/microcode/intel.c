@@ -333,7 +333,7 @@ static int cf_check apply_microcode(const struct microcode_patch *patch,
     return 0;
 }
 
-static struct microcode_patch *cf_check cpu_request_microcode(
+static struct microcode_patch *cf_check intel_ucode_parse(
     const void *buf, size_t size, bool make_copy)
 {
     int error = 0;
@@ -409,7 +409,7 @@ static const char __initconst intel_cpio_path[] =
 
 static const struct microcode_ops __initconst_cf_clobber intel_ucode_ops = {
     .collect_cpu_info                 = collect_cpu_info,
-    .cpu_request_microcode            = MICROCODE_OP(cpu_request_microcode),
+    .parse                            = MICROCODE_OP(intel_ucode_parse),
     .apply_microcode                  = MICROCODE_OP(apply_microcode),
     .compare                          = MICROCODE_OP(intel_compare),
     .cpio_path                        = MICROCODE_OP(intel_cpio_path),

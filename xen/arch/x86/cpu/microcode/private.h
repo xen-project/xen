@@ -33,7 +33,7 @@ struct microcode_ops {
      * If one is not found, (nothing matches the current CPU), return NULL.
      * Also may return ERR_PTR(-err), e.g. bad container, out of memory.
      */
-    struct microcode_patch *(*cpu_request_microcode)(
+    struct microcode_patch *(*parse)(
         const void *buf, size_t size, bool make_copy);
 
     /*
