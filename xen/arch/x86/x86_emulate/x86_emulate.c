@@ -8116,13 +8116,13 @@ x86_emulate(
     }
     else if ( state->simd_size != simd_none )
     {
-        generate_exception_if(!op_bytes, X86_EXC_UD);
         generate_exception_if((vex.opcx && (d & TwoOp) &&
                                (vex.reg != 0xf || (evex_encoded() && !evex.RX))),
                               X86_EXC_UD);
 
-        if ( !opc )
-            BUG();
+        EXPECT(op_bytes);
+        EXPECT(opc);
+
         if ( evex_encoded() )
         {
             opc[insn_bytes - EVEX_PFX_BYTES] = 0xc3;
