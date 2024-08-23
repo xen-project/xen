@@ -6075,6 +6075,7 @@ x86_emulate(
     case X86EMUL_OPC_VEX_F2(0x0f38, 0x51): /* vpdpbssds [xy]mm/mem,[xy]mm,[xy]mm */
         host_and_vcpu_must_have(avx_vnni_int8);
         generate_exception_if(vex.w, X86_EXC_UD);
+        op_bytes = 16 << vex.l;
         goto simd_0f_ymm;
 
     case X86EMUL_OPC_VEX_66(0x0f38, 0x50): /* vpdpbusd [xy]mm/mem,[xy]mm,[xy]mm */
