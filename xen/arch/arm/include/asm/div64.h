@@ -102,7 +102,7 @@
 		/* preserve low part of n for reminder computation */	\
 		__r = __n;						\
 		/* determine number of bits to represent __b */		\
-		__p = 1 << __div64_fls(__b);				\
+		__p = 1 << fls(__b);					\
 		/* compute __m = ((__p << 64) + __b - 1) / __b */	\
 		__m = (~0ULL / __b) * __p;				\
 		__m += (((~0ULL % __b + 1) * __p) + __b - 1) / __b;	\
@@ -150,8 +150,8 @@
 				__p /= (__m & -__m);			\
 				__m /= (__m & -__m);			\
 			} else {					\
-				__p >>= __div64_fls(__bits);		\
-				__m >>= __div64_fls(__bits);		\
+				__p >>= fls(__bits);			\
+				__m >>= fls(__bits);			\
 			}						\
 			/* No correction needed. */			\
 			__c = 0;					\
@@ -215,18 +215,6 @@
 		n = __res;						\
 	}								\
 	__r;								\
-})
-
-/* our own fls implementation to make sure constant propagation is fine */
-#define __div64_fls(bits)						\
-({									\
-	unsigned int __left = (bits), __nr = 0;				\
-	if (__left & 0xffff0000) __nr += 16, __left >>= 16;		\
-	if (__left & 0x0000ff00) __nr +=  8, __left >>=  8;		\
-	if (__left & 0x000000f0) __nr +=  4, __left >>=  4;		\
-	if (__left & 0x0000000c) __nr +=  2, __left >>=  2;		\
-	if (__left & 0x00000002) __nr +=  1;				\
-	__nr;								\
 })
 
 #endif /* GCC version */
