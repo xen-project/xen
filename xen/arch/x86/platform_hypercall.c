@@ -313,7 +313,7 @@ ret_t do_platform_op(
 
         guest_from_compat_handle(data, op->u.microcode.data);
 
-        ret = microcode_update(data, op->u.microcode.length, 0);
+        ret = ucode_update_hcall(data, op->u.microcode.length, 0);
         break;
     }
 
@@ -323,8 +323,8 @@ ret_t do_platform_op(
 
         guest_from_compat_handle(data, op->u.microcode2.data);
 
-        ret = microcode_update(data, op->u.microcode2.length,
-                               op->u.microcode2.flags);
+        ret = ucode_update_hcall(data, op->u.microcode2.length,
+                                 op->u.microcode2.flags);
         break;
     }
 

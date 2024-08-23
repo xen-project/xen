@@ -22,8 +22,8 @@ struct cpu_signature {
 DECLARE_PER_CPU(struct cpu_signature, cpu_sig);
 
 void microcode_set_module(unsigned int idx);
-int microcode_update(XEN_GUEST_HANDLE(const_void) buf,
-                     unsigned long len, unsigned int flags);
+int ucode_update_hcall(XEN_GUEST_HANDLE(const_void) buf,
+                       unsigned long len, unsigned int flags);
 int microcode_update_one(void);
 
 struct boot_info;

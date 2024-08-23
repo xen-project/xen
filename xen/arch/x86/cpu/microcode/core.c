@@ -467,7 +467,7 @@ struct ucode_buf {
     char buffer[];
 };
 
-static long cf_check microcode_update_helper(void *data)
+static long cf_check ucode_update_hcall_cont(void *data)
 {
     struct microcode_patch *patch = NULL;
     int ret, result;
@@ -611,8 +611,8 @@ static long cf_check microcode_update_helper(void *data)
     return ret;
 }
 
-int microcode_update(XEN_GUEST_HANDLE(const_void) buf,
-                     unsigned long len, unsigned int flags)
+int ucode_update_hcall(XEN_GUEST_HANDLE(const_void) buf,
+                       unsigned long len, unsigned int flags)
 {
     int ret;
     struct ucode_buf *buffer;
@@ -637,11 +637,11 @@ int microcode_update(XEN_GUEST_HANDLE(const_void) buf,
     buffer->flags = flags;
 
     /*
-     * Always queue microcode_update_helper() on CPU0.  Most of the logic
+     * Always queue ucode_update_hcall_cont() on CPU0.  Most of the logic
      * won't care, but the update of the Raw CPU policy wants to (re)run on
      * the BSP.
      */
-    return continue_hypercall_on_cpu(0, microcode_update_helper, buffer);
+    return continue_hypercall_on_cpu(0, ucode_update_hcall_cont, buffer);
 }
 
 /* Load a cached update to current cpu */
