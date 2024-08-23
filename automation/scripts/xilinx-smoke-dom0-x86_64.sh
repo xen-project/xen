@@ -12,7 +12,6 @@ fatal() {
 # Test parameter defaults.
 TEST="$1"
 PASS_MSG="Test passed: ${TEST}"
-XEN_CMD_CONSOLE="console=com1 com1=115200,8n1,0x3F8,4"
 XEN_CMD_DOM0="dom0=pvh dom0_max_vcpus=4 dom0_mem=4G"
 XEN_CMD_XEN="sched=null loglvl=all guest_loglvl=all console_timestamps=boot"
 XEN_CMD_EXTRA=""
@@ -28,7 +27,7 @@ memory = 512
 vif = [ "bridge=xenbr0", ]
 disk = [ ]
 '
-TIMEOUT_SECONDS=120
+TIMEOUT_SECONDS=200
 
 # Select test variant.
 if [ "${TEST}" = "ping" ]; then
@@ -113,27 +112,28 @@ cd ..
 # Load software into TFTP server directory.
 TFTP="/scratch/gitlab-runner/tftp"
 XEN_CMDLINE="${XEN_CMD_CONSOLE} ${XEN_CMD_XEN} ${XEN_CMD_DOM0} ${XEN_CMD_EXTRA}"
-cp -f binaries/xen ${TFTP}/pxelinux.cfg/xen
-cp -f binaries/bzImage ${TFTP}/pxelinux.cfg/vmlinuz
-cp -f binaries/dom0-rootfs.cpio.gz ${TFTP}/pxelinux.cfg/initrd-dom0
+cp -f binaries/xen ${TFTP}/${TEST_BOARD}/xen
+cp -f binaries/bzImage ${TFTP}/${TEST_BOARD}/vmlinuz
+cp -f binaries/dom0-rootfs.cpio.gz ${TFTP}/${TEST_BOARD}/initrd-dom0
 echo "
 net_default_server=10.0.6.1
-multiboot2 (tftp)/pxelinux.cfg/xen ${XEN_CMDLINE}
-module2 (tftp)/pxelinux.cfg/vmlinuz console=hvc0 root=/dev/ram0 earlyprintk=xen
-module2 (tftp)/pxelinux.cfg/initrd-dom0
+multiboot2 (tftp)/${TEST_BOARD}/xen ${XEN_CMDLINE}
+module2 (tftp)/${TEST_BOARD}/vmlinuz console=hvc0 root=/dev/ram0 earlyprintk=xen
+module2 (tftp)/${TEST_BOARD}/initrd-dom0
 boot
-" > ${TFTP}/pxelinux.cfg/grub.cfg
+" > ${TFTP}/${TEST_BOARD}/grub.cfg
 
 # Power cycle board and collect serial port output.
-SERIAL_CMD="cat /dev/ttyUSB9 | tee smoke.serial | sed 's/\r//'"
-sh /scratch/gitlab-runner/v2000a.sh 2
+SERIAL_DEV="/dev/serial/${TEST_BOARD}"
+SERIAL_CMD="cat ${SERIAL_DEV} | tee smoke.serial | sed 's/\r//'"
+sh /scratch/gitlab-runner/${TEST_BOARD}.sh 2
 sleep 5
-sh /scratch/gitlab-runner/v2000a.sh 1
+sh /scratch/gitlab-runner/${TEST_BOARD}.sh 1
 sleep 5
 set +e
-stty -F /dev/ttyUSB9 115200
+stty -F ${SERIAL_DEV} 115200
 timeout -k 1 ${TIMEOUT_SECONDS} nohup sh -c "${SERIAL_CMD}"
-sh /scratch/gitlab-runner/v2000a.sh 2
+sh /scratch/gitlab-runner/${TEST_BOARD}.sh 2
 
 set -e
 
