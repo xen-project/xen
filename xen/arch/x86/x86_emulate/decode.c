@@ -1122,7 +1122,9 @@ int x86emul_decode(struct x86_emulate_state *s,
             switch ( def_ad_bytes )
             {
             default:
-                BUG(); /* Shouldn't be possible. */
+                ASSERT_UNREACHABLE(); /* Shouldn't be possible. */
+                return X86EMUL_UNHANDLEABLE;
+
             case 2:
                 if ( ctxt->regs->eflags & X86_EFLAGS_VM )
                     break;

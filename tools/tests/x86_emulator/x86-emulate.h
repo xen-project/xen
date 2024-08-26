@@ -42,7 +42,6 @@
 
 #include <xen-tools/common-macros.h>
 
-#define BUG() abort()
 #define ASSERT assert
 #define ASSERT_UNREACHABLE() assert(!__LINE__)
 

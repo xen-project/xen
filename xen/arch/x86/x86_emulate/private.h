@@ -15,6 +15,9 @@
 # include <asm/x86-vendors.h>
 # include <asm/x86_emulate.h>
 
+# undef BUG /* Make sure it's not used anywhere here. */
+void BUG(void);
+
 # ifndef CONFIG_HVM
 #  define X86EMUL_NO_FPU
 #  define X86EMUL_NO_MMX
