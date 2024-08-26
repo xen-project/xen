@@ -228,7 +228,8 @@ static int cf_check update_clusterinfo(
     case CPU_UP_CANCELED:
     case CPU_DEAD:
     case CPU_REMOVE:
-        if ( park_offline_cpus == (action != CPU_REMOVE) )
+        if ( park_offline_cpus == (action != CPU_REMOVE) ||
+             system_state == SYS_STATE_suspend )
             break;
         if ( per_cpu(cluster_cpus, cpu) )
         {
