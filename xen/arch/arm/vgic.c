@@ -468,8 +468,6 @@ bool vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode,
                  int virq, const struct sgi_target *target)
 {
     struct domain *d = v->domain;
-    int vcpuid;
-    int i;
     unsigned int base, bitmap;
 
     ASSERT( virq < 16 );
@@ -483,12 +481,13 @@ bool vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode,
 
         for_each_set_bit ( i, bitmap )
         {
-            vcpuid = base + i;
+            unsigned int vcpuid = base + i;
+
             if ( vcpuid >= d->max_vcpus || d->vcpu[vcpuid] == NULL ||
                  !is_vcpu_online(d->vcpu[vcpuid]) )
             {
                 gprintk(XENLOG_WARNING,
-                        "vGIC: write %#"PRIregister", target->list=%#x, bad target vcpu%d\n",
+                        "vGIC: write %#"PRIregister", target->list=%#x, bad target vcpu%u\n",
                         sgir, target->list, vcpuid);
                 continue;
             }
@@ -497,7 +496,7 @@ bool vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode,
         break;
     case SGI_TARGET_OTHERS:
         perfc_incr(vgic_sgi_others);
-        for ( i = 0; i < d->max_vcpus; i++ )
+        for ( unsigned int i = 0; i < d->max_vcpus; i++ )
         {
             if ( i != current->vcpu_id && d->vcpu[i] != NULL &&
                  is_vcpu_online(d->vcpu[i]) )
