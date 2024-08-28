@@ -64,6 +64,8 @@ extern bool opt_dom0_verbose;
 extern bool opt_dom0_cpuid_faulting;
 extern bool opt_dom0_msr_relaxed;
 
+extern unsigned long cr4_pv32_mask;
+
 #define max_init_domid (0)
 
 #endif
