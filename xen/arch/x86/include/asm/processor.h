@@ -312,11 +312,15 @@ static inline void stts(void)
  * after us can get the correct flags.
  */
 extern unsigned long mmu_cr4_features;
+extern unsigned long cr4_pv32_mask;
 
 static always_inline void set_in_cr4 (unsigned long mask)
 {
     mmu_cr4_features |= mask;
     write_cr4(read_cr4() | mask);
+
+    if ( IS_ENABLED(CONFIG_PV32) && (mask & XEN_CR4_PV32_BITS) )
+        cr4_pv32_mask |= (mask & XEN_CR4_PV32_BITS);
 }
 
 static always_inline void __monitor(const void *eax, unsigned long ecx,

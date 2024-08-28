@@ -19,6 +19,7 @@
 
 #ifdef CONFIG_PV32
 int8_t __read_mostly opt_pv32 = -1;
+unsigned long __ro_after_init cr4_pv32_mask;
 #endif
 
 static int __init cf_check parse_pv(const char *s)

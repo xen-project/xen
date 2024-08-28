@@ -1061,12 +1061,14 @@ int __init dom0_construct_pv(struct domain *d,
 
     /*
      * Clear SMAP in CR4 to allow user-accesses in construct_dom0().  This
-     * prevents us needing to write rewrite construct_dom0() in terms of
+     * prevents us needing to write construct_dom0() in terms of
      * copy_{to,from}_user().
      */
     if ( boot_cpu_has(X86_FEATURE_XEN_SMAP) )
     {
-        cr4_pv32_mask &= ~X86_CR4_SMAP;
+        if ( IS_ENABLED(CONFIG_PV32) )
+            cr4_pv32_mask &= ~X86_CR4_SMAP;
+
         write_cr4(read_cr4() & ~X86_CR4_SMAP);
     }
 
@@ -1075,7 +1077,9 @@ int __init dom0_construct_pv(struct domain *d,
     if ( boot_cpu_has(X86_FEATURE_XEN_SMAP) )
     {
         write_cr4(read_cr4() | X86_CR4_SMAP);
-        cr4_pv32_mask |= X86_CR4_SMAP;
+
+        if ( IS_ENABLED(CONFIG_PV32) )
+            cr4_pv32_mask |= X86_CR4_SMAP;
     }
 
     return rc;

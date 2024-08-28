@@ -79,8 +79,6 @@ bool __read_mostly use_invpcid;
 int8_t __initdata opt_probe_port_aliases = -1;
 boolean_param("probe-port-aliases", opt_probe_port_aliases);
 
-unsigned long __ro_after_init cr4_pv32_mask;
-
 /* **** Linux config option: propagated to domain0. */
 /* "acpi=off":    Sisables both ACPI table parsing and interpreter. */
 /* "acpi=force":  Override the disable blacklist.                   */
@@ -1897,8 +1895,6 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
         setup_force_cpu_cap(X86_FEATURE_XEN_SMAP);
     if ( boot_cpu_has(X86_FEATURE_XEN_SMAP) )
         set_in_cr4(X86_CR4_SMAP);
-
-    cr4_pv32_mask = mmu_cr4_features & XEN_CR4_PV32_BITS;
 
     if ( boot_cpu_has(X86_FEATURE_FSGSBASE) )
         set_in_cr4(X86_CR4_FSGSBASE);
