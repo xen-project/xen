@@ -32,8 +32,8 @@ extern void __bitop_bad_size(void);
  *
  * Bits are labelled from 1.  Returns 0 if given 0.
  */
-unsigned int __pure generic_ffsl(unsigned long x);
-unsigned int __pure generic_flsl(unsigned long x);
+unsigned int attr_const generic_ffsl(unsigned long x);
+unsigned int attr_const generic_flsl(unsigned long x);
 
 /**
  * generic__test_and_set_bit - Set a bit and return its old value
@@ -204,7 +204,7 @@ static always_inline bool test_bit(int nr, const volatile void *addr)
     test_bit(nr, addr);                                 \
 })
 
-static always_inline __pure unsigned int ffs(unsigned int x)
+static always_inline attr_const unsigned int ffs(unsigned int x)
 {
     if ( __builtin_constant_p(x) )
         return __builtin_ffs(x);
@@ -216,7 +216,7 @@ static always_inline __pure unsigned int ffs(unsigned int x)
 #endif
 }
 
-static always_inline __pure unsigned int ffsl(unsigned long x)
+static always_inline attr_const unsigned int ffsl(unsigned long x)
 {
     if ( __builtin_constant_p(x) )
         return __builtin_ffsl(x);
@@ -228,7 +228,7 @@ static always_inline __pure unsigned int ffsl(unsigned long x)
 #endif
 }
 
-static always_inline __pure unsigned int ffs64(uint64_t x)
+static always_inline attr_const unsigned int ffs64(uint64_t x)
 {
     if ( BITS_PER_LONG == 64 )
         return ffsl(x);
@@ -246,7 +246,7 @@ static always_inline __pure unsigned int ffs64(uint64_t x)
      sizeof(x) <= sizeof(uint64_t) ? ffs64(x) :         \
      ({ BUILD_ERROR("ffs_g() Bad input type"); 0; }))
 
-static always_inline __pure unsigned int fls(unsigned int x)
+static always_inline attr_const unsigned int fls(unsigned int x)
 {
     if ( __builtin_constant_p(x) )
         return x ? 32 - __builtin_clz(x) : 0;
@@ -258,7 +258,7 @@ static always_inline __pure unsigned int fls(unsigned int x)
 #endif
 }
 
-static always_inline __pure unsigned int flsl(unsigned long x)
+static always_inline attr_const unsigned int flsl(unsigned long x)
 {
     if ( __builtin_constant_p(x) )
         return x ? BITS_PER_LONG - __builtin_clzl(x) : 0;
@@ -270,7 +270,7 @@ static always_inline __pure unsigned int flsl(unsigned long x)
 #endif
 }
 
-static always_inline __pure unsigned int fls64(uint64_t x)
+static always_inline attr_const unsigned int fls64(uint64_t x)
 {
     if ( BITS_PER_LONG == 64 )
         return flsl(x);
