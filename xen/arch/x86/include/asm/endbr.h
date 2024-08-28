@@ -19,7 +19,7 @@
  * gen_endbr64() is written deliberately to avoid the problematic operand, and
  * marked __const__ as it is safe for the optimiser to hoist/merge/etc.
  */
-static inline uint32_t __attribute_const__ gen_endbr64(void)
+static inline uint32_t attr_const gen_endbr64(void)
 {
     uint32_t res;
 
@@ -45,7 +45,7 @@ static inline void place_endbr64(void *ptr)
  * contain an ENDBR64 instruction.  Use an encoding which isn't the default
  * P6_NOP4.  Specifically, nopw (%rcx)
  */
-static inline uint32_t __attribute_const__ gen_endbr64_poison(void)
+static inline uint32_t attr_const gen_endbr64_poison(void)
 {
     uint32_t res;
 

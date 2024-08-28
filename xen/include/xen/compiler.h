@@ -88,7 +88,7 @@
 
 #define __constructor       __attribute__((__constructor__)) cf_check
 #define __pure              __attribute__((__pure__))
-#define __attribute_const__ __attribute__((__const__))
+#define attr_const          __attribute__((__const__))
 #define __transparent__     __attribute__((__transparent_union__))
 
 /*

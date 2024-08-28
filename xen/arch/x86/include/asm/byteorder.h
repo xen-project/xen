@@ -4,13 +4,13 @@
 #include <xen/types.h>
 #include <xen/compiler.h>
 
-static inline __attribute_const__ __u32 ___arch__swab32(__u32 x)
+static inline attr_const __u32 ___arch__swab32(__u32 x)
 {
     asm("bswap %0" : "=r" (x) : "0" (x));
     return x;
 }
 
-static inline __attribute_const__ __u64 ___arch__swab64(__u64 val)
+static inline attr_const __u64 ___arch__swab64(__u64 val)
 { 
     union { 
         struct { __u32 a,b; } s;
