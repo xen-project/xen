@@ -494,7 +494,7 @@ custom_param("pv-l1tf", parse_pv_l1tf);
 
 static void __init print_details(enum ind_thunk thunk)
 {
-    unsigned int _7d0 = 0, _7d2 = 0, e8b = 0, e21a = 0, max = 0, tmp;
+    unsigned int _7d0 = 0, _7d2 = 0, e8b = 0, e21a = 0, e21c = 0, max = 0, tmp;
     uint64_t caps = 0;
 
     /* Collect diagnostics about available mitigations. */
@@ -505,7 +505,7 @@ static void __init print_details(enum ind_thunk thunk)
     if ( boot_cpu_data.extended_cpuid_level >= 0x80000008U )
         cpuid(0x80000008U, &tmp, &e8b, &tmp, &tmp);
     if ( boot_cpu_data.extended_cpuid_level >= 0x80000021U )
-        cpuid(0x80000021U, &e21a, &tmp, &tmp, &tmp);
+        cpuid(0x80000021U, &e21a, &tmp, &e21c, &tmp);
     if ( cpu_has_arch_caps )
         rdmsrl(MSR_ARCH_CAPABILITIES, caps);
 
@@ -515,7 +515,7 @@ static void __init print_details(enum ind_thunk thunk)
      * Hardware read-only information, stating immunity to certain issues, or
      * suggestions of which mitigation to use.
      */
-    printk("  Hardware hints:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
+    printk("  Hardware hints:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
            (caps & ARCH_CAPS_RDCL_NO)                        ? " RDCL_NO"        : "",
            (caps & ARCH_CAPS_EIBRS)                          ? " EIBRS"          : "",
            (caps & ARCH_CAPS_RSBA)                           ? " RSBA"           : "",
@@ -540,10 +540,12 @@ static void __init print_details(enum ind_thunk thunk)
            (e8b  & cpufeat_mask(X86_FEATURE_IBPB_RET))       ? " IBPB_RET"       : "",
            (e21a & cpufeat_mask(X86_FEATURE_IBPB_BRTYPE))    ? " IBPB_BRTYPE"    : "",
            (e21a & cpufeat_mask(X86_FEATURE_SRSO_NO))        ? " SRSO_NO"        : "",
-           (e21a & cpufeat_mask(X86_FEATURE_SRSO_US_NO))     ? " SRSO_US_NO"     : "");
+           (e21a & cpufeat_mask(X86_FEATURE_SRSO_US_NO))     ? " SRSO_US_NO"     : "",
+           (e21c & cpufeat_mask(X86_FEATURE_TSA_SQ_NO))      ? " TSA_SQ_NO"      : "",
+           (e21c & cpufeat_mask(X86_FEATURE_TSA_L1_NO))      ? " TSA_L1_NO"      : "");
 
     /* Hardware features which need driving to mitigate issues. */
-    printk("  Hardware features:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
+    printk("  Hardware features:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
            (e8b  & cpufeat_mask(X86_FEATURE_IBPB)) ||
            (_7d0 & cpufeat_mask(X86_FEATURE_IBRSB))          ? " IBPB"           : "",
            (e8b  & cpufeat_mask(X86_FEATURE_IBRS)) ||
@@ -563,7 +565,8 @@ static void __init print_details(enum ind_thunk thunk)
            (caps & ARCH_CAPS_GDS_CTRL)                       ? " GDS_CTRL"       : "",
            (caps & ARCH_CAPS_RFDS_CLEAR)                     ? " RFDS_CLEAR"     : "",
            (e21a & cpufeat_mask(X86_FEATURE_SBPB))           ? " SBPB"           : "",
-           (e21a & cpufeat_mask(X86_FEATURE_SRSO_MSR_FIX))   ? " SRSO_MSR_FIX"   : "");
+           (e21a & cpufeat_mask(X86_FEATURE_SRSO_MSR_FIX))   ? " SRSO_MSR_FIX"   : "",
+           (e21a & cpufeat_mask(X86_FEATURE_VERW_CLEAR))     ? " VERW_CLEAR"     : "");
 
     /* Compiled-in support which pertains to mitigations. */
     if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) || IS_ENABLED(CONFIG_SHADOW_PAGING) ||
@@ -1524,6 +1527,77 @@ static void __init rfds_calculations(void)
     setup_force_cpu_cap(X86_FEATURE_RFDS_NO);
 }
 
+/*
+ * Transient Scheduler Attacks
+ *
+ * https://www.amd.com/content/dam/amd/en/documents/resources/bulletin/technical-guidance-for-mitigating-transient-scheduler-attacks.pdf
+ */
+static void __init tsa_calculations(void)
+{
+    unsigned int curr_rev, min_rev;
+
+    /* TSA is only known to affect AMD processors at this time. */
+    if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
+        return;
+
+    /* If we're virtualised, don't attempt to synthesise anything. */
+    if ( cpu_has_hypervisor )
+        return;
+
+    /*
+     * According to the whitepaper, some Fam1A CPUs (Models 0x00...0x4f,
+     * 0x60...0x7f) are not vulnerable but don't enumerate TSA_{SQ,L1}_NO.  If
+     * we see either enumerated, assume both are correct ...
+     */
+    if ( cpu_has_tsa_sq_no || cpu_has_tsa_l1_no )
+        return;
+
+    /*
+     * ... otherwise, synthesise them.  CPUs other than Fam19 (Zen3/4) are
+     * stated to be not vulnerable.
+     */
+    if ( boot_cpu_data.x86 != 0x19 )
+    {
+        setup_force_cpu_cap(X86_FEATURE_TSA_SQ_NO);
+        setup_force_cpu_cap(X86_FEATURE_TSA_L1_NO);
+        return;
+    }
+
+    /*
+     * Fam19 CPUs get VERW_CLEAR with new enough microcode, but must
+     * synthesise the CPUID bit.
+     */
+    curr_rev = this_cpu(cpu_sig).rev;
+    switch ( curr_rev >> 8 )
+    {
+    case 0x0a0011: min_rev = 0x0a0011d7; break;
+    case 0x0a0012: min_rev = 0x0a00123b; break;
+    case 0x0a0082: min_rev = 0x0a00820d; break;
+    case 0x0a1011: min_rev = 0x0a10114c; break;
+    case 0x0a1012: min_rev = 0x0a10124c; break;
+    case 0x0a1081: min_rev = 0x0a108109; break;
+    case 0x0a2010: min_rev = 0x0a20102e; break;
+    case 0x0a2012: min_rev = 0x0a201211; break;
+    case 0x0a4041: min_rev = 0x0a404108; break;
+    case 0x0a5000: min_rev = 0x0a500012; break;
+    case 0x0a6012: min_rev = 0x0a60120a; break;
+    case 0x0a7041: min_rev = 0x0a704108; break;
+    case 0x0a7052: min_rev = 0x0a705208; break;
+    case 0x0a7080: min_rev = 0x0a708008; break;
+    case 0x0a70c0: min_rev = 0x0a70c008; break;
+    case 0x0aa002: min_rev = 0x0aa00216; break;
+    default:
+        printk(XENLOG_WARNING
+               "Unrecognised CPU %02x-%02x-%02x, ucode 0x%08x for TSA mitigation\n",
+               boot_cpu_data.x86, boot_cpu_data.x86_model,
+               boot_cpu_data.x86_mask, curr_rev);
+        return;
+    }
+
+    if ( curr_rev >= min_rev )
+        setup_force_cpu_cap(X86_FEATURE_VERW_CLEAR);
+}
+
 static bool __init cpu_has_gds(void)
 {
     /*
@@ -2221,6 +2295,7 @@ void __init init_speculation_mitigations(void)
      * https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/technical-documentation/intel-analysis-microarchitectural-data-sampling.html
      * https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/technical-documentation/processor-mmio-stale-data-vulnerabilities.html
      * https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/advisory-guidance/register-file-data-sampling.html
+     * https://www.amd.com/content/dam/amd/en/documents/resources/bulletin/technical-guidance-for-mitigating-transient-scheduler-attacks.pdf
      *
      * Relevant ucodes:
      *
@@ -2253,9 +2328,18 @@ void __init init_speculation_mitigations(void)
      *
      * - March 2023, for RFDS.  Enumerate RFDS_CLEAR to mean that VERW now
      *   scrubs non-architectural entries from certain register files.
+     *
+     * - July 2025, for TSA.  Introduces VERW side effects to mitigate
+     *   TSA_{SQ/L1}.  Xen must synthesise the VERW_CLEAR feature based on
+     *   microcode version.
+     *
+     *   Note, these microcode updates were produced before the remediation of
+     *   the microcode signature issues, and are included in the firwmare
+     *   updates fixing the entrysign vulnerability from ~December 2024.
      */
     mds_calculations();
     rfds_calculations();
+    tsa_calculations();
 
     /*
      * Parts which enumerate FB_CLEAR are those with now-updated microcode
@@ -2287,21 +2371,27 @@ void __init init_speculation_mitigations(void)
      * MLPDS/MFBDS when SMT is enabled.
      */
     if ( opt_verw_pv == -1 )
-        opt_verw_pv = cpu_has_useful_md_clear || cpu_has_rfds_clear;
+        opt_verw_pv = (cpu_has_useful_md_clear || cpu_has_rfds_clear ||
+                       cpu_has_verw_clear);
 
     if ( opt_verw_hvm == -1 )
-        opt_verw_hvm = cpu_has_useful_md_clear || cpu_has_rfds_clear;
+        opt_verw_hvm = (cpu_has_useful_md_clear || cpu_has_rfds_clear ||
+                        cpu_has_verw_clear);
 
     /*
-     * If SMT is active, and we're protecting against MDS or MMIO stale data,
+     * If SMT is active, and we're protecting against any of:
+     *   - MSBDS
+     *   - MMIO stale data
+     *   - TSA-SQ
      * we need to scrub before going idle as well as on return to guest.
      * Various pipeline resources are repartitioned amongst non-idle threads.
      *
-     * We don't need to scrub on idle for RFDS.  There are no affected cores
-     * which support SMT, despite there being affected cores in hybrid systems
-     * which have SMT elsewhere in the platform.
+     * We don't need to scrub on idle for:
+     *   - RFDS (no SMT affected cores)
+     *   - TSA-L1 (utags never shared between threads)
      */
     if ( ((cpu_has_useful_md_clear && (opt_verw_pv || opt_verw_hvm)) ||
+          (cpu_has_verw_clear && !cpu_has_tsa_sq_no) ||
           opt_verw_mmio) && hw_smt_enabled )
         setup_force_cpu_cap(X86_FEATURE_SC_VERW_IDLE);
 
