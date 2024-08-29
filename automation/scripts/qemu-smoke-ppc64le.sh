@@ -10,7 +10,7 @@ machine=$1
 # Run the test
 rm -f ${serial_log}
 
-export QEMU_CMD="qemu-system-ppc64 \
+export TEST_CMD="qemu-system-ppc64 \
     -bios skiboot.lid \
     -M $machine \
     -m 2g \
@@ -21,7 +21,7 @@ export QEMU_CMD="qemu-system-ppc64 \
     -serial stdio \
     -kernel binaries/xen"
 
-export QEMU_LOG="${serial_log}"
+export TEST_LOG="${serial_log}"
 export PASSED="Hello, ppc64le!"
 
-./automation/scripts/qemu-key.exp | sed 's/\r\+$//'
+./automation/scripts/console.exp | sed 's/\r\+$//'

@@ -20,6 +20,7 @@ RUN apt-get update && \
         git \
         gzip \
         file \
+        expect \
         && \
         apt-get autoremove -y && \
         apt-get clean && \

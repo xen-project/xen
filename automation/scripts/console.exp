@@ -1,16 +1,16 @@
 #!/usr/bin/expect -f
 
-if {[info exists env(QEMU_TIMEOUT)]} {
-    set timeout $env(QEMU_TIMEOUT)
+if {[info exists env(TEST_TIMEOUT)]} {
+    set timeout $env(TEST_TIMEOUT)
 } else {
     set timeout 1500
 }
 
-log_file -a $env(QEMU_LOG)
+log_file -a $env(TEST_LOG)
 
 match_max 10000
 
-eval spawn $env(QEMU_CMD)
+eval spawn $env(TEST_CMD)
 
 expect_after {
     -re "(.*)\r" {

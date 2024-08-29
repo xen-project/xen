@@ -1,8 +1,8 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 # Run x86_64 dom0 tests on hardware.
 
-set -ex
+set -ex -o pipefail
 
 fatal() {
     echo "$(basename "$0") $*" >&2
@@ -27,7 +27,6 @@ memory = 512
 vif = [ "bridge=xenbr0", ]
 disk = [ ]
 '
-TIMEOUT_SECONDS=200
 
 # Select test variant.
 if [ "${TEST}" = "ping" ]; then
@@ -125,20 +124,19 @@ boot
 
 # Power cycle board and collect serial port output.
 SERIAL_DEV="/dev/serial/${TEST_BOARD}"
-SERIAL_CMD="cat ${SERIAL_DEV} | tee smoke.serial | sed 's/\r//'"
 sh /scratch/gitlab-runner/${TEST_BOARD}.sh 2
 sleep 5
 sh /scratch/gitlab-runner/${TEST_BOARD}.sh 1
 sleep 5
 set +e
 stty -F ${SERIAL_DEV} 115200
-timeout -k 1 ${TIMEOUT_SECONDS} nohup sh -c "${SERIAL_CMD}"
-sh /scratch/gitlab-runner/${TEST_BOARD}.sh 2
 
-set -e
+# Capture test result and power off board before exiting.
+export PASSED="${PASS_MSG}"
+export TEST_CMD="cat ${SERIAL_DEV}"
+export TEST_LOG="smoke.serial"
 
-if grep -q "${PASS_MSG}" smoke.serial; then
-    exit 0
-fi
-
-fatal "Test failed"
+./automation/scripts/console.exp | sed 's/\r\+$//'
+TEST_RESULT=$?
+sh "/scratch/gitlab-runner/${TEST_BOARD}.sh" 2
+exit ${TEST_RESULT}
