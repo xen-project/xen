@@ -2858,6 +2858,20 @@ static void device_model_qmp_cb(libxl__egc *egc, libxl__ev_qmp *ev,
 static void device_model_spawn_outcome(libxl__egc *egc,
                                        libxl__dm_spawn_state *dmss,
                                        int rc);
+static void device_model_probe_startup_failed(libxl__egc *egc,
+    libxl__spawn_state *spawn, int rc);
+static void device_model_probe_confirm(libxl__egc *egc,
+    libxl__spawn_state *spawn, const char *xsdata);
+static void device_model_probe_detached(libxl__egc *egc,
+    libxl__spawn_state *spawn);
+static void device_model_probe_cmdline(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *response, int rc);
+static void device_model_probe_quit(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *response, int rc);
+static void device_model_probe_spawn_outcome(libxl__egc *egc,
+     libxl__dm_spawn_state *dmss, int rc);
+static void device_model_launch(libxl__egc *egc,
+    libxl__dm_spawn_state *dmss, int rc);
 static void device_model_postconfig_chardev(libxl__egc *egc,
     libxl__ev_qmp *qmp, const libxl__json_object *response, int rc);
 static void device_model_postconfig_vnc(libxl__egc *egc,
@@ -2873,25 +2887,18 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
 {
     /* convenience aliases */
     const int domid = dmss->guest_domid;
-    libxl__domain_build_state *const state = dmss->build_state;
     libxl__spawn_state *const spawn = &dmss->spawn;
 
     STATE_AO_GC(dmss->spawn.ao);
 
-    libxl_ctx *ctx = CTX;
     libxl_domain_config *guest_config = dmss->guest_config;
     const libxl_domain_create_info *c_info = &guest_config->c_info;
     const libxl_domain_build_info *b_info = &guest_config->b_info;
-    const libxl_vnc_info *vnc = libxl__dm_vnc(guest_config);
-    char *path;
-    int logfile_w, null;
     int rc;
-    char **args, **arg, **envs;
-    xs_transaction_t t;
-    char *vm_path;
-    char **pass_stuff;
     const char *dm;
-    int dm_state_fd = -1;
+    int logfile_w = -1, null = -1;
+    int qmp_probe_fd = -1;
+    bool probe_spawned = false;
 
     dmss_init(dmss);
 
@@ -2904,6 +2911,7 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
         rc = ERROR_FAIL;
         goto out;
     }
+    dmss->dm = dm;
     if (access(dm, X_OK) < 0) {
         LOGED(ERROR, domid, "device model %s is not executable", dm);
         rc = ERROR_FAIL;
@@ -2911,6 +2919,185 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
     }
 
     rc = libxl__domain_get_device_model_uid(gc, dmss);
+    if (rc)
+        goto out;
+
+    /* probe QEMU's available command line options */
+    if (b_info->device_model_version
+        == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
+
+        logfile_w = libxl__create_qemu_logfile(
+            gc, GCSPRINTF("qemu-probe-%s", c_info->name));
+        if (logfile_w < 0) {
+            rc = logfile_w;
+            goto out;
+        }
+        null = open("/dev/null", O_RDONLY);
+        if (null < 0) {
+            LOGED(ERROR, domid, "unable to open /dev/null");
+            rc = ERROR_FAIL;
+            goto out;
+        }
+
+        rc = libxl__pre_open_qmp_socket(gc, domid, &qmp_probe_fd);
+        if (rc) goto out;
+
+        flexarray_t *dm_args = flexarray_make(gc, 16, 1);
+        flexarray_vappend(dm_args, dm,
+                          "-S",
+                          "-no-user-config",
+                          "-nodefaults",
+                          "-nographic",
+                          "-machine", "none,accel=xen",
+                          NULL);
+        flexarray_vappend(dm_args,
+                          "-chardev",
+                          GCSPRINTF("socket,id=libxl-cmd,fd=%d,server=on,wait=off",
+                                    qmp_probe_fd),
+                          "-mon", "chardev=libxl-cmd,mode=control",
+                          NULL);
+        flexarray_append(dm_args, NULL);
+        char **exec_args = (char **) flexarray_contents(dm_args);
+
+        const char *dom_path = libxl__xs_get_dompath(gc, domid);
+
+        spawn->what = GCSPRINTF("domain %d qemu command line probe", domid);
+        spawn->xspath = "/dev/null"; /* No path to watch */
+        spawn->timeout_ms = LIBXL_DEVICE_MODEL_START_TIMEOUT * 1000;
+        spawn->pidpath = GCSPRINTF("%s/image/device-model-pid", dom_path);
+        spawn->midproc_cb = libxl__spawn_record_pid;
+        spawn->confirm_cb = device_model_probe_confirm;
+        spawn->failure_cb = device_model_probe_startup_failed;
+        spawn->detached_cb = device_model_probe_detached;
+
+        dmss->qmp.ao = ao;
+        dmss->qmp.callback = device_model_probe_cmdline;
+        dmss->qmp.domid = domid;
+        dmss->qmp.payload_fd = -1;
+        rc = libxl__ev_qmp_send(egc, &dmss->qmp, "query-command-line-options", NULL);
+        if (rc) goto out;
+
+        rc = libxl__spawn_spawn(egc, spawn);
+        if (rc < 0)
+            goto out;
+        if (!rc) { /* inner child */
+            setsid();
+            libxl__exec(gc, null, logfile_w, logfile_w, dm, exec_args, NULL);
+        }
+        probe_spawned = true;
+    } else {
+        /* Continue with launching DM instead of probing it */
+        probe_spawned = false;
+    }
+    rc = 0;
+out:
+    if (qmp_probe_fd >= 0)
+        close(qmp_probe_fd);
+    if (null >= 0)
+        close(null);
+    if (logfile_w >= 0)
+        close(logfile_w);
+    if (rc || !probe_spawned)
+        device_model_launch(egc, dmss, rc);
+}
+
+static void device_model_probe_startup_failed(libxl__egc *egc,
+    libxl__spawn_state *spawn, int rc)
+{
+    libxl__dm_spawn_state *dmss = CONTAINER_OF(spawn, *dmss, spawn);
+    device_model_probe_spawn_outcome(egc, dmss, rc);
+}
+
+static void device_model_probe_confirm(libxl__egc *egc,
+    libxl__spawn_state *spawn, const char *xsdata)
+{
+    /* Nothing to do, confirmation is done via QMP instead */
+}
+
+static void device_model_probe_detached(libxl__egc *egc,
+    libxl__spawn_state *spawn)
+{
+    libxl__dm_spawn_state *dmss = CONTAINER_OF(spawn, *dmss, spawn);
+    device_model_probe_spawn_outcome(egc, dmss, 0);
+}
+
+static void device_model_probe_cmdline(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *response, int rc)
+{
+    libxl__dm_spawn_state *dmss = CONTAINER_OF(qmp, *dmss, qmp);
+
+    if (rc)
+        goto out;
+
+    /*
+     * query-command-line-options response:
+     * [ { 'option': 'str', 'parameters': [{ 'name': 'str', ... }] } ]
+     */
+
+    qmp->callback = device_model_probe_quit;
+    rc = libxl__ev_qmp_send(egc, qmp, "quit", NULL);
+    if (rc) goto out;
+    return;
+
+out:
+    libxl__spawn_initiate_failure(egc, &dmss->spawn, rc);
+}
+
+static void device_model_probe_quit(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *response, int rc)
+{
+    EGC_GC;
+    libxl__dm_spawn_state *dmss = CONTAINER_OF(qmp, *dmss, qmp);
+
+    libxl__ev_qmp_dispose(gc, qmp);
+    libxl__spawn_initiate_detach(gc, &dmss->spawn);
+}
+
+static void device_model_probe_spawn_outcome(libxl__egc *egc,
+    libxl__dm_spawn_state *dmss, int rc)
+{
+    EGC_GC;
+    libxl__ev_qmp_dispose(gc, &dmss->qmp);
+
+    /* Ensure our QEMU command line probe is killed. */
+    rc = libxl__kill_xs_path(gc, dmss->spawn.pidpath,
+                             "qemu command-line probe");
+    if (rc) {
+        LOGD(WARN, dmss->guest_domid,
+             "Killing qemu command-line probe pid from path %s",
+             dmss->spawn.pidpath);
+    }
+
+    /*
+     * Ignore all failure from the QEMU command line probe, start the
+     * device model in any case.
+     */
+    device_model_launch(egc, dmss, 0);
+}
+
+static void device_model_launch(libxl__egc *egc,
+    libxl__dm_spawn_state *dmss, int rc)
+{
+    STATE_AO_GC(dmss->spawn.ao);
+    libxl_ctx *ctx = CTX;
+    libxl_domain_config *guest_config = dmss->guest_config;
+    const libxl_domain_create_info *c_info = &guest_config->c_info;
+    const libxl_domain_build_info *b_info = &guest_config->b_info;
+    const libxl_vnc_info *vnc = libxl__dm_vnc(guest_config);
+    char *path;
+    int logfile_w, null;
+    char **args, **arg, **envs;
+    xs_transaction_t t;
+    char *vm_path;
+    char **pass_stuff;
+    int dm_state_fd = -1;
+
+    /* convenience aliases */
+    const int domid = dmss->guest_domid;
+    libxl__domain_build_state *const state = dmss->build_state;
+    libxl__spawn_state *const spawn = &dmss->spawn;
+    const char *const dm = dmss->dm;
+
     if (rc)
         goto out;
 
