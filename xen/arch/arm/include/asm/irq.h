@@ -56,7 +56,7 @@ extern const unsigned int nr_irqs;
 struct irq_desc;
 struct irqaction;
 
-struct irq_desc *__irq_to_desc(int irq);
+struct irq_desc *__irq_to_desc(unsigned int irq);
 
 #define irq_to_desc(irq)    __irq_to_desc(irq)
 
