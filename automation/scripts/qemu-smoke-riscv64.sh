@@ -1,10 +1,9 @@
 #!/bin/bash
 
-set -ex
+set -ex -o pipefail
 
 # Run the test
 rm -f smoke.serial
-set +e
 
 export QEMU_CMD="qemu-system-riscv64 \
     -M virt \

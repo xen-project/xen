@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -ex -o pipefail
 
 test_variant=$1
 
@@ -130,7 +130,6 @@ bash imagebuilder/scripts/uboot-script-gen -t tftp -d . -c config
 
 # Run the test
 rm -f ${serial_log}
-set +e
 export QEMU_CMD="./qemu-system-arm \
     -machine virt \
     -machine virtualization=true \
