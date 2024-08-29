@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -ex -o pipefail
 
 serial_log="$(pwd)/smoke.serial"
 
@@ -77,7 +77,6 @@ git clone --depth 1 https://gitlab.com/xen-project/imagebuilder.git
 bash imagebuilder/scripts/uboot-script-gen -t tftp -d . -c config
 
 rm -f ${serial_log}
-set +e
 export QEMU_CMD="./qemu-system-arm \
    -machine virt \
    -machine virtualization=true \

@@ -14,7 +14,7 @@ eval spawn $env(QEMU_CMD)
 
 expect_after {
     -re "(.*)\r" {
-        exp_continue
+        exp_continue -continue_timer
     }
     timeout {send_error "ERROR-Timeout!\n"; exit 1}
     eof {send_error "ERROR-EOF!\n"; exit 1}

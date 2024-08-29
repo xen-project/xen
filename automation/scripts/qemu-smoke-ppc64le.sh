@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -ex -o pipefail
 
 serial_log="$(pwd)/smoke.serial"
 
@@ -9,7 +9,6 @@ machine=$1
 
 # Run the test
 rm -f ${serial_log}
-set +e
 
 export QEMU_CMD="qemu-system-ppc64 \
     -bios skiboot.lid \

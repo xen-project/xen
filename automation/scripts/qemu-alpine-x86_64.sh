@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -ex -o pipefail
 
 # DomU Busybox
 cd binaries
@@ -76,7 +76,6 @@ EOF
 
 # Run the test
 rm -f smoke.serial
-set +e
 export QEMU_CMD="qemu-system-x86_64 \
     -cpu qemu64,+svm \
     -m 2G -smp 2 \

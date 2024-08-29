@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -ex -o pipefail
 
 # variant should be either pv or pvh
 variant=$1
@@ -15,7 +15,6 @@ case $variant in
 esac
 
 rm -f smoke.serial
-set +e
 export QEMU_CMD="qemu-system-x86_64 -nographic -kernel binaries/xen \
         -initrd xtf/tests/example/$k \
         -append \"loglvl=all console=com1 noreboot console_timestamps=boot $extra\" \
