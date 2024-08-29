@@ -57,7 +57,7 @@ typedef u16 uint16_t;
 typedef u32 uint32_t;
 typedef u64 uint64_t;
 
-#define U16_MAX		((u16)(~0U))
+#define UINT16_MAX	((uint16_t)(~0U))
 #define UINT_MAX	(~0U)
 
 #endif /* __BOOT_DEFS_H__ */

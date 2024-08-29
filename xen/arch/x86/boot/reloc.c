@@ -68,24 +68,24 @@ struct vesa_mode_info {
 #endif /* CONFIG_VIDEO */
 
 #define get_mb2_data(tag, type, member)   (((const multiboot2_tag_##type##_t *)(tag))->member)
-#define get_mb2_string(tag, type, member) ((u32)get_mb2_data(tag, type, member))
+#define get_mb2_string(tag, type, member) ((uint32_t)get_mb2_data(tag, type, member))
 
-static u32 alloc;
+static uint32_t alloc;
 
-static u32 alloc_mem(u32 bytes)
+static uint32_t alloc_mem(uint32_t bytes)
 {
     return alloc -= ALIGN_UP(bytes, 16);
 }
 
-static void zero_mem(u32 s, u32 bytes)
+static void zero_mem(uint32_t s, uint32_t bytes)
 {
     while ( bytes-- )
         *(char *)s++ = 0;
 }
 
-static u32 copy_mem(u32 src, u32 bytes)
+static uint32_t copy_mem(uint32_t src, uint32_t bytes)
 {
-    u32 dst, dst_ret;
+    uint32_t dst, dst_ret;
 
     dst = alloc_mem(bytes);
     dst_ret = dst;
@@ -96,9 +96,9 @@ static u32 copy_mem(u32 src, u32 bytes)
     return dst_ret;
 }
 
-static u32 copy_string(u32 src)
+static uint32_t copy_string(uint32_t src)
 {
-    u32 p;
+    uint32_t p;
 
     if ( !src )
         return 0;
@@ -109,7 +109,7 @@ static u32 copy_string(u32 src)
     return copy_mem(src, p - src + 1);
 }
 
-static struct hvm_start_info *pvh_info_reloc(u32 in)
+static struct hvm_start_info *pvh_info_reloc(uint32_t in)
 {
     struct hvm_start_info *out;
 
@@ -139,7 +139,7 @@ static struct hvm_start_info *pvh_info_reloc(u32 in)
     return out;
 }
 
-static multiboot_info_t *mbi_reloc(u32 mbi_in)
+static multiboot_info_t *mbi_reloc(uint32_t mbi_in)
 {
     int i;
     multiboot_info_t *mbi_out;
@@ -192,7 +192,7 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
 #ifdef CONFIG_VIDEO
     struct boot_video_info *video = NULL;
 #endif
-    u32 ptr;
+    uint32_t ptr;
     unsigned int i, mod_idx = 0;
 
     ptr = alloc_mem(sizeof(*mbi_out));
@@ -203,8 +203,8 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
     ptr = ALIGN_UP(mbi_in + sizeof(*mbi_fix), MULTIBOOT2_TAG_ALIGN);
 
     /* Get the number of modules. */
-    for ( tag = _p(ptr); (u32)tag - mbi_in < mbi_fix->total_size;
-          tag = _p(ALIGN_UP((u32)tag + tag->size, MULTIBOOT2_TAG_ALIGN)) )
+    for ( tag = _p(ptr); (uint32_t)tag - mbi_in < mbi_fix->total_size;
+          tag = _p(ALIGN_UP((uint32_t)tag + tag->size, MULTIBOOT2_TAG_ALIGN)) )
     {
         if ( tag->type == MULTIBOOT2_TAG_TYPE_MODULE )
             ++mbi_out->mods_count;
@@ -228,8 +228,8 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
     ptr = ALIGN_UP(mbi_in + sizeof(*mbi_fix), MULTIBOOT2_TAG_ALIGN);
 
     /* Put all needed data into mbi_out. */
-    for ( tag = _p(ptr); (u32)tag - mbi_in < mbi_fix->total_size;
-          tag = _p(ALIGN_UP((u32)tag + tag->size, MULTIBOOT2_TAG_ALIGN)) )
+    for ( tag = _p(ptr); (uint32_t)tag - mbi_in < mbi_fix->total_size;
+          tag = _p(ALIGN_UP((uint32_t)tag + tag->size, MULTIBOOT2_TAG_ALIGN)) )
     {
         switch ( tag->type )
         {
@@ -272,10 +272,10 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
                 mmap_dst[i].size = sizeof(*mmap_dst);
                 mmap_dst[i].size -= sizeof(mmap_dst[i].size);
                 /* Now copy a given region data. */
-                mmap_dst[i].base_addr_low = (u32)mmap_src->addr;
-                mmap_dst[i].base_addr_high = (u32)(mmap_src->addr >> 32);
-                mmap_dst[i].length_low = (u32)mmap_src->len;
-                mmap_dst[i].length_high = (u32)(mmap_src->len >> 32);
+                mmap_dst[i].base_addr_low = (uint32_t)mmap_src->addr;
+                mmap_dst[i].base_addr_high = (uint32_t)(mmap_src->addr >> 32);
+                mmap_dst[i].length_low = (uint32_t)mmap_src->len;
+                mmap_dst[i].length_high = (uint32_t)(mmap_src->len >> 32);
                 mmap_dst[i].type = mmap_src->type;
                 mmap_src = _p(mmap_src) + get_mb2_data(tag, mmap, entry_size);
             }
