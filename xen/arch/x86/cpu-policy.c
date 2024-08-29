@@ -477,6 +477,17 @@ static void __init guest_common_max_feature_adjustments(uint32_t *fs)
         if ( test_bit(X86_FEATURE_RTM, fs) )
             __set_bit(X86_FEATURE_RTM_ALWAYS_ABORT, fs);
         break;
+
+    case X86_VENDOR_AMD:
+        /*
+         * This bit indicates that the VERW instruction may have gained
+         * scrubbing side effects.  With pooling, it means "you might migrate
+         * somewhere where scrubbing is necessary", and may need exposing on
+         * unaffected hardware.  This is fine, because the VERW instruction
+         * has been around since the 286.
+         */
+        __set_bit(X86_FEATURE_VERW_CLEAR, fs);
+        break;
     }
 
     /*
@@ -554,6 +565,17 @@ static void __init guest_common_default_feature_adjustments(uint32_t *fs)
             __clear_bit(X86_FEATURE_RTM, fs);
             __set_bit(X86_FEATURE_RTM_ALWAYS_ABORT, fs);
         }
+        break;
+
+    case X86_VENDOR_AMD:
+        /*
+         * This bit indicate that the VERW instruction may have gained
+         * scrubbing side effects.  The max policy has it set for migration
+         * reasons, so reset the default policy back to the host value in case
+         * we're unaffected.
+         */
+        if ( !cpu_has_verw_clear )
+            __clear_bit(X86_FEATURE_VERW_CLEAR, fs);
         break;
     }
 
