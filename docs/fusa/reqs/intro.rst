@@ -55,7 +55,8 @@ Title of the requirement
   be 'XenMkt', 'XenProd' or 'XenSwdgn' to denote market, product or design
   requirement.
   name - This denotes name of the requirement. In case of architecture specific
-  requirements, this starts with the architecture type (ie x86_64, arm64).
+  requirements, this starts with the architecture type (eg x86_64, arm64)
+  followed by component name (eg generic_timer) and action (eg read_xxx).
   revision number - This gets incremented each time the requirement is modified.
 
 
