@@ -127,6 +127,7 @@ config AMD_SVM
 
 config INTEL_VMX
 	def_bool HVM
+	select ARCH_VCPU_IOREQ_COMPLETION
 
 config XEN_SHSTK
 	bool "Supervisor Shadow Stacks"

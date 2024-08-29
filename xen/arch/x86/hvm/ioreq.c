@@ -29,6 +29,7 @@ bool arch_ioreq_complete_mmio(void)
     return handle_mmio();
 }
 
+#ifdef CONFIG_VCPU_ARCH_IOREQ_COMPLETION
 bool arch_vcpu_ioreq_completion(enum vio_completion completion)
 {
     switch ( completion )
@@ -51,6 +52,7 @@ bool arch_vcpu_ioreq_completion(enum vio_completion completion)
 
     return true;
 }
+#endif
 
 static gfn_t hvm_alloc_legacy_ioreq_gfn(struct ioreq_server *s)
 {

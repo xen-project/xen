@@ -135,12 +135,6 @@ bool arch_ioreq_complete_mmio(void)
     return false;
 }
 
-bool arch_vcpu_ioreq_completion(enum vio_completion completion)
-{
-    ASSERT_UNREACHABLE();
-    return true;
-}
-
 /*
  * The "legacy" mechanism of mapping magic pages for the IOREQ servers
  * is x86 specific, so the following hooks don't need to be implemented on Arm:

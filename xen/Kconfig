@@ -95,4 +95,11 @@ config LTO
 config ARCH_SUPPORTS_INT128
 	bool
 
+#
+# For platforms that require specific handling of per-vCPU ioreq completion
+# events
+#
+config ARCH_VCPU_IOREQ_COMPLETION
+	bool
+
 source "Kconfig.debug"
