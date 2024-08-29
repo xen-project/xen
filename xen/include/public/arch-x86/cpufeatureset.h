@@ -321,6 +321,7 @@ XEN_CPUFEATURE(NO_INVD,      10*32+30) /*   INVD instruction unusable */
 XEN_CPUFEATURE(NO_NEST_BP,         11*32+ 0) /*A  No Nested Data Breakpoints */
 XEN_CPUFEATURE(FS_GS_NS,           11*32+ 1) /*S| FS/GS base MSRs non-serialising */
 XEN_CPUFEATURE(LFENCE_DISPATCH,    11*32+ 2) /*A  LFENCE always serializing */
+XEN_CPUFEATURE(VERW_CLEAR,         11*32+ 5) /*!A| VERW clears microarchitectural buffers */
 XEN_CPUFEATURE(NSCB,               11*32+ 6) /*A  Null Selector Clears Base (and limit too) */
 XEN_CPUFEATURE(AUTO_IBRS,          11*32+ 8) /*S  Automatic IBRS */
 XEN_CPUFEATURE(AMD_FSRS,           11*32+10) /*A  Fast Short REP STOSB */
@@ -396,6 +397,8 @@ XEN_CPUFEATURE(PB_OPT_CTRL,        16*32+32) /*   MSR_PB_OPT_CTRL.IBPB_ALT */
 XEN_CPUFEATURE(ITS_NO,             16*32+62) /*!A No Indirect Target Selection */
 
 /* AMD-defined CPU features, CPUID level 0x80000021.ecx, word 18 */
+XEN_CPUFEATURE(TSA_SQ_NO,          18*32+ 1) /*A  No Store Queue Transitive Scheduler Attacks */
+XEN_CPUFEATURE(TSA_L1_NO,          18*32+ 2) /*A  No L1D Transitive Scheduler Attacks */
 
 #endif /* XEN_CPUFEATURE */
 
