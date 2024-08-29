@@ -130,7 +130,7 @@ bash imagebuilder/scripts/uboot-script-gen -t tftp -d . -c config
 
 # Run the test
 rm -f ${serial_log}
-export QEMU_CMD="./qemu-system-arm \
+export TEST_CMD="./qemu-system-arm \
     -machine virt \
     -machine virtualization=true \
     -smp 4 \
@@ -144,8 +144,8 @@ export QEMU_CMD="./qemu-system-arm \
     -bios /usr/lib/u-boot/qemu_arm/u-boot.bin"
 
 export UBOOT_CMD="virtio scan; dhcp; tftpb 0x40000000 boot.scr; source 0x40000000"
-export QEMU_LOG="${serial_log}"
+export TEST_LOG="${serial_log}"
 export LOG_MSG="${dom0_prompt}"
 export PASSED="${passed}"
 
-../automation/scripts/qemu-key.exp | sed 's/\r\+$//'
+../automation/scripts/console.exp | sed 's/\r\+$//'

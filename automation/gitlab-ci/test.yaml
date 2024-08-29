@@ -84,6 +84,7 @@
   variables:
     CONTAINER: ubuntu:xenial-xilinx
     LOGFILE: qemu-smoke-xilinx.log
+    TEST_TIMEOUT: 120
   artifacts:
     paths:
       - smoke.serial
@@ -103,6 +104,7 @@
     LOGFILE: xilinx-smoke-x86_64.log
     XEN_CMD_CONSOLE: "console=com2 com2=115200,8n1,0x2F8,4"
     TEST_BOARD: "crater"
+    TEST_TIMEOUT: 1000
   artifacts:
     paths:
       - smoke.serial

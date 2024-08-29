@@ -76,7 +76,7 @@ EOF
 
 # Run the test
 rm -f smoke.serial
-export QEMU_CMD="qemu-system-x86_64 \
+export TEST_CMD="qemu-system-x86_64 \
     -cpu qemu64,+svm \
     -m 2G -smp 2 \
     -monitor none -serial stdio \
@@ -84,8 +84,8 @@ export QEMU_CMD="qemu-system-x86_64 \
     -device virtio-net-pci,netdev=n0 \
     -netdev user,id=n0,tftp=binaries,bootfile=/pxelinux.0"
 
-export QEMU_LOG="smoke.serial"
+export TEST_LOG="smoke.serial"
 export LOG_MSG="Domain-0"
 export PASSED="BusyBox"
 
-./automation/scripts/qemu-key.exp | sed 's/\r\+$//'
+./automation/scripts/console.exp | sed 's/\r\+$//'

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -ex -o pipefail
 
 test_variant=$1
 
@@ -137,13 +137,14 @@ cd $START
 SERIAL_DEV="/dev/serial/zynq"
 set +e
 stty -F ${SERIAL_DEV} 115200
-timeout -k 1 120 nohup sh -c "cat ${SERIAL_DEV} | tee smoke.serial | sed 's/\r//'"
 
-# stop the board
-cd /scratch/gitlab-runner
-bash zcu102.sh 2
-cd $START
+# Capture test result and power off board before exiting.
+export PASSED="${passed}"
+export LOG_MSG="Welcome to Alpine Linux"
+export TEST_CMD="cat ${SERIAL_DEV}"
+export TEST_LOG="smoke.serial"
 
-set -e
-(grep -q "^Welcome to Alpine Linux" smoke.serial && grep -q "${passed}" smoke.serial) || exit 1
-exit 0
+./automation/scripts/console.exp | sed 's/\r\+$//'
+TEST_RESULT=$?
+sh "/scratch/gitlab-runner/zcu102.sh" 2
+exit ${TEST_RESULT}
