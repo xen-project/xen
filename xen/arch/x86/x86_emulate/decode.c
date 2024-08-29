@@ -427,13 +427,11 @@ static const struct ext0f38_table {
     [0xbe] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
     [0xbf] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
     [0xc4] = { .simd_size = simd_packed_int, .two_op = 1, .d8s = d8s_vl },
-    [0xc6 ... 0xc7] = { .simd_size = simd_other, .vsib = 1, .d8s = d8s_dq },
     [0xc8] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_vl },
     [0xc9] = { .simd_size = simd_other },
     [0xca] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_vl },
-    [0xcb] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
-    [0xcc] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_vl },
-    [0xcd] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0xcb] = { .simd_size = simd_other, .d8s = d8s_vl },
+    [0xcc ... 0xcd] = { .simd_size = simd_other, .two_op = 1, .d8s = d8s_vl },
     [0xcf] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0xd2] = { .simd_size = simd_other },
     [0xd3] = { .simd_size = simd_other },
@@ -916,14 +914,6 @@ decode_0f38(struct x86_emulate_state *s,
     case X86EMUL_OPC_EVEX_66(0, 0x7a): /* vpbroadcastb */
     case X86EMUL_OPC_EVEX_66(0, 0x7b): /* vpbroadcastw */
     case X86EMUL_OPC_EVEX_66(0, 0x7c): /* vpbroadcast{d,q} */
-        break;
-
-    case X86EMUL_OPC_VEX_F2(0, 0xcc): /* vsha512msg1 */
-    case X86EMUL_OPC_VEX_F2(0, 0xcd): /* vsha512msg2 */
-        s->desc |= TwoOp;
-        /* fallthrough */
-    case X86EMUL_OPC_VEX_F2(0, 0xcb): /* vsha512rnds2 */
-        s->simd_size = simd_other;
         break;
 
     case 0xf0: /* movbe / crc32 */
@@ -1420,20 +1410,6 @@ int x86emul_decode(struct x86_emulate_state *s,
                     disp8scale = decode_disp8scale(ext0f38_table[b ^ 0x30].d8s,
                                                    s);
                     s->simd_size = simd_other;
-                }
-
-                switch ( b )
-                {
-                /* vp4dpwssd{,s} need special casing */
-                case 0x52: case 0x53:
-                /* v4f{,n}madd{p,s}s need special casing */
-                case 0x9a: case 0x9b: case 0xaa: case 0xab:
-                    if ( s->evex.pfx == vex_f2 )
-                    {
-                        disp8scale = 4;
-                        s->simd_size = simd_128;
-                    }
-                    break;
                 }
             }
             break;
