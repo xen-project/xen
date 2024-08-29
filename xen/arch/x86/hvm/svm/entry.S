@@ -94,6 +94,9 @@ __UNLIKELY_END(nsvm_hap)
         pop  %rdi
 
         sti
+
+        SPEC_CTRL_COND_VERW     /* Req: %rsp=eframe                    Clob: efl */
+
         vmrun
 
         SAVE_ALL

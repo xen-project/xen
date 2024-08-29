@@ -150,6 +150,7 @@
 
 /* CPUID level 0x80000021.eax */
 #define cpu_has_lfence_dispatch boot_cpu_has(X86_FEATURE_LFENCE_DISPATCH)
+#define cpu_has_verw_clear      boot_cpu_has(X86_FEATURE_VERW_CLEAR)
 #define cpu_has_nscb            boot_cpu_has(X86_FEATURE_NSCB)
 
 /* MSR_ARCH_CAPS */
@@ -169,6 +170,10 @@
 #define cpu_has_rfds_no         boot_cpu_has(X86_FEATURE_RFDS_NO)
 #define cpu_has_rfds_clear      boot_cpu_has(X86_FEATURE_RFDS_CLEAR)
 #define cpu_has_its_no          boot_cpu_has(X86_FEATURE_ITS_NO)
+
+/* CPUID level 0x80000021.ecx */
+#define cpu_has_tsa_sq_no       boot_cpu_has(X86_FEATURE_TSA_SQ_NO)
+#define cpu_has_tsa_l1_no       boot_cpu_has(X86_FEATURE_TSA_L1_NO)
 
 /* Synthesized. */
 #define cpu_has_arch_perfmon    boot_cpu_has(X86_FEATURE_ARCH_PERFMON)
