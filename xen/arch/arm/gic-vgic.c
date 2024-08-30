@@ -102,25 +102,23 @@ static unsigned int gic_find_unused_lr(struct vcpu *v,
                                        struct pending_irq *p,
                                        unsigned int lr)
 {
-    unsigned int nr_lrs = gic_get_nr_lrs();
-    unsigned long *lr_mask = (unsigned long *) &this_cpu(lr_mask);
-    struct gic_lr lr_val;
+    uint64_t *lr_mask = &this_cpu(lr_mask);
 
     ASSERT(spin_is_locked(&v->arch.vgic.lock));
 
     if ( unlikely(test_bit(GIC_IRQ_GUEST_PRISTINE_LPI, &p->status)) )
     {
-        unsigned int used_lr;
-
-        bitmap_for_each ( used_lr, lr_mask, nr_lrs )
+        for_each_set_bit ( used_lr, *lr_mask )
         {
+            struct gic_lr lr_val;
+
             gic_hw_ops->read_lr(used_lr, &lr_val);
             if ( lr_val.virq == p->irq )
                 return used_lr;
         }
     }
 
-    lr = find_next_zero_bit(lr_mask, nr_lrs, lr);
+    lr = find_next_zero_bit((unsigned long *)lr_mask, gic_get_nr_lrs(), lr);
 
     return lr;
 }
