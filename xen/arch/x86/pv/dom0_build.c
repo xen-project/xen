@@ -1057,6 +1057,7 @@ int __init dom0_construct_pv(struct domain *d,
                              module_t *initrd,
                              const char *cmdline)
 {
+    unsigned long cr4 = read_cr4();
     int rc;
 
     /*
@@ -1064,19 +1065,19 @@ int __init dom0_construct_pv(struct domain *d,
      * prevents us needing to write construct_dom0() in terms of
      * copy_{to,from}_user().
      */
-    if ( boot_cpu_has(X86_FEATURE_XEN_SMAP) )
+    if ( cr4 & X86_CR4_SMAP )
     {
         if ( IS_ENABLED(CONFIG_PV32) )
             cr4_pv32_mask &= ~X86_CR4_SMAP;
 
-        write_cr4(read_cr4() & ~X86_CR4_SMAP);
+        write_cr4(cr4 & ~X86_CR4_SMAP);
     }
 
     rc = dom0_construct(d, image, image_headroom, initrd, cmdline);
 
-    if ( boot_cpu_has(X86_FEATURE_XEN_SMAP) )
+    if ( cr4 & X86_CR4_SMAP )
     {
-        write_cr4(read_cr4() | X86_CR4_SMAP);
+        write_cr4(cr4);
 
         if ( IS_ENABLED(CONFIG_PV32) )
             cr4_pv32_mask |= X86_CR4_SMAP;
