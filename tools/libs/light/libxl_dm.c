@@ -1183,11 +1183,12 @@ out:
 }
 
 static int libxl__build_device_model_args_new(libxl__gc *gc,
-                                        const char *dm, int guest_domid,
-                                        const libxl_domain_config *guest_config,
-                                        char ***args, char ***envs,
-                                        const libxl__domain_build_state *state,
-                                        int *dm_state_fd)
+    const char *dm, int guest_domid,
+    const libxl_domain_config *guest_config,
+    char ***args, char ***envs,
+    const libxl__domain_build_state *state,
+    const libxl__qemu_available_opts *qemu_opts,
+    int *dm_state_fd)
 {
     const libxl_domain_create_info *c_info = &guest_config->c_info;
     const libxl_domain_build_info *b_info = &guest_config->b_info;
@@ -1778,8 +1779,13 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         }
 
         /* Add "-chroot [dir]" to command-line */
-        flexarray_append(dm_args, "-chroot");
-        flexarray_append(dm_args, chroot_dir);
+        if (qemu_opts->have_runwith_chroot) {
+            flexarray_append_pair(dm_args, "-run-with",
+                                  GCSPRINTF("chroot=%s", chroot_dir));
+        } else {
+            flexarray_append(dm_args, "-chroot");
+            flexarray_append(dm_args, chroot_dir);
+        }
     }
 
     if (state->saved_state) {
@@ -2059,11 +2065,12 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
 }
 
 static int libxl__build_device_model_args(libxl__gc *gc,
-                                        const char *dm, int guest_domid,
-                                        const libxl_domain_config *guest_config,
-                                        char ***args, char ***envs,
-                                        const libxl__domain_build_state *state,
-                                        int *dm_state_fd)
+    const char *dm, int guest_domid,
+    const libxl_domain_config *guest_config,
+    char ***args, char ***envs,
+    const libxl__domain_build_state *state,
+    const libxl__qemu_available_opts *qemu_opts,
+    int *dm_state_fd)
 /* dm_state_fd may be NULL iff caller knows we are using stubdom
  * and therefore will be passing a filename rather than a fd. */
 {
@@ -2081,7 +2088,9 @@ static int libxl__build_device_model_args(libxl__gc *gc,
         return libxl__build_device_model_args_new(gc, dm,
                                                   guest_domid, guest_config,
                                                   args, envs,
-                                                  state, dm_state_fd);
+                                                  state,
+                                                  qemu_opts,
+                                                  dm_state_fd);
     default:
         LOGED(ERROR, guest_domid, "unknown device model version %d",
               guest_config->b_info.device_model_version);
@@ -2403,7 +2412,9 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
 
     ret = libxl__build_device_model_args(gc, "stubdom-dm", guest_domid,
                                          guest_config, &args, NULL,
-                                         d_state, NULL);
+                                         d_state,
+                                         &sdss->dm.qemu_opts,
+                                         NULL);
     if (ret) {
         ret = ERROR_FAIL;
         goto out;
@@ -3024,6 +3035,7 @@ static void device_model_probe_detached(libxl__egc *egc,
 static void device_model_probe_cmdline(libxl__egc *egc,
     libxl__ev_qmp *qmp, const libxl__json_object *response, int rc)
 {
+    EGC_GC;
     libxl__dm_spawn_state *dmss = CONTAINER_OF(qmp, *dmss, qmp);
 
     if (rc)
@@ -3033,6 +3045,43 @@ static void device_model_probe_cmdline(libxl__egc *egc,
      * query-command-line-options response:
      * [ { 'option': 'str', 'parameters': [{ 'name': 'str', ... }] } ]
      */
+    const libxl__json_object *option;
+    for (int i_option = 0;
+         (option = libxl__json_array_get(response, i_option));
+         i_option++) {
+        const libxl__json_object *o;
+        const char *opt_str;
+
+        o = libxl__json_map_get("option", option, JSON_STRING);
+        if (!o) {
+            rc = ERROR_QEMU_API;
+            goto out;
+        }
+        opt_str = libxl__json_object_get_string(o);
+
+        if (!strcmp("run-with", opt_str)) {
+            const libxl__json_object *params;
+            const libxl__json_object *item;
+
+            params = libxl__json_map_get("parameters", option, JSON_ARRAY);
+            for (int i = 0; (item = libxl__json_array_get(params, i)); i++) {
+                o = libxl__json_map_get("name", item, JSON_STRING);
+                if (!o) {
+                    rc = ERROR_QEMU_API;
+                    goto out;
+                }
+                if (!strcmp("chroot", libxl__json_object_get_string(o))) {
+                    dmss->qemu_opts.have_runwith_chroot = true;
+                }
+            }
+
+            /*
+             * No need to parse more options, we are only interested with
+             * -run-with at the moment.
+             */
+            break;
+        }
+    }
 
     qmp->callback = device_model_probe_quit;
     rc = libxl__ev_qmp_send(egc, qmp, "quit", NULL);
@@ -3113,6 +3162,7 @@ static void device_model_launch(libxl__egc *egc,
 
     rc = libxl__build_device_model_args(gc, dm, domid, guest_config,
                                           &args, &envs, state,
+                                          &dmss->qemu_opts,
                                           &dm_state_fd);
     if (rc)
         goto out;

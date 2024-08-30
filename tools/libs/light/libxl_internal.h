@@ -4142,6 +4142,10 @@ _hidden void libxl__add_nics(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
 /* First layer; wraps libxl__spawn_spawn. */
 
 typedef struct libxl__dm_spawn_state libxl__dm_spawn_state;
+typedef struct libxl__qemu_available_opts libxl__qemu_available_opts;
+struct libxl__qemu_available_opts {
+    bool have_runwith_chroot;
+};
 
 typedef void libxl__dm_spawn_cb(libxl__egc *egc, libxl__dm_spawn_state*,
                                 int rc /* if !0, error was logged */);
@@ -4154,6 +4158,7 @@ struct libxl__dm_spawn_state {
     libxl__ev_qmp qmp;
     libxl__ev_time timeout;
     libxl__dm_resume_state dmrs;
+    libxl__qemu_available_opts qemu_opts;
     const char *dm;
     /* filled in by user, must remain valid: */
     uint32_t guest_domid; /* domain being served */
