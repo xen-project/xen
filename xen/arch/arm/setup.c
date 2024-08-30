@@ -446,7 +446,9 @@ void asmlinkage __init start_xen(unsigned long fdt_paddr)
      * It needs to be called after do_initcalls to be able to use
      * stop_machine (tasklets initialized via an initcall).
      */
+#ifdef CONFIG_HAS_ALTERNATIVE
     apply_alternatives_all();
+#endif
     enable_errata_workarounds();
     enable_cpu_features();
 

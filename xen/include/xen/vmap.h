@@ -141,7 +141,9 @@ void *arch_vmap_virt_end(void);
 /* Initialises the VMAP_DEFAULT virtual range */
 static inline void vm_init(void)
 {
+#ifdef CONFIG_HAS_VMAP
     vm_init_type(VMAP_DEFAULT, (void *)VMAP_VIRT_START, arch_vmap_virt_end());
+#endif
 }
 
 #endif /* __XEN_VMAP_H__ */

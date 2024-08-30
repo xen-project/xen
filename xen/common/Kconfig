@@ -83,6 +83,9 @@ config HAS_SCHED_GRANULARITY
 config HAS_UBSAN
 	bool
 
+config HAS_VMAP
+	bool
+
 config MEM_ACCESS_ALWAYS_ON
 	bool
 

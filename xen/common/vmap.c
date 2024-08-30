@@ -1,4 +1,3 @@
-#ifdef VMAP_VIRT_START
 #include <xen/bitmap.h>
 #include <xen/sections.h>
 #include <xen/init.h>
@@ -427,4 +426,3 @@ void *_xvrealloc(void *va, size_t size, unsigned int align)
 
     return ptr;
 }
-#endif

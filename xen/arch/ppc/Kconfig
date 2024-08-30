@@ -2,6 +2,7 @@ config PPC
 	def_bool y
 	select FUNCTION_ALIGNMENT_4B
 	select HAS_DEVICE_TREE
+	select HAS_VMAP
 
 config PPC64
 	def_bool y
