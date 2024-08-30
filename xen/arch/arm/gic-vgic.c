@@ -16,7 +16,8 @@
 #include <asm/gic.h>
 #include <asm/vgic.h>
 
-#define lr_all_full() (this_cpu(lr_mask) == ((1 << gic_get_nr_lrs()) - 1))
+#define lr_all_full()                                           \
+    (this_cpu(lr_mask) == (-1ULL >> (64 - gic_get_nr_lrs())))
 
 #undef GIC_DEBUG
 
