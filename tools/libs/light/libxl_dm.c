@@ -2052,8 +2052,13 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         }
 
         if (state->dm_runas) {
-            flexarray_append(dm_args, "-runas");
-            flexarray_append(dm_args, state->dm_runas);
+            if (qemu_opts->have_runwith_user) {
+                flexarray_append_pair(dm_args, "-run-with",
+                                      GCSPRINTF("user=%s", state->dm_runas));
+            } else {
+                flexarray_append(dm_args, "-runas");
+                flexarray_append(dm_args, state->dm_runas);
+            }
         }
     }
     flexarray_append(dm_args, NULL);
@@ -3072,6 +3077,9 @@ static void device_model_probe_cmdline(libxl__egc *egc,
                 }
                 if (!strcmp("chroot", libxl__json_object_get_string(o))) {
                     dmss->qemu_opts.have_runwith_chroot = true;
+                }
+                else if (!strcmp("user", libxl__json_object_get_string(o))) {
+                    dmss->qemu_opts.have_runwith_user = true;
                 }
             }
 

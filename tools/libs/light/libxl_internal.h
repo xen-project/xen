@@ -4145,6 +4145,7 @@ typedef struct libxl__dm_spawn_state libxl__dm_spawn_state;
 typedef struct libxl__qemu_available_opts libxl__qemu_available_opts;
 struct libxl__qemu_available_opts {
     bool have_runwith_chroot;
+    bool have_runwith_user;
 };
 
 typedef void libxl__dm_spawn_cb(libxl__egc *egc, libxl__dm_spawn_state*,
