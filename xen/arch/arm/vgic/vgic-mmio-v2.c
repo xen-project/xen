@@ -88,13 +88,12 @@ static void vgic_mmio_write_sgir(struct vcpu *source_vcpu,
     struct domain *d = source_vcpu->domain;
     unsigned int nr_vcpus = d->max_vcpus;
     unsigned int intid = val & GICD_SGI_INTID_MASK;
-    unsigned long targets = (val & GICD_SGI_TARGET_MASK) >>
-                            GICD_SGI_TARGET_SHIFT;
-    unsigned int vcpu_id;
+    uint8_t targets = 0;
 
     switch ( val & GICD_SGI_TARGET_LIST_MASK )
     {
     case GICD_SGI_TARGET_LIST:                    /* as specified by targets */
+        targets = MASK_EXTR(val, GICD_SGI_TARGET_MASK);
         targets &= GENMASK(nr_vcpus - 1, 0);      /* limit to existing VCPUs */
         break;
     case GICD_SGI_TARGET_OTHERS:
@@ -109,7 +108,7 @@ static void vgic_mmio_write_sgir(struct vcpu *source_vcpu,
         return;
     }
 
-    bitmap_for_each ( vcpu_id, &targets, 8 )
+    for_each_set_bit ( vcpu_id, targets )
     {
         struct vcpu *vcpu = d->vcpu[vcpu_id];
         struct vgic_irq *irq = vgic_get_irq(d, vcpu, intid);
