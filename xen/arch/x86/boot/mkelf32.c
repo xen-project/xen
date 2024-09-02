@@ -17,14 +17,6 @@
 #include <unistd.h>
 #include <inttypes.h>
 
-#define u8  uint8_t
-#define u16 uint16_t
-#define u32 uint32_t
-#define u64 uint64_t
-#define s8  int8_t
-#define s16 int16_t
-#define s32 int32_t
-#define s64 int64_t
 #include "../../../include/xen/elfstructs.h"
 
 #define DYNAMICALLY_FILLED   0
@@ -72,9 +64,9 @@ static Elf32_Phdr note_phdr = {
     4                                        /* p_align */
 };
 
-static u8 out_shstrtab[] = "\0.text\0.shstrtab";
+static uint8_t out_shstrtab[] = "\0.text\0.shstrtab";
 /* If num_phdrs >= 2, we need to tack the .note. */
-static u8 out_shstrtab_extra[] = ".note\0";
+static uint8_t out_shstrtab_extra[] = ".note\0";
 
 static Elf32_Shdr out_shdr[] = {
     { 0 },
@@ -124,9 +116,9 @@ static Elf32_Shdr out_shdr_note = {
 #undef swap32
 #undef swap64
 
-#define swap16(_v) ((((u16)(_v)>>8)&0xff)|(((u16)(_v)&0xff)<<8))
-#define swap32(_v) (((u32)swap16((u16)(_v))<<16)|(u32)swap16((u32)((_v)>>16)))
-#define swap64(_v) (((u64)swap32((u32)(_v))<<32)|(u64)swap32((u32)((_v)>>32)))
+#define swap16(v) (( (uint8_t)(v)       <<  8) | (uint8_t)((v) >>  8))
+#define swap32(v) (((uint32_t)swap16(v) << 16) |    swap16((v) >> 16))
+#define swap64(v) (((uint64_t)swap32(v) << 32) |    swap32((v) >> 32))
 
 static int big_endian;
 
@@ -256,8 +248,8 @@ static void do_read(int fd, void *data, int len)
 
 int main(int argc, char **argv)
 {
-    u64        final_exec_addr;
-    u32        loadbase, dat_siz, mem_siz, note_base, note_sz, offset;
+    uint64_t   final_exec_addr;
+    uint32_t   loadbase, dat_siz, mem_siz, note_base, note_sz, offset;
     char      *inimage, *outimage;
     int        infd, outfd;
     char       buffer[1024] = {};
@@ -302,7 +294,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    big_endian = (*(u16 *)in32_ehdr.e_ident == ((ELFMAG0 << 8) | ELFMAG1));
+    big_endian = (*(uint16_t *)in32_ehdr.e_ident == ((ELFMAG0 << 8) | ELFMAG1));
 
     endianadjust_ehdr32(&in32_ehdr);
     if ( in32_ehdr.e_ident[EI_CLASS] != ELFCLASS64 )
@@ -345,11 +337,11 @@ int main(int argc, char **argv)
     endianadjust_phdr64(&in64_phdr);
 
     (void)lseek(infd, in64_phdr.p_offset, SEEK_SET);
-    dat_siz = (u32)in64_phdr.p_filesz;
+    dat_siz = (uint32_t)in64_phdr.p_filesz;
 
     /* Do not use p_memsz: it does not include BSS alignment padding. */
-    /*mem_siz = (u32)in64_phdr.p_memsz;*/
-    mem_siz = (u32)(final_exec_addr - in64_phdr.p_vaddr);
+    /*mem_siz = (uint32_t)in64_phdr.p_memsz;*/
+    mem_siz = (uint32_t)(final_exec_addr - in64_phdr.p_vaddr);
 
     note_sz = note_base = offset = 0;
     if ( num_phdrs > 1 )
