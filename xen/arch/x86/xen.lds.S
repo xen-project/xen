@@ -359,14 +359,6 @@ SECTIONS
 
   DWARF2_DEBUG_SECTIONS
 
-#ifdef EFI
-  /* Trick the linker into setting the image size to no less than 16Mb. */
-  __image_end__ = .;
-  .pad ALIGN(__section_alignment__) : {
-    . = __image_end__ < __image_base__ + MB(16) ? ALIGN(MB(16)) : .;
-  }
-#endif
-
 #ifdef CONFIG_HYPERV_GUEST
   hv_hcall_page = ABSOLUTE(HV_HCALL_PAGE - XEN_VIRT_START + __XEN_VIRT_START);
 #endif
@@ -429,6 +421,3 @@ ASSERT((trampoline_end - trampoline_start) < TRAMPOLINE_SPACE - MBI_SPACE_MIN,
     "not enough room for trampoline and mbi data")
 ASSERT((wakeup_stack - wakeup_stack_start) >= WAKEUP_STACK_MIN,
     "wakeup stack too small")
-
-/* Plenty of boot code assumes that Xen isn't larger than 16M. */
-ASSERT(_end - _start <= MB(16), "Xen too large for early-boot assumptions")
