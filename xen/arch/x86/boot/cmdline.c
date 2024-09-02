@@ -31,6 +31,8 @@ asm (
     );
 
 #include <xen/kconfig.h>
+#include <xen/types.h>
+
 #include "defs.h"
 #include "video.h"
 

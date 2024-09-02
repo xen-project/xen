@@ -20,13 +20,9 @@
 #ifndef __BOOT_DEFS_H__
 #define __BOOT_DEFS_H__
 
-#include <xen/stdbool.h>
-
 #define __maybe_unused	__attribute__((__unused__))
 #define __packed	__attribute__((__packed__))
 #define __stdcall	__attribute__((__stdcall__))
-
-#define NULL		((void *)0)
 
 #define ALIGN_UP(arg, align) \
                 (((arg) + (align) - 1) & ~((typeof(arg))(align) - 1))
@@ -46,18 +42,5 @@
 #define _p(val)		((void *)(unsigned long)(val))
 
 #define tolower(c)	((c) | 0x20)
-
-typedef unsigned char u8;
-typedef unsigned short u16;
-typedef unsigned int u32;
-typedef unsigned long long u64;
-typedef unsigned int size_t;
-typedef u8 uint8_t;
-typedef u16 uint16_t;
-typedef u32 uint32_t;
-typedef u64 uint64_t;
-
-#define UINT16_MAX	((uint16_t)(~0U))
-#define UINT_MAX	(~0U)
 
 #endif /* __BOOT_DEFS_H__ */
