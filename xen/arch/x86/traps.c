@@ -1116,7 +1116,7 @@ void cpuid_hypervisor_leaves(const struct vcpu *v, uint32_t leaf,
             res->a = offset;
             res->b = offset >> 32;
             res->c = d->arch.vtsc_to_ns.mul_frac;
-            res->d = (s8)d->arch.vtsc_to_ns.shift;
+            res->d = d->arch.vtsc_to_ns.shift;
             break;
         }
 

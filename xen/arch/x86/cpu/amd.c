@@ -46,7 +46,7 @@ static unsigned int __initdata opt_cpuid_mask_thermal_ecx = ~0u;
 integer_param("cpuid_mask_thermal_ecx", opt_cpuid_mask_thermal_ecx);
 
 /* 1 = allow, 0 = don't allow guest creation, -1 = don't allow boot */
-s8 __read_mostly opt_allow_unsafe;
+int8_t __ro_after_init opt_allow_unsafe;
 boolean_param("allow_unsafe", opt_allow_unsafe);
 
 /* Signal whether the ACPI C1E quirk is required. */

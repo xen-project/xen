@@ -157,7 +157,7 @@ static inline u64 op_amd_randomize_ibs_op(u64 val)
          * IbsOpMaxCnt must fit in the range from 0x0081 to
          * 0xff80.
          */
-        val += (s8)(random >> 4);
+        val += (int8_t)(random >> 4);
     else
         val |= (u64)(random & IBS_RANDOM_MASK) << 32;
 

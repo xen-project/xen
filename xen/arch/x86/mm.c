@@ -170,7 +170,7 @@ static uint32_t __ro_after_init base_disallow_mask;
       is_pv_domain(d)) ?                                        \
      L1_DISALLOW_MASK : (L1_DISALLOW_MASK & ~PAGE_CACHE_ATTRS))
 
-static s8 __read_mostly opt_mmio_relax;
+static int8_t __ro_after_init opt_mmio_relax;
 
 static int __init cf_check parse_mmio_relax(const char *s)
 {

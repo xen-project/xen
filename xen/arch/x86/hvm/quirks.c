@@ -11,7 +11,7 @@
 #include <xen/param.h>
 #include <asm/hvm/support.h>
 
-s8 __read_mostly hvm_port80_allowed = -1;
+int8_t __ro_after_init hvm_port80_allowed = -1;
 boolean_param("hvm_port80", hvm_port80_allowed);
 
 static int __init cf_check dmi_hvm_deny_port80(const struct dmi_system_id *id)

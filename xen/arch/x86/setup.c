@@ -164,7 +164,7 @@ unsigned long __read_mostly mmu_cr4_features = XEN_MINIMAL_CR4;
 
 /* smep: Enable/disable Supervisor Mode Execution Protection */
 #define SMEP_HVM_ONLY (-2)
-static s8 __initdata opt_smep = -1;
+static int8_t __initdata opt_smep = -1;
 
 /*
  * Initial domain place holder. Needs to be global so it can be created in
@@ -201,7 +201,7 @@ custom_param("smep", parse_smep_param);
 
 /* smap: Enable/disable Supervisor Mode Access Prevention */
 #define SMAP_HVM_ONLY (-2)
-static s8 __initdata opt_smap = -1;
+static int8_t __initdata opt_smap = -1;
 
 static int __init cf_check parse_smap_param(const char *s)
 {

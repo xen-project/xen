@@ -241,7 +241,7 @@ struct hvm_function_table {
 
 extern struct hvm_function_table hvm_funcs;
 extern bool hvm_enabled;
-extern s8 hvm_port80_allowed;
+extern int8_t hvm_port80_allowed;
 
 extern const struct hvm_function_table *start_svm(void);
 extern const struct hvm_function_table *start_vmx(void);

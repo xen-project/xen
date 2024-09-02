@@ -25,7 +25,7 @@ nodeid_t apicid_to_node[MAX_LOCAL_APIC] = {
     [0 ... MAX_LOCAL_APIC-1] = NUMA_NO_NODE
 };
 
-s8 acpi_numa = 0;
+int8_t __ro_after_init acpi_numa = 0;
 
 int __init arch_numa_setup(const char *opt)
 {

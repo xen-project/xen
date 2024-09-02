@@ -80,8 +80,8 @@ struct arch_irq_desc {
         cpumask_var_t pending_mask;
         vmask_t *used_vectors;
         unsigned move_cleanup_count;
-        u8 move_in_progress : 1;
-        s8 used;
+        bool move_in_progress : 1;
+        int8_t used;
         /*
          * Weak reference to domain having permission over this IRQ (which can
          * be different from the domain actually having the IRQ assigned)

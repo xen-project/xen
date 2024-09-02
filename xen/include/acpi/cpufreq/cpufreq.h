@@ -79,7 +79,7 @@ struct cpufreq_policy {
 
     bool                resume; /* flag for cpufreq 1st run
                                  * S3 wakeup, hotplug cpu, etc */
-    s8                  turbo;  /* tristate flag: 0 for unsupported
+    int8_t              turbo;  /* tristate flag: 0 for unsupported
                                  * -1 for disable, 1 for enabled
                                  * See CPUFREQ_TURBO_* below for defines */
 };

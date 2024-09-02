@@ -27,7 +27,7 @@ static unsigned long long __initdata opt_availmem;
 size_param("availmem", opt_availmem);
 
 /* opt_nomtrr_check: Don't clip ram to highest cacheable MTRR. */
-static s8 __initdata e820_mtrr_clip = -1;
+static int8_t __initdata e820_mtrr_clip = -1;
 boolean_param("e820-mtrr-clip", e820_mtrr_clip);
 
 /* opt_e820_verbose: Be verbose about clipping, the original e820, &c */

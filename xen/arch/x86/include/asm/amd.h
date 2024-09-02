@@ -160,7 +160,7 @@
 struct cpuinfo_x86;
 int cpu_has_amd_erratum(const struct cpuinfo_x86 *cpu, int osvw_id, ...);
 
-extern s8 opt_allow_unsafe;
+extern int8_t opt_allow_unsafe;
 
 void fam10h_check_enable_mmcfg(void);
 void check_enable_amd_mmconf_dmi(void);

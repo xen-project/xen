@@ -59,7 +59,7 @@ static unsigned int __ro_after_init vm_notify_window;
 integer_param("vm-notify-window", vm_notify_window);
 
 static bool __read_mostly opt_ept_pml = true;
-static s8 __read_mostly opt_ept_ad = -1;
+static int8_t __ro_after_init opt_ept_ad = -1;
 int8_t __read_mostly opt_ept_exec_sp = -1;
 
 static int __init cf_check parse_ept_param(const char *s)

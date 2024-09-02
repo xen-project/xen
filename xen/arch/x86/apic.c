@@ -71,7 +71,7 @@ static struct {
 /*
  * Knob to control our willingness to enable the local APIC.
  */
-static s8 __initdata enable_local_apic; /* -1=force-disable, +1=force-enable */
+static int8_t __initdata enable_local_apic; /* -1=force-disable, +1=force-enable */
 
 /*
  * Debug level
