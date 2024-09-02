@@ -783,7 +783,7 @@ libxl_xen_console_reader *
     unsigned int size = 16384 + 1;
 
     cr = libxl__zalloc(NOGC, sizeof(libxl_xen_console_reader));
-    cr->buffer = libxl__zalloc(NOGC, size);
+    cr->buffer = libxl__malloc(NOGC, size);
     cr->size = size;
     cr->clear = clear;
     cr->incremental = 1;
@@ -813,7 +813,6 @@ int libxl_xen_console_read_line(libxl_ctx *ctx,
     unsigned int nr_chars = cr->size - 1;
     GC_INIT(ctx);
 
-    memset(cr->buffer, 0, cr->size);
     ret = xc_readconsolering(ctx->xch, cr->buffer, &nr_chars,
                              cr->clear, cr->incremental, &cr->index);
     if (ret < 0) {
@@ -823,6 +822,7 @@ int libxl_xen_console_read_line(libxl_ctx *ctx,
     }
     if (!ret) {
         if (nr_chars) {
+            cr->buffer[nr_chars] = '\0';
             *line_r = cr->buffer;
             ret = 1;
         } else {
