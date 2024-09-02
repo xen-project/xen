@@ -31,6 +31,7 @@ asm (
     );
 
 #include <xen/kconfig.h>
+#include <xen/macros.h>
 #include <xen/types.h>
 
 #include "defs.h"
@@ -49,6 +50,9 @@ typedef struct __packed {
     uint16_t vesa_depth;
 #endif
 } early_boot_opts_t;
+
+/* Avoid pulling in all of ctypes.h for this. */
+#define tolower(c)	((c) | 0x20)
 
 /*
  * Space and TAB are obvious delimiters. However, I am

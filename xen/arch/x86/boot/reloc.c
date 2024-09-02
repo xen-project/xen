@@ -26,6 +26,7 @@ asm (
     "    jmp  reloc                    \n"
     );
 
+#include <xen/macros.h>
 #include <xen/types.h>
 
 #include "defs.h"
@@ -76,7 +77,7 @@ static uint32_t alloc;
 
 static uint32_t alloc_mem(uint32_t bytes)
 {
-    return alloc -= ALIGN_UP(bytes, 16);
+    return alloc -= ROUNDUP(bytes, 16);
 }
 
 static void zero_mem(uint32_t s, uint32_t bytes)
@@ -202,11 +203,11 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
     zero_mem(ptr, sizeof(*mbi_out));
 
     /* Skip Multiboot2 information fixed part. */
-    ptr = ALIGN_UP(mbi_in + sizeof(*mbi_fix), MULTIBOOT2_TAG_ALIGN);
+    ptr = ROUNDUP(mbi_in + sizeof(*mbi_fix), MULTIBOOT2_TAG_ALIGN);
 
     /* Get the number of modules. */
     for ( tag = _p(ptr); (uint32_t)tag - mbi_in < mbi_fix->total_size;
-          tag = _p(ALIGN_UP((uint32_t)tag + tag->size, MULTIBOOT2_TAG_ALIGN)) )
+          tag = _p(ROUNDUP((uint32_t)tag + tag->size, MULTIBOOT2_TAG_ALIGN)) )
     {
         if ( tag->type == MULTIBOOT2_TAG_TYPE_MODULE )
             ++mbi_out->mods_count;
@@ -227,11 +228,11 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
     }
 
     /* Skip Multiboot2 information fixed part. */
-    ptr = ALIGN_UP(mbi_in + sizeof(*mbi_fix), MULTIBOOT2_TAG_ALIGN);
+    ptr = ROUNDUP(mbi_in + sizeof(*mbi_fix), MULTIBOOT2_TAG_ALIGN);
 
     /* Put all needed data into mbi_out. */
     for ( tag = _p(ptr); (uint32_t)tag - mbi_in < mbi_fix->total_size;
-          tag = _p(ALIGN_UP((uint32_t)tag + tag->size, MULTIBOOT2_TAG_ALIGN)) )
+          tag = _p(ROUNDUP((uint32_t)tag + tag->size, MULTIBOOT2_TAG_ALIGN)) )
     {
         switch ( tag->type )
         {

@@ -24,23 +24,4 @@
 #define __packed	__attribute__((__packed__))
 #define __stdcall	__attribute__((__stdcall__))
 
-#define ALIGN_UP(arg, align) \
-                (((arg) + (align) - 1) & ~((typeof(arg))(align) - 1))
-
-#define min(x,y) ({ \
-        const typeof(x) _x = (x);       \
-        const typeof(y) _y = (y);       \
-        (void) (&_x == &_y);            \
-        _x < _y ? _x : _y; })
-
-#define max(x,y) ({ \
-        const typeof(x) _x = (x);       \
-        const typeof(y) _y = (y);       \
-        (void) (&_x == &_y);            \
-        _x > _y ? _x : _y; })
-
-#define _p(val)		((void *)(unsigned long)(val))
-
-#define tolower(c)	((c) | 0x20)
-
 #endif /* __BOOT_DEFS_H__ */
