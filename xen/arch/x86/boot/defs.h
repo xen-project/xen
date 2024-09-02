@@ -22,6 +22,5 @@
 
 #define __maybe_unused	__attribute__((__unused__))
 #define __packed	__attribute__((__packed__))
-#define __stdcall	__attribute__((__stdcall__))
 
 #endif /* __BOOT_DEFS_H__ */

@@ -20,8 +20,8 @@
 
 /*
  * This entry point is entered from xen/arch/x86/boot/head.S with:
- *   - 0x4(%esp) = &cmdline,
- *   - 0x8(%esp) = &early_boot_opts.
+ *   - %eax      = &cmdline,
+ *   - %edx      = &early_boot_opts.
  */
 asm (
     "    .text                         \n"
@@ -347,7 +347,7 @@ static void vga_parse(const char *cmdline, early_boot_opts_t *ebo)
 #endif
 
 /* SAF-1-safe */
-void __stdcall cmdline_parse_early(const char *cmdline, early_boot_opts_t *ebo)
+void cmdline_parse_early(const char *cmdline, early_boot_opts_t *ebo)
 {
     if ( !cmdline )
         return;

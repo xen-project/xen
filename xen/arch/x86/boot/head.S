@@ -613,10 +613,11 @@ trampoline_setup:
 
         /* Save Multiboot / PVH info struct (after relocation) for later use. */
         push    %edx                /* Boot video info to be filled from MB2. */
-        push    %ecx                /* Bottom-most low-memory stack address. */
-        push    %ebx                /* Multiboot / PVH information address. */
-        push    %eax                /* Magic number. */
+        mov     %ebx, %edx          /* Multiboot / PVH information address. */
+        /*      reloc(magic/eax, info/edx, trampoline/ecx, video/stk) using fastcall. */
         call    reloc
+        add     $4, %esp
+
 #ifdef CONFIG_PVH_GUEST
         cmpb    $0, sym_esi(pvh_boot)
         je      1f
@@ -848,9 +849,9 @@ trampoline_setup:
         testl   $MBI_CMDLINE,MB_flags(%ebx)
         jz      1f
 
-        lea     sym_esi(early_boot_opts),%eax
-        push    %eax
-        pushl   MB_cmdline(%ebx)
+        lea     sym_esi(early_boot_opts), %edx
+        mov     MB_cmdline(%ebx), %eax
+        /*      cmdline_parse_early(cmdline/eax, opts/edx) using fastcall. */
         call    cmdline_parse_early
 
 1:
@@ -871,7 +872,7 @@ trampoline_setup:
 
         /*
          * cmdline and reloc are written in C, and linked to be 32bit PIC with
-         * entrypoints at 0 and using the stdcall convention.
+         * entrypoints at 0 and using the fastcall convention.
          */
         ALIGN
 cmdline_parse_early:

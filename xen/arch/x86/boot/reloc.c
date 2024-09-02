@@ -14,10 +14,10 @@
 
 /*
  * This entry point is entered from xen/arch/x86/boot/head.S with:
- *   - 0x04(%esp) = MAGIC,
- *   - 0x08(%esp) = INFORMATION_ADDRESS,
- *   - 0x0c(%esp) = TOPMOST_LOW_MEMORY_STACK_ADDRESS.
- *   - 0x10(%esp) = BOOT_VIDEO_INFO_ADDRESS.
+ *   - %eax       = MAGIC,
+ *   - %edx       = INFORMATION_ADDRESS,
+ *   - %ecx       = TOPMOST_LOW_MEMORY_STACK_ADDRESS.
+ *   - 0x04(%esp) = BOOT_VIDEO_INFO_ADDRESS.
  */
 asm (
     "    .text                         \n"
@@ -354,8 +354,8 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
 }
 
 /* SAF-1-safe */
-void *__stdcall reloc(uint32_t magic, uint32_t in, uint32_t trampoline,
-                      uint32_t video_info)
+void *reloc(uint32_t magic, uint32_t in, uint32_t trampoline,
+            uint32_t video_info)
 {
     alloc = trampoline;
 
