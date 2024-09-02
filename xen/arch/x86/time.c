@@ -1552,6 +1552,37 @@ static const char *__init wallclock_type_to_string(void)
     return "";
 }
 
+static int __init cf_check parse_wallclock(const char *arg)
+{
+    wallclock_source = WALLCLOCK_UNSET;
+
+    if ( !arg )
+        return -EINVAL;
+
+    if ( !strcmp("auto", arg) )
+        ASSERT(wallclock_source == WALLCLOCK_UNSET);
+    else if ( !strcmp("xen", arg) )
+    {
+        if ( !xen_guest )
+            return -EINVAL;
+
+        wallclock_source = WALLCLOCK_XEN;
+    }
+    else if ( !strcmp("cmos", arg) )
+        wallclock_source = WALLCLOCK_CMOS;
+    else if ( !strcmp("efi", arg) )
+        /*
+         * Checking if run-time services are available must be done after
+         * command line parsing.
+         */
+        wallclock_source = WALLCLOCK_EFI;
+    else
+        return -EINVAL;
+
+    return 0;
+}
+custom_param("wallclock", parse_wallclock);
+
 static void __init probe_wallclock(void)
 {
     ASSERT(wallclock_source == WALLCLOCK_UNSET);
@@ -2527,7 +2558,15 @@ int __init init_xen_time(void)
 
     open_softirq(TIME_CALIBRATE_SOFTIRQ, local_time_calibration);
 
-    probe_wallclock();
+    /*
+     * EFI run time services can be disabled from the command line, hence the
+     * check for them cannot be done as part of the wallclock option parsing.
+     */
+    if ( wallclock_source == WALLCLOCK_EFI && !efi_enabled(EFI_RS) )
+        wallclock_source = WALLCLOCK_UNSET;
+
+    if ( wallclock_source == WALLCLOCK_UNSET )
+        probe_wallclock();
 
     printk(XENLOG_INFO "Wallclock source: %s\n", wallclock_type_to_string());
 
