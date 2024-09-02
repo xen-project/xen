@@ -26,10 +26,9 @@ asm (
     "    jmp  reloc                    \n"
     );
 
+#include <xen/compiler.h>
 #include <xen/macros.h>
 #include <xen/types.h>
-
-#include "defs.h"
 
 #include <xen/kconfig.h>
 #include <xen/multiboot.h>

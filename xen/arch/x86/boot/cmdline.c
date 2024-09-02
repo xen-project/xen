@@ -30,11 +30,11 @@ asm (
     "    jmp  cmdline_parse_early      \n"
     );
 
+#include <xen/compiler.h>
 #include <xen/kconfig.h>
 #include <xen/macros.h>
 #include <xen/types.h>
 
-#include "defs.h"
 #include "video.h"
 
 /* Keep in sync with trampoline.S:early_boot_opts label! */
