@@ -792,17 +792,24 @@ libxl_xen_console_reader *
     return cr;
 }
 
-/* return values:                                          *line_r
- *   1          success, whole line obtained from buffer    non-0
- *   0          no more lines available right now           0
- *   negative   error code ERROR_*                          0
- * On success *line_r is updated to point to a nul-terminated
- * string which is valid until the next call on the same console
- * reader.  The libxl caller may overwrite parts of the string
- * if it wishes. */
+/*
+ * Copy part of the console ring into a buffer
+ *
+ * Return values:
+ *   1: Success, *buff points to the string
+ *   0: No more lines available right now
+ *   -ERROR_* on error
+ *
+ * Despite its name, libxl_xen_console_read_line() does not
+ * necessarily read a complete line.  It attempts to fill the buffer
+ * with as many characters as it can accommodate.  The buffer pointed
+ * to by *buff is updated to contain a nul-terminated string.  This
+ * string remains valid until the next call to
+ * libxl_xen_console_read_line() on the same console reader.
+ */
 int libxl_xen_console_read_line(libxl_ctx *ctx,
                                 libxl_xen_console_reader *cr,
-                                char **line_r)
+                                char **buff)
 {
     int ret;
     /*
@@ -823,10 +830,10 @@ int libxl_xen_console_read_line(libxl_ctx *ctx,
     if (!ret) {
         if (nr_chars) {
             cr->buffer[nr_chars] = '\0';
-            *line_r = cr->buffer;
+            *buff = cr->buffer;
             ret = 1;
         } else {
-            *line_r = NULL;
+            *buff = NULL;
             ret = 0;
         }
     }

@@ -2813,7 +2813,7 @@ libxl_xen_console_reader *
     libxl_xen_console_read_start(libxl_ctx *ctx, int clear);
 int libxl_xen_console_read_line(libxl_ctx *ctx,
                                 libxl_xen_console_reader *cr,
-                                char **line_r);
+                                char **buff);
 void libxl_xen_console_read_finish(libxl_ctx *ctx,
                                    libxl_xen_console_reader *cr);
 
