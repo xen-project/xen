@@ -1592,14 +1592,14 @@ static void __init probe_wallclock(void)
         wallclock_source = WALLCLOCK_XEN;
         return;
     }
-    if ( efi_enabled(EFI_RS) && efi_get_time() )
-    {
-        wallclock_source = WALLCLOCK_EFI;
-        return;
-    }
     if ( cmos_rtc_probe() )
     {
         wallclock_source = WALLCLOCK_CMOS;
+        return;
+    }
+    if ( efi_enabled(EFI_RS) && efi_get_time() )
+    {
+        wallclock_source = WALLCLOCK_EFI;
         return;
     }
 

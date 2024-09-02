@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
    leaving this to the guest kernel to do in guest context.
  - On x86:
    - Prefer ACPI reboot over UEFI ResetSystem() run time service call.
+   - Prefer CMOS over EFI_GET_TIME as time source.
    - Switched the xAPIC flat driver to use physical destination mode for external
      interrupts instead of logical destination mode.
 
@@ -24,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
    - Support for LLC (Last Level Cache) coloring.
  - On x86:
    - xl suspend/resume subcommands.
+   - `wallclock` command line option to select time source.
 
 ### Removed
  - On x86:
