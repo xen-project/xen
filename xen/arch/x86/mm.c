@@ -918,6 +918,7 @@ get_page_from_l1e(
                 return 0;
             default:
                 ASSERT_UNREACHABLE();
+                return -EILSEQ;
             }
         }
         else if ( l1f & _PAGE_RW )
