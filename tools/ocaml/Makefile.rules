@@ -51,12 +51,13 @@ ifneq ($(MAKECMDGOALS),clean)
 endif
 
 clean: $(CLEAN_HOOKS)
-	$(Q)rm -f .*.d *.o *.so *.a *.cmo *.cmi *.cma *.cmx *.cmxa *.annot *.spot *.spit $(LIBS) $(PROGRAMS) $(GENERATED_FILES) .ocamldep.make META
+	$(Q)rm -f .*.d *.o *.so *.a *.cmo *.cmi *.cma *.cmx *.cmxa *.cmxs *.annot *.spot *.spit $(LIBS) $(PROGRAMS) $(GENERATED_FILES) .ocamldep.make META
 
 distclean: clean
 
 quiet-command = $(if $(V),$1,@printf " %-8s %s\n" "$2" "$3" && $1)
 
+mk-caml-shared-lib-native = $(call quiet-command, $(OCAMLOPT) $(OCAMLOPTFLAGS) -shared -linkall -o $1 $2 $3,MLA,$1)
 mk-caml-lib-native = $(call quiet-command, $(OCAMLOPT) $(OCAMLOPTFLAGS) -a -o $1 $2 $3,MLA,$1)
 mk-caml-lib-bytecode = $(call quiet-command, $(OCAMLC) $(OCAMLCFLAGS) -a -o $1 $2 $3,MLA,$1)
 
@@ -74,6 +75,19 @@ define OCAML_LIBRARY_template
 	$(call mk-caml-stubs,$$@, $$+)
  lib$(1)_stubs.a: $(foreach obj,$($(1)_C_OBJS),$(obj).o)
 	$(call mk-caml-lib-stubs,$$@, $$+, $(foreach lib,$(LIBS_$(1)),$(lib)))
+endef
+
+# Dynamically linked OCaml libraries ("plugins" in Dynlink parlance)
+# need to compile an .cmxs file
+define OCAML_DYN_LIBRARY_template
+ $(1).cmxs: $(1).cmxa
+	$(call mk-caml-shared-lib-native,$$@, $(1).cmxa)
+ $(1).cmxa: lib$(1)_stubs.a $(foreach obj,$($(1)_OBJS),$(obj).cmx)
+	$(call mk-caml-lib-native,$$@, -cclib -l$(1)_stubs $(foreach lib,$(LIBS_$(1)),-cclib $(lib)), $(foreach obj,$($(1)_OBJS),$(obj).cmx))
+ $(1)_stubs.a: $(foreach obj,$$($(1)_C_OBJS),$(obj).o)
+	$(call mk-caml-stubs,$$@, $$+)
+ lib$(1)_stubs.a: $(foreach obj,$($(1)_C_OBJS),$(obj).o)
+	$(call mk-caml-lib-stubs,$$@, $$+)
 endef
 
 define OCAML_NOC_LIBRARY_template
@@ -98,6 +112,7 @@ endef
 -include .ocamldep.make
 
 $(foreach lib,$(OCAML_LIBRARY),$(eval $(call OCAML_LIBRARY_template,$(lib))))
+$(foreach lib,$(OCAML_DYN_LIBRARY),$(eval $(call OCAML_DYN_LIBRARY_template,$(lib))))
 $(foreach lib,$(OCAML_NOC_LIBRARY),$(eval $(call OCAML_NOC_LIBRARY_template,$(lib))))
 $(foreach p,$(OCAML_PROGRAM),$(eval $(call OCAML_PROGRAM_template,$(p))))
 $(foreach p,$(C_PROGRAM),$(eval $(call C_PROGRAM_template,$(p))))
