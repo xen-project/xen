@@ -49,18 +49,6 @@ void domain_set_time_offset(struct domain *d, int64_t time_offset_seconds)
     BUG_ON("unimplemented");
 }
 
-/* shutdown.c */
-
-void machine_restart(unsigned int delay_millisecs)
-{
-    BUG_ON("unimplemented");
-}
-
-void machine_halt(void)
-{
-    BUG_ON("unimplemented");
-}
-
 /* domctl.c */
 
 long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,

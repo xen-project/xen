@@ -4,6 +4,7 @@
 #include <xen/compile.h>
 #include <xen/init.h>
 #include <xen/mm.h>
+#include <xen/shutdown.h>
 
 #include <public/version.h>
 
@@ -28,8 +29,5 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
 
     printk("All set up\n");
 
-    for ( ;; )
-        asm volatile ("wfi");
-
-    unreachable();
+    machine_halt();
 }

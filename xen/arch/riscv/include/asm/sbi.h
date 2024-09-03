@@ -13,6 +13,7 @@
 #define __ASM_RISCV_SBI_H__
 
 #define SBI_EXT_0_1_CONSOLE_PUTCHAR		0x1
+#define SBI_EXT_0_1_SHUTDOWN			0x8
 
 struct sbiret {
     long error;
@@ -30,5 +31,7 @@ struct sbiret sbi_ecall(unsigned long ext, unsigned long fid,
  * @param ch The data to be written to the console.
  */
 void sbi_console_putchar(int ch);
+
+void sbi_shutdown(void);
 
 #endif /* __ASM_RISCV_SBI_H__ */
