@@ -1072,7 +1072,7 @@ void asmlinkage __init noreturn __start_xen(void)
     unsigned int initrdidx, num_parked = 0;
     struct boot_info *bi;
     unsigned long nr_pages, raw_max_page;
-    int i, j, e820_warn = 0, bytes = 0;
+    int i, j, bytes = 0;
     unsigned long eb_start, eb_end;
     bool acpi_boot_table_init_done = false, relocated = false;
     bool vm_init_done = false;
@@ -1309,12 +1309,8 @@ void asmlinkage __init noreturn __start_xen(void)
              */
             if ( (map->base_addr_high == 0) && (map->length_high != 0) )
             {
-                if ( !e820_warn )
-                {
-                    printk("WARNING: Buggy e820 map detected and fixed "
-                           "(truncated length fields).\n");
-                    e820_warn = 1;
-                }
+                printk_once(XENLOG_WARNING
+                            "WARNING: Buggy e820 map detected; truncated length\n");
                 map->length_high = 0;
             }
 
