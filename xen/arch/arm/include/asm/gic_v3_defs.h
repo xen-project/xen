@@ -189,7 +189,7 @@
 #define ICH_LR_GRP1                  (1ULL << 60)
 #define ICH_LR_HW                    (1ULL << 61)
 
-#define ICH_VTR_NRLRGS               0x3f
+#define ICH_VTR_NRLRGS               0xf
 #define ICH_VTR_PRIBITS_MASK         0x7
 #define ICH_VTR_PRIBITS_SHIFT        29
 
