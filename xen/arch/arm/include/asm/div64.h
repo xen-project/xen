@@ -54,20 +54,6 @@
 	__rem;							\
 })
 
-#if __GNUC__ < 4
-
-/*
- * gcc versions earlier than 4.0 are simply too problematic for the
- * optimized implementation below. First there is gcc PR 15089 that
- * tend to trig on more complex constructs, spurious .global __udivsi3
- * are inserted even if none of those symbols are referenced in the
- * generated code, and those gcc versions are not able to do constant
- * propagation on long long values anyway.
- */
-#define do_div(n, base) __do_div_asm(n, base)
-
-#elif __GNUC__ >= 4
-
 #include <xen/bug.h>
 
 /*
@@ -216,8 +202,6 @@
 	}								\
 	__r;								\
 })
-
-#endif /* GCC version */
 
 #endif /* BITS_PER_LONG */
 
