@@ -14,10 +14,8 @@ $(obj)/head.o: $(head-bin-objs:.o=.bin)
 CFLAGS_x86_32 := $(subst -m64,-m32 -march=i686,$(XEN_TREEWIDE_CFLAGS))
 $(call cc-options-add,CFLAGS_x86_32,CC,$(EMBEDDED_EXTRA_CFLAGS))
 CFLAGS_x86_32 += -Werror -fno-builtin -g0 -msoft-float
-ifneq ($(abs_objtree),$(abs_srctree))
-CFLAGS_x86_32 += -I$(objtree)/include
-endif
-CFLAGS_x86_32 += -I$(srctree)/include
+CFLAGS_x86_32 += -nostdinc -include $(filter %/include/xen/config.h,$(XEN_CFLAGS))
+CFLAGS_x86_32 += $(filter -I%,$(XEN_CFLAGS))
 
 # override for 32bit binaries
 $(head-bin-objs): CFLAGS_stack_boundary :=
