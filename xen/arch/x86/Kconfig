@@ -222,7 +222,7 @@ config HVM_FEP
 
 config TBOOT
 	bool "Xen tboot support (UNSUPPORTED)"
-	depends on UNSUPPORTED
+	depends on INTEL && UNSUPPORTED
 	default !PV_SHIM_EXCLUSIVE
 	select CRYPTO
 	help
