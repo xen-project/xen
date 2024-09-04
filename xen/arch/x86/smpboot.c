@@ -226,7 +226,7 @@ static int booting_cpu;
 /* CPUs for which sibling maps can be computed. */
 static cpumask_t cpu_sibling_setup_map;
 
-static void link_thread_siblings(int cpu1, int cpu2)
+static void link_thread_siblings(unsigned int cpu1, unsigned int cpu2)
 {
     cpumask_set_cpu(cpu1, per_cpu(cpu_sibling_mask, cpu2));
     cpumask_set_cpu(cpu2, per_cpu(cpu_sibling_mask, cpu1));
