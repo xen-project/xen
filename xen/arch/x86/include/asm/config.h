@@ -83,25 +83,6 @@
 #define LIST_POISON1  ((void *)0x0100100100100100UL)
 #define LIST_POISON2  ((void *)0x0200200200200200UL)
 
-#ifndef __ASSEMBLY__
-extern unsigned long trampoline_phys;
-#define bootsym_phys(sym)                                 \
-    (((unsigned long)&(sym)-(unsigned long)&trampoline_start)+trampoline_phys)
-#define bootsym(sym)                                      \
-    (*((typeof(sym) *)__va(bootsym_phys(sym))))
-
-extern char trampoline_start[], trampoline_end[];
-extern char trampoline_realmode_entry[];
-extern unsigned int trampoline_xen_phys_start;
-extern unsigned char trampoline_cpu_started;
-extern char wakeup_start[];
-
-extern unsigned char video_flags;
-
-extern unsigned short boot_edid_caps;
-extern unsigned char boot_edid_info[128];
-#endif
-
 #include <xen/const.h>
 
 #define PML4_ENTRY_BITS  39

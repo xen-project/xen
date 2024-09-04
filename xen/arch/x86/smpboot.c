@@ -35,6 +35,7 @@
 #include <asm/spec_ctrl.h>
 #include <asm/time.h>
 #include <asm/tboot.h>
+#include <asm/trampoline.h>
 #include <irq_vectors.h>
 #include <mach_apic.h>
 

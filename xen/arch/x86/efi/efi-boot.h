@@ -9,6 +9,7 @@
 #include <asm/microcode.h>
 #include <asm/msr.h>
 #include <asm/setup.h>
+#include <asm/trampoline.h>
 
 static struct file __initdata ucode;
 static multiboot_info_t __initdata mbi = {

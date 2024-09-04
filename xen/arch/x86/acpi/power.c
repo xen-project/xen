@@ -31,6 +31,8 @@
 #include <asm/microcode.h>
 #include <asm/prot-key.h>
 #include <asm/spec_ctrl.h>
+#include <asm/trampoline.h>
+
 #include <acpi/cpufreq/cpufreq.h>
 
 uint32_t system_reset_counter = 1;

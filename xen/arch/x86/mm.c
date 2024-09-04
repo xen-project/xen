@@ -131,6 +131,7 @@
 #include <asm/guest.h>
 #include <asm/pv/domain.h>
 #include <asm/pv/mm.h>
+#include <asm/trampoline.h>
 
 #ifdef CONFIG_PV
 #include "pv/mm.h"

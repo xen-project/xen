@@ -32,6 +32,8 @@
 #include <asm/mtrr.h>
 #include <asm/io_apic.h>
 #include <asm/setup.h>
+#include <asm/trampoline.h>
+
 #include "cpu/mcheck/mce.h"
 #include "cpu/mtrr/mtrr.h"
 #include <xsm/xsm.h>

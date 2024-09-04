@@ -12,6 +12,7 @@
 
 #include <asm/e820.h>
 #include <asm/guest.h>
+#include <asm/trampoline.h>
 
 #include <public/arch-x86/hvm/start_info.h>
 

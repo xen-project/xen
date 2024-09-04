@@ -37,6 +37,8 @@ EMIT_FILE;
 #include <asm/numa.h>
 #include <asm/mem_paging.h>
 #include <asm/mem_sharing.h>
+#include <asm/trampoline.h>
+
 #include <public/memory.h>
 
 #ifdef CONFIG_PV32

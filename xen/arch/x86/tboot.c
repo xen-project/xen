@@ -14,6 +14,8 @@
 #include <asm/e820.h>
 #include <asm/tboot.h>
 #include <asm/setup.h>
+#include <asm/trampoline.h>
+
 #include <crypto/vmac.h>
 
 /* tboot=<physical address of shared page> */
