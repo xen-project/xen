@@ -899,7 +899,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size)
     int rc;
 
     /* Not part of the initializer, for old gcc to cope. */
-    ctxt.cpu_policy = &cp;
+    ctxt.cpu_policy = &cpu_policy;
 
     /* Reset all global state variables */
     memset(&input, 0, sizeof(input));

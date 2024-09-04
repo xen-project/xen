@@ -25,7 +25,7 @@
 #endif
 
 uint32_t mxcsr_mask = 0x0000ffbf;
-struct cpu_policy cp;
+struct cpu_policy cpu_policy;
 
 static char fpu_save_area[0x4000] __attribute__((__aligned__((64))));
 static bool use_xsave;
@@ -75,18 +75,18 @@ bool emul_test_init(void)
 
     unsigned long sp;
 
-    x86_cpu_policy_fill_native(&cp);
+    x86_cpu_policy_fill_native(&cpu_policy);
 
     /*
      * The emulator doesn't use these instructions, so can always emulate
      * them.
      */
-    cp.basic.movbe = true;
-    cp.feat.invpcid = true;
-    cp.feat.adx = true;
-    cp.feat.rdpid = true;
-    cp.feat.wrmsrns = true;
-    cp.extd.clzero = true;
+    cpu_policy.basic.movbe = true;
+    cpu_policy.feat.invpcid = true;
+    cpu_policy.feat.adx = true;
+    cpu_policy.feat.rdpid = true;
+    cpu_policy.feat.wrmsrns = true;
+    cpu_policy.extd.clzero = true;
 
     if ( cpu_has_xsave )
     {

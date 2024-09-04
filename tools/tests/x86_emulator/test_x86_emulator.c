@@ -779,7 +779,8 @@ static void zap_fpsel(unsigned int *env, bool is_32bit)
         env[3] &= ~0xffff;
     }
 
-    if ( cp.x86_vendor != X86_VENDOR_AMD && cp.x86_vendor != X86_VENDOR_HYGON )
+    if ( cpu_policy.x86_vendor != X86_VENDOR_AMD &&
+         cpu_policy.x86_vendor != X86_VENDOR_HYGON )
         return;
 
     if ( is_32bit )
@@ -913,7 +914,7 @@ int main(int argc, char **argv)
 
     ctxt.regs = &regs;
     ctxt.force_writeback = 0;
-    ctxt.cpu_policy = &cp;
+    ctxt.cpu_policy = &cpu_policy;
     ctxt.lma       = sizeof(void *) == 8;
     ctxt.addr_size = 8 * sizeof(void *);
     ctxt.sp_size   = 8 * sizeof(void *);
@@ -1487,11 +1488,11 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
-    vendor_native = cp.x86_vendor;
-    for ( cp.x86_vendor = X86_VENDOR_AMD; ; )
+    vendor_native = cpu_policy.x86_vendor;
+    for ( cpu_policy.x86_vendor = X86_VENDOR_AMD; ; )
     {
-        unsigned int v = cp.x86_vendor == X86_VENDOR_INTEL;
-        const char *vendor = cp.x86_vendor == X86_VENDOR_INTEL ? "Intel" : "AMD";
+        unsigned int v = cpu_policy.x86_vendor == X86_VENDOR_INTEL;
+        const char *vendor = cpu_policy.x86_vendor == X86_VENDOR_INTEL ? "Intel" : "AMD";
         uint64_t *stk = (void *)res + MMAP_SZ - 16;
 
         regs.rcx = 2;
@@ -1527,11 +1528,11 @@ int main(int argc, char **argv)
             printf("okay\n");
         }
 
-        if ( cp.x86_vendor == X86_VENDOR_INTEL )
+        if ( cpu_policy.x86_vendor == X86_VENDOR_INTEL )
             break;
-        cp.x86_vendor = X86_VENDOR_INTEL;
+        cpu_policy.x86_vendor = X86_VENDOR_INTEL;
     }
-    cp.x86_vendor = vendor_native;
+    cpu_policy.x86_vendor = vendor_native;
 #endif /* x86-64 */
 
     printf("%-40s", "Testing shld $1,%ecx,(%edx)...");

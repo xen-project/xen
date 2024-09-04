@@ -68,7 +68,7 @@
 #define is_canonical_address(x) (((int64_t)(x) >> 47) == ((int64_t)(x) >> 63))
 
 extern uint32_t mxcsr_mask;
-extern struct cpu_policy cp;
+extern struct cpu_policy cpu_policy;
 
 #define MMAP_SZ 16384
 bool emul_test_init(void);
@@ -122,7 +122,7 @@ static inline uint64_t xgetbv(uint32_t xcr)
 }
 
 /* Intentionally checking OSXSAVE here. */
-#define cpu_has_xsave     (cp.basic.raw[1].c & (1u << 27))
+#define cpu_has_xsave     (cpu_policy.basic.raw[1].c & (1u << 27))
 
 static inline bool xcr0_mask(uint64_t mask)
 {
@@ -132,63 +132,80 @@ static inline bool xcr0_mask(uint64_t mask)
 unsigned int rdpkru(void);
 void wrpkru(unsigned int val);
 
-#define cache_line_size() (cp.basic.clflush_size * 8)
-#define cpu_has_fpu        cp.basic.fpu
-#define cpu_has_mmx        cp.basic.mmx
-#define cpu_has_fxsr       cp.basic.fxsr
-#define cpu_has_sse        cp.basic.sse
-#define cpu_has_sse2       cp.basic.sse2
-#define cpu_has_sse3       cp.basic.sse3
-#define cpu_has_pclmulqdq  cp.basic.pclmulqdq
-#define cpu_has_ssse3      cp.basic.ssse3
-#define cpu_has_fma       (cp.basic.fma && xcr0_mask(6))
-#define cpu_has_sse4_1     cp.basic.sse4_1
-#define cpu_has_sse4_2     cp.basic.sse4_2
-#define cpu_has_popcnt     cp.basic.popcnt
-#define cpu_has_aesni      cp.basic.aesni
-#define cpu_has_avx       (cp.basic.avx  && xcr0_mask(6))
-#define cpu_has_f16c      (cp.basic.f16c && xcr0_mask(6))
+#define cache_line_size()           (cpu_policy.basic.clflush_size * 8)
+#define cpu_has_fpu                  cpu_policy.basic.fpu
+#define cpu_has_mmx                  cpu_policy.basic.mmx
+#define cpu_has_fxsr                 cpu_policy.basic.fxsr
+#define cpu_has_sse                  cpu_policy.basic.sse
+#define cpu_has_sse2                 cpu_policy.basic.sse2
+#define cpu_has_sse3                 cpu_policy.basic.sse3
+#define cpu_has_pclmulqdq            cpu_policy.basic.pclmulqdq
+#define cpu_has_ssse3                cpu_policy.basic.ssse3
+#define cpu_has_fma                 (cpu_policy.basic.fma && xcr0_mask(6))
+#define cpu_has_sse4_1               cpu_policy.basic.sse4_1
+#define cpu_has_sse4_2               cpu_policy.basic.sse4_2
+#define cpu_has_popcnt               cpu_policy.basic.popcnt
+#define cpu_has_aesni                cpu_policy.basic.aesni
+#define cpu_has_avx                 (cpu_policy.basic.avx  && xcr0_mask(6))
+#define cpu_has_f16c                (cpu_policy.basic.f16c && xcr0_mask(6))
 
-#define cpu_has_avx2      (cp.feat.avx2 && xcr0_mask(6))
-#define cpu_has_bmi1       cp.feat.bmi1
-#define cpu_has_bmi2       cp.feat.bmi2
-#define cpu_has_avx512f   (cp.feat.avx512f  && xcr0_mask(0xe6))
-#define cpu_has_avx512dq  (cp.feat.avx512dq && xcr0_mask(0xe6))
-#define cpu_has_avx512_ifma (cp.feat.avx512_ifma && xcr0_mask(0xe6))
-#define cpu_has_avx512cd  (cp.feat.avx512cd && xcr0_mask(0xe6))
-#define cpu_has_sha        cp.feat.sha
-#define cpu_has_avx512bw  (cp.feat.avx512bw && xcr0_mask(0xe6))
-#define cpu_has_avx512vl  (cp.feat.avx512vl && xcr0_mask(0xe6))
-#define cpu_has_avx512_vbmi (cp.feat.avx512_vbmi && xcr0_mask(0xe6))
-#define cpu_has_avx512_vbmi2 (cp.feat.avx512_vbmi2 && xcr0_mask(0xe6))
-#define cpu_has_gfni       cp.feat.gfni
-#define cpu_has_vaes      (cp.feat.vaes && xcr0_mask(6))
-#define cpu_has_vpclmulqdq (cp.feat.vpclmulqdq && xcr0_mask(6))
-#define cpu_has_avx512_vnni (cp.feat.avx512_vnni && xcr0_mask(0xe6))
-#define cpu_has_avx512_bitalg (cp.feat.avx512_bitalg && xcr0_mask(0xe6))
-#define cpu_has_avx512_vpopcntdq (cp.feat.avx512_vpopcntdq && xcr0_mask(0xe6))
-#define cpu_has_movdiri    cp.feat.movdiri
-#define cpu_has_movdir64b  cp.feat.movdir64b
-#define cpu_has_avx512_vp2intersect (cp.feat.avx512_vp2intersect && xcr0_mask(0xe6))
-#define cpu_has_serialize  cp.feat.serialize
-#define cpu_has_avx512_fp16 (cp.feat.avx512_fp16 && xcr0_mask(0xe6))
-#define cpu_has_sha512     (cp.feat.sha512 && xcr0_mask(6))
-#define cpu_has_sm3        (cp.feat.sm3 && xcr0_mask(6))
-#define cpu_has_sm4        (cp.feat.sm4 && xcr0_mask(6))
-#define cpu_has_avx_vnni   (cp.feat.avx_vnni && xcr0_mask(6))
-#define cpu_has_avx512_bf16 (cp.feat.avx512_bf16 && xcr0_mask(0xe6))
-#define cpu_has_avx_ifma   (cp.feat.avx_ifma && xcr0_mask(6))
-#define cpu_has_avx_vnni_int8 (cp.feat.avx_vnni_int8 && xcr0_mask(6))
-#define cpu_has_avx_ne_convert (cp.feat.avx_ne_convert && xcr0_mask(6))
-#define cpu_has_avx_vnni_int16 (cp.feat.avx_vnni_int16 && xcr0_mask(6))
+#define cpu_has_avx2                (cpu_policy.feat.avx2 && xcr0_mask(6))
+#define cpu_has_bmi1                 cpu_policy.feat.bmi1
+#define cpu_has_bmi2                 cpu_policy.feat.bmi2
+#define cpu_has_avx512f             (cpu_policy.feat.avx512f && \
+                                     xcr0_mask(0xe6))
+#define cpu_has_avx512dq            (cpu_policy.feat.avx512dq && \
+                                     xcr0_mask(0xe6))
+#define cpu_has_avx512_ifma         (cpu_policy.feat.avx512_ifma && \
+                                     xcr0_mask(0xe6))
+#define cpu_has_avx512cd            (cpu_policy.feat.avx512cd && \
+                                     xcr0_mask(0xe6))
+#define cpu_has_sha                  cpu_policy.feat.sha
+#define cpu_has_avx512bw            (cpu_policy.feat.avx512bw && \
+                                     xcr0_mask(0xe6))
+#define cpu_has_avx512vl            (cpu_policy.feat.avx512vl && \
+                                     xcr0_mask(0xe6))
+#define cpu_has_avx512_vbmi         (cpu_policy.feat.avx512_vbmi && \
+                                     xcr0_mask(0xe6))
+#define cpu_has_avx512_vbmi2        (cpu_policy.feat.avx512_vbmi2 && \
+                                     xcr0_mask(0xe6))
+#define cpu_has_gfni                 cpu_policy.feat.gfni
+#define cpu_has_vaes                (cpu_policy.feat.vaes && xcr0_mask(6))
+#define cpu_has_vpclmulqdq          (cpu_policy.feat.vpclmulqdq && xcr0_mask(6))
+#define cpu_has_avx512_vnni         (cpu_policy.feat.avx512_vnni && \
+                                     xcr0_mask(0xe6))
+#define cpu_has_avx512_bitalg       (cpu_policy.feat.avx512_bitalg && \
+                                     xcr0_mask(0xe6))
+#define cpu_has_avx512_vpopcntdq    (cpu_policy.feat.avx512_vpopcntdq && \
+                                     xcr0_mask(0xe6))
+#define cpu_has_movdiri              cpu_policy.feat.movdiri
+#define cpu_has_movdir64b            cpu_policy.feat.movdir64b
+#define cpu_has_avx512_vp2intersect (cpu_policy.feat.avx512_vp2intersect && \
+                                     xcr0_mask(0xe6))
+#define cpu_has_serialize            cpu_policy.feat.serialize
+#define cpu_has_avx512_fp16         (cpu_policy.feat.avx512_fp16 && \
+                                     xcr0_mask(0xe6))
+#define cpu_has_sha512              (cpu_policy.feat.sha512 && xcr0_mask(6))
+#define cpu_has_sm3                 (cpu_policy.feat.sm3 && xcr0_mask(6))
+#define cpu_has_sm4                 (cpu_policy.feat.sm4 && xcr0_mask(6))
+#define cpu_has_avx_vnni            (cpu_policy.feat.avx_vnni && xcr0_mask(6))
+#define cpu_has_avx512_bf16         (cpu_policy.feat.avx512_bf16 && \
+                                     xcr0_mask(0xe6))
+#define cpu_has_avx_ifma            (cpu_policy.feat.avx_ifma && xcr0_mask(6))
+#define cpu_has_avx_vnni_int8       (cpu_policy.feat.avx_vnni_int8 && \
+                                     xcr0_mask(6))
+#define cpu_has_avx_ne_convert      (cpu_policy.feat.avx_ne_convert && \
+                                     xcr0_mask(6))
+#define cpu_has_avx_vnni_int16      (cpu_policy.feat.avx_vnni_int16 && \
+                                     xcr0_mask(6))
 
-#define cpu_has_xgetbv1   (cpu_has_xsave && cp.xstate.xgetbv1)
+#define cpu_has_xgetbv1             (cpu_has_xsave && cpu_policy.xstate.xgetbv1)
 
-#define cpu_has_3dnow_ext  cp.extd._3dnowext
-#define cpu_has_sse4a      cp.extd.sse4a
-#define cpu_has_xop       (cp.extd.xop  && xcr0_mask(6))
-#define cpu_has_fma4      (cp.extd.fma4 && xcr0_mask(6))
-#define cpu_has_tbm        cp.extd.tbm
+#define cpu_has_3dnow_ext            cpu_policy.extd._3dnowext
+#define cpu_has_sse4a                cpu_policy.extd.sse4a
+#define cpu_has_xop                 (cpu_policy.extd.xop  && xcr0_mask(6))
+#define cpu_has_fma4                (cpu_policy.extd.fma4 && xcr0_mask(6))
+#define cpu_has_tbm                  cpu_policy.extd.tbm
 
 int emul_test_cpuid(
     uint32_t leaf,
