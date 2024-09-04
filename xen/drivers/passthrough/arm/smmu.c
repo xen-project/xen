@@ -1620,19 +1620,21 @@ static int arm_smmu_master_alloc_smes(struct device *dev)
 	spin_lock(&smmu->stream_map_lock);
 	/* Figure out a viable stream map entry allocation */
 	for_each_cfg_sme(cfg, i, idx, fwspec->num_ids) {
+		uint16_t mask = (fwspec->ids[i] >> SMR_MASK_SHIFT) & SMR_MASK_MASK;
+
 		if (idx != INVALID_SMENDX) {
 			ret = -EEXIST;
 			goto out_err;
 		}
 
-		ret = arm_smmu_find_sme(smmu, fwspec->ids[i], 0);
+		ret = arm_smmu_find_sme(smmu, fwspec->ids[i], mask);
 		if (ret < 0)
 			goto out_err;
 
 		idx = ret;
 		if (smrs && smmu->s2crs[idx].count == 0) {
 			smrs[idx].id = fwspec->ids[i];
-			smrs[idx].mask = 0; /* We don't currently share SMRs */
+			smrs[idx].mask = mask;
 			smrs[idx].valid = true;
 		}
 		smmu->s2crs[idx].count++;
