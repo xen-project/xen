@@ -56,7 +56,7 @@ static int __init cf_check parse_acpi_sleep(const char *s)
         s = ss + 1;
     } while ( *ss );
 
-    acpi_video_flags |= flag;
+    bootsym(video_flags) |= flag;
 
     return rc;
 }

@@ -103,7 +103,6 @@ extern unsigned long acpi_wakeup_address;
 extern int8_t acpi_numa;
 
 extern struct acpi_sleep_info acpi_sinfo;
-#define acpi_video_flags bootsym(video_flags)
 struct xenpf_enter_acpi_sleep;
 extern int acpi_enter_sleep(const struct xenpf_enter_acpi_sleep *sleep);
 extern int acpi_enter_state(u32 state);

@@ -499,13 +499,6 @@ static int __init cf_check ich10_bios_quirk(const struct dmi_system_id *d)
     return 0;
 }
 
-static __init int cf_check reset_videomode_after_s3(const struct dmi_blacklist *d)
-{
-	/* See wakeup.S */
-	acpi_video_flags |= 2;
-	return 0;
-}
-
 static __init int cf_check dmi_disable_acpi(const struct dmi_blacklist *d)
 { 
 	if (!acpi_force) { 
@@ -545,11 +538,6 @@ static __init int cf_check force_acpi_ht(const struct dmi_blacklist *d)
  */
  
 static const struct dmi_blacklist __initconstrel dmi_blacklist[] = {
-
-	{ reset_videomode_after_s3, "Toshiba Satellite 4030cdt", { /* Reset video mode after returning from ACPI S3 sleep */
-			MATCH(DMI_PRODUCT_NAME, "S4030CDT/4.3"),
-			NO_MATCH, NO_MATCH, NO_MATCH
-			} },
 
 	{ ich10_bios_quirk, "Intel board & BIOS",
 		/*
