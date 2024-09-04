@@ -1233,6 +1233,7 @@ x86_emulate(
 {
     /* Shadow copy of register state. Committed on successful emulation. */
     struct cpu_user_regs _regs = *ctxt->regs;
+    const struct cpu_policy *cp = ctxt->cpu_policy;
     struct x86_emulate_state state;
     int rc;
     uint8_t b, d, *opc = NULL;
@@ -3075,7 +3076,7 @@ x86_emulate(
          * in fact risking to make guest OSes vulnerable to the equivalent of
          * XSA-7 (CVE-2012-0217).
          */
-        generate_exception_if(ctxt->cpuid->x86_vendor == X86_VENDOR_INTEL &&
+        generate_exception_if(cp->x86_vendor == X86_VENDOR_INTEL &&
                               op_bytes == 8 && !is_canonical_address(_regs.rcx),
                               X86_EXC_GP, 0);
 #endif
