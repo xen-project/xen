@@ -200,10 +200,6 @@ rpmball: dist
 subtree-force-update: mini-os-dir-force-update
 	$(MAKE) -C tools subtree-force-update
 
-.PHONY: subtree-force-update-all
-subtree-force-update-all: mini-os-dir-force-update
-	$(MAKE) -C tools subtree-force-update-all
-
 # Make a source tarball, including qemu sub-trees.
 #
 # src-tarball will use "git describe" for the version number.  This
@@ -214,11 +210,11 @@ subtree-force-update-all: mini-os-dir-force-update
 # src-tarball-release will use "make xenversion" as the version
 # number.  This is suitable for release tarballs.
 .PHONY: src-tarball-release
-src-tarball-release: subtree-force-update-all
+src-tarball-release:
 	bash ./tools/misc/mktarball $(XEN_ROOT) $$($(MAKE) -C xen xenversion --no-print-directory)
 
 .PHONY: src-tarball
-src-tarball: subtree-force-update-all
+src-tarball:
 	bash ./tools/misc/mktarball $(XEN_ROOT) $$(git describe)
 
 .PHONY: clean

@@ -206,7 +206,7 @@ subdir-all-% subdir-clean-% subdir-install-% subdir-uninstall-%: .phony
 subdir-distclean-%: .phony
 	$(MAKE) -C $* distclean
 
-no-configure-targets := distclean subdir-distclean% clean subdir-clean% subtree-force-update-all %-dir-force-update
+no-configure-targets := distclean subdir-distclean% clean subdir-clean% %-dir-force-update
 ifeq (,$(filter $(no-configure-targets),$(MAKECMDGOALS)))
 $(XEN_ROOT)/config/Tools.mk:
 	$(error You have to run ./configure before building or installing the tools)

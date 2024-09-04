@@ -127,9 +127,5 @@ ifeq ($(CONFIG_OVMF),y)
 	$(MAKE) ovmf-dir-force-update
 endif
 
-subtree-force-update-all:
-	$(MAKE) seabios-dir-force-update
-	$(MAKE) ovmf-dir-force-update
-
 subdir-all-seabios-dir: seabios-dir
 	$(MAKE) -C $< CC=$(SEABIOSCC) LD=$(SEABIOSLD) PYTHON=$(PYTHON) EXTRAVERSION=$(SEABIOS_EXTRAVERSION) all;
