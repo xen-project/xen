@@ -1,25 +1,23 @@
-/* Copyright 2003 Andi Kleen, SuSE Labs. 
- * Subject to the GNU Public License, v.2 
- * 
+/* Copyright 2003 Andi Kleen, SuSE Labs.
+ * Subject to the GNU Public License, v.2
+ *
  * Generic x86 APIC driver probe layer.
- */  
-#include <xen/cpumask.h>
-#include <xen/string.h>
-#include <xen/kernel.h>
-#include <xen/ctype.h>
+ */
+#include <xen/bug.h>
+#include <xen/errno.h>
 #include <xen/init.h>
 #include <xen/param.h>
-#include <asm/cache.h>
-#include <asm/fixmap.h>
-#include <asm/mpspec.h>
-#include <asm/apicdef.h>
-#include <asm/mach-generic/mach_apic.h>
-#include <asm/setup.h>
+#include <xen/sections.h>
+#include <xen/string.h>
+#include <xen/types.h>
+
+#include <asm/apic.h>
+#include <asm/genapic.h>
 
 struct genapic __ro_after_init genapic;
 
 static const struct genapic *const __initconstrel apic_probe[] = {
-	&apic_bigsmp, 
+	&apic_bigsmp,
 	&apic_default,	/* must be last */
 	NULL,
 };
@@ -57,8 +55,8 @@ static int __init cf_check genapic_apic_force(const char *str)
 }
 custom_param("apic", genapic_apic_force);
 
-void __init generic_apic_probe(void) 
-{ 
+void __init generic_apic_probe(void)
+{
 	int i;
 
 	record_boot_APIC_mode();
@@ -75,4 +73,4 @@ void __init generic_apic_probe(void)
 	BUG_ON(!genapic.name);
 
 	printk(KERN_INFO "Using APIC driver %s\n", genapic.name);
-} 
+}

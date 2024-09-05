@@ -1,6 +1,8 @@
 #ifndef _ASM_GENAPIC_H
 #define _ASM_GENAPIC_H 1
 
+#include <xen/cpumask.h>
+
 /*
  * Generic APIC driver interface.
  *
