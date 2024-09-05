@@ -85,8 +85,23 @@ extern uint32_t trampoline_xen_phys_start;
 /* A semaphore to indicate signs-of-life at the start of the AP boot path. */
 extern uint8_t trampoline_cpu_started;
 
+/*
+ * Extra MSR_EFER settings when activating Long Mode.  EFER_NXE is necessary
+ * for APs to boot if the BSP found and activated support.
+ */
+extern uint32_t trampoline_efer;
+
+/*
+ * When nonzero, clear the specified bits in MSR_MISC_ENABLE.  This is
+ * necessary to clobber XD_DISABLE before trying to set MSR_EFER.NXE.
+ */
+extern uint64_t trampoline_misc_enable_off;
+
 /* Quirks about video mode-setting on S3 resume. */
 extern uint8_t video_flags;
+
+/* BIOS Int 16h, Fn 02h.  The keyboard shift status. */
+extern uint8_t kbd_shift_flags;
 
 /* Extended Display Identification Data, gathered from the BIOS. */
 extern uint16_t boot_edid_caps;

@@ -48,8 +48,6 @@ int remove_xen_ranges(struct rangeset *r);
 
 int cf_check stub_selftest(void);
 
-extern uint8_t kbd_shift_flags;
-
 #ifdef NDEBUG
 # define highmem_start 0
 #else

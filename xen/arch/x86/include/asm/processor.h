@@ -96,8 +96,6 @@ extern void ctxt_switch_levelling(const struct vcpu *next);
 extern void (*ctxt_switch_masking)(const struct vcpu *next);
 
 extern bool opt_cpu_info;
-extern u32 trampoline_efer;
-extern u64 trampoline_misc_enable_off;
 
 /* Maximum width of physical addresses supported by the hardware. */
 extern unsigned int paddr_bits;
