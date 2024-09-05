@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
-#include <xen/cache.h>
 #include <xen/kernel.h>
 #include <xen/param.h>
 #include <xen/sched.h>
+#include <xen/sections.h>
 
 #include <xen/lib/x86/cpu-policy.h>
 

@@ -1,9 +1,10 @@
 #include "efi.h"
 #include "runtime.h"
-#include <xen/cache.h>
+
 #include <xen/errno.h>
 #include <xen/guest_access.h>
 #include <xen/irq.h>
+#include <xen/sections.h>
 #include <xen/time.h>
 
 DEFINE_XEN_GUEST_HANDLE(CHAR16);

@@ -40,7 +40,8 @@
 #include <xen/param.h>
 #include <xen/trace.h>
 #include <xen/irq.h>
-#include <asm/cache.h>
+#include <xen/sections.h>
+
 #include <asm/io.h>
 #include <asm/iocap.h>
 #include <asm/hpet.h>

@@ -8,9 +8,9 @@
  */
 #include <xen/cpumask.h>
 #include <xen/init.h>
+#include <xen/sections.h>
 #include <xen/types.h>
 
-#include <asm/cache.h>
 #include <asm/guest.h>
 
 static struct hypervisor_ops __ro_after_init ops;
