@@ -1,0 +1,6 @@
+**/META
+**/.ocamldep.make
+**/*.annot
+**/*.cm[ixaot]
+**/*.cmti
+**/*.cmx[as]
