@@ -1233,7 +1233,7 @@ x86_emulate(
 {
     /* Shadow copy of register state. Committed on successful emulation. */
     struct cpu_user_regs _regs = *ctxt->regs;
-    const struct cpu_policy *cp = ctxt->cpu_policy;
+    const struct cpu_policy *__maybe_unused cp = ctxt->cpu_policy;
     struct x86_emulate_state state;
     int rc;
     uint8_t b, d, *opc = NULL;
