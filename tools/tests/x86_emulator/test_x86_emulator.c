@@ -689,11 +689,11 @@ static int read_msr(
 {
     switch ( reg )
     {
-    case 0xc0000080: /* EFER */
-        *val = ctxt->addr_size > 32 ? 0x500 /* LME|LMA */ : 0;
+    case MSR_EFER:
+        *val = ctxt->addr_size > 32 ? EFER_LME | EFER_LMA : 0;
         return X86EMUL_OKAY;
 
-    case 0xc0000103: /* TSC_AUX */
+    case MSR_TSC_AUX:
 #define TSC_AUX_VALUE 0xCACACACA
         *val = TSC_AUX_VALUE;
         return X86EMUL_OKAY;
