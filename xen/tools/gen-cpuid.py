@@ -252,7 +252,7 @@ def crunch_numbers(state):
         # instruction groups which are specified to require XSAVE for state
         # management.
         XSAVE: [XSAVEOPT, XSAVEC, XGETBV1, XSAVES,
-                AVX, MPX, PKU, LWP],
+                AVX, MPX, PKU, AMX_TILE, LWP],
 
         # AVX is taken to mean hardware support for 256bit registers (which in
         # practice depends on the VEX prefix to encode), and the instructions
@@ -274,7 +274,7 @@ def crunch_numbers(state):
         # superpages, PCID and PKU are only available in 4 level paging.
         # NO_LMSL indicates the absense of Long Mode Segment Limits, which
         # have been dropped in hardware.
-        LM: [CX16, PCID, LAHF_LM, PAGE1GB, PKU, NO_LMSL],
+        LM: [CX16, PCID, LAHF_LM, PAGE1GB, PKU, NO_LMSL, AMX_TILE],
 
         # AMD K6-2+ and K6-III processors shipped with 3DNow+, beyond the
         # standard 3DNow in the earlier K6 processors.
@@ -338,6 +338,11 @@ def crunch_numbers(state):
 
         # The behaviour described by RRSBA depend on eIBRS being active.
         EIBRS: [RRSBA],
+
+        # AMX-TILE means hardware support for tile registers and general non-
+        # computational instructions.  All further AMX features are built on top
+        # of AMX-TILE.
+        AMX_TILE: [AMX_BF16, AMX_INT8, AMX_FP16, AMX_COMPLEX],
     }
 
     deep_features = tuple(sorted(deps.keys()))

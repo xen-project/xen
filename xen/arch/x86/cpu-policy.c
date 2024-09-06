@@ -216,6 +216,9 @@ static void recalculate_xstate(struct cpu_policy *p)
     if ( p->feat.pku )
         xstates |= X86_XCR0_PKRU;
 
+    if ( p->feat.amx_tile )
+        xstates |= X86_XCR0_TILE_CFG | X86_XCR0_TILE_DATA;
+
     /* Subleaf 0 */
     p->xstate.max_size =
         xstate_uncompressed_size(xstates & ~XSTATE_XSAVES_ONLY);
