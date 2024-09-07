@@ -17,3 +17,6 @@ accepted_rst="${ECLAIR_PROJECT_ROOT}/docs/misra/rules.rst"
 
 # Generate accepted guidelines
 "${script_dir}/accepted_guidelines.sh" "${accepted_rst}"
+
+# Generate the list of linker-defined symbols (must be run after a Xen build)
+"${script_dir}/generate-linker-symbols.sh"

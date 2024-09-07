@@ -533,6 +533,17 @@ safe."
 # Series 18.
 #
 
+-doc_begin="Subtractions between pointers involving at least one of the linker symbols specified by the regex below
+are guaranteed not to be exploited by a compiler that relies on the absence of
+C99 Undefined Behaviour 45: Pointers that do not point into, or just beyond, the same array object are subtracted (6.5.6)."
+-eval_file=linker_symbols.ecl
+-config=MC3R1.R18.2,reports+={safe, "any_area(stmt(operator(sub)&&child(lhs||rhs, skip(__non_syntactic_paren_stmts, ref(linker_symbols)))))"}
+-doc_end
+
+-doc_begin="The following macro performs a subtraction between pointers to obtain the mfn, but does not lead to undefined behaviour."
+-config=MC3R1.R18.2,reports+={safe, "any_area(any_loc(any_exp(macro(^page_to_mfn$))))"}
+-doc_end
+
 -doc_begin="Flexible array members are deliberately used and XEN developers are aware of the dangers related to them:
 unexpected result when the structure is given as argument to a sizeof() operator and the truncation in assignment between structures."
 -config=MC3R1.R18.7,reports+={deliberate, "any()"}

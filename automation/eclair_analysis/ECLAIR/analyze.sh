@@ -73,16 +73,10 @@ export ECLAIR_WORKSPACE="${ECLAIR_DATA_DIR}/eclair_workspace"
 
 # Identifies the particular build of the project.
 export ECLAIR_PROJECT_NAME="XEN_${VARIANT}-${SET}"
-# All paths mentioned in ECLAIR reports that are below this directory
-# will be presented as relative to ECLAIR_PROJECT_ROOT.
-export ECLAIR_PROJECT_ROOT="${PWD}"
 
 # Erase and recreate the output directory and the data directory.
 rm -rf "${ECLAIR_OUTPUT_DIR:?}/*"
 mkdir -p "${ECLAIR_DATA_DIR}"
-
-# Generate additional configuration files 
-"${SCRIPT_DIR}/generate_ecl.sh"
 
 # Perform the build (from scratch) in an ECLAIR environment.
 "${ECLAIR_BIN_DIR}eclair_env" \

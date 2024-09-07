@@ -39,10 +39,14 @@ fi
     cp "${CONFIG_FILE}" xen/.config
     make clean
     find . -type f -name "*.safparse" -print -delete
+    "${script_dir}/build.sh" "$1"
+    # Generate additional configuration files
+    "${script_dir}/ECLAIR/generate_ecl.sh"
+    make clean
     cd xen
     make -f "${script_dir}/Makefile.prepare" prepare
     # Translate the /* SAF-n-safe */ comments into ECLAIR CBTs
     scripts/xen-analysis.py --run-eclair --no-build --no-clean
     # Translate function-properties.json into ECLAIR properties
-    python3 ${script_dir}/propertyparser.py
+    python3 "${script_dir}/propertyparser.py"
 )

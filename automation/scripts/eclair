@@ -3,6 +3,9 @@
 ECLAIR_ANALYSIS_DIR=automation/eclair_analysis
 ECLAIR_DIR="${ECLAIR_ANALYSIS_DIR}/ECLAIR"
 ECLAIR_OUTPUT_DIR=$(realpath "${ECLAIR_OUTPUT_DIR}")
+# All paths mentioned in ECLAIR reports that are below this directory
+# will be presented as relative to ECLAIR_PROJECT_ROOT.
+export ECLAIR_PROJECT_ROOT="${PWD}"
 
 "${ECLAIR_ANALYSIS_DIR}/prepare.sh" "${VARIANT}"
 

@@ -501,6 +501,16 @@ Deviations related to MISRA C:2012 Rules:
          - __builtin_memset()
          - cpumask_check()
 
+   * - R18.2
+     - Subtractions between pointers where at least one of the operand is a
+       pointer to a symbol defined by the linker are safe.
+     - Tagged as `safe` for ECLAIR.
+
+   * - R18.2
+     - Subtraction between pointers encapsulated by macro page_to_mfn
+       are safe.
+     - Tagged as `safe` for ECLAIR.
+
    * - R20.4
      - The override of the keyword \"inline\" in xen/compiler.h is present so
        that section contents checks pass when the compiler chooses not to
