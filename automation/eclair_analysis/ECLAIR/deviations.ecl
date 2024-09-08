@@ -581,6 +581,12 @@ of this macro do not lead to developer confusion, and can thus be deviated."
 -config=MC3R1.R20.7,reports+={safe, "any_area(any_loc(any_exp(macro(^count_args_$))))"}
 -doc_end
 
+-doc_begin="The argument \"fn\" in macros {COMPILE,RUNTIME}_CHECK is not parenthesized
+on purpose, to be able to test function-like macros. Given the specialized and limited
+use of this macro, it is deemed ok to deviate them."
+-config=MC3R1.R20.7,reports+={deliberate, "any_area(any_loc(any_exp(macro(^(COMPILE_CHECK|RUNTIME_CHECK)$))))"}
+-doc_end
+
 -doc_begin="Uses of variadic macros that have one of their arguments defined as
 a macro and used within the body for both ordinary parameter expansion and as an
 operand to the # or ## operators have a behavior that is well-understood and

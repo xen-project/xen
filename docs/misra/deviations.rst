@@ -534,6 +534,14 @@ Deviations related to MISRA C:2012 Rules:
        refactoring it to add parentheses breaks its functionality.
      - Tagged as `safe` for ECLAIR.
 
+   * - R20.7
+     - The macros `{COMPILE,RUNTIME}_CHECK` defined in
+       `xen/include/xen/self-tests.h` are allowed not to parenthesize the "fn"
+       argument, to allow function-like macros to be tested as well as
+       functions. Given the specialized use of these macros and their limited
+       usage scope, omitting parentheses is deemed unlikely to cause issues.
+     - Tagged as `deliberate` for ECLAIR.
+
    * - R20.12
      - Variadic macros that use token pasting often employ the gcc extension
        `ext_paste_comma`, as detailed in `C-language-toolchain.rst`, which is
