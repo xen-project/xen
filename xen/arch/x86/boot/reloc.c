@@ -72,11 +72,18 @@ struct vesa_mode_info {
 #define get_mb2_data(tag, type, member)   (((const multiboot2_tag_##type##_t *)(tag))->member)
 #define get_mb2_string(tag, type, member) ((uint32_t)get_mb2_data(tag, type, member))
 
-static uint32_t alloc;
+typedef struct memctx {
+    /*
+     * Simple bump allocator.
+     *
+     * It starts from the base of the trampoline and allocates downwards.
+     */
+    uint32_t ptr;
+} memctx;
 
-static uint32_t alloc_mem(uint32_t bytes)
+static uint32_t alloc_mem(uint32_t bytes, memctx *ctx)
 {
-    return alloc -= ROUNDUP(bytes, 16);
+    return ctx->ptr -= ROUNDUP(bytes, 16);
 }
 
 static void zero_mem(uint32_t s, uint32_t bytes)
@@ -85,11 +92,11 @@ static void zero_mem(uint32_t s, uint32_t bytes)
         *(char *)s++ = 0;
 }
 
-static uint32_t copy_mem(uint32_t src, uint32_t bytes)
+static uint32_t copy_mem(uint32_t src, uint32_t bytes, memctx *ctx)
 {
     uint32_t dst, dst_ret;
 
-    dst = alloc_mem(bytes);
+    dst = alloc_mem(bytes, ctx);
     dst_ret = dst;
 
     while ( bytes-- )
@@ -98,7 +105,7 @@ static uint32_t copy_mem(uint32_t src, uint32_t bytes)
     return dst_ret;
 }
 
-static uint32_t copy_string(uint32_t src)
+static uint32_t copy_string(uint32_t src, memctx *ctx)
 {
     uint32_t p;
 
@@ -108,17 +115,17 @@ static uint32_t copy_string(uint32_t src)
     for ( p = src; *(char *)p != '\0'; p++ )
         continue;
 
-    return copy_mem(src, p - src + 1);
+    return copy_mem(src, p - src + 1, ctx);
 }
 
-static struct hvm_start_info *pvh_info_reloc(uint32_t in)
+static struct hvm_start_info *pvh_info_reloc(uint32_t in, memctx *ctx)
 {
     struct hvm_start_info *out;
 
-    out = _p(copy_mem(in, sizeof(*out)));
+    out = _p(copy_mem(in, sizeof(*out), ctx));
 
     if ( out->cmdline_paddr )
-        out->cmdline_paddr = copy_string(out->cmdline_paddr);
+        out->cmdline_paddr = copy_string(out->cmdline_paddr, ctx);
 
     if ( out->nr_modules )
     {
@@ -127,51 +134,51 @@ static struct hvm_start_info *pvh_info_reloc(uint32_t in)
 
         out->modlist_paddr =
             copy_mem(out->modlist_paddr,
-                     out->nr_modules * sizeof(struct hvm_modlist_entry));
+                     out->nr_modules * sizeof(struct hvm_modlist_entry), ctx);
 
         mods = _p(out->modlist_paddr);
 
         for ( i = 0; i < out->nr_modules; i++ )
         {
             if ( mods[i].cmdline_paddr )
-                mods[i].cmdline_paddr = copy_string(mods[i].cmdline_paddr);
+                mods[i].cmdline_paddr = copy_string(mods[i].cmdline_paddr, ctx);
         }
     }
 
     return out;
 }
 
-static multiboot_info_t *mbi_reloc(uint32_t mbi_in)
+static multiboot_info_t *mbi_reloc(uint32_t mbi_in, memctx *ctx)
 {
     int i;
     multiboot_info_t *mbi_out;
 
-    mbi_out = _p(copy_mem(mbi_in, sizeof(*mbi_out)));
+    mbi_out = _p(copy_mem(mbi_in, sizeof(*mbi_out), ctx));
 
     if ( mbi_out->flags & MBI_CMDLINE )
-        mbi_out->cmdline = copy_string(mbi_out->cmdline);
+        mbi_out->cmdline = copy_string(mbi_out->cmdline, ctx);
 
     if ( mbi_out->flags & MBI_MODULES )
     {
         module_t *mods;
 
         mbi_out->mods_addr = copy_mem(mbi_out->mods_addr,
-                                      mbi_out->mods_count * sizeof(module_t));
+                                      mbi_out->mods_count * sizeof(module_t), ctx);
 
         mods = _p(mbi_out->mods_addr);
 
         for ( i = 0; i < mbi_out->mods_count; i++ )
         {
             if ( mods[i].string )
-                mods[i].string = copy_string(mods[i].string);
+                mods[i].string = copy_string(mods[i].string, ctx);
         }
     }
 
     if ( mbi_out->flags & MBI_MEMMAP )
-        mbi_out->mmap_addr = copy_mem(mbi_out->mmap_addr, mbi_out->mmap_length);
+        mbi_out->mmap_addr = copy_mem(mbi_out->mmap_addr, mbi_out->mmap_length, ctx);
 
     if ( mbi_out->flags & MBI_LOADERNAME )
-        mbi_out->boot_loader_name = copy_string(mbi_out->boot_loader_name);
+        mbi_out->boot_loader_name = copy_string(mbi_out->boot_loader_name, ctx);
 
     /* Mask features we don't understand or don't relocate. */
     mbi_out->flags &= (MBI_MEMLIMITS |
@@ -183,7 +190,7 @@ static multiboot_info_t *mbi_reloc(uint32_t mbi_in)
     return mbi_out;
 }
 
-static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
+static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out, memctx *ctx)
 {
     const multiboot2_fixed_t *mbi_fix = _p(mbi_in);
     const multiboot2_memory_map_t *mmap_src;
@@ -197,7 +204,7 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
     uint32_t ptr;
     unsigned int i, mod_idx = 0;
 
-    ptr = alloc_mem(sizeof(*mbi_out));
+    ptr = alloc_mem(sizeof(*mbi_out), ctx);
     mbi_out = _p(ptr);
     zero_mem(ptr, sizeof(*mbi_out));
 
@@ -222,7 +229,7 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
          * __start_xen() may put Xen image placement into it.
          */
         mbi_out->mods_addr = alloc_mem((mbi_out->mods_count + 1) *
-                                       sizeof(*mbi_out_mods));
+                                       sizeof(*mbi_out_mods), ctx);
         mbi_out_mods = _p(mbi_out->mods_addr);
     }
 
@@ -238,13 +245,13 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
         case MULTIBOOT2_TAG_TYPE_BOOT_LOADER_NAME:
             mbi_out->flags |= MBI_LOADERNAME;
             ptr = get_mb2_string(tag, string, string);
-            mbi_out->boot_loader_name = copy_string(ptr);
+            mbi_out->boot_loader_name = copy_string(ptr, ctx);
             break;
 
         case MULTIBOOT2_TAG_TYPE_CMDLINE:
             mbi_out->flags |= MBI_CMDLINE;
             ptr = get_mb2_string(tag, string, string);
-            mbi_out->cmdline = copy_string(ptr);
+            mbi_out->cmdline = copy_string(ptr, ctx);
             break;
 
         case MULTIBOOT2_TAG_TYPE_BASIC_MEMINFO:
@@ -263,7 +270,7 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
             mbi_out->mmap_length /= get_mb2_data(tag, mmap, entry_size);
             mbi_out->mmap_length *= sizeof(*mmap_dst);
 
-            mbi_out->mmap_addr = alloc_mem(mbi_out->mmap_length);
+            mbi_out->mmap_addr = alloc_mem(mbi_out->mmap_length, ctx);
 
             mmap_src = get_mb2_data(tag, mmap, entries);
             mmap_dst = _p(mbi_out->mmap_addr);
@@ -290,7 +297,7 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
             mbi_out_mods[mod_idx].mod_start = get_mb2_data(tag, module, mod_start);
             mbi_out_mods[mod_idx].mod_end = get_mb2_data(tag, module, mod_end);
             ptr = get_mb2_string(tag, module, cmdline);
-            mbi_out_mods[mod_idx].string = copy_string(ptr);
+            mbi_out_mods[mod_idx].string = copy_string(ptr, ctx);
             mbi_out_mods[mod_idx].reserved = 0;
             ++mod_idx;
             break;
@@ -356,19 +363,19 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, uint32_t video_out)
 void *reloc(uint32_t magic, uint32_t in, uint32_t trampoline,
             uint32_t video_info)
 {
-    alloc = trampoline;
+    memctx ctx = { trampoline };
 
     switch ( magic )
     {
     case MULTIBOOT_BOOTLOADER_MAGIC:
-        return mbi_reloc(in);
+        return mbi_reloc(in, &ctx);
 
     case MULTIBOOT2_BOOTLOADER_MAGIC:
-        return mbi2_reloc(in, video_info);
+        return mbi2_reloc(in, video_info, &ctx);
 
     case XEN_HVM_START_MAGIC_VALUE:
         if ( IS_ENABLED(CONFIG_PVH_GUEST) )
-            return pvh_info_reloc(in);
+            return pvh_info_reloc(in, &ctx);
         /* Fallthrough */
 
     default:
