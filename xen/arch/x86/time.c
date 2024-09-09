@@ -1246,8 +1246,26 @@ struct rtc_time {
     unsigned int year, mon, day, hour, min, sec;
 };
 
-static void __get_cmos_time(struct rtc_time *rtc)
+static bool __get_cmos_time(struct rtc_time *rtc)
 {
+    s_time_t start, t1, t2;
+    unsigned long flags;
+
+    spin_lock_irqsave(&rtc_lock, flags);
+
+    /* read RTC exactly on falling edge of update flag */
+    start = NOW();
+    do { /* may take up to 1 second... */
+        t1 = NOW() - start;
+    } while ( !(CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP) &&
+              t1 <= SECONDS(1) );
+
+    start = NOW();
+    do { /* must try at least 2.228 ms */
+        t2 = NOW() - start;
+    } while ( (CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP) &&
+              t2 < MILLISECS(3) );
+
     rtc->sec  = CMOS_READ(RTC_SECONDS);
     rtc->min  = CMOS_READ(RTC_MINUTES);
     rtc->hour = CMOS_READ(RTC_HOURS);
@@ -1265,13 +1283,17 @@ static void __get_cmos_time(struct rtc_time *rtc)
         BCD_TO_BIN(rtc->year);
     }
 
+    spin_unlock_irqrestore(&rtc_lock, flags);
+
     if ( (rtc->year += 1900) < 1970 )
         rtc->year += 100;
+
+    return t1 <= SECONDS(1) && t2 < MILLISECS(3);
 }
 
 static unsigned long get_cmos_time(void)
 {
-    unsigned long res, flags;
+    unsigned long res;
     struct rtc_time rtc;
     unsigned int seconds = 60;
     static bool __read_mostly cmos_rtc_probe;
@@ -1292,29 +1314,9 @@ static unsigned long get_cmos_time(void)
 
     for ( ; ; )
     {
-        s_time_t start, t1, t2;
+        bool success = __get_cmos_time(&rtc);
 
-        spin_lock_irqsave(&rtc_lock, flags);
-
-        /* read RTC exactly on falling edge of update flag */
-        start = NOW();
-        do { /* may take up to 1 second... */
-            t1 = NOW() - start;
-        } while ( !(CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP) &&
-                  t1 <= SECONDS(1) );
-
-        start = NOW();
-        do { /* must try at least 2.228 ms */
-            t2 = NOW() - start;
-        } while ( (CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP) &&
-                  t2 < MILLISECS(3) );
-
-        __get_cmos_time(&rtc);
-
-        spin_unlock_irqrestore(&rtc_lock, flags);
-
-        if ( likely(!cmos_rtc_probe) ||
-             t1 > SECONDS(1) || t2 >= MILLISECS(3) ||
+        if ( likely(!cmos_rtc_probe) || !success ||
              rtc.sec >= 60 || rtc.min >= 60 || rtc.hour >= 24 ||
              !rtc.day || rtc.day > 31 ||
              !rtc.mon || rtc.mon > 12 )
