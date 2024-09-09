@@ -304,6 +304,12 @@ static inline bool __must_check vpci_process_pending(struct vcpu *v)
 }
 #endif
 
+static inline int __must_check vpci_reset_device(struct pci_dev *pdev)
+{
+    vpci_deassign_device(pdev);
+    return vpci_assign_device(pdev);
+}
+
 #endif
 
 /*

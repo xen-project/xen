@@ -2,6 +2,7 @@
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
 #include <xen/init.h>
+#include <xen/vpci.h>
 
 #ifndef COMPAT
 typedef long ret_t;
@@ -64,6 +65,57 @@ ret_t pci_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             break;
 
         ret = pci_remove_device(dev.seg, dev.bus, dev.devfn);
+        break;
+    }
+
+    case PHYSDEVOP_pci_device_reset:
+    {
+        struct pci_device_reset dev_reset;
+        struct pci_dev *pdev;
+        pci_sbdf_t sbdf;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&dev_reset, arg, 1) != 0 )
+            break;
+
+        ret = -EINVAL;
+        if ( dev_reset.flags & ~PCI_DEVICE_RESET_MASK )
+            break;
+
+        sbdf = PCI_SBDF(dev_reset.dev.seg,
+                        dev_reset.dev.bus,
+                        dev_reset.dev.devfn);
+
+        ret = xsm_resource_setup_pci(XSM_PRIV, sbdf.sbdf);
+        if ( ret )
+            break;
+
+        pcidevs_lock();
+        pdev = pci_get_pdev(NULL, sbdf);
+        if ( !pdev )
+        {
+            pcidevs_unlock();
+            ret = -ENODEV;
+            break;
+        }
+
+        write_lock(&pdev->domain->pci_lock);
+        pcidevs_unlock();
+        switch ( dev_reset.flags & PCI_DEVICE_RESET_MASK )
+        {
+        case PCI_DEVICE_RESET_COLD:
+        case PCI_DEVICE_RESET_WARM:
+        case PCI_DEVICE_RESET_HOT:
+        case PCI_DEVICE_RESET_FLR:
+            ret = vpci_reset_device(pdev);
+            break;
+
+        default:
+            ret = -EINVAL;
+            break;
+        }
+        write_unlock(&pdev->domain->pci_lock);
+
         break;
     }
 
