@@ -29,6 +29,7 @@ build-tools-oxenstored:
 	$(MAKE) -s -C libs/mmap
 	$(MAKE) -s -C libs/xb
 	$(MAKE) -s -C libs/xc
+	$(MAKE) -s -C libs/xsd_glue
 	$(MAKE) -C xenstored
 
 .PHONY: format

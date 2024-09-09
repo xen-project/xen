@@ -1,0 +1,5 @@
+version = "@VERSION@"
+description = "Xenstored plugin for Xenctrl.domain_getinfo unstable interface - V1"
+requires = "plugin_interface_v1"
+archive(byte) = "domain_getinfo_v1.cma"
+archive(native) = "domain_getinfo_v1.cmxa"

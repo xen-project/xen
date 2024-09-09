@@ -1,0 +1,4 @@
+version = "@VERSION@"
+description = "A small library on top of unstable Xenctrl interfaces used by Oxenstored"
+archive(byte) = "plugin_interface_v1.cma"
+archive(native) = "plugin_interface_v1.cmxa"
