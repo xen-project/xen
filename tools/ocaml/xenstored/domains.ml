@@ -49,8 +49,8 @@ module Plugin =
 let handle = Plugin.interface_open ()
 
 type domains = {
-  eventchn: Event.t;
-  table: (Xenctrl.domid, Domain.t) Hashtbl.t;
+  eventchn : Event.t;
+  table : (Plugin.domid, Domain.t) Hashtbl.t;
 
   (* N.B. the Queue module is not thread-safe but oxenstored is single-threaded. *)
   (* Domains queue up to regain conflict-credit; we have a queue for
@@ -121,30 +121,29 @@ let cleanup doms =
   let notify = ref false in
   let dead_dom = ref [] in
 
-  Hashtbl.iter (fun id _ -> if id <> 0 then
-                   try
-                     let info = Xenctrl.domain_getinfo xc id in
-                     if info.Xenctrl.shutdown || info.Xenctrl.dying then (
-                       debug "Domain %u died (dying=%b, shutdown %b -- code %d)"
-                         id info.Xenctrl.dying info.Xenctrl.shutdown info.Xenctrl.shutdown_code;
-                       if info.Xenctrl.dying then
-                         dead_dom := id :: !dead_dom
-                       else
-                         notify := true;
-                     )
-                   with Xenctrl.Error _ ->
-                     debug "Domain %u died -- no domain info" id;
-                     dead_dom := id :: !dead_dom;
-               ) doms.table;
-  List.iter (fun id ->
-      let dom = Hashtbl.find doms.table id in
-      Domain.close dom;
-      Hashtbl.remove doms.table id;
-      if dom.Domain.conflict_credit <= !Define.conflict_burst_limit
-      then (
-        remove_from_queue dom doms.doms_with_conflict_penalty;
-        if (dom.Domain.conflict_credit <= 0.) then remove_from_queue dom doms.doms_conflict_paused
-      )
+  Hashtbl.iter
+    (fun id _ ->
+       if id <> 0 then (
+         try
+           let info = Plugin.domain_getinfo handle id in
+           if info.Plugin.shutdown || info.Plugin.dying then (
+             debug "Domain %u died (dying=%b, shutdown %b -- code %d)" id
+               info.Plugin.dying info.Plugin.shutdown info.Plugin.shutdown_code;
+             if info.Plugin.dying then dead_dom := id :: !dead_dom else notify := true)
+         with Plugin.Error _ ->
+           debug "Domain %u died -- no domain info" id;
+           dead_dom := id :: !dead_dom))
+    doms.table;
+  List.iter
+    (fun id ->
+       let dom = Hashtbl.find doms.table id in
+       Domain.close dom;
+       Hashtbl.remove doms.table id;
+       if dom.Domain.conflict_credit <= !Define.conflict_burst_limit
+       then (
+         remove_from_queue dom doms.doms_with_conflict_penalty;
+         if (dom.Domain.conflict_credit <= 0.) then remove_from_queue dom doms.doms_conflict_paused
+       )
     ) !dead_dom;
   !notify, !dead_dom
 
