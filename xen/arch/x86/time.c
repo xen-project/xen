@@ -1291,11 +1291,47 @@ static bool __get_cmos_time(struct rtc_time *rtc)
     return t1 <= SECONDS(1) && t2 < MILLISECS(3);
 }
 
+static bool cmos_probe(struct rtc_time *rtc_p, bool cmos_rtc_probe)
+{
+    unsigned int seconds = 60;
+
+    for ( ; ; )
+    {
+        bool success = __get_cmos_time(rtc_p);
+        struct rtc_time rtc = *rtc_p;
+
+        if ( likely(!cmos_rtc_probe) )
+            return true;
+
+        if ( !success ||
+             rtc.sec >= 60 || rtc.min >= 60 || rtc.hour >= 24 ||
+             !rtc.day || rtc.day > 31 ||
+             !rtc.mon || rtc.mon > 12 )
+            return false;
+
+        if ( seconds < 60 )
+        {
+            if ( rtc.sec != seconds )
+            {
+                acpi_gbl_FADT.boot_flags &= ~ACPI_FADT_NO_CMOS_RTC;
+                return true;
+            }
+            return false;
+        }
+
+        process_pending_softirqs();
+
+        seconds = rtc.sec;
+    }
+
+    ASSERT_UNREACHABLE();
+    return false;
+}
+
 static unsigned long get_cmos_time(void)
 {
     unsigned long res;
     struct rtc_time rtc;
-    unsigned int seconds = 60;
     static bool __read_mostly cmos_rtc_probe;
     boolean_param("cmos-rtc-probe", cmos_rtc_probe);
 
@@ -1312,32 +1348,7 @@ static unsigned long get_cmos_time(void)
         panic("System with no CMOS RTC advertised must be booted from EFI"
               " (or with command line option \"cmos-rtc-probe\")\n");
 
-    for ( ; ; )
-    {
-        bool success = __get_cmos_time(&rtc);
-
-        if ( likely(!cmos_rtc_probe) || !success ||
-             rtc.sec >= 60 || rtc.min >= 60 || rtc.hour >= 24 ||
-             !rtc.day || rtc.day > 31 ||
-             !rtc.mon || rtc.mon > 12 )
-            break;
-
-        if ( seconds < 60 )
-        {
-            if ( rtc.sec != seconds )
-            {
-                cmos_rtc_probe = false;
-                acpi_gbl_FADT.boot_flags &= ~ACPI_FADT_NO_CMOS_RTC;
-            }
-            break;
-        }
-
-        process_pending_softirqs();
-
-        seconds = rtc.sec;
-    }
-
-    if ( unlikely(cmos_rtc_probe) )
+    if ( !cmos_probe(&rtc, cmos_rtc_probe) )
         panic("No CMOS RTC found - system must be booted from EFI\n");
 
     return mktime(rtc.year, rtc.mon, rtc.day, rtc.hour, rtc.min, rtc.sec);
