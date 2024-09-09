@@ -45,7 +45,7 @@ static always_inline void read_atomic_size(const volatile void *p,
     case 2: *(uint16_t *)res = readw(p); break;
     case 4: *(uint32_t *)res = readl(p); break;
 #ifndef CONFIG_RISCV_32
-    case 8: *(uint32_t *)res = readq(p); break;
+    case 8: *(uint64_t *)res = readq(p); break;
 #endif
     default: __bad_atomic_size(); break;
     }
