@@ -20,6 +20,34 @@ let warn fmt  = Logging.warn  "domains" fmt
 
 let xc = Xenctrl.interface_open ()
 
+let load_plug fname =
+  let fail_with fmt = Printf.ksprintf failwith fmt in
+  let fname = Dynlink.adapt_filename fname in
+  if Sys.file_exists fname then
+    try Dynlink.loadfile fname with
+    | Dynlink.Error err as e ->
+      error "ERROR loading plugin '%s': %s\n%!" fname
+        (Dynlink.error_message err);
+      raise e
+    | _ -> fail_with "Unknown error while loading plugin"
+  else fail_with "Plugin file '%s' does not exist" fname
+
+let () =
+  let plugins_dir = Paths.libexec ^ "/ocaml/xsd_glue/xenctrl_plugin/" in
+  let filepath = plugins_dir ^ "domain_getinfo_v1.cmxs" in
+  debug "Trying to load plugin '%s'\n%!" filepath;
+  let list_files = Sys.readdir plugins_dir in
+  debug "Directory listing of '%s'\n%!" plugins_dir ;
+  Array.iter (fun x -> debug "\t%s\n%!" x) list_files;
+  Dynlink.allow_only [ "Plugin_interface_v1" ];
+  load_plug filepath
+
+module Plugin =
+  (val Plugin_interface_v1.get_plugin_v1 ()
+    : Plugin_interface_v1.Domain_getinfo_V1)
+
+let handle = Plugin.interface_open ()
+
 type domains = {
   eventchn: Event.t;
   table: (Xenctrl.domid, Domain.t) Hashtbl.t;
