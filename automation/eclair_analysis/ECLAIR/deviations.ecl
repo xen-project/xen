@@ -577,7 +577,7 @@ of the IS_ENABLED or STATIC_IF/STATIC_IF_NOT macros, so it always receives a lit
 not in scope for compliance are allowed, as that is imported code."
 -file_tag+={gnu_efi_include, "^xen/include/efi/.*$"}
 -file_tag+={acpi_cpu_idle, "^xen/arch/x86/acpi/cpu_idle\\.c$"}
--config=MC3R1.R20.7,reports+={safe, "any_area(any_loc(file(gnu_efi_include)))"}
+-config=MC3R1.R20.7,reports+={safe, "any_area(any_loc(file(gnu_efi_include)||any_exp(macro(^NextMemoryDescriptor$))))"}
 -config=MC3R1.R20.7,reports+={safe, "any_area(any_loc(file(acpi_cpu_idle)))"}
 -doc_end
 
