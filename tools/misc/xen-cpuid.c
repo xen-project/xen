@@ -37,6 +37,7 @@ static const struct {
     { "CPUID 0x00000007:1.edx",     "7d1" },
     { "MSR_ARCH_CAPS.lo",         "m10Al" },
     { "MSR_ARCH_CAPS.hi",         "m10Ah" },
+    { "CPUID 0x80000021.ecx",      "e21c" },
 };
 
 #define COL_ALIGN "24"
