@@ -102,7 +102,7 @@
   variables:
     CONTAINER: ubuntu:xenial-xilinx
     LOGFILE: xilinx-smoke-x86_64.log
-    XEN_CMD_CONSOLE: "console=com2 com2=115200,8n1,0x2F8,4"
+    XEN_CMD_CONSOLE: "console=com2 com2=57600,8n1,0x2F8,4"
     TEST_BOARD: "crater"
     TEST_TIMEOUT: 1000
   artifacts:
