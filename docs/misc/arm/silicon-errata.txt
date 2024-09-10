@@ -46,6 +46,7 @@ stable hypervisors.
 | ARM            | Cortex-A53      | #824069         | ARM64_ERRATUM_824069    |
 | ARM            | Cortex-A53      | #819472         | ARM64_ERRATUM_819472    |
 | ARM            | Cortex-A53      | #843419         | ARM64_ERRATUM_843419    |
+| ARM            | Cortex-A53      | #1530924        | N/A                     |
 | ARM            | Cortex-A55      | #1530923        | N/A                     |
 | ARM            | Cortex-A57      | #852523         | N/A                     |
 | ARM            | Cortex-A57      | #832075         | ARM64_ERRATUM_832075    |
