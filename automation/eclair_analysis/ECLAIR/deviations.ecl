@@ -76,6 +76,7 @@ they are not instances of commented-out code."
 conform to the directive."
 -config=MC3R1.D4.10,reports+={safe, "first_area(text(^/\\* This file is legitimately included multiple times\\. \\*/$, begin-4))"}
 -config=MC3R1.D4.10,reports+={safe, "first_area(text(^/\\* Generated file, do not edit! \\*/$, begin-3))"}
+-config=MC3R1.D4.10,reports+={safe, "all_area(all_loc(file(^xen/include/generated/autoconf.h$)))"}
 -doc_end
 
 -doc_begin="Including multiple times a .c file is safe because every function or data item
