@@ -190,6 +190,7 @@ static void vm_event_pack_segment_register(enum x86_segment segment,
 
     default:
         ASSERT_UNREACHABLE();
+        break;
     }
 }
 #endif
