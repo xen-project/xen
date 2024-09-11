@@ -4708,7 +4708,7 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     {
         struct xen_foreign_memory_map fmap;
         struct domain *d;
-        struct e820entry *e820;
+        struct e820entry *e;
 
         if ( copy_from_guest(&fmap, arg, 1) )
             return -EFAULT;
@@ -4727,23 +4727,23 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             return rc;
         }
 
-        e820 = xmalloc_array(e820entry_t, fmap.map.nr_entries);
-        if ( e820 == NULL )
+        e = xmalloc_array(e820entry_t, fmap.map.nr_entries);
+        if ( e == NULL )
         {
             rcu_unlock_domain(d);
             return -ENOMEM;
         }
 
-        if ( copy_from_guest(e820, fmap.map.buffer, fmap.map.nr_entries) )
+        if ( copy_from_guest(e, fmap.map.buffer, fmap.map.nr_entries) )
         {
-            xfree(e820);
+            xfree(e);
             rcu_unlock_domain(d);
             return -EFAULT;
         }
 
         spin_lock(&d->arch.e820_lock);
         xfree(d->arch.e820);
-        d->arch.e820 = e820;
+        d->arch.e820 = e;
         d->arch.nr_e820 = fmap.map.nr_entries;
         spin_unlock(&d->arch.e820_lock);
 
