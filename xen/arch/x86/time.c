@@ -1467,6 +1467,7 @@ unsigned int rtc_guest_read(unsigned int port)
 
     default:
         ASSERT_UNREACHABLE();
+        break;
     }
 
     return data;
@@ -1519,6 +1520,7 @@ void rtc_guest_write(unsigned int port, unsigned int data)
 
     default:
         ASSERT_UNREACHABLE();
+        break;
     }
 }
 
