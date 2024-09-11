@@ -925,7 +925,7 @@ void __init init_apic_mappings(void)
     unsigned long apic_phys;
 
     if ( x2apic_enabled )
-        goto __next;
+        goto next;
     /*
      * If no local APIC can be found then set up a fake all
      * zeroes page to simulate the local APIC and another
@@ -941,7 +941,7 @@ void __init init_apic_mappings(void)
     apic_printk(APIC_VERBOSE, "mapped APIC to %p (%08lx)\n",
                 fix_to_virt(FIX_APIC_BASE), apic_phys);
 
-__next:
+ next:
     /*
      * Fetch the APIC ID of the BSP in case we have a
      * default configuration (or the MP table is broken).
