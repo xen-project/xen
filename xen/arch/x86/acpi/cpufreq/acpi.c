@@ -25,7 +25,7 @@ enum {
     SYSTEM_IO_CAPABLE,
 };
 
-#define INTEL_MSR_RANGE         (0xffffull)
+#define INTEL_MSR_RANGE         0xffffULL
 
 static bool __read_mostly acpi_pstate_strict;
 boolean_param("acpi_pstate_strict", acpi_pstate_strict);
