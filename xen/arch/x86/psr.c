@@ -276,6 +276,7 @@ static enum psr_feat_type psr_type_to_feat_type(enum psr_type type)
 
     default:
         ASSERT_UNREACHABLE();
+        break;
     }
 
     return feat_type;
