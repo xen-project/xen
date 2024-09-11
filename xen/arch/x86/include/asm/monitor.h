@@ -65,6 +65,7 @@ int arch_monitor_domctl_op(struct domain *d, struct xen_domctl_monitor_op *mop)
 
     default:
         rc = -EOPNOTSUPP;
+        break;
     }
 
     return rc;
