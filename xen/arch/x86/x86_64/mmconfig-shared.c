@@ -112,6 +112,7 @@ static const char *__init cf_check pci_mmcfg_intel_945(void)
         break;
     default:
         pci_mmcfg_config_num = 0;
+        break;
     }
 
     /* Errata #2, things break when not aligned on a 256Mb boundary */
