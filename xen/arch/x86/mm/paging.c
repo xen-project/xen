@@ -726,7 +726,7 @@ int paging_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
     case XEN_DOMCTL_SHADOW_OP_ENABLE:
         if ( !(sc->mode & XEN_DOMCTL_SHADOW_ENABLE_LOG_DIRTY) )
             break;
-        /* Else fall through... */
+        fallthrough;
     case XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY:
         return paging_log_dirty_enable(d);
 

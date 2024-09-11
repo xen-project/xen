@@ -498,6 +498,7 @@ guest_walk_tables(const struct vcpu *v, struct p2m_domain *p2m,
             hvmemul_write_cache(v, l4gpa, &gw->l4e, sizeof(gw->l4e));
         }
 #endif
+        break;
     }
 
  out:

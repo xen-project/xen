@@ -217,6 +217,7 @@ int nestedhvm_hap_nested_page_fault(
         p2ma_10 = p2m_access_n;
         /* For safety, remove all permissions. */
         gdprintk(XENLOG_ERR, "Unhandled p2m access type:%d\n", p2ma_10);
+        break;
     }
     /* Use minimal permission for nested p2m. */
     p2ma_10 &= (p2m_access_t)p2ma_21;

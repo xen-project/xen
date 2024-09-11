@@ -652,7 +652,7 @@ int hap_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
         return rc;
     case XEN_DOMCTL_SHADOW_OP_GET_ALLOCATION:
         sc->mb = hap_get_allocation(d);
-        /* Fall through... */
+        fallthrough;
     case XEN_DOMCTL_SHADOW_OP_OFF:
         return 0;
     default:
