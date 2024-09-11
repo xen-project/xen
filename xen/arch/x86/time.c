@@ -1291,7 +1291,10 @@ static bool __get_cmos_time(struct rtc_time *rtc)
     return t1 <= SECONDS(1) && t2 < MILLISECS(3);
 }
 
-static bool cmos_probe(struct rtc_time *rtc_p, bool cmos_rtc_probe)
+static bool __read_mostly opt_cmos_rtc_probe;
+boolean_param("cmos-rtc-probe", opt_cmos_rtc_probe);
+
+static bool cmos_rtc_probe(struct rtc_time *rtc_p)
 {
     unsigned int seconds = 60;
 
@@ -1300,7 +1303,7 @@ static bool cmos_probe(struct rtc_time *rtc_p, bool cmos_rtc_probe)
         bool success = __get_cmos_time(rtc_p);
         struct rtc_time rtc = *rtc_p;
 
-        if ( likely(!cmos_rtc_probe) )
+        if ( likely(!opt_cmos_rtc_probe) )
             return true;
 
         if ( !success ||
@@ -1332,8 +1335,6 @@ static unsigned long get_cmos_time(void)
 {
     unsigned long res;
     struct rtc_time rtc;
-    static bool __read_mostly cmos_rtc_probe;
-    boolean_param("cmos-rtc-probe", cmos_rtc_probe);
 
     if ( efi_enabled(EFI_RS) )
     {
@@ -1343,12 +1344,12 @@ static unsigned long get_cmos_time(void)
     }
 
     if ( likely(!(acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_CMOS_RTC)) )
-        cmos_rtc_probe = false;
-    else if ( system_state < SYS_STATE_smp_boot && !cmos_rtc_probe )
+        opt_cmos_rtc_probe = false;
+    else if ( system_state < SYS_STATE_smp_boot && !opt_cmos_rtc_probe )
         panic("System with no CMOS RTC advertised must be booted from EFI"
               " (or with command line option \"cmos-rtc-probe\")\n");
 
-    if ( !cmos_probe(&rtc, cmos_rtc_probe) )
+    if ( !cmos_rtc_probe(&rtc) )
         panic("No CMOS RTC found - system must be booted from EFI\n");
 
     return mktime(rtc.year, rtc.mon, rtc.day, rtc.hour, rtc.min, rtc.sec);
