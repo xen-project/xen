@@ -1497,7 +1497,7 @@ static void cf_check ept_dump_p2m_table(unsigned char key)
     rcu_read_unlock(&domlist_read_lock);
 }
 
-void setup_ept_dump(void)
+void __init setup_ept_dump(void)
 {
     register_keyhandler('D', ept_dump_p2m_table, "dump VT-x EPT tables", 0);
 }

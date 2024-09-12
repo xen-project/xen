@@ -40,7 +40,7 @@ static struct keyhandler {
     const char *desc;    /* Description for help message.                 */
     bool irq_callback,   /* Call in irq context? if not, tasklet context. */
         diagnostic;      /* Include in 'dump all' handler.                */
-} key_table[128] __read_mostly =
+} key_table[128] __ro_after_init =
 {
 #define KEYHANDLER(k, f, desc, diag)            \
     [k] = { { .fn = (f) }, desc, 0, diag }
@@ -99,8 +99,8 @@ void handle_keypress(unsigned char key, bool need_context)
     }
 }
 
-void register_keyhandler(unsigned char key, keyhandler_fn_t *fn,
-                         const char *desc, bool diagnostic)
+void __init register_keyhandler(unsigned char key, keyhandler_fn_t *fn,
+                                const char *desc, bool diagnostic)
 {
     BUG_ON(key >= ARRAY_SIZE(key_table)); /* Key in range? */
     ASSERT(!key_table[key].fn);           /* Clobbering something else? */
@@ -111,8 +111,8 @@ void register_keyhandler(unsigned char key, keyhandler_fn_t *fn,
     key_table[key].diagnostic = diagnostic;
 }
 
-void register_irq_keyhandler(unsigned char key, irq_keyhandler_fn_t *fn,
-                             const char *desc, bool diagnostic)
+void __init register_irq_keyhandler(unsigned char key, irq_keyhandler_fn_t *fn,
+                                    const char *desc, bool diagnostic)
 {
     BUG_ON(key >= ARRAY_SIZE(key_table)); /* Key in range? */
     ASSERT(!key_table[key].irq_fn);       /* Clobbering something else? */

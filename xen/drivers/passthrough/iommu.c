@@ -271,8 +271,6 @@ void __hwdom_init iommu_hwdom_init(struct domain *d)
     if ( !is_iommu_enabled(d) )
         return;
 
-    register_keyhandler('o', &iommu_dump_page_tables, "dump iommu page tables", 0);
-
     iommu_vcall(hd->platform_ops, hwdom_init, d);
 }
 
@@ -605,6 +603,9 @@ int __init iommu_setup(void)
 #ifndef iommu_intremap
         printk("Interrupt remapping %sabled\n", iommu_intremap ? "en" : "dis");
 #endif
+
+        register_keyhandler('o', &iommu_dump_page_tables,
+                            "dump iommu page tables", 0);
     }
 
     return rc;
