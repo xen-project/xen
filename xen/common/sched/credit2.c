@@ -10,22 +10,18 @@
  * Based on an earlier verson by Emmanuel Ackaouy.
  */
 
+#include <xen/errno.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/param.h>
+#include <xen/perfc.h>
 #include <xen/sched.h>
 #include <xen/sections.h>
-#include <xen/domain.h>
-#include <xen/delay.h>
-#include <xen/event.h>
-#include <xen/time.h>
-#include <xen/perfc.h>
 #include <xen/softirq.h>
-#include <asm/div64.h>
-#include <xen/errno.h>
+#include <xen/time.h>
 #include <xen/trace.h>
-#include <xen/cpu.h>
-#include <xen/keyhandler.h>
+
+#include <asm/div64.h>
 
 #include "private.h"
 
