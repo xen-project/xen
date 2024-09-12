@@ -286,7 +286,7 @@ struct page_info
         struct {
             u16 nr_validated_ptes:PAGETABLE_ORDER + 1;
             u16 :16 - PAGETABLE_ORDER - 1 - 1;
-            bool partial_flags:1;
+            uint16_t partial_flags:1;
             int16_t linear_pt_count;
         };
 
