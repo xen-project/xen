@@ -118,11 +118,6 @@ extern void init_intel_cacheinfo(struct cpuinfo_x86 *c);
 
 unsigned int apicid_to_socket(unsigned int apicid);
 
-static inline int cpu_nr_siblings(unsigned int cpu)
-{
-    return cpu_data[cpu].x86_num_siblings;
-}
-
 /* Some CPUID calls want 'count' to be placed in ecx */
 static inline void cpuid_count(
     unsigned int op,

@@ -26,8 +26,6 @@
 #include <xen/trace.h>
 #include <xen/cpu.h>
 #include <xen/keyhandler.h>
-#include <asm/cpufeature.h>
-#include <asm/processor.h>
 
 #include "private.h"
 
@@ -35,6 +33,19 @@
 /* #define d2printk printk */
 #define d2printk(x...)
 
+/*
+ * TODO: Abstract this properly, and figure out what Credit2 wants to do with
+ *       the fact that x86_num_siblings doesn't even have the same meaning
+ *       between x86 vendors.
+ */
+static unsigned int cpu_nr_siblings(unsigned int cpu)
+{
+#ifdef CONFIG_X86
+    return cpu_data[cpu].x86_num_siblings;
+#else
+    return 1;
+#endif
+}
 
 /*
  * Credit2 tracing events ("only" 512 available!). Check
