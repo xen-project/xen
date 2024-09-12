@@ -191,6 +191,7 @@ void wrpkru(unsigned int val);
 #define cpu_has_avx_vnni            (cpu_policy.feat.avx_vnni && xcr0_mask(6))
 #define cpu_has_avx512_bf16         (cpu_policy.feat.avx512_bf16 && \
                                      xcr0_mask(0xe6))
+#define cpu_has_cmpccxadd            cpu_policy.feat.cmpccxadd
 #define cpu_has_avx_ifma            (cpu_policy.feat.avx_ifma && xcr0_mask(6))
 #define cpu_has_avx_vnni_int8       (cpu_policy.feat.avx_vnni_int8 && \
                                      xcr0_mask(6))
