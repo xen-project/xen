@@ -75,8 +75,8 @@ u64 aarch64_insn_decode_immediate(enum aarch64_insn_imm_type type, u32 insn);
 u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
 				  u32 insn, u64 imm);
 
-s32 aarch64_get_branch_offset(u32 insn);
-u32 aarch64_set_branch_offset(u32 insn, s32 offset);
+int32_t aarch64_get_branch_offset(uint32_t insn);
+uint32_t aarch64_set_branch_offset(uint32_t insn, int32_t offset);
 
 u32 aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
 				enum aarch64_insn_branch_type type);
@@ -89,12 +89,12 @@ static inline bool insn_is_branch_imm(u32 insn)
     return aarch64_insn_is_branch_imm(insn);
 }
 
-static inline s32 insn_get_branch_offset(u32 insn)
+static inline int32_t insn_get_branch_offset(uint32_t insn)
 {
     return aarch64_get_branch_offset(insn);
 }
 
-static inline u32 insn_set_branch_offset(u32 insn, s32 offset)
+static inline uint32_t insn_set_branch_offset(uint32_t insn, int32_t offset)
 {
     return aarch64_set_branch_offset(insn, offset);
 }

@@ -406,7 +406,7 @@ copy_from_unsafe(void *to, const void __user *from, unsigned int n)
 
 struct exception_table_entry
 {
-	s32 addr, cont;
+	int32_t addr, cont;
 };
 extern struct exception_table_entry __start___ex_table[];
 extern struct exception_table_entry __stop___ex_table[];

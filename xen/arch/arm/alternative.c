@@ -63,7 +63,7 @@ static u32 get_alt_insn(const struct alt_instr *alt,
 
     if ( insn_is_branch_imm(insn) )
     {
-        s32 offset = insn_get_branch_offset(insn);
+        int32_t offset = insn_get_branch_offset(insn);
         unsigned long target;
 
         target = (unsigned long)altinsnptr + offset;

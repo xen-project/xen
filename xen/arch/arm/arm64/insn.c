@@ -223,9 +223,9 @@ u32 __kprobes aarch64_insn_gen_nop(void)
  * signed value (so it can be used when computing a new branch
  * target).
  */
-s32 aarch64_get_branch_offset(u32 insn)
+int32_t aarch64_get_branch_offset(uint32_t insn)
 {
-	s32 imm;
+	int32_t imm;
 
 	if (aarch64_insn_is_b(insn) || aarch64_insn_is_bl(insn)) {
 		imm = aarch64_insn_decode_immediate(AARCH64_INSN_IMM_26, insn);
@@ -251,7 +251,7 @@ s32 aarch64_get_branch_offset(u32 insn)
  * Encode the displacement of a branch in the imm field and return the
  * updated instruction.
  */
-u32 aarch64_set_branch_offset(u32 insn, s32 offset)
+uint32_t aarch64_set_branch_offset(uint32_t insn, int32_t offset)
 {
 	if (aarch64_insn_is_b(insn) || aarch64_insn_is_bl(insn))
 		return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_26, insn,

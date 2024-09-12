@@ -459,8 +459,8 @@ static inline bool bogus(u32 prod, u32 cons)
 
 static inline u32 calc_unconsumed_bytes(const struct t_buf *buf)
 {
-    u32 prod = buf->prod, cons = buf->cons;
-    s32 x;
+    uint32_t prod = buf->prod, cons = buf->cons;
+    int32_t x;
 
     barrier(); /* must read buf->prod and buf->cons only once */
     if ( bogus(prod, cons) )
@@ -478,8 +478,8 @@ static inline u32 calc_unconsumed_bytes(const struct t_buf *buf)
 
 static inline u32 calc_bytes_to_wrap(const struct t_buf *buf)
 {
-    u32 prod = buf->prod, cons = buf->cons;
-    s32 x;
+    uint32_t prod = buf->prod, cons = buf->cons;
+    int32_t x;
 
     barrier(); /* must read buf->prod and buf->cons only once */
     if ( bogus(prod, cons) )

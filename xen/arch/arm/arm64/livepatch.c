@@ -130,7 +130,7 @@ static int reloc_data(enum aarch64_reloc_op op, void *place, u64 val, int len)
         break;
 
     case 32:
-        *(s32 *)place = sval;
+        *(int32_t *)place = sval;
         if ( sval < INT32_MIN || sval > UINT32_MAX )
 	        return -EOVERFLOW;
         break;

@@ -32,7 +32,7 @@ void arch_livepatch_apply(const struct livepatch_func *func,
 
     if ( func->new_addr )
     {
-        s32 delta;
+        int32_t delta;
 
         /*
          * PC is current address (old_addr) + 8 bytes. The semantics for a
@@ -41,11 +41,11 @@ void arch_livepatch_apply(const struct livepatch_func *func,
          * ARM DDI 0406C.c, see A2.3 (pg 45) and A8.8.18 pg (pg 334,335)
          *
          */
-        delta = (s32)func->new_addr - (s32)(func->old_addr + 8);
+        delta = (int32_t)func->new_addr - (int32_t)(func->old_addr + 8);
 
         /* The arch_livepatch_symbol_ok should have caught it. */
-        ASSERT(delta >= -(s32)ARCH_LIVEPATCH_RANGE ||
-               delta < (s32)ARCH_LIVEPATCH_RANGE);
+        ASSERT(delta >= -(int32_t)ARCH_LIVEPATCH_RANGE ||
+               delta <   (int32_t)ARCH_LIVEPATCH_RANGE);
 
         /* CPU shifts by two (left) when decoding, so we shift right by two. */
         delta = delta >> 2;
@@ -113,9 +113,9 @@ bool arch_livepatch_symbol_deny(const struct livepatch_elf *elf,
     return false;
 }
 
-static s32 get_addend(unsigned char type, void *dest)
+static int32_t get_addend(unsigned char type, void *dest)
 {
-    s32 addend = 0;
+    int32_t addend = 0;
 
     switch ( type ) {
     case R_ARM_NONE:
@@ -149,7 +149,8 @@ static s32 get_addend(unsigned char type, void *dest)
     return addend;
 }
 
-static int perform_rel(unsigned char type, void *dest, uint32_t val, s32 addend)
+static int perform_rel(unsigned char type, void *dest, uint32_t val,
+                       int32_t addend)
 {
 
     switch ( type ) {
@@ -203,8 +204,8 @@ static int perform_rel(unsigned char type, void *dest, uint32_t val, s32 addend)
          * arch_livepatch_verify_distance can't account of addend so we have
          * to do the check here as well.
          */
-        if ( (s32)val < -(s32)ARCH_LIVEPATCH_RANGE ||
-             (s32)val >= (s32)ARCH_LIVEPATCH_RANGE )
+        if ( (int32_t)val < -(int32_t)ARCH_LIVEPATCH_RANGE ||
+             (int32_t)val >= (int32_t)ARCH_LIVEPATCH_RANGE )
             return -EOVERFLOW;
 
         /* CPU always shifts insn by two, so complement it. */
@@ -234,7 +235,7 @@ int arch_livepatch_perform(struct livepatch_elf *elf,
         uint32_t val;
         void *dest;
         unsigned char type;
-        s32 addend;
+        int32_t addend;
 
         if ( use_rela )
         {

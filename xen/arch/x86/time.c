@@ -1945,8 +1945,8 @@ static void cf_check local_time_calibration(void)
      * This allows us to binary shift a 32-bit tsc_elapsed such that:
      * stime_elapsed < tsc_elapsed <= 2*stime_elapsed
      */
-    while ( ((u32)stime_elapsed64 != stime_elapsed64) ||
-            ((s32)stime_elapsed64 < 0) )
+    while ( ((uint32_t)stime_elapsed64 != stime_elapsed64) ||
+            ((int32_t)stime_elapsed64 < 0) )
     {
         stime_elapsed64 >>= 1;
         tsc_elapsed64   >>= 1;

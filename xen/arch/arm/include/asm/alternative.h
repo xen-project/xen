@@ -12,11 +12,11 @@
 #include <xen/stringify.h>
 
 struct alt_instr {
-	s32 orig_offset;	/* offset to original instruction */
-	s32 repl_offset;	/* offset to replacement instruction */
-	u16 cpufeature;		/* cpufeature bit set for replacement */
-	u8  orig_len;		/* size of original instruction(s) */
-	u8  repl_len;		/* size of new instruction(s), <= orig_len */
+	int32_t  orig_offset;	/* offset to original instruction */
+	int32_t  repl_offset;	/* offset to replacement instruction */
+	uint16_t cpufeature;	/* cpufeature bit set for replacement */
+	uint8_t  orig_len;	/* size of original instruction(s) */
+	uint8_t  repl_len;	/* size of new instruction(s), <= orig_len */
 };
 
 /* Xen: helpers used by common code. */

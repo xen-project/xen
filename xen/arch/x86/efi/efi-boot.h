@@ -102,12 +102,12 @@ static void __init efi_arch_relocate_image(unsigned long delta)
     }
 }
 
-extern const s32 __trampoline_rel_start[], __trampoline_rel_stop[];
-extern const s32 __trampoline_seg_start[], __trampoline_seg_stop[];
+extern const int32_t __trampoline_rel_start[], __trampoline_rel_stop[];
+extern const int32_t __trampoline_seg_start[], __trampoline_seg_stop[];
 
 static void __init relocate_trampoline(unsigned long phys)
 {
-    const s32 *trampoline_ptr;
+    const int32_t *trampoline_ptr;
 
     trampoline_phys = phys;
 
