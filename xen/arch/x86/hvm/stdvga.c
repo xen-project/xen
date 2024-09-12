@@ -37,26 +37,6 @@
 #define VGA_MEM_BASE 0xa0000
 #define VGA_MEM_SIZE 0x20000
 
-#define PAT(x) (x)
-static const uint32_t mask16[16] = {
-    PAT(0x00000000U),
-    PAT(0x000000ffU),
-    PAT(0x0000ff00U),
-    PAT(0x0000ffffU),
-    PAT(0x00ff0000U),
-    PAT(0x00ff00ffU),
-    PAT(0x00ffff00U),
-    PAT(0x00ffffffU),
-    PAT(0xff000000U),
-    PAT(0xff0000ffU),
-    PAT(0xff00ff00U),
-    PAT(0xff00ffffU),
-    PAT(0xffff0000U),
-    PAT(0xffff00ffU),
-    PAT(0xffffff00U),
-    PAT(0xffffffffU),
-};
-
 /* force some bits to zero */
 static const uint8_t sr_mask[8] = {
     (uint8_t)~0xfc,
@@ -80,25 +60,6 @@ static const uint8_t gr_mask[9] = {
     (uint8_t)~0xf0, /* 0x07 */
     (uint8_t)~0x00, /* 0x08 */
 };
-
-static uint8_t *vram_getb(struct hvm_hw_stdvga *s, unsigned int a)
-{
-    struct page_info *pg = s->vram_page[(a >> 12) & 0x3f];
-    uint8_t *p = __map_domain_page(pg);
-    return &p[a & 0xfff];
-}
-
-static uint32_t *vram_getl(struct hvm_hw_stdvga *s, unsigned int a)
-{
-    struct page_info *pg = s->vram_page[(a >> 10) & 0x3f];
-    uint32_t *p = __map_domain_page(pg);
-    return &p[a & 0x3ff];
-}
-
-static void vram_put(struct hvm_hw_stdvga *s, void *p)
-{
-    unmap_domain_page(p);
-}
 
 static int stdvga_outb(uint64_t addr, uint8_t val)
 {
@@ -168,244 +129,13 @@ static int cf_check stdvga_intercept_pio(
     return X86EMUL_UNHANDLEABLE; /* propagate to external ioemu */
 }
 
-static unsigned int stdvga_mem_offset(
-    struct hvm_hw_stdvga *s, unsigned int mmio_addr)
-{
-    unsigned int memory_map_mode = (s->gr[6] >> 2) & 3;
-    unsigned int offset = mmio_addr & 0x1ffff;
-
-    switch ( memory_map_mode )
-    {
-    case 0:
-        break;
-    case 1:
-        if ( offset >= 0x10000 )
-            goto fail;
-        offset += 0; /* assume bank_offset == 0; */
-        break;
-    case 2:
-        offset -= 0x10000;
-        if ( offset >= 0x8000 )
-            goto fail;
-        break;
-    default:
-    case 3:
-        offset -= 0x18000;
-        if ( offset >= 0x8000 )
-            goto fail;
-        break;
-    }
-
-    return offset;
-
- fail:
-    return ~0u;
-}
-
-#define GET_PLANE(data, p) (((data) >> ((p) * 8)) & 0xff)
-
-static uint8_t stdvga_mem_readb(uint64_t addr)
-{
-    struct hvm_hw_stdvga *s = &current->domain->arch.hvm.stdvga;
-    int plane;
-    uint32_t ret, *vram_l;
-    uint8_t *vram_b;
-
-    addr = stdvga_mem_offset(s, addr);
-    if ( addr == ~0u )
-        return 0xff;
-
-    if ( s->sr[4] & 0x08 )
-    {
-        /* chain 4 mode : simplest access */
-        vram_b = vram_getb(s, addr);
-        ret = *vram_b;
-        vram_put(s, vram_b);
-    }
-    else if ( s->gr[5] & 0x10 )
-    {
-        /* odd/even mode (aka text mode mapping) */
-        plane = (s->gr[4] & 2) | (addr & 1);
-        vram_b = vram_getb(s, ((addr & ~1) << 1) | plane);
-        ret = *vram_b;
-        vram_put(s, vram_b);
-    }
-    else
-    {
-        /* standard VGA latched access */
-        vram_l = vram_getl(s, addr);
-        s->latch = *vram_l;
-        vram_put(s, vram_l);
-
-        if ( !(s->gr[5] & 0x08) )
-        {
-            /* read mode 0 */
-            plane = s->gr[4];
-            ret = GET_PLANE(s->latch, plane);
-        }
-        else
-        {
-            /* read mode 1 */
-            ret = (s->latch ^ mask16[s->gr[2]]) & mask16[s->gr[7]];
-            ret |= ret >> 16;
-            ret |= ret >> 8;
-            ret = (~ret) & 0xff;
-        }
-    }
-
-    return ret;
-}
-
 static int cf_check stdvga_mem_read(
     const struct hvm_io_handler *handler, uint64_t addr, uint32_t size,
     uint64_t *p_data)
 {
-    uint64_t data = ~0UL;
-
-    switch ( size )
-    {
-    case 1:
-        data = stdvga_mem_readb(addr);
-        break;
-
-    case 2:
-        data = stdvga_mem_readb(addr);
-        data |= stdvga_mem_readb(addr + 1) << 8;
-        break;
-
-    case 4:
-        data = stdvga_mem_readb(addr);
-        data |= stdvga_mem_readb(addr + 1) << 8;
-        data |= stdvga_mem_readb(addr + 2) << 16;
-        data |= (uint32_t)stdvga_mem_readb(addr + 3) << 24;
-        break;
-
-    case 8:
-        data =  (uint64_t)(stdvga_mem_readb(addr));
-        data |= (uint64_t)(stdvga_mem_readb(addr + 1)) << 8;
-        data |= (uint64_t)(stdvga_mem_readb(addr + 2)) << 16;
-        data |= (uint64_t)(stdvga_mem_readb(addr + 3)) << 24;
-        data |= (uint64_t)(stdvga_mem_readb(addr + 4)) << 32;
-        data |= (uint64_t)(stdvga_mem_readb(addr + 5)) << 40;
-        data |= (uint64_t)(stdvga_mem_readb(addr + 6)) << 48;
-        data |= (uint64_t)(stdvga_mem_readb(addr + 7)) << 56;
-        break;
-
-    default:
-        gdprintk(XENLOG_WARNING, "invalid io size: %u\n", size);
-        break;
-    }
-
-    *p_data = data;
-    return X86EMUL_OKAY;
-}
-
-static void stdvga_mem_writeb(uint64_t addr, uint32_t val)
-{
-    struct hvm_hw_stdvga *s = &current->domain->arch.hvm.stdvga;
-    int plane, write_mode, b, func_select, mask;
-    uint32_t write_mask, bit_mask, set_mask, *vram_l;
-    uint8_t *vram_b;
-
-    addr = stdvga_mem_offset(s, addr);
-    if ( addr == ~0u )
-        return;
-
-    if ( s->sr[4] & 0x08 )
-    {
-        /* chain 4 mode : simplest access */
-        plane = addr & 3;
-        mask = (1 << plane);
-        if ( s->sr[2] & mask )
-        {
-            vram_b = vram_getb(s, addr);
-            *vram_b = val;
-            vram_put(s, vram_b);
-        }
-    }
-    else if ( s->gr[5] & 0x10 )
-    {
-        /* odd/even mode (aka text mode mapping) */
-        plane = (s->gr[4] & 2) | (addr & 1);
-        mask = (1 << plane);
-        if ( s->sr[2] & mask )
-        {
-            addr = ((addr & ~1) << 1) | plane;
-            vram_b = vram_getb(s, addr);
-            *vram_b = val;
-            vram_put(s, vram_b);
-        }
-    }
-    else
-    {
-        write_mode = s->gr[5] & 3;
-        switch ( write_mode )
-        {
-        default:
-        case 0:
-            /* rotate */
-            b = s->gr[3] & 7;
-            val = ((val >> b) | (val << (8 - b))) & 0xff;
-            val |= val << 8;
-            val |= val << 16;
-
-            /* apply set/reset mask */
-            set_mask = mask16[s->gr[1]];
-            val = (val & ~set_mask) | (mask16[s->gr[0]] & set_mask);
-            bit_mask = s->gr[8];
-            break;
-        case 1:
-            val = s->latch;
-            goto do_write;
-        case 2:
-            val = mask16[val & 0x0f];
-            bit_mask = s->gr[8];
-            break;
-        case 3:
-            /* rotate */
-            b = s->gr[3] & 7;
-            val = (val >> b) | (val << (8 - b));
-
-            bit_mask = s->gr[8] & val;
-            val = mask16[s->gr[0]];
-            break;
-        }
-
-        /* apply logical operation */
-        func_select = s->gr[3] >> 3;
-        switch ( func_select )
-        {
-        case 0:
-        default:
-            /* nothing to do */
-            break;
-        case 1:
-            /* and */
-            val &= s->latch;
-            break;
-        case 2:
-            /* or */
-            val |= s->latch;
-            break;
-        case 3:
-            /* xor */
-            val ^= s->latch;
-            break;
-        }
-
-        /* apply bit mask */
-        bit_mask |= bit_mask << 8;
-        bit_mask |= bit_mask << 16;
-        val = (val & bit_mask) | (s->latch & ~bit_mask);
-
-    do_write:
-        /* mask data according to sr[2] */
-        mask = s->sr[2];
-        write_mask = mask16[mask];
-        vram_l = vram_getl(s, addr);
-        *vram_l = (*vram_l & ~write_mask) | (val & write_mask);
-        vram_put(s, vram_l);
-    }
+    ASSERT_UNREACHABLE();
+    *p_data = ~0;
+    return X86EMUL_UNHANDLEABLE;
 }
 
 static int cf_check stdvga_mem_write(
@@ -420,47 +150,8 @@ static int cf_check stdvga_mem_write(
         .dir = IOREQ_WRITE,
         .data = data,
     };
-    struct ioreq_server *srv;
+    struct ioreq_server *srv = ioreq_server_select(current->domain, &p);
 
-    goto done;
-
-    /* Intercept mmio write */
-    switch ( size )
-    {
-    case 1:
-        stdvga_mem_writeb(addr, (data >>  0) & 0xff);
-        break;
-
-    case 2:
-        stdvga_mem_writeb(addr+0, (data >>  0) & 0xff);
-        stdvga_mem_writeb(addr+1, (data >>  8) & 0xff);
-        break;
-
-    case 4:
-        stdvga_mem_writeb(addr+0, (data >>  0) & 0xff);
-        stdvga_mem_writeb(addr+1, (data >>  8) & 0xff);
-        stdvga_mem_writeb(addr+2, (data >> 16) & 0xff);
-        stdvga_mem_writeb(addr+3, (data >> 24) & 0xff);
-        break;
-
-    case 8:
-        stdvga_mem_writeb(addr+0, (data >>  0) & 0xff);
-        stdvga_mem_writeb(addr+1, (data >>  8) & 0xff);
-        stdvga_mem_writeb(addr+2, (data >> 16) & 0xff);
-        stdvga_mem_writeb(addr+3, (data >> 24) & 0xff);
-        stdvga_mem_writeb(addr+4, (data >> 32) & 0xff);
-        stdvga_mem_writeb(addr+5, (data >> 40) & 0xff);
-        stdvga_mem_writeb(addr+6, (data >> 48) & 0xff);
-        stdvga_mem_writeb(addr+7, (data >> 56) & 0xff);
-        break;
-
-    default:
-        gdprintk(XENLOG_WARNING, "invalid io size: %u\n", size);
-        break;
-    }
-
- done:
-    srv = ioreq_server_select(current->domain, &p);
     if ( !srv )
         return X86EMUL_UNHANDLEABLE;
 
