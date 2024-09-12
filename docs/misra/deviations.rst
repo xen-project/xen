@@ -552,6 +552,11 @@ Deviations related to MISRA C:2012 Rules:
        usage scope, omitting parentheses is deemed unlikely to cause issues.
      - Tagged as `deliberate` for ECLAIR.
 
+   * - R20.7
+     - Problems related to operator precedence can not occur if the expansion
+       of the macro argument is surrounded by tokens '{', '}' and ';'.
+     - Tagged as `safe` for ECLAIR.
+
    * - R20.12
      - Variadic macros that use token pasting often employ the gcc extension
        `ext_paste_comma`, as detailed in `C-language-toolchain.rst`, which is
