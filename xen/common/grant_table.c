@@ -1390,7 +1390,7 @@ unmap_common(
     struct grant_table *lgt, *rgt;
     grant_ref_t ref;
     struct active_grant_entry *act;
-    s16              rc = 0;
+    int16_t          rc;
     struct grant_mapping *map;
     unsigned int flags;
     bool put_handle = false;
@@ -2580,7 +2580,7 @@ acquire_grant_for_copy(
     uint16_t trans_page_off;
     uint16_t trans_length;
     bool is_sub_page;
-    s16 rc = GNTST_okay;
+    int16_t rc = GNTST_okay;
     unsigned int pin_incr = readonly ? GNTPIN_hstr_inc : GNTPIN_hstw_inc;
 
     *page = NULL;
@@ -3416,14 +3416,14 @@ gnttab_get_version(XEN_GUEST_HANDLE_PARAM(gnttab_get_version_t) uop)
     return 0;
 }
 
-static s16
+static int16_t
 swap_grant_ref(grant_ref_t ref_a, grant_ref_t ref_b)
 {
     struct domain *d = rcu_lock_current_domain();
     struct grant_table *gt = d->grant_table;
     struct active_grant_entry *act_a = NULL;
     struct active_grant_entry *act_b = NULL;
-    s16 rc = GNTST_okay;
+    int16_t rc = GNTST_okay;
 
     grant_write_lock(gt);
 

@@ -67,8 +67,8 @@ struct irq_desc;
  * the old destinations.
  */
 struct arch_irq_desc {
-        s16 vector;                  /* vector itself is only 8 bits, */
-        s16 old_vector;              /* but we use -1 for unassigned  */
+        int16_t vector;                  /* vector itself is only 8 bits, */
+        int16_t old_vector;              /* but we use -1 for unassigned  */
         /*
          * Except for high priority interrupts @cpu_mask may have bits set for
          * offline CPUs.  Consumers need to be careful to mask this down to

@@ -13,7 +13,7 @@
 
 typedef int8_t  s8, __s8;
 typedef uint8_t __u8;
-typedef int16_t __s16;
+typedef int16_t s16, __s16;
 typedef int32_t __s32;
 typedef int64_t __s64;
 

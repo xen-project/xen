@@ -135,7 +135,7 @@ static s32 get_addend(unsigned char type, void *dest)
         addend =  (*(u32 *)dest & 0x00000FFF);
         addend |= (*(u32 *)dest & 0x000F0000) >> 4;
         /* Addend is to sign-extend ([19:16],[11:0]). */
-        addend = (s16)addend;
+        addend = (int16_t)addend;
         break;
 
     case R_ARM_CALL:

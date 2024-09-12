@@ -124,7 +124,7 @@ static int reloc_data(enum aarch64_reloc_op op, void *place, u64 val, int len)
     switch ( len )
     {
     case 16:
-        *(s16 *)place = sval;
+        *(int16_t *)place = sval;
         if ( sval < INT16_MIN || sval > UINT16_MAX )
 	        return -EOVERFLOW;
         break;
