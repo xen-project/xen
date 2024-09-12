@@ -240,21 +240,13 @@ static const struct hvm_io_handler *hvm_find_io_handler(const ioreq_t *p)
 int hvm_io_intercept(ioreq_t *p)
 {
     const struct hvm_io_handler *handler;
-    const struct hvm_io_ops *ops;
-    int rc;
 
     handler = hvm_find_io_handler(p);
 
     if ( handler == NULL )
         return X86EMUL_UNHANDLEABLE;
 
-    rc = hvm_process_io_intercept(handler, p);
-
-    ops = handler->ops;
-    if ( ops->complete != NULL )
-        ops->complete(handler);
-
-    return rc;
+    return hvm_process_io_intercept(handler, p);
 }
 
 struct hvm_io_handler *hvm_next_io_handler(struct domain *d)
@@ -326,25 +318,15 @@ bool relocate_portio_handler(struct domain *d, unsigned int old_port,
 
 bool hvm_mmio_internal(paddr_t gpa)
 {
-    const struct hvm_io_handler *handler;
-    const struct hvm_io_ops *ops;
     ioreq_t p = {
         .type = IOREQ_TYPE_COPY,
         .addr = gpa,
         .count = 1,
         .size = 1,
+        .dir = IOREQ_WRITE, /* for stdvga */
     };
 
-    handler = hvm_find_io_handler(&p);
-
-    if ( handler == NULL )
-        return 0;
-
-    ops = handler->ops;
-    if ( ops->complete != NULL )
-        ops->complete(handler);
-
-    return 1;
+    return hvm_find_io_handler(&p);
 }
 
 /*

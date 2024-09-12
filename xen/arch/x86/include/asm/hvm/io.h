@@ -56,13 +56,11 @@ typedef int (*hvm_io_write_t)(const struct hvm_io_handler *handler,
                               uint64_t data);
 typedef bool (*hvm_io_accept_t)(const struct hvm_io_handler *handler,
                                 const ioreq_t *p);
-typedef void (*hvm_io_complete_t)(const struct hvm_io_handler *handler);
 
 struct hvm_io_ops {
     hvm_io_accept_t   accept;
     hvm_io_read_t     read;
     hvm_io_write_t    write;
-    hvm_io_complete_t complete;
 };
 
 int hvm_process_io_intercept(const struct hvm_io_handler *handler,
