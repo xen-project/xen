@@ -52,11 +52,11 @@ struct microcode_patch {
 };
 
 #define UCODE_MAGIC                0x00414d44
-#define UCODE_EQUIV_CPU_TABLE_TYPE 0x00000000
+#define UCODE_EQUIV_TYPE           0x00000000
 #define UCODE_UCODE_TYPE           0x00000001
 
 struct container_equiv_table {
-    uint32_t type; /* UCODE_EQUIV_CPU_TABLE_TYPE */
+    uint32_t type; /* UCODE_EQUIV_TYPE */
     uint32_t len;
     struct equiv_cpu_entry eq[];
 };
@@ -335,10 +335,10 @@ static struct microcode_patch *cf_check cpu_request_microcode(
         buf  += 4;
         size -= 4;
 
-        if ( size < sizeof(*et) ||
-             (et = buf)->type != UCODE_EQUIV_CPU_TABLE_TYPE ||
-             size - sizeof(*et) < et->len ||
-             et->len % sizeof(et->eq[0]) )
+        if ( size < sizeof(*et) ||                   /* No space for header? */
+             (et = buf)->type != UCODE_EQUIV_TYPE || /* Not an Equivalence Table? */
+             size - sizeof(*et) < et->len ||         /* No space for table? */
+             et->len % sizeof(et->eq[0]) )           /* Not multiple of equiv_cpu_entry? */
         {
             printk(XENLOG_ERR "microcode: Bad equivalent cpu table\n");
             error = -EINVAL;
@@ -351,7 +351,12 @@ static struct microcode_patch *cf_check cpu_request_microcode(
 
         error = scan_equiv_cpu_table(et);
 
-        /* -ESRCH means no applicable microcode in this container. */
+        /*
+         * -ESRCH means no applicable microcode in this container.  But, there
+         * might be subsequent containers in the blob.  Skipping to the end of
+         * this container still requires us to follow the UCODE_UCODE_TYPE/len
+         * metadata because there's no overall container length given.
+         */
         if ( error && error != -ESRCH )
             break;
         skip_ucode = error;
@@ -361,10 +366,10 @@ static struct microcode_patch *cf_check cpu_request_microcode(
         {
             const struct container_microcode *mc;
 
-            if ( size < sizeof(*mc) ||
-                 (mc = buf)->type != UCODE_UCODE_TYPE ||
-                 size - sizeof(*mc) < mc->len ||
-                 mc->len < sizeof(struct microcode_patch) )
+            if ( size < sizeof(*mc) ||                      /* No space for container header? */
+                 (mc = buf)->type != UCODE_UCODE_TYPE ||    /* Not a ucode blob? */
+                 size - sizeof(*mc) < mc->len ||            /* No space for blob? */
+                 mc->len < sizeof(struct microcode_patch) ) /* No space for patch header? */
             {
                 printk(XENLOG_ERR "microcode: Bad microcode data\n");
                 error = -EINVAL;
