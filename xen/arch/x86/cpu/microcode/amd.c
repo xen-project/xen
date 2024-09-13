@@ -338,8 +338,7 @@ static struct microcode_patch *cf_check cpu_request_microcode(
         if ( size < sizeof(*et) ||
              (et = buf)->type != UCODE_EQUIV_CPU_TABLE_TYPE ||
              size - sizeof(*et) < et->len ||
-             et->len % sizeof(et->eq[0]) ||
-             et->eq[(et->len / sizeof(et->eq[0])) - 1].installed_cpu )
+             et->len % sizeof(et->eq[0]) )
         {
             printk(XENLOG_ERR "microcode: Bad equivalent cpu table\n");
             error = -EINVAL;
