@@ -35,8 +35,4 @@ Other options depends on the driver selected:
 
   - For all other uarts there are no additional options.
 
-As a convenience it is also possible to select from a list of
-predefined configurations available in the list of choice for "Early
-printk" for specific platform.
-
 By default early printk is disabled.
