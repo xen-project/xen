@@ -652,11 +652,7 @@ trampoline_setup:
         cmpb    $0, sym_esi(efi_platform)
         jnz     1f
 
-        /*
-         * Initialise the BSS.
-         *
-         * !!! WARNING - also zeroes the current stack !!!
-         */
+        /* Initialise the BSS. */
         lea     sym_esi(__bss_start), %edi
         lea     sym_esi(__bss_end), %ecx
         sub     %edi,%ecx
