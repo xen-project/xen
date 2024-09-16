@@ -176,7 +176,7 @@ typedef uint64_t   UINTN;
     #elif __clang__ || __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
         #define EFIAPI __attribute__((__ms_abi__))  // Force Microsoft ABI
     #else
-        #define EFIAPI          // Substitute expresion to force C calling convention
+        #define EFIAPI          // Substitute expression to force C calling convention
     #endif
 #endif
 
