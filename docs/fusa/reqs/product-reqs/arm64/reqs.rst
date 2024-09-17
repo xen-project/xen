@@ -21,3 +21,22 @@ Covers:
 
 Needs:
  - XenSwdgn
+
+Emulated UART
+-------------
+
+`XenProd~emulated_uart~1`
+
+Description:
+Xen shall provide an "Arm SBSA UART" compliant device to the domains.
+
+Rationale:
+
+Comments:
+
+Covers:
+ - `XenMkt~run_arm64_vms~1`
+ - `XenMkt~provide_console_vms~1`
+
+Needs:
+ - XenSwdgn
