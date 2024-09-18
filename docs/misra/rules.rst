@@ -561,6 +561,13 @@ maintainers if you want to suggest a change.
      - The features of <stdarg.h> shall not be used
      -
 
+   * - `Rule 17.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_17_02.c>`_
+     - Required
+     - Functions shall not call themselves, either directly or indirectly
+     - Limited forms of recursion are allowed if the recursion is bound
+       (there is an upper limit and the upper limit is enforced.) The
+       bounding should be explained in a comment or in a deviation.
+
    * - `Rule 17.3 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_17_03.c>`_
      - Mandatory
      - A function shall not be declared implicitly
@@ -592,6 +599,12 @@ maintainers if you want to suggest a change.
        codebase today, and its adoption is aspirational. However, when
        submitting new patches please try to decrease the number of
        violations when possible.
+
+   * - `Rule 18.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_18_01.c>`_
+     - Required
+     - A pointer resulting from arithmetic on a pointer operand shall
+       address an element of the same array as that pointer operand
+     -
 
    * - `Rule 18.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_18_02.c>`_
      - Required
