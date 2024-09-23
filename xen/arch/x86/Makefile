@@ -88,6 +88,8 @@ extra-y += xen.lds
 hostprogs-y += boot/mkelf32
 hostprogs-y += efi/mkreloc
 
+$(obj)/efi/mkreloc: HOSTCFLAGS += -I$(srctree)/include
+
 # Allows usercopy.c to include itself
 $(obj)/usercopy.o: CFLAGS-y += -iquote .
 

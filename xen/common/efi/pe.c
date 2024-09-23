@@ -20,30 +20,8 @@
  * Lesser General Public License for more details.
  */
 
-
 #include "efi.h"
-
-struct DosFileHeader {
-    UINT8   Magic[2];
-    UINT16  LastSize;
-    UINT16  nBlocks;
-    UINT16  nReloc;
-    UINT16  HdrSize;
-    UINT16  MinAlloc;
-    UINT16  MaxAlloc;
-    UINT16  ss;
-    UINT16  sp;
-    UINT16  Checksum;
-    UINT16  ip;
-    UINT16  cs;
-    UINT16  RelocPos;
-    UINT16  nOverlay;
-    UINT16  reserved[4];
-    UINT16  OEMId;
-    UINT16  OEMInfo;
-    UINT16  reserved2[10];
-    UINT32  ExeHeader;
-};
+#include "efi/pe.h"
 
 #if defined(__arm__) || defined (__aarch64__)
 #define PE_HEADER_MACHINE 0xaa64
@@ -53,45 +31,17 @@ struct DosFileHeader {
 #error "Unknown architecture"
 #endif
 
-struct PeFileHeader {
-    UINT16  Machine;
-    UINT16  NumberOfSections;
-    UINT32  TimeDateStamp;
-    UINT32  PointerToSymbolTable;
-    UINT32  NumberOfSymbols;
-    UINT16  SizeOfOptionalHeader;
-    UINT16  Characteristics;
-};
-
-struct PeHeader {
-    UINT8   Magic[4];
-    struct PeFileHeader FileHeader;
-};
-
-struct PeSectionHeader {
-    CHAR8   Name[8];
-    UINT32  VirtualSize;
-    UINT32  VirtualAddress;
-    UINT32  SizeOfRawData;
-    UINT32  PointerToRawData;
-    UINT32  PointerToRelocations;
-    UINT32  PointerToLinenumbers;
-    UINT16  NumberOfRelocations;
-    UINT16  NumberOfLinenumbers;
-    UINT32  Characteristics;
-};
-
-static bool __init pe_name_compare(const struct PeSectionHeader *sect,
+static bool __init pe_name_compare(const struct section_header *sect,
                                    const CHAR16 *name)
 {
     size_t i;
 
-    if ( sect->Name[0] != '.' )
+    if ( sect->name[0] != '.' )
         return false;
 
-    for ( i = 1; i < sizeof(sect->Name); i++ )
+    for ( i = 1; i < sizeof(sect->name); i++ )
     {
-        const char c = sect->Name[i];
+        const char c = sect->name[i];
 
         if ( c != name[i - 1] )
             return false;
@@ -105,33 +55,29 @@ static bool __init pe_name_compare(const struct PeSectionHeader *sect,
 const void *__init pe_find_section(const void *image, const UINTN image_size,
                                    const CHAR16 *section_name, UINTN *size_out)
 {
-    const struct DosFileHeader *dos = image;
-    const struct PeHeader *pe;
-    const struct PeSectionHeader *sect;
+    const struct mz_hdr *mz = image;
+    const struct pe_hdr *pe;
+    const struct section_header *sect;
     UINTN offset, i;
 
-    if ( image_size < sizeof(*dos) ||
-         dos->Magic[0] != 'M' ||
-         dos->Magic[1] != 'Z' )
+    if ( image_size < sizeof(*mz) ||
+         mz->magic != MZ_MAGIC )
         return NULL;
 
-    offset = dos->ExeHeader;
+    offset = mz->peaddr;
     pe = image + offset;
 
     offset += sizeof(*pe);
     if ( image_size < offset ||
-         pe->Magic[0] != 'P' ||
-         pe->Magic[1] != 'E' ||
-         pe->Magic[2] != '\0' ||
-         pe->Magic[3] != '\0' )
+         pe->magic != PE_MAGIC )
         return NULL;
 
-    if ( pe->FileHeader.Machine != PE_HEADER_MACHINE )
+    if ( pe->machine != PE_HEADER_MACHINE )
         return NULL;
 
-    offset += pe->FileHeader.SizeOfOptionalHeader;
+    offset += pe->opt_hdr_size;
 
-    for ( i = 0; i < pe->FileHeader.NumberOfSections; i++ )
+    for ( i = 0; i < pe->sections; i++ )
     {
         sect = image + offset;
         if ( image_size < offset + sizeof(*sect) )
@@ -143,13 +89,13 @@ const void *__init pe_find_section(const void *image, const UINTN image_size,
             continue;
         }
 
-        if ( image_size < sect->VirtualSize + sect->VirtualAddress )
+        if ( image_size < sect->virtual_size + sect->rva )
             blexit(L"PE invalid section size + address");
 
         if ( size_out )
-            *size_out = sect->VirtualSize;
+            *size_out = sect->virtual_size;
 
-        return image + sect->VirtualAddress;
+        return image + sect->rva;
     }
 
     return NULL;
