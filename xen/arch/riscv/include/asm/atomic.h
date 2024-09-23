@@ -31,21 +31,17 @@
 
 void __bad_atomic_size(void);
 
-/*
- * Legacy from Linux kernel. For some reason they wanted to have ordered
- * read/write access. Thereby read* is used instead of read*_cpu()
- */
 static always_inline void read_atomic_size(const volatile void *p,
                                            void *res,
                                            unsigned int size)
 {
     switch ( size )
     {
-    case 1: *(uint8_t *)res = readb(p); break;
-    case 2: *(uint16_t *)res = readw(p); break;
-    case 4: *(uint32_t *)res = readl(p); break;
+    case 1: *(uint8_t *)res = readb_cpu(p); break;
+    case 2: *(uint16_t *)res = readw_cpu(p); break;
+    case 4: *(uint32_t *)res = readl_cpu(p); break;
 #ifndef CONFIG_RISCV_32
-    case 8: *(uint64_t *)res = readq(p); break;
+    case 8: *(uint64_t *)res = readq_cpu(p); break;
 #endif
     default: __bad_atomic_size(); break;
     }
@@ -58,15 +54,16 @@ static always_inline void read_atomic_size(const volatile void *p,
 })
 
 static always_inline void _write_atomic(volatile void *p,
-                                       unsigned long x, unsigned int size)
+                                        unsigned long x,
+                                        unsigned int size)
 {
     switch ( size )
     {
-    case 1: writeb(x, p); break;
-    case 2: writew(x, p); break;
-    case 4: writel(x, p); break;
+    case 1: writeb_cpu(x, p); break;
+    case 2: writew_cpu(x, p); break;
+    case 4: writel_cpu(x, p); break;
 #ifndef CONFIG_RISCV_32
-    case 8: writeq(x, p); break;
+    case 8: writeq_cpu(x, p); break;
 #endif
     default: __bad_atomic_size(); break;
     }
