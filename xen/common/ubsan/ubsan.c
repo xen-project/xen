@@ -20,8 +20,6 @@ static DEFINE_PER_CPU(struct xen_ubsan[1], in_ubsan);
 #undef current
 #define current this_cpu(in_ubsan)
 #define dump_stack dump_execution_state
-#define u64 long long unsigned int
-#define s64 long long int
 
 #include "ubsan.h"
 
@@ -141,10 +139,11 @@ static void val_to_string(char *str, size_t size, struct type_descriptor *type,
 #endif
 		} else if (type_is_signed(type)) {
 			scnprintf(str, size, "%lld",
-				(s64)get_signed_val(type, value));
+				  (long long)get_signed_val(type, value));
 		} else {
 			scnprintf(str, size, "%llu",
-				(u64)get_unsigned_val(type, value));
+				  (unsigned long long)get_unsigned_val(type,
+								       value));
 		}
 	}
 }

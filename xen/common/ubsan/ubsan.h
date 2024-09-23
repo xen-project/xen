@@ -1,6 +1,8 @@
 #ifndef _LIB_UBSAN_H
 #define _LIB_UBSAN_H
 
+#include <xen/linux-compat.h>
+
 enum {
 	type_kind_int = 0,
 	type_kind_float = 1,
