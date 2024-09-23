@@ -275,18 +275,6 @@ config X2APIC_PHYSICAL
 	  destination inter processor interrupts (IPIs) slightly slower than
 	  Logical Destination mode.
 
-config X2APIC_CLUSTER
-	bool "Cluster Destination mode"
-	help
-	  When using this mode APICs are addressed using the Cluster Logical
-	  Destination mode.
-
-	  Cluster Destination has the benefit of sending IPIs faster since
-	  multiple APICs can be targeted as destinations of a single IPI.
-	  However the vector space is shared between all CPUs on the cluster,
-	  and hence using this mode reduces the number of available vectors
-	  when compared to Physical mode.
-
 config X2APIC_MIXED
 	bool "Mixed Destination mode"
 	help
