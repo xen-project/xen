@@ -333,7 +333,7 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 # if FLOAT_SIZE == 4
 #  define broadcast(x) ({ \
     vec_t t_; \
-    asm ( "%{evex%} vbroadcastss %1, %0" \
+    asm ( "vbroadcastss %1, %0" \
           : "=v" (t_) : "m" (*(float[1]){ x }) ); \
     t_; \
 })
@@ -401,14 +401,14 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #  if VEC_SIZE >= 32
 #   define broadcast(x) ({ \
     vec_t t_; \
-    asm ( "%{evex%} vbroadcastsd %1, %0" : "=v" (t_) \
+    asm ( "vbroadcastsd %1, %0" : "=v" (t_) \
           : "m" (*(double[1]){ x }) ); \
     t_; \
 })
 #  else
 #   define broadcast(x) ({ \
     vec_t t_; \
-    asm ( "%{evex%} vpbroadcastq %1, %0" \
+    asm ( "vpbroadcastq %1, %0" \
           : "=v" (t_) : "m" (*(double[1]){ x }) ); \
     t_; \
 })
@@ -601,7 +601,7 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 # if INT_SIZE == 4 || UINT_SIZE == 4
 #  define broadcast(x) ({ \
     vec_t t_; \
-    asm ( "%{evex%} vpbroadcastd %1, %0" \
+    asm ( "vpbroadcastd %1, %0" \
           : "=v" (t_) : "m" (*(int[1]){ x }) ); \
     t_; \
 })
@@ -649,7 +649,7 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 # elif INT_SIZE == 8 || UINT_SIZE == 8
 #  define broadcast(x) ({ \
     vec_t t_; \
-    asm ( "%{evex%} vpbroadcastq %1, %0" \
+    asm ( "vpbroadcastq %1, %0" \
           : "=v" (t_) : "m" (*(long long[1]){ x }) ); \
     t_; \
 })
@@ -716,7 +716,7 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 # if INT_SIZE == 1 || UINT_SIZE == 1
 #  define broadcast(x) ({ \
     vec_t t_; \
-    asm ( "%{evex%} vpbroadcastb %1, %0" \
+    asm ( "vpbroadcastb %1, %0" \
           : "=v" (t_) : "m" (*(char[1]){ x }) ); \
     t_; \
 })
@@ -745,7 +745,7 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 # elif INT_SIZE == 2 || UINT_SIZE == 2
 #  define broadcast(x) ({ \
     vec_t t_; \
-    asm ( "%{evex%} vpbroadcastw %1, %0" \
+    asm ( "vpbroadcastw %1, %0" \
           : "=v" (t_) : "m" (*(short[1]){ x }) ); \
     t_; \
 })
