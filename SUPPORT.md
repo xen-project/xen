@@ -768,13 +768,21 @@ Compile time disabled for ARM by default.
 
     Status, x86: Supported, not security supported
 
-### XSM & FLASK
+### XSM (Xen Security Module) Framework
+
+XSM is a security policy framework.  The dummy implementation is covered by this
+statement, and implements a policy whereby dom0 is all powerful.  See below for
+alternative modules (FLASK, SILO).
+
+    Status: Supported
+
+### FLASK XSM Module
 
     Status: Experimental
 
 Compile time disabled by default.
 
-Also note that using XSM
+Also note that using FLASK
 to delegate various domain control hypercalls
 to particular other domains, rather than only permitting use by dom0,
 is also specifically excluded from security support for many hypercalls.
@@ -786,6 +794,13 @@ Please see XSA-77 for more details.
 
 The default policy includes FLASK labels and roles for a "typical" Xen-based system
 with dom0, driver domains, stub domains, domUs, and so on.
+
+### SILO XSM Module
+
+SILO extends the dummy policy by enforcing that DomU-s can only communicate
+with Dom0, yet not with each other.
+
+    Status: Supported
 
 ## Virtual Hardware, Hypervisor
 
