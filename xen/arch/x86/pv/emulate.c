@@ -71,10 +71,15 @@ void pv_emul_instruction_done(struct cpu_user_regs *regs, unsigned long rip)
 {
     regs->rip = rip;
     regs->eflags &= ~X86_EFLAGS_RF;
+
     if ( regs->eflags & X86_EFLAGS_TF )
     {
-        current->arch.dr6 |= DR_STEP | DR_STATUS_RESERVED_ONE;
-        pv_inject_hw_exception(X86_EXC_DB, X86_EVENT_NO_EC);
+        /*
+         * TODO: this should generally use TF from the start of the
+         * instruction.  It's only a latent bug for now, as this path isn't
+         * used for any instruction which modifies eflags.
+         */
+        pv_inject_DB(X86_DR6_BS);
     }
 }
 

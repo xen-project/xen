@@ -2032,7 +2032,7 @@ void asmlinkage do_debug(struct cpu_user_regs *regs)
         return;
     }
 
-    pv_inject_hw_exception(X86_EXC_DB, X86_EVENT_NO_EC);
+    pv_inject_DB(0 /* N/A, already merged */);
 }
 
 void asmlinkage do_entry_CP(struct cpu_user_regs *regs)
