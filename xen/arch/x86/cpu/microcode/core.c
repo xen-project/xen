@@ -195,17 +195,6 @@ static struct patch_with_flags nmi_patch =
     .patch  = ZERO_BLOCK_PTR,
 };
 
-/*
- * Return a patch that covers current CPU. If there are multiple patches,
- * return the one with the highest revision number. Return error If no
- * patch is found and an error occurs during the parsing process. Otherwise
- * return NULL.
- */
-static struct microcode_patch *parse_blob(const char *buf, size_t len)
-{
-    return alternative_call(ucode_ops.cpu_request_microcode, buf, len, true);
-}
-
 /* Returns true if ucode should be loaded on a given cpu */
 static bool is_cpu_primary(unsigned int cpu)
 {
@@ -510,7 +499,8 @@ static long cf_check __maybe_unused ucode_update_hcall_cont(void *data)
         goto put;
     }
 
-    patch = parse_blob(buffer->buffer, buffer->len);
+    patch = alternative_call(ucode_ops.cpu_request_microcode,
+                             (const void *)buffer->buffer, buffer->len, true);
     patch_with_flags.flags = buffer->flags;
 
     xfree(buffer);
@@ -725,7 +715,7 @@ static int __init cf_check microcode_init_cache(void)
         size = cd.size;
     }
 
-    patch = parse_blob(data, size);
+    patch = alternative_call(ucode_ops.cpu_request_microcode, data, size, true);
     if ( IS_ERR(patch) )
     {
         rc = PTR_ERR(patch);
