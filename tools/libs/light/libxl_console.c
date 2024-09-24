@@ -774,12 +774,17 @@ libxl_xen_console_reader *
 {
     GC_INIT(ctx);
     libxl_xen_console_reader *cr;
-    unsigned int size = 16384;
+    /*
+     * We want xen to fill the buffer in as few hypercalls as
+     * possible, but xen will not nul-terminate it.  The default size
+     * of Xen's console buffer is 16384.  Leave one byte at the end
+     * for the null character.
+     */
+    unsigned int size = 16384 + 1;
 
     cr = libxl__zalloc(NOGC, sizeof(libxl_xen_console_reader));
     cr->buffer = libxl__zalloc(NOGC, size);
     cr->size = size;
-    cr->count = size;
     cr->clear = clear;
     cr->incremental = 1;
 
@@ -800,10 +805,16 @@ int libxl_xen_console_read_line(libxl_ctx *ctx,
                                 char **line_r)
 {
     int ret;
+    /*
+     * Number of chars to copy into the buffer.  xc_readconsolering()
+     * does not add a null character at the end, so leave a space for
+     * us to add it.
+     */
+    unsigned int nr_chars = cr->size - 1;
     GC_INIT(ctx);
 
     memset(cr->buffer, 0, cr->size);
-    ret = xc_readconsolering(ctx->xch, cr->buffer, &cr->count,
+    ret = xc_readconsolering(ctx->xch, cr->buffer, &nr_chars,
                              cr->clear, cr->incremental, &cr->index);
     if (ret < 0) {
         LOGE(ERROR, "reading console ring buffer");
@@ -811,7 +822,7 @@ int libxl_xen_console_read_line(libxl_ctx *ctx,
         return ERROR_FAIL;
     }
     if (!ret) {
-        if (cr->count) {
+        if (nr_chars) {
             *line_r = cr->buffer;
             ret = 1;
         } else {

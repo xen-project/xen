@@ -2077,7 +2077,6 @@ _hidden char *libxl__uuid2string(libxl__gc *gc, const libxl_uuid uuid);
 struct libxl__xen_console_reader {
     char *buffer;
     unsigned int size;
-    unsigned int count;
     unsigned int clear;
     unsigned int incremental;
     unsigned int index;
