@@ -124,9 +124,24 @@ static void vlapic_error(struct vlapic *vlapic, unsigned int errmask)
     if ( (esr & errmask) != errmask )
     {
         uint32_t lvterr = vlapic_get_reg(vlapic, APIC_LVTERR);
+        bool inj = false;
+
+        if ( !(lvterr & APIC_LVT_MASKED) )
+        {
+            /*
+             * If LVTERR is unmasked and has an illegal vector, vlapic_set_irq()
+             * will end up back here.  Break the cycle by only injecting LVTERR
+             * if it will succeed, and folding in RECVILL otherwise.
+             */
+            if ( (lvterr & APIC_VECTOR_MASK) >= 16 )
+                 inj = true;
+            else
+                 errmask |= APIC_ESR_RECVILL;
+        }
 
         vlapic_set_reg(vlapic, APIC_ESR, esr | errmask);
-        if ( !(lvterr & APIC_LVT_MASKED) )
+
+        if ( inj )
             vlapic_set_irq(vlapic, lvterr & APIC_VECTOR_MASK, 0);
     }
     spin_unlock_irqrestore(&vlapic->esr_lock, flags);
