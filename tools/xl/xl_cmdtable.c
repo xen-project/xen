@@ -433,7 +433,7 @@ const struct cmd_spec cmd_table[] = {
     },
     { "vsnd-list",
       &main_vsndlist, 0, 0,
-      "List virtual display devices for a domain",
+      "List virtual sound devices for a domain",
       "<Domain(s)>",
     },
     { "vsnd-detach",
