@@ -38,6 +38,16 @@ The requirements are linked using OpenFastTrace
 OpenFastTrace parses through the requirements and generates a traceability
 report.
 
+Assumption of Use
+=================
+
+Xen is making several assumptions on the status of the platform or on some
+functions being present and operational. For example, Xen might assume that
+some registers are set.
+Anybody who wants to use Xen must validate that the platform it is used on
+(meaning the hardware and any software running before Xen like the firmware)
+fulfils all the AoU described by Xen.
+
 The following is the skeleton for a requirement.
 
 Title of the requirement

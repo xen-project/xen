@@ -30,7 +30,7 @@ Read system counter frequency
 
 Description:
 Xen shall expose the frequency of the system counter to the domains in
-CNTFRQ_EL0 register and/or domain device tree's "clock-frequency" property.
+CNTFRQ_EL0 register.
 
 Rationale:
 
@@ -115,6 +115,28 @@ condition is met.
 Rationale:
 
 Comments:
+
+Covers:
+ - `XenProd~emulated_timer~1`
+
+Assumption of Use on the Platform
+=================================
+
+Expose system timer frequency via register
+------------------------------------------
+
+`XenSwdgn~arm64_generic_timer_plat_program_cntfrq_el0~1`
+
+Description:
+CNTFRQ_EL0 register shall be programmed with the value of the system timer
+frequency.
+
+Rationale:
+Xen reads the CNTFRQ_EL0 register to get the value of system timer frequency.
+
+Comments:
+While there is a provision to get this value by reading the "clock-frequency"
+dt property [2], the use of this property is strongly discouraged.
 
 Covers:
  - `XenProd~emulated_timer~1`
