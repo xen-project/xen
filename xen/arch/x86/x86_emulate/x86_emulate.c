@@ -5928,6 +5928,7 @@ x86_emulate(
                                evex.w == ((b >> 4) & 1)),
                               X86_EXC_UD);
         d |= TwoOp;
+        op_bytes = 1; /* fake */
         /* fall through */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0xc4): /* vpconflict{d,q} [xyz]mm/mem,[xyz]mm{k} */
         fault_suppression = false;
