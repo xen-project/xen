@@ -2017,9 +2017,14 @@ void asmlinkage do_debug(struct cpu_user_regs *regs)
         return;
     }
 
-    /* Save debug status register where guest OS can peek at it */
-    v->arch.dr6 |= (dr6 & ~X86_DR6_DEFAULT);
-    v->arch.dr6 &= (dr6 | ~X86_DR6_DEFAULT);
+    /*
+     * Update the guest's dr6 so the debugger can peek at it.
+     *
+     * TODO: This should be passed out-of-band, so guest state is not modified
+     * by debugging actions completed behind it's back.
+     */
+    v->arch.dr6 = x86_merge_dr6(v->domain->arch.cpu_policy,
+                                v->arch.dr6, dr6 ^ X86_DR6_DEFAULT);
 
     if ( guest_kernel_mode(v, regs) && v->domain->debugger_attached )
     {
