@@ -323,30 +323,21 @@ static unsigned int check_guest_io_breakpoint(struct vcpu *v,
                                               unsigned int port,
                                               unsigned int len)
 {
-    unsigned int width, i, match = 0;
-    unsigned long start;
+    unsigned int i, match = 0;
 
     if ( !v->arch.pv.dr7_emul || !(v->arch.pv.ctrlreg[4] & X86_CR4_DE) )
         return 0;
 
     for ( i = 0; i < 4; i++ )
     {
+        unsigned long start;
+        unsigned int width;
+
         if ( !(v->arch.pv.dr7_emul & (3 << (i * DR_ENABLE_SIZE))) )
             continue;
 
-        start = v->arch.dr[i];
-        width = 0;
-
-        switch ( (v->arch.dr7 >>
-                  (DR_CONTROL_SHIFT + i * DR_CONTROL_SIZE)) & 0xc )
-        {
-        case DR_LEN_1: width = 1; break;
-        case DR_LEN_2: width = 2; break;
-        case DR_LEN_4: width = 4; break;
-        case DR_LEN_8: width = 8; break;
-        }
-
-        start &= ~(width - 1UL);
+        width = x86_bp_width(v->arch.dr7, i);
+        start = v->arch.dr[i] & ~(width - 1UL);
 
         if ( (start < (port + len)) && ((start + width) > port) )
             match |= 1u << i;
