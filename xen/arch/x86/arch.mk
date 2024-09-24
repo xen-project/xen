@@ -91,7 +91,7 @@ XEN_BUILD_EFI := $(call if-success,$(CC) $(filter-out -include %/include/xen/con
                                          -c $(srctree)/$(efi-check).c -o $(efi-check).o,y)
 
 # Check if the linker supports PE.
-EFI_LDFLAGS := $(patsubst -m%,-mi386pep,$(LDFLAGS)) --subsystem=10
+EFI_LDFLAGS := $(patsubst -m%,-mi386pep,$(LDFLAGS)) --subsystem=10 --enable-long-section-names
 LD_PE_check_cmd = $(call ld-option,$(EFI_LDFLAGS) --image-base=0x100000000 -o $(efi-check).efi $(efi-check).o)
 XEN_BUILD_PE := $(LD_PE_check_cmd)
 
