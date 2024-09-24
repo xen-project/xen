@@ -732,14 +732,28 @@ static inline void pv_inject_hw_exception(unsigned int vector, int errcode)
     pv_inject_event(&event);
 }
 
+static inline void pv_inject_DB(unsigned long pending_dbg)
+{
+    struct x86_event event = {
+        .vector      = X86_EXC_DB,
+        .type        = X86_EVENTTYPE_HW_EXCEPTION,
+        .error_code  = X86_EVENT_NO_EC,
+    };
+
+    event.pending_dbg = pending_dbg;
+
+    pv_inject_event(&event);
+}
+
 static inline void pv_inject_page_fault(int errcode, unsigned long cr2)
 {
-    const struct x86_event event = {
+    struct x86_event event = {
         .vector = X86_EXC_PF,
         .type = X86_EVENTTYPE_HW_EXCEPTION,
         .error_code = errcode,
-        .cr2 = cr2,
     };
+
+    event.cr2 = cr2;
 
     pv_inject_event(&event);
 }

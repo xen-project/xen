@@ -532,8 +532,9 @@ static inline void hvm_inject_page_fault(int errcode, unsigned long cr2)
         .vector = X86_EXC_PF,
         .type = X86_EVENTTYPE_HW_EXCEPTION,
         .error_code = errcode,
-        .cr2 = cr2,
     };
+
+    event.cr2 = cr2;
 
     hvm_inject_event(&event);
 }
