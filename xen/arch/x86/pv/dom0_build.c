@@ -354,11 +354,11 @@ static struct page_info * __init alloc_chunk(struct domain *d,
     return page;
 }
 
-int __init dom0_construct_pv(struct domain *d,
-                             const module_t *image,
-                             unsigned long image_headroom,
-                             module_t *initrd,
-                             const char *cmdline)
+static int __init dom0_construct(struct domain *d,
+                                 const module_t *image,
+                                 unsigned long image_headroom,
+                                 module_t *initrd,
+                                 const char *cmdline)
 {
     int i, rc, order, machine;
     bool compatible, compat;
@@ -1047,6 +1047,36 @@ int __init dom0_construct_pv(struct domain *d,
 out:
     if ( elf_check_broken(&elf) )
         printk("%pd kernel: broken ELF: %s\n", d, elf_check_broken(&elf));
+
+    return rc;
+}
+
+int __init dom0_construct_pv(struct domain *d,
+                             const module_t *image,
+                             unsigned long image_headroom,
+                             module_t *initrd,
+                             const char *cmdline)
+{
+    int rc;
+
+    /*
+     * Clear SMAP in CR4 to allow user-accesses in construct_dom0().  This
+     * prevents us needing to rewrite construct_dom0() in terms of
+     * copy_{to,from}_user().
+     */
+    if ( boot_cpu_has(X86_FEATURE_XEN_SMAP) )
+    {
+        cr4_pv32_mask &= ~X86_CR4_SMAP;
+        write_cr4(read_cr4() & ~X86_CR4_SMAP);
+    }
+
+    rc = dom0_construct(d, image, image_headroom, initrd, cmdline);
+
+    if ( boot_cpu_has(X86_FEATURE_XEN_SMAP) )
+    {
+        write_cr4(read_cr4() | X86_CR4_SMAP);
+        cr4_pv32_mask |= X86_CR4_SMAP;
+    }
 
     return rc;
 }
