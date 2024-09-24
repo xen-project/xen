@@ -321,14 +321,7 @@ SECTIONS
   DECL_SECTION(.bss) {
        __bss_start = .;
        *(.bss.page_aligned*)
-       . = ALIGN(PAGE_SIZE);
-       __per_cpu_start = .;
-       *(.bss.percpu.page_aligned)
-       *(.bss.percpu)
-       . = ALIGN(SMP_CACHE_BYTES);
-       *(.bss.percpu.read_mostly)
-       . = ALIGN(SMP_CACHE_BYTES);
-       __per_cpu_data_end = .;
+       PERCPU_BSS
        *(.bss .bss.*)
        . = ALIGN(POINTER_ALIGN);
        __bss_end = .;
