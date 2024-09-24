@@ -15,7 +15,14 @@ extern void (*lapic_timer_on)(void);
 
 extern uint64_t (*cpuidle_get_tick)(void);
 
+#ifdef CONFIG_INTEL
 int mwait_idle_init(struct notifier_block *nfb);
+#else
+static inline int mwait_idle_init(struct notifier_block *nfb)
+{
+    return -ENODEV;
+}
+#endif
 int cpuidle_init_cpu(unsigned int cpu);
 void cf_check default_dead_idle(void);
 void cf_check acpi_dead_idle(void);
