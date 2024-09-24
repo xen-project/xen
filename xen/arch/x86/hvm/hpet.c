@@ -405,7 +405,8 @@ static int cf_check hpet_write(
         break;
 
     case HPET_STATUS:
-        /* write 1 to clear. */
+        /* Write 1 to clear. Therefore don't use new_val directly here. */
+        new_val = val << ((addr & 7) * 8);
         while ( new_val )
         {
             bool active;
