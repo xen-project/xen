@@ -7,18 +7,18 @@
         .equ    wakeup_stack, trampoline_start + PAGE_SIZE
         .local  wakeup_stack
 
-#define wakesym(sym) (sym - wakeup_start)
+#define wakesym(sym) (sym - entry_S3)
 
 /*
  * acpi_sleep_prepare() programs the S3 wakeup vector to point here.
  *
  * The ACPI spec says that we shall be entered in Real Mode with:
- *   %cs = wakeup_start >> 4
- *   %ip = wakeup_start & 0xf
+ *   %cs = entry_S3 >> 4
+ *   %ip = entry_S3 & 0xf
  *
- * As wakeup_start is 16-byte aligned, %ip is 0 in practice.
+ * As entry_S3 is 16-byte aligned, %ip is 0 in practice.
  */
-ENTRY(wakeup_start)
+ENTRY(entry_S3)
         cli
         cld
 

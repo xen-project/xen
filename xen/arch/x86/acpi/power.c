@@ -169,6 +169,7 @@ static void thaw_domains(void)
 static void acpi_sleep_prepare(u32 state)
 {
     void *wakeup_vector_va;
+    paddr_t entry_pa;
 
     if ( state != ACPI_STATE_S3 )
         return;
@@ -181,10 +182,12 @@ static void acpi_sleep_prepare(u32 state)
     wakeup_vector_va = fix_to_virt(FIX_ACPI_END) +
                        PAGE_OFFSET(acpi_sinfo.wakeup_vector);
 
+    entry_pa = bootsym_phys(entry_S3);
+
     if ( acpi_sinfo.vector_width == 32 )
-        *(uint32_t *)wakeup_vector_va = bootsym_phys(wakeup_start);
+        *(uint32_t *)wakeup_vector_va = entry_pa;
     else
-        *(uint64_t *)wakeup_vector_va = bootsym_phys(wakeup_start);
+        *(uint64_t *)wakeup_vector_va = entry_pa;
 
     clear_fixmap(FIX_ACPI_END);
 }
@@ -446,7 +449,7 @@ static void tboot_sleep(u8 sleep_state)
     g_tboot_shared->acpi_sinfo.wakeup_vector = acpi_sinfo.wakeup_vector;
     g_tboot_shared->acpi_sinfo.vector_width = acpi_sinfo.vector_width;
     g_tboot_shared->acpi_sinfo.kernel_s3_resume_vector =
-                                              bootsym_phys(wakeup_start);
+                                              bootsym_phys(entry_S3);
 
     switch ( sleep_state )
     {

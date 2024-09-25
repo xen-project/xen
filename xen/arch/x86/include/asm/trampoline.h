@@ -130,10 +130,10 @@ extern uint32_t trampoline_phys;
 #define bootsym(sym) (*((typeof(sym) *)__va(bootsym_phys(sym))))
 
 /* The INIT-SIPI-SIPI entrypoint.  16-bit code. */
-void nocall trampoline_realmode_entry(void);
+void nocall entry_SIPI16(void);
 
 /* The S3 wakeup vector.  16-bit code. */
-void nocall wakeup_start(void);
+void nocall entry_S3(void);
 
 /*
  * A variable in the trampoline, containing Xen's physical address.  Amongst
