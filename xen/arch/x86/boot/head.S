@@ -231,6 +231,27 @@ __efi64_mb2_start:
         /* VGA is not available on EFI platforms. */
         movl   $0,vga_text_buffer(%rip)
 
+        /*
+         * Align the stack as UEFI spec requires. Keep it aligned
+         * before efi_multiboot2() call by pushing/popping even
+         * numbers of items on it.
+         */
+        and     $~15, %rsp
+
+        /*
+         * Initialize BSS (no nasty surprises!).
+         * It must be done earlier than in BIOS case
+         * because efi_multiboot2() touches it.
+         */
+        mov     %eax, %edx
+        lea     __bss_start(%rip), %edi
+        lea     __bss_end(%rip), %ecx
+        sub     %edi, %ecx
+        shr     $3, %ecx
+        xor     %eax, %eax
+        rep stosq
+        mov     %edx, %eax
+
         /* Check for Multiboot2 bootloader. */
         cmp     $MULTIBOOT2_BOOTLOADER_MAGIC,%eax
         je      .Lefi_multiboot2_proto
@@ -321,33 +342,11 @@ __efi64_mb2_start:
         lea     .Lmb2_no_ih(%rip),%r15
         jz      x86_32_switch
 
-        /*
-         * Align the stack as UEFI spec requires. Keep it aligned
-         * before efi_multiboot2() call by pushing/popping even
-         * numbers of items on it.
-         */
-        and     $~15,%rsp
-
         /* Save Multiboot2 magic on the stack. */
         push    %rax
 
         /* Save EFI ImageHandle on the stack. */
         push    %rdi
-
-        /*
-         * Initialize BSS (no nasty surprises!).
-         * It must be done earlier than in BIOS case
-         * because efi_multiboot2() touches it.
-         */
-        lea     __bss_start(%rip),%edi
-        lea     __bss_end(%rip),%ecx
-        sub     %edi,%ecx
-        shr     $3,%ecx
-        xor     %eax,%eax
-        rep stosq
-
-        /* Keep the stack aligned. Do not pop a single item off it. */
-        mov     (%rsp),%rdi
 
         /*
          * efi_multiboot2() is called according to System V AMD64 ABI:
@@ -434,6 +433,8 @@ __pvh_start:
         /* Set up stack. */
         lea     STACK_SIZE - CPUINFO_sizeof + sym_esi(cpu0_stack), %esp
 
+        call    .Linitialise_bss
+
         mov     %ebx, sym_esi(pvh_start_info_pa)
 
         /* Force xen console.  Will revert to user choice in init code. */
@@ -458,6 +459,20 @@ __pvh_start:
         jmp     trampoline_setup
 
 #endif /* CONFIG_PVH_GUEST */
+
+.Linitialise_bss:
+        /* Initialise the BSS.  Preserve %eax (BOOTLOADER_MAGIC). */
+        mov     %eax, %ebp
+
+        lea     sym_esi(__bss_start), %edi
+        lea     sym_esi(__bss_end), %ecx
+        sub     %edi, %ecx
+        xor     %eax, %eax
+        shr     $2, %ecx
+        rep stosl
+
+        mov     %ebp, %eax
+        ret
 
 __start:
         cld
@@ -488,6 +503,8 @@ __start:
 
         /* Set up stack. */
         lea     STACK_SIZE - CPUINFO_sizeof + sym_esi(cpu0_stack), %esp
+
+        call    .Linitialise_bss
 
         /* Bootloaders may set multiboot{1,2}.mem_lower to a nonzero value. */
         xor     %edx,%edx
@@ -645,22 +662,6 @@ trampoline_setup:
          * reserved for trampoline code and data.
          */
 
-        /*
-         * Do not zero BSS on EFI platform here.
-         * It was initialized earlier.
-         */
-        cmpb    $0, sym_esi(efi_platform)
-        jnz     1f
-
-        /* Initialise the BSS. */
-        lea     sym_esi(__bss_start), %edi
-        lea     sym_esi(__bss_end), %ecx
-        sub     %edi,%ecx
-        xor     %eax,%eax
-        shr     $2,%ecx
-        rep stosl
-
-1:
         /* Interrogate CPU extended features via CPUID. */
         mov     $1, %eax
         cpuid
