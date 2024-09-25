@@ -171,7 +171,7 @@
 #define X86_EXC_TS            10 /* Invalid TSS */
 #define X86_EXC_NP            11 /* Segment Not Present */
 #define X86_EXC_SS            12 /* Stack-Segment Fault */
-#define X86_EXC_GP            13 /* General Porection Fault */
+#define X86_EXC_GP            13 /* General Protection Fault */
 #define X86_EXC_PF            14 /* Page Fault */
 #define X86_EXC_SPV           15 /* PIC Spurious Interrupt Vector */
 #define X86_EXC_MF            16 /* Maths fault (x87 FPU) */
