@@ -239,20 +239,20 @@ int arch_livepatch_perform(struct livepatch_elf *elf,
 
         if ( use_rela )
         {
-            const Elf_RelA *r_a = rela->data + i * rela->sec->sh_entsize;
+            const Elf_RelA *r_a = rela->addr + i * rela->sec->sh_entsize;
 
             symndx = ELF32_R_SYM(r_a->r_info);
             type = ELF32_R_TYPE(r_a->r_info);
-            dest = base->load_addr + r_a->r_offset; /* P */
+            dest = base->addr + r_a->r_offset; /* P */
             addend = r_a->r_addend;
         }
         else
         {
-            const Elf_Rel *r = rela->data + i * rela->sec->sh_entsize;
+            const Elf_Rel *r = rela->addr + i * rela->sec->sh_entsize;
 
             symndx = ELF32_R_SYM(r->r_info);
             type = ELF32_R_TYPE(r->r_info);
-            dest = base->load_addr + r->r_offset; /* P */
+            dest = base->addr + r->r_offset; /* P */
             addend = get_addend(type, dest);
         }
 

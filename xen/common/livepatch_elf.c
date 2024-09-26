@@ -36,7 +36,7 @@ static int elf_verify_strtab(const struct livepatch_elf_sec *sec)
     if ( !s->sh_size )
         return -EINVAL;
 
-    contents = sec->data;
+    contents = sec->addr;
 
     if ( contents[0] || contents[s->sh_size - 1] )
         return -EINVAL;
@@ -44,7 +44,7 @@ static int elf_verify_strtab(const struct livepatch_elf_sec *sec)
     return 0;
 }
 
-static int elf_resolve_sections(struct livepatch_elf *elf, const void *data)
+static int elf_resolve_sections(struct livepatch_elf *elf, void *data)
 {
     struct livepatch_elf_sec *sec;
     unsigned int i;
@@ -104,7 +104,7 @@ static int elf_resolve_sections(struct livepatch_elf *elf, const void *data)
                   sec[i].sec->sh_size > LIVEPATCH_MAX_SIZE )
             return -EINVAL;
 
-        sec[i].data = data + delta;
+        sec[i].addr = data + delta;
         /* Name is populated in elf_resolve_section_names. */
         sec[i].name = NULL;
 
@@ -226,14 +226,14 @@ static int elf_get_sym(struct livepatch_elf *elf, const void *data)
     strtab_sec = elf->strtab;
 
     /* Pointers arithmetic to get file offset. */
-    offset = strtab_sec->data - data;
+    offset = strtab_sec->addr - data;
 
     /* Checked already in elf_resolve_sections, but just in case. */
     ASSERT(offset == strtab_sec->sec->sh_offset);
     ASSERT(offset < elf->len && (offset + strtab_sec->sec->sh_size <= elf->len));
 
-    /* symtab_sec->data was computed in elf_resolve_sections. */
-    ASSERT((symtab_sec->sec->sh_offset + data) == symtab_sec->data);
+    /* symtab_sec->addr was computed in elf_resolve_sections. */
+    ASSERT((symtab_sec->sec->sh_offset + data) == symtab_sec->addr);
 
     /* No need to check values as elf_resolve_sections did it. */
     nsym = symtab_sec->sec->sh_size / symtab_sec->sec->sh_entsize;
@@ -251,7 +251,7 @@ static int elf_get_sym(struct livepatch_elf *elf, const void *data)
 
     for ( i = 1; i < nsym; i++ )
     {
-        const Elf_Sym *s = symtab_sec->data + symtab_sec->sec->sh_entsize * i;
+        const Elf_Sym *s = symtab_sec->addr + symtab_sec->sec->sh_entsize * i;
 
         delta = s->st_name;
         /* Boundary check within the .strtab. */
@@ -263,7 +263,7 @@ static int elf_get_sym(struct livepatch_elf *elf, const void *data)
         }
 
         sym[i].sym = s;
-        sym[i].name = strtab_sec->data + delta;
+        sym[i].name = strtab_sec->addr + delta;
         if ( arch_livepatch_symbol_deny(elf, &sym[i]) )
         {
             printk(XENLOG_ERR LIVEPATCH "%s: Symbol '%s' should not be in payload\n",
@@ -342,7 +342,7 @@ int livepatch_elf_resolve_symbols(struct livepatch_elf *elf)
                 break;
             }
 
-            st_value += (unsigned long)elf->sec[idx].load_addr;
+            st_value += (unsigned long)elf->sec[idx].addr;
             if ( elf->sym[i].name )
                 dprintk(XENLOG_DEBUG, LIVEPATCH "%s: Symbol resolved: %s => %#"PRIxElfAddr" (%s)\n",
                        elf->name, elf->sym[i].name,
@@ -503,7 +503,7 @@ static int livepatch_header_check(const struct livepatch_elf *elf)
     return 0;
 }
 
-int livepatch_elf_load(struct livepatch_elf *elf, const void *data)
+int livepatch_elf_load(struct livepatch_elf *elf, void *data)
 {
     int rc;
 
