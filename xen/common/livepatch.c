@@ -448,28 +448,6 @@ static bool section_ok(const struct livepatch_elf *elf,
     return true;
 }
 
-static int xen_build_id_dep(const struct payload *payload)
-{
-    const void *id = NULL;
-    unsigned int len = 0;
-    int rc;
-
-    ASSERT(payload->xen_dep.len);
-    ASSERT(payload->xen_dep.p);
-
-    rc = xen_build_id(&id, &len);
-    if ( rc )
-        return rc;
-
-    if ( payload->xen_dep.len != len || memcmp(id, payload->xen_dep.p, len) ) {
-        printk(XENLOG_ERR LIVEPATCH "%s: check against hypervisor build-id failed\n",
-               payload->name);
-        return -EINVAL;
-    }
-
-    return 0;
-}
-
 /* Parses build-id sections into the given destination. */
 static int parse_buildid(const struct livepatch_elf_sec *sec,
                          struct livepatch_build_id *id)
@@ -495,11 +473,56 @@ static int parse_buildid(const struct livepatch_elf_sec *sec,
    return 0;
 }
 
+static int check_xen_buildid(const struct livepatch_elf *elf)
+{
+    const void *id;
+    unsigned int len;
+    struct livepatch_build_id lp_id;
+    const struct livepatch_elf_sec *sec =
+        livepatch_elf_sec_by_name(elf, ELF_LIVEPATCH_XEN_DEPENDS);
+    int rc;
+
+    if ( !sec )
+    {
+        printk(XENLOG_ERR LIVEPATCH "%s: section %s is missing\n",
+               elf->name, ELF_LIVEPATCH_XEN_DEPENDS);
+        return -EINVAL;
+    }
+
+    rc = parse_buildid(sec, &lp_id);
+    if ( rc )
+    {
+        printk(XENLOG_ERR LIVEPATCH
+               "%s: failed to parse section %s as build-id: %d\n",
+               elf->name, ELF_LIVEPATCH_XEN_DEPENDS, rc);
+        return -EINVAL;
+    }
+
+    rc = xen_build_id(&id, &len);
+    if ( rc )
+    {
+        printk(XENLOG_ERR LIVEPATCH
+               "%s: unable to get running Xen build-id: %d\n",
+               elf->name, rc);
+        return rc;
+    }
+
+    if ( lp_id.len != len || memcmp(id, lp_id.p, len) )
+    {
+        printk(XENLOG_ERR LIVEPATCH "%s: build-id mismatch:\n"
+                                    "  livepatch: %*phN\n"
+                                    "        xen: %*phN\n",
+               elf->name, lp_id.len, lp_id.p, len, id);
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
 static int check_special_sections(const struct livepatch_elf *elf)
 {
     unsigned int i;
     static const char *const names[] = { ELF_LIVEPATCH_DEPENDS,
-                                         ELF_LIVEPATCH_XEN_DEPENDS,
                                          ELF_BUILD_ID_NOTE};
 
     for ( i = 0; i < ARRAY_SIZE(names); i++ )
@@ -752,12 +775,6 @@ static int prepare_payload(struct payload *payload,
 
     rc = parse_buildid(livepatch_elf_sec_by_name(elf, ELF_LIVEPATCH_DEPENDS),
                        &payload->dep);
-    if ( rc )
-        return rc;
-
-    rc = parse_buildid(livepatch_elf_sec_by_name(elf,
-                                                 ELF_LIVEPATCH_XEN_DEPENDS),
-                       &payload->xen_dep);
     if ( rc )
         return rc;
 
@@ -1069,6 +1086,10 @@ static int load_payload_data(struct payload *payload, void *raw, size_t len)
     if ( rc )
         goto out;
 
+    rc = check_xen_buildid(&elf);
+    if ( rc )
+       goto out;
+
     rc = move_payload(payload, &elf);
     if ( rc )
         goto out;
@@ -1090,10 +1111,6 @@ static int load_payload_data(struct payload *payload, void *raw, size_t len)
         goto out;
 
     rc = prepare_payload(payload, &elf);
-    if ( rc )
-        goto out;
-
-    rc = xen_build_id_dep(payload);
     if ( rc )
         goto out;
 
@@ -2199,9 +2216,6 @@ static void cf_check livepatch_printall(unsigned char key)
 
         if ( data->dep.len )
             printk("depend-on=%*phN\n", data->dep.len, data->dep.p);
-
-        if ( data->xen_dep.len )
-            printk("depend-on-xen=%*phN\n", data->xen_dep.len, data->xen_dep.p);
     }
 
     spin_unlock(&payload_lock);
