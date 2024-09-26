@@ -7,6 +7,7 @@
 #include <xen/lib.h>
 #include <xen/stringify.h>
 #include <asm/asm-macros.h>
+#include <asm/cpufeatureset.h>
 
 struct __packed alt_instr {
     int32_t  orig_offset;   /* original instruction */
@@ -59,6 +60,9 @@ extern void alternative_branches(void);
                     alt_repl_len(n2)) "-" alt_orig_len)
 
 #define ALTINSTR_ENTRY(feature, num)                                    \
+        " .if " STR(feature) " >= " STR(NCAPINTS * 32) "\n"             \
+        " .error \"alternative feature outside of featureset range\"\n" \
+        " .endif\n"                                                     \
         " .long .LXEN%=_orig_s - .\n"             /* label           */ \
         " .long " alt_repl_s(num)" - .\n"         /* new instruction */ \
         " .word " __stringify(feature) "\n"       /* feature bit     */ \
