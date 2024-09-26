@@ -888,7 +888,15 @@ static int prepare_payload(struct payload *payload,
                 return -EINVAL;
             }
         }
-        apply_alternatives(start, end);
+
+        rc = apply_alternatives(start, end);
+        if ( rc )
+        {
+            printk(XENLOG_ERR LIVEPATCH "%s applying alternatives failed: %d\n",
+                   elf->name, rc);
+            return rc;
+        }
+
     alt_done:;
 #else
         printk(XENLOG_ERR LIVEPATCH "%s: We don't support alternative patching\n",

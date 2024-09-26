@@ -24,7 +24,7 @@ struct __packed alt_instr {
 
 extern void add_nops(void *insns, unsigned int len);
 /* Similar to alternative_instructions except it can be run with IRQs enabled. */
-extern void apply_alternatives(struct alt_instr *start, struct alt_instr *end);
+extern int apply_alternatives(struct alt_instr *start, struct alt_instr *end);
 extern void alternative_instructions(void);
 extern void alternative_branches(void);
 
