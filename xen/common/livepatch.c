@@ -470,6 +470,31 @@ static int xen_build_id_dep(const struct payload *payload)
     return 0;
 }
 
+/* Parses build-id sections into the given destination. */
+static int parse_buildid(const struct livepatch_elf_sec *sec,
+                         struct livepatch_build_id *id)
+{
+    const Elf_Note *n;
+    int rc;
+
+    /* Presence of the sections is ensured by check_special_sections(). */
+    ASSERT(sec);
+
+    n = sec->addr;
+
+    if ( sec->sec->sh_size <= sizeof(*n) )
+        return -EINVAL;
+
+    rc = xen_build_id_check(n, sec->sec->sh_size, &id->p, &id->len);
+    if ( rc )
+        return rc;
+
+    if ( !id->len || !id->p )
+        return -EINVAL;
+
+   return 0;
+}
+
 static int check_special_sections(const struct livepatch_elf *elf)
 {
     unsigned int i;
@@ -641,11 +666,12 @@ static int prepare_payload(struct payload *payload,
                            struct livepatch_elf *elf)
 {
     const struct livepatch_elf_sec *sec;
+    const struct payload *data;
     unsigned int i;
     struct livepatch_func *funcs;
     struct livepatch_func *f;
     struct virtual_region *region;
-    const Elf_Note *n;
+    int rc;
 
     sec = livepatch_elf_sec_by_name(elf, ELF_LIVEPATCH_FUNC);
     if ( sec )
@@ -663,8 +689,6 @@ static int prepare_payload(struct payload *payload,
 
         for ( i = 0; i < payload->nfuncs; i++ )
         {
-            int rc;
-
             f = &(funcs[i]);
 
             if ( f->version != LIVEPATCH_PAYLOAD_VERSION )
@@ -707,69 +731,35 @@ static int prepare_payload(struct payload *payload,
     LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.revert.action, ELF_LIVEPATCH_REVERT_HOOK);
     LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.revert.post, ELF_LIVEPATCH_POSTREVERT_HOOK);
 
-    sec = livepatch_elf_sec_by_name(elf, ELF_BUILD_ID_NOTE);
-    if ( sec )
+    rc = parse_buildid(livepatch_elf_sec_by_name(elf, ELF_BUILD_ID_NOTE),
+                       &payload->id);
+    if ( rc )
+        return rc;
+
+    /* Make sure it is not a duplicate. */
+    list_for_each_entry ( data, &payload_list, list )
     {
-        const struct payload *data;
-
-        n = sec->addr;
-
-        if ( sec->sec->sh_size <= sizeof(*n) )
-            return -EINVAL;
-
-        if ( xen_build_id_check(n, sec->sec->sh_size,
-                                &payload->id.p, &payload->id.len) )
-            return -EINVAL;
-
-        if ( !payload->id.len || !payload->id.p )
-            return -EINVAL;
-
-        /* Make sure it is not a duplicate. */
-        list_for_each_entry ( data, &payload_list, list )
+        /* No way _this_ payload is on the list. */
+        ASSERT(data != payload);
+        if ( data->id.len == payload->id.len &&
+             !memcmp(data->id.p, payload->id.p, data->id.len) )
         {
-            /* No way _this_ payload is on the list. */
-            ASSERT(data != payload);
-            if ( data->id.len == payload->id.len &&
-                 !memcmp(data->id.p, payload->id.p, data->id.len) )
-            {
-                dprintk(XENLOG_DEBUG, LIVEPATCH "%s: Already loaded as %s!\n",
-                        elf->name, data->name);
-                return -EEXIST;
-            }
+            dprintk(XENLOG_DEBUG, LIVEPATCH "%s: Already loaded as %s!\n",
+                    elf->name, data->name);
+            return -EEXIST;
         }
     }
 
-    sec = livepatch_elf_sec_by_name(elf, ELF_LIVEPATCH_DEPENDS);
-    if ( sec )
-    {
-        n = sec->addr;
+    rc = parse_buildid(livepatch_elf_sec_by_name(elf, ELF_LIVEPATCH_DEPENDS),
+                       &payload->dep);
+    if ( rc )
+        return rc;
 
-        if ( sec->sec->sh_size <= sizeof(*n) )
-            return -EINVAL;
-
-        if ( xen_build_id_check(n, sec->sec->sh_size,
-                                &payload->dep.p, &payload->dep.len) )
-            return -EINVAL;
-
-        if ( !payload->dep.len || !payload->dep.p )
-            return -EINVAL;
-    }
-
-    sec = livepatch_elf_sec_by_name(elf, ELF_LIVEPATCH_XEN_DEPENDS);
-    if ( sec )
-    {
-        n = sec->addr;
-
-        if ( sec->sec->sh_size <= sizeof(*n) )
-            return -EINVAL;
-
-        if ( xen_build_id_check(n, sec->sec->sh_size,
-                                &payload->xen_dep.p, &payload->xen_dep.len) )
-            return -EINVAL;
-
-        if ( !payload->xen_dep.len || !payload->xen_dep.p )
-            return -EINVAL;
-    }
+    rc = parse_buildid(livepatch_elf_sec_by_name(elf,
+                                                 ELF_LIVEPATCH_XEN_DEPENDS),
+                       &payload->xen_dep);
+    if ( rc )
+        return rc;
 
     /* Setup the virtual region with proper data. */
     region = &payload->region;
