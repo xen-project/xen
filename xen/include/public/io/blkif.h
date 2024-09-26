@@ -668,7 +668,7 @@ typedef struct blkif_request blkif_request_t;
  *
  * The 'sector_number' field is in units of 512b, despite the value of the
  * 'sector-size' xenstore node.  Note however that the offset in
- * 'sector_number' must be aligned to 'sector-size'.
+ * 'sector_number' must be aligned to 'discard-granularity'.
  */
 struct blkif_request_discard {
     uint8_t        operation;    /* BLKIF_OP_DISCARD                     */
