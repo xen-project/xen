@@ -521,3 +521,18 @@ void __init ucode_probe_amd(struct microcode_ops *ops)
 
     *ops = amd_ucode_ops;
 }
+
+#if 0 /* Manual CONFIG_SELF_TESTS */
+static void __init __constructor test_digests_sorted(void)
+{
+    for ( unsigned int i = 1; i < ARRAY_SIZE(patch_digests); ++i )
+    {
+        if ( patch_digests[i - 1].patch_id < patch_digests[i].patch_id )
+            continue;
+
+        panic("patch_digests[] not sorted: %08x >= %08x\n",
+              patch_digests[i - 1].patch_id,
+              patch_digests[i].patch_id);
+    }
+}
+#endif /* CONFIG_SELF_TESTS */
