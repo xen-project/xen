@@ -5,6 +5,8 @@
 #include <xen/cpumask.h>
 #include <xen/percpu.h>
 
+#include <asm/current.h>
+
 DECLARE_PER_CPU(cpumask_var_t, cpu_sibling_mask);
 DECLARE_PER_CPU(cpumask_var_t, cpu_core_mask);
 
@@ -13,6 +15,22 @@ DECLARE_PER_CPU(cpumask_var_t, cpu_core_mask);
  * would otherwise prefer them to be off?
  */
 #define park_offline_cpus false
+
+/*
+ * Mapping between Xen logical cpu index and hartid.
+ */
+static inline unsigned long cpuid_to_hartid(unsigned long cpuid)
+{
+    return pcpu_info[cpuid].hart_id;
+}
+
+static inline void set_cpuid_to_hartid(unsigned long cpuid,
+                                       unsigned long hartid)
+{
+    pcpu_info[cpuid].hart_id = hartid;
+}
+
+void setup_tp(unsigned int cpuid);
 
 #endif
 

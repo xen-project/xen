@@ -3,11 +3,36 @@
 #ifndef __ASM_CURRENT_H
 #define __ASM_CURRENT_H
 
-#include <xen/lib.h>
+#include <xen/bug.h>
+#include <xen/cache.h>
 #include <xen/percpu.h>
+
 #include <asm/processor.h>
 
 #ifndef __ASSEMBLY__
+
+register struct pcpu_info *tp asm ( "tp" );
+
+struct pcpu_info {
+    unsigned int processor_id; /* Xen CPU id */
+    unsigned long hart_id; /* physical CPU id */
+} __cacheline_aligned;
+
+/* tp points to one of these */
+extern struct pcpu_info pcpu_info[NR_CPUS];
+
+#define set_processor_id(id)    do { \
+    tp->processor_id = (id);         \
+} while (0)
+
+static inline unsigned int smp_processor_id(void)
+{
+    unsigned int id = tp->processor_id;
+
+    BUG_ON(id >= NR_CPUS);
+
+    return id;
+}
 
 /* Which VCPU is "current" on this PCPU. */
 DECLARE_PER_CPU(struct vcpu *, curr_vcpu);

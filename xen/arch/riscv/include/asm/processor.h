@@ -12,9 +12,6 @@
 
 #ifndef __ASSEMBLY__
 
-/* TODO: need to be implemeted */
-#define smp_processor_id() 0
-
 /* On stack VCPU state */
 struct cpu_user_regs
 {

@@ -1,5 +1,6 @@
 #define COMPILE_OFFSETS
 
+#include <asm/current.h>
 #include <asm/processor.h>
 #include <xen/types.h>
 
@@ -49,5 +50,7 @@ void asm_offsets(void)
     OFFSET(CPU_USER_REGS_SEPC, struct cpu_user_regs, sepc);
     OFFSET(CPU_USER_REGS_SSTATUS, struct cpu_user_regs, sstatus);
     OFFSET(CPU_USER_REGS_PREGS, struct cpu_user_regs, pregs);
+    BLANK();
+    DEFINE(PCPU_INFO_SIZE, sizeof(struct pcpu_info));
     BLANK();
 }

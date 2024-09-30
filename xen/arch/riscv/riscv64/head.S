@@ -1,4 +1,5 @@
 #include <asm/asm.h>
+#include <asm/asm-offsets.h>
 #include <asm/riscv_encoding.h>
 
         .section .text.header, "ax", %progbits
@@ -55,6 +56,10 @@ FUNC(start)
          */
         jal     reset_stack
 
+        /* Xen's boot cpu id is equal to 0 so setup TP register for it */
+        li      a0, 0
+        jal     setup_tp
+
         /* restore hart_id ( bootcpu_id ) and dtb address */
         mv      a0, s0
         mv      a1, s1
@@ -71,6 +76,15 @@ FUNC(reset_stack)
 
         ret
 END(reset_stack)
+
+/* void setup_tp(unsigned int xen_cpuid); */
+FUNC(setup_tp)
+        la      t0, pcpu_info
+        li      t1, PCPU_INFO_SIZE
+        mul     t1, a0, t1
+        add     tp, t0, t1
+        ret
+END(setup_tp)
 
         .section .text.ident, "ax", %progbits
 
