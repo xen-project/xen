@@ -231,6 +231,16 @@ config TBOOT
 
 	  If unsure, stay with the default.
 
+config X86_PSR
+	bool "Platform Shared Resource support" if EXPERT
+	default INTEL
+	help
+	  Support of Platform Shared Resource technology, which is basis for
+	  monitoring and control of resources like cache and memory bandwidth.
+	  See xl-psr documentation for details.
+
+	  If unsure, stay with the default.
+
 choice
 	prompt "Alignment of Xen image"
 	default XEN_ALIGN_2M if PV_SHIM_EXCLUSIVE

@@ -1195,6 +1195,7 @@ long arch_do_domctl(
     case XEN_DOMCTL_psr_alloc:
         switch ( domctl->u.psr_alloc.cmd )
         {
+#ifdef CONFIG_X86_PSR
         case XEN_DOMCTL_PSR_SET_L3_CBM:
             ret = psr_set_val(d, domctl->u.psr_alloc.target,
                               domctl->u.psr_alloc.data,
@@ -1256,6 +1257,8 @@ long arch_do_domctl(
             break;
 
 #undef domctl_psr_get_val
+
+#endif /* CONFIG_X86_PSR */
 
         default:
             ret = -EOPNOTSUPP;

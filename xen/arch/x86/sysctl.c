@@ -225,10 +225,11 @@ long arch_do_sysctl(
 
     case XEN_SYSCTL_psr_alloc:
     {
-        uint32_t data[PSR_INFO_ARRAY_SIZE] = { };
+        uint32_t __maybe_unused data[PSR_INFO_ARRAY_SIZE] = { };
 
         switch ( sysctl->u.psr_alloc.cmd )
         {
+#ifdef CONFIG_X86_PSR
         case XEN_SYSCTL_PSR_get_l3_info:
             ret = psr_get_info(sysctl->u.psr_alloc.target,
                                PSR_TYPE_L3_CBM, data, ARRAY_SIZE(data));
@@ -279,6 +280,7 @@ long arch_do_sysctl(
             if ( __copy_field_to_guest(u_sysctl, sysctl, u.psr_alloc) )
                 ret = -EFAULT;
             break;
+#endif /* CONFIG_X86_PSR */
 
         default:
             ret = -EOPNOTSUPP;

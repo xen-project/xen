@@ -69,12 +69,11 @@ extern struct psr_cmt *psr_cmt;
 
 static inline bool psr_cmt_enabled(void)
 {
-    return !!psr_cmt;
+    return IS_ENABLED(CONFIG_X86_PSR) && psr_cmt;
 }
 
 int psr_alloc_rmid(struct domain *d);
 void psr_free_rmid(struct domain *d);
-void psr_ctxt_switch_to(struct domain *d);
 
 int psr_get_info(unsigned int socket, enum psr_type type,
                  uint32_t data[], unsigned int array_len);
@@ -83,8 +82,15 @@ int psr_get_val(struct domain *d, unsigned int socket,
 int psr_set_val(struct domain *d, unsigned int socket,
                 uint64_t new_val, enum psr_type type);
 
+#ifdef CONFIG_X86_PSR
+void psr_ctxt_switch_to(struct domain *d);
 void psr_domain_init(struct domain *d);
 void psr_domain_free(struct domain *d);
+#else
+static inline void psr_ctxt_switch_to(struct domain *d) {}
+static inline void psr_domain_init(struct domain *d) {}
+static inline void psr_domain_free(struct domain *d) {}
+#endif
 
 #endif /* __ASM_PSR_H__ */
 
