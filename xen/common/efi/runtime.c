@@ -250,14 +250,20 @@ int efi_get_info(uint32_t idx, union xenpf_efi_info *info)
         info->cfg.addr = __pa(efi_ct);
         info->cfg.nent = efi_num_ct;
         break;
+
     case XEN_FW_EFI_VENDOR:
+    {
+        XEN_GUEST_HANDLE_PARAM(CHAR16) vendor_name =
+            guest_handle_cast(info->vendor.name, CHAR16);
+
         if ( !efi_fw_vendor )
             return -EOPNOTSUPP;
+
         info->vendor.revision = efi_fw_revision;
         n = info->vendor.bufsz / sizeof(*efi_fw_vendor);
-        if ( !guest_handle_okay(guest_handle_cast(info->vendor.name,
-                                                  CHAR16), n) )
+        if ( !guest_handle_okay(vendor_name, n) )
             return -EFAULT;
+
         for ( i = 0; i < n; ++i )
         {
             if ( __copy_to_guest_offset(info->vendor.name, i,
@@ -267,6 +273,8 @@ int efi_get_info(uint32_t idx, union xenpf_efi_info *info)
                 break;
         }
         break;
+    }
+
     case XEN_FW_EFI_MEM_INFO:
         for ( i = 0; i < efi_memmap_size; i += efi_mdesc_size )
         {
