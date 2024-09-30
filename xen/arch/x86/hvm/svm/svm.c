@@ -749,6 +749,7 @@ static void cf_check svm_set_segment_register(
         vmcb->ldtr = *reg;
         break;
 
+    case x86_seg_sys:
     case x86_seg_none:
         ASSERT_UNREACHABLE();
         break;

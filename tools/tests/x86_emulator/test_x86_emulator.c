@@ -593,6 +593,8 @@ static int read(
     default:
         if ( !is_x86_user_segment(seg) )
             return X86EMUL_UNHANDLEABLE;
+    case x86_seg_sys:
+    case x86_seg_none:
         bytes_read += bytes;
         break;
     }

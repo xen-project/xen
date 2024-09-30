@@ -840,7 +840,7 @@ static int hvmemul_virtual_to_linear(
     int okay;
     unsigned long reps = 1;
 
-    if ( seg == x86_seg_none )
+    if ( seg == x86_seg_none || seg == x86_seg_sys )
     {
         *linear = offset;
         return X86EMUL_OKAY;

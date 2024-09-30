@@ -43,7 +43,8 @@ enum x86_segment {
     x86_seg_ldtr,
     x86_seg_gdtr,
     x86_seg_idtr,
-    /* No Segment: For accesses which are already linear. */
+    /* No Segment: For (system/normal) accesses which are already linear. */
+    x86_seg_sys,
     x86_seg_none
 };
 

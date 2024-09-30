@@ -2599,7 +2599,7 @@ bool hvm_vcpu_virtual_to_linear(
      * It is expected that the access rights of reg are suitable for seg (and
      * that this is enforced at the point that seg is loaded).
      */
-    ASSERT(seg < x86_seg_none);
+    ASSERT(seg < x86_seg_sys);
 
     /* However, check that insn fetches only ever specify CS. */
     ASSERT(access_type != hvm_access_insn_fetch || seg == x86_seg_cs);
