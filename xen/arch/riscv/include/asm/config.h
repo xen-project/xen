@@ -41,8 +41,10 @@
  * Start addr          | End addr         | Slot       | area description
  * ============================================================================
  *                   .....                 L2 511          Unused
- *  0xffffffffc0600000  0xffffffffc0800000 L2 511          Fixmap
- *  0xffffffffc0200000  0xffffffffc0600000 L2 511          FDT
+ *  0xffffffffc0a00000  0xffffffffc0c00000 L2 511          Fixmap
+ *                   ..... ( 2 MB gap )
+ *  0xffffffffc0400000  0xffffffffc0800000 L2 511          FDT
+ *                   ..... ( 2 MB gap )
  *  0xffffffffc0000000  0xffffffffc0200000 L2 511          Xen
  *                   .....                 L2 510          Unused
  *  0x3200000000        0x7f40000000       L2 200-509      Direct map
@@ -73,6 +75,16 @@
 #else
 #error "unsupported RV_STAGE1_MODE"
 #endif
+
+#define GAP_SIZE                MB(2)
+
+#define XEN_VIRT_SIZE           MB(2)
+
+#define BOOT_FDT_VIRT_START     (XEN_VIRT_START + XEN_VIRT_SIZE + GAP_SIZE)
+#define BOOT_FDT_VIRT_SIZE      MB(4)
+
+#define FIXMAP_BASE \
+    (BOOT_FDT_VIRT_START + BOOT_FDT_VIRT_SIZE + GAP_SIZE)
 
 #define DIRECTMAP_SLOT_END      509
 #define DIRECTMAP_SLOT_START    200

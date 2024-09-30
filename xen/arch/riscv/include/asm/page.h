@@ -9,6 +9,7 @@
 #include <xen/bug.h>
 #include <xen/types.h>
 
+#include <asm/atomic.h>
 #include <asm/mm.h>
 #include <asm/page-bits.h>
 
@@ -79,6 +80,18 @@ static inline void invalidate_icache(void)
 static inline void flush_page_to_ram(unsigned long mfn, bool sync_icache)
 {
     BUG_ON("unimplemented");
+}
+
+/* Write a pagetable entry. */
+static inline void write_pte(pte_t *p, pte_t pte)
+{
+    write_atomic(p, pte);
+}
+
+/* Read a pagetable entry. */
+static inline pte_t read_pte(const pte_t *p)
+{
+    return read_atomic(p);
 }
 
 #endif /* __ASSEMBLY__ */

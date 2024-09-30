@@ -27,6 +27,8 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
 
     trap_init();
 
+    setup_fixmap_mappings();
+
     printk("All set up\n");
 
     machine_halt();
