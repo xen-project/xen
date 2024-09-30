@@ -66,6 +66,26 @@ void *xc_memalign(xc_interface *xch, size_t alignment, size_t size)
     return ptr;
 }
 
+int xc_pcidev_get_gsi(xc_interface *xch, uint32_t sbdf)
+{
+    int ret;
+    privcmd_pcidev_get_gsi_t dev_gsi = {
+        .sbdf = sbdf,
+        .gsi = 0,
+    };
+
+    ret = ioctl(xencall_fd(xch->xcall),
+                IOCTL_PRIVCMD_PCIDEV_GET_GSI, &dev_gsi);
+
+    if (ret < 0) {
+        PERROR("Failed to get gsi from dev");
+    } else {
+        ret = dev_gsi.gsi;
+    }
+
+    return ret;
+}
+
 /*
  * Local variables:
  * mode: C
