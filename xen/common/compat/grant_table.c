@@ -78,12 +78,15 @@ int compat_grant_table_op(
         cmd_op = cmd;
     switch ( cmd_op )
     {
-#define CASE(name) \
-    case GNTTABOP_##name: \
-        if ( unlikely(!guest_handle_okay(guest_handle_cast(uop, \
-                                                           gnttab_##name##_compat_t), \
-                                         count)) ) \
-            rc = -EFAULT; \
+#define CASE(name)                                                  \
+    case GNTTABOP_ ## name:                                         \
+    {                                                               \
+        XEN_GUEST_HANDLE_PARAM(gnttab_ ## name ## _compat_t) h =    \
+            guest_handle_cast(uop, gnttab_ ## name ## _compat_t);   \
+                                                                    \
+        if ( unlikely(!guest_handle_okay(h, count)) )               \
+            rc = -EFAULT;                                           \
+    }                                                               \
         break
 
 #ifndef CHECK_gnttab_map_grant_ref
