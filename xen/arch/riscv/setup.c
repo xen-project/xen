@@ -9,6 +9,7 @@
 #include <public/version.h>
 
 #include <asm/early_printk.h>
+#include <asm/sbi.h>
 #include <asm/smp.h>
 #include <asm/traps.h>
 
@@ -31,6 +32,8 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
     set_cpuid_to_hartid(0, bootcpu_id);
 
     trap_init();
+
+    sbi_init();
 
     setup_fixmap_mappings();
 
