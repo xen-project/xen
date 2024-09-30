@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
+ /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Taken and modified from Linux.
  *
@@ -69,10 +69,11 @@ static always_inline void _write_atomic(volatile void *p,
     }
 }
 
-#define write_atomic(p, x)                              \
-({                                                      \
-    typeof(*(p)) x_ = (x);                              \
-    _write_atomic(p, x_, sizeof(*(p)));                 \
+#define write_atomic(p, x)                                          \
+({                                                                  \
+    union { typeof(*(p)) v; unsigned long ul; } x_ = { .ul = 0UL }; \
+    x_.v = (x);                                                     \
+    _write_atomic(p, x_.ul, sizeof(*(p)));                          \
 })
 
 static always_inline void _add_sized(volatile void *p,
