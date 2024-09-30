@@ -1383,6 +1383,11 @@ int xc_domain_irq_permission(xc_interface *xch,
                              uint32_t pirq,
                              bool allow_access);
 
+int xc_domain_gsi_permission(xc_interface *xch,
+                             uint32_t domid,
+                             uint32_t gsi,
+                             uint32_t flags);
+
 int xc_domain_iomem_permission(xc_interface *xch,
                                uint32_t domid,
                                unsigned long first_mfn,
@@ -1637,6 +1642,11 @@ int xc_physdev_map_pirq_msi(xc_interface *xch,
                             int bus,
                             int entry_nr,
                             uint64_t table_base);
+
+int xc_physdev_map_pirq_gsi(xc_interface *xch,
+                            uint32_t domid,
+                            int gsi,
+                            int *pirq);
 
 int xc_physdev_unmap_pirq(xc_interface *xch,
                           uint32_t domid,
