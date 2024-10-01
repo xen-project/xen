@@ -251,7 +251,8 @@ do {                                                                       \
 static always_inline unsigned long
 __copy_to_guest_pv(void __user *to, const void *from, unsigned long n)
 {
-    if (__builtin_constant_p(n)) {
+    if ( __builtin_constant_p(n) && !((unsigned long)to & (n - 1)) )
+    {
         unsigned long ret;
 
         switch (n) {
@@ -291,7 +292,8 @@ __copy_to_guest_pv(void __user *to, const void *from, unsigned long n)
 static always_inline unsigned long
 __copy_from_guest_pv(void *to, const void __user *from, unsigned long n)
 {
-    if (__builtin_constant_p(n)) {
+    if ( __builtin_constant_p(n) && !((unsigned long)from & (n - 1)) )
+    {
         unsigned long ret;
 
         switch (n) {
@@ -321,8 +323,7 @@ __copy_from_guest_pv(void *to, const void __user *from, unsigned long n)
  *
  * Copy data from hypervisor space to a potentially unmapped area.
  *
- * Returns number of bytes that could not be copied.
- * On success, this will be zero.
+ * Returns zero on success and non-zero if some bytes could not be copied.
  */
 static always_inline unsigned int
 copy_to_unsafe(void __user *to, const void *from, unsigned int n)
@@ -358,8 +359,7 @@ copy_to_unsafe(void __user *to, const void *from, unsigned int n)
  *
  * Copy data from a potentially unmapped area space to hypervisor space.
  *
- * Returns number of bytes that could not be copied.
- * On success, this will be zero.
+ * Returns zero on success and non-zero if some bytes could not be copied.
  *
  * If some data could not be copied, this function will pad the copied
  * data to the requested size using zero bytes.
