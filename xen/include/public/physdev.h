@@ -87,6 +87,9 @@ DEFINE_XEN_GUEST_HANDLE(physdev_set_iopl_t);
 /*
  * Set the current VCPU's I/O-port permissions bitmap.
  * @arg == pointer to physdev_set_iobitmap structure.
+ *
+ * When @nr_ports is non-zero, Xen, like real CPUs and the TSS IOPB, always
+ * reads 2 bytes from @bitmap, which might be one byte beyond @nr_ports.
  */
 #define PHYSDEVOP_set_iobitmap           7
 struct physdev_set_iobitmap {
