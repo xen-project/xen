@@ -54,17 +54,17 @@ static inline void wrmsr_ns(uint32_t msr, uint32_t lo, uint32_t hi)
 /* rdmsr with exception handling */
 #define rdmsr_safe(msr,val) ({\
     int rc_; \
-    uint32_t lo_, hi_; \
+    uint64_t lo_, hi_; \
     __asm__ __volatile__( \
         "1: rdmsr\n2:\n" \
         ".section .fixup,\"ax\"\n" \
-        "3: xorl %0,%0\n; xorl %1,%1\n" \
+        "3: xorl %k0,%k0\n; xorl %k1,%k1\n" \
         "   movl %5,%2\n; jmp 2b\n" \
         ".previous\n" \
         _ASM_EXTABLE(1b, 3b) \
         : "=a" (lo_), "=d" (hi_), "=&r" (rc_) \
         : "c" (msr), "2" (0), "i" (-EFAULT)); \
-    val = lo_ | ((uint64_t)hi_ << 32); \
+    val = lo_ | (hi_ << 32); \
     rc_; })
 
 /* wrmsr with exception handling */
@@ -99,11 +99,11 @@ static inline void msr_split(struct cpu_user_regs *regs, uint64_t val)
 
 static inline uint64_t rdtsc(void)
 {
-    uint32_t low, high;
+    uint64_t low, high;
 
     __asm__ __volatile__("rdtsc" : "=a" (low), "=d" (high));
 
-    return ((uint64_t)high << 32) | low;
+    return (high << 32) | low;
 }
 
 static inline uint64_t rdtsc_ordered(void)
