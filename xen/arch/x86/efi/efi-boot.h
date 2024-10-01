@@ -10,6 +10,7 @@
 #include <asm/msr.h>
 #include <asm/setup.h>
 #include <asm/trampoline.h>
+#include <asm/efi.h>
 
 static struct file __initdata ucode;
 static multiboot_info_t __initdata mbi = {
@@ -816,9 +817,9 @@ static const char *__init get_option(const char *cmd, const char *opt)
     return o;
 }
 
-void asmlinkage __init efi_multiboot2(EFI_HANDLE ImageHandle,
-                                      EFI_SYSTEM_TABLE *SystemTable,
-                                      const char *cmdline)
+void __init efi_multiboot2(EFI_HANDLE ImageHandle,
+                           EFI_SYSTEM_TABLE *SystemTable,
+                           const char *cmdline)
 {
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
     EFI_HANDLE gop_handle;
