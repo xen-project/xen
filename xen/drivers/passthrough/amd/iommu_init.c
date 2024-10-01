@@ -32,7 +32,7 @@ unsigned int __read_mostly amd_iommu_acpi_info;
 unsigned int __read_mostly ivrs_bdf_entries;
 u8 __read_mostly ivhd_type;
 static struct radix_tree_root ivrs_maps;
-LIST_HEAD_READ_MOSTLY(amd_iommu_head);
+LIST_HEAD_RO_AFTER_INIT(amd_iommu_head);
 bool iommuv2_enabled;
 
 bool __ro_after_init amd_iommu_perdev_intremap = true;
