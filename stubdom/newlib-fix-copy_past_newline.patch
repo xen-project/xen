@@ -1,0 +1,10 @@
+--- newlib-1.16.0/newlib/doc/makedoc.c.orig
++++ newlib-1.16.0/newlib/doc/makedoc.c
+@@ -798,6 +798,7 @@ DEFUN( iscommand,(ptr, idx),
+ }
+
+
++static unsigned int
+ DEFUN(copy_past_newline,(ptr, idx, dst),
+       string_type *ptr AND
+       unsigned int idx AND
