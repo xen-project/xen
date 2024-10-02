@@ -10,9 +10,8 @@
 #include <asm/cpufeature.h>
 #include <public/elfnote.h>
 
-#define ALIGN .align CONFIG_FUNCTION_ALIGNMENT, CODE_FILL
 #define ENTRY(name)                             \
-  ALIGN;                                        \
+  .align CONFIG_FUNCTION_ALIGNMENT, CODE_FILL;  \
   GLOBAL(name)
 #define GLOBAL(name)                            \
   .globl name;                                  \
@@ -764,13 +763,13 @@ trampoline_setup:
          * cmdline and reloc are written in C, and linked to be 32bit PIC with
          * entrypoints at 0 and using the fastcall convention.
          */
-        ALIGN
-cmdline_parse_early:
+FUNC_LOCAL(cmdline_parse_early)
         .incbin "cmdline.bin"
+END(cmdline_parse_early)
 
-        ALIGN
-reloc:
+FUNC_LOCAL(reloc)
         .incbin "reloc.bin"
+END(reloc)
 
 ENTRY(trampoline_start)
 #include "trampoline.S"
