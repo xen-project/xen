@@ -42,14 +42,6 @@
 /* Linkage for x86 */
 #ifdef __ASSEMBLY__
 #define CODE_FILL 0x90
-#define ALIGN .align CONFIG_FUNCTION_ALIGNMENT, CODE_FILL
-#define ENTRY(name)                             \
-  ALIGN;                                        \
-  GLOBAL(name)
-#define GLOBAL(name)                            \
-  .globl name;                                  \
-  .hidden name;                                 \
-  name:
 #endif
 
 #define NR_hypercalls 64

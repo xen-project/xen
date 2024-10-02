@@ -1254,7 +1254,7 @@ FUNC_LOCAL(autogen_stubs, 0) /* Automatically generated stubs. */
         .if vec >= FIRST_IRQ_VECTOR
 #endif
 
-        ALIGN
+        .align CONFIG_FUNCTION_ALIGNMENT, CODE_FILL
 1:
         ENDBR64
         pushq $0

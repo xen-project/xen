@@ -10,6 +10,15 @@
 #include <asm/cpufeature.h>
 #include <public/elfnote.h>
 
+#define ALIGN .align CONFIG_FUNCTION_ALIGNMENT, CODE_FILL
+#define ENTRY(name)                             \
+  ALIGN;                                        \
+  GLOBAL(name)
+#define GLOBAL(name)                            \
+  .globl name;                                  \
+  .hidden name;                                 \
+  name:
+
         .section .text.header, "ax", @progbits
         .code32
 
