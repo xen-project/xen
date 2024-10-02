@@ -624,7 +624,7 @@ domain_crash_page_fault_0x8:
         ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
         movq  %rsi,%rdi
         call  show_page_walk
-ENTRY(dom_crash_sync_extable)
+LABEL(dom_crash_sync_extable, 0)
         ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
         # Get out of the guest-save area of the stack.
         GET_STACK_END(ax)
