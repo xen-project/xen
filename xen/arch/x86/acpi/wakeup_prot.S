@@ -7,7 +7,7 @@
         .text
         .code64
 
-ENTRY(do_suspend_lowlevel)
+FUNC(do_suspend_lowlevel)
         push    %rbp
         push    %rbx
         push    %r12
@@ -43,7 +43,7 @@ ENTRY(do_suspend_lowlevel)
          *
          * Everything else, including the stack, needs restoring.
          */
-ENTRY(s3_resume)
+LABEL(s3_resume)
         lgdt    boot_gdtr(%rip)
 
         mov     saved_cr0(%rip), %rax
@@ -132,6 +132,7 @@ ENTRY(s3_resume)
         pop     %rbx
         pop     %rbp
         ret
+END(do_suspend_lowlevel)
 
 .data
         .align 16
@@ -142,5 +143,4 @@ saved_cr0:      .quad   0
 saved_ssp:      .quad   0
 #endif
 
-GLOBAL(saved_magic)
-        .long   0x9abcdef0
+ASM_INT(saved_magic, 0x9abcdef0)
