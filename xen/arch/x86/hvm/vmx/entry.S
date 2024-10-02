@@ -24,7 +24,7 @@
 #define VMRESUME     .byte 0x0f,0x01,0xc3
 #define VMLAUNCH     .byte 0x0f,0x01,0xc2
 
-ENTRY(vmx_asm_vmexit_handler)
+FUNC(vmx_asm_vmexit_handler)
         SAVE_ALL
 
         mov  %cr2,%rax
@@ -187,7 +187,7 @@ UNLIKELY_END(realmode)
         call vmx_vmentry_failure
         jmp  .Lvmx_process_softirqs
 
-ENTRY(vmx_asm_do_vmentry)
+LABEL(vmx_asm_do_vmentry)
         GET_CURRENT(bx)
         jmp  .Lvmx_do_vmentry
 
@@ -205,6 +205,4 @@ ENTRY(vmx_asm_do_vmentry)
         sti
         call do_softirq
         jmp  .Lvmx_do_vmentry
-
-        .type vmx_asm_vmexit_handler, @function
-        .size vmx_asm_vmexit_handler, . - vmx_asm_vmexit_handler
+END(vmx_asm_vmexit_handler)
