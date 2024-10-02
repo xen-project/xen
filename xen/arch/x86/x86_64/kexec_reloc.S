@@ -13,6 +13,9 @@
 
         .file __FILE__
 
+/* All contents of .text.kexec wants to be kept together. */
+#undef CONFIG_CC_SPLIT_SECTIONS
+
 #include <xen/kimage.h>
 
 #include <asm/asm_defns.h>
@@ -21,10 +24,9 @@
 #include <asm/machine_kexec.h>
 
         .section .text.kexec, "ax", @progbits
-        .align PAGE_SIZE
         .code64
 
-ENTRY(kexec_reloc)
+FUNC(kexec_reloc, PAGE_SIZE)
         /* %rdi - code page maddr */
         /* %rsi - page table maddr */
         /* %rdx - indirection page maddr */
@@ -91,8 +93,9 @@ ENTRY(kexec_reloc)
         push    $0x10
         push    %rax
         lretq
+END(kexec_reloc)
 
-relocate_pages:
+FUNC_LOCAL(relocate_pages)
         /* %rdi - indirection page maddr */
         pushq   %rbx
 
@@ -138,10 +141,11 @@ relocate_pages:
 .L_done:
         popq    %rbx
         ret
+END(relocate_pages)
 
         .code32
 
-compatibility_mode:
+FUNC_LOCAL(compatibility_mode)
         /* Setup some sane segments. */
         movl    $0x0008, %eax
         movl    %eax, %ds
@@ -168,39 +172,29 @@ compatibility_mode:
         /* Call the image entry point.  This should never return. */
         call    *%ebp
         ud2
+END(compatibility_mode)
 
-        .align 4
-compat_mode_gdt_desc:
+DATA_LOCAL(compat_mode_gdt_desc, 4)
         .word .Lcompat_mode_gdt_end - compat_mode_gdt -1
         .quad 0x0000000000000000     /* set in call_32_bit above */
+END(compat_mode_gdt_desc)
 
-        .type compat_mode_gdt_desc, @object
-        .size compat_mode_gdt_desc, . - compat_mode_gdt_desc
-
-        .align 8
-compat_mode_gdt:
+DATA_LOCAL(compat_mode_gdt, 8)
         .quad 0x0000000000000000     /* null                              */
         .quad 0x00cf93000000ffff     /* 0x0008 ring 0 data                */
         .quad 0x00cf9b000000ffff     /* 0x0010 ring 0 code, compatibility */
 .Lcompat_mode_gdt_end:
+END(compat_mode_gdt)
 
-        .type compat_mode_gdt, @object
-        .size compat_mode_gdt, . - compat_mode_gdt
-
-compat_mode_idt:
+DATA_LOCAL(compat_mode_idt)
         .word 0                      /* limit */
         .long 0                      /* base */
-
-        .type compat_mode_idt, @object
-        .size compat_mode_idt, . - compat_mode_idt
+END(compat_mode_idt)
 
         /*
          * 16 words of stack are more than enough.
          */
-        .align 8
-reloc_stack:
+DATA_LOCAL(reloc_stack, 8)
         .fill 16,8,0
 .Lreloc_stack_base:
-
-        .type reloc_stack, @object
-        .size reloc_stack, . - reloc_stack
+END(reloc_stack)
