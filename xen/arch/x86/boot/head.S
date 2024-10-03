@@ -279,14 +279,12 @@ __efi64_mb2_start:
         pop     %rbx
         pop     %rax
 
-        /* We are on EFI platform and EFI boot services are available. */
-        incb    efi_platform(%rip)
-
         /*
-         * Disable real mode and other legacy stuff which should not
-         * be run on EFI platforms.
+         * efi_multiboot2_prelude() is happy that we're on EFI platform.  Skip
+         * the BIOS initialisation path.
          */
-        incb    skip_realmode(%rip)
+        movb    $1, efi_platform(%rip)
+        movb    $1, skip_realmode(%rip)
 
         /* Jump to trampoline_setup after switching CPU to x86_32 mode. */
         lea     trampoline_setup(%rip),%r15
