@@ -1,6 +1,8 @@
 #!/usr/bin/expect -f
 
-if {[info exists env(TEST_TIMEOUT)]} {
+if {[info exists env(TEST_TIMEOUT_OVERRIDE)]} {
+    set timeout $env(TEST_TIMEOUT_OVERRIDE)
+} elseif {[info exists env(TEST_TIMEOUT)]} {
     set timeout $env(TEST_TIMEOUT)
 } else {
     set timeout 1500
