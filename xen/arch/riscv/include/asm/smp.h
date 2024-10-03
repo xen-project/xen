@@ -11,12 +11,6 @@ DECLARE_PER_CPU(cpumask_var_t, cpu_sibling_mask);
 DECLARE_PER_CPU(cpumask_var_t, cpu_core_mask);
 
 /*
- * Do we, for platform reasons, need to actually keep CPUs online when we
- * would otherwise prefer them to be off?
- */
-#define park_offline_cpus false
-
-/*
  * Mapping between Xen logical cpu index and hartid.
  */
 static inline unsigned long cpuid_to_hartid(unsigned long cpuid)

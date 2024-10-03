@@ -1,19 +1,21 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 #include <xen/percpu.h>
 #include <xen/cpu.h>
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/rcupdate.h>
+#include <xen/sections.h>
 
-unsigned long __per_cpu_offset[NR_CPUS];
+#ifndef INVALID_PERCPU_AREA
+#define INVALID_PERCPU_AREA (-(long)__per_cpu_start)
+#endif
 
-/*
- * Force uses of per_cpu() with an invalid area to attempt to access the
- * middle of the non-canonical address space resulting in a #GP, rather than a
- * possible #PF at (NULL + a little) which has security implications in the
- * context of PV guests.
- */
-#define INVALID_PERCPU_AREA (0x8000000000000000UL - (unsigned long)__per_cpu_start)
 #define PERCPU_ORDER get_order_from_bytes(__per_cpu_data_end - __per_cpu_start)
+
+extern char __per_cpu_start[];
+extern const char __per_cpu_data_end[];
+
+unsigned long __read_mostly __per_cpu_offset[NR_CPUS];
 
 void __init percpu_init_areas(void)
 {
@@ -28,7 +30,7 @@ static int init_percpu_area(unsigned int cpu)
     char *p;
 
     if ( __per_cpu_offset[cpu] != INVALID_PERCPU_AREA )
-        return 0;
+        return park_offline_cpus ? 0 : -EBUSY;
 
     if ( (p = alloc_xenheap_pages(PERCPU_ORDER, 0)) == NULL )
         return -ENOMEM;
@@ -74,15 +76,20 @@ static int cf_check cpu_percpu_callback(
     case CPU_UP_PREPARE:
         rc = init_percpu_area(cpu);
         break;
+
     case CPU_UP_CANCELED:
     case CPU_DEAD:
     case CPU_RESUME_FAILED:
         if ( !park_offline_cpus && system_state != SYS_STATE_suspend )
             free_percpu_area(cpu);
         break;
+
     case CPU_REMOVE:
         if ( park_offline_cpus )
             free_percpu_area(cpu);
+        break;
+
+    default:
         break;
     }
 

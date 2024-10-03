@@ -2,6 +2,7 @@
 #define __ASM_SMP_H
 
 #ifndef __ASSEMBLY__
+#include <xen/percpu.h>
 #include <xen/cpumask.h>
 #include <asm/current.h>
 #endif
@@ -11,12 +12,6 @@ extern unsigned long smp_up_cpu;
 
 DECLARE_PER_CPU(cpumask_var_t, cpu_sibling_mask);
 DECLARE_PER_CPU(cpumask_var_t, cpu_core_mask);
-
-/*
- * Do we, for platform reasons, need to actually keep CPUs online when we
- * would otherwise prefer them to be off?
- */
-#define park_offline_cpus false
 
 extern void noreturn stop_cpu(void);
 
