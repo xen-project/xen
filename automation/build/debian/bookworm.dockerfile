@@ -46,6 +46,8 @@ RUN apt-get update && \
         # for test phase, qemu-smoke-* jobs
         qemu-system-x86 \
         expect \
+        # For *-efi jobs
+        ovmf \
         # for test phase, qemu-alpine-* jobs
         cpio \
         busybox-static \
