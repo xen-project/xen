@@ -869,7 +869,8 @@ static long handle_attach_overlay_nodes(struct domain *d,
         goto out;
     }
 
-    entry->iomem_ranges = rangeset_new(d, "Overlay: I/O Memory", 0);
+    entry->iomem_ranges = rangeset_new(d, "Overlay: I/O Memory",
+                                       RANGESETF_prettyprint_hex);
     if (entry->iomem_ranges == NULL)
     {
         rc = -ENOMEM;
