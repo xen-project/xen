@@ -596,11 +596,7 @@ static long add_nodes(struct overlay_track *tr, char **nodes_full_path)
         overlay_node = dt_find_node_by_path_from(tr->dt_host_new,
                                                  nodes_full_path[j]);
         if ( overlay_node == NULL )
-        {
-            /* Sanity check. But code will never come here. */
-            ASSERT_UNREACHABLE();
             return -EFAULT;
-        }
 
         /*
          * Find previous and next node to overlay_node in dt_host_new. We will
