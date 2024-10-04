@@ -908,8 +908,11 @@ static long handle_attach_overlay_nodes(struct domain *d,
  out:
     spin_unlock(&overlay_lock);
 
-    rangeset_destroy(entry->irq_ranges);
-    rangeset_destroy(entry->iomem_ranges);
+    if ( entry )
+    {
+        rangeset_destroy(entry->irq_ranges);
+        rangeset_destroy(entry->iomem_ranges);
+    }
 
     return rc;
 }
