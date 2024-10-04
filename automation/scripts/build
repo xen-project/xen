@@ -41,19 +41,30 @@ cp xen/.config xen-config
 # Directory for the artefacts to be dumped into
 mkdir -p binaries
 
+collect_xen_artefacts()
+{
+    local f
+
+    for f in xen/xen xen/xen.efi; do
+        if [[ -f $f ]]; then
+            cp $f binaries/
+        fi
+    done
+}
+
 if [[ "${CPPCHECK}" == "y" ]] && [[ "${HYPERVISOR_ONLY}" == "y" ]]; then
     # Cppcheck analysis invokes Xen-only build
     xen/scripts/xen-analysis.py --run-cppcheck --cppcheck-misra -- -j$(nproc)
 
     # Preserve artefacts
-    cp xen/xen binaries/xen
+    collect_xen_artefacts
     cp xen/cppcheck-report/xen-cppcheck.txt xen-cppcheck.txt
 elif [[ "${HYPERVISOR_ONLY}" == "y" ]]; then
     # Xen-only build
     make -j$(nproc) xen
 
     # Preserve artefacts
-    cp xen/xen binaries/xen
+    collect_xen_artefacts
 else
     # Full build.  Figure out our ./configure options
     cfgargs=()
@@ -101,5 +112,5 @@ else
     # even though dist/ contains everything, while some containers don't even
     # build Xen
     cp -r dist binaries/
-    if [[ -f xen/xen ]] ; then cp xen/xen binaries/xen; fi
+    collect_xen_artefacts
 fi
