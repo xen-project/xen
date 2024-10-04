@@ -62,6 +62,7 @@ RUN <<EOF
         meson
         ninja-build
         python3-packaging
+        python3-venv
     )
 
     apt-get -y --no-install-recommends install "${DEPS[@]}"

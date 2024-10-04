@@ -91,9 +91,9 @@ else
         cfgargs+=("--with-extra-qemuu-configure-args=\"--disable-werror\"")
     fi
 
-    # Qemu requires Python 3.5 or later, and ninja
+    # Qemu requires Python 3.8 or later, and ninja
     # and Clang 10 or later
-    if ! type python3 || python3 -c "import sys; res = sys.version_info < (3, 5); exit(not(res))" \
+    if ! type python3 || ! python3 automation/scripts/qemu-deps-check.py \
             || [[ "$cc_is_clang" == y && "$cc_ver" -lt 0x0a0000 ]] \
             || ! type ninja; then
         cfgargs+=("--with-system-qemu=/bin/false")
