@@ -274,11 +274,9 @@ static unsigned int overlay_node_count(const void *overlay_fdt)
         int overlay;
 
         overlay = fdt_subnode_offset(overlay_fdt, fragment, "__overlay__");
+        if ( overlay < 0 )
+            continue;
 
-        /*
-         * overlay value can be < 0. But fdt_for_each_subnode() loop checks for
-         * overlay >= 0. So, no need for a overlay>=0 check here.
-         */
         fdt_for_each_subnode(subnode, overlay_fdt, overlay)
         {
             num_overlay_nodes++;
@@ -305,6 +303,10 @@ static int overlay_get_nodes_info(const void *fdto, char **nodes_full_path)
         int subnode;
         const char *target_path;
 
+        overlay = fdt_subnode_offset(fdto, fragment, "__overlay__");
+        if ( overlay < 0 )
+            continue;
+
         target = fdt_overlay_target_offset(device_tree_flattened, fdto,
                                            fragment, &target_path);
         if ( target < 0 )
@@ -313,12 +315,6 @@ static int overlay_get_nodes_info(const void *fdto, char **nodes_full_path)
         if ( target_path == NULL )
             return -EINVAL;
 
-        overlay = fdt_subnode_offset(fdto, fragment, "__overlay__");
-
-        /*
-         * overlay value can be < 0. But fdt_for_each_subnode() loop checks for
-         * overlay >= 0. So, no need for a overlay>=0 check here.
-         */
         fdt_for_each_subnode(subnode, fdto, overlay)
         {
             const char *node_name = NULL;
