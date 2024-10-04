@@ -53,6 +53,11 @@
   tags:
     - x86_64
 
+.qemu-smoke-x86-64:
+  extends: .qemu-x86-64
+  variables:
+    TEST_TIMEOUT_OVERRIDE: 120
+
 .qemu-riscv64:
   extends: .test-jobs-common
   variables:
@@ -436,35 +441,35 @@ qemu-alpine-x86_64-gcc:
     - alpine-3.18-gcc
 
 qemu-smoke-x86-64-gcc:
-  extends: .qemu-x86-64
+  extends: .qemu-smoke-x86-64
   script:
     - ./automation/scripts/qemu-smoke-x86-64.sh pv 2>&1 | tee ${LOGFILE}
   needs:
     - debian-bookworm-gcc-debug
 
 qemu-smoke-x86-64-clang:
-  extends: .qemu-x86-64
+  extends: .qemu-smoke-x86-64
   script:
     - ./automation/scripts/qemu-smoke-x86-64.sh pv 2>&1 | tee ${LOGFILE}
   needs:
     - debian-bookworm-clang-debug
 
 qemu-smoke-x86-64-gcc-pvh:
-  extends: .qemu-x86-64
+  extends: .qemu-smoke-x86-64
   script:
     - ./automation/scripts/qemu-smoke-x86-64.sh pvh 2>&1 | tee ${LOGFILE}
   needs:
     - debian-bookworm-gcc-debug
 
 qemu-smoke-x86-64-clang-pvh:
-  extends: .qemu-x86-64
+  extends: .qemu-smoke-x86-64
   script:
     - ./automation/scripts/qemu-smoke-x86-64.sh pvh 2>&1 | tee ${LOGFILE}
   needs:
     - debian-bookworm-clang-debug
 
 qemu-smoke-x86-64-gcc-efi:
-  extends: .qemu-x86-64
+  extends: .qemu-smoke-x86-64
   script:
     - ./automation/scripts/qemu-smoke-x86-64-efi.sh pv 2>&1 | tee ${LOGFILE}
   needs:
