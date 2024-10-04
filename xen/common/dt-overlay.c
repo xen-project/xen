@@ -325,6 +325,7 @@ static int overlay_get_nodes_info(const void *fdto, char **nodes_full_path)
             int node_name_len;
             unsigned int target_path_len = strlen(target_path);
             unsigned int node_full_name_len;
+            unsigned int extra_len;
 
             node_name = fdt_get_name(fdto, subnode, &node_name_len);
 
@@ -332,10 +333,13 @@ static int overlay_get_nodes_info(const void *fdto, char **nodes_full_path)
                 return node_name_len;
 
             /*
-             * Magic number 2 is for adding '/' and '\0'. This is done to keep
-             * the node_full_path in the correct full node name format.
+             * Extra length is for adding '/' and '\0' unless the target path is
+             * root in which case we don't add the '/' at the beginning. This is
+             * done to keep the node_full_path in the correct full node name
+             * format.
              */
-            node_full_name_len = target_path_len + node_name_len + 2;
+            extra_len = (target_path_len > 1) ? 2 : 1;
+            node_full_name_len = target_path_len + node_name_len + extra_len;
 
             nodes_full_path[node_num] = xmalloc_bytes(node_full_name_len);
 
@@ -344,9 +348,11 @@ static int overlay_get_nodes_info(const void *fdto, char **nodes_full_path)
 
             memcpy(nodes_full_path[node_num], target_path, target_path_len);
 
-            nodes_full_path[node_num][target_path_len] = '/';
+            /* Target is not root - add separator */
+            if ( target_path_len > 1 )
+                nodes_full_path[node_num][target_path_len++] = '/';
 
-            memcpy(nodes_full_path[node_num] + target_path_len + 1,
+            memcpy(nodes_full_path[node_num] + target_path_len,
                     node_name, node_name_len);
 
             nodes_full_path[node_num][node_full_name_len - 1] = '\0';
