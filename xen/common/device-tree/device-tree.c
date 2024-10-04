@@ -120,8 +120,8 @@ void dt_child_set_range(__be32 **cellp, int addrcells, int sizecells,
     dt_set_cell(cellp, sizecells, size);
 }
 
-static void __init *unflatten_dt_alloc(unsigned long *mem, unsigned long size,
-                                       unsigned long align)
+static void *unflatten_dt_alloc(unsigned long *mem, unsigned long size,
+                                unsigned long align)
 {
     void *res;
 
