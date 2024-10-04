@@ -463,6 +463,13 @@ qemu-smoke-x86-64-clang-pvh:
   needs:
     - debian-bookworm-clang-debug
 
+qemu-smoke-x86-64-gcc-efi:
+  extends: .qemu-x86-64
+  script:
+    - ./automation/scripts/qemu-smoke-x86-64-efi.sh pv 2>&1 | tee ${LOGFILE}
+  needs:
+    - debian-bookworm-gcc-debug
+
 qemu-smoke-riscv64-gcc:
   extends: .qemu-riscv64
   script:
