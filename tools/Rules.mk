@@ -81,13 +81,6 @@ endif
 # include any CFLAGS or LDLIBS relating to libbar or libbaz unless
 # they use those libraries directly (not via libfoo) too.
 
-# Give the list of Xen library that the libraries in $(1) are linked against,
-# directly or indirectly.
-define xenlibs-dependencies
-    $(sort $(foreach lib,$(1), \
-        $(USELIBS_$(lib)) $(call xenlibs-dependencies,$(USELIBS_$(lib)))))
-endef
-
 # Flags for linking recursive dependencies of Xen libraries in $(1)
 define xenlibs-rpath
     $(addprefix -Wl$(comma)-rpath-link=$(XEN_ROOT)/tools/libs/,$(call xenlibs-dependencies,$(1)))

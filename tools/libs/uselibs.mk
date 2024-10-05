@@ -31,3 +31,10 @@ USELIBS_light := toollog evtchn toolcore ctrl store hypfs guest
 LIBS_LIBS += util
 USELIBS_util := light
 FILENAME_util := xlutil
+
+# Give the list of Xen library that the libraries in $(1) are linked against,
+# directly or indirectly.
+define xenlibs-dependencies
+    $(sort $(foreach lib,$(1), \
+        $(USELIBS_$(lib)) $(call xenlibs-dependencies,$(USELIBS_$(lib)))))
+endef
