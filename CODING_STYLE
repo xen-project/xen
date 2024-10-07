@@ -153,6 +153,48 @@ E.g. timer-works.
 Note that some of the options and filenames are using '_'. This is now
 deprecated.
 
+Header inclusion guards
+-----------------------
+
+Unless otherwise specified, all header files should include proper
+guards to prevent multiple inclusions. The following naming conventions
+apply:
+
+- Guard names are derived from directory path underneath xen/ and the
+  actual file name.  Path components are separated by double
+  underscores.  Alphabetic characters are converted to upper case.  Non-
+  alphanumeric characters are replaced by single underscores.
+- Certain directory components are omitted, to keep identifier length
+  bounded:
+  - the top level include/,
+  - architecture-specific private files' arch/,
+  - any architecture's arch/<arch>/include/asm/ collapses to
+    ASM__<ARCH>__.
+
+For example:
+
+- Xen headers: XEN__<filename>_H
+  - include/xen/something.h -> XEN__SOMETHING_H
+
+- asm-generic headers: ASM_GENERIC__<filename>_H
+  - include/asm-generic/something.h -> ASM_GENERIC__SOMETHING_H
+
+- arch-specific headers: ASM__<architecture>__<subdir>__<filename>_H
+  - arch/x86/include/asm/something.h -> ASM__X86__SOMETHING_H
+
+- Private headers: <dir>__<filename>_H
+  - arch/arm/arm64/lib/something.h -> ARM__ARM64__LIB__SOMETHING_H
+  - arch/x86/lib/something.h -> X86__LIB__SOMETHING_H
+  - common/something.h -> COMMON__SOMETHING_H
+
+Note that this requires some discipline on the naming of future new
+sub-directories: There shouldn't be any other asm/ one anywhere, for
+example.  Nor should any new ports be named the same as top-level
+(within xen/) directories.  Which may in turn require some care if any
+new top-level directories were to be added.  Rule of thumb: Whenever
+adding a new subdirectory, check the rules to prevent any potential
+collisions.
+
 Emacs local variables
 ---------------------
 
