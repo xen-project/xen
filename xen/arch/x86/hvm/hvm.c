@@ -1163,10 +1163,10 @@ static int cf_check hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     seg.attr = ctxt.ldtr_arbytes;
     hvm_set_segment_register(v, x86_seg_ldtr, &seg);
 
-    /* Cover xsave-absent save file restoration on xsave-capable host. */
-    vcpu_setup_fpu(v, xsave_enabled(v) ? NULL : v->arch.xsave_area,
-                   ctxt.flags & XEN_X86_FPU_INITIALISED ? ctxt.fpu_regs : NULL,
-                   FCW_RESET);
+    if ( ctxt.flags & XEN_X86_FPU_INITIALISED )
+        vcpu_setup_fpu(v, &ctxt.fpu_regs);
+    else
+        vcpu_reset_fpu(v);
 
     v->arch.user_regs.rax = ctxt.rax;
     v->arch.user_regs.rbx = ctxt.rbx;
@@ -4013,9 +4013,7 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
         v->arch.guest_table = pagetable_null();
     }
 
-    if ( v->arch.xsave_area )
-        v->arch.xsave_area->xsave_hdr.xstate_bv = 0;
-    vcpu_setup_fpu(v, v->arch.xsave_area, NULL, FCW_RESET);
+    vcpu_reset_fpu(v);
 
     arch_vcpu_regs_init(v);
     v->arch.user_regs.rip = ip;

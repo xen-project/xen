@@ -14,6 +14,7 @@
 
 #define FCW_DEFAULT               0x037f
 #define FCW_RESET                 0x0040
+#define FXSAVE_FTW_RESET          0xFF /* Abridged Tag Word format */
 #define MXCSR_DEFAULT             0x1f80
 
 extern uint32_t mxcsr_mask;

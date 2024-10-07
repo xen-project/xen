@@ -31,10 +31,23 @@ void vcpu_restore_fpu_nonlazy(struct vcpu *v, bool need_stts);
 void vcpu_restore_fpu_lazy(struct vcpu *v);
 void vcpu_save_fpu(struct vcpu *v);
 void save_fpu_enable(void);
-
 int vcpu_init_fpu(struct vcpu *v);
-struct xsave_struct;
-void vcpu_setup_fpu(struct vcpu *v, struct xsave_struct *xsave_area,
-                    const void *data, unsigned int fcw_default);
 void vcpu_destroy_fpu(struct vcpu *v);
+
+/*
+ * Restore v's FPU to power-on reset values
+ *
+ * @param v vCPU containing the FPU
+ */
+void vcpu_reset_fpu(struct vcpu *v);
+
+/*
+ * Load x87/SSE state into v's FPU
+ *
+ * Overrides the XSAVE header to set the state components to be x87 and SSE.
+ *
+ * @param v    vCPU containing the FPU
+ * @param data 512-octet blob for x87/SSE state
+ */
+void vcpu_setup_fpu(struct vcpu *v, const void *data);
 #endif /* __ASM_I386_I387_H */

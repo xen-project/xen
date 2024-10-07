@@ -304,41 +304,26 @@ int vcpu_init_fpu(struct vcpu *v)
     return xstate_alloc_save_area(v);
 }
 
-void vcpu_setup_fpu(struct vcpu *v, struct xsave_struct *xsave_area,
-                    const void *data, unsigned int fcw_default)
+void vcpu_reset_fpu(struct vcpu *v)
 {
-    fpusse_t *fpu_sse = &v->arch.xsave_area->fpu_sse;
+    v->fpu_initialised = false;
+    *v->arch.xsave_area = (struct xsave_struct) {
+        .fpu_sse = {
+            .mxcsr = MXCSR_DEFAULT,
+            .fcw = FCW_RESET,
+            .ftw = FXSAVE_FTW_RESET,
+        },
+        .xsave_hdr.xstate_bv = X86_XCR0_X87,
+    };
+}
 
-    ASSERT(!xsave_area || xsave_area == v->arch.xsave_area);
-
-    v->fpu_initialised = !!data;
-
-    if ( data )
-    {
-        memcpy(fpu_sse, data, sizeof(*fpu_sse));
-        if ( xsave_area )
-            xsave_area->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
-    }
-    else if ( xsave_area && fcw_default == FCW_DEFAULT )
-    {
-        xsave_area->xsave_hdr.xstate_bv = 0;
-        fpu_sse->mxcsr = MXCSR_DEFAULT;
-    }
-    else
-    {
-        memset(fpu_sse, 0, sizeof(*fpu_sse));
-        fpu_sse->fcw = fcw_default;
-        fpu_sse->mxcsr = MXCSR_DEFAULT;
-        if ( v->arch.xsave_area )
-        {
-            v->arch.xsave_area->xsave_hdr.xstate_bv &= ~XSTATE_FP_SSE;
-            if ( fcw_default != FCW_DEFAULT )
-                v->arch.xsave_area->xsave_hdr.xstate_bv |= X86_XCR0_X87;
-        }
-    }
-
-    if ( xsave_area )
-        xsave_area->xsave_hdr.xcomp_bv = 0;
+void vcpu_setup_fpu(struct vcpu *v, const void *data)
+{
+    v->fpu_initialised = true;
+    *v->arch.xsave_area = (struct xsave_struct) {
+        .fpu_sse = *(const fpusse_t*)data,
+        .xsave_hdr.xstate_bv = XSTATE_FP_SSE,
+    };
 }
 
 /* Free FPU's context save area */

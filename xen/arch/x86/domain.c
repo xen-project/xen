@@ -1186,9 +1186,10 @@ int arch_set_info_guest(
          is_pv_64bit_domain(d) )
         v->arch.flags &= ~TF_kernel_mode;
 
-    vcpu_setup_fpu(v, v->arch.xsave_area,
-                   flags & VGCF_I387_VALID ? &c.nat->fpu_ctxt : NULL,
-                   FCW_DEFAULT);
+    if ( flags & VGCF_I387_VALID )
+        vcpu_setup_fpu(v, &c.nat->fpu_ctxt);
+    else
+        vcpu_reset_fpu(v);
 
     if ( !compat )
     {
