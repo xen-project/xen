@@ -213,8 +213,6 @@ xen/.config.old
 xen/.xen.elf32
 xen/System.map
 xen/arch/x86/boot/mkelf32
-xen/arch/x86/boot/cmdline.S
-xen/arch/x86/boot/reloc.S
 xen/arch/x86/boot/*.bin
 xen/arch/x86/boot/*.lnk
 xen/arch/x86/efi.lds
