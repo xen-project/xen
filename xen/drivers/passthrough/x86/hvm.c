@@ -1105,22 +1105,26 @@ static int cf_check cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
     unsigned int cpu = (unsigned long)hcpu;
+    unsigned long flags;
 
     switch ( action )
     {
     case CPU_UP_PREPARE:
         INIT_LIST_HEAD(&per_cpu(dpci_list, cpu));
         break;
+
     case CPU_UP_CANCELED:
-    case CPU_DEAD:
-        /*
-         * On CPU_DYING this callback is called (on the CPU that is dying)
-         * with an possible HVM_DPIC_SOFTIRQ pending - at which point we can
-         * clear out any outstanding domains (by the virtue of the idle loop
-         * calling the softirq later). In CPU_DEAD case the CPU is deaf and
-         * there are no pending softirqs for us to handle so we can chill.
-         */
         ASSERT(list_empty(&per_cpu(dpci_list, cpu)));
+        break;
+
+    case CPU_DEAD:
+        if ( list_empty(&per_cpu(dpci_list, cpu)) )
+            break;
+        /* Take whatever dpci interrupts are pending on the dead CPU. */
+        local_irq_save(flags);
+        list_splice_init(&per_cpu(dpci_list, cpu), &this_cpu(dpci_list));
+        local_irq_restore(flags);
+        raise_softirq(HVM_DPCI_SOFTIRQ);
         break;
     }
 
