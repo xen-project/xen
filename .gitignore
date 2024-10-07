@@ -212,9 +212,6 @@ xen/.config
 xen/.config.old
 xen/.xen.elf32
 xen/System.map
-xen/arch/x86/boot/mkelf32
-xen/arch/x86/boot/*.bin
-xen/arch/x86/boot/*.lnk
 xen/arch/x86/efi.lds
 xen/arch/x86/efi/check.efi
 xen/arch/x86/efi/mkreloc
