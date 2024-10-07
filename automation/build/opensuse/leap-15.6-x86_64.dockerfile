@@ -3,6 +3,7 @@ FROM --platform=linux/amd64 opensuse/leap:15.6
 LABEL maintainer.name="The Xen Project"
 LABEL maintainer.email="xen-devel@lists.xenproject.org"
 
+ENV PYTHON=python3.11
 ENV XEN_TARGET_ARCH=x86_64
 
 RUN <<EOF
@@ -25,7 +26,7 @@ RUN <<EOF
         gawk
         gcc
         make
-        python3
+        python311
 
         # Tools (general)
         git-core
@@ -53,8 +54,8 @@ RUN <<EOF
         # xentop
         'pkgconfig(ncurses)'
         # Python bindings
-        python3-devel
-        python3-setuptools
+        python311-devel
+        python311-setuptools
         # Ocaml bindings/oxenstored
         ocaml
         ocaml-findlib
@@ -68,7 +69,7 @@ RUN <<EOF
         ninja
         'pkgconfig(glib-2.0)'
         'pkgconfig(pixman-1)'
-        python3-packaging
+        python311-packaging
     )
 
     zypper install -y --no-recommends "${DEPS[@]}"
