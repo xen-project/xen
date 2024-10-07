@@ -11,7 +11,7 @@
     !defined(X86EMUL_NO_SIMD)
 # ifdef __XEN__
 #  include <asm/xstate.h>
-#  define FXSAVE_AREA current->arch.fpu_ctxt
+#  define FXSAVE_AREA ((void *)&current->arch.xsave_area->fpu_sse)
 # else
 #  define FXSAVE_AREA get_fpu_save_area()
 # endif

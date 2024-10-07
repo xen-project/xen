@@ -591,12 +591,6 @@ struct pv_vcpu
 
 struct arch_vcpu
 {
-    /*
-     * guest context (mirroring struct vcpu_guest_context) common
-     * between pv and hvm guests
-     */
-
-    void              *fpu_ctxt;
     struct cpu_user_regs user_regs;
 
     /* Debug registers. */

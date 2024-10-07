@@ -39,7 +39,7 @@ static inline void fpu_xrstor(struct vcpu *v, uint64_t mask)
 /* Restore x87 FPU, MMX, SSE and SSE2 state */
 static inline void fpu_fxrstor(struct vcpu *v)
 {
-    const fpusse_t *fpu_ctxt = v->arch.fpu_ctxt;
+    const fpusse_t *fpu_ctxt = &v->arch.xsave_area->fpu_sse;
 
     /*
      * Some CPUs don't save/restore FDP/FIP/FOP unless an exception
@@ -151,7 +151,7 @@ static inline void fpu_xsave(struct vcpu *v)
 /* Save x87 FPU, MMX, SSE and SSE2 state */
 static inline void fpu_fxsave(struct vcpu *v)
 {
-    fpusse_t *fpu_ctxt = v->arch.fpu_ctxt;
+    fpusse_t *fpu_ctxt = &v->arch.xsave_area->fpu_sse;
     unsigned int fip_width = v->domain->arch.x87_fip_width;
 
     if ( fip_width != 4 )
@@ -212,7 +212,7 @@ void vcpu_restore_fpu_nonlazy(struct vcpu *v, bool need_stts)
      * above) we also need to restore full state, to prevent subsequently
      * saving state belonging to another vCPU.
      */
-    if ( v->arch.fully_eager_fpu || (v->arch.xsave_area && xstate_all(v)) )
+    if ( v->arch.fully_eager_fpu || xstate_all(v) )
     {
         if ( cpu_has_xsave )
             fpu_xrstor(v, XSTATE_ALL);
@@ -299,44 +299,15 @@ void save_fpu_enable(void)
 /* Initialize FPU's context save area */
 int vcpu_init_fpu(struct vcpu *v)
 {
-    int rc;
-
     v->arch.fully_eager_fpu = opt_eager_fpu;
 
-    if ( (rc = xstate_alloc_save_area(v)) != 0 )
-        return rc;
-
-    if ( v->arch.xsave_area )
-        v->arch.fpu_ctxt = &v->arch.xsave_area->fpu_sse;
-    else
-    {
-        BUILD_BUG_ON(__alignof(v->arch.xsave_area->fpu_sse) < 16);
-        v->arch.fpu_ctxt = _xzalloc(sizeof(v->arch.xsave_area->fpu_sse),
-                                    __alignof(v->arch.xsave_area->fpu_sse));
-        if ( v->arch.fpu_ctxt )
-        {
-            fpusse_t *fpu_sse = v->arch.fpu_ctxt;
-
-            fpu_sse->fcw = FCW_DEFAULT;
-            fpu_sse->mxcsr = MXCSR_DEFAULT;
-        }
-        else
-            rc = -ENOMEM;
-    }
-
-    return rc;
+    return xstate_alloc_save_area(v);
 }
 
 void vcpu_setup_fpu(struct vcpu *v, struct xsave_struct *xsave_area,
                     const void *data, unsigned int fcw_default)
 {
-    /*
-     * For the entire function please note that vcpu_init_fpu() (above) points
-     * v->arch.fpu_ctxt into v->arch.xsave_area when XSAVE is available. Hence
-     * accesses through both pointers alias one another, and the shorter form
-     * is used here.
-     */
-    fpusse_t *fpu_sse = v->arch.fpu_ctxt;
+    fpusse_t *fpu_sse = &v->arch.xsave_area->fpu_sse;
 
     ASSERT(!xsave_area || xsave_area == v->arch.xsave_area);
 
@@ -373,10 +344,7 @@ void vcpu_setup_fpu(struct vcpu *v, struct xsave_struct *xsave_area,
 /* Free FPU's context save area */
 void vcpu_destroy_fpu(struct vcpu *v)
 {
-    if ( v->arch.xsave_area )
-        xstate_free_save_area(v);
-    else
-        xfree(v->arch.fpu_ctxt);
+    xstate_free_save_area(v);
 }
 
 /*

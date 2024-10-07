@@ -2371,7 +2371,7 @@ static int cf_check hvmemul_get_fpu(
         alternative_vcall(hvm_funcs.fpu_dirty_intercept);
     else if ( type == X86EMUL_FPU_fpu )
     {
-        const fpusse_t *fpu_ctxt = curr->arch.fpu_ctxt;
+        const fpusse_t *fpu_ctxt = &curr->arch.xsave_area->fpu_sse;
 
         /*
          * Latch current register state so that we can back out changes
@@ -2411,7 +2411,7 @@ static void cf_check hvmemul_put_fpu(
 
     if ( aux )
     {
-        fpusse_t *fpu_ctxt = curr->arch.fpu_ctxt;
+        fpusse_t *fpu_ctxt = &curr->arch.xsave_area->fpu_sse;
         bool dval = aux->dval;
         int mode = hvm_guest_x86_mode(curr);
 

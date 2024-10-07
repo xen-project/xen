@@ -508,9 +508,15 @@ int xstate_alloc_save_area(struct vcpu *v)
     unsigned int size;
 
     if ( !cpu_has_xsave )
-        return 0;
-
-    if ( !is_idle_vcpu(v) || !cpu_has_xsavec )
+    {
+        /*
+         * On non-XSAVE systems, we allocate an XSTATE buffer for simplicity.
+         * XSTATE is backwards compatible to FXSAVE, and only one cacheline
+         * larger.
+         */
+        size = XSTATE_AREA_MIN_SIZE;
+    }
+    else if ( !is_idle_vcpu(v) || !cpu_has_xsavec )
     {
         size = xsave_cntxt_size;
         BUG_ON(size < XSTATE_AREA_MIN_SIZE);

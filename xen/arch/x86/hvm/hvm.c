@@ -914,7 +914,11 @@ static int cf_check hvm_save_cpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
 
     if ( v->fpu_initialised )
     {
-        memcpy(ctxt.fpu_regs, v->arch.fpu_ctxt, sizeof(ctxt.fpu_regs));
+        BUILD_BUG_ON(sizeof(ctxt.fpu_regs) !=
+                     sizeof(v->arch.xsave_area->fpu_sse));
+        memcpy(ctxt.fpu_regs, &v->arch.xsave_area->fpu_sse,
+               sizeof(ctxt.fpu_regs));
+
         ctxt.flags = XEN_X86_FPU_INITIALISED;
     }
 

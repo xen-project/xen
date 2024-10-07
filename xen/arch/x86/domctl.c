@@ -1383,7 +1383,11 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 #define c(fld) (c.nat->fld)
 #endif
 
-    memcpy(&c.nat->fpu_ctxt, v->arch.fpu_ctxt, sizeof(c.nat->fpu_ctxt));
+    BUILD_BUG_ON(sizeof(c.nat->fpu_ctxt) !=
+                 sizeof(v->arch.xsave_area->fpu_sse));
+    memcpy(&c.nat->fpu_ctxt, &v->arch.xsave_area->fpu_sse,
+           sizeof(c.nat->fpu_ctxt));
+
     if ( is_pv_domain(d) )
         c(flags = v->arch.pv.vgc_flags & ~(VGCF_i387_valid|VGCF_in_kernel));
     else
