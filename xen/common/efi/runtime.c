@@ -699,7 +699,7 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
 
         if ( !efi_enabled(EFI_RS) || (efi_rs->Hdr.Revision >> 16) < 2 )
             return -EOPNOTSUPP;
-        /* XXX fall through for now */
+        fallthrough; /* XXX fall through for now */
     default:
         return -ENOSYS;
     }
