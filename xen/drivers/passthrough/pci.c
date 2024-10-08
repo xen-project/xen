@@ -170,8 +170,11 @@ static int __init cf_check parse_phantom_dev(const char *str)
     {
     case 1: case 2: case 4:
         if ( *s )
-    default:
             return -EINVAL;
+        break;
+
+    default:
+        return -EINVAL;
     }
 
     phantom_devs[nr_phantom_devs++] = phantom;
