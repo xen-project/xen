@@ -16,8 +16,8 @@ Rationale:
 Comments:
 
 Covers:
- - `XenMkt~run_arm64_vms~1`
- - `XenMkt~provide_timer_vms~1`
+ - `XenMkt~run_arm64_domains~1`
+ - `XenMkt~provide_timer_domains~1`
 
 Needs:
  - XenSwdgn
@@ -35,8 +35,8 @@ Rationale:
 Comments:
 
 Covers:
- - `XenMkt~run_arm64_vms~1`
- - `XenMkt~provide_console_vms~1`
+ - `XenMkt~run_arm64_domains~1`
+ - `XenMkt~provide_console_domains~1`
 
 Needs:
  - XenSwdgn
