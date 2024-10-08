@@ -6840,6 +6840,7 @@ x86_emulate(
             break;
         default:
             ASSERT_UNREACHABLE();
+            goto unhandleable;
         }
         break;
 #ifdef HAVE_AS_SSE4_2
@@ -6868,6 +6869,7 @@ x86_emulate(
 # endif
         default:
             ASSERT_UNREACHABLE();
+            goto unhandleable;
         }
         break;
 #endif
