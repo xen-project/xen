@@ -115,46 +115,46 @@
 
 #ifndef __ASSEMBLY__
 typedef struct {
-    u32 total_size;
-    u32 reserved;
+    uint32_t total_size;
+    uint32_t reserved;
 } multiboot2_fixed_t;
 
 typedef struct {
-    u32 type;
-    u32 size;
+    uint32_t type;
+    uint32_t size;
 } multiboot2_tag_t;
 
 typedef struct {
-    u32 type;
-    u32 size;
-    u32 load_base_addr;
+    uint32_t type;
+    uint32_t size;
+    uint32_t load_base_addr;
 } multiboot2_tag_load_base_addr_t;
 
 typedef struct {
-    u32 type;
-    u32 size;
+    uint32_t type;
+    uint32_t size;
     char string[];
 } multiboot2_tag_string_t;
 
 typedef struct {
-    u32 type;
-    u32 size;
-    u32 mem_lower;
-    u32 mem_upper;
+    uint32_t type;
+    uint32_t size;
+    uint32_t mem_lower;
+    uint32_t mem_upper;
 } multiboot2_tag_basic_meminfo_t;
 
 typedef struct {
-    u64 addr;
-    u64 len;
-    u32 type;
-    u32 zero;
+    uint64_t addr;
+    uint64_t len;
+    uint32_t type;
+    uint32_t zero;
 } multiboot2_memory_map_t;
 
 typedef struct {
-    u32 type;
-    u32 size;
-    u32 entry_size;
-    u32 entry_version;
+    uint32_t type;
+    uint32_t size;
+    uint32_t entry_size;
+    uint32_t entry_version;
     multiboot2_memory_map_t entries[];
 } multiboot2_tag_mmap_t;
 
@@ -212,22 +212,22 @@ typedef struct
 } multiboot2_tag_framebuffer_t;
 
 typedef struct {
-    u32 type;
-    u32 size;
-    u64 pointer;
+    uint32_t type;
+    uint32_t size;
+    uint64_t pointer;
 } multiboot2_tag_efi64_t;
 
 typedef struct {
-    u32 type;
-    u32 size;
-    u64 pointer;
+    uint32_t type;
+    uint32_t size;
+    uint64_t pointer;
 } multiboot2_tag_efi64_ih_t;
 
 typedef struct {
-    u32 type;
-    u32 size;
-    u32 mod_start;
-    u32 mod_end;
+    uint32_t type;
+    uint32_t size;
+    uint32_t mod_start;
+    uint32_t mod_end;
     char cmdline[];
 } multiboot2_tag_module_t;
 #endif /* __ASSEMBLY__ */
