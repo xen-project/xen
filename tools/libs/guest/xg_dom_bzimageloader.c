@@ -272,8 +272,7 @@ static int _xc_try_lzma_decode(
     return retval;
 }
 
-/* 128 Mb is the minimum size (half-way) documented to work for all inputs. */
-#define LZMA_BLOCK_SIZE (128*1024*1024)
+#define LZMA_BLOCK_SIZE (256*1024*1024)
 
 static int xc_try_xz_decode(
     struct xc_dom_image *dom, void **blob, size_t *size)
