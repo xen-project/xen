@@ -516,6 +516,7 @@ F:	stubdom/
 
 TEE MEDIATORS
 M:	Volodymyr Babchuk <volodymyr_babchuk@epam.com>
+M:	Bertrand Marquis <bertrand.marquis@arm.com>
 S:	Supported
 F:	xen/arch/arm/include/asm/tee
 F:	xen/arch/arm/tee/
