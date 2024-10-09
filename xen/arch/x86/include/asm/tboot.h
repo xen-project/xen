@@ -34,8 +34,8 @@
  *
  */
 
-#ifndef __TBOOT_H__
-#define __TBOOT_H__
+#ifndef ASM__X86__TBOOT_H
+#define ASM__X86__TBOOT_H
 
 #include <xen/acpi.h>
 
@@ -147,7 +147,7 @@ static inline int tboot_wake_ap(int apicid, unsigned long sipi_vec)
 }
 #endif /* CONFIG_TBOOT */
 
-#endif /* __TBOOT_H__ */
+#endif /* ASM__X86__TBOOT_H */
 
 /*
  * Local variables:
