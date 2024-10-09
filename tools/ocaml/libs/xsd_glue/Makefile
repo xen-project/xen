@@ -5,6 +5,7 @@ include $(OCAML_TOPLEVEL)/common.make
 SUBDIRS= domain_getinfo_plugin_v1
 
 CFLAGS += $(CFLAGS_xeninclude)
+OCAMLCFLAGS += -opaque
 OCAMLOPTFLAGS += -opaque
 
 OBJS = plugin_interface_v1
@@ -28,14 +29,11 @@ OCAML_NOC_LIBRARY = plugin_interface_v1
 install: $(LIBS) META subdirs-install
 	mkdir -p $(OCAMLDESTDIR)
 	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xsd_glue
-	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore xsd_glue META $(INTF) $(LIBS)
-	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xsd_glue_dev
-	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore xsd_glue_dev META $(INTF) $(LIBS) *.ml *.mli
+	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore xsd_glue META $(INTF) $(LIBS) *.a
 
 .PHONY: uninstall
 uninstall: subdirs-uninstall
 	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xsd_glue
-	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xsd_glue_dev
 
 .PHONY: clean
 clean: subdirs-clean
