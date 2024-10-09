@@ -1,6 +1,8 @@
 #ifndef __ASM_ARM_ARM64_CPUFEATURES_H
 #define __ASM_ARM_ARM64_CPUFEATURES_H
 
+#include <xen/linux-compat.h>
+
 /*
  * CPU feature register tracking
  *

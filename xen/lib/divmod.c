@@ -46,8 +46,8 @@
  * one or more of the following formats.
  */
 union uu {
-    s64            q;              /* as a (signed) quad */
-    s64            uq;             /* as an unsigned quad */
+    int64_t        q;              /* as a (signed) quad */
+    uint64_t       uq;             /* as an unsigned quad */
     long           sl[2];          /* as two signed longs */
     unsigned long  ul[2];          /* as two unsigned longs */
 };
@@ -72,7 +72,7 @@ union uu {
  * and assembly.
  */
 #define CHAR_BIT        8               /* number of bits in a char */
-#define QUAD_BITS       (sizeof(s64) * CHAR_BIT)
+#define QUAD_BITS       (sizeof(int64_t) * CHAR_BIT)
 #define LONG_BITS       (sizeof(long) * CHAR_BIT)
 #define HALF_BITS       (sizeof(long) * CHAR_BIT / 2)
 
@@ -324,7 +324,7 @@ u64 __qdivrem(u64 uq, u64 vq, u64 *arq)
  * Divide two signed quads.
  * Truncates towards zero, as required by C99.
  */
-s64 __divdi3(s64 a, s64 b)
+int64_t __divdi3(int64_t a, int64_t b)
 {
     u64 ua, ub, uq;
     int neg = (a < 0) ^ (b < 0);
@@ -361,7 +361,7 @@ u64 __umoddi3(u64 a, u64 b)
  *  11 % -5 =  1
  * -11 % -5 = -1
  */
-s64 __moddi3(s64 a, s64 b)
+int64_t __moddi3(int64_t a, int64_t b)
 {
     u64 ua, ub, urem;
     int neg = (a < 0);
@@ -374,7 +374,7 @@ s64 __moddi3(s64 a, s64 b)
 /*
  * Quotient and remainder of unsigned long long division
  */
-s64 __ldivmod_helper(s64 a, s64 b, s64 *r)
+int64_t __ldivmod_helper(int64_t a, int64_t b, int64_t *r)
 {
     u64 ua, ub, rem, quot;
 

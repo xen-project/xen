@@ -8,7 +8,6 @@
 typedef uint8_t u8;
 typedef uint16_t u16, __u16;
 typedef uint32_t u32, __u32;
-typedef int64_t s64;
 typedef uint64_t u64, __u64;
 
 #include <asm/types.h>
