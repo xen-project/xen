@@ -16,8 +16,8 @@
  * Copyright (C) Ashok Raj <ashok.raj@intel.com>
  */
 
-#ifndef _INTEL_IOMMU_H_
-#define _INTEL_IOMMU_H_
+#ifndef DRIVERS__PASSTHROUGH__VTD__IOMMU_H
+#define DRIVERS__PASSTHROUGH__VTD__IOMMU_H
 
 #include <xen/iommu.h>
 #include <asm/msi.h>

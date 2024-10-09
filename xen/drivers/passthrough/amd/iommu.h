@@ -16,8 +16,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef AMD_IOMMU_H
-#define AMD_IOMMU_H
+#ifndef DRIVERS__PASSTHROUGH__AMD__IOMMU_H
+#define DRIVERS__PASSTHROUGH__AMD__IOMMU_H
 
 #include <xen/init.h>
 #include <xen/types.h>
@@ -372,4 +372,4 @@ static inline void iommu_set_addr_hi_to_reg(uint32_t *reg, uint32_t addr)
                          IOMMU_REG_BASE_ADDR_HIGH_SHIFT, reg);
 }
 
-#endif /* AMD_IOMMU_H */
+#endif /* DRIVERS__PASSTHROUGH__AMD__IOMMU_H */

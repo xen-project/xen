@@ -16,8 +16,8 @@
  * Copyright (C) Allen Kay <allen.m.kay@intel.com>
  */
 
-#ifndef _IOMMU_H_
-#define _IOMMU_H_
+#ifndef XEN__IOMMU_H
+#define XEN__IOMMU_H
 
 #include <xen/mm-frame.h>
 #include <xen/init.h>
@@ -440,7 +440,7 @@ static inline int iommu_update_ire_from_msi(
 }
 #endif
 
-#endif /* _IOMMU_H_ */
+#endif /* XEN__IOMMU_H */
 
 /*
  * Local variables:

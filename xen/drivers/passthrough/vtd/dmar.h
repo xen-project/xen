@@ -17,8 +17,8 @@
  * Copyright (C) Shaohua Li <shaohua.li@intel.com>
  */
 
-#ifndef _DMAR_H_
-#define _DMAR_H_
+#ifndef DRIVERS__PASSTHROUGH__VTD__DMAR_H
+#define DRIVERS__PASSTHROUGH__VTD__DMAR_H
 
 #include <xen/list.h>
 #include <xen/iommu.h>
@@ -171,4 +171,4 @@ int vtd_hw_check(void);
 void disable_pmr(struct vtd_iommu *iommu);
 int is_igd_drhd(struct acpi_drhd_unit *drhd);
 
-#endif /* _DMAR_H_ */
+#endif /* DRIVERS__PASSTHROUGH__VTD__DMAR_H */

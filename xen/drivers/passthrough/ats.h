@@ -12,8 +12,8 @@
  * this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _ATS_H_
-#define _ATS_H_
+#ifndef DRIVERS__PASSTHROUGH__ATS_H
+#define DRIVERS__PASSTHROUGH__ATS_H
 
 #include <xen/pci_regs.h>
 
@@ -50,5 +50,5 @@ static inline int pci_ats_device(int seg, int bus, int devfn)
                                    PCI_EXT_CAP_ID_ATS);
 }
 
-#endif /* _ATS_H_ */
+#endif /* DRIVERS__PASSTHROUGH__ATS_H */
 

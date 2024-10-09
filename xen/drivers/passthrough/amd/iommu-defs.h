@@ -17,8 +17,8 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef AMD_IOMMU_DEFS_H
-#define AMD_IOMMU_DEFS_H
+#ifndef DRIVERS__PASSTHROUGH__AMD__IOMMU_DEFS_H
+#define DRIVERS__PASSTHROUGH__AMD__IOMMU_DEFS_H
 
 /* IOMMU Event Log entries: in power of 2 increments, minimum of 256 */
 #define IOMMU_EVENT_LOG_DEFAULT_ENTRIES     512
@@ -486,7 +486,7 @@ union amd_iommu_pte {
 #define IOMMU_REG_BASE_ADDR_HIGH_MASK               0x000FFFFFU
 #define IOMMU_REG_BASE_ADDR_HIGH_SHIFT              0
 
-#endif /* AMD_IOMMU_DEFS_H */
+#endif /* DRIVERS__PASSTHROUGH__AMD__IOMMU_DEFS_H */
 
 /*
  * Local variables:

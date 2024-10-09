@@ -17,8 +17,8 @@
  * Copyright (C) Weidong Han <weidong.han@intel.com>
  */
 
-#ifndef _VTD_H_
-#define _VTD_H_
+#ifndef DRIVERS__PASSTHROUGH__VTD__VTD_H
+#define DRIVERS__PASSTHROUGH__VTD__VTD_H
 
 #include <xen/iommu.h>
 
@@ -72,4 +72,4 @@ struct msi_msg_remap_entry {
     u32	data;		/* msi message data */
 };
 
-#endif // _VTD_H_
+#endif // DRIVERS__PASSTHROUGH__VTD__VTD_H

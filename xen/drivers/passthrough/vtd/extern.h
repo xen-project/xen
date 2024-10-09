@@ -17,8 +17,8 @@
  * Copyright (C) Weidong Han <weidong.han@intel.com>
  */
 
-#ifndef _VTD_EXTERN_H_
-#define _VTD_EXTERN_H_
+#ifndef DRIVERS__PASSTHROUGH__VTD__EXTERN_H
+#define DRIVERS__PASSTHROUGH__VTD__EXTERN_H
 
 #include "dmar.h"
 #include <xen/keyhandler.h>
@@ -114,4 +114,4 @@ void quirk_iommu_caps(struct vtd_iommu *iommu);
 bool platform_supports_intremap(void);
 bool platform_supports_x2apic(void);
 
-#endif // _VTD_EXTERN_H_
+#endif // DRIVERS__PASSTHROUGH__VTD__EXTERN_H
