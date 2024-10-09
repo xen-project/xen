@@ -1162,6 +1162,7 @@ long arch_do_domctl(
                 if ( msr.reserved )
                     break;
 
+                ret = -ENXIO;
                 switch ( msr.index )
                 {
                 case MSR_SPEC_CTRL:
@@ -1170,9 +1171,16 @@ long arch_do_domctl(
                 case MSR_AMD64_DR0_ADDRESS_MASK:
                 case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
                     if ( guest_wrmsr(v, msr.index, msr.value) != X86EMUL_OKAY )
+                    {
+                        printk(XENLOG_G_ERR
+                               "%pv load MSR %#x with value %#lx failed\n",
+                               v, msr.index, msr.value);
                         break;
+                    }
                     continue;
                 }
+                printk(XENLOG_G_ERR "%pv attempted load of unhandled MSR %#x\n",
+                       v, msr.index);
                 break;
             }
 

@@ -1535,10 +1535,17 @@ static int cf_check hvm_load_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
             rc = guest_wrmsr(v, ctxt->msr[i].index, ctxt->msr[i].val);
 
             if ( rc != X86EMUL_OKAY )
+            {
+                printk(XENLOG_G_ERR
+                       "HVM %pv load MSR %#x with value %#lx failed\n",
+                       v, ctxt->msr[i].index, ctxt->msr[i].val);
                 return -ENXIO;
+            }
             break;
 
         default:
+            printk(XENLOG_G_ERR "HVM %pv attempted load of unhandled MSR %#x\n",
+                   v, ctxt->msr[i].index);
             return -ENXIO;
         }
     }
