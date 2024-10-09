@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef _ASM_RISCV_MM_H
-#define _ASM_RISCV_MM_H
+#ifndef ASM__RISCV__MM_H
+#define ASM__RISCV__MM_H
 
 #include <public/xen.h>
 #include <xen/bug.h>
@@ -261,4 +261,4 @@ void setup_fixmap_mappings(void);
 
 void *early_fdt_map(paddr_t fdt_paddr);
 
-#endif /* _ASM_RISCV_MM_H */
+#endif /* ASM__RISCV__MM_H */

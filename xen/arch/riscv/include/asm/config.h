@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef __RISCV_CONFIG_H__
-#define __RISCV_CONFIG_H__
+#ifndef ASM__RISCV__CONFIG_H
+#define ASM__RISCV__CONFIG_H
 
 #include <xen/const.h>
 #include <xen/page-size.h>
@@ -155,7 +155,7 @@
 
 #define IDENT_AREA_SIZE 64
 
-#endif /* __RISCV_CONFIG_H__ */
+#endif /* ASM__RISCV__CONFIG_H */
 /*
  * Local variables:
  * mode: C

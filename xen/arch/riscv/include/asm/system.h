@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef _ASM_RISCV_SYSTEM_H
-#define _ASM_RISCV_SYSTEM_H
+#ifndef ASM__RISCV__SYSTEM_H
+#define ASM__RISCV__SYSTEM_H
 
 #include <xen/stdbool.h>
 
@@ -78,7 +78,7 @@ static inline bool local_irq_is_enabled(void)
 
 #endif /* __ASSEMBLY__ */
 
-#endif /* _ASM_RISCV_SYSTEM_H */
+#endif /* ASM__RISCV__SYSTEM_H */
 
 /*
  * Local variables:

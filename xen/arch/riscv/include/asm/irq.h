@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef __ASM_RISCV_IRQ_H__
-#define __ASM_RISCV_IRQ_H__
+#ifndef ASM__RISCV__IRQ_H
+#define ASM__RISCV__IRQ_H
 
 #include <xen/bug.h>
 
@@ -25,7 +25,7 @@ static inline void arch_move_irqs(struct vcpu *v)
     BUG_ON("unimplemented");
 }
 
-#endif /* __ASM_RISCV_IRQ_H__ */
+#endif /* ASM__RISCV__IRQ_H */
 
 /*
  * Local variables:

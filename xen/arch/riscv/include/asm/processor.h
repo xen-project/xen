@@ -7,8 +7,8 @@
  *
  */
 
-#ifndef _ASM_RISCV_PROCESSOR_H
-#define _ASM_RISCV_PROCESSOR_H
+#ifndef ASM__RISCV__PROCESSOR_H
+#define ASM__RISCV__PROCESSOR_H
 
 #ifndef __ASSEMBLY__
 
@@ -93,7 +93,7 @@ static inline void sfence_vma(void)
 
 #endif /* __ASSEMBLY__ */
 
-#endif /* _ASM_RISCV_PROCESSOR_H */
+#endif /* ASM__RISCV__PROCESSOR_H */
 
 /*
  * Local variables:

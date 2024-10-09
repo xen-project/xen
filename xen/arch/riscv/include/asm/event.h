@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef __ASM_RISCV_EVENT_H__
-#define __ASM_RISCV_EVENT_H__
+#ifndef ASM__RISCV__EVENT_H
+#define ASM__RISCV__EVENT_H
 
 #include <xen/lib.h>
 
@@ -29,7 +29,7 @@ static inline bool arch_virq_is_global(unsigned int virq)
     return true;
 }
 
-#endif /* __ASM_RISCV_EVENT_H__ */
+#endif /* ASM__RISCV__EVENT_H */
 /*
  * Local variables:
  * mode: C

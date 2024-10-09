@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef __ASM_RISCV_GUEST_ATOMICS_H
-#define __ASM_RISCV_GUEST_ATOMICS_H
+#ifndef ASM__RISCV__GUEST_ATOMICS_H
+#define ASM__RISCV__GUEST_ATOMICS_H
 
 #include <xen/bug.h>
 
@@ -32,7 +32,7 @@ guest_testop(test_and_change_bit)
 
 #define guest_test_bit(d, nr, p) ((void)(d), test_bit(nr, p))
 
-#endif /* __ASM_RISCV_GUEST_ATOMICS_H */
+#endif /* ASM__RISCV__GUEST_ATOMICS_H */
 
 /*
  * Local variables:

@@ -3,8 +3,8 @@
  * Copyright (C) 2015 Regents of the University of California
  */
 
-#ifndef _ASM_RISCV_CSR_H
-#define _ASM_RISCV_CSR_H
+#ifndef ASM__RISCV__CSR_H
+#define ASM__RISCV__CSR_H
 
 #include <asm/asm.h>
 #include <xen/const.h>
@@ -80,4 +80,4 @@
 
 #endif /* __ASSEMBLY__ */
 
-#endif /* _ASM_RISCV_CSR_H */
+#endif /* ASM__RISCV__CSR_H */

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef __EARLY_PRINTK_H__
-#define __EARLY_PRINTK_H__
+#ifndef ASM__RISCV__EARLY_PRINTK_H
+#define ASM__RISCV__EARLY_PRINTK_H
 
 #include <xen/early_printk.h>
 
@@ -11,4 +11,4 @@ void early_printk(const char *str);
 static inline void early_printk(const char *s) {};
 #endif
 
-#endif /* __EARLY_PRINTK_H__ */
+#endif /* ASM__RISCV__EARLY_PRINTK_H */

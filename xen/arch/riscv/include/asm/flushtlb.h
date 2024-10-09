@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef __ASM_RISCV_FLUSHTLB_H__
-#define __ASM_RISCV_FLUSHTLB_H__
+#ifndef ASM__RISCV__FLUSHTLB_H
+#define ASM__RISCV__FLUSHTLB_H
 
 #include <xen/bug.h>
 #include <xen/cpumask.h>
@@ -37,7 +37,7 @@ static inline void page_set_tlbflush_timestamp(struct page_info *page)
 /* Flush specified CPUs' TLBs */
 void arch_flush_tlb_mask(const cpumask_t *mask);
 
-#endif /* __ASM_RISCV_FLUSHTLB_H__ */
+#endif /* ASM__RISCV__FLUSHTLB_H */
 
 /*
  * Local variables:

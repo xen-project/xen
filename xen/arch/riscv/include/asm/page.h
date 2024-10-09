@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef _ASM_RISCV_PAGE_H
-#define _ASM_RISCV_PAGE_H
+#ifndef ASM__RISCV__PAGE_H
+#define ASM__RISCV__PAGE_H
 
 #ifndef __ASSEMBLY__
 
@@ -182,4 +182,4 @@ static inline pte_t pte_from_mfn(mfn_t mfn, unsigned int flags)
 
 #endif /* __ASSEMBLY__ */
 
-#endif /* _ASM_RISCV_PAGE_H */
+#endif /* ASM__RISCV__PAGE_H */

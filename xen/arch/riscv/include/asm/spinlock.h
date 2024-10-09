@@ -1,5 +1,5 @@
-#ifndef __ASM_RISCV_SPINLOCK_H
-#define __ASM_RISCV_SPINLOCK_H
+#ifndef ASM__RISCV__SPINLOCK_H
+#define ASM__RISCV__SPINLOCK_H
 
 #define arch_lock_acquire_barrier() smp_mb()
 #define arch_lock_release_barrier() smp_mb()
@@ -12,4 +12,4 @@
     arch_lock_signal();             \
 })
 
-#endif /* __ASM_RISCV_SPINLOCK_H */
+#endif /* ASM__RISCV__SPINLOCK_H */

@@ -19,8 +19,8 @@
  * Copyright (C) 2024 Vates SAS
  */
 
-#ifndef _ASM_RISCV_ATOMIC_H
-#define _ASM_RISCV_ATOMIC_H
+#ifndef ASM__RISCV__ATOMIC_H
+#define ASM__RISCV__ATOMIC_H
 
 #include <xen/atomic.h>
 
@@ -266,7 +266,7 @@ ATOMIC_OPS()
 #undef ATOMIC_OPS
 #undef ATOMIC_OP
 
-#endif /* _ASM_RISCV_ATOMIC_H */
+#endif /* ASM__RISCV__ATOMIC_H */
 
 /*
  * Local variables:

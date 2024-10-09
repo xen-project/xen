@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /* Copyright (C) 2012 Regents of the University of California */
 
-#ifndef _ASM_RISCV_BITOPS_H
-#define _ASM_RISCV_BITOPS_H
+#ifndef ASM__RISCV__BITOPS_H
+#define ASM__RISCV__BITOPS_H
 
 #include <asm/system.h>
 
@@ -125,7 +125,7 @@ static inline void clear_bit(int nr, volatile void *p)
 #undef NOT
 #undef __AMO
 
-#endif /* _ASM_RISCV_BITOPS_H */
+#endif /* ASM__RISCV__BITOPS_H */
 
 /*
  * Local variables:

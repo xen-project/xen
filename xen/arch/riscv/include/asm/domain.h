@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef __ASM_RISCV_DOMAIN_H__
-#define __ASM_RISCV_DOMAIN_H__
+#ifndef ASM__RISCV__DOMAIN_H
+#define ASM__RISCV__DOMAIN_H
 
 #include <xen/xmalloc.h>
 #include <public/hvm/params.h>
@@ -39,7 +39,7 @@ static inline void update_guest_memory_policy(struct vcpu *v,
 
 static inline void arch_vcpu_block(struct vcpu *v) {}
 
-#endif /* __ASM_RISCV_DOMAIN_H__ */
+#endif /* ASM__RISCV__DOMAIN_H */
 
 /*
  * Local variables:

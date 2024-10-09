@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef __ASM_RISCV_SMP_H
-#define __ASM_RISCV_SMP_H
+#ifndef ASM__RISCV__SMP_H
+#define ASM__RISCV__SMP_H
 
 #include <xen/cpumask.h>
 #include <xen/percpu.h>

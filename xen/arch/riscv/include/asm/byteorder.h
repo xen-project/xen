@@ -1,11 +1,11 @@
-#ifndef __ASM_RISCV_BYTEORDER_H__
-#define __ASM_RISCV_BYTEORDER_H__
+#ifndef ASM__RISCV__BYTEORDER_H
+#define ASM__RISCV__BYTEORDER_H
 
 #define __BYTEORDER_HAS_U64__
 
 #include <xen/byteorder/little_endian.h>
 
-#endif /* __ASM_RISCV_BYTEORDER_H__ */
+#endif /* ASM__RISCV__BYTEORDER_H */
 /*
  * Local variables:
  * mode: C

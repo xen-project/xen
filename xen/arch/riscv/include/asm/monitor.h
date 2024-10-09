@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef __ASM_RISCV_MONITOR_H__
-#define __ASM_RISCV_MONITOR_H__
+#ifndef ASM__RISCV__MONITOR_H
+#define ASM__RISCV__MONITOR_H
 
 #include <xen/bug.h>
 
@@ -14,7 +14,7 @@ static inline uint32_t arch_monitor_get_capabilities(struct domain *d)
     return 0;
 }
 
-#endif /* __ASM_RISCV_MONITOR_H__ */
+#endif /* ASM__RISCV__MONITOR_H */
 
 /*
  * Local variables:

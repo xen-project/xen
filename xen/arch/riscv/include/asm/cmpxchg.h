@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (C) 2014 Regents of the University of California */
 
-#ifndef _ASM_RISCV_CMPXCHG_H
-#define _ASM_RISCV_CMPXCHG_H
+#ifndef ASM__RISCV__CMPXCHG_H
+#define ASM__RISCV__CMPXCHG_H
 
 #include <xen/compiler.h>
 #include <xen/lib.h>
@@ -242,7 +242,7 @@ static always_inline unsigned long __cmpxchg(volatile void *ptr,
               sizeof(*(ptr))); \
 })
 
-#endif /* _ASM_RISCV_CMPXCHG_H */
+#endif /* ASM__RISCV__CMPXCHG_H */
 
 /*
  * Local variables:

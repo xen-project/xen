@@ -9,8 +9,8 @@
  * Copyright (c) 2019 Western Digital Corporation or its affiliates.
  */
 
-#ifndef __ASM_RISCV_SBI_H__
-#define __ASM_RISCV_SBI_H__
+#ifndef ASM__RISCV__SBI_H
+#define ASM__RISCV__SBI_H
 
 #include <xen/cpumask.h>
 
@@ -96,4 +96,4 @@ int sbi_remote_sfence_vma(const cpumask_t *cpu_mask, vaddr_t start,
  */
 int sbi_init(void);
 
-#endif /* __ASM_RISCV_SBI_H__ */
+#endif /* ASM__RISCV__SBI_H */

@@ -4,8 +4,8 @@
  * Copyright (C) 2021-2023 Vates
  *
  */
-#ifndef _ASM_RISCV_BUG_H
-#define _ASM_RISCV_BUG_H
+#ifndef ASM__RISCV__BUG_H
+#define ASM__RISCV__BUG_H
 
 #ifndef __ASSEMBLY__
 
@@ -32,4 +32,4 @@
 
 #endif /* !__ASSEMBLY__ */
 
-#endif /* _ASM_RISCV_BUG_H */
+#endif /* ASM__RISCV__BUG_H */

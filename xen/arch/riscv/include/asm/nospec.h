@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (C) 2024 Vates */
 
-#ifndef _ASM_RISCV_NOSPEC_H
-#define _ASM_RISCV_NOSPEC_H
+#ifndef ASM__RISCV__NOSPEC_H
+#define ASM__RISCV__NOSPEC_H
 
 static inline bool evaluate_nospec(bool condition)
 {
@@ -13,7 +13,7 @@ static inline void block_speculation(void)
 {
 }
 
-#endif /* _ASM_RISCV_NOSPEC_H */
+#endif /* ASM__RISCV__NOSPEC_H */
 
 /*
  * Local variables:

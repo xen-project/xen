@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef __ASM_RISCV_TIME_H__
-#define __ASM_RISCV_TIME_H__
+#ifndef ASM__RISCV__TIME_H
+#define ASM__RISCV__TIME_H
 
 #include <xen/bug.h>
 #include <asm/csr.h>
@@ -19,7 +19,7 @@ static inline cycles_t get_cycles(void)
     return csr_read(CSR_TIME);
 }
 
-#endif /* __ASM_RISCV_TIME_H__ */
+#endif /* ASM__RISCV__TIME_H */
 
 /*
  * Local variables:

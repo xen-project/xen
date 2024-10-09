@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef __RISCV_PAGE_BITS_H__
-#define __RISCV_PAGE_BITS_H__
+#ifndef ASM__RISCV__PAGE_BITS_H
+#define ASM__RISCV__PAGE_BITS_H
 
 #define PAGE_SHIFT              12 /* 4 KiB Pages */
 #define PADDR_BITS              56 /* 44-bit PPN */
@@ -16,4 +16,4 @@
 
 #define PTE_PPN_SHIFT           10
 
-#endif /* __RISCV_PAGE_BITS_H__ */
+#endif /* ASM__RISCV__PAGE_BITS_H */

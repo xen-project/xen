@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef __ASM_RISCV_CPUFEATURE_H
-#define __ASM_RISCV_CPUFEATURE_H
+#ifndef ASM__RISCV__CPUFEATURE_H
+#define ASM__RISCV__CPUFEATURE_H
 
 #ifndef __ASSEMBLY__
 
@@ -11,7 +11,7 @@ static inline unsigned int cpu_nr_siblings(unsigned int cpu)
 
 #endif /* __ASSEMBLY__ */
 
-#endif /* __ASM_RISCV_CPUFEATURE_H */
+#endif /* ASM__RISCV__CPUFEATURE_H */
 
 /*
  * Local variables:

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef __ASM_RISCV_P2M_H__
-#define __ASM_RISCV_P2M_H__
+#ifndef ASM__RISCV__P2M_H
+#define ASM__RISCV__P2M_H
 
 #include <xen/errno.h>
 
@@ -93,7 +93,7 @@ static inline void p2m_altp2m_check(struct vcpu *v, uint16_t idx)
     /* Not supported on RISCV. */
 }
 
-#endif /* __ASM_RISCV_P2M_H__ */
+#endif /* ASM__RISCV__P2M_H */
 
 /*
  * Local variables:

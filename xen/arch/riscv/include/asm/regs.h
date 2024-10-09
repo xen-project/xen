@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef __ARM_RISCV_REGS_H__
-#define __ARM_RISCV_REGS_H__
+#ifndef ASM__RISCV__REGS_H
+#define ASM__RISCV__REGS_H
 
 #ifndef __ASSEMBLY__
 
@@ -17,7 +17,7 @@ static inline bool guest_mode(const struct cpu_user_regs *r)
 
 #endif /* __ASSEMBLY__ */
 
-#endif /* __ARM_RISCV_REGS_H__ */
+#endif /* ASM__RISCV__REGS_H */
 
 /*
  * Local variables:
