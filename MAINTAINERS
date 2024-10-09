@@ -485,6 +485,7 @@ RISCV
 R:	Alistair Francis <alistair.francis@wdc.com>
 R:	Bob Eshleman <bobbyeshleman@gmail.com>
 R:	Connor Davis <connojdavis@gmail.com>
+R:	Oleksii Kurochko <oleksii.kurochko@gmail.com>
 S:	Supported
 F:	config/riscv64.mk
 F:	xen/arch/riscv/
