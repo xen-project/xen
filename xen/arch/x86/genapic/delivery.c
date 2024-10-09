@@ -19,16 +19,6 @@ void cf_check init_apic_ldr_flat(void)
 	apic_write(APIC_LDR, val);
 }
 
-const cpumask_t *cf_check vector_allocation_cpumask_flat(int cpu)
-{
-	return &cpu_online_map;
-} 
-
-unsigned int cf_check cpu_mask_to_apicid_flat(const cpumask_t *cpumask)
-{
-	return cpumask_bits(cpumask)[0]&0xFF;
-}
-
 /*
  * PHYSICAL DELIVERY MODE (unicast to physical APIC IDs).
  */
