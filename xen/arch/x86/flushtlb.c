@@ -286,7 +286,7 @@ void cache_flush(const void *addr, unsigned int size)
          * + prefix than a clflush + nop, and hence the prefix is added instead
          * of letting the alternative framework fill the gap by appending nops.
          */
-        alternative_input("ds clflush %[p]",
+        alternative_input("ds; clflush %[p]",/* Semicolon for Clang-IAS < 12 */
                           "data16 clflush %[p]", /* clflushopt */
                            X86_FEATURE_CLFLUSHOPT,
                            [p] "m" (*(const char *)(addr)));
