@@ -29,7 +29,6 @@ struct mmu_desc {
 unsigned long __ro_after_init phys_offset; /* = load_start - XEN_VIRT_START */
 
 #define LOAD_TO_LINK(addr) ((unsigned long)(addr) - phys_offset)
-#define LINK_TO_LOAD(addr) ((unsigned long)(addr) + phys_offset)
 
 /*
  * It is expected that Xen won't be more then 2 MB.
@@ -122,7 +121,7 @@ static void __init setup_initial_mapping(struct mmu_desc *mmu_desc,
                 unsigned long paddr = (page_addr - map_start) + pa_start;
                 unsigned int permissions = PTE_LEAF_DEFAULT;
                 unsigned long addr = is_identity_mapping
-                                     ? page_addr : LINK_TO_LOAD(page_addr);
+                                     ? page_addr : virt_to_maddr(page_addr);
                 pte_t pte_to_be_written;
 
                 index = pt_index(0, page_addr);
@@ -225,7 +224,7 @@ void __init setup_fixmap_mappings(void)
 
     BUG_ON(pte_is_valid(*pte));
 
-    tmp = paddr_to_pte(LINK_TO_LOAD((unsigned long)&xen_fixmap), PTE_TABLE);
+    tmp = paddr_to_pte(virt_to_maddr(&xen_fixmap), PTE_TABLE);
     write_pte(pte, tmp);
 
     RISCV_FENCE(rw, rw);
@@ -312,7 +311,7 @@ void __init remove_identity_mapping(void)
     pte_t *pgtbl;
     unsigned int index, xen_index;
     unsigned long ident_start =
-        LINK_TO_LOAD(turn_on_mmu) & XEN_PT_LEVEL_MAP_MASK(0);
+        virt_to_maddr(turn_on_mmu) & XEN_PT_LEVEL_MAP_MASK(0);
 
     for ( pgtbl = stage1_pgtbl_root, i = CONFIG_PAGING_LEVELS; i; i-- )
     {
