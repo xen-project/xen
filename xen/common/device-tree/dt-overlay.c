@@ -1,7 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * xen/common/dt-overlay.c
- *
  * Device tree overlay support in Xen.
  *
  * Copyright (C) 2023, Advanced Micro Devices, Inc. All Rights Reserved.
