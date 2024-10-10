@@ -12,8 +12,8 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __XEN_ARGO_H__
-#define __XEN_ARGO_H__
+#ifndef XEN__ARGO_H
+#define XEN__ARGO_H
 
 #include <xen/sched.h>
 
