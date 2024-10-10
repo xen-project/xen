@@ -131,7 +131,7 @@ struct range_trans {
 
 /* Boolean data type */
 struct cond_bool_datum {
-    __u32 value;        /* internal type value */
+    uint32_t value;        /* internal type value */
     int state;
 };
 

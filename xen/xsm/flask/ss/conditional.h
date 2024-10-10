@@ -29,8 +29,8 @@ struct cond_expr {
 #define COND_EQ        6 /* bool == bool */
 #define COND_NEQ    7 /* bool != bool */
 #define COND_LAST    COND_NEQ
-    __u32 expr_type;
-    __u32 bool_val;
+    uint32_t expr_type;
+    uint32_t bool_val;
     struct cond_expr *next;
 };
 
