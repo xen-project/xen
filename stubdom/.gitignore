@@ -1,3 +1,4 @@
+*.gen.cfg
 /*.tar.gz
 /*-minios-config.mk
 /autom4te.cache/
