@@ -155,6 +155,10 @@
 
 #define IDENT_AREA_SIZE 64
 
+#ifndef __ASSEMBLY__
+extern unsigned long phys_offset; /* = load_start - XEN_VIRT_START */
+#endif
+
 #endif /* ASM__RISCV__CONFIG_H */
 /*
  * Local variables:

@@ -26,7 +26,7 @@ struct mmu_desc {
     pte_t *pgtbl_base;
 };
 
-static unsigned long __ro_after_init phys_offset;
+unsigned long __ro_after_init phys_offset; /* = load_start - XEN_VIRT_START */
 
 #define LOAD_TO_LINK(addr) ((unsigned long)(addr) - phys_offset)
 #define LINK_TO_LOAD(addr) ((unsigned long)(addr) + phys_offset)

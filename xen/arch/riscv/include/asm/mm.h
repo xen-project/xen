@@ -5,6 +5,7 @@
 
 #include <public/xen.h>
 #include <xen/bug.h>
+#include <xen/const.h>
 #include <xen/mm-frame.h>
 #include <xen/pdx.h>
 #include <xen/types.h>
@@ -28,7 +29,26 @@ static inline void *maddr_to_virt(paddr_t ma)
     return NULL;
 }
 
-#define virt_to_maddr(va) ({ BUG_ON("unimplemented"); 0; })
+/*
+ * virt_to_maddr() is expected to work with virtual addresses from either
+ * the directmap region or Xen's linkage (XEN_VIRT_START) region.
+ * Therefore, it is sufficient to check only these regions and assert if `va`
+ * is not within the directmap or Xen's linkage region.
+ */
+static inline unsigned long virt_to_maddr(unsigned long va)
+{
+    if ((va >= DIRECTMAP_VIRT_START) &&
+        (va < (DIRECTMAP_VIRT_START + DIRECTMAP_SIZE)))
+        return directmapoff_to_maddr(va - DIRECTMAP_VIRT_START);
+
+    BUILD_BUG_ON(XEN_VIRT_SIZE != MB(2));
+    ASSERT((va >> (PAGETABLE_ORDER + PAGE_SHIFT)) ==
+           (_AC(XEN_VIRT_START, UL) >> (PAGETABLE_ORDER + PAGE_SHIFT)));
+
+    /* phys_offset = load_start - XEN_VIRT_START */
+    return phys_offset + va;
+}
+#define virt_to_maddr(va) virt_to_maddr((unsigned long)(va))
 
 /* Convert between Xen-heap virtual addresses and machine frame numbers. */
 #define __virt_to_mfn(va)  mfn_x(maddr_to_mfn(virt_to_maddr(va)))
