@@ -554,7 +554,10 @@ static int __init domain_handle_dtb_bootmodule(struct domain *d,
          */
         if ( dt_node_cmp(name, "gic") == 0 )
         {
-            kinfo->phandle_gic = fdt_get_phandle(pfdt, node_next);
+            uint32_t phandle_gic = fdt_get_phandle(pfdt, node_next);
+
+            if ( phandle_gic != 0 )
+                kinfo->phandle_gic = phandle_gic;
             continue;
         }
 
