@@ -334,15 +334,15 @@ alpine-3.18-gcc-debug:
       CONFIG_UNSUPPORTED=y
       CONFIG_ARGO=y
 
-debian-bookworm-gcc-debug:
+debian-12-x86_64-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: debian:bookworm
+    CONTAINER: debian:12-x86_64
 
-debian-bookworm-clang-debug:
+debian-12-x86_64-clang-debug:
   extends: .clang-x86-64-build-debug
   variables:
-    CONTAINER: debian:bookworm
+    CONTAINER: debian:12-x86_64
 
 debian-12-ppc64le-gcc-debug:
   extends: .gcc-ppc64le-cross-build-debug
@@ -546,20 +546,20 @@ debian-12-x86_64-gcc-ibt:
     EXTRA_FIXED_RANDCONFIG: |
       CONFIG_XEN_IBT=y
 
-debian-bookworm-clang:
+debian-12-x86_64-clang:
   extends: .clang-x86-64-build
   variables:
-    CONTAINER: debian:bookworm
+    CONTAINER: debian:12-x86_64
 
-debian-bookworm-gcc:
+debian-12-x86_64-gcc:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: debian:bookworm
+    CONTAINER: debian:12-x86_64
 
-debian-bookworm-gcc-randconfig:
+debian-12-x86_64-gcc-randconfig:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: debian:bookworm
+    CONTAINER: debian:12-x86_64
     RANDCONFIG: y
 
 debian-bookworm-32-clang-debug:
