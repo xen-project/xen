@@ -1,4 +1,6 @@
 #include <xen/lib.h>
+
+#define DECL_SECTION_WITH_LADDR
 #include <xen/xen.lds.h>
 
 OUTPUT_ARCH(powerpc:common64)

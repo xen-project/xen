@@ -3,6 +3,10 @@
 
 #include <xen/cache.h>
 #include <xen/lib.h>
+
+#ifndef EFI
+# define DECL_SECTION_WITH_LADDR
+#endif
 #include <xen/xen.lds.h>
 #include <asm/page.h>
 
@@ -10,9 +14,7 @@
 
 #define FORMAT "pei-x86-64"
 #undef __XEN_VIRT_START
-#undef DECL_SECTION
 #define __XEN_VIRT_START __image_base__
-#define DECL_SECTION(x) x :
 
 ENTRY(efi_start)
 

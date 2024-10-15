@@ -5,6 +5,8 @@
  * Common macros to be used in architecture specific linker scripts.
  */
 
+#ifdef DECL_SECTION_WITH_LADDR
+
 /*
  * Declare a section whose load address is based at PA 0 rather than
  * Xen's virtual base address.
@@ -13,6 +15,10 @@
 # define DECL_SECTION(x) x : AT(ADDR(#x) - __XEN_VIRT_START)
 #else
 # define DECL_SECTION(x) x : AT(ADDR(x) - __XEN_VIRT_START)
+#endif
+
+#else /* !DECL_SECTION_WITH_LADDR */
+#define DECL_SECTION(x) x :
 #endif
 
 /*
