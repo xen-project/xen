@@ -364,6 +364,7 @@ static int adjacent_read(const struct domain *d, const struct vpci_msix *msix,
 
     default:
         ASSERT_UNREACHABLE();
+        break;
     }
     spin_unlock(&vpci->lock);
 
@@ -512,6 +513,7 @@ static int adjacent_write(const struct domain *d, const struct vpci_msix *msix,
 
     default:
         ASSERT_UNREACHABLE();
+        break;
     }
     spin_unlock(&vpci->lock);
 
