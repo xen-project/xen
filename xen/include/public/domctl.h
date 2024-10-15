@@ -21,6 +21,16 @@
 #include "hvm/save.h"
 #include "memory.h"
 
+/*
+ * The interface version needs to be incremented by 1 in case the interface
+ * is modified in an incompatible way AND if the version hasn't been
+ * incremented in the current development cycle already.
+ * Pure additions (e.g. new sub-commands) or compatible interface changes
+ * (e.g. adding semantics to 0-checked input fields or data to zeroed output
+ * fields) don't require a change of the version.
+ *
+ * Last version bump: Xen 4.19
+ */
 #define XEN_DOMCTL_INTERFACE_VERSION 0x00000017
 
 /*
