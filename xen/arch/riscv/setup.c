@@ -27,6 +27,8 @@ unsigned char __initdata cpu0_boot_stack[STACK_SIZE]
 void __init noreturn start_xen(unsigned long bootcpu_id,
                                paddr_t dtb_addr)
 {
+    const char *cmdline;
+
     remove_identity_mapping();
 
     set_processor_id(0);
@@ -52,6 +54,10 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
 
     if ( !boot_fdt_info(device_tree_flattened, dtb_addr) )
         BUG();
+
+    cmdline = boot_fdt_cmdline(device_tree_flattened);
+    printk("Command line: %s\n", cmdline);
+    cmdline_parse(cmdline);
 
     printk("All set up\n");
 
