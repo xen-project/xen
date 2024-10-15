@@ -50,6 +50,9 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
                           _end - _start, false) )
         panic("Failed to add BOOTMOD_XEN\n");
 
+    if ( !boot_fdt_info(device_tree_flattened, dtb_addr) )
+        BUG();
+
     printk("All set up\n");
 
     machine_halt();
