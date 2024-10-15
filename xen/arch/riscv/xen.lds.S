@@ -91,6 +91,8 @@ SECTIONS
         CONSTRUCTORS
     } :text
 
+    DT_DEV_INFO                       /* Devicetree based device info */
+
     . = ALIGN(PAGE_SIZE);             /* Init code and data */
     __init_begin = .;
     .init.text : {
