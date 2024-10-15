@@ -120,6 +120,14 @@
 
 /* List of constructs other than *_SECTIONS in alphabetical order. */
 
+#define ACPI_DEV_INFO        \
+  . = ALIGN(POINTER_ALIGN);  \
+  DECL_SECTION(.adev.info) { \
+      _asdevice = .;         \
+      *(.adev.info)          \
+      _aedevice = .;         \
+  } :text
+
 #define BUGFRAMES                               \
     __start_bug_frames_0 = .;                   \
     *(.bug_frames.0)                            \
@@ -136,6 +144,14 @@
     __start_bug_frames_3 = .;                   \
     *(.bug_frames.3)                            \
     __stop_bug_frames_3 = .;
+
+#define DT_DEV_INFO         \
+  . = ALIGN(POINTER_ALIGN); \
+  DECL_SECTION(.dev.info) { \
+       _sdevice = .;        \
+       *(.dev.info)         \
+       _edevice = .;        \
+  } :text
 
 #ifdef CONFIG_HYPFS
 #define HYPFS_PARAM              \
