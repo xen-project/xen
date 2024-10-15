@@ -124,20 +124,10 @@ SECTIONS
       _eplatform = .;
   } :text
 
-  . = ALIGN(8);
-  .dev.info : {
-      _sdevice = .;
-      *(.dev.info)
-      _edevice = .;
-  } :text
+  DT_DEV_INFO
 
 #ifdef CONFIG_ACPI
-  . = ALIGN(8);
-  .adev.info : {
-      _asdevice = .;
-      *(.adev.info)
-      _aedevice = .;
-  } :text
+  ACPI_DEV_INFO
 #endif
 
   . = ALIGN(8);
