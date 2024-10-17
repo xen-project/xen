@@ -32,6 +32,8 @@ int construct_dom0(
     const char *cmdline);
 void setup_io_bitmap(struct domain *d);
 
+extern struct boot_info xen_boot_info;
+
 unsigned long initial_images_nrpages(nodeid_t node);
 void discard_initial_images(void);
 void *bootstrap_map(const module_t *mod);

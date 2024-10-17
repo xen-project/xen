@@ -32,6 +32,7 @@
 #include <compat/xen.h>
 #endif
 #include <xen/bitops.h>
+#include <asm/bootinfo.h>
 #include <asm/smp.h>
 #include <asm/processor.h>
 #include <asm/mpspec.h>
@@ -274,16 +275,30 @@ static int __init cf_check parse_acpi_param(const char *s)
 custom_param("acpi", parse_acpi_param);
 
 static const module_t *__initdata initial_images;
-static unsigned int __initdata nr_initial_images;
+
+struct boot_info __initdata xen_boot_info = {
+};
+
+static struct boot_info *__init multiboot_fill_boot_info(unsigned long mbi_p)
+{
+    struct boot_info *bi = &xen_boot_info;
+    const multiboot_info_t *mbi = __va(mbi_p);
+
+    if ( mbi->flags & MBI_MODULES )
+        bi->nr_modules = mbi->mods_count;
+
+    return bi;
+}
 
 unsigned long __init initial_images_nrpages(nodeid_t node)
 {
+    struct boot_info *bi = &xen_boot_info;
     unsigned long node_start = node_start_pfn(node);
     unsigned long node_end = node_end_pfn(node);
     unsigned long nr;
     unsigned int i;
 
-    for ( nr = i = 0; i < nr_initial_images; ++i )
+    for ( nr = i = 0; i < bi->nr_modules; ++i )
     {
         unsigned long start = initial_images[i].mod_start;
         unsigned long end = start + PFN_UP(initial_images[i].mod_end);
@@ -297,9 +312,10 @@ unsigned long __init initial_images_nrpages(nodeid_t node)
 
 void __init discard_initial_images(void)
 {
+    struct boot_info *bi = &xen_boot_info;
     unsigned int i;
 
-    for ( i = 0; i < nr_initial_images; ++i )
+    for ( i = 0; i < bi->nr_modules; ++i )
     {
         uint64_t start = (uint64_t)initial_images[i].mod_start << PAGE_SHIFT;
 
@@ -307,7 +323,7 @@ void __init discard_initial_images(void)
                            start + PAGE_ALIGN(initial_images[i].mod_end));
     }
 
-    nr_initial_images = 0;
+    bi->nr_modules = 0;
     initial_images = NULL;
 }
 
@@ -969,6 +985,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
     void *bsp_stack;
     struct cpu_info *info = get_cpu_info(), *bsp_info;
     unsigned int initrdidx, num_parked = 0;
+    struct boot_info *bi;
     multiboot_info_t *mbi;
     module_t *mod;
     unsigned long nr_pages, raw_max_page, modules_headroom, module_map[1];
@@ -1014,6 +1031,8 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
         mbi = __va(mbi_p);
         mod = __va(mbi->mods_addr);
     }
+
+    bi = multiboot_fill_boot_info(mbi_p);
 
     loader = (mbi->flags & MBI_LOADERNAME) ? __va(mbi->boot_loader_name)
                                            : "unknown";
@@ -1122,18 +1141,18 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
            bootsym(boot_edd_info_nr));
 
     /* Check that we have at least one Multiboot module. */
-    if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )
+    if ( !bi->nr_modules )
         panic("dom0 kernel not specified. Check bootloader configuration\n");
 
     /* Check that we don't have a silly number of modules. */
-    if ( mbi->mods_count > sizeof(module_map) * 8 )
+    if ( bi->nr_modules > sizeof(module_map) * 8 )
     {
-        mbi->mods_count = sizeof(module_map) * 8;
-        printk("Excessive multiboot modules - using the first %u only\n",
-               mbi->mods_count);
+        bi->nr_modules = sizeof(module_map) * 8;
+        printk("Excessive boot modules - using the first %u only\n",
+               bi->nr_modules);
     }
 
-    bitmap_fill(module_map, mbi->mods_count);
+    bitmap_fill(module_map, bi->nr_modules);
     __clear_bit(0, module_map); /* Dom0 kernel is always first */
 
     if ( pvh_boot )
@@ -1306,9 +1325,8 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
     kexec_reserve_area();
 
     initial_images = mod;
-    nr_initial_images = mbi->mods_count;
 
-    for ( i = 0; !efi_enabled(EFI_LOADER) && i < mbi->mods_count; i++ )
+    for ( i = 0; !efi_enabled(EFI_LOADER) && i < bi->nr_modules; i++ )
     {
         if ( mod[i].mod_start & (PAGE_SIZE - 1) )
             panic("Bootloader didn't honor module alignment request\n");
@@ -1332,8 +1350,8 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
          * respective reserve_e820_ram() invocation below. No need to
          * query efi_boot_mem_unused() here, though.
          */
-        mod[mbi->mods_count].mod_start = virt_to_mfn(_stext);
-        mod[mbi->mods_count].mod_end = __2M_rwdata_end - _stext;
+        mod[bi->nr_modules].mod_start = virt_to_mfn(_stext);
+        mod[bi->nr_modules].mod_end = __2M_rwdata_end - _stext;
     }
 
     modules_headroom = bzimage_headroom(bootstrap_map(mod), mod->mod_end);
@@ -1393,7 +1411,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
         {
             /* Don't overlap with modules. */
             end = consider_modules(s, e, reloc_size + mask,
-                                   mod, mbi->mods_count, -1);
+                                   mod, bi->nr_modules, -1);
             end &= ~mask;
         }
         else
@@ -1414,7 +1432,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
         }
 
         /* Is the region suitable for relocating the multiboot modules? */
-        for ( j = mbi->mods_count - 1; j >= 0; j-- )
+        for ( j = bi->nr_modules - 1; j >= 0; j-- )
         {
             /*
              * 'headroom' is a guess for the decompressed size and
@@ -1429,7 +1447,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
 
             /* Don't overlap with other modules (or Xen itself). */
             end = consider_modules(s, e, size, mod,
-                                   mbi->mods_count + relocated, j);
+                                   bi->nr_modules + relocated, j);
 
             if ( highmem_start && end > highmem_start )
                 continue;
@@ -1456,7 +1474,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
         {
             /* Don't overlap with modules (or Xen itself). */
             e = consider_modules(s, e, PAGE_ALIGN(kexec_crash_area.size), mod,
-                                 mbi->mods_count + relocated, -1);
+                                 bi->nr_modules + relocated, -1);
             if ( s >= e )
                 break;
             if ( e > kexec_crash_area_limit )
@@ -1471,7 +1489,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( modules_headroom && !mod->reserved )
         panic("Not enough memory to relocate the dom0 kernel image\n");
-    for ( i = 0; i < mbi->mods_count; ++i )
+    for ( i = 0; i < bi->nr_modules; ++i )
     {
         uint64_t s = (uint64_t)mod[i].mod_start << PAGE_SHIFT;
 
@@ -1551,7 +1569,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
                     ASSERT(j);
                 }
                 map_e = boot_e820.map[j].addr + boot_e820.map[j].size;
-                for ( j = 0; j < mbi->mods_count; ++j )
+                for ( j = 0; j < bi->nr_modules; ++j )
                 {
                     uint64_t end = pfn_to_paddr(mod[j].mod_start) +
                                    mod[j].mod_end;
@@ -1626,7 +1644,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
         }
     }
 
-    for ( i = 0; i < mbi->mods_count; ++i )
+    for ( i = 0; i < bi->nr_modules; ++i )
     {
         set_pdx_range(mod[i].mod_start,
                       mod[i].mod_start + PFN_UP(mod[i].mod_end));
@@ -2011,8 +2029,8 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
            cpu_has_nx ? XENLOG_INFO : XENLOG_WARNING "Warning: ",
            cpu_has_nx ? "" : "not ");
 
-    initrdidx = find_first_bit(module_map, mbi->mods_count);
-    if ( bitmap_weight(module_map, mbi->mods_count) > 1 )
+    initrdidx = find_first_bit(module_map, bi->nr_modules);
+    if ( bitmap_weight(module_map, bi->nr_modules) > 1 )
         printk(XENLOG_WARNING
                "Multiple initrd candidates, picking module #%u\n",
                initrdidx);
@@ -2022,7 +2040,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
     dom0 = create_dom0(mod, modules_headroom,
-                       initrdidx < mbi->mods_count ? mod + initrdidx : NULL,
+                       initrdidx < bi->nr_modules ? mod + initrdidx : NULL,
                        kextra, loader);
     if ( !dom0 )
         panic("Could not set up DOM0 guest OS\n");
