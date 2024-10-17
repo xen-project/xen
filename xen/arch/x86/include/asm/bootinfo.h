@@ -14,6 +14,7 @@
  */
 struct boot_info {
     const char *loader;
+    const char *cmdline;
 
     unsigned int nr_modules;
 };

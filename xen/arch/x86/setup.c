@@ -274,10 +274,13 @@ static int __init cf_check parse_acpi_param(const char *s)
 }
 custom_param("acpi", parse_acpi_param);
 
+static const char *cmdline_cook(const char *p, const char *loader_name);
+
 static const module_t *__initdata initial_images;
 
 struct boot_info __initdata xen_boot_info = {
     .loader = "unknown",
+    .cmdline = "",
 };
 
 static struct boot_info *__init multiboot_fill_boot_info(unsigned long mbi_p)
@@ -290,6 +293,9 @@ static struct boot_info *__init multiboot_fill_boot_info(unsigned long mbi_p)
 
     if ( mbi->flags & MBI_LOADERNAME )
         bi->loader = __va(mbi->boot_loader_name);
+
+    if ( mbi->flags & MBI_CMDLINE )
+        bi->cmdline = cmdline_cook(__va(mbi->cmdline), bi->loader);
 
     return bi;
 }
@@ -984,7 +990,7 @@ static struct domain *__init create_dom0(const module_t *image,
 
 void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
 {
-    const char *memmap_type = NULL, *cmdline = "";
+    const char *memmap_type = NULL;
     char *kextra;
     void *bsp_stack;
     struct cpu_info *info = get_cpu_info(), *bsp_info;
@@ -1039,10 +1045,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
     bi = multiboot_fill_boot_info(mbi_p);
 
     /* Parse the command-line options. */
-    if ( mbi->flags & MBI_CMDLINE )
-        cmdline = cmdline_cook(__va(mbi->cmdline), bi->loader);
-
-    if ( (kextra = strstr(cmdline, " -- ")) != NULL )
+    if ( (kextra = strstr(bi->cmdline, " -- ")) != NULL )
     {
         /*
          * Options after ' -- ' separator belong to dom0.
@@ -1053,7 +1056,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
         kextra += 3;
         while ( kextra[1] == ' ' ) kextra++;
     }
-    cmdline_parse(cmdline);
+    cmdline_parse(bi->cmdline);
 
     /* Must be after command line argument parsing and before
      * allocing any xenheap structures wanted in lower memory. */
@@ -1083,7 +1086,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
 
     printk("Bootloader: %s\n", bi->loader);
 
-    printk("Command line: %s\n", cmdline);
+    printk("Command line: %s\n", bi->cmdline);
 
     printk("Xen image load base address: %#lx\n", xen_phys_start);
     if ( hypervisor_name )
