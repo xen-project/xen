@@ -8,6 +8,8 @@
 #ifndef X86_BOOTINFO_H
 #define X86_BOOTINFO_H
 
+#include <xen/types.h>
+
 /*
  * Xen internal representation of information provided by the
  * bootloader/environment, or derived from the information.
@@ -15,6 +17,9 @@
 struct boot_info {
     const char *loader;
     const char *cmdline;
+
+    paddr_t memmap_addr;
+    size_t memmap_length;
 
     unsigned int nr_modules;
 };

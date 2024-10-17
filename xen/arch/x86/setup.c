@@ -297,6 +297,12 @@ static struct boot_info *__init multiboot_fill_boot_info(unsigned long mbi_p)
     if ( mbi->flags & MBI_CMDLINE )
         bi->cmdline = cmdline_cook(__va(mbi->cmdline), bi->loader);
 
+    if ( mbi->flags & MBI_MEMMAP )
+    {
+        bi->memmap_addr   = mbi->mmap_addr;
+        bi->memmap_length = mbi->mmap_length;
+    }
+
     return bi;
 }
 
@@ -1187,13 +1193,13 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
     {
         memmap_type = "Xen-e820";
     }
-    else if ( mbi->flags & MBI_MEMMAP )
+    else if ( bi->memmap_length )
     {
         memmap_type = "Multiboot-e820";
-        while ( bytes < mbi->mmap_length &&
+        while ( bytes < bi->memmap_length &&
                 e820_raw.nr_map < ARRAY_SIZE(e820_raw.map) )
         {
-            memory_map_t *map = __va(mbi->mmap_addr + bytes);
+            memory_map_t *map = __va(bi->memmap_addr + bytes);
 
             /*
              * This is a gross workaround for a BIOS bug. Some bootloaders do
