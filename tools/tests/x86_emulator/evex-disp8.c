@@ -911,10 +911,8 @@ static void test_one(const struct test *test, enum vl vl,
     n = test->scale == SC_vl ? vsz : esz;
     if ( !sg )
         n += vsz;
-    else if ( !strstr(test->mnemonic, "pf") )
-        n += esz;
     else
-        ++n;
+        n += esz;
 
     for ( ; i < n; ++i )
         if ( accessed[i] != (sg ? (vsz / esz) >> (test->opc & 1 & !evex.w)
