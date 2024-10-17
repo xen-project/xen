@@ -2139,7 +2139,7 @@ callbacks are safe to be executed. Expressed in milliseconds; maximum is
 ### reboot (x86)
 > `= t[riple] | k[bd] | a[cpi] | p[ci] | P[ower] | e[fi] | n[o] [, [w]arm | [c]old]`
 
-> Default: `0`
+> Default: system dependent
 
 Specify the host reboot method.
 
@@ -2153,14 +2153,14 @@ Specify the host reboot method.
 
 `kbd` instructs Xen to reboot the host via the keyboard controller.
 
-`acpi` instructs Xen to reboot the host using RESET_REG in the ACPI FADT.
+`acpi` instructs Xen to reboot the host using RESET_REG in the ACPI FADT (this
+is default mode if available).
 
 `pci` instructs Xen to reboot the host using PCI reset register (port CF9).
 
 `Power` instructs Xen to power-cycle the host using PCI reset register (port CF9).
 
-'efi' instructs Xen to reboot using the EFI reboot call (in EFI mode by
- default it will use that method first).
+`efi` instructs Xen to reboot using the EFI reboot call.
 
 `xen` instructs Xen to reboot using Xen's SCHEDOP hypercall (this is the default
 when running nested Xen)
