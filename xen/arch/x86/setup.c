@@ -277,6 +277,7 @@ custom_param("acpi", parse_acpi_param);
 static const module_t *__initdata initial_images;
 
 struct boot_info __initdata xen_boot_info = {
+    .loader = "unknown",
 };
 
 static struct boot_info *__init multiboot_fill_boot_info(unsigned long mbi_p)
@@ -286,6 +287,9 @@ static struct boot_info *__init multiboot_fill_boot_info(unsigned long mbi_p)
 
     if ( mbi->flags & MBI_MODULES )
         bi->nr_modules = mbi->mods_count;
+
+    if ( mbi->flags & MBI_LOADERNAME )
+        bi->loader = __va(mbi->boot_loader_name);
 
     return bi;
 }
@@ -980,7 +984,7 @@ static struct domain *__init create_dom0(const module_t *image,
 
 void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
 {
-    const char *memmap_type = NULL, *loader, *cmdline = "";
+    const char *memmap_type = NULL, *cmdline = "";
     char *kextra;
     void *bsp_stack;
     struct cpu_info *info = get_cpu_info(), *bsp_info;
@@ -1034,12 +1038,9 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
 
     bi = multiboot_fill_boot_info(mbi_p);
 
-    loader = (mbi->flags & MBI_LOADERNAME) ? __va(mbi->boot_loader_name)
-                                           : "unknown";
-
     /* Parse the command-line options. */
     if ( mbi->flags & MBI_CMDLINE )
-        cmdline = cmdline_cook(__va(mbi->cmdline), loader);
+        cmdline = cmdline_cook(__va(mbi->cmdline), bi->loader);
 
     if ( (kextra = strstr(cmdline, " -- ")) != NULL )
     {
@@ -1080,7 +1081,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
     if ( pvh_boot )
         pvh_print_info();
 
-    printk("Bootloader: %s\n", loader);
+    printk("Bootloader: %s\n", bi->loader);
 
     printk("Command line: %s\n", cmdline);
 
@@ -1173,7 +1174,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
         l3_bootmap[l3_table_offset(BOOTSTRAP_MAP_BASE)] =
             l3e_from_paddr(__pa(l2_bootmap), __PAGE_HYPERVISOR);
 
-        memmap_type = loader;
+        memmap_type = bi->loader;
     }
     else if ( efi_enabled(EFI_BOOT) )
         memmap_type = "EFI";
@@ -2041,7 +2042,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
      */
     dom0 = create_dom0(mod, modules_headroom,
                        initrdidx < bi->nr_modules ? mod + initrdidx : NULL,
-                       kextra, loader);
+                       kextra, bi->loader);
     if ( !dom0 )
         panic("Could not set up DOM0 guest OS\n");
 

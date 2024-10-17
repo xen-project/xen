@@ -13,6 +13,8 @@
  * bootloader/environment, or derived from the information.
  */
 struct boot_info {
+    const char *loader;
+
     unsigned int nr_modules;
 };
 
