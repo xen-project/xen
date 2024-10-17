@@ -110,7 +110,7 @@ make -C automation/build opensuse/tumbleweed-x86_64 PUSH=1
 
 [BuildKit]: https://docs.docker.com/build/buildkit/
 [registry]: https://gitlab.com/xen-project/xen/container_registry
-[registry help]: https://gitlab.com/help/user/project/container_registry
+[registry help]: https://docs.gitlab.com/ee/user/packages/container_registry/
 
 
 Building/Running container for a different architecture
