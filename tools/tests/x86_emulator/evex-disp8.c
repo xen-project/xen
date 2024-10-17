@@ -905,8 +905,8 @@ static void test_one(const struct test *test, enum vl vl,
         goto fail;
 
     for ( i = 0; i < (test->scale == SC_vl ? vsz : esz); ++i )
-         if ( accessed[i] )
-             goto fail;
+        if ( accessed[i] )
+            goto fail;
 
     n = test->scale == SC_vl ? vsz : esz;
     if ( !sg )
@@ -917,13 +917,13 @@ static void test_one(const struct test *test, enum vl vl,
         ++n;
 
     for ( ; i < n; ++i )
-         if ( accessed[i] != (sg ? (vsz / esz) >> (test->opc & 1 & !evex.w)
-                                 : 1) )
-             goto fail;
+        if ( accessed[i] != (sg ? (vsz / esz) >> (test->opc & 1 & !evex.w)
+                                : 1) )
+            goto fail;
 
     for ( ; i < ARRAY_SIZE(accessed); ++i )
-         if ( accessed[i] )
-             goto fail;
+        if ( accessed[i] )
+            goto fail;
 
     /* Also check the broadcast case, if available. */
     if ( test->vsz >= VSZ_el || test->scale != SC_vl )
@@ -954,14 +954,14 @@ static void test_one(const struct test *test, enum vl vl,
         goto fail;
 
     for ( i = 0; i < esz; ++i )
-         if ( accessed[i] )
-             goto fail;
+        if ( accessed[i] )
+            goto fail;
     for ( ; i < esz * 2; ++i )
-         if ( accessed[i] != 1 )
-             goto fail;
+        if ( accessed[i] != 1 )
+            goto fail;
     for ( ; i < ARRAY_SIZE(accessed); ++i )
-         if ( accessed[i] )
-             goto fail;
+        if ( accessed[i] )
+            goto fail;
 
     return;
 
