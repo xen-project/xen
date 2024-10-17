@@ -69,6 +69,7 @@ static void Noreturn xsd_glue_failwith(
 	free(str);
 
 	caml_raise_with_arg(*caml_named_value("xsg.error_v1"), msg);
+	CAMLnoreturn;
 }
 #define xsd_glue_failwith(xch) xsd_glue_failwith(xch, __func__, __LINE__)
 
