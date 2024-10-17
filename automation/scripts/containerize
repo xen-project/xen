@@ -28,7 +28,7 @@ case "_${CONTAINER}" in
     _alpine-arm64v8) CONTAINER="${BASE}/alpine:3.18-arm64v8" ;;
     _archlinux|_arch) CONTAINER="${BASE}/archlinux:current" ;;
     _centos7) CONTAINER="${BASE}/centos:7" ;;
-    _fedora) CONTAINER="${BASE}/fedora:29";;
+    _fedora) CONTAINER="${BASE}/fedora:40-x86_64";;
     _bullseye-ppc64le) CONTAINER="${BASE}/debian:11-ppc64le" ;;
     _bookworm-ppc64le) CONTAINER="${BASE}/debian:12-ppc64le" ;;
     _bullseye-riscv64) CONTAINER="${BASE}/debian:11-riscv64" ;;

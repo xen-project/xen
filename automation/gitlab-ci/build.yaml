@@ -579,15 +579,15 @@ debian-bookworm-32-gcc-debug:
   variables:
     CONTAINER: debian:bookworm-i386
 
-fedora-gcc:
+fedora-40-x86_64-gcc:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: fedora:29
+    CONTAINER: fedora:40-x86_64
 
-fedora-gcc-debug:
+fedora-40-x86_64-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: fedora:29
+    CONTAINER: fedora:40-x86_64
 
 ubuntu-16.04-x86_64-clang:
   extends: .clang-x86-64-build
