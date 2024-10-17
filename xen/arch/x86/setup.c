@@ -425,24 +425,22 @@ static void __init normalise_cpu_order(void)
  * Ensure a given physical memory range is present in the bootstrap mappings.
  * Use superpage mappings to ensure that pagetable memory needn't be allocated.
  */
-void *__init bootstrap_map(const module_t *mod)
+static void *__init bootstrap_map_addr(paddr_t start, paddr_t end)
 {
     static unsigned long __initdata map_cur = BOOTSTRAP_MAP_BASE;
-    uint64_t start, end, mask = (1L << L2_PAGETABLE_SHIFT) - 1;
+    uint64_t mask = (1L << L2_PAGETABLE_SHIFT) - 1;
     void *ret;
 
     if ( system_state != SYS_STATE_early_boot )
-        return mod ? mfn_to_virt(mod->mod_start) : NULL;
+        return end ? maddr_to_virt(start) : NULL;
 
-    if ( !mod )
+    if ( !end )
     {
         destroy_xen_mappings(BOOTSTRAP_MAP_BASE, BOOTSTRAP_MAP_LIMIT);
         map_cur = BOOTSTRAP_MAP_BASE;
         return NULL;
     }
 
-    start = (uint64_t)mod->mod_start << PAGE_SHIFT;
-    end = start + mod->mod_end;
     if ( start >= end )
         return NULL;
 
@@ -456,6 +454,15 @@ void *__init bootstrap_map(const module_t *mod)
                      PFN_DOWN(end - start), PAGE_HYPERVISOR);
     map_cur += end - start;
     return ret;
+}
+
+void *__init bootstrap_map(const module_t *mod)
+{
+    if ( !mod )
+        return bootstrap_map_addr(0, 0);
+
+    return bootstrap_map_addr(pfn_to_paddr(mod->mod_start),
+                              pfn_to_paddr(mod->mod_start) + mod->mod_end);
 }
 
 static void __init move_memory(
