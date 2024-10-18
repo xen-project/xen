@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-License-Identifier: GPL-2.0-only */
 #include <xen/domain_page.h>
 #include <xen/guest_access.h>
 #include <xen/lib.h>

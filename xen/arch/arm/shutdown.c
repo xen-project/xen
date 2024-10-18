@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-License-Identifier: GPL-2.0-only */
 #include <xen/console.h>
 #include <xen/cpu.h>
 #include <xen/delay.h>

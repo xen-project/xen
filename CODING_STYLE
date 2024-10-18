@@ -20,7 +20,7 @@ SPDX
 New files should start with a single-line SPDX comment to express the
 license, e.g.:
 
-/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-License-Identifier: GPL-2.0-only */
 
 See LICENSES/ for a list of licenses and SPDX tags currently used.
 

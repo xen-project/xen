@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * The header provides default implementations for every xen/atomic.h-provided
  * forward inline declaration that can be synthesized from other atomic

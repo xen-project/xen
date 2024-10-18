@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-License-Identifier: GPL-2.0-only */
 #ifndef XEN_ALTERNATIVE_CALL
 #define XEN_ALTERNATIVE_CALL
 

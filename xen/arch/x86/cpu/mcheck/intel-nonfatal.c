@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Non Fatal Machine Check Exception Reporting
  * (C) Copyright 2002 Dave Jones. <davej@codemonkey.org.uk>

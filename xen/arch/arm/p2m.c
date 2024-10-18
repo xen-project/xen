@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-License-Identifier: GPL-2.0-only */
 #include <xen/iocap.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
