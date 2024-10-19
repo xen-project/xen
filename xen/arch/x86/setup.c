@@ -1048,6 +1048,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
     {
         ASSERT(mbi_p == 0);
         pvh_init(&mbi, &mod);
+        mbi_p = __pa(mbi);
     }
     else
     {
