@@ -848,7 +848,7 @@ This feature is not security supported: see https://xenbits.xen.org/xsa/advisory
 
 ### Argo: Inter-domain message delivery by hypercall
 
-    Status: Experimental
+    Status: Tech Preview
 
 ### x86/PCI Device Passthrough
 
