@@ -15,16 +15,9 @@ test_variant=$1
 extra_xen_opts=
 wait_and_wakeup=
 timeout=120
-domU_config='
-type = "pvh"
-name = "domU"
-kernel = "/boot/vmlinuz"
-ramdisk = "/boot/initrd-domU"
-extra = "root=/dev/ram0 console=hvc0"
-memory = 512
-vif = [ "bridge=xenbr0", ]
-disk = [ ]
-'
+domU_type="pvh"
+domU_vif="'bridge=xenbr0',"
+domU_extra_config=
 
 case "${test_variant}" in
     ### test: smoke test & smoke test PVH & smoke test HVM
@@ -50,16 +43,7 @@ echo \"${passed}\"
         fi
 
         if [ "${test_variant}" = "dom0pvh-hvm" ]; then
-            domU_config='
-type = "hvm"
-name = "domU"
-kernel = "/boot/vmlinuz"
-ramdisk = "/boot/initrd-domU"
-extra = "root=/dev/ram0 console=hvc0"
-memory = 512
-vif = [ "bridge=xenbr0", ]
-disk = [ ]
-'
+            domU_type="hvm"
         fi
         ;;
 
@@ -101,15 +85,11 @@ echo \"${passed}\"
 
         passed="pci test passed"
 
-        domU_config='
-type = "'${test_variant#pci-}'"
-name = "domU"
-kernel = "/boot/vmlinuz"
-ramdisk = "/boot/initrd-domU"
-extra = "root=/dev/ram0 console=hvc0 earlyprintk=xen"
-memory = 512
-vif = [ ]
-disk = [ ]
+        domU_type="${test_variant#pci-}"
+        domU_vif=""
+
+        domU_extra_config='
+extra = "earlyprintk=xen"
 pci = [ "'$PCIDEV',seize=1" ]
 on_reboot = "destroy"
 '
@@ -147,6 +127,18 @@ done
         exit 1
         ;;
 esac
+
+domU_config="
+type = '${domU_type}'
+name = 'domU'
+kernel = '/boot/vmlinuz'
+ramdisk = '/boot/initrd-domU'
+cmdline = 'root=/dev/ram0 console=hvc0'
+memory = 512
+vif = [ ${domU_vif} ]
+disk = [ ]
+${domU_extra_config}
+"
 
 # DomU
 mkdir -p rootfs
