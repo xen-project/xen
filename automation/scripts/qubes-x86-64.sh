@@ -8,6 +8,7 @@ set -ex
 #  - dom0pvh-hvm    PVH dom0, HVM domU
 #  - pci-hvm        PV dom0,  HVM domU + PCI Passthrough
 #  - pci-pv         PV dom0,  PV domU + PCI Passthrough
+#  - pvshim         PV dom0,  PVSHIM domU
 #  - s3             PV dom0,  S3 suspend/resume
 test_variant=$1
 
@@ -20,8 +21,8 @@ domU_vif="'bridge=xenbr0',"
 domU_extra_config=
 
 case "${test_variant}" in
-    ### test: smoke test & smoke test PVH & smoke test HVM
-    ""|"dom0pvh"|"dom0pvh-hvm")
+    ### test: smoke test & smoke test PVH & smoke test HVM & smoke test PVSHIM
+    ""|"dom0pvh"|"dom0pvh-hvm"|"pvshim")
         passed="ping test passed"
         domU_check="
 ifconfig eth0 192.168.0.2
@@ -44,6 +45,9 @@ echo \"${passed}\"
 
         if [ "${test_variant}" = "dom0pvh-hvm" ]; then
             domU_type="hvm"
+        elif [ "${test_variant}" = "pvshim" ]; then
+            domU_type="pvh"
+            domU_extra_config='pvshim = 1'
         fi
         ;;
 
