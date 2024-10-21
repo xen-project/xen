@@ -287,6 +287,8 @@ static struct boot_info *__init multiboot_fill_boot_info(unsigned long mbi_p)
 {
     struct boot_info *bi = &xen_boot_info;
     const multiboot_info_t *mbi = __va(mbi_p);
+    module_t *mods = __va(mbi->mods_addr);
+    unsigned int i;
 
     if ( mbi->flags & MBI_MODULES )
         bi->nr_modules = mbi->mods_count;
@@ -302,6 +304,21 @@ static struct boot_info *__init multiboot_fill_boot_info(unsigned long mbi_p)
         bi->memmap_addr   = mbi->mmap_addr;
         bi->memmap_length = mbi->mmap_length;
     }
+
+    /*
+     * The multiboot entry point will reserve mods_count + 1 instances of
+     * module_t, with the last one being for Xen. First iterate over nr_modules
+     * module_t entries, or MAX_NR_BOOTMODS if more than the max was passed.
+     *
+     * As the Xen entry may be beyond MAX_NR_BOOTMODS, explicitly set the last
+     * entry in mods to point at the last module_t entry which the entry point
+     * reserved for Xen.
+     */
+    for ( i = 0; i < MAX_NR_BOOTMODS && i < bi->nr_modules; i++ )
+        bi->mods[i].mod = &mods[i];
+
+    /* Variable 'i' should be one entry past the last module. */
+    bi->mods[i].mod = &mods[bi->nr_modules];
 
     return bi;
 }
@@ -1163,9 +1180,14 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
         panic("dom0 kernel not specified. Check bootloader configuration\n");
 
     /* Check that we don't have a silly number of modules. */
-    if ( bi->nr_modules > sizeof(module_map) * 8 )
+    if ( bi->nr_modules > MAX_NR_BOOTMODS )
     {
-        bi->nr_modules = sizeof(module_map) * 8;
+        /*
+         * Only MAX_NR_BOOTMODS were populated in bootinfo, truncate nr_modules
+         * now that it can be report that an excess number of modules were
+         * passed.
+         */
+        bi->nr_modules = MAX_NR_BOOTMODS;
         printk("Excessive boot modules - using the first %u only\n",
                bi->nr_modules);
     }

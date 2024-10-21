@@ -8,7 +8,16 @@
 #ifndef X86_BOOTINFO_H
 #define X86_BOOTINFO_H
 
+#include <xen/multiboot.h>
 #include <xen/types.h>
+
+/* Max number of boot modules a bootloader can provide in addition to Xen */
+#define MAX_NR_BOOTMODS 63
+
+struct boot_module {
+    /* Transitionary only */
+    module_t *mod;
+};
 
 /*
  * Xen internal representation of information provided by the
@@ -22,6 +31,7 @@ struct boot_info {
     size_t memmap_length;
 
     unsigned int nr_modules;
+    struct boot_module mods[MAX_NR_BOOTMODS + 1];
 };
 
 #endif /* X86_BOOTINFO_H */
