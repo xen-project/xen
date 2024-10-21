@@ -276,8 +276,6 @@ custom_param("acpi", parse_acpi_param);
 
 static const char *cmdline_cook(const char *p, const char *loader_name);
 
-static const module_t *__initdata initial_images;
-
 struct boot_info __initdata xen_boot_info = {
     .loader = "unknown",
     .cmdline = "",
@@ -332,8 +330,8 @@ unsigned long __init initial_images_nrpages(nodeid_t node)
 
     for ( nr = i = 0; i < bi->nr_modules; ++i )
     {
-        unsigned long start = initial_images[i].mod_start;
-        unsigned long end = start + PFN_UP(initial_images[i].mod_end);
+        unsigned long start = bi->mods[i].mod->mod_start;
+        unsigned long end   = start + PFN_UP(bi->mods[i].mod->mod_end);
 
         if ( end > node_start && node_end > start )
             nr += min(node_end, end) - max(node_start, start);
@@ -349,14 +347,13 @@ void __init discard_initial_images(void)
 
     for ( i = 0; i < bi->nr_modules; ++i )
     {
-        uint64_t start = (uint64_t)initial_images[i].mod_start << PAGE_SHIFT;
+        uint64_t start = pfn_to_paddr(bi->mods[i].mod->mod_start);
 
         init_domheap_pages(start,
-                           start + PAGE_ALIGN(initial_images[i].mod_end));
+                           start + PAGE_ALIGN(bi->mods[i].mod->mod_end));
     }
 
     bi->nr_modules = 0;
-    initial_images = NULL;
 }
 
 static void __init init_idle_domain(void)
@@ -1375,8 +1372,6 @@ void asmlinkage __init noreturn __start_xen(void)
             nr_pages += e820.map[i].size >> PAGE_SHIFT;
     set_kexec_crash_area_size((u64)nr_pages << PAGE_SHIFT);
     kexec_reserve_area();
-
-    initial_images = mod;
 
     for ( i = 0; !efi_enabled(EFI_LOADER) && i < bi->nr_modules; i++ )
     {
