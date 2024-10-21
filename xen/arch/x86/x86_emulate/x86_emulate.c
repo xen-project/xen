@@ -8310,6 +8310,7 @@ x86_emulate(
         }
         if ( rc != 0 )
             goto done;
+        break;
     default:
         break;
     }

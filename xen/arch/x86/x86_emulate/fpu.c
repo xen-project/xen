@@ -218,6 +218,7 @@ int x86emul_fpu(struct x86_emulate_state *s,
              */
             if ( dst->type == OP_MEM && !s->fpu_ctrl && !fpu_check_write() )
                 dst->type = OP_NONE;
+            break;
         }
         break;
 
@@ -296,6 +297,7 @@ int x86emul_fpu(struct x86_emulate_state *s,
             default:
                 generate_exception(X86_EXC_UD);
             }
+            break;
         }
         break;
 
@@ -386,6 +388,7 @@ int x86emul_fpu(struct x86_emulate_state *s,
              */
             if ( dst->type == OP_MEM && !s->fpu_ctrl && !fpu_check_write() )
                 dst->type = OP_NONE;
+            break;
         }
         break;
 
@@ -457,6 +460,8 @@ int x86emul_fpu(struct x86_emulate_state *s,
             case 7: /* fistp m64i */
                 goto fpu_memdst64;
             }
+            ASSERT_UNREACHABLE();
+            return X86EMUL_UNHANDLEABLE;
         }
         break;
 
