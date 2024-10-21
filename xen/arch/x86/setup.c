@@ -1382,11 +1382,11 @@ void asmlinkage __init noreturn __start_xen(void)
 
     for ( i = 0; !efi_enabled(EFI_LOADER) && i < bi->nr_modules; i++ )
     {
-        if ( mod[i].mod_start & (PAGE_SIZE - 1) )
+        if ( bi->mods[i].mod->mod_start & (PAGE_SIZE - 1) )
             panic("Bootloader didn't honor module alignment request\n");
-        mod[i].mod_end -= mod[i].mod_start;
-        mod[i].mod_start >>= PAGE_SHIFT;
-        mod[i].reserved = 0;
+        bi->mods[i].mod->mod_end -= bi->mods[i].mod->mod_start;
+        bi->mods[i].mod->mod_start >>= PAGE_SHIFT;
+        bi->mods[i].mod->reserved = 0;
     }
 
     /*
@@ -1397,6 +1397,8 @@ void asmlinkage __init noreturn __start_xen(void)
 
     if ( xen_phys_start )
     {
+        struct boot_module *xen = &bi->mods[bi->nr_modules];
+
         relocated = true;
 
         /*
@@ -1404,8 +1406,8 @@ void asmlinkage __init noreturn __start_xen(void)
          * respective reserve_e820_ram() invocation below. No need to
          * query efi_boot_mem_unused() here, though.
          */
-        mod[bi->nr_modules].mod_start = virt_to_mfn(_stext);
-        mod[bi->nr_modules].mod_end = __2M_rwdata_end - _stext;
+        xen->mod->mod_start = virt_to_mfn(_stext);
+        xen->mod->mod_end   = __2M_rwdata_end - _stext;
     }
 
     modules_headroom =
@@ -1490,15 +1492,17 @@ void asmlinkage __init noreturn __start_xen(void)
         /* Is the region suitable for relocating the multiboot modules? */
         for ( j = bi->nr_modules - 1; j >= 0; j-- )
         {
+            struct boot_module *bm = &bi->mods[j];
+
             /*
              * 'headroom' is a guess for the decompressed size and
              * decompressor overheads of mod[0] (the dom0 kernel).  When we
              * move mod[0], we incorporate this as extra space at the start.
              */
             unsigned long headroom = j ? 0 : modules_headroom;
-            unsigned long size = PAGE_ALIGN(headroom + mod[j].mod_end);
+            unsigned long size = PAGE_ALIGN(headroom + bm->mod->mod_end);
 
-            if ( mod[j].reserved )
+            if ( bm->mod->reserved )
                 continue;
 
             /* Don't overlap with other modules (or Xen itself). */
@@ -1510,14 +1514,13 @@ void asmlinkage __init noreturn __start_xen(void)
 
             if ( s < end &&
                  (headroom ||
-                  ((end - size) >> PAGE_SHIFT) > mod[j].mod_start) )
+                  ((end - size) >> PAGE_SHIFT) > bm->mod->mod_start) )
             {
                 move_memory(end - size + headroom,
-                            (uint64_t)mod[j].mod_start << PAGE_SHIFT,
-                            mod[j].mod_end);
-                mod[j].mod_start = (end - size) >> PAGE_SHIFT;
-                mod[j].mod_end += headroom;
-                mod[j].reserved = 1;
+                            pfn_to_paddr(bm->mod->mod_start), bm->mod->mod_end);
+                bm->mod->mod_start = (end - size) >> PAGE_SHIFT;
+                bm->mod->mod_end += headroom;
+                bm->mod->reserved = 1;
             }
         }
 
@@ -1543,13 +1546,14 @@ void asmlinkage __init noreturn __start_xen(void)
 #endif
     }
 
-    if ( modules_headroom && !mod->reserved )
+    if ( modules_headroom && !bi->mods[0].mod->reserved )
         panic("Not enough memory to relocate the dom0 kernel image\n");
     for ( i = 0; i < bi->nr_modules; ++i )
     {
-        uint64_t s = (uint64_t)mod[i].mod_start << PAGE_SHIFT;
+        const struct boot_module *bm = &bi->mods[i];
+        uint64_t s = pfn_to_paddr(bm->mod->mod_start);
 
-        reserve_e820_ram(&boot_e820, s, s + PAGE_ALIGN(mod[i].mod_end));
+        reserve_e820_ram(&boot_e820, s, s + PAGE_ALIGN(bm->mod->mod_end));
     }
 
     if ( !xen_phys_start )
@@ -1627,8 +1631,8 @@ void asmlinkage __init noreturn __start_xen(void)
                 map_e = boot_e820.map[j].addr + boot_e820.map[j].size;
                 for ( j = 0; j < bi->nr_modules; ++j )
                 {
-                    uint64_t end = pfn_to_paddr(mod[j].mod_start) +
-                                   mod[j].mod_end;
+                    uint64_t end = pfn_to_paddr(bi->mods[j].mod->mod_start) +
+                                   bi->mods[j].mod->mod_end;
 
                     if ( map_e < end )
                         map_e = end;
@@ -1702,11 +1706,13 @@ void asmlinkage __init noreturn __start_xen(void)
 
     for ( i = 0; i < bi->nr_modules; ++i )
     {
-        set_pdx_range(mod[i].mod_start,
-                      mod[i].mod_start + PFN_UP(mod[i].mod_end));
-        map_pages_to_xen((unsigned long)mfn_to_virt(mod[i].mod_start),
-                         _mfn(mod[i].mod_start),
-                         PFN_UP(mod[i].mod_end), PAGE_HYPERVISOR);
+        const struct boot_module *bm = &bi->mods[i];
+
+        set_pdx_range(bm->mod->mod_start,
+                      bm->mod->mod_start + PFN_UP(bm->mod->mod_end));
+        map_pages_to_xen((unsigned long)mfn_to_virt(bm->mod->mod_start),
+                         _mfn(bm->mod->mod_start),
+                         PFN_UP(bm->mod->mod_end), PAGE_HYPERVISOR);
     }
 
 #ifdef CONFIG_KEXEC
@@ -2095,8 +2101,9 @@ void asmlinkage __init noreturn __start_xen(void)
      * We're going to setup domain0 using the module(s) that we stashed safely
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
-    dom0 = create_dom0(mod, modules_headroom,
-                       initrdidx < bi->nr_modules ? mod + initrdidx : NULL,
+    dom0 = create_dom0(bi->mods[0].mod, modules_headroom,
+                       initrdidx < bi->nr_modules ? bi->mods[initrdidx].mod
+                                                  : NULL,
                        kextra, bi->loader);
     if ( !dom0 )
         panic("Could not set up DOM0 guest OS\n");
