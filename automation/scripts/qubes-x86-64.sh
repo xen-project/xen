@@ -2,6 +2,13 @@
 
 set -ex
 
+# One of:
+#  - ""             PV dom0,  PVH domU
+#  - dom0pvh        PVH dom0, PVH domU
+#  - dom0pvh-hvm    PVH dom0, HVM domU
+#  - pci-hvm        PV dom0,  HVM domU + PCI Passthrough
+#  - pci-pv         PV dom0,  PV domU + PCI Passthrough
+#  - s3             PV dom0,  S3 suspend/resume
 test_variant=$1
 
 ### defaults
@@ -19,17 +26,18 @@ vif = [ "bridge=xenbr0", ]
 disk = [ ]
 '
 
-### test: smoke test & smoke test PVH & smoke test HVM
-if [ -z "${test_variant}" ] || [ "${test_variant}" = "dom0pvh" ] || [ "${test_variant}" = "dom0pvh-hvm" ]; then
-    passed="ping test passed"
-    domU_check="
+case "${test_variant}" in
+    ### test: smoke test & smoke test PVH & smoke test HVM
+    ""|"dom0pvh"|"dom0pvh-hvm")
+        passed="ping test passed"
+        domU_check="
 ifconfig eth0 192.168.0.2
 until ping -c 10 192.168.0.1; do
     sleep 1
 done
 echo \"${passed}\"
 "
-    dom0_check="
+        dom0_check="
 set +x
 until grep -q \"${passed}\" /var/log/xen/console/guest-domU.log; do
     sleep 1
@@ -37,12 +45,12 @@ done
 set -x
 echo \"${passed}\"
 "
-if [ "${test_variant}" = "dom0pvh" ] || [ "${test_variant}" = "dom0pvh-hvm" ]; then
-    extra_xen_opts="dom0=pvh"
-fi
+        if [ "${test_variant}" = "dom0pvh" ] || [ "${test_variant}" = "dom0pvh-hvm" ]; then
+            extra_xen_opts="dom0=pvh"
+        fi
 
-if [ "${test_variant}" = "dom0pvh-hvm" ]; then
-    domU_config='
+        if [ "${test_variant}" = "dom0pvh-hvm" ]; then
+            domU_config='
 type = "hvm"
 name = "domU"
 kernel = "/boot/vmlinuz"
@@ -52,17 +60,18 @@ memory = 512
 vif = [ "bridge=xenbr0", ]
 disk = [ ]
 '
-fi
+        fi
+        ;;
 
-### test: S3
-elif [ "${test_variant}" = "s3" ]; then
-    passed="suspend test passed"
-    wait_and_wakeup="started, suspending"
-    domU_check="
+    ### test: S3
+    "s3")
+        passed="suspend test passed"
+        wait_and_wakeup="started, suspending"
+        domU_check="
 ifconfig eth0 192.168.0.2
 echo domU started
 "
-    dom0_check="
+        dom0_check="
 until grep 'domU started' /var/log/xen/console/guest-domU.log; do
     sleep 1
 done
@@ -79,19 +88,20 @@ xl dmesg | grep 'Finishing wakeup from ACPI S3 state' || exit 1
 ping -c 10 192.168.0.2 || exit 1
 echo \"${passed}\"
 "
+        ;;
 
-### test: pci-pv, pci-hvm
-elif [ "${test_variant}" = "pci-pv" ] || [ "${test_variant}" = "pci-hvm" ]; then
+    ### test: pci-pv, pci-hvm
+    "pci-pv"|"pci-hvm")
 
-    if [ -z "$PCIDEV" ]; then
-        echo "Please set 'PCIDEV' variable with BDF of test network adapter" >&2
-        echo "Optionally set also 'PCIDEV_INTR' to 'MSI' or 'MSI-X'" >&2
-        exit 1
-    fi
+        if [ -z "$PCIDEV" ]; then
+            echo "Please set 'PCIDEV' variable with BDF of test network adapter" >&2
+            echo "Optionally set also 'PCIDEV_INTR' to 'MSI' or 'MSI-X'" >&2
+            exit 1
+        fi
 
-    passed="pci test passed"
+        passed="pci test passed"
 
-    domU_config='
+        domU_config='
 type = "'${test_variant#pci-}'"
 name = "domU"
 kernel = "/boot/vmlinuz"
@@ -104,7 +114,7 @@ pci = [ "'$PCIDEV',seize=1" ]
 on_reboot = "destroy"
 '
 
-    domU_check="
+        domU_check="
 set -x -e
 interface=eth0
 ip link set \"\$interface\" up
@@ -115,22 +125,28 @@ echo domU started
 pcidevice=\$(basename \$(readlink /sys/class/net/\$interface/device))
 lspci -vs \$pcidevice
 "
-    if [ -n "$PCIDEV_INTR" ]; then
-        domU_check="$domU_check
+        if [ -n "$PCIDEV_INTR" ]; then
+            domU_check="$domU_check
 lspci -vs \$pcidevice | fgrep '$PCIDEV_INTR: Enable+'
 "
-    fi
-    domU_check="$domU_check
+        fi
+        domU_check="$domU_check
 echo \"${passed}\"
 "
 
-    dom0_check="
+        dom0_check="
 tail -F /var/log/xen/qemu-dm-domU.log &
 until grep -q \"^domU Welcome to Alpine Linux\" /var/log/xen/console/guest-domU.log; do
     sleep 1
 done
 "
-fi
+        ;;
+
+    *)
+        echo "Unrecognised test_variant '${test_variant}'" >&2
+        exit 1
+        ;;
+esac
 
 # DomU
 mkdir -p rootfs
