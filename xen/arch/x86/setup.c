@@ -492,23 +492,22 @@ static void __init move_memory(
 
     while ( size )
     {
-        unsigned int end   /* mapsz */;
         unsigned int soffs = src & mask;
         unsigned int doffs = dst & mask;
         unsigned int sz;
         void *d, *s;
 
-        end = soffs + size;
-        if ( end > blksz )
-            end = blksz;
-        sz = end - soffs;
-        s = bootstrap_map_addr(src, src + sz);
+        /*
+         * We're copying between two arbitrary buffers, as they fall within
+         * 2M-aligned regions with a maximum bound of blksz.
+         *
+         * For [ds]offs + size <= blksz, sz = size.
+         * For [ds]offs + size >  blksz, sz = blksz - [ds]offs.
+         */
+        sz = max(soffs, doffs);
+        sz = min(sz + size, blksz) - sz;
 
-        end = doffs + size;
-        if ( end > blksz )
-            end = blksz;
-        if ( sz > end - doffs )
-            sz = end - doffs;
+        s = bootstrap_map_addr(src, src + sz);
         d = bootstrap_map_addr(dst, dst + sz);
 
         memmove(d, s, sz);
