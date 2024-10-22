@@ -55,7 +55,7 @@ bool pv_map_ldt_shadow_page(unsigned int offset)
     l1_pgentry_t gl1e, *pl1e;
     unsigned long linear = curr->arch.pv.ldt_base + offset;
 
-    BUG_ON(unlikely(in_irq()));
+    BUG_ON(in_irq());
 
     /*
      * Prior limit checking should guarantee this property.  NB. This is
