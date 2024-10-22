@@ -492,31 +492,26 @@ static void __init move_memory(
 
     while ( size )
     {
-        unsigned int start /* frame */;
         unsigned int end   /* mapsz */;
         unsigned int soffs = src & mask;
         unsigned int doffs = dst & mask;
         unsigned int sz;
         void *d, *s;
 
-        start = (src - soffs) >> PAGE_SHIFT;
         end = soffs + size;
         if ( end > blksz )
             end = blksz;
         sz = end - soffs;
-        s = bootstrap_map_addr(pfn_to_paddr(start),
-                               pfn_to_paddr(start) + end);
+        s = bootstrap_map_addr(src, src + sz);
 
-        start = (dst - doffs) >> PAGE_SHIFT;
         end = doffs + size;
         if ( end > blksz )
             end = blksz;
         if ( sz > end - doffs )
             sz = end - doffs;
-        d = bootstrap_map_addr(pfn_to_paddr(start),
-                               pfn_to_paddr(start) + end);
+        d = bootstrap_map_addr(dst, dst + sz);
 
-        memmove(d + doffs, s + soffs, sz);
+        memmove(d, s, sz);
 
         dst += sz;
         src += sz;
