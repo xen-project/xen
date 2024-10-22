@@ -492,26 +492,29 @@ static void __init move_memory(
 
     while ( size )
     {
-        module_t mod;
+        unsigned int start /* frame */;
+        unsigned int end   /* mapsz */;
         unsigned int soffs = src & mask;
         unsigned int doffs = dst & mask;
         unsigned int sz;
         void *d, *s;
 
-        mod.mod_start = (src - soffs) >> PAGE_SHIFT;
-        mod.mod_end = soffs + size;
-        if ( mod.mod_end > blksz )
-            mod.mod_end = blksz;
-        sz = mod.mod_end - soffs;
-        s = bootstrap_map(&mod);
+        start = (src - soffs) >> PAGE_SHIFT;
+        end = soffs + size;
+        if ( end > blksz )
+            end = blksz;
+        sz = end - soffs;
+        s = bootstrap_map_addr(pfn_to_paddr(start),
+                               pfn_to_paddr(start) + end);
 
-        mod.mod_start = (dst - doffs) >> PAGE_SHIFT;
-        mod.mod_end = doffs + size;
-        if ( mod.mod_end > blksz )
-            mod.mod_end = blksz;
-        if ( sz > mod.mod_end - doffs )
-            sz = mod.mod_end - doffs;
-        d = bootstrap_map(&mod);
+        start = (dst - doffs) >> PAGE_SHIFT;
+        end = doffs + size;
+        if ( end > blksz )
+            end = blksz;
+        if ( sz > end - doffs )
+            sz = end - doffs;
+        d = bootstrap_map_addr(pfn_to_paddr(start),
+                               pfn_to_paddr(start) + end);
 
         memmove(d + doffs, s + soffs, sz);
 
@@ -519,7 +522,7 @@ static void __init move_memory(
         src += sz;
         size -= sz;
 
-        bootstrap_map(NULL);
+        bootstrap_map_addr(0, 0);
     }
 }
 
