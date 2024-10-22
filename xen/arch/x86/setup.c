@@ -283,11 +283,10 @@ struct boot_info __initdata xen_boot_info = {
     .cmdline = "",
 };
 
-static struct boot_info *__init multiboot_fill_boot_info(unsigned long mbi_p)
+static struct boot_info *__init multiboot_fill_boot_info(
+    const multiboot_info_t *mbi, module_t *mods)
 {
     struct boot_info *bi = &xen_boot_info;
-    const multiboot_info_t *mbi = __va(mbi_p);
-    module_t *mods = __va(mbi->mods_addr);
     unsigned int i;
 
     if ( mbi->flags & MBI_MODULES )
@@ -1065,15 +1064,31 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
     {
         ASSERT(mbi_p == 0);
         pvh_init(&mbi, &mod);
-        mbi_p = __pa(mbi);
+        /*
+         * mbi and mod are regular pointers to .initdata.  These remain valid
+         * across move_xen().
+         */
     }
     else
     {
         mbi = __va(mbi_p);
         mod = __va(mbi->mods_addr);
+
+        /*
+         * For MB1/2, mbi and mod are directmap pointers into the trampoline.
+         * These remain valid across move_xen().
+         *
+         * For EFI, these are directmap pointers into the Xen image.  They do
+         * not remain valid across move_xen().  EFI boot only functions
+         * because a non-zero xen_phys_start inhibits move_xen().
+         *
+         * Don't be fooled by efi_arch_post_exit_boot() passing "D" (&mbi).
+         * This is a EFI physical-mode (i.e. identity map) pointer.
+         */
+        ASSERT(mbi_p < MB(1) || xen_phys_start);
     }
 
-    bi = multiboot_fill_boot_info(mbi_p);
+    bi = multiboot_fill_boot_info(mbi, mod);
 
     /* Parse the command-line options. */
     if ( (kextra = strstr(bi->cmdline, " -- ")) != NULL )
