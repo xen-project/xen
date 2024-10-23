@@ -1026,8 +1026,6 @@ void asmlinkage __init noreturn __start_xen(void)
     struct cpu_info *info = get_cpu_info(), *bsp_info;
     unsigned int initrdidx, num_parked = 0;
     struct boot_info *bi;
-    multiboot_info_t *mbi;
-    module_t *mod;
     unsigned long nr_pages, raw_max_page, modules_headroom, module_map[1];
     int i, j, e820_warn = 0, bytes = 0;
     unsigned long eb_start, eb_end;
@@ -1063,16 +1061,22 @@ void asmlinkage __init noreturn __start_xen(void)
 
     if ( pvh_boot )
     {
+        multiboot_info_t *mbi;
+        module_t *mod;
+
         pvh_init(&mbi, &mod);
         /*
          * mbi and mod are regular pointers to .initdata.  These remain valid
          * across move_xen().
          */
+
+        bi = multiboot_fill_boot_info(mbi, mod);
     }
     else
     {
-        mbi = __va(multiboot_ptr);
-        mod = __va(mbi->mods_addr);
+        multiboot_info_t *mbi = __va(multiboot_ptr);
+
+        bi = multiboot_fill_boot_info(mbi, __va(mbi->mods_addr));
 
         /*
          * For MB1/2, mbi and mod are directmap pointers into the trampoline.
@@ -1085,11 +1089,7 @@ void asmlinkage __init noreturn __start_xen(void)
         ASSERT(multiboot_ptr < MB(1) || xen_phys_start);
     }
 
-    bi = multiboot_fill_boot_info(mbi, mod);
     bi->module_map = module_map; /* Temporary */
-
-    /* Use bi-> instead */
-#define mbi DO_NOT_USE
 
     /* Parse the command-line options. */
     if ( (kextra = strstr(bi->cmdline, " -- ")) != NULL )
