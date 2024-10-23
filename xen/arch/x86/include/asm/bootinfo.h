@@ -31,6 +31,7 @@ struct boot_info {
     size_t memmap_length;
 
     unsigned int nr_modules;
+    unsigned long *module_map; /* Temporary */
     struct boot_module mods[MAX_NR_BOOTMODS + 1];
 };
 

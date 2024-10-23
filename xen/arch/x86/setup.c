@@ -1086,6 +1086,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
     }
 
     bi = multiboot_fill_boot_info(mbi, mod);
+    bi->module_map = module_map; /* Temporary */
 
     /* Parse the command-line options. */
     if ( (kextra = strstr(bi->cmdline, " -- ")) != NULL )
