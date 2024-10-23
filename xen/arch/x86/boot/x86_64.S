@@ -77,8 +77,6 @@ ENTRY(__high_start)
         tailcall start_secondary
 
 .L_bsp:
-        /* Pass off the Multiboot info structure to C land (if applicable). */
-        mov     multiboot_ptr(%rip),%edi
         tailcall __start_xen
 
         .section .data.page_aligned, "aw", @progbits

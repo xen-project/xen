@@ -248,6 +248,12 @@ static void __init noreturn efi_arch_post_exit_boot(void)
     efi_arch_relocate_image(__XEN_VIRT_START - xen_phys_start);
     memcpy((void *)trampoline_phys, trampoline_start, cfg.size);
 
+    /*
+     * We're in physical mode right now (i.e. identity map), so a regular
+     * pointer is also a phyiscal address to the rest of Xen.
+     */
+    multiboot_ptr = (unsigned long)&mbi;
+
     /* Set system registers and transfer control. */
     asm volatile("pushq $0\n\tpopfq");
     rdmsrl(MSR_EFER, efer);
@@ -279,8 +285,7 @@ static void __init noreturn efi_arch_post_exit_boot(void)
                      [cr4] "+&r" (cr4)
                    : [cr3] "r" (idle_pg_table),
                      [cs] "i" (__HYPERVISOR_CS),
-                     [ds] "r" (__HYPERVISOR_DS),
-                     "D" (&mbi)
+                     [ds] "r" (__HYPERVISOR_DS)
                    : "memory" );
     unreachable();
 }

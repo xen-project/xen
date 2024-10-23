@@ -157,8 +157,8 @@ char asmlinkage __section(".init.bss.stack_aligned") __aligned(STACK_SIZE)
 /* Used by the BSP/AP paths to find the higher half stack mapping to use. */
 void *stack_start = cpu0_stack + STACK_SIZE - sizeof(struct cpu_info);
 
-/* Used by the boot asm to stash the relocated multiboot info pointer. */
-unsigned int asmlinkage __initdata multiboot_ptr;
+/* Used by the boot asm and EFI to stash the multiboot_info paddr. */
+unsigned int __initdata multiboot_ptr;
 
 struct cpuinfo_x86 __read_mostly boot_cpu_data = { 0, 0, 0, 0, -1 };
 
@@ -1014,7 +1014,7 @@ static struct domain *__init create_dom0(const module_t *image,
 /* How much of the directmap is prebuilt at compile time. */
 #define PREBUILT_MAP_LIMIT (1 << L2_PAGETABLE_SHIFT)
 
-void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
+void asmlinkage __init noreturn __start_xen(void)
 {
     const char *memmap_type = NULL;
     char *kextra;
@@ -1059,7 +1059,6 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( pvh_boot )
     {
-        ASSERT(mbi_p == 0);
         pvh_init(&mbi, &mod);
         /*
          * mbi and mod are regular pointers to .initdata.  These remain valid
@@ -1068,7 +1067,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
     }
     else
     {
-        mbi = __va(mbi_p);
+        mbi = __va(multiboot_ptr);
         mod = __va(mbi->mods_addr);
 
         /*
@@ -1078,11 +1077,8 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
          * For EFI, these are directmap pointers into the Xen image.  They do
          * not remain valid across move_xen().  EFI boot only functions
          * because a non-zero xen_phys_start inhibits move_xen().
-         *
-         * Don't be fooled by efi_arch_post_exit_boot() passing "D" (&mbi).
-         * This is a EFI physical-mode (i.e. identity map) pointer.
          */
-        ASSERT(mbi_p < MB(1) || xen_phys_start);
+        ASSERT(multiboot_ptr < MB(1) || xen_phys_start);
     }
 
     bi = multiboot_fill_boot_info(mbi, mod);
