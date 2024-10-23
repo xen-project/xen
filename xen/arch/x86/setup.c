@@ -471,11 +471,13 @@ static void *__init bootstrap_map_addr(paddr_t start, paddr_t end)
 
 void *__init bootstrap_map(const module_t *mod)
 {
-    if ( !mod )
-        return bootstrap_map_addr(0, 0);
-
     return bootstrap_map_addr(pfn_to_paddr(mod->mod_start),
                               pfn_to_paddr(mod->mod_start) + mod->mod_end);
+}
+
+void __init bootstrap_unmap(void)
+{
+    bootstrap_map_addr(0, 0);
 }
 
 static void __init move_memory(
@@ -1402,7 +1404,7 @@ void asmlinkage __init noreturn __start_xen(void)
     }
 
     modules_headroom = bzimage_headroom(bootstrap_map(mod), mod->mod_end);
-    bootstrap_map(NULL);
+    bootstrap_unmap();
 
 #ifndef highmem_start
     /* Don't allow split below 4Gb. */

@@ -37,7 +37,9 @@ extern struct boot_info xen_boot_info;
 
 unsigned long initial_images_nrpages(nodeid_t node);
 void discard_initial_images(void);
+
 void *bootstrap_map(const module_t *mod);
+void bootstrap_unmap(void);
 
 int remove_xen_ranges(struct rangeset *r);
 

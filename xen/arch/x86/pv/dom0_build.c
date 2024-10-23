@@ -830,7 +830,7 @@ static int __init dom0_construct(struct domain *d,
         printk("Failed to load the kernel binary\n");
         goto out;
     }
-    bootstrap_map(NULL);
+    bootstrap_unmap();
 
     if ( UNSET_ADDR != parms.virt_hypercall )
     {

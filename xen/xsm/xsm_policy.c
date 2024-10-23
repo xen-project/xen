@@ -63,7 +63,7 @@ int __init xsm_multiboot_policy_init(
 
         }
 
-        bootstrap_map(NULL);
+        bootstrap_unmap();
     }
 
     return rc;

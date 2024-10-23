@@ -201,7 +201,7 @@ static void __init microcode_scan_module(struct boot_info *bi)
             ucode_blob.data = cd.data;
             break;
         }
-        bootstrap_map(NULL);
+        bootstrap_unmap();
     }
 }
 
@@ -766,13 +766,13 @@ static int __init cf_check microcode_init(void)
      */
     if ( ucode_blob.size )
     {
-        bootstrap_map(NULL);
+        bootstrap_unmap();
         ucode_blob.size = 0;
         ucode_blob.data = NULL;
     }
     else if ( ucode_mod.mod_end )
     {
-        bootstrap_map(NULL);
+        bootstrap_unmap();
         ucode_mod.mod_end = 0;
     }
 

@@ -153,14 +153,14 @@ int __init xsm_multiboot_init(struct boot_info *bi)
         ret = xsm_multiboot_policy_init(bi, &policy_buffer, &policy_size);
         if ( ret )
         {
-            bootstrap_map(NULL);
+            bootstrap_unmap();
             printk(XENLOG_ERR "Error %d initializing XSM policy\n", ret);
             return -EINVAL;
         }
     }
 
     ret = xsm_core_init(policy_buffer, policy_size);
-    bootstrap_map(NULL);
+    bootstrap_unmap();
 
     return 0;
 }
