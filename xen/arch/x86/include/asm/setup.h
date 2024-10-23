@@ -38,6 +38,8 @@ extern struct boot_info xen_boot_info;
 unsigned long initial_images_nrpages(nodeid_t node);
 void discard_initial_images(void);
 
+struct boot_module;
+void *bootstrap_map_bm(const struct boot_module *bm);
 void *bootstrap_map(const module_t *mod);
 void bootstrap_unmap(void);
 

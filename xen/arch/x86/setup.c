@@ -475,6 +475,11 @@ void *__init bootstrap_map(const module_t *mod)
                               pfn_to_paddr(mod->mod_start) + mod->mod_end);
 }
 
+void *__init bootstrap_map_bm(const struct boot_module *bm)
+{
+    return bootstrap_map(bm->mod);
+}
+
 void __init bootstrap_unmap(void)
 {
     bootstrap_map_addr(0, 0);
@@ -1403,7 +1408,9 @@ void asmlinkage __init noreturn __start_xen(void)
         mod[bi->nr_modules].mod_end = __2M_rwdata_end - _stext;
     }
 
-    modules_headroom = bzimage_headroom(bootstrap_map(mod), mod->mod_end);
+    modules_headroom =
+        bzimage_headroom(bootstrap_map_bm(&bi->mods[0]),
+                         bi->mods[0].mod->mod_end);
     bootstrap_unmap();
 
 #ifndef highmem_start
