@@ -48,7 +48,6 @@ struct microcode_patch {
     uint8_t  sb_rev_id;
     uint8_t  bios_api_rev;
     uint8_t  reserved1[3];
-    uint32_t match_reg[8];
 };
 
 #define UCODE_MAGIC                0x00414d44
