@@ -711,33 +711,6 @@ int microcode_update_one(void)
     return microcode_update_cpu(NULL, 0);
 }
 
-static int __init early_update_cache(const void *data, size_t len)
-{
-    int rc = 0;
-    struct microcode_patch *patch;
-
-    if ( !data )
-        return -ENOMEM;
-
-    patch = parse_blob(data, len);
-    if ( IS_ERR(patch) )
-    {
-        printk(XENLOG_WARNING "Parsing microcode blob error %ld\n",
-               PTR_ERR(patch));
-        return PTR_ERR(patch);
-    }
-
-    if ( !patch )
-        return -ENOENT;
-
-    spin_lock(&microcode_mutex);
-    rc = microcode_update_cache(patch);
-    spin_unlock(&microcode_mutex);
-    ASSERT(rc);
-
-    return rc;
-}
-
 /*
  * Set by early_microcode_load() to indicate where it found microcode, so
  * microcode_init_cache() can find it again and initalise the cache.  opt_scan
@@ -748,6 +721,7 @@ static int __initdata early_mod_idx = -1;
 static int __init cf_check microcode_init_cache(void)
 {
     struct boot_info *bi = &xen_boot_info;
+    struct microcode_patch *patch;
     void *data;
     size_t size;
     int rc = 0;
@@ -778,7 +752,24 @@ static int __init cf_check microcode_init_cache(void)
         size = cd.size;
     }
 
-    rc = early_update_cache(data, size);
+    patch = parse_blob(data, size);
+    if ( IS_ERR(patch) )
+    {
+        rc = PTR_ERR(patch);
+        printk(XENLOG_WARNING "Microcode: Parse error %d\n", rc);
+        return rc;
+    }
+
+    if ( !patch )
+    {
+        printk(XENLOG_WARNING "Microcode: No suitable patch found\n");
+        return -ENOENT;
+    }
+
+    spin_lock(&microcode_mutex);
+    ASSERT(microcode_cache == NULL);
+    microcode_cache = patch;
+    spin_unlock(&microcode_mutex);
 
     return rc;
 }
