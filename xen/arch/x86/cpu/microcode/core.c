@@ -60,7 +60,6 @@
 #define MICROCODE_UPDATE_TIMEOUT_US 1000000
 
 static module_t __initdata ucode_mod;
-static signed int __initdata ucode_mod_idx;
 static bool __initdata ucode_mod_forced;
 static unsigned int nr_cores;
 
@@ -97,11 +96,6 @@ struct patch_with_flags {
 };
 
 static struct ucode_mod_blob __initdata ucode_blob;
-/*
- * By default we will NOT parse the multiboot modules to see if there is
- * cpio image with the microcode images.
- */
-static bool __initdata ucode_scan;
 
 /* By default, ucode loading is done in NMI handler */
 static bool ucode_in_nmi = true;
@@ -110,12 +104,27 @@ static bool ucode_in_nmi = true;
 static const struct microcode_patch *microcode_cache;
 
 /*
+ * opt_mod_idx and opt_scan have subtle semantics.
+ *
+ * The cmdline can either identify a module by number (inc -ve back-reference)
+ * containing a raw microcode container, or select scan which instructs Xen to
+ * search all modules for an uncompressed CPIO archive containing a file with
+ * a vendor-dependent name.
+ *
+ * These options do not make sense when combined, so for the benefit of module
+ * location we require that they are not both active together.
+ */
+static int __initdata opt_mod_idx;
+static bool __initdata opt_scan;
+
+/*
  * Used by the EFI path only, when xen.cfg identifies an explicit microcode
  * file.  Overrides ucode=<int>|scan on the regular command line.
  */
 void __init microcode_set_module(unsigned int idx)
 {
-    ucode_mod_idx = idx;
+    opt_mod_idx = idx;
+    opt_scan = false;
     ucode_mod_forced = 1;
 }
 
@@ -139,14 +148,22 @@ static int __init cf_check parse_ucode(const char *s)
         else if ( !ucode_mod_forced ) /* Not forced by EFI */
         {
             if ( (val = parse_boolean("scan", s, ss)) >= 0 )
-                ucode_scan = val;
+            {
+                opt_scan = val;
+                opt_mod_idx = 0;
+            }
             else
             {
                 const char *q;
 
-                ucode_mod_idx = simple_strtol(s, &q, 0);
+                opt_mod_idx = simple_strtol(s, &q, 0);
                 if ( q != ss )
+                {
+                    opt_mod_idx = 0;
                     rc = -EINVAL;
+                }
+                else
+                    opt_scan = false;
             }
         }
 
@@ -167,7 +184,7 @@ static void __init microcode_scan_module(struct boot_info *bi)
     int i;
 
     ucode_blob.size = 0;
-    if ( !ucode_scan )
+    if ( !opt_scan )
         return;
 
     /*
@@ -806,7 +823,7 @@ static int __init cf_check microcode_init_cache(void)
     if ( !ucode_ops.apply_microcode )
         return -ENODEV;
 
-    if ( ucode_scan )
+    if ( opt_scan )
         /* Need to rescan the modules because they might have been relocated */
         microcode_scan_module(bi);
 
@@ -831,16 +848,41 @@ static int __init early_microcode_load(struct boot_info *bi)
     const void *data = NULL;
     size_t size;
     struct microcode_patch *patch;
+    int idx = opt_mod_idx;
 
-    if ( ucode_mod_idx < 0 )
-        ucode_mod_idx += bi->nr_modules;
-    if ( ucode_mod_idx <= 0 || ucode_mod_idx >= bi->nr_modules ||
-         !__test_and_clear_bit(ucode_mod_idx, bi->module_map) )
-        goto scan;
-    ucode_mod = *bi->mods[ucode_mod_idx].mod;
- scan:
-    if ( ucode_scan )
+    /*
+     * Cmdline parsing ensures this invariant holds, so that we don't end up
+     * trying to mix multiple ways of finding the microcode.
+     */
+    ASSERT(idx == 0 || !opt_scan);
+
+    if ( opt_scan ) /* Scan for a CPIO archive */
         microcode_scan_module(bi);
+
+    if ( idx ) /* Specific module nominated */
+    {
+        /*
+         * Negative indicies can be used to reference from the end of the
+         * modules.  e.g. ucode=-1 refers to the last module.
+         */
+        if ( idx < 0 )
+            idx += bi->nr_modules;
+
+        if ( idx <= 0 || idx >= bi->nr_modules )
+        {
+            printk(XENLOG_WARNING "Microcode: Chosen module %d out of range [1, %u)\n",
+                   idx, bi->nr_modules);
+            return -ENODEV;
+        }
+
+        if ( !__test_and_clear_bit(idx, bi->module_map) )
+        {
+            printk(XENLOG_WARNING "Microcode: Chosen module %d already used\n", idx);
+            return -ENODEV;
+        }
+
+        ucode_mod = *bi->mods[idx].mod;
+    }
 
     if ( !ucode_mod.mod_end && !ucode_blob.size )
         return 0;
