@@ -841,28 +841,38 @@ static int __init cf_check microcode_init_cache(void)
 }
 presmp_initcall(microcode_init_cache);
 
-/* BSP calls this function to parse ucode blob and then apply an update. */
-static int __init early_microcode_update_cpu(void)
+/*
+ * There are several tasks:
+ * - Locate the ucode blob in the boot modules.
+ * - Parse and attempt in-place load.
+ * - Inform microcode_init_cache() of how to find the blob again.
+ */
+static int __init early_microcode_load(struct boot_info *bi)
 {
     const void *data = NULL;
-    size_t len;
+    size_t size;
     struct microcode_patch *patch;
+
+    microcode_grab_module(bi);
+
+    if ( !ucode_mod.mod_end && !ucode_blob.size )
+        return 0;
 
     if ( ucode_blob.size )
     {
-        len = ucode_blob.size;
+        size = ucode_blob.size;
         data = ucode_blob.data;
     }
     else if ( ucode_mod.mod_end )
     {
-        len = ucode_mod.mod_end;
+        size = ucode_mod.mod_end;
         data = bootstrap_map(&ucode_mod);
     }
 
     if ( !data )
         return -ENOMEM;
 
-    patch = ucode_ops.cpu_request_microcode(data, len, false);
+    patch = ucode_ops.cpu_request_microcode(data, size, false);
     if ( IS_ERR(patch) )
     {
         printk(XENLOG_WARNING "Parsing microcode blob error %ld\n",
@@ -874,22 +884,6 @@ static int __init early_microcode_update_cpu(void)
         return -ENOENT;
 
     return microcode_update_cpu(patch, 0);
-}
-
-/*
- * There are several tasks:
- * - Locate the ucode blob in the boot modules.
- * - Parse and attempt in-place load.
- * - Inform microcode_init_cache() of how to find the blob again.
- */
-static int __init early_microcode_load(struct boot_info *bi)
-{
-    microcode_grab_module(bi);
-
-    if ( !ucode_mod.mod_end && !ucode_blob.size )
-        return 0;
-
-    return early_microcode_update_cpu();
 }
 
 int __init early_microcode_init(struct boot_info *bi)
