@@ -28,7 +28,6 @@
 #include <xen/err.h>
 #include <xen/guest_access.h>
 #include <xen/init.h>
-#include <xen/multiboot.h>
 #include <xen/param.h>
 #include <xen/spinlock.h>
 #include <xen/stop_machine.h>
@@ -59,7 +58,6 @@
  */
 #define MICROCODE_UPDATE_TIMEOUT_US 1000000
 
-static module_t __initdata ucode_mod;
 static bool __initdata ucode_mod_forced;
 static unsigned int nr_cores;
 
@@ -79,23 +77,10 @@ static enum {
     LOADING_EXIT,
 } loading_state;
 
-/*
- * If we scan the initramfs.cpio for the early microcode code
- * and find it, then 'ucode_blob' will contain the pointer
- * and the size of said blob. It is allocated from Xen's heap
- * memory.
- */
-struct ucode_mod_blob {
-    const void *data;
-    size_t size;
-};
-
 struct patch_with_flags {
     unsigned int flags;
     const struct microcode_patch *patch;
 };
-
-static struct ucode_mod_blob __initdata ucode_blob;
 
 /* By default, ucode loading is done in NMI handler */
 static bool ucode_in_nmi = true;
@@ -175,46 +160,6 @@ static int __init cf_check parse_ucode(const char *s)
 custom_param("ucode", parse_ucode);
 
 static struct microcode_ops __ro_after_init ucode_ops;
-
-static void __init microcode_scan_module(struct boot_info *bi)
-{
-    uint64_t *_blob_start;
-    unsigned long _blob_size;
-    struct cpio_data cd;
-    int i;
-
-    ucode_blob.size = 0;
-    if ( !opt_scan )
-        return;
-
-    /*
-     * Try all modules and see whichever could be the microcode blob.
-     */
-    for ( i = 1 /* Ignore dom0 kernel */; i < bi->nr_modules; i++ )
-    {
-        if ( !test_bit(i, bi->module_map) )
-            continue;
-
-        _blob_start = bootstrap_map(bi->mods[i].mod);
-        _blob_size = bi->mods[i].mod->mod_end;
-        if ( !_blob_start )
-        {
-            printk("Could not map multiboot module #%d (size: %ld)\n",
-                   i, _blob_size);
-            continue;
-        }
-        cd.data = NULL;
-        cd.size = 0;
-        cd = find_cpio_data(ucode_ops.cpio_path, _blob_start, _blob_size);
-        if ( cd.data )
-        {
-            ucode_blob.size = cd.size;
-            ucode_blob.data = cd.data;
-            break;
-        }
-        bootstrap_unmap();
-    }
-}
 
 static DEFINE_SPINLOCK(microcode_mutex);
 
@@ -754,28 +699,6 @@ int microcode_update(XEN_GUEST_HANDLE(const_void) buf,
     return continue_hypercall_on_cpu(0, microcode_update_helper, buffer);
 }
 
-static int __init cf_check microcode_init(void)
-{
-    /*
-     * At this point, all CPUs should have updated their microcode
-     * via the early_microcode_* paths so free the microcode blob.
-     */
-    if ( ucode_blob.size )
-    {
-        bootstrap_unmap();
-        ucode_blob.size = 0;
-        ucode_blob.data = NULL;
-    }
-    else if ( ucode_mod.mod_end )
-    {
-        bootstrap_unmap();
-        ucode_mod.mod_end = 0;
-    }
-
-    return 0;
-}
-__initcall(microcode_init);
-
 /* Load a cached update to current cpu */
 int microcode_update_one(void)
 {
@@ -815,23 +738,47 @@ static int __init early_update_cache(const void *data, size_t len)
     return rc;
 }
 
+/*
+ * Set by early_microcode_load() to indicate where it found microcode, so
+ * microcode_init_cache() can find it again and initalise the cache.  opt_scan
+ * tells us whether we're looking for a raw container or CPIO archive.
+ */
+static int __initdata early_mod_idx = -1;
+
 static int __init cf_check microcode_init_cache(void)
 {
     struct boot_info *bi = &xen_boot_info;
+    void *data;
+    size_t size;
     int rc = 0;
 
-    if ( !ucode_ops.apply_microcode )
-        return -ENODEV;
+    if ( early_mod_idx < 0 )
+        /* early_microcode_load() didn't leave us any work to do. */
+        return 0;
 
+    size = bi->mods[early_mod_idx].mod->mod_end;
+    data = __mfn_to_virt(bi->mods[early_mod_idx].mod->mod_start);
+
+    /*
+     * If opt_scan is set, we're looking for a CPIO archive rather than a raw
+     * microcode container.  Look within it.
+     */
     if ( opt_scan )
-        /* Need to rescan the modules because they might have been relocated */
-        microcode_scan_module(bi);
+    {
+        struct cpio_data cd = find_cpio_data(ucode_ops.cpio_path, data, size);
 
-    if ( ucode_mod.mod_end )
-        rc = early_update_cache(bootstrap_map(&ucode_mod),
-                                ucode_mod.mod_end);
-    else if ( ucode_blob.size )
-        rc = early_update_cache(ucode_blob.data, ucode_blob.size);
+        if ( !cd.data )
+        {
+            printk(XENLOG_WARNING "Microcode: %s not found in CPIO archive\n",
+                   strrchr(ucode_ops.cpio_path, '/') + 1);
+            return -ENOENT;
+        }
+
+        data = cd.data;
+        size = cd.size;
+    }
+
+    rc = early_update_cache(data, size);
 
     return rc;
 }
@@ -845,7 +792,7 @@ presmp_initcall(microcode_init_cache);
  */
 static int __init early_microcode_load(struct boot_info *bi)
 {
-    const void *data = NULL;
+    void *data = NULL;
     size_t size;
     struct microcode_patch *patch;
     int idx = opt_mod_idx;
@@ -858,7 +805,40 @@ static int __init early_microcode_load(struct boot_info *bi)
     ASSERT(idx == 0 || !opt_scan);
 
     if ( opt_scan ) /* Scan for a CPIO archive */
-        microcode_scan_module(bi);
+    {
+        for ( idx = 1; idx < bi->nr_modules; ++idx )
+        {
+            struct cpio_data cd;
+
+            if ( !test_bit(idx, bi->module_map) )
+                continue;
+
+            size = bi->mods[idx].mod->mod_end;
+            data = bootstrap_map_bm(&bi->mods[idx]);
+            if ( !data )
+            {
+                printk(XENLOG_WARNING "Microcode: Could not map module %d, size %zu\n",
+                       idx, size);
+                continue;
+            }
+
+            cd = find_cpio_data(ucode_ops.cpio_path, data, size);
+            if ( !cd.data )
+            {
+                /* CPIO archive, but no cpio_path.  Try the next module */
+                bootstrap_unmap();
+                continue;
+            }
+
+            data = cd.data;
+            size = cd.size;
+            goto found;
+        }
+
+        printk(XENLOG_WARNING "Microcode: %s not found during CPIO scan\n",
+               strrchr(ucode_ops.cpio_path, '/') + 1);
+        return -ENODEV;
+    }
 
     if ( idx ) /* Specific module nominated */
     {
@@ -882,26 +862,21 @@ static int __init early_microcode_load(struct boot_info *bi)
             return -ENODEV;
         }
 
-        ucode_mod = *bi->mods[idx].mod;
+        size = bi->mods[idx].mod->mod_end;
+        data = bootstrap_map_bm(&bi->mods[idx]);
+        if ( !data )
+        {
+            printk(XENLOG_WARNING "Microcode: Could not map module %d, size %zu\n",
+                   idx, size);
+            return -ENODEV;
+        }
+        goto found;
     }
 
-    if ( !ucode_mod.mod_end && !ucode_blob.size )
-        return 0;
+    /* No method of finding microcode specified.  Nothing to do. */
+    return 0;
 
-    if ( ucode_blob.size )
-    {
-        size = ucode_blob.size;
-        data = ucode_blob.data;
-    }
-    else if ( ucode_mod.mod_end )
-    {
-        size = ucode_mod.mod_end;
-        data = bootstrap_map(&ucode_mod);
-    }
-
-    if ( !data )
-        return -ENOMEM;
-
+ found:
     patch = ucode_ops.cpu_request_microcode(data, size, false);
     if ( IS_ERR(patch) )
     {
@@ -916,6 +891,15 @@ static int __init early_microcode_load(struct boot_info *bi)
         rc = -ENOENT;
         goto unmap;
     }
+
+    /*
+     * We've found a microcode patch suitable for this CPU.
+     *
+     * Tell microcode_init_cache() which module we found it in.  We cache it
+     * irrespective of whether the BSP successfully loads it; Some platforms
+     * are known to update the BSP but leave the APs on older ucode.
+     */
+    early_mod_idx = idx;
 
     rc = microcode_update_cpu(patch, 0);
 
