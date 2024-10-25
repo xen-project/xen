@@ -849,6 +849,7 @@ static int __init early_microcode_load(struct boot_info *bi)
     size_t size;
     struct microcode_patch *patch;
     int idx = opt_mod_idx;
+    int rc;
 
     /*
      * Cmdline parsing ensures this invariant holds, so that we don't end up
@@ -904,15 +905,24 @@ static int __init early_microcode_load(struct boot_info *bi)
     patch = ucode_ops.cpu_request_microcode(data, size, false);
     if ( IS_ERR(patch) )
     {
-        printk(XENLOG_WARNING "Parsing microcode blob error %ld\n",
-               PTR_ERR(patch));
-        return PTR_ERR(patch);
+        rc = PTR_ERR(patch);
+        printk(XENLOG_WARNING "Microcode: Parse error %d\n", rc);
+        goto unmap;
     }
 
     if ( !patch )
-        return -ENOENT;
+    {
+        printk(XENLOG_DEBUG "Microcode: No suitable patch found\n");
+        rc = -ENOENT;
+        goto unmap;
+    }
 
-    return microcode_update_cpu(patch, 0);
+    rc = microcode_update_cpu(patch, 0);
+
+ unmap:
+    bootstrap_unmap();
+
+    return rc;
 }
 
 int __init early_microcode_init(struct boot_info *bi)
