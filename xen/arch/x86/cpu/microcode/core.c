@@ -205,19 +205,6 @@ static void __init microcode_scan_module(struct boot_info *bi)
     }
 }
 
-static void __init microcode_grab_module(struct boot_info *bi)
-{
-    if ( ucode_mod_idx < 0 )
-        ucode_mod_idx += bi->nr_modules;
-    if ( ucode_mod_idx <= 0 || ucode_mod_idx >= bi->nr_modules ||
-         !__test_and_clear_bit(ucode_mod_idx, bi->module_map) )
-        goto scan;
-    ucode_mod = *bi->mods[ucode_mod_idx].mod;
-scan:
-    if ( ucode_scan )
-        microcode_scan_module(bi);
-}
-
 static struct microcode_ops __ro_after_init ucode_ops;
 
 static DEFINE_SPINLOCK(microcode_mutex);
@@ -853,7 +840,15 @@ static int __init early_microcode_load(struct boot_info *bi)
     size_t size;
     struct microcode_patch *patch;
 
-    microcode_grab_module(bi);
+    if ( ucode_mod_idx < 0 )
+        ucode_mod_idx += bi->nr_modules;
+    if ( ucode_mod_idx <= 0 || ucode_mod_idx >= bi->nr_modules ||
+         !__test_and_clear_bit(ucode_mod_idx, bi->module_map) )
+        goto scan;
+    ucode_mod = *bi->mods[ucode_mod_idx].mod;
+ scan:
+    if ( ucode_scan )
+        microcode_scan_module(bi);
 
     if ( !ucode_mod.mod_end && !ucode_blob.size )
         return 0;
