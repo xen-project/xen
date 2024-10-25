@@ -876,6 +876,22 @@ static int __init early_microcode_update_cpu(void)
     return microcode_update_cpu(patch, 0);
 }
 
+/*
+ * There are several tasks:
+ * - Locate the ucode blob in the boot modules.
+ * - Parse and attempt in-place load.
+ * - Inform microcode_init_cache() of how to find the blob again.
+ */
+static int __init early_microcode_load(struct boot_info *bi)
+{
+    microcode_grab_module(bi);
+
+    if ( !ucode_mod.mod_end && !ucode_blob.size )
+        return 0;
+
+    return early_microcode_update_cpu();
+}
+
 int __init early_microcode_init(struct boot_info *bi)
 {
     const struct cpuinfo_x86 *c = &boot_cpu_data;
@@ -919,10 +935,7 @@ int __init early_microcode_init(struct boot_info *bi)
         return -ENODEV;
     }
 
-    microcode_grab_module(bi);
-
-    if ( ucode_mod.mod_end || ucode_blob.size )
-        rc = early_microcode_update_cpu();
+    rc = early_microcode_load(bi);
 
     /*
      * Some CPUID leaves and MSRs are only present after microcode updates
