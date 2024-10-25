@@ -157,23 +157,17 @@ static int __init cf_check parse_ucode(const char *s)
 }
 custom_param("ucode", parse_ucode);
 
+static struct microcode_ops __ro_after_init ucode_ops;
+
 static void __init microcode_scan_module(struct boot_info *bi)
 {
     uint64_t *_blob_start;
     unsigned long _blob_size;
     struct cpio_data cd;
-    const char *p = NULL;
     int i;
 
     ucode_blob.size = 0;
     if ( !ucode_scan )
-        return;
-
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
-        p = "kernel/x86/microcode/AuthenticAMD.bin";
-    else if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
-        p = "kernel/x86/microcode/GenuineIntel.bin";
-    else
         return;
 
     /*
@@ -194,7 +188,7 @@ static void __init microcode_scan_module(struct boot_info *bi)
         }
         cd.data = NULL;
         cd.size = 0;
-        cd = find_cpio_data(p, _blob_start, _blob_size);
+        cd = find_cpio_data(ucode_ops.cpio_path, _blob_start, _blob_size);
         if ( cd.data )
         {
             ucode_blob.size = cd.size;
@@ -204,8 +198,6 @@ static void __init microcode_scan_module(struct boot_info *bi)
         bootstrap_unmap();
     }
 }
-
-static struct microcode_ops __ro_after_init ucode_ops;
 
 static DEFINE_SPINLOCK(microcode_mutex);
 

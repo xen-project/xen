@@ -405,11 +405,15 @@ static bool __init can_load_microcode(void)
     return !(mcu_ctrl & MCU_CONTROL_DIS_MCU_LOAD);
 }
 
+static const char __initconst intel_cpio_path[] =
+    "kernel/x86/microcode/GenuineIntel.bin";
+
 static const struct microcode_ops __initconst_cf_clobber intel_ucode_ops = {
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
     .apply_microcode                  = apply_microcode,
     .compare_patch                    = compare_patch,
+    .cpio_path                        = intel_cpio_path,
 };
 
 void __init ucode_probe_intel(struct microcode_ops *ops)

@@ -59,6 +59,13 @@ struct microcode_ops {
      */
     enum microcode_match_result (*compare_patch)(
         const struct microcode_patch *new, const struct microcode_patch *old);
+
+    /*
+     * For Linux inird microcode compatibliity.
+     *
+     * The path where this vendor's microcode can be found in CPIO.
+     */
+    const char *cpio_path;
 };
 
 /*

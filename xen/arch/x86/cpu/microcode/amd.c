@@ -443,11 +443,15 @@ static struct microcode_patch *cf_check cpu_request_microcode(
     return patch;
 }
 
+static const char __initconst amd_cpio_path[] =
+    "kernel/x86/microcode/AuthenticAMD.bin";
+
 static const struct microcode_ops __initconst_cf_clobber amd_ucode_ops = {
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
     .apply_microcode                  = apply_microcode,
     .compare_patch                    = compare_patch,
+    .cpio_path                        = amd_cpio_path,
 };
 
 void __init ucode_probe_amd(struct microcode_ops *ops)
