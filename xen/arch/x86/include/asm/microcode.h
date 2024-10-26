@@ -28,6 +28,5 @@ int microcode_update_one(void);
 
 struct boot_info;
 int early_microcode_init(struct boot_info *bi);
-int microcode_init_cache(struct boot_info *bi);
 
 #endif /* ASM_X86__MICROCODE_H */

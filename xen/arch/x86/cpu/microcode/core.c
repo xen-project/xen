@@ -819,8 +819,9 @@ static int __init early_update_cache(const void *data, size_t len)
     return rc;
 }
 
-int __init microcode_init_cache(struct boot_info *bi)
+static int __init cf_check microcode_init_cache(void)
 {
+    struct boot_info *bi = &xen_boot_info;
     int rc = 0;
 
     if ( !ucode_ops.apply_microcode )
@@ -838,6 +839,7 @@ int __init microcode_init_cache(struct boot_info *bi)
 
     return rc;
 }
+presmp_initcall(microcode_init_cache);
 
 /* BSP calls this function to parse ucode blob and then apply an update. */
 static int __init early_microcode_update_cpu(void)

@@ -1952,8 +1952,6 @@ void asmlinkage __init noreturn __start_xen(void)
 
     timer_init();
 
-    microcode_init_cache(bi); /* Needs xmalloc() */
-
     tsx_init(); /* Needs microcode.  May change HLE/RTM feature bits. */
 
     calculate_raw_cpu_policy(); /* Needs microcode.  No other dependenices. */
