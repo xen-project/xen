@@ -192,6 +192,22 @@ xilinx-smoke-dom0-x86_64-gcc-debug:
     - *x86-64-test-needs
     - alpine-3.18-gcc-debug
 
+xilinx-smoke-dom0-x86_64-gcc-debug-argo:
+  extends: .xilinx-x86_64
+  script:
+    - ./automation/scripts/xilinx-smoke-dom0-x86_64.sh argo 2>&1 | tee ${LOGFILE}
+  needs:
+    - alpine-3.18-gcc-debug
+    - project: xen-project/hardware/test-artifacts
+      job: x86_64-kernel-linux-6.6.56
+      ref: master
+    - project: xen-project/hardware/test-artifacts
+      job: x86_64-rootfs-alpine-3.18
+      ref: master
+    - project: xen-project/hardware/test-artifacts
+      job: x86_64-argo-linux-6.6.56
+      ref: master
+
 adl-smoke-x86-64-gcc-debug:
   extends: .adl-x86-64
   script:

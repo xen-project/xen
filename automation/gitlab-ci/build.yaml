@@ -340,6 +340,10 @@ alpine-3.18-gcc-debug:
   variables:
     CONTAINER: alpine:3.18
     BUILD_QEMU_XEN: y
+    EXTRA_XEN_CONFIG: |
+      CONFIG_EXPERT=y
+      CONFIG_UNSUPPORTED=y
+      CONFIG_ARGO=y
 
 debian-bookworm-gcc-debug:
   extends: .gcc-x86-64-build-debug
