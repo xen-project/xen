@@ -40,6 +40,7 @@ supported in this document.
 
     Status, Xen in AArch64 mode: Supported
     Status, Xen in AArch32 mode: Tech Preview
+    Status, Xen in Armv8-R: Experimental
     Status, Cortex A57 r0p0-r1p1: Supported, not security supported
     Status, Cortex A77 r0p0-r1p0: Supported, not security supported
 

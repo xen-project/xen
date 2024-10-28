@@ -1,5 +1,5 @@
 choice
-	prompt "Platform Support"
+	prompt "Platform Support" if MMU
 	default ALL_PLAT
 	help
 	Choose which hardware platform to enable in Xen.

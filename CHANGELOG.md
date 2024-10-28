@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
    - Prefer ACPI reboot over UEFI ResetSystem() run time service call.
 
 ### Added
+ - On Arm:
+   - Experimental support for Armv8-R.
 
 ### Removed
  - On x86:

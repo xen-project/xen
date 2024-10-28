@@ -58,10 +58,25 @@ config PADDR_BITS
 	default 40 if ARM_PA_BITS_40
 	default 48 if ARM_64
 
+choice
+	prompt "Memory management system"
+	default MMU
+	help
+	  User can choose between the different forms of memory management system.
+
 config MMU
-	def_bool y
+	bool "MMU"
 	select HAS_PMAP
 	select HAS_VMAP
+	help
+	  Select it if you plan to run Xen on A-profile Armv7+
+
+config MPU
+	bool "MPU" if UNSUPPORTED
+	help
+	  Memory Protection Unit (MPU). Select if you plan to run Xen on ARMv8-R
+	  systems supporting EL2. (UNSUPPORTED)
+endchoice
 
 source "arch/Kconfig"
 
