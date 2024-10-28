@@ -185,12 +185,15 @@ zero_bss:
         PRINT("- Zero BSS -\r\n")
         mov_w r0, __bss_start        /* r0 := vaddr(__bss_start) */
         mov_w r1, __bss_end          /* r1 := vaddr(__bss_end)   */
+        cmp   r1, r0
+        beq   skip_bss
 
         mov   r2, #0
 1:      str   r2, [r0], #4
         cmp   r0, r1
         blo   1b
 
+skip_bss:
         mov   pc, lr
 ENDPROC(zero_bss)
 
