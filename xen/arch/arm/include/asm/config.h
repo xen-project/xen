@@ -69,8 +69,10 @@
 #include <xen/const.h>
 #include <xen/page-size.h>
 
-#ifdef CONFIG_MMU
+#if defined(CONFIG_MMU)
 #include <asm/mmu/layout.h>
+#elif defined(CONFIG_MPU)
+#include <asm/mpu/layout.h>
 #else
 # error "Unknown memory management layout"
 #endif

@@ -213,6 +213,13 @@ SECTIONS
  * match the context.
  */
 ASSERT(_start == XEN_VIRT_START, "_start != XEN_VIRT_START")
+#ifdef CONFIG_MPU
+/*
+ * On MPU based platforms, the starting address is to be provided by user.
+ * One need to check that it is 4KB aligned.
+ */
+ASSERT(IS_ALIGNED(_start,       4096), "starting address should be aligned to 4KB")
+#endif
 
 /*
  * We require that Xen is loaded at a page boundary, so this ensures that any

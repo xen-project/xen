@@ -23,6 +23,16 @@ config ARCH_DEFCONFIG
 	default "arch/arm/configs/arm32_defconfig" if ARM_32
 	default "arch/arm/configs/arm64_defconfig" if ARM_64
 
+config XEN_START_ADDRESS
+	hex "Xen start address: keep default to use platform defined address"
+	default 0xFFFFFFFF
+	depends on MPU
+	help
+	  Used to set customized address at which which Xen will be linked on MPU
+	  systems. Must be aligned to 4KB.
+	  0xFFFFFFFF is used as default value to indicate that user has not
+	  customized this address.
+
 menu "Architecture Features"
 
 choice
