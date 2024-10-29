@@ -779,9 +779,11 @@ static inline int xsm_argo_send(const struct domain *d, const struct domain *t)
 
 #ifdef CONFIG_MULTIBOOT
 int xsm_multiboot_init(
-    unsigned long *module_map, const multiboot_info_t *mbi);
+    unsigned long *module_map, const multiboot_info_t *mbi,
+    const module_t mods[]);
 int xsm_multiboot_policy_init(
     unsigned long *module_map, const multiboot_info_t *mbi,
+    const module_t mods[],
     void **policy_buffer, size_t *policy_size);
 #endif
 
@@ -829,7 +831,8 @@ static const inline struct xsm_ops *silo_init(void)
 
 #ifdef CONFIG_MULTIBOOT
 static inline int xsm_multiboot_init (
-    unsigned long *module_map, const multiboot_info_t *mbi)
+    unsigned long *module_map, const multiboot_info_t *mbi,
+    const module_t mods[])
 {
     return 0;
 }

@@ -140,7 +140,8 @@ static int __init xsm_core_init(const void *policy_buffer, size_t policy_size)
 
 #ifdef CONFIG_MULTIBOOT
 int __init xsm_multiboot_init(
-    unsigned long *module_map, const multiboot_info_t *mbi)
+    unsigned long *module_map, const multiboot_info_t *mbi,
+    const module_t mods[])
 {
     int ret = 0;
     void *policy_buffer = NULL;
@@ -150,8 +151,8 @@ int __init xsm_multiboot_init(
 
     if ( XSM_MAGIC )
     {
-        ret = xsm_multiboot_policy_init(module_map, mbi, &policy_buffer,
-                                        &policy_size);
+        ret = xsm_multiboot_policy_init(module_map, mbi, mods,
+                                        &policy_buffer, &policy_size);
         if ( ret )
         {
             bootstrap_map(NULL);
