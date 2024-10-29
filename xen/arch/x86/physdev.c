@@ -436,7 +436,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 #else
         guest_from_compat_handle(curr->arch.pv.iobmp, set_iobitmap.bitmap);
 #endif
-        curr->arch.pv.iobmp_limit = set_iobitmap.nr_ports;
+        curr->arch.pv.iobmp_nr = set_iobitmap.nr_ports;
         break;
     }
 

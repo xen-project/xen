@@ -167,7 +167,11 @@ static int guest_io_okay(unsigned int port, unsigned int bytes,
     if ( iopl_ok(v, regs) )
         return X86EMUL_OKAY;
 
-    if ( (port + bytes) <= v->arch.pv.iobmp_limit )
+    /*
+     * When @iobmp_nr is non-zero, Xen, like real CPUs and the TSS IOPB,
+     * always reads 2 bytes from @iobmp, which might be one byte @iobmp_nr.
+     */
+    if ( (port + bytes) <= v->arch.pv.iobmp_nr )
     {
         const void *__user addr = v->arch.pv.iobmp.p + (port >> 3);
         uint16_t mask;
