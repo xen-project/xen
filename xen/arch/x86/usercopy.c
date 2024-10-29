@@ -16,42 +16,19 @@
 
 unsigned int copy_to_guest_ll(void __user *to, const void *from, unsigned int n)
 {
-    unsigned dummy;
+    GUARD(unsigned dummy);
 
     stac();
     asm volatile (
         GUARD(
         "    guest_access_mask_ptr %[to], %q[scratch1], %q[scratch2]\n"
         )
-        "    cmp  $"STR(2*BYTES_PER_LONG-1)", %[cnt]\n"
-        "    jbe  1f\n"
-        "    mov  %k[to], %[cnt]\n"
-        "    neg  %[cnt]\n"
-        "    and  $"STR(BYTES_PER_LONG-1)", %[cnt]\n"
-        "    sub  %[cnt], %[aux]\n"
-        "4:  rep movsb\n" /* make 'to' address aligned */
-        "    mov  %[aux], %[cnt]\n"
-        "    shr  $"STR(LONG_BYTEORDER)", %[cnt]\n"
-        "    and  $"STR(BYTES_PER_LONG-1)", %[aux]\n"
-        "    .align 2,0x90\n"
-        "0:  rep movs"__OS"\n" /* as many words as possible... */
-        "    mov  %[aux],%[cnt]\n"
-        "1:  rep movsb\n" /* ...remainder copied as bytes */
+        "1:  rep movsb\n"
         "2:\n"
-        ".section .fixup,\"ax\"\n"
-        "5:  add %[aux], %[cnt]\n"
-        "    jmp 2b\n"
-        "3:  lea (%q[aux], %q[cnt], "STR(BYTES_PER_LONG)"), %[cnt]\n"
-        "    jmp 2b\n"
-        ".previous\n"
-        _ASM_EXTABLE(4b, 5b)
-        _ASM_EXTABLE(0b, 3b)
         _ASM_EXTABLE(1b, 2b)
-        : [cnt] "+c" (n), [to] "+D" (to), [from] "+S" (from),
-          [aux] "=&r" (dummy)
+        : [cnt] "+c" (n), [to] "+D" (to), [from] "+S" (from)
           GUARD(, [scratch1] "=&r" (dummy), [scratch2] "=&r" (dummy))
-        : "[aux]" (n)
-        : "memory" );
+        :: "memory" );
     clac();
 
     return n;
@@ -66,25 +43,9 @@ unsigned int copy_from_guest_ll(void *to, const void __user *from, unsigned int 
         GUARD(
         "    guest_access_mask_ptr %[from], %q[scratch1], %q[scratch2]\n"
         )
-        "    cmp  $"STR(2*BYTES_PER_LONG-1)", %[cnt]\n"
-        "    jbe  1f\n"
-        "    mov  %k[to], %[cnt]\n"
-        "    neg  %[cnt]\n"
-        "    and  $"STR(BYTES_PER_LONG-1)", %[cnt]\n"
-        "    sub  %[cnt], %[aux]\n"
-        "4:  rep movsb\n" /* make 'to' address aligned */
-        "    mov  %[aux],%[cnt]\n"
-        "    shr  $"STR(LONG_BYTEORDER)", %[cnt]\n"
-        "    and  $"STR(BYTES_PER_LONG-1)", %[aux]\n"
-        "    .align 2,0x90\n"
-        "0:  rep movs"__OS"\n" /* as many words as possible... */
-        "    mov  %[aux], %[cnt]\n"
-        "1:  rep movsb\n" /* ...remainder copied as bytes */
+        "1:  rep movsb\n"
         "2:\n"
         ".section .fixup,\"ax\"\n"
-        "5:  add  %[aux], %[cnt]\n"
-        "    jmp 6f\n"
-        "3:  lea  (%q[aux], %q[cnt], "STR(BYTES_PER_LONG)"), %[cnt]\n"
         "6:  mov  %[cnt], %k[from]\n"
         "    xchg %%eax, %[aux]\n"
         "    xor  %%eax, %%eax\n"
@@ -93,14 +54,11 @@ unsigned int copy_from_guest_ll(void *to, const void __user *from, unsigned int 
         "    mov  %k[from], %[cnt]\n"
         "    jmp 2b\n"
         ".previous\n"
-        _ASM_EXTABLE(4b, 5b)
-        _ASM_EXTABLE(0b, 3b)
         _ASM_EXTABLE(1b, 6b)
         : [cnt] "+c" (n), [to] "+D" (to), [from] "+S" (from),
           [aux] "=&r" (dummy)
           GUARD(, [scratch1] "=&r" (dummy), [scratch2] "=&r" (dummy))
-        : "[aux]" (n)
-        : "memory" );
+        :: "memory" );
     clac();
 
     return n;
@@ -145,20 +103,12 @@ unsigned int clear_guest_pv(void __user *to, unsigned int n)
         stac();
         asm volatile (
             "    guest_access_mask_ptr %[to], %[scratch1], %[scratch2]\n"
-            "0:  rep stos"__OS"\n"
-            "    mov  %[bytes], %[cnt]\n"
             "1:  rep stosb\n"
             "2:\n"
-            ".section .fixup,\"ax\"\n"
-            "3:  lea  (%q[bytes], %q[longs], "STR(BYTES_PER_LONG)"), %[cnt]\n"
-            "    jmp  2b\n"
-            ".previous\n"
-            _ASM_EXTABLE(0b,3b)
             _ASM_EXTABLE(1b,2b)
-            : [cnt] "=&c" (n), [to] "+D" (to), [scratch1] "=&r" (dummy),
+            : [cnt] "+c" (n), [to] "+D" (to), [scratch1] "=&r" (dummy),
               [scratch2] "=&r" (dummy)
-            : [bytes] "r" (n & (BYTES_PER_LONG - 1)),
-              [longs] "0" (n / BYTES_PER_LONG), "a" (0) );
+            : "a" (0) );
         clac();
     }
 
