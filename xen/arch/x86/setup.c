@@ -1771,7 +1771,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     mmio_ro_ranges = rangeset_new(NULL, "r/o mmio ranges",
                                   RANGESETF_prettyprint_hex);
 
-    xsm_multiboot_init(module_map, mbi);
+    xsm_multiboot_init(module_map, mbi, mod);
 
     /*
      * IOMMU-related ACPI table parsing may require some of the system domains
