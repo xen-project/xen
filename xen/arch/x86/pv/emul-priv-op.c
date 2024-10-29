@@ -156,14 +156,16 @@ static bool iopl_ok(const struct vcpu *v, const struct cpu_user_regs *regs)
 }
 
 /* Has the guest requested sufficient permission for this I/O access? */
-static bool guest_io_okay(unsigned int port, unsigned int bytes,
-                          struct vcpu *v, struct cpu_user_regs *regs)
+static int guest_io_okay(unsigned int port, unsigned int bytes,
+                         struct x86_emulate_ctxt *ctxt)
 {
+    const struct cpu_user_regs *regs = ctxt->regs;
+    struct vcpu *v = current;
     /* If in user mode, switch to kernel mode just to read I/O bitmap. */
     const bool user_mode = !(v->arch.flags & TF_kernel_mode);
 
     if ( iopl_ok(v, regs) )
-        return true;
+        return X86EMUL_OKAY;
 
     if ( (port + bytes) <= v->arch.pv.iobmp_limit )
     {
@@ -190,10 +192,12 @@ static bool guest_io_okay(unsigned int port, unsigned int bytes,
             toggle_guest_pt(v);
 
         if ( (x.mask & (((1 << bytes) - 1) << (port & 7))) == 0 )
-            return true;
+            return X86EMUL_OKAY;
     }
 
-    return false;
+    x86_emul_hw_exception(X86_EXC_GP, 0, ctxt);
+
+    return X86EMUL_EXCEPTION;
 }
 
 /* Has the administrator granted sufficient permission for this I/O access? */
@@ -353,12 +357,14 @@ static int cf_check read_io(
     struct priv_op_ctxt *poc = container_of(ctxt, struct priv_op_ctxt, ctxt);
     struct vcpu *curr = current;
     struct domain *currd = current->domain;
+    int rc;
 
     /* INS must not come here. */
     ASSERT((ctxt->opcode & ~9) == 0xe4);
 
-    if ( !guest_io_okay(port, bytes, curr, ctxt->regs) )
-        return X86EMUL_UNHANDLEABLE;
+    rc = guest_io_okay(port, bytes, ctxt);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
 
     poc->bpmatch = check_guest_io_breakpoint(curr, port, bytes);
 
@@ -458,12 +464,14 @@ static int cf_check write_io(
     struct priv_op_ctxt *poc = container_of(ctxt, struct priv_op_ctxt, ctxt);
     struct vcpu *curr = current;
     struct domain *currd = current->domain;
+    int rc;
 
     /* OUTS must not come here. */
     ASSERT((ctxt->opcode & ~9) == 0xe6);
 
-    if ( !guest_io_okay(port, bytes, curr, ctxt->regs) )
-        return X86EMUL_UNHANDLEABLE;
+    rc = guest_io_okay(port, bytes, ctxt);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
 
     poc->bpmatch = check_guest_io_breakpoint(curr, port, bytes);
 
@@ -612,8 +620,9 @@ static int cf_check rep_ins(
 
     *reps = 0;
 
-    if ( !guest_io_okay(port, bytes_per_rep, curr, ctxt->regs) )
-        return X86EMUL_UNHANDLEABLE;
+    rc = guest_io_okay(port, bytes_per_rep, ctxt);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
 
     rc = read_segment(x86_seg_es, &sreg, ctxt);
     if ( rc != X86EMUL_OKAY )
@@ -678,8 +687,9 @@ static int cf_check rep_outs(
 
     *reps = 0;
 
-    if ( !guest_io_okay(port, bytes_per_rep, curr, ctxt->regs) )
-        return X86EMUL_UNHANDLEABLE;
+    rc = guest_io_okay(port, bytes_per_rep, ctxt);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
 
     rc = read_segment(seg, &sreg, ctxt);
     if ( rc != X86EMUL_OKAY )
