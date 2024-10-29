@@ -151,9 +151,9 @@ custom_param("ucode", parse_ucode);
 
 static void __init microcode_scan_module(
     unsigned long *module_map,
-    const multiboot_info_t *mbi)
+    const multiboot_info_t *mbi,
+    const module_t mod[])
 {
-    module_t *mod = (module_t *)__va(mbi->mods_addr);
     uint64_t *_blob_start;
     unsigned long _blob_size;
     struct cpio_data cd;
@@ -203,10 +203,9 @@ static void __init microcode_scan_module(
 
 static void __init microcode_grab_module(
     unsigned long *module_map,
-    const multiboot_info_t *mbi)
+    const multiboot_info_t *mbi,
+    const module_t mod[])
 {
-    module_t *mod = (module_t *)__va(mbi->mods_addr);
-
     if ( ucode_mod_idx < 0 )
         ucode_mod_idx += mbi->mods_count;
     if ( ucode_mod_idx <= 0 || ucode_mod_idx >= mbi->mods_count ||
@@ -215,7 +214,7 @@ static void __init microcode_grab_module(
     ucode_mod = mod[ucode_mod_idx];
 scan:
     if ( ucode_scan )
-        microcode_scan_module(module_map, mbi);
+        microcode_scan_module(module_map, mbi, mod);
 }
 
 static struct microcode_ops __ro_after_init ucode_ops;
@@ -801,7 +800,8 @@ static int __init early_update_cache(const void *data, size_t len)
 }
 
 int __init microcode_init_cache(unsigned long *module_map,
-                                const struct multiboot_info *mbi)
+                                const struct multiboot_info *mbi,
+                                const module_t mods[])
 {
     int rc = 0;
 
@@ -810,7 +810,7 @@ int __init microcode_init_cache(unsigned long *module_map,
 
     if ( ucode_scan )
         /* Need to rescan the modules because they might have been relocated */
-        microcode_scan_module(module_map, mbi);
+        microcode_scan_module(module_map, mbi, mods);
 
     if ( ucode_mod.mod_end )
         rc = early_update_cache(bootstrap_map(&ucode_mod),
@@ -857,7 +857,8 @@ static int __init early_microcode_update_cpu(void)
 }
 
 int __init early_microcode_init(unsigned long *module_map,
-                                const struct multiboot_info *mbi)
+                                const struct multiboot_info *mbi,
+                                const module_t mods[])
 {
     const struct cpuinfo_x86 *c = &boot_cpu_data;
     int rc = 0;
@@ -906,7 +907,7 @@ int __init early_microcode_init(unsigned long *module_map,
         return -ENODEV;
     }
 
-    microcode_grab_module(module_map, mbi);
+    microcode_grab_module(module_map, mbi, mods);
 
     if ( ucode_mod.mod_end || ucode_blob.size )
         rc = early_microcode_update_cpu();
