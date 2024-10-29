@@ -1175,7 +1175,7 @@ static int ioreq_send_buffered(struct ioreq_server *s, ioreq_t *p)
         return IOREQ_STATUS_UNHANDLED;
 
     /*
-     * Return 0 for the cases we can't deal with:
+     * Return UNHANDLED for the cases we can't deal with:
      *  - 'addr' is only a 20-bit field, so we cannot address beyond 1MB
      *  - we cannot buffer accesses to guest memory buffers, as the guest
      *    may expect the memory buffer to be synchronously accessed
@@ -1183,7 +1183,7 @@ static int ioreq_send_buffered(struct ioreq_server *s, ioreq_t *p)
      *    support data_is_ptr we do not waste space for the count field either
      */
     if ( (p->addr > 0xfffffUL) || p->data_is_ptr || (p->count != 1) )
-        return 0;
+        return IOREQ_STATUS_UNHANDLED;
 
     switch ( p->size )
     {
