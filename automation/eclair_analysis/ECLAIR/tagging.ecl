@@ -28,7 +28,6 @@ MC3R1.D4.14||
 MC3R1.R1.1||
 MC3R1.R1.3||
 MC3R1.R1.4||
-MC3R1.R2.2||
 MC3R1.R2.6||
 MC3R1.R3.1||
 MC3R1.R3.2||
@@ -42,6 +41,7 @@ MC3R1.R6.1||
 MC3R1.R6.2||
 MC3R1.R7.1||
 MC3R1.R7.2||
+MC3R1.R7.3||
 MC3R1.R7.4||
 MC3R1.R8.1||
 MC3R1.R8.2||
@@ -54,7 +54,6 @@ MC3R1.R8.14||
 MC3R1.R9.2||
 MC3R1.R9.3||
 MC3R1.R9.4||
-MC3R1.R9.5||
 MC3R1.R10.2||
 MC3R1.R11.6||
 MC3R1.R11.7||
@@ -109,11 +108,11 @@ MC3R1.R22.10"
 -setq=target,getenv("XEN_TARGET_ARCH")
 
 if(string_equal(target,"x86_64"),
-    service_selector({"additional_clean_guidelines","MC3R1.D4.3"})
+    service_selector({"additional_clean_guidelines","none()"})
 )
 
 if(string_equal(target,"arm64"),
-    service_selector({"additional_clean_guidelines","MC3R1.R2.1||MC3R1.R5.3||MC3R1.R7.3||MC3R1.R16.3||MC3R1.R16.6"})
+    service_selector({"additional_clean_guidelines","MC3R1.R2.1||MC3R1.R5.3||MC3.R11.2||MC3R1.R16.3||MC3R1.R16.6||MC3R1.R20.7"})
 )
 
 -reports+={clean:added,"service(clean_guidelines_common||additional_clean_guidelines)"}
