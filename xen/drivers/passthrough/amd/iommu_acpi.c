@@ -248,8 +248,9 @@ static int __init register_range_for_device(
     iommu = find_iommu_for_device(seg, bdf);
     if ( !iommu )
     {
-        AMD_IOMMU_ERROR("IVMD: no IOMMU for Dev_Id %#x\n", bdf);
-        return -ENODEV;
+        AMD_IOMMU_WARN("IVMD: no IOMMU for device %pp - ignoring constrain\n",
+                       &PCI_SBDF(seg, bdf));
+        return 0;
     }
     req = ivrs_mappings[bdf].dte_requestor_id;
 
