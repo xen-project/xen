@@ -607,9 +607,6 @@ struct lock_profile_anc {
 typedef void lock_profile_subfunc(struct lock_profile *data, int32_t type,
     int32_t idx, void *par);
 
-extern struct lock_profile *__lock_profile_start;
-extern struct lock_profile *__lock_profile_end;
-
 static s_time_t lock_profile_start;
 static struct lock_profile_anc lock_profile_ancs[] = {
     [LOCKPROF_TYPE_GLOBAL] = { .name = "Global" },
@@ -779,13 +776,16 @@ void _lock_profile_deregister_struct(
     spin_unlock(&lock_profile_lock);
 }
 
+extern struct lock_profile *__lock_profile_start[];
+extern struct lock_profile *__lock_profile_end[];
+
 static int __init cf_check lock_prof_init(void)
 {
     struct lock_profile **q;
 
     BUILD_BUG_ON(ARRAY_SIZE(lock_profile_ancs) != LOCKPROF_TYPE_N);
 
-    for ( q = &__lock_profile_start; q < &__lock_profile_end; q++ )
+    for ( q = __lock_profile_start; q < __lock_profile_end; q++ )
     {
         (*q)->next = lock_profile_glb_q.elem_q;
         lock_profile_glb_q.elem_q = *q;
