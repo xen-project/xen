@@ -1,3 +1,5 @@
 /mkelf32
-/*.bin
-/*.lnk
+/build32.*.lds
+/built-in-32.*.bin
+/built-in-32.*.map
+/built-in-32.S
