@@ -155,10 +155,13 @@ static int microcode_sanity_check(const struct microcode_patch *patch)
     uint32_t sum;
 
     /*
-     * Total size must be a multiple of 1024 bytes.  Data size and the header
-     * must fit within it.
+     * The SDM states:
+     * - Data size must be a multiple of 4.
+     * - Total size must be a multiple of 1024 bytes.  Data size and the
+     *   header must fit within it.
      */
     if ( (total_size & 1023) ||
+         (data_size & 3) ||
          data_size > (total_size - MC_HEADER_SIZE) )
     {
         printk(XENLOG_WARNING "microcode: Bad size\n");
