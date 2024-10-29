@@ -169,29 +169,26 @@ static int guest_io_okay(unsigned int port, unsigned int bytes,
 
     if ( (port + bytes) <= v->arch.pv.iobmp_limit )
     {
-        union { uint8_t bytes[2]; uint16_t mask; } x;
+        const void *__user addr = v->arch.pv.iobmp.p + (port >> 3);
+        uint16_t mask;
+        int rc;
 
-        /*
-         * Grab permission bytes from guest space. Inaccessible bytes are
-         * read as 0xff (no access allowed).
-         */
+        /* Grab permission bytes from guest space. */
         if ( user_mode )
             toggle_guest_pt(v);
 
-        switch ( __copy_from_guest_offset(x.bytes, v->arch.pv.iobmp,
-                                          port>>3, 2) )
+        rc = __copy_from_guest_pv(&mask, addr, 2);
+
+        if ( user_mode )
+            toggle_guest_pt(v);
+
+        if ( rc )
         {
-        default: x.bytes[0] = ~0;
-            /* fallthrough */
-        case 1:  x.bytes[1] = ~0;
-            /* fallthrough */
-        case 0:  break;
+            x86_emul_pagefault(0, (unsigned long)addr + bytes - rc, ctxt);
+            return X86EMUL_EXCEPTION;
         }
 
-        if ( user_mode )
-            toggle_guest_pt(v);
-
-        if ( (x.mask & (((1 << bytes) - 1) << (port & 7))) == 0 )
+        if ( (mask & (((1 << bytes) - 1) << (port & 7))) == 0 )
             return X86EMUL_OKAY;
     }
 
