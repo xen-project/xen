@@ -1110,10 +1110,6 @@ long arch_do_domctl(
              !is_pv_domain(d) )
             break;
 
-        /* Count maximum number of optional msrs. */
-        if ( boot_cpu_has(X86_FEATURE_DBEXT) )
-            nr_msrs += 4;
-
         if ( domctl->cmd == XEN_DOMCTL_get_vcpu_msrs )
         {
             ret = 0; copyback = true;
