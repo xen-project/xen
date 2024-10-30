@@ -230,7 +230,7 @@ struct page_info
          * Only valid for: a) free pages, and b) pages with zero type count
          * (except page table pages when the guest is in shadow mode).
          */
-        u32 tlbflush_timestamp;
+        uint32_t tlbflush_timestamp;
 
         /*
          * When PGT_partial is true then the first two fields are valid and
@@ -284,8 +284,8 @@ struct page_info
          *   in use.
          */
         struct {
-            u16 nr_validated_ptes:PAGETABLE_ORDER + 1;
-            u16 :16 - PAGETABLE_ORDER - 1 - 1;
+            uint16_t nr_validated_ptes:PAGETABLE_ORDER + 1;
+            uint16_t :16 - PAGETABLE_ORDER - 1 - 1;
             uint16_t partial_flags:1;
             int16_t linear_pt_count;
         };
