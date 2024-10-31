@@ -11,8 +11,10 @@
   - qemu-system-aarch64-6.0.0-arm32-export
 
 .x86-64-test-needs: &x86-64-test-needs
-  - alpine-3.18-rootfs-export
   - kernel-6.1.19-export
+  - project: xen-project/hardware/test-artifacts
+    job: x86_64-rootfs-alpine-3.18
+    ref: master
 
 .qemu-arm64:
   extends: .test-jobs-common
