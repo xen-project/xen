@@ -12,7 +12,7 @@
 
 /*
  * Casts are necessary for constants, because we never know for sure how
- * U/UL/ULL map to __u32, __u64. At least not in a portable way.
+ * UL/ULL map to __u64. At least not in a portable way.
  */
 #define ___swab16(x)                                    \
 ({                                                      \
@@ -24,12 +24,12 @@
 
 #define ___swab32(x)                                            \
 ({                                                              \
-    __u32 __x = (x);                                            \
-    ((__u32)(                                                   \
-        (((__u32)(__x) & (__u32)0x000000ffUL) << 24) |          \
-        (((__u32)(__x) & (__u32)0x0000ff00UL) <<  8) |          \
-        (((__u32)(__x) & (__u32)0x00ff0000UL) >>  8) |          \
-        (((__u32)(__x) & (__u32)0xff000000UL) >> 24) ));        \
+    uint32_t x_ = (x);                                          \
+    (uint32_t)(                                                 \
+        (((uint32_t)(x_) & 0x000000ffU) << 24) |                \
+        (((uint32_t)(x_) & 0x0000ff00U) <<  8) |                \
+        (((uint32_t)(x_) & 0x00ff0000U) >>  8) |                \
+        (((uint32_t)(x_) & 0xff000000U) >> 24));                \
 })
 
 #define ___swab64(x)                                                       \
@@ -51,11 +51,11 @@
         (((uint16_t)(x) & 0x00ffU) << 8) |      \
         (((uint16_t)(x) & 0xff00U) >> 8)))
 #define ___constant_swab32(x)                           \
-    ((__u32)(                                           \
-        (((__u32)(x) & (__u32)0x000000ffUL) << 24) |    \
-        (((__u32)(x) & (__u32)0x0000ff00UL) <<  8) |    \
-        (((__u32)(x) & (__u32)0x00ff0000UL) >>  8) |    \
-        (((__u32)(x) & (__u32)0xff000000UL) >> 24) ))
+    ((uint32_t)(                                        \
+        (((uint32_t)(x) & 0x000000ffU) << 24) |         \
+        (((uint32_t)(x) & 0x0000ff00U) <<  8) |         \
+        (((uint32_t)(x) & 0x00ff0000U) >>  8) |         \
+        (((uint32_t)(x) & 0xff000000U) >> 24)))
 #define ___constant_swab64(x)                                            \
     ((__u64)(                                                            \
         (__u64)(((__u64)(x) & (__u64)0x00000000000000ffULL) << 56) |     \
@@ -74,7 +74,7 @@
 #  define __arch__swab16(x) ___swab16(x)
 #endif
 #ifndef __arch__swab32
-#  define __arch__swab32(x) ({ __u32 __tmp = (x) ; ___swab32(__tmp); })
+#  define __arch__swab32(x) ___swab32(x)
 #endif
 #ifndef __arch__swab64
 #  define __arch__swab64(x) ({ __u64 __tmp = (x) ; ___swab64(__tmp); })
@@ -110,7 +110,7 @@
  ___swab16((x)) : \
  __fswab16((x)))
 #  define __swab32(x) \
-(__builtin_constant_p((__u32)(x)) ? \
+(__builtin_constant_p((uint32_t)(x)) ? \
  ___swab32((x)) : \
  __fswab32((x)))
 #  define __swab64(x) \
@@ -137,15 +137,15 @@ static inline void __swab16s(uint16_t *addr)
     __arch__swab16s(addr);
 }
 
-static inline attr_const __u32 __fswab32(__u32 x)
+static inline attr_const uint32_t __fswab32(uint32_t x)
 {
     return __arch__swab32(x);
 }
-static inline __u32 __swab32p(const __u32 *x)
+static inline uint32_t __swab32p(const uint32_t *x)
 {
     return __arch__swab32p(x);
 }
-static inline void __swab32s(__u32 *addr)
+static inline void __swab32s(uint32_t *addr)
 {
     __arch__swab32s(addr);
 }
@@ -154,8 +154,7 @@ static inline void __swab32s(__u32 *addr)
 static inline attr_const __u64 __fswab64(__u64 x)
 {
 #  ifdef __SWAB_64_THRU_32__
-    __u32 h = x >> 32;
-        __u32 l = x & ((1ULL<<32)-1);
+    uint32_t h = x >> 32, l = x;
         return (((__u64)__swab32(l)) << 32) | ((__u64)(__swab32(h)));
 #  else
     return __arch__swab64(x);
