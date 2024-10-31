@@ -113,6 +113,9 @@ struct pci_dev {
         pci_sbdf_t sbdf;
     };
 
+    uint8_t msi_pos;
+    uint8_t msix_pos;
+
     uint8_t msi_maxvec;
     uint8_t phantom_stride;
 

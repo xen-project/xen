@@ -278,23 +278,21 @@ void __msi_set_enable(u16 seg, u8 bus, u8 slot, u8 func, int pos, int enable)
 
 static void msi_set_enable(struct pci_dev *dev, int enable)
 {
-    int pos;
+    unsigned int pos = dev->msi_pos;
     u16 seg = dev->seg;
     u8 bus = dev->bus;
     u8 slot = PCI_SLOT(dev->devfn);
     u8 func = PCI_FUNC(dev->devfn);
 
-    pos = pci_find_cap_offset(dev->sbdf, PCI_CAP_ID_MSI);
     if ( pos )
         __msi_set_enable(seg, bus, slot, func, pos, enable);
 }
 
 static void msix_set_enable(struct pci_dev *dev, int enable)
 {
-    int pos;
+    unsigned int pos = dev->msix_pos;
     uint16_t control;
 
-    pos = pci_find_cap_offset(dev->sbdf, PCI_CAP_ID_MSIX);
     if ( pos )
     {
         control = pci_conf_read16(dev->sbdf, msix_control_reg(pos));
@@ -601,7 +599,7 @@ static int msi_capability_init(struct pci_dev *dev,
     uint16_t control;
 
     ASSERT_PDEV_LIST_IS_READ_LOCKED(dev->domain);
-    pos = pci_find_cap_offset(dev->sbdf, PCI_CAP_ID_MSI);
+    pos = dev->msi_pos;
     if ( !pos )
         return -ENODEV;
     control = pci_conf_read16(dev->sbdf, msi_control_reg(pos));
@@ -764,7 +762,7 @@ static int msix_capability_init(struct pci_dev *dev,
     u8 slot = PCI_SLOT(dev->devfn);
     u8 func = PCI_FUNC(dev->devfn);
     bool maskall = msix->host_maskall, zap_on_error = false;
-    unsigned int pos = pci_find_cap_offset(dev->sbdf, PCI_CAP_ID_MSIX);
+    unsigned int pos = dev->msix_pos;
 
     if ( !pos )
         return -ENODEV;
@@ -1133,10 +1131,12 @@ static void _pci_cleanup_msix(struct arch_msix *msix)
 static void __pci_disable_msix(struct msi_desc *entry)
 {
     struct pci_dev *dev = entry->dev;
-    unsigned int pos = pci_find_cap_offset(dev->sbdf, PCI_CAP_ID_MSIX);
+    unsigned int pos = dev->msix_pos;
     u16 control = pci_conf_read16(dev->sbdf,
                                   msix_control_reg(entry->msi_attrib.pos));
     bool maskall = dev->msix->host_maskall;
+
+    ASSERT(pos);
 
     if ( unlikely(!(control & PCI_MSIX_FLAGS_ENABLE)) )
     {
@@ -1241,7 +1241,7 @@ void pci_cleanup_msi(struct pci_dev *pdev)
 
 int pci_reset_msix_state(struct pci_dev *pdev)
 {
-    unsigned int pos = pci_find_cap_offset(pdev->sbdf, PCI_CAP_ID_MSIX);
+    unsigned int pos = pdev->msix_pos;
 
     ASSERT(pos);
     /*
@@ -1269,8 +1269,7 @@ int pci_msi_conf_write_intercept(struct pci_dev *pdev, unsigned int reg,
     if ( pdev->msix )
     {
         entry = find_msi_entry(pdev, -1, PCI_CAP_ID_MSIX);
-        pos = entry ? entry->msi_attrib.pos
-                    : pci_find_cap_offset(pdev->sbdf, PCI_CAP_ID_MSIX);
+        pos = entry ? entry->msi_attrib.pos : pdev->msix_pos;
         ASSERT(pos);
 
         if ( reg >= pos && reg < msix_pba_offset_reg(pos) + 4 )

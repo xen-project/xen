@@ -195,7 +195,7 @@ static void cf_check mask_write(
 
 static int cf_check init_msi(struct pci_dev *pdev)
 {
-    unsigned int pos = pci_find_cap_offset(pdev->sbdf, PCI_CAP_ID_MSI);
+    unsigned int pos = pdev->msi_pos;
     uint16_t control;
     int ret;
 

@@ -711,7 +711,7 @@ static int cf_check init_msix(struct pci_dev *pdev)
     struct vpci_msix *msix;
     int rc;
 
-    msix_offset = pci_find_cap_offset(pdev->sbdf, PCI_CAP_ID_MSIX);
+    msix_offset = pdev->msix_pos;
     if ( !msix_offset )
         return 0;
 

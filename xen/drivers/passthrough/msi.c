@@ -29,6 +29,7 @@ int pdev_msi_init(struct pci_dev *pdev)
     {
         uint16_t ctrl = pci_conf_read16(pdev->sbdf, msi_control_reg(pos));
 
+        pdev->msi_pos = pos;
         pdev->msi_maxvec = multi_msi_capable(ctrl);
     }
 
@@ -40,6 +41,8 @@ int pdev_msi_init(struct pci_dev *pdev)
 
         if ( !msix )
             return -ENOMEM;
+
+        pdev->msix_pos = pos;
 
         spin_lock_init(&msix->table_lock);
 
