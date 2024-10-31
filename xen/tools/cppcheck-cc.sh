@@ -26,6 +26,7 @@ EOF
 
 BUILD_DIR=""
 CC_FILE=""
+OBJ_FILE=""
 COMPILER=""
 CPPCHECK_HTML="n"
 CPPCHECK_PLAT_PATH=""
@@ -56,6 +57,7 @@ do
         then
             # This must be the path to the obj file, turn off flag and save path
             OBJTREE_PATH="$(dirname "${OPTION}")"
+            OBJ_FILE="$(basename "${OPTION}")"
             obj_arg_content="n"
         fi
         # Forward any argument to the compiler
@@ -177,12 +179,12 @@ then
     done
     if [ "${IGNORE_PATH}" = "n" ]
     then
-        JDB_FILE="${OBJTREE_PATH}/$(basename "${CC_FILE}".json)"
+        JDB_FILE="${OBJTREE_PATH}/${OBJ_FILE}.json"
 
         # Prepare the Json Compilation Database for the file
         create_jcd "${COMPILER} ${FORWARD_FLAGS}"
 
-        out_file="${OBJTREE_PATH}/$(basename "${CC_FILE%.c}".cppcheck.txt)"
+        out_file="${OBJTREE_PATH}/${OBJ_FILE}.cppcheck.txt"
 
         # Select the right target platform, ARCH is generated from Xen Makefile
         case ${ARCH} in
@@ -211,7 +213,7 @@ then
         fi
 
         # Generate build directory for the analysed file
-        cppcheck_build_dir="${BUILD_DIR}/${OBJTREE_PATH}"
+        cppcheck_build_dir="${BUILD_DIR}/${OBJTREE_PATH}/${OBJ_FILE}"
         mkdir -p "${cppcheck_build_dir}"
 
         # Shellcheck complains about missing quotes on CPPCHECK_TOOL_ARGS, but
