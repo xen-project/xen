@@ -10,17 +10,10 @@ static inline attr_const __u32 ___arch__swab32(__u32 x)
     return x;
 }
 
-static inline attr_const __u64 ___arch__swab64(__u64 val)
+static inline attr_const uint64_t ___arch__swab64(uint64_t x)
 { 
-    union { 
-        struct { __u32 a,b; } s;
-        __u64 u;
-    } v;
-    v.u = val;
-    asm("bswapl %0 ; bswapl %1 ; xchgl %0,%1" 
-        : "=r" (v.s.a), "=r" (v.s.b) 
-        : "0" (v.s.a), "1" (v.s.b)); 
-    return v.u;
+    asm ( "bswap %0" : "+r" (x) );
+    return x;
 } 
 
 /* Do not define swab16.  Gcc is smart enough to recognize "C" version and
