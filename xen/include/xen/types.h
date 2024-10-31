@@ -6,7 +6,7 @@
 
 /* Linux inherited types which are being phased out */
 typedef uint8_t u8;
-typedef uint16_t u16, __u16;
+typedef uint16_t u16;
 typedef uint32_t u32, __u32;
 typedef uint64_t u64, __u64;
 
@@ -51,8 +51,8 @@ typedef __PTRDIFF_TYPE__ ptrdiff_t;
 #define LONG_MIN        (-LONG_MAX - 1)
 #define ULONG_MAX       (~0UL)
 
-typedef __u16 __le16;
-typedef __u16 __be16;
+typedef uint16_t __le16;
+typedef uint16_t __be16;
 typedef __u32 __le32;
 typedef __u32 __be32;
 typedef __u64 __le64;

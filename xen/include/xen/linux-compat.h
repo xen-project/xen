@@ -14,6 +14,7 @@
 typedef int8_t  s8, __s8;
 typedef uint8_t __u8;
 typedef int16_t s16, __s16;
+typedef uint16_t __u16;
 typedef int32_t s32, __s32;
 typedef int64_t s64, __s64;
 

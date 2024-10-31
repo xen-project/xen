@@ -10,15 +10,16 @@
  *    to clean up support for bizarre-endian architectures.
  */
 
-/* casts are necessary for constants, because we never know how for sure
- * how U/UL/ULL map to __u16, __u32, __u64. At least not in a portable way.
+/*
+ * Casts are necessary for constants, because we never know for sure how
+ * U/UL/ULL map to __u32, __u64. At least not in a portable way.
  */
 #define ___swab16(x)                                    \
 ({                                                      \
-    __u16 __x = (x);                                    \
-    ((__u16)(                                           \
-        (((__u16)(__x) & (__u16)0x00ffU) << 8) |        \
-        (((__u16)(__x) & (__u16)0xff00U) >> 8) ));      \
+    uint16_t x_ = (x);                                  \
+    (uint16_t)(                                         \
+        (((uint16_t)(x_) & 0x00ffU) << 8) |             \
+        (((uint16_t)(x_) & 0xff00U) >> 8));             \
 })
 
 #define ___swab32(x)                                            \
@@ -46,9 +47,9 @@
 })
 
 #define ___constant_swab16(x)                   \
-    ((__u16)(                                   \
-        (((__u16)(x) & (__u16)0x00ffU) << 8) |  \
-        (((__u16)(x) & (__u16)0xff00U) >> 8) ))
+    ((uint16_t)(                                \
+        (((uint16_t)(x) & 0x00ffU) << 8) |      \
+        (((uint16_t)(x) & 0xff00U) >> 8)))
 #define ___constant_swab32(x)                           \
     ((__u32)(                                           \
         (((__u32)(x) & (__u32)0x000000ffUL) << 24) |    \
@@ -70,7 +71,7 @@
  * provide defaults when no architecture-specific optimization is detected
  */
 #ifndef __arch__swab16
-#  define __arch__swab16(x) ({ __u16 __tmp = (x) ; ___swab16(__tmp); })
+#  define __arch__swab16(x) ___swab16(x)
 #endif
 #ifndef __arch__swab32
 #  define __arch__swab32(x) ({ __u32 __tmp = (x) ; ___swab32(__tmp); })
@@ -105,7 +106,7 @@
  */
 #if defined(__GNUC__) && defined(__OPTIMIZE__)
 #  define __swab16(x) \
-(__builtin_constant_p((__u16)(x)) ? \
+(__builtin_constant_p((uint16_t)(x)) ? \
  ___swab16((x)) : \
  __fswab16((x)))
 #  define __swab32(x) \
@@ -123,15 +124,15 @@
 #endif /* OPTIMIZE */
 
 
-static inline attr_const __u16 __fswab16(__u16 x)
+static inline attr_const uint16_t __fswab16(uint16_t x)
 {
     return __arch__swab16(x);
 }
-static inline __u16 __swab16p(const __u16 *x)
+static inline uint16_t __swab16p(const uint16_t *x)
 {
     return __arch__swab16p(x);
 }
-static inline void __swab16s(__u16 *addr)
+static inline void __swab16s(uint16_t *addr)
 {
     __arch__swab16s(addr);
 }
