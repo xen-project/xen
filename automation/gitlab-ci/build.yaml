@@ -304,17 +304,6 @@ qemu-system-aarch64-6.0.0-arm32-export:
 
 # x86_64 test artifacts
 
-alpine-3.18-rootfs-export:
-  extends: .test-jobs-artifact-common
-  image: registry.gitlab.com/xen-project/xen/tests-artifacts/alpine:3.18
-  script:
-    - mkdir binaries && cp /initrd.tar.gz binaries/initrd.tar.gz
-  artifacts:
-    paths:
-      - binaries/initrd.tar.gz
-  tags:
-    - x86_64
-
 kernel-6.1.19-export:
   extends: .test-jobs-artifact-common
   image: registry.gitlab.com/xen-project/xen/tests-artifacts/kernel:6.1.19
