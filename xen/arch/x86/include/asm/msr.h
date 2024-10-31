@@ -31,7 +31,7 @@
 			  : /* no outputs */ \
 			  : "c" (msr), "a" (val1), "d" (val2))
 
-static inline void wrmsrl(unsigned int msr, __u64 val)
+static inline void wrmsrl(unsigned int msr, uint64_t val)
 {
         uint32_t lo = val, hi = val >> 32;
 

@@ -8,7 +8,7 @@
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
-typedef uint64_t u64, __u64;
+typedef uint64_t u64;
 
 #include <asm/types.h>
 
@@ -55,8 +55,8 @@ typedef uint16_t __le16;
 typedef uint16_t __be16;
 typedef uint32_t __le32;
 typedef uint32_t __be32;
-typedef __u64 __le64;
-typedef __u64 __be64;
+typedef uint64_t __le64;
+typedef uint64_t __be64;
 
 typedef unsigned int __attribute__((__mode__(__pointer__))) uintptr_t;
 
