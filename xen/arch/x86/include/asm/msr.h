@@ -33,9 +33,8 @@
 
 static inline void wrmsrl(unsigned int msr, __u64 val)
 {
-        __u32 lo, hi;
-        lo = (__u32)val;
-        hi = (__u32)(val >> 32);
+        uint32_t lo = val, hi = val >> 32;
+
         wrmsr(msr, lo, hi);
 }
 

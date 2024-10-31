@@ -4,7 +4,7 @@
 #include <xen/types.h>
 #include <xen/compiler.h>
 
-static inline attr_const __u32 ___arch__swab32(__u32 x)
+static inline attr_const uint32_t ___arch__swab32(uint32_t x)
 {
     asm("bswap %0" : "=r" (x) : "0" (x));
     return x;
