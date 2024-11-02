@@ -797,15 +797,18 @@ static int __init early_microcode_load(struct boot_info *bi)
 
     if ( opt_scan ) /* Scan for a CPIO archive */
     {
-        for ( idx = 1; idx < bi->nr_modules; ++idx )
+        for ( idx = 0; idx < bi->nr_modules; ++idx )
         {
+            const struct boot_module *bm = &bi->mods[idx];
             struct cpio_data cd;
 
-            if ( !test_bit(idx, bi->module_map) )
+            /* Search anything unclaimed or likely to be a CPIO archive. */
+            if ( bm->type != BOOTMOD_UNKNOWN &&
+                 bm->type != BOOTMOD_RAMDISK )
                 continue;
 
-            size = bi->mods[idx].mod->mod_end;
-            data = bootstrap_map_bm(&bi->mods[idx]);
+            size = bm->mod->mod_end;
+            data = bootstrap_map_bm(bm);
             if ( !data )
             {
                 printk(XENLOG_WARNING "Microcode: Could not map module %d, size %zu\n",
@@ -851,7 +854,7 @@ static int __init early_microcode_load(struct boot_info *bi)
             return -ENODEV;
         }
 
-        if ( !__test_and_clear_bit(idx, bi->module_map) )
+        if ( bi->mods[idx].type != BOOTMOD_UNKNOWN )
         {
             printk(XENLOG_WARNING "Microcode: Chosen module %d already used\n", idx);
             return -ENODEV;

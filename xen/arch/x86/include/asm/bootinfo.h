@@ -43,9 +43,49 @@ struct boot_info {
     size_t memmap_length;
 
     unsigned int nr_modules;
-    unsigned long *module_map; /* Temporary */
     struct boot_module mods[MAX_NR_BOOTMODS + 1];
 };
+
+/*
+ * next_boot_module_index:
+ *     Finds the next boot module of type t, starting at array index start.
+ *
+ * Returns:
+ *      Success - index in boot_module array
+ *      Failure - a value greater than MAX_NR_BOOTMODS
+ */
+static inline unsigned int __init next_boot_module_index(
+    const struct boot_info *bi, enum bootmod_type t, unsigned int start)
+{
+    unsigned int i;
+
+    if ( t == BOOTMOD_XEN )
+        return bi->nr_modules;
+
+    for ( i = start; i < bi->nr_modules; i++ )
+    {
+        if ( bi->mods[i].type == t )
+            return i;
+    }
+
+    return MAX_NR_BOOTMODS + 1;
+}
+
+/*
+ * first_boot_module_index:
+ *     Finds the first boot module of type t.
+ *
+ * Returns:
+ *      Success - index in boot_module array
+ *      Failure - a value greater than MAX_NR_BOOTMODS
+ */
+#define first_boot_module_index(bi, t)          \
+    next_boot_module_index(bi, t, 0)
+
+#define for_each_boot_module_by_type(i, b, t)           \
+    for ( (i) = first_boot_module_index(b, t);          \
+          (i) <= (b)->nr_modules;                       \
+          (i) = next_boot_module_index(b, t, i + 1) )
 
 #endif /* X86_BOOTINFO_H */
 
