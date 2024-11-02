@@ -29,6 +29,12 @@ struct boot_module {
     module_t *mod;
 
     enum bootmod_type type;
+
+    /*
+     * Module State Flags:
+     *   relocated: indicates module has been relocated in memory.
+     */
+    bool relocated:1;
 };
 
 /*

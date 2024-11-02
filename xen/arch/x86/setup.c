@@ -1392,7 +1392,6 @@ void asmlinkage __init noreturn __start_xen(void)
             panic("Bootloader didn't honor module alignment request\n");
         bi->mods[i].mod->mod_end -= bi->mods[i].mod->mod_start;
         bi->mods[i].mod->mod_start >>= PAGE_SHIFT;
-        bi->mods[i].mod->reserved = 0;
     }
 
     /*
@@ -1508,7 +1507,7 @@ void asmlinkage __init noreturn __start_xen(void)
             unsigned long headroom = j ? 0 : modules_headroom;
             unsigned long size = PAGE_ALIGN(headroom + bm->mod->mod_end);
 
-            if ( bm->mod->reserved )
+            if ( bm->relocated )
                 continue;
 
             /* Don't overlap with other modules (or Xen itself). */
@@ -1526,7 +1525,7 @@ void asmlinkage __init noreturn __start_xen(void)
                             pfn_to_paddr(bm->mod->mod_start), bm->mod->mod_end);
                 bm->mod->mod_start = (end - size) >> PAGE_SHIFT;
                 bm->mod->mod_end += headroom;
-                bm->mod->reserved = 1;
+                bm->relocated = true;
             }
         }
 
@@ -1552,7 +1551,7 @@ void asmlinkage __init noreturn __start_xen(void)
 #endif
     }
 
-    if ( modules_headroom && !bi->mods[0].mod->reserved )
+    if ( modules_headroom && !bi->mods[0].relocated )
         panic("Not enough memory to relocate the dom0 kernel image\n");
     for ( i = 0; i < bi->nr_modules; ++i )
     {
