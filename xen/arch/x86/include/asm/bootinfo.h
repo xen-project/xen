@@ -57,6 +57,8 @@ struct boot_module {
      *   +-----------------------------------------+
      */
     unsigned long headroom;
+
+    paddr_t cmdline_pa;
 };
 
 /*

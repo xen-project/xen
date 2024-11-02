@@ -312,7 +312,11 @@ static struct boot_info *__init multiboot_fill_boot_info(
      * reserved for Xen.
      */
     for ( i = 0; i < MAX_NR_BOOTMODS && i < bi->nr_modules; i++ )
+    {
         bi->mods[i].mod = &mods[i];
+
+        bi->mods[i].cmdline_pa = mods[i].string;
+    }
 
     /* Variable 'i' should be one entry past the last module. */
     bi->mods[i].mod = &mods[bi->nr_modules];
