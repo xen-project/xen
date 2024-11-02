@@ -66,6 +66,7 @@ struct boot_module {
 struct boot_info {
     const char *loader;
     const char *cmdline;
+    const char *kextra;
 
     paddr_t memmap_addr;
     size_t memmap_length;

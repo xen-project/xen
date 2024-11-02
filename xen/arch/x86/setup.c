@@ -1108,6 +1108,7 @@ void asmlinkage __init noreturn __start_xen(void)
         *kextra = '\0';
         kextra += 3;
         while ( kextra[1] == ' ' ) kextra++;
+        bi->kextra = kextra;
     }
     cmdline_parse(bi->cmdline);
 
@@ -2111,7 +2112,7 @@ void asmlinkage __init noreturn __start_xen(void)
     dom0 = create_dom0(bi->mods[0].mod, bi->mods[0].headroom,
                        initrdidx < bi->nr_modules ? bi->mods[initrdidx].mod
                                                   : NULL,
-                       kextra, bi->loader);
+                       bi->kextra, bi->loader);
     if ( !dom0 )
         panic("Could not set up DOM0 guest OS\n");
 
