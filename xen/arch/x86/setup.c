@@ -1034,7 +1034,7 @@ void asmlinkage __init noreturn __start_xen(void)
     struct cpu_info *info = get_cpu_info(), *bsp_info;
     unsigned int initrdidx, num_parked = 0;
     struct boot_info *bi;
-    unsigned long nr_pages, raw_max_page, modules_headroom;
+    unsigned long nr_pages, raw_max_page;
     int i, j, e820_warn = 0, bytes = 0;
     unsigned long eb_start, eb_end;
     bool acpi_boot_table_init_done = false, relocated = false;
@@ -1415,7 +1415,7 @@ void asmlinkage __init noreturn __start_xen(void)
         xen->mod->mod_end   = __2M_rwdata_end - _stext;
     }
 
-    modules_headroom =
+    bi->mods[0].headroom =
         bzimage_headroom(bootstrap_map_bm(&bi->mods[0]),
                          bi->mods[0].mod->mod_end);
     bootstrap_unmap();
@@ -1498,14 +1498,7 @@ void asmlinkage __init noreturn __start_xen(void)
         for ( j = bi->nr_modules - 1; j >= 0; j-- )
         {
             struct boot_module *bm = &bi->mods[j];
-
-            /*
-             * 'headroom' is a guess for the decompressed size and
-             * decompressor overheads of mod[0] (the dom0 kernel).  When we
-             * move mod[0], we incorporate this as extra space at the start.
-             */
-            unsigned long headroom = j ? 0 : modules_headroom;
-            unsigned long size = PAGE_ALIGN(headroom + bm->mod->mod_end);
+            unsigned long size = PAGE_ALIGN(bm->headroom + bm->mod->mod_end);
 
             if ( bm->relocated )
                 continue;
@@ -1518,13 +1511,13 @@ void asmlinkage __init noreturn __start_xen(void)
                 continue;
 
             if ( s < end &&
-                 (headroom ||
+                 (bm->headroom ||
                   ((end - size) >> PAGE_SHIFT) > bm->mod->mod_start) )
             {
-                move_memory(end - size + headroom,
+                move_memory(end - size + bm->headroom,
                             pfn_to_paddr(bm->mod->mod_start), bm->mod->mod_end);
                 bm->mod->mod_start = (end - size) >> PAGE_SHIFT;
-                bm->mod->mod_end += headroom;
+                bm->mod->mod_end += bm->headroom;
                 bm->relocated = true;
             }
         }
@@ -1551,7 +1544,7 @@ void asmlinkage __init noreturn __start_xen(void)
 #endif
     }
 
-    if ( modules_headroom && !bi->mods[0].relocated )
+    if ( bi->mods[0].headroom && !bi->mods[0].relocated )
         panic("Not enough memory to relocate the dom0 kernel image\n");
     for ( i = 0; i < bi->nr_modules; ++i )
     {
@@ -2115,7 +2108,7 @@ void asmlinkage __init noreturn __start_xen(void)
      * We're going to setup domain0 using the module(s) that we stashed safely
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
-    dom0 = create_dom0(bi->mods[0].mod, modules_headroom,
+    dom0 = create_dom0(bi->mods[0].mod, bi->mods[0].headroom,
                        initrdidx < bi->nr_modules ? bi->mods[initrdidx].mod
                                                   : NULL,
                        kextra, bi->loader);
