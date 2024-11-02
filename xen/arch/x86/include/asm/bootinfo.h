@@ -14,9 +14,21 @@
 /* Max number of boot modules a bootloader can provide in addition to Xen */
 #define MAX_NR_BOOTMODS 63
 
+/* Boot module binary type / purpose */
+enum bootmod_type {
+    BOOTMOD_UNKNOWN,
+    BOOTMOD_XEN,
+    BOOTMOD_KERNEL,
+    BOOTMOD_RAMDISK,
+    BOOTMOD_MICROCODE,
+    BOOTMOD_XSM_POLICY,
+};
+
 struct boot_module {
     /* Transitionary only */
     module_t *mod;
+
+    enum bootmod_type type;
 };
 
 /*

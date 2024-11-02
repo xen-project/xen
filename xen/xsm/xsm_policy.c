@@ -59,6 +59,7 @@ int __init xsm_multiboot_policy_init(
                    _policy_len,_policy_start);
 
             __clear_bit(i, bi->module_map);
+            bi->mods[i].type = BOOTMOD_XSM_POLICY;
             break;
 
         }

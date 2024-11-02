@@ -821,6 +821,10 @@ static int __init early_microcode_load(struct boot_info *bi)
                 continue;
             }
 
+            /*
+             * Do not alter this boot module's type.  We're most likely
+             * peeking at dom0's initrd.
+             */
             data = cd.data;
             size = cd.size;
             goto found;
@@ -852,6 +856,7 @@ static int __init early_microcode_load(struct boot_info *bi)
             printk(XENLOG_WARNING "Microcode: Chosen module %d already used\n", idx);
             return -ENODEV;
         }
+        bi->mods[idx].type = BOOTMOD_MICROCODE;
 
         size = bi->mods[idx].mod->mod_end;
         data = bootstrap_map_bm(&bi->mods[idx]);
