@@ -13,7 +13,7 @@ RUN <<EOF
 
     useradd --create-home user
 
-    apt-get -y update
+    apt-get update
 
     DEPS=(
         # Xen

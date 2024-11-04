@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN <<EOF
 #!/bin/bash
     set -e
-    apt-get -y update
+    apt-get update
 
     DEPS=(
         bison
@@ -62,7 +62,7 @@ RUN <<EOF
 
     useradd --create-home user
 
-    apt-get -y update
+    apt-get update
 
     DEPS=(
         # Xen
