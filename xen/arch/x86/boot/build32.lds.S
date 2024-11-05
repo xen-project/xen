@@ -66,6 +66,15 @@ SECTIONS
        *(.comment.*)
        *(.note.*)
   }
+  .shstrtab : {
+       *(.shstrtab)
+  }
+  .strtab : {
+       *(.strtab)
+  }
+  .symtab : {
+       *(.symtab)
+  }
   /* Dynamic linkage sections.  Collected simply so we can check they're empty. */
   .got : {
         *(.got)
