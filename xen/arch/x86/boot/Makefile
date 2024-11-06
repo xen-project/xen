@@ -66,7 +66,8 @@ $(obj)/built-in-32.tmp.o: $(obj32)
 # If possible we use --orphan-handling=error option to make sure we account
 # for all possible sections from C code.
 $(obj)/built-in-32.%.bin: $(obj)/build32.%.lds $(obj)/built-in-32.tmp.o
-	$(LD32) $(orphan-handling-y) -N -T $< -Map $(@:bin=map) -o $(@:bin=o) $(filter %.o,$^)
+	$(LD32) $(orphan-handling-y) -N -T $< -o $(@:bin=o) $(filter %.o,$^)
+	$(NM) -p --format=bsd $(@:bin=o) > $(@:bin=map)
 	$(OBJCOPY) -j .text -O binary $(@:bin=o) $@
 	rm -f $(@:bin=o)
 

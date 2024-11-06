@@ -29,7 +29,7 @@ parser.add_argument('--text-diff', dest='text_diff',
 parser.add_argument('--output', dest='output',
                     help='Output file')
 parser.add_argument('--map', dest='mapfile',
-                    help='Map file to read for symbols to export')
+                    help='Map file (NM) to read for symbols to export')
 parser.add_argument('--exports', dest='exports',
                     help='Symbols to export')
 parser.add_argument('--section-header', dest='section_header',
@@ -65,15 +65,20 @@ exports = []
 if args.exports is not None:
     exports = dict([(name, None) for name in args.exports.split(',')])
 
-# Parse mapfile, look for ther symbols we want to export.
+# Parse mapfile, look for symbols we want to export.
 if args.mapfile is not None:
-    symbol_re = re.compile(r'\s{15,}0x([0-9a-f]+)\s+(\S+)\n')
+    exports["dummy_start"] = None
     for line in open(args.mapfile):
-        m = symbol_re.match(line)
-        if not m or m.group(2) not in exports:
+        parts = line.split()
+        if len(parts) != 3:
             continue
-        addr = int(m.group(1), 16)
-        exports[m.group(2)] = addr
+        addr, sym_type, sym = parts
+        if sym_type.upper() == 'T' and sym in exports:
+            exports[sym] = int(addr, 16)
+    if exports["dummy_start"] != 0:
+        raise Exception("dummy_start symbol expected to be present and 0")
+    del exports["dummy_start"]
+
 for (name, addr) in exports.items():
     if addr is None:
         raise Exception("Required export symbols %s not found" % name)
