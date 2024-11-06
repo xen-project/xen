@@ -263,38 +263,6 @@ static bool cf_check wait_cpu_callout(unsigned int nr)
     return atomic_read(&cpu_out) >= nr;
 }
 
-/*
- * Load a microcode update to current CPU.
- *
- * If no patch is provided, the cached patch will be loaded. Microcode update
- * during APs bringup and CPU resuming falls into this case.
- */
-static int microcode_update_cpu(const struct microcode_patch *patch,
-                                unsigned int flags)
-{
-    int err;
-
-    alternative_vcall(ucode_ops.collect_cpu_info);
-
-    spin_lock(&microcode_mutex);
-    if ( microcode_cache )
-    {
-        err = alternative_call(ucode_ops.apply_microcode, microcode_cache,
-                               flags);
-        if ( err == -EIO )
-        {
-            microcode_free_patch(microcode_cache);
-            microcode_cache = NULL;
-        }
-    }
-    else
-        /* No patch to update */
-        err = -ENOENT;
-    spin_unlock(&microcode_mutex);
-
-    return err;
-}
-
 static bool wait_for_state(typeof(loading_state) state)
 {
     typeof(loading_state) cur_state;
@@ -700,13 +668,26 @@ int microcode_update(XEN_GUEST_HANDLE(const_void) buf,
 /* Load a cached update to current cpu */
 int microcode_update_one(void)
 {
+    int rc;
+
+    /*
+     * This path is used for APs and S3 resume.  Read the microcode revision
+     * if possible, even if we can't load microcode.
+     */
     if ( ucode_ops.collect_cpu_info )
         alternative_vcall(ucode_ops.collect_cpu_info);
 
     if ( !ucode_ops.apply_microcode )
         return -EOPNOTSUPP;
 
-    return microcode_update_cpu(NULL, 0);
+    spin_lock(&microcode_mutex);
+    if ( microcode_cache )
+        rc = alternative_call(ucode_ops.apply_microcode, microcode_cache, 0);
+    else
+        rc = -ENOENT;
+    spin_unlock(&microcode_mutex);
+
+    return rc;
 }
 
 /*
