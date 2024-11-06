@@ -44,7 +44,7 @@ text_gap := 0x010200
 text_diff := 0x408020
 
 $(obj)/build32.base.lds: AFLAGS-y += -DGAP=$(text_gap) -DTEXT_DIFF=$(text_diff)
-$(obj)/build32.offset.lds: AFLAGS-y += -DGAP=$(text_gap) -DTEXT_DIFF=$(text_diff) -DFINAL
+$(obj)/build32.offset.lds: AFLAGS-y += -DGAP=$(text_gap) -DTEXT_DIFF=$(text_diff) -DAPPLY_OFFSET
 $(obj)/build32.base.lds $(obj)/build32.offset.lds: $(src)/build32.lds.S FORCE
 	$(call if_changed_dep,cpp_lds_S)
 
@@ -75,10 +75,10 @@ cmd_combine = \
     $(PYTHON) $(srctree)/tools/combine_two_binaries.py \
               --gap       $(text_gap) \
               --text-diff $(text_diff) \
-              --script    $(obj)/build32.offset.lds \
+              --script    $(obj)/build32.base.lds \
               --bin1      $(obj)/built-in-32.base.bin \
               --bin2      $(obj)/built-in-32.offset.bin \
-              --map       $(obj)/built-in-32.offset.map \
+              --map       $(obj)/built-in-32.base.map \
               --exports   cmdline_parse_early,reloc,reloc_trampoline32 \
               --output    $@
 

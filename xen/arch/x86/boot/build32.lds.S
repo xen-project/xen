@@ -15,7 +15,7 @@
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifdef FINAL
+#ifndef APPLY_OFFSET
 # undef GAP
 # define GAP 0
 # define MULT 0
