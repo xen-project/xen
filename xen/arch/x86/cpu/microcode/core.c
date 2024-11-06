@@ -189,8 +189,6 @@ static struct patch_with_flags nmi_patch =
  */
 static struct microcode_patch *parse_blob(const char *buf, size_t len)
 {
-    alternative_vcall(ucode_ops.collect_cpu_info);
-
     return alternative_call(ucode_ops.cpu_request_microcode, buf, len, true);
 }
 
