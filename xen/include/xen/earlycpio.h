@@ -1,6 +1,8 @@
 #ifndef _EARLYCPIO_H
 #define _EARLYCPIO_H
 
+#include <xen/types.h>
+
 #define MAX_CPIO_FILE_NAME 18
 
 struct cpio_data {
