@@ -277,9 +277,7 @@ static int microcode_update_cpu(const struct microcode_patch *patch,
     alternative_vcall(ucode_ops.collect_cpu_info);
 
     spin_lock(&microcode_mutex);
-    if ( patch )
-        err = alternative_call(ucode_ops.apply_microcode, patch, flags);
-    else if ( microcode_cache )
+    if ( microcode_cache )
     {
         err = alternative_call(ucode_ops.apply_microcode, microcode_cache,
                                flags);
@@ -900,7 +898,7 @@ static int __init early_microcode_load(struct boot_info *bi)
      */
     early_mod_idx = idx;
 
-    rc = microcode_update_cpu(patch, 0);
+    rc = ucode_ops.apply_microcode(patch, 0);
 
  unmap:
     bootstrap_unmap();
