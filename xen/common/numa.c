@@ -10,6 +10,7 @@
 #include <xen/nodemask.h>
 #include <xen/numa.h>
 #include <xen/param.h>
+#include <xen/pfn.h>
 #include <xen/sched.h>
 #include <xen/softirq.h>
 
@@ -499,14 +500,41 @@ int __init compute_hash_shift(const struct node *nodes,
     return shift;
 }
 
-/* Initialize NODE_DATA given nodeid and start/end */
+/**
+ * @brief Initialize a NUMA node's node_data structure at boot.
+ *
+ * It is given the NUMA node's index in the node_data array as well
+ * as the start and exclusive end address of the node's memory span
+ * as arguments and initializes the node_data entry with this information.
+ *
+ * It then initializes the total number of usable memory pages within
+ * the NUMA node's memory span using the arch_get_ram_range() function.
+ *
+ * @param nodeid The index into the node_data array for the node.
+ * @param start The starting physical address of the node's memory range.
+ * @param end The exclusive ending physical address of the node's memory range.
+ */
 void __init setup_node_bootmem(nodeid_t nodeid, paddr_t start, paddr_t end)
 {
     unsigned long start_pfn = paddr_to_pfn(start);
     unsigned long end_pfn = paddr_to_pfn(end);
+    struct node_data *node = NODE_DATA(nodeid);
+    unsigned int idx = 0;
+    int err;
 
-    NODE_DATA(nodeid)->node_start_pfn = start_pfn;
-    NODE_DATA(nodeid)->node_spanned_pages = end_pfn - start_pfn;
+    node->node_start_pfn = start_pfn;
+    node->node_spanned_pages = end_pfn - start_pfn;
+    node->node_present_pages = 0;
+
+    /* Calculate the number of present RAM pages within the node */
+    do {
+        paddr_t ram_start, ram_end;
+
+        err = arch_get_ram_range(idx++, &ram_start, &ram_end);
+        if ( !err && ram_start < end && ram_end > start )
+            node->node_present_pages += PFN_DOWN(min(ram_end, end)) -
+                                        PFN_UP(max(ram_start, start));
+    } while ( err != -ENOENT );
 
     node_set_online(nodeid);
 }

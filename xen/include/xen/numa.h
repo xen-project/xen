@@ -68,9 +68,24 @@ extern unsigned int memnode_shift;
 extern unsigned long memnodemapsize;
 extern nodeid_t *memnodemap;
 
+/* The memory information of NUMA nodes in the node_data[] array */
 struct node_data {
+    /* The starting page frame number (lowest pfn) of the NUMA node */
     unsigned long node_start_pfn;
+
+    /*
+     * The number of pages spanned by the NUMA node, including memory holes.
+     * Used for the pyhsical memory range when scrubbing unallocated memory.
+     */
     unsigned long node_spanned_pages;
+
+    /*
+     * Number of usable memory pages that are available in this NUMA node.
+     * The sum of these values from all NUMA nodes reflects total_pages.
+     * The Xen Hypervisor does not use this field internally, but it is useful
+     * for reporting the memory information of NUMA nodes to management tools.
+     */
+    unsigned long node_present_pages;
 };
 
 extern struct node_data node_data[];
@@ -91,6 +106,7 @@ static inline nodeid_t mfn_to_nid(mfn_t mfn)
 
 #define node_start_pfn(nid)     (NODE_DATA(nid)->node_start_pfn)
 #define node_spanned_pages(nid) (NODE_DATA(nid)->node_spanned_pages)
+#define node_present_pages(nid) (NODE_DATA(nid)->node_present_pages)
 #define node_end_pfn(nid)       (NODE_DATA(nid)->node_start_pfn + \
                                  NODE_DATA(nid)->node_spanned_pages)
 
@@ -123,6 +139,7 @@ extern void numa_set_processor_nodes_parsed(nodeid_t node);
 extern mfn_t first_valid_mfn;
 
 #define node_spanned_pages(nid) (max_page - mfn_x(first_valid_mfn))
+#define node_present_pages(nid) total_pages
 #define node_start_pfn(nid) mfn_x(first_valid_mfn)
 #define __node_distance(a, b) 20
 

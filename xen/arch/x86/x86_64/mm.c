@@ -1336,6 +1336,9 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
     share_hotadd_m2p_table(&info);
     transfer_pages_to_heap(&info);
 
+    /* Update the node's present pages (like the total_pages of the system) */
+    NODE_DATA(node)->node_present_pages += epfn - spfn;
+
     return 0;
 
 destroy_m2p:

@@ -100,6 +100,19 @@ unsigned int __init arch_get_dma_bitsize(void)
                  + PAGE_SHIFT, 32);
 }
 
+/**
+ * @brief Retrieves the RAM range for a given index from the e820 memory map.
+ *
+ * This function fetches the starting and ending addresses of a RAM range
+ * specified by the given index idx from the e820 memory map.
+ *
+ * @param idx The index of the RAM range in the e820 memory map to retrieve.
+ * @param start Pointer to store the starting address of the RAM range.
+ * @param end Pointer to store the exclusive ending address of the RAM range.
+ *
+ * @return 0 on success, -ENOENT if the index is out of bounds,
+ *         or -ENODATA if the memory map at index idx is not of type E820_RAM.
+ */
 int __init arch_get_ram_range(unsigned int idx, paddr_t *start, paddr_t *end)
 {
     if ( idx >= e820.nr_map )
