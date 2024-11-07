@@ -86,7 +86,7 @@ struct patch_with_flags {
 static bool ucode_in_nmi = true;
 
 /* Protected by microcode_mutex */
-static const struct microcode_patch *microcode_cache;
+static struct microcode_patch *microcode_cache;
 
 /*
  * opt_mod_idx and opt_scan have subtle semantics.
@@ -190,33 +190,6 @@ static struct patch_with_flags nmi_patch =
 static struct microcode_patch *parse_blob(const char *buf, size_t len)
 {
     return alternative_call(ucode_ops.cpu_request_microcode, buf, len, true);
-}
-
-static void microcode_free_patch(const struct microcode_patch *patch)
-{
-    xfree((struct microcode_patch *)patch);
-}
-
-/* Return true if cache gets updated. Otherwise, return false */
-static bool microcode_update_cache(const struct microcode_patch *patch)
-{
-    ASSERT(spin_is_locked(&microcode_mutex));
-
-    if ( !microcode_cache )
-        microcode_cache = patch;
-    else if ( alternative_call(ucode_ops.compare_patch,
-                               patch, microcode_cache) == NEW_UCODE )
-    {
-        microcode_free_patch(microcode_cache);
-        microcode_cache = patch;
-    }
-    else
-    {
-        microcode_free_patch(patch);
-        return false;
-    }
-
-    return true;
 }
 
 /* Returns true if ucode should be loaded on a given cpu */
@@ -496,6 +469,8 @@ struct ucode_buf {
 
 static long cf_check microcode_update_helper(void *data)
 {
+    struct microcode_patch *patch = NULL;
+    enum microcode_match_result result;
     int ret;
     struct ucode_buf *buffer = data;
     unsigned int cpu, updated;
@@ -524,17 +499,20 @@ static long cf_check microcode_update_helper(void *data)
         goto put;
     }
 
-    patch_with_flags.patch = parse_blob(buffer->buffer, buffer->len);
+    patch = parse_blob(buffer->buffer, buffer->len);
     patch_with_flags.flags = buffer->flags;
+
     xfree(buffer);
-    if ( IS_ERR(patch_with_flags.patch) )
+
+    if ( IS_ERR(patch) )
     {
-        ret = PTR_ERR(patch_with_flags.patch);
+        ret = PTR_ERR(patch);
+        patch = NULL;
         printk(XENLOG_WARNING "Parsing microcode blob error %d\n", ret);
         goto put;
     }
 
-    if ( !patch_with_flags.patch )
+    if ( !patch )
     {
         printk(XENLOG_WARNING "microcode: couldn't find any matching ucode in "
                               "the provided blob!\n");
@@ -549,10 +527,7 @@ static long cf_check microcode_update_helper(void *data)
     spin_lock(&microcode_mutex);
     if ( microcode_cache )
     {
-        enum microcode_match_result result;
-
-        result = alternative_call(ucode_ops.compare_patch,
-                                  patch_with_flags.patch, microcode_cache);
+        result = alternative_call(ucode_ops.compare_patch, patch, microcode_cache);
 
         if ( result != NEW_UCODE &&
              !(ucode_force && (result == OLD_UCODE || result == SAME_UCODE)) )
@@ -561,12 +536,13 @@ static long cf_check microcode_update_helper(void *data)
             printk(XENLOG_WARNING
                    "microcode: couldn't find any newer%s revision in the provided blob!\n",
                    ucode_force ? " (or a valid)" : "");
-            microcode_free_patch(patch_with_flags.patch);
             ret = -EEXIST;
 
             goto put;
         }
     }
+    else
+        result = NEW_UCODE;
     spin_unlock(&microcode_mutex);
 
     cpumask_clear(&cpu_callin_map);
@@ -593,14 +569,18 @@ static long cf_check microcode_update_helper(void *data)
      *   this requirement can be relaxed in the future. Right now, this is
      *   conservative and good.
      */
+    patch_with_flags.patch = patch;
     ret = stop_machine_run(do_microcode_update, &patch_with_flags, NR_CPUS);
 
     updated = atomic_read(&cpu_updated);
     if ( updated > 0 )
     {
-        spin_lock(&microcode_mutex);
-        microcode_update_cache(patch_with_flags.patch);
-        spin_unlock(&microcode_mutex);
+        if ( result == NEW_UCODE )
+        {
+            spin_lock(&microcode_mutex);
+            SWAP(patch, microcode_cache);
+            spin_unlock(&microcode_mutex);
+        }
 
         /*
          * Refresh the raw CPU policy, in case the features have changed.
@@ -615,8 +595,6 @@ static long cf_check microcode_update_helper(void *data)
         if ( ctxt_switch_masking )
             alternative_vcall(ctxt_switch_masking, current);
     }
-    else
-        microcode_free_patch(patch_with_flags.patch);
 
     if ( updated && updated != nr_cores )
         printk(XENLOG_ERR "ERROR: Updating microcode succeeded on %u cores and failed\n"
@@ -627,6 +605,10 @@ static long cf_check microcode_update_helper(void *data)
 
  put:
     put_cpu_maps();
+
+    /* The parsed blob or old cached value, whichever we're not keeping. */
+    xfree(patch);
+
     return ret;
 }
 
