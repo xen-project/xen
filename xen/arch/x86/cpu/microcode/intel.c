@@ -248,9 +248,8 @@ static enum microcode_match_result compare_revisions(
     return OLD_UCODE;
 }
 
-/* Check an update against the CPU signature and current update revision */
-static enum microcode_match_result microcode_update_match(
-    const struct microcode_patch *mc)
+/* Check whether this microcode patch is applicable for the current CPU. */
+static bool microcode_fits_cpu(const struct microcode_patch *mc)
 {
     const struct extended_sigtable *ext;
     unsigned int i;
@@ -260,18 +259,15 @@ static enum microcode_match_result microcode_update_match(
 
     /* Check the main microcode signature. */
     if ( signature_matches(cpu_sig, mc->sig, mc->pf) )
-        goto found;
+        return true;
 
     /* If there is an extended signature table, check each of them. */
     if ( (ext = get_ext_sigtable(mc)) != NULL )
         for ( i = 0; i < ext->count; ++i )
             if ( signature_matches(cpu_sig, ext->sigs[i].sig, ext->sigs[i].pf) )
-                goto found;
+                return true;
 
-    return MIS_UCODE;
-
- found:
-    return compare_revisions(cpu_sig->rev, mc->rev);
+    return false;
 }
 
 static enum microcode_match_result cf_check compare_patch(
@@ -281,8 +277,8 @@ static enum microcode_match_result cf_check compare_patch(
      * Both patches to compare are supposed to be applicable to local CPU.
      * Just compare the revision number.
      */
-    ASSERT(microcode_update_match(old) != MIS_UCODE);
-    ASSERT(microcode_update_match(new) != MIS_UCODE);
+    ASSERT(microcode_fits_cpu(old));
+    ASSERT(microcode_fits_cpu(new));
 
     return compare_revisions(old->rev, new->rev);
 }
@@ -297,10 +293,10 @@ static int cf_check apply_microcode(const struct microcode_patch *patch,
     enum microcode_match_result result;
     bool ucode_force = flags & XENPF_UCODE_FORCE;
 
-    result = microcode_update_match(patch);
-
-    if ( result == MIS_UCODE )
+    if ( !microcode_fits_cpu(patch) )
         return -EINVAL;
+
+    result = compare_revisions(old_rev, patch->rev);
 
     if ( !ucode_force && (result == SAME_UCODE || result == OLD_UCODE) )
         return -EEXIST;
@@ -365,7 +361,7 @@ static struct microcode_patch *cf_check cpu_request_microcode(
          * If the new update covers current CPU, compare updates and store the
          * one with higher revision.
          */
-        if ( (microcode_update_match(mc) != MIS_UCODE) &&
+        if ( microcode_fits_cpu(mc) &&
              (!saved || compare_revisions(saved->rev, mc->rev) == NEW_UCODE) )
             saved = mc;
 
