@@ -788,6 +788,7 @@ static void ipmmu_device_reset(struct ipmmu_vmsa_device *mmu)
 #define RCAR_PRODUCT_M3W     0x00005200
 #define RCAR_PRODUCT_M3N     0x00005500
 #define RCAR_PRODUCT_S4      0x00005A00
+#define RCAR_PRODUCT_V4H     0x00005C00
 #define RCAR_CUT_MASK        0x000000FF
 #define RCAR_CUT_VER30       0x00000020
 
@@ -836,6 +837,7 @@ static __init bool ipmmu_stage2_supported(void)
         break;
 
     case RCAR_PRODUCT_S4:
+    case RCAR_PRODUCT_V4H:
         stage2_supported = true;
         break;
 
@@ -869,6 +871,10 @@ static const struct dt_device_match ipmmu_dt_match[] __initconst =
     },
     {
         .compatible = "renesas,ipmmu-r8a779f0",
+        .data = &ipmmu_features_rcar_gen4,
+    },
+    {
+        .compatible = "renesas,ipmmu-r8a779g0",
         .data = &ipmmu_features_rcar_gen4,
     },
     { /* sentinel */ },
