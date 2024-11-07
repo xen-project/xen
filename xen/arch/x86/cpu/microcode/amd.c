@@ -182,36 +182,31 @@ static enum microcode_match_result compare_revisions(
     return OLD_UCODE;
 }
 
-static enum microcode_match_result microcode_fits(
-    const struct microcode_patch *patch)
+/*
+ * Check whether this microcode patch is applicable for the current CPU.
+ *
+ * AMD microcode blobs only have the "equivalent CPU identifier" which is a 16
+ * bit contraction of the 32 bit Family/Model/Stepping.
+ *
+ * We expect to only be run after scan_equiv_cpu_table() has found a valid
+ * mapping for the current CPU.  If this is violated, the 0 in equiv.id will
+ * cause the patch to be rejected too.
+ */
+static bool microcode_fits_cpu(const struct microcode_patch *patch)
 {
-    unsigned int cpu = smp_processor_id();
-    const struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
+    ASSERT(equiv.sig);
 
-    if ( equiv.sig != sig->sig ||
-         equiv.id  != patch->processor_rev_id )
-        return MIS_UCODE;
-
-    return compare_revisions(sig->rev, patch->patch_id);
-}
-
-static enum microcode_match_result compare_header(
-    const struct microcode_patch *new, const struct microcode_patch *old)
-{
-    if ( new->processor_rev_id != old->processor_rev_id )
-        return MIS_UCODE;
-
-    return compare_revisions(old->patch_id, new->patch_id);
+    return equiv.id == patch->processor_rev_id;
 }
 
 static enum microcode_match_result cf_check compare_patch(
     const struct microcode_patch *new, const struct microcode_patch *old)
 {
     /* Both patches to compare are supposed to be applicable to local CPU. */
-    ASSERT(microcode_fits(new) != MIS_UCODE);
-    ASSERT(microcode_fits(old) != MIS_UCODE);
+    ASSERT(microcode_fits_cpu(new));
+    ASSERT(microcode_fits_cpu(old));
 
-    return compare_header(new, old);
+    return compare_revisions(old->patch_id, new->patch_id);
 }
 
 static int cf_check apply_microcode(const struct microcode_patch *patch,
@@ -221,11 +216,13 @@ static int cf_check apply_microcode(const struct microcode_patch *patch,
     unsigned int cpu = smp_processor_id();
     struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
     uint32_t rev, old_rev = sig->rev;
-    enum microcode_match_result result = microcode_fits(patch);
+    enum microcode_match_result result;
     bool ucode_force = flags & XENPF_UCODE_FORCE;
 
-    if ( result == MIS_UCODE )
+    if ( !microcode_fits_cpu(patch) )
         return -EINVAL;
+
+    result = compare_revisions(old_rev, patch->patch_id);
 
     /*
      * Allow application of the same revision to pick up SMT-specific changes
@@ -396,8 +393,10 @@ static struct microcode_patch *cf_check cpu_request_microcode(
              * If the new ucode covers current CPU, compare ucodes and store the
              * one with higher revision.
              */
-            if ( (microcode_fits(mc->patch) != MIS_UCODE) &&
-                 (!saved || (compare_header(mc->patch, saved) == NEW_UCODE)) )
+            if ( microcode_fits_cpu(mc->patch) &&
+                 (!saved ||
+                  compare_revisions(saved->patch_id,
+                                    mc->patch->patch_id) == NEW_UCODE) )
             {
                 saved = mc->patch;
                 saved_size = mc->len;
