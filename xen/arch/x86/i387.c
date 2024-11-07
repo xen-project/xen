@@ -24,7 +24,6 @@ static inline void fpu_xrstor(struct vcpu *v, uint64_t mask)
 {
     bool ok;
 
-    ASSERT(v->arch.xsave_area);
     /*
      * XCR0 normally represents what guest OS set. In case of Xen itself,
      * we set the accumulated feature mask before doing save/restore.
@@ -136,7 +135,6 @@ static inline void fpu_xsave(struct vcpu *v)
     uint64_t mask = vcpu_xsave_mask(v);
 
     ASSERT(mask);
-    ASSERT(v->arch.xsave_area);
     /*
      * XCR0 normally represents what guest OS set. In case of Xen itself,
      * we set the accumulated feature mask before doing save/restore.
