@@ -470,8 +470,7 @@ struct ucode_buf {
 static long cf_check microcode_update_helper(void *data)
 {
     struct microcode_patch *patch = NULL;
-    enum microcode_match_result result;
-    int ret;
+    int ret, result;
     struct ucode_buf *buffer = data;
     unsigned int cpu, updated;
     struct patch_with_flags patch_with_flags;
@@ -527,7 +526,7 @@ static long cf_check microcode_update_helper(void *data)
     spin_lock(&microcode_mutex);
     if ( microcode_cache )
     {
-        result = alternative_call(ucode_ops.compare_patch, patch, microcode_cache);
+        result = alternative_call(ucode_ops.compare, microcode_cache, patch);
 
         if ( result != NEW_UCODE &&
              !(ucode_force && (result == OLD_UCODE || result == SAME_UCODE)) )

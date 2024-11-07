@@ -170,8 +170,7 @@ static bool check_final_patch_levels(const struct cpu_signature *sig)
     return false;
 }
 
-static enum microcode_match_result compare_revisions(
-    uint32_t old_rev, uint32_t new_rev)
+static int compare_revisions(uint32_t old_rev, uint32_t new_rev)
 {
     if ( new_rev > old_rev )
         return NEW_UCODE;
@@ -199,8 +198,8 @@ static bool microcode_fits_cpu(const struct microcode_patch *patch)
     return equiv.id == patch->processor_rev_id;
 }
 
-static enum microcode_match_result cf_check compare_patch(
-    const struct microcode_patch *new, const struct microcode_patch *old)
+static int cf_check amd_compare(
+    const struct microcode_patch *old, const struct microcode_patch *new)
 {
     /* Both patches to compare are supposed to be applicable to local CPU. */
     ASSERT(microcode_fits_cpu(new));
@@ -212,11 +211,10 @@ static enum microcode_match_result cf_check compare_patch(
 static int cf_check apply_microcode(const struct microcode_patch *patch,
                                     unsigned int flags)
 {
-    int hw_err;
+    int hw_err, result;
     unsigned int cpu = smp_processor_id();
     struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
     uint32_t rev, old_rev = sig->rev;
-    enum microcode_match_result result;
     bool ucode_force = flags & XENPF_UCODE_FORCE;
 
     if ( !microcode_fits_cpu(patch) )
@@ -449,7 +447,7 @@ static const struct microcode_ops __initconst_cf_clobber amd_ucode_ops = {
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
     .apply_microcode                  = apply_microcode,
-    .compare_patch                    = compare_patch,
+    .compare                          = amd_compare,
     .cpio_path                        = amd_cpio_path,
 };
 

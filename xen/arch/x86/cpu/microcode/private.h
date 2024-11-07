@@ -5,13 +5,6 @@
 
 #include <asm/microcode.h>
 
-enum microcode_match_result {
-    OLD_UCODE, /* signature matched, but revision id is older */
-    SAME_UCODE, /* signature matched, but revision id is the same */
-    NEW_UCODE, /* signature matched, but revision id is newer */
-    MIS_UCODE, /* signature mismatched */
-};
-
 /* Opaque.  Internals are vendor-specific. */
 struct microcode_patch;
 
@@ -54,11 +47,17 @@ struct microcode_ops {
                            unsigned int flags);
 
     /*
-     * Given two patches, are they both applicable to the current CPU, and is
-     * new a higher revision than old?
+     * Given a current patch, and a proposed new patch, order them based on revision.
+     *
+     * This operation is not necessarily symmetrical.  In some cases, a debug
+     * "new" patch will always considered to be newer, on the expectation that
+     * whomever is using debug patches knows exactly what they're doing.
      */
-    enum microcode_match_result (*compare_patch)(
-        const struct microcode_patch *new, const struct microcode_patch *old);
+#define OLD_UCODE  (-1)
+#define SAME_UCODE  (0)
+#define NEW_UCODE   (1)
+    int (*compare)(const struct microcode_patch *old,
+                   const struct microcode_patch *new);
 
     /*
      * For Linux inird microcode compatibliity.

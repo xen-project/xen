@@ -229,8 +229,7 @@ static int microcode_sanity_check(const struct microcode_patch *patch)
  * Production microcode has a positive revision.  Pre-production microcode has
  * a negative revision.
  */
-static enum microcode_match_result compare_revisions(
-    int32_t old_rev, int32_t new_rev)
+static int compare_revisions(int32_t old_rev, int32_t new_rev)
 {
     if ( new_rev > old_rev )
         return NEW_UCODE;
@@ -270,8 +269,8 @@ static bool microcode_fits_cpu(const struct microcode_patch *mc)
     return false;
 }
 
-static enum microcode_match_result cf_check compare_patch(
-    const struct microcode_patch *new, const struct microcode_patch *old)
+static int cf_check intel_compare(
+    const struct microcode_patch *old, const struct microcode_patch *new)
 {
     /*
      * Both patches to compare are supposed to be applicable to local CPU.
@@ -290,7 +289,7 @@ static int cf_check apply_microcode(const struct microcode_patch *patch,
     unsigned int cpu = smp_processor_id();
     struct cpu_signature *sig = &this_cpu(cpu_sig);
     uint32_t rev, old_rev = sig->rev;
-    enum microcode_match_result result;
+    int result;
     bool ucode_force = flags & XENPF_UCODE_FORCE;
 
     if ( !microcode_fits_cpu(patch) )
@@ -408,7 +407,7 @@ static const struct microcode_ops __initconst_cf_clobber intel_ucode_ops = {
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
     .apply_microcode                  = apply_microcode,
-    .compare_patch                    = compare_patch,
+    .compare                          = intel_compare,
     .cpio_path                        = intel_cpio_path,
 };
 
