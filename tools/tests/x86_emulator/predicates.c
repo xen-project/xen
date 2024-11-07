@@ -2213,41 +2213,36 @@ void do_test(uint8_t *instr, unsigned int len, unsigned int modrm,
                           unsigned int bytes,
                           struct x86_emulate_ctxt *ctxt))
 {
-    struct x86_emulate_state *s;
+    struct x86_emulate_state *s = x86_decode_insn(ctxt, fetch);
 
-    if ( !modrm || mem != mem_none )
+    if ( !s )
     {
-        s = x86_decode_insn(ctxt, fetch);
-
-        if ( !s )
-        {
-            print_insn(instr, len);
-            printf(" failed to decode\n");
-            return;
-        }
-
-        if ( x86_insn_length(s, ctxt) != len )
-        {
-            print_insn(instr, len);
-            printf(" length %u (expected %u)\n", x86_insn_length(s, ctxt), len);
-        }
-
-        if ( x86_insn_is_mem_access(s, ctxt) != (mem != mem_none) )
-        {
-            print_insn(instr, len);
-            printf(" mem access %d (expected %d)\n",
-                   x86_insn_is_mem_access(s, ctxt), mem != mem_none);
-        }
-
-        if ( x86_insn_is_mem_write(s, ctxt) != (mem == mem_write) )
-        {
-            print_insn(instr, len);
-            printf(" mem write %d (expected %d)\n",
-                   x86_insn_is_mem_write(s, ctxt), mem == mem_write);
-        }
-
-        x86_emulate_free_state(s);
+        print_insn(instr, len);
+        printf(" failed to decode\n");
+        return;
     }
+
+    if ( x86_insn_length(s, ctxt) != len )
+    {
+        print_insn(instr, len);
+        printf(" length %u (expected %u)\n", x86_insn_length(s, ctxt), len);
+    }
+
+    if ( x86_insn_is_mem_access(s, ctxt) != (mem != mem_none) )
+    {
+        print_insn(instr, len);
+        printf(" mem access %d (expected %d)\n",
+               x86_insn_is_mem_access(s, ctxt), mem != mem_none);
+    }
+
+    if ( x86_insn_is_mem_write(s, ctxt) != (mem == mem_write) )
+    {
+        print_insn(instr, len);
+        printf(" mem write %d (expected %d)\n",
+               x86_insn_is_mem_write(s, ctxt), mem == mem_write);
+    }
+
+    x86_emulate_free_state(s);
 
     if ( modrm )
     {
