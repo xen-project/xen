@@ -31,8 +31,6 @@
 #include <asm/io_apic.h>
 #include <asm/setup.h>
 
-#include <bios_ebda.h>
-
 /* Have we found an MP table */
 bool __initdata smp_found_config;
 
@@ -732,6 +730,13 @@ static void __init efi_check_config(void)
 	}
 	else
 		efi_unmap_mpf();
+}
+
+static unsigned int get_bios_ebda(void)
+{
+	unsigned int address = *(uint16_t *)maddr_to_virt(0x40e);
+
+	return address << 4; /* 0 means none */
 }
 
 void __init find_smp_config (void)
