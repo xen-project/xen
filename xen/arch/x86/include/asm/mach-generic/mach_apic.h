@@ -39,15 +39,4 @@ static inline int multi_timer_check(int apic, int irq)
 	return 0;
 }
 
-/*
- * The following functions based around phys_cpu_present_map are disabled in
- * some i386 Linux subarchitectures, and in x86_64 'cluster' genapic mode. I'm
- * really not sure why, since all local APICs should have distinct physical
- * IDs, and we need to know what they are.
- */
-static inline void set_apicid(int phys_apicid, physid_mask_t *map)
-{
-	physid_set(phys_apicid, *map);
-}
-
 #endif /* __ASM_MACH_APIC_H */

@@ -1537,7 +1537,7 @@ static void __init setup_ioapic_ids_from_mpc(void)
                         "phys_id_present_map\n",
                         mp_ioapics[apic].mpc_apicid);
         }
-        set_apicid(mp_ioapics[apic].mpc_apicid, &phys_id_present_map);
+        physid_set(mp_ioapics[apic].mpc_apicid, phys_id_present_map);
 
         /*
          * We need to adjust the IRQ routing table
@@ -2270,7 +2270,7 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
         apic_id = i;
     } 
 
-    set_apicid(apic_id, &apic_id_map);
+    physid_set(apic_id, apic_id_map);
 
     if (reg_00.bits.ID != apic_id) {
         reg_00.bits.ID = apic_id;

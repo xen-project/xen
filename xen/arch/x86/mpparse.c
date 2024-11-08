@@ -20,8 +20,10 @@
 #include <xen/delay.h>
 #include <xen/efi.h>
 #include <xen/sched.h>
-
 #include <xen/bitops.h>
+
+#include <asm/apic.h>
+#include <asm/genapic.h>
 #include <asm/smp.h>
 #include <asm/acpi.h>
 #include <asm/mtrr.h>
@@ -29,7 +31,6 @@
 #include <asm/io_apic.h>
 #include <asm/setup.h>
 
-#include <mach_apic.h>
 #include <bios_ebda.h>
 
 /* Have we found an MP table */
@@ -161,7 +162,7 @@ static int MP_processor_info_x(struct mpc_config_processor *m,
 	}
 	apic_version[apicid] = ver;
 
-	set_apicid(apicid, &phys_cpu_present_map);
+	physid_set(apicid, phys_cpu_present_map);
 
 	if (num_processors >= nr_cpu_ids) {
 		printk_once(XENLOG_WARNING
