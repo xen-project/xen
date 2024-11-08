@@ -8,6 +8,7 @@
 #ifndef X86_BOOTINFO_H
 #define X86_BOOTINFO_H
 
+#include <xen/init.h>
 #include <xen/multiboot.h>
 #include <xen/types.h>
 
