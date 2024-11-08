@@ -37,6 +37,61 @@
  * manually as part of placement.
  */
 
+/*
+ * Layout of the trampoline.  Logical areas, in ascending order:
+ *
+ * 1) AP boot:
+ *
+ *    The INIT-SIPI-SIPI entrypoint.  This logic is stack-less so the identity
+ *    mapping (which must be executable) can at least be Read Only.
+ *
+ * 2) S3 resume:
+ *
+ *    The S3 wakeup logic may need to interact with the BIOS, so needs a
+ *    stack.  The stack pointer is set to trampoline_phys + 4k and clobbers an
+ *    arbitrary part of the the boot trampoline.  The stack is only used with
+ *    paging disabled.
+ *
+ * 3) Boot trampoline:
+ *
+ *    The boot trampoline collects data from the BIOS (E820/EDD/EDID/etc), so
+ *    needs a stack.  The stack pointer is set to trampoline_phys + 64k, is 4k
+ *    in size, and only used with paging disabled.
+ *
+ * 4) Heap space:
+ *
+ *    The first 1k of heap space is statically allocated scratch space for
+ *    VESA information.
+ *
+ *    The remainder of the heap is used by reloc(), logic which is otherwise
+ *    outside of the trampoline, to collect the bootloader metadata (cmdline,
+ *    module list, etc).  It does so with a bump allocator starting from the
+ *    end of the heap and allocating backwards.
+ *
+ * 5) Boot stack:
+ *
+ *    The boot stack is 4k in size at the end of the trampoline, taking the
+ *    total trampoline size to 64k.
+ *
+ * Therefore, when placed, it looks somewhat like this:
+ *
+ *    +--- trampoline_phys
+ *    v
+ *    |<-------------------------------64K------------------------------->|
+ *    |<-----4K----->|                                         |<---4K--->|
+ *    +-------+------+-+---------------------------------------+----------+
+ *    | AP+S3 |  Boot  | Heap                                  |    Stack |
+ *    +-------+------+-+---------------------------------------+----------+
+ *    ^       ^   <~~^ ^                                    <~~^       <~~^
+ *    |       |      | +- trampoline_end[]                     |          |
+ *    |       |      +--- wakeup_stack      reloc() allocator -+          |
+ *    |       +---------- trampoline_perm_end      Boot Stack ------------+
+ *    +------------------ trampoline_start[]
+ *
+ * Note: trampoline_start[] and trampoline_end[] represent the shown
+ * boundaries, but are addresses as linked into Xen's .init section.
+ */
+
 #include <xen/compiler.h>
 #include <xen/types.h>
 
