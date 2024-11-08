@@ -26,6 +26,8 @@
 #include <xen/delay.h>
 #include <xen/smp.h>
 #include <xen/softirq.h>
+
+#include <asm/irq-vectors.h>
 #include <asm/mc146818rtc.h>
 #include <asm/microcode.h>
 #include <asm/msr.h>
@@ -38,7 +40,6 @@
 #include <asm/genapic.h>
 
 #include <io_ports.h>
-#include <irq_vectors.h>
 #include <xen/kexec.h>
 #include <asm/guest.h>
 #include <asm/nmi.h>

@@ -19,13 +19,13 @@
 #include <asm/current.h>
 #include <asm/genapic.h>
 #include <asm/guest.h>
+#include <asm/irq-vectors.h>
 #include <asm/smp.h>
 #include <asm/mc146818rtc.h>
 #include <asm/flushtlb.h>
 #include <asm/hardirq.h>
 #include <asm/hpet.h>
 #include <asm/setup.h>
-#include <irq_vectors.h>
 
 /* Helper functions to prepare APIC register values. */
 static unsigned int prepare_ICR(unsigned int shortcut, int vector)

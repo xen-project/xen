@@ -7,10 +7,10 @@
         .file "x86_64/entry.S"
 
 #include <asm/asm_defns.h>
+#include <asm/irq-vectors.h>
 #include <asm/page.h>
 #include <asm/processor.h>
 #include <public/xen.h>
-#include <irq_vectors.h>
 
 /* %rsp: struct cpu_user_regs */
 .macro ASSERT_CONTEXT_IS_XEN

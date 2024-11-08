@@ -25,11 +25,11 @@
 #include <asm/apic.h>
 #include <asm/genapic.h>
 #include <asm/io_apic.h>
+#include <asm/irq-vectors.h>
 #include <asm/msi.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 
-#include <irq_vectors.h>
 #include <public/physdev.h>
 
 /* opt_noirqbalance: If true, software IRQ balancing/affinity is disabled. */

@@ -19,9 +19,9 @@
 #include <xen/delay.h>
 #include <asm/apic.h>
 #include <asm/asm_defns.h>
+#include <asm/irq-vectors.h>
 #include <asm/setup.h>
 #include <io_ports.h>
-#include <irq_vectors.h>
 
 /*
  * This is the 'legacy' 8259A Programmable Interrupt Controller,

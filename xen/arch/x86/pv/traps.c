@@ -13,10 +13,10 @@
 #include <xen/softirq.h>
 
 #include <asm/debugreg.h>
+#include <asm/irq-vectors.h>
 #include <asm/pv/trace.h>
 #include <asm/shared.h>
 #include <asm/traps.h>
-#include <irq_vectors.h>
 
 void pv_inject_event(const struct x86_event *event)
 {

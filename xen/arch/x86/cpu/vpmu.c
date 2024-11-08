@@ -13,13 +13,15 @@
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
 #include <xen/sched.h>
+
+#include <asm/irq-vectors.h>
 #include <asm/regs.h>
 #include <asm/msr.h>
 #include <asm/nmi.h>
 #include <asm/p2m.h>
 #include <asm/vpmu.h>
 #include <asm/apic.h>
-#include <irq_vectors.h>
+
 #include <public/pmu.h>
 #include <xsm/xsm.h>
 

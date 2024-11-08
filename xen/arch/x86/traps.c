@@ -69,7 +69,7 @@
 #include <public/hvm/params.h>
 #include <asm/cpuid.h>
 #include <xsm/xsm.h>
-#include <asm/mach-default/irq_vectors.h>
+#include <asm/irq-vectors.h>
 #include <asm/pv/traps.h>
 #include <asm/pv/trace.h>
 #include <asm/pv/mm.h>

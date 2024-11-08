@@ -39,7 +39,7 @@
 #include <asm/time.h>
 #include <asm/tboot.h>
 #include <asm/trampoline.h>
-#include <irq_vectors.h>
+#include <asm/irq-vectors.h>
 
 unsigned long __read_mostly trampoline_phys;
 enum ap_boot_method __read_mostly ap_boot_method = AP_BOOT_NORMAL;

@@ -5,11 +5,11 @@
         .file "x86_64/compat/entry.S"
 
 #include <asm/asm_defns.h>
+#include <asm/irq-vectors.h>
 #include <asm/page.h>
 #include <asm/processor.h>
 #include <asm/desc.h>
 #include <public/xen.h>
-#include <irq_vectors.h>
 
 FUNC(entry_int82)
         ENDBR64
