@@ -21,10 +21,14 @@
 #include <xen/trace.h>
 #include <xen/softirq.h>
 #include <xsm/xsm.h>
+
+#include <asm/apic.h>
+#include <asm/genapic.h>
+#include <asm/io_apic.h>
 #include <asm/msi.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
-#include <asm/mach-generic/mach_apic.h>
+
 #include <irq_vectors.h>
 #include <public/physdev.h>
 
