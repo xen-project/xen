@@ -39,7 +39,7 @@
 #include <asm/div64.h>
 #include <asm/acpi.h>
 #include <asm/hpet.h>
-#include <io_ports.h>
+#include <asm/io-ports.h>
 #include <asm/setup.h> /* for early_time_init */
 #include <public/arch-x86/cpuid.h>
 

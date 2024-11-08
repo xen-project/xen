@@ -17,7 +17,6 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <asm/current.h>
-#include <io_ports.h>
 #include <xen/event.h>
 #include <xen/iommu.h>
 

@@ -16,11 +16,11 @@
 #include <asm/dom0_build.h>
 #include <asm/guest.h>
 #include <asm/hpet.h>
+#include <asm/io-ports.h>
 #include <asm/io_apic.h>
 #include <asm/p2m.h>
 #include <asm/setup.h>
 #include <asm/spec_ctrl.h>
-#include <io_ports.h>
 
 struct memsize {
     long nr_pages;

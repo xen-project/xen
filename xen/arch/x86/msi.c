@@ -33,7 +33,6 @@
 #include <asm/fixmap.h>
 #include <asm/p2m.h>
 
-#include <io_ports.h>
 #include <public/physdev.h>
 #include <xen/iommu.h>
 #include <xsm/xsm.h>

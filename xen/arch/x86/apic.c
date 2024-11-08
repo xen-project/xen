@@ -27,6 +27,7 @@
 #include <xen/smp.h>
 #include <xen/softirq.h>
 
+#include <asm/io-ports.h>
 #include <asm/irq-vectors.h>
 #include <asm/mc146818rtc.h>
 #include <asm/microcode.h>
@@ -39,7 +40,6 @@
 #include <asm/io_apic.h>
 #include <asm/genapic.h>
 
-#include <io_ports.h>
 #include <xen/kexec.h>
 #include <asm/guest.h>
 #include <asm/nmi.h>

@@ -34,6 +34,7 @@
 #include <asm/apic.h>
 #include <asm/genapic.h>
 #include <asm/hpet.h>
+#include <asm/io-ports.h>
 #include <asm/io_apic.h>
 #include <asm/irq-vectors.h>
 #include <asm/mc146818rtc.h>
@@ -42,7 +43,6 @@
 #include <asm/msi.h>
 #include <asm/setup.h>
 
-#include <io_ports.h>
 #include <public/physdev.h>
 #include <xen/trace.h>
 
