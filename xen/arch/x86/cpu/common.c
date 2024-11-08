@@ -18,7 +18,6 @@
 #include <asm/random.h>
 #include <asm/setup.h>
 #include <asm/shstk.h>
-#include <mach_apic.h>
 #include <public/sysctl.h> /* for XEN_INVALID_{SOCKET,CORE}_ID */
 
 #include "cpu.h"

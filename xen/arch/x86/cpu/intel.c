@@ -14,8 +14,6 @@
 #include <asm/i387.h>
 #include <asm/trampoline.h>
 
-#include <mach_apic.h>
-
 #include "cpu.h"
 
 /*

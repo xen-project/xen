@@ -1,9 +1,10 @@
 #include <xen/irq.h>
 #include <xen/sched.h>
+
+#include <asm/apic.h>
 #include <asm/current.h>
 #include <asm/smp.h>
 #include <asm/hardirq.h>
-#include <mach_apic.h>
 
 /*
  * LOGICAL FLAT DELIVERY MODE (multicast via bitmask to <= 8 logical APIC IDs).

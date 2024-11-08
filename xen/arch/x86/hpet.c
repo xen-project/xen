@@ -13,11 +13,12 @@
 #include <xen/numa.h>
 #include <xen/param.h>
 #include <xen/sched.h>
+
+#include <asm/apic.h>
 #include <asm/fixmap.h>
 #include <asm/div64.h>
 #include <asm/hpet.h>
 #include <asm/msi.h>
-#include <mach_apic.h>
 #include <xen/cpuidle.h>
 
 #define MAX_DELTA_NS MILLISECS(10*1000)
