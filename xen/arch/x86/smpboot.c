@@ -20,6 +20,9 @@
 #include <xen/serial.h>
 #include <xen/numa.h>
 #include <xen/cpu.h>
+
+#include <asm/apic.h>
+#include <asm/io_apic.h>
 #include <asm/cpuidle.h>
 #include <asm/current.h>
 #include <asm/mc146818rtc.h>
@@ -37,7 +40,6 @@
 #include <asm/tboot.h>
 #include <asm/trampoline.h>
 #include <irq_vectors.h>
-#include <mach_apic.h>
 
 unsigned long __read_mostly trampoline_phys;
 enum ap_boot_method __read_mostly ap_boot_method = AP_BOOT_NORMAL;
@@ -1193,7 +1195,7 @@ void __init smp_prepare_cpus(void)
      * CPU too, but we do it for the sake of robustness anyway.
      * Makes no sense to do this check in clustered apic mode, so skip it
      */
-    if ( !check_apicid_present(boot_cpu_physical_apicid) )
+    if ( !physid_isset(boot_cpu_physical_apicid, phys_cpu_present_map) )
     {
         printk("weird, boot CPU (#%d) not listed by the BIOS.\n",
                boot_cpu_physical_apicid);
