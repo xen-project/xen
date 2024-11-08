@@ -46,7 +46,8 @@
 #include <xsm/xsm.h>
 #include <asm/tboot.h>
 #include <asm/bzimage.h> /* for bzimage_headroom */
-#include <asm/mach-generic/mach_apic.h> /* for generic_apic_probe */
+#include <asm/genapic.h>
+#include <asm/io_apic.h>
 #include <asm/setup.h>
 #include <xen/cpu.h>
 #include <xen/cpuidle.h>

@@ -51,4 +51,7 @@ unsigned int cf_check cpu_mask_to_apicid_phys(const cpumask_t *cpumask);
 void cf_check send_IPI_mask_phys(const cpumask_t *mask, int vector);
 const cpumask_t *cf_check vector_allocation_cpumask_phys(int cpu);
 
+void generic_apic_probe(void);
+void generic_bigsmp_probe(void);
+
 #endif

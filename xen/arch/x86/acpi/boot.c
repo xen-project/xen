@@ -38,7 +38,7 @@
 #include <asm/mpspec.h>
 #include <asm/processor.h>
 #include <asm/hpet.h> /* for hpet_address */
-#include <mach_apic.h>
+#include <asm/genapic.h>
 
 #define PREFIX			"ACPI: "
 
