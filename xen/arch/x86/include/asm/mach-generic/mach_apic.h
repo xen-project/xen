@@ -45,11 +45,6 @@ static inline int multi_timer_check(int apic, int irq)
  * really not sure why, since all local APICs should have distinct physical
  * IDs, and we need to know what they are.
  */
-static inline int check_apicid_used(const physid_mask_t *map, int apicid)
-{
-	return physid_isset(apicid, *map);
-}
-
 static inline int check_apicid_present(int apicid)
 {
 	return physid_isset(apicid, phys_cpu_present_map);
