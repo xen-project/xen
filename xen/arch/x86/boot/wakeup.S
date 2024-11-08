@@ -153,15 +153,16 @@ wakeup_32:
         /* Now in compatibility mode. Long-jump to 64-bit mode */
         ljmp    $BOOT_CS64, $bootsym_rel(wakeup_64,6)
 
+FUNC_LOCAL(bogus_saved_magic, 0)
+        movw    $0x0e00 + 'S', 0xb8014
+        jmp     bogus_saved_magic
+END(bogus_saved_magic)
+
         .code64
 wakeup_64:
         /* Jump to high mappings and the higher-level wakeup code. */
         movabs  $s3_resume, %rbx
         jmp     *%rbx
-
-bogus_saved_magic:
-        movw    $0x0e00 + 'S', 0xb8014
-        jmp     bogus_saved_magic
 
 /* Stack for wakeup: rest of first trampoline page. */
 ENTRY(wakeup_stack_start)
