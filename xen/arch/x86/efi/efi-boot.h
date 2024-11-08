@@ -633,7 +633,7 @@ static void __init efi_arch_memory_setup(void)
     if ( efi_enabled(EFI_LOADER) )
         cfg.size = trampoline_end - trampoline_start;
     else
-        cfg.size = TRAMPOLINE_SPACE + TRAMPOLINE_STACK_SPACE;
+        cfg.size = TRAMPOLINE_SIZE;
 
     status = efi_bs->AllocatePages(AllocateMaxAddress, EfiLoaderData,
                                    PFN_UP(cfg.size), &cfg.addr);

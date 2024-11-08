@@ -92,6 +92,12 @@
  * boundaries, but are addresses as linked into Xen's .init section.
  */
 
+#define TRAMPOLINE_SIZE         KB(64)
+#define TRAMPOLINE_HEAP_END     (TRAMPOLINE_SIZE - PAGE_SIZE)
+#define MBI_SPACE_MIN           (2 * PAGE_SIZE)
+
+#ifndef __ASSEMBLY__
+
 #include <xen/compiler.h>
 #include <xen/types.h>
 
@@ -162,4 +168,5 @@ extern uint8_t kbd_shift_flags;
 extern uint16_t boot_edid_caps;
 extern uint8_t boot_edid_info[128];
 
+#endif /* !__ASSEMBLY__ */
 #endif /* X86_ASM_TRAMPOLINE_H */

@@ -8,6 +8,8 @@
 #include <asm/processor.h>
 #include <asm/msr-index.h>
 #include <asm/cpufeature.h>
+#include <asm/trampoline.h>
+
 #include <public/elfnote.h>
 
 #define ENTRY(name)                             \
@@ -494,7 +496,7 @@ trampoline_bios_setup:
 
 2:
         /* Reserve memory for the trampoline and the low-memory stack. */
-        sub     $((TRAMPOLINE_SPACE+TRAMPOLINE_STACK_SPACE)>>4),%ecx
+        sub     $TRAMPOLINE_SIZE >> 4, %ecx
 
         /* From arch/x86/smpboot.c: start_eip had better be page-aligned! */
         xor     %cl, %cl
@@ -524,23 +526,6 @@ trampoline_setup:
 1:
         mov     %eax, sym_esi(multiboot_ptr)
 2:
-
-        /*
-         * Now trampoline_phys points to the following structure (lowest address
-         * is at the bottom):
-         *
-         * +------------------------+
-         * | TRAMPOLINE_STACK_SPACE |
-         * +------------------------+
-         * |     Data (MBI / PVH)   |
-         * +- - - - - - - - - - - - +
-         * |    TRAMPOLINE_SPACE    |
-         * +------------------------+
-         *
-         * Data grows downwards from the highest address of TRAMPOLINE_SPACE
-         * region to the end of the trampoline. The rest of TRAMPOLINE_SPACE is
-         * reserved for trampoline code and data.
-         */
 
         /* Interrogate CPU extended features via CPUID. */
         mov     $1, %eax
@@ -713,7 +698,7 @@ trampoline_setup:
 1:
         /* Switch to low-memory stack which lives at the end of trampoline region. */
         mov     sym_esi(trampoline_phys), %edi
-        lea     TRAMPOLINE_SPACE+TRAMPOLINE_STACK_SPACE(%edi),%esp
+        lea     TRAMPOLINE_SIZE(%edi), %esp
         lea     trampoline_boot_cpu_entry-trampoline_start(%edi),%eax
         pushl   $BOOT_CS32
         push    %eax

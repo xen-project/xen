@@ -65,7 +65,7 @@ typedef struct memctx {
     /*
      * Simple bump allocator.
      *
-     * It starts from the base of the trampoline and allocates downwards.
+     * It starts from end of the trampoline heap and allocates downwards.
      */
     uint32_t ptr;
 } memctx;
@@ -349,8 +349,7 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, memctx *ctx)
 /* SAF-1-safe */
 void *reloc(uint32_t magic, uint32_t in)
 {
-    /* Get bottom-most low-memory stack address. */
-    memctx ctx = { trampoline_phys + TRAMPOLINE_SPACE };
+    memctx ctx = { trampoline_phys + TRAMPOLINE_HEAP_END };
 
     switch ( magic )
     {

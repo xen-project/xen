@@ -9,6 +9,7 @@
 #endif
 #include <xen/xen.lds.h>
 #include <asm/page.h>
+#include <asm/trampoline.h>
 
 #ifdef EFI
 
@@ -420,5 +421,5 @@ ASSERT(!SIZEOF(.rela),     "leftover relocations")
 ASSERT((trampoline_perm_end - trampoline_start) <= 1024,
        "Permentant trampoline too large")
 
-ASSERT((trampoline_end - trampoline_start) < TRAMPOLINE_SPACE - MBI_SPACE_MIN,
+ASSERT((trampoline_end - trampoline_start) < TRAMPOLINE_HEAP_END - MBI_SPACE_MIN,
     "not enough room for trampoline and mbi data")
