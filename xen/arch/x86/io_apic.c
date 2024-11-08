@@ -31,13 +31,16 @@
 #include <xen/softirq.h>
 #include <xen/xvmalloc.h>
 
+#include <asm/apic.h>
+#include <asm/genapic.h>
 #include <asm/hpet.h>
+#include <asm/io_apic.h>
 #include <asm/mc146818rtc.h>
 #include <asm/smp.h>
 #include <asm/desc.h>
 #include <asm/msi.h>
 #include <asm/setup.h>
-#include <mach_apic.h>
+
 #include <io_ports.h>
 #include <irq_vectors.h>
 #include <public/physdev.h>
@@ -1104,14 +1107,8 @@ static void __init setup_IO_APIC_irqs(void)
             }
 
             irq = pin_2_irq(idx, apic, pin);
-            /*
-             * skip adding the timer int on secondary nodes, which causes
-             * a small but painful rift in the time-space continuum
-             */
-            if (multi_timer_check(apic, irq))
-                continue;
-            else
-                add_pin_to_irq(irq, apic, pin);
+
+            add_pin_to_irq(irq, apic, pin);
 
             if (!IO_APIC_IRQ(irq))
                 continue;

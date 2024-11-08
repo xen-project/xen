@@ -35,7 +35,8 @@
 #include <asm/hardirq.h>
 #include <asm/apic.h>
 #include <asm/io_apic.h>
-#include <mach_apic.h>
+#include <asm/genapic.h>
+
 #include <io_ports.h>
 #include <irq_vectors.h>
 #include <xen/kexec.h>
@@ -230,7 +231,6 @@ void __init connect_bsp_APIC(void)
     }
 
     printk("Enabling APIC mode.  Using %d I/O APICs\n", nr_ioapics);
-    enable_apic_mode();
 }
 
 void disconnect_bsp_APIC(int virt_wire_setup)
