@@ -32,7 +32,7 @@
 #include <asm/msi.h>
 #include <asm/irq.h>
 #include <asm/pci.h>
-#include <mach_apic.h>
+
 #include "iommu.h"
 #include "dmar.h"
 #include "extern.h"
@@ -321,7 +321,7 @@ static int __init cf_check parse_snb_timeout(const char *s)
         else if ( strcmp(s, "cap") == 0 )
             t = SNB_IGD_TIMEOUT;
         else
-            t = strtoul(s, &q, 0);
+            t = simple_strtoul(s, &q, 0);
     }
     else
         t = t ? SNB_IGD_TIMEOUT_LEGACY : 0;

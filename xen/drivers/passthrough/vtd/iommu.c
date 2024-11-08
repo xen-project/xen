@@ -31,12 +31,15 @@
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <xen/keyhandler.h>
+
+#include <asm/apic.h>
+#include <asm/io_apic.h>
 #include <asm/msi.h>
 #include <asm/nops.h>
 #include <asm/irq.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/p2m.h>
-#include <mach_apic.h>
+
 #include "iommu.h"
 #include "dmar.h"
 #include "extern.h"
