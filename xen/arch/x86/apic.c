@@ -495,8 +495,7 @@ void setup_local_APIC(bool bsp)
     /*
      * Double-check whether this APIC is really registered.
      */
-    if (!apic_id_registered())
-        BUG();
+    BUG_ON(!physid_isset(get_apic_id(), phys_cpu_present_map));
 
     /*
      * Intel recommends to set DFR, LDR and TPR before enabling
