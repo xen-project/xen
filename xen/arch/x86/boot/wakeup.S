@@ -77,8 +77,11 @@ check_vesaw:
         ret
 
 bogus_real_magic:
+        movw    $0xb800, %ax
+        movw    %ax, %fs
+1:
         movw    $0x0e00 + 'B', %fs:(0x12)
-        jmp     bogus_real_magic
+        jmp     1b
 
         .align 4
 real_magic:     .long 0x12345678
