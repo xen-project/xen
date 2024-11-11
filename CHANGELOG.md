@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Fixed blkif protocol specification for sector sizes different than 512b.
  - On x86:
    - Prefer ACPI reboot over UEFI ResetSystem() run time service call.
+   - Switched the xAPIC flat driver to use physical destination mode for external
+     interrupts instead of logical destination mode.
 
 ### Added
  - On Arm:
