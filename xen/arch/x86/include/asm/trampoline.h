@@ -52,7 +52,7 @@ extern char trampoline_start[], trampoline_end[];
  * the 1M boundary (as the trampoline contains 16-bit code), and must be 4k
  * aligned (SIPI requirement for APs).
  */
-extern unsigned long trampoline_phys;
+extern uint32_t trampoline_phys;
 
 /*
  * Calculate the physical address of a symbol in the trampoline.

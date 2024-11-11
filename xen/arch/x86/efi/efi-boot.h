@@ -235,7 +235,7 @@ static void __init noreturn efi_arch_post_exit_boot(void)
     u64 cr4 = XEN_MINIMAL_CR4 & ~X86_CR4_PGE, efer;
 
     efi_arch_relocate_image(__XEN_VIRT_START - xen_phys_start);
-    memcpy((void *)trampoline_phys, trampoline_start, cfg.size);
+    memcpy(_p(trampoline_phys), trampoline_start, cfg.size);
 
     /*
      * We're in physical mode right now (i.e. identity map), so a regular

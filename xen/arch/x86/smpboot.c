@@ -41,7 +41,7 @@
 #include <asm/trampoline.h>
 #include <asm/irq-vectors.h>
 
-unsigned long __read_mostly trampoline_phys;
+uint32_t __ro_after_init trampoline_phys;
 enum ap_boot_method __read_mostly ap_boot_method = AP_BOOT_NORMAL;
 
 /* representing HT siblings of each logical CPU */

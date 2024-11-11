@@ -15,7 +15,7 @@ void reloc_trampoline64(void)
 #error Unknown architecture
 #endif
 {
-    unsigned long phys = trampoline_phys;
+    uint32_t phys = trampoline_phys;
     const int32_t *trampoline_ptr;
 
     /*
