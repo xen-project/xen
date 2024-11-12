@@ -69,18 +69,9 @@ static int stdvga_mem_write(const struct hvm_io_handler *handler,
 static bool_t stdvga_mem_accept(const struct hvm_io_handler *handler,
                                 const ioreq_t *p)
 {
-    struct hvm_hw_stdvga *s = &current->domain->arch.hvm.stdvga;
-
-    /*
-     * The range check must be done without taking the lock, to avoid
-     * deadlock when hvm_mmio_internal() is called from
-     * hvm_copy_to/from_guest_phys() in hvm_process_io_intercept().
-     */
     if ( (ioreq_mmio_first_byte(p) < VGA_MEM_BASE) ||
          (ioreq_mmio_last_byte(p) >= (VGA_MEM_BASE + VGA_MEM_SIZE)) )
         return 0;
-
-    spin_lock(&s->lock);
 
     if ( p->dir != IOREQ_WRITE || p->data_is_ptr || p->count != 1 )
     {
@@ -88,42 +79,25 @@ static bool_t stdvga_mem_accept(const struct hvm_io_handler *handler,
          * Only accept single direct writes, as that's the only thing we can
          * accelerate using buffered ioreq handling.
          */
-        goto reject;
+        return false;
     }
 
-    /* s->lock intentionally held */
-    return 1;
-
- reject:
-    spin_unlock(&s->lock);
-    return 0;
-}
-
-static void stdvga_mem_complete(const struct hvm_io_handler *handler)
-{
-    struct hvm_hw_stdvga *s = &current->domain->arch.hvm.stdvga;
-
-    spin_unlock(&s->lock);
+    return true;
 }
 
 static const struct hvm_io_ops stdvga_mem_ops = {
     .accept = stdvga_mem_accept,
     .read = stdvga_mem_read,
     .write = stdvga_mem_write,
-    .complete = stdvga_mem_complete
 };
 
 void stdvga_init(struct domain *d)
 {
-    struct hvm_hw_stdvga *s = &d->arch.hvm.stdvga;
     struct hvm_io_handler *handler;
 
     if ( !has_vvga(d) )
         return;
 
-    memset(s, 0, sizeof(*s));
-    spin_lock_init(&s->lock);
-    
     /* VGA memory */
     handler = hvm_next_io_handler(d);
     if ( handler )

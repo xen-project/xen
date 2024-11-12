@@ -121,10 +121,6 @@ struct vpci_arch_msix_entry {
     int pirq;
 };
 
-struct hvm_hw_stdvga {
-    spinlock_t lock;
-};
-
 void stdvga_init(struct domain *d);
 
 extern void hvm_dpci_msi_eoi(struct domain *d, int vector);
