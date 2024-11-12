@@ -69,18 +69,14 @@ static int cf_check stdvga_mem_write(
 static bool cf_check stdvga_mem_accept(
     const struct hvm_io_handler *handler, const ioreq_t *p)
 {
-    if ( (ioreq_mmio_first_byte(p) < VGA_MEM_BASE) ||
+    /*
+     * Only accept single direct writes, as that's the only thing we can
+     * accelerate using buffered ioreq handling.
+     */
+    if ( p->dir != IOREQ_WRITE || p->data_is_ptr || p->count != 1 ||
+         (ioreq_mmio_first_byte(p) < VGA_MEM_BASE) ||
          (ioreq_mmio_last_byte(p) >= (VGA_MEM_BASE + VGA_MEM_SIZE)) )
-        return 0;
-
-    if ( p->dir != IOREQ_WRITE || p->data_is_ptr || p->count != 1 )
-    {
-        /*
-         * Only accept single direct writes, as that's the only thing we can
-         * accelerate using buffered ioreq handling.
-         */
         return false;
-    }
 
     return true;
 }
