@@ -122,8 +122,6 @@ struct vpci_arch_msix_entry {
 };
 
 struct hvm_hw_stdvga {
-    uint8_t sr_index;
-    uint8_t gr_index;
     struct page_info *vram_page[64];  /* shadow of 0xa0000-0xaffff */
     spinlock_t lock;
 };
