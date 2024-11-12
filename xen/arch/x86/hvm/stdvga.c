@@ -49,18 +49,6 @@ static const uint8_t sr_mask[8] = {
     (uint8_t)~0x00,
 };
 
-static const uint8_t gr_mask[9] = {
-    (uint8_t)~0xf0, /* 0x00 */
-    (uint8_t)~0xf0, /* 0x01 */
-    (uint8_t)~0xf0, /* 0x02 */
-    (uint8_t)~0xe0, /* 0x03 */
-    (uint8_t)~0xfc, /* 0x04 */
-    (uint8_t)~0x84, /* 0x05 */
-    (uint8_t)~0xf0, /* 0x06 */
-    (uint8_t)~0xf0, /* 0x07 */
-    (uint8_t)~0x00, /* 0x08 */
-};
-
 static int stdvga_outb(uint64_t addr, uint8_t val)
 {
     struct hvm_hw_stdvga *s = &current->domain->arch.hvm.stdvga;
@@ -80,12 +68,6 @@ static int stdvga_outb(uint64_t addr, uint8_t val)
 
     case 0x3ce:                 /* graphics address register */
         s->gr_index = val;
-        break;
-
-    case 0x3cf:                 /* graphics data register */
-        rc = (s->gr_index < sizeof(s->gr));
-        if ( rc )
-            s->gr[s->gr_index] = val & gr_mask[s->gr_index];
         break;
 
     default:
