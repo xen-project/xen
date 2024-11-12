@@ -116,8 +116,7 @@ static const struct hvm_io_ops stdvga_mem_ops = {
 void stdvga_init(struct domain *d)
 {
     struct hvm_hw_stdvga *s = &d->arch.hvm.stdvga;
-    struct page_info *pg;
-    unsigned int i;
+    struct hvm_io_handler *handler;
 
     if ( !has_vvga(d) )
         return;
@@ -125,44 +124,12 @@ void stdvga_init(struct domain *d)
     memset(s, 0, sizeof(*s));
     spin_lock_init(&s->lock);
     
-    for ( i = 0; i != ARRAY_SIZE(s->vram_page); i++ )
+    /* VGA memory */
+    handler = hvm_next_io_handler(d);
+    if ( handler )
     {
-        pg = alloc_domheap_page(d, MEMF_no_owner);
-        if ( pg == NULL )
-            break;
-        s->vram_page[i] = pg;
-        clear_domain_page(page_to_mfn(pg));
-    }
-
-    if ( i == ARRAY_SIZE(s->vram_page) )
-    {
-        struct hvm_io_handler *handler;
-
-        /* VGA memory */
-        handler = hvm_next_io_handler(d);
-
-        if ( handler == NULL )
-            return;
-
         handler->type = IOREQ_TYPE_COPY;
         handler->ops = &stdvga_mem_ops;
-    }
-}
-
-void stdvga_deinit(struct domain *d)
-{
-    struct hvm_hw_stdvga *s = &d->arch.hvm.stdvga;
-    int i;
-
-    if ( !has_vvga(d) )
-        return;
-
-    for ( i = 0; i != ARRAY_SIZE(s->vram_page); i++ )
-    {
-        if ( s->vram_page[i] == NULL )
-            continue;
-        free_domheap_page(s->vram_page[i]);
-        s->vram_page[i] = NULL;
     }
 }
 

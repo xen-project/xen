@@ -111,12 +111,10 @@ struct vpci_arch_msix_entry {
 };
 
 struct hvm_hw_stdvga {
-    struct page_info *vram_page[64];  /* shadow of 0xa0000-0xaffff */
     spinlock_t lock;
 };
 
 void stdvga_init(struct domain *d);
-void stdvga_deinit(struct domain *d);
 
 extern void hvm_dpci_msi_eoi(struct domain *d, int vector);
 
