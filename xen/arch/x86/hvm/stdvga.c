@@ -37,62 +37,6 @@
 #define VGA_MEM_BASE 0xa0000
 #define VGA_MEM_SIZE 0x20000
 
-static int stdvga_outb(uint64_t addr, uint8_t val)
-{
-    struct hvm_hw_stdvga *s = &current->domain->arch.hvm.stdvga;
-    int rc = 1;
-
-    switch ( addr )
-    {
-    case 0x3c4:                 /* sequencer address register */
-        s->sr_index = val;
-        break;
-
-    case 0x3ce:                 /* graphics address register */
-        s->gr_index = val;
-        break;
-
-    default:
-        rc = 0;
-        break;
-    }
-
-    return rc;
-}
-
-static void stdvga_out(uint32_t port, uint32_t bytes, uint32_t val)
-{
-    switch ( bytes )
-    {
-    case 1:
-        stdvga_outb(port, val);
-        break;
-
-    case 2:
-        stdvga_outb(port + 0, val >> 0);
-        stdvga_outb(port + 1, val >> 8);
-        break;
-
-    default:
-        break;
-    }
-}
-
-static int cf_check stdvga_intercept_pio(
-    int dir, unsigned int port, unsigned int bytes, uint32_t *val)
-{
-    struct hvm_hw_stdvga *s = &current->domain->arch.hvm.stdvga;
-
-    if ( dir == IOREQ_WRITE )
-    {
-        spin_lock(&s->lock);
-        stdvga_out(port, bytes, *val);
-        spin_unlock(&s->lock);
-    }
-
-    return X86EMUL_UNHANDLEABLE; /* propagate to external ioemu */
-}
-
 static int cf_check stdvga_mem_read(
     const struct hvm_io_handler *handler, uint64_t addr, uint32_t size,
     uint64_t *p_data)
@@ -193,11 +137,6 @@ void stdvga_init(struct domain *d)
     if ( i == ARRAY_SIZE(s->vram_page) )
     {
         struct hvm_io_handler *handler;
-
-        /* Sequencer registers. */
-        register_portio_handler(d, 0x3c4, 2, stdvga_intercept_pio);
-        /* Graphics registers. */
-        register_portio_handler(d, 0x3ce, 2, stdvga_intercept_pio);
 
         /* VGA memory */
         handler = hvm_next_io_handler(d);
