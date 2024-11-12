@@ -176,10 +176,11 @@ int libxl__dom_load_acpi(libxl__gc *gc,
         goto out;
     }
 
-    config.rsdp = (unsigned long)libxl__malloc(gc, libxl_ctxt.page_size);
-    config.infop = (unsigned long)libxl__malloc(gc, libxl_ctxt.page_size);
+    /* These are all copied into guest memory, so use zero-ed memory. */
+    config.rsdp = (unsigned long)libxl__zalloc(gc, libxl_ctxt.page_size);
+    config.infop = (unsigned long)libxl__zalloc(gc, libxl_ctxt.page_size);
     /* Pages to hold ACPI tables */
-    libxl_ctxt.buf = libxl__malloc(gc, NUM_ACPI_PAGES *
+    libxl_ctxt.buf = libxl__zalloc(gc, NUM_ACPI_PAGES *
                                    libxl_ctxt.page_size);
 
     /*
