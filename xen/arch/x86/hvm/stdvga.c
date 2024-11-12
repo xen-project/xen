@@ -499,13 +499,13 @@ static bool cf_check stdvga_mem_accept(
 
     spin_lock(&s->lock);
 
-    if ( p->dir == IOREQ_WRITE && p->count > 1 )
+    if ( p->dir == IOREQ_WRITE && (p->data_is_ptr || p->count != 1) )
     {
         /*
          * We cannot return X86EMUL_UNHANDLEABLE on anything other then the
          * first cycle of an I/O. So, since we cannot guarantee to always be
          * able to send buffered writes, we have to reject any multi-cycle
-         * I/O.
+         * or "indirect" I/O.
          */
         goto reject;
     }
