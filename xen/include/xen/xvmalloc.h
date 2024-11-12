@@ -52,7 +52,7 @@ void xvfree(void *va);
 /* Underlying functions */
 void *_xvmalloc(size_t size, unsigned int align);
 void *_xvzalloc(size_t size, unsigned int align);
-void *_xvrealloc(void *ptr, size_t size, unsigned int align);
+void *_xvrealloc(void *va, size_t size, unsigned int align);
 
 static inline void *_xvmalloc_array(
     size_t size, unsigned int align, unsigned long num)
