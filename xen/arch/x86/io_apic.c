@@ -71,6 +71,24 @@ static int apic_pin_2_gsi_irq(int apic, int pin);
 
 static vmask_t *__read_mostly vector_map[MAX_IO_APICS];
 
+/*
+ * Store the EOI handle when using interrupt remapping.
+ *
+ * If using AMD-Vi interrupt remapping the IO-APIC redirection entry remapped
+ * format repurposes the vector field to store the offset into the Interrupt
+ * Remap table.  This breaks directed EOI, as the CPU vector no longer matches
+ * the contents of the RTE vector field.  Add a translation cache so that
+ * directed EOI uses the value in the RTE vector field when interrupt remapping
+ * is enabled.
+ *
+ * Intel VT-d Xen code still stores the CPU vector in the RTE vector field when
+ * using the remapped format, but use the translation cache uniformly in order
+ * to avoid extra logic to differentiate between VT-d and AMD-Vi.
+ *
+ * The matrix is accessed as [#io-apic][#pin].
+ */
+static uint8_t **__ro_after_init io_apic_pin_eoi;
+
 static void share_vector_maps(unsigned int src, unsigned int dst)
 {
     unsigned int pin;
@@ -273,6 +291,17 @@ void __ioapic_write_entry(
     {
         __io_apic_write(apic, 0x11 + 2 * pin, eu.w2);
         __io_apic_write(apic, 0x10 + 2 * pin, eu.w1);
+        /*
+         * Might be called before io_apic_pin_eoi is allocated.  Entry will be
+         * initialized to the RTE value once the cache is allocated.
+         *
+         * The vector field is only cached for raw RTE writes when using IR.
+         * In that case the vector field might have been repurposed to store
+         * something different than the CPU vector, and hence need to be cached
+         * for performing EOI.
+         */
+        if ( io_apic_pin_eoi )
+            io_apic_pin_eoi[apic][pin] = e.vector;
     }
     else
         iommu_update_ire_from_apic(apic, pin, e.raw);
@@ -288,18 +317,36 @@ static void ioapic_write_entry(
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
-/* EOI an IO-APIC entry.  Vector may be -1, indicating that it should be
+/*
+ * EOI an IO-APIC entry.  Vector may be -1, indicating that it should be
  * worked out using the pin.  This function expects that the ioapic_lock is
  * being held, and interrupts are disabled (or there is a good reason not
  * to), and that if both pin and vector are passed, that they refer to the
- * same redirection entry in the IO-APIC. */
+ * same redirection entry in the IO-APIC.
+ *
+ * If using Interrupt Remapping the vector is always ignored because the RTE
+ * remapping format might have repurposed the vector field and a cached value
+ * of the EOI handle to use is obtained based on the provided apic and pin
+ * values.
+ */
 static void __io_apic_eoi(unsigned int apic, unsigned int vector, unsigned int pin)
 {
     /* Prefer the use of the EOI register if available */
     if ( ioapic_has_eoi_reg(apic) )
     {
-        /* If vector is unknown, read it from the IO-APIC */
-        if ( vector == IRQ_VECTOR_UNASSIGNED )
+        if ( io_apic_pin_eoi )
+            /*
+             * If the EOI handle is cached use it. When using AMD-Vi IR the CPU
+             * vector no longer matches the vector field in the RTE, because
+             * the RTE remapping format repurposes the field.
+             *
+             * The value in the RTE vector field must always be used to signal
+             * which RTE to EOI, hence use the cached value which always
+             * mirrors the contents of the raw RTE vector field.
+             */
+            vector = io_apic_pin_eoi[apic][pin];
+        else if ( vector == IRQ_VECTOR_UNASSIGNED )
+             /* If vector is unknown, read it from the IO-APIC */
             vector = __ioapic_read_entry(apic, pin, true).vector;
 
         *(IO_APIC_BASE(apic)+16) = vector;
@@ -1298,11 +1345,29 @@ void __init enable_IO_APIC(void)
             vector_map[apic] = vector_map[0];
     }
 
+    if ( iommu_intremap != iommu_intremap_off )
+    {
+        io_apic_pin_eoi = xmalloc_array(typeof(*io_apic_pin_eoi), nr_ioapics);
+        BUG_ON(!io_apic_pin_eoi);
+    }
+
     for(apic = 0; apic < nr_ioapics; apic++) {
         int pin;
-        /* See if any of the pins is in ExtINT mode */
+
+        if ( io_apic_pin_eoi )
+        {
+            io_apic_pin_eoi[apic] = xmalloc_array(typeof(**io_apic_pin_eoi),
+                                                  nr_ioapic_entries[apic]);
+            BUG_ON(!io_apic_pin_eoi[apic]);
+        }
+
+        /* See if any of the pins is in ExtINT mode and cache EOI handle */
         for (pin = 0; pin < nr_ioapic_entries[apic]; pin++) {
             struct IO_APIC_route_entry entry = ioapic_read_entry(apic, pin, false);
+
+            if ( io_apic_pin_eoi )
+                io_apic_pin_eoi[apic][pin] =
+                    ioapic_read_entry(apic, pin, true).vector;
 
             /* If the interrupt line is enabled and in ExtInt mode
              * I have found the pin where the i8259 is connected.
