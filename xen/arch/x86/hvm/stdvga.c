@@ -103,7 +103,7 @@ static void vram_put(struct hvm_hw_stdvga *s, void *p)
 static int stdvga_outb(uint64_t addr, uint8_t val)
 {
     struct hvm_hw_stdvga *s = &current->domain->arch.hvm.stdvga;
-    int rc = 1, prev_stdvga = s->stdvga;
+    int rc = 1;
 
     switch ( addr )
     {
@@ -130,19 +130,6 @@ static int stdvga_outb(uint64_t addr, uint8_t val)
     default:
         rc = 0;
         break;
-    }
-
-    /* When in standard vga mode, emulate here all writes to the vram buffer
-     * so we can immediately satisfy reads without waiting for qemu. */
-    s->stdvga = (s->sr[7] == 0x00);
-
-    if ( !prev_stdvga && s->stdvga )
-    {
-        gdprintk(XENLOG_INFO, "entering stdvga mode\n");
-    }
-    else if ( prev_stdvga && !s->stdvga )
-    {
-        gdprintk(XENLOG_INFO, "leaving stdvga mode\n");
     }
 
     return rc;
@@ -425,7 +412,6 @@ static int cf_check stdvga_mem_write(
     const struct hvm_io_handler *handler, uint64_t addr, uint32_t size,
     uint64_t data)
 {
-    struct hvm_hw_stdvga *s = &current->domain->arch.hvm.stdvga;
     ioreq_t p = {
         .type = IOREQ_TYPE_COPY,
         .addr = addr,
@@ -436,8 +422,7 @@ static int cf_check stdvga_mem_write(
     };
     struct ioreq_server *srv;
 
-    if ( true || !s->stdvga )
-        goto done;
+    goto done;
 
     /* Intercept mmio write */
     switch ( size )
@@ -498,19 +483,14 @@ static bool cf_check stdvga_mem_accept(
 
     spin_lock(&s->lock);
 
-    if ( p->dir == IOREQ_WRITE && (p->data_is_ptr || p->count != 1) )
+    if ( p->dir != IOREQ_WRITE || p->data_is_ptr || p->count != 1 )
     {
         /*
-         * We cannot return X86EMUL_UNHANDLEABLE on anything other then the
-         * first cycle of an I/O. So, since we cannot guarantee to always be
-         * able to send buffered writes, we have to reject any multi-cycle
-         * or "indirect" I/O.
+         * Only accept single direct writes, as that's the only thing we can
+         * accelerate using buffered ioreq handling.
          */
         goto reject;
     }
-    else if ( p->dir == IOREQ_READ &&
-              (true || !s->stdvga) )
-        goto reject;
 
     /* s->lock intentionally held */
     return 1;
