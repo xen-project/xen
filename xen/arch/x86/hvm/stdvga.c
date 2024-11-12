@@ -38,18 +38,6 @@
 #define VGA_MEM_BASE 0xa0000
 #define VGA_MEM_SIZE 0x20000
 
-/* force some bits to zero */
-static const uint8_t sr_mask[8] = {
-    (uint8_t)~0xfc,
-    (uint8_t)~0xc2,
-    (uint8_t)~0xf0,
-    (uint8_t)~0xc0,
-    (uint8_t)~0xf1,
-    (uint8_t)~0xff,
-    (uint8_t)~0xff,
-    (uint8_t)~0x00,
-};
-
 static int stdvga_outb(uint64_t addr, uint8_t val)
 {
     struct hvm_hw_stdvga *s = &current->domain->arch.hvm.stdvga;
@@ -59,12 +47,6 @@ static int stdvga_outb(uint64_t addr, uint8_t val)
     {
     case 0x3c4:                 /* sequencer address register */
         s->sr_index = val;
-        break;
-
-    case 0x3c5:                 /* sequencer data register */
-        rc = (s->sr_index < sizeof(s->sr));
-        if ( rc )
-            s->sr[s->sr_index] = val & sr_mask[s->sr_index] ;
         break;
 
     case 0x3ce:                 /* graphics address register */
