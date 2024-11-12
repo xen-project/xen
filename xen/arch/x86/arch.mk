@@ -46,6 +46,12 @@ CFLAGS-$(CONFIG_CC_IS_GCC) += -fno-jump-tables
 CFLAGS-$(CONFIG_CC_IS_CLANG) += -mretpoline-external-thunk
 endif
 
+# Disable the addition of a .note.gnu.property section to object files when
+# livepatch support is enabled.  The contents of that section can change
+# depending on the instructions used, and livepatch-build-tools doesn't know
+# how to deal with such changes.
+$(call cc-option-add,CFLAGS-$(CONFIG_LIVEPATCH),CC,-Wa$$(comma)-mx86-used-note=no)
+
 ifdef CONFIG_XEN_IBT
 # Force -fno-jump-tables to work around
 #   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=104816
