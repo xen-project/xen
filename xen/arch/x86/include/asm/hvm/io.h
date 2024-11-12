@@ -110,19 +110,12 @@ struct vpci_arch_msix_entry {
     int pirq;
 };
 
-enum stdvga_cache_state {
-    STDVGA_CACHE_UNINITIALIZED,
-    STDVGA_CACHE_ENABLED,
-    STDVGA_CACHE_DISABLED
-};
-
 struct hvm_hw_stdvga {
     uint8_t sr_index;
     uint8_t sr[8];
     uint8_t gr_index;
     uint8_t gr[9];
     bool stdvga;
-    enum stdvga_cache_state cache;
     uint32_t latch;
     struct page_info *vram_page[64];  /* shadow of 0xa0000-0xaffff */
     spinlock_t lock;

@@ -100,37 +100,6 @@ static void vram_put(struct hvm_hw_stdvga *s, void *p)
     unmap_domain_page(p);
 }
 
-static void stdvga_try_cache_enable(struct hvm_hw_stdvga *s)
-{
-    /*
-     * Caching mode can only be enabled if the the cache has
-     * never been used before. As soon as it is disabled, it will
-     * become out-of-sync with the VGA device model and since no
-     * mechanism exists to acquire current VRAM state from the
-     * device model, re-enabling it would lead to stale data being
-     * seen by the guest.
-     */
-    if ( s->cache != STDVGA_CACHE_UNINITIALIZED )
-        return;
-
-    gdprintk(XENLOG_INFO, "entering caching mode\n");
-    s->cache = STDVGA_CACHE_ENABLED;
-}
-
-static void stdvga_cache_disable(struct hvm_hw_stdvga *s)
-{
-    if ( s->cache != STDVGA_CACHE_ENABLED )
-        return;
-
-    gdprintk(XENLOG_INFO, "leaving caching mode\n");
-    s->cache = STDVGA_CACHE_DISABLED;
-}
-
-static bool stdvga_cache_is_enabled(const struct hvm_hw_stdvga *s)
-{
-    return s->cache == STDVGA_CACHE_ENABLED;
-}
-
 static int stdvga_outb(uint64_t addr, uint8_t val)
 {
     struct hvm_hw_stdvga *s = &current->domain->arch.hvm.stdvga;
@@ -170,7 +139,6 @@ static int stdvga_outb(uint64_t addr, uint8_t val)
     if ( !prev_stdvga && s->stdvga )
     {
         gdprintk(XENLOG_INFO, "entering stdvga mode\n");
-        stdvga_try_cache_enable(s);
     }
     else if ( prev_stdvga && !s->stdvga )
     {
@@ -468,7 +436,7 @@ static int cf_check stdvga_mem_write(
     };
     struct ioreq_server *srv;
 
-    if ( !stdvga_cache_is_enabled(s) || !s->stdvga )
+    if ( true || !s->stdvga )
         goto done;
 
     /* Intercept mmio write */
@@ -536,18 +504,12 @@ static bool cf_check stdvga_mem_accept(
          * We cannot return X86EMUL_UNHANDLEABLE on anything other then the
          * first cycle of an I/O. So, since we cannot guarantee to always be
          * able to send buffered writes, we have to reject any multi-cycle
-         * or "indirect" I/O and, since we are rejecting an I/O, we must
-         * invalidate the cache.
-         * Single-cycle write transactions are accepted even if the cache is
-         * not active since we can assert, when in stdvga mode, that writes
-         * to VRAM have no side effect and thus we can try to buffer them.
+         * or "indirect" I/O.
          */
-        stdvga_cache_disable(s);
-
         goto reject;
     }
     else if ( p->dir == IOREQ_READ &&
-              (!stdvga_cache_is_enabled(s) || !s->stdvga) )
+              (true || !s->stdvga) )
         goto reject;
 
     /* s->lock intentionally held */

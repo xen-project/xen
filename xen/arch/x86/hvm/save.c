@@ -69,9 +69,6 @@ static void arch_hvm_load(struct domain *d, const struct hvm_save_header *hdr)
 
     /* Time when restore started  */
     d->arch.hvm.sync_tsc = rdtsc();
-
-    /* VGA state is not saved/restored, so we nobble the cache. */
-    d->arch.hvm.stdvga.cache = STDVGA_CACHE_DISABLED;
 }
 
 /* List of handlers for various HVM save and restore types */
