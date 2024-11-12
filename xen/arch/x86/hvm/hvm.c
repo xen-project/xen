@@ -677,7 +677,6 @@ int hvm_domain_initialise(struct domain *d,
     return 0;
 
  fail2:
-    stdvga_deinit(d);
     vioapic_deinit(d);
  fail1:
     if ( is_hardware_domain(d) )
@@ -740,7 +739,6 @@ void hvm_domain_destroy(struct domain *d)
     if ( hvm_funcs.domain_destroy )
         alternative_vcall(hvm_funcs.domain_destroy, d);
 
-    stdvga_deinit(d);
     vioapic_deinit(d);
 
     XFREE(d->arch.hvm.pl_time);
