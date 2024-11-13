@@ -410,6 +410,13 @@ ASSERT(!SIZEOF(.plt),      ".plt non-empty")
 ASSERT(!SIZEOF(.rela),     "leftover relocations")
 #endif
 
+/*
+ * The permanent trampoline resides in a single 4k page.  Placement logic
+ * takes care to ensure that trampoline_phys is page aligned.
+ */
+ASSERT((trampoline_perm_end - trampoline_start) <= PAGE_SIZE,
+       "Permentant trampoline too large")
+
 ASSERT((trampoline_end - trampoline_start) < TRAMPOLINE_SPACE - MBI_SPACE_MIN,
     "not enough room for trampoline and mbi data")
 ASSERT((wakeup_stack - wakeup_stack_start) >= WAKEUP_STACK_MIN,

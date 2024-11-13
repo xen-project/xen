@@ -161,6 +161,8 @@ GLOBAL(trampoline_cpu_started)
         .equ    wakeup_stack, trampoline_start + PAGE_SIZE
         .global wakeup_stack
 
+LABEL(trampoline_perm_end, 0)
+
 /* From here on early boot only. */
 
         .code32
