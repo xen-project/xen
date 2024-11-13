@@ -1,5 +1,12 @@
         .code16
 
+/*
+ * The first page of trampoline is permanent, the rest boot-time only.  Reuse
+ * the boot logic in the first trampoline page as the stack for S3 wakeup.
+ */
+        .equ    wakeup_stack, trampoline_start + PAGE_SIZE
+        .local  wakeup_stack
+
 #define wakesym(sym) (sym - wakeup_start)
 
 /*
@@ -166,6 +173,3 @@ wakeup_64:
         /* Jump to high mappings and the higher-level wakeup code. */
         movabs  $s3_resume, %rbx
         jmp     *%rbx
-
-/* Stack for wakeup: rest of first trampoline page. */
-ENTRY(wakeup_stack_start)

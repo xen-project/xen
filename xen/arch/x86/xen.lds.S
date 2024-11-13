@@ -413,11 +413,12 @@ ASSERT(!SIZEOF(.rela),     "leftover relocations")
 /*
  * The permanent trampoline resides in a single 4k page.  Placement logic
  * takes care to ensure that trampoline_phys is page aligned.
+ *
+ * The wakeup stack wants to reside in the same page and wants to be at least
+ * 3k in size, so make sure the text/data fits in 1k.
  */
-ASSERT((trampoline_perm_end - trampoline_start) <= PAGE_SIZE,
+ASSERT((trampoline_perm_end - trampoline_start) <= 1024,
        "Permentant trampoline too large")
 
 ASSERT((trampoline_end - trampoline_start) < TRAMPOLINE_SPACE - MBI_SPACE_MIN,
     "not enough room for trampoline and mbi data")
-ASSERT((wakeup_stack - wakeup_stack_start) >= WAKEUP_STACK_MIN,
-    "wakeup stack too small")

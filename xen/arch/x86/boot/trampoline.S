@@ -156,11 +156,6 @@ GLOBAL(trampoline_xen_phys_start)
 GLOBAL(trampoline_cpu_started)
         .byte   0
 
-/* The first page of trampoline is permanent, the rest boot-time only. */
-/* Reuse the boot trampoline on the 1st trampoline page as stack for wakeup. */
-        .equ    wakeup_stack, trampoline_start + PAGE_SIZE
-        .global wakeup_stack
-
 LABEL(trampoline_perm_end, 0)
 
 /* From here on early boot only. */
