@@ -17,7 +17,7 @@
 #ifndef __MULTIBOOT_H__
 #define __MULTIBOOT_H__
 
-#include "const.h"
+#include <xen/const.h>
 
 /*
  * Multiboot header structure.
@@ -45,41 +45,43 @@
 
 #ifndef __ASSEMBLY__
 
+#include <xen/stdint.h>
+
 /* The symbol table for a.out.  */
 struct aout_symbol_table {
-    u32 tabsize;
-    u32 strsize;
-    u32 addr;
-    u32 reserved;
+    uint32_t tabsize;
+    uint32_t strsize;
+    uint32_t addr;
+    uint32_t reserved;
 };
 typedef struct aout_symbol_table aout_symbol_table_t;
 
 /* The section header table for ELF.  */
 struct elf_section_header_table {
-    u32 num;
-    u32 size;
-    u32 addr;
-    u32 shndx;
+    uint32_t num;
+    uint32_t size;
+    uint32_t addr;
+    uint32_t shndx;
 };
 typedef struct elf_section_header_table elf_section_header_table_t;
 
 /* The Multiboot information.  */
 struct multiboot_info {
-    u32 flags;
+    uint32_t flags;
 
     /* Valid if flags sets MBI_MEMLIMITS */
-    u32 mem_lower;
-    u32 mem_upper;
+    uint32_t mem_lower;
+    uint32_t mem_upper;
 
     /* Valid if flags sets MBI_BOOTDEV */
-    u32 boot_device;
+    uint32_t boot_device;
 
     /* Valid if flags sets MBI_CMDLINE */
-    u32 cmdline;
+    uint32_t cmdline;
 
     /* Valid if flags sets MBI_MODULES */
-    u32 mods_count;
-    u32 mods_addr;
+    uint32_t mods_count;
+    uint32_t mods_addr;
 
     /* Valid if flags sets ... */
     union {
@@ -88,42 +90,42 @@ struct multiboot_info {
     } u;
 
     /* Valid if flags sets MBI_MEMMAP */
-    u32 mmap_length;
-    u32 mmap_addr;
+    uint32_t mmap_length;
+    uint32_t mmap_addr;
 
     /* Valid if flags sets MBI_DRIVES */
-    u32 drives_length;
-    u32 drives_addr;
+    uint32_t drives_length;
+    uint32_t drives_addr;
 
     /* Valid if flags sets MBI_BIOSCONFIG */
-    u32 config_table;
+    uint32_t config_table;
 
     /* Valid if flags sets MBI_LOADERNAME */
-    u32 boot_loader_name;
+    uint32_t boot_loader_name;
 
     /* Valid if flags sets MBI_APM */
-    u32 apm_table;
+    uint32_t apm_table;
 };
 typedef struct multiboot_info multiboot_info_t;
 
 /* The module structure.  */
 struct module {
-    u32 mod_start;
-    u32 mod_end;
-    u32 string;
-    u32 reserved;
+    uint32_t mod_start;
+    uint32_t mod_end;
+    uint32_t string;
+    uint32_t reserved;
 };
 typedef struct module module_t;
 
 /* The memory map. Be careful that the offset 0 is base_addr_low
    but no size.  */
 struct memory_map {
-    u32 size;
-    u32 base_addr_low;
-    u32 base_addr_high;
-    u32 length_low;
-    u32 length_high;
-    u32 type;
+    uint32_t size;
+    uint32_t base_addr_low;
+    uint32_t base_addr_high;
+    uint32_t length_low;
+    uint32_t length_high;
+    uint32_t type;
 };
 typedef struct memory_map memory_map_t;
 

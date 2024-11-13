@@ -114,6 +114,9 @@
 #define MULTIBOOT2_FRAMEBUFFER_TYPE_EGA_TEXT            2
 
 #ifndef __ASSEMBLY__
+
+#include <xen/stdint.h>
+
 typedef struct {
     uint32_t total_size;
     uint32_t reserved;
