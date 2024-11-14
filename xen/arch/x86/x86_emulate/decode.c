@@ -1356,7 +1356,8 @@ int x86emul_decode(struct x86_emulate_state *s,
                         --disp8scale;
                     break;
                 }
-                /* vcvt{,t}s{s,d}2usi need special casing: fall through */
+                /* vcvt{,t}s{s,d}2usi need special casing. */
+                fallthrough;
             case 0x2c: /* vcvtts{s,d}2si need special casing */
             case 0x2d: /* vcvts{s,d}2si need special casing */
                 if ( evex_encoded() )
@@ -1530,7 +1531,8 @@ int x86emul_decode(struct x86_emulate_state *s,
                         disp8scale -= 1 + (s->evex.pfx == vex_66);
                     break;
                 }
-                /* vcvt{,t}sh2usi needs special casing: fall through */
+                /* vcvt{,t}sh2usi needs special casing. */
+                fallthrough;
             case 0x2c: case 0x2d: /* vcvt{,t}sh2si need special casing */
                 disp8scale = 1;
                 break;

@@ -1460,6 +1460,7 @@ x86_emulate(
 
         d = (d & ~DstMask) | DstMem;
         /* Becomes a normal DstMem operation from here on. */
+        fallthrough;
     case DstMem:
         generate_exception_if(ea.type == OP_MEM && evex.z, X86_EXC_UD);
         if ( state->simd_size != simd_none )
@@ -1942,6 +1943,7 @@ x86_emulate(
             break;
         }
         generate_exception_if((modrm_reg & 7) != 0, X86_EXC_UD);
+        fallthrough;
     case 0x88 ... 0x8b: /* mov */
     case 0xa0 ... 0xa1: /* mov mem.offs,{%al,%ax,%eax,%rax} */
     case 0xa2 ... 0xa3: /* mov {%al,%ax,%eax,%rax},mem.offs */
