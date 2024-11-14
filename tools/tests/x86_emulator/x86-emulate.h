@@ -56,6 +56,16 @@
 
 #define cf_check /* No Control Flow Integriy checking */
 
+/*
+ * Pseudo keyword 'fallthrough' to make explicit the fallthrough intention at
+ * the end of a case statement block.
+ */
+#if !defined(__clang__) && (__GNUC__ >= 7)
+# define fallthrough        __attribute__((__fallthrough__))
+#else
+# define fallthrough        do {} while (0)  /* fallthrough */
+#endif
+
 #ifdef __GCC_ASM_FLAG_OUTPUTS__
 # define ASM_FLAG_OUT(yes, no) yes
 #else
