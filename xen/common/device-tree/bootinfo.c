@@ -101,7 +101,8 @@ static void __init dt_unreserved_regions(paddr_t s, paddr_t e,
  */
 static bool __init meminfo_overlap_check(const struct membanks *mem,
                                          paddr_t region_start,
-                                         paddr_t region_size)
+                                         paddr_t region_size,
+                                         bool allow_memreserve_overlap)
 {
     paddr_t bank_start = INVALID_PADDR, bank_end = 0;
     paddr_t region_end = region_start + region_size;
@@ -115,12 +116,23 @@ static bool __init meminfo_overlap_check(const struct membanks *mem,
         if ( INVALID_PADDR == bank_start || region_end <= bank_start ||
              region_start >= bank_end )
             continue;
-        else
-        {
-            printk("Region: [%#"PRIpaddr", %#"PRIpaddr") overlapping with bank[%u]: [%#"PRIpaddr", %#"PRIpaddr")\n",
-                   region_start, region_end, i, bank_start, bank_end);
-            return true;
-        }
+
+        /*
+         * If allow_memreserve_overlap is set, this check allows a region to be
+         * included in a MEMBANK_FDT_RESVMEM bank, but struct membanks *mem of
+         * type STATIC_SHARED_MEMORY don't set the bank[].type field because
+         * that is declared in a union with a field that is instead used,
+         * in any case this restriction is ok since STATIC_SHARED_MEMORY banks
+         * are not meant to clash with FDT /memreserve/ ranges.
+         */
+        if ( allow_memreserve_overlap && mem->type != STATIC_SHARED_MEMORY &&
+             region_start >= bank_start && region_end <= bank_end &&
+             mem->bank[i].type == MEMBANK_FDT_RESVMEM )
+            continue;
+
+        printk("Region: [%#"PRIpaddr", %#"PRIpaddr") overlapping with bank[%u]: [%#"PRIpaddr", %#"PRIpaddr")\n",
+                region_start, region_end, i, bank_start, bank_end);
+        return true;
     }
 
     return false;
@@ -173,7 +185,8 @@ void __init fw_unreserved_regions(paddr_t s, paddr_t e,
  * existing reserved memory regions, otherwise false.
  */
 bool __init check_reserved_regions_overlap(paddr_t region_start,
-                                           paddr_t region_size)
+                                           paddr_t region_size,
+                                           bool allow_memreserve_overlap)
 {
     const struct membanks *mem_banks[] = {
         bootinfo_get_reserved_mem(),
@@ -192,7 +205,8 @@ bool __init check_reserved_regions_overlap(paddr_t region_start,
      * shared memory banks (when static shared memory feature is enabled)
      */
     for ( i = 0; i < ARRAY_SIZE(mem_banks); i++ )
-        if ( meminfo_overlap_check(mem_banks[i], region_start, region_size) )
+        if ( meminfo_overlap_check(mem_banks[i], region_start, region_size,
+                                   allow_memreserve_overlap) )
             return true;
 
     /* Check if input region is overlapping with bootmodules */
@@ -218,7 +232,12 @@ struct bootmodule __init *add_boot_module(bootmodule_kind kind,
         return NULL;
     }
 
-    if ( check_reserved_regions_overlap(start, size) )
+    /*
+     * u-boot adds boot module such as ramdisk to the /memreserve/, since these
+     * ranges are saved in reserved_mem at this stage, allow an eventual exact
+     * match with MEMBANK_FDT_RESVMEM banks.
+     */
+    if ( check_reserved_regions_overlap(start, size, true) )
         return NULL;
 
     for ( i = 0 ; i < mods->nr_mods ; i++ )
