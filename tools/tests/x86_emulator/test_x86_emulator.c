@@ -2021,6 +2021,30 @@ int main(int argc, char **argv)
               (EFLAGS_ALWAYS_SET | X86_EFLAGS_SF) ||
              !check_eip(blsr) )
             goto fail;
+
+#ifdef __x86_64__
+        /* Re-test with VEX.W set while emulating 32-bit mode. */
+        ctxt.lma       = 0;
+        ctxt.addr_size = 32;
+        ctxt.sp_size   = 32;
+
+        memcpy(instr, blsr, blsr_end - blsr);
+        instr[2] |= 0x80;
+        regs.rip = (unsigned long)&instr[0];
+        regs.eflags = EFLAGS_ALWAYS_SET | X86_EFLAGS_OF | X86_EFLAGS_ZF | \
+                      X86_EFLAGS_CF;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) || regs.ecx != 0xfedcba90 ||
+             (regs.eflags & (EFLAGS_MASK & ~(X86_EFLAGS_AF | X86_EFLAGS_PF))) !=
+              (EFLAGS_ALWAYS_SET | X86_EFLAGS_SF) ||
+             (regs.rip != (unsigned long)&instr[blsr_end - blsr]) )
+            goto fail;
+
+        ctxt.lma       = 1;
+        ctxt.addr_size = 64;
+        ctxt.sp_size   = 64;
+#endif
+
         printf("okay\n");
     }
     else
