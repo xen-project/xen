@@ -1969,10 +1969,13 @@ int main(int argc, char **argv)
 
         *res        = 0xfedcba98;
         regs.edx    = (unsigned long)res;
-        regs.eflags = 0xac2;
+        regs.eflags = EFLAGS_ALWAYS_SET | X86_EFLAGS_OF | X86_EFLAGS_SF | \
+                      X86_EFLAGS_ZF;
         rc = x86_emulate(&ctxt, &emulops);
         if ( (rc != X86EMUL_OKAY) || regs.ecx != 8 || *res != 0xfedcba98 ||
-             (regs.eflags & 0xf6b) != 0x203 || !check_eip(blsi) )
+             (regs.eflags & (EFLAGS_MASK & ~(X86_EFLAGS_AF | X86_EFLAGS_PF))) !=
+              (EFLAGS_ALWAYS_SET | X86_EFLAGS_CF) ||
+             !check_eip(blsi) )
             goto fail;
         printf("okay\n");
     }
@@ -1988,10 +1991,13 @@ int main(int argc, char **argv)
                        :: "d" (NULL) );
         set_insn(blsmsk);
 
-        regs.eflags = 0xac3;
+        regs.eflags = EFLAGS_ALWAYS_SET | X86_EFLAGS_OF | X86_EFLAGS_SF | \
+                      X86_EFLAGS_ZF | X86_EFLAGS_CF;
         rc = x86_emulate(&ctxt, &emulops);
         if ( (rc != X86EMUL_OKAY) || regs.ecx != 0xf || *res != 0xfedcba98 ||
-             (regs.eflags & 0xf6b) != 0x202 || !check_eip(blsmsk) )
+             (regs.eflags & (EFLAGS_MASK & ~(X86_EFLAGS_AF | X86_EFLAGS_PF))) !=
+              EFLAGS_ALWAYS_SET ||
+             !check_eip(blsmsk) )
             goto fail;
         printf("okay\n");
     }
@@ -2007,10 +2013,13 @@ int main(int argc, char **argv)
                        :: "d" (NULL) );
         set_insn(blsr);
 
-        regs.eflags = 0xac3;
+        regs.eflags = EFLAGS_ALWAYS_SET | X86_EFLAGS_OF | X86_EFLAGS_ZF | \
+                      X86_EFLAGS_CF;
         rc = x86_emulate(&ctxt, &emulops);
         if ( (rc != X86EMUL_OKAY) || regs.ecx != 0xfedcba90 ||
-             (regs.eflags & 0xf6b) != 0x202 || !check_eip(blsr) )
+             (regs.eflags & (EFLAGS_MASK & ~(X86_EFLAGS_AF | X86_EFLAGS_PF))) !=
+              (EFLAGS_ALWAYS_SET | X86_EFLAGS_SF) ||
+             !check_eip(blsr) )
             goto fail;
         printf("okay\n");
     }
@@ -2028,11 +2037,14 @@ int main(int argc, char **argv)
 
         regs.ecx    = (unsigned long)res;
         regs.edx    = 0xff13;
-        regs.eflags = 0xa43;
+        regs.eflags = EFLAGS_ALWAYS_SET | X86_EFLAGS_OF | X86_EFLAGS_SF | \
+                      X86_EFLAGS_ZF | X86_EFLAGS_CF;
         rc = x86_emulate(&ctxt, &emulops);
         if ( (rc != X86EMUL_OKAY) || regs.ebx != (*res & 0x7ffff) ||
              regs.edx != 0xff13 || *res != 0xfedcba98 ||
-             (regs.eflags & 0xf6b) != 0x202 || !check_eip(bzhi) )
+             (regs.eflags & (EFLAGS_MASK & ~(X86_EFLAGS_AF | X86_EFLAGS_PF))) !=
+              EFLAGS_ALWAYS_SET ||
+             !check_eip(bzhi) )
             goto fail;
         printf("okay\n");
     }
