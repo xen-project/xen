@@ -755,7 +755,7 @@ static int __init pvh_load_kernel(
     }
 
     /* Free temporary buffers. */
-    discard_initial_images();
+    free_boot_modules();
 
     if ( cmdline != NULL )
     {

@@ -34,8 +34,10 @@ struct boot_module {
     /*
      * Module State Flags:
      *   relocated: indicates module has been relocated in memory.
+     *   released:  indicates module's pages have been freed.
      */
     bool relocated:1;
+    bool released:1;
 
     /*
      * A boot module may need decompressing by Xen.  Headroom is an estimate of

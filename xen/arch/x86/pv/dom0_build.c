@@ -649,9 +649,12 @@ static int __init dom0_construct(struct boot_info *bi, struct domain *d)
                 }
             memcpy(page_to_virt(page), mfn_to_virt(initrd->mod->mod_start),
                    initrd_len);
-            mpt_alloc = pfn_to_paddr(initrd->mod->mod_start);
-            init_domheap_pages(mpt_alloc,
-                               mpt_alloc + PAGE_ALIGN(initrd_len));
+            /*
+             * The initrd was copied but the initrd variable is reused in the
+             * calculations below. As to not leak the memory used for the
+             * module free at this time.
+             */
+            release_boot_module(initrd);
             initrd_mfn = mfn_x(page_to_mfn(page));
             initrd->mod->mod_start = initrd_mfn;
         }
@@ -660,17 +663,13 @@ static int __init dom0_construct(struct boot_info *bi, struct domain *d)
             while ( count-- )
                 if ( assign_pages(mfn_to_page(_mfn(mfn++)), 1, d, 0) )
                     BUG();
+            /*
+             * We have mapped the initrd directly into dom0, and assigned the
+             * pages. Tell the boot_module handling that we've freed it, so the
+             * memory is left alone.
+             */
+            initrd->released = true;
         }
-
-        /*
-         * We have either:
-         * - Mapped the initrd directly into dom0, or
-         * - Copied it and freed the module.
-         *
-         * Either way, tell discard_initial_images() to not free it a second
-         * time.
-         */
-        initrd->mod->mod_end = 0;
 
         iommu_memory_setup(d, "initrd", mfn_to_page(_mfn(initrd_mfn)),
                            PFN_UP(initrd_len), &flush_flags);
@@ -875,7 +874,7 @@ static int __init dom0_construct(struct boot_info *bi, struct domain *d)
     }
 
     /* Free temporary buffers. */
-    discard_initial_images();
+    free_boot_modules();
 
     /* Set up start info area. */
     si = (start_info_t *)vstartinfo_start;
