@@ -5525,7 +5525,7 @@ int map_pages_to_xen(
         ol3e = *pl3e;
 
         if ( cpu_has_page1gb &&
-             (!(flags & _PAGE_PRESENT) || IS_L3E_ALIGNED(virt, mfn)) &&
+             IS_L3E_ALIGNED(virt, flags & _PAGE_PRESENT ? mfn : _mfn(0)) &&
              nr_mfns >= (1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT)) &&
              !(flags & (_PAGE_PAT | MAP_SMALL_PAGES)) )
         {
@@ -5644,7 +5644,7 @@ int map_pages_to_xen(
         if ( !pl2e )
             goto out;
 
-        if ( (!(flags & _PAGE_PRESENT) || IS_L2E_ALIGNED(virt, mfn)) &&
+        if ( IS_L2E_ALIGNED(virt, flags & _PAGE_PRESENT ? mfn : _mfn(0)) &&
              (nr_mfns >= (1u << PAGETABLE_ORDER)) &&
              !(flags & (_PAGE_PAT|MAP_SMALL_PAGES)) )
         {
