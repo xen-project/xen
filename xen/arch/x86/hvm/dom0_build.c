@@ -649,8 +649,8 @@ static int __init pvh_load_kernel(
 {
     void *image_base = bootstrap_map_bm(image);
     void *image_start = image_base + image->headroom;
-    unsigned long image_len = image->mod->mod_end;
-    unsigned long initrd_len = initrd ? initrd->mod->mod_end : 0;
+    unsigned long image_len = image->size;
+    unsigned long initrd_len = initrd ? initrd->size : 0;
     const char *cmdline = image->cmdline_pa ? __va(image->cmdline_pa) : NULL;
     struct elf_binary elf;
     struct elf_dom_parms parms;
@@ -726,7 +726,7 @@ static int __init pvh_load_kernel(
 
     if ( initrd != NULL )
     {
-        rc = hvm_copy_to_guest_phys(last_addr, mfn_to_virt(initrd->mod->mod_start),
+        rc = hvm_copy_to_guest_phys(last_addr, __va(initrd->start),
                                     initrd_len, v);
         if ( rc )
         {

@@ -422,14 +422,14 @@ static int __init dom0_construct(struct boot_info *bi, struct domain *d)
 
     image = &bi->mods[i];
     image_base = bootstrap_map_bm(image);
-    image_len = image->mod->mod_end;
+    image_len = image->size;
     image_start = image_base + image->headroom;
 
     i = first_boot_module_index(bi, BOOTMOD_RAMDISK);
     if ( i < bi->nr_modules )
     {
         initrd = &bi->mods[i];
-        initrd_len = initrd->mod->mod_end;
+        initrd_len = initrd->size;
     }
 
     d->max_pages = ~0U;
@@ -631,7 +631,7 @@ static int __init dom0_construct(struct boot_info *bi, struct domain *d)
         initrd_pfn = vinitrd_start ?
                      (vinitrd_start - v_start) >> PAGE_SHIFT :
                      domain_tot_pages(d);
-        initrd_mfn = initrd->mod->mod_start;
+        initrd_mfn = paddr_to_pfn(initrd->start);
         mfn = initrd_mfn;
         count = PFN_UP(initrd_len);
         if ( d->arch.physaddr_bitsize &&
@@ -647,8 +647,7 @@ static int __init dom0_construct(struct boot_info *bi, struct domain *d)
                     free_domheap_pages(page, order);
                     page += 1UL << order;
                 }
-            memcpy(page_to_virt(page), mfn_to_virt(initrd->mod->mod_start),
-                   initrd_len);
+            memcpy(page_to_virt(page), __va(initrd->start), initrd_len);
             /*
              * The initrd was copied but the initrd variable is reused in the
              * calculations below. As to not leak the memory used for the
@@ -656,7 +655,7 @@ static int __init dom0_construct(struct boot_info *bi, struct domain *d)
              */
             release_boot_module(initrd);
             initrd_mfn = mfn_x(page_to_mfn(page));
-            initrd->mod->mod_start = initrd_mfn;
+            initrd->start = pfn_to_paddr(initrd_mfn);
         }
         else
         {
@@ -683,7 +682,7 @@ static int __init dom0_construct(struct boot_info *bi, struct domain *d)
                nr_pages - domain_tot_pages(d));
     if ( initrd )
     {
-        mpt_alloc = pfn_to_paddr(initrd->mod->mod_start);
+        mpt_alloc = initrd->start;
         printk("\n Init. ramdisk: %"PRIpaddr"->%"PRIpaddr,
                mpt_alloc, mpt_alloc + initrd_len);
     }
@@ -911,7 +910,7 @@ static int __init dom0_construct(struct boot_info *bi, struct domain *d)
         if ( pfn >= initrd_pfn )
         {
             if ( pfn < initrd_pfn + PFN_UP(initrd_len) )
-                mfn = initrd->mod->mod_start + (pfn - initrd_pfn);
+                mfn = paddr_to_pfn(initrd->start) + (pfn - initrd_pfn);
             else
                 mfn -= PFN_UP(initrd_len);
         }

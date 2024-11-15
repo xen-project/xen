@@ -314,13 +314,29 @@ static struct boot_info *__init multiboot_fill_boot_info(
      */
     for ( i = 0; i < MAX_NR_BOOTMODS && i < bi->nr_modules; i++ )
     {
-        bi->mods[i].mod = &mods[i];
-
         bi->mods[i].cmdline_pa = mods[i].string;
+
+        if ( efi_enabled(EFI_LOADER) )
+        {
+            /*
+             * The EFI loader gives us modules which are in frame/size. Switch
+             * to address/size.
+             */
+            bi->mods[i].start = pfn_to_paddr(mods[i].mod_start);
+            bi->mods[i].size  = mods[i].mod_end;
+        }
+        else
+        {
+            /*
+             * PVH and BIOS loaders give us modules which are start/end.
+             * Switch to address/size.
+             */
+            bi->mods[i].start = mods[i].mod_start;
+            bi->mods[i].size  = mods[i].mod_end - mods[i].mod_start;
+        }
     }
 
     /* Variable 'i' should be one entry past the last module. */
-    bi->mods[i].mod = &mods[bi->nr_modules];
     bi->mods[i].type = BOOTMOD_XEN;
 
     return bi;
@@ -336,8 +352,8 @@ unsigned long __init initial_images_nrpages(nodeid_t node)
 
     for ( nr = i = 0; i < bi->nr_modules; ++i )
     {
-        unsigned long start = bi->mods[i].mod->mod_start;
-        unsigned long end   = start + PFN_UP(bi->mods[i].mod->mod_end);
+        unsigned long start = paddr_to_pfn(bi->mods[i].start);
+        unsigned long end   = start + PFN_UP(bi->mods[i].size);
 
         if ( end > node_start && node_end > start )
             nr += min(node_end, end) - max(node_start, start);
@@ -348,12 +364,9 @@ unsigned long __init initial_images_nrpages(nodeid_t node)
 
 void __init release_boot_module(struct boot_module *bm)
 {
-    uint64_t start = pfn_to_paddr(bm->mod->mod_start);
-    uint64_t size  = bm->mod->mod_end;
-
     ASSERT(!bm->released);
 
-    init_domheap_pages(start, start + PAGE_ALIGN(size));
+    init_domheap_pages(bm->start, bm->start + PAGE_ALIGN(bm->size));
 
     bm->released = true;
 }
@@ -487,15 +500,9 @@ static void *__init bootstrap_map_addr(paddr_t start, paddr_t end)
     return ret;
 }
 
-void *__init bootstrap_map(const module_t *mod)
-{
-    return bootstrap_map_addr(pfn_to_paddr(mod->mod_start),
-                              pfn_to_paddr(mod->mod_start) + mod->mod_end);
-}
-
 void *__init bootstrap_map_bm(const struct boot_module *bm)
 {
-    return bootstrap_map(bm->mod);
+    return bootstrap_map_addr(bm->start, bm->start + bm->size);
 }
 
 void __init bootstrap_unmap(void)
@@ -673,8 +680,8 @@ static uint64_t __init consider_modules(
 
     for ( i = 0; i < nr_mods ; ++i )
     {
-        uint64_t start = pfn_to_paddr(mods[i].mod->mod_start);
-        uint64_t end = start + PAGE_ALIGN(mods[i].mod->mod_end);
+        uint64_t start = mods[i].start;
+        uint64_t end   = start + PAGE_ALIGN(mods[i].size);
 
         if ( i == this_mod )
             continue;
@@ -1405,13 +1412,9 @@ void asmlinkage __init noreturn __start_xen(void)
     set_kexec_crash_area_size((u64)nr_pages << PAGE_SHIFT);
     kexec_reserve_area();
 
-    for ( i = 0; !efi_enabled(EFI_LOADER) && i < bi->nr_modules; i++ )
-    {
-        if ( bi->mods[i].mod->mod_start & (PAGE_SIZE - 1) )
+    for ( i = 0; i < bi->nr_modules; i++ )
+        if ( bi->mods[i].start & (PAGE_SIZE - 1) )
             panic("Bootloader didn't honor module alignment request\n");
-        bi->mods[i].mod->mod_end -= bi->mods[i].mod->mod_start;
-        bi->mods[i].mod->mod_start >>= PAGE_SHIFT;
-    }
 
     /*
      * TODO: load ucode earlier once multiboot modules become accessible
@@ -1430,13 +1433,12 @@ void asmlinkage __init noreturn __start_xen(void)
          * respective reserve_e820_ram() invocation below. No need to
          * query efi_boot_mem_unused() here, though.
          */
-        xen->mod->mod_start = virt_to_mfn(_stext);
-        xen->mod->mod_end   = __2M_rwdata_end - _stext;
+        xen->start = virt_to_maddr(_stext);
+        xen->size  = __2M_rwdata_end - _stext;
     }
 
     bi->mods[0].headroom =
-        bzimage_headroom(bootstrap_map_bm(&bi->mods[0]),
-                         bi->mods[0].mod->mod_end);
+        bzimage_headroom(bootstrap_map_bm(&bi->mods[0]), bi->mods[0].size);
     bootstrap_unmap();
 
 #ifndef highmem_start
@@ -1517,7 +1519,7 @@ void asmlinkage __init noreturn __start_xen(void)
         for ( j = bi->nr_modules - 1; j >= 0; j-- )
         {
             struct boot_module *bm = &bi->mods[j];
-            unsigned long size = PAGE_ALIGN(bm->headroom + bm->mod->mod_end);
+            unsigned long size = PAGE_ALIGN(bm->headroom + bm->size);
 
             if ( bm->relocated )
                 continue;
@@ -1529,14 +1531,11 @@ void asmlinkage __init noreturn __start_xen(void)
             if ( highmem_start && end > highmem_start )
                 continue;
 
-            if ( s < end &&
-                 (bm->headroom ||
-                  ((end - size) >> PAGE_SHIFT) > bm->mod->mod_start) )
+            if ( s < end && (bm->headroom || (end - size) > bm->start) )
             {
-                move_memory(end - size + bm->headroom,
-                            pfn_to_paddr(bm->mod->mod_start), bm->mod->mod_end);
-                bm->mod->mod_start = (end - size) >> PAGE_SHIFT;
-                bm->mod->mod_end += bm->headroom;
+                move_memory(end - size + bm->headroom, bm->start, bm->size);
+                bm->start = (end - size);
+                bm->size += bm->headroom;
                 bm->relocated = true;
             }
         }
@@ -1567,10 +1566,9 @@ void asmlinkage __init noreturn __start_xen(void)
         panic("Not enough memory to relocate the dom0 kernel image\n");
     for ( i = 0; i < bi->nr_modules; ++i )
     {
-        const struct boot_module *bm = &bi->mods[i];
-        uint64_t s = pfn_to_paddr(bm->mod->mod_start);
+        uint64_t s = bi->mods[i].start, l = bi->mods[i].size;
 
-        reserve_e820_ram(&boot_e820, s, s + PAGE_ALIGN(bm->mod->mod_end));
+        reserve_e820_ram(&boot_e820, s, s + PAGE_ALIGN(l));
     }
 
     if ( !xen_phys_start )
@@ -1648,8 +1646,7 @@ void asmlinkage __init noreturn __start_xen(void)
                 map_e = boot_e820.map[j].addr + boot_e820.map[j].size;
                 for ( j = 0; j < bi->nr_modules; ++j )
                 {
-                    uint64_t end = pfn_to_paddr(bi->mods[j].mod->mod_start) +
-                                   bi->mods[j].mod->mod_end;
+                    uint64_t end = bi->mods[j].start + bi->mods[j].size;
 
                     if ( map_e < end )
                         map_e = end;
@@ -1723,13 +1720,11 @@ void asmlinkage __init noreturn __start_xen(void)
 
     for ( i = 0; i < bi->nr_modules; ++i )
     {
-        const struct boot_module *bm = &bi->mods[i];
+        unsigned long s = bi->mods[i].start, l = bi->mods[i].size;
 
-        set_pdx_range(bm->mod->mod_start,
-                      bm->mod->mod_start + PFN_UP(bm->mod->mod_end));
-        map_pages_to_xen((unsigned long)mfn_to_virt(bm->mod->mod_start),
-                         _mfn(bm->mod->mod_start),
-                         PFN_UP(bm->mod->mod_end), PAGE_HYPERVISOR);
+        set_pdx_range(paddr_to_pfn(s), paddr_to_pfn(s + l) + 1);
+        map_pages_to_xen((unsigned long)maddr_to_virt(s), maddr_to_mfn(s),
+                         PFN_UP(l), PAGE_HYPERVISOR);
     }
 
 #ifdef CONFIG_KEXEC

@@ -26,9 +26,6 @@ enum bootmod_type {
 };
 
 struct boot_module {
-    /* Transitionary only */
-    module_t *mod;
-
     enum bootmod_type type;
 
     /*
@@ -62,6 +59,9 @@ struct boot_module {
     unsigned long headroom;
 
     paddr_t cmdline_pa;
+
+    paddr_t start;
+    size_t size;
 };
 
 /*

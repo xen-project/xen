@@ -43,7 +43,7 @@ int __init xsm_multiboot_policy_init(
         struct boot_module *bm = &bi->mods[i];
 
         _policy_start = bootstrap_map_bm(bm);
-        _policy_len   = bm->mod->mod_end;
+        _policy_len   = bm->size;
 
         if ( (xsm_magic_t)(*_policy_start) == XSM_MAGIC )
         {

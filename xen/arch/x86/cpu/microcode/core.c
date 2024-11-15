@@ -688,8 +688,8 @@ static int __init cf_check microcode_init_cache(void)
         /* early_microcode_load() didn't leave us any work to do. */
         return 0;
 
-    size = bi->mods[early_mod_idx].mod->mod_end;
-    data = __mfn_to_virt(bi->mods[early_mod_idx].mod->mod_start);
+    size = bi->mods[early_mod_idx].size;
+    data = __va(bi->mods[early_mod_idx].start);
 
     /*
      * If opt_scan is set, we're looking for a CPIO archive rather than a raw
@@ -765,7 +765,7 @@ static int __init early_microcode_load(struct boot_info *bi)
                  bm->type != BOOTMOD_RAMDISK )
                 continue;
 
-            size = bm->mod->mod_end;
+            size = bm->size;
             data = bootstrap_map_bm(bm);
             if ( !data )
             {
@@ -819,7 +819,7 @@ static int __init early_microcode_load(struct boot_info *bi)
         }
         bi->mods[idx].type = BOOTMOD_MICROCODE;
 
-        size = bi->mods[idx].mod->mod_end;
+        size = bi->mods[idx].size;
         data = bootstrap_map_bm(&bi->mods[idx]);
         if ( !data )
         {
