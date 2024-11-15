@@ -672,19 +672,19 @@ amd_like(const struct x86_emulate_ctxt *ctxt)
 # include <asm/uaccess.h>
 
 # define get_stub(stb) ({                                    \
-    void *ptr;                                               \
+    void *_ptr;                                              \
     BUILD_BUG_ON(STUB_BUF_SIZE / 2 < MAX_INST_LEN + 1);      \
     ASSERT(!(stb).ptr);                                      \
     (stb).addr = this_cpu(stubs.addr) + STUB_BUF_SIZE / 2;   \
     (stb).ptr = map_domain_page(_mfn(this_cpu(stubs.mfn))) + \
         ((stb).addr & ~PAGE_MASK);                           \
-    ptr = memset((stb).ptr, 0xcc, STUB_BUF_SIZE / 2);        \
+    _ptr = memset((stb).ptr, 0xcc, STUB_BUF_SIZE / 2);       \
     if ( cpu_has_xen_ibt )                                   \
     {                                                        \
-        place_endbr64(ptr);                                  \
-        ptr += 4;                                            \
+        place_endbr64(_ptr);                                 \
+        _ptr += 4;                                           \
     }                                                        \
-    ptr;                                                     \
+    _ptr;                                                    \
 })
 
 # define put_stub(stb) ({             \
