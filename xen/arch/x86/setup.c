@@ -952,10 +952,7 @@ static unsigned int __init copy_bios_e820(struct e820entry *map, unsigned int li
     return n;
 }
 
-static struct domain *__init create_dom0(const module_t *image,
-                                         unsigned long headroom,
-                                         module_t *initrd, const char *kextra,
-                                         const char *loader)
+static struct domain *__init create_dom0(struct boot_info *bi)
 {
     static char __initdata cmdline[MAX_GUEST_CMDLINE];
 
@@ -972,6 +969,14 @@ static struct domain *__init create_dom0(const module_t *image,
     };
     struct domain *d;
     domid_t domid;
+    struct boot_module *image;
+    unsigned int idx;
+
+    idx = first_boot_module_index(bi, BOOTMOD_KERNEL);
+    if ( idx >= bi->nr_modules )
+        panic("Missing kernel boot module for building domain\n");
+
+    image = &bi->mods[idx];
 
     if ( opt_dom0_pvh )
     {
@@ -998,14 +1003,15 @@ static struct domain *__init create_dom0(const module_t *image,
         panic("Error creating d%uv0\n", domid);
 
     /* Grab the DOM0 command line. */
-    if ( image->string || kextra )
+    if ( image->cmdline_pa || bi->kextra )
     {
-        if ( image->string )
-            safe_strcpy(cmdline, cmdline_cook(__va(image->string), loader));
+        if ( image->cmdline_pa )
+            safe_strcpy(
+                cmdline, cmdline_cook(__va(image->cmdline_pa), bi->loader));
 
-        if ( kextra )
+        if ( bi->kextra )
             /* kextra always includes exactly one leading space. */
-            safe_strcat(cmdline, kextra);
+            safe_strcat(cmdline, bi->kextra);
 
         /* Append any extra parameters. */
         if ( skip_ioapic_setup && !strstr(cmdline, "noapic") )
@@ -1022,9 +1028,11 @@ static struct domain *__init create_dom0(const module_t *image,
             safe_strcat(cmdline, " acpi=");
             safe_strcat(cmdline, acpi_param);
         }
+
+        image->cmdline_pa = __pa(cmdline);
     }
 
-    if ( construct_dom0(d, image, headroom, initrd, cmdline) != 0 )
+    if ( construct_dom0(bi, d) != 0 )
         panic("Could not construct domain 0\n");
 
     return d;
@@ -2116,10 +2124,7 @@ void asmlinkage __init noreturn __start_xen(void)
      * We're going to setup domain0 using the module(s) that we stashed safely
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
-    dom0 = create_dom0(bi->mods[0].mod, bi->mods[0].headroom,
-                       initrdidx < bi->nr_modules ? bi->mods[initrdidx].mod
-                                                  : NULL,
-                       bi->kextra, bi->loader);
+    dom0 = create_dom0(bi);
     if ( !dom0 )
         panic("Could not set up DOM0 guest OS\n");
 

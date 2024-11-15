@@ -26,11 +26,9 @@ void subarch_init_memory(void);
 
 void init_IRQ(void);
 
-int construct_dom0(
-    struct domain *d,
-    const module_t *image, unsigned long image_headroom,
-    module_t *initrd,
-    const char *cmdline);
+struct boot_info;
+int construct_dom0(struct boot_info *bi, struct domain *d);
+
 void setup_io_bitmap(struct domain *d);
 
 extern struct boot_info xen_boot_info;

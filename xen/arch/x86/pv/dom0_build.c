@@ -14,6 +14,7 @@
 #include <xen/softirq.h>
 #include <xen/vga.h>
 
+#include <asm/bootinfo.h>
 #include <asm/bzimage.h>
 #include <asm/dom0_build.h>
 #include <asm/guest.h>
@@ -354,13 +355,10 @@ static struct page_info * __init alloc_chunk(struct domain *d,
     return page;
 }
 
-static int __init dom0_construct(struct domain *d,
-                                 const module_t *image,
-                                 unsigned long image_headroom,
-                                 module_t *initrd,
-                                 const char *cmdline)
+static int __init dom0_construct(struct boot_info *bi, struct domain *d)
 {
-    int i, rc, order, machine;
+    unsigned int i;
+    int rc, order, machine;
     bool compatible, compat;
     struct cpu_user_regs *regs;
     unsigned long pfn, mfn;
@@ -374,10 +372,14 @@ static int __init dom0_construct(struct domain *d,
     unsigned int flush_flags = 0;
     start_info_t *si;
     struct vcpu *v = d->vcpu[0];
-    void *image_base = bootstrap_map(image);
-    unsigned long image_len = image->mod_end;
-    void *image_start = image_base + image_headroom;
-    unsigned long initrd_len = initrd ? initrd->mod_end : 0;
+
+    struct boot_module *image;
+    struct boot_module *initrd = NULL;
+    void *image_base;
+    unsigned long image_len;
+    void *image_start;
+    unsigned long initrd_len = 0;
+
     l4_pgentry_t *l4tab = NULL, *l4start = NULL;
     l3_pgentry_t *l3tab = NULL, *l3start = NULL;
     l2_pgentry_t *l2tab = NULL, *l2start = NULL;
@@ -413,6 +415,22 @@ static int __init dom0_construct(struct domain *d,
     paddr_t mpt_alloc;
 
     printk(XENLOG_INFO "*** Building a PV Dom%d ***\n", d->domain_id);
+
+    i = first_boot_module_index(bi, BOOTMOD_KERNEL);
+    if ( i >= bi->nr_modules )
+        panic("Missing kernel boot module for %pd construction\n", d);
+
+    image = &bi->mods[i];
+    image_base = bootstrap_map_bm(image);
+    image_len = image->mod->mod_end;
+    image_start = image_base + image->headroom;
+
+    i = first_boot_module_index(bi, BOOTMOD_RAMDISK);
+    if ( i < bi->nr_modules )
+    {
+        initrd = &bi->mods[i];
+        initrd_len = initrd->mod->mod_end;
+    }
 
     d->max_pages = ~0U;
 
@@ -613,7 +631,8 @@ static int __init dom0_construct(struct domain *d,
         initrd_pfn = vinitrd_start ?
                      (vinitrd_start - v_start) >> PAGE_SHIFT :
                      domain_tot_pages(d);
-        initrd_mfn = mfn = initrd->mod_start;
+        initrd_mfn = initrd->mod->mod_start;
+        mfn = initrd_mfn;
         count = PFN_UP(initrd_len);
         if ( d->arch.physaddr_bitsize &&
              ((mfn + count - 1) >> (d->arch.physaddr_bitsize - PAGE_SHIFT)) )
@@ -628,12 +647,13 @@ static int __init dom0_construct(struct domain *d,
                     free_domheap_pages(page, order);
                     page += 1UL << order;
                 }
-            memcpy(page_to_virt(page), mfn_to_virt(initrd->mod_start),
+            memcpy(page_to_virt(page), mfn_to_virt(initrd->mod->mod_start),
                    initrd_len);
-            mpt_alloc = (paddr_t)initrd->mod_start << PAGE_SHIFT;
+            mpt_alloc = pfn_to_paddr(initrd->mod->mod_start);
             init_domheap_pages(mpt_alloc,
                                mpt_alloc + PAGE_ALIGN(initrd_len));
-            initrd->mod_start = initrd_mfn = mfn_x(page_to_mfn(page));
+            initrd_mfn = mfn_x(page_to_mfn(page));
+            initrd->mod->mod_start = initrd_mfn;
         }
         else
         {
@@ -650,7 +670,7 @@ static int __init dom0_construct(struct domain *d,
          * Either way, tell discard_initial_images() to not free it a second
          * time.
          */
-        initrd->mod_end = 0;
+        initrd->mod->mod_end = 0;
 
         iommu_memory_setup(d, "initrd", mfn_to_page(_mfn(initrd_mfn)),
                            PFN_UP(initrd_len), &flush_flags);
@@ -664,7 +684,7 @@ static int __init dom0_construct(struct domain *d,
                nr_pages - domain_tot_pages(d));
     if ( initrd )
     {
-        mpt_alloc = (paddr_t)initrd->mod_start << PAGE_SHIFT;
+        mpt_alloc = pfn_to_paddr(initrd->mod->mod_start);
         printk("\n Init. ramdisk: %"PRIpaddr"->%"PRIpaddr,
                mpt_alloc, mpt_alloc + initrd_len);
     }
@@ -892,7 +912,7 @@ static int __init dom0_construct(struct domain *d,
         if ( pfn >= initrd_pfn )
         {
             if ( pfn < initrd_pfn + PFN_UP(initrd_len) )
-                mfn = initrd->mod_start + (pfn - initrd_pfn);
+                mfn = initrd->mod->mod_start + (pfn - initrd_pfn);
             else
                 mfn -= PFN_UP(initrd_len);
         }
@@ -962,8 +982,8 @@ static int __init dom0_construct(struct domain *d,
     }
 
     memset(si->cmd_line, 0, sizeof(si->cmd_line));
-    if ( cmdline != NULL )
-        strlcpy((char *)si->cmd_line, cmdline, sizeof(si->cmd_line));
+    if ( image->cmdline_pa )
+        strlcpy((char *)si->cmd_line, __va(image->cmdline_pa), sizeof(si->cmd_line));
 
 #ifdef CONFIG_VIDEO
     if ( !pv_shim && fill_console_start_info((void *)(si + 1)) )
@@ -1060,11 +1080,7 @@ out:
     return rc;
 }
 
-int __init dom0_construct_pv(struct domain *d,
-                             const module_t *image,
-                             unsigned long image_headroom,
-                             module_t *initrd,
-                             const char *cmdline)
+int __init dom0_construct_pv(struct boot_info *bi, struct domain *d)
 {
     unsigned long cr4 = read_cr4();
     int rc;
@@ -1082,7 +1098,7 @@ int __init dom0_construct_pv(struct domain *d,
         write_cr4(cr4 & ~X86_CR4_SMAP);
     }
 
-    rc = dom0_construct(d, image, image_headroom, initrd, cmdline);
+    rc = dom0_construct(bi, d);
 
     if ( cr4 & X86_CR4_SMAP )
     {

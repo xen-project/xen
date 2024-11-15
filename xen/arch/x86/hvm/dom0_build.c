@@ -16,6 +16,7 @@
 
 #include <acpi/actables.h>
 
+#include <asm/bootinfo.h>
 #include <asm/bzimage.h>
 #include <asm/dom0_build.h>
 #include <asm/hvm/support.h>
@@ -642,15 +643,15 @@ static bool __init check_and_adjust_load_address(
     return true;
 }
 
-static int __init pvh_load_kernel(struct domain *d, const module_t *image,
-                                  unsigned long image_headroom,
-                                  module_t *initrd, void *image_base,
-                                  const char *cmdline, paddr_t *entry,
-                                  paddr_t *start_info_addr)
+static int __init pvh_load_kernel(
+    struct domain *d, struct boot_module *image, struct boot_module *initrd,
+    paddr_t *entry, paddr_t *start_info_addr)
 {
-    void *image_start = image_base + image_headroom;
-    unsigned long image_len = image->mod_end;
-    unsigned long initrd_len = initrd ? initrd->mod_end : 0;
+    void *image_base = bootstrap_map_bm(image);
+    void *image_start = image_base + image->headroom;
+    unsigned long image_len = image->mod->mod_end;
+    unsigned long initrd_len = initrd ? initrd->mod->mod_end : 0;
+    const char *cmdline = image->cmdline_pa ? __va(image->cmdline_pa) : NULL;
     struct elf_binary elf;
     struct elf_dom_parms parms;
     paddr_t last_addr;
@@ -725,7 +726,7 @@ static int __init pvh_load_kernel(struct domain *d, const module_t *image,
 
     if ( initrd != NULL )
     {
-        rc = hvm_copy_to_guest_phys(last_addr, mfn_to_virt(initrd->mod_start),
+        rc = hvm_copy_to_guest_phys(last_addr, mfn_to_virt(initrd->mod->mod_start),
                                     initrd_len, v);
         if ( rc )
         {
@@ -736,9 +737,9 @@ static int __init pvh_load_kernel(struct domain *d, const module_t *image,
         mod.paddr = last_addr;
         mod.size = initrd_len;
         last_addr += ROUNDUP(initrd_len, elf_64bit(&elf) ? 8 : 4);
-        if ( initrd->string )
+        if ( initrd->cmdline_pa )
         {
-            char *str = __va(initrd->string);
+            char *str = __va(initrd->cmdline_pa);
             size_t len = strlen(str) + 1;
 
             rc = hvm_copy_to_guest_phys(last_addr, str, len, v);
@@ -1300,15 +1301,25 @@ static void __hwdom_init pvh_setup_mmcfg(struct domain *d)
     }
 }
 
-int __init dom0_construct_pvh(struct domain *d, const module_t *image,
-                              unsigned long image_headroom,
-                              module_t *initrd,
-                              const char *cmdline)
+int __init dom0_construct_pvh(struct boot_info *bi, struct domain *d)
 {
     paddr_t entry, start_info;
+    struct boot_module *image;
+    struct boot_module *initrd = NULL;
+    unsigned int idx;
     int rc;
 
     printk(XENLOG_INFO "*** Building a PVH Dom%d ***\n", d->domain_id);
+
+    idx = first_boot_module_index(bi, BOOTMOD_KERNEL);
+    if ( idx >= bi->nr_modules )
+        panic("Missing kernel boot module for %pd construction\n", d);
+
+    image = &bi->mods[idx];
+
+    idx = first_boot_module_index(bi, BOOTMOD_RAMDISK);
+    if ( idx < bi->nr_modules )
+        initrd = &bi->mods[idx];
 
     if ( is_hardware_domain(d) )
     {
@@ -1347,8 +1358,7 @@ int __init dom0_construct_pvh(struct domain *d, const module_t *image,
         return rc;
     }
 
-    rc = pvh_load_kernel(d, image, image_headroom, initrd, bootstrap_map(image),
-                         cmdline, &entry, &start_info);
+    rc = pvh_load_kernel(d, image, initrd, &entry, &start_info);
     if ( rc )
     {
         printk("Failed to load Dom0 kernel\n");
