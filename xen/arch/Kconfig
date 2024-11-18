@@ -6,8 +6,10 @@ config PHYS_ADDR_T_32
 
 config NR_CPUS
 	int "Maximum number of CPUs"
+	range 1 1 if ARM && MPU
 	range 1 16383
 	default "256" if X86
+	default "1" if ARM && MPU
 	default "8" if ARM && RCAR3
 	default "4" if ARM && QEMU
 	default "4" if ARM && MPSOC

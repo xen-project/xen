@@ -1,10 +1,21 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
+#include <xen/init.h>
 #include <xen/mm.h>
 #include <asm/system.h>
 #include <asm/smp.h>
 #include <asm/page.h>
 #include <asm/gic.h>
 #include <asm/flushtlb.h>
+
+static void __init __maybe_unused build_assertions(void)
+{
+#ifdef CONFIG_MPU
+    /*
+     * Currently, SMP is not enabled on MPU based systems.
+     */
+    BUILD_BUG_ON(NR_CPUS > 1);
+#endif
+}
 
 void arch_flush_tlb_mask(const cpumask_t *mask)
 {
