@@ -2,13 +2,15 @@
 
 #include <xen/compiler.h>
 #include <xen/stdint.h>
+
+#include <asm/boot-helpers.h>
 #include <asm/trampoline.h>
 
 extern const int32_t __trampoline_rel_start[], __trampoline_rel_stop[];
 extern const int32_t __trampoline_seg_start[], __trampoline_seg_stop[];
 
 #if defined(__i386__)
-void reloc_trampoline32(void)
+void asmlinkage reloc_trampoline32(void)
 #elif defined (__x86_64__)
 void reloc_trampoline64(void)
 #else

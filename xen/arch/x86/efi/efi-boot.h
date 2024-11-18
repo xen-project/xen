@@ -4,6 +4,8 @@
  * therefore can define arch specific global variables.
  */
 #include <xen/vga.h>
+
+#include <asm/boot-helpers.h>
 #include <asm/e820.h>
 #include <asm/edd.h>
 #include <asm/microcode.h>
@@ -102,8 +104,6 @@ static void __init efi_arch_relocate_image(unsigned long delta)
         base_relocs = (const void *)(base_relocs->entries + i + (i & 1));
     }
 }
-
-void reloc_trampoline64(void);
 
 static void __init relocate_trampoline(unsigned long phys)
 {
