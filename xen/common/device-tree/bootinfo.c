@@ -17,6 +17,8 @@
 #include <xen/libfdt/libfdt-xen.h>
 #include <xen/mm.h>
 
+#include <asm/setup.h>
+
 struct bootinfo __initdata bootinfo = BOOTINFO_INIT;
 
 const char * __init boot_module_kind_as_string(bootmodule_kind kind)
