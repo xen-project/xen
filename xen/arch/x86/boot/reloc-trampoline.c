@@ -18,7 +18,7 @@ void reloc_trampoline64(void)
 #endif
 {
     uint32_t phys = trampoline_phys;
-    const int32_t *trampoline_ptr;
+    const int32_t *ptr;
 
     /*
      * Apply relocations to trampoline.
@@ -26,13 +26,9 @@ void reloc_trampoline64(void)
      * This modifies the trampoline in place within Xen, so that it will
      * operate correctly when copied into place.
      */
-    for ( trampoline_ptr = __trampoline_rel_start;
-          trampoline_ptr < __trampoline_rel_stop;
-          ++trampoline_ptr )
-        *(uint32_t *)(*trampoline_ptr + (long)trampoline_ptr) += phys;
+    for ( ptr = __trampoline_rel_start; ptr < __trampoline_rel_stop; ++ptr )
+        *(uint32_t *)(*ptr + (long)ptr) += phys;
 
-    for ( trampoline_ptr = __trampoline_seg_start;
-          trampoline_ptr < __trampoline_seg_stop;
-          ++trampoline_ptr )
-        *(uint16_t *)(*trampoline_ptr + (long)trampoline_ptr) = phys >> 4;
+    for ( ptr = __trampoline_seg_start; ptr < __trampoline_seg_stop; ++ptr )
+        *(uint16_t *)(*ptr + (long)ptr) = phys >> 4;
 }
