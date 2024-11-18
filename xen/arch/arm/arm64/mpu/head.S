@@ -5,6 +5,9 @@
 
 #include <asm/arm64/mpu.h>
 
+/* Backgroud region enable/disable */
+#define SCTLR_ELx_BR    BIT(17, UL)
+
 #define REGION_TEXT_PRBAR       0x38    /* SH=11 AP=10 XN=00 */
 #define REGION_RO_PRBAR         0x3A    /* SH=11 AP=10 XN=10 */
 #define REGION_DATA_PRBAR       0x32    /* SH=11 AP=00 XN=10 */
@@ -76,6 +79,29 @@ FUNC_LOCAL(fail_insufficient_regions)
 END(fail_insufficient_regions)
 
 /*
+ * Enable EL2 MPU and data cache
+ * If the Background region is enabled, then the MPU uses the default memory
+ * map as the Background region for generating the memory
+ * attributes when MPU is disabled.
+ * Since the default memory map of the Armv8-R AArch64 architecture is
+ * IMPLEMENTATION DEFINED, we intend to turn off the Background region here.
+ *
+ * Clobbers x0
+ *
+ */
+FUNC_LOCAL(enable_mpu)
+    mrs   x0, SCTLR_EL2
+    bic   x0, x0, #SCTLR_ELx_BR       /* Disable Background region */
+    orr   x0, x0, #SCTLR_Axx_ELx_M    /* Enable MPU */
+    orr   x0, x0, #SCTLR_Axx_ELx_C    /* Enable D-cache */
+    orr   x0, x0, #SCTLR_Axx_ELx_WXN  /* Enable WXN */
+    msr   SCTLR_EL2, x0
+    isb
+
+    ret
+END(enable_mpu)
+
+/*
  * Maps the various sections of Xen (described in xen.lds.S) as different MPU
  * regions.
  *
@@ -114,6 +140,7 @@ FUNC(enable_boot_cpu_mm)
     ldr   x2, =__bss_end
     prepare_xen_region x0, x1, x2, x3, x4, x5
 
+    b    enable_mpu
     ret
 END(enable_boot_cpu_mm)
 
