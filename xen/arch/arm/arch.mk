@@ -9,7 +9,11 @@ CFLAGS-$(CONFIG_ARM_32) += -msoft-float
 CFLAGS-$(CONFIG_ARM_32) += -mcpu=cortex-a15
 CFLAGS-$(CONFIG_ARM_32) += -mno-unaligned-access
 
+ifeq ($(CONFIG_MPU),y)
+CFLAGS-$(CONFIG_ARM_64) += -march=armv8-r
+else
 CFLAGS-$(CONFIG_ARM_64) += -mcpu=generic
+endif
 CFLAGS-$(CONFIG_ARM_64) += -mgeneral-regs-only # No fp registers etc
 $(call cc-option-add,CFLAGS-$(CONFIG_ARM_64),CC,-mno-outline-atomics)
 

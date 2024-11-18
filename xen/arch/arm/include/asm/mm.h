@@ -16,7 +16,7 @@
 
 #if defined(CONFIG_MMU)
 # include <asm/mmu/mm.h>
-#else
+#elif !defined(CONFIG_MPU)
 # error "Unknown memory management layout"
 #endif
 
