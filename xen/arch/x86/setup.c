@@ -1160,6 +1160,13 @@ void asmlinkage __init noreturn __start_xen(void)
     xhci_dbc_uart_init();
     console_init_preirq();
 
+    /*
+     * Try to load microcode as early as possible, although wait until after
+     * configuring the console(s).
+     */
+    early_cpu_init(true);
+    early_microcode_init(bi);
+
     if ( pvh_boot )
         pvh_print_info();
 
@@ -1312,9 +1319,6 @@ void asmlinkage __init noreturn __start_xen(void)
     else
         panic("Bootloader provided no memory information\n");
 
-    /* This must come before e820 code because it sets paddr_bits. */
-    early_cpu_init(true);
-
     /* Choose shadow stack early, to set infrastructure up appropriately. */
     if ( !boot_cpu_has(X86_FEATURE_CET_SS) )
         opt_xen_shstk = 0;
@@ -1415,12 +1419,6 @@ void asmlinkage __init noreturn __start_xen(void)
     for ( i = 0; i < bi->nr_modules; i++ )
         if ( bi->mods[i].start & (PAGE_SIZE - 1) )
             panic("Bootloader didn't honor module alignment request\n");
-
-    /*
-     * TODO: load ucode earlier once multiboot modules become accessible
-     * at an earlier stage.
-     */
-    early_microcode_init(bi);
 
     if ( xen_phys_start )
     {
