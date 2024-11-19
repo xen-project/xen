@@ -860,6 +860,10 @@ static int __init early_microcode_load(struct boot_info *bi)
 
     rc = ucode_ops.apply_microcode(patch, 0);
 
+    if ( rc == 0 )
+        /* Rescan CPUID/MSR features, which may have changed after a load. */
+        early_cpu_init(false);
+
  unmap:
     bootstrap_unmap();
 
@@ -869,7 +873,6 @@ static int __init early_microcode_load(struct boot_info *bi)
 int __init early_microcode_init(struct boot_info *bi)
 {
     const struct cpuinfo_x86 *c = &boot_cpu_data;
-    int rc = 0;
 
     switch ( c->x86_vendor )
     {
@@ -909,16 +912,5 @@ int __init early_microcode_init(struct boot_info *bi)
         return -ENODEV;
     }
 
-    rc = early_microcode_load(bi);
-
-    /*
-     * Some CPUID leaves and MSRs are only present after microcode updates
-     * on some processors. We take the chance here to make sure what little
-     * state we have already probed is re-probed in order to ensure we do
-     * not use stale values. tsx_init() in particular needs to have up to
-     * date MSR_ARCH_CAPS.
-     */
-    early_cpu_init(false);
-
-    return rc;
+    return early_microcode_load(bi);
 }
