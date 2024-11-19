@@ -154,7 +154,7 @@ maintainers if you want to suggest a change.
    * - `Rule 5.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_05_01_2.c>`_
      - Required
      - External identifiers shall be distinct
-     - The Xen characters limit for identifiers is 40. Public headers
+     - The Xen characters limit for identifiers is 63. Public headers
        (xen/include/public/) are allowed to retain longer identifiers
        for backward compatibility.
 
@@ -162,7 +162,7 @@ maintainers if you want to suggest a change.
      - Required
      - Identifiers declared in the same scope and name space shall be
        distinct
-     - The Xen characters limit for identifiers is 40. Public headers
+     - The Xen characters limit for identifiers is 63. Public headers
        (xen/include/public/) are allowed to retain longer identifiers
        for backward compatibility.
 
@@ -177,7 +177,7 @@ maintainers if you want to suggest a change.
    * - `Rule 5.4 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_05_04.c>`_
      - Required
      - Macro identifiers shall be distinct
-     - The Xen characters limit for macro identifiers is 40. Public
+     - The Xen characters limit for macro identifiers is 63. Public
        headers (xen/include/public/) are allowed to retain longer
        identifiers for backward compatibility.
 
