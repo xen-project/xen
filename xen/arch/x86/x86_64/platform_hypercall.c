@@ -4,8 +4,8 @@
 
 EMIT_FILE;
 
-#include <xen/lib.h>
 #include <xen/hypercall.h>
+#include <xen/pmstat.h>
 
 #define xen_platform_op     compat_platform_op
 #define xen_platform_op_t   compat_platform_op_t

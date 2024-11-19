@@ -7,6 +7,14 @@
 
 int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *perf);
 long set_cx_pminfo(uint32_t acpi_id, struct xen_processor_power *power);
+
+#ifdef CONFIG_COMPAT
+struct compat_processor_performance;
+int compat_set_px_pminfo(uint32_t acpi_id, struct compat_processor_performance *perf);
+struct compat_processor_power;
+long compat_set_cx_pminfo(uint32_t acpi_id, struct compat_processor_power *power);
+#endif
+
 uint32_t pmstat_get_cx_nr(unsigned int cpu);
 int pmstat_get_cx_stat(unsigned int cpu, struct pm_cx_stat *stat);
 int pmstat_reset_cx_stat(unsigned int cpu);
