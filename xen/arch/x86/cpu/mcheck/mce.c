@@ -932,7 +932,7 @@ void x86_mcinfo_dump(struct mc_info *mi)
     } while ( 1 );
 }
 
-static void cf_check do_mc_get_cpu_info(void *v)
+static void cf_check __maybe_unused do_mc_get_cpu_info(void *v)
 {
     int cpu = smp_processor_id();
     int cindex, cpn;
@@ -1114,7 +1114,7 @@ bool intpose_inval(unsigned int cpu_nr, uint64_t msr)
      (r) <= MSR_IA32_MCx_MISC(per_cpu(nr_mce_banks, cpu) - 1) && \
      ((r) - MSR_IA32_MC0_CTL) % 4) /* excludes MCi_CTL */
 
-static bool x86_mc_msrinject_verify(struct xen_mc_msrinject *mci)
+static bool __maybe_unused x86_mc_msrinject_verify(struct xen_mc_msrinject *mci)
 {
     const struct cpuinfo_x86 *c = &cpu_data[mci->mcinj_cpunr];
     int i, errs = 0;
@@ -1192,7 +1192,7 @@ static bool x86_mc_msrinject_verify(struct xen_mc_msrinject *mci)
     return !errs;
 }
 
-static uint64_t x86_mc_hwcr_wren(void)
+static uint64_t __maybe_unused x86_mc_hwcr_wren(void)
 {
     uint64_t old;
 
@@ -1207,13 +1207,13 @@ static uint64_t x86_mc_hwcr_wren(void)
     return old;
 }
 
-static void x86_mc_hwcr_wren_restore(uint64_t hwcr)
+static void __maybe_unused x86_mc_hwcr_wren_restore(uint64_t hwcr)
 {
     if ( !(hwcr & K8_HWCR_MCi_STATUS_WREN) )
         wrmsrl(MSR_K8_HWCR, hwcr);
 }
 
-static void cf_check x86_mc_msrinject(void *data)
+static void cf_check __maybe_unused x86_mc_msrinject(void *data)
 {
     struct xen_mc_msrinject *mci = data;
     struct mcinfo_msr *msr;
@@ -1244,12 +1244,13 @@ static void cf_check x86_mc_msrinject(void *data)
         x86_mc_hwcr_wren_restore(hwcr);
 }
 
-/*ARGSUSED*/
-static void cf_check x86_mc_mceinject(void *data)
+static void cf_check __maybe_unused x86_mc_mceinject(void *data)
 {
     printk("Simulating #MC on cpu %d\n", smp_processor_id());
     __asm__ __volatile__("int $0x12");
 }
+
+#ifdef CONFIG_PV /* do_mca() hypercall is PV-only */
 
 #if BITS_PER_LONG == 64
 
@@ -1653,6 +1654,8 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
 
     return ret;
 }
+
+#endif /* CONFIG_PV */
 
 static int mcinfo_dumped;
 
