@@ -98,9 +98,8 @@
       - '*.log'
       - '*.dtb'
     when: always
-  only:
-    variables:
-      - $XILINX_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
+  rules:
+    - if: $XILINX_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
   tags:
     - xilinx
 
@@ -117,9 +116,8 @@
       - smoke.serial
       - '*.log'
     when: always
-  only:
-    variables:
-      - $XILINX_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
+  rules:
+    - if: $XILINX_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
   tags:
     - xilinx
 
@@ -137,9 +135,8 @@
       - smoke.serial
       - '*.log'
     when: always
-  only:
-    variables:
-      - $QUBES_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
+  rules:
+    - if: $QUBES_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
   tags:
     - qubes-hw2
 
