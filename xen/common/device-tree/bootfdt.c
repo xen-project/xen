@@ -439,7 +439,7 @@ static int __init process_chosen_node(const void *fdt, int node,
         return -EINVAL;
     }
 
-    printk("Initrd %"PRIpaddr"-%"PRIpaddr"\n", start, end);
+    printk("Initrd %"PRIpaddr"-%"PRIpaddr"\n", start, end - 1);
 
     add_boot_module(BOOTMOD_RAMDISK, start, end-start, false);
 
@@ -524,7 +524,7 @@ static void __init early_print_info(void)
         printk("MODULE[%d]: %"PRIpaddr" - %"PRIpaddr" %-12s\n",
                 i,
                 mods->module[i].start,
-                mods->module[i].start + mods->module[i].size,
+                mods->module[i].start + mods->module[i].size - 1,
                 boot_module_kind_as_string(mods->module[i].kind));
 
     for ( i = 0; i < mem_resv->nr_banks; i++ )
