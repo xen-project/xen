@@ -1,0 +1,29 @@
+.container-build-tmpl:
+  stage: containers
+  image: docker:stable
+  tags:
+    - container-builder
+  rules:
+    - if: $XEN_CI_REBUILD_CONTAINERS
+  services:
+    - docker:dind
+  before_script:
+    - apk add make
+    - docker info
+    - docker login -u $CI_DEPLOY_USER -p $CI_DEPLOY_PASSWORD $CI_REGISTRY
+  script:
+    - make -C automation/build PUSH=1 REGISTRY=${XEN_REGISTRY} ${CONTAINER/:/\/}
+  after_script:
+    - docker logout
+
+container-archlinux-current:
+  extends:
+    - .container-build-tmpl
+  variables:
+    CONTAINER: "archlinux:current"
+
+container-opensuse-tumbleweed-x86_64:
+  extends:
+    - .container-build-tmpl
+  variables:
+    CONTAINER: "opensuse:tumbleweed-x86_64"

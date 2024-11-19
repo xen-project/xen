@@ -8,11 +8,21 @@ workflow:
     - when: always
 
 stages:
+  - containers
   - analyze
   - build
   - test
 
 include:
-  - 'automation/gitlab-ci/analyze.yaml'
-  - 'automation/gitlab-ci/build.yaml'
-  - 'automation/gitlab-ci/test.yaml'
+  - local: 'automation/gitlab-ci/containers.yaml'
+    rules:
+      - if: $XEN_CI_REBUILD_CONTAINERS
+  - local: 'automation/gitlab-ci/analyze.yaml'
+    rules:
+      - if: $XEN_CI_REBUILD_CONTAINERS == null
+  - local: 'automation/gitlab-ci/build.yaml'
+    rules:
+      - if: $XEN_CI_REBUILD_CONTAINERS == null
+  - local: 'automation/gitlab-ci/test.yaml'
+    rules:
+      - if: $XEN_CI_REBUILD_CONTAINERS == null
