@@ -1,6 +1,6 @@
 .build-tmpl: &build
   stage: build
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  image: ${XEN_REGISTRY}/${CONTAINER}
   script:
     - ./automation/scripts/build 2>&1 | tee build.log
   artifacts:
@@ -208,7 +208,7 @@
 
 .yocto-test:
   stage: build
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  image: ${XEN_REGISTRY}/${CONTAINER}
   script:
     - ./automation/build/yocto/build-yocto.sh -v --log-dir=./logs --xen-dir=`pwd` ${YOCTO_BOARD} ${YOCTO_OUTPUT}
   variables:
