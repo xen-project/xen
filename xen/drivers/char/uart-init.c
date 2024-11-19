@@ -1,20 +1,13 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+
 /*
+ * Derived from:
  * xen/drivers/char/arm-uart.c
  *
  * Generic uart retrieved via the device tree or ACPI
  *
  * Julien Grall <julien.grall@linaro.org>
  * Copyright (c) 2013 Linaro Limited.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  */
 
 #include <asm/device.h>
@@ -126,7 +119,7 @@ static void __init acpi_uart_init(void)
 static void __init acpi_uart_init(void) { }
 #endif
 
-void __init arm_uart_init(void)
+void __init uart_init(void)
 {
     if ( acpi_disabled )
         dt_uart_init();

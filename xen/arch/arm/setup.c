@@ -361,7 +361,7 @@ void asmlinkage __init start_xen(unsigned long fdt_paddr)
 
     gic_preinit();
 
-    arm_uart_init();
+    uart_init();
     console_init_preirq();
     console_init_ring();
 
