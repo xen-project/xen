@@ -5498,7 +5498,7 @@ int map_pages_to_xen(
  * be INVALID_MFN, since alignment is only relevant for present entries.
  */
 #define IS_LnE_ALIGNED(v, m, n) ({                              \
-    mfn_t m_ = m;                                               \
+    mfn_t m_ = (m);                                             \
                                                                 \
     ASSERT(!mfn_eq(m_, INVALID_MFN));                           \
     IS_ALIGNED(PFN_DOWN(v) | mfn_x(m_),                         \
