@@ -2746,35 +2746,53 @@ performance.
    Alternatively, selecting `tsx=1` will re-enable TSX at the users own risk.
 
 ### ucode
-> `= List of [ <integer> | scan=<bool>, nmi=<bool>, digest-check=<bool> ]`
+> `= List of [ <integer>, scan=<bool>, nmi=<bool>, digest-check=<bool> ]`
 
     Applicability: x86
     Default: `scan` is selectable via Kconfig, `nmi,digest-check`
 
 Controls for CPU microcode loading, available when `CONFIG_MICROCODE_LOADING`
-is enabled. For early loading, this parameter can specify how and where to
-find the microcode update blob. For late loading, this parameter specifies if
-the update happens within a NMI handler.
+is enabled.
 
-'integer' specifies the CPU microcode update blob module index. When positive,
-this specifies the n-th module (in the GrUB entry, zero based) to be used
-for updating CPU micrcode. When negative, counting starts at the end of
-the modules in the GrUB entry (so with the blob commonly being last,
-one could specify `ucode=-1`). Note that the value of zero is not valid
-here (entry zero, i.e. the first module, is always the Dom0 kernel
-image). Note further that use of this option has an unspecified effect
-when used with xen.efi (there the concept of modules doesn't exist, and
-the blob gets specified via the `ucode=<filename>` config file/section
-entry; see [EFI configuration file description](efi.html)).
+In order to load microcode at boot, Xen needs to find a suitable update
+amongst the modules provided by the bootloader.  Two kinds of microcode update
+are supported:
 
-'scan' instructs the hypervisor to scan the multiboot images for an cpio
-image that contains microcode. Depending on the platform the blob with the
-microcode in the cpio name space must be:
-  - on Intel: kernel/x86/microcode/GenuineIntel.bin
-  - on AMD  : kernel/x86/microcode/AuthenticAMD.bin
-When using xen.efi, the `ucode=<filename>` config file setting takes
-precedence over `scan`. The default value for `scan` is set with
-`CONFIG_MICROCODE_SCAN_DEFAULT`.
+ 1. Raw microcode containers.  The format of the container is CPU vendor
+    specific.
+
+ 2. CPIO archive.  This is Linux's preferred mechanism, and involves having
+    the raw containers expressed as files
+    (e.g. `kernel/x86/microcode/{GenuineIntel,AuthenticAMD}.bin`) in a CPIO
+    archive, typically prepended to the initrd.
+
+The `<integer>` and `scan=<bool>` options are mutually exclusive and select
+between these two options.  Further restrictions exist for booting xen.efi
+(see below).
+
+ *  The `<integer>` option nominates a specific multiboot module as a raw
+    container (option 1 above).  Valid options start from 1 (module 0 is
+    always the dom0 kernel).  A negative number may be used, and will
+    back-reference from the end of the module list.  i.e. `ucode=-1` will
+    nominate the final multiboot module.
+
+ *  The `scan=` option causes Xen to search all modules in order to find the
+    first CPIO archive containing the appropriate file (option 2 above).  The
+    default for this option can be chosen at build time via
+    `CONFIG_MICROCODE_SCAN_DEFAULT`.
+
+When booting xen.efi natively, the concept of multiboot modules doesn't exist.
+Instead:
+
+ *  In the [EFI configuration file](efi.html), `ucode=<filename>` can be used
+    to identify a file as a raw container (option 1 above).  Use of this
+    mechanism will disable both `<integer>` and `scan=`.
+
+ *  If `ucode=<filename>` in the EFI configuration file is not used, it is
+    still possible to use `scan=` to search all modules.  The order of module
+    is undefined, but there is only a single `ramdisk=<filename>`
+    configuration option available.  The use of `<integer>` for xen.efi is
+    always undefined.
 
 'nmi' determines late loading is performed in NMI handler or just in
 stop_machine context. In NMI handler, even NMIs are blocked, which is

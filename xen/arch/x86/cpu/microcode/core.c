@@ -116,11 +116,6 @@ void __init microcode_set_module(unsigned int idx)
     ucode_mod_forced = 1;
 }
 
-/*
- * The format is '[<integer>|scan=<bool>, nmi=<bool>]'. Both options are
- * optional. If the EFI has forced which of the multiboot payloads is to be
- * used, only nmi=<bool> is parsed.
- */
 static int __init cf_check parse_ucode(const char *s)
 {
     const char *ss;
@@ -135,13 +130,24 @@ static int __init cf_check parse_ucode(const char *s)
             ucode_in_nmi = val;
         else if ( (val = parse_boolean("digest-check", s, ss)) >= 0 )
             opt_digest_check = val;
-        else if ( !ucode_mod_forced ) /* Not forced by EFI */
+        else if ( (val = parse_boolean("scan", s, ss)) >= 0 )
         {
-            if ( (val = parse_boolean("scan", s, ss)) >= 0 )
+            if ( ucode_mod_forced )
+                printk(XENLOG_WARNING
+                       "Ignoring ucode=%.*s setting; overridden by EFI\n",
+                       (int)(ss - s), s);
+            else
             {
                 opt_scan = val;
                 opt_mod_idx = 0;
             }
+        }
+        else if ( isdigit(s[0]) || s[0] == '-' )
+        {
+            if ( ucode_mod_forced )
+                printk(XENLOG_WARNING
+                       "Ignoring ucode=%.*s setting; overridden by EFI\n",
+                       (int)(ss - s), s);
             else
             {
                 const char *q;
@@ -156,6 +162,8 @@ static int __init cf_check parse_ucode(const char *s)
                     opt_scan = false;
             }
         }
+        else
+            rc = -EINVAL;
 
         s = ss + 1;
     } while ( *ss );
