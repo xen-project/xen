@@ -1,3 +1,6 @@
+variables:
+  XEN_REGISTRY: registry.gitlab.com/xen-project/xen
+
 workflow:
   rules:
     - if: $CI_COMMIT_BRANCH =~ /^(master|smoke|^coverity-tested\/.*|stable-.*)$/
