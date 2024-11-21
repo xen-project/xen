@@ -86,7 +86,7 @@ static void __init test_fls(void)
 
 static void __init test_for_each_set_bit(void)
 {
-    unsigned int  ui,  ui_res = 0;
+    unsigned int  ui,  ui_res = 0, tmp;
     unsigned long ul,  ul_res = 0;
     uint64_t      ull, ull_res = 0;
 
@@ -110,6 +110,21 @@ static void __init test_for_each_set_bit(void)
 
     if ( ull != ull_res )
         panic("for_each_set_bit(uint64) expected %#"PRIx64", got %#"PRIx64"\n", ull, ull_res);
+
+    /* Check that we can break from the middle of the loop. */
+    ui = HIDE(0x80001008U);
+    tmp = 0;
+    ui_res = 0;
+    for_each_set_bit ( i, ui )
+    {
+        if ( tmp++ > 1 )
+            break;
+
+        ui_res |= 1U << i;
+    }
+
+    if ( ui_res != 0x1008 )
+        panic("for_each_set_bit(break) expected 0x1008, got %#x\n", ui_res);
 }
 
 static void __init test_multiple_bits_set(void)
