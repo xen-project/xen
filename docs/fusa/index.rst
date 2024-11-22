@@ -6,4 +6,4 @@ Functional Safety documentation
 .. toctree::
    :maxdepth: 2
 
-   reqs
+   reqs/index

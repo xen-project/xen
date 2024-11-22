@@ -7,6 +7,7 @@ Requirements documentation
    :maxdepth: 2
 
    intro
-   market-reqs
-   product-reqs
-   design-reqs/arm64
+   market-reqs/reqs
+   product-reqs/arm64/reqs
+   design-reqs/arm64/generic-timer
+   design-reqs/arm64/sbsa-uart

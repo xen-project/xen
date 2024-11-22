@@ -65,6 +65,7 @@ Documents in need of some rearranging.
    designs/launch/hyperlaunch-devicetree
    misc/xen-makefiles/makefiles
    misra/index
+   fusa/index
 
 
 Miscellanea
