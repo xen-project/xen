@@ -82,6 +82,13 @@ The hypercall page is a page of guest RAM into which Xen will write suitable
 transfer stubs.  It is intended as a convenience for guests, but use of the
 hypercall page is not mandatory for making hypercalls to Xen.
 
+.. note::
+
+   There are cases where a hypercall page should not be used.  It contains
+   ``ret`` instructions which are not compatible with certain speculative
+   security techniques, and it does not contain ``endbr`` instructions which
+   are necessary for certain Control-flow Integrity schemes.
+
 Creating a hypercall page is an isolated operation from Xen's point of view.
 It is the guests responsibility to ensure that the hypercall page, once
 written by Xen, is mapped with executable permissions so it may be used.
