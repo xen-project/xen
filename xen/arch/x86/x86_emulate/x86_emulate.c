@@ -7817,11 +7817,6 @@ x86_emulate(
     case X86EMUL_OPC_VEX_F2(0x0f3a, 0xf0): /* rorx imm,r/m,r */
         vcpu_must_have(bmi2);
         generate_exception_if(vex.l || vex.reg != 0xf, X86_EXC_UD);
-        if ( ea.type == OP_REG )
-            src.val = *ea.reg;
-        else if ( (rc = read_ulong(ea.mem.seg, ea.mem.off, &src.val, op_bytes,
-                                   ctxt, ops)) != X86EMUL_OKAY )
-            goto done;
         if ( mode_64bit() && vex.w )
             asm ( "rorq %b1,%0" : "=g" (dst.val) : "c" (imm1), "0" (src.val) );
         else
