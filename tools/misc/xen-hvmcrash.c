@@ -1,7 +1,7 @@
 /* 
  * xen-hvmcrash.c
  *
- * Attempt to crash an HVM guest by overwriting RIP/EIP with a bogus value
+ * Attempt to crash an HVM guest by injecting #DF to every vcpu
  * 
  * Copyright (c) 2010 Citrix Systems, Inc.
  *
@@ -24,36 +24,25 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <limits.h>
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <arpa/inet.h>
 
 #include <xenctrl.h>
-#include <xen/xen.h>
-#include <xen/domctl.h>
-#include <xen/hvm/save.h>
+#include <xendevicemodel.h>
+
+#include <xen/asm/x86-defns.h>
 
 int
 main(int argc, char **argv)
 {
     int domid;
     xc_interface *xch;
+    xendevicemodel_handle *dmod;
     xc_domaininfo_t dominfo;
-    int ret;
-    uint32_t len;
-    uint8_t *buf;
-    uint32_t off;
-    struct hvm_save_descriptor *descriptor;
+    int vcpu_id, ret;
+    bool injected = false;
 
     if (argc != 2 || !argv[1] || (domid = atoi(argv[1])) < 0) {
         fprintf(stderr, "usage: %s <domid>\n", argv[0]);
@@ -83,59 +72,29 @@ main(int argc, char **argv)
         exit(-1);
     }
 
-    /*
-     * Calling with zero buffer length should return the buffer length
-     * required.
-     */
-    ret = xc_domain_hvm_getcontext(xch, domid, 0, 0);
-    if (ret < 0) {
-        perror("xc_domain_hvm_getcontext");
-        exit(1);
-    }
-    
-    len = ret;
-    buf = malloc(len);
-    if (buf == NULL) {
-        perror("malloc");
-        exit(1);
-    }
+    dmod = xc_interface_dmod_handle(xch);
 
-    ret = xc_domain_hvm_getcontext(xch, domid, buf, len);
-    if (ret < 0) {
-        perror("xc_domain_hvm_getcontext");
-        exit(1);
-    }
-
-    off = 0;
-
-    while (off < len) {
-        descriptor = (struct hvm_save_descriptor *)(buf + off);
-
-        off += sizeof (struct hvm_save_descriptor);
-
-        if (descriptor->typecode == HVM_SAVE_CODE(CPU)) {
-            HVM_SAVE_TYPE(CPU) *cpu;
-
-            /* Overwrite EIP/RIP with some recognisable but bogus value */
-            cpu = (HVM_SAVE_TYPE(CPU) *)(buf + off);
-            printf("CPU[%d]: RIP = %" PRIx64 "\n", descriptor->instance, cpu->rip);
-            cpu->rip = 0xf001;
-        } else if (descriptor->typecode == HVM_SAVE_CODE(END)) {
-            break;
+    for (vcpu_id = 0; vcpu_id <= dominfo.max_vcpu_id; vcpu_id++) {
+        printf("Injecting #DF to vcpu ID #%d...\n", vcpu_id);
+        ret = xendevicemodel_inject_event(dmod, domid, vcpu_id,
+                                X86_EXC_DF,
+                                XEN_DMOP_EVENT_hw_exc, 0, 0, 0);
+        if (ret < 0) {
+            fprintf(stderr, "Could not inject #DF to vcpu ID #%d: %s\n",
+                    vcpu_id, strerror(errno));
+            continue;
         }
-
-        off += descriptor->length;
-    }
-
-    ret = xc_domain_hvm_setcontext(xch, domid, buf, len);
-    if (ret < 0) {
-        perror("xc_domain_hvm_setcontext");
-        exit(1);
+        injected = true;
     }
 
     ret = xc_domain_unpause(xch, domid);
     if (ret < 0) {
         perror("xc_domain_unpause");
+        exit(1);
+    }
+
+    if (!injected) {
+        fprintf(stderr, "Could not inject #DF to any vcpu!\n");
         exit(1);
     }
 
