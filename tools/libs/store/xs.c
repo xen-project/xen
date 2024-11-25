@@ -576,20 +576,23 @@ static void *xs_talkv(struct xs_handle *h, xs_transaction_t t,
 	struct xsd_sockmsg msg;
 	void *ret = NULL;
 	int saved_errno;
-	unsigned int i;
+	unsigned int i, msg_len;
 	struct sigaction ignorepipe, oldact;
 
 	msg.tx_id = t;
 	msg.req_id = 0;
 	msg.type = type;
-	msg.len = 0;
-	for (i = 0; i < num_vecs; i++)
-		msg.len += iovec[i].iov_len;
 
-	if (msg.len > XENSTORE_PAYLOAD_MAX) {
-		errno = E2BIG;
-		return 0;
+	/* Calculate the payload length by summing iovec elements */
+	for (i = 0, msg_len = 0; i < num_vecs; i++) {
+		if ((iovec[i].iov_len > XENSTORE_PAYLOAD_MAX) ||
+		    ((msg_len += iovec[i].iov_len) > XENSTORE_PAYLOAD_MAX)) {
+			errno = E2BIG;
+			return NULL;
+		}
 	}
+
+	msg.len = msg_len;
 
 	ignorepipe.sa_handler = SIG_IGN;
 	sigemptyset(&ignorepipe.sa_mask);
