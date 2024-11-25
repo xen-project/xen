@@ -13,10 +13,11 @@ struct livepatch_elf_sec {
     const Elf_Shdr *sec;                 /* Hooked up in elf_resolve_sections.*/
     const char *name;                    /* Human readable name hooked in
                                             elf_resolve_section_names. */
-    const void *data;                    /* Pointer to the section (done by
-                                            elf_resolve_sections). */
-    void *load_addr;                     /* A pointer to the allocated destination.
-                                            Done by load_payload_data. */
+    void *addr;                          /*
+                                          * Pointer to the section.  This is
+                                          * first a temporary buffer, then
+                                          * later the relocated load address.
+                                          */
 };
 
 struct livepatch_elf_sym {
@@ -41,7 +42,7 @@ struct livepatch_elf {
 const struct livepatch_elf_sec *
 livepatch_elf_sec_by_name(const struct livepatch_elf *elf,
                           const char *name);
-int livepatch_elf_load(struct livepatch_elf *elf, const void *data);
+int livepatch_elf_load(struct livepatch_elf *elf, void *data);
 void livepatch_elf_free(struct livepatch_elf *elf);
 
 int livepatch_elf_resolve_symbols(struct livepatch_elf *elf);
