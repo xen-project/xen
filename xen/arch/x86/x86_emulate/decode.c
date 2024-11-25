@@ -518,7 +518,7 @@ static const struct ext0f3a_table {
     [0xcc] = { .simd_size = simd_other },
     [0xce ... 0xcf] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0xdf] = { .simd_size = simd_packed_int, .two_op = 1 },
-    [0xf0] = {},
+    [0xf0] = { .two_op = 1 /* Mov */ },
 };
 
 static const opcode_desc_t xop_table[] = {
