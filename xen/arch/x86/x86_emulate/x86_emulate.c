@@ -7016,6 +7016,8 @@ x86_emulate(
         *pvex = vex;
         pvex->b = 1;
         pvex->r = 1;
+        if ( !mode_64bit() )
+            pvex->w = 0;
         pvex->reg = 0xf; /* rAX */
         buf[3] = b;
         buf[4] = 0x09; /* reg=rCX r/m=(%rCX) */
@@ -7050,6 +7052,8 @@ x86_emulate(
         *pvex = vex;
         pvex->b = 1;
         pvex->r = 1;
+        if ( !mode_64bit() )
+            pvex->w = 0;
         pvex->reg = 0xf; /* rAX */
         buf[3] = b;
         buf[4] = (modrm & 0x38) | 0x01; /* r/m=(%rCX) */
