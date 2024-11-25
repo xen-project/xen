@@ -175,9 +175,9 @@ extern void *const __initdata_cf_clobber_end[];
  * invocation, such that no CALLs/JMPs to NULL pointers will be left
  * around. See also the further comment below.
  */
-static void init_or_livepatch _apply_alternatives(struct alt_instr *start,
-                                                  struct alt_instr *end,
-                                                  bool force)
+static int init_or_livepatch _apply_alternatives(struct alt_instr *start,
+                                                 struct alt_instr *end,
+                                                 bool force)
 {
     struct alt_instr *a, *base;
 
@@ -198,9 +198,29 @@ static void init_or_livepatch _apply_alternatives(struct alt_instr *start,
         uint8_t buf[MAX_PATCH_LEN];
         unsigned int total_len = a->orig_len + a->pad_len;
 
-        BUG_ON(a->repl_len > total_len);
-        BUG_ON(total_len > sizeof(buf));
-        BUG_ON(a->cpuid >= NCAPINTS * 32);
+        if ( a->repl_len > total_len )
+        {
+            printk(XENLOG_ERR
+                   "Alt for %ps, replacement size %#x larger than origin %#x\n",
+                    ALT_ORIG_PTR(a), a->repl_len, total_len);
+            return -ENOSPC;
+        }
+
+        if ( total_len > sizeof(buf) )
+        {
+            printk(XENLOG_ERR
+                   "Alt for %ps, origin size %#x bigger than buffer %#zx\n",
+                   ALT_ORIG_PTR(a), total_len, sizeof(buf));
+            return -ENOSPC;
+        }
+
+        if ( a->cpuid >= NCAPINTS * 32 )
+        {
+             printk(XENLOG_ERR
+                   "Alt for %ps, feature %#x outside of featureset range %#x\n",
+                   ALT_ORIG_PTR(a), a->cpuid, NCAPINTS * 32);
+            return -ERANGE;
+        }
 
         /*
          * Detect sequences of alt_instr's patching the same origin site, and
@@ -356,12 +376,14 @@ static void init_or_livepatch _apply_alternatives(struct alt_instr *start,
 
         printk("altcall: Optimised away %u endbr64 instructions\n", clobbered);
     }
+
+    return 0;
 }
 
 #ifdef CONFIG_LIVEPATCH
-void apply_alternatives(struct alt_instr *start, struct alt_instr *end)
+int apply_alternatives(struct alt_instr *start, struct alt_instr *end)
 {
-    _apply_alternatives(start, end, true);
+    return _apply_alternatives(start, end, true);
 }
 #endif
 
@@ -383,6 +405,8 @@ static int __init cf_check nmi_apply_alternatives(
      */
     if ( !(alt_done & alt_todo) )
     {
+        int rc;
+
         /*
          * Relax perms on .text to be RWX, so we can modify them.
          *
@@ -394,8 +418,10 @@ static int __init cf_check nmi_apply_alternatives(
                                  PAGE_HYPERVISOR_RWX);
         flush_local(FLUSH_TLB_GLOBAL);
 
-        _apply_alternatives(__alt_instructions, __alt_instructions_end,
-                            alt_done);
+        rc = _apply_alternatives(__alt_instructions, __alt_instructions_end,
+                                 alt_done);
+        if ( rc )
+            panic("Unable to apply alternatives: %d\n", rc);
 
         /*
          * Reinstate perms on .text to be RX.  This also cleans out the dirty
