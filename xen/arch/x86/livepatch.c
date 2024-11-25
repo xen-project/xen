@@ -258,9 +258,9 @@ int arch_livepatch_perform_rela(struct livepatch_elf *elf,
 
     for ( i = 0; i < (rela->sec->sh_size / rela->sec->sh_entsize); i++ )
     {
-        const Elf_RelA *r = rela->data + i * rela->sec->sh_entsize;
+        const Elf_RelA *r = rela->addr + i * rela->sec->sh_entsize;
         unsigned int symndx = ELF64_R_SYM(r->r_info);
-        uint8_t *dest = base->load_addr + r->r_offset;
+        uint8_t *dest = base->addr + r->r_offset;
         uint64_t val;
 
         if ( symndx == STN_UNDEF )
