@@ -573,6 +573,89 @@ static void *read_reply(
 }
 
 /*
+ * Update an iov/nr pair after an incomplete writev()/sendmsg().
+ *
+ * Awkwardly, nr has different widths and signs between writev() and
+ * sendmsg(), so we take it and return it by value, rather than by pointer.
+ */
+static size_t update_iov(struct iovec **p_iov, size_t nr, size_t res)
+{
+	struct iovec *iov = *p_iov;
+
+        /* Skip fully complete elements, including empty elements. */
+        while (nr && res >= iov->iov_len) {
+                res -= iov->iov_len;
+                nr--;
+                iov++;
+        }
+
+        /* Partial element, adjust base/len. */
+        if (res) {
+                iov->iov_len  -= res;
+                iov->iov_base += res;
+        }
+
+        *p_iov = iov;
+
+	return nr;
+}
+
+/*
+ * Wrapper around sendmsg() to resubmit on EINTR or short write.  Returns
+ * @true if all data was transmitted, or @false with errno for an error.
+ * Note: May alter @iov in place on resubmit.
+ */
+static bool sendmsg_exact(int fd, struct iovec *iov, unsigned int nr)
+{
+	struct msghdr hdr = {
+		.msg_iov    = iov,
+		.msg_iovlen = nr,
+	};
+
+	while (hdr.msg_iovlen) {
+		ssize_t res = sendmsg(fd, &hdr, 0);
+
+		if (res < 0 && errno == EINTR)
+			continue;
+		if (res <= 0)
+			return false;
+
+		hdr.msg_iovlen = update_iov(&hdr.msg_iov, hdr.msg_iovlen, res);
+	}
+
+	return true;
+}
+
+/*
+ * Wrapper around sendmsg() to resubmit on EINTR or short write.  Returns
+ * @true if all data was transmitted, or @false with errno for an error.
+ * Note: May alter @iov in place on resubmit.
+ */
+static bool writev_exact(int fd, struct iovec *iov, unsigned int nr)
+{
+	while (nr) {
+		ssize_t res = writev(fd, iov, nr);
+
+		if (res < 0 && errno == EINTR)
+			continue;
+		if (res <= 0)
+			return false;
+
+		nr = update_iov(&iov, nr, res);
+	}
+
+	return true;
+}
+
+static bool write_request(struct xs_handle *h, struct iovec *iov, unsigned int nr)
+{
+	if (h->is_socket)
+		return sendmsg_exact(h->fd, iov, nr);
+	else
+		return writev_exact(h->fd, iov, nr);
+}
+
+/*
  * Send message to xenstore, get malloc'ed reply.  NULL and set errno on error.
  *
  * @iovec describes the entire outgoing message, starting with the xsd_sockmsg
@@ -614,9 +697,8 @@ static void *xs_talkv(struct xs_handle *h,
 
 	mutex_lock(&h->request_mutex);
 
-	for (i = 0; i < num_vecs; i++)
-		if (!xs_write_all(h->fd, iovec[i].iov_base, iovec[i].iov_len))
-			goto fail;
+	if (!write_request(h, iovec, num_vecs))
+		goto fail;
 
 	ret = read_reply(h, &reply_type, len);
 	if (!ret)
