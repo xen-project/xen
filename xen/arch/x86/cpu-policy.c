@@ -388,6 +388,27 @@ static void __init calculate_host_policy(void)
     p->platform_info.cpuid_faulting = cpu_has_cpuid_faulting;
 }
 
+/*
+ * Guest max policies can have any max leaf/subleaf within bounds.
+ *
+ * - Some incoming VMs have a larger-than-necessary feat max_subleaf.
+ * - Some VMs we'd like to synthesise leaves not present on the host.
+ */
+static void __init guest_common_max_leaves(struct cpu_policy *p)
+{
+    p->basic.max_leaf       = ARRAY_SIZE(p->basic.raw) - 1;
+    p->feat.max_subleaf     = ARRAY_SIZE(p->feat.raw) - 1;
+    p->extd.max_leaf        = 0x80000000U + ARRAY_SIZE(p->extd.raw) - 1;
+}
+
+/* Guest default policies inherit the host max leaf/subleaf settings. */
+static void __init guest_common_default_leaves(struct cpu_policy *p)
+{
+    p->basic.max_leaf       = host_cpu_policy.basic.max_leaf;
+    p->feat.max_subleaf     = host_cpu_policy.feat.max_subleaf;
+    p->extd.max_leaf        = host_cpu_policy.extd.max_leaf;
+}
+
 static void __init guest_common_max_feature_adjustments(uint32_t *fs)
 {
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
@@ -576,11 +597,7 @@ static void __init calculate_pv_max_policy(void)
 
     *p = host_cpu_policy;
 
-    /*
-     * Some VMs may have a larger-than-necessary feat max_subleaf.  Allow them
-     * to migrate in.
-     */
-    p->feat.max_subleaf = ARRAY_SIZE(p->feat.raw) - 1;
+    guest_common_max_leaves(p);
 
     x86_cpu_policy_to_featureset(p, fs);
 
@@ -623,8 +640,7 @@ static void __init calculate_pv_def_policy(void)
 
     *p = pv_max_cpu_policy;
 
-    /* Default to the same max_subleaf as the host. */
-    p->feat.max_subleaf = host_cpu_policy.feat.max_subleaf;
+    guest_common_default_leaves(p);
 
     x86_cpu_policy_to_featureset(p, fs);
 
@@ -663,11 +679,7 @@ static void __init calculate_hvm_max_policy(void)
 
     *p = host_cpu_policy;
 
-    /*
-     * Some VMs may have a larger-than-necessary feat max_subleaf.  Allow them
-     * to migrate in.
-     */
-    p->feat.max_subleaf = ARRAY_SIZE(p->feat.raw) - 1;
+    guest_common_max_leaves(p);
 
     x86_cpu_policy_to_featureset(p, fs);
 
@@ -787,8 +799,7 @@ static void __init calculate_hvm_def_policy(void)
 
     *p = hvm_max_cpu_policy;
 
-    /* Default to the same max_subleaf as the host. */
-    p->feat.max_subleaf = host_cpu_policy.feat.max_subleaf;
+    guest_common_default_leaves(p);
 
     x86_cpu_policy_to_featureset(p, fs);
 
