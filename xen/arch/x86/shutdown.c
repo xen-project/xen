@@ -150,19 +150,20 @@ static void default_reboot_type(void)
 
     if ( xen_guest )
         reboot_type = BOOT_XEN;
+    else if ( !acpi_disabled && !acpi_gbl_reduced_hardware )
+        reboot_type = BOOT_ACPI;
     else if ( efi_enabled(EFI_RS) )
         reboot_type = BOOT_EFI;
-    else if ( acpi_disabled )
-        reboot_type = BOOT_KBD;
     else
-        reboot_type = BOOT_ACPI;
+        reboot_type = BOOT_KBD;
 }
 
 static int __init cf_check override_reboot(const struct dmi_system_id *d)
 {
     enum reboot_type type = (long)d->driver_data;
 
-    if ( type == BOOT_ACPI && acpi_disabled )
+    if ( (type == BOOT_ACPI && acpi_disabled) ||
+         (type == BOOT_EFI && !efi_enabled(EFI_RS)) )
         type = BOOT_KBD;
 
     if ( reboot_type != type )
@@ -172,6 +173,7 @@ static int __init cf_check override_reboot(const struct dmi_system_id *d)
             [BOOT_KBD]  = "keyboard controller",
             [BOOT_ACPI] = "ACPI",
             [BOOT_CF9]  = "PCI",
+            [BOOT_EFI]  = "UEFI",
         };
 
         reboot_type = type;
@@ -528,6 +530,15 @@ static const struct dmi_system_id __initconstrel reboot_dmi_table[] = {
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
             DMI_MATCH(DMI_PRODUCT_NAME, "PowerEdge R740"),
+        },
+    },
+    {    /* Handle problems with rebooting on Acer TravelMate X514-51T. */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_EFI,
+        .ident = "Acer TravelMate X514-51T",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+            DMI_MATCH(DMI_PRODUCT_NAME, "TravelMate X514-51T"),
         },
     },
     { }

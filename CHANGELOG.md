@@ -4,6 +4,12 @@ Notable changes to Xen will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
+## [4.18.4](https://xenbits.xenproject.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.18.4)
+
+### Changed
+ - On x86:
+   - Prefer ACPI reboot over UEFI ResetSystem() run time service call.
+
 ## [4.18.3](https://xenbits.xen.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.18.3)
 
 ### Changed
