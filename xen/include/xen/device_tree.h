@@ -238,6 +238,8 @@ extern rwlock_t dt_host_lock;
 struct dt_device_node *
 dt_find_interrupt_controller(const struct dt_device_match *matches);
 
+void intc_dt_preinit(void);
+
 #define dt_prop_cmp(s1, s2) strcmp((s1), (s2))
 #define dt_node_cmp(s1, s2) strcasecmp((s1), (s2))
 #define dt_compat_cmp(s1, s2) strcasecmp((s1), (s2))
