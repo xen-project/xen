@@ -253,7 +253,7 @@ static void dump_guest_os_id(const struct domain *d)
     goi = &d->arch.hvm.viridian->guest_os_id;
 
     printk(XENLOG_G_INFO
-           "d%d: VIRIDIAN GUEST_OS_ID: vendor: %x os: %x major: %x minor: %x sp: %x build: %x\n",
+           "d%d: VIRIDIAN GUEST_OS_ID: vendor: %#x os: %#x major: %#x minor: %#x sp: %#x build: %#x\n",
            d->domain_id, goi->vendor, goi->os, goi->major, goi->minor,
            goi->service_pack, goi->build_number);
 }
@@ -264,7 +264,7 @@ static void dump_hypercall(const struct domain *d)
 
     hg = &d->arch.hvm.viridian->hypercall_gpa;
 
-    printk(XENLOG_G_INFO "d%d: VIRIDIAN HYPERCALL: enabled: %x pfn: %lx\n",
+    printk(XENLOG_G_INFO "d%d: VIRIDIAN HYPERCALL: enabled: %u pfn: %#lx\n",
            d->domain_id,
            hg->enabled, (unsigned long)hg->pfn);
 }
@@ -372,7 +372,8 @@ int guest_wrmsr_viridian(struct vcpu *v, uint32_t idx, uint64_t val)
         d->shutdown_code = SHUTDOWN_crash;
         spin_unlock(&d->shutdown_lock);
 
-        gprintk(XENLOG_WARNING, "VIRIDIAN CRASH: %lx %lx %lx %lx %lx\n",
+        gprintk(XENLOG_WARNING,
+                "VIRIDIAN GUEST_CRASH: %#lx %#lx %#lx %#lx %#lx\n",
                 vv->crash_param[0], vv->crash_param[1], vv->crash_param[2],
                 vv->crash_param[3], vv->crash_param[4]);
         break;
@@ -1056,7 +1057,7 @@ void viridian_dump_guest_page(const struct vcpu *v, const char *name,
     if ( !vp->msr.enabled )
         return;
 
-    printk(XENLOG_G_INFO "%pv: VIRIDIAN %s: pfn: %lx\n",
+    printk(XENLOG_G_INFO "%pv: VIRIDIAN %s: pfn: %#lx\n",
            v, name, (unsigned long)vp->msr.pfn);
 }
 
