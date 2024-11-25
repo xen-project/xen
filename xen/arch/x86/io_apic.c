@@ -2754,11 +2754,13 @@ unsigned int __hwdom_init arch_hwdom_irqs(const struct domain *d)
 
     /* PVH (generally: HVM) can't use PHYSDEVOP_pirq_eoi_gmfn_v{1,2}. */
     if ( is_hvm_domain(d) )
-        return nr_irqs;
-
-    if ( !d->domain_id )
-        n = min(n, dom0_max_vcpus());
-    n = min(nr_irqs_gsi + n * NR_DYNAMIC_VECTORS, max_irqs);
+        n = nr_irqs;
+    else
+    {
+        if ( !d->domain_id )
+            n = min(n, dom0_max_vcpus());
+        n = min(nr_irqs_gsi + n * NR_DYNAMIC_VECTORS, max_irqs);
+    }
 
     printk("%pd has maximum %u PIRQs\n", d, n);
 
