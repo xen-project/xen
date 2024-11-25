@@ -405,7 +405,9 @@ void *__init bootstrap_map(const module_t *mod)
 
     if ( !mod )
     {
-        destroy_xen_mappings(BOOTSTRAP_MAP_BASE, BOOTSTRAP_MAP_LIMIT);
+        map_pages_to_xen(BOOTSTRAP_MAP_BASE, INVALID_MFN,
+                         PFN_DOWN(map_cur - BOOTSTRAP_MAP_BASE),
+                         _PAGE_NONE);
         map_cur = BOOTSTRAP_MAP_BASE;
         return NULL;
     }
