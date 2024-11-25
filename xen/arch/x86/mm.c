@@ -5227,6 +5227,13 @@ int map_pages_to_xen(
     }                                          \
 } while (0)
 
+/* Check if a (virt, mfn) tuple is aligned for a given slot level. */
+#define IS_LnE_ALIGNED(v, m, n)                                 \
+    IS_ALIGNED(PFN_DOWN(v) | mfn_x(m),                          \
+               (1UL << (PAGETABLE_ORDER * ((n) - 1))) - 1)
+#define IS_L2E_ALIGNED(v, m) IS_LnE_ALIGNED(v, m, 2)
+#define IS_L3E_ALIGNED(v, m) IS_LnE_ALIGNED(v, m, 3)
+
     L3T_INIT(current_l3page);
 
     while ( nr_mfns != 0 )
@@ -5244,9 +5251,7 @@ int map_pages_to_xen(
         L3T_LOCK(current_l3page);
         ol3e = *pl3e;
 
-        if ( cpu_has_page1gb &&
-             !(((virt >> PAGE_SHIFT) | mfn_x(mfn)) &
-               ((1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT)) - 1)) &&
+        if ( cpu_has_page1gb && IS_L3E_ALIGNED(virt, mfn) &&
              nr_mfns >= (1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT)) &&
              !(flags & (_PAGE_PAT | MAP_SMALL_PAGES)) )
         {
@@ -5366,8 +5371,7 @@ int map_pages_to_xen(
         if ( !pl2e )
             goto out;
 
-        if ( ((((virt >> PAGE_SHIFT) | mfn_x(mfn)) &
-               ((1u << PAGETABLE_ORDER) - 1)) == 0) &&
+        if ( IS_L2E_ALIGNED(virt, mfn) &&
              (nr_mfns >= (1u << PAGETABLE_ORDER)) &&
              !(flags & (_PAGE_PAT|MAP_SMALL_PAGES)) )
         {
@@ -5485,9 +5489,7 @@ int map_pages_to_xen(
             nr_mfns -= 1UL;
 
             if ( (flags == PAGE_HYPERVISOR) &&
-                 ((nr_mfns == 0) ||
-                  ((((virt >> PAGE_SHIFT) | mfn_x(mfn)) &
-                    ((1u << PAGETABLE_ORDER) - 1)) == 0)) )
+                 ((nr_mfns == 0) || IS_L2E_ALIGNED(virt, mfn)) )
             {
                 unsigned long base_mfn;
                 const l1_pgentry_t *l1t;
@@ -5539,9 +5541,7 @@ int map_pages_to_xen(
  check_l3:
         if ( cpu_has_page1gb &&
              (flags == PAGE_HYPERVISOR) &&
-             ((nr_mfns == 0) ||
-              !(((virt >> PAGE_SHIFT) | mfn_x(mfn)) &
-                ((1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT)) - 1))) )
+             ((nr_mfns == 0) || IS_L3E_ALIGNED(virt, mfn)) )
         {
             unsigned long base_mfn;
             const l2_pgentry_t *l2t;
@@ -5586,6 +5586,9 @@ int map_pages_to_xen(
         }
     }
 
+#undef IS_L3E_ALIGNED
+#undef IS_L2E_ALIGNED
+#undef IS_LnE_ALIGNED
 #undef flush_flags
 
     rc = 0;
