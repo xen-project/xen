@@ -333,6 +333,8 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
     *((u8*) &pdev->devfn) = devfn;
     pdev->domain = NULL;
 
+    INIT_LIST_HEAD(&pdev->vf_list);
+
     arch_pci_init_pdev(pdev);
 
     rc = pdev_msi_init(pdev);
@@ -449,6 +451,10 @@ static void free_pdev(struct pci_seg *pseg, struct pci_dev *pdev)
 
     list_del(&pdev->alldevs_list);
     pdev_msi_deinit(pdev);
+
+    if ( pdev->info.is_virtfn )
+        list_del(&pdev->vf_list);
+
     xfree(pdev);
 }
 
@@ -656,24 +662,11 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
     unsigned int slot = PCI_SLOT(devfn), func = PCI_FUNC(devfn);
     const char *type;
     int ret;
-    bool pf_is_extfn = false;
 
     if ( !info )
         type = "device";
     else if ( info->is_virtfn )
-    {
-        pcidevs_lock();
-        pdev = pci_get_pdev(NULL,
-                            PCI_SBDF(seg, info->physfn.bus,
-                                     info->physfn.devfn));
-        if ( pdev )
-            pf_is_extfn = pdev->info.is_extfn;
-        pcidevs_unlock();
-        if ( !pdev )
-            pci_add_device(seg, info->physfn.bus, info->physfn.devfn,
-                           NULL, node);
         type = "virtual function";
-    }
     else if ( info->is_extfn )
         type = "extended function";
     else
@@ -698,12 +691,50 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
     if ( info )
     {
         pdev->info = *info;
-        /*
-         * VF's 'is_extfn' field is used to indicate whether its PF is an
-         * extended function.
-         */
         if ( pdev->info.is_virtfn )
-            pdev->info.is_extfn = pf_is_extfn;
+        {
+            struct pci_dev *pf_pdev =
+                pci_get_pdev(NULL, PCI_SBDF(seg, info->physfn.bus,
+                                            info->physfn.devfn));
+
+            if ( !pf_pdev )
+            {
+                ret = pci_add_device(seg, info->physfn.bus, info->physfn.devfn,
+                                     NULL, node);
+                if ( ret )
+                {
+                    printk(XENLOG_WARNING
+                           "Failed to add SR-IOV device PF %pp for VF %pp\n",
+                           &PCI_SBDF(seg, info->physfn.bus, info->physfn.devfn),
+                           &pdev->sbdf);
+                    free_pdev(pseg, pdev);
+                    goto out;
+                }
+                pf_pdev = pci_get_pdev(NULL, PCI_SBDF(seg, info->physfn.bus,
+                                                      info->physfn.devfn));
+                if ( !pf_pdev )
+                {
+                    printk(XENLOG_ERR
+                           "Inconsistent PCI state: failed to find newly added PF %pp for VF %pp\n",
+                           &PCI_SBDF(seg, info->physfn.bus, info->physfn.devfn),
+                           &pdev->sbdf);
+                    ASSERT_UNREACHABLE();
+                    free_pdev(pseg, pdev);
+                    ret = -EILSEQ;
+                    goto out;
+                }
+            }
+
+            if ( !pdev->pf_pdev )
+            {
+                pdev->pf_pdev = pf_pdev;
+
+                /* VF inherits its 'is_extfn' from PF */
+                pdev->info.is_extfn = pf_pdev->info.is_extfn;
+
+                list_add(&pdev->vf_list, &pf_pdev->vf_list);
+            }
+        }
     }
 
     if ( !pdev->info.is_virtfn && !pdev->vf_rlen[0] )
@@ -821,6 +852,28 @@ int pci_remove_device(u16 seg, u8 bus, u8 devfn)
     list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
         if ( pdev->bus == bus && pdev->devfn == devfn )
         {
+            if ( !pdev->info.is_virtfn && !list_empty(&pdev->vf_list) )
+            {
+                struct pci_dev *vf_pdev;
+
+                /*
+                 * Linux Dom0 has been observed to not respect an error code
+                 * returned from PHYSDEVOP_pci_device_remove. Mark VFs and PF
+                 * broken.
+                 */
+                list_for_each_entry(vf_pdev, &pdev->vf_list, vf_list)
+                    vf_pdev->broken = true;
+
+                pdev->broken = true;
+
+                printk(XENLOG_WARNING
+                       "Attempted to remove PCI SR-IOV PF %pp with VFs still present\n",
+                       &pdev->sbdf);
+
+                ret = -EBUSY;
+                break;
+            }
+
             if ( pdev->domain )
             {
                 write_lock(&pdev->domain->pci_lock);
