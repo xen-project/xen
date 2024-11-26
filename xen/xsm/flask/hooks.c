@@ -198,6 +198,7 @@ static int cf_check flask_domain_alloc_security(struct domain *d)
             else if ( pv_shim )
                 dsec->sid = SECINITSID_DOMU;
         }
+        break;
     }
 
     dsec->self_sid = dsec->sid;
@@ -342,6 +343,7 @@ static int cf_check flask_evtchn_send(struct domain *d, struct evtchn *chn)
         break;
     default:
         rc = avc_unknown_permission("event channel state", chn->state);
+        break;
     }
 
     return rc;
@@ -1310,6 +1312,7 @@ static int cf_check flask_hvm_param(struct domain *d, unsigned long op)
         break;
     default:
         perm = HVM__HVMCTL;
+        break;
     }
 
     return current_has_perm(d, SECCLASS_HVM, perm);
@@ -2013,6 +2016,7 @@ const struct xsm_ops *__init flask_init(
     case FLASK_BOOTPARAM_INVALID:
     default:
         panic("Flask: Invalid value for flask= boot parameter.\n");
+        break;
     }
 
     avc_init();
