@@ -218,7 +218,7 @@ int libxl__dom_load_acpi(libxl__gc *gc,
         dom->acpi_modules[0].guest_addr_out = 0x100000 - 64;
 
     dom->acpi_modules[1].data = (void *)config.infop;
-    dom->acpi_modules[1].length = 4096;
+    dom->acpi_modules[1].length = libxl_ctxt.page_size;
     dom->acpi_modules[1].guest_addr_out = ACPI_INFO_PHYSICAL_ADDRESS;
 
     dom->acpi_modules[2].data = libxl_ctxt.buf;
