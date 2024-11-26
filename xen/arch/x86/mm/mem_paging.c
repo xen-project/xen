@@ -304,9 +304,6 @@ static int evict(struct domain *d, gfn_t gfn)
     ret = p2m_set_entry(p2m, gfn, INVALID_MFN, PAGE_ORDER_4K,
                         p2m_ram_paged, a);
 
-    /* Clear content before returning the page to Xen */
-    scrub_one_page(page);
-
     /* Track number of paged gfns */
     atomic_inc(&d->paged_pages);
 

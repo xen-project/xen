@@ -1203,6 +1203,12 @@ static always_inline bool is_iommu_enabled(const struct domain *d)
     return evaluate_nospec(d->options & XEN_DOMCTL_CDF_iommu);
 }
 
+#ifdef CONFIG_MEM_PAGING
+# define mem_paging_enabled(d) vm_event_check_ring((d)->vm_event_paging)
+#else
+# define mem_paging_enabled(d) false
+#endif
+
 extern bool sched_smt_power_savings;
 extern bool sched_disable_smt_switching;
 

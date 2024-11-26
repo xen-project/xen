@@ -532,8 +532,6 @@ static inline unsigned int get_order_from_pages(unsigned long nr_pages)
     return order;
 }
 
-void scrub_one_page(struct page_info *pg);
-
 #ifndef arch_free_heap_page
 #define arch_free_heap_page(d, pg) \
     page_list_del(pg, page_to_list(d, pg))

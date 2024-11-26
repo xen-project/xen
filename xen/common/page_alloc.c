@@ -137,6 +137,7 @@
 #include <xen/sections.h>
 #include <xen/softirq.h>
 #include <xen/spinlock.h>
+#include <xen/vm_event.h>
 
 #include <asm/flushtlb.h>
 #include <asm/page.h>
@@ -773,6 +774,21 @@ static void page_list_add_scrub(struct page_info *pg, unsigned int node,
 #define SCRUB_PATTERN        0ULL
 #endif
 #define SCRUB_BYTE_PATTERN   (SCRUB_PATTERN & 0xff)
+
+static void scrub_one_page(const struct page_info *pg)
+{
+    if ( unlikely(pg->count_info & PGC_broken) )
+        return;
+
+#ifndef NDEBUG
+    /* Avoid callers relying on allocations returning zeroed pages. */
+    unmap_domain_page(memset(__map_domain_page(pg),
+                             SCRUB_BYTE_PATTERN, PAGE_SIZE));
+#else
+    /* For a production build, clear_page() is the fastest way to scrub. */
+    clear_domain_page(_mfn(page_to_mfn(pg)));
+#endif
+}
 
 static void poison_one_page(struct page_info *pg)
 {
@@ -2548,10 +2564,12 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
             /*
              * Normally we expect a domain to clear pages before freeing them,
              * if it cares about the secrecy of their contents. However, after
-             * a domain has died we assume responsibility for erasure. We do
-             * scrub regardless if option scrub_domheap is set.
+             * a domain has died or if it has mem-paging enabled we assume
+             * responsibility for erasure. We do scrub regardless if option
+             * scrub_domheap is set.
              */
-            scrub = d->is_dying || scrub_debug || opt_scrub_domheap;
+            scrub = d->is_dying || mem_paging_enabled(d) ||
+                    scrub_debug || opt_scrub_domheap;
         }
         else
         {
@@ -2634,22 +2652,6 @@ static __init int cf_check pagealloc_keyhandler_init(void)
     return 0;
 }
 __initcall(pagealloc_keyhandler_init);
-
-
-void scrub_one_page(struct page_info *pg)
-{
-    if ( unlikely(pg->count_info & PGC_broken) )
-        return;
-
-#ifndef NDEBUG
-    /* Avoid callers relying on allocations returning zeroed pages. */
-    unmap_domain_page(memset(__map_domain_page(pg),
-                             SCRUB_BYTE_PATTERN, PAGE_SIZE));
-#else
-    /* For a production build, clear_page() is the fastest way to scrub. */
-    clear_domain_page(_mfn(page_to_mfn(pg)));
-#endif
-}
 
 static void cf_check dump_heap(unsigned char key)
 {
