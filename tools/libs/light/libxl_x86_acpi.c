@@ -20,6 +20,8 @@
 
  /* Number of pages holding ACPI tables */
 #define NUM_ACPI_PAGES 16
+/* Hard-coded size of RSDP */
+#define RSDP_LEN 64
 #define ALIGN(p, a) (((p) + ((a) - 1)) & ~((a) - 1))
 
 struct libxl_acpi_ctxt {
@@ -177,7 +179,7 @@ int libxl__dom_load_acpi(libxl__gc *gc,
     }
 
     /* These are all copied into guest memory, so use zero-ed memory. */
-    config.rsdp = (unsigned long)libxl__zalloc(gc, libxl_ctxt.page_size);
+    config.rsdp = (unsigned long)libxl__zalloc(gc, RSDP_LEN);
     config.infop = (unsigned long)libxl__zalloc(gc, libxl_ctxt.page_size);
     /* Pages to hold ACPI tables */
     libxl_ctxt.buf = libxl__zalloc(gc, NUM_ACPI_PAGES *
@@ -204,18 +206,18 @@ int libxl__dom_load_acpi(libxl__gc *gc,
                       libxl_ctxt.guest_start) >> libxl_ctxt.page_shift;
 
     dom->acpi_modules[0].data = (void *)config.rsdp;
-    dom->acpi_modules[0].length = 64;
+    dom->acpi_modules[0].length = RSDP_LEN;
     /*
      * Some Linux versions cannot properly process hvm_start_info.rsdp_paddr
      * and so we need to put RSDP in location that can be discovered by ACPI's
-     * standard search method, in R-O BIOS memory (we chose last 64 bytes)
+     * standard search method, in R-O BIOS memory (we chose last RSDP_LEN bytes)
      */
     if (strcmp(xc_dom_guest_os(dom), "linux") ||
         xc_dom_feature_get(dom, XENFEAT_linux_rsdp_unrestricted))
         dom->acpi_modules[0].guest_addr_out = ACPI_INFO_PHYSICAL_ADDRESS +
             (1 + acpi_pages_num) * libxl_ctxt.page_size;
     else
-        dom->acpi_modules[0].guest_addr_out = 0x100000 - 64;
+        dom->acpi_modules[0].guest_addr_out = 0x100000 - RSDP_LEN;
 
     dom->acpi_modules[1].data = (void *)config.infop;
     dom->acpi_modules[1].length = libxl_ctxt.page_size;
