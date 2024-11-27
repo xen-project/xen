@@ -469,6 +469,7 @@ void ffa_handle_mem_share(struct cpu_user_regs *regs)
     int ret = FFA_RET_DENIED;
     uint32_t range_count;
     uint32_t region_offs;
+    uint16_t dst_id;
 
     if ( !ffa_fw_supports_fid(FFA_MEM_SHARE_64) )
     {
@@ -537,6 +538,15 @@ void ffa_handle_mem_share(struct cpu_user_regs *regs)
         goto out_unlock;
 
     mem_access = ctx->tx + trans.mem_access_offs;
+
+    dst_id = ACCESS_ONCE(mem_access->access_perm.endpoint_id);
+    if ( !FFA_ID_IS_SECURE(dst_id) )
+    {
+        /* we do not support sharing with VMs */
+        ret = FFA_RET_NOT_SUPPORTED;
+        goto out_unlock;
+    }
+
     if ( ACCESS_ONCE(mem_access->access_perm.perm) != FFA_MEM_ACC_RW )
     {
         ret = FFA_RET_NOT_SUPPORTED;
@@ -567,7 +577,7 @@ void ffa_handle_mem_share(struct cpu_user_regs *regs)
         goto out_unlock;
     }
     shm->sender_id = trans.sender_id;
-    shm->ep_id = ACCESS_ONCE(mem_access->access_perm.endpoint_id);
+    shm->ep_id = dst_id;
 
     /*
      * Check that the Composite memory region descriptor fits.

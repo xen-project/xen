@@ -195,6 +195,14 @@ static void handle_msg_send_direct_req(struct cpu_user_regs *regs, uint32_t fid)
         goto out;
     }
 
+    /* we do not support direct messages to VMs */
+    if ( !FFA_ID_IS_SECURE(src_dst & GENMASK(15,0)) )
+    {
+        resp.a0 = FFA_ERROR;
+        resp.a2 = FFA_RET_NOT_SUPPORTED;
+        goto out;
+    }
+
     arg.a1 = src_dst;
     arg.a2 = get_user_reg(regs, 2) & mask;
     arg.a3 = get_user_reg(regs, 3) & mask;
@@ -391,11 +399,15 @@ static int ffa_domain_init(struct domain *d)
 
     if ( !ffa_fw_version )
         return -ENODEV;
-     /*
-      * We can't use that last possible domain ID or ffa_get_vm_id() would
-      * cause an overflow.
-      */
-    if ( d->domain_id >= UINT16_MAX)
+    /*
+     * We are using the domain_id + 1 as the FF-A ID for VMs as FF-A ID 0 is
+     * reserved for the hypervisor and we only support secure endpoints using
+     * FF-A IDs with BIT 15 set to 1 so make sure those are not used by Xen.
+     */
+    BUILD_BUG_ON(DOMID_FIRST_RESERVED >= UINT16_MAX);
+    BUILD_BUG_ON((DOMID_MASK & BIT(15, U)) != 0);
+
+    if ( d->domain_id >= DOMID_FIRST_RESERVED )
         return -ERANGE;
 
     ctx = xzalloc(struct ffa_ctx);

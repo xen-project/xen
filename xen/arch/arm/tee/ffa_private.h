@@ -108,6 +108,13 @@
  */
 #define FFA_CTX_TEARDOWN_DELAY          SECONDS(1)
 
+/*
+ * We rely on the convention suggested but not mandated by the FF-A
+ * specification that secure world endpoint identifiers have the bit 15
+ * set and normal world have it set to 0.
+ */
+#define FFA_ID_IS_SECURE(id)    ((id) & BIT(15, U))
+
 /* FF-A-1.1-REL0 section 10.9.2 Memory region handle, page 167 */
 #define FFA_HANDLE_HYP_FLAG             BIT(63, ULL)
 #define FFA_HANDLE_INVALID              0xffffffffffffffffULL
