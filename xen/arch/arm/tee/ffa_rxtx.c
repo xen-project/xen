@@ -203,10 +203,8 @@ bool ffa_rxtx_init(void)
 
     e = ffa_rxtx_map(__pa(ffa_tx), __pa(ffa_rx), FFA_RXTX_PAGE_COUNT);
     if ( e )
-    {
-        printk(XENLOG_ERR "ffa: Failed to map rxtx: error %d\n", e);
         goto err;
-    }
+
     return true;
 
 err:

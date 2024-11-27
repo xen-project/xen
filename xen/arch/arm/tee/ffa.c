@@ -71,8 +71,8 @@
 
 #include "ffa_private.h"
 
-/* Negotiated FF-A version to use with the SPMC */
-static uint32_t __ro_after_init ffa_version;
+/* Negotiated FF-A version to use with the SPMC, 0 if not there or supported */
+static uint32_t __ro_after_init ffa_fw_version;
 
 
 /*
@@ -105,10 +105,7 @@ static bool ffa_get_version(uint32_t *vers)
 
     arm_smccc_1_2_smc(&arg, &resp);
     if ( resp.a0 == FFA_RET_NOT_SUPPORTED )
-    {
-        gprintk(XENLOG_ERR, "ffa: FFA_VERSION returned not supported\n");
         return false;
-    }
 
     *vers = resp.a0;
 
@@ -372,7 +369,7 @@ static int ffa_domain_init(struct domain *d)
     struct ffa_ctx *ctx;
     int ret;
 
-    if ( !ffa_version )
+    if ( !ffa_fw_version )
         return -ENODEV;
      /*
       * We can't use that last possible domain ID or ffa_get_vm_id() would
@@ -505,6 +502,9 @@ static bool ffa_probe(void)
      */
     BUILD_BUG_ON(PAGE_SIZE != FFA_PAGE_SIZE);
 
+    printk(XENLOG_INFO "ARM FF-A Mediator version %u.%u\n",
+           FFA_MY_VERSION_MAJOR, FFA_MY_VERSION_MINOR);
+
     /*
      * psci_init_smccc() updates this value with what's reported by EL-3
      * or secure world.
@@ -514,22 +514,23 @@ static bool ffa_probe(void)
         printk(XENLOG_ERR
                "ffa: unsupported SMCCC version %#x (need at least %#x)\n",
                smccc_ver, ARM_SMCCC_VERSION_1_2);
-        return false;
+        goto err_no_fw;
     }
 
     if ( !ffa_get_version(&vers) )
-        return false;
+    {
+        gprintk(XENLOG_ERR, "Cannot retrieve the FFA version\n");
+        goto err_no_fw;
+    }
 
     if ( vers < FFA_MIN_SPMC_VERSION || vers > FFA_MY_VERSION )
     {
         printk(XENLOG_ERR "ffa: Incompatible version %#x found\n", vers);
-        return false;
+        goto err_no_fw;
     }
 
     major_vers = (vers >> FFA_VERSION_MAJOR_SHIFT) & FFA_VERSION_MAJOR_MASK;
     minor_vers = vers & FFA_VERSION_MINOR_MASK;
-    printk(XENLOG_INFO "ARM FF-A Mediator version %u.%u\n",
-           FFA_MY_VERSION_MAJOR, FFA_MY_VERSION_MINOR);
     printk(XENLOG_INFO "ARM FF-A Firmware version %u.%u\n",
            major_vers, minor_vers);
 
@@ -546,12 +547,18 @@ static bool ffa_probe(void)
          !check_mandatory_feature(FFA_MEM_SHARE_32) ||
          !check_mandatory_feature(FFA_MEM_RECLAIM) ||
          !check_mandatory_feature(FFA_MSG_SEND_DIRECT_REQ_32) )
-        return false;
+    {
+        printk(XENLOG_ERR "ffa: Mandatory feature not supported by fw\n");
+        goto err_no_fw;
+    }
+
+    ffa_fw_version = vers;
 
     if ( !ffa_rxtx_init() )
-        return false;
-
-    ffa_version = vers;
+    {
+        printk(XENLOG_ERR "ffa: Error during RXTX buffer init\n");
+        goto err_no_fw;
+    }
 
     if ( !ffa_partinfo_init() )
         goto err_rxtx_destroy;
@@ -564,7 +571,9 @@ static bool ffa_probe(void)
 
 err_rxtx_destroy:
     ffa_rxtx_destroy();
-    ffa_version = 0;
+err_no_fw:
+    ffa_fw_version = 0;
+    printk(XENLOG_WARNING "ARM FF-A No firmware support\n");
 
     return false;
 }
