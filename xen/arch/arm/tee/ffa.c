@@ -311,8 +311,6 @@ static bool ffa_handle_call(struct cpu_user_regs *regs)
     uint32_t fid = get_user_reg(regs, 0);
     struct domain *d = current->domain;
     struct ffa_ctx *ctx = d->arch.tee;
-    uint32_t fpi_size;
-    uint32_t count;
     int e;
 
     if ( !ctx )
@@ -338,16 +336,7 @@ static bool ffa_handle_call(struct cpu_user_regs *regs)
         e = ffa_handle_rxtx_unmap();
         break;
     case FFA_PARTITION_INFO_GET:
-        e = ffa_handle_partition_info_get(get_user_reg(regs, 1),
-                                          get_user_reg(regs, 2),
-                                          get_user_reg(regs, 3),
-                                          get_user_reg(regs, 4),
-                                          get_user_reg(regs, 5), &count,
-                                          &fpi_size);
-        if ( e )
-            ffa_set_regs_error(regs, e);
-        else
-            ffa_set_regs_success(regs, count, fpi_size);
+        ffa_handle_partition_info_get(regs);
         return true;
     case FFA_RX_RELEASE:
         e = ffa_handle_rx_release();

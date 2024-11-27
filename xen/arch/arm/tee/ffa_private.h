@@ -316,9 +316,7 @@ int ffa_handle_mem_reclaim(uint64_t handle, uint32_t flags);
 bool ffa_partinfo_init(void);
 int ffa_partinfo_domain_init(struct domain *d);
 bool ffa_partinfo_domain_destroy(struct domain *d);
-int32_t ffa_handle_partition_info_get(uint32_t w1, uint32_t w2, uint32_t w3,
-                                      uint32_t w4, uint32_t w5, uint32_t *count,
-                                      uint32_t *fpi_size);
+void ffa_handle_partition_info_get(struct cpu_user_regs *regs);
 
 bool ffa_rxtx_init(void);
 void ffa_rxtx_destroy(void);
