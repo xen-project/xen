@@ -281,8 +281,6 @@ struct ffa_mem_region {
 };
 
 struct ffa_ctx_notif {
-    bool enabled;
-
     /*
      * True if domain is reported by FFA_NOTIFICATION_INFO_GET to have
      * pending global notifications.

@@ -169,8 +169,6 @@ static void handle_version(struct cpu_user_regs *regs)
 
 static void handle_features(struct cpu_user_regs *regs)
 {
-    struct domain *d = current->domain;
-    struct ffa_ctx *ctx = d->arch.tee;
     uint32_t a1 = get_user_reg(regs, 1);
     unsigned int n;
 
@@ -218,16 +216,10 @@ static void handle_features(struct cpu_user_regs *regs)
         ffa_set_regs_success(regs, 0, 0);
         break;
     case FFA_FEATURE_NOTIF_PEND_INTR:
-        if ( ctx->notif.enabled )
-            ffa_set_regs_success(regs, GUEST_FFA_NOTIF_PEND_INTR_ID, 0);
-        else
-            ffa_set_regs_error(regs, FFA_RET_NOT_SUPPORTED);
+        ffa_set_regs_success(regs, GUEST_FFA_NOTIF_PEND_INTR_ID, 0);
         break;
     case FFA_FEATURE_SCHEDULE_RECV_INTR:
-        if ( ctx->notif.enabled )
-            ffa_set_regs_success(regs, GUEST_FFA_SCHEDULE_RECV_INTR_ID, 0);
-        else
-            ffa_set_regs_error(regs, FFA_RET_NOT_SUPPORTED);
+        ffa_set_regs_success(regs, GUEST_FFA_SCHEDULE_RECV_INTR_ID, 0);
         break;
 
     case FFA_NOTIFICATION_BIND:
@@ -236,10 +228,7 @@ static void handle_features(struct cpu_user_regs *regs)
     case FFA_NOTIFICATION_SET:
     case FFA_NOTIFICATION_INFO_GET_32:
     case FFA_NOTIFICATION_INFO_GET_64:
-        if ( ctx->notif.enabled )
-            ffa_set_regs_success(regs, 0, 0);
-        else
-            ffa_set_regs_error(regs, FFA_RET_NOT_SUPPORTED);
+        ffa_set_regs_success(regs, 0, 0);
         break;
     default:
         ffa_set_regs_error(regs, FFA_RET_NOT_SUPPORTED);
