@@ -148,13 +148,20 @@ static void handle_version(struct cpu_user_regs *regs)
     struct ffa_ctx *ctx = d->arch.tee;
     uint32_t vers = get_user_reg(regs, 1);
 
-    if ( vers < FFA_VERSION_1_1 )
-        vers = FFA_VERSION_1_0;
-    else
-        vers = FFA_VERSION_1_1;
-
-    ctx->guest_vers = vers;
-    ffa_set_regs(regs, vers, 0, 0, 0, 0, 0, 0, 0);
+    /*
+     * Guest will use the version it requested if it is our major and minor
+     * lower or equals to ours. If the minor is greater, our version will be
+     * used.
+     * In any case return our version to the caller.
+     */
+    if ( FFA_VERSION_MAJOR(vers) == FFA_MY_VERSION_MAJOR )
+    {
+        if ( FFA_VERSION_MINOR(vers) > FFA_MY_VERSION_MINOR )
+            ctx->guest_vers = FFA_MY_VERSION;
+        else
+            ctx->guest_vers = vers;
+    }
+    ffa_set_regs(regs, FFA_MY_VERSION, 0, 0, 0, 0, 0, 0, 0);
 }
 
 static void handle_msg_send_direct_req(struct cpu_user_regs *regs, uint32_t fid)
@@ -537,16 +544,38 @@ static bool ffa_probe(void)
         goto err_no_fw;
     }
 
-    if ( vers < FFA_MIN_SPMC_VERSION || vers > FFA_MY_VERSION )
+    /* Some sanity check in case we update the version we support */
+    BUILD_BUG_ON(FFA_MIN_SPMC_VERSION > FFA_MY_VERSION);
+    BUILD_BUG_ON(FFA_VERSION_MAJOR(FFA_MIN_SPMC_VERSION) !=
+                                   FFA_MY_VERSION_MAJOR);
+
+    major_vers = FFA_VERSION_MAJOR(vers);
+    minor_vers = FFA_VERSION_MINOR(vers);
+
+    if ( major_vers != FFA_MY_VERSION_MAJOR ||
+         minor_vers < FFA_VERSION_MINOR(FFA_MIN_SPMC_VERSION) )
     {
-        printk(XENLOG_ERR "ffa: Incompatible version %#x found\n", vers);
+        printk(XENLOG_ERR "ffa: Incompatible firmware version %u.%u\n",
+               major_vers, minor_vers);
         goto err_no_fw;
     }
 
-    major_vers = (vers >> FFA_VERSION_MAJOR_SHIFT) & FFA_VERSION_MAJOR_MASK;
-    minor_vers = vers & FFA_VERSION_MINOR_MASK;
     printk(XENLOG_INFO "ARM FF-A Firmware version %u.%u\n",
            major_vers, minor_vers);
+
+    /*
+     * If the call succeed and the version returned is higher or equal to
+     * the one Xen requested, the version requested by Xen will be the one
+     * used. If the version returned is lower but compatible with Xen, Xen
+     * will use that version instead.
+     * A version with a different major or lower than the minimum version
+     * we support is rejected before.
+     * See https://developer.arm.com/documentation/den0077/e/ chapter 13.2.1
+     */
+    if ( minor_vers > FFA_MY_VERSION_MINOR )
+        ffa_fw_version = FFA_MY_VERSION;
+    else
+        ffa_fw_version = vers;
 
     /*
      * At the moment domains must support the same features used by Xen.
@@ -562,8 +591,6 @@ static bool ffa_probe(void)
             goto err_no_fw;
         }
     }
-
-    ffa_fw_version = vers;
 
     if ( !ffa_rxtx_init() )
     {
