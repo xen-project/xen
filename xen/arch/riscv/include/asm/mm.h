@@ -12,6 +12,8 @@
 
 #include <asm/page-bits.h>
 
+extern vaddr_t directmap_virt_start;
+
 #define pfn_to_paddr(pfn) ((paddr_t)(pfn) << PAGE_SHIFT)
 #define paddr_to_pfn(pa)  ((unsigned long)((pa) >> PAGE_SHIFT))
 
@@ -25,8 +27,11 @@
 
 static inline void *maddr_to_virt(paddr_t ma)
 {
-    BUG_ON("unimplemented");
-    return NULL;
+    unsigned long va = directmap_virt_start + maddr_to_directmapoff(ma);
+
+    ASSERT((va >= DIRECTMAP_VIRT_START) && (va <= DIRECTMAP_VIRT_END));
+
+    return (void *)va;
 }
 
 /*
@@ -38,8 +43,8 @@ static inline void *maddr_to_virt(paddr_t ma)
 static inline unsigned long virt_to_maddr(unsigned long va)
 {
     if ((va >= DIRECTMAP_VIRT_START) &&
-        (va < (DIRECTMAP_VIRT_START + DIRECTMAP_SIZE)))
-        return directmapoff_to_maddr(va - DIRECTMAP_VIRT_START);
+        (va <= DIRECTMAP_VIRT_END))
+        return directmapoff_to_maddr(va - directmap_virt_start);
 
     BUILD_BUG_ON(XEN_VIRT_SIZE != MB(2));
     ASSERT((va >> (PAGETABLE_ORDER + PAGE_SHIFT)) ==
@@ -127,11 +132,13 @@ struct page_info
     };
 };
 
+extern struct page_info *frametable_virt_start;
+
 #define frame_table ((struct page_info *)FRAMETABLE_VIRT_START)
 
 /* Convert between machine frame numbers and page-info structures. */
-#define mfn_to_page(mfn)    (frame_table + mfn_x(mfn))
-#define page_to_mfn(pg)     _mfn((pg) - frame_table)
+#define mfn_to_page(mfn)    (frametable_virt_start + mfn_x(mfn))
+#define page_to_mfn(pg)     _mfn((pg) - frametable_virt_start)
 
 static inline void *page_to_virt(const struct page_info *pg)
 {
