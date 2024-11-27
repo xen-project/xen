@@ -83,7 +83,7 @@ int8_t __initdata opt_probe_port_aliases = -1;
 boolean_param("probe-port-aliases", opt_probe_port_aliases);
 
 /* **** Linux config option: propagated to domain0. */
-/* "acpi=off":    Sisables both ACPI table parsing and interpreter. */
+/* "acpi=off":    Disables both ACPI table parsing and interpreter. */
 /* "acpi=force":  Override the disable blacklist.                   */
 /* "acpi=ht":     Limit ACPI just to boot-time to enable HT.        */
 /* "acpi=noirq":  Disables ACPI interrupt routing.                  */
