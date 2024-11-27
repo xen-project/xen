@@ -7,6 +7,7 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/shutdown.h>
+#include <xen/vmap.h>
 
 #include <public/version.h>
 
@@ -61,6 +62,8 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
     cmdline_parse(cmdline);
 
     setup_mm();
+
+    vm_init();
 
     printk("All set up\n");
 

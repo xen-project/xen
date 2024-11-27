@@ -1,6 +1,7 @@
 #include <xen/bug.h>
 #include <xen/domain_page.h>
 #include <xen/errno.h>
+#include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/pfn.h>
@@ -418,4 +419,9 @@ int map_pages_to_xen(unsigned long virt,
     ASSERT(!mfn_eq(mfn, INVALID_MFN) && (flags & PTE_VALID));
 
     return pt_update(virt, mfn, nr_mfns, flags);
+}
+
+int __init populate_pt_range(unsigned long virt, unsigned long nr_mfns)
+{
+    return pt_update(virt, INVALID_MFN, nr_mfns, PTE_POPULATE);
 }
