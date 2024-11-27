@@ -2727,7 +2727,7 @@ void __init ioapic_init(void)
 
 unsigned int __hwdom_init arch_hwdom_irqs(const struct domain *d)
 {
-    unsigned int n = fls(num_present_cpus());
+    unsigned int n = num_present_cpus();
     /* Bounding by the domain pirq EOI bitmap capacity. */
     const unsigned int max_irqs = min_t(unsigned int, nr_irqs,
                                         PAGE_SIZE * BITS_PER_BYTE);
