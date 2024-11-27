@@ -6204,6 +6204,12 @@ void __iomem *__init ioremap_wc(paddr_t pa, size_t len)
     return (void __force __iomem *)(va ? va + offs : NULL);
 }
 
+static bool perdomain_l1e_needs_freeing(l1_pgentry_t l1e)
+{
+    return (l1e_get_flags(l1e) & (_PAGE_PRESENT | _PAGE_AVAIL0)) ==
+           (_PAGE_PRESENT | _PAGE_AVAIL0);
+}
+
 int create_perdomain_mapping(struct domain *d, unsigned long va,
                              unsigned int nr, l1_pgentry_t **pl1tab,
                              struct page_info **ppg)
@@ -6356,9 +6362,7 @@ void destroy_perdomain_mapping(struct domain *d, unsigned long va,
 
                 for ( ; nr && i < L1_PAGETABLE_ENTRIES; --nr, ++i )
                 {
-                    if ( (l1e_get_flags(l1tab[i]) &
-                          (_PAGE_PRESENT | _PAGE_AVAIL0)) ==
-                         (_PAGE_PRESENT | _PAGE_AVAIL0) )
+                    if ( perdomain_l1e_needs_freeing(l1tab[i]) )
                         free_domheap_page(l1e_get_page(l1tab[i]));
                     l1tab[i] = l1e_empty();
                 }
@@ -6408,9 +6412,7 @@ void free_perdomain_mappings(struct domain *d)
                         unsigned int k;
 
                         for ( k = 0; k < L1_PAGETABLE_ENTRIES; ++k )
-                            if ( (l1e_get_flags(l1tab[k]) &
-                                  (_PAGE_PRESENT | _PAGE_AVAIL0)) ==
-                                 (_PAGE_PRESENT | _PAGE_AVAIL0) )
+                            if ( perdomain_l1e_needs_freeing(l1tab[k]) )
                                 free_domheap_page(l1e_get_page(l1tab[k]));
 
                         unmap_domain_page(l1tab);
