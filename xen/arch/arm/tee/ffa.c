@@ -74,6 +74,31 @@
 /* Negotiated FF-A version to use with the SPMC, 0 if not there or supported */
 static uint32_t __ro_after_init ffa_fw_version;
 
+struct ffa_fw_abi {
+    uint32_t id;
+    const char *name;
+};
+
+#define FW_ABI(abi) {abi,#abi}
+
+/* List of ABI we use from the firmware */
+static const struct ffa_fw_abi ffa_fw_abi_needed[] = {
+    FW_ABI(FFA_VERSION),
+    FW_ABI(FFA_FEATURES),
+    FW_ABI(FFA_NOTIFICATION_BITMAP_CREATE),
+    FW_ABI(FFA_NOTIFICATION_BITMAP_DESTROY),
+    FW_ABI(FFA_PARTITION_INFO_GET),
+    FW_ABI(FFA_NOTIFICATION_INFO_GET_64),
+    FW_ABI(FFA_NOTIFICATION_GET),
+    FW_ABI(FFA_RX_RELEASE),
+    FW_ABI(FFA_RXTX_MAP_64),
+    FW_ABI(FFA_RXTX_UNMAP),
+    FW_ABI(FFA_MEM_SHARE_32),
+    FW_ABI(FFA_MEM_SHARE_64),
+    FW_ABI(FFA_MEM_RECLAIM),
+    FW_ABI(FFA_MSG_SEND_DIRECT_REQ_32),
+    FW_ABI(FFA_MSG_SEND_DIRECT_REQ_64),
+};
 
 /*
  * Our rx/tx buffers shared with the SPMC. FFA_RXTX_PAGE_COUNT is the
@@ -112,20 +137,9 @@ static bool ffa_get_version(uint32_t *vers)
     return true;
 }
 
-static int32_t ffa_features(uint32_t id)
+static bool ffa_abi_supported(uint32_t id)
 {
-    return ffa_simple_call(FFA_FEATURES, id, 0, 0, 0);
-}
-
-static bool check_mandatory_feature(uint32_t id)
-{
-    int32_t ret = ffa_features(id);
-
-    if ( ret )
-        printk(XENLOG_ERR "ffa: mandatory feature id %#x missing: error %d\n",
-               id, ret);
-
-    return !ret;
+    return !ffa_simple_call(FFA_FEATURES, id, 0, 0, 0);
 }
 
 static void handle_version(struct cpu_user_regs *regs)
@@ -539,17 +553,14 @@ static bool ffa_probe(void)
      * TODO: Rework the code to allow domain to use a subset of the
      * features supported.
      */
-    if ( !check_mandatory_feature(FFA_PARTITION_INFO_GET) ||
-         !check_mandatory_feature(FFA_RX_RELEASE) ||
-         !check_mandatory_feature(FFA_RXTX_MAP_64) ||
-         !check_mandatory_feature(FFA_MEM_SHARE_64) ||
-         !check_mandatory_feature(FFA_RXTX_UNMAP) ||
-         !check_mandatory_feature(FFA_MEM_SHARE_32) ||
-         !check_mandatory_feature(FFA_MEM_RECLAIM) ||
-         !check_mandatory_feature(FFA_MSG_SEND_DIRECT_REQ_32) )
+    for ( unsigned int i = 0; i < ARRAY_SIZE(ffa_fw_abi_needed); i++ )
     {
-        printk(XENLOG_ERR "ffa: Mandatory feature not supported by fw\n");
-        goto err_no_fw;
+        if ( !ffa_abi_supported(ffa_fw_abi_needed[i].id) )
+        {
+            printk(XENLOG_INFO "ARM FF-A Firmware does not support %s\n",
+                   ffa_fw_abi_needed[i].name);
+            goto err_no_fw;
+        }
     }
 
     ffa_fw_version = vers;
