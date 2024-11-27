@@ -156,9 +156,14 @@ struct pci_dev {
      * List entry if VF.
      */
     struct list_head vf_list;
-    u64 vf_rlen[6];
-    /* Link from VF to PF. Only populated for VFs. */
-    const struct pci_dev *pf_pdev;
+    union {
+        struct pf_info {
+            /* Only populated for PFs. */
+            uint64_t vf_rlen[PCI_SRIOV_NUM_BARS];
+        } physfn;
+        /* Link from VF to PF. Only populated for VFs. */
+        const struct pci_dev *pf_pdev;
+    };
 
     /* Data for vPCI. */
     struct vpci *vpci;
