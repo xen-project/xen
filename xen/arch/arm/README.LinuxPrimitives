@@ -108,10 +108,8 @@ linux/arch/arm/lib/memchr.S             xen/arch/arm/arm32/lib/memchr.S
 linux/arch/arm/lib/memcpy.S             xen/arch/arm/arm32/lib/memcpy.S
 linux/arch/arm/lib/memmove.S            xen/arch/arm/arm32/lib/memmove.S
 linux/arch/arm/lib/memset.S             xen/arch/arm/arm32/lib/memset.S
-linux/arch/arm/lib/memzero.S            xen/arch/arm/arm32/lib/memzero.S
 
-for i in copy_template.S memchr.S memcpy.S memmove.S memset.S \
-         memzero.S ; do
+for i in copy_template.S memchr.S memcpy.S memmove.S memset.S; do
     diff -u linux/arch/arm/lib/$i xen/arch/arm/arm32/lib/$i
 done
 

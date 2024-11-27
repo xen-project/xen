@@ -1,4 +1,4 @@
-obj-y += memcpy.o memmove.o memset.o memchr.o memzero.o
+obj-y += memcpy.o memmove.o memset.o memchr.o
 obj-y += findbit.o
 obj-y += bitops.o
 obj-y += strchr.o strrchr.o

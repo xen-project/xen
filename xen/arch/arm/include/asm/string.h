@@ -24,24 +24,6 @@
 #define __HAVE_ARCH_MEMSET
 #define __HAVE_ARCH_MEMCHR
 
-#if defined(CONFIG_ARM_32)
-
-void __memzero(void *ptr, size_t n);
-
-#define memset(p, v, n)                                                 \
-        ({                                                              \
-                void *__p = (p); size_t __n = n;                        \
-                if ((__n) != 0) {                                       \
-                        if (__builtin_constant_p((v)) && (v) == 0)      \
-                                __memzero((__p),(__n));                 \
-                        else                                            \
-                                memset((__p),(v),(__n));                \
-                }                                                       \
-                (__p);                                                  \
-        })
-
-#endif
-
 #endif /* __ARM_STRING_H__ */
 /*
  * Local variables:
