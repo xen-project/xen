@@ -149,6 +149,9 @@ static int32_t ffa_mem_share(uint32_t tot_len, uint32_t frag_len,
 static int32_t ffa_mem_reclaim(uint32_t handle_lo, uint32_t handle_hi,
                                uint32_t flags)
 {
+    if ( !ffa_fw_supports_fid(FFA_MEM_RECLAIM) )
+        return FFA_RET_NOT_SUPPORTED;
+
     return ffa_simple_call(FFA_MEM_RECLAIM, handle_lo, handle_hi, flags, 0);
 }
 
@@ -467,6 +470,12 @@ void ffa_handle_mem_share(struct cpu_user_regs *regs)
     uint32_t range_count;
     uint32_t region_offs;
 
+    if ( !ffa_fw_supports_fid(FFA_MEM_SHARE_64) )
+    {
+        ret = FFA_RET_NOT_SUPPORTED;
+        goto out_set_ret;
+    }
+
     /*
      * We're only accepting memory transaction descriptors via the rx/tx
      * buffer.
@@ -620,6 +629,9 @@ int ffa_handle_mem_reclaim(uint64_t handle, uint32_t flags)
     register_t handle_hi;
     register_t handle_lo;
     int ret;
+
+    if ( !ffa_fw_supports_fid(FFA_MEM_RECLAIM) )
+        return FFA_RET_NOT_SUPPORTED;
 
     spin_lock(&ctx->lock);
     shm = find_shm_mem(ctx, handle);

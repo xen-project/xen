@@ -14,6 +14,7 @@
 #include <xen/spinlock.h>
 #include <xen/sched.h>
 #include <xen/time.h>
+#include <xen/bitmap.h>
 
 /* Error codes */
 #define FFA_RET_OK                      0
@@ -201,18 +202,17 @@
 #define FFA_INTERRUPT                   0x84000062U
 #define FFA_VERSION                     0x84000063U
 #define FFA_FEATURES                    0x84000064U
-#define FFA_RX_ACQUIRE                  0x84000084U
 #define FFA_RX_RELEASE                  0x84000065U
 #define FFA_RXTX_MAP_32                 0x84000066U
 #define FFA_RXTX_MAP_64                 0xC4000066U
 #define FFA_RXTX_UNMAP                  0x84000067U
 #define FFA_PARTITION_INFO_GET          0x84000068U
 #define FFA_ID_GET                      0x84000069U
-#define FFA_SPM_ID_GET                  0x84000085U
+#define FFA_MSG_POLL                    0x8400006AU
 #define FFA_MSG_WAIT                    0x8400006BU
 #define FFA_MSG_YIELD                   0x8400006CU
 #define FFA_RUN                         0x8400006DU
-#define FFA_MSG_SEND2                   0x84000086U
+#define FFA_MSG_SEND                    0x8400006EU
 #define FFA_MSG_SEND_DIRECT_REQ_32      0x8400006FU
 #define FFA_MSG_SEND_DIRECT_REQ_64      0xC400006FU
 #define FFA_MSG_SEND_DIRECT_RESP_32     0x84000070U
@@ -230,8 +230,6 @@
 #define FFA_MEM_RECLAIM                 0x84000077U
 #define FFA_MEM_FRAG_RX                 0x8400007AU
 #define FFA_MEM_FRAG_TX                 0x8400007BU
-#define FFA_MSG_SEND                    0x8400006EU
-#define FFA_MSG_POLL                    0x8400006AU
 #define FFA_NOTIFICATION_BITMAP_CREATE  0x8400007DU
 #define FFA_NOTIFICATION_BITMAP_DESTROY 0x8400007EU
 #define FFA_NOTIFICATION_BIND           0x8400007FU
@@ -240,6 +238,25 @@
 #define FFA_NOTIFICATION_GET            0x84000082U
 #define FFA_NOTIFICATION_INFO_GET_32    0x84000083U
 #define FFA_NOTIFICATION_INFO_GET_64    0xC4000083U
+#define FFA_RX_ACQUIRE                  0x84000084U
+#define FFA_SPM_ID_GET                  0x84000085U
+#define FFA_MSG_SEND2                   0x84000086U
+
+/**
+ * Encoding of features supported or not by the fw in a bitmap:
+ * - Function IDs are going from 0x60 to 0xFF
+ * - A function can be supported in 32 and/or 64bit
+ * The bitmap has one bit for each function in 32 and 64 bit.
+ */
+#define FFA_ABI_ID(id)        ((id) & ARM_SMCCC_FUNC_MASK)
+#define FFA_ABI_CONV(id)      (((id) >> ARM_SMCCC_CONV_SHIFT) & BIT(0,U))
+
+#define FFA_ABI_MIN           FFA_ABI_ID(FFA_ERROR)
+#define FFA_ABI_MAX           FFA_ABI_ID(FFA_MSG_SEND2)
+
+#define FFA_ABI_BITMAP_SIZE   (2 * (FFA_ABI_MAX - FFA_ABI_MIN + 1))
+#define FFA_ABI_BITNUM(id)    ((FFA_ABI_ID(id) - FFA_ABI_MIN) << 1 | \
+                               FFA_ABI_CONV(id))
 
 struct ffa_ctx_notif {
     bool enabled;
@@ -289,6 +306,8 @@ extern void *ffa_rx;
 extern void *ffa_tx;
 extern spinlock_t ffa_rx_buffer_lock;
 extern spinlock_t ffa_tx_buffer_lock;
+extern uint32_t __ro_after_init ffa_fw_version;
+extern DECLARE_BITMAP(ffa_fw_abi_supported, FFA_ABI_BITMAP_SIZE);
 
 bool ffa_shm_domain_destroy(struct domain *d);
 void ffa_handle_mem_share(struct cpu_user_regs *regs);
@@ -399,6 +418,15 @@ static inline int32_t ffa_simple_call(uint32_t fid, register_t a1,
 static inline int32_t ffa_rx_release(void)
 {
     return ffa_simple_call(FFA_RX_RELEASE, 0, 0, 0, 0);
+}
+
+static inline bool ffa_fw_supports_fid(uint32_t fid)
+{
+    BUILD_BUG_ON(FFA_ABI_MIN > FFA_ABI_MAX);
+
+    if ( FFA_ABI_BITNUM(fid) > FFA_ABI_BITMAP_SIZE)
+        return false;
+    return test_bit(FFA_ABI_BITNUM(fid), ffa_fw_abi_supported);
 }
 
 #endif /*__FFA_PRIVATE_H__*/

@@ -377,6 +377,13 @@ void ffa_notif_init(void)
     unsigned int irq;
     int ret;
 
+    /* Only enable fw notification if all ABIs we need are supported */
+    if ( !(ffa_fw_supports_fid(FFA_NOTIFICATION_BITMAP_CREATE) &&
+           ffa_fw_supports_fid(FFA_NOTIFICATION_BITMAP_DESTROY) &&
+           ffa_fw_supports_fid(FFA_NOTIFICATION_GET) &&
+           ffa_fw_supports_fid(FFA_NOTIFICATION_INFO_GET_64)) )
+        return;
+
     arm_smccc_1_2_smc(&arg, &resp);
     if ( resp.a0 != FFA_SUCCESS_32 )
         return;

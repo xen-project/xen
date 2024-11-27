@@ -72,7 +72,10 @@
 #include "ffa_private.h"
 
 /* Negotiated FF-A version to use with the SPMC, 0 if not there or supported */
-static uint32_t __ro_after_init ffa_fw_version;
+uint32_t __ro_after_init ffa_fw_version;
+
+/* Features supported by the SPMC or secure world when present */
+DECLARE_BITMAP(ffa_fw_abi_supported, FFA_ABI_BITMAP_SIZE);
 
 struct ffa_fw_abi {
     uint32_t id;
@@ -176,6 +179,13 @@ static void handle_msg_send_direct_req(struct cpu_user_regs *regs, uint32_t fid)
         mask = GENMASK_ULL(63, 0);
     else
         mask = GENMASK_ULL(31, 0);
+
+    if ( !ffa_fw_supports_fid(fid) )
+    {
+        resp.a0 = FFA_ERROR;
+        resp.a2 = FFA_RET_NOT_SUPPORTED;
+        goto out;
+    }
 
     src_dst = get_user_reg(regs, 1);
     if ( (src_dst >> 16) != ffa_get_vm_id(d) )
@@ -577,19 +587,16 @@ static bool ffa_probe(void)
     else
         ffa_fw_version = vers;
 
-    /*
-     * At the moment domains must support the same features used by Xen.
-     * TODO: Rework the code to allow domain to use a subset of the
-     * features supported.
-     */
     for ( unsigned int i = 0; i < ARRAY_SIZE(ffa_fw_abi_needed); i++ )
     {
-        if ( !ffa_abi_supported(ffa_fw_abi_needed[i].id) )
-        {
+        ASSERT(FFA_ABI_BITNUM(ffa_fw_abi_needed[i].id) < FFA_ABI_BITMAP_SIZE);
+
+        if ( ffa_abi_supported(ffa_fw_abi_needed[i].id) )
+            set_bit(FFA_ABI_BITNUM(ffa_fw_abi_needed[i].id),
+                    ffa_fw_abi_supported);
+        else
             printk(XENLOG_INFO "ARM FF-A Firmware does not support %s\n",
                    ffa_fw_abi_needed[i].name);
-            goto err_no_fw;
-        }
     }
 
     if ( !ffa_rxtx_init() )
@@ -611,6 +618,7 @@ err_rxtx_destroy:
     ffa_rxtx_destroy();
 err_no_fw:
     ffa_fw_version = 0;
+    bitmap_zero(ffa_fw_abi_supported, FFA_ABI_BITMAP_SIZE);
     printk(XENLOG_WARNING "ARM FF-A No firmware support\n");
 
     return false;
