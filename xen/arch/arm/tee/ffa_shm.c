@@ -16,21 +16,6 @@
 
 #include "ffa_private.h"
 
-/* Constituent memory region descriptor */
-struct ffa_address_range {
-    uint64_t address;
-    uint32_t page_count;
-    uint32_t reserved;
-};
-
-/* Composite memory region descriptor */
-struct ffa_mem_region {
-    uint32_t total_page_count;
-    uint32_t address_range_count;
-    uint64_t reserved;
-    struct ffa_address_range address_range_array[];
-};
-
 /* Memory access permissions descriptor */
 struct ffa_mem_access_perm {
     uint16_t endpoint_id;

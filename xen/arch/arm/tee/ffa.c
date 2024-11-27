@@ -347,7 +347,7 @@ static bool ffa_handle_call(struct cpu_user_regs *regs)
         ffa_handle_partition_info_get(regs);
         return true;
     case FFA_RX_RELEASE:
-        e = ffa_handle_rx_release();
+        e = ffa_rx_release(d);
         break;
     case FFA_MSG_SEND_DIRECT_REQ_32:
     case FFA_MSG_SEND_DIRECT_REQ_64:
