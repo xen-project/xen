@@ -108,7 +108,7 @@ static void vlapic_error(struct vlapic *vlapic, unsigned int errmask)
     uint32_t esr;
 
     spin_lock_irqsave(&vlapic->esr_lock, flags);
-    esr = vlapic_get_reg(vlapic, APIC_ESR);
+    esr = vlapic->hw.pending_esr;
     if ( (esr & errmask) != errmask )
     {
         uint32_t lvterr = vlapic_get_reg(vlapic, APIC_LVTERR);
@@ -127,7 +127,7 @@ static void vlapic_error(struct vlapic *vlapic, unsigned int errmask)
                  errmask |= APIC_ESR_RECVILL;
         }
 
-        vlapic_set_reg(vlapic, APIC_ESR, esr | errmask);
+        vlapic->hw.pending_esr |= errmask;
 
         if ( inj )
             vlapic_set_irq(vlapic, lvterr & APIC_VECTOR_MASK, 0);
@@ -801,6 +801,19 @@ void vlapic_reg_write(struct vcpu *v, unsigned int reg, uint32_t val)
     case APIC_ID:
         vlapic_set_reg(vlapic, APIC_ID, val);
         break;
+
+    case APIC_ESR:
+    {
+        unsigned long flags;
+
+        spin_lock_irqsave(&vlapic->esr_lock, flags);
+        val = vlapic->hw.pending_esr;
+        vlapic->hw.pending_esr = 0;
+        spin_unlock_irqrestore(&vlapic->esr_lock, flags);
+
+        vlapic_set_reg(vlapic, APIC_ESR, val);
+        break;
+    }
 
     case APIC_TASKPRI:
         vlapic_set_reg(vlapic, APIC_TASKPRI, val & 0xff);
