@@ -102,14 +102,16 @@ static int vlapic_find_highest_irr(struct vlapic *vlapic)
     return vlapic_find_highest_vector(&vlapic->regs->data[APIC_IRR]);
 }
 
-static void vlapic_error(struct vlapic *vlapic, unsigned int errmask)
+static void vlapic_error(struct vlapic *vlapic, unsigned int err_bit)
 {
-    unsigned long flags;
-    uint32_t esr;
-
-    spin_lock_irqsave(&vlapic->esr_lock, flags);
-    esr = vlapic->hw.pending_esr;
-    if ( (esr & errmask) != errmask )
+    /*
+     * Whether LVTERR is delivered on a per-bit basis, or only on
+     * pending_esr becoming nonzero is implementation specific.
+     *
+     * Xen implements the per-bit behaviour as it can be expressed
+     * locklessly.
+     */
+    if ( !test_and_set_bit(err_bit, &vlapic->hw.pending_esr) )
     {
         uint32_t lvterr = vlapic_get_reg(vlapic, APIC_LVTERR);
         bool inj = false;
@@ -122,17 +124,14 @@ static void vlapic_error(struct vlapic *vlapic, unsigned int errmask)
              * if it will succeed, and folding in RECVILL otherwise.
              */
             if ( (lvterr & APIC_VECTOR_MASK) >= 16 )
-                 inj = true;
+                inj = true;
             else
-                 errmask |= APIC_ESR_RECVILL;
+                set_bit(ilog2(APIC_ESR_RECVILL), &vlapic->hw.pending_esr);
         }
-
-        vlapic->hw.pending_esr |= errmask;
 
         if ( inj )
             vlapic_set_irq(vlapic, lvterr & APIC_VECTOR_MASK, 0);
     }
-    spin_unlock_irqrestore(&vlapic->esr_lock, flags);
 }
 
 bool vlapic_test_irq(const struct vlapic *vlapic, uint8_t vec)
@@ -153,7 +152,7 @@ void vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
 
     if ( unlikely(vec < 16) )
     {
-        vlapic_error(vlapic, APIC_ESR_RECVILL);
+        vlapic_error(vlapic, ilog2(APIC_ESR_RECVILL));
         return;
     }
 
@@ -525,7 +524,7 @@ void vlapic_ipi(
             vlapic_domain(vlapic), vlapic, short_hand, dest, dest_mode);
 
         if ( unlikely((icr_low & APIC_VECTOR_MASK) < 16) )
-            vlapic_error(vlapic, APIC_ESR_SENDILL);
+            vlapic_error(vlapic, ilog2(APIC_ESR_SENDILL));
         else if ( target )
             vlapic_accept_irq(vlapic_vcpu(target), icr_low);
         break;
@@ -534,7 +533,7 @@ void vlapic_ipi(
     case APIC_DM_FIXED:
         if ( unlikely((icr_low & APIC_VECTOR_MASK) < 16) )
         {
-            vlapic_error(vlapic, APIC_ESR_SENDILL);
+            vlapic_error(vlapic, ilog2(APIC_ESR_SENDILL));
             break;
         }
         /* fall through */
@@ -803,17 +802,9 @@ void vlapic_reg_write(struct vcpu *v, unsigned int reg, uint32_t val)
         break;
 
     case APIC_ESR:
-    {
-        unsigned long flags;
-
-        spin_lock_irqsave(&vlapic->esr_lock, flags);
-        val = vlapic->hw.pending_esr;
-        vlapic->hw.pending_esr = 0;
-        spin_unlock_irqrestore(&vlapic->esr_lock, flags);
-
+        val = xchg(&vlapic->hw.pending_esr, 0);
         vlapic_set_reg(vlapic, APIC_ESR, val);
         break;
-    }
 
     case APIC_TASKPRI:
         vlapic_set_reg(vlapic, APIC_TASKPRI, val & 0xff);
@@ -1715,8 +1706,6 @@ int vlapic_init(struct vcpu *v)
     clear_page(vlapic->regs);
 
     vlapic_reset(vlapic);
-
-    spin_lock_init(&vlapic->esr_lock);
 
     tasklet_init(&vlapic->init_sipi.tasklet, vlapic_init_sipi_action, v);
 
