@@ -1889,7 +1889,7 @@ static const struct evex {
     { { 0x39 }, 2, T, R, pfx_66, Wn, Ln }, /* vpmins{d,q} */
     { { 0x39, 0xc0 }, 2, F, N, pfx_f3, Wn, Ln }, /* vpmov{d,q}2m */
     { { 0x3a }, 2, T, R, pfx_66, WIG, Ln }, /* vpminuw */
-    { { 0x2a, 0xc0 }, 2, F, N, pfx_f3, W0, Ln }, /* vpbroadcastmw2d */
+    { { 0x3a, 0xc0 }, 2, F, N, pfx_f3, W0, Ln }, /* vpbroadcastmw2d */
     { { 0x3b }, 2, T, R, pfx_66, Wn, Ln }, /* vpminu{d,q} */
     { { 0x3c }, 2, T, R, pfx_66, WIG, Ln }, /* vpmaxsb */
     { { 0x3d }, 2, T, R, pfx_66, Wn, Ln }, /* vpmaxs{d,q} */
