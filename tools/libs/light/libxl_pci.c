@@ -633,7 +633,7 @@ bool libxl__is_igd_vga_passthru(libxl__gc *gc,
 
         if (sysfs_dev_get_class(gc, pci, &class))
             continue;
-        if (class == 0x030000)
+        if (class == 0x030000 || class == 0x038000)
             return true;
     }
 
