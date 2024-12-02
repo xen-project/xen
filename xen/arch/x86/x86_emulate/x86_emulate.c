@@ -6824,6 +6824,7 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f38, 0xf0): /* movbe m,r */
     case X86EMUL_OPC(0x0f38, 0xf1): /* movbe r,m */
+        generate_exception_if(ea.type != OP_MEM, X86_EXC_UD);
         vcpu_must_have(movbe);
         switch ( op_bytes )
         {
