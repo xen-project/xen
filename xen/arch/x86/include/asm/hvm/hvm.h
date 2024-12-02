@@ -26,6 +26,20 @@ extern bool opt_hvm_fep;
 #define opt_hvm_fep 0
 #endif
 
+/*
+ * Results for hvm_guest_x86_mode().
+ *
+ * Note, some callers depend on the order of these constants.
+ *
+ * TODO: Rework hvm_guest_x86_mode() to avoid mixing the architectural
+ * concepts of mode and operand size.
+ */
+#define X86_MODE_REAL  0
+#define X86_MODE_VM86  1
+#define X86_MODE_16BIT 2
+#define X86_MODE_32BIT 4
+#define X86_MODE_64BIT 8
+
 /* Interrupt acknowledgement sources. */
 enum hvm_intsrc {
     hvm_intsrc_none,

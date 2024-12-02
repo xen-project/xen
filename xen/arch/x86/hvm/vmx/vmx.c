@@ -886,14 +886,15 @@ int cf_check vmx_guest_x86_mode(struct vcpu *v)
     unsigned long cs_ar_bytes;
 
     if ( unlikely(!(v->arch.hvm.guest_cr[0] & X86_CR0_PE)) )
-        return 0;
+        return X86_MODE_REAL;
     if ( unlikely(guest_cpu_user_regs()->eflags & X86_EFLAGS_VM) )
-        return 1;
+        return X86_MODE_VM86;
     __vmread(GUEST_CS_AR_BYTES, &cs_ar_bytes);
     if ( hvm_long_mode_active(v) &&
          likely(cs_ar_bytes & X86_SEG_AR_CS_LM_ACTIVE) )
-        return 8;
-    return (likely(cs_ar_bytes & X86_SEG_AR_DEF_OP_SIZE) ? 4 : 2);
+        return X86_MODE_64BIT;
+    return (likely(cs_ar_bytes & X86_SEG_AR_DEF_OP_SIZE)
+            ? X86_MODE_32BIT : X86_MODE_16BIT);
 }
 
 static void vmx_save_dr(struct vcpu *v)

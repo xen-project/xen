@@ -411,7 +411,7 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
     }
     else
     {
-        bool mode_64bit = (vmx_guest_x86_mode(v) == 8);
+        bool mode_64bit = vmx_guest_x86_mode(v) == X86_MODE_64BIT;
 
         decode->type = VMX_INST_MEMREG_TYPE_MEMORY;
 
@@ -2073,7 +2073,8 @@ int nvmx_handle_vmx_insn(struct cpu_user_regs *regs, unsigned int exit_reason)
 
     if ( !(curr->arch.hvm.guest_cr[4] & X86_CR4_VMXE) ||
          !nestedhvm_enabled(curr->domain) ||
-         (vmx_guest_x86_mode(curr) < (hvm_long_mode_active(curr) ? 8 : 2)) ||
+         (vmx_guest_x86_mode(curr) <
+          (hvm_long_mode_active(curr) ? X86_MODE_64BIT : X86_MODE_16BIT)) ||
          (exit_reason != EXIT_REASON_VMXON && !nvmx_vcpu_in_vmx(curr)) )
     {
         hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);

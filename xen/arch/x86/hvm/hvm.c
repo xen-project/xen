@@ -3974,7 +3974,9 @@ static void hvm_latch_shinfo_size(struct domain *d)
      */
     if ( current->domain == d )
     {
-        d->arch.has_32bit_shinfo = (hvm_guest_x86_mode(current) != 8);
+        d->arch.has_32bit_shinfo =
+            hvm_guest_x86_mode(current) != X86_MODE_64BIT;
+
         /*
          * Make sure that the timebase in the shared info structure is correct.
          *

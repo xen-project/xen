@@ -571,12 +571,12 @@ static int cf_check svm_guest_x86_mode(struct vcpu *v)
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
 
     if ( unlikely(!(v->arch.hvm.guest_cr[0] & X86_CR0_PE)) )
-        return 0;
+        return X86_MODE_REAL;
     if ( unlikely(guest_cpu_user_regs()->eflags & X86_EFLAGS_VM) )
-        return 1;
+        return X86_MODE_VM86;
     if ( hvm_long_mode_active(v) && likely(vmcb->cs.l) )
-        return 8;
-    return likely(vmcb->cs.db) ? 4 : 2;
+        return X86_MODE_64BIT;
+    return vmcb->cs.db ? X86_MODE_32BIT : X86_MODE_16BIT;
 }
 
 static void cf_check svm_cpuid_policy_changed(struct vcpu *v)

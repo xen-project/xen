@@ -86,11 +86,11 @@ int xenoprofile_get_mode(struct vcpu *curr, const struct cpu_user_regs *regs)
 
     switch ( hvm_guest_x86_mode(curr) )
     {
-    case 0: /* real mode */
+    case X86_MODE_REAL:
         return 1;
-    case 1: /* vm86 mode */
+    case X86_MODE_VM86:
         return 0;
-    default:
+    default: /* 16BIT | 32BIT | 64BIT */
         return hvm_get_cpl(curr) != 3;
     }
 }

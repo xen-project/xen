@@ -2433,14 +2433,15 @@ static void cf_check hvmemul_put_fpu(
 
         switch ( mode )
         {
-        case 8:
+        case X86_MODE_64BIT:
             fpu_ctxt->fip.addr = aux->ip;
             if ( dval )
                 fpu_ctxt->fdp.addr = aux->dp;
             fpu_ctxt->x[FPU_WORD_SIZE_OFFSET] = 8;
             break;
 
-        case 4: case 2:
+        case X86_MODE_32BIT:
+        case X86_MODE_16BIT:
             fpu_ctxt->fip.offs = aux->ip;
             fpu_ctxt->fip.sel  = aux->cs;
             if ( dval )
@@ -2451,7 +2452,8 @@ static void cf_check hvmemul_put_fpu(
             fpu_ctxt->x[FPU_WORD_SIZE_OFFSET] = mode;
             break;
 
-        case 0: case 1:
+        case X86_MODE_REAL:
+        case X86_MODE_VM86:
             fpu_ctxt->fip.addr = aux->ip | (aux->cs << 4);
             if ( dval )
                 fpu_ctxt->fdp.addr = aux->dp | (aux->ds << 4);
@@ -2952,11 +2954,11 @@ static const char *guest_x86_mode_to_str(int mode)
 {
     switch ( mode )
     {
-    case 0:  return "Real";
-    case 1:  return "v86";
-    case 2:  return "16bit";
-    case 4:  return "32bit";
-    case 8:  return "64bit";
+    case X86_MODE_REAL:   return "Real";
+    case X86_MODE_VM86:   return "vm86";
+    case X86_MODE_16BIT:  return "16bit";
+    case X86_MODE_32BIT:  return "32bit";
+    case X86_MODE_64BIT:  return "64bit";
     default: return "Unknown";
     }
 }

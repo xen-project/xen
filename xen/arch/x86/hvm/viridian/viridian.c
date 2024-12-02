@@ -933,13 +933,13 @@ int viridian_hypercall(struct cpu_user_regs *regs)
 
     switch ( mode )
     {
-    case 8:
+    case X86_MODE_64BIT:
         input.raw = regs->rcx;
         input_params_gpa = regs->rdx;
         output_params_gpa = regs->r8;
         break;
 
-    case 4:
+    case X86_MODE_32BIT:
         input.raw = (regs->rdx << 32) | regs->eax;
         input_params_gpa = (regs->rbx << 32) | regs->ecx;
         output_params_gpa = (regs->rdi << 32) | regs->esi;
@@ -1038,11 +1038,11 @@ int viridian_hypercall(struct cpu_user_regs *regs)
 
     switch ( mode )
     {
-    case 8:
+    case X86_MODE_64BIT:
         regs->rax = output.raw;
         break;
 
-    case 4:
+    case X86_MODE_32BIT:
         regs->rdx = output.raw >> 32;
         regs->rax = (uint32_t)output.raw;
         break;
