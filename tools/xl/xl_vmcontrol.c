@@ -417,7 +417,7 @@ static domain_restart_type handle_domain_death(uint32_t *r_domid,
         break;
     case LIBXL_SHUTDOWN_REASON_SUSPEND:
         LOG("Domain has suspended.");
-        return 0;
+        return DOMAIN_RESTART_SUSPENDED;
     case LIBXL_SHUTDOWN_REASON_CRASH:
         action = d_config->on_crash;
         break;
@@ -1030,6 +1030,7 @@ start:
         }
     }
     while (1) {
+        libxl_evgen_domain_death *deathw2 = NULL;
         libxl_event *event;
         ret = domain_wait_event(domid, &event);
         if (ret) goto out;
@@ -1100,9 +1101,24 @@ start:
                 ret = 0;
                 goto out;
 
+            case DOMAIN_RESTART_SUSPENDED:
+                LOG("Continue waiting for domain %u", domid);
+                /*
+                 * Enable a new event before disabling the old.  This ensures
+                 * the xenstore watch remains active.  Otherwise it'll fire
+                 * immediately on re-registration and find our suspended domain.
+                 */
+                ret = libxl_evenable_domain_death(ctx, domid, 0, &deathw2);
+                if (ret) goto out;
+                libxl_evdisable_domain_death(ctx, deathw);
+                deathw = deathw2;
+                deathw2 = NULL;
+                break;
+
             default:
                 abort();
             }
+            break;
 
         case LIBXL_EVENT_TYPE_DOMAIN_DEATH:
             LOG("Domain %u has been destroyed.", domid);
