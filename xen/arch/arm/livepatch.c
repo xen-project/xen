@@ -39,8 +39,7 @@ int arch_livepatch_quiesce(void)
      * The text section is read-only. So re-map Xen to be able to patch
      * the code.
      */
-    vmap_of_xen_text = __vmap(&text_mfn, 1U << text_order, 1, 1, PAGE_HYPERVISOR,
-                              VMAP_DEFAULT);
+    vmap_of_xen_text = vmap_contig(text_mfn, 1U << text_order);
 
     if ( !vmap_of_xen_text )
     {

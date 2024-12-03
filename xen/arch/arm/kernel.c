@@ -211,7 +211,7 @@ static __init int kernel_decompress(struct bootmodule *mod, uint32_t offset)
         return -ENOMEM;
     }
     mfn = page_to_mfn(pages);
-    output = __vmap(&mfn, 1 << kernel_order_out, 1, 1, PAGE_HYPERVISOR, VMAP_DEFAULT);
+    output = vmap_contig(mfn, 1 << kernel_order_out);
 
     rc = perform_gunzip(output, input, size);
     clean_dcache_va_range(output, output_size);

@@ -61,9 +61,8 @@ static bool copy_hyp_vect_bpi(unsigned int slot, const char *hyp_vec_start,
      * Vectors are part of the text that are mapped read-only. So re-map
      * the vector table to be able to update vectors.
      */
-    dst_remapped = __vmap(&dst_mfn,
-                          1UL << get_order_from_bytes(VECTOR_TABLE_SIZE),
-                          1, 1, PAGE_HYPERVISOR, VMAP_DEFAULT);
+    dst_remapped = vmap_contig(dst_mfn,
+                               1UL << get_order_from_bytes(VECTOR_TABLE_SIZE));
     if ( !dst_remapped )
         return false;
 
