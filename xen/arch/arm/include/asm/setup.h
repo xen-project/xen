@@ -6,6 +6,12 @@
 #include <xen/bootfdt.h>
 #include <xen/device_tree.h>
 
+#if defined(CONFIG_MMU)
+# include <asm/mmu/setup.h>
+#elif !defined(CONFIG_MPU)
+# error "Unknown memory management layout"
+#endif
+
 #define MAX_FDT_SIZE SZ_2M
 
 struct map_range_data
@@ -64,20 +70,6 @@ int map_irq_to_domain(struct domain *d, unsigned int irq,
 
 int map_range_to_domain(const struct dt_device_node *dev,
                         uint64_t addr, uint64_t len, void *data);
-
-extern lpae_t boot_pgtable[XEN_PT_LPAE_ENTRIES];
-
-#ifdef CONFIG_ARM_64
-extern lpae_t boot_first[XEN_PT_LPAE_ENTRIES];
-extern lpae_t boot_first_id[XEN_PT_LPAE_ENTRIES];
-#endif
-extern lpae_t boot_second[XEN_PT_LPAE_ENTRIES];
-extern lpae_t boot_second_id[XEN_PT_LPAE_ENTRIES];
-extern lpae_t boot_third[XEN_PT_LPAE_ENTRIES * XEN_NR_ENTRIES(2)];
-extern lpae_t boot_third_id[XEN_PT_LPAE_ENTRIES];
-
-/* Find where Xen will be residing at runtime and return a PT entry */
-lpae_t pte_of_xenaddr(vaddr_t va);
 
 extern const char __ro_after_init_start[], __ro_after_init_end[];
 
