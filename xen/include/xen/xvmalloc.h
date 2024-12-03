@@ -40,19 +40,30 @@
     ((typeof(ptr))_xvrealloc(ptr, offsetof(typeof(*(ptr)), field[nr]), \
                              __alignof__(typeof(*(ptr)))))
 
+#ifdef CONFIG_HAS_VMAP
+
 /* Free any of the above. */
 void xvfree(void *va);
+
+/* Underlying functions */
+void *_xvmalloc(size_t size, unsigned int align);
+void *_xvzalloc(size_t size, unsigned int align);
+void *_xvrealloc(void *va, size_t size, unsigned int align);
+
+#else /* !CONFIG_HAS_VMAP */
+
+#define xvfree      xfree
+#define _xvmalloc   _xmalloc
+#define _xvzalloc   _xzalloc
+#define _xvrealloc  _xrealloc
+
+#endif /* CONFIG_HAS_VMAP */
 
 /* Free an allocation, and zero the pointer to it. */
 #define XVFREE(p) do { \
     xvfree(p);         \
     (p) = NULL;        \
 } while ( false )
-
-/* Underlying functions */
-void *_xvmalloc(size_t size, unsigned int align);
-void *_xvzalloc(size_t size, unsigned int align);
-void *_xvrealloc(void *va, size_t size, unsigned int align);
 
 static inline void *_xvmalloc_array(
     size_t size, unsigned int align, unsigned long num)
