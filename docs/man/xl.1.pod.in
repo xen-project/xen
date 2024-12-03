@@ -682,6 +682,10 @@ Pass the VNC password to vncviewer via stdin.
 
 =back
 
+=item B<resume> I<domain-id>
+
+Resume a domain, after having been suspended.
+
 =item B<save> [I<OPTIONS>] I<domain-id> I<checkpointfile> [I<configfile>]
 
 Saves a running domain to a state file so that it can be restored
@@ -759,6 +763,14 @@ You should ensure that the guest is configured to behave as expected
 in response to this event.
 
 =back
+
+=item B<suspend> I<domain-id>
+
+Suspend a domain.  This is a cooperative operation where the domain must
+respond to the xenstore trigger.  When in a suspended state the domain
+still consumes allocated resources (such as memory), but is not eligible
+for scheduling by the Xen hypervisor.  It is in a shutdown state, but
+not dying.
 
 =item B<sysrq> I<domain-id> I<letter>
 
