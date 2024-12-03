@@ -145,7 +145,7 @@ struct bootinfo {
 #ifdef CONFIG_ACPI
 #define BOOTINFO_ACPI_INIT                          \
     .acpi.common.max_banks = NR_MEM_BANKS,          \
-    .acpi.common.type = MEMORY
+    .acpi.common.type = MEMORY,
 #else
 #define BOOTINFO_ACPI_INIT
 #endif
@@ -153,7 +153,7 @@ struct bootinfo {
 #ifdef CONFIG_STATIC_SHM
 #define BOOTINFO_SHMEM_INIT                         \
     .shmem.common.max_banks = NR_SHMEM_BANKS,       \
-    .shmem.common.type = STATIC_SHARED_MEMORY
+    .shmem.common.type = STATIC_SHARED_MEMORY,
 #else
 #define BOOTINFO_SHMEM_INIT
 #endif
