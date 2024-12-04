@@ -4,6 +4,7 @@
  */
 
 #include <asm/arm64/mpu.h>
+#include <asm/early_printk.h>
 
 /* Backgroud region enable/disable */
 #define SCTLR_ELx_BR    BIT(17, UL)
@@ -11,8 +12,10 @@
 #define REGION_TEXT_PRBAR       0x38    /* SH=11 AP=10 XN=00 */
 #define REGION_RO_PRBAR         0x3A    /* SH=11 AP=10 XN=10 */
 #define REGION_DATA_PRBAR       0x32    /* SH=11 AP=00 XN=10 */
+#define REGION_DEVICE_PRBAR     0x22    /* SH=10 AP=00 XN=10 */
 
 #define REGION_NORMAL_PRLAR     0x0f    /* NS=0 ATTR=111 EN=1 */
+#define REGION_DEVICE_PRLAR     0x09    /* NS=0 ATTR=100 EN=1 */
 
 /*
  * Macro to prepare and set a EL2 MPU memory region.
@@ -139,6 +142,13 @@ FUNC(enable_boot_cpu_mm)
     ldr   x1, =__init_data_begin
     ldr   x2, =__bss_end
     prepare_xen_region x0, x1, x2, x3, x4, x5
+
+#ifdef CONFIG_EARLY_PRINTK
+    /* Xen early UART section. */
+    ldr   x1, =CONFIG_EARLY_UART_BASE_ADDRESS
+    ldr   x2, =(CONFIG_EARLY_UART_BASE_ADDRESS + CONFIG_EARLY_UART_SIZE)
+    prepare_xen_region x0, x1, x2, x3, x4, x5, attr_prbar=REGION_DEVICE_PRBAR, attr_prlar=REGION_DEVICE_PRLAR
+#endif
 
     b    enable_mpu
     ret

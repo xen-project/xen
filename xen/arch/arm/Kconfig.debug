@@ -121,6 +121,13 @@ config EARLY_UART_BASE_ADDRESS
 	hex "Early printk, physical base address of debug UART"
 	range 0x0 0xffffffff if ARM_32
 
+config EARLY_UART_SIZE
+       depends on EARLY_PRINTK
+       depends on MPU
+       hex "Early printk, physical size of debug UART"
+       range 0x0 0xffffffff if ARM_32
+       default 0x1000
+
 config EARLY_UART_PL011_BAUD_RATE
 	depends on EARLY_UART_PL011
 	int "Early printk UART baud rate for pl011"
