@@ -15,9 +15,7 @@ config ARM
 	select GENERIC_UART_INIT
 	select HAS_ALTERNATIVE if HAS_VMAP
 	select HAS_DEVICE_TREE
-	select HAS_PASSTHROUGH
 	select HAS_UBSAN
-	select IOMMU_FORCE_PT_SHARE
 
 config ARCH_DEFCONFIG
 	string
@@ -79,6 +77,8 @@ config MMU
 	bool "MMU"
 	select HAS_PMAP
 	select HAS_VMAP
+	select HAS_PASSTHROUGH
+	select IOMMU_FORCE_PT_SHARE
 	help
 	  Select it if you plan to run Xen on A-profile Armv7+
 
