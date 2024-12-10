@@ -53,7 +53,7 @@ Here is an example to add a new justification in safe.json::
 |            "analyser": {
 |                "cppcheck": "misra-c2012-20.7",
 |                "coverity": "misra_c_2012_rule_20_7_violation",
-|                "eclair": "MC3R1.R20.7"
+|                "eclair": "MC3A2.R20.7"
 |            },
 |            "name": "R20.7 C macro parameters not used as expression",
 |            "text": "The macro parameters used in this [...]"
@@ -138,7 +138,7 @@ for the Rule 8.6:
 
 Eclair reports it in its web report, file xen/include/xen/kernel.h, line 68:
 
-| MC3R1.R8.6 for program 'xen/xen-syms', variable '_start' has no definition
+| MC3A2.R8.6 for program 'xen/xen-syms', variable '_start' has no definition
 
 Also coverity reports it, here is an extract of the finding:
 
@@ -165,7 +165,7 @@ We will prepare our entry in the safe.json database::
 |        {
 |            "id": "SAF-1-safe",
 |            "analyser": {
-|                "eclair": "MC3R1.R8.6",
+|                "eclair": "MC3A2.R8.6",
 |                "coverity": "misra_c_2012_rule_8_6_violation"
 |            },
 |            "name": "Rule 8.6: linker script defined symbols",

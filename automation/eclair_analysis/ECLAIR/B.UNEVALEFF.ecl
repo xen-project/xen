@@ -1,4 +1,4 @@
--clone_service=MC3R1.R13.6,B.UNEVALEFF
+-clone_service=MC3A2.R13.6,B.UNEVALEFF
 
 -config=B.UNEVALEFF,summary="The operand of the `alignof' and `typeof'  operators shall not contain any expression which has potential side effects"
 -config=B.UNEVALEFF,stmt_child_matcher=
