@@ -662,8 +662,11 @@ K:	\b(xsm|XSM)\b
 
 THE REST
 M:	Andrew Cooper <andrew.cooper3@citrix.com>
+M:	Anthony PERARD <anthony.perard@vates.tech>
+M:	Michal Orzel <michal.orzel@amd.com>
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Julien Grall <julien@xen.org>
+M:	Roger Pau Monné <roger.pau@citrix.com>
 M:	Stefano Stabellini <sstabellini@kernel.org>
 L:	xen-devel@lists.xenproject.org
 S:	Supported
