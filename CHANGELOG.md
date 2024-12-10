@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Added
  - On Arm:
    - Experimental support for Armv8-R.
+ - On x86:
+   - xl suspend/resume subcommands.
 
 ### Removed
  - On x86:
