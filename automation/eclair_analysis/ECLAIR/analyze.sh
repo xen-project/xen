@@ -40,7 +40,7 @@ ECLAIR_REPORT_LOG=${ECLAIR_OUTPUT_DIR}/REPORT.log
 if [[ "$1" = "X86_64" ]]; then
   export CROSS_COMPILE=
   export XEN_TARGET_ARCH=x86_64
-  EXTRA_ECLAIR_ENV_OPTIONS=-disable=MC3R1.R20.7
+  EXTRA_ECLAIR_ENV_OPTIONS=-disable=MC3A2.R20.7
 elif [[ "$1" = "ARM64" ]]; then
   export CROSS_COMPILE=aarch64-linux-gnu-
   export XEN_TARGET_ARCH=arm64

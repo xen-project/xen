@@ -4,7 +4,7 @@
         {
             "id": "SAF-0-safe",
             "analyser": {
-                "eclair": "MC3R1.R8.6",
+                "eclair": "MC3A2.R8.6",
                 "coverity": "misra_c_2012_rule_8_6_violation"
             },
             "name": "Rule 8.6: linker script defined symbols",
@@ -13,7 +13,7 @@
         {
             "id": "SAF-1-safe",
             "analyser": {
-                "eclair": "MC3R1.R8.4"
+                "eclair": "MC3A2.R8.4"
             },
             "name": "Rule 8.4: asm-only definition",
             "text": "Functions and variables used only by asm modules do not need to have a visible declaration prior to their definition."
