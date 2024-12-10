@@ -1005,7 +1005,14 @@ p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, unsigned int count
             {
                 ASSERT_UNREACHABLE();
                 domain_crash(d);
-                goto out_unmap;
+ out_unmap:
+                /*
+                 * Something went wrong, probably crashing the domain.  Unmap
+                 * everything and return.
+                 */
+                for ( i = 0; i < count; i++ )
+                    if ( map[i] )
+                        unmap_domain_page(map[i]);
             }
         }
         else
@@ -1032,17 +1039,6 @@ p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, unsigned int count
             ioreq_request_mapcache_invalidate(d);
         }
     }
-
-    return;
-
-out_unmap:
-    /*
-     * Something went wrong, probably crashing the domain.  Unmap
-     * everything and return.
-     */
-    for ( i = 0; i < count; i++ )
-        if ( map[i] )
-            unmap_domain_page(map[i]);
 }
 
 static void
