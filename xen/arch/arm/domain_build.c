@@ -901,31 +901,25 @@ int __init add_ext_regions(unsigned long s_gfn, unsigned long e_gfn,
 }
 
 /*
- * Find unused regions of Host address space which can be exposed to Dom0
- * as extended regions for the special memory mappings. In order to calculate
- * regions we exclude every region assigned to Dom0 from the Host RAM:
- * - domain RAM
- * - reserved-memory
- * - static shared memory
- * - grant table space
+ * Find unused regions of Host address space which can be exposed to domain
+ * using the host memory layout. In order to calculate regions we exclude every
+ * region passed in mem_banks from the Host RAM.
  */
 static int __init find_unallocated_memory(const struct kernel_info *kinfo,
-                                          struct membanks *ext_regions)
+                                          const struct membanks *mem_banks[],
+                                          unsigned int nr_mem_banks,
+                                          struct membanks *free_regions,
+                                          int (*cb)(unsigned long s_gfn,
+                                                    unsigned long e_gfn,
+                                                    void *data))
 {
     const struct membanks *mem = bootinfo_get_mem();
-    const struct membanks *mem_banks[] = {
-        kernel_info_get_mem_const(kinfo),
-        bootinfo_get_reserved_mem(),
-#ifdef CONFIG_STATIC_SHM
-        bootinfo_get_shmem(),
-#endif
-    };
     struct rangeset *unalloc_mem;
     paddr_t start, end;
     unsigned int i, j;
     int res;
 
-    dt_dprintk("Find unallocated memory for extended regions\n");
+    ASSERT(domain_use_host_layout(kinfo->d));
 
     unalloc_mem = rangeset_new(NULL, NULL, 0);
     if ( !unalloc_mem )
@@ -946,13 +940,8 @@ static int __init find_unallocated_memory(const struct kernel_info *kinfo,
         }
     }
 
-    /*
-     * Exclude the following regions:
-     * 1) Remove RAM assigned to Dom0
-     * 2) Remove reserved memory
-     * 3) Remove static shared memory (when the feature is enabled)
-     */
-    for ( i = 0; i < ARRAY_SIZE(mem_banks); i++ )
+    /* Remove all regions listed in mem_banks */
+    for ( i = 0; i < nr_mem_banks; i++ )
         for ( j = 0; j < mem_banks[i]->nr_banks; j++ )
         {
             start = mem_banks[i]->bank[j].start;
@@ -973,28 +962,13 @@ static int __init find_unallocated_memory(const struct kernel_info *kinfo,
             }
         }
 
-    /* Remove grant table region */
-    if ( kinfo->gnttab_size )
-    {
-        start = kinfo->gnttab_start;
-        end = kinfo->gnttab_start + kinfo->gnttab_size;
-        res = rangeset_remove_range(unalloc_mem, PFN_DOWN(start),
-                                    PFN_DOWN(end - 1));
-        if ( res )
-        {
-            printk(XENLOG_ERR "Failed to remove: %#"PRIpaddr"->%#"PRIpaddr"\n",
-                   start, end);
-            goto out;
-        }
-    }
-
     start = 0;
     end = (1ULL << p2m_ipa_bits) - 1;
     res = rangeset_report_ranges(unalloc_mem, PFN_DOWN(start), PFN_DOWN(end),
-                                 add_ext_regions, ext_regions);
+                                 cb, free_regions);
     if ( res )
-        ext_regions->nr_banks = 0;
-    else if ( !ext_regions->nr_banks )
+        free_regions->nr_banks = 0;
+    else if ( !free_regions->nr_banks )
         res = -ENOENT;
 
 out:
@@ -1170,6 +1144,44 @@ static int __init find_domU_holes(const struct kernel_info *kinfo,
     return remove_shm_holes_for_domU(kinfo, ext_regions);
 }
 
+static int __init find_host_extended_regions(const struct kernel_info *kinfo,
+                                             struct membanks *ext_regions)
+{
+    int res;
+    struct membanks *gnttab = xzalloc_flex_struct(struct membanks, bank, 1);
+
+    /*
+     * Exclude the following regions:
+     * 1) Remove RAM assigned to domain
+     * 2) Remove reserved memory
+     * 3) Grant table assigned to domain
+     * 4) Remove static shared memory (when the feature is enabled)
+     */
+    const struct membanks *mem_banks[] = {
+        kernel_info_get_mem_const(kinfo),
+        bootinfo_get_reserved_mem(),
+        gnttab,
+#ifdef CONFIG_STATIC_SHM
+        bootinfo_get_shmem(),
+#endif
+    };
+
+    dt_dprintk("Find unallocated memory for extended regions\n");
+
+    if ( !gnttab )
+        return -ENOMEM;
+
+    gnttab->nr_banks = 1;
+    gnttab->bank[0].start = kinfo->gnttab_start;
+    gnttab->bank[0].size = kinfo->gnttab_size;
+
+    res = find_unallocated_memory(kinfo, mem_banks, ARRAY_SIZE(mem_banks),
+                                  ext_regions, add_ext_regions);
+    xfree(gnttab);
+
+    return res;
+}
+
 int __init make_hypervisor_node(struct domain *d,
                                 const struct kernel_info *kinfo,
                                 int addrcells, int sizecells)
@@ -1226,7 +1238,7 @@ int __init make_hypervisor_node(struct domain *d,
         if ( is_domain_direct_mapped(d) )
         {
             if ( !is_iommu_enabled(d) )
-                res = find_unallocated_memory(kinfo, ext_regions);
+                res = find_host_extended_regions(kinfo, ext_regions);
             else
                 res = find_memory_holes(kinfo, ext_regions);
         }
