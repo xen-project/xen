@@ -4,7 +4,7 @@
         {
             "id": "SAF-0-safe",
             "analyser": {
-                "eclair": "MC3R1.R8.6",
+                "eclair": "MC3A2.R8.6",
                 "coverity": "misra_c_2012_rule_8_6_violation"
             },
             "name": "Rule 8.6: linker script defined symbols",
@@ -13,7 +13,7 @@
         {
             "id": "SAF-1-safe",
             "analyser": {
-                "eclair": "MC3R1.R8.4"
+                "eclair": "MC3A2.R8.4"
             },
             "name": "Rule 8.4: asm-only definition",
             "text": "Functions and variables used only by asm modules do not need to have a visible declaration prior to their definition."
@@ -21,23 +21,23 @@
         {
             "id": "SAF-2-safe",
             "analyser": {
-                "eclair": "MC3R1.R10.1"
+                "eclair": "MC3A2.R10.1"
             },
-            "name": "MC3R1.R10.1: use of an enumeration constant in an arithmetic operation",
+            "name": "MC3A2.R10.1: use of an enumeration constant in an arithmetic operation",
             "text": "This violation can be fixed with a cast to (int) of the enumeration constant, but a deviation was chosen due to code readability (see also the comment in BITS_TO_LONGS)."
         },
         {
             "id": "SAF-3-safe",
             "analyser": {
-                "eclair": "MC3R1.R20.4"
+                "eclair": "MC3A2.R20.4"
             },
-            "name": "MC3R1.R20.4: allow the definition of a macro with the same name as a keyword in some special cases",
+            "name": "MC3A2.R20.4: allow the definition of a macro with the same name as a keyword in some special cases",
             "text": "The definition of a macro with the same name as a keyword can be useful in certain configurations to improve the guarantees that can be provided by Xen. See docs/misra/deviations.rst for a precise rationale for all such cases."
         },
         {
             "id": "SAF-4-safe",
             "analyser": {
-                "eclair": "MC3R1.R17.1"
+                "eclair": "MC3A2.R17.1"
             },
             "name": "Rule 17.1: internal helper functions made to break long running hypercalls into multiple calls.",
             "text": "They need to take a variable number of arguments depending on the original hypercall they are trying to continue."
@@ -45,31 +45,31 @@
         {
             "id": "SAF-5-safe",
             "analyser": {
-                "eclair": "MC3R1.R16.2"
+                "eclair": "MC3A2.R16.2"
             },
-            "name": "MC3R1.R16.2: using a case label when the most closely-enclosing compound statement is not a switch statement",
+            "name": "MC3A2.R16.2: using a case label when the most closely-enclosing compound statement is not a switch statement",
             "text": "A switch label enclosed by some compound statement that is not the body of a switch is permitted within local helper macros that are unlikely to be misused or misunderstood."
         },
         {
             "id": "SAF-6-safe",
             "analyser": {
-                "eclair": "MC3R1.R20.12"
+                "eclair": "MC3A2.R20.12"
             },
-            "name": "MC3R1.R20.12: use of a macro argument that deliberately violates the Rule",
+            "name": "MC3A2.R20.12: use of a macro argument that deliberately violates the Rule",
             "text": "A macro parameter that is itself a macro is intentionally used within the macro both as a regular parameter and for text replacement."
         },
         {
             "id": "SAF-7-safe",
             "analyser": {
-                "eclair": "MC3R1.R20.7"
+                "eclair": "MC3A2.R20.7"
             },
-            "name": "MC3R1.R20.7: deliberately non-parenthesized macro argument",
+            "name": "MC3A2.R20.7: deliberately non-parenthesized macro argument",
             "text": "A macro parameter expands to an expression that is non-parenthesized, as doing so would break the functionality."
         },
         {
             "id": "SAF-8-safe",
             "analyser": {
-                "eclair": "MC3R1.D4.10"
+                "eclair": "MC3A2.D4.10"
             },
             "name": "Dir 4.10: headers that leave it up to the caller to include them correctly",
             "text": "Headers that deliberatively leave the responsability of their correct inclusion to the caller are allowed."
@@ -77,7 +77,7 @@
         {
             "id": "SAF-9-safe",
             "analyser": {
-                "eclair": "MC3R1.D4.10"
+                "eclair": "MC3A2.D4.10"
             },
             "name": "Dir 4.10: empty headers",
             "text": "Empty headers pose no risk if included more than once."
@@ -85,7 +85,7 @@
         {
             "id": "SAF-10-safe",
             "analyser": {
-                "eclair": "MC3R1.D4.10"
+                "eclair": "MC3A2.D4.10"
             },
             "name": "Dir 4.10: direct inclusion guard before",
             "text": "Headers with just the direct inclusion guard before the inclusion guard are safe."
