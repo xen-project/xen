@@ -2641,10 +2641,10 @@ performance.
    Alternatively, selecting `tsx=1` will re-enable TSX at the users own risk.
 
 ### ucode
-> `= List of [ <integer> | scan=<bool>, nmi=<bool>, allow-same=<bool> ]`
+> `= List of [ <integer> | scan=<bool>, nmi=<bool>, allow-same=<bool>, digest-check=<bool> ]`
 
     Applicability: x86
-    Default: `nmi`
+    Default: `nmi,digest-check`
 
 Controls for CPU microcode loading. For early loading, this parameter can
 specify how and where to find the microcode update blob. For late loading,
@@ -2677,6 +2677,12 @@ considered safer. The default value is `true`.
 trying to reload the same version.  Many CPUs will actually reload microcode
 of the same version, and this allows for easy testing of the late microcode
 loading path.
+
+The `digest-check=` option is active by default and controls whether to
+perform additional authenticity checks.  Collisions in the signature algorithm
+used by AMD Fam17h/19h processors have been found.  Xen contains a table of
+digests of microcode patches with known-good provenance, and will block
+loading of patches that do not match.
 
 ### unrestricted_guest (Intel)
 > `= <boolean>`

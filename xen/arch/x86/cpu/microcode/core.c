@@ -99,6 +99,7 @@ static bool_t __initdata ucode_scan;
 static bool ucode_in_nmi = true;
 
 bool __read_mostly opt_ucode_allow_same;
+bool __ro_after_init opt_digest_check = true;
 
 /* Protected by microcode_mutex */
 static struct microcode_patch *microcode_cache;
@@ -128,6 +129,8 @@ static int __init cf_check parse_ucode(const char *s)
             ucode_in_nmi = val;
         else if ( (val = parse_boolean("allow-same", s, ss)) >= 0 )
             opt_ucode_allow_same = val;
+        else if ( (val = parse_boolean("digest-check", s, ss)) >= 0 )
+            opt_digest_check = val;
         else if ( !ucode_mod_forced ) /* Not forced by EFI */
         {
             if ( (val = parse_boolean("scan", s, ss)) >= 0 )
@@ -867,6 +870,14 @@ int __init early_microcode_init(unsigned long *module_map,
     switch ( c->x86_vendor )
     {
     case X86_VENDOR_AMD:
+        if ( !opt_digest_check &&
+             boot_cpu_data.x86 >= 0x17 && boot_cpu_data.x86 <= 0x19 )
+        {
+            printk(XENLOG_WARNING
+                   "Microcode patch additional digest checks disabled");
+            add_taint(TAINT_CPU_OUT_OF_SPEC);
+        }
+
         if ( c->x86 >= 0x10 )
         {
             ucode_ops = amd_ucode_ops;
