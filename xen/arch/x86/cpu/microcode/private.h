@@ -67,6 +67,8 @@ struct microcode_ops {
     const char *cpio_path;
 };
 
+extern bool opt_digest_check;
+
 /*
  * Microcode loading falls into one of 3 states.
  *   - No support at all
