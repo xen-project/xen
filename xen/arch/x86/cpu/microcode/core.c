@@ -101,6 +101,7 @@ static struct microcode_patch *microcode_cache;
  */
 static int __initdata opt_mod_idx;
 static bool __initdata opt_scan = IS_ENABLED(CONFIG_UCODE_SCAN_DEFAULT);
+bool __ro_after_init opt_digest_check = true;
 
 /*
  * Used by the EFI path only, when xen.cfg identifies an explicit microcode
@@ -130,6 +131,8 @@ static int __init cf_check parse_ucode(const char *s)
 
         if ( (val = parse_boolean("nmi", s, ss)) >= 0 )
             ucode_in_nmi = val;
+        else if ( (val = parse_boolean("digest-check", s, ss)) >= 0 )
+            opt_digest_check = val;
         else if ( !ucode_mod_forced ) /* Not forced by EFI */
         {
             if ( (val = parse_boolean("scan", s, ss)) >= 0 )
