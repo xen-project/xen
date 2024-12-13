@@ -13,6 +13,7 @@ lib-y += memset.o
 lib-y += muldiv64.o
 lib-y += parse-size.o
 lib-y += rbtree.o
+lib-$(CONFIG_X86) += sha2-256.o
 lib-y += sort.o
 lib-y += strcasecmp.o
 lib-y += strchr.o
