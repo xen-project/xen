@@ -236,6 +236,13 @@ static __init int kernel_decompress(struct bootmodule *mod, uint32_t offset)
         free_domheap_page(pages + i);
 
     /*
+     * When using static heap feature, don't give bootmodules memory back to
+     * the heap allocator
+     */
+    if ( using_static_heap )
+        return 0;
+
+    /*
      * When freeing the kernel, we need to pass the module start address and
      * size as they were before taking an offset to gzip header into account,
      * so that the entire region will be freed.

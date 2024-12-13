@@ -206,6 +206,13 @@ void __init discard_initial_modules(void)
     struct bootmodules *mi = &bootinfo.modules;
     int i;
 
+    /*
+     * When using static heap feature, don't give bootmodules memory back to
+     * the heap allocator
+     */
+    if ( using_static_heap )
+        goto out;
+
     for ( i = 0; i < mi->nr_mods; i++ )
     {
         paddr_t s = mi->module[i].start;
@@ -223,6 +230,7 @@ void __init discard_initial_modules(void)
 
     mi->nr_mods = 0;
 
+ out:
     remove_early_mappings();
 }
 

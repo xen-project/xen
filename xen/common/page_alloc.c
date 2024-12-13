@@ -165,6 +165,9 @@
 #define PGT_TYPE_INFO_INITIALIZER 0
 #endif
 
+/* Flag saved when Xen is using the static heap feature */
+bool __ro_after_init using_static_heap;
+
 unsigned long __read_mostly max_page;
 unsigned long __read_mostly total_pages;
 paddr_t __ro_after_init mem_hotplug;

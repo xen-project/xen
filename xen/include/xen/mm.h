@@ -72,6 +72,8 @@
 
 struct page_info;
 
+extern bool using_static_heap;
+
 void put_page(struct page_info *page);
 bool __must_check get_page(struct page_info *page,
                            const struct domain *domain);

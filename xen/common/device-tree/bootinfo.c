@@ -407,7 +407,7 @@ void __init populate_boot_allocator(void)
     const struct membanks *reserved_mem = bootinfo_get_reserved_mem();
     paddr_t s, e;
 
-    if ( bootinfo.static_heap )
+    if ( using_static_heap )
     {
         for ( i = 0 ; i < reserved_mem->nr_banks; i++ )
         {
