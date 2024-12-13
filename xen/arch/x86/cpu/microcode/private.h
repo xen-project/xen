@@ -60,6 +60,8 @@ struct microcode_ops {
         const struct microcode_patch *new, const struct microcode_patch *old);
 };
 
+extern bool opt_digest_check;
+
 /*
  * Microcode loading falls into one of 3 states.
  *   - No support at all
