@@ -16,7 +16,9 @@
 
 #include <xen/err.h>
 #include <xen/init.h>
+#include <xen/lib.h>
 #include <xen/mm.h> /* TODO: Fix asm/tlbflush.h breakage */
+#include <xen/sha2.h>
 
 #include <asm/msr.h>
 
@@ -90,6 +92,59 @@ static struct {
     uint32_t sig;
     uint16_t id;
 } equiv __read_mostly;
+
+static const struct patch_digest {
+    uint32_t patch_id;
+    uint8_t digest[SHA2_256_DIGEST_SIZE];
+} patch_digests[] = {
+#include "amd-patch-digests.c"
+};
+
+static int cf_check cmp_patch_id(const void *key, const void *elem)
+{
+    const struct patch_digest *pd = elem;
+    uint32_t patch_id = *(uint32_t *)key;
+
+    if ( patch_id == pd->patch_id )
+        return 0;
+    else if ( patch_id < pd->patch_id )
+        return -1;
+    return 1;
+}
+
+static bool check_digest(const struct container_microcode *mc)
+{
+    const struct microcode_patch *patch = mc->patch;
+    const struct patch_digest *pd;
+    uint8_t digest[SHA2_256_DIGEST_SIZE];
+
+    /* Only Fam17h/19h are known to need extra checks.  Skip other families. */
+    if ( boot_cpu_data.x86 < 0x17 || boot_cpu_data.x86 > 0x19 ||
+         !opt_digest_check )
+        return true;
+
+    pd = bsearch(&patch->patch_id, patch_digests, ARRAY_SIZE(patch_digests),
+                 sizeof(struct patch_digest), cmp_patch_id);
+    if ( !pd )
+    {
+        printk(XENLOG_WARNING "No digest found for patch_id %08x\n",
+               patch->patch_id);
+        return false;
+    }
+
+    sha2_256_digest(digest, patch, mc->len);
+
+    if ( memcmp(digest, pd->digest, sizeof(digest)) )
+    {
+        printk(XENLOG_WARNING "Patch %08x SHA256 mismatch:\n"
+               "  expected %" STR(SHA2_256_DIGEST_SIZE) "phN\n"
+               "       got %" STR(SHA2_256_DIGEST_SIZE) "phN\n",
+               patch->patch_id, pd->digest, digest);
+        return false;
+    }
+
+    return true;
+}
 
 static void cf_check collect_cpu_info(void)
 {
@@ -391,7 +446,8 @@ static struct microcode_patch *cf_check cpu_request_microcode(
              * one with higher revision.
              */
             if ( (microcode_fits(mc->patch) != MIS_UCODE) &&
-                 (!saved || (compare_header(mc->patch, saved) == NEW_UCODE)) )
+                 (!saved || (compare_header(mc->patch, saved) == NEW_UCODE)) &&
+                 check_digest(mc) )
             {
                 saved = mc->patch;
                 saved_size = mc->len;
