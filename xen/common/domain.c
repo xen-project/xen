@@ -562,6 +562,32 @@ static void _domain_destroy(struct domain *d)
     free_domain_struct(d);
 }
 
+static uint64_t get_unique_id(void)
+{
+    static uint64_t unique_id;
+    static DEFINE_SPINLOCK(lock);
+    uint64_t x;
+
+    spin_lock(&lock);
+
+    x = unique_id ? : NOW();
+
+    /*
+     * Pseudo-randomize id in order to avoid consumers relying on sequence.
+     * Randomization algorithm has a period of 2^64 - 1.
+     * Unique id is not repeatable between resets and each id has the same
+     * lifetime as the domain it is associated with.
+     */
+    x ^= x << 13;
+    x ^= x >> 7;
+    x ^= x << 17;
+    unique_id = x;
+
+    spin_unlock(&lock);
+
+    return x;
+}
+
 static int sanitise_domain_config(struct xen_domctl_createdomain *config)
 {
     bool hvm = config->flags & XEN_DOMCTL_CDF_hvm;
@@ -654,6 +680,7 @@ struct domain *domain_create(domid_t domid,
 
     /* Sort out our idea of is_system_domain(). */
     d->domain_id = domid;
+    d->unique_id = get_unique_id();
 
     /* Holding CDF_* internal flags. */
     d->cdf = flags;
