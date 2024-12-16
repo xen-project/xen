@@ -8,6 +8,7 @@
 #include <xen/pmap.h>
 #include <xen/spinlock.h>
 
+#include <asm/fixmap.h>
 #include <asm/flushtlb.h>
 #include <asm/page.h>
 
@@ -432,4 +433,19 @@ int destroy_xen_mappings(unsigned long s, unsigned long e)
 int __init populate_pt_range(unsigned long virt, unsigned long nr_mfns)
 {
     return pt_update(virt, INVALID_MFN, nr_mfns, PTE_POPULATE);
+}
+
+/* Map a 4k page in a fixmap entry */
+void set_fixmap(unsigned int map, mfn_t mfn, unsigned int flags)
+{
+    if ( map_pages_to_xen(FIXMAP_ADDR(map), mfn, 1, flags | PTE_SMALL) != 0 )
+        BUG();
+}
+
+/* Remove a mapping from a fixmap entry */
+void clear_fixmap(unsigned int map)
+{
+    if ( destroy_xen_mappings(FIXMAP_ADDR(map),
+                              FIXMAP_ADDR(map) + PAGE_SIZE) != 0 )
+        BUG();
 }

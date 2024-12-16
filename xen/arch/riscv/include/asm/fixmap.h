@@ -32,6 +32,11 @@
  */
 extern pte_t xen_fixmap[];
 
+/* Map a page in a fixmap entry */
+void set_fixmap(unsigned int map, mfn_t mfn, unsigned int flags);
+/* Remove a mapping from a fixmap entry */
+void clear_fixmap(unsigned int map);
+
 #define fix_to_virt(slot) ((void *)FIXMAP_ADDR(slot))
 
 static inline unsigned int virt_to_fix(vaddr_t vaddr)
