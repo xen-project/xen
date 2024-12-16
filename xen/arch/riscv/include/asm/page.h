@@ -5,8 +5,8 @@
 
 #ifndef __ASSEMBLY__
 
-#include <xen/const.h>
 #include <xen/bug.h>
+#include <xen/const.h>
 #include <xen/types.h>
 
 #include <asm/atomic.h>
