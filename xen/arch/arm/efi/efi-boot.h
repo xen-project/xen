@@ -167,13 +167,14 @@ static bool __init meminfo_add_bank(struct membanks *mem,
     if ( mem->nr_banks >= mem->max_banks )
         return false;
 #ifdef CONFIG_ACPI
-    if ( check_reserved_regions_overlap(start, size) )
+    if ( check_reserved_regions_overlap(start, size, false) )
         return false;
 #endif
 
     bank = &mem->bank[mem->nr_banks];
     bank->start = start;
     bank->size = size;
+    bank->type = MEMBANK_DEFAULT;
 
     mem->nr_banks++;
 

@@ -696,7 +696,7 @@ int __init process_shm_node(const void *fdt, int node, uint32_t address_cells,
         if (i < mem->max_banks)
         {
             if ( (paddr != INVALID_PADDR) &&
-                 check_reserved_regions_overlap(paddr, size) )
+                 check_reserved_regions_overlap(paddr, size, false) )
                 return -EINVAL;
 
             /* Static shared memory shall be reserved from any other use. */

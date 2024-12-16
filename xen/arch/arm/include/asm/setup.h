@@ -49,6 +49,12 @@ enum membank_type {
     MEMBANK_FDT_RESVMEM,
 };
 
+enum region_type {
+    MEMORY,
+    RESERVED_MEMORY,
+    STATIC_SHARED_MEMORY
+};
+
 /* Indicates the maximum number of characters(\0 included) for shm_id */
 #define MAX_SHM_ID_LENGTH 16
 
@@ -72,6 +78,7 @@ struct membanks {
     __struct_group(membanks_hdr, common, ,
         unsigned int nr_banks;
         unsigned int max_banks;
+        enum region_type type;
     );
     struct membank bank[];
 };
@@ -137,13 +144,17 @@ struct bootinfo {
 };
 
 #ifdef CONFIG_ACPI
-#define BOOTINFO_ACPI_INIT .acpi.common.max_banks = NR_MEM_BANKS,
+#define BOOTINFO_ACPI_INIT                          \
+    .acpi.common.max_banks = NR_MEM_BANKS,          \
+    .acpi.common.type = MEMORY,
 #else
 #define BOOTINFO_ACPI_INIT
 #endif
 
 #ifdef CONFIG_STATIC_SHM
-#define BOOTINFO_SHMEM_INIT .shmem.common.max_banks = NR_SHMEM_BANKS,
+#define BOOTINFO_SHMEM_INIT                         \
+    .shmem.common.max_banks = NR_SHMEM_BANKS,       \
+    .shmem.common.type = STATIC_SHARED_MEMORY,
 #else
 #define BOOTINFO_SHMEM_INIT
 #endif
@@ -151,7 +162,9 @@ struct bootinfo {
 #define BOOTINFO_INIT                               \
 {                                                   \
     .mem.common.max_banks = NR_MEM_BANKS,           \
+    .mem.common.type = MEMORY,                      \
     .reserved_mem.common.max_banks = NR_MEM_BANKS,  \
+    .reserved_mem.common.type = RESERVED_MEMORY,    \
     BOOTINFO_ACPI_INIT                              \
     BOOTINFO_SHMEM_INIT                             \
 }
@@ -223,7 +236,8 @@ void fw_unreserved_regions(paddr_t s, paddr_t e,
 size_t boot_fdt_info(const void *fdt, paddr_t paddr);
 const char *boot_fdt_cmdline(const void *fdt);
 
-bool check_reserved_regions_overlap(paddr_t region_start, paddr_t region_size);
+bool check_reserved_regions_overlap(paddr_t region_start, paddr_t region_size,
+                                    bool allow_memreserve_overlap);
 
 struct bootmodule *add_boot_module(bootmodule_kind kind,
                                    paddr_t start, paddr_t size, bool domU);
