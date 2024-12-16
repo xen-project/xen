@@ -360,12 +360,6 @@ int xenmem_add_to_physmap_one(struct domain *d, unsigned int space,
     return 0;
 }
 
-int destroy_xen_mappings(unsigned long s, unsigned long e)
-{
-    BUG_ON("unimplemented");
-    return -1;
-}
-
 void share_xen_page_with_guest(struct page_info *page, struct domain *d,
                                enum XENSHARE_flags flags)
 {
