@@ -93,7 +93,7 @@ def __generate_suppression_list(out_file):
                         # start of a comment '/*'
                         comment_line_starts = re.match('^[ \t]*/\*.*$', line)
                         # Matches a line with text and the end of a comment '*/'
-                        comment_line_stops = re.match('^.*\*/$', line)
+                        comment_line_stops = re.match(r'^.*\*/$', line)
                         if (not comment_section) and comment_line_starts:
                             comment_section = True
                         if (len(line.strip()) != 0) and (not comment_section):
@@ -157,7 +157,7 @@ def generate_cppcheck_deps():
             "Error occured retrieving cppcheck version:\n{}\n\n{}"
         )
 
-    version_regex = re.search('^Cppcheck (\d+)\.(\d+)(?:\.\d+)?$',
+    version_regex = re.search(r'^Cppcheck (\d+)\.(\d+)(?:\.\d+)?$',
                               invoke_cppcheck, flags=re.M)
     # Currently, only cppcheck version >= 2.7 is supported, but version 2.8 is
     # known to be broken, please refer to docs/misra/cppcheck.txt

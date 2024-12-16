@@ -320,7 +320,7 @@ class GrubConfigFile(_GrubConfigFile):
 def grub2_handle_set(arg):
     (com,arg) = grub_split(arg,2)
     com="set:" + com
-    m = re.match("([\"\'])(.*)\\1", arg)
+    m = re.match(r"([\"\'])(.*)\1", arg)
     if m is not None:
         arg=m.group(2)
     return (com,arg)
@@ -402,7 +402,7 @@ class Grub2ConfigFile(_GrubConfigFile):
                 continue
 
             # new image
-            title_match = re.match('^menuentry ["\'](.*?)["\'] (.*){', l)
+            title_match = re.match(r'^menuentry ["\'](.*?)["\'] (.*){', l)
             if title_match:
                 if img is not None:
                     raise RuntimeError("syntax error: cannot nest menuentry (%d %s)" % (len(img),img))

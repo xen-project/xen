@@ -614,7 +614,7 @@ class Grub:
             title = self.cf.default
             while 1:
                 try:
-                    title = re.search('(\S)>(\S.+$)',title).group(2)
+                    title = re.search(r'(\S)>(\S.+$)',title).group(2)
                 except AttributeError:
                     break
 
@@ -1039,7 +1039,7 @@ if __name__ == "__main__":
 
     # if boot filesystem is set then pass to fsimage.open
     bootfsargs = '"%s"' % incfg["args"]
-    bootfsgroup = re.findall('zfs-bootfs=(.*?)[\s\,\"]', bootfsargs)
+    bootfsgroup = re.findall(r'zfs-bootfs=(.*?)[\s\,\"]', bootfsargs)
     if bootfsgroup:
         bootfsoptions = bootfsgroup[0]
     else:
@@ -1104,7 +1104,7 @@ if __name__ == "__main__":
     if chosencfg["args"]:
         zfsinfo = xenfsimage.getbootstring(fs)
         if zfsinfo is not None:
-            e = re.compile("zfs-bootfs=[\w\-\.\:@/]+" )
+            e = re.compile(r"zfs-bootfs=[\w\-.:@/]+" )
             (chosencfg["args"],count) = e.subn(zfsinfo, chosencfg["args"])
             if count == 0:
                chosencfg["args"] += " -B %s" % zfsinfo
