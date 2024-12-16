@@ -1389,14 +1389,14 @@ void __init enable_IO_APIC(void)
             /* If the interrupt line is enabled and in ExtInt mode
              * I have found the pin where the i8259 is connected.
              */
-            if ((entry.mask == 0) && (entry.delivery_mode == dest_ExtINT)) {
+            if ( ioapic_i8259.pin == -1 && entry.mask == 0 &&
+                 entry.delivery_mode == dest_ExtINT )
+            {
                 ioapic_i8259.apic = apic;
                 ioapic_i8259.pin  = pin;
-                goto found_i8259;
             }
         }
     }
- found_i8259:
     /* Look to see what if the MP table has reported the ExtINT */
     /* If we could not find the appropriate pin by looking at the ioapic
      * the i8259 probably is not connected the ioapic but give the
