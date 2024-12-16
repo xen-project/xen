@@ -640,7 +640,8 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
          *
          * This restore path is used for incoming VMs with no CPUID data
          * i.e. originated on Xen 4.13 or earlier.  We must invent a policy
-         * compatible with what Xen 4.13 would have done on the same hardware.
+         * compatible with what a security-patched Xen 4.13 would have done on
+         * the same hardware.
          *
          * Specifically:
          * - Clamp max leaves.
@@ -657,8 +658,8 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid, bool restore,
         }
 
         p->policy.basic.max_leaf = min(p->policy.basic.max_leaf, 0xdu);
-        p->policy.feat.max_subleaf = 0;
-        p->policy.extd.max_leaf = min(p->policy.extd.max_leaf, 0x8000001c);
+        p->policy.feat.max_subleaf = min(p->policy.feat.max_subleaf, 0x2u);
+        p->policy.extd.max_leaf = min(p->policy.extd.max_leaf, 0x80000021);
     }
 
     if ( featureset )
