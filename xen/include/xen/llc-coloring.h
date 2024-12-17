@@ -11,6 +11,7 @@
 #include <xen/types.h>
 
 struct domain;
+struct page_info;
 struct xen_domctl_set_llc_colors;
 
 #ifdef CONFIG_LLC_COLORING
@@ -35,6 +36,8 @@ int dom0_set_llc_colors(struct domain *d);
 int domain_set_llc_colors(struct domain *d,
                           const struct xen_domctl_set_llc_colors *config);
 int domain_set_llc_colors_from_str(struct domain *d, const char *str);
+unsigned int page_to_llc_color(const struct page_info *pg);
+unsigned int get_max_nr_llc_colors(void);
 
 #endif /* __XEN_LLC_COLORING_H__ */
 
