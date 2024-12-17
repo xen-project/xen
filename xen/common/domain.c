@@ -34,6 +34,7 @@
 #include <xen/xenoprof.h>
 #include <xen/irq.h>
 #include <xen/argo.h>
+#include <xen/llc-coloring.h>
 #include <asm/p2m.h>
 #include <asm/processor.h>
 #include <public/sched.h>
@@ -1302,6 +1303,8 @@ static void cf_check complete_domain_destroy(struct rcu_head *head)
 void domain_destroy(struct domain *d)
 {
     BUG_ON(!d->is_dying);
+
+    domain_llc_coloring_free(d);
 
     /* May be already destroyed, or get_domain() can race us. */
     if ( atomic_cmpxchg(&d->refcnt, 0, DOMAIN_DESTROYED) != 0 )
