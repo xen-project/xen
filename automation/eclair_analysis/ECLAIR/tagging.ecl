@@ -29,7 +29,7 @@
 
 -doc_begin="Clean guidelines: new violations for these guidelines are not accepted."
 
--service_selector={clean_guidelines_common,"^(MC3A2\\.D1\\.1|MC3A2\\.D2\\.1|MC3A2\\.D4\\.11|MC3A2\\.D4\\.14|MC3A2\\.R1\\.1|MC3A2\\.R1\\.3|MC3A2\\.R1\\.4|MC3A2\\.R2\\.2|MC3A2\\.R3\\.1|MC3A2\\.R3\\.2|MC3A2\\.R4\\.1|MC3A2\\.R5\\.1|MC3A2\\.R5\\.2|MC3A2\\.R5\\.4|MC3A2\\.R6\\.1|MC3A2\\.R6\\.2|MC3A2\\.R7\\.1|MC3A2\\.R8\\.1|MC3A2\\.R8\\.5|MC3A2\\.R8\\.8|MC3A2\\.R8\\.10|MC3A2\\.R8\\.12|MC3A2\\.R8\\.14|MC3A2\\.R9\\.2|MC3A2\\.R9\\.4|MC3A2\\.R9\\.5|MC3A2\\.R12\\.5|MC3A2\\.R17\\.3|MC3A2\\.R17\\.4|MC3A2\\.R17\\.6|MC3A2\\.R21\\.13|MC3A2\\.R21\\.19|MC3A2\\.R21\\.21|MC3A2\\.R22\\.2|MC3A2\\.R22\\.4|MC3A2\\.R22\\.5|MC3A2\\.R22\\.6)$"
+-service_selector={clean_guidelines_common,"^(MC3A2\\.D1\\.1|MC3A2\\.D2\\.1|MC3A2\\.D4\\.14|MC3A2\\.R1\\.3|MC3A2\\.R1\\.4|MC3A2\\.R2\\.2|MC3A2\\.R3\\.1|MC3A2\\.R3\\.2|MC3A2\\.R4\\.1|MC3A2\\.R5\\.1|MC3A2\\.R5\\.2|MC3A2\\.R5\\.4|MC3A2\\.R6\\.1|MC3A2\\.R6\\.2|MC3A2\\.R7\\.1|MC3A2\\.R8\\.1|MC3A2\\.R8\\.5|MC3A2\\.R8\\.8|MC3A2\\.R8\\.10|MC3A2\\.R8\\.12|MC3A2\\.R8\\.14|MC3A2\\.R9\\.2|MC3A2\\.R9\\.4|MC3A2\\.R9\\.5|MC3A2\\.R12\\.5|MC3A2\\.R17\\.3|MC3A2\\.R17\\.4|MC3A2\\.R17\\.6|MC3A2\\.R21\\.13|MC3A2\\.R21\\.19|MC3A2\\.R21\\.21|MC3A2\\.R22\\.2|MC3A2\\.R22\\.4|MC3A2\\.R22\\.5|MC3A2\\.R22\\.6)$"
 }
 
 -setq=target,getenv("XEN_TARGET_ARCH")
