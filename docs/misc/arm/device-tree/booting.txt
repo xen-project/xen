@@ -162,6 +162,11 @@ with the following properties:
 
     An integer specifying the number of vcpus to allocate to the guest.
 
+- llc-colors
+    A string specifying the LLC color configuration for the guest.
+    Refer to docs/misc/cache_coloring.rst for syntax. This option is applicable
+    only to Arm64 guests.
+
 - vpl011
 
     An empty property to enable/disable a virtual pl011 for the guest to
