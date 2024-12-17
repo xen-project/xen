@@ -5,6 +5,7 @@
 #include <asm/regs.h>
 #include <xen/delay.h>
 #include <xen/keyhandler.h>
+#include <xen/llc-coloring.h>
 #include <xen/param.h>
 #include <xen/sections.h>
 #include <xen/shutdown.h>
@@ -303,6 +304,8 @@ static void cf_check dump_domains(unsigned char key)
                        i, (u32)((d->watchdog_timer[i].expires - NOW()) >> 30));
 
         arch_dump_domain_info(d);
+
+        domain_dump_llc_colors(d);
 
         rangeset_domain_printk(d);
 

@@ -66,6 +66,7 @@ Documents in need of some rearranging.
    misc/xen-makefiles/makefiles
    misra/index
    fusa/index
+   misc/cache-coloring
 
 
 Miscellanea
