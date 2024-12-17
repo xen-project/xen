@@ -12,6 +12,7 @@
 #include <xen/device_tree.h>
 #include <xen/domain_page.h>
 #include <xen/grant_table.h>
+#include <xen/llc-coloring.h>
 #include <xen/types.h>
 #include <xen/string.h>
 #include <xen/serial.h>
@@ -333,6 +334,8 @@ void asmlinkage __init start_xen(unsigned long fdt_paddr)
     cmdline = boot_fdt_cmdline(device_tree_flattened);
     printk("Command line: %s\n", cmdline);
     cmdline_parse(cmdline);
+
+    llc_coloring_init();
 
     setup_mm();
 

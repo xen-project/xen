@@ -8,6 +8,8 @@
 #include <xen/keyhandler.h>
 #include <xen/llc-coloring.h>
 #include <xen/param.h>
+#include <xen/sched.h>
+#include <xen/types.h>
 
 #define NR_LLC_COLORS          (1U << CONFIG_LLC_COLORS_ORDER)
 
@@ -19,7 +21,7 @@
 static int8_t __initdata opt_llc_coloring = -1;
 boolean_param("llc-coloring", opt_llc_coloring);
 
-static bool __ro_after_init llc_coloring_enabled;
+bool __ro_after_init llc_coloring_enabled;
 
 static unsigned int __initdata llc_size;
 size_param("llc-size", llc_size);
