@@ -25,7 +25,6 @@ MC3A2.D2.1||
 MC3A2.D4.1||
 MC3A2.D4.11||
 MC3A2.D4.14||
-MC3A2.R1.1||
 MC3A2.R1.3||
 MC3A2.R1.4||
 MC3A2.R2.6||
@@ -116,7 +115,7 @@ if(string_equal(target,"x86_64"),
 )
 
 if(string_equal(target,"arm64"),
-    service_selector({"additional_clean_guidelines","MC3A2.R2.1||MC3A2.R5.3||MC3.R11.2||MC3A2.R16.6||MC3A2.R20.7"})
+    service_selector({"additional_clean_guidelines","MC3A2.R5.3||MC3.R11.2||MC3A2.R16.6||MC3A2.R20.7"})
 )
 
 -reports+={clean:added,"service(clean_guidelines_common||additional_clean_guidelines)"}
