@@ -31,6 +31,7 @@ void dump_pt_walk(paddr_t ttbr, paddr_t addr,
 
 /* Switch to a new root page-tables */
 extern void switch_ttbr(uint64_t ttbr);
+extern void relocate_and_switch_ttbr(uint64_t ttbr);
 
 #endif /* __ARM_MMU_MM_H__ */
 
