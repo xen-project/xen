@@ -575,6 +575,7 @@ SchedParams DomainSchedParams
 Ioports []IoportRange
 Irqs []uint32
 Iomem []IomemRange
+LlcColors []uint32
 ClaimMode Defbool
 EventChannels uint32
 Kernel string

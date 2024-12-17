@@ -1097,6 +1097,14 @@ if err := x.Iomem[i].fromC(&v); err != nil {
 return fmt.Errorf("converting field Iomem: %v", err) }
 }
 }
+x.LlcColors = nil
+if n := int(xc.num_llc_colors); n > 0 {
+cLlcColors := (*[1<<28]C.uint32_t)(unsafe.Pointer(xc.llc_colors))[:n:n]
+x.LlcColors = make([]uint32, n)
+for i, v := range cLlcColors {
+x.LlcColors[i] = uint32(v)
+}
+}
 if err := x.ClaimMode.fromC(&xc.claim_mode);err != nil {
 return fmt.Errorf("converting field ClaimMode: %v", err)
 }
@@ -1451,6 +1459,14 @@ for i,v := range x.Iomem {
 if err := v.toC(&cIomem[i]); err != nil {
 return fmt.Errorf("converting field Iomem: %v", err)
 }
+}
+}
+if numLlcColors := len(x.LlcColors); numLlcColors > 0 {
+xc.llc_colors = (*C.uint32_t)(C.malloc(C.size_t(numLlcColors*numLlcColors)))
+xc.num_llc_colors = C.int(numLlcColors)
+cLlcColors := (*[1<<28]C.uint32_t)(unsafe.Pointer(xc.llc_colors))[:numLlcColors:numLlcColors]
+for i,v := range x.LlcColors {
+cLlcColors[i] = C.uint32_t(v)
 }
 }
 if err := x.ClaimMode.toC(&xc.claim_mode); err != nil {
