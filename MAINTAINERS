@@ -426,6 +426,12 @@ L:	minios-devel@lists.xenproject.org
 T:	git https://xenbits.xenproject.org/git-http/mini-os.git
 F:	config/MiniOS.mk
 
+NXP S32G3 PROCESSORS FAMILY SUPPORT
+M:	Andrei Cherechesu <andrei.cherechesu@oss.nxp.com>
+L:	NXP S32 Linux Team <s32@nxp.com>
+F:	xen/arch/arm/include/asm/linflex-uart.h
+F:	xen/drivers/char/linflex-uart.c
+
 OCAML TOOLS
 M:	Christian Lindig <christian.lindig@citrix.com>
 M:	David Scott <dave@recoil.org>
