@@ -935,6 +935,14 @@ Add/Remove device tree nodes using a device tree overlay binary (.dtbo).
 
     Status: Tech Preview
 
+### Arm: SCMI over SMC calls forwarding to EL3 Firmware
+
+Enable SCMI calls using SMC as doorbell mechanism and Shared Memory for
+transport ("arm,scmi-smc" compatible only) to reach EL3 Firmware if issued
+by hwdom. Some platforms use SCMI for access to system-level resources.
+
+    Status: Supported
+
 ## Virtual Hardware, QEMU
 
 This section describes supported devices available in HVM mode using a
