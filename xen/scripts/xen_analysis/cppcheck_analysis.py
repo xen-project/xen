@@ -91,7 +91,7 @@ def __generate_suppression_list(out_file):
                         line = header_content[tmp_line]
                         # Matches a line with just optional spaces/tabs and the
                         # start of a comment '/*'
-                        comment_line_starts = re.match('^[ \t]*/\*.*$', line)
+                        comment_line_starts = re.match(r'^[ \t]*/\*.*$', line)
                         # Matches a line with text and the end of a comment '*/'
                         comment_line_stops = re.match(r'^.*\*/$', line)
                         if (not comment_section) and comment_line_starts:
