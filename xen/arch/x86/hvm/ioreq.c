@@ -29,7 +29,7 @@ bool arch_ioreq_complete_mmio(void)
     return handle_mmio();
 }
 
-#ifdef CONFIG_VCPU_ARCH_IOREQ_COMPLETION
+#ifdef CONFIG_ARCH_VCPU_IOREQ_COMPLETION
 bool arch_vcpu_ioreq_completion(enum vio_completion completion)
 {
     switch ( completion )

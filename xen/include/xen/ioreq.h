@@ -112,7 +112,7 @@ int ioreq_server_dm_op(struct xen_dm_op *op, struct domain *d, bool *const_op);
 
 bool arch_ioreq_complete_mmio(void);
 
-#ifdef CONFIG_VCPU_ARCH_IOREQ_COMPLETION
+#ifdef CONFIG_ARCH_VCPU_IOREQ_COMPLETION
 bool arch_vcpu_ioreq_completion(enum vio_completion completion);
 #else
 static inline bool arch_vcpu_ioreq_completion(enum vio_completion completion)
