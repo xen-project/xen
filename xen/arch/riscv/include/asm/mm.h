@@ -8,6 +8,7 @@
 #include <xen/const.h>
 #include <xen/mm-frame.h>
 #include <xen/pdx.h>
+#include <xen/pfn.h>
 #include <xen/types.h>
 
 #include <asm/page-bits.h>
@@ -148,8 +149,11 @@ static inline void *page_to_virt(const struct page_info *pg)
 /* Convert between Xen-heap virtual addresses and page-info structures. */
 static inline struct page_info *virt_to_page(const void *v)
 {
-    BUG_ON("unimplemented");
-    return NULL;
+    unsigned long va = (unsigned long)v;
+
+    ASSERT((va >= DIRECTMAP_VIRT_START) && (va <= DIRECTMAP_VIRT_END));
+
+    return frametable_virt_start + PFN_DOWN(va - directmap_virt_start);
 }
 
 /*

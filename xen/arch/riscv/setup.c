@@ -12,6 +12,7 @@
 #include <public/version.h>
 
 #include <asm/early_printk.h>
+#include <asm/fixmap.h>
 #include <asm/sbi.h>
 #include <asm/setup.h>
 #include <asm/smp.h>
@@ -25,6 +26,31 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
 /* Xen stack for bringing up the first CPU. */
 unsigned char __initdata cpu0_boot_stack[STACK_SIZE]
     __aligned(STACK_SIZE);
+
+/**
+ * copy_from_paddr - copy data from a physical address
+ * @dst: destination virtual address
+ * @paddr: source physical address
+ * @len: length to copy
+ */
+void __init copy_from_paddr(void *dst, paddr_t paddr, unsigned long len)
+{
+    const void *src = (void *)FIXMAP_ADDR(FIX_MISC);
+
+    while ( len )
+    {
+        unsigned long s = paddr & (PAGE_SIZE - 1);
+        unsigned long l = min(PAGE_SIZE - s, len);
+
+        set_fixmap(FIX_MISC, maddr_to_mfn(paddr), PAGE_HYPERVISOR_RW);
+        memcpy(dst, src + s, l);
+        clear_fixmap(FIX_MISC);
+
+        paddr += l;
+        dst += l;
+        len -= l;
+    }
+}
 
 void __init noreturn start_xen(unsigned long bootcpu_id,
                                paddr_t dtb_addr)

@@ -7,6 +7,7 @@
 
 #include <xen/bug.h>
 #include <xen/const.h>
+#include <xen/domain_page.h>
 #include <xen/errno.h>
 #include <xen/types.h>
 
@@ -176,10 +177,17 @@ static inline void invalidate_icache(void)
 #define clear_page(page) memset((void *)(page), 0, PAGE_SIZE)
 #define copy_page(dp, sp) memcpy(dp, sp, PAGE_SIZE)
 
-/* TODO: Flush the dcache for an entire page. */
 static inline void flush_page_to_ram(unsigned long mfn, bool sync_icache)
 {
-    BUG_ON("unimplemented");
+    const void *v = map_domain_page(_mfn(mfn));
+
+    if ( clean_and_invalidate_dcache_va_range(v, PAGE_SIZE) )
+        BUG();
+
+    unmap_domain_page(v);
+
+    if ( sync_icache )
+        invalidate_icache();
 }
 
 /* Write a pagetable entry. */
