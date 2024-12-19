@@ -1,0 +1,5 @@
+config QEMU_PLATFORM
+	bool "QEMU based platform support"
+	help
+	  Enable all the required drivers for QEMU riscv64
+	  virt emulated machine.

@@ -7,6 +7,7 @@
 
 #include <xen/bug.h>
 #include <xen/const.h>
+#include <xen/errno.h>
 #include <xen/types.h>
 
 #include <asm/atomic.h>
@@ -148,9 +149,28 @@ static inline bool pte_is_mapping(pte_t p)
     return (p.pte & PTE_VALID) && (p.pte & PTE_ACCESS_MASK);
 }
 
+static inline int clean_and_invalidate_dcache_va_range(const void *p,
+                                                       unsigned long size)
+{
+#ifndef CONFIG_QEMU_PLATFORM
+# error "should clean_and_invalidate_dcache_va_range() be updated?"
+#endif
+
+    return 0;
+}
+
+static inline int clean_dcache_va_range(const void *p, unsigned long size)
+{
+#ifndef CONFIG_QEMU_PLATFORM
+# error "should clean_dcache_va_range() be updated?"
+#endif
+
+    return 0;
+}
+
 static inline void invalidate_icache(void)
 {
-    BUG_ON("unimplemented");
+    asm volatile ( "fence.i" ::: "memory" );
 }
 
 #define clear_page(page) memset((void *)(page), 0, PAGE_SIZE)

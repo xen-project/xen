@@ -52,6 +52,8 @@ config RISCV_ISA_C
 
 endmenu
 
+source "arch/riscv/platforms/Kconfig"
+
 source "common/Kconfig"
 
 source "drivers/Kconfig"
