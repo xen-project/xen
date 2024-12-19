@@ -13,15 +13,18 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <stdarg.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <fcntl.h>
-#include <xenctrl.h>           /* For cpu barriers. */
+#include <xen-barrier.h>
 #include <xen-tools/common-macros.h>
 
 #include "xen-9pfsd.h"

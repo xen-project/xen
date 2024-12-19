@@ -3,7 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 include Makefile.common
 
-LIBHEADER := xenctrl.h xenctrl_compat.h
+LIBHEADER := xenctrl.h xenctrl_compat.h xen-barrier.h
 PKG_CONFIG_FILE := xencontrol.pc
 PKG_CONFIG_NAME := Xencontrol
 
