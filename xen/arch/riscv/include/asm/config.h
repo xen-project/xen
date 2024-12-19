@@ -41,17 +41,17 @@
  * Start addr          | End addr         | Slot       | area description
  * ============================================================================
  *                   .....                 L2 511          Unused
- *  0xffffffffc0a00000  0xffffffffc0c00000 L2 511          Fixmap
+ *  0xffffffffc0a00000  0xffffffffc0bfffff L2 511          Fixmap
  *                   ..... ( 2 MB gap )
- *  0xffffffffc0400000  0xffffffffc0800000 L2 511          FDT
+ *  0xffffffffc0400000  0xffffffffc07fffff L2 511          FDT
  *                   ..... ( 2 MB gap )
- *  0xffffffffc0000000  0xffffffffc0200000 L2 511          Xen
+ *  0xffffffffc0000000  0xffffffffc01fffff L2 511          Xen
  *                   .....                 L2 510          Unused
- *  0x3200000000        0x7f40000000       L2 200-509      Direct map
+ *  0x3200000000        0x7f7fffffff       L2 200-509      Direct map
  *                   .....                 L2 199          Unused
- *  0x30c0000000        0x31c0000000       L2 195-198      Frametable
+ *  0x30c0000000        0x31bfffffff       L2 195-198      Frametable
  *                   .....                 L2 194          Unused
- *  0x3040000000        0x3080000000       L2 193          VMAP
+ *  0x3040000000        0x307fffffff       L2 193          VMAP
  *                   .....                 L2 0-192        Unused
 #elif RV_STAGE1_MODE == SATP_MODE_SV48
  * Memory layout is the same as for SV39 in terms of slots, so only start and
