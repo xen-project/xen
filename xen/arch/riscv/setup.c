@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
+#include <xen/acpi.h>
 #include <xen/bug.h>
 #include <xen/bootfdt.h>
 #include <xen/compile.h>
@@ -8,6 +9,7 @@
 #include <xen/mm.h>
 #include <xen/shutdown.h>
 #include <xen/vmap.h>
+#include <xen/xvmalloc.h>
 
 #include <public/version.h>
 
@@ -52,10 +54,24 @@ void __init copy_from_paddr(void *dst, paddr_t paddr, unsigned long len)
     }
 }
 
+/* Relocate the FDT in Xen heap */
+static void * __init relocate_fdt(paddr_t dtb_paddr, size_t dtb_size)
+{
+    void *fdt = xvmalloc_array(uint8_t, dtb_size);
+
+    if ( !fdt )
+        panic("Unable to allocate memory for relocating the Device-Tree.\n");
+
+    copy_from_paddr(fdt, dtb_paddr, dtb_size);
+
+    return fdt;
+}
+
 void __init noreturn start_xen(unsigned long bootcpu_id,
                                paddr_t dtb_addr)
 {
     const char *cmdline;
+    size_t fdt_size;
 
     remove_identity_mapping();
 
@@ -80,8 +96,7 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
                           _end - _start, false) )
         panic("Failed to add BOOTMOD_XEN\n");
 
-    if ( !boot_fdt_info(device_tree_flattened, dtb_addr) )
-        BUG();
+    fdt_size = boot_fdt_info(device_tree_flattened, dtb_addr);
 
     cmdline = boot_fdt_cmdline(device_tree_flattened);
     printk("Command line: %s\n", cmdline);
@@ -98,6 +113,18 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
      * early_boot -> boot.
      */
     system_state = SYS_STATE_boot;
+
+    if ( acpi_disabled )
+    {
+        printk("Booting using Device Tree\n");
+        device_tree_flattened = relocate_fdt(dtb_addr, fdt_size);
+        dt_unflatten_host_device_tree();
+    }
+    else
+    {
+        device_tree_flattened = NULL;
+        panic("Booting using ACPI isn't supported\n");
+    }
 
     printk("All set up\n");
 
