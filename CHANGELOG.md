@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
    - Support for NXP S32G3 Processors Family and NXP LINFlexD UART driver.
    - Basic handling for SCMI requests over SMC using Shared Memory, by allowing
      forwarding the calls to EL3 FW if coming from hwdom.
+   - Support for LLC (Last Level Cache) coloring.
  - On x86:
    - xl suspend/resume subcommands.
 
