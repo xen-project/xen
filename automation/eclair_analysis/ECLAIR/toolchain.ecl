@@ -12,25 +12,47 @@
 -setq=C99_STD,"ISO/IEC 9899:1999"
 
 -doc_begin="
-    _Static_assert: see Section \"2.1 C Language\" of "GCC_MANUAL".
-    asm, __asm__: see Sections \"6.48 Alternate Keywords\" and \"6.47 How to Use Inline Assembly Language in C Code\" of "GCC_MANUAL".
-    __volatile__: see Sections \"6.48 Alternate Keywords\" and \"6.47.2.1 Volatile\" of "GCC_MANUAL".
-    __const__ : see Section \"6.48 Alternate Keywords\" of "GCC_MANUAL".
-    typeof, __typeof__: see Section \"6.7 Referring to a Type with typeof\" of "GCC_MANUAL".
     __alignof__, __alignof: see Sections \"6.48 Alternate Keywords\" and \"6.44 Determining the Alignment of Functions, Types or Variables\" of "GCC_MANUAL".
+    asm, __asm__: see Sections \"6.48 Alternate Keywords\" and \"6.47 How to Use Inline Assembly Language in C Code\" of "GCC_MANUAL".
     __attribute__: see Section \"6.39 Attribute Syntax\" of "GCC_MANUAL".
+    __builtin_offsetof: see Section \"6.53 Support for offsetof\" of "GCC_MANUAL".
     __builtin_types_compatible_p: see Section \"6.59 Other Built-in Functions Provided by GCC\" of "GCC_MANUAL".
     __builtin_va_arg: non-documented GCC extension.
-    __builtin_offsetof: see Section \"6.53 Support for offsetof\" of "GCC_MANUAL".
+    __const__, __inline__, __inline: see Section \"6.48 Alternate Keywords\" of "GCC_MANUAL".
+    _Static_assert: see Section \"2.1 C Language\" of "GCC_MANUAL".
+    typeof, __typeof__: see Section \"6.7 Referring to a Type with typeof\" of "GCC_MANUAL".
+    __volatile__: see Sections \"6.48 Alternate Keywords\" and \"6.47.2.1 Volatile\" of "GCC_MANUAL".
 "
--config=STD.tokenext,behavior+={c99, GCC_ARM64, "^(_Static_assert|asm|__asm__|__volatile__|__const__|typeof|__typeof__|__alignof__|__attribute__|__builtin_types_compatible_p|__builtin_va_arg|__builtin_offsetof)$"}
--config=STD.tokenext,behavior+={c99, GCC_X86_64, "^(_Static_assert|asm|__asm__|__volatile__|__const__|typeof|__typeof__|__alignof__|__alignof|__attribute__|__builtin_types_compatible_p|__builtin_va_arg|__builtin_offsetof)$"}
+-name_selector+={alignof, "^(__alignof__|__alignof)$"}
+-name_selector+={asm, "^(__asm__|asm)$"}
+-name_selector+={attribute, "^__attribute__$"}
+-name_selector+={builtin_offsetof, "^__builtin_offsetof$"}
+-name_selector+={builtin_types_p, "^__builtin_types_compatible_p$"}
+-name_selector+={builtin_va_arg, "^__builtin_va_arg$"}
+-name_selector+={const, "^__const__$"}
+-name_selector+={inline, "^(__inline__|__inline)$"}
+-name_selector+={static_assert, "^_Static_assert$"}
+-name_selector+={typeof, "^(__typeof__|typeof)$"}
+-name_selector+={volatile, "^__volatile__$"}
+
+-config=STD.tokenext,behavior+={c99, GCC_ARM64||GCC_X86_64,
+"alignof||
+asm||
+attribute||
+builtin_offsetof||
+builtin_types_p||
+builtin_va_arg||
+const||
+inline||
+static_assert||
+typeof||
+volatile"
+}
 -doc_end
 
 -doc_begin="Non-documented GCC extension."
 -config=STD.emptinit,behavior+={c99,GCC_ARM64,specified}
 -config=STD.emptinit,behavior+={c99,GCC_X86_64,specified}
-#-config=STD.emptinit,behavior+={c18,GCC_X86_64,specified}
 -doc_end
 
 -doc_begin="See Section \"6.24 Arithmetic on void- and Function-Pointers\" of "GCC_MANUAL"."
@@ -80,7 +102,6 @@
 -doc_begin="Non-documented GCC extension."
 -config=STD.pteincmp,behavior+={c99,GCC_ARM64,specified}
 -config=STD.pteincmp,behavior+={c99,GCC_X86_64,specified}
-#-config=STD.pteincmp,behavior+={c18,GCC_X86_64,specified}
 -doc_end
 
 -doc_begin="Non-documented GCC extension."
@@ -88,20 +109,52 @@
 -doc_end
 
 -doc_begin="
-    ext_paste_comma: see Section \"6.21 Macros with a Variable Number of Arguments\" of "GCC_MANUAL".
-    ext_missing_varargs_arg: see Section \"6.21 Macros with a Variable Number of Arguments\" of "GCC_MANUAL".
-    ext_named_variadic_macro: see Section \"6.21 Macros with a Variable Number of Arguments\" of "GCC_MANUAL".
-    ext_return_has_void_expr: see the documentation for -Wreturn-type in Section \"3.8 Options to Request or Suppress Warnings\" of "GCC_MANUAL".
-    ext_gnu_statement_expr_macro: see Section \"6.1 Statements and Declarations in Expressions\" of "GCC_MANUAL".
-    ext_sizeof_alignof_void_type: see Section \"6.24 Arithmetic on void- and Function-Pointers\" of "GCC_MANUAL".
-    ext_forward_ref_enum_def: see Section \"6.49 Incomplete enum Types\" of "GCC_MANUAL".
-    ext_flexible_array_in_struct: see Section \"6.18 Arrays of Length Zero\" of "GCC_MANUAL".
-    ext_flexible_array_in_array: see Section \"6.18 Arrays of Length Zero\" of "GCC_MANUAL".
+    ext_c_missing_varargs_arg: see Section \"6.21 Macros with a Variable Number of Arguments\" of "GCC_MANUAL".
     ext_enum_value_not_int: non-documented GCC extension.
+    ext_flexible_array_in_array: see Section \"6.18 Arrays of Length Zero\" of "GCC_MANUAL".
+    ext_flexible_array_in_struct: see Section \"6.18 Arrays of Length Zero\" of "GCC_MANUAL".
+    ext_forward_ref_enum_def: see Section \"6.49 Incomplete enum Types\" of "GCC_MANUAL".
     ext_gnu_array_range: see Section \"6.29 Designated Initializers\" of "GCC_MANUAL".
+    ext_gnu_statement_expr_macro: see Section \"6.1 Statements and Declarations in Expressions\" of "GCC_MANUAL".
+    ext_named_variadic_macro: see Section \"6.21 Macros with a Variable Number of Arguments\" of "GCC_MANUAL".
+    ext_paste_comma: see Section \"6.21 Macros with a Variable Number of Arguments\" of "GCC_MANUAL".
+    ext_return_has_void_expr: see the documentation for -Wreturn-type in Section \"3.8 Options to Request or Suppress Warnings\" of "GCC_MANUAL".
+    ext_sizeof_alignof_void_type: see Section \"6.24 Arithmetic on void- and Function-Pointers\" of "GCC_MANUAL".
 "
--config=STD.diag,behavior+={c99,GCC_ARM64,"^(ext_paste_comma|ext_missing_varargs_arg|ext_named_variadic_macro|ext_return_has_void_expr|ext_gnu_statement_expr_macro|ext_sizeof_alignof_void_type|ext_forward_ref_enum_def|ext_gnu_array_range)$"}
--config=STD.diag,behavior+={c99,GCC_X86_64,"^(ext_paste_comma|ext_missing_varargs_arg|ext_named_variadic_macro|ext_return_has_void_expr|ext_gnu_statement_expr_macro|ext_sizeof_alignof_void_type|ext_flexible_array_in_struct|ext_flexible_array_in_array|ext_enum_value_not_int|ext_gnu_array_range)$"}
+-name_selector+={ext_c_missing_varargs_arg, "^ext_c_missing_varargs_arg$"}
+-name_selector+={ext_enum_value_not_int, "^ext_enum_value_not_int$"}
+-name_selector+={ext_flexible_array_in_array, "^ext_flexible_array_in_array$"}
+-name_selector+={ext_flexible_array_in_struct, "^ext_flexible_array_in_struct$"}
+-name_selector+={ext_forward_ref_enum_def, "^ext_forward_ref_enum_def$"}
+-name_selector+={ext_gnu_array_range, "^ext_gnu_array_range$"}
+-name_selector+={ext_gnu_statement_expr_macro, "^ext_gnu_statement_expr_macro$"}
+-name_selector+={ext_named_variadic_macro, "^ext_named_variadic_macro$"}
+-name_selector+={ext_paste_comma, "^ext_paste_comma$"}
+-name_selector+={ext_return_has_void_expr, "^ext_return_has_void_expr$"}
+-name_selector+={ext_sizeof_alignof_void_type, "^ext_sizeof_alignof_void_type$"}
+
+-config=STD.diag,behavior+={c99,GCC_ARM64,
+"ext_c_missing_varargs_arg||
+ext_forward_ref_enum_def||
+ext_gnu_array_range||
+ext_gnu_statement_expr_macro||
+ext_named_variadic_macro||
+ext_paste_comma||
+ext_return_has_void_expr||
+ext_sizeof_alignof_void_type"
+}
+-config=STD.diag,behavior+={c99,GCC_X86_64,
+"ext_c_missing_varargs_arg||
+ext_enum_value_not_int||
+ext_flexible_array_in_array||
+ext_flexible_array_in_struct||
+ext_gnu_array_range||
+ext_gnu_statement_expr_macro||
+ext_named_variadic_macro||
+ext_paste_comma||
+ext_return_has_void_expr||
+ext_sizeof_alignof_void_type"
+}
 -doc_end
 
 -doc_begin="The maximum size of an object is defined in the MAX_SIZE macro, and for a 32 bit architecture is 8MB.
