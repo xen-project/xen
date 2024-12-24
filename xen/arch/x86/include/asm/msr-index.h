@@ -157,7 +157,7 @@
 #define MSR_PL1_SSP                         0x000006a5
 #define MSR_PL2_SSP                         0x000006a6
 #define MSR_PL3_SSP                         0x000006a7
-#define MSR_INTERRUPT_SSP_TABLE             0x000006a8
+#define MSR_ISST                            0x000006a8
 
 #define MSR_PKRS                            0x000006e1
 

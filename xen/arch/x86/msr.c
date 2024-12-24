@@ -138,7 +138,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_RTIT_OUTPUT_BASE ... MSR_RTIT_ADDR_B(7):
     case MSR_U_CET:
     case MSR_S_CET:
-    case MSR_PL0_SSP ... MSR_INTERRUPT_SSP_TABLE:
+    case MSR_PL0_SSP ... MSR_ISST:
     case MSR_AMD64_LWP_CFG:
     case MSR_AMD64_LWP_CBADDR:
     case MSR_PPIN_CTL:
@@ -442,7 +442,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     case MSR_RTIT_OUTPUT_BASE ... MSR_RTIT_ADDR_B(7):
     case MSR_U_CET:
     case MSR_S_CET:
-    case MSR_PL0_SSP ... MSR_INTERRUPT_SSP_TABLE:
+    case MSR_PL0_SSP ... MSR_ISST:
     case MSR_AMD64_LWP_CFG:
     case MSR_AMD64_LWP_CBADDR:
     case MSR_PPIN_CTL:

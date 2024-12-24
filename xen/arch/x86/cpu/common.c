@@ -933,7 +933,7 @@ void load_system_tables(void)
 			wrss(df_ssp,  _p(df_ssp));
 		}
 
-		wrmsrl(MSR_INTERRUPT_SSP_TABLE, (unsigned long)ist_ssp);
+		wrmsrl(MSR_ISST, (unsigned long)ist_ssp);
 	}
 
 	BUILD_BUG_ON(sizeof(*tss) <= 0x67); /* Mandated by the architecture. */
