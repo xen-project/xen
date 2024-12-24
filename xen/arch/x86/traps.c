@@ -89,6 +89,13 @@ const unsigned int nmi_cpu;
 #define stack_words_per_line 4
 #define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)(regs)->rsp)
 
+/* Only valid to use when FRED is active. */
+static inline struct fred_info *cpu_regs_fred_info(struct cpu_user_regs *regs)
+{
+    ASSERT(read_cr4() & X86_CR4_FRED);
+    return &container_of(regs, struct cpu_info, guest_cpu_user_regs)->_fred;
+}
+
 struct extra_state
 {
     unsigned long cr0, cr2, cr3, cr4;
@@ -1029,6 +1036,32 @@ void show_execution_state_nmi(const cpumask_t *mask, bool show_all)
         printk("Non-responding CPUs: {%*pbl}\n", CPUMASK_PR(&show_state_mask));
 }
 
+static const char *x86_et_name(unsigned int type)
+{
+    static const char *const names[] = {
+        [X86_ET_EXT_INTR]    = "EXT_INTR",
+        [X86_ET_NMI]         = "NMI",
+        [X86_ET_HW_EXC]      = "HW_EXC",
+        [X86_ET_SW_INT]      = "SW_INT",
+        [X86_ET_PRIV_SW_EXC] = "PRIV_SW_EXC",
+        [X86_ET_SW_EXC]      = "SW_EXC",
+        [X86_ET_OTHER]       = "OTHER",
+    };
+
+    return (type < ARRAY_SIZE(names) && names[type]) ? names[type] : "???";
+}
+
+static const char *x86_et_other_name(unsigned int what)
+{
+    static const char *const names[] = {
+        [0] = "MTF",
+        [1] = "SYSCALL",
+        [2] = "SYSENTER",
+    };
+
+    return (what < ARRAY_SIZE(names) && names[what]) ? names[what] : "???";
+}
+
 const char *vector_name(unsigned int vec)
 {
     static const char names[][4] = {
@@ -1105,6 +1138,38 @@ void fatal_trap(const struct cpu_user_regs *regs, bool show_remote)
                            cpumask_of(smp_processor_id()));
             show_execution_state_nmi(scratch, false);
         }
+    }
+
+    if ( read_cr4() & X86_CR4_FRED )
+    {
+        bool render_ec = false;
+        const char *vec_name = NULL;
+
+        switch ( regs->fred_ss.type )
+        {
+        case X86_ET_HW_EXC:
+        case X86_ET_PRIV_SW_EXC:
+        case X86_ET_SW_EXC:
+            render_ec = true;
+            vec_name = vector_name(regs->fred_ss.vector);
+            break;
+
+        case X86_ET_OTHER:
+            vec_name = x86_et_other_name(regs->fred_ss.vector);
+            break;
+        }
+
+        if ( render_ec )
+            panic("FATAL TRAP: type %u, %s, vec %u, %s[%04x]%s\n",
+                  regs->fred_ss.type, x86_et_name(regs->fred_ss.type),
+                  regs->fred_ss.vector, vec_name ?: "",
+                  regs->error_code,
+                  (regs->eflags & X86_EFLAGS_IF) ? "" : " IN INTERRUPT CONTEXT");
+        else
+            panic("FATAL TRAP: type %u, %s, vec %u, %s%s\n",
+                  regs->fred_ss.type, x86_et_name(regs->fred_ss.type),
+                  regs->fred_ss.vector, vec_name ?: "",
+                  (regs->eflags & X86_EFLAGS_IF) ? "" : " IN INTERRUPT CONTEXT");
     }
 
     panic("FATAL TRAP: vec %u, %s[%04x]%s\n",
@@ -2203,6 +2268,96 @@ void asmlinkage check_ist_exit(const struct cpu_user_regs *regs, bool ist_exit)
     ASSERT(is_ist == ist_exit);
 }
 #endif
+
+void asmlinkage entry_from_pv(struct cpu_user_regs *regs)
+{
+    /* Copy fred_ss.vector into entry_vector as IDT delivery would have done. */
+    regs->entry_vector = regs->fred_ss.vector;
+
+    fatal_trap(regs, false);
+}
+
+void asmlinkage entry_from_xen(struct cpu_user_regs *regs)
+{
+    struct fred_info *fi = cpu_regs_fred_info(regs);
+    uint8_t type = regs->fred_ss.type;
+
+    /* Copy fred_ss.vector into entry_vector as IDT delivery would have done. */
+    regs->entry_vector = regs->fred_ss.vector;
+
+    /*
+     * First, handle the asynchronous or fatal events.  These are either
+     * unrelated to the interrupted context, or may not have valid context
+     * recorded, and all have special rules on how/whether to re-enable IRQs.
+     */
+    if ( regs->fred_ss.nested )
+        goto fatal;
+
+    switch ( type )
+    {
+    case X86_ET_EXT_INTR:
+        return do_IRQ(regs);
+
+    case X86_ET_NMI:
+        return do_nmi(regs);
+
+    case X86_ET_HW_EXC:
+        switch ( regs->fred_ss.vector )
+        {
+        case X86_EXC_DF: return do_double_fault(regs);
+        case X86_EXC_MC: return do_machine_check(regs);
+        }
+        break;
+    }
+
+    /*
+     * With the asynchronous events handled, what remains are the synchronous
+     * ones.  If we interrupted an IRQs-on region, we should re-enable IRQs
+     * now; for #PF and #DB, %cr2 and PENDING_DBG are on the stack in edata.
+     */
+    if ( regs->eflags & X86_EFLAGS_IF )
+        local_irq_enable();
+
+    switch ( type )
+    {
+    case X86_ET_HW_EXC:
+    case X86_ET_PRIV_SW_EXC:
+    case X86_ET_SW_EXC:
+        switch ( regs->fred_ss.vector )
+        {
+        case X86_EXC_PF:  handle_PF(regs, fi->edata); break;
+        case X86_EXC_GP:  do_general_protection(regs); break;
+        case X86_EXC_UD:  do_invalid_op(regs); break;
+        case X86_EXC_NM:  do_device_not_available(regs); break;
+        case X86_EXC_BP:  do_int3(regs); break;
+        case X86_EXC_DB:  handle_DB(regs, fi->edata); break;
+        case X86_EXC_CP:  do_entry_CP(regs); break;
+
+        case X86_EXC_DE:
+        case X86_EXC_OF:
+        case X86_EXC_BR:
+        case X86_EXC_NP:
+        case X86_EXC_SS:
+        case X86_EXC_MF:
+        case X86_EXC_AC:
+        case X86_EXC_XM:
+            do_trap(regs);
+            break;
+
+        default:
+            goto fatal;
+        }
+        break;
+
+    default:
+        goto fatal;
+    }
+
+    return;
+
+ fatal:
+    fatal_trap(regs, false);
+}
 
 /*
  * Local variables:
