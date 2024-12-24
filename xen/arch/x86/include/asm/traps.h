@@ -16,6 +16,8 @@ void traps_init(void);
 void bsp_traps_reinit(void);
 void percpu_traps_init(void);
 
+void nocall entry_FRED_R3(void);
+
 extern unsigned int ler_msr;
 
 const char *vector_name(unsigned int vec);
