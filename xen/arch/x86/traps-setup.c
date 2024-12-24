@@ -59,6 +59,8 @@ static void load_system_tables(void)
         .limit = sizeof(bsp_idt) - 1,
     };
 
+    ASSERT(opt_fred == 0);
+
     /*
      * Set up the TSS.  Warning - may be live, and the NMI/#MC must remain
      * valid on every instruction boundary.  (Note: these are all
@@ -191,6 +193,8 @@ static void legacy_syscall_init(void)
     unsigned char *stub_page;
     unsigned int offset;
 
+    ASSERT(opt_fred == 0);
+
     /* No PV guests?  No need to set up SYSCALL/SYSENTER infrastructure. */
     if ( !IS_ENABLED(CONFIG_PV) )
         return;
@@ -269,6 +273,76 @@ static void __init init_ler(void)
 }
 
 /*
+ * Set up all MSRs relevant for FRED event delivery.
+ *
+ * Xen does not use any of the optional config in MSR_FRED_CONFIG, so all that
+ * is needed is the entrypoint.
+ *
+ * Because FRED always provides a good stack, NMI and #DB do not need any
+ * special treatment.  Only #DF needs another stack level, and #MC for the
+ * off-chance that Xen's main stack suffers an uncorrectable error.
+ *
+ * This makes Stack Level 1 unused, but we use #DB's stacks, and with the
+ * regular and shadow stack pointers reversed as poison to guarantee that any
+ * use escalates to #DF.
+ *
+ * FRED reuses MSR_STAR to provide the segment selector values to load on
+ * entry from Ring3.  Entry from Ring0 leave %cs and %ss unmodified.
+ */
+static void init_fred(void)
+{
+    unsigned long stack_top = get_stack_bottom() & ~(STACK_SIZE - 1);
+
+    ASSERT(opt_fred == 1);
+
+    wrmsrns(MSR_STAR, XEN_MSR_STAR);
+    wrmsrns(MSR_FRED_CONFIG, (unsigned long)entry_FRED_R3);
+
+    /*
+     * MSR_FRED_RSP_* all come with an 64-byte alignment check, avoiding the
+     * need for an explicit BUG_ON().
+     */
+    wrmsrns(MSR_FRED_RSP_SL0, (unsigned long)(&get_cpu_info()->_fred + 1));
+    wrmsrns(MSR_FRED_RSP_SL1, stack_top + (IST_DB * IST_SHSTK_SIZE)); /* Poison */
+    wrmsrns(MSR_FRED_RSP_SL2, stack_top + (1 + IST_MCE)  * PAGE_SIZE);
+    wrmsrns(MSR_FRED_RSP_SL3, stack_top + (1 + IST_DF)   * PAGE_SIZE);
+    wrmsrns(MSR_FRED_STK_LVLS, ((2UL << (X86_EXC_MC * 2)) |
+                                (3UL << (X86_EXC_DF * 2))));
+
+    if ( cpu_has_xen_shstk )
+    {
+        wrmsrns(MSR_FRED_SSP_SL0, stack_top + (PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE);
+        wrmsrns(MSR_FRED_SSP_SL1, stack_top + (1 + IST_DB) * PAGE_SIZE); /* Poison */
+        wrmsrns(MSR_FRED_SSP_SL2, stack_top + (IST_MCE * IST_SHSTK_SIZE));
+        wrmsrns(MSR_FRED_SSP_SL3, stack_top + (IST_DF  * IST_SHSTK_SIZE));
+    }
+}
+
+/*
+ * Set up a minimal TSS and selector for use in FRED mode.
+ *
+ * With FRED moving the stack pointers into MSRs, we would like to avoid
+ * having a TSS at all, but:
+ *  - VT-x VMExit unconditionally sets TR.limit to 0x67, meaning that
+ *    HOST_TR_BASE needs to point to a good TSS.
+ *  - show_stack_overflow() cross-checks tss->rsp0.
+ *
+ * Fill in rsp0 and the bitmap offset, and load a zero-length TR.  If VT-x
+ * does get used, it will clobber TR to refer to this_cpu(tss_page).tss.
+ */
+static void init_fred_tss(void)
+{
+    seg_desc_t *gdt = this_cpu(gdt) - FIRST_RESERVED_GDT_ENTRY;
+    struct tss64 *tss = &this_cpu(tss_page).tss;
+
+    tss->rsp0 = get_stack_bottom();
+    tss->bitmap = IOBMP_INVALID_OFFSET;
+
+    _set_tssldt_desc(gdt + TSS_ENTRY, 0, 0, SYS_DESC_tss_avail);
+    ltr(TSS_SELECTOR);
+}
+
+/*
  * Configure basic exception handling.  This is prior to parsing the command
  * line or configuring a console, and needs to be as simple as possible.
  *
@@ -322,6 +396,8 @@ void __init traps_init(void)
 
     if ( opt_fred )
     {
+        const struct desc_ptr idtr = {};
+
 #ifdef CONFIG_PV32
         if ( opt_pv32 )
         {
@@ -329,15 +405,26 @@ void __init traps_init(void)
             printk(XENLOG_INFO "Disabling PV32 due to FRED\n");
         }
 #endif
+
+        init_fred();
+        set_in_cr4(X86_CR4_FRED);
+
+        /*
+         * Invalidate the IDT as it's not used.  Set up a minimal TSS.  The
+         * LDT was configured by bsp_early_traps_init().
+         */
+        lidt(&idtr);
+        init_fred_tss();
+
         setup_force_cpu_cap(X86_FEATURE_XEN_FRED);
         printk("Using FRED event delivery\n");
     }
     else
     {
+        load_system_tables();
+
         printk("Using IDT event delivery\n");
     }
-
-    load_system_tables();
 
     init_ler();
 
@@ -353,7 +440,11 @@ void __init traps_init(void)
  */
 void __init bsp_traps_reinit(void)
 {
-    load_system_tables();
+    if ( opt_fred )
+        init_fred();
+    else
+        load_system_tables();
+
     percpu_traps_init();
 }
 
@@ -368,7 +459,7 @@ void percpu_traps_init(void)
      * allocated, limiting the placement of the traps_init() call, and gets
      * re-done anyway by bsp_traps_reinit().
      */
-    if ( system_state > SYS_STATE_early_boot )
+    if ( !opt_fred && system_state > SYS_STATE_early_boot )
         legacy_syscall_init();
 
     if ( cpu_has_xen_lbr )
@@ -384,7 +475,29 @@ void percpu_traps_init(void)
  */
 void asmlinkage percpu_early_traps_init(void)
 {
-    load_system_tables();
+    if ( opt_fred )
+    {
+        seg_desc_t *gdt = this_cpu(gdt) - FIRST_RESERVED_GDT_ENTRY;
+        const struct desc_ptr gdtr = {
+            .base = (unsigned long)gdt,
+            .limit = LAST_RESERVED_GDT_BYTE,
+        }, idtr = {};
+
+        lgdt(&gdtr);
+
+        init_fred();
+        write_cr4(read_cr4() | X86_CR4_FRED);
+
+        /*
+         * Invalidate the IDT (not used) and LDT (not set up yet).  Set up a
+         * minimal TSS.
+         */
+        lidt(&idtr);
+        init_fred_tss();
+        lldt(0);
+    }
+    else
+        load_system_tables();
 }
 
 static void __init __maybe_unused build_assertions(void)
@@ -403,4 +516,11 @@ static void __init __maybe_unused build_assertions(void)
                   endof_field(struct cpu_info, guest_cpu_user_regs)) & 15);
     BUILD_BUG_ON((sizeof(struct cpu_info) -
                   endof_field(struct cpu_info, _fred)) & 63);
+
+    /*
+     * The x86 architecture is happy with TR.limit being less than 0x67, but
+     * VT-x is not.  VMExit unconditionally sets the limit to 0x67, meaning
+     * that HOST_TR_BASE needs to refer to a good TSS of at least this size.
+     */
+    BUILD_BUG_ON(sizeof(struct tss64) <= 0x67);
 }
