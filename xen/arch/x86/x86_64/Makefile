@@ -1,5 +1,6 @@
 obj-$(CONFIG_PV32) += compat/
 
+obj-bin-y += entry-fred.o
 obj-bin-y += entry.o
 obj-$(CONFIG_KEXEC) += machine_kexec.o
 obj-y += pci.o
