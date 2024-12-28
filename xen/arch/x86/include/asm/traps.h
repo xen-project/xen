@@ -7,6 +7,7 @@
 #ifndef ASM_TRAP_H
 #define ASM_TRAP_H
 
+void early_traps_init(void);
 void traps_init(void);
 void percpu_traps_init(void);
 

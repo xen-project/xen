@@ -1087,14 +1087,13 @@ void asmlinkage __init noreturn __start_xen(void)
     };
     const char *hypervisor_name;
 
-    /* Critical region without IDT or TSS.  Any fault is deadly! */
+    /* Critical region without exception handling.  Any fault is deadly! */
 
     init_shadow_spec_ctrl_state();
 
     percpu_init_areas();
 
-    init_idt_traps();
-    load_system_tables();
+    early_traps_init();
 
     smp_prepare_boot_cpu();
     sort_exception_tables();

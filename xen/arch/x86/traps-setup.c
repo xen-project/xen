@@ -56,12 +56,44 @@ static void __init init_ler(void)
 }
 
 /*
+ * Configure basic exception handling.  This is prior to parsing the command
+ * line or configuring a console, and needs to be as simple as possible.
+ *
+ * boot_gdt is already loaded, and bsp_idt[] is constructed without IST
+ * settings, so we don't need a TSS configured yet.
+ */
+void __init early_traps_init(void)
+{
+    const struct desc_ptr idtr = {
+        .base = (unsigned long)bsp_idt,
+        .limit = sizeof(bsp_idt) - 1,
+    };
+
+    lidt(&idtr);
+
+    /* Invalidate TR/LDTR as they're not set up yet. */
+    _set_tssldt_desc(boot_gdt + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
+                     0, 0, SYS_DESC_tss_avail);
+
+    ltr(TSS_SELECTOR);
+    lldt(0);
+
+    /* Set up the BSPs per-cpu references. */
+    this_cpu(idt) = bsp_idt;
+    this_cpu(gdt) = boot_gdt;
+    if ( IS_ENABLED(CONFIG_PV32) )
+        this_cpu(compat_gdt) = boot_compat_gdt;
+}
+
+/*
  * Configure complete exception, interrupt and syscall handling.
  */
 void __init traps_init(void)
 {
     /* Replace early pagefault with real pagefault handler. */
     _update_gate_addr_lower(&bsp_idt[X86_EXC_PF], entry_PF);
+
+    load_system_tables();
 
     init_ler();
 

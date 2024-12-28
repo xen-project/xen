@@ -1858,19 +1858,6 @@ void asmlinkage do_entry_CP(struct cpu_user_regs *regs)
     panic("CONTROL-FLOW PROTECTION FAULT: #CP[%04x] %s\n", ec, err);
 }
 
-void __init init_idt_traps(void)
-{
-    /* Specify dedicated interrupt stacks for NMI, #DF, and #MC. */
-    enable_each_ist(bsp_idt);
-
-    /* CPU0 uses the master IDT. */
-    this_cpu(idt) = bsp_idt;
-
-    this_cpu(gdt) = boot_gdt;
-    if ( IS_ENABLED(CONFIG_PV32) )
-        this_cpu(compat_gdt) = boot_compat_gdt;
-}
-
 void asm_domain_crash_synchronous(unsigned long addr)
 {
     /*
