@@ -1287,6 +1287,16 @@ requirement can be relaxed.  This option is particularly useful for nested
 virtualization, to allow the L1 hypervisor to use EPT even if the L0 hypervisor
 does not provide `VM_ENTRY_LOAD_GUEST_PAT`.
 
+### fred (x86)
+> `= <bool>`
+
+> Default: `false`
+
+Flexible Return and Event Delivery is an overhaul of interrupt, exception and
+system call handling, fixing many corner cases in the x86 architecture, and
+expected in hardware from 2025.  Support in Xen is a work in progress and
+disabled by default.
+
 ### gnttab
 > `= List of [ max-ver:<integer>, transitive=<bool>, transfer=<bool> ]`
 

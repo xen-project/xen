@@ -9,6 +9,8 @@
 #include <asm/endbr.h>
 #include <asm/idt.h>
 #include <asm/msr.h>
+#include <asm/pv/domain.h>
+#include <asm/pv/shim.h>
 #include <asm/shstk.h>
 #include <asm/stubs.h>
 #include <asm/traps.h>
@@ -19,6 +21,9 @@ DEFINE_PER_CPU_READ_MOSTLY(idt_entry_t *, idt);
 unsigned int __ro_after_init ler_msr;
 static bool __initdata opt_ler;
 boolean_param("ler", opt_ler);
+
+int8_t __ro_after_init opt_fred = 0;
+boolean_param("fred", opt_fred);
 
 void nocall entry_PF(void);
 void nocall lstar_enter(void);
@@ -298,6 +303,37 @@ void __init traps_init(void)
 {
     /* Replace early pagefault with real pagefault handler. */
     _update_gate_addr_lower(&bsp_idt[X86_EXC_PF], entry_PF);
+
+    /*
+     * Xen doesn't use GS like most software does, and doesn't need the LKGS
+     * instruction in order to manage PV guests.  No need to check for it.
+     */
+    if ( !cpu_has_fred )
+    {
+        if ( opt_fred == 1 )
+            printk(XENLOG_WARNING "FRED not available, ignoring\n");
+        opt_fred = 0;
+    }
+
+    if ( opt_fred == -1 )
+        opt_fred = !pv_shim;
+
+    if ( opt_fred )
+    {
+#ifdef CONFIG_PV32
+        if ( opt_pv32 )
+        {
+            opt_pv32 = 0;
+            printk(XENLOG_INFO "Disabling PV32 due to FRED\n");
+        }
+#endif
+        setup_force_cpu_cap(X86_FEATURE_XEN_FRED);
+        printk("Using FRED event delivery\n");
+    }
+    else
+    {
+        printk("Using IDT event delivery\n");
+    }
 
     load_system_tables();
 

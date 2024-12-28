@@ -7,6 +7,10 @@
 #ifndef ASM_TRAP_H
 #define ASM_TRAP_H
 
+#include <xen/types.h>
+
+extern int8_t opt_fred;
+
 void bsp_early_traps_init(void);
 void traps_init(void);
 void bsp_traps_reinit(void);
