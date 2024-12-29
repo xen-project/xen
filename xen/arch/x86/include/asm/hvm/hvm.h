@@ -624,10 +624,6 @@ static inline void hvm_sanitize_regs_fields(struct cpu_user_regs *regs,
     regs->saved_upcall_mask = 0xbf;
     regs->cs = 0xbeef;
     regs->ss = 0xbeef;
-    regs->ds = 0xbeef;
-    regs->es = 0xbeef;
-    regs->fs = 0xbeef;
-    regs->gs = 0xbeef;
 #endif
 }
 

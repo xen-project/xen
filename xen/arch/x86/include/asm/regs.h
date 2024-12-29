@@ -23,8 +23,7 @@
     (!is_pv_32bit_vcpu(v) ? ((tb)->eip == 0) : (((tb)->cs & ~3) == 0))
 
 /* Number of bytes of on-stack execution state to be context-switched. */
-/* NB. Segment registers and bases are not saved/restored on x86/64 stack. */
-#define CTXT_SWITCH_STACK_BYTES (offsetof(struct cpu_user_regs, es))
+#define CTXT_SWITCH_STACK_BYTES sizeof(struct cpu_user_regs)
 
 #define guest_mode(r)                                                         \
 ({                                                                            \

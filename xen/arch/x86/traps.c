@@ -387,7 +387,7 @@ unsigned long get_stack_trace_bottom(unsigned long sp)
     {
     case 1 ... 4:
         return ROUNDUP(sp, PAGE_SIZE) -
-            offsetof(struct cpu_user_regs, es) - sizeof(unsigned long);
+            sizeof(struct cpu_user_regs) - sizeof(unsigned long);
 
     case 6 ... 7:
         return ROUNDUP(sp, STACK_SIZE) -

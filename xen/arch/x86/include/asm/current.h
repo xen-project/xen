@@ -106,12 +106,12 @@ static inline struct cpu_info *get_cpu_info(void)
 #define get_per_cpu_offset()  (get_cpu_info()->per_cpu_offset)
 
 /*
- * Get the bottom-of-stack, as stored in the per-CPU TSS. This actually points
- * into the middle of cpu_info.guest_cpu_user_regs, at the section that
- * precisely corresponds to a CPU trap frame.
+ * Get the bottom-of-stack, as stored in the per-CPU TSS. This points at the
+ * end of cpu_info.guest_cpu_user_regs, at the section that precisely
+ * corresponds to a CPU trap frame.
  */
 #define get_stack_bottom()                      \
-    ((unsigned long)&get_cpu_info()->guest_cpu_user_regs.es)
+    ((unsigned long)(&get_cpu_info()->guest_cpu_user_regs + 1))
 
 /*
  * Get the reasonable stack bounds for stack traces and stack dumps.  Stack

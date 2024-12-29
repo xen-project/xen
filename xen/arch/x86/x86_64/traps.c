@@ -135,16 +135,10 @@ static void _show_registers(
 
 void show_registers(const struct cpu_user_regs *regs)
 {
-    struct cpu_user_regs fault_regs;
+    struct cpu_user_regs fault_regs = *regs;
     struct extra_state fault_state;
     enum context context;
     struct vcpu *v = system_state >= SYS_STATE_smp_boot ? current : NULL;
-
-    /*
-     * Don't read beyond the end of the hardware frame.  It is out of bounds
-     * for WARN()/etc.
-     */
-    memcpy(&fault_regs, regs, offsetof(struct cpu_user_regs, es));
 
     if ( guest_mode(regs) && is_hvm_vcpu(v) )
     {

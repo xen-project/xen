@@ -53,11 +53,6 @@ struct cpu_user_regs
      * For IDT delivery, tss->rsp0 points to this boundary as embedded within
      * struct cpu_info.  It must be 16-byte aligned.
      */
-
-    uint16_t es, _pad3[3];
-    uint16_t ds, _pad4[3];
-    uint16_t fs, _pad5[3];
-    uint16_t gs, _pad6[3];
 };
 
 #endif /* X86_CPU_USER_REGS_H */

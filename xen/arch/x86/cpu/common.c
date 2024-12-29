@@ -959,7 +959,7 @@ void load_system_tables(void)
 	 * Defer checks until exception support is sufficiently set up.
 	 */
 	BUILD_BUG_ON((sizeof(struct cpu_info) -
-		      offsetof(struct cpu_info, guest_cpu_user_regs.es)) & 0xf);
+		      sizeof(struct cpu_user_regs)) & 0xf);
 	BUG_ON(system_state != SYS_STATE_early_boot && (stack_bottom & 0xf));
 }
 
