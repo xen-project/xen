@@ -27,6 +27,7 @@ struct extra_state
 {
     unsigned long cr0, cr2, cr3, cr4;
     unsigned long fsb, gsb, gss;
+    uint16_t ds, es, fs, gs;
 };
 
 static void print_xen_info(void)
@@ -40,18 +41,21 @@ static void print_xen_info(void)
 
 enum context { CTXT_hypervisor, CTXT_pv_guest, CTXT_hvm_guest };
 
-static void read_registers(struct cpu_user_regs *regs, struct extra_state *state)
+static void read_registers(struct extra_state *state)
 {
     state->cr0 = read_cr0();
     state->cr2 = read_cr2();
     state->cr3 = read_cr3();
     state->cr4 = read_cr4();
 
-    read_sregs(regs);
-
     state->fsb = read_fs_base();
     state->gsb = read_gs_base();
     state->gss = read_gs_shadow();
+
+    asm ( "mov %%ds, %0" : "=m" (state->ds) );
+    asm ( "mov %%es, %0" : "=m" (state->es) );
+    asm ( "mov %%fs, %0" : "=m" (state->fs) );
+    asm ( "mov %%gs, %0" : "=m" (state->gs) );
 }
 
 static void get_hvm_registers(struct vcpu *v, struct cpu_user_regs *regs,
@@ -68,17 +72,17 @@ static void get_hvm_registers(struct vcpu *v, struct cpu_user_regs *regs,
     regs->cs = sreg.sel;
 
     hvm_get_segment_register(v, x86_seg_ds, &sreg);
-    regs->ds = sreg.sel;
+    state->ds = sreg.sel;
 
     hvm_get_segment_register(v, x86_seg_es, &sreg);
-    regs->es = sreg.sel;
+    state->es = sreg.sel;
 
     hvm_get_segment_register(v, x86_seg_fs, &sreg);
-    regs->fs = sreg.sel;
+    state->fs = sreg.sel;
     state->fsb = sreg.base;
 
     hvm_get_segment_register(v, x86_seg_gs, &sreg);
-    regs->gs = sreg.sel;
+    state->gs = sreg.sel;
     state->gsb = sreg.base;
 
     hvm_get_segment_register(v, x86_seg_ss, &sreg);
@@ -124,16 +128,22 @@ static void _show_registers(
            state->fsb, state->gsb, state->gss);
     printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   "
            "ss: %04x   cs: %04x\n",
-           regs->ds, regs->es, regs->fs,
-           regs->gs, regs->ss, regs->cs);
+           state->ds, state->es, state->fs,
+           state->gs, regs->ss, regs->cs);
 }
 
 void show_registers(const struct cpu_user_regs *regs)
 {
-    struct cpu_user_regs fault_regs = *regs;
+    struct cpu_user_regs fault_regs;
     struct extra_state fault_state;
     enum context context;
     struct vcpu *v = system_state >= SYS_STATE_smp_boot ? current : NULL;
+
+    /*
+     * Don't read beyond the end of the hardware frame.  It is out of bounds
+     * for WARN()/etc.
+     */
+    memcpy(&fault_regs, regs, offsetof(struct cpu_user_regs, es));
 
     if ( guest_mode(regs) && is_hvm_vcpu(v) )
     {
@@ -142,7 +152,7 @@ void show_registers(const struct cpu_user_regs *regs)
     }
     else
     {
-        read_registers(&fault_regs, &fault_state);
+        read_registers(&fault_state);
 
         if ( guest_mode(regs) )
         {
@@ -208,6 +218,11 @@ void vcpu_show_registers(struct vcpu *v)
         state.fsb = v->arch.pv.fs_base;
         state.gsb = gsb;
         state.gss = gss;
+
+        state.ds = v->arch.user_regs.ds;
+        state.es = v->arch.user_regs.es;
+        state.fs = v->arch.user_regs.fs;
+        state.gs = v->arch.user_regs.gs;
 
         context = CTXT_pv_guest;
     }
@@ -291,7 +306,7 @@ void asmlinkage do_double_fault(struct cpu_user_regs *regs)
     printk("*** DOUBLE FAULT ***\n");
     print_xen_info();
 
-    read_registers(regs, &state);
+    read_registers(&state);
 
     printk("CPU:    %d\n", cpu);
     _show_registers(regs, &state, CTXT_hypervisor, NULL);
