@@ -173,7 +173,18 @@ struct vcpu_guest_context {
 #define _VGCF_online                   5
 #define VGCF_online                    (1<<_VGCF_online)
     unsigned long flags;                    /* VGCF_* flags                 */
+
+    /*
+     * Outside of Xen, regs type stays named cpu_user_regs for backwards
+     * compatibility.  Inside Xen, the type called cpu_user_regs is different,
+     * and the public API type is renamed to guest_user_regs.
+     */
+#ifdef __XEN__
+    struct guest_user_regs user_regs;       /* User-level CPU registers     */
+#else
     struct cpu_user_regs user_regs;         /* User-level CPU registers     */
+#endif
+
     struct trap_info trap_ctxt[256];        /* Virtual IDT                  */
     unsigned long ldt_base, ldt_ents;       /* LDT (linear address, # ents) */
     unsigned long gdt_frames[16], gdt_ents; /* GDT (machine frames, # ents) */

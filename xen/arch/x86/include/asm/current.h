@@ -9,7 +9,8 @@
 
 #include <xen/percpu.h>
 #include <xen/page-size.h>
-#include <public/xen.h>
+
+#include <asm/cpu-user-regs.h>
 
 /*
  * Xen's cpu stacks are 8 pages (8-page aligned), arranged as:

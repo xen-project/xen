@@ -14,6 +14,7 @@
 # include <xen/bug.h>
 # include <xen/kernel.h>
 
+# include <asm/cpu-user-regs.h>
 # include <asm/endbr.h>
 # include <asm/msr-index.h>
 # include <asm/stubs.h>
