@@ -34,7 +34,7 @@ typedef struct {
     unsigned long gs;
 } ELF_Gregset;
 
-static inline void elf_core_save_regs(ELF_Gregset *core_regs, 
+static inline void elf_core_save_regs(ELF_Gregset *core_regs,
                                       crash_xen_core_t *xen_core_regs)
 {
     asm ( "movq %%r15, %0" : "=m" (core_regs->r15) );
@@ -54,17 +54,17 @@ static inline void elf_core_save_regs(ELF_Gregset *core_regs,
     asm ( "movq %%rdi, %0" : "=m" (core_regs->rdi) );
 
     /* orig_rax not filled in for now */
-    asm ( "call 0f; 0: popq %0" : "=m" (core_regs->rip) );
-    core_regs->cs = read_sreg(cs);
-    asm ( "pushfq; popq %0" : "=m" (core_regs->rflags) );
+    asm ( "lea (%%rip), %0" : "=r" (core_regs->rip) );
+    asm ( "mov %%cs, %0" : "=m" (core_regs->cs) );
+    asm ( "pushfq; popq %0" : "=m" (core_regs->rflags) ASM_CALL_CONSTRAINT );
     asm ( "movq %%rsp, %0" : "=m" (core_regs->rsp) );
-    core_regs->ss = read_sreg(ss);
+    asm ( "mov %%ss, %0" : "=m" (core_regs->ss) );
     rdmsrl(MSR_FS_BASE, core_regs->thread_fs);
     rdmsrl(MSR_GS_BASE, core_regs->thread_gs);
-    core_regs->ds = read_sreg(ds);
-    core_regs->es = read_sreg(es);
-    core_regs->fs = read_sreg(fs);
-    core_regs->gs = read_sreg(gs);
+    asm ( "mov %%ds, %0" : "=m" (core_regs->ds) );
+    asm ( "mov %%es, %0" : "=m" (core_regs->es) );
+    asm ( "mov %%fs, %0" : "=m" (core_regs->fs) );
+    asm ( "mov %%gs, %0" : "=m" (core_regs->gs) );
 
     asm ( "mov %%cr0, %0" : "=r" (xen_core_regs->cr0) );
     asm ( "mov %%cr2, %0" : "=r" (xen_core_regs->cr2) );
