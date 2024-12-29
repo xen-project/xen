@@ -1,4 +1,5 @@
 
+#include <xen/errno.h>
 #include <xen/lib.h>
 #include <xen/smp.h>
 #include <xen/time.h>

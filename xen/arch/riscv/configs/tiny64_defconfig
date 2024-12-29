@@ -1,7 +1,6 @@
 # CONFIG_BOOT_TIME_CPUPOOLS is not set
 # CONFIG_GRANT_TABLE is not set
 # CONFIG_MEM_ACCESS is not set
-# CONFIG_PERF_COUNTERS is not set
 # CONFIG_COVERAGE is not set
 # CONFIG_LIVEPATCH is not set
 # CONFIG_XSM is not set

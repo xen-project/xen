@@ -4,7 +4,9 @@
 
 #include <asm/perfc_defn.h>
 
+#ifdef NR_hypercalls
 PERFCOUNTER_ARRAY(hypercalls,           "hypercalls", NR_hypercalls)
+#endif
 
 PERFCOUNTER(calls_from_multicall,       "calls from multicall")
 

@@ -734,7 +734,6 @@ debian-12-riscv64-gcc:
       CONFIG_GRANT_TABLE=n
       CONFIG_LIVEPATCH=n
       CONFIG_MEM_ACCESS=n
-      CONFIG_PERF_COUNTERS=n
       CONFIG_QEMU_PLATFORM=y
       CONFIG_XSM=n
 
