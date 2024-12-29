@@ -8,24 +8,24 @@
 
 /*
  * NOTE: new counters must be defined in perfc_defn.h
- * 
+ *
  * Counter declarations:
  * PERFCOUNTER (counter, string)              define a new performance counter
  * PERFCOUNTER_ARRAY (counter, string, size)  define an array of counters
- * 
+ *
  * Unlike counters, status variables do not reset:
  * PERFSTATUS (counter, string)               define a new performance stauts
  * PERFSTATUS_ARRAY (counter, string, size)   define an array of status vars
- * 
- * unsigned long perfc_value  (counter)        get value of a counter  
+ *
+ * unsigned long perfc_value  (counter)        get value of a counter
  * unsigned long perfc_valuea (counter, index) get value of an array counter
- * unsigned long perfc_set  (counter, val)     set value of a counter  
+ * unsigned long perfc_set  (counter, val)     set value of a counter
  * unsigned long perfc_seta (counter, index, val) set value of an array counter
- * void perfc_incr  (counter)                  increment a counter          
+ * void perfc_incr  (counter)                  increment a counter
  * void perfc_decr  (counter)                  decrement a status
- * void perfc_incra (counter, index)           increment an array counter   
- * void perfc_add   (counter, value)           add a value to a counter     
- * void perfc_adda  (counter, index, value)    add a value to array counter 
+ * void perfc_incra (counter, index)           increment an array counter
+ * void perfc_add   (counter, value)           add a value to a counter
+ * void perfc_adda  (counter, index, value)    add a value to array counter
  * void perfc_print (counter)                  print out the counter
  */
 
@@ -49,7 +49,6 @@ enum {
 #undef PERFSTATUS_ARRAY
 
 typedef unsigned int perfc_t;
-#define PRIperfc ""
 
 DECLARE_PER_CPU(perfc_t[NUM_PERFCOUNTERS], perfcounters);
 
@@ -72,7 +71,7 @@ DECLARE_PER_CPU(perfc_t[NUM_PERFCOUNTERS], perfcounters);
 	 this_cpu(perfcounters)[PERFC_ ## x + (y)] = (v) : (v) )
 
 /*
- * Histogram: special treatment for 0 and 1 count. After that equally spaced 
+ * Histogram: special treatment for 0 and 1 count. After that equally spaced
  * with last bucket taking the rest.
  */
 #ifdef CONFIG_PERF_ARRAYS
@@ -98,7 +97,7 @@ int perfc_control(struct xen_sysctl_perfc_op *pc);
 extern void cf_check perfc_printall(unsigned char key);
 extern void cf_check perfc_reset(unsigned char key);
 
-    
+
 #else /* CONFIG_PERF_COUNTERS */
 
 #define perfc_value(x)    (0)

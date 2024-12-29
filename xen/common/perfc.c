@@ -46,7 +46,7 @@ void cf_check perfc_printall(unsigned char key)
         case TYPE_S_SINGLE:
             for_each_online_cpu ( cpu )
                 sum += per_cpu(perfcounters, cpu)[j];
-            if ( perfc_info[i].type == TYPE_S_SINGLE ) 
+            if ( perfc_info[i].type == TYPE_S_SINGLE )
                 sum = (perfc_t) sum;
             printk("TOTAL[%12Lu]", sum);
             if ( sum )
@@ -56,7 +56,7 @@ void cf_check perfc_printall(unsigned char key)
                 {
                     if ( k > 0 && (k % 4) == 0 )
                         printk("\n%53s", "");
-                    printk("  CPU%02u[%10"PRIperfc"u]", cpu, per_cpu(perfcounters, cpu)[j]);
+                    printk("  CPU%02u[%10u]", cpu, per_cpu(perfcounters, cpu)[j]);
                     ++k;
                 }
             }
@@ -71,7 +71,7 @@ void cf_check perfc_printall(unsigned char key)
                 for ( k = 0; k < perfc_info[i].nr_elements; k++ )
                     sum += counters[k];
             }
-            if ( perfc_info[i].type == TYPE_S_ARRAY ) 
+            if ( perfc_info[i].type == TYPE_S_ARRAY )
                 sum = (perfc_t) sum;
             printk("TOTAL[%12Lu]", sum);
             if (sum)
@@ -82,7 +82,7 @@ void cf_check perfc_printall(unsigned char key)
                     sum = 0;
                     for_each_online_cpu ( cpu )
                         sum += per_cpu(perfcounters, cpu)[j + k];
-                    if ( perfc_info[i].type == TYPE_S_ARRAY ) 
+                    if ( perfc_info[i].type == TYPE_S_ARRAY )
                         sum = (perfc_t) sum;
                     if ( (k % 4) == 0 )
                         printk("\n%16s", "");
@@ -98,7 +98,7 @@ void cf_check perfc_printall(unsigned char key)
                     sum = 0;
                     for ( n = 0; n < perfc_info[i].nr_elements; n++ )
                         sum += counters[n];
-                    if ( perfc_info[i].type == TYPE_S_ARRAY ) 
+                    if ( perfc_info[i].type == TYPE_S_ARRAY )
                         sum = (perfc_t) sum;
                     if ( k > 0 && (k % 4) == 0 )
                         printk("\n%53s", "");
