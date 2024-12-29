@@ -8,7 +8,6 @@
 #include <xen/mm.h>
 #include <xen/guest_access.h>
 #include <public/sysctl.h>
-#include <asm/perfc.h>
 
 #define PERFCOUNTER( var, name )              { name, TYPE_SINGLE, 0 },
 #define PERFCOUNTER_ARRAY( var, name, size )  { name, TYPE_ARRAY,  size },
@@ -148,8 +147,6 @@ void cf_check perfc_reset(unsigned char key)
             break;
         }
     }
-
-    arch_perfc_reset();
 }
 
 static struct xen_sysctl_perfc_desc perfc_d[NR_PERFCTRS];
@@ -198,9 +195,6 @@ static int perfc_copy_info(XEN_GUEST_HANDLE_64(xen_sysctl_perfc_desc_t) desc,
 
     if ( perfc_vals == NULL )
         return -ENOMEM;
-
-    /* Architecture may fill counters from hardware.  */
-    arch_perfc_gather();
 
     /* We gather the counts together every time. */
     for ( i = j = v = 0; i < NR_PERFCTRS; i++ )
