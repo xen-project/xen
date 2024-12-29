@@ -1,13 +1,12 @@
 
+#include <xen/cpumask.h>
 #include <xen/errno.h>
-#include <xen/lib.h>
-#include <xen/smp.h>
-#include <xen/time.h>
-#include <xen/perfc.h>
-#include <xen/keyhandler.h> 
-#include <xen/spinlock.h>
-#include <xen/mm.h>
 #include <xen/guest_access.h>
+#include <xen/lib.h>
+#include <xen/perfc.h>
+#include <xen/spinlock.h>
+#include <xen/time.h>
+
 #include <public/sysctl.h>
 
 #define PERFCOUNTER( var, name )              { name, TYPE_SINGLE, 0 },

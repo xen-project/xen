@@ -3,8 +3,7 @@
 
 #ifdef CONFIG_PERF_COUNTERS
 
-#include <xen/lib.h>
-#include <xen/smp.h>
+#include <xen/macros.h>
 #include <xen/percpu.h>
 
 /*
