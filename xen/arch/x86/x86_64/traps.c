@@ -170,7 +170,7 @@ void show_registers(const struct cpu_user_regs *regs)
     }
 }
 
-void vcpu_show_registers(const struct vcpu *v)
+void vcpu_show_registers(struct vcpu *v)
 {
     const struct cpu_user_regs *regs = &v->arch.user_regs;
     struct cpu_user_regs aux_regs;
@@ -180,7 +180,7 @@ void vcpu_show_registers(const struct vcpu *v)
     if ( is_hvm_vcpu(v) )
     {
         aux_regs = *regs;
-        get_hvm_registers(v->domain->vcpu[v->vcpu_id], &aux_regs, crs);
+        get_hvm_registers(v, &aux_regs, crs);
         regs = &aux_regs;
         context = CTXT_hvm_guest;
     }

@@ -964,9 +964,10 @@ void show_registers(const struct cpu_user_regs *regs)
     _show_registers(regs, &ctxt, guest_mode(regs), current);
 }
 
-void vcpu_show_registers(const struct vcpu *v)
+void vcpu_show_registers(struct vcpu *v)
 {
     struct reg_ctxt ctxt;
+
     ctxt.sctlr_el1 = v->arch.sctlr;
     ctxt.tcr_el1 = v->arch.ttbcr;
     ctxt.ttbr0_el1 = v->arch.ttbr0;

@@ -688,7 +688,7 @@ bool update_secondary_system_time(struct vcpu *v,
 void force_update_secondary_system_time(struct vcpu *v,
                                         struct vcpu_time_info *map);
 
-void vcpu_show_registers(const struct vcpu *v);
+void vcpu_show_registers(struct vcpu *v);
 
 static inline struct vcpu_guest_context *alloc_vcpu_guest_context(void)
 {
