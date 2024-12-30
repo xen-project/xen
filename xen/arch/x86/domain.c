@@ -1247,10 +1247,10 @@ int arch_set_info_guest(
         v->arch.user_regs.rflags            = c.nat->user_regs.rflags;
         v->arch.user_regs.rsp               = c.nat->user_regs.rsp;
         v->arch.user_regs.ss                = c.nat->user_regs.ss;
-        v->arch.user_regs.es                = c.nat->user_regs.es;
-        v->arch.user_regs.ds                = c.nat->user_regs.ds;
-        v->arch.user_regs.fs                = c.nat->user_regs.fs;
-        v->arch.user_regs.gs                = c.nat->user_regs.gs;
+        v->arch.pv.es                       = c.nat->user_regs.es;
+        v->arch.pv.ds                       = c.nat->user_regs.ds;
+        v->arch.pv.fs                       = c.nat->user_regs.fs;
+        v->arch.pv.gs                       = c.nat->user_regs.gs;
 
         if ( is_pv_domain(d) )
             memcpy(v->arch.pv.trap_ctxt, c.nat->trap_ctxt,
@@ -1271,10 +1271,10 @@ int arch_set_info_guest(
         v->arch.user_regs.eflags            = c.cmp->user_regs.eflags;
         v->arch.user_regs.esp               = c.cmp->user_regs.esp;
         v->arch.user_regs.ss                = c.cmp->user_regs.ss;
-        v->arch.user_regs.es                = c.cmp->user_regs.es;
-        v->arch.user_regs.ds                = c.cmp->user_regs.ds;
-        v->arch.user_regs.fs                = c.cmp->user_regs.fs;
-        v->arch.user_regs.gs                = c.cmp->user_regs.gs;
+        v->arch.pv.es                       = c.cmp->user_regs.es;
+        v->arch.pv.ds                       = c.cmp->user_regs.ds;
+        v->arch.pv.fs                       = c.cmp->user_regs.fs;
+        v->arch.pv.gs                       = c.cmp->user_regs.gs;
 
         if ( is_pv_domain(d) )
         {
@@ -1762,7 +1762,6 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
  */
 static void load_segments(struct vcpu *n)
 {
-    struct cpu_user_regs *uregs = &n->arch.user_regs;
     unsigned long gsb = 0, gss = 0;
     bool compat = is_pv_32bit_vcpu(n);
     bool all_segs_okay = true, fs_gs_done = false;
@@ -1796,7 +1795,7 @@ static void load_segments(struct vcpu *n)
         if ( !(n->arch.flags & TF_kernel_mode) )
             SWAP(gsb, gss);
 
-        if ( using_svm() && (uregs->fs | uregs->gs) <= 3 )
+        if ( using_svm() && (n->arch.pv.fs | n->arch.pv.gs) <= 3 )
             fs_gs_done = svm_load_segs(n->arch.pv.ldt_ents, LDT_VIRT_START(n),
                                        n->arch.pv.fs_base, gsb, gss);
     }
@@ -1805,12 +1804,12 @@ static void load_segments(struct vcpu *n)
     {
         load_LDT(n);
 
-        TRY_LOAD_SEG(fs, uregs->fs);
-        TRY_LOAD_SEG(gs, uregs->gs);
+        TRY_LOAD_SEG(fs, n->arch.pv.fs);
+        TRY_LOAD_SEG(gs, n->arch.pv.gs);
     }
 
-    TRY_LOAD_SEG(ds, uregs->ds);
-    TRY_LOAD_SEG(es, uregs->es);
+    TRY_LOAD_SEG(ds, n->arch.pv.ds);
+    TRY_LOAD_SEG(es, n->arch.pv.es);
 
     if ( !fs_gs_done && !compat )
     {
@@ -1863,13 +1862,13 @@ static void load_segments(struct vcpu *n)
             }
 
             if ( ret |
-                 put_guest(rflags,      esp - 1) |
-                 put_guest(cs_and_mask, esp - 2) |
-                 put_guest(regs->eip,   esp - 3) |
-                 put_guest(uregs->gs,   esp - 4) |
-                 put_guest(uregs->fs,   esp - 5) |
-                 put_guest(uregs->es,   esp - 6) |
-                 put_guest(uregs->ds,   esp - 7) )
+                 put_guest(rflags,        esp - 1) |
+                 put_guest(cs_and_mask,   esp - 2) |
+                 put_guest(regs->eip,     esp - 3) |
+                 put_guest(n->arch.pv.gs, esp - 4) |
+                 put_guest(n->arch.pv.fs, esp - 5) |
+                 put_guest(n->arch.pv.es, esp - 6) |
+                 put_guest(n->arch.pv.ds, esp - 7) )
                 domain_crash(n->domain,
                              "Error creating compat failsafe callback frame\n");
 
@@ -1895,17 +1894,17 @@ static void load_segments(struct vcpu *n)
         cs_and_mask = (unsigned long)regs->cs |
             ((unsigned long)vcpu_info(n, evtchn_upcall_mask) << 32);
 
-        if ( put_guest(regs->ss,    rsp -  1) |
-             put_guest(regs->rsp,   rsp -  2) |
-             put_guest(rflags,      rsp -  3) |
-             put_guest(cs_and_mask, rsp -  4) |
-             put_guest(regs->rip,   rsp -  5) |
-             put_guest(uregs->gs,   rsp -  6) |
-             put_guest(uregs->fs,   rsp -  7) |
-             put_guest(uregs->es,   rsp -  8) |
-             put_guest(uregs->ds,   rsp -  9) |
-             put_guest(regs->r11,   rsp - 10) |
-             put_guest(regs->rcx,   rsp - 11) )
+        if ( put_guest(regs->ss,      rsp -  1) |
+             put_guest(regs->rsp,     rsp -  2) |
+             put_guest(rflags,        rsp -  3) |
+             put_guest(cs_and_mask,   rsp -  4) |
+             put_guest(regs->rip,     rsp -  5) |
+             put_guest(n->arch.pv.gs, rsp -  6) |
+             put_guest(n->arch.pv.fs, rsp -  7) |
+             put_guest(n->arch.pv.es, rsp -  8) |
+             put_guest(n->arch.pv.ds, rsp -  9) |
+             put_guest(regs->r11,     rsp - 10) |
+             put_guest(regs->rcx,     rsp - 11) )
             domain_crash(n->domain,
                          "Error creating failsafe callback frame\n");
 
@@ -1934,9 +1933,10 @@ static void load_segments(struct vcpu *n)
  */
 static void save_segments(struct vcpu *v)
 {
-    struct cpu_user_regs *regs = &v->arch.user_regs;
-
-    read_sregs(regs);
+    asm ( "mov %%ds, %0" : "=m" (v->arch.pv.ds) );
+    asm ( "mov %%es, %0" : "=m" (v->arch.pv.es) );
+    asm ( "mov %%fs, %0" : "=m" (v->arch.pv.fs) );
+    asm ( "mov %%gs, %0" : "=m" (v->arch.pv.gs) );
 
     if ( !is_pv_32bit_vcpu(v) )
     {

@@ -546,6 +546,8 @@ struct pv_vcpu
     bool syscall32_disables_events;
     bool sysenter_disables_events;
 
+    uint16_t ds, es, fs, gs;
+
     /*
      * 64bit segment bases.
      *

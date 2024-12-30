@@ -1412,10 +1412,10 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         c.nat->user_regs.rflags            = v->arch.user_regs.rflags;
         c.nat->user_regs.rsp               = v->arch.user_regs.rsp;
         c.nat->user_regs.ss                = v->arch.user_regs.ss;
-        c.nat->user_regs.es                = v->arch.user_regs.es;
-        c.nat->user_regs.ds                = v->arch.user_regs.ds;
-        c.nat->user_regs.fs                = v->arch.user_regs.fs;
-        c.nat->user_regs.gs                = v->arch.user_regs.gs;
+        c.nat->user_regs.es                = v->arch.pv.es;
+        c.nat->user_regs.ds                = v->arch.pv.ds;
+        c.nat->user_regs.fs                = v->arch.pv.fs;
+        c.nat->user_regs.gs                = v->arch.pv.gs;
 
         if ( is_pv_domain(d) )
             memcpy(c.nat->trap_ctxt, v->arch.pv.trap_ctxt,
@@ -1437,10 +1437,10 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         c.cmp->user_regs.eflags            = v->arch.user_regs.eflags;
         c.cmp->user_regs.esp               = v->arch.user_regs.esp;
         c.cmp->user_regs.ss                = v->arch.user_regs.ss;
-        c.cmp->user_regs.es                = v->arch.user_regs.es;
-        c.cmp->user_regs.ds                = v->arch.user_regs.ds;
-        c.cmp->user_regs.fs                = v->arch.user_regs.fs;
-        c.cmp->user_regs.gs                = v->arch.user_regs.gs;
+        c.cmp->user_regs.es                = v->arch.pv.es;
+        c.cmp->user_regs.ds                = v->arch.pv.ds;
+        c.cmp->user_regs.fs                = v->arch.pv.fs;
+        c.cmp->user_regs.gs                = v->arch.pv.gs;
 
         if ( is_pv_domain(d) )
         {

@@ -220,10 +220,10 @@ void vcpu_show_registers(struct vcpu *v)
         state.gsb = gsb;
         state.gss = gss;
 
-        state.ds = v->arch.user_regs.ds;
-        state.es = v->arch.user_regs.es;
-        state.fs = v->arch.user_regs.fs;
-        state.gs = v->arch.user_regs.gs;
+        state.ds = v->arch.pv.ds;
+        state.es = v->arch.pv.es;
+        state.fs = v->arch.pv.fs;
+        state.gs = v->arch.pv.gs;
 
         context = CTXT_pv_guest;
     }

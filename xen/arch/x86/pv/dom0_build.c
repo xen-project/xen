@@ -1012,8 +1012,10 @@ static int __init dom0_construct(const struct boot_domain *bd)
      *  [rAX,rBX,rCX,rDX,rDI,rBP,R8-R15 are zero]
      */
     regs = &v->arch.user_regs;
-    regs->ds = regs->es = regs->fs = regs->gs =
-               (compat ? FLAT_COMPAT_KERNEL_DS : FLAT_KERNEL_DS);
+    v->arch.pv.ds = (compat ? FLAT_COMPAT_KERNEL_DS : FLAT_KERNEL_DS);
+    v->arch.pv.es = (compat ? FLAT_COMPAT_KERNEL_DS : FLAT_KERNEL_DS);
+    v->arch.pv.fs = (compat ? FLAT_COMPAT_KERNEL_DS : FLAT_KERNEL_DS);
+    v->arch.pv.gs = (compat ? FLAT_COMPAT_KERNEL_DS : FLAT_KERNEL_DS);
     regs->ss = (compat ? FLAT_COMPAT_KERNEL_SS : FLAT_KERNEL_SS);
     regs->cs = (compat ? FLAT_COMPAT_KERNEL_CS : FLAT_KERNEL_CS);
     regs->rip = parms.virt_entry;
