@@ -2212,7 +2212,7 @@ int xc_memshr_domain_resume(xc_interface *xch,
  * May fail with:
  *  EINVAL if the gfn is not populated or not sharable (mmio, etc)
  *  ENOMEM if internal data structures cannot be allocated
- *  E2BIG if the page is being referenced by other subsytems (e.g. qemu)
+ *  E2BIG if the page is being referenced by other subsystems (e.g. qemu)
  *  ENOENT or EEXIST if there are internal hypervisor errors.
  */
 int xc_memshr_nominate_gfn(xc_interface *xch,

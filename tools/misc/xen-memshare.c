@@ -30,7 +30,7 @@ static int usage(const char* prog)
     printf("  add-to-physmap <domid> <gfn> <source> <source-gfn> <source-handle>\n");
     printf("                          - Populate a page in a domain with a shared page.\n");
     printf("  debug-gfn <domid> <gfn> - Debug a particular domain and gfn.\n");
-    printf("  audit                   - Audit the sharing subsytem in Xen.\n");
+    printf("  audit                   - Audit the sharing subsystem in Xen.\n");
     return 1;
 }
 
