@@ -141,6 +141,14 @@ export XEN_HAS_BUILD_ID=y
 build_id_linker := --build-id=sha1
 endif
 
+# Wrap date(1) to use SOURCE_DATE_EPOCH if set the environment.
+# See https://reproducible-builds.org/docs/source-date-epoch/
+ifdef SOURCE_DATE_EPOCH
+date = $(shell LC_ALL=C date -u -d "@$(SOURCE_DATE_EPOCH)" $(1) 2>/dev/null || LC_ALL=C date -u -r "$(SOURCE_DATE_EPOCH)" $(1) 2>/dev/null || LC_ALL=C date -u $(1))
+else
+date = $(shell LC_ALL=C date $(1))
+endif
+
 define buildmakevars2shellvars
     export PREFIX="$(prefix)";                                            \
     export XEN_SCRIPT_DIR="$(XEN_SCRIPT_DIR)";                            \

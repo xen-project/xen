@@ -23,7 +23,7 @@ include $(XEN_ROOT)/tools/firmware/Rules.mk
 ld-option = $(shell if $(LD) -v $(1) >/dev/null 2>&1; then echo y; else echo n; fi)
 
 # SMBIOS spec requires format mm/dd/yyyy
-SMBIOS_REL_DATE ?= $(shell date +%m/%d/%Y)
+SMBIOS_REL_DATE ?= $(call date,"+%m/%d/%Y")
 
 CFLAGS += $(CFLAGS_xeninclude) -fno-pic -mregparm=3
 

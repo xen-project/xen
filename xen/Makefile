@@ -14,15 +14,11 @@ export XEN_WHOAMI	?= $(USER)
 ifeq ($(origin XEN_DOMAIN), undefined)
 export XEN_DOMAIN	:= $(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) || ([ -x /bin/domainname ] && /bin/domainname || echo [unknown]))
 endif
-ifeq ($(origin XEN_BUILD_DATE), undefined)
-export XEN_BUILD_DATE	:= $(shell LC_ALL=C date)
-endif
-ifeq ($(origin XEN_BUILD_TIME), undefined)
-export XEN_BUILD_TIME	:= $(shell LC_ALL=C date +%T)
-endif
 ifeq ($(origin XEN_BUILD_HOST), undefined)
 export XEN_BUILD_HOST	:= $(shell hostname)
 endif
+# XEN_BUILD_DATE and XEN_BUILD_TIME are set further down, as they depend on
+# Config.mk for SOURCE_DATE_EPOCH handling.
 
 # Best effort attempt to find a python interpreter, defaulting to Python 3 if
 # available.  Fall back to just `python`.
@@ -249,6 +245,13 @@ SRCARCH := $(shell echo $(ARCH) | \
     sed -e 's/x86.*/x86/' -e 's/arm\(32\|64\)/arm/g' \
         -e 's/riscv.*/riscv/g' -e 's/ppc.*/ppc/g')
 export ARCH SRCARCH
+
+ifeq ($(origin XEN_BUILD_DATE), undefined)
+export XEN_BUILD_DATE	:= $(call date)
+endif
+ifeq ($(origin XEN_BUILD_TIME), undefined)
+export XEN_BUILD_TIME	:= $(call date,"+%T")
+endif
 
 export CONFIG_SHELL := $(SHELL)
 export CC CXX LD NM OBJCOPY OBJDUMP ADDR2LINE
