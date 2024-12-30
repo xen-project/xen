@@ -34,8 +34,6 @@
 ?	pmu_intel_ctxt			arch-x86/pmu.h
 ?	pmu_regs			arch-x86/pmu.h
 
-!	cpu_user_regs			arch-x86/xen-@arch@.h
-
 ?	cpu_offline_action		arch-x86/xen-mca.h
 ?	mc				arch-x86/xen-mca.h
 !	mc_fetch			arch-x86/xen-mca.h
