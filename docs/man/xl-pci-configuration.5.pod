@@ -89,7 +89,7 @@ device. For example, running L<lspci(1)> in a Linux guest where B<vslot>
 was specified as C<8> would identify the device as C<00:08.0>. Virtual domain
 and bus numbers are always 0.
 
-B<NOTE:> This parameter is always parsed as a hexidecimal value.
+B<NOTE:> This parameter is always parsed as a hexadecimal value.
 
 =item Default Value
 
