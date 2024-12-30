@@ -30,6 +30,10 @@ struct cpu_user_regs
     /*
      * During IDT delivery for exceptions with an error code, hardware pushes
      * to this point.  Entry_vector is filled in by software.
+     *
+     * During FRED delivery, hardware always pushes to this point.  Software
+     * copies fred_ss.vector into entry_vector so most interrupt/exception
+     * handling can be FRED-agnostic.
      */
 
     uint32_t error_code;
@@ -42,16 +46,75 @@ struct cpu_user_regs
      */
 
     union { uint64_t rip;    uint32_t eip;    uint16_t ip; };
-    uint16_t cs, _pad0[1];
-    uint8_t  saved_upcall_mask; /* PV (v)rflags.IF == !saved_upcall_mask */
-    uint8_t  _pad1[3];
+    union {
+        struct {
+            uint16_t      cs;
+            unsigned long :16;
+            uint8_t       saved_upcall_mask; /* PV (v)rflags.IF == !saved_upcall_mask */
+        };
+        unsigned long     csx;
+        struct {
+            /*
+             * Bits 0 to 31 control ERET{U,S} behaviour, and are state of the
+             * interrupted context.
+             */
+            uint16_t      cs;
+            unsigned int  sl:2;      /* Stack Level */
+            bool          wfe:1;     /* Wait-for-ENDBRANCH state */
+        } fred_cs;
+    };
     union { uint64_t rflags; uint32_t eflags; uint16_t flags; };
     union { uint64_t rsp;    uint32_t esp;    uint16_t sp;    uint8_t spl; };
-    uint16_t ss, _pad2[3];
+    union {
+        uint16_t          ss;
+        unsigned long     ssx;
+        struct {
+            /*
+             * Bits 0 to 31 control ERET{U,S} behaviour, and are state about
+             * the event which occured.
+             */
+            uint16_t      ss;
+            bool          sti:1;     /* Was blocked-by-STI, and not cancelled */
+            bool          swint:1;   /* Was a SYSCALL/SYSENTER/INT $N.  On ERETx, pend_DB iff TF */
+            bool          nmi:1;     /* Was an NMI. */
+            unsigned long :13;
+
+            /*
+             * Bits 32 to 63 are ignored by ERET{U,S} and are informative
+             * only.
+             */
+            uint8_t       vector;
+            unsigned long :8;
+            unsigned int  type:4;    /* X86_ET_* */
+            unsigned long :4;
+            bool          enclave:1; /* Event taken in SGX mode */
+            bool          l:1;       /* Event taken in 64bit mode (old %cs.l) */
+            bool          nested:1;  /* Exception during event delivery (clear for #DF) */
+            unsigned long :1;
+            unsigned int  insnlen:4; /* .type >= SW_INT */
+        } fred_ss;
+    };
 
     /*
      * For IDT delivery, tss->rsp0 points to this boundary as embedded within
      * struct cpu_info.  It must be 16-byte aligned.
+     */
+};
+struct fred_info
+{
+    /*
+     * Event Data.  For:
+     *   #DB: PENDING_DBG (%dr6 with positive polarity)
+     *   NMI: NMI-Source Bitmap (on capable hardware)
+     *   #PF: %cr2
+     *   #NM: MSR_XFD_ERR (only XFD-induced #NMs)
+     */
+    uint64_t edata;
+    uint64_t _rsvd;
+
+    /*
+     * For FRED delivery, MSR_FRED_RSP_SL0 points to this boundary as embedded
+     * within struct cpu_info.  It must be 64-byte aligned.
      */
 };
 

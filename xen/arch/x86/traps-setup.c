@@ -354,7 +354,12 @@ static void __init __maybe_unused build_assertions(void)
      *
      * tss->rsp0, pointing at the end of cpu_info.guest_cpu_user_regs, must be
      * 16-byte aligned.
+     *
+     * MSR_FRED_RSP_SL0, pointing to the end of cpu_info._fred must be 64-byte
+     * aligned.
      */
     BUILD_BUG_ON((sizeof(struct cpu_info) -
                   endof_field(struct cpu_info, guest_cpu_user_regs)) & 15);
+    BUILD_BUG_ON((sizeof(struct cpu_info) -
+                  endof_field(struct cpu_info, _fred)) & 63);
 }

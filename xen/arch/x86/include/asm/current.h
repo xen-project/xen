@@ -38,6 +38,8 @@ struct vcpu;
 
 struct cpu_info {
     struct cpu_user_regs guest_cpu_user_regs;
+    struct fred_info _fred; /* Only used when FRED is active. */
+
     unsigned int processor_id;
     unsigned int verw_sel;
     struct vcpu *current_vcpu;
