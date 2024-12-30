@@ -847,13 +847,7 @@ void load_system_tables(void)
 	tss->ist[IST_MCE - 1] = stack_top + (1 + IST_MCE) * PAGE_SIZE;
 	tss->ist[IST_NMI - 1] = stack_top + (1 + IST_NMI) * PAGE_SIZE;
 	tss->ist[IST_DB  - 1] = stack_top + (1 + IST_DB)  * PAGE_SIZE;
-	/*
-	 * Gross bodge.  The #DF handler uses the vm86 fields of cpu_user_regs
-	 * beyond the hardware frame.  Adjust the stack entrypoint so this
-	 * doesn't manifest as an OoB write which hits the guard page.
-	 */
-	tss->ist[IST_DF  - 1] = stack_top + (1 + IST_DF)  * PAGE_SIZE -
-		(sizeof(struct cpu_user_regs) - offsetof(struct cpu_user_regs, es));
+	tss->ist[IST_DF  - 1] = stack_top + (1 + IST_DF)  * PAGE_SIZE;
 	tss->bitmap = IOBMP_INVALID_OFFSET;
 
 	/* All other stack pointers poisioned. */
