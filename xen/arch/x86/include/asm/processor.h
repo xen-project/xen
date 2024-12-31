@@ -472,8 +472,6 @@ struct stubs {
 DECLARE_PER_CPU(struct stubs, stubs);
 unsigned long alloc_stub_page(unsigned int cpu, unsigned long *mfn);
 
-void cpuid_hypervisor_leaves(const struct vcpu *v, uint32_t leaf,
-                             uint32_t subleaf, struct cpuid_leaf *res);
 int guest_rdmsr_xen(const struct vcpu *v, uint32_t idx, uint64_t *val);
 int guest_wrmsr_xen(struct vcpu *v, uint32_t idx, uint64_t val);
 

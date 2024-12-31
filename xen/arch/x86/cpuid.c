@@ -1,6 +1,8 @@
 #include <xen/sched.h>
 #include <xen/types.h>
+#include <xen/version.h>
 
+#include <public/arch-x86/cpuid.h>
 #include <public/hvm/params.h>
 
 #include <asm/cpu-policy.h>
@@ -30,6 +32,140 @@ bool recheck_cpu_features(unsigned int cpu)
     }
 
     return okay;
+}
+
+static void cpuid_hypervisor_leaves(const struct vcpu *v, uint32_t leaf,
+                                    uint32_t subleaf, struct cpuid_leaf *res)
+{
+    const struct domain *d = v->domain;
+    const struct cpu_policy *p = d->arch.cpu_policy;
+    uint32_t base = is_viridian_domain(d) ? 0x40000100 : 0x40000000;
+    uint32_t idx  = leaf - base;
+    unsigned int limit = is_viridian_domain(d) ? p->hv2_limit : p->hv_limit;
+
+    if ( limit == 0 )
+        /* Default number of leaves */
+        limit = XEN_CPUID_MAX_NUM_LEAVES;
+    else
+        /* Clamp toolstack value between 2 and MAX_NUM_LEAVES. */
+        limit = min(max(limit, 2u), XEN_CPUID_MAX_NUM_LEAVES + 0u);
+
+    if ( idx > limit )
+        return;
+
+    switch ( idx )
+    {
+    case 0:
+        res->a = base + limit; /* Largest leaf */
+        res->b = XEN_CPUID_SIGNATURE_EBX;
+        res->c = XEN_CPUID_SIGNATURE_ECX;
+        res->d = XEN_CPUID_SIGNATURE_EDX;
+        break;
+
+    case 1:
+        res->a = (xen_major_version() << 16) | xen_minor_version();
+        break;
+
+    case 2:
+        res->a = 1;            /* Number of hypercall-transfer pages */
+                               /* MSR base address */
+        res->b = is_viridian_domain(d) ? 0x40000200 : 0x40000000;
+        if ( is_pv_domain(d) ) /* Features */
+            res->c |= XEN_CPUID_FEAT1_MMU_PT_UPDATE_PRESERVE_AD;
+        break;
+
+    case 3: /* Time leaf. */
+        switch ( subleaf )
+        {
+        case 0: /* features */
+            res->a = ((d->arch.vtsc << 0) |
+                      (!!host_tsc_is_safe() << 1) |
+                      (!!boot_cpu_has(X86_FEATURE_RDTSCP) << 2));
+            res->b = d->arch.tsc_mode;
+            res->c = d->arch.tsc_khz;
+            res->d = d->arch.incarnation;
+            break;
+
+        case 1: /* scale and offset */
+        {
+            uint64_t offset;
+
+            if ( !d->arch.vtsc )
+                offset = d->arch.vtsc_offset;
+            else
+                /* offset already applied to value returned by virtual rdtscp */
+                offset = 0;
+            res->a = offset;
+            res->b = offset >> 32;
+            res->c = d->arch.vtsc_to_ns.mul_frac;
+            res->d = d->arch.vtsc_to_ns.shift;
+            break;
+        }
+
+        case 2: /* physical cpu_khz */
+            res->a = cpu_khz;
+            break;
+        }
+        break;
+
+    case 4: /* HVM hypervisor leaf. */
+        if ( !is_hvm_domain(d) || subleaf != 0 )
+            break;
+
+        if ( cpu_has_vmx_apic_reg_virt )
+            res->a |= XEN_HVM_CPUID_APIC_ACCESS_VIRT;
+
+        /*
+         * We want to claim that x2APIC is virtualized if APIC MSR accesses
+         * are not intercepted. When all three of these are true both rdmsr
+         * and wrmsr in the guest will run without VMEXITs (see
+         * vmx_vlapic_msr_changed()).
+         */
+        if ( cpu_has_vmx_virtualize_x2apic_mode &&
+             cpu_has_vmx_apic_reg_virt &&
+             cpu_has_vmx_virtual_intr_delivery )
+            res->a |= XEN_HVM_CPUID_X2APIC_VIRT;
+
+        /*
+         * 1) Xen 4.10 and older was broken WRT grant maps requesting a DMA
+         * mapping, and forgot to honour the guest's request.
+         * 2) 4.11 (and presumably backports) fixed the bug, so the map
+         * hypercall actually did what the guest asked.
+         * 3) To work around the bug, guests must bounce buffer all DMA that
+         * would otherwise use a grant map, because it doesn't know whether the
+         * DMA is originating from an emulated or a real device.
+         * 4) This flag tells guests it is safe not to bounce-buffer all DMA to
+         * work around the bug.
+         */
+        res->a |= XEN_HVM_CPUID_IOMMU_MAPPINGS;
+
+        /* Indicate presence of vcpu id and set it in ebx */
+        res->a |= XEN_HVM_CPUID_VCPU_ID_PRESENT;
+        res->b = v->vcpu_id;
+
+        /* Indicate presence of domain id and set it in ecx */
+        res->a |= XEN_HVM_CPUID_DOMID_PRESENT;
+        res->c = d->domain_id;
+
+        /*
+         * Per-vCPU event channel upcalls are implemented and work
+         * correctly with PIRQs routed over event channels.
+         */
+        res->a |= XEN_HVM_CPUID_UPCALL_VECTOR;
+
+        break;
+
+    case 5: /* PV-specific parameters */
+        if ( is_hvm_domain(d) || subleaf != 0 )
+            break;
+
+        res->b = flsl(get_upper_mfn_bound()) + PAGE_SHIFT;
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        break;
+    }
 }
 
 void guest_cpuid(const struct vcpu *v, uint32_t leaf,
