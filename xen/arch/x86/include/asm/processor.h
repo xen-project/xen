@@ -472,9 +472,6 @@ struct stubs {
 DECLARE_PER_CPU(struct stubs, stubs);
 unsigned long alloc_stub_page(unsigned int cpu, unsigned long *mfn);
 
-int guest_rdmsr_xen(const struct vcpu *v, uint32_t idx, uint64_t *val);
-int guest_wrmsr_xen(struct vcpu *v, uint32_t idx, uint64_t val);
-
 static inline uint8_t get_cpu_family(uint32_t raw, uint8_t *model,
                                      uint8_t *stepping)
 {

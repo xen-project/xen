@@ -64,7 +64,6 @@
 #include <asm/mc146818rtc.h>
 #include <asm/hpet.h>
 #include <asm/vpmu.h>
-#include <public/hvm/params.h>
 #include <asm/cpuid.h>
 #include <xsm/xsm.h>
 #include <asm/irq-vectors.h>
@@ -977,78 +976,6 @@ void asmlinkage do_trap(struct cpu_user_regs *regs)
 
  hardware_trap:
     fatal_trap(regs, false);
-}
-
-int guest_rdmsr_xen(const struct vcpu *v, uint32_t idx, uint64_t *val)
-{
-    const struct domain *d = v->domain;
-    /* Optionally shift out of the way of Viridian architectural MSRs. */
-    uint32_t base = is_viridian_domain(d) ? 0x40000200 : 0x40000000;
-
-    switch ( idx - base )
-    {
-    case 0: /* Write hypercall page MSR.  Read as zero. */
-        *val = 0;
-        return X86EMUL_OKAY;
-    }
-
-    return X86EMUL_EXCEPTION;
-}
-
-int guest_wrmsr_xen(struct vcpu *v, uint32_t idx, uint64_t val)
-{
-    struct domain *d = v->domain;
-    /* Optionally shift out of the way of Viridian architectural MSRs. */
-    uint32_t base = is_viridian_domain(d) ? 0x40000200 : 0x40000000;
-
-    switch ( idx - base )
-    {
-    case 0: /* Write hypercall page */
-    {
-        void *hypercall_page;
-        unsigned long gmfn = val >> PAGE_SHIFT;
-        unsigned int page_index = val & (PAGE_SIZE - 1);
-        struct page_info *page;
-        p2m_type_t t;
-
-        if ( page_index > 0 )
-        {
-            gdprintk(XENLOG_WARNING,
-                     "wrmsr hypercall page index %#x unsupported\n",
-                     page_index);
-            return X86EMUL_EXCEPTION;
-        }
-
-        page = get_page_from_gfn(d, gmfn, &t, P2M_ALLOC);
-
-        if ( !page || !get_page_type(page, PGT_writable_page) )
-        {
-            if ( page )
-                put_page(page);
-
-            if ( p2m_is_paging(t) )
-            {
-                p2m_mem_paging_populate(d, _gfn(gmfn));
-                return X86EMUL_RETRY;
-            }
-
-            gdprintk(XENLOG_WARNING,
-                     "Bad GMFN %lx (MFN %#"PRI_mfn") to MSR %08x\n",
-                     gmfn, mfn_x(page ? page_to_mfn(page) : INVALID_MFN), base);
-            return X86EMUL_EXCEPTION;
-        }
-
-        hypercall_page = __map_domain_page(page);
-        init_hypercall_page(d, hypercall_page);
-        unmap_domain_page(hypercall_page);
-
-        put_page_and_type(page);
-        return X86EMUL_OKAY;
-    }
-
-    default:
-        return X86EMUL_EXCEPTION;
-    }
 }
 
 void asmlinkage do_invalid_op(struct cpu_user_regs *regs)
