@@ -1864,14 +1864,6 @@ void asmlinkage do_entry_CP(struct cpu_user_regs *regs)
     panic("CONTROL-FLOW PROTECTION FAULT: #CP[%04x] %s\n", ec, err);
 }
 
-void percpu_traps_init(void)
-{
-    subarch_percpu_traps_init();
-
-    if ( cpu_has_xen_lbr )
-        wrmsrl(MSR_IA32_DEBUGCTLMSR, IA32_DEBUGCTLMSR_LBR);
-}
-
 void nocall entry_PF(void);
 
 void __init init_idt_traps(void)

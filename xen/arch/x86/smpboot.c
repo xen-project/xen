@@ -41,6 +41,7 @@
 #include <asm/tboot.h>
 #include <asm/time.h>
 #include <asm/trampoline.h>
+#include <asm/traps.h>
 
 uint32_t __ro_after_init trampoline_phys;
 enum ap_boot_method __read_mostly ap_boot_method = AP_BOOT_NORMAL;

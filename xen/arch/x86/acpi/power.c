@@ -31,6 +31,7 @@
 #include <asm/spec_ctrl.h>
 #include <asm/tboot.h>
 #include <asm/trampoline.h>
+#include <asm/traps.h>
 
 #include <public/platform.h>
 

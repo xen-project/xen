@@ -7,6 +7,8 @@
 #ifndef ASM_TRAP_H
 #define ASM_TRAP_H
 
+void percpu_traps_init(void);
+
 const char *vector_name(unsigned int vec);
 
 #endif /* ASM_TRAP_H */
