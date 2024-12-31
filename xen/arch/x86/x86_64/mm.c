@@ -718,14 +718,16 @@ void __init zap_low_mappings(void)
 {
     BUG_ON(num_online_cpus() != 1);
 
-    /* Remove aliased mapping of first 1:1 PML4 entry. */
+    /* Stop using l?_bootmap[] mappings. */
     l4e_write(&idle_pg_table[0], l4e_empty());
     flush_local(FLUSH_TLB_GLOBAL);
 
-    /* Replace with mapping of the boot trampoline only. */
+    /*
+     * Insert an identity mapping of the AP/S3 part of the trampoline, which
+     * is arranged to fit in a single page.
+     */
     map_pages_to_xen(trampoline_phys, maddr_to_mfn(trampoline_phys),
-                     PFN_UP(trampoline_end - trampoline_start),
-                     __PAGE_HYPERVISOR_RX);
+                     1, __PAGE_HYPERVISOR_RX);
 }
 
 int setup_compat_arg_xlat(struct vcpu *v)
