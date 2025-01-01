@@ -256,7 +256,6 @@ static inline int local_irq_is_enabled(void)
 #define BROKEN_ACPI_Sx          0x0001
 #define BROKEN_INIT_AFTER_S1    0x0002
 
-void load_system_tables(void);
 void subarch_percpu_traps_init(void);
 
 #endif
