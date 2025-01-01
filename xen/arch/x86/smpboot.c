@@ -7,39 +7,39 @@
  *  (c) 1998, 1999, 2000 Ingo Molnar <mingo@redhat.com>
  */
 
-#include <xen/init.h>
-#include <xen/kernel.h>
-#include <xen/mm.h>
+#include <xen/cpu.h>
+#include <xen/delay.h>
 #include <xen/domain.h>
 #include <xen/domain_page.h>
-#include <xen/sched.h>
+#include <xen/init.h>
 #include <xen/irq.h>
-#include <xen/delay.h>
+#include <xen/kernel.h>
+#include <xen/mm.h>
+#include <xen/numa.h>
+#include <xen/sched.h>
+#include <xen/serial.h>
 #include <xen/softirq.h>
 #include <xen/tasklet.h>
-#include <xen/serial.h>
-#include <xen/numa.h>
-#include <xen/cpu.h>
 
 #include <asm/apic.h>
-#include <asm/io_apic.h>
 #include <asm/cpuidle.h>
 #include <asm/current.h>
-#include <asm/mc146818rtc.h>
 #include <asm/desc.h>
 #include <asm/div64.h>
 #include <asm/flushtlb.h>
 #include <asm/guest.h>
+#include <asm/io_apic.h>
+#include <asm/irq-vectors.h>
+#include <asm/mc146818rtc.h>
 #include <asm/microcode.h>
 #include <asm/msr.h>
 #include <asm/mtrr.h>
 #include <asm/prot-key.h>
 #include <asm/setup.h>
 #include <asm/spec_ctrl.h>
-#include <asm/time.h>
 #include <asm/tboot.h>
+#include <asm/time.h>
 #include <asm/trampoline.h>
-#include <asm/irq-vectors.h>
 
 uint32_t __ro_after_init trampoline_phys;
 enum ap_boot_method __read_mostly ap_boot_method = AP_BOOT_NORMAL;

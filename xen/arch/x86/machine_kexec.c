@@ -15,14 +15,15 @@
  * Version 2.  See the file COPYING for more details.
  */
 
-#include <xen/types.h>
 #include <xen/domain_page.h>
 #include <xen/elfstructs.h>
 #include <xen/kexec.h>
+#include <xen/types.h>
+
 #include <asm/fixmap.h>
 #include <asm/hpet.h>
-#include <asm/page.h>
 #include <asm/machine_kexec.h>
+#include <asm/page.h>
 
 /*
  * Add a mapping for a page to the page tables used during kexec.

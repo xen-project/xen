@@ -1,24 +1,25 @@
-#include <xen/init.h>
-#include <xen/string.h>
 #include <xen/delay.h>
+#include <xen/init.h>
 #include <xen/param.h>
 #include <xen/smp.h>
+#include <xen/string.h>
 
 #include <asm/amd.h>
+#include <asm/apic.h>
 #include <asm/cpu-policy.h>
 #include <asm/current.h>
 #include <asm/debugreg.h>
-#include <asm/processor.h>
-#include <asm/xstate.h>
-#include <asm/msr.h>
 #include <asm/io.h>
 #include <asm/mpspec.h>
-#include <asm/apic.h>
+#include <asm/msr.h>
+#include <asm/processor.h>
 #include <asm/prot-key.h>
 #include <asm/random.h>
 #include <asm/setup.h>
 #include <asm/shstk.h>
-#include <public/sysctl.h> /* for XEN_INVALID_{SOCKET,CORE}_ID */
+#include <asm/xstate.h>
+
+#include <public/sysctl.h>
 
 #include "cpu.h"
 #include "mcheck/x86_mca.h"

@@ -11,66 +11,68 @@
  *  Gareth Hughes <gareth@valinux.com>, May 2000
  */
 
-#include <xen/init.h>
-#include <xen/lib.h>
-#include <xen/errno.h>
-#include <xen/sched.h>
-#include <xen/domain.h>
-#include <xen/smp.h>
-#include <xen/delay.h>
-#include <xen/softirq.h>
-#include <xen/grant_table.h>
-#include <xen/iocap.h>
-#include <xen/kernel.h>
-#include <xen/hypercall.h>
-#include <xen/multicall.h>
-#include <xen/irq.h>
-#include <xen/event.h>
-#include <xen/console.h>
-#include <xen/percpu.h>
-#include <xen/compat.h>
 #include <xen/acpi.h>
-#include <xen/pci.h>
-#include <xen/paging.h>
+#include <xen/compat.h>
+#include <xen/console.h>
 #include <xen/cpu.h>
-#include <xen/wait.h>
+#include <xen/delay.h>
+#include <xen/domain.h>
+#include <xen/errno.h>
+#include <xen/event.h>
+#include <xen/grant_table.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
+#include <xen/init.h>
+#include <xen/iocap.h>
+#include <xen/irq.h>
+#include <xen/kernel.h>
+#include <xen/lib.h>
 #include <xen/livepatch.h>
-#include <public/arch-x86/cpuid.h>
-#include <public/sysctl.h>
-#include <public/hvm/hvm_vcpu.h>
-#include <asm/regs.h>
-#include <asm/mc146818rtc.h>
-#include <asm/system.h>
-#include <asm/io.h>
-#include <asm/processor.h>
-#include <asm/desc.h>
-#include <asm/i387.h>
-#include <asm/xstate.h>
+#include <xen/multicall.h>
+#include <xen/paging.h>
+#include <xen/pci.h>
+#include <xen/percpu.h>
+#include <xen/sched.h>
+#include <xen/smp.h>
+#include <xen/softirq.h>
+#include <xen/wait.h>
+
+#include <asm/amd.h>
+#include <asm/cpu-policy.h>
 #include <asm/cpuidle.h>
-#include <asm/mpspec.h>
-#include <asm/ldt.h>
+#include <asm/debugreg.h>
+#include <asm/desc.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/viridian.h>
-#include <asm/debugreg.h>
-#include <asm/msr.h>
-#include <asm/spec_ctrl.h>
-#include <asm/traps.h>
-#include <asm/nmi.h>
+#include <asm/i387.h>
+#include <asm/io.h>
+#include <asm/ldt.h>
+#include <asm/mc146818rtc.h>
 #include <asm/mce.h>
-#include <asm/amd.h>
-#include <xen/numa.h>
-#include <xen/iommu.h>
-#ifdef CONFIG_COMPAT
-#include <compat/vcpu.h>
-#endif
-#include <asm/cpu-policy.h>
+#include <asm/mpspec.h>
+#include <asm/msr.h>
+#include <asm/nmi.h>
+#include <asm/processor.h>
 #include <asm/psr.h>
 #include <asm/pv/domain.h>
 #include <asm/pv/mm.h>
+#include <asm/regs.h>
 #include <asm/spec_ctrl.h>
+#include <asm/system.h>
+#include <asm/traps.h>
+#include <asm/xstate.h>
+#include <xen/iommu.h>
+#include <xen/numa.h>
+
+#include <public/arch-x86/cpuid.h>
+#include <public/sysctl.h>
+#include <public/hvm/hvm_vcpu.h>
+
+#ifdef CONFIG_COMPAT
+#include <compat/vcpu.h>
+#endif
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 

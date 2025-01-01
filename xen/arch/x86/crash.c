@@ -8,27 +8,29 @@
  * - Magnus Damm <magnus@valinux.co.jp>
  */
 
-#include <asm/atomic.h>
-#include <asm/elf.h>
-#include <xen/types.h>
-#include <xen/irq.h>
-#include <asm/nmi.h>
-#include <xen/string.h>
+#include <xen/console.h>
+#include <xen/delay.h>
 #include <xen/elf.h>
 #include <xen/elfcore.h>
-#include <xen/smp.h>
-#include <xen/delay.h>
-#include <xen/perfc.h>
-#include <xen/kexec.h>
-#include <xen/sched.h>
-#include <xen/keyhandler.h>
-#include <public/xen.h>
-#include <asm/shared.h>
-#include <asm/apic.h>
-#include <asm/io_apic.h>
 #include <xen/iommu.h>
+#include <xen/irq.h>
+#include <xen/kexec.h>
+#include <xen/keyhandler.h>
+#include <xen/perfc.h>
+#include <xen/sched.h>
+#include <xen/smp.h>
+#include <xen/string.h>
+#include <xen/types.h>
+
+#include <asm/apic.h>
+#include <asm/atomic.h>
+#include <asm/elf.h>
 #include <asm/hpet.h>
-#include <xen/console.h>
+#include <asm/io_apic.h>
+#include <asm/nmi.h>
+#include <asm/shared.h>
+
+#include <public/xen.h>
 
 static cpumask_t waiting_to_crash;
 static unsigned int crashing_cpu;

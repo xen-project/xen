@@ -4,33 +4,34 @@
  * Copyright (c) 2004, Intel Corporation.
  */
 
-#include <xen/init.h>
-#include <xen/mm.h>
-#include <xen/lib.h>
-#include <xen/param.h>
-#include <xen/errno.h>
 #include <xen/domain_page.h>
+#include <xen/errno.h>
 #include <xen/event.h>
+#include <xen/init.h>
 #include <xen/kernel.h>
 #include <xen/keyhandler.h>
+#include <xen/lib.h>
+#include <xen/mm.h>
+#include <xen/param.h>
 #include <xen/vm_event.h>
-#include <asm/current.h>
+
+#include <asm/apic.h>
 #include <asm/cpufeature.h>
-#include <asm/processor.h>
-#include <asm/msr.h>
-#include <asm/xstate.h>
+#include <asm/current.h>
+#include <asm/flushtlb.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/nestedhvm.h>
+#include <asm/hvm/vmx/vmcs.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vvmx.h>
-#include <asm/hvm/vmx/vmcs.h>
-#include <asm/flushtlb.h>
 #include <asm/monitor.h>
+#include <asm/msr.h>
+#include <asm/processor.h>
 #include <asm/shadow.h>
 #include <asm/spec_ctrl.h>
 #include <asm/tboot.h>
-#include <asm/apic.h>
+#include <asm/xstate.h>
 
 static bool __read_mostly opt_vpid_enabled = true;
 boolean_param("vpid", opt_vpid_enabled);

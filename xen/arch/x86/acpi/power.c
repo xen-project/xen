@@ -11,27 +11,28 @@
  */
 
 #include <xen/acpi.h>
+#include <xen/console.h>
+#include <xen/cpu.h>
+#include <xen/domain.h>
 #include <xen/errno.h>
 #include <xen/iocap.h>
+#include <xen/iommu.h>
 #include <xen/param.h>
 #include <xen/sched.h>
-#include <asm/acpi.h>
-#include <asm/irq.h>
 #include <xen/spinlock.h>
-#include <xen/sched.h>
-#include <xen/domain.h>
-#include <xen/console.h>
-#include <xen/iommu.h>
 #include <xen/watchdog.h>
-#include <xen/cpu.h>
-#include <public/platform.h>
-#include <asm/tboot.h>
+
+#include <asm/acpi.h>
 #include <asm/apic.h>
 #include <asm/io_apic.h>
+#include <asm/irq.h>
 #include <asm/microcode.h>
 #include <asm/prot-key.h>
 #include <asm/spec_ctrl.h>
+#include <asm/tboot.h>
 #include <asm/trampoline.h>
+
+#include <public/platform.h>
 
 #include <acpi/cpufreq/cpufreq.h>
 

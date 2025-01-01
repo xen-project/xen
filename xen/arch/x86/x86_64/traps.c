@@ -1,28 +1,27 @@
-
-#include <xen/version.h>
-#include <xen/init.h>
-#include <xen/sched.h>
-#include <xen/lib.h>
-#include <xen/errno.h>
-#include <xen/mm.h>
-#include <xen/irq.h>
-#include <xen/symbols.h>
 #include <xen/console.h>
+#include <xen/errno.h>
+#include <xen/guest_access.h>
+#include <xen/hypercall.h>
+#include <xen/init.h>
+#include <xen/irq.h>
+#include <xen/lib.h>
+#include <xen/mm.h>
 #include <xen/sched.h>
 #include <xen/shutdown.h>
-#include <xen/guest_access.h>
+#include <xen/symbols.h>
+#include <xen/version.h>
 #include <xen/watchdog.h>
-#include <xen/hypercall.h>
+
 #include <asm/current.h>
-#include <asm/flushtlb.h>
-#include <asm/traps.h>
 #include <asm/endbr.h>
 #include <asm/event.h>
-#include <asm/nmi.h>
+#include <asm/flushtlb.h>
+#include <asm/hvm/hvm.h>
 #include <asm/msr.h>
+#include <asm/nmi.h>
 #include <asm/page.h>
 #include <asm/shared.h>
-#include <asm/hvm/hvm.h>
+#include <asm/traps.h>
 
 
 static void print_xen_info(void)
