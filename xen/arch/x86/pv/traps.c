@@ -13,6 +13,7 @@
 #include <xen/softirq.h>
 
 #include <asm/debugreg.h>
+#include <asm/idt.h>
 #include <asm/irq-vectors.h>
 #include <asm/pv/trace.h>
 #include <asm/shared.h>

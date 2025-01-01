@@ -47,6 +47,7 @@
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/viridian.h>
 #include <asm/i387.h>
+#include <asm/idt.h>
 #include <asm/io.h>
 #include <asm/ldt.h>
 #include <asm/mc146818rtc.h>

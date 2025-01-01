@@ -115,6 +115,7 @@
 #include <asm/fixmap.h>
 #include <asm/flushtlb.h>
 #include <asm/guest.h>
+#include <asm/idt.h>
 #include <asm/io.h>
 #include <asm/io_apic.h>
 #include <asm/ldt.h>
@@ -6639,6 +6640,9 @@ static void __init __maybe_unused build_assertions(void)
      * using different PATs will not work.
      */
     BUILD_BUG_ON(XEN_MSR_PAT != 0x050100070406ULL);
+
+    /* IST_MAX IST pages + at least 1 guard page + primary stack. */
+    BUILD_BUG_ON((IST_MAX + 1) * PAGE_SIZE + PRIMARY_STACK_SIZE > STACK_SIZE);
 }
 
 /*

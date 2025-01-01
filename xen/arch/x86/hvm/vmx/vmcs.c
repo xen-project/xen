@@ -25,6 +25,7 @@
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vvmx.h>
+#include <asm/idt.h>
 #include <asm/monitor.h>
 #include <asm/msr.h>
 #include <asm/processor.h>

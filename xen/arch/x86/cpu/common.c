@@ -9,6 +9,7 @@
 #include <asm/cpu-policy.h>
 #include <asm/current.h>
 #include <asm/debugreg.h>
+#include <asm/idt.h>
 #include <asm/io.h>
 #include <asm/mpspec.h>
 #include <asm/msr.h>

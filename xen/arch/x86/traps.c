@@ -53,6 +53,7 @@
 #include <asm/hpet.h>
 #include <asm/hvm/vpt.h>
 #include <asm/i387.h>
+#include <asm/idt.h>
 #include <asm/io.h>
 #include <asm/irq-vectors.h>
 #include <asm/mc146818rtc.h>

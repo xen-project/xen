@@ -353,43 +353,6 @@ struct tss_page {
 };
 DECLARE_PER_CPU(struct tss_page, tss_page);
 
-#define IST_NONE 0UL
-#define IST_MCE  1UL
-#define IST_NMI  2UL
-#define IST_DB   3UL
-#define IST_DF   4UL
-#define IST_MAX  4UL
-
-/* Set the Interrupt Stack Table used by a particular IDT entry. */
-static inline void set_ist(idt_entry_t *idt, unsigned int ist)
-{
-    /* IST is a 3 bit field, 32 bits into the IDT entry. */
-    ASSERT(ist <= IST_MAX);
-
-    /* Typically used on a live idt.  Disuade any clever optimisations. */
-    ACCESS_ONCE(idt->ist) = ist;
-}
-
-static inline void enable_each_ist(idt_entry_t *idt)
-{
-    set_ist(&idt[X86_EXC_DF],  IST_DF);
-    set_ist(&idt[X86_EXC_NMI], IST_NMI);
-    set_ist(&idt[X86_EXC_MC],  IST_MCE);
-    set_ist(&idt[X86_EXC_DB],  IST_DB);
-}
-
-static inline void disable_each_ist(idt_entry_t *idt)
-{
-    set_ist(&idt[X86_EXC_DF],  IST_NONE);
-    set_ist(&idt[X86_EXC_NMI], IST_NONE);
-    set_ist(&idt[X86_EXC_MC],  IST_NONE);
-    set_ist(&idt[X86_EXC_DB],  IST_NONE);
-}
-
-#define IDT_ENTRIES 256
-extern idt_entry_t idt_table[];
-extern idt_entry_t *idt_tables[];
-
 DECLARE_PER_CPU(root_pgentry_t *, root_pgt);
 
 extern void write_ptbase(struct vcpu *v);

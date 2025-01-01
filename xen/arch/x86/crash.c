@@ -26,6 +26,7 @@
 #include <asm/atomic.h>
 #include <asm/elf.h>
 #include <asm/hpet.h>
+#include <asm/idt.h>
 #include <asm/io_apic.h>
 #include <asm/nmi.h>
 #include <asm/shared.h>

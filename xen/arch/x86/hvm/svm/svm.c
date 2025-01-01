@@ -18,6 +18,7 @@
 #include <asm/cpufeature.h>
 #include <asm/current.h>
 #include <asm/debugreg.h>
+#include <asm/idt.h>
 #include <asm/gdbsx.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
