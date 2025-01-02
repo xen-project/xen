@@ -347,7 +347,7 @@ long do_set_trap_table(XEN_GUEST_HANDLE_PARAM(const_trap_info_t) traps)
     /* If no table is presented then clear the entire virtual IDT. */
     if ( guest_handle_is_null(traps) )
     {
-        memset(dst, 0, X86_NR_VECTORS * sizeof(*dst));
+        memset(dst, 0, X86_IDT_VECTORS * sizeof(*dst));
         return 0;
     }
 
@@ -393,7 +393,7 @@ int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps)
     /* If no table is presented then clear the entire virtual IDT. */
     if ( guest_handle_is_null(traps) )
     {
-        memset(dst, 0, X86_NR_VECTORS * sizeof(*dst));
+        memset(dst, 0, X86_IDT_VECTORS * sizeof(*dst));
         return 0;
     }
 

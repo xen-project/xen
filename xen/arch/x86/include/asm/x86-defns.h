@@ -155,7 +155,7 @@
 #define X86_INVPCID_ALL_INCL_GLOBAL 2
 #define X86_INVPCID_ALL_NON_GLOBAL  3
 
-#define X86_NR_VECTORS 256
+#define X86_IDT_VECTORS 256
 
 /* Exception Vectors */
 #define X86_EXC_DE             0 /* Divide Error */

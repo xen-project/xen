@@ -72,7 +72,7 @@ static void vlapic_do_init(struct vlapic *vlapic);
 static int vlapic_find_highest_vector(const void *bitmap)
 {
     const uint32_t *word = bitmap;
-    unsigned int word_offset = X86_NR_VECTORS / 32;
+    unsigned int word_offset = X86_IDT_VECTORS / 32;
 
     /* Work backwards through the bitmap (first 32-bit word in every four). */
     while ( (word_offset != 0) && (word[(--word_offset)*4] == 0) )
@@ -665,7 +665,7 @@ int guest_rdmsr_x2apic(const struct vcpu *v, uint32_t msr, uint64_t *val)
         REG(LVT0)  | REG(LVT1) | REG(LVTERR)  | REG(TMICT)   |
         REG(TMCCT) | REG(TDCR) |
 #undef REG
-#define REGBLOCK(x) (((1UL << (X86_NR_VECTORS / 32)) - 1) << (APIC_ ## x >> 4))
+#define REGBLOCK(x) (((1UL << (X86_IDT_VECTORS / 32)) - 1) << (APIC_ ## x >> 4))
         REGBLOCK(ISR) | REGBLOCK(TMR) | REGBLOCK(IRR)
 #undef REGBLOCK
     };

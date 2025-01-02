@@ -356,7 +356,7 @@ void asmlinkage vmx_intr_assist(void)
                 {
                     word = (const void *)&vlapic->regs->data[APIC_IRR];
                     printk(XENLOG_ERR "vIRR:");
-                    for ( i = X86_NR_VECTORS / 32; i-- ; )
+                    for ( i = X86_IDT_VECTORS / 32; i-- ; )
                         printk(" %08x", word[i*4]);
                     printk("\n");
                 }
@@ -366,7 +366,7 @@ void asmlinkage vmx_intr_assist(void)
                 {
                     word = (const void *)&pi_desc->pir;
                     printk(XENLOG_ERR " PIR:");
-                    for ( i = X86_NR_VECTORS / 32; i-- ; )
+                    for ( i = X86_IDT_VECTORS / 32; i-- ; )
                         printk(" %08x", word[i]);
                     printk("\n");
                 }

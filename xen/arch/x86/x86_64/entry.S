@@ -1243,7 +1243,7 @@ DATA(autogen_entrypoints, 8)
 FUNC_LOCAL(autogen_stubs, 0) /* Automatically generated stubs. */
 
         vec = 0
-        .rept X86_NR_VECTORS
+        .rept X86_IDT_VECTORS
 
         /* Common interrupts, heading towards do_IRQ(). */
 #if defined(CONFIG_PV32)

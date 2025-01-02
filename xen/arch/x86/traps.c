@@ -1986,7 +1986,7 @@ static void __init init_ler(void)
     setup_force_cpu_cap(X86_FEATURE_XEN_LBR);
 }
 
-extern void (*const autogen_entrypoints[X86_NR_VECTORS])(void);
+extern void (*const autogen_entrypoints[X86_IDT_VECTORS])(void);
 void __init trap_init(void)
 {
     unsigned int vector;
@@ -1996,7 +1996,7 @@ void __init trap_init(void)
 
     pv_trap_init();
 
-    for ( vector = 0; vector < X86_NR_VECTORS; ++vector )
+    for ( vector = 0; vector < X86_IDT_VECTORS; ++vector )
     {
         if ( autogen_entrypoints[vector] )
         {
