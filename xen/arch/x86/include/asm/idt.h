@@ -28,8 +28,7 @@ typedef union {
     };
 } idt_entry_t;
 
-#define IDT_ENTRIES 256
-extern idt_entry_t idt_table[];
+extern idt_entry_t bsp_idt[X86_IDT_VECTORS];
 extern idt_entry_t *idt_tables[];
 
 /*

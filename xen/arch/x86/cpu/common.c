@@ -831,7 +831,7 @@ void load_system_tables(void)
 	};
 	const struct desc_ptr idtr = {
 		.base = (unsigned long)idt_tables[cpu],
-		.limit = (IDT_ENTRIES * sizeof(idt_entry_t)) - 1,
+		.limit = sizeof(bsp_idt) - 1,
 	};
 
 	/*

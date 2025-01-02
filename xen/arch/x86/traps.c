@@ -98,10 +98,6 @@ DEFINE_PER_CPU_READ_MOSTLY(seg_desc_t *, compat_gdt);
 DEFINE_PER_CPU_READ_MOSTLY(l1_pgentry_t, compat_gdt_l1e);
 #endif
 
-/* Master table, used by CPU0. */
-idt_entry_t __section(".bss.page_aligned") __aligned(PAGE_SIZE)
-    idt_table[IDT_ENTRIES];
-
 /* Pointer to the IDT of every CPU. */
 idt_entry_t *idt_tables[NR_CPUS] __read_mostly;
 
@@ -1874,7 +1870,7 @@ void asmlinkage do_entry_CP(struct cpu_user_regs *regs)
 static void __init noinline __set_intr_gate(unsigned int n,
                                             uint32_t dpl, void *addr)
 {
-    _set_gate(&idt_table[n], SYS_DESC_irq_gate, dpl, addr);
+    _set_gate(&bsp_idt[n], SYS_DESC_irq_gate, dpl, addr);
 }
 
 static void __init set_swint_gate(unsigned int n, void *addr)
@@ -1940,10 +1936,10 @@ void __init init_idt_traps(void)
     set_intr_gate (X86_EXC_CP,  entry_CP);
 
     /* Specify dedicated interrupt stacks for NMI, #DF, and #MC. */
-    enable_each_ist(idt_table);
+    enable_each_ist(bsp_idt);
 
     /* CPU0 uses the master IDT. */
-    idt_tables[0] = idt_table;
+    idt_tables[0] = bsp_idt;
 
     this_cpu(gdt) = boot_gdt;
     if ( IS_ENABLED(CONFIG_PV32) )
@@ -2001,13 +1997,13 @@ void __init trap_init(void)
         if ( autogen_entrypoints[vector] )
         {
             /* Found autogen entry: check we won't clobber an existing trap. */
-            ASSERT(idt_table[vector].b == 0);
+            ASSERT(bsp_idt[vector].b == 0);
             set_intr_gate(vector, autogen_entrypoints[vector]);
         }
         else
         {
             /* No entry point: confirm we have an existing trap in place. */
-            ASSERT(idt_table[vector].b != 0);
+            ASSERT(bsp_idt[vector].b != 0);
         }
     }
 

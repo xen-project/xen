@@ -1080,7 +1080,7 @@ static int cpu_smpboot_alloc(unsigned int cpu)
         idt_tables[cpu] = alloc_xenheap_pages(0, memflags);
     if ( idt_tables[cpu] == NULL )
         goto out;
-    memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES * sizeof(idt_entry_t));
+    memcpy(idt_tables[cpu], bsp_idt, sizeof(bsp_idt));
     disable_each_ist(idt_tables[cpu]);
 
     for ( stub_page = 0, i = cpu & ~(STUBS_PER_PAGE - 1);
