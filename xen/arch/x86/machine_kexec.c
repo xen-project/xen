@@ -170,9 +170,12 @@ void machine_kexec(struct kexec_image *image)
      */
     for ( i = 0; i < nr_cpu_ids; i++ )
     {
-        if ( idt_tables[i] == NULL )
+        idt_entry_t *idt = per_cpu(idt, i);
+
+        if ( !idt )
             continue;
-        _update_gate_addr_lower(&idt_tables[i][X86_EXC_MC], &trap_nop);
+
+        _update_gate_addr_lower(&idt[X86_EXC_MC], &trap_nop);
     }
 
     /* Reset CPUID masking and faulting to the host's default. */

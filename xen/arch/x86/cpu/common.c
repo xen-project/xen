@@ -819,6 +819,7 @@ void load_system_tables(void)
 	 * support using ARRAY_SIZE against per-cpu variables.
 	 */
 	struct tss_page *tss_page = &this_cpu(tss_page);
+	idt_entry_t *idt = this_cpu(idt);
 
 	/* The TSS may be live.	 Disuade any clever optimisations. */
 	volatile struct tss64 *tss = &tss_page->tss;
@@ -830,7 +831,7 @@ void load_system_tables(void)
 		.limit = LAST_RESERVED_GDT_BYTE,
 	};
 	const struct desc_ptr idtr = {
-		.base = (unsigned long)idt_tables[cpu],
+		.base = (unsigned long)idt,
 		.limit = sizeof(bsp_idt) - 1,
 	};
 
@@ -914,7 +915,7 @@ void load_system_tables(void)
 	ltr(TSS_SELECTOR);
 	lldt(0);
 
-	enable_each_ist(idt_tables[cpu]);
+	enable_each_ist(idt);
 
 	/*
 	 * Bottom-of-stack must be 16-byte aligned!

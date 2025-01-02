@@ -915,7 +915,7 @@ static void cf_check svm_ctxt_switch_from(struct vcpu *v)
     svm_vmload_pa(per_cpu(host_vmcb, cpu));
 
     /* Resume use of ISTs now that the host TR is reinstated. */
-    enable_each_ist(idt_tables[cpu]);
+    enable_each_ist(per_cpu(idt, cpu));
 
     /*
      * Possibly clear previous guest selection of SSBD if set.  Note that
@@ -944,7 +944,7 @@ static void cf_check svm_ctxt_switch_to(struct vcpu *v)
      * Cannot use ISTs for NMI/#MC/#DF while we are running with the guest TR.
      * But this doesn't matter: the IST is only req'd to handle SYSCALL/SYSRET.
      */
-    disable_each_ist(idt_tables[cpu]);
+    disable_each_ist(per_cpu(idt, cpu));
 
     svm_restore_dr(v);
 

@@ -893,7 +893,7 @@ static void vmx_set_host_env(struct vcpu *v)
 
     __vmwrite(HOST_GDTR_BASE,
               (unsigned long)(this_cpu(gdt) - FIRST_RESERVED_GDT_ENTRY));
-    __vmwrite(HOST_IDTR_BASE, (unsigned long)idt_tables[cpu]);
+    __vmwrite(HOST_IDTR_BASE, (unsigned long)per_cpu(idt, cpu));
 
     __vmwrite(HOST_TR_BASE, (unsigned long)&per_cpu(tss_page, cpu).tss);
 

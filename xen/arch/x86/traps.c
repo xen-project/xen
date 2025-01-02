@@ -98,9 +98,6 @@ DEFINE_PER_CPU_READ_MOSTLY(seg_desc_t *, compat_gdt);
 DEFINE_PER_CPU_READ_MOSTLY(l1_pgentry_t, compat_gdt_l1e);
 #endif
 
-/* Pointer to the IDT of every CPU. */
-idt_entry_t *idt_tables[NR_CPUS] __read_mostly;
-
 /*
  * The TSS is smaller than a page, but we give it a full page to avoid
  * adjacent per-cpu data leaking via Meltdown when XPTI is in use.
@@ -1939,7 +1936,7 @@ void __init init_idt_traps(void)
     enable_each_ist(bsp_idt);
 
     /* CPU0 uses the master IDT. */
-    idt_tables[0] = bsp_idt;
+    this_cpu(idt) = bsp_idt;
 
     this_cpu(gdt) = boot_gdt;
     if ( IS_ENABLED(CONFIG_PV32) )

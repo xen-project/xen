@@ -863,7 +863,7 @@ int setup_cpu_root_pgt(unsigned int cpu)
         rc = clone_mapping(__va(__pa(stack_base[cpu])) + off, rpt);
 
     if ( !rc )
-        rc = clone_mapping(idt_tables[cpu], rpt);
+        rc = clone_mapping(per_cpu(idt, cpu), rpt);
     if ( !rc )
     {
         struct tss_page *ptr = &per_cpu(tss_page, cpu);
@@ -1009,7 +1009,7 @@ static void cpu_smpboot_free(unsigned int cpu, bool remove)
     if ( remove )
     {
         FREE_XENHEAP_PAGE(per_cpu(gdt, cpu));
-        FREE_XENHEAP_PAGE(idt_tables[cpu]);
+        FREE_XENHEAP_PAGE(per_cpu(idt, cpu));
 
         if ( stack_base[cpu] )
         {
@@ -1076,12 +1076,12 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
 #endif
 
-    if ( idt_tables[cpu] == NULL )
-        idt_tables[cpu] = alloc_xenheap_pages(0, memflags);
-    if ( idt_tables[cpu] == NULL )
+    if ( per_cpu(idt, cpu) == NULL )
+        per_cpu(idt, cpu) = alloc_xenheap_pages(0, memflags);
+    if ( per_cpu(idt, cpu) == NULL )
         goto out;
-    memcpy(idt_tables[cpu], bsp_idt, sizeof(bsp_idt));
-    disable_each_ist(idt_tables[cpu]);
+    memcpy(per_cpu(idt, cpu), bsp_idt, sizeof(bsp_idt));
+    disable_each_ist(per_cpu(idt, cpu));
 
     for ( stub_page = 0, i = cpu & ~(STUBS_PER_PAGE - 1);
           i < nr_cpu_ids && i <= (cpu | (STUBS_PER_PAGE - 1)); ++i )

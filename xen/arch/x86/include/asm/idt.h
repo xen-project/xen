@@ -3,6 +3,7 @@
 #define X86_ASM_IDT_H
 
 #include <xen/bug.h>
+#include <xen/percpu.h>
 
 #include <asm/x86-defns.h>
 
@@ -29,7 +30,7 @@ typedef union {
 } idt_entry_t;
 
 extern idt_entry_t bsp_idt[X86_IDT_VECTORS];
-extern idt_entry_t *idt_tables[];
+DECLARE_PER_CPU(idt_entry_t *, idt);
 
 /*
  * Set the Interrupt Stack Table used by a particular IDT entry.  Typically

@@ -63,7 +63,7 @@ static int noreturn cf_check do_nmi_crash(
          * This update is safe from a security point of view, as this
          * pcpu is never going to try to sysret back to a PV vcpu.
          */
-        set_ist(&idt_tables[cpu][X86_EXC_MC], IST_NONE);
+        set_ist(&per_cpu(idt, cpu)[X86_EXC_MC], IST_NONE);
 
         kexec_crash_save_cpu();
         __stop_this_cpu();
@@ -120,6 +120,7 @@ static void nmi_shootdown_cpus(void)
 {
     unsigned long msecs;
     unsigned int cpu = smp_processor_id();
+    idt_entry_t *idt = this_cpu(idt);
 
     disable_lapic_nmi_watchdog();
     local_irq_disable();
@@ -133,9 +134,8 @@ static void nmi_shootdown_cpus(void)
      * Disable IST for MCEs to avoid stack corruption race conditions, and
      * change the NMI handler to a nop to avoid deviation from this codepath.
      */
-    _set_gate_lower(&idt_tables[cpu][X86_EXC_NMI],
-                    SYS_DESC_irq_gate, 0, &trap_nop);
-    set_ist(&idt_tables[cpu][X86_EXC_MC], IST_NONE);
+    _set_gate_lower(&idt[X86_EXC_NMI], SYS_DESC_irq_gate, 0, &trap_nop);
+    set_ist(&idt[X86_EXC_MC], IST_NONE);
 
     set_nmi_callback(do_nmi_crash);
     smp_send_nmi_allbutself();
