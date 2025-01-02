@@ -597,6 +597,7 @@ static void p2m_set_permission(lpae_t *e, p2m_type_t t, p2m_access_t a)
         e->p2m.read = 0;
         break;
     case p2m_access_r:
+    case p2m_access_r_pw:
         e->p2m.write = 0;
         e->p2m.xn = 1;
         break;

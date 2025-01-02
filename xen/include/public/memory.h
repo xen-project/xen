@@ -426,6 +426,15 @@ typedef enum {
      * pausing the vcpu
      */
     XENMEM_access_n2rwx,
+
+    /*
+     * Same as XENMEM_access_r, but on processors with
+     * the TERTIARY_EXEC_EPT_PAGING_WRITE support,
+     * CPU-initiated page-table walks can still
+     * write to it (e.g., update A/D bits)
+     */
+    XENMEM_access_r_pw,
+
     /* Take the domain default */
     XENMEM_access_default
 } xenmem_access_t;

@@ -1897,6 +1897,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
             violation = npfec.read_access || npfec.write_access || npfec.insn_fetch;
             break;
         case p2m_access_r:
+        case p2m_access_r_pw:
             violation = npfec.write_access || npfec.insn_fetch;
             break;
         case p2m_access_w:

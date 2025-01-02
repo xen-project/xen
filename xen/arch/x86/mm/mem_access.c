@@ -45,6 +45,7 @@ static int _p2m_get_mem_access(struct p2m_domain *p2m, gfn_t gfn,
             ACCESS(rwx),
             ACCESS(rx2rw),
             ACCESS(n2rwx),
+            ACCESS(r_pw),
 #undef ACCESS
     };
 
@@ -94,6 +95,7 @@ bool p2m_mem_access_emulate_check(struct vcpu *v,
             break;
 
         case XENMEM_access_r:
+        case XENMEM_access_r_pw:
             violation = data->flags & MEM_ACCESS_WX;
             break;
 
@@ -312,6 +314,7 @@ bool xenmem_access_to_p2m_access(const struct p2m_domain *p2m,
         ACCESS(rwx),
         ACCESS(rx2rw),
         ACCESS(n2rwx),
+        ACCESS(r_pw),
 #undef ACCESS
     };
 

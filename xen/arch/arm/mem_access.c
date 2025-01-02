@@ -32,6 +32,7 @@ static int __p2m_get_mem_access(struct domain *d, gfn_t gfn,
             ACCESS(rwx),
             ACCESS(rx2rw),
             ACCESS(n2rwx),
+            ACCESS(r_pw),
 #undef ACCESS
     };
 
@@ -172,6 +173,7 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag,
             break;
         else
             goto err;
+    case XENMEM_access_r_pw:
     case XENMEM_access_rx2rw:
     case XENMEM_access_rx:
     case XENMEM_access_r:
@@ -253,6 +255,7 @@ bool p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
         violation = npfec.read_access || npfec.insn_fetch;
         break;
     case XENMEM_access_r:
+    case XENMEM_access_r_pw:
         violation = npfec.write_access || npfec.insn_fetch;
         break;
     default:
@@ -361,6 +364,7 @@ long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
         ACCESS(rwx),
         ACCESS(rx2rw),
         ACCESS(n2rwx),
+        ACCESS(r_pw),
 #undef ACCESS
     };
 

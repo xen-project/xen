@@ -213,6 +213,9 @@ int nestedhvm_hap_nested_page_fault(
     case p2m_access_n2rwx:
         p2ma_10 = p2m_access_n;
         break;
+    case p2m_access_r_pw:
+        p2ma_10 = p2m_access_r;
+        break;
     default:
         p2ma_10 = p2m_access_n;
         /* For safety, remove all permissions. */

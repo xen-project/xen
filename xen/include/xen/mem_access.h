@@ -64,6 +64,12 @@ typedef enum {
                            * generates an event but does not pause the
                            * vcpu */
 
+    p2m_access_r_pw = 10, /* Special: same as R, but on processors with
+                           * the TERTIARY_EXEC_EPT_PAGING_WRITE support,
+                           * CPU-initiated page-table walks can still
+                           * write to it (e.g., update A/D bits)
+                           */
+
     /* NOTE: Assumed to be only 4 bits right now on x86. */
 } p2m_access_t;
 

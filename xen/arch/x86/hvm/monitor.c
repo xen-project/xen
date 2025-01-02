@@ -295,6 +295,7 @@ bool hvm_monitor_check_p2m(unsigned long gla, gfn_t gfn, uint32_t pfec,
 
     case XENMEM_access_r:
     case XENMEM_access_n:
+    case XENMEM_access_r_pw:
         if ( pfec & PFEC_write_access )
             req.u.mem_access.flags |= MEM_ACCESS_R | MEM_ACCESS_W;
         if ( pfec & PFEC_insn_fetch )

@@ -980,6 +980,7 @@ static inline unsigned int p2m_access_to_iommu_flags(p2m_access_t p2ma)
     case p2m_access_r:
     case p2m_access_rx:
     case p2m_access_rx2rw:
+    case p2m_access_r_pw:
         return IOMMUF_readable;
 
     case p2m_access_w:

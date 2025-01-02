@@ -149,12 +149,16 @@ static void ept_p2m_type_to_flags(const struct p2m_domain *p2m,
     }
 
     /* Then restrict with access permissions */
+    entry->pw = 0;
     switch ( entry->access )
     {
         case p2m_access_n:
         case p2m_access_n2rwx:
             entry->r = entry->w = entry->x = 0;
             break;
+        case p2m_access_r_pw:
+            entry->pw = !!cpu_has_vmx_ept_paging_write;
+            fallthrough;
         case p2m_access_r:
             entry->w = entry->x = 0;
             break;
