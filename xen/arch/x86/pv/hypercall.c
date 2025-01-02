@@ -21,7 +21,7 @@ static void always_inline
 _pv_hypercall(struct cpu_user_regs *regs, bool compat)
 {
     struct vcpu *curr = current;
-    unsigned long eax;
+    unsigned long eax = -1; /* Clang -Wsometimes-uninitialized */
 
     ASSERT(guest_kernel_mode(curr, regs));
 
