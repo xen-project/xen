@@ -8,6 +8,8 @@
 # define DECL_SECTION_WITH_LADDR
 #endif
 #include <xen/xen.lds.h>
+
+#include <asm/gen-idt.lds.h>
 #include <asm/page.h>
 #include <asm/trampoline.h>
 

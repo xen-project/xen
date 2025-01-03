@@ -1229,6 +1229,82 @@ FUNC(trap_nop, 0)
         iretq
 END(trap_nop)
 
+/*
+ * Automatically generated entrypoints, and IDT
+ */
+
+        .pushsection .data.page_aligned, "aw", @progbits
+DATA(bsp_idt, PAGE_SIZE)
+        .popsection
+
+/*
+ * Write an IDT Entry.  The linker provides us new _ADDR1/2 symbols calculated
+ * from \sym.
+ */
+.macro write_idte sym, dpl
+        .pushsection .data.page_aligned, "aw", @progbits
+        .word IDT_\sym\()_ADDR1
+        .word __HYPERVISOR_CS
+        .word 0x8e00 | (\dpl << 13) /* Present, DPL, Interrupt Gate */
+        .word IDT_\sym\()_ADDR2
+        .long __XEN_VIRT_START >> 32
+        .long 0
+        .popsection
+.endm
+
+/*
+ * Write an automatically generated stub.  Vectors in the exception range keep
+ * the stack properly aligned by judging whether the CPU pushed an error code
+ * or not.
+ *
+ * Alignment is forced to 16 because that's the size of the interrupt stub
+ * with CET active.
+ */
+.macro gen_entry_stub vec, sym
+
+FUNC(\sym, 16)
+        ENDBR64
+
+        .if \vec < 0x20 /* Exception. */
+
+            test  $8, %spl       /* 64bit exception frames are 16 byte aligned, but the word */
+            jz    1f             /* size is 8 bytes.  Check whether the processor gave us an */
+            pushq $0             /* error code, and insert an empty one if not.              */
+1:          movb  $\vec, EFRAME_entry_vector(%rsp)
+            jmp   handle_exception
+
+        .else /* Interrupt. */
+
+            pushq $0
+            movb  $\vec, EFRAME_entry_vector(%rsp)
+            jmp   common_interrupt
+
+        .endif
+END(\sym)
+.endm
+
+/*
+ * Generator.  Write an entrypoint if necessary, and record an IDT entry.
+ */
+.macro gen vec, sym, dpl, auto
+
+        .if \auto
+            gen_entry_stub \vec, \sym
+        .endif
+
+        write_idte \sym, \dpl
+.endm
+#define GEN(v, s, d, a) gen vec=v, sym=s, dpl=d auto=a
+#include <asm/gen-idt.h>
+#undef GEN
+
+        .pushsection .data.page_aligned, "aw", @progbits
+END(bsp_idt)
+        .if . - bsp_idt != PAGE_SIZE
+            .error "Bad bsp_idt size, should be PAGE_SIZE"
+        .endif
+        .popsection
+
 /* Table of automatically generated entry points.  One per vector. */
         .pushsection .init.rodata, "a", @progbits
 DATA(autogen_entrypoints, 8)
