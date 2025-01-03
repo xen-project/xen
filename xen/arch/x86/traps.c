@@ -1864,22 +1864,6 @@ void asmlinkage do_entry_CP(struct cpu_user_regs *regs)
     panic("CONTROL-FLOW PROTECTION FAULT: #CP[%04x] %s\n", ec, err);
 }
 
-static void __init noinline __set_intr_gate(unsigned int n,
-                                            uint32_t dpl, void *addr)
-{
-    _set_gate(&bsp_idt[n], SYS_DESC_irq_gate, dpl, addr);
-}
-
-static void __init set_swint_gate(unsigned int n, void *addr)
-{
-    __set_intr_gate(n, 3, addr);
-}
-
-static void __init set_intr_gate(unsigned int n, void *addr)
-{
-    __set_intr_gate(n, 0, addr);
-}
-
 void percpu_traps_init(void)
 {
     subarch_percpu_traps_init();
@@ -1888,50 +1872,10 @@ void percpu_traps_init(void)
         wrmsrl(MSR_IA32_DEBUGCTLMSR, IA32_DEBUGCTLMSR_LBR);
 }
 
-/* Exception entries */
-void nocall entry_DE(void);
-void nocall entry_DB(void);
-void nocall entry_NMI(void);
-void nocall entry_BP(void);
-void nocall entry_OF(void);
-void nocall entry_BR(void);
-void nocall entry_UD(void);
-void nocall entry_NM(void);
-void nocall entry_DF(void);
-void nocall entry_TS(void);
-void nocall entry_NP(void);
-void nocall entry_SS(void);
-void nocall entry_GP(void);
-void nocall early_page_fault(void);
 void nocall entry_PF(void);
-void nocall entry_MF(void);
-void nocall entry_AC(void);
-void nocall entry_MC(void);
-void nocall entry_XM(void);
-void nocall entry_CP(void);
 
 void __init init_idt_traps(void)
 {
-    set_intr_gate (X86_EXC_DE,  entry_DE);
-    set_intr_gate (X86_EXC_DB,  entry_DB);
-    set_intr_gate (X86_EXC_NMI, entry_NMI);
-    set_swint_gate(X86_EXC_BP,  entry_BP);
-    set_swint_gate(X86_EXC_OF,  entry_OF);
-    set_intr_gate (X86_EXC_BR,  entry_BR);
-    set_intr_gate (X86_EXC_UD,  entry_UD);
-    set_intr_gate (X86_EXC_NM,  entry_NM);
-    set_intr_gate (X86_EXC_DF,  entry_DF);
-    set_intr_gate (X86_EXC_TS,  entry_TS);
-    set_intr_gate (X86_EXC_NP,  entry_NP);
-    set_intr_gate (X86_EXC_SS,  entry_SS);
-    set_intr_gate (X86_EXC_GP,  entry_GP);
-    set_intr_gate (X86_EXC_PF,  early_page_fault);
-    set_intr_gate (X86_EXC_MF,  entry_MF);
-    set_intr_gate (X86_EXC_AC,  entry_AC);
-    set_intr_gate (X86_EXC_MC,  entry_MC);
-    set_intr_gate (X86_EXC_XM,  entry_XM);
-    set_intr_gate (X86_EXC_CP,  entry_CP);
-
     /* Specify dedicated interrupt stacks for NMI, #DF, and #MC. */
     enable_each_ist(bsp_idt);
 
@@ -1979,30 +1923,12 @@ static void __init init_ler(void)
     setup_force_cpu_cap(X86_FEATURE_XEN_LBR);
 }
 
-extern void (*const autogen_entrypoints[X86_IDT_VECTORS])(void);
 void __init trap_init(void)
 {
-    unsigned int vector;
-
     /* Replace early pagefault with real pagefault handler. */
-    set_intr_gate(X86_EXC_PF, entry_PF);
+    _update_gate_addr_lower(&bsp_idt[X86_EXC_PF], entry_PF);
 
     pv_trap_init();
-
-    for ( vector = 0; vector < X86_IDT_VECTORS; ++vector )
-    {
-        if ( autogen_entrypoints[vector] )
-        {
-            /* Found autogen entry: check we won't clobber an existing trap. */
-            ASSERT(bsp_idt[vector].b == 0);
-            set_intr_gate(vector, autogen_entrypoints[vector]);
-        }
-        else
-        {
-            /* No entry point: confirm we have an existing trap in place. */
-            ASSERT(bsp_idt[vector].b != 0);
-        }
-    }
 
     init_ler();
 

@@ -141,21 +141,8 @@ static void cf_check nmi_softirq(void)
     *v_ptr = NULL;
 }
 
-void nocall entry_int80(void);
-void nocall entry_int82(void);
-
 void __init pv_trap_init(void)
 {
-#ifdef CONFIG_PV32
-    /* The 32-on-64 hypercall vector is only accessible from ring 1. */
-    _set_gate(bsp_idt + HYPERCALL_VECTOR,
-              SYS_DESC_irq_gate, 1, entry_int82);
-#endif
-
-    /* Fast trap for int80 (faster than taking the #GP-fixup path). */
-    _set_gate(bsp_idt + LEGACY_SYSCALL_VECTOR, SYS_DESC_irq_gate, 3,
-              &entry_int80);
-
     open_softirq(NMI_SOFTIRQ, nmi_softirq);
 }
 
