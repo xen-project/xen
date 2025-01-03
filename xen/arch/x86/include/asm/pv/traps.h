@@ -14,8 +14,6 @@
 
 #include <public/xen.h>
 
-void pv_trap_init(void);
-
 int pv_raise_nmi(struct vcpu *v);
 
 int pv_emulate_privileged_op(struct cpu_user_regs *regs);
@@ -31,8 +29,6 @@ static inline bool pv_trap_callback_registered(const struct vcpu *v,
 #else  /* !CONFIG_PV */
 
 #include <xen/errno.h>
-
-static inline void pv_trap_init(void) {}
 
 static inline int pv_raise_nmi(struct vcpu *v) { return -EOPNOTSUPP; }
 

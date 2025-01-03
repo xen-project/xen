@@ -141,10 +141,13 @@ static void cf_check nmi_softirq(void)
     *v_ptr = NULL;
 }
 
-void __init pv_trap_init(void)
+static int __init cf_check pv_trap_init(void)
 {
     open_softirq(NMI_SOFTIRQ, nmi_softirq);
+
+    return 0;
 }
+__initcall(pv_trap_init);
 
 /*
  * Deliver NMI to PV guest. Return 0 on success.

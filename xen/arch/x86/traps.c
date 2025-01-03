@@ -1928,8 +1928,6 @@ void __init trap_init(void)
     /* Replace early pagefault with real pagefault handler. */
     _update_gate_addr_lower(&bsp_idt[X86_EXC_PF], entry_PF);
 
-    pv_trap_init();
-
     init_ler();
 
     /* Cache {,compat_}gdt_l1e now that physically relocation is done. */
