@@ -3,10 +3,11 @@
  * Copyright (C) 2023 XenServer.
  */
 #include <xen/bug.h>
-#include <xen/kernel.h>
+#include <xen/sched.h>
 
 #include <xen/lib/x86/cpu-policy.h>
 
+#include <asm/current.h>
 #include <asm/debugreg.h>
 
 /*
@@ -83,4 +84,36 @@ unsigned int x86_adj_dr7_rsvd(const struct cpu_policy *p, unsigned int dr7)
     dr7 |= X86_DR7_DEFAULT;
 
     return dr7;
+}
+
+void activate_debugregs(const struct vcpu *curr)
+{
+    ASSERT(curr == current);
+
+    write_debugreg(0, curr->arch.dr[0]);
+    write_debugreg(1, curr->arch.dr[1]);
+    write_debugreg(2, curr->arch.dr[2]);
+    write_debugreg(3, curr->arch.dr[3]);
+    write_debugreg(6, curr->arch.dr6);
+
+    /*
+     * Avoid writing the subsequently getting replaced value when getting
+     * called from set_debugreg() below. Eventual future callers will need
+     * to take this into account.
+     */
+    if ( curr->arch.dr7 & DR7_ACTIVE_MASK )
+        write_debugreg(7, curr->arch.dr7);
+
+    /*
+     * Both the PV and HVM paths leave stale DR_MASK values in hardware on
+     * context-switch-out.  If we're activating %dr7 for the guest, we must
+     * sync the DR_MASKs too, whether or not the guest can see them.
+     */
+    if ( boot_cpu_has(X86_FEATURE_DBEXT) )
+    {
+        wrmsrl(MSR_AMD64_DR0_ADDRESS_MASK, curr->arch.msrs->dr_mask[0]);
+        wrmsrl(MSR_AMD64_DR1_ADDRESS_MASK, curr->arch.msrs->dr_mask[1]);
+        wrmsrl(MSR_AMD64_DR2_ADDRESS_MASK, curr->arch.msrs->dr_mask[2]);
+        wrmsrl(MSR_AMD64_DR3_ADDRESS_MASK, curr->arch.msrs->dr_mask[3]);
+    }
 }
