@@ -1938,8 +1938,6 @@ void __init trap_init(void)
             l1e_from_pfn(virt_to_mfn(boot_compat_gdt), __PAGE_HYPERVISOR_RW);
 
     percpu_traps_init();
-
-    cpu_init();
 }
 
 void asm_domain_crash_synchronous(unsigned long addr)
