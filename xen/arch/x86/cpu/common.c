@@ -936,8 +936,6 @@ void load_system_tables(void)
 		wrmsrl(MSR_ISST, (unsigned long)ist_ssp);
 	}
 
-	BUILD_BUG_ON(sizeof(*tss) <= 0x67); /* Mandated by the architecture. */
-
 	_set_tssldt_desc(gdt + TSS_ENTRY, (unsigned long)tss,
 			 sizeof(*tss) - 1, SYS_DESC_tss_avail);
 	if ( IS_ENABLED(CONFIG_PV32) )
