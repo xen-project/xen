@@ -255,6 +255,8 @@ class domain2
     vuart_op
 # XEN_DOMCTL_dt_overlay
     dt_overlay
+# XEN_DOMCTL_set_llc_colors
+    set_llc_colors
 }
 
 # Similar to class domain, but primarily contains domctls related to HVM domains
