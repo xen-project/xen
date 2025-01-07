@@ -94,7 +94,7 @@ define(`manage_domain', `
 			getaddrsize pause unpause trigger shutdown destroy
 			setaffinity setdomainmaxmem getscheduler resume
 			setpodtarget getpodtarget getpagingmempool setpagingmempool };
-    allow $1 $2:domain2 set_vnumainfo;
+    allow $1 $2:domain2 { set_vnumainfo dt_overlay };
 ')
 
 # migrate_domain_out(priv, target)
