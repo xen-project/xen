@@ -2,13 +2,15 @@
 /*
  * Configuration of event handling for all CPUs.
  */
+#include <xen/domain_page.h>
 #include <xen/init.h>
 #include <xen/param.h>
 
+#include <asm/endbr.h>
 #include <asm/idt.h>
 #include <asm/msr.h>
 #include <asm/shstk.h>
-#include <asm/system.h>
+#include <asm/stubs.h>
 #include <asm/traps.h>
 
 DEFINE_PER_CPU_READ_MOSTLY(idt_entry_t *, idt);
@@ -19,6 +21,8 @@ static bool __initdata opt_ler;
 boolean_param("ler", opt_ler);
 
 void nocall entry_PF(void);
+void nocall lstar_enter(void);
+void nocall cstar_enter(void);
 
 /*
  * Sets up system tables and descriptors for IDT devliery.
@@ -132,6 +136,95 @@ static void load_system_tables(void)
     BUG_ON(stack_bottom & 15);
 }
 
+static unsigned int write_stub_trampoline(
+    unsigned char *stub, unsigned long stub_va,
+    unsigned long stack_bottom, unsigned long target_va)
+{
+    unsigned char *p = stub;
+
+    if ( cpu_has_xen_ibt )
+    {
+        place_endbr64(p);
+        p += 4;
+    }
+
+    /* Store guest %rax into %ss slot */
+    /* movabsq %rax, stack_bottom - 8 */
+    *p++ = 0x48;
+    *p++ = 0xa3;
+    *(uint64_t *)p = stack_bottom - 8;
+    p += 8;
+
+    /* Store guest %rsp in %rax */
+    /* movq %rsp, %rax */
+    *p++ = 0x48;
+    *p++ = 0x89;
+    *p++ = 0xe0;
+
+    /* Switch to Xen stack */
+    /* movabsq $stack_bottom - 8, %rsp */
+    *p++ = 0x48;
+    *p++ = 0xbc;
+    *(uint64_t *)p = stack_bottom - 8;
+    p += 8;
+
+    /* jmp target_va */
+    *p++ = 0xe9;
+    *(int32_t *)p = target_va - (stub_va + (p - stub) + 4);
+    p += 4;
+
+    /* Round up to a multiple of 16 bytes. */
+    return ROUNDUP(p - stub, 16);
+}
+
+static void legacy_syscall_init(void)
+{
+    unsigned long stack_bottom = get_stack_bottom();
+    unsigned long stub_va = this_cpu(stubs.addr);
+    unsigned char *stub_page;
+    unsigned int offset;
+
+    /* No PV guests?  No need to set up SYSCALL/SYSENTER infrastructure. */
+    if ( !IS_ENABLED(CONFIG_PV) )
+        return;
+
+    stub_page = map_domain_page(_mfn(this_cpu(stubs.mfn)));
+
+    /*
+     * Trampoline for SYSCALL entry from 64-bit mode.  The VT-x HVM vcpu
+     * context switch logic relies on the SYSCALL trampoline being at the
+     * start of the stubs.
+     */
+    wrmsrns(MSR_LSTAR, stub_va);
+    offset = write_stub_trampoline(stub_page + (stub_va & ~PAGE_MASK),
+                                   stub_va, stack_bottom,
+                                   (unsigned long)lstar_enter);
+    stub_va += offset;
+
+    if ( cpu_has_sep )
+    {
+        /* SYSENTER entry. */
+        wrmsrns(MSR_IA32_SYSENTER_ESP, stack_bottom);
+        wrmsrns(MSR_IA32_SYSENTER_EIP, (unsigned long)sysenter_entry);
+        wrmsrns(MSR_IA32_SYSENTER_CS,  __HYPERVISOR_CS);
+    }
+
+    /* Trampoline for SYSCALL entry from compatibility mode. */
+    wrmsrns(MSR_CSTAR, stub_va);
+    offset += write_stub_trampoline(stub_page + (stub_va & ~PAGE_MASK),
+                                    stub_va, stack_bottom,
+                                    (unsigned long)cstar_enter);
+
+    /* Don't consume more than half of the stub space here. */
+    ASSERT(offset <= STUB_BUF_SIZE / 2);
+
+    unmap_domain_page(stub_page);
+
+    /* Common SYSCALL parameters. */
+    wrmsrns(MSR_STAR, XEN_MSR_STAR);
+    wrmsrns(MSR_SYSCALL_MASK, XEN_SYSCALL_MASK);
+}
+
 static void __init init_ler(void)
 {
     unsigned int msr = 0;
@@ -235,7 +328,7 @@ void __init bsp_traps_reinit(void)
  */
 void percpu_traps_init(void)
 {
-    subarch_percpu_traps_init();
+    legacy_syscall_init();
 
     if ( cpu_has_xen_lbr )
         wrmsrl(MSR_IA32_DEBUGCTLMSR, IA32_DEBUGCTLMSR_LBR);
