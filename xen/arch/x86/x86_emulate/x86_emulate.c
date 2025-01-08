@@ -3596,12 +3596,15 @@ x86_emulate(
         if ( !mode_64bit() )
             evex.w = 0;
         /*
-         * SDM version 067 claims that exception type E10NF implies #UD when
-         * EVEX.L'L is non-zero for 32-bit VCVT{,U}SI2SD. Experimentally this
-         * cannot be confirmed, but be on the safe side for the stub.
+         * While SDM version 085 has explicit wording towards embedded rounding
+         * being ignored, it's still not entirely unambiguous with the exception
+         * type referred to. Be on the safe side for the stub.
          */
         if ( !evex.w && evex.pfx == vex_f2 )
+        {
+            evex.brs = 0;
             evex.lr = 0;
+        }
         opc[1] = (modrm & 0x38) | 0xc0;
         insn_bytes = EVEX_PFX_BYTES + 2;
         opc[2] = 0xc3;
@@ -4819,7 +4822,16 @@ x86_emulate(
         else
         {
             host_and_vcpu_must_have(avx512f);
-            generate_exception_if(ea.type != OP_MEM && evex.brs, X86_EXC_UD);
+            /*
+             * While SDM version 085 has explicit wording towards embedded
+             * rounding being ignored, it's still not entirely unambiguous with
+             * the exception type referred to. Be on the safe side for the stub.
+             */
+            if ( ea.type != OP_MEM && evex.brs )
+            {
+                evex.brs = 0;
+                evex.lr = 2;
+            }
         }
         if ( ea.type != OP_REG || !evex.brs )
             avx512_vlen_check(false);
