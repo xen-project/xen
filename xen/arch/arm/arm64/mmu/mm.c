@@ -171,8 +171,6 @@ void __init relocate_and_switch_ttbr(uint64_t ttbr)
      */
     update_identity_mapping(false);
 }
-#else
-void __init relocate_and_switch_ttbr(uint64_t ttbr) {}
 #endif
 
 void __init switch_ttbr(uint64_t ttbr)
