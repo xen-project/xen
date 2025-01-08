@@ -638,20 +638,6 @@ int libxl__domain_device_construct_rdm(libxl__gc *gc,
     return ERROR_FAIL;
 }
 
-/* XSA-180 / CVE-2014-3672
- *
- * The QEMU shipped with Xen has a bodge. It checks for
- * XEN_QEMU_CONSOLE_LIMIT to see how much data QEMU is allowed
- * to write to stderr. We set that to 1MB if it is not set by
- * system administrator.
- */
-static void libxl__set_qemu_env_for_xsa_180(libxl__gc *gc,
-                                            flexarray_t *dm_envs)
-{
-    if (getenv("XEN_QEMU_CONSOLE_LIMIT")) return;
-    flexarray_append_pair(dm_envs, "XEN_QEMU_CONSOLE_LIMIT", "1048576");
-}
-
 const libxl_vnc_info *libxl__dm_vnc(const libxl_domain_config *guest_config)
 {
     const libxl_vnc_info *vnc = NULL;
@@ -703,8 +689,6 @@ static int libxl__build_device_model_args_old(libxl__gc *gc,
     dm_envs = flexarray_make(gc, 16, 1);
 
     assert(state->dm_monitor_fd == -1);
-
-    libxl__set_qemu_env_for_xsa_180(gc, dm_envs);
 
     flexarray_vappend(dm_args, dm,
                       "-d", GCSPRINTF("%d", domid), NULL);
@@ -1209,8 +1193,6 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
 
     dm_args = flexarray_make(gc, 16, 1);
     dm_envs = flexarray_make(gc, 16, 1);
-
-    libxl__set_qemu_env_for_xsa_180(gc, dm_envs);
 
     flexarray_vappend(dm_args, dm,
                       "-xen-domid",
@@ -3656,7 +3638,6 @@ void libxl__spawn_qemu_xenpv_backend(libxl__egc *egc,
     flexarray_append(dm_args, NULL);
     args = (char **) flexarray_contents(dm_args);
 
-    libxl__set_qemu_env_for_xsa_180(gc, dm_envs);
     envs = (char **) flexarray_contents(dm_envs);
 
     logfile_w = libxl__create_qemu_logfile(gc, GCSPRINTF("qdisk-%u", domid));
