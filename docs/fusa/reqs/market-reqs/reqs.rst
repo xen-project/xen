@@ -47,3 +47,35 @@ Comments:
 
 Needs:
  - XenProd
+
+Static VM definition
+--------------------
+
+`XenMkt~static_vm_definition~1`
+
+Description:
+Xen shall support assigning peripherals to a domain.
+
+Rationale:
+
+Comments:
+Peripheral implies an iomem (input output memory) and/or interrupts.
+
+Needs:
+ - XenProd
+
+Multiple schedulers
+-------------------
+
+`XenMkt~multiple_schedulers~1`
+
+Description:
+Xen shall have configurable scheduling strategies of virtual cpus onto physical
+cpus.
+
+Rationale:
+
+Comments:
+
+Needs:
+ - XenProd
