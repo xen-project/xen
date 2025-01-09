@@ -979,6 +979,7 @@ void send_global_virq(uint32_t virq)
 int set_global_virq_handler(struct domain *d, uint32_t virq)
 {
     struct domain *old;
+    int rc = 0;
 
     if (virq >= NR_VIRQS)
         return -EINVAL;
@@ -992,14 +993,32 @@ int set_global_virq_handler(struct domain *d, uint32_t virq)
         return -EINVAL;
 
     spin_lock(&global_virq_handlers_lock);
-    old = global_virq_handlers[virq];
-    global_virq_handlers[virq] = d;
+
+    /*
+     * Note that this check won't guarantee that a domain just going down can't
+     * be set as the handling domain of a virq, as the is_dying indicator might
+     * change just after testing it.
+     * This isn't going to be a major problem, as clear_global_virq_handlers()
+     * is guaranteed to run afterwards and it will reset the handling domain
+     * for the virq to the hardware domain.
+     */
+    if ( d->is_dying != DOMDYING_alive )
+    {
+        old = d;
+        rc = -EINVAL;
+    }
+    else
+    {
+        old = global_virq_handlers[virq];
+        global_virq_handlers[virq] = d;
+    }
+
     spin_unlock(&global_virq_handlers_lock);
 
     if (old != NULL)
         put_domain(old);
 
-    return 0;
+    return rc;
 }
 
 static void clear_global_virq_handlers(struct domain *d)
