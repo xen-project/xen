@@ -72,7 +72,7 @@
 #include "ffa_private.h"
 
 /* Negotiated FF-A version to use with the SPMC, 0 if not there or supported */
-uint32_t __ro_after_init ffa_fw_version;
+static uint32_t __ro_after_init ffa_fw_version;
 
 /* Features supported by the SPMC or secure world when present */
 DECLARE_BITMAP(ffa_fw_abi_supported, FFA_ABI_BITMAP_SIZE);

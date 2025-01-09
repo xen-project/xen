@@ -326,7 +326,6 @@ extern void *ffa_rx;
 extern void *ffa_tx;
 extern spinlock_t ffa_rx_buffer_lock;
 extern spinlock_t ffa_tx_buffer_lock;
-extern uint32_t __ro_after_init ffa_fw_version;
 extern DECLARE_BITMAP(ffa_fw_abi_supported, FFA_ABI_BITMAP_SIZE);
 
 bool ffa_shm_domain_destroy(struct domain *d);
