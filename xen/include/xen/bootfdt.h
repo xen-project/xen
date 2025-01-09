@@ -4,6 +4,7 @@
 #include <xen/types.h>
 #include <xen/kernel.h>
 #include <xen/macros.h>
+#include <xen/xmalloc.h>
 
 #define MIN_FDT_ALIGN 8
 
@@ -218,5 +219,20 @@ static inline struct shmem_membank_extra *bootinfo_get_shmem_extra(void)
     return bootinfo.shmem.extra;
 }
 #endif
+
+static inline struct membanks *membanks_xzalloc(unsigned int nr,
+                                                enum region_type type)
+{
+    struct membanks *banks = xzalloc_flex_struct(struct membanks, bank, nr);
+
+    if ( !banks )
+        goto out;
+
+    banks->max_banks = nr;
+    banks->type = type;
+
+ out:
+    return banks;
+}
 
 #endif /* XEN_BOOTFDT_H */

@@ -20,7 +20,8 @@ static struct {
     struct membanks_hdr common;
     struct membank bank[NR_SHMEM_BANKS];
 } shm_heap_banks __initdata = {
-    .common.max_banks = NR_SHMEM_BANKS
+    .common.max_banks = NR_SHMEM_BANKS,
+    .common.type = STATIC_SHARED_MEMORY
 };
 
 static inline struct membanks *get_shmem_heap_banks(void)

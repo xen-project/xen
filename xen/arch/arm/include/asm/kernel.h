@@ -92,7 +92,9 @@ kernel_info_get_mem_const(const struct kernel_info *kinfo)
 }
 
 #ifdef CONFIG_STATIC_SHM
-#define KERNEL_INFO_SHM_MEM_INIT .shm_mem.common.max_banks = NR_SHMEM_BANKS,
+#define KERNEL_INFO_SHM_MEM_INIT                \
+    .shm_mem.common.max_banks = NR_SHMEM_BANKS, \
+    .shm_mem.common.type = STATIC_SHARED_MEMORY,
 #else
 #define KERNEL_INFO_SHM_MEM_INIT
 #endif
@@ -100,6 +102,7 @@ kernel_info_get_mem_const(const struct kernel_info *kinfo)
 #define KERNEL_INFO_INIT                        \
 {                                               \
     .mem.common.max_banks = NR_MEM_BANKS,       \
+    .mem.common.type = MEMORY,                  \
     KERNEL_INFO_SHM_MEM_INIT                    \
 }
 

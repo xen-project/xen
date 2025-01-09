@@ -1039,7 +1039,7 @@ void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
      */
     if ( is_hardware_domain(d) )
     {
-        struct membanks *gnttab = xzalloc_flex_struct(struct membanks, bank, 1);
+        struct membanks *gnttab = membanks_xzalloc(1, MEMORY);
         /*
          * Exclude the following regions:
          * 1) Remove reserved memory
@@ -1057,12 +1057,9 @@ void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
         gnttab->bank[0].start = kinfo->gnttab_start;
         gnttab->bank[0].size = kinfo->gnttab_size;
 
-        hwdom_free_mem = xzalloc_flex_struct(struct membanks, bank,
-                                             NR_MEM_BANKS);
+        hwdom_free_mem = membanks_xzalloc(NR_MEM_BANKS, MEMORY);
         if ( !hwdom_free_mem )
             goto fail;
-
-        hwdom_free_mem->max_banks = NR_MEM_BANKS;
 
         if ( find_unallocated_memory(kinfo, mem_banks, ARRAY_SIZE(mem_banks),
                                      hwdom_free_mem, add_hwdom_free_regions) )
@@ -1293,7 +1290,7 @@ static int __init find_host_extended_regions(const struct kernel_info *kinfo,
                                              struct membanks *ext_regions)
 {
     int res;
-    struct membanks *gnttab = xzalloc_flex_struct(struct membanks, bank, 1);
+    struct membanks *gnttab = membanks_xzalloc(1, MEMORY);
 
     /*
      * Exclude the following regions:
@@ -1374,11 +1371,9 @@ int __init make_hypervisor_node(struct domain *d,
     }
     else
     {
-        ext_regions = xzalloc_flex_struct(struct membanks, bank, NR_MEM_BANKS);
+        ext_regions = membanks_xzalloc(NR_MEM_BANKS, MEMORY);
         if ( !ext_regions )
             return -ENOMEM;
-
-        ext_regions->max_banks = NR_MEM_BANKS;
 
         if ( domain_use_host_layout(d) )
         {
