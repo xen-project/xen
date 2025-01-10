@@ -551,6 +551,12 @@ debian-12-x86_64-clang:
   variables:
     CONTAINER: debian:12-x86_64
 
+debian-12-x86_64-clang-randconfig:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: debian:12-x86_64
+    RANDCONFIG: y
+
 debian-12-x86_64-gcc:
   extends: .gcc-x86-64-build
   variables:
