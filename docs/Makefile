@@ -5,7 +5,7 @@ include $(XEN_ROOT)/Config.mk
 VERSION		:= $(shell $(MAKE) -C $(XEN_ROOT)/xen --no-print-directory xenversion)
 DATE		:= $(shell date +%Y-%m-%d)
 
-DOC_ARCHES      := arm x86_32 x86_64
+DOC_ARCHES      := arm ppc riscv x86_32 x86_64
 MAN_SECTIONS    := 1 5 7 8
 
 # Documentation sources to build
