@@ -80,6 +80,7 @@ MC3A2.R20.2||
 MC3A2.R20.3||
 MC3A2.R20.4||
 MC3A2.R20.6||
+MC3A2.R20.7||
 MC3A2.R20.9||
 MC3A2.R20.11||
 MC3A2.R20.12||
@@ -116,7 +117,7 @@ if(string_equal(target,"x86_64"),
 )
 
 if(string_equal(target,"arm64"),
-    service_selector({"additional_clean_guidelines","MC3A2.R5.3||MC3.R11.2||MC3A2.R16.6||MC3A2.R20.7"})
+    service_selector({"additional_clean_guidelines","MC3A2.R5.3||MC3.R11.2||MC3A2.R16.6"})
 )
 
 -reports+={clean:added,"service(clean_guidelines_common||additional_clean_guidelines)"}
