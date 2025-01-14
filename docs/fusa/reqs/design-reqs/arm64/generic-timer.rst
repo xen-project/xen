@@ -21,7 +21,7 @@ Comments:
 Domains can detect the presence of the Generic Timer device tree node.
 
 Covers:
- - `XenProd~emulated_timer~1`
+ - `XenProd~arm64_emulated_timer~1`
 
 Read system counter frequency
 -----------------------------
@@ -37,7 +37,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_timer~1`
+ - `XenProd~arm64_emulated_timer~1`
 
 Access CNTKCTL_EL1 system register from a domain
 ------------------------------------------------
@@ -53,7 +53,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_timer~1`
+ - `XenProd~arm64_emulated_timer~1`
 
 Access virtual timer from a domain
 ----------------------------------
@@ -69,7 +69,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_timer~1`
+ - `XenProd~arm64_emulated_timer~1`
 
 Access physical timer from a domain
 -----------------------------------
@@ -85,7 +85,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_timer~1`
+ - `XenProd~arm64_emulated_timer~1`
 
 Trigger the virtual timer interrupt from a domain
 -------------------------------------------------
@@ -101,7 +101,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_timer~1`
+ - `XenProd~arm64_emulated_timer~1`
 
 Trigger the physical timer interrupt from a domain
 --------------------------------------------------
@@ -117,7 +117,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_timer~1`
+ - `XenProd~arm64_emulated_timer~1`
 
 Assumption of Use on the Platform
 =================================
@@ -139,7 +139,7 @@ While there is a provision to get this value by reading the "clock-frequency"
 dt property [2], the use of this property is strongly discouraged.
 
 Covers:
- - `XenProd~emulated_timer~1`
+ - `XenProd~arm64_emulated_timer~1`
 
 [1] Arm Architecture Reference Manual for A-profile architecture, Chapter 11
 [2] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/timer/arm,arch_timer.yaml

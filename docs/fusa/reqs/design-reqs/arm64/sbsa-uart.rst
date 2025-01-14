@@ -21,7 +21,7 @@ Comments:
 Domains can detect the presence of the SBSA UART device tree node.
 
 Covers:
- - `XenProd~emulated_uart~1`
+ - `XenProd~arm64_emulated_uart~1`
 
 Transmit data in software polling mode
 --------------------------------------
@@ -36,7 +36,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_uart~1`
+ - `XenProd~arm64_emulated_uart~1`
 
 Transmit data in interrupt driven mode
 --------------------------------------
@@ -51,7 +51,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_uart~1`
+ - `XenProd~arm64_emulated_uart~1`
 
 Receive data in software polling mode
 -------------------------------------
@@ -66,7 +66,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_uart~1`
+ - `XenProd~arm64_emulated_uart~1`
 
 Receive data in interrupt driven mode
 -------------------------------------
@@ -81,7 +81,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_uart~1`
+ - `XenProd~arm64_emulated_uart~1`
 
 Access UART data register
 -------------------------
@@ -96,7 +96,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_uart~1`
+ - `XenProd~arm64_emulated_uart~1`
 
 Access UART receive status register
 -----------------------------------
@@ -111,7 +111,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_uart~1`
+ - `XenProd~arm64_emulated_uart~1`
 
 Access UART flag register
 -------------------------
@@ -126,7 +126,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_uart~1`
+ - `XenProd~arm64_emulated_uart~1`
 
 Access UART mask set/clear register
 -----------------------------------
@@ -141,7 +141,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_uart~1`
+ - `XenProd~arm64_emulated_uart~1`
 
 Access UART raw interrupt status register
 -----------------------------------------
@@ -156,7 +156,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_uart~1`
+ - `XenProd~arm64_emulated_uart~1`
 
 Access UART masked interrupt status register
 --------------------------------------------
@@ -171,7 +171,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_uart~1`
+ - `XenProd~arm64_emulated_uart~1`
 
 Access UART interrupt clear register
 ------------------------------------
@@ -186,7 +186,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_uart~1`
+ - `XenProd~arm64_emulated_uart~1`
 
 Receive UART TX interrupt
 -------------------------
@@ -202,7 +202,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_uart~1`
+ - `XenProd~arm64_emulated_uart~1`
 
 Receive UART RX interrupt reception
 -----------------------------------
@@ -218,7 +218,7 @@ Rationale:
 Comments:
 
 Covers:
- - `XenProd~emulated_uart~1`
+ - `XenProd~arm64_emulated_uart~1`
 
 [1] Arm Base System Architecture, chapter B
 [2] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
