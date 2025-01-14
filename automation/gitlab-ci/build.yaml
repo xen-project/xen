@@ -556,6 +556,8 @@ debian-12-x86_64-clang-randconfig:
   variables:
     CONTAINER: debian:12-x86_64
     RANDCONFIG: y
+    EXTRA_FIXED_RANDCONFIG: |
+      CONFIG_COVERAGE=n # Disable coverage otherwise build times out.
 
 debian-12-x86_64-gcc:
   extends: .gcc-x86-64-build
