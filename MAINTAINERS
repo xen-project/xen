@@ -297,7 +297,7 @@ F:	xen/include/xen/device_tree.h
 F:	xen/drivers/passthrough/device_tree.c
 
 ECLAIR
-R:	Simone Ballarin <simone.ballarin@bugseng.com>
+R:	Nicola Vetrini <nicola.vetrini@bugseng.com>
 S:	Supported
 F:	automation/eclair_analysis/
 F:	automation/scripts/eclair
