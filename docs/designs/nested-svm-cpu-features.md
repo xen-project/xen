@@ -22,7 +22,7 @@ leaf 8000000A:edx
   from the L1 hypervisor's perspective to be as close as possible to
   the original hardware.  In particular, the behavior of the hardware
   on error paths 1) is not easy to understand or test, 2) can be the
-  source of surprising vulnerabiliies.  (See XSA-7 for an example of a
+  source of surprising vulnerabilities.  (See XSA-7 for an example of a
   case where subtle error-handling differences can open up a privilege
   escalation.)  We should avoid emulating any bit of the hardware with
   complex error paths if we can at all help it.
@@ -59,11 +59,11 @@ leaf 8000000A:edx
 
 - 2 `SVML` *SVM Lock*: Not required for L0, not provided to L1
 
-  Seems to be aboult enabling an operating system to prevent "blue
+  Seems to be about enabling an operating system to prevent "blue
   pill" attacks against itself.
 
   Xen doesn't use it, nor provide it; so it would need to be
-  implementend.  The best way to protect a guest OS is to leave nested
+  implemented.  The best way to protect a guest OS is to leave nested
   virt disabled in the tools.
 
 - 3 `NRIPS` NRIP Save: Require for both L0 and L1
@@ -78,8 +78,8 @@ leaf 8000000A:edx
   The main putative use for this would be trying to maintain an
   invariant TSC across cores with different clock speeds, or after a
   migrate.  Unlike others, this doesn't have an error path to worry
-  about compatibility-wise; and according to tests done when nestedSVM
-  was first implemented, it's actually faster to emliate TscRateMSR in
+  about compatibility-wise; and according to tests done when nested SVM
+  was first implemented, it's actually faster to emulate TscRateMSR in
   the L0 hypervisor than for L1 to attempt to emulate it itself.
 
   However, using this properly in L0 will take some implementation
@@ -89,7 +89,7 @@ leaf 8000000A:edx
  - 5 `VmcbClean`: VMCB Clean Bits: Not required by L0, provide to L1
 
   This is a pure optimization, both on the side of the L0 and L1.  The
-  implementaiton for L1 is entirely Xen-side, so can be provided even
+  implementation for L1 is entirely Xen-side, so can be provided even
   on hardware that doesn't provide it.  And it's purely an
   optimization, so could be "implemented" by ignoring the bits
   entirely.
@@ -102,7 +102,7 @@ leaf 8000000A:edx
 - 6 `FlushByAsid`: Require for L0, provide to L1
 
   This is cheap and easy to use for L0 and to provide to the L1;
-  there's no reson not to just pass it through.
+  there's no reason not to just pass it through.
 
 - 7 `DecodeAssists`: Require for L0, provide to L1
 

@@ -372,7 +372,7 @@ or modified by a transaction for which there is also a `TRANSACTION_DATA`
 record previously present).
 
 Each _committed_ node in the stream is required to have an already known parent
-node. A parent node is known if it was either in the node data base before the
+node. A parent node is known if it was either in the node database before the
 stream was started to be processed, or if a `NODE_DATA` record for that parent
 node has already been processed in the stream.
 

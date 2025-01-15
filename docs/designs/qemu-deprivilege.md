@@ -22,7 +22,7 @@ The following restrictions are currently implemented.
 '''Description''': As mentioned above, having QEMU switch to a
 non-root user, one per domain id.  Not being the root user limits what
 a compromised QEMU process can do to the system, and having one user
-per domain id limits what a comprimised QEMU process can do to the
+per domain id limits what a compromised QEMU process can do to the
 QEMU processes of other VMs.
 
 '''Implementation''': The toolstack adds the following to the qemu command-line:
@@ -79,8 +79,8 @@ Then adds the following to the qemu command-line:
 ## Namespaces for unused functionality (Linux only)
 
 '''Description''': QEMU doesn't use the functionality associated with
-mount and IPC namespaces. (IPC namespaces contol non-file-based IPC
-mechanisms within the kernel; unix and network sockets are not
+mount and IPC namespaces. (IPC namespaces control non-file-based IPC
+mechanisms within the kernel; Unix and network sockets are not
 affected by this.)  Making separate namespaces for these for QEMU
 won't affect normal operation, but it does mean that even if other
 restrictions fail, the process won't be able to even name system mount
@@ -179,7 +179,7 @@ being killed by the target process:
             kill(-1, 9);
     }
 
-Fortunately there is an assymetry we can take advantage of.  From the
+Fortunately there is an asymmetry we can take advantage of.  From the
 POSIX spec:
 
 > For a process to have permission to send a signal to a process
@@ -220,7 +220,7 @@ RLIMIT_NPROC limits total number of processes or threads.  QEMU uses
 threads for some devices, so this would require some thought.
 
 Other things that would take some cleverness / changes to QEMU to
-utilize due to ordering constrants:
+utilize due to ordering constraints:
  - RLIMIT_NOFILES (after all necessary files are opened)
 
 ## libxl: Treat QMP connection as untrusted
@@ -251,7 +251,7 @@ executing QEMU.  (But this would then require other changes to create
 the QMP socket, VNC socket, and so on).
 
 It should be noted that `-sandbox` is implemented as a blacklist, not
-a whitelist; that is, it disables known-unsed functionality which may
+a whitelist; that is, it disables known-unused functionality which may
 be harmful, rather than disabling all functionality except that known
 to be safe and needed.  This is unfortunately necessary since qemu
 doesn't know what system calls libraries might end up making.  (See

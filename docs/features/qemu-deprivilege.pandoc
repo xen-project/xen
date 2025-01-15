@@ -25,7 +25,7 @@ dm_restrict is a set of operations to restrict QEMU running in domain
 
  1. Mechanisms to restrict QEMU to only being able to affect its own
 domain
- 2. Mechanisms to restruct QEMU's ability to interact with domain 0.
+ 2. Mechanisms to restrict QEMU's ability to interact with domain 0.
 
 # User details
 

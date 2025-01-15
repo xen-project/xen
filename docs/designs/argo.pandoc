@@ -58,7 +58,7 @@ concurrency.
 
 Avoidance of deadlock is essential and since state must frequently be updated
 that pertains to more than one domain, a locking protocol defines which locks
-are needed and the order of their acquistion.
+are needed and the order of their acquisition.
 
 ## Structure
 
@@ -127,7 +127,7 @@ by the domain.
 
 ## Hierarchical Locking Model and Protocol
 
-The locking discipline within the Argo code is heirarchical and utilizes
+The locking discipline within the Argo code is hierarchical and utilizes
 reader/writer locks to enable increased concurrency when operations do not
 conflict. None of the Argo locks are reentrant.
 
@@ -283,7 +283,7 @@ state for a domain's own registered ring.
 
 ## Reasoning Model
 
-A common model for reasoning about concurrent code focusses on accesses to
+A common model for reasoning about concurrent code focuses on accesses to
 individual variables: if code touches this variable, see that it first acquires
 the corresponding lock and then drops it afterwards. A challenge with this
 model is in ensuring that the sequence of locks acquired within nested
