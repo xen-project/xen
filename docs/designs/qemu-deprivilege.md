@@ -3,7 +3,7 @@
 The goal of deprilvileging qemu is this: Even if there is a bug (for
 example in qemu) which permits a domain to gain control of the device
 model, the compromised device model process is prevented from
-violating the system's overall security properties.  Ie, a guest
+violating the system's overall security properties.  I.e., a guest
 cannot "escape" from the virtualisation by using a qemu bug.
 
 This document lists the various technical measures which we either

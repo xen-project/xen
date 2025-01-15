@@ -4,7 +4,7 @@
 
 =head1 DESCRIPTION
 
-The F<xl.conf> file allows configuration of hostwide C<xl> toolstack
+The F<xl.conf> file allows configuration of host-wide C<xl> toolstack
 options.
 
 For details of per-domain configuration options please see

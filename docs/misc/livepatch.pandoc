@@ -2,7 +2,7 @@
 
 ## Rationale
 
-A mechanism is required to binarily patch the running hypervisor with new
+A mechanism is required to binary patch the running hypervisor with new
 opcodes that have come about due to primarily security updates.
 
 This document describes the design of the API that would allow us to

@@ -112,7 +112,7 @@ because the guest can sample its own domid from the frontend area and use
 it in hypercalls (e.g. HVMOP_set_param) rather than DOMID_SELF, the guest
 domid must also be preserved to maintain the ABI.
 
-Furthermore, it will necessary to modify backend drivers to re-establish
+Furthermore, it will be necessary to modify backend drivers to re-establish
 communication with frontend drivers without perturbing the content of the
 backend area or requiring any changes to the values of the xenstore state
 nodes.
@@ -259,7 +259,7 @@ Essentially this should skip the check to see if PV drivers and migrate as
 if there are none present, but also enabling the extra save records. Note
 that at least some of the extra records should only form part of a
 non-cooperative migration stream. For example, migrating event channel
-state would be counter productive in a normal migration as this will
+state would be counter-productive in a normal migration as this will
 essentially leak event channel objects at the receiving end. Others, such
 as grant table state, could potentially harmlessly form part of a normal
 migration stream.

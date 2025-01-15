@@ -109,7 +109,7 @@ abstracting away the details of how it is currently running.
 Creating Hypercall Pages
 ------------------------
 
-Guests which are started using the PV boot protocol may set set
+Guests which are started using the PV boot protocol may set
 ``XEN_ELFNOTE_HYPERCALL_PAGE`` to have the nominated page written as a
 hypercall page during construction.  This mechanism is common for PV guests,
 and allows hypercalls to be issued with no additional setup.
