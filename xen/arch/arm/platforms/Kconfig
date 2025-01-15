@@ -29,6 +29,15 @@ config RCAR3
 	help
 	Enable all the required drivers for Renesas RCar3
 
+config RCAR4
+	bool "Renesas RCar4 support"
+	depends on ARM_64
+	select HAS_SCIF
+	select HAS_ITS
+	select IPMMU_VMSA
+	help
+	Enable all the required drivers for Renesas RCar4
+
 config MPSOC
 	bool "Xilinx Ultrascale+ MPSoC support"
 	depends on ARM_64
@@ -63,4 +72,3 @@ config ALL32_PLAT
 config MPSOC_PLATFORM
 	bool
 	default (ALL64_PLAT || MPSOC)
-
