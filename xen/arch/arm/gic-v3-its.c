@@ -42,6 +42,7 @@ struct its_device {
     struct rb_node rbnode;
     struct host_its *hw_its;
     void *itt_addr;
+    unsigned int itt_order;
     paddr_t guest_doorbell;             /* Identifies the virtual ITS */
     uint32_t host_devid;
     uint32_t guest_devid;
@@ -49,6 +50,104 @@ struct its_device {
     uint32_t *host_lpi_blocks;          /* Which LPIs are used on the host */
     struct pending_irq *pend_irqs;      /* One struct per event */
 };
+
+/*
+ * It is unlikely that a platform implements ITSes with different quirks,
+ * so assume they all share the same.
+ */
+struct its_quirk {
+    const char *desc;
+    bool (*init)(struct host_its *hw_its);
+    uint32_t iidr;
+    uint32_t mask;
+};
+
+static uint32_t __ro_after_init its_quirk_flags;
+
+static bool gicv3_its_enable_quirk_gen4(struct host_its *hw_its)
+{
+    its_quirk_flags |= HOST_ITS_WORKAROUND_NC_NS |
+        HOST_ITS_WORKAROUND_32BIT_ADDR;
+
+    return true;
+}
+
+static const struct its_quirk its_quirks[] = {
+    {
+        .desc	= "R-Car Gen4",
+        .iidr	= 0x0201743b,
+        .mask	= 0xffffffff,
+        .init	= gicv3_its_enable_quirk_gen4,
+    },
+    {
+        /* Sentinel. */
+    }
+};
+
+static struct its_quirk* gicv3_its_find_quirk(uint32_t iidr)
+{
+    const struct its_quirk *quirks = its_quirks;
+
+    for ( ; quirks->desc; quirks++ )
+    {
+        if ( quirks->iidr == (quirks->mask & iidr) )
+            return (struct its_quirk *)quirks;
+    }
+
+    return NULL;
+}
+
+static void gicv3_its_enable_quirks(struct host_its *hw_its)
+{
+    uint32_t iidr = readl_relaxed(hw_its->its_base + GITS_IIDR);
+    const struct its_quirk *quirk = gicv3_its_find_quirk(iidr);
+
+    if ( quirk && quirk->init(hw_its) )
+        printk("GICv3: enabling workaround for ITS: %s\n", quirk->desc);
+}
+
+static void gicv3_its_validate_quirks(void)
+{
+    const struct its_quirk *quirk = NULL, *prev = NULL;
+    const struct host_its *hw_its;
+
+    if ( list_empty(&host_its_list) )
+        return;
+
+    hw_its = list_first_entry(&host_its_list, struct host_its, entry);
+    prev = gicv3_its_find_quirk(readl_relaxed(hw_its->its_base + GITS_IIDR));
+
+    list_for_each_entry(hw_its, &host_its_list, entry)
+    {
+        quirk = gicv3_its_find_quirk(readl_relaxed(hw_its->its_base + GITS_IIDR));
+        BUG_ON(quirk != prev);
+        prev = quirk;
+    }
+}
+
+uint64_t gicv3_its_get_cacheability(void)
+{
+    if ( its_quirk_flags & HOST_ITS_WORKAROUND_NC_NS )
+        return GIC_BASER_CACHE_nC;
+
+    return GIC_BASER_CACHE_RaWaWb;
+}
+
+uint64_t gicv3_its_get_shareability(void)
+{
+    if ( its_quirk_flags & HOST_ITS_WORKAROUND_NC_NS )
+        return GIC_BASER_NonShareable;
+
+    return GIC_BASER_InnerShareable;
+}
+
+unsigned int gicv3_its_get_memflags(void)
+{
+    if ( its_quirk_flags & HOST_ITS_WORKAROUND_32BIT_ADDR )
+        return MEMF_bits(32);
+
+    return 0;
+}
 
 bool gicv3_its_host_has_its(void)
 {
@@ -289,19 +388,23 @@ static void *its_map_cbaser(struct host_its *its)
 {
     void __iomem *cbasereg = its->its_base + GITS_CBASER;
     uint64_t reg;
+    unsigned int order;
     void *buffer;
 
-    reg  = GIC_BASER_InnerShareable << GITS_BASER_SHAREABILITY_SHIFT;
+    reg  = gicv3_its_get_shareability() << GITS_BASER_SHAREABILITY_SHIFT;
     reg |= GIC_BASER_CACHE_SameAsInner << GITS_BASER_OUTER_CACHEABILITY_SHIFT;
-    reg |= GIC_BASER_CACHE_RaWaWb << GITS_BASER_INNER_CACHEABILITY_SHIFT;
+    reg |= gicv3_its_get_cacheability() << GITS_BASER_INNER_CACHEABILITY_SHIFT;
 
-    buffer = _xzalloc(ITS_CMD_QUEUE_SZ, SZ_64K);
+    order = get_order_from_bytes(max(ITS_CMD_QUEUE_SZ, SZ_64K));
+    buffer = alloc_xenheap_pages(order, gicv3_its_get_memflags());
     if ( !buffer )
         return NULL;
 
+    memset(buffer, 0, PAGE_SIZE << order);
+
     if ( virt_to_maddr(buffer) & ~GENMASK(51, 12) )
     {
-        xfree(buffer);
+        free_xenheap_pages(buffer, order);
         return NULL;
     }
 
@@ -340,11 +443,12 @@ static int its_map_baser(void __iomem *basereg, uint64_t regc,
     unsigned int entry_size = GITS_BASER_ENTRY_SIZE(regc);
     unsigned int pagesz = 2;    /* try 64K pages first, then go down. */
     unsigned int table_size;
+    unsigned int order;
     void *buffer;
 
-    attr  = GIC_BASER_InnerShareable << GITS_BASER_SHAREABILITY_SHIFT;
+    attr  = gicv3_its_get_shareability() << GITS_BASER_SHAREABILITY_SHIFT;
     attr |= GIC_BASER_CACHE_SameAsInner << GITS_BASER_OUTER_CACHEABILITY_SHIFT;
-    attr |= GIC_BASER_CACHE_RaWaWb << GITS_BASER_INNER_CACHEABILITY_SHIFT;
+    attr |= gicv3_its_get_cacheability() << GITS_BASER_INNER_CACHEABILITY_SHIFT;
 
     /*
      * Setup the BASE register with the attributes that we like. Then read
@@ -357,13 +461,16 @@ retry:
     /* The BASE registers support at most 256 pages. */
     table_size = min(table_size, 256U << BASER_PAGE_BITS(pagesz));
 
-    buffer = _xzalloc(table_size, BIT(BASER_PAGE_BITS(pagesz), UL));
+    order = get_order_from_bytes(max(table_size, BIT(BASER_PAGE_BITS(pagesz), U)));
+    buffer = alloc_xenheap_pages(order, gicv3_its_get_memflags());
     if ( !buffer )
         return -ENOMEM;
 
+    memset(buffer, 0, PAGE_SIZE << order);
+
     if ( !check_baser_phys_addr(buffer, BASER_PAGE_BITS(pagesz)) )
     {
-        xfree(buffer);
+        free_xenheap_pages(buffer, order);
         return -ERANGE;
     }
 
@@ -396,7 +503,7 @@ retry:
     if ( ((regc >> GITS_BASER_PAGE_SIZE_SHIFT) & 0x3UL) == pagesz )
         return 0;
 
-    xfree(buffer);
+    free_xenheap_pages(buffer, order);
 
     if ( pagesz-- > 0 )
         goto retry;
@@ -452,6 +559,8 @@ static int gicv3_its_init_single_its(struct host_its *hw_its)
     ret = gicv3_disable_its(hw_its);
     if ( ret )
         return ret;
+
+    gicv3_its_enable_quirks(hw_its);
 
     reg = readq_relaxed(hw_its->its_base + GITS_TYPER);
     hw_its->devid_bits = GITS_TYPER_DEVICE_ID_BITS(reg);
@@ -530,7 +639,7 @@ static int remove_mapped_guest_device(struct its_device *dev)
         printk(XENLOG_WARNING "Can't unmap host ITS device 0x%x\n",
                dev->host_devid);
 
-    xfree(dev->itt_addr);
+    free_xenheap_pages(dev->itt_addr, dev->itt_order);
     xfree(dev->pend_irqs);
     xfree(dev->host_lpi_blocks);
     xfree(dev);
@@ -619,6 +728,7 @@ int gicv3_its_map_guest_device(struct domain *d,
     struct its_device *dev = NULL;
     struct rb_node **new = &d->arch.vgic.its_devices.rb_node, *parent = NULL;
     int i, ret = -ENOENT;      /* "i" must be signed to check for >= 0 below. */
+    unsigned int order;
 
     hw_its = gicv3_its_find_by_doorbell(host_doorbell);
     if ( !hw_its )
@@ -681,9 +791,12 @@ int gicv3_its_map_guest_device(struct domain *d,
     ret = -ENOMEM;
 
     /* An Interrupt Translation Table needs to be 256-byte aligned. */
-    itt_addr = _xzalloc(nr_events * hw_its->itte_size, 256);
+    order = get_order_from_bytes(max(nr_events * hw_its->itte_size, 256UL));
+    itt_addr = alloc_xenheap_pages(order, gicv3_its_get_memflags());
     if ( !itt_addr )
         goto out_unlock;
+
+    memset(itt_addr, 0, PAGE_SIZE << order);
 
     clean_and_invalidate_dcache_va_range(itt_addr,
                                          nr_events * hw_its->itte_size);
@@ -718,6 +831,7 @@ int gicv3_its_map_guest_device(struct domain *d,
         goto out_unlock;
 
     dev->itt_addr = itt_addr;
+    dev->itt_order = order;
     dev->hw_its = hw_its;
     dev->guest_doorbell = guest_doorbell;
     dev->guest_devid = guest_devid;
@@ -775,7 +889,8 @@ out:
         xfree(dev->pend_irqs);
         xfree(dev->host_lpi_blocks);
     }
-    xfree(itt_addr);
+    if ( itt_addr )
+        free_xenheap_pages(itt_addr, order);
     xfree(dev);
 
     return ret;
@@ -1088,6 +1203,8 @@ int gicv3_its_init(void)
         if ( ret )
             return ret;
     }
+
+    gicv3_its_validate_quirks();
 
     return 0;
 }

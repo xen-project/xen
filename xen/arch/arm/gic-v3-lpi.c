@@ -227,6 +227,7 @@ void gicv3_lpi_update_host_entry(uint32_t host_lpi, int domain_id,
 static int gicv3_lpi_allocate_pendtable(unsigned int cpu)
 {
     void *pendtable;
+    unsigned int order;
 
     if ( per_cpu(lpi_redist, cpu).pending_table )
         return -EBUSY;
@@ -237,14 +238,16 @@ static int gicv3_lpi_allocate_pendtable(unsigned int cpu)
      * The GICv3 imposes a 64KB alignment requirement, also requires
      * physically contiguous memory.
      */
-    pendtable = _xzalloc(lpi_data.max_host_lpi_ids / 8, SZ_64K);
+    order = get_order_from_bytes(max(lpi_data.max_host_lpi_ids / 8, (unsigned long)SZ_64K));
+    pendtable = alloc_xenheap_pages(order, gicv3_its_get_memflags());
     if ( !pendtable )
         return -ENOMEM;
 
+    memset(pendtable, 0, PAGE_SIZE << order);
     /* Make sure the physical address can be encoded in the register. */
     if ( virt_to_maddr(pendtable) & ~GENMASK(51, 16) )
     {
-        xfree(pendtable);
+        free_xenheap_pages(pendtable, order);
         return -ERANGE;
     }
     clean_and_invalidate_dcache_va_range(pendtable,
@@ -272,9 +275,9 @@ static int gicv3_lpi_set_pendtable(void __iomem *rdist_base)
 
     ASSERT(!(virt_to_maddr(pendtable) & ~GENMASK(51, 16)));
 
-    val  = GIC_BASER_CACHE_RaWaWb << GICR_PENDBASER_INNER_CACHEABILITY_SHIFT;
+    val  = gicv3_its_get_cacheability() << GICR_PENDBASER_INNER_CACHEABILITY_SHIFT;
     val |= GIC_BASER_CACHE_SameAsInner << GICR_PENDBASER_OUTER_CACHEABILITY_SHIFT;
-    val |= GIC_BASER_InnerShareable << GICR_PENDBASER_SHAREABILITY_SHIFT;
+    val |= gicv3_its_get_shareability() << GICR_PENDBASER_SHAREABILITY_SHIFT;
     val |= GICR_PENDBASER_PTZ;
     val |= virt_to_maddr(pendtable);
 
@@ -300,10 +303,11 @@ static int gicv3_lpi_set_pendtable(void __iomem *rdist_base)
 static int gicv3_lpi_set_proptable(void __iomem * rdist_base)
 {
     uint64_t reg;
+    unsigned int order;
 
-    reg  = GIC_BASER_CACHE_RaWaWb << GICR_PROPBASER_INNER_CACHEABILITY_SHIFT;
+    reg  = gicv3_its_get_cacheability() << GICR_PROPBASER_INNER_CACHEABILITY_SHIFT;
     reg |= GIC_BASER_CACHE_SameAsInner << GICR_PROPBASER_OUTER_CACHEABILITY_SHIFT;
-    reg |= GIC_BASER_InnerShareable << GICR_PROPBASER_SHAREABILITY_SHIFT;
+    reg |= gicv3_its_get_shareability() << GICR_PROPBASER_SHAREABILITY_SHIFT;
 
     /*
      * The property table is shared across all redistributors, so allocate
@@ -312,7 +316,10 @@ static int gicv3_lpi_set_proptable(void __iomem * rdist_base)
     if ( !lpi_data.lpi_property )
     {
         /* The property table holds one byte per LPI. */
-        void *table = _xmalloc(lpi_data.max_host_lpi_ids, SZ_4K);
+        void *table;
+
+        order = get_order_from_bytes(max(lpi_data.max_host_lpi_ids, (unsigned long)SZ_4K));
+        table = alloc_xenheap_pages(order, gicv3_its_get_memflags());
 
         if ( !table )
             return -ENOMEM;
@@ -320,7 +327,7 @@ static int gicv3_lpi_set_proptable(void __iomem * rdist_base)
         /* Make sure the physical address can be encoded in the register. */
         if ( (virt_to_maddr(table) & ~GENMASK(51, 12)) )
         {
-            xfree(table);
+            free_xenheap_pages(table, order);
             return -ERANGE;
         }
         memset(table, GIC_PRI_IRQ | LPI_PROP_RES1, MAX_NR_HOST_LPIS);

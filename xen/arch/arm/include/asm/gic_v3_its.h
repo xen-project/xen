@@ -110,6 +110,9 @@
 #define HOST_ITS_FLUSH_CMD_QUEUE        (1U << 0)
 #define HOST_ITS_USES_PTA               (1U << 1)
 
+#define HOST_ITS_WORKAROUND_NC_NS       (1U << 0)
+#define HOST_ITS_WORKAROUND_32BIT_ADDR  (1U << 1)
+
 /* We allocate LPIs on the hosts in chunks of 32 to reduce handling overhead. */
 #define LPI_BLOCK                       32U
 
@@ -196,6 +199,11 @@ struct pending_irq *gicv3_assign_guest_event(struct domain *d,
                                              uint32_t virt_lpi);
 void gicv3_lpi_update_host_entry(uint32_t host_lpi, int domain_id,
                                  uint32_t virt_lpi);
+
+/* ITS quirks handling. */
+uint64_t gicv3_its_get_cacheability(void);
+uint64_t gicv3_its_get_shareability(void);
+unsigned int gicv3_its_get_memflags(void);
 
 #else
 
