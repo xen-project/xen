@@ -54,11 +54,6 @@ typedef uint64_t xen_pfn_t;
 
 typedef uint64_t xen_ulong_t;
 #define PRI_xen_ulong PRIx64
-#endif
-
-#ifndef __ASSEMBLY__
-
-typedef uint64_t xen_ulong_t;
 
 /*
  * User-accessible registers: most of these need to be saved/restored
@@ -107,6 +102,6 @@ struct xen_arch_domainconfig {
 
 typedef struct xen_pmu_arch { uint8_t dummy; } xen_pmu_arch_t;
 
-#endif
+#endif /* !__ASSEMBLY__ */
 
 #endif /* __XEN_PUBLIC_ARCH_PPC_H__ */
