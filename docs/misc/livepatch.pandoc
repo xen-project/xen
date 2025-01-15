@@ -25,7 +25,7 @@ The document is split in four sections:
  * reloc - telemetries contained in the payload to construct proper trampoline.
  * hook - an auxiliary function being called before, during or after payload
           application or revert.
- * quiescing zone - period when all CPUs are lock-step with each other.
+ * quiescent zone - period when all CPUs are lock-step with each other.
 
 ## History
 
@@ -267,7 +267,7 @@ It may also have some architecture-specific sections. For example:
  * Relocations for each of these sections.
 
 The Xen Live Patch core code loads the payload as a standard ELF binary, relocates it
-and handles the architecture-specifc sections as needed. This process is much
+and handles the architecture-specific sections as needed. This process is much
 like what the Linux kernel module loader does.
 
 The payload contains at least three sections:
@@ -372,7 +372,7 @@ and the core code copies the data from the undo buffer (private internal copy)
 to `old_addr`.
 
 It optionally may contain the address of hooks to be called right before
-being applied and after being reverted (while all CPUs are still in quiescing
+being applied and after being reverted (while all CPUs are still in quiescent
 zone). These hooks do not have access to payload structure.
 
  * `.livepatch.hooks.load` - an array of function pointers.
@@ -380,7 +380,7 @@ zone). These hooks do not have access to payload structure.
 
 It optionally may also contain the address of pre- and post- vetoing hooks to
 be called before (pre) or after (post) apply and revert payload actions (while
-all CPUs are already released from quiescing zone). These hooks do have
+all CPUs are already released from quiescent zone). These hooks do have
 access to payload structure. The pre-apply hook can prevent from loading the
 payload if encoded in it condition is not met. Accordingly, the pre-revert
 hook can prevent from unloading the livepatch if encoded in it condition is not
@@ -392,7 +392,7 @@ met.
 
 Finally, it optionally may also contain the address of apply or revert action
 hooks to be called instead of the default apply and revert payload actions
-(while all CPUs are kept in quiescing zone). These hooks do have access to
+(while all CPUs are kept in quiescent zone). These hooks do have access to
 payload structure.
 
  * `.livepatch.hooks.{apply,revert}`
@@ -463,7 +463,7 @@ The type definition of the function are as follow:
 
 This section contains a pointer to a single function pointer to be executed
 before apply action is scheduled (and thereby before CPUs are put into
-quiescing zone). This is useful to prevent from applying a payload when
+quiescent zone). This is useful to prevent from applying a payload when
 certain expected conditions aren't met or when mutating actions implemented
 in the hook fail or cannot be executed.
 This type of hooks do have access to payload structure.
@@ -477,7 +477,7 @@ The type definition of the function are as follow:
 #### .livepatch.hooks.postapply
 
 This section contains a pointer to a single function pointer to be executed
-after apply action has finished and after all CPUs left the quiescing zone.
+after apply action has finished and after all CPUs left the quiescent zone.
 This is useful to provide an ability to follow up on actions performed by
 the preapply hook. Especially, when module application was successful or to
 be able to undo certain preparation steps of the preapply hook in case of a
@@ -495,7 +495,7 @@ The type definition of the function are as follow:
 
 This section contains a pointer to a single function pointer to be executed
 before revert action is scheduled (and thereby before CPUs are put into
-quiescing zone). This is useful to prevent from reverting a payload when
+quiescent zone). This is useful to prevent from reverting a payload when
 certain expected conditions aren't met or when mutating actions implemented
 in the hook fail or cannot be executed.
 This type of hooks do have access to payload structure.
@@ -509,7 +509,7 @@ The type definition of the function are as follow:
 #### .livepatch.hooks.postrevert
 
 This section contains a pointer to a single function pointer to be executed
-after revert action has finished and after all CPUs left the quiescing zone.
+after revert action has finished and after all CPUs left the quiescent zone.
 This is useful to provide an ability to perform cleanup of all previously
 executed mutating actions in order to restore the original system state from
 before the current payload application. The success/failure error code is
@@ -527,7 +527,7 @@ The type definition of the function are as follow:
 This section contains a pointer to a single function pointer to be executed
 instead of a default apply (or revert) action function. This is useful to
 replace or augment default behavior of the apply (or revert) action that
-requires all CPUs to be in the quiescing zone.
+requires all CPUs to be in the quiescent zone.
 This type of hooks do have access to payload structure.
 
 Each entry in this array is eight bytes.
@@ -539,13 +539,13 @@ The type definition of the function are as follow:
 ### .livepatch.xen_depends, .livepatch.depends and .note.gnu.build-id
 
 To support dependencies checking and safe loading (to load the
-appropiate payload against the right hypervisor) there is a need
-to embbed an build-id dependency.
+appropriate payload against the right hypervisor) there is a need
+to embed a build-id dependency.
 
 This is done by the payload containing sections `.livepatch.xen_depends`
 and `.livepatch.depends` which follow the format of an ELF Note.
 The contents of these (name, and description) are specific to the linker
-utilized to build the hypevisor and payload.
+utilized to build the hypervisor and payload.
 
 If GNU linker is used then the name is `GNU` and the description
 is a NT_GNU_BUILD_ID type ID. The description can be an SHA1
@@ -639,7 +639,7 @@ The `name` could be an UUID that stays fixed forever for a given
 payload. It can be embedded into the ELF payload at creation time
 and extracted by tools.
 
-The return value is zero if the payload was succesfully uploaded.
+The return value is zero if the payload was successfully uploaded.
 Otherwise an -XEN_EXX return value is provided. Duplicate `name` are not supported.
 
 The `payload` is the ELF payload as mentioned in the `Payload format` section.
@@ -819,7 +819,7 @@ The caller provides:
  * `cmd` The command requested:
   * *LIVEPATCH_ACTION_UNLOAD* (1) Unload the payload.
    Any further hypercalls against the `name` will result in failure unless
-   **XEN_SYSCTL_LIVEPATCH_UPLOAD** hypercall is perfomed with same `name`.
+   **XEN_SYSCTL_LIVEPATCH_UPLOAD** hypercall is performed with same `name`.
   * *LIVEPATCH_ACTION_REVERT* (2) Revert the payload. If the operation takes
   more time than the upper bound of time the `rc` in `xen_livepatch_status`
   retrieved via **XEN_SYSCTL_LIVEPATCH_GET** will be -XEN_EBUSY.
@@ -969,7 +969,7 @@ Before we call VMXResume we check whether any soft IRQs need to be executed.
 This is a good spot because all Xen stacks are effectively empty at
 that point.
 
-To randezvous all the CPUs an barrier with an maximum timeout (which
+To rendezvous all the CPUs an barrier with an maximum timeout (which
 could be adjusted), combined with forcing all other CPUs through the
 hypervisor with IPIs, can be utilized to execute lockstep instructions
 on all CPUs.
@@ -990,7 +990,7 @@ be done to the linker scripts to support this.
 
 The design of that is not discussed in this design.
 
-This is implemented in a seperate tool which lives in a seperate
+This is implemented in a separate tool which lives in a separate
 GIT repo.
 
 Currently it resides at https://xenbits.xen.org/git-http/livepatch-build-tools.git
@@ -1066,17 +1066,17 @@ There are the ways this can be addressed:
    grows to accumulate all the code changes.
  * Hotpatch stack - where an mechanism exists that loads the hotpatches
    in the same order they were built in. We would need an build-id
-   of the hypevisor to make sure the hot-patches are build against the
+   of the hypervisor to make sure the hot-patches are build against the
    correct build.
  * Payload containing the old code to check against that. That allows
-   the hotpatches to be loaded indepedently (if they don't overlap) - or
-   if the old code also containst previously patched code - even if they
+   the hotpatches to be loaded independently (if they don't overlap) - or
+   if the old code also contains previously patched code - even if they
    overlap.
 
 The disadvantage of the first large patch is that it can grow over
 time and not provide an bisection mechanism to identify faulty patches.
 
-The hot-patch stack puts stricts requirements on the order of the patches
+The hot-patch stack puts strict requirements on the order of the patches
 being loaded and requires an hypervisor build-id to match against.
 
 The old code allows much more flexibility and an additional guard,
@@ -1263,7 +1263,7 @@ limit that calls the next trampoline.
 
 Please note there is a small limitation for trampolines in
 function entries: The target function (+ trailing padding) must be able
-to accomodate the trampoline. On x86 with +-2 GB relative jumps,
+to accommodate the trampoline. On x86 with +-2 GB relative jumps,
 this means 5 bytes are required which means that `old_size` **MUST** be
 at least five bytes if patching in trampoline.
 

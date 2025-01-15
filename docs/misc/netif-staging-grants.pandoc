@@ -9,7 +9,7 @@ Architecture(s): Any
 
 # Background and Motivation
 
-At the Xen hackaton '16 networking session, we spoke about having a permanently
+At the Xen hackathon '16 networking session, we spoke about having a permanently
 mapped region to describe header/linear region of packet buffers. This document
 outlines the proposal covering motivation of this and applicability for other
 use-cases alongside the necessary changes.
@@ -174,8 +174,8 @@ boundary
 
 17) Allocate packet metadata
 
-[ *Linux specific*: This structure emcompasses a linear data region which
-generally accomodates the protocol header and such. Netback allocates up to 128
+[ *Linux specific*: This structure encompasses a linear data region which
+generally accommodates the protocol header and such. Netback allocates up to 128
 bytes for that. ]
 
 18) *Linux specific*: Setup up a `GNTTABOP_copy` to copy up to 128 bytes to this small
@@ -317,7 +317,7 @@ In essence the steps for receiving of a packet in a Linux frontend is as
  process the actual like the steps below. This thread has the purpose of
  aggregating as much copies as possible.]
 
-2) Checks if there are enough rx ring slots that can accomodate the packet.
+2) Checks if there are enough rx ring slots that can accommodate the packet.
 
 3) Gets a request from the ring for the first data slot and fetches the `gref`
    from it.
@@ -375,7 +375,7 @@ In essence the steps for receiving of a packet in a Linux frontend is as
 
 24) Call packet into the network stack.
 
-25) Allocate new pages and any necessary packet metadata strutures to new
+25) Allocate new pages and any necessary packet metadata structures to new
     requests. These requests will then be used in step 1) and so forth.
 
 26) Update the request producer index (`req_prod`)
@@ -391,7 +391,7 @@ In essence the steps for receiving of a packet in a Linux frontend is as
 
 This proposal aims at replacing step 4), 12) and  22) with memcpy if the
 grefs on the Rx ring were requested to be mapped by the guest. Frontend may use
-strategies to allow fast recycling of grants for replinishing the ring,
+strategies to allow fast recycling of grants for replenishing the ring,
 hence letting Domain-0 replace the grant copies with  memcpy instead, which is
 faster.
 
@@ -400,8 +400,8 @@ would need to aggregate as much as grant ops as possible (step 1) and could
 transmit the packet on the transmit function (e.g. Linux ```ndo_start_xmit```)
 as previously proposed
 here\[[0](http://lists.xenproject.org/archives/html/xen-devel/2015-05/msg01504.html)\].
-This would heavily improve efficiency specifially for smaller packets. Which in
-return would decrease RTT, having data being acknoledged much quicker.
+This would heavily improve efficiency specifically for smaller packets. Which in
+return would decrease RTT, having data being acknowledged much quicker.
 
 \clearpage
 
@@ -467,13 +467,13 @@ The entry 'status' field determines if the entry was successfully removed.
 Control ring is only available after backend state is `XenbusConnected`
 therefore only on this state change can the frontend query the total amount of
 maps it can keep. It then grants N entries per queue on both TX and RX ring
-which will create the underying backend gref -> page association (e.g.  stored
+which will create the underlying backend gref -> page association (e.g.  stored
 in hash table). Frontend may wish to recycle these pregranted buffers or choose
 a copy approach to replace granting.
 
 On steps 19) of Guest Transmit and 3) of Guest Receive, data gref is first
 looked up in this table and uses the underlying page if it already exists a
-mapping. On the successfull cases, steps 20) 21) and 27) of Guest Transmit are
+mapping. On the successful cases, steps 20) 21) and 27) of Guest Transmit are
 skipped, with 19) being replaced with a memcpy of up to 128 bytes. On Guest
 Receive, 4) 12) and 22) are replaced with memcpy instead of a grant copy.
 

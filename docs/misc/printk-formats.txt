@@ -11,7 +11,7 @@ Raw buffer as hex string:
        %*phN   000102 ... 3f
 
        Up to 64 characters.  Buffer length expected via the field_width
-       paramter. i.e. printk("%*ph", 8, buffer);
+       parameter. i.e. printk("%*ph", 8, buffer);
 
 Bitmaps (e.g. cpumask/nodemask):
 
