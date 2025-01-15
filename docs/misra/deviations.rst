@@ -353,6 +353,15 @@ Deviations related to MISRA C:2012 Rules:
        Fixing this violation would require to increase code complexity and lower readability.
      - Tagged as `safe` for ECLAIR.
 
+   * - R11.8
+     - Violations caused by function __hvm_copy occur when a const void
+       argument is passed, as the const qualifier is stripped. However, in such
+       cases, the function ensures that it does not modify the buffer
+       referenced by the argument, therefore, this use is deemed safe. Fixing
+       this violation would require to increase code complexity and lower
+       readability.
+     - Tagged as `safe` for ECLAIR.
+
    * - R11.9
      - __ACCESS_ONCE uses an integer, which happens to be zero, as a
        compile time check. The typecheck uses a cast. The usage of zero or other
