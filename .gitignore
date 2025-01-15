@@ -50,19 +50,6 @@ config/Toplevel.mk
 config/Paths.mk
 
 dist/*
-docs/tmp.*
-docs/html/
-docs/man/xl.cfg.5.pod
-docs/man/xl-disk-configuration.5.pod
-docs/man/xl-network-configuration.5.pod
-docs/man/xl.1.pod
-docs/man/xl.conf.5.pod
-docs/man1/
-docs/man5/
-docs/man7/
-docs/man8/
-docs/pdf/
-docs/txt/
 extras/
 install/*
 
@@ -302,7 +289,3 @@ tools/debugger/kdd/kdd
 tools/firmware/etherboot/ipxe.tar.gz
 tools/firmware/etherboot/ipxe/
 tools/xl/xl
-
-docs/txt/misc/*.txt
-docs/txt/man/*.txt
-docs/figs/*.png
