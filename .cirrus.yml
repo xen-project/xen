@@ -1,33 +1,69 @@
 # https://cirrus-ci.org/guide/tips-and-tricks/#sharing-configuration-between-tasks
-freebsd_template: &FREEBSD_TEMPLATE
+freebsd_13: &FREEBSD_13
+  freebsd_instance:
+    image_family: freebsd-13-4
+freebsd_14: &FREEBSD_14
+  freebsd_instance:
+    image_family: freebsd-14-2
+freebsd_15: &FREEBSD_15
+  freebsd_instance:
+    image_family: freebsd-15-0-snap
+
+freebsd_template: &FREEBSD_ENV
   environment:
     APPEND_LIB: /usr/local/lib
     APPEND_INCLUDES: /usr/local/include
 
+freebsd_full_build_template: &FREEBSD_FULL_BUILD_TEMPLATE
+  << : *FREEBSD_ENV
+
   install_script: pkg install -y seabios gmake ninja bash
-                                 pkgconf python bison perl5
+                                 pkgconf bison perl5
                                  yajl lzo2 pixman argp-standalone
-                                 libxml2 glib git
+                                 libxml2 glib git python3
 
   build_script:
     - cc --version
     - ./configure --with-system-seabios=/usr/local/share/seabios/bios.bin
     - gmake -j`sysctl -n hw.ncpu` clang=y
 
-task:
-  name: 'FreeBSD 13'
-  freebsd_instance:
-    image_family: freebsd-13-4
-  << : *FREEBSD_TEMPLATE
+freebsd_randconfig_template: &FREEBSD_RANDCONFIG_TEMPLATE
+  << : *FREEBSD_ENV
+
+  install_script: pkg install -y gmake python3 bison
+
+  build_script:
+    - cc --version
+    - gmake -j`sysctl -n hw.ncpu` -C xen clang=y \
+            KCONFIG_ALLCONFIG=tools/kconfig/allrandom.config randconfig
+    - gmake -j`sysctl -n hw.ncpu` build-xen clang=y
 
 task:
-  name: 'FreeBSD 14'
-  freebsd_instance:
-    image_family: freebsd-14-2
-  << : *FREEBSD_TEMPLATE
+  name: 'FreeBSD 13: full build'
+  << : *FREEBSD_13
+  << : *FREEBSD_FULL_BUILD_TEMPLATE
 
 task:
-  name: 'FreeBSD 15'
-  freebsd_instance:
-    image_family: freebsd-15-0-snap
-  << : *FREEBSD_TEMPLATE
+  name: 'FreeBSD 14: full build'
+  << : *FREEBSD_14
+  << : *FREEBSD_FULL_BUILD_TEMPLATE
+
+task:
+  name: 'FreeBSD 15: full build'
+  << : *FREEBSD_15
+  << : *FREEBSD_FULL_BUILD_TEMPLATE
+
+task:
+  name: 'FreeBSD 13: randconfig'
+  << : *FREEBSD_13
+  << : *FREEBSD_RANDCONFIG_TEMPLATE
+
+task:
+  name: 'FreeBSD 14: randconfig'
+  << : *FREEBSD_14
+  << : *FREEBSD_RANDCONFIG_TEMPLATE
+
+task:
+  name: 'FreeBSD 15: randconfig'
+  << : *FREEBSD_15
+  << : *FREEBSD_RANDCONFIG_TEMPLATE
