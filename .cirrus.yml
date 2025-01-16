@@ -18,7 +18,7 @@ freebsd_template: &FREEBSD_TEMPLATE
 task:
   name: 'FreeBSD 13'
   freebsd_instance:
-    image_family: freebsd-13-3
+    image_family: freebsd-13-4
   << : *FREEBSD_TEMPLATE
 
 task:
