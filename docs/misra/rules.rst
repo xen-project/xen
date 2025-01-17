@@ -671,7 +671,14 @@ maintainers if you want to suggest a change.
        shall be enclosed in parentheses
      - Extra parentheses are not required when macro parameters are used
        as function arguments, as macro arguments, array indices, lhs in
-       assignments or as initializers in initalizer lists.
+       assignments or as initializers in initalizer lists. In addition,
+       the use of a named variable argument in a macro that would constitute
+       a violation of the rule is allowed by ECLAIR as an extension of the
+       MISRA guideline, since it may not always be possible to parenthesize
+       such argument and the feature is non-standard::
+
+         #define M(args...) args
+         #if M(1) + 0 
 
    * - `Rule 20.9 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_20_09.c>`_
      - Required
