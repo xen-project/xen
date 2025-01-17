@@ -45,8 +45,10 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config, FILE *fh)
     /* retrieve the UUID from dominfo, since it is probably generated
      * during parsing and thus does not match the real one
      */
+    libxl_dominfo_init(&info);
     if (libxl_domain_info(ctx, &info, domid) == 0) {
         fprintf(fh, "\t(uuid " LIBXL_UUID_FMT ")\n", LIBXL_UUID_BYTES(info.uuid));
+        libxl_dominfo_dispose(&info);
     } else {
         fprintf(fh, "\t(uuid <unknown>)\n");
     }

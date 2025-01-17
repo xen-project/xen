@@ -286,6 +286,8 @@ int main_vcpupin(int argc, char **argv)
     if (!ignore_masks && hard) {
         libxl_dominfo dominfo;
 
+        libxl_dominfo_init(&dominfo);
+
         if (libxl_domain_info(ctx, &dominfo, domid)) {
             fprintf(stderr, "Could not get domain info\n");
             goto out;
@@ -293,6 +295,8 @@ int main_vcpupin(int argc, char **argv)
 
         /* HVM and PVH domains use the same global affinity mask */
         apply_global_affinity_masks(dominfo.domain_type, hard, 1);
+
+        libxl_dominfo_dispose(&dominfo);
     }
 
     if (force) {
@@ -348,6 +352,7 @@ static int vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
         unsigned int online_vcpus, host_cpu = libxl_get_max_cpus(ctx);
         libxl_dominfo dominfo;
 
+        libxl_dominfo_init(&dominfo);
         if (libxl_domain_info(ctx, &dominfo, domid))
             return 1;
 
