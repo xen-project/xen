@@ -44,12 +44,14 @@ int main_vtpmattach(int argc, char **argv)
         if (MATCH_OPTION("uuid", *argv, oparg)) {
             if(libxl_uuid_from_string(&(vtpm.uuid), oparg)) {
                 fprintf(stderr, "Invalid uuid specified (%s)\n", oparg);
+                libxl_device_vtpm_dispose(&vtpm);
                 return 1;
             }
         } else if (MATCH_OPTION("backend", *argv, oparg)) {
             replace_string(&vtpm.backend_domname, oparg);
         } else {
             fprintf(stderr, "unrecognized argument `%s'\n", *argv);
+            libxl_device_vtpm_dispose(&vtpm);
             return 1;
         }
     }
@@ -65,6 +67,7 @@ int main_vtpmattach(int argc, char **argv)
 
     if (libxl_device_vtpm_add(ctx, domid, &vtpm, 0)) {
         fprintf(stderr, "libxl_device_vtpm_add failed.\n");
+        libxl_device_vtpm_dispose(&vtpm);
         return 1;
     }
     libxl_device_vtpm_dispose(&vtpm);
