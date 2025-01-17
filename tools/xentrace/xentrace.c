@@ -1105,8 +1105,10 @@ static void parse_args(int argc, char **argv)
             break;
 
         case 'c': /* set new cpu mask for filtering (when xch is set). */
+            free(opts.cpu_mask_str);
             opts.cpu_mask_str = strdup(optarg);
             break;
+
         case 'e': /* set new event mask for filtering*/
             parse_evtmask(optarg);
             break;
