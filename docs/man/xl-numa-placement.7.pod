@@ -45,7 +45,7 @@ user, via the proper libxl calls or xl config item, it will be computed
 basing on the vCPUs' scheduling affinity.
 
 Notice that, even if the node affinity of a domain may change on-line,
-it is very important to "place" the domain correctly when it is fist
+it is very important to "place" the domain correctly when it is first
 created, as the most of its memory is allocated at that time and can
 not (for now) be moved easily.
 
@@ -94,7 +94,7 @@ this reason, NUMA aware scheduling has the potential of bringing
 substantial performances benefits, although this will depend on the
 workload.
 
-Notice that, for each vCPU, the following three scenarios are possbile:
+Notice that, for each vCPU, the following three scenarios are possible:
 
 =over
 
@@ -102,7 +102,7 @@ Notice that, for each vCPU, the following three scenarios are possbile:
 
 a vCPU I<is pinned> to some pCPUs and I<does not have> any soft affinity
 In this case, the vCPU is always scheduled on one of the pCPUs to which
-it is pinned, without any specific peference among them.
+it is pinned, without any specific preference among them.
 
 
 =item *

@@ -297,7 +297,7 @@ extra option to launch vtpmmgr-stubdom domain on TPM 2.0, and ignore it on TPM
     |   Primary Seed   |
     +------------------+
 
-Now the secrets for the vTPMs are only being bound to the presence of thephysical
+Now the secrets for the vTPMs are only being bound to the presence of the physical
 TPM 2.0. Since using PCRs to seal the data can be an important security feature
 that users of the vtpmmgr rely on. I will replace TPM2_Bind/TPM2_Unbind with
 TPM2_Seal/TPM2_Unseal to provide as much security as it did for TPM 1.2 in later
