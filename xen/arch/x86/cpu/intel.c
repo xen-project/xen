@@ -535,39 +535,49 @@ static void intel_log_freq(const struct cpuinfo_x86 *c)
     printk("%u MHz\n", (factor * max_ratio + 50) / 100);
 }
 
+static void init_intel_perf(struct cpuinfo_x86 *c)
+{
+    uint64_t val;
+    unsigned int eax, ver, nr_cnt;
+
+    if ( c->cpuid_level <= 9 ||
+         ({  rdmsrl(MSR_IA32_MISC_ENABLE, val);
+             !(val & MSR_IA32_MISC_ENABLE_PERF_AVAIL); }) )
+        return;
+
+    eax = cpuid_eax(10);
+    ver = eax & 0xff;
+    nr_cnt = (eax >> 8) & 0xff;
+
+    if ( ver && nr_cnt > 1 && nr_cnt <= 32 )
+    {
+        unsigned int cnt_mask = (1UL << nr_cnt) - 1;
+
+        /*
+         * On (some?) Sapphire/Emerald Rapids platforms each package-BSP
+         * starts with all the enable bits for the general-purpose PMCs
+         * cleared.  Adjust so counters can be enabled from EVNTSEL.
+         */
+        rdmsrl(MSR_CORE_PERF_GLOBAL_CTRL, val);
+
+        if ( (val & cnt_mask) != cnt_mask )
+        {
+            printk("FIRMWARE BUG: CPU%u invalid PERF_GLOBAL_CTRL: %#"PRIx64" adjusting to %#"PRIx64"\n",
+                   smp_processor_id(), val, val | cnt_mask);
+            wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL, val | cnt_mask);
+        }
+
+        __set_bit(X86_FEATURE_ARCH_PERFMON, c->x86_capability);
+    }
+}
+
 static void cf_check init_intel(struct cpuinfo_x86 *c)
 {
 	/* Detect the extended topology information if available */
 	detect_extended_topology(c);
 
 	init_intel_cacheinfo(c);
-	if (c->cpuid_level > 9) {
-		unsigned eax = cpuid_eax(10);
-		unsigned int cnt = (eax >> 8) & 0xff;
-
-		/* Check for version and the number of counters */
-		if ((eax & 0xff) && (cnt > 1) && (cnt <= 32)) {
-			uint64_t global_ctrl;
-			unsigned int cnt_mask = (1UL << cnt) - 1;
-
-			/*
-			 * On (some?) Sapphire/Emerald Rapids platforms each
-			 * package-BSP starts with all the enable bits for the
-			 * general-purpose PMCs cleared.  Adjust so counters
-			 * can be enabled from EVNTSEL.
-			 */
-			rdmsrl(MSR_CORE_PERF_GLOBAL_CTRL, global_ctrl);
-			if ((global_ctrl & cnt_mask) != cnt_mask) {
-				printk("CPU%u: invalid PERF_GLOBAL_CTRL: %#"
-				       PRIx64 " adjusting to %#" PRIx64 "\n",
-				       smp_processor_id(), global_ctrl,
-				       global_ctrl | cnt_mask);
-				wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL,
-				       global_ctrl | cnt_mask);
-			}
-			__set_bit(X86_FEATURE_ARCH_PERFMON, c->x86_capability);
-		}
-	}
+	init_intel_perf(c);
 
 	if ( !cpu_has(c, X86_FEATURE_XTOPOLOGY) )
 	{
