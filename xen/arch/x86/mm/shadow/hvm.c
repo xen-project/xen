@@ -287,11 +287,29 @@ hvm_emulate_cmpxchg(enum x86_segment seg,
     return rc;
 }
 
+static int cf_check
+hvm_emulate_read_segment(enum x86_segment seg,
+                         struct segment_register *reg,
+                         struct x86_emulate_ctxt *ctxt)
+{
+    struct sh_emulate_ctxt *sh_ctxt =
+        container_of(ctxt, struct sh_emulate_ctxt, ctxt);
+    const struct segment_register *sreg = hvm_get_seg_reg(seg, sh_ctxt);
+
+    if ( IS_ERR(sreg) )
+        return -PTR_ERR(sreg);
+
+    *reg = *sreg;
+
+    return X86EMUL_OKAY;
+}
+
 static const struct x86_emulate_ops hvm_shadow_emulator_ops = {
     .read       = hvm_emulate_read,
     .insn_fetch = hvm_emulate_insn_fetch,
     .write      = hvm_emulate_write,
     .cmpxchg    = hvm_emulate_cmpxchg,
+    .read_segment = hvm_emulate_read_segment,
 };
 
 const struct x86_emulate_ops *shadow_init_emulation(

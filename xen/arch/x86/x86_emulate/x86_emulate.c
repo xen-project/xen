@@ -447,14 +447,37 @@ static void put_fpu(
         if ( state->ea.type == OP_MEM )
         {
             aux.dp = state->ea.mem.off;
-            if ( ops->read_segment &&
-                 ops->read_segment(state->ea.mem.seg, &sreg,
-                                   ctxt) == X86EMUL_OKAY )
+            if ( state->ea.mem.seg == x86_seg_cs )
+                aux.ds = aux.cs;
+            else if ( ops->read_segment &&
+                      ops->read_segment(state->ea.mem.seg, &sreg,
+                                        ctxt) == X86EMUL_OKAY )
                 aux.ds = sreg.sel;
+#ifdef __XEN__
+            /*
+             * While generally the expectation is that input structures are
+             * fully populated, the selector fields under ctxt->regs normally
+             * aren't set, with the exception of CS and SS for PV domains.
+             * Read the real selector registers for PV, and assert that HVM
+             * invocations always set a properly functioning ->read_segment()
+             * hook.
+             */
+            else if ( is_pv_vcpu(current) )
+                switch ( state->ea.mem.seg )
+                {
+                case x86_seg_ds: aux.ds = read_sreg(ds);  break;
+                case x86_seg_es: aux.ds = read_sreg(es);  break;
+                case x86_seg_fs: aux.ds = read_sreg(fs);  break;
+                case x86_seg_gs: aux.ds = read_sreg(gs);  break;
+                case x86_seg_ss: aux.ds = ctxt->regs->ss; break;
+                default:         ASSERT_UNREACHABLE();    break;
+                }
+            else
+                ASSERT_UNREACHABLE();
+#else
             else
                 switch ( state->ea.mem.seg )
                 {
-                case x86_seg_cs: aux.ds = ctxt->regs->cs; break;
                 case x86_seg_ds: aux.ds = ctxt->regs->ds; break;
                 case x86_seg_es: aux.ds = ctxt->regs->es; break;
                 case x86_seg_fs: aux.ds = ctxt->regs->fs; break;
@@ -462,6 +485,7 @@ static void put_fpu(
                 case x86_seg_ss: aux.ds = ctxt->regs->ss; break;
                 default:         ASSERT_UNREACHABLE();    break;
                 }
+#endif
             aux.dval = true;
         }
         ops->put_fpu(ctxt, X86EMUL_FPU_none, &aux);
