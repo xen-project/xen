@@ -253,6 +253,8 @@ class domain2
     get_cpu_policy
 # XEN_DOMCTL_vuart_op
     vuart_op
+# XEN_DOMCTL_dt_overlay
+    dt_overlay
 }
 
 # Similar to class domain, but primarily contains domctls related to HVM domains
