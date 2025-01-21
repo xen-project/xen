@@ -83,6 +83,7 @@ static bool __initdata opt_unpriv_mmio;
 static bool __ro_after_init opt_verw_mmio;
 static int8_t __initdata opt_gds_mit = -1;
 static int8_t __initdata opt_div_scrub = -1;
+bool __ro_after_init opt_bp_spec_reduce = true;
 
 static int __init cf_check parse_spec_ctrl(const char *s)
 {
@@ -143,6 +144,7 @@ static int __init cf_check parse_spec_ctrl(const char *s)
             opt_unpriv_mmio = false;
             opt_gds_mit = 0;
             opt_div_scrub = 0;
+            opt_bp_spec_reduce = false;
         }
         else if ( val > 0 )
             rc = -EINVAL;
@@ -363,6 +365,8 @@ static int __init cf_check parse_spec_ctrl(const char *s)
             opt_gds_mit = val;
         else if ( (val = parse_boolean("div-scrub", s, ss)) >= 0 )
             opt_div_scrub = val;
+        else if ( (val = parse_boolean("bp-spec-reduce", s, ss)) >= 0 )
+            opt_bp_spec_reduce = val;
         else
             rc = -EINVAL;
 
@@ -505,7 +509,7 @@ static void __init print_details(enum ind_thunk thunk)
      * Hardware read-only information, stating immunity to certain issues, or
      * suggestions of which mitigation to use.
      */
-    printk("  Hardware hints:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
+    printk("  Hardware hints:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
            (caps & ARCH_CAPS_RDCL_NO)                        ? " RDCL_NO"        : "",
            (caps & ARCH_CAPS_EIBRS)                          ? " EIBRS"          : "",
            (caps & ARCH_CAPS_RSBA)                           ? " RSBA"           : "",
@@ -529,10 +533,11 @@ static void __init print_details(enum ind_thunk thunk)
            (e8b  & cpufeat_mask(X86_FEATURE_BTC_NO))         ? " BTC_NO"         : "",
            (e8b  & cpufeat_mask(X86_FEATURE_IBPB_RET))       ? " IBPB_RET"       : "",
            (e21a & cpufeat_mask(X86_FEATURE_IBPB_BRTYPE))    ? " IBPB_BRTYPE"    : "",
-           (e21a & cpufeat_mask(X86_FEATURE_SRSO_NO))        ? " SRSO_NO"        : "");
+           (e21a & cpufeat_mask(X86_FEATURE_SRSO_NO))        ? " SRSO_NO"        : "",
+           (e21a & cpufeat_mask(X86_FEATURE_SRSO_US_NO))     ? " SRSO_US_NO"     : "");
 
     /* Hardware features which need driving to mitigate issues. */
-    printk("  Hardware features:%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
+    printk("  Hardware features:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
            (e8b  & cpufeat_mask(X86_FEATURE_IBPB)) ||
            (_7d0 & cpufeat_mask(X86_FEATURE_IBRSB))          ? " IBPB"           : "",
            (e8b  & cpufeat_mask(X86_FEATURE_IBRS)) ||
@@ -551,7 +556,8 @@ static void __init print_details(enum ind_thunk thunk)
            (caps & ARCH_CAPS_FB_CLEAR_CTRL)                  ? " FB_CLEAR_CTRL"  : "",
            (caps & ARCH_CAPS_GDS_CTRL)                       ? " GDS_CTRL"       : "",
            (caps & ARCH_CAPS_RFDS_CLEAR)                     ? " RFDS_CLEAR"     : "",
-           (e21a & cpufeat_mask(X86_FEATURE_SBPB))           ? " SBPB"           : "");
+           (e21a & cpufeat_mask(X86_FEATURE_SBPB))           ? " SBPB"           : "",
+           (e21a & cpufeat_mask(X86_FEATURE_SRSO_MSR_FIX))   ? " SRSO_MSR_FIX"   : "");
 
     /* Compiled-in support which pertains to mitigations. */
     if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) || IS_ENABLED(CONFIG_SHADOW_PAGING) ||
@@ -1120,7 +1126,7 @@ static void __init div_calculations(bool hw_smt_enabled)
 
 static void __init ibpb_calculations(void)
 {
-    bool def_ibpb_entry = false;
+    bool def_ibpb_entry_pv = false, def_ibpb_entry_hvm = false;
 
     /* Check we have hardware IBPB support before using it... */
     if ( !boot_cpu_has(X86_FEATURE_IBRSB) && !boot_cpu_has(X86_FEATURE_IBPB) )
@@ -1145,22 +1151,43 @@ static void __init ibpb_calculations(void)
          * Confusion.  Mitigate with IBPB-on-entry.
          */
         if ( !boot_cpu_has(X86_FEATURE_BTC_NO) )
-            def_ibpb_entry = true;
+            def_ibpb_entry_pv = def_ibpb_entry_hvm = true;
 
         /*
-         * Further to BTC, Zen3/4 CPUs suffer from Speculative Return Stack
-         * Overflow in most configurations.  Mitigate with IBPB-on-entry if we
-         * have the microcode that makes this an effective option.
+         * In addition to BTC, Zen3 and later CPUs suffer from Speculative
+         * Return Stack Overflow in most configurations.  If we have microcode
+         * that makes IBPB-on-entry an effective mitigation, see about using
+         * it.
          */
         if ( !boot_cpu_has(X86_FEATURE_SRSO_NO) &&
              boot_cpu_has(X86_FEATURE_IBPB_BRTYPE) )
-            def_ibpb_entry = true;
+        {
+            /*
+             * SRSO_U/S_NO is a subset of SRSO_NO, identifying that SRSO isn't
+             * possible across the User (CPL3) / Supervisor (CPL<3) boundary.
+             *
+             * Ignoring PV32 (not security supported for speculative issues),
+             * this means we only need to use IBPB-on-entry for PV guests on
+             * hardware which doesn't enumerate SRSO_US_NO.
+             */
+            if ( !boot_cpu_has(X86_FEATURE_SRSO_US_NO) )
+                def_ibpb_entry_pv = true;
+
+            /*
+             * SRSO_MSR_FIX enumerates that we can use MSR_BP_CFG.SPEC_REDUCE
+             * to mitigate SRSO across the host/guest boundary.  We only need
+             * to use IBPB-on-entry for HVM guests if we haven't enabled this
+             * control.
+             */
+            if ( !boot_cpu_has(X86_FEATURE_SRSO_MSR_FIX) || !opt_bp_spec_reduce )
+                def_ibpb_entry_hvm = true;
+        }
     }
 
     if ( opt_ibpb_entry_pv == -1 )
-        opt_ibpb_entry_pv = IS_ENABLED(CONFIG_PV) && def_ibpb_entry;
+        opt_ibpb_entry_pv = IS_ENABLED(CONFIG_PV) && def_ibpb_entry_pv;
     if ( opt_ibpb_entry_hvm == -1 )
-        opt_ibpb_entry_hvm = IS_ENABLED(CONFIG_HVM) && def_ibpb_entry;
+        opt_ibpb_entry_hvm = IS_ENABLED(CONFIG_HVM) && def_ibpb_entry_hvm;
 
     if ( opt_ibpb_entry_pv )
     {
