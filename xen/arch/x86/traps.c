@@ -114,7 +114,7 @@ DEFINE_PER_CPU_PAGE_ALIGNED(struct tss_page, tss_page);
 static int debug_stack_lines = 20;
 integer_param("debug_stack_lines", debug_stack_lines);
 
-static bool __ro_after_init opt_ler;
+static bool __initdata opt_ler;
 boolean_param("ler", opt_ler);
 
 /* LastExceptionFromIP on this hardware.  Zero if LER is not in use. */
@@ -2093,55 +2093,9 @@ static void __init set_intr_gate(unsigned int n, void *addr)
     __set_intr_gate(n, 0, addr);
 }
 
-static unsigned int noinline __init calc_ler_msr(void)
-{
-    switch ( boot_cpu_data.x86_vendor )
-    {
-    case X86_VENDOR_INTEL:
-        switch ( boot_cpu_data.x86 )
-        {
-        case 6:
-            return MSR_IA32_LASTINTFROMIP;
-
-        case 15:
-            return MSR_P4_LER_FROM_LIP;
-        }
-        break;
-
-    case X86_VENDOR_AMD:
-        switch ( boot_cpu_data.x86 )
-        {
-        case 6:
-        case 0xf ... 0x19:
-            return MSR_IA32_LASTINTFROMIP;
-        }
-        break;
-
-    case X86_VENDOR_HYGON:
-        return MSR_IA32_LASTINTFROMIP;
-    }
-
-    return 0;
-}
-
 void percpu_traps_init(void)
 {
     subarch_percpu_traps_init();
-
-    if ( !opt_ler )
-        return;
-
-    if ( !ler_msr )
-    {
-        ler_msr = calc_ler_msr();
-        if ( !ler_msr )
-        {
-            opt_ler = false;
-            return;
-        }
-
-        setup_force_cpu_cap(X86_FEATURE_XEN_LBR);
-    }
 
     if ( cpu_has_xen_lbr )
         wrmsrl(MSR_IA32_DEBUGCTLMSR, IA32_DEBUGCTLMSR_LBR);
@@ -2202,6 +2156,42 @@ void __init init_idt_traps(void)
         this_cpu(compat_gdt) = boot_compat_gdt;
 }
 
+static void __init init_ler(void)
+{
+    unsigned int msr = 0;
+
+    if ( !opt_ler )
+        return;
+
+    /*
+     * Intel Pentium 4 is the only known CPU to not use the architectural MSR
+     * indicies.
+     */
+    switch ( boot_cpu_data.x86_vendor )
+    {
+    case X86_VENDOR_INTEL:
+        if ( boot_cpu_data.x86 == 0xf )
+        {
+            msr = MSR_P4_LER_FROM_LIP;
+            break;
+        }
+        fallthrough;
+    case X86_VENDOR_AMD:
+    case X86_VENDOR_HYGON:
+        msr = MSR_IA32_LASTINTFROMIP;
+        break;
+    }
+
+    if ( msr == 0 )
+    {
+        printk(XENLOG_WARNING "LER disabled: failed to identify MSRs\n");
+        return;
+    }
+
+    ler_msr = msr;
+    setup_force_cpu_cap(X86_FEATURE_XEN_LBR);
+}
+
 extern void (*const autogen_entrypoints[X86_NR_VECTORS])(void);
 void __init trap_init(void)
 {
@@ -2226,6 +2216,8 @@ void __init trap_init(void)
             ASSERT(idt_table[vector].b != 0);
         }
     }
+
+    init_ler();
 
     /* Cache {,compat_}gdt_l1e now that physically relocation is done. */
     this_cpu(gdt_l1e) =
