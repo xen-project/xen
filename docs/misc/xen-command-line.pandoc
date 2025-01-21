@@ -2392,7 +2392,7 @@ By default SSBD will be mitigated at runtime (i.e `ssbd=runtime`).
 >              {ibrs,ibpb,ssbd,psfd,
 >              eager-fpu,l1d-flush,branch-harden,srb-lock,
 >              unpriv-mmio,gds-mit,div-scrub,lock-harden,
->              bhi-dis-s}=<bool> ]`
+>              bhi-dis-s,bp-spec-reduce}=<bool> ]`
 
 Controls for speculative execution sidechannel mitigations.  By default, Xen
 will pick the most appropriate mitigations based on compiled in support,
@@ -2540,6 +2540,13 @@ If Xen is compiled with `CONFIG_SPECULATIVE_HARDEN_LOCK`, the `lock-harden=`
 boolean can be used to force or prevent Xen from using speculation barriers to
 protect lock critical regions.  This mitigation won't be engaged by default,
 and needs to be explicitly enabled on the command line.
+
+On hardware supporting SRSO_MSR_FIX, the `bp-spec-reduce=` option can be used
+to force or prevent Xen from using MSR_BP_CFG.BP_SPEC_REDUCE to mitigate the
+SRSO (Speculative Return Stack Overflow) vulnerability.  Xen will use
+bp-spec-reduce when available, as it is preferable to using `ibpb-entry=hvm`
+to mitigate SRSO for HVM guests, and because it is a prerequisite to advertise
+SRSO_U/S_NO to PV guests.
 
 ### sync_console
 > `= <boolean>`
