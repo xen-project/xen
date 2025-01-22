@@ -962,11 +962,17 @@ static void vprintk_common(const char *prefix, const char *fmt, va_list args)
     local_irq_restore(flags);
 }
 
+void vprintk(const char *fmt, va_list args)
+{
+    vprintk_common("(XEN) ", fmt, args);
+}
+
 void printk(const char *fmt, ...)
 {
     va_list args;
+
     va_start(args, fmt);
-    vprintk_common("(XEN) ", fmt, args);
+    vprintk(fmt, args);
     va_end(args);
 }
 
@@ -1268,23 +1274,22 @@ void panic(const char *fmt, ...)
     va_list args;
     unsigned long flags;
     static DEFINE_SPINLOCK(lock);
-    static char buf[128];
 
     spin_debug_disable();
     spinlock_profile_printall('\0');
     debugtrace_dump();
 
-    /* Protects buf[] and ensure multi-line message prints atomically. */
+    /* Ensure multi-line message prints atomically. */
     spin_lock_irqsave(&lock, flags);
-
-    va_start(args, fmt);
-    (void)vsnprintf(buf, sizeof(buf), fmt, args);
-    va_end(args);
 
     console_start_sync();
     printk("\n****************************************\n");
     printk("Panic on CPU %d:\n", smp_processor_id());
-    printk("%s", buf);
+
+    va_start(args, fmt);
+    vprintk(fmt, args);
+    va_end(args);
+
     printk("****************************************\n\n");
     if ( opt_noreboot )
         printk("Manual reset required ('noreboot' specified)\n");
