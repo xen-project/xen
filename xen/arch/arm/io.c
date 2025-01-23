@@ -7,6 +7,7 @@
  * Copyright (c) 2011 Citrix Systems.
  */
 
+#include <xen/bsearch.h>
 #include <xen/ioreq.h>
 #include <xen/lib.h>
 #include <xen/spinlock.h>

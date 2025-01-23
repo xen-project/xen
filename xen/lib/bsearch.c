@@ -10,4 +10,4 @@
  */
 
 #define BSEARCH_IMPLEMENTATION
-#include <xen/lib.h>
+#include <xen/bsearch.h>

@@ -13,6 +13,7 @@
  */
 
 #include <xen/bitops.h>
+#include <xen/bsearch.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <asm/new_vgic.h>
