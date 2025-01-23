@@ -909,7 +909,7 @@ static void printk_start_of_line(const char *prefix)
     __putstr(tstr);
 }
 
-static void vprintk_common(const char *prefix, const char *fmt, va_list args)
+static void vprintk_common(const char *fmt, va_list args, const char *prefix)
 {
     struct vps {
         bool continued, do_print;
@@ -963,7 +963,7 @@ static void vprintk_common(const char *prefix, const char *fmt, va_list args)
 
 void vprintk(const char *fmt, va_list args)
 {
-    vprintk_common("(XEN) ", fmt, args);
+    vprintk_common(fmt, args, "(XEN) ");
 }
 
 void printk(const char *fmt, ...)
@@ -983,7 +983,7 @@ void guest_printk(const struct domain *d, const char *fmt, ...)
     snprintf(prefix, sizeof(prefix), "(d%d) ", d->domain_id);
 
     va_start(args, fmt);
-    vprintk_common(prefix, fmt, args);
+    vprintk_common(fmt, args, prefix);
     va_end(args);
 }
 
