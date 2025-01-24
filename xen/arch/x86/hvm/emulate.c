@@ -31,8 +31,9 @@
  * device-model transactions.
  */
 struct hvm_mmio_cache {
-    unsigned long gla;
-    unsigned int size;     /* Amount of buffer[] actually used. */
+    unsigned long gla;     /* Start of original access (e.g. insn operand). */
+    unsigned int skip;     /* Offset to start of MMIO */
+    unsigned int size;     /* Amount of buffer[] actually used, incl @skip. */
     unsigned int space:31; /* Allocated size of buffer[]. */
     unsigned int dir:1;
     uint8_t buffer[] __aligned(sizeof(long));
@@ -953,6 +954,13 @@ static int hvmemul_phys_mmio_access(
         return X86EMUL_UNHANDLEABLE;
     }
 
+    /* Accesses must not be to the unused leading space. */
+    if ( offset < cache->skip )
+    {
+        ASSERT_UNREACHABLE();
+        return X86EMUL_UNHANDLEABLE;
+    }
+
     /*
      * hvmemul_do_io() cannot handle non-power-of-2 accesses or
      * accesses larger than sizeof(long), so choose the highest power
@@ -1010,13 +1018,15 @@ static int hvmemul_phys_mmio_access(
 
 /*
  * Multi-cycle MMIO handling is based upon the assumption that emulation
- * of the same instruction will not access the same MMIO region more
- * than once. Hence we can deal with re-emulation (for secondary or
- * subsequent cycles) by looking up the result or previous I/O in a
- * cache indexed by linear MMIO address.
+ * of the same instruction will not access the exact same MMIO region
+ * more than once in exactly the same way (if it does, the accesses will
+ * be "folded"). Hence we can deal with re-emulation (for secondary or
+ * subsequent cycles) by looking up the result of previous I/O in a cache
+ * indexed by linear address and access type.
  */
 static struct hvm_mmio_cache *hvmemul_find_mmio_cache(
-    struct hvm_vcpu_io *hvio, unsigned long gla, uint8_t dir, bool create)
+    struct hvm_vcpu_io *hvio, unsigned long gla, uint8_t dir,
+    unsigned int skip)
 {
     unsigned int i;
     struct hvm_mmio_cache *cache;
@@ -1030,7 +1040,11 @@ static struct hvm_mmio_cache *hvmemul_find_mmio_cache(
             return cache;
     }
 
-    if ( !create )
+    /*
+     * Bail if a new entry shouldn't be allocated, relying on ->space having
+     * the same value for all entries.
+     */
+    if ( skip >= hvio->mmio_cache[0]->space )
         return NULL;
 
     i = hvio->mmio_cache_count;
@@ -1043,7 +1057,8 @@ static struct hvm_mmio_cache *hvmemul_find_mmio_cache(
     memset(cache->buffer, 0, cache->space);
 
     cache->gla = gla;
-    cache->size = 0;
+    cache->skip = skip;
+    cache->size = skip;
     cache->dir = dir;
 
     return cache;
@@ -1064,12 +1079,14 @@ static void latch_linear_to_phys(struct hvm_vcpu_io *hvio, unsigned long gla,
 
 static int hvmemul_linear_mmio_access(
     unsigned long gla, unsigned int size, uint8_t dir, void *buffer,
-    uint32_t pfec, struct hvm_emulate_ctxt *hvmemul_ctxt, bool known_gpfn)
+    uint32_t pfec, struct hvm_emulate_ctxt *hvmemul_ctxt,
+    unsigned long start_gla, bool known_gpfn)
 {
     struct hvm_vcpu_io *hvio = &current->arch.hvm.hvm_io;
     unsigned long offset = gla & ~PAGE_MASK;
-    struct hvm_mmio_cache *cache = hvmemul_find_mmio_cache(hvio, gla, dir, true);
-    unsigned int chunk, buffer_offset = 0;
+    unsigned int chunk, buffer_offset = gla - start_gla;
+    struct hvm_mmio_cache *cache = hvmemul_find_mmio_cache(hvio, start_gla,
+                                                           dir, buffer_offset);
     paddr_t gpa;
     unsigned long one_rep = 1;
     int rc;
@@ -1117,19 +1134,19 @@ static int hvmemul_linear_mmio_access(
 static inline int hvmemul_linear_mmio_read(
     unsigned long gla, unsigned int size, void *buffer,
     uint32_t pfec, struct hvm_emulate_ctxt *hvmemul_ctxt,
-    bool translate)
+    unsigned long start_gla, bool translate)
 {
-    return hvmemul_linear_mmio_access(gla, size, IOREQ_READ, buffer,
-                                      pfec, hvmemul_ctxt, translate);
+    return hvmemul_linear_mmio_access(gla, size, IOREQ_READ, buffer, pfec,
+                                      hvmemul_ctxt, start_gla, translate);
 }
 
 static inline int hvmemul_linear_mmio_write(
     unsigned long gla, unsigned int size, void *buffer,
     uint32_t pfec, struct hvm_emulate_ctxt *hvmemul_ctxt,
-    bool translate)
+    unsigned long start_gla, bool translate)
 {
-    return hvmemul_linear_mmio_access(gla, size, IOREQ_WRITE, buffer,
-                                      pfec, hvmemul_ctxt, translate);
+    return hvmemul_linear_mmio_access(gla, size, IOREQ_WRITE, buffer, pfec,
+                                      hvmemul_ctxt, start_gla, translate);
 }
 
 static bool known_gla(unsigned long addr, unsigned int bytes, uint32_t pfec)
@@ -1158,7 +1175,10 @@ static int linear_read(unsigned long addr, unsigned int bytes, void *p_data,
 {
     pagefault_info_t pfinfo;
     struct hvm_vcpu_io *hvio = &current->arch.hvm.hvm_io;
+    void *buffer = p_data;
+    unsigned long start = addr;
     unsigned int offset = addr & ~PAGE_MASK;
+    const struct hvm_mmio_cache *cache;
     int rc;
 
     if ( offset + bytes > PAGE_SIZE )
@@ -1182,8 +1202,17 @@ static int linear_read(unsigned long addr, unsigned int bytes, void *p_data,
      * an access that was previously handled as MMIO. Thus it is imperative that
      * we handle this access in the same way to guarantee completion and hence
      * clean up any interim state.
+     *
+     * Care must be taken, however, to correctly deal with crossing RAM/MMIO or
+     * MMIO/RAM boundaries. While we want to use a single cache entry (tagged
+     * by the starting linear address), we need to continue issuing (i.e. also
+     * upon replay) the RAM access for anything that's ahead of or past MMIO,
+     * i.e. in RAM.
      */
-    if ( !hvmemul_find_mmio_cache(hvio, addr, IOREQ_READ, false) )
+    cache = hvmemul_find_mmio_cache(hvio, start, IOREQ_READ, ~0);
+    if ( !cache ||
+         addr + bytes <= start + cache->skip ||
+         addr >= start + cache->size )
         rc = hvm_copy_from_guest_linear(p_data, addr, bytes, pfec, &pfinfo);
 
     switch ( rc )
@@ -1199,8 +1228,8 @@ static int linear_read(unsigned long addr, unsigned int bytes, void *p_data,
         if ( pfec & PFEC_insn_fetch )
             return X86EMUL_UNHANDLEABLE;
 
-        return hvmemul_linear_mmio_read(addr, bytes, p_data, pfec,
-                                        hvmemul_ctxt,
+        return hvmemul_linear_mmio_read(addr, bytes, buffer, pfec,
+                                        hvmemul_ctxt, start,
                                         known_gla(addr, bytes, pfec));
 
     case HVMTRANS_gfn_paged_out:
@@ -1217,7 +1246,10 @@ static int linear_write(unsigned long addr, unsigned int bytes, void *p_data,
 {
     pagefault_info_t pfinfo;
     struct hvm_vcpu_io *hvio = &current->arch.hvm.hvm_io;
+    void *buffer = p_data;
+    unsigned long start = addr;
     unsigned int offset = addr & ~PAGE_MASK;
+    const struct hvm_mmio_cache *cache;
     int rc;
 
     if ( offset + bytes > PAGE_SIZE )
@@ -1236,13 +1268,11 @@ static int linear_write(unsigned long addr, unsigned int bytes, void *p_data,
 
     rc = HVMTRANS_bad_gfn_to_mfn;
 
-    /*
-     * If there is an MMIO cache entry for the access then we must be re-issuing
-     * an access that was previously handled as MMIO. Thus it is imperative that
-     * we handle this access in the same way to guarantee completion and hence
-     * clean up any interim state.
-     */
-    if ( !hvmemul_find_mmio_cache(hvio, addr, IOREQ_WRITE, false) )
+    /* See commentary in linear_read(). */
+    cache = hvmemul_find_mmio_cache(hvio, start, IOREQ_WRITE, ~0);
+    if ( !cache ||
+         addr + bytes <= start + cache->skip ||
+         addr >= start + cache->size )
         rc = hvm_copy_to_guest_linear(addr, p_data, bytes, pfec, &pfinfo);
 
     switch ( rc )
@@ -1255,8 +1285,8 @@ static int linear_write(unsigned long addr, unsigned int bytes, void *p_data,
         return X86EMUL_EXCEPTION;
 
     case HVMTRANS_bad_gfn_to_mfn:
-        return hvmemul_linear_mmio_write(addr, bytes, p_data, pfec,
-                                         hvmemul_ctxt,
+        return hvmemul_linear_mmio_write(addr, bytes, buffer, pfec,
+                                         hvmemul_ctxt, start,
                                          known_gla(addr, bytes, pfec));
 
     case HVMTRANS_gfn_paged_out:
@@ -1643,7 +1673,7 @@ static int cf_check hvmemul_cmpxchg(
     {
         /* Fix this in case the guest is really relying on r-m-w atomicity. */
         return hvmemul_linear_mmio_write(addr, bytes, p_new, pfec,
-                                         hvmemul_ctxt,
+                                         hvmemul_ctxt, addr,
                                          hvio->mmio_access.write_access &&
                                          hvio->mmio_gla == (addr & PAGE_MASK));
     }
