@@ -15,6 +15,7 @@
 #include <xen/err.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
+#include <xen/xvmalloc.h>
 #include <asm/hvm/hvm.h>
 #include <asm/x86_emulate.h>
 
@@ -119,7 +120,11 @@ int hvmemul_do_pio_buffer(uint16_t port,
 int __must_check hvmemul_cache_init(struct vcpu *v);
 static inline void hvmemul_cache_destroy(struct vcpu *v)
 {
-    XFREE(v->arch.hvm.hvm_io.cache);
+    unsigned int i;
+
+    for ( i = 0; i < ARRAY_SIZE(v->arch.hvm.hvm_io.mmio_cache); ++i )
+        XFREE(v->arch.hvm.hvm_io.mmio_cache[i]);
+    XVFREE(v->arch.hvm.hvm_io.cache);
 }
 bool hvmemul_read_cache(const struct vcpu *v, paddr_t gpa,
                         void *buffer, unsigned int size);
