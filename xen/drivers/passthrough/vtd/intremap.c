@@ -150,6 +150,19 @@ bool __init cf_check intel_iommu_supports_eim(void)
     if ( !iommu_qinval || !iommu_intremap || list_empty(&acpi_drhd_units) )
         return false;
 
+    if ( unlikely(!cpu_has_cx16) )
+    {
+        printk(XENLOG_ERR VTDPREFIX "no CMPXCHG16B support, disabling IOMMU\n");
+        /*
+         * Disable IOMMU support at once: there's no reason to check for CX16
+         * yet again when attempting to initialize IOMMU DMA remapping
+         * functionality or interrupt remapping without x2APIC support.
+         */
+        iommu_enable = false;
+        iommu_intremap = iommu_intremap_off;
+        return false;
+    }
+
     /* We MUST have a DRHD unit for each IOAPIC. */
     for ( apic = 0; apic < nr_ioapics; apic++ )
         if ( !ioapic_to_drhd(IO_APIC_ID(apic)) )
