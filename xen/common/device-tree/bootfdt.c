@@ -27,8 +27,8 @@ static void __init __maybe_unused build_assertions(void)
      */
     BUILD_BUG_ON((offsetof(struct membanks, bank) !=
                  offsetof(struct meminfo, bank)));
-    /* Ensure "struct membanks" is 8-byte aligned */
-    BUILD_BUG_ON(alignof(struct membanks) != 8);
+    /* Ensure "struct membanks" and "struct membank" are equally aligned */
+    BUILD_BUG_ON(alignof(struct membanks) != alignof(struct membank));
 }
 
 static bool __init device_tree_node_is_available(const void *fdt, int node)
