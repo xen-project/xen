@@ -345,6 +345,11 @@ void __stop_this_cpu(void)
 
 static void cf_check stop_this_cpu(void *dummy)
 {
+    const bool *stop_aps = dummy;
+
+    while ( !*stop_aps )
+        cpu_relax();
+
     __stop_this_cpu();
     for ( ; ; )
         halt();
@@ -357,16 +362,25 @@ static void cf_check stop_this_cpu(void *dummy)
 void smp_send_stop(void)
 {
     unsigned int cpu = smp_processor_id();
+    bool stop_aps = false;
+
+    /*
+     * Perform AP offlining and disabling of interrupt controllers with all
+     * CPUs on the system having interrupts disabled to prevent interrupt
+     * delivery errors.  On AMD systems "Receive accept error" will be
+     * broadcast to local APICs if interrupts target CPUs that are offline.
+     */
+    if ( num_online_cpus() > 1 )
+        smp_call_function(stop_this_cpu, &stop_aps, 0);
+
+    local_irq_disable();
 
     if ( num_online_cpus() > 1 )
     {
         int timeout = 10;
 
-        local_irq_disable();
-        fixup_irqs(cpumask_of(cpu), 0);
-        local_irq_enable();
-
-        smp_call_function(stop_this_cpu, NULL, 0);
+        /* Signal APs to stop. */
+        stop_aps = true;
 
         /* Wait 10ms for all other CPUs to go offline. */
         while ( (num_online_cpus() > 1) && (timeout-- > 0) )
@@ -375,13 +389,12 @@ void smp_send_stop(void)
 
     if ( cpu_online(cpu) )
     {
-        local_irq_disable();
         disable_IO_APIC();
         hpet_disable();
         __stop_this_cpu();
         x2apic_enabled = (current_local_apic_mode() == APIC_MODE_X2APIC);
-        local_irq_enable();
     }
+    local_irq_enable();
 }
 
 void smp_send_nmi_allbutself(void)
