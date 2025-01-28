@@ -2590,17 +2590,21 @@ static int __init cf_check setup_dump_irqs(void)
 }
 __initcall(setup_dump_irqs);
 
-/* Evacuate interrupts assigned to CPUs not present in the input CPU mask. */
-void fixup_irqs(const cpumask_t *mask, bool verbose)
+/* Evacuate interrupts assigned to CPUs not present in the CPU online map. */
+void fixup_irqs(void)
 {
+    const unsigned int cpu = smp_processor_id();
     unsigned int irq;
     static int warned;
     struct irq_desc *desc;
 
+    /* Only to be called from the context of a CPU going offline. */
+    ASSERT(!cpu_online(cpu));
+
     for ( irq = 0; irq < nr_irqs; irq++ )
     {
         bool break_affinity = false, set_affinity = true, check_irr = false;
-        unsigned int vector, cpu = smp_processor_id();
+        unsigned int vector;
         cpumask_t *affinity = this_cpu(scratch_cpumask);
 
         if ( irq == 2 )
@@ -2644,12 +2648,6 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
         }
 
         if ( desc->arch.move_in_progress &&
-             /*
-              * Only attempt to adjust the mask if the current CPU is going
-              * offline, otherwise the whole system is going down and leaving
-              * stale data in the masks is fine.
-              */
-             !cpu_online(cpu) &&
              cpumask_test_cpu(cpu, desc->arch.old_cpu_mask) )
         {
             /*
@@ -2691,16 +2689,17 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
 
         /*
          * Avoid shuffling the interrupt around as long as current target CPUs
-         * are a subset of the input mask.  What fixup_irqs() cares about is
-         * evacuating interrupts from CPUs not in the input mask.
+         * are a subset of the online mask.  What fixup_irqs() cares about is
+         * evacuating interrupts from CPUs not in the online mask.
          */
-        if ( !desc->action || cpumask_subset(desc->arch.cpu_mask, mask) )
+        if ( !desc->action || cpumask_subset(desc->arch.cpu_mask,
+                                             &cpu_online_map) )
         {
             spin_unlock(&desc->lock);
             continue;
         }
 
-        if ( !cpumask_intersects(mask, desc->affinity) )
+        if ( !cpumask_intersects(&cpu_online_map, desc->affinity) )
         {
             break_affinity = true;
             cpumask_setall(affinity);
@@ -2716,7 +2715,7 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
          * the interrupt, signal to check whether there are any pending vectors
          * to be handled in the local APIC after the interrupt has been moved.
          */
-        if ( !cpu_online(cpu) && cpumask_test_cpu(cpu, desc->arch.cpu_mask) )
+        if ( cpumask_test_cpu(cpu, desc->arch.cpu_mask) )
             check_irr = true;
 
         if ( desc->handler->set_affinity )
@@ -2742,9 +2741,6 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
                           desc->arch.vector);
 
         spin_unlock(&desc->lock);
-
-        if ( !verbose )
-            continue;
 
         if ( !set_affinity )
             printk("Cannot set affinity for IRQ%u\n", irq);
