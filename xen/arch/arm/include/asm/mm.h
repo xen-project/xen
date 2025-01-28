@@ -263,7 +263,7 @@ static inline void __iomem *ioremap_wc(paddr_t start, size_t len)
 
 #define virt_to_maddr(va) ({                                        \
     vaddr_t va_ = (vaddr_t)(va);                                    \
-    (va_to_par(va_) & PADDR_MASK & PAGE_MASK) | (va_ & ~PAGE_MASK); \
+    (paddr_t)((va_to_par(va_) & PADDR_MASK & PAGE_MASK) | (va_ & ~PAGE_MASK)); \
 })
 
 #ifdef CONFIG_ARM_32
