@@ -25,6 +25,9 @@ if [[ "${test_variant}" == "static-mem" ]]; then
     domU_check="
 mem_range=$(printf \"%08x-%08x\" ${domu_base} $(( ${domu_base} + ${domu_size} - 1 )))
 if grep -q -x \"\${mem_range} : System RAM\" /proc/iomem; then
+    until ifconfig eth0 192.168.0.2 &> /dev/null && ping -c 10 192.168.0.1; do
+        sleep 30
+    done
     echo \"${passed}\"
 fi
 "
