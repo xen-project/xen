@@ -4,7 +4,7 @@ LABEL maintainer.name="The Xen Project" \
       maintainer.email="xen-devel@lists.xenproject.org"
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV LINUX_VERSION=5.19
+ENV LINUX_VERSION=6.6.74
 ENV USER root
 
 RUN mkdir /build
@@ -18,10 +18,11 @@ RUN apt-get update && \
         curl \
         flex \
         bison \
+        libssl-dev \
         && \
     \
     # Build the kernel
-    curl -fsSLO https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-"$LINUX_VERSION".tar.xz && \
+    curl -fsSLO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-"$LINUX_VERSION".tar.xz && \
     tar xvJf linux-"$LINUX_VERSION".tar.xz && \
     cd linux-"$LINUX_VERSION" && \
     make defconfig && \
