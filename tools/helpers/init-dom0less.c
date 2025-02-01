@@ -16,7 +16,33 @@
 
 #include "init-dom-json.h"
 
+#define XENSTORE_PFN_OFFSET 1
 #define STR_MAX_LENGTH 128
+
+static int alloc_xs_page(struct xc_interface_core *xch,
+                         libxl_dominfo *info,
+                         uint64_t *xenstore_pfn)
+{
+    int rc;
+    const xen_pfn_t base = GUEST_MAGIC_BASE >> XC_PAGE_SHIFT;
+    xen_pfn_t p2m = base + XENSTORE_PFN_OFFSET;
+
+    rc = xc_domain_setmaxmem(xch, info->domid,
+                             info->max_memkb + (XC_PAGE_SIZE/1024));
+    if (rc < 0)
+        return rc;
+
+    rc = xc_domain_populate_physmap_exact(xch, info->domid, 1, 0, 0, &p2m);
+    if (rc < 0)
+        return rc;
+
+    *xenstore_pfn = base + XENSTORE_PFN_OFFSET;
+    rc = xc_clear_domain_page(xch, info->domid, *xenstore_pfn);
+    if (rc < 0)
+        return rc;
+
+    return 0;
+}
 
 static int get_xs_page(struct xc_interface_core *xch, libxl_dominfo *info,
                        uint64_t *xenstore_pfn)
@@ -233,9 +259,33 @@ static int init_domain(struct xs_handle *xsh,
         return 0;
 
     /* Get xenstore page */
-    if (get_xs_page(xch, info, &xenstore_pfn) != 0) {
-        printf("Error on getting xenstore page\n");
+    if (get_xs_page(xch, info, &xenstore_pfn) != 0)
         return 1;
+
+    if (xenstore_pfn == ~0ULL) {
+        struct xenstore_domain_interface *intf;
+
+        rc = alloc_xs_page(xch, info, &xenstore_pfn);
+        if (rc != 0) {
+            printf("Error on getting xenstore page\n");
+            return 1;
+        }
+
+        intf = xenforeignmemory_map(xfh, info->domid, PROT_READ | PROT_WRITE, 1,
+                                    &xenstore_pfn, NULL);
+        if (!intf) {
+            printf("Error mapping xenstore page\n");
+            return 1;
+        }
+
+        intf->connection = XENSTORE_RECONNECT;
+        xenforeignmemory_unmap(xfh, intf, 1);
+
+        /* Now everything is ready: set HVM_PARAM_STORE_PFN */
+        rc = xc_hvm_param_set(xch, info->domid, HVM_PARAM_STORE_PFN,
+                xenstore_pfn);
+        if (rc < 0)
+            return rc;
     }
 
     rc = xc_dom_gnttab_seed(xch, info->domid, true,
