@@ -222,6 +222,11 @@ with the following properties:
     Xen PV interfaces, including grant-table and xenstore, will be
     enabled for the VM.
 
+    - "legacy"
+    Same as above, but the way the xenstore page is allocated is not
+    compatible with static-mem guests. On the other hand, it works with
+    older Linux kernels.
+
     - "disabled"
     Xen PV interfaces are disabled.
 
