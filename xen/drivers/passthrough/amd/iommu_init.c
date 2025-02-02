@@ -409,8 +409,9 @@ static void iommu_reset_log(struct amd_iommu *iommu,
 
 static void amd_iommu_msi_enable(struct amd_iommu *iommu, int flag)
 {
-    __msi_set_enable(iommu->seg, PCI_BUS(iommu->bdf), PCI_SLOT(iommu->bdf),
-                     PCI_FUNC(iommu->bdf), iommu->msi.msi_attrib.pos, flag);
+    pci_sbdf_t sbdf = { .seg = iommu->seg, .bdf = iommu->bdf };
+
+    __msi_set_enable(sbdf, iommu->msi.msi_attrib.pos, flag);
 }
 
 static void cf_check iommu_msi_unmask(struct irq_desc *desc)

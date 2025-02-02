@@ -238,7 +238,7 @@ struct arch_msix {
 void early_msi_init(void);
 void msi_compose_msg(unsigned vector, const cpumask_t *cpu_mask,
                      struct msi_msg *msg);
-void __msi_set_enable(u16 seg, u8 bus, u8 slot, u8 func, int pos, int enable);
+void __msi_set_enable(pci_sbdf_t sbdf, int pos, int enable);
 void cf_check mask_msi_irq(struct irq_desc *desc);
 void cf_check unmask_msi_irq(struct irq_desc *desc);
 void guest_mask_msi_irq(struct irq_desc *desc, bool mask);

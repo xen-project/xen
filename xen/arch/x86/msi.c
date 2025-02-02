@@ -267,28 +267,22 @@ void cf_check set_msi_affinity(struct irq_desc *desc, const cpumask_t *mask)
     write_msi_msg(msi_desc, &msg);
 }
 
-void __msi_set_enable(u16 seg, u8 bus, u8 slot, u8 func, int pos, int enable)
+void __msi_set_enable(pci_sbdf_t sbdf, int pos, int enable)
 {
-    uint16_t control = pci_conf_read16(PCI_SBDF(seg, bus, slot, func),
-                                       pos + PCI_MSI_FLAGS);
+    uint16_t control = pci_conf_read16(sbdf, pos + PCI_MSI_FLAGS);
 
     control &= ~PCI_MSI_FLAGS_ENABLE;
     if ( enable )
         control |= PCI_MSI_FLAGS_ENABLE;
-    pci_conf_write16(PCI_SBDF(seg, bus, slot, func),
-                     pos + PCI_MSI_FLAGS, control);
+    pci_conf_write16(sbdf, pos + PCI_MSI_FLAGS, control);
 }
 
 static void msi_set_enable(struct pci_dev *dev, int enable)
 {
     unsigned int pos = dev->msi_pos;
-    u16 seg = dev->seg;
-    u8 bus = dev->bus;
-    u8 slot = PCI_SLOT(dev->devfn);
-    u8 func = PCI_FUNC(dev->devfn);
 
     if ( pos )
-        __msi_set_enable(seg, bus, slot, func, pos, enable);
+        __msi_set_enable(dev->sbdf, pos, enable);
 }
 
 static void msix_set_enable(struct pci_dev *dev, int enable)
