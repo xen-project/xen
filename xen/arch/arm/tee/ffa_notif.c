@@ -40,8 +40,8 @@ int ffa_handle_notification_bind(struct cpu_user_regs *regs)
      * We only support notifications from SP so no need to check the sender
      * endpoint ID, the SPMC will take care of that for us.
      */
-    return ffa_simple_call(FFA_NOTIFICATION_BIND, src_dst, flags, bitmap_hi,
-                           bitmap_lo);
+    return ffa_simple_call(FFA_NOTIFICATION_BIND, src_dst, flags, bitmap_lo,
+                           bitmap_hi);
 }
 
 int ffa_handle_notification_unbind(struct cpu_user_regs *regs)
@@ -61,8 +61,8 @@ int ffa_handle_notification_unbind(struct cpu_user_regs *regs)
      * We only support notifications from SP so no need to check the
      * destination endpoint ID, the SPMC will take care of that for us.
      */
-    return  ffa_simple_call(FFA_NOTIFICATION_UNBIND, src_dst, 0, bitmap_hi,
-                            bitmap_lo);
+    return  ffa_simple_call(FFA_NOTIFICATION_UNBIND, src_dst, 0, bitmap_lo,
+                            bitmap_hi);
 }
 
 void ffa_handle_notification_info_get(struct cpu_user_regs *regs)
