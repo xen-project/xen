@@ -911,6 +911,11 @@ static int __init parse_ivhd_block(const struct acpi_ivrs_hardware *ivhd_block)
         return -ENODEV;
     }
 
+    AMD_IOMMU_DEBUG("IVHD: IOMMU @ %#lx cap @ %#x seg 0x%04x info %#x attr %#x\n",
+                    ivhd_block->base_address, ivhd_block->capability_offset,
+                    ivhd_block->pci_segment_group, ivhd_block->info,
+                    ivhd_block->iommu_attr);
+
     iommu = find_iommu_from_bdf_cap(ivhd_block->pci_segment_group,
                                     ivhd_block->header.device_id,
                                     ivhd_block->capability_offset);
