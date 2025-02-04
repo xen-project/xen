@@ -187,6 +187,7 @@ static void nmi_shootdown_cpus(void)
 
         disable_IO_APIC();
         hpet_disable();
+        iommu_quiesce();
     }
 }
 
