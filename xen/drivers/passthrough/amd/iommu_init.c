@@ -902,8 +902,6 @@ static void enable_iommu(struct amd_iommu *iommu)
         }
     }
 
-    amd_iommu_msi_enable(iommu, IOMMU_CONTROL_ENABLED);
-
     set_iommu_ht_flags(iommu);
     set_iommu_command_buffer_control(iommu, IOMMU_CONTROL_ENABLED);
 
