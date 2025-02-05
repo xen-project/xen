@@ -374,6 +374,7 @@ void smp_send_stop(void)
         smp_call_function(stop_this_cpu, &stop_aps, 0);
 
     local_irq_disable();
+    pci_disable_msi_all();
     disable_IO_APIC();
     hpet_disable();
 

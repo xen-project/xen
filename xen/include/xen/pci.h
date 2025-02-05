@@ -190,6 +190,11 @@ static always_inline void pcidevs_lock(void)
 }
 void pcidevs_unlock(void);
 bool __must_check pcidevs_locked(void);
+bool pcidevs_trylock_unsafe(void);
+static always_inline bool pcidevs_trylock(void)
+{
+    return lock_evaluate_nospec(pcidevs_trylock_unsafe());
+}
 
 #ifndef NDEBUG
 /*
@@ -225,6 +230,13 @@ int pci_hide_device(unsigned int seg, unsigned int bus, unsigned int devfn);
 struct pci_dev *pci_get_pdev(const struct domain *d, pci_sbdf_t sbdf);
 struct pci_dev *pci_get_real_pdev(pci_sbdf_t sbdf);
 void pci_check_disable_device(u16 seg, u8 bus, u8 devfn);
+
+/*
+ * Iterate without locking or preemption over all PCI devices known by Xen.
+ * Can be called with interrupts disabled.
+ */
+int pci_iterate_devices(int (*handler)(struct pci_dev *pdev, void *arg),
+                        void *arg);
 
 uint8_t pci_conf_read8(pci_sbdf_t sbdf, unsigned int reg);
 uint16_t pci_conf_read16(pci_sbdf_t sbdf, unsigned int reg);
