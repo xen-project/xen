@@ -374,6 +374,8 @@ void smp_send_stop(void)
         smp_call_function(stop_this_cpu, &stop_aps, 0);
 
     local_irq_disable();
+    disable_IO_APIC();
+    hpet_disable();
 
     if ( num_online_cpus() > 1 )
     {
@@ -389,8 +391,6 @@ void smp_send_stop(void)
 
     if ( cpu_online(cpu) )
     {
-        disable_IO_APIC();
-        hpet_disable();
         __stop_this_cpu();
         x2apic_enabled = (current_local_apic_mode() == APIC_MODE_X2APIC);
     }
