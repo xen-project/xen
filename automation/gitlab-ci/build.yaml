@@ -333,6 +333,8 @@ alpine-3.18-gcc-debug:
       CONFIG_EXPERT=y
       CONFIG_UNSUPPORTED=y
       CONFIG_ARGO=y
+      CONFIG_UBSAN=y
+      CONFIG_UBSAN_FATAL=y
 
 debian-12-x86_64-gcc-debug:
   extends: .gcc-x86-64-build-debug
@@ -419,6 +421,9 @@ alpine-3.18-gcc-debug-arm64:
   extends: .gcc-arm64-build-debug
   variables:
     CONTAINER: alpine:3.18-arm64v8
+    EXTRA_XEN_CONFIG: |
+      CONFIG_UBSAN=y
+      CONFIG_UBSAN_FATAL=y
 
 alpine-3.18-gcc-arm64-randconfig:
   extends: .gcc-arm64-build
