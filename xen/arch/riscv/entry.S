@@ -49,7 +49,7 @@ save_to_stack:
         REG_S   t0, CPU_USER_REGS_SSTATUS(sp)
 
         mv      a0, sp
-        jal     do_trap
+        call    do_trap
 
 restore_registers:
         /* Restore stack_cpu_regs */

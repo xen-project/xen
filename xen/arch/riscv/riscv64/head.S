@@ -28,7 +28,7 @@ FUNC(start)
         add     t3, t3, __SIZEOF_POINTER__
         bltu    t3, t4, .L_clear_bss
 
-        jal     reset_stack
+        call    reset_stack
 
         /*
          * save hart_id ( bootcpu_id ) and dtb_base as a0 and a1 register can
@@ -37,16 +37,16 @@ FUNC(start)
         mv      s0, a0
         mv      s1, a1
 
-        jal     calc_phys_offset
+        call    calc_phys_offset
         mv      s2, a0
 
-        jal     setup_initial_pagetables
+        call    setup_initial_pagetables
 
         /* Calculate proper VA after jump from 1:1 mapping */
         la      a0, .L_primary_switched
         sub     a0, a0, s2
 
-        jal     turn_on_mmu
+        call    turn_on_mmu
 
 .L_primary_switched:
         /*
@@ -54,11 +54,11 @@ FUNC(start)
          * recalculated after jump from 1:1 mapping world as 1:1 mapping
          * will be removed soon in start_xen().
          */
-        jal     reset_stack
+        call    reset_stack
 
         /* Xen's boot cpu id is equal to 0 so setup TP register for it */
         li      a0, 0
-        jal     setup_tp
+        call    setup_tp
 
         /* restore hart_id ( bootcpu_id ) and dtb address */
         mv      a0, s0
