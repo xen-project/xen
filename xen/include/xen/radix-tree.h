@@ -66,11 +66,6 @@ typedef void radix_tree_free_fn_t(struct radix_tree_node *, void *);
 struct radix_tree_root {
 	unsigned int		height;
 	struct radix_tree_node	__rcu *rnode;
-
-	/* Allow to specify custom node alloc/dealloc routines. */
-	radix_tree_alloc_fn_t *node_alloc;
-	radix_tree_free_fn_t *node_free;
-	void *node_alloc_free_arg;
 };
 
 /*
@@ -78,11 +73,6 @@ struct radix_tree_root {
  */
 
 void radix_tree_init(struct radix_tree_root *root);
-void radix_tree_set_alloc_callbacks(
-	struct radix_tree_root *root,
-	radix_tree_alloc_fn_t *node_alloc,
-	radix_tree_free_fn_t *node_free,
-	void *node_alloc_free_arg);
 
 void radix_tree_destroy(
 	struct radix_tree_root *root,
