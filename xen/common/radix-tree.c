@@ -705,7 +705,7 @@ void radix_tree_destroy(
 
 void radix_tree_init(struct radix_tree_root *root)
 {
-	memset(root, 0, sizeof(*root));
+	*root = (struct radix_tree_root)RADIX_TREE_INIT();
 }
 
 static __init unsigned long __maxindex(unsigned int height)
