@@ -10,8 +10,11 @@
  *
  */
 
-#include <xen/spinlock.h>
+#include <xen/bitops.h>
+#include <xen/kernel.h>
+#include <xen/lib.h>
 #include <xen/percpu.h>
+#include <xen/spinlock.h>
 
 #define __noreturn    noreturn
 #define pr_err(...) printk(XENLOG_ERR __VA_ARGS__)

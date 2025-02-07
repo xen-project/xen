@@ -91,6 +91,8 @@ static inline void sfence_vma(void)
     asm volatile ( "sfence.vma" ::: "memory" );
 }
 
+#define dump_execution_state() run_in_exception_handler(show_execution_state)
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* ASM__RISCV__PROCESSOR_H */

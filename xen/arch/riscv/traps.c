@@ -140,7 +140,7 @@ void vcpu_show_execution_state(struct vcpu *v)
 
 void show_execution_state(const struct cpu_user_regs *regs)
 {
-    printk("implement show_execution_state(regs)\n");
+    printk("TODO: Implement show_execution_state(regs)\n");
 }
 
 void arch_hypercall_tasklet_result(struct vcpu *v, long res)

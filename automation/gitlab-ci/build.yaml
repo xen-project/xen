@@ -359,6 +359,9 @@ debian-12-riscv64-gcc-debug:
     CONTAINER: debian:12-riscv64
     KBUILD_DEFCONFIG: tiny64_defconfig
     HYPERVISOR_ONLY: y
+    EXTRA_XEN_CONFIG: |
+      CONFIG_UBSAN=y
+      CONFIG_UBSAN_FATAL=y
 
 # Arm32 cross-build
 
