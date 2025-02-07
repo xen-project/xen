@@ -36,8 +36,7 @@ void do_trap_undefined_instruction(struct cpu_user_regs *regs)
     uint32_t pc = regs->pc;
     uint32_t instr;
 
-    if ( !is_kernel_text(pc) &&
-         (system_state >= SYS_STATE_active || !is_kernel_inittext(pc)) )
+    if ( !is_active_kernel_text(pc) )
         goto die;
 
     /* PC should be always a multiple of 4, as Xen is using ARM instruction set */
