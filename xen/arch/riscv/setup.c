@@ -109,6 +109,8 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
      */
     system_state = SYS_STATE_boot;
 
+    init_constructors();
+
     if ( acpi_disabled )
     {
         printk("Booting using Device Tree\n");
