@@ -59,15 +59,15 @@ struct bug_frame {
  * be called function in a fixed register.
  */
 #define  run_in_exception_handler(fn) do {                                  \
-    asm ("mov " __stringify(BUG_FN_REG) ", %0\n"                            \
-         "1:"BUG_INSTR"\n"                                                  \
+    register unsigned long _fn asm (STR(BUG_FN_REG)) = (unsigned long)(fn); \
+    asm ("1:"BUG_INSTR"\n"                                                  \
          ".pushsection .bug_frames." __stringify(BUGFRAME_run_fn) ","       \
          "             \"a\", %%progbits\n"                                 \
          "2:\n"                                                             \
          ".p2align 2\n"                                                     \
          ".long (1b - 2b)\n"                                                \
          ".long 0, 0, 0\n"                                                  \
-         ".popsection" :: "r" (fn) : __stringify(BUG_FN_REG) );             \
+         ".popsection" :: "r" (_fn) );                                      \
 } while (0)
 
 #define WARN() BUG_FRAME(BUGFRAME_warn, __LINE__, __FILE__, 0, "")
