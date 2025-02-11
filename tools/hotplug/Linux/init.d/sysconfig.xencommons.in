@@ -8,7 +8,7 @@
 ## Type: string
 ## Default: daemon
 #
-# Select type of xentore service.
+# Select type of xenstore service.
 #
 # This can be either of:
 #  * daemon
