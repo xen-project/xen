@@ -50,6 +50,7 @@
 #include <xen/rbtree.h>
 #include <xen/sched.h>
 #include <xen/sizes.h>
+#include <xen/resource.h>
 #include <asm/atomic.h>
 #include <asm/device.h>
 #include <asm/io.h>
@@ -64,27 +65,14 @@
 
 /* Alias to Xen device tree helpers */
 #define device_node dt_device_node
+#define platform_device dt_device_node
+
 #define of_phandle_args dt_phandle_args
 #define of_device_id dt_device_match
 #define of_match_node dt_match_node
 #define of_property_read_u32(np, pname, out) (!dt_property_read_u32(np, pname, out))
 #define of_property_read_bool dt_property_read_bool
 #define of_parse_phandle_with_args dt_parse_phandle_with_args
-
-/* Xen: Helpers to get device MMIO and IRQs */
-struct resource
-{
-	paddr_t addr;
-	paddr_t size;
-	unsigned int type;
-};
-
-#define resource_size(res) (res)->size;
-
-#define platform_device dt_device_node
-
-#define IORESOURCE_MEM 0
-#define IORESOURCE_IRQ 1
 
 static struct resource *platform_get_resource(struct platform_device *pdev,
 					      unsigned int type,
