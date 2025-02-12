@@ -553,21 +553,14 @@ static void __serial_rx(char c)
     {
         struct domain *d = rcu_lock_domain_by_id(console_rx - 1);
 
-        /*
-         * If we have a properly initialized vpl011 console for the
-         * domain, without a full PV ring to Dom0 (in that case input
-         * comes from the PV ring), then send the character to it.
-         */
-        if ( d != NULL &&
-             !d->arch.vpl011.backend_in_domain &&
-             d->arch.vpl011.backend.xen != NULL )
-            vpl011_rx_char_xen(d, c);
-        else
-            printk("Cannot send chars to Dom%d: no UART available\n",
-                   console_rx - 1);
-
-        if ( d != NULL )
+        if ( d )
+        {
+            int rc = vpl011_rx_char_xen(d, c);
+            if ( rc )
+                guest_printk(d, XENLOG_G_WARNING
+                                "failed to process console input: %d\n", rc);
             rcu_unlock_domain(d);
+        }
 
         break;
     }
