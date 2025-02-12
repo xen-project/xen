@@ -554,6 +554,13 @@ int __init dom0_setup_permissions(struct domain *d)
         mfn = paddr_to_pfn(mp_lapic_addr);
         rc |= iomem_deny_access(d, mfn, mfn);
     }
+    /* If using an emulated local APIC make sure its MMIO is unpopulated. */
+    if ( has_vlapic(d) )
+    {
+        /* Xen doesn't allow changing the local APIC MMIO window position. */
+        mfn = paddr_to_pfn(APIC_DEFAULT_PHYS_BASE);
+        rc |= iomem_deny_access(d, mfn, mfn);
+    }
     /* I/O APICs. */
     for ( i = 0; i < nr_ioapics; i++ )
     {
@@ -563,10 +570,6 @@ int __init dom0_setup_permissions(struct domain *d)
              !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
             rc |= iomem_deny_access(d, mfn, mfn);
     }
-    /* MSI range. */
-    rc |= iomem_deny_access(d, paddr_to_pfn(MSI_ADDR_BASE_LO),
-                            paddr_to_pfn(MSI_ADDR_BASE_LO +
-                                         MSI_ADDR_DEST_ID_MASK));
     /* HyperTransport range. */
     if ( boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
     {
