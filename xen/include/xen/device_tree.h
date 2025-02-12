@@ -81,16 +81,9 @@ struct dt_property {
 struct dt_device_node {
     const char *name;
     const char *type;
-    dt_phandle phandle;
     char *full_name;
+    dt_phandle phandle;
     domid_t used_by; /* By default it's used by dom0 */
-
-    struct dt_property *properties;
-    struct dt_device_node *parent;
-    struct dt_device_node *child;
-    struct dt_device_node *sibling;
-    struct dt_device_node *next; /* TODO: Remove it. Only use to know the last children */
-    struct dt_device_node *allnext;
 
     /* IOMMU specific fields */
     bool is_protected;
@@ -99,6 +92,13 @@ struct dt_device_node {
     /* HACK: Remove this if there is a need of space */
     bool static_evtchn_created;
 #endif
+
+    struct dt_property *properties;
+    struct dt_device_node *parent;
+    struct dt_device_node *child;
+    struct dt_device_node *sibling;
+    struct dt_device_node *next; /* TODO: Remove it. Only use to know the last children */
+    struct dt_device_node *allnext;
 
     /*
      * The main purpose of this list is to link the structure in the list
