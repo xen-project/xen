@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Changed
 
 ### Added
+ - On x86:
+   - Option to attempt to fixup p2m page-faults on PVH dom0.
 
 ### Removed
 

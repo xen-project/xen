@@ -10,12 +10,15 @@
  */
 
 #include <xen/init.h>
+#include <xen/iocap.h>
 #include <xen/ioreq.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/paging.h>
 #include <xen/trace.h>
 #include <xen/vm_event.h>
+
+#include <asm/altp2m.h>
 #include <asm/event.h>
 #include <asm/i387.h>
 #include <asm/xstate.h>
@@ -159,6 +162,36 @@ void hvmemul_cancel(struct vcpu *v)
     hvio->g2m_ioport = NULL;
 
     hvmemul_cache_disable(v);
+}
+
+bool __ro_after_init opt_dom0_pf_fixup;
+static int hwdom_fixup_p2m(paddr_t addr)
+{
+    unsigned long gfn = paddr_to_pfn(addr);
+    struct domain *currd = current->domain;
+    p2m_type_t type;
+    mfn_t mfn;
+    int rc;
+
+    ASSERT(is_hardware_domain(currd));
+    ASSERT(!altp2m_active(currd));
+
+    /*
+     * Fixups are only applied for MMIO holes, and rely on the hardware domain
+     * having identity mappings for non RAM regions (gfn == mfn).
+     */
+    if ( !iomem_access_permitted(currd, gfn, gfn) ||
+         !is_memory_hole(_mfn(gfn), _mfn(gfn)) )
+        return -EPERM;
+
+    mfn = get_gfn(currd, gfn, &type);
+    if ( !mfn_eq(mfn, INVALID_MFN) || !p2m_is_hole(type) )
+        rc = mfn_eq(mfn, _mfn(gfn)) ? -EEXIST : -ENOTEMPTY;
+    else
+        rc = set_mmio_p2m_entry(currd, _gfn(gfn), _mfn(gfn), 0);
+    put_gfn(currd, gfn);
+
+    return rc;
 }
 
 static int hvmemul_do_io(
@@ -338,8 +371,45 @@ static int hvmemul_do_io(
         if ( !s )
         {
             if ( is_mmio && is_hardware_domain(currd) )
-                gdprintk(XENLOG_DEBUG, "unhandled memory %s %#lx size %u\n",
-                         dir ? "read from" : "write to", addr, size);
+            {
+                /*
+                 * PVH dom0 is likely missing MMIO mappings on the p2m, due to
+                 * the incomplete information Xen has about the memory layout.
+                 *
+                 * Either print a message to note dom0 attempted to access an
+                 * unpopulated GPA, or try to fixup the p2m by creating an
+                 * identity mapping for the faulting GPA.
+                 */
+                if ( opt_dom0_pf_fixup )
+                {
+                    int inner_rc = hwdom_fixup_p2m(addr);
+
+                    if ( !inner_rc || inner_rc == -EEXIST )
+                    {
+                        if ( !inner_rc )
+                            gdprintk(XENLOG_DEBUG,
+                                     "fixup p2m mapping for page %lx added\n",
+                                     paddr_to_pfn(addr));
+                        else
+                            gprintk(XENLOG_INFO,
+                                    "fixup p2m mapping for page %lx already present\n",
+                                    paddr_to_pfn(addr));
+
+                        rc = X86EMUL_RETRY;
+                        vio->req.state = STATE_IOREQ_NONE;
+                        break;
+                    }
+
+                    gprintk(XENLOG_WARNING,
+                            "unable to fixup memory %s %#lx size %u: %d\n",
+                            dir ? "read from" : "write to", addr, size,
+                            inner_rc);
+                }
+                else
+                    gdprintk(XENLOG_DEBUG,
+                             "unhandled memory %s %#lx size %u\n",
+                             dir ? "read from" : "write to", addr, size);
+            }
             rc = hvm_process_io_intercept(&null_handler, &p);
             vio->req.state = STATE_IOREQ_NONE;
         }
