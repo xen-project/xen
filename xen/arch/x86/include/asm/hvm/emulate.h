@@ -123,7 +123,7 @@ static inline void hvmemul_cache_destroy(struct vcpu *v)
     unsigned int i;
 
     for ( i = 0; i < ARRAY_SIZE(v->arch.hvm.hvm_io.mmio_cache); ++i )
-        XFREE(v->arch.hvm.hvm_io.mmio_cache[i]);
+        XVFREE(v->arch.hvm.hvm_io.mmio_cache[i]);
     XVFREE(v->arch.hvm.hvm_io.cache);
 }
 bool hvmemul_read_cache(const struct vcpu *v, paddr_t gpa,
