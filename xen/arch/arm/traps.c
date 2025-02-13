@@ -559,13 +559,12 @@ void inject_undef64_exception(struct cpu_user_regs *regs)
 /* Inject an abort exception into a 64 bit guest */
 static void inject_abt64_exception(struct cpu_user_regs *regs,
                                    int prefetch,
-                                   register_t addr,
-                                   int instr_len)
+                                   register_t addr)
 {
     vaddr_t handler;
     union hsr esr = {
         .iss = 0,
-        .len = instr_len,
+        .len = 1,
     };
 
     if ( regs_mode_is_user(regs) )
@@ -591,17 +590,15 @@ static void inject_abt64_exception(struct cpu_user_regs *regs,
 }
 
 static void inject_dabt64_exception(struct cpu_user_regs *regs,
-                                   register_t addr,
-                                   int instr_len)
+                                    register_t addr)
 {
-    inject_abt64_exception(regs, 0, addr, instr_len);
+    inject_abt64_exception(regs, 0, addr);
 }
 
 static void inject_iabt64_exception(struct cpu_user_regs *regs,
-                                   register_t addr,
-                                   int instr_len)
+                                    register_t addr)
 {
-    inject_abt64_exception(regs, 1, addr, instr_len);
+    inject_abt64_exception(regs, 1, addr);
 }
 
 #endif
@@ -617,26 +614,24 @@ void inject_undef_exception(struct cpu_user_regs *regs)
 }
 
 static void inject_iabt_exception(struct cpu_user_regs *regs,
-                                  register_t addr,
-                                  int instr_len)
+                                  register_t addr)
 {
         if ( is_32bit_domain(current->domain) )
             inject_pabt32_exception(regs, addr);
 #ifdef CONFIG_ARM_64
         else
-            inject_iabt64_exception(regs, addr, instr_len);
+            inject_iabt64_exception(regs, addr);
 #endif
 }
 
 static void inject_dabt_exception(struct cpu_user_regs *regs,
-                                  register_t addr,
-                                  int instr_len)
+                                  register_t addr)
 {
         if ( is_32bit_domain(current->domain) )
             inject_dabt32_exception(regs, addr);
 #ifdef CONFIG_ARM_64
         else
-            inject_dabt64_exception(regs, addr, instr_len);
+            inject_dabt64_exception(regs, addr);
 #endif
 }
 
@@ -1965,9 +1960,9 @@ inject_abt:
              "HSR=%#"PRIregister" pc=%#"PRIregister" gva=%#"PRIvaddr" gpa=%#"PRIpaddr"\n",
              hsr.bits, regs->pc, gva, gpa);
     if ( is_data )
-        inject_dabt_exception(regs, gva, hsr.len);
+        inject_dabt_exception(regs, gva);
     else
-        inject_iabt_exception(regs, gva, hsr.len);
+        inject_iabt_exception(regs, gva);
 }
 
 static inline bool needs_ssbd_flip(struct vcpu *v)
