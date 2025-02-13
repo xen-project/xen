@@ -206,7 +206,7 @@ void do_cp15_32(struct cpu_user_regs *regs, const union hsr hsr)
     case HSR_CPREG32(CNTP_CTL):
     case HSR_CPREG32(CNTP_TVAL):
         if ( !vtimer_emulate(regs, hsr) )
-            return inject_undef_exception(regs, hsr);
+            return inject_undef_exception(regs);
         break;
 
     /*
@@ -217,7 +217,7 @@ void do_cp15_32(struct cpu_user_regs *regs, const union hsr hsr)
      */
     case HSR_CPREG32(ACTLR):
         if ( regs_mode_is_user(regs) )
-            return inject_undef_exception(regs, hsr);
+            return inject_undef_exception(regs);
         if ( cp32.read )
             set_user_reg(regs, regidx, v->arch.actlr);
         break;
@@ -232,7 +232,7 @@ void do_cp15_32(struct cpu_user_regs *regs, const union hsr hsr)
     case HSR_CPREG32(DCCSW):
     case HSR_CPREG32(DCCISW):
         if ( !cp32.read )
-            p2m_set_way_flush(current, regs, hsr);
+            p2m_set_way_flush(current, regs);
         break;
 
     /*
@@ -397,7 +397,7 @@ void do_cp15_32(struct cpu_user_regs *regs, const union hsr hsr)
                  cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
         gdprintk(XENLOG_ERR, "unhandled 32-bit CP15 access %#"PRIregister"\n",
                  hsr.bits & HSR_CP32_REGS_MASK);
-        inject_undef_exception(regs, hsr);
+        inject_undef_exception(regs);
         return;
     }
     advance_pc(regs, hsr);
@@ -421,7 +421,7 @@ void do_cp15_64(struct cpu_user_regs *regs, const union hsr hsr)
      */
     case HSR_CPREG64(CNTP_CVAL):
         if ( !vtimer_emulate(regs, hsr) )
-            return inject_undef_exception(regs, hsr);
+            return inject_undef_exception(regs);
         break;
 
     /*
@@ -433,7 +433,7 @@ void do_cp15_64(struct cpu_user_regs *regs, const union hsr hsr)
     case HSR_CPREG64(ICC_ASGI1R):
     case HSR_CPREG64(ICC_SGI0R):
         if ( !vgic_emulate(regs, hsr) )
-            return inject_undef_exception(regs, hsr);
+            return inject_undef_exception(regs);
         break;
 
     GENERATE_CASE(TTBR0, 64)
@@ -467,7 +467,7 @@ void do_cp15_64(struct cpu_user_regs *regs, const union hsr hsr)
             gdprintk(XENLOG_ERR,
                      "unhandled 64-bit CP15 access %#"PRIregister"\n",
                      hsr.bits & HSR_CP64_REGS_MASK);
-            inject_undef_exception(regs, hsr);
+            inject_undef_exception(regs);
             return;
         }
     }
@@ -532,7 +532,7 @@ void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
          * is set to 0, which we emulated below.
          */
         if ( !cp32.read )
-            return inject_undef_exception(regs, hsr);
+            return inject_undef_exception(regs);
 
         /* Implement the minimum requirements:
          *  - Number of watchpoints: 1
@@ -631,7 +631,7 @@ void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
              cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
     gdprintk(XENLOG_ERR, "unhandled 32-bit cp14 access %#"PRIregister"\n",
              hsr.bits & HSR_CP32_REGS_MASK);
-    inject_undef_exception(regs, hsr);
+    inject_undef_exception(regs);
 }
 
 void do_cp14_64(struct cpu_user_regs *regs, const union hsr hsr)
@@ -669,7 +669,7 @@ void do_cp14_64(struct cpu_user_regs *regs, const union hsr hsr)
              cp64.op1, cp64.reg1, cp64.reg2, cp64.crm, regs->pc);
     gdprintk(XENLOG_ERR, "unhandled 64-bit CP14 access %#"PRIregister"\n",
              hsr.bits & HSR_CP64_REGS_MASK);
-    inject_undef_exception(regs, hsr);
+    inject_undef_exception(regs);
 }
 
 void do_cp14_dbg(struct cpu_user_regs *regs, const union hsr hsr)
@@ -698,7 +698,7 @@ void do_cp14_dbg(struct cpu_user_regs *regs, const union hsr hsr)
     gdprintk(XENLOG_ERR, "unhandled 64-bit CP14 DBG access %#"PRIregister"\n",
              hsr.bits & HSR_CP64_REGS_MASK);
 
-    inject_undef_exception(regs, hsr);
+    inject_undef_exception(regs);
 }
 
 void do_cp10(struct cpu_user_regs *regs, const union hsr hsr)
@@ -731,7 +731,7 @@ void do_cp10(struct cpu_user_regs *regs, const union hsr hsr)
                  cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
         gdprintk(XENLOG_ERR, "unhandled 32-bit CP10 access %#"PRIregister"\n",
                  hsr.bits & HSR_CP32_REGS_MASK);
-        inject_undef_exception(regs, hsr);
+        inject_undef_exception(regs);
         return;
     }
     
@@ -756,7 +756,7 @@ void do_cp(struct cpu_user_regs *regs, const union hsr hsr)
 
     ASSERT(!cp.tas); /* We don't trap SIMD instruction */
     gdprintk(XENLOG_ERR, "unhandled CP%d access\n", cp.coproc);
-    inject_undef_exception(regs, hsr);
+    inject_undef_exception(regs);
 }
 
 /*

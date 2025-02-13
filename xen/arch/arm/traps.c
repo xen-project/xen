@@ -533,12 +533,12 @@ static vaddr_t exception_handler64(struct cpu_user_regs *regs, vaddr_t offset)
 }
 
 /* Inject an undefined exception into a 64 bit guest */
-void inject_undef64_exception(struct cpu_user_regs *regs, int instr_len)
+void inject_undef64_exception(struct cpu_user_regs *regs)
 {
     vaddr_t handler;
     const union hsr esr = {
         .iss = 0,
-        .len = instr_len,
+        .len = 1,
         .ec = HSR_EC_UNKNOWN,
     };
 
@@ -606,13 +606,13 @@ static void inject_iabt64_exception(struct cpu_user_regs *regs,
 
 #endif
 
-void inject_undef_exception(struct cpu_user_regs *regs, const union hsr hsr)
+void inject_undef_exception(struct cpu_user_regs *regs)
 {
         if ( is_32bit_domain(current->domain) )
             inject_undef32_exception(regs);
 #ifdef CONFIG_ARM_64
         else
-            inject_undef64_exception(regs, hsr.len);
+            inject_undef64_exception(regs);
 #endif
 }
 
@@ -1418,7 +1418,7 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, register_t *nr,
     if ( hsr.iss != XEN_HYPERCALL_TAG )
     {
         gprintk(XENLOG_WARNING, "Invalid HVC imm 0x%x\n", hsr.iss);
-        return inject_undef_exception(regs, hsr);
+        return inject_undef_exception(regs);
     }
 
     curr->hcall_preempted = false;
@@ -1655,7 +1655,7 @@ void handle_raz_wi(struct cpu_user_regs *regs,
     ASSERT((min_el == 0) || (min_el == 1));
 
     if ( min_el > 0 && regs_mode_is_user(regs) )
-        return inject_undef_exception(regs, hsr);
+        return inject_undef_exception(regs);
 
     if ( read )
         set_user_reg(regs, regidx, 0);
@@ -1674,10 +1674,10 @@ void handle_wo_wi(struct cpu_user_regs *regs,
     ASSERT((min_el == 0) || (min_el == 1));
 
     if ( min_el > 0 && regs_mode_is_user(regs) )
-        return inject_undef_exception(regs, hsr);
+        return inject_undef_exception(regs);
 
     if ( read )
-        return inject_undef_exception(regs, hsr);
+        return inject_undef_exception(regs);
     /* else: ignore */
 
     advance_pc(regs, hsr);
@@ -1694,10 +1694,10 @@ void handle_ro_read_val(struct cpu_user_regs *regs,
     ASSERT((min_el == 0) || (min_el == 1));
 
     if ( min_el > 0 && regs_mode_is_user(regs) )
-        return inject_undef_exception(regs, hsr);
+        return inject_undef_exception(regs);
 
     if ( !read )
-        return inject_undef_exception(regs, hsr);
+        return inject_undef_exception(regs);
 
     set_user_reg(regs, regidx, val);
 
@@ -2147,7 +2147,7 @@ void asmlinkage do_trap_guest_sync(struct cpu_user_regs *regs)
     case HSR_EC_SVE:
         GUEST_BUG_ON(regs_mode_is_32bit(regs));
         gprintk(XENLOG_WARNING, "Domain tried to use SVE while not allowed\n");
-        inject_undef_exception(regs, hsr);
+        inject_undef_exception(regs);
         break;
 #endif
 
@@ -2164,7 +2164,7 @@ void asmlinkage do_trap_guest_sync(struct cpu_user_regs *regs)
         gprintk(XENLOG_WARNING,
                 "Unknown Guest Trap. HSR=%#"PRIregister" EC=0x%x IL=%x Syndrome=0x%"PRIx32"\n",
                 hsr.bits, hsr.ec, hsr.len, hsr.iss);
-        inject_undef_exception(regs, hsr);
+        inject_undef_exception(regs);
         break;
     }
 }

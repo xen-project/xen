@@ -44,7 +44,7 @@ int check_conditional_instr(struct cpu_user_regs *regs, const union hsr hsr);
 
 void advance_pc(struct cpu_user_regs *regs, const union hsr hsr);
 
-void inject_undef_exception(struct cpu_user_regs *regs, const union hsr hsr);
+void inject_undef_exception(struct cpu_user_regs *regs);
 
 /* read as zero and write ignore */
 void handle_raz_wi(struct cpu_user_regs *regs, int regidx, bool read,

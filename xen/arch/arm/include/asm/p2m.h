@@ -298,8 +298,7 @@ void p2m_domain_creation_finished(struct domain *d);
  */
 int p2m_cache_flush_range(struct domain *d, gfn_t *pstart, gfn_t end);
 
-void p2m_set_way_flush(struct vcpu *v, struct cpu_user_regs *regs,
-                       const union hsr hsr);
+void p2m_set_way_flush(struct vcpu *v, struct cpu_user_regs *regs);
 
 void p2m_toggle_cache(struct vcpu *v, bool was_enabled);
 

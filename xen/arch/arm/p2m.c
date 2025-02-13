@@ -428,8 +428,7 @@ int p2m_cache_flush_range(struct domain *d, gfn_t *pstart, gfn_t end)
  *
  *  - Once the caches are enabled, we stop trapping VM ops.
  */
-void p2m_set_way_flush(struct vcpu *v, struct cpu_user_regs *regs,
-                       const union hsr hsr)
+void p2m_set_way_flush(struct vcpu *v, struct cpu_user_regs *regs)
 {
     /* This function can only work with the current vCPU. */
     ASSERT(v == current);
@@ -438,7 +437,7 @@ void p2m_set_way_flush(struct vcpu *v, struct cpu_user_regs *regs,
     {
         gprintk(XENLOG_ERR,
                 "The cache should be flushed by VA rather than by set/way.\n");
-        inject_undef_exception(regs, hsr);
+        inject_undef_exception(regs);
         return;
     }
 

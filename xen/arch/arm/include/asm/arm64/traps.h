@@ -1,7 +1,7 @@
 #ifndef __ASM_ARM64_TRAPS__
 #define __ASM_ARM64_TRAPS__
 
-void inject_undef64_exception(struct cpu_user_regs *regs, int instr_len);
+void inject_undef64_exception(struct cpu_user_regs *regs);
 
 void do_sysreg(struct cpu_user_regs *regs,
                const union hsr hsr);

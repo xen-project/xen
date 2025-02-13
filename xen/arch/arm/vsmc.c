@@ -346,13 +346,11 @@ void do_trap_smc(struct cpu_user_regs *regs, const union hsr hsr)
     if ( vsmccc_handle_call(regs) )
         advance_pc(regs, hsr);
     else
-        inject_undef_exception(regs, hsr);
+        inject_undef_exception(regs);
 }
 
 void do_trap_hvc_smccc(struct cpu_user_regs *regs)
 {
-    const union hsr hsr = { .bits = regs->hsr };
-
     /*
      * vsmccc_handle_call() will return false if this call is not
      * SMCCC compatible (e.g. immediate value != 0). As it is not
@@ -360,7 +358,7 @@ void do_trap_hvc_smccc(struct cpu_user_regs *regs)
      * ARM_SMCCC_ERR_UNKNOWN_FUNCTION.
      */
     if ( !vsmccc_handle_call(regs) )
-        inject_undef_exception(regs, hsr);
+        inject_undef_exception(regs);
 }
 
 /*

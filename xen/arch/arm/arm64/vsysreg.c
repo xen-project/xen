@@ -95,7 +95,7 @@ void do_sysreg(struct cpu_user_regs *regs,
      */
     case HSR_SYSREG_ACTLR_EL1:
         if ( regs_mode_is_user(regs) )
-            return inject_undef_exception(regs, hsr);
+            return inject_undef_exception(regs);
         if ( hsr.sysreg.read )
             set_user_reg(regs, regidx, v->arch.actlr);
         break;
@@ -109,7 +109,7 @@ void do_sysreg(struct cpu_user_regs *regs,
     case HSR_SYSREG_DCCSW:
     case HSR_SYSREG_DCCISW:
         if ( !hsr.sysreg.read )
-            p2m_set_way_flush(current, regs, hsr);
+            p2m_set_way_flush(current, regs);
         break;
 
     /*
@@ -267,7 +267,7 @@ void do_sysreg(struct cpu_user_regs *regs,
     case HSR_SYSREG_CNTP_TVAL_EL0:
     case HSR_SYSREG_CNTP_CVAL_EL0:
         if ( !vtimer_emulate(regs, hsr) )
-            return inject_undef_exception(regs, hsr);
+            return inject_undef_exception(regs);
         break;
 
     /*
@@ -280,7 +280,7 @@ void do_sysreg(struct cpu_user_regs *regs,
     case HSR_SYSREG_ICC_SGI0R_EL1:
 
         if ( !vgic_emulate(regs, hsr) )
-            return inject_undef64_exception(regs, hsr.len);
+            return inject_undef64_exception(regs);
         break;
 
     /*
@@ -440,7 +440,7 @@ void do_sysreg(struct cpu_user_regs *regs,
     gdprintk(XENLOG_ERR,
              "unhandled 64-bit sysreg access %#"PRIregister"\n",
              hsr.bits & HSR_SYSREG_REGS_MASK);
-    inject_undef_exception(regs, hsr);
+    inject_undef_exception(regs);
 }
 
 /*
