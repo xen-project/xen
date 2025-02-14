@@ -500,7 +500,7 @@ deadline_queue_remove(struct list_head *queue, struct list_head *elem)
 }
 
 static inline bool
-deadline_queue_insert(struct rt_unit * (*qelem)(struct list_head *),
+deadline_queue_insert(struct rt_unit * (*qelem)(struct list_head *elem),
                       struct rt_unit *svc, struct list_head *elem,
                       struct list_head *queue)
 {
