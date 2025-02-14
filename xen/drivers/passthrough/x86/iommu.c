@@ -320,6 +320,26 @@ static int __hwdom_init cf_check map_subtract(unsigned long s, unsigned long e,
     return rangeset_remove_range(map, s, e);
 }
 
+struct handle_iomemcap {
+    struct rangeset *r;
+    unsigned long last;
+};
+static int __hwdom_init cf_check map_subtract_iomemcap(unsigned long s,
+                                                       unsigned long e,
+                                                       void *data)
+{
+    struct handle_iomemcap *h = data;
+    int rc = 0;
+
+    if ( h->last != s )
+        rc = rangeset_remove_range(h->r, h->last, s - 1);
+
+    ASSERT(e < ~0UL);
+    h->last = e + 1;
+
+    return rc;
+}
+
 struct map_data {
     struct domain *d;
     unsigned int flush_flags;
@@ -400,6 +420,7 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
     unsigned int i;
     struct rangeset *map;
     struct map_data map_data = { .d = d };
+    struct handle_iomemcap iomem = {};
     int rc;
 
     BUG_ON(!is_hardware_domain(d));
@@ -442,14 +463,6 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
 
         switch ( entry.type )
         {
-        case E820_UNUSABLE:
-            /* Only relevant for inclusive mode, otherwise this is a no-op. */
-            rc = rangeset_remove_range(map, PFN_DOWN(entry.addr),
-                                       PFN_DOWN(entry.addr + entry.size - 1));
-            if ( rc )
-                panic("IOMMU failed to remove unusable memory: %d\n", rc);
-            continue;
-
         case E820_RESERVED:
             if ( !iommu_hwdom_inclusive && !iommu_hwdom_reserved )
                 continue;
@@ -475,22 +488,13 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
     if ( rc )
         panic("IOMMU failed to remove Xen ranges: %d\n", rc);
 
-    /* Remove any overlap with the Interrupt Address Range. */
-    rc = rangeset_remove_range(map, 0xfee00, 0xfeeff);
+    iomem.r = map;
+    rc = rangeset_report_ranges(d->iomem_caps, 0, ~0UL, map_subtract_iomemcap,
+                                &iomem);
+    if ( !rc && iomem.last < ~0UL )
+        rc = rangeset_remove_range(map, iomem.last, ~0UL);
     if ( rc )
-        panic("IOMMU failed to remove Interrupt Address Range: %d\n", rc);
-
-    /* If emulating IO-APIC(s) make sure the base address is unmapped. */
-    if ( has_vioapic(d) )
-    {
-        for ( i = 0; i < d->arch.hvm.nr_vioapics; i++ )
-        {
-            rc = rangeset_remove_singleton(map,
-                PFN_DOWN(domain_vioapic(d, i)->base_address));
-            if ( rc )
-                panic("IOMMU failed to remove IO-APIC: %d\n", rc);
-        }
-    }
+        panic("IOMMU failed to remove forbidden regions: %d\n", rc);
 
     if ( is_pv_domain(d) )
     {
@@ -505,23 +509,6 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
         if ( rc )
             panic("IOMMU failed to remove read-only regions: %d\n", rc);
     }
-
-    if ( has_vpci(d) )
-    {
-        /*
-         * TODO: runtime added MMCFG regions are not checked to make sure they
-         * don't overlap with already mapped regions, thus preventing trapping.
-         */
-        rc = vpci_subtract_mmcfg(d, map);
-        if ( rc )
-            panic("IOMMU unable to remove MMCFG areas: %d\n", rc);
-    }
-
-    /* Remove any regions past the last address addressable by the domain. */
-    rc = rangeset_remove_range(map, PFN_DOWN(1UL << domain_max_paddr_bits(d)),
-                               ~0UL);
-    if ( rc )
-        panic("IOMMU unable to remove unaddressable ranges: %d\n", rc);
 
     if ( iommu_verbose )
         printk(XENLOG_INFO "%pd: identity mappings for IOMMU:\n", d);
