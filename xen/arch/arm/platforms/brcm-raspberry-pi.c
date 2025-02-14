@@ -47,11 +47,11 @@ static const struct dt_device_match rpi4_blacklist_dev[] __initconst =
 };
 
 
-#define PM_PASSWORD                 0x5a000000
+#define PM_PASSWORD                 0x5a000000U
 #define PM_RSTC                     0x1c
 #define PM_WDOG                     0x24
-#define PM_RSTC_WRCFG_FULL_RESET    0x00000020
-#define PM_RSTC_WRCFG_CLR           0xffffffcf
+#define PM_RSTC_WRCFG_FULL_RESET    0x00000020U
+#define PM_RSTC_WRCFG_CLR           0xffffffcfU
 
 static void __iomem *rpi4_map_watchdog(void)
 {
