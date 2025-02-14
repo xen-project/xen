@@ -70,7 +70,7 @@ struct
 
   let perm_of_string s =
     let ty = permty_of_char s.[0]
-    and id = int_of_string (String.sub s 1 (String.length s - 1)) in
+    and id = Utils.int_of_string_exn (String.sub s 1 (String.length s - 1)) in
     (id, ty)
 
   let of_strings ls =
