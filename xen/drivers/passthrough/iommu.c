@@ -662,6 +662,18 @@ void iommu_crash_shutdown(void)
 #endif
 }
 
+void iommu_quiesce(void)
+{
+    const struct iommu_ops *ops;
+
+    if ( !iommu_enabled )
+        return;
+
+    ops = iommu_get_ops();
+    if ( ops->quiesce )
+        iommu_vcall(ops, quiesce);
+}
+
 int iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt)
 {
     const struct iommu_ops *ops;

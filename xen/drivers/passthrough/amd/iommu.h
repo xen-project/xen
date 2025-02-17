@@ -292,6 +292,7 @@ extern unsigned long *shared_intremap_inuse;
 void cf_check amd_iommu_resume(void);
 int __must_check cf_check amd_iommu_suspend(void);
 void cf_check amd_iommu_crash_shutdown(void);
+void cf_check amd_iommu_quiesce(void);
 
 static inline u32 get_field_from_reg_u32(u32 reg_value, u32 mask, u32 shift)
 {

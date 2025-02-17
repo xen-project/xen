@@ -375,6 +375,7 @@ void smp_send_stop(void)
     pci_disable_msi_all();
     disable_IO_APIC();
     hpet_disable();
+    iommu_quiesce();
 
     if ( num_online_cpus() > 1 )
     {

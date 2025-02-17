@@ -3247,6 +3247,24 @@ static int cf_check intel_iommu_quarantine_init(struct pci_dev *pdev,
     return rc;
 }
 
+static void cf_check vtd_quiesce(void)
+{
+    const struct acpi_drhd_unit *drhd;
+
+    for_each_drhd_unit ( drhd )
+    {
+        const struct vtd_iommu *iommu = drhd->iommu;
+        uint32_t sts = dmar_readl(iommu->reg, DMAR_FECTL_REG);
+
+        /*
+         * Open code dma_msi_mask() to avoid taking the spinlock which could
+         * deadlock if called from crash context.
+         */
+        sts |= DMA_FECTL_IM;
+        dmar_writel(iommu->reg, DMAR_FECTL_REG, sts);
+    }
+}
+
 static const struct iommu_ops __initconst_cf_clobber vtd_ops = {
     .page_sizes = PAGE_SIZE_4K,
     .init = intel_iommu_domain_init,
@@ -3276,6 +3294,7 @@ static const struct iommu_ops __initconst_cf_clobber vtd_ops = {
     .iotlb_flush = iommu_flush_iotlb,
     .get_reserved_device_memory = intel_iommu_get_reserved_device_memory,
     .dump_page_tables = vtd_dump_page_tables,
+    .quiesce = vtd_quiesce,
 };
 
 const struct iommu_init_ops __initconstrel intel_iommu_init_ops = {
