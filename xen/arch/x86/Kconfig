@@ -383,6 +383,16 @@ config ALTP2M
 
 	  If unsure, stay with defaults.
 
+config UCODE_SCAN_DEFAULT
+	bool "Scan for microcode by default"
+	help
+	  During boot, Xen can scan the multiboot images for a CPIO archive
+	  containing CPU microcode to be loaded, which is Linux's mechanism for
+	  early microcode loading.
+
+	  Enable if you have a Linux-based dom0 with microcode attached to the
+	  initramfs.
+
 endmenu
 
 source "common/Kconfig"

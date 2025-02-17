@@ -100,7 +100,7 @@ static struct microcode_patch *microcode_cache;
  * location we require that they are not both active together.
  */
 static int __initdata opt_mod_idx;
-static bool __initdata opt_scan;
+static bool __initdata opt_scan = IS_ENABLED(CONFIG_UCODE_SCAN_DEFAULT);
 
 /*
  * Used by the EFI path only, when xen.cfg identifies an explicit microcode

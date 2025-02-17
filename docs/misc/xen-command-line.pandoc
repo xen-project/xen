@@ -2724,7 +2724,7 @@ performance.
 > `= List of [ <integer> | scan=<bool>, nmi=<bool> ]`
 
     Applicability: x86
-    Default: `nmi`
+    Default: `scan` is selectable via Kconfig, `nmi=true`
 
 Controls for CPU microcode loading. For early loading, this parameter can
 specify how and where to find the microcode update blob. For late loading,
@@ -2747,7 +2747,8 @@ microcode in the cpio name space must be:
   - on Intel: kernel/x86/microcode/GenuineIntel.bin
   - on AMD  : kernel/x86/microcode/AuthenticAMD.bin
 When using xen.efi, the `ucode=<filename>` config file setting takes
-precedence over `scan`.
+precedence over `scan`. The default value for `scan` is set with
+`CONFIG_UCODE_SCAN_DEFAULT`.
 
 'nmi' determines late loading is performed in NMI handler or just in
 stop_machine context. In NMI handler, even NMIs are blocked, which is
