@@ -1606,3 +1606,20 @@ void cf_check amd_iommu_resume(void)
         invalidate_all_domain_pages();
     }
 }
+
+void cf_check amd_iommu_quiesce(void)
+{
+    struct amd_iommu *iommu;
+
+    for_each_amd_iommu ( iommu )
+    {
+        if ( iommu->ctrl.int_cap_xt_en )
+        {
+            iommu->ctrl.int_cap_xt_en = false;
+            writeq(iommu->ctrl.raw,
+                   iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
+        }
+        else
+            amd_iommu_msi_enable(iommu, IOMMU_CONTROL_DISABLED);
+    }
+}
