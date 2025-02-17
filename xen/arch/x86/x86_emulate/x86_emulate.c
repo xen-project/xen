@@ -513,7 +513,7 @@ static inline void put_loop_count(
         regs->r(cx) = ad_bytes == 4 ? (uint32_t)count : count;
 }
 
-#define get_rep_prefix(using_si, using_di) ({                           \
+#define get_rep_prefix(extend_si, extend_di) ({                         \
     unsigned long max_reps = 1;                                         \
     if ( rep_prefix() )                                                 \
         max_reps = get_loop_count(&_regs, ad_bytes);                    \
@@ -521,14 +521,14 @@ static inline void put_loop_count(
     {                                                                   \
         /*                                                              \
          * Skip the instruction if no repetitions are required, but     \
-         * zero extend involved registers first when using 32-bit       \
+         * zero extend relevant registers first when using 32-bit       \
          * addressing in 64-bit mode.                                   \
          */                                                             \
-        if ( mode_64bit() && ad_bytes == 4 )                            \
+        if ( !amd_like(ctxt) && mode_64bit() && ad_bytes == 4 )         \
         {                                                               \
             _regs.r(cx) = 0;                                            \
-            if ( using_si ) _regs.r(si) = (uint32_t)_regs.r(si);        \
-            if ( using_di ) _regs.r(di) = (uint32_t)_regs.r(di);        \
+            if ( extend_si ) _regs.r(si) = _regs.esi;                   \
+            if ( extend_di ) _regs.r(di) = _regs.edi;                   \
         }                                                               \
         goto complete_insn;                                             \
     }                                                                   \
@@ -1815,7 +1815,7 @@ x86_emulate(
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
         if ( (rc = ioport_access_check(port, dst.bytes, ctxt, ops)) != 0 )
             goto done;
-        nr_reps = get_rep_prefix(false, true);
+        nr_reps = get_rep_prefix(false, false /* don't extend RSI/RDI */);
         dst.mem.off = truncate_ea_and_reps(_regs.r(di), nr_reps, dst.bytes);
         dst.mem.seg = x86_seg_es;
         /* Try the presumably most efficient approach first. */
@@ -1857,7 +1857,7 @@ x86_emulate(
         dst.bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
         if ( (rc = ioport_access_check(port, dst.bytes, ctxt, ops)) != 0 )
             goto done;
-        nr_reps = get_rep_prefix(true, false);
+        nr_reps = get_rep_prefix(false, false /* don't extend RSI/RDI */);
         ea.mem.off = truncate_ea_and_reps(_regs.r(si), nr_reps, dst.bytes);
         /* Try the presumably most efficient approach first. */
         if ( !ops->rep_outs )
@@ -2194,7 +2194,7 @@ x86_emulate(
     case 0xa6 ... 0xa7: /* cmps */ {
         unsigned long next_eip = _regs.r(ip);
 
-        get_rep_prefix(true, true);
+        get_rep_prefix(false, false /* don't extend RSI/RDI */);
         src.bytes = dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         if ( (rc = read_ulong(ea.mem.seg, truncate_ea(_regs.r(si)),
                               &dst.val, dst.bytes, ctxt, ops)) ||
@@ -2236,7 +2236,7 @@ x86_emulate(
     }
 
     case 0xac ... 0xad: /* lods */
-        get_rep_prefix(true, false);
+        get_rep_prefix(false, false /* don't extend RSI/RDI */);
         if ( (rc = read_ulong(ea.mem.seg, truncate_ea(_regs.r(si)),
                               &dst.val, dst.bytes, ctxt, ops)) != 0 )
             goto done;
@@ -2247,7 +2247,7 @@ x86_emulate(
     case 0xae ... 0xaf: /* scas */ {
         unsigned long next_eip = _regs.r(ip);
 
-        get_rep_prefix(false, true);
+        get_rep_prefix(false, false /* don't extend RSI/RDI */);
         if ( (rc = read_ulong(x86_seg_es, truncate_ea(_regs.r(di)),
                               &dst.val, src.bytes, ctxt, ops)) != 0 )
             goto done;
