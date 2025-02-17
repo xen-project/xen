@@ -68,6 +68,11 @@ bool pcidevs_locked(void)
     return !!spin_is_locked(&_pcidevs_lock);
 }
 
+bool pcidevs_trylock_unsafe(void)
+{
+    return spin_trylock_recursive(&_pcidevs_lock);
+}
+
 static RADIX_TREE(pci_segments);
 
 static inline struct pci_seg *get_pseg(u16 seg)
@@ -1689,6 +1694,43 @@ int iommu_do_pci_domctl(
     }
 
     return ret;
+}
+
+struct segment_iter {
+    int (*handler)(struct pci_dev *pdev, void *arg);
+    void *arg;
+    int rc;
+};
+
+static int cf_check iterate_all(struct pci_seg *pseg, void *arg)
+{
+    struct segment_iter *iter = arg;
+    struct pci_dev *pdev;
+
+    list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
+    {
+        int rc = iter->handler(pdev, iter->arg);
+
+        if ( !iter->rc )
+            iter->rc = rc;
+    }
+
+    return 0;
+}
+
+/*
+ * Iterate without locking or preemption over all PCI devices known by Xen.
+ * Can be called with interrupts disabled.
+ */
+int pci_iterate_devices(int (*handler)(struct pci_dev *pdev, void *arg),
+                        void *arg)
+{
+    struct segment_iter iter = {
+        .handler = handler,
+        .arg = arg,
+    };
+
+    return pci_segments_iterate(iterate_all, &iter) ?: iter.rc;
 }
 
 /*
