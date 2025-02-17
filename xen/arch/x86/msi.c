@@ -1245,6 +1245,24 @@ void pci_cleanup_msi(struct pci_dev *pdev)
     msi_free_irqs(pdev);
 }
 
+static int cf_check disable_msi(struct pci_dev *pdev, void *arg)
+{
+    msi_set_enable(pdev, 0);
+    msix_set_enable(pdev, 0);
+
+    return 0;
+}
+
+/* Disable MSI and/or MSI-X on all devices known by Xen. */
+void pci_disable_msi_all(void)
+{
+    int rc = pci_iterate_devices(disable_msi, NULL);
+
+    if ( rc )
+        printk(XENLOG_ERR
+               "Failed to disable MSI(-X) on some devices: %d\n", rc);
+}
+
 int pci_reset_msix_state(struct pci_dev *pdev)
 {
     unsigned int pos = pci_find_cap_offset(pdev->sbdf, PCI_CAP_ID_MSIX);

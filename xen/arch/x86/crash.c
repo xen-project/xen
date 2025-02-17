@@ -175,6 +175,16 @@ static void nmi_shootdown_cpus(void)
          */
         x2apic_enabled = (current_local_apic_mode() == APIC_MODE_X2APIC);
 
+        if ( pcidevs_trylock() )
+        {
+            /*
+             * Assume the PCI device list to be in a consistent state if the
+             * lock is not held when the crash happened.
+             */
+            pci_disable_msi_all();
+            pcidevs_unlock();
+        }
+
         disable_IO_APIC();
         hpet_disable();
     }
