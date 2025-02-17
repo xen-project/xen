@@ -32,7 +32,7 @@ static DECLARE_SOFTIRQ_TASKLET(amd_iommu_irq_tasklet, do_amd_iommu_irq, NULL);
 unsigned int __read_mostly amd_iommu_acpi_info;
 unsigned int __read_mostly ivrs_bdf_entries;
 u8 __read_mostly ivhd_type;
-static struct radix_tree_root ivrs_maps;
+static RADIX_TREE(ivrs_maps);
 LIST_HEAD_READ_MOSTLY(amd_iommu_head);
 bool iommuv2_enabled;
 
@@ -1406,7 +1406,6 @@ int __init amd_iommu_prepare(bool xt)
         goto error_out;
     ivrs_bdf_entries = rc;
 
-    radix_tree_init(&ivrs_maps);
     for_each_amd_iommu ( iommu )
     {
         rc = amd_iommu_prepare_one(iommu);

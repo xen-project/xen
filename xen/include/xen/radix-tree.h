@@ -72,6 +72,9 @@ struct radix_tree_root {
  *** radix-tree API starts here **
  */
 
+#define RADIX_TREE_INIT() {}
+#define RADIX_TREE(name) struct radix_tree_root name = RADIX_TREE_INIT()
+
 void radix_tree_init(struct radix_tree_root *root);
 
 void radix_tree_destroy(

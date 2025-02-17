@@ -68,7 +68,7 @@ bool pcidevs_locked(void)
     return !!spin_is_locked(&_pcidevs_lock);
 }
 
-static struct radix_tree_root pci_segments;
+static RADIX_TREE(pci_segments);
 
 static inline struct pci_seg *get_pseg(u16 seg)
 {
@@ -124,7 +124,6 @@ static int pci_segments_iterate(
 
 void __init pci_segments_init(void)
 {
-    radix_tree_init(&pci_segments);
     if ( !alloc_pseg(0) )
         panic("Could not initialize PCI segment 0\n");
 }
