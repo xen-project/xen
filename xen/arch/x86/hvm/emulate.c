@@ -937,7 +937,7 @@ static int hvmemul_phys_mmio_access(
     }
 
     /* Accesses must not overflow the cache's buffer. */
-    if ( size > sizeof(cache->buffer) )
+    if ( offset + size > sizeof(cache->buffer) )
     {
         ASSERT_UNREACHABLE();
         return X86EMUL_UNHANDLEABLE;
