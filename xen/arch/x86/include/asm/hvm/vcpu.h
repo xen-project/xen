@@ -22,17 +22,6 @@ struct hvm_vcpu_asid {
     uint32_t asid;
 };
 
-/*
- * We may read or write up to m512 as a number of device-model
- * transactions.
- */
-struct hvm_mmio_cache {
-    unsigned long gla;
-    unsigned int size;
-    uint8_t dir;
-    uint8_t buffer[64] __aligned(sizeof(long));
-};
-
 struct hvm_vcpu_io {
     /*
      * HVM emulation:
@@ -48,7 +37,7 @@ struct hvm_vcpu_io {
      * We may need to handle up to 3 distinct memory accesses per
      * instruction.
      */
-    struct hvm_mmio_cache mmio_cache[3];
+    struct hvm_mmio_cache *mmio_cache[3];
     unsigned int mmio_cache_count;
 
     /* For retries we shouldn't re-fetch the instruction. */
