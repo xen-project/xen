@@ -1147,7 +1147,7 @@ static int linear_read(unsigned long addr, unsigned int bytes, void *p_data,
     pagefault_info_t pfinfo;
     struct hvm_vcpu_io *hvio = &current->arch.hvm.hvm_io;
     unsigned int offset = addr & ~PAGE_MASK;
-    int rc = HVMTRANS_bad_gfn_to_mfn;
+    int rc;
 
     if ( offset + bytes > PAGE_SIZE )
     {
@@ -1155,11 +1155,15 @@ static int linear_read(unsigned long addr, unsigned int bytes, void *p_data,
 
         /* Split the access at the page boundary. */
         rc = linear_read(addr, part1, p_data, pfec, hvmemul_ctxt);
-        if ( rc == X86EMUL_OKAY )
-            rc = linear_read(addr + part1, bytes - part1, p_data + part1,
-                             pfec, hvmemul_ctxt);
-        return rc;
+        if ( rc != X86EMUL_OKAY )
+            return rc;
+
+        addr += part1;
+        bytes -= part1;
+        p_data += part1;
     }
+
+    rc = HVMTRANS_bad_gfn_to_mfn;
 
     /*
      * If there is an MMIO cache entry for the access then we must be re-issuing
@@ -1202,7 +1206,7 @@ static int linear_write(unsigned long addr, unsigned int bytes, void *p_data,
     pagefault_info_t pfinfo;
     struct hvm_vcpu_io *hvio = &current->arch.hvm.hvm_io;
     unsigned int offset = addr & ~PAGE_MASK;
-    int rc = HVMTRANS_bad_gfn_to_mfn;
+    int rc;
 
     if ( offset + bytes > PAGE_SIZE )
     {
@@ -1210,11 +1214,15 @@ static int linear_write(unsigned long addr, unsigned int bytes, void *p_data,
 
         /* Split the access at the page boundary. */
         rc = linear_write(addr, part1, p_data, pfec, hvmemul_ctxt);
-        if ( rc == X86EMUL_OKAY )
-            rc = linear_write(addr + part1, bytes - part1, p_data + part1,
-                              pfec, hvmemul_ctxt);
-        return rc;
+        if ( rc != X86EMUL_OKAY )
+            return rc;
+
+        addr += part1;
+        bytes -= part1;
+        p_data += part1;
     }
+
+    rc = HVMTRANS_bad_gfn_to_mfn;
 
     /*
      * If there is an MMIO cache entry for the access then we must be re-issuing
