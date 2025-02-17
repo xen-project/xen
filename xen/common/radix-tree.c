@@ -52,12 +52,6 @@ struct rcu_node {
 	struct rcu_head rcu_head;
 };
 
-static struct radix_tree_node *cf_check rcu_node_alloc(void *arg)
-{
-	struct rcu_node *rcu_node = xmalloc(struct rcu_node);
-	return rcu_node ? &rcu_node->node : NULL;
-}
-
 static void cf_check _rcu_node_free(struct rcu_head *head)
 {
 	struct rcu_node *rcu_node =
@@ -65,26 +59,20 @@ static void cf_check _rcu_node_free(struct rcu_head *head)
 	xfree(rcu_node);
 }
 
-static void cf_check rcu_node_free(struct radix_tree_node *node, void *arg)
-{
-	struct rcu_node *rcu_node = container_of(node, struct rcu_node, node);
-	call_rcu(&rcu_node->rcu_head, _rcu_node_free);
-}
-
 static struct radix_tree_node *radix_tree_node_alloc(
 	struct radix_tree_root *root)
 {
-	struct radix_tree_node *ret;
-	ret = root->node_alloc(root->node_alloc_free_arg);
-	if (ret)
-		memset(ret, 0, sizeof(*ret));
-	return ret;
+	struct rcu_node *rcu_node = xzalloc(struct rcu_node);
+
+	return rcu_node ? &rcu_node->node : NULL;
 }
 
 static void radix_tree_node_free(
 	struct radix_tree_root *root, struct radix_tree_node *node)
 {
-	root->node_free(node, root->node_alloc_free_arg);
+	struct rcu_node *rcu_node = container_of(node, struct rcu_node, node);
+
+	call_rcu(&rcu_node->rcu_head, _rcu_node_free);
 }
 
 /*
@@ -717,19 +705,6 @@ void radix_tree_destroy(
 void radix_tree_init(struct radix_tree_root *root)
 {
 	memset(root, 0, sizeof(*root));
-	root->node_alloc = rcu_node_alloc;
-	root->node_free = rcu_node_free;
-}
-
-void radix_tree_set_alloc_callbacks(
-	struct radix_tree_root *root,
-	radix_tree_alloc_fn_t *node_alloc,
-	radix_tree_free_fn_t *node_free,
-	void *node_alloc_free_arg)
-{
-	root->node_alloc = node_alloc;
-	root->node_free = node_free;
-	root->node_alloc_free_arg = node_alloc_free_arg;
 }
 
 static __init unsigned long __maxindex(unsigned int height)
