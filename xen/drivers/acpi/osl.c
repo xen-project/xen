@@ -45,23 +45,6 @@ ACPI_MODULE_NAME("osl")
 #include CONFIG_ACPI_CUSTOM_DSDT_FILE
 #endif
 
-void __init acpi_os_printf(const char *fmt, ...)
-{
-	va_list args;
-	va_start(args, fmt);
-	acpi_os_vprintf(fmt, args);
-	va_end(args);
-}
-
-void __init acpi_os_vprintf(const char *fmt, va_list args)
-{
-	static char buffer[512];
-
-	vsnprintf(buffer, sizeof(buffer), fmt, args);
-
-	printk("%s", buffer);
-}
-
 acpi_physical_address __initdata rsdp_hint;
 
 acpi_physical_address __init acpi_os_get_root_pointer(void)

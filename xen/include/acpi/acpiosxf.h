@@ -82,8 +82,7 @@ acpi_os_write_memory(acpi_physical_address address, u32 value, u32 width);
 /*
  * Debug print routines
  */
-void ACPI_INTERNAL_VAR_XFACE acpi_os_printf(const char *format, ...);
-
-void acpi_os_vprintf(const char *format, va_list args);
+#define acpi_os_printf printk
+#define acpi_os_vprintf vprintk
 
 #endif				/* __ACPIOSXF_H__ */
