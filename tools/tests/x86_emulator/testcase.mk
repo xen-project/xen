@@ -4,7 +4,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 $(call cc-options-add,CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
 
-CFLAGS += -fno-builtin -g0 $($(TESTCASE)-cflags)
+CFLAGS += -fno-builtin -fno-stack-protector -g0 $($(TESTCASE)-cflags)
 
 LDFLAGS_DIRECT += $(shell { $(LD) -v --warn-rwx-segments; } >/dev/null 2>&1 && echo --no-warn-rwx-segments)
 

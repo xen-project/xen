@@ -435,6 +435,8 @@ else
 CFLAGS_UBSAN :=
 endif
 
+CFLAGS += -fno-stack-protector
+
 ifeq ($(CONFIG_LTO),y)
 CFLAGS += -flto
 LDFLAGS-$(CONFIG_CC_IS_CLANG) += -plugin LLVMgold.so

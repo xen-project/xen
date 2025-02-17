@@ -11,6 +11,8 @@ ifneq ($(debug),y)
 CFLAGS += -DNDEBUG
 endif
 
+CFLAGS += -fno-stack-protector
+
 $(call cc-options-add,CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
 
 $(call cc-option-add,CFLAGS,CC,-fcf-protection=none)
