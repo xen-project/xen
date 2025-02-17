@@ -27,6 +27,18 @@
 #include <asm/iocap.h>
 #include <asm/vm_event.h>
 
+/*
+ * We may read or write up to m512 or up to a tile row as a number of
+ * device-model transactions.
+ */
+struct hvm_mmio_cache {
+    unsigned long gla;
+    unsigned int size;     /* Amount of buffer[] actually used. */
+    unsigned int space:31; /* Allocated size of buffer[]. */
+    unsigned int dir:1;
+    uint8_t buffer[] __aligned(sizeof(long));
+};
+
 struct hvmemul_cache
 {
     /* The cache is disabled as long as num_ents > max_ents. */
@@ -937,7 +949,7 @@ static int hvmemul_phys_mmio_access(
     }
 
     /* Accesses must not overflow the cache's buffer. */
-    if ( offset + size > sizeof(cache->buffer) )
+    if ( offset + size > cache->space )
     {
         ASSERT_UNREACHABLE();
         return X86EMUL_UNHANDLEABLE;
@@ -1013,7 +1025,7 @@ static struct hvm_mmio_cache *hvmemul_find_mmio_cache(
 
     for ( i = 0; i < hvio->mmio_cache_count; i ++ )
     {
-        cache = &hvio->mmio_cache[i];
+        cache = hvio->mmio_cache[i];
 
         if ( gla == cache->gla &&
              dir == cache->dir )
@@ -1029,10 +1041,11 @@ static struct hvm_mmio_cache *hvmemul_find_mmio_cache(
 
     ++hvio->mmio_cache_count;
 
-    cache = &hvio->mmio_cache[i];
-    memset(cache, 0, sizeof (*cache));
+    cache = hvio->mmio_cache[i];
+    memset(cache->buffer, 0, cache->space);
 
     cache->gla = gla;
+    cache->size = 0;
     cache->dir = dir;
 
     return cache;
@@ -2978,16 +2991,21 @@ void hvm_dump_emulation_state(const char *loglvl, const char *prefix,
 int hvmemul_cache_init(struct vcpu *v)
 {
     /*
-     * No insn can access more than 16 independent linear addresses (AVX512F
-     * scatters/gathers being the worst). Each such linear range can span a
-     * page boundary, i.e. may require two page walks. Account for each insn
-     * byte individually, for simplicity.
+     * AVX512F scatter/gather insns can access up to 16 independent linear
+     * addresses, up to 8 bytes size. Each such linear range can span a page
+     * boundary, i.e. may require two page walks.
      */
-    const unsigned int nents = (CONFIG_PAGING_LEVELS + 1) *
-                               (MAX_INST_LEN + 16 * 2);
-    struct hvmemul_cache *cache = xmalloc_flex_struct(struct hvmemul_cache,
-                                                      ents, nents);
+    unsigned int nents = 16 * 2 * (CONFIG_PAGING_LEVELS + 1);
+    unsigned int i, max_bytes = 64;
+    struct hvmemul_cache *cache;
 
+    /*
+     * Account for each insn byte individually, both for simplicity and to
+     * leave some slack space.
+     */
+    nents += MAX_INST_LEN * (CONFIG_PAGING_LEVELS + 1);
+
+    cache = xmalloc_flex_struct(struct hvmemul_cache, ents, nents);
     if ( !cache )
         return -ENOMEM;
 
@@ -2996,6 +3014,15 @@ int hvmemul_cache_init(struct vcpu *v)
     cache->max_ents = nents;
 
     v->arch.hvm.hvm_io.cache = cache;
+
+    for ( i = 0; i < ARRAY_SIZE(v->arch.hvm.hvm_io.mmio_cache); ++i )
+    {
+        v->arch.hvm.hvm_io.mmio_cache[i] =
+            xmalloc_flex_struct(struct hvm_mmio_cache, buffer, max_bytes);
+        if ( !v->arch.hvm.hvm_io.mmio_cache[i] )
+            return -ENOMEM;
+        v->arch.hvm.hvm_io.mmio_cache[i]->space = max_bytes;
+    }
 
     return 0;
 }
