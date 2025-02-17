@@ -648,6 +648,19 @@ bool __init cf_check iov_supports_xt(void)
     if ( !iommu_enable || !iommu_intremap )
         return false;
 
+    if ( unlikely(!cpu_has_cx16) )
+    {
+        AMD_IOMMU_ERROR("no CMPXCHG16B support, disabling IOMMU\n");
+        /*
+         * Disable IOMMU support at once: there's no reason to check for CX16
+         * yet again when attempting to initialize IOMMU DMA remapping
+         * functionality or interrupt remapping without x2APIC support.
+         */
+        iommu_enable = false;
+        iommu_intremap = iommu_intremap_off;
+        return false;
+    }
+
     if ( amd_iommu_prepare(true) )
         return false;
 
