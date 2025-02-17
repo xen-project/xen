@@ -1157,7 +1157,7 @@ static unsigned int resource_max_frames(const struct domain *d,
         return d->vmtrace_size >> PAGE_SHIFT;
 
     default:
-        return -EOPNOTSUPP;
+        return 0;
     }
 }
 
@@ -1240,6 +1240,7 @@ static int _acquire_resource(
         return acquire_vmtrace_buf(d, id, frame, nr_frames, mfn_list);
 
     default:
+        ASSERT_UNREACHABLE();
         return -EOPNOTSUPP;
     }
 }
