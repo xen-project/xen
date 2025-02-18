@@ -107,7 +107,7 @@ int map_range_to_domain(const struct dt_device_node *dev,
     {
         res = rangeset_add_range(mr_data->iomem_ranges,
                                  paddr_to_pfn(addr),
-                                 paddr_to_pfn_aligned(addr + len - 1));
+                                 paddr_to_pfn(addr + len - 1));
         if ( res )
             return res;
     }
