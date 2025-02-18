@@ -71,7 +71,7 @@ int map_range_to_domain(const struct dt_device_node *dev,
                      strlen("/reserved-memory/")) != 0 )
     {
         res = iomem_permit_access(d, paddr_to_pfn(addr),
-                paddr_to_pfn(PAGE_ALIGN(addr + len - 1)));
+                                  paddr_to_pfn(addr + len - 1));
         if ( res )
         {
             printk(XENLOG_ERR "Unable to permit to dom%d access to"
