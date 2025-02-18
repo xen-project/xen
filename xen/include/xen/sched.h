@@ -651,7 +651,7 @@ struct domain
     unsigned int num_llc_colors;
     const unsigned int *llc_colors;
 #endif
-};
+} __aligned(PAGE_SIZE);
 
 static inline struct page_list_head *page_to_list(
     struct domain *d, const struct page_info *pg)
