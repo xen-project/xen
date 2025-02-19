@@ -51,6 +51,7 @@ kind of development environment.
    :maxdepth: 2
 
    hypervisor-guide/index
+   misc/ci
 
 
 Unsorted documents
