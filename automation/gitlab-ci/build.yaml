@@ -12,6 +12,12 @@
       - '*/*.log'
     when: always
   needs: []
+  rules:
+  - if: $SELECTED_JOBS_ONLY && $CI_JOB_NAME =~ $SELECTED_JOBS_ONLY
+    when: always
+  - if: $SELECTED_JOBS_ONLY
+    when: never
+  - when: on_success
 
 .gcc-tmpl:
   variables: &gcc
