@@ -637,14 +637,13 @@ static void cf_check init_intel(struct cpuinfo_x86 *c)
 	/* Work around errata */
 	Intel_errata_workarounds(c);
 
-	if ((c->x86 == 0xf && c->x86_model >= 0x03) ||
-		(c->x86 == 0x6 && c->x86_model >= 0x0e))
-		__set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
 	if (cpu_has(c, X86_FEATURE_ITSC)) {
 		__set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
 		__set_bit(X86_FEATURE_NONSTOP_TSC, c->x86_capability);
 		__set_bit(X86_FEATURE_TSC_RELIABLE, c->x86_capability);
-	}
+	} else if ((c->vfm >= INTEL_P4_PRESCOTT && c->vfm <= INTEL_P4_CEDARMILL) ||
+	           (c->vfm >= INTEL_CORE_YONAH && c->vfm <= INTEL_IVYBRIDGE))
+		__set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
 
 	if ((opt_cpu_info && !(c->apicid & (c->x86_num_siblings - 1))) ||
 	    c == &boot_cpu_data )
