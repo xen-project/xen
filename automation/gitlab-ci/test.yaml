@@ -130,6 +130,7 @@
     PCIDEV: "03:00.0"
     PCIDEV_INTR: "MSI-X"
     CONSOLE_OPTS: "console=com1 com1=115200,8n1"
+    SUT_ADDR: test-2.testnet
   artifacts:
     paths:
       - smoke.serial
@@ -270,6 +271,28 @@ adl-pvshim-x86-64-gcc-debug:
   extends: .adl-x86-64
   script:
     - ./automation/scripts/qubes-x86-64.sh pvshim 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+adl-tools-tests-pv-x86-64-gcc-debug:
+  extends: .adl-x86-64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh tools-tests-pv 2>&1 | tee ${LOGFILE}
+  artifacts:
+    reports:
+      junit: tests-junit.xml
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+adl-tools-tests-pvh-x86-64-gcc-debug:
+  extends: .adl-x86-64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh tools-tests-pvh 2>&1 | tee ${LOGFILE}
+  artifacts:
+    reports:
+      junit: tests-junit.xml
   needs:
     - *x86-64-test-needs
     - alpine-3.18-gcc-debug
