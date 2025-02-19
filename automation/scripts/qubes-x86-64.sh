@@ -144,26 +144,28 @@ disk = [ ]
 ${domU_extra_config}
 "
 
-# DomU
-mkdir -p rootfs
-cd rootfs
-# fakeroot is needed to preserve device nodes in rootless podman container
-fakeroot -s ../fakeroot-save tar xzf ../binaries/initrd.tar.gz
-mkdir proc
-mkdir run
-mkdir srv
-mkdir sys
-rm var/run
-echo "#!/bin/sh
+if [ -n "$domU_check" ]; then
+    # DomU
+    mkdir -p rootfs
+    cd rootfs
+    # fakeroot is needed to preserve device nodes in rootless podman container
+    fakeroot -s ../fakeroot-save tar xzf ../binaries/initrd.tar.gz
+    mkdir proc
+    mkdir run
+    mkdir srv
+    mkdir sys
+    rm var/run
+    echo "#!/bin/sh
 
 ${domU_check}
 " > etc/local.d/xen.start
-chmod +x etc/local.d/xen.start
-echo "rc_verbose=yes" >> etc/rc.conf
-sed -i -e 's/^Welcome/domU \0/' etc/issue
-find . | fakeroot -i ../fakeroot-save cpio -H newc -o | gzip > ../binaries/domU-rootfs.cpio.gz
-cd ..
-rm -rf rootfs
+    chmod +x etc/local.d/xen.start
+    echo "rc_verbose=yes" >> etc/rc.conf
+    sed -i -e 's/^Welcome/domU \0/' etc/issue
+    find . | fakeroot -i ../fakeroot-save cpio -H newc -o | gzip > ../binaries/domU-rootfs.cpio.gz
+    cd ..
+    rm -rf rootfs
+fi
 
 # DOM0 rootfs
 mkdir -p rootfs
@@ -188,11 +190,19 @@ ifconfig eth0 up
 ifconfig xenbr0 up
 ifconfig xenbr0 192.168.0.1
 
+" > etc/local.d/xen.start
+
+if [ -n "$domU_check" ]; then
+    echo "
 # get domU console content into test log
 tail -F /var/log/xen/console/guest-domU.log 2>/dev/null | sed -e \"s/^/(domU) /\" &
 xl create /etc/xen/domU.cfg
 ${dom0_check}
-" > etc/local.d/xen.start
+" >> etc/local.d/xen.start
+else
+    echo "${dom0_check}" >> etc/local.d/xen.start
+fi
+
 chmod +x etc/local.d/xen.start
 echo "$domU_config" > etc/xen/domU.cfg
 
@@ -201,7 +211,9 @@ echo "XENCONSOLED_TRACE=all" >> etc/default/xencommons
 echo "QEMU_XEN=/bin/false" >> etc/default/xencommons
 mkdir -p var/log/xen/console
 cp ../binaries/bzImage boot/vmlinuz
-cp ../binaries/domU-rootfs.cpio.gz boot/initrd-domU
+if [ -n "$domU_check" ]; then
+    cp ../binaries/domU-rootfs.cpio.gz boot/initrd-domU
+fi
 find . | fakeroot -i ../fakeroot-save cpio -H newc -o | gzip > ../binaries/dom0-rootfs.cpio.gz
 cd ..
 
