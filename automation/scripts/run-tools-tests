@@ -1,0 +1,47 @@
+#!/bin/bash
+
+usage() {
+    echo "Usage: $0 tests-dir xml-out"
+}
+
+xml_out=$2
+if [ -z "$xml_out" ]; then
+  xml_out=/dev/null
+fi
+printf '<?xml version="1.0" encoding="UTF-8"?>\n' > "$xml_out"
+printf '<testsuites name="tools.tests">\n' >> "$xml_out"
+printf ' <testsuite name="tools.tests">\n' >> "$xml_out"
+failed=
+for dir in "$1"/*; do
+    [ -d "$dir" ] || continue
+    echo "Running test in $dir"
+    printf '  <testcase name="%s">\n' "$dir" >> "$xml_out"
+    ret=
+    for f in "$dir"/*; do
+        [ -f "$f" ] || continue
+        [ -x "$f" ] || continue
+        "$f" 2>&1 | tee /tmp/out
+        ret=$?
+        if [ "$ret" -ne 0 ]; then
+            echo "FAILED: $ret"
+            failed+=" $dir"
+            printf '   <failure type="failure" message="binary %s exited with code %d">\n' "$f" "$ret" >> "$xml_out"
+            # TODO: could use xml escaping... but current tests seems to
+            # produce sane output
+            cat /tmp/out >> "$xml_out"
+            printf '   </failure>\n' >> "$xml_out"
+        else
+            echo "PASSED"
+        fi
+    done
+    if [ -z "$ret" ]; then
+        printf '   <skipped type="skipped" message="no executable test found in %s"/>\n' "$dir" >> "$xml_out"
+    fi
+    printf '  </testcase>\n' >> "$xml_out"
+done
+printf ' </testsuite>\n' >> "$xml_out"
+printf '</testsuites>\n' >> "$xml_out"
+
+if [ -n "$failed" ]; then
+    exit 1
+fi
