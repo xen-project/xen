@@ -779,6 +779,68 @@ static int __init alloc_xenstore_params(struct kernel_info *kinfo)
     return rc;
 }
 
+static void __init domain_vcpu_affinity(struct domain *d,
+                                        const struct dt_device_node *node)
+{
+    struct dt_device_node *np;
+
+    dt_for_each_child_node(node, np)
+    {
+        const char *hard_affinity_str = NULL;
+        uint32_t val;
+        int rc;
+        struct vcpu *v;
+        cpumask_t affinity;
+
+        if ( !dt_device_is_compatible(np, "xen,vcpu") )
+            continue;
+
+        if ( !dt_property_read_u32(np, "id", &val) )
+            panic("Invalid xen,vcpu node for domain %s\n", dt_node_name(node));
+
+        if ( val >= d->max_vcpus )
+            panic("Invalid vcpu_id %u for domain %s, max_vcpus=%u\n", val,
+                  dt_node_name(node), d->max_vcpus);
+
+        v = d->vcpu[val];
+        rc = dt_property_read_string(np, "hard-affinity", &hard_affinity_str);
+        if ( rc < 0 )
+            continue;
+
+        cpumask_clear(&affinity);
+        while ( *hard_affinity_str != '\0' )
+        {
+            unsigned int start, end;
+
+            start = simple_strtoul(hard_affinity_str, &hard_affinity_str, 0);
+
+            if ( *hard_affinity_str == '-' )    /* Range */
+            {
+                hard_affinity_str++;
+                end = simple_strtoul(hard_affinity_str, &hard_affinity_str, 0);
+            }
+            else                /* Single value */
+                end = start;
+
+            if ( end >= nr_cpu_ids )
+                panic("Invalid pCPU %u for domain %s\n", end, dt_node_name(node));
+
+            for ( ; start <= end; start++ )
+                cpumask_set_cpu(start, &affinity);
+
+            if ( *hard_affinity_str == ',' )
+                hard_affinity_str++;
+            else if ( *hard_affinity_str != '\0' )
+                break;
+        }
+
+        rc = vcpu_set_hard_affinity(v, &affinity);
+        if ( rc )
+            panic("vcpu%d: failed (rc=%d) to set hard affinity for domain %s\n",
+                  v->vcpu_id, rc, dt_node_name(node));
+    }
+}
+
 static int __init construct_domU(struct domain *d,
                                  const struct dt_device_node *node)
 {
@@ -879,6 +941,8 @@ static int __init construct_domU(struct domain *d,
     rc = construct_domain(d, &kinfo);
     if ( rc < 0 )
         return rc;
+
+    domain_vcpu_affinity(d, node);
 
     return alloc_xenstore_params(&kinfo);
 }

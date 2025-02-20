@@ -329,6 +329,28 @@ The ramdisk sub-node has the following properties:
     property because it will be created by the UEFI stub on boot.
     This option is needed only when UEFI boot is used.
 
+Under the "xen,domain" compatible node, it is possible optionally to add
+one or more sub-nodes to configure vCPU affinity. The vCPU affinity
+sub-node has the following properties:
+
+- compatible
+
+    "xen,vcpu"
+
+- id
+
+    A 32-bit integer that specifies the vCPU id. 0 is the first vCPU.
+    The last vCPU is cpus-1, where "cpus" is the number of vCPUs
+    specified with the "cpus" property under the "xen,domain" node.
+    Each "xen,vcpu" node must have a unique vCPU id.
+
+- hard-affinity
+
+    Optional. A string specifying the hard affinity configuration for the
+    vCPU: a comma-separated list of pCPUs or ranges of pCPUs is used.
+    Ranges are hyphen-separated intervals (such as `0-4`) and are inclusive
+    on both sides. The numbers refer to logical pCPU ids.
+
 
 Example
 =======
@@ -341,6 +363,18 @@ chosen {
         memory = <0 131072>;
         cpus = <2>;
         vpl011;
+
+        vcpu0 {
+            compatible = "xen,vcpu";
+            id = <0>;
+            hard-affinity = "0-3";
+        };
+
+        vcpu1 {
+            compatible = "xen,vcpu";
+            id = <1>;
+            hard-affinity = "1,4-7";
+        };
 
         module@0x4a000000 {
             compatible = "multiboot,kernel", "multiboot,module";
