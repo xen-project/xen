@@ -3797,6 +3797,7 @@ uint64_t hvm_get_reg(struct vcpu *v, unsigned int reg)
 {
     ASSERT(v == current || !vcpu_runnable(v));
 
+    /* SAF-12-safe */
     switch ( reg )
     {
     default:
@@ -3808,6 +3809,7 @@ void hvm_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
 {
     ASSERT(v == current || !vcpu_runnable(v));
 
+    /* SAF-12-safe */
     switch ( reg )
     {
     default:

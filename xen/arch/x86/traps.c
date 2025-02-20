@@ -436,6 +436,7 @@ unsigned long get_stack_trace_bottom(unsigned long sp)
 
 static unsigned long get_shstk_bottom(unsigned long sp)
 {
+    /* SAF-11-safe */
     switch ( get_stack_page(sp) )
     {
 #ifdef CONFIG_XEN_SHSTK

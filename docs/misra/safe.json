@@ -92,6 +92,22 @@
         },
         {
             "id": "SAF-11-safe",
+            "analyser": {
+                "eclair": "MC3A2.R16.6"
+            },
+            "name": "Rule 16.6: single clause due to kconfig",
+            "text": "A switch statement with a single switch clause because other switch clauses are disabled in a given kconfig is safe."
+        },
+        {
+            "id": "SAF-12-safe",
+            "analyser": {
+                "eclair": "MC3A2.R16.6"
+            },
+            "name": "Rule 16.6: single clause due to future expansion",
+            "text": "A switch statement with a single switch clause to purposely enable future additions of new cases is safe."
+        },
+        {
+            "id": "SAF-13-safe",
             "analyser": {},
             "name": "Sentinel",
             "text": "Next ID to be used"
