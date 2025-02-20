@@ -52,7 +52,7 @@
  * the element from the processing list.
  */
 
-typedef struct mctelem_cookie *mctelem_cookie_t;
+typedef struct mctelem_ent *mctelem_cookie_t;
 
 typedef enum mctelem_class {
     MC_URGENT,

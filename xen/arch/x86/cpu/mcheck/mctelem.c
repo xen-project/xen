@@ -64,8 +64,8 @@ struct mctelem_ent {
 
 #define MC_NENT (MC_URGENT_NENT + MC_NONURGENT_NENT)
 
-#define	COOKIE2MCTE(c)		((struct mctelem_ent *)(c))
-#define	MCTE2COOKIE(tep)	((mctelem_cookie_t)(tep))
+#define	COOKIE2MCTE(c)		(c)
+#define	MCTE2COOKIE(tep)	(tep)
 
 static struct mc_telem_ctl {
 	/* Linked lists that thread the array members together.
