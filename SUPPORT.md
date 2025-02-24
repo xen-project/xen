@@ -170,7 +170,7 @@ unexpected behavior or issues on some hardware.
 
 At least the following features are missing on a PVH dom0:
 
-  * PCI SR-IOV and Resizable BARs.
+  * PCI SR-IOV.
 
   * Native NMI forwarding (nmi=dom0 command line option).
 
