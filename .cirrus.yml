@@ -13,6 +13,7 @@ freebsd_template: &FREEBSD_ENV
   environment:
     APPEND_LIB: /usr/local/lib
     APPEND_INCLUDES: /usr/local/include
+    CIRRUS_CLONE_DEPTH: 1
 
 freebsd_full_build_template: &FREEBSD_FULL_BUILD_TEMPLATE
   << : *FREEBSD_ENV
