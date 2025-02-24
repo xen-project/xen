@@ -475,7 +475,7 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
             set_ire_sid(ire, SVT_VERIFY_SID_SQ, SQ_ALL_16,
                         PCI_BDF(bus, devfn));
         }
-        else if ( ret == 1 ) /* find upstream bridge */
+        else if ( ret == 1 ) /* found upstream bridge */
         {
             if ( pdev_type(seg, bus, devfn) == DEV_TYPE_PCIe2PCI_BRIDGE )
                 set_ire_sid(ire, SVT_VERIFY_BUS, SQ_ALL_16,
