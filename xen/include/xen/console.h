@@ -8,6 +8,7 @@
 #define __CONSOLE_H__
 
 #include <xen/inttypes.h>
+#include <xen/ctype.h>
 #include <public/xen.h>
 
 struct xen_sysctl_readconsole;
@@ -49,5 +50,10 @@ int console_resume(void);
 void console_serial_puts(const char *s, size_t nr);
 
 extern int8_t opt_console_xen;
+
+static inline bool is_console_printable(unsigned char c)
+{
+    return isprint(c) || c == '\n' || c == '\t';
+}
 
 #endif /* __CONSOLE_H__ */

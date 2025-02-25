@@ -24,7 +24,7 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/errno.h>
-#include <xen/ctype.h>
+#include <xen/console.h>
 #include <xen/serial.h>
 #include <asm/mmio.h>
 #include <xen/perfc.h>
@@ -79,8 +79,7 @@ static void vuart_print_char(struct vcpu *v, char c)
     struct domain *d = v->domain;
     struct vuart *uart = &d->arch.vuart;
 
-    /* Accept only printable characters, newline, and horizontal tab. */
-    if ( !isprint(c) && (c != '\n') && (c != '\t') )
+    if ( !is_console_printable(c) )
         return ;
 
     spin_lock(&uart->lock);

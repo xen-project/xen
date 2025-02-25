@@ -7,7 +7,6 @@
  * Copyright (c) 2008, Citrix Systems, Inc.
  */
 
-#include <xen/ctype.h>
 #include <xen/init.h>
 #include <xen/ioreq.h>
 #include <xen/lib.h>
@@ -30,6 +29,7 @@
 #include <xen/vpci.h>
 #include <xen/nospec.h>
 #include <xen/vm_event.h>
+#include <xen/console.h>
 #include <asm/shadow.h>
 #include <asm/hap.h>
 #include <asm/current.h>
@@ -561,8 +561,7 @@ static int cf_check hvm_print_line(
     if ( dir != IOREQ_WRITE )
         return X86EMUL_UNHANDLEABLE;
 
-    /* Accept only printable characters, newline, and horizontal tab. */
-    if ( !isprint(c) && (c != '\n') && (c != '\t') )
+    if ( !is_console_printable(c) )
         return X86EMUL_OKAY;
 
     spin_lock(&cd->pbuf_lock);
