@@ -2987,13 +2987,17 @@ static bool __init has_if_pschange_mc(void)
 
 const struct hvm_function_table * __init start_vmx(void)
 {
-    set_in_cr4(X86_CR4_VMXE);
+    write_cr4(read_cr4() | X86_CR4_VMXE);
 
     if ( vmx_vmcs_init() )
     {
+        write_cr4(read_cr4() & ~X86_CR4_VMXE);
         printk("VMX: failed to initialise.\n");
         return NULL;
     }
+
+    /* Arrange for APs to have CR4.VMXE set early on. */
+    set_in_cr4(X86_CR4_VMXE);
 
     vmx_function_table.caps.singlestep = cpu_has_monitor_trap_flag;
 
