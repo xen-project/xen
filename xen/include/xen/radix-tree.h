@@ -172,7 +172,7 @@ static inline void radix_tree_replace_slot(void **pslot, void *item)
  */
 static inline void *radix_tree_int_to_ptr(int val)
 {
-    long _ptr = ((long)val << 2) | 0x2l;
+    long _ptr = ((unsigned long)val << 2) | 2;
     ASSERT((_ptr >> 2) == val);
     return (void *)_ptr;
 }
