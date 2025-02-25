@@ -259,16 +259,7 @@ int x86_emul_blk(
         if ( s->op_bytes < sizeof(*fxsr) )
         {
             if ( s->rex_prefix & REX_W )
-            {
-                /*
-                 * The only way to force fxsaveq on a wide range of gas
-                 * versions. On older versions the rex64 prefix works only if
-                 * we force an addressing mode that doesn't require extended
-                 * registers.
-                 */
-                asm volatile ( ".byte 0x48; fxsave (%1)"
-                               : "=m" (*fxsr) : "R" (fxsr) );
-            }
+                asm volatile ( "fxsaveq %0" : "=m" (*fxsr) );
             else
                 asm volatile ( "fxsave %0" : "=m" (*fxsr) );
         }
@@ -285,11 +276,7 @@ int x86_emul_blk(
         generate_exception_if(fxsr->mxcsr & ~mxcsr_mask, X86_EXC_GP, 0);
 
         if ( s->rex_prefix & REX_W )
-        {
-            /* See above for why operand/constraints are this way. */
-            asm volatile ( ".byte 0x48; fxrstor (%1)"
-                           :: "m" (*fxsr), "R" (fxsr) );
-        }
+            asm volatile ( "fxrstorq %0" :: "m" (*fxsr) );
         else
             asm volatile ( "fxrstor %0" :: "m" (*fxsr) );
         break;
@@ -310,11 +297,7 @@ int x86_emul_blk(
             fxsr = ptr;
 
         if ( s->rex_prefix & REX_W )
-        {
-            /* See above for why operand/constraints are this way. */
-            asm volatile ( ".byte 0x48; fxsave (%1)"
-                           : "=m" (*fxsr) : "R" (fxsr) );
-        }
+            asm volatile ( "fxsaveq %0" : "=m" (*fxsr) );
         else
             asm volatile ( "fxsave %0" : "=m" (*fxsr) );
 
