@@ -47,7 +47,7 @@ bool arch_vcpu_ioreq_completion(enum vio_completion completion)
 
     default:
         ASSERT_UNREACHABLE();
-        break;
+        return false;
     }
 
     return true;

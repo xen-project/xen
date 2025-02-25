@@ -118,7 +118,7 @@ bool arch_vcpu_ioreq_completion(enum vio_completion completion);
 static inline bool arch_vcpu_ioreq_completion(enum vio_completion completion)
 {
     ASSERT_UNREACHABLE();
-    return true;
+    return false;
 }
 #endif
 
