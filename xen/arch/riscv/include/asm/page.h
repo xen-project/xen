@@ -208,6 +208,8 @@ static inline pte_t pte_from_mfn(mfn_t mfn, unsigned int flags)
     return (pte_t){ .pte = pte };
 }
 
+pte_t pt_walk(vaddr_t va, unsigned int *pte_level);
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* ASM__RISCV__PAGE_H */
