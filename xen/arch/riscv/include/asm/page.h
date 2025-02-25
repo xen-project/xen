@@ -210,6 +210,15 @@ static inline pte_t pte_from_mfn(mfn_t mfn, unsigned int flags)
 
 pte_t pt_walk(vaddr_t va, unsigned int *pte_level);
 
+static inline mfn_t _vmap_to_mfn(vaddr_t va)
+{
+    pte_t entry = pt_walk(va, NULL);
+
+    BUG_ON(!pte_is_mapping(entry));
+
+    return mfn_from_pte(entry);
+}
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* ASM__RISCV__PAGE_H */
