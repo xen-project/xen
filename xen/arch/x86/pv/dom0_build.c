@@ -886,7 +886,7 @@ static int __init dom0_construct(struct boot_info *bi, struct domain *d)
         si->flags    = SIF_PRIVILEGED | SIF_INITDOMAIN;
     if ( !vinitrd_start && initrd_len )
         si->flags   |= SIF_MOD_START_PFN;
-    si->flags       |= (xen_processor_pmbits << 8) & SIF_PM_MASK;
+    si->flags       |= MASK_INSR(xen_processor_pmbits, SIF_PM_MASK);
     si->pt_base      = vpt_start;
     si->nr_pt_frames = nr_pt_pages;
     si->mfn_list     = vphysmap_start;
