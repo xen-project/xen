@@ -60,16 +60,14 @@ static void cf_check _rcu_node_free(struct rcu_head *head)
 	xfree(rcu_node);
 }
 
-static struct radix_tree_node *radix_tree_node_alloc(
-	struct radix_tree_root *root)
+static struct radix_tree_node *radix_tree_node_alloc(void)
 {
 	struct rcu_node *rcu_node = xzalloc(struct rcu_node);
 
 	return rcu_node ? &rcu_node->node : NULL;
 }
 
-static void radix_tree_node_free(
-	struct radix_tree_root *root, struct radix_tree_node *node)
+static void radix_tree_node_free(struct radix_tree_node *node)
 {
 	struct rcu_node *rcu_node = container_of(node, struct rcu_node, node);
 
@@ -105,7 +103,7 @@ static int radix_tree_extend(struct radix_tree_root *root, unsigned long index)
 
 	do {
 		unsigned int newheight;
-		if (!(node = radix_tree_node_alloc(root)))
+		if (!(node = radix_tree_node_alloc()))
 			return -ENOMEM;
 
 		/* Increase the height.  */
@@ -156,7 +154,7 @@ int radix_tree_insert(struct radix_tree_root *root,
 	while (height > 0) {
 		if (slot == NULL) {
 			/* Have to add a child node.  */
-			if (!(slot = radix_tree_node_alloc(root)))
+			if (!(slot = radix_tree_node_alloc()))
 				return -ENOMEM;
 			slot->height = height;
 			if (node) {
@@ -575,7 +573,7 @@ static inline void radix_tree_shrink(struct radix_tree_root *root)
 			*((unsigned long *)&to_free->slots[0]) |=
 						RADIX_TREE_INDIRECT_PTR;
 
-		radix_tree_node_free(root, to_free);
+		radix_tree_node_free(to_free);
 	}
 }
 
@@ -640,7 +638,7 @@ void *radix_tree_delete(struct radix_tree_root *root, unsigned long index)
 		 * last reference to it disappears (set NULL, above).
 		 */
 		if (to_free)
-			radix_tree_node_free(root, to_free);
+			radix_tree_node_free(to_free);
 
 		if (pathp->node->count) {
 			if (pathp->node == indirect_to_ptr(root->rnode))
@@ -656,7 +654,7 @@ void *radix_tree_delete(struct radix_tree_root *root, unsigned long index)
 	root->height = 0;
 	root->rnode = NULL;
 	if (to_free)
-		radix_tree_node_free(root, to_free);
+		radix_tree_node_free(to_free);
 
 out:
 	return slot;
@@ -683,7 +681,7 @@ radix_tree_node_destroy(
 		}
 	}
 
-	radix_tree_node_free(root, node);
+	radix_tree_node_free(node);
 }
 
 void radix_tree_destroy(
