@@ -634,15 +634,12 @@ static void set_poll_bankmask(struct cpuinfo_x86 *c)
 }
 
 /* The perbank ctl/status init is platform specific because of AMD's quirk */
-static int mca_cap_init(void)
+static int mca_cap_init(bool bsp)
 {
     uint64_t msr_content;
     unsigned int nr, cpu = smp_processor_id();
 
     rdmsrl(MSR_IA32_MCG_CAP, msr_content);
-
-    if ( msr_content & MCG_CTL_P ) /* Control register present ? */
-        wrmsrl(MSR_IA32_MCG_CTL, 0xffffffffffffffffULL);
 
     per_cpu(nr_mce_banks, cpu) = nr = MASK_EXTR(msr_content, MCG_CAP_COUNT);
 
@@ -654,8 +651,11 @@ static int mca_cap_init(void)
         return -ENODEV;
     }
 
+    if ( !bsp && !mca_allbanks )
+        return -ENODATA;
+
     /* mcabanks_alloc depends on nr_mce_banks */
-    if ( !mca_allbanks || nr > mca_allbanks->num )
+    if ( bsp || nr > mca_allbanks->num )
     {
         unsigned int i;
         struct mca_banks *all = mcabanks_alloc(nr);
@@ -666,6 +666,9 @@ static int mca_cap_init(void)
             mcabanks_set(i, mca_allbanks);
         mcabanks_free(xchg(&mca_allbanks, all));
     }
+
+    if ( msr_content & MCG_CTL_P ) /* Control register present ? */
+        wrmsrl(MSR_IA32_MCG_CTL, ~0ULL);
 
     return 0;
 }
@@ -751,7 +754,7 @@ void mcheck_init(struct cpuinfo_x86 *c, bool bsp)
     }
 
     /*Hardware Enable */
-    if ( mca_cap_init() )
+    if ( mca_cap_init(bsp) )
         return;
 
     if ( !bsp )
