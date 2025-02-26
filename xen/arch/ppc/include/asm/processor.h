@@ -219,6 +219,8 @@ static inline void noreturn die(void)
  */
 #define cpu_relax() asm volatile ( "or %r1, %r1, %r1; or %r2, %r2, %r2" )
 
+#define dump_execution_state() run_in_exception_handler(show_execution_state)
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* _ASM_PPC_PROCESSOR_H */
