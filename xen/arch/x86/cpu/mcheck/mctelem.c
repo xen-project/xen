@@ -122,7 +122,6 @@ struct mc_telem_cpu_ctl {
 	 * to guarantee the above mutual exclusivity.
 	 */
 	struct mctelem_ent *pending, *lmce_pending;
-	struct mctelem_ent *processing;
 };
 static DEFINE_PER_CPU(struct mc_telem_cpu_ctl, mctctl);
 
@@ -233,9 +232,7 @@ void mctelem_process_deferred(unsigned int cpu,
 	 * handled by another round of MCE softirq.
 	 */
 	mctelem_xchg_head(lmce ? &ctl->lmce_pending : &ctl->pending,
-			  &this_cpu(mctctl.processing), NULL);
-
-	head = this_cpu(mctctl.processing);
+			  &head, NULL);
 
 	/*
 	 * Then, fix up the list to include prev pointers, to make
