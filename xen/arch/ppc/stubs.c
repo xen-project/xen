@@ -47,7 +47,7 @@ void send_timer_event(struct vcpu *v)
 
 void show_execution_state(const struct cpu_user_regs *regs)
 {
-    BUG_ON("unimplemented");
+    printk("TODO: Implement show_execution_state(regs)\n");
 }
 
 void arch_hypercall_tasklet_result(struct vcpu *v, long res)

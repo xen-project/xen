@@ -352,6 +352,9 @@ debian-12-ppc64le-gcc-debug:
     CONTAINER: debian:12-ppc64le
     KBUILD_DEFCONFIG: ppc64_defconfig
     HYPERVISOR_ONLY: y
+    EXTRA_XEN_CONFIG: |
+      CONFIG_UBSAN=y
+      CONFIG_UBSAN_FATAL=y
 
 debian-12-riscv64-gcc-debug:
   extends: .gcc-riscv64-cross-build-debug
