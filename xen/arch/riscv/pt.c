@@ -102,6 +102,9 @@ static pte_t *map_table(mfn_t mfn)
 
 static void unmap_table(const pte_t *table)
 {
+    if ( !table )
+        return;
+
     /*
      * During early boot, map_table() will not use map_domain_page()
      * but the PMAP.
@@ -245,14 +248,21 @@ pte_t pt_walk(vaddr_t va, unsigned int *pte_level)
     return pte;
 }
 
-/* Update an entry at the level @target. */
+/*
+ * Update an entry at the level @target.
+ *
+ * If `target` == CONFIG_PAGING_LEVELS, the search will continue until
+ * a leaf node is found.
+ * Otherwise, the page table entry will be searched at the requested
+ * `target` level.
+ * For an example of why this might be needed, see the comment in
+ * pt_update() before pt_update_entry() is called.
+ */
 static int pt_update_entry(mfn_t root, vaddr_t virt,
-                           mfn_t mfn, unsigned int target,
+                           mfn_t mfn, unsigned int *target,
                            unsigned int flags)
 {
     int rc;
-    unsigned int level = HYP_PT_ROOT_LEVEL;
-    pte_t *table;
     /*
      * The intermediate page table shouldn't be allocated when MFN isn't
      * valid and we are not populating page table.
@@ -263,43 +273,50 @@ static int pt_update_entry(mfn_t root, vaddr_t virt,
      * combinations of (mfn, flags).
     */
     bool alloc_tbl = !mfn_eq(mfn, INVALID_MFN) || (flags & PTE_POPULATE);
-    pte_t pte, *entry;
+    pte_t pte, *ptep = NULL;
 
-    /* convenience aliases */
-    DECLARE_OFFSETS(offsets, virt);
-
-    table = map_table(root);
-    for ( ; level > target; level-- )
+    if ( *target == CONFIG_PAGING_LEVELS )
+        ptep = _pt_walk(virt, target);
+    else
     {
-        rc = pt_next_level(alloc_tbl, &table, offsets[level]);
-        if ( rc == XEN_TABLE_MAP_NOMEM )
+        pte_t *table;
+        unsigned int level = HYP_PT_ROOT_LEVEL;
+        /* Convenience aliases */
+        DECLARE_OFFSETS(offsets, virt);
+
+        table = map_table(root);
+        for ( ; level > *target; level-- )
         {
-            rc = -ENOMEM;
+            rc = pt_next_level(alloc_tbl, &table, offsets[level]);
+            if ( rc == XEN_TABLE_MAP_NOMEM )
+            {
+                rc = -ENOMEM;
+                goto out;
+            }
+
+            if ( rc == XEN_TABLE_MAP_NONE )
+            {
+                rc = 0;
+                goto out;
+            }
+
+            if ( rc != XEN_TABLE_NORMAL )
+                break;
+        }
+
+        if ( level != *target )
+        {
+            dprintk(XENLOG_ERR,
+                    "%s: Shattering superpage is not supported\n", __func__);
+            rc = -EOPNOTSUPP;
             goto out;
         }
 
-        if ( rc == XEN_TABLE_MAP_NONE )
-        {
-            rc = 0;
-            goto out;
-        }
-
-        if ( rc != XEN_TABLE_NORMAL )
-            break;
+        ptep = table + offsets[level];
     }
-
-    if ( level != target )
-    {
-        dprintk(XENLOG_ERR,
-                "%s: Shattering superpage is not supported\n", __func__);
-        rc = -EOPNOTSUPP;
-        goto out;
-    }
-
-    entry = table + offsets[level];
 
     rc = -EINVAL;
-    if ( !pt_check_entry(*entry, mfn, flags) )
+    if ( !pt_check_entry(*ptep, mfn, flags) )
         goto out;
 
     /* We are removing the page */
@@ -316,7 +333,7 @@ static int pt_update_entry(mfn_t root, vaddr_t virt,
             pte = pte_from_mfn(mfn, PTE_VALID);
         else /* We are updating the permission => Copy the current pte. */
         {
-            pte = *entry;
+            pte = *ptep;
             pte.pte &= ~PTE_ACCESS_MASK;
         }
 
@@ -324,12 +341,12 @@ static int pt_update_entry(mfn_t root, vaddr_t virt,
         pte.pte |= (flags & PTE_ACCESS_MASK) | PTE_ACCESSED | PTE_DIRTY;
     }
 
-    write_pte(entry, pte);
+    write_pte(ptep, pte);
 
     rc = 0;
 
  out:
-    unmap_table(table);
+    unmap_table(ptep);
 
     return rc;
 }
@@ -422,16 +439,38 @@ static int pt_update(vaddr_t virt, mfn_t mfn,
 
     while ( left )
     {
-        unsigned int order, level;
+        unsigned int order, level = CONFIG_PAGING_LEVELS;
 
-        level = pt_mapping_level(vfn, mfn, left, flags);
-        order = XEN_PT_LEVEL_ORDER(level);
+        /*
+         * In the case when modifying or destroying a mapping, it is necessary
+         * to search until a leaf node is found, instead of searching for
+         * a page table entry based on the precalculated `level` and `order`
+         * (look at pt_update()).
+         * This is because when `mfn` == INVALID_MFN, the `mask`(in
+         * pt_mapping_level()) will take into account only `vfn`, which could
+         * accidentally return an incorrect level, leading to the discovery of
+         * an incorrect page table entry.
+         *
+         * For example, if `vfn` is page table level 1 aligned, but it was
+         * mapped as page table level 0, then pt_mapping_level() will return
+         * `level` = 1, since only `vfn` (which is page table level 1 aligned)
+         * is taken into account when `mfn` == INVALID_MFN
+         * (look at pt_mapping_level()).
+         *
+         * To force searching until a leaf node is found is necessary to have
+         * `level` == CONFIG_PAGING_LEVELS.
+         *
+         * For other cases (when a mapping is not being modified or destroyed),
+         * pt_mapping_level() should be used.
+         */
+        if ( !mfn_eq(mfn, INVALID_MFN) || (flags & PTE_POPULATE) )
+            level = pt_mapping_level(vfn, mfn, left, flags);
 
-        ASSERT(left >= BIT(order, UL));
-
-        rc = pt_update_entry(root, vfn << PAGE_SHIFT, mfn, level, flags);
+        rc = pt_update_entry(root, vfn << PAGE_SHIFT, mfn, &level, flags);
         if ( rc )
             break;
+
+        order = XEN_PT_LEVEL_ORDER(level);
 
         vfn += 1UL << order;
         if ( !mfn_eq(mfn, INVALID_MFN) )
