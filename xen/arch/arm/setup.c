@@ -237,16 +237,17 @@ void __init discard_initial_modules(void)
 }
 
 /* Relocate the FDT in Xen heap */
-static void * __init relocate_fdt(paddr_t dtb_paddr, size_t dtb_size)
+static void __init relocate_fdt(const void **dtb_vaddr, size_t dtb_size)
 {
     void *fdt = xmalloc_bytes(dtb_size);
 
     if ( !fdt )
         panic("Unable to allocate memory for relocating the Device-Tree.\n");
 
-    copy_from_paddr(fdt, dtb_paddr, dtb_size);
+    memcpy(fdt, *dtb_vaddr, dtb_size);
+    clean_dcache_va_range(fdt, dtb_size);
 
-    return fdt;
+    *dtb_vaddr = fdt;
 }
 
 void __init init_pdx(void)
@@ -362,7 +363,7 @@ void asmlinkage __init start_xen(unsigned long fdt_paddr)
     if ( acpi_disabled )
     {
         printk("Booting using Device Tree\n");
-        device_tree_flattened = relocate_fdt(fdt_paddr, fdt_size);
+        relocate_fdt(&device_tree_flattened, fdt_size);
         dt_unflatten_host_device_tree();
     }
     else
