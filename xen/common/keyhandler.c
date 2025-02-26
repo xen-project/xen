@@ -129,6 +129,10 @@ static void cf_check show_handlers(unsigned char key)
     unsigned int i;
 
     printk("'%c' pressed -> showing installed handlers\n", key);
+
+    print_version();
+    print_build_id();
+
     for ( i = 0; i < ARRAY_SIZE(key_table); i++ )
         if ( key_table[i].fn )
             printk(" key '%c' (ascii '%02x') => %s\n",

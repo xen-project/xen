@@ -94,6 +94,16 @@ const char *xen_build_info(void)
     return build_info;
 }
 
+void print_version(void)
+{
+    printk("Xen version %d.%d%s (%s@%s) (%s) %s %s\n",
+           xen_major_version(), xen_minor_version(), xen_extra_version(),
+           xen_compile_by(), xen_compile_domain(), xen_compiler(),
+           xen_build_info(), xen_compile_date());
+
+    printk("Latest ChangeSet: %s\n", xen_changeset());
+}
+
 static const void *build_id_p __read_mostly;
 static unsigned int build_id_len __read_mostly;
 
@@ -106,6 +116,16 @@ int xen_build_id(const void **p, unsigned int *len)
     *p = build_id_p;
 
     return 0;
+}
+
+void print_build_id(void)
+{
+    /*
+     * NB: build_id_len may be 0 if XEN_HAS_BUILD_ID=n.
+     * Do not print empty build-id.
+     */
+    if ( build_id_len )
+        printk("build-id: %*phN\n", build_id_len, build_id_p);
 }
 
 #ifdef BUILD_ID
@@ -210,8 +230,6 @@ void __init xen_build_init(void)
         }
     }
 #endif /* CONFIG_X86 */
-    if ( !rc )
-        printk(XENLOG_INFO "build-id: %*phN\n", build_id_len, build_id_p);
 }
 #endif /* BUILD_ID */
 /*
