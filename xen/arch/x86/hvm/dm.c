@@ -219,7 +219,8 @@ static int set_mem_type(struct domain *d,
                         struct xen_dm_op_set_mem_type *data)
 {
     xen_pfn_t last_pfn = data->first_pfn + data->nr - 1;
-    unsigned int iter = 0, mem_type;
+    unsigned int iter = 0;
+    p2m_type_t nt;
     int rc = 0;
 
     /* Interface types to internal p2m types */
@@ -239,16 +240,16 @@ static int set_mem_type(struct domain *d,
          unlikely(data->mem_type == HVMMEM_unused) )
         return -EINVAL;
 
-    mem_type = array_index_nospec(data->mem_type, ARRAY_SIZE(memtype));
+    nt = array_access_nospec(memtype, data->mem_type);
 
-    if ( mem_type == HVMMEM_ioreq_server )
+    if ( nt == p2m_ioreq_server )
     {
         unsigned int flags;
 
         if ( !hap_enabled(d) )
             return -EOPNOTSUPP;
 
-        /* Do not change to HVMMEM_ioreq_server if no ioreq server mapped. */
+        /* Do not change to p2m_ioreq_server if no ioreq server mapped. */
         if ( !p2m_get_ioreq_server(d, &flags) )
             return -EINVAL;
     }
@@ -256,22 +257,22 @@ static int set_mem_type(struct domain *d,
     while ( iter < data->nr )
     {
         unsigned long pfn = data->first_pfn + iter;
-        p2m_type_t t;
+        p2m_type_t ot;
 
-        get_gfn_unshare(d, pfn, &t);
-        if ( p2m_is_paging(t) )
+        get_gfn_unshare(d, pfn, &ot);
+        if ( p2m_is_paging(ot) )
         {
             put_gfn(d, pfn);
             p2m_mem_paging_populate(d, _gfn(pfn));
             return -EAGAIN;
         }
 
-        if ( p2m_is_shared(t) )
+        if ( p2m_is_shared(ot) )
             rc = -EAGAIN;
-        else if ( !allow_p2m_type_change(t, memtype[mem_type]) )
+        else if ( !allow_p2m_type_change(ot, nt) )
             rc = -EINVAL;
         else
-            rc = p2m_change_type_one(d, pfn, t, memtype[mem_type]);
+            rc = p2m_change_type_one(d, pfn, ot, nt);
 
         put_gfn(d, pfn);
 
