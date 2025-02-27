@@ -351,20 +351,21 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
     switch ( pdev->type = pdev_type(pseg->nr, bus, devfn) )
     {
         unsigned int cap, sec_bus, sub_bus;
+        unsigned long flags;
 
         case DEV_TYPE_PCIe2PCI_BRIDGE:
         case DEV_TYPE_LEGACY_PCI_BRIDGE:
             sec_bus = pci_conf_read8(pdev->sbdf, PCI_SECONDARY_BUS);
             sub_bus = pci_conf_read8(pdev->sbdf, PCI_SUBORDINATE_BUS);
 
-            spin_lock(&pseg->bus2bridge_lock);
+            spin_lock_irqsave(&pseg->bus2bridge_lock, flags);
             for ( ; sec_bus <= sub_bus; sec_bus++ )
             {
                 pseg->bus2bridge[sec_bus].map = 1;
                 pseg->bus2bridge[sec_bus].bus = bus;
                 pseg->bus2bridge[sec_bus].devfn = devfn;
             }
-            spin_unlock(&pseg->bus2bridge_lock);
+            spin_unlock_irqrestore(&pseg->bus2bridge_lock, flags);
             break;
 
         case DEV_TYPE_PCIe_ENDPOINT:
@@ -434,16 +435,17 @@ static void free_pdev(struct pci_seg *pseg, struct pci_dev *pdev)
     switch ( pdev->type )
     {
         unsigned int sec_bus, sub_bus;
+        unsigned long flags;
 
         case DEV_TYPE_PCIe2PCI_BRIDGE:
         case DEV_TYPE_LEGACY_PCI_BRIDGE:
             sec_bus = pci_conf_read8(pdev->sbdf, PCI_SECONDARY_BUS);
             sub_bus = pci_conf_read8(pdev->sbdf, PCI_SUBORDINATE_BUS);
 
-            spin_lock(&pseg->bus2bridge_lock);
+            spin_lock_irqsave(&pseg->bus2bridge_lock, flags);
             for ( ; sec_bus <= sub_bus; sec_bus++ )
                 pseg->bus2bridge[sec_bus] = pseg->bus2bridge[pdev->bus];
-            spin_unlock(&pseg->bus2bridge_lock);
+            spin_unlock_irqrestore(&pseg->bus2bridge_lock, flags);
             break;
 
         default:
@@ -1067,8 +1069,9 @@ enum pdev_type pdev_type(u16 seg, u8 bus, u8 devfn)
 int find_upstream_bridge(u16 seg, u8 *bus, u8 *devfn, u8 *secbus)
 {
     struct pci_seg *pseg = get_pseg(seg);
-    int ret = 0;
-    int cnt = 0;
+    int ret = 1;
+    unsigned long flags;
+    unsigned int cnt = 0;
 
     if ( *bus == 0 )
         return 0;
@@ -1079,8 +1082,7 @@ int find_upstream_bridge(u16 seg, u8 *bus, u8 *devfn, u8 *secbus)
     if ( !pseg->bus2bridge[*bus].map )
         return 0;
 
-    ret = 1;
-    spin_lock(&pseg->bus2bridge_lock);
+    spin_lock_irqsave(&pseg->bus2bridge_lock, flags);
     while ( pseg->bus2bridge[*bus].map )
     {
         *secbus = *bus;
@@ -1094,7 +1096,7 @@ int find_upstream_bridge(u16 seg, u8 *bus, u8 *devfn, u8 *secbus)
     }
 
 out:
-    spin_unlock(&pseg->bus2bridge_lock);
+    spin_unlock_irqrestore(&pseg->bus2bridge_lock, flags);
     return ret;
 }
 
