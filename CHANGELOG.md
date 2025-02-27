@@ -18,6 +18,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Fixed blkif protocol specification for sector sizes different than 512b.
  - The dombuilder in libxenguest no longer un-gzips secondary modules, instead
    leaving this to the guest kernel to do in guest context.
+ - Reduce xenstore library dependencies.
+ - On Arm:
+   - Several FF-A support improvements: add indirect messages support, transmit
+     RXTX buffer to the SPMC, fix version negotication and partition information
+     retrieval.
  - On x86:
    - Prefer ACPI reboot over UEFI ResetSystem() run time service call.
    - Prefer CMOS over EFI_GET_TIME as time source.
@@ -25,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
      interrupts instead of logical destination mode.
 
 ### Added
+ - Enable CONFIG_UBSAN (Arm64, x86, PPC, RISC-V) for GitLab CI.
  - On Arm:
    - Experimental support for Armv8-R.
    - Support for NXP S32G3 Processors Family and NXP LINFlexD UART driver.
@@ -34,6 +40,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - On x86:
    - xl suspend/resume subcommands.
    - `wallclock` command line option to select time source.
+   - Support for Intel EPT Paging-Write Feature.
+   - AMD Zen 5 CPU support, including for new hardware mitigations for the
+     SRSO speculative vulnerability.
 
 ### Removed
  - On x86:
