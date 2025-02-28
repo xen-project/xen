@@ -231,7 +231,7 @@ Therefore the absence of prior declarations is safe."
 
 -doc_begin="Given that bsearch and sort are defined with the attribute 'gnu_inline', it's deliberate not to have a prior declaration.
 See Section \"6.33.1 Common Function Attributes\" of \"GCC_MANUAL\" for a full explanation of gnu_inline."
--file_tag+={bsearch_sort, "^xen/include/xen/(sort|lib)\\.h$"}
+-file_tag+={bsearch_sort, "^xen/include/xen/(sort|bsearch)\\.h$"}
 -config=MC3A2.R8.4,reports+={deliberate, "any_area(any_loc(file(bsearch_sort))&&decl(name(bsearch||sort)))"}
 -doc_end
 
