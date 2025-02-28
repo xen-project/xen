@@ -750,6 +750,8 @@ static int __init early_microcode_load(struct boot_info *bi)
     int idx = opt_mod_idx;
     int rc;
 
+    amd_check_entrysign();
+
     /*
      * Cmdline parsing ensures this invariant holds, so that we don't end up
      * trying to mix multiple ways of finding the microcode.

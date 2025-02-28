@@ -81,8 +81,10 @@ extern bool opt_digest_check;
  */
 #ifdef CONFIG_AMD
 void ucode_probe_amd(struct microcode_ops *ops);
+void amd_check_entrysign(void);
 #else
 static inline void ucode_probe_amd(struct microcode_ops *ops) {}
+static inline void amd_check_entrysign(void) {}
 #endif
 
 #ifdef CONFIG_INTEL
