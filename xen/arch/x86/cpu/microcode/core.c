@@ -904,6 +904,8 @@ int __init early_microcode_init(unsigned long *module_map,
         return -ENODEV;
     }
 
+    amd_check_entrysign();
+
     microcode_grab_module(module_map, mbi, mods);
 
     if ( ucode_mod.mod_end || ucode_blob.size )
