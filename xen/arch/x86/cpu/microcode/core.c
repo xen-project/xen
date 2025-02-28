@@ -836,6 +836,8 @@ int __init early_microcode_init(void)
 
     printk(XENLOG_INFO "BSP microcode revision: 0x%08x\n", this_cpu(cpu_sig).rev);
 
+    amd_check_entrysign();
+
     if ( ucode_mod.mod_end || ucode_blob.size )
         rc = early_microcode_update_cpu();
 

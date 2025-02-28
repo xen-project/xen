@@ -56,6 +56,8 @@ struct microcode_ops {
 
 extern bool opt_digest_check;
 
+void amd_check_entrysign(void);
+
 extern const struct microcode_ops amd_ucode_ops, intel_ucode_ops;
 
 #endif /* ASM_X86_MICROCODE_PRIVATE_H */
