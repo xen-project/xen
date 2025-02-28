@@ -3,7 +3,7 @@
 
 #define _raw_read_unlock(l) \
     BUILD_BUG_ON(sizeof((l)->lock) != 4); /* Clang doesn't support %z in asm. */ \
-    asm volatile ( "lock; decl %0" : "+m" ((l)->lock) :: "memory" )
+    asm volatile ( "lock decl %0" : "+m" ((l)->lock) :: "memory" )
 
 /*
  * On x86 the only reordering is of reads with older writes.  In the
