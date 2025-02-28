@@ -102,6 +102,7 @@ static const struct patch_digest {
 } patch_digests[] = {
 #include "amd-patch-digests.c"
 };
+static bool __ro_after_init entrysign_mitigiated_in_firmware;
 
 static int cf_check cmp_patch_id(const void *key, const void *elem)
 {
@@ -123,11 +124,11 @@ static bool check_digest(const struct container_microcode *mc)
 
     /*
      * Zen1 thru Zen5 CPUs are known to use a weak signature algorithm on
-     * microcode updates.  Mitigate by checking the digest of the patch
-     * against a list of known provenance.
+     * microcode updates.  If this has not been mitigated in firmware, check
+     * the digest of the patch against a list of known provenance.
      */
     if ( boot_cpu_data.x86 < 0x17 || boot_cpu_data.x86 > 0x1a ||
-         !opt_digest_check )
+         entrysign_mitigiated_in_firmware || !opt_digest_check )
         return true;
 
     pd = bsearch(&patch->patch_id, patch_digests, ARRAY_SIZE(patch_digests),
@@ -553,3 +554,82 @@ const struct microcode_ops __initconst_cf_clobber amd_ucode_ops = {
     .apply_microcode                  = apply_microcode,
     .compare_patch                    = compare_patch,
 };
+
+/*
+ * The Entrysign vulnerability affects all Zen1 thru Zen5 CPUs.  Firmware
+ * fixes were produced from Nov 2024.  Zen3 thru Zen5 can continue to take
+ * OS-loadable microcode updates using a new signature scheme, as long as
+ * firmware has been updated first.
+ */
+void __init amd_check_entrysign(void)
+{
+    unsigned int curr_rev;
+    uint8_t fixed_rev;
+
+    if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD ||
+         boot_cpu_data.x86 < 0x17 ||
+         boot_cpu_data.x86 > 0x1a )
+        return;
+
+    /*
+     * Table taken from Linux, which is the only known source of information
+     * about client revisions.  Note, Linux expresses "last-vulnerable-rev"
+     * while Xen wants "first-fixed-rev".
+     */
+    curr_rev = this_cpu(cpu_sig).rev;
+    switch ( curr_rev >> 8 )
+    {
+    case 0x080012: fixed_rev = 0x78; break;
+    case 0x080082: fixed_rev = 0x10; break;
+    case 0x083010: fixed_rev = 0x7d; break;
+    case 0x086001: fixed_rev = 0x0f; break;
+    case 0x086081: fixed_rev = 0x09; break;
+    case 0x087010: fixed_rev = 0x35; break;
+    case 0x08a000: fixed_rev = 0x0b; break;
+    case 0x0a0010: fixed_rev = 0x7b; break;
+    case 0x0a0011: fixed_rev = 0xdb; break;
+    case 0x0a0012: fixed_rev = 0x44; break;
+    case 0x0a0082: fixed_rev = 0x0f; break;
+    case 0x0a1011: fixed_rev = 0x54; break;
+    case 0x0a1012: fixed_rev = 0x4f; break;
+    case 0x0a1081: fixed_rev = 0x0a; break;
+    case 0x0a2010: fixed_rev = 0x30; break;
+    case 0x0a2012: fixed_rev = 0x13; break;
+    case 0x0a4041: fixed_rev = 0x0a; break;
+    case 0x0a5000: fixed_rev = 0x14; break;
+    case 0x0a6012: fixed_rev = 0x0b; break;
+    case 0x0a7041: fixed_rev = 0x0a; break;
+    case 0x0a7052: fixed_rev = 0x09; break;
+    case 0x0a7080: fixed_rev = 0x0a; break;
+    case 0x0a70c0: fixed_rev = 0x0a; break;
+    case 0x0aa001: fixed_rev = 0x17; break;
+    case 0x0aa002: fixed_rev = 0x19; break;
+    case 0x0b0021: fixed_rev = 0x47; break;
+    case 0x0b1010: fixed_rev = 0x47; break;
+    case 0x0b2040: fixed_rev = 0x32; break;
+    case 0x0b4040: fixed_rev = 0x32; break;
+    case 0x0b6000: fixed_rev = 0x32; break;
+    case 0x0b7000: fixed_rev = 0x32; break;
+    default:
+        printk(XENLOG_WARNING
+               "Unrecognised CPU %02x-%02x-%02x ucode 0x%08x, assuming vulnerable to Entrysign\n",
+               boot_cpu_data.x86, boot_cpu_data.x86_model,
+               boot_cpu_data.x86_mask, curr_rev);
+        return;
+    }
+
+    /*
+     * This check is best-effort.  If the platform looks to be out of date, it
+     * probably is.  If the platform looks to be fixed, it either genuinely
+     * is, or malware has gotten in before Xen booted and all bets are off.
+     */
+    if ( (uint8_t)curr_rev >= fixed_rev )
+    {
+        entrysign_mitigiated_in_firmware = true;
+        return;
+    }
+
+    printk(XENLOG_WARNING
+           "WARNING: Platform vulnerable to Entrysign (SB-7033, CVE-2024-36347) - firmware update required\n");
+    add_taint(TAINT_CPU_OUT_OF_SPEC);
+}

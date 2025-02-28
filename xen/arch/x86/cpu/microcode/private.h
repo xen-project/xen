@@ -69,6 +69,8 @@ extern bool opt_digest_check;
  */
 bool intel_can_load_microcode(void);
 
+void amd_check_entrysign(void);
+
 extern const struct microcode_ops amd_ucode_ops, intel_ucode_ops;
 
 #endif /* ASM_X86_MICROCODE_PRIVATE_H */
