@@ -2117,12 +2117,12 @@ static void __init initrd_load(struct kernel_info *kinfo)
 
     initrd = ioremap_wc(paddr, len);
     if ( !initrd )
-        panic("Unable to map the hwdom initrd\n");
+        panic("Unable to map the %pd initrd\n", kinfo->d);
 
     res = copy_to_guest_phys_flush_dcache(kinfo->d, load_addr,
                                           initrd, len);
     if ( res != 0 )
-        panic("Unable to copy the initrd in the hwdom memory\n");
+        panic("Unable to copy the initrd in the %pd memory\n", kinfo->d);
 
     iounmap(initrd);
 }

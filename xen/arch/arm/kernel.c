@@ -150,12 +150,12 @@ static void __init kernel_zimage_load(struct kernel_info *info)
 
     kernel = ioremap_wc(paddr, len);
     if ( !kernel )
-        panic("Unable to map the hwdom kernel\n");
+        panic("Unable to map the %pd kernel\n", info->d);
 
     rc = copy_to_guest_phys_flush_dcache(info->d, load_addr,
                                          kernel, len);
     if ( rc != 0 )
-        panic("Unable to copy the kernel in the hwdom memory\n");
+        panic("Unable to copy the kernel in the %pd memory\n", info->d);
 
     iounmap(kernel);
 }
