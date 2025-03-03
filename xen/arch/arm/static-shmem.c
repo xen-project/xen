@@ -302,7 +302,7 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
         const struct membank *boot_shm_bank;
         const struct dt_property *prop;
         const __be32 *cells;
-        uint32_t addr_cells, size_cells;
+        uint32_t addr_cells;
         paddr_t gbase, pbase, psize;
         int ret = 0;
         unsigned int i;
@@ -338,7 +338,6 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
          * pbase is optional.
          */
         addr_cells = dt_n_addr_cells(shm_node);
-        size_cells = dt_n_size_cells(shm_node);
         prop = dt_find_property(shm_node, "xen,shared-mem", NULL);
         BUG_ON(!prop);
         cells = (const __be32 *)prop->value;
