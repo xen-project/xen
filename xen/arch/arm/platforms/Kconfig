@@ -2,15 +2,15 @@ choice
 	prompt "Platform Support" if MMU
 	default ALL_PLAT
 	help
-	Choose which hardware platform to enable in Xen.
+	  Choose which hardware platform to enable in Xen.
 
-	If unsure, choose ALL_PLAT.
+	  If unsure, choose ALL_PLAT.
 
 config ALL_PLAT
 	bool "All Platforms"
 	help
-	Enable support for all available hardware platforms. It doesn't
-	automatically select any of the related drivers.
+	  Enable support for all available hardware platforms. It doesn't
+	  automatically select any of the related drivers.
 
 config QEMU
 	bool "QEMU aarch virt machine support"
@@ -18,8 +18,8 @@ config QEMU
 	select GICV3
 	select HAS_PL011
 	help
-	Enable all the required drivers for QEMU aarch64 virt emulated
-	machine.
+	  Enable all the required drivers for QEMU aarch64 virt emulated
+	  machine.
 
 config RCAR3
 	bool "Renesas RCar3 support"
@@ -27,7 +27,7 @@ config RCAR3
 	select HAS_SCIF
 	select IPMMU_VMSA
 	help
-	Enable all the required drivers for Renesas RCar3
+	  Enable all the required drivers for Renesas RCar3
 
 config RCAR4
 	bool "Renesas RCar4 support"
@@ -44,7 +44,7 @@ config MPSOC
 	select HAS_CADENCE_UART
 	select ARM_SMMU
 	help
-	Enable all the required drivers for Xilinx Ultrascale+ MPSoC
+	  Enable all the required drivers for Xilinx Ultrascale+ MPSoC
 
 config S32G3
 	bool "NXP S32G3 Processors support"
@@ -52,12 +52,12 @@ config S32G3
 	select HAS_LINFLEX
 	select SCMI_SMC
 	help
-	Enable all the required drivers for NXP S32G3 Processors Family
+	  Enable all the required drivers for NXP S32G3 Processors Family
 
 config NO_PLAT
 	bool "No Platforms"
 	help
-	Do not enable specific support for any platform.
+	  Do not enable specific support for any platform.
 
 endchoice
 

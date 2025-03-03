@@ -2,85 +2,85 @@ choice
 	bool "Early printk"
 	optional
 	help
-		You may want to enable early printk if you are debugging code
-		that executes before the console is initialized.
+	  You may want to enable early printk if you are debugging code
+	  that executes before the console is initialized.
 
-		Note that selecting this option will limit Xen to a single UART
-		definition. Attempting to boot Xen image on a different
-		platform *will not work*, so this option should not be enable
-		for Xens that are intended to be portable.
+	  Note that selecting this option will limit Xen to a single UART
+	  definition. Attempting to boot Xen image on a different
+	  platform *will not work*, so this option should not be enable
+	  for Xens that are intended to be portable.
 
-		Choose one of the UART drivers for early printk, then you'll
-		have to specify the parameters, like the base address.
+	  Choose one of the UART drivers for early printk, then you'll
+	  have to specify the parameters, like the base address.
 
 	config EARLY_UART_CHOICE_8250
 		select EARLY_UART_8250
 		bool "Early printk via 8250 UART"
 		help
-			Say Y here if you wish the early printk to direct their
-			output to a 8250 UART.
+		  Say Y here if you wish the early printk to direct their
+		  output to a 8250 UART.
 
 	config EARLY_UART_CHOICE_CADENCE
 		select EARLY_UART_CADENCE
 		depends on ARM_64
 		bool "Early printk via Cadence UART"
 		help
-			Say Y here if you wish the early printk to direct their
-			output to a Cadence UART.
+		  Say Y here if you wish the early printk to direct their
+		  output to a Cadence UART.
 
 	config EARLY_UART_CHOICE_EXYNOS4210
 		select EARLY_UART_EXYNOS4210
 		depends on ARM_32
 		bool "Early printk via Exynos4210 UART"
 		help
-			Say Y here if you wish the early printk to direct their
-			output to a Exynos 4210 UART.
+		  Say Y here if you wish the early printk to direct their
+		  output to a Exynos 4210 UART.
 
 	config EARLY_UART_CHOICE_IMX_LPUART
 		select EARLY_UART_IMX_LPUART
 		depends on ARM_64
 		bool "Early printk via i.MX LPUART"
 		help
-			Say Y here if you wish the early printk to direct their
-			output to a i.MX LPUART.
+		  Say Y here if you wish the early printk to direct their
+		  output to a i.MX LPUART.
 
 	config EARLY_UART_CHOICE_LINFLEX
 		select EARLY_UART_LINFLEX
 		depends on ARM_64
 		bool "Early printk via NXP LINFlexD UART"
 		help
-			Say Y here if you wish the early printk to direct their
-			output to an NXP LINFlexD UART.
+		  Say Y here if you wish the early printk to direct their
+		  output to an NXP LINFlexD UART.
 
 	config EARLY_UART_CHOICE_MESON
 		select EARLY_UART_MESON
 		depends on ARM_64
 		bool "Early printk via MESON UART"
 		help
-			Say Y here if you wish the early printk to direct their
-			output to a MESON UART.
+		  Say Y here if you wish the early printk to direct their
+		  output to a MESON UART.
 
 	config EARLY_UART_CHOICE_MVEBU
 		select EARLY_UART_MVEBU
 		depends on ARM_64
 		bool "Early printk via MVEBU UART"
 		help
-			Say Y here if you wish the early printk to direct their
-			output to a MVEBU UART.
+		  Say Y here if you wish the early printk to direct their
+		  output to a MVEBU UART.
 
 	config EARLY_UART_CHOICE_PL011
 		select EARLY_UART_PL011
 		bool "Early printk via PL011 UART"
 		help
-			Say Y here if you wish the early printk to direct their
-			output to a PL011 UART.
+		  Say Y here if you wish the early printk to direct their
+		  output to a PL011 UART.
 
 	config EARLY_UART_CHOICE_SCIF
 		select EARLY_UART_SCIF
 		bool "Early printk via SCIF UART"
 		help
-			Say Y here if you wish the early printk to direct their
-			output to a SCIF UART.
+		  Say Y here if you wish the early printk to direct their
+		  output to a SCIF UART.
 
 endchoice
 
@@ -131,15 +131,14 @@ config EARLY_UART_SIZE
 config EARLY_UART_PL011_BAUD_RATE
 	depends on EARLY_UART_PL011
 	int "Early printk UART baud rate for pl011"
-	help
-		Optionally sets the baud rate which should be used to configure
-		the UART at start of day.
-
-		If EARLY_UART_PL011_BAUD_RATE is set to 0 then the code will
-		not try to initialize the UART, so that bootloader or firmware
-		settings can be used for maximum compatibility.
-
 	default 0
+	help
+	  Optionally sets the baud rate which should be used to configure
+	  the UART at start of day.
+
+	  If EARLY_UART_PL011_BAUD_RATE is set to 0 then the code will
+	  not try to initialize the UART, so that bootloader or firmware
+	  settings can be used for maximum compatibility.
 
 config EARLY_UART_PL011_MMIO32
 	bool "32-bit only MMIO for PL011 early printk"
@@ -155,24 +154,25 @@ config EARLY_UART_INIT
 config EARLY_UART_8250_REG_SHIFT
 	depends on EARLY_UART_8250
 	int "Early printk, left-shift to apply to the register offsets within the 8250 UART"
-	help
-		EARLY_UART_8250_REG_SHIFT is, optionally, the left-shift to
-		apply to the register offsets within the UART with early
-		printk.
-
-		Default to 0.
-
 	default 0
+	help
+	  EARLY_UART_8250_REG_SHIFT is, optionally, the left-shift to
+	  apply to the register offsets within the UART with early
+	  printk.
+
+	  Default to 0.
+
 
 choice EARLY_UART_SCIF_VERSION
 	prompt "Early printk UART SCIF interface version"
 	depends on EARLY_UART_SCIF
 	default EARLY_UART_SCIF_VERSION_NONE
 	help
-		Select the interface version of the SCIF UART.
+	  Select the interface version of the SCIF UART.
 
-		Select EARLY_UART_SCIF_VERSION_NONE to use the default
-		interface version (SCIF).
+	  Select EARLY_UART_SCIF_VERSION_NONE to use the default
+	  interface version (SCIF).
+
 	config EARLY_UART_SCIF_VERSION_NONE
 		bool "default SCIF UART interface"
 	config EARLY_UART_SCIF_VERSION_A
