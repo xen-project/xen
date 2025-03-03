@@ -93,7 +93,7 @@ int dm_op(const struct dmop_args *op_args)
             if ( data->pad[i] )
             {
                 rc = -EINVAL;
-                break;
+                goto out;
             }
         }
 
