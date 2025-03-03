@@ -2038,7 +2038,9 @@ static int __init prepare_dtb_hwdom(struct domain *d, struct kernel_info *kinfo)
     if ( ret < 0 )
         goto err;
 
-    fdt_finish_reservemap(kinfo->fdt);
+    ret = fdt_finish_reservemap(kinfo->fdt);
+    if ( ret )
+        goto err;
 
     ret = handle_node(d, kinfo, dt_host, default_p2mt);
     if ( ret )
