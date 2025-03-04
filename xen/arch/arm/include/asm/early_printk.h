@@ -11,8 +11,8 @@
 #define __ARM_EARLY_PRINTK_H__
 
 #include <xen/page-size.h>
-#include <asm/arm64/mpu.h>
 #include <asm/fixmap.h>
+#include <asm/mpu.h>
 
 #ifdef CONFIG_EARLY_PRINTK
 

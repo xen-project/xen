@@ -3,8 +3,8 @@
  * Start-of-day code for an Armv8-R MPU system.
  */
 
-#include <asm/arm64/mpu.h>
 #include <asm/early_printk.h>
+#include <asm/mpu.h>
 
 /* Backgroud region enable/disable */
 #define SCTLR_ELx_BR    BIT(17, UL)

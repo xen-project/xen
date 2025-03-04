@@ -3,8 +3,8 @@
  * mpu.h: Arm Memory Protection Unit definitions.
  */
 
-#ifndef __ARM64_MPU_H__
-#define __ARM64_MPU_H__
+#ifndef __ARM_MPU_H__
+#define __ARM_MPU_H__
 
 #define MPU_REGION_SHIFT  6
 #define MPU_REGION_ALIGN  (_AC(1, UL) << MPU_REGION_SHIFT)
@@ -13,7 +13,8 @@
 #define NUM_MPU_REGIONS_SHIFT   8
 #define NUM_MPU_REGIONS         (_AC(1, UL) << NUM_MPU_REGIONS_SHIFT)
 #define NUM_MPU_REGIONS_MASK    (NUM_MPU_REGIONS - 1)
-#endif /* __ARM64_MPU_H__ */
+
+#endif /* __ARM_MPU_H__ */
 
 /*
  * Local variables:
