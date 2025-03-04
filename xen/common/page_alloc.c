@@ -490,31 +490,30 @@ static long outstanding_claims; /* total outstanding claims by all domains */
 
 unsigned long domain_adjust_tot_pages(struct domain *d, long pages)
 {
-    long dom_before, dom_after, dom_claimed, sys_before, sys_after;
-
     ASSERT(rspin_is_locked(&d->page_alloc_lock));
     d->tot_pages += pages;
 
     /*
-     * can test d->claimed_pages race-free because it can only change
+     * can test d->outstanding_pages race-free because it can only change
      * if d->page_alloc_lock and heap_lock are both held, see also
      * domain_set_outstanding_pages below
      */
-    if ( !d->outstanding_pages )
+    if ( !d->outstanding_pages || pages <= 0 )
         goto out;
 
     spin_lock(&heap_lock);
-    /* adjust domain outstanding pages; may not go negative */
-    dom_before = d->outstanding_pages;
-    dom_after = dom_before - pages;
-    BUG_ON(dom_before < 0);
-    dom_claimed = dom_after < 0 ? 0 : dom_after;
-    d->outstanding_pages = dom_claimed;
-    /* flag accounting bug if system outstanding_claims would go negative */
-    sys_before = outstanding_claims;
-    sys_after = sys_before - (dom_before - dom_claimed);
-    BUG_ON(sys_after < 0);
-    outstanding_claims = sys_after;
+    BUG_ON(outstanding_claims < d->outstanding_pages);
+    if ( d->outstanding_pages < pages )
+    {
+        /* `pages` exceeds the domain's outstanding count. Zero it out. */
+        outstanding_claims -= d->outstanding_pages;
+        d->outstanding_pages = 0;
+    }
+    else
+    {
+        outstanding_claims -= pages;
+        d->outstanding_pages -= pages;
+    }
     spin_unlock(&heap_lock);
 
 out:
