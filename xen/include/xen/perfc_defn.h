@@ -1,4 +1,4 @@
-/* This file is legitimately included multiple times. */
+/* This file is intended to be included multiple times. */
 /*#ifndef __XEN_PERFC_DEFN_H__*/
 /*#define __XEN_PERFC_DEFN_H__*/
 
