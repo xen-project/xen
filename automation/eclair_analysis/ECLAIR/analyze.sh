@@ -97,11 +97,13 @@ find "${ECLAIR_DATA_DIR}" -maxdepth 1 -name "FRAME.*.ecb" |
   sort | xargs cat |
   "${ECLAIR_BIN_DIR}eclair_report" \
     "-create_db='${PROJECT_ECD}'" \
+    -quiet \
     -load=/dev/stdin > "${ECLAIR_REPORT_LOG}" 2>&1
 
 # Create the Jenkins reports file.
 "${ECLAIR_BIN_DIR}eclair_report" \
   "-db='${PROJECT_ECD}'" \
+  -quiet \
   "-eval_file='${SCRIPT_DIR}/report.ecl'" \
   >> "${ECLAIR_REPORT_LOG}" 2>&1
 
