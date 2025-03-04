@@ -10,8 +10,6 @@ setq(analysis_kind,getenv("ANALYSIS_KIND"))
 # strings_map("scheduled-analysis",500,"","^.*$",0)
 # map_strings("scheduled-analysis",analysis_kind)
 
--verbose
-
 -enable=B.REPORT.ECB
 -config=B.REPORT.ECB,output=join_paths(data_dir,"FRAME.@FRAME@.ecb")
 -config=B.REPORT.ECB,preprocessed=show
