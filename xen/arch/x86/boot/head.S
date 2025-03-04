@@ -504,9 +504,7 @@ trampoline_bios_setup:
         mov     %ecx,sym_esi(trampoline_phys)
 
 trampoline_setup:
-        /*
-         * Called on legacy BIOS and EFI platforms.
-         */
+        /* Called for Mutiboot entry, including MB2+EFI. */
 
         /* Save Xen image load base address for later use. */
         mov     %esi, sym_esi(xen_phys_start)
