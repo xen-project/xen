@@ -21,10 +21,6 @@ static bool __ro_after_init feature_hdc;
 
 static bool __ro_after_init opt_cpufreq_hdc = true;
 
-#define HWP_ENERGY_PERF_MAX_PERFORMANCE 0
-#define HWP_ENERGY_PERF_BALANCE         0x80
-#define HWP_ENERGY_PERF_MAX_POWERSAVE   0xff
-
 union hwp_request
 {
     struct
@@ -597,7 +593,7 @@ int set_hwp_para(struct cpufreq_policy *policy,
         data->minimum = data->hw.lowest;
         data->maximum = data->hw.lowest;
         data->activity_window = 0;
-        data->energy_perf = HWP_ENERGY_PERF_MAX_POWERSAVE;
+        data->energy_perf = CPPC_ENERGY_PERF_MAX_POWERSAVE;
         data->desired = 0;
         break;
 
@@ -605,7 +601,7 @@ int set_hwp_para(struct cpufreq_policy *policy,
         data->minimum = data->hw.highest;
         data->maximum = data->hw.highest;
         data->activity_window = 0;
-        data->energy_perf = HWP_ENERGY_PERF_MAX_PERFORMANCE;
+        data->energy_perf = CPPC_ENERGY_PERF_MAX_PERFORMANCE;
         data->desired = 0;
         break;
 
@@ -613,7 +609,7 @@ int set_hwp_para(struct cpufreq_policy *policy,
         data->minimum = data->hw.lowest;
         data->maximum = data->hw.highest;
         data->activity_window = 0;
-        data->energy_perf = HWP_ENERGY_PERF_BALANCE;
+        data->energy_perf = CPPC_ENERGY_PERF_BALANCE;
         data->desired = 0;
         break;
 

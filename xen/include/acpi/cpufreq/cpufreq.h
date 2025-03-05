@@ -252,6 +252,16 @@ void cpufreq_dbs_timer_resume(void);
 
 void intel_feature_detect(struct cpufreq_policy *policy);
 
+/*
+ * If Energy Performance Preference(epp) is supported in the platform,
+ * OSPM may write a range of values from 0(performance preference)
+ * to 0xFF(energy efficiency perference) to control the platform's
+ * energy efficiency and performance optimization policies
+ */
+#define CPPC_ENERGY_PERF_MAX_PERFORMANCE 0
+#define CPPC_ENERGY_PERF_BALANCE         0x80
+#define CPPC_ENERGY_PERF_MAX_POWERSAVE   0xff
+
 int hwp_cmdline_parse(const char *s, const char *e);
 int hwp_register_driver(void);
 #ifdef CONFIG_INTEL
