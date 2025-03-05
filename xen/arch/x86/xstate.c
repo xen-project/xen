@@ -993,7 +993,13 @@ int handle_xsetbv(u32 index, u64 new_bv)
 
         clts();
         if ( curr->fpu_dirtied )
-            asm ( "stmxcsr %0" : "=m" (curr->arch.xsave_area->fpu_sse.mxcsr) );
+        {
+            /* Has a fastpath for `current`, so there's no actual map */
+            struct xsave_struct *xsave_area = VCPU_MAP_XSAVE_AREA(curr);
+
+            asm ( "stmxcsr %0" : "=m" (xsave_area->fpu_sse.mxcsr) );
+            VCPU_UNMAP_XSAVE_AREA(curr, xsave_area);
+        }
         else if ( xstate_all(curr) )
         {
             /* See the comment in i387.c:vcpu_restore_fpu_eager(). */
@@ -1048,7 +1054,7 @@ void xstate_set_init(uint64_t mask)
     unsigned long cr0 = read_cr0();
     unsigned long xcr0 = this_cpu(xcr0);
     struct vcpu *v = idle_vcpu[smp_processor_id()];
-    struct xsave_struct *xstate = v->arch.xsave_area;
+    struct xsave_struct *xstate;
 
     if ( ~xfeature_mask & mask )
     {
@@ -1061,8 +1067,10 @@ void xstate_set_init(uint64_t mask)
 
     clts();
 
+    xstate = VCPU_MAP_XSAVE_AREA(v);
     memset(&xstate->xsave_hdr, 0, sizeof(xstate->xsave_hdr));
     xrstor(v, mask);
+    VCPU_UNMAP_XSAVE_AREA(v, xstate);
 
     if ( cr0 & X86_CR0_TS )
         write_cr0(cr0);
