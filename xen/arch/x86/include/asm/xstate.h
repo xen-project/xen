@@ -143,4 +143,46 @@ static inline bool xstate_all(const struct vcpu *v)
            (v->arch.xcr0_accum & XSTATE_LAZY & ~XSTATE_FP_SSE);
 }
 
+/*
+ * Fetch a pointer to a vCPU's XSAVE area
+ *
+ * TL;DR: If v == current, the mapping is guaranteed to already exist.
+ *
+ * Despite the name, this macro might not actually map anything. The only case
+ * in which a mutation of page tables is strictly required is when ASI==on &&
+ * v!=current. For everything else the mapping already exists and needs not
+ * be created nor destroyed.
+ *
+ *                         +-----------------+--------------+
+ *                         |   v == current  | v != current |
+ *          +--------------+-----------------+--------------+
+ *          | ASI  enabled | per-vCPU fixmap |  actual map  |
+ *          +--------------+-----------------+--------------+
+ *          | ASI disabled |             directmap          |
+ *          +--------------+--------------------------------+
+ *
+ * There MUST NOT be outstanding maps of XSAVE areas of the non-current vCPU
+ * at the point of context switch. Otherwise, the unmap operation will
+ * misbehave.
+ *
+ * TODO: Expand the macro to the ASI cases after infra to do so is in place.
+ *
+ * @param v Owner of the XSAVE area
+ */
+#define VCPU_MAP_XSAVE_AREA(v) ((v)->arch.xsave_area)
+
+/*
+ * Drops the mapping of a vCPU's XSAVE area and nullifies its pointer on exit
+ *
+ * See VCPU_MAP_XSAVE_AREA() for additional information on the persistence of
+ * these mappings. This macro only tears down the mappings in the ASI=on &&
+ * v!=current case.
+ *
+ * TODO: Expand the macro to the ASI cases after infra to do so is in place.
+ *
+ * @param v Owner of the XSAVE area
+ * @param x XSAVE blob of v
+ */
+#define VCPU_UNMAP_XSAVE_AREA(v, x) do { (void)(v); (x) = NULL; } while (0)
+
 #endif /* __ASM_XSTATE_H */
