@@ -1157,7 +1157,7 @@ static int hvmemul_linear_mmio_access(
 {
     struct hvm_vcpu_io *hvio = &current->arch.hvm.hvm_io;
     unsigned long offset = gla & ~PAGE_MASK;
-    unsigned int chunk, buffer_offset = gla - start_gla;
+    unsigned int buffer_offset = gla - start_gla;
     struct hvm_mmio_cache *cache = hvmemul_find_mmio_cache(hvio, start_gla,
                                                            dir, buffer_offset);
     paddr_t gpa;
@@ -1167,13 +1167,17 @@ static int hvmemul_linear_mmio_access(
     if ( cache == NULL )
         return X86EMUL_UNHANDLEABLE;
 
-    chunk = min_t(unsigned int, size, PAGE_SIZE - offset);
+    if ( size + offset > PAGE_SIZE )
+    {
+        ASSERT_UNREACHABLE();
+        return X86EMUL_UNHANDLEABLE;
+    }
 
     if ( known_gpfn )
         gpa = pfn_to_paddr(hvio->mmio_gpfn) | offset;
     else
     {
-        rc = hvmemul_linear_to_phys(gla, &gpa, chunk, &one_rep, pfec,
+        rc = hvmemul_linear_to_phys(gla, &gpa, size, &one_rep, pfec,
                                     hvmemul_ctxt);
         if ( rc != X86EMUL_OKAY )
             return rc;
@@ -1181,27 +1185,8 @@ static int hvmemul_linear_mmio_access(
         latch_linear_to_phys(hvio, gla, gpa, dir == IOREQ_WRITE);
     }
 
-    for ( ;; )
-    {
-        rc = hvmemul_phys_mmio_access(cache, gpa, chunk, dir, buffer, buffer_offset);
-        if ( rc != X86EMUL_OKAY )
-            break;
-
-        gla += chunk;
-        buffer_offset += chunk;
-        size -= chunk;
-
-        if ( size == 0 )
-            break;
-
-        chunk = min_t(unsigned int, size, PAGE_SIZE);
-        rc = hvmemul_linear_to_phys(gla, &gpa, chunk, &one_rep, pfec,
-                                    hvmemul_ctxt);
-        if ( rc != X86EMUL_OKAY )
-            return rc;
-    }
-
-    return rc;
+    return hvmemul_phys_mmio_access(cache, gpa, size, dir, buffer,
+                                    buffer_offset);
 }
 
 static inline int hvmemul_linear_mmio_read(
