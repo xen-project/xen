@@ -6,12 +6,10 @@ $(call cc-options-add,CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
 riscv-abi-$(CONFIG_RISCV_32) := -mabi=ilp32
 riscv-abi-$(CONFIG_RISCV_64) := -mabi=lp64
 
-riscv-march-$(CONFIG_RISCV_64) := rv64
-riscv-march-y += ima
-riscv-march-$(CONFIG_RISCV_ISA_C) += c
-riscv-march-y += _zicsr_zifencei
+riscv-march-$(CONFIG_RISCV_ISA_RV64G) := rv64g
+riscv-march-$(CONFIG_RISCV_ISA_C)       := $(riscv-march-y)c
 
-riscv-generic-flags := $(riscv-abi-y) -march=$(subst $(space),,$(riscv-march-y))
+riscv-generic-flags := $(riscv-abi-y) -march=$(riscv-march-y)
 
 # check-extension: Check whether extenstion is supported by a compiler and
 #                  an assembler.
