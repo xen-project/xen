@@ -99,7 +99,7 @@ static const struct patch_digest {
 #include "amd-patch-digests.c"
 };
 
-static int cmp_patch_id(const void *key, const void *elem)
+static int cf_check cmp_patch_id(const void *key, const void *elem)
 {
     const struct patch_digest *pd = elem;
     uint32_t patch_id = *(uint32_t *)key;
