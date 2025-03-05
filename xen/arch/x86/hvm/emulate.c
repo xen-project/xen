@@ -2467,7 +2467,9 @@ static int cf_check hvmemul_get_fpu(
         alternative_vcall(hvm_funcs.fpu_dirty_intercept);
     else if ( type == X86EMUL_FPU_fpu )
     {
-        const fpusse_t *fpu_ctxt = &curr->arch.xsave_area->fpu_sse;
+        /* Has a fastpath for `current`, so there's no actual map */
+        const struct xsave_struct *xsave_area = VCPU_MAP_XSAVE_AREA(curr);
+        const fpusse_t *fpu_ctxt = &xsave_area->fpu_sse;
 
         /*
          * Latch current register state so that we can back out changes
@@ -2493,6 +2495,8 @@ static int cf_check hvmemul_get_fpu(
             else
                 ASSERT(fcw == fpu_ctxt->fcw);
         }
+
+        VCPU_UNMAP_XSAVE_AREA(curr, xsave_area);
     }
 
     return X86EMUL_OKAY;
@@ -2507,7 +2511,9 @@ static void cf_check hvmemul_put_fpu(
 
     if ( aux )
     {
-        fpusse_t *fpu_ctxt = &curr->arch.xsave_area->fpu_sse;
+        /* Has a fastpath for `current`, so there's no actual map */
+        struct xsave_struct *xsave_area = VCPU_MAP_XSAVE_AREA(curr);
+        fpusse_t *fpu_ctxt = &xsave_area->fpu_sse;
         bool dval = aux->dval;
         int mode = hvm_guest_x86_mode(curr);
 
@@ -2562,6 +2568,8 @@ static void cf_check hvmemul_put_fpu(
         }
 
         fpu_ctxt->fop = aux->op;
+
+        VCPU_UNMAP_XSAVE_AREA(curr, xsave_area);
 
         /* Re-use backout code below. */
         backout = X86EMUL_FPU_fpu;
