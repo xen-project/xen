@@ -304,24 +304,32 @@ int vcpu_init_fpu(struct vcpu *v)
 
 void vcpu_reset_fpu(struct vcpu *v)
 {
+    struct xsave_struct *xsave_area = VCPU_MAP_XSAVE_AREA(v);
+
     v->fpu_initialised = false;
-    *v->arch.xsave_area = (struct xsave_struct) {
+    *xsave_area = (struct xsave_struct) {
         .xsave_hdr.xstate_bv = X86_XCR0_X87,
     };
 
     /* Old gcc doesn't permit these to be part of the initializer. */
-    v->arch.xsave_area->fpu_sse.mxcsr = MXCSR_DEFAULT;
-    v->arch.xsave_area->fpu_sse.fcw = FCW_RESET;
-    v->arch.xsave_area->fpu_sse.ftw = FXSAVE_FTW_RESET;
+    xsave_area->fpu_sse.mxcsr = MXCSR_DEFAULT;
+    xsave_area->fpu_sse.fcw = FCW_RESET;
+    xsave_area->fpu_sse.ftw = FXSAVE_FTW_RESET;
+
+    VCPU_UNMAP_XSAVE_AREA(v, xsave_area);
 }
 
 void vcpu_setup_fpu(struct vcpu *v, const void *data)
 {
+    struct xsave_struct *xsave_area = VCPU_MAP_XSAVE_AREA(v);
+
     v->fpu_initialised = true;
-    *v->arch.xsave_area = (struct xsave_struct) {
+    *xsave_area = (struct xsave_struct) {
         .fpu_sse = *(const fpusse_t*)data,
         .xsave_hdr.xstate_bv = XSTATE_FP_SSE,
     };
+
+    VCPU_UNMAP_XSAVE_AREA(v, xsave_area);
 }
 
 /* Free FPU's context save area */
