@@ -32,7 +32,8 @@ void console_end_sync(void);
 void console_start_log_everything(void);
 void console_end_log_everything(void);
 
-struct domain *console_input_domain(void);
+struct domain *console_get_domain(void);
+void console_put_domain(struct domain *d);
 
 /*
  * Steal output from the console. Returns +ve identifier, else -ve error.

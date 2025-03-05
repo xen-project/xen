@@ -78,7 +78,7 @@ static void vpl011_write_data_xen(struct domain *d, uint8_t data)
     unsigned long flags;
     struct vpl011 *vpl011 = &d->arch.vpl011;
     struct vpl011_xen_backend *intf = vpl011->backend.xen;
-    struct domain *input = console_input_domain();
+    struct domain *input = console_get_domain();
 
     VPL011_LOCK(d, flags);
 
@@ -123,8 +123,8 @@ static void vpl011_write_data_xen(struct domain *d, uint8_t data)
     vpl011_update_interrupt_status(d);
 
     VPL011_UNLOCK(d, flags);
-    if ( input != NULL )
-        rcu_unlock_domain(input);
+
+    console_put_domain(input);
 }
 
 /*

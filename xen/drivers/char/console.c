@@ -474,15 +474,18 @@ static unsigned int __read_mostly console_rx = 0;
 
 #define max_console_rx (max_init_domid + 1)
 
-#ifdef CONFIG_SBSA_VUART_CONSOLE
-/* Make sure to rcu_unlock_domain after use */
-struct domain *console_input_domain(void)
+struct domain *console_get_domain(void)
 {
     if ( console_rx == 0 )
             return NULL;
     return rcu_lock_domain_by_id(console_rx - 1);
 }
-#endif
+
+void console_put_domain(struct domain *d)
+{
+    if ( d )
+        rcu_unlock_domain(d);
+}
 
 static void switch_serial_input(void)
 {
@@ -528,12 +531,18 @@ static void switch_serial_input(void)
 
 static void __serial_rx(char c)
 {
-    switch ( console_rx )
-    {
-    case 0:
+    struct domain *d;
+    int rc = 0;
+
+    if ( console_rx == 0 )
         return handle_keypress(c, false);
 
-    case 1:
+    d = console_get_domain();
+    if ( !d )
+        return;
+
+    if ( is_hardware_domain(d) )
+    {
         /*
          * Deliver input to the hardware domain buffer, unless it is
          * already full.
@@ -546,31 +555,24 @@ static void __serial_rx(char c)
          * getting stuck.
          */
         send_global_virq(VIRQ_CONSOLE);
-        break;
-
+    }
 #ifdef CONFIG_SBSA_VUART_CONSOLE
-    default:
-    {
-        struct domain *d = rcu_lock_domain_by_id(console_rx - 1);
-
-        if ( d )
-        {
-            int rc = vpl011_rx_char_xen(d, c);
-            if ( rc )
-                guest_printk(d, XENLOG_G_WARNING
-                                "failed to process console input: %d\n", rc);
-            rcu_unlock_domain(d);
-        }
-
-        break;
-    }
+    else
+        /* Deliver input to the emulated UART. */
+        rc = vpl011_rx_char_xen(d, c);
 #endif
-    }
+
+    if ( rc )
+        guest_printk(d,
+                     XENLOG_WARNING "failed to process console input: %d\n",
+                     rc);
 
 #ifdef CONFIG_X86
     if ( pv_shim && pv_console )
         consoled_guest_tx(c);
 #endif
+
+    console_put_domain(d);
 }
 
 static void cf_check serial_rx(char c)
