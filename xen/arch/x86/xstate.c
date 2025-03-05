@@ -177,7 +177,7 @@ static void setup_xstate_comp(uint16_t *comp_offsets,
  */
 void expand_xsave_states(const struct vcpu *v, void *dest, unsigned int size)
 {
-    const struct xsave_struct *xstate = v->arch.xsave_area;
+    const struct xsave_struct *xstate = VCPU_MAP_XSAVE_AREA(v);
     const void *src;
     uint16_t comp_offsets[sizeof(xfeature_mask)*8];
     u64 xstate_bv = xstate->xsave_hdr.xstate_bv;
@@ -191,7 +191,7 @@ void expand_xsave_states(const struct vcpu *v, void *dest, unsigned int size)
     if ( !(xstate->xsave_hdr.xcomp_bv & XSTATE_COMPACTION_ENABLED) )
     {
         memcpy(dest, xstate, size);
-        return;
+        goto out;
     }
 
     ASSERT(xsave_area_compressed(xstate));
@@ -228,6 +228,9 @@ void expand_xsave_states(const struct vcpu *v, void *dest, unsigned int size)
 
         valid &= ~feature;
     }
+
+ out:
+    VCPU_UNMAP_XSAVE_AREA(v, xstate);
 }
 
 /*
@@ -242,7 +245,7 @@ void expand_xsave_states(const struct vcpu *v, void *dest, unsigned int size)
  */
 void compress_xsave_states(struct vcpu *v, const void *src, unsigned int size)
 {
-    struct xsave_struct *xstate = v->arch.xsave_area;
+    struct xsave_struct *xstate = VCPU_MAP_XSAVE_AREA(v);
     void *dest;
     uint16_t comp_offsets[sizeof(xfeature_mask)*8];
     u64 xstate_bv, valid;
@@ -256,7 +259,7 @@ void compress_xsave_states(struct vcpu *v, const void *src, unsigned int size)
     if ( !(v->arch.xcr0_accum & XSTATE_XSAVES_ONLY) )
     {
         memcpy(xstate, src, size);
-        return;
+        goto out;
     }
 
     /*
@@ -294,6 +297,9 @@ void compress_xsave_states(struct vcpu *v, const void *src, unsigned int size)
 
         valid &= ~feature;
     }
+
+ out:
+    VCPU_UNMAP_XSAVE_AREA(v, xstate);
 }
 
 void xsave(struct vcpu *v, uint64_t mask)
