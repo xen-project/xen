@@ -1,0 +1,8 @@
+VERS_1.0 {
+	global:
+		xenmanage_open;
+		xenmanage_close;
+		xenmanage_get_domain_info;
+		xenmanage_poll_changed_domain;
+	local: *; /* Do not expose anything by default */
+};

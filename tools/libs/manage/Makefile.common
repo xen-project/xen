@@ -1,0 +1,3 @@
+CFLAGS += -D__XEN_TOOLS__
+
+OBJS-y  += core.o
