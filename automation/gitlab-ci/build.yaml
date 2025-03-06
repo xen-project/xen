@@ -729,20 +729,6 @@ debian-12-ppc64le-gcc:
     HYPERVISOR_ONLY: y
 
 # RISC-V 64 cross-build
-debian-11-riscv64-gcc:
-  extends: .gcc-riscv64-cross-build
-  variables:
-    CONTAINER: debian:11-riscv64
-    KBUILD_DEFCONFIG: tiny64_defconfig
-    HYPERVISOR_ONLY: y
-
-debian-11-riscv64-gcc-debug:
-  extends: .gcc-riscv64-cross-build-debug
-  variables:
-    CONTAINER: debian:11-riscv64
-    KBUILD_DEFCONFIG: tiny64_defconfig
-    HYPERVISOR_ONLY: y
-
 debian-12-riscv64-gcc:
   extends: .gcc-riscv64-cross-build
   variables:
