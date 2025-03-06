@@ -17,7 +17,7 @@ int cf_check vmx_cpu_up(void);
 void cf_check vmx_cpu_down(void);
 
 struct vmcs_struct {
-    u32 vmcs_revision_id;
+    uint32_t revision_id;
     unsigned char data [0]; /* vmcs size is read from MSR */
 };
 

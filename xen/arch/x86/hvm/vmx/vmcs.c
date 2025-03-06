@@ -177,7 +177,7 @@ static DEFINE_PER_CPU(paddr_t, current_vmcs);
 static DEFINE_PER_CPU(struct list_head, active_vmcs_list);
 DEFINE_PER_CPU(bool, vmxon);
 
-static u32 vmcs_revision_id __read_mostly;
+#define vmcs_revision_id (vmx_basic_msr & VMX_BASIC_REVISION_MASK)
 u64 __read_mostly vmx_basic_msr;
 
 static void __init vmx_display_features(void)
@@ -503,7 +503,6 @@ static int vmx_init_vmcs_config(bool bsp)
     if ( !vmx_pin_based_exec_control )
     {
         /* First time through. */
-        vmcs_revision_id           = vmx_basic_msr_low & VMX_BASIC_REVISION_MASK;
         vmx_pin_based_exec_control = _vmx_pin_based_exec_control;
         vmx_cpu_based_exec_control = _vmx_cpu_based_exec_control;
         vmx_secondary_exec_control = _vmx_secondary_exec_control;
@@ -615,7 +614,7 @@ static paddr_t vmx_alloc_vmcs(void)
 
     vmcs = __map_domain_page(pg);
     clear_page(vmcs);
-    vmcs->vmcs_revision_id = vmcs_revision_id;
+    vmcs->revision_id = vmcs_revision_id;
     unmap_domain_page(vmcs);
 
     return page_to_maddr(pg);

@@ -1166,7 +1166,7 @@ static void nvmx_set_vmcs_pointer(struct vcpu *v, struct vmcs_struct *vvmcs)
     paddr_t vvmcs_maddr = v->arch.hvm.vmx.vmcs_shadow_maddr;
 
     __vmpclear(vvmcs_maddr);
-    vvmcs->vmcs_revision_id |= VMCS_RID_TYPE_MASK;
+    vvmcs->revision_id |= VMCS_RID_TYPE_MASK;
     v->arch.hvm.vmx.secondary_exec_control |=
         SECONDARY_EXEC_ENABLE_VMCS_SHADOWING;
     __vmwrite(SECONDARY_VM_EXEC_CONTROL,
@@ -1181,7 +1181,7 @@ static void nvmx_clear_vmcs_pointer(struct vcpu *v, struct vmcs_struct *vvmcs)
     paddr_t vvmcs_maddr = v->arch.hvm.vmx.vmcs_shadow_maddr;
 
     __vmpclear(vvmcs_maddr);
-    vvmcs->vmcs_revision_id &= ~VMCS_RID_TYPE_MASK;
+    vvmcs->revision_id &= ~VMCS_RID_TYPE_MASK;
     v->arch.hvm.vmx.secondary_exec_control &=
         ~SECONDARY_EXEC_ENABLE_VMCS_SHADOWING;
     __vmwrite(SECONDARY_VM_EXEC_CONTROL,
@@ -1799,10 +1799,10 @@ static int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
             {
                 struct vmcs_struct *vvmcs = vvmcx;
 
-                if ( ((vvmcs->vmcs_revision_id ^ vmx_basic_msr) &
-                                         VMX_BASIC_REVISION_MASK) ||
+                if ( ((vvmcs->revision_id ^ vmx_basic_msr) &
+                      VMX_BASIC_REVISION_MASK) ||
                      (!cpu_has_vmx_vmcs_shadowing &&
-                      (vvmcs->vmcs_revision_id & ~VMX_BASIC_REVISION_MASK)) )
+                      (vvmcs->revision_id & ~VMX_BASIC_REVISION_MASK)) )
                 {
                     hvm_unmap_guest_frame(vvmcx, 1);
                     vmfail(regs, VMX_INSN_VMPTRLD_INCORRECT_VMCS_ID);
@@ -2215,7 +2215,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
             map_domain_page(_mfn(PFN_DOWN(v->arch.hvm.vmx.vmcs_pa)));
 
         data = (host_data & (~0ul << 32)) |
-               (vmcs->vmcs_revision_id & 0x7fffffff);
+               (vmcs->revision_id & 0x7fffffff);
         unmap_domain_page(vmcs);
 
         if ( !cpu_has_vmx_vmcs_shadowing )
