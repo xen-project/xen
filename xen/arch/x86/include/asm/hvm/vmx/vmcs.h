@@ -210,7 +210,6 @@ void vmx_vmcs_reload(struct vcpu *v);
 #define CPU_BASED_MONITOR_EXITING             0x20000000U
 #define CPU_BASED_PAUSE_EXITING               0x40000000U
 #define CPU_BASED_ACTIVATE_SECONDARY_CONTROLS 0x80000000U
-extern u32 vmx_cpu_based_exec_control;
 
 #define PIN_BASED_EXT_INTR_MASK         0x00000001
 #define PIN_BASED_NMI_EXITING           0x00000008
@@ -303,6 +302,7 @@ extern u64 vmx_ept_vpid_cap;
 struct vmx_caps {
     uint64_t basic_msr;
     uint32_t pin_based_exec_control;
+    uint32_t cpu_based_exec_control;
 };
 extern struct vmx_caps vmx_caps;
 
@@ -314,19 +314,19 @@ extern struct vmx_caps vmx_caps;
      vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES)
 #define cpu_has_vmx_tpr_shadow \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
-     vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW)
+     (vmx_caps.cpu_based_exec_control & CPU_BASED_TPR_SHADOW))
 #define cpu_has_vmx_vnmi \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
      (vmx_caps.pin_based_exec_control & PIN_BASED_VIRTUAL_NMIS))
 #define cpu_has_vmx_msr_bitmap \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
-     vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_MSR_BITMAP)
+     (vmx_caps.cpu_based_exec_control & CPU_BASED_ACTIVATE_MSR_BITMAP))
 #define cpu_has_vmx_secondary_exec_control \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
-     vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS)
+     (vmx_caps.cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS))
 #define cpu_has_vmx_tertiary_exec_control \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
-     vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_TERTIARY_CONTROLS)
+     (vmx_caps.cpu_based_exec_control & CPU_BASED_ACTIVATE_TERTIARY_CONTROLS))
 #define cpu_has_vmx_ept \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
      vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT)
@@ -341,7 +341,7 @@ extern struct vmx_caps vmx_caps;
      vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VPID)
 #define cpu_has_monitor_trap_flag \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
-     vmx_cpu_based_exec_control & CPU_BASED_MONITOR_TRAP_FLAG)
+     (vmx_caps.cpu_based_exec_control & CPU_BASED_MONITOR_TRAP_FLAG))
 #define cpu_has_vmx_pat \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
      vmx_vmentry_control & VM_ENTRY_LOAD_GUEST_PAT)
