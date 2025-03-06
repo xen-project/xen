@@ -163,6 +163,7 @@ static int cf_check parse_ept_param_runtime(const char *s)
 #endif
 
 /* Dynamic (run-time adjusted) execution control flags. */
+struct vmx_caps __ro_after_init vmx_caps;
 u32 vmx_pin_based_exec_control __read_mostly;
 u32 vmx_cpu_based_exec_control __read_mostly;
 u32 vmx_secondary_exec_control __read_mostly;
@@ -177,8 +178,7 @@ static DEFINE_PER_CPU(paddr_t, current_vmcs);
 static DEFINE_PER_CPU(struct list_head, active_vmcs_list);
 DEFINE_PER_CPU(bool, vmxon);
 
-#define vmcs_revision_id (vmx_basic_msr & VMX_BASIC_REVISION_MASK)
-u64 __read_mostly vmx_basic_msr;
+#define vmcs_revision_id (vmx_caps.basic_msr & VMX_BASIC_REVISION_MASK)
 
 static void __init vmx_display_features(void)
 {
@@ -510,8 +510,8 @@ static int vmx_init_vmcs_config(bool bsp)
         vmx_ept_vpid_cap           = _vmx_ept_vpid_cap;
         vmx_vmexit_control         = _vmx_vmexit_control;
         vmx_vmentry_control        = _vmx_vmentry_control;
-        vmx_basic_msr              = ((u64)vmx_basic_msr_high << 32) |
-                                     vmx_basic_msr_low;
+        vmx_caps.basic_msr = ((uint64_t)vmx_basic_msr_high << 32) |
+                             vmx_basic_msr_low;
         vmx_vmfunc                 = _vmx_vmfunc;
 
         vmx_display_features();
@@ -565,7 +565,7 @@ static int vmx_init_vmcs_config(bool bsp)
             mismatch = 1;
         }
         if ( (vmx_basic_msr_high & (VMX_BASIC_VMCS_SIZE_MASK >> 32)) !=
-             ((vmx_basic_msr & VMX_BASIC_VMCS_SIZE_MASK) >> 32) )
+             ((vmx_caps.basic_msr & VMX_BASIC_VMCS_SIZE_MASK) >> 32) )
         {
             printk("VMX: CPU%d unexpected VMCS size %Lu\n",
                    smp_processor_id(),
@@ -2230,7 +2230,7 @@ int __init vmx_vmcs_init(void)
          * _vmx_vcpu_up() may have made it past feature identification.
          * Make sure all dependent features are off as well.
          */
-        vmx_basic_msr              = 0;
+        memset(&vmx_caps, 0, sizeof(vmx_caps));
         vmx_pin_based_exec_control = 0;
         vmx_cpu_based_exec_control = 0;
         vmx_secondary_exec_control = 0;

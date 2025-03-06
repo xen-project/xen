@@ -1561,7 +1561,7 @@ static int nvmx_handle_vmxon(struct cpu_user_regs *regs)
     rc = hvm_copy_from_guest_phys(&nvmcs_revid, gpa, sizeof(nvmcs_revid));
     if ( rc != HVMTRANS_okay ||
          (nvmcs_revid & ~VMX_BASIC_REVISION_MASK) ||
-         ((nvmcs_revid ^ vmx_basic_msr) & VMX_BASIC_REVISION_MASK) )
+         ((nvmcs_revid ^ vmx_caps.basic_msr) & VMX_BASIC_REVISION_MASK) )
     {
         vmfail_invalid(regs);
         return X86EMUL_OKAY;
@@ -1799,7 +1799,7 @@ static int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
             {
                 struct vmcs_struct *vvmcs = vvmcx;
 
-                if ( ((vvmcs->revision_id ^ vmx_basic_msr) &
+                if ( ((vvmcs->revision_id ^ vmx_caps.basic_msr) &
                       VMX_BASIC_REVISION_MASK) ||
                      (!cpu_has_vmx_vmcs_shadowing &&
                       (vvmcs->revision_id & ~VMX_BASIC_REVISION_MASK)) )
@@ -2193,7 +2193,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
     case MSR_IA32_VMX_TRUE_PROCBASED_CTLS:
     case MSR_IA32_VMX_TRUE_EXIT_CTLS:
     case MSR_IA32_VMX_TRUE_ENTRY_CTLS:
-        if ( !(vmx_basic_msr & VMX_BASIC_DEFAULT1_ZERO) )
+        if ( !(vmx_caps.basic_msr & VMX_BASIC_DEFAULT1_ZERO) )
             return 0;
         break;
 
