@@ -34,14 +34,15 @@
 #include "control.h"
 
 #include <xenevtchn.h>
-#include <xenctrl.h>
+#include <xenmanage.h>
+#include <xen-barrier.h>
 #include <xen/grant_table.h>
 
 #ifdef __MINIOS__
 #include <mini-os/xenbus.h>
 #endif
 
-static xc_interface **xc_handle;
+static xenmanage_handle *xm_handle;
 xengnttab_handle **xgt_handle;
 static evtchn_port_t virq_port;
 
@@ -619,32 +620,28 @@ static int destroy_domain(void *_domain)
 	return 0;
 }
 
-static bool get_domain_info(unsigned int domid, xc_domaininfo_t *dominfo)
-{
-	return xc_domain_getinfo_single(*xc_handle, domid, dominfo) == 0;
-}
-
 static int check_domain(const void *k, void *v, void *arg)
 {
-	xc_domaininfo_t dominfo;
+	unsigned int state;
 	struct connection *conn;
-	bool dom_valid;
+	int dom_invalid;
 	struct domain *domain = v;
 	bool *notify = arg;
 
-	dom_valid = get_domain_info(domain->domid, &dominfo);
+	dom_invalid = xenmanage_get_domain_info(xm_handle, domain->domid,
+						&state, NULL);
 	if (!domain->introduced) {
-		if (!dom_valid)
+		if (dom_invalid)
 			talloc_free(domain);
 		return 0;
 	}
-	if (dom_valid) {
-		if ((dominfo.flags & XEN_DOMINF_shutdown)
+	if (!dom_invalid) {
+		if ((state & XENMANAGE_GETDOMSTATE_STATE_SHUTDOWN)
 		    && !domain->shutdown) {
 			domain->shutdown = true;
 			*notify = true;
 		}
-		if (!(dominfo.flags & XEN_DOMINF_dying))
+		if (!(state & XENMANAGE_GETDOMSTATE_STATE_DEAD))
 			return 0;
 	}
 	if (domain->conn) {
@@ -786,10 +783,9 @@ static struct domain *find_or_alloc_domain(const void *ctx, unsigned int domid)
 static struct domain *find_or_alloc_existing_domain(unsigned int domid)
 {
 	struct domain *domain;
-	xc_domaininfo_t dominfo;
 
 	domain = find_domain_struct(domid);
-	if (!domain && get_domain_info(domid, &dominfo))
+	if (!domain && !xenmanage_get_domain_info(xm_handle, domid, NULL, NULL))
 		domain = alloc_domain(NULL, domid);
 
 	return domain;
@@ -1187,12 +1183,6 @@ int do_reset_watches(const void *ctx, struct connection *conn,
 	return 0;
 }
 
-static int close_xc_handle(void *_handle)
-{
-	xc_interface_close(*(xc_interface**)_handle);
-	return 0;
-}
-
 static int close_xgt_handle(void *_handle)
 {
 	xengnttab_close(*(xengnttab_handle **)_handle);
@@ -1258,15 +1248,9 @@ void domain_early_init(void)
 	if (!domhash)
 		barf_perror("Failed to allocate domain hashtable");
 
-	xc_handle = talloc(talloc_autofree_context(), xc_interface*);
-	if (!xc_handle)
-		barf_perror("Failed to allocate domain handle");
-
-	*xc_handle = xc_interface_open(0,0,0);
-	if (!*xc_handle)
-		barf_perror("Failed to open connection to hypervisor");
-
-	talloc_set_destructor(xc_handle, close_xc_handle);
+	xm_handle = xenmanage_open(NULL, 0);
+	if (!xm_handle)
+		barf_perror("Failed to open connection to libxenmanage");
 
 	xgt_handle = talloc(talloc_autofree_context(), xengnttab_handle*);
 	if (!xgt_handle)
@@ -1306,6 +1290,8 @@ void domain_deinit(void)
 {
 	if (virq_port)
 		xenevtchn_unbind(xce_handle, virq_port);
+
+	xenmanage_close(xm_handle);
 }
 
 /*
@@ -1335,13 +1321,13 @@ int domain_alloc_permrefs(struct node_perms *perms)
 {
 	unsigned int i, domid;
 	struct domain *d;
-	xc_domaininfo_t dominfo;
 
 	for (i = 0; i < perms->num; i++) {
 		domid = perms->p[i].id;
 		d = find_domain_struct(domid);
 		if (!d) {
-			if (!get_domain_info(domid, &dominfo))
+			if (xenmanage_get_domain_info(xm_handle, domid,
+						      NULL, NULL))
 				perms->p[i].perms |= XS_PERM_IGNORE;
 			else if (!alloc_domain(NULL, domid))
 				return ENOMEM;

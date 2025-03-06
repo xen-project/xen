@@ -12,7 +12,7 @@ XENSTORED_OBJS-$(CONFIG_MiniOS) += minios.o lu_minios.o
 # Include configure output (config.h)
 CFLAGS += -include $(XEN_ROOT)/tools/config.h
 CFLAGS += $(CFLAGS_libxenevtchn)
-CFLAGS += $(CFLAGS_libxenctrl)
+CFLAGS += $(CFLAGS_libxenmanage)
 CFLAGS += $(CFLAGS_libxentoolcore)
 
 $(XENSTORED_OBJS-y): CFLAGS += $(CFLAGS_libxengnttab)

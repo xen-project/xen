@@ -19,7 +19,6 @@
 #ifndef _XENSTORED_CORE_H
 #define _XENSTORED_CORE_H
 
-#include <xenctrl.h>
 #include <xengnttab.h>
 
 #include <sys/types.h>

@@ -6,6 +6,7 @@
  */
 
 #include <syslog.h>
+#include <unistd.h>
 #include <sys/stat.h>
 
 #include "talloc.h"

@@ -308,7 +308,7 @@ endif
 # libraries under tools/libs
 #######
 
-STUB_LIBS := toolcore toollog evtchn gnttab call foreignmemory devicemodel ctrl guest
+STUB_LIBS := toolcore toollog evtchn gnttab call foreignmemory devicemodel ctrl guest manage
 
 LIBDEP_guest := cross-zlib
 
@@ -466,7 +466,7 @@ grub: cross-polarssl grub-upstream $(CROSS_ROOT) grub-$(XEN_TARGET_ARCH)-minios-
 # xenstore
 ##########
 
-xenstore-minios.gen.cfg: APP_LIBS = gnttab evtchn toollog ctrl
+xenstore-minios.gen.cfg: APP_LIBS = gnttab evtchn toollog manage
 xenstore-minios.gen.cfg: xenstore-minios.cfg Makefile
 	$(GEN_config) >$@
 
@@ -481,7 +481,7 @@ xenstore: $(CROSS_ROOT) xenstore-minios-config.mk
 # xenstorepvh
 #############
 
-xenstorepvh-minios.gen.cfg: APP_LIBS = gnttab evtchn toollog ctrl
+xenstorepvh-minios.gen.cfg: APP_LIBS = gnttab evtchn toollog manage
 xenstorepvh-minios.gen.cfg: xenstorepvh-minios.cfg Makefile
 	$(GEN_config) >$@
 
@@ -524,7 +524,7 @@ else
 pv-grub-if-enabled:
 endif
 
-XENSTORE_DEPS := libxenevtchn libxengnttab libxenctrl
+XENSTORE_DEPS := libxenevtchn libxengnttab libxenmanage
 
 .PHONY: xenstore-stubdom
 xenstore-stubdom: mini-os-$(XEN_TARGET_ARCH)-xenstore $(XENSTORE_DEPS) xenstore
