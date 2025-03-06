@@ -41,10 +41,6 @@ enum xsd_sockmsg_type
     XS_INVALID = 0xffff /* Guaranteed to remain an invalid type */
 };
 
-#define XS_WRITE_NONE "NONE"
-#define XS_WRITE_CREATE "CREATE"
-#define XS_WRITE_CREATE_EXCL "CREATE|EXCL"
-
 /* We hand errors as strings, for portability. */
 struct xsd_errors
 {
