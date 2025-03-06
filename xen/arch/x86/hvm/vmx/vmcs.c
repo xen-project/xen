@@ -164,7 +164,6 @@ static int cf_check parse_ept_param_runtime(const char *s)
 
 /* Dynamic (run-time adjusted) execution control flags. */
 struct vmx_caps __ro_after_init vmx_caps;
-u32 vmx_pin_based_exec_control __read_mostly;
 u32 vmx_cpu_based_exec_control __read_mostly;
 u32 vmx_secondary_exec_control __read_mostly;
 uint64_t vmx_tertiary_exec_control __read_mostly;
@@ -265,7 +264,7 @@ static bool cap_check(
 static int vmx_init_vmcs_config(bool bsp)
 {
     u32 vmx_basic_msr_low, vmx_basic_msr_high, min, opt;
-    u32 _vmx_pin_based_exec_control;
+    struct vmx_caps caps = {};
     u32 _vmx_cpu_based_exec_control;
     u32 _vmx_secondary_exec_control = 0;
     uint64_t _vmx_tertiary_exec_control = 0;
@@ -282,7 +281,7 @@ static int vmx_init_vmcs_config(bool bsp)
            PIN_BASED_NMI_EXITING);
     opt = (PIN_BASED_VIRTUAL_NMIS |
            PIN_BASED_POSTED_INTERRUPT);
-    _vmx_pin_based_exec_control = adjust_vmx_controls(
+    caps.pin_based_exec_control = adjust_vmx_controls(
         "Pin-Based Exec Control", min, opt,
         MSR_IA32_VMX_PINBASED_CTLS, &mismatch);
 
@@ -445,7 +444,7 @@ static int vmx_init_vmcs_config(bool bsp)
     if ( (_vmx_secondary_exec_control & SECONDARY_EXEC_PAUSE_LOOP_EXITING) &&
           ple_gap == 0 )
     {
-        if ( !vmx_pin_based_exec_control )
+        if ( !vmx_caps.pin_based_exec_control )
             printk(XENLOG_INFO "Disable Pause-Loop Exiting.\n");
         _vmx_secondary_exec_control &= ~ SECONDARY_EXEC_PAUSE_LOOP_EXITING;
     }
@@ -463,10 +462,10 @@ static int vmx_init_vmcs_config(bool bsp)
      * is a minimal requirement, only check the former, which is optional.
      */
     if ( !(_vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY) )
-        _vmx_pin_based_exec_control &= ~PIN_BASED_POSTED_INTERRUPT;
+        caps.pin_based_exec_control &= ~PIN_BASED_POSTED_INTERRUPT;
 
     if ( iommu_intpost &&
-         !(_vmx_pin_based_exec_control & PIN_BASED_POSTED_INTERRUPT) )
+         !(caps.pin_based_exec_control & PIN_BASED_POSTED_INTERRUPT) )
     {
         printk("Intel VT-d Posted Interrupt is disabled for CPU-side Posted "
                "Interrupt is not enabled\n");
@@ -500,10 +499,10 @@ static int vmx_init_vmcs_config(bool bsp)
     if ( mismatch )
         return -EINVAL;
 
-    if ( !vmx_pin_based_exec_control )
+    if ( !vmx_caps.pin_based_exec_control )
     {
         /* First time through. */
-        vmx_pin_based_exec_control = _vmx_pin_based_exec_control;
+        vmx_caps = caps;
         vmx_cpu_based_exec_control = _vmx_cpu_based_exec_control;
         vmx_secondary_exec_control = _vmx_secondary_exec_control;
         vmx_tertiary_exec_control  = _vmx_tertiary_exec_control;
@@ -534,7 +533,7 @@ static int vmx_init_vmcs_config(bool bsp)
             vmcs_revision_id, vmx_basic_msr_low & VMX_BASIC_REVISION_MASK);
         mismatch |= cap_check(
             "Pin-Based Exec Control",
-            vmx_pin_based_exec_control, _vmx_pin_based_exec_control);
+            vmx_caps.pin_based_exec_control, caps.pin_based_exec_control);
         mismatch |= cap_check(
             "CPU-Based Exec Control",
             vmx_cpu_based_exec_control, _vmx_cpu_based_exec_control);
@@ -1115,7 +1114,7 @@ static int construct_vmcs(struct vcpu *v)
     vmx_vmcs_enter(v);
 
     /* VMCS controls. */
-    __vmwrite(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_control);
+    __vmwrite(PIN_BASED_VM_EXEC_CONTROL, vmx_caps.pin_based_exec_control);
 
     v->arch.hvm.vmx.exec_control = vmx_cpu_based_exec_control;
     if ( d->arch.vtsc && !cpu_has_vmx_tsc_scaling )
@@ -2152,7 +2151,7 @@ void vmcs_dump_vcpu(struct vcpu *v)
     printk("TSC Offset = 0x%016lx  TSC Multiplier = 0x%016lx\n",
            vmr(TSC_OFFSET), vmr(TSC_MULTIPLIER));
     if ( (v->arch.hvm.vmx.exec_control & CPU_BASED_TPR_SHADOW) ||
-         (vmx_pin_based_exec_control & PIN_BASED_POSTED_INTERRUPT) )
+         (vmx_caps.pin_based_exec_control & PIN_BASED_POSTED_INTERRUPT) )
         printk("TPR Threshold = 0x%02x  PostedIntrVec = 0x%02x\n",
                vmr32(TPR_THRESHOLD), vmr16(POSTED_INTR_NOTIFICATION_VECTOR));
     if ( (v->arch.hvm.vmx.secondary_exec_control &
@@ -2231,7 +2230,6 @@ int __init vmx_vmcs_init(void)
          * Make sure all dependent features are off as well.
          */
         memset(&vmx_caps, 0, sizeof(vmx_caps));
-        vmx_pin_based_exec_control = 0;
         vmx_cpu_based_exec_control = 0;
         vmx_secondary_exec_control = 0;
         vmx_tertiary_exec_control  = 0;

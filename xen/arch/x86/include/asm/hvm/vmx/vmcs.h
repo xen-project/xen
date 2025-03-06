@@ -217,7 +217,6 @@ extern u32 vmx_cpu_based_exec_control;
 #define PIN_BASED_VIRTUAL_NMIS          0x00000020
 #define PIN_BASED_PREEMPT_TIMER         0x00000040
 #define PIN_BASED_POSTED_INTERRUPT      0x00000080
-extern u32 vmx_pin_based_exec_control;
 
 #define VM_EXIT_SAVE_DEBUG_CNTRLS       0x00000004
 #define VM_EXIT_IA32E_MODE              0x00000200
@@ -303,6 +302,7 @@ extern u64 vmx_ept_vpid_cap;
 /* Capabilities and dynamic (run-time adjusted) execution control flags. */
 struct vmx_caps {
     uint64_t basic_msr;
+    uint32_t pin_based_exec_control;
 };
 extern struct vmx_caps vmx_caps;
 
@@ -317,7 +317,7 @@ extern struct vmx_caps vmx_caps;
      vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW)
 #define cpu_has_vmx_vnmi \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
-     vmx_pin_based_exec_control & PIN_BASED_VIRTUAL_NMIS)
+     (vmx_caps.pin_based_exec_control & PIN_BASED_VIRTUAL_NMIS))
 #define cpu_has_vmx_msr_bitmap \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
      vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_MSR_BITMAP)
@@ -371,7 +371,7 @@ extern struct vmx_caps vmx_caps;
      vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE)
 #define cpu_has_vmx_posted_intr_processing \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
-     vmx_pin_based_exec_control & PIN_BASED_POSTED_INTERRUPT)
+     (vmx_caps.pin_based_exec_control & PIN_BASED_POSTED_INTERRUPT))
 #define cpu_has_vmx_vmcs_shadowing \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
      vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VMCS_SHADOWING)

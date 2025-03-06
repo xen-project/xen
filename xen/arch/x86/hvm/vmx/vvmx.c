@@ -1057,7 +1057,7 @@ static void load_shadow_control(struct vcpu *v)
      * and EXCEPTION
      * Enforce the removed features
      */
-    nvmx_update_pin_control(v, vmx_pin_based_exec_control);
+    nvmx_update_pin_control(v, vmx_caps.pin_based_exec_control);
     vmx_update_cpu_exec_control(v);
     vmx_update_secondary_exec_control(v);
     nvmx_update_exit_control(v, vmx_vmexit_control);
