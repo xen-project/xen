@@ -509,10 +509,18 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
         goto out;
     }
 
+    if ( virq == VIRQ_DOM_EXC )
+    {
+        rc = domain_init_states();
+        if ( rc )
+            goto out;
+    }
+
     port = rc = evtchn_get_port(d, port);
     if ( rc < 0 )
     {
         gdprintk(XENLOG_WARNING, "EVTCHNOP failure: error %d\n", rc);
+        domain_deinit_states(d);
         goto out;
     }
 
@@ -744,6 +752,9 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
     case ECS_VIRQ: {
         struct vcpu *v;
         unsigned long flags;
+
+        if ( chn1->u.virq == VIRQ_DOM_EXC )
+            domain_deinit_states(d1);
 
         v = d1->vcpu[virq_is_global(chn1->u.virq) ? 0 : chn1->notify_vcpu_id];
 
@@ -1073,6 +1084,26 @@ static void clear_global_virq_handlers(struct domain *d)
         put_domain(d);
         put_count--;
     }
+}
+
+struct domain *lock_dom_exc_handler(void)
+{
+    struct domain *d;
+
+    d = get_global_virq_handler(VIRQ_DOM_EXC);
+    if ( unlikely(!get_domain(d)) )
+        return NULL;
+
+    read_lock(&d->event_lock);
+
+    return d;
+}
+
+void unlock_dom_exc_handler(struct domain *d)
+{
+    read_unlock(&d->event_lock);
+
+    put_domain(d);
 }
 
 int evtchn_status(evtchn_status_t *status)

@@ -35,6 +35,7 @@
 #include <xen/irq.h>
 #include <xen/argo.h>
 #include <xen/llc-coloring.h>
+#include <xen/xvmalloc.h>
 #include <asm/p2m.h>
 #include <asm/processor.h>
 #include <public/sched.h>
@@ -139,6 +140,51 @@ bool __read_mostly vmtrace_available;
 
 bool __read_mostly vpmu_is_available;
 
+static unsigned long *__read_mostly dom_state_changed;
+
+int domain_init_states(void)
+{
+    const struct domain *d;
+
+    ASSERT(!dom_state_changed);
+    ASSERT(rw_is_write_locked_by_me(&current->domain->event_lock));
+
+    dom_state_changed = xvzalloc_array(unsigned long,
+                                       BITS_TO_LONGS(DOMID_FIRST_RESERVED));
+    if ( !dom_state_changed )
+        return -ENOMEM;
+
+    rcu_read_lock(&domlist_read_lock);
+
+    for_each_domain ( d )
+        __set_bit(d->domain_id, dom_state_changed);
+
+    rcu_read_unlock(&domlist_read_lock);
+
+    return 0;
+}
+
+void domain_deinit_states(const struct domain *d)
+{
+    ASSERT(rw_is_write_locked_by_me(&d->event_lock));
+
+    XVFREE(dom_state_changed);
+}
+
+static void domain_changed_state(const struct domain *d)
+{
+    struct domain *hdl;
+
+    hdl = lock_dom_exc_handler();
+    if ( unlikely(!hdl) )
+        return;
+
+    if ( dom_state_changed )
+        set_bit(d->domain_id, dom_state_changed);
+
+    unlock_dom_exc_handler(hdl);
+}
+
 static void __domain_finalise_shutdown(struct domain *d)
 {
     struct vcpu *v;
@@ -153,6 +199,7 @@ static void __domain_finalise_shutdown(struct domain *d)
             return;
 
     d->is_shut_down = 1;
+    domain_changed_state(d);
     if ( (d->shutdown_code == SHUTDOWN_suspend) && d->suspend_evtchn )
         evtchn_send(d, d->suspend_evtchn);
     else
@@ -840,6 +887,7 @@ struct domain *domain_create(domid_t domid,
      */
     domlist_insert(d);
 
+    domain_changed_state(d);
     memcpy(d->handle, config->handle, sizeof(d->handle));
 
     return d;
@@ -1105,6 +1153,7 @@ int domain_kill(struct domain *d)
         /* Mem event cleanup has to go here because the rings 
          * have to be put before we call put_domain. */
         vm_event_cleanup(d);
+        domain_changed_state(d);
         put_domain(d);
         send_global_virq(VIRQ_DOM_EXC);
         /* fallthrough */
@@ -1293,6 +1342,8 @@ static void cf_check complete_domain_destroy(struct rcu_head *head)
 #endif
 
     xfree(d->vcpu);
+
+    domain_changed_state(d);
 
     _domain_destroy(d);
 

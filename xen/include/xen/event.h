@@ -100,6 +100,10 @@ bool evtchn_virq_enabled(const struct vcpu *v, unsigned int virq);
 /* Notify remote end of a Xen-attached event channel.*/
 void notify_via_xen_event_channel(struct domain *ld, int lport);
 
+/* Lock/unlock of VIRQ_DOM_EXC associated data (read_lock(d->event_lock)). */
+struct domain *lock_dom_exc_handler(void);
+void unlock_dom_exc_handler(struct domain *d);
+
 /*
  * Internal event channel object storage.
  *
