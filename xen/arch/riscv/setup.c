@@ -13,6 +13,7 @@
 
 #include <public/version.h>
 
+#include <asm/cpufeature.h>
 #include <asm/early_printk.h>
 #include <asm/fixmap.h>
 #include <asm/sbi.h>
@@ -122,6 +123,8 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
         device_tree_flattened = NULL;
         panic("Booting using ACPI isn't supported\n");
     }
+
+    riscv_fill_hwcap();
 
     printk("All set up\n");
 
