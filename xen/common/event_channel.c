@@ -991,7 +991,8 @@ void send_global_virq(uint32_t virq)
 
 int set_global_virq_handler(struct domain *d, uint32_t virq)
 {
-    struct domain *old;
+    struct domain *old, *hdl;
+    const struct vcpu *v;
     int rc = 0;
 
     if (virq >= NR_VIRQS)
@@ -1023,7 +1024,22 @@ int set_global_virq_handler(struct domain *d, uint32_t virq)
     else
     {
         old = global_virq_handlers[virq];
-        global_virq_handlers[virq] = d;
+        hdl = get_global_virq_handler(virq);
+        if ( hdl != d )
+        {
+            read_lock(&hdl->event_lock);
+
+            v = hdl->vcpu[0];
+            if ( v && read_atomic(&v->virq_to_evtchn[virq]) )
+            {
+                rc = -EBUSY;
+                old = d;
+            }
+            else
+                global_virq_handlers[virq] = d;
+
+            read_unlock(&hdl->event_lock);
+        }
     }
 
     spin_unlock(&global_virq_handlers_lock);
