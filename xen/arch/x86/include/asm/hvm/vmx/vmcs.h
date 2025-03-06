@@ -227,7 +227,6 @@ void vmx_vmcs_reload(struct vcpu *v);
 #define VM_EXIT_LOAD_HOST_EFER          0x00200000
 #define VM_EXIT_SAVE_PREEMPT_TIMER      0x00400000
 #define VM_EXIT_CLEAR_BNDCFGS           0x00800000
-extern u32 vmx_vmexit_control;
 
 #define VM_ENTRY_IA32E_MODE             0x00000200
 #define VM_ENTRY_SMM                    0x00000400
@@ -303,6 +302,7 @@ struct vmx_caps {
     uint32_t cpu_based_exec_control;
     uint32_t secondary_exec_control;
     uint64_t tertiary_exec_control;
+    uint32_t vmexit_control;
 };
 extern struct vmx_caps vmx_caps;
 
@@ -386,7 +386,7 @@ extern struct vmx_caps vmx_caps;
      (vmx_caps.secondary_exec_control & SECONDARY_EXEC_ENABLE_PML))
 #define cpu_has_vmx_mpx \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
-     (vmx_vmexit_control & VM_EXIT_CLEAR_BNDCFGS) && \
+     (vmx_caps.vmexit_control & VM_EXIT_CLEAR_BNDCFGS) && \
      (vmx_vmentry_control & VM_ENTRY_LOAD_BNDCFGS))
 #define cpu_has_vmx_xsaves \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \

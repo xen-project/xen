@@ -1060,7 +1060,7 @@ static void load_shadow_control(struct vcpu *v)
     nvmx_update_pin_control(v, vmx_caps.pin_based_exec_control);
     vmx_update_cpu_exec_control(v);
     vmx_update_secondary_exec_control(v);
-    nvmx_update_exit_control(v, vmx_vmexit_control);
+    nvmx_update_exit_control(v, vmx_caps.vmexit_control);
     nvmx_update_entry_control(v);
     vmx_update_exception_bitmap(v);
     nvmx_update_apic_access_address(v);
