@@ -164,7 +164,6 @@ static int cf_check parse_ept_param_runtime(const char *s)
 
 /* Dynamic (run-time adjusted) execution control flags. */
 struct vmx_caps __ro_after_init vmx_caps;
-uint64_t vmx_tertiary_exec_control __read_mostly;
 u32 vmx_vmexit_control __read_mostly;
 u32 vmx_vmentry_control __read_mostly;
 u64 vmx_ept_vpid_cap __read_mostly;
@@ -263,7 +262,6 @@ static int vmx_init_vmcs_config(bool bsp)
 {
     u32 vmx_basic_msr_low, vmx_basic_msr_high, min, opt;
     struct vmx_caps caps = {};
-    uint64_t _vmx_tertiary_exec_control = 0;
     u64 _vmx_ept_vpid_cap = 0;
     u64 _vmx_misc_cap = 0;
     u32 _vmx_vmexit_control;
@@ -367,7 +365,7 @@ static int vmx_init_vmcs_config(bool bsp)
         uint64_t opt = (TERTIARY_EXEC_VIRT_SPEC_CTRL |
                         TERTIARY_EXEC_EPT_PAGING_WRITE);
 
-        _vmx_tertiary_exec_control = adjust_vmx_controls2(
+        caps.tertiary_exec_control = adjust_vmx_controls2(
             "Tertiary Exec Control", 0, opt,
             MSR_IA32_VMX_PROCBASED_CTLS3, &mismatch);
     }
@@ -499,7 +497,6 @@ static int vmx_init_vmcs_config(bool bsp)
     {
         /* First time through. */
         vmx_caps = caps;
-        vmx_tertiary_exec_control  = _vmx_tertiary_exec_control;
         vmx_ept_vpid_cap           = _vmx_ept_vpid_cap;
         vmx_vmexit_control         = _vmx_vmexit_control;
         vmx_vmentry_control        = _vmx_vmentry_control;
@@ -536,7 +533,7 @@ static int vmx_init_vmcs_config(bool bsp)
             vmx_caps.secondary_exec_control, caps.secondary_exec_control);
         mismatch |= cap_check(
             "Tertiary Exec Control",
-            vmx_tertiary_exec_control, _vmx_tertiary_exec_control);
+            vmx_caps.tertiary_exec_control, caps.tertiary_exec_control);
         mismatch |= cap_check(
             "VMExit Control",
             vmx_vmexit_control, _vmx_vmexit_control);
@@ -1115,7 +1112,7 @@ static int construct_vmcs(struct vcpu *v)
         v->arch.hvm.vmx.exec_control |= CPU_BASED_RDTSC_EXITING;
 
     v->arch.hvm.vmx.secondary_exec_control = vmx_caps.secondary_exec_control;
-    v->arch.hvm.vmx.tertiary_exec_control  = vmx_tertiary_exec_control;
+    v->arch.hvm.vmx.tertiary_exec_control  = vmx_caps.tertiary_exec_control;
 
     /*
      * Disable features which we don't want active by default:
@@ -2224,7 +2221,6 @@ int __init vmx_vmcs_init(void)
          * Make sure all dependent features are off as well.
          */
         memset(&vmx_caps, 0, sizeof(vmx_caps));
-        vmx_tertiary_exec_control  = 0;
         vmx_vmexit_control         = 0;
         vmx_vmentry_control        = 0;
         vmx_ept_vpid_cap           = 0;

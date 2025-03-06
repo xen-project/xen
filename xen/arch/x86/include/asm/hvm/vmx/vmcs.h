@@ -265,13 +265,12 @@ extern u32 vmx_vmentry_control;
 #define TERTIARY_EXEC_GUEST_PAGING_VERIFY       BIT(3, UL)
 #define TERTIARY_EXEC_IPI_VIRT                  BIT(4, UL)
 #define TERTIARY_EXEC_VIRT_SPEC_CTRL            BIT(7, UL)
-extern uint64_t vmx_tertiary_exec_control;
 
 #define cpu_has_vmx_virt_spec_ctrl \
-     (vmx_tertiary_exec_control & TERTIARY_EXEC_VIRT_SPEC_CTRL)
+     (vmx_caps.tertiary_exec_control & TERTIARY_EXEC_VIRT_SPEC_CTRL)
 
 #define cpu_has_vmx_ept_paging_write \
-     (vmx_tertiary_exec_control & TERTIARY_EXEC_EPT_PAGING_WRITE)
+     (vmx_caps.tertiary_exec_control & TERTIARY_EXEC_EPT_PAGING_WRITE)
 
 #define VMX_EPT_EXEC_ONLY_SUPPORTED                         0x00000001
 #define VMX_EPT_WALK_LENGTH_4_SUPPORTED                     0x00000040
@@ -303,6 +302,7 @@ struct vmx_caps {
     uint32_t pin_based_exec_control;
     uint32_t cpu_based_exec_control;
     uint32_t secondary_exec_control;
+    uint64_t tertiary_exec_control;
 };
 extern struct vmx_caps vmx_caps;
 
