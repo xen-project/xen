@@ -164,7 +164,6 @@ static int cf_check parse_ept_param_runtime(const char *s)
 
 /* Dynamic (run-time adjusted) execution control flags. */
 struct vmx_caps __ro_after_init vmx_caps;
-u32 vmx_secondary_exec_control __read_mostly;
 uint64_t vmx_tertiary_exec_control __read_mostly;
 u32 vmx_vmexit_control __read_mostly;
 u32 vmx_vmentry_control __read_mostly;
@@ -264,7 +263,6 @@ static int vmx_init_vmcs_config(bool bsp)
 {
     u32 vmx_basic_msr_low, vmx_basic_msr_high, min, opt;
     struct vmx_caps caps = {};
-    u32 _vmx_secondary_exec_control = 0;
     uint64_t _vmx_tertiary_exec_control = 0;
     u64 _vmx_ept_vpid_cap = 0;
     u64 _vmx_misc_cap = 0;
@@ -359,7 +357,7 @@ static int vmx_init_vmcs_config(bool bsp)
                    SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
                    SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE;
 
-        _vmx_secondary_exec_control = adjust_vmx_controls(
+        caps.secondary_exec_control = adjust_vmx_controls(
             "Secondary Exec Control", min, opt,
             MSR_IA32_VMX_PROCBASED_CTLS2, &mismatch);
     }
@@ -375,7 +373,7 @@ static int vmx_init_vmcs_config(bool bsp)
     }
 
     /* The IA32_VMX_EPT_VPID_CAP MSR exists only when EPT or VPID available */
-    if ( _vmx_secondary_exec_control & (SECONDARY_EXEC_ENABLE_EPT |
+    if ( caps.secondary_exec_control & (SECONDARY_EXEC_ENABLE_EPT |
                                         SECONDARY_EXEC_ENABLE_VPID) )
     {
         rdmsrl(MSR_IA32_VMX_EPT_VPID_CAP, _vmx_ept_vpid_cap);
@@ -397,7 +395,7 @@ static int vmx_init_vmcs_config(bool bsp)
         if ( !(_vmx_ept_vpid_cap & VMX_EPT_MEMORY_TYPE_WB) ||
              !(_vmx_ept_vpid_cap & VMX_EPT_WALK_LENGTH_4_SUPPORTED) ||
              !(_vmx_ept_vpid_cap & VMX_EPT_INVEPT_ALL_CONTEXT) )
-            _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_EPT;
+            caps.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_EPT;
 
         /*
          * the CPU must support INVVPID all context invalidation, because we
@@ -406,14 +404,14 @@ static int vmx_init_vmcs_config(bool bsp)
          * Or we just don't use VPID.
          */
         if ( !(_vmx_ept_vpid_cap & VMX_VPID_INVVPID_ALL_CONTEXT) )
-            _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_VPID;
+            caps.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_VPID;
 
         /* EPT A/D bits is required for PML */
         if ( !(_vmx_ept_vpid_cap & VMX_EPT_AD_BIT) )
-            _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_PML;
+            caps.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_PML;
     }
 
-    if ( _vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT )
+    if ( caps.secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT )
     {
         /*
          * To use EPT we expect to be able to clear certain intercepts.
@@ -426,25 +424,25 @@ static int vmx_init_vmcs_config(bool bsp)
         if ( must_be_one & (CPU_BASED_INVLPG_EXITING |
                             CPU_BASED_CR3_LOAD_EXITING |
                             CPU_BASED_CR3_STORE_EXITING) )
-            _vmx_secondary_exec_control &=
+            caps.secondary_exec_control &=
                 ~(SECONDARY_EXEC_ENABLE_EPT |
                   SECONDARY_EXEC_UNRESTRICTED_GUEST);
     }
 
     /* PML cannot be supported if EPT is not used */
-    if ( !(_vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT) )
-        _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_PML;
+    if ( !(caps.secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT) )
+        caps.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_PML;
 
     /* Turn off opt_ept_pml if PML feature is not present. */
-    if ( !(_vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_PML) )
+    if ( !(caps.secondary_exec_control & SECONDARY_EXEC_ENABLE_PML) )
         opt_ept_pml = false;
 
-    if ( (_vmx_secondary_exec_control & SECONDARY_EXEC_PAUSE_LOOP_EXITING) &&
+    if ( (caps.secondary_exec_control & SECONDARY_EXEC_PAUSE_LOOP_EXITING) &&
           ple_gap == 0 )
     {
         if ( !vmx_caps.pin_based_exec_control )
             printk(XENLOG_INFO "Disable Pause-Loop Exiting.\n");
-        _vmx_secondary_exec_control &= ~ SECONDARY_EXEC_PAUSE_LOOP_EXITING;
+        caps.secondary_exec_control &= ~ SECONDARY_EXEC_PAUSE_LOOP_EXITING;
     }
 
     min = VM_EXIT_ACK_INTR_ON_EXIT;
@@ -459,7 +457,7 @@ static int vmx_init_vmcs_config(bool bsp)
      * delivery" and "acknowledge interrupt on exit" is set. For the latter
      * is a minimal requirement, only check the former, which is optional.
      */
-    if ( !(_vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY) )
+    if ( !(caps.secondary_exec_control & SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY) )
         caps.pin_based_exec_control &= ~PIN_BASED_POSTED_INTERRUPT;
 
     if ( iommu_intpost &&
@@ -471,7 +469,7 @@ static int vmx_init_vmcs_config(bool bsp)
     }
 
     /* The IA32_VMX_VMFUNC MSR exists only when VMFUNC is available */
-    if ( _vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VM_FUNCTIONS )
+    if ( caps.secondary_exec_control & SECONDARY_EXEC_ENABLE_VM_FUNCTIONS )
     {
         rdmsrl(MSR_IA32_VMX_VMFUNC, _vmx_vmfunc);
 
@@ -481,12 +479,12 @@ static int vmx_init_vmcs_config(bool bsp)
          * Or we just don't use VMFUNC.
          */
         if ( !(_vmx_vmfunc & VMX_VMFUNC_EPTP_SWITCHING) )
-            _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_VM_FUNCTIONS;
+            caps.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_VM_FUNCTIONS;
     }
 
     /* Virtualization exceptions are only enabled if VMFUNC is enabled */
-    if ( !(_vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VM_FUNCTIONS) )
-        _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS;
+    if ( !(caps.secondary_exec_control & SECONDARY_EXEC_ENABLE_VM_FUNCTIONS) )
+        caps.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS;
 
     min = 0;
     opt = (VM_ENTRY_LOAD_GUEST_PAT | VM_ENTRY_LOAD_GUEST_EFER |
@@ -501,7 +499,6 @@ static int vmx_init_vmcs_config(bool bsp)
     {
         /* First time through. */
         vmx_caps = caps;
-        vmx_secondary_exec_control = _vmx_secondary_exec_control;
         vmx_tertiary_exec_control  = _vmx_tertiary_exec_control;
         vmx_ept_vpid_cap           = _vmx_ept_vpid_cap;
         vmx_vmexit_control         = _vmx_vmexit_control;
@@ -536,7 +533,7 @@ static int vmx_init_vmcs_config(bool bsp)
             vmx_caps.cpu_based_exec_control, caps.cpu_based_exec_control);
         mismatch |= cap_check(
             "Secondary Exec Control",
-            vmx_secondary_exec_control, _vmx_secondary_exec_control);
+            vmx_caps.secondary_exec_control, caps.secondary_exec_control);
         mismatch |= cap_check(
             "Tertiary Exec Control",
             vmx_tertiary_exec_control, _vmx_tertiary_exec_control);
@@ -1117,7 +1114,7 @@ static int construct_vmcs(struct vcpu *v)
     if ( d->arch.vtsc && !cpu_has_vmx_tsc_scaling )
         v->arch.hvm.vmx.exec_control |= CPU_BASED_RDTSC_EXITING;
 
-    v->arch.hvm.vmx.secondary_exec_control = vmx_secondary_exec_control;
+    v->arch.hvm.vmx.secondary_exec_control = vmx_caps.secondary_exec_control;
     v->arch.hvm.vmx.tertiary_exec_control  = vmx_tertiary_exec_control;
 
     /*
@@ -2227,7 +2224,6 @@ int __init vmx_vmcs_init(void)
          * Make sure all dependent features are off as well.
          */
         memset(&vmx_caps, 0, sizeof(vmx_caps));
-        vmx_secondary_exec_control = 0;
         vmx_tertiary_exec_control  = 0;
         vmx_vmexit_control         = 0;
         vmx_vmentry_control        = 0;
