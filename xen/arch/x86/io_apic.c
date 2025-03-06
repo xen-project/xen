@@ -1080,8 +1080,8 @@ static void __init setup_IO_APIC_irqs(void)
              */
             memset(&entry,0,sizeof(entry));
 
-            entry.delivery_mode = INT_DELIVERY_MODE;
-            entry.dest_mode = INT_DEST_MODE;
+            entry.delivery_mode = dest_Fixed;
+            entry.dest_mode = 0; /* physical delivery */
             entry.mask = 0;                /* enable IRQ */
 
             idx = find_irq_entry(apic,pin,mp_INT);
@@ -1150,10 +1150,10 @@ static void __init setup_ExtINT_IRQ0_pin(unsigned int apic, unsigned int pin, in
      * We use logical delivery to get the timer IRQ
      * to the first CPU.
      */
-    entry.dest_mode = INT_DEST_MODE;
+    entry.dest_mode = 0; /* physical delivery */
     entry.mask = 0;					/* unmask IRQ now */
     SET_DEST(entry, logical, cpu_mask_to_apicid(TARGET_CPUS));
-    entry.delivery_mode = INT_DELIVERY_MODE;
+    entry.delivery_mode = dest_Fixed;
     entry.polarity = 0;
     entry.trigger = 0;
     entry.vector = vector;
@@ -2338,8 +2338,8 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 
     memset(&entry,0,sizeof(entry));
 
-    entry.delivery_mode = INT_DELIVERY_MODE;
-    entry.dest_mode = INT_DEST_MODE;
+    entry.delivery_mode = dest_Fixed;
+    entry.dest_mode = 0; /* physical delivery */
     entry.trigger = edge_level;
     entry.polarity = active_high_low;
     entry.mask  = 1;
@@ -2473,8 +2473,8 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
      * The guest does not know physical APIC arrangement (flat vs. cluster).
      * Apply genapic conventions for this platform.
      */
-    rte.delivery_mode = INT_DELIVERY_MODE;
-    rte.dest_mode     = INT_DEST_MODE;
+    rte.delivery_mode = dest_Fixed;
+    rte.dest_mode     = 0; /* physical delivery */
 
     irq = apic_pin_2_gsi_irq(apic, pin);
     if ( irq < 0 )

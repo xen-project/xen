@@ -23,9 +23,6 @@ struct genapic {
 	const char *name;
 	int (*probe)(void);
 
-	/* Interrupt delivery parameters ('physical' vs. 'logical flat'). */
-	int int_delivery_mode;
-	int int_dest_mode;
 	void (*init_apic_ldr)(void);
 	const cpumask_t *(*vector_allocation_cpumask)(int cpu);
 	unsigned int (*cpu_mask_to_apicid)(const cpumask_t *cpumask);
@@ -37,8 +34,6 @@ struct genapic {
 	.name = aname, \
 	.probe = aprobe
 
-#define INT_DELIVERY_MODE (genapic.int_delivery_mode)
-#define INT_DEST_MODE (genapic.int_dest_mode)
 #define TARGET_CPUS ((const typeof(cpu_online_map) *)&cpu_online_map)
 #define init_apic_ldr() alternative_vcall(genapic.init_apic_ldr)
 #define cpu_mask_to_apicid(mask) ({ \

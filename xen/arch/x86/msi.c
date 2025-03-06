@@ -174,18 +174,13 @@ void msi_compose_msg(unsigned vector, const cpumask_t *cpu_mask, struct msi_msg 
 
     msg->address_hi = MSI_ADDR_BASE_HI;
     msg->address_lo = MSI_ADDR_BASE_LO |
-                      (INT_DEST_MODE ? MSI_ADDR_DESTMODE_LOGIC
-                                     : MSI_ADDR_DESTMODE_PHYS) |
-                      ((INT_DELIVERY_MODE != dest_LowestPrio)
-                       ? MSI_ADDR_REDIRECTION_CPU
-                       : MSI_ADDR_REDIRECTION_LOWPRI) |
+                      MSI_ADDR_DESTMODE_PHYS |
+                      MSI_ADDR_REDIRECTION_CPU |
                       MSI_ADDR_DEST_ID(msg->dest32);
 
     msg->data = MSI_DATA_TRIGGER_EDGE |
                 MSI_DATA_LEVEL_ASSERT |
-                ((INT_DELIVERY_MODE != dest_LowestPrio)
-                 ? MSI_DATA_DELIVERY_FIXED
-                 : MSI_DATA_DELIVERY_LOWPRI) |
+                MSI_DATA_DELIVERY_FIXED |
                 MSI_DATA_VECTOR(vector);
 }
 
