@@ -125,6 +125,13 @@ static inline void clear_bit(int nr, volatile void *p)
 #undef NOT
 #undef __AMO
 
+#define arch_ffs(x)     ((x) ? 1 + __builtin_ctz(x) : 0)
+#define arch_ffsl(x)    ((x) ? 1 + __builtin_ctzl(x) : 0)
+#define arch_fls(x)     ((x) ? BITS_PER_INT - __builtin_clz(x) : 0)
+#define arch_flsl(x)    ((x) ? BITS_PER_LONG - __builtin_clzl(x) : 0)
+
+#define arch_hweightl(x) __builtin_popcountl(x)
+
 #endif /* ASM__RISCV__BITOPS_H */
 
 /*

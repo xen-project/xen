@@ -119,12 +119,16 @@
 #define HYPERVISOR_VIRT_START XEN_VIRT_START
 
 #if defined(CONFIG_RISCV_64)
+# define INT_BYTEORDER 2
 # define LONG_BYTEORDER 3
 # define ELFSIZE 64
 # define MAX_VIRT_CPUS 128u
 #else
 # error "Unsupported RISCV variant"
 #endif
+
+#define BYTES_PER_INT  (1 << INT_BYTEORDER)
+#define BITS_PER_INT  (BYTES_PER_INT << 3)
 
 #define BYTES_PER_LONG (1 << LONG_BYTEORDER)
 #define BITS_PER_LONG  (BYTES_PER_LONG << 3)
