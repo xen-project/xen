@@ -304,6 +304,7 @@ struct vmx_caps {
     uint32_t vmentry_control;
     uint32_t ept;
     uint32_t vpid;
+    uint64_t vmfunc;
 };
 extern struct vmx_caps vmx_caps;
 

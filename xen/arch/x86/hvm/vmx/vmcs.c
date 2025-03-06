@@ -164,7 +164,6 @@ static int cf_check parse_ept_param_runtime(const char *s)
 
 /* Dynamic (run-time adjusted) execution control flags. */
 struct vmx_caps __ro_after_init vmx_caps;
-static uint64_t __read_mostly vmx_vmfunc;
 
 static DEFINE_PER_CPU_READ_MOSTLY(paddr_t, vmxon_region);
 static DEFINE_PER_CPU(paddr_t, current_vmcs);
@@ -260,7 +259,6 @@ static int vmx_init_vmcs_config(bool bsp)
     u32 vmx_basic_msr_low, vmx_basic_msr_high, min, opt;
     struct vmx_caps caps = {};
     u64 _vmx_misc_cap = 0;
-    u64 _vmx_vmfunc = 0;
     bool mismatch = false;
 
     rdmsr(MSR_IA32_VMX_BASIC, vmx_basic_msr_low, vmx_basic_msr_high);
@@ -463,14 +461,14 @@ static int vmx_init_vmcs_config(bool bsp)
     /* The IA32_VMX_VMFUNC MSR exists only when VMFUNC is available */
     if ( caps.secondary_exec_control & SECONDARY_EXEC_ENABLE_VM_FUNCTIONS )
     {
-        rdmsrl(MSR_IA32_VMX_VMFUNC, _vmx_vmfunc);
+        rdmsrl(MSR_IA32_VMX_VMFUNC, caps.vmfunc);
 
         /*
          * VMFUNC leaf 0 (EPTP switching) must be supported.
          *
          * Or we just don't use VMFUNC.
          */
-        if ( !(_vmx_vmfunc & VMX_VMFUNC_EPTP_SWITCHING) )
+        if ( !(caps.vmfunc & VMX_VMFUNC_EPTP_SWITCHING) )
             caps.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_VM_FUNCTIONS;
     }
 
@@ -493,7 +491,6 @@ static int vmx_init_vmcs_config(bool bsp)
         vmx_caps = caps;
         vmx_caps.basic_msr = ((uint64_t)vmx_basic_msr_high << 32) |
                              vmx_basic_msr_low;
-        vmx_vmfunc                 = _vmx_vmfunc;
 
         vmx_display_features();
 
@@ -535,7 +532,7 @@ static int vmx_init_vmcs_config(bool bsp)
         mismatch |= cap_check("VPID Capability", vmx_caps.vpid, caps.vpid);
         mismatch |= cap_check(
             "VMFUNC Capability",
-            vmx_vmfunc, _vmx_vmfunc);
+            vmx_caps.vmfunc, caps.vmfunc);
         if ( cpu_has_vmx_ins_outs_instr_info !=
              !!(vmx_basic_msr_high & (VMX_BASIC_INS_OUT_INFO >> 32)) )
         {
@@ -2211,7 +2208,6 @@ int __init vmx_vmcs_init(void)
          * Make sure all dependent features are off as well.
          */
         memset(&vmx_caps, 0, sizeof(vmx_caps));
-        vmx_vmfunc                 = 0;
     }
 
     return ret;
