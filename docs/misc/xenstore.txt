@@ -286,18 +286,31 @@ TRANSACTION_END		F|
 INTRODUCE		<domid>|<gfn>|<evtchn>|?
 	Notifies xenstored to communicate with this domain.
 
-	INTRODUCE is currently only used by xend (during domain
+	INTRODUCE is currently only used by xen tools (during domain
 	startup and various forms of restore and resume), and
 	xenstored prevents its use other than by dom0.
 
 	<domid> must be a real domain id (not 0 and not a special
 	DOMID_... value).  <gfn> must be a page in that domain
-	represented in signed decimal (!).  <evtchn> must be event
-	channel is an unbound event channel in <domid> (likewise in
-	decimal), on which xenstored will call bind_interdomain.
+	represented in signed decimal (!).  <evtchn> is an unbound
+	event channel in <domid> (likewise in decimal), on which
+	xenstored will call bind_interdomain.
+
 	Violations of these rules may result in undefined behaviour;
 	for example passing a high-bit-set 32-bit gfn as an unsigned
 	decimal will attempt to use 0x7fffffff instead (!).
+
+	The <gfn> field is used by xenstoreds which use foreign
+	mapping to access the ring page.
+
+	Alternatively, Grant 1 (GNTTAB_RESERVED_XENSTORE) is reserved
+	for the same purpose, and is populated by the domain builder
+	on behalf of the guest.  This mechanism is preferred because
+	it reduces the permissions that xenstored needs in order to
+	function.
+
+	Both <gfn> and Grant 1 need to agree, because implementations
+	of xenstored will use one and ignore the other.
 
 RELEASE			<domid>|
 	Manually requests that xenstored disconnect from the domain.
