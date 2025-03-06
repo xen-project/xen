@@ -200,6 +200,7 @@ struct xsm_ops {
     int (*argo_register_any_source)(const struct domain *d);
     int (*argo_send)(const struct domain *d, const struct domain *t);
 #endif
+    int (*get_domain_state)(struct domain *d);
 };
 
 #ifdef CONFIG_XSM
@@ -773,6 +774,11 @@ static inline int xsm_argo_send(const struct domain *d, const struct domain *t)
 }
 
 #endif /* CONFIG_ARGO */
+
+static inline int xsm_get_domain_state(struct domain *d)
+{
+    return alternative_call(xsm_ops.get_domain_state, d);
+}
 
 #endif /* XSM_NO_WRAPPERS */
 

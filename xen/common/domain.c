@@ -185,6 +185,80 @@ static void domain_changed_state(const struct domain *d)
     unlock_dom_exc_handler(hdl);
 }
 
+static void set_domain_state_info(struct xen_domctl_get_domain_state *info,
+                                  const struct domain *d)
+{
+    info->state = XEN_DOMCTL_GETDOMSTATE_STATE_EXIST;
+    if ( d->is_shut_down )
+        info->state |= XEN_DOMCTL_GETDOMSTATE_STATE_SHUTDOWN;
+    if ( d->is_dying == DOMDYING_dying )
+        info->state |= XEN_DOMCTL_GETDOMSTATE_STATE_DYING;
+    if ( d->is_dying == DOMDYING_dead )
+        info->state |= XEN_DOMCTL_GETDOMSTATE_STATE_DEAD;
+    info->unique_id = d->unique_id;
+}
+
+int get_domain_state(struct xen_domctl_get_domain_state *info, struct domain *d,
+                     domid_t *domid)
+{
+    unsigned int dom;
+    int rc = -ENOENT;
+    struct domain *hdl;
+
+    if ( info->pad0 || info->pad1 )
+        return -EINVAL;
+
+    if ( d )
+    {
+        set_domain_state_info(info, d);
+
+        return 0;
+    }
+
+    hdl = lock_dom_exc_handler();
+
+    /*
+     * Only domain registered for VIRQ_DOM_EXC event is allowed to query
+     * domains having changed state.
+     */
+    if ( current->domain != hdl )
+    {
+        rc = -EACCES;
+        goto out;
+    }
+
+    while ( dom_state_changed )
+    {
+        dom = find_first_bit(dom_state_changed, DOMID_MASK + 1);
+        if ( dom >= DOMID_FIRST_RESERVED )
+            break;
+        if ( test_and_clear_bit(dom, dom_state_changed) )
+        {
+            *domid = dom;
+
+            d = rcu_lock_domain_by_id(dom);
+
+            if ( d )
+            {
+                set_domain_state_info(info, d);
+
+                rcu_unlock_domain(d);
+            }
+            else
+                memset(info, 0, sizeof(*info));
+
+            rc = 0;
+
+            break;
+        }
+    }
+
+ out:
+    unlock_dom_exc_handler(hdl);
+
+    return rc;
+}
+
 static void __domain_finalise_shutdown(struct domain *d)
 {
     struct vcpu *v;

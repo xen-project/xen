@@ -13,6 +13,7 @@ allow dom0_t xenstore_t:domain set_virq_handler;
 allow xenstore_t xen_t:xen writeconsole;
 # Xenstore queries domaininfo on all domains
 allow xenstore_t domain_type:domain getdomaininfo;
+allow xenstore_t domain_type:domain2 get_domain_state;
 
 # As a shortcut, the following 3 rules are used instead of adding a domain_comms
 # rule between xenstore_t and every domain type that talks to xenstore

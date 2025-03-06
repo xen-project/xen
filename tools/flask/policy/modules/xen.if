@@ -54,7 +54,8 @@ define(`create_domain_common', `
 	allow $1 $2:domain2 { set_cpu_policy settsc setscheduler setclaim
 			set_vnumainfo get_vnumainfo cacheflush
 			psr_cmt_op psr_alloc soft_reset
-			resource_map get_cpu_policy vuart_op set_llc_colors };
+			resource_map get_cpu_policy vuart_op set_llc_colors
+			get_domain_state };
 	allow $1 $2:security check_context;
 	allow $1 $2:shadow enable;
 	allow $1 $2:mmu { map_read map_write adjust memorymap physmap pinpage mmuext_op updatemp };
@@ -94,7 +95,7 @@ define(`manage_domain', `
 			getaddrsize pause unpause trigger shutdown destroy
 			setaffinity setdomainmaxmem getscheduler resume
 			setpodtarget getpodtarget getpagingmempool setpagingmempool };
-    allow $1 $2:domain2 { set_vnumainfo dt_overlay };
+    allow $1 $2:domain2 { set_vnumainfo dt_overlay get_domain_state };
 ')
 
 # migrate_domain_out(priv, target)

@@ -257,6 +257,8 @@ class domain2
     dt_overlay
 # XEN_DOMCTL_set_llc_colors
     set_llc_colors
+# XEN_DOMCTL_get_domain_state
+    get_domain_state
 }
 
 # Similar to class domain, but primarily contains domctls related to HVM domains

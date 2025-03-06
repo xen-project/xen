@@ -807,6 +807,8 @@ int domain_soft_reset(struct domain *d, bool resuming);
 
 int domain_init_states(void);
 void domain_deinit_states(const struct domain *d);
+int get_domain_state(struct xen_domctl_get_domain_state *info,
+                     struct domain *d, domid_t *domid);
 
 int vcpu_start_shutdown_deferral(struct vcpu *v);
 void vcpu_end_shutdown_deferral(struct vcpu *v);
