@@ -280,12 +280,11 @@ void vmx_vmcs_reload(struct vcpu *v);
 #define VMX_EPT_AD_BIT                                      0x00200000
 #define VMX_EPT_INVEPT_SINGLE_CONTEXT                       0x02000000
 #define VMX_EPT_INVEPT_ALL_CONTEXT                          0x04000000
-#define VMX_VPID_INVVPID_INSTRUCTION                     0x00100000000ULL
-#define VMX_VPID_INVVPID_INDIVIDUAL_ADDR                 0x10000000000ULL
-#define VMX_VPID_INVVPID_SINGLE_CONTEXT                  0x20000000000ULL
-#define VMX_VPID_INVVPID_ALL_CONTEXT                     0x40000000000ULL
-#define VMX_VPID_INVVPID_SINGLE_CONTEXT_RETAINING_GLOBAL 0x80000000000ULL
-extern u64 vmx_ept_vpid_cap;
+#define VMX_VPID_INVVPID_INSTRUCTION                        0x00000001
+#define VMX_VPID_INVVPID_INDIVIDUAL_ADDR                    0x00000100
+#define VMX_VPID_INVVPID_SINGLE_CONTEXT                     0x00000200
+#define VMX_VPID_INVVPID_ALL_CONTEXT                        0x00000400
+#define VMX_VPID_INVVPID_SINGLE_CONTEXT_RETAINING_GLOBAL    0x00000800
 
 #define VMX_MISC_ACTIVITY_MASK                  0x000001c0
 #define VMX_MISC_PROC_TRACE                     0x00004000
@@ -303,6 +302,8 @@ struct vmx_caps {
     uint64_t tertiary_exec_control;
     uint32_t vmexit_control;
     uint32_t vmentry_control;
+    uint32_t ept;
+    uint32_t vpid;
 };
 extern struct vmx_caps vmx_caps;
 

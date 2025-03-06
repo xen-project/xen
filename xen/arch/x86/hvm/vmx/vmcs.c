@@ -164,7 +164,6 @@ static int cf_check parse_ept_param_runtime(const char *s)
 
 /* Dynamic (run-time adjusted) execution control flags. */
 struct vmx_caps __ro_after_init vmx_caps;
-u64 vmx_ept_vpid_cap __read_mostly;
 static uint64_t __read_mostly vmx_vmfunc;
 
 static DEFINE_PER_CPU_READ_MOSTLY(paddr_t, vmxon_region);
@@ -260,7 +259,6 @@ static int vmx_init_vmcs_config(bool bsp)
 {
     u32 vmx_basic_msr_low, vmx_basic_msr_high, min, opt;
     struct vmx_caps caps = {};
-    u64 _vmx_ept_vpid_cap = 0;
     u64 _vmx_misc_cap = 0;
     u64 _vmx_vmfunc = 0;
     bool mismatch = false;
@@ -370,10 +368,10 @@ static int vmx_init_vmcs_config(bool bsp)
     if ( caps.secondary_exec_control & (SECONDARY_EXEC_ENABLE_EPT |
                                         SECONDARY_EXEC_ENABLE_VPID) )
     {
-        rdmsrl(MSR_IA32_VMX_EPT_VPID_CAP, _vmx_ept_vpid_cap);
+        rdmsr(MSR_IA32_VMX_EPT_VPID_CAP, caps.ept, caps.vpid);
 
         if ( !opt_ept_ad )
-            _vmx_ept_vpid_cap &= ~VMX_EPT_AD_BIT;
+            caps.ept &= ~VMX_EPT_AD_BIT;
 
         /*
          * Additional sanity checking before using EPT:
@@ -386,9 +384,9 @@ static int vmx_init_vmcs_config(bool bsp)
          *
          * Or we just don't use EPT.
          */
-        if ( !(_vmx_ept_vpid_cap & VMX_EPT_MEMORY_TYPE_WB) ||
-             !(_vmx_ept_vpid_cap & VMX_EPT_WALK_LENGTH_4_SUPPORTED) ||
-             !(_vmx_ept_vpid_cap & VMX_EPT_INVEPT_ALL_CONTEXT) )
+        if ( !(caps.ept & VMX_EPT_MEMORY_TYPE_WB) ||
+             !(caps.ept & VMX_EPT_WALK_LENGTH_4_SUPPORTED) ||
+             !(caps.ept & VMX_EPT_INVEPT_ALL_CONTEXT) )
             caps.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_EPT;
 
         /*
@@ -397,11 +395,11 @@ static int vmx_init_vmcs_config(bool bsp)
          *
          * Or we just don't use VPID.
          */
-        if ( !(_vmx_ept_vpid_cap & VMX_VPID_INVVPID_ALL_CONTEXT) )
+        if ( !(caps.vpid & VMX_VPID_INVVPID_ALL_CONTEXT) )
             caps.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_VPID;
 
         /* EPT A/D bits is required for PML */
-        if ( !(_vmx_ept_vpid_cap & VMX_EPT_AD_BIT) )
+        if ( !(caps.ept & VMX_EPT_AD_BIT) )
             caps.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_PML;
     }
 
@@ -493,7 +491,6 @@ static int vmx_init_vmcs_config(bool bsp)
     {
         /* First time through. */
         vmx_caps = caps;
-        vmx_ept_vpid_cap           = _vmx_ept_vpid_cap;
         vmx_caps.basic_msr = ((uint64_t)vmx_basic_msr_high << 32) |
                              vmx_basic_msr_low;
         vmx_vmfunc                 = _vmx_vmfunc;
@@ -534,9 +531,8 @@ static int vmx_init_vmcs_config(bool bsp)
         mismatch |= cap_check(
             "VMEntry Control",
             vmx_caps.vmentry_control, caps.vmentry_control);
-        mismatch |= cap_check(
-            "EPT and VPID Capability",
-            vmx_ept_vpid_cap, _vmx_ept_vpid_cap);
+        mismatch |= cap_check("EPT Capability", vmx_caps.ept, caps.ept);
+        mismatch |= cap_check("VPID Capability", vmx_caps.vpid, caps.vpid);
         mismatch |= cap_check(
             "VMFUNC Capability",
             vmx_vmfunc, _vmx_vmfunc);
@@ -2215,7 +2211,6 @@ int __init vmx_vmcs_init(void)
          * Make sure all dependent features are off as well.
          */
         memset(&vmx_caps, 0, sizeof(vmx_caps));
-        vmx_ept_vpid_cap           = 0;
         vmx_vmfunc                 = 0;
     }
 
