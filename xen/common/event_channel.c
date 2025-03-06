@@ -120,6 +120,13 @@ static uint8_t get_xen_consumer(xen_event_channel_notification_t fn)
 /* Get the notification function for a given Xen-bound event channel. */
 #define xen_notification_fn(e) (xen_consumers[(e)->xen_consumer-1])
 
+static struct domain *__read_mostly global_virq_handlers[NR_VIRQS];
+
+static struct domain *get_global_virq_handler(unsigned int virq)
+{
+    return global_virq_handlers[virq] ?: hardware_domain;
+}
+
 static bool virq_is_global(unsigned int virq)
 {
     switch ( virq )
@@ -469,6 +476,7 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
     struct domain *d = current->domain;
     int            virq = bind->virq, vcpu = bind->vcpu;
     int            rc = 0;
+    bool           is_global;
 
     if ( (virq < 0) || (virq >= ARRAY_SIZE(v->virq_to_evtchn)) )
         return -EINVAL;
@@ -478,14 +486,21 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
     * speculative execution.
     */
     virq = array_index_nospec(virq, ARRAY_SIZE(v->virq_to_evtchn));
+    is_global = virq_is_global(virq);
 
-    if ( virq_is_global(virq) && (vcpu != 0) )
+    if ( is_global && vcpu != 0 )
         return -EINVAL;
 
     if ( (v = domain_vcpu(d, vcpu)) == NULL )
         return -ENOENT;
 
     write_lock(&d->event_lock);
+
+    if ( is_global && get_global_virq_handler(virq) != d )
+    {
+        rc = -EBUSY;
+        goto out;
+    }
 
     if ( read_atomic(&v->virq_to_evtchn[virq]) )
     {
@@ -965,15 +980,13 @@ void send_guest_pirq(struct domain *d, const struct pirq *pirq)
     }
 }
 
-static struct domain *global_virq_handlers[NR_VIRQS] __read_mostly;
-
 static DEFINE_SPINLOCK(global_virq_handlers_lock);
 
 void send_global_virq(uint32_t virq)
 {
     ASSERT(virq_is_global(virq));
 
-    send_guest_global_virq(global_virq_handlers[virq] ?: hardware_domain, virq);
+    send_guest_global_virq(get_global_virq_handler(virq), virq);
 }
 
 int set_global_virq_handler(struct domain *d, uint32_t virq)
