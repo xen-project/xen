@@ -231,6 +231,11 @@ static inline int xsm_getdomaininfo(xsm_default_t def, struct domain *d)
     return alternative_call(xsm_ops.getdomaininfo, d);
 }
 
+static inline int xsm_get_domain_state(xsm_default_t def, struct domain *d)
+{
+    return alternative_call(xsm_ops.get_domain_state, d);
+}
+
 static inline int xsm_domctl_scheduler_op(
     xsm_default_t def, struct domain *d, int cmd)
 {
@@ -774,11 +779,6 @@ static inline int xsm_argo_send(const struct domain *d, const struct domain *t)
 }
 
 #endif /* CONFIG_ARGO */
-
-static inline int xsm_get_domain_state(struct domain *d)
-{
-    return alternative_call(xsm_ops.get_domain_state, d);
-}
 
 #endif /* XSM_NO_WRAPPERS */
 
