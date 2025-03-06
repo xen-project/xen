@@ -1036,7 +1036,9 @@ int set_global_virq_handler(struct domain *d, uint32_t virq)
     {
         old = global_virq_handlers[virq];
         hdl = get_global_virq_handler(virq);
-        if ( hdl != d )
+        if ( !hdl )
+            global_virq_handlers[virq] = d;
+        else if ( hdl != d )
         {
             read_lock(&hdl->event_lock);
 
@@ -1091,7 +1093,7 @@ struct domain *lock_dom_exc_handler(void)
     struct domain *d;
 
     d = get_global_virq_handler(VIRQ_DOM_EXC);
-    if ( unlikely(!get_domain(d)) )
+    if ( unlikely(!d) || unlikely(!get_domain(d)) )
         return NULL;
 
     read_lock(&d->event_lock);
@@ -1101,6 +1103,9 @@ struct domain *lock_dom_exc_handler(void)
 
 void unlock_dom_exc_handler(struct domain *d)
 {
+    if ( likely(!d) )
+        return;
+
     read_unlock(&d->event_lock);
 
     put_domain(d);
