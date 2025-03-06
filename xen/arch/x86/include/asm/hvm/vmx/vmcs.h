@@ -235,7 +235,6 @@ void vmx_vmcs_reload(struct vcpu *v);
 #define VM_ENTRY_LOAD_GUEST_PAT         0x00004000
 #define VM_ENTRY_LOAD_GUEST_EFER        0x00008000
 #define VM_ENTRY_LOAD_BNDCFGS           0x00010000
-extern u32 vmx_vmentry_control;
 
 #define SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES 0x00000001U
 #define SECONDARY_EXEC_ENABLE_EPT               0x00000002U
@@ -303,6 +302,7 @@ struct vmx_caps {
     uint32_t secondary_exec_control;
     uint64_t tertiary_exec_control;
     uint32_t vmexit_control;
+    uint32_t vmentry_control;
 };
 extern struct vmx_caps vmx_caps;
 
@@ -344,10 +344,10 @@ extern struct vmx_caps vmx_caps;
      (vmx_caps.cpu_based_exec_control & CPU_BASED_MONITOR_TRAP_FLAG))
 #define cpu_has_vmx_pat \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
-     vmx_vmentry_control & VM_ENTRY_LOAD_GUEST_PAT)
+     (vmx_caps.vmentry_control & VM_ENTRY_LOAD_GUEST_PAT))
 #define cpu_has_vmx_efer \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
-     vmx_vmentry_control & VM_ENTRY_LOAD_GUEST_EFER)
+     (vmx_caps.vmentry_control & VM_ENTRY_LOAD_GUEST_EFER))
 #define cpu_has_vmx_unrestricted_guest \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
      (vmx_caps.secondary_exec_control & SECONDARY_EXEC_UNRESTRICTED_GUEST))
@@ -387,7 +387,7 @@ extern struct vmx_caps vmx_caps;
 #define cpu_has_vmx_mpx \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
      (vmx_caps.vmexit_control & VM_EXIT_CLEAR_BNDCFGS) && \
-     (vmx_vmentry_control & VM_ENTRY_LOAD_BNDCFGS))
+     (vmx_caps.vmentry_control & VM_ENTRY_LOAD_BNDCFGS))
 #define cpu_has_vmx_xsaves \
     (IS_ENABLED(CONFIG_INTEL_VMX) && \
      (vmx_caps.secondary_exec_control & SECONDARY_EXEC_XSAVES))

@@ -164,7 +164,6 @@ static int cf_check parse_ept_param_runtime(const char *s)
 
 /* Dynamic (run-time adjusted) execution control flags. */
 struct vmx_caps __ro_after_init vmx_caps;
-u32 vmx_vmentry_control __read_mostly;
 u64 vmx_ept_vpid_cap __read_mostly;
 static uint64_t __read_mostly vmx_vmfunc;
 
@@ -263,7 +262,6 @@ static int vmx_init_vmcs_config(bool bsp)
     struct vmx_caps caps = {};
     u64 _vmx_ept_vpid_cap = 0;
     u64 _vmx_misc_cap = 0;
-    u32 _vmx_vmentry_control;
     u64 _vmx_vmfunc = 0;
     bool mismatch = false;
 
@@ -485,7 +483,7 @@ static int vmx_init_vmcs_config(bool bsp)
     min = 0;
     opt = (VM_ENTRY_LOAD_GUEST_PAT | VM_ENTRY_LOAD_GUEST_EFER |
            VM_ENTRY_LOAD_BNDCFGS);
-    _vmx_vmentry_control = adjust_vmx_controls(
+    caps.vmentry_control = adjust_vmx_controls(
         "VMEntry Control", min, opt, MSR_IA32_VMX_ENTRY_CTLS, &mismatch);
 
     if ( mismatch )
@@ -496,7 +494,6 @@ static int vmx_init_vmcs_config(bool bsp)
         /* First time through. */
         vmx_caps = caps;
         vmx_ept_vpid_cap           = _vmx_ept_vpid_cap;
-        vmx_vmentry_control        = _vmx_vmentry_control;
         vmx_caps.basic_msr = ((uint64_t)vmx_basic_msr_high << 32) |
                              vmx_basic_msr_low;
         vmx_vmfunc                 = _vmx_vmfunc;
@@ -536,7 +533,7 @@ static int vmx_init_vmcs_config(bool bsp)
             vmx_caps.vmexit_control, caps.vmexit_control);
         mismatch |= cap_check(
             "VMEntry Control",
-            vmx_vmentry_control, _vmx_vmentry_control);
+            vmx_caps.vmentry_control, caps.vmentry_control);
         mismatch |= cap_check(
             "EPT and VPID Capability",
             vmx_ept_vpid_cap, _vmx_ept_vpid_cap);
@@ -1096,7 +1093,7 @@ static int construct_vmcs(struct vcpu *v)
 {
     struct domain *d = v->domain;
     uint32_t vmexit_ctl = vmx_caps.vmexit_control;
-    u32 vmentry_ctl = vmx_vmentry_control;
+    u32 vmentry_ctl = vmx_caps.vmentry_control;
     int rc = 0;
 
     vmx_vmcs_enter(v);
@@ -2218,7 +2215,6 @@ int __init vmx_vmcs_init(void)
          * Make sure all dependent features are off as well.
          */
         memset(&vmx_caps, 0, sizeof(vmx_caps));
-        vmx_vmentry_control        = 0;
         vmx_ept_vpid_cap           = 0;
         vmx_vmfunc                 = 0;
     }
