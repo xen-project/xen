@@ -160,10 +160,17 @@ static int __init cf_check hvm_enable(void)
     else if ( using_svm() )
         fns = start_svm();
 
+    if ( fns )
+        hvm_funcs = *fns;
+
+    if ( IS_ENABLED(CONFIG_INTEL_VMX) )
+        vmx_fill_funcs();
+    if ( IS_ENABLED(CONFIG_AMD_SVM) )
+        svm_fill_funcs();
+
     if ( fns == NULL )
         return 0;
 
-    hvm_funcs = *fns;
     hvm_enabled = 1;
 
     printk("HVM: %s enabled\n", fns->name);

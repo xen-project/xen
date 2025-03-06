@@ -2531,6 +2531,19 @@ const struct hvm_function_table * __init start_svm(void)
     return &svm_function_table;
 }
 
+void __init svm_fill_funcs(void)
+{
+    /*
+     * Now that svm_function_table was copied, populate all function pointers
+     * which may have been left at NULL, for __initdata_cf_clobber to have as
+     * much of an effect as possible.
+     */
+    if ( !cpu_has_xen_ibt )
+        return;
+
+    /* Nothing at present. */
+}
+
 void asmlinkage svm_vmexit_handler(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
