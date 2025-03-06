@@ -421,21 +421,12 @@ static void __init clip_to_limit(uint64_t limit, const char *warnmsg)
 /* Conservative estimate of top-of-RAM by looking for MTRR WB regions. */
 static uint64_t __init mtrr_top_of_ram(void)
 {
-    uint32_t eax, ebx, ecx, edx;
     uint64_t mtrr_cap, mtrr_def, addr_mask, base, mask, top;
     unsigned int i;
 
     /* By default we check only Intel systems. */
     if ( e820_mtrr_clip == -1 )
-    {
-        char vendor[13];
-        cpuid(0x00000000, &eax,
-              (uint32_t *)&vendor[0],
-              (uint32_t *)&vendor[8],
-              (uint32_t *)&vendor[4]);
-        vendor[12] = '\0';
-        e820_mtrr_clip = !strcmp(vendor, "GenuineIntel");
-    }
+        e820_mtrr_clip = boot_cpu_data.x86_vendor == X86_VENDOR_INTEL;
 
     if ( !e820_mtrr_clip )
         return 0;
@@ -444,8 +435,7 @@ static uint64_t __init mtrr_top_of_ram(void)
         printk("Checking MTRR ranges...\n");
 
     /* Does the CPU support architectural MTRRs? */
-    cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
-    if ( !test_bit(X86_FEATURE_MTRR & 31, &edx) )
+    if ( !cpu_has_mtrr )
          return 0;
 
     /* paddr_bits must have been set at this point */
