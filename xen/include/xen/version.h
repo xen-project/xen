@@ -1,7 +1,6 @@
 #ifndef __XEN_VERSION_H__
 #define __XEN_VERSION_H__
 
-#include <xen/types.h>
 #include <xen/elfstructs.h>
 
 const char *xen_compile_date(void);

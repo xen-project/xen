@@ -5,7 +5,6 @@
 #ifndef __XEN_LIVEPATCH_ELF_H__
 #define __XEN_LIVEPATCH_ELF_H__
 
-#include <xen/types.h>
 #include <xen/elfstructs.h>
 
 /* The following describes an Elf file as consumed by Xen Live Patch. */
