@@ -9,7 +9,6 @@
 #include <xen/livepatch.h>
 
 #include <asm/page.h>
-#include <asm/livepatch.h>
 
 void arch_livepatch_apply(const struct livepatch_func *func,
                           struct livepatch_fstate *state)

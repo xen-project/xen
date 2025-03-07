@@ -14,11 +14,13 @@ struct xen_sysctl_livepatch_op;
 #include <xen/elfstructs.h>
 #include <xen/errno.h> /* For -ENOSYS or -EOVERFLOW */
 
-#include <public/sysctl.h> /* For LIVEPATCH_OPAQUE_SIZE */
-
 #ifdef CONFIG_LIVEPATCH
 
 #include <xen/lib.h>
+
+#include <asm/livepatch.h>
+
+#include <public/sysctl.h>
 
 /*
  * We use alternative and exception table code - which by default are __init
@@ -93,8 +95,6 @@ int arch_livepatch_secure(const void *va, unsigned int pages, enum va_type type)
 
 void arch_livepatch_init(void);
 
-#include <public/sysctl.h> /* For struct livepatch_func. */
-#include <asm/livepatch.h>
 int arch_livepatch_verify_func(const struct livepatch_func *func);
 
 static inline
@@ -143,7 +143,7 @@ struct payload;
 int revert_payload(struct payload *data);
 void revert_payload_tail(struct payload *data);
 
-#else
+#else /* !CONFIG_LIVEPATCH */
 
 /*
  * If not compiling with Live Patch certain functionality should stay as
@@ -165,7 +165,7 @@ static inline bool is_patch(const void *addr)
 {
     return 0;
 }
-#endif /* CONFIG_LIVEPATCH */
+#endif /* !CONFIG_LIVEPATCH */
 
 #endif /* __XEN_LIVEPATCH_H__ */
 

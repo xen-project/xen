@@ -13,7 +13,6 @@
 
 #include <asm/bitops.h>
 #include <asm/insn.h>
-#include <asm/livepatch.h>
 
 void arch_livepatch_apply(const struct livepatch_func *func,
                           struct livepatch_fstate *state)

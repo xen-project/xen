@@ -11,7 +11,6 @@
 #include <xen/vmap.h>
 
 #include <asm/cpufeature.h>
-#include <asm/livepatch.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef virt_to_mfn

@@ -17,7 +17,6 @@
 #include <asm/endbr.h>
 #include <asm/fixmap.h>
 #include <asm/nmi.h>
-#include <asm/livepatch.h>
 #include <asm/setup.h>
 
 static bool has_active_waitqueue(const struct vm_event_domain *ved)
