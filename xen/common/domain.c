@@ -901,6 +901,8 @@ struct domain *domain_create(domid_t domid,
      */
     ASSERT(config);
 
+    memcpy(d->handle, config->handle, sizeof(d->handle));
+
 #ifdef CONFIG_HAS_PIRQ
     if ( !is_hardware_domain(d) )
         d->nr_pirqs = nr_static_irqs + extra_domU_irqs;
@@ -962,7 +964,6 @@ struct domain *domain_create(domid_t domid,
     domlist_insert(d);
 
     domain_changed_state(d);
-    memcpy(d->handle, config->handle, sizeof(d->handle));
 
     return d;
 
