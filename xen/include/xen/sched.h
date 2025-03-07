@@ -84,6 +84,12 @@ extern domid_t hardware_domid;
 #define XEN_CONSUMER_BITS 3
 #define NR_XEN_CONSUMERS ((1 << XEN_CONSUMER_BITS) - 1)
 
+enum virq_type {
+    VIRQ_GLOBAL,
+    VIRQ_DOMAIN,
+    VIRQ_VCPU,
+};
+
 struct evtchn
 {
     rwlock_t lock;

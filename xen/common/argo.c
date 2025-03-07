@@ -440,7 +440,7 @@ signal_domain(struct domain *d)
 {
     argo_dprintk("signalling domid:%u\n", d->domain_id);
 
-    send_guest_global_virq(d, VIRQ_ARGO);
+    send_guest_domain_virq(d, VIRQ_ARGO);
 }
 
 static void

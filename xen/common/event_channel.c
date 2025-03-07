@@ -127,7 +127,7 @@ static struct domain *get_global_virq_handler(unsigned int virq)
     return global_virq_handlers[virq] ?: hardware_domain;
 }
 
-static bool virq_is_global(unsigned int virq)
+static enum virq_type get_virq_type(unsigned int virq)
 {
     switch ( virq )
     {
@@ -135,14 +135,17 @@ static bool virq_is_global(unsigned int virq)
     case VIRQ_DEBUG:
     case VIRQ_XENOPROF:
     case VIRQ_XENPMU:
-        return false;
+        return VIRQ_VCPU;
+
+    case VIRQ_ARGO:
+        return VIRQ_DOMAIN;
 
     case VIRQ_ARCH_0 ... VIRQ_ARCH_7:
-        return arch_virq_is_global(virq);
+        return arch_get_virq_type(virq);
     }
 
     ASSERT(virq < NR_VIRQS);
-    return true;
+    return VIRQ_GLOBAL;
 }
 
 static struct evtchn *_evtchn_from_port(const struct domain *d,
@@ -476,7 +479,7 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
     struct domain *d = current->domain;
     int            virq = bind->virq, vcpu = bind->vcpu;
     int            rc = 0;
-    bool           is_global;
+    enum virq_type type;
 
     if ( (virq < 0) || (virq >= ARRAY_SIZE(v->virq_to_evtchn)) )
         return -EINVAL;
@@ -486,9 +489,9 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
     * speculative execution.
     */
     virq = array_index_nospec(virq, ARRAY_SIZE(v->virq_to_evtchn));
-    is_global = virq_is_global(virq);
+    type = get_virq_type(virq);
 
-    if ( is_global && vcpu != 0 )
+    if ( type != VIRQ_VCPU && vcpu != 0 )
         return -EINVAL;
 
     if ( (v = domain_vcpu(d, vcpu)) == NULL )
@@ -496,7 +499,7 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
 
     write_lock(&d->event_lock);
 
-    if ( is_global && get_global_virq_handler(virq) != d )
+    if ( type == VIRQ_GLOBAL && get_global_virq_handler(virq) != d )
     {
         rc = -EBUSY;
         goto out;
@@ -756,7 +759,8 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
         if ( chn1->u.virq == VIRQ_DOM_EXC )
             domain_deinit_states(d1);
 
-        v = d1->vcpu[virq_is_global(chn1->u.virq) ? 0 : chn1->notify_vcpu_id];
+        v = d1->vcpu[get_virq_type(chn1->u.virq) != VIRQ_VCPU
+            ? 0 : chn1->notify_vcpu_id];
 
         write_lock_irqsave(&v->virq_lock, flags);
         ASSERT(read_atomic(&v->virq_to_evtchn[chn1->u.virq]) == port1);
@@ -900,7 +904,7 @@ bool evtchn_virq_enabled(const struct vcpu *v, unsigned int virq)
     if ( !v )
         return false;
 
-    if ( virq_is_global(virq) && v->vcpu_id )
+    if ( get_virq_type(virq) != VIRQ_VCPU && v->vcpu_id )
         v = domain_vcpu(v->domain, 0);
 
     return read_atomic(&v->virq_to_evtchn[virq]);
@@ -913,7 +917,7 @@ void send_guest_vcpu_virq(struct vcpu *v, uint32_t virq)
     struct domain *d;
     struct evtchn *chn;
 
-    ASSERT(!virq_is_global(virq));
+    ASSERT(get_virq_type(virq) == VIRQ_VCPU);
 
     read_lock_irqsave(&v->virq_lock, flags);
 
@@ -933,14 +937,14 @@ void send_guest_vcpu_virq(struct vcpu *v, uint32_t virq)
     read_unlock_irqrestore(&v->virq_lock, flags);
 }
 
-void send_guest_global_virq(struct domain *d, uint32_t virq)
+void send_guest_domain_virq(struct domain *d, uint32_t virq)
 {
     unsigned long flags;
     int port;
     struct vcpu *v;
     struct evtchn *chn;
 
-    ASSERT(virq_is_global(virq));
+    ASSERT(get_virq_type(virq) != VIRQ_VCPU);
 
     if ( unlikely(d == NULL) || unlikely(d->vcpu == NULL) )
         return;
@@ -995,9 +999,9 @@ static DEFINE_SPINLOCK(global_virq_handlers_lock);
 
 void send_global_virq(uint32_t virq)
 {
-    ASSERT(virq_is_global(virq));
+    ASSERT(get_virq_type(virq) == VIRQ_GLOBAL);
 
-    send_guest_global_virq(get_global_virq_handler(virq), virq);
+    send_guest_domain_virq(get_global_virq_handler(virq), virq);
 }
 
 int set_global_virq_handler(struct domain *d, uint32_t virq)
@@ -1008,7 +1012,7 @@ int set_global_virq_handler(struct domain *d, uint32_t virq)
 
     if (virq >= NR_VIRQS)
         return -EINVAL;
-    if (!virq_is_global(virq))
+    if (get_virq_type(virq) != VIRQ_GLOBAL)
         return -EINVAL;
 
     if (global_virq_handlers[virq] == d)
@@ -1204,7 +1208,7 @@ int evtchn_bind_vcpu(evtchn_port_t port, unsigned int vcpu_id)
     switch ( chn->state )
     {
     case ECS_VIRQ:
-        if ( virq_is_global(chn->u.virq) )
+        if ( get_virq_type(chn->u.virq) != VIRQ_VCPU )
             chn->notify_vcpu_id = v->vcpu_id;
         else
             rc = -EINVAL;

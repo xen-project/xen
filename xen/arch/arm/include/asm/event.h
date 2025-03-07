@@ -47,9 +47,9 @@ static inline void local_event_delivery_enable(void)
 }
 
 /* No arch specific virq definition now. Default to global. */
-static inline bool arch_virq_is_global(unsigned int virq)
+static inline enum virq_type arch_get_virq_type(unsigned int virq)
 {
-    return true;
+    return VIRQ_GLOBAL;
 }
 
 #endif
