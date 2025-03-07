@@ -1534,12 +1534,19 @@ long vcpu_yield(void)
 
 static void cf_check domain_watchdog_timeout(void *data)
 {
-    struct domain *d = data;
+    /*
+     * The data parameter encodes the watchdog id in the low bits of
+     * the domain pointer.
+     */
+    struct domain *d = _p((unsigned long)data & PAGE_MASK);
+    unsigned int id = (unsigned long)data & ~PAGE_MASK;
+
+    BUILD_BUG_ON(alignof(*d) < PAGE_SIZE);
 
     if ( d->is_shutting_down || d->is_dying )
         return;
 
-    printk("Watchdog timer fired for domain %u\n", d->domain_id);
+    printk("Watchdog timer %u fired for %pd\n", id, d);
     domain_shutdown(d, SHUTDOWN_watchdog);
 }
 
@@ -1593,7 +1600,17 @@ void watchdog_domain_init(struct domain *d)
     d->watchdog_inuse_map = 0;
 
     for ( i = 0; i < NR_DOMAIN_WATCHDOG_TIMERS; i++ )
-        init_timer(&d->watchdog_timer[i], domain_watchdog_timeout, d, 0);
+    {
+        void *data = d;
+
+        BUILD_BUG_ON(NR_DOMAIN_WATCHDOG_TIMERS > alignof(*d));
+
+        /*
+         * For the timer callback parameter, encode the watchdog id in
+         * the low bits of the domain pointer.
+         */
+        init_timer(&d->watchdog_timer[i], domain_watchdog_timeout, data + i, 0);
+    }
 }
 
 void watchdog_domain_destroy(struct domain *d)
