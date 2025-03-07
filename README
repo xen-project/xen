@@ -38,16 +38,13 @@ provided by your OS distributor:
     * GNU Make v3.80 or later
     * C compiler and linker:
       - For x86:
-        - GCC 4.1.2_20070115 or later
-        - GNU Binutils 2.16.91.0.5 or later
-        or
-        - Clang/LLVM 3.5 or later
-      - For ARM 32-bit:
-        - GCC 4.9 or later
-        - GNU Binutils 2.24 or later
-      - For ARM 64-bit:
         - GCC 5.1 or later
-        - GNU Binutils 2.24 or later
+        - GNU Binutils 2.25 or later
+        or
+        - Clang/LLVM 11 or later
+      - For ARM:
+        - GCC 5.1 or later
+        - GNU Binutils 2.25 or later
       - For RISC-V 64-bit:
         - GCC 12.2 or later
         - GNU Binutils 2.39 or later
