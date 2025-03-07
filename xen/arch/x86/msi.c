@@ -184,7 +184,8 @@ void msi_compose_msg(unsigned vector, const cpumask_t *cpu_mask, struct msi_msg 
                 MSI_DATA_VECTOR(vector);
 }
 
-static int write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
+static int write_msi_msg(struct msi_desc *entry, struct msi_msg *msg,
+                         bool force)
 {
     entry->msg = *msg;
 
@@ -194,7 +195,7 @@ static int write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
 
         ASSERT(msg != &entry->msg);
         rc = iommu_update_ire_from_msi(entry, msg);
-        if ( rc )
+        if ( rc < 0 || (rc == 0 && !force) )
             return rc;
     }
 
@@ -259,7 +260,7 @@ void cf_check set_msi_affinity(struct irq_desc *desc, const cpumask_t *mask)
     msg.address_lo |= MSI_ADDR_DEST_ID(dest);
     msg.dest32 = dest;
 
-    write_msi_msg(msi_desc, &msg);
+    write_msi_msg(msi_desc, &msg, false);
 }
 
 void __msi_set_enable(pci_sbdf_t sbdf, int pos, int enable)
@@ -522,7 +523,7 @@ int __setup_msi_irq(struct irq_desc *desc, struct msi_desc *msidesc,
     desc->msi_desc = msidesc;
     desc->handler = handler;
     msi_compose_msg(desc->arch.vector, desc->arch.cpu_mask, &msg);
-    ret = write_msi_msg(msidesc, &msg);
+    ret = write_msi_msg(msidesc, &msg, false);
     if ( unlikely(ret) )
     {
         desc->handler = &no_irq_type;
@@ -1403,7 +1404,7 @@ int pci_restore_msi_state(struct pci_dev *pdev)
         type = entry->msi_attrib.type;
 
         msg = entry->msg;
-        write_msi_msg(entry, &msg);
+        write_msi_msg(entry, &msg, true);
 
         for ( i = 0; ; )
         {

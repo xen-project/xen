@@ -283,8 +283,12 @@ static int hpet_msi_write(struct hpet_event_channel *ch, struct msi_msg *msg)
     {
         int rc = iommu_update_ire_from_msi(&ch->msi, msg);
 
-        if ( rc )
+        if ( rc < 0 )
             return rc;
+        /*
+         * Always propagate writes, to avoid having to pass a flag for handling
+         * a forceful write in the resume from suspension case.
+         */
     }
 
     hpet_write32(msg->data, HPET_Tn_ROUTE(ch->idx));

@@ -492,7 +492,7 @@ static int update_intremap_entry_from_msi_msg(
                get_ivrs_mappings(iommu->seg)[alias_id].intremap_table);
     }
 
-    return 0;
+    return fresh;
 }
 
 static struct amd_iommu *_find_iommu_for_device(int seg, int bdf)
@@ -546,7 +546,7 @@ int cf_check amd_iommu_msi_msg_update_ire(
     rc = update_intremap_entry_from_msi_msg(iommu, bdf, nr,
                                             &msi_desc->remap_index,
                                             msg, &data);
-    if ( !rc )
+    if ( rc > 0 )
     {
         for ( i = 1; i < nr; ++i )
             msi_desc[i].remap_index = msi_desc->remap_index + i;

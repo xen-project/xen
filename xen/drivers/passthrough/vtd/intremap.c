@@ -506,6 +506,7 @@ static int msi_msg_to_remap_entry(
     unsigned int index, i, nr = 1;
     unsigned long flags;
     const struct pi_desc *pi_desc = msi_desc->pi_desc;
+    bool alloc = false;
 
     if ( msi_desc->msi_attrib.type == PCI_CAP_ID_MSI )
         nr = msi_desc->msi.nvec;
@@ -529,6 +530,7 @@ static int msi_msg_to_remap_entry(
         index = alloc_remap_entry(iommu, nr);
         for ( i = 0; i < nr; ++i )
             msi_desc[i].remap_index = index + i;
+        alloc = true;
     }
     else
         index = msi_desc->remap_index;
@@ -601,7 +603,7 @@ static int msi_msg_to_remap_entry(
     unmap_vtd_domain_page(iremap_entries);
     spin_unlock_irqrestore(&iommu->intremap.lock, flags);
 
-    return 0;
+    return alloc;
 }
 
 int cf_check msi_msg_write_remap_rte(

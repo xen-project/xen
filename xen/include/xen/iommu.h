@@ -435,6 +435,12 @@ extern struct page_list_head iommu_pt_cleanup_list;
 bool arch_iommu_use_permitted(const struct domain *d);
 
 #ifdef CONFIG_X86
+/*
+ * Return values:
+ *  - < 0 on error.
+ *  - 0 on success and no need to write msi_msg to the hardware.
+ *  - 1 on success and msi_msg must be propagated to the hardware.
+ */
 static inline int iommu_update_ire_from_msi(
     struct msi_desc *msi_desc, struct msi_msg *msg)
 {
