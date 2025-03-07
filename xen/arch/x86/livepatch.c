@@ -5,14 +5,14 @@
 #include <xen/errno.h>
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/livepatch.h>
+#include <xen/livepatch_elf.h>
 #include <xen/mm.h>
 #include <xen/pfn.h>
-#include <xen/vmap.h>
-#include <xen/livepatch_elf.h>
-#include <xen/livepatch.h>
 #include <xen/sched.h>
-#include <xen/vm_event.h>
 #include <xen/virtual_region.h>
+#include <xen/vm_event.h>
+#include <xen/vmap.h>
 
 #include <asm/endbr.h>
 #include <asm/fixmap.h>

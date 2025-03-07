@@ -4,19 +4,19 @@
  */
 
 #include <xen/delay.h>
-#include <xen/types.h>
+#include <xen/init.h>
+#include <xen/livepatch.h>
+
+#include <asm/alternative.h>
 #include <asm/apic.h>
 #include <asm/endbr.h>
+#include <asm/nmi.h>
+#include <asm/nops.h>
 #include <asm/processor.h>
-#include <asm/alternative.h>
-#include <xen/init.h>
 #include <asm/setup.h>
 #include <asm/stubs.h>
 #include <asm/system.h>
 #include <asm/traps.h>
-#include <asm/nmi.h>
-#include <asm/nops.h>
-#include <xen/livepatch.h>
 
 #define MAX_PATCH_LEN (255-1)
 

@@ -26,14 +26,15 @@
 #include <xen/sched.h>
 #include <xen/sections.h>
 #include <xen/trace.h>
-#include <xen/types.h>
 #include <xen/xvmalloc.h>
 
 #include <asm/current.h>
 #include <asm/hardirq.h>
 #include <asm/p2m.h>
 #include <asm/page.h>
+
 #include <public/memory.h>
+
 #include <xsm/xsm.h>
 
 #ifdef CONFIG_X86

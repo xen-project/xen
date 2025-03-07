@@ -133,7 +133,6 @@
 #include <xen/param.h>
 #include <xen/perfc.h>
 #include <xen/pfn.h>
-#include <xen/types.h>
 #include <xen/sched.h>
 #include <xen/scrub.h>
 #include <xen/sections.h>
@@ -145,14 +144,14 @@
 #include <asm/flushtlb.h>
 #include <asm/page.h>
 
-#include <public/sysctl.h>
 #include <public/sched.h>
+#include <public/sysctl.h>
 
 #ifdef CONFIG_X86
 #include <asm/guest.h>
 #include <asm/p2m.h>
-#include <asm/setup.h> /* for highmem_start only */
 #include <asm/paging.h>
+#include <asm/setup.h>
 #else
 #define p2m_pod_offline_or_broken_hit(pg) 0
 #define p2m_pod_offline_or_broken_replace(pg) BUG_ON(pg)
