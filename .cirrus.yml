@@ -15,6 +15,14 @@ freebsd_template: &FREEBSD_ENV
     APPEND_INCLUDES: /usr/local/include
     CIRRUS_CLONE_DEPTH: 1
 
+freebsd_artifacts: &FREEBSD_ARTIFACTS
+  always:
+    rename_script:
+      - cp xen/.config xen-config
+    config_artifacts:
+      path: xen-config
+      type: text/plain
+
 freebsd_full_build_template: &FREEBSD_FULL_BUILD_TEMPLATE
   << : *FREEBSD_ENV
 
@@ -28,6 +36,8 @@ freebsd_full_build_template: &FREEBSD_FULL_BUILD_TEMPLATE
     - ./configure --with-system-seabios=/usr/local/share/seabios/bios.bin
     - gmake -j`sysctl -n hw.ncpu` clang=y
 
+  << : *FREEBSD_ARTIFACTS
+
 freebsd_randconfig_template: &FREEBSD_RANDCONFIG_TEMPLATE
   << : *FREEBSD_ENV
 
@@ -38,6 +48,8 @@ freebsd_randconfig_template: &FREEBSD_RANDCONFIG_TEMPLATE
     - gmake -j`sysctl -n hw.ncpu` -C xen clang=y \
             KCONFIG_ALLCONFIG=tools/kconfig/allrandom.config randconfig
     - gmake -j`sysctl -n hw.ncpu` build-xen clang=y
+
+  << : *FREEBSD_ARTIFACTS
 
 task:
   name: 'FreeBSD 13: full build'
