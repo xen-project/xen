@@ -31,9 +31,38 @@
 
 static int ap_callin;
 
+/** True if x2apic support is exposed to the guest. */
+static bool has_x2apic;
+
+/**
+ * Lookup table of APIC IDs.
+ *
+ * Each entry is populated for its respective CPU as they come online. This is
+ * required for generating the MADT with minimal assumptions about ID
+ * relationships.
+ */
+uint32_t *cpu_to_apicid;
+
+static uint32_t read_apic_id(void)
+{
+    uint32_t apic_id;
+
+    if ( has_x2apic )
+        cpuid(0xb, NULL, NULL, NULL, &apic_id);
+    else
+    {
+        cpuid(1, NULL, &apic_id, NULL, NULL);
+        apic_id >>= 24;
+    }
+
+    return apic_id;
+}
+
 static void cpu_setup(unsigned int cpu)
 {
-    printf(" - CPU%d ... ", cpu);
+    uint32_t apicid = cpu_to_apicid[cpu] = read_apic_id();
+
+    printf(" - CPU%u APIC ID %u ... ", cpu, apicid);
     cacheattr_init();
     printf("done.\n");
 
@@ -104,8 +133,20 @@ static void boot_cpu(unsigned int cpu)
 void smp_initialise(void)
 {
     unsigned int i, nr_cpus = hvm_info->nr_vcpus;
+    uint32_t ecx, max_leaf;
+
+    cpuid(0, &max_leaf, NULL, NULL, NULL);
+    if ( max_leaf >= 0xb )
+    {
+        cpuid(1, NULL, NULL, &ecx, NULL);
+        has_x2apic = (ecx >> 21) & 1;
+        if ( has_x2apic )
+            printf("x2APIC supported\n");
+    }
 
     printf("Multiprocessor initialisation:\n");
+    cpu_to_apicid = scratch_alloc(sizeof(*cpu_to_apicid) * nr_cpus,
+                                  sizeof(*cpu_to_apicid));
     cpu_setup(0);
     for ( i = 1; i < nr_cpus; i++ )
         boot_cpu(i);

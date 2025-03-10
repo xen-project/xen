@@ -48,6 +48,8 @@ extern uint8_t ioapic_version;
 
 #define IOAPIC_ID           0x01
 
+extern uint32_t *cpu_to_apicid;
+
 #define LAPIC_BASE_ADDRESS  0xfee00000
 #define LAPIC_ID(vcpu_id)   ((vcpu_id) * 2)
 
