@@ -603,8 +603,7 @@ long pv_shim_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         if ( pv_console && send.port == pv_console_evtchn() )
         {
-            consoled_guest_rx();
-            rc = 0;
+            rc = consoled_guest_rx();
         }
         else
             rc = xen_hypercall_event_channel_op(EVTCHNOP_send, &send);
@@ -1016,12 +1015,9 @@ void pv_shim_offline_memory(unsigned int nr, unsigned int order)
     }
 }
 
-domid_t get_initial_domain_id(void)
+domid_t pv_shim_get_initial_domain_id(void)
 {
     uint32_t eax, ebx, ecx, edx;
-
-    if ( !pv_shim )
-        return 0;
 
     cpuid(xen_cpuid_base + 4, &eax, &ebx, &ecx, &edx);
 

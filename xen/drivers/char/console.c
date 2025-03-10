@@ -32,9 +32,9 @@
 #include <xen/pv_console.h>
 #include <asm/setup.h>
 #include <xen/sections.h>
+#include <xen/consoled.h>
 
 #ifdef CONFIG_X86
-#include <xen/consoled.h>
 #include <asm/guest.h>
 #endif
 #ifdef CONFIG_SBSA_VUART_CONSOLE
@@ -507,11 +507,9 @@ static void switch_serial_input(void)
             break;
         }
 
-#ifdef CONFIG_PV_SHIM
-        if ( next_rx == 1 )
+        if ( consoled_is_enabled() && next_rx == 1 )
             domid = get_initial_domain_id();
         else
-#endif
             domid = next_rx - 1;
         d = rcu_lock_domain_by_id(domid);
         if ( d )
@@ -562,15 +560,14 @@ static void __serial_rx(char c)
         rc = vpl011_rx_char_xen(d, c);
 #endif
 
+    if ( consoled_is_enabled() )
+        /* Deliver input to the PV shim console. */
+        rc = consoled_guest_tx(c);
+
     if ( rc )
         guest_printk(d,
                      XENLOG_WARNING "failed to process console input: %d\n",
                      rc);
-
-#ifdef CONFIG_X86
-    if ( pv_shim && pv_console )
-        consoled_guest_tx(c);
-#endif
 
     console_put_domain(d);
 }
