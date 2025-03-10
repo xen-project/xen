@@ -396,6 +396,7 @@ static int cf_check vmx_pi_update_irte(const struct vcpu *v,
     const struct pi_desc *pi_desc = v ? &v->arch.hvm.vmx.pi_desc : NULL;
     struct irq_desc *desc;
     struct msi_desc *msi_desc;
+    struct msi_msg msg;
     int rc;
 
     desc = pirq_spin_lock_irq_desc(pirq, NULL);
@@ -410,12 +411,13 @@ static int cf_check vmx_pi_update_irte(const struct vcpu *v,
     }
     msi_desc->pi_desc = pi_desc;
     msi_desc->gvec = gvec;
+    msg = msi_desc->msg;
 
     spin_unlock_irq(&desc->lock);
 
     ASSERT_PDEV_LIST_IS_READ_LOCKED(msi_desc->dev->domain);
 
-    return iommu_update_ire_from_msi(msi_desc, &msi_desc->msg);
+    return iommu_update_ire_from_msi(msi_desc, &msg);
 
  unlock_out:
     spin_unlock_irq(&desc->lock);
