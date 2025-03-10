@@ -1345,11 +1345,7 @@ bool xs_resume_domain(struct xs_handle *h, unsigned int domid)
 
 char *xs_get_domain_path(struct xs_handle *h, unsigned int domid)
 {
-	char domid_str[MAX_STRLEN(domid)];
-
-	snprintf(domid_str, sizeof(domid_str), "%u", domid);
-
-	return xs_single(h, XBT_NULL, XS_GET_DOMAIN_PATH, domid_str, NULL);
+	return single_with_domid(h, XS_GET_DOMAIN_PATH, domid);
 }
 
 bool xs_path_is_subpath(const char *parent, const char *child)
