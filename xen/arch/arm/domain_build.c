@@ -2296,8 +2296,6 @@ static int __init construct_dom0(struct domain *d)
         dom0_mem = MB(512);
     }
 
-    iommu_hwdom_init(d);
-
     d->max_pages = dom0_mem >> PAGE_SHIFT;
 
     kinfo.unassigned_mem = dom0_mem;
@@ -2307,17 +2305,27 @@ static int __init construct_dom0(struct domain *d)
     if ( rc < 0 )
         return rc;
 
+    return construct_hwdom(&kinfo);
+}
+
+int __init construct_hwdom(struct kernel_info *kinfo)
+{
+    struct domain *d = kinfo->d;
+    int rc;
+
+    iommu_hwdom_init(d);
+
 #ifdef CONFIG_ARM_64
     /* type must be set before allocate_memory */
-    d->arch.type = kinfo.type;
+    d->arch.type = kinfo->type;
 #endif
-    find_gnttab_region(d, &kinfo);
+    find_gnttab_region(d, kinfo);
     if ( is_domain_direct_mapped(d) )
-        allocate_memory_11(d, &kinfo);
+        allocate_memory_11(d, kinfo);
     else
-        allocate_memory(d, &kinfo);
+        allocate_memory(d, kinfo);
 
-    rc = process_shm_chosen(d, &kinfo);
+    rc = process_shm_chosen(d, kinfo);
     if ( rc < 0 )
         return rc;
 
@@ -2332,7 +2340,7 @@ static int __init construct_dom0(struct domain *d)
 
     if ( acpi_disabled )
     {
-        rc = prepare_dtb_hwdom(d, &kinfo);
+        rc = prepare_dtb_hwdom(d, kinfo);
         if ( rc < 0 )
             return rc;
 #ifdef CONFIG_HAS_PCI
@@ -2340,12 +2348,12 @@ static int __init construct_dom0(struct domain *d)
 #endif
     }
     else
-        rc = prepare_acpi(d, &kinfo);
+        rc = prepare_acpi(d, kinfo);
 
     if ( rc < 0 )
         return rc;
 
-    return construct_domain(d, &kinfo);
+    return construct_domain(d, kinfo);
 }
 
 void __init create_dom0(void)
