@@ -77,7 +77,7 @@ GEN16(6);
 GEN16(7);
 
 #ifdef CONFIG_PV
-GEN(0x80, entry_int80,      DPL0, manual);
+GEN(0x80, entry_int80,      DPL3, manual);
 #else
 GEN(0x80, entry_0x80,       DPL0, autogen);
 #endif
