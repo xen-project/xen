@@ -522,9 +522,9 @@ p2m_remove_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
         mfn_t mfn_return = p2m->get_entry(p2m, gfn_add(gfn, i), &t, &a, 0,
                                           &cur_order, NULL);
 
-        if ( p2m_is_valid(t) &&
-             (!mfn_valid(mfn) || t == p2m_mmio_direct ||
-              !mfn_eq(mfn_add(mfn, i), mfn_return)) )
+        if ( p2m_is_any_ram(t) || p2m_is_broken(t)
+             ? !mfn_valid(mfn) || !mfn_eq(mfn_add(mfn, i), mfn_return)
+             : !p2m_is_hole(t) || !mfn_eq(mfn, INVALID_MFN) )
             return -EILSEQ;
 
         i += (1UL << cur_order) -
