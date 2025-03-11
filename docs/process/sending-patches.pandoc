@@ -106,6 +106,18 @@ If git was configured as explained earlier, this can be retrieved using
 ``git log --pretty=fixes`` otherwise ``git log --abbrev=12 --oneline`` will
 give the proper tag and commit-id.
 
+### Resolves:
+
+If your patch addresses an issue logged in a GitLab ticket, use the `Resolves:`
+tag followed by the issue link to automatically close the ticket when the patch
+is merged.
+
+    Resolves: <URL>
+
+E.g.:
+
+    Resolves: https://gitlab.com/xen-project/xen/-/issues/199
+
 ### Backport:
 
 A backport tag is an optional tag in the commit message to request a
