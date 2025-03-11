@@ -1900,6 +1900,13 @@ void asmlinkage __init noreturn __start_xen(void)
     setup_system_domains();
 
     /*
+     * Ahead of any ACPI table parsing make sure we have control structures
+     * for PCI segment 0.
+     */
+    if ( pci_add_segment(0) )
+        panic("Could not initialize PCI segment 0\n");
+
+    /*
      * IOMMU-related ACPI table parsing has to happen before APIC probing, for
      * check_x2apic_preenabled() to be able to observe respective findings, in
      * particular iommu_intremap having got turned off.

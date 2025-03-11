@@ -127,12 +127,6 @@ static int pci_segments_iterate(
     return rc;
 }
 
-void __init pci_segments_init(void)
-{
-    if ( !alloc_pseg(0) )
-        panic("Could not initialize PCI segment 0\n");
-}
-
 int __init pci_add_segment(u16 seg)
 {
     return alloc_pseg(seg) ? 0 : -ENOMEM;

@@ -402,8 +402,6 @@ void __init acpi_mmcfg_init(void)
 {
     bool valid = true;
 
-    pci_segments_init();
-
     /* MMCONFIG disabled */
     if ((pci_probe & PCI_PROBE_MMCONF) == 0)
         return;

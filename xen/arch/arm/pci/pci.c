@@ -88,7 +88,8 @@ static int __init pci_init(void)
     if ( !pci_passthrough_enabled )
         return 0;
 
-    pci_segments_init();
+    if ( pci_add_segment(0) )
+        panic("Could not initialize PCI segment 0\n");
 
     if ( acpi_disabled )
         return dt_pci_init();
