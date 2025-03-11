@@ -168,8 +168,8 @@ typedef unsigned int p2m_query_t;
 /* Grant types are *not* considered valid, because they can be
    unmapped at any time and, unless you happen to be the shadow or p2m
    implementations, there's no way of synchronising against that. */
-#define p2m_is_valid(_t) (p2m_to_mask(_t) & (P2M_RAM_TYPES | P2M_MMIO_TYPES))
-#define p2m_has_emt(_t)  (p2m_to_mask(_t) & (P2M_RAM_TYPES | p2m_to_mask(p2m_mmio_direct)))
+#define p2m_is_valid(_t)    (p2m_to_mask(_t) & \
+                             (P2M_RAM_TYPES | p2m_to_mask(p2m_mmio_direct)))
 #define p2m_is_pageable(_t) (p2m_to_mask(_t) & P2M_PAGEABLE_TYPES)
 #define p2m_is_paging(_t)   (p2m_to_mask(_t) & P2M_PAGING_TYPES)
 #define p2m_is_paged(_t)    (p2m_to_mask(_t) & P2M_PAGED_TYPES)
