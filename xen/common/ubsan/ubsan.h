@@ -95,6 +95,11 @@ enum {
 	kind_clz,
 };
 
+struct function_type_mismatch_data {
+	struct source_location location;
+	struct type_descriptor *type;
+};
+
 #if defined(CONFIG_ARCH_SUPPORTS_INT128) && defined(__SIZEOF_INT128__)
 typedef __int128 s_max;
 typedef unsigned __int128 u_max;

@@ -546,3 +546,19 @@ void __ubsan_handle_invalid_builtin(struct invalid_builtin_data *data)
 
 	ubsan_epilogue(&flags);
 }
+
+void __ubsan_handle_function_type_mismatch(
+	struct function_type_mismatch_data *data, unsigned long val)
+{
+	unsigned long flags;
+
+	if (suppress_report(&data->location))
+		return;
+
+	ubsan_prologue(&data->location, &flags);
+
+	pr_err("call to function %ps through pointer to incorrect function type %s\n",
+		(void *)val, data->type->type_name);
+
+	ubsan_epilogue(&flags);
+}
