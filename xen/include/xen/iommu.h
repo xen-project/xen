@@ -110,6 +110,8 @@ extern int8_t iommu_hwdom_reserved;
 
 extern unsigned int iommu_dev_iotlb_timeout;
 
+#ifdef CONFIG_HAS_PASSTHROUGH
+
 int iommu_setup(void);
 int iommu_hardware_setup(void);
 
@@ -121,6 +123,28 @@ void arch_iommu_domain_destroy(struct domain *d);
 int arch_iommu_domain_init(struct domain *d);
 void arch_iommu_check_autotranslated_hwdom(struct domain *d);
 void arch_iommu_hwdom_init(struct domain *d);
+
+#else
+
+static inline int iommu_setup(void)
+{
+    return -ENODEV;
+}
+
+static inline int iommu_domain_init(struct domain *d, unsigned int opts)
+{
+    /*
+     * Return as the real iommu_domain_init() would: Success when
+     * !is_iommu_enabled(), following from !iommu_enabled when !HAS_PASSTHROUGH
+     */
+    return 0;
+}
+
+static inline void iommu_hwdom_init(struct domain *d) {}
+
+static inline void iommu_domain_destroy(struct domain *d) {}
+
+#endif /* HAS_PASSTHROUGH */
 
 /*
  * The following flags are passed to map (applicable ones also to unmap)
@@ -209,6 +233,8 @@ struct msi_msg;
 #ifdef CONFIG_HAS_DEVICE_TREE
 #include <xen/device_tree.h>
 
+#ifdef CONFIG_HAS_PASSTHROUGH
+
 int iommu_assign_dt_device(struct domain *d, struct dt_device_node *dev);
 int iommu_deassign_dt_device(struct domain *d, struct dt_device_node *dev);
 int iommu_dt_domain_init(struct domain *d);
@@ -237,6 +263,30 @@ int iommu_do_dt_domctl(struct xen_domctl *domctl, struct domain *d,
  * >0 : IOMMU is not enabled/present.
  */
 int iommu_remove_dt_device(struct dt_device_node *np);
+
+#else
+
+static inline int iommu_assign_dt_device(struct domain *d,
+                                         struct dt_device_node *dev)
+{
+    return -EINVAL;
+}
+
+static inline int iommu_add_dt_device(struct dt_device_node *np)
+{
+    /*
+     * !HAS_PASSTHROUGH => !iommu_enabled (see the non-stub
+     * iommu_add_dt_device())
+     */
+    return 1;
+}
+
+static inline int iommu_release_dt_devices(struct domain *d)
+{
+    return 0;
+}
+
+#endif /* HAS_PASSTHROUGH */
 
 #endif /* HAS_DEVICE_TREE */
 
@@ -383,17 +433,19 @@ struct domain_iommu {
 #define iommu_set_feature(d, f)   set_bit(f, dom_iommu(d)->features)
 #define iommu_clear_feature(d, f) clear_bit(f, dom_iommu(d)->features)
 
+#ifdef CONFIG_HAS_PASSTHROUGH
 /* Are we using the domain P2M table as its IOMMU pagetable? */
 #define iommu_use_hap_pt(d)       (IS_ENABLED(CONFIG_HVM) && \
                                    dom_iommu(d)->hap_pt_share)
 
 /* Does the IOMMU pagetable need to be kept synchronized with the P2M */
-#ifdef CONFIG_HAS_PASSTHROUGH
 #define need_iommu_pt_sync(d)     (dom_iommu(d)->need_sync)
 
 int iommu_do_domctl(struct xen_domctl *domctl, struct domain *d,
                     XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl);
 #else
+#define iommu_use_hap_pt(d)       ({ (void)(d); false; })
+
 #define need_iommu_pt_sync(d)     ({ (void)(d); false; })
 
 static inline int iommu_do_domctl(struct xen_domctl *domctl, struct domain *d,
