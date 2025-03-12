@@ -251,6 +251,9 @@ void __init gic_init(void)
         panic("Failed to initialize the GIC drivers\n");
     /* Clear LR mask for cpu0 */
     clear_cpu_lr_mask();
+
+    if ( gic_number_lines() > VGIC_MAX_IRQS )
+        printk(XENLOG_WARNING "Maximum number of vGIC IRQs exceeded\n");
 }
 
 void send_SGI_mask(const cpumask_t *cpumask, enum gic_sgi sgi)

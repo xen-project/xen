@@ -329,6 +329,12 @@ extern void vgic_check_inflight_irqs_pending(struct vcpu *v,
  */
 #define vgic_num_irqs(d)        ((d)->arch.vgic.nr_spis + 32)
 
+/* Maximum number of IRQs supported by vGIC */
+#define VGIC_MAX_IRQS 992U
+
+/* Default number of vGIC SPIs. 32 are substracted to cover local IRQs. */
+#define VGIC_DEF_NR_SPIS (min(gic_number_lines(), VGIC_MAX_IRQS) - 32)
+
 /*
  * Allocate a guest VIRQ
  *  - spi == 0 => allocate a PPI. It will be the same on every vCPU

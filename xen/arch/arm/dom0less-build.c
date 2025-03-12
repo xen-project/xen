@@ -1018,7 +1018,7 @@ void __init create_domUs(void)
         {
             int vpl011_virq = GUEST_VPL011_SPI;
 
-            d_cfg.arch.nr_spis = gic_number_lines() - 32;
+            d_cfg.arch.nr_spis = VGIC_DEF_NR_SPIS;
 
             /*
              * The VPL011 virq is GUEST_VPL011_SPI, unless direct-map is
