@@ -3083,14 +3083,11 @@ interval of colors (such as "0-4").
 =item B<nr_spis="NR_SPIS">
 
 An optional integer parameter specifying the number of SPIs (Shared
-Peripheral Interrupts) to allocate for the domain. Max is 991 SPIs. If
-the value specified by the `nr_spis` parameter is smaller than the
-number of SPIs calculated by the toolstack based on the devices
-allocated for the domain, or the `nr_spis` parameter is not specified,
-the value calculated by the toolstack will be used for the domain.
-Otherwise, the value specified by the `nr_spis` parameter will be used.
-The number of SPIs should match the highest interrupt ID that will be
-assigned to the domain.
+Peripheral Interrupts) to allocate for the domain. Max is 960 SPIs. If
+the `nr_spis` parameter is not specified, the value calculated by the toolstack
+will be used for the domain. Otherwise, the value specified by the `nr_spis`
+parameter will be used. The number of SPIs should match the highest interrupt
+ID that will be assigned to the domain.
 
 =back
 

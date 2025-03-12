@@ -181,6 +181,12 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
 
     LOG(DEBUG, "Configure the domain");
 
+    if (nr_spis > d_config->b_info.arch_arm.nr_spis) {
+        LOG(ERROR, "Provided nr_spis value is too small (minimum required %u)\n",
+            nr_spis);
+        return ERROR_FAIL;
+    }
+
     config->arch.nr_spis = max(nr_spis, d_config->b_info.arch_arm.nr_spis);
     LOG(DEBUG, " - Allocate %u SPIs", config->arch.nr_spis);
 
