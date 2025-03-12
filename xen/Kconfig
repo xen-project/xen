@@ -37,6 +37,10 @@ config CC_HAS_VISIBILITY_ATTRIBUTE
 config CC_SPLIT_SECTIONS
 	bool
 
+# Compiler supports -fsanitize=undefined
+config CC_HAS_UBSAN
+	def_bool $(cc-option,-fsanitize=undefined)
+
 # Set code alignment.
 #
 # Allow setting on a boolean basis, and then convert such selection to an
