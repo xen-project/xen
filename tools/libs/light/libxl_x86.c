@@ -901,7 +901,10 @@ int libxl__arch_hvm_map_gsi(libxl__gc *gc, uint32_t sbdf, uint32_t domid)
     int pirq = -1, gsi, r;
 
     gsi = xc_pcidev_get_gsi(CTX->xch, sbdf);
-    if (gsi < 0) {
+    if (gsi < 0 && errno == ENOENT) {
+        LOGD(DEBUG, domid, "xc_pcidev_get_gsi no gsi");
+        return 0;
+    } else if (gsi < 0) {
         return ERROR_FAIL;
     }
 
@@ -925,7 +928,10 @@ int libxl__arch_hvm_unmap_gsi(libxl__gc *gc, uint32_t sbdf, uint32_t domid)
     int pirq = -1, gsi, r;
 
     gsi = xc_pcidev_get_gsi(CTX->xch, sbdf);
-    if (gsi < 0) {
+    if (gsi < 0 && errno == ENOENT) {
+        LOGD(DEBUG, domid, "xc_pcidev_get_gsi no gsi");
+        return 0;
+    } else if (gsi < 0) {
         return ERROR_FAIL;
     }
 
