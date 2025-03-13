@@ -517,9 +517,18 @@ void __ubsan_handle_pointer_overflow(struct pointer_overflow_data *data,
 
 	ubsan_prologue(&data->location, &flags);
 
-	pr_err("pointer operation %s %p to %p\n",
-	       base > result ? "overflowed" : "underflowed",
-	       _p(base), _p(result));
+	if (!base && !result)
+		pr_err("applying zero offset to null pointer\n");
+	else if (!base && result)
+		pr_err("applying non-zero offset %p to null pointer\n",
+			_p(result));
+	else if (base && !result)
+		pr_err("applying non-zero offset to non-null pointer %p produced null pointer\n",
+			_p(base));
+	else
+		pr_err("pointer operation %s %p to %p\n",
+			base > result ? "overflowed" : "underflowed",
+			_p(base), _p(result));
 
 	ubsan_epilogue(&flags);
 }
