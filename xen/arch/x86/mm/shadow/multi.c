@@ -471,9 +471,7 @@ _sh_propagate(struct vcpu *v,
     /* We don't shadow PAE l3s */
     ASSERT(GUEST_PAGING_LEVELS > 3 || level != 3);
 
-    /* Check there's something for the shadows to map to */
-    if ( (!p2m_is_valid(p2mt) && !p2m_is_grant(p2mt))
-         || !gfn_valid(d, target_gfn) )
+    if ( !gfn_valid(d, target_gfn) )
     {
         *sp = shadow_l1e_empty();
         goto done;
@@ -500,6 +498,13 @@ _sh_propagate(struct vcpu *v,
         *sp = sh_l1e_mmio(target_gfn, gflags);
         if ( sh_l1e_is_magic(*sp) )
             d->arch.paging.shadow.has_fast_mmio_entries = true;
+        goto done;
+    }
+
+    /* Check there's something for the shadows to map to */
+    if ( !p2m_is_any_ram(p2mt) && p2mt != p2m_mmio_direct )
+    {
+        *sp = shadow_l1e_empty();
         goto done;
     }
 
@@ -2365,9 +2370,17 @@ static int cf_check sh_page_fault(
     gfn = guest_walk_to_gfn(&gw);
     gmfn = get_gfn(d, gfn, &p2mt);
 
+    /*
+     * p2m_mmio_dm in particular is handled further down, and hence can't be
+     * short-circuited here. Furthermore, while not fitting with architectural
+     * behavior, propagating #PF to the guest when a sensible shadow entry
+     * can't be written is necessary. Without doing so (by installing a non-
+     * present entry) we'd get back right here immediately afterwards, thus
+     * preventing the guest from making further forward progress.
+     */
     if ( shadow_mode_refcounts(d) &&
-         ((!p2m_is_valid(p2mt) && !p2m_is_grant(p2mt)) ||
-          (!p2m_is_mmio(p2mt) && !mfn_valid(gmfn))) )
+         !p2m_is_mmio(p2mt) &&
+         (!p2m_is_any_ram(p2mt) || !mfn_valid(gmfn)) )
     {
         perfc_incr(shadow_fault_bail_bad_gfn);
         SHADOW_PRINTK("BAD gfn=%"SH_PRI_gfn" gmfn=%"PRI_mfn"\n",
