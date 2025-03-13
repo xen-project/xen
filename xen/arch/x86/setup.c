@@ -684,7 +684,7 @@ static void __init noinline move_xen(void)
 #undef BOOTSTRAP_MAP_LIMIT
 
 static uint64_t __init consider_modules(
-    uint64_t s, uint64_t e, uint32_t size, const struct boot_module mods[],
+    uint64_t s, uint64_t e, uint32_t size, const struct boot_module *mods,
     unsigned int nr_mods, unsigned int this_mod)
 {
     unsigned int i;
