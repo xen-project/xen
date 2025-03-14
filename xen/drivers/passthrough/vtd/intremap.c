@@ -485,15 +485,15 @@ static int set_msi_source_id(const struct pci_dev *pdev,
         else
         {
             dprintk(XENLOG_WARNING VTDPREFIX,
-                    "d%d: no upstream bridge for %pp\n",
-                    pdev->domain->domain_id, &pdev->sbdf);
+                    "%pd: no upstream bridge for %pp\n",
+                    pdev->domain, &pdev->sbdf);
             return -ENXIO;
         }
         break;
 
     default:
-        dprintk(XENLOG_WARNING VTDPREFIX, "d%d: unknown(%u): %pp\n",
-                pdev->domain->domain_id, pdev->type, &pdev->sbdf);
+        dprintk(XENLOG_WARNING VTDPREFIX, "%pd: %pp unknown device type %d\n",
+                pdev->domain, &pdev->sbdf, pdev->type);
         return -EOPNOTSUPP;
     }
 
@@ -751,7 +751,7 @@ void disable_intremap(struct vtd_iommu *iommu)
                   !(sts & DMA_GSTS_IRES), sts);
 
     /* If we are disabling Interrupt Remapping, make sure we dont stay in
-     * Extended Interrupt Mode, as this is unaffected by the Interrupt 
+     * Extended Interrupt Mode, as this is unaffected by the Interrupt
      * Remapping flag in each DMAR Global Control Register.
      * Specifically, local apics in xapic mode do not like interrupts delivered
      * in x2apic mode.  Any code turning interrupt remapping back on will set
