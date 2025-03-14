@@ -1,7 +1,7 @@
 # https://cirrus-ci.org/guide/tips-and-tricks/#sharing-configuration-between-tasks
 freebsd_13: &FREEBSD_13
   freebsd_instance:
-    image_family: freebsd-13-4
+    image_family: freebsd-13-5
 freebsd_14: &FREEBSD_14
   freebsd_instance:
     image_family: freebsd-14-2
