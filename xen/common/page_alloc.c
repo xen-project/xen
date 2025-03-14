@@ -1763,7 +1763,7 @@ int offline_page(mfn_t mfn, int broken, uint32_t *status)
  *   The caller should make sure end_pfn <= max_page,
  *   if not, expand_pages() should be called prior to online_page().
  */
-unsigned int online_page(mfn_t mfn, uint32_t *status)
+int online_page(mfn_t mfn, uint32_t *status)
 {
     unsigned long x, nx, y;
     struct page_info *pg;
