@@ -436,14 +436,12 @@ void cf_check io_apic_write_remap_rte(
     __ioapic_write_entry(apic, pin, true, old_rte);
 }
 
-static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
+static int set_msi_source_id(const struct pci_dev *pdev,
+                             struct iremap_entry *ire)
 {
     u16 seg;
     u8 bus, devfn, secbus;
     int ret;
-
-    if ( !pdev || !ire )
-        return;
 
     seg = pdev->seg;
     bus = pdev->bus;
@@ -485,16 +483,21 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
                             PCI_BDF(bus, devfn));
         }
         else
+        {
             dprintk(XENLOG_WARNING VTDPREFIX,
                     "d%d: no upstream bridge for %pp\n",
                     pdev->domain->domain_id, &pdev->sbdf);
+            return -ENXIO;
+        }
         break;
 
     default:
         dprintk(XENLOG_WARNING VTDPREFIX, "d%d: unknown(%u): %pp\n",
                 pdev->domain->domain_id, pdev->type, &pdev->sbdf);
-        break;
-   }
+        return -EOPNOTSUPP;
+    }
+
+    return 0;
 }
 
 static int msi_msg_to_remap_entry(
@@ -509,7 +512,12 @@ static int msi_msg_to_remap_entry(
     bool alloc = false;
 
     if ( pdev )
-        set_msi_source_id(pdev, &new_ire);
+    {
+        int rc = set_msi_source_id(pdev, &new_ire);
+
+        if ( rc )
+            return rc;
+    }
     else
         set_hpet_source_id(msi_desc->hpet_id, &new_ire);
 
