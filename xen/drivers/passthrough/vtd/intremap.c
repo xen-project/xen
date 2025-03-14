@@ -508,6 +508,11 @@ static int msi_msg_to_remap_entry(
     const struct pi_desc *pi_desc = msi_desc->pi_desc;
     bool alloc = false;
 
+    if ( pdev )
+        set_msi_source_id(pdev, &new_ire);
+    else
+        set_hpet_source_id(msi_desc->hpet_id, &new_ire);
+
     if ( msi_desc->msi_attrib.type == PCI_CAP_ID_MSI )
         nr = msi_desc->msi.nvec;
 
@@ -574,11 +579,6 @@ static int msi_msg_to_remap_entry(
         new_ire.post.pda_h = virt_to_maddr(pi_desc) >> 32;
         new_ire.post.p = 1;
     }
-
-    if ( pdev )
-        set_msi_source_id(pdev, &new_ire);
-    else
-        set_hpet_source_id(msi_desc->hpet_id, &new_ire);
 
     /* now construct new MSI/MSI-X rte entry */
     remap_rte = (struct msi_msg_remap_entry *)msg;
