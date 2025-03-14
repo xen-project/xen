@@ -350,7 +350,7 @@ endif
 
 config MEM_PAGING
 	bool "Xen memory paging support (UNSUPPORTED)" if UNSUPPORTED
-	depends on HVM
+	depends on HVM && VM_EVENT
 
 config MEM_SHARING
 	bool "Xen memory sharing support (UNSUPPORTED)" if UNSUPPORTED
