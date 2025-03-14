@@ -86,6 +86,67 @@ parts of xenstore inaccessible to some clients.  In any case passing
 bulk data through xenstore is not recommended as the performance
 properties are poor.
 
+---------- Defined Xenstore message types ----------
+
+Below is a table with all defined Xenstore message types (type name
+and its associated numerical value).
+
+Some types are optional to be supported by a specific Xenstore
+implementation.  If an optional type is not supported by a Xenstore
+implementation, Xen tools will continue to work, maybe with slightly
+reduced functionality.  A mandatory type not being supported will
+result in severely reduced functionality, like inability to create
+domains.  In case a type is optional, this is stated in the table with
+the lost functionality in case Xenstore doesn't support that type.
+Any not supported type sent to Xenstore will result in an error response
+with the "ENOSYS" error.
+
+CONTROL               0    optional
+    If not supported, xenstore-control command will not work.
+    DEBUG is a deprecated alias of CONTROL.
+DIRECTORY             1
+READ                  2
+GET_PERMS             3
+WATCH                 4
+UNWATCH               5
+TRANSACTION_START     6
+TRANSACTION_END       7
+INTRODUCE             8
+RELEASE               9
+GET_DOMAIN_PATH      10
+WRITE                11
+MKDIR                12
+RM                   13
+SET_PERMS            14
+WATCH_EVENT          15
+    Not valid in client sent messages.
+    Only valid in Xenstore replies.
+ERROR                16
+    Not valid in client sent messages.
+    Only valid in Xenstore replies.
+IS_DOMAIN_INTRODUCED 17
+RESUME               18
+SET_TARGET           19
+RESTRICT             20    no longer supported
+    RESTRICT has been removed, the type value 20 is invalid.
+RESET_WATCHES        21
+DIRECTORY_PART       22    optional
+    If not supported, the output of xenstore-ls might be incomplete
+    with a node's sub-node list exceeding the maximum payload size
+    (e.g. the "/local/domain" node with more than ca. 1000 domains
+    active).
+GET_FEATURE          23    optional
+SET_FEATURE          24    optional
+    SET_FEATURE requires GET_FEATURE to be supported.
+    If unsupported, setting availability of Xenstore features per
+    domain is not possible.
+GET_QUOTA            25    optional
+SET_QUOTA            26    optional
+    SET_QUOTA requires GET_QUOTA to be supported.
+    If unsupported, setting of Xenstore quota per domain is not
+    possible.
+INVALID           65535
+    Guaranteed invalid type (never supported).
 
 ---------- Xenstore protocol details - introduction ----------
 
