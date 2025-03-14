@@ -5,6 +5,8 @@ freebsd_versions: &FREEBSD_VERSIONS
     FREEBSD_PRODUCTION: freebsd-14-2
     FREEBSD_CURRENT:    freebsd-15-0-snap
 
+# Build jobs
+
 freebsd_template: &FREEBSD_ENV
   environment:
     APPEND_LIB: /usr/local/lib
@@ -118,3 +120,55 @@ task:
   xtf_artifacts:
     path: xtf/tests/selftest/test-*-selftest
     type: application/octet-stream
+
+# Test jobs
+
+task:
+  name: 'FreeBSD: XTF selftest'
+
+  << : *FREEBSD_ENV_PRODUCTION
+
+  env:
+    matrix:
+      FREEBSD_BUILD: $FREEBSD_LEGACY
+      FREEBSD_BUILD: $FREEBSD_PRODUCTION
+      FREEBSD_BUILD: $FREEBSD_CURRENT
+
+  depends_on:
+    - freebsd_full_$FREEBSD_BUILD
+    - xtf
+
+  install_script: pkg install -y qemu-nox11 expect
+
+  env:
+    matrix:
+      XTF_ARCH: hvm32
+      XTF_ARCH: hvm32pae
+      XTF_ARCH: hvm32pse
+      XTF_ARCH: hvm64
+      XTF_ARCH: pv64
+
+  fetch_script:
+    - fetch https://api.cirrus-ci.com/v1/artifact/build/$CIRRUS_BUILD_ID/xtf/xtf.zip
+    - fetch https://api.cirrus-ci.com/v1/artifact/build/$CIRRUS_BUILD_ID/freebsd_full_$FREEBSD_BUILD/xen.zip
+    - unzip xtf.zip
+    - unzip xen.zip
+
+  test_script: |
+    case "$XTF_ARCH" in \
+      *hvm*) \
+        XEN_EXTRA_CMD="dom0=pvh dom0-iommu=none" \
+        ;; \
+    esac
+    export TEST_CMD="qemu-system-x86_64 -kernel xen/xen -initrd xtf/tests/selftest/test-${XTF_ARCH}-selftest \
+                                        -append \"loglvl=all console=com1 noreboot console_timestamps=boot dom0=verbose ${XEN_EXTRA_CMD}\" \
+                                        -m 512 -nographic -monitor none -serial stdio"
+    export TEST_LOG="serial-${FREEBSD_BUILD}-${XTF_ARCH}.txt"
+    export PASSED="Test result: SUCCESS"
+    export TEST_TIMEOUT=120
+    ./automation/scripts/console.exp | sed 's/\r\+$//'
+
+  always:
+    serial_artifacts:
+      path: serial-*.txt
+      type: text/plain
