@@ -5,7 +5,7 @@ CONFIG_ARM=y
 # Architecture Features
 #
 # CONFIG_GICV3 is not set
-# CONFIG_MEM_ACCESS is not set
+# CONFIG_VM_EVENT is not set
 # CONFIG_SBSA_VUART_CONSOLE is not set
 
 #

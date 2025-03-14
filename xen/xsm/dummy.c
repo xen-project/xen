@@ -111,7 +111,7 @@ static const struct xsm_ops __initconst_cf_clobber dummy_ops = {
 
     .vm_event_control              = xsm_vm_event_control,
 
-#ifdef CONFIG_MEM_ACCESS
+#ifdef CONFIG_VM_EVENT
     .mem_access                    = xsm_mem_access,
 #endif
 

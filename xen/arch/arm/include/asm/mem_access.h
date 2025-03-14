@@ -37,7 +37,7 @@ static inline bool p2m_mem_access_sanity_check(struct domain *d)
  * Send mem event based on the access. Boolean return value indicates if trap
  * needs to be injected into guest.
  */
-#ifdef CONFIG_MEM_ACCESS
+#ifdef CONFIG_VM_EVENT
 bool p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec);
 
 struct page_info*
@@ -58,7 +58,7 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag,
     return NULL;
 }
 
-#endif /*CONFIG_MEM_ACCESS*/
+#endif /* CONFIG_VM_EVENT */
 #endif /* _ASM_ARM_MEM_ACCESS_H */
 
 /*

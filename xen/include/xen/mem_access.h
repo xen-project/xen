@@ -33,7 +33,7 @@
  */
 struct vm_event_st;
 
-#ifdef CONFIG_MEM_ACCESS
+#ifdef CONFIG_VM_EVENT
 #include <asm/mem_access.h>
 #endif
 
@@ -99,7 +99,7 @@ long p2m_set_mem_access_multi(struct domain *d,
 int p2m_get_mem_access(struct domain *d, gfn_t gfn, xenmem_access_t *access,
                        unsigned int altp2m_idx);
 
-#ifdef CONFIG_MEM_ACCESS
+#ifdef CONFIG_VM_EVENT
 int mem_access_memop(unsigned long cmd,
                      XEN_GUEST_HANDLE_PARAM(xen_mem_access_op_t) arg);
 #else
@@ -109,7 +109,7 @@ int mem_access_memop(unsigned long cmd,
 {
     return -ENOSYS;
 }
-#endif /* CONFIG_MEM_ACCESS */
+#endif /* CONFIG_VM_EVENT */
 
 #endif /* _XEN_MEM_ACCESS_H */
 
