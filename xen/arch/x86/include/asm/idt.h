@@ -92,15 +92,16 @@ static inline void _set_gate_lower(idt_entry_t *gate, unsigned long type,
  * Update the lower half handler of an IDT entry, without changing any other
  * configuration.
  */
-static inline void _update_gate_addr_lower(idt_entry_t *gate, void *addr)
+static inline void _update_gate_addr_lower(idt_entry_t *gate, void *_addr)
 {
+    unsigned long addr = (unsigned long)_addr;
+    unsigned int addr1 = addr & 0xffff0000U; /* GCC: force better codegen. */
     idt_entry_t idte;
-    idte.a = gate->a;
 
-    idte.b = ((unsigned long)(addr) >> 32);
-    idte.a &= 0x0000FFFFFFFF0000ULL;
-    idte.a |= (((unsigned long)(addr) & 0xFFFF0000UL) << 32) |
-        ((unsigned long)(addr) & 0xFFFFUL);
+    idte.b = addr >> 32;
+    idte.a = gate->a & 0x0000ffffffff0000UL;
+    idte.a |= (unsigned long)addr1 << 32;
+    idte.a |= addr & 0xffff;
 
     _write_gate_lower(gate, &idte);
 }
