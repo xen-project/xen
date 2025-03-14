@@ -124,6 +124,11 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
     struct cpu_info *cpu_info = get_cpu_info();
     struct vcpu *curr = current;
     unsigned long dummy;
+    /*
+     * Latch esp to a local variable to prevent clang from duplicating the
+     * inline assembly block when UBSAN is enabled.
+     */
+    void *esp = NULL;
 
     ASSERT(wqv->esp == NULL);
 
@@ -166,12 +171,12 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
         ".L_skip:"
         "pop %%r15; pop %%r14; pop %%r13;"
         "pop %%r12; pop %%rbp; pop %%rbx"
-        : "=&S" (wqv->esp), "=&c" (dummy), "=&D" (dummy)
+        : "=&S" (esp), "=&c" (dummy), "=&D" (dummy)
         : "0" (0), "1" (cpu_info), "2" (wqv->stack),
           [sz] "i" (PAGE_SIZE)
         : "memory", "rax", "rdx", "r8", "r9", "r10", "r11" );
 
-    if ( unlikely(wqv->esp == NULL) )
+    if ( unlikely(esp == NULL) )
     {
         gdprintk(XENLOG_ERR, "Stack too large in %s\n", __func__);
         domain_crash(curr->domain);
@@ -179,6 +184,7 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
         for ( ; ; )
             do_softirq();
     }
+    wqv->esp = esp;
 }
 
 static void __finish_wait(struct waitqueue_vcpu *wqv)
