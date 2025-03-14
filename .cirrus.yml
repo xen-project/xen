@@ -12,6 +12,12 @@ freebsd_template: &FREEBSD_ENV
     CIRRUS_CLONE_DEPTH: 1
     CIRRUS_LOG_TIMESTAMP: true
 
+freebsd_template_latest: &FREEBSD_ENV_PRODUCTION
+  << : *FREEBSD_VERSIONS
+  freebsd_instance:
+    image_family: $FREEBSD_PRODUCTION
+  << : *FREEBSD_ENV
+
 freebsd_configure_artifacts: &FREEBSD_CONFIGURE_ARTIFACTS
   always:
     rename_script:
@@ -82,3 +88,21 @@ task:
 
   build_script:
     - gmake -j`sysctl -n hw.ncpu` build-xen clang=y
+
+task:
+  name: 'FreeBSD: XTF build'
+  alias: xtf
+
+  << : *FREEBSD_ENV_PRODUCTION
+
+  clone_script:
+    - pkg install -y git
+    - git clone --depth 1 https://xenbits.xen.org/git-http/xtf.git
+
+  install_script: pkg install -y gmake
+
+  build_script:
+    - cd xtf
+    - cc --version
+    - git rev-parse HEAD
+    - gmake -j`sysctl -n hw.ncpu` LLVM=y
