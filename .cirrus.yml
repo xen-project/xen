@@ -16,7 +16,7 @@ freebsd_template: &FREEBSD_ENV
     CIRRUS_CLONE_DEPTH: 1
     CIRRUS_LOG_TIMESTAMP: true
 
-freebsd_artifacts: &FREEBSD_ARTIFACTS
+freebsd_configure_artifacts: &FREEBSD_CONFIGURE_ARTIFACTS
   always:
     rename_script:
       - cp xen/.config xen-config
@@ -32,25 +32,30 @@ freebsd_full_build_template: &FREEBSD_FULL_BUILD_TEMPLATE
                                  yajl lzo2 pixman argp-standalone
                                  libxml2 glib git python3
 
-  build_script:
+  configure_script:
     - cc --version
     - ./configure --with-system-seabios=/usr/local/share/seabios/bios.bin
-    - gmake -j`sysctl -n hw.ncpu` clang=y
+    - gmake -j`sysctl -n hw.ncpu` -C xen clang=y defconfig
 
-  << : *FREEBSD_ARTIFACTS
+  << : *FREEBSD_CONFIGURE_ARTIFACTS
+
+  build_script:
+    - gmake -j`sysctl -n hw.ncpu` clang=y
 
 freebsd_randconfig_template: &FREEBSD_RANDCONFIG_TEMPLATE
   << : *FREEBSD_ENV
 
   install_script: pkg install -y gmake python3 bison
 
-  build_script:
+  configure_script:
     - cc --version
     - gmake -j`sysctl -n hw.ncpu` -C xen clang=y \
             KCONFIG_ALLCONFIG=tools/kconfig/allrandom.config randconfig
-    - gmake -j`sysctl -n hw.ncpu` build-xen clang=y
 
-  << : *FREEBSD_ARTIFACTS
+  << : *FREEBSD_CONFIGURE_ARTIFACTS
+
+  build_script:
+    - gmake -j`sysctl -n hw.ncpu` build-xen clang=y
 
 task:
   name: 'FreeBSD 13: full build'
