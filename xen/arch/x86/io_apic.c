@@ -2715,15 +2715,15 @@ void __init ioapic_init(void)
                               " than \"nr_irqs=\"\n");
         max_gsi_irqs = nr_irqs;
     }
-    if ( max_gsi_irqs < 16 )
-        max_gsi_irqs = 16;
+    if ( max_gsi_irqs < NR_ISA_IRQS )
+        max_gsi_irqs = NR_ISA_IRQS;
 
     /* for PHYSDEVOP_pirq_eoi_gmfn guest assumptions */
     if ( max_gsi_irqs > PAGE_SIZE * 8 )
         max_gsi_irqs = PAGE_SIZE * 8;
 
-    if ( !smp_found_config || skip_ioapic_setup || nr_irqs_gsi < 16 )
-        nr_irqs_gsi = 16;
+    if ( !smp_found_config || skip_ioapic_setup || nr_irqs_gsi < NR_ISA_IRQS )
+        nr_irqs_gsi = NR_ISA_IRQS;
     else if ( nr_irqs_gsi > max_gsi_irqs )
     {
         printk(XENLOG_WARNING "Limiting to %u GSI IRQs (found %u)\n",
@@ -2736,8 +2736,8 @@ void __init ioapic_init(void)
                   max(0U + num_present_cpus() * NR_DYNAMIC_VECTORS,
                       8 * nr_irqs_gsi) :
                   nr_irqs_gsi;
-    else if ( nr_irqs < 16 )
-        nr_irqs = 16;
+    else if ( nr_irqs < NR_ISA_IRQS )
+        nr_irqs = NR_ISA_IRQS;
     printk(XENLOG_INFO "IRQ limits: %u GSI, %u MSI/MSI-X\n",
            nr_irqs_gsi, nr_irqs - nr_irqs_gsi);
 }

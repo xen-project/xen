@@ -36,7 +36,7 @@
 bool __read_mostly opt_noirqbalance;
 boolean_param("noirqbalance", opt_noirqbalance);
 
-unsigned int __read_mostly nr_irqs_gsi = 16;
+unsigned int __read_mostly nr_irqs_gsi = NR_ISA_IRQS;
 unsigned int __read_mostly nr_irqs;
 integer_param("nr_irqs", nr_irqs);
 
@@ -1525,7 +1525,7 @@ void desc_guest_eoi(struct irq_desc *desc, struct pirq *pirq)
 int pirq_guest_unmask(struct domain *d)
 {
     unsigned int pirq = 0, n, i;
-    struct pirq *pirqs[16];
+    struct pirq *pirqs[NR_ISA_IRQS];
 
     do {
         n = radix_tree_gang_lookup(&d->pirq_tree, (void **)pirqs, pirq,
@@ -2113,7 +2113,7 @@ int get_free_pirq(struct domain *d, int type)
 
     if ( type == MAP_PIRQ_TYPE_GSI )
     {
-        for ( i = 16; i < nr_irqs_gsi; i++ )
+        for ( i = NR_ISA_IRQS; i < nr_irqs_gsi; i++ )
             if ( is_free_pirq(d, pirq_info(d, i)) )
             {
                 pirq_get_info(d, i);

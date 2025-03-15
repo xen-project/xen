@@ -209,7 +209,7 @@ int hvm_isa_irq_assert(struct domain *d, unsigned int isa_irq,
     unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
     int vector = -1;
 
-    ASSERT(isa_irq <= 15);
+    ASSERT(isa_irq < NR_ISA_IRQS);
 
     spin_lock(&d->arch.hvm.irq_lock);
 
@@ -231,7 +231,7 @@ void hvm_isa_irq_deassert(
     struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     unsigned int gsi = hvm_isa_irq_to_gsi(isa_irq);
 
-    ASSERT(isa_irq <= 15);
+    ASSERT(isa_irq < NR_ISA_IRQS);
 
     spin_lock(&d->arch.hvm.irq_lock);
 
@@ -266,12 +266,12 @@ static void hvm_set_callback_irq_level(struct vcpu *v)
         if ( asserted && (hvm_irq->gsi_assert_count[gsi]++ == 0) )
         {
             vioapic_irq_positive_edge(d, gsi);
-            if ( gsi <= 15 )
+            if ( gsi < NR_ISA_IRQS )
                 vpic_irq_positive_edge(d, gsi);
         }
         else if ( !asserted && (--hvm_irq->gsi_assert_count[gsi] == 0) )
         {
-            if ( gsi <= 15 )
+            if ( gsi < NR_ISA_IRQS )
                 vpic_irq_negative_edge(d, gsi);
         }
         break;
@@ -328,7 +328,7 @@ int hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
     u8 old_isa_irq;
     int i;
 
-    if ( (link > 3) || (isa_irq > 15) )
+    if ( (link > 3) || (isa_irq >= NR_ISA_IRQS) )
         return -EINVAL;
 
     spin_lock(&d->arch.hvm.irq_lock);
@@ -440,7 +440,8 @@ void hvm_set_callback_via(struct domain *d, uint64_t via)
         {
         case HVMIRQ_callback_gsi:
             gsi = hvm_irq->callback_via.gsi;
-            if ( (--hvm_irq->gsi_assert_count[gsi] == 0) && (gsi <= 15) )
+            if ( (--hvm_irq->gsi_assert_count[gsi] == 0) &&
+                 (gsi < NR_ISA_IRQS) )
                 vpic_irq_negative_edge(d, gsi);
             break;
         case HVMIRQ_callback_pci_intx:
@@ -464,7 +465,7 @@ void hvm_set_callback_via(struct domain *d, uint64_t via)
                   (hvm_irq->gsi_assert_count[gsi]++ == 0) )
         {
             vioapic_irq_positive_edge(d, gsi);
-            if ( gsi <= 15 )
+            if ( gsi < NR_ISA_IRQS )
                 vpic_irq_positive_edge(d, gsi);
         }
         break;
@@ -764,7 +765,7 @@ static int cf_check irq_check_link(const struct domain *d,
             return -EINVAL;
 
     for ( link = 0; link < ARRAY_SIZE(pci_link->route); link++ )
-        if ( pci_link->route[link] > 15 )
+        if ( pci_link->route[link] >= NR_ISA_IRQS )
         {
             printk(XENLOG_G_ERR
                    "HVM restore: PCI-ISA link %u out of range (%u)\n",

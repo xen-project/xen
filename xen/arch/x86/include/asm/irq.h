@@ -108,7 +108,7 @@ extern bool opt_noirqbalance;
 
 extern int opt_irq_vector_map;
 
-#define platform_legacy_irq(irq)	((irq) < 16)
+#define platform_legacy_irq(irq)	((irq) < NR_ISA_IRQS)
 
 void cf_check event_check_interrupt(void);
 void cf_check invalidate_interrupt(void);

@@ -523,7 +523,7 @@ void vpic_irq_positive_edge(struct domain *d, int irq)
     uint8_t mask = 1 << (irq & 7);
 
     ASSERT(has_vpic(d));
-    ASSERT(irq <= 15);
+    ASSERT(irq < NR_ISA_IRQS);
     ASSERT(vpic_is_locked(vpic));
 
     TRACE_TIME(TRC_HVM_EMUL_PIC_POSEDGE, irq);
@@ -541,7 +541,7 @@ void vpic_irq_negative_edge(struct domain *d, int irq)
     uint8_t mask = 1 << (irq & 7);
 
     ASSERT(has_vpic(d));
-    ASSERT(irq <= 15);
+    ASSERT(irq < NR_ISA_IRQS);
     ASSERT(vpic_is_locked(vpic));
 
     TRACE_TIME(TRC_HVM_EMUL_PIC_NEGEDGE, irq);

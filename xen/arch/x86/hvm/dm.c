@@ -90,7 +90,7 @@ static int set_pci_intx_level(struct domain *d, uint16_t domain,
 static int set_isa_irq_level(struct domain *d, uint8_t isa_irq,
                              uint8_t level)
 {
-    if ( isa_irq > 15 )
+    if ( isa_irq >= NR_ISA_IRQS )
         return -EINVAL;
 
     switch ( level )
