@@ -1,13 +1,9 @@
 # https://cirrus-ci.org/guide/tips-and-tricks/#sharing-configuration-between-tasks
-freebsd_13: &FREEBSD_13
-  freebsd_instance:
-    image_family: freebsd-13-5
-freebsd_14: &FREEBSD_14
-  freebsd_instance:
-    image_family: freebsd-14-2
-freebsd_15: &FREEBSD_15
-  freebsd_instance:
-    image_family: freebsd-15-0-snap
+freebsd_versions: &FREEBSD_VERSIONS
+  env:
+    FREEBSD_LEGACY:     freebsd-13-5
+    FREEBSD_PRODUCTION: freebsd-14-2
+    FREEBSD_CURRENT:    freebsd-15-0-snap
 
 freebsd_template: &FREEBSD_ENV
   environment:
@@ -24,7 +20,24 @@ freebsd_configure_artifacts: &FREEBSD_CONFIGURE_ARTIFACTS
       path: xen-config
       type: text/plain
 
-freebsd_full_build_template: &FREEBSD_FULL_BUILD_TEMPLATE
+task:
+  name: 'FreeBSD: full build'
+
+  # It's not possible to use the matrix keyword in YAML aliases, as they
+  # keyword usage is restricted to task, docker_builder or pipe.  Attempting to
+  # use a YAML alias with the duplicated keys doesn't work either. Use an env
+  # variable so the version can also be appended to the task alias.
+  << : *FREEBSD_VERSIONS
+  env:
+    matrix:
+      FREEBSD_VERSION: $FREEBSD_LEGACY
+      FREEBSD_VERSION: $FREEBSD_PRODUCTION
+      FREEBSD_VERSION: $FREEBSD_CURRENT
+
+  alias: freebsd_full_$FREEBSD_VERSION
+  freebsd_instance:
+    image_family: $FREEBSD_VERSION
+
   << : *FREEBSD_ENV
 
   install_script: pkg install -y seabios gmake ninja bash
@@ -42,7 +55,20 @@ freebsd_full_build_template: &FREEBSD_FULL_BUILD_TEMPLATE
   build_script:
     - gmake -j`sysctl -n hw.ncpu` clang=y
 
-freebsd_randconfig_template: &FREEBSD_RANDCONFIG_TEMPLATE
+task:
+  name: 'FreeBSD: randconfig build'
+
+  # It's not possible to use the matrix keyword in YAML aliases, as they
+  # keyword usage is restricted to task, docker_builder or pipe.  Attempting to
+  # use a YAML alias with the duplicated `image_family` keys doesn't work
+  # either. Abstract the version numbers at least.
+  << : *FREEBSD_VERSIONS
+  freebsd_instance:
+    matrix:
+      image_family: $FREEBSD_LEGACY
+      image_family: $FREEBSD_PRODUCTION
+      image_family: $FREEBSD_CURRENT
+
   << : *FREEBSD_ENV
 
   install_script: pkg install -y gmake python3 bison
@@ -56,33 +82,3 @@ freebsd_randconfig_template: &FREEBSD_RANDCONFIG_TEMPLATE
 
   build_script:
     - gmake -j`sysctl -n hw.ncpu` build-xen clang=y
-
-task:
-  name: 'FreeBSD 13: full build'
-  << : *FREEBSD_13
-  << : *FREEBSD_FULL_BUILD_TEMPLATE
-
-task:
-  name: 'FreeBSD 14: full build'
-  << : *FREEBSD_14
-  << : *FREEBSD_FULL_BUILD_TEMPLATE
-
-task:
-  name: 'FreeBSD 15: full build'
-  << : *FREEBSD_15
-  << : *FREEBSD_FULL_BUILD_TEMPLATE
-
-task:
-  name: 'FreeBSD 13: randconfig'
-  << : *FREEBSD_13
-  << : *FREEBSD_RANDCONFIG_TEMPLATE
-
-task:
-  name: 'FreeBSD 14: randconfig'
-  << : *FREEBSD_14
-  << : *FREEBSD_RANDCONFIG_TEMPLATE
-
-task:
-  name: 'FreeBSD 15: randconfig'
-  << : *FREEBSD_15
-  << : *FREEBSD_RANDCONFIG_TEMPLATE
