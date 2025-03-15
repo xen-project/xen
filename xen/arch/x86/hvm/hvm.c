@@ -633,8 +633,8 @@ int hvm_domain_initialise(struct domain *d,
     /* Set the number of GSIs */
     hvm_domain_irq(d)->nr_gsis = nr_gsis;
 
-    BUILD_BUG_ON(NR_HVM_DOMU_IRQS < NR_ISAIRQS);
-    ASSERT(hvm_domain_irq(d)->nr_gsis >= NR_ISAIRQS);
+    BUILD_BUG_ON(NR_HVM_DOMU_IRQS < NR_ISA_IRQS);
+    ASSERT(hvm_domain_irq(d)->nr_gsis >= NR_ISA_IRQS);
 
     /* need link to containing domain */
     d->arch.hvm.pl_time->domain = d;

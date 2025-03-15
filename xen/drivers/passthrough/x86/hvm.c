@@ -958,7 +958,7 @@ static void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
 {
     const struct hvm_irq_dpci *dpci = NULL;
 
-    ASSERT(isairq < NR_ISAIRQS);
+    ASSERT(isairq < NR_ISA_IRQS);
 
     if ( !is_iommu_enabled(d) )
         return;
@@ -991,7 +991,7 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi)
         goto unlock;
     }
 
-    if ( guest_gsi < NR_ISAIRQS )
+    if ( guest_gsi < NR_ISA_IRQS )
     {
         hvm_dpci_isairq_eoi(d, guest_gsi);
         return;

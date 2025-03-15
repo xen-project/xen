@@ -198,7 +198,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
             /* if this is a level irq and count > 0, send another
              * notification */ 
-            if ( gsi >= NR_ISAIRQS /* ISA irqs are edge triggered */
+            if ( gsi >= NR_ISA_IRQS /* ISA irqs are edge triggered */
                     && hvm_irq->gsi_assert_count[gsi] )
                 send_guest_pirq(currd, pirq);
         }

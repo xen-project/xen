@@ -134,7 +134,7 @@ struct hvm_girq_dpci_mapping {
     uint8_t machine_gsi;
 };
 
-#define NR_ISAIRQS  16
+#define NR_ISA_IRQS 16
 #define NR_LINK     4
 #define NR_HVM_DOMU_IRQS ARRAY_SIZE(((struct hvm_hw_vioapic *)NULL)->redirtbl)
 
@@ -143,7 +143,7 @@ struct hvm_irq_dpci {
     /* Guest IRQ to guest device/intx mapping. */
     struct list_head girq[NR_HVM_DOMU_IRQS];
     /* Record of mapped ISA IRQs */
-    DECLARE_BITMAP(isairq_map, NR_ISAIRQS);
+    DECLARE_BITMAP(isairq_map, NR_ISA_IRQS);
     /* Record of mapped Links */
     uint8_t link_cnt[NR_LINK];
 };
