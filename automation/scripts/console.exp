@@ -1,4 +1,4 @@
-#!/usr/bin/expect -f
+#!/usr/bin/env expect
 
 if {[info exists env(TEST_TIMEOUT_OVERRIDE)]} {
     set timeout $env(TEST_TIMEOUT_OVERRIDE)
