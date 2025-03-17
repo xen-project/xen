@@ -189,6 +189,15 @@ static int write_msi_msg(struct msi_desc *entry, struct msi_msg *msg,
 {
     entry->msg = *msg;
 
+    if ( unlikely(system_state != SYS_STATE_active) )
+        /*
+         * Always propagate writes when not in the 'active' state.  The
+         * optimization to avoid the MSI address and data registers write is
+         * only relevant for runtime state, and drivers on resume (at least)
+         * rely on set_msi_affinity() to update the hardware state.
+         */
+        force = true;
+
     if ( iommu_intremap != iommu_intremap_off )
     {
         int rc;
