@@ -279,8 +279,6 @@ static inline void write_efer(uint64_t val)
     wrmsrl(MSR_EFER, val);
 }
 
-extern unsigned int ler_msr;
-
 DECLARE_PER_CPU(uint32_t, tsc_aux);
 
 /* Lazy update of MSR_TSC_AUX */

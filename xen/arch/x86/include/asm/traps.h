@@ -7,7 +7,10 @@
 #ifndef ASM_TRAP_H
 #define ASM_TRAP_H
 
+void traps_init(void);
 void percpu_traps_init(void);
+
+extern unsigned int ler_msr;
 
 const char *vector_name(unsigned int vec);
 

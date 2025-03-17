@@ -107,12 +107,6 @@ DEFINE_PER_CPU_PAGE_ALIGNED(struct tss_page, tss_page);
 static int debug_stack_lines = 20;
 integer_param("debug_stack_lines", debug_stack_lines);
 
-static bool __initdata opt_ler;
-boolean_param("ler", opt_ler);
-
-/* LastExceptionFromIP on this hardware.  Zero if LER is not in use. */
-unsigned int __ro_after_init ler_msr;
-
 const unsigned int nmi_cpu;
 
 #define stack_words_per_line 4
@@ -1864,8 +1858,6 @@ void asmlinkage do_entry_CP(struct cpu_user_regs *regs)
     panic("CONTROL-FLOW PROTECTION FAULT: #CP[%04x] %s\n", ec, err);
 }
 
-void nocall entry_PF(void);
-
 void __init init_idt_traps(void)
 {
     /* Specify dedicated interrupt stacks for NMI, #DF, and #MC. */
@@ -1877,59 +1869,6 @@ void __init init_idt_traps(void)
     this_cpu(gdt) = boot_gdt;
     if ( IS_ENABLED(CONFIG_PV32) )
         this_cpu(compat_gdt) = boot_compat_gdt;
-}
-
-static void __init init_ler(void)
-{
-    unsigned int msr = 0;
-
-    if ( !opt_ler )
-        return;
-
-    /*
-     * Intel Pentium 4 is the only known CPU to not use the architectural MSR
-     * indicies.
-     */
-    switch ( boot_cpu_data.x86_vendor )
-    {
-    case X86_VENDOR_INTEL:
-        if ( boot_cpu_data.x86 == 0xf )
-        {
-            msr = MSR_P4_LER_FROM_LIP;
-            break;
-        }
-        fallthrough;
-    case X86_VENDOR_AMD:
-    case X86_VENDOR_HYGON:
-        msr = MSR_IA32_LASTINTFROMIP;
-        break;
-    }
-
-    if ( msr == 0 )
-    {
-        printk(XENLOG_WARNING "LER disabled: failed to identify MSRs\n");
-        return;
-    }
-
-    ler_msr = msr;
-    setup_force_cpu_cap(X86_FEATURE_XEN_LBR);
-}
-
-void __init trap_init(void)
-{
-    /* Replace early pagefault with real pagefault handler. */
-    _update_gate_addr_lower(&bsp_idt[X86_EXC_PF], entry_PF);
-
-    init_ler();
-
-    /* Cache {,compat_}gdt_l1e now that physically relocation is done. */
-    this_cpu(gdt_l1e) =
-        l1e_from_pfn(virt_to_mfn(boot_gdt), __PAGE_HYPERVISOR_RW);
-    if ( IS_ENABLED(CONFIG_PV32) )
-        this_cpu(compat_gdt_l1e) =
-            l1e_from_pfn(virt_to_mfn(boot_compat_gdt), __PAGE_HYPERVISOR_RW);
-
-    percpu_traps_init();
 }
 
 void asm_domain_crash_synchronous(unsigned long addr)

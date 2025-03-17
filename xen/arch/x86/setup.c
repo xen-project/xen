@@ -2023,7 +2023,7 @@ void asmlinkage __init noreturn __start_xen(void)
                                            &this_cpu(stubs).mfn);
     BUG_ON(!this_cpu(stubs.addr));
 
-    trap_init();
+    traps_init(); /* Needs stubs allocated. */
 
     cpu_init();
 
