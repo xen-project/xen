@@ -2288,6 +2288,10 @@ static int cf_check hvmemul_read_cr(
         val = curr->arch.hvm.guest_cr[reg];
         break;
 
+    case 8:
+        val = (vlapic_get_reg(vcpu_vlapic(curr), APIC_TASKPRI) & 0xf0) >> 4;
+        break;
+
     default:
         return X86EMUL_UNHANDLEABLE;
     }
@@ -2331,6 +2335,17 @@ static int cf_check hvmemul_write_cr(
 
     case 4:
         rc = hvm_set_cr4(val, true);
+        break;
+
+    case 8:
+        if ( val & ~X86_CR8_VALID_MASK )
+        {
+            rc = X86EMUL_EXCEPTION;
+            break;
+        }
+
+        vlapic_set_reg(vcpu_vlapic(curr), APIC_TASKPRI, val << 4);
+        rc = X86EMUL_OKAY;
         break;
 
     default:
