@@ -621,30 +621,24 @@ static int destroy_domain(void *_domain)
 	return 0;
 }
 
-static int check_domain(const void *k, void *v, void *arg)
+static int do_check_domain(struct domain *domain, bool *notify,
+			   unsigned int state, uint64_t unique_id)
 {
-	unsigned int state;
 	struct connection *conn;
-	bool dom_valid;
-	struct domain *domain = v;
-	bool *notify = arg;
-	uint64_t unique_id;
 
-	dom_valid = !xenmanage_get_domain_info(xm_handle, domain->domid,
-					       &state, &unique_id);
-	if (dom_valid) {
+	if (unique_id) {
 		if (!domain->unique_id)
 			domain->unique_id = unique_id;
 		else if (domain->unique_id != unique_id)
-			dom_valid = false;
+			unique_id = 0;
 	}
 
 	if (!domain->introduced) {
-		if (!dom_valid)
+		if (!unique_id)
 			talloc_free(domain);
 		return 0;
 	}
-	if (dom_valid) {
+	if (unique_id) {
 		if ((state & XENMANAGE_GETDOMSTATE_STATE_SHUTDOWN)
 		    && !domain->shutdown) {
 			domain->shutdown = true;
@@ -667,12 +661,51 @@ static int check_domain(const void *k, void *v, void *arg)
 	return 0;
 }
 
+static int check_domain(const void *k, void *v, void *arg)
+{
+	struct domain *domain = v;
+	unsigned int state;
+	uint64_t unique_id;
+
+	if (xenmanage_get_domain_info(xm_handle, domain->domid, &state,
+				      &unique_id)) {
+		unique_id = 0;
+		state = 0;
+	}
+
+	return do_check_domain(domain, arg, state, unique_id);
+}
+
 void check_domains(void)
 {
 	bool notify = false;
 
 	while (hashtable_iterate(domhash, check_domain, &notify))
 		;
+
+	if (notify)
+		fire_special_watches("@releaseDomain");
+}
+
+static struct domain *find_domain_struct(unsigned int domid)
+{
+	return hashtable_search(domhash, &domid);
+}
+
+static void do_check_domains(void)
+{
+	unsigned int domid;
+	unsigned int state;
+	uint64_t unique_id;
+	struct domain *domain;
+	bool notify = false;
+
+	while (!xenmanage_poll_changed_domain(xm_handle, &domid, &state,
+					      &unique_id)) {
+		domain = find_domain_struct(domid);
+		if (domain)
+			do_check_domain(domain, &notify, state, unique_id);
+	}
 
 	if (notify)
 		fire_special_watches("@releaseDomain");
@@ -687,7 +720,7 @@ void handle_event(void)
 		barf_perror("Failed to read from event fd");
 
 	if (port == virq_port)
-		check_domains();
+		do_check_domains();
 
 	if (xenevtchn_unmask(xce_handle, port) == -1)
 		barf_perror("Failed to write to event fd");
@@ -696,11 +729,6 @@ void handle_event(void)
 static char *talloc_domain_path(const void *context, unsigned int domid)
 {
 	return talloc_asprintf(context, "/local/domain/%u", domid);
-}
-
-static struct domain *find_domain_struct(unsigned int domid)
-{
-	return hashtable_search(domhash, &domid);
 }
 
 int domain_get_quota(const void *ctx, struct connection *conn,
