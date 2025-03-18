@@ -108,7 +108,7 @@ const char *symbols_lookup(unsigned long addr,
                            unsigned long *offset,
                            char *namebuf)
 {
-    unsigned long i, low, high, mid;
+    unsigned int i, low, high, mid;
     unsigned long symbol_end = 0;
     const struct virtual_region *region;
 
@@ -179,7 +179,7 @@ int xensyms_read(uint32_t *symnum, char *type,
      * from previous read. This can help us avoid the extra call to
      * get_symbol_offset().
      */
-    static uint64_t next_symbol, next_offset;
+    static unsigned int next_symbol, next_offset;
     static DEFINE_SPINLOCK(symbols_mutex);
 
     if ( *symnum > symbols_num_syms )
