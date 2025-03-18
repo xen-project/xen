@@ -512,13 +512,14 @@ static inline unsigned long __backpointer(const struct page_info *sp)
 static inline int
 sh_mfn_is_a_page_table(mfn_t gmfn)
 {
-    struct page_info *page = mfn_to_page(gmfn);
+    const struct page_info *page;
     struct domain *owner;
     unsigned long type_info;
 
     if ( !mfn_valid(gmfn) )
         return 0;
 
+    page = mfn_to_page(gmfn);
     owner = page_get_owner(page);
     if ( owner && shadow_mode_refcounts(owner)
          && (page->count_info & PGC_shadowed_pt) )
