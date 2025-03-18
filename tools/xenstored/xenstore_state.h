@@ -74,7 +74,8 @@ struct xs_state_connection {
     uint16_t conn_type;
 #define XS_STATE_CONN_TYPE_RING   0
 #define XS_STATE_CONN_TYPE_SOCKET 1
-    uint16_t pad;
+    uint16_t fields;
+#define XS_STATE_CONN_FIELDS_UNIQ_ID 0x0001
     union {
         struct {
             uint16_t domid;  /* Domain-Id. */

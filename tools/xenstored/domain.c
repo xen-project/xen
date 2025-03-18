@@ -110,6 +110,7 @@ struct domain
 {
 	/* The id of this domain */
 	unsigned int domid;
+	uint64_t unique_id;
 
 	/* Event channel port */
 	evtchn_port_t port;
@@ -624,18 +625,26 @@ static int check_domain(const void *k, void *v, void *arg)
 {
 	unsigned int state;
 	struct connection *conn;
-	int dom_invalid;
+	bool dom_valid;
 	struct domain *domain = v;
 	bool *notify = arg;
+	uint64_t unique_id;
 
-	dom_invalid = xenmanage_get_domain_info(xm_handle, domain->domid,
-						&state, NULL);
+	dom_valid = !xenmanage_get_domain_info(xm_handle, domain->domid,
+					       &state, &unique_id);
+	if (dom_valid) {
+		if (!domain->unique_id)
+			domain->unique_id = unique_id;
+		else if (domain->unique_id != unique_id)
+			dom_valid = false;
+	}
+
 	if (!domain->introduced) {
-		if (dom_invalid)
+		if (!dom_valid)
 			talloc_free(domain);
 		return 0;
 	}
-	if (!dom_invalid) {
+	if (dom_valid) {
 		if ((state & XENMANAGE_GETDOMSTATE_STATE_SHUTDOWN)
 		    && !domain->shutdown) {
 			domain->shutdown = true;
@@ -747,7 +756,8 @@ int domain_max_global_acc(const void *ctx, struct connection *conn)
 	return 0;
 }
 
-static struct domain *alloc_domain(const void *context, unsigned int domid)
+static struct domain *alloc_domain(const void *context, unsigned int domid,
+				   uint64_t unique_id)
 {
 	struct domain *domain;
 
@@ -758,6 +768,7 @@ static struct domain *alloc_domain(const void *context, unsigned int domid)
 	}
 
 	domain->domid = domid;
+	domain->unique_id = unique_id;
 	domain->generation = generation;
 	domain->introduced = false;
 
@@ -777,16 +788,27 @@ static struct domain *find_or_alloc_domain(const void *ctx, unsigned int domid)
 	struct domain *domain;
 
 	domain = find_domain_struct(domid);
-	return domain ? : alloc_domain(ctx, domid);
+	/* If domain not already known, use unique_id = 0 meaning "unknown". */
+	return domain ? : alloc_domain(ctx, domid, 0);
 }
 
 static struct domain *find_or_alloc_existing_domain(unsigned int domid)
 {
 	struct domain *domain;
+	uint64_t unique_id = 0;
+	bool dom_valid = true;
 
 	domain = find_domain_struct(domid);
-	if (!domain && !xenmanage_get_domain_info(xm_handle, domid, NULL, NULL))
-		domain = alloc_domain(NULL, domid);
+	if (!domain || !domain->unique_id)
+		dom_valid = !xenmanage_get_domain_info(xm_handle, domid,
+						       NULL, &unique_id);
+
+	if (dom_valid) {
+		if (!domain)
+			domain = alloc_domain(NULL, domid, unique_id);
+		else if (unique_id)
+			domain->unique_id = unique_id;
+	}
 
 	return domain;
 }
@@ -1321,15 +1343,16 @@ int domain_alloc_permrefs(struct node_perms *perms)
 {
 	unsigned int i, domid;
 	struct domain *d;
+	uint64_t unique_id;
 
 	for (i = 0; i < perms->num; i++) {
 		domid = perms->p[i].id;
 		d = find_domain_struct(domid);
 		if (!d) {
 			if (xenmanage_get_domain_info(xm_handle, domid,
-						      NULL, NULL))
+						      NULL, &unique_id))
 				perms->p[i].perms |= XS_PERM_IGNORE;
-			else if (!alloc_domain(NULL, domid))
+			else if (!alloc_domain(NULL, domid, unique_id))
 				return ENOMEM;
 		}
 	}
@@ -1697,12 +1720,14 @@ const char *dump_state_connections(FILE *fp)
 	struct xs_state_record_header head;
 	struct connection *c;
 
+	BUILD_BUG_ON(sizeof(c->domain->unique_id) != sizeof(uint64_t));
+
 	list_for_each_entry(c, &connections, list) {
 		head.type = XS_STATE_TYPE_CONN;
 		head.length = sizeof(sc);
 
 		sc.conn_id = conn_id++;
-		sc.pad = 0;
+		sc.fields = 0;
 		memset(&sc.spec, 0, sizeof(sc.spec));
 		if (c->domain) {
 			sc.conn_type = XS_STATE_CONN_TYPE_RING;
@@ -1720,6 +1745,10 @@ const char *dump_state_connections(FILE *fp)
 			return ret;
 		head.length += sc.data_in_len + sc.data_out_len;
 		head.length = ROUNDUP(head.length, 3);
+		if (c->domain) {
+			sc.fields |= XS_STATE_CONN_FIELDS_UNIQ_ID;
+			head.length += sizeof(uint64_t);
+		}
 		if (fwrite(&head, sizeof(head), 1, fp) != 1)
 			return "Dump connection state error";
 		if (fwrite(&sc, offsetof(struct xs_state_connection, data),
@@ -1731,6 +1760,9 @@ const char *dump_state_connections(FILE *fp)
 		ret = dump_state_align(fp);
 		if (ret)
 			return ret;
+		if (c->domain &&
+		    fwrite(&c->domain->unique_id, sizeof(uint64_t), 1, fp) != 1)
+			return "Dump connection state error";
 
 		ret = dump_state_watches(fp, c, sc.conn_id);
 		if (ret)
@@ -1748,6 +1780,7 @@ void read_state_connection(const void *ctx, const void *state)
 
 	if (sc->conn_type == XS_STATE_CONN_TYPE_SOCKET) {
 		conn = add_socket_connection(sc->spec.socket_fd);
+		domain = NULL;
 	} else {
 		domain = introduce_domain(ctx, sc->spec.ring.domid,
 					  sc->spec.ring.evtchn, true);
@@ -1778,6 +1811,14 @@ void read_state_connection(const void *ctx, const void *state)
 	conn->conn_id = sc->conn_id;
 
 	read_state_buffered_data(ctx, conn, sc);
+
+	/* Validity of unique_id will be tested by check_domains() later. */
+	if ((sc->fields & XS_STATE_CONN_FIELDS_UNIQ_ID) && domain) {
+		unsigned long off;
+
+		off = sizeof(*sc) + sc->data_in_len + sc->data_out_len;
+		domain->unique_id = *(uint64_t *)(state + ROUNDUP(off, 3));
+	}
 }
 
 struct domain_acc {
