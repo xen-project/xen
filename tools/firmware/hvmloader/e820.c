@@ -210,6 +210,10 @@ int build_e820_table(struct e820entry *e820,
      * space reuse by an ACPI unaware / buggy bootloader, option ROM, etc.
      * before an ACPI OS takes control. This is possible due to the fact that
      * ACPI NVS memory is explicitly described as non-reclaimable in ACPI spec.
+     *
+     * Furthermore, Xen relies on accessing ACPI tables from within the AML
+     * code exposed to guests. So Xen's ACPI tables are not, in general,
+     * reclaimable.
      */
 
     if ( acpi_enabled )

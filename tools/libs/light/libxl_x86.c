@@ -737,12 +737,22 @@ static int domain_construct_memmap(libxl__gc *gc,
         nr++;
     }
 
+    /*
+     * Mark populated reserved memory that contains ACPI tables as ACPI NVS.
+     * That should help the guest to treat it correctly later: e.g. pass to
+     * the next kernel on kexec.
+     *
+     * Furthermore, Xen relies on accessing ACPI tables from within the AML
+     * code exposed to guests. So Xen's ACPI tables are not, in general,
+     * reclaimable.
+     */
+
     for (i = 0; i < MAX_ACPI_MODULES; i++) {
         if (dom->acpi_modules[i].length) {
             e820[nr].addr = dom->acpi_modules[i].guest_addr_out & ~(page_size - 1);
             e820[nr].size = dom->acpi_modules[i].length +
                 (dom->acpi_modules[i].guest_addr_out & (page_size - 1));
-            e820[nr].type = E820_ACPI;
+            e820[nr].type = E820_NVS;
             nr++;
         }
     }
