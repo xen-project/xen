@@ -532,7 +532,7 @@ int __setup_msi_irq(struct irq_desc *desc, struct msi_desc *msidesc,
     desc->msi_desc = msidesc;
     desc->handler = handler;
     msi_compose_msg(desc->arch.vector, desc->arch.cpu_mask, &msg);
-    ret = write_msi_msg(msidesc, &msg, false);
+    ret = write_msi_msg(msidesc, &msg, true);
     if ( unlikely(ret) )
     {
         desc->handler = &no_irq_type;
