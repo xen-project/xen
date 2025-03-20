@@ -1728,7 +1728,7 @@ void asmlinkage __init noreturn __start_xen(void)
     {
         unsigned long s = bi->mods[i].start, l = bi->mods[i].size;
 
-        set_pdx_range(paddr_to_pfn(s), paddr_to_pfn(s + l) + 1);
+        set_pdx_range(PFN_DOWN(s), PFN_UP(s + l));
         map_pages_to_xen((unsigned long)maddr_to_virt(s), maddr_to_mfn(s),
                          PFN_UP(l), PAGE_HYPERVISOR);
     }
