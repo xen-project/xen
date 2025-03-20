@@ -123,6 +123,16 @@ static void test_gnttab(uint32_t domid, unsigned int nr_frames,
         fail("    Fail: Managed to map gnttab v2 status frames in v1 mode\n");
         xenforeignmemory_unmap_resource(fh, res);
     }
+
+    /*
+     * If this check starts failing, you've found the right place to test your
+     * addition to the Acquire Resource infrastructure.
+     */
+    rc = xenforeignmemory_resource_size(fh, domid, 3, 0, &size);
+
+    /* Check that Xen rejected the resource type. */
+    if ( !rc )
+        fail("    Fail: Expected error on an invalid resource type, got success\n");
 }
 
 static void test_domain_configurations(void)
