@@ -545,16 +545,6 @@ archlinux-gcc-debug:
     CONTAINER: archlinux:current
   allow_failure: true
 
-centos-7-gcc:
-  extends: .gcc-x86-64-build
-  variables:
-    CONTAINER: centos:7
-
-centos-7-gcc-debug:
-  extends: .gcc-x86-64-build-debug
-  variables:
-    CONTAINER: centos:7
-
 debian-12-x86_64-gcc-ibt:
   extends: .gcc-x86-64-build
   variables:
@@ -607,16 +597,6 @@ fedora-41-x86_64-gcc-debug:
   variables:
     CONTAINER: fedora:41-x86_64
 
-ubuntu-16.04-x86_64-clang:
-  extends: .clang-x86-64-build
-  variables:
-    CONTAINER: ubuntu:16.04-x86_64
-
-ubuntu-16.04-x86_64-clang-debug:
-  extends: .clang-x86-64-build-debug
-  variables:
-    CONTAINER: ubuntu:16.04-x86_64
-
 ubuntu-16.04-x86_64-gcc:
   extends: .gcc-x86-64-build
   variables:
@@ -636,6 +616,16 @@ ubuntu-20.04-x86_64-gcc:
   extends: .gcc-x86-64-build
   variables:
     CONTAINER: ubuntu:20.04-x86_64
+
+ubuntu-22.04-x86_64-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: ubuntu:22.04-x86_64
+
+ubuntu-22.04-x86_64-clang-debug:
+  extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:22.04-x86_64
 
 ubuntu-22.04-x86_64-gcc:
   extends: .gcc-x86-64-build
