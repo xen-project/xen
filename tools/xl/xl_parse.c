@@ -2423,8 +2423,9 @@ void parse_config_data(const char *config_source,
             char *path = NULL;
             int len;
 
-            chn = ARRAY_EXTEND_INIT(d_config->channels, d_config->num_channels,
-                                   libxl_device_channel_init);
+            chn = ARRAY_EXTEND_INIT_NODEVID(d_config->channels,
+                                            d_config->num_channels,
+                                            libxl_device_channel_init);
 
             split_string_into_string_list(buf, ",", &pairs);
             len = libxl_string_list_length(&pairs);
