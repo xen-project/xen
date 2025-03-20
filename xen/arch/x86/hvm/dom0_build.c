@@ -1313,6 +1313,13 @@ int __init dom0_construct_pvh(struct domain *d, const module_t *image,
     if ( is_hardware_domain(d) )
     {
         /*
+         * MMCFG initialization must be performed before setting domain
+         * permissions, as the MCFG areas must not be part of the domain IOMEM
+         * accessible regions.
+         */
+        pvh_setup_mmcfg(d);
+
+        /*
          * Setup permissions early so that calls to add MMIO regions to the
          * p2m as part of vPCI setup don't fail due to permission checks.
          */
@@ -1323,13 +1330,6 @@ int __init dom0_construct_pvh(struct domain *d, const module_t *image,
             return rc;
         }
     }
-
-    /*
-     * NB: MMCFG initialization needs to be performed before iommu
-     * initialization so the iommu code can fetch the MMCFG regions used by the
-     * domain.
-     */
-    pvh_setup_mmcfg(d);
 
     /*
      * Craft dom0 physical memory map and set the paging allocation. This must

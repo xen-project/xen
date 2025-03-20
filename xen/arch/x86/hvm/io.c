@@ -363,14 +363,14 @@ static const struct hvm_mmcfg *vpci_mmcfg_find(const struct domain *d,
     return NULL;
 }
 
-int __hwdom_init vpci_subtract_mmcfg(const struct domain *d, struct rangeset *r)
+int __hwdom_init vpci_mmcfg_deny_access(struct domain *d)
 {
     const struct hvm_mmcfg *mmcfg;
 
     list_for_each_entry ( mmcfg, &d->arch.hvm.mmcfg_regions, next )
     {
-        int rc = rangeset_remove_range(r, PFN_DOWN(mmcfg->addr),
-                                       PFN_DOWN(mmcfg->addr + mmcfg->size - 1));
+        int rc = iomem_deny_access(d, PFN_DOWN(mmcfg->addr),
+                                   PFN_DOWN(mmcfg->addr + mmcfg->size - 1));
 
         if ( rc )
             return rc;
