@@ -558,7 +558,9 @@ int __init dom0_setup_permissions(struct domain *d)
     for ( i = 0; i < nr_ioapics; i++ )
     {
         mfn = paddr_to_pfn(mp_ioapics[i].mpc_apicaddr);
-        if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
+        /* If emulating IO-APIC(s) make sure the base address is unmapped. */
+        if ( has_vioapic(d) ||
+             !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
             rc |= iomem_deny_access(d, mfn, mfn);
     }
     /* MSI range. */
@@ -598,6 +600,13 @@ int __init dom0_setup_permissions(struct domain *d)
         else if ( ro_hpet )
             rc |= rangeset_add_singleton(mmio_ro_ranges, mfn);
     }
+
+    if ( has_vpci(d) )
+        /*
+         * TODO: runtime added MMCFG regions are not checked to make sure they
+         * don't overlap with already mapped regions, thus preventing trapping.
+         */
+        rc |= vpci_mmcfg_deny_access(d);
 
     return rc;
 }
