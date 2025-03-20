@@ -463,10 +463,11 @@ a653sched_free_udata(const struct scheduler *ops, void *priv)
     if ( !is_idle_unit(av->unit) )
         list_del(&av->list);
 
-    xfree(av);
     update_schedule_units(ops);
 
     spin_unlock_irqrestore(&sched_priv->lock, flags);
+
+    xfree(av);
 }
 
 /**
