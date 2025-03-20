@@ -77,9 +77,14 @@ int xc_pcidev_get_gsi(xc_interface *xch, uint32_t sbdf)
     ret = ioctl(xencall_fd(xch->xcall),
                 IOCTL_PRIVCMD_PCIDEV_GET_GSI, &dev_gsi);
 
-    if (ret < 0) {
-        PERROR("Failed to get gsi from dev");
-    } else {
+    if ( ret < 0 )
+    {
+        if ( errno != ENOENT )
+            PERROR("Failed to get gsi for dev %04x:%02x:%02x.%u",
+                sbdf >> 16, (sbdf >> 8) & 0xff, sbdf >> 3 & 0x1f, sbdf & 0x7);
+    }
+    else
+    {
         ret = dev_gsi.gsi;
     }
 
