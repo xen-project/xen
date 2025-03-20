@@ -61,6 +61,8 @@ debugtrace_printk(const char *fmt, ...) {}
 #define _p(_x) ((void *)(unsigned long)(_x))
 extern void printk(const char *fmt, ...)
     __attribute__ ((format (printf, 1, 2), cold));
+void vprintk(const char *fmt, va_list args)
+    __attribute__ ((format (printf, 1, 0), cold));
 
 #define printk_once(fmt, args...)               \
 ({                                              \
