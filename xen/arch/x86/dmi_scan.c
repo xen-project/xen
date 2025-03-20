@@ -113,6 +113,7 @@ static const void *__init bt_ioremap(paddr_t addr, unsigned int len)
 {
     mfn_t mfn = _mfn(PFN_DOWN(addr));
     unsigned int offs = PAGE_OFFSET(addr);
+    void *va;
 
     if ( addr + len <= MB(1) )
         return __va(addr);
@@ -120,8 +121,10 @@ static const void *__init bt_ioremap(paddr_t addr, unsigned int len)
     if ( system_state < SYS_STATE_boot )
         return __acpi_map_table(addr, len);
 
-    return __vmap(&mfn, PFN_UP(offs + len), 1, 1, PAGE_HYPERVISOR_RO,
-                  VMAP_DEFAULT) + offs;
+    va = __vmap(&mfn, PFN_UP(offs + len), 1, 1, PAGE_HYPERVISOR_RO,
+                VMAP_DEFAULT);
+
+    return va ? va + offs : NULL;
 }
 
 static void __init bt_iounmap(const void *ptr, unsigned int len)

@@ -5994,7 +5994,9 @@ void __iomem *ioremap(paddr_t pa, size_t len)
         unsigned int offs = pa & (PAGE_SIZE - 1);
         unsigned int nr = PFN_UP(offs + len);
 
-        va = __vmap(&mfn, nr, 1, 1, PAGE_HYPERVISOR_UCMINUS, VMAP_DEFAULT) + offs;
+        va = __vmap(&mfn, nr, 1, 1, PAGE_HYPERVISOR_UCMINUS, VMAP_DEFAULT);
+        if ( va )
+            va += offs;
     }
 
     return (void __force __iomem *)va;
@@ -6011,7 +6013,7 @@ void __iomem *__init ioremap_wc(paddr_t pa, size_t len)
 
     va = __vmap(&mfn, nr, 1, 1, PAGE_HYPERVISOR_WC, VMAP_DEFAULT);
 
-    return (void __force __iomem *)(va + offs);
+    return (void __force __iomem *)(va ? va + offs : NULL);
 }
 
 int create_perdomain_mapping(struct domain *d, unsigned long va,
