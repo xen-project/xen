@@ -575,6 +575,7 @@ int libxl__remove_directory(libxl__gc *gc, const char *dirpath)
         if (errno == EINTR) continue;
         LOGE(ERROR, "failed to remove emptied directory %s", dirpath);
         rc = ERROR_FAIL;
+        break;
     }
 
  out:
