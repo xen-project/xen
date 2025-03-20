@@ -381,7 +381,15 @@ int pt_irq_create_bind(
 
         /* Use interrupt posting if it is supported. */
         if ( iommu_intpost )
-            hvm_pi_update_irte(vcpu, info, pirq_dpci->gmsi.gvec);
+        {
+            rc = hvm_pi_update_irte(vcpu, info, pirq_dpci->gmsi.gvec);
+
+            if ( rc )
+            {
+                pt_irq_destroy_bind(d, pt_irq_bind);
+                return rc;
+            }
+        }
 
         if ( pt_irq_bind->u.msi.gflags & XEN_DOMCTL_VMSI_X86_UNMASKED )
         {
