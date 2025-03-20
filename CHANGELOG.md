@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ## [4.21.0 UNRELEASED](https://xenbits.xenproject.org/gitweb/?p=xen.git;a=shortlog;h=staging) - TBD
 
 ### Changed
+ - The minimum toolchain requirements have increased for some architectures:
+   - For x86, GCC 5.1 and Binutils 2.25, or Clang/LLVM 11
+   - For ARM32 and ARM64, GCC 5.1 and Binutils 2.25
 
 ### Added
  - On x86:
