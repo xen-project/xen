@@ -4,6 +4,12 @@ Notable changes to Xen will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
+## [4.19.2](https://xenbits.xenproject.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.19.2)
+
+### Added
+ - On x86:
+   - Option to attempt to fixup p2m page-faults on PVH dom0.
+
 ## [4.19.1](https://xenbits.xenproject.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.19.1)
 
 ### Changed

@@ -147,6 +147,9 @@ static inline void hvmemul_write_cache(const struct vcpu *v, paddr_t gpa,
 void hvm_dump_emulation_state(const char *loglvl, const char *prefix,
                               struct hvm_emulate_ctxt *hvmemul_ctxt, int rc);
 
+/* For PVH dom0: signal whether to attempt fixup of p2m page-faults. */
+extern bool opt_dom0_pf_fixup;
+
 #endif /* __ASM_X86_HVM_EMULATE_H__ */
 
 /*

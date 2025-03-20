@@ -16,6 +16,7 @@
 #include <asm/dom0_build.h>
 #include <asm/guest.h>
 #include <asm/hpet.h>
+#include <asm/hvm/emulate.h>
 #include <asm/io_apic.h>
 #include <asm/p2m.h>
 #include <asm/setup.h>
@@ -286,6 +287,10 @@ int __init parse_arch_dom0_param(const char *s, const char *e)
         opt_dom0_cpuid_faulting = val;
     else if ( (val = parse_boolean("msr-relaxed", s, e)) >= 0 )
         opt_dom0_msr_relaxed = val;
+#ifdef CONFIG_HVM
+    else if ( (val = parse_boolean("pf-fixup", s, e)) >= 0 )
+        opt_dom0_pf_fixup = val;
+#endif
     else
         return -EINVAL;
 
