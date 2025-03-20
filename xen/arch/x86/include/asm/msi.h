@@ -124,7 +124,7 @@ struct msi_desc {
     int irq;
     int remap_index;         /* index in interrupt remapping table */
 
-    struct msi_msg msg;      /* Last set MSI message */
+    struct msi_msg msg;      /* Last set MSI message (untranslated) */
 };
 
 /*
