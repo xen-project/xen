@@ -481,7 +481,8 @@ int __init dom0_setup_permissions(struct domain *d)
 
     /* The hardware domain is initially permitted full I/O capabilities. */
     rc = ioports_permit_access(d, 0, 0xFFFF);
-    rc |= iomem_permit_access(d, 0UL, (1UL << (paddr_bits - PAGE_SHIFT)) - 1);
+    rc |= iomem_permit_access(d, 0UL,
+                              PFN_DOWN(1UL << domain_max_paddr_bits(d)) - 1);
     rc |= irqs_permit_access(d, 1, nr_irqs_gsi - 1);
 
     /* Modify I/O port access permissions. */
