@@ -5502,7 +5502,7 @@ int map_pages_to_xen(
                                                                 \
     ASSERT(!mfn_eq(m_, INVALID_MFN));                           \
     IS_ALIGNED(PFN_DOWN(v) | mfn_x(m_),                         \
-               (1UL << (PAGETABLE_ORDER * ((n) - 1))) - 1);     \
+               1UL << (PAGETABLE_ORDER * ((n) - 1)));           \
 })
 #define IS_L2E_ALIGNED(v, m) IS_LnE_ALIGNED(v, m, 2)
 #define IS_L3E_ALIGNED(v, m) IS_LnE_ALIGNED(v, m, 3)
