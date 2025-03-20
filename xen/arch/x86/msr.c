@@ -243,6 +243,14 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         *val = 0;
         break;
 
+    case MSR_FAM10H_MMIO_CONF_BASE:
+        if ( !is_hardware_domain(d) ||
+             !(cp->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) ||
+             rdmsr_safe(msr, *val) )
+            goto gp_fault;
+
+        break;
+
     case MSR_VIRT_SPEC_CTRL:
         if ( !cp->extd.virt_ssbd )
             goto gp_fault;
