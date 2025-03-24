@@ -1,6 +1,6 @@
 obj-$(CONFIG_AMD_SVM) += svm/
 obj-$(CONFIG_INTEL_VMX) += vmx/
-obj-$(CONFIG_HVM_VIRIDIAN) += viridian/
+obj-y += viridian/
 
 obj-y += asid.o
 obj-y += dm.o

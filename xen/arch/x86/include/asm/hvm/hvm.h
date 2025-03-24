@@ -507,8 +507,7 @@ hvm_get_cpl(struct vcpu *v)
     (has_hvm_params(d) ? (d)->arch.hvm.params[HVM_PARAM_VIRIDIAN] : 0)
 
 #define is_viridian_domain(d) \
-    (IS_ENABLED(CONFIG_HVM_VIRIDIAN) && \
-     is_hvm_domain(d) && (viridian_feature_mask(d) & HVMPV_base_freq))
+    (is_hvm_domain(d) && (viridian_feature_mask(d) & HVMPV_base_freq))
 
 #define is_viridian_vcpu(v) \
     is_viridian_domain((v)->domain)
