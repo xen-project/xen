@@ -695,9 +695,12 @@ int hvm_domain_initialise(struct domain *d,
     if ( hvm_tsc_scaling_supported )
         d->arch.hvm.tsc_scaling_ratio = hvm_default_tsc_scaling_ratio;
 
-    rc = viridian_domain_init(d);
-    if ( rc )
-        goto fail2;
+    if ( is_viridian_domain(d) )
+    {
+        rc = viridian_domain_init(d);
+        if ( rc )
+            goto fail2;
+    }
 
     rc = alternative_call(hvm_funcs.domain_initialise, d);
     if ( rc != 0 )
@@ -733,7 +736,8 @@ void hvm_domain_relinquish_resources(struct domain *d)
     if ( hvm_funcs.nhvm_domain_relinquish_resources )
         alternative_vcall(hvm_funcs.nhvm_domain_relinquish_resources, d);
 
-    viridian_domain_deinit(d);
+    if ( is_viridian_domain(d) )
+        viridian_domain_deinit(d);
 
     ioreq_server_destroy_all(d);
 
@@ -1637,9 +1641,12 @@ int hvm_vcpu_initialise(struct vcpu *v)
          && (rc = nestedhvm_vcpu_initialise(v)) < 0 ) /* teardown: nestedhvm_vcpu_destroy */
         goto fail5;
 
-    rc = viridian_vcpu_init(v);
-    if ( rc )
-        goto fail6;
+    if ( is_viridian_domain(d) )
+    {
+        rc = viridian_vcpu_init(v);
+        if ( rc )
+            goto fail6;
+    }
 
     rc = ioreq_server_add_vcpu_all(d, v);
     if ( rc != 0 )
@@ -1669,13 +1676,15 @@ int hvm_vcpu_initialise(struct vcpu *v)
  fail2:
     hvm_vcpu_cacheattr_destroy(v);
  fail1:
-    viridian_vcpu_deinit(v);
+    if ( is_viridian_domain(d) )
+        viridian_vcpu_deinit(v);
     return rc;
 }
 
 void hvm_vcpu_destroy(struct vcpu *v)
 {
-    viridian_vcpu_deinit(v);
+    if ( is_viridian_domain(v->domain) )
+        viridian_vcpu_deinit(v);
 
     ioreq_server_remove_vcpu_all(v->domain, v);
 

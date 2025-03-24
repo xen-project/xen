@@ -63,6 +63,16 @@ config ALTP2M
 
 	  If unsure, stay with defaults.
 
+config HVM_VIRIDIAN
+	bool "Hyper-V enlightenments for guests" if EXPERT
+	default y
+	help
+	  Support optimizations for Hyper-V guests such as faster hypercalls,
+	  efficient timer and interrupt handling, and enhanced paravirtualized
+	  I/O. This is to improve performance and compatibility of Windows VMs.
+
+	  If unsure, say Y.
+
 config MEM_PAGING
 	bool "Xen memory paging support (UNSUPPORTED)" if UNSUPPORTED
 	depends on VM_EVENT

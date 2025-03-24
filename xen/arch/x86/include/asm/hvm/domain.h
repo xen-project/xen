@@ -111,7 +111,9 @@ struct hvm_domain {
     /* hypervisor intercepted msix table */
     struct list_head       msixtbl_list;
 
+#ifdef CONFIG_HVM_VIRIDIAN
     struct viridian_domain *viridian;
+#endif
 
     /*
      * TSC value that VCPUs use to calculate their tsc_offset value.
