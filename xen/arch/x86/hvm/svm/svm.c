@@ -253,7 +253,7 @@ static void cf_check svm_update_guest_efer(struct vcpu *v)
     vmcb_set_efer(vmcb, guest_efer);
 
     ASSERT(nestedhvm_enabled(v->domain) ||
-           !(v->arch.hvm.guest_efer & EFER_SVME));
+           !nsvm_efer_svm_enabled(v));
 
     if ( nestedhvm_enabled(v->domain) )
         svm_nested_features_on_efer_update(v);
