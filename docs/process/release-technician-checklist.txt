@@ -53,6 +53,9 @@ t=RELEASE-$r
     - "Xen 4.5-unstable" on unstable
     - "Xen 4.5-rc" for release candidate
 
+* for major releases, drop staging-only text from MAINTAINERS and add stable
+  maintainer(s) there
+
 * change xen-unstable Config.mk
 #   QEMU_UPSTREAM_REVISION,
 #   QEMU_TRADITIONAL_REVISION
