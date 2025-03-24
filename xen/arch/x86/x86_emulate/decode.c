@@ -780,12 +780,12 @@ decode_twobyte(struct x86_emulate_state *s,
         break;
 
     case 0x20: case 0x22: /* mov to/from cr */
-        if ( s->lock_prefix && vcpu_has_cr8_legacy() )
+        if ( s->lock_prefix && vcpu_has_cr8_legacy() && s->modrm_reg == 0 )
         {
-            s->modrm_reg += 8;
+            s->modrm_reg = 8;
             s->lock_prefix = false;
         }
-        /* fall through */
+        fallthrough;
     case 0x21: case 0x23: /* mov to/from dr */
         ASSERT(s->ea.type == OP_REG); /* Early operand adjustment ensures this. */
         generate_exception_if(s->lock_prefix, X86_EXC_UD);
