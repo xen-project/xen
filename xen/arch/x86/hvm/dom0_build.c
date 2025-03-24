@@ -718,8 +718,7 @@ static int __init pvh_load_kernel(
         extra_space += sizeof(mod) + ROUNDUP(initrd_len, PAGE_SIZE);
 
     if ( cmdline )
-        extra_space += ROUNDUP(strlen(cmdline) + 1,
-                               elf_64bit(&elf) ? 8 : 4);
+        extra_space += elf_round_up(&elf, strlen(cmdline) + 1);
 
     last_addr = find_memory(d, &elf, extra_space);
     if ( last_addr == INVALID_PADDR )
@@ -740,7 +739,7 @@ static int __init pvh_load_kernel(
 
         mod.paddr = last_addr;
         mod.size = initrd_len;
-        last_addr += ROUNDUP(initrd_len, elf_64bit(&elf) ? 8 : 4);
+        last_addr += elf_round_up(&elf, initrd_len);
         if ( initrd->cmdline_pa )
         {
             char *str = __va(initrd->cmdline_pa);
@@ -774,7 +773,7 @@ static int __init pvh_load_kernel(
          * Round up to 32/64 bits (depending on the guest kernel bitness) so
          * the modlist/start_info is aligned.
          */
-        last_addr += ROUNDUP(strlen(cmdline) + 1, elf_64bit(&elf) ? 8 : 4);
+        last_addr += elf_round_up(&elf, strlen(cmdline) + 1);
     }
     if ( initrd != NULL )
     {
