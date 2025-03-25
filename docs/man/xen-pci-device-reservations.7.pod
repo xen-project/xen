@@ -10,6 +10,9 @@ use of this is with device ID 0x0001 to advertise the Xen Platform PCI
 device - the presence of this virtual device enables a guest Operating
 System (subject to the availability of suitable drivers) to make use of
 paravirtualisation features such as disk and network devices etc.
+XenServer, for Windows machines, may present Xen Platform device with device
+ID 0x0002 instead of 0x0001. Device 0x0001 and 0x0002 should be mutually
+exclusive.
 
 Some Xen vendors wish to provide alternative and/or additional guest drivers
 that can bind to virtual devices[1]. This may be done using the Xen PCI
@@ -85,5 +88,9 @@ and unplug protocol.
 
 libxl provides support for creation of a single additional xen-pvdevice.
 See the vendor_device parameter in xl.cfg(5).
+
+XenServer might present a xen-pvdevice device with ID 0xC000.
+Such device is a placeholder for Windows update usage and is always exposed
+in conjunction with a Xen Platform PCI device, usually with ID 0x0002
 
 =back
