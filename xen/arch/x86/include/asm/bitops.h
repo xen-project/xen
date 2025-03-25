@@ -488,10 +488,16 @@ static always_inline unsigned int arch_hweightl(unsigned long x)
      *
      * This limits the POPCNT instruction to using the same ABI as a function
      * call (input in %rdi, output in %eax) but that's fine.
+     *
+     * On Intel CPUs prior to Cannon Lake, the POPCNT instruction has a false
+     * input dependency on it's destination register (errata HSD146, SKL029
+     * amongst others), impacting loops such as bitmap_weight().  Insert an
+     * XOR to manually break the dependency.
      */
     alternative_io("call arch_generic_hweightl",
+                   "xor %k[res], %k[res]\n\t"
                    "popcnt %[val], %q[res]", X86_FEATURE_POPCNT,
-                   ASM_OUTPUT2([res] "=a" (r) ASM_CALL_CONSTRAINT),
+                   ASM_OUTPUT2([res] "=&a" (r) ASM_CALL_CONSTRAINT),
                    [val] "D" (x));
 
     return r;
