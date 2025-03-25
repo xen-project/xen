@@ -1579,6 +1579,7 @@ bool libxl_defbool_val(libxl_defbool db);
 
 const char *libxl_defbool_to_string(libxl_defbool b);
 
+#define LIBXL_NR_SPIS_DEFAULT (~(uint32_t)0)
 #define LIBXL_TIMER_MODE_DEFAULT -1
 #define LIBXL_MEMKB_DEFAULT ~0ULL
 

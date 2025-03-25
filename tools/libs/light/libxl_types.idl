@@ -723,7 +723,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("arch_arm", Struct(None, [("gic_version", libxl_gic_version),
                                ("vuart", libxl_vuart_type),
                                ("sve_vl", libxl_sve_type),
-                               ("nr_spis", uint32),
+                               ("nr_spis", uint32, {'init_val': 'LIBXL_NR_SPIS_DEFAULT'}),
                               ])),
     ("arch_x86", Struct(None, [("msr_relaxed", libxl_defbool),
                               ])),

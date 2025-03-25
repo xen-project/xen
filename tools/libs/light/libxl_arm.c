@@ -84,7 +84,7 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
                                       libxl_domain_config *d_config,
                                       struct xen_domctl_createdomain *config)
 {
-    uint32_t nr_spis = 0;
+    uint32_t nr_spis = 0, cfg_nr_spis = d_config->b_info.arch_arm.nr_spis;
     unsigned int i;
     uint32_t vuart_irq, virtio_irq = 0;
     bool vuart_enabled = false, virtio_enabled = false;
@@ -181,13 +181,18 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
 
     LOG(DEBUG, "Configure the domain");
 
-    if (nr_spis > d_config->b_info.arch_arm.nr_spis) {
-        LOG(ERROR, "Provided nr_spis value is too small (minimum required %u)\n",
-            nr_spis);
-        return ERROR_FAIL;
+    /* Check if a user provided a value or not */
+    if (cfg_nr_spis != LIBXL_NR_SPIS_DEFAULT) {
+        if (nr_spis > cfg_nr_spis) {
+            LOG(ERROR, "Provided nr_spis value is too small (minimum required %u)\n",
+                nr_spis);
+            return ERROR_FAIL;
+        }
+        config->arch.nr_spis = cfg_nr_spis;
+    } else {
+        config->arch.nr_spis = nr_spis;
     }
 
-    config->arch.nr_spis = max(nr_spis, d_config->b_info.arch_arm.nr_spis);
     LOG(DEBUG, " - Allocate %u SPIs", config->arch.nr_spis);
 
     switch (d_config->b_info.arch_arm.gic_version) {
