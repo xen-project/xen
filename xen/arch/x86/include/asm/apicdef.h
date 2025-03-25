@@ -78,6 +78,8 @@
 #define			APIC_DM_STARTUP		0x00600
 #define			APIC_DM_EXTINT		0x00700
 #define			APIC_VECTOR_MASK	0x000FF
+#define			APIC_VECTOR_VALID(x)	\
+					(((x) & APIC_VECTOR_MASK) >= 16)
 #define		APIC_ICR2	0x310
 #define			GET_xAPIC_DEST_FIELD(x)	(((x)>>24)&0xFF)
 #define			SET_xAPIC_DEST_FIELD(x)	((x)<<24)

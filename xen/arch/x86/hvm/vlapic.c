@@ -123,7 +123,7 @@ static void vlapic_error(struct vlapic *vlapic, unsigned int err_bit)
              * will end up back here.  Break the cycle by only injecting LVTERR
              * if it will succeed, and folding in RECVILL otherwise.
              */
-            if ( (lvterr & APIC_VECTOR_MASK) >= 16 )
+            if ( APIC_VECTOR_VALID(lvterr) )
                 inj = true;
             else
                 set_bit(ilog2(APIC_ESR_RECVILL), &vlapic->hw.pending_esr);
@@ -136,7 +136,7 @@ static void vlapic_error(struct vlapic *vlapic, unsigned int err_bit)
 
 bool vlapic_test_irq(const struct vlapic *vlapic, uint8_t vec)
 {
-    if ( unlikely(vec < 16) )
+    if ( unlikely(!APIC_VECTOR_VALID(vec)) )
         return false;
 
     if ( hvm_funcs.test_pir &&
@@ -150,7 +150,7 @@ void vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
 {
     struct vcpu *target = vlapic_vcpu(vlapic);
 
-    if ( unlikely(vec < 16) )
+    if ( unlikely(!APIC_VECTOR_VALID(vec)) )
     {
         vlapic_error(vlapic, ilog2(APIC_ESR_RECVILL));
         return;
@@ -523,7 +523,7 @@ void vlapic_ipi(
         struct vlapic *target = vlapic_lowest_prio(
             vlapic_domain(vlapic), vlapic, short_hand, dest, dest_mode);
 
-        if ( unlikely((icr_low & APIC_VECTOR_MASK) < 16) )
+        if ( unlikely(!APIC_VECTOR_VALID(icr_low)) )
             vlapic_error(vlapic, ilog2(APIC_ESR_SENDILL));
         else if ( target )
             vlapic_accept_irq(vlapic_vcpu(target), icr_low);
@@ -531,7 +531,7 @@ void vlapic_ipi(
     }
 
     case APIC_DM_FIXED:
-        if ( unlikely((icr_low & APIC_VECTOR_MASK) < 16) )
+        if ( unlikely(!APIC_VECTOR_VALID(icr_low)) )
         {
             vlapic_error(vlapic, ilog2(APIC_ESR_SENDILL));
             break;

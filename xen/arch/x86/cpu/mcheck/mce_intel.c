@@ -135,8 +135,7 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
      * BIOS has programmed on AP based on BSP's info we saved (since BIOS
      * is required to set the same value for all threads/cores).
      */
-    if ( (val & APIC_DM_MASK) != APIC_DM_FIXED
-         || (val & APIC_VECTOR_MASK) > 0xf )
+    if ( (val & APIC_DM_MASK) != APIC_DM_FIXED || APIC_VECTOR_VALID(val) )
         apic_write(APIC_LVTTHMR, val);
 
     if ( (msr_content & (1ULL<<3))
