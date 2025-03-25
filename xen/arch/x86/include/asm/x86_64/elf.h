@@ -56,7 +56,7 @@ static inline void elf_core_save_regs(ELF_Gregset *core_regs,
     /* orig_rax not filled in for now */
     asm ( "lea (%%rip), %0" : "=r" (core_regs->rip) );
     asm ( "mov %%cs, %0" : "=m" (core_regs->cs) );
-    asm ( "pushfq; popq %0" : "=m" (core_regs->rflags) ASM_CALL_CONSTRAINT );
+    asm ( "pushfq; popq %0" : "=m" (core_regs->rflags) );
     asm ( "movq %%rsp, %0" : "=m" (core_regs->rsp) );
     asm ( "mov %%ss, %0" : "=m" (core_regs->ss) );
     rdmsrl(MSR_FS_BASE, core_regs->thread_fs);

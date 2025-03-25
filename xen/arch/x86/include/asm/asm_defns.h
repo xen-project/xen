@@ -28,8 +28,9 @@ asm ( "\t.equ CONFIG_INDIRECT_THUNK, "
 
 /*
  * This output constraint should be used for any inline asm which has a "call"
- * instruction.  Otherwise the asm may be inserted before the frame pointer
- * gets set up by the containing function.
+ * instruction, which forces the frame pointer to be set up prior to the asm
+ * block.  This matters when unwinding using frame pointers, where the asm's
+ * function can get skipped over.
  */
 #ifdef CONFIG_FRAME_POINTER
 register unsigned long current_stack_pointer asm("rsp");
