@@ -580,6 +580,9 @@ a653sched_do_schedule(
      */
     BUG_ON(now >= sched_priv->next_major_frame);
 
+    /* Return the amount of time the next domain has to run. */
+    prev->next_time = sched_priv->next_switch_time - now;
+
     spin_unlock_irqrestore(&sched_priv->lock, flags);
 
     /* Tasklet work (which runs in idle UNIT context) overrides all else. */
@@ -591,11 +594,7 @@ a653sched_do_schedule(
          && (sched_unit_master(new_task) != cpu) )
         new_task = IDLETASK(cpu);
 
-    /*
-     * Return the amount of time the next domain has to run and the address
-     * of the selected task's UNIT structure.
-     */
-    prev->next_time = sched_priv->next_switch_time - now;
+    /* Also return the address of the selected task's UNIT structure. */
     prev->next_task = new_task;
     new_task->migrated = false;
 
