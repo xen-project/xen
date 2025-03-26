@@ -193,11 +193,10 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
     const struct processor_pminfo *pmpt;
     struct cpufreq_policy *policy;
     uint32_t gov_num = 0;
-    uint32_t *affected_cpus;
-    uint32_t *scaling_available_frequencies;
+    uint32_t *data;
     char     *scaling_available_governors;
     struct list_head *pos;
-    uint32_t cpu, i, j = 0;
+    unsigned int cpu, i = 0;
 
     pmpt = processor_pminfo[op->cpuid];
     policy = per_cpu(cpufreq_cpu_policy, op->cpuid);
@@ -219,25 +218,22 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
         return -EAGAIN;
     }
 
-    if ( !(affected_cpus = xzalloc_array(uint32_t, op->u.get_para.cpu_num)) )
+    if ( !(data = xzalloc_array(uint32_t,
+                                max(op->u.get_para.cpu_num,
+                                    op->u.get_para.freq_num))) )
         return -ENOMEM;
-    for_each_cpu(cpu, policy->cpus)
-        affected_cpus[j++] = cpu;
-    ret = copy_to_guest(op->u.get_para.affected_cpus,
-                       affected_cpus, op->u.get_para.cpu_num);
-    xfree(affected_cpus);
-    if ( ret )
-        return ret;
 
-    if ( !(scaling_available_frequencies =
-           xzalloc_array(uint32_t, op->u.get_para.freq_num)) )
-        return -ENOMEM;
+    for_each_cpu(cpu, policy->cpus)
+        data[i++] = cpu;
+    ret = copy_to_guest(op->u.get_para.affected_cpus,
+                        data, op->u.get_para.cpu_num);
+
     for ( i = 0; i < op->u.get_para.freq_num; i++ )
-        scaling_available_frequencies[i] =
-                        pmpt->perf.states[i].core_frequency * 1000;
+        data[i] = pmpt->perf.states[i].core_frequency * 1000;
     ret = copy_to_guest(op->u.get_para.scaling_available_frequencies,
-                   scaling_available_frequencies, op->u.get_para.freq_num);
-    xfree(scaling_available_frequencies);
+                        data, op->u.get_para.freq_num) ?: ret;
+
+    xfree(data);
     if ( ret )
         return ret;
 
