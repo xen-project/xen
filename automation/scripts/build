@@ -12,12 +12,12 @@ $cc --version
 # random config or default config
 if [[ "${RANDCONFIG}" == "y" ]]; then
 
-    # Append job-specific fixed configuration
-    if [[ -n "${EXTRA_FIXED_RANDCONFIG}" ]]; then
-        echo "${EXTRA_FIXED_RANDCONFIG}" >> xen/tools/kconfig/allrandom.config
-    fi
+    cp -f xen/tools/kconfig/allrandom.config xen/allrandom.config.tmp
 
-    make -j$(nproc) -C xen KCONFIG_ALLCONFIG=tools/kconfig/allrandom.config randconfig
+    # Append job-specific fixed configuration
+    echo "${EXTRA_FIXED_RANDCONFIG}" >> xen/allrandom.config.tmp
+
+    make -j$(nproc) -C xen KCONFIG_ALLCONFIG=allrandom.config.tmp randconfig
 
     # RANDCONFIG implies HYPERVISOR_ONLY
     HYPERVISOR_ONLY="y"
