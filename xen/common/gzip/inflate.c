@@ -1164,8 +1164,6 @@ static int __init gunzip(struct gunzip_state *s)
     if ( (res = inflate(s)) )
     {
         switch (res) {
-        case 0:
-            break;
         case 1:
             error("invalid compressed format (err=1)");
             break;
