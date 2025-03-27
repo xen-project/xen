@@ -3,6 +3,10 @@ System requirements
 
 The following extensions are expected to be supported by a system on which
 Xen is run:
+- H:
+  Provides additional instructions and CSRs that control the new stage of
+  address translation and support hosting a guest OS in virtual S-mode
+  (VS-mode).
 - Zbb:
   RISC-V doesn't have a CLZ instruction in the base ISA.
   As a consequence, __builtin_ffs() emits a library call to ffs() on GCC,

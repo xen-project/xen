@@ -9,7 +9,6 @@ riscv-abi-$(CONFIG_RISCV_64) := -mabi=lp64
 riscv-march-$(CONFIG_RISCV_64) := rv64
 riscv-march-y += ima
 riscv-march-$(CONFIG_RISCV_ISA_C) += c
-riscv-march-y += _zicsr_zifencei_zbb
 
 riscv-generic-flags := $(riscv-abi-y) -march=$(subst $(space),,$(riscv-march-y))
 
@@ -25,10 +24,18 @@ $(eval $(1) := \
 	$(call as-insn,$(CC) $(riscv-generic-flags)_$(1),$(value $(1)-insn),_$(1)))
 endef
 
+h-insn := "hfence.gvma"
+$(call check-extension,h)
+
+ifneq ($(h),_h)
+hh-insn := "hfence.gvma"
+$(call check-extension,hh)
+endif
+
 zihintpause-insn := "pause"
 $(call check-extension,zihintpause)
 
-extensions := $(zihintpause)
+extensions := $(h) $(hh) $(zihintpause) _zicsr_zifencei_zbb
 
 extensions := $(subst $(space),,$(extensions))
 

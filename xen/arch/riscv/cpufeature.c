@@ -146,6 +146,7 @@ static const struct riscv_isa_ext_data __initconst required_extensions[] = {
 #ifdef CONFIG_RISCV_ISA_C
     RISCV_ISA_EXT_DATA(c),
 #endif
+    RISCV_ISA_EXT_DATA(h),
     RISCV_ISA_EXT_DATA(zicsr),
     RISCV_ISA_EXT_DATA(zifencei),
     RISCV_ISA_EXT_DATA(zihintpause),
