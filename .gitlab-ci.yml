@@ -4,6 +4,7 @@ variables:
     description: "Regex to select only some jobs, must be enclosed with /. For example /job1|job2/"
 
 workflow:
+  name: "$CI_PIPELINE_SCHEDULE_DESCRIPTION"
   rules:
     - if: $CI_COMMIT_BRANCH =~ /^(master|smoke|^coverity-tested\/.*|stable-.*)$/
       when: never
