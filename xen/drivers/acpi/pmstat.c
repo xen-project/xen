@@ -227,7 +227,7 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
                        affected_cpus, op->u.get_para.cpu_num);
     xfree(affected_cpus);
     if ( ret )
-        return ret;
+        return -EFAULT;
 
     if ( !(scaling_available_frequencies =
            xzalloc_array(uint32_t, op->u.get_para.freq_num)) )
@@ -239,7 +239,7 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
                    scaling_available_frequencies, op->u.get_para.freq_num);
     xfree(scaling_available_frequencies);
     if ( ret )
-        return ret;
+        return -EFAULT;
 
     op->u.get_para.cpuinfo_cur_freq =
         cpufreq_driver.get ? alternative_call(cpufreq_driver.get, op->cpuid)
@@ -275,7 +275,7 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
                             gov_num * CPUFREQ_NAME_LEN);
         xfree(scaling_available_governors);
         if ( ret )
-            return ret;
+            return -EFAULT;
 
         op->u.get_para.u.s.scaling_cur_freq = policy->cur;
         op->u.get_para.u.s.scaling_max_freq = policy->max;
