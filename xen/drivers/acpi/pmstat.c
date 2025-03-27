@@ -230,12 +230,12 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
 
     for ( i = 0; i < op->u.get_para.freq_num; i++ )
         data[i] = pmpt->perf.states[i].core_frequency * 1000;
-    ret = copy_to_guest(op->u.get_para.scaling_available_frequencies,
-                        data, op->u.get_para.freq_num) ?: ret;
+    ret += copy_to_guest(op->u.get_para.scaling_available_frequencies,
+                         data, op->u.get_para.freq_num);
 
     xfree(data);
     if ( ret )
-        return ret;
+        return -EFAULT;
 
     op->u.get_para.cpuinfo_cur_freq =
         cpufreq_driver.get ? alternative_call(cpufreq_driver.get, op->cpuid)
@@ -272,7 +272,7 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
                             gov_num * CPUFREQ_NAME_LEN);
         xfree(scaling_available_governors);
         if ( ret )
-            return ret;
+            return -EFAULT;
 
         op->u.get_para.u.s.scaling_cur_freq = policy->cur;
         op->u.get_para.u.s.scaling_max_freq = policy->max;
