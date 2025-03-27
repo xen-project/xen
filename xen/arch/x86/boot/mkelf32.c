@@ -366,11 +366,13 @@ int main(int argc, char **argv)
         note_sz = in64_phdr.p_memsz;
         note_base = in64_phdr.p_vaddr - note_base;
 
-        if ( in64_phdr.p_offset > dat_siz || offset > in64_phdr.p_offset )
+        if ( in64_phdr.p_offset < offset ||
+             in64_phdr.p_offset + in64_phdr.p_filesz > offset + dat_siz )
         {
             fprintf(stderr, "Expected .note section within .text section!\n" \
-                    "Offset %"PRId64" not within %d!\n",
-                    in64_phdr.p_offset, dat_siz);
+                    ".note: [%"PRIx64", %"PRIx64") .text: [%x, %x)\n",
+                    in64_phdr.p_offset, in64_phdr.p_offset + in64_phdr.p_filesz,
+                    offset, offset + dat_siz);
             return 1;
         }
         /* Gets us the absolute offset within the .text section. */
