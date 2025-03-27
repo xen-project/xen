@@ -23,6 +23,20 @@ config GRANT_TABLE
 
 	  If unsure, say Y.
 
+config EVTCHN_FIFO
+	bool "Event Channel Fifo support" if EXPERT
+	default y
+	help
+	  The Event channel Fifo extends support for event channels
+	  beyond 1024 event channels for 32-bit guests and 4096 for
+	  64-bit guests.
+
+	  Cons: They cause runtime anonymous memory allocations and expose
+	  an additional interface to the guest. For smaller systems, you
+	  might consider disabling this feature.
+
+	  If unsure, say Y.
+
 config PDX_COMPRESSION
 	bool "PDX (Page inDeX) compression" if EXPERT && !X86 && !RISCV
 	default ARM || PPC
