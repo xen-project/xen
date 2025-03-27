@@ -172,8 +172,8 @@ long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
             break;
         }
 
-        if ( !rc )
-            rc = copy_to_guest(u_domctl, domctl, 1);
+        if ( !rc && copy_to_guest(u_domctl, domctl, 1) )
+            rc = -EFAULT;
 
         return rc;
     }
