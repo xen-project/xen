@@ -540,6 +540,7 @@ static int __init pvh_load_kernel(struct domain *d, const module_t *image,
     unsigned long image_len = image->mod_end;
     struct elf_binary elf;
     struct elf_dom_parms parms;
+    size_t extra_space;
     paddr_t last_addr;
     struct hvm_start_info start_info = { 0 };
     struct hvm_modlist_entry mod = { 0 };
@@ -592,13 +593,16 @@ static int __init pvh_load_kernel(struct domain *d, const module_t *image,
      * split into smaller allocations, done as a single region in order to
      * simplify it.
      */
-    last_addr = find_memory(d, &elf, sizeof(start_info) +
-                            (initrd ? ROUNDUP(initrd->mod_end, PAGE_SIZE) +
-                                      sizeof(mod)
-                                    : 0) +
-                            (cmdline ? ROUNDUP(strlen(cmdline) + 1,
-                                               elf_64bit(&elf) ? 8 : 4)
-                                     : 0));
+    extra_space = sizeof(start_info);
+
+    if ( initrd )
+        extra_space += sizeof(mod) + ROUNDUP(initrd->mod_end, PAGE_SIZE);
+
+    if ( cmdline )
+        extra_space += ROUNDUP(strlen(cmdline) + 1,
+                               elf_64bit(&elf) ? 8 : 4);
+
+    last_addr = find_memory(d, &elf, extra_space);
     if ( last_addr == INVALID_PADDR )
     {
         printk("Unable to find a memory region to load initrd and metadata\n");
