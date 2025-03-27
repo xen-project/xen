@@ -15,6 +15,11 @@
 # endif
 #endif
 
+#ifdef CONFIG_CC_HAS_VISIBILITY_ATTRIBUTE
+/* Results in more efficient PIC code (no indirections through GOT or PLT). */
+#pragma GCC visibility push(hidden)
+#endif
+
 #define barrier()     __asm__ __volatile__("": : :"memory")
 
 #define likely(x)     __builtin_expect(!!(x),1)
@@ -117,11 +122,6 @@
 /* &a[0] degrades to a pointer: a different type from an array */
 #define __must_be_array(a) \
   BUILD_BUG_ON_ZERO(__builtin_types_compatible_p(typeof(a), typeof(&(a)[0])))
-
-#ifdef CONFIG_CC_HAS_VISIBILITY_ATTRIBUTE
-/* Results in more efficient PIC code (no indirections through GOT or PLT). */
-#pragma GCC visibility push(hidden)
-#endif
 
 /* Make the optimizer believe the variable can be manipulated arbitrarily. */
 #define OPTIMIZER_HIDE_VAR(var) __asm__ ( "" : "+g" (var) )
