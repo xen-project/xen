@@ -827,8 +827,9 @@ static void print_cpufreq_para(int cpuid, struct xc_get_cpufreq_para *p_cpufreq)
     }
     else
     {
-        printf("scaling_avail_gov    : %s\n",
-               p_cpufreq->scaling_available_governors);
+        if ( p_cpufreq->gov_num )
+            printf("scaling_avail_gov    : %s\n",
+                   p_cpufreq->scaling_available_governors);
 
         printf("current_governor     : %s\n", p_cpufreq->u.s.scaling_governor);
         if ( !strncmp(p_cpufreq->u.s.scaling_governor,
@@ -894,7 +895,8 @@ static int show_cpufreq_para_by_cpuid(xc_interface *xc_handle, int cpuid)
         p_cpufreq->scaling_available_frequencies = NULL;
         p_cpufreq->scaling_available_governors = NULL;
 
-        if (!(p_cpufreq->affected_cpus =
+        if (p_cpufreq->cpu_num &&
+            !(p_cpufreq->affected_cpus =
               malloc(p_cpufreq->cpu_num * sizeof(uint32_t))))
         {
             fprintf(stderr,
@@ -903,7 +905,8 @@ static int show_cpufreq_para_by_cpuid(xc_interface *xc_handle, int cpuid)
             ret = -ENOMEM;
             goto out;
         }
-        if (!(p_cpufreq->scaling_available_frequencies =
+        if (p_cpufreq->freq_num &&
+            !(p_cpufreq->scaling_available_frequencies =
               malloc(p_cpufreq->freq_num * sizeof(uint32_t))))
         {
             fprintf(stderr,
