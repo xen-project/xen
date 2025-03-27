@@ -652,6 +652,7 @@ static int __init pvh_load_kernel(
     unsigned long image_len = image->size;
     unsigned long initrd_len = initrd ? initrd->size : 0;
     const char *cmdline = image->cmdline_pa ? __va(image->cmdline_pa) : NULL;
+    const char *initrd_cmdline = NULL;
     struct elf_binary elf;
     struct elf_dom_parms parms;
     size_t extra_space;
@@ -715,7 +716,23 @@ static int __init pvh_load_kernel(
     extra_space = sizeof(start_info);
 
     if ( initrd )
-        extra_space += sizeof(mod) + ROUNDUP(initrd_len, PAGE_SIZE);
+    {
+        size_t initrd_space = elf_round_up(&elf, initrd_len);
+
+        if ( initrd->cmdline_pa )
+        {
+            initrd_cmdline = __va(initrd->cmdline_pa);
+            if ( !*initrd_cmdline )
+                initrd_cmdline = NULL;
+        }
+        if ( initrd_cmdline )
+            initrd_space += strlen(initrd_cmdline) + 1;
+
+        if ( initrd_space )
+            extra_space += ROUNDUP(initrd_space, PAGE_SIZE) + sizeof(mod);
+        else
+            initrd = NULL;
+    }
 
     if ( cmdline )
         extra_space += elf_round_up(&elf, strlen(cmdline) + 1);
@@ -740,12 +757,11 @@ static int __init pvh_load_kernel(
         mod.paddr = last_addr;
         mod.size = initrd_len;
         last_addr += elf_round_up(&elf, initrd_len);
-        if ( initrd->cmdline_pa )
+        if ( initrd_cmdline )
         {
-            char *str = __va(initrd->cmdline_pa);
-            size_t len = strlen(str) + 1;
+            size_t len = strlen(initrd_cmdline) + 1;
 
-            rc = hvm_copy_to_guest_phys(last_addr, str, len, v);
+            rc = hvm_copy_to_guest_phys(last_addr, initrd_cmdline, len, v);
             if ( rc )
             {
                 printk("Unable to copy module command line\n");
