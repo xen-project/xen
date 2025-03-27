@@ -2222,23 +2222,30 @@ static int cf_check hvmemul_write_io(
 
 static int cf_check hvmemul_read_cr(
     unsigned int reg,
-    unsigned long *val,
+    unsigned long *pval,
     struct x86_emulate_ctxt *ctxt)
 {
+    struct vcpu *curr = current;
+    unsigned long val;
+
     switch ( reg )
     {
     case 0:
     case 2:
     case 3:
     case 4:
-        *val = current->arch.hvm.guest_cr[reg];
-        HVMTRACE_LONG_2D(CR_READ, reg, TRC_PAR_LONG(*val));
-        return X86EMUL_OKAY;
-    default:
+        val = curr->arch.hvm.guest_cr[reg];
         break;
+
+    default:
+        return X86EMUL_UNHANDLEABLE;
     }
 
-    return X86EMUL_UNHANDLEABLE;
+    HVMTRACE_LONG_2D(CR_READ, reg, TRC_PAR_LONG(val));
+
+    *pval = val;
+
+    return X86EMUL_OKAY;
 }
 
 static int cf_check hvmemul_write_cr(
@@ -2246,6 +2253,7 @@ static int cf_check hvmemul_write_cr(
     unsigned long val,
     struct x86_emulate_ctxt *ctxt)
 {
+    struct vcpu *curr = current;
     int rc;
 
     HVMTRACE_LONG_2D(CR_WRITE, reg, TRC_PAR_LONG(val));
@@ -2256,13 +2264,13 @@ static int cf_check hvmemul_write_cr(
         break;
 
     case 2:
-        current->arch.hvm.guest_cr[2] = val;
+        curr->arch.hvm.guest_cr[2] = val;
         rc = X86EMUL_OKAY;
         break;
 
     case 3:
     {
-        bool noflush = hvm_pcid_enabled(current) && (val & X86_CR3_NOFLUSH);
+        bool noflush = hvm_pcid_enabled(curr) && (val & X86_CR3_NOFLUSH);
 
         if ( noflush )
             val &= ~X86_CR3_NOFLUSH;
