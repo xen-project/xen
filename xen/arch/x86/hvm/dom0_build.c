@@ -1011,10 +1011,18 @@ static bool __init pvh_acpi_table_allowed(const char *sig,
             return true;
         else
         {
+    skip:
             printk("Skipping table %.4s in non-ACPI non-reserved region\n",
                    sig);
             return false;
         }
+    }
+
+    if ( !strncmp(sig, "OEM", 3) )
+    {
+        if ( acpi_memory_banned(address, size) )
+            goto skip;
+        return true;
     }
 
     return false;
