@@ -3,7 +3,6 @@
 
 #include <xen/cpumask.h>
 #include <xen/pci.h>
-#include <asm/byteorder.h>
 #include <asm/hvm/vmx/vmcs.h>
 
 /*
