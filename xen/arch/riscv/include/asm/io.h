@@ -38,7 +38,8 @@
 #ifndef ASM__RISCV__IO_H
 #define ASM__RISCV__IO_H
 
-#include <asm/byteorder.h>
+#include <xen/macros.h>
+#include <xen/types.h>
 
 /*
  * The RISC-V ISA doesn't yet specify how to query or modify PMAs, so we can't
