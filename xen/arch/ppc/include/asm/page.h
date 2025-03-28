@@ -3,9 +3,7 @@
 #define _ASM_PPC_PAGE_H
 
 #include <xen/bitops.h>
-#include <xen/types.h>
-
-#include <asm/byteorder.h>
+#include <xen/byteorder.h>
 
 #define PDE_VALID     PPC_BIT(0)
 #define PDE_NLB_MASK  0x1ffffffffffffe0UL
