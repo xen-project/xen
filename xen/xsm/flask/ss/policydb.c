@@ -22,13 +22,12 @@
 
 /* Ported to Xen 3.0, George Coker, <gscoker@alpha.ncsc.mil> */
 
+#include <xen/byteorder.h>
+#include <xen/errno.h>
 #include <xen/lib.h>
+#include <xen/string.h>
 #include <xen/types.h>
 #include <xen/xmalloc.h>
-#include <xen/string.h>
-#include <xen/errno.h>
-
-#include <asm/byteorder.h>
 
 #include <conditional.h>
 #include "security.h"

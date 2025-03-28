@@ -9,14 +9,13 @@
 
 /* Ported to Xen 3.0, George Coker, <gscoker@alpha.ncsc.mil> */
 
-#include <xen/lib.h>
-#include <xen/types.h>
+#include <xen/byteorder.h>
 #include <xen/errno.h>
-#include <xen/string.h>
+#include <xen/lib.h>
 #include <xen/spinlock.h>
+#include <xen/string.h>
+#include <xen/types.h>
 #include <xen/xmalloc.h>
-
-#include <asm/byteorder.h>
 
 #include "security.h"
 #include "conditional.h"

@@ -10,13 +10,12 @@
 
 /* Ported to Xen 3.0, George Coker, <gscoker@alpha.ncsc.mil> */
 
-#include <xen/lib.h>
-#include <xen/xmalloc.h>
-#include <xen/errno.h>
-#include <xen/spinlock.h>
 #include <xen/bitmap.h>
-
-#include <asm/byteorder.h>
+#include <xen/byteorder.h>
+#include <xen/errno.h>
+#include <xen/lib.h>
+#include <xen/spinlock.h>
+#include <xen/xmalloc.h>
 
 #include "ebitmap.h"
 #include "policydb.h"
