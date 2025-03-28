@@ -4,6 +4,7 @@
  *
  * Copyright (C) 2011 Citrix Systems, Inc.
  */
+#include <xen/byteorder.h>
 #include <xen/domain_page.h>
 #include <xen/errno.h>
 #include <xen/guest_access.h>
@@ -15,7 +16,6 @@
 #include <xen/sched.h>
 #include <xen/vmap.h>
 
-#include <asm/byteorder.h>
 #include <asm/kernel.h>
 #include <asm/setup.h>
 

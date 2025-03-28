@@ -3,6 +3,7 @@
  */
 
 #include <xen/bitops.h>
+#include <xen/byteorder.h>
 #include <xen/errno.h>
 #include <xen/lib.h>
 #include <xen/livepatch_elf.h>
@@ -11,7 +12,6 @@
 #include <xen/vmap.h>
 
 #include <asm/bitops.h>
-#include <asm/byteorder.h>
 #include <asm/insn.h>
 #include <asm/livepatch.h>
 

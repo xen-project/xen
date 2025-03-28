@@ -6,18 +6,18 @@
  * Copyright (C) 2014-2016 ARM Ltd.
  */
 
+#include <xen/byteorder.h>
 #include <xen/init.h>
-#include <xen/types.h>
 #include <xen/kernel.h>
 #include <xen/llc-coloring.h>
 #include <xen/mm.h>
-#include <xen/vmap.h>
 #include <xen/smp.h>
 #include <xen/stop_machine.h>
 #include <xen/virtual_region.h>
+#include <xen/vmap.h>
+
 #include <asm/alternative.h>
 #include <asm/atomic.h>
-#include <asm/byteorder.h>
 #include <asm/cpufeature.h>
 #include <asm/insn.h>
 #include <asm/page.h>

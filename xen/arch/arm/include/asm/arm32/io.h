@@ -21,8 +21,9 @@
 #ifndef _ARM_ARM32_IO_H
 #define _ARM_ARM32_IO_H
 
+#include <xen/byteorder.h>
+
 #include <asm/system.h>
-#include <asm/byteorder.h>
 
 static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
 {

@@ -20,8 +20,9 @@
 #ifndef _ARM_ARM64_IO_H
 #define _ARM_ARM64_IO_H
 
+#include <xen/byteorder.h>
+
 #include <asm/system.h>
-#include <asm/byteorder.h>
 #include <asm/alternative.h>
 
 /*
