@@ -230,7 +230,7 @@ static inline unsigned int bitmap_weight(const unsigned long *src,
 	return __bitmap_weight(src, nbits);
 }
 
-#include <asm/byteorder.h>
+#include <xen/byteorder.h>
 
 #ifdef __LITTLE_ENDIAN
 #define BITMAP_MEM_ALIGNMENT 8

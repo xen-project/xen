@@ -3,8 +3,7 @@
 #define __XEN_UNALIGNED_H__
 
 #ifdef __XEN__
-#include <xen/types.h>
-#include <asm/byteorder.h>
+#include <xen/byteorder.h>
 #endif
 
 /*

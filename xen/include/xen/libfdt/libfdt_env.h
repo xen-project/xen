@@ -7,9 +7,8 @@
  * Copyright 2012 Kim Phillips, Freescale Semiconductor.
  */
 
-#include <xen/types.h>
+#include <xen/byteorder.h>
 #include <xen/string.h>
-#include <asm/byteorder.h>
 
 #ifdef __CHECKER__
 #define FDT_FORCE __attribute__((force))

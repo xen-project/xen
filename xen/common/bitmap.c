@@ -5,14 +5,13 @@
  * This source code is licensed under the GNU General Public License,
  * Version 2.  See the file COPYING for more details.
  */
-#include <xen/types.h>
-#include <xen/errno.h>
 #include <xen/bitmap.h>
 #include <xen/bitops.h>
+#include <xen/byteorder.h>
 #include <xen/cpumask.h>
+#include <xen/errno.h>
 #include <xen/guest_access.h>
 #include <xen/lib.h>
-#include <asm/byteorder.h>
 
 /*
  * bitmaps provide an array of bits, implemented using an an

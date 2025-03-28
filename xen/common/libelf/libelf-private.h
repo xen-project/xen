@@ -17,10 +17,11 @@
 
 #ifdef __XEN__
 
+#include <xen/byteorder.h>
 #include <xen/lib.h>
 #include <xen/libelf.h>
 #include <xen/softirq.h>
-#include <asm/byteorder.h>
+
 #include <public/elfnote.h>
 
 /* we would like to use elf->log_callback but we can't because

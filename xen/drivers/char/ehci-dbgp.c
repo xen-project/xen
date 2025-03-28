@@ -5,15 +5,17 @@
  * Linux; see the Linux source for authorship and copyrights.
  */
 
+#include <xen/byteorder.h>
 #include <xen/console.h>
 #include <xen/delay.h>
 #include <xen/errno.h>
 #include <xen/param.h>
 #include <xen/pci.h>
 #include <xen/serial.h>
-#include <asm/byteorder.h>
+
 #include <asm/io.h>
 #include <asm/fixmap.h>
+
 #include <public/physdev.h>
 
 /* #define DBGP_DEBUG */

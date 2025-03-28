@@ -10,7 +10,8 @@
 #ifndef __XEN_DEVICE_TREE_H__
 #define __XEN_DEVICE_TREE_H__
 
-#include <asm/byteorder.h>
+#include <xen/byteorder.h>
+
 #include <asm/device.h>
 #include <public/xen.h>
 #include <public/device_tree_defs.h>
