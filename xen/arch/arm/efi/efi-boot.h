@@ -163,6 +163,7 @@ static bool __init meminfo_add_bank(struct membanks *mem,
     struct membank *bank;
     paddr_t start = desc->PhysicalStart;
     paddr_t size = desc->NumberOfPages * EFI_PAGE_SIZE;
+    unsigned int j;
 
     if ( mem->nr_banks >= mem->max_banks )
         return false;
@@ -170,6 +171,15 @@ static bool __init meminfo_add_bank(struct membanks *mem,
     if ( check_reserved_regions_overlap(start, size, false) )
         return false;
 #endif
+
+    for ( j = 0; j < mem->nr_banks; j++ )
+    {
+        if ( (mem->bank[j].start + mem->bank[j].size) == start )
+        {
+            mem->bank[j].size += size;
+            return true;
+        }
+    }
 
     bank = &mem->bank[mem->nr_banks];
     bank->start = start;
