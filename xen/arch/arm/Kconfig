@@ -58,7 +58,7 @@ config ARM_PA_BITS_32
 
 config ARM_PA_BITS_40
 	bool "40-bit"
-	depends on ARM_32
+	depends on ARM_32 && !MPU
 endchoice
 
 config PADDR_BITS
