@@ -218,20 +218,6 @@ cpu_init:
         add   pc, r1, r10                   /* Call paddr(init func) */
 
 cpu_init_done:
-        /* Set up memory attribute type tables */
-        mov_w r0, MAIR0VAL
-        mov_w r1, MAIR1VAL
-        mcr   CP32(r0, HMAIR0)
-        mcr   CP32(r1, HMAIR1)
-
-        /*
-         * Set up the HTCR:
-         * PT walks use Inner-Shareable accesses,
-         * PT walks are write-back, write-allocate in both cache levels,
-         * Full 32-bit address space goes through this table.
-         */
-        mov_w r0, (TCR_RES1|TCR_SH0_IS|TCR_ORGN0_WBWA|TCR_IRGN0_WBWA|TCR_T0SZ(0))
-        mcr   CP32(r0, HTCR)
 
         mov_w r0, HSCTLR_SET
         mcr   CP32(r0, HSCTLR)
