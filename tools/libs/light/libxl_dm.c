@@ -331,9 +331,43 @@ const char *libxl__domain_device_model(libxl__gc *gc,
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
             dm = libxl__abs_path(gc, "qemu-dm", libxl__private_bindir_path());
             break;
-        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-            dm = qemu_xen_path(gc);
+        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN: {
+            const char *configured_dm = qemu_xen_path(gc);
+            if (configured_dm[0] == '/')
+            {
+                dm = configured_dm;
+            }
+            else
+            {
+                const char *path_env = getenv("PATH");
+                if (!path_env)
+                {
+                    dm = configured_dm;
+                }
+                else
+                {
+                    char *path_dup = libxl__strdup(gc, path_env);
+                    char *saveptr = NULL;
+
+                    char *path = strtok_r(path_dup, ":", &saveptr);
+                    dm = NULL;
+                    while (path)
+                    {
+                        char *candidate = libxl__abs_path(gc, configured_dm, path);
+                        if (access(candidate, X_OK) == 0)
+                        {
+                            dm = candidate;
+                            break;
+                        }
+                        path = strtok_r(NULL, ":", &saveptr);
+                    }
+
+                    if (!dm)
+                        dm = configured_dm;
+                }
+            }
             break;
+        }
         default:
             LOG(ERROR, "invalid device model version %d",
                 info->device_model_version);
