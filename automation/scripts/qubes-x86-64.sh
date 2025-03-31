@@ -251,6 +251,14 @@ module2 (http)/gitlab-ci/vmlinuz console=hvc0 root=/dev/ram0 earlyprintk=xen
 module2 (http)/gitlab-ci/initrd-dom0
 " > $TFTP/grub.cfg
 
+echo "#!ipxe
+
+kernel /gitlab-ci/xen $CONSOLE_OPTS loglvl=all guest_loglvl=all dom0_mem=4G console_timestamps=boot $extra_xen_opts || reboot
+module /gitlab-ci/vmlinuz console=hvc0 root=/dev/ram0 earlyprintk=xen || reboot
+module /gitlab-ci/initrd-dom0 || reboot
+boot
+" > $TFTP/boot.ipxe
+
 cp -f binaries/xen $TFTP/xen
 cp -f binaries/bzImage $TFTP/vmlinuz
 cp -f binaries/dom0-rootfs.cpio.gz $TFTP/initrd-dom0
