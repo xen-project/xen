@@ -56,6 +56,11 @@ void __gcov_merge_delta(gcov_type *counters, unsigned int n_counters)
     /* Unused. */
 }
 
+void __gcov_merge_ior(gcov_type *counters, unsigned int n_counters)
+{
+    /* Unused. */
+}
+
 /*
  * Local variables:
  * mode: C

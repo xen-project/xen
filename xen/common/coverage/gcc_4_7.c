@@ -28,8 +28,10 @@
 #define GCOV_COUNTERS 10
 #elif GCC_VERSION < 100000
 #define GCOV_COUNTERS 9
-#else
+#elif GCC_VERSION < 140000
 #define GCOV_COUNTERS 8
+#else
+#define GCOV_COUNTERS 9
 #endif
 
 #define GCOV_TAG_FUNCTION_LENGTH        3
