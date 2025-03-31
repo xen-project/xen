@@ -31,7 +31,7 @@
  *  r4: Set to a non-zero value if a pending Abort exception took place.
  *      Otherwise, it will be set to zero.
  */
-prepare_context_from_guest:
+FUNC_LOCAL(prepare_context_from_guest)
 #ifdef CONFIG_ARM32_HARDEN_BRANCH_PREDICTOR
         /*
          * Restore vectors table to the default as it may have been
@@ -140,7 +140,7 @@ abort_guest_exit_end:
 
 skip_check:
         b   enter_hypervisor_from_guest_preirq
-ENDPROC(prepare_context_from_guest)
+END(prepare_context_from_guest)
 
         /*
          * Macro to define a trap entry.
@@ -362,13 +362,13 @@ trap_irq:
 trap_fiq:
         vector fiq
 
-return_from_trap:
+LABEL_LOCAL(return_from_trap)
         /*
          * Restore the stack pointer from r11. It was saved on exception
          * entry (see __DEFINE_TRAP_ENTRY).
          */
         mov sp, r11
-ENTRY(return_to_new_vcpu32)
+LABEL(return_to_new_vcpu32)
         ldr r11, [sp, #UREGS_cpsr]
         and r11, #PSR_MODE_MASK
         cmp r11, #PSR_MODE_HYP
@@ -426,6 +426,7 @@ return_to_hypervisor:
         clrex
         eret
         sb
+END(return_from_trap)
 
 /*
  * struct vcpu *__context_switch(struct vcpu *prev, struct vcpu *next)
@@ -435,12 +436,13 @@ return_to_hypervisor:
  *
  * Returns prev in r0
  */
-ENTRY(__context_switch)
+FUNC(__context_switch)
         add     ip, r0, #VCPU_arch_saved_context
         stmia   ip!, {r4 - sl, fp, sp, lr}      /* Save register state */
 
         add     r4, r1, #VCPU_arch_saved_context
         ldmia   r4, {r4 - sl, fp, sp, pc}       /* Load registers and return */
+END(__context_switch)
 
 /*
  * Local variables:
