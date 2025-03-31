@@ -155,6 +155,17 @@
   tags:
     - qubes-hw2
 
+.kbl-x86-64:
+  # it's really similar to the ADL one
+  extends: .adl-x86-64
+  variables:
+    PCIDEV: "00:1f.6"
+    PCIDEV_INTR: "MSI"
+    CONSOLE_OPTS: "console=com1 com1=115200,8n1,pci,msi"
+    SUT_ADDR: test-3.testnet
+  tags:
+    - qubes-hw3
+
 .zen2-x86-64:
   # it's really similar to the above
   extends: .adl-x86-64
@@ -303,6 +314,84 @@ adl-tools-tests-pv-x86-64-gcc-debug:
 
 adl-tools-tests-pvh-x86-64-gcc-debug:
   extends: .adl-x86-64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh tools-tests-pvh 2>&1 | tee ${LOGFILE}
+  artifacts:
+    reports:
+      junit: tests-junit.xml
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+kbl-smoke-x86-64-gcc-debug:
+  extends: .kbl-x86-64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+kbl-smoke-x86-64-dom0pvh-gcc-debug:
+  extends: .kbl-x86-64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh dom0pvh 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+kbl-smoke-x86-64-dom0pvh-hvm-gcc-debug:
+  extends: .kbl-x86-64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh dom0pvh-hvm 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+kbl-suspend-x86-64-gcc-debug:
+  extends: .kbl-x86-64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh s3 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+kbl-pci-pv-x86-64-gcc-debug:
+  extends: .kbl-x86-64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh pci-pv 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+kbl-pci-hvm-x86-64-gcc-debug:
+  extends: .kbl-x86-64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh pci-hvm 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+kbl-pvshim-x86-64-gcc-debug:
+  extends: .kbl-x86-64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh pvshim 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+kbl-tools-tests-pv-x86-64-gcc-debug:
+  extends: .kbl-x86-64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh tools-tests-pv 2>&1 | tee ${LOGFILE}
+  artifacts:
+    reports:
+      junit: tests-junit.xml
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+kbl-tools-tests-pvh-x86-64-gcc-debug:
+  extends: .kbl-x86-64
   script:
     - ./automation/scripts/qubes-x86-64.sh tools-tests-pvh 2>&1 | tee ${LOGFILE}
   artifacts:
