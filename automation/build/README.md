@@ -108,6 +108,13 @@ env CONTAINER_NO_PULL=1 \
 make -C automation/build opensuse/tumbleweed-x86_64 PUSH=1
 ```
 
+To rebuild all containers the `all` make target can be used, with or without
+the `PUSH` environment variable:
+
+```
+make -C automation/build all PUSH=1
+```
+
 [BuildKit]: https://docs.docker.com/build/buildkit/
 [registry]: https://gitlab.com/xen-project/xen/container_registry
 [registry help]: https://docs.gitlab.com/ee/user/packages/container_registry/
