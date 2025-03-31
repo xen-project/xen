@@ -2145,8 +2145,6 @@ void asmlinkage __init noreturn __start_xen(void)
 
     heap_init_late();
 
-    init_trace_bufs();
-
     init_constructors();
 
     console_endboot();

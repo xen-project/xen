@@ -29,9 +29,6 @@
 
 extern bool tb_init_done;
 
-/* Used to initialise trace buffer functionality */
-void init_trace_bufs(void);
-
 /* used to retrieve the physical address of the trace buffers */
 int tb_control(struct xen_sysctl_tbuf_op *tbc);
 
@@ -49,7 +46,6 @@ void __trace_hypercall(uint32_t event, unsigned long op,
 
 #define tb_init_done false
 
-static inline void init_trace_bufs(void) {}
 static inline int tb_control(struct xen_sysctl_tbuf_op *tbc)
 {
     return -ENOSYS;

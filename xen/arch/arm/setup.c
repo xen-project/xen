@@ -491,8 +491,6 @@ void asmlinkage __init start_xen(unsigned long fdt_paddr)
 
     heap_init_late();
 
-    init_trace_bufs();
-
     init_constructors();
 
     console_endboot();

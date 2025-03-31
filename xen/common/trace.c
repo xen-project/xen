@@ -335,8 +335,10 @@ int trace_will_trace_event(u32 event)
  * This function is called at start of day in order to initialize the per-cpu
  * trace buffers.  The trace buffers are then available for debugging use, via
  * the %TRACE_xD macros exported in <xen/trace.h>.
+ *
+ * TODO: Try and make this a presmp_initcall() to improve alloc_trace_bufs().
  */
-void __init init_trace_bufs(void)
+static void __init __constructor init_trace_bufs(void)
 {
     cpumask_setall(&tb_cpu_mask);
     register_cpu_notifier(&cpu_nfb);
