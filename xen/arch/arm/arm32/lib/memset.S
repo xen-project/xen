@@ -12,9 +12,8 @@
 #include "assembler.h"
 
 	.text
-	.align	5
 
-ENTRY(memset)
+FUNC(memset, 32)
 	and	r1, r1, #0xff
 	ands	r3, r0, #3		@ 1 unaligned?
 	mov	ip, r0			@ preserve r0 as return value
@@ -120,4 +119,4 @@ ENTRY(memset)
 	strb	r1, [ip], #1		@ 1
 	add	r2, r2, r3		@ 1 (r2 = r2 - (4 - r3))
 	b	1b
-ENDPROC(memset)
+END(memset)

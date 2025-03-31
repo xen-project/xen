@@ -34,8 +34,8 @@ along with this program; see the file COPYING.  If not, see <http://www.gnu.org/
 #define ah r1
 #endif
 
-ENTRY(__lshrdi3)
-ENTRY(__aeabi_llsr)
+FUNC(__lshrdi3)
+LABEL(__aeabi_llsr)
 
 	subs	r3, r2, #32
 	rsb	ip, r2, #32
@@ -47,5 +47,4 @@ ENTRY(__aeabi_llsr)
 	mov	ah, ah, lsr r2
 	mov	pc, lr
 
-ENDPROC(__lshrdi3)
-ENDPROC(__aeabi_llsr)
+END(__lshrdi3)

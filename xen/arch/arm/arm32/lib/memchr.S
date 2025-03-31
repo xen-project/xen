@@ -12,8 +12,7 @@
 #include "assembler.h"
 
 	.text
-	.align	5
-ENTRY(memchr)
+FUNC(memchr, 32)
 	and	r1, r1, #0xff
 1:	subs	r2, r2, #1
 	bmi	2f
@@ -23,4 +22,4 @@ ENTRY(memchr)
 	sub	r0, r0, #1
 2:	movne	r0, #0
 	mov	pc, lr
-ENDPROC(memchr)
+END(memchr)

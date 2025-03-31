@@ -201,8 +201,8 @@ along with this program; see the file COPYING.  If not, see <http://www.gnu.org/
 .endm
 
 
-ENTRY(__udivsi3)
-ENTRY(__aeabi_uidiv)
+FUNC(__udivsi3)
+LABEL(__aeabi_uidiv)
 UNWIND(.fnstart)
 
 	subs	r2, r1, #1
@@ -228,10 +228,9 @@ UNWIND(.fnstart)
 	mov	pc, lr
 
 UNWIND(.fnend)
-ENDPROC(__udivsi3)
-ENDPROC(__aeabi_uidiv)
+END(__udivsi3)
 
-ENTRY(__umodsi3)
+FUNC(__umodsi3)
 UNWIND(.fnstart)
 
 	subs	r2, r1, #1			@ compare divisor with 1
@@ -247,10 +246,10 @@ UNWIND(.fnstart)
 	mov	pc, lr
 
 UNWIND(.fnend)
-ENDPROC(__umodsi3)
+END(__umodsi3)
 
-ENTRY(__divsi3)
-ENTRY(__aeabi_idiv)
+FUNC(__divsi3)
+LABEL(__aeabi_idiv)
 UNWIND(.fnstart)
 
 	cmp	r1, #0
@@ -289,10 +288,9 @@ UNWIND(.fnstart)
 	mov	pc, lr
 
 UNWIND(.fnend)
-ENDPROC(__divsi3)
-ENDPROC(__aeabi_idiv)
+END(__divsi3)
 
-ENTRY(__modsi3)
+FUNC(__modsi3)
 UNWIND(.fnstart)
 
 	cmp	r1, #0
@@ -314,11 +312,11 @@ UNWIND(.fnstart)
 	mov	pc, lr
 
 UNWIND(.fnend)
-ENDPROC(__modsi3)
+END(__modsi3)
 
 #ifdef CONFIG_AEABI
 
-ENTRY(__aeabi_uidivmod)
+FUNC(__aeabi_uidivmod)
 UNWIND(.fnstart)
 UNWIND(.save {r0, r1, ip, lr}	)
 
@@ -330,9 +328,9 @@ UNWIND(.save {r0, r1, ip, lr}	)
 	mov	pc, lr
 
 UNWIND(.fnend)
-ENDPROC(__aeabi_uidivmod)
+END(__aeabi_uidivmod)
 
-ENTRY(__aeabi_idivmod)
+FUNC(__aeabi_idivmod)
 UNWIND(.fnstart)
 UNWIND(.save {r0, r1, ip, lr}	)
 	stmfd	sp!, {r0, r1, ip, lr}
@@ -343,9 +341,9 @@ UNWIND(.save {r0, r1, ip, lr}	)
 	mov	pc, lr
 
 UNWIND(.fnend)
-ENDPROC(__aeabi_idivmod)
+END(__aeabi_idivmod)
 
-ENTRY(__aeabi_uldivmod)
+FUNC(__aeabi_uldivmod)
 UNWIND(.fnstart)
 UNWIND(.save {lr}	)
 	sub sp, sp, #8
@@ -357,9 +355,9 @@ UNWIND(.save {lr}	)
 	mov	pc, lr
 
 UNWIND(.fnend)
-ENDPROC(__aeabi_uldivmod)
+END(__aeabi_uldivmod)
 
-ENTRY(__aeabi_ldivmod)
+FUNC(__aeabi_ldivmod)
 UNWIND(.fnstart)
 UNWIND(.save {lr}	)
 	sub sp, sp, #16
@@ -371,10 +369,10 @@ UNWIND(.save {lr}	)
 	mov	pc, lr
 	
 UNWIND(.fnend)
-ENDPROC(__aeabi_ldivmod)
+END(__aeabi_ldivmod)
 #endif
 
-Ldiv0:
+FUNC_LOCAL(Ldiv0)
 UNWIND(.fnstart)
 UNWIND(.pad #4)
 UNWIND(.save {lr})
@@ -383,4 +381,4 @@ UNWIND(.save {lr})
 	mov	r0, #0			@ About as wrong as it could be.
 	ldr	pc, [sp], #8
 UNWIND(.fnend)
-ENDPROC(Ldiv0)
+END(Ldiv0)

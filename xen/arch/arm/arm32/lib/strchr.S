@@ -14,8 +14,7 @@
 #include "assembler.h"
 
 		.text
-		.align	5
-ENTRY(strchr)
+FUNC(strchr, 32)
 		and	r1, r1, #0xff
 1:		ldrb	r2, [r0], #1
 		teq	r2, r1
@@ -25,4 +24,4 @@ ENTRY(strchr)
 		movne	r0, #0
 		subeq	r0, r0, #1
 		mov	pc, lr
-ENDPROC(strchr)
+END(strchr)

@@ -12,8 +12,7 @@
 #include "assembler.h"
 
 		.text
-		.align	5
-ENTRY(strrchr)
+FUNC(strrchr, 32)
 		and	r1, r1, #0xff
 		mov	r3, #0
 1:		ldrb	r2, [r0], #1
@@ -23,4 +22,4 @@ ENTRY(strrchr)
 		bne	1b
 		mov	r0, r3
 		mov	pc, lr
-ENDPROC(strrchr)
+END(strrchr)
