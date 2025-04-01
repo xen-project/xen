@@ -14,12 +14,6 @@
 # error "unknown ARM variant"
 #endif
 
-#if defined(CONFIG_MMU)
-# include <asm/mmu/mm.h>
-#elif !defined(CONFIG_MPU)
-# error "Unknown memory management layout"
-#endif
-
 /* Align Xen to a 2 MiB boundary. */
 #define XEN_PADDR_ALIGN (1 << 21)
 
@@ -261,55 +255,6 @@ static inline void __iomem *ioremap_wc(paddr_t start, size_t len)
 /* Page-align address and convert to frame number format */
 #define paddr_to_pfn_aligned(paddr)    paddr_to_pfn(PAGE_ALIGN(paddr))
 
-#define virt_to_maddr(va) ({                                        \
-    vaddr_t va_ = (vaddr_t)(va);                                    \
-    (paddr_t)((va_to_par(va_) & PADDR_MASK & PAGE_MASK) | (va_ & ~PAGE_MASK)); \
-})
-
-#ifdef CONFIG_ARM_32
-/**
- * Find the virtual address corresponding to a machine address
- *
- * Only memory backing the XENHEAP has a corresponding virtual address to
- * be found. This is so we can save precious virtual space, as it's in
- * short supply on arm32. This mapping is not subject to PDX compression
- * because XENHEAP is known to be physically contiguous and can't hence
- * jump over the PDX hole. This means we can avoid the roundtrips
- * converting to/from pdx.
- *
- * @param ma Machine address
- * @return Virtual address mapped to `ma`
- */
-static inline void *maddr_to_virt(paddr_t ma)
-{
-    ASSERT(is_xen_heap_mfn(maddr_to_mfn(ma)));
-    ma -= mfn_to_maddr(directmap_mfn_start);
-    return (void *)(unsigned long) ma + XENHEAP_VIRT_START;
-}
-#else
-/**
- * Find the virtual address corresponding to a machine address
- *
- * The directmap covers all conventional memory accesible by the
- * hypervisor. This means it's subject to PDX compression.
- *
- * Note there's an extra offset applied (directmap_base_pdx) on top of the
- * regular PDX compression logic. Its purpose is to skip over the initial
- * range of non-existing memory, should there be one.
- *
- * @param ma Machine address
- * @return Virtual address mapped to `ma`
- */
-static inline void *maddr_to_virt(paddr_t ma)
-{
-    ASSERT((mfn_to_pdx(maddr_to_mfn(ma)) - directmap_base_pdx) <
-           (DIRECTMAP_SIZE >> PAGE_SHIFT));
-    return (void *)(XENHEAP_VIRT_START -
-                    (directmap_base_pdx << PAGE_SHIFT) +
-                    maddr_to_directmapoff(ma));
-}
-#endif
-
 /*
  * Translate a guest virtual address to a machine address.
  * Return the fault information if the translation has failed else 0.
@@ -339,6 +284,15 @@ static inline uint64_t gvirt_to_maddr(vaddr_t va, paddr_t *pa,
  */
 #define virt_to_mfn(va)     __virt_to_mfn(va)
 #define mfn_to_virt(mfn)    __mfn_to_virt(mfn)
+
+/* Memory management subsystem header placed here to see the above macros */
+#if defined(CONFIG_MMU)
+# include <asm/mmu/mm.h>
+#elif defined(CONFIG_MPU)
+# include <asm/mpu/mm.h>
+#else
+#error "Unknown memory management layout"
+#endif
 
 /* Convert between Xen-heap virtual addresses and page-info structures. */
 static inline struct page_info *virt_to_page(const void *v)
