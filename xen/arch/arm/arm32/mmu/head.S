@@ -174,7 +174,7 @@
  *
  * Clobbers r0 - r5
  */
-create_page_tables:
+FUNC_LOCAL(create_page_tables)
         /* Prepare the page-tables for mapping Xen */
         mov_w r0, XEN_VIRT_START
 
@@ -263,7 +263,7 @@ use_temporary_mapping:
 
         mov   r12, #1                /* r12 := temporary mapping created */
         mov   pc, lr
-ENDPROC(create_page_tables)
+END(create_page_tables)
 
 /*
  * Turn on the Data Cache and the MMU. The function will return
@@ -276,7 +276,7 @@ ENDPROC(create_page_tables)
  *
  * Clobbers r0 - r5
  */
-enable_mmu:
+FUNC_LOCAL(enable_mmu)
         PRINT("- Turning on paging -\r\n")
 
         /* Set up memory attribute type tables */
@@ -361,7 +361,7 @@ enable_mmu:
         teq   r12, #0
         beq   remove_identity_mapping
         b     remove_temporary_mapping
-ENDPROC(enable_mmu)
+END(enable_mmu)
 
 /*
  * Switch to the runtime mapping. The logic depends on whether the
@@ -381,7 +381,7 @@ ENDPROC(enable_mmu)
  *
  * Clobbers r0 - r4
  */
-switch_to_runtime_mapping:
+FUNC_LOCAL(switch_to_runtime_mapping)
         /*
          * Jump to the runtime mapping if the virt and phys are not
          * clashing
@@ -426,7 +426,7 @@ ready_to_switch:
         PRINT_ID("- Jumping to runtime address -\r\n")
 
         mov   pc, lr
-ENDPROC(switch_to_runtime_mapping)
+END(switch_to_runtime_mapping)
 
 /*
  * Enable mm (turn on the data cache and the MMU) for secondary CPUs.
@@ -443,7 +443,7 @@ ENDPROC(switch_to_runtime_mapping)
  *
  * Clobbers r0 - r6
  */
-ENTRY(enable_secondary_cpu_mm)
+FUNC(enable_secondary_cpu_mm)
         mov   r6, lr
 
         bl    create_page_tables
@@ -471,7 +471,7 @@ ENTRY(enable_secondary_cpu_mm)
 
         /* Return to the virtual address requested by the caller. */
         mov   pc, r6
-ENDPROC(enable_secondary_cpu_mm)
+END(enable_secondary_cpu_mm)
 
 /*
  * Enable mm (turn on the data cache and the MMU) for the boot CPU.
@@ -489,7 +489,7 @@ ENDPROC(enable_secondary_cpu_mm)
  *
  * Clobbers r0 - r6
  */
-ENTRY(enable_boot_cpu_mm)
+FUNC(enable_boot_cpu_mm)
         mov   r6, lr
 
 #ifdef CONFIG_EARLY_PRINTK
@@ -506,7 +506,7 @@ ENTRY(enable_boot_cpu_mm)
         /* Address in the runtime mapping to jump to after the MMU is enabled */
         mov   lr, r6
         b     enable_mmu
-ENDPROC(enable_boot_cpu_mm)
+END(enable_boot_cpu_mm)
 
 /*
  * Remove the 1:1 map from the page-tables. It is not easy to keep track
@@ -518,7 +518,7 @@ ENDPROC(enable_boot_cpu_mm)
  *
  * Clobbers r0 - r3
  */
-remove_identity_mapping:
+FUNC_LOCAL(remove_identity_mapping)
         PRINT("- Removing the identity mapping -\r\n")
 
         /* r2:r3 := invalid page-table entry */
@@ -533,14 +533,14 @@ remove_identity_mapping:
 
         flush_xen_tlb_local r0
         mov   pc, lr
-ENDPROC(remove_identity_mapping)
+END(remove_identity_mapping)
 
 /*
  * Remove the temporary mapping of Xen starting at TEMPORARY_XEN_VIRT_START.
  *
  * Clobbers r0 - r3
  */
-remove_temporary_mapping:
+FUNC_LOCAL(remove_temporary_mapping)
         PRINT("- Removing the temporary mapping -\r\n")
 
         /* r2:r3 := invalid page-table entry */
@@ -556,13 +556,14 @@ remove_temporary_mapping:
         flush_xen_tlb_local r0
 
         mov  pc, lr
-ENDPROC(remove_temporary_mapping)
+END(remove_temporary_mapping)
 
 /* Fail-stop */
-fail:   PRINT("- Boot failed -\r\n")
+FUNC_LOCAL(fail)
+        PRINT("- Boot failed -\r\n")
 1:      wfe
         b     1b
-ENDPROC(fail)
+END(fail)
 
 /*
  * Switch TTBR
@@ -570,7 +571,7 @@ ENDPROC(fail)
  *
  * TODO: This code does not comply with break-before-make.
  */
-ENTRY(switch_ttbr)
+FUNC(switch_ttbr)
         dsb                            /* Ensure the flushes happen before
                                         * continuing */
         isb                            /* Ensure synchronization with previous
@@ -594,4 +595,4 @@ ENTRY(switch_ttbr)
         isb
 
         mov pc, lr
-ENDPROC(switch_ttbr)
+END(switch_ttbr)
