@@ -53,17 +53,9 @@
 
 /* Linkage for ARM */
 #ifdef __ASSEMBLY__
-#define ALIGN .balign CONFIG_FUNCTION_ALIGNMENT
-#define ENTRY(name)                             \
-  .globl name;                                  \
-  ALIGN;                                        \
-  name:
 #define GLOBAL(name)                            \
   .globl name;                                  \
   name:
-#define ENDPROC(name) \
-  .type name, %function; \
-  END(name)
 #endif
 
 #include <xen/const.h>
