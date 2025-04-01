@@ -1,6 +1,6 @@
 /*
- * cpu_idle - xen idle state module derived from Linux 
- *            drivers/acpi/processor_idle.c & 
+ * cpu_idle - xen idle state module derived from Linux
+ *            drivers/acpi/processor_idle.c &
  *            arch/x86/kernel/acpi/cstate.c
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
@@ -30,33 +30,33 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
-#include <xen/errno.h>
-#include <xen/lib.h>
-#include <xen/types.h>
 #include <xen/acpi.h>
-#include <xen/smp.h>
+#include <xen/cpu.h>
+#include <xen/errno.h>
 #include <xen/guest_access.h>
-#include <xen/keyhandler.h>
-#include <xen/param.h>
-#include <xen/trace.h>
 #include <xen/irq.h>
-#include <xen/sections.h>
-
-#include <asm/io.h>
-#include <asm/iocap.h>
-#include <asm/hpet.h>
-#include <asm/processor.h>
+#include <xen/keyhandler.h>
+#include <xen/lib.h>
+#include <xen/notifier.h>
+#include <xen/param.h>
 #include <xen/pmstat.h>
+#include <xen/sections.h>
+#include <xen/smp.h>
 #include <xen/softirq.h>
-#include <public/platform.h>
-#include <public/sysctl.h>
+#include <xen/trace.h>
+
 #include <acpi/cpufreq/cpufreq.h>
 #include <asm/apic.h>
 #include <asm/cpuidle.h>
+#include <asm/hpet.h>
+#include <asm/io.h>
+#include <asm/iocap.h>
 #include <asm/mwait.h>
-#include <xen/notifier.h>
-#include <xen/cpu.h>
+#include <asm/processor.h>
 #include <asm/spec_ctrl.h>
+
+#include <public/platform.h>
+#include <public/sysctl.h>
 
 /*#define DEBUG_PM_CX*/
 
@@ -791,7 +791,7 @@ static void cf_check acpi_processor_idle(void)
 
     case ACPI_STATE_C3:
         /*
-         * Before invoking C3, be aware that TSC/APIC timer may be 
+         * Before invoking C3, be aware that TSC/APIC timer may be
          * stopped by H/W. Without carefully handling of TSC/APIC stop issues,
          * deep C state can't work correctly.
          */
@@ -1082,7 +1082,7 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
         break;
 
     case ACPI_ADR_SPACE_FIXED_HARDWARE:
-        if ( cx->reg.bit_width != VENDOR_INTEL || 
+        if ( cx->reg.bit_width != VENDOR_INTEL ||
              cx->reg.bit_offset != NATIVE_CSTATE_BEYOND_HALT )
             return -EINVAL;
 
@@ -1269,14 +1269,14 @@ static void print_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
            "\t       pwr_setup_done[%d], bm_rld_set[%d]\n",
            power->flags.bm_control, power->flags.bm_check, power->flags.has_cst,
            power->flags.power_setup_done, power->flags.bm_rld_set);
-    
+
     states = power->states;
-    
+
     for ( i = 0; i < power->count; i++ )
     {
         if ( unlikely(copy_from_guest_offset(&state, states, i, 1)) )
             return;
-        
+
         printk("\tstates[%d]:\n", i);
         printk("\t\treg.space_id = %#x\n", state.reg.space_id);
         printk("\t\treg.bit_width = %#x\n", state.reg.bit_width);
@@ -1289,7 +1289,7 @@ static void print_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
 
         csd = state.dp;
         printk("\t\tdp(@0x%p)\n", csd.p);
-        
+
         if ( csd.p != NULL )
         {
             if ( unlikely(copy_from_guest(&dp, csd, 1)) )
@@ -1388,7 +1388,7 @@ long set_cx_pminfo(uint32_t acpi_id, struct xen_processor_power *power)
 
         dead_idle = acpi_dead_idle;
     }
- 
+
     return 0;
 }
 
@@ -1676,4 +1676,3 @@ static int __init cf_check cpuidle_presmp_init(void)
     return 0;
 }
 presmp_initcall(cpuidle_presmp_init);
-
