@@ -79,15 +79,18 @@ ENTRY(__high_start)
 .L_bsp:
         tailcall __start_xen
 
+/* Around page tables the fill pattern would better be zero. */
+#undef DATA_FILL
+#define DATA_FILL 0
+
         .section .data.page_aligned, "aw", @progbits
-        .align PAGE_SIZE, 0
 /*
  * Mapping of first 2 megabytes of memory. This is mapped with 4kB mappings
  * to avoid type conflicts with fixed-range MTRRs covering the lowest megabyte
  * of physical memory. In any case the VGA hole should be mapped with type UC.
  * Uses 1x 4k page.
  */
-l1_directmap:
+DATA_LOCAL(l1_directmap, PAGE_SIZE)
         pfn = 0
         .rept L1_PAGETABLE_ENTRIES
         /* VGA hole (0xa0000-0xc0000) should be mapped UC-. */
@@ -98,7 +101,7 @@ l1_directmap:
         .endif
         pfn = pfn + 1
         .endr
-        .size l1_directmap, . - l1_directmap
+END(l1_directmap)
 
 /*
  * __page_tables_{start,end} cover the range of pagetables which need
@@ -111,17 +114,17 @@ GLOBAL(__page_tables_start)
  * Space for 4G worth of 2M mappings, first 2M actually mapped via
  * l1_directmap[].  Uses 4x 4k pages.
  */
-GLOBAL(l2_directmap)
+DATA(l2_directmap, PAGE_SIZE)
         .quad sym_offs(l1_directmap) + __PAGE_HYPERVISOR
         .fill 4 * L2_PAGETABLE_ENTRIES - 1, 8, 0
-        .size l2_directmap, . - l2_directmap
+END(l2_directmap)
 
 /*
  * L2 mapping the Xen text/data/bss region, constructed dynamically.
  * Executable fixmap is hooked up statically.
  * Uses 1x 4k page.
  */
-GLOBAL(l2_xenmap)
+DATA(l2_xenmap, PAGE_SIZE)
         idx = 0
         .rept L2_PAGETABLE_ENTRIES
         .if idx == l2_table_offset(FIXADDR_X_TOP - 1)
@@ -131,10 +134,10 @@ GLOBAL(l2_xenmap)
         .endif
         idx = idx + 1
         .endr
-        .size l2_xenmap, . - l2_xenmap
+END(l2_xenmap)
 
 /* L2 mapping the fixmap.  Uses 1x 4k page. */
-l2_fixmap:
+DATA_LOCAL(l2_fixmap, PAGE_SIZE)
         idx = 0
         .rept L2_PAGETABLE_ENTRIES
         .if idx == l2_table_offset(FIXADDR_TOP - 1)
@@ -144,20 +147,20 @@ l2_fixmap:
         .endif
         idx = idx + 1
         .endr
-        .size l2_fixmap, . - l2_fixmap
+END(l2_fixmap)
 
 /* Direct map, initially covering the 4 l2_directmap tables.  Uses 1x 4k page. */
-l3_directmap:
+DATA_LOCAL(l3_directmap, PAGE_SIZE)
         idx = 0
         .rept 4
         .quad sym_offs(l2_directmap) + (idx << PAGE_SHIFT) + __PAGE_HYPERVISOR
         idx = idx + 1
         .endr
         .fill L3_PAGETABLE_ENTRIES - 4, 8, 0
-        .size l3_directmap, . - l3_directmap
+END(l3_directmap)
 
 /* L3 mapping the fixmap.  Uses 1x 4k page. */
-l3_xenmap:
+DATA_LOCAL(l3_xenmap, PAGE_SIZE)
         idx = 0
         .rept L3_PAGETABLE_ENTRIES
         .if idx == l3_table_offset(XEN_VIRT_START)
@@ -169,10 +172,10 @@ l3_xenmap:
         .endif
         idx = idx + 1
         .endr
-        .size l3_xenmap, . - l3_xenmap
+END(l3_xenmap)
 
 /* Top-level master (and idle-domain) page directory. */
-GLOBAL(idle_pg_table)
+DATA(idle_pg_table, PAGE_SIZE)
         .quad sym_offs(l3_bootmap) + __PAGE_HYPERVISOR
         idx = 1
         .rept L4_PAGETABLE_ENTRIES - 1
@@ -185,22 +188,21 @@ GLOBAL(idle_pg_table)
         .endif
         idx = idx + 1
         .endr
-        .size idle_pg_table, . - idle_pg_table
+END(idle_pg_table)
 
 GLOBAL(__page_tables_end)
 
 /* Init pagetables. Enough page directories to map into 4GB. */
         .section .init.data, "aw", @progbits
-        .align PAGE_SIZE, 0
 
-l1_bootmap:
+DATA_LOCAL(l1_bootmap, PAGE_SIZE)
         .fill L1_PAGETABLE_ENTRIES, 8, 0
-        .size l1_bootmap, . - l1_bootmap
+END(l1_bootmap)
 
-GLOBAL(l2_bootmap)
+DATA(l2_bootmap, PAGE_SIZE)
         .fill 4 * L2_PAGETABLE_ENTRIES, 8, 0
-        .size l2_bootmap, . - l2_bootmap
+END(l2_bootmap)
 
-GLOBAL(l3_bootmap)
+DATA(l3_bootmap, PAGE_SIZE)
         .fill L3_PAGETABLE_ENTRIES, 8, 0
-        .size l3_bootmap, . - l3_bootmap
+END(l3_bootmap)
