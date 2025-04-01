@@ -6,7 +6,7 @@ set -ex -o pipefail
 rm -f smoke.serial
 
 export TEST_CMD="qemu-system-riscv64 \
-    -M virt \
+    -M virt,aia=aplic-imsic \
     -smp 1 \
     -nographic \
     -m 2g \
