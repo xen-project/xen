@@ -1,8 +1,11 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#include <xen/lib.h>
 #include <xen/init.h>
+#include <xen/lib.h>
+#include <xen/mm.h>
 #include <xen/sizes.h>
+
+struct page_info *frame_table;
 
 static void __init __maybe_unused build_assertions(void)
 {
@@ -13,3 +16,12 @@ static void __init __maybe_unused build_assertions(void)
      */
     BUILD_BUG_ON(PAGE_SIZE != SZ_4K);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

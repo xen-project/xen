@@ -3,6 +3,9 @@
 #ifndef __ARM_MPU_LAYOUT_H__
 #define __ARM_MPU_LAYOUT_H__
 
+#define FRAMETABLE_SIZE   GB(16)
+#define FRAMETABLE_NR     (FRAMETABLE_SIZE / sizeof(*frame_table))
+
 #define XEN_START_ADDRESS CONFIG_XEN_START_ADDRESS
 
 /*
