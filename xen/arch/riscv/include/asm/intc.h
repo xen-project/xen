@@ -17,4 +17,6 @@ struct intc_info {
     const struct dt_device_node *node;
 };
 
+void intc_preinit(void);
+
 #endif /* ASM__RISCV__INTERRUPT_CONTOLLER_H */

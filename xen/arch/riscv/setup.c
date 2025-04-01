@@ -16,6 +16,7 @@
 #include <asm/cpufeature.h>
 #include <asm/early_printk.h>
 #include <asm/fixmap.h>
+#include <asm/intc.h>
 #include <asm/sbi.h>
 #include <asm/setup.h>
 #include <asm/smp.h>
@@ -127,6 +128,8 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
     riscv_fill_hwcap();
 
     preinit_xen_time();
+
+    intc_preinit();
 
     printk("All set up\n");
 
