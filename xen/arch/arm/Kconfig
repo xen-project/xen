@@ -85,6 +85,7 @@ config MMU
 
 config MPU
 	bool "MPU" if UNSUPPORTED
+	select STATIC_MEMORY
 	help
 	  Memory Protection Unit (MPU). Select if you plan to run Xen on ARMv8-R
 	  systems supporting EL2. (UNSUPPORTED)
@@ -102,7 +103,7 @@ config ACPI
 
 config ARM_EFI
 	bool "UEFI boot service support"
-	depends on ARM_64
+	depends on ARM_64 && !MPU
 	default y
 	help
 	  This option provides support for boot services through
