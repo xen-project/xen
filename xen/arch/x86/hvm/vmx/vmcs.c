@@ -749,30 +749,15 @@ static int _vmx_cpu_up(bool bsp)
     if ( bsp && (rc = vmx_cpu_up_prepare(cpu)) != 0 )
         return rc;
 
-    switch ( __vmxon(this_cpu(vmxon_region)) )
-    {
-    case -2: /* #UD or #GP */
-        if ( bios_locked &&
-             test_bit(X86_FEATURE_SMX, &boot_cpu_data.x86_capability) &&
-             (!(eax & IA32_FEATURE_CONTROL_ENABLE_VMXON_OUTSIDE_SMX) ||
-              !(eax & IA32_FEATURE_CONTROL_ENABLE_VMXON_INSIDE_SMX)) )
-        {
-            printk("CPU%d: VMXON failed: perhaps because of TXT settings "
-                   "in your BIOS configuration?\n", cpu);
-            printk(" --> Disable TXT in your BIOS unless using a secure "
-                   "bootloader.\n");
-            return -EINVAL;
-        }
-        /* fall through */
-    case -1: /* CF==1 or ZF==1 */
-        printk("CPU%d: unexpected VMXON failure\n", cpu);
-        return -EINVAL;
-    case 0: /* success */
-        this_cpu(vmxon) = 1;
-        break;
-    default:
-        BUG();
-    }
+    asm goto ( "1: vmxon %[addr]\n\t"
+               "   jbe %l[vmxon_fail]\n\t"
+               _ASM_EXTABLE(1b, %l[vmxon_fault])
+               :
+               : [addr] "m" (this_cpu(vmxon_region))
+               : "memory"
+               : vmxon_fail, vmxon_fault );
+
+    this_cpu(vmxon) = 1;
 
     hvm_asid_init(cpu_has_vmx_vpid ? (1u << VMCS_VPID_WIDTH) : 0);
 
@@ -785,6 +770,24 @@ static int _vmx_cpu_up(bool bsp)
     vmx_pi_per_cpu_init(cpu);
 
     return 0;
+
+ vmxon_fault:
+    if ( bios_locked &&
+         test_bit(X86_FEATURE_SMX, &boot_cpu_data.x86_capability) &&
+         (!(eax & IA32_FEATURE_CONTROL_ENABLE_VMXON_OUTSIDE_SMX) ||
+          !(eax & IA32_FEATURE_CONTROL_ENABLE_VMXON_INSIDE_SMX)) )
+    {
+        printk(XENLOG_ERR
+               "CPU%d: VMXON failed: perhaps because of TXT settings in your BIOS configuration?\n",
+               cpu);
+        printk(XENLOG_ERR
+               " --> Disable TXT in your BIOS unless using a secure bootloader.\n");
+        return -EINVAL;
+    }
+
+ vmxon_fail:
+    printk(XENLOG_ERR "CPU%d: unexpected VMXON failure\n", cpu);
+    return -EINVAL;
 }
 
 int cf_check vmx_cpu_up(void)
