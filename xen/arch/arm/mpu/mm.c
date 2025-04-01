@@ -17,6 +17,12 @@ static void __init __maybe_unused build_assertions(void)
     BUILD_BUG_ON(PAGE_SIZE != SZ_4K);
 }
 
+void __iomem *ioremap_attr(paddr_t start, size_t len, unsigned int flags)
+{
+    BUG_ON("unimplemented");
+    return NULL;
+}
+
 /*
  * Local variables:
  * mode: C

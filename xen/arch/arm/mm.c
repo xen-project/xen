@@ -395,6 +395,11 @@ unsigned long get_upper_mfn_bound(void)
     return max_page - 1;
 }
 
+void *ioremap(paddr_t pa, size_t len)
+{
+    return ioremap_attr(pa, len, PAGE_HYPERVISOR_NOCACHE);
+}
+
 /*
  * Local variables:
  * mode: C

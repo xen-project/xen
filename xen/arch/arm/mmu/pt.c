@@ -223,11 +223,6 @@ void *ioremap_attr(paddr_t start, size_t len, unsigned int attributes)
     return ptr + offs;
 }
 
-void *ioremap(paddr_t pa, size_t len)
-{
-    return ioremap_attr(pa, len, PAGE_HYPERVISOR_NOCACHE);
-}
-
 static int create_xen_table(lpae_t *entry)
 {
     mfn_t mfn;
