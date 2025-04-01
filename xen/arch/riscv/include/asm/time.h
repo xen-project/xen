@@ -3,7 +3,11 @@
 #define ASM__RISCV__TIME_H
 
 #include <xen/bug.h>
+#include <xen/types.h>
 #include <asm/csr.h>
+
+/* Clock cycles count at Xen startup */
+extern uint64_t boot_clock_cycles;
 
 struct vcpu;
 
@@ -18,6 +22,8 @@ static inline cycles_t get_cycles(void)
 {
     return csr_read(CSR_TIME);
 }
+
+void preinit_xen_time(void);
 
 #endif /* ASM__RISCV__TIME_H */
 

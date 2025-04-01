@@ -27,8 +27,6 @@ nodemask_t __read_mostly node_online_map = { { [0] = 1UL } };
 
 /* time.c */
 
-unsigned long __ro_after_init cpu_khz;  /* CPU clock frequency in kHz. */
-
 s_time_t get_s_time(void)
 {
     BUG_ON("unimplemented");

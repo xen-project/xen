@@ -126,6 +126,8 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
 
     riscv_fill_hwcap();
 
+    preinit_xen_time();
+
     printk("All set up\n");
 
     machine_halt();
