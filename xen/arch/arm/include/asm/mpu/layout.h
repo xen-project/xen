@@ -22,6 +22,8 @@
  */
 #define XEN_VIRT_START         _AT(paddr_t, XEN_START_ADDRESS)
 
+#define HYPERVISOR_VIRT_START  XEN_VIRT_START
+
 #endif /* __ARM_MPU_LAYOUT_H__ */
 /*
  * Local variables:
