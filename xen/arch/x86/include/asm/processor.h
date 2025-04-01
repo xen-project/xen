@@ -319,23 +319,6 @@ static always_inline void set_in_cr4 (unsigned long mask)
     write_cr4(read_cr4() | mask);
 }
 
-static always_inline void __monitor(const void *eax, unsigned long ecx,
-                                    unsigned long edx)
-{
-    /* "monitor %eax,%ecx,%edx;" */
-    asm volatile (
-        ".byte 0x0f,0x01,0xc8;"
-        : : "a" (eax), "c" (ecx), "d"(edx) );
-}
-
-static always_inline void __mwait(unsigned long eax, unsigned long ecx)
-{
-    /* "mwait %eax,%ecx;" */
-    asm volatile (
-        ".byte 0x0f,0x01,0xc9;"
-        : : "a" (eax), "c" (ecx) );
-}
-
 #define IOBMP_BYTES             8192
 #define IOBMP_INVALID_OFFSET    0x8000
 
