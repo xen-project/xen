@@ -110,11 +110,19 @@ struct operand {
     } mem;
 };
 
+#if defined(__x86_64__)
 #define REX_PREFIX 0x40
 #define REX_B 0x01
 #define REX_X 0x02
 #define REX_R 0x04
 #define REX_W 0x08
+#elif defined(__i386__)
+#define REX_PREFIX 0
+#define REX_B 0
+#define REX_X 0
+#define REX_R 0
+#define REX_W 0
+#endif
 
 enum simd_opsize {
     simd_none,
