@@ -44,6 +44,9 @@ config ALTERNATIVE_CALL
 config ARCH_MAP_DOMAIN_PAGE
 	bool
 
+config ARCH_PAGING_MEMPOOL
+	bool
+
 config GENERIC_BUG_FRAME
 	bool
 

@@ -673,21 +673,6 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     return -EINVAL;
 }
 
-static unsigned long __init domain_p2m_pages(unsigned long maxmem_kb,
-                                             unsigned int smp_cpus)
-{
-    /*
-     * Keep in sync with libxl__get_required_paging_memory().
-     * 256 pages (1MB) per vcpu, plus 1 page per MiB of RAM for the P2M map,
-     * plus 128 pages to cover extended regions.
-     */
-    unsigned long memkb = 4 * (256 * smp_cpus + (maxmem_kb / 1024) + 128);
-
-    BUILD_BUG_ON(PAGE_SIZE != SZ_4K);
-
-    return DIV_ROUND_UP(memkb, 1024) << (20 - PAGE_SHIFT);
-}
-
 static int __init alloc_xenstore_evtchn(struct domain *d)
 {
     evtchn_alloc_unbound_t alloc;
@@ -841,23 +826,28 @@ static void __init domain_vcpu_affinity(struct domain *d,
     }
 }
 
-static int __init construct_domU(struct domain *d,
-                                 const struct dt_device_node *node)
+#ifdef CONFIG_ARCH_PAGING_MEMPOOL
+static unsigned long __init domain_p2m_pages(unsigned long maxmem_kb,
+                                             unsigned int smp_cpus)
 {
-    struct kernel_info kinfo = KERNEL_INFO_INIT;
-    const char *dom0less_enhanced;
-    int rc;
-    u64 mem;
-    u32 p2m_mem_mb;
-    unsigned long p2m_pages;
+    /*
+     * Keep in sync with libxl__get_required_paging_memory().
+     * 256 pages (1MB) per vcpu, plus 1 page per MiB of RAM for the P2M map,
+     * plus 128 pages to cover extended regions.
+     */
+    unsigned long memkb = 4 * (256 * smp_cpus + (maxmem_kb / 1024) + 128);
 
-    rc = dt_property_read_u64(node, "memory", &mem);
-    if ( !rc )
-    {
-        printk("Error building DomU: cannot read \"memory\" property\n");
-        return -EINVAL;
-    }
-    kinfo.unassigned_mem = (paddr_t)mem * SZ_1K;
+    BUILD_BUG_ON(PAGE_SIZE != SZ_4K);
+
+    return DIV_ROUND_UP(memkb, 1024) << (20 - PAGE_SHIFT);
+}
+
+static int __init domain_p2m_set_allocation(struct domain *d, uint64_t mem,
+                                            const struct dt_device_node *node)
+{
+    unsigned long p2m_pages;
+    uint32_t p2m_mem_mb;
+    int rc;
 
     rc = dt_property_read_u32(node, "xen,domain-p2m-mem-mb", &p2m_mem_mb);
     /* If xen,domain-p2m-mem-mb is not specified, use the default value. */
@@ -868,6 +858,34 @@ static int __init construct_domU(struct domain *d,
     spin_lock(&d->arch.paging.lock);
     rc = p2m_set_allocation(d, p2m_pages, NULL);
     spin_unlock(&d->arch.paging.lock);
+
+    return rc;
+}
+#else /* !CONFIG_ARCH_PAGING_MEMPOOL */
+static inline int domain_p2m_set_allocation(struct domain *d, uint64_t mem,
+                                            const struct dt_device_node *node)
+{
+    return 0;
+}
+#endif /* CONFIG_ARCH_PAGING_MEMPOOL */
+
+static int __init construct_domU(struct domain *d,
+                                 const struct dt_device_node *node)
+{
+    struct kernel_info kinfo = KERNEL_INFO_INIT;
+    const char *dom0less_enhanced;
+    int rc;
+    u64 mem;
+
+    rc = dt_property_read_u64(node, "memory", &mem);
+    if ( !rc )
+    {
+        printk("Error building DomU: cannot read \"memory\" property\n");
+        return -EINVAL;
+    }
+    kinfo.unassigned_mem = (paddr_t)mem * SZ_1K;
+
+    rc = domain_p2m_set_allocation(d, mem, node);
     if ( rc != 0 )
         return rc;
 

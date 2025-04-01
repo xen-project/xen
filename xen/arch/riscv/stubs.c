@@ -333,11 +333,6 @@ void arch_do_physinfo(struct xen_sysctl_physinfo *pi)
 
 /* p2m.c */
 
-int arch_set_paging_mempool_size(struct domain *d, uint64_t size)
-{
-    BUG_ON("unimplemented");
-}
-
 int unmap_mmio_regions(struct domain *d,
                        gfn_t start_gfn,
                        unsigned long nr,
@@ -356,12 +351,6 @@ int map_mmio_regions(struct domain *d,
 
 int set_foreign_p2m_entry(struct domain *d, const struct domain *fd,
                           unsigned long gfn, mfn_t mfn)
-{
-    BUG_ON("unimplemented");
-}
-
-/* Return the size of the pool, in bytes. */
-int arch_get_paging_mempool_size(struct domain *d, uint64_t *size)
 {
     BUG_ON("unimplemented");
 }
