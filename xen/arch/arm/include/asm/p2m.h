@@ -168,7 +168,7 @@ typedef enum {
 #if defined(CONFIG_MMU)
 # include <asm/mmu/p2m.h>
 #else
-# error "Unknown memory management layout"
+# include <asm/mpu/p2m.h>
 #endif
 
 static inline bool arch_acquire_resource_check(struct domain *d)
