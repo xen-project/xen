@@ -18,14 +18,6 @@ int make_resv_memory_node(const struct kernel_info *kinfo, int addrcells,
 int process_shm(struct domain *d, struct kernel_info *kinfo,
                 const struct dt_device_node *node);
 
-static inline int process_shm_chosen(struct domain *d,
-                                     struct kernel_info *kinfo)
-{
-    const struct dt_device_node *node = dt_find_node_by_path("/chosen");
-
-    return process_shm(d, kinfo, node);
-}
-
 int process_shm_node(const void *fdt, int node, uint32_t address_cells,
                      uint32_t size_cells);
 
@@ -70,12 +62,6 @@ static inline int make_resv_memory_node(const struct kernel_info *kinfo,
 
 static inline int process_shm(struct domain *d, struct kernel_info *kinfo,
                               const struct dt_device_node *node)
-{
-    return 0;
-}
-
-static inline int process_shm_chosen(struct domain *d,
-                                     struct kernel_info *kinfo)
 {
     return 0;
 }

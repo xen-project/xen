@@ -2327,7 +2327,7 @@ int __init construct_hwdom(struct kernel_info *kinfo)
 
     if ( acpi_disabled )
     {
-        rc = process_shm_chosen(d, kinfo);
+        rc = process_shm(d, kinfo, NULL);
         if ( rc < 0 )
             return rc;
     }

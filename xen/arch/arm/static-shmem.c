@@ -297,6 +297,13 @@ int __init process_shm(struct domain *d, struct kernel_info *kinfo,
 {
     struct dt_device_node *shm_node;
 
+    /* Hwdom case - shm node under /chosen */
+    if ( !node )
+    {
+        node = dt_find_node_by_path("/chosen");
+        BUG_ON(!node);
+    }
+
     dt_for_each_child_node(node, shm_node)
     {
         const struct membank *boot_shm_bank;
