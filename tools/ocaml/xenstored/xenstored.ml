@@ -167,20 +167,20 @@ module DB = struct
                					   e.g. a RO socket from a previous version: ignore it *)
             global_f ~rw
           | "evtchn-dev" :: fd :: domexc_port :: [] ->
-            evtchn_f ~fd:(int_of_string fd)
-              ~domexc_port:(int_of_string domexc_port)
+            evtchn_f ~fd:(Utils.int_of_string_exn fd)
+              ~domexc_port:(Utils.int_of_string_exn domexc_port)
           | "socket" :: fd :: [] ->
-            socket_f ~fd:(int_of_string fd)
+            socket_f ~fd:(Utils.int_of_string_exn fd)
           | "dom" :: domid :: mfn :: remote_port :: rest ->
             let local_port = match rest with
               | [] -> None (* backward compat: old version didn't have it *)
-              | local_port :: _ -> Some (int_of_string local_port) in
+              | local_port :: _ -> Some (Utils.int_of_string_exn local_port) in
             domain_f ?local_port
-              ~remote_port:(int_of_string remote_port)
-              (int_of_string domid)
+              ~remote_port:(Utils.int_of_string_exn remote_port)
+              (Utils.int_of_string_exn domid)
               (Nativeint.of_string mfn)
           | "watch" :: domid :: path :: token :: [] ->
-            watch_f (int_of_string domid)
+            watch_f (Utils.int_of_string_exn domid)
               (unhexify path) (unhexify token)
           | "store" :: path :: perms :: value :: [] ->
             store_f (getpath path)
@@ -214,7 +214,7 @@ module DB = struct
     in
     let global_f ~rw =
       let get_listen_sock sockfd =
-        let fd = sockfd |> int_of_string |> Utils.FD.of_int in
+        let fd = sockfd |> Utils.int_of_string_exn |> Utils.FD.of_int in
         Unix.listen fd 1;
         Some fd
       in
