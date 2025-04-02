@@ -450,8 +450,17 @@ __initcall(cpu_idle_key_init);
 void mwait_idle_with_hints(unsigned int eax, unsigned int ecx)
 {
     unsigned int cpu = smp_processor_id();
+    struct cpu_info *info = get_cpu_info();
     irq_cpustat_t *stat = &irq_stat[cpu];
     const unsigned int *this_softirq_pending = &stat->__softirq_pending;
+
+    /*
+     * Heuristic: if we're definitely not going to idle, bail early as the
+     * speculative safety can be expensive.  This is a performance
+     * consideration not a correctness issue.
+     */
+    if ( *this_softirq_pending )
+        return;
 
     /*
      * By setting in_mwait, we promise to other CPUs that we'll notice changes
@@ -466,15 +475,19 @@ void mwait_idle_with_hints(unsigned int eax, unsigned int ecx)
                    "", X86_BUG_MONITOR,
                    [in_mwait] "=m" (stat->in_mwait));
 
+    /*
+     * On AMD systems, side effects from VERW cancel MONITOR, causing MWAIT to
+     * wake up immediately.  Therefore, VERW must come ahead of MONITOR.
+     */
+    __spec_ctrl_enter_idle_verw(info);
+
     monitor(this_softirq_pending, 0, 0);
 
     ASSERT(!local_irq_is_enabled());
 
     if ( !*this_softirq_pending )
     {
-        struct cpu_info *info = get_cpu_info();
-
-        spec_ctrl_enter_idle(info);
+        __spec_ctrl_enter_idle(info, false /* VERW handled above */);
 
         if ( ecx & MWAIT_ECX_INTERRUPT_BREAK )
             mwait(eax, ecx);
