@@ -126,8 +126,22 @@ static inline void init_shadow_spec_ctrl_state(void)
     info->verw_sel = __HYPERVISOR_DS32;
 }
 
+static always_inline void __spec_ctrl_enter_idle_verw(struct cpu_info *info)
+{
+    /*
+     * Flush/scrub structures which are statically partitioned between active
+     * threads.  Otherwise data of ours (of unknown sensitivity) will become
+     * available to our sibling when we go idle.
+     *
+     * Note: VERW must be encoded with a memory operand, as it is only that
+     * form with side effects.
+     */
+    alternative_input("", "verw %[sel]", X86_FEATURE_SC_VERW_IDLE,
+                      [sel] "m" (info->verw_sel));
+}
+
 /* WARNING! `ret`, `call *`, `jmp *` not safe after this call. */
-static always_inline void spec_ctrl_enter_idle(struct cpu_info *info)
+static always_inline void __spec_ctrl_enter_idle(struct cpu_info *info, bool verw)
 {
     uint32_t val = 0;
 
@@ -146,21 +160,8 @@ static always_inline void spec_ctrl_enter_idle(struct cpu_info *info)
                       "a" (val), "c" (MSR_SPEC_CTRL), "d" (0));
     barrier();
 
-    /*
-     * Microarchitectural Store Buffer Data Sampling:
-     *
-     * On vulnerable systems, store buffer entries are statically partitioned
-     * between active threads.  When entering idle, our store buffer entries
-     * are re-partitioned to allow the other threads to use them.
-     *
-     * Flush the buffers to ensure that no sensitive data of ours can be
-     * leaked by a sibling after it gets our store buffer entries.
-     *
-     * Note: VERW must be encoded with a memory operand, as it is only that
-     * form which causes a flush.
-     */
-    alternative_input("", "verw %[sel]", X86_FEATURE_SC_VERW_IDLE,
-                      [sel] "m" (info->verw_sel));
+    if ( verw ) /* Expected to be const-propagated. */
+        __spec_ctrl_enter_idle_verw(info);
 
     /*
      * Cross-Thread Return Address Predictions:
@@ -176,6 +177,12 @@ static always_inline void spec_ctrl_enter_idle(struct cpu_info *info)
      */
     alternative_input("", "DO_OVERWRITE_RSB xu=%=", X86_FEATURE_SC_RSB_IDLE,
                       : "rax", "rcx");
+}
+
+/* WARNING! `ret`, `call *`, `jmp *` not safe after this call. */
+static always_inline void spec_ctrl_enter_idle(struct cpu_info *info)
+{
+    __spec_ctrl_enter_idle(info, true /* VERW */);
 }
 
 /* WARNING! `ret`, `call *`, `jmp *` not safe before this call. */
