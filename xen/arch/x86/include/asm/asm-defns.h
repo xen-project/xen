@@ -1,17 +1,5 @@
 #include <asm/page-bits.h>
 
-.macro vmrun
-    .byte 0x0f, 0x01, 0xd8
-.endm
-
-.macro stgi
-    .byte 0x0f, 0x01, 0xdc
-.endm
-
-.macro clgi
-    .byte 0x0f, 0x01, 0xdd
-.endm
-
 /*
  * Call a noreturn function.  This could be JMP, but CALL results in a more
  * helpful backtrace.  BUG is to catch functions which do decide to return...

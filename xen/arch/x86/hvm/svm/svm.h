@@ -23,25 +23,17 @@ void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len);
 
 static inline void svm_vmload_pa(paddr_t vmcb)
 {
-    asm volatile (
-        ".byte 0x0f,0x01,0xda" /* vmload */
-        : : "a" (vmcb) : "memory" );
+    asm volatile ( "vmload" :: "a" (vmcb) : "memory" );
 }
 
 static inline void svm_vmsave_pa(paddr_t vmcb)
 {
-    asm volatile (
-        ".byte 0x0f,0x01,0xdb" /* vmsave */
-        : : "a" (vmcb) : "memory" );
+    asm volatile ( "vmsave" :: "a" (vmcb) : "memory" );
 }
 
 static inline void svm_invlpga(unsigned long linear, uint32_t asid)
 {
-    asm volatile (
-        ".byte 0x0f,0x01,0xdf"
-        : /* output */
-        : /* input */
-        "a" (linear), "c" (asid) );
+    asm volatile ( "invlpga" :: "a" (linear), "c" (asid) );
 }
 
 /*
