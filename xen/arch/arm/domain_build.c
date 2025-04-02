@@ -2325,9 +2325,12 @@ int __init construct_hwdom(struct kernel_info *kinfo)
     else
         allocate_memory(d, kinfo);
 
-    rc = process_shm_chosen(d, kinfo);
-    if ( rc < 0 )
-        return rc;
+    if ( acpi_disabled )
+    {
+        rc = process_shm_chosen(d, kinfo);
+        if ( rc < 0 )
+            return rc;
+    }
 
     /* Map extra GIC MMIO, irqs and other hw stuffs to dom0. */
     rc = gic_map_hwdom_extra_mappings(d);
