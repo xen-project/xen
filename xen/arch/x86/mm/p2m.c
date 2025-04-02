@@ -328,12 +328,46 @@ void p2m_put_gfn(struct p2m_domain *p2m, gfn_t gfn)
     gfn_unlock(p2m, gfn_x(gfn), 0);
 }
 
+static struct page_info *get_page_from_mfn_and_type(
+    const struct domain *d, mfn_t mfn, p2m_type_t t)
+{
+    struct page_info *page;
+
+    if ( !mfn_valid(mfn) )
+        return NULL;
+
+    page = mfn_to_page(mfn);
+
+    if ( p2m_is_ram(t) )
+    {
+        if ( p2m_is_shared(t) )
+            d = dom_cow;
+
+        if ( get_page(page, d) )
+            return page;
+    }
+    else if ( unlikely(p2m_is_foreign(t)) )
+    {
+        const struct domain *fdom = page_get_owner_and_reference(page);
+
+        if ( fdom )
+        {
+            if ( likely(fdom != d) )
+                return page;
+            ASSERT_UNREACHABLE();
+            put_page(page);
+        }
+    }
+
+    return NULL;
+}
+
 /* Atomically look up a GFN and take a reference count on the backing page. */
 struct page_info *p2m_get_page_from_gfn(
     struct p2m_domain *p2m, gfn_t gfn,
     p2m_type_t *t, p2m_access_t *a, p2m_query_t q)
 {
-    struct page_info *page = NULL;
+    struct page_info *page;
     p2m_access_t _a;
     p2m_type_t _t;
     mfn_t mfn;
@@ -347,26 +381,9 @@ struct page_info *p2m_get_page_from_gfn(
         /* Fast path: look up and get out */
         p2m_read_lock(p2m);
         mfn = p2m_get_gfn_type_access(p2m, gfn, t, a, 0, NULL, 0);
-        if ( p2m_is_any_ram(*t) && mfn_valid(mfn)
-             && !((q & P2M_UNSHARE) && p2m_is_shared(*t)) )
-        {
-            page = mfn_to_page(mfn);
-            if ( unlikely(p2m_is_foreign(*t)) || unlikely(p2m_is_grant(*t)) )
-            {
-                struct domain *fdom = page_get_owner_and_reference(page);
-
-                ASSERT(!p2m_is_foreign(*t) || fdom != p2m->domain);
-                if ( fdom == NULL )
-                    page = NULL;
-            }
-            else
-            {
-                struct domain *d = !p2m_is_shared(*t) ? p2m->domain : dom_cow;
-
-                if ( !get_page(page, d) )
-                    page = NULL;
-            }
-        }
+        page = !(q & P2M_UNSHARE) || !p2m_is_shared(*t)
+               ? get_page_from_mfn_and_type(p2m->domain, mfn, *t)
+               : NULL;
         p2m_read_unlock(p2m);
 
         if ( page )
@@ -380,14 +397,7 @@ struct page_info *p2m_get_page_from_gfn(
 
     /* Slow path: take the write lock and do fixups */
     mfn = get_gfn_type_access(p2m, gfn_x(gfn), t, a, q, NULL);
-    if ( p2m_is_ram(*t) && mfn_valid(mfn) )
-    {
-        struct domain *d = !p2m_is_shared(*t) ? p2m->domain : dom_cow;
-
-        page = mfn_to_page(mfn);
-        if ( !get_page(page, d) )
-            page = NULL;
-    }
+    page = get_page_from_mfn_and_type(p2m->domain, mfn, *t);
     put_gfn(p2m->domain, gfn_x(gfn));
 
     return page;
