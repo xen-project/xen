@@ -104,7 +104,8 @@ static void vgic_mmio_write_sgir(struct vcpu *source_vcpu,
     case GICD_SGI_TARGET_SELF:                    /* this very vCPU only */
         targets = (1U << source_vcpu->vcpu_id);
         break;
-    case 0x3:                                     /* reserved */
+
+    default:
         return;
     }
 
