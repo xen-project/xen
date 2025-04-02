@@ -158,11 +158,11 @@ END(enable_boot_cpu_mm)
  * We don't yet support secondary CPUs bring-up. Implement a dummy helper to
  * please the common code.
  */
-ENTRY(enable_secondary_cpu_mm)
+FUNC(enable_secondary_cpu_mm)
     PRINT("- SMP not enabled yet -\r\n")
 1:  wfe
     b 1b
-ENDPROC(enable_secondary_cpu_mm)
+END(enable_secondary_cpu_mm)
 
 /*
  * Local variables:
