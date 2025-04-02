@@ -30,7 +30,9 @@ static int init_percpu_area(unsigned int cpu)
     char *p;
 
     if ( __per_cpu_offset[cpu] != INVALID_PERCPU_AREA )
-        return park_offline_cpus ? 0 : -EBUSY;
+        return park_offline_cpus || system_state == SYS_STATE_resume
+               ? 0
+               : -EBUSY;
 
     if ( (p = alloc_xenheap_pages(PERCPU_ORDER, 0)) == NULL )
         return -ENOMEM;
