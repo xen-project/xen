@@ -6882,7 +6882,7 @@ x86_emulate(
             goto unhandleable;
         }
         break;
-#ifdef HAVE_AS_SSE4_2
+
     case X86EMUL_OPC_F2(0x0f38, 0xf0): /* crc32 r/m8, r{32,64} */
     case X86EMUL_OPC_F2(0x0f38, 0xf1): /* crc32 r/m{16,32,64}, r{32,64} */
         host_and_vcpu_must_have(sse4_2);
@@ -6901,17 +6901,16 @@ x86_emulate(
             asm ( "crc32l %1,%k0" : "+r" (dst.val)
                                   : "rm" (*(uint32_t *)&src.val) );
             break;
-# ifdef __x86_64__
+#ifdef __x86_64__
         case 8:
             asm ( "crc32q %1,%0" : "+r" (dst.val) : "rm" (src.val) );
             break;
-# endif
+#endif
         default:
             ASSERT_UNREACHABLE();
             goto unhandleable;
         }
         break;
-#endif
 
     case X86EMUL_OPC_VEX(0x0f38, 0xf2):    /* andn r/m,r,r */
     case X86EMUL_OPC_VEX(0x0f38, 0xf5):    /* bzhi r,r/m,r */
