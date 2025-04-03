@@ -216,9 +216,9 @@ static struct notifier_block x2apic_cpu_nfb = {
 static int8_t __initdata x2apic_phys = -1;
 boolean_param("x2apic_phys", x2apic_phys);
 
-enum {
+static enum {
    unset, physical, mixed
-} static __initdata x2apic_mode = unset;
+} x2apic_mode __initdata = unset;
 
 static int __init cf_check parse_x2apic_mode(const char *s)
 {

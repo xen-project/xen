@@ -91,10 +91,10 @@ static int __init pvh_populate_memory_range(struct domain *d,
                                             unsigned long start,
                                             unsigned long nr_pages)
 {
-    struct {
+    static const struct {
         unsigned long align;
         unsigned int order;
-    } static const __initconst orders[] = {
+    } orders[] __initconst = {
         /* NB: must be sorted by decreasing size. */
         { .align = PFN_DOWN(GB(1)), .order = PAGE_ORDER_1G },
         { .align = PFN_DOWN(MB(2)), .order = PAGE_ORDER_2M },

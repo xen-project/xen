@@ -1311,7 +1311,7 @@ static void gicv2_do_LPI(unsigned int lpi)
     BUG();
 }
 
-const static struct gic_hw_operations gicv2_ops = {
+static const struct gic_hw_operations gicv2_ops = {
     .info                = &gicv2_info,
     .init                = gicv2_init,
     .secondary_init      = gicv2_secondary_cpu_init,
