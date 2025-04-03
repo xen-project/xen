@@ -229,7 +229,7 @@ let do_debug con t _domains cons data =
       Logging.xb_op ~tid:0 ~ty:Xenbus.Xb.Op.Debug ~con:"=======>" msg;
       None
     | "quota" :: domid :: _ ->
-      let domid = Utils.int_of_string_exn domid in
+      let domid = int_of_string domid in
       let quota = (Store.get_quota t.Transaction.store) in
       Some (Quota.to_string quota domid ^ "\000")
     | "watches" :: _ ->
@@ -242,7 +242,7 @@ let do_debug con t _domains cons data =
       History.trim ();
       Some "trimmed"
     | "txn" :: domid :: _ ->
-      let domid = Utils.int_of_string_exn domid in
+      let domid = int_of_string domid in
       let con = Connections.find_domain cons domid in
       let b = Buffer.create 128 in
       let () = con.transactions |> Hashtbl.iter @@ fun id tx ->
@@ -253,7 +253,7 @@ let do_debug con t _domains cons data =
       in
       Some (Buffer.contents b)
     | "xenbus" :: domid :: _ ->
-      let domid = Utils.int_of_string_exn domid in
+      let domid = int_of_string domid in
       let con = Connections.find_domain cons domid in
       let s = Printf.sprintf "xenbus: %s; overflow queue length: %d, can_input: %b, has_more_input: %b, has_old_output: %b, has_new_output: %b, has_more_work: %b. pending: %s"
           (Xenbus.Xb.debug con.xb)
@@ -267,7 +267,7 @@ let do_debug con t _domains cons data =
       in
       Some s
     | "mfn" :: domid :: _ ->
-      let domid = Utils.int_of_string_exn domid in
+      let domid = int_of_string domid in
       let con = Connections.find_domain cons domid in
       may (fun dom -> Printf.sprintf "%nd\000" (Domain.get_mfn dom)) (Connection.get_domain con)
     | _ -> None
@@ -340,7 +340,7 @@ let do_isintroduced con _t domains _cons data =
   then raise Define.Permission_denied;
   let domid =
     match (split None '\000' data) with
-    | domid :: _ -> Utils.int_of_string_exn domid
+    | domid :: _ -> int_of_string domid
     | _          -> raise Invalid_Cmd_Args
   in
   if domid = Define.domid_self || Domains.exist domains domid then "T\000" else "F\000"
@@ -437,7 +437,7 @@ let input_handle_error ~cons ~doms ~fct ~con ~t ~req =
   | Quota.Limit_reached          -> reply_error "EQUOTA"
   | Quota.Data_too_big           -> reply_error "E2BIG"
   | Quota.Transaction_opened     -> reply_error "EQUOTA"
-  | Utils.ConversionFailed s     -> reply_error "EINVAL"
+  | (Failure "int_of_string")    -> reply_error "EINVAL"
   | Define.Unknown_operation     -> reply_error "ENOSYS"
 
 let write_access_log ~ty ~tid ~con ~data =
@@ -578,7 +578,7 @@ let do_introduce con t domains cons data =
   let (domid, mfn, remote_port) =
     match (split None '\000' data) with
     | domid :: mfn :: remote_port :: _ ->
-      Utils.int_of_string_exn domid, Nativeint.of_string mfn, Utils.int_of_string_exn remote_port
+      int_of_string domid, Nativeint.of_string mfn, int_of_string remote_port
     | _                         -> raise Invalid_Cmd_Args;
   in
   let dom =
@@ -604,7 +604,7 @@ let do_release con t domains cons data =
   then raise Define.Permission_denied;
   let domid =
     match (split None '\000' data) with
-    | [domid;""] -> Utils.int_of_string_exn domid
+    | [domid;""] -> int_of_string domid
     | _          -> raise Invalid_Cmd_Args
   in
   let fire_spec_watches = Domains.exist domains domid in
@@ -620,7 +620,7 @@ let do_resume con _t domains _cons data =
   then raise Define.Permission_denied;
   let domid =
     match (split None '\000' data) with
-    | domid :: _ -> Utils.int_of_string_exn domid
+    | domid :: _ -> int_of_string domid
     | _          -> raise Invalid_Cmd_Args
   in
   if Domains.exist domains domid
