@@ -74,21 +74,19 @@ static inline int rdmsr_amd_safe(unsigned int msr, unsigned int *lo,
 }
 
 static inline int wrmsr_amd_safe(unsigned int msr, unsigned int lo,
-				 unsigned int hi)
+                                 unsigned int hi)
 {
-	int err;
+    asm goto ( "1: wrmsr\n\t"
+               _ASM_EXTABLE(1b, %l[fault])
+               :
+               : "c" (msr), "a" (lo), "d" (hi), "D" (0x9c5a203a)
+               :
+               : fault );
 
-	asm volatile("1: wrmsr\n2:\n"
-		     ".section .fixup,\"ax\"\n"
-		     "3: movl %6,%0\n"
-		     "   jmp 2b\n"
-		     ".previous\n"
-		     _ASM_EXTABLE(1b, 3b)
-		     : "=r" (err)
-		     : "c" (msr), "a" (lo), "d" (hi), "D" (0x9c5a203a),
-		       "0" (0), "i" (-EFAULT));
+    return 0;
 
-	return err;
+ fault:
+    return -EFAULT;
 }
 
 static void wrmsr_amd(unsigned int msr, uint64_t val)
