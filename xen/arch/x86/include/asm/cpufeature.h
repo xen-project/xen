@@ -70,7 +70,7 @@ static inline bool boot_cpu_has(unsigned int feat)
 #define cpu_has_pse             1
 #define cpu_has_apic            boot_cpu_has(X86_FEATURE_APIC)
 #define cpu_has_sep             boot_cpu_has(X86_FEATURE_SEP)
-#define cpu_has_mtrr            1
+#define cpu_has_mtrr            boot_cpu_has(X86_FEATURE_MTRR)
 #define cpu_has_pge             1
 #define cpu_has_pse36           boot_cpu_has(X86_FEATURE_PSE36)
 #define cpu_has_clflush         boot_cpu_has(X86_FEATURE_CLFLUSH)
