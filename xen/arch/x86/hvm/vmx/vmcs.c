@@ -811,7 +811,7 @@ void cf_check vmx_cpu_down(void)
 
     BUG_ON(!(read_cr4() & X86_CR4_VMXE));
     this_cpu(vmxon) = 0;
-    __vmxoff();
+    asm volatile ( "vmxoff" ::: "memory" );
 
     local_irq_restore(flags);
 }
