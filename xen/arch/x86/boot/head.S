@@ -136,6 +136,7 @@ multiboot2_header:
 .Lno_nx_msg:   .asciz "ERR: Not an NX-capable CPU!"
 
         .section .init.data, "aw", @progbits
+        .subsection 1 /* Put data here after the page tables (in x86_64.S). */
         .align 4
 
         .word   0
