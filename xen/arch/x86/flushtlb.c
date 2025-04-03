@@ -287,7 +287,7 @@ void cache_flush(const void *addr, unsigned int size)
          * of letting the alternative framework fill the gap by appending nops.
          */
         alternative_input("ds; clflush %[p]",/* Semicolon for Clang-IAS < 12 */
-                          "data16 clflush %[p]", /* clflushopt */
+                          "clflushopt %[p]",
                            X86_FEATURE_CLFLUSHOPT,
                            [p] "m" (*(const char *)(addr)));
     }
@@ -313,33 +313,7 @@ void cache_writeback(const void *addr, unsigned int size)
     clflush_size = current_cpu_data.x86_clflush_size ?: 16;
     addr -= (unsigned long)addr & (clflush_size - 1);
     for ( ; addr < end; addr += clflush_size )
-    {
-/*
- * The arguments to a macro must not include preprocessor directives. Doing so
- * results in undefined behavior, so we have to create some defines here in
- * order to avoid it.
- */
-#if defined(HAVE_AS_CLWB)
-# define CLWB_ENCODING "clwb %[p]"
-#elif defined(HAVE_AS_XSAVEOPT)
-# define CLWB_ENCODING "data16 xsaveopt %[p]" /* clwb */
-#else
-# define CLWB_ENCODING ".byte 0x66, 0x0f, 0xae, 0x30" /* clwb (%%rax) */
-#endif
-
-#define BASE_INPUT(addr) [p] "m" (*(const char *)(addr))
-#if defined(HAVE_AS_CLWB) || defined(HAVE_AS_XSAVEOPT)
-# define INPUT BASE_INPUT
-#else
-# define INPUT(addr) "a" (addr), BASE_INPUT(addr)
-#endif
-
-        asm volatile (CLWB_ENCODING :: INPUT(addr));
-
-#undef INPUT
-#undef BASE_INPUT
-#undef CLWB_ENCODING
-    }
+        clwb(addr);
 
     asm volatile ("sfence" ::: "memory");
 }
