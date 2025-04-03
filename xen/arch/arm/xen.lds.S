@@ -45,7 +45,6 @@ SECTIONS
        *(.text.*)
 #endif
 
-       *(.fixup)
        *(.gnu.warning)
        _etext = .;             /* End of text section */
   } :text = 0x9090

@@ -33,7 +33,6 @@ SECTIONS
         *(.text.ident)
         _ident_end = .;
 
-        *(.fixup)
         *(.gnu.warning)
         . = ALIGN(POINTER_ALIGN);
         _etext = .;             /* End of text section */
