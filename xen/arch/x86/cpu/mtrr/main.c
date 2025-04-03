@@ -605,13 +605,15 @@ void mtrr_aps_sync_begin(void)
 
 void mtrr_aps_sync_end(void)
 {
-	set_mtrr(~0U, 0, 0, 0);
+	if (mtrr_if)
+		set_mtrr(~0U, 0, 0, 0);
 	hold_mtrr_updates_on_aps = 0;
 }
 
 void mtrr_bp_restore(void)
 {
-	mtrr_set_all();
+	if (mtrr_if)
+		mtrr_set_all();
 }
 
 static int __init cf_check mtrr_init_finialize(void)
