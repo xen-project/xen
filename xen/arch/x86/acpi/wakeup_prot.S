@@ -124,6 +124,8 @@ LABEL(s3_resume)
         mov     STACK_CPUINFO_FIELD(cr4)(%rbx), %rax
         mov     %rax, %cr4
 
+        call    mtrr_bp_restore
+
 .Lsuspend_err:
         pop     %r15
         pop     %r14
