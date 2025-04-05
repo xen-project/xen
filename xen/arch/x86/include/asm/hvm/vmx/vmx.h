@@ -294,28 +294,30 @@ extern uint8_t posted_intr_vector;
 
 static always_inline void __vmptrld(u64 addr)
 {
-    asm volatile ( "vmptrld %0\n\t"
-                   /* CF==1 or ZF==1 --> BUG() */
-                   UNLIKELY_START(be, vmptrld)
-                   _ASM_BUGFRAME_TEXT(0)
-                   UNLIKELY_END_SECTION
-                   :
-                   : "m" (addr),
-                     _ASM_BUGFRAME_INFO(BUGFRAME_bug, __LINE__, __FILE__, 0)
-                   : "memory" );
+    asm goto ( "vmptrld %[addr]\n\t"
+               "jbe %l[vmfail]"
+               :
+               : [addr] "m" (addr)
+               : "memory"
+               : vmfail );
+    return;
+
+ vmfail:
+    BUG();
 }
 
 static always_inline void __vmpclear(u64 addr)
 {
-    asm volatile ( "vmclear %0\n\t"
-                   /* CF==1 or ZF==1 --> BUG() */
-                   UNLIKELY_START(be, vmclear)
-                   _ASM_BUGFRAME_TEXT(0)
-                   UNLIKELY_END_SECTION
-                   :
-                   : "m" (addr),
-                     _ASM_BUGFRAME_INFO(BUGFRAME_bug, __LINE__, __FILE__, 0)
-                   : "memory" );
+    asm goto ( "vmclear %[addr]\n\t"
+               "jbe %l[vmfail]"
+               :
+               : [addr] "m" (addr)
+               : "memory"
+               : vmfail );
+    return;
+
+ vmfail:
+    BUG();
 }
 
 static always_inline void __vmread(unsigned long field, unsigned long *value)
@@ -332,14 +334,16 @@ static always_inline void __vmread(unsigned long field, unsigned long *value)
 
 static always_inline void __vmwrite(unsigned long field, unsigned long value)
 {
-    asm volatile ( "vmwrite %1, %0\n"
-                   /* CF==1 or ZF==1 --> BUG() */
-                   UNLIKELY_START(be, vmwrite)
-                   _ASM_BUGFRAME_TEXT(0)
-                   UNLIKELY_END_SECTION
-                   :
-                   : "r" (field) , "rm" (value),
-                     _ASM_BUGFRAME_INFO(BUGFRAME_bug, __LINE__, __FILE__, 0) );
+    asm goto ( "vmwrite %[value], %[field]\n\t"
+               "jbe %l[vmfail]"
+               :
+               : [field] "r" (field), [value] "rm" (value)
+               :
+               : vmfail );
+    return;
+
+ vmfail:
+    BUG();
 }
 
 static inline enum vmx_insn_errno vmread_safe(unsigned long field,
@@ -367,22 +371,22 @@ static inline enum vmx_insn_errno vmread_safe(unsigned long field,
 static inline enum vmx_insn_errno vmwrite_safe(unsigned long field,
                                                unsigned long value)
 {
-    unsigned long ret = VMX_INSN_SUCCEED;
-    bool fail_invalid, fail_valid;
+    unsigned long ret;
 
-    asm volatile ( "vmwrite %[value], %[field]\n\t"
-                   ASM_FLAG_OUT(, "setc %[invalid]\n\t")
-                   ASM_FLAG_OUT(, "setz %[valid]\n\t")
-                   : ASM_FLAG_OUT("=@ccc", [invalid] "=rm") (fail_invalid),
-                     ASM_FLAG_OUT("=@ccz", [valid] "=rm") (fail_valid)
-                   : [field] "r" (field),
-                     [value] "rm" (value) );
+    asm goto ( "vmwrite %[value], %[field]\n\t"
+               "jc %l[vmfail_invalid]\n\t"
+               "jz %l[vmfail_error]"
+               :
+               : [field] "r" (field), [value] "rm" (value)
+               :
+               : vmfail_invalid, vmfail_error );
+    return VMX_INSN_SUCCEED;
 
-    if ( unlikely(fail_invalid) )
-        ret = VMX_INSN_FAIL_INVALID;
-    else if ( unlikely(fail_valid) )
-        __vmread(VM_INSTRUCTION_ERROR, &ret);
+ vmfail_invalid:
+    return VMX_INSN_FAIL_INVALID;
 
+ vmfail_error:
+    __vmread(VM_INSTRUCTION_ERROR, &ret);
     return ret;
 }
 
@@ -400,15 +404,16 @@ static always_inline void __invept(unsigned long type, uint64_t eptp)
          !cpu_has_vmx_ept_invept_single_context )
         type = INVEPT_ALL_CONTEXT;
 
-    asm volatile ( "invept %0, %1\n\t"
-                   /* CF==1 or ZF==1 --> BUG() */
-                   UNLIKELY_START(be, invept)
-                   _ASM_BUGFRAME_TEXT(0)
-                   UNLIKELY_END_SECTION
-                   :
-                   : "m" (operand), "r" (type),
-                     _ASM_BUGFRAME_INFO(BUGFRAME_bug, __LINE__, __FILE__, 0)
-                   : "memory" );
+    asm goto ( "invept %[operand], %[type]\n\t"
+               "jbe %l[vmfail]"
+               :
+               : [operand] "m" (operand), [type] "r" (type)
+               : "memory"
+               : vmfail );
+    return;
+
+ vmfail:
+    BUG();
 }
 
 static always_inline void __invvpid(unsigned long type, u16 vpid, u64 gva)
@@ -420,16 +425,17 @@ static always_inline void __invvpid(unsigned long type, u16 vpid, u64 gva)
     }  operand = {vpid, 0, gva};
 
     /* Fix up #UD exceptions which occur when TLBs are flushed before VMXON. */
-    asm volatile ( "1: invvpid %0, %1\n\t"
-                   /* CF==1 or ZF==1 --> BUG() */
-                   UNLIKELY_START(be, invvpid)
-                   _ASM_BUGFRAME_TEXT(0)
-                   UNLIKELY_END_SECTION "\n"
-                   "2:" _ASM_EXTABLE(1b, 2b)
-                   :
-                   : "m" (operand), "r" (type),
-                     _ASM_BUGFRAME_INFO(BUGFRAME_bug, __LINE__, __FILE__, 0)
-                   : "memory" );
+    asm goto ( "1: invvpid %[operand], %[type]\n\t"
+               "   jbe %l[vmfail]\n\t"
+               "2:" _ASM_EXTABLE(1b, 2b)
+               :
+               : [operand] "m" (operand), [type] "r" (type)
+               : "memory"
+               : vmfail );
+    return;
+
+ vmfail:
+    BUG();
 }
 
 static inline void ept_sync_all(void)
