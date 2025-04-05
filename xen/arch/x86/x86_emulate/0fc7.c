@@ -32,7 +32,6 @@ int x86emul_0fc7(struct x86_emulate_state *s,
             return X86EMUL_UNRECOGNIZED;
 
         case 6: /* rdrand */
-#ifdef HAVE_AS_RDRAND
             generate_exception_if(s->vex.pfx >= vex_f3, X86_EXC_UD);
             host_and_vcpu_must_have(rdrand);
             *dst = s->ea;
@@ -43,12 +42,12 @@ int x86emul_0fc7(struct x86_emulate_state *s,
                       : "=r" (dst->val), ASM_FLAG_OUT("=@ccc", "=qm") (carry) );
                 break;
             default:
-# ifdef __x86_64__
+#ifdef __x86_64__
                 asm ( "rdrand %k0" ASM_FLAG_OUT(, "; setc %1")
                       : "=r" (dst->val), ASM_FLAG_OUT("=@ccc", "=qm") (carry) );
                 break;
             case 8:
-# endif
+#endif
                 asm ( "rdrand %0" ASM_FLAG_OUT(, "; setc %1")
                       : "=r" (dst->val), ASM_FLAG_OUT("=@ccc", "=qm") (carry) );
                 break;
@@ -57,9 +56,6 @@ int x86emul_0fc7(struct x86_emulate_state *s,
             if ( carry )
                 regs->eflags |= X86_EFLAGS_CF;
             break;
-#else
-            return X86EMUL_UNIMPLEMENTED;
-#endif
 
         case 7: /* rdseed / rdpid */
             if ( s->vex.pfx == vex_f3 ) /* rdpid */
@@ -77,7 +73,7 @@ int x86emul_0fc7(struct x86_emulate_state *s,
                 dst->bytes = 4;
                 break;
             }
-#ifdef HAVE_AS_RDSEED
+
             generate_exception_if(s->vex.pfx >= vex_f3, X86_EXC_UD);
             host_and_vcpu_must_have(rdseed);
             *dst = s->ea;
@@ -88,12 +84,12 @@ int x86emul_0fc7(struct x86_emulate_state *s,
                       : "=r" (dst->val), ASM_FLAG_OUT("=@ccc", "=qm") (carry) );
                 break;
             default:
-# ifdef __x86_64__
+#ifdef __x86_64__
                 asm ( "rdseed %k0" ASM_FLAG_OUT(, "; setc %1")
                       : "=r" (dst->val), ASM_FLAG_OUT("=@ccc", "=qm") (carry) );
                 break;
             case 8:
-# endif
+#endif
                 asm ( "rdseed %0" ASM_FLAG_OUT(, "; setc %1")
                       : "=r" (dst->val), ASM_FLAG_OUT("=@ccc", "=qm") (carry) );
                 break;
@@ -102,7 +98,6 @@ int x86emul_0fc7(struct x86_emulate_state *s,
             if ( carry )
                 regs->eflags |= X86_EFLAGS_CF;
             break;
-#endif
         }
     }
     else
