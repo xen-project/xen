@@ -641,11 +641,9 @@ amd_like(const struct x86_emulate_ctxt *ctxt)
 #if defined(__x86_64__)
 #define _LO32 "k"          /* force 32-bit operand */
 #define _STK  "%%rsp"      /* stack pointer */
-#define _BYTES_PER_LONG "8"
 #elif defined(__i386__)
 #define _LO32 ""           /* force 32-bit operand */
 #define _STK  "%%esp"      /* stack pointer */
-#define _BYTES_PER_LONG "4"
 #endif
 
 /* Before executing instruction: restore necessary bits in EFLAGS. */
@@ -659,7 +657,7 @@ amd_like(const struct x86_emulate_ctxt *ctxt)
 "pushf; "                                                       \
 "notl %"_LO32 _tmp"; "                                          \
 "andl %"_LO32 _tmp",("_STK"); "                                 \
-"andl %"_LO32 _tmp",2*"_BYTES_PER_LONG"("_STK"); "              \
+"andl %"_LO32 _tmp", 2 * " STR(__SIZEOF_LONG__) "("_STK"); "    \
 "pop  %"_tmp"; "                                                \
 "orl  %"_LO32 _tmp",("_STK"); "                                 \
 "popf; "                                                        \
