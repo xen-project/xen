@@ -94,7 +94,7 @@ ifconfig xenbr0 192.168.0.1
 
 # get domU console content into test log
 tail -F /var/log/xen/console/guest-domU.log 2>/dev/null | sed -e \"s/^/(domU) /\" &
-xl create /etc/xen/domU.cfg
+xl -vvv create /etc/xen/domU.cfg
 ${DOM0_CMD}
 " > etc/local.d/xen.start
 chmod +x etc/local.d/xen.start

@@ -122,7 +122,6 @@ echo \"${passed}\"
 "
 
         dom0_check="
-tail -F /var/log/xen/qemu-dm-domU.log &
 until grep -q \"^domU Welcome to Alpine Linux\" /var/log/xen/console/guest-domU.log; do
     sleep 1
 done
@@ -222,7 +221,8 @@ if [ -n "$domU_check" ]; then
     echo "
 # get domU console content into test log
 tail -F /var/log/xen/console/guest-domU.log 2>/dev/null | sed -e \"s/^/(domU) /\" &
-xl create /etc/xen/domU.cfg
+tail -F /var/log/xen/qemu-dm-domU.log 2>/dev/null | sed -e \"s/^/(qemu-dm) /\" &
+xl -vvv create /etc/xen/domU.cfg
 ${dom0_check}
 " >> etc/local.d/xen.start
 else
