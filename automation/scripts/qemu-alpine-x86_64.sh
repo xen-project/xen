@@ -56,7 +56,7 @@ bash /etc/init.d/xencommons start
 
 xl list
 
-xl create -c /root/test.cfg
+xl -vvv create -c /root/test.cfg
 
 " > etc/local.d/xen.start
 chmod +x etc/local.d/xen.start
