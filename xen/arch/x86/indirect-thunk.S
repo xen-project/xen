@@ -35,6 +35,16 @@
 .macro GEN_INDIRECT_THUNK reg:req
         .section .text.__x86_indirect_thunk_\reg, "ax", @progbits
 
+        /*
+         * The Indirect Target Selection speculative vulnerability means that
+         * indirect branches (including RETs) are unsafe when in the first
+         * half of a cacheline.  Arrange for them to be in the second half.
+         *
+         * Align to 64, then skip 32.
+         */
+        .balign 64
+        .fill 32, 1, 0xcc
+
 ENTRY(__x86_indirect_thunk_\reg)
         ALTERNATIVE_2 __stringify(IND_THUNK_RETPOLINE \reg),              \
         __stringify(IND_THUNK_LFENCE \reg), X86_FEATURE_IND_THUNK_LFENCE, \
