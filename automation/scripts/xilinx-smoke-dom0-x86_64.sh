@@ -49,7 +49,7 @@ ifconfig xenbr0 up
 ifconfig xenbr0 192.168.0.1
 # get domU console content into test log
 tail -F /var/log/xen/console/guest-domU.log 2>/dev/null | sed -e \"s/^/(domU) /\" &
-xl create /etc/xen/domU.cfg
+xl -vvv create /etc/xen/domU.cfg
 set +x
 until grep -q \"${DOMU_MSG}\" /var/log/xen/console/guest-domU.log; do
     sleep 1
@@ -75,7 +75,7 @@ done | argo-exec -p 28333 -d 0 -- /bin/echo
 "
     DOM0_CMD="
 insmod /root/xen-argo.ko
-xl create /etc/xen/domU.cfg
+xl -vvv create /etc/xen/domU.cfg
 argo-exec -l -p 28333 -- /bin/echo
 "
 copy_dom0_files ()

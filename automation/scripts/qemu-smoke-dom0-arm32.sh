@@ -21,7 +21,7 @@ echo "#!/bin/bash
 
 xl list
 
-xl create -c /root/test.cfg
+xl -vvv create -c /root/test.cfg
 
 " > ./root/xen.start
 echo "bash /root/xen.start" >> ./etc/init.d/xen-watchdog
