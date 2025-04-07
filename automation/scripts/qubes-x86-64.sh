@@ -104,6 +104,7 @@ on_reboot = "destroy"
         domU_check="
 set -x -e
 interface=eth0
+while ! [ -e \"/sys/class/net/\$interface\" ]; do sleep 1; done
 ip link set \"\$interface\" up
 timeout 30s udhcpc -i \"\$interface\"
 pingip=\$(ip -o -4 r show default|cut -f 3 -d ' ')
