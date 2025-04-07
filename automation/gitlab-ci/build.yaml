@@ -341,6 +341,7 @@ alpine-3.18-gcc-debug:
       CONFIG_ARGO=y
       CONFIG_UBSAN=y
       CONFIG_UBSAN_FATAL=y
+      CONFIG_XHCI=y
 
 debian-12-x86_64-gcc-debug:
   extends: .gcc-x86-64-build-debug
