@@ -598,7 +598,7 @@ __UNLIKELY_END(create_bounce_frame_bad_bounce_ip)
         xor   %eax, %eax
         mov   %rax, TRAPBOUNCE_eip(%rdx)
         mov   %al,  TRAPBOUNCE_flags(%rdx)
-        ret
+        RET
 
         .pushsection .fixup, "ax", @progbits
         # Numeric tags below represent the intended overall %rsi adjustment.

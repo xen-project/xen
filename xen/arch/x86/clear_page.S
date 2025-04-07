@@ -1,5 +1,6 @@
         .file __FILE__
 
+#include <asm/asm_defns.h>
 #include <asm/page.h>
 
 ENTRY(clear_page_sse2)
@@ -15,7 +16,7 @@ ENTRY(clear_page_sse2)
         jnz     0b
 
         sfence
-        ret
+        RET
 
         .type clear_page_sse2, @function
         .size clear_page_sse2, . - clear_page_sse2

@@ -44,6 +44,7 @@ obj-$(CONFIG_LIVEPATCH) += livepatch.o
 obj-y += msi.o
 obj-y += msr.o
 obj-$(CONFIG_INDIRECT_THUNK) += indirect-thunk.o
+obj-$(CONFIG_RETURN_THUNK) += indirect-thunk.o
 obj-$(CONFIG_PV) += ioport_emulate.o
 obj-y += irq.o
 obj-$(CONFIG_KEXEC) += machine_kexec.o

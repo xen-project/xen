@@ -1,5 +1,6 @@
         .file __FILE__
 
+#include <asm/asm_defns.h>
 #include <asm/page.h>
 
 #define src_reg %rsi
@@ -40,7 +41,7 @@ ENTRY(copy_page_sse2)
         movnti  tmp4_reg, 3*WORD_SIZE(dst_reg)
 
         sfence
-        ret
+        RET
 
         .type copy_page_sse2, @function
         .size copy_page_sse2, . - copy_page_sse2

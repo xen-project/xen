@@ -23,7 +23,7 @@ ENTRY(clear_bhb_tsx)
 0:      .byte 0xc6, 0xf8, 0             /* xabort $0 */
         int3
 1:
-        ret
+        RET
 
         .size clear_bhb_tsx, . - clear_bhb_tsx
         .type clear_bhb_tsx, @function

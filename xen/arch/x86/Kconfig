@@ -35,8 +35,13 @@ config ARCH_DEFCONFIG
 	default "arch/x86/configs/x86_64_defconfig"
 
 config CC_HAS_INDIRECT_THUNK
+	# GCC >= 8 or Clang >= 6
 	def_bool $(cc-option,-mindirect-branch-register) || \
 	         $(cc-option,-mretpoline-external-thunk)
+
+config CC_HAS_RETURN_THUNK
+	# GCC >= 8 or Clang >= 15
+	def_bool $(cc-option,-mfunction-return=thunk-extern)
 
 config HAS_AS_CET_SS
 	# binutils >= 2.29 or LLVM >= 6

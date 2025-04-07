@@ -137,16 +137,45 @@ void init_or_livepatch add_nops(void *insns, unsigned int len)
     }
 }
 
+void nocall __x86_return_thunk(void);
+
 /*
  * Place a return at @ptr.  @ptr must be in the writable alias of a stub.
+ *
+ * When CONFIG_RETURN_THUNK is active, this may be a JMP __x86_return_thunk
+ * instead, depending on the safety of @ptr with respect to Indirect Target
+ * Selection.
  *
  * Returns the next position to write into the stub.
  */
 void *place_ret(void *ptr)
 {
+    unsigned long addr = (unsigned long)ptr;
     uint8_t *p = ptr;
 
-    *p++ = 0xc3;
+    /*
+     * When Return Thunks are used, if a RET would be unsafe at this location
+     * with respect to Indirect Target Selection (i.e. if addr is in the first
+     * half of a cacheline), insert a JMP __x86_return_thunk instead.
+     *
+     * The displacement needs to be relative to the executable alias of the
+     * stub, not to @ptr which is the writeable alias.
+     */
+    if ( IS_ENABLED(CONFIG_RETURN_THUNK) && !(addr & 0x20) )
+    {
+        long stub_va = (this_cpu(stubs.addr) & PAGE_MASK) + (addr & ~PAGE_MASK);
+        long disp = (long)__x86_return_thunk - (stub_va + 5);
+
+        BUG_ON((int32_t)disp != disp);
+
+        *p++ = 0xe9;
+        *(int32_t *)p = disp;
+        p += 4;
+    }
+    else
+    {
+        *p++ = 0xc3;
+    }
 
     return p;
 }
