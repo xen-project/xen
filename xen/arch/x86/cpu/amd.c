@@ -59,6 +59,18 @@ static bool __read_mostly fam17_c6_disabled;
 static inline int rdmsr_amd_safe(unsigned int msr, unsigned int *lo,
 				 unsigned int *hi)
 {
+#ifdef CONFIG_CC_HAS_ASM_GOTO_OUTPUT
+    asm goto ( "1: rdmsr\n\t"
+               _ASM_EXTABLE(1b, %l[fault])
+               : "=a" (*lo), "=d" (*hi)
+               : "c" (msr), "D" (0x9c5a203a)
+               :
+               : fault );
+    return 0;
+
+ fault:
+    return -EFAULT;
+#else
 	int err;
 
 	asm volatile("1: rdmsr\n2:\n"
@@ -71,6 +83,7 @@ static inline int rdmsr_amd_safe(unsigned int msr, unsigned int *lo,
 		     : "c" (msr), "D" (0x9c5a203a), "2" (0), "i" (-EFAULT));
 
 	return err;
+#endif
 }
 
 static inline int wrmsr_amd_safe(unsigned int msr, unsigned int lo,
