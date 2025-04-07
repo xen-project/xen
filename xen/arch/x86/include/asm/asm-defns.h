@@ -47,6 +47,12 @@
     .endif
 .endm
 
+#ifdef CONFIG_RETURN_THUNK
+# define RET jmp __x86_return_thunk
+#else
+# define RET ret
+#endif
+
 #ifdef CONFIG_XEN_IBT
 # define ENDBR64 endbr64
 #else

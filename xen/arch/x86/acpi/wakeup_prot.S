@@ -131,7 +131,7 @@ ENTRY(s3_resume)
         pop     %r12
         pop     %rbx
         pop     %rbp
-        ret
+        RET
 
 .data
         .align 16

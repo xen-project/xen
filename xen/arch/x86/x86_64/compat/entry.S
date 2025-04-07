@@ -183,7 +183,7 @@ ENTRY(cr4_pv32_restore)
         mov   %rax, %cr4
         mov   %rax, (%rdx)
         pop   %rdx
-        ret
+        RET
 0:
 #ifndef NDEBUG
         /* Check that _all_ of the bits intended to be set actually are. */
@@ -202,7 +202,7 @@ ENTRY(cr4_pv32_restore)
 #endif
         pop   %rdx
         xor   %eax, %eax
-        ret
+        RET
 
 ENTRY(compat_syscall)
         /* Fix up reported %cs/%ss for compat domains. */
@@ -329,7 +329,7 @@ __UNLIKELY_END(compat_bounce_null_selector)
         xor   %eax, %eax
         mov   %ax,  TRAPBOUNCE_cs(%rdx)
         mov   %al,  TRAPBOUNCE_flags(%rdx)
-        ret
+        RET
 
 .section .fixup,"ax"
 .Lfx13:

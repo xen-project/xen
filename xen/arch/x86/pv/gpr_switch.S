@@ -26,7 +26,7 @@ ENTRY(load_guest_gprs)
         movq  UREGS_r15(%rdi), %r15
         movq  UREGS_rcx(%rdi), %rcx
         movq  UREGS_rdi(%rdi), %rdi
-        ret
+        RET
 
         .size load_guest_gprs, . - load_guest_gprs
         .type load_guest_gprs, STT_FUNC
@@ -51,7 +51,7 @@ ENTRY(save_guest_gprs)
         movq  %rbx, UREGS_rbx(%rdi)
         movq  %rdx, UREGS_rdx(%rdi)
         movq  %rcx, UREGS_rcx(%rdi)
-        ret
+        RET
 
         .size save_guest_gprs, . - save_guest_gprs
         .type save_guest_gprs, STT_FUNC

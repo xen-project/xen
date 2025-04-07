@@ -575,6 +575,9 @@ static void __init print_details(enum ind_thunk thunk)
 #ifdef CONFIG_INDIRECT_THUNK
                " INDIRECT_THUNK"
 #endif
+#ifdef CONFIG_RETURN_THUNK
+               " RETURN_THUNK"
+#endif
 #ifdef CONFIG_SHADOW_PAGING
                " SHADOW_PAGING"
 #endif

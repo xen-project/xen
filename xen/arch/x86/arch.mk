@@ -50,6 +50,9 @@ CFLAGS-$(CONFIG_CC_IS_GCC) += -fno-jump-tables
 CFLAGS-$(CONFIG_CC_IS_CLANG) += -mretpoline-external-thunk
 endif
 
+# Compile with return thunk support if selected.
+CFLAGS-$(CONFIG_RETURN_THUNK) += -mfunction-return=thunk-extern
+
 ifdef CONFIG_XEN_IBT
 # Force -fno-jump-tables to work around
 #   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=104816
