@@ -195,7 +195,7 @@ libxl.api-ok: check-libxl-api-rules _libxl.api-for-check
 	touch $@
 
 _libxl.api-for-check: $(XEN_INCLUDE)/libxl.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c -E $< $(APPEND_CFLAGS) \
+	$(CC) $(CPPFLAGS) $(CFLAGS) -E $< $(APPEND_CFLAGS) \
 		-DLIBXL_EXTERNAL_CALLERS_ONLY=LIBXL_EXTERNAL_CALLERS_ONLY \
 		>$@.new
 	mv -f $@.new $@
