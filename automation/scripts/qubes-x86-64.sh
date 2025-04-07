@@ -110,7 +110,8 @@ timeout 30s udhcpc -i \"\$interface\"
 pingip=\$(ip -o -4 r show default|cut -f 3 -d ' ')
 ping -c 10 \"\$pingip\"
 echo domU started
-pcidevice=\$(basename \$(readlink /sys/class/net/\$interface/device))
+pcidevice=\$(realpath /sys/class/net/\$interface/device |
+             sed 's#.*pci0000:00/\\([^/]*\\).*#\\1#')
 lspci -vs \$pcidevice
 "
         if [ -n "$PCIDEV_INTR" ]; then
