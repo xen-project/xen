@@ -1,6 +1,8 @@
         .file __FILE__
 
 #include <xen/linkage.h>
+
+#include <asm/asm_defns.h>
 #include <asm/page.h>
 
 #define src_reg %rsi
@@ -41,5 +43,5 @@ FUNC(copy_page_sse2)
         movnti  tmp4_reg, 3*WORD_SIZE(dst_reg)
 
         sfence
-        ret
+        RET
 END(copy_page_sse2)
