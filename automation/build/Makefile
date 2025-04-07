@@ -31,8 +31,8 @@ clean:
 define CLEAN_RULE
 .PHONY: clean-$(1)
 clean-$(1):
-	if [ -n "$$$$(docker image ls -q $(REGISTRY)/$(subst /,:,$(1)))" ]; then \
-		docker image rm $(REGISTRY)/$(subst /,:,$(1)); \
+	if [ -n "$$$$($(DOCKER_CMD) image ls -q $(REGISTRY)/$(subst /,:,$(1)))" ]; then \
+		$(DOCKER_CMD) image rm $(REGISTRY)/$(subst /,:,$(1)); \
 	fi
 
 endef
