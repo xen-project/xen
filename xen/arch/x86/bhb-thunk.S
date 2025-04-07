@@ -23,7 +23,7 @@ FUNC(clear_bhb_tsx)
         xabort  $0
         int3
 1:
-        ret
+        RET
 END(clear_bhb_tsx)
 
 /*

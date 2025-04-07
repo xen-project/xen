@@ -1,6 +1,8 @@
         .file __FILE__
 
 #include <xen/linkage.h>
+
+#include <asm/asm_defns.h>
 #include <asm/page.h>
 
 FUNC(clear_page_sse2)
@@ -16,5 +18,5 @@ FUNC(clear_page_sse2)
         jnz     0b
 
         sfence
-        ret
+        RET
 END(clear_page_sse2)

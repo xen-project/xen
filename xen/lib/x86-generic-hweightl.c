@@ -51,7 +51,11 @@ asm (
     "pop    %rdx\n\t"
     "pop    %rdi\n\t"
 
+#ifdef CONFIG_RETURN_THUNK
+    "jmp    __x86_return_thunk\n\t"
+#else
     "ret\n\t"
+#endif
 
     ".size arch_generic_hweightl, . - arch_generic_hweightl\n\t"
 );

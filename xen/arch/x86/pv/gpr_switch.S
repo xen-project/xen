@@ -26,7 +26,7 @@ FUNC(load_guest_gprs)
         movq  UREGS_r15(%rdi), %r15
         movq  UREGS_rcx(%rdi), %rcx
         movq  UREGS_rdi(%rdi), %rdi
-        ret
+        RET
 END(load_guest_gprs)
 
 /* Save guest GPRs.  Parameter on the stack above the return address. */
@@ -48,5 +48,5 @@ FUNC(save_guest_gprs)
         movq  %rbx, UREGS_rbx(%rdi)
         movq  %rdx, UREGS_rdx(%rdi)
         movq  %rcx, UREGS_rcx(%rdi)
-        ret
+        RET
 END(save_guest_gprs)
