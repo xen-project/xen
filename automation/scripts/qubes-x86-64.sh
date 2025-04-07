@@ -175,6 +175,8 @@ if [ -n "$domU_check" ]; then
     rm var/run
     echo "#!/bin/sh
 
+echo 8 > /proc/sys/kernel/printk
+
 ${domU_check}
 " > etc/local.d/xen.start
     chmod +x etc/local.d/xen.start
