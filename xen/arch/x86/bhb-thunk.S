@@ -23,7 +23,7 @@ FUNC(clear_bhb_tsx)
 0:      .byte 0xc6, 0xf8, 0             /* xabort $0 */
         int3
 1:
-        ret
+        RET
 END(clear_bhb_tsx)
 
 /*

@@ -44,6 +44,9 @@ CFLAGS-$(CONFIG_CC_IS_GCC) += -fno-jump-tables
 CFLAGS-$(CONFIG_CC_IS_CLANG) += -mretpoline-external-thunk
 endif
 
+# Compile with return thunk support if selected.
+CFLAGS-$(CONFIG_RETURN_THUNK) += -mfunction-return=thunk-extern
+
 # Disable the addition of a .note.gnu.property section to object files when
 # livepatch support is enabled.  The contents of that section can change
 # depending on the instructions used, and livepatch-build-tools doesn't know

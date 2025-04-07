@@ -83,6 +83,7 @@ SECTIONS
        . = ALIGN(PAGE_SIZE);
        _stextentry = .;
        *(.text.entry)
+       *(.text.entry.*)
        . = ALIGN(PAGE_SIZE);
        _etextentry = .;
 
