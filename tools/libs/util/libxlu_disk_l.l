@@ -64,7 +64,7 @@ void xlu__disk_yyset_column(int  column_no, yyscan_t yyscanner);
 #define DSET(dpc,member,enumname,str,valname) do{			\
 	if (dpc->disk->member != LIBXL_DISK_##enumname##_UNKNOWN &&	\
 	    dpc->disk->member != LIBXL_DISK_##enumname##_##valname) {	\
-	    xlu__disk_err(dpc, str, TOSTRING(member) " respecified");	\
+	    xlu__disk_err(dpc, str, STR(member) " respecified");	\
 	} else {							\
 	    dpc->disk->member = LIBXL_DISK_##enumname##_##valname;	\
 	}								\

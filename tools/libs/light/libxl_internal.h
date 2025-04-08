@@ -2093,9 +2093,6 @@ _hidden int libxl__init_recursive_mutex(libxl_ctx *ctx, pthread_mutex_t *lock);
 
 _hidden int libxl__gettimeofday(libxl__gc *gc, struct timeval *now_r);
 
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
-
 /* from libxl_qmp */
 typedef struct libxl__qmp_handler libxl__qmp_handler;
 

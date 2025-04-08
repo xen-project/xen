@@ -53,7 +53,7 @@ static void disk_eject_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
     }
 
     sscanf(backend,
-            "/local/domain/%d/backend/%" TOSTRING(BACKEND_STRING_SIZE)
+           "/local/domain/%d/backend/%" STR(BACKEND_STRING_SIZE)
            "[a-z]/%*d/%*d",
            &disk->backend_domid, backend_type);
     if (!strcmp(backend_type, "tap") ||

@@ -25,6 +25,8 @@
 
 #include "libxlutil.h"
 
+#include <xen-tools/common-macros.h>
+
 struct XLU_ConfigList {
     int avalues; /* available slots */
     int nvalues; /* actual occupied slots */
@@ -68,10 +70,6 @@ typedef struct {
     int err, lexerrlineno, likely_python;
     void *scanner;
 } CfgParseContext;
-
-
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
 
 #endif /*LIBXLU_INTERNAL_H*/
 
