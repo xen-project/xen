@@ -125,8 +125,8 @@ define cc-ver-check-closure
     endif
 endef
 
-# Require GCC v5.1 as the project global baseline
-check-$(gcc) = $(call cc-ver-check,CC,0x050100,"Xen requires at least GCC 5.1")
+# Require GCC v5 as the project global baseline
+check-$(gcc) = $(call cc-ver-check,CC,0x050000,"Xen requires at least GCC 5")
 $(eval $(check-y))
 
 ld-ver-build-id = $(shell $(1) --build-id 2>&1 | \
