@@ -2858,12 +2858,6 @@ int hvm_emulate_one(
 
 int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
 {
-    static const struct x86_emulate_ops hvm_intercept_ops_mmcfg = {
-        .read       = x86emul_unhandleable_rw,
-        .insn_fetch = hvmemul_insn_fetch,
-        .write      = mmcfg_intercept_write,
-        .validate   = hvmemul_validate,
-    };
     static const struct x86_emulate_ops hvm_ro_emulate_ops_mmio = {
         .read       = x86emul_unhandleable_rw,
         .insn_fetch = hvmemul_insn_fetch,
@@ -2872,28 +2866,28 @@ int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
     };
     struct mmio_ro_emulate_ctxt mmio_ro_ctxt = { .cr2 = gla, .mfn = _mfn(mfn) };
     struct hvm_emulate_ctxt ctxt;
-    const struct x86_emulate_ops *ops;
     unsigned int seg, bdf;
     int rc;
 
     if ( pci_ro_mmcfg_decode(mfn, &seg, &bdf) )
     {
-        mmio_ro_ctxt.seg = seg;
-        mmio_ro_ctxt.bdf = bdf;
-        ops = &hvm_intercept_ops_mmcfg;
+        /* Should be always handled by vPCI for PVH dom0. */
+        gdprintk(XENLOG_ERR, "unhandled MMCFG access for %pp\n",
+                 &PCI_SBDF(seg, bdf));
+        ASSERT_UNREACHABLE();
+        return X86EMUL_UNHANDLEABLE;
     }
-    else
-        ops = &hvm_ro_emulate_ops_mmio;
 
     hvm_emulate_init_once(&ctxt, x86_insn_is_mem_write,
                           guest_cpu_user_regs());
     ctxt.ctxt.data = &mmio_ro_ctxt;
 
-    switch ( rc = _hvm_emulate_one(&ctxt, ops, VIO_no_completion) )
+    switch ( rc = _hvm_emulate_one(&ctxt, &hvm_ro_emulate_ops_mmio,
+                                   VIO_no_completion) )
     {
     case X86EMUL_UNHANDLEABLE:
     case X86EMUL_UNIMPLEMENTED:
-        hvm_dump_emulation_state(XENLOG_G_WARNING, "MMCFG", &ctxt, rc);
+        hvm_dump_emulation_state(XENLOG_G_WARNING, "r/o MMIO", &ctxt, rc);
         break;
     case X86EMUL_EXCEPTION:
         hvm_inject_event(&ctxt.ctxt.event);

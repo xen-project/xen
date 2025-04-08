@@ -5200,37 +5200,6 @@ int cf_check mmio_ro_emulated_write(
     return X86EMUL_OKAY;
 }
 
-int cf_check mmcfg_intercept_write(
-    enum x86_segment seg,
-    unsigned long offset,
-    void *p_data,
-    unsigned int bytes,
-    struct x86_emulate_ctxt *ctxt)
-{
-    struct mmio_ro_emulate_ctxt *mmio_ctxt = ctxt->data;
-
-    /*
-     * Only allow naturally-aligned stores no wider than 4 bytes to the
-     * original %cr2 address.
-     */
-    if ( ((bytes | offset) & (bytes - 1)) || bytes > 4 || !bytes ||
-         offset != mmio_ctxt->cr2 )
-    {
-        gdprintk(XENLOG_WARNING, "bad write (cr2=%lx, addr=%lx, bytes=%u)\n",
-                mmio_ctxt->cr2, offset, bytes);
-        return X86EMUL_UNHANDLEABLE;
-    }
-
-    offset &= 0xfff;
-    if ( pci_conf_write_intercept(mmio_ctxt->seg, mmio_ctxt->bdf,
-                                  offset, bytes, p_data) >= 0 )
-        pci_mmcfg_write(mmio_ctxt->seg, PCI_BUS(mmio_ctxt->bdf),
-                        PCI_DEVFN(mmio_ctxt->bdf), offset, bytes,
-                        *(uint32_t *)p_data);
-
-    return X86EMUL_OKAY;
-}
-
 /*
  * For these PTE APIs, the caller must follow the alloc-map-unmap-free
  * lifecycle, which means explicitly mapping the PTE pages before accessing
