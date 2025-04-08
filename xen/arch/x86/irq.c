@@ -265,7 +265,7 @@ void __init clear_irq_vector(int irq)
 int create_irq(nodeid_t node, bool grant_access)
 {
     int irq, ret;
-    struct irq_desc *desc;
+    struct irq_desc *desc = NULL ; /* gcc14 -Og or -fcondition-coverage */
 
     for (irq = nr_irqs_gsi; irq < nr_irqs; irq++)
     {
