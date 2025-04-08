@@ -805,7 +805,7 @@ int __init early_microcode_init(void)
     {
     case X86_VENDOR_AMD:
         if ( !opt_digest_check &&
-             boot_cpu_data.x86 >= 0x17 && boot_cpu_data.x86 <= 0x19 )
+             boot_cpu_data.x86 >= 0x17 )
         {
             printk(XENLOG_WARNING
                    "Microcode patch additional digest checks disabled");
