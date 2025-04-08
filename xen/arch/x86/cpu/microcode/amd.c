@@ -118,8 +118,12 @@ static bool check_digest(const struct container_microcode *mc)
     const struct patch_digest *pd;
     uint8_t digest[SHA2_256_DIGEST_SIZE];
 
-    /* Only Fam17h/19h are known to need extra checks.  Skip other families. */
-    if ( boot_cpu_data.x86 < 0x17 || boot_cpu_data.x86 > 0x19 ||
+    /*
+     * Zen1 thru Zen5 CPUs are known to use a weak signature algorithm on
+     * microcode updates.  Mitigate by checking the digest of the patch
+     * against a list of known provenance.
+     */
+    if ( boot_cpu_data.x86 < 0x17 ||
          !opt_digest_check )
         return true;
 
@@ -505,8 +509,7 @@ static const struct microcode_ops __initconst_cf_clobber amd_ucode_ops = {
 
 void __init ucode_probe_amd(struct microcode_ops *ops)
 {
-    if ( !opt_digest_check &&
-         boot_cpu_data.x86 >= 0x17 && boot_cpu_data.x86 <= 0x19 )
+    if ( !opt_digest_check && boot_cpu_data.x86 >= 0x17 )
     {
         printk(XENLOG_WARNING
                "Microcode patch additional digest checks disabled");
