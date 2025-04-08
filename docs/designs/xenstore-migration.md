@@ -156,7 +156,7 @@ the domain being migrated.
 ```
     0       1       2       3       4       5       6       7    octet
 +-------+-------+-------+-------+-------+-------+-------+-------+
-| conn-id                       | conn-type     |               |
+| conn-id                       | conn-type     | fields        |
 +-------------------------------+---------------+---------------+
 | conn-spec
 ...
@@ -165,6 +165,9 @@ the domain being migrated.
 +---------------+---------------+-------------------------------+
 | data
 ...
++---------------------------------------------------------------+
+| unique-id                                                     |
++---------------------------------------------------------------+
 ```
 
 
@@ -177,6 +180,16 @@ the domain being migrated.
 | `conn-type`    | 0x0000: shared ring                          |
 |                | 0x0001: socket                               |
 |                | 0x0002 - 0xFFFF: reserved for future use     |
+|                |                                              |
+| `fields`       | A collection of flags indicating presence    |
+|                | of additional fields after the variable      |
+|                | length `data` part. The additional fields    |
+|                | will start after a possible padding for      |
+|                | aligning to a 8 octet boundary.              |
+|                | Defined flag values (to be or-ed):           |
+|                | 0x0001: `unique_id` present (only needed for |
+|                |         `shared ring` connection in live     |
+|                |         update streams).                     |
 |                |                                              |
 | `conn-spec`    | See below                                    |
 |                |                                              |
@@ -193,6 +206,9 @@ the domain being migrated.
 | `data`         | Pending data: first in-data-len octets of    |
 |                | read data, then out-data-len octets of       |
 |                | written data (any of both may be empty)      |
+|                |                                              |
+| `unique-id`    | Unique identifier of a domain                |
+|                |                                              |
 
 In case of live update the connection record for the connection via which
 the live update command was issued will contain the response for the live
