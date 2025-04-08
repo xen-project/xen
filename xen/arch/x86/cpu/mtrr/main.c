@@ -118,7 +118,7 @@ struct set_mtrr_data {
  * After all the cpus have came up, then mtrr_aps_sync_end() synchronizes all 
  * the cpus and updates mtrrs on all of them. Then this flag is turned off.
  */
-int hold_mtrr_updates_on_aps;
+static bool hold_mtrr_updates_on_aps;
 
 static void cf_check ipi_handler(void *info)
 /*  [SUMMARY] Synchronisation handler. Executed by "other" CPUs.
@@ -600,14 +600,14 @@ void mtrr_save_state(void)
 
 void mtrr_aps_sync_begin(void)
 {
-	hold_mtrr_updates_on_aps = 1;
+	hold_mtrr_updates_on_aps = true;
 }
 
 void mtrr_aps_sync_end(void)
 {
 	if (mtrr_if)
 		set_mtrr(~0U, 0, 0, 0);
-	hold_mtrr_updates_on_aps = 0;
+	hold_mtrr_updates_on_aps = false;
 }
 
 void asmlinkage mtrr_bp_restore(void)
