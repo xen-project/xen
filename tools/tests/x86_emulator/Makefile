@@ -105,7 +105,7 @@ TARGET-$(shell echo 'int i;' | $(CC) -x c -c -o /dev/null -m$(1) - || echo y) :=
 endef
 
 ISA := bmi bmi2 tbm sse4.1 sse4.2 sse4a avx avx2 f16c
-ISA += $(addprefix avx512,f bw dq 4fmaps)
+ISA += $(addprefix avx512,f bw dq)
 $(foreach isa,$(ISA),$(eval $(call isa-check-cc,$(isa))))
 
 # Also explicitly check for {evex} pseudo-prefix support, which got introduced
