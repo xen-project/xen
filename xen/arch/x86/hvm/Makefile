@@ -15,6 +15,7 @@ obj-y += intercept.o
 obj-y += io.o
 obj-y += ioreq.o
 obj-y += irq.o
+obj-y += mmio.o
 obj-y += monitor.o
 obj-y += mtrr.o
 obj-y += nestedhvm.o

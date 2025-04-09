@@ -8,6 +8,7 @@
  */
 
 #include <xen/init.h>
+#include <xen/io.h>
 #include <xen/ioreq.h>
 #include <xen/lib.h>
 #include <xen/trace.h>
@@ -35,7 +36,6 @@
 #include <asm/current.h>
 #include <asm/debugreg.h>
 #include <asm/e820.h>
-#include <asm/io.h>
 #include <asm/regs.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
@@ -691,6 +691,8 @@ int hvm_domain_initialise(struct domain *d,
     rtc_init(d);
 
     register_portio_handler(d, XEN_HVM_DEBUGCONS_IOPORT, 1, hvm_print_line);
+
+    register_subpage_ro_handler(d);
 
     if ( hvm_tsc_scaling_supported )
         d->arch.hvm.tsc_scaling_ratio = hvm_default_tsc_scaling_ratio;
@@ -1981,7 +1983,10 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
      */
     if ( (p2mt == p2m_mmio_dm) ||
          (npfec.write_access &&
-          (p2m_is_discard_write(p2mt) || (p2mt == p2m_ioreq_server))) )
+          (p2m_is_discard_write(p2mt) || (p2mt == p2m_ioreq_server) ||
+           /* MMIO entries can be r/o if the target mfn is in mmio_ro_ranges. */
+           (p2mt == p2m_mmio_direct &&
+            rangeset_contains_singleton(mmio_ro_ranges, mfn_x(mfn))))) )
     {
         if ( !handle_mmio_with_translation(gla, gfn, npfec) )
             hvm_inject_hw_exception(X86_EXC_GP, 0);
@@ -2030,14 +2035,6 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
 
             goto out;
         }
-        goto out_put_gfn;
-    }
-
-    if ( (p2mt == p2m_mmio_direct) && npfec.write_access && npfec.present &&
-         (is_hardware_domain(currd) || subpage_mmio_write_accept(mfn, gla)) &&
-         (hvm_emulate_one_mmio(mfn_x(mfn), gla) == X86EMUL_OKAY) )
-    {
-        rc = 1;
         goto out_put_gfn;
     }
 

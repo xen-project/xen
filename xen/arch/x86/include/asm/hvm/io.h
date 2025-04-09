@@ -135,6 +135,9 @@ void destroy_vpci_mmcfg(struct domain *d);
 /* Remove MMCFG regions from a domain ->iomem_caps. */
 int vpci_mmcfg_deny_access(struct domain *d);
 
+/* r/o MMIO subpage access handler. */
+void register_subpage_ro_handler(struct domain *d);
+
 #endif /* __ASM_X86_HVM_IO_H__ */
 
 
