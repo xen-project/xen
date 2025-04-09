@@ -8,7 +8,11 @@
 #ifndef __XEN_X86_BOOTDOMAIN_H__
 #define __XEN_X86_BOOTDOMAIN_H__
 
+#include <public/xen.h>
+
 struct boot_domain {
+    domid_t domid;
+
     struct boot_module *kernel;
     struct boot_module *module;
 
