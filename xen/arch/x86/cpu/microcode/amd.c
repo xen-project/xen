@@ -516,8 +516,7 @@ static const struct microcode_ops __initconst_cf_clobber amd_ucode_ops = {
 
 void __init ucode_probe_amd(struct microcode_ops *ops)
 {
-    if ( !opt_digest_check &&
-         boot_cpu_data.x86 >= 0x17 && boot_cpu_data.x86 <= 0x19 )
+    if ( !opt_digest_check && boot_cpu_data.x86 >= 0x17 )
     {
         printk(XENLOG_WARNING
                "Microcode patch additional digest checks disabled");
