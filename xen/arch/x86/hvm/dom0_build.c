@@ -644,9 +644,11 @@ static bool __init check_and_adjust_load_address(
 }
 
 static int __init pvh_load_kernel(
-    struct domain *d, struct boot_module *image, struct boot_module *initrd,
-    paddr_t *entry, paddr_t *start_info_addr)
+    const struct boot_domain *bd, paddr_t *entry, paddr_t *start_info_addr)
 {
+    struct domain *d = bd->d;
+    struct boot_module *image = bd->kernel;
+    struct boot_module *initrd = bd->module;
     void *image_base = bootstrap_map_bm(image);
     void *image_start = image_base + image->headroom;
     unsigned long image_len = image->size;
@@ -1328,25 +1330,16 @@ static void __hwdom_init pvh_setup_mmcfg(struct domain *d)
     }
 }
 
-int __init dom0_construct_pvh(struct boot_info *bi, struct domain *d)
+int __init dom0_construct_pvh(const struct boot_domain *bd)
 {
     paddr_t entry, start_info;
-    struct boot_module *image;
-    struct boot_module *initrd = NULL;
-    unsigned int idx;
+    struct domain *d = bd->d;
     int rc;
 
     printk(XENLOG_INFO "*** Building a PVH Dom%d ***\n", d->domain_id);
 
-    idx = first_boot_module_index(bi, BOOTMOD_KERNEL);
-    if ( idx >= bi->nr_modules )
+    if ( bd->kernel == NULL )
         panic("Missing kernel boot module for %pd construction\n", d);
-
-    image = &bi->mods[idx];
-
-    idx = first_boot_module_index(bi, BOOTMOD_RAMDISK);
-    if ( idx < bi->nr_modules )
-        initrd = &bi->mods[idx];
 
     if ( is_hardware_domain(d) )
     {
@@ -1385,7 +1378,7 @@ int __init dom0_construct_pvh(struct boot_info *bi, struct domain *d)
         return rc;
     }
 
-    rc = pvh_load_kernel(d, image, initrd, &entry, &start_info);
+    rc = pvh_load_kernel(bd, &entry, &start_info);
     if ( rc )
     {
         printk("Failed to load Dom0 kernel\n");
