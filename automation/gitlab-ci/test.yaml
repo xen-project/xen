@@ -16,7 +16,9 @@
   - qemu-system-aarch64-6.0.0-arm32-export
 
 .x86-64-test-needs: &x86-64-test-needs
-  - kernel-6.1.19-export
+  - project: xen-project/hardware/test-artifacts
+    job: linux-6.6.56-x86_64
+    ref: master
   - project: xen-project/hardware/test-artifacts
     job: x86_64-rootfs-alpine-3.18
     ref: master

@@ -308,19 +308,6 @@ qemu-system-aarch64-6.0.0-arm32-export:
   tags:
     - arm64
 
-# x86_64 test artifacts
-
-kernel-6.1.19-export:
-  extends: .test-jobs-artifact-common
-  image: registry.gitlab.com/xen-project/xen/tests-artifacts/kernel:6.1.19
-  script:
-    - mkdir binaries && cp /bzImage binaries/bzImage
-  artifacts:
-    paths:
-      - binaries/bzImage
-  tags:
-    - x86_64
-
 # Jobs below this line
 
 # Build jobs needed for tests
