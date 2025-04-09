@@ -798,13 +798,14 @@ int arch_domain_create(struct domain *d,
     {
         if ( !opt_allow_unsafe )
         {
-            printk(XENLOG_G_ERR "Xen does not allow DomU creation on this CPU"
-                   " for security reasons.\n");
+            printk(XENLOG_G_ERR
+                   "%pd: will not create domU on this CPU for security reasons\n",
+                   d);
             return -EPERM;
         }
         printk(XENLOG_G_WARNING
-               "Dom%d may compromise security on this CPU.\n",
-               d->domain_id);
+               "%pd: may compromise security on this CPU\n",
+               d);
     }
 
     emflags = config->arch.emulation_flags;
@@ -814,16 +815,20 @@ int arch_domain_create(struct domain *d,
 
     if ( emflags & ~XEN_X86_EMU_ALL )
     {
-        printk(XENLOG_G_ERR "d%d: Invalid emulation bitmap: %#x\n",
-               d->domain_id, emflags);
+        printk(XENLOG_G_ERR
+               "%pd: invalid emulation bitmap: %#x\n",
+               d, emflags);
         return -EINVAL;
     }
 
     if ( !emulation_flags_ok(d, emflags) )
     {
-        printk(XENLOG_G_ERR "d%d: Xen does not allow %s domain creation "
-               "with the current selection of emulators: %#x\n",
-               d->domain_id, is_hvm_domain(d) ? "HVM" : "PV", emflags);
+        printk(XENLOG_G_ERR
+               "%pd: will not create %s %sdomain with emulators: %#x\n",
+               d,
+               is_hvm_domain(d) ? "HVM" : "PV",
+               is_hardware_domain(d) ? "hardware " : "",
+               emflags);
         return -EOPNOTSUPP;
     }
     d->arch.emulation_flags = emflags;
