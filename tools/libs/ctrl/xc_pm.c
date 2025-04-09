@@ -212,10 +212,7 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
     DECLARE_NAMED_HYPERCALL_BOUNCE(scaling_available_governors,
 			 user_para->scaling_available_governors,
 			 user_para->gov_num * CPUFREQ_NAME_LEN * sizeof(char), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
-
-    bool has_num = user_para->cpu_num &&
-                     user_para->freq_num &&
-                     user_para->gov_num;
+    bool has_num = user_para->cpu_num && user_para->freq_num;
 
     if ( has_num )
     {
@@ -226,12 +223,15 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
             errno = EINVAL;
             return -1;
         }
-        if ( xc_hypercall_bounce_pre(xch, affected_cpus) )
-            goto unlock_1;
-        if ( xc_hypercall_bounce_pre(xch, scaling_available_frequencies) )
+        ret = xc_hypercall_bounce_pre(xch, affected_cpus);
+        if ( ret )
+            return ret;
+        ret = xc_hypercall_bounce_pre(xch, scaling_available_frequencies);
+        if ( ret )
             goto unlock_2;
-        if ( user_para->gov_num &&
-             xc_hypercall_bounce_pre(xch, scaling_available_governors) )
+        if ( user_para->gov_num )
+            ret = xc_hypercall_bounce_pre(xch, scaling_available_governors);
+        if ( ret )
             goto unlock_3;
 
         set_xen_guest_handle(sys_para->affected_cpus, affected_cpus);
@@ -256,12 +256,11 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
             user_para->cpu_num  = sys_para->cpu_num;
             user_para->freq_num = sys_para->freq_num;
             user_para->gov_num  = sys_para->gov_num;
-            ret = -errno;
         }
 
         if ( has_num )
             goto unlock_4;
-        goto unlock_1;
+        return ret;
     }
     else
     {
@@ -298,13 +297,12 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
     }
 
 unlock_4:
-    if ( user_para->gov_num )
-        xc_hypercall_bounce_post(xch, scaling_available_governors);
+    xc_hypercall_bounce_post(xch, scaling_available_governors);
 unlock_3:
     xc_hypercall_bounce_post(xch, scaling_available_frequencies);
 unlock_2:
     xc_hypercall_bounce_post(xch, affected_cpus);
-unlock_1:
+
     return ret;
 }
 
