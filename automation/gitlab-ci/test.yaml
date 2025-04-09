@@ -8,8 +8,10 @@
   - when: on_success
 
 .arm64-test-needs: &arm64-test-needs
+  - project: xen-project/hardware/test-artifacts
+    job: linux-6.6.86-arm64
+    ref: master
   - alpine-3.18-arm64-rootfs-export
-  - kernel-6.6.74-arm64-export
   - qemu-system-aarch64-6.0.0-arm64-export
 
 .arm32-test-needs: &arm32-test-needs
