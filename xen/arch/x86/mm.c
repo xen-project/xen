@@ -5144,39 +5144,6 @@ void subpage_mmio_write_emulate(
         goto write_ignored;
 }
 
-int cf_check mmio_ro_emulated_write(
-    enum x86_segment seg,
-    unsigned long offset,
-    void *p_data,
-    unsigned int bytes,
-    struct x86_emulate_ctxt *ctxt)
-{
-    struct mmio_ro_emulate_ctxt *mmio_ro_ctxt = ctxt->data;
-    unsigned long data = 0;
-
-    /* Only allow naturally-aligned stores at the original %cr2 address. */
-    if ( ((bytes | offset) & (bytes - 1)) || !bytes ||
-         offset != mmio_ro_ctxt->cr2 )
-    {
-        gdprintk(XENLOG_WARNING, "bad access (cr2=%lx, addr=%lx, bytes=%u)\n",
-                mmio_ro_ctxt->cr2, offset, bytes);
-        return X86EMUL_UNHANDLEABLE;
-    }
-
-    if ( bytes <= sizeof(data) )
-    {
-        memcpy(&data, p_data, bytes);
-        subpage_mmio_write_emulate(mmio_ro_ctxt->mfn, PAGE_OFFSET(offset),
-                                   data, bytes);
-    }
-    else if ( subpage_mmio_find_page(mmio_ro_ctxt->mfn) )
-        gprintk(XENLOG_WARNING,
-                "unsupported %u-byte write to R/O MMIO 0x%"PRI_mfn"%03lx\n",
-                bytes, mfn_x(mmio_ro_ctxt->mfn), PAGE_OFFSET(offset));
-
-    return X86EMUL_OKAY;
-}
-
 /*
  * For these PTE APIs, the caller must follow the alloc-map-unmap-free
  * lifecycle, which means explicitly mapping the PTE pages before accessing

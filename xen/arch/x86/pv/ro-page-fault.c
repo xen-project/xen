@@ -298,6 +298,14 @@ static int ptwr_do_page_fault(struct x86_emulate_ctxt *ctxt,
  * fault handling for read-only MMIO pages
  */
 
+struct mmio_ro_emulate_ctxt {
+    unsigned long cr2;
+    /* Used only for mmcfg case */
+    unsigned int seg, bdf;
+    /* Used only for non-mmcfg case */
+    mfn_t mfn;
+};
+
 static int cf_check mmcfg_intercept_write(
     enum x86_segment seg,
     unsigned long offset,
@@ -325,6 +333,39 @@ static int cf_check mmcfg_intercept_write(
         pci_mmcfg_write(mmio_ctxt->seg, PCI_BUS(mmio_ctxt->bdf),
                         PCI_DEVFN(mmio_ctxt->bdf), offset, bytes,
                         *(uint32_t *)p_data);
+
+    return X86EMUL_OKAY;
+}
+
+int cf_check mmio_ro_emulated_write(
+    enum x86_segment seg,
+    unsigned long offset,
+    void *p_data,
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
+{
+    struct mmio_ro_emulate_ctxt *mmio_ro_ctxt = ctxt->data;
+    unsigned long data = 0;
+
+    /* Only allow naturally-aligned stores at the original %cr2 address. */
+    if ( ((bytes | offset) & (bytes - 1)) || !bytes ||
+         offset != mmio_ro_ctxt->cr2 )
+    {
+        gdprintk(XENLOG_WARNING, "bad access (cr2=%lx, addr=%lx, bytes=%u)\n",
+                mmio_ro_ctxt->cr2, offset, bytes);
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    if ( bytes <= sizeof(data) )
+    {
+        memcpy(&data, p_data, bytes);
+        subpage_mmio_write_emulate(mmio_ro_ctxt->mfn, PAGE_OFFSET(offset),
+                                   data, bytes);
+    }
+    else if ( subpage_mmio_find_page(mmio_ro_ctxt->mfn) )
+        gprintk(XENLOG_WARNING,
+                "unsupported %u-byte write to R/O MMIO 0x%"PRI_mfn"%03lx\n",
+                bytes, mfn_x(mmio_ro_ctxt->mfn), PAGE_OFFSET(offset));
 
     return X86EMUL_OKAY;
 }
