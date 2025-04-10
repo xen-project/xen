@@ -24,6 +24,7 @@
  * Will be merged it with virtual IOAPIC logic, since most is the same
 */
 
+#include <xen/io.h>
 #include <xen/types.h>
 #include <xen/mm.h>
 #include <xen/xmalloc.h>
@@ -304,28 +305,7 @@ static void adjacent_read(
 
     hwaddr = fix_to_virt(fixmap_idx) + PAGE_OFFSET(address);
 
-    switch ( len )
-    {
-    case 1:
-        *pval = readb(hwaddr);
-        break;
-
-    case 2:
-        *pval = readw(hwaddr);
-        break;
-
-    case 4:
-        *pval = readl(hwaddr);
-        break;
-
-    case 8:
-        *pval = readq(hwaddr);
-        break;
-
-    default:
-        ASSERT_UNREACHABLE();
-        break;
-    }
+    *pval = read_mmio(hwaddr, len);
 }
 
 static void adjacent_write(
@@ -344,28 +324,7 @@ static void adjacent_write(
 
     hwaddr = fix_to_virt(fixmap_idx) + PAGE_OFFSET(address);
 
-    switch ( len )
-    {
-    case 1:
-        writeb(val, hwaddr);
-        break;
-
-    case 2:
-        writew(val, hwaddr);
-        break;
-
-    case 4:
-        writel(val, hwaddr);
-        break;
-
-    case 8:
-        writeq(val, hwaddr);
-        break;
-
-    default:
-        ASSERT_UNREACHABLE();
-        break;
-    }
+    write_mmio(hwaddr, val, len);
 }
 
 static int cf_check msixtbl_read(

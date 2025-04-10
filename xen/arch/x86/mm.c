@@ -95,6 +95,7 @@
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
 #include <xen/init.h>
+#include <xen/io.h>
 #include <xen/iocap.h>
 #include <xen/ioreq.h>
 #include <xen/irq.h>
@@ -116,7 +117,6 @@
 #include <asm/flushtlb.h>
 #include <asm/guest.h>
 #include <asm/idt.h>
-#include <asm/io.h>
 #include <asm/io_apic.h>
 #include <asm/ldt.h>
 #include <asm/mem_sharing.h>
@@ -5102,7 +5102,7 @@ static void __iomem *subpage_mmio_map_page(
 static void subpage_mmio_write_emulate(
     mfn_t mfn,
     unsigned int offset,
-    const void *data,
+    unsigned long data,
     unsigned int len)
 {
     struct subpage_ro_range *entry;
@@ -5131,26 +5131,8 @@ static void subpage_mmio_write_emulate(
         return;
     }
 
-    addr += offset;
-    switch ( len )
-    {
-    case 1:
-        writeb(*(const uint8_t*)data, addr);
-        break;
-    case 2:
-        writew(*(const uint16_t*)data, addr);
-        break;
-    case 4:
-        writel(*(const uint32_t*)data, addr);
-        break;
-    case 8:
-        writeq(*(const uint64_t*)data, addr);
-        break;
-    default:
-        /* mmio_ro_emulated_write() already validated the size */
-        ASSERT_UNREACHABLE();
+    if ( !write_mmio(addr + offset, data, len) )
         goto write_ignored;
-    }
 }
 
 #ifdef CONFIG_HVM
@@ -5185,6 +5167,7 @@ int cf_check mmio_ro_emulated_write(
     struct x86_emulate_ctxt *ctxt)
 {
     struct mmio_ro_emulate_ctxt *mmio_ro_ctxt = ctxt->data;
+    unsigned long data = 0;
 
     /* Only allow naturally-aligned stores at the original %cr2 address. */
     if ( ((bytes | offset) & (bytes - 1)) || !bytes ||
@@ -5195,9 +5178,12 @@ int cf_check mmio_ro_emulated_write(
         return X86EMUL_UNHANDLEABLE;
     }
 
-    if ( bytes <= 8 )
+    if ( bytes <= sizeof(data) )
+    {
+        memcpy(&data, p_data, bytes);
         subpage_mmio_write_emulate(mmio_ro_ctxt->mfn, PAGE_OFFSET(offset),
-                                   p_data, bytes);
+                                   data, bytes);
+    }
     else if ( subpage_mmio_find_page(mmio_ro_ctxt->mfn) )
         gprintk(XENLOG_WARNING,
                 "unsupported %u-byte write to R/O MMIO 0x%"PRI_mfn"%03lx\n",
