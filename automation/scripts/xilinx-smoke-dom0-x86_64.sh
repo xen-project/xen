@@ -28,8 +28,6 @@ extra = "root=/dev/ram0 console=hvc0"
 memory = 512
 '
 DOMU_CFG_EXTRA=""
-copy_domU_files () { :; }
-copy_dom0_files () { :; }
 
 # Select test variant.
 if [ "${TEST}" = "ping" ]; then
@@ -66,7 +64,7 @@ then
     PASS_MSG="TEST: Message from DOMU"
     XEN_CMD_EXTRA="argo=1,mac-permissive=1"
     DOMU_CMD="
-insmod /root/xen-argo.ko
+insmod /lib/modules/\$(uname -r)/updates/xen-argo.ko
 until false
 do
   echo \"${PASS_MSG}\"
@@ -74,24 +72,19 @@ do
 done | argo-exec -p 28333 -d 0 -- /bin/echo
 "
     DOM0_CMD="
-insmod /root/xen-argo.ko
+insmod /lib/modules/\$(uname -r)/updates/xen-argo.ko
 xl -vvv create /etc/xen/domU.cfg
 argo-exec -l -p 28333 -- /bin/echo
 "
-copy_dom0_files ()
-{
-    mkdir -p root usr/local/lib usr/local/bin
-    cp "${WORKDIR}/binaries/xen-argo.ko" "root/"
-    cp -ar "${WORKDIR}/binaries/lib/"* "usr/local/lib/"
-    cp "${WORKDIR}/binaries/argo-exec" "usr/local/bin/"
-}
-copy_domU_files () { copy_dom0_files; }
 else
     fatal "Unknown test: ${TEST}"
 fi
 
 # DomU rootfs
 cp binaries/rootfs.cpio.gz binaries/domU-rootfs.cpio.gz
+if [[ "${TEST}" == argo ]]; then
+    cat binaries/argo.cpio.gz >> binaries/domU-rootfs.cpio.gz
+fi
 
 # test-local configuration
 mkdir -p rootfs
@@ -108,13 +101,15 @@ echo "domU Welcome to Alpine Linux
 Kernel \r on an \m (\l)
 
 " > etc/issue
-copy_domU_files
 find . | cpio -H newc -o | gzip >> ../binaries/domU-rootfs.cpio.gz
 cd ..
 rm -rf rootfs
 
 # Dom0 rootfs
 cp binaries/rootfs.cpio.gz binaries/dom0-rootfs.cpio.gz
+if [[ "${TEST}" == argo ]]; then
+    cat binaries/argo.cpio.gz >> binaries/dom0-rootfs.cpio.gz
+fi
 
 # test-local configuration
 mkdir -p rootfs
@@ -134,7 +129,6 @@ echo "QEMU_XEN=/bin/false" >> etc/default/xencommons
 mkdir -p var/log/xen/console
 cp ../binaries/bzImage boot/vmlinuz
 cp ../binaries/domU-rootfs.cpio.gz boot/initrd-domU
-copy_dom0_files
 find . | cpio -H newc -o | gzip >> ../binaries/dom0-rootfs.cpio.gz
 cd ..
 

@@ -242,13 +242,10 @@ xilinx-smoke-dom0-x86_64-gcc-debug-argo:
   needs:
     - alpine-3.18-gcc-debug
     - project: xen-project/hardware/test-artifacts
-      job: x86_64-kernel-linux-6.6.56
+      job: linux-6.6.56-x86_64
       ref: master
     - project: xen-project/hardware/test-artifacts
       job: alpine-3.18-x86_64-rootfs
-      ref: master
-    - project: xen-project/hardware/test-artifacts
-      job: x86_64-argo-linux-6.6.56
       ref: master
 
 adl-smoke-x86-64-gcc-debug:
