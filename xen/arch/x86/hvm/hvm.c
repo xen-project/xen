@@ -1794,7 +1794,7 @@ void hvm_inject_event(const struct x86_event *event)
 int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
                               struct npfec npfec)
 {
-    unsigned long gfn = gpa >> PAGE_SHIFT;
+    unsigned long gfn;
     p2m_type_t p2mt;
     p2m_access_t p2ma;
     mfn_t mfn;
@@ -1841,11 +1841,12 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
                 hvm_inject_hw_exception(X86_EXC_GP, 0);
             return 1;
         case NESTEDHVM_PAGEFAULT_L0_ERROR:
-            /* gpa is now translated to l1 guest address, update gfn. */
-            gfn = gpa >> PAGE_SHIFT;
+            /* gpa is now translated to l1 guest address. */
             break;
         }
     }
+
+    gfn = gpa >> PAGE_SHIFT;
 
     /*
      * No need to do the P2M lookup for internally handled MMIO, benefiting
@@ -1854,7 +1855,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
      */
     if ( !nestedhvm_vcpu_in_guestmode(curr) && hvm_mmio_internal(gpa) )
     {
-        if ( !handle_mmio_with_translation(gla, gpa >> PAGE_SHIFT, npfec) )
+        if ( !handle_mmio_with_translation(gla, gfn, npfec) )
             hvm_inject_hw_exception(X86_EXC_GP, 0);
         rc = 1;
         goto out;
@@ -1982,7 +1983,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
          (npfec.write_access &&
           (p2m_is_discard_write(p2mt) || (p2mt == p2m_ioreq_server))) )
     {
-        if ( !handle_mmio_with_translation(gla, gpa >> PAGE_SHIFT, npfec) )
+        if ( !handle_mmio_with_translation(gla, gfn, npfec) )
             hvm_inject_hw_exception(X86_EXC_GP, 0);
         rc = 1;
         goto out_put_gfn;
