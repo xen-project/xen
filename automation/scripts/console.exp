@@ -9,6 +9,10 @@
 #   tests that's a command to read serial console
 # - UBOOT_CMD (optional): command to enter at u-boot prompt
 # - BOOT_MSG (optional): initial Xen message to wait for (aka sign-of-life)
+# - SUSPEND_MSG (optional): message signaling system is going to sleep, it's
+#   trigger for WAKEUP_CMD (see below)
+# - WAKEUP_CMD (optional): command to execute to wakeup the system 30s after
+#   seeing SUSPEND_MSG
 # - LOG_MSG (optional): final console message to wait for
 # - PASSED: message to look for to consider test a success; if LOG_MSG is set,
 #   both LOG_MSG and PASSED must appear (in any order) for test to succeed
@@ -43,6 +47,15 @@ if {[info exists env(UBOOT_CMD)]} {
 
 if {[info exists env(BOOT_MSG)]} {
     expect -re "$env(BOOT_MSG)"
+}
+
+if {[info exists env(WAKEUP_CMD)]} {
+    expect -re "$env(SUSPEND_MSG)"
+
+    # keep it suspended a bit, then wakeup
+    sleep 30
+
+    system "$env(WAKEUP_CMD)"
 }
 
 if {[info exists env(LOG_MSG)]} {

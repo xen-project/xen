@@ -48,3 +48,4 @@ RUN apk --no-cache add \
   # qubes test deps
   openssh-client \
   fakeroot \
+  expect \
