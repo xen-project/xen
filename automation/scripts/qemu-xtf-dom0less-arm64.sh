@@ -61,6 +61,7 @@ export TEST_CMD="./binaries/qemu-system-aarch64 \
     -bios /usr/lib/u-boot/qemu_arm64/u-boot.bin"
 
 export UBOOT_CMD="virtio scan; dhcp; tftpb 0x40000000 boot.scr; source 0x40000000"
+export BOOT_MSG="Latest ChangeSet: "
 export TEST_LOG="smoke.serial"
 export PASSED="${passed}"
 
