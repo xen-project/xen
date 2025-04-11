@@ -561,6 +561,7 @@ struct subpage_ro_range {
     void __iomem *mapped;
     DECLARE_BITMAP(ro_elems, PAGE_SIZE / MMIO_RO_SUBPAGE_GRAN);
 };
+bool subpage_ro_active(void);
 struct subpage_ro_range *subpage_mmio_find_page(mfn_t mfn);
 void __iomem *subpage_mmio_map_page(struct subpage_ro_range *entry);
 void subpage_mmio_write_emulate(
