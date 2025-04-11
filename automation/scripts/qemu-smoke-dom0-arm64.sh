@@ -27,15 +27,14 @@ cd initrd
 find . | cpio -H newc -o | gzip > ../domU-rootfs.cpio.gz
 cd ..
 
+# Dom0 rootfs
+cp rootfs.cpio.gz dom0-rootfs.cpio.gz
+
+# test-local configuration
 mkdir -p rootfs
 cd rootfs
-tar xvzf ../initrd.tar.gz
-mkdir proc
-mkdir run
-mkdir srv
-mkdir sys
-rm var/run
 cp -ar ../dist/install/* .
+mkdir -p etc/local.d root
 mv ../domU-rootfs.cpio.gz ./root
 cp ../Image ./root
 echo "name=\"domU\"
@@ -56,8 +55,7 @@ xl -vvv create -c /root/domU.cfg
 
 " > etc/local.d/xen.start
 chmod +x etc/local.d/xen.start
-echo "rc_verbose=yes" >> etc/rc.conf
-find . | cpio -H newc -o | gzip > ../dom0-rootfs.cpio.gz
+find . | cpio -H newc -o | gzip >> ../dom0-rootfs.cpio.gz
 cd ../..
 
 # XXX QEMU looks for "efi-virtio.rom" even if it is unneeded

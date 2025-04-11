@@ -164,16 +164,13 @@ ${domU_extra_config}
 "
 
 if [ -n "$domU_check" ]; then
-    # DomU
+    # DomU rootfs
+    cp binaries/rootfs.cpio.gz binaries/domU-rootfs.cpio.gz
+
+    # test-local configuration
     mkdir -p rootfs
     cd rootfs
-    # fakeroot is needed to preserve device nodes in rootless podman container
-    fakeroot -s ../fakeroot-save tar xzf ../binaries/initrd.tar.gz
-    mkdir proc
-    mkdir run
-    mkdir srv
-    mkdir sys
-    rm var/run
+    mkdir -p etc/local.d
     echo "#!/bin/sh
 
 echo 8 > /proc/sys/kernel/printk
@@ -181,26 +178,22 @@ echo 8 > /proc/sys/kernel/printk
 ${domU_check}
 " > etc/local.d/xen.start
     chmod +x etc/local.d/xen.start
-    echo "rc_verbose=yes" >> etc/rc.conf
     echo "domU Welcome to Alpine Linux
 Kernel \r on an \m (\l)
 
 " > etc/issue
-    find . | fakeroot -i ../fakeroot-save cpio -H newc -o | gzip > ../binaries/domU-rootfs.cpio.gz
+    find . | cpio -H newc -o | gzip >> ../binaries/domU-rootfs.cpio.gz
     cd ..
     rm -rf rootfs
 fi
 
-# DOM0 rootfs
+# Dom0 rootfs
+cp binaries/rootfs.cpio.gz binaries/dom0-rootfs.cpio.gz
+
+# test-local configuration
 mkdir -p rootfs
 cd rootfs
-fakeroot -s ../fakeroot-save tar xzf ../binaries/initrd.tar.gz
-mkdir boot
-mkdir proc
-mkdir run
-mkdir srv
-mkdir sys
-rm var/run
+mkdir -p boot etc/local.d
 cp -ar ../binaries/dist/install/* .
 cp -ar ../binaries/tests .
 cp -a ../automation/scripts/run-tools-tests tests/
@@ -237,7 +230,6 @@ fi
 chmod +x etc/local.d/xen.start
 echo "$domU_config" > etc/xen/domU.cfg
 
-echo "rc_verbose=yes" >> etc/rc.conf
 echo "XENCONSOLED_TRACE=all" >> etc/default/xencommons
 echo "QEMU_XEN=/bin/false" >> etc/default/xencommons
 mkdir -p var/log/xen/console
@@ -245,7 +237,7 @@ cp ../binaries/bzImage boot/vmlinuz
 if [ -n "$domU_check" ]; then
     cp ../binaries/domU-rootfs.cpio.gz boot/initrd-domU
 fi
-find . | fakeroot -i ../fakeroot-save cpio -H newc -o | gzip > ../binaries/dom0-rootfs.cpio.gz
+find . | cpio -H newc -o | gzip >> ../binaries/dom0-rootfs.cpio.gz
 cd ..
 
 

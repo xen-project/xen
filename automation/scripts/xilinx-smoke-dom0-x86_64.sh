@@ -80,6 +80,7 @@ argo-exec -l -p 28333 -- /bin/echo
 "
 copy_dom0_files ()
 {
+    mkdir -p root usr/local/lib usr/local/bin
     cp "${WORKDIR}/binaries/xen-argo.ko" "root/"
     cp -ar "${WORKDIR}/binaries/lib/"* "usr/local/lib/"
     cp "${WORKDIR}/binaries/argo-exec" "usr/local/bin/"
@@ -89,12 +90,13 @@ else
     fatal "Unknown test: ${TEST}"
 fi
 
-# Set up domU rootfs.
+# DomU rootfs
+cp binaries/rootfs.cpio.gz binaries/domU-rootfs.cpio.gz
+
+# test-local configuration
 mkdir -p rootfs
 cd rootfs
-tar xzf ../binaries/initrd.tar.gz
-mkdir proc run srv sys
-rm var/run
+mkdir -p etc/local.d
 echo "#!/bin/sh
 set -x
 export LD_LIBRARY_PATH=/usr/local/lib
@@ -102,22 +104,22 @@ PATH=/usr/local/bin:/usr/local/sbin:\$PATH
 ${DOMU_CMD}
 " > etc/local.d/xen.start
 chmod +x etc/local.d/xen.start
-echo "rc_verbose=yes" >> etc/rc.conf
 echo "domU Welcome to Alpine Linux
 Kernel \r on an \m (\l)
 
 " > etc/issue
 copy_domU_files
-find . | cpio -H newc -o | gzip > ../binaries/domU-rootfs.cpio.gz
+find . | cpio -H newc -o | gzip >> ../binaries/domU-rootfs.cpio.gz
 cd ..
 rm -rf rootfs
 
-# Set up dom0 rootfs.
+# Dom0 rootfs
+cp binaries/rootfs.cpio.gz binaries/dom0-rootfs.cpio.gz
+
+# test-local configuration
 mkdir -p rootfs
 cd rootfs
-tar xzf ../binaries/initrd.tar.gz
-mkdir boot proc run srv sys
-rm var/run
+mkdir -p boot etc/local.d
 cp -ar ../binaries/dist/install/* .
 echo "#!/bin/bash
 set -x
@@ -127,14 +129,13 @@ ${DOM0_CMD}
 " > etc/local.d/xen.start
 chmod +x etc/local.d/xen.start
 echo "${DOMU_CFG}${DOMU_CFG_EXTRA}" > etc/xen/domU.cfg
-echo "rc_verbose=yes" >> etc/rc.conf
 echo "XENCONSOLED_TRACE=all" >> etc/default/xencommons
 echo "QEMU_XEN=/bin/false" >> etc/default/xencommons
 mkdir -p var/log/xen/console
 cp ../binaries/bzImage boot/vmlinuz
 cp ../binaries/domU-rootfs.cpio.gz boot/initrd-domU
 copy_dom0_files
-find . | cpio -H newc -o | gzip > ../binaries/dom0-rootfs.cpio.gz
+find . | cpio -H newc -o | gzip >> ../binaries/dom0-rootfs.cpio.gz
 cd ..
 
 # Load software into TFTP server directory.
@@ -147,7 +148,7 @@ echo "
 net_default_server=10.0.6.1
 multiboot2 (tftp)/${TEST_BOARD}/xen ${XEN_CMDLINE} sync_console
 module2 (tftp)/${TEST_BOARD}/vmlinuz console=hvc0 root=/dev/ram0 earlyprintk=xen
-module2 (tftp)/${TEST_BOARD}/initrd-dom0
+module2 --nounzip (tftp)/${TEST_BOARD}/initrd-dom0
 boot
 " > ${TFTP}/${TEST_BOARD}/grub.cfg
 
