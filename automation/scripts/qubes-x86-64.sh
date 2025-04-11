@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -ex
+set -ex -o pipefail
 
 # One of:
 #  - ""             PV dom0,  PVH domU
@@ -267,52 +267,26 @@ cp -f binaries/xen $TFTP/xen
 cp -f binaries/bzImage $TFTP/vmlinuz
 cp -f binaries/dom0-rootfs.cpio.gz $TFTP/initrd-dom0
 
-# start logging the serial; this gives interactive console, don't close its
-# stdin to not close it; the 'cat' is important, plain redirection would hang
-# until somebody opens the pipe; opening and closing the pipe is used to close
-# the console
-mkfifo /tmp/console-stdin
-cat /tmp/console-stdin |\
-ssh $CONTROLLER console | tee smoke.serial | sed 's/\r//' &
-
 # start the system pointing at gitlab-ci predefined config
 ssh $CONTROLLER gitlabci poweron
-trap "ssh $CONTROLLER poweroff; : > /tmp/console-stdin" EXIT
+trap "ssh $CONTROLLER poweroff" EXIT
 
 if [ -n "$wait_and_wakeup" ]; then
-    # wait for suspend or a timeout
-    until grep "$wait_and_wakeup" smoke.serial || [ $timeout -le 0 ]; do
-        sleep 1;
-        : $((--timeout))
-    done
-    if [ $timeout -le 0 ]; then
-        echo "ERROR: suspend timeout, aborting"
-        exit 1
-    fi
-    # keep it suspended a bit, then wakeup
-    sleep 30
-    ssh $CONTROLLER wake
+    export SUSPEND_MSG="$wait_and_wakeup"
+    export WAKEUP_CMD="ssh $CONTROLLER wake"
 fi
 
-set +x
-until grep "^Welcome to Alpine Linux" smoke.serial || [ $timeout -le 0 ]; do
-    sleep 1;
-    : $((--timeout))
-done
-set -x
-
-tail -n 100 smoke.serial
-
-if [ $timeout -le 0 ]; then
-    echo "ERROR: test timeout, aborting"
-    exit 1
-fi
+export PASSED="${passed}"
+export BOOT_MSG="Latest ChangeSet: "
+export LOG_MSG="\nWelcome to Alpine Linux"
+export TEST_CMD="ssh $CONTROLLER console"
+export TEST_LOG="smoke.serial"
+export TEST_TIMEOUT="$timeout"
+./automation/scripts/console.exp | sed 's/\r\+$//'
+TEST_RESULT=$?
 
 if [ -n "$retrieve_xml" ]; then
     nc -w 10 "$SUT_ADDR" 8080 > tests-junit.xml </dev/null
 fi
 
-sleep 1
-
-(grep -q "^Welcome to Alpine Linux" smoke.serial && grep -q "${passed}" smoke.serial) || exit 1
-exit 0
+exit "$TEST_RESULT"
