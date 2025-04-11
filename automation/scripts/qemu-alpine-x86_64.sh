@@ -28,16 +28,14 @@ cd initrd
 find . | cpio -H newc -o | gzip > ../domU-rootfs.cpio.gz
 cd ..
 
-# initrd.tar.gz is Dom0 rootfs
+# Dom0 rootfs
+cp rootfs.cpio.gz dom0-rootfs.cpio.gz
+
+# test-local configuration
 mkdir -p rootfs
 cd rootfs
-tar xvzf ../initrd.tar.gz
-mkdir proc
-mkdir run
-mkdir srv
-mkdir sys
-rm var/run
 cp -ar ../dist/install/* .
+mkdir -p root etc/local.d
 mv ../domU-rootfs.cpio.gz ./root
 cp ../bzImage ./root
 echo "name=\"domU\"
@@ -60,9 +58,7 @@ xl -vvv create -c /root/domU.cfg
 
 " > etc/local.d/xen.start
 chmod +x etc/local.d/xen.start
-echo "rc_verbose=yes" >> etc/rc.conf
-# rebuild Dom0 rootfs
-find . | cpio -H newc -o | gzip > ../dom0-rootfs.cpio.gz
+find . | cpio -H newc -o | gzip >> ../dom0-rootfs.cpio.gz
 cd ../..
 
 cat >> binaries/pxelinux.0 << EOF
