@@ -107,6 +107,7 @@ rm -rf rootfs
 
 # Dom0 rootfs
 cp binaries/rootfs.cpio.gz binaries/dom0-rootfs.cpio.gz
+cat binaries/xen-tools.cpio.gz >> binaries/dom0-rootfs.cpio.gz
 if [[ "${TEST}" == argo ]]; then
     cat binaries/argo.cpio.gz >> binaries/dom0-rootfs.cpio.gz
 fi
@@ -114,8 +115,7 @@ fi
 # test-local configuration
 mkdir -p rootfs
 cd rootfs
-mkdir -p boot etc/local.d
-cp -ar ../binaries/dist/install/* .
+mkdir -p boot etc/local.d etc/xen etc/default
 echo "#!/bin/bash
 set -x
 export LD_LIBRARY_PATH=/usr/local/lib

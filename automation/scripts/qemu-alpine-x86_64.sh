@@ -30,11 +30,11 @@ cd ..
 
 # Dom0 rootfs
 cp rootfs.cpio.gz dom0-rootfs.cpio.gz
+cat xen-tools.cpio.gz >> dom0-rootfs.cpio.gz
 
 # test-local configuration
 mkdir -p rootfs
 cd rootfs
-cp -ar ../dist/install/* .
 mkdir -p root etc/local.d
 mv ../domU-rootfs.cpio.gz ./root
 cp ../bzImage ./root

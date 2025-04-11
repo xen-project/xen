@@ -113,11 +113,11 @@ cd ..
 
 # Dom0 rootfs
 cp binaries/rootfs.cpio.gz binaries/dom0-rootfs.cpio.gz
+cat binaries/xen-tools.cpio.gz >> binaries/dom0-rootfs.cpio.gz
 
 # test-local configuration
 mkdir -p rootfs
 cd rootfs
-cp -ar ../binaries/dist/install/* .
 mkdir -p etc/local.d
 
 echo "#!/bin/bash
