@@ -140,6 +140,7 @@ stty -F ${SERIAL_DEV} 115200
 
 # Capture test result and power off board before exiting.
 export PASSED="${passed}"
+export BOOT_MSG="Latest ChangeSet: "
 export LOG_MSG="Welcome to Alpine Linux"
 export TEST_CMD="cat ${SERIAL_DEV}"
 export TEST_LOG="smoke.serial"

@@ -85,6 +85,7 @@ export TEST_CMD="qemu-system-x86_64 \
     -netdev user,id=n0,tftp=binaries,bootfile=/pxelinux.0"
 
 export TEST_LOG="smoke.serial"
+export BOOT_MSG="Latest ChangeSet: "
 export LOG_MSG="Domain-0"
 export PASSED="BusyBox"
 
