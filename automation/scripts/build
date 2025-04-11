@@ -108,7 +108,7 @@ else
     # Note: Some smoke tests depending on finding binaries/xen on a full build
     # even though dist/ contains everything, while some containers don't even
     # build Xen
-    cp -r dist binaries/
+    (cd dist/install; find | cpio -o -H newc | gzip) > binaries/xen-tools.cpio.gz
     cp -r tools/tests binaries/
     collect_xen_artefacts
 fi

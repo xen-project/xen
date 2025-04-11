@@ -189,12 +189,12 @@ fi
 
 # Dom0 rootfs
 cp binaries/rootfs.cpio.gz binaries/dom0-rootfs.cpio.gz
+cat binaries/xen-tools.cpio.gz >> binaries/dom0-rootfs.cpio.gz
 
 # test-local configuration
 mkdir -p rootfs
 cd rootfs
 mkdir -p boot etc/local.d
-cp -ar ../binaries/dist/install/* .
 cp -ar ../binaries/tests .
 cp -a ../automation/scripts/run-tools-tests tests/
 
@@ -228,8 +228,10 @@ else
 fi
 
 chmod +x etc/local.d/xen.start
+mkdir -p etc/xen
 echo "$domU_config" > etc/xen/domU.cfg
 
+mkdir -p etc/default
 echo "XENCONSOLED_TRACE=all" >> etc/default/xencommons
 echo "QEMU_XEN=/bin/false" >> etc/default/xencommons
 mkdir -p var/log/xen/console
