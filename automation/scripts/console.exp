@@ -48,11 +48,11 @@ if {[info exists env(BOOT_MSG)]} {
 if {[info exists env(LOG_MSG)]} {
     expect {
         -re "$env(PASSED)" {
-            expect -re "$env(LOG_MSG)"
+            expect -notransfer -re "$env(LOG_MSG)"
             exit 0
         }
         -re "$env(LOG_MSG)" {
-            expect -re "$env(PASSED)"
+            expect -notransfer -re "$env(PASSED)"
             exit 0
         }
     }
