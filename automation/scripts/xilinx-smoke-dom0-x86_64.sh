@@ -106,7 +106,8 @@ cd ..
 rm -rf rootfs
 
 # Dom0 rootfs
-cp binaries/rootfs.cpio.gz binaries/dom0-rootfs.cpio.gz
+cp binaries/ucode.cpio binaries/dom0-rootfs.cpio.gz
+cat binaries/rootfs.cpio.gz >> binaries/dom0-rootfs.cpio.gz
 cat binaries/xen-tools.cpio.gz >> binaries/dom0-rootfs.cpio.gz
 if [[ "${TEST}" == argo ]]; then
     cat binaries/argo.cpio.gz >> binaries/dom0-rootfs.cpio.gz

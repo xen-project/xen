@@ -26,6 +26,9 @@
   - project: xen-project/hardware/test-artifacts
     job: alpine-3.18-x86_64-rootfs
     ref: master
+  - project: xen-project/hardware/test-artifacts
+    job: microcode-x86
+    ref: master
 
 .qemu-arm64:
   extends: .test-jobs-common
@@ -246,6 +249,9 @@ xilinx-smoke-dom0-x86_64-gcc-debug-argo:
       ref: master
     - project: xen-project/hardware/test-artifacts
       job: alpine-3.18-x86_64-rootfs
+      ref: master
+    - project: xen-project/hardware/test-artifacts
+      job: microcode-x86
       ref: master
 
 adl-smoke-x86-64-gcc-debug:

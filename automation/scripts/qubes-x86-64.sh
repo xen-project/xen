@@ -188,7 +188,8 @@ Kernel \r on an \m (\l)
 fi
 
 # Dom0 rootfs
-cp binaries/rootfs.cpio.gz binaries/dom0-rootfs.cpio.gz
+cp binaries/ucode.cpio binaries/dom0-rootfs.cpio.gz
+cat binaries/rootfs.cpio.gz >> binaries/dom0-rootfs.cpio.gz
 cat binaries/xen-tools.cpio.gz >> binaries/dom0-rootfs.cpio.gz
 
 # test-local configuration
