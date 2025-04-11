@@ -1,4 +1,17 @@
 #!/usr/bin/env expect
+#
+# Variables used by this script:
+# - TEST_TIMEOUT: timeout between each *_MSG match
+# - TEST_TIMEOUT_OVERRIDE: when set, overrides TEST_TIMEOUT
+# - TEST_LOG: save console log to this file
+# - TEST_CMD: commands that prints test system console output to stdout - in
+#   qemu tests that's usually qemu itself (with -serial stdio), in hardware
+#   tests that's a command to read serial console
+# - UBOOT_CMD (optional): command to enter at u-boot prompt
+# - BOOT_MSG (optional): initial Xen message to wait for (aka sign-of-life)
+# - LOG_MSG (optional): final console message to wait for
+# - PASSED: message to look for to consider test a success; if LOG_MSG is set,
+#   both LOG_MSG and PASSED must appear (in any order) for test to succeed
 
 if {[info exists env(TEST_TIMEOUT_OVERRIDE)]} {
     set timeout $env(TEST_TIMEOUT_OVERRIDE)
@@ -28,21 +41,25 @@ if {[info exists env(UBOOT_CMD)]} {
     send "$env(UBOOT_CMD)\r"
 }
 
+if {[info exists env(BOOT_MSG)]} {
+    expect -re "$env(BOOT_MSG)"
+}
+
 if {[info exists env(LOG_MSG)]} {
     expect {
-        "$env(PASSED)" {
-            expect "$env(LOG_MSG)"
+        -re "$env(PASSED)" {
+            expect -re "$env(LOG_MSG)"
             exit 0
         }
-        "$env(LOG_MSG)" {
-            expect "$env(PASSED)"
+        -re "$env(LOG_MSG)" {
+            expect -re "$env(PASSED)"
             exit 0
         }
     }
 }
 
 expect {
-    "$env(PASSED)" {
+    -re "$env(PASSED)" {
         exit 0
     }
 }

@@ -92,6 +92,7 @@ export TEST_CMD="./qemu-system-arm \
 
 export UBOOT_CMD="virtio scan; dhcp; tftpb 0x40000000 boot.scr; source 0x40000000"
 export TEST_LOG="${serial_log}"
+export BOOT_MSG="Latest ChangeSet: "
 export LOG_MSG="Domain-0"
 export PASSED="/ #"
 

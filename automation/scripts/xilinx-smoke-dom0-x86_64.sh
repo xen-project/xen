@@ -133,6 +133,7 @@ stty -F ${SERIAL_DEV} 57600
 
 # Capture test result and power off board before exiting.
 export PASSED="${PASS_MSG}"
+export BOOT_MSG="Latest ChangeSet: "
 export TEST_CMD="cat ${SERIAL_DEV}"
 export TEST_LOG="smoke.serial"
 
