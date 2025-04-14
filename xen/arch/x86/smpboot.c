@@ -1375,6 +1375,7 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
 int __cpu_up(unsigned int cpu)
 {
     int apicid, ret;
+    s_time_t start;
 
     if ( (apicid = x86_cpu_to_apicid[cpu]) == BAD_APICID )
         return -ENODEV;
@@ -1393,10 +1394,18 @@ int __cpu_up(unsigned int cpu)
     time_latch_stamps();
 
     set_cpu_state(CPU_STATE_ONLINE);
+    start = NOW();
     while ( !cpu_online(cpu) )
     {
         cpu_relax();
         process_pending_softirqs();
+        if ( (NOW() - start) > SECONDS(5) )
+        {
+            /* AP is stuck, send NMI and panic. */
+            show_execution_state_nmi(cpumask_of(cpu), true);
+            panic("APIC ID %#x (CPU%u) stuck while starting up\n",
+                  apicid, cpu);
+        }
     }
 
     return 0;
