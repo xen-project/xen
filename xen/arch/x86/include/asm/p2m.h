@@ -136,11 +136,16 @@ typedef unsigned int p2m_query_t;
 #endif
 
 /* Shared types */
+#ifdef CONFIG_MEM_SHARING
 /* XXX: Sharable types could include p2m_ram_ro too, but we would need to
  * reinit the type correctly after fault */
 #define P2M_SHARABLE_TYPES (p2m_to_mask(p2m_ram_rw) \
                             | p2m_to_mask(p2m_ram_logdirty) )
 #define P2M_SHARED_TYPES   (p2m_to_mask(p2m_ram_shared))
+#else
+/* P2M_SHARABLE_TYPES deliberately not provided. */
+#define P2M_SHARED_TYPES 0
+#endif
 
 /* Types established/cleaned up via special accessors. */
 #define P2M_SPECIAL_TYPES (P2M_GRANT_TYPES | \
