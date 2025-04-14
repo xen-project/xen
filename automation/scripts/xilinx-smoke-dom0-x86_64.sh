@@ -22,7 +22,7 @@ DOMU_CMD=""
 DOMU_CFG='
 type = "pvh"
 name = "domU"
-kernel = "/boot/vmlinuz"
+kernel = "/boot/vmlinuz-domU"
 ramdisk = "/boot/initrd-domU"
 extra = "root=/dev/ram0 console=hvc0"
 memory = 512
@@ -106,10 +106,20 @@ find . | cpio -H newc -o | gzip >> ../binaries/domU-rootfs.cpio.gz
 cd ..
 rm -rf rootfs
 
+# Package domU kernel+rootfs in /boot for dom0 (uncompressed)
+mkdir -p rootfs/boot
+cd rootfs
+cp ../binaries/bzImage boot/vmlinuz-domU
+cp ../binaries/domU-rootfs.cpio.gz boot/initrd-domU
+find . | cpio -H newc -o > ../binaries/domU-in-dom0.cpio
+cd ..
+rm -rf rootfs
+
 # Dom0 rootfs.  The order of concatenation is important; ucode wants to come
 # first, and all uncompressed must be ahead of compressed.
 dom0_rootfs_parts=(
     binaries/ucode.cpio
+    binaries/domU-in-dom0.cpio
     "${dom0_rootfs_extra_uncomp[@]}"
     binaries/rootfs.cpio.gz
     binaries/xen-tools.cpio.gz
@@ -131,8 +141,6 @@ echo "${DOMU_CFG}${DOMU_CFG_EXTRA}" > etc/xen/domU.cfg
 echo "XENCONSOLED_TRACE=all" >> etc/default/xencommons
 echo "QEMU_XEN=/bin/false" >> etc/default/xencommons
 mkdir -p var/log/xen/console
-cp ../binaries/bzImage boot/vmlinuz
-cp ../binaries/domU-rootfs.cpio.gz boot/initrd-domU
 find . | cpio -H newc -o | gzip >> ../binaries/dom0-rootfs.cpio.gz
 cd ..
 

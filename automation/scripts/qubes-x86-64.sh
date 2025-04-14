@@ -156,7 +156,7 @@ esac
 domU_config="
 type = '${domU_type}'
 name = 'domU'
-kernel = '/boot/vmlinuz'
+kernel = '/boot/vmlinuz-domU'
 ramdisk = '/boot/initrd-domU'
 cmdline = 'root=/dev/ram0 console=hvc0'
 memory = 512
@@ -187,6 +187,17 @@ Kernel \r on an \m (\l)
     find . | cpio -H newc -o | gzip >> ../binaries/domU-rootfs.cpio.gz
     cd ..
     rm -rf rootfs
+
+    # Package domU kernel+rootfs in /boot for dom0 (uncompressed)
+    mkdir -p rootfs/boot
+    cd rootfs
+    cp ../binaries/bzImage boot/vmlinuz-domU
+    cp ../binaries/domU-rootfs.cpio.gz boot/initrd-domU
+    find . | cpio -H newc -o > ../binaries/domU-in-dom0.cpio
+    cd ..
+    rm -rf rootfs
+
+    dom0_rootfs_extra_uncomp+=(binaries/domU-in-dom0.cpio)
 fi
 
 # Dom0 rootfs.  The order of concatenation is important; ucode wants to come
@@ -241,10 +252,6 @@ mkdir -p etc/default
 echo "XENCONSOLED_TRACE=all" >> etc/default/xencommons
 echo "QEMU_XEN=/bin/false" >> etc/default/xencommons
 mkdir -p var/log/xen/console
-cp ../binaries/bzImage boot/vmlinuz
-if [ -n "$domU_check" ]; then
-    cp ../binaries/domU-rootfs.cpio.gz boot/initrd-domU
-fi
 find . | cpio -H newc -o | gzip >> ../binaries/dom0-rootfs.cpio.gz
 cd ..
 
