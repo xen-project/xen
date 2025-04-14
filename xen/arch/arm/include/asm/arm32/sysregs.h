@@ -20,7 +20,16 @@
  * uses r0 as a placeholder register. */
 #define CMD_CP32(name...)      "mcr " __stringify(CP32(r0, name)) ";"
 
-#ifndef __ASSEMBLY__
+#define REGION_TEXT_PRBAR       0x18    /* SH=11 AP=10 XN=0 */
+#define REGION_RO_PRBAR         0x1D    /* SH=11 AP=10 XN=1 */
+#define REGION_DATA_PRBAR       0x19    /* SH=11 AP=00 XN=1 */
+#define REGION_DEVICE_PRBAR     0x11    /* SH=10 AP=00 XN=1 */
+
+#ifdef __ASSEMBLY__
+
+#define WRITE_SYSREG_ASM(v, name) mcr CP32(v, name)
+
+#else /* __ASSEMBLY__ */
 
 /* C wrappers */
 #define READ_CP32(name...) ({                                   \
@@ -84,7 +93,7 @@
 /* MVFR2 is not defined on ARMv7 */
 #define MVFR2_MAYBE_UNDEFINED
 
-#endif /* __ASSEMBLY__ */
+#endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_ARM_ARM32_SYSREGS_H */
 /*
