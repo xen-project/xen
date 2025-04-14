@@ -30,6 +30,7 @@
 #include <xen/virtual_region.h>
 #include <xen/version.h>
 #include <xen/vmap.h>
+#include <xen/stack-protector.h>
 #include <xen/trace.h>
 #include <xen/libfdt/libfdt-xen.h>
 #include <xen/acpi.h>
@@ -305,6 +306,8 @@ void asmlinkage __init start_xen(unsigned long fdt_paddr)
     struct bootmodule *xen_bootmodule;
     struct domain *d;
     int rc, i;
+
+    boot_stack_chk_guard_setup();
 
     dcache_line_bytes = read_dcache_line_bytes();
 
