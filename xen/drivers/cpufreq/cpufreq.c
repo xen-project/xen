@@ -307,7 +307,13 @@ int cpufreq_add_cpu(unsigned int cpu)
     if (hw_all || (cpumask_weight(cpufreq_dom->map) ==
                    perf->domain_info.num_processors)) {
         memcpy(&new_policy, policy, sizeof(struct cpufreq_policy));
-        policy->governor = NULL;
+
+        /*
+         * Only when cpufreq_driver.setpolicy == NULL, we need to deliberately
+         * set old gov as NULL to trigger the according gov starting.
+         */
+        if ( cpufreq_driver.setpolicy == NULL )
+            policy->governor = NULL;
 
         cpufreq_cmdline_common_para(&new_policy);
 
