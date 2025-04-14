@@ -170,14 +170,7 @@ struct page_info
 #define _PGC_need_scrub   _PGC_allocated
 #define PGC_need_scrub    PGC_allocated
 
-#ifdef CONFIG_ARM_32
-#define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))
-#define is_xen_heap_mfn(mfn) ({                                 \
-    unsigned long mfn_ = mfn_x(mfn);                            \
-    (mfn_ >= mfn_x(directmap_mfn_start) &&                      \
-     mfn_ < mfn_x(directmap_mfn_end));                          \
-})
-#else
+#ifdef CONFIG_ARM_64
 #define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
 #define is_xen_heap_mfn(mfn) \
     (mfn_valid(mfn) && is_xen_heap_page(mfn_to_page(mfn)))

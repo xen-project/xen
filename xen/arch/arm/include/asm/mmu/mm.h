@@ -27,6 +27,13 @@ extern unsigned long directmap_base_pdx;
 })
 
 #ifdef CONFIG_ARM_32
+#define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))
+#define is_xen_heap_mfn(mfn) ({                                 \
+    unsigned long mfn_ = mfn_x(mfn);                            \
+    (mfn_ >= mfn_x(directmap_mfn_start) &&                      \
+     mfn_ < mfn_x(directmap_mfn_end));                          \
+})
+
 /**
  * Find the virtual address corresponding to a machine address
  *
