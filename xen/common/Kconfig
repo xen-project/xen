@@ -72,6 +72,7 @@ config HAS_COMPAT
 
 config HAS_DEVICE_TREE
 	bool
+	select LIBFDT
 
 config HAS_DIT # Data Independent Timing
 	bool
@@ -107,6 +108,9 @@ config HAS_UBSAN
 	bool
 
 config HAS_VMAP
+	bool
+
+config LIBFDT
 	bool
 
 config MEM_ACCESS_ALWAYS_ON
