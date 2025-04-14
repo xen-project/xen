@@ -462,6 +462,17 @@
 #define ZCR_ELx_LEN_SIZE             9
 #define ZCR_ELx_LEN_MASK             0x1ff
 
+#define REGION_TEXT_PRBAR       0x38    /* SH=11 AP=10 XN=00 */
+#define REGION_RO_PRBAR         0x3A    /* SH=11 AP=10 XN=10 */
+#define REGION_DATA_PRBAR       0x32    /* SH=11 AP=00 XN=10 */
+#define REGION_DEVICE_PRBAR     0x22    /* SH=10 AP=00 XN=10 */
+
+#ifdef __ASSEMBLY__
+
+#define WRITE_SYSREG_ASM(v, name) "msr " __stringify(name,) #v
+
+#else /* __ASSEMBLY__ */
+
 /* Access to system registers */
 
 #define WRITE_SYSREG64(v, name) do {                    \
@@ -480,6 +491,8 @@
 #define ICH_LR_REG(index)          ICH_LR ## index ## _EL2
 #define WRITE_SYSREG_LR(v, index)  WRITE_SYSREG(v, ICH_LR_REG(index))
 #define READ_SYSREG_LR(index)      READ_SYSREG(ICH_LR_REG(index))
+
+#endif /* !__ASSEMBLY__ */
 
 #endif /* _ASM_ARM_ARM64_SYSREGS_H */
 
