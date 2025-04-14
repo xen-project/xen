@@ -435,7 +435,11 @@ else
 CFLAGS_UBSAN :=
 endif
 
+ifeq ($(CONFIG_STACK_PROTECTOR),y)
+CFLAGS += -fstack-protector
+else
 CFLAGS += -fno-stack-protector
+endif
 
 ifeq ($(CONFIG_LTO),y)
 CFLAGS += -flto

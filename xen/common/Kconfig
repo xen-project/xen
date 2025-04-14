@@ -100,6 +100,9 @@ config HAS_PMAP
 config HAS_SCHED_GRANULARITY
 	bool
 
+config HAS_STACK_PROTECTOR
+	bool
+
 config HAS_UBSAN
 	bool
 
@@ -230,6 +233,18 @@ config SPECULATIVE_HARDEN_LOCK
 	  enabled on the command line.
 
 	  If unsure, say Y.
+
+endmenu
+
+menu "Other hardening"
+
+config STACK_PROTECTOR
+	bool "Stack protector"
+	depends on HAS_STACK_PROTECTOR
+	help
+	  Enable the Stack Protector compiler hardening option. This inserts a
+	  canary value in the stack frame of functions, and performs an integrity
+	  check on function exit.
 
 endmenu
 

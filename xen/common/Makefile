@@ -46,6 +46,7 @@ obj-y += shutdown.o
 obj-y += softirq.o
 obj-y += smp.o
 obj-y += spinlock.o
+obj-$(CONFIG_STACK_PROTECTOR) += stack-protector.o
 obj-y += stop_machine.o
 obj-y += symbols.o
 obj-y += tasklet.o

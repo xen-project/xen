@@ -108,6 +108,14 @@
         },
         {
             "id": "SAF-13-safe",
+            "analyser": {
+                "eclair": "MC3A2.R8.4"
+            },
+            "name": "Rule 8.4: compiler-called function",
+            "text": "A function, all invocations of which are compiler generated, does not need to have a visible declaration prior to its definition."
+        },
+        {
+            "id": "SAF-14-safe",
             "analyser": {},
             "name": "Sentinel",
             "text": "Next ID to be used"
