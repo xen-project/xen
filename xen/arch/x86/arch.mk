@@ -103,6 +103,7 @@ efi-nr-fixups := $(shell LC_ALL=C $(OBJDUMP) -p $(efi-check).efi | grep '^[[:bla
 
 ifeq ($(efi-nr-fixups),2)
 MKRELOC := :
+EFI_LDFLAGS += --disable-high-entropy-va
 else
 MKRELOC := arch/x86/efi/mkreloc
 # If the linker produced fixups but not precisely two of them, we need to
@@ -112,6 +113,8 @@ ifneq ($(efi-nr-fixups),0)
 EFI_LDFLAGS += --disable-reloc-section
 endif
 endif
+
+EFI_LDFLAGS += --dynamicbase
 
 endif # $(XEN_BUILD_PE)
 
