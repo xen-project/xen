@@ -15,8 +15,6 @@
 #define __set_bit(n, p)         set_bit(n, p)
 #define __clear_bit(n, p)       clear_bit(n, p)
 
-#define BITS_PER_BYTE           8
-
 /* PPC bit number conversion */
 #define PPC_BITLSHIFT(be)    (BITS_PER_LONG - 1 - (be))
 #define PPC_BIT(bit)         (1UL << PPC_BITLSHIFT(bit))
@@ -121,7 +119,7 @@ static inline int test_and_set_bit(unsigned int nr, volatile void *addr)
 
 #define arch_ffs(x)  ((x) ? 1 + __builtin_ctz(x) : 0)
 #define arch_ffsl(x) ((x) ? 1 + __builtin_ctzl(x) : 0)
-#define arch_fls(x)  ((x) ? 32 - __builtin_clz(x) : 0)
+#define arch_fls(x)  ((x) ? BITS_PER_INT - __builtin_clz(x) : 0)
 #define arch_flsl(x) ((x) ? BITS_PER_LONG - __builtin_clzl(x) : 0)
 
 #define arch_hweightl(x) __builtin_popcountl(x)

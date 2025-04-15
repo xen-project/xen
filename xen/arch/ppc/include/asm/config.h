@@ -6,18 +6,11 @@
 #include <xen/page-size.h>
 
 #if defined(CONFIG_PPC64)
-#define LONG_BYTEORDER 3
 #define ELFSIZE        64
 #define MAX_VIRT_CPUS  1024u
 #else
 #error "Unsupported PowerPC variant"
 #endif
-
-#define BYTES_PER_LONG (1 << LONG_BYTEORDER)
-#define BITS_PER_LONG  (BYTES_PER_LONG << 3)
-#define POINTER_ALIGN  BYTES_PER_LONG
-
-#define BITS_PER_LLONG 64
 
 /* xen_ulong_t is always 64 bits */
 #define BITS_PER_XEN_ULONG 64

@@ -98,4 +98,14 @@
 #define ZERO_BLOCK_PTR ((void *)-1L)
 #endif
 
+#define BYTES_PER_LONG  __SIZEOF_LONG__
+
+#define BITS_PER_BYTE   __CHAR_BIT__
+#define BITS_PER_INT    (BITS_PER_BYTE * __SIZEOF_INT__)
+#define BITS_PER_LONG   (BITS_PER_BYTE * BYTES_PER_LONG)
+#define BITS_PER_LLONG  (BITS_PER_BYTE * __SIZEOF_LONG_LONG__)
+
+/* It is assumed that sizeof(void *) == __alignof(void *) */
+#define POINTER_ALIGN   __SIZEOF_POINTER__
+
 #endif /* __XEN_CONFIG_H__ */

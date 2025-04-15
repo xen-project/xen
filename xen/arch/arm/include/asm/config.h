@@ -8,18 +8,10 @@
 #define __ARM_CONFIG_H__
 
 #if defined(CONFIG_ARM_64)
-# define LONG_BYTEORDER 3
 # define ELFSIZE 64
 #else
-# define LONG_BYTEORDER 2
 # define ELFSIZE 32
 #endif
-
-#define BYTES_PER_LONG (1 << LONG_BYTEORDER)
-#define BITS_PER_LONG (BYTES_PER_LONG << 3)
-#define POINTER_ALIGN BYTES_PER_LONG
-
-#define BITS_PER_LLONG 64
 
 /* xen_ulong_t is always 64 bits */
 #define BITS_PER_XEN_ULONG 64

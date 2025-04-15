@@ -22,8 +22,6 @@
 #define __set_bit(n,p)            set_bit(n,p)
 #define __clear_bit(n,p)          clear_bit(n,p)
 
-#define BITS_PER_BYTE           8
-
 #define ADDR (*(volatile int *) addr)
 #define CONST_ADDR (*(const volatile int *) addr)
 
@@ -75,7 +73,7 @@ bool clear_mask16_timeout(uint16_t mask, volatile void *p,
 
 #define arch_ffs(x)  ((x) ? 1 + __builtin_ctz(x) : 0)
 #define arch_ffsl(x) ((x) ? 1 + __builtin_ctzl(x) : 0)
-#define arch_fls(x)  ((x) ? 32 - __builtin_clz(x) : 0)
+#define arch_fls(x)  ((x) ? BITS_PER_INT - __builtin_clz(x) : 0)
 #define arch_flsl(x) ((x) ? BITS_PER_LONG - __builtin_clzl(x) : 0)
 
 #endif /* _ARM_BITOPS_H */
