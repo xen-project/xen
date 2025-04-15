@@ -4,9 +4,17 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/sections.h>
+#include <xen/types.h>
 
 unsigned long __ro_after_init cpu_khz; /* CPU clock frequency in kHz. */
 uint64_t __ro_after_init boot_clock_cycles;
+
+s_time_t get_s_time(void)
+{
+    uint64_t ticks = get_cycles() - boot_clock_cycles;
+
+    return ticks_to_ns(ticks);
+}
 
 /* Set up the timer on the boot CPU (early init function) */
 static void __init preinit_dt_xen_time(void)

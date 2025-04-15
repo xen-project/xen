@@ -27,11 +27,6 @@ nodemask_t __read_mostly node_online_map = { { [0] = 1UL } };
 
 /* time.c */
 
-s_time_t get_s_time(void)
-{
-    BUG_ON("unimplemented");
-}
-
 int reprogram_timer(s_time_t timeout)
 {
     BUG_ON("unimplemented");

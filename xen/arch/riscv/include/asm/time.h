@@ -3,6 +3,7 @@
 #define ASM__RISCV__TIME_H
 
 #include <xen/bug.h>
+#include <xen/lib.h>
 #include <xen/types.h>
 #include <asm/csr.h>
 
@@ -21,6 +22,11 @@ typedef unsigned long cycles_t;
 static inline cycles_t get_cycles(void)
 {
     return csr_read(CSR_TIME);
+}
+
+static inline s_time_t ticks_to_ns(uint64_t ticks)
+{
+    return muldiv64(ticks, MILLISECS(1), cpu_khz);
 }
 
 void preinit_xen_time(void);
