@@ -201,7 +201,6 @@ cp -a ../automation/scripts/run-tools-tests tests/
 
 echo "#!/bin/bash
 
-export LD_LIBRARY_PATH=/usr/local/lib
 bash /etc/init.d/xencommons start
 
 brctl addbr xenbr0
