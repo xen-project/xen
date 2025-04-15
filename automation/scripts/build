@@ -67,7 +67,7 @@ elif [[ "${HYPERVISOR_ONLY}" == "y" ]]; then
     collect_xen_artefacts
 else
     # Full build.  Figure out our ./configure options
-    cfgargs=()
+    cfgargs=("--prefix=/usr")
     cfgargs+=("--enable-docs")
 
     # booleans for which compiler is in use

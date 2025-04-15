@@ -125,10 +125,9 @@ mkdir -p etc/local.d
 
 echo "#!/bin/bash
 
-export LD_LIBRARY_PATH=/usr/local/lib
 bash /etc/init.d/xencommons start
 
-/usr/local/lib/xen/bin/init-dom0less
+/usr/lib/xen/bin/init-dom0less
 
 brctl addbr xenbr0
 brctl addif xenbr0 eth0

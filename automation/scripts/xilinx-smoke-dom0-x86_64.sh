@@ -92,8 +92,6 @@ cd rootfs
 mkdir -p etc/local.d
 echo "#!/bin/sh
 set -x
-export LD_LIBRARY_PATH=/usr/local/lib
-PATH=/usr/local/bin:/usr/local/sbin:\$PATH
 ${DOMU_CMD}
 " > etc/local.d/xen.start
 chmod +x etc/local.d/xen.start
@@ -119,7 +117,6 @@ cd rootfs
 mkdir -p boot etc/local.d etc/xen etc/default
 echo "#!/bin/bash
 set -x
-export LD_LIBRARY_PATH=/usr/local/lib
 bash /etc/init.d/xencommons start
 ${DOM0_CMD}
 " > etc/local.d/xen.start
