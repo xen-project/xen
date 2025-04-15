@@ -49,7 +49,6 @@ echo "#!/bin/bash
 
 set -x
 
-export LD_LIBRARY_PATH=/usr/local/lib
 bash /etc/init.d/xencommons start
 
 xl list

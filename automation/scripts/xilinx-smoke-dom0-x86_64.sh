@@ -80,7 +80,6 @@ cd rootfs
 mkdir -p boot etc/local.d etc/xen etc/default
 echo "#!/bin/bash
 
-export LD_LIBRARY_PATH=/usr/local/lib
 bash /etc/init.d/xencommons start
 
 brctl addbr xenbr0

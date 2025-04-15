@@ -46,7 +46,6 @@ extra=\"console=hvc0 root=/dev/ram0 rdinit=/bin/sh\"
 " > root/domU.cfg
 echo "#!/bin/bash
 
-export LD_LIBRARY_PATH=/usr/local/lib
 bash /etc/init.d/xencommons start
 
 xl list
