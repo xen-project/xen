@@ -2408,6 +2408,8 @@ void __init create_dom0(void)
     rc = construct_dom0(dom0);
     if ( rc )
         panic("Could not set up DOM0 guest OS (rc = %d)\n", rc);
+
+    set_xs_domain(dom0);
 }
 
 /*
