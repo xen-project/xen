@@ -2305,10 +2305,11 @@ static int __init construct_dom0(struct domain *d)
     if ( rc < 0 )
         return rc;
 
-    return construct_hwdom(&kinfo);
+    return construct_hwdom(&kinfo, NULL);
 }
 
-int __init construct_hwdom(struct kernel_info *kinfo)
+int __init construct_hwdom(struct kernel_info *kinfo,
+                           const struct dt_device_node *node)
 {
     struct domain *d = kinfo->d;
     int rc;
@@ -2327,7 +2328,7 @@ int __init construct_hwdom(struct kernel_info *kinfo)
 
     if ( acpi_disabled )
     {
-        rc = process_shm(d, kinfo, NULL);
+        rc = process_shm(d, kinfo, node);
         if ( rc < 0 )
             return rc;
     }
