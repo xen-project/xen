@@ -379,6 +379,16 @@ debian-bookworm-gcc-arm32-debug-earlyprintk:
       CONFIG_EARLY_UART_CHOICE_PL011=y
       CONFIG_EARLY_UART_BASE_ADDRESS=0x9000000
 
+debian-bookworm-gcc-arm32-debug-mpu:
+  extends: .gcc-arm32-cross-build-debug
+  variables:
+    CONTAINER: debian:bookworm-arm64v8-arm32-gcc
+    HYPERVISOR_ONLY: y
+    EXTRA_XEN_CONFIG: |
+      CONFIG_XEN_START_ADDRESS=0x0
+      CONFIG_MPU=y
+      CONFIG_UNSUPPORTED=y
+
 # Arm builds
 
 debian-bookworm-gcc-arm64:
@@ -442,6 +452,16 @@ alpine-3.18-gcc-debug-arm64-earlyprintk:
     EXTRA_XEN_CONFIG: |
       CONFIG_EARLY_UART_CHOICE_PL011=y
       CONFIG_EARLY_UART_BASE_ADDRESS=0x9000000
+
+alpine-3.18-gcc-debug-arm64-mpu:
+  extends: .gcc-arm64-build-debug
+  variables:
+    CONTAINER: alpine:3.18-arm64v8
+    HYPERVISOR_ONLY: y
+    EXTRA_XEN_CONFIG: |
+      CONFIG_XEN_START_ADDRESS=0x0
+      CONFIG_MPU=y
+      CONFIG_UNSUPPORTED=y
 
 # Yocto test jobs
 yocto-qemuarm64:
