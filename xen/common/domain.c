@@ -804,9 +804,6 @@ struct domain *domain_create(domid_t domid,
     d->domain_id = domid;
     d->unique_id = get_unique_id();
 
-    /* Holding CDF_* internal flags. */
-    d->cdf = flags;
-
     /* Debug sanity. */
     ASSERT(is_system_domain(d) ? config == NULL : config != NULL);
 
@@ -820,14 +817,24 @@ struct domain *domain_create(domid_t domid,
     d->is_privileged = flags & CDF_privileged;
 
     /* Sort out our idea of is_hardware_domain(). */
-    if ( domid == 0 || domid == hardware_domid )
+    if ( (flags & CDF_hardware) || domid == hardware_domid )
     {
         if ( hardware_domid < 0 || hardware_domid >= DOMID_FIRST_RESERVED )
             panic("The value of hardware_dom must be a valid domain ID\n");
 
+        /* late_hwdom is only allowed for dom0. */
+        if ( hardware_domain && hardware_domain->domain_id )
+            return ERR_PTR(-EINVAL);
+
         old_hwdom = hardware_domain;
         hardware_domain = d;
+        flags |= CDF_hardware;
+        if ( old_hwdom )
+            old_hwdom->cdf &= ~CDF_hardware;
     }
+
+    /* Holding CDF_* internal flags. */
+    d->cdf = flags;
 
     TRACE_TIME(TRC_DOM0_DOM_ADD, d->domain_id);
 
@@ -973,7 +980,11 @@ struct domain *domain_create(domid_t domid,
 
     d->is_dying = DOMDYING_dead;
     if ( hardware_domain == d )
+    {
+        if ( old_hwdom )
+            old_hwdom->cdf |= CDF_hardware;
         hardware_domain = old_hwdom;
+    }
     atomic_set(&d->refcnt, DOMAIN_DESTROYED);
 
     sched_destroy_domain(d);

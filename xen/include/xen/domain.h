@@ -53,6 +53,8 @@ domid_t get_initial_domain_id(void);
 #else
 #define CDF_staticmem            0
 #endif
+/* This is the hardware domain.  Only 1 allowed. */
+#define CDF_hardware             (1U << 3)
 
 #define is_domain_direct_mapped(d) ((d)->cdf & CDF_directmap)
 #define is_domain_using_staticmem(d) ((d)->cdf & CDF_staticmem)
