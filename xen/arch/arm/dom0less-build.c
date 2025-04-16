@@ -20,6 +20,8 @@
 #include <asm/static-memory.h>
 #include <asm/static-shmem.h>
 
+#define XENSTORE_PFN_LATE_ALLOC UINT64_MAX
+
 static domid_t __initdata xs_domid = DOMID_INVALID;
 static bool __initdata need_xenstore;
 
@@ -756,7 +758,7 @@ static int __init alloc_xenstore_params(struct kernel_info *kinfo)
 
     if ( (kinfo->dom0less_feature & (DOM0LESS_XENSTORE | DOM0LESS_XS_LEGACY))
                                  == (DOM0LESS_XENSTORE | DOM0LESS_XS_LEGACY) )
-        d->arch.hvm.params[HVM_PARAM_STORE_PFN] = ~0ULL;
+        d->arch.hvm.params[HVM_PARAM_STORE_PFN] = XENSTORE_PFN_LATE_ALLOC;
     else if ( kinfo->dom0less_feature & DOM0LESS_XENSTORE )
     {
         rc = alloc_xenstore_page(d);
@@ -788,6 +790,12 @@ static void __init initialize_domU_xenstore(void)
         rc = alloc_xenstore_evtchn(d);
         if ( rc < 0 )
             panic("%pd: Failed to allocate xenstore_evtchn\n", d);
+
+        if ( gfn != XENSTORE_PFN_LATE_ALLOC && IS_ENABLED(CONFIG_GRANT_TABLE) )
+        {
+            ASSERT(gfn < UINT32_MAX);
+            gnttab_seed_entry(d, GNTTAB_RESERVED_XENSTORE, xs_domid, gfn);
+        }
     }
 }
 

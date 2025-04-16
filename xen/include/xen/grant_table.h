@@ -33,6 +33,10 @@
 
 struct grant_table;
 
+/* Seed a gnttab entry for Hyperlaunch/dom0less. */
+void gnttab_seed_entry(const struct domain *d, unsigned int idx,
+                       domid_t be_domid, uint32_t frame);
+
 #ifdef CONFIG_GRANT_TABLE
 
 extern unsigned int opt_gnttab_max_version;
