@@ -1033,6 +1033,7 @@ void __init create_domUs(void)
             .grant_opts = XEN_DOMCTL_GRANT_version(opt_gnttab_max_version),
         };
         unsigned int flags = 0U;
+        bool has_dtb = false;
         uint32_t val;
         int rc;
 
@@ -1067,9 +1068,10 @@ void __init create_domUs(void)
              !strcmp(dom0less_iommu, "enabled") )
             iommu = true;
 
-        if ( iommu_enabled &&
-             (iommu || dt_find_compatible_node(node, NULL,
-                                               "multiboot,device-tree")) )
+        if ( dt_find_compatible_node(node, NULL, "multiboot,device-tree") )
+            has_dtb = true;
+
+        if ( iommu_enabled && (iommu || has_dtb) )
             d_cfg.flags |= XEN_DOMCTL_CDF_iommu;
 
         if ( !dt_property_read_u32(node, "nr_spis", &d_cfg.arch.nr_spis) )
