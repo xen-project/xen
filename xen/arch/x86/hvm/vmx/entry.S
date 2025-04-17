@@ -21,9 +21,6 @@
 #include <asm/asm_defns.h>
 #include <asm/page.h>
 
-#define VMRESUME     .byte 0x0f,0x01,0xc3
-#define VMLAUNCH     .byte 0x0f,0x01,0xc2
-
 FUNC(vmx_asm_vmexit_handler)
         SAVE_ALL
 
@@ -166,11 +163,11 @@ UNLIKELY_END(realmode)
         jns  .Lvmx_launch
 
 /*.Lvmx_resume:*/
-        VMRESUME
+        vmresume
         jmp  .Lvmx_vmentry_fail
 
 .Lvmx_launch:
-        VMLAUNCH
+        vmlaunch
 
 .Lvmx_vmentry_fail:
         sti
