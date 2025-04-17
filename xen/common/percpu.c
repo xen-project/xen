@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#include <xen/percpu.h>
 #include <xen/cpu.h>
 #include <xen/init.h>
 #include <xen/mm.h>
+#include <xen/numa.h>
+#include <xen/percpu.h>
 #include <xen/rcupdate.h>
 #include <xen/sections.h>
 
@@ -27,6 +28,8 @@ void __init percpu_init_areas(void)
 
 static int init_percpu_area(unsigned int cpu)
 {
+    nodeid_t node = cpu_to_node(cpu);
+    unsigned int memflags = node != NUMA_NO_NODE ? MEMF_node(node) : 0;
     char *p;
 
     if ( __per_cpu_offset[cpu] != INVALID_PERCPU_AREA )
@@ -34,7 +37,7 @@ static int init_percpu_area(unsigned int cpu)
                ? 0
                : -EBUSY;
 
-    if ( (p = alloc_xenheap_pages(PERCPU_ORDER, 0)) == NULL )
+    if ( (p = alloc_xenheap_pages(PERCPU_ORDER, memflags)) == NULL )
         return -ENOMEM;
 
     memset(p, 0, __per_cpu_data_end - __per_cpu_start);
