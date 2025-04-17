@@ -206,6 +206,8 @@ SECTIONS
   ELF_DETAILS_SECTIONS
 }
 
+PROVIDE(cpu_present_map = cpu_possible_map);
+
 /*
  * The assembly code use _start and XEN_VIRT_START interchangeably to
  * match the context.

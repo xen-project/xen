@@ -35,9 +35,8 @@
 #undef virt_to_mfn
 #define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
 
-cpumask_t cpu_online_map;
-cpumask_t cpu_present_map;
-cpumask_t cpu_possible_map;
+cpumask_t __read_mostly cpu_online_map;
+cpumask_t __ro_after_init cpu_possible_map;
 
 struct cpuinfo_arm cpu_data[NR_CPUS];
 
@@ -111,8 +110,6 @@ static void remove_cpu_sibling_map(int cpu)
 void __init
 smp_clear_cpu_maps (void)
 {
-    cpumask_clear(&cpu_possible_map);
-    cpumask_clear(&cpu_online_map);
     cpumask_set_cpu(0, &cpu_online_map);
     cpumask_set_cpu(0, &cpu_possible_map);
     cpu_logical_map(0) = READ_SYSREG(MPIDR_EL1) & MPIDR_HWID_MASK;
@@ -311,8 +308,6 @@ void __init
 smp_prepare_cpus(void)
 {
     int rc;
-
-    cpumask_copy(&cpu_present_map, &cpu_possible_map);
 
     rc = setup_cpu_sibling_map(0);
     if ( rc )
