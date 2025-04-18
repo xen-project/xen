@@ -1028,6 +1028,7 @@ static int cf_check write_msr(
     struct vcpu *curr = current;
     const struct domain *currd = curr->domain;
     const struct cpu_policy *cp = currd->arch.cpu_policy;
+    uint64_t temp = 0;
     bool vpmu_msr = false;
     int ret;
 
@@ -1041,8 +1042,6 @@ static int cf_check write_msr(
 
     switch ( reg )
     {
-        uint64_t temp;
-
     case MSR_FS_BASE:
     case MSR_GS_BASE:
     case MSR_SHADOW_GS_BASE:

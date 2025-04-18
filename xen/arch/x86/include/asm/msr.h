@@ -51,6 +51,23 @@ static inline void wrmsrns(uint32_t msr, uint64_t val)
 static inline int rdmsr_safe(unsigned int msr, uint64_t *val)
 {
     uint64_t lo, hi;
+
+#ifdef CONFIG_CC_HAS_ASM_GOTO_OUTPUT
+    asm_inline goto (
+        "1: rdmsr\n\t"
+        _ASM_EXTABLE(1b, %l[fault])
+        : "=a" (lo), "=d" (hi)
+        : "c" (msr)
+        :
+        : fault );
+
+    *val = lo | (hi << 32);
+
+    return 0;
+
+ fault:
+    return -EFAULT;
+#else
     int rc;
 
     asm_inline volatile (
@@ -68,6 +85,7 @@ static inline int rdmsr_safe(unsigned int msr, uint64_t *val)
     *val = lo | (hi << 32);
 
     return rc;
+#endif
 }
 
 /* wrmsr with exception handling */
