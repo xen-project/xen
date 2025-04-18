@@ -37,6 +37,8 @@ static enum io_state handle_read(const struct mmio_handler *handler,
     if ( !handler->ops->read(v, info, &r, handler->priv) )
         return IO_ABORT;
 
+    ASSERT((r & ~GENMASK((1U << info->dabt.size) * 8 - 1, 0)) == 0);
+
     r = sign_extend(dabt, r);
 
     set_user_reg(regs, dabt.reg, r);
