@@ -26,6 +26,9 @@
 #define PCI_BDF_XSPATH         "%04x-%02x-%02x-%01x"
 #define PCI_PT_QDEV_ID         "pci-pt-%02x_%02x.%01x"
 
+/* PCI Interrupt Line is an 8-bit value, 0xff means disconnected. */
+#define PCI_IRQ_LINE_LIMIT     0xff
+
 static unsigned int pci_encode_bdf(libxl_device_pci *pci)
 {
     unsigned int value;
@@ -1495,7 +1498,7 @@ static void pci_add_dm_done(libxl__egc *egc,
             LOGED(ERROR, domainid, "Couldn't open %s", sysfs_path);
             goto out_no_irq;
         }
-        if ((fscanf(f, "%u", &irq) == 1) && irq) {
+        if (fscanf(f, "%u", &irq) == 1 && irq > 0 && irq < PCI_IRQ_LINE_LIMIT) {
             r = xc_physdev_map_pirq(ctx->xch, domid, irq, &irq);
             if (r < 0) {
                 LOGED(ERROR, domainid, "xc_physdev_map_pirq irq=%d (error=%d)",
@@ -2257,7 +2260,7 @@ skip_bar:
             goto skip_legacy_irq;
         }
 
-        if ((fscanf(f, "%u", &irq) == 1) && irq) {
+        if (fscanf(f, "%u", &irq) == 1 && irq > 0 && irq < PCI_IRQ_LINE_LIMIT) {
             rc = xc_physdev_unmap_pirq(ctx->xch, domid, irq);
             if (rc < 0) {
                 /*
