@@ -1420,8 +1420,8 @@ static void pci_add_dm_done(libxl__egc *egc,
     char *sysfs_path;
     FILE *f;
     unsigned long long start, end, flags, size;
-    int irq, i;
-    int r;
+    unsigned int irq;
+    int i, r;
     uint32_t flag = XEN_DOMCTL_DEV_RDM_RELAXED;
     uint32_t domainid = domid;
     bool isstubdom = libxl_is_stubdom(ctx, domid, &domainid);
@@ -1499,7 +1499,9 @@ static void pci_add_dm_done(libxl__egc *egc,
             goto out_no_irq;
         }
         if (fscanf(f, "%u", &irq) == 1 && irq > 0 && irq < PCI_IRQ_LINE_LIMIT) {
-            r = xc_physdev_map_pirq(ctx->xch, domid, irq, &irq);
+            int pirq = irq;
+
+            r = xc_physdev_map_pirq(ctx->xch, domid, irq, &pirq);
             if (r < 0) {
                 LOGED(ERROR, domainid, "xc_physdev_map_pirq irq=%d (error=%d)",
                     irq, r);
@@ -1507,10 +1509,10 @@ static void pci_add_dm_done(libxl__egc *egc,
                 rc = ERROR_FAIL;
                 goto out;
             }
-            r = xc_domain_irq_permission(ctx->xch, domid, irq, 1);
+            r = xc_domain_irq_permission(ctx->xch, domid, pirq, 1);
             if (r < 0) {
                 LOGED(ERROR, domainid,
-                    "xc_domain_irq_permission irq=%d (error=%d)", irq, r);
+                    "xc_domain_irq_permission irq=%d (error=%d)", pirq, r);
                 fclose(f);
                 rc = ERROR_FAIL;
                 goto out;
@@ -2182,8 +2184,8 @@ static void pci_remove_detached(libxl__egc *egc,
 {
     STATE_AO_GC(prs->aodev->ao);
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    unsigned int start = 0, end = 0, flags = 0, size = 0;
-    int  irq = 0, i, stubdomid = 0;
+    unsigned int start = 0, end = 0, flags = 0, size = 0, irq = 0;
+    int i, stubdomid = 0;
     const char *sysfs_path;
     FILE *f;
     uint32_t domainid = prs->domid;
