@@ -40,21 +40,22 @@ static DEFINE_PER_CPU(uint64_t, xcr0);
 /* Because XCR0 is cached for each CPU, xsetbv() is not exposed. Users should 
  * use set_xcr0() instead.
  */
-static inline bool xsetbv(u32 index, u64 xfeatures)
+static inline bool xsetbv(uint32_t xcr, uint64_t val)
 {
-    u32 hi = xfeatures >> 32;
-    u32 lo = (u32)xfeatures;
+    uint32_t hi = val >> 32, lo = val;
 
-    asm volatile ( "1: .byte 0x0f,0x01,0xd1\n"
-                   "3:                     \n"
-                   ".section .fixup,\"ax\" \n"
-                   "2: xor %0,%0           \n"
-                   "   jmp 3b              \n"
-                   ".previous              \n"
-                   _ASM_EXTABLE(1b, 2b)
-                   : "+a" (lo)
-                   : "c" (index), "d" (hi));
-    return lo != 0;
+    asm_inline goto (
+        "1: xsetbv\n\t"
+        _ASM_EXTABLE(1b, %l[fault])
+        :
+        : "a" (lo), "c" (xcr), "d" (hi)
+        :
+        : fault );
+
+    return true;
+
+ fault:
+    return false;
 }
 
 bool set_xcr0(u64 xfeatures)
