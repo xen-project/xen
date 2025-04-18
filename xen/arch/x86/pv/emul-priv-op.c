@@ -249,7 +249,7 @@ static bool pci_cfg_ok(struct domain *currd, unsigned int start,
     {
         uint64_t msr_val;
 
-        if ( rdmsr_safe(MSR_AMD64_NB_CFG, msr_val) )
+        if ( rdmsr_safe(MSR_AMD64_NB_CFG, &msr_val) )
             return false;
         if ( msr_val & (1ULL << AMD64_NB_CFG_CF8_EXT_ENABLE_BIT) )
             start |= CF8_ADDR_HI(currd->arch.pci_cf8);
@@ -962,7 +962,7 @@ static int cf_check read_msr(
         return X86EMUL_OKAY;
 
     case MSR_IA32_MISC_ENABLE:
-        if ( rdmsr_safe(reg, *val) )
+        if ( rdmsr_safe(reg, val) )
             break;
         *val = guest_misc_enable(*val);
         return X86EMUL_OKAY;
@@ -992,7 +992,7 @@ static int cf_check read_msr(
         }
         /* fall through */
     default:
-        if ( currd->arch.msr_relaxed && !rdmsr_safe(reg, tmp) )
+        if ( currd->arch.msr_relaxed && !rdmsr_safe(reg, &tmp) )
         {
             *val = 0;
             return X86EMUL_OKAY;
@@ -1002,14 +1002,14 @@ static int cf_check read_msr(
         break;
 
     normal:
-        if ( rdmsr_safe(reg, *val) )
+        if ( rdmsr_safe(reg, val) )
             break;
         return X86EMUL_OKAY;
     }
 
  done:
     if ( ret != X86EMUL_OKAY && !curr->arch.pv.trap_ctxt[X86_EXC_GP].address &&
-         (reg >> 16) != 0x4000 && !rdmsr_safe(reg, tmp) )
+         (reg >> 16) != 0x4000 && !rdmsr_safe(reg, &tmp) )
     {
         gprintk(XENLOG_WARNING, "faking RDMSR 0x%08x\n", reg);
         *val = 0;
@@ -1096,7 +1096,7 @@ static int cf_check write_msr(
     case MSR_AMD64_NB_CFG:
         if ( !is_hwdom_pinned_vcpu(curr) )
             return X86EMUL_OKAY;
-        if ( (rdmsr_safe(MSR_AMD64_NB_CFG, temp) != 0) ||
+        if ( (rdmsr_safe(MSR_AMD64_NB_CFG, &temp) != 0) ||
              ((val ^ temp) & ~(1ULL << AMD64_NB_CFG_CF8_EXT_ENABLE_BIT)) )
             goto invalid;
         if ( wrmsr_safe(MSR_AMD64_NB_CFG, val) == 0 )
@@ -1109,7 +1109,7 @@ static int cf_check write_msr(
             break;
         if ( !is_hwdom_pinned_vcpu(curr) )
             return X86EMUL_OKAY;
-        if ( rdmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, temp) != 0 )
+        if ( rdmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, &temp) != 0 )
             break;
         if ( (pci_probe & PCI_PROBE_MASK) == PCI_PROBE_MMCONF ?
              temp != val :
@@ -1125,7 +1125,7 @@ static int cf_check write_msr(
         break;
 
     case MSR_IA32_MISC_ENABLE:
-        if ( rdmsr_safe(reg, temp) )
+        if ( rdmsr_safe(reg, &temp) )
             break;
         if ( val != guest_misc_enable(temp) )
             goto invalid;
@@ -1172,7 +1172,7 @@ static int cf_check write_msr(
         }
         /* fall through */
     default:
-        if ( currd->arch.msr_relaxed && !rdmsr_safe(reg, val) )
+        if ( currd->arch.msr_relaxed && !rdmsr_safe(reg, &val) )
             return X86EMUL_OKAY;
 
         gdprintk(XENLOG_WARNING,

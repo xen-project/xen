@@ -764,7 +764,7 @@ static int __init detect_init_APIC (void)
     if (enable_local_apic < 0)
         return -1;
 
-    if ( rdmsr_safe(MSR_APIC_BASE, msr_content) )
+    if ( rdmsr_safe(MSR_APIC_BASE, &msr_content) )
     {
         printk("No local APIC present\n");
         return -1;

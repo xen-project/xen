@@ -186,7 +186,7 @@ void cf_check resource_access(void *info)
                 if ( unlikely(read_tsc) )
                     local_irq_save(flags);
 
-                ret = rdmsr_safe(entry->idx, entry->val);
+                ret = rdmsr_safe(entry->idx, &entry->val);
 
                 if ( unlikely(read_tsc) )
                 {

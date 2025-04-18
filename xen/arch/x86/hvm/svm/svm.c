@@ -1083,8 +1083,8 @@ static void svm_host_osvw_init(void)
     {
         uint64_t len, status;
 
-        if ( rdmsr_safe(MSR_AMD_OSVW_ID_LENGTH, len) ||
-             rdmsr_safe(MSR_AMD_OSVW_STATUS, status) )
+        if ( rdmsr_safe(MSR_AMD_OSVW_ID_LENGTH, &len) ||
+             rdmsr_safe(MSR_AMD_OSVW_STATUS, &status) )
             len = status = 0;
 
         if ( len < osvw_length )
@@ -1482,7 +1482,7 @@ static void svm_init_erratum_383(const struct cpuinfo_x86 *c)
         return;
 
     /* use safe methods to be compatible with nested virtualization */
-    if ( rdmsr_safe(MSR_AMD64_DC_CFG, msr_content) == 0 &&
+    if ( rdmsr_safe(MSR_AMD64_DC_CFG, &msr_content) == 0 &&
          wrmsr_safe(MSR_AMD64_DC_CFG, msr_content | (1ULL << 47)) == 0 )
         amd_erratum383_found = 1;
     else
@@ -1786,7 +1786,7 @@ static int cf_check svm_msr_read_intercept(
         break;
 
     case MSR_F10_BU_CFG:
-        if ( !rdmsr_safe(msr, *msr_content) )
+        if ( !rdmsr_safe(msr, msr_content) )
             break;
 
         if ( boot_cpu_data.x86 == 0xf )
@@ -1805,7 +1805,7 @@ static int cf_check svm_msr_read_intercept(
         goto gpf;
 
     case MSR_F10_BU_CFG2:
-        if ( rdmsr_safe(msr, *msr_content) )
+        if ( rdmsr_safe(msr, msr_content) )
             goto gpf;
         break;
 
@@ -1882,7 +1882,7 @@ static int cf_check svm_msr_read_intercept(
         break;
 
     default:
-        if ( d->arch.msr_relaxed && !rdmsr_safe(msr, tmp) )
+        if ( d->arch.msr_relaxed && !rdmsr_safe(msr, &tmp) )
         {
             *msr_content = 0;
             break;
@@ -2048,7 +2048,7 @@ static int cf_check svm_msr_write_intercept(
 
     case MSR_F10_BU_CFG:
     case MSR_F10_BU_CFG2:
-        if ( rdmsr_safe(msr, msr_content) )
+        if ( rdmsr_safe(msr, &msr_content) )
             goto gpf;
         break;
 
@@ -2069,7 +2069,7 @@ static int cf_check svm_msr_write_intercept(
         break;
 
     default:
-        if ( d->arch.msr_relaxed && !rdmsr_safe(msr, msr_content) )
+        if ( d->arch.msr_relaxed && !rdmsr_safe(msr, &msr_content) )
             break;
 
         gdprintk(XENLOG_WARNING,

@@ -149,7 +149,7 @@ static const char *__init cf_check pci_mmcfg_amd_fam10h(void)
         return NULL;
 
     address = MSR_FAM10H_MMIO_CONF_BASE;
-    if (rdmsr_safe(address, msr_content))
+    if ( rdmsr_safe(address, &msr_content) )
         return NULL;
 
     /* mmconfig is not enable */

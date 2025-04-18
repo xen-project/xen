@@ -195,7 +195,7 @@ static void mcequirk_amd_apply(enum mcequirk_amd_flags flags)
         break;
 
     case MCEQUIRK_F10_GART:
-        if ( rdmsr_safe(MSR_AMD64_MCx_MASK(4), val) == 0 )
+        if ( rdmsr_safe(MSR_AMD64_MCx_MASK(4), &val) == 0 )
             wrmsr_safe(MSR_AMD64_MCx_MASK(4), val | (1 << 10));
         break;
 

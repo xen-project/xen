@@ -115,7 +115,7 @@ static uint64_t __init _probe_mask_msr(unsigned int *msr, uint64_t caps)
 
 	expected_levelling_cap |= caps;
 
-	if (rdmsr_safe(*msr, val) || wrmsr_safe(*msr, val))
+	if (rdmsr_safe(*msr, &val) || wrmsr_safe(*msr, val))
 		*msr = 0;
 	else
 		levelling_caps |= caps;
@@ -546,7 +546,7 @@ static void intel_log_freq(const struct cpuinfo_x86 *c)
             { 26667, 13333, 20000, 16667, 33333, 10000, 40000 };
 
     case 6:
-        if ( rdmsr_safe(MSR_INTEL_PLATFORM_INFO, msrval) )
+        if ( rdmsr_safe(MSR_INTEL_PLATFORM_INFO, &msrval) )
             return;
         max_ratio = msrval >> 8;
         min_ratio = msrval >> 40;
@@ -566,7 +566,7 @@ static void intel_log_freq(const struct cpuinfo_x86 *c)
              */
             if ( min_ratio > max_ratio )
                 SWAP(min_ratio, max_ratio);
-            if ( rdmsr_safe(MSR_FSB_FREQ, msrval) ||
+            if ( rdmsr_safe(MSR_FSB_FREQ, &msrval) ||
                  (msrval &= 7) >= ARRAY_SIZE(core_factors) )
                 return;
             factor = core_factors[msrval];
@@ -584,7 +584,7 @@ static void intel_log_freq(const struct cpuinfo_x86 *c)
         break;
 
     case 0xf:
-        if ( rdmsr_safe(MSR_IA32_EBC_FREQUENCY_ID, msrval) )
+        if ( rdmsr_safe(MSR_IA32_EBC_FREQUENCY_ID, &msrval) )
             return;
         max_ratio = msrval >> 24;
         min_ratio = 0;

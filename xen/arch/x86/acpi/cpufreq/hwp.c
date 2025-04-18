@@ -249,7 +249,7 @@ static void cf_check hwp_write_request(void *info)
     {
         hwp_verbose("CPU%u: error wrmsr_safe(MSR_HWP_REQUEST, %lx)\n",
                     policy->cpu, hwp_req.raw);
-        rdmsr_safe(MSR_HWP_REQUEST, data->curr_req.raw);
+        rdmsr_safe(MSR_HWP_REQUEST, &data->curr_req.raw);
         data->ret = -EINVAL;
     }
 }
@@ -285,7 +285,7 @@ static bool hdc_set_pkg_hdc_ctl(unsigned int cpu, bool val)
 {
     uint64_t msr;
 
-    if ( rdmsr_safe(MSR_PKG_HDC_CTL, msr) )
+    if ( rdmsr_safe(MSR_PKG_HDC_CTL, &msr) )
     {
         hwp_err(cpu, "rdmsr_safe(MSR_PKG_HDC_CTL)\n");
         return false;
@@ -309,7 +309,7 @@ static bool hdc_set_pm_ctl1(unsigned int cpu, bool val)
 {
     uint64_t msr;
 
-    if ( rdmsr_safe(MSR_PM_CTL1, msr) )
+    if ( rdmsr_safe(MSR_PM_CTL1, &msr) )
     {
         hwp_err(cpu, "rdmsr_safe(MSR_PM_CTL1)\n");
         return false;
@@ -357,7 +357,7 @@ static void cf_check hwp_init_msrs(void *info)
      * Package level MSR, but we don't have a good idea of packages here, so
      * just do it everytime.
      */
-    if ( rdmsr_safe(MSR_PM_ENABLE, val) )
+    if ( rdmsr_safe(MSR_PM_ENABLE, &val) )
     {
         hwp_err(policy->cpu, "rdmsr_safe(MSR_PM_ENABLE)\n");
         data->curr_req.raw = -1;
@@ -379,13 +379,13 @@ static void cf_check hwp_init_msrs(void *info)
         }
     }
 
-    if ( rdmsr_safe(MSR_HWP_CAPABILITIES, data->hwp_caps) )
+    if ( rdmsr_safe(MSR_HWP_CAPABILITIES, &data->hwp_caps) )
     {
         hwp_err(policy->cpu, "rdmsr_safe(MSR_HWP_CAPABILITIES)\n");
         goto error;
     }
 
-    if ( rdmsr_safe(MSR_HWP_REQUEST, data->curr_req.raw) )
+    if ( rdmsr_safe(MSR_HWP_REQUEST, &data->curr_req.raw) )
     {
         hwp_err(policy->cpu, "rdmsr_safe(MSR_HWP_REQUEST)\n");
         goto error;
@@ -485,7 +485,7 @@ static void cf_check hwp_set_misc_turbo(void *info)
 
     data->ret = 0;
 
-    if ( rdmsr_safe(MSR_IA32_MISC_ENABLE, msr) )
+    if ( rdmsr_safe(MSR_IA32_MISC_ENABLE, &msr) )
     {
         hwp_verbose("CPU%u: error rdmsr_safe(MSR_IA32_MISC_ENABLE)\n",
                     policy->cpu);

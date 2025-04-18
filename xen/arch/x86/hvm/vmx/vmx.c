@@ -3503,7 +3503,7 @@ static int cf_check vmx_msr_read_intercept(
             break;
         }
 
-        if ( curr->domain->arch.msr_relaxed && !rdmsr_safe(msr, tmp) )
+        if ( curr->domain->arch.msr_relaxed && !rdmsr_safe(msr, &tmp) )
         {
             *msr_content = 0;
             break;
@@ -3813,7 +3813,7 @@ static int cf_check vmx_msr_write_intercept(
              is_last_branch_msr(msr) )
             break;
 
-        if ( v->domain->arch.msr_relaxed && !rdmsr_safe(msr, msr_content) )
+        if ( v->domain->arch.msr_relaxed && !rdmsr_safe(msr, &msr_content) )
             break;
 
         gdprintk(XENLOG_WARNING,

@@ -496,7 +496,7 @@ static void cf_check disable_c1e(void *unused)
 	 * The MSR does not exist in all FamilyF CPUs (only Rev F and above),
 	 * but we safely catch the #GP in that case.
 	 */
-	if ((rdmsr_safe(MSR_K8_ENABLE_C1E, msr_content) == 0) &&
+	if ((rdmsr_safe(MSR_K8_ENABLE_C1E, &msr_content) == 0) &&
 	    (msr_content & (3ULL << 27)) &&
 	    (wrmsr_safe(MSR_K8_ENABLE_C1E, msr_content & ~(3ULL << 27)) != 0))
 		printk(KERN_ERR "Failed to disable C1E on CPU#%u (%16"PRIx64")\n",
@@ -695,21 +695,21 @@ static void amd_process_freq(const struct cpuinfo_x86 *c,
 
 	lo = 0; /* gcc may not recognize the loop having at least 5 iterations */
 	for (h = c->x86 == 0x10 ? 5 : 8; h--; )
-		if (!rdmsr_safe(0xC0010064 + h, lo) && (lo >> 63))
+		if (!rdmsr_safe(0xC0010064 + h, &lo) && (lo >> 63))
 			break;
 	if (!(lo >> 63))
 		return;
 
 	if (idx && idx < h &&
-	    !rdmsr_safe(0xC0010064 + idx, val) && (val >> 63) &&
-	    !rdmsr_safe(0xC0010064, hi) && (hi >> 63)) {
+	    !rdmsr_safe(0xC0010064 + idx, &val) && (val >> 63) &&
+	    !rdmsr_safe(0xC0010064, &hi) && (hi >> 63)) {
 		if (nom_mhz)
 			*nom_mhz = amd_parse_freq(c->x86, val);
 		if (low_mhz)
 			*low_mhz = amd_parse_freq(c->x86, lo);
 		if (hi_mhz)
 			*hi_mhz = amd_parse_freq(c->x86, hi);
-	} else if (h && !rdmsr_safe(0xC0010064, hi) && (hi >> 63)) {
+	} else if (h && !rdmsr_safe(0xC0010064, &hi) && (hi >> 63)) {
 		if (low_mhz)
 			*low_mhz = amd_parse_freq(c->x86, lo);
 		if (hi_mhz)
@@ -765,7 +765,7 @@ void amd_init_lfence(struct cpuinfo_x86 *c)
 	 * rather than per-thread, so do a full safe read/write/readback cycle
 	 * in the worst case.
 	 */
-	if (rdmsr_safe(MSR_AMD64_DE_CFG, value))
+	if (rdmsr_safe(MSR_AMD64_DE_CFG, &value))
 		/* Unable to read.  Assume the safer default. */
 		__clear_bit(X86_FEATURE_LFENCE_DISPATCH,
 			    c->x86_capability);
@@ -775,7 +775,7 @@ void amd_init_lfence(struct cpuinfo_x86 *c)
 			  c->x86_capability);
 	else if (wrmsr_safe(MSR_AMD64_DE_CFG,
 			    value | AMD64_DE_CFG_LFENCE_SERIALISE) ||
-		 rdmsr_safe(MSR_AMD64_DE_CFG, value) ||
+		 rdmsr_safe(MSR_AMD64_DE_CFG, &value) ||
 		 !(value & AMD64_DE_CFG_LFENCE_SERIALISE))
 		/* Attempt to set failed.  Assume the safer default. */
 		__clear_bit(X86_FEATURE_LFENCE_DISPATCH,
@@ -804,7 +804,7 @@ static bool set_legacy_ssbd(const struct cpuinfo_x86 *c, bool enable)
 	if (bit >= 0) {
 		uint64_t val, mask = 1ull << bit;
 
-		if (rdmsr_safe(MSR_AMD64_LS_CFG, val) ||
+		if (rdmsr_safe(MSR_AMD64_LS_CFG, &val) ||
 		    ({
 			    val &= ~mask;
 			    if (enable)
@@ -962,7 +962,7 @@ void amd_init_spectral_chicken(void)
 	if (cpu_has_hypervisor || !is_zen2_uarch())
 		return;
 
-	if (rdmsr_safe(MSR_AMD64_DE_CFG2, val) == 0 && !(val & chickenbit))
+	if (rdmsr_safe(MSR_AMD64_DE_CFG2, &val) == 0 && !(val & chickenbit))
 		wrmsr_safe(MSR_AMD64_DE_CFG2, val | chickenbit);
 }
 
@@ -1116,8 +1116,7 @@ static void amd_check_bp_cfg(void)
 static void cf_check init_amd(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
-
-	unsigned long long value;
+	uint64_t value;
 
 	/* Disable TLB flush filter by setting HWCR.FFDIS on K8
 	 * bit 6 of msr C001_0015
@@ -1251,7 +1250,7 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 	if ((c->x86 == 0x15) &&
 	    (c->x86_model >= 0x10) && (c->x86_model <= 0x1f) &&
 	    !cpu_has(c, X86_FEATURE_TOPOEXT) &&
-	    !rdmsr_safe(MSR_K8_EXT_FEATURE_MASK, value)) {
+	    !rdmsr_safe(MSR_K8_EXT_FEATURE_MASK, &value)) {
 		value |= 1ULL << 54;
 		wrmsr_safe(MSR_K8_EXT_FEATURE_MASK, value);
 		rdmsrl(MSR_K8_EXT_FEATURE_MASK, value);
@@ -1267,7 +1266,7 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 	 * Disable it on the affected CPUs.
 	 */
 	if (c->x86 == 0x15 && c->x86_model >= 0x02 && c->x86_model < 0x20 &&
-	    !rdmsr_safe(MSR_AMD64_IC_CFG, value) && (value & 0x1e) != 0x1e)
+	    !rdmsr_safe(MSR_AMD64_IC_CFG, &value) && (value & 0x1e) != 0x1e)
 		wrmsr_safe(MSR_AMD64_IC_CFG, value | 0x1e);
 
         amd_get_topology(c);

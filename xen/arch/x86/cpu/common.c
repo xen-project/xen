@@ -131,14 +131,14 @@ bool __init probe_cpuid_faulting(void)
 	uint64_t val;
 	int rc;
 
-	if ((rc = rdmsr_safe(MSR_INTEL_PLATFORM_INFO, val)) == 0)
+	if ((rc = rdmsr_safe(MSR_INTEL_PLATFORM_INFO, &val)) == 0)
 		raw_cpu_policy.platform_info.cpuid_faulting =
 			val & MSR_PLATFORM_INFO_CPUID_FAULTING;
 
 	if (rc ||
 	    !(val & MSR_PLATFORM_INFO_CPUID_FAULTING) ||
 	    rdmsr_safe(MSR_INTEL_MISC_FEATURES_ENABLES,
-		       this_cpu(msr_misc_features)))
+		       &this_cpu(msr_misc_features)))
 	{
 		setup_clear_cpu_cap(X86_FEATURE_CPUID_FAULTING);
 		return false;
@@ -852,7 +852,7 @@ static void skinit_enable_intr(void)
 	 * If the platform is performing a Secure Launch via SKINIT
 	 * INIT_REDIRECTION flag will be active.
 	 */
-	if ( !cpu_has_skinit || rdmsr_safe(MSR_K8_VM_CR, val) ||
+	if ( !cpu_has_skinit || rdmsr_safe(MSR_K8_VM_CR, &val) ||
 	     !(val & VM_CR_INIT_REDIRECTION) )
 		return;
 

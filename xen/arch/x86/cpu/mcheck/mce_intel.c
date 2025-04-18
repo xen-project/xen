@@ -726,7 +726,7 @@ static bool intel_enable_lmce(void)
      * MSR_IA32_MCG_EXT_CTL.LMCE_EN.
      */
 
-    if ( rdmsr_safe(MSR_IA32_FEATURE_CONTROL, msr_content) )
+    if ( rdmsr_safe(MSR_IA32_FEATURE_CONTROL, &msr_content) )
         return false;
 
     if ( (msr_content & IA32_FEATURE_CONTROL_LOCK) &&
@@ -879,14 +879,14 @@ static void intel_init_ppin(const struct cpuinfo_x86 *c)
     case 0x8f: /* Sapphire Rapids X */
 
         if ( (c != &boot_cpu_data && !ppin_msr) ||
-             rdmsr_safe(MSR_PPIN_CTL, val) )
+             rdmsr_safe(MSR_PPIN_CTL, &val) )
             return;
 
         /* If PPIN is disabled, but not locked, try to enable. */
         if ( !(val & (PPIN_ENABLE | PPIN_LOCKOUT)) )
         {
             wrmsr_safe(MSR_PPIN_CTL, val | PPIN_ENABLE);
-            rdmsr_safe(MSR_PPIN_CTL, val);
+            rdmsrl(MSR_PPIN_CTL, val);
         }
 
         if ( !(val & PPIN_ENABLE) )

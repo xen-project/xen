@@ -192,7 +192,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         if ( !(cp->x86_vendor & (X86_VENDOR_INTEL | X86_VENDOR_AMD)) ||
              !(boot_cpu_data.x86_vendor &
                (X86_VENDOR_INTEL | X86_VENDOR_AMD)) ||
-             rdmsr_safe(MSR_AMD_PATCHLEVEL, *val) )
+             rdmsr_safe(MSR_AMD_PATCHLEVEL, val) )
             goto gp_fault;
         break;
 
@@ -240,7 +240,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
             goto gp_fault;
 
         *val = 0;
-        if ( likely(!is_cpufreq_controller(d)) || rdmsr_safe(msr, *val) == 0 )
+        if ( likely(!is_cpufreq_controller(d)) || rdmsr_safe(msr, val) == 0 )
             break;
         goto gp_fault;
 
@@ -306,7 +306,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
             goto gp_fault;
         if ( !is_hardware_domain(d) )
             return X86EMUL_UNHANDLEABLE;
-        if ( rdmsr_safe(msr, *val) )
+        if ( rdmsr_safe(msr, val) )
             goto gp_fault;
         if ( msr == MSR_K8_SYSCFG )
             *val &= (SYSCFG_TOM2_FORCE_WB | SYSCFG_MTRR_TOM2_EN |
@@ -322,7 +322,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_FAM10H_MMIO_CONF_BASE:
         if ( !is_hardware_domain(d) ||
              !(cp->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) ||
-             rdmsr_safe(msr, *val) )
+             rdmsr_safe(msr, val) )
             goto gp_fault;
 
         break;
