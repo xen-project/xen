@@ -29,7 +29,6 @@ extern void add_nops(void *insns, unsigned int len);
 /* Similar to alternative_instructions except it can be run with IRQs enabled. */
 extern int apply_alternatives(struct alt_instr *start, struct alt_instr *end);
 extern void alternative_instructions(void);
-extern void alternative_branches(void);
 
 #define alt_orig_len       "(.LXEN%=_orig_e - .LXEN%=_orig_s)"
 #define alt_pad_len        "(.LXEN%=_orig_p - .LXEN%=_orig_e)"

@@ -493,7 +493,7 @@ void __init alternative_instructions(void)
     _alternative_instructions(false);
 }
 
-void __init alternative_branches(void)
+void __init boot_apply_alt_calls(void)
 {
     local_irq_disable();
     _alternative_instructions(true);

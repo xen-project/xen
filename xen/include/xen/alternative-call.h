@@ -17,6 +17,8 @@
  *   generation requirements are to emit a function pointer call at build
  *   time, and stash enough metadata to simplify the call at boot once the
  *   implementation has been resolved.
+ * - Implement boot_apply_alt_calls() to convert the function pointer calls
+ *   into direct calls on boot.
  * - Select ALTERNATIVE_CALL in Kconfig.
  *
  * To use:
@@ -57,7 +59,13 @@
 # define __alt_call_maybe_initdata __initdata
 #endif
 
-#else
+/*
+ * Devirtualise the alternative_{,v}call()'s on boot.  Convert still-NULL
+ * function pointers into traps.
+ */
+void boot_apply_alt_calls(void);
+
+#else /* CONFIG_ALTERNATIVE_CALL */
 
 #define alternative_call(func, args...)  (func)(args)
 #define alternative_vcall(func, args...) (func)(args)

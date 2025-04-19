@@ -1,4 +1,5 @@
 #include <xen/acpi.h>
+#include <xen/alternative-call.h>
 #include <xen/bitops.h>
 #include <xen/console.h>
 #include <xen/cpu.h>
@@ -2082,7 +2083,7 @@ void asmlinkage __init noreturn __start_xen(void)
 
     do_presmp_initcalls();
 
-    alternative_branches();
+    boot_apply_alt_calls();
 
     /*
      * NB: when running as a PV shim VCPUOP_up/down is wired to the shim
