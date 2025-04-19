@@ -2,7 +2,8 @@
 #ifndef X86_ALTERNATIVE_CALL_H
 #define X86_ALTERNATIVE_CALL_H
 
-#include <asm/alternative.h>
+#include <xen/macros.h>
+#include <xen/stdint.h>
 
 /* Simply the relative position of the source call. */
 struct alt_call {
@@ -86,8 +87,10 @@ struct alt_call {
     rettype ret_;                                                  \
     register unsigned long r10_ asm("r10");                        \
     register unsigned long r11_ asm("r11");                        \
-    asm volatile (ALTERNATIVE("call *%c[addr](%%rip)", "call .",   \
-                              X86_FEATURE_ALWAYS)                  \
+    asm volatile ("1: call *%c[addr](%%rip)\n\t"                   \
+                  ".pushsection .alt_call_sites, \"a\", @progbits\n\t"  \
+                  ".long 1b - .\n\t"                               \
+                  ".popsection"                                    \
                   : ALT_CALL ## n ## _OUT, "=a" (ret_),            \
                     "=r" (r10_), "=r" (r11_) ASM_CALL_CONSTRAINT   \
                   : [addr] "i" (&(func)), "g" (func)               \

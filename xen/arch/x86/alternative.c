@@ -378,13 +378,6 @@ static int init_or_livepatch _apply_alternatives(struct alt_instr *start,
         text_poke(orig, buf, total_len);
     }
 
-    /*
-     * Clobber endbr64 instructions now that altcall has finished optimising
-     * all indirect branches to direct ones.
-     */
-    if ( force && system_state < SYS_STATE_active )
-        seal_endbr64();
-
     return 0;
 }
 
@@ -533,6 +526,8 @@ static int __init cf_check nmi_apply_alternatives(
             rc = apply_alt_calls(__alt_call_sites_start, __alt_call_sites_end);
             if ( rc )
                 panic("Unable to apply alternative calls: %d\n", rc);
+
+            seal_endbr64();
         }
 
         /*
