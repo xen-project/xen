@@ -15,10 +15,10 @@
  *  General Public License for more details.
  */
 
-#include <xen/types.h>
+#include <xen/alternative-call.h>
 #include <xen/cpu.h>
-#include <xen/init.h>
 #include <xen/cpumask.h>
+#include <xen/init.h>
 #include <xen/param.h>
 
 #include <asm/smp.h>

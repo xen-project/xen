@@ -414,8 +414,8 @@ of the short-circuit evaluation strategy of such logical operators."
 -doc_end
 
 -doc_begin="Macros alternative_v?call[0-9] use sizeof and typeof to check that the argument types match the corresponding parameter ones."
--config=MC3A2.R13.6,reports+={deliberate,"any_area(any_loc(any_exp(macro(^alternative_vcall[0-9]$))&&file(^xen/arch/x86/include/asm/alternative\\.h*$)))"}
--config=B.UNEVALEFF,reports+={deliberate,"any_area(any_loc(any_exp(macro(^alternative_v?call[0-9]$))&&file(^xen/arch/x86/include/asm/alterantive\\.h*$)))"}
+-config=MC3A2.R13.6,reports+={deliberate,"any_area(any_loc(any_exp(macro(^alternative_vcall[0-9]$))&&file(^xen/arch/x86/include/asm/alternative-call\\.h*$)))"}
+-config=B.UNEVALEFF,reports+={deliberate,"any_area(any_loc(any_exp(macro(^alternative_v?call[0-9]$))&&file(^xen/arch/x86/include/asm/alterantive-call\\.h*$)))"}
 -doc_end
 
 -doc_begin="Anything, no matter how complicated, inside the BUILD_BUG_ON macro is subject to a compile-time evaluation without relevant side effects."

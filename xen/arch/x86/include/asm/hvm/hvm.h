@@ -9,9 +9,9 @@
 #ifndef __ASM_X86_HVM_HVM_H__
 #define __ASM_X86_HVM_HVM_H__
 
+#include <xen/alternative-call.h>
 #include <xen/mm.h>
 
-#include <asm/alternative.h>
 #include <asm/asm_defns.h>
 #include <asm/current.h>
 #include <asm/x86_emulate.h>

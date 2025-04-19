@@ -13,10 +13,10 @@
  *
  * For architectures to support:
  *
- * - Implement alternative_{,v}call() in asm/alternative.h.  Code generation
- *   requirements are to emit a function pointer call at build time, and stash
- *   enough metadata to simplify the call at boot once the implementation has
- *   been resolved.
+ * - Implement alternative_{,v}call() in asm/alternative-call.h.  Code
+ *   generation requirements are to emit a function pointer call at build
+ *   time, and stash enough metadata to simplify the call at boot once the
+ *   implementation has been resolved.
  * - Select ALTERNATIVE_CALL in Kconfig.
  *
  * To use:
@@ -48,7 +48,7 @@
 
 #ifdef CONFIG_ALTERNATIVE_CALL
 
-#include <asm/alternative.h>
+#include <asm/alternative-call.h>
 
 #ifdef CONFIG_LIVEPATCH
 /* Must keep for livepatches to resolve alternative calls. */
