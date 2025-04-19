@@ -12,7 +12,6 @@
 #include <xen/softirq.h>
 #include <xen/wait.h>
 
-#include <asm/alternative.h>
 #include <asm/arm64/sve.h>
 #include <asm/cpuerrata.h>
 #include <asm/cpufeature.h>
