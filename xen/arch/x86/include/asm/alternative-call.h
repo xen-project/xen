@@ -4,6 +4,13 @@
 
 #include <asm/alternative.h>
 
+/* Simply the relative position of the source call. */
+struct alt_call {
+    int32_t offset;
+};
+#define ALT_CALL_PTR(a) ((void *)&(a)->offset + (a)->offset)
+#define ALT_CALL_LEN(a) (6)
+
 /*
  * Machinery to allow converting indirect to direct calls, when the called
  * function is determined once at boot and later never changed.

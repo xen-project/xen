@@ -388,6 +388,92 @@ static int init_or_livepatch _apply_alternatives(struct alt_instr *start,
     return 0;
 }
 
+/*
+ * At build time, alternative calls are emitted as:
+ *   ff 15 xx xx xx xx  =>  call *disp32(%rip)
+ *
+ * During boot, we devirtualise by editing to:
+ *   2e e8 xx xx xx xx  =>  cs call disp32
+ *
+ * or, if the function pointer is still NULL, poison to:
+ *   0f 0b 0f 0b 0f 0b  =>  ud2a (x3)
+ */
+static int init_or_livepatch apply_alt_calls(
+    const struct alt_call *start, const struct alt_call *end)
+{
+    const struct alt_call *a;
+
+    for ( a = start; a < end; a++ )
+    {
+        const uint8_t *dest;
+        uint8_t buf[6], *orig = ALT_CALL_PTR(a);
+        long disp;
+
+        /* It's likely that this won't change, but check just to be safe. */
+        BUILD_BUG_ON(ALT_CALL_LEN(a) != 6);
+
+        if ( orig[0] != 0xff || orig[1] != 0x15 )
+        {
+            printk(XENLOG_ERR
+                   "Altcall for %ps [%6ph] not CALL *RIPREL\n",
+                   orig, orig);
+            return -EINVAL;
+        }
+
+        disp = *(int32_t *)(orig + 2);
+        dest = *(const void **)(orig + 6 + disp);
+
+        if ( dest )
+        {
+            /*
+             * When building for CET-IBT, all function pointer targets
+             * should have an endbr64 instruction.
+             *
+             * If this is not the case, leave a warning because
+             * something is probably wrong with the build.  A CET-IBT
+             * enabled system might have exploded already.
+             *
+             * Otherwise, skip the endbr64 instruction.  This is a
+             * marginal perf improvement which saves on instruction
+             * decode bandwidth.
+             */
+            if ( IS_ENABLED(CONFIG_XEN_IBT) )
+            {
+                if ( is_endbr64(dest) )
+                    dest += ENDBR64_LEN;
+                else
+                    printk(XENLOG_WARNING
+                           "Altcall %ps dest %ps has no endbr64\n",
+                           orig, dest);
+            }
+
+            disp = dest - (orig + 6);
+            ASSERT(disp == (int32_t)disp);
+
+            buf[0] = 0x2e;
+            buf[1] = 0xe8;
+            *(int32_t *)(buf + 2) = disp;
+        }
+        else
+        {
+            /*
+             * The function pointer is still NULL.  Seal the whole call, as
+             * it's not used.
+             */
+            buf[0] = 0x0f;
+            buf[1] = 0x0b;
+            buf[2] = 0x0f;
+            buf[3] = 0x0b;
+            buf[4] = 0x0f;
+            buf[5] = 0x0b;
+        }
+
+        text_poke(orig, buf, sizeof(buf));
+    }
+
+    return 0;
+}
+
 #ifdef CONFIG_LIVEPATCH
 int apply_alternatives(struct alt_instr *start, struct alt_instr *end)
 {
@@ -401,6 +487,7 @@ static unsigned int __initdata alt_todo;
 static unsigned int __initdata alt_done;
 
 extern struct alt_instr __alt_instructions[], __alt_instructions_end[];
+extern struct alt_call __alt_call_sites_start[], __alt_call_sites_end[];
 
 /*
  * At boot time, we patch alternatives in NMI context.  This means that the
@@ -434,6 +521,13 @@ static int __init cf_check nmi_apply_alternatives(
                                  alt_todo == ALT_CALLS);
         if ( rc )
             panic("Unable to apply alternatives: %d\n", rc);
+
+        if ( alt_todo & ALT_CALLS )
+        {
+            rc = apply_alt_calls(__alt_call_sites_start, __alt_call_sites_end);
+            if ( rc )
+                panic("Unable to apply alternative calls: %d\n", rc);
+        }
 
         /*
          * Reinstate perms on .text to be RX.  This also cleans out the dirty
