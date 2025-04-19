@@ -69,20 +69,20 @@ static inline void wrmsr_ns(uint32_t msr, uint32_t lo, uint32_t hi)
 /* wrmsr with exception handling */
 static inline int wrmsr_safe(unsigned int msr, uint64_t val)
 {
-    int rc;
-    uint32_t lo, hi;
-    lo = (uint32_t)val;
-    hi = (uint32_t)(val >> 32);
+    uint32_t lo = val, hi = val >> 32;
 
-    __asm__ __volatile__(
-        "1: wrmsr\n2:\n"
-        ".section .fixup,\"ax\"\n"
-        "3: movl %5,%0\n; jmp 2b\n"
-        ".previous\n"
-        _ASM_EXTABLE(1b, 3b)
-        : "=&r" (rc)
-        : "c" (msr), "a" (lo), "d" (hi), "0" (0), "i" (-EFAULT));
-    return rc;
+    asm_inline goto (
+        "1: wrmsr\n\t"
+        _ASM_EXTABLE(1b, %l[fault])
+        :
+        : "a" (lo), "c" (msr), "d" (hi)
+        :
+        : fault );
+
+    return 0;
+
+ fault:
+    return -EFAULT;
 }
 
 static inline uint64_t msr_fold(const struct cpu_user_regs *regs)
