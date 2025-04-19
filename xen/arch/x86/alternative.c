@@ -19,8 +19,6 @@
 
 #define MAX_PATCH_LEN (255-1)
 
-extern struct alt_instr __alt_instructions[], __alt_instructions_end[];
-
 #ifdef K8_NOP1
 static const unsigned char k8nops[] init_or_livepatch_const = {
     K8_NOP1,
@@ -387,8 +385,12 @@ int apply_alternatives(struct alt_instr *start, struct alt_instr *end)
 }
 #endif
 
+#define ALT_INSNS (1U << 0)
+#define ALT_CALLS (1U << 1)
 static unsigned int __initdata alt_todo;
 static unsigned int __initdata alt_done;
+
+extern struct alt_instr __alt_instructions[], __alt_instructions_end[];
 
 /*
  * At boot time, we patch alternatives in NMI context.  This means that the
@@ -419,7 +421,7 @@ static int __init cf_check nmi_apply_alternatives(
         flush_local(FLUSH_TLB_GLOBAL);
 
         rc = _apply_alternatives(__alt_instructions, __alt_instructions_end,
-                                 alt_done);
+                                 alt_todo == ALT_CALLS);
         if ( rc )
             panic("Unable to apply alternatives: %d\n", rc);
 
@@ -442,7 +444,7 @@ static int __init cf_check nmi_apply_alternatives(
  * This routine is called with local interrupt disabled and used during
  * bootup.
  */
-static void __init _alternative_instructions(bool force)
+static void __init _alternative_instructions(unsigned int what)
 {
     unsigned int i;
     nmi_callback_t *saved_nmi_callback;
@@ -460,7 +462,7 @@ static void __init _alternative_instructions(bool force)
     ASSERT(!local_irq_is_enabled());
 
     /* Set what operation to perform /before/ setting the callback. */
-    alt_todo = 1u << force;
+    alt_todo = what;
     barrier();
 
     /*
@@ -490,12 +492,12 @@ static void __init _alternative_instructions(bool force)
 void __init alternative_instructions(void)
 {
     arch_init_ideal_nops();
-    _alternative_instructions(false);
+    _alternative_instructions(ALT_INSNS);
 }
 
 void __init boot_apply_alt_calls(void)
 {
     local_irq_disable();
-    _alternative_instructions(true);
+    _alternative_instructions(ALT_CALLS);
     local_irq_enable();
 }
