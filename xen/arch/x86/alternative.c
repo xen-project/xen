@@ -479,6 +479,12 @@ int apply_alternatives(struct alt_instr *start, struct alt_instr *end)
 {
     return _apply_alternatives(start, end, true);
 }
+
+int livepatch_apply_alt_calls(const struct alt_call *start,
+                              const struct alt_call *end)
+{
+    return apply_alt_calls(start, end);
+}
 #endif
 
 #define ALT_INSNS (1U << 0)

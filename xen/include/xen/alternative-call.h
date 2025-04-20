@@ -17,8 +17,8 @@
  *   generation requirements are to emit a function pointer call at build
  *   time, and stash enough metadata to simplify the call at boot once the
  *   implementation has been resolved.
- * - Implement boot_apply_alt_calls() to convert the function pointer calls
- *   into direct calls on boot.
+ * - Implement {boot,livepatch}_apply_alt_calls() to convert the function
+ *   pointer calls into direct calls on boot/livepatch.
  * - Select ALTERNATIVE_CALL in Kconfig.
  *
  * To use:
@@ -64,6 +64,10 @@
  * function pointers into traps.
  */
 void boot_apply_alt_calls(void);
+
+/* As per boot_apply_alt_calls() but for a livepatch. */
+int livepatch_apply_alt_calls(const struct alt_call *start,
+                              const struct alt_call *end);
 
 #else /* CONFIG_ALTERNATIVE_CALL */
 

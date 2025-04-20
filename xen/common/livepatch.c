@@ -905,6 +905,64 @@ static int prepare_payload(struct payload *payload,
 #endif
     }
 
+    sec = livepatch_elf_sec_by_name(elf, ".alt_call_sites");
+    if ( sec )
+    {
+#ifdef CONFIG_ALTERNATIVE_CALL
+        const struct alt_call *a, *start, *end;
+
+        if ( !section_ok(elf, sec, sizeof(*a)) )
+            return -EINVAL;
+
+        /* Tolerate an empty .alt_call_sites section... */
+        if ( sec->sec->sh_size == 0 )
+            goto alt_call_done;
+
+        /* ... but otherwise, there needs to be something to alter... */
+        if ( payload->text_size == 0 )
+        {
+            printk(XENLOG_ERR LIVEPATCH "%s Alternative calls provided, but no .text\n",
+                   elf->name);
+            return -EINVAL;
+        }
+
+        start = sec->addr;
+        end = sec->addr + sec->sec->sh_size;
+
+        for ( a = start; a < end; a++ )
+        {
+            const void *orig = ALT_CALL_PTR(a);
+            size_t len = ALT_CALL_LEN(a);
+
+            /* orig must be fully within .text. */
+            if ( orig       < payload->text_addr ||
+                 len        > payload->text_size ||
+                 orig + len > payload->text_addr + payload->text_size )
+            {
+                printk(XENLOG_ERR LIVEPATCH
+                       "%s: Alternative call %p+%#zx outside payload text %p+%#zx\n",
+                       elf->name, orig, len,
+                       payload->text_addr, payload->text_size);
+                return -EINVAL;
+            }
+        }
+
+        rc = livepatch_apply_alt_calls(start, end);
+        if ( rc )
+        {
+            printk(XENLOG_ERR LIVEPATCH "%s: Applying alternative calls failed: %d\n",
+                   elf->name, rc);
+            return rc;
+        }
+
+    alt_call_done:;
+#else /* CONFIG_ALTERNATIVE_CALL */
+        printk(XENLOG_ERR LIVEPATCH "%s: Alternative calls not supported\n",
+               elf->name);
+        return -EOPNOTSUPP;
+#endif /* !CONFIG_ALTERNATIVE_CALL */
+    }
+
     sec = livepatch_elf_sec_by_name(elf, ".ex_table");
     if ( sec )
     {
