@@ -26,7 +26,6 @@
 bool __read_mostly xen_guest;
 
 uint32_t __read_mostly xen_cpuid_base;
-extern char hypercall_page[];
 static struct rangeset *mem;
 
 DEFINE_PER_CPU(unsigned int, vcpu_id);
@@ -34,6 +33,50 @@ DEFINE_PER_CPU(unsigned int, vcpu_id);
 static struct vcpu_info *vcpu_info;
 static unsigned long vcpu_info_mapped[BITS_TO_LONGS(NR_CPUS)];
 DEFINE_PER_CPU(struct vcpu_info *, vcpu_info);
+
+/*
+ * Which instruction to use for early hypercalls:
+ *   < 0 setup
+ *     0 vmcall
+ *   > 0 vmmcall
+ */
+int8_t __initdata early_hypercall_insn = -1;
+
+/*
+ * Called once during the first hypercall to figure out which instruction to
+ * use.  Error handling options are limited.
+ */
+void __init early_hypercall_setup(void)
+{
+    BUG_ON(early_hypercall_insn != -1);
+
+    if ( !boot_cpu_data.x86_vendor )
+    {
+        unsigned int eax, ebx, ecx, edx;
+
+        cpuid(0, &eax, &ebx, &ecx, &edx);
+
+        boot_cpu_data.x86_vendor = x86_cpuid_lookup_vendor(ebx, ecx, edx);
+    }
+
+    switch ( boot_cpu_data.x86_vendor )
+    {
+    case X86_VENDOR_INTEL:
+    case X86_VENDOR_CENTAUR:
+    case X86_VENDOR_SHANGHAI:
+        early_hypercall_insn = 0;
+        setup_force_cpu_cap(X86_FEATURE_USE_VMCALL);
+        break;
+
+    case X86_VENDOR_AMD:
+    case X86_VENDOR_HYGON:
+        early_hypercall_insn = 1;
+        break;
+
+    default:
+        BUG();
+    }
+}
 
 static void __init find_xen_leaves(void)
 {
@@ -336,9 +379,6 @@ const struct hypervisor_ops *__init xg_probe(void)
 
     if ( !xen_cpuid_base )
         return NULL;
-
-    /* Fill the hypercall page. */
-    wrmsrl(cpuid_ebx(xen_cpuid_base + 2), __pa(hypercall_page));
 
     xen_guest = true;
 
