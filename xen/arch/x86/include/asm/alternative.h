@@ -1,6 +1,13 @@
 #ifndef __X86_ALTERNATIVE_H__
 #define __X86_ALTERNATIVE_H__
 
+/*
+ * Common to both C and ASM.  Express a replacement when a feature is not
+ * available.
+ */
+#define ALT_FLAG_NOT (1 << 15)
+#define ALT_NOT(x) (ALT_FLAG_NOT | (x))
+
 #ifdef __ASSEMBLY__
 #include <asm/alternative-asm.h>
 #else
@@ -11,7 +18,7 @@
 struct __packed alt_instr {
     int32_t  orig_offset;   /* original instruction */
     int32_t  repl_offset;   /* offset to replacement instruction */
-    uint16_t cpuid;         /* cpuid bit set for replacement */
+    uint16_t cpuid;         /* cpuid bit set for replacement (top bit is polarity) */
     uint8_t  orig_len;      /* length of original instruction */
     uint8_t  repl_len;      /* length of new instruction */
     uint8_t  pad_len;       /* length of build-time padding */

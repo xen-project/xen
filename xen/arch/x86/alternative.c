@@ -209,10 +209,12 @@ static void init_or_livepatch _apply_alternatives(struct alt_instr *start,
         uint8_t *repl = ALT_REPL_PTR(a);
         uint8_t buf[MAX_PATCH_LEN];
         unsigned int total_len = a->orig_len + a->pad_len;
+        unsigned int feat = a->cpuid & ~ALT_FLAG_NOT;
+        bool inv = a->cpuid & ALT_FLAG_NOT, replace;
 
         BUG_ON(a->repl_len > total_len);
         BUG_ON(total_len > sizeof(buf));
-        BUG_ON(a->cpuid >= NCAPINTS * 32);
+        BUG_ON(feat >= NCAPINTS * 32);
 
         /*
          * Detect sequences of alt_instr's patching the same origin site, and
@@ -235,8 +237,14 @@ static void init_or_livepatch _apply_alternatives(struct alt_instr *start,
             continue;
         }
 
+        /*
+         * Should a replacement be performed?  Most replacements have positive
+         * polarity, but we support negative polarity too.
+         */
+        replace = boot_cpu_has(feat) ^ inv;
+
         /* If there is no replacement to make, see about optimising the nops. */
-        if ( !boot_cpu_has(a->cpuid) )
+        if ( !replace )
         {
             /* Origin site site already touched?  Don't nop anything. */
             if ( base->priv )
