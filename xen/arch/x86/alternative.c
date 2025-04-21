@@ -197,6 +197,8 @@ static int init_or_livepatch _apply_alternatives(struct alt_instr *start,
         uint8_t *repl = ALT_REPL_PTR(a);
         uint8_t buf[MAX_PATCH_LEN];
         unsigned int total_len = a->orig_len + a->pad_len;
+        unsigned int feat = a->cpuid & ~ALT_FLAG_NOT;
+        bool inv = a->cpuid & ALT_FLAG_NOT, replace;
 
         if ( a->repl_len > total_len )
         {
@@ -214,11 +216,11 @@ static int init_or_livepatch _apply_alternatives(struct alt_instr *start,
             return -ENOSPC;
         }
 
-        if ( a->cpuid >= NCAPINTS * 32 )
+        if ( feat >= NCAPINTS * 32 )
         {
              printk(XENLOG_ERR
                    "Alt for %ps, feature %#x outside of featureset range %#x\n",
-                   ALT_ORIG_PTR(a), a->cpuid, NCAPINTS * 32);
+                   ALT_ORIG_PTR(a), feat, NCAPINTS * 32);
             return -ERANGE;
         }
 
@@ -243,8 +245,14 @@ static int init_or_livepatch _apply_alternatives(struct alt_instr *start,
             continue;
         }
 
+        /*
+         * Should a replacement be performed?  Most replacements have positive
+         * polarity, but we support negative polarity too.
+         */
+        replace = boot_cpu_has(feat) ^ inv;
+
         /* If there is no replacement to make, see about optimising the nops. */
-        if ( !boot_cpu_has(a->cpuid) )
+        if ( !replace )
         {
             /* Origin site site already touched?  Don't nop anything. */
             if ( base->priv )
