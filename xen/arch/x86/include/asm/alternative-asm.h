@@ -12,7 +12,7 @@
  * instruction. See apply_alternatives().
  */
 .macro altinstruction_entry orig, repl, feature, orig_len, repl_len, pad_len
-    .if \feature >= NCAPINTS * 32
+    .if ((\feature) & ~ALT_FLAG_NOT) >= NCAPINTS * 32
         .error "alternative feature outside of featureset range"
     .endif
     .long \orig - .
