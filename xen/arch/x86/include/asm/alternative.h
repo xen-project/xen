@@ -4,8 +4,10 @@
 #ifdef __ASSEMBLY__
 #include <asm/alternative-asm.h>
 #else
-#include <xen/lib.h>
-#include <xen/stringify.h>
+
+#include <xen/macros.h>
+#include <xen/types.h>
+
 #include <asm/asm-macros.h>
 #include <asm/cpufeatureset.h>
 
@@ -65,7 +67,7 @@ extern void alternative_branches(void);
         " .endif\n"                                                     \
         " .long .LXEN%=_orig_s - .\n"             /* label           */ \
         " .long " alt_repl_s(num)" - .\n"         /* new instruction */ \
-        " .word " __stringify(feature) "\n"       /* feature bit     */ \
+        " .word " STR(feature) "\n"               /* feature bit     */ \
         " .byte " alt_orig_len "\n"               /* source len      */ \
         " .byte " alt_repl_len(num) "\n"          /* replacement len */ \
         " .byte " alt_pad_len "\n"                /* padding len     */ \
