@@ -54,6 +54,21 @@
 #endif
 
 /*
+ * Compilers estimate the size of an asm() block for inlining purposes.
+ *
+ * Constructs with embedded metadata (BUG_FRAME, ALTERNATIVE, EXTABLE, etc)
+ * appear large, depsite typically only being a handful of instructions.  asm
+ * inline() overrides the estimation to identify the block as being small.
+ *
+ * Note: __inline is needed to avoid getting caught up in INIT_SECTIONS_ONLY.
+ */
+#if CONFIG_CC_HAS_ASM_INLINE
+# define asm_inline asm __inline
+#else
+# define asm_inline asm
+#endif
+
+/*
  * Add the pseudo keyword 'fallthrough' so case statement blocks
  * must end with any of these keywords:
  *   break;

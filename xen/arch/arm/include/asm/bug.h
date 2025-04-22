@@ -34,7 +34,8 @@ struct bug_frame {
 #define BUG_FRAME(type, line, file, has_msg, msg) do {                      \
     BUILD_BUG_ON((line) >> 16);                                             \
     BUILD_BUG_ON((type) >= BUGFRAME_NR);                                    \
-    asm ("1:"BUG_INSTR"\n"                                                  \
+    asm_inline (                                                            \
+         "1:"BUG_INSTR"\n"                                                  \
          ".pushsection .rodata.str, \"aMS\", %progbits, 1\n"                \
          "2:\t.asciz " __stringify(file) "\n"                               \
          "3:\n"                                                             \
@@ -60,7 +61,8 @@ struct bug_frame {
  */
 #define  run_in_exception_handler(fn) do {                                  \
     register unsigned long _fn asm (STR(BUG_FN_REG)) = (unsigned long)(fn); \
-    asm ("1:"BUG_INSTR"\n"                                                  \
+    asm_inline (                                                            \
+         "1:"BUG_INSTR"\n"                                                  \
          ".pushsection .bug_frames." __stringify(BUGFRAME_run_fn) ","       \
          "             \"a\", %%progbits\n"                                 \
          "2:\n"                                                             \
