@@ -35,7 +35,6 @@
 #include <getopt.h>
 #include <signal.h>
 #include <assert.h>
-#include <setjmp.h>
 
 #include <xenevtchn.h>
 #include <xen-tools/xenstore-common.h>
