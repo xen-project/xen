@@ -691,6 +691,15 @@ qemu-smoke-x86-64-gcc-efi:
   needs:
     - debian-12-x86_64-gcc-debug
 
+qemu-xtf-argo-x86_64-gcc-debug:
+  extends: .qemu-smoke-x86-64
+  variables:
+    TEST_TIMEOUT_OVERRIDE: 60
+  script:
+    - ./automation/scripts/qemu-xtf.sh x86-64 pv64 argo 2>&1 | tee ${LOGFILE}
+  needs:
+    - alpine-3.18-gcc-debug
+
 qemu-smoke-riscv64-gcc:
   extends: .qemu-riscv64
   script:

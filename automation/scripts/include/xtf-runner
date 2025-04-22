@@ -68,12 +68,19 @@ function xtf_build_cmdline()
     local xtf_variant=$1
     local xtf_name=$2
     declare -a cmdline=()
+    declare -A per_test_args=(
+        [argo]="argo=1 mac-permissive=1"
+    )
 
     cmdline+=("${XEN_CMDLINE}")
 
     # NB: OK to have hvm64, which is x86-only variant
     if [[ $xtf_variant == "hvm64" ]]; then
         cmdline+=("dom0-iommu=none dom0=pvh")
+    fi
+
+    if [[ -v per_test_args[${xtf_name}] ]]; then
+        cmdline+=("${per_test_args[${xtf_name}]}")
     fi
 
     export XEN_CMDLINE="${cmdline[@]}"
