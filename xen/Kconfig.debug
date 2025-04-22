@@ -98,7 +98,7 @@ config SCRUB_DEBUG
 
 config UBSAN
 	bool "Undefined behaviour sanitizer"
-	depends on HAS_UBSAN && CC_HAS_UBSAN
+	depends on HAS_UBSAN
 	help
 	  Enable undefined behaviour sanitizer. It uses compiler to insert code
 	  snippets so that undefined behaviours in C are detected during runtime.
