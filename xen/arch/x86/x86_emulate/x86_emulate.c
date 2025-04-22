@@ -2221,7 +2221,7 @@ x86_emulate(
 
         dst.bytes = src.bytes;
         dst.mem.seg = x86_seg_es;
-        dst.mem.off = truncate_ea(_regs.r(di));
+        dst.mem.off = truncate_ea_and_reps(_regs.r(di), nr_reps, dst.bytes);
         if ( (nr_reps == 1) || !ops->rep_stos ||
              ((rc = ops->rep_stos(&src.val,
                                   dst.mem.seg, dst.mem.off, dst.bytes,
