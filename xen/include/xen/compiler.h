@@ -17,10 +17,8 @@
 
 #endif /* Compiler checks. */
 
-#ifdef CONFIG_CC_HAS_VISIBILITY_ATTRIBUTE
 /* Results in more efficient PIC code (no indirections through GOT or PLT). */
 #pragma GCC visibility push(hidden)
-#endif
 
 #define barrier()     __asm__ __volatile__("": : :"memory")
 

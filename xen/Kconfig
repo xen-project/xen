@@ -29,10 +29,6 @@ config LD_IS_GNU
 config LD_IS_LLVM
 	def_bool $(success,$(LD) --version | head -n 1 | grep -q "^LLD")
 
-# -fvisibility=hidden reduces -fpic cost, if it's available
-config CC_HAS_VISIBILITY_ATTRIBUTE
-	def_bool $(cc-option,-fvisibility=hidden)
-
 # Use -f{function,data}-sections compiler parameters
 config CC_SPLIT_SECTIONS
 	bool
