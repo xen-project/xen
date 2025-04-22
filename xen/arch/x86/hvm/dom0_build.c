@@ -653,7 +653,7 @@ static int __init pvh_load_kernel(
     void *image_start = image_base + image->headroom;
     unsigned long image_len = image->size;
     unsigned long initrd_len = initrd ? initrd->size : 0;
-    const char *cmdline = image->cmdline_pa ? __va(image->cmdline_pa) : NULL;
+    size_t cmdline_len = bd->cmdline ? strlen(bd->cmdline) + 1 : 0;
     const char *initrd_cmdline = NULL;
     struct elf_binary elf;
     struct elf_dom_parms parms;
@@ -736,8 +736,7 @@ static int __init pvh_load_kernel(
             initrd = NULL;
     }
 
-    if ( cmdline )
-        extra_space += elf_round_up(&elf, strlen(cmdline) + 1);
+    extra_space += elf_round_up(&elf, cmdline_len);
 
     last_addr = find_memory(d, &elf, extra_space);
     if ( last_addr == INVALID_PADDR )
@@ -778,21 +777,21 @@ static int __init pvh_load_kernel(
     /* Free temporary buffers. */
     free_boot_modules();
 
-    if ( cmdline != NULL )
+    rc = hvm_copy_to_guest_phys(last_addr, bd->cmdline, cmdline_len, v);
+    if ( rc )
     {
-        rc = hvm_copy_to_guest_phys(last_addr, cmdline, strlen(cmdline) + 1, v);
-        if ( rc )
-        {
-            printk("Unable to copy guest command line\n");
-            return rc;
-        }
-        start_info.cmdline_paddr = last_addr;
-        /*
-         * Round up to 32/64 bits (depending on the guest kernel bitness) so
-         * the modlist/start_info is aligned.
-         */
-        last_addr += elf_round_up(&elf, strlen(cmdline) + 1);
+        printk("Unable to copy guest command line\n");
+        return rc;
     }
+
+    start_info.cmdline_paddr = cmdline_len ? last_addr : 0;
+
+    /*
+     * Round up to 32/64 bits (depending on the guest kernel bitness) so
+     * the modlist/start_info is aligned.
+     */
+    last_addr += elf_round_up(&elf, cmdline_len);
+
     if ( initrd != NULL )
     {
         rc = hvm_copy_to_guest_phys(last_addr, &mod, sizeof(mod), v);

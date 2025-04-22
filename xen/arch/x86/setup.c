@@ -978,10 +978,30 @@ static unsigned int __init copy_bios_e820(struct e820entry *map, unsigned int li
     return n;
 }
 
+static size_t __init domain_cmdline_size(const struct boot_info *bi,
+                                         const struct boot_domain *bd)
+{
+    size_t s = bi->kextra ? strlen(bi->kextra) : 0;
+
+    s += bd->kernel->cmdline_pa ? strlen(__va(bd->kernel->cmdline_pa)) : 0;
+
+    if ( s == 0 )
+        return s;
+
+    /*
+     * Certain parameters from the Xen command line may be added to the dom0
+     * command line. Add additional space for the possible cases along with one
+     * extra char to hold \0.
+     */
+    s += strlen(" noapic") + strlen(" acpi=") + sizeof(acpi_param) + 1;
+
+    return s;
+}
+
 static struct domain *__init create_dom0(struct boot_info *bi)
 {
-    static char __initdata cmdline[MAX_GUEST_CMDLINE];
-
+    char *cmdline = NULL;
+    size_t cmdline_size;
     struct xen_domctl_createdomain dom0_cfg = {
         .flags = IS_ENABLED(CONFIG_TBOOT) ? XEN_DOMCTL_CDF_s3_integrity : 0,
         .max_evtchn_port = -1,
@@ -1021,20 +1041,24 @@ static struct domain *__init create_dom0(struct boot_info *bi)
     if ( alloc_dom0_vcpu0(d) == NULL )
         panic("Error creating %pdv0\n", d);
 
-    /* Grab the DOM0 command line. */
-    if ( bd->kernel->cmdline_pa || bi->kextra )
+    cmdline_size = domain_cmdline_size(bi, bd);
+    if ( cmdline_size )
     {
+        if ( !(cmdline = xzalloc_array(char, cmdline_size)) )
+            panic("Error allocating cmdline buffer for %pd\n", d);
+
         if ( bd->kernel->cmdline_pa )
-            safe_strcpy(cmdline,
-                        cmdline_cook(__va(bd->kernel->cmdline_pa), bi->loader));
+            strlcpy(cmdline,
+                    cmdline_cook(__va(bd->kernel->cmdline_pa), bi->loader),
+                    cmdline_size);
 
         if ( bi->kextra )
             /* kextra always includes exactly one leading space. */
-            safe_strcat(cmdline, bi->kextra);
+            strlcat(cmdline, bi->kextra, cmdline_size);
 
         /* Append any extra parameters. */
         if ( skip_ioapic_setup && !strstr(cmdline, "noapic") )
-            safe_strcat(cmdline, " noapic");
+            strlcat(cmdline, " noapic", cmdline_size);
 
         if ( (strlen(acpi_param) == 0) && acpi_disabled )
         {
@@ -1044,16 +1068,19 @@ static struct domain *__init create_dom0(struct boot_info *bi)
 
         if ( (strlen(acpi_param) != 0) && !strstr(cmdline, "acpi=") )
         {
-            safe_strcat(cmdline, " acpi=");
-            safe_strcat(cmdline, acpi_param);
+            strlcat(cmdline, " acpi=", cmdline_size);
+            strlcat(cmdline, acpi_param, cmdline_size);
         }
-
-        bd->kernel->cmdline_pa = __pa(cmdline);
+        bd->kernel->cmdline_pa = 0;
+        bd->cmdline = cmdline;
     }
 
     bd->d = d;
     if ( construct_dom0(bd) != 0 )
         panic("Could not construct domain 0\n");
+
+    bd->cmdline = NULL;
+    xfree(cmdline);
 
     return d;
 }

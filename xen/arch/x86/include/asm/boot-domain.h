@@ -15,6 +15,7 @@ struct boot_domain {
 
     struct boot_module *kernel;
     struct boot_module *module;
+    const char *cmdline;
 
     struct domain *d;
 };
