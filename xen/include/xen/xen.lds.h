@@ -56,6 +56,7 @@
   DECL_DEBUG2(.debug_info, .gnu.linkonce.wi.*, 1) \
   DECL_DEBUG(.debug_types, 1)                     \
   DECL_DEBUG(.debug_str, 1)                       \
+  DECL_DEBUG(.debug_str_offsets, 4)               \
   DECL_DEBUG2(.debug_line, .debug_line.*, 1)      \
   DECL_DEBUG(.debug_line_str, 1)                  \
   DECL_DEBUG(.debug_names, 4)                     \
