@@ -1,3 +1,6 @@
 /binaries/
+/imagebuilder/
 /smoke.serial
 /xtf-*/
+
+*.rom

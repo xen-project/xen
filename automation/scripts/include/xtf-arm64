@@ -1,0 +1,81 @@
+#!/bin/bash
+#
+# XTF test utilities (arm64).
+#
+
+# Arch-specific environment overrides.
+function xtf_arch_prepare()
+{
+    export FW_PREFIX="${FW_PREFIX:-/usr/lib/u-boot/qemu_arm64/}"
+    export QEMU_PREFIX="${QEMU_PREFIX:-${WORKDIR}/}"
+    export XEN_BINARY="${XEN_BINARY:-${WORKDIR}/xen}"
+    export XEN_CMDLINE="${XEN_CMDLINE:-loglvl=all noreboot console_timestamps=boot console=dtuart}"
+    export XTF_SRC_BRANCH="${XTF_SRC_BRANCH:-xtf-arm}"
+    export XTF_SRC_URI="${XTF_SRC_URI:-https://gitlab.com/xen-project/fusa/xtf.git}"
+    export XTF_SRC_VARIANTS="mmu64le"
+}
+
+# Perform arch-specific XTF environment setup.
+function xtf_arch_setup()
+{
+    # QEMU looks for "efi-virtio.rom" even if it is unneeded
+    curl -fsSLO https://github.com/qemu/qemu/raw/v5.2.0/pc-bios/efi-virtio.rom
+
+    # Crude check for local testing
+    if [ ! -d imagebuilder ]; then
+        git clone --depth 1 https://gitlab.com/xen-project/imagebuilder.git
+    fi
+
+    cat > ${WORKDIR}/config <<EOF
+MEMORY_START="0x40000000"
+MEMORY_END="0xC0000000"
+
+XEN="xen"
+DEVICE_TREE="virt-gicv2.dtb"
+
+XEN_CMD="${XEN_CMDLINE}"
+
+DOMU_KERNEL[0]="xtf-test"
+DOMU_MEM[0]="128"
+
+NUM_DOMUS=1
+
+LOAD_CMD="tftpb"
+UBOOT_SOURCE="boot.source"
+UBOOT_SCRIPT="boot.scr"
+EOF
+    cp ${XTF_BINARY} ${WORKDIR}/xtf-test
+
+    # Generate virt-gicv2.dtb
+    ${WORKDIR}/qemu-system-aarch64 \
+        -machine virtualization=true \
+        -cpu cortex-a57 \
+        -machine type=virt \
+        -m 2048 \
+        -smp 2 \
+        -display none \
+        -machine dumpdtb=${WORKDIR}/virt-gicv2.dtb
+
+    # Generate U-Boot environment
+    bash -x imagebuilder/scripts/uboot-script-gen \
+        -t tftp \
+        -d ${WORKDIR}/ \
+        -c ${WORKDIR}/config
+
+    export TEST_CMD="${QEMU_PREFIX}qemu-system-aarch64 \
+        -machine virtualization=true \
+        -cpu cortex-a57 \
+        -machine type=virt \
+        -no-reboot \
+        -nographic \
+        -monitor none \
+        -serial stdio \
+        -m 2048 \
+        -smp 2 \
+        -device virtio-net-pci,netdev=n0 \
+        -netdev user,id=n0,tftp=${WORKDIR} \
+        -bios ${FW_PREFIX}u-boot.bin \
+    "
+
+    export UBOOT_CMD="virtio scan; dhcp; tftpb 0x40000000 boot.scr; source 0x40000000"
+}
