@@ -57,8 +57,8 @@ static void update_entry(struct vpci_msix_entry *entry,
     }
 
     rc = vpci_msix_arch_enable_entry(entry, pdev,
-                                     vmsix_table_base(pdev->vpci,
-                                                      VPCI_MSIX_TABLE));
+                                     vmsix_table_host_base(pdev->vpci,
+                                                           VPCI_MSIX_TABLE));
     if ( rc )
     {
         gprintk(XENLOG_WARNING, "%pp: unable to enable entry %u: %d\n",
@@ -218,14 +218,14 @@ static void __iomem *get_table(const struct vpci *vpci, unsigned int slot)
         addr = vmsix_table_size(vpci, VPCI_MSIX_TABLE);
         fallthrough;
     case VPCI_MSIX_TBL_HEAD:
-        addr += vmsix_table_addr(vpci, VPCI_MSIX_TABLE);
+        addr += vmsix_table_host_addr(vpci, VPCI_MSIX_TABLE);
         break;
 
     case VPCI_MSIX_PBA_TAIL:
         addr = vmsix_table_size(vpci, VPCI_MSIX_PBA);
         fallthrough;
     case VPCI_MSIX_PBA_HEAD:
-        addr += vmsix_table_addr(vpci, VPCI_MSIX_PBA);
+        addr += vmsix_table_host_addr(vpci, VPCI_MSIX_PBA);
         break;
 
     default:
@@ -241,12 +241,6 @@ static void __iomem *get_table(const struct vpci *vpci, unsigned int slot)
 static unsigned int get_slot(const struct vpci *vpci, unsigned long addr)
 {
     unsigned long pfn = PFN_DOWN(addr);
-
-    /*
-     * The logic below relies on having the tables identity mapped to the guest
-     * address space, or for the `addr` parameter to be translated into its
-     * host physical memory address equivalent.
-     */
 
     if ( pfn == PFN_DOWN(vmsix_table_addr(vpci, VPCI_MSIX_TABLE)) )
         return VPCI_MSIX_TBL_HEAD;

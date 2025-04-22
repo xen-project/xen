@@ -231,6 +231,19 @@ int vpci_msix_arch_print(const struct vpci_msix *msix);
  * Helper functions to fetch MSIX related data. They are used by both the
  * emulated MSIX code and the BAR handlers.
  */
+static inline paddr_t vmsix_table_host_base(const struct vpci *vpci,
+                                            unsigned int nr)
+{
+    return vpci->header.bars[vpci->msix->tables[nr] & PCI_MSIX_BIRMASK].addr;
+}
+
+static inline paddr_t vmsix_table_host_addr(const struct vpci *vpci,
+                                            unsigned int nr)
+{
+    return vmsix_table_host_base(vpci, nr) +
+           (vpci->msix->tables[nr] & ~PCI_MSIX_BIRMASK);
+}
+
 static inline paddr_t vmsix_table_base(const struct vpci *vpci, unsigned int nr)
 {
     return vpci->header.bars[vpci->msix->tables[nr] &
