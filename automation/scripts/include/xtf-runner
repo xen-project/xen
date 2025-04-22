@@ -1,0 +1,131 @@
+#!/bin/bash
+#
+# XTF test utilities.
+#
+# Environment variables:
+#   BOOT_MSG: Expected boot message
+#   FW_PREFIX: Firmware images path including '/' at the end
+#   PASSED: XTF test printout in case of a pass
+#   QEMU_PREFIX: QEMU path including '/' at the end
+#   TEST_LOG: Output log file
+#   UBOOT_CMD: U-Boot command line
+#   WORKDIR: Test working directory
+#   XEN_BINARY: Xen binary location
+#   XEN_CONSOLE: Xen console device name
+#   XTF_SRC_CONFIG: XTF config file
+#   XTF_SRC_BRANCH: XTF branch
+#   XTF_SRC_URI: XTF source code URI
+
+# Output log file
+TEST_LOG="${TEST_LOG:-${XEN_ROOT}/smoke.serial}"
+# XTF test printout in case of a pass
+PASSED="${PASSED:-Test result: SUCCESS}"
+# Expected boot message
+BOOT_MSG="${BOOT_MSG:-Latest ChangeSet: }"
+# Test working directory
+WORKDIR="${WORKDIR:-${XEN_ROOT}/binaries}"
+# XTF source code
+XTF_SRC_CONFIG="${XTF_SRC_CONFIG:-include/configs/xtf-${ARCH}-config}"
+
+function die()
+{
+    set +x
+    echo "FATAL: $*" >&2
+    exit 1
+}
+
+# Build an XTF test binary.
+# $1 Test variant.
+# $2 Test name.
+function xtf_build_binary()
+{
+    local xtf_variant=$1
+    local xtf_name=$2
+    local xtf_dir="xtf-${ARCH}"
+
+    # Crude check for local testing
+    if [ ! -d ${xtf_dir} ]; then
+        git clone ${XTF_SRC_URI} ${xtf_dir} -b ${XTF_SRC_BRANCH}
+    fi
+
+    make \
+        -C ${xtf_dir} \
+        -j$(nproc) \
+        $(tr '\n' ' ' < ${XTF_SRC_CONFIG}) \
+        TESTS=tests/${xtf_name}
+
+    export XTF_NAME="${xtf_name}"
+    export XTF_VARIANT="${xtf_variant}"
+    export XTF_WORKDIR="$(readlink -f ${xtf_dir})"
+    export XTF_BINARY="${XTF_WORKDIR}/tests/${xtf_name}/test-${xtf_variant}-${xtf_name}"
+}
+
+# Build Xen command line for running an XTF test.
+# $1 Test variant.
+# $2 Test name.
+function xtf_build_cmdline()
+{
+    local xtf_variant=$1
+    local xtf_name=$2
+    declare -a cmdline=()
+
+    cmdline+=("${XEN_CMDLINE}")
+
+    # NB: OK to have hvm64, which is x86-only variant
+    if [[ $xtf_variant == "hvm64" ]]; then
+        cmdline+=("dom0-iommu=none dom0=pvh")
+    fi
+
+    export XEN_CMDLINE="${cmdline[@]}"
+}
+
+# Build an XTF test environment.
+# $1 Test variant.
+# $2 Test name.
+function xtf_build_test()
+{
+    local v=$1
+    local xtf_name=$2
+    local xtf_variant=""
+
+    for x in ${XTF_SRC_VARIANTS}; do
+        if [[ "${x}" == "${v}" ]]; then
+            xtf_variant=${v}
+            break
+        fi
+    done
+    if [[ -z $xtf_variant ]]; then
+        die "unsupported test variant '$1', supported variants: ${XTF_SRC_VARIANTS}"
+    fi
+
+    xtf_build_binary ${xtf_variant} ${xtf_name}
+    xtf_build_cmdline ${xtf_variant} ${xtf_name}
+}
+
+# Execute an XTF test.
+function xtf_run_test()
+{
+    rm -f ${TEST_LOG}
+    export BOOT_MSG PASSED TEST_CMD TEST_LOG UBOOT_CMD
+    ./console.exp | sed 's/\r\+$//'
+}
+
+# Setup environment and run an XTF test.
+# $1 Test variant.
+# $2 Test name.
+function xtf_test()
+{
+    # Out: FW_*, QEMU_*, XEN_{BINARY,CONSOLE}, XTF_SRC_*
+    xtf_arch_prepare
+
+    # In: XTF_SRC_*
+    # OUt: XTF_{BINARY,NAME,VARIANT,WORKDIR} and XEN_CMDLINE
+    xtf_build_test $@
+
+    # In: FW_*, QEMU_*, XTF_*, XEN_*
+    # Out: BOOT_MSG, PASSED, TEST_{CMD,LOG}, UBOOT_CMD
+    xtf_arch_setup
+
+    # In: BOOT_MSG, PASSED, TEST_{CMD,LOG}, UBOOT_CMD
+    xtf_run_test
+}
