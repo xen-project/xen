@@ -29,6 +29,7 @@ targets :=
 subdir-y :=
 CFLAGS-y :=
 AFLAGS-y :=
+cov-cflags-y :=
 nocov-y :=
 noubsan-y :=
 
@@ -133,19 +134,18 @@ $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS-y += -DINIT_SECTIONS
 
 non-init-objects = $(filter-out %.init.o, $(obj-y) $(obj-bin-y) $(extra-y))
 
-ifeq ($(CONFIG_COVERAGE),y)
 ifeq ($(CONFIG_CC_IS_CLANG),y)
-    COV_FLAGS := -fprofile-instr-generate -fcoverage-mapping
+    cov-cflags-$(CONFIG_COVERAGE) := -fprofile-instr-generate -fcoverage-mapping
 else
-    COV_FLAGS := -fprofile-arcs -ftest-coverage
+    cov-cflags-$(CONFIG_COVERAGE) := -fprofile-arcs -ftest-coverage
+    cov-cflags-$(CONFIG_CONDITION_COVERAGE) += -fcondition-coverage
 endif
 
-# Reset COV_FLAGS in cases where an objects has another one as prerequisite
+# Reset cov-cflags-y in cases where an objects has another one as prerequisite
 $(nocov-y) $(filter %.init.o, $(obj-y) $(obj-bin-y) $(extra-y)): \
-    COV_FLAGS :=
+    cov-cflags-y :=
 
-$(non-init-objects): _c_flags += $(COV_FLAGS)
-endif
+$(non-init-objects): _c_flags += $(cov-cflags-y)
 
 ifeq ($(CONFIG_UBSAN),y)
 # Any -fno-sanitize= options need to come after any -fsanitize= options

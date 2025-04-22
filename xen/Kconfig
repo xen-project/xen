@@ -47,6 +47,10 @@ config CC_HAS_ASM_GOTO_OUTPUT
 	depends on !GCC_ASM_GOTO_OUTPUT_BROKEN
 	depends on $(success,echo 'int foo(int x) { asm goto ("": "=r"(x) ::: bar); return x; bar: return 0; }' | $(CC) -x c - -c -o /dev/null)
 
+# Compiler supports -fcondition-coverage aka MC/DC
+config CC_HAS_MCDC
+	def_bool $(cc-option,-fcondition-coverage)
+
 # Set code alignment.
 #
 # Allow setting on a boolean basis, and then convert such selection to an

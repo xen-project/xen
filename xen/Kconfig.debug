@@ -44,6 +44,15 @@ config COVERAGE
 
 	  If unsure, say N here.
 
+config CONDITION_COVERAGE
+	bool "Condition coverage support"
+	depends on COVERAGE && CC_HAS_MCDC
+	help
+	  Enable condition coverage support. Used for collecting MC/DC
+	  (Modified Condition/Decision Coverage) metrics.
+
+	  If unsure, say N here.
+
 config DEBUG_LOCK_PROFILE
 	bool "Lock Profiling"
 	select DEBUG_LOCKS
