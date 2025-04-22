@@ -1,0 +1,52 @@
+#!/bin/bash
+#
+# XTF test utilities (x86_64, EFI).
+#
+
+# Arch-specific environment overrides.
+function xtf_arch_prepare()
+{
+    export FW_PREFIX="${FW_PREFIX:-/usr/share/OVMF/}"
+    export QEMU_PREFIX="${QEMU_PREFIX:-}"
+    export XEN_BINARY="${XEN_BINARY:-${WORKDIR}/xen.efi}"
+    export XEN_CMDLINE="${XEN_CMDLINE:-loglvl=all noreboot console_timestamps=boot console=com1}"
+    export XTF_SRC_BRANCH="${XTF_SRC_BRANCH:-master}"
+    export XTF_SRC_URI="${XTF_SRC_URI:-https://xenbits.xen.org/git-http/xtf.git}"
+    export XTF_SRC_VARIANTS="hvm64 pv64"
+}
+
+# Perform arch-specific XTF environment setup.
+function xtf_arch_setup()
+{
+    local esp_dir="${WORKDIR}/boot-esp"
+    local efi_dir="${esp_dir}/EFI/BOOT"
+
+    # Generate EFI boot environment
+    mkdir -p ${efi_dir}
+    cp ${XEN_BINARY} ${efi_dir}/BOOTX64.EFI
+    cp ${XTF_BINARY} ${efi_dir}/kernel
+
+    cat > ${efi_dir}/BOOTX64.cfg <<EOF
+[global]
+default=test
+
+[test]
+options=${XEN_CMDLINE}
+kernel=kernel
+EOF
+
+    # NB: OVMF_CODE.fd is read-only, no need to copy
+    cp ${FW_PREFIX}OVMF_VARS.fd ${WORKDIR}
+
+    export TEST_CMD="${QEMU_PREFIX}qemu-system-x86_64 \
+        -no-reboot \
+        -nographic \
+        -monitor none \
+        -serial stdio \
+        -m 512 \
+        -M q35,kernel-irqchip=split \
+        -drive if=pflash,format=raw,readonly=on,file=${FW_PREFIX}OVMF_CODE.fd \
+        -drive if=pflash,format=raw,file=${WORKDIR}/OVMF_VARS.fd \
+        -drive file=fat:rw:${esp_dir},media=disk,index=0,format=raw \
+    "
+}
