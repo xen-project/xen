@@ -317,7 +317,7 @@ void asmlinkage __init start_xen(unsigned long fdt_paddr)
     /* Initialize traps early allow us to get backtrace when an error occurred */
     init_traps();
 
-    smp_clear_cpu_maps();
+    smp_prepare_boot_cpu();
 
     device_tree_flattened = early_fdt_map(fdt_paddr);
     if ( !device_tree_flattened )

@@ -107,8 +107,7 @@ static void remove_cpu_sibling_map(int cpu)
     free_cpumask_var(per_cpu(cpu_core_mask, cpu));
 }
 
-void __init
-smp_clear_cpu_maps (void)
+void __init smp_prepare_boot_cpu(void)
 {
     cpumask_set_cpu(0, &cpu_online_map);
     cpumask_set_cpu(0, &cpu_possible_map);
