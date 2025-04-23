@@ -55,6 +55,11 @@ unsigned int pci_find_next_cap_ttl(pci_sbdf_t sbdf, unsigned int pos,
 
         if ( id == 0xff )
             break;
+
+        if ( !n )
+            return pos;
+        ASSERT(caps);
+
         for ( i = 0; i < n; i++ )
         {
             if ( id == caps[i] )
