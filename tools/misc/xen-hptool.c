@@ -51,7 +51,7 @@ static int hp_mem_online_func(int argc, char *argv[])
     ret = xc_mark_page_online(xch, mfn, mfn, &status);
 
     if (ret < 0)
-        fprintf(stderr, "Onlining page mfn %lx failed, error %x", mfn, errno);
+        fprintf(stderr, "Onlining page mfn %lx failed, error %x\n", mfn, errno);
     else if (status & (PG_ONLINE_FAILED |PG_ONLINE_BROKEN)) {
         fprintf(stderr, "Onlining page mfn %lx is broken, "
                         "Memory online failed\n", mfn);
@@ -82,7 +82,7 @@ static int hp_mem_query_func(int argc, char *argv[])
     ret = xc_query_page_offline_status(xch, mfn, mfn, &status);
 
     if (ret < 0)
-        fprintf(stderr, "Querying page mfn %lx failed, error %x", mfn, errno);
+        fprintf(stderr, "Querying page mfn %lx failed, error %x\n", mfn, errno);
     else
     {
 		printf("Memory Status %x: [", status);
