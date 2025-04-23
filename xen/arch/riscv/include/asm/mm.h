@@ -9,6 +9,7 @@
 #include <xen/mm-frame.h>
 #include <xen/pdx.h>
 #include <xen/pfn.h>
+#include <xen/sections.h>
 #include <xen/types.h>
 
 #include <asm/page-bits.h>
@@ -43,13 +44,21 @@ static inline void *maddr_to_virt(paddr_t ma)
  */
 static inline unsigned long virt_to_maddr(unsigned long va)
 {
+    const unsigned long xen_size = (unsigned long)(_end - _start);
+    const unsigned long xen_virt_start = _AC(XEN_VIRT_START, UL);
+    const unsigned long xen_virt_end = xen_virt_start + xen_size - 1;
+
     if ((va >= DIRECTMAP_VIRT_START) &&
         (va <= DIRECTMAP_VIRT_END))
         return directmapoff_to_maddr(va - directmap_virt_start);
 
-    BUILD_BUG_ON(XEN_VIRT_SIZE != MB(2));
-    ASSERT((va >> (PAGETABLE_ORDER + PAGE_SHIFT)) ==
-           (_AC(XEN_VIRT_START, UL) >> (PAGETABLE_ORDER + PAGE_SHIFT)));
+    ASSERT((va >= xen_virt_start) && (va <= xen_virt_end));
+
+    /*
+    * The .init* sections will be freed when Xen completes booting,
+    * so the [__init_begin, __init_end) range must be excluded.
+    */
+    ASSERT((system_state < SYS_STATE_active) || !is_init_section(va));
 
     /* phys_offset = load_start - XEN_VIRT_START */
     return phys_offset + va;

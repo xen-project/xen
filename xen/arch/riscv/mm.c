@@ -31,20 +31,39 @@ unsigned long __ro_after_init phys_offset; /* = load_start - XEN_VIRT_START */
 #define LOAD_TO_LINK(addr) ((unsigned long)(addr) - phys_offset)
 
 /*
- * It is expected that Xen won't be more then 2 MB.
+ * It is expected that Xen won't be more then XEN_VIRT_SIZE.
  * The check in xen.lds.S guarantees that.
- * At least 3 page tables (in case of Sv39 ) are needed to cover 2 MB.
- * One for each page level table with PAGE_SIZE = 4 Kb.
  *
- * One L0 page table can cover 2 MB(512 entries of one page table * PAGE_SIZE).
+ * Root page table is shared with the initial mapping and is declared
+ * separately (look at stage1_pgtbl_root), so it isn't taken into account
+ * in PGTBL_INITIAL_COUNT.
  *
- * It might be needed one more page table in case when Xen load address
- * isn't 2 MB aligned.
+ * An amount of page tables between root page table and L0 page table
+ * (in the case of Sv39 it covers L1 table):
+ *   (CONFIG_PAGING_LEVELS - 2) are needed for an identity mapping and
+ *   the same amount are needed for Xen.
  *
- * CONFIG_PAGING_LEVELS page tables are needed for the identity mapping,
- * except that the root page table is shared with the initial mapping
+ * An amount of L0 page tables:
+ *   (512 entries of one L0 page table covers 2MB == 1<<XEN_PT_LEVEL_SHIFT(1))
+ *   XEN_VIRT_SIZE >> XEN_PT_LEVEL_SHIFT(1) are needed for Xen and
+ *   one L0 is needed for identity mapping.
  */
-#define PGTBL_INITIAL_COUNT ((CONFIG_PAGING_LEVELS - 1) * 2 + 1)
+#define PGTBL_INITIAL_COUNT ((CONFIG_PAGING_LEVELS - 2) * 2 + \
+                             (XEN_VIRT_SIZE >> XEN_PT_LEVEL_SHIFT(1)) + 1)
+
+/*
+ * Modifying these checks may require updating PGTBL_INITIAL_COUNT.
+ *
+ * If XEN_VIRT_{START,SIZE} are not properly aligned and XEN_VIRT_SIZE > GB(1),
+ * additional L1 and L0 page tables are required.
+ */
+static void __init __maybe_unused build_assertions(void)
+{
+    BUILD_BUG_ON(!IS_ALIGNED(XEN_VIRT_START, GB(1)));
+    BUILD_BUG_ON(!IS_ALIGNED(XEN_VIRT_SIZE, MB(2)));
+
+    BUILD_BUG_ON(XEN_VIRT_SIZE > GB(1));
+}
 
 pte_t __section(".bss.page_aligned") __aligned(PAGE_SIZE)
 stage1_pgtbl_root[PAGETABLE_ENTRIES];
