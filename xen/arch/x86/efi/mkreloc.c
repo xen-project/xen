@@ -28,14 +28,16 @@ static void usage(const char *cmd, int rc)
 static unsigned int load(const char *name, int *handle,
                          struct section_header **sections,
                          uint_fast64_t *image_base,
-                         uint32_t *image_size,
+                         uint_fast32_t *image_size,
                          unsigned int *width)
 {
     int in = open(name, O_RDONLY);
     struct mz_hdr mz_hdr;
     struct pe_hdr pe_hdr;
-    struct pe32_opt_hdr pe32_opt_hdr;
-    uint32_t base;
+    union {
+        struct pe32_opt_hdr pe;
+        struct pe32plus_opt_hdr pep;
+    } pe32_opt_hdr;
 
     if ( in < 0 ||
          read(in, &mz_hdr, sizeof(mz_hdr)) != sizeof(mz_hdr) )
@@ -54,31 +56,40 @@ static unsigned int load(const char *name, int *handle,
 
     if ( lseek(in, mz_hdr.peaddr, SEEK_SET) < 0 ||
          read(in, &pe_hdr, sizeof(pe_hdr)) != sizeof(pe_hdr) ||
-         read(in, &pe32_opt_hdr, sizeof(pe32_opt_hdr)) != sizeof(pe32_opt_hdr) ||
-         read(in, &base, sizeof(base)) != sizeof(base) ||
-         /*
-          * Luckily the image size field lives at the
-          * same offset for both formats.
-          */
-         lseek(in, 24, SEEK_CUR) < 0 ||
-         read(in, image_size, sizeof(*image_size)) != sizeof(*image_size) )
+         (read(in, &pe32_opt_hdr.pe, sizeof(pe32_opt_hdr.pe)) !=
+          sizeof(pe32_opt_hdr.pe)) )
     {
         perror(name);
         exit(3);
     }
 
     switch ( (pe_hdr.magic == PE_MAGIC &&
-              pe_hdr.opt_hdr_size > sizeof(pe32_opt_hdr)) *
-              pe32_opt_hdr.magic )
+              pe_hdr.opt_hdr_size > sizeof(pe32_opt_hdr.pe)) *
+              pe32_opt_hdr.pe.magic )
     {
     case PE_OPT_MAGIC_PE32:
         *width = 32;
-        *image_base = base;
+        *image_base = pe32_opt_hdr.pe.image_base;
+        *image_size = pe32_opt_hdr.pe.image_size;
         break;
     case PE_OPT_MAGIC_PE32PLUS:
-        *width = 64;
-        *image_base = ((uint64_t)base << 32) | pe32_opt_hdr.data_base;
-        break;
+        if ( pe_hdr.opt_hdr_size > sizeof(pe32_opt_hdr.pep) )
+        {
+            if ( read(in,
+                      &pe32_opt_hdr.pe + 1,
+                      sizeof(pe32_opt_hdr.pep) - sizeof(pe32_opt_hdr.pe)) !=
+                 sizeof(pe32_opt_hdr.pep) - sizeof(pe32_opt_hdr.pe) )
+            {
+                perror(name);
+                exit(3);
+            }
+
+            *width = 64;
+            *image_base = pe32_opt_hdr.pep.image_base;
+            *image_size = pe32_opt_hdr.pep.image_size;
+            break;
+        }
+        /* Fall through. */
     default:
         fprintf(stderr, "%s: Wrong PE file format\n", name);
         exit(3);
@@ -108,10 +119,27 @@ static unsigned int load(const char *name, int *handle,
 static long page_size;
 
 static const void *map_section(const struct section_header *sec, int in,
-                               const char *name)
+                               const char *name, uint_fast32_t image_size)
 {
     const char *ptr;
     unsigned long offs;
+
+    if ( sec->rva > image_size )
+    {
+        fprintf(stderr,
+                "%s: section %.8s @ %08"PRIx32" beyond image size %08"PRIxFAST32"\n",
+                name, sec->name, sec->rva, image_size);
+        exit(6);
+    }
+
+    if ( (uint_fast64_t)sec->rva + sec->virtual_size > image_size )
+    {
+        fprintf(stderr,
+                "%s: section %.8s @ [%09"PRIx32",%09"PRIxFAST64") extends beyond image size %09"PRIxFAST32"\n",
+                name, sec->name, sec->rva,
+                (uint_fast64_t)sec->rva + sec->virtual_size, image_size);
+        exit(6);
+    }
 
     if ( !page_size )
         page_size = sysconf(_SC_PAGESIZE);
@@ -233,7 +261,7 @@ int main(int argc, char *argv[])
     int in1, in2;
     unsigned int i, nsec, width1, width2;
     uint_fast64_t base1, base2;
-    uint32_t size1, size2;
+    uint_fast32_t size1, size2;
     struct section_header *sec1, *sec2;
 
     if ( argc == 1 ||
@@ -308,8 +336,8 @@ int main(int argc, char *argv[])
             sec1[i].raw_data_size = sec1[i].virtual_size;
             sec2[i].raw_data_size = sec2[i].virtual_size;
         }
-        ptr1 = map_section(sec1 + i, in1, argv[1]);
-        ptr2 = map_section(sec2 + i, in2, argv[2]);
+        ptr1 = map_section(sec1 + i, in1, argv[1], size1);
+        ptr2 = map_section(sec2 + i, in2, argv[2], size1);
 
         diff_sections(ptr1, ptr2, sec1 + i, base2 - base1, width1,
                       base1, base1 + size1);
