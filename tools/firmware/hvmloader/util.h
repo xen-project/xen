@@ -190,6 +190,17 @@ static inline void cpuid_count(
     uint32_t *ecx,
     uint32_t *edx)
 {
+    uint32_t tmp;
+
+    if ( !eax )
+        eax = &tmp;
+    if ( !ebx )
+        ebx = &tmp;
+    if ( !ecx )
+        ecx = &tmp;
+    if ( !edx )
+        edx = &tmp;
+
     asm volatile ( "cpuid"
                    : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
                    : "a" (leaf), "c" (subleaf) );
