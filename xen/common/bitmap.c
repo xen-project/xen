@@ -369,6 +369,9 @@ int bitmap_to_xenctl_bitmap(struct xenctl_bitmap *xenctl_bitmap,
     const uint8_t *bytemap;
     uint8_t last, *buf = NULL;
 
+    if ( !nbits )
+        return 0;
+
     if ( !IS_ENABLED(LITTLE_ENDIAN) )
     {
         buf = xmalloc_array(uint8_t, xen_bytes);
@@ -396,7 +399,7 @@ int bitmap_to_xenctl_bitmap(struct xenctl_bitmap *xenctl_bitmap,
      * their loops to 8 bits. Ensure we clear those left over bits so as to
      * prevent surprises.
      */
-    last = bytemap[nbits / 8];
+    last = bytemap[(nbits - 1) / 8];
     if ( nbits % 8 )
         last &= (1U << (nbits % 8)) - 1;
 
