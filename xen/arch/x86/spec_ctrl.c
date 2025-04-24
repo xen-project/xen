@@ -85,6 +85,8 @@ static int8_t __initdata opt_gds_mit = -1;
 static int8_t __initdata opt_div_scrub = -1;
 bool __ro_after_init opt_bp_spec_reduce = true;
 
+static bool __initdata opt_ibpb_alt;
+
 static int __init cf_check parse_spec_ctrl(const char *s)
 {
     const char *ss;
@@ -369,6 +371,8 @@ static int __init cf_check parse_spec_ctrl(const char *s)
             opt_div_scrub = val;
         else if ( (val = parse_boolean("bp-spec-reduce", s, ss)) >= 0 )
             opt_bp_spec_reduce = val;
+        else if ( (val = parse_boolean("ibpb-alt", s, ss)) >= 0 )
+            opt_ibpb_alt = val;
         else
             rc = -EINVAL;
 
@@ -2494,6 +2498,9 @@ void __init init_speculation_mitigations(void)
         wrmsrl(MSR_SPEC_CTRL, val);
         info->last_spec_ctrl = val;
     }
+
+    if ( cpu_has_pb_opt_ctrl )
+        set_in_pb_opt_ctrl(PB_OPT_IBPB_ALT, opt_ibpb_alt);
 }
 
 static void __init __maybe_unused build_assertions(void)
