@@ -665,8 +665,7 @@ int vpci_make_msix_hole(const struct pci_dev *pdev)
             default:
                 put_gfn(d, start);
                 gprintk(XENLOG_WARNING,
-                        "%pp: existing mapping (mfn: %" PRI_mfn
-                        "type: %d) at %#lx clobbers MSIX MMIO area\n",
+                        "%pp: existing mapping (mfn: %" PRI_mfn " type: %d) at %#lx clobbers MSIX MMIO area\n",
                         &pdev->sbdf, mfn_x(mfn), t, start);
                 return -EEXIST;
             }
