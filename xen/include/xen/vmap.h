@@ -9,6 +9,7 @@
 #define __XEN_VMAP_H__
 
 #include <xen/mm-frame.h>
+#include <xen/mm-types.h>
 #include <xen/page-size.h>
 
 /* Identifiers for the linear ranges tracked by vmap */
@@ -57,7 +58,7 @@ void vm_init_type(enum vmap_region type, void *start, void *end);
  * @return Pointer to the mapped area on success; NULL otherwise.
  */
 void *__vmap(const mfn_t *mfn, unsigned int granularity, unsigned int nr,
-             unsigned int align, unsigned int flags, enum vmap_region type);
+             unsigned int align, pte_attr_t flags, enum vmap_region type);
 
 /*
  * Map an array of pages contiguously into the VMAP_DEFAULT vmap region
