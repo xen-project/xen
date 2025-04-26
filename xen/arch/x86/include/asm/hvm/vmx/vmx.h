@@ -320,16 +320,25 @@ static always_inline void __vmpclear(u64 addr)
     BUG();
 }
 
-static always_inline void __vmread(unsigned long field, unsigned long *value)
+static always_inline unsigned long vmread(unsigned long field)
 {
-    asm volatile ( "vmread %1, %0\n\t"
+    unsigned long value;
+
+    asm volatile ( "vmread %[field], %[value]\n\t"
                    /* CF==1 or ZF==1 --> BUG() */
                    UNLIKELY_START(be, vmread)
                    _ASM_BUGFRAME_TEXT(0)
                    UNLIKELY_END_SECTION
-                   : "=rm" (*value)
-                   : "r" (field),
+                   : [value] "=rm" (value)
+                   : [field] "r" (field),
                      _ASM_BUGFRAME_INFO(BUGFRAME_bug, __LINE__, __FILE__, 0) );
+
+    return value;
+}
+
+static always_inline void __vmread(unsigned long field, unsigned long *value)
+{
+    *value = vmread(field);
 }
 
 static always_inline void __vmwrite(unsigned long field, unsigned long value)
@@ -363,7 +372,7 @@ static inline enum vmx_insn_errno vmread_safe(unsigned long field,
     if ( unlikely(fail_invalid) )
         ret = VMX_INSN_FAIL_INVALID;
     else if ( unlikely(fail_valid) )
-        __vmread(VM_INSTRUCTION_ERROR, &ret);
+        ret = vmread(VM_INSTRUCTION_ERROR);
 
     return ret;
 }
@@ -371,8 +380,6 @@ static inline enum vmx_insn_errno vmread_safe(unsigned long field,
 static inline enum vmx_insn_errno vmwrite_safe(unsigned long field,
                                                unsigned long value)
 {
-    unsigned long ret;
-
     asm goto ( "vmwrite %[value], %[field]\n\t"
                "jc %l[vmfail_invalid]\n\t"
                "jz %l[vmfail_error]"
@@ -386,8 +393,7 @@ static inline enum vmx_insn_errno vmwrite_safe(unsigned long field,
     return VMX_INSN_FAIL_INVALID;
 
  vmfail_error:
-    __vmread(VM_INSTRUCTION_ERROR, &ret);
-    return ret;
+    return vmread(VM_INSTRUCTION_ERROR);
 }
 
 static always_inline void __invept(unsigned long type, uint64_t eptp)
