@@ -926,7 +926,7 @@ static void vmx_save_dr(struct vcpu *v)
     v->arch.dr[3] = read_debugreg(3);
     v->arch.dr6   = read_debugreg(6);
     /* DR7 must be saved as it is used by vmx_restore_dr(). */
-    __vmread(GUEST_DR7, &v->arch.dr7);
+    v->arch.dr7   = vmread(GUEST_DR7);
 }
 
 static void __restore_debug_registers(struct vcpu *v)

@@ -595,8 +595,8 @@ struct arch_vcpu
 
     /* Debug registers. */
     unsigned long dr[4];
-    unsigned long dr7; /* Ideally int, but __vmread() needs long. */
     unsigned int dr6;
+    unsigned int dr7;
 
     /* other state */
 
