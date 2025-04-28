@@ -260,7 +260,10 @@ Go (golang) bindings for libxl
 
 Support for running qemu-xen device model in a linux stubdomain.
 
-    Status: Tech Preview
+    Status: Supported, with caveats
+
+Any issue in the stubdomain affecting only the guest it is servicing
+or itself will not be regarded a security issue.
 
 ## Xenstore
 
