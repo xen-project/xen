@@ -382,17 +382,17 @@ static inline enum vmx_insn_errno vmwrite_safe(unsigned long field,
 {
     asm goto ( "vmwrite %[value], %[field]\n\t"
                "jc %l[vmfail_invalid]\n\t"
-               "jz %l[vmfail_error]"
+               "jz %l[vmfail_valid]"
                :
                : [field] "r" (field), [value] "rm" (value)
                :
-               : vmfail_invalid, vmfail_error );
+               : vmfail_invalid, vmfail_valid );
     return VMX_INSN_SUCCEED;
 
  vmfail_invalid:
     return VMX_INSN_FAIL_INVALID;
 
- vmfail_error:
+ vmfail_valid:
     return vmread(VM_INSTRUCTION_ERROR);
 }
 
