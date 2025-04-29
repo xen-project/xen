@@ -47,17 +47,16 @@
 #define VPIC_PRIO_NONE 8
 static int vpic_get_priority(struct hvm_hw_vpic *vpic, uint8_t mask)
 {
-    int prio;
-
     ASSERT(vpic_is_locked(vpic));
 
     if ( mask == 0 )
         return VPIC_PRIO_NONE;
 
-    /* prio = ffs(mask ROR vpic->priority_add); */
-    asm ( "ror %%cl,%b1 ; rep; bsf %1,%0"
-          : "=r" (prio) : "q" ((uint32_t)mask), "c" (vpic->priority_add) );
-    return prio;
+    /*
+     * We use __builtin_ctz() rather than ffs() because the compiler can't
+     * reason that a nonzero mask rotated is still nonzero.
+     */
+    return __builtin_ctz(ror8(mask, vpic->priority_add));
 }
 
 /* Return the PIC's highest priority pending interrupt. Return -1 if none. */
@@ -196,7 +195,7 @@ static void vpic_ioport_write(
     {
         if ( val & 0x10 )
         {
-            unsigned int pending = vpic->isr | (vpic->irr & ~vpic->elcr);
+            uint8_t pending = vpic->isr | (vpic->irr & ~vpic->elcr);
 
             /* ICW1 */
             /* Clear edge-sensing logic. */
@@ -229,15 +228,9 @@ static void vpic_ioport_write(
              * been cleared from IRR or ISR, or else the dpci logic will get
              * out of sync with the state of the interrupt controller.
              */
-            while ( pending )
-            {
-                unsigned int pin = __scanbit(pending, 8);
-
-                ASSERT(pin < 8);
+            for_each_set_bit ( pin, pending )
                 hvm_dpci_eoi(current->domain,
                              hvm_isa_irq_to_gsi((addr >> 7) ? (pin | 8) : pin));
-                __clear_bit(pin, &pending);
-            }
             return;
         }
         else if ( val & 0x08 )

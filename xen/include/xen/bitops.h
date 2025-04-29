@@ -418,6 +418,12 @@ static inline uint32_t rol32(uint32_t word, unsigned int shift)
     return (word << shift) | (word >> (32 - shift));
 }
 
+/* ror8 - rotate an 8-bit value right */
+static inline uint8_t ror8(uint8_t value, unsigned int shift)
+{
+    return (value >> shift) | (value << (8 - shift));
+}
+
 /*
  * ror32 - rotate a 32-bit value right
  *
