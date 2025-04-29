@@ -5128,6 +5128,7 @@ static void subpage_mmio_write_emulate(
         return;
     }
 
+    addr += offset;
     switch ( len )
     {
     case 1:
