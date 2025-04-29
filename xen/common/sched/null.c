@@ -557,7 +557,7 @@ static void cf_check null_unit_remove(
 
     cpu = sched_unit_master(unit);
     npc = get_sched_res(cpu)->sched_priv;
-    if ( npc->unit )
+    if ( npc->unit == unit )
         unit_deassign(prv, unit);
 
  out:
