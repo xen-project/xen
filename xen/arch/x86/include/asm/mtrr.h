@@ -66,7 +66,6 @@ extern uint8_t pat_type_2_pte_flags(uint8_t pat_type);
 extern int hold_mtrr_updates_on_aps;
 extern void mtrr_aps_sync_begin(void);
 extern void mtrr_aps_sync_end(void);
-extern void mtrr_bp_restore(void);
 
 extern bool_t mtrr_var_range_msr_set(struct domain *, struct mtrr_state *,
                                      uint32_t msr, uint64_t msr_content);
