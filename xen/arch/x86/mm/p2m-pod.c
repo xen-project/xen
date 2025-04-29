@@ -338,7 +338,7 @@ p2m_pod_set_mem_target(struct domain *d, unsigned long target)
 
     ASSERT( pod_target >= p2m->pod.count );
 
-    if ( has_arch_pdevs(d) || cache_flush_permitted(d) )
+    if ( has_arch_pdevs(d) || has_arch_io_resources(d) )
         ret = -ENOTEMPTY;
     else
         ret = p2m_pod_set_cache_target(p2m, pod_target, 1/*preemptible*/);
@@ -1395,7 +1395,7 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
     if ( !paging_mode_translate(d) )
         return -EINVAL;
 
-    if ( has_arch_pdevs(d) || cache_flush_permitted(d) )
+    if ( has_arch_pdevs(d) || has_arch_io_resources(d) )
         return -ENOTEMPTY;
 
     do {

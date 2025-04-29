@@ -86,7 +86,7 @@ static unsigned int max_order(const struct domain *d)
     unsigned int order = domu_max_order;
 
 #ifdef CONFIG_HAS_PASSTHROUGH
-    if ( cache_flush_permitted(d) && order < ptdom_max_order )
+    if ( has_arch_io_resources(d) && order < ptdom_max_order )
         order = ptdom_max_order;
 #endif
 
