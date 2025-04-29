@@ -227,7 +227,8 @@ int rangeset_remove_range(
 
         if ( x->s < s )
         {
-            x->e = s - 1;
+            if ( x->e >= s )
+                x->e = s - 1;
             x = next_range(r, x);
         }
 
