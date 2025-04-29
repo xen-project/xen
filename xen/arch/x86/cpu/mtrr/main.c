@@ -609,7 +609,7 @@ void mtrr_aps_sync_end(void)
 	hold_mtrr_updates_on_aps = 0;
 }
 
-void mtrr_bp_restore(void)
+void asmlinkage mtrr_bp_restore(void)
 {
 	mtrr_set_all();
 }
