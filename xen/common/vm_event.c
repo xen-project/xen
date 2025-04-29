@@ -600,6 +600,10 @@ int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec)
         return 0;
     }
 
+    /* All other subops need to target a real domain. */
+    if ( unlikely(d == NULL) )
+        return -ESRCH;
+
     rc = xsm_vm_event_control(XSM_PRIV, d, vec->mode, vec->op);
     if ( rc )
         return rc;
