@@ -453,8 +453,14 @@ void cpuidle_wakeup_mwait(cpumask_t *mask)
     cpumask_andnot(mask, mask, &target);
 }
 
+/* Force sending of a wakeup IPI regardless of mwait usage. */
+bool __ro_after_init force_mwait_ipi_wakeup;
+
 bool arch_skip_send_event_check(unsigned int cpu)
 {
+    if ( force_mwait_ipi_wakeup )
+        return false;
+
     /*
      * This relies on softirq_pending() and mwait_wakeup() to access data
      * on the same cache line.
