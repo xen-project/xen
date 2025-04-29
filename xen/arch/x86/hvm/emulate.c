@@ -754,7 +754,7 @@ static void hvmemul_unmap_linear_addr(
 
 /*
  * Convert addr from linear to physical form, valid over the range
- * [addr, addr + *reps * bytes_per_rep]. *reps is adjusted according to
+ * [addr, addr + *reps * bytes_per_rep). *reps is adjusted according to
  * the valid computed range. It is always >0 when X86EMUL_OKAY is returned.
  * @pfec indicates the access checks to be performed during page-table walks.
  */
@@ -794,7 +794,10 @@ static int hvmemul_linear_to_phys(
         int rc = hvmemul_linear_to_phys(
             addr, &_paddr, bytes_per_rep, &one_rep, pfec, hvmemul_ctxt);
         if ( rc != X86EMUL_OKAY )
+        {
+            *reps = one_rep;
             return rc;
+        }
         pfn = _paddr >> PAGE_SHIFT;
     }
     else if ( (pfn = paging_gva_to_gfn(curr, addr, &pfec)) == gfn_x(INVALID_GFN) )
