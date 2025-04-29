@@ -41,8 +41,8 @@ cppflags-$(CONFIG_X86)    += -m32
 
 endif
 
-public-$(CONFIG_X86) := $(wildcard $(srcdir)/public/arch-x86/*.h $(srcdir)/public/arch-x86/*/*.h)
-public-$(CONFIG_ARM) := $(wildcard $(srcdir)/public/arch-arm/*.h $(srcdir)/public/arch-arm/*/*.h)
+public-$(CONFIG_X86) := $(sort $(wildcard $(srcdir)/public/arch-x86/*.h $(srcdir)/public/arch-x86/*/*.h))
+public-$(CONFIG_ARM) := $(sort $(wildcard $(srcdir)/public/arch-arm/*.h $(srcdir)/public/arch-arm/*/*.h))
 
 .PHONY: all
 all: $(addprefix $(obj)/,$(headers-y) $(headers-n))
@@ -130,7 +130,7 @@ all: $(obj)/headers.chk $(obj)/headers99.chk $(obj)/headers++.chk
 
 public-hdrs-path := $(srcdir)/public
 
-public-list-headers = $(wildcard $1/*.h $1/*/*.h)
+public-list-headers = $(sort $(wildcard $1/*.h $1/*/*.h))
 public-filter-headers = $(filter-out $(addprefix $(public-hdrs-path)/, $($1-filter)), $($1))
 
 public-headers := $(call public-list-headers, $(public-hdrs-path)) $(public-y)
