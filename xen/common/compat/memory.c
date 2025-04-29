@@ -161,6 +161,11 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             if ( copy_from_guest(&cmp.xchg, arg, 1) )
                 return -EFAULT;
 
+            /* Early coarse check, as max_order() isn't available here. */
+            if ( cmp.xchg.in.extent_order >= 32 ||
+                 cmp.xchg.out.extent_order >= 32 )
+                return -EPERM;
+
             order_delta = cmp.xchg.out.extent_order - cmp.xchg.in.extent_order;
             /* Various sanity checks. */
             if ( (cmp.xchg.nr_exchanged > cmp.xchg.in.nr_extents) ||
