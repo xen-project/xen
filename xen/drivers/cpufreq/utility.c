@@ -130,10 +130,10 @@ int cpufreq_statistic_init(unsigned int cpu)
         return -ENOMEM;
     }
 
-    pxpt->u.total = pmpt->perf.state_count;
-    pxpt->u.usable = pmpt->perf.state_count - pmpt->perf.platform_limit;
+    pxpt->u.total = count;
+    pxpt->u.usable = count - pmpt->perf.platform_limit;
 
-    for (i=0; i < pmpt->perf.state_count; i++)
+    for ( i = 0; i < count; i++ )
         pxpt->u.pt[i].freq = pmpt->perf.states[i].core_frequency;
 
     pxpt->prev_state_wall = NOW();
