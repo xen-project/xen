@@ -342,7 +342,7 @@ void init_frametable(void);
 #define PDX_GROUP_SHIFT L2_PAGETABLE_SHIFT
 
 /* Convert between Xen-heap virtual addresses and page-info structures. */
-static inline struct page_info *__virt_to_page(const void *v)
+static inline struct page_info *virt_to_page(const void *v)
 {
     unsigned long va = (unsigned long)v;
 
@@ -355,7 +355,7 @@ static inline struct page_info *__virt_to_page(const void *v)
     return frame_table + ((va - DIRECTMAP_VIRT_START) >> PAGE_SHIFT);
 }
 
-static inline void *__page_to_virt(const struct page_info *pg)
+static inline void *page_to_virt(const struct page_info *pg)
 {
     ASSERT((unsigned long)pg - FRAMETABLE_VIRT_START < FRAMETABLE_SIZE);
     /*

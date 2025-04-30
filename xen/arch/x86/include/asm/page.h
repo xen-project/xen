@@ -238,8 +238,8 @@ void copy_page_sse2(void *to, const void *from);
 #define page_to_mfn(pg)     pdx_to_mfn((unsigned long)((pg) - frame_table))
 
 /* Convert between machine addresses and page-info structures. */
-#define __maddr_to_page(ma) mfn_to_page(maddr_to_mfn(ma))
-#define __page_to_maddr(pg) mfn_to_maddr(page_to_mfn(pg))
+#define maddr_to_page(ma)   mfn_to_page(maddr_to_mfn(ma))
+#define page_to_maddr(pg)   mfn_to_maddr(page_to_mfn(pg))
 
 /* Convert between frame number and address formats.  */
 #define __pfn_to_paddr(pfn) ((paddr_t)(pfn) << PAGE_SHIFT)
@@ -256,10 +256,6 @@ void copy_page_sse2(void *to, const void *from);
 #define mfn_valid(mfn)      __mfn_valid(mfn_x(mfn))
 #define virt_to_mfn(va)     __virt_to_mfn(va)
 #define mfn_to_virt(mfn)    __mfn_to_virt(mfn)
-#define maddr_to_page(ma)   __maddr_to_page(ma)
-#define page_to_maddr(pg)   __page_to_maddr(pg)
-#define virt_to_page(va)    __virt_to_page(va)
-#define page_to_virt(pg)    __page_to_virt(pg)
 #define pfn_to_paddr(pfn)   __pfn_to_paddr(pfn)
 #define paddr_to_pfn(pa)    __paddr_to_pfn(pa)
 #define paddr_to_pdx(pa)    pfn_to_pdx(paddr_to_pfn(pa))
