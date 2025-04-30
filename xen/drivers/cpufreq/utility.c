@@ -113,7 +113,6 @@ int cpufreq_statistic_init(unsigned int cpu)
         spin_unlock(cpufreq_statistic_lock);
         return -ENOMEM;
     }
-    per_cpu(cpufreq_statistic_data, cpu) = pxpt;
 
     pxpt->u.trans_pt = xzalloc_array(uint64_t, count * count);
     if (!pxpt->u.trans_pt) {
@@ -138,6 +137,8 @@ int cpufreq_statistic_init(unsigned int cpu)
 
     pxpt->prev_state_wall = NOW();
     pxpt->prev_idle_wall = get_cpu_idle_time(cpu);
+
+    per_cpu(cpufreq_statistic_data, cpu) = pxpt;
 
     spin_unlock(cpufreq_statistic_lock);
 
