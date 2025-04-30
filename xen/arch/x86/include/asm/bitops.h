@@ -399,9 +399,16 @@ static always_inline unsigned int arch_ffs(unsigned int x)
          *
          * and the optimiser really can work with the knowledge of x being
          * non-zero without knowing it's exact value, in which case we don't
-         * need to compensate for BSF's corner cases.  Otherwise...
+         * need to compensate for BSF's corner cases.
+         *
+         * That said, we intentionally use TZCNT on capable hardware when the
+         * behaviour for the 0 case doesn't matter.  On AMD CPUs prior to
+         * Zen4, TZCNT is 1-2 uops while BSF is 6-8 with a latency to match.
+         * Intel CPUs don't suffer this discrepancy.
+         *
+         * Otherwise...
          */
-        asm ( "bsf %[val], %[res]"
+        asm ( "tzcnt %[val], %[res]"
               : [res] "=r" (r)
               : [val] "rm" (x) );
     }
@@ -428,7 +435,7 @@ static always_inline unsigned int arch_ffsl(unsigned long x)
 
     /* See arch_ffs() for safety discussions. */
     if ( __builtin_constant_p(x > 0) && x > 0 )
-        asm ( "bsf %[val], %q[res]"
+        asm ( "tzcnt %[val], %q[res]"
               : [res] "=r" (r)
               : [val] "rm" (x) );
     else
