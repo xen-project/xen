@@ -81,17 +81,19 @@ int x86_emul_blk(
             if ( !s->rex_prefix )
             {
                 /* Convert 32-bit real/vm86 to 32-bit prot format. */
-                unsigned int fip = fpstate.env.mode.real.fip_lo +
-                                   (fpstate.env.mode.real.fip_hi << 16);
-                unsigned int fdp = fpstate.env.mode.real.fdp_lo +
-                                   (fpstate.env.mode.real.fdp_hi << 16);
+                unsigned int fip = fpstate.env.mode.real.fip_lo & 0xf;
+                unsigned int fcs = (fpstate.env.mode.real.fip_lo >> 4) |
+                                   (fpstate.env.mode.real.fip_hi << 12);
+                unsigned int fdp = fpstate.env.mode.real.fdp_lo & 0xf;
+                unsigned int fds = (fpstate.env.mode.real.fdp_lo >> 4) |
+                                   (fpstate.env.mode.real.fdp_hi << 12);
                 unsigned int fop = fpstate.env.mode.real.fop;
 
-                fpstate.env.mode.prot.fip = fip & 0xf;
-                fpstate.env.mode.prot.fcs = fip >> 4;
+                fpstate.env.mode.prot.fip = fip;
+                fpstate.env.mode.prot.fcs = fcs;
                 fpstate.env.mode.prot.fop = fop;
-                fpstate.env.mode.prot.fdp = fdp & 0xf;
-                fpstate.env.mode.prot.fds = fdp >> 4;
+                fpstate.env.mode.prot.fdp = fdp;
+                fpstate.env.mode.prot.fds = fds;
             }
 
             if ( bytes == sizeof(fpstate.env) )
@@ -121,17 +123,19 @@ int x86_emul_blk(
             else
             {
                 /* Convert 16-bit real/vm86 to 32-bit prot format. */
-                unsigned int fip = env->mode.real.fip_lo +
-                                   (env->mode.real.fip_hi << 16);
-                unsigned int fdp = env->mode.real.fdp_lo +
-                                   (env->mode.real.fdp_hi << 16);
+                unsigned int fip = env->mode.real.fip_lo & 0xf;
+                unsigned int fcs = (env->mode.real.fip_lo >> 4) |
+                                   (env->mode.real.fip_hi << 12);
+                unsigned int fdp = env->mode.real.fdp_lo & 0xf;
+                unsigned int fds = (env->mode.real.fdp_lo >> 4) |
+                                   (env->mode.real.fdp_hi << 12);
                 unsigned int fop = env->mode.real.fop;
 
-                fpstate.env.mode.prot.fip = fip & 0xf;
-                fpstate.env.mode.prot.fcs = fip >> 4;
+                fpstate.env.mode.prot.fip = fip;
+                fpstate.env.mode.prot.fcs = fcs;
                 fpstate.env.mode.prot.fop = fop;
-                fpstate.env.mode.prot.fdp = fdp & 0xf;
-                fpstate.env.mode.prot.fds = fdp >> 4;
+                fpstate.env.mode.prot.fdp = fdp;
+                fpstate.env.mode.prot.fds = fds;
             }
 
             if ( bytes == sizeof(*env) )
