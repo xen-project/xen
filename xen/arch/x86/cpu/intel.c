@@ -21,8 +21,8 @@
  * MSR_MCU_OPT_CTRL is a collection of unrelated functionality, with separate
  * enablement requirements, but which want to be consistent across the system.
  */
-static uint32_t __read_mostly mcu_opt_ctrl_mask;
-static uint32_t __read_mostly mcu_opt_ctrl_val;
+static uint32_t __ro_after_init mcu_opt_ctrl_mask;
+static uint32_t __ro_after_init mcu_opt_ctrl_val;
 
 void update_mcu_opt_ctrl(void)
 {
