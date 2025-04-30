@@ -126,11 +126,20 @@ static void _memory_type_changed(struct p2m_domain *p2m)
 {
     if ( p2m->memory_type_changed )
         p2m->memory_type_changed(p2m);
+    else
+        ASSERT_UNREACHABLE();
 }
 
-void p2m_memory_type_changed(struct domain *d)
+bool p2m_memory_type_changed(struct domain *d)
 {
     struct p2m_domain *hostp2m = p2m_get_hostp2m(d);
+
+    /*
+     * The p2m memory_type_changed hook will be the same for the host p2m or
+     * the altp2ms, do the check early and return if not set.
+     */
+    if ( !hostp2m->memory_type_changed )
+        return false;
 
     p2m_lock(hostp2m);
 
@@ -154,6 +163,8 @@ void p2m_memory_type_changed(struct domain *d)
     }
 
     p2m_unlock(hostp2m);
+
+    return true;
 }
 
 int p2m_set_ioreq_server(struct domain *d,

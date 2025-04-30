@@ -783,9 +783,8 @@ HVM_REGISTER_SAVE_RESTORE(MTRR, hvm_save_mtrr_msr, NULL, hvm_load_mtrr_msr, 1,
 void memory_type_changed(struct domain *d)
 {
     if ( (is_iommu_enabled(d) || cache_flush_permitted(d)) &&
-         d->vcpu && d->vcpu[0] )
+         d->vcpu && d->vcpu[0] && p2m_memory_type_changed(d) )
     {
-        p2m_memory_type_changed(d);
         flush_all(FLUSH_CACHE);
     }
 }

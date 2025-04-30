@@ -700,7 +700,7 @@ void p2m_pod_dump_data(struct domain *d);
 #ifdef CONFIG_HVM
 
 /* Report a change affecting memory types. */
-void p2m_memory_type_changed(struct domain *d);
+bool p2m_memory_type_changed(struct domain *d);
 
 /* Called by p2m code when demand-populating a PoD page */
 bool
