@@ -86,6 +86,8 @@ The table columns are as follows:
           see Sections "6.48 Alternate Keywords" and "6.47.2.1 Volatile" of GCC_MANUAL.
        __const__:
           see Section "6.48 Alternate Keywords" of GCC_MANUAL.
+       __inline, __inline__:
+          see Section "6.48 Alternate Keywords" of GCC_MANUAL.
        typeof, __typeof__:
           see Section "6.7 Referring to a Type with typeof" of GCC_MANUAL.
        __alignof__, __alignof:
