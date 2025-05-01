@@ -19,8 +19,8 @@
  * disabled for e.g. TAA mitigation reasons.
  */
 FUNC(clear_bhb_tsx)
-        .byte 0xc7, 0xf8; .long 1f - 0f /* xbegin 1f */
-0:      .byte 0xc6, 0xf8, 0             /* xabort $0 */
+        xbegin  1f
+        xabort  $0
         int3
 1:
         ret
