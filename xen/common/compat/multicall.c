@@ -14,9 +14,13 @@ typedef int ret_t;
 
 static inline void xlat_multicall_entry(struct mc_state *mcs)
 {
-    int i;
-    for (i=0; i<6; i++)
-        mcs->compat_call.args[i] = mcs->call.args[i];
+    unsigned int i;
+    typeof(mcs->compat_call.args[0]) args[ARRAY_SIZE(mcs->call.args)];
+
+    for ( i = 0; i < ARRAY_SIZE(args); i++ )
+        args[i] = mcs->call.args[i];
+
+    memcpy(mcs->compat_call.args, args, sizeof(args));
 }
 
 #define multicall_entry      compat_multicall_entry
@@ -29,8 +33,8 @@ static inline void xlat_multicall_entry(struct mc_state *mcs)
 
 static void __trace_multicall_call(multicall_entry_t *call)
 {
-    xen_ulong_t args[6];
-    int i;
+    xen_ulong_t args[ARRAY_SIZE(call->args)];
+    unsigned int i;
 
     for ( i = 0; i < ARRAY_SIZE(args); i++ )
         args[i] = call->args[i];

@@ -41,7 +41,11 @@ unsigned long hypercall_create_continuation(
     if ( mcs->flags & MCSF_in_multicall )
     {
         for ( i = 0; *p != '\0'; i++ )
-            mcs->call.args[i] = NEXT_ARG(p, args);
+        {
+            if ( i >= ARRAY_SIZE(mcs->call.args) )
+                goto bad_fmt;
+            array_access_nospec(mcs->call.args, i) = NEXT_ARG(p, args);
+        }
     }
     else
     {
@@ -65,7 +69,7 @@ unsigned long hypercall_create_continuation(
                 case 2: regs->rdx = arg; break;
                 case 3: regs->r10 = arg; break;
                 case 4: regs->r8  = arg; break;
-                case 5: regs->r9  = arg; break;
+                default: goto bad_fmt;
                 }
             }
         }
@@ -81,7 +85,7 @@ unsigned long hypercall_create_continuation(
                 case 2: regs->rdx = arg; break;
                 case 3: regs->rsi = arg; break;
                 case 4: regs->rdi = arg; break;
-                case 5: regs->rbp = arg; break;
+                default: goto bad_fmt;
                 }
             }
         }
@@ -177,7 +181,6 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int nr,
             case 2: reg = &regs->rdx; break;
             case 3: reg = &regs->rsi; break;
             case 4: reg = &regs->rdi; break;
-            case 5: reg = &regs->rbp; break;
             default: BUG(); reg = NULL; break;
             }
             if ( (mask & 1) )

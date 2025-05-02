@@ -640,7 +640,11 @@ DEFINE_XEN_GUEST_HANDLE(mmu_update_t);
  */
 struct multicall_entry {
     xen_ulong_t op, result;
+#ifndef __XEN__
     xen_ulong_t args[6];
+#else /* Only 5 arguments are supported in reality. */
+    xen_ulong_t args[5], unused;
+#endif
 };
 typedef struct multicall_entry multicall_entry_t;
 DEFINE_XEN_GUEST_HANDLE(multicall_entry_t);

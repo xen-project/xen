@@ -391,7 +391,11 @@ unsigned long hypercall_create_continuation(
     if ( mcs->flags & MCSF_in_multicall )
     {
         for ( i = 0; *p != '\0'; i++ )
-            mcs->call.args[i] = NEXT_ARG(p, args);
+        {
+            if ( i >= ARRAY_SIZE(mcs->call.args) )
+                goto bad_fmt;
+            array_access_nospec(mcs->call.args, i) = NEXT_ARG(p, args);
+        }
 
         /* Return value gets written back to mcs->call.result */
         rc = mcs->call.result;
@@ -416,7 +420,7 @@ unsigned long hypercall_create_continuation(
                 case 2: regs->x2 = arg; break;
                 case 3: regs->x3 = arg; break;
                 case 4: regs->x4 = arg; break;
-                case 5: regs->x5 = arg; break;
+                default: goto bad_fmt;
                 }
             }
 
@@ -439,7 +443,7 @@ unsigned long hypercall_create_continuation(
                 case 2: regs->r2 = arg; break;
                 case 3: regs->r3 = arg; break;
                 case 4: regs->r4 = arg; break;
-                case 5: regs->r5 = arg; break;
+                default: goto bad_fmt;
                 }
             }
 
