@@ -88,7 +88,6 @@ static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
         0x41, 0x5c, /* pop %r12  */
         0x5d,       /* pop %rbp  */
         0x5b,       /* pop %rbx  */
-        0xc3,       /* ret       */
     };
 
     const struct stubs *this_stubs = &this_cpu(stubs);
@@ -138,11 +137,13 @@ static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
 
     APPEND_CALL(save_guest_gprs);
     APPEND_BUFF(epilogue);
+    p = place_ret(p);
 
     /* Build-time best effort attempt to catch problems. */
     BUILD_BUG_ON(STUB_BUF_SIZE / 2 <
                  (sizeof(prologue) + sizeof(epilogue) + 10 /* 2x call */ +
-                  MAX(3 /* default stub */, IOEMUL_QUIRK_STUB_BYTES)));
+                  MAX(3 /* default stub */, IOEMUL_QUIRK_STUB_BYTES) +
+                  1 /* ret */));
     /* Runtime confirmation that we haven't clobbered an adjacent stub. */
     BUG_ON(STUB_BUF_SIZE / 2 < (p - ctxt->io_emul_stub));
 
