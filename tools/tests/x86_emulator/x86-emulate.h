@@ -77,6 +77,12 @@
 
 #define is_canonical_address(x) (((int64_t)(x) >> 47) == ((int64_t)(x) >> 63))
 
+static inline void *place_ret(void *ptr)
+{
+    *(uint8_t *)ptr = 0xc3;
+    return ptr + 1;
+}
+
 extern uint32_t mxcsr_mask;
 extern struct cpu_policy cpu_policy;
 

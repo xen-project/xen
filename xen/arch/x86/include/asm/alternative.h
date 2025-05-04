@@ -31,6 +31,8 @@ struct __packed alt_instr {
 #define ALT_REPL_PTR(a)     __ALT_PTR(a, repl_offset)
 
 extern void add_nops(void *insns, unsigned int len);
+void *place_ret(void *ptr);
+
 /* Similar to alternative_instructions except it can be run with IRQs enabled. */
 extern int apply_alternatives(struct alt_instr *start, struct alt_instr *end);
 extern void alternative_instructions(void);
