@@ -135,20 +135,20 @@ search_exception_table(const struct cpu_user_regs *regs, unsigned long *stub_ra)
 int __init cf_check stub_selftest(void)
 {
     static const struct {
-        uint8_t opc[8];
+        uint8_t opc[7];
         uint64_t rax;
         union stub_exception_token res;
     } tests[] __initconst = {
 #define endbr64 0xf3, 0x0f, 0x1e, 0xfa
-        { .opc = { endbr64, 0x0f, 0xb9, 0xc3, 0xc3 }, /* ud1 */
+        { .opc = { endbr64, 0x0f, 0xb9, 0x90 }, /* ud1 */
           .res.fields.trapnr = X86_EXC_UD },
-        { .opc = { endbr64, 0x90, 0x02, 0x00, 0xc3 }, /* nop; add (%rax),%al */
+        { .opc = { endbr64, 0x90, 0x02, 0x00 }, /* nop; add (%rax),%al */
           .rax = 0x0123456789abcdef,
           .res.fields.trapnr = X86_EXC_GP },
-        { .opc = { endbr64, 0x02, 0x04, 0x04, 0xc3 }, /* add (%rsp,%rax),%al */
+        { .opc = { endbr64, 0x02, 0x04, 0x04 }, /* add (%rsp,%rax),%al */
           .rax = 0xfedcba9876543210,
           .res.fields.trapnr = X86_EXC_SS },
-        { .opc = { endbr64, 0xcc, 0xc3, 0xc3, 0xc3 }, /* int3 */
+        { .opc = { endbr64, 0xcc, 0x90, 0x90 }, /* int3 */
           .res.fields.trapnr = X86_EXC_BP },
 #undef endbr64
     };
@@ -167,6 +167,7 @@ int __init cf_check stub_selftest(void)
 
         memset(ptr, 0xcc, STUB_BUF_SIZE / 2);
         memcpy(ptr, tests[i].opc, ARRAY_SIZE(tests[i].opc));
+        place_ret(ptr + ARRAY_SIZE(tests[i].opc));
         unmap_domain_page(ptr);
 
         asm volatile ( "INDIRECT_CALL %[stb]\n"
