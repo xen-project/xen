@@ -136,6 +136,20 @@ void init_or_livepatch add_nops(void *insns, unsigned int len)
 }
 
 /*
+ * Place a return at @ptr.  @ptr must be in the writable alias of a stub.
+ *
+ * Returns the next position to write into the stub.
+ */
+void *place_ret(void *ptr)
+{
+    uint8_t *p = ptr;
+
+    *p++ = 0xc3;
+
+    return p;
+}
+
+/*
  * text_poke - Update instructions on a live kernel or non-executed code.
  * @addr: address to modify
  * @opcode: source of the copy
