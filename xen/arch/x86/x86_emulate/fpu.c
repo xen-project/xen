@@ -32,36 +32,42 @@ static inline bool fpu_check_write(void)
 
 #define emulate_fpu_insn_memdst(opc, ext, arg)                          \
 do {                                                                    \
+    void *_p = get_stub(stub);                                          \
     /* ModRM: mod=0, reg=ext, rm=0, i.e. a (%rax) operand */            \
     *insn_bytes = 2;                                                    \
-    memcpy(get_stub(stub),                                              \
-           ((uint8_t[]){ opc, ((ext) & 7) << 3, 0xc3 }), 3);            \
+    memcpy(_p, ((uint8_t[]){ opc, ((ext) & 7) << 3 }), 2); _p += 2;     \
+    place_ret(_p);                                                      \
     invoke_stub("", "", "+m" (arg) : "a" (&(arg)));                     \
     put_stub(stub);                                                     \
 } while (0)
 
 #define emulate_fpu_insn_memsrc(opc, ext, arg)                          \
 do {                                                                    \
+    void *_p = get_stub(stub);                                          \
     /* ModRM: mod=0, reg=ext, rm=0, i.e. a (%rax) operand */            \
-    memcpy(get_stub(stub),                                              \
-           ((uint8_t[]){ opc, ((ext) & 7) << 3, 0xc3 }), 3);            \
+    memcpy(_p, ((uint8_t[]){ opc, ((ext) & 7) << 3 }), 2); _p += 2;     \
+    place_ret(_p);                                                      \
     invoke_stub("", "", "=m" (dummy) : "m" (arg), "a" (&(arg)));        \
     put_stub(stub);                                                     \
 } while (0)
 
 #define emulate_fpu_insn_stub(bytes...)                                 \
 do {                                                                    \
+    void *_p = get_stub(stub);                                          \
     unsigned int nr_ = sizeof((uint8_t[]){ bytes });                    \
-    memcpy(get_stub(stub), ((uint8_t[]){ bytes, 0xc3 }), nr_ + 1);      \
+    memcpy(_p, ((uint8_t[]){ bytes }), nr_); _p += nr_;                 \
+    place_ret(_p);                                                      \
     invoke_stub("", "", "=m" (dummy) : "i" (0));                        \
     put_stub(stub);                                                     \
 } while (0)
 
 #define emulate_fpu_insn_stub_eflags(bytes...)                          \
 do {                                                                    \
+    void *_p = get_stub(stub);                                          \
     unsigned int nr_ = sizeof((uint8_t[]){ bytes });                    \
     unsigned long tmp_;                                                 \
-    memcpy(get_stub(stub), ((uint8_t[]){ bytes, 0xc3 }), nr_ + 1);      \
+    memcpy(_p, ((uint8_t[]){ bytes }), nr_); _p += nr_;                 \
+    place_ret(_p);                                                      \
     invoke_stub(_PRE_EFLAGS("[eflags]", "[mask]", "[tmp]"),             \
                 _POST_EFLAGS("[eflags]", "[mask]", "[tmp]"),            \
                 [eflags] "+g" (regs->eflags), [tmp] "=&r" (tmp_)        \
