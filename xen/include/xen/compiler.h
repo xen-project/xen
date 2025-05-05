@@ -65,6 +65,20 @@
 #endif
 
 /*
+ * In C23, the auto keyword has been repurposed to perform type inference.
+ *
+ * This behaviour is available via the __auto_type extension in supported
+ * toolchains.
+ *
+ * https://www.gnu.org/software/c-intro-and-ref/manual/html_node/Auto-Type.html
+ * https://clang.llvm.org/docs/LanguageExtensions.html#auto-type
+ */
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
+/* SAF-3-safe MISRA C Rule 20.4: Giving the keyword it's C23 meaning. */
+#define auto __auto_type
+#endif
+
+/*
  * Add the pseudo keyword 'fallthrough' so case statement blocks
  * must end with any of these keywords:
  *   break;

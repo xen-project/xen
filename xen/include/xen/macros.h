@@ -63,18 +63,18 @@
 /* Hide a value from the optimiser. */
 #define HIDE(x)                                 \
     ({                                          \
-        typeof(x) _x = (x);                     \
+        auto _x = (x);                          \
         asm volatile ( "" : "+r" (_x) );        \
         _x;                                     \
     })
 
 #define ABS(x) ({                              \
-    typeof(x) x_ = (x);                        \
+    auto x_ = (x);                             \
     (x_ < 0) ? -x_ : x_;                       \
 })
 
 #define SWAP(a, b) \
-   do { typeof(a) t_ = (a); (a) = (b); (b) = t_; } while ( 0 )
+   do { auto t_ = (a); (a) = (b); (b) = t_; } while ( 0 )
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]) + __must_be_array(x))
 
@@ -104,15 +104,15 @@
  */
 #define min(x, y)                               \
     ({                                          \
-        const typeof(x) _x = (x);               \
-        const typeof(y) _y = (y);               \
+        const auto _x = (x);                    \
+        const auto _y = (y);                    \
         (void)(&_x == &_y); /* typecheck */     \
         _x < _y ? _x : _y;                      \
     })
 #define max(x, y)                               \
     ({                                          \
-        const typeof(x) _x = (x);               \
-        const typeof(y) _y = (y);               \
+        const auto _x = (x);                    \
+        const auto _y = (y);                    \
         (void)(&_x == &_y); /* typecheck */     \
         _x > _y ? _x : _y;                      \
     })

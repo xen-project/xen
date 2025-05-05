@@ -94,6 +94,8 @@ The table columns are as follows:
           see Sections "6.48 Alternate Keywords" and "6.44 Determining the Alignment of Functions, Types or Variables" of GCC_MANUAL.
        __attribute__:
           see Section "6.39 Attribute Syntax" of GCC_MANUAL.
+       __auto_type:
+          see Section "6.7 Referring to a Type with typeof" of GCC_MANUAL.
        __builtin_types_compatible_p:
           see Section "6.59 Other Built-in Functions Provided by GCC" of GCC_MANUAL.
        __builtin_va_arg:

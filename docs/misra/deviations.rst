@@ -599,6 +599,11 @@ Deviations related to MISRA C:2012 Rules:
      - The override of the keyword \"inline\" in xen/compiler.h is present so
        that section contents checks pass when the compiler chooses not to
        inline a particular function.
+
+       Xen does not use the \"auto\" keyword as a storage qualifier.  The
+       override of the keyword \"auto\" in xen/compiler.h is to give it it's
+       C23 behaviour of type inference.
+
      - Comment-based deviation.
 
    * - R20.7
