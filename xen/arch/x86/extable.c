@@ -1,15 +1,17 @@
 
+#include <xen/domain_page.h>
 #include <xen/init.h>
 #include <xen/list.h>
+#include <xen/livepatch.h>
 #include <xen/perfc.h>
 #include <xen/rcupdate.h>
 #include <xen/sort.h>
 #include <xen/spinlock.h>
-#include <asm/uaccess.h>
-#include <xen/domain_page.h>
 #include <xen/virtual_region.h>
-#include <xen/livepatch.h>
 #include <xen/warning.h>
+
+#include <asm/stubs.h>
+#include <asm/uaccess.h>
 
 #define EX_FIELD(ptr, field) ((unsigned long)&(ptr)->field + (ptr)->field)
 

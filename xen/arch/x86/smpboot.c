@@ -38,6 +38,7 @@
 #include <asm/prot-key.h>
 #include <asm/setup.h>
 #include <asm/spec_ctrl.h>
+#include <asm/stubs.h>
 #include <asm/tboot.h>
 #include <asm/time.h>
 #include <asm/trampoline.h>
@@ -56,6 +57,8 @@ static cpumask_t scratch_cpu0mask;
 
 DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, send_ipi_cpumask);
 static cpumask_t send_ipi_cpu0mask;
+
+DEFINE_PER_CPU_READ_MOSTLY(struct stubs, stubs);
 
 cpumask_t cpu_online_map __read_mostly;
 EXPORT_SYMBOL(cpu_online_map);

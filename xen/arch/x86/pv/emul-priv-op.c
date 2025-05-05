@@ -21,6 +21,7 @@
 #include <asm/pv/domain.h>
 #include <asm/pv/trace.h>
 #include <asm/shared.h>
+#include <asm/stubs.h>
 
 #include <xsm/xsm.h>
 

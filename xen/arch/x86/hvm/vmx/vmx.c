@@ -48,6 +48,7 @@
 #include <asm/monitor.h>
 #include <asm/prot-key.h>
 #include <asm/spec_ctrl.h>
+#include <asm/stubs.h>
 #include <public/arch-x86/cpuid.h>
 
 static bool __initdata opt_force_ept;

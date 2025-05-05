@@ -21,6 +21,7 @@
 #include <asm/nmi.h>
 #include <asm/page.h>
 #include <asm/shared.h>
+#include <asm/stubs.h>
 #include <asm/traps.h>
 
 struct extra_state
@@ -356,8 +357,6 @@ static unsigned int write_stub_trampoline(
     /* Round up to a multiple of 16 bytes. */
     return ROUNDUP(p - stub, 16);
 }
-
-DEFINE_PER_CPU(struct stubs, stubs);
 
 void nocall lstar_enter(void);
 void nocall cstar_enter(void);

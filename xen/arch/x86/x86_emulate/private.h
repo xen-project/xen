@@ -13,8 +13,10 @@
 
 # include <xen/bug.h>
 # include <xen/kernel.h>
+
 # include <asm/endbr.h>
 # include <asm/msr-index.h>
+# include <asm/stubs.h>
 # include <asm/x86-vendors.h>
 # include <asm/x86_emulate.h>
 

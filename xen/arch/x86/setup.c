@@ -55,6 +55,7 @@
 #include <asm/setup.h>
 #include <asm/smp.h>
 #include <asm/spec_ctrl.h>
+#include <asm/stubs.h>
 #include <asm/tboot.h>
 #include <asm/trampoline.h>
 #include <asm/traps.h>

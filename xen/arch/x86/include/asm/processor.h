@@ -424,17 +424,6 @@ static inline void enable_nmis(void)
 
 void nocall sysenter_entry(void);
 
-struct stubs {
-    union {
-        void(*func)(void);
-        unsigned long addr;
-    };
-    unsigned long mfn;
-};
-
-DECLARE_PER_CPU(struct stubs, stubs);
-unsigned long alloc_stub_page(unsigned int cpu, unsigned long *mfn);
-
 static inline uint8_t get_cpu_family(uint32_t raw, uint8_t *model,
                                      uint8_t *stepping)
 {

@@ -11,6 +11,7 @@
 #include <asm/alternative.h>
 #include <xen/init.h>
 #include <asm/setup.h>
+#include <asm/stubs.h>
 #include <asm/system.h>
 #include <asm/traps.h>
 #include <asm/nmi.h>
