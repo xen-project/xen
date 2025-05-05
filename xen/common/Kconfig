@@ -35,6 +35,9 @@ config GRANT_TABLE
 
 	  If unsure, say Y.
 
+config HAS_GRANT_CACHE_FLUSH
+	bool
+
 config EVTCHN_FIFO
 	bool "Event Channel Fifo support" if EXPERT
 	default y

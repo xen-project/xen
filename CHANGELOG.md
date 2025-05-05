@@ -28,6 +28,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
     - Ability to enable stack protector
 
 ### Removed
+ - On x86:
+   - GNTTABOP_cache_flush: it's unused on x86 and the implementation is
+     broken.
 
 ## [4.20.0](https://xenbits.xenproject.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.20.0) - 2025-03-05
 
