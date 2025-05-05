@@ -52,7 +52,12 @@ ENTRY(clear_bhb_tsx)
  *   ret
  *
  * The CALL/RETs are necessary to prevent the Loop Stream Detector from
- * interfering.  The alignment is for performance and not safety.
+ * interfering.
+ *
+ * The .balign's are for performance, but they cause the RETs to be in unsafe
+ * positions with respect to Indirect Target Selection.  The .skips are to
+ * move the RETs into ITS-safe positions, rather than using the slowpath
+ * through __x86_return_thunk.
  *
  * The "short" sequence (5 and 5) is for CPUs prior to Alder Lake / Sapphire
  * Rapids (i.e. Cores prior to Golden Cove and/or Gracemont).
@@ -68,12 +73,14 @@ ENTRY(clear_bhb_loops)
         jmp     5f
         int3
 
-        .align 64
+        .balign 64
+        .skip   32 - (.Lr1 - 1f), 0xcc
 1:      call    2f
-        ret
+.Lr1:   ret
         int3
 
-        .align 64
+        .balign 64
+        .skip   32 - 18 /* (.Lr2 - 2f) but Clang IAS doesn't like this */, 0xcc
 2:      ALTERNATIVE "mov $5, %eax", "mov $7, %eax", X86_SPEC_BHB_LOOPS_LONG
 
 3:      jmp     4f
@@ -85,7 +92,7 @@ ENTRY(clear_bhb_loops)
         sub     $1, %ecx
         jnz     1b
 
-        ret
+.Lr2:   ret
 5:
         /*
          * The Intel sequence has an LFENCE here.  The purpose is to ensure
