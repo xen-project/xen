@@ -22,48 +22,7 @@
 #include <asm/static-memory.h>
 #include <asm/static-shmem.h>
 
-#define XENSTORE_PFN_LATE_ALLOC UINT64_MAX
-
-static domid_t __initdata xs_domid = DOMID_INVALID;
-static bool __initdata need_xenstore;
-
-void __init set_xs_domain(struct domain *d)
-{
-    xs_domid = d->domain_id;
-    set_global_virq_handler(d, VIRQ_DOM_EXC);
-}
-
-bool __init is_dom0less_mode(void)
-{
-    struct bootmodules *mods = &bootinfo.modules;
-    struct bootmodule *mod;
-    unsigned int i;
-    bool dom0found = false;
-    bool domUfound = false;
-
-    /* Look into the bootmodules */
-    for ( i = 0 ; i < mods->nr_mods ; i++ )
-    {
-        mod = &mods->module[i];
-        /* Find if dom0 and domU kernels are present */
-        if ( mod->kind == BOOTMOD_KERNEL )
-        {
-            if ( mod->domU == false )
-            {
-                dom0found = true;
-                break;
-            }
-            else
-                domUfound = true;
-        }
-    }
-
-    /*
-     * If there is no dom0 kernel but at least one domU, then we are in
-     * dom0less mode
-     */
-    return ( !dom0found && domUfound );
-}
+bool __initdata need_xenstore;
 
 #ifdef CONFIG_VGICV2
 static int __init make_gicv2_domU_node(struct kernel_info *kinfo)
@@ -686,25 +645,6 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     return -EINVAL;
 }
 
-static int __init alloc_xenstore_evtchn(struct domain *d)
-{
-    evtchn_alloc_unbound_t alloc;
-    int rc;
-
-    alloc.dom = d->domain_id;
-    alloc.remote_dom = xs_domid;
-    rc = evtchn_alloc_unbound(&alloc, 0);
-    if ( rc )
-    {
-        printk("Failed allocating event channel for domain\n");
-        return rc;
-    }
-
-    d->arch.hvm.params[HVM_PARAM_STORE_EVTCHN] = alloc.port;
-
-    return 0;
-}
-
 #define XENSTORE_PFN_OFFSET 1
 static int __init alloc_xenstore_page(struct domain *d)
 {
@@ -769,36 +709,6 @@ static int __init alloc_xenstore_params(struct kernel_info *kinfo)
     }
 
     return rc;
-}
-
-static void __init initialize_domU_xenstore(void)
-{
-    struct domain *d;
-
-    if ( xs_domid == DOMID_INVALID )
-        return;
-
-    for_each_domain( d )
-    {
-        uint64_t gfn = d->arch.hvm.params[HVM_PARAM_STORE_PFN];
-        int rc;
-
-        if ( gfn == 0 )
-            continue;
-
-        if ( is_xenstore_domain(d) )
-            continue;
-
-        rc = alloc_xenstore_evtchn(d);
-        if ( rc < 0 )
-            panic("%pd: Failed to allocate xenstore_evtchn\n", d);
-
-        if ( gfn != XENSTORE_PFN_LATE_ALLOC && IS_ENABLED(CONFIG_GRANT_TABLE) )
-        {
-            ASSERT(gfn < UINT32_MAX);
-            gnttab_seed_entry(d, GNTTAB_RESERVED_XENSTORE, xs_domid, gfn);
-        }
-    }
 }
 
 static void __init domain_vcpu_affinity(struct domain *d,
@@ -906,8 +816,8 @@ static inline int domain_p2m_set_allocation(struct domain *d, uint64_t mem,
 }
 #endif /* CONFIG_ARCH_PAGING_MEMPOOL */
 
-static int __init construct_domU(struct domain *d,
-                                 const struct dt_device_node *node)
+int __init construct_domU(struct domain *d,
+                          const struct dt_device_node *node)
 {
     struct kernel_info kinfo = KERNEL_INFO_INIT;
     const char *dom0less_enhanced;
@@ -1009,246 +919,77 @@ static int __init construct_domU(struct domain *d,
     return alloc_xenstore_params(&kinfo);
 }
 
-void __init create_domUs(void)
+void __init arch_create_domUs(struct dt_device_node *node,
+                       struct xen_domctl_createdomain *d_cfg,
+                       unsigned int flags)
 {
-    struct dt_device_node *node;
-    const char *dom0less_iommu;
-    bool iommu = false;
-    const struct dt_device_node *cpupool_node,
-                                *chosen = dt_find_node_by_path("/chosen");
-    const char *llc_colors_str = NULL;
+    uint32_t val;
 
-    BUG_ON(chosen == NULL);
-    dt_for_each_child_node(chosen, node)
+    d_cfg->arch.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE;
+    d_cfg->flags |= XEN_DOMCTL_CDF_hvm | XEN_DOMCTL_CDF_hap;
+
+    if ( !dt_property_read_u32(node, "nr_spis", &d_cfg->arch.nr_spis) )
     {
-        struct domain *d;
-        struct xen_domctl_createdomain d_cfg = {
-            .arch.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE,
-            .flags = XEN_DOMCTL_CDF_hvm | XEN_DOMCTL_CDF_hap,
-            /*
-             * The default of 1023 should be sufficient for guests because
-             * on ARM we don't bind physical interrupts to event channels.
-             * The only use of the evtchn port is inter-domain communications.
-             * 1023 is also the default value used in libxl.
-             */
-            .max_evtchn_port = 1023,
-            .max_grant_frames = -1,
-            .max_maptrack_frames = -1,
-            .grant_opts = XEN_DOMCTL_GRANT_version(opt_gnttab_max_version),
-        };
-        unsigned int flags = 0U;
-        bool has_dtb = false;
-        uint32_t val;
-        int rc;
+        int vpl011_virq = GUEST_VPL011_SPI;
 
-        if ( !dt_device_is_compatible(node, "xen,domain") )
-            continue;
-
-        if ( (max_init_domid + 1) >= DOMID_FIRST_RESERVED )
-            panic("No more domain IDs available\n");
-
-        if ( dt_property_read_u32(node, "capabilities", &val) )
-        {
-            if ( val & ~DOMAIN_CAPS_MASK )
-                panic("Invalid capabilities (%"PRIx32")\n", val);
-
-            if ( val & DOMAIN_CAPS_CONTROL )
-                flags |= CDF_privileged;
-
-            if ( val & DOMAIN_CAPS_HARDWARE )
-            {
-                if ( hardware_domain )
-                    panic("Only 1 hardware domain can be specified! (%pd)\n",
-                           hardware_domain);
-
-                d_cfg.max_grant_frames = gnttab_dom0_frames();
-                d_cfg.max_evtchn_port = -1;
-                flags |= CDF_hardware;
-                iommu = true;
-            }
-
-            if ( val & DOMAIN_CAPS_XENSTORE )
-            {
-                if ( xs_domid != DOMID_INVALID )
-                    panic("Only 1 xenstore domain can be specified! (%u)\n",
-                          xs_domid);
-
-                d_cfg.flags |= XEN_DOMCTL_CDF_xs_domain;
-                d_cfg.max_evtchn_port = -1;
-            }
-        }
-
-        if ( dt_find_property(node, "xen,static-mem", NULL) )
-        {
-            if ( llc_coloring_enabled )
-                panic("LLC coloring and static memory are incompatible\n");
-
-            flags |= CDF_staticmem;
-        }
-
-        if ( dt_property_read_bool(node, "direct-map") )
-        {
-            if ( !(flags & CDF_staticmem) )
-                panic("direct-map is not valid for domain %s without static allocation.\n",
-                      dt_node_name(node));
-
-            flags |= CDF_directmap;
-        }
-
-        if ( !dt_property_read_u32(node, "cpus", &d_cfg.max_vcpus) )
-            panic("Missing property 'cpus' for domain %s\n",
-                  dt_node_name(node));
-
-        if ( !dt_property_read_string(node, "passthrough", &dom0less_iommu) )
-        {
-            if ( flags & CDF_hardware )
-                panic("Don't specify passthrough for hardware domain\n");
-
-            if ( !strcmp(dom0less_iommu, "enabled") )
-                iommu = true;
-        }
-
-        if ( (flags & CDF_hardware) && !(flags & CDF_directmap) &&
-             !iommu_enabled )
-            panic("non-direct mapped hardware domain requires iommu\n");
-
-        if ( dt_find_compatible_node(node, NULL, "multiboot,device-tree") )
-        {
-            if ( flags & CDF_hardware )
-                panic("\"multiboot,device-tree\" incompatible with hardware domain\n");
-
-            has_dtb = true;
-        }
-
-        if ( iommu_enabled && (iommu || has_dtb) )
-            d_cfg.flags |= XEN_DOMCTL_CDF_iommu;
-
-        if ( !dt_property_read_u32(node, "nr_spis", &d_cfg.arch.nr_spis) )
-        {
-            int vpl011_virq = GUEST_VPL011_SPI;
-
-            d_cfg.arch.nr_spis = VGIC_DEF_NR_SPIS;
-
-            /*
-             * The VPL011 virq is GUEST_VPL011_SPI, unless direct-map is
-             * set, in which case it'll match the hardware.
-             *
-             * Since the domain is not yet created, we can't use
-             * d->arch.vpl011.irq. So the logic to find the vIRQ has to
-             * be hardcoded.
-             * The logic here shall be consistent with the one in
-             * domain_vpl011_init().
-             */
-            if ( flags & CDF_directmap )
-            {
-                vpl011_virq = serial_irq(SERHND_DTUART);
-                if ( vpl011_virq < 0 )
-                    panic("Error getting IRQ number for this serial port %d\n",
-                          SERHND_DTUART);
-            }
-
-            /*
-             * vpl011 uses one emulated SPI. If vpl011 is requested, make
-             * sure that we allocate enough SPIs for it.
-             */
-            if ( dt_property_read_bool(node, "vpl011") )
-                d_cfg.arch.nr_spis = MAX(d_cfg.arch.nr_spis,
-                                         vpl011_virq - 32 + 1);
-        }
-        else if ( flags & CDF_hardware )
-            panic("nr_spis cannot be specified for hardware domain\n");
-
-        /* Get the optional property domain-cpupool */
-        cpupool_node = dt_parse_phandle(node, "domain-cpupool", 0);
-        if ( cpupool_node )
-        {
-            int pool_id = btcpupools_get_domain_pool_id(cpupool_node);
-            if ( pool_id < 0 )
-                panic("Error getting cpupool id from domain-cpupool (%d)\n",
-                      pool_id);
-            d_cfg.cpupool_id = pool_id;
-        }
-
-        if ( dt_property_read_u32(node, "max_grant_version", &val) )
-            d_cfg.grant_opts = XEN_DOMCTL_GRANT_version(val);
-
-        if ( dt_property_read_u32(node, "max_grant_frames", &val) )
-        {
-            if ( val > INT32_MAX )
-                panic("max_grant_frames (%"PRIu32") overflow\n", val);
-            d_cfg.max_grant_frames = val;
-        }
-
-        if ( dt_property_read_u32(node, "max_maptrack_frames", &val) )
-        {
-            if ( val > INT32_MAX )
-                panic("max_maptrack_frames (%"PRIu32") overflow\n", val);
-            d_cfg.max_maptrack_frames = val;
-        }
-
-        if ( dt_get_property(node, "sve", &val) )
-        {
-#ifdef CONFIG_ARM64_SVE
-            unsigned int sve_vl_bits;
-            bool ret = false;
-
-            if ( !val )
-            {
-                /* Property found with no value, means max HW VL supported */
-                ret = sve_domctl_vl_param(-1, &sve_vl_bits);
-            }
-            else
-            {
-                if ( dt_property_read_u32(node, "sve", &val) )
-                    ret = sve_domctl_vl_param(val, &sve_vl_bits);
-                else
-                    panic("Error reading 'sve' property\n");
-            }
-
-            if ( ret )
-                d_cfg.arch.sve_vl = sve_encode_vl(sve_vl_bits);
-            else
-                panic("SVE vector length error\n");
-#else
-            panic("'sve' property found, but CONFIG_ARM64_SVE not selected\n");
-#endif
-        }
-
-        dt_property_read_string(node, "llc-colors", &llc_colors_str);
-        if ( !llc_coloring_enabled && llc_colors_str )
-            panic("'llc-colors' found, but LLC coloring is disabled\n");
+        d_cfg->arch.nr_spis = VGIC_DEF_NR_SPIS;
 
         /*
-         * The variable max_init_domid is initialized with zero, so here it's
-         * very important to use the pre-increment operator to call
-         * domain_create() with a domid > 0. (domid == 0 is reserved for Dom0)
+         * The VPL011 virq is GUEST_VPL011_SPI, unless direct-map is
+         * set, in which case it'll match the hardware.
+         *
+         * Since the domain is not yet created, we can't use
+         * d->arch.vpl011.irq. So the logic to find the vIRQ has to
+         * be hardcoded.
+         * The logic here shall be consistent with the one in
+         * domain_vpl011_init().
          */
-        d = domain_create(++max_init_domid, &d_cfg, flags);
-        if ( IS_ERR(d) )
-            panic("Error creating domain %s (rc = %ld)\n",
-                  dt_node_name(node), PTR_ERR(d));
+        if ( flags & CDF_directmap )
+        {
+            vpl011_virq = serial_irq(SERHND_DTUART);
+            if ( vpl011_virq < 0 )
+                panic("Error getting IRQ number for this serial port %d\n",
+                        SERHND_DTUART);
+        }
 
-        if ( llc_coloring_enabled &&
-             (rc = domain_set_llc_colors_from_str(d, llc_colors_str)) )
-            panic("Error initializing LLC coloring for domain %s (rc = %d)\n",
-                  dt_node_name(node), rc);
-
-        d->is_console = true;
-        dt_device_set_used_by(node, d->domain_id);
-
-        rc = construct_domU(d, node);
-        if ( rc )
-            panic("Could not set up domain %s (rc = %d)\n",
-                  dt_node_name(node), rc);
-
-        if ( d_cfg.flags & XEN_DOMCTL_CDF_xs_domain )
-            set_xs_domain(d);
+        /*
+            * vpl011 uses one emulated SPI. If vpl011 is requested, make
+            * sure that we allocate enough SPIs for it.
+            */
+        if ( dt_property_read_bool(node, "vpl011") )
+            d_cfg->arch.nr_spis = MAX(d_cfg->arch.nr_spis,
+                                      vpl011_virq - 32 + 1);
     }
+    else if ( flags & CDF_hardware )
+        panic("nr_spis cannot be specified for hardware domain\n");
 
-    if ( need_xenstore && xs_domid == DOMID_INVALID )
-        panic("xenstore requested, but xenstore domain not present\n");
+    if ( dt_get_property(node, "sve", &val) )
+    {
+#ifdef CONFIG_ARM64_SVE
+        unsigned int sve_vl_bits;
+        bool ret = false;
 
-    initialize_domU_xenstore();
+        if ( !val )
+        {
+            /* Property found with no value, means max HW VL supported */
+            ret = sve_domctl_vl_param(-1, &sve_vl_bits);
+        }
+        else
+        {
+            if ( dt_property_read_u32(node, "sve", &val) )
+                ret = sve_domctl_vl_param(val, &sve_vl_bits);
+            else
+                panic("Error reading 'sve' property\n");
+        }
+
+        if ( ret )
+            d_cfg->arch.sve_vl = sve_encode_vl(sve_vl_bits);
+        else
+            panic("SVE vector length error\n");
+#else
+        panic("'sve' property found, but CONFIG_ARM64_SVE not selected\n");
+#endif
+    }
 }
 
 /*

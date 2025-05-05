@@ -15,6 +15,7 @@ config ARM
 	select GENERIC_UART_INIT
 	select HAS_ALTERNATIVE if HAS_VMAP
 	select HAS_DEVICE_TREE
+	select HAS_DOM0LESS
 	select HAS_STACK_PROTECTOR
 	select HAS_UBSAN
 
@@ -119,14 +120,6 @@ config GICV2
 	help
 	  Driver for the ARM Generic Interrupt Controller v2.
 	  If unsure, say Y
-
-config DOM0LESS_BOOT
-	bool "Dom0less boot support" if EXPERT
-	default y
-	help
-	  Dom0less boot support enables Xen to create and start domU guests during
-	  Xen boot without the need of a control domain (Dom0), which could be
-	  present anyway.
 
 config GICV3
 	bool "GICv3 driver"

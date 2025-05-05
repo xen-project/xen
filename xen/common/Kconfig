@@ -12,6 +12,15 @@ config CORE_PARKING
 	bool
 	depends on NR_CPUS > 1
 
+config DOM0LESS_BOOT
+	bool "Dom0less boot support" if EXPERT
+	depends on HAS_DOM0LESS && HAS_DEVICE_TREE
+	default y
+	help
+	  Dom0less boot support enables Xen to create and start domU guests during
+	  Xen boot without the need of a control domain (Dom0), which could be
+	  present anyway.
+
 config GRANT_TABLE
 	bool "Grant table support" if EXPERT
 	default y
@@ -73,6 +82,9 @@ config HAS_COMPAT
 config HAS_DEVICE_TREE
 	bool
 	select LIBFDT
+
+config HAS_DOM0LESS
+	bool
 
 config HAS_DIT # Data Independent Timing
 	bool
