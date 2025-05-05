@@ -5,7 +5,6 @@
 
 #include <xen/fdt-kernel.h>
 #include <xen/types.h>
-#include <asm/setup.h>
 
 #ifdef CONFIG_STATIC_SHM
 

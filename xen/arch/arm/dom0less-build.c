@@ -20,6 +20,7 @@
 #include <asm/dom0less-build.h>
 #include <asm/domain_build.h>
 #include <asm/grant_table.h>
+#include <asm/setup.h>
 #include <asm/static-memory.h>
 #include <asm/static-shmem.h>
 
