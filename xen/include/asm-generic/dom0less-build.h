@@ -12,10 +12,7 @@ struct domain;
 #include <public/domctl.h>
 
 struct dt_device_node;
-
-/* TODO: remove both when construct_domU() will be moved to common. */
-#define XENSTORE_PFN_LATE_ALLOC UINT64_MAX
-extern bool need_xenstore;
+struct kernel_info;
 
 /*
  * List of possible features for dom0less domUs
@@ -49,11 +46,20 @@ void create_domUs(void);
 bool is_dom0less_mode(void);
 void set_xs_domain(struct domain *d);
 
-int construct_domU(struct domain *d, const struct dt_device_node *node);
-
 void arch_create_domUs(struct dt_device_node *node,
                        struct xen_domctl_createdomain *d_cfg,
                        unsigned int flags);
+
+int init_vuart(struct domain *d, struct kernel_info *kinfo,
+               const struct dt_device_node *node);
+
+int make_intc_domU_node(struct kernel_info *kinfo);
+int make_arch_nodes(struct kernel_info *kinfo);
+
+void set_domain_type(struct domain *d, struct kernel_info *kinfo);
+
+int init_intc_phandle(struct kernel_info *kinfo, const char *name,
+                      const int node_next, const void *pfdt);
 
 #else /* !CONFIG_DOM0LESS_BOOT */
 
