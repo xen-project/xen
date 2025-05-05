@@ -29,17 +29,6 @@ void evtchn_allocate(struct domain *d);
 unsigned int get_allocation_size(paddr_t size);
 
 /*
- * handle_device_interrupts retrieves the interrupts configuration from
- * a device tree node and maps those interrupts to the target domain.
- *
- * Returns:
- *   < 0 error
- *   0   success
- */
-int handle_device_interrupts(struct domain *d, struct dt_device_node *dev,
-                             bool need_mapping);
-
-/*
  * Helper to write an interrupts with the GIC format
  * This code is assuming the irq is an PPI.
  */
