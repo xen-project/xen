@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 #include <xen/device_tree.h>
 #include <xen/domain_page.h>
+#include <xen/fdt-kernel.h>
 #include <xen/err.h>
 #include <xen/event.h>
 #include <xen/grant_table.h>
@@ -64,11 +65,11 @@ static int __init make_gicv2_domU_node(struct kernel_info *kinfo)
     if (res)
         return res;
 
-    res = fdt_property_cell(fdt, "linux,phandle", kinfo->phandle_gic);
+    res = fdt_property_cell(fdt, "linux,phandle", kinfo->phandle_intc);
     if (res)
         return res;
 
-    res = fdt_property_cell(fdt, "phandle", kinfo->phandle_gic);
+    res = fdt_property_cell(fdt, "phandle", kinfo->phandle_intc);
     if (res)
         return res;
 
@@ -135,11 +136,11 @@ static int __init make_gicv3_domU_node(struct kernel_info *kinfo)
     if (res)
         return res;
 
-    res = fdt_property_cell(fdt, "linux,phandle", kinfo->phandle_gic);
+    res = fdt_property_cell(fdt, "linux,phandle", kinfo->phandle_intc);
     if (res)
         return res;
 
-    res = fdt_property_cell(fdt, "phandle", kinfo->phandle_gic);
+    res = fdt_property_cell(fdt, "phandle", kinfo->phandle_intc);
     if (res)
         return res;
 
@@ -200,7 +201,7 @@ static int __init make_vpl011_uart_node(struct kernel_info *kinfo)
         return res;
 
     res = fdt_property_cell(fdt, "interrupt-parent",
-                            kinfo->phandle_gic);
+                            kinfo->phandle_intc);
     if ( res )
         return res;
 
@@ -486,10 +487,10 @@ static int __init domain_handle_dtb_bootmodule(struct domain *d,
          */
         if ( dt_node_cmp(name, "gic") == 0 )
         {
-            uint32_t phandle_gic = fdt_get_phandle(pfdt, node_next);
+            uint32_t phandle_intc = fdt_get_phandle(pfdt, node_next);
 
-            if ( phandle_gic != 0 )
-                kinfo->phandle_gic = phandle_gic;
+            if ( phandle_intc != 0 )
+                kinfo->phandle_intc = phandle_intc;
             continue;
         }
 
@@ -532,7 +533,7 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     int addrcells, sizecells;
     int ret, fdt_size = DOMU_DTB_SIZE;
 
-    kinfo->phandle_gic = GUEST_PHANDLE_GIC;
+    kinfo->phandle_intc = GUEST_PHANDLE_GIC;
     kinfo->gnttab_start = GUEST_GNTTAB_BASE;
     kinfo->gnttab_size = GUEST_GNTTAB_SIZE;
 
@@ -594,7 +595,7 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     /*
      * domain_handle_dtb_bootmodule has to be called before the rest of
      * the device tree is generated because it depends on the value of
-     * the field phandle_gic.
+     * the field phandle_intc.
      */
     if ( kinfo->dtb_bootmodule )
     {
@@ -611,7 +612,7 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     if ( ret )
         goto err;
 
-    if ( kinfo->vpl011 )
+    if ( kinfo->arch.vpl011 )
     {
         ret = -EINVAL;
 #ifdef CONFIG_SBSA_VUART_CONSOLE
@@ -839,8 +840,8 @@ int __init construct_domU(struct domain *d,
     printk("*** LOADING DOMU cpus=%u memory=%#"PRIx64"KB ***\n",
            d->max_vcpus, mem);
 
-    kinfo.vpl011 = dt_property_read_bool(node, "vpl011");
-    if ( kinfo.vpl011 && is_hardware_domain(d) )
+    kinfo.arch.vpl011  = dt_property_read_bool(node, "vpl011");
+    if ( kinfo.arch.vpl011  && is_hardware_domain(d) )
         panic("hardware domain cannot specify vpl011\n");
 
     rc = dt_property_read_string(node, "xen,enhanced", &dom0less_enhanced);
@@ -872,7 +873,7 @@ int __init construct_domU(struct domain *d,
 
 #ifdef CONFIG_ARM_64
     /* type must be set before allocate memory */
-    d->arch.type = kinfo.type;
+    d->arch.type = kinfo.arch.type;
 #endif
     if ( is_hardware_domain(d) )
     {
@@ -898,7 +899,7 @@ int __init construct_domU(struct domain *d,
          * tree node in prepare_dtb_domU, so initialization on related variables
          * shall be done first.
          */
-        if ( kinfo.vpl011 )
+        if ( kinfo.arch.vpl011  )
         {
             rc = domain_vpl011_init(d, NULL);
             if ( rc < 0 )

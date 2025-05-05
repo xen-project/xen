@@ -3,8 +3,8 @@
 #ifndef __ASM_STATIC_SHMEM_H_
 #define __ASM_STATIC_SHMEM_H_
 
+#include <xen/fdt-kernel.h>
 #include <xen/types.h>
-#include <asm/kernel.h>
 #include <asm/setup.h>
 
 #ifdef CONFIG_STATIC_SHM

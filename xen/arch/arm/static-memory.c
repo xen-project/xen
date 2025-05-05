@@ -2,6 +2,7 @@
 
 #include <xen/sched.h>
 
+#include <asm/setup.h>
 #include <asm/static-memory.h>
 
 static bool __init append_static_memory_to_bank(struct domain *d,

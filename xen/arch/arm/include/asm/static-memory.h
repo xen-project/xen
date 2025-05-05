@@ -3,8 +3,8 @@
 #ifndef __ASM_STATIC_MEMORY_H_
 #define __ASM_STATIC_MEMORY_H_
 
+#include <xen/fdt-kernel.h>
 #include <xen/pfn.h>
-#include <asm/kernel.h>
 
 #ifdef CONFIG_STATIC_MEMORY
 

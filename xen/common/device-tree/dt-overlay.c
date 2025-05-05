@@ -6,8 +6,8 @@
  * Written by Vikram Garhwal <vikram.garhwal@amd.com>
  *
  */
-#include <asm/domain_build.h>
 #include <xen/dt-overlay.h>
+#include <xen/fdt-kernel.h>
 #include <xen/guest_access.h>
 #include <xen/iocap.h>
 #include <xen/libfdt/libfdt.h>

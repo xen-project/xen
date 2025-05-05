@@ -10,6 +10,7 @@
  */
 
 #include <xen/compile.h>
+#include <xen/fdt-kernel.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
 #include <xen/acpi.h>
@@ -18,7 +19,6 @@
 #include <xen/device_tree.h>
 #include <xen/libfdt/libfdt.h>
 #include <acpi/actables.h>
-#include <asm/kernel.h>
 #include <asm/domain_build.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */

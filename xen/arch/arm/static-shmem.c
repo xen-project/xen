@@ -6,6 +6,7 @@
 #include <xen/sched.h>
 
 #include <asm/domain_build.h>
+#include <asm/setup.h>
 #include <asm/static-memory.h>
 #include <asm/static-shmem.h>
 

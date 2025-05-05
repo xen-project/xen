@@ -1,8 +1,8 @@
 #ifndef __ASM_DOMAIN_BUILD_H__
 #define __ASM_DOMAIN_BUILD_H__
 
+#include <xen/fdt-kernel.h>
 #include <xen/sched.h>
-#include <asm/kernel.h>
 
 typedef __be32 gic_interrupt_t[3];
 typedef bool (*alloc_domheap_mem_cb)(struct domain *d, struct page_info *pg,

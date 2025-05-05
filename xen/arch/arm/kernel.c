@@ -7,6 +7,7 @@
 #include <xen/byteorder.h>
 #include <xen/domain_page.h>
 #include <xen/errno.h>
+#include <xen/fdt-kernel.h>
 #include <xen/guest_access.h>
 #include <xen/gunzip.h>
 #include <xen/init.h>
@@ -16,7 +17,7 @@
 #include <xen/sched.h>
 #include <xen/vmap.h>
 
-#include <asm/kernel.h>
+#include <asm/domain_build.h>
 #include <asm/setup.h>
 
 #define UIMAGE_MAGIC          0x27051956
@@ -101,7 +102,7 @@ static paddr_t __init kernel_zimage_place(struct kernel_info *info)
     paddr_t load_addr;
 
 #ifdef CONFIG_ARM_64
-    if ( (info->type == DOMAIN_64BIT) && (info->zimage.start == 0) )
+    if ( (info->arch.type == DOMAIN_64BIT) && (info->zimage.start == 0) )
         return mem->bank[0].start + info->zimage.text_offset;
 #endif
 
@@ -371,10 +372,10 @@ static int __init kernel_uimage_probe(struct kernel_info *info,
     switch ( uimage.arch )
     {
     case IH_ARCH_ARM:
-        info->type = DOMAIN_32BIT;
+        info->arch.type = DOMAIN_32BIT;
         break;
     case IH_ARCH_ARM64:
-        info->type = DOMAIN_64BIT;
+        info->arch.type = DOMAIN_64BIT;
         break;
     default:
         printk(XENLOG_ERR "Unsupported uImage arch type %d\n", uimage.arch);
@@ -444,7 +445,7 @@ static int __init kernel_zimage64_probe(struct kernel_info *info,
 
     info->load = kernel_zimage_load;
 
-    info->type = DOMAIN_64BIT;
+    info->arch.type = DOMAIN_64BIT;
 
     return 0;
 }
@@ -496,7 +497,7 @@ static int __init kernel_zimage32_probe(struct kernel_info *info,
     info->load = kernel_zimage_load;
 
 #ifdef CONFIG_ARM_64
-    info->type = DOMAIN_32BIT;
+    info->arch.type = DOMAIN_32BIT;
 #endif
 
     return 0;
