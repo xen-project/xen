@@ -7,6 +7,7 @@
 #include <xen/byteorder.h>
 #include <xen/domain_page.h>
 #include <xen/errno.h>
+#include <xen/fdt-domain-build.h>
 #include <xen/fdt-kernel.h>
 #include <xen/guest_access.h>
 #include <xen/gunzip.h>
