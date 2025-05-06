@@ -10,12 +10,6 @@
 #include <xen/string.h>
 #include <xen/unaligned.h>
 
-struct sha2_256_state {
-    uint32_t state[SHA2_256_DIGEST_SIZE / sizeof(uint32_t)];
-    uint8_t buf[64];
-    size_t count; /* Byte count. */
-};
-
 static uint32_t choose(uint32_t x, uint32_t y, uint32_t z)
 {
     return z ^ (x & (y ^ z));
@@ -131,7 +125,7 @@ static void sha2_256_transform(uint32_t *state, const void *_input)
     state[4] += e; state[5] += f; state[6] += g; state[7] += h;
 }
 
-static void sha2_256_init(struct sha2_256_state *s)
+void sha2_256_init(struct sha2_256_state *s)
 {
     *s = (struct sha2_256_state){
         .state = {
@@ -147,8 +141,7 @@ static void sha2_256_init(struct sha2_256_state *s)
     };
 }
 
-static void sha2_256_update(struct sha2_256_state *s, const void *msg,
-                            size_t len)
+void sha2_256_update(struct sha2_256_state *s, const void *msg, size_t len)
 {
     unsigned int partial = s->count & 63;
 
@@ -177,9 +170,9 @@ static void sha2_256_update(struct sha2_256_state *s, const void *msg,
     memcpy(s->buf + partial, msg, len);
 }
 
-static void sha2_256_final(struct sha2_256_state *s, void *_dst)
+void sha2_256_final(struct sha2_256_state *s, uint8_t digest[SHA2_256_DIGEST_SIZE])
 {
-    uint32_t *dst = _dst;
+    uint32_t *dst = (uint32_t *)digest;
     unsigned int i, partial = s->count & 63;
 
     /* Start padding */
