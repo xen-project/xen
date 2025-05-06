@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+
 #include <xen/bootfdt.h>
 #include <xen/device_tree.h>
 #include <xen/fdt-kernel.h>
@@ -240,3 +242,12 @@ void __init kernel_load(struct kernel_info *info)
 
     info->load(info);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

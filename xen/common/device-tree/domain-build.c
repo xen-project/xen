@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+
 #include <xen/bootfdt.h>
 #include <xen/fdt-domain-build.h>
 #include <xen/init.h>
@@ -393,3 +395,12 @@ void __init initrd_load(struct kernel_info *kinfo,
 
     iounmap(initrd);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
