@@ -22,6 +22,7 @@ lib-y += sort.o
 lib-y += strcasecmp.o
 lib-y += strchr.o
 lib-y += strcmp.o
+lib-y += strcspn.o
 lib-y += strlcat.o
 lib-y += strlcpy.o
 lib-y += strlen.o

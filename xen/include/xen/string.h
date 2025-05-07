@@ -26,6 +26,7 @@ size_t strnlen(const char *s, size_t count);
 char *strpbrk(const char *cs,const char *ct);
 char *strsep(char **s, const char *ct);
 size_t strspn(const char *s, const char *accept);
+size_t strcspn(const char *s, const char *reject);
 
 void *memset(void *s, int c, size_t n);
 void *memcpy(void *dest, const void *src, size_t n);
@@ -66,6 +67,10 @@ void *memchr_inv(const void *s, int c, size_t n);
 
 #ifndef __HAVE_ARCH_STRLEN
 #define strlen(s1) __builtin_strlen(s1)
+#endif
+
+#ifndef __HAVE_ARCH_STRCSPN
+#define strcspn(s, r) __builtin_strcspn(s, r)
 #endif
 
 #ifndef __HAVE_ARCH_MEMSET
