@@ -867,6 +867,9 @@ int xc_livepatch_list(xc_interface *xch, const unsigned int max,
         set_xen_guest_handle(sysctl.u.livepatch.u.list.metadata, metadata);
         set_xen_guest_handle(sysctl.u.livepatch.u.list.metadata_len, metadata_len);
 
+        sysctl.u.livepatch.u.list.name_total_size = name_sz;
+        sysctl.u.livepatch.u.list.metadata_total_size = metadata_sz;
+
         rc = do_sysctl(xch, &sysctl);
         /*
          * From here on we MUST call xc_hypercall_bounce. If rc < 0 we

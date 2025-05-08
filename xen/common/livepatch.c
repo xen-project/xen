@@ -1311,11 +1311,10 @@ static int livepatch_list(struct xen_sysctl_livepatch_list *list)
         return -EINVAL;
     }
 
-    list->name_total_size = 0;
-    list->metadata_total_size = 0;
     if ( list->nr )
     {
         size_t name_offset = 0, metadata_offset = 0;
+        size_t name_total_copied = 0, metadata_total_copied = 0;
 
         list_for_each_entry( data, &payload_list, list )
         {
@@ -1328,10 +1327,15 @@ static int livepatch_list(struct xen_sysctl_livepatch_list *list)
             status.rc = data->rc;
 
             name_len = strlen(data->name) + 1;
-            list->name_total_size += name_len;
-
             metadata_len = data->metadata.len;
-            list->metadata_total_size += metadata_len;
+
+            if ( (name_total_copied + name_len) > list->name_total_size ||
+                 (metadata_total_copied + metadata_len) >
+                 list->metadata_total_size )
+            {
+                rc = -ENOBUFS;
+                break;
+            }
 
             if ( !guest_handle_subrange_okay(list->name, name_offset,
                                              name_offset + name_len - 1) ||
@@ -1355,6 +1359,9 @@ static int livepatch_list(struct xen_sysctl_livepatch_list *list)
                 break;
             }
 
+            name_total_copied += name_len;
+            metadata_total_copied += metadata_len;
+
             idx++;
             name_offset += name_len;
             metadata_offset += metadata_len;
@@ -1362,9 +1369,15 @@ static int livepatch_list(struct xen_sysctl_livepatch_list *list)
             if ( (idx >= list->nr) || hypercall_preempt_check() )
                 break;
         }
+
+        list->name_total_size = name_total_copied;
+        list->metadata_total_size = metadata_total_copied;
     }
     else
     {
+        list->name_total_size = 0;
+        list->metadata_total_size = 0;
+
         list_for_each_entry( data, &payload_list, list )
         {
             list->name_total_size += strlen(data->name) + 1;
