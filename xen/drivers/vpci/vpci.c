@@ -174,6 +174,35 @@ int vpci_assign_device(struct pci_dev *pdev)
 }
 #endif /* __XEN__ */
 
+/*
+ * Find the physical device which is mapped to the virtual device
+ * and translate virtual SBDF to the physical one.
+ */
+static const struct pci_dev *translate_virtual_device(const struct domain *d,
+                                                      pci_sbdf_t *sbdf)
+{
+#ifdef CONFIG_HAS_VPCI_GUEST_SUPPORT
+    const struct pci_dev *pdev;
+
+    ASSERT(!is_hardware_domain(d));
+    ASSERT(rw_is_locked(&d->pci_lock));
+
+    for_each_pdev ( d, pdev )
+    {
+        if ( pdev->vpci && (pdev->vpci->guest_sbdf.sbdf == sbdf->sbdf) )
+        {
+            /* Replace guest SBDF with the physical one. */
+            *sbdf = pdev->sbdf;
+            return pdev;
+        }
+    }
+#else /* !CONFIG_HAS_VPCI_GUEST_SUPPORT */
+    ASSERT_UNREACHABLE();
+#endif /* CONFIG_HAS_VPCI_GUEST_SUPPORT */
+
+    return NULL;
+}
+
 static int vpci_register_cmp(const struct vpci_register *r1,
                              const struct vpci_register *r2)
 {
@@ -453,9 +482,15 @@ uint32_t vpci_read(pci_sbdf_t sbdf, unsigned int reg, unsigned int size)
      * pci_lock is sufficient.
      */
     read_lock(&d->pci_lock);
-    pdev = pci_get_pdev(d, sbdf);
-    if ( !pdev && is_hardware_domain(d) )
-        pdev = pci_get_pdev(dom_xen, sbdf);
+    if ( is_hardware_domain(d) )
+    {
+        pdev = pci_get_pdev(d, sbdf);
+        if ( !pdev )
+            pdev = pci_get_pdev(dom_xen, sbdf);
+    }
+    else
+        pdev = translate_virtual_device(d, &sbdf);
+
     if ( !pdev || !pdev->vpci )
     {
         read_unlock(&d->pci_lock);
@@ -571,9 +606,15 @@ void vpci_write(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
      * are modifying BARs, so there is a room for improvement.
      */
     write_lock(&d->pci_lock);
-    pdev = pci_get_pdev(d, sbdf);
-    if ( !pdev && is_hardware_domain(d) )
-        pdev = pci_get_pdev(dom_xen, sbdf);
+    if ( is_hardware_domain(d) )
+    {
+        pdev = pci_get_pdev(d, sbdf);
+        if ( !pdev )
+            pdev = pci_get_pdev(dom_xen, sbdf);
+    }
+    else
+        pdev = translate_virtual_device(d, &sbdf);
+
     if ( !pdev || !pdev->vpci )
     {
         /* Ignore writes to read-only devices, which have no ->vpci. */

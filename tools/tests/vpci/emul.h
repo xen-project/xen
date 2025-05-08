@@ -89,7 +89,7 @@ typedef union {
 
 #define __hwdom_init
 
-#define is_hardware_domain(d) ((void)(d), false)
+#define is_hardware_domain(d) ((void)(d), true)
 
 #define has_vpci(d) true
 
