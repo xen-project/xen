@@ -761,7 +761,7 @@ int __init add_ext_regions(unsigned long s_gfn, unsigned long e_gfn,
     struct membanks *ext_regions = data;
     paddr_t start, size;
     paddr_t s = pfn_to_paddr(s_gfn);
-    paddr_t e = pfn_to_paddr(e_gfn);
+    paddr_t e = pfn_to_paddr(e_gfn + 1) - 1;
 
     if ( ext_regions->nr_banks >= ext_regions->max_banks )
         return 0;
