@@ -933,34 +933,58 @@ static int __init find_domU_holes(const struct kernel_info *kinfo,
                                   struct membanks *ext_regions)
 {
     unsigned int i;
-    uint64_t bankend;
     const uint64_t bankbase[] = GUEST_RAM_BANK_BASES;
     const uint64_t banksize[] = GUEST_RAM_BANK_SIZES;
     const struct membanks *kinfo_mem = kernel_info_get_mem_const(kinfo);
-    int res = -ENOENT;
+    struct rangeset *mem_holes;
+    int res;
+
+    mem_holes = rangeset_new(NULL, NULL, 0);
+    if ( !mem_holes )
+        return -ENOMEM;
 
     for ( i = 0; i < GUEST_RAM_BANKS; i++ )
     {
-        struct membank *ext_bank = &(ext_regions->bank[ext_regions->nr_banks]);
+        uint64_t bankend, start, size = 0;
 
-        ext_bank->start = ROUNDUP(bankbase[i] + kinfo_mem->bank[i].size, SZ_2M);
+        start = ROUNDUP(bankbase[i] + kinfo_mem->bank[i].size, SZ_2M);
 
         bankend = ~0ULL >> (64 - p2m_ipa_bits);
         bankend = min(bankend, bankbase[i] + banksize[i] - 1);
-        if ( bankend > ext_bank->start )
-            ext_bank->size = bankend - ext_bank->start + 1;
+
+        if ( bankend > start )
+            size = bankend - start + 1;
 
         /* 64MB is the minimum size of an extended region */
-        if ( ext_bank->size < MB(64) )
+        if ( size < MB(64) )
             continue;
-        ext_regions->nr_banks++;
-        res = 0;
+
+        res = rangeset_add_range(mem_holes, PFN_DOWN(start), PFN_DOWN(bankend));
+        if ( res )
+        {
+            printk(XENLOG_ERR "Failed to add: %#"PRIx64"->%#"PRIx64"\n",
+                   start, start + size - 1);
+            goto out;
+        }
     }
 
+    /* Remove static shared memory regions */
+    res = remove_shm_from_rangeset(kinfo, mem_holes);
     if ( res )
-        return res;
+        goto out;
 
-    return remove_shm_holes_for_domU(kinfo, ext_regions);
+    res = rangeset_report_ranges(mem_holes, 0,
+                                 PFN_DOWN((1ULL << p2m_ipa_bits) - 1),
+                                 add_ext_regions, ext_regions);
+    if ( res )
+        ext_regions->nr_banks = 0;
+    else if ( !ext_regions->nr_banks )
+        res = -ENOENT;
+
+ out:
+    rangeset_destroy(mem_holes);
+
+    return res;
 }
 
 static int __init find_host_extended_regions(const struct kernel_info *kinfo,

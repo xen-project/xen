@@ -27,9 +27,6 @@ void init_sharedmem_pages(void);
 int remove_shm_from_rangeset(const struct kernel_info *kinfo,
                              struct rangeset *rangeset);
 
-int remove_shm_holes_for_domU(const struct kernel_info *kinfo,
-                              struct membanks *ext_regions);
-
 int make_shm_resv_memory_node(const struct kernel_info *kinfo, int addrcells,
                               int sizecells);
 
@@ -69,12 +66,6 @@ static inline void init_sharedmem_pages(void) {};
 
 static inline int remove_shm_from_rangeset(const struct kernel_info *kinfo,
                                            struct rangeset *rangeset)
-{
-    return 0;
-}
-
-static inline int remove_shm_holes_for_domU(const struct kernel_info *kinfo,
-                                            struct membanks *ext_regions)
 {
     return 0;
 }
