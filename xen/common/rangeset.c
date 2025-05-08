@@ -397,6 +397,18 @@ int rangeset_merge(struct rangeset *r1, struct rangeset *r2)
     return rangeset_report_ranges(r2, 0, ~0UL, merge, r1);
 }
 
+static int cf_check subtract(unsigned long s, unsigned long e, void *data)
+{
+    struct rangeset *r = data;
+
+    return rangeset_remove_range(r, s, e);
+}
+
+int rangeset_subtract(struct rangeset *r1, struct rangeset *r2)
+{
+    return rangeset_report_ranges(r2, 0, ~0UL, subtract, r1);
+}
+
 int rangeset_add_singleton(
     struct rangeset *r, unsigned long s)
 {

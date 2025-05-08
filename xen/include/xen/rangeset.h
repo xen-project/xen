@@ -85,6 +85,9 @@ int rangeset_consume_ranges(struct rangeset *r,
 /* Merge rangeset r2 into rangeset r1. */
 int __must_check rangeset_merge(struct rangeset *r1, struct rangeset *r2);
 
+/* Subtract rangeset r2 from rangeset r1. */
+int __must_check rangeset_subtract(struct rangeset *r1, struct rangeset *r2);
+
 /* Add/remove/query a single number. */
 int __must_check rangeset_add_singleton(
     struct rangeset *r, unsigned long s);
