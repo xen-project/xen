@@ -162,29 +162,21 @@ config STATIC_MEMORY
 menu "Speculative hardening"
 
 config INDIRECT_THUNK
-	bool "Speculative Branch Target Injection Protection"
+	bool "Out-of-line Indirect Call/Jumps"
 	depends on CC_HAS_INDIRECT_THUNK
 	default y
 	help
-	  Contemporary processors may use speculative execution as a
-	  performance optimisation, but this can potentially be abused by an
-	  attacker to leak data via speculative sidechannels.
+	  Compile Xen with out-of-line indirect call and jumps.
 
-	  One source of data leakage is via branch target injection.
-
-	  When enabled, indirect branches are implemented using a new construct
-	  called "retpoline" that prevents speculation.
+	  This allows Xen to mitigate a variety of speculative vulnerabilities
+	  by choosing a hardware-dependent instruction sequence to implement
+	  (e.g. function pointers) safely.  "Retpoline" is one such sequence.
 
 config SPECULATIVE_HARDEN_ARRAY
 	bool "Speculative Array Hardening"
 	default y
 	help
-	  Contemporary processors may use speculative execution as a
-	  performance optimisation, but this can potentially be abused by an
-	  attacker to leak data via speculative sidechannels.
-
-	  One source of data leakage is via speculative out-of-bounds array
-	  accesses.
+	  Compile Xen with extra hardening for some array accesses.
 
 	  When enabled, specific array accesses which have been deemed liable
 	  to be speculatively abused will be hardened to avoid out-of-bounds
@@ -193,19 +185,12 @@ config SPECULATIVE_HARDEN_ARRAY
 	  This is a best-effort mitigation.  There are no guarantees that all
 	  areas of code open to abuse have been hardened.
 
-	  If unsure, say Y.
-
 config SPECULATIVE_HARDEN_BRANCH
-	bool "Speculative Branch Hardening"
+	bool "Speculative Conditional Branch Hardening"
 	default y
 	depends on X86
-        help
-	  Contemporary processors may use speculative execution as a
-	  performance optimisation, but this can potentially be abused by an
-	  attacker to leak data via speculative sidechannels.
-
-	  One source of misbehaviour is by executing the wrong basic block
-	  following a conditional jump.
+	help
+	  Compile Xen with extra hardening for some conditional branches.
 
 	  When enabled, specific conditions which have been deemed liable to
 	  be speculatively abused will be hardened to avoid entering the wrong
@@ -216,42 +201,26 @@ config SPECULATIVE_HARDEN_BRANCH
 	  optimisations in the compiler haven't subverted the attempts to
 	  harden.
 
-	  If unsure, say Y.
-
 config SPECULATIVE_HARDEN_GUEST_ACCESS
 	bool "Speculative PV Guest Memory Access Hardening"
 	default y
 	depends on PV
 	help
-	  Contemporary processors may use speculative execution as a
-	  performance optimisation, but this can potentially be abused by an
-	  attacker to leak data via speculative sidechannels.
-
-	  One source of data leakage is via speculative accesses to hypervisor
-	  memory through guest controlled values used to access guest memory.
+	  Compile Xen with extra hardening for PV guest memory access.
 
 	  When enabled, code paths accessing PV guest memory will have guest
 	  controlled addresses massaged such that memory accesses through them
 	  won't touch hypervisor address space.
-
-	  If unsure, say Y.
 
 config SPECULATIVE_HARDEN_LOCK
 	bool "Speculative lock context hardening"
 	default y
 	depends on X86
 	help
-	  Contemporary processors may use speculative execution as a
-	  performance optimisation, but this can potentially be abused by an
-	  attacker to leak data via speculative sidechannels.
-
-	  One source of data leakage is via speculative accesses to lock
-	  critical regions.
+	  Compile Xen with extra hardening for locked regions.
 
 	  This option is disabled by default at run time, and needs to be
 	  enabled on the command line.
-
-	  If unsure, say Y.
 
 endmenu
 
