@@ -146,6 +146,14 @@ static int __init handle_passthrough_prop(struct kernel_info *kinfo,
     int res;
     paddr_t mstart, size, gstart;
 
+    if ( !kinfo->xen_reg_assigned )
+    {
+        kinfo->xen_reg_assigned = rangeset_new(NULL, NULL, 0);
+
+        if ( !kinfo->xen_reg_assigned )
+            return -ENOMEM;
+    }
+
     /* xen,reg specifies where to map the MMIO region */
     cell = (const __be32 *)xen_reg->data;
     len = fdt32_to_cpu(xen_reg->len) / ((address_cells * 2 + size_cells) *
@@ -187,6 +195,11 @@ static int __init handle_passthrough_prop(struct kernel_info *kinfo,
                    mstart, gstart);
             return -EFAULT;
         }
+
+        res = rangeset_add_range(kinfo->xen_reg_assigned, PFN_DOWN(gstart),
+                                 PFN_DOWN(gstart + size - 1));
+        if ( res )
+            return res;
     }
 
     /*
@@ -814,7 +827,11 @@ static int __init construct_domU(struct domain *d,
 
     domain_vcpu_affinity(d, node);
 
-    return alloc_xenstore_params(&kinfo);
+    rc = alloc_xenstore_params(&kinfo);
+
+    rangeset_destroy(kinfo.xen_reg_assigned);
+
+    return rc;
 }
 
 void __init create_domUs(void)

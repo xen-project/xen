@@ -973,6 +973,13 @@ static int __init find_domU_holes(const struct kernel_info *kinfo,
     if ( res )
         goto out;
 
+    if ( kinfo->xen_reg_assigned )
+    {
+        res = rangeset_subtract(mem_holes, kinfo->xen_reg_assigned);
+        if ( res )
+            goto out;
+    }
+
     res = rangeset_report_ranges(mem_holes, 0,
                                  PFN_DOWN((1ULL << p2m_ipa_bits) - 1),
                                  add_ext_regions, ext_regions);

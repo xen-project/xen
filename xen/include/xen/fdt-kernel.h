@@ -24,6 +24,7 @@ struct kernel_info {
 #ifdef CONFIG_STATIC_SHM
     struct shared_meminfo shm_mem;
 #endif
+    struct rangeset *xen_reg_assigned;
 
     /* kernel entry point */
     paddr_t entry;
