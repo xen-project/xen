@@ -37,7 +37,7 @@ static int vpci_mmio_read(struct vcpu *v, mmio_info_t *info,
     if ( vpci_ecam_read(sbdf, ECAM_REG_OFFSET(info->gpa),
                         1U << info->dabt.size, &data) )
     {
-        *r = data;
+        *r = data & invalid;
         return 1;
     }
 
