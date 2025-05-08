@@ -109,7 +109,7 @@ static int __init add_hwdom_free_regions(unsigned long s_gfn,
     struct membanks *free_regions = data;
     paddr_t start, size;
     paddr_t s = pfn_to_paddr(s_gfn);
-    paddr_t e = pfn_to_paddr(e_gfn);
+    paddr_t e = pfn_to_paddr(e_gfn + 1) - 1;
     unsigned int i, j;
 
     if ( free_regions->nr_banks >= free_regions->max_banks )
