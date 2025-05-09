@@ -2005,7 +2005,10 @@ static unsigned long __initdata buddy_alloc_size =
     MB(CONFIG_BUDDY_ALLOCATOR_SIZE);
 size_param("buddy-alloc-size", buddy_alloc_size);
 #else
-#define domain_num_llc_colors(d) 0
+static inline unsigned int domain_num_llc_colors(const struct domain *d)
+{
+    return 0;
+}
 #define domain_llc_color(d, i)   0
 #endif
 
