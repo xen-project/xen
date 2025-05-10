@@ -226,8 +226,6 @@ static void smp_callin(void)
         cpu_relax();
 }
 
-static int booting_cpu;
-
 /* CPUs for which sibling maps can be computed. */
 static cpumask_t cpu_sibling_setup_map;
 
@@ -315,15 +313,10 @@ static void set_cpu_sibling_map(unsigned int cpu)
     }
 }
 
-void asmlinkage start_secondary(void *unused)
+void asmlinkage start_secondary(void)
 {
     struct cpu_info *info = get_cpu_info();
-
-    /*
-     * Dont put anything before smp_callin(), SMP booting is so fragile that we
-     * want to limit the things done here to the most necessary things.
-     */
-    unsigned int cpu = booting_cpu;
+    unsigned int cpu = smp_processor_id();
 
     /* Critical region without IDT or TSS.  Any fault is deadly! */
 
@@ -570,8 +563,6 @@ static int do_boot_cpu(int apicid, int cpu)
      * (e.g. by the ACPI SMI) to initialize new CPUs with MTRRs in sync:
      */
     mtrr_save_state();
-
-    booting_cpu = cpu;
 
     start_eip = bootsym_phys(entry_SIPI16);
 
