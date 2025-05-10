@@ -333,12 +333,14 @@ do {                                                                    \
                               : (ip) > (cs)->limit, X86_EXC_GP, 0);     \
 })
 
-#define commit_far_branch(cs, newip) ({                                 \
-    validate_far_branch(cs, newip);                                     \
-    _regs.r(ip) = (newip);                                              \
-    singlestep = _regs.eflags & X86_EFLAGS_TF;                          \
-    ops->write_segment(x86_seg_cs, cs, ctxt);                           \
-})
+#define commit_far_branch(cs, newip) (                                  \
+        ({                                                              \
+            validate_far_branch(cs, newip);                             \
+            _regs.r(ip) = (newip);                                      \
+            singlestep = _regs.eflags & X86_EFLAGS_TF;                  \
+        }),                                                             \
+        ops->write_segment(x86_seg_cs, cs, ctxt)                        \
+    )
 
 int x86emul_get_fpu(
     enum x86_emulate_fpu_type type,
