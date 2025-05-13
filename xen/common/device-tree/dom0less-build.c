@@ -730,8 +730,8 @@ static int __init domain_p2m_set_allocation(struct domain *d, uint64_t mem,
     return rc;
 }
 #else /* !CONFIG_ARCH_PAGING_MEMPOOL */
-static inline int domain_p2m_set_allocation(struct domain *d, uint64_t mem,
-                                            const struct dt_device_node *node)
+static inline int __init domain_p2m_set_allocation(
+    struct domain *d, uint64_t mem, const struct dt_device_node *node)
 {
     return 0;
 }
