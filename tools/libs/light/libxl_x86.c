@@ -814,17 +814,19 @@ int libxl__arch_domain_build_info_setdefault(libxl__gc *gc,
     libxl_defbool_setdefault(&b_info->acpi, true);
     libxl_defbool_setdefault(&b_info->arch_x86.msr_relaxed, false);
 
-    /*
-     * The config parameter "altp2m" replaces the parameter "altp2mhvm".
-     * For legacy reasons, both parameters are accepted on x86 HVM guests.
-     *
-     * If the legacy field info->u.hvm.altp2m is set, activate altp2m.
-     * Otherwise set altp2m based on the field info->altp2m.
-     */
-    libxl_defbool_setdefault(&b_info->u.hvm.altp2m, false);
-    if (b_info->altp2m == LIBXL_ALTP2M_MODE_DISABLED &&
-        libxl_defbool_val(b_info->u.hvm.altp2m))
-        b_info->altp2m = libxl_defbool_val(b_info->u.hvm.altp2m);
+    if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
+        /*
+         * The config parameter "altp2m" replaces the parameter "altp2mhvm".
+         * For legacy reasons, both parameters are accepted on x86 HVM guests.
+         *
+         * If the legacy field info->u.hvm.altp2m is set, activate altp2m.
+         * Otherwise set altp2m based on the field info->altp2m.
+         */
+        libxl_defbool_setdefault(&b_info->u.hvm.altp2m, false);
+        if (b_info->altp2m == LIBXL_ALTP2M_MODE_DISABLED &&
+            libxl_defbool_val(b_info->u.hvm.altp2m))
+            b_info->altp2m = libxl_defbool_val(b_info->u.hvm.altp2m);
+    }
 
     return 0;
 }
