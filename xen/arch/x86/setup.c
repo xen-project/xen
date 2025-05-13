@@ -1713,15 +1713,15 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( max_page - 1 > virt_to_mfn(HYPERVISOR_VIRT_END - 1) )
     {
-        unsigned long limit = virt_to_mfn(HYPERVISOR_VIRT_END - 1);
+        unsigned long lo = virt_to_mfn(HYPERVISOR_VIRT_END - 1);
         uint64_t mask = PAGE_SIZE - 1;
 
         if ( !highmem_start )
-            xenheap_max_mfn(limit);
+            xenheap_max_mfn(lo);
 
         end_boot_allocator();
 
-        /* Pass the remaining memory to the allocator. */
+        /* Pass the remaining memory in (lo, max_page) to the allocator. */
         for ( i = 0; i < boot_e820.nr_map; i++ )
         {
             uint64_t s, e;
@@ -1730,10 +1730,12 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                 continue;
             s = (boot_e820.map[i].addr + mask) & ~mask;
             e = (boot_e820.map[i].addr + boot_e820.map[i].size) & ~mask;
-            if ( PFN_DOWN(e) <= limit )
+            if ( PFN_DOWN(e) <= lo || PFN_DOWN(s) >= max_page )
                 continue;
-            if ( PFN_DOWN(s) <= limit )
-                s = pfn_to_paddr(limit + 1);
+            if ( PFN_DOWN(s) <= lo )
+                s = pfn_to_paddr(lo + 1);
+            if ( PFN_DOWN(e) > max_page )
+                e = pfn_to_paddr(max_page);
             init_domheap_pages(s, e);
         }
     }
