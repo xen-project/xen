@@ -135,6 +135,8 @@ void switch_cr3_cr4(unsigned long cr3, unsigned long cr4);
 #else
 # define FLUSH_NO_ASSIST 0
 #endif
+ /* Write back data cache contents */
+#define FLUSH_CACHE_WRITEBACK  0x10000
 
 /* Flush local TLBs/caches. */
 unsigned int flush_area_local(const void *va, unsigned int flags);
@@ -195,7 +197,11 @@ static inline int clean_and_invalidate_dcache_va_range(const void *p,
 }
 static inline int clean_dcache_va_range(const void *p, unsigned long size)
 {
-    return clean_and_invalidate_dcache_va_range(p, size);
+    unsigned int order = get_order_from_bytes(size);
+
+    /* sub-page granularity support needs to be added if necessary */
+    flush_area_local(p, FLUSH_CACHE_WRITEBACK | FLUSH_ORDER(order));
+    return 0;
 }
 
 unsigned int guest_flush_tlb_flags(const struct domain *d);
