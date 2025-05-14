@@ -4,6 +4,7 @@
 #ifndef ASM__RISCV__CMPXCHG_H
 #define ASM__RISCV__CMPXCHG_H
 
+#include <xen/bitops.h>
 #include <xen/compiler.h>
 #include <xen/lib.h>
 
