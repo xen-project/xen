@@ -289,9 +289,9 @@ int create_irq(nodeid_t node, bool grant_access)
                 mask = NULL;
         }
         ret = assign_irq_vector(irq, mask);
-    }
 
-    ASSERT(desc->arch.creator_domid == DOMID_INVALID);
+        ASSERT(desc->arch.creator_domid == DOMID_INVALID);
+    }
 
     if (ret < 0)
     {
