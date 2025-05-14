@@ -405,6 +405,8 @@ static void __init riscv_fill_hwcap_from_isa_string(void)
         const char *isa;
         unsigned long cpuid;
 
+        bitmap_zero(this_isa, RISCV_ISA_EXT_MAX);
+
         if ( !dt_device_type_is_equal(cpu, "cpu") )
             continue;
 
