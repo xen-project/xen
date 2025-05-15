@@ -4,7 +4,7 @@ int __attribute__((__ms_abi__)) test(int i)
 }
 
 /* In case -mfunction-return is in use. */
-void __x86_return_thunk(void) {};
+void __x86_return_thunk(void) {}
 
 /*
  * Populate an array with "addresses" of relocatable and absolute values.
