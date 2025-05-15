@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
    - For ARM32 and ARM64, GCC 5.1 and Binutils 2.25
  - Linux based device model stubdomains are now fully supported.
 
+ - On x86:
+   - Restrict the cache flushing done as a result of guest physical memory map
+     manipulations and memory type changes.
+
 ### Added
  - On x86:
    - Option to attempt to fixup p2m page-faults on PVH dom0.

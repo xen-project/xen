@@ -782,14 +782,22 @@ HVM_REGISTER_SAVE_RESTORE(MTRR, hvm_save_mtrr_msr, NULL, hvm_load_mtrr_msr, 1,
 
 void memory_type_changed(struct domain *d)
 {
-    if ( (is_iommu_enabled(d) || cache_flush_permitted(d)) &&
+    if ( cache_flush_permitted(d) &&
          d->vcpu && d->vcpu[0] && p2m_memory_type_changed(d) &&
          /*
           * Do the p2m type-change, but skip the cache flush if the domain is
           * not yet running.  The check for creation_finished must strictly be
           * done after the call to p2m_memory_type_changed().
           */
-         d->creation_finished )
+         d->creation_finished &&
+         /*
+          * The cache flush should be done if either: CPU doesn't have
+          * self-snoop in which case there could be aliases left in the cache,
+          * or (some) IOMMUs cannot force all DMA device accesses to be
+          * snooped.
+          */
+         (!boot_cpu_has(X86_FEATURE_XEN_SELFSNOOP) ||
+          (is_iommu_enabled(d) && !iommu_snoop)) )
     {
         flush_all(FLUSH_CACHE);
     }
