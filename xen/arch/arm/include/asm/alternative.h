@@ -209,9 +209,9 @@ alternative_endif
 #endif  /*  __ASSEMBLY__  */
 
 /*
- * Usage: asm(ALTERNATIVE(oldinstr, newinstr, feature));
+ * Usage: asm_inline (ALTERNATIVE(oldinstr, newinstr, feature));
  *
- * Usage: asm(ALTERNATIVE(oldinstr, newinstr, feature, CONFIG_FOO));
+ * Usage: asm_inline (ALTERNATIVE(oldinstr, newinstr, feature, CONFIG_FOO));
  * N.B. If CONFIG_FOO is specified, but not selected, the whole block
  *      will be omitted, including oldinstr.
  */

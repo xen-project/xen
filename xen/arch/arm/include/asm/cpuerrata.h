@@ -16,10 +16,10 @@ static inline bool check_workaround_##erratum(void)             \
     {                                                           \
         register_t ret;                                         \
                                                                 \
-        asm volatile (ALTERNATIVE("mov %0, #0",                 \
-                                  "mov %0, #1",                 \
-                                  feature)                      \
-                      : "=r" (ret));                            \
+        asm_inline volatile (                                   \
+            ALTERNATIVE("mov %0, #0",                           \
+                        "mov %0, #1", feature)                  \
+            : "=r" (ret) );                                     \
                                                                 \
         return unlikely(ret);                                   \
     }                                                           \

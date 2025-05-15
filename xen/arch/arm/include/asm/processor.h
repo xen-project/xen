@@ -607,9 +607,10 @@ register_t get_default_cptr_flags(void);
 #define SYNCHRONIZE_SERROR(feat)                                  \
     do {                                                          \
         ASSERT(local_abort_is_enabled());                         \
-        asm volatile(ALTERNATIVE("dsb sy; isb",                   \
-                                 "nop; nop", feat)                \
-                                 : : : "memory");                 \
+        asm_inline volatile (                                     \
+            ALTERNATIVE("dsb sy; isb",                            \
+                        "nop; nop", feat)                         \
+            ::: "memory" );                                       \
     } while (0)
 
 /*

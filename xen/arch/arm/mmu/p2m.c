@@ -228,7 +228,8 @@ void p2m_restore_state(struct vcpu *n)
      * registers associated to EL1/EL0 translations regime have been
      * synchronized.
      */
-    asm volatile(ALTERNATIVE("nop", "isb", ARM64_WORKAROUND_AT_SPECULATE));
+    asm_inline volatile (
+        ALTERNATIVE("nop", "isb", ARM64_WORKAROUND_AT_SPECULATE) );
     WRITE_SYSREG64(p2m->vttbr, VTTBR_EL2);
 
     last_vcpu_ran = &p2m->last_vcpu_ran[smp_processor_id()];

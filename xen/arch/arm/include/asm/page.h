@@ -176,7 +176,8 @@ static inline int invalidate_dcache_va_range(const void *p, unsigned long size)
     {
         size -= dcache_line_bytes - ((uintptr_t)p & cacheline_mask);
         p = (void *)((uintptr_t)p & ~cacheline_mask);
-        asm volatile (__clean_and_invalidate_dcache_one(0) : : "r" (p));
+        asm_inline volatile (
+            __clean_and_invalidate_dcache_one(0) :: "r" (p) );
         p += dcache_line_bytes;
     }
 
@@ -185,7 +186,8 @@ static inline int invalidate_dcache_va_range(const void *p, unsigned long size)
         asm volatile (__invalidate_dcache_one(0) : : "r" (p + idx));
 
     if ( size > 0 )
-        asm volatile (__clean_and_invalidate_dcache_one(0) : : "r" (p + idx));
+        asm_inline volatile (
+            __clean_and_invalidate_dcache_one(0) :: "r" (p + idx) );
 
     dsb(sy);           /* So we know the flushes happen before continuing */
 
@@ -209,7 +211,7 @@ static inline int clean_dcache_va_range(const void *p, unsigned long size)
     p = (void *)((uintptr_t)p & ~cacheline_mask);
     for ( ; size >= dcache_line_bytes;
             idx += dcache_line_bytes, size -= dcache_line_bytes )
-        asm volatile (__clean_dcache_one(0) : : "r" (p + idx));
+        asm_inline volatile ( __clean_dcache_one(0) : : "r" (p + idx) );
     dsb(sy);           /* So we know the flushes happen before continuing */
     /* ARM callers assume that dcache_* functions cannot fail. */
     return 0;
@@ -247,7 +249,7 @@ static inline int clean_and_invalidate_dcache_va_range
     if ( sizeof(x) > MIN_CACHELINE_BYTES || sizeof(x) > alignof(x) )    \
         clean_dcache_va_range(_p, sizeof(x));                           \
     else                                                                \
-        asm volatile (                                                  \
+        asm_inline volatile (                                           \
             "dsb sy;"   /* Finish all earlier writes */                 \
             __clean_dcache_one(0)                                       \
             "dsb sy;"   /* Finish flush before continuing */            \
@@ -259,7 +261,7 @@ static inline int clean_and_invalidate_dcache_va_range
     if ( sizeof(x) > MIN_CACHELINE_BYTES || sizeof(x) > alignof(x) )    \
         clean_and_invalidate_dcache_va_range(_p, sizeof(x));            \
     else                                                                \
-        asm volatile (                                                  \
+        asm_inline volatile (                                           \
             "dsb sy;"   /* Finish all earlier writes */                 \
             __clean_and_invalidate_dcache_one(0)                        \
             "dsb sy;"   /* Finish flush before continuing */            \

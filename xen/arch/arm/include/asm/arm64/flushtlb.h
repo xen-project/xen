@@ -31,7 +31,7 @@
 #define TLB_HELPER(name, tlbop, sh)              \
 static inline void name(void)                    \
 {                                                \
-    asm volatile(                                \
+    asm_inline volatile (                        \
         "dsb  "  # sh  "st;"                     \
         "tlbi "  # tlbop  ";"                    \
         ALTERNATIVE(                             \
@@ -55,7 +55,7 @@ static inline void name(void)                    \
 #define TLB_HELPER_VA(name, tlbop)               \
 static inline void name(vaddr_t va)              \
 {                                                \
-    asm volatile(                                \
+    asm_inline volatile (                        \
         "tlbi "  # tlbop  ", %0;"                \
         ALTERNATIVE(                             \
             "nop; nop;",                         \
