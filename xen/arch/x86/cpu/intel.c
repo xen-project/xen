@@ -49,6 +49,34 @@ void __init set_in_mcu_opt_ctrl(uint32_t mask, uint32_t val)
     update_mcu_opt_ctrl();
 }
 
+static uint32_t __ro_after_init pb_opt_ctrl_mask;
+static uint32_t __ro_after_init pb_opt_ctrl_val;
+
+void update_pb_opt_ctrl(void)
+{
+    uint32_t mask = pb_opt_ctrl_mask, lo, hi;
+
+    if ( !mask )
+        return;
+
+    rdmsr(MSR_PB_OPT_CTRL, lo, hi);
+
+    lo &= ~mask;
+    lo |= pb_opt_ctrl_val;
+
+    wrmsr(MSR_PB_OPT_CTRL, lo, hi);
+}
+
+void __init set_in_pb_opt_ctrl(uint32_t mask, uint32_t val)
+{
+    pb_opt_ctrl_mask |= mask;
+
+    pb_opt_ctrl_val &= ~mask;
+    pb_opt_ctrl_val |= (val & mask);
+
+    update_pb_opt_ctrl();
+}
+
 /*
  * Processors which have self-snooping capability can handle conflicting
  * memory type across CPUs by snooping its own cache. However, there exists
