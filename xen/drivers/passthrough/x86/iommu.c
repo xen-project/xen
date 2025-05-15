@@ -312,14 +312,6 @@ void iommu_identity_map_teardown(struct domain *d)
     }
 }
 
-static int __hwdom_init cf_check map_subtract(unsigned long s, unsigned long e,
-                                              void *data)
-{
-    struct rangeset *map = data;
-
-    return rangeset_remove_range(map, s, e);
-}
-
 struct handle_iomemcap {
     struct rangeset *r;
     unsigned long last;
@@ -505,7 +497,7 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
          * since ranges in mmio_ro_ranges are already explicitly mapped below
          * in read-only mode.
          */
-        rc = rangeset_report_ranges(mmio_ro_ranges, 0, ~0UL, map_subtract, map);
+        rc = rangeset_subtract(map, mmio_ro_ranges);
         if ( rc )
             panic("IOMMU failed to remove read-only regions: %d\n", rc);
     }
