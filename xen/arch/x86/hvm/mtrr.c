@@ -783,7 +783,13 @@ HVM_REGISTER_SAVE_RESTORE(MTRR, hvm_save_mtrr_msr, NULL, hvm_load_mtrr_msr, 1,
 void memory_type_changed(struct domain *d)
 {
     if ( (is_iommu_enabled(d) || cache_flush_permitted(d)) &&
-         d->vcpu && d->vcpu[0] && p2m_memory_type_changed(d) )
+         d->vcpu && d->vcpu[0] && p2m_memory_type_changed(d) &&
+         /*
+          * Do the p2m type-change, but skip the cache flush if the domain is
+          * not yet running.  The check for creation_finished must strictly be
+          * done after the call to p2m_memory_type_changed().
+          */
+         d->creation_finished )
     {
         flush_all(FLUSH_CACHE);
     }
