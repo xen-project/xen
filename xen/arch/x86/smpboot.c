@@ -381,6 +381,7 @@ void asmlinkage start_secondary(void *unused)
         info->last_spec_ctrl = default_xen_spec_ctrl;
     }
     update_mcu_opt_ctrl();
+    update_pb_opt_ctrl();
 
     tsx_init(); /* Needs microcode.  May change HLE/RTM feature bits. */
 

@@ -301,6 +301,7 @@ static int enter_state(u32 state)
     }
 
     update_mcu_opt_ctrl();
+    update_pb_opt_ctrl();
 
     /*
      * This should be before restoring CR4, but that is earlier in asm and
