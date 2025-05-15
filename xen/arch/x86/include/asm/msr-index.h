@@ -56,6 +56,9 @@
 #define MSR_MISC_PACKAGE_CTRL               0x000000bc
 #define  PGK_CTRL_ENERGY_FILTER_EN          (_AC(1, ULL) <<  0)
 
+#define MSR_PB_OPT_CTRL                     0x000000bf
+#define  PB_OPT_IBPB_ALT                    (_AC(1, ULL) <<  0)
+
 #define MSR_CORE_CAPABILITIES               0x000000cf
 #define  CORE_CAPS_SPLITLOCK_DETECT         (_AC(1, ULL) <<  5)
 
