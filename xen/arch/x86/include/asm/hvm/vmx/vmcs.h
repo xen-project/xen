@@ -436,6 +436,7 @@ extern struct vmx_caps vmx_caps;
 /* VMCS field encodings. */
 #define VMCS_HIGH(x) ((x) | 1)
 enum vmcs_field {
+    /* 16-bit fields. */
     VIRTUAL_PROCESSOR_ID            = 0x00000000,
     POSTED_INTR_NOTIFICATION_VECTOR = 0x00000002,
     EPTP_INDEX                      = 0x00000004,
@@ -457,6 +458,8 @@ enum vmcs_field {
     HOST_FS_SELECTOR                = 0x00000c08,
     HOST_GS_SELECTOR                = 0x00000c0a,
     HOST_TR_SELECTOR                = 0x00000c0c,
+
+    /* 64-bit fields. */
     IO_BITMAP_A                     = 0x00002000,
     IO_BITMAP_B                     = 0x00002002,
     MSR_BITMAP                      = 0x00002004,
@@ -493,6 +496,8 @@ enum vmcs_field {
     HOST_PAT                        = 0x00002c00,
     HOST_EFER                       = 0x00002c02,
     HOST_PERF_GLOBAL_CTRL           = 0x00002c04,
+
+    /* 32-bit fields. */
     PIN_BASED_VM_EXEC_CONTROL       = 0x00004000,
     CPU_BASED_VM_EXEC_CONTROL       = 0x00004002,
     EXCEPTION_BITMAP                = 0x00004004,
@@ -546,6 +551,8 @@ enum vmcs_field {
     GUEST_SYSENTER_CS               = 0x0000482a,
     GUEST_PREEMPTION_TIMER          = 0x0000482e,
     HOST_SYSENTER_CS                = 0x00004c00,
+
+    /* Natural-width fields. */
     CR0_GUEST_HOST_MASK             = 0x00006000,
     CR4_GUEST_HOST_MASK             = 0x00006002,
     CR0_READ_SHADOW                 = 0x00006004,
