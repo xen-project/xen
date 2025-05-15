@@ -3795,14 +3795,11 @@ long do_mmuext_op(
             break;
 
         case MMUEXT_FLUSH_CACHE:
-            if ( unlikely(currd != pg_owner) )
-                rc = -EPERM;
-            else if ( unlikely(!cache_flush_permitted(currd)) )
-                rc = -EACCES;
-            else
-                wbinvd();
-            break;
-
+            /*
+             * Dirty pCPU caches where the current vCPU has been scheduled are
+             * not tracked, and hence we need to resort to a global cache
+             * flush for correctness.
+             */
         case MMUEXT_FLUSH_CACHE_GLOBAL:
             if ( unlikely(currd != pg_owner) )
                 rc = -EPERM;
@@ -3819,7 +3816,7 @@ long do_mmuext_op(
                 flush_mask(mask, FLUSH_CACHE);
             }
             else
-                rc = -EINVAL;
+                rc = -EACCES;
             break;
 
         case MMUEXT_SET_LDT:
