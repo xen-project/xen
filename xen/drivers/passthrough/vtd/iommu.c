@@ -698,7 +698,8 @@ static int __must_check iommu_flush_all(void)
     bool flush_dev_iotlb;
     int rc = 0;
 
-    flush_local(FLUSH_CACHE);
+    if ( iommu_non_coherent )
+        flush_local(FLUSH_CACHE_WRITEBACK);
 
     for_each_drhd_unit ( drhd )
     {
