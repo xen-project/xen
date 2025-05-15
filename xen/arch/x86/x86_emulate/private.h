@@ -704,12 +704,15 @@ struct stub_exn {
     stub_exn.info = (union stub_exception_token) { .raw = ~0 };         \
     stub_exn.line = __LINE__; /* Utility outweighs livepatching cost */ \
     block_speculation(); /* SCSB */                                     \
-    asm volatile ( pre "\n\tINDIRECT_CALL %[stub]\n\t" post "\n"        \
+    asm volatile ( pre "\n\t"                                           \
+                   "INDIRECT_CALL %[stub]\n"                            \
                    ".Lret%=:\n\t"                                       \
+                   post "\n\t"                                          \
+                   ".Lskip%=:\n\t"                                      \
                    ".pushsection .fixup,\"ax\"\n"                       \
                    ".Lfix%=:\n\t"                                       \
                    "pop %[exn]\n\t"                                     \
-                   "jmp .Lret%=\n\t"                                    \
+                   "jmp .Lskip%=\n\t"                                   \
                    ".popsection\n\t"                                    \
                    _ASM_EXTABLE(.Lret%=, .Lfix%=)                       \
                    : [exn] "+g" (stub_exn.info) ASM_CALL_CONSTRAINT,    \
