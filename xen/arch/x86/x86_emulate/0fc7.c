@@ -102,6 +102,8 @@ int x86emul_0fc7(struct x86_emulate_state *s,
             if ( carry )
                 regs->eflags |= X86_EFLAGS_CF;
             break;
+#else
+            return X86EMUL_UNIMPLEMENTED;
 #endif
         }
     }
