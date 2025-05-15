@@ -154,7 +154,7 @@ struct __large_struct { unsigned long buf[100]; };
  * aliasing issues.
  */
 #define put_unsafe_asm(x, addr, GUARD, err, itype, rtype, ltype, errret) \
-	__asm__ __volatile__(						\
+	asm_inline volatile (						\
 		GUARD(							\
 		"	guest_access_mask_ptr %[ptr], %[scr1], %[scr2]\n" \
 		)							\
@@ -171,7 +171,7 @@ struct __large_struct { unsigned long buf[100]; };
 		  "[ptr]" (addr), [errno] "i" (errret))
 
 #define get_unsafe_asm(x, addr, GUARD, err, rtype, ltype, errret)	\
-	__asm__ __volatile__(						\
+	asm_inline volatile (						\
 		GUARD(							\
 		"	guest_access_mask_ptr %[ptr], %[scr1], %[scr2]\n" \
 		)							\

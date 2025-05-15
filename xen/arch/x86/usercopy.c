@@ -19,7 +19,7 @@ unsigned int copy_to_guest_ll(void __user *to, const void *from, unsigned int n)
     GUARD(unsigned dummy);
 
     stac();
-    asm volatile (
+    asm_inline volatile (
         GUARD(
         "    guest_access_mask_ptr %[to], %q[scratch1], %q[scratch2]\n"
         )
@@ -39,7 +39,7 @@ unsigned int copy_from_guest_ll(void *to, const void __user *from, unsigned int 
     unsigned dummy;
 
     stac();
-    asm volatile (
+    asm_inline volatile (
         GUARD(
         "    guest_access_mask_ptr %[from], %q[scratch1], %q[scratch2]\n"
         )
@@ -101,7 +101,7 @@ unsigned int clear_guest_pv(void __user *to, unsigned int n)
         long dummy;
 
         stac();
-        asm volatile (
+        asm_inline volatile (
             "    guest_access_mask_ptr %[to], %[scratch1], %[scratch2]\n"
             "1:  rep stosb\n"
             "2:\n"

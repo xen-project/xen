@@ -186,16 +186,17 @@ int __init cf_check stub_selftest(void)
         place_ret(ptr + ARRAY_SIZE(tests[i].opc));
         unmap_domain_page(ptr);
 
-        asm volatile ( "INDIRECT_CALL %[stb]\n"
-                       ".Lret%=:\n\t"
-                       ".pushsection .fixup,\"ax\"\n"
-                       ".Lfix%=:\n\t"
-                       "pop %[exn]\n\t"
-                       "jmp .Lret%=\n\t"
-                       ".popsection\n\t"
-                       _ASM_EXTABLE(.Lret%=, .Lfix%=)
-                       : [exn] "+m" (res) ASM_CALL_CONSTRAINT
-                       : [stb] "r" (addr), "a" (tests[i].rax));
+        asm_inline volatile (
+            "INDIRECT_CALL %[stb]\n"
+            ".Lret%=:\n\t"
+            ".pushsection .fixup,\"ax\"\n"
+            ".Lfix%=:\n\t"
+            "pop %[exn]\n\t"
+            "jmp .Lret%=\n\t"
+            ".popsection\n\t"
+            _ASM_EXTABLE(.Lret%=, .Lfix%=)
+            : [exn] "+m" (res) ASM_CALL_CONSTRAINT
+            : [stb] "r" (addr), "a" (tests[i].rax) );
 
         if ( res.raw != tests[i].res.raw )
         {

@@ -60,41 +60,45 @@ static inline int rdmsr_amd_safe(unsigned int msr, unsigned int *lo,
 				 unsigned int *hi)
 {
 #ifdef CONFIG_CC_HAS_ASM_GOTO_OUTPUT
-    asm goto ( "1: rdmsr\n\t"
-               _ASM_EXTABLE(1b, %l[fault])
-               : "=a" (*lo), "=d" (*hi)
-               : "c" (msr), "D" (0x9c5a203a)
-               :
-               : fault );
+    asm_inline goto (
+        "1: rdmsr\n\t"
+        _ASM_EXTABLE(1b, %l[fault])
+        : "=a" (*lo), "=d" (*hi)
+        : "c" (msr), "D" (0x9c5a203a)
+        :
+        : fault );
+
     return 0;
 
  fault:
     return -EFAULT;
 #else
-	int err;
+    int err;
 
-	asm volatile("1: rdmsr\n2:\n"
-		     ".section .fixup,\"ax\"\n"
-		     "3: movl %6,%2\n"
-		     "   jmp 2b\n"
-		     ".previous\n"
-		     _ASM_EXTABLE(1b, 3b)
-		     : "=a" (*lo), "=d" (*hi), "=r" (err)
-		     : "c" (msr), "D" (0x9c5a203a), "2" (0), "i" (-EFAULT));
+    asm_inline volatile (
+        "1: rdmsr\n2:\n"
+        ".section .fixup,\"ax\"\n"
+        "3: movl %6,%2\n"
+        "   jmp 2b\n"
+        ".previous\n"
+        _ASM_EXTABLE(1b, 3b)
+        : "=a" (*lo), "=d" (*hi), "=r" (err)
+        : "c" (msr), "D" (0x9c5a203a), "2" (0), "i" (-EFAULT) );
 
-	return err;
+    return err;
 #endif
 }
 
 static inline int wrmsr_amd_safe(unsigned int msr, unsigned int lo,
                                  unsigned int hi)
 {
-    asm goto ( "1: wrmsr\n\t"
-               _ASM_EXTABLE(1b, %l[fault])
-               :
-               : "c" (msr), "a" (lo), "d" (hi), "D" (0x9c5a203a)
-               :
-               : fault );
+    asm_inline goto (
+        "1: wrmsr\n\t"
+        _ASM_EXTABLE(1b, %l[fault])
+        :
+        : "c" (msr), "a" (lo), "d" (hi), "D" (0x9c5a203a)
+        :
+        : fault );
 
     return 0;
 

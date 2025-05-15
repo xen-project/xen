@@ -126,27 +126,29 @@ void show_code(const struct cpu_user_regs *regs)
      * Copy forward from regs->rip.  In the case of a fault, %ecx contains the
      * number of bytes remaining to copy.
      */
-    asm volatile ("1: rep movsb; 2:"
-                  _ASM_EXTABLE(1b, 2b)
-                  : "=&c" (missing_after),
-                    "=&D" (tmp), "=&S" (tmp)
-                  : "0" (ARRAY_SIZE(insns_after)),
-                    "1" (insns_after),
-                    "2" (regs->rip));
+    asm_inline volatile (
+        "1: rep movsb; 2:"
+        _ASM_EXTABLE(1b, 2b)
+        : "=&c" (missing_after),
+          "=&D" (tmp), "=&S" (tmp)
+        : "0" (ARRAY_SIZE(insns_after)),
+          "1" (insns_after),
+          "2" (regs->rip) );
 
     /*
      * Copy backwards from regs->rip - 1.  In the case of a fault, %ecx
      * contains the number of bytes remaining to copy.
      */
-    asm volatile ("std;"
-                  "1: rep movsb;"
-                  "2: cld;"
-                  _ASM_EXTABLE(1b, 2b)
-                  : "=&c" (missing_before),
-                    "=&D" (tmp), "=&S" (tmp)
-                  : "0" (ARRAY_SIZE(insns_before)),
-                    "1" (insns_before + ARRAY_SIZE(insns_before) - 1),
-                    "2" (regs->rip - 1));
+    asm_inline volatile (
+        "std;"
+        "1: rep movsb;"
+        "2: cld;"
+        _ASM_EXTABLE(1b, 2b)
+        : "=&c" (missing_before),
+          "=&D" (tmp), "=&S" (tmp)
+        : "0" (ARRAY_SIZE(insns_before)),
+          "1" (insns_before + ARRAY_SIZE(insns_before) - 1),
+          "2" (regs->rip - 1) );
     clac();
 
     printk("Xen code around <%p> (%ps)%s:\n",
@@ -524,12 +526,14 @@ static void show_trace(const struct cpu_user_regs *regs)
     printk("Xen call trace:\n");
 
     /* Guarded read of the stack top. */
-    asm ( "1: mov %[data], %[tos]; 2:\n"
-          ".pushsection .fixup,\"ax\"\n"
-          "3: movb $1, %[fault]; jmp 2b\n"
-          ".popsection\n"
-          _ASM_EXTABLE(1b, 3b)
-          : [tos] "+r" (tos), [fault] "+qm" (fault) : [data] "m" (*sp) );
+    asm_inline (
+        "1: mov %[data], %[tos]; 2:\n"
+        ".pushsection .fixup,\"ax\"\n"
+        "3: movb $1, %[fault]; jmp 2b\n"
+        ".popsection\n"
+        _ASM_EXTABLE(1b, 3b)
+        : [tos] "+r" (tos), [fault] "+qm" (fault)
+        : [data] "m" (*sp) );
 
     /*
      * If RIP looks sensible, or the top of the stack doesn't, print RIP at

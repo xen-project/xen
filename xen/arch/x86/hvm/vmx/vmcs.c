@@ -749,13 +749,14 @@ static int _vmx_cpu_up(bool bsp)
     if ( bsp && (rc = vmx_cpu_up_prepare(cpu)) != 0 )
         return rc;
 
-    asm goto ( "1: vmxon %[addr]\n\t"
-               "   jbe %l[vmxon_fail]\n\t"
-               _ASM_EXTABLE(1b, %l[vmxon_fault])
-               :
-               : [addr] "m" (this_cpu(vmxon_region))
-               : "memory"
-               : vmxon_fail, vmxon_fault );
+    asm_inline goto (
+        "1: vmxon %[addr]\n\t"
+        "   jbe %l[vmxon_fail]\n\t"
+        _ASM_EXTABLE(1b, %l[vmxon_fault])
+        :
+        : [addr] "m" (this_cpu(vmxon_region))
+        : "memory"
+        : vmxon_fail, vmxon_fault );
 
     this_cpu(vmxon) = 1;
 

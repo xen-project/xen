@@ -230,15 +230,16 @@ long do_set_segment_base(unsigned int which, unsigned long base)
          * Anyone wanting to check for errors from this hypercall should
          * re-read %gs and compare against the input.
          */
-        asm volatile ( "1: mov %[sel], %%gs\n\t"
-                       ".section .fixup, \"ax\", @progbits\n\t"
-                       "2: mov %k[flat], %%gs\n\t"
-                       "   xor %[sel], %[sel]\n\t"
-                       "   jmp 1b\n\t"
-                       ".previous\n\t"
-                       _ASM_EXTABLE(1b, 2b)
-                       : [sel] "+r" (sel)
-                       : [flat] "r" (FLAT_USER_DS32) );
+        asm_inline volatile (
+            "1: mov %[sel], %%gs\n\t"
+            ".section .fixup, \"ax\", @progbits\n\t"
+            "2: mov %k[flat], %%gs\n\t"
+            "   xor %[sel], %[sel]\n\t"
+            "   jmp 1b\n\t"
+            ".previous\n\t"
+            _ASM_EXTABLE(1b, 2b)
+            : [sel] "+r" (sel)
+            : [flat] "r" (FLAT_USER_DS32) );
 
         /* Update the cache of the inactive base, as read from the GDT/LDT. */
         v->arch.pv.gs_base_user = read_gs_base();

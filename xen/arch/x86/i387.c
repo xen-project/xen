@@ -62,7 +62,7 @@ static inline void fpu_fxrstor(struct vcpu *v)
     switch ( __builtin_expect(fpu_ctxt->x[FPU_WORD_SIZE_OFFSET], 8) )
     {
     default:
-        asm volatile (
+        asm_inline volatile (
             "1: fxrstorq %0\n"
             ".section .fixup,\"ax\"   \n"
             "2: push %%"__OP"ax       \n"
@@ -82,7 +82,7 @@ static inline void fpu_fxrstor(struct vcpu *v)
             : "m" (*fpu_ctxt), "i" (sizeof(*fpu_ctxt) / 4) );
         break;
     case 4: case 2:
-        asm volatile (
+        asm_inline volatile (
             "1: fxrstor %0         \n"
             ".section .fixup,\"ax\"\n"
             "2: push %%"__OP"ax    \n"

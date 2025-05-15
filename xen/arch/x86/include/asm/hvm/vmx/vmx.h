@@ -431,13 +431,14 @@ static always_inline void __invvpid(unsigned long type, u16 vpid, u64 gva)
     }  operand = {vpid, 0, gva};
 
     /* Fix up #UD exceptions which occur when TLBs are flushed before VMXON. */
-    asm goto ( "1: invvpid %[operand], %[type]\n\t"
-               "   jbe %l[vmfail]\n\t"
-               "2:" _ASM_EXTABLE(1b, 2b)
-               :
-               : [operand] "m" (operand), [type] "r" (type)
-               : "memory"
-               : vmfail );
+    asm_inline goto (
+        "1: invvpid %[operand], %[type]\n\t"
+        "   jbe %l[vmfail]\n\t"
+        "2:" _ASM_EXTABLE(1b, 2b)
+        :
+        : [operand] "m" (operand), [type] "r" (type)
+        : "memory"
+        : vmfail );
     return;
 
  vmfail:

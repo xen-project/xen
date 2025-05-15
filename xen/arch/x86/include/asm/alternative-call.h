@@ -87,7 +87,8 @@ struct alt_call {
     rettype ret_;                                                  \
     register unsigned long r10_ asm("r10");                        \
     register unsigned long r11_ asm("r11");                        \
-    asm volatile ("1: call *%c[addr](%%rip)\n\t"                   \
+    asm_inline volatile (                                          \
+                  "1: call *%c[addr](%%rip)\n\t"                   \
                   ".pushsection .alt_call_sites, \"a\", @progbits\n\t"  \
                   ".long 1b - .\n\t"                               \
                   ".popsection"                                    \

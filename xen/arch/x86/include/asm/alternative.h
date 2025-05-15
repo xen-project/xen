@@ -126,12 +126,15 @@ extern void alternative_instructions(void);
  * without volatile and memory clobber.
  */
 #define alternative(oldinstr, newinstr, feature)                        \
-        asm volatile (ALTERNATIVE(oldinstr, newinstr, feature) : : : "memory")
+    asm_inline volatile (                                               \
+        ALTERNATIVE(oldinstr, newinstr, feature)                        \
+        ::: "memory" )
 
 #define alternative_2(oldinstr, newinstr1, feature1, newinstr2, feature2) \
-	asm volatile (ALTERNATIVE_2(oldinstr, newinstr1, feature1,	\
-				    newinstr2, feature2)		\
-		      : : : "memory")
+    asm_inline volatile (                                               \
+        ALTERNATIVE_2(oldinstr, newinstr1, feature1,                    \
+                      newinstr2, feature2)                              \
+        ::: "memory" )
 
 /*
  * Alternative inline assembly with input.
@@ -143,14 +146,16 @@ extern void alternative_instructions(void);
  * If you use variable sized constraints like "m" or "g" in the
  * replacement make sure to pad to the worst case length.
  */
-#define alternative_input(oldinstr, newinstr, feature, input...)	\
-	asm volatile (ALTERNATIVE(oldinstr, newinstr, feature)		\
-		      : : input)
+#define alternative_input(oldinstr, newinstr, feature, input...)        \
+    asm_inline volatile (                                               \
+        ALTERNATIVE(oldinstr, newinstr, feature)                        \
+        :: input )
 
 /* Like alternative_input, but with a single output argument */
-#define alternative_io(oldinstr, newinstr, feature, output, input...)	\
-	asm volatile (ALTERNATIVE(oldinstr, newinstr, feature)		\
-		      : output : input)
+#define alternative_io(oldinstr, newinstr, feature, output, input...)   \
+    asm_inline volatile (                                               \
+        ALTERNATIVE(oldinstr, newinstr, feature)                        \
+        : output : input )
 
 /*
  * This is similar to alternative_io. But it has two features and
@@ -160,11 +165,12 @@ extern void alternative_instructions(void);
  * Otherwise, if CPU has feature1, newinstr1 is used.
  * Otherwise, oldinstr is used.
  */
-#define alternative_io_2(oldinstr, newinstr1, feature1, newinstr2,	\
-			 feature2, output, input...)			\
-	asm volatile(ALTERNATIVE_2(oldinstr, newinstr1, feature1,	\
-				   newinstr2, feature2)			\
-		     : output : input)
+#define alternative_io_2(oldinstr, newinstr1, feature1, newinstr2,      \
+                         feature2, output, input...)                    \
+    asm_inline volatile (                                               \
+        ALTERNATIVE_2(oldinstr, newinstr1, feature1,                    \
+                      newinstr2, feature2)                              \
+        : output : input )
 
 /* Use this macro(s) if you need more than one output parameter. */
 #define ASM_OUTPUT2(a...) a

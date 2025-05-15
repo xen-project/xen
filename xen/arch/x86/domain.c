@@ -1706,16 +1706,17 @@ static void load_segments(struct vcpu *n)
      * @all_segs_okay in function scope, and load NUL into @sel.
      */
 #define TRY_LOAD_SEG(seg, val)                          \
-    asm volatile ( "1: mov %k[_val], %%" #seg "\n\t"    \
-                   "2:\n\t"                             \
-                   ".section .fixup, \"ax\"\n\t"        \
-                   "3: xor %k[ok], %k[ok]\n\t"          \
-                   "   mov %k[ok], %%" #seg "\n\t"      \
-                   "   jmp 2b\n\t"                      \
-                   ".previous\n\t"                      \
-                   _ASM_EXTABLE(1b, 3b)                 \
-                   : [ok] "+r" (all_segs_okay)          \
-                   : [_val] "rm" (val) )
+    asm_inline volatile (                               \
+        "1: mov %k[_val], %%" #seg "\n\t"               \
+        "2:\n\t"                                        \
+        ".section .fixup, \"ax\"\n\t"                   \
+        "3: xor %k[ok], %k[ok]\n\t"                     \
+        "   mov %k[ok], %%" #seg "\n\t"                 \
+        "   jmp 2b\n\t"                                 \
+        ".previous\n\t"                                 \
+        _ASM_EXTABLE(1b, 3b)                            \
+        : [ok] "+r" (all_segs_okay)                     \
+        : [_val] "rm" (val) )
 
     if ( !compat )
     {
