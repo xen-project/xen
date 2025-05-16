@@ -1,4 +1,8 @@
 /* attempt to consolidate cpu attributes */
+
+#ifndef X86_CPU_H
+#define X86_CPU_H
+
 struct cpu_dev {
 	void		(*c_early_init)(struct cpuinfo_x86 *c);
 	void		(*c_init)(struct cpuinfo_x86 * c);
@@ -26,3 +30,5 @@ void amd_init_spectral_chicken(void);
 void detect_zen2_null_seg_behaviour(void);
 
 void intel_unlock_cpuid_leaves(struct cpuinfo_x86 *c);
+
+#endif /* X86_CPU_H */

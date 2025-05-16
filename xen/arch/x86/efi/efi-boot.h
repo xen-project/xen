@@ -3,6 +3,10 @@
  * is intended to be included by common/efi/boot.c _only_, and
  * therefore can define arch specific global variables.
  */
+
+#ifndef X86_EFI_EFI_BOOT_H
+#define X86_EFI_EFI_BOOT_H
+
 #include <xen/vga.h>
 
 #include <asm/boot-helpers.h>
@@ -907,6 +911,8 @@ void __init efi_multiboot2(EFI_HANDLE ImageHandle,
 
     efi_exit_boot(ImageHandle, SystemTable);
 }
+
+#endif /* X86_EFI_EFI_BOOT_H */
 
 /*
  * Local variables:

@@ -6,6 +6,9 @@
  * Copyright (c) 2005-2007 XenSource Inc.
  */
 
+#ifndef X86_EMULATE_PRIVATE_H
+#define X86_EMULATE_PRIVATE_H
+
 #ifdef __XEN__
 
 # include <xen/bug.h>
@@ -843,3 +846,5 @@ static inline int read_ulong(enum x86_segment seg,
     *val = 0;
     return ops->read(seg, offset, val, bytes, ctxt);
 }
+
+#endif /* X86_EMULATE_PRIVATE_H */

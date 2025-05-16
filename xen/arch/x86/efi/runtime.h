@@ -1,3 +1,6 @@
+#ifndef X86_EFI_RUNTIME_H
+#define X86_EFI_RUNTIME_H
+
 #include <xen/domain_page.h>
 #include <xen/mm.h>
 #include <asm/atomic.h>
@@ -17,3 +20,5 @@ void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t l4e)
     }
 }
 #endif
+
+#endif /* X86_EFI_RUNTIME_H */
