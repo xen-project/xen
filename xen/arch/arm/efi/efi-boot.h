@@ -3,6 +3,10 @@
  * is intended to be included by common/efi/boot.c _only_, and
  * therefore can define arch specific global variables.
  */
+
+#ifndef ARM_EFI_BOOT_H
+#define ARM_EFI_BOOT_H
+
 #include <xen/device_tree.h>
 #include <xen/libfdt/libfdt.h>
 #include <asm/setup.h>
@@ -1002,6 +1006,8 @@ static void __init efi_arch_flush_dcache_area(const void *vaddr, UINTN size)
 {
     __flush_dcache_area(vaddr, size);
 }
+
+#endif /* ARM_EFI_BOOT_H */
 
 /*
  * Local variables:
