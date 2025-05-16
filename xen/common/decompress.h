@@ -1,3 +1,6 @@
+#ifndef DECOMPRESS_H
+#define DECOMPRESS_H
+
 #ifdef __XEN__
 
 #include <xen/decompress.h>
@@ -22,3 +25,5 @@
 #define large_free free
 
 #endif
+
+#endif /* DECOMPRESS_H */
