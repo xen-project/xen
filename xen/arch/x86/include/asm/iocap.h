@@ -19,7 +19,8 @@
     (!rangeset_is_empty((d)->iomem_caps) ||             \
      !rangeset_is_empty((d)->arch.ioport_caps))
 
-#define cache_flush_permitted has_arch_io_resources
+#define cache_flush_permitted(d) \
+    (has_arch_io_resources(d) || has_arch_pdevs(d))
 
 static inline int ioports_permit_access(struct domain *d, unsigned long s,
                                         unsigned long e)

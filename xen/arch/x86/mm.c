@@ -172,9 +172,7 @@ static DEFINE_SPINLOCK(subpage_ro_lock);
 
 #define l1_disallow_mask(d)                                     \
     (((d) != dom_io) &&                                         \
-     (rangeset_is_empty((d)->iomem_caps) &&                     \
-      rangeset_is_empty((d)->arch.ioport_caps) &&               \
-      !has_arch_pdevs(d) &&                                     \
+     (!cache_flush_permitted(d) &&                              \
       is_pv_domain(d)) ?                                        \
      L1_DISALLOW_MASK : (L1_DISALLOW_MASK & ~PAGE_CACHE_ATTRS))
 
