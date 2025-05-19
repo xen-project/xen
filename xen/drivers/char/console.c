@@ -325,6 +325,16 @@ static void cf_check do_dec_thresh(unsigned char key, bool unused)
  * ********************************************************
  */
 
+static void cf_check conring_notify(void *unused)
+{
+    send_global_virq(VIRQ_CON_RING);
+}
+
+static DECLARE_SOFTIRQ_TASKLET(conring_tasklet, conring_notify, NULL);
+
+/* NB: Do not send conring VIRQs during panic. */
+static bool conring_no_notify;
+
 static void conring_puts(const char *str, size_t len)
 {
     ASSERT(rspin_is_locked(&console_lock));
@@ -594,13 +604,6 @@ static void cf_check serial_rx(char c)
     __serial_rx(c);
 }
 
-static void cf_check notify_dom0_con_ring(void *unused)
-{
-    send_global_virq(VIRQ_CON_RING);
-}
-static DECLARE_SOFTIRQ_TASKLET(notify_dom0_con_ring_tasklet,
-                               notify_dom0_con_ring, NULL);
-
 #ifdef CONFIG_X86
 static inline void xen_console_write_debug_port(const char *buf, size_t len)
 {
@@ -650,7 +653,7 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer,
             if ( opt_console_to_ring )
             {
                 conring_puts(kbuf, kcount);
-                tasklet_schedule(&notify_dom0_con_ring_tasklet);
+                tasklet_schedule(&conring_tasklet);
             }
 
             nrspin_unlock_irq(&console_lock);
@@ -753,8 +756,6 @@ long do_console_io(
  * *****************************************************
  */
 
-static bool console_locks_busted;
-
 static void __putstr(const char *str)
 {
     size_t len = strlen(str);
@@ -775,9 +776,8 @@ static void __putstr(const char *str)
 #endif
 
     conring_puts(str, len);
-
-    if ( !console_locks_busted )
-        tasklet_schedule(&notify_dom0_con_ring_tasklet);
+    if ( !conring_no_notify )
+        tasklet_schedule(&conring_tasklet);
 }
 
 static int printk_prefix_check(char *p, char **pp)
@@ -1171,7 +1171,7 @@ void console_force_unlock(void)
     spin_debug_disable();
     rspin_lock_init(&console_lock);
     serial_force_unlock(sercon_handle);
-    console_locks_busted = 1;
+    conring_no_notify = true;
     console_start_sync();
 }
 
