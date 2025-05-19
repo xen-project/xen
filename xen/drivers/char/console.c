@@ -41,6 +41,28 @@
 #include <asm/vpl011.h>
 #endif
 
+/* Internal console flags. */
+enum {
+    CONSOLE_SERIAL          = BIT(0, U),    /* Use serial device. */
+    CONSOLE_PV              = BIT(1, U),    /* Use PV console. */
+    CONSOLE_VIDEO           = BIT(2, U),    /* Use video device. */
+    CONSOLE_DEBUG           = BIT(3, U),    /* Use debug device. */
+    CONSOLE_RING            = BIT(4, U),    /* Use console ring. */
+    CONSOLE_RING_VIRQ       = BIT(5, U),    /* Use console ring VIRQ. */
+
+    /* Default console flags. */
+    CONSOLE_DEFAULT         = CONSOLE_SERIAL |
+                              CONSOLE_PV |
+                              CONSOLE_VIDEO |
+                              CONSOLE_RING_VIRQ |
+                              CONSOLE_DEBUG,
+
+    /* Use all known console devices. */
+    CONSOLE_ALL             = CONSOLE_DEFAULT | CONSOLE_RING,
+};
+
+static void console_send(const char *str, size_t len, unsigned int flags);
+
 /* console: comma-separated list of console outputs. */
 static char __initdata opt_console[30] = OPT_CONSOLE_STR;
 string_param("console", opt_console);
@@ -428,9 +450,6 @@ void console_serial_puts(const char *s, size_t nr)
         serial_steal_fn(s, nr);
     else
         serial_puts(sercon_handle, s, nr);
-
-    /* Copy all serial output into PV console */
-    pv_console_puts(s, nr);
 }
 
 static void cf_check dump_console_ring_key(unsigned char key)
@@ -464,8 +483,7 @@ static void cf_check dump_console_ring_key(unsigned char key)
         c += len;
     }
 
-    console_serial_puts(buf, sofar);
-    video_puts(buf, sofar);
+    console_send(buf, sofar, CONSOLE_SERIAL | CONSOLE_VIDEO | CONSOLE_PV);
 
     free_xenheap_pages(buf, order);
 }
@@ -614,11 +632,71 @@ static inline void xen_console_write_debug_port(const char *buf, size_t len)
 }
 #endif
 
+static inline void console_debug_puts(const char *str, size_t len)
+{
+#ifdef CONFIG_X86
+    if ( opt_console_xen )
+    {
+        if ( xen_guest )
+            xen_hypercall_console_write(str, len);
+        else
+            xen_console_write_debug_port(str, len);
+    }
+#endif
+}
+
+/*
+ * Send a message on console device(s).
+ *
+ * That will handle all possible scenarios working w/ console
+ * - physical console (serial console, VGA console (x86 only));
+ * - PV console;
+ * - debug console (x86 only): debug I/O port or __HYPERVISOR_console_io
+ *   hypercall;
+ * - console ring.
+ */
+static void console_send(const char *str, size_t len, unsigned int flags)
+{
+    if ( flags & CONSOLE_SERIAL )
+        console_serial_puts(str, len);
+
+    if ( flags & CONSOLE_PV )
+        pv_console_puts(str, len);
+
+    if ( flags & CONSOLE_VIDEO )
+        video_puts(str, len);
+
+    if ( flags & CONSOLE_DEBUG )
+        console_debug_puts(str, len);
+
+    if ( flags & CONSOLE_RING )
+    {
+        conring_puts(str, len);
+
+        if ( flags & CONSOLE_RING_VIRQ )
+            tasklet_schedule(&conring_tasklet);
+    }
+}
+
+static inline void __putstr(const char *str)
+{
+    unsigned int flags = CONSOLE_ALL;
+
+    ASSERT(rspin_is_locked(&console_lock));
+
+    if ( conring_no_notify )
+        flags &= ~CONSOLE_RING_VIRQ;
+
+    console_send(str, strlen(str), flags);
+}
+
 static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer,
                                 unsigned int count)
 {
     char kbuf[128];
     unsigned int kcount = 0;
+    unsigned int flags = opt_console_to_ring
+                         ? CONSOLE_ALL : CONSOLE_DEFAULT;
     struct domain *cd = current->domain;
 
     while ( count > 0 )
@@ -636,26 +714,7 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer,
         {
             /* Use direct console output as it could be interactive */
             nrspin_lock_irq(&console_lock);
-
-            console_serial_puts(kbuf, kcount);
-            video_puts(kbuf, kcount);
-
-#ifdef CONFIG_X86
-            if ( opt_console_xen )
-            {
-                if ( xen_guest )
-                    xen_hypercall_console_write(kbuf, kcount);
-                else
-                    xen_console_write_debug_port(kbuf, kcount);
-            }
-#endif
-
-            if ( opt_console_to_ring )
-            {
-                conring_puts(kbuf, kcount);
-                tasklet_schedule(&conring_tasklet);
-            }
-
+            console_send(kbuf, kcount, flags);
             nrspin_unlock_irq(&console_lock);
         }
         else
@@ -755,30 +814,6 @@ long do_console_io(
  * *************** GENERIC CONSOLE I/O *****************
  * *****************************************************
  */
-
-static void __putstr(const char *str)
-{
-    size_t len = strlen(str);
-
-    ASSERT(rspin_is_locked(&console_lock));
-
-    console_serial_puts(str, len);
-    video_puts(str, len);
-
-#ifdef CONFIG_X86
-    if ( opt_console_xen )
-    {
-        if ( xen_guest )
-            xen_hypercall_console_write(str, len);
-        else
-            xen_console_write_debug_port(str, len);
-    }
-#endif
-
-    conring_puts(str, len);
-    if ( !conring_no_notify )
-        tasklet_schedule(&conring_tasklet);
-}
 
 static int printk_prefix_check(char *p, char **pp)
 {
