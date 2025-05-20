@@ -2,16 +2,16 @@
 
 set -ex -o pipefail
 
-# One of:
-#  - ""             PV dom0,  PVH domU
-#  - dom0pvh        PVH dom0, PVH domU
-#  - dom0pvh-hvm    PVH dom0, HVM domU
-#  - pci-hvm        PV dom0,  HVM domU + PCI Passthrough
-#  - pci-pv         PV dom0,  PV domU + PCI Passthrough
-#  - pvshim         PV dom0,  PVSHIM domU
-#  - s3             PV dom0,  S3 suspend/resume
-#  - tools-tests-pv PV dom0, run tests from tools/tests/*
-#  - tools-tests-pvh PVH dom0, run tests from tools/tests/*
+# One of:              dom0:   Testing:
+#  - dom0pv              PV      PVH domU
+#  - dom0pvh             PVH     PVH domU
+#  - dom0pvh-hvm         PVH     HVM domU
+#  - pci-hvm             PV      HVM domU + PCI Passthrough
+#  - pci-pv              PV      PV domU + PCI Passthrough
+#  - pvshim              PV      PVSHIM domU
+#  - s3                  PV      S3 suspend/resume
+#  - tools-tests-pv      PV      Run tests from tools/tests/*
+#  - tools-tests-pvh     PVH     Run tests from tools/tests/*
 test_variant=$1
 
 ### defaults
@@ -25,7 +25,7 @@ retrieve_xml=
 
 case "${test_variant}" in
     ### test: smoke test & smoke test PVH & smoke test HVM & smoke test PVSHIM
-    ""|"dom0pvh"|"dom0pvh-hvm"|"pvshim")
+    "dom0pv"|"dom0pvh"|"dom0pvh-hvm"|"pvshim")
         passed="ping test passed"
         domU_check="
 ifconfig eth0 192.168.0.2
