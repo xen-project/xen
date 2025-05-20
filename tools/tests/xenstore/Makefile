@@ -20,12 +20,12 @@ distclean: clean
 
 .PHONY: install
 install: all
-	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
-	$(if $(TARGETS),$(INSTALL_PROG) $(TARGETS) $(DESTDIR)$(LIBEXEC_BIN))
+	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC)/tests
+	$(if $(TARGETS),$(INSTALL_PROG) $(TARGETS) $(DESTDIR)$(LIBEXEC)/tests)
 
 .PHONY: uninstall
 uninstall:
-	$(RM) -- $(addprefix $(DESTDIR)$(LIBEXEC_BIN)/,$(TARGETS))
+	$(RM) -- $(addprefix $(DESTDIR)$(LIBEXEC)/tests/,$(TARGETS))
 
 CFLAGS += $(CFLAGS_libxenstore)
 CFLAGS += $(APPEND_CFLAGS)

@@ -16,12 +16,12 @@ distclean: clean
 
 .PHONY: install
 install: all
-	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
-	$(INSTALL_PROG) $(TARGET) $(DESTDIR)$(LIBEXEC_BIN)
+	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC)/tests
+	$(INSTALL_PROG) $(TARGET) $(DESTDIR)$(LIBEXEC)/tests
 
 .PHONY: uninstall
 uninstall:
-	$(RM) -- $(DESTDIR)$(LIBEXEC_BIN)/$(TARGET)
+	$(RM) -- $(DESTDIR)$(LIBEXEC)/tests/$(TARGET)
 
 CFLAGS += $(CFLAGS_xeninclude)
 CFLAGS += $(CFLAGS_libxenctrl)
