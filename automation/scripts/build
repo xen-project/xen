@@ -109,6 +109,5 @@ else
     # even though dist/ contains everything, while some containers don't even
     # build Xen
     (cd dist/install; find | cpio -o -H newc | gzip) > binaries/xen-tools.cpio.gz
-    cp -r tools/tests binaries/
     collect_xen_artefacts
 fi

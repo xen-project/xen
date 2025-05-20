@@ -136,7 +136,7 @@ done
         passed="test passed"
         domU_check=""
         dom0_check="
-/tests/run-tools-tests /tests /tmp/tests-junit.xml && echo \"${passed}\"
+/root/run-tools-tests /usr/lib/xen/tests /tmp/tests-junit.xml && echo \"${passed}\"
 nc -l -p 8080 < /tmp/tests-junit.xml >/dev/null &
 "
         if [ "${test_variant}" = "tools-tests-pvh" ]; then
@@ -195,9 +195,8 @@ cat binaries/xen-tools.cpio.gz >> binaries/dom0-rootfs.cpio.gz
 # test-local configuration
 mkdir -p rootfs
 cd rootfs
-mkdir -p boot etc/local.d
-cp -ar ../binaries/tests .
-cp -a ../automation/scripts/run-tools-tests tests/
+mkdir -p boot etc/local.d root
+cp -a ../automation/scripts/run-tools-tests root/
 
 echo "#!/bin/bash
 
