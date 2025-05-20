@@ -649,7 +649,8 @@ bad_width:
     return 0;
 
 write_ignore_64:
-    if ( vgic_reg64_check_access(dabt) ) goto bad_width;
+    if ( !vgic_reg64_check_access(dabt) )
+        goto bad_width;
     return 1;
 
 write_ignore_32:
