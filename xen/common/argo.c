@@ -80,8 +80,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_argo_unregister_ring_t);
 DEFINE_COMPAT_HANDLE(compat_argo_iov_t);
 #endif
 
-static bool __read_mostly opt_argo;
-static bool __read_mostly opt_argo_mac_permissive;
+static bool __ro_after_init opt_argo;
+static bool __ro_after_init opt_argo_mac_permissive;
 
 static int __init cf_check parse_argo(const char *s)
 {
@@ -93,7 +93,10 @@ static int __init cf_check parse_argo(const char *s)
         if ( !ss )
             ss = strchr(s, '\0');
 
-        if ( (val = parse_bool(s, ss)) >= 0 )
+        /* Intepret "argo" as a positive boolean. */
+        if ( *s == '\0' )
+            opt_argo = true;
+        else if ( (val = parse_bool(s, ss)) >= 0 )
             opt_argo = val;
         else if ( (val = parse_boolean("mac-permissive", s, ss)) >= 0 )
             opt_argo_mac_permissive = val;
