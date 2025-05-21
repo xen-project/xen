@@ -47,7 +47,7 @@ static const unsigned char p6_nops[] init_or_livepatch_const = {
 };
 #endif
 
-static const unsigned char *ideal_nops init_or_livepatch_data = p6_nops;
+static const unsigned char *init_or_livepatch_ro_after_init ideal_nops = p6_nops;
 
 #ifdef HAVE_AS_NOPS_DIRECTIVE
 
@@ -56,7 +56,7 @@ asm ( ".pushsection .init.rodata, \"a\", @progbits\n\t"
       "toolchain_nops: .nops " __stringify(ASM_NOP_MAX) "\n\t"
       ".popsection\n\t");
 extern char toolchain_nops[ASM_NOP_MAX];
-static bool init_or_livepatch_read_mostly toolchain_nops_are_ideal;
+static bool init_or_livepatch_ro_after_init toolchain_nops_are_ideal;
 
 #else
 # define toolchain_nops_are_ideal false
