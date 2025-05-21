@@ -20,7 +20,7 @@
 #define MAX_PATCH_LEN (255-1)
 
 #ifdef K8_NOP1
-static const unsigned char k8nops[] init_or_livepatch_const = {
+static const unsigned char k8_nops[] init_or_livepatch_const = {
     K8_NOP1,
     K8_NOP2,
     K8_NOP3,
@@ -31,22 +31,10 @@ static const unsigned char k8nops[] init_or_livepatch_const = {
     K8_NOP8,
     K8_NOP9,
 };
-static const unsigned char * const k8_nops[ASM_NOP_MAX+1] init_or_livepatch_constrel = {
-    NULL,
-    k8nops,
-    k8nops + 1,
-    k8nops + 1 + 2,
-    k8nops + 1 + 2 + 3,
-    k8nops + 1 + 2 + 3 + 4,
-    k8nops + 1 + 2 + 3 + 4 + 5,
-    k8nops + 1 + 2 + 3 + 4 + 5 + 6,
-    k8nops + 1 + 2 + 3 + 4 + 5 + 6 + 7,
-    k8nops + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8,
-};
 #endif
 
 #ifdef P6_NOP1
-static const unsigned char p6nops[] init_or_livepatch_const = {
+static const unsigned char p6_nops[] init_or_livepatch_const = {
     P6_NOP1,
     P6_NOP2,
     P6_NOP3,
@@ -57,21 +45,9 @@ static const unsigned char p6nops[] init_or_livepatch_const = {
     P6_NOP8,
     P6_NOP9,
 };
-static const unsigned char * const p6_nops[ASM_NOP_MAX+1] init_or_livepatch_constrel = {
-    NULL,
-    p6nops,
-    p6nops + 1,
-    p6nops + 1 + 2,
-    p6nops + 1 + 2 + 3,
-    p6nops + 1 + 2 + 3 + 4,
-    p6nops + 1 + 2 + 3 + 4 + 5,
-    p6nops + 1 + 2 + 3 + 4 + 5 + 6,
-    p6nops + 1 + 2 + 3 + 4 + 5 + 6 + 7,
-    p6nops + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8,
-};
 #endif
 
-static const unsigned char * const *ideal_nops init_or_livepatch_data = p6_nops;
+static const unsigned char *ideal_nops init_or_livepatch_data = p6_nops;
 
 #ifdef HAVE_AS_NOPS_DIRECTIVE
 
@@ -86,9 +62,19 @@ static bool init_or_livepatch_read_mostly toolchain_nops_are_ideal;
 # define toolchain_nops_are_ideal false
 #endif
 
+#define TRIANGLE(x) (((x) * ((x) + 1)) / 2)
+
+/*
+ * Both k8_nops[] and p6_nops[] are flattened triangular data structures,
+ * making the offsets easy to calculate.
+ *
+ * To get the start of NOP $N, we want to calculate TRIANGLE($N - 1)
+ */
 static const unsigned char *init_or_livepatch get_ideal_nops(unsigned int noplen)
 {
-    return ideal_nops[noplen];
+    unsigned int offset = TRIANGLE(noplen - 1);
+
+    return &ideal_nops[offset];
 }
 
 static void __init arch_init_ideal_nops(void)
@@ -600,4 +586,10 @@ void __init boot_apply_alt_calls(void)
     local_irq_disable();
     _alternative_instructions(ALT_CALLS);
     local_irq_enable();
+}
+
+static void __init __maybe_unused build_assertions(void)
+{
+    BUILD_BUG_ON(ARRAY_SIZE(k8_nops) != TRIANGLE(ASM_NOP_MAX));
+    BUILD_BUG_ON(ARRAY_SIZE(p6_nops) != TRIANGLE(ASM_NOP_MAX));
 }
