@@ -621,10 +621,12 @@ static int do_boot_cpu(int apicid, int cpu)
             smp_mb();
             if ( bootsym(trampoline_cpu_started) == 0xA5 )
                 /* trampoline started but...? */
-                printk("Stuck ??\n");
+                printk("APIC ID %#x (CPU%u) didn't finish start sequence\n",
+                       apicid, cpu);
             else
                 /* trampoline code not run */
-                printk("Not responding.\n");
+                printk("APIC ID %#x (CPU%u) didn't respond to SIPI\n",
+                       apicid, cpu);
         }
     }
 
