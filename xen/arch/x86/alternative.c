@@ -86,6 +86,11 @@ static bool init_or_livepatch_read_mostly toolchain_nops_are_ideal;
 # define toolchain_nops_are_ideal false
 #endif
 
+static const unsigned char *init_or_livepatch get_ideal_nops(unsigned int noplen)
+{
+    return ideal_nops[noplen];
+}
+
 static void __init arch_init_ideal_nops(void)
 {
     switch ( boot_cpu_data.vendor )
@@ -116,7 +121,7 @@ static void __init arch_init_ideal_nops(void)
     }
 
 #ifdef HAVE_AS_NOPS_DIRECTIVE
-    if ( memcmp(ideal_nops[ASM_NOP_MAX], toolchain_nops, ASM_NOP_MAX) == 0 )
+    if ( memcmp(get_ideal_nops(ASM_NOP_MAX), toolchain_nops, ASM_NOP_MAX) == 0 )
         toolchain_nops_are_ideal = true;
 #endif
 }
@@ -127,9 +132,11 @@ void init_or_livepatch add_nops(void *insns, unsigned int len)
     while ( len > 0 )
     {
         unsigned int noplen = len;
+
         if ( noplen > ASM_NOP_MAX )
             noplen = ASM_NOP_MAX;
-        memcpy(insns, ideal_nops[noplen], noplen);
+
+        memcpy(insns, get_ideal_nops(noplen), noplen);
         insns += noplen;
         len -= noplen;
     }
