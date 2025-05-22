@@ -785,8 +785,6 @@ void fatal_trap(const struct cpu_user_regs *regs, bool show_remote)
             cpumask_andnot(&show_state_mask, &cpu_online_map,
                            cpumask_of(smp_processor_id()));
             set_nmi_callback(nmi_show_execution_state);
-            /* Ensure new callback is set before sending out the NMI. */
-            smp_wmb();
             smp_send_nmi_allbutself();
 
             /* Wait at most 10ms for some other CPU to respond. */
