@@ -221,11 +221,10 @@ if [ -n "$domU_check" ]; then
 tail -F /var/log/xen/console/guest-domU.log 2>/dev/null | sed -e \"s/^/(domU) /\" &
 tail -F /var/log/xen/qemu-dm-domU.log 2>/dev/null | sed -e \"s/^/(qemu-dm) /\" &
 xl -vvv create /etc/xen/domU.cfg
-${dom0_check}
 " >> etc/local.d/xen.start
-else
-    echo "${dom0_check}" >> etc/local.d/xen.start
 fi
+
+echo "${dom0_check}" >> etc/local.d/xen.start
 
 chmod +x etc/local.d/xen.start
 mkdir -p etc/xen
