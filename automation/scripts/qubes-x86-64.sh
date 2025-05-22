@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 set -ex -o pipefail
 
@@ -22,6 +22,8 @@ domU_type="pvh"
 domU_vif="'bridge=xenbr0',"
 domU_extra_config=
 retrieve_xml=
+dom0_rootfs_extra_comp=()
+dom0_rootfs_extra_uncomp=()
 
 case "${test_variant}" in
     ### test: smoke test & smoke test PVH & smoke test HVM & smoke test PVSHIM
@@ -187,10 +189,16 @@ Kernel \r on an \m (\l)
     rm -rf rootfs
 fi
 
-# Dom0 rootfs
-cp binaries/ucode.cpio binaries/dom0-rootfs.cpio.gz
-cat binaries/rootfs.cpio.gz >> binaries/dom0-rootfs.cpio.gz
-cat binaries/xen-tools.cpio.gz >> binaries/dom0-rootfs.cpio.gz
+# Dom0 rootfs.  The order of concatenation is important; ucode wants to come
+# first, and all uncompressed must be ahead of compressed.
+dom0_rootfs_parts=(
+    binaries/ucode.cpio
+    "${dom0_rootfs_extra_uncomp[@]}"
+    binaries/rootfs.cpio.gz
+    binaries/xen-tools.cpio.gz
+    "${dom0_rootfs_extra_comp[@]}"
+)
+cat "${dom0_rootfs_parts[@]}" > binaries/dom0-rootfs.cpio.gz
 
 # test-local configuration
 mkdir -p rootfs

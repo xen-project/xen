@@ -28,6 +28,8 @@ extra = "root=/dev/ram0 console=hvc0"
 memory = 512
 '
 DOMU_CFG_EXTRA=""
+dom0_rootfs_extra_comp=()
+dom0_rootfs_extra_uncomp=()
 
 # Select test variant.
 if [ "${TEST}" = "ping" ]; then
@@ -71,6 +73,7 @@ do
   sleep 1
 done | argo-exec -p 28333 -d 0 -- /bin/echo
 "
+    dom0_rootfs_extra_comp+=(binaries/argo.cpio.gz)
     DOM0_CMD="
 insmod /lib/modules/\$(uname -r)/updates/xen-argo.ko
 xl -vvv create /etc/xen/domU.cfg
@@ -103,13 +106,16 @@ find . | cpio -H newc -o | gzip >> ../binaries/domU-rootfs.cpio.gz
 cd ..
 rm -rf rootfs
 
-# Dom0 rootfs
-cp binaries/ucode.cpio binaries/dom0-rootfs.cpio.gz
-cat binaries/rootfs.cpio.gz >> binaries/dom0-rootfs.cpio.gz
-cat binaries/xen-tools.cpio.gz >> binaries/dom0-rootfs.cpio.gz
-if [[ "${TEST}" == argo ]]; then
-    cat binaries/argo.cpio.gz >> binaries/dom0-rootfs.cpio.gz
-fi
+# Dom0 rootfs.  The order of concatenation is important; ucode wants to come
+# first, and all uncompressed must be ahead of compressed.
+dom0_rootfs_parts=(
+    binaries/ucode.cpio
+    "${dom0_rootfs_extra_uncomp[@]}"
+    binaries/rootfs.cpio.gz
+    binaries/xen-tools.cpio.gz
+    "${dom0_rootfs_extra_comp[@]}"
+)
+cat "${dom0_rootfs_parts[@]}" > binaries/dom0-rootfs.cpio.gz
 
 # test-local configuration
 mkdir -p rootfs
