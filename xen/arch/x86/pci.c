@@ -131,7 +131,7 @@ int pci_sanitize_bar_memory(struct rangeset *r)
             continue;
 
         rc = rangeset_remove_range(r, PFN_DOWN(entry->addr),
-                                   PFN_UP(entry->addr + entry->size - 1));
+                                   PFN_DOWN(entry->addr + entry->size - 1));
         if ( rc )
             return rc;
     }
