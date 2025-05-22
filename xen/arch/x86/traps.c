@@ -734,6 +734,43 @@ static int cf_check nmi_show_execution_state(
     return 1;
 }
 
+void show_execution_state_nmi(const cpumask_t *mask, bool show_all)
+{
+    unsigned int msecs, pending;
+
+    /*
+     * Overwrite the global variable, caller is expected to panic after having
+     * dumped the execution state.
+     */
+    if ( show_all )
+        opt_show_all = true;
+
+    watchdog_disable();
+    console_start_sync();
+
+    cpumask_copy(&show_state_mask, mask);
+    set_nmi_callback(nmi_show_execution_state);
+    send_IPI_mask(mask, APIC_DM_NMI);
+
+    /* Wait at most 10ms for some other CPU to respond. */
+    msecs = 10;
+    pending = cpumask_weight(&show_state_mask);
+    while ( pending && msecs-- )
+    {
+        unsigned int left;
+
+        mdelay(1);
+        left = cpumask_weight(&show_state_mask);
+        if ( left < pending )
+        {
+            pending = left;
+            msecs = 10;
+        }
+    }
+    if ( pending )
+        printk("Non-responding CPUs: {%*pbl}\n", CPUMASK_PR(&show_state_mask));
+}
+
 const char *vector_name(unsigned int vec)
 {
     static const char names[][4] = {
@@ -780,31 +817,11 @@ void fatal_trap(const struct cpu_user_regs *regs, bool show_remote)
 
         if ( show_remote )
         {
-            unsigned int msecs, pending;
+            cpumask_t *scratch = this_cpu(scratch_cpumask);
 
-            cpumask_andnot(&show_state_mask, &cpu_online_map,
+            cpumask_andnot(scratch, &cpu_online_map,
                            cpumask_of(smp_processor_id()));
-            set_nmi_callback(nmi_show_execution_state);
-            smp_send_nmi_allbutself();
-
-            /* Wait at most 10ms for some other CPU to respond. */
-            msecs = 10;
-            pending = cpumask_weight(&show_state_mask);
-            while ( pending && msecs-- )
-            {
-                unsigned int left;
-
-                mdelay(1);
-                left = cpumask_weight(&show_state_mask);
-                if ( left < pending )
-                {
-                    pending = left;
-                    msecs = 10;
-                }
-            }
-            if ( pending )
-                printk("Non-responding CPUs: {%*pbl}\n",
-                       CPUMASK_PR(&show_state_mask));
+            show_execution_state_nmi(scratch, false);
         }
     }
 
