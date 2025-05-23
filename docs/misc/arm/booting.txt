@@ -56,12 +56,17 @@ image header to determine the load address, entry point, etc.
 Firmware/bootloader requirements
 --------------------------------
 
-Xen relies on some settings the firmware has to configure in EL3 before starting Xen.
+Xen relies on some settings the firmware has to configure before starting Xen.
 
-* Xen must be entered in NS EL2 mode
+* Xen must be entered in:
+  * Non-Secure EL2 mode for Armv8-A Arm64 and Arm32, Armv8-R Arm32.
+  * Secure EL2 mode for Armv8-R Arm64.
 
-* The bit SCR_EL3.HCE (resp. SCR.HCE for 32-bit ARM) must be set to 1.
+* When EL3 is supported, the bit SCR_EL3.HCE (resp. SCR.HCE for 32-bit ARM) must
+  be set to 1.
 
+* Xen must be entered with MMU/MPU off and data cache disabled (SCTLR_EL2.M bit
+  and SCTLR_EL2.C set to 0). Cache state shall follow [1], [2] for MPU.
 
 [1] linux/Documentation/arm/booting.rst
 Latest version: http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arch/arm/booting.rst
