@@ -23,6 +23,72 @@
 #define NUM_MPU_REGIONS_MASK    (NUM_MPU_REGIONS - 1)
 #define MAX_MPU_REGION_NR       NUM_MPU_REGIONS_MASK
 
+#ifndef __ASSEMBLY__
+
+#ifdef CONFIG_ARM_64
+/*
+ * Set base address of MPU protection region.
+ *
+ * @pr: pointer to the protection region structure.
+ * @base: base address as base of the protection region.
+ */
+static inline void pr_set_base(pr_t *pr, paddr_t base)
+{
+    pr->prbar.reg.base = ((base & ~MPU_REGION_RES0) >> MPU_REGION_SHIFT);
+}
+
+/*
+ * Set limit address of MPU protection region.
+ *
+ * @pr: pointer to the protection region structure.
+ * @limit: exclusive address as limit of the protection region.
+ */
+static inline void pr_set_limit(pr_t *pr, paddr_t limit)
+{
+    /* PRLAR_ELx.LIMIT expects inclusive limit */
+    pr->prlar.reg.limit = (((limit - 1) & ~MPU_REGION_RES0)
+                           >> MPU_REGION_SHIFT);
+}
+
+/*
+ * Access to get base address of MPU protection region.
+ * The base address shall be zero extended.
+ *
+ * @pr: pointer to the protection region structure.
+ * @return: Base address configured for the passed protection region.
+ */
+static inline paddr_t pr_get_base(const pr_t *pr)
+{
+    return (paddr_t)(pr->prbar.reg.base << MPU_REGION_SHIFT);
+}
+
+/*
+ * Access to get limit address of MPU protection region.
+ * The limit address shall be concatenated with 0x3f.
+ *
+ * @pr: pointer to the protection region structure.
+ * @return: Inclusive limit address configured for the passed protection region.
+ */
+static inline paddr_t pr_get_limit(const pr_t *pr)
+{
+    return (paddr_t)((pr->prlar.reg.limit << MPU_REGION_SHIFT)
+                     | ~MPU_REGION_MASK);
+}
+
+/*
+ * Check if the protection region is valid (enabled).
+ *
+ * @pr: pointer to the protection region structure.
+ * @return: True if the region is valid (enabled), false otherwise.
+ */
+static inline bool region_is_valid(const pr_t *pr)
+{
+    return pr->prlar.reg.en;
+}
+#endif /* CONFIG_ARM_64 */
+
+#endif /* __ASSEMBLY__ */
+
 #endif /* __ARM_MPU_H__ */
 
 /*
