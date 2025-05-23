@@ -62,7 +62,7 @@ static void __init init_ler(void)
  * boot_gdt is already loaded, and bsp_idt[] is constructed without IST
  * settings, so we don't need a TSS configured yet.
  */
-void __init early_traps_init(void)
+void __init bsp_early_traps_init(void)
 {
     const struct desc_ptr idtr = {
         .base = (unsigned long)bsp_idt,

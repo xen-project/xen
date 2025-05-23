@@ -1134,7 +1134,7 @@ void asmlinkage __init noreturn __start_xen(void)
 
     percpu_init_areas();
 
-    early_traps_init();
+    bsp_early_traps_init();
 
     smp_prepare_boot_cpu();
     sort_exception_tables();
