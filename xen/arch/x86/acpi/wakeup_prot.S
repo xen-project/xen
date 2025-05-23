@@ -63,6 +63,9 @@ LABEL(s3_resume)
         pushq   %rax
         lretq
 1:
+        /* Set up early exceptions and CET before entering C properly. */
+        call    percpu_early_traps_init
+
 #if defined(CONFIG_XEN_SHSTK) || defined(CONFIG_XEN_IBT)
         call    xen_msr_s_cet_value
         test    %eax, %eax
@@ -116,8 +119,6 @@ LABEL(s3_resume)
 #endif /* CONFIG_XEN_SHSTK */
 .L_cet_done:
 #endif /* CONFIG_XEN_SHSTK || CONFIG_XEN_IBT */
-
-        call    load_system_tables
 
         /* Restore CR4 from the cpuinfo block. */
         GET_STACK_END(bx)

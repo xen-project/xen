@@ -30,7 +30,10 @@ ENTRY(__high_start)
         test    %ebx,%ebx
         jz      .L_bsp
 
-        /* APs.  Set up CET before entering C properly. */
+        /* APs.  Set up early exceptions and CET before entering C properly. */
+
+        call    percpu_early_traps_init
+
 #if defined(CONFIG_XEN_SHSTK) || defined(CONFIG_XEN_IBT)
         call    xen_msr_s_cet_value
         test    %eax, %eax

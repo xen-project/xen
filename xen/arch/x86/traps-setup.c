@@ -127,3 +127,15 @@ void percpu_traps_init(void)
     if ( cpu_has_xen_lbr )
         wrmsrl(MSR_IA32_DEBUGCTLMSR, IA32_DEBUGCTLMSR_LBR);
 }
+
+/*
+ * Configure exception handling on APs and S3.  Called before entering C
+ * properly, and before shadow stacks are activated.
+ *
+ * boot_gdt is currently loaded, and we must switch to our local GDT.  The
+ * local IDT has unknown IST-ness.
+ */
+void asmlinkage percpu_early_traps_init(void)
+{
+    load_system_tables();
+}

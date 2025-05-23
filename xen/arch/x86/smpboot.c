@@ -327,12 +327,7 @@ void asmlinkage start_secondary(void)
     struct cpu_info *info = get_cpu_info();
     unsigned int cpu = smp_processor_id();
 
-    /* Critical region without IDT or TSS.  Any fault is deadly! */
-
-    set_current(idle_vcpu[cpu]);
-    this_cpu(curr_vcpu) = idle_vcpu[cpu];
     rdmsrl(MSR_EFER, this_cpu(efer));
-    init_shadow_spec_ctrl_state(info);
 
     /*
      * Just as during early bootstrap, it is convenient here to disable
@@ -351,14 +346,6 @@ void asmlinkage start_secondary(void)
      * visible in cpu_online_map. Hence such a deadlock is not possible.
      */
     spin_debug_disable();
-
-    get_cpu_info()->use_pv_cr3 = false;
-    get_cpu_info()->xen_cr3 = 0;
-    get_cpu_info()->pv_cr3 = 0;
-
-    load_system_tables();
-
-    /* Full exception support from here on in. */
 
     if ( cpu_has_pks )
         wrpkrs_and_cache(0); /* Must be before setting CR4.PKS */
@@ -1064,8 +1051,14 @@ static int cpu_smpboot_alloc(unsigned int cpu)
             goto out;
 
     info = get_cpu_info_from_stack((unsigned long)stack_base[cpu]);
+    memset(info, 0, sizeof(*info));
     info->processor_id = cpu;
     info->per_cpu_offset = __per_cpu_offset[cpu];
+
+    init_shadow_spec_ctrl_state(info);
+
+    info->current_vcpu = idle_vcpu[cpu]; /* set_current() */
+    per_cpu(curr_vcpu, cpu) = idle_vcpu[cpu];
 
     gdt = per_cpu(gdt, cpu) ?: alloc_xenheap_pages(0, memflags);
     if ( gdt == NULL )
