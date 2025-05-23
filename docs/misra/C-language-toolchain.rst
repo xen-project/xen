@@ -214,6 +214,10 @@ The table columns are as follows:
      - All architectures
      - See Section "4.5 Integers" of GCC_MANUAL.
 
+   * - Taking the address of a label
+     - All architectures
+     - See Section "6.3 Labels as Values" of GCC_MANUAL.
+
 Translation Limits
 __________________
 

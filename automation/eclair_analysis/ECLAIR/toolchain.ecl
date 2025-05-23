@@ -108,6 +108,11 @@ volatile"
 -config=STD.funojptr,behavior+={c99,GCC_X86_64,specified}
 -doc_end
 
+-doc_begin="See section \"6.3 Labels as Values\" of "GCC_MANUAL"."
+-config=STD.adrslabl,behavior={c99,GCC_ARM64,specified}
+-config=STD.adrslabl,behavior={c99,GCC_X86_64,specified}
+-doc_end
+
 -doc_begin="
     ext_c_missing_varargs_arg: see Section \"6.21 Macros with a Variable Number of Arguments\" of "GCC_MANUAL".
     ext_enum_value_not_int: non-documented GCC extension.
