@@ -5,6 +5,8 @@
 
 #ifndef __ASSEMBLY__
 
+#define MPU_REGION_RES0        (0xFFFFULL << 48)
+
 /* Protection Region Base Address Register */
 typedef union {
     struct __packed {

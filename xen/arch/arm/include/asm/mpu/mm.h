@@ -41,6 +41,30 @@ static inline struct page_info *virt_to_page(const void *v)
     return mfn_to_page(mfn);
 }
 
+/* Utility function to be used whenever MPU regions are modified */
+static inline void context_sync_mpu(void)
+{
+    /*
+     * ARM DDI 0600B.a, C1.7.1
+     * Writes to MPU registers are only guaranteed to be visible following a
+     * Context synchronization event and DSB operation.
+     */
+    dsb(sy);
+    isb();
+}
+
+/*
+ * The following API requires context_sync_mpu() after being used to modify MPU
+ * regions:
+ *  - write_protection_region
+ */
+
+/* Reads the MPU region (into @pr_read) with index @sel from the HW */
+void read_protection_region(pr_t *pr_read, uint8_t sel);
+
+/* Writes the MPU region (from @pr_write) with index @sel to the HW */
+void write_protection_region(const pr_t *pr_write, uint8_t sel);
+
 #endif /* __ARM_MPU_MM_H__ */
 
 /*
