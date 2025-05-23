@@ -8,6 +8,10 @@
 
 #if defined(CONFIG_ARM_64)
 # include <asm/arm64/mpu.h>
+#elif defined(CONFIG_ARM_32)
+# include <asm/arm32/mpu.h>
+#else
+# error "unknown ARM variant"
 #endif
 
 #define MPU_REGION_SHIFT  6
@@ -17,6 +21,7 @@
 #define NUM_MPU_REGIONS_SHIFT   8
 #define NUM_MPU_REGIONS         (_AC(1, UL) << NUM_MPU_REGIONS_SHIFT)
 #define NUM_MPU_REGIONS_MASK    (NUM_MPU_REGIONS - 1)
+#define MAX_MPU_REGION_NR       NUM_MPU_REGIONS_MASK
 
 #endif /* __ARM_MPU_H__ */
 

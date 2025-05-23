@@ -40,6 +40,10 @@ FUNC(enable_boot_cpu_mm)
     mrs   x5, MPUIR_EL2
     and   x5, x5, #NUM_MPU_REGIONS_MASK
 
+    ldr   x0, =max_mpu_regions
+    strb  w5, [x0]
+    dc ivac, x0                 /* Invalidate cache for max_mpu_regions addr */
+
     /* x0: region sel */
     mov   x0, xzr
     /* Xen text section. */
@@ -73,6 +77,27 @@ FUNC(enable_boot_cpu_mm)
     ldr   x2, =(CONFIG_EARLY_UART_BASE_ADDRESS + CONFIG_EARLY_UART_SIZE)
     prepare_xen_region x0, x1, x2, x3, x4, x5, attr_prbar=REGION_DEVICE_PRBAR, attr_prlar=REGION_DEVICE_PRLAR
 #endif
+
+zero_mpu:
+    /* Reset remaining MPU regions */
+    cmp   x0, x5
+    beq   out_zero_mpu
+    mov   x1, #0
+    mov   x2, #1
+    prepare_xen_region x0, x1, x2, x3, x4, x5, attr_prlar=REGION_DISABLED_PRLAR
+    b     zero_mpu
+
+out_zero_mpu:
+    /* Invalidate data cache for MPU data structures */
+    mov x4, lr
+    ldr x0, =xen_mpumap_mask
+    mov x1, #XEN_MPUMAP_MASK_sizeof
+    bl __invalidate_dcache_area
+
+    ldr x0, =xen_mpumap
+    mov x1, #XEN_MPUMAP_sizeof
+    bl __invalidate_dcache_area
+    mov lr, x4
 
     b    enable_mpu
     ret

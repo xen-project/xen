@@ -8,8 +8,15 @@
 #include <xen/page-size.h>
 #include <xen/types.h>
 #include <asm/mm.h>
+#include <asm/mpu.h>
 
 extern struct page_info *frame_table;
+
+extern uint8_t max_mpu_regions;
+
+extern DECLARE_BITMAP(xen_mpumap_mask, MAX_MPU_REGION_NR);
+
+extern pr_t xen_mpumap[MAX_MPU_REGION_NR];
 
 #define virt_to_maddr(va) ((paddr_t)((vaddr_t)(va) & PADDR_MASK))
 

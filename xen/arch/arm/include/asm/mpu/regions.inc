@@ -1,13 +1,33 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
+#include <asm/bitmap-op.inc>
 #include <asm/mpu.h>
 #include <asm/sysregs.h>
 
 /* Backgroud region enable/disable */
 #define SCTLR_ELx_BR    BIT(17, UL)
 
+#define REGION_DISABLED_PRLAR   0x00    /* NS=0 ATTR=000 EN=0 */
 #define REGION_NORMAL_PRLAR     0x0f    /* NS=0 ATTR=111 EN=1 */
 #define REGION_DEVICE_PRLAR     0x09    /* NS=0 ATTR=100 EN=1 */
+
+#define PRLAR_ELx_EN            0x1
+
+#ifdef CONFIG_ARM_64
+#define XEN_MPUMAP_ENTRY_SHIFT  0x4     /* 16 byte structure */
+
+.macro store_pair reg1, reg2, dst
+    stp \reg1, \reg2, [\dst]
+.endm
+
+#else
+#define XEN_MPUMAP_ENTRY_SHIFT  0x3     /* 8 byte structure */
+
+.macro store_pair reg1, reg2, dst
+    .word 0xe7f000f0                    /* unimplemented */
+.endm
+
+#endif
 
 /*
  * Macro to prepare and set a EL2 MPU memory region.
@@ -58,6 +78,24 @@
     WRITE_SYSREG_ASM(\prlar, PRLAR_EL2)
     dsb   sy
     isb
+
+    /* Load pair into xen_mpumap */
+    adr_l \base, xen_mpumap
+    add   \base, \base, \sel, LSL #XEN_MPUMAP_ENTRY_SHIFT
+    store_pair \prbar, \prlar, \base
+
+    /* Set/clear xen_mpumap_mask bitmap */
+    tst   \prlar, #PRLAR_ELx_EN
+    bne   2f
+    /* Region is disabled, clear the bit in the bitmap */
+    bitmap_clear_bit xen_mpumap_mask, \sel, \base, \limit, \prbar, \prlar
+    b     3f
+
+2:
+    /* Region is enabled, set the bit in the bitmap */
+    bitmap_set_bit xen_mpumap_mask, \sel, \base, \limit, \prbar, \prlar
+
+3:
 
     add   \sel, \sel, #1
 
