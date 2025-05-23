@@ -9,6 +9,7 @@
 #include <xen/types.h>
 #include <asm/mpu.h>
 #include <asm/mpu/mm.h>
+#include <asm/page.h>
 #include <asm/sysregs.h>
 
 struct page_info *frame_table;
@@ -154,6 +155,73 @@ void write_protection_region(const pr_t *pr_write, uint8_t sel)
         BUG(); /* Can't happen */
         break;
     }
+}
+
+pr_t pr_of_addr(paddr_t base, paddr_t limit, unsigned int flags)
+{
+    unsigned int attr_idx = PAGE_AI_MASK(flags);
+    prbar_t prbar;
+    prlar_t prlar;
+    pr_t region;
+
+    /* Build up value for PRBAR_EL2. */
+    prbar = (prbar_t) {
+        .reg = {
+            .xn_0 = 0,
+            .xn = PAGE_XN_MASK(flags),
+            .ap_0 = 0,
+            .ro = PAGE_RO_MASK(flags)
+        }};
+
+    switch ( attr_idx )
+    {
+    /*
+     * ARM ARM: Shareable, Inner Shareable, and Outer Shareable Normal memory
+     * (DDI 0487L.a B2.10.1.1.1 Note section):
+     *
+     * Because all data accesses to Non-cacheable locations are data coherent
+     * to all observers, Non-cacheable locations are always treated as Outer
+     * Shareable
+     *
+     * ARM ARM: Device memory (DDI 0487L.a B2.10.2)
+     *
+     * All of these memory types have the following properties:
+     * [...]
+     *  - Data accesses to memory locations are coherent for all observers in
+     *    the system, and correspondingly are treated as being Outer Shareable
+     */
+    case MT_NORMAL_NC:
+        /* Fall through */
+    case MT_DEVICE_nGnRnE:
+        /* Fall through */
+    case MT_DEVICE_nGnRE:
+        prbar.reg.sh = LPAE_SH_OUTER;
+        break;
+    default:
+        /* Xen mappings are SMP coherent */
+        prbar.reg.sh = LPAE_SH_INNER;
+        break;
+    }
+
+    /* Build up value for PRLAR_EL2. */
+    prlar = (prlar_t) {
+        .reg = {
+            .ns = 0,        /* Hyp mode is in secure world */
+            .ai = attr_idx,
+            .en = 1,        /* Region enabled */
+        }};
+
+    /* Build up MPU memory region. */
+    region = (pr_t) {
+        .prbar = prbar,
+        .prlar = prlar,
+    };
+
+    /* Set base address and limit address. */
+    pr_set_base(&region, base);
+    pr_set_limit(&region, limit);
+
+    return region;
 }
 #endif /* CONFIG_ARM_64 */
 

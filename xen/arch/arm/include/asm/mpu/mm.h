@@ -65,6 +65,16 @@ void read_protection_region(pr_t *pr_read, uint8_t sel);
 /* Writes the MPU region (from @pr_write) with index @sel to the HW */
 void write_protection_region(const pr_t *pr_write, uint8_t sel);
 
+/*
+ * Creates a pr_t structure describing a protection region.
+ *
+ * @base: base address as base of the protection region.
+ * @limit: exclusive address as limit of the protection region.
+ * @flags: memory flags for the mapping.
+ * @return: pr_t structure describing a protection region.
+ */
+pr_t pr_of_addr(paddr_t base, paddr_t limit, unsigned int flags);
+
 #endif /* __ARM_MPU_MM_H__ */
 
 /*
