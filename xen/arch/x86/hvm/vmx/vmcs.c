@@ -1132,9 +1132,11 @@ static int construct_vmcs(struct vcpu *v)
     else
     {
         v->arch.hvm.vmx.secondary_exec_control &=
-            ~(SECONDARY_EXEC_ENABLE_EPT | 
+            ~(SECONDARY_EXEC_ENABLE_EPT |
               SECONDARY_EXEC_UNRESTRICTED_GUEST |
               SECONDARY_EXEC_ENABLE_INVPCID);
+        v->arch.hvm.vmx.tertiary_exec_control &=
+            ~(TERTIARY_EXEC_EPT_PAGING_WRITE);
         vmexit_ctl &= ~(VM_EXIT_SAVE_GUEST_PAT |
                         VM_EXIT_LOAD_HOST_PAT);
         vmentry_ctl &= ~VM_ENTRY_LOAD_GUEST_PAT;
