@@ -22,7 +22,7 @@ unsigned int __ro_after_init ler_msr;
 static bool __initdata opt_ler;
 boolean_param("ler", opt_ler);
 
-int8_t __ro_after_init opt_fred = 0;
+int8_t __ro_after_init opt_fred = -1;
 boolean_param("fred", opt_fred);
 
 void nocall entry_PF(void);
@@ -392,7 +392,7 @@ void __init traps_init(void)
     }
 
     if ( opt_fred == -1 )
-        opt_fred = !pv_shim;
+        opt_fred = (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) && !pv_shim;
 
     if ( opt_fred )
     {

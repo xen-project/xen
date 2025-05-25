@@ -1259,12 +1259,13 @@ does not provide `VM_ENTRY_LOAD_GUEST_PAT`.
 ### fred (x86)
 > `= <bool>`
 
-> Default: `false`
+> Default: `true` on AMD, `false` otherwise
 
 Flexible Return and Event Delivery is an overhaul of interrupt, exception and
-system call handling, fixing many corner cases in the x86 architecture, and
-expected in hardware from 2025.  Support in Xen is a work in progress and
-disabled by default.
+system call handling, fixing many corner cases in the x86 architecture, and is
+available on Intel Panther Lake and Diamond Rapids CPUs, and AMD Zen6 CPUs.
+FRED is fully supported on AMD hardware.  On Intel hardware it is still tech
+preview, and in particular not security supported.
 
 ### gnttab
 > `= List of [ max-ver:<integer>, transitive=<bool>, transfer=<bool> ]`
