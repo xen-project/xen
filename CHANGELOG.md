@@ -15,6 +15,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - On x86:
    - Restrict the cache flushing done as a result of guest physical memory map
      manipulations and memory type changes.
+   - Allow controlling the MTRR cache attribute of the Xen platform PCI device
+     BAR for HVM guests, to improve performance of guests using it to map the
+     grant table or foreign memory.
 
 ### Added
  - On x86:

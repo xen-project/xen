@@ -2351,6 +2351,14 @@ Windows L<https://xenproject.org/windows-pv-drivers/>.
 Setting B<xen_platform_pci=0> with the default device_model "qemu-xen"
 requires at least QEMU 1.6.
 
+
+=item B<xen_platform_pci_bar_uc=BOOLEAN>
+
+B<x86 only:> Select whether the memory BAR of the Xen platform PCI device
+should have uncacheable (UC) cache attribute set in MTRR.
+
+Default is B<true>.
+
 =item B<viridian=[ "GROUP", "GROUP", ...]> or B<viridian=BOOLEAN>
 
 The groups of Microsoft Hyper-V (AKA viridian) compatible enlightenments

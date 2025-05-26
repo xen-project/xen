@@ -234,6 +234,11 @@ These xenstore values are used to override some of the default string
 values in the SMBIOS table constructed in hvmloader. See the SMBIOS
 table specification at http://www.dmtf.org/standards/smbios/ 
 
+#### ~/hvmloader/pci/xen-platform-pci-bar-uc = ("1"|"0") [HVM,INTERNAL]
+
+Select whether the Xen platform PCI device MMIO BAR will have the uncacheable
+cache attribute set in the MTRRs by hvmloader.
+
 #### ~/bios-strings/oem-* = STRING [HVM,INTERNAL]
 
 1 to 99 OEM strings can be set in xenstore using values of the form
