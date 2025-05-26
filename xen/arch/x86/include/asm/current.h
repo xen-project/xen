@@ -154,7 +154,9 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
     "rdsspd %[ssp];"                                            \
     "cmp $1, %[ssp];"                                           \
     "je .L_shstk_done.%=;" /* CET not active?  Skip. */         \
-    "mov $%c[skstk_base], %[val];"                              \
+    ALTERNATIVE("mov $%c[shstk_base], %[val];",                 \
+                "mov $%c[shstk_base] + 8, %[val];",             \
+                X86_FEATURE_XEN_FRED)                           \
     "and $%c[stack_mask], %[ssp];"                              \
     "sub %[ssp], %[val];"                                       \
     "shr $3, %[val];"                                           \
@@ -188,7 +190,7 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
               [ssp] "=&r" (tmp)                                         \
             : [stk] "r" (guest_cpu_user_regs()),                        \
               [fun] constr (fn),                                        \
-              [skstk_base] "i"                                          \
+              [shstk_base] "i"                                          \
               ((PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8),               \
               [stack_mask] "i" (STACK_SIZE - 1),                        \
               _ASM_BUGFRAME_INFO(BUGFRAME_bug, __LINE__,                \
