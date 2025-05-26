@@ -90,7 +90,7 @@ LABEL(s3_resume)
         mov     %rcx, STACK_CPUINFO_FIELD(cr4)(%r15)
         mov     %rcx, %cr4
 
-        /* WARNING! call/ret now fatal (iff SHSTK) until SETSSBSY loads SSP */
+        /* WARNING! CALL/RET now fatal (iff SHSTK) until RSTORSSP loads SSP */
 
 #if defined(CONFIG_XEN_SHSTK)
         test    $CET_SHSTK_EN, %al
@@ -98,32 +98,31 @@ LABEL(s3_resume)
 
         /*
          * Restoring SSP is a little complicated, because we are intercepting
-         * an in-use shadow stack.  Write a temporary token under the stack,
-         * so SETSSBSY will successfully load a value useful for us, then
-         * reset MSR_PL0_SSP to its usual value and pop the temporary token.
+         * an in-use shadow stack.  Write a Restore Token under the stack, and
+         * use RSTORSSP to load it.  RSTORSSP converts the token to a
+         * Previous-SSP Token, which we discard.
          */
         mov     saved_ssp(%rip), %rdi
 
-        /* Construct the temporary supervisor token under SSP. */
-        sub     $8, %rdi
-
-        /* Load it into MSR_PL0_SSP. */
+        /* Calculate MSR_PL0_SSP from SSP. */
         mov     $MSR_PL0_SSP, %ecx
         mov     %rdi, %rdx
         shr     $32, %rdx
         mov     %edi, %eax
-        wrmsr
-
-        /* Write the temporary token onto the shadow stack, and activate it. */
-        wrssq   %rdi, (%rdi)
-        setssbsy
-
-        /* Reset MSR_PL0_SSP back to its normal value. */
         and     $~(STACK_SIZE - 1), %eax
         or      $(PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8, %eax
         wrmsr
 
-        /* Pop the temporary token off the stack. */
+        /*
+         * A Restore Token's value is &token + 8 + 64BIT (bit 0).
+         * We want to put this on the shstk at SSP - 8.
+         */
+        lea     1(%rdi), %rax
+        sub     $8, %rdi
+        wrssq   %rax, (%rdi)
+        rstorssp (%rdi)
+
+        /* Discard the Previous-SSP Token from the shstk. */
         mov     $2, %eax
         incsspd %eax
 #endif /* CONFIG_XEN_SHSTK */
