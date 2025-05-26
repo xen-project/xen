@@ -25,7 +25,7 @@
  * this by keeping a bitmap of the ranges in the frame table containing
  * invalid entries and not allocating backing memory for them.
  *
- * ## PDX compression
+ * ## PDX mask compression
  *
  * This is a technique to avoid wasting memory on machines known to have
  * split their machine address space in several big discontinuous and highly
@@ -101,21 +101,12 @@ bool __mfn_valid(unsigned long mfn);
 #define paddr_to_pdx(pa) pfn_to_pdx(paddr_to_pfn(pa))
 #define pdx_to_paddr(px) pfn_to_paddr(pdx_to_pfn(px))
 
-#ifdef CONFIG_PDX_COMPRESSION
+#ifdef CONFIG_PDX_MASK_COMPRESSION
 
 extern unsigned long pfn_pdx_bottom_mask, ma_va_bottom_mask;
 extern unsigned int pfn_pdx_hole_shift;
 extern unsigned long pfn_hole_mask;
 extern unsigned long pfn_top_mask, ma_top_mask;
-
-/**
- * Validate a region's compatibility with the current compression runtime
- *
- * @param base Base address of the region
- * @param npages Number of PAGE_SIZE-sized pages in the region
- * @return True iff the region can be used with the current compression
- */
-bool pdx_is_region_compressible(paddr_t base, unsigned long npages);
 
 /**
  * Calculates a mask covering "moving" bits of all addresses of a region
@@ -209,7 +200,9 @@ static inline paddr_t directmapoff_to_maddr(unsigned long offset)
  */
 void pfn_pdx_hole_setup(unsigned long mask);
 
-#else /* !CONFIG_PDX_COMPRESSION */
+#endif /* CONFIG_PDX_MASK_COMPRESSION */
+
+#ifdef CONFIG_PDX_NONE
 
 /* Without PDX compression we can skip some computations */
 
@@ -241,7 +234,20 @@ static inline void pfn_pdx_hole_setup(unsigned long mask)
 {
 }
 
-#endif /* CONFIG_PDX_COMPRESSION */
+#else /* !CONFIG_PDX_NONE */
+
+/* Shared functions implemented by all PDX compressions. */
+
+/**
+ * Validate a region's compatibility with the current compression runtime
+ *
+ * @param base Base address of the region
+ * @param npages Number of PAGE_SIZE-sized pages in the region
+ * @return True iff the region can be used with the current compression
+ */
+bool pdx_is_region_compressible(paddr_t base, unsigned long npages);
+
+#endif /* !CONFIG_PDX_NONE */
 #endif /* __XEN_PDX_H__ */
 
 /*

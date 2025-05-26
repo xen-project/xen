@@ -57,9 +57,10 @@ config EVTCHN_FIFO
 
 	  If unsure, say Y.
 
-config PDX_COMPRESSION
-	bool "PDX (Page inDeX) compression" if EXPERT && !X86 && !RISCV
-	default ARM || PPC
+choice
+	prompt "PDX (Page inDeX) compression"
+	default PDX_MASK_COMPRESSION if !X86 && !RISCV
+	default PDX_NONE
 	help
 	  PDX compression is a technique designed to reduce the memory
 	  overhead of physical memory management on platforms with sparse RAM
@@ -71,6 +72,17 @@ config PDX_COMPRESSION
 
 	  If your platform does not have sparse RAM banks, do not enable PDX
 	  compression.
+
+config PDX_MASK_COMPRESSION
+	bool "Mask compression"
+	help
+	  Compression relying on all RAM addresses sharing a zeroed bit region.
+
+config PDX_NONE
+	bool "None"
+	help
+	  No compression
+endchoice
 
 config ALTERNATIVE_CALL
 	bool

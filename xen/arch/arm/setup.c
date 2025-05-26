@@ -258,7 +258,7 @@ void __init init_pdx(void)
     paddr_t bank_start, bank_size, bank_end, ram_end = 0;
     int bank;
 
-#ifdef CONFIG_PDX_COMPRESSION
+#ifndef CONFIG_PDX_NONE
     /*
      * Arm does not have any restrictions on the bits to compress. Pass 0 to
      * let the common code further restrict the mask.

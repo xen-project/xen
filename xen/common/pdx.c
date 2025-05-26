@@ -34,7 +34,7 @@ bool __mfn_valid(unsigned long mfn)
 {
     bool invalid = mfn >= max_page;
 
-#ifdef CONFIG_PDX_COMPRESSION
+#ifdef CONFIG_PDX_MASK_COMPRESSION
     invalid |= mfn & pfn_hole_mask;
 #endif
 
@@ -55,7 +55,7 @@ void set_pdx_range(unsigned long smfn, unsigned long emfn)
         __set_bit(idx, pdx_group_valid);
 }
 
-#ifdef CONFIG_PDX_COMPRESSION
+#ifdef CONFIG_PDX_MASK_COMPRESSION
 
 /*
  * Diagram to make sense of the following variables. The masks and shifts
