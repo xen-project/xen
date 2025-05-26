@@ -1840,7 +1840,7 @@ void asmlinkage do_debug(struct cpu_user_regs *regs)
         return;
     }
 
-    pv_inject_DB(0 /* N/A, already merged */);
+    pv_inject_DB(dr6 ^ X86_DR6_DEFAULT);
 }
 
 void asmlinkage do_entry_CP(struct cpu_user_regs *regs)
