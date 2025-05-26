@@ -45,7 +45,7 @@ void irq_end_none(struct irq_desc *irq)
     gic_hw_ops->gic_host_irq_type->end(irq);
 }
 
-static irq_desc_t irq_desc[NR_IRQS];
+static irq_desc_t irq_desc[NR_IRQS - NR_LOCAL_IRQS];
 static DEFINE_PER_CPU(irq_desc_t[NR_LOCAL_IRQS], local_irq_desc);
 
 struct irq_desc *__irq_to_desc(unsigned int irq)
