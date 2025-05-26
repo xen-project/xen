@@ -32,7 +32,6 @@
 #include <asm/hvm/vmx/vmcs.h>
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
-#include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
 #include <asm/x86_emulate.h>
 #include <asm/hvm/vpt.h>

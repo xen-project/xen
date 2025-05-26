@@ -26,7 +26,6 @@
 #include <asm/p2m.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/vpt.h>
-#include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/emulate.h>
 #include <public/sched.h>

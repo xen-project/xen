@@ -38,7 +38,6 @@
 #include <public/hvm/ioreq.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/io.h>
-#include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/support.h>
 #include <asm/current.h>
