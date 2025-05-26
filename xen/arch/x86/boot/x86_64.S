@@ -53,16 +53,20 @@ ENTRY(__high_start)
         mov     %rcx, STACK_CPUINFO_FIELD(cr4)(%r15)
         mov     %rcx, %cr4
 
-        /* WARNING! call/ret now fatal (iff SHSTK) until SETSSBSY loads SSP */
+        /* WARNING! CALL/RET now fatal (iff SHSTK) until SETSSBSY/RSTORSSP loads SSP */
 
 #if defined(CONFIG_XEN_SHSTK)
         test    $CET_SHSTK_EN, %al
         jz      .L_ap_cet_done
 
-        /* Derive the supervisor token address from %rsp. */
+        /* Derive the token address from %rsp. */
         mov     %rsp, %rdx
         and     $~(STACK_SIZE - 1), %rdx
         or      $(PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8, %rdx
+
+        /* Establishing SSP differs between IDT or FRED mode. */
+        bt      $32 /* ilog2(X86_CR4_FRED) */, %rcx
+        jc      .L_fred_shstk
 
         /*
          * Write a new Supervisor Token.  It doesn't matter the first time a
@@ -71,6 +75,21 @@ ENTRY(__high_start)
          */
         wrssq   %rdx, (%rdx)
         setssbsy
+        jmp     .L_ap_cet_done
+
+.L_fred_shstk:
+
+        /*
+         * Write a Restore Token, value: &token + 8 + 64BIT (bit 0) at the
+         * base of the shstk (which isn't in use yet).
+         */
+        lea     9(%rdx), %rdi
+        wrssq   %rdi, (%rdx)
+        rstorssp (%rdx)
+
+        /* Discard the Previous-SSP Token from the shstk. */
+        mov     $2, %edx
+        incsspd %edx
 
 #endif /* CONFIG_XEN_SHSTK */
 .L_ap_cet_done:

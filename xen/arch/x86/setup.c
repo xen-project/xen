@@ -49,6 +49,7 @@
 #include <asm/prot-key.h>
 #include <asm/pv/domain.h>
 #include <asm/setup.h>
+#include <asm/shstk.h>
 #include <asm/smp.h>
 #include <asm/spec_ctrl.h>
 #include <asm/stubs.h>
@@ -908,7 +909,29 @@ static void __init noreturn reinit_bsp_stack(void)
     if ( cpu_has_xen_shstk )
     {
         wrmsrl(MSR_S_CET, xen_msr_s_cet_value());
-        asm volatile ("setssbsy" ::: "memory");
+
+        /*
+         * IDT and FRED differ by a Supervisor Token on the shadow stack.
+         *
+         * In IDT mode, we use SETSSBSY (itself using MSR_PL0_SSP, configured
+         * previously) to mark the Supervisor Token as Busy.  In FRED mode,
+         * there is no token, so we need to create a temporary Restore Token
+         * to establish SSP.
+         */
+        if ( opt_fred )
+        {
+            unsigned long *token =
+                (void *)stack + (PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8;
+
+            wrss((unsigned long)token + 9, token);
+            asm volatile ( "rstorssp %0" : "+m" (*token) );
+            /*
+             * We need to discard the resulting Previous-SSP Token, but
+             * reset_stack_and_jump() will do that for us.
+             */
+        }
+        else
+            asm volatile ( "setssbsy" ::: "memory" );
     }
 
     reset_stack_and_jump(init_done);
