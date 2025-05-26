@@ -11,15 +11,18 @@ ENTRY(__high_start)
         mov     %ecx,%gs
         mov     %ecx,%ss
 
-        /* Enable minimal CR4 features. */
-        mov     $XEN_MINIMAL_CR4,%rcx
-        mov     %rcx,%cr4
-
         mov     stack_start(%rip),%rsp
 
         /* Reset EFLAGS (subsumes CLI and CLD). */
         pushq   $0
         popf
+
+        GET_STACK_END(15)
+
+        /* Enable minimal CR4 features, sync cached state. */
+        mov     $XEN_MINIMAL_CR4, %eax
+        mov     %rax, STACK_CPUINFO_FIELD(cr4)(%r15)
+        mov     %rax, %cr4
 
         /* Reload code selector. */
         pushq   $__HYPERVISOR_CS
@@ -45,7 +48,9 @@ ENTRY(__high_start)
         wrmsr
 
         /* Enable CR4.CET. */
-        mov     $XEN_MINIMAL_CR4 | X86_CR4_CET, %ecx
+        mov     $X86_CR4_CET, %ecx
+        or      STACK_CPUINFO_FIELD(cr4)(%r15), %rcx
+        mov     %rcx, STACK_CPUINFO_FIELD(cr4)(%r15)
         mov     %rcx, %cr4
 
         /* WARNING! call/ret now fatal (iff SHSTK) until SETSSBSY loads SSP */

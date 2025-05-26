@@ -63,6 +63,14 @@ LABEL(s3_resume)
         pushq   %rax
         lretq
 1:
+
+        GET_STACK_END(15)
+
+        /* Enable minimal CR4 features, sync cached state. */
+        mov     $XEN_MINIMAL_CR4, %eax
+        mov     %rax, STACK_CPUINFO_FIELD(cr4)(%r15)
+        mov     %rax, %cr4
+
         /* Set up early exceptions and CET before entering C properly. */
         call    percpu_early_traps_init
 
@@ -77,7 +85,9 @@ LABEL(s3_resume)
         wrmsr
 
         /* Enable CR4.CET. */
-        mov     $XEN_MINIMAL_CR4 | X86_CR4_CET, %ecx
+        mov     $X86_CR4_CET, %ecx
+        or      STACK_CPUINFO_FIELD(cr4)(%r15), %rcx
+        mov     %rcx, STACK_CPUINFO_FIELD(cr4)(%r15)
         mov     %rcx, %cr4
 
         /* WARNING! call/ret now fatal (iff SHSTK) until SETSSBSY loads SSP */
@@ -120,9 +130,9 @@ LABEL(s3_resume)
 .L_cet_done:
 #endif /* CONFIG_XEN_SHSTK || CONFIG_XEN_IBT */
 
-        /* Restore CR4 from the cpuinfo block. */
-        GET_STACK_END(bx)
-        mov     STACK_CPUINFO_FIELD(cr4)(%rbx), %rax
+        /* Load all CR4 settings. */
+        mov     mmu_cr4_features(%rip), %rax
+        mov     %rax, STACK_CPUINFO_FIELD(cr4)(%r15)
         mov     %rax, %cr4
 
         call    mtrr_bp_restore
