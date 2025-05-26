@@ -354,7 +354,7 @@ void show_page_walk(unsigned long addr)
            l1_table_offset(addr), l1e_get_intpte(l1e), pfn);
 }
 
-void show_code(const struct cpu_user_regs *regs)
+static void show_code(const struct cpu_user_regs *regs)
 {
     unsigned char insns_before[8] = {}, insns_after[16] = {};
     unsigned int i, tmp, missing_before, missing_after;
@@ -838,7 +838,7 @@ static void show_stack(const struct cpu_user_regs *regs)
     show_trace(regs);
 }
 
-void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs)
+static void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs)
 {
     unsigned long esp = regs->rsp;
     unsigned long curr_stack_base = esp & ~(STACK_SIZE - 1);

@@ -333,8 +333,6 @@ extern void write_ptbase(struct vcpu *v);
 /* PAUSE (encoding: REP NOP) is a good thing to insert into busy-wait loops. */
 #define cpu_relax() asm volatile ( "pause" ::: "memory" )
 
-void show_code(const struct cpu_user_regs *regs);
-void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs);
 void show_registers(const struct cpu_user_regs *regs);
 #define dump_execution_state() run_in_exception_handler(show_execution_state)
 void show_page_walk(unsigned long addr);
