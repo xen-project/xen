@@ -6,11 +6,9 @@
 #include <xen/cpuidle.h>
 #include <xen/dmi.h>
 #include <xen/domain.h>
-#include <xen/domain_page.h>
 #include <xen/efi.h>
 #include <xen/err.h>
 #include <xen/grant_table.h>
-#include <xen/hypercall.h>
 #include <xen/init.h>
 #include <xen/kexec.h>
 #include <xen/keyhandler.h>
@@ -25,7 +23,6 @@
 #include <xen/sections.h>
 #include <xen/serial.h>
 #include <xen/softirq.h>
-#include <xen/trace.h>
 #include <xen/version.h>
 #include <xen/vga.h>
 #include <xen/virtual_region.h>
@@ -36,7 +33,6 @@
 #include <asm/bootinfo.h>
 #include <asm/bzimage.h>
 #include <asm/cpu-policy.h>
-#include <asm/desc.h>
 #include <asm/e820.h>
 #include <asm/edd.h>
 #include <asm/genapic.h>
@@ -62,7 +58,6 @@
 
 #include <xsm/xsm.h>
 
-#include <public/version.h>
 #ifdef CONFIG_COMPAT
 #include <compat/platform.h>
 #include <compat/xen.h>
