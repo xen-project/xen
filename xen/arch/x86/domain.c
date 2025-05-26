@@ -461,30 +461,6 @@ void domain_cpu_policy_changed(struct domain *d)
     }
 }
 
-#if !defined(CONFIG_BIGMEM) && defined(CONFIG_PDX_COMPRESSION)
-/*
- * The hole may be at or above the 44-bit boundary, so we need to determine
- * the total bit count until reaching 32 significant (not squashed out) bits
- * in PFN representations.
- * Note that the way "bits" gets initialized/updated/bounds-checked guarantees
- * that the function will never return zero, and hence will never be called
- * more than once (which is important due to it being deliberately placed in
- * .init.text).
- */
-static unsigned int __init noinline _domain_struct_bits(void)
-{
-    unsigned int bits = 32 + PAGE_SHIFT;
-    unsigned int sig = hweight32(~pfn_hole_mask);
-    unsigned int mask = pfn_hole_mask >> 32;
-
-    for ( ; bits < BITS_PER_LONG && sig < 32; ++bits, mask >>= 1 )
-        if ( !(mask & 1) )
-            ++sig;
-
-    return bits;
-}
-#endif
-
 struct domain *alloc_domain_struct(void)
 {
     struct domain *d;
@@ -498,14 +474,20 @@ struct domain *alloc_domain_struct(void)
      * On systems with CONFIG_BIGMEM there's no packing, and so there's no
      * such restriction.
      */
-#if defined(CONFIG_BIGMEM) || !defined(CONFIG_PDX_COMPRESSION)
-    const unsigned int bits = IS_ENABLED(CONFIG_BIGMEM) ? 0 :
-                                                          32 + PAGE_SHIFT;
+#if defined(CONFIG_BIGMEM)
+    const unsigned int bits = 0;
 #else
-    static unsigned int __read_mostly bits;
+    static unsigned int __ro_after_init bits;
 
     if ( unlikely(!bits) )
-         bits = _domain_struct_bits();
+         /*
+          * Get the width for the next pfn, and unconditionally subtract one
+          * from it to ensure the used width will not allocate past the PDX
+          * field limit.
+          */
+         bits = flsl(pdx_to_paddr(1UL <<
+                                  (sizeof(frame_table->v.inuse._domain) * 8)))
+                - 1;
 #endif
 
     BUILD_BUG_ON(sizeof(*d) > PAGE_SIZE);

@@ -99,6 +99,7 @@ bool __mfn_valid(unsigned long mfn);
 #define pdx_to_mfn(pdx) _mfn(pdx_to_pfn(pdx))
 
 #define paddr_to_pdx(pa) pfn_to_pdx(paddr_to_pfn(pa))
+#define pdx_to_paddr(px) pfn_to_paddr(pdx_to_pfn(px))
 
 #ifdef CONFIG_PDX_COMPRESSION
 
