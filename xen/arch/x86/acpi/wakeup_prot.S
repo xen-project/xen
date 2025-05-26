@@ -104,15 +104,6 @@ LABEL(s3_resume)
          */
         mov     saved_ssp(%rip), %rdi
 
-        /* Calculate MSR_PL0_SSP from SSP. */
-        mov     $MSR_PL0_SSP, %ecx
-        mov     %rdi, %rdx
-        shr     $32, %rdx
-        mov     %edi, %eax
-        and     $~(STACK_SIZE - 1), %eax
-        or      $(PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8, %eax
-        wrmsr
-
         /*
          * A Restore Token's value is &token + 8 + 64BIT (bit 0).
          * We want to put this on the shstk at SSP - 8.

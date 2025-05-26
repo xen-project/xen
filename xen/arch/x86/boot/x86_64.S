@@ -65,17 +65,11 @@ ENTRY(__high_start)
         or      $(PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8, %rdx
 
         /*
-         * Write a new supervisor token.  Doesn't matter on boot, but for S3
-         * resume this clears the busy bit.
+         * Write a new Supervisor Token.  It doesn't matter the first time a
+         * CPU boots, but for S3 resume or hotplug this clears the busy bit so
+         * SETSSBSY can set it again.
          */
         wrssq   %rdx, (%rdx)
-
-        /* Point MSR_PL0_SSP at the token. */
-        mov     $MSR_PL0_SSP, %ecx
-        mov     %edx, %eax
-        shr     $32, %rdx
-        wrmsr
-
         setssbsy
 
 #endif /* CONFIG_XEN_SHSTK */

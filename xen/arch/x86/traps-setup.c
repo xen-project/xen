@@ -92,6 +92,7 @@ static void load_system_tables(void)
     {
         volatile uint64_t *ist_ssp = tss_page->ist_ssp;
         unsigned long
+            ssp = stack_top + (PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8,
             mce_ssp = stack_top + (IST_MCE * IST_SHSTK_SIZE) - 8,
             nmi_ssp = stack_top + (IST_NMI * IST_SHSTK_SIZE) - 8,
             db_ssp  = stack_top + (IST_DB  * IST_SHSTK_SIZE) - 8,
@@ -118,6 +119,7 @@ static void load_system_tables(void)
         }
 
         wrmsrns(MSR_ISST, (unsigned long)ist_ssp);
+        wrmsrns(MSR_PL0_SSP, (unsigned long)ssp);
     }
 
     _set_tssldt_desc(gdt + TSS_ENTRY, (unsigned long)tss,
