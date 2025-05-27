@@ -709,7 +709,7 @@ static int __vgic_v3_distr_common_mmio_read(const char *name, struct vcpu *v,
 
     /* Read the pending status of an IRQ via GICD/GICR is not supported */
     case VRANGE32(GICD_ISPENDR, GICD_ISPENDRN):
-    case VRANGE32(GICD_ICPENDR, GICD_ICPENDR):
+    case VRANGE32(GICD_ICPENDR, GICD_ICPENDRN):
         goto read_as_zero;
 
     /* Read the active status of an IRQ via GICD/GICR is not supported */
