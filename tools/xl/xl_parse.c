@@ -2733,10 +2733,7 @@ skip_usbdev:
     xlu_cfg_replace_string (config, "device_model_override",
                             &b_info->device_model, 0);
     if (!xlu_cfg_get_string (config, "device_model_version", &buf, 0)) {
-        if (!strcmp(buf, "qemu-xen-traditional")) {
-            b_info->device_model_version
-                = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
-        } else if (!strcmp(buf, "qemu-xen")) {
+        if (!strcmp(buf, "qemu-xen")) {
             b_info->device_model_version
                 = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
         } else {

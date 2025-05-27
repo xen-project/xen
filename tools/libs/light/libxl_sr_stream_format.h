@@ -45,7 +45,7 @@ typedef struct libxl__sr_emulator_hdr
 } libxl__sr_emulator_hdr;
 
 #define EMULATOR_UNKNOWN             0x00000000U
-#define EMULATOR_QEMU_TRADITIONAL    0x00000001U
+#define EMULATOR_QEMU_TRADITIONAL    0x00000001U /* Dropped in Xen 4.21 */
 #define EMULATOR_QEMU_UPSTREAM       0x00000002U
 
 typedef struct libxl_sr_checkpoint_state

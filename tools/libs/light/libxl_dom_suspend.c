@@ -85,15 +85,8 @@ void libxl__domain_suspend_device_model(libxl__egc *egc,
     STATE_AO_GC(dsps->ao);
     int rc = 0;
     uint32_t const domid = dsps->domid;
-    const char *const filename = dsps->dm_savefile;
 
     switch (libxl__device_model_version_running(gc, domid)) {
-    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL: {
-        LOGD(DEBUG, domid, "Saving device model state to %s", filename);
-        libxl__qemu_traditional_cmd(gc, domid, "save");
-        libxl__wait_for_device_model_deprecated(gc, domid, "paused", NULL, NULL, NULL);
-        break;
-    }
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
         /* calls dsps->callback_device_model_done when done */
         libxl__qmp_suspend_save(egc, dsps); /* must be last */
@@ -420,21 +413,7 @@ static void domain_suspend_callback_common_done(libxl__egc *egc,
 
 int libxl__domain_resume_device_model_deprecated(libxl__gc *gc, uint32_t domid)
 {
-    const char *path, *state;
-
     switch (libxl__device_model_version_running(gc, domid)) {
-    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL: {
-        uint32_t dm_domid = libxl_get_stubdom_id(CTX, domid);
-
-        path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/state");
-        state = libxl__xs_read(gc, XBT_NULL, path);
-        if (state != NULL && !strcmp(state, "paused")) {
-            libxl__qemu_traditional_cmd(gc, domid, "continue");
-            libxl__wait_for_device_model_deprecated(gc, domid, "running",
-                                                    NULL, NULL, NULL);
-        }
-        break;
-    }
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
         if (libxl__qmp_resume(gc, domid))
             return ERROR_FAIL;
@@ -493,8 +472,6 @@ static void dm_resume_dispose(libxl__gc *gc,
     libxl__ev_xswatch_deregister(gc, &dmrs->watch);
 }
 
-static void dm_resume_xswatch_cb(libxl__egc *egc,
-    libxl__ev_xswatch *, const char *watch_path, const char *);
 static void dm_resume_qmp_done(libxl__egc *egc,
     libxl__ev_qmp *qmp, const libxl__json_object *, int rc);
 static void dm_resume_timeout(libxl__egc *egc,
@@ -521,27 +498,6 @@ void libxl__dm_resume(libxl__egc *egc,
     if (rc) goto out;
 
     switch (libxl__device_model_version_running(gc, domid)) {
-    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL: {
-        uint32_t dm_domid = libxl_get_stubdom_id(CTX, domid);
-        const char *path, *state;
-
-        path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/state");
-        rc = libxl__xs_read_checked(gc, XBT_NULL, path, &state);
-        if (rc) goto out;
-        if (!state || strcmp(state, "paused")) {
-            /* already running */
-            rc = 0;
-            goto out;
-        }
-
-        rc = libxl__qemu_traditional_cmd(gc, domid, "continue");
-        if (rc) goto out;
-        rc = libxl__ev_xswatch_register(gc, &dmrs->watch,
-                                        dm_resume_xswatch_cb,
-                                        path);
-        if (rc) goto out;
-        break;
-    }
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
         qmp->ao = dmrs->ao;
         qmp->domid = domid;
@@ -557,27 +513,6 @@ void libxl__dm_resume(libxl__egc *egc,
 
     return;
 
-out:
-    dm_resume_done(egc, dmrs, rc);
-}
-
-static void dm_resume_xswatch_cb(libxl__egc *egc,
-                                 libxl__ev_xswatch *xsw,
-                                 const char *watch_path,
-                                 const char *event_path)
-{
-    EGC_GC;
-    libxl__dm_resume_state *dmrs = CONTAINER_OF(xsw, *dmrs, watch);
-    int rc;
-    const char *value;
-
-    rc = libxl__xs_read_checked(gc, XBT_NULL, watch_path, &value);
-    if (rc) goto out;
-
-    if (!value || strcmp(value, "running"))
-        return;
-
-    rc = 0;
 out:
     dm_resume_done(egc, dmrs, rc);
 }

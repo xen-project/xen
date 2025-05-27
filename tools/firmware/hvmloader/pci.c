@@ -113,17 +113,7 @@ void pci_setup(void)
      * increase the size of the lowmem MMIO hole?  Defaulting to 1
      * here will mean that non-libxl toolstacks (including xend and
      * home-grown ones) means that those using qemu-xen will still
-     * experience the memory relocation bug described below; but it
-     * also means that those using qemu-traditional will *not*
-     * experience any change; and it also means that there is a
-     * work-around for those using qemu-xen, namely switching to
-     * qemu-traditional.
-     *
-     * If we defaulted to 0, and failing to resize the hole caused any
-     * problems with qemu-traditional, then there is no work-around.
-     *
-     * Since xend can only use qemu-traditional, I think this is the
-     * option that will have the least impact.
+     * experience the memory relocation bug described below.
      */
     bool allow_memory_relocate = 1;
 
@@ -347,9 +337,8 @@ void pci_setup(void)
     {
         /*
          * At the moment qemu-xen can't deal with relocated memory regions.
-         * It's too close to the release to make a proper fix; for now,
-         * only allow the MMIO hole to grow large enough to move guest memory
-         * if we're running qemu-traditional.  Items that don't fit will be
+         * Only allow the MMIO hole to grow large enough to move guest memory
+         * if allow_memory_relocate is true.  Items that don't fit will be
          * relocated into the 64-bit address space.
          *
          * This loop now does the following:

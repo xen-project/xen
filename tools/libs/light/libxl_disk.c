@@ -1007,13 +1007,6 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
         disk->backend = LIBXL_DISK_BACKEND_PHY;
     }
 
-    if (cis->dm_ver == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL &&
-        stubdomid) {
-        LOGD(ERROR, domid, "cdrom-insert doesn't work for Mini-OS stubdoms");
-        rc = ERROR_INVAL;
-        goto out;
-    }
-
     disks = libxl__device_list(gc, &libxl__disk_devtype, cis->disk_domid, &num);
     for (i = 0; i < num; i++) {
         if (disks[i].is_cdrom && !strcmp(disk->vdev, disks[i].vdev))

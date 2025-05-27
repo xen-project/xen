@@ -881,7 +881,6 @@ static int libxl__domain_firmware(libxl__gc *gc,
             switch (info->device_model_version)
             {
             case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-            case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
                 firmware = "hvmloader";
                 break;
             default:
@@ -1210,15 +1209,6 @@ out:
     assert(rc != 0);
     if (dom != NULL) xc_dom_release(dom);
     return rc;
-}
-
-int libxl__qemu_traditional_cmd(libxl__gc *gc, uint32_t domid,
-                                const char *cmd)
-{
-    char *path = NULL;
-    uint32_t dm_domid = libxl_get_stubdom_id(CTX, domid);
-    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/command");
-    return libxl__xs_printf(gc, XBT_NULL, path, "%s", cmd);
 }
 
 /*==================== Miscellaneous ====================*/

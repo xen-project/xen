@@ -328,9 +328,6 @@ const char *libxl__domain_device_model(libxl__gc *gc,
         dm = libxl__strdup(gc, info->device_model);
     } else {
         switch (info->device_model_version) {
-        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-            dm = libxl__abs_path(gc, "qemu-dm", libxl__private_bindir_path());
-            break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN: {
             const char *configured_dm = qemu_xen_path(gc);
             if (configured_dm[0] == '/')
@@ -702,272 +699,6 @@ static const char *dm_keymap(const libxl_domain_config *guest_config)
         return guest_config->vfbs[0].keymap;
     } else
         return NULL;
-}
-
-static int libxl__build_device_model_args_old(libxl__gc *gc,
-                                        const char *dm, int domid,
-                                        const libxl_domain_config *guest_config,
-                                        char ***args, char ***envs,
-                                        const libxl__domain_build_state *state)
-{
-    const libxl_domain_create_info *c_info = &guest_config->c_info;
-    const libxl_domain_build_info *b_info = &guest_config->b_info;
-    const libxl_device_nic *nics = guest_config->nics;
-    const libxl_vnc_info *vnc = libxl__dm_vnc(guest_config);
-    const libxl_sdl_info *sdl = dm_sdl(guest_config);
-    const int num_nics = guest_config->num_nics;
-    const char *keymap = dm_keymap(guest_config);
-    int i;
-    flexarray_t *dm_args, *dm_envs;
-    dm_args = flexarray_make(gc, 16, 1);
-    dm_envs = flexarray_make(gc, 16, 1);
-
-    assert(state->dm_monitor_fd == -1);
-
-    flexarray_vappend(dm_args, dm,
-                      "-d", GCSPRINTF("%d", domid), NULL);
-
-    if (c_info->name)
-        flexarray_vappend(dm_args, "-domain-name", c_info->name, NULL);
-
-    if (vnc) {
-        char *vncarg = NULL;
-
-        flexarray_append(dm_args, "-vnc");
-
-        /*
-         * If vnc->listen is present and contains a :, and
-         *  - vnc->display is 0, use vnc->listen
-         *  - vnc->display is non-zero, be confused
-         * If vnc->listen is present but doesn't, use vnc->listen:vnc->display.
-         * If vnc->listen is not present, use 127.0.0.1:vnc->display
-         * (Remembering that vnc->display already defaults to 0.)
-         */
-        if (vnc->listen) {
-            if (strchr(vnc->listen, ':') != NULL) {
-                if (vnc->display) {
-                    LOGD(ERROR, domid, "vncdisplay set, vnclisten contains display");
-                    return ERROR_INVAL;
-                }
-                vncarg = vnc->listen;
-            } else {
-                vncarg = GCSPRINTF("%s:%d", vnc->listen, vnc->display);
-            }
-        } else
-            vncarg = GCSPRINTF("127.0.0.1:%d", vnc->display);
-
-        if (vnc->passwd && vnc->passwd[0]) {
-            vncarg = GCSPRINTF("%s,password", vncarg);
-        }
-
-        flexarray_append(dm_args, vncarg);
-
-        if (libxl_defbool_val(vnc->findunused)) {
-            flexarray_append(dm_args, "-vncunused");
-        }
-    } else if (!sdl) {
-        /*
-         * VNC is not enabled by default by qemu-xen-traditional,
-         * however skipping -vnc causes SDL to be
-         * (unexpectedly) enabled by default. If undesired, disable graphics at
-         * all.
-         */
-        flexarray_append(dm_args, "-nographic");
-    }
-
-    if (sdl) {
-        flexarray_append(dm_args, "-sdl");
-        if (!libxl_defbool_val(sdl->opengl)) {
-            flexarray_append(dm_args, "-disable-opengl");
-        }
-        if (sdl->display)
-            flexarray_append_pair(dm_envs, "DISPLAY", sdl->display);
-        if (sdl->xauthority)
-            flexarray_append_pair(dm_envs, "XAUTHORITY", sdl->xauthority);
-    }
-    if (keymap) {
-        flexarray_vappend(dm_args, "-k", keymap, NULL);
-    }
-    if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
-        int ioemu_nics = 0;
-        int nr_set_cpus = 0;
-        char *s;
-
-        flexarray_append_pair(dm_envs, "XEN_DOMAIN_ID", GCSPRINTF("%d", domid));
-
-        if (b_info->kernel) {
-            LOGD(ERROR, domid, "HVM direct kernel boot is not supported by "
-                 "qemu-xen-traditional");
-            return ERROR_INVAL;
-        }
-
-        if (b_info->u.hvm.serial || b_info->u.hvm.serial_list) {
-            if ( b_info->u.hvm.serial && b_info->u.hvm.serial_list )
-            {
-                LOGD(ERROR, domid, "Both serial and serial_list set");
-                return ERROR_INVAL;
-            }
-            if (b_info->u.hvm.serial) {
-                flexarray_vappend(dm_args,
-                                  "-serial", b_info->u.hvm.serial, NULL);
-            } else if (b_info->u.hvm.serial_list) {
-                char **p;
-                for (p = b_info->u.hvm.serial_list;
-                     *p;
-                     p++) {
-                    flexarray_vappend(dm_args,
-                                      "-serial",
-                                      *p, NULL);
-                }
-            }
-        }
-
-        if (libxl_defbool_val(b_info->u.hvm.nographic) && (!sdl && !vnc)) {
-            flexarray_append(dm_args, "-nographic");
-        }
-
-        if (b_info->video_memkb) {
-            flexarray_vappend(dm_args, "-videoram",
-                    GCSPRINTF("%d", libxl__sizekb_to_mb(b_info->video_memkb)),
-                    NULL);
-        }
-
-        switch (b_info->u.hvm.vga.kind) {
-        case LIBXL_VGA_INTERFACE_TYPE_STD:
-            flexarray_append(dm_args, "-std-vga");
-            break;
-        case LIBXL_VGA_INTERFACE_TYPE_CIRRUS:
-            break;
-        case LIBXL_VGA_INTERFACE_TYPE_NONE:
-            flexarray_append_pair(dm_args, "-vga", "none");
-            break;
-        case LIBXL_VGA_INTERFACE_TYPE_QXL:
-            break;
-        default:
-            LOGD(ERROR, domid, "Invalid emulated video card specified");
-            return ERROR_INVAL;
-        }
-
-        if (b_info->u.hvm.boot) {
-            flexarray_vappend(dm_args, "-boot", b_info->u.hvm.boot, NULL);
-        }
-        if (libxl_defbool_val(b_info->u.hvm.usb)
-            || b_info->u.hvm.usbdevice
-            || libxl_string_list_length(&b_info->u.hvm.usbdevice_list)) {
-            if (b_info->u.hvm.usbdevice
-                && libxl_string_list_length(&b_info->u.hvm.usbdevice_list)) {
-                LOGD(ERROR, domid, "Both usbdevice and usbdevice_list set");
-                return ERROR_INVAL;
-            }
-            flexarray_append(dm_args, "-usb");
-            if (b_info->u.hvm.usbdevice) {
-                flexarray_vappend(dm_args,
-                                  "-usbdevice", b_info->u.hvm.usbdevice, NULL);
-            } else if (b_info->u.hvm.usbdevice_list) {
-                char **p;
-                for (p = b_info->u.hvm.usbdevice_list;
-                     *p;
-                     p++) {
-                    flexarray_vappend(dm_args,
-                                      "-usbdevice",
-                                      *p, NULL);
-                }
-            }
-        }
-        if (b_info->u.hvm.soundhw) {
-            flexarray_vappend(dm_args, "-soundhw", b_info->u.hvm.soundhw, NULL);
-        }
-        if (libxl__acpi_defbool_val(b_info)) {
-            flexarray_append(dm_args, "-acpi");
-        }
-        if (b_info->max_vcpus > 1) {
-            flexarray_vappend(dm_args, "-vcpus",
-                              GCSPRINTF("%d", b_info->max_vcpus),
-                              NULL);
-        }
-
-        nr_set_cpus = libxl_bitmap_count_set(&b_info->avail_vcpus);
-        s = libxl_bitmap_to_hex_string(CTX, &b_info->avail_vcpus);
-        flexarray_vappend(dm_args, "-vcpu_avail",
-                              GCSPRINTF("%s", s), NULL);
-        free(s);
-
-        for (i = 0; i < num_nics; i++) {
-            if (nics[i].nictype == LIBXL_NIC_TYPE_VIF_IOEMU) {
-                char *smac = GCSPRINTF(
-                                   LIBXL_MAC_FMT, LIBXL_MAC_BYTES(nics[i].mac));
-                const char *ifname = libxl__device_nic_devname(gc,
-                                                domid, nics[i].devid,
-                                                LIBXL_NIC_TYPE_VIF_IOEMU);
-                flexarray_vappend(dm_args,
-                                  "-net",
-                                  GCSPRINTF(
-                                      "nic,vlan=%d,macaddr=%s,model=%s",
-                                      nics[i].devid, smac, nics[i].model),
-                                  "-net",
-                                  GCSPRINTF(
-                                      "tap,vlan=%d,ifname=%s,bridge=%s,"
-                                      "script=%s,downscript=%s",
-                                      nics[i].devid, ifname, nics[i].bridge,
-                                      libxl_tapif_script(gc),
-                                      libxl_tapif_script(gc)),
-                                  NULL);
-                ioemu_nics++;
-            }
-        }
-        /* If we have no emulated nics, tell qemu not to create any */
-        if ( ioemu_nics == 0 ) {
-            flexarray_vappend(dm_args, "-net", "none", NULL);
-        }
-        if (libxl_defbool_val(b_info->u.hvm.gfx_passthru)) {
-            switch (b_info->u.hvm.gfx_passthru_kind) {
-            case LIBXL_GFX_PASSTHRU_KIND_DEFAULT:
-            case LIBXL_GFX_PASSTHRU_KIND_IGD:
-                flexarray_append(dm_args, "-gfx_passthru");
-                break;
-            default:
-                LOGD(ERROR, domid, "unsupported gfx_passthru_kind.");
-                return ERROR_INVAL;
-            }
-        }
-    } else {
-        if (!sdl && !vnc)
-            flexarray_append(dm_args, "-nographic");
-    }
-
-    if (libxl_defbool_val(b_info->dm_restrict)) {
-        LOGD(ERROR, domid,
-             "dm_restrict not supported by qemu-xen-traditional");
-        return ERROR_INVAL;
-    }
-
-    if (state->saved_state) {
-        flexarray_vappend(dm_args, "-loadvm", state->saved_state, NULL);
-    }
-    for (i = 0; b_info->extra && b_info->extra[i] != NULL; i++)
-        flexarray_append(dm_args, b_info->extra[i]);
-    flexarray_append(dm_args, "-M");
-    switch (b_info->type) {
-    case LIBXL_DOMAIN_TYPE_PVH:
-    case LIBXL_DOMAIN_TYPE_PV:
-        flexarray_append(dm_args, "xenpv");
-        for (i = 0; b_info->extra_pv && b_info->extra_pv[i] != NULL; i++)
-            flexarray_append(dm_args, b_info->extra_pv[i]);
-        break;
-    case LIBXL_DOMAIN_TYPE_HVM:
-        flexarray_append(dm_args, "xenfv");
-        for (i = 0; b_info->extra_hvm && b_info->extra_hvm[i] != NULL; i++)
-            flexarray_append(dm_args, b_info->extra_hvm[i]);
-        break;
-    default:
-        abort();
-    }
-    flexarray_append(dm_args, NULL);
-    *args = (char **) flexarray_contents(dm_args);
-    flexarray_append(dm_envs, NULL);
-    if (envs)
-        *envs = (char **) flexarray_contents(dm_envs);
-    return 0;
 }
 
 static char *dm_spice_options(libxl__gc *gc,
@@ -2096,11 +1827,6 @@ static int libxl__build_device_model_args(libxl__gc *gc,
  * and therefore will be passing a filename rather than a fd. */
 {
     switch (guest_config->b_info.device_model_version) {
-    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-        return libxl__build_device_model_args_old(gc, dm,
-                                                  guest_domid, guest_config,
-                                                  args, envs,
-                                                  state);
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
         if (!libxl_defbool_val(guest_config->b_info.device_model_stubdomain)) {
             assert(dm_state_fd != NULL);
@@ -2463,16 +2189,15 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
                         "%s",
                         libxl_bios_type_to_string(guest_config->b_info.u.hvm.bios));
     }
-    /* Disable relocating memory to make the MMIO hole larger
-     * unless we're running qemu-traditional and vNUMA is not
-     * configured. */
+
+    /*
+     * Disable relocating memory, having a larger MMIO hole isn't
+     * implemented with qemu-xen.
+     */
     libxl__xs_printf(gc, XBT_NULL,
                      libxl__sprintf(gc, "%s/hvmloader/allow-memory-relocate",
                                     libxl__xs_get_dompath(gc, guest_domid)),
-                     "%d",
-                     guest_config->b_info.device_model_version
-                        == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL &&
-                     !libxl__vnuma_configured(&guest_config->b_info));
+                     "0");
     ret = xc_domain_set_target(ctx->xch, dm_domid, guest_domid);
     if (ret<0) {
         LOGED(ERROR, guest_domid, "setting target domain %d -> %d",
@@ -3156,13 +2881,9 @@ static void device_model_launch(libxl__egc *egc,
     libxl_domain_config *guest_config = dmss->guest_config;
     const libxl_domain_create_info *c_info = &guest_config->c_info;
     const libxl_domain_build_info *b_info = &guest_config->b_info;
-    const libxl_vnc_info *vnc = libxl__dm_vnc(guest_config);
     char *path;
     int logfile_w, null;
     char **args, **arg, **envs;
-    xs_transaction_t t;
-    char *vm_path;
-    char **pass_stuff;
     int dm_state_fd = -1;
 
     /* convenience aliases */
@@ -3196,25 +2917,18 @@ static void device_model_launch(libxl__egc *egc,
         libxl__xs_printf(gc, XBT_NULL,
                          GCSPRINTF("%s/hvmloader/bios", path),
                          "%s", libxl_bios_type_to_string(b_info->u.hvm.bios));
-        /* Disable relocating memory to make the MMIO hole larger
-         * unless we're running qemu-traditional and vNUMA is not
-         * configured. */
+        /*
+         * Disable relocating memory, having a larger MMIO hole isn't
+         * implemented with qemu-xen.
+         */
         libxl__xs_printf(gc, XBT_NULL,
                          GCSPRINTF("%s/hvmloader/allow-memory-relocate", path),
-                         "%d",
-                         b_info->device_model_version==LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL &&
-                         !libxl__vnuma_configured(b_info));
+                         "0");
         free(path);
     }
 
     path = DEVICE_MODEL_XS_PATH(gc, LIBXL_TOOLSTACK_DOMID, domid, "");
     xs_mkdir(ctx->xsh, XBT_NULL, path);
-
-    if (b_info->type == LIBXL_DOMAIN_TYPE_HVM &&
-        b_info->device_model_version
-        == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL)
-        libxl__xs_printf(gc, XBT_NULL, GCSPRINTF("%s/disable_pf", path),
-                         "%d", !libxl_defbool_val(b_info->u.hvm.xen_platform_pci));
 
     logfile_w = libxl__create_qemu_logfile(gc, GCSPRINTF("qemu-dm-%s",
                                                          c_info->name));
@@ -3239,25 +2953,6 @@ static void device_model_launch(libxl__egc *egc,
         libxl__xs_printf(gc, XBT_NULL,
                          GCSPRINTF("%s/image/device-model-kill-uid", dom_path),
                          "%s", state->dm_kill_uid);
-
-    if (vnc && vnc->passwd) {
-        /* This xenstore key will only be used by qemu-xen-traditionnal.
-         * The code to supply vncpasswd to qemu-xen is later. */
-retry_transaction:
-        /* Find uuid and the write the vnc password to xenstore for qemu. */
-        t = xs_transaction_start(ctx->xsh);
-        vm_path = libxl__xs_read(gc,t,GCSPRINTF("%s/vm", dom_path));
-        if (vm_path) {
-            /* Now write the vncpassword into it. */
-            pass_stuff = libxl__calloc(gc, 3, sizeof(char *));
-            pass_stuff[0] = "vncpasswd";
-            pass_stuff[1] = vnc->passwd;
-            libxl__xs_writev(gc,t,vm_path,pass_stuff);
-            if (!xs_transaction_end(ctx->xsh, t, 0))
-                if (errno == EAGAIN)
-                    goto retry_transaction;
-        }
-    }
 
     LOGD(DEBUG, domid, "Spawning device-model %s with arguments:", dm);
     for (arg = args; *arg; arg++)

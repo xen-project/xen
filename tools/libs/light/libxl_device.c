@@ -1440,25 +1440,6 @@ static void devices_remove_callback(libxl__egc *egc,
     return;
 }
 
-int libxl__wait_for_device_model_deprecated(libxl__gc *gc,
-                                 uint32_t domid, char *state,
-                                 libxl__spawn_starting *spawning,
-                                 int (*check_callback)(libxl__gc *gc,
-                                                       uint32_t domid,
-                                                       const char *state,
-                                                       void *userdata),
-                                 void *check_callback_userdata)
-{
-    char *path;
-    uint32_t dm_domid = libxl_get_stubdom_id(CTX, domid);
-
-    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/state");
-    return libxl__xenstore_child_wait_deprecated(gc, domid,
-                                     LIBXL_DEVICE_MODEL_START_TIMEOUT,
-                                     "Device Model", path, state, spawning,
-                                     check_callback, check_callback_userdata);
-}
-
 int libxl__wait_for_backend(libxl__gc *gc, const char *be_path,
                             const char *state)
 {

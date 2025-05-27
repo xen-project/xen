@@ -19,8 +19,8 @@ static bool debug = false;
 
 typedef enum dm_version {
     QEMU_NONE,
-    QEMU_XEN_TRADITIONAL,
     QEMU_XEN,
+    QEMU_INVALID
 } dm_version;
 
 static void indent(void)
@@ -68,30 +68,6 @@ static void pop_block(void)
     printf("}\n");
 }
 
-#ifdef CONFIG_X86
-static void pci_hotplug_notify(unsigned int slt)
-{
-    stmt("Notify", "\\_SB.PCI0.S%02X, EVT", slt);
-}
-
-static void decision_tree(
-    unsigned int s, unsigned int e, char *var, void (*leaf)(unsigned int))
-{
-    if ( s == (e-1) )
-    {
-        (*leaf)(s);
-        return;
-    }
-
-    push_block("If", "And(%s, 0x%02x)", var, (e-s)/2);
-    decision_tree((s+e)/2, e, var, leaf);
-    pop_block();
-    push_block("Else", NULL);
-    decision_tree(s, (s+e)/2, var, leaf);
-    pop_block();
-}
-#endif
-
 static struct option options[] = {
     { "maxcpu", 1, 0, 'c' },
 #ifdef CONFIG_X86
@@ -105,7 +81,7 @@ int main(int argc, char **argv)
 {
     unsigned int cpu, max_cpus;
 #if defined(CONFIG_X86)
-    dm_version dm_version = QEMU_XEN_TRADITIONAL;
+    dm_version dm_version = QEMU_INVALID;
     unsigned int slot, dev, intx, link;
 
     max_cpus = HVM_MAX_VCPUS;
@@ -141,8 +117,6 @@ int main(int argc, char **argv)
         case 'q':
             if (strcmp(optarg, "qemu-xen") == 0) {
                 dm_version = QEMU_XEN;
-            } else if (strcmp(optarg, "qemu-xen-traditional") == 0) {
-                dm_version = QEMU_XEN_TRADITIONAL;
             } else if (strcmp(optarg, "none") == 0) {
                 dm_version = QEMU_NONE;
             } else {
@@ -159,6 +133,13 @@ int main(int argc, char **argv)
             return -1;
         }
     }
+
+#ifdef CONFIG_X86
+    if (dm_version == QEMU_INVALID) {
+        fprintf(stderr, "--dm_version is a mandatory parameter.\n");
+        return -1;
+    }
+#endif
 
     /**** DSDT DefinitionBlock start ****/
     /* (we append to existing DSDT definition block) */
@@ -278,9 +259,7 @@ int main(int argc, char **argv)
 
     /* Define GPE control method. */
     push_block("Scope", "\\_GPE");
-    push_block("Method",
-               dm_version == QEMU_XEN_TRADITIONAL ? "_L%02d" : "_E%02d",
-               XEN_ACPI_GPE0_CPUHP_BIT);
+    push_block("Method", "_E%02d", XEN_ACPI_GPE0_CPUHP_BIT);
     stmt("\\_SB.PRSC ()", NULL);
     pop_block();
     pop_block();
@@ -302,17 +281,10 @@ int main(int argc, char **argv)
      */
     push_block("Device", "HP0"); {
         stmt("Name", "_HID, EISAID(\"PNP0C02\")");
-        if (dm_version == QEMU_XEN_TRADITIONAL) {
-            stmt("Name", "_CRS, ResourceTemplate() {"
-                 "  IO (Decode16, 0x10c0, 0x10c0, 0x00, 0x82)"
-                 "  IO (Decode16, 0xb044, 0xb044, 0x00, 0x04)"
-                 "}");
-        } else {
-            stmt("Name", "_CRS, ResourceTemplate() {"
-                 "  IO (Decode16, 0xae00, 0xae00, 0x00, 0x10)"
-                 "  IO (Decode16, 0xb044, 0xb044, 0x00, 0x04)"
-                 "}");
-        }
+        stmt("Name", "_CRS, ResourceTemplate() {"
+             "  IO (Decode16, 0xae00, 0xae00, 0x00, 0x10)"
+             "  IO (Decode16, 0xb044, 0xb044, 0x00, 0x04)"
+             "}");
     } pop_block();
 
     /*** PCI-ISA link definitions ***/
@@ -397,60 +369,27 @@ int main(int argc, char **argv)
      * QEMU provides a simple hotplug controller with some I/O to handle
      * the hotplug action and status, which is beyond the ACPI scope.
      */
-    if (dm_version == QEMU_XEN_TRADITIONAL) {
-        for ( slot = 0; slot < 0x100; slot++ )
-        {
-            push_block("Device", "S%02X", slot);
-            /* _ADR == dev:fn (16:16) */
-            stmt("Name", "_ADR, 0x%08x", ((slot & ~7) << 13) | (slot & 7));
-            /* _SUN == dev */
-            stmt("Name", "_SUN, 0x%08x", slot >> 3);
-            push_block("Method", "_EJ0, 1");
-            if (debug)
-            {
-                stmt("Store", "0x%02x, \\_GPE.DPT1", slot);
-                stmt("Store", "0x88, \\_GPE.DPT2");
-            }
-            stmt("Store", "0x%02x, \\_GPE.PH%02X", /* eject */
-                 (slot & 1) ? 0x10 : 0x01, slot & ~1);
-            pop_block();
-            push_block("Method", "_STA, 0");
-            if (debug)
-            {
-                stmt("Store", "0x%02x, \\_GPE.DPT1", slot);
-                stmt("Store", "0x89, \\_GPE.DPT2");
-            }
-            if ( slot & 1 )
-                stmt("ShiftRight", "\\_GPE.PH%02X, 0x04, Local1", slot & ~1);
-            else
-                stmt("And", "\\_GPE.PH%02X, 0x0f, Local1", slot & ~1);
-            stmt("Return", "Local1"); /* IN status as the _STA */
-            pop_block();
-            pop_block();
-        }
-    } else {
-        stmt("OperationRegion", "SEJ, SystemIO, 0xae08, 0x08");
-        push_block("Field", "SEJ, DWordAcc, NoLock, WriteAsZeros");
-        indent(); printf("B0EJ, 32,\n");
-        indent(); printf("B0RM, 32,\n");
-        pop_block();
+    stmt("OperationRegion", "SEJ, SystemIO, 0xae08, 0x08");
+    push_block("Field", "SEJ, DWordAcc, NoLock, WriteAsZeros");
+    indent(); printf("B0EJ, 32,\n");
+    indent(); printf("B0RM, 32,\n");
+    pop_block();
 
-        /* hotplug_slot */
-        for (slot = 1; slot <= 31; slot++) {
-            push_block("Device", "S%i", slot); {
-                stmt("Name", "_ADR, %#06x0000", slot);
-                push_block("Method", "_EJ0,1"); {
-                    stmt("Store", "%#010x, B0EJ", 1 << slot);
-                } pop_block();
-                stmt("Name", "_SUN, %i", slot);
-                push_block("Method", "_STA, 0"); {
-                    push_block("If", "And(B0RM, ShiftLeft(1, %i))", slot);
-                    stmt("Return", "0xF");
-                    pop_block();
-                    stmt("Return", "0x0");
-                } pop_block();
+    /* hotplug_slot */
+    for (slot = 1; slot <= 31; slot++) {
+        push_block("Device", "S%i", slot); {
+            stmt("Name", "_ADR, %#06x0000", slot);
+            push_block("Method", "_EJ0,1"); {
+                stmt("Store", "%#010x, B0EJ", 1 << slot);
             } pop_block();
-        }
+            stmt("Name", "_SUN, %i", slot);
+            push_block("Method", "_STA, 0"); {
+                push_block("If", "And(B0RM, ShiftLeft(1, %i))", slot);
+                stmt("Return", "0xF");
+                pop_block();
+                stmt("Return", "0x0");
+            } pop_block();
+        } pop_block();
     }
 
     pop_block();
@@ -460,26 +399,11 @@ int main(int argc, char **argv)
     /**** GPE start ****/
     push_block("Scope", "\\_GPE");
 
-    if (dm_version == QEMU_XEN_TRADITIONAL) {
-        stmt("OperationRegion", "PHP, SystemIO, 0x10c0, 0x82");
-
-        push_block("Field", "PHP, ByteAcc, NoLock, Preserve");
-        indent(); printf("PSTA, 8,\n"); /* hotplug controller event reg */
-        indent(); printf("PSTB, 8,\n"); /* hotplug controller slot reg */
-        for ( slot = 0; slot < 0x100; slot += 2 )
-        {
-            indent();
-            /* Each hotplug control register manages a pair of pci functions. */
-            printf("PH%02X, 8,\n", slot);
-        }
-        pop_block();
-    } else {
-        stmt("OperationRegion", "PCST, SystemIO, 0xae00, 0x08");
-        push_block("Field", "PCST, DWordAcc, NoLock, WriteAsZeros");
-        indent(); printf("PCIU, 32,\n");
-        indent(); printf("PCID, 32,\n");
-        pop_block();
-    }
+    stmt("OperationRegion", "PCST, SystemIO, 0xae00, 0x08");
+    push_block("Field", "PCST, DWordAcc, NoLock, WriteAsZeros");
+    indent(); printf("PCIU, 32,\n");
+    indent(); printf("PCID, 32,\n");
+    pop_block();
 
     stmt("OperationRegion", "DG1, SystemIO, 0xb044, 0x04");
 
@@ -487,35 +411,16 @@ int main(int argc, char **argv)
     indent(); printf("DPT1, 8, DPT2, 8\n");
     pop_block();
 
-    if (dm_version == QEMU_XEN_TRADITIONAL) {
-        push_block("Method", "_L03, 0, Serialized");
-        /* Detect slot and event (remove/add). */
-        stmt("Name", "SLT, 0x0");
-        stmt("Name", "EVT, 0x0");
-        stmt("Store", "PSTA, Local1");
-        stmt("And", "Local1, 0xf, EVT");
-        stmt("Store", "PSTB, Local1"); /* XXX: Store (PSTB, SLT) ? */
-        stmt("And", "Local1, 0xff, SLT");
-        if (debug)
-        {
-            stmt("Store", "SLT, DPT1");
-            stmt("Store", "EVT, DPT2");
-        }
-        /* Decision tree */
-        decision_tree(0x00, 0x100, "SLT", pci_hotplug_notify);
+    push_block("Method", "_E01");
+    for (slot = 1; slot <= 31; slot++) {
+        push_block("If", "And(PCIU, ShiftLeft(1, %i))", slot);
+        stmt("Notify", "\\_SB.PCI0.S%i, 1", slot);
         pop_block();
-    } else {
-        push_block("Method", "_E01");
-        for (slot = 1; slot <= 31; slot++) {
-            push_block("If", "And(PCIU, ShiftLeft(1, %i))", slot);
-            stmt("Notify", "\\_SB.PCI0.S%i, 1", slot);
-            pop_block();
-            push_block("If", "And(PCID, ShiftLeft(1, %i))", slot);
-            stmt("Notify", "\\_SB.PCI0.S%i, 3", slot);
-            pop_block();
-        }
+        push_block("If", "And(PCID, ShiftLeft(1, %i))", slot);
+        stmt("Notify", "\\_SB.PCI0.S%i, 3", slot);
         pop_block();
     }
+    pop_block();
 
     pop_block();
     /**** GPE end ****/

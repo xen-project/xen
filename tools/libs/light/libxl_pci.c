@@ -1023,82 +1023,6 @@ static int pci_multifunction_check(libxl__gc *gc, libxl_device_pci *pci, unsigne
     return 0;
 }
 
-static int pci_ins_check(libxl__gc *gc, uint32_t domid, const char *state, void *priv)
-{
-    char *orig_state = priv;
-
-    if ( !strcmp(state, "pci-insert-failed") )
-        return -1;
-    if ( !strcmp(state, "pci-inserted") )
-        return 0;
-    if ( !strcmp(state, orig_state) )
-        return 1;
-
-    return 1;
-}
-
-static int qemu_pci_add_xenstore(libxl__gc *gc, uint32_t domid,
-                                 libxl_device_pci *pci)
-{
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-    int rc = 0;
-    char *path;
-    char *state, *vdevfn;
-    uint32_t dm_domid;
-
-    dm_domid = libxl_get_stubdom_id(CTX, domid);
-    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/state");
-    state = libxl__xs_read(gc, XBT_NULL, path);
-    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/parameter");
-    if (pci->vdevfn) {
-        libxl__xs_printf(gc, XBT_NULL, path, PCI_BDF_VDEVFN","PCI_OPTIONS,
-                         pci->domain, pci->bus, pci->dev,
-                         pci->func, pci->vdevfn, pci->msitranslate,
-                         pci->power_mgmt);
-    } else {
-        libxl__xs_printf(gc, XBT_NULL, path, PCI_BDF","PCI_OPTIONS,
-                         pci->domain,  pci->bus, pci->dev,
-                         pci->func, pci->msitranslate, pci->power_mgmt);
-    }
-
-    libxl__qemu_traditional_cmd(gc, domid, "pci-ins");
-    rc = libxl__wait_for_device_model_deprecated(gc, domid, NULL, NULL,
-                                      pci_ins_check, state);
-    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/parameter");
-    vdevfn = libxl__xs_read(gc, XBT_NULL, path);
-    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/state");
-    if ( rc < 0 )
-        LOGD(ERROR, domid, "qemu refused to add device: %s", vdevfn);
-    else if ( sscanf(vdevfn, "0x%x", &pci->vdevfn) != 1 ) {
-        LOGD(ERROR, domid, "wrong format for the vdevfn: '%s'", vdevfn);
-        rc = -1;
-    }
-    xs_write(ctx->xsh, XBT_NULL, path, state, strlen(state));
-
-    return rc;
-}
-
-static int check_qemu_running(libxl__gc *gc,
-                              libxl_domid domid,
-                              libxl__xswait_state *xswa,
-                              int rc,
-                              const char *state)
-{
-    if (rc) {
-        if (rc == ERROR_TIMEDOUT) {
-            LOGD(ERROR, domid, "%s not ready", xswa->what);
-        }
-        goto out;
-    }
-
-    if (!state || strcmp(state, "running"))
-        return ERROR_NOT_READY;
-
-out:
-    libxl__xswait_stop(gc, xswa);
-    return rc;
-}
-
 typedef struct pci_add_state {
     /* filled by user of do_pci_add */
     libxl__ao_device *aodev;
@@ -1119,8 +1043,6 @@ typedef struct pci_add_state {
     int retries;
 } pci_add_state;
 
-static void pci_add_qemu_trad_watch_state_cb(libxl__egc *egc,
-    libxl__xswait_state *xswa, int rc, const char *state);
 static void pci_add_qmp_device_add(libxl__egc *, pci_add_state *);
 static void pci_add_qmp_device_add_cb(libxl__egc *,
     libxl__ev_qmp *, const libxl__json_object *, int rc);
@@ -1156,16 +1078,6 @@ static void do_pci_add(libxl__egc *egc,
 
     if (type == LIBXL_DOMAIN_TYPE_HVM) {
         switch (libxl__device_model_version_running(gc, domid)) {
-            case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-                pas->xswait.ao = ao;
-                pas->xswait.what = "Device Model";
-                pas->xswait.path = DEVICE_MODEL_XS_PATH(gc,
-                    libxl_get_stubdom_id(CTX, domid), domid, "/state");
-                pas->xswait.timeout_ms = LIBXL_DEVICE_MODEL_START_TIMEOUT * 1000;
-                pas->xswait.callback = pci_add_qemu_trad_watch_state_cb;
-                rc = libxl__xswait_start(gc, &pas->xswait);
-                if (rc) goto out;
-                return;
             case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
                 rc = libxl__ev_time_register_rel(ao, &pas->timeout,
                                                  pci_add_timeout,
@@ -1182,29 +1094,6 @@ static void do_pci_add(libxl__egc *egc,
 
     rc = 0;
 
-out:
-    pci_add_dm_done(egc, pas, rc); /* must be last */
-}
-
-static void pci_add_qemu_trad_watch_state_cb(libxl__egc *egc,
-                                             libxl__xswait_state *xswa,
-                                             int rc,
-                                             const char *state)
-{
-    pci_add_state *pas = CONTAINER_OF(xswa, *pas, xswait);
-    STATE_AO_GC(pas->aodev->ao);
-
-    /* Convenience aliases */
-    libxl_domid domid = pas->domid;
-    libxl_device_pci *pci = &pas->pci;
-
-    rc = check_qemu_running(gc, domid, xswa, rc, state);
-    if (rc == ERROR_NOT_READY)
-        return;
-    if (rc)
-        goto out;
-
-    rc = qemu_pci_add_xenstore(gc, domid, pci);
 out:
     pci_add_dm_done(egc, pas, rc); /* must be last */
 }
@@ -1882,42 +1771,6 @@ static void add_pcis_done(libxl__egc *egc, libxl__multidev *multidev,
     aodev->callback(egc, aodev);
 }
 
-static int qemu_pci_remove_xenstore(libxl__gc *gc, uint32_t domid,
-                                    libxl_device_pci *pci, int force)
-{
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-    char *state;
-    char *path;
-    uint32_t dm_domid;
-
-    dm_domid = libxl_get_stubdom_id(CTX, domid);
-
-    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/state");
-    state = libxl__xs_read(gc, XBT_NULL, path);
-    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/parameter");
-    libxl__xs_printf(gc, XBT_NULL, path, PCI_BDF, pci->domain,
-                     pci->bus, pci->dev, pci->func);
-
-    /* Remove all functions at once atomically by only signalling
-     * device-model for function 0 */
-    if ( !force && (pci->vdevfn & 0x7) == 0 ) {
-        libxl__qemu_traditional_cmd(gc, domid, "pci-rem");
-        if (libxl__wait_for_device_model_deprecated(gc, domid, "pci-removed",
-                                         NULL, NULL, NULL) < 0) {
-            LOGD(ERROR, domid, "Device Model didn't respond in time");
-            /* This depends on guest operating system acknowledging the
-             * SCI, if it doesn't respond in time then we may wish to
-             * force the removal.
-             */
-            return ERROR_FAIL;
-        }
-    }
-    path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid, "/state");
-    xs_write(ctx->xsh, XBT_NULL, path, state, strlen(state));
-
-    return 0;
-}
-
 typedef struct pci_remove_state {
     libxl__ao_device *aodev;
     libxl_domid domid;
@@ -1940,8 +1793,6 @@ static void libxl__device_pci_remove_common(libxl__egc *egc,
 static void device_pci_remove_common_next(libxl__egc *egc,
     pci_remove_state *prs, int rc);
 
-static void pci_remove_qemu_trad_watch_state_cb(libxl__egc *egc,
-    libxl__xswait_state *xswa, int rc, const char *state);
 static void pci_remove_qmp_device_del(libxl__egc *egc,
     pci_remove_state *prs);
 static void pci_remove_qmp_device_del_cb(libxl__egc *egc,
@@ -1987,16 +1838,6 @@ static void do_pci_remove(libxl__egc *egc, pci_remove_state *prs)
     if (type == LIBXL_DOMAIN_TYPE_HVM) {
         prs->hvm = true;
         switch (libxl__device_model_version_running(gc, domid)) {
-        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-            prs->xswait.ao = ao;
-            prs->xswait.what = "Device Model";
-            prs->xswait.path = DEVICE_MODEL_XS_PATH(gc,
-                libxl_get_stubdom_id(CTX, domid), domid, "/state");
-            prs->xswait.timeout_ms = LIBXL_DEVICE_MODEL_START_TIMEOUT * 1000;
-            prs->xswait.callback = pci_remove_qemu_trad_watch_state_cb;
-            rc = libxl__xswait_start(gc, &prs->xswait);
-            if (rc) goto out_fail;
-            return;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
             pci_remove_qmp_device_del(egc, prs); /* must be last */
             return;
@@ -2008,30 +1849,6 @@ static void do_pci_remove(libxl__egc *egc, pci_remove_state *prs)
     rc = 0;
 out_fail:
     pci_remove_detached(egc, prs, rc); /* must be last */
-}
-
-static void pci_remove_qemu_trad_watch_state_cb(libxl__egc *egc,
-                                                libxl__xswait_state *xswa,
-                                                int rc,
-                                                const char *state)
-{
-    pci_remove_state *prs = CONTAINER_OF(xswa, *prs, xswait);
-    STATE_AO_GC(prs->aodev->ao);
-
-    /* Convenience aliases */
-    libxl_domid domid = prs->domid;
-    libxl_device_pci *const pci = &prs->pci;
-
-    rc = check_qemu_running(gc, domid, xswa, rc, state);
-    if (rc == ERROR_NOT_READY)
-        return;
-    if (rc)
-        goto out;
-
-    rc = qemu_pci_remove_xenstore(gc, domid, pci, prs->force);
-
-out:
-    pci_remove_detached(egc, prs, rc);
 }
 
 static void pci_remove_qmp_device_del(libxl__egc *egc,

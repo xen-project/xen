@@ -843,14 +843,7 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
 
     /* If the device model is specified switch to the corresponding tables */
     s = xenstore_read("platform/device-model", "");
-    if ( !strncmp(s, "qemu_xen_traditional", 21) )
-    {
-        config->dsdt_anycpu = dsdt_anycpu;
-        config->dsdt_anycpu_len = dsdt_anycpu_len;
-        config->dsdt_15cpu = dsdt_15cpu;
-        config->dsdt_15cpu_len = dsdt_15cpu_len;
-    }
-    else if ( !strncmp(s, "qemu_xen", 9) )
+    if ( !strncmp(s, "qemu_xen", 9) )
     {
         config->dsdt_anycpu = dsdt_anycpu_qemu_xen;
         config->dsdt_anycpu_len = dsdt_anycpu_qemu_xen_len;

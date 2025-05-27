@@ -28,19 +28,6 @@ static void domain_save_done(libxl__egc *egc,
 
 /*----- complicated callback, called by xc_domain_save -----*/
 
-/*
- * We implement the other end of protocol for controlling qemu-dm's
- * logdirty.  There is no documentation for this protocol, but our
- * counterparty's implementation is in
- * qemu-xen-traditional.git:xenstore.c in the function
- * xenstore_process_logdirty_event
- */
-
-static void domain_suspend_switch_qemu_xen_traditional_logdirty
-                               (libxl__egc *egc, int domid, unsigned enable,
-                                libxl__logdirty_switch *lds);
-static void switch_logdirty_xswatch(libxl__egc *egc, libxl__ev_xswatch*,
-                            const char *watch_path, const char *event_path);
 static void domain_suspend_switch_qemu_xen_logdirty
                                (libxl__egc *egc, int domid, unsigned enable,
                                 libxl__logdirty_switch *lds);
@@ -69,10 +56,6 @@ void libxl__domain_common_switch_qemu_logdirty(libxl__egc *egc,
     STATE_AO_GC(lds->ao);
 
     switch (libxl__device_model_version_running(gc, domid)) {
-    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-        domain_suspend_switch_qemu_xen_traditional_logdirty(egc, domid, enable,
-                                                            lds);
-        break;
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
         domain_suspend_switch_qemu_xen_logdirty(egc, domid, enable, lds);
         break;
@@ -80,129 +63,6 @@ void libxl__domain_common_switch_qemu_logdirty(libxl__egc *egc,
         LOGD(ERROR, domid, "logdirty switch failed"
              ", no valid device model version found, abandoning suspend");
         lds->callback(egc, lds, ERROR_FAIL);
-    }
-}
-
-static void domain_suspend_switch_qemu_xen_traditional_logdirty
-                               (libxl__egc *egc, int domid, unsigned enable,
-                                libxl__logdirty_switch *lds)
-{
-    STATE_AO_GC(lds->ao);
-    int rc;
-    xs_transaction_t t = 0;
-    const char *got;
-
-    if (!lds->cmd_path) {
-        uint32_t dm_domid = libxl_get_stubdom_id(CTX, domid);
-        lds->cmd_path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid,
-                                             "/logdirty/cmd");
-        lds->ret_path = DEVICE_MODEL_XS_PATH(gc, dm_domid, domid,
-                                             "/logdirty/ret");
-    }
-    lds->cmd = enable ? "enable" : "disable";
-
-    rc = libxl__ev_xswatch_register(gc, &lds->watch,
-                                switch_logdirty_xswatch, lds->ret_path);
-    if (rc) goto out;
-
-    rc = libxl__ev_time_register_rel(ao, &lds->timeout,
-                                switch_logdirty_timeout, 10*1000);
-    if (rc) goto out;
-
-    for (;;) {
-        rc = libxl__xs_transaction_start(gc, &t);
-        if (rc) goto out;
-
-        rc = libxl__xs_read_checked(gc, t, lds->cmd_path, &got);
-        if (rc) goto out;
-
-        if (got) {
-            const char *got_ret;
-            rc = libxl__xs_read_checked(gc, t, lds->ret_path, &got_ret);
-            if (rc) goto out;
-
-            if (!got_ret || strcmp(got, got_ret)) {
-                LOGD(ERROR, domid, "controlling logdirty: qemu was already sent"
-                     " command `%s' (xenstore path `%s') but result is `%s'",
-                     got, lds->cmd_path, got_ret ? got_ret : "<none>");
-                rc = ERROR_FAIL;
-                goto out;
-            }
-            rc = libxl__xs_rm_checked(gc, t, lds->cmd_path);
-            if (rc) goto out;
-        }
-
-        rc = libxl__xs_rm_checked(gc, t, lds->ret_path);
-        if (rc) goto out;
-
-        rc = libxl__xs_write_checked(gc, t, lds->cmd_path, lds->cmd);
-        if (rc) goto out;
-
-        rc = libxl__xs_transaction_commit(gc, &t);
-        if (!rc) break;
-        if (rc<0) goto out;
-    }
-
-    /* OK, wait for some callback */
-    return;
-
- out:
-    LOGD(ERROR, domid, "logdirty switch failed (rc=%d), abandoning suspend",rc);
-    libxl__xs_transaction_abort(gc, &t);
-    switch_logdirty_done(egc,lds,rc);
-}
-
-static void switch_logdirty_xswatch(libxl__egc *egc, libxl__ev_xswatch *watch,
-                            const char *watch_path, const char *event_path)
-{
-    libxl__logdirty_switch *lds = CONTAINER_OF(watch, *lds, watch);
-    STATE_AO_GC(lds->ao);
-    const char *got;
-    xs_transaction_t t = 0;
-    int rc;
-
-    for (;;) {
-        rc = libxl__xs_transaction_start(gc, &t);
-        if (rc) goto out;
-
-        rc = libxl__xs_read_checked(gc, t, lds->ret_path, &got);
-        if (rc) goto out;
-
-        if (!got) {
-            rc = +1;
-            goto out;
-        }
-
-        if (strcmp(got, lds->cmd)) {
-            LOG(ERROR,"logdirty switch: sent command `%s' but got reply `%s'"
-                " (xenstore paths `%s' / `%s')", lds->cmd, got,
-                lds->cmd_path, lds->ret_path);
-            rc = ERROR_FAIL;
-            goto out;
-        }
-
-        rc = libxl__xs_rm_checked(gc, t, lds->cmd_path);
-        if (rc) goto out;
-
-        rc = libxl__xs_rm_checked(gc, t, lds->ret_path);
-        if (rc) goto out;
-
-        rc = libxl__xs_transaction_commit(gc, &t);
-        if (!rc) break;
-        if (rc<0) goto out;
-    }
-
- out:
-    /* rc < 0: error
-     * rc == 0: ok, we are done
-     * rc == +1: need to keep waiting
-     */
-    libxl__xs_transaction_abort(gc, &t);
-
-    if (rc <= 0) {
-        if (rc < 0)
-            LOG(ERROR,"logdirty switch: failed (rc=%d)",rc);
-        switch_logdirty_done(egc,lds,rc);
     }
 }
 

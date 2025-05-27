@@ -99,35 +99,14 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         b_info->device_model_ssidref = SECINITSID_DOMDM;
 
     if (!b_info->device_model_version) {
-        if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
-            if (libxl_defbool_val(b_info->device_model_stubdomain)) {
-                b_info->device_model_version =
-                    LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
-            } else {
-                b_info->device_model_version = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
-            }
-        } else {
-            b_info->device_model_version =
-                LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
-        }
-        if (b_info->device_model_version
-                == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
-            const char *dm;
+        const char *dm;
 
-            dm = libxl__domain_device_model(gc, b_info);
-            rc = access(dm, X_OK);
-            if (rc < 0) {
-                /* qemu-xen unavailable, use qemu-xen-traditional */
-                if (errno == ENOENT) {
-                    LOGE(INFO, "qemu-xen is unavailable"
-                         ", using qemu-xen-traditional instead");
-                    b_info->device_model_version =
-                        LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
-                } else {
-                    LOGE(ERROR, "qemu-xen access error");
-                    return ERROR_FAIL;
-                }
-            }
+        b_info->device_model_version = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
+        dm = libxl__domain_device_model(gc, b_info);
+        rc = access(dm, X_OK);
+        if (rc < 0) {
+            LOGE(ERROR, "qemu-xen access error");
+            return ERROR_FAIL;
         }
     }
 
@@ -137,8 +116,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         if (!b_info->u.hvm.bios)
             switch (b_info->device_model_version) {
-            case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-                b_info->u.hvm.bios = LIBXL_BIOS_TYPE_ROMBIOS; break;
             case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
                 b_info->u.hvm.bios = LIBXL_BIOS_TYPE_SEABIOS; break;
             default:
@@ -148,12 +125,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
 
         /* Enforce BIOS<->Device Model version relationship */
         switch (b_info->device_model_version) {
-        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-            if (b_info->u.hvm.bios != LIBXL_BIOS_TYPE_ROMBIOS) {
-                LOG(ERROR, "qemu-xen-traditional requires bios=rombios.");
-                return ERROR_INVAL;
-            }
-            break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
             if (b_info->u.hvm.bios == LIBXL_BIOS_TYPE_ROMBIOS) {
                 LOG(ERROR, "qemu-xen does not support bios=rombios.");
@@ -176,10 +147,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         libxl_defbool_val(b_info->device_model_stubdomain)) {
         if (!b_info->stubdomain_kernel) {
             switch (b_info->device_model_version) {
-                case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-                    b_info->stubdomain_kernel =
-                        libxl__abs_path(NOGC, "ioemu-stubdom.gz", libxl__xenfirmwaredir_path());
-                    break;
                 case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
                     b_info->stubdomain_kernel =
                         libxl__abs_path(NOGC,
@@ -192,8 +159,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         }
         if (!b_info->stubdomain_ramdisk) {
             switch (b_info->device_model_version) {
-                case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-                    break;
                 case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
                     b_info->stubdomain_ramdisk =
                         libxl__abs_path(NOGC,
@@ -299,33 +264,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             b_info->u.hvm.hdtype = LIBXL_HDTYPE_IDE;
 
         switch (b_info->device_model_version) {
-        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-            switch (b_info->u.hvm.vga.kind) {
-            case LIBXL_VGA_INTERFACE_TYPE_NONE:
-                if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT)
-                    b_info->video_memkb = 0;
-                break;
-            case LIBXL_VGA_INTERFACE_TYPE_QXL:
-                LOG(ERROR,"qemu upstream required for qxl vga");
-                return ERROR_INVAL;
-                break;
-            case LIBXL_VGA_INTERFACE_TYPE_STD:
-                if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT)
-                    b_info->video_memkb = 8 * 1024;
-                if (b_info->video_memkb < 8 * 1024) {
-                    LOG(ERROR, "videoram must be at least 8 MB for STDVGA on QEMU_XEN_TRADITIONAL");
-                    return ERROR_INVAL;
-                }
-                break;
-            case LIBXL_VGA_INTERFACE_TYPE_CIRRUS:
-            default:
-                if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT)
-                    b_info->video_memkb = 4 * 1024;
-                if (b_info->video_memkb != 4 * 1024)
-                    LOG(WARN, "ignoring videoram other than 4 MB for CIRRUS on QEMU_XEN_TRADITIONAL");
-                break;
-            }
-            break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
         default:
             switch (b_info->u.hvm.vga.kind) {

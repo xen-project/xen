@@ -387,11 +387,9 @@ int libxl__device_model_version_running(libxl__gc *gc, uint32_t domid)
     path = libxl__xs_libxl_path(gc, domid);
     path = GCSPRINTF("%s/dm-version", path);
     dm_version = libxl__xs_read(gc, XBT_NULL, path);
-    if (!dm_version) {
-        return LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
-    }
 
-    if (libxl_device_model_version_from_string(dm_version, &value) < 0) {
+    if (!dm_version ||
+        libxl_device_model_version_from_string(dm_version, &value) < 0) {
         LOGD(ERROR, domid, "fatal: %s contain a wrong value (%s)", path, dm_version);
         return -1;
     }

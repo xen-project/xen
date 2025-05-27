@@ -53,12 +53,14 @@ endif
 endif
 
 ROMS := 
+DSDT_FILES :=
 
 ifeq ($(CONFIG_ROMBIOS),y)
 OBJS += optionroms.o 32bitbios_support.o rombios.o
 CFLAGS += -DENABLE_ROMBIOS
 ROMBIOS_ROM := $(ROMBIOS_DIR)/BIOS-bochs-latest
 ROMS += $(ROMBIOS_ROM) $(STDVGA_ROM) $(CIRRUSVGA_ROM)
+DSDT_FILES += dsdt_anycpu.c dsdt_15cpu.c
 endif
 
 # Suppress the warning about LOAD segments with RWX permissions, as what we
@@ -76,7 +78,7 @@ rombios.o: roms.inc
 smbios.o: CFLAGS += -D__SMBIOS_DATE__="\"$(SMBIOS_REL_DATE)\""
 
 ACPI_PATH = ../../libacpi
-DSDT_FILES = dsdt_anycpu.c dsdt_15cpu.c dsdt_anycpu_qemu_xen.c
+DSDT_FILES += dsdt_anycpu_qemu_xen.c
 ACPI_OBJS = $(patsubst %.c,%.o,$(DSDT_FILES)) build.o static_tables.o
 $(ACPI_OBJS): CFLAGS += -iquote . -DLIBACPI_STDUTILS=\"$(CURDIR)/util.h\"
 CFLAGS += -I$(ACPI_PATH)

@@ -252,10 +252,6 @@ void libxl__stream_write_start(libxl__egc *egc,
         stream->device_model_version =
             libxl__device_model_version_running(gc, dss->domid);
         switch (stream->device_model_version) {
-        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-            stream->emu_sub_hdr.id = EMULATOR_QEMU_TRADITIONAL;
-            break;
-
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
             stream->emu_sub_hdr.id = EMULATOR_QEMU_UPSTREAM;
             break;

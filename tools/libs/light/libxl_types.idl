@@ -104,7 +104,7 @@ libxl_channel_connection = Enumeration("channel_connection", [
 
 libxl_device_model_version = Enumeration("device_model_version", [
     (0, "UNKNOWN"),
-    (1, "QEMU_XEN_TRADITIONAL"), # Historical qemu-xen device model (qemu-dm)
+    (1, "QEMU_XEN_TRADITIONAL"), # Historical dm (qemu-dm, no longer supported)
     (2, "QEMU_XEN"),             # Upstream based qemu-xen device model
     ])
 
