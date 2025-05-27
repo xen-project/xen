@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef __ASM_STATIC_EVTCHN_H_
-#define __ASM_STATIC_EVTCHN_H_
+#ifndef XEN_STATIC_EVTCHN_H
+#define XEN_STATIC_EVTCHN_H
 
 #ifdef CONFIG_STATIC_EVTCHN
 
@@ -13,7 +13,7 @@ static inline void alloc_static_evtchn(void) {};
 
 #endif /* CONFIG_STATIC_EVTCHN */
 
-#endif /* __ASM_STATIC_EVTCHN_H_ */
+#endif /* XEN_STATIC_EVTCHN_H */
 
 /*
  * Local variables:

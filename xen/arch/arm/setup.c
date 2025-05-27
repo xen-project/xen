@@ -31,6 +31,7 @@
 #include <xen/version.h>
 #include <xen/vmap.h>
 #include <xen/stack-protector.h>
+#include <xen/static-evtchn.h>
 #include <xen/trace.h>
 #include <xen/libfdt/libfdt-xen.h>
 #include <xen/acpi.h>
@@ -39,7 +40,6 @@
 #include <asm/alternative.h>
 #include <asm/dom0less-build.h>
 #include <asm/page.h>
-#include <asm/static-evtchn.h>
 #include <asm/current.h>
 #include <asm/setup.h>
 #include <asm/gic.h>

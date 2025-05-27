@@ -1,8 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
 #include <xen/event.h>
-
-#include <asm/static-evtchn.h>
+#include <xen/static-evtchn.h>
 
 #define STATIC_EVTCHN_NODE_SIZE_CELLS 2
 

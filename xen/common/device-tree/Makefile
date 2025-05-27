@@ -6,3 +6,4 @@ obj-$(CONFIG_DOM0LESS_BOOT) += dom0less-build.init.o
 obj-$(CONFIG_OVERLAY_DTB) += dt-overlay.o
 obj-y += intc.o
 obj-$(CONFIG_DOMAIN_BUILD_HELPERS) += kernel.o
+obj-$(CONFIG_STATIC_EVTCHN) += static-evtchn.init.o
