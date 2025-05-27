@@ -35,6 +35,5 @@ void vpic_irq_negative_edge(struct domain *d, int irq);
 void vpic_init(struct domain *d);
 void vpic_reset(struct domain *d);
 int vpic_ack_pending_irq(struct vcpu *v);
-int is_periodic_irq(struct vcpu *v, int irq, int type);
 
 #endif  /* __ASM_X86_HVM_VPIC_H__ */  
