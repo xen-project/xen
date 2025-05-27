@@ -80,8 +80,9 @@ long do_iret(void)
 
     regs->rip    = iret_saved.rip;
     regs->cs     = iret_saved.cs | 3; /* force guest privilege */
-    regs->rflags = ((iret_saved.rflags & ~(X86_EFLAGS_IOPL|X86_EFLAGS_VM))
-                    | X86_EFLAGS_IF);
+    regs->rflags = ((iret_saved.rflags & X86_EFLAGS_ALL &
+                     ~(X86_EFLAGS_IOPL | X86_EFLAGS_VM)) |
+                    X86_EFLAGS_IF | X86_EFLAGS_MBS);
     regs->rsp    = iret_saved.rsp;
     regs->ss     = iret_saved.ss | 3; /* force guest privilege */
 
@@ -143,7 +144,8 @@ int compat_iret(void)
     if ( VM_ASSIST(v->domain, architectural_iopl) )
         v->arch.pv.iopl = eflags & X86_EFLAGS_IOPL;
 
-    regs->eflags = (eflags & ~X86_EFLAGS_IOPL) | X86_EFLAGS_IF;
+    regs->eflags = ((eflags & X86_EFLAGS_ALL & ~X86_EFLAGS_IOPL) |
+                    X86_EFLAGS_IF | X86_EFLAGS_MBS);
 
     if ( unlikely(eflags & X86_EFLAGS_VM) )
     {
