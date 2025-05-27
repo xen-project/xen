@@ -1218,6 +1218,14 @@ int arch_set_info_guest(
 
             if ( !__addr_ok(c.nat->ldt_base) )
                 return -EINVAL;
+
+            /*
+             * IRET in Long Mode discards EFLAGS.VM, but in FRED mode ERET
+             * cares that it is zero.
+             *
+             * Guests can't see FRED, so emulate IRET behaviour.
+             */
+            c.nat->user_regs.rflags &= ~X86_EFLAGS_VM;
         }
 #ifdef CONFIG_COMPAT
         else
@@ -1230,6 +1238,18 @@ int arch_set_info_guest(
 
             for ( i = 0; i < ARRAY_SIZE(c.cmp->trap_ctxt); i++ )
                 fixup_guest_code_selector(d, c.cmp->trap_ctxt[i].cs);
+
+            /*
+             * Under 32bit Xen, PV guests could really use vm86 mode.  Under
+             * 64bit Xen, vm86 mode can't be entered even by PV32 guests.
+             *
+             * For backwards compatibility, compat HYPERCALL_iret will arrange
+             * to deliver #GP at the target of the IRET rather than to fail
+             * the IRET itself, but we can't arrange for the same behaviour
+             * here.  Reject the hypercall as the next best option.
+             */
+            if ( c.cmp->user_regs.eflags & X86_EFLAGS_VM )
+                return -EINVAL;
         }
 #endif
 
@@ -1269,7 +1289,7 @@ int arch_set_info_guest(
         v->arch.user_regs.rax               = c.nat->user_regs.rax;
         v->arch.user_regs.rip               = c.nat->user_regs.rip;
         v->arch.user_regs.cs                = c.nat->user_regs.cs;
-        v->arch.user_regs.rflags            = c.nat->user_regs.rflags;
+        v->arch.user_regs.rflags            = (c.nat->user_regs.rflags & X86_EFLAGS_ALL) | X86_EFLAGS_MBS;
         v->arch.user_regs.rsp               = c.nat->user_regs.rsp;
         v->arch.user_regs.ss                = c.nat->user_regs.ss;
         v->arch.pv.es                       = c.nat->user_regs.es;
@@ -1293,7 +1313,7 @@ int arch_set_info_guest(
         v->arch.user_regs.eax               = c.cmp->user_regs.eax;
         v->arch.user_regs.eip               = c.cmp->user_regs.eip;
         v->arch.user_regs.cs                = c.cmp->user_regs.cs;
-        v->arch.user_regs.eflags            = c.cmp->user_regs.eflags;
+        v->arch.user_regs.eflags            = (c.cmp->user_regs.eflags & X86_EFLAGS_ALL) | X86_EFLAGS_MBS;
         v->arch.user_regs.esp               = c.cmp->user_regs.esp;
         v->arch.user_regs.ss                = c.cmp->user_regs.ss;
         v->arch.pv.es                       = c.cmp->user_regs.es;

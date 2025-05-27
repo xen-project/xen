@@ -1021,7 +1021,7 @@ static int __init dom0_construct(const struct boot_domain *bd)
     regs->rip = parms.virt_entry;
     regs->rsp = vstack_end;
     regs->rsi = vstartinfo_start;
-    regs->eflags = X86_EFLAGS_IF;
+    regs->eflags = X86_EFLAGS_IF | X86_EFLAGS_MBS;
 
     /*
      * We don't call arch_set_info_guest(), so some initialisation needs doing
