@@ -32,8 +32,6 @@ t=RELEASE-$r
   git show # should show appropriate intended commit
   git-tag -u 'Xen.org Xen tree code signing' -m "Xen $v" xen-$v
 
-  git-push xenbits.xen.org:/home/xen/git/qemu-xen-traditional.git $s:stable-$x xen-$v
-
 # consider making tag in minios, and updating xen.git Config.mk
   git checkout SOMETHING
   git show # should show appropriate intended commit

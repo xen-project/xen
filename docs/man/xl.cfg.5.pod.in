@@ -841,7 +841,7 @@ This option does not control the emulated graphics card presented to
 an HVM guest. See B<Emulated VGA Graphics Device> below for how to
 configure the emulated device. If B<Emulated VGA Graphics Device> options
 are used in a PV guest configuration, B<xl> will pick up B<vnc>, B<vnclisten>,
-B<vncpasswd>, B<vncdisplay>, B<vncunused>, B<sdl>, B<opengl> and
+B<vncpasswd>, B<vncdisplay>, B<vncunused>, B<sdl> and
 B<keymap> to construct the paravirtual framebuffer device for the guest.
 
 Each B<VFB_SPEC_STRING> is a comma-separated list of C<KEY=VALUE>
@@ -894,12 +894,6 @@ is used.
 
 Specifies the path to the X authority file that should be used to
 connect to the X server when the B<sdl> option is used.
-
-=item B<opengl=BOOLEAN>
-
-Enable OpenGL acceleration of the SDL display. Only effects machines
-using B<device_model_version="qemu-xen-traditional"> and only if the
-device-model was compiled with OpenGL support. The default is 0 (disabled).
 
 =item B<keymap=LANG>
 
@@ -1215,17 +1209,11 @@ working graphics passthrough. See the XenVGAPassthroughTestedAdapters
 L<https://wiki.xenproject.org/wiki/XenVGAPassthroughTestedAdapters> wiki page
 for graphics cards currently supported by B<gfx_passthru>.
 
-B<gfx_passthru> is currently supported both with the qemu-xen-traditional
-device-model and upstream qemu-xen device-model.
-
 When given as a boolean the B<gfx_passthru> option either disables graphics
 card passthrough or enables autodetection.
 
 When given as a string the B<gfx_passthru> option describes the type
-of device to enable. Note that this behavior is only supported with the
-upstream qemu-xen device-model. With qemu-xen-traditional IGD (Intel Graphics
-Device) is always assumed and options other than autodetect or explicit IGD
-will result in an error.
+of device to enable.
 
 Currently, valid values for the option are:
 
@@ -1903,10 +1891,7 @@ it may be useful to request a different one, like UEFI.
 
 =item B<rombios>
 
-Loads ROMBIOS, a 16-bit x86 compatible BIOS. This is used by default
-when B<device_model_version=qemu-xen-traditional>. This is the only BIOS
-option supported when B<device_model_version=qemu-xen-traditional>. This is
-the BIOS used by all previous Xen versions.
+Loads ROMBIOS, a 16-bit x86 compatible BIOS.
 
 =item B<seabios>
 
@@ -1926,8 +1911,7 @@ Override the path to the blob to be used as BIOS. The blob provided here MUST
 be consistent with the B<bios=> which you have specified. You should not
 normally need to specify this option.
 
-This option does not have any effect if using B<bios="rombios"> or
-B<device_model_version="qemu-xen-traditional">.
+Requires B<device_model_version="qemu-xen">.
 
 =item B<pae=BOOLEAN>
 
@@ -2516,15 +2500,10 @@ Sets the amount of RAM which the emulated video card will contain,
 which in turn limits the resolutions and bit depths which will be
 available.
 
-When using the qemu-xen-traditional device-model, the default as well as
-minimum amount of video RAM for stdvga is 8 MB, which is sufficient for e.g.
-1600x1200 at 32bpp. For the upstream qemu-xen device-model, the default and
-minimum is 16 MB.
+When using stdvga, the default and minimum is 16 MB.
 
-When using the emulated Cirrus graphics card (B<vga="cirrus">) and the
-qemu-xen-traditional device-model, the amount of video RAM is fixed at 4 MB,
-which is sufficient for 1024x768 at 32 bpp. For the upstream qemu-xen
-device-model, the default and minimum is 8 MB.
+When using the emulated Cirrus graphics card (B<vga="cirrus">), the
+default and minimum is 8 MB.
 
 For QXL vga, both the default and minimal are 128MB.
 If B<videoram> is set less than 128MB, an error will be triggered.
@@ -2589,12 +2568,6 @@ B<qemu(1)> manpage. The default is B<en-us>.
 
 Specifies that the display should be presented via an X window (using
 Simple DirectMedia Layer). The default is (0) not enabled.
-
-=item B<opengl=BOOLEAN>
-
-Enable OpenGL acceleration of the SDL display. Only effects machines
-using B<device_model_version="qemu-xen-traditional"> and only if the
-device-model was compiled with OpenGL support. Default is (0) false.
 
 =item B<nographic=BOOLEAN>
 
@@ -2925,11 +2898,6 @@ Valid values are:
 Use the device-model merged into the upstream QEMU project.
 This device-model is the default for Linux dom0.
 
-=item B<qemu-xen-traditional>
-
-Use the device-model based upon the historical Xen fork of QEMU.
-This device-model is still the default for NetBSD dom0.
-
 =back
 
 It is recommended to accept the default value for new guests.  If
@@ -2949,8 +2917,7 @@ to specify this option.
 Override the path to the kernel image used as device-model stubdomain.
 The binary provided here MUST be consistent with the
 B<device_model_version> which you have specified.
-In case of B<qemu-xen-traditional> it is expected to be MiniOS-based stubdomain
-image, in case of B<qemu-xen> it is expected to be Linux-based stubdomain
+In case of B<qemu-xen> it is expected to be Linux-based stubdomain
 kernel.
 
 =item B<stubdomain_cmdline="STRING">

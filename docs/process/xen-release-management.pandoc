@@ -193,7 +193,7 @@ from the last RC:
 
 1. Send out commit moratorium emails to committers@.
 
-2. Check all the trees (mini-os, qemu-trad, qemu-xen, seabios, ovmf etc).
+2. Check all the trees (mini-os, qemu-xen, seabios, ovmf etc).
 They have the correct commits and all security patches applied. There will be
 tools provided.
 

@@ -636,7 +636,8 @@ Trustworthy copy of /local/domain/$DOMID/backend/$KIND/$DEVID/$NODE.
 
 #### /libxl/$DOMID/dm-version ("qemu_xen"|"qemu_xen_traditional") = [n,INTERNAL]
 
-The device model version for a domain.
+The device model version for a domain. Note that "qemu_xen_traditional" is
+a device model variant which has been removed from Xen.
 
 #### /libxl/$DOMID/remus/netbuf/$DEVID/ifb = STRING [n,INTERNAL]
 

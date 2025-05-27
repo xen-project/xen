@@ -111,8 +111,8 @@ if this parameter is not specified.
 =item Description
 
 By default pciback only allows PV guests to write "known safe" values
-into PCI configuration space, likewise QEMU (both qemu-xen and
-qemu-xen-traditional) imposes the same constraint on HVM guests.
+into PCI configuration space, likewise QEMU imposes the same constraint
+on HVM guests.
 However, many devices require writes to other areas of the configuration space
 in order to operate properly.  This option tells the backend (pciback or QEMU)
 to allow all writes to the PCI configuration space of this device by this
