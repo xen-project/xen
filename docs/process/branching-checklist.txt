@@ -71,7 +71,6 @@ ov=4.0
 Ensure references to qemu trees and Mini-OS in xen.git's Config.mk are updated.
 The variables and there content should be:
   * QEMU_UPSTREAM_REVISION: qemu-xen-X.Y.0
-  * QEMU_TRADITIONAL_REVISION: xen-X.Y.0
   * MINIOS_UPSTREAM_REVISION: xen-RELEASE-X.Y.0
 Where X.Y is the release version (e.g. 4.17).
 

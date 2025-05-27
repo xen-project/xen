@@ -80,7 +80,7 @@ disabled at compile time:
       libnl-3-dev, etc).  Required if network buffering is desired
       when using Remus with libxl.  See docs/README.remus for detailed
       information.
-    * 16-bit x86 assembler, loader and compiler for qemu-traditional / rombios
+    * 16-bit x86 assembler, loader and compiler for rombios
       (dev86 rpm or bin86 & bcc debs)
     * Development install of liblzma for rombios
     * Development install of libbz2, liblzma, liblzo2, and libzstd for DomU

@@ -24,7 +24,6 @@ SUBDIRS-$(CONFIG_Linux) += vchan
 
 # do not recurse in to a dir we are about to delete
 ifneq "$(MAKECMDGOALS)" "distclean"
-SUBDIRS-$(CONFIG_QEMU_TRAD) += qemu-xen-traditional-dir
 SUBDIRS-$(CONFIG_QEMU_XEN) += qemu-xen-dir
 endif
 
@@ -79,7 +78,6 @@ clean: subdirs-clean
 
 .PHONY: distclean
 distclean: subdirs-distclean clean
-	rm -rf qemu-xen-traditional-dir qemu-xen-traditional-dir-remote
 	rm -rf qemu-xen-dir qemu-xen-dir-remote qemu-xen-build
 	rm -rf ../config/Tools.mk config.h config.log config.status \
 		config.cache autom4te.cache
@@ -95,11 +93,6 @@ IOEMU_EXTRA_LDFLAGS := --extra-ldflags="-Wl,-rpath,$(libdir)"
 else
 QEMU_UPSTREAM_RPATH := -Wl,-rpath,$(LIBEXEC_LIB)
 IOEMU_EXTRA_LDFLAGS :=
-endif
-
-QEMU_ROOT := $(shell if [ -d "$(QEMU_TRADITIONAL_LOC)" ]; then echo "$(QEMU_TRADITIONAL_LOC)"; else echo .; fi)
-ifneq ($(QEMU_ROOT),.)
-export QEMU_ROOT
 endif
 
 # Targets for external trees:
@@ -135,54 +128,6 @@ endif
 #     a source tarball)
 #   ${TARGET}_LOC
 #     The ultimate location of the source (either a local dir or remote URL)
-
-# External target: qemu-xen-traditional
-qemu-xen-traditional-dir-find:
-	set -ex; \
-	if test -d $(QEMU_TRADITIONAL_LOC); then \
-		mkdir -p qemu-xen-traditional-dir; \
-	else \
-		export GIT=$(GIT); \
-		$(XEN_ROOT)/scripts/git-checkout.sh $(QEMU_TRADITIONAL_LOC) $(QEMU_TRADITIONAL_REVISION) qemu-xen-traditional-dir; \
-	fi
-
-.PHONY: qemu-xen-traditional-dir-force-update
-qemu-xen-traditional-dir-force-update: qemu-xen-traditional-dir-find
-	set -ex; \
-	if [ "$(QEMU_TRADITIONAL_REVISION)" ]; then \
-		cd qemu-xen-traditional-dir-remote; \
-		$(GIT) fetch origin; \
-		$(GIT) reset --hard $(QEMU_TRADITIONAL_REVISION); \
-	fi
-
-qemu-traditional-recurse = \
-	set -e; \
-		$(buildmakevars2shellvars); \
-		export CONFIG_BLKTAP1=n; \
-		export BUILDING_QEMU_TRAD=y; \
-		cd qemu-xen-traditional-dir; \
-		$(1)
-
-subdir-all-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
-	$(call qemu-traditional-recurse,\
-		$(QEMU_ROOT)/xen-setup \
-		--extra-cflags="-D__XEN_TOOLS__ $(EXTRA_CFLAGS_QEMU_TRADITIONAL)" \
-		$(IOEMU_EXTRA_LDFLAGS) \
-		--cpu=$(IOEMU_CPU_ARCH) \
-		$(IOEMU_CONFIGURE_CROSS); \
-		$(MAKE) all \
-	)
-
-subdir-install-qemu-xen-traditional-dir: subdir-all-qemu-xen-traditional-dir
-	$(call qemu-traditional-recurse,$(MAKE) install)
-
-subdir-clean-qemu-xen-traditional-dir:
-	set -e; if test -d qemu-xen-traditional-dir/.; then \
-		$(MAKE) -C qemu-xen-traditional-dir clean; \
-	fi
-subdir-uninstall-qemu-xen-traditional-dir:
-	rm -f $(D)$(bindir)/qemu-nbd*
-	rm -f $(D)$(bindir)/qemu-img*
 
 # External target: qemu-xen
 qemu-xen-dir-find:
@@ -275,9 +220,6 @@ subdir-uninstall-qemu-xen-dir: ;
 subtree-force-update:
 ifeq ($(CONFIG_QEMU_XEN),y)
 	$(MAKE) qemu-xen-dir-force-update
-endif
-ifeq ($(CONFIG_QEMU_TRAD),y)
-	$(MAKE) qemu-xen-traditional-dir-force-update
 endif
 ifeq ($(CONFIG_X86),y)
 	$(MAKE) -C firmware subtree-force-update

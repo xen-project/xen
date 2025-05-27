@@ -165,20 +165,6 @@ define move-if-changed
 	if ! cmp -s $(1) $(2); then mv -f $(1) $(2); else rm -f $(1); fi
 endef
 
-BUILD_MAKE_VARS := sbindir bindir LIBEXEC LIBEXEC_BIN libdir SHAREDIR \
-                   XENFIRMWAREDIR XEN_CONFIG_DIR XEN_SCRIPT_DIR XEN_LOCK_DIR \
-                   XEN_RUN_DIR XEN_PAGING_DIR XEN_DUMP_DIR XEN_LOG_DIR \
-                   XEN_LIB_DIR XEN_RUN_STORED
-
-buildmakevars2file = $(eval $(call buildmakevars2file-closure,$(1)))
-define buildmakevars2file-closure
-    $(1): .phony
-	rm -f $(1).tmp; \
-	$(foreach var, $(BUILD_MAKE_VARS), \
-	          echo "$(var)=\"$($(var))\"" >>$(1).tmp;) \
-	$(call move-if-changed,$(1).tmp,$(1))
-endef
-
 CFLAGS += -fno-strict-aliasing
 
 CFLAGS += -std=gnu99
@@ -208,21 +194,11 @@ XEN_EXTFILES_URL ?= https://xenbits.xen.org/xen-extfiles
 
 # Where to look for inlined subtrees (for example, from a tarball)
 QEMU_UPSTREAM_INTREE ?= $(XEN_ROOT)/tools/qemu-xen
-QEMU_TRADITIONAL_INTREE ?= $(XEN_ROOT)/tools/qemu-xen-traditional
 
 
 # Handle legacy options
 ifneq (,$(SEABIOS_UPSTREAM_TAG))
 SEABIOS_UPSTREAM_REVISION ?= $(SEABIOS_UPSTREAM_TAG)
-endif
-ifneq (,$(QEMU_REMOTE))
-QEMU_TRADITIONAL_URL ?= $(QEMU_REMOTE)
-endif
-ifneq (,$(CONFIG_QEMU))
-QEMU_TRADITIONAL_LOC ?= $(CONFIG_QEMU)
-endif
-ifneq (,$(QEMU_TAG))
-QEMU_TRADITIONAL_REVISION ?= $(QEMU_TAG)
 endif
 
 OVMF_UPSTREAM_URL ?= https://xenbits.xen.org/git-http/ovmf.git
@@ -238,20 +214,6 @@ SEABIOS_UPSTREAM_URL ?= https://xenbits.xen.org/git-http/seabios.git
 SEABIOS_UPSTREAM_REVISION ?= rel-1.16.3
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
-
-
-QEMU_TRADITIONAL_URL ?= https://xenbits.xen.org/git-http/qemu-xen-traditional.git
-QEMU_TRADITIONAL_REVISION ?= 3d273dd05e51e5a1ffba3d98c7437ee84e8f8764
-# Wed Jul 15 10:01:40 2020 +0100
-# qemu-trad: remove Xen path dependencies
-
-# Specify which qemu-dm to use. This may be `ioemu' to use the old
-# Mercurial in-tree version, or a local directory, or a git URL.
-# QEMU_UPSTREAM_LOC ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
-
-# Defaults for subtree locations
-QEMU_TRADITIONAL_LOC ?= $(call or,$(wildcard $(QEMU_TRADITIONAL_INTREE)),\
-                                  $(QEMU_TRADITIONAL_URL))
 
 QEMU_UPSTREAM_LOC ?= $(call or,$(wildcard $(QEMU_UPSTREAM_INTREE)),\
                                $(QEMU_UPSTREAM_URL))

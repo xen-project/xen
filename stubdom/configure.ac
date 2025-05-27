@@ -18,26 +18,12 @@ m4_include([../m4/depends.m4])
 m4_include([../m4/fetcher.m4])
 
 # Enable/disable stub domains
-AX_STUBDOM_CONDITIONAL([ioemu-stubdom], [ioemu])
 AX_STUBDOM_DEFAULT_DISABLE([c-stubdom], [c])
 AX_STUBDOM_DEFAULT_DISABLE([pv-grub], [grub])
 AX_STUBDOM_DEFAULT_ENABLE([xenstore-stubdom], [xenstore])
 AX_STUBDOM_DEFAULT_ENABLE([xenstorepvh-stubdom], [xenstorepvh])
 AX_STUBDOM_CONDITIONAL([vtpm-stubdom], [vtpm])
 AX_STUBDOM_CONDITIONAL([vtpmmgr-stubdom], [vtpmmgr])
-
-AC_ARG_ENABLE([qemu-traditional])
-AS_IF([test "x$enable_qemu_traditional" = "xyes"], [
-    qemu_traditional=y],[
-    qemu_traditional=n
-])
-AS_IF([test "x$ioemu" = "x"], [
-    ioemu=$qemu_traditional
-])
-echo "x$ioemu$qemu_traditional"
-AS_IF([test "x$ioemu$qemu_traditional" = "xyn"], [
-    AC_MSG_ERROR(IOEMU stubdomain requires qemu-traditional)
-])
 
 AX_ARG_DEFAULT_ENABLE([debug], [Disable debug build of stubdom])
 AX_ARG_DEFAULT_ENABLE([extfiles], [Use xen extfiles repository for libraries])
@@ -69,7 +55,6 @@ AX_STUBDOM_AUTO_DEPENDS([vtpmmgr], [vtpm])
 #Conditionally enable these stubdoms based on the presense of dependencies
 AX_STUBDOM_CONDITIONAL_FINISH([vtpm-stubdom], [vtpm])
 AX_STUBDOM_CONDITIONAL_FINISH([vtpmmgr-stubdom], [vtpmmgr])
-AX_STUBDOM_CONDITIONAL_FINISH([ioemu-stubdom], [ioemu])
 
 AX_STUBDOM_FINISH
 AC_OUTPUT()

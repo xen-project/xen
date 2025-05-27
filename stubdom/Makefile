@@ -7,7 +7,6 @@ export PKG_CONFIG_DIR = $(CURDIR)/pkg-config
 
 # Remove flags which are meant for tools, e.g. "-m64"
 export EXTRA_CFLAGS_XEN_TOOLS=
-export EXTRA_CFLAGS_QEMU_TRADITIONAL=
 
 export stubdom=y
 export debug=y
@@ -71,16 +70,12 @@ TARGET_LDFLAGS += -nostdlib -L$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib
 
 TARGETS=$(STUBDOM_TARGETS)
 
-STUBDOMPATH="stubdompath.sh"
-genpath-target = $(call buildmakevars2file,$(STUBDOMPATH))
-$(eval $(genpath-target))
-
 .PHONY: all
 all: build
 ifeq ($(STUBDOM_SUPPORTED),1)
-build: $(STUBDOMPATH) $(STUBDOM_BUILD)
+build: $(STUBDOM_BUILD)
 else
-build: $(STUBDOMPATH)
+build:
 endif
 
 ##############
@@ -267,43 +262,6 @@ cross-tpmemu: $(TPMEMU_STAMPFILE)
 .PHONY: $(CROSS_ROOT)
 $(CROSS_ROOT): cross-newlib cross-zlib cross-libpci
 
-QEMU_ROOT := $(shell if [ -d "$(QEMU_TRADITIONAL_LOC)" ]; then echo "$(QEMU_TRADITIONAL_LOC)"; else echo .; fi)
-
-ifneq ($(filter ioemu,$(STUBDOM_TARGETS)),)
-IOEMU_LINKFARM_TARGET := ioemu/linkfarm.stamp
-endif
-
-ifeq ($(QEMU_ROOT),.)
-$(XEN_ROOT)/tools/qemu-xen-traditional-dir:
-	$(MAKE) DESTDIR= -C $(XEN_ROOT)/tools qemu-xen-traditional-dir-find
-
-ioemu/linkfarm.stamp: $(XEN_ROOT)/tools/qemu-xen-traditional-dir
-	mkdir -p ioemu
-	set -e;									\
-	$(buildmakevars2shellvars);						\
-	cd ioemu;								\
-	src="$$XEN_ROOT/tools/qemu-xen-traditional-dir"; export src;		\
-	(cd $$src && find * -type d						\
-		$(addprefix ! -path , '*-softmmu*' '*-linux-user*') -print)	\
-		| xargs mkdir -p;						\
-	(cd $$src && find *	! -type l  -type f  $(addprefix ! -path ,	\
-			'*.[oda1]' 'config-*' config.mak qemu-dm qemu-img-xen	\
-			'*.html' '*.pod' '*-softmmu*' '*-linux-user*'		\
-			)) >linkfarm.stamp.tmp;				\
-	cmp -s linkfarm.stamp.tmp linkfarm.stamp &&			\
-		rm linkfarm.stamp.tmp || {				\
-		mv linkfarm.stamp.tmp linkfarm.stamp;			\
-		cat linkfarm.stamp | while read f;			\
-			do rm -f "$$f"; ln -s "$$src/$$f" "$$f"; done;	\
-	}
-else
-export QEMU_ROOT
-
-ioemu/linkfarm.stamp:
-	mkdir -p ioemu
-	touch ioemu/linkfarm.stamp
-endif
-
 #######
 # libraries under tools/libs
 #######
@@ -379,29 +337,6 @@ $(TARGETS_MINIOS): mini-os-%:
 	for i in $$(cd $(MINI_OS) ; find . -type d) ; do \
                 mkdir -p $@/$$i ; \
 	done
-
-#######
-# ioemu
-#######
-
-ioemu-minios.gen.cfg: APP_LIBS = evtchn gnttab ctrl guest
-ioemu-minios.gen.cfg: ioemu-minios.cfg Makefile
-	$(GEN_config) >$@
-
-ioemu-minios-config.mk: ioemu-minios.gen.cfg
-	MINIOS_CONFIG="$(CURDIR)/$<" CONFIG_FILE="$(CURDIR)/$@" $(MAKE) DESTDIR= -C $(MINI_OS) config
-
-.PHONY: ioemu
-ioemu: cross-zlib cross-libpci libxenguest ioemu-minios-config.mk
-	[ -f ioemu/config-host.mak ] || \
-	  ( $(buildmakevars2shellvars); \
-	    cd ioemu ; \
-	    LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) \
-	    TARGET_CPPFLAGS="$(TARGET_CPPFLAGS) $(shell cat ioemu-minios-config.mk)" \
-	    TARGET_CFLAGS="$(TARGET_CFLAGS)" \
-	    TARGET_LDFLAGS="$(TARGET_LDFLAGS)" \
-	    $(QEMU_ROOT)/xen-setup-stubdom )
-	$(MAKE) DESTDIR= -C ioemu -f $(QEMU_ROOT)/Makefile
 
 ###
 # C
@@ -496,11 +431,6 @@ xenstorepvh: $(CROSS_ROOT) xenstorepvh-minios-config.mk
 # minios
 ########
 
-.PHONY: ioemu-stubdom
-ioemu-stubdom: APP_OBJS=$(CURDIR)/ioemu/i386-stubdom/qemu.a $(CURDIR)/ioemu/i386-stubdom/libqemu.a $(CURDIR)/ioemu/libqemu_common.a
-ioemu-stubdom: mini-os-$(XEN_TARGET_ARCH)-ioemu lwip-$(XEN_TARGET_ARCH) libxenguest ioemu
-	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/ioemu-minios.gen.cfg" $(MAKE) DESTDIR= -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) APP_OBJS="$(APP_OBJS)"
-
 .PHONY: c-stubdom
 c-stubdom: mini-os-$(XEN_TARGET_ARCH)-c lwip-$(XEN_TARGET_ARCH) libxenguest c
 	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/c/minios.cfg" $(MAKE) DESTDIR= -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) APP_OBJS=$(CURDIR)/c/main.a
@@ -539,17 +469,10 @@ xenstorepvh-stubdom: mini-os-$(XEN_TARGET_ARCH)-xenstorepvh $(XENSTORE_DEPS) xen
 #########
 
 ifeq ($(STUBDOM_SUPPORTED),1)
-install: $(STUBDOMPATH) $(STUBDOM_INSTALL)
+install: $(STUBDOM_INSTALL)
 else
-install: $(STUBDOMPATH)
+install:
 endif
-
-install-ioemu: ioemu-stubdom
-	$(INSTALL_DIR) "$(DESTDIR)$(LIBEXEC_BIN)"
-	$(INSTALL_PROG) stubdom-dm "$(DESTDIR)$(LIBEXEC_BIN)"
-	$(INSTALL_DATA) stubdompath.sh "$(DESTDIR)$(LIBEXEC_BIN)"
-	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
-	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-ioemu/mini-os.gz "$(DESTDIR)$(XENFIRMWAREDIR)/ioemu-stubdom.gz"
 
 install-grub: pv-grub
 	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
@@ -593,11 +516,6 @@ else
 uninstall:
 endif
 
-uninstall-ioemu:
-	rm -f $(DESTDIR)$(LIBEXEC_BIN)/stubdom-dm
-	rm -f $(DESTDIR)$(LIBEXEC_BIN)/stubdompath.sh
-	rm -f $(DESTDIR)$(XENFIRMWAREDIR)/ioemu-stubdom.gz
-
 uninstall-grub:
 	rm -f $(DESTDIR)$(XENFIRMWAREDIR)/pv-grub-$(XEN_TARGET_ARCH).gz
 
@@ -617,11 +535,10 @@ uninstall-vtpmmgr:
 # clean
 #######
 
-# Only clean the libxc/ioemu/mini-os part
+# Only clean the libxc/mini-os part
 .PHONY: clean
 clean: $(foreach lib,$(STUB_LIBS),clean-libxen$(lib))
 clean:
-	rm -fr mini-os-$(XEN_TARGET_ARCH)-ioemu
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-c
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-grub
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-xenstore
@@ -632,11 +549,9 @@ clean:
 	$(MAKE) -C vtpm clean
 	$(MAKE) -C vtpmmgr clean
 	rm -fr grub-$(XEN_TARGET_ARCH)
-	rm -f $(STUBDOMPATH)
 	rm -f *-minios-config.mk
 	rm -f *.gen.cfg
 	rm -fr pkg-config
-	-[ ! -d ioemu ] || $(MAKE) DESTDIR= -C ioemu clean
 	-[ ! -d xenstore ] || $(MAKE) -f $(CURDIR)/xenlibs.mk -C xenstore clean
 	-[ ! -d xenstorepvh ] || $(MAKE) -f $(CURDIR)/xenlibs.mk -C xenstorepvh clean
 
@@ -647,7 +562,7 @@ crossclean: clean
 	rm -fr newlib-$(XEN_TARGET_ARCH)
 	rm -fr zlib-$(XEN_TARGET_ARCH) pciutils-$(XEN_TARGET_ARCH)
 	rm -fr libs-$(XEN_TARGET_ARCH)
-	rm -fr ioemu xenstore xenstorepvh
+	rm -fr xenstore xenstorepvh
 	rm -fr gmp-$(XEN_TARGET_ARCH)
 	rm -fr polarssl-$(XEN_TARGET_ARCH)
 	rm -fr tpm_emulator-$(XEN_TARGET_ARCH)

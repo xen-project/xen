@@ -466,10 +466,6 @@ M:	Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>
 S:	Supported
 F:	tools/python
 
-QEMU-DM
-S:	Supported
-T:	git https://xenbits.xenproject.org/git-http/qemu-xen-traditional.git
-
 QEMU UPSTREAM
 M:	Stefano Stabellini <sstabellini@kernel.org>
 M:	Anthony Perard <anthony.perard@vates.tech>

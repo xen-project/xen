@@ -121,25 +121,11 @@ esac])
 LINUX_BACKEND_MODULES="`eval echo $LINUX_BACKEND_MODULES`"
 AC_SUBST(LINUX_BACKEND_MODULES)
 
-AC_ARG_ENABLE([qemu-traditional],
-    AS_HELP_STRING([--enable-qemu-traditional],
-                   [Enable qemu traditional device model, (DEFAULT is off)]))
-AS_IF([test "x$enable_qemu_traditional" = "xyes"], [
-AC_DEFINE([HAVE_QEMU_TRADITIONAL], [1], [Qemu traditional enabled])
-    qemu_traditional=y],[
-    qemu_traditional=n
-])
-AC_SUBST(qemu_traditional)
-
 AC_ARG_ENABLE([ipxe],
     AS_HELP_STRING([--enable-ipxe],
                    [Enable in-tree IPXE,
                     (DEFAULT is off, see also --with-system-ipxe)]),,[
-    AS_IF([test "x$enable_qemu_traditional" = "xyes"], [
-        enable_ipxe="yes"
-    ], [
         enable_ipxe="no"
-    ])
 ])
 AS_IF([test "x$enable_ipxe" = "xno"], [ipxe=n], [ipxe=y])
 AC_ARG_WITH([system-ipxe],
@@ -162,18 +148,15 @@ AC_SUBST(ipxe)
 
 AC_ARG_ENABLE([rombios],
     AS_HELP_STRING([--enable-rombios],
-                   [Enable ROMBIOS, (DEFAULT is on if qemu-traditional or ipxe is enabled,
+                   [Enable ROMBIOS, (DEFAULT is on if ipxe is enabled,
                     otherwise off)]),,[
-    AS_IF([test "x$enable_qemu_traditional" = "xyes" -o "x$enable_ipxe" = "xyes"], [
+    AS_IF([test "x$enable_ipxe" = "xyes"], [
         enable_rombios="yes"
     ], [
         enable_rombios="no"
     ])
 ])
 AS_IF([test "x$enable_rombios" = "xyes"], [
-    dnl as86, ld86, and bcc are only required when building rombios. They
-    dnl are only needed when the host system is x86 but that check is done
-    dnl for us above when checking if we should build with qemu-traditional.
     AX_PATH_PROG_OR_FAIL([AS86], [as86])
     AX_PATH_PROG_OR_FAIL([LD86], [ld86])
     AX_PATH_PROG_OR_FAIL([BCC], [bcc])

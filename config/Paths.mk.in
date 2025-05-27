@@ -5,8 +5,7 @@
 # because of this these variables are defined on one master input source file
 # and is generated after running ./configure. The master source is located
 # on the xen source tree at under config/Paths.mk.in and it is used to
-# generate shell or header files by the build system upon demand through the
-# use of the helper makefile helper buildmakevars2file().
+# generate shell or header files by the build system upon demand.
 #
 # For more documentation you can refer to the wiki:
 #

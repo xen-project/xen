@@ -622,7 +622,6 @@ STUBDOM_UNINSTALL
 STUBDOM_INSTALL
 STUBDOM_BUILD
 STUBDOM_TARGETS
-ioemu
 vtpmmgr
 vtpm
 TPMEMU_VERSION
@@ -713,14 +712,12 @@ SHELL'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
-enable_ioemu_stubdom
 enable_c_stubdom
 enable_pv_grub
 enable_xenstore_stubdom
 enable_xenstorepvh_stubdom
 enable_vtpm_stubdom
 enable_vtpmmgr_stubdom
-enable_qemu_traditional
 enable_debug
 enable_extfiles
 '
@@ -1363,7 +1360,6 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
-  --enable-ioemu-stubdom  Build and install ioemu-stubdom
   --enable-c-stubdom      Build and install c-stubdom (default is DISABLED)
   --enable-pv-grub        Build and install pv-grub (default is DISABLED)
   --disable-xenstore-stubdom
@@ -1375,7 +1371,6 @@ Optional Features:
   --enable-vtpm-stubdom   Build and install vtpm-stubdom
   --enable-vtpmmgr-stubdom
                           Build and install vtpmmgr-stubdom
-
   --disable-debug         Disable debug build of stubdom (default is ENABLED)
   --disable-extfiles      Use xen extfiles repository for libraries (default
                           is ENABLED)
@@ -2411,40 +2406,6 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 # Enable/disable stub domains
 
-# Check whether --enable-ioemu-stubdom was given.
-if test ${enable_ioemu_stubdom+y}
-then :
-  enableval=$enable_ioemu_stubdom;
-
-if test "x$enableval" = "xyes"
-then :
-
-
-ioemu=y
-STUBDOM_TARGETS="$STUBDOM_TARGETS ioemu"
-STUBDOM_BUILD="$STUBDOM_BUILD ioemu-stubdom"
-STUBDOM_INSTALL="$STUBDOM_INSTALL install-ioemu"
-STUBDOM_UNINSTALL="$STUBDOM_UNINSTALL install-ioemu"
-
-
-else $as_nop
-
-if test "x$enableval" = "xno"
-then :
-
-
-ioemu=n
-
-
-fi
-
-fi
-
-
-fi
-
-
-
 # Check whether --enable-c-stubdom was given.
 if test ${enable_c_stubdom+y}
 then :
@@ -2684,35 +2645,6 @@ fi
 fi
 
 
-
-# Check whether --enable-qemu-traditional was given.
-if test ${enable_qemu_traditional+y}
-then :
-  enableval=$enable_qemu_traditional;
-fi
-
-if test "x$enable_qemu_traditional" = "xyes"
-then :
-
-    qemu_traditional=y
-else $as_nop
-
-    qemu_traditional=n
-
-fi
-if test "x$ioemu" = "x"
-then :
-
-    ioemu=$qemu_traditional
-
-fi
-echo "x$ioemu$qemu_traditional"
-if test "x$ioemu$qemu_traditional" = "xyn"
-then :
-
-    as_fn_error $? "IOEMU stubdomain requires qemu-traditional" "$LINENO" 5
-
-fi
 
 
 # Check whether --enable-debug was given.
@@ -4352,27 +4284,6 @@ else $as_nop
 
 
 vtpmmgr=n
-
-
-fi
-
-
-
-if test "x$ioemu" = "xy" || test "x$ioemu" = "x"
-then :
-
-
-ioemu=y
-STUBDOM_TARGETS="$STUBDOM_TARGETS ioemu"
-STUBDOM_BUILD="$STUBDOM_BUILD ioemu-stubdom"
-STUBDOM_INSTALL="$STUBDOM_INSTALL install-ioemu"
-STUBDOM_UNINSTALL="$STUBDOM_UNINSTALL install-ioemu"
-
-
-else $as_nop
-
-
-ioemu=n
 
 
 fi

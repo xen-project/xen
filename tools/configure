@@ -726,7 +726,6 @@ BCC
 LD86
 AS86
 ipxe
-qemu_traditional
 LINUX_BACKEND_MODULES
 pygrub
 golang
@@ -835,7 +834,6 @@ enable_seabios
 enable_golang
 enable_pygrub
 with_linux_backend_modules
-enable_qemu_traditional
 enable_ipxe
 with_system_ipxe
 enable_rombios
@@ -1518,13 +1516,10 @@ Optional Features:
   --disable-seabios       Disable SeaBIOS (default is ENABLED)
   --disable-golang        Disable Go tools (default is ENABLED)
   --disable-pygrub        Disable pygrub (default is ENABLED)
-  --enable-qemu-traditional
-                          Enable qemu traditional device model, (DEFAULT is
-                          off)
   --enable-ipxe           Enable in-tree IPXE, (DEFAULT is off, see also
                           --with-system-ipxe)
-  --enable-rombios        Enable ROMBIOS, (DEFAULT is on if qemu-traditional
-                          or ipxe is enabled, otherwise off)
+  --enable-rombios        Enable ROMBIOS, (DEFAULT is on if ipxe is enabled,
+                          otherwise off)
   --enable-libfsimage     Enable libfsimage, (DEFAULT is on if pygrub is
                           enabled, otherwise off)
   --enable-systemd        Enable systemd support (default is DISABLED)
@@ -4838,42 +4833,13 @@ fi
 LINUX_BACKEND_MODULES="`eval echo $LINUX_BACKEND_MODULES`"
 
 
-# Check whether --enable-qemu-traditional was given.
-if test ${enable_qemu_traditional+y}
-then :
-  enableval=$enable_qemu_traditional;
-fi
-
-if test "x$enable_qemu_traditional" = "xyes"
-then :
-
-
-printf "%s\n" "#define HAVE_QEMU_TRADITIONAL 1" >>confdefs.h
-
-    qemu_traditional=y
-else $as_nop
-
-    qemu_traditional=n
-
-fi
-
-
 # Check whether --enable-ipxe was given.
 if test ${enable_ipxe+y}
 then :
   enableval=$enable_ipxe;
 else $as_nop
 
-    if test "x$enable_qemu_traditional" = "xyes"
-then :
-
-        enable_ipxe="yes"
-
-else $as_nop
-
         enable_ipxe="no"
-
-fi
 
 fi
 
@@ -4912,7 +4878,7 @@ then :
   enableval=$enable_rombios;
 else $as_nop
 
-    if test "x$enable_qemu_traditional" = "xyes" -o "x$enable_ipxe" = "xyes"
+    if test "x$enable_ipxe" = "xyes"
 then :
 
         enable_rombios="yes"
@@ -4928,7 +4894,7 @@ fi
 if test "x$enable_rombios" = "xyes"
 then :
 
-                # Extract the first word of "as86", so it can be a program name with args.
+    # Extract the first word of "as86", so it can be a program name with args.
 set dummy as86; ac_word=$2
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 printf %s "checking for $ac_word... " >&6; }

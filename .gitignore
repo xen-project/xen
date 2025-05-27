@@ -254,9 +254,6 @@ LibVNCServer*
 tools/qemu-xen-dir-remote
 tools/qemu-xen-dir
 
-tools/qemu-xen-traditional-dir-remote
-tools/qemu-xen-traditional-dir
-
 tools/firmware/seabios-dir-remote
 tools/firmware/seabios-dir
 

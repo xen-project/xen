@@ -11,8 +11,6 @@
 /gmp-*
 /grub-*
 /include
-/ioemu
-/ioemu/
 /libs-*
 /libxencall-*
 /libxenevtchn-*
@@ -29,7 +27,6 @@
 /pciutils-*
 /pkg-config/*
 /polarssl-*
-/stubdompath.sh
 /tpm_emulator-*
 /vtpm/vtpm_manager.h
 /xenstore

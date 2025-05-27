@@ -113,15 +113,6 @@ Build a private copy of SeaBIOS.
 Use the given SeaBIOS binary instead of compiling a private copy.
   --with-system-seabios=PATH
 
-Build the old qemu used by xm/xend. This is required if existing domUs
-should be migrated to this host, or if existing domU snapshots should be
-started with this version of the tools. Only if all domUs used the new
-upstream qemu during initial start it is safe to disable this option.
-The old qemu requires rombios, which can be disable along with
-qemu-traditional.
-  --enable-qemu-traditional
-  --enable-rombios
-
 The libxl toolstack uses the upstream qemu per default. A private copy
 will be built. If desired this private copy can be configured with
 additional options passed to its configure script.
@@ -161,7 +152,6 @@ this detection and the sysv runlevel scripts have to be used.
 
 Build various stubom components, some are only example code. Its usually
 enough to specify just --enable-stubdom and leave these options alone.
-  --enable-ioemu-stubdom
   --enable-c-stubdom
   --disable-pv-grub
   --disable-xenstore-stubdom
@@ -245,7 +235,6 @@ locations.
 XEN_EXTFILES_URL=
 OVMF_UPSTREAM_URL=
 QEMU_UPSTREAM_URL=
-QEMU_TRADITIONAL_URL=
 SEABIOS_UPSTREAM_URL=
 MINIOS_UPSTREAM_URL=
 
@@ -253,7 +242,6 @@ Using additional CFLAGS to build tools which will run in dom0 is
 required when building distro packages. These variables can be used to
 pass RPM_OPT_FLAGS.
 EXTRA_CFLAGS_XEN_TOOLS=
-EXTRA_CFLAGS_QEMU_TRADITIONAL=
 EXTRA_CFLAGS_QEMU_XEN=
 
 Additional CFLAGS may be supplied to the build of the hypervisor by
@@ -340,7 +328,6 @@ sudo make install BOOT_DIR=/ood/path/boot EFI_DIR=/odd/path/efi
 export WGET=$(type -P false)
 export GIT=$(type -P false)
 export EXTRA_CFLAGS_XEN_TOOLS="$RPM_OPT_FLAGS"
-export EXTRA_CFLAGS_QEMU_TRADITIONAL="$RPM_OPT_FLAGS"
 export EXTRA_CFLAGS_QEMU_XEN="$RPM_OPT_FLAGS"
 %configure \
         --with-initddir=%{_initddir}

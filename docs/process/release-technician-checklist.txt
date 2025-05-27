@@ -56,7 +56,6 @@ t=RELEASE-$r
 
 * change xen-unstable Config.mk
 #   QEMU_UPSTREAM_REVISION,
-#   QEMU_TRADITIONAL_REVISION
 #   MINIOS_UPSTREAM_REVISION
 #     (drop any references to the specific commits, e.g. date or title)
 * change SUPPORT.md heading version number; -unstable or -rc tag

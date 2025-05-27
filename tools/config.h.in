@@ -42,9 +42,6 @@
 /* pygrub enabled */
 #undef HAVE_PYGRUB
 
-/* Qemu traditional enabled */
-#undef HAVE_QEMU_TRADITIONAL
-
 /* ROMBIOS enabled */
 #undef HAVE_ROMBIOS
 
