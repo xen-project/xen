@@ -341,10 +341,16 @@ int main(void)
 
     printf("CPU speed is %u MHz\n", get_cpu_mhz());
 
+    /*
+     * PCI setup must be done before SMP initialization, as the later also does
+     * the MTRR setup and so the size of the PCI MMIO windows must be known at
+     * that point.
+     */
+    pci_setup();
+
     smp_initialise();
 
     apic_setup();
-    pci_setup();
 
     perform_tests();
 
