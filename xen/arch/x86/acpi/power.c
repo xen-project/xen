@@ -151,15 +151,11 @@ static void freeze_domains(void)
     for_each_domain ( d )
         domain_pause(d);
     rcu_read_unlock(&domlist_read_lock);
-
-    scheduler_disable();
 }
 
 static void thaw_domains(void)
 {
     struct domain *d;
-
-    scheduler_enable();
 
     rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
@@ -216,6 +212,7 @@ static int enter_state(u32 state)
     printk(XENLOG_INFO "Preparing system for ACPI S%d state.\n", state);
 
     freeze_domains();
+    scheduler_disable();
 
     acpi_dmar_reinstate();
 
@@ -334,6 +331,7 @@ static int enter_state(u32 state)
     mtrr_aps_sync_end();
     iommu_adjust_irq_affinities();
     acpi_dmar_zap();
+    scheduler_enable();
     thaw_domains();
     system_state = SYS_STATE_active;
     spin_unlock(&pm_lock);
