@@ -268,7 +268,7 @@ bool do_vpsci_0_2_call(struct cpu_user_regs *regs, uint32_t fid)
 {
     /*
      * /!\ VPSCI_NR_FUNCS (in asm/vpsci.h) should be updated when
-     * adding/removing a function. SCCC_SMCCC_*_REVISION should be
+     * adding/removing a function. SSSC_SMCCC_*_REVISION should be
      * updated once per release.
      */
     switch ( fid )
