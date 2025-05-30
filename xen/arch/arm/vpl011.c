@@ -713,6 +713,7 @@ int domain_vpl011_init(struct domain *d, struct vpl011_init_info *info)
     }
     else
     {
+        d->console.input_allowed = true;
         vpl011->backend_in_domain = false;
 
         vpl011->backend.xen = xzalloc(struct vpl011_xen_backend);

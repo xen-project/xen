@@ -831,6 +831,8 @@ struct domain *domain_create(domid_t domid,
         flags |= CDF_hardware;
         if ( old_hwdom )
             old_hwdom->cdf &= ~CDF_hardware;
+
+        d->console.input_allowed = true;
     }
 
     /* Holding CDF_* internal flags. */

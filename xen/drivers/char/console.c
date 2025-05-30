@@ -512,9 +512,21 @@ static unsigned int __read_mostly console_rx = 0;
 
 struct domain *console_get_domain(void)
 {
+    struct domain *d;
+
     if ( console_rx == 0 )
             return NULL;
-    return rcu_lock_domain_by_id(console_rx - 1);
+
+    d = rcu_lock_domain_by_id(console_rx - 1);
+    if ( !d )
+        return NULL;
+
+    if ( d->console.input_allowed )
+        return d;
+
+    rcu_unlock_domain(d);
+
+    return NULL;
 }
 
 void console_put_domain(struct domain *d)
@@ -551,6 +563,10 @@ static void console_switch_input(void)
         if ( d )
         {
             rcu_unlock_domain(d);
+
+            if ( !d->console.input_allowed )
+                continue;
+
             console_rx = next_rx;
             printk("*** Serial input to DOM%u", domid);
             break;
