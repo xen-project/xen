@@ -29,6 +29,9 @@
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
       when: never
+    - if: $SELECTED_JOBS_ONLY && $CI_JOB_NAME =~ $SELECTED_JOBS_ONLY
+    - if: $SELECTED_JOBS_ONLY
+      when: never
     - if: $WTOKEN && $CI_PROJECT_PATH =~ /^xen-project\/people\/.*$/
       when: manual
       allow_failure: true
