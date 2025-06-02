@@ -20,7 +20,7 @@ for f in "$1"/*; do
     echo "Running $f"
     printf '  <testcase name="%s">\n' "$f" >> "$xml_out"
     "$f" 2>&1 | tee /tmp/out
-    ret=$?
+    ret=${PIPESTATUS[0]}
     if [ "$ret" -ne 0 ]; then
         echo "FAILED: $f"
         failed+=" $f"
