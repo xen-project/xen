@@ -222,6 +222,7 @@ F:	tools/libacpi/
 
 ARGO
 M:	Christopher Clark <christopher.w.clark@gmail.com>
+R:	Daniel P. Smith <dpsmith@apertussolutions.com>
 S:	Maintained
 F:	xen/include/public/argo.h
 F:	xen/include/xen/argo.h
