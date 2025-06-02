@@ -37,6 +37,16 @@
 #define PTE_ACCESSED                BIT(6, UL)
 #define PTE_DIRTY                   BIT(7, UL)
 #define PTE_RSW                     (BIT(8, UL) | BIT(9, UL))
+/*
+ * [62:61] Svpbmt Memory Type definitions:
+ *
+ *  00 - PMA    Normal Cacheable, No change to implied PMA memory type
+ *  01 - NC     Non-cacheable, idempotent, weakly-ordered Main Memory
+ *  10 - IO     Non-cacheable, non-idempotent, strongly-ordered I/O memory
+ *  11 - Rsvd   Reserved for future standard use
+ */
+#define PTE_PBMT_NOCACHE            BIT(61, UL)
+#define PTE_PBMT_IO                 BIT(62, UL)
 
 #define PTE_LEAF_DEFAULT            (PTE_VALID | PTE_READABLE | PTE_WRITABLE)
 #define PTE_TABLE                   (PTE_VALID)
@@ -46,6 +56,15 @@
 #define PAGE_HYPERVISOR_RX          (PTE_VALID | PTE_READABLE | PTE_EXECUTABLE)
 
 #define PAGE_HYPERVISOR             PAGE_HYPERVISOR_RW
+/*
+ * PAGE_HYPERVISOR_NOCACHE is used for ioremap().
+ *
+ * Both PTE_PBMT_IO and PTE_PBMT_NOCACHE are non-cacheable, but the difference
+ * is that IO is non-idempotent and strongly ordered, which makes it a good
+ * candidate for mapping IOMEM.
+ */
+#define PAGE_HYPERVISOR_NOCACHE     (PAGE_HYPERVISOR_RW | PTE_PBMT_IO)
+#define PAGE_HYPERVISOR_WC          (PAGE_HYPERVISOR_RW | PTE_PBMT_NOCACHE)
 
 /*
  * The PTE format does not contain the following bits within itself;
@@ -57,6 +76,8 @@
 #define PTE_POPULATE    BIT(11, UL)
 
 #define PTE_ACCESS_MASK (PTE_READABLE | PTE_WRITABLE | PTE_EXECUTABLE)
+
+#define PTE_PBMT_MASK   (PTE_PBMT_NOCACHE | PTE_PBMT_IO)
 
 /* Calculate the offsets into the pagetables for a given VA */
 #define pt_linear_offset(lvl, va)   ((va) >> XEN_PT_LEVEL_SHIFT(lvl))
@@ -202,7 +223,7 @@ static inline pte_t read_pte(const pte_t *p)
     return read_atomic(p);
 }
 
-static inline pte_t pte_from_mfn(mfn_t mfn, unsigned int flags)
+static inline pte_t pte_from_mfn(mfn_t mfn, pte_attr_t flags)
 {
     unsigned long pte = (mfn_x(mfn) << PTE_PPN_SHIFT) | flags;
     return (pte_t){ .pte = pte };

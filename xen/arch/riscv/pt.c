@@ -25,7 +25,7 @@ static inline mfn_t get_root_page(void)
  * See the comment about the possible combination of (mfn, flags) in
  * the comment above pt_update().
  */
-static bool pt_check_entry(pte_t entry, mfn_t mfn, unsigned int flags)
+static bool pt_check_entry(pte_t entry, mfn_t mfn, pte_attr_t flags)
 {
     /* Sanity check when modifying an entry. */
     if ( (flags & PTE_VALID) && mfn_eq(mfn, INVALID_MFN) )
@@ -260,7 +260,7 @@ pte_t pt_walk(vaddr_t va, unsigned int *pte_level)
  */
 static int pt_update_entry(mfn_t root, vaddr_t virt,
                            mfn_t mfn, unsigned int *target,
-                           unsigned int flags)
+                           pte_attr_t flags)
 {
     int rc;
     /*
@@ -328,17 +328,19 @@ static int pt_update_entry(mfn_t root, vaddr_t virt,
         pte.pte = 0;
     else
     {
+        const pte_attr_t attrs = PTE_ACCESS_MASK | PTE_PBMT_MASK;
+
         /* We are inserting a mapping => Create new pte. */
         if ( !mfn_eq(mfn, INVALID_MFN) )
             pte = pte_from_mfn(mfn, PTE_VALID);
-        else /* We are updating the permission => Copy the current pte. */
+        else /* We are updating the attributes => Copy the current pte. */
         {
             pte = *ptep;
-            pte.pte &= ~PTE_ACCESS_MASK;
+            pte.pte &= ~attrs;
         }
 
-        /* update permission according to the flags */
-        pte.pte |= (flags & PTE_ACCESS_MASK) | PTE_ACCESSED | PTE_DIRTY;
+        /* Update attributes of PTE according to the flags. */
+        pte.pte |= (flags & attrs) | PTE_ACCESSED | PTE_DIRTY;
     }
 
     write_pte(ptep, pte);
@@ -353,7 +355,7 @@ static int pt_update_entry(mfn_t root, vaddr_t virt,
 
 /* Return the level where mapping should be done */
 static int pt_mapping_level(unsigned long vfn, mfn_t mfn, unsigned long nr,
-                            unsigned int flags)
+                            pte_attr_t flags)
 {
     unsigned int level = 0;
     unsigned long mask;
@@ -407,7 +409,7 @@ static DEFINE_SPINLOCK(pt_lock);
  * inserting will be done.
  */
 static int pt_update(vaddr_t virt, mfn_t mfn,
-                     unsigned long nr_mfns, unsigned int flags)
+                     unsigned long nr_mfns, pte_attr_t flags)
 {
     int rc = 0;
     unsigned long vfn = PFN_DOWN(virt);
@@ -535,7 +537,7 @@ int __init populate_pt_range(unsigned long virt, unsigned long nr_mfns)
 }
 
 /* Map a 4k page in a fixmap entry */
-void set_fixmap(unsigned int map, mfn_t mfn, unsigned int flags)
+void set_fixmap(unsigned int map, mfn_t mfn, pte_attr_t flags)
 {
     if ( map_pages_to_xen(FIXMAP_ADDR(map), mfn, 1, flags | PTE_SMALL) != 0 )
         BUG();

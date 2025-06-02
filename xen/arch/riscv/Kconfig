@@ -10,10 +10,14 @@ config RISCV
 config RISCV_64
 	def_bool y
 	select 64BIT
+	select HAS_SVPBMT
 
 config ARCH_DEFCONFIG
 	string
 	default "arch/riscv/configs/tiny64_defconfig"
+
+config HAS_SVPBMT
+	bool
 
 menu "Architecture Features"
 

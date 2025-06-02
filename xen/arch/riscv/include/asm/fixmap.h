@@ -33,7 +33,7 @@
 extern pte_t xen_fixmap[];
 
 /* Map a page in a fixmap entry */
-void set_fixmap(unsigned int map, mfn_t mfn, unsigned int flags);
+void set_fixmap(unsigned int map, mfn_t mfn, pte_attr_t flags);
 /* Remove a mapping from a fixmap entry */
 void clear_fixmap(unsigned int map);
 

@@ -18,3 +18,7 @@ Xen is run:
 - Zihintpause:
   On a system that doesn't have this extension, cpu_relax() should be
   implemented properly.
+- SVPBMT is mandatory to enable changing the memory attributes of a page.
+  For platforms that do not support SVPBMT, it is necessary to introduce a
+  similar mechanism as described in:
+  https://lore.kernel.org/all/20241102000843.1301099-1-samuel.holland@sifive.com/

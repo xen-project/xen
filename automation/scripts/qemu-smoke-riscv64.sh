@@ -7,6 +7,7 @@ rm -f smoke.serial
 
 export TEST_CMD="qemu-system-riscv64 \
     -M virt,aia=aplic-imsic \
+    -cpu rv64,svpbmt=on \
     -smp 1 \
     -nographic \
     -m 2g \
