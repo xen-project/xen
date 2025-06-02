@@ -11,6 +11,7 @@
 #include <xen/pfn.h>
 #include <xen/sections.h>
 #include <xen/sizes.h>
+#include <xen/vmap.h>
 
 #include <asm/early_printk.h>
 #include <asm/csr.h>
@@ -582,4 +583,33 @@ void __init setup_mm(void)
 void *__init arch_vmap_virt_end(void)
 {
     return (void *)(VMAP_VIRT_START + VMAP_VIRT_SIZE);
+}
+
+static void __iomem *ioremap_attr(paddr_t pa, size_t len,
+                                  pte_attr_t attributes)
+{
+    mfn_t mfn = _mfn(PFN_DOWN(pa));
+    unsigned int offs = pa & (PAGE_SIZE - 1);
+    unsigned int nr = PFN_UP(offs + len);
+    void *ptr = __vmap(&mfn, nr, 1, 1, attributes, VMAP_DEFAULT);
+
+    if ( ptr == NULL )
+        return NULL;
+
+    return ptr + offs;
+}
+
+void __iomem *ioremap_cache(paddr_t pa, size_t len)
+{
+    return ioremap_attr(pa, len, PAGE_HYPERVISOR);
+}
+
+void __iomem *ioremap_wc(paddr_t pa, size_t len)
+{
+    return ioremap_attr(pa, len, PAGE_HYPERVISOR_WC);
+}
+
+void __iomem *ioremap(paddr_t pa, size_t len)
+{
+    return ioremap_attr(pa, len, PAGE_HYPERVISOR_NOCACHE);
 }

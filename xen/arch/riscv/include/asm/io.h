@@ -41,14 +41,8 @@
 #include <xen/macros.h>
 #include <xen/types.h>
 
-/*
- * The RISC-V ISA doesn't yet specify how to query or modify PMAs, so we can't
- * change the properties of memory regions.  This should be fixed by the
- * upcoming platform spec.
- */
-#define ioremap_nocache(addr, size) ioremap(addr, size)
-#define ioremap_wc(addr, size) ioremap(addr, size)
-#define ioremap_wt(addr, size) ioremap(addr, size)
+void __iomem *ioremap_cache(paddr_t pa, size_t len);
+void __iomem *ioremap_wc(paddr_t pa, size_t len);
 
 /* Generic IO read/write.  These perform native-endian accesses. */
 static inline void __raw_writeb(uint8_t val, volatile void __iomem *addr)
