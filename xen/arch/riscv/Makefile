@@ -10,6 +10,7 @@ obj-y += sbi.o
 obj-y += setup.o
 obj-y += shutdown.o
 obj-y += smp.o
+obj-y += smpboot.o
 obj-y += stubs.o
 obj-y += time.o
 obj-y += traps.o

@@ -8,6 +8,7 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/shutdown.h>
+#include <xen/smp.h>
 #include <xen/vmap.h>
 #include <xen/xvmalloc.h>
 
@@ -19,7 +20,6 @@
 #include <asm/intc.h>
 #include <asm/sbi.h>
 #include <asm/setup.h>
-#include <asm/smp.h>
 #include <asm/traps.h>
 
 /* Xen stack for bringing up the first CPU. */
@@ -72,7 +72,7 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
 
     remove_identity_mapping();
 
-    set_processor_id(0);
+    smp_prepare_boot_cpu();
 
     set_cpuid_to_hartid(0, bootcpu_id);
 

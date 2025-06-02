@@ -11,12 +11,6 @@
 
 /* smpboot.c */
 
-cpumask_t cpu_online_map;
-cpumask_t cpu_present_map;
-cpumask_t cpu_possible_map;
-
-/* ID of the PCPU we're running on */
-DEFINE_PER_CPU(unsigned int, cpu_id);
 /* XXX these seem awfully x86ish... */
 /* representing HT siblings of each logical CPU */
 DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_sibling_mask);
