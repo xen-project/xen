@@ -3,6 +3,19 @@
 #define ASM__RISCV__IRQ_H
 
 #include <xen/bug.h>
+#include <xen/device_tree.h>
+
+#include <asm/irq-dt.h>
+
+/*
+ * According to the AIA spec:
+ *   The maximum number of interrupt sources an APLIC may support is 1023.
+ *
+ * The same is true for PLIC.
+ *
+ * Interrupt Source 0 is reserved and shall never generate an interrupt.
+ */
+#define NR_IRQS 1024
 
 /* TODO */
 #define nr_irqs 0U
@@ -24,6 +37,8 @@ static inline void arch_move_irqs(struct vcpu *v)
 {
     BUG_ON("unimplemented");
 }
+
+void init_IRQ(void);
 
 #endif /* ASM__RISCV__IRQ_H */
 

@@ -107,11 +107,6 @@ void irq_ack_none(struct irq_desc *desc)
     BUG_ON("unimplemented");
 }
 
-int arch_init_one_irq_desc(struct irq_desc *desc)
-{
-    BUG_ON("unimplemented");
-}
-
 void smp_send_state_dump(unsigned int cpu)
 {
     BUG_ON("unimplemented");

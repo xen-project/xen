@@ -6,6 +6,7 @@
 #include <xen/compile.h>
 #include <xen/device_tree.h>
 #include <xen/init.h>
+#include <xen/irq.h>
 #include <xen/mm.h>
 #include <xen/shutdown.h>
 #include <xen/smp.h>
@@ -124,6 +125,8 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
         device_tree_flattened = NULL;
         panic("Booting using ACPI isn't supported\n");
     }
+
+    init_IRQ();
 
     riscv_fill_hwcap();
 
