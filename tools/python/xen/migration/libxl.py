@@ -51,10 +51,12 @@ rec_type_to_str = {
 EMULATOR_HEADER_FORMAT = "II"
 
 EMULATOR_ID_unknown       = 0x00000000
+EMULATOR_ID_qemu_trad     = 0x00000001
 EMULATOR_ID_qemu_upstream = 0x00000002
 
 emulator_id_to_str = {
     EMULATOR_ID_unknown       : "Unknown",
+    EMULATOR_ID_qemu_trad     : "Qemu Traditional",
     EMULATOR_ID_qemu_upstream : "Qemu Upstream",
 }
 
