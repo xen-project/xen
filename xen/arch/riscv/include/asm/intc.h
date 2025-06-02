@@ -8,6 +8,8 @@
 #ifndef ASM__RISCV__INTERRUPT_CONTOLLER_H
 #define ASM__RISCV__INTERRUPT_CONTOLLER_H
 
+struct dt_device_node;
+
 enum intc_version {
     INTC_APLIC,
 };
