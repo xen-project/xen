@@ -18,9 +18,12 @@ for f in "$1"/*; do
         continue
     fi
     echo "Running $f"
-    printf '  <testcase name="%s">\n' "$f" >> "$xml_out"
+    time_start=$EPOCHREALTIME
     "$f" 2>&1 | tee /tmp/out
     ret=${PIPESTATUS[0]}
+    time_end=$EPOCHREALTIME
+    time_delta="$(bc <<<"$time_end - $time_start")"
+    printf '  <testcase name="%s" time="%f">\n' "$f" "$time_delta" >> "$xml_out"
     if [ "$ret" -ne 0 ]; then
         echo "FAILED: $f"
         failed+=" $f"
