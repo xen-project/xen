@@ -313,6 +313,7 @@ END(enable_mmu)
  *
  * Inputs:
  *   lr : Virtual address to return to.
+ *   x20: phys offset
  *
  * Clobbers x0 - x6
  */
@@ -337,6 +338,8 @@ END(enable_secondary_cpu_mm)
  *
  * Inputs:
  *   lr : Virtual address to return to.
+ *   x19: paddr(start)
+ *   x20: phys offset
  *
  * Clobbers x0 - x6
  */
