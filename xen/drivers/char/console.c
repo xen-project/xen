@@ -523,7 +523,7 @@ void console_put_domain(struct domain *d)
         rcu_unlock_domain(d);
 }
 
-static void switch_serial_input(void)
+static void console_switch_input(void)
 {
     unsigned int next_rx = console_rx;
 
@@ -617,7 +617,7 @@ static void cf_check serial_rx(char c)
         /* We eat CTRL-<switch_char> in groups of 3 to switch console input. */
         if ( ++switch_code_count == 3 )
         {
-            switch_serial_input();
+            console_switch_input();
             switch_code_count = 0;
         }
         return;
@@ -1171,7 +1171,7 @@ void __init console_endboot(void)
                             "toggle host/guest log level adjustment", 0);
 
     /* Serial input is directed to DOM0 by default. */
-    switch_serial_input();
+    console_switch_input();
 }
 
 int __init console_has(const char *device)
