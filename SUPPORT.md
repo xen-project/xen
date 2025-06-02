@@ -272,6 +272,16 @@ or itself will not be regarded a security issue.
     Status: Supported
     Status, Liveupdate: Tech Preview
 
+### C xenstore stubdom PV
+
+    Status: Supported
+    Status, Liveupdate: Not implemented
+
+### C xenstore stubdom PVH
+
+    Status: Supported
+    Status, Liveupdate: Not implemented
+
 ### OCaml xenstored daemon
 
     Status: Supported
