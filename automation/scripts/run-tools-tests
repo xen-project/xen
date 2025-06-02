@@ -25,9 +25,10 @@ for f in "$1"/*; do
         echo "FAILED: $f"
         failed+=" $f"
         printf '   <failure type="failure" message="binary %s exited with code %d">\n' "$f" "$ret" >> "$xml_out"
-        # TODO: could use xml escaping... but current tests seems to
-        # produce sane output
+        printf '<![CDATA[' >> "$xml_out"
+        # TODO: Escape ']]>' if necessary
         cat /tmp/out >> "$xml_out"
+        printf ']]>\n' >> "$xml_out"
         printf '   </failure>\n' >> "$xml_out"
     else
         echo "PASSED"
