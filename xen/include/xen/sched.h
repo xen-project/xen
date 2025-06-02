@@ -1291,15 +1291,15 @@ static inline unsigned int btcpupools_get_cpupool_id(unsigned int cpu)
 {
     return 0;
 }
-#ifdef CONFIG_HAS_DEVICE_TREE
+
+struct dt_device_node;
+
 static inline int
 btcpupools_get_domain_pool_id(const struct dt_device_node *node)
 {
     return 0;
 }
-#endif
-
-#endif
+#endif /* CONFIG_BOOT_TIME_CPUPOOLS */
 
 #endif /* __SCHED_H__ */
 
