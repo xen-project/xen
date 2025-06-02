@@ -11,6 +11,7 @@
 
 #include <xen/errno.h>
 #include <xen/init.h>
+#include <xen/irq.h>
 #include <xen/sections.h>
 #include <xen/types.h>
 
@@ -20,6 +21,23 @@
 static struct intc_info __ro_after_init aplic_info = {
     .hw_version = INTC_APLIC,
 };
+
+static int cf_check aplic_irq_xlate(const uint32_t *intspec,
+                                    unsigned int intsize,
+                                    unsigned int *out_hwirq,
+                                    unsigned int *out_type)
+{
+    if ( intsize < 2 )
+        return -EINVAL;
+
+    /* Mapping 1:1 */
+    *out_hwirq = intspec[0];
+
+    if ( out_type )
+        *out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
+
+    return 0;
+}
 
 static int __init aplic_preinit(struct dt_device_node *node, const void *dat)
 {
@@ -34,6 +52,8 @@ static int __init aplic_preinit(struct dt_device_node *node, const void *dat)
         return -ENODEV;
 
     aplic_info.node = node;
+
+    dt_irq_xlate = aplic_irq_xlate;
 
     return 0;
 }

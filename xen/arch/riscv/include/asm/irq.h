@@ -38,6 +38,9 @@ static inline void arch_move_irqs(struct vcpu *v)
     BUG_ON("unimplemented");
 }
 
+struct dt_device_node;
+int platform_get_irq(const struct dt_device_node *device, int index);
+
 void init_IRQ(void);
 
 #endif /* ASM__RISCV__IRQ_H */
