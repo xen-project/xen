@@ -7,3 +7,4 @@ obj-$(CONFIG_OVERLAY_DTB) += dt-overlay.o
 obj-y += intc.o
 obj-$(CONFIG_DOMAIN_BUILD_HELPERS) += kernel.o
 obj-$(CONFIG_STATIC_EVTCHN) += static-evtchn.init.o
+obj-$(CONFIG_STATIC_MEMORY) += static-memory.init.o

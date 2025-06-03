@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
 #include <xen/sched.h>
+#include <xen/static-memory.h>
 
 #include <asm/setup.h>
-#include <asm/static-memory.h>
 
 static bool __init append_static_memory_to_bank(struct domain *d,
                                                 struct membank *bank,

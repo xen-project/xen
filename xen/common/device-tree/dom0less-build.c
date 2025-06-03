@@ -28,9 +28,7 @@
 #include <asm/dom0less-build.h>
 #include <asm/setup.h>
 
-#if __has_include(<asm/static-memory.h>)
-#   include <asm/static-memory.h>
-#endif
+#include <xen/static-memory.h>
 
 #if __has_include(<asm/static-shmem.h>)
 #   include <asm/static-shmem.h>
@@ -799,12 +797,10 @@ static int __init construct_domU(struct domain *d,
     {
         if ( !dt_find_property(node, "xen,static-mem", NULL) )
             allocate_memory(d, &kinfo);
-#ifdef CONFIG_STATIC_MEMORY
         else if ( !is_domain_direct_mapped(d) )
             allocate_static_memory(d, &kinfo, node);
         else
             assign_static_memory_11(d, &kinfo, node);
-#endif
 
 #ifdef CONFIG_STATIC_SHM
         rc = process_shm(d, &kinfo, node);

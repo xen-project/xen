@@ -1,12 +1,13 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef __ASM_STATIC_MEMORY_H_
-#define __ASM_STATIC_MEMORY_H_
+#ifndef XEN_STATIC_MEMORY_H
+#define XEN_STATIC_MEMORY_H
 
 #include <xen/fdt-kernel.h>
-#include <xen/pfn.h>
 
 #ifdef CONFIG_STATIC_MEMORY
+
+#include <xen/pfn.h>
 
 static inline void init_staticmem_bank(const struct membank *bank)
 {
@@ -46,7 +47,7 @@ static inline void init_staticmem_pages(void) {};
 
 #endif /* CONFIG_STATIC_MEMORY */
 
-#endif /* __ASM_STATIC_MEMORY_H_ */
+#endif /* XEN_STATIC_MEMORY_H */
 
 /*
  * Local variables:

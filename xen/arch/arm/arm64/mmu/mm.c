@@ -4,9 +4,9 @@
 #include <xen/llc-coloring.h>
 #include <xen/mm.h>
 #include <xen/pfn.h>
+#include <xen/static-memory.h>
 
 #include <asm/setup.h>
-#include <asm/static-memory.h>
 #include <asm/static-shmem.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */

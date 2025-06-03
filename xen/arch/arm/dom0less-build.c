@@ -12,6 +12,7 @@
 #include <xen/sched.h>
 #include <xen/serial.h>
 #include <xen/sizes.h>
+#include <xen/static-memory.h>
 #include <xen/vmap.h>
 
 #include <public/bootfdt.h>
@@ -22,7 +23,6 @@
 #include <asm/domain_build.h>
 #include <asm/grant_table.h>
 #include <asm/setup.h>
-#include <asm/static-memory.h>
 #include <asm/static-shmem.h>
 
 #ifdef CONFIG_VGICV2

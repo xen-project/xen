@@ -5,9 +5,9 @@
 #include <xen/libfdt/libfdt.h>
 #include <xen/rangeset.h>
 #include <xen/sched.h>
+#include <xen/static-memory.h>
 
 #include <asm/setup.h>
-#include <asm/static-memory.h>
 #include <asm/static-shmem.h>
 
 typedef struct {
