@@ -29,10 +29,7 @@
 #include <asm/setup.h>
 
 #include <xen/static-memory.h>
-
-#if __has_include(<asm/static-shmem.h>)
-#   include <asm/static-shmem.h>
-#endif
+#include <xen/static-shmem.h>
 
 #define XENSTORE_PFN_LATE_ALLOC UINT64_MAX
 
@@ -505,11 +502,9 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     if ( ret )
         goto err;
 
-#ifdef CONFIG_STATIC_SHM
     ret = make_resv_memory_node(kinfo, addrcells, sizecells);
     if ( ret )
         goto err;
-#endif
 
     /*
      * domain_handle_dtb_bootmodule has to be called before the rest of
@@ -802,11 +797,9 @@ static int __init construct_domU(struct domain *d,
         else
             assign_static_memory_11(d, &kinfo, node);
 
-#ifdef CONFIG_STATIC_SHM
         rc = process_shm(d, &kinfo, node);
         if ( rc < 0 )
             return rc;
-#endif
 
         rc = init_vuart(d, &kinfo, node);
         if ( rc < 0 )

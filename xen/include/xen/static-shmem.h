@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef __ASM_STATIC_SHMEM_H_
-#define __ASM_STATIC_SHMEM_H_
+#ifndef XEN_STATIC_SHMEM_H
+#define XEN_STATIC_SHMEM_H
 
 #include <xen/fdt-kernel.h>
 #include <xen/types.h>
@@ -82,7 +82,7 @@ static inline void shm_mem_node_fill_reg_range(const struct kernel_info *kinfo,
 
 #endif /* CONFIG_STATIC_SHM */
 
-#endif /* __ASM_STATIC_SHMEM_H_ */
+#endif /* XEN_STATIC_SHMEM_H */
 
 /*
  * Local variables:

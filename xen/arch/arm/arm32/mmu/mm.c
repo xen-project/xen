@@ -7,9 +7,9 @@
 #include <xen/param.h>
 #include <xen/pfn.h>
 #include <xen/static-memory.h>
+#include <xen/static-shmem.h>
 #include <asm/fixmap.h>
 #include <asm/setup.h>
-#include <asm/static-shmem.h>
 
 static unsigned long opt_xenheap_megabytes __initdata;
 integer_param("xenheap_megabytes", opt_xenheap_megabytes);

@@ -21,6 +21,7 @@
 #include <xen/acpi.h>
 #include <xen/vmap.h>
 #include <xen/warning.h>
+#include <xen/static-shmem.h>
 #include <asm/device.h>
 #include <asm/setup.h>
 #include <asm/tee/tee.h>
@@ -32,7 +33,6 @@
 #include <asm/cpufeature.h>
 #include <asm/dom0less-build.h>
 #include <asm/domain_build.h>
-#include <asm/static-shmem.h>
 #include <xen/event.h>
 
 #include <xen/irq.h>

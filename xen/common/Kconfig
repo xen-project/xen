@@ -162,6 +162,12 @@ config STATIC_MEMORY
 
 	  If unsure, say N.
 
+config STATIC_SHM
+	bool "Statically shared memory on a dom0less system" if UNSUPPORTED
+	depends on STATIC_MEMORY
+	help
+	  This option enables statically shared memory on a dom0less system.
+
 config STATIC_EVTCHN
 	bool "Static event channel support on a dom0less system"
 	depends on DOM0LESS_BOOT

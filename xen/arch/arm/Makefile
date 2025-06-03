@@ -51,7 +51,6 @@ obj-y += setup.o
 obj-y += shutdown.o
 obj-y += smp.o
 obj-y += smpboot.o
-obj-$(CONFIG_STATIC_SHM) += static-shmem.init.o
 obj-y += sysctl.o
 obj-y += time.o
 obj-y += traps.o

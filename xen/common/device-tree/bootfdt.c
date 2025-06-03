@@ -13,11 +13,9 @@
 #include <xen/lib.h>
 #include <xen/libfdt/libfdt-xen.h>
 #include <xen/sort.h>
+#include <xen/static-shmem.h>
 #include <xsm/xsm.h>
 #include <asm/setup.h>
-#ifdef CONFIG_STATIC_SHM
-#include <asm/static-shmem.h>
-#endif
 
 static void __init __maybe_unused build_assertions(void)
 {
