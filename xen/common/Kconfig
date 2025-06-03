@@ -164,7 +164,7 @@ config STATIC_MEMORY
 
 config STATIC_EVTCHN
 	bool "Static event channel support on a dom0less system"
-	depends on DOM0LESS_BOOT && ARM
+	depends on DOM0LESS_BOOT
 	default y
 	help
 	  This option enables establishing static event channel communication
