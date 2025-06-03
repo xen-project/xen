@@ -980,15 +980,22 @@ static unsigned int __init copy_bios_e820(struct e820entry *map, unsigned int li
     return n;
 }
 
+/*
+ * Calculate the maximum possible size of the dom0 cmdline.  Pieces of the
+ * dom0 cmdline optionally come from the bootloader directly, from Xen's
+ * cmdline (following " -- "), and individual Xen parameters are forwarded
+ * too.
+ */
 static size_t __init domain_cmdline_size(const struct boot_info *bi,
                                          const struct boot_domain *bd)
 {
-    size_t s = bi->kextra ? strlen(bi->kextra) : 0;
+    size_t s = 0;
 
-    s += bd->kernel->cmdline_pa ? strlen(__va(bd->kernel->cmdline_pa)) : 0;
+    if ( bd->kernel->cmdline_pa )
+        s += strlen(__va(bd->kernel->cmdline_pa));
 
-    if ( s == 0 )
-        return s;
+    if ( bi->kextra )
+        s += strlen(bi->kextra);
 
     /*
      * Certain parameters from the Xen command line may be added to the dom0
