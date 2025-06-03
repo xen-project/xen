@@ -67,8 +67,9 @@ static int assign_integer_param(const struct kernel_param *param, uint64_t val)
     return 0;
 }
 
-static int parse_params(const char *cmdline, const struct kernel_param *start,
-                        const struct kernel_param *end)
+static int __init parse_params(
+    const char *cmdline, const struct kernel_param *start,
+    const struct kernel_param *end)
 {
     char opt[MAX_PARAM_SIZE], *optval, *optkey, *q;
     const char *p = cmdline, *key;
