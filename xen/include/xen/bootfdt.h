@@ -191,6 +191,7 @@ void populate_boot_allocator(void);
 size_t boot_fdt_info(const void *fdt, paddr_t paddr);
 
 const char *boot_fdt_cmdline(const void *fdt);
+int domain_fdt_begin_node(void *fdt, const char *name, uint64_t unit);
 
 static inline struct membanks *bootinfo_get_reserved_mem(void)
 {
