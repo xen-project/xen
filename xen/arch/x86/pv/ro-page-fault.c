@@ -337,7 +337,7 @@ static int cf_check mmcfg_intercept_write(
     return X86EMUL_OKAY;
 }
 
-int cf_check mmio_ro_emulated_write(
+static int cf_check mmio_ro_emulated_write(
     enum x86_segment seg,
     unsigned long offset,
     void *p_data,
