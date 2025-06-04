@@ -8,10 +8,14 @@ all: $(TARGET)
 
 .PHONY: run
 run: $(TARGET)
+ifeq ($(CC),$(HOSTCC))
 	./$(TARGET)
+else
+	$(warning HOSTCC != CC, will not run test)
+endif
 
 $(TARGET): vpci.c vpci.h list.h main.c emul.h
-	$(HOSTCC) $(CFLAGS_xeninclude) -g -o $@ vpci.c main.c
+	$(CC) $(CFLAGS_xeninclude) -g -o $@ vpci.c main.c
 
 .PHONY: clean
 clean:
