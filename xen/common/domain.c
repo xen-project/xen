@@ -2405,6 +2405,31 @@ domid_t get_initial_domain_id(void)
     return hardware_domid;
 }
 
+void freeze_domains(void)
+{
+    struct domain *d;
+
+    rcu_read_lock(&domlist_read_lock);
+    /*
+     * Note that we iterate in order of domain-id. Hence we will pause dom0
+     * first which is required for correctness (as only dom0 can add domains to
+     * the domain list). Otherwise we could miss concurrently-created domains.
+     */
+    for_each_domain ( d )
+        domain_pause(d);
+    rcu_read_unlock(&domlist_read_lock);
+}
+
+void thaw_domains(void)
+{
+    struct domain *d;
+
+    rcu_read_lock(&domlist_read_lock);
+    for_each_domain ( d )
+        domain_unpause(d);
+    rcu_read_unlock(&domlist_read_lock);
+}
+
 /*
  * Local variables:
  * mode: C
