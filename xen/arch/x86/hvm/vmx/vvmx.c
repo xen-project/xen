@@ -1820,7 +1820,8 @@ static int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
                 vvmcx = NULL;
             }
         }
-        else
+
+        if ( !vvmcx )
         {
             vmfail(regs, VMX_INSN_VMPTRLD_INVALID_PHYADDR);
             goto out;
