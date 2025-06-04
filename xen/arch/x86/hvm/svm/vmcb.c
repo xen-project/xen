@@ -12,6 +12,8 @@
 #include <xen/mm.h>
 #include <xen/rcupdate.h>
 #include <xen/sched.h>
+#include <xen/softirq.h>
+
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/msr-index.h>
 #include <asm/p2m.h>
@@ -246,6 +248,8 @@ static void cf_check vmcb_dump(unsigned char ch)
             }
             printk("\tVCPU %d\n", v->vcpu_id);
             svm_vmcb_dump("key_handler", v->arch.hvm.svm.vmcb);
+
+            process_pending_softirqs();
         }
     }
 
