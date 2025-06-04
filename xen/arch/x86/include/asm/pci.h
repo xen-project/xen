@@ -13,6 +13,8 @@
                         || (id) == 0x01128086 || (id) == 0x01228086 \
                         || (id) == 0x010A8086 )
 
+struct pci_dev;
+
 struct arch_pci_dev {
     vmask_t used_vectors;
     /*
