@@ -203,8 +203,11 @@ void __init xen_build_init(void)
     rc = xen_build_id_check(n, sz, &build_id_p, &build_id_len);
 
 #ifdef CONFIG_X86
-    /* Alternatively we may have a CodeView record from an EFI build. */
-    if ( rc && efi_enabled(EFI_LOADER) )
+    /*
+     * xen.efi built with a new enough toolchain will have a CodeView record,
+     * not an ELF note.
+     */
+    if ( rc )
     {
         const struct pe_external_debug_directory *dir = (const void *)n;
 
