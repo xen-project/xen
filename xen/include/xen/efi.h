@@ -1,9 +1,7 @@
 #ifndef __XEN_EFI_H__
 #define __XEN_EFI_H__
 
-#ifndef __ASSEMBLY__
 #include <xen/types.h>
-#endif
 
 #define EFI_INVALID_TABLE_ADDR (~0UL)
 
@@ -22,8 +20,6 @@ struct efi {
 };
 
 extern struct efi efi;
-
-#ifndef __ASSEMBLY__
 
 union xenpf_efi_info;
 union compat_pf_efi_info;
@@ -52,7 +48,5 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op);
 #endif
 int efi_compat_get_info(uint32_t idx, union compat_pf_efi_info *info);
 int efi_compat_runtime_call(struct compat_pf_efi_runtime_call *op);
-
-#endif /* !__ASSEMBLY__ */
 
 #endif /* __XEN_EFI_H__ */
