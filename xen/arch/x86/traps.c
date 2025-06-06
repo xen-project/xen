@@ -805,7 +805,7 @@ void fatal_trap(const struct cpu_user_regs *regs, bool show_remote)
           (regs->eflags & X86_EFLAGS_IF) ? "" : " IN INTERRUPT CONTEXT");
 }
 
-void asmlinkage do_unhandled_trap(struct cpu_user_regs *regs)
+void asmlinkage noreturn do_unhandled_trap(struct cpu_user_regs *regs)
 {
     fatal_trap(regs, false);
 }

@@ -769,7 +769,7 @@ static void __init efi_arch_blexit(void)
         efi_bs->FreePages(ucode.addr, PFN_UP(ucode.size));
 }
 
-static void __init efi_arch_halt(void)
+static void noreturn __init efi_arch_halt(void)
 {
     local_irq_disable();
     for ( ; ; )

@@ -343,7 +343,7 @@ void __stop_this_cpu(void)
     cpumask_clear_cpu(smp_processor_id(), &cpu_online_map);
 }
 
-static void cf_check stop_this_cpu(void *dummy)
+static void noreturn cf_check stop_this_cpu(void *dummy)
 {
     const bool *stop_aps = dummy;
 
