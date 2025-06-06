@@ -571,7 +571,7 @@ extern register_t __cpu_logical_map[];
 #endif
 
 #ifndef __ASSEMBLY__
-void panic_PAR(uint64_t par);
+void noreturn panic_PAR(uint64_t par);
 
 /* Debugging functions are declared with external linkage to aid development. */
 void show_registers(const struct cpu_user_regs *regs);

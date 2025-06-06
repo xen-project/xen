@@ -934,7 +934,7 @@ static void __init efi_arch_blexit(void)
         efi_bs->FreePool(memmap);
 }
 
-static void __init efi_arch_halt(void)
+static void noreturn __init efi_arch_halt(void)
 {
     stop_cpu();
 }

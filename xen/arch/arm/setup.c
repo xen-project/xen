@@ -63,7 +63,7 @@ bool __read_mostly acpi_disabled;
 
 domid_t __read_mostly max_init_domid;
 
-static __used void init_done(void)
+static __used void noreturn init_done(void)
 {
     int rc;
 
