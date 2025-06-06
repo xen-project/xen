@@ -61,6 +61,9 @@ enum {
     CONSOLE_ALL             = CONSOLE_DEFAULT | CONSOLE_RING,
 };
 
+/* Prefix for hypervisor's diagnostic console messages. */
+#define CONSOLE_PREFIX      "(XEN) "
+
 static void console_send(const char *str, size_t len, unsigned int flags);
 
 /* console: comma-separated list of console outputs. */
@@ -1016,7 +1019,7 @@ static void vprintk_common(const char *fmt, va_list args, const char *prefix)
 
 void vprintk(const char *fmt, va_list args)
 {
-    vprintk_common(fmt, args, "(XEN) ");
+    vprintk_common(fmt, args, CONSOLE_PREFIX);
 }
 
 void printk(const char *fmt, ...)
@@ -1295,7 +1298,7 @@ int __printk_ratelimit(int ratelimit_ms, int ratelimit_burst)
             snprintf(lost_str, sizeof(lost_str), "%d", lost);
             /* console_lock may already be acquired by printk(). */
             rspin_lock(&console_lock);
-            printk_start_of_line("(XEN) ");
+            printk_start_of_line(CONSOLE_PREFIX);
             __putstr("printk: ");
             __putstr(lost_str);
             __putstr(" messages suppressed.\n");
