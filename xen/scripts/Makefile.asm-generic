@@ -32,7 +32,14 @@ old-headers := $(wildcard $(obj)/*.h)
 unwanted    := $(filter-out $(generic-y) $(generated-y),$(old-headers))
 
 quiet_cmd_wrap = WRAP    $@
-      cmd_wrap = echo "\#include <asm-generic/$*.h>" > $@
+      cmd_wrap = \
+	arch=$$(echo $@ | sed -n 's:.*arch/\([^/]*\)/.*:\1:p' | tr a-z A-Z); \
+	upper=$$(echo $*.h | tr a-z A-Z | tr '/.' '__'); \
+	echo "\#ifndef $${arch}_GENERIC_$${upper}" > $@.new; \
+	echo "\#define $${arch}_GENERIC_$${upper}" >> $@.new; \
+	echo "\#include <asm-generic/$*.h>" >> $@.new; \
+	echo "\#endif /* $${arch}_GENERIC_$${upper} */" >> $@.new; \
+	mv -f $@.new $@
 
 quiet_cmd_remove = REMOVE  $(unwanted)
       cmd_remove = rm -f $(unwanted)
