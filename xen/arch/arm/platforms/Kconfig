@@ -22,21 +22,23 @@ config QEMU
 	  machine.
 
 config RCAR3
-	bool "Renesas RCar3 support"
+	bool "Renesas R-Car Gen3 support"
 	depends on ARM_64
 	select HAS_SCIF
 	select IPMMU_VMSA
 	help
-	  Enable all the required drivers for Renesas RCar3
+	  Enable support for Renesas R-Car Generation 3 SoCs (H3, M3, etc.).
+	  Includes all required drivers and platform-specific features.
 
 config RCAR4
-	bool "Renesas RCar4 support"
+	bool "Renesas R-Car Gen4 support"
 	depends on ARM_64
 	select HAS_SCIF
 	select HAS_ITS
 	select IPMMU_VMSA
 	help
-	Enable all the required drivers for Renesas RCar4
+	  Enable support for Renesas R-Car Generation 4 SoCs (V4H, V4M, etc.).
+	  Includes all required drivers and platform-specific features.
 
 config MPSOC
 	bool "Xilinx Ultrascale+ MPSoC support"
