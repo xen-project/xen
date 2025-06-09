@@ -19,6 +19,7 @@
 #include <xen/mm.h>
 #include <xen/bitops.h>
 #include <xen/nospec.h>
+#include <xen/pfn.h>
 #include <xen/sections.h>
 
 /**
@@ -54,6 +55,44 @@ void set_pdx_range(unsigned long smfn, unsigned long emfn)
     for ( ; idx < eidx; ++idx )
         __set_bit(idx, pdx_group_valid);
 }
+
+#ifndef CONFIG_PDX_NONE
+
+#ifdef CONFIG_X86
+# include <asm/e820.h>
+# define MAX_PFN_RANGES E820MAX
+#elif defined(CONFIG_HAS_DEVICE_TREE_DISCOVERY)
+# include <xen/bootinfo.h>
+# define MAX_PFN_RANGES NR_MEM_BANKS
+#endif
+
+#ifndef MAX_PFN_RANGES
+# error "Missing architecture maximum number of RAM ranges"
+#endif
+
+/* Generic PFN compression helpers. */
+static struct pfn_range {
+    unsigned long base_pfn, pages;
+} ranges[MAX_PFN_RANGES] __initdata;
+static unsigned int __initdata nr_ranges;
+
+void __init pfn_pdx_add_region(paddr_t base, paddr_t size)
+{
+    if ( !size )
+        return;
+
+    if ( nr_ranges >= ARRAY_SIZE(ranges) )
+    {
+        ASSERT((nr_ranges + 1) > nr_ranges);
+        nr_ranges++;
+        return;
+    }
+
+    ranges[nr_ranges].base_pfn = PFN_DOWN(base);
+    ranges[nr_ranges++].pages = PFN_UP(base + size) - PFN_DOWN(base);
+}
+
+#endif /* !CONFIG_PDX_NONE */
 
 #ifdef CONFIG_PDX_MASK_COMPRESSION
 
@@ -115,20 +154,25 @@ static uint64_t fill_mask(uint64_t mask)
     return mask;
 }
 
-bool pdx_is_region_compressible(paddr_t base, unsigned long npages)
-{
-    return !(paddr_to_pfn(base) & pfn_hole_mask) &&
-           !(pdx_region_mask(base, npages * PAGE_SIZE) & ~ma_va_bottom_mask);
-}
-
-/* We don't want to compress the low MAX_ORDER bits of the addresses. */
-uint64_t __init pdx_init_mask(uint64_t base_addr)
-{
-    return fill_mask(max(base_addr,
-                         (uint64_t)1 << (MAX_ORDER + PAGE_SHIFT)) - 1);
-}
-
-uint64_t pdx_region_mask(uint64_t base, uint64_t len)
+/**
+ * Calculates a mask covering "moving" bits of all addresses of a region
+ *
+ * The i-th bit of the mask must be set if there's 2 different addresses
+ * in the region that have different j-th bits. where j >= i.
+ *
+ * e.g:
+ *       base=0x1B00000000
+ *   len+base=0x1B00042000
+ *
+ *   ought to return 0x000007FFFF, which implies that every bit position
+ *   with a zero in the mask remains unchanged in every address of the
+ *   region.
+ *
+ * @param base Base address of the region
+ * @param len  Size in octets of the region
+ * @return Mask of moving bits at the bottom of all the region addresses
+ */
+static uint64_t pdx_region_mask(uint64_t base, uint64_t len)
 {
     /*
      * We say a bit "moves" in a range if there exist 2 addresses in that
@@ -143,9 +187,45 @@ uint64_t pdx_region_mask(uint64_t base, uint64_t len)
     return fill_mask(base ^ (base + len - 1));
 }
 
-void __init pfn_pdx_hole_setup(unsigned long mask)
+bool pdx_is_region_compressible(paddr_t base, unsigned long npages)
+{
+    return !(paddr_to_pfn(base) & pfn_hole_mask) &&
+           !(pdx_region_mask(base, npages * PAGE_SIZE) & ~ma_va_bottom_mask);
+}
+
+/**
+ * Creates the mask to start from when calculating non-compressible bits
+ *
+ * This function is intimately related to pdx_region_mask(), and together
+ * they are meant to calculate the mask of non-compressible bits given the
+ * current memory map.
+ *
+ * @param base_addr Address of the first maddr in the system
+ * @return An integer of the form 2^n - 1
+ */
+static uint64_t __init pdx_init_mask(uint64_t base_addr)
+{
+    return fill_mask(max(base_addr,
+                         /* Don't compress the low MAX_ORDER bits. */
+                         (uint64_t)1 << (MAX_ORDER + PAGE_SHIFT)) - 1);
+}
+
+void __init pfn_pdx_compression_setup(paddr_t base)
 {
     unsigned int i, j, bottom_shift = 0, hole_shift = 0;
+    unsigned long mask = pdx_init_mask(base) >> PAGE_SHIFT;
+
+    if ( nr_ranges > ARRAY_SIZE(ranges) )
+    {
+        printk(XENLOG_WARNING
+               "Too many PFN ranges (%u > %zu), not attempting PFN compression\n",
+               nr_ranges, ARRAY_SIZE(ranges));
+        return;
+    }
+
+    for ( i = 0; i < nr_ranges; i++ )
+        mask |= ranges[i].base_pfn |
+                pdx_region_mask(ranges[i].base_pfn, ranges[i].pages);
 
     /*
      * We skip the first MAX_ORDER bits, as we never want to compress them.
@@ -182,6 +262,18 @@ void __init pfn_pdx_hole_setup(unsigned long mask)
     pfn_hole_mask       = ((1UL << hole_shift) - 1) << bottom_shift;
     pfn_top_mask        = ~(pfn_pdx_bottom_mask | pfn_hole_mask);
     ma_top_mask         = pfn_top_mask << PAGE_SHIFT;
+}
+
+void __init pfn_pdx_compression_reset(void)
+{
+    pfn_pdx_bottom_mask = ~0UL;
+    ma_va_bottom_mask = ~0UL;
+    pfn_top_mask = 0;
+    ma_top_mask = 0;
+    pfn_hole_mask = 0;
+    pfn_pdx_hole_shift = 0;
+
+    nr_ranges = 0;
 }
 
 #endif /* CONFIG_PDX_COMPRESSION */

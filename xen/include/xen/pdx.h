@@ -109,38 +109,6 @@ extern unsigned long pfn_hole_mask;
 extern unsigned long pfn_top_mask, ma_top_mask;
 
 /**
- * Calculates a mask covering "moving" bits of all addresses of a region
- *
- * The i-th bit of the mask must be set if there's 2 different addresses
- * in the region that have different j-th bits. where j >= i.
- *
- * e.g:
- *       base=0x1B00000000
- *   len+base=0x1B00042000
- *
- *   ought to return 0x000007FFFF, which implies that every bit position
- *   with a zero in the mask remains unchanged in every address of the
- *   region.
- *
- * @param base Base address of the region
- * @param len  Size in octets of the region
- * @return Mask of moving bits at the bottom of all the region addresses
- */
-uint64_t pdx_region_mask(uint64_t base, uint64_t len);
-
-/**
- * Creates the mask to start from when calculating non-compressible bits
- *
- * This function is intimately related to pdx_region_mask(), and together
- * they are meant to calculate the mask of non-compressible bits given the
- * current memory map.
- *
- * @param base_addr Address of the first maddr in the system
- * @return An integer of the form 2^n - 1
- */
-uint64_t pdx_init_mask(uint64_t base_addr);
-
-/**
  * Map pfn to its corresponding pdx
  *
  * @param pfn Frame number
@@ -189,17 +157,6 @@ static inline paddr_t directmapoff_to_maddr(unsigned long offset)
             (offset & ma_va_bottom_mask));
 }
 
-/**
- * Initializes global variables with information about the compressible
- * range of the current memory regions.
- *
- * @param mask This mask is the biggest pdx_mask of every region in the
- *             system ORed with all base addresses of every region in the
- *             system. This results in a mask where every zero in a bit
- *             position marks a potentially compressible bit.
- */
-void pfn_pdx_hole_setup(unsigned long mask);
-
 #endif /* CONFIG_PDX_MASK_COMPRESSION */
 
 #ifdef CONFIG_PDX_NONE
@@ -220,17 +177,15 @@ static inline bool pdx_is_region_compressible(paddr_t base,
     return true;
 }
 
-static inline uint64_t pdx_init_mask(uint64_t base_addr)
+static inline void pfn_pdx_add_region(paddr_t base, paddr_t size)
 {
-    return 0;
 }
 
-static inline uint64_t pdx_region_mask(uint64_t base, uint64_t len)
+static inline void pfn_pdx_compression_setup(paddr_t base)
 {
-    return 0;
 }
 
-static inline void pfn_pdx_hole_setup(unsigned long mask)
+static inline void pfn_pdx_compression_reset(void)
 {
 }
 
@@ -246,6 +201,28 @@ static inline void pfn_pdx_hole_setup(unsigned long mask)
  * @return True iff the region can be used with the current compression
  */
 bool pdx_is_region_compressible(paddr_t base, unsigned long npages);
+
+/**
+ * Register a RAM region with the PFN compression logic.
+ *
+ * @param base Start of the region in bytes.
+ * @param size Length of the region in bytes.
+ */
+void pfn_pdx_add_region(paddr_t base, paddr_t size);
+
+/**
+ * Initializes global variables with information about the compressible
+ * range of the current memory regions.
+ *
+ * @param base address to start compression from.
+ */
+void pfn_pdx_compression_setup(paddr_t base);
+
+/**
+ * Reset the global variables to it's default values, thus disabling PFN
+ * compression.
+ */
+void pfn_pdx_compression_reset(void);
 
 #endif /* !CONFIG_PDX_NONE */
 #endif /* __XEN_PDX_H__ */

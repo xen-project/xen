@@ -256,9 +256,11 @@ void __init init_pdx(void)
 {
     const struct membanks *mem = bootinfo_get_mem();
     paddr_t bank_start, bank_size, bank_end, ram_end = 0;
-    int bank;
+    unsigned int bank;
 
 #ifndef CONFIG_PDX_NONE
+    for ( bank = 0 ; bank < mem->nr_banks; bank++ )
+        pfn_pdx_add_region(mem->bank[bank].start, mem->bank[bank].size);
     /*
      * Arm does not have any restrictions on the bits to compress. Pass 0 to
      * let the common code further restrict the mask.
@@ -266,26 +268,24 @@ void __init init_pdx(void)
      * If the logic changes in pfn_pdx_hole_setup we might have to
      * update this function too.
      */
-    uint64_t mask = pdx_init_mask(0x0);
+    pfn_pdx_compression_setup(0);
 
     for ( bank = 0 ; bank < mem->nr_banks; bank++ )
     {
-        bank_start = mem->bank[bank].start;
-        bank_size = mem->bank[bank].size;
+        const struct membank *m = &mem->bank[bank];
 
-        mask |= bank_start | pdx_region_mask(bank_start, bank_size);
+        if ( !pdx_is_region_compressible(m->start,
+                                         PFN_UP(m->start + m->size) -
+                                         PFN_DOWN(m->start)) )
+        {
+            pfn_pdx_compression_reset();
+            printk(XENLOG_WARNING
+                   "PFN compression disabled, RAM region [%#" PRIpaddr ", %#"
+                   PRIpaddr "] not covered\n",
+                   m->start, m->start + m->size - 1);
+            break;
+        }
     }
-
-    for ( bank = 0 ; bank < mem->nr_banks; bank++ )
-    {
-        bank_start = mem->bank[bank].start;
-        bank_size = mem->bank[bank].size;
-
-        if (~mask & pdx_region_mask(bank_start, bank_size))
-            mask = 0;
-    }
-
-    pfn_pdx_hole_setup(mask >> PAGE_SHIFT);
 #endif
 
     for ( bank = 0 ; bank < mem->nr_banks; bank++ )

@@ -261,8 +261,6 @@ acpi_numa_memory_affinity_init(const struct acpi_srat_mem_affinity *ma)
 
 void __init acpi_numa_arch_fixup(void) {}
 
-static uint64_t __initdata srat_region_mask;
-
 static int __init cf_check srat_parse_region(
     struct acpi_subtable_header *header, const unsigned long end)
 {
@@ -282,15 +280,13 @@ static int __init cf_check srat_parse_region(
 		printk(KERN_INFO "SRAT: %013"PRIx64"-%013"PRIx64"\n",
 		       ma->base_address, ma->base_address + ma->length - 1);
 
-	srat_region_mask |= ma->base_address |
-			    pdx_region_mask(ma->base_address, ma->length);
+	pfn_pdx_add_region(ma->base_address, ma->length);
 
 	return 0;
 }
 
 void __init srat_parse_regions(paddr_t addr)
 {
-	u64 mask;
 	unsigned int i;
 
 	if (acpi_disabled || acpi_numa < 0 ||
@@ -299,19 +295,29 @@ void __init srat_parse_regions(paddr_t addr)
 
 	/* Set "PXM" as early as feasible. */
 	numa_fw_nid_name = "PXM";
-	srat_region_mask = pdx_init_mask(addr);
 	acpi_table_parse_srat(ACPI_SRAT_TYPE_MEMORY_AFFINITY,
 			      srat_parse_region, 0);
 
-	for (mask = srat_region_mask, i = 0; mask && i < e820.nr_map; i++) {
+	pfn_pdx_compression_setup(addr);
+
+	/* Ensure all RAM ranges in the e820 are covered. */
+	for (i = 0; i < e820.nr_map; i++) {
 		if (e820.map[i].type != E820_RAM)
 			continue;
 
-		if (~mask & pdx_region_mask(e820.map[i].addr, e820.map[i].size))
-			mask = 0;
+		if (!pdx_is_region_compressible(
+		          e820.map[i].addr,
+		          PFN_UP(e820.map[i].addr + e820.map[i].size) -
+		          PFN_DOWN(e820.map[i].addr))) {
+			pfn_pdx_compression_reset();
+			printk(XENLOG_WARNING
+			       "PFN compression disabled, RAM region [%#" PRIx64
+			       ", %#" PRIx64 "] not covered\n",
+			       e820.map[i].addr,
+			       e820.map[i].addr + e820.map[i].size - 1);
+			return;
+		}
 	}
-
-	pfn_pdx_hole_setup(mask >> PAGE_SHIFT);
 }
 
 unsigned int numa_node_to_arch_nid(nodeid_t n)
