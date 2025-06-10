@@ -23,6 +23,8 @@
 
 extern bool pci_passthrough_enabled;
 
+struct rangeset;
+
 /* Arch pci dev struct */
 struct arch_pci_dev {
     struct device dev;
