@@ -36,8 +36,7 @@ $(INIT_DOM0LESS_OBJS): CFLAGS += $(CFLAGS_libxentoollog)
 $(INIT_DOM0LESS_OBJS): CFLAGS += $(CFLAGS_libxenstore)
 $(INIT_DOM0LESS_OBJS): CFLAGS += $(CFLAGS_libxenlight)
 $(INIT_DOM0LESS_OBJS): CFLAGS += $(CFLAGS_libxenctrl)
-$(INIT_DOM0LESS_OBJS): CFLAGS += $(CFLAGS_libxenevtchn)
-init-dom0less: LDLIBS += $(call xenlibs-ldlibs,ctrl evtchn toollog store light guest foreignmemory)
+init-dom0less: LDLIBS += $(call xenlibs-ldlibs,ctrl toollog store light guest foreignmemory)
 
 .PHONY: all
 all: $(TARGETS)

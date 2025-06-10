@@ -10,7 +10,6 @@
 #include <xenctrl.h>
 #include <xenguest.h>
 #include <libxl.h>
-#include <xenevtchn.h>
 #include <xenforeignmemory.h>
 #include <xen/io/xs_wire.h>
 
