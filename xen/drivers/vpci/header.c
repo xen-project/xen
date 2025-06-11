@@ -758,9 +758,9 @@ static int vpci_init_capability_list(struct pci_dev *pdev)
 {
     int rc;
     bool mask_cap_list = false;
+    bool is_hwdom = is_hardware_domain(pdev->domain);
 
-    if ( !is_hardware_domain(pdev->domain) &&
-         pci_conf_read16(pdev->sbdf, PCI_STATUS) & PCI_STATUS_CAP_LIST )
+    if ( pci_conf_read16(pdev->sbdf, PCI_STATUS) & PCI_STATUS_CAP_LIST )
     {
         /* Only expose capabilities to the guest that vPCI can handle. */
         unsigned int next, ttl = 48;
@@ -768,12 +768,18 @@ static int vpci_init_capability_list(struct pci_dev *pdev)
             PCI_CAP_ID_MSI,
             PCI_CAP_ID_MSIX,
         };
+        /*
+         * For dom0, we should expose all capabilities instead of a fixed
+         * capabilities array, so setting n to 0 here is to get the next
+         * capability position directly in pci_find_next_cap_ttl.
+         */
+        const unsigned int n = is_hwdom ? 0 : ARRAY_SIZE(supported_caps);
 
         next = pci_find_next_cap_ttl(pdev->sbdf, PCI_CAPABILITY_LIST,
-                                     supported_caps,
-                                     ARRAY_SIZE(supported_caps), &ttl);
+                                     supported_caps, n, &ttl);
 
-        rc = vpci_add_register(pdev->vpci, vpci_read_val, NULL,
+        rc = vpci_add_register(pdev->vpci, vpci_read_val,
+                               is_hwdom ? vpci_hw_write8 : NULL,
                                PCI_CAPABILITY_LIST, 1,
                                (void *)(uintptr_t)next);
         if ( rc )
@@ -781,7 +787,7 @@ static int vpci_init_capability_list(struct pci_dev *pdev)
 
         next &= ~3;
 
-        if ( !next )
+        if ( !next && !is_hwdom )
             /*
              * If we don't have any supported capabilities to expose to the
              * guest, mask the PCI_STATUS_CAP_LIST bit in the status
@@ -795,15 +801,18 @@ static int vpci_init_capability_list(struct pci_dev *pdev)
 
             next = pci_find_next_cap_ttl(pdev->sbdf,
                                          pos + PCI_CAP_LIST_NEXT,
-                                         supported_caps,
-                                         ARRAY_SIZE(supported_caps), &ttl);
+                                         supported_caps, n, &ttl);
 
-            rc = vpci_add_register(pdev->vpci, vpci_hw_read8, NULL,
-                                   pos + PCI_CAP_LIST_ID, 1, NULL);
-            if ( rc )
-                return rc;
+            if ( !is_hwdom )
+            {
+                rc = vpci_add_register(pdev->vpci, vpci_hw_read8, NULL,
+                                       pos + PCI_CAP_LIST_ID, 1, NULL);
+                if ( rc )
+                    return rc;
+            }
 
-            rc = vpci_add_register(pdev->vpci, vpci_read_val, NULL,
+            rc = vpci_add_register(pdev->vpci, vpci_read_val,
+                                   is_hwdom ? vpci_hw_write8 : NULL,
                                    pos + PCI_CAP_LIST_NEXT, 1,
                                    (void *)(uintptr_t)next);
             if ( rc )
@@ -812,6 +821,10 @@ static int vpci_init_capability_list(struct pci_dev *pdev)
             next &= ~3;
         }
     }
+
+    /* Return early for the hw domain, no masking of PCI_STATUS. */
+    if ( is_hwdom )
+        return 0;
 
     /* Utilize rsvdp_mask to hide PCI_STATUS_CAP_LIST from the guest. */
     return vpci_add_register_mask(pdev->vpci, vpci_hw_read16, vpci_hw_write16,
