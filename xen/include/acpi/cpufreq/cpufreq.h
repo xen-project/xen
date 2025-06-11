@@ -20,8 +20,6 @@
 
 #include "processor_perf.h"
 
-DECLARE_PER_CPU(spinlock_t, cpufreq_statistic_lock);
-
 extern bool cpufreq_verbose;
 
 enum cpufreq_xen_opt {
