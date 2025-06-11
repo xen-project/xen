@@ -654,10 +654,6 @@ static void dbc_rx_trb(struct dbc *dbc, struct xhci_trb *trb,
         cache_flush(&ring->buf[start], end - start);
 }
 
-/*
- * Note that if IN transfer support is added, then this
- * will need to be changed; it assumes an OUT transfer ring only
- */
 static void dbc_pop_events(struct dbc *dbc)
 {
     struct dbc_reg *reg = dbc->dbc_reg;
