@@ -24,7 +24,7 @@
 #define XEN_MPUMAP_ENTRY_SHIFT  0x3     /* 8 byte structure */
 
 .macro store_pair reg1, reg2, dst
-    .word 0xe7f000f0                    /* unimplemented */
+    strd  \reg1, \reg2, [\dst]
 .endm
 
 #endif

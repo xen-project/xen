@@ -75,6 +75,12 @@ void __dummy__(void)
 
    OFFSET(INITINFO_stack, struct init_info, stack);
    BLANK();
+
+#ifdef CONFIG_MPU
+   DEFINE(XEN_MPUMAP_MASK_sizeof, sizeof(xen_mpumap_mask));
+   DEFINE(XEN_MPUMAP_sizeof, sizeof(xen_mpumap));
+   BLANK();
+#endif
 }
 
 /*

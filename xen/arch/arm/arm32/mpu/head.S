@@ -46,42 +46,67 @@ END(enable_mpu)
  */
 FUNC(enable_boot_cpu_mm)
     /* Get the number of regions specified in MPUIR_EL2 */
-    mrc   CP32(r5, MPUIR_EL2)
-    and   r5, r5, #NUM_MPU_REGIONS_MASK
+    mrc   CP32(r3, MPUIR_EL2)
+    and   r3, r3, #NUM_MPU_REGIONS_MASK
+
+    mov_w   r0, max_mpu_regions
+    str   r3, [r0]
+    mcr   CP32(r0, DCIMVAC) /* Invalidate cache for max_mpu_regions addr */
 
     /* x0: region sel */
     mov   r0, #0
     /* Xen text section. */
     mov_w   r1, _stext
     mov_w   r2, _etext
-    prepare_xen_region r0, r1, r2, r3, r4, r5, attr_prbar=REGION_TEXT_PRBAR
+    prepare_xen_region r0, r1, r2, r4, r5, r3, attr_prbar=REGION_TEXT_PRBAR
 
     /* Xen read-only data section. */
     mov_w   r1, _srodata
     mov_w   r2, _erodata
-    prepare_xen_region r0, r1, r2, r3, r4, r5, attr_prbar=REGION_RO_PRBAR
+    prepare_xen_region r0, r1, r2, r4, r5, r3, attr_prbar=REGION_RO_PRBAR
 
     /* Xen read-only after init and data section. (RW data) */
     mov_w   r1, __ro_after_init_start
     mov_w   r2, __init_begin
-    prepare_xen_region r0, r1, r2, r3, r4, r5
+    prepare_xen_region r0, r1, r2, r4, r5, r3
 
     /* Xen code section. */
     mov_w   r1, __init_begin
     mov_w   r2, __init_data_begin
-    prepare_xen_region r0, r1, r2, r3, r4, r5, attr_prbar=REGION_TEXT_PRBAR
+    prepare_xen_region r0, r1, r2, r4, r5, r3, attr_prbar=REGION_TEXT_PRBAR
 
     /* Xen data and BSS section. */
     mov_w   r1, __init_data_begin
     mov_w   r2, __bss_end
-    prepare_xen_region r0, r1, r2, r3, r4, r5
+    prepare_xen_region r0, r1, r2, r4, r5, r3
 
 #ifdef CONFIG_EARLY_PRINTK
     /* Xen early UART section. */
     mov_w   r1, CONFIG_EARLY_UART_BASE_ADDRESS
     mov_w   r2, (CONFIG_EARLY_UART_BASE_ADDRESS + CONFIG_EARLY_UART_SIZE)
-    prepare_xen_region r0, r1, r2, r3, r4, r5, attr_prbar=REGION_DEVICE_PRBAR, attr_prlar=REGION_DEVICE_PRLAR
+    prepare_xen_region r0, r1, r2, r4, r5, r3, attr_prbar=REGION_DEVICE_PRBAR, attr_prlar=REGION_DEVICE_PRLAR
 #endif
+
+zero_mpu:
+    /* Reset remaining MPU regions */
+    cmp   r0, r3
+    beq   out_zero_mpu
+    mov   r1, #0
+    mov   r2, #1
+    prepare_xen_region r0, r1, r2, r4, r5, r3, attr_prlar=REGION_DISABLED_PRLAR
+    b     zero_mpu
+
+out_zero_mpu:
+    /* Invalidate data cache for MPU data structures */
+    mov r4, lr
+    mov_w r0, xen_mpumap_mask
+    mov r1, #XEN_MPUMAP_MASK_sizeof
+    bl __invalidate_dcache_area
+
+    ldr r0, =xen_mpumap
+    mov r1, #XEN_MPUMAP_sizeof
+    bl __invalidate_dcache_area
+    mov lr, r4
 
     b    enable_mpu
 END(enable_boot_cpu_mm)
