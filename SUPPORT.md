@@ -270,7 +270,7 @@ or itself will not be regarded a security issue.
 ### C xenstored daemon
 
     Status: Supported
-    Status, Liveupdate: Tech Preview
+    Status, Liveupdate: Supported
 
 ### C xenstore stubdom PV
 
