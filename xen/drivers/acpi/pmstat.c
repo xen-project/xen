@@ -103,8 +103,11 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
 
         cpufreq_residency_update(op->cpuid, pxpt->u.cur);
 
-        ct = pmpt->perf.state_count;
-        if ( copy_to_guest(op->u.getpx.trans_pt, pxpt->u.trans_pt, ct*ct) )
+        ct = min(pmpt->perf.state_count, op->u.getpx.total + 0U);
+
+        /* Avoid partial copying of 2-D array */
+        if ( ct == op->u.getpx.total &&
+             copy_to_guest(op->u.getpx.trans_pt, pxpt->u.trans_pt, ct * ct) )
         {
             spin_unlock(cpufreq_statistic_lock);
             ret = -EFAULT;
