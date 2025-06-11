@@ -45,36 +45,34 @@ int xc_pm_get_max_px(xc_interface *xch, int cpuid, int *max_px)
 int xc_pm_get_pxstat(xc_interface *xch, int cpuid, struct xc_px_stat *pxpt)
 {
     struct xen_sysctl sysctl = {};
-    /* Sizes unknown until xc_pm_get_max_px */
-    DECLARE_NAMED_HYPERCALL_BOUNCE(trans, pxpt->trans_pt, 0, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
-    DECLARE_NAMED_HYPERCALL_BOUNCE(pt, pxpt->pt, 0, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+    DECLARE_NAMED_HYPERCALL_BOUNCE(trans, pxpt->trans_pt,
+                                   pxpt->total * pxpt->total * sizeof(uint64_t),
+                                   XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+    DECLARE_NAMED_HYPERCALL_BOUNCE(pt, pxpt->pt,
+                                   pxpt->total * sizeof(struct xc_px_val),
+                                   XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
-    int max_px, ret;
+    int ret;
 
     if ( !pxpt->trans_pt || !pxpt->pt )
     {
         errno = EINVAL;
         return -1;
     }
-    if ( (ret = xc_pm_get_max_px(xch, cpuid, &max_px)) != 0)
-        return ret;
-
-    HYPERCALL_BOUNCE_SET_SIZE(trans, max_px * max_px * sizeof(uint64_t));
-    HYPERCALL_BOUNCE_SET_SIZE(pt, max_px * sizeof(struct xc_px_val));
 
     if ( xc_hypercall_bounce_pre(xch, trans) )
-        return ret;
+        return -1;
 
     if ( xc_hypercall_bounce_pre(xch, pt) )
     {
         xc_hypercall_bounce_post(xch, trans);
-        return ret;
+        return -1;
     }
 
     sysctl.cmd = XEN_SYSCTL_get_pmstat;
     sysctl.u.get_pmstat.type = PMSTAT_get_pxstat;
     sysctl.u.get_pmstat.cpuid = cpuid;
-    sysctl.u.get_pmstat.u.getpx.total = max_px;
+    sysctl.u.get_pmstat.u.getpx.total = pxpt->total;
     set_xen_guest_handle(sysctl.u.get_pmstat.u.getpx.trans_pt, trans);
     set_xen_guest_handle(sysctl.u.get_pmstat.u.getpx.pt, pt);
 
