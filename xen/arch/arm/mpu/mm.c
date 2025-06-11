@@ -167,7 +167,9 @@ pr_t pr_of_addr(paddr_t base, paddr_t limit, unsigned int flags)
     /* Build up value for PRBAR_EL2. */
     prbar = (prbar_t) {
         .reg = {
+#ifdef CONFIG_ARM_64
             .xn_0 = 0,
+#endif
             .xn = PAGE_XN_MASK(flags),
             .ap_0 = 0,
             .ro = PAGE_RO_MASK(flags)
@@ -206,7 +208,9 @@ pr_t pr_of_addr(paddr_t base, paddr_t limit, unsigned int flags)
     /* Build up value for PRLAR_EL2. */
     prlar = (prlar_t) {
         .reg = {
+#ifdef CONFIG_ARM_64
             .ns = 0,        /* Hyp mode is in secure world */
+#endif
             .ai = attr_idx,
             .en = 1,        /* Region enabled */
         }};
