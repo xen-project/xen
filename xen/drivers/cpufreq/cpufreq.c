@@ -517,7 +517,7 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *perf)
         }
     }
 
-    if ( perf->flags & XEN_PX_PSS )
+    if ( perf->flags & XEN_PX_PSS && !pxpt->states )
     {
         /* capability check */
         if ( perf->state_count <= 1 )
@@ -534,6 +534,7 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *perf)
         }
         if ( copy_from_guest(pxpt->states, perf->states, perf->state_count) )
         {
+            XFREE(pxpt->states);
             ret = -EFAULT;
             goto out;
         }
