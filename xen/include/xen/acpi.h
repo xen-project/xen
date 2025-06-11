@@ -186,7 +186,7 @@ static inline void acpi_set_csubstate_limit(unsigned int new_limit) { return; }
 #endif
 
 #ifdef XEN_GUEST_HANDLE
-int acpi_set_pdc_bits(uint32_t acpi_id, XEN_GUEST_HANDLE(uint32));
+int acpi_set_pdc_bits(unsigned int acpi_id, XEN_GUEST_HANDLE(uint32));
 #endif
 int arch_acpi_set_pdc_bits(u32 acpi_id, u32 *, u32 mask);
 
