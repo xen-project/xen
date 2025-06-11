@@ -221,9 +221,9 @@ struct pm_px_stat {
      * OUT: total Px states (PMSTAT_get_max_px, PMSTAT_get_pxstat)
      */
     uint8_t total;
-    uint8_t usable;       /* usable Px states */
-    uint8_t last;         /* last Px state */
-    uint8_t cur;          /* current Px state */
+    uint8_t usable;       /* OUT: usable Px states (PMSTAT_get_pxstat) */
+    uint8_t last;         /* OUT: last Px state (PMSTAT_get_pxstat) */
+    uint8_t cur;          /* OUT: current Px state (PMSTAT_get_pxstat) */
     /*
      * OUT: Px transition table. This should have total * total elements.
      *      As it is a 2-D array, this will not be copied if input total is
@@ -235,14 +235,33 @@ struct pm_px_stat {
 };
 
 struct pm_cx_stat {
-    uint32_t nr;    /* entry nr in triggers & residencies, including C0 */
-    uint32_t last;  /* last Cx state */
-    uint64_aligned_t idle_time;                 /* idle time from boot */
-    XEN_GUEST_HANDLE_64(uint64) triggers;    /* Cx trigger counts */
-    XEN_GUEST_HANDLE_64(uint64) residencies; /* Cx residencies */
-    uint32_t nr_pc;                          /* entry nr in pc[] */
-    uint32_t nr_cc;                          /* entry nr in cc[] */
     /*
+     * IN:  Number of elements in triggers, residencies (PMSTAT_get_cxstat)
+     * OUT: entry nr in triggers & residencies, including C0
+     *      (PMSTAT_get_cxstat, PMSTAT_get_max_cx)
+     */
+    uint32_t nr;
+    uint32_t last;  /* OUT: last Cx state (PMSTAT_get_cxstat) */
+    /* OUT: idle time from boot (PMSTAT_get_cxstat)*/
+    uint64_aligned_t idle_time;
+    /* OUT: Cx trigger counts, nr elements (PMSTAT_get_cxstat) */
+    XEN_GUEST_HANDLE_64(uint64) triggers;
+    /* OUT: Cx residencies, nr elements (PMSTAT_get_cxstat) */
+    XEN_GUEST_HANDLE_64(uint64) residencies;
+    /*
+     * IN: entry nr in pc[] (PMSTAT_get_cxstat)
+     * OUT: Required size of pc[] for all known to Xen entries to be written
+     *      (PMSTAT_get_cxstat)
+     */
+    uint32_t nr_pc;
+    /*
+     * IN: entry nr in cc[] (PMSTAT_get_cxstat)
+     * OUT: Required size of cc[] for all known to Xen entries to be written
+     *      (PMSTAT_get_cxstat)
+     */
+    uint32_t nr_cc;
+    /*
+     * OUT: (PMSTAT_get_cxstat)
      * These two arrays may (and generally will) have unused slots; slots not
      * having a corresponding hardware register will not be written by the
      * hypervisor. It is therefore up to the caller to put a suitable sentinel
