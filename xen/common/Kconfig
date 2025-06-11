@@ -122,6 +122,9 @@ config HAS_SCHED_GRANULARITY
 config HAS_STACK_PROTECTOR
 	bool
 
+config HAS_SYSTEM_SUSPEND
+	bool
+
 config HAS_UBSAN
 	bool
 
@@ -592,5 +595,20 @@ config BUDDY_ALLOCATOR_SIZE
 	help
 	  Amount of memory reserved for the buddy allocator to serve Xen heap,
 	  working alongside the colored one.
+
+config SYSTEM_SUSPEND_ALWAYS_ON
+	bool
+	select HAS_SYSTEM_SUSPEND
+
+config SYSTEM_SUSPEND
+	bool "System suspend support" if !SYSTEM_SUSPEND_ALWAYS_ON
+	depends on HAS_SYSTEM_SUSPEND
+	default SYSTEM_SUSPEND_ALWAYS_ON
+	help
+	  This option enables the system suspend support. This is the
+	  mechanism that allows the system to be suspended to RAM and
+	  later resumed.
+
+	  If unsure, say N.
 
 endmenu
