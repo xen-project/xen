@@ -488,6 +488,27 @@ static long total_avail_pages;
 static DEFINE_SPINLOCK(heap_lock);
 static long outstanding_claims; /* total outstanding claims by all domains */
 
+static unsigned long avail_heap_pages(
+    unsigned int zone_lo, unsigned int zone_hi, unsigned int node)
+{
+    unsigned int i, zone;
+    unsigned long free_pages = 0;
+
+    if ( zone_hi >= NR_ZONES )
+        zone_hi = NR_ZONES - 1;
+
+    for_each_online_node(i)
+    {
+        if ( !avail[i] )
+            continue;
+        for ( zone = zone_lo; zone <= zone_hi; zone++ )
+            if ( (node == -1) || (node == i) )
+                free_pages += avail[i][zone];
+    }
+
+    return free_pages;
+}
+
 unsigned long domain_adjust_tot_pages(struct domain *d, long pages)
 {
     ASSERT(rspin_is_locked(&d->page_alloc_lock));
@@ -584,7 +605,7 @@ void get_outstanding_claims(uint64_t *free_pages, uint64_t *outstanding_pages)
 {
     spin_lock(&heap_lock);
     *outstanding_pages = outstanding_claims;
-    *free_pages =  avail_domheap_pages();
+    *free_pages = avail_heap_pages(MEMZONE_XEN + 1, NR_ZONES - 1, -1);
     spin_unlock(&heap_lock);
 }
 
@@ -1962,27 +1983,6 @@ static void init_heap_pages(
     }
 }
 
-static unsigned long avail_heap_pages(
-    unsigned int zone_lo, unsigned int zone_hi, unsigned int node)
-{
-    unsigned int i, zone;
-    unsigned long free_pages = 0;
-
-    if ( zone_hi >= NR_ZONES )
-        zone_hi = NR_ZONES - 1;
-
-    for_each_online_node(i)
-    {
-        if ( !avail[i] )
-            continue;
-        for ( zone = zone_lo; zone <= zone_hi; zone++ )
-            if ( (node == -1) || (node == i) )
-                free_pages += avail[i][zone];
-    }
-
-    return free_pages;
-}
-
 /*************************
  * COLORED SIDE-ALLOCATOR
  *
@@ -2794,13 +2794,6 @@ unsigned long avail_domheap_pages_region(
     zone_hi = max_t(int, MEMZONE_XEN + 1, min_t(int, NR_ZONES - 1, zone_hi));
 
     return avail_heap_pages(zone_lo, zone_hi, node);
-}
-
-unsigned long avail_domheap_pages(void)
-{
-    return avail_heap_pages(MEMZONE_XEN + 1,
-                            NR_ZONES - 1,
-                            -1);
 }
 
 unsigned long avail_node_heap_pages(unsigned int nodeid)
