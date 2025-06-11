@@ -351,6 +351,8 @@ static void __init process_multiboot_node(const void *fdt, int node,
         kind = BOOTMOD_XSM;
     else if ( fdt_node_check_compatible(fdt, node, "multiboot,device-tree") == 0 )
         kind = BOOTMOD_GUEST_DTB;
+    else if ( fdt_node_check_compatible(fdt, node, "multiboot,microcode") == 0 )
+        kind = BOOTMOD_MICROCODE;
     else
         kind = BOOTMOD_UNKNOWN;
 

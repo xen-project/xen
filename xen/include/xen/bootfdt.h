@@ -21,6 +21,7 @@ typedef enum {
     BOOTMOD_RAMDISK,
     BOOTMOD_XSM,
     BOOTMOD_GUEST_DTB,
+    BOOTMOD_MICROCODE,
     BOOTMOD_UNKNOWN
 }  bootmodule_kind;
 
