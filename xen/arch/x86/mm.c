@@ -3821,7 +3821,7 @@ long do_mmuext_op(
                     if ( !cpumask_intersects(mask,
                                              per_cpu(cpu_sibling_mask, cpu)) )
                         __cpumask_set_cpu(cpu, mask);
-                flush_mask(mask, FLUSH_CACHE);
+                flush_mask(mask, FLUSH_CACHE_EVICT);
             }
             else
                 rc = -EACCES;
@@ -5395,7 +5395,7 @@ int map_pages_to_xen(
     if ( (flags & _PAGE_PRESENT) &&            \
          (((o_) ^ flags) & PAGE_CACHE_ATTRS) ) \
     {                                          \
-        flush_flags |= FLUSH_CACHE;            \
+        flush_flags |= FLUSH_CACHE_EVICT;      \
         if ( virt >= DIRECTMAP_VIRT_START &&   \
              virt < HYPERVISOR_VIRT_END )      \
             flush_flags |= FLUSH_VA_VALID;     \

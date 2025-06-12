@@ -3844,7 +3844,7 @@ static void cf_check vmx_wbinvd_intercept(void)
         return;
 
     if ( cpu_has_wbinvd_exiting )
-        flush_all(FLUSH_CACHE);
+        flush_all(FLUSH_CACHE_EVICT);
     else
         wbinvd();
 }

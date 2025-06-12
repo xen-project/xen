@@ -2277,7 +2277,7 @@ void hvm_shadow_handle_cd(struct vcpu *v, unsigned long value)
             domain_pause_nosync(v->domain);
 
             /* Flush physical caches. */
-            flush_all(FLUSH_CACHE);
+            flush_all(FLUSH_CACHE_EVICT);
             hvm_set_uc_mode(v, 1);
 
             domain_unpause(v->domain);

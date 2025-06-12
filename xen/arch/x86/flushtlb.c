@@ -232,7 +232,7 @@ unsigned int flush_area_local(const void *va, unsigned int flags)
     if ( flags & FLUSH_HVM_ASID_CORE )
         hvm_flush_guest_tlbs();
 
-    if ( flags & (FLUSH_CACHE | FLUSH_CACHE_WRITEBACK) )
+    if ( flags & (FLUSH_CACHE_EVICT | FLUSH_CACHE_WRITEBACK) )
     {
         const struct cpuinfo_x86 *c = &current_cpu_data;
         unsigned long sz = 0;
@@ -245,13 +245,13 @@ unsigned int flush_area_local(const void *va, unsigned int flags)
              c->x86_clflush_size && c->x86_cache_size && sz &&
              ((sz >> 10) < c->x86_cache_size) )
         {
-            if ( flags & FLUSH_CACHE )
+            if ( flags & FLUSH_CACHE_EVICT )
                 cache_flush(va, sz);
             else
                 cache_writeback(va, sz);
-            flags &= ~(FLUSH_CACHE | FLUSH_CACHE_WRITEBACK);
+            flags &= ~(FLUSH_CACHE_EVICT | FLUSH_CACHE_WRITEBACK);
         }
-        else if ( flags & FLUSH_CACHE )
+        else if ( flags & FLUSH_CACHE_EVICT )
             wbinvd();
         else
             wbnoinvd();

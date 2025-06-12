@@ -618,7 +618,7 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
                         break;
                     /* fall through */
                 default:
-                    flush_all(FLUSH_CACHE);
+                    flush_all(FLUSH_CACHE_EVICT);
                     break;
                 }
                 return 0;
@@ -684,7 +684,7 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
 
     p2m_memory_type_changed(d);
     if ( type != X86_MT_WB )
-        flush_all(FLUSH_CACHE);
+        flush_all(FLUSH_CACHE_EVICT);
 
     return rc;
 }
@@ -799,7 +799,7 @@ void memory_type_changed(struct domain *d)
          (!boot_cpu_has(X86_FEATURE_XEN_SELFSNOOP) ||
           (is_iommu_enabled(d) && !iommu_snoop)) )
     {
-        flush_all(FLUSH_CACHE);
+        flush_all(FLUSH_CACHE_EVICT);
     }
 }
 

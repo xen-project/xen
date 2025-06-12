@@ -1929,7 +1929,7 @@ void cf_check vmx_do_resume(void)
         {
             int cpu = v->arch.hvm.vmx.active_cpu;
             if ( cpu != -1 )
-                flush_mask(cpumask_of(cpu), FLUSH_CACHE);
+                flush_mask(cpumask_of(cpu), FLUSH_CACHE_EVICT);
         }
 
         vmx_clear_vmcs(v);

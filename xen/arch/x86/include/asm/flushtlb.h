@@ -113,7 +113,7 @@ void switch_cr3_cr4(unsigned long cr3, unsigned long cr4);
  /* Flush TLBs (or parts thereof) including global mappings */
 #define FLUSH_TLB_GLOBAL 0x200
  /* Flush data caches */
-#define FLUSH_CACHE      0x400
+#define FLUSH_CACHE_EVICT 0x400
  /* VA for the flush has a valid mapping */
 #define FLUSH_VA_VALID   0x800
  /* Flush CPU state */

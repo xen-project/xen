@@ -1205,7 +1205,7 @@ static int cf_check cache_op(
     else if ( op == x86emul_wbnoinvd /* && cpu_has_wbnoinvd */ )
         flush_all(FLUSH_CACHE_WRITEBACK);
     else
-        flush_all(FLUSH_CACHE);
+        flush_all(FLUSH_CACHE_EVICT);
 
     return X86EMUL_OKAY;
 }
