@@ -60,6 +60,7 @@ const struct pci_ecam_ops pci_generic_ecam_ops = {
         .read                   = pci_generic_config_read,
         .write                  = pci_generic_config_write,
         .need_p2m_hwdom_mapping = pci_ecam_need_p2m_hwdom_mapping,
+        .init_bus_range         = pci_generic_init_bus_range,
     }
 };
 

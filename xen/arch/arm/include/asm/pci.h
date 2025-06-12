@@ -69,6 +69,9 @@ struct pci_host_bridge {
     uint16_t segment;                /* Segment number */
     struct pci_config_window* cfg;   /* Pointer to the bridge config window */
     const struct pci_ops *ops;
+    /* Child bus */
+    struct pci_config_window *child_cfg;
+    const struct pci_ops *child_ops;
     void *priv;                      /* Private data of the bridge. */
 };
 
@@ -82,6 +85,9 @@ struct pci_ops {
     bool (*need_p2m_hwdom_mapping)(struct domain *d,
                                    struct pci_host_bridge *bridge,
                                    uint64_t addr);
+    void (*init_bus_range)(struct dt_device_node *dev,
+                           struct pci_host_bridge *bridge,
+                           struct pci_config_window *cfg);
 };
 
 /*
@@ -98,8 +104,10 @@ struct pci_ecam_ops {
 /* Default ECAM ops */
 extern const struct pci_ecam_ops pci_generic_ecam_ops;
 
-struct pci_host_bridge *pci_host_common_probe(struct dt_device_node *dev,
-                                              const struct pci_ecam_ops *ops);
+struct pci_host_bridge *
+pci_host_common_probe(struct dt_device_node *dev,
+                      const struct pci_ecam_ops *ops,
+                      const struct pci_ecam_ops *child_ops);
 int pci_generic_config_read(struct pci_host_bridge *bridge, pci_sbdf_t sbdf,
                             uint32_t reg, uint32_t len, uint32_t *value);
 int pci_generic_config_write(struct pci_host_bridge *bridge, pci_sbdf_t sbdf,
@@ -134,6 +142,14 @@ bool pci_check_bar(const struct pci_dev *pdev, mfn_t start, mfn_t end);
 
 static inline int pci_sanitize_bar_memory(struct rangeset *r)
 { return 0; }
+
+void pci_generic_init_bus_range(struct dt_device_node *dev,
+                                struct pci_host_bridge *bridge,
+                                struct pci_config_window *cfg);
+
+void pci_generic_init_bus_range_child(struct dt_device_node *dev,
+                                      struct pci_host_bridge *bridge,
+                                      struct pci_config_window *cfg);
 
 #else   /*!CONFIG_HAS_PCI*/
 

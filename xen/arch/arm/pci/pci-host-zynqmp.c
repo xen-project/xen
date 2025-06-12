@@ -35,6 +35,7 @@ const struct pci_ecam_ops nwl_pcie_ops = {
         .read                   = pci_generic_config_read,
         .write                  = pci_generic_config_write,
         .need_p2m_hwdom_mapping = pci_ecam_need_p2m_hwdom_mapping,
+        .init_bus_range         = pci_generic_init_bus_range,
     }
 };
 
@@ -47,7 +48,7 @@ static const struct dt_device_match __initconstrel nwl_pcie_dt_match[] =
 static int __init pci_host_generic_probe(struct dt_device_node *dev,
                                          const void *data)
 {
-    return PTR_RET(pci_host_common_probe(dev, &nwl_pcie_ops));
+    return PTR_RET(pci_host_common_probe(dev, &nwl_pcie_ops, NULL));
 }
 
 DT_DEVICE_START(pci_gen, "PCI HOST ZYNQMP", DEVICE_PCI_HOSTBRIDGE)
