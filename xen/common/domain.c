@@ -2404,7 +2404,7 @@ domid_t get_initial_domain_id(void)
     if ( pv_shim )
         return pv_shim_get_initial_domain_id();
 #endif
-    return hardware_domid;
+    return 0;
 }
 
 void freeze_domains(void)
