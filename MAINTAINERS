@@ -473,6 +473,11 @@ M:	Anthony Perard <anthony.perard@vates.tech>
 S:	Supported
 T:	git https://xenbits.xenproject.org/git-http/qemu-xen.git
 
+RCAR PCI
+M:	Mykyta Poturai <mykyta_poturai@epam.com>
+S:	Supported
+F:	xen/arch/arm/pci/pci-host-rcar4.c
+
 REMUS
 S:	Orphan
 F:	docs/README.remus
