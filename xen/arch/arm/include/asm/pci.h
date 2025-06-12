@@ -68,6 +68,7 @@ struct pci_host_bridge {
     uint16_t segment;                /* Segment number */
     struct pci_config_window* cfg;   /* Pointer to the bridge config window */
     const struct pci_ops *ops;
+    void *priv;                      /* Private data of the bridge. */
 };
 
 struct pci_ops {
