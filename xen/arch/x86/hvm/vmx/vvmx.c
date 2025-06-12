@@ -2675,7 +2675,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
             {
             case VMX_CR_ACCESS_TYPE_MOV_TO_CR:
             {
-                val = *decode_gpr(guest_cpu_user_regs(), qual.gpr);
+                val = reg_read(regs, qual.gpr);
 
                 if ( qual.cr == 0 )
                 {
