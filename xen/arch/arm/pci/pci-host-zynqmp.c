@@ -47,7 +47,7 @@ static const struct dt_device_match __initconstrel nwl_pcie_dt_match[] =
 static int __init pci_host_generic_probe(struct dt_device_node *dev,
                                          const void *data)
 {
-    return pci_host_common_probe(dev, &nwl_pcie_ops);
+    return PTR_RET(pci_host_common_probe(dev, &nwl_pcie_ops));
 }
 
 DT_DEVICE_START(pci_gen, "PCI HOST ZYNQMP", DEVICE_PCI_HOSTBRIDGE)

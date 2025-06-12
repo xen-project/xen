@@ -208,8 +208,8 @@ static int pci_bus_find_domain_nr(struct dt_device_node *dev)
     return domain;
 }
 
-int pci_host_common_probe(struct dt_device_node *dev,
-                          const struct pci_ecam_ops *ops)
+struct pci_host_bridge *pci_host_common_probe(struct dt_device_node *dev,
+                                              const struct pci_ecam_ops *ops)
 {
     struct pci_host_bridge *bridge;
     struct pci_config_window *cfg;
@@ -217,11 +217,11 @@ int pci_host_common_probe(struct dt_device_node *dev,
     int domain;
 
     if ( dt_device_for_passthrough(dev) )
-        return 0;
+        return NULL;
 
     bridge = pci_alloc_host_bridge();
     if ( !bridge )
-        return -ENOMEM;
+        return ERR_PTR(-ENOMEM);
 
     /* Parse and map our Configuration Space windows */
     cfg = gen_pci_init(dev, ops);
@@ -244,12 +244,12 @@ int pci_host_common_probe(struct dt_device_node *dev,
     bridge->segment = domain;
     pci_add_host_bridge(bridge);
 
-    return 0;
+    return bridge;
 
 err_exit:
     xfree(bridge);
 
-    return err;
+    return ERR_PTR(err);
 }
 
 /*
