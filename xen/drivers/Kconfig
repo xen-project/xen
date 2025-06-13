@@ -14,6 +14,7 @@ source "drivers/video/Kconfig"
 
 config HAS_VPCI
 	bool
+	select HAS_PCI
 
 config HAS_VPCI_GUEST_SUPPORT
 	bool

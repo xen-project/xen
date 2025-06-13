@@ -8,6 +8,8 @@ config ARM_64
 	depends on !ARM_32
 	select 64BIT
 	select HAS_FAST_MULTIPLY
+	select HAS_VPCI_GUEST_SUPPORT if PCI_PASSTHROUGH
+	select HAS_PASSTHROUGH if PCI_PASSTHROUGH
 
 config ARM
 	def_bool y
@@ -257,6 +259,12 @@ config PARTIAL_EMULATION
 	  result in unwanted/non-spec compliant behavior.
 
 source "arch/arm/firmware/Kconfig"
+
+config PCI_PASSTHROUGH
+	bool "PCI passthrough" if EXPERT
+	depends on ARM_64
+	help
+	  This option enables PCI device passthrough
 
 endmenu
 
