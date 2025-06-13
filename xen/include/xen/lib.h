@@ -48,7 +48,6 @@ int parse_signed_integer(const char *name, const char *s, const char *e,
 int cmdline_strcmp(const char *frag, const char *name);
 
 void print_version(void);
-void print_build_id(void);
 
 #ifdef CONFIG_DEBUG_TRACE
 extern void debugtrace_dump(void);

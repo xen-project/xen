@@ -1105,11 +1105,10 @@ void __init console_init_preirq(void)
     __putstr(xen_banner());
     nrspin_unlock(&console_lock);
 
-    print_version();
-
-    /* Locate and print the buildid, if applicable. */
+    /* Locate the buildid, if possible. */
     xen_build_init();
-    print_build_id();
+
+    print_version();
 
     if ( opt_sync_console )
     {
