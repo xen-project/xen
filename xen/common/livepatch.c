@@ -475,8 +475,8 @@ static int parse_buildid(const struct livepatch_elf_sec *sec,
 
 static int check_xen_buildid(const struct livepatch_elf *elf)
 {
-    const void *id;
-    unsigned int len;
+    const void *id = xen_build_id;
+    unsigned int len = xen_build_id_len;
     struct livepatch_build_id lp_id;
     const struct livepatch_elf_sec *sec =
         livepatch_elf_sec_by_name(elf, ELF_LIVEPATCH_XEN_DEPENDS);
@@ -498,13 +498,12 @@ static int check_xen_buildid(const struct livepatch_elf *elf)
         return -EINVAL;
     }
 
-    rc = xen_build_id(&id, &len);
-    if ( rc )
+    if ( !len )
     {
         printk(XENLOG_ERR LIVEPATCH
                "%s: unable to get running Xen build-id: %d\n",
                elf->name, rc);
-        return rc;
+        return -ENODATA;
     }
 
     if ( lp_id.len != len || memcmp(id, lp_id.p, len) )
@@ -1984,7 +1983,6 @@ static int build_id_dep(struct payload *payload, bool internal)
 {
     const void *id = NULL;
     unsigned int len = 0;
-    int rc;
     const char *name = "hypervisor";
 
     ASSERT(payload->dep.len && payload->dep.p);
@@ -1992,9 +1990,10 @@ static int build_id_dep(struct payload *payload, bool internal)
     /* First time user is against hypervisor. */
     if ( internal )
     {
-        rc = xen_build_id(&id, &len);
-        if ( rc )
-            return rc;
+        id = xen_build_id;
+        len = xen_build_id_len;
+        if ( !len )
+            return -ENODATA;
     }
     else
     {
@@ -2249,14 +2248,12 @@ static const char *state2str(unsigned int state)
 static void cf_check livepatch_printall(unsigned char key)
 {
     struct payload *data;
-    const void *binary_id = NULL;
-    unsigned int len = 0;
     unsigned int i;
 
     printk("'%c' pressed - Dumping all livepatch patches\n", key);
 
-    if ( !xen_build_id(&binary_id, &len) )
-        printk("build-id: %*phN\n", len, binary_id);
+    if ( xen_build_id_len )
+        printk("build-id: %*phN\n", xen_build_id_len, xen_build_id);
 
     if ( !spin_trylock(&payload_lock) )
     {

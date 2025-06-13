@@ -94,8 +94,8 @@ const char *xen_build_info(void)
     return build_info;
 }
 
-static const void *build_id_p __read_mostly;
-static unsigned int build_id_len __read_mostly;
+const void *__ro_after_init xen_build_id;
+unsigned int __ro_after_init xen_build_id_len;
 
 void print_version(void)
 {
@@ -106,19 +106,8 @@ void print_version(void)
 
     printk("Latest ChangeSet: %s\n", xen_changeset());
 
-    if ( build_id_len )
-        printk("build-id: %*phN\n", build_id_len, build_id_p);
-}
-
-int xen_build_id(const void **p, unsigned int *len)
-{
-    if ( !build_id_len )
-        return -ENODATA;
-
-    *len = build_id_len;
-    *p = build_id_p;
-
-    return 0;
+    if ( xen_build_id_len )
+        printk("build-id: %*phN\n", xen_build_id_len, xen_build_id);
 }
 
 #ifdef BUILD_ID
@@ -193,7 +182,7 @@ void __init xen_build_init(void)
 
     sz = (uintptr_t)__note_gnu_build_id_end - (uintptr_t)n;
 
-    rc = xen_build_id_check(n, sz, &build_id_p, &build_id_len);
+    rc = xen_build_id_check(n, sz, &xen_build_id, &xen_build_id_len);
 
 #ifdef CONFIG_X86
     /*
@@ -219,8 +208,8 @@ void __init xen_build_init(void)
 
             if ( info->cv_signature == CVINFO_PDB70_CVSIGNATURE )
             {
-                build_id_p = info->signature;
-                build_id_len = sizeof(info->signature);
+                xen_build_id = info->signature;
+                xen_build_id_len = sizeof(info->signature);
                 rc = 0;
             }
         }

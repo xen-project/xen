@@ -510,21 +510,15 @@ static long xenver_varbuf_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     struct xen_varbuf user_str;
     const char *str = NULL;
     size_t sz;
-    int rc;
 
     switch ( cmd )
     {
     case XENVER_build_id:
-    {
-        unsigned int local_sz;
-
-        rc = xen_build_id((const void **)&str, &local_sz);
-        if ( rc )
-            return rc;
-
-        sz = local_sz;
+        str = xen_build_id;
+        sz  = xen_build_id_len;
+        if ( !sz )
+            return -ENODATA;
         goto have_len;
-    }
 
     case XENVER_extraversion2:
         str = xen_extra_version();
