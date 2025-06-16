@@ -606,6 +606,7 @@ MsrRelaxed Defbool
 Altp2M Altp2MMode
 VmtraceBufKb int
 Vpmu Defbool
+TrapUnmappedAccesses Defbool
 }
 
 type DomainBuildInfoTypeUnion interface {

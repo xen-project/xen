@@ -1171,6 +1171,9 @@ x.VmtraceBufKb = int(xc.vmtrace_buf_kb)
 if err := x.Vpmu.fromC(&xc.vpmu);err != nil {
 return fmt.Errorf("converting field Vpmu: %v", err)
 }
+if err := x.TrapUnmappedAccesses.fromC(&xc.trap_unmapped_accesses);err != nil {
+return fmt.Errorf("converting field TrapUnmappedAccesses: %v", err)
+}
 
  return nil}
 
@@ -1695,6 +1698,9 @@ xc.altp2m = C.libxl_altp2m_mode(x.Altp2M)
 xc.vmtrace_buf_kb = C.int(x.VmtraceBufKb)
 if err := x.Vpmu.toC(&xc.vpmu); err != nil {
 return fmt.Errorf("converting field Vpmu: %v", err)
+}
+if err := x.TrapUnmappedAccesses.toC(&xc.trap_unmapped_accesses); err != nil {
+return fmt.Errorf("converting field TrapUnmappedAccesses: %v", err)
 }
 
  return nil
