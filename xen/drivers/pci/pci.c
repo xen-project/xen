@@ -11,7 +11,7 @@
 unsigned int pci_find_cap_offset(pci_sbdf_t sbdf, unsigned int cap)
 {
     u8 id;
-    int max_cap = 48;
+    int max_cap = 48; /* 192 bytes, minimum 4 bytes per capability */
     u8 pos = PCI_CAPABILITY_LIST;
     u16 status;
 
