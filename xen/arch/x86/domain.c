@@ -713,6 +713,13 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
         }
     }
 
+    if ( config->flags & XEN_DOMCTL_CDF_trap_unmapped_accesses )
+    {
+        dprintk(XENLOG_INFO, "Unsupported trap_unmapped_accesses flag %#x\n",
+                config->flags);
+        return -EINVAL;
+    }
+
     if ( config->arch.misc_flags & ~XEN_X86_MSR_RELAXED )
     {
         dprintk(XENLOG_INFO, "Invalid arch misc flags %#x\n",

@@ -343,6 +343,9 @@ void __init arch_create_domUs(struct dt_device_node *node,
         panic("'sve' property found, but CONFIG_ARM64_SVE not selected\n");
 #endif
     }
+
+    /* Trap accesses to unmapped areas. */
+    d_cfg->flags |= XEN_DOMCTL_CDF_trap_unmapped_accesses;
 }
 
 int __init init_intc_phandle(struct kernel_info *kinfo, const char *name,
