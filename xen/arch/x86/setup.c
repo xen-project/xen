@@ -298,6 +298,12 @@ struct boot_info __initdata xen_boot_info = {
     .loader = "unknown",
     .cmdline = "",
     .domains = { [0 ... MAX_NR_BOOTDOMS - 1] = { .domid = DOMID_INVALID } },
+    /*
+     * There's a MAX_NR_BOOTMODS-th entry in the array. It's not off by one.
+     *
+     * The extra entry exists to be able to add the Xen image as a module.
+     */
+    .mods = { [0 ... MAX_NR_BOOTMODS] = { .type = BOOTMOD_UNKNOWN } },
 };
 
 static struct boot_info *__init multiboot_fill_boot_info(
