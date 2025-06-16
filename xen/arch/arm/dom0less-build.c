@@ -344,8 +344,15 @@ void __init arch_create_domUs(struct dt_device_node *node,
 #endif
     }
 
-    /* Trap accesses to unmapped areas. */
+    /* Trap unmapped accesses by default. */
     d_cfg->flags |= XEN_DOMCTL_CDF_trap_unmapped_accesses;
+    if ( dt_property_read_u32(node, "trap-unmapped-accesses", &val) )
+    {
+        if ( val > 1 )
+            panic("trap-unmapped-accesses: supported values are 0 or 1");
+        if ( !val )
+            d_cfg->flags &= ~XEN_DOMCTL_CDF_trap_unmapped_accesses;
+    }
 }
 
 int __init init_intc_phandle(struct kernel_info *kinfo, const char *name,

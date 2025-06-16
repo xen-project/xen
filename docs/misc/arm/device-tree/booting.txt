@@ -225,6 +225,16 @@ with the following properties:
     option is provided with a non zero value, but the platform doesn't support
     SVE.
 
+- trap-unmapped-accesses
+
+    Optional. An integer that configures handling of accesses to unmapped
+    address ranges.
+    If set to 0, guest accesses will read all bits as ones, e.g 0xFFFFFFFF
+    for a 32bit access and writes will be ignored.
+    If set to 1, guest accesses will trap.
+
+    The default is 1 when trap-unmapped-accesses is absent.
+
 - xen,enhanced
 
     A string property. Possible property values are:
