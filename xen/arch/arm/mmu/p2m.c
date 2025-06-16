@@ -1291,7 +1291,7 @@ static void p2m_invalidate_root(struct p2m_domain *p2m)
 
     p2m_write_lock(p2m);
 
-    for ( i = 0; i < P2M_ROOT_LEVEL; i++ )
+    for ( i = 0; i < P2M_ROOT_PAGES; i++ )
         p2m_invalidate_table(p2m, page_to_mfn(p2m->root + i));
 
     p2m_write_unlock(p2m);
