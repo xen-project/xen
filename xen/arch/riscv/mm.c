@@ -3,6 +3,7 @@
 #include <xen/bootfdt.h>
 #include <xen/bug.h>
 #include <xen/compiler.h>
+#include <xen/domain_page.h>
 #include <xen/init.h>
 #include <xen/kernel.h>
 #include <xen/libfdt/libfdt.h>
@@ -612,4 +613,17 @@ void __iomem *ioremap_wc(paddr_t pa, size_t len)
 void __iomem *ioremap(paddr_t pa, size_t len)
 {
     return ioremap_attr(pa, len, PAGE_HYPERVISOR_NOCACHE);
+}
+
+void flush_page_to_ram(unsigned long mfn, bool sync_icache)
+{
+    const void *v = map_domain_page(_mfn(mfn));
+
+    if ( clean_and_invalidate_dcache_va_range(v, PAGE_SIZE) )
+        BUG();
+
+    unmap_domain_page(v);
+
+    if ( sync_icache )
+        invalidate_icache();
 }

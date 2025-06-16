@@ -12,6 +12,7 @@
 #include <xen/sections.h>
 #include <xen/types.h>
 
+#include <asm/page.h>
 #include <asm/page-bits.h>
 
 extern vaddr_t directmap_virt_start;
@@ -19,11 +20,21 @@ extern vaddr_t directmap_virt_start;
 #define pfn_to_paddr(pfn) ((paddr_t)(pfn) << PAGE_SHIFT)
 #define paddr_to_pfn(pa)  ((unsigned long)((pa) >> PAGE_SHIFT))
 
+static inline pte_t paddr_to_pte(paddr_t paddr,
+                                 unsigned int permissions)
+{
+    return (pte_t) { .pte = (paddr_to_pfn(paddr) << PTE_PPN_SHIFT) | permissions };
+}
+
+static inline paddr_t pte_to_paddr(pte_t pte)
+{
+    return pfn_to_paddr(pte.pte >> PTE_PPN_SHIFT);
+}
+
 #define gfn_to_gaddr(gfn)   pfn_to_paddr(gfn_x(gfn))
 #define gaddr_to_gfn(ga)    _gfn(paddr_to_pfn(ga))
 #define mfn_to_maddr(mfn)   pfn_to_paddr(mfn_x(mfn))
 #define maddr_to_mfn(ma)    _mfn(paddr_to_pfn(ma))
-#define vmap_to_mfn(va)     _vmap_to_mfn((vaddr_t)(va))
 #define vmap_to_page(va)    mfn_to_page(vmap_to_mfn(va))
 
 static inline void *maddr_to_virt(paddr_t ma)
@@ -34,6 +45,15 @@ static inline void *maddr_to_virt(paddr_t ma)
 
     return (void *)va;
 }
+
+#define mfn_from_pte(pte) maddr_to_mfn(pte_to_paddr(pte))
+
+#define vmap_to_mfn(va)                             \
+({                                                  \
+    pte_t __entry = pt_walk((vaddr_t)(va), NULL);   \
+    BUG_ON(!pte_is_mapping(__entry));               \
+    maddr_to_mfn(pte_to_paddr(__entry));            \
+})
 
 /*
  * virt_to_maddr() is expected to work with virtual addresses from either
@@ -75,8 +95,6 @@ static inline unsigned long virt_to_maddr(unsigned long va)
  */
 #define virt_to_mfn(va)     __virt_to_mfn(va)
 #define mfn_to_virt(mfn)    __mfn_to_virt(mfn)
-
-#define mfn_from_pte(pte) maddr_to_mfn(pte_to_paddr(pte))
 
 struct page_info
 {

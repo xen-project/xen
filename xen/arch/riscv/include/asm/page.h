@@ -7,12 +7,10 @@
 
 #include <xen/bug.h>
 #include <xen/const.h>
-#include <xen/domain_page.h>
 #include <xen/errno.h>
 #include <xen/types.h>
 
 #include <asm/atomic.h>
-#include <asm/mm.h>
 #include <asm/page-bits.h>
 
 #define VPN_MASK                    (PAGETABLE_ENTRIES - 1UL)
@@ -114,17 +112,6 @@ typedef struct {
 #endif
 } pte_t;
 
-static inline pte_t paddr_to_pte(paddr_t paddr,
-                                 unsigned int permissions)
-{
-    return (pte_t) { .pte = (paddr_to_pfn(paddr) << PTE_PPN_SHIFT) | permissions };
-}
-
-static inline paddr_t pte_to_paddr(pte_t pte)
-{
-    return pfn_to_paddr(pte.pte >> PTE_PPN_SHIFT);
-}
-
 static inline bool pte_is_valid(pte_t p)
 {
     return p.pte & PTE_VALID;
@@ -198,18 +185,7 @@ static inline void invalidate_icache(void)
 #define clear_page(page) memset((void *)(page), 0, PAGE_SIZE)
 #define copy_page(dp, sp) memcpy(dp, sp, PAGE_SIZE)
 
-static inline void flush_page_to_ram(unsigned long mfn, bool sync_icache)
-{
-    const void *v = map_domain_page(_mfn(mfn));
-
-    if ( clean_and_invalidate_dcache_va_range(v, PAGE_SIZE) )
-        BUG();
-
-    unmap_domain_page(v);
-
-    if ( sync_icache )
-        invalidate_icache();
-}
+void flush_page_to_ram(unsigned long mfn, bool sync_icache);
 
 /* Write a pagetable entry. */
 static inline void write_pte(pte_t *p, pte_t pte)
@@ -230,15 +206,6 @@ static inline pte_t pte_from_mfn(mfn_t mfn, pte_attr_t flags)
 }
 
 pte_t pt_walk(vaddr_t va, unsigned int *pte_level);
-
-static inline mfn_t _vmap_to_mfn(vaddr_t va)
-{
-    pte_t entry = pt_walk(va, NULL);
-
-    BUG_ON(!pte_is_mapping(entry));
-
-    return mfn_from_pte(entry);
-}
 
 #endif /* __ASSEMBLY__ */
 
