@@ -26,6 +26,10 @@ static inline void set_cpuid_to_hartid(unsigned long cpuid,
 
 void setup_tp(unsigned int cpuid);
 
+struct dt_device_node;
+int dt_processor_hartid(const struct dt_device_node *node,
+                        unsigned long *hartid);
+
 #endif
 
 /*
