@@ -1,7 +1,6 @@
 #ifndef __ASM_GRANT_TABLE_H__
 #define __ASM_GRANT_TABLE_H__
 
-#include <xen/grant_table.h>
 #include <xen/kernel.h>
 #include <xen/pfn.h>
 #include <xen/sched.h>
