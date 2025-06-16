@@ -550,6 +550,13 @@
 #define LIBXL_HAVE_VPMU 1
 
 /*
+ * LIBXL_HAVE_TRAP_UNMAPPED_ACCESSES indicates that libxl_domain_build_info
+ * has a trap_unmapped_accesses parameter, which allows the control of how
+ * accesses to unmapped adresses behave.
+ */
+#define LIBXL_HAVE_TRAP_UNMAPPED_ACCESSES 1
+
+/*
  * LIBXL_HAVE_PHYSINFO_CAP_GNTTAB indicates that libxl_physinfo has a
  * cap_gnttab_v1/2 fields, which indicates the available grant table ABIs.
  */
