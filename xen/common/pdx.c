@@ -15,6 +15,8 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+/* Trim content when built for the test harness. */
+#ifdef __XEN__
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/bitops.h>
@@ -56,6 +58,8 @@ void set_pdx_range(unsigned long smfn, unsigned long emfn)
     for ( ; idx < eidx; ++idx )
         __set_bit(idx, pdx_group_valid);
 }
+
+#endif /* __XEN__ */
 
 #ifndef CONFIG_PDX_NONE
 
