@@ -101,6 +101,65 @@ void __init pfn_pdx_add_region(paddr_t base, paddr_t size)
     ranges[nr_ranges++].pages = PFN_UP(base + size) - PFN_DOWN(base);
 }
 
+/* Sets all bits from the most-significant 1-bit down to the LSB */
+static uint64_t fill_mask(uint64_t mask)
+{
+    while (mask & (mask + 1))
+        mask |= mask + 1;
+
+    return mask;
+}
+
+/**
+ * Calculates a mask covering "moving" bits of all addresses of a region
+ *
+ * The i-th bit of the mask must be set if there's 2 different addresses
+ * in the region that have different j-th bits. where j >= i.
+ *
+ * e.g:
+ *       base=0x1B00000000
+ *   len+base=0x1B00042000
+ *
+ *   ought to return 0x000007FFFF, which implies that every bit position
+ *   with a zero in the mask remains unchanged in every address of the
+ *   region.
+ *
+ * @param base Base address of the region
+ * @param len  Size in octets of the region
+ * @return Mask of moving bits at the bottom of all the region addresses
+ */
+static uint64_t pdx_region_mask(uint64_t base, uint64_t len)
+{
+    /*
+     * We say a bit "moves" in a range if there exist 2 addresses in that
+     * range that have that bit both set and cleared respectively. We want
+     * to create a mask of _all_ moving bits in this range. We do this by
+     * comparing the first and last addresses in the range, discarding the
+     * bits that remain the same (this is logically an XOR operation). The
+     * MSB of the resulting expression is the most significant moving bit
+     * in the range. Then it's a matter of setting every bit in lower
+     * positions in order to get the mask of moving bits.
+     */
+    return fill_mask(base ^ (base + len - 1));
+}
+
+/**
+ * Creates the mask to start from when calculating non-compressible bits
+ *
+ * This function is intimately related to pdx_region_mask(), and together
+ * they are meant to calculate the mask of non-compressible bits given the
+ * current memory map.
+ *
+ * @param base_addr Address of the first maddr in the system
+ * @return An integer of the form 2^n - 1
+ */
+static uint64_t __init pdx_init_mask(uint64_t base_addr)
+{
+    return fill_mask(max(base_addr,
+                         /* Don't compress the low MAX_ORDER bits. */
+                         (uint64_t)1 << (MAX_ORDER + PAGE_SHIFT)) - 1);
+}
+
 #endif /* !CONFIG_PDX_NONE */
 
 #ifdef CONFIG_PDX_MASK_COMPRESSION
@@ -154,69 +213,10 @@ unsigned long __ro_after_init pfn_hole_mask = 0;
 /** Number of bits of the "compressible" bit slice of an mfn */
 unsigned int __ro_after_init pfn_pdx_hole_shift = 0;
 
-/* Sets all bits from the most-significant 1-bit down to the LSB */
-static uint64_t fill_mask(uint64_t mask)
-{
-    while (mask & (mask + 1))
-        mask |= mask + 1;
-
-    return mask;
-}
-
-/**
- * Calculates a mask covering "moving" bits of all addresses of a region
- *
- * The i-th bit of the mask must be set if there's 2 different addresses
- * in the region that have different j-th bits. where j >= i.
- *
- * e.g:
- *       base=0x1B00000000
- *   len+base=0x1B00042000
- *
- *   ought to return 0x000007FFFF, which implies that every bit position
- *   with a zero in the mask remains unchanged in every address of the
- *   region.
- *
- * @param base Base address of the region
- * @param len  Size in octets of the region
- * @return Mask of moving bits at the bottom of all the region addresses
- */
-static uint64_t pdx_region_mask(uint64_t base, uint64_t len)
-{
-    /*
-     * We say a bit "moves" in a range if there exist 2 addresses in that
-     * range that have that bit both set and cleared respectively. We want
-     * to create a mask of _all_ moving bits in this range. We do this by
-     * comparing the first and last addresses in the range, discarding the
-     * bits that remain the same (this is logically an XOR operation). The
-     * MSB of the resulting expression is the most significant moving bit
-     * in the range. Then it's a matter of setting every bit in lower
-     * positions in order to get the mask of moving bits.
-     */
-    return fill_mask(base ^ (base + len - 1));
-}
-
 bool pdx_is_region_compressible(paddr_t base, unsigned long npages)
 {
     return !(paddr_to_pfn(base) & pfn_hole_mask) &&
            !(pdx_region_mask(base, npages * PAGE_SIZE) & ~ma_va_bottom_mask);
-}
-
-/**
- * Creates the mask to start from when calculating non-compressible bits
- *
- * This function is intimately related to pdx_region_mask(), and together
- * they are meant to calculate the mask of non-compressible bits given the
- * current memory map.
- *
- * @param base_addr Address of the first maddr in the system
- * @return An integer of the form 2^n - 1
- */
-static uint64_t __init pdx_init_mask(uint64_t base_addr)
-{
-    return fill_mask(max(base_addr,
-                         /* Don't compress the low MAX_ORDER bits. */
-                         (uint64_t)1 << (MAX_ORDER + PAGE_SHIFT)) - 1);
 }
 
 bool __init pfn_pdx_compression_setup(paddr_t base)
