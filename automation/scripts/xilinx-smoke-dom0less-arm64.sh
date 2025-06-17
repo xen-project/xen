@@ -136,7 +136,7 @@ cd $START
 # connect to serial
 SERIAL_DEV="/dev/serial/zynq"
 set +e
-stty -F ${SERIAL_DEV} 115200
+stty -F ${SERIAL_DEV} 115200 -echo
 timeout -k 1 120 nohup sh -c "cat ${SERIAL_DEV} | tee smoke.serial"
 
 # stop the board
