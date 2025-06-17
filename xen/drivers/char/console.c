@@ -453,9 +453,9 @@ void console_serial_puts(const char *s, size_t nr)
 }
 
 /*
- * Flush contents of the conring to the physical console devices.
+ * Flush contents of the conring to the selected console devices.
  */
-static int conring_flush(void)
+static int conring_flush(unsigned int flags)
 {
     uint32_t idx, len, sofar, c;
     unsigned int order;
@@ -479,7 +479,7 @@ static int conring_flush(void)
         c += len;
     }
 
-    console_send(buf, sofar, CONSOLE_SERIAL | CONSOLE_VIDEO | CONSOLE_PV);
+    console_send(buf, sofar, flags);
 
     free_xenheap_pages(buf, order);
 
@@ -491,7 +491,7 @@ static void cf_check conring_dump_keyhandler(unsigned char key)
     int rc;
 
     printk("'%c' pressed -> dumping console ring buffer (dmesg)\n", key);
-    rc = conring_flush();
+    rc = conring_flush(CONSOLE_SERIAL | CONSOLE_VIDEO | CONSOLE_PV);
     if ( rc )
         printk("failed to dump console ring buffer: %d\n", rc);
 }
@@ -1042,6 +1042,7 @@ void __init console_init_preirq(void)
 {
     char *p;
     int sh;
+    unsigned int flags = CONSOLE_SERIAL | CONSOLE_VIDEO | CONSOLE_PV;
 
     serial_init_preirq();
 
@@ -1084,8 +1085,15 @@ void __init console_init_preirq(void)
     serial_set_rx_handler(sercon_handle, serial_rx);
     pv_console_set_rx_handler(serial_rx);
 
-    /* NB: send conring contents to all enabled physical consoles, if any */
-    conring_flush();
+    /*
+     * NB: send conring contents to all enabled physical consoles, if any.
+     * Skip serial if CONFIG_EARLY_PRINTK is enabled, which means the early
+     * messages have already been sent to serial.
+     */
+    if ( IS_ENABLED(CONFIG_EARLY_PRINTK) )
+        flags &= ~CONSOLE_SERIAL;
+
+    conring_flush(flags);
 
     /* HELLO WORLD --- start-of-day banner text. */
     nrspin_lock(&console_lock);
