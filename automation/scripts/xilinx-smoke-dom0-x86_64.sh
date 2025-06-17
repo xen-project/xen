@@ -165,7 +165,7 @@ sleep 5
 sh /scratch/gitlab-runner/${TEST_BOARD}.sh 1
 sleep 5
 set +e
-stty -F ${SERIAL_DEV} 57600
+stty -F ${SERIAL_DEV} 57600 -echo
 
 # Capture test result and power off board before exiting.
 export PASSED="${PASS_MSG}"

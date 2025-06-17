@@ -128,7 +128,7 @@ cd $START
 # connect to serial
 SERIAL_DEV="/dev/serial/zynq"
 set +e
-stty -F ${SERIAL_DEV} 115200
+stty -F ${SERIAL_DEV} 115200 -echo
 
 # Capture test result and power off board before exiting.
 export PASSED="${passed}"
