@@ -750,32 +750,75 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
     return 0;
 }
 
+/*
+ * Verify that the domain's emulation flags resolve to a supported configuration.
+ *
+ * This ensures we only allow a known, safe subset of emulation combinations
+ * (for both functionality and security). Arbitrary mixes are likely to cause
+ * errors (e.g. null pointer dereferences).
+ *
+ * NB: use the internal X86_EMU_XXX symbols, not the public XEN_X86_EMU_XXX
+ * symbols, to take build-time config options (e.g. CONFIG_HVM) into account
+ * for short-circuited emulations.
+ */
 static bool emulation_flags_ok(const struct domain *d, uint32_t emflags)
 {
+    enum {
+        CAP_PV          = BIT(0, U),
+        CAP_HVM         = BIT(1, U),
+        CAP_HWDOM       = BIT(2, U),
+        CAP_DOMU        = BIT(3, U),
+    };
+    static const struct {
+        unsigned int caps;
+        uint32_t min;
+        uint32_t opt;
+    } configs[] = {
+#ifdef CONFIG_PV
+        /* PV dom0 and domU */
+        {
+            .caps   = CAP_PV | CAP_HWDOM | CAP_DOMU,
+            .opt    = X86_EMU_PIT,
+        },
+#endif /* #ifdef CONFIG_PV */
+
+#ifdef CONFIG_HVM
+        /* PVH dom0 */
+        {
+            .caps   = CAP_HVM | CAP_HWDOM,
+            .min    = X86_EMU_LAPIC | X86_EMU_IOAPIC | X86_EMU_VPCI,
+        },
+
+        /* PVH domU */
+        {
+            .caps   = CAP_HVM | CAP_DOMU,
+            .min    = X86_EMU_LAPIC,
+        },
+
+        /* HVM domU */
+        {
+            .caps   = CAP_HVM | CAP_DOMU,
+            .min    = X86_EMU_ALL & ~(X86_EMU_VPCI | X86_EMU_USE_PIRQ),
+            /* HVM PIRQ feature is user-selectable. */
+            .opt    = X86_EMU_USE_PIRQ,
+        },
+#endif /* #ifdef CONFIG_HVM */
+    };
+    unsigned int i;
+    unsigned int caps = (is_pv_domain(d) ? CAP_PV : CAP_HVM) |
+                        (is_hardware_domain(d) ? CAP_HWDOM : CAP_DOMU);
+
 #ifdef CONFIG_HVM
     /* This doesn't catch !CONFIG_HVM case but it is better than nothing */
     BUILD_BUG_ON(X86_EMU_ALL != XEN_X86_EMU_ALL);
 #endif
 
-    if ( is_hvm_domain(d) )
-    {
-        if ( is_hardware_domain(d) &&
-             emflags != (X86_EMU_VPCI | X86_EMU_LAPIC | X86_EMU_IOAPIC) )
-            return false;
-        if ( !is_hardware_domain(d) &&
-             /* HVM PIRQ feature is user-selectable. */
-             (emflags & ~X86_EMU_USE_PIRQ) !=
-             (X86_EMU_ALL & ~(X86_EMU_VPCI | X86_EMU_USE_PIRQ)) &&
-             emflags != X86_EMU_LAPIC )
-            return false;
-    }
-    else if ( emflags != 0 && emflags != X86_EMU_PIT )
-    {
-        /* PV or classic PVH. */
-        return false;
-    }
+    for ( i = 0; i < ARRAY_SIZE(configs); i++ )
+        if ( (caps & configs[i].caps) == caps &&
+             (emflags & ~configs[i].opt) == configs[i].min )
+            return true;
 
-    return true;
+    return false;
 }
 
 void __init arch_init_idle_domain(struct domain *d)
