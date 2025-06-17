@@ -792,15 +792,17 @@ static int __init handle_pci_range(const struct dt_device_node *dev,
 }
 
 /*
- * Find the holes in the Host DT which can be exposed to Dom0 as extended
- * regions for the special memory mappings. In order to calculate regions
- * we exclude every addressable memory region described by "reg" and "ranges"
- * properties from the maximum possible addressable physical memory range:
+ * Find the holes in the Host DT which can be exposed to hwdom or a direct-map
+ * domU as extended regions for the special memory mappings. In order to
+ * calculate regions we exclude every addressable memory region described by
+ * "reg" and "ranges" properties from the maximum possible addressable physical
+ * memory range:
  * - MMIO
  * - Host RAM
  * - PCI aperture
  * - Static shared memory regions, which are described by special property
  *   "xen,shared-mem"
+ * - xen,reg mappings
  */
 static int __init find_memory_holes(const struct kernel_info *kinfo,
                                     struct membanks *ext_regions)
@@ -880,6 +882,13 @@ static int __init find_memory_holes(const struct kernel_info *kinfo,
             if ( res )
                 goto out;
         }
+    }
+
+    if ( kinfo->xen_reg_assigned )
+    {
+        res = rangeset_subtract(mem_holes, kinfo->xen_reg_assigned);
+        if ( res )
+            goto out;
     }
 
     start = 0;
@@ -962,11 +971,51 @@ static int __init find_domU_holes(const struct kernel_info *kinfo,
     return res;
 }
 
+static int __init count(unsigned long s_gfn, unsigned long e_gfn, void *data)
+{
+    unsigned int *cnt = data;
+
+    (*cnt)++;
+
+    return 0;
+}
+
+static unsigned int __init count_ranges(struct rangeset *r)
+{
+    unsigned int cnt = 0;
+
+    (void) rangeset_report_ranges(r, 0, PFN_DOWN((1ULL << p2m_ipa_bits) - 1),
+                                  count, &cnt);
+
+    return cnt;
+}
+
+static int __init rangeset_to_membank(unsigned long s_gfn, unsigned long e_gfn,
+                                      void *data)
+{
+    struct membanks *membank = data;
+    paddr_t s = pfn_to_paddr(s_gfn);
+    paddr_t e = pfn_to_paddr(e_gfn + 1);
+
+    if ( membank->nr_banks >= membank->max_banks )
+        return 0;
+
+    membank->bank[membank->nr_banks].start = s;
+    membank->bank[membank->nr_banks].size = e - s;
+    membank->nr_banks++;
+
+    return 0;
+}
+
 static int __init find_host_extended_regions(const struct kernel_info *kinfo,
                                              struct membanks *ext_regions)
 {
     int res;
     struct membanks *gnttab = membanks_xzalloc(1, MEMORY);
+    struct membanks *xen_reg =
+        kinfo->xen_reg_assigned
+        ? membanks_xzalloc(count_ranges(kinfo->xen_reg_assigned), MEMORY)
+        : NULL;
 
     /*
      * Exclude the following regions:
@@ -974,6 +1023,7 @@ static int __init find_host_extended_regions(const struct kernel_info *kinfo,
      * 2) Remove reserved memory
      * 3) Grant table assigned to domain
      * 4) Remove static shared memory (when the feature is enabled)
+     * 5) Remove xen,reg
      */
     const struct membanks *mem_banks[] = {
         kernel_info_get_mem_const(kinfo),
@@ -982,12 +1032,29 @@ static int __init find_host_extended_regions(const struct kernel_info *kinfo,
 #ifdef CONFIG_STATIC_SHM
         bootinfo_get_shmem(),
 #endif
+        xen_reg,
     };
 
     dt_dprintk("Find unallocated memory for extended regions\n");
 
     if ( !gnttab )
-        return -ENOMEM;
+    {
+        res = -ENOMEM;
+        goto out;
+    }
+
+    if ( kinfo->xen_reg_assigned )
+    {
+        if ( !xen_reg )
+        {
+            res = -ENOMEM;
+            goto out;
+        }
+
+        rangeset_report_ranges(kinfo->xen_reg_assigned, 0,
+                               PFN_DOWN((1ULL << p2m_ipa_bits) - 1),
+                               rangeset_to_membank, xen_reg);
+    }
 
     gnttab->nr_banks = 1;
     gnttab->bank[0].start = kinfo->gnttab_start;
@@ -995,6 +1062,9 @@ static int __init find_host_extended_regions(const struct kernel_info *kinfo,
 
     res = find_unallocated_memory(kinfo, mem_banks, ARRAY_SIZE(mem_banks),
                                   ext_regions, add_ext_regions);
+
+ out:
+    xfree(xen_reg);
     xfree(gnttab);
 
     return res;

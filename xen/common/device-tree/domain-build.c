@@ -193,6 +193,10 @@ int __init find_unallocated_memory(const struct kernel_info *kinfo,
 
     /* Remove all regions listed in mem_banks */
     for ( i = 0; i < nr_mem_banks; i++ )
+    {
+        if ( !mem_banks[i] )
+            continue;
+
         for ( j = 0; j < mem_banks[i]->nr_banks; j++ )
         {
             start = mem_banks[i]->bank[j].start;
@@ -212,6 +216,7 @@ int __init find_unallocated_memory(const struct kernel_info *kinfo,
                 goto out;
             }
         }
+    }
 
     start = 0;
     end = (1ULL << p2m_ipa_bits) - 1;
