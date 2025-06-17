@@ -330,7 +330,7 @@ F:	xen/arch/x86/debug.c
 F:	tools/debugger/gdbsx/
 
 GOLANG BINDINGS
-M:	Nick Rosbrook <rosbrookn@gmail.com>
+M:	Nick Rosbrook <enr0n@ubuntu.com>
 R:	George Dunlap <gwd@xenproject.org>
 S:	Maintained
 F:	tools/golang
