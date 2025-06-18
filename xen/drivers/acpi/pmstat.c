@@ -237,7 +237,7 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
             return -ENODEV;
         if ( hwp_active() )
             return -EOPNOTSUPP;
-        if ( !pmpt || !(pmpt->perf.init & XEN_PX_INIT) )
+        if ( !pmpt || !(pmpt->init & XEN_PX_INIT) )
             return -EINVAL;
         break;
     default:
@@ -635,7 +635,7 @@ int do_pm_op(struct xen_sysctl_pm_op *op)
     case CPUFREQ_PARA:
         if ( !(xen_processor_pmbits & XEN_PROCESSOR_PM_PX) )
             return -ENODEV;
-        if ( !pmpt || !(pmpt->perf.init & XEN_PX_INIT) )
+        if ( !pmpt || !(pmpt->init & XEN_PX_INIT) )
             return -EINVAL;
         break;
     }

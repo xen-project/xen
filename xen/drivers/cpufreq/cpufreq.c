@@ -209,7 +209,7 @@ int cpufreq_add_cpu(unsigned int cpu)
 
     perf = &processor_pminfo[cpu]->perf;
 
-    if ( !(perf->init & XEN_PX_INIT) )
+    if ( !(processor_pminfo[cpu]->init & XEN_PX_INIT) )
         return -EINVAL;
 
     if (!cpufreq_driver.init)
@@ -373,7 +373,7 @@ int cpufreq_del_cpu(unsigned int cpu)
 
     perf = &processor_pminfo[cpu]->perf;
 
-    if ( !(perf->init & XEN_PX_INIT) )
+    if ( !(processor_pminfo[cpu]->init & XEN_PX_INIT) )
         return -EINVAL;
 
     if (!per_cpu(cpufreq_cpu_policy, cpu))
@@ -570,7 +570,7 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *perf)
         if ( cpufreq_verbose )
             print_PPC(pxpt->platform_limit);
 
-        if ( pxpt->init == XEN_PX_INIT )
+        if ( pmpt->init == XEN_PX_INIT )
         {
             ret = cpufreq_limit_change(cpu);
             goto out;
@@ -579,7 +579,7 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *perf)
 
     if ( perf->flags == ( XEN_PX_PCT | XEN_PX_PSS | XEN_PX_PSD | XEN_PX_PPC ) )
     {
-        pxpt->init = XEN_PX_INIT;
+        pmpt->init = XEN_PX_INIT;
 
         ret = cpufreq_cpu_init(cpu);
         goto out;

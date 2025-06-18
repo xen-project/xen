@@ -27,14 +27,14 @@ struct processor_performance {
     struct xen_processor_px *states;
     struct xen_psd_package domain_info;
     uint32_t shared_type;
-
-    uint32_t init;
 };
 
 struct processor_pminfo {
     uint32_t acpi_id;
     uint32_t id;
     struct processor_performance    perf;
+
+    uint32_t init;
 };
 
 extern struct processor_pminfo *processor_pminfo[NR_CPUS];
