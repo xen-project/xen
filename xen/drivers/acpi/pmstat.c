@@ -272,11 +272,14 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
 
         cpufreq_residency_update(op->cpuid, pxpt->u.cur);
 
-        ct = min(pmpt->perf.state_count, op->u.getpx.total + 0U);
-
-        /* Avoid partial copying of 2-D array */
-        if ( ct == op->u.getpx.total &&
-             copy_to_guest(op->u.getpx.trans_pt, pxpt->u.trans_pt, ct * ct) )
+        /*
+         * Avoid partial copying of 2-D array, whereas partial copying of a
+         * simple vector (further down) is deemed okay.
+         */
+        ct = pmpt->perf.state_count;
+        if ( ct > op->u.getpx.total )
+            ct = op->u.getpx.total;
+        else if ( copy_to_guest(op->u.getpx.trans_pt, pxpt->u.trans_pt, ct * ct) )
         {
             spin_unlock(cpufreq_statistic_lock);
             ret = -EFAULT;
