@@ -19,6 +19,7 @@
 #include <xen/mm.h>
 #include <xen/bitops.h>
 #include <xen/nospec.h>
+#include <xen/param.h>
 #include <xen/pfn.h>
 #include <xen/sections.h>
 
@@ -76,9 +77,13 @@ static struct pfn_range {
 } ranges[MAX_PFN_RANGES] __initdata;
 static unsigned int __initdata nr_ranges;
 
+static bool __initdata pdx_compress = true;
+boolean_param("pdx-compress", pdx_compress);
+
 void __init pfn_pdx_add_region(paddr_t base, paddr_t size)
 {
-    if ( !size )
+    /* Without ranges there's no PFN compression. */
+    if ( !size || !pdx_compress )
         return;
 
     if ( nr_ranges >= ARRAY_SIZE(ranges) )
@@ -214,6 +219,13 @@ void __init pfn_pdx_compression_setup(paddr_t base)
 {
     unsigned int i, j, bottom_shift = 0, hole_shift = 0;
     unsigned long mask = pdx_init_mask(base) >> PAGE_SHIFT;
+
+    if ( !nr_ranges )
+    {
+        printk(XENLOG_DEBUG "PFN compression disabled%s\n",
+               pdx_compress ? ": no ranges provided" : "");
+        return;
+    }
 
     if ( nr_ranges > ARRAY_SIZE(ranges) )
     {

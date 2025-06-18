@@ -2072,6 +2072,15 @@ for all of them (`true`), only for those subject to XPTI (`xpti`) or for
 those not subject to XPTI (`no-xpti`). The feature is used only in case
 INVPCID is supported and not disabled via `invpcid=false`.
 
+### pdx-compress
+> `= <boolean>`
+
+> Default: `true` if CONFIG_PDX_NONE is unset
+
+Only relevant when the hypervisor is build with PFN PDX compression. Controls
+whether Xen will engage in PFN compression.  The algorithm used for PFN
+compression is selected at build time from Kconfig.
+
 ### ple_gap
 > `= <integer>`
 
