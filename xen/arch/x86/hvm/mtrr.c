@@ -582,6 +582,7 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
 {
     struct hvm_mem_pinned_cacheattr_range *range, *newr;
     unsigned int nr = 0;
+    bool flush = false;
     int rc = 1;
 
     if ( !is_hvm_domain(d) )
@@ -605,31 +606,34 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
 
                 type = range->type;
                 call_rcu(&range->rcu, free_pinned_cacheattr_entry);
-                p2m_memory_type_changed(d);
                 switch ( type )
                 {
-                case X86_MT_UCM:
+                case X86_MT_WB:
+                case X86_MT_WP:
+                case X86_MT_WT:
                     /*
-                     * For EPT we can also avoid the flush in this case;
-                     * see epte_get_entry_emt().
+                     * Flush since we don't know what the cachability is going
+                     * to be.
                      */
-                    if ( hap_enabled(d) && cpu_has_vmx )
-                case X86_MT_UC:
-                        break;
-                    /* fall through */
-                default:
-                    flush_all(FLUSH_CACHE_EVICT);
+                    flush = true;
                     break;
                 }
-                return 0;
+                rc = 0;
+                goto finish;
             }
         domain_unlock(d);
         return -ENOENT;
 
     case X86_MT_UCM:
     case X86_MT_UC:
-    case X86_MT_WB:
     case X86_MT_WC:
+        if ( !is_iommu_enabled(d) && !cache_flush_permitted(d) )
+            return -EPERM;
+        /* Flush since we don't know what the cachability was. */
+        flush = true;
+        break;
+
+    case X86_MT_WB:
     case X86_MT_WP:
     case X86_MT_WT:
         break;
@@ -682,9 +686,11 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
 
     xfree(newr);
 
-    p2m_memory_type_changed(d);
-    if ( type != X86_MT_WB )
-        flush_all(FLUSH_CACHE_EVICT);
+ finish:
+    if ( flush )
+        memory_type_changed(d);
+    else if ( d->vcpu && d->vcpu[0] )
+        p2m_memory_type_changed(d);
 
     return rc;
 }
