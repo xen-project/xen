@@ -587,12 +587,38 @@ static void amd_get_topology(struct cpuinfo_x86 *c)
                                                           : c->cpu_core_id);
 }
 
+static unsigned int attr_const amd_parse_freq(unsigned int family,
+					      unsigned int value)
+{
+	unsigned int freq = 0;
+
+	switch (family) {
+	case 0x10 ... 0x16:
+		freq = (((value & 0x3f) + 0x10) * 100) >> ((value >> 6) & 7);
+		break;
+
+	case 0x17 ... 0x19:
+		freq = ((value & 0xff) * 25 * 8) / ((value >> 8) & 0x3f);
+		break;
+
+	case 0x1A:
+		freq = (value & 0xfff) * 5;
+		break;
+
+	default:
+		ASSERT_UNREACHABLE();
+		break;
+	}
+
+	return freq;
+}
+
 void amd_log_freq(const struct cpuinfo_x86 *c)
 {
 	unsigned int idx = 0, h;
 	uint64_t hi, lo, val;
 
-	if (c->x86 < 0x10 || c->x86 > 0x19 ||
+	if (c->x86 < 0x10 || c->x86 > 0x1A ||
 	    (c != &boot_cpu_data &&
 	     (!opt_cpu_info || (c->apicid & (c->x86_num_siblings - 1)))))
 		return;
@@ -673,19 +699,22 @@ void amd_log_freq(const struct cpuinfo_x86 *c)
 	if (!(lo >> 63))
 		return;
 
-#define FREQ(v) (c->x86 < 0x17 ? ((((v) & 0x3f) + 0x10) * 100) >> (((v) >> 6) & 7) \
-		                     : (((v) & 0xff) * 25 * 8) / (((v) >> 8) & 0x3f))
 	if (idx && idx < h &&
 	    !rdmsr_safe(0xC0010064 + idx, val) && (val >> 63) &&
 	    !rdmsr_safe(0xC0010064, hi) && (hi >> 63))
-		printk("CPU%u: %lu (%lu ... %lu) MHz\n",
-		       smp_processor_id(), FREQ(val), FREQ(lo), FREQ(hi));
+		printk("CPU%u: %u (%u ... %u) MHz\n",
+		       smp_processor_id(),
+		       amd_parse_freq(c->x86, val),
+		       amd_parse_freq(c->x86, lo),
+		       amd_parse_freq(c->x86, hi));
 	else if (h && !rdmsr_safe(0xC0010064, hi) && (hi >> 63))
-		printk("CPU%u: %lu ... %lu MHz\n",
-		       smp_processor_id(), FREQ(lo), FREQ(hi));
+		printk("CPU%u: %u ... %u MHz\n",
+		       smp_processor_id(),
+		       amd_parse_freq(c->x86, lo),
+		       amd_parse_freq(c->x86, hi));
 	else
-		printk("CPU%u: %lu MHz\n", smp_processor_id(), FREQ(lo));
-#undef FREQ
+		printk("CPU%u: %u MHz\n", smp_processor_id(),
+		       amd_parse_freq(c->x86, lo));
 }
 
 void cf_check early_init_amd(struct cpuinfo_x86 *c)
