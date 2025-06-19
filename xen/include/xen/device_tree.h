@@ -261,10 +261,22 @@ void intc_dt_preinit(void);
 /* Helper to read a big number; size is in cells (not bytes) */
 static inline u64 dt_read_number(const __be32 *cell, int size)
 {
-    u64 r = 0;
+    u64 r = be32_to_cpu(*cell);
 
-    while ( size-- )
-        r = (r << 32) | be32_to_cpu(*(cell++));
+    switch ( size )
+    {
+    case 1:
+        break;
+    case 2:
+        r = (r << 32) | be32_to_cpu(cell[1]);
+        break;
+    default:
+        /* Nonsensical size. default to 1 */
+        printk(XENLOG_ERR "dt_read_number(,%d) bad size\n", size);
+        ASSERT_UNREACHABLE();
+        break;
+    };
+
     return r;
 }
 
