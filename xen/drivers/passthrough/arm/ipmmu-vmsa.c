@@ -13,7 +13,7 @@
  *
  * Based on Linux's IPMMU-VMSA driver from Renesas BSP:
  *    drivers/iommu/ipmmu-vmsa.c
- * you can found at:
+ * which can be found at:
  *    url: git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas-bsp.git
  *    branch: v4.14.75-ltsi/rcar-3.9.6
  *    commit: e206eb5b81a60e64c35fbc3a999b1a0db2b98044
@@ -433,6 +433,8 @@ static void ipmmu_tlb_invalidate(struct ipmmu_vmsa_domain *domain)
     data |= IMCTR_FLUSH;
     ipmmu_ctx_write_all(domain, IMCTR, data);
 
+    /* Force IMCTR write to complete before polling to avoid false completion check. */
+    dsb(sy);
     ipmmu_tlb_sync(domain);
 }
 
@@ -780,6 +782,8 @@ static void ipmmu_device_reset(struct ipmmu_vmsa_device *mmu)
     /* Disable all contexts. */
     for ( i = 0; i < mmu->num_ctx; ++i )
         ipmmu_ctx_write(mmu, i, IMCTR, 0);
+
+    dev_info(mmu->dev, "Reset completed, disabled %u contexts\n", mmu->num_ctx);
 }
 
 /* R-Car Gen3/Gen4 SoCs product and cut information. */
