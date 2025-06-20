@@ -114,7 +114,7 @@ extern unsigned long pfn_top_mask, ma_top_mask;
  * @param pfn Frame number
  * @return Obtained pdx after compressing the pfn
  */
-static inline unsigned long pfn_to_pdx(unsigned long pfn)
+static inline unsigned long pfn_to_pdx_xlate(unsigned long pfn)
 {
     return (pfn & pfn_pdx_bottom_mask) |
            ((pfn & pfn_top_mask) >> pfn_pdx_hole_shift);
@@ -126,7 +126,7 @@ static inline unsigned long pfn_to_pdx(unsigned long pfn)
  * @param pdx Page index
  * @return Obtained pfn after decompressing the pdx
  */
-static inline unsigned long pdx_to_pfn(unsigned long pdx)
+static inline unsigned long pdx_to_pfn_xlate(unsigned long pdx)
 {
     return (pdx & pfn_pdx_bottom_mask) |
            ((pdx << pfn_pdx_hole_shift) & pfn_top_mask);
@@ -139,7 +139,7 @@ static inline unsigned long pdx_to_pfn(unsigned long pdx)
  * @return Offset on the direct map where that
  *         machine address can be accessed
  */
-static inline unsigned long maddr_to_directmapoff(paddr_t ma)
+static inline unsigned long maddr_to_directmapoff_xlate(paddr_t ma)
 {
     return (((ma & ma_top_mask) >> pfn_pdx_hole_shift) |
             (ma & ma_va_bottom_mask));
@@ -151,7 +151,7 @@ static inline unsigned long maddr_to_directmapoff(paddr_t ma)
  * @param offset Offset into the direct map
  * @return Corresponding machine address of that virtual location
  */
-static inline paddr_t directmapoff_to_maddr(unsigned long offset)
+static inline paddr_t directmapoff_to_maddr_xlate(unsigned long offset)
 {
     return ((((paddr_t)offset << pfn_pdx_hole_shift) & ma_top_mask) |
             (offset & ma_va_bottom_mask));
@@ -181,8 +181,9 @@ static inline void pfn_pdx_add_region(paddr_t base, paddr_t size)
 {
 }
 
-static inline void pfn_pdx_compression_setup(paddr_t base)
+static inline bool pfn_pdx_compression_setup(paddr_t base)
 {
+    return false;
 }
 
 static inline void pfn_pdx_compression_reset(void)
@@ -190,6 +191,21 @@ static inline void pfn_pdx_compression_reset(void)
 }
 
 #else /* !CONFIG_PDX_NONE */
+
+/*
+ * Allow each architecture to define its (possibly optimized) versions of the
+ * translation functions.
+ *
+ * Do not use _xlate suffixed functions, always use the non _xlate variants.
+ */
+#if __has_include(<asm/pdx.h>)
+# include <asm/pdx.h>
+#else
+# define pdx_to_pfn pdx_to_pfn_xlate
+# define pfn_to_pdx pfn_to_pdx_xlate
+# define maddr_to_directmapoff maddr_to_directmapoff_xlate
+# define directmapoff_to_maddr directmapoff_to_maddr_xlate
+#endif
 
 /* Shared functions implemented by all PDX compressions. */
 
@@ -215,8 +231,9 @@ void pfn_pdx_add_region(paddr_t base, paddr_t size);
  * range of the current memory regions.
  *
  * @param base address to start compression from.
+ * @return True if PDX compression has been enabled.
  */
-void pfn_pdx_compression_setup(paddr_t base);
+bool pfn_pdx_compression_setup(paddr_t base);
 
 /**
  * Reset the global variables to it's default values, thus disabling PFN

@@ -298,7 +298,8 @@ void __init srat_parse_regions(paddr_t addr)
 	acpi_table_parse_srat(ACPI_SRAT_TYPE_MEMORY_AFFINITY,
 			      srat_parse_region, 0);
 
-	pfn_pdx_compression_setup(addr);
+	if (!pfn_pdx_compression_setup(addr))
+		return;
 
 	/* Ensure all RAM ranges in the e820 are covered. */
 	for (i = 0; i < e820.nr_map; i++) {
@@ -318,6 +319,9 @@ void __init srat_parse_regions(paddr_t addr)
 			return;
 		}
 	}
+
+	/* If we got this far compression is working as expected. */
+	setup_force_cpu_cap(X86_FEATURE_PDX_COMPRESSION);
 }
 
 unsigned int numa_node_to_arch_nid(nodeid_t n)
