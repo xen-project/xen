@@ -46,6 +46,8 @@ typedef uint32_t	Elf64_Word;
 typedef int64_t		Elf64_Sxword;
 typedef uint64_t	Elf64_Xword;
 
+#define NT_GNU_HDR_SIZE 16 /* sizeof(Elf_note) + "GNU\0" */
+
 /* Unique build id string format when using --build-id. */
 #define NT_GNU_BUILD_ID 3
 

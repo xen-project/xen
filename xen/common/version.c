@@ -114,6 +114,39 @@ void print_version(void)
 /* Defined in linker script. */
 extern const Elf_Note __note_gnu_build_id_start[], __note_gnu_build_id_end[];
 
+/*
+ * Check whether @n is a GNU Build ID note.
+ *
+ * Check that:
+ *  - type is NT_GNU_BUILD_ID
+ *  - name is GNU\0
+ *  - desc is non-empty and fits within the buffer.
+ *
+ * If this returns true, the contents starts at n + NT_GNU_HDR_SIZE, and is
+ * n->descsz long.
+ */
+bool is_gnu_build_id(const Elf_Note *n, unsigned int len)
+{
+    const char *name;
+
+    if ( len <= NT_GNU_HDR_SIZE )
+        return false;
+
+    if ( n->type != NT_GNU_BUILD_ID ||
+         n->namesz != 4 )
+        return false;
+
+    name = ELFNOTE_NAME(n);
+    if ( strncmp(name, "GNU", 4) != 0 )
+        return false;
+
+    if ( n->descsz == 0 ||
+         n->descsz > (len - NT_GNU_HDR_SIZE) )
+        return false;
+
+    return true;
+}
+
 int xen_build_id_check(const Elf_Note *n, unsigned int n_sz,
                        const void **p, unsigned int *len)
 {
@@ -234,6 +267,8 @@ static void __init __maybe_unused build_assertions(void)
 {
     BUILD_BUG_ON(sizeof(unsigned long) != sizeof(void (*)(void)));
     BUILD_BUG_ON(sizeof(void *) != sizeof(void (*)(void)));
+
+    BUILD_BUG_ON(NT_GNU_HDR_SIZE != sizeof(Elf_Note) + 4);
 }
 
 /*
