@@ -825,7 +825,10 @@ struct domain *domain_create(domid_t domid,
 
         /* late_hwdom is only allowed for dom0. */
         if ( hardware_domain && hardware_domain->domain_id )
+        {
+            free_domain_struct(d);
             return ERR_PTR(-EINVAL);
+        }
 
         old_hwdom = hardware_domain;
         hardware_domain = d;
