@@ -813,7 +813,9 @@ maintainers if you want to suggest a change.
        shall point to either a pointer type, an essentially signed type,
        an essentially unsigned type, an essentially Boolean type or an
        essentially enum type
-     - void* arguments are allowed
+     - void* arguments are allowed. string literal arguments are allowed
+       when the last argument passed for the comparison is less or equal
+       to the size of the string.
 
    * - `Rule 21.17 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_21_17.c>`_
      - Mandatory
