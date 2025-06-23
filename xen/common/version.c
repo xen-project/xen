@@ -147,36 +147,6 @@ bool is_gnu_build_id(const Elf_Note *n, unsigned int len)
     return true;
 }
 
-int xen_build_id_check(const Elf_Note *n, unsigned int n_sz,
-                       const void **p, unsigned int *len)
-{
-    /* Check if we really have a build-id. */
-    ASSERT(n_sz > sizeof(*n));
-
-    if ( NT_GNU_BUILD_ID != n->type )
-        return -ENODATA;
-
-    if ( n->namesz + n->descsz < n->namesz )
-        return -EINVAL;
-
-    if ( n->namesz < 4 /* GNU\0 */)
-        return -EINVAL;
-
-    if ( n->namesz + n->descsz > n_sz - sizeof(*n) )
-        return -EINVAL;
-
-    /* Sanity check, name should be "GNU" for ld-generated build-id. */
-    if ( strncmp(ELFNOTE_NAME(n), "GNU", n->namesz) != 0 )
-        return -ENODATA;
-
-    if ( len )
-        *len = n->descsz;
-    if ( p )
-        *p = ELFNOTE_DESC(n);
-
-    return 0;
-}
-
 struct pe_external_debug_directory
 {
     uint32_t characteristics;
@@ -203,7 +173,6 @@ void __init xen_build_init(void)
 {
     const Elf_Note *n = __note_gnu_build_id_start;
     unsigned int sz;
-    int rc;
 
     /* --build-id invoked with wrong parameters. */
     if ( __note_gnu_build_id_end <= &n[0] )
@@ -215,14 +184,18 @@ void __init xen_build_init(void)
 
     sz = (uintptr_t)__note_gnu_build_id_end - (uintptr_t)n;
 
-    rc = xen_build_id_check(n, sz, &xen_build_id, &xen_build_id_len);
+    if ( is_gnu_build_id(n, sz) )
+    {
+        xen_build_id     = (const void *)n + NT_GNU_HDR_SIZE;
+        xen_build_id_len = n->descsz;
+        return;
+    }
 
 #ifdef CONFIG_X86
     /*
      * xen.efi built with a new enough toolchain will have a CodeView record,
      * not an ELF note.
      */
-    if ( rc )
     {
         const struct pe_external_debug_directory *dir = (const void *)n;
 
@@ -243,7 +216,7 @@ void __init xen_build_init(void)
             {
                 xen_build_id = info->signature;
                 xen_build_id_len = sizeof(info->signature);
-                rc = 0;
+                return;
             }
         }
     }

@@ -453,22 +453,17 @@ static int parse_buildid(const struct livepatch_elf_sec *sec,
                          struct livepatch_build_id *id)
 {
     const Elf_Note *n;
-    int rc;
 
     /* Presence of the sections is ensured by check_special_sections(). */
     ASSERT(sec);
 
     n = sec->addr;
 
-    if ( sec->sec->sh_size <= sizeof(*n) )
+    if ( !is_gnu_build_id(n, sec->sec->sh_size) )
         return -EINVAL;
 
-    rc = xen_build_id_check(n, sec->sec->sh_size, &id->p, &id->len);
-    if ( rc )
-        return rc;
-
-    if ( !id->len || !id->p )
-        return -EINVAL;
+    id->p   = (const void *)n + NT_GNU_HDR_SIZE;
+    id->len = n->descsz;
 
    return 0;
 }

@@ -25,8 +25,6 @@ extern unsigned int xen_build_id_len; /* 0 -> No build id. */
 
 #ifdef BUILD_ID
 void xen_build_init(void);
-int xen_build_id_check(const Elf_Note *n, unsigned int n_sz,
-                       const void **p, unsigned int *len);
 bool is_gnu_build_id(const Elf_Note *n, unsigned int len);
 #else
 static inline void xen_build_init(void) {};
