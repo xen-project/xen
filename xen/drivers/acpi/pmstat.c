@@ -124,7 +124,6 @@ int cpufreq_statistic_init(unsigned int cpu)
         spin_unlock(cpufreq_statistic_lock);
         return -ENOMEM;
     }
-    per_cpu(cpufreq_statistic_data, cpu) = pxpt;
 
     pxpt->u.trans_pt = xzalloc_array(uint64_t, count * count);
     if ( !pxpt->u.trans_pt )
@@ -143,14 +142,16 @@ int cpufreq_statistic_init(unsigned int cpu)
         return -ENOMEM;
     }
 
-    pxpt->u.total = pmpt->perf.state_count;
-    pxpt->u.usable = pmpt->perf.state_count - pmpt->perf.platform_limit;
+    pxpt->u.total = count;
+    pxpt->u.usable = count - pmpt->perf.platform_limit;
 
-    for ( i = 0; i < pmpt->perf.state_count; i++ )
+    for ( i = 0; i < count; i++ )
         pxpt->u.pt[i].freq = pmpt->perf.states[i].core_frequency;
 
     pxpt->prev_state_wall = NOW();
     pxpt->prev_idle_wall = get_cpu_idle_time(cpu);
+
+    per_cpu(cpufreq_statistic_data, cpu) = pxpt;
 
     spin_unlock(cpufreq_statistic_lock);
 
