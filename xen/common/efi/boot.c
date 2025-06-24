@@ -513,7 +513,6 @@ static EFI_FILE_HANDLE __init get_parent_handle(const EFI_LOADED_IMAGE *loaded_i
     else
         *leaf = buffer;
 #undef BUFFERSIZE
-#undef buffer
 
     return dir_handle;
 }
