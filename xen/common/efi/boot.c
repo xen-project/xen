@@ -329,6 +329,9 @@ static void __init PrintErrMesg(const CHAR16 *mesg, EFI_STATUS ErrCode)
     case EFI_BUFFER_TOO_SMALL:
         mesg = L"Buffer too small";
         break;
+    case EFI_INVALID_PARAMETER:
+        mesg = L"Invalid parameter";
+        break;
     default:
         PrintErr(L"ErrCode: ");
         DisplayUint(ErrCode, 0);
