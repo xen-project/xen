@@ -2411,6 +2411,8 @@ domid_t get_initial_domain_id(void)
     return 0;
 }
 
+#ifdef CONFIG_SYSTEM_SUSPEND
+
 void freeze_domains(void)
 {
     struct domain *d;
@@ -2435,6 +2437,8 @@ void thaw_domains(void)
         domain_unpause(d);
     rcu_read_unlock(&domlist_read_lock);
 }
+
+#endif /* CONFIG_SYSTEM_SUSPEND */
 
 /*
  * Local variables:
