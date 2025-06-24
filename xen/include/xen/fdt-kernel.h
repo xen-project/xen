@@ -34,7 +34,7 @@ struct kernel_info {
     paddr_t gnttab_size;
 
     /* boot blob load addresses */
-    const struct bootmodule *kernel_bootmodule, *initrd_bootmodule, *dtb_bootmodule;
+    const struct boot_module *kernel, *initrd, *dtb;
     const char* cmdline;
     paddr_t dtb_paddr;
     paddr_t initrd_paddr;
@@ -121,7 +121,7 @@ int kernel_probe(struct kernel_info *info, const struct dt_device_node *domain);
  */
 void kernel_load(struct kernel_info *info);
 
-int kernel_decompress(struct bootmodule *mod, uint32_t offset);
+int kernel_decompress(struct boot_module *mod, uint32_t offset);
 
 int kernel_zimage_probe(struct kernel_info *info, paddr_t addr, paddr_t size);
 
@@ -130,8 +130,7 @@ int kernel_zimage_probe(struct kernel_info *info, paddr_t addr, paddr_t size);
  * call here just for compatability with Arm code.
  */
 #ifdef CONFIG_ARM
-struct bootmodule;
-int kernel_uimage_probe(struct kernel_info *info, struct bootmodule *mod);
+int kernel_uimage_probe(struct kernel_info *info, struct boot_module *mod);
 #endif
 
 #endif /* __XEN_FDT_KERNEL_H__ */

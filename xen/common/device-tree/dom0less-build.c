@@ -44,13 +44,13 @@ void __init set_xs_domain(struct domain *d)
 
 bool __init is_dom0less_mode(void)
 {
-    struct bootmodules *mods = &bootinfo.modules;
-    struct bootmodule *mod;
+    struct boot_modules *mods = &bootinfo.modules;
+    struct boot_module *mod;
     unsigned int i;
     bool dom0found = false;
     bool domUfound = false;
 
-    /* Look into the bootmodules */
+    /* Look into the boot_modules */
     for ( i = 0 ; i < mods->nr_mods ; i++ )
     {
         mod = &mods->module[i];
@@ -374,18 +374,17 @@ static int __init check_partial_fdt(void *pfdt, size_t size)
     return 0;
 }
 
-static int __init domain_handle_dtb_bootmodule(struct domain *d,
-                                               struct kernel_info *kinfo)
+static int __init domain_handle_dtb_boot_module(struct domain *d,
+                                                struct kernel_info *kinfo)
 {
     void *pfdt;
     int res, node_next;
 
-    pfdt = ioremap_cache(kinfo->dtb_bootmodule->start,
-                         kinfo->dtb_bootmodule->size);
+    pfdt = ioremap_cache(kinfo->dtb->start, kinfo->dtb->size);
     if ( pfdt == NULL )
         return -EFAULT;
 
-    res = check_partial_fdt(pfdt, kinfo->dtb_bootmodule->size);
+    res = check_partial_fdt(pfdt, kinfo->dtb->size);
     if ( res < 0 )
         goto out;
 
@@ -459,8 +458,8 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     sizecells = GUEST_ROOT_SIZE_CELLS;
 
     /* Account for domU passthrough DT size */
-    if ( kinfo->dtb_bootmodule )
-        fdt_size += kinfo->dtb_bootmodule->size;
+    if ( kinfo->dtb )
+        fdt_size += kinfo->dtb->size;
 
     /* Cap to max DT size if needed */
     fdt_size = min(fdt_size, SZ_2M);
@@ -507,13 +506,13 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
         goto err;
 
     /*
-     * domain_handle_dtb_bootmodule has to be called before the rest of
+     * domain_handle_dtb_boot_module has to be called before the rest of
      * the device tree is generated because it depends on the value of
      * the field phandle_intc.
      */
-    if ( kinfo->dtb_bootmodule )
+    if ( kinfo->dtb )
     {
-        ret = domain_handle_dtb_bootmodule(d, kinfo);
+        ret = domain_handle_dtb_boot_module(d, kinfo);
         if ( ret )
             goto err;
     }

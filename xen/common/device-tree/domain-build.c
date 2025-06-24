@@ -352,7 +352,7 @@ void __init dtb_load(struct kernel_info *kinfo,
 void __init initrd_load(struct kernel_info *kinfo,
                         copy_to_guest_phys_cb copy_to_guest)
 {
-    const struct bootmodule *mod = kinfo->initrd_bootmodule;
+    const struct boot_module *mod = kinfo->initrd;
     paddr_t load_addr = kinfo->initrd_paddr;
     paddr_t paddr, len;
     int node;

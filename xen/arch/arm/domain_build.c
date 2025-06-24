@@ -579,7 +579,7 @@ static int __init write_properties(struct domain *d, struct kernel_info *kinfo,
 
     if ( dt_node_path_is_equal(node, "/chosen") )
     {
-        const struct bootmodule *initrd = kinfo->initrd_bootmodule;
+        const struct boot_module *initrd = kinfo->initrd;
 
         if ( bootargs )
         {
@@ -1517,7 +1517,7 @@ int __init make_chosen_node(const struct kernel_info *kinfo)
 {
     int res;
     const char *bootargs = NULL;
-    const struct bootmodule *initrd = kinfo->initrd_bootmodule;
+    const struct boot_module *initrd = kinfo->initrd;
     void *fdt = kinfo->fdt;
 
     dt_dprintk("Create chosen node\n");

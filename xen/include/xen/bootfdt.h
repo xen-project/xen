@@ -23,7 +23,7 @@ typedef enum {
     BOOTMOD_GUEST_DTB,
     BOOTMOD_MICROCODE,
     BOOTMOD_UNKNOWN
-}  bootmodule_kind;
+}  boot_module_kind;
 
 enum membank_type {
     /*
@@ -103,8 +103,8 @@ struct shared_meminfo {
  * initrd to be compatible with all versions of the multiboot spec.
  */
 #define BOOTMOD_MAX_CMDLINE 1024
-struct bootmodule {
-    bootmodule_kind kind;
+struct boot_module {
+    boot_module_kind kind;
     bool domU;
     paddr_t start;
     paddr_t size;
@@ -113,16 +113,16 @@ struct bootmodule {
 /* DT_MAX_NAME is the node name max length according the DT spec */
 #define DT_MAX_NAME 41
 struct bootcmdline {
-    bootmodule_kind kind;
+    boot_module_kind kind;
     bool domU;
     paddr_t start;
     char dt_name[DT_MAX_NAME];
     char cmdline[BOOTMOD_MAX_CMDLINE];
 };
 
-struct bootmodules {
+struct boot_modules {
     int nr_mods;
-    struct bootmodule module[MAX_MODULES];
+    struct boot_module module[MAX_MODULES];
 };
 
 struct bootcmdlines {
@@ -134,7 +134,7 @@ struct bootinfo {
     struct meminfo mem;
     /* The reserved regions are only used when booting using Device-Tree */
     struct meminfo reserved_mem;
-    struct bootmodules modules;
+    struct boot_modules modules;
     struct bootcmdlines cmdlines;
 #ifdef CONFIG_ACPI
     struct meminfo acpi;
@@ -176,16 +176,16 @@ bool check_reserved_regions_overlap(paddr_t region_start,
                                     paddr_t region_size,
                                     bool allow_memreserve_overlap);
 
-struct bootmodule *add_boot_module(bootmodule_kind kind,
+struct boot_module *add_boot_module(boot_module_kind kind,
                                    paddr_t start, paddr_t size, bool domU);
-struct bootmodule *boot_module_find_by_kind(bootmodule_kind kind);
-struct bootmodule * boot_module_find_by_addr_and_kind(bootmodule_kind kind,
+struct boot_module *boot_module_find_by_kind(boot_module_kind kind);
+struct boot_module * boot_module_find_by_addr_and_kind(boot_module_kind kind,
                                                              paddr_t start);
 void add_boot_cmdline(const char *name, const char *cmdline,
-                      bootmodule_kind kind, paddr_t start, bool domU);
-struct bootcmdline *boot_cmdline_find_by_kind(bootmodule_kind kind);
+                      boot_module_kind kind, paddr_t start, bool domU);
+struct bootcmdline *boot_cmdline_find_by_kind(boot_module_kind kind);
 struct bootcmdline * boot_cmdline_find_by_name(const char *name);
-const char *boot_module_kind_as_string(bootmodule_kind kind);
+const char *boot_module_kind_as_string(boot_module_kind kind);
 
 void populate_boot_allocator(void);
 

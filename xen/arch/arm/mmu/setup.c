@@ -246,7 +246,7 @@ paddr_t __init consider_modules(paddr_t s, paddr_t e,
 #ifdef CONFIG_STATIC_SHM
     const struct membanks *shmem = bootinfo_get_shmem();
 #endif
-    const struct bootmodules *mi = &bootinfo.modules;
+    const struct boot_modules *mi = &bootinfo.modules;
     int i;
     int nr;
 
@@ -273,8 +273,8 @@ paddr_t __init consider_modules(paddr_t s, paddr_t e,
     }
 
     /*
-     * i is the current bootmodule we are evaluating, across all
-     * possible kinds of bootmodules.
+     * i is the current boot_module we are evaluating, across all
+     * possible kinds of boot_modules.
      *
      * When retrieving the corresponding reserved-memory addresses, we
      * need to index the reserved_mem bank starting from 0, and only counting
@@ -328,8 +328,8 @@ static void __init create_llc_coloring_mappings(void)
 {
     lpae_t pte;
     unsigned int i;
-    struct bootmodule *xen_bootmodule = boot_module_find_by_kind(BOOTMOD_XEN);
-    mfn_t start_mfn = maddr_to_mfn(xen_bootmodule->start), mfn;
+    struct boot_module *xen_boot_module = boot_module_find_by_kind(BOOTMOD_XEN);
+    mfn_t start_mfn = maddr_to_mfn(xen_boot_module->start), mfn;
 
     for_each_xen_colored_mfn ( start_mfn, mfn, i )
     {

@@ -206,11 +206,11 @@ static void __init processor_id(void)
 
 void __init discard_initial_modules(void)
 {
-    struct bootmodules *mi = &bootinfo.modules;
+    struct boot_modules *mi = &bootinfo.modules;
     int i;
 
     /*
-     * When using static heap feature, don't give bootmodules memory back to
+     * When using static heap feature, don't give boot_modules memory back to
      * the heap allocator
      */
     if ( using_static_heap )
@@ -303,7 +303,7 @@ void asmlinkage __init start_xen(unsigned long fdt_paddr)
 {
     size_t fdt_size;
     const char *cmdline;
-    struct bootmodule *xen_bootmodule;
+    struct boot_module *xen_boot_module;
     struct domain *d;
     int rc, i;
 
@@ -327,10 +327,10 @@ void asmlinkage __init start_xen(unsigned long fdt_paddr)
               fdt_paddr);
 
     /* Register Xen's load address as a boot module. */
-    xen_bootmodule = add_boot_module(BOOTMOD_XEN,
+    xen_boot_module = add_boot_module(BOOTMOD_XEN,
                              virt_to_maddr(_start),
                              (paddr_t)(uintptr_t)(_end - _start), false);
-    BUG_ON(!xen_bootmodule);
+    BUG_ON(!xen_boot_module);
 
     fdt_size = boot_fdt_info(device_tree_flattened, fdt_paddr);
 

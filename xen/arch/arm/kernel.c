@@ -46,7 +46,7 @@ static void __init place_modules(struct kernel_info *info,
                                  paddr_t kernbase, paddr_t kernend)
 {
     /* Align DTB and initrd size to 2Mb. Linux only requires 4 byte alignment */
-    const struct bootmodule *mod = info->initrd_bootmodule;
+    const struct boot_module *mod = info->initrd;
     const struct membanks *mem = kernel_info_get_mem(info);
     const paddr_t initrd_len = ROUNDUP(mod ? mod->size : 0, MB(2));
     const paddr_t dtb_len = ROUNDUP(fdt_totalsize(info->fdt), MB(2));
@@ -175,7 +175,7 @@ static void __init kernel_zimage_load(struct kernel_info *info)
  * Check if the image is a uImage and setup kernel_info
  */
 int __init kernel_uimage_probe(struct kernel_info *info,
-                               struct bootmodule *mod)
+                               struct boot_module *mod)
 {
     struct {
         __be32 magic;   /* Image Header Magic Number */

@@ -21,7 +21,7 @@ static uint32_t __init output_length(char *image, unsigned long image_len)
     return *(uint32_t *)&image[image_len - 4];
 }
 
-int __init kernel_decompress(struct bootmodule *mod, uint32_t offset)
+int __init kernel_decompress(struct boot_module *mod, uint32_t offset)
 {
     char *output, *input;
     char magic[2];
@@ -92,7 +92,7 @@ int __init kernel_decompress(struct bootmodule *mod, uint32_t offset)
         free_domheap_page(pages + i);
 
     /*
-     * When using static heap feature, don't give bootmodules memory back to
+     * When using static heap feature, don't give boot_modules memory back to
      * the heap allocator
      */
     if ( using_static_heap )
@@ -118,7 +118,7 @@ int __init kernel_decompress(struct bootmodule *mod, uint32_t offset)
 int __init kernel_probe(struct kernel_info *info,
                         const struct dt_device_node *domain)
 {
-    struct bootmodule *mod = NULL;
+    struct boot_module *mod = NULL;
     struct bootcmdline *cmd = NULL;
     struct dt_device_node *node;
     u64 kernel_addr, initrd_addr, dtb_addr, size;
@@ -140,8 +140,8 @@ int __init kernel_probe(struct kernel_info *info,
 
         mod = boot_module_find_by_kind(BOOTMOD_KERNEL);
 
-        info->kernel_bootmodule = mod;
-        info->initrd_bootmodule = boot_module_find_by_kind(BOOTMOD_RAMDISK);
+        info->kernel = mod;
+        info->initrd = boot_module_find_by_kind(BOOTMOD_RAMDISK);
 
         cmd = boot_cmdline_find_by_kind(BOOTMOD_KERNEL);
         if ( cmd )
@@ -162,7 +162,7 @@ int __init kernel_probe(struct kernel_info *info,
                 dt_get_range(&val, node, &kernel_addr, &size);
                 mod = boot_module_find_by_addr_and_kind(
                         BOOTMOD_KERNEL, kernel_addr);
-                info->kernel_bootmodule = mod;
+                info->kernel = mod;
             }
             else if ( dt_device_is_compatible(node, "multiboot,ramdisk") )
             {
@@ -171,7 +171,7 @@ int __init kernel_probe(struct kernel_info *info,
 
                 val = dt_get_property(node, "reg", &len);
                 dt_get_range(&val, node, &initrd_addr, &size);
-                info->initrd_bootmodule = boot_module_find_by_addr_and_kind(
+                info->initrd = boot_module_find_by_addr_and_kind(
                         BOOTMOD_RAMDISK, initrd_addr);
             }
             else if ( dt_device_is_compatible(node, "multiboot,device-tree") )
@@ -183,7 +183,7 @@ int __init kernel_probe(struct kernel_info *info,
                 if ( val == NULL )
                     continue;
                 dt_get_range(&val, node, &dtb_addr, &size);
-                info->dtb_bootmodule = boot_module_find_by_addr_and_kind(
+                info->dtb = boot_module_find_by_addr_and_kind(
                         BOOTMOD_GUEST_DTB, dtb_addr);
             }
             else
@@ -201,10 +201,10 @@ int __init kernel_probe(struct kernel_info *info,
     }
 
     printk("Loading %pd kernel from boot module @ %"PRIpaddr"\n",
-           info->d, info->kernel_bootmodule->start);
-    if ( info->initrd_bootmodule )
+           info->d, info->kernel->start);
+    if ( info->initrd )
         printk("Loading ramdisk from boot module @ %"PRIpaddr"\n",
-               info->initrd_bootmodule->start);
+               info->initrd->start);
 
     /*
      * uImage isn't really used nowadays thereby leave kernel_uimage_probe()

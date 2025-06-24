@@ -314,7 +314,7 @@ static void __init process_multiboot_node(const void *fdt, int node,
     static int __initdata kind_guess = 0;
     const struct fdt_property *prop;
     const __be32 *cell;
-    bootmodule_kind kind;
+    boot_module_kind kind;
     paddr_t start, size;
     int len;
     /* sizeof("/chosen/") + DT_MAX_NAME + '/' + DT_MAX_NAME + '/0' => 92 */
@@ -518,7 +518,7 @@ static void __init early_print_info(void)
 {
     const struct membanks *mi = bootinfo_get_mem();
     const struct membanks *mem_resv = bootinfo_get_reserved_mem();
-    struct bootmodules *mods = &bootinfo.modules;
+    struct boot_modules *mods = &bootinfo.modules;
     struct bootcmdlines *cmds = &bootinfo.cmdlines;
     unsigned int i;
 

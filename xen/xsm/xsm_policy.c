@@ -68,7 +68,7 @@ int __init xsm_multiboot_policy_init(
 #ifdef CONFIG_HAS_DEVICE_TREE
 int __init xsm_dt_policy_init(void **policy_buffer, size_t *policy_size)
 {
-    struct bootmodule *mod = boot_module_find_by_kind(BOOTMOD_XSM);
+    struct boot_module *mod = boot_module_find_by_kind(BOOTMOD_XSM);
     paddr_t paddr, len;
 
     if ( !mod || !mod->size )

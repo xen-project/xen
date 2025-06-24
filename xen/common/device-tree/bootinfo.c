@@ -21,7 +21,7 @@
 
 struct bootinfo __initdata bootinfo = BOOTINFO_INIT;
 
-const char * __init boot_module_kind_as_string(bootmodule_kind kind)
+const char * __init boot_module_kind_as_string(boot_module_kind kind)
 {
     switch ( kind )
     {
@@ -49,7 +49,7 @@ static void __init dt_unreserved_regions(paddr_t s, paddr_t e,
     unsigned int i;
 
     /*
-     * i is the current bootmodule we are evaluating across all possible
+     * i is the current boot_module we are evaluating across all possible
      * kinds.
      */
     for ( i = first; i < reserved_mem->nr_banks; i++ )
@@ -143,18 +143,18 @@ static bool __init meminfo_overlap_check(const struct membanks *mem,
  * TODO: '*_end' could be 0 if the module/region is at the end of the physical
  * address space. This is for now not handled as it requires more rework.
  */
-static bool __init bootmodules_overlap_check(struct bootmodules *bootmodules,
-                                             paddr_t region_start,
-                                             paddr_t region_size)
+static bool __init boot_modules_overlap_check(struct boot_modules *boot_modules,
+                                              paddr_t region_start,
+                                              paddr_t region_size)
 {
     paddr_t mod_start = INVALID_PADDR, mod_end = 0;
     paddr_t region_end = region_start + region_size;
-    unsigned int i, mod_num = bootmodules->nr_mods;
+    unsigned int i, mod_num = boot_modules->nr_mods;
 
     for ( i = 0; i < mod_num; i++ )
     {
-        mod_start = bootmodules->module[i].start;
-        mod_end = mod_start + bootmodules->module[i].size;
+        mod_start = boot_modules->module[i].start;
+        mod_end = mod_start + boot_modules->module[i].size;
 
         if ( region_end <= mod_start || region_start >= mod_end )
             continue;
@@ -210,20 +210,20 @@ bool __init check_reserved_regions_overlap(paddr_t region_start,
                                    allow_memreserve_overlap) )
             return true;
 
-    /* Check if input region is overlapping with bootmodules */
-    if ( bootmodules_overlap_check(&bootinfo.modules,
-                                   region_start, region_size) )
+    /* Check if input region is overlapping with boot_modules */
+    if ( boot_modules_overlap_check(&bootinfo.modules,
+                                    region_start, region_size) )
         return true;
 
     return false;
 }
 
-struct bootmodule __init *add_boot_module(bootmodule_kind kind,
-                                          paddr_t start, paddr_t size,
-                                          bool domU)
+struct boot_module __init *add_boot_module(boot_module_kind kind,
+                                           paddr_t start, paddr_t size,
+                                           bool domU)
 {
-    struct bootmodules *mods = &bootinfo.modules;
-    struct bootmodule *mod;
+    struct boot_modules *mods = &bootinfo.modules;
+    struct boot_module *mod;
     unsigned int i;
 
     if ( mods->nr_mods == MAX_MODULES )
@@ -266,10 +266,10 @@ struct bootmodule __init *add_boot_module(bootmodule_kind kind,
  * XSM, DTB) or Dom0 modules. This is not suitable for looking up guest
  * modules.
  */
-struct bootmodule * __init boot_module_find_by_kind(bootmodule_kind kind)
+struct boot_module * __init boot_module_find_by_kind(boot_module_kind kind)
 {
-    struct bootmodules *mods = &bootinfo.modules;
-    struct bootmodule *mod;
+    struct boot_modules *mods = &bootinfo.modules;
+    struct boot_module *mod;
     int i;
     for (i = 0 ; i < mods->nr_mods ; i++ )
     {
@@ -281,7 +281,7 @@ struct bootmodule * __init boot_module_find_by_kind(bootmodule_kind kind)
 }
 
 void __init add_boot_cmdline(const char *name, const char *cmdline,
-                             bootmodule_kind kind, paddr_t start, bool domU)
+                             boot_module_kind kind, paddr_t start, bool domU)
 {
     struct bootcmdlines *cmds = &bootinfo.cmdlines;
     struct bootcmdline *cmd;
@@ -310,7 +310,7 @@ void __init add_boot_cmdline(const char *name, const char *cmdline,
  * XSM, DTB) or Dom0 modules. This is not suitable for looking up guest
  * modules.
  */
-struct bootcmdline * __init boot_cmdline_find_by_kind(bootmodule_kind kind)
+struct bootcmdline * __init boot_cmdline_find_by_kind(boot_module_kind kind)
 {
     struct bootcmdlines *cmds = &bootinfo.cmdlines;
     struct bootcmdline *cmd;
@@ -340,11 +340,11 @@ struct bootcmdline * __init boot_cmdline_find_by_name(const char *name)
     return NULL;
 }
 
-struct bootmodule * __init boot_module_find_by_addr_and_kind(bootmodule_kind kind,
-                                                             paddr_t start)
+struct boot_module * __init boot_module_find_by_addr_and_kind(
+    boot_module_kind kind, paddr_t start)
 {
-    struct bootmodules *mods = &bootinfo.modules;
-    struct bootmodule *mod;
+    struct boot_modules *mods = &bootinfo.modules;
+    struct boot_module *mod;
     unsigned int i;
 
     for (i = 0 ; i < mods->nr_mods ; i++ )
@@ -366,7 +366,7 @@ struct bootmodule * __init boot_module_find_by_addr_and_kind(bootmodule_kind kin
  */
 static paddr_t __init next_module(paddr_t s, paddr_t *end)
 {
-    struct bootmodules *mi = &bootinfo.modules;
+    struct boot_modules *mi = &bootinfo.modules;
     paddr_t lowest = ~(paddr_t)0;
     int i;
 

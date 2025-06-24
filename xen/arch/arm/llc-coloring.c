@@ -123,12 +123,12 @@ static paddr_t __init xen_colored_map_size(void)
 
 void __init arch_llc_coloring_init(void)
 {
-    struct bootmodule *xen_bootmodule = boot_module_find_by_kind(BOOTMOD_XEN);
+    struct boot_module *xen_boot_module = boot_module_find_by_kind(BOOTMOD_XEN);
 
-    BUG_ON(!xen_bootmodule);
+    BUG_ON(!xen_boot_module);
 
-    xen_bootmodule->size = xen_colored_map_size();
-    xen_bootmodule->start = get_xen_paddr(xen_bootmodule->size);
+    xen_boot_module->size = xen_colored_map_size();
+    xen_boot_module->start = get_xen_paddr(xen_boot_module->size);
 }
 
 /*

@@ -20,7 +20,7 @@ typedef struct {
 } module_info;
 
 /*
- * Binaries will be translated into bootmodules, the maximum number for them is
+ * Binaries will be translated into boot_modules, the maximum number for them is
  * MAX_MODULES where we should remove a unit for Xen and one for Xen DTB
  */
 #define MAX_UEFI_MODULES (MAX_MODULES - 2)
@@ -602,9 +602,9 @@ static void __init efi_arch_handle_module(const struct file *file,
 
     /*
      * modules_available is decremented here because for each dom0 file added
-     * from the configuration file, there will be an additional bootmodule,
+     * from the configuration file, there will be an additional boot_module,
      * so the number of available slots will be decremented because there is a
-     * maximum amount of bootmodules that can be loaded.
+     * maximum amount of boot_modules that can be loaded.
      */
     modules_available--;
 }
