@@ -902,7 +902,6 @@ static const struct cpuidle_state snr_cstates[] = {
 static void cf_check mwait_idle(void)
 {
 	unsigned int cpu = smp_processor_id();
-	struct cpu_info *info = get_cpu_info();
 	struct acpi_processor_power *power = processor_powers[cpu];
 	struct acpi_processor_cx *cx = NULL;
 	unsigned int next_state;
@@ -929,6 +928,8 @@ static void cf_check mwait_idle(void)
 			pm_idle_save();
 		else
 		{
+			struct cpu_info *info = get_cpu_info();
+
 			spec_ctrl_enter_idle(info);
 			safe_halt();
 			spec_ctrl_exit_idle(info);
@@ -954,11 +955,6 @@ static void cf_check mwait_idle(void)
 
 	if ((cx->type >= 3) && errata_c6_workaround())
 		cx = power->safe_state;
-
-	if (cx->ibrs_disable) {
-		ASSERT(!cx->irq_enable_early);
-		spec_ctrl_enter_idle(info);
-	}
 
 #if 0 /* XXX Can we/do we need to do something similar on Xen? */
 	/*
@@ -991,10 +987,6 @@ static void cf_check mwait_idle(void)
 
 	/* Now back in C0. */
 	update_idle_stats(power, cx, before, after);
-
-	if (cx->ibrs_disable)
-		spec_ctrl_exit_idle(info);
-
 	local_irq_enable();
 
 	TRACE_6D(TRC_PM_IDLE_EXIT, cx->type, after,
