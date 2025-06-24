@@ -12,3 +12,8 @@ s_(.*)_"\1\\n"_
 
 # Trailing \ on all but the final line.
 $!s_$_ \\_
+
+# Append closing header guard
+$a\
+\
+#endif /* XEN_COMPILE_H */

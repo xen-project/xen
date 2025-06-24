@@ -1,7 +1,6 @@
-/*
- * Explicitly intended for multiple inclusion.
- */
+/* This file is intended to be included multiple times. */
 
+/* SAF-8-safe */
 #include <xen/lib/x86/cpuid-autogen.h>
 
 /* Number of capability words covered by the featureset words. */
