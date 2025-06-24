@@ -113,6 +113,12 @@ Braces should be omitted for blocks with a single statement. e.g.,
 if ( condition )
     single_statement();
 
+Identifiers
+-----------
+
+When giving names to identifiers (variables, functions, constants...), separate
+words using underscores (for example, use "my_foo" instead of "myfoo").
+
 Types
 -----
 
