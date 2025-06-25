@@ -1011,7 +1011,10 @@ static int __init find_host_extended_regions(const struct kernel_info *kinfo,
                                              struct membanks *ext_regions)
 {
     int res;
-    struct membanks *gnttab = membanks_xzalloc(1, MEMORY);
+    struct membanks *gnttab =
+        IS_ENABLED(CONFIG_GRANT_TABLE)
+        ? membanks_xzalloc(1, MEMORY)
+        : NULL;
     struct membanks *xen_reg =
         kinfo->xen_reg_assigned
         ? membanks_xzalloc(count_ranges(kinfo->xen_reg_assigned), MEMORY)
@@ -1037,12 +1040,6 @@ static int __init find_host_extended_regions(const struct kernel_info *kinfo,
 
     dt_dprintk("Find unallocated memory for extended regions\n");
 
-    if ( !gnttab )
-    {
-        res = -ENOMEM;
-        goto out;
-    }
-
     if ( kinfo->xen_reg_assigned )
     {
         if ( !xen_reg )
@@ -1056,9 +1053,17 @@ static int __init find_host_extended_regions(const struct kernel_info *kinfo,
                                rangeset_to_membank, xen_reg);
     }
 
+#ifdef CONFIG_GRANT_TABLE
+    if ( !gnttab )
+    {
+        res = -ENOMEM;
+        goto out;
+    }
+
     gnttab->nr_banks = 1;
     gnttab->bank[0].start = kinfo->gnttab_start;
     gnttab->bank[0].size = kinfo->gnttab_size;
+#endif
 
     res = find_unallocated_memory(kinfo, mem_banks, ARRAY_SIZE(mem_banks),
                                   ext_regions, add_ext_regions);

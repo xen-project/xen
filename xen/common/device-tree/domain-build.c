@@ -250,7 +250,10 @@ void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
      */
     if ( is_hardware_domain(d) )
     {
-        struct membanks *gnttab = membanks_xzalloc(1, MEMORY);
+        struct membanks *gnttab =
+            IS_ENABLED(CONFIG_GRANT_TABLE)
+            ? membanks_xzalloc(1, MEMORY)
+            : NULL;
         /*
          * Exclude the following regions:
          * 1) Remove reserved memory
@@ -261,12 +264,14 @@ void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
             gnttab,
         };
 
+#ifdef CONFIG_GRANT_TABLE
         if ( !gnttab )
             goto fail;
 
         gnttab->nr_banks = 1;
         gnttab->bank[0].start = kinfo->gnttab_start;
         gnttab->bank[0].size = kinfo->gnttab_size;
+#endif
 
         hwdom_free_mem = membanks_xzalloc(NR_MEM_BANKS, MEMORY);
         if ( !hwdom_free_mem )
