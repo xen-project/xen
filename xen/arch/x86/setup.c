@@ -1033,9 +1033,12 @@ static struct domain *__init create_dom0(struct boot_info *bi)
 
     if ( opt_dom0_pvh )
     {
-        dom0_cfg.flags |= (XEN_DOMCTL_CDF_hvm |
-                           ((hvm_hap_supported() && !opt_dom0_shadow) ?
-                            XEN_DOMCTL_CDF_hap : 0));
+        dom0_cfg.flags |= XEN_DOMCTL_CDF_hvm;
+
+        if ( hvm_hap_supported() && !opt_dom0_shadow )
+            dom0_cfg.flags |= XEN_DOMCTL_CDF_hap;
+        else if ( !IS_ENABLED(CONFIG_SHADOW_PAGING) )
+            panic("Neither HAP nor Shadow available for PVH domain\n");
 
         dom0_cfg.arch.emulation_flags |=
             XEN_X86_EMU_LAPIC | XEN_X86_EMU_IOAPIC | XEN_X86_EMU_VPCI;
