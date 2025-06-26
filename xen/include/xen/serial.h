@@ -66,9 +66,11 @@ struct uart_driver {
     void (*init_postirq)(struct serial_port *port);
     /* Hook to clean up after Xen bootstrap (before domain 0 runs). */
     void (*endboot)(struct serial_port *port);
+#ifdef CONFIG_SYSTEM_SUSPEND
     /* Driver suspend/resume. */
     void (*suspend)(struct serial_port *port);
     void (*resume)(struct serial_port *port);
+#endif
     /* Return number of characters the port can hold for transmit,
      * or -EIO if port is inaccesible */
     int (*tx_ready)(struct serial_port *port);
@@ -131,9 +133,11 @@ int serial_irq(int idx);
 /* Retrieve basic UART information to emulate it (base address, size...) */
 const struct vuart_info* serial_vuart_info(int idx);
 
+#ifdef CONFIG_SYSTEM_SUSPEND
 /* Serial suspend/resume. */
 void serial_suspend(void);
 void serial_resume(void);
+#endif
 
 /*
  * Initialisation and helper functions for uart drivers.

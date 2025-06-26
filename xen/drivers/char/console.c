@@ -1365,6 +1365,8 @@ void panic(const char *fmt, ...)
         machine_restart(5000);
 }
 
+#ifdef CONFIG_SYSTEM_SUSPEND
+
 /*
  * **************************************************************
  * ****************** Console suspend/resume ********************
@@ -1387,6 +1389,8 @@ int console_resume(void)
     console_giveback(suspend_steal_id);
     return 0;
 }
+
+#endif /* CONFIG_SYSTEM_SUSPEND */
 
 /*
  * Local variables:

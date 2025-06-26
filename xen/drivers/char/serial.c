@@ -495,6 +495,8 @@ const struct vuart_info *serial_vuart_info(int idx)
     return NULL;
 }
 
+#ifdef CONFIG_SYSTEM_SUSPEND
+
 void serial_suspend(void)
 {
     int i;
@@ -510,6 +512,8 @@ void serial_resume(void)
         if ( com[i].state == serial_initialized && com[i].driver->resume )
             com[i].driver->resume(&com[i]);
 }
+
+#endif /* CONFIG_SYSTEM_SUSPEND */
 
 void __init serial_register_uart(int idx, struct uart_driver *driver,
                                  void *uart)

@@ -1419,6 +1419,8 @@ static void __init cf_check ehci_dbgp_endboot(struct serial_port *port)
     ehci_dbgp_check_release(port->uart);
 }
 
+#ifdef CONFIG_SYSTEM_SUSPEND
+
 static void cf_check ehci_dbgp_suspend(struct serial_port *port)
 {
     struct ehci_dbgp *dbgp = port->uart;
@@ -1452,12 +1454,16 @@ static void cf_check ehci_dbgp_resume(struct serial_port *port)
     ehci_dbgp_setup_postirq(dbgp);
 }
 
+#endif /* CONFIG_SYSTEM_SUSPEND */
+
 static struct uart_driver __read_mostly ehci_dbgp_driver = {
     .init_preirq  = ehci_dbgp_init_preirq,
     .init_postirq = ehci_dbgp_init_postirq,
     .endboot      = ehci_dbgp_endboot,
+#ifdef CONFIG_SYSTEM_SUSPEND
     .suspend      = ehci_dbgp_suspend,
     .resume       = ehci_dbgp_resume,
+#endif
     .tx_ready     = ehci_dbgp_tx_ready,
     .putc         = ehci_dbgp_putc,
     .flush        = ehci_dbgp_flush,

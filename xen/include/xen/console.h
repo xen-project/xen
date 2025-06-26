@@ -44,8 +44,10 @@ int console_steal(int handle, void (*fn)(const char *str, size_t nr));
 /* Give back stolen console. Takes the identifier returned by console_steal. */
 void console_giveback(int id);
 
+#ifdef CONFIG_SYSTEM_SUSPEND
 int console_suspend(void);
 int console_resume(void);
+#endif
 
 /* Emit a string via the serial console. */
 void console_serial_puts(const char *s, size_t nr);

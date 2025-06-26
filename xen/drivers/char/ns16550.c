@@ -57,7 +57,9 @@ static struct ns16550 {
 #endif
     /* UART with no IRQ line: periodically-polled I/O. */
     struct timer timer;
+#ifdef CONFIG_SYSTEM_SUSPEND
     struct timer resume_timer;
+#endif
     unsigned int timeout_ms;
     bool intr_works;
     bool dw_usr_bsy;
@@ -113,7 +115,9 @@ struct ns16550_config_param {
 static void enable_exar_enhanced_bits(const struct ns16550 *uart);
 #endif
 
+#ifdef CONFIG_SYSTEM_SUSPEND
 static void cf_check ns16550_delayed_resume(void *data);
+#endif
 
 static u8 ns_read_reg(const struct ns16550 *uart, unsigned int reg)
 {
@@ -420,7 +424,9 @@ static void __init cf_check ns16550_init_postirq(struct serial_port *port)
     serial_async_transmit(port);
 
     init_timer(&uart->timer, ns16550_poll, port, 0);
+#ifdef CONFIG_SYSTEM_SUSPEND
     init_timer(&uart->resume_timer, ns16550_delayed_resume, port, 0);
+#endif
 
     /* Calculate time to fill RX FIFO and/or empty TX FIFO for polling. */
     bits = uart->data_bits + uart->stop_bits + !!uart->parity;
@@ -506,6 +512,8 @@ static void __init cf_check ns16550_init_postirq(struct serial_port *port)
     ns16550_setup_postirq(uart);
 }
 
+#ifdef CONFIG_SYSTEM_SUSPEND
+
 static void cf_check ns16550_suspend(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
@@ -584,6 +592,8 @@ static void cf_check ns16550_resume(struct serial_port *port)
         _ns16550_resume(port);
 }
 
+#endif /* CONFIG_SYSTEM_SUSPEND */
+
 static void __init cf_check ns16550_endboot(struct serial_port *port)
 {
 #ifdef CONFIG_HAS_IOPORTS
@@ -638,8 +648,10 @@ static struct uart_driver __read_mostly ns16550_driver = {
     .init_irq     = ns16550_init_irq,
     .init_postirq = ns16550_init_postirq,
     .endboot      = ns16550_endboot,
+#ifdef CONFIG_SYSTEM_SUSPEND
     .suspend      = ns16550_suspend,
     .resume       = ns16550_resume,
+#endif
     .tx_ready     = ns16550_tx_ready,
     .putc         = ns16550_putc,
     .getc         = ns16550_getc,

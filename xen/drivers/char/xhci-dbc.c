@@ -1271,6 +1271,8 @@ static void cf_check dbc_uart_flush(struct serial_port *port)
         set_timer(&uart->timer, goal);
 }
 
+#ifdef CONFIG_SYSTEM_SUSPEND
+
 static void cf_check dbc_uart_suspend(struct serial_port *port)
 {
     struct dbc_uart *uart = port->uart;
@@ -1303,6 +1305,8 @@ static void cf_check dbc_uart_resume(struct serial_port *port)
     set_timer(&uart->timer, NOW() + MICROSECS(DBC_POLL_INTERVAL));
 }
 
+#endif /* CONFIG_SYSTEM_SUSPEND */
+
 static struct uart_driver dbc_uart_driver = {
     .init_preirq = dbc_uart_init_preirq,
     .init_postirq = dbc_uart_init_postirq,
@@ -1310,8 +1314,10 @@ static struct uart_driver dbc_uart_driver = {
     .putc = dbc_uart_putc,
     .getc = dbc_uart_getc,
     .flush = dbc_uart_flush,
+#ifdef CONFIG_SYSTEM_SUSPEND
     .suspend = dbc_uart_suspend,
     .resume = dbc_uart_resume,
+#endif
 };
 
 /* Those are accessed via DMA. */
