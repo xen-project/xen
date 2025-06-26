@@ -221,6 +221,7 @@ SECTIONS
   DECL_SECTION(.init.data) {
 #endif
        *(.init.bss.stack_aligned)
+       *(.init.data.page_aligned)
 
        . = ALIGN(POINTER_ALIGN);
        __initdata_cf_clobber_start = .;

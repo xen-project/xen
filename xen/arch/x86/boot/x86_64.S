@@ -193,7 +193,7 @@ END(idle_pg_table)
 GLOBAL(__page_tables_end)
 
 /* Init pagetables. Enough page directories to map into 4GB. */
-        .section .init.data, "aw", @progbits
+        .section .init.data.page_aligned, "aw", @progbits
 
 DATA_LOCAL(l1_bootmap, PAGE_SIZE)
         .fill L1_PAGETABLE_ENTRIES, 8, 0
