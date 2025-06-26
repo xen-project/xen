@@ -98,3 +98,53 @@ int pci_conf_write_intercept(unsigned int seg, unsigned int bdf,
 
     return rc;
 }
+
+bool pci_check_bar(const struct pci_dev *pdev, mfn_t start, mfn_t end)
+{
+    /*
+     * Check if BAR is not overlapping with any memory region defined
+     * in the memory map.
+     */
+    if ( !is_memory_hole(start, end) )
+        gdprintk(XENLOG_WARNING,
+                 "%pp: BAR at [%"PRI_mfn", %"PRI_mfn"] not in memory map hole\n",
+                 &pdev->sbdf, mfn_x(start), mfn_x(end));
+
+    /*
+     * Unconditionally return true, pci_sanitize_bar_memory() will remove any
+     * non-hole regions.
+     */
+    return true;
+}
+
+/* Remove overlaps with any ranges defined in the host memory map. */
+int pci_sanitize_bar_memory(struct rangeset *r)
+{
+    unsigned int i;
+
+    for ( i = 0; i < e820.nr_map; i++ )
+    {
+        const struct e820entry *entry = &e820.map[i];
+        int rc;
+
+        if ( !entry->size )
+            continue;
+
+        rc = rangeset_remove_range(r, PFN_DOWN(entry->addr),
+                                   PFN_DOWN(entry->addr + entry->size - 1));
+        if ( rc )
+            return rc;
+    }
+
+    return 0;
+}
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

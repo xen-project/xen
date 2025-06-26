@@ -394,6 +394,15 @@ static int modify_bars(const struct pci_dev *pdev, uint16_t cmd, bool rom_only)
                 return rc;
             }
         }
+
+        rc = pci_sanitize_bar_memory(bar->mem);
+        if ( rc )
+        {
+            gprintk(XENLOG_WARNING,
+                    "%pp: failed to sanitize BAR#%u memory: %d\n",
+                    &pdev->sbdf, i, rc);
+            return rc;
+        }
     }
 
     /* Remove any MSIX regions if present. */
