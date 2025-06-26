@@ -1198,13 +1198,11 @@ static int cf_check cache_op(
     if ( !cache_flush_permitted(current->domain) )
         /*
          * Non-physdev domain attempted WBINVD; ignore for now since
-         * newer linux uses this in some start-of-day timing loops.
+         * Linux uses this in some start-of-day code.
          */
         ;
-    else if ( op == x86emul_wbnoinvd /* && cpu_has_wbnoinvd */ )
-        wbnoinvd();
     else
-        wbinvd();
+        flush_all(FLUSH_CACHE);
 
     return X86EMUL_OKAY;
 }
