@@ -215,11 +215,22 @@ typedef struct pm_px_val pm_px_val_t;
 DEFINE_XEN_GUEST_HANDLE(pm_px_val_t);
 
 struct pm_px_stat {
-    uint8_t total;        /* total Px states */
+    /*
+     * IN: Number of elements in pt, number of rows/columns in trans_pt
+     *     (PMSTAT_get_pxstat)
+     * OUT: total Px states (PMSTAT_get_max_px, PMSTAT_get_pxstat)
+     */
+    uint8_t total;
     uint8_t usable;       /* usable Px states */
     uint8_t last;         /* last Px state */
     uint8_t cur;          /* current Px state */
-    XEN_GUEST_HANDLE_64(uint64) trans_pt;   /* Px transition table */
+    /*
+     * OUT: Px transition table. This should have total * total elements.
+     *      As it is a 2-D array, this will not be copied if input total is
+     *      less than output total. (PMSTAT_get_pxstat)
+     */
+    XEN_GUEST_HANDLE_64(uint64) trans_pt;
+    /* OUT: This should have total elements (PMSTAT_get_pxstat) */
     XEN_GUEST_HANDLE_64(pm_px_val_t) pt;
 };
 
