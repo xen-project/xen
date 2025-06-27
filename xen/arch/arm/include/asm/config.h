@@ -66,10 +66,6 @@
 #define STACK_ORDER 3
 #define STACK_SIZE  (PAGE_SIZE << STACK_ORDER)
 
-#ifndef __ASSEMBLY__
-extern unsigned long frametable_virt_end;
-#endif
-
 #define watchdog_disable() ((void)0)
 #define watchdog_enable()  ((void)0)
 

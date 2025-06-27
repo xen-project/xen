@@ -8,8 +8,6 @@
 #include <xen/pdx.h>
 #include <xen/string.h>
 
-unsigned long frametable_virt_end __read_mostly;
-
 /* Map a frame table to cover physical addresses ps through pe */
 void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
 {
@@ -46,9 +44,6 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     memset(&frame_table[0], 0, nr_pdxs * sizeof(struct page_info));
     memset(&frame_table[nr_pdxs], -1,
            frametable_size - (nr_pdxs * sizeof(struct page_info)));
-
-    frametable_virt_end = FRAMETABLE_VIRT_START + (nr_pdxs *
-                                                   sizeof(struct page_info));
 }
 
 /*
