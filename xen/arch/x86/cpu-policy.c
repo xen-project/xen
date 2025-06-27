@@ -518,17 +518,14 @@ static void __init guest_common_default_feature_adjustments(uint32_t *fs)
          * reasons, so reset the default policy back to the host values in
          * case we're unaffected.
          */
-        __clear_bit(X86_FEATURE_MD_CLEAR, fs);
-        if ( cpu_has_md_clear )
-            __set_bit(X86_FEATURE_MD_CLEAR, fs);
+        if ( !cpu_has_md_clear )
+            __clear_bit(X86_FEATURE_MD_CLEAR, fs);
 
-        __clear_bit(X86_FEATURE_FB_CLEAR, fs);
-        if ( cpu_has_fb_clear )
-            __set_bit(X86_FEATURE_FB_CLEAR, fs);
+        if ( !cpu_has_fb_clear )
+            __clear_bit(X86_FEATURE_FB_CLEAR, fs);
 
-        __clear_bit(X86_FEATURE_RFDS_CLEAR, fs);
-        if ( cpu_has_rfds_clear )
-            __set_bit(X86_FEATURE_RFDS_CLEAR, fs);
+        if ( !cpu_has_rfds_clear )
+            __clear_bit(X86_FEATURE_RFDS_CLEAR, fs);
 
         /*
          * The Gather Data Sampling microcode mitigation (August 2023) has an
@@ -548,13 +545,11 @@ static void __init guest_common_default_feature_adjustments(uint32_t *fs)
      * Topology information is at the toolstack's discretion so these are
      * unconditionally set in max, but pick a default which matches the host.
      */
-    __clear_bit(X86_FEATURE_HTT, fs);
-    if ( cpu_has_htt )
-        __set_bit(X86_FEATURE_HTT, fs);
+    if ( !cpu_has_htt )
+        __clear_bit(X86_FEATURE_HTT, fs);
 
-    __clear_bit(X86_FEATURE_CMP_LEGACY, fs);
-    if ( cpu_has_cmp_legacy )
-        __set_bit(X86_FEATURE_CMP_LEGACY, fs);
+    if ( !cpu_has_cmp_legacy )
+        __clear_bit(X86_FEATURE_CMP_LEGACY, fs);
 
     /*
      * On certain hardware, speculative or errata workarounds can result in
