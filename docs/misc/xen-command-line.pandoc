@@ -2370,7 +2370,7 @@ accidentally leaking secrets by releasing pages without proper sanitization.
 ### serial_tx_buffer
 > `= <size>`
 
-> Default: `16kB`
+> Default: `CONFIG_SERIAL_TX_BUFSIZE`
 
 Set the serial transmit buffer size.
 
