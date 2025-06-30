@@ -611,4 +611,12 @@ config SYSTEM_SUSPEND
 
 	  If unsure, say N.
 
+menu "Supported hypercall interfaces"
+	visible if EXPERT
+
+config SYSCTL
+	def_bool y
+
+endmenu
+
 endmenu
