@@ -34,7 +34,7 @@ unwanted    := $(filter-out $(generic-y) $(generated-y),$(old-headers))
 quiet_cmd_wrap = WRAP    $@
       cmd_wrap = \
 	arch=$$(echo $@ | sed -n 's:.*arch/\([^/]*\)/.*:\1:p' | tr a-z A-Z); \
-	upper=$$(echo $*.h | tr a-z A-Z | tr '/.-' '__'); \
+	upper=$$(echo $*.h | tr a-z A-Z | tr '/.-' '___'); \
 	echo "\#ifndef $${arch}_GENERIC_$${upper}" > $@.new; \
 	echo "\#define $${arch}_GENERIC_$${upper}" >> $@.new; \
 	echo "\#include <asm-generic/$*.h>" >> $@.new; \
