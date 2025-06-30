@@ -25,6 +25,15 @@ static inline uint16_t be16_to_cpu(const uint16_t v)
 #endif
 }
 
+static inline uint32_t be32_to_cpu(const uint32_t v)
+{
+#if BYTE_ORDER == LITTLE_ENDIAN
+	return __builtin_bswap32(v);
+#else
+	return v;
+#endif
+}
+
 #include "../../xen/common/lzo.c"
 #include "../../xen/common/unlzo.c"
 

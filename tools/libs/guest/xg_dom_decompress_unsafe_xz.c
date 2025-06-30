@@ -25,7 +25,7 @@ static inline uint32_t cpu_to_le32(const uint32_t v)
 #endif
 }
 
-static inline uint32_t le32_to_cpu(const uint32_t p)
+static inline uint32_t le32_to_cpu(const uint32_t v)
 {
 #if BYTE_ORDER == BIG_ENDIAN
 	return __builtin_bswap32(v);
