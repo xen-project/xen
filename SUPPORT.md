@@ -956,6 +956,15 @@ by hwdom. Some platforms use SCMI for access to system-level resources.
 
     Status: Supported
 
+### ARM: Guest PSCI support
+
+Emulated PSCI interface exposed to guests. We support all mandatory
+functions of PSCI 1.1. See below for the list of optional PSCI call
+implemented and their status.
+
+   Status, Mandatory: Supported
+   Status, MIGRATE_INFO_TYPE: Supported
+
 ## Virtual Hardware, QEMU
 
 This section describes supported devices available in HVM mode using a
