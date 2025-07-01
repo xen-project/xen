@@ -65,8 +65,12 @@ static always_inline void monitor(
     alternative_input("", "clflush (%[addr])", X86_BUG_CLFLUSH_MONITOR,
                       [addr] "a" (addr));
 
+    /*
+     * The memory clobber is a compiler barrier.  Subseqeunt reads from the
+     * monitored cacheline must not be reordered over MONITOR.
+     */
     asm volatile ( "monitor"
-                   :: "a" (addr), "c" (ecx), "d" (edx) );
+                   :: "a" (addr), "c" (ecx), "d" (edx) : "memory" );
 }
 
 static always_inline void mwait(unsigned int eax, unsigned int ecx)
@@ -465,7 +469,6 @@ void mwait_idle_with_hints(unsigned int eax, unsigned int ecx)
     const unsigned int *this_softirq_pending = &softirq_pending(cpu);
 
     monitor(this_softirq_pending, 0, 0);
-    smp_mb();
 
     if ( !*this_softirq_pending )
     {
