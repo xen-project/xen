@@ -3,7 +3,7 @@
 #
 # Add maintainers to patches generated with git format-patch
 #
-# Usage: perl scripts/add_maintainers.pl [OPTIONS] -patchdir <patchdir>
+# Usage: perl scripts/add_maintainers.pl [OPTIONS] --patchdir <patchdir>
 #
 # Prerequisites: Execute
 #                git format-patch ... -o <patchdir> ...
@@ -126,7 +126,7 @@ WORKFLOW:
   Step 1: git format-patch ... -o <patchdir> ...
   Step 2: ./scripts/add_maintainers.pl -d <patchdir>
           This overwrites *.patch files in <patchdir> but makes a backup
-  Step 3: git send-email -to xen-devel\@lists.xenproject.org <patchdir>/*.patch
+  Step 3: git send-email --to xen-devel\@lists.xenproject.org <patchdir>/*.patch
 EOT
 
 # Constants and functions related to LOCATIONS
@@ -371,7 +371,7 @@ if ($has_cover_letter) {
 }
 
 print "Then perform:\n".
-      "git send-email -to xen-devel\@lists.xenproject.org ".
+      "git send-email --to xen-devel\@lists.xenproject.org ".
       $patch_dir.'/'.$patch_prefix."*.patch"."\n";
 
 exit 0;
