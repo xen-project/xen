@@ -94,9 +94,7 @@ void cpumask_raise_softirq(const cpumask_t *mask, unsigned int nr)
         raise_mask = &per_cpu(batch_mask, this_cpu);
 
     for_each_cpu(cpu, mask)
-        if ( !test_and_set_bit(nr, &softirq_pending(cpu)) &&
-             cpu != this_cpu &&
-             !arch_skip_send_event_check(cpu) )
+        if ( !arch_set_softirq(nr, cpu) && cpu != this_cpu )
             __cpumask_set_cpu(cpu, raise_mask);
 
     if ( raise_mask == &send_mask )
@@ -107,9 +105,7 @@ void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
 {
     unsigned int this_cpu = smp_processor_id();
 
-    if ( test_and_set_bit(nr, &softirq_pending(cpu))
-         || (cpu == this_cpu)
-         || arch_skip_send_event_check(cpu) )
+    if ( arch_set_softirq(nr, cpu) || cpu == this_cpu )
         return;
 
     if ( !per_cpu(batching, this_cpu) || in_irq() )
