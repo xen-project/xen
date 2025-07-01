@@ -396,6 +396,7 @@ endif
 CFLAGS-$(CONFIG_CC_SPLIT_SECTIONS) += -ffunction-sections -fdata-sections
 
 CFLAGS += -nostdinc -fno-builtin -fno-common
+$(call cc-option-add,CFLAGS,CC,-fzero-init-padding-bits=all)
 CFLAGS += -Werror -Wredundant-decls -Wwrite-strings -Wno-pointer-arith
 CFLAGS += -Wdeclaration-after-statement -Wuninitialized
 $(call cc-option-add,CFLAGS,CC,-Wvla)
