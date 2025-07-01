@@ -92,8 +92,6 @@ extern struct cpuidle_governor *cpuidle_current_governor;
 bool cpuidle_using_deep_cstate(void);
 void cpuidle_disable_deep_cstate(void);
 
-extern void cpuidle_wakeup_mwait(cpumask_t *mask);
-
 #define CPUIDLE_DRIVER_STATE_START  1
 
 extern void menu_get_trace_data(u32 *expected, u32 *pred);
