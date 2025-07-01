@@ -455,7 +455,21 @@ __initcall(cpu_idle_key_init);
 void mwait_idle_with_hints(unsigned int eax, unsigned int ecx)
 {
     unsigned int cpu = smp_processor_id();
-    const unsigned int *this_softirq_pending = &softirq_pending(cpu);
+    irq_cpustat_t *stat = &irq_stat[cpu];
+    const unsigned int *this_softirq_pending = &stat->__softirq_pending;
+
+    /*
+     * By setting in_mwait, we promise to other CPUs that we'll notice changes
+     * to __softirq_pending without being sent an IPI.  We achieve this by
+     * either not going to sleep, or by having hardware notice on our behalf.
+     *
+     * Some errata exist where MONITOR doesn't work properly, and the
+     * workaround is to force the use of an IPI.  Cause this to happen by
+     * simply not advertising ourselves as being in_mwait.
+     */
+    alternative_io("movb $1, %[in_mwait]",
+                   "", X86_BUG_MONITOR,
+                   [in_mwait] "=m" (stat->in_mwait));
 
     monitor(this_softirq_pending, 0, 0);
 
@@ -467,6 +481,10 @@ void mwait_idle_with_hints(unsigned int eax, unsigned int ecx)
         mwait(eax, ecx);
         spec_ctrl_exit_idle(info);
     }
+
+    alternative_io("movb $0, %[in_mwait]",
+                   "", X86_BUG_MONITOR,
+                   [in_mwait] "=m" (stat->in_mwait));
 }
 
 static void acpi_processor_ffh_cstate_enter(struct acpi_processor_cx *cx)
