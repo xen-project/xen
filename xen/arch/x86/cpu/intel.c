@@ -403,7 +403,7 @@ static void __init probe_mwait_errata(void)
     {
         printk(XENLOG_WARNING
                "Forcing IPI MWAIT wakeup due to CPU erratum\n");
-        force_mwait_ipi_wakeup = true;
+        setup_force_cpu_cap(X86_BUG_MONITOR);
     }
 }
 
