@@ -650,7 +650,8 @@ implements a set of functions that share the same names as their Standard Librar
 The implementation of these functions is available in source form, so the undefined, unspecified
 or implementation-defined behaviors contemplated by the C Standard do not apply.
 If some undefined or unspecified behavior does arise in the implementation, it
-falls under the jurisdiction of other MISRA rules."
+falls under the jurisdiction of other MISRA guidelines."
+-config=MC3A2.R21.6,reports+={deliberate, "any()"}
 -config=MC3A2.R21.9,reports+={deliberate, "any()"}
 -config=MC3A2.R21.10,reports+={deliberate, "any()"}
 -doc_end

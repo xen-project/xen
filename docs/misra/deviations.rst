@@ -587,7 +587,16 @@ Deviations related to MISRA C:2012 Rules:
        construct is deviated only in Translation Units that present a violation
        of the Rule due to uses of this macro.
      - Tagged as `deliberate` for ECLAIR.
-     
+
+   * - R21.6
+     - Xen does not use the input/output functions provided by the C
+       Standard Library, but provides in source form its own implementation,
+       therefore any unspecified or undefined behavior associated to the
+       functions provided by the Standard Library does not apply. Any such
+       behavior that may exist in such functions is therefore under the
+       jurisdiction of other MISRA C guidelines.
+     - Tagged as `deliberate` for ECLAIR.
+
    * - R21.9
      - Xen does not use the `bsearch` and `qsort` functions provided by the C
        Standard Library, but provides in source form its own implementation,
