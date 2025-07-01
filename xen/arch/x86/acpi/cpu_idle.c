@@ -436,27 +436,6 @@ static int __init cf_check cpu_idle_key_init(void)
 }
 __initcall(cpu_idle_key_init);
 
-/*
- * The bit is set iff cpu use monitor/mwait to enter C state
- * with this flag set, CPU can be waken up from C state
- * by writing to specific memory address, instead of sending an IPI.
- */
-static cpumask_t cpuidle_mwait_flags;
-
-void cpuidle_wakeup_mwait(cpumask_t *mask)
-{
-    cpumask_t target;
-    unsigned int cpu;
-
-    cpumask_and(&target, mask, &cpuidle_mwait_flags);
-
-    /* CPU is MWAITing on the cpuidle_mwait_wakeup flag. */
-    for_each_cpu(cpu, &target)
-        mwait_wakeup(cpu) = 0;
-
-    cpumask_andnot(mask, mask, &target);
-}
-
 /* Force sending of a wakeup IPI regardless of mwait usage. */
 bool __ro_after_init force_mwait_ipi_wakeup;
 
@@ -465,42 +444,25 @@ bool arch_skip_send_event_check(unsigned int cpu)
     if ( force_mwait_ipi_wakeup )
         return false;
 
-    /*
-     * This relies on softirq_pending() and mwait_wakeup() to access data
-     * on the same cache line.
-     */
-    smp_mb();
-    return !!cpumask_test_cpu(cpu, &cpuidle_mwait_flags);
+    return false;
 }
 
 void mwait_idle_with_hints(unsigned int eax, unsigned int ecx)
 {
     unsigned int cpu = smp_processor_id();
-    s_time_t expires = per_cpu(timer_deadline, cpu);
-    const void *monitor_addr = &mwait_wakeup(cpu);
+    const unsigned int *this_softirq_pending = &softirq_pending(cpu);
 
-    monitor(monitor_addr, 0, 0);
+    monitor(this_softirq_pending, 0, 0);
     smp_mb();
 
-    /*
-     * Timer deadline passing is the event on which we will be woken via
-     * cpuidle_mwait_wakeup. So check it now that the location is armed.
-     */
-    if ( (expires > NOW() || expires == 0) && !softirq_pending(cpu) )
+    if ( !*this_softirq_pending )
     {
         struct cpu_info *info = get_cpu_info();
-
-        cpumask_set_cpu(cpu, &cpuidle_mwait_flags);
 
         spec_ctrl_enter_idle(info);
         mwait(eax, ecx);
         spec_ctrl_exit_idle(info);
-
-        cpumask_clear_cpu(cpu, &cpuidle_mwait_flags);
     }
-
-    if ( expires <= NOW() && expires > 0 )
-        raise_softirq(TIMER_SOFTIRQ);
 }
 
 static void acpi_processor_ffh_cstate_enter(struct acpi_processor_cx *cx)
@@ -901,7 +863,7 @@ void cf_check acpi_dead_idle(void)
 
     if ( cx->entry_method == ACPI_CSTATE_EM_FFH )
     {
-        void *mwait_ptr = &mwait_wakeup(smp_processor_id());
+        void *mwait_ptr = &softirq_pending(smp_processor_id());
 
         /*
          * Cache must be flushed as the last operation before sleeping.
