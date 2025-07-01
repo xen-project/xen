@@ -187,8 +187,6 @@ static void evt_do_broadcast(cpumask_t *mask)
     if ( __cpumask_test_and_clear_cpu(cpu, mask) )
         raise_softirq(TIMER_SOFTIRQ);
 
-    cpuidle_wakeup_mwait(mask);
-
     if ( !cpumask_empty(mask) )
        cpumask_raise_softirq(mask, TIMER_SOFTIRQ);
 }
