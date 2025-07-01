@@ -13,9 +13,6 @@
 
 #define MWAIT_ECX_INTERRUPT_BREAK	0x1
 
-/* Force sending of a wakeup IPI regardless of mwait usage. */
-extern bool force_mwait_ipi_wakeup;
-
 void mwait_idle_with_hints(unsigned int eax, unsigned int ecx);
 #ifdef CONFIG_INTEL
 bool mwait_pc10_supported(void);
