@@ -15,6 +15,7 @@
  * GNU General Public License for more details.
  */
 
+#include <xen/acpi.h>
 #include <xen/device_tree.h>
 #include <xen/iommu.h>
 #include <xen/lib.h>
@@ -150,4 +151,16 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
 bool arch_iommu_use_permitted(const struct domain *d)
 {
     return true;
+}
+
+int iommu_add_pci_sideband_ids(struct pci_dev *pdev)
+{
+    int ret = -EOPNOTSUPP;
+
+#ifdef CONFIG_HAS_PCI
+    if ( acpi_disabled )
+        ret = iommu_add_dt_pci_sideband_ids(pdev);
+#endif
+
+    return ret;
 }

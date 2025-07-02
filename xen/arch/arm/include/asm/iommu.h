@@ -34,6 +34,21 @@ int __must_check arm_iommu_unmap_page(struct domain *d, dfn_t dfn,
                                       unsigned int order,
                                       unsigned int *flush_flags);
 
+/*
+ * This function is not strictly ARM-specific, but it is only used by ARM
+ * as of now. So put it here to avoid creating dead code on other
+ * architectures. When usage is extended to other architectures, it should
+ * be moved to the generic header.
+ *
+ *
+ * Fills out the device's IOMMU fwspec with IOMMU ids.
+ *
+ * Return values:
+ *  0 : iommu_fwspec is filled out successfully.
+ * <0 : error while filling out the iommu_fwspec.
+ * >0 : IOMMU is not enabled/present or device is not connected to it.
+ */
+int iommu_add_pci_sideband_ids(struct pci_dev *pdev);
 #endif /* __ARCH_ARM_IOMMU_H__ */
 
 /*
