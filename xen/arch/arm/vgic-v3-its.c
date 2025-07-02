@@ -1445,11 +1445,13 @@ static const struct mmio_handler_ops vgic_its_mmio_handler = {
 };
 
 static int vgic_v3_its_init_virtual(struct domain *d, paddr_t guest_addr,
+                                    paddr_t host_addr,
                                     unsigned int devid_bits,
                                     unsigned int evid_bits)
 {
     struct virt_its *its;
     uint64_t base_attr;
+    paddr_t host_doorbell_addr = host_addr + ITS_DOORBELL_OFFSET;
 
     its = xzalloc(struct virt_its);
     if ( !its )
@@ -1477,6 +1479,26 @@ static int vgic_v3_its_init_virtual(struct domain *d, paddr_t guest_addr,
     spin_lock_init(&its->its_lock);
 
     register_mmio_handler(d, &vgic_its_mmio_handler, guest_addr, SZ_64K, its);
+
+    if ( is_iommu_enabled(its->d) )
+    {
+        mfn_t mfn = maddr_to_mfn(host_doorbell_addr);
+        unsigned int flush_flags = 0;
+        int ret = iommu_map(its->d, _dfn(PFN_DOWN(its->doorbell_address)),
+                            mfn, 1, IOMMUF_writable, &flush_flags);
+
+        if ( ret < 0 )
+        {
+            printk(XENLOG_G_ERR
+                    "GICv3: Map ITS translation register for %pd failed.\n",
+                    its->d);
+            return ret;
+        }
+
+        ret = iommu_iotlb_flush(its->d, _dfn(PFN_DOWN(its->doorbell_address)), 1, flush_flags);
+        if ( ret < 0 )
+            return ret;
+    }
 
     /* Register the virtual ITS to be able to clean it up later. */
     list_add_tail(&its->vits_list, &d->arch.vgic.vits_list);
@@ -1522,7 +1544,7 @@ int vgic_v3_its_init_domain(struct domain *d)
              * base and thus doorbell address.
              * Use the same number of device ID and event ID bits as the host.
              */
-            ret = vgic_v3_its_init_virtual(d, hw_its->addr,
+            ret = vgic_v3_its_init_virtual(d, hw_its->addr, hw_its->addr,
                                            hw_its->devid_bits,
                                            hw_its->evid_bits);
             if ( ret )
