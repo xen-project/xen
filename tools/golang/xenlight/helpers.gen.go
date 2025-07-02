@@ -1277,6 +1277,9 @@ x.Soundhw = C.GoString(tmp.soundhw)
 if err := x.XenPlatformPci.fromC(&tmp.xen_platform_pci);err != nil {
 return fmt.Errorf("converting field XenPlatformPci: %v", err)
 }
+if err := x.XenPlatformPciBarUc.fromC(&tmp.xen_platform_pci_bar_uc);err != nil {
+return fmt.Errorf("converting field XenPlatformPciBarUc: %v", err)
+}
 if err := x.UsbdeviceList.fromC(&tmp.usbdevice_list);err != nil {
 return fmt.Errorf("converting field UsbdeviceList: %v", err)
 }
@@ -1620,6 +1623,9 @@ if tmp.Soundhw != "" {
 hvm.soundhw = C.CString(tmp.Soundhw)}
 if err := tmp.XenPlatformPci.toC(&hvm.xen_platform_pci); err != nil {
 return fmt.Errorf("converting field XenPlatformPci: %v", err)
+}
+if err := tmp.XenPlatformPciBarUc.toC(&hvm.xen_platform_pci_bar_uc); err != nil {
+return fmt.Errorf("converting field XenPlatformPciBarUc: %v", err)
 }
 if err := tmp.UsbdeviceList.toC(&hvm.usbdevice_list); err != nil {
 return fmt.Errorf("converting field UsbdeviceList: %v", err)

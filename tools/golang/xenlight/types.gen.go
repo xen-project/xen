@@ -654,6 +654,7 @@ Usbdevice string
 VkbDevice Defbool
 Soundhw string
 XenPlatformPci Defbool
+XenPlatformPciBarUc Defbool
 UsbdeviceList StringList
 VendorDevice VendorDevice
 MsVmGenid MsVmGenid
