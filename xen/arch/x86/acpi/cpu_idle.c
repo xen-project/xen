@@ -79,6 +79,13 @@ static always_inline void mwait(unsigned int eax, unsigned int ecx)
                    :: "a" (eax), "c" (ecx) );
 }
 
+static always_inline void sti_mwait_cli(unsigned int eax, unsigned int ecx)
+{
+    /* STI shadow covers MWAIT. */
+    asm volatile ( "sti; mwait; cli"
+                   :: "a" (eax), "c" (ecx) );
+}
+
 #define GET_HW_RES_IN_NS(msr, val) \
     do { rdmsrl(msr, val); val = tsc_ticks2ns(val); } while( 0 )
 #define GET_MC6_RES(val)  GET_HW_RES_IN_NS(0x664, val)
@@ -473,12 +480,19 @@ void mwait_idle_with_hints(unsigned int eax, unsigned int ecx)
 
     monitor(this_softirq_pending, 0, 0);
 
+    ASSERT(!local_irq_is_enabled());
+
     if ( !*this_softirq_pending )
     {
         struct cpu_info *info = get_cpu_info();
 
         spec_ctrl_enter_idle(info);
-        mwait(eax, ecx);
+
+        if ( ecx & MWAIT_ECX_INTERRUPT_BREAK )
+            mwait(eax, ecx);
+        else
+            sti_mwait_cli(eax, ecx);
+
         spec_ctrl_exit_idle(info);
     }
 

@@ -973,12 +973,8 @@ static void cf_check mwait_idle(void)
 
 	update_last_cx_stat(power, cx, before);
 
-	if (cx->irq_enable_early)
-		local_irq_enable();
-
-	mwait_idle_with_hints(cx->address, MWAIT_ECX_INTERRUPT_BREAK);
-
-	local_irq_disable();
+	mwait_idle_with_hints(cx->address,
+			      cx->irq_enable_early ? 0 : MWAIT_ECX_INTERRUPT_BREAK);
 
 	after = alternative_call(cpuidle_get_tick);
 
