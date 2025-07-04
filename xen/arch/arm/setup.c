@@ -255,7 +255,9 @@ void __init init_pdx(void)
 {
     const struct membanks *mem = bootinfo_get_mem();
     paddr_t bank_start, bank_size, bank_end, ram_end = 0;
+    int bank;
 
+#ifdef CONFIG_PDX_COMPRESSION
     /*
      * Arm does not have any restrictions on the bits to compress. Pass 0 to
      * let the common code further restrict the mask.
@@ -264,7 +266,6 @@ void __init init_pdx(void)
      * update this function too.
      */
     uint64_t mask = pdx_init_mask(0x0);
-    int bank;
 
     for ( bank = 0 ; bank < mem->nr_banks; bank++ )
     {
@@ -284,6 +285,7 @@ void __init init_pdx(void)
     }
 
     pfn_pdx_hole_setup(mask >> PAGE_SHIFT);
+#endif
 
     for ( bank = 0 ; bank < mem->nr_banks; bank++ )
     {
