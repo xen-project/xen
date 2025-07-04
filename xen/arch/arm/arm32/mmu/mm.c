@@ -190,7 +190,6 @@ void __init setup_mm(void)
 
     /* Frame table covers all of RAM region, including holes */
     setup_frametable_mappings(ram_start, ram_end);
-    max_page = PFN_DOWN(ram_end);
 
     /*
      * The allocators may need to use map_domain_page() (such as for

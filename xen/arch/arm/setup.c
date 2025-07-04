@@ -254,7 +254,7 @@ static void __init relocate_fdt(const void **dtb_vaddr, size_t dtb_size)
 void __init init_pdx(void)
 {
     const struct membanks *mem = bootinfo_get_mem();
-    paddr_t bank_start, bank_size, bank_end;
+    paddr_t bank_start, bank_size, bank_end, ram_end = 0;
 
     /*
      * Arm does not have any restrictions on the bits to compress. Pass 0 to
@@ -290,10 +290,14 @@ void __init init_pdx(void)
         bank_start = mem->bank[bank].start;
         bank_size = mem->bank[bank].size;
         bank_end = bank_start + bank_size;
+        ram_end = max(ram_end, bank_end);
 
         set_pdx_range(paddr_to_pfn(bank_start),
                       paddr_to_pfn(bank_end));
     }
+
+    max_page = PFN_DOWN(ram_end);
+    max_pdx = pfn_to_pdx(max_page - 1) + 1;
 }
 
 size_t __read_mostly dcache_line_bytes;

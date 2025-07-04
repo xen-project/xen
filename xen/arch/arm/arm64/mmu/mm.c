@@ -224,6 +224,9 @@ static void __init setup_directmap_mappings(unsigned long base_mfn,
          */
         directmap_virt_start = DIRECTMAP_VIRT_START +
             (base_mfn - mfn_gb) * PAGE_SIZE;
+
+        if ( (max_pdx - directmap_base_pdx) > (DIRECTMAP_SIZE >> PAGE_SHIFT) )
+            panic("Direct map is too small\n");
     }
 
     if ( base_mfn < mfn_x(directmap_mfn_start) )
@@ -278,7 +281,6 @@ void __init setup_mm(void)
     directmap_mfn_end = maddr_to_mfn(ram_end);
 
     setup_frametable_mappings(ram_start, ram_end);
-    max_page = PFN_DOWN(ram_end);
 
     init_staticmem_pages();
     init_sharedmem_pages();
