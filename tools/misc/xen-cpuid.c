@@ -205,6 +205,7 @@ static const char *const str_e21a[32] =
 
     /* 26 */                [27] = "sbpb",
     [28] = "ibpb-brtype",   [29] = "srso-no",
+    [30] = "srso-us-no",    [31] = "srso-msr-fix",
 };
 
 static const char *const str_7b1[32] =
@@ -230,7 +231,7 @@ static const char *const str_7d2[32] =
     [ 4] = "bhi-ctrl",      [ 5] = "mcdt-no",
 };
 
-static const char *const str_m10Al[32] =
+static const char *const str_m10Al[64] =
 {
     [ 0] = "rdcl-no",             [ 1] = "eibrs",
     [ 2] = "rsba",                [ 3] = "skip-l1dfl",
@@ -247,10 +248,10 @@ static const char *const str_m10Al[32] =
     [24] = "pbrsb-no",            [25] = "gds-ctrl",
     [26] = "gds-no",              [27] = "rfds-no",
     [28] = "rfds-clear",
-};
 
-static const char *const str_m10Ah[32] =
-{
+    [32] = "pb-opt-ctrl",
+
+    [62] = "its-no",
 };
 
 static const struct {
@@ -276,7 +277,7 @@ static const struct {
     { "CPUID 0x00000007:1.ecx",     "7c1", str_7c1 },
     { "CPUID 0x00000007:1.edx",     "7d1", str_7d1 },
     { "MSR_ARCH_CAPS.lo",         "m10Al", str_m10Al },
-    { "MSR_ARCH_CAPS.hi",         "m10Ah", str_m10Ah },
+    { "MSR_ARCH_CAPS.hi",         "m10Ah", str_m10Al + 32 },
 };
 
 #define COL_ALIGN "24"
