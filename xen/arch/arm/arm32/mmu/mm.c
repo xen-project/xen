@@ -74,8 +74,7 @@ static paddr_t __init fit_xenheap_in_static_heap(uint32_t size, paddr_t align)
 void __init setup_mm(void)
 {
     const struct membanks *mem = bootinfo_get_mem();
-    paddr_t ram_start, ram_end, ram_size, e, bank_start, bank_end, bank_size;
-    paddr_t static_heap_end = 0, static_heap_size = 0;
+    paddr_t ram_start = INVALID_PADDR, ram_end = 0, ram_size = 0, e;
     unsigned long heap_pages, xenheap_pages, domheap_pages;
     unsigned int i;
     const uint32_t ctr = READ_CP32(CTR);
@@ -89,19 +88,14 @@ void __init setup_mm(void)
 
     init_pdx();
 
-    ram_start = mem->bank[0].start;
-    ram_size  = mem->bank[0].size;
-    ram_end   = ram_start + ram_size;
-
-    for ( i = 1; i < mem->nr_banks; i++ )
+    for ( i = 0; i < mem->nr_banks; i++ )
     {
-        bank_start = mem->bank[i].start;
-        bank_size = mem->bank[i].size;
-        bank_end = bank_start + bank_size;
+        const struct membank *bank = &mem->bank[i];
+        paddr_t bank_end = bank->start + bank->size;
 
-        ram_size  = ram_size + bank_size;
-        ram_start = min(ram_start,bank_start);
-        ram_end   = max(ram_end,bank_end);
+        ram_size = ram_size + bank->size;
+        ram_start = min(ram_start, bank->start);
+        ram_end = max(ram_end, bank_end);
     }
 
     total_pages = ram_size >> PAGE_SHIFT;
@@ -109,18 +103,14 @@ void __init setup_mm(void)
     if ( using_static_heap )
     {
         const struct membanks *reserved_mem = bootinfo_get_reserved_mem();
+        paddr_t static_heap_size = 0;
 
         for ( i = 0 ; i < reserved_mem->nr_banks; i++ )
         {
             if ( reserved_mem->bank[i].type != MEMBANK_STATIC_HEAP )
                 continue;
 
-            bank_start = reserved_mem->bank[i].start;
-            bank_size = reserved_mem->bank[i].size;
-            bank_end = bank_start + bank_size;
-
-            static_heap_size += bank_size;
-            static_heap_end = max(static_heap_end, bank_end);
+            static_heap_size += reserved_mem->bank[i].size;
         }
 
         heap_pages = static_heap_size >> PAGE_SHIFT;
