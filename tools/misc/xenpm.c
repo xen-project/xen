@@ -319,6 +319,7 @@ static int get_pxstat_by_cpuid(xc_interface *xc_handle, int cpuid, struct xc_px_
     if ( !pxstat)
         return -EINVAL;
 
+    pxstat->total = max_px_num;
     pxstat->trans_pt = malloc(max_px_num * max_px_num *
                               sizeof(uint64_t));
     if ( !pxstat->trans_pt )
