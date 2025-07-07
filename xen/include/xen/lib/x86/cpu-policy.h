@@ -325,7 +325,10 @@ struct cpu_policy
                 uint32_t e21a;
                 struct { DECL_BITFIELD(e21a); };
             };
-            uint32_t /* b */:32, /* c */:32, /* d */:32;
+            uint16_t ucode_size; /* Units of 16 bytes */
+            uint8_t  rap_size;   /* Units of 8 entries */
+            uint8_t  :8;
+            uint32_t /* c */:32, /* d */:32;
         };
     } extd;
 

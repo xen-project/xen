@@ -326,6 +326,9 @@ static void recalculate_misc(struct cpu_policy *p)
         p->extd.raw[0x1e] = EMPTY_LEAF; /* TopoExt APIC ID/Core/Node */
         p->extd.raw[0x1f] = EMPTY_LEAF; /* SEV */
         p->extd.raw[0x20] = EMPTY_LEAF; /* Platform QoS */
+        p->extd.raw[0x21].b = 0;
+        p->extd.raw[0x21].c = 0;
+        p->extd.raw[0x21].d = 0;
         break;
     }
 }
