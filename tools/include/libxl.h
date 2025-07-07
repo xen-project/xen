@@ -1258,13 +1258,6 @@ typedef struct libxl__ctx libxl_ctx;
 #define LIBXL_HAVE_ALTP2M 1
 
 /*
- * LIBXL_HAVE_ALTP2M_COUNT
- * If this is defined, then libxl supports setting the maximum number of
- * alternate p2m tables.
- */
-#define LIBXL_HAVE_ALTP2M_COUNT 1
-
-/*
  * LIBXL_HAVE_REMUS
  * If this is defined, then libxl supports remus.
  */

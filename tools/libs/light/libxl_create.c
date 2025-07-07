@@ -421,15 +421,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         return -ERROR_INVAL;
     }
 
-    if (b_info->altp2m_count == LIBXL_ALTP2M_COUNT_DEFAULT) {
-        if ((libxl_defbool_val(b_info->u.hvm.altp2m) ||
-            b_info->altp2m != LIBXL_ALTP2M_MODE_DISABLED))
-            /* Reflect the default legacy count */
-            b_info->altp2m_count = 10;
-        else
-            b_info->altp2m_count = 0;
-    }
-
     /* Assume that providing a bootloader user implies enabling restrict. */
     libxl_defbool_setdefault(&b_info->bootloader_restrict,
                              !!b_info->bootloader_user);

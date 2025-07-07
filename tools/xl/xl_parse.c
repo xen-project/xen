@@ -2099,15 +2099,6 @@ void parse_config_data(const char *config_source,
         }
     }
 
-    if (!xlu_cfg_get_long(config, "altp2m_count", &l, 1)) {
-        if (l != (uint16_t)l) {
-            fprintf(stderr, "ERROR: invalid value %ld for \"altp2m_count\"\n", l);
-            exit (1);
-        }
-
-        b_info->altp2m_count = l;
-    }
-
     if (!xlu_cfg_get_long(config, "vmtrace_buf_kb", &l, 1) && l) {
         b_info->vmtrace_buf_kb = l;
     }
