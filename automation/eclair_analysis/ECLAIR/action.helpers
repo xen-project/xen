@@ -58,7 +58,7 @@ summary() {
         ;;
     esac
 
-    currentDbReportsUrl="${eclairReportUrlPrefix}/fs${jobDir}/PROJECT.ecd;/by_service.html#service&kind"
+    currentDbReportsUrl="${eclairResultsUrl}/fs${jobDir}/PROJECT.ecd;/by_service.html#service&kind"
     if [ -z "${newReports}" ]; then
         fixedMsg="No fixed reports as there is no baseline"
         unfixedMsg="Unfixed reports: ${unfixedReports}"
@@ -69,11 +69,11 @@ summary() {
         unfixedMsg="Unfixed reports: ${unfixedReports} [new: ${newReports}]"
         case "${event}" in
         pull_request | auto_pull_request)
-            referenceDbReportsUrl="${eclairReportUrlPrefix}/fs${jobDir}/base/PROJECT.ecd;/by_service.html#service&kind"
+            referenceDbReportsUrl="${eclairResultsUrl}/fs${jobDir}/base/PROJECT.ecd;/by_service.html#service&kind"
             reference_kind=base
             ;;
         push)
-            referenceDbReportsUrl="${eclairReportUrlPrefix}/fs${jobDir}/prev/PROJECT.ecd;/by_service.html#service&kind"
+            referenceDbReportsUrl="${eclairResultsUrl}/fs${jobDir}/prev/PROJECT.ecd;/by_service.html#service&kind"
             reference_kind=previous
             ;;
         *)
@@ -92,7 +92,7 @@ summary() {
 ${fixedMsg}${eol}
 ${unfixedMsg}                                                                              ${eol}
 <a href="https://www.bugseng.com/eclair">
-  <img src="${eclairReportUrlPrefix}/rsrc/eclair.svg" width="100" />
+  <img src="${eclairResultsUrl}/rsrc/eclair.svg" width="100" />
 </a>
 <h3>${jobHeadline}</h3>
 <a href="${indexHtmlUrl}">Browse analysis summary</a>
@@ -106,7 +106,7 @@ EOF
         fi
         cat <<EOF >"${summaryTxt}"
 <a href="https://www.bugseng.com/eclair">
-  <img src="${eclairReportUrlPrefix}/rsrc/eclair.svg" width="100" />
+  <img src="${eclairResultsUrl}/rsrc/eclair.svg" width="100" />
 </a>
 Analysis Summary
 

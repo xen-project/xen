@@ -8,6 +8,7 @@
     ENABLE_ECLAIR_BOT: "n"
     AUTO_PR_BRANCH: "staging"
     AUTO_PR_REPOSITORY: "xen-project/xen"
+    ECLAIR_ANALYSIS_RESULTS: "https://eclair-analysis-logs.xenproject.org"
   script:
     - ./automation/scripts/eclair 2>&1 | tee "${LOGFILE}"
   artifacts:
