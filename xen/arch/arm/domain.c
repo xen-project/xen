@@ -693,7 +693,7 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
-    if ( config->altp2m_opts )
+    if ( config->altp2m.opts )
     {
         dprintk(XENLOG_INFO, "Altp2m not supported\n");
         return -EINVAL;

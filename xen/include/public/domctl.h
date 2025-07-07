@@ -99,6 +99,7 @@ struct xen_domctl_createdomain {
 
     uint32_t grant_opts;
 
+    struct {
 /*
  * Enable altp2m mixed mode.
  *
@@ -115,7 +116,8 @@ struct xen_domctl_createdomain {
 /* Altp2m mode signaling uses bits [0, 1]. */
 #define XEN_DOMCTL_ALTP2M_mode_mask  (0x3U)
 #define XEN_DOMCTL_ALTP2M_mode(m)    ((m) & XEN_DOMCTL_ALTP2M_mode_mask)
-    uint32_t altp2m_opts;
+        uint32_t opts;
+    } altp2m;
 
     /* Per-vCPU buffer size in bytes.  0 to disable. */
     uint32_t vmtrace_size;
