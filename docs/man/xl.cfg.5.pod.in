@@ -2023,20 +2023,6 @@ a single guest HVM domain. B<This option is deprecated, use the option
 B<Note>: While the option "altp2mhvm" is deprecated, legacy applications for
 x86 systems will continue to work using it.
 
-=item B<altp2m_count=NUMBER>
-
-Specifies the maximum number of alternate-p2m views available to the guest.
-This setting is crucial in domain introspection scenarios that require
-multiple physical-to-machine (p2m) memory mappings to be established
-simultaneously.
-
-Enabling multiple p2m views may increase memory usage. It is advisable to
-review and adjust the B<shadow_memory> setting as necessary to accommodate
-the additional memory requirements.
-
-B<Note>: This option is ignored if B<altp2m> is disabled. The default value
-is 10.
-
 =item B<nestedhvm=BOOLEAN>
 
 Enable or disables guest access to hardware virtualisation features,
