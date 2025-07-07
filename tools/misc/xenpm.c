@@ -312,29 +312,42 @@ static int get_pxstat_by_cpuid(xc_interface *xc_handle, int cpuid, struct xc_px_
     int ret = 0;
     int max_px_num = 0;
 
-    ret = xc_pm_get_max_px(xc_handle, cpuid, &max_px_num);
-    if ( ret )
-        return -errno;
-
     if ( !pxstat)
         return -EINVAL;
 
-    pxstat->total = max_px_num;
-    pxstat->trans_pt = malloc(max_px_num * max_px_num *
-                              sizeof(uint64_t));
-    if ( !pxstat->trans_pt )
-        return -ENOMEM;
-    pxstat->pt = malloc(max_px_num * sizeof(struct xc_px_val));
-    if ( !pxstat->pt )
+    for ( ; ; )
     {
-        free(pxstat->trans_pt);
-        return -ENOMEM;
-    }
+        ret = xc_pm_get_max_px(xc_handle, cpuid, &max_px_num);
+        if ( ret )
+            return -errno;
 
-    ret = xc_pm_get_pxstat(xc_handle, cpuid, pxstat);
-    if( ret )
-    {
-        ret = -errno;
+        pxstat->total = max_px_num;
+        pxstat->trans_pt = malloc(max_px_num * max_px_num *
+                                  sizeof(uint64_t));
+        if ( !pxstat->trans_pt )
+            return -ENOMEM;
+        pxstat->pt = malloc(max_px_num * sizeof(struct xc_px_val));
+        if ( !pxstat->pt )
+        {
+            free(pxstat->trans_pt);
+            return -ENOMEM;
+        }
+
+        ret = xc_pm_get_pxstat(xc_handle, cpuid, pxstat);
+        if ( ret )
+        {
+            ret = -errno;
+            free(pxstat->trans_pt);
+            free(pxstat->pt);
+            pxstat->trans_pt = NULL;
+            pxstat->pt = NULL;
+            break;
+        }
+
+        if ( pxstat->total <= max_px_num )
+            break;
+
+        /* get_max_px changed under our feet so the data is incomplete. */
         free(pxstat->trans_pt);
         free(pxstat->pt);
         pxstat->trans_pt = NULL;
