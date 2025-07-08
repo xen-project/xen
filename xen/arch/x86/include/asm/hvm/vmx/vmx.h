@@ -491,6 +491,7 @@ void ept_walk_table(struct domain *d, unsigned long gfn);
 bool ept_handle_misconfig(uint64_t gpa);
 int epte_get_entry_emt(struct domain *d, gfn_t gfn, mfn_t mfn,
                        unsigned int order, bool *ipat, p2m_type_t type);
+void ept_vcpu_flush_pml_buffer(struct vcpu *v);
 void setup_ept_dump(void);
 /* Locate an alternate p2m by its EPTP */
 unsigned int p2m_find_altp2m_by_eptp(struct domain *d, uint64_t eptp);

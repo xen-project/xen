@@ -4787,7 +4787,7 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
              !(idtv_info & INTR_INFO_VALID_MASK) )
             undo_nmis_unblocked_by_iret();
 
-        vmx_vcpu_flush_pml_buffer(v);
+        ept_vcpu_flush_pml_buffer(v);
         break;
 
     case EXIT_REASON_XSAVES:

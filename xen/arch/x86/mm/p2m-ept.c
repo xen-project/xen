@@ -1373,6 +1373,62 @@ static void cf_check ept_flush_pml_buffers(struct p2m_domain *p2m)
     vmx_domain_flush_pml_buffers(p2m->domain);
 }
 
+void ept_vcpu_flush_pml_buffer(struct vcpu *v)
+{
+    uint64_t *pml_buf;
+    unsigned long pml_idx;
+
+    ASSERT((v == current) || (!vcpu_runnable(v) && !v->is_running));
+    ASSERT(vmx_vcpu_pml_enabled(v));
+
+    vmx_vmcs_enter(v);
+
+    __vmread(GUEST_PML_INDEX, &pml_idx);
+
+    /* Do nothing if PML buffer is empty. */
+    if ( pml_idx == (NR_PML_ENTRIES - 1) )
+        goto out;
+
+    pml_buf = __map_domain_page(v->arch.hvm.vmx.pml_pg);
+
+    /*
+     * PML index can be either 2^16-1 (buffer is full), or 0 ~ NR_PML_ENTRIES-1
+     * (buffer is not full), and in latter case PML index always points to next
+     * available entity.
+     */
+    if ( pml_idx >= NR_PML_ENTRIES )
+        pml_idx = 0;
+    else
+        pml_idx++;
+
+    for ( ; pml_idx < NR_PML_ENTRIES; pml_idx++ )
+    {
+        unsigned long gfn = pml_buf[pml_idx] >> PAGE_SHIFT;
+
+        /*
+         * Need to change type from log-dirty to normal memory for logged GFN.
+         * hap_track_dirty_vram depends on it to work. And we mark all loqgged
+         * GFNs to be dirty, as we cannot be sure whether it's safe to ignore
+         * GFNs on which p2m_change_type_one returns failure. The failure cases
+         * are very rare, and additional cost is negligible, but a missing mark
+         * is extremely difficult to debug.
+         */
+        p2m_change_type_one(v->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
+
+        /* HVM guest: pfn == gfn */
+        paging_mark_pfn_dirty(v->domain, _pfn(gfn));
+    }
+
+    unmap_domain_page(pml_buf);
+
+    /* Reset PML index */
+    __vmwrite(GUEST_PML_INDEX, NR_PML_ENTRIES - 1);
+
+ out:
+    vmx_vmcs_exit(v);
+
+}
+
 int ept_p2m_init(struct p2m_domain *p2m)
 {
     struct ept_data *ept = &p2m->ept;
