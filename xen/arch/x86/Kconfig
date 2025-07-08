@@ -248,6 +248,20 @@ config X2APIC_MIXED
 
 endchoice
 
+config MCE_NONFATAL
+	bool "Check for non-fatal MCEs" if EXPERT
+	default y
+	help
+	  Check for non-fatal MCE errors.
+	
+	  When this option is on (default), Xen regularly checks for
+	  non-fatal MCEs potentially occurring on all physical CPUs. The
+	  checking is done via timers and IPI interrupts, which is
+	  acceptable in most configurations, but not for real-time.
+	
+	  Turn this option off if you plan on deploying real-time workloads
+	  on Xen.
+
 config GUEST
 	bool
 

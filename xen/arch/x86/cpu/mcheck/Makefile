@@ -1,12 +1,12 @@
-obj-$(CONFIG_AMD) += amd_nonfatal.o
+obj-$(filter $(CONFIG_AMD),$(CONFIG_MCE_NONFATAL)) += amd_nonfatal.o
 obj-$(CONFIG_AMD) += mce_amd.o
 obj-y += mcaction.o
 obj-y += barrier.o
-obj-$(CONFIG_INTEL) += intel-nonfatal.o
+obj-$(filter $(CONFIG_INTEL),$(CONFIG_MCE_NONFATAL)) += intel-nonfatal.o
 obj-y += mctelem.o
 obj-y += mce.o
 obj-y += mce-apei.o
 obj-$(CONFIG_INTEL) += mce_intel.o
-obj-y += non-fatal.o
+obj-$(CONFIG_MCE_NONFATAL) += non-fatal.o
 obj-y += util.o
 obj-y += vmce.o
