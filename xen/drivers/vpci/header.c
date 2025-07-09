@@ -175,7 +175,7 @@ static void modify_decoding(const struct pci_dev *pdev, uint16_t cmd,
 
 bool vpci_process_pending(struct vcpu *v)
 {
-    struct pci_dev *pdev = v->vpci.pdev;
+    const struct pci_dev *pdev = v->vpci.pdev;
     struct vpci_header *header = NULL;
     unsigned int i;
 
@@ -283,8 +283,7 @@ static int __init apply_map(struct domain *d, const struct pci_dev *pdev,
     return rc;
 }
 
-static void defer_map(struct domain *d, struct pci_dev *pdev,
-                      uint16_t cmd, bool rom_only)
+static void defer_map(const struct pci_dev *pdev, uint16_t cmd, bool rom_only)
 {
     struct vcpu *curr = current;
 
@@ -308,7 +307,7 @@ static void defer_map(struct domain *d, struct pci_dev *pdev,
 static int modify_bars(const struct pci_dev *pdev, uint16_t cmd, bool rom_only)
 {
     struct vpci_header *header = &pdev->vpci->header;
-    struct pci_dev *tmp, *dev = NULL;
+    struct pci_dev *tmp;
     const struct domain *d;
     const struct vpci_msix *msix = pdev->vpci->msix;
     unsigned int i, j;
@@ -448,21 +447,13 @@ static int modify_bars(const struct pci_dev *pdev, uint16_t cmd, bool rom_only)
                  */
                 continue;
 
-            if ( tmp == pdev )
-            {
+            if ( tmp == pdev && !rom_only )
                 /*
-                 * Need to store the device so it's not constified and defer_map
-                 * can modify it in case of error.
+                 * If memory decoding is toggled avoid checking against the
+                 * same device, or else all regions will be removed from the
+                 * memory map in the unmap case.
                  */
-                dev = tmp;
-                if ( !rom_only )
-                    /*
-                     * If memory decoding is toggled avoid checking against the
-                     * same device, or else all regions will be removed from the
-                     * memory map in the unmap case.
-                     */
-                    continue;
-            }
+                continue;
 
             for ( i = 0; i < ARRAY_SIZE(tmp->vpci->header.bars); i++ )
             {
@@ -507,8 +498,6 @@ static int modify_bars(const struct pci_dev *pdev, uint16_t cmd, bool rom_only)
         d = dom_xen;
     }
 
-    ASSERT(dev);
-
     if ( system_state < SYS_STATE_active )
     {
         /*
@@ -523,7 +512,7 @@ static int modify_bars(const struct pci_dev *pdev, uint16_t cmd, bool rom_only)
         return apply_map(pdev->domain, pdev, cmd);
     }
 
-    defer_map(dev->domain, dev, cmd, rom_only);
+    defer_map(pdev, cmd, rom_only);
 
     return 0;
 }

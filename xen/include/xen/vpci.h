@@ -196,7 +196,7 @@ struct vpci {
 
 struct vpci_vcpu {
     /* Per-vcpu structure to store state while {un}mapping of PCI BARs. */
-    struct pci_dev *pdev;
+    const struct pci_dev *pdev;
     uint16_t cmd;
     bool rom_only : 1;
 };
