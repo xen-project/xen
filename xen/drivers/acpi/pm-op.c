@@ -5,6 +5,7 @@
 #include <xen/errno.h>
 #include <xen/guest_access.h>
 #include <xen/lib.h>
+#include <xen/pmstat.h>
 #include <xen/sched.h>
 
 #include <acpi/cpufreq/cpufreq.h>
