@@ -106,14 +106,14 @@ struct idle_cpu {
 	enum c1e_promotion c1e_promotion;
 };
 
-static const struct idle_cpu *icpu;
+static const struct idle_cpu *__ro_after_init icpu;
 
 static const struct cpuidle_state {
 	char		name[16];
 	unsigned int	flags;
 	unsigned int	exit_latency; /* in US */
 	unsigned int	target_residency; /* in US */
-} *cpuidle_state_table;
+} *__ro_after_init cpuidle_state_table;
 
 #define CPUIDLE_FLAG_DISABLED		0x1
 /*
@@ -504,7 +504,7 @@ static const struct cpuidle_state bdw_cstates[] = {
 	{}
 };
 
-static struct cpuidle_state __read_mostly skl_cstates[] = {
+static struct cpuidle_state __ro_after_init skl_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -556,7 +556,7 @@ static struct cpuidle_state __read_mostly skl_cstates[] = {
 	{}
 };
 
-static struct cpuidle_state __read_mostly skx_cstates[] = {
+static struct cpuidle_state __ro_after_init skx_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00) | CPUIDLE_FLAG_IRQ_ENABLE,
@@ -610,7 +610,7 @@ static const struct cpuidle_state icx_cstates[] = {
  * By default we enable C1E and disable C1 by marking it with
  * 'CPUIDLE_FLAG_DISABLED'.
  */
-static struct cpuidle_state __read_mostly adl_cstates[] = {
+static struct cpuidle_state __ro_after_init adl_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00) | CPUIDLE_FLAG_DISABLED,
@@ -644,7 +644,7 @@ static struct cpuidle_state __read_mostly adl_cstates[] = {
 	{}
 };
 
-static struct cpuidle_state __read_mostly adl_l_cstates[] = {
+static struct cpuidle_state __ro_after_init adl_l_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00) | CPUIDLE_FLAG_DISABLED,
@@ -678,7 +678,7 @@ static struct cpuidle_state __read_mostly adl_l_cstates[] = {
 	{}
 };
 
-static struct cpuidle_state __read_mostly spr_cstates[] = {
+static struct cpuidle_state __ro_after_init spr_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -778,7 +778,7 @@ static const struct cpuidle_state avn_cstates[] = {
 	{}
 };
 
-static struct cpuidle_state __read_mostly bxt_cstates[] = {
+static struct cpuidle_state __ro_after_init bxt_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -1075,15 +1075,15 @@ static const struct idle_cpu idle_cpu_icx = {
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static struct idle_cpu __read_mostly idle_cpu_adl = {
+static struct idle_cpu __ro_after_init idle_cpu_adl = {
 	.state_table = adl_cstates,
 };
 
-static struct idle_cpu __read_mostly idle_cpu_adl_l = {
+static struct idle_cpu __ro_after_init idle_cpu_adl_l = {
 	.state_table = adl_l_cstates,
 };
 
-static struct idle_cpu __read_mostly idle_cpu_spr = {
+static const struct idle_cpu idle_cpu_spr = {
 	.state_table = spr_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
