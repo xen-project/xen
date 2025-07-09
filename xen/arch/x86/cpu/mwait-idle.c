@@ -756,6 +756,34 @@ static struct cpuidle_state __ro_after_init spr_cstates[] = {
 	{}
 };
 
+static const struct cpuidle_state gnr_cstates[] = {
+	{
+		.name = "C1",
+		.flags = MWAIT2flg(0x00),
+		.exit_latency = 1,
+		.target_residency = 1,
+	},
+	{
+		.name = "C1E",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 4,
+		.target_residency = 4,
+	},
+	{
+		.name = "C6",
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 170,
+		.target_residency = 650,
+	},
+	{
+		.name = "C6P",
+		.flags = MWAIT2flg(0x21) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 210,
+		.target_residency = 1000,
+	},
+	{}
+};
+
 static const struct cpuidle_state atom_cstates[] = {
 	{
 		.name = "C1E",
@@ -1202,6 +1230,11 @@ static const struct idle_cpu idle_cpu_spr = {
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
+static const struct idle_cpu idle_cpu_gnr = {
+	.state_table = gnr_cstates,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
+};
+
 static const struct idle_cpu idle_cpu_avn = {
 	.state_table = avn_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
@@ -1276,6 +1309,7 @@ static const struct x86_cpu_id intel_idle_ids[] __initconstrel = {
 	ICPU(ATOM_GRACEMONT,		gmt),
 	ICPU(SAPPHIRERAPIDS_X,		spr),
 	ICPU(EMERALDRAPIDS_X,		spr),
+	ICPU(GRANITERAPIDS_X,		gnr),
 	ICPU(ATOM_GOLDMONT,		bxt),
 	ICPU(ATOM_GOLDMONT_PLUS,	bxt),
 	ICPU(ATOM_GOLDMONT_D,		dnv),
