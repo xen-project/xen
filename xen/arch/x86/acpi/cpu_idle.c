@@ -70,20 +70,20 @@ static always_inline void monitor(
      * The memory clobber is a compiler barrier.  Subseqeunt reads from the
      * monitored cacheline must not be reordered over MONITOR.
      */
-    asm volatile ( "monitor"
+    asm volatile ( ".byte 0x0f, 0x01, 0xc8" /* monitor */
                    :: "a" (addr), "c" (ecx), "d" (edx) : "memory" );
 }
 
 static always_inline void mwait(unsigned int eax, unsigned int ecx)
 {
-    asm volatile ( "mwait"
+    asm volatile ( ".byte 0x0f, 0x01, 0xc9" /* mwait */
                    :: "a" (eax), "c" (ecx) );
 }
 
 static always_inline void sti_mwait_cli(unsigned int eax, unsigned int ecx)
 {
     /* STI shadow covers MWAIT. */
-    asm volatile ( "sti; mwait; cli"
+    asm volatile ( "sti; .byte 0x0f, 0x01, 0xc9;" /* mwait */ " cli"
                    :: "a" (eax), "c" (ecx) );
 }
 
