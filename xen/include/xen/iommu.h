@@ -500,9 +500,6 @@ void iommu_dev_iotlb_flush_timeout(struct domain *d, struct pci_dev *pdev);
  */
 DECLARE_PER_CPU(bool, iommu_dont_flush_iotlb);
 
-extern struct spinlock iommu_pt_cleanup_lock;
-extern struct page_list_head iommu_pt_cleanup_list;
-
 bool arch_iommu_use_permitted(const struct domain *d);
 
 #ifdef CONFIG_X86
