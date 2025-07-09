@@ -628,4 +628,12 @@ config PM_OP
 	  This option shall enable userspace performance management control
 	  to do power/performance analyzing and tuning.
 
+config PM_STATS
+	bool "Enable Performance Management Statistics"
+	depends on ACPI && HAS_CPUFREQ && SYSCTL
+	default y
+	help
+	  Enable collection of performance management statistics to aid in
+	  analyzing and tuning power/performance characteristics of the system
+
 endmenu
