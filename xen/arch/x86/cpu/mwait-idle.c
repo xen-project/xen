@@ -1350,6 +1350,7 @@ static const struct x86_cpu_id intel_idle_ids[] __initconstrel = {
 	ICPU(ATOM_TREMONT_D,		snr),
 	ICPU(ATOM_CRESTMONT,		grr),
 	ICPU(ATOM_CRESTMONT_X,		srf),
+	ICPU(ATOM_DARKMONT_X,		srf),
 	{}
 };
 
