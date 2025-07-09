@@ -928,6 +928,28 @@ static const struct cpuidle_state snr_cstates[] = {
 	{}
 };
 
+static const struct cpuidle_state grr_cstates[] = {
+	{
+		.name = "C1",
+		.flags = MWAIT2flg(0x00),
+		.exit_latency = 1,
+		.target_residency = 1,
+	},
+	{
+		.name = "C1E",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 2,
+		.target_residency = 10,
+	},
+	{
+		.name = "C6S",
+		.flags = MWAIT2flg(0x22) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 140,
+		.target_residency = 500,
+	},
+	{}
+};
+
 static void cf_check mwait_idle(void)
 {
 	unsigned int cpu = smp_processor_id();
@@ -1172,6 +1194,11 @@ static const struct idle_cpu idle_cpu_snr = {
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
+static const struct idle_cpu idle_cpu_grr = {
+	.state_table = grr_cstates,
+	.c1e_promotion = C1E_PROMOTION_DISABLE,
+};
+
 #define ICPU(model, cpu) \
 	{ X86_VENDOR_INTEL, 6, INTEL_FAM6_ ## model, X86_FEATURE_ALWAYS, \
 	  &idle_cpu_ ## cpu}
@@ -1220,6 +1247,7 @@ static const struct x86_cpu_id intel_idle_ids[] __initconstrel = {
 	ICPU(ATOM_GOLDMONT_PLUS,	bxt),
 	ICPU(ATOM_GOLDMONT_D,		dnv),
 	ICPU(ATOM_TREMONT_D,		snr),
+	ICPU(ATOM_CRESTMONT,		grr),
 	{}
 };
 
