@@ -96,16 +96,18 @@ struct shared_meminfo {
     struct shmem_membank_extra extra[NR_SHMEM_BANKS];
 };
 
-/*
- * The domU flag is set for kernels and ramdisks of "xen,domain" nodes.
- * The purpose of the domU flag is to avoid getting confused in
- * kernel_probe, where we try to guess which is the dom0 kernel and
- * initrd to be compatible with all versions of the multiboot spec.
- */
 #define BOOTMOD_MAX_CMDLINE 1024
 struct boot_module {
     boot_module_kind kind;
+#ifndef CONFIG_X86
+    /*
+     * The domU flag is set for kernels and ramdisks of "xen,domain" nodes.
+     * The purpose of the domU flag is to avoid getting confused in
+     * kernel_probe, where we try to guess which is the dom0 kernel and
+     * initrd to be compatible with all versions of the multiboot spec.
+     */
     bool domU;
+#endif
     paddr_t start;
     paddr_t size;
 };
