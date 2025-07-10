@@ -19,6 +19,9 @@ struct irq_desc;
 struct intc_info {
     enum intc_version hw_version;
     const struct dt_device_node *node;
+
+    /* number of irqs */
+    unsigned int num_irqs;
 };
 
 struct intc_hw_operations {
