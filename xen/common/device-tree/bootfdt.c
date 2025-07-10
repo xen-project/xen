@@ -13,6 +13,7 @@
 #include <xen/lib.h>
 #include <xen/libfdt/libfdt-xen.h>
 #include <xen/sort.h>
+#include <xen/unaligned.h>
 #include <xen/static-shmem.h>
 #include <xsm/xsm.h>
 #include <asm/setup.h>
@@ -211,7 +212,7 @@ u32 __init device_tree_get_u32(const void *fdt, int node,
     if ( !prop || prop->len < sizeof(u32) )
         return dflt;
 
-    return fdt32_to_cpu(*(uint32_t*)prop->data);
+    return fdt32_to_cpu(get_unaligned_t(uint32_t, prop->data));
 }
 
 /**

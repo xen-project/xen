@@ -9,6 +9,7 @@
 
 #include <xen/device_tree.h>
 #include <xen/libfdt/libfdt.h>
+#include <xen/unaligned.h>
 #include <asm/setup.h>
 #include <asm/smp.h>
 
@@ -85,7 +86,7 @@ static int __init setup_chosen_node(void *fdt, int *addr_cells, int *size_cells)
         *addr_cells = 2;
     }
     else
-        *addr_cells = fdt32_to_cpu(*((uint32_t *)prop->data));
+        *addr_cells = fdt32_to_cpu(get_unaligned_t(uint32_t, prop->data));
 
     prop = fdt_get_property(fdt, node, "#size-cells", &len);
     if ( !prop )
@@ -96,7 +97,7 @@ static int __init setup_chosen_node(void *fdt, int *addr_cells, int *size_cells)
         *size_cells = 2;
     }
     else
-        *size_cells = fdt32_to_cpu(*((uint32_t *)prop->data));
+        *size_cells = fdt32_to_cpu(get_unaligned_t(uint32_t, prop->data));
 
     /*
      * Make sure ranges is empty if it exists, otherwise create empty ranges
@@ -824,7 +825,7 @@ static int __init handle_dom0less_domain_node(const EFI_LOADED_IMAGE *loaded_ima
         return ERROR_MISSING_DT_PROPERTY;
     }
 
-    addr_cells = fdt32_to_cpu(*((uint32_t *)prop->data));
+    addr_cells = fdt32_to_cpu(get_unaligned_t(uint32_t, prop->data));
 
     prop = fdt_get_property(fdt_efi, domain_node, "#size-cells", &len);
     if ( !prop )
@@ -833,7 +834,7 @@ static int __init handle_dom0less_domain_node(const EFI_LOADED_IMAGE *loaded_ima
         return ERROR_MISSING_DT_PROPERTY;
     }
 
-    size_cells = fdt32_to_cpu(*((uint32_t *)prop->data));
+    size_cells = fdt32_to_cpu(get_unaligned_t(uint32_t, prop->data));
 
     /* Check for nodes compatible with multiboot,module inside this node */
     for ( module_node = fdt_first_subnode(fdt_efi, domain_node);
