@@ -14,6 +14,7 @@
 #ifndef ASM_RISCV_APLIC_PRIV_H
 #define ASM_RISCV_APLIC_PRIV_H
 
+#include <xen/spinlock.h>
 #include <xen/types.h>
 
 #include <asm/aplic.h>
@@ -25,6 +26,9 @@ struct aplic_priv {
 
     /* Registers */
     volatile struct aplic_regs __iomem *regs;
+
+    /* Lock to protect access to APLIC's registers */
+    spinlock_t lock;
 
     /* IMSIC configuration */
     const struct imsic_config *imsic_cfg;

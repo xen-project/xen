@@ -29,7 +29,124 @@ struct imsic_mmios {
     unsigned long size;
 };
 
-static struct imsic_config imsic_cfg;
+static struct imsic_config imsic_cfg = {
+    .lock = SPIN_LOCK_UNLOCKED,
+};
+
+#define IMSIC_DISABLE_EIDELIVERY    0
+#define IMSIC_ENABLE_EIDELIVERY     1
+#define IMSIC_DISABLE_EITHRESHOLD   1
+#define IMSIC_ENABLE_EITHRESHOLD    0
+
+#define imsic_csr_write(c, v)   \
+do {                            \
+    csr_write(CSR_SISELECT, c); \
+    csr_write(CSR_SIREG, v);    \
+} while (0)
+
+#define imsic_csr_set(c, v)     \
+do {                            \
+    csr_write(CSR_SISELECT, c); \
+    csr_set(CSR_SIREG, v);      \
+} while (0)
+
+#define imsic_csr_clear(c, v)   \
+do {                            \
+    csr_write(CSR_SISELECT, c); \
+    csr_clear(CSR_SIREG, v);    \
+} while (0)
+
+void __init imsic_ids_local_delivery(bool enable)
+{
+    if ( enable )
+    {
+        imsic_csr_write(IMSIC_EITHRESHOLD, IMSIC_ENABLE_EITHRESHOLD);
+        imsic_csr_write(IMSIC_EIDELIVERY, IMSIC_ENABLE_EIDELIVERY);
+    }
+    else
+    {
+        imsic_csr_write(IMSIC_EITHRESHOLD, IMSIC_DISABLE_EITHRESHOLD);
+        imsic_csr_write(IMSIC_EIDELIVERY, IMSIC_DISABLE_EIDELIVERY);
+    }
+}
+
+static void imsic_local_eix_update(unsigned long base_id, unsigned long num_id,
+                                   bool pend, bool val)
+{
+    unsigned long id = base_id, last_id = base_id + num_id;
+
+    while ( id < last_id )
+    {
+        unsigned long isel, ireg;
+        unsigned long start_id = id & (__riscv_xlen - 1);
+        unsigned long chunk = __riscv_xlen - start_id;
+        unsigned long count = min(last_id - id, chunk);
+
+        isel = id / __riscv_xlen;
+        isel *= __riscv_xlen / IMSIC_EIPx_BITS;
+        isel += pend ? IMSIC_EIP0 : IMSIC_EIE0;
+
+        ireg = GENMASK(start_id + count - 1, start_id);
+
+        id += count;
+
+        if ( val )
+            imsic_csr_set(isel, ireg);
+        else
+            imsic_csr_clear(isel, ireg);
+    }
+}
+
+void imsic_irq_enable(unsigned int irq)
+{
+    /*
+     * The only caller of imsic_irq_enable() is aplic_irq_enable(), which
+     * already runs with IRQs disabled. Therefore, there's no need to use
+     * spin_lock_irqsave() in this function.
+     *
+     * This ASSERT is added as a safeguard: if imsic_irq_enable() is ever
+     * called from a context where IRQs are not disabled,
+     * spin_lock_irqsave() should be used instead of spin_lock().
+     */
+    ASSERT(!local_irq_is_enabled());
+
+    spin_lock(&imsic_cfg.lock);
+    /*
+     * There is no irq - 1 here (look at aplic_set_irq_type()) because:
+     * From the spec:
+     *   When an interrupt file supports distinct interrupt identities,
+     *   valid identity numbers are between 1 and inclusive. The identity
+     *   numbers within this range are said to be implemented by the interrupt
+     *   file; numbers outside this range are not implemented. The number zero
+     *   is never a valid interrupt identity.
+     *   ...
+     *   Bit positions in a valid eiek register that don’t correspond to a
+     *   supported interrupt identity (such as bit 0 of eie0) are read-only zeros.
+     *
+     * So in EIx registers interrupt i corresponds to bit i in comparison wiht
+     * APLIC's sourcecfg which starts from 0.
+     */
+    imsic_local_eix_update(irq, 1, false, true);
+    spin_unlock(&imsic_cfg.lock);
+}
+
+void imsic_irq_disable(unsigned int irq)
+{
+   /*
+    * The only caller of imsic_irq_disable() is aplic_irq_disable(), which
+    * already runs with IRQs disabled. Therefore, there's no need to use
+    * spin_lock_irqsave() in this function.
+    *
+    * This ASSERT is added as a safeguard: if imsic_irq_disable() is ever
+    * called from a context where IRQs are not disabled,
+    * spin_lock_irqsave() should be used instead of spin_lock().
+    */
+    ASSERT(!local_irq_is_enabled());
+
+    spin_lock(&imsic_cfg.lock);
+    imsic_local_eix_update(irq, 1, false, false);
+    spin_unlock(&imsic_cfg.lock);
+}
 
 /* Callers aren't intended to changed imsic_cfg so return const. */
 const struct imsic_config *imsic_get_config(void)
@@ -354,6 +471,9 @@ int __init imsic_init(const struct dt_device_node *node)
         rc = -ENODEV;
         goto imsic_init_err;
     }
+
+    /* Enable local interrupt delivery */
+    imsic_ids_local_delivery(true);
 
     imsic_cfg.msi = msi;
 
