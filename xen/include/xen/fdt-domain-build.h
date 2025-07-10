@@ -50,10 +50,10 @@ typedef unsigned long (*copy_to_guest_phys_cb)(struct domain *d,
                                                unsigned int len);
 
 void initrd_load(struct kernel_info *kinfo,
-                 copy_to_guest_phys_cb copy_to_guest);
+                 copy_to_guest_phys_cb cb);
 
 void dtb_load(struct kernel_info *kinfo,
-              copy_to_guest_phys_cb copy_to_guest);
+              copy_to_guest_phys_cb cb);
 
 int find_unallocated_memory(const struct kernel_info *kinfo,
                             const struct membanks *mem_banks[],

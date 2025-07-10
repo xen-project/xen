@@ -336,7 +336,7 @@ void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
 }
 
 void __init dtb_load(struct kernel_info *kinfo,
-                     copy_to_guest_phys_cb copy_to_guest)
+                     copy_to_guest_phys_cb cb)
 {
     unsigned long left;
 
@@ -344,9 +344,9 @@ void __init dtb_load(struct kernel_info *kinfo,
            kinfo->d, kinfo->dtb_paddr,
            kinfo->dtb_paddr + fdt_totalsize(kinfo->fdt));
 
-    left = copy_to_guest(kinfo->d, kinfo->dtb_paddr,
-                         kinfo->fdt,
-                         fdt_totalsize(kinfo->fdt));
+    left = cb(kinfo->d, kinfo->dtb_paddr,
+              kinfo->fdt,
+              fdt_totalsize(kinfo->fdt));
 
     if ( left != 0 )
         panic("Unable to copy the DTB to %pd memory (left = %lu bytes)\n",
@@ -355,7 +355,7 @@ void __init dtb_load(struct kernel_info *kinfo,
 }
 
 void __init initrd_load(struct kernel_info *kinfo,
-                        copy_to_guest_phys_cb copy_to_guest)
+                        copy_to_guest_phys_cb cb)
 {
     const struct boot_module *mod = kinfo->initrd;
     paddr_t load_addr = kinfo->initrd_paddr;
@@ -398,8 +398,7 @@ void __init initrd_load(struct kernel_info *kinfo,
     if ( !initrd )
         panic("Unable to map the %pd initrd\n", kinfo->d);
 
-    res = copy_to_guest(kinfo->d, load_addr,
-                        initrd, len);
+    res = cb(kinfo->d, load_addr, initrd, len);
     if ( res != 0 )
         panic("Unable to copy the initrd in the %pd memory\n", kinfo->d);
 
