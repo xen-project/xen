@@ -53,7 +53,9 @@ static inline bool dfn_eq(dfn_t x, dfn_t y)
 extern bool iommu_enable, iommu_enabled;
 extern bool force_iommu, iommu_verbose;
 /* Boolean except for the specific purposes of drivers/passthrough/iommu.c. */
+#ifdef CONFIG_HAS_PCI
 extern uint8_t iommu_quarantine;
+#endif /* CONFIG_HAS_PCI */
 #else
 #define iommu_enabled false
 #endif
