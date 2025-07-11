@@ -105,8 +105,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         dm = libxl__domain_device_model(gc, b_info);
         rc = access(dm, X_OK);
         if (rc < 0) {
-            LOGE(ERROR, "qemu-xen access error");
-            return ERROR_FAIL;
+            LOGE(INFO, "qemu-xen is unavailable");
+            b_info->device_model_version = LIBXL_DEVICE_MODEL_VERSION_UNKNOWN;
         }
     }
 
