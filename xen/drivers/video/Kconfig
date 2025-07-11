@@ -3,7 +3,7 @@ config VIDEO
 	bool
 
 config VGA
-	bool "VGA support" if !PV_SHIM_EXCLUSIVE
+	bool "VGA support"
 	select VIDEO
 	depends on X86
 	default y if !PV_SHIM_EXCLUSIVE

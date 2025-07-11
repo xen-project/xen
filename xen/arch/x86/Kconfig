@@ -303,8 +303,6 @@ config PV_SHIM_EXCLUSIVE
 
 	  If unsure, say N.
 
-if !PV_SHIM_EXCLUSIVE
-
 config HYPERV_GUEST
 	bool "Hyper-V Guest"
 	select GUEST
@@ -312,8 +310,6 @@ config HYPERV_GUEST
 	  Support for Xen detecting when it is running under Hyper-V.
 
 	  If unsure, say N.
-
-endif
 
 config REQUIRE_NX
 	bool "Require NX (No eXecute) support"
