@@ -616,7 +616,11 @@ menu "Supported hypercall interfaces"
 	visible if EXPERT
 
 config SYSCTL
-	def_bool y
+	bool "Enable sysctl hypercall"
+	default y
+	help
+	  This option shall only be disabled on some dom0less systems, or
+	  PV shim on x86, to reduce Xen footprint.
 
 endmenu
 
