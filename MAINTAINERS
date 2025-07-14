@@ -516,6 +516,7 @@ T:	git https://xenbits.xenproject.org/git-http/seabios.git
 
 STUB DOMAINS
 M:	Samuel Thibault <samuel.thibault@ens-lyon.org>
+M:	Juergen Gross <jgross@suse.com>
 S:	Supported
 F:	config/Stubdom.mk.in
 F:	m4/stubdom.m4
