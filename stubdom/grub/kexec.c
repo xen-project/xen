@@ -209,6 +209,8 @@ static void tpm_hash2pcr(struct xc_dom_image *dom, char *cmdline)
 	shutdown_tpmfront(tpm);
 }
 
+static void call_start_info_hook(struct xc_dom_image *dom);
+
 void kexec(void *kernel, long kernel_size, void *module, long module_size, char *cmdline, unsigned long flags)
 {
     struct xc_dom_image *dom;
@@ -330,10 +332,7 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
         }
 
     /* start info page */
-#undef start_info
-    if ( dom->arch_hooks->start_info )
-        dom->arch_hooks->start_info(dom);
-#define start_info (start_info_union.start_info)
+    call_start_info_hook(dom);
 
     xc_dom_log_memory_footprint(dom);
 
@@ -431,4 +430,12 @@ out:
     pages_mfns = NULL;
     allocated = 0;
     xc_interface_close(xc_handle );
+}
+
+/* No references to start_info of Mini-OS after this function. */
+static void call_start_info_hook(struct xc_dom_image *dom)
+{
+#undef start_info
+    if ( dom->arch_hooks->start_info )
+        dom->arch_hooks->start_info(dom);
 }
