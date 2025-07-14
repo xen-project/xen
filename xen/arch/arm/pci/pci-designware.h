@@ -66,7 +66,11 @@ struct dw_pcie_priv {
     bool iatu_unroll_enabled;
     void __iomem *atu_base;
     unsigned int version;
+    void *priv;
 };
+
+void *dw_pcie_get_priv(struct pci_host_bridge *bridge);
+void dw_pcie_set_priv(struct pci_host_bridge *bridge, void *other);
 
 void dw_pcie_set_version(struct pci_host_bridge *bridge, unsigned int version);
 

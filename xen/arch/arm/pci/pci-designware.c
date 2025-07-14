@@ -403,3 +403,15 @@ dw_pcie_host_probe(struct dt_device_node *dev, const void *data,
 
     return bridge;
 }
+
+void *dw_pcie_get_priv(struct pci_host_bridge *bridge)
+{
+    struct dw_pcie_priv *priv = bridge->priv;
+    return priv->priv;
+}
+
+void dw_pcie_set_priv(struct pci_host_bridge *bridge, void *other)
+{
+    struct dw_pcie_priv *priv = bridge->priv;
+    priv->priv = other;
+}
