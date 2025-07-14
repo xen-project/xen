@@ -342,6 +342,12 @@ constant expressions are required.\""
   "any()"}
 -doc_end
 
+-doc_begin="Unary minus operations on unsigned type(s) have a semantics (wrap around) that is well-defined by the toolchains."
+-config=MC3A2.R10.1,etypes+={safe,
+  "stmt(node(unary_operator)&&operator(minus))",
+  "src_expr(definitely_in(0..))"}
+-doc_end
+
 #
 # Series 11
 #

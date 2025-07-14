@@ -325,6 +325,12 @@ Deviations related to MISRA C:2012 Rules:
        If no bits are set, 0 is returned.
      - Tagged as `safe` for ECLAIR.
 
+   * - R10.1
+     - Applying the unary minus operator to unsigned type(s) has a
+       semantics (wrap around) that is well-defined by the toolchains.
+       For this reason, the operation is safe.
+     - Tagged as `safe` for ECLAIR.
+
    * - R11.1
      - The conversion from a function pointer to unsigned long or (void \*) does
        not lose any information, provided that the target type has enough bits
