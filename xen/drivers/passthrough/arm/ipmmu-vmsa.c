@@ -51,12 +51,25 @@
 #include <asm/device.h>
 #include <asm/io.h>
 #include <asm/iommu_fwspec.h>
+#include "../arch/arm/pci/pci-host-rcar4.h"
 
 #define dev_name(dev) dt_node_full_name(dev_to_dt(dev))
 
 /* Device logger functions */
+#ifndef CONFIG_HAS_PCI
 #define dev_print(dev, lvl, fmt, ...)    \
     printk(lvl "ipmmu: %s: " fmt, dev_name(dev), ## __VA_ARGS__)
+#else
+#define dev_print(dev, lvl, fmt, ...) ({                                \
+    if ( !dev_is_pci((dev)) )                                           \
+        printk(lvl "ipmmu: %s: " fmt, dev_name((dev)), ## __VA_ARGS__);  \
+    else                                                                \
+    {                                                                   \
+        struct pci_dev *pdev = dev_to_pci((dev));                       \
+        printk(lvl "ipmmu: %pp: " fmt, &pdev->sbdf, ## __VA_ARGS__);     \
+    }                                                                   \
+})
+#endif
 
 #define dev_info(dev, fmt, ...)    \
     dev_print(dev, XENLOG_INFO, fmt, ## __VA_ARGS__)
@@ -1125,6 +1138,8 @@ static void ipmmu_free_root_domain(struct ipmmu_vmsa_domain *domain)
     xfree(domain);
 }
 
+static int ipmmu_deassign_device(struct domain *d, struct device *dev);
+
 static int ipmmu_assign_device(struct domain *d, u8 devfn, struct device *dev,
                                uint32_t flag)
 {
@@ -1138,8 +1153,38 @@ static int ipmmu_assign_device(struct domain *d, u8 devfn, struct device *dev,
     if ( !to_ipmmu(dev) )
         return -ENODEV;
 
-    spin_lock(&xen_domain->lock);
+#ifdef CONFIG_HAS_PCI
+    if ( dev_is_pci(dev) )
+    {
+        struct pci_dev *pdev = dev_to_pci(dev);
+        struct domain *old_d = pdev->domain;
 
+        /* Ignore calls for phantom functions */
+        if ( devfn != pdev->devfn )
+            return 0;
+
+        write_lock(&d->pci_lock);
+        list_move(&pdev->domain_list, &d->pdev_list);
+        write_unlock(&d->pci_lock);
+        pdev->domain = d;
+
+        /* dom_io is used as a sentinel for quarantined devices */
+        if ( d == dom_io )
+        {
+            int ret;
+
+            /*
+             * Try to de-assign: do not return error if it was already
+             * de-assigned.
+             */
+            ret = ipmmu_deassign_device(old_d, dev);
+
+            return ret == -ESRCH ? 0 : ret;
+        }
+    }
+#endif
+
+    spin_lock(&xen_domain->lock);
     /*
      * The IPMMU context for the Xen domain is not allocated beforehand
      * (at the Xen domain creation time), but on demand only, when the first
@@ -1244,7 +1289,7 @@ static int ipmmu_reassign_device(struct domain *s, struct domain *t,
     int ret = 0;
 
     /* Don't allow remapping on other domain than hwdom */
-    if ( t && !is_hardware_domain(t) )
+    if ( t && !is_hardware_domain(t) && (t != dom_io) )
         return -EPERM;
 
     if ( t == s )
@@ -1292,20 +1337,95 @@ static int ipmmu_dt_xlate(struct device *dev,
 
 static int ipmmu_add_device(u8 devfn, struct device *dev)
 {
-    struct iommu_fwspec *fwspec = dev_iommu_fwspec_get(dev);
+    struct iommu_fwspec *fwspec;
+
+#ifdef CONFIG_HAS_PCI
+    if ( dev_is_pci(dev) )
+    {
+        struct pci_dev *pdev = dev_to_pci(dev);
+        int ret;
+
+        if ( devfn != pdev->devfn )
+            return 0;
+
+        ret = iommu_add_pci_sideband_ids(pdev);
+        if ( ret < 0 )
+            iommu_fwspec_free(dev);
+    }
+#endif
+
+    fwspec = dev_iommu_fwspec_get(dev);
 
     /* Only let through devices that have been verified in xlate(). */
     if ( !to_ipmmu(dev) )
         return -ENODEV;
 
-    if ( dt_device_is_protected(dev_to_dt(dev)) )
+    if ( !dev_is_pci(dev) )
     {
-        dev_err(dev, "Already added to IPMMU\n");
-        return -EEXIST;
-    }
+        if ( dt_device_is_protected(dev_to_dt(dev)) )
+        {
+            dev_err(dev, "Already added to IPMMU\n");
+            return -EEXIST;
+        }
 
-    /* Let Xen know that the master device is protected by an IOMMU. */
-    dt_device_set_protected(dev_to_dt(dev));
+        /* Let Xen know that the master device is protected by an IOMMU. */
+        dt_device_set_protected(dev_to_dt(dev));
+    }
+#ifdef CONFIG_HAS_PCI
+    if ( dev_is_pci(dev) )
+    {
+        struct pci_dev *pdev = dev_to_pci(dev);
+        unsigned int reg_id, osid;
+        struct pci_host_bridge *bridge;
+        struct iommu_fwspec *fwspec_bridge;
+        unsigned int utlb_osid0 = 0;
+        int ret;
+
+        bridge = pci_find_host_bridge(pdev->seg, pdev->bus);
+        if ( !bridge )
+        {
+            dev_err(dev, "Failed to find host bridge\n");
+            return -ENODEV;
+        }
+
+        fwspec_bridge = dev_iommu_fwspec_get(dt_to_dev(bridge->dt_node));
+        if ( fwspec_bridge->num_ids < 1 )
+        {
+            dev_err(dev, "Failed to find host bridge uTLB\n");
+            return -ENXIO;
+        }
+
+        if ( fwspec->num_ids < 1 )
+        {
+            dev_err(dev, "Failed to find uTLB");
+            return -ENXIO;
+        }
+
+        rcar4_pcie_osid_regs_init(bridge);
+
+        ret = rcar4_pcie_osid_reg_alloc(bridge);
+        if ( ret < 0 )
+        {
+            dev_err(dev, "No unused OSID regs\n");
+            return ret;
+        }
+        reg_id = ret;
+
+        osid = fwspec->ids[0] - utlb_osid0;
+        rcar4_pcie_osid_bdf_set(bridge, reg_id, osid, pdev->sbdf.bdf);
+        rcar4_pcie_bdf_msk_set(bridge, reg_id, 0);
+
+        dev_info(dev, "Allocated OSID reg %u (OSID %u)\n", reg_id, osid);
+
+        ret = ipmmu_assign_device(pdev->domain, devfn, dev, 0);
+        if ( ret )
+        {
+            rcar4_pcie_osid_bdf_clear(bridge, reg_id);
+            rcar4_pcie_osid_reg_free(bridge, reg_id);
+            return ret;
+        }
+    }
+#endif
 
     dev_info(dev, "Added master device (IPMMU %s micro-TLBs %u)\n",
              dev_name(fwspec->iommu_dev), fwspec->num_ids);
