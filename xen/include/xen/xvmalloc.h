@@ -22,11 +22,21 @@
     (typeof(*(ptr)) *)p_;                                      \
 })
 
+#define DIM_MUL1(n) (n)
+#define DIM_MUL2(n1, n2) ({                                     \
+    unsigned long res_;                                         \
+    __builtin_umull_overflow(n1, n2, &res_) ? ULONG_MAX : res_; \
+})
+#define DIM_MUL_(n, nums...) DIM_MUL##n(nums)
+#define DIM_MUL(n, nums...) DIM_MUL_(n, ## nums)
+
 /* Allocate space for array of typed objects. */
-#define xvmalloc_array(_type, _num) \
-    ((_type *)_xvmalloc_array(sizeof(_type), __alignof__(_type), _num))
-#define xvzalloc_array(_type, _num) \
-    ((_type *)_xvzalloc_array(sizeof(_type), __alignof__(_type), _num))
+#define xvmalloc_array(type, num, nums...) \
+    ((type *)_xvmalloc_array(sizeof(type), __alignof__(type), \
+                             DIM_MUL(count_args(num, ## nums), num, ## nums)))
+#define xvzalloc_array(type, num, nums...) \
+    ((type *)_xvzalloc_array(sizeof(type), __alignof__(type), \
+                             DIM_MUL(count_args(num, ## nums), num, ## nums)))
 
 /* Allocate space for a structure with a flexible array of typed objects. */
 #define xvzalloc_flex_struct(type, field, nr) \

@@ -26,6 +26,8 @@
 #include <xen/hypercall.h>
 #include <xen/vm_event.h>
 #include <xen/monitor.h>
+#include <xen/xvmalloc.h>
+
 #include <asm/current.h>
 #include <asm/irq.h>
 #include <asm/page.h>
@@ -160,7 +162,7 @@ void vnuma_destroy(struct vnuma_info *vnuma)
     {
         xfree(vnuma->vmemrange);
         xfree(vnuma->vcpu_to_vnode);
-        xfree(vnuma->vdistance);
+        xvfree(vnuma->vdistance);
         xfree(vnuma->vnode_to_pnode);
         xfree(vnuma);
     }
@@ -197,7 +199,7 @@ static struct vnuma_info *vnuma_alloc(unsigned int nr_vnodes,
     if ( !vnuma )
         return ERR_PTR(-ENOMEM);
 
-    vnuma->vdistance = xmalloc_array(unsigned int, nr_vnodes * nr_vnodes);
+    vnuma->vdistance = xvmalloc_array(unsigned int, nr_vnodes, nr_vnodes);
     vnuma->vcpu_to_vnode = xmalloc_array(unsigned int, nr_vcpus);
     vnuma->vnode_to_pnode = xmalloc_array(nodeid_t, nr_vnodes);
     vnuma->vmemrange = xmalloc_array(xen_vmemrange_t, nr_ranges);

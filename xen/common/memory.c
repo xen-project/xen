@@ -26,6 +26,8 @@
 #include <xen/sections.h>
 #include <xen/trace.h>
 #include <xen/types.h>
+#include <xen/xvmalloc.h>
+
 #include <asm/current.h>
 #include <asm/hardirq.h>
 #include <asm/p2m.h>
@@ -1750,7 +1752,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         read_unlock(&d->vnuma_rwlock);
 
-        tmp.vdistance = xmalloc_array(unsigned int, dom_vnodes * dom_vnodes);
+        tmp.vdistance = xvmalloc_array(unsigned int, dom_vnodes, dom_vnodes);
         tmp.vmemrange = xmalloc_array(xen_vmemrange_t, dom_vranges);
         tmp.vcpu_to_vnode = xmalloc_array(unsigned int, dom_vcpus);
 
@@ -1813,7 +1815,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
  vnumainfo_out:
         rcu_unlock_domain(d);
 
-        xfree(tmp.vdistance);
+        xvfree(tmp.vdistance);
         xfree(tmp.vmemrange);
         xfree(tmp.vcpu_to_vnode);
         break;

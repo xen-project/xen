@@ -36,6 +36,7 @@
 #include <xen/percpu.h>
 #include <xen/domain.h>
 #include <xen/acpi.h>
+#include <xen/xvmalloc.h>
 
 #include <public/sysctl.h>
 #include <acpi/cpufreq/cpufreq.h>
@@ -125,7 +126,7 @@ int cpufreq_statistic_init(unsigned int cpu)
         return -ENOMEM;
     }
 
-    pxpt->u.trans_pt = xzalloc_array(uint64_t, count * count);
+    pxpt->u.trans_pt = xvzalloc_array(uint64_t, count, count);
     if ( !pxpt->u.trans_pt )
     {
         xfree(pxpt);
@@ -136,7 +137,7 @@ int cpufreq_statistic_init(unsigned int cpu)
     pxpt->u.pt = xzalloc_array(struct pm_px_val, count);
     if ( !pxpt->u.pt )
     {
-        xfree(pxpt->u.trans_pt);
+        xvfree(pxpt->u.trans_pt);
         xfree(pxpt);
         spin_unlock(cpufreq_statistic_lock);
         return -ENOMEM;
@@ -172,7 +173,7 @@ void cpufreq_statistic_exit(unsigned int cpu)
         return;
     }
 
-    xfree(pxpt->u.trans_pt);
+    xvfree(pxpt->u.trans_pt);
     xfree(pxpt->u.pt);
     xfree(pxpt);
     per_cpu(cpufreq_statistic_data, cpu) = NULL;
