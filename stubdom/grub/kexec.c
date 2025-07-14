@@ -34,6 +34,8 @@
 
 #include "mini-os.h"
 
+#undef start_info
+
 #if 0
 #define DEBUG(fmt, ...) printk(fmt, ## __VA_ARGS__)
 #else
@@ -86,10 +88,10 @@ static void do_exchange(struct xc_dom_image *dom, xen_pfn_t target_pfn, xen_pfn_
     xen_pfn_t source_pfn;
     xen_pfn_t target_mfn;
 
-    for (source_pfn = 0; source_pfn < start_info.nr_pages; source_pfn++)
+    for (source_pfn = 0; source_pfn < start_info_ptr->nr_pages; source_pfn++)
         if (dom->pv_p2m[source_pfn] == source_mfn)
             break;
-    ASSERT(source_pfn < start_info.nr_pages);
+    ASSERT(source_pfn < start_info_ptr->nr_pages);
 
     target_mfn = dom->pv_p2m[target_pfn];
 
@@ -209,8 +211,6 @@ static void tpm_hash2pcr(struct xc_dom_image *dom, char *cmdline)
 	shutdown_tpmfront(tpm);
 }
 
-static void call_start_info_hook(struct xc_dom_image *dom);
-
 void kexec(void *kernel, long kernel_size, void *module, long module_size, char *cmdline, unsigned long flags)
 {
     struct xc_dom_image *dom;
@@ -242,8 +242,8 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     xc_dom_module_mem(dom, module, module_size, NULL);
 
     dom->flags = flags;
-    dom->console_evtchn = start_info.console.domU.evtchn;
-    dom->xenstore_evtchn = start_info.store_evtchn;
+    dom->console_evtchn = start_info_ptr->console.domU.evtchn;
+    dom->xenstore_evtchn = start_info_ptr->store_evtchn;
 
     tpm_hash2pcr(dom, cmdline);
 
@@ -279,7 +279,7 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
         errnum = ERR_EXEC_FORMAT;
         goto out;
     }
-    dom->total_pages = start_info.nr_pages;
+    dom->total_pages = start_info_ptr->nr_pages;
 
     /* equivalent of arch_setup_meminit */
     dom->p2m_size = dom->total_pages;
@@ -306,7 +306,7 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     }
 
     /* Equivalent of xc_dom_boot_image */
-    dom->shared_info_mfn = PHYS_PFN(start_info.shared_info);
+    dom->shared_info_mfn = PHYS_PFN(start_info_ptr->shared_info);
 
     if (!xc_dom_compat_check(dom)) {
         printk("xc_dom_compat_check failed\n");
@@ -315,8 +315,8 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     }
 
     /* Move current console, xenstore and boot MFNs to the allocated place */
-    do_exchange(dom, dom->console_pfn, start_info.console.domU.mfn);
-    do_exchange(dom, dom->xenstore_pfn, start_info.store_mfn);
+    do_exchange(dom, dom->console_pfn, start_info_ptr->console.domU.mfn);
+    do_exchange(dom, dom->xenstore_pfn, start_info_ptr->store_mfn);
     DEBUG("virt base at %llx\n", virt_base);
     DEBUG("bootstack_pfn %lx\n", dom->bootstack_pfn);
     _boot_target = virt_base + PFN_PHYS(dom->bootstack_pfn);
@@ -332,7 +332,8 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
         }
 
     /* start info page */
-    call_start_info_hook(dom);
+    if ( dom->arch_hooks->start_info )
+        dom->arch_hooks->start_info(dom);
 
     xc_dom_log_memory_footprint(dom);
 
@@ -371,7 +372,7 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     DEBUG("boot page mfn %lx\n", boot_page_mfn);
     _boot_page_entry = PFN_PHYS(boot_page_mfn) | L1_PROT;
     DEBUG("boot page entry %llx\n", _boot_page_entry);
-    _boot_oldpdmfn = virt_to_mfn(start_info.pt_base);
+    _boot_oldpdmfn = virt_to_mfn(start_info_ptr->pt_base);
     DEBUG("boot old pd mfn %lx\n", _boot_oldpdmfn);
     DEBUG("boot pd virt %lx\n", dom->pgtables_seg.vstart);
     _boot_pdmfn = dom->pv_p2m[PHYS_PFN(dom->pgtables_seg.vstart - virt_base)];
@@ -384,12 +385,12 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     DEBUG("boot start %lx\n", _boot_start);
 
     /* Keep only useful entries */
-    for (nr_m2p_updates = pfn = 0; pfn < start_info.nr_pages; pfn++)
+    for (nr_m2p_updates = pfn = 0; pfn < start_info_ptr->nr_pages; pfn++)
         if (dom->pv_p2m[pfn] != pfn_to_mfn(pfn))
             nr_m2p_updates++;
 
     m2p_updates = malloc(sizeof(*m2p_updates) * nr_m2p_updates);
-    for (i = pfn = 0; pfn < start_info.nr_pages; pfn++)
+    for (i = pfn = 0; pfn < start_info_ptr->nr_pages; pfn++)
         if (dom->pv_p2m[pfn] != pfn_to_mfn(pfn)) {
             m2p_updates[i].ptr = PFN_PHYS(dom->pv_p2m[pfn]) | MMU_MACHPHYS_UPDATE;
             m2p_updates[i].val = pfn;
@@ -430,12 +431,4 @@ out:
     pages_mfns = NULL;
     allocated = 0;
     xc_interface_close(xc_handle );
-}
-
-/* No references to start_info of Mini-OS after this function. */
-static void call_start_info_hook(struct xc_dom_image *dom)
-{
-#undef start_info
-    if ( dom->arch_hooks->start_info )
-        dom->arch_hooks->start_info(dom);
 }
