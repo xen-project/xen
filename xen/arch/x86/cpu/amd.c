@@ -613,14 +613,15 @@ static unsigned int attr_const amd_parse_freq(unsigned int family,
 	return freq;
 }
 
-void amd_log_freq(const struct cpuinfo_x86 *c)
+static void amd_process_freq(const struct cpuinfo_x86 *c,
+			     unsigned int *low_mhz,
+			     unsigned int *nom_mhz,
+			     unsigned int *hi_mhz)
 {
 	unsigned int idx = 0, h;
 	uint64_t hi, lo, val;
 
-	if (c->x86 < 0x10 || c->x86 > 0x1A ||
-	    (c != &boot_cpu_data &&
-	     (!opt_cpu_info || (c->apicid & (c->x86_num_siblings - 1)))))
+	if (c->x86 < 0x10 || c->x86 > 0x1A)
 		return;
 
 	if (c->x86 < 0x17) {
@@ -701,20 +702,20 @@ void amd_log_freq(const struct cpuinfo_x86 *c)
 
 	if (idx && idx < h &&
 	    !rdmsr_safe(0xC0010064 + idx, val) && (val >> 63) &&
-	    !rdmsr_safe(0xC0010064, hi) && (hi >> 63))
-		printk("CPU%u: %u (%u ... %u) MHz\n",
-		       smp_processor_id(),
-		       amd_parse_freq(c->x86, val),
-		       amd_parse_freq(c->x86, lo),
-		       amd_parse_freq(c->x86, hi));
-	else if (h && !rdmsr_safe(0xC0010064, hi) && (hi >> 63))
-		printk("CPU%u: %u ... %u MHz\n",
-		       smp_processor_id(),
-		       amd_parse_freq(c->x86, lo),
-		       amd_parse_freq(c->x86, hi));
-	else
-		printk("CPU%u: %u MHz\n", smp_processor_id(),
-		       amd_parse_freq(c->x86, lo));
+	    !rdmsr_safe(0xC0010064, hi) && (hi >> 63)) {
+		if (nom_mhz)
+			*nom_mhz = amd_parse_freq(c->x86, val);
+		if (low_mhz)
+			*low_mhz = amd_parse_freq(c->x86, lo);
+		if (hi_mhz)
+			*hi_mhz = amd_parse_freq(c->x86, hi);
+	} else if (h && !rdmsr_safe(0xC0010064, hi) && (hi >> 63)) {
+		if (low_mhz)
+			*low_mhz = amd_parse_freq(c->x86, lo);
+		if (hi_mhz)
+			*hi_mhz = amd_parse_freq(c->x86, hi);
+	} else if (low_mhz)
+		*low_mhz = amd_parse_freq(c->x86, lo);
 }
 
 void cf_check early_init_amd(struct cpuinfo_x86 *c)
@@ -723,6 +724,27 @@ void cf_check early_init_amd(struct cpuinfo_x86 *c)
 		amd_init_levelling();
 
 	ctxt_switch_levelling(NULL);
+}
+
+void amd_log_freq(const struct cpuinfo_x86 *c)
+{
+	unsigned int low_mhz = 0, nom_mhz = 0, hi_mhz = 0;
+
+	if (c != &boot_cpu_data &&
+	    (!opt_cpu_info || (c->apicid & (c->x86_num_siblings - 1))))
+		return;
+
+	amd_process_freq(c, &low_mhz, &nom_mhz, &hi_mhz);
+
+	if (low_mhz && nom_mhz && hi_mhz)
+		printk("CPU%u: %u (%u ... %u) MHz\n",
+		       smp_processor_id(),
+		       nom_mhz, low_mhz, hi_mhz);
+	else if (low_mhz && hi_mhz)
+		printk("CPU%u: %u ... %u MHz\n",
+		       smp_processor_id(), low_mhz, hi_mhz);
+	else if (low_mhz)
+		printk("CPU%u: %u MHz\n", smp_processor_id(), low_mhz);
 }
 
 void amd_init_lfence(struct cpuinfo_x86 *c)
