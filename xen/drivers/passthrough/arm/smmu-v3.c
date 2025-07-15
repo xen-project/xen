@@ -315,7 +315,7 @@ static int queue_poll_cons(struct arm_smmu_queue *q, bool sync, bool wfe)
 
 	while (queue_sync_cons_in(q),
 	      (sync ? !queue_empty(&q->llq) : queue_full(&q->llq))) {
-		if ((NOW() > timeout) > 0)
+		if (NOW() > timeout)
 			return -ETIMEDOUT;
 
 		if (wfe) {

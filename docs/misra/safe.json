@@ -116,6 +116,14 @@
         },
         {
             "id": "SAF-14-safe",
+            "analyser": {
+                "eclair": "MC3A2.R10.1"
+            },
+            "name": "Rule 10.1: use boolean as an array index",
+            "text": "Using a boolean type as an array index is safe."
+        },
+        {
+            "id": "SAF-15-safe",
             "analyser": {},
             "name": "Sentinel",
             "text": "Next ID to be used"
