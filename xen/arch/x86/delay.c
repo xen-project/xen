@@ -23,7 +23,7 @@ void udelay(unsigned long usecs)
     s = rdtsc_ordered();
     do
     {
-        rep_nop();
+        cpu_relax();
         e = rdtsc_ordered();
     } while ((e-s) < ticks);
 }

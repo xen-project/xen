@@ -340,13 +340,8 @@ DECLARE_PER_CPU(root_pgentry_t *, root_pgt);
 
 extern void write_ptbase(struct vcpu *v);
 
-/* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
-static always_inline void rep_nop(void)
-{
-    asm volatile ( "rep;nop" : : : "memory" );
-}
-
-#define cpu_relax() rep_nop()
+/* PAUSE (encoding: REP NOP) is a good thing to insert into busy-wait loops. */
+#define cpu_relax() asm volatile ( "pause" ::: "memory" )
 
 void show_code(const struct cpu_user_regs *regs);
 void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs);
