@@ -8,6 +8,8 @@
 
 #include <xen/cache.h>
 #include <xen/const.h>
+#include <xen/macros.h>
+
 #include <asm/cpuid.h>
 
 #define cpufeat_word(idx)	((idx) / 32)
@@ -16,6 +18,21 @@
 
 /* An alias of a feature we know is always going to be present. */
 #define X86_FEATURE_ALWAYS      X86_FEATURE_LM
+
+/*
+ * Layout tied to cpuinfo_x86.vfm
+ */
+#define VFM_MODEL_MASK  0x000000ff
+#define VFM_FAMILY_MASK 0x0000ff00
+#define VFM_VENDOR_MASK 0x00ff0000
+
+#define VFM_MAKE(v, f, m) (MASK_INSR(v, VFM_VENDOR_MASK) | \
+                           MASK_INSR(f, VFM_FAMILY_MASK) | \
+                           MASK_INSR(m, VFM_MODEL_MASK))
+
+#define VFM_MODEL(vfm)  MASK_EXTR(vfm, VFM_MODEL_MASK)
+#define VFM_FAMILY(vfm) MASK_EXTR(vfm, VFM_FAMILY_MASK)
+#define VFM_VENDOR(vfm) MASK_EXTR(vfm, VFM_VENDOR_MASK)
 
 #ifndef __ASSEMBLY__
 
@@ -35,7 +52,7 @@ struct cpuinfo_x86 {
                 uint8_t x86_vendor;
                 uint8_t vendor;
             };
-            uint8_t _rsvd;
+            uint8_t _rsvd;             /* Use of this needs coordinating with VFM_MAKE() */
         };
         uint32_t vfm;                  /* Vendor Family Model */
     };
