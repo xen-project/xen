@@ -20,10 +20,30 @@
 #ifndef __ASSEMBLY__
 
 struct cpuinfo_x86 {
-    unsigned char x86;                 /* CPU family */
-    unsigned char x86_vendor;          /* CPU vendor */
-    unsigned char x86_model;
-    unsigned char x86_mask;
+    /* TODO: Phase out the x86 prefixed names. */
+    union {
+        struct {
+            union {
+                uint8_t x86_model;
+                uint8_t model;
+            };
+            union {
+                uint8_t x86;
+                uint8_t family;
+            };
+            union {
+                uint8_t x86_vendor;
+                uint8_t vendor;
+            };
+            uint8_t _rsvd;
+        };
+        uint32_t vfm;                  /* Vendor Family Model */
+    };
+    union {
+        uint8_t x86_mask;
+        uint8_t stepping;
+    };
+
     unsigned int cpuid_level;          /* Maximum supported CPUID level */
     unsigned int extended_cpuid_level; /* Maximum supported CPUID extended level */
     unsigned int x86_capability[NCAPINTS];
