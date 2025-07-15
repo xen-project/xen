@@ -30,6 +30,7 @@
 #include <xen/pci_regs.h>
 #include <xen/keyhandler.h>
 #include <asm/msi.h>
+#include <asm/intel-family.h>
 #include <asm/irq.h>
 #include <asm/pci.h>
 
@@ -630,9 +631,7 @@ void __init quirk_iommu_caps(struct vtd_iommu *iommu)
      * model because the client parts don't expose their IOMMUs as PCI devices
      * we could match with a Device ID.
      */
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
-         boot_cpu_data.x86 == 6 &&
-         (boot_cpu_data.x86_model == 0x2a ||
-          boot_cpu_data.x86_model == 0x2d) )
+    if ( boot_cpu_data.vfm == INTEL_SANDYBRIDGE ||
+         boot_cpu_data.vfm == INTEL_SANDYBRIDGE_X )
         iommu->cap &= ~(0xful << 34);
 }
