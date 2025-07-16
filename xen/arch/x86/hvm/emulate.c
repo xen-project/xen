@@ -176,13 +176,27 @@ static int hwdom_fixup_p2m(paddr_t addr)
     ASSERT(is_hardware_domain(currd));
     ASSERT(!altp2m_active(currd));
 
+    if ( !iomem_access_permitted(currd, gfn, gfn) )
+        return -EPERM;
+
     /*
      * Fixups are only applied for MMIO holes, and rely on the hardware domain
      * having identity mappings for non RAM regions (gfn == mfn).
+     *
+     * Much like get_page_from_l1e() for PV Dom0 does, check that the page
+     * accessed is actually an MMIO one: Either its MFN is out of range, or
+     * it's owned by DOM_IO.
      */
-    if ( !iomem_access_permitted(currd, gfn, gfn) ||
-         !is_memory_hole(_mfn(gfn), _mfn(gfn)) )
-        return -EPERM;
+    if ( mfn_valid(_mfn(gfn)) )
+    {
+        struct page_info *pg = mfn_to_page(_mfn(gfn));
+        const struct domain *owner = page_get_owner_and_reference(pg);
+
+        if ( owner )
+            put_page(pg);
+        if ( owner != dom_io )
+            return -EPERM;
+    }
 
     mfn = get_gfn(currd, gfn, &type);
     if ( !mfn_eq(mfn, INVALID_MFN) || !p2m_is_hole(type) )
