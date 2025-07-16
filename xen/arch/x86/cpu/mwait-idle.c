@@ -51,7 +51,6 @@
 
 #include <asm/cpuidle.h>
 #include <asm/hpet.h>
-#include <asm/intel-family.h>
 #include <asm/match-cpu.h>
 #include <asm/msr.h>
 #include <asm/mwait.h>
@@ -1302,8 +1301,7 @@ static const struct idle_cpu idle_cpu_srf = {
 };
 
 #define ICPU(model, cpu) \
-	{ X86_VENDOR_INTEL, 6, INTEL_FAM6_ ## model, X86_FEATURE_ALWAYS, \
-	  &idle_cpu_ ## cpu}
+	X86_MATCH_VFM(INTEL_ ## model, &idle_cpu_ ## cpu)
 
 static const struct x86_cpu_id intel_idle_ids[] __initconstrel = {
 	ICPU(NEHALEM_EP,		nehalem),

@@ -4,13 +4,32 @@
 
 #include <xen/stdint.h>
 
+#include <asm/cpufeature.h>
+#include <asm/intel-family.h>
+#include <asm/x86-vendors.h>
+
+#define X86_FEATURE_ANY X86_FEATURE_LM
+
 struct x86_cpu_id {
     uint16_t vendor;
     uint16_t family;
     uint16_t model;
-    uint16_t feature;
+    uint16_t feature;   /* X86_FEATURE_*, or X86_FEATURE_ANY */
     const void *driver_data;
 };
+
+#define X86_MATCH_CPU(v, f, m, feat, data)                      \
+    {                                                           \
+        .vendor       = (v),                                    \
+        .family       = (f),                                    \
+        .model        = (m),                                    \
+        .feature      = (feat),                                 \
+        .driver_data  = (const void *)(unsigned long)(data),    \
+    }
+
+#define X86_MATCH_VFM(vfm, data)                                \
+    X86_MATCH_CPU(VFM_VENDOR(vfm), VFM_FAMILY(vfm),             \
+                  VFM_MODEL(vfm), X86_FEATURE_ANY, data)
 
 /*
  * x86_match_cpu() - match the CPU against an array of x86_cpu_ids[]
