@@ -583,7 +583,6 @@ bool errata_c6_workaround(void)
 
     if ( unlikely(fix_needed == -1) )
     {
-#define INTEL_FAM6_MODEL(m) { X86_VENDOR_INTEL, 6, m, X86_FEATURE_ALWAYS }
         /*
          * Errata AAJ72, etc: EOI Transaction May Not be Sent if Software
          * Enters Core C6 During an Interrupt Service Routine
@@ -599,13 +598,13 @@ bool errata_c6_workaround(void)
          * service only enter C1.
          */
         static const struct x86_cpu_id eoi_errata[] = {
-            INTEL_FAM6_MODEL(0x1a), /* AAJ72 */
-            INTEL_FAM6_MODEL(0x1e),
-            INTEL_FAM6_MODEL(0x1f),
-            INTEL_FAM6_MODEL(0x2e), /* BA106 */
-            INTEL_FAM6_MODEL(0x25),
-            INTEL_FAM6_MODEL(0x2c),
-            INTEL_FAM6_MODEL(0x2f),
+            X86_MATCH_VFM(INTEL_NEHALEM_EP,   NULL), /* AAJ72 */
+            X86_MATCH_VFM(INTEL_NEHALEM,      NULL),
+            X86_MATCH_VFM(INTEL_NEHALEM_G,    NULL),
+            X86_MATCH_VFM(INTEL_NEHALEM_EX,   NULL), /* BA106 */
+            X86_MATCH_VFM(INTEL_WESTMERE,     NULL),
+            X86_MATCH_VFM(INTEL_WESTMERE_EP,  NULL),
+            X86_MATCH_VFM(INTEL_WESTMERE_EX,  NULL),
             { }
         };
         /*
@@ -623,29 +622,22 @@ bool errata_c6_workaround(void)
          * discovered on Haswell hardware, and is affected.
          */
         static const struct x86_cpu_id isr_errata[] = {
-            /* Haswell */
-            INTEL_FAM6_MODEL(0x3c),
-            INTEL_FAM6_MODEL(0x3f),
-            INTEL_FAM6_MODEL(0x45),
-            INTEL_FAM6_MODEL(0x46),
-            /* Broadwell */
-            INTEL_FAM6_MODEL(0x47),
-            INTEL_FAM6_MODEL(0x3d),
-            INTEL_FAM6_MODEL(0x4f),
-            INTEL_FAM6_MODEL(0x56),
-            /* Skylake (client) */
-            INTEL_FAM6_MODEL(0x5e),
-            INTEL_FAM6_MODEL(0x4e),
-            /* {Sky/Cascade}lake (server) */
-            INTEL_FAM6_MODEL(0x55),
-            /* {Kaby/Coffee/Whiskey/Amber} Lake */
-            INTEL_FAM6_MODEL(0x9e),
-            INTEL_FAM6_MODEL(0x8e),
-            /* Cannon Lake */
-            INTEL_FAM6_MODEL(0x66),
+            X86_MATCH_VFM(INTEL_HASWELL,      NULL),
+            X86_MATCH_VFM(INTEL_HASWELL_X,    NULL),
+            X86_MATCH_VFM(INTEL_HASWELL_L,    NULL),
+            X86_MATCH_VFM(INTEL_HASWELL_G,    NULL),
+            X86_MATCH_VFM(INTEL_BROADWELL,    NULL),
+            X86_MATCH_VFM(INTEL_BROADWELL_G,  NULL),
+            X86_MATCH_VFM(INTEL_BROADWELL_X,  NULL),
+            X86_MATCH_VFM(INTEL_BROADWELL_D,  NULL),
+            X86_MATCH_VFM(INTEL_SKYLAKE_L,    NULL),
+            X86_MATCH_VFM(INTEL_SKYLAKE,      NULL),
+            X86_MATCH_VFM(INTEL_SKYLAKE_X,    NULL),
+            X86_MATCH_VFM(INTEL_KABYLAKE_L,   NULL),
+            X86_MATCH_VFM(INTEL_KABYLAKE,     NULL),
+            X86_MATCH_VFM(INTEL_CANNONLAKE_L, NULL),
             { }
         };
-#undef INTEL_FAM6_MODEL
 
         fix_needed = cpu_has_apic &&
                      ((!directed_eoi_enabled && x86_match_cpu(eoi_errata)) ||

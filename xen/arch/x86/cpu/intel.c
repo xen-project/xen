@@ -382,16 +382,14 @@ static void cf_check early_init_intel(struct cpuinfo_x86 *c)
  */
 static void probe_c3_errata(const struct cpuinfo_x86 *c)
 {
-#define INTEL_FAM6_MODEL(m) { X86_VENDOR_INTEL, 6, m, X86_FEATURE_ALWAYS }
     static const struct x86_cpu_id models[] = {
-        /* Nehalem */
-        INTEL_FAM6_MODEL(0x1a),
-        INTEL_FAM6_MODEL(0x1e),
-        INTEL_FAM6_MODEL(0x1f),
-        INTEL_FAM6_MODEL(0x2e),
-        /* Westmere (note Westmere-EX is not affected) */
-        INTEL_FAM6_MODEL(0x2c),
-        INTEL_FAM6_MODEL(0x25),
+        X86_MATCH_VFM(INTEL_NEHALEM_EP,   NULL),
+        X86_MATCH_VFM(INTEL_NEHALEM,      NULL),
+        X86_MATCH_VFM(INTEL_NEHALEM_G,    NULL),
+        X86_MATCH_VFM(INTEL_NEHALEM_EX,   NULL), /* BA80 */
+        X86_MATCH_VFM(INTEL_WESTMERE,     NULL),
+        X86_MATCH_VFM(INTEL_WESTMERE_EP,  NULL),
+        /* Westmere-EX is not affected */
         { }
     };
 
@@ -405,29 +403,30 @@ static void probe_c3_errata(const struct cpuinfo_x86 *c)
     }
 }
 
-/*
- * APL30: One use of the MONITOR/MWAIT instruction pair is to allow a logical
- * processor to wait in a sleep state until a store to the armed address range
- * occurs. Due to this erratum, stores to the armed address range may not
- * trigger MWAIT to resume execution.
- *
- * ICX143: Under complex microarchitectural conditions, a monitor that is armed
- * with the MWAIT instruction may not be triggered, leading to a processor
- * hang.
- *
- * LNL030: Problem P-cores may not exit power state Core C6 on monitor hit.
- *
- * Force the sending of an IPI in those cases.
- */
 static void __init probe_mwait_errata(void)
 {
     static const struct x86_cpu_id __initconst models[] = {
-        INTEL_FAM6_MODEL(INTEL_FAM6_ATOM_GOLDMONT), /* APL30  */
-        INTEL_FAM6_MODEL(INTEL_FAM6_ICELAKE_X),     /* ICX143 */
-        INTEL_FAM6_MODEL(INTEL_FAM6_LUNARLAKE_M),   /* LNL030 */
+        /*
+         * APL30: One use of the MONITOR/MWAIT instruction pair is to allow a
+         * logical processor to wait in a sleep state until a store to the
+         * armed address range occurs. Due to this erratum, stores to the
+         * armed address range may not trigger MWAIT to resume execution.
+         */
+        X86_MATCH_VFM(INTEL_ATOM_GOLDMONT, NULL),
+
+        /*
+         * ICX143: Under complex microarchitectural conditions, a monitor that
+         * is armed with the MWAIT instruction may not be triggered, leading
+         * to a processor hang.
+         */
+        X86_MATCH_VFM(INTEL_ICELAKE_X, NULL),
+
+        /*
+         * LNL030: P-cores may not exit power state Core C6 on monitor hit.
+         */
+        X86_MATCH_VFM(INTEL_LUNARLAKE_M, NULL),
         { }
     };
-#undef INTEL_FAM6_MODEL
 
     if ( boot_cpu_has(X86_FEATURE_MONITOR) && x86_match_cpu(models) )
     {
