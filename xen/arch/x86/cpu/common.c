@@ -1022,6 +1022,8 @@ const struct x86_cpu_id *x86_match_cpu(const struct x86_cpu_id table[])
             continue;
         if ( c->model != m->model )
             continue;
+        if ( !((1U << c->stepping) & m->steppings) )
+            continue;
         if ( !cpu_has(c, m->feature) )
             continue;
 
