@@ -17,6 +17,7 @@
       - "${ECLAIR_OUTPUT_DIR}/*.log"
       - "${ECLAIR_OUTPUT_DIR}/*.txt"
       - '*.log'
+      - '*.json'
     reports:
       codequality: gl-code-quality-report.json
   rules:
