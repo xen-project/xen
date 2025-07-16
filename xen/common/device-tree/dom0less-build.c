@@ -829,11 +829,11 @@ void __init create_domUs(void)
     bool iommu = false;
     const struct dt_device_node *cpupool_node,
                                 *chosen = dt_find_node_by_path("/chosen");
-    const char *llc_colors_str = NULL;
 
     BUG_ON(chosen == NULL);
     dt_for_each_child_node(chosen, node)
     {
+        const char *llc_colors_str = NULL;
         struct domain *d;
         struct xen_domctl_createdomain d_cfg = {0};
         unsigned int flags = 0U;
