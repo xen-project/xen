@@ -42,18 +42,20 @@
 /* un-comment DEBUG to enable pr_debug() statements */
 #define DEBUG
 
-#include <xen/lib.h>
 #include <xen/cpu.h>
 #include <xen/init.h>
+#include <xen/lib.h>
 #include <xen/param.h>
 #include <xen/softirq.h>
 #include <xen/trace.h>
+
 #include <asm/cpuidle.h>
 #include <asm/hpet.h>
 #include <asm/intel-family.h>
-#include <asm/mwait.h>
 #include <asm/msr.h>
+#include <asm/mwait.h>
 #include <asm/spec_ctrl.h>
+
 #include <acpi/cpufreq/cpufreq.h>
 
 #define MWAIT_IDLE_VERSION "0.4.1"

@@ -16,32 +16,31 @@
  *    Mikael Pettersson    :    PM converted to driver model.
  */
 
-#include <xen/perfc.h>
+#include <xen/delay.h>
 #include <xen/errno.h>
 #include <xen/init.h>
+#include <xen/irq.h>
+#include <xen/kexec.h>
 #include <xen/mm.h>
 #include <xen/param.h>
+#include <xen/perfc.h>
 #include <xen/sched.h>
-#include <xen/irq.h>
-#include <xen/delay.h>
 #include <xen/smp.h>
 #include <xen/softirq.h>
 
+#include <asm/apic.h>
+#include <asm/atomic.h>
+#include <asm/flushtlb.h>
+#include <asm/genapic.h>
+#include <asm/guest.h>
+#include <asm/hardirq.h>
 #include <asm/io-ports.h>
+#include <asm/io_apic.h>
 #include <asm/irq-vectors.h>
 #include <asm/mc146818rtc.h>
 #include <asm/microcode.h>
-#include <asm/msr.h>
-#include <asm/atomic.h>
 #include <asm/mpspec.h>
-#include <asm/flushtlb.h>
-#include <asm/hardirq.h>
-#include <asm/apic.h>
-#include <asm/io_apic.h>
-#include <asm/genapic.h>
-
-#include <xen/kexec.h>
-#include <asm/guest.h>
+#include <asm/msr.h>
 #include <asm/nmi.h>
 #include <asm/time.h>
 

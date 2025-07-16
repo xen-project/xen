@@ -45,7 +45,6 @@
 #include <xen/softirq.h>
 #include <xen/trace.h>
 
-#include <acpi/cpufreq/cpufreq.h>
 #include <asm/apic.h>
 #include <asm/cpuidle.h>
 #include <asm/hpet.h>
@@ -54,6 +53,8 @@
 #include <asm/mwait.h>
 #include <asm/processor.h>
 #include <asm/spec_ctrl.h>
+
+#include <acpi/cpufreq/cpufreq.h>
 
 #include <public/platform.h>
 #include <public/sysctl.h>

@@ -1,18 +1,16 @@
+#include <xen/bitops.h>
 #include <xen/init.h>
 #include <xen/kernel.h>
 #include <xen/sched.h>
-#include <xen/string.h>
-#include <xen/bitops.h>
 #include <xen/smp.h>
+#include <xen/string.h>
 
-#include <asm/intel-family.h>
-#include <asm/processor.h>
-#include <asm/msr.h>
-#include <asm/mwait.h>
-#include <asm/uaccess.h>
-#include <asm/mpspec.h>
 #include <asm/apic.h>
 #include <asm/i387.h>
+#include <asm/intel-family.h>
+#include <asm/mpspec.h>
+#include <asm/msr.h>
+#include <asm/processor.h>
 #include <asm/trampoline.h>
 
 #include "cpu.h"
