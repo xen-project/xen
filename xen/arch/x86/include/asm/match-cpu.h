@@ -35,6 +35,11 @@ struct x86_cpu_id {
                   VFM_MODEL(vfm), X86_STEPPING_ANY,             \
                   X86_FEATURE_ANY, data)
 
+#define X86_MATCH_VFMS(vfm, stepping, data)                     \
+    X86_MATCH_CPU(VFM_VENDOR(vfm), VFM_FAMILY(vfm),             \
+                  VFM_MODEL(vfm), 1U << (stepping),             \
+                  X86_FEATURE_ANY, data)
+
 /*
  * x86_match_cpu() - match the CPU against an array of x86_cpu_ids[]
  *

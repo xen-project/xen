@@ -1051,88 +1051,41 @@ static void setup_APIC_timer(void)
     local_irq_restore(flags);
 }
 
-#define DEADLINE_MODEL_MATCH(m, fr) \
-    { .vendor = X86_VENDOR_INTEL, .family = 6, .model = (m), \
-      .feature = X86_FEATURE_TSC_DEADLINE, \
-      .driver_data = (void *)(unsigned long)(fr) }
-
-static unsigned int __init hsx_deadline_rev(void)
-{
-    switch ( boot_cpu_data.x86_mask )
-    {
-    case 0x02: return 0x3a; /* EP */
-    case 0x04: return 0x0f; /* EX */
-    }
-
-    return ~0U;
-}
-
-static unsigned int __init bdx_deadline_rev(void)
-{
-    switch ( boot_cpu_data.x86_mask )
-    {
-    case 0x02: return 0x00000011;
-    case 0x03: return 0x0700000e;
-    case 0x04: return 0x0f00000c;
-    case 0x05: return 0x0e000003;
-    }
-
-    return ~0U;
-}
-
-static unsigned int __init skx_deadline_rev(void)
-{
-    switch ( boot_cpu_data.x86_mask )
-    {
-    case 0x00 ... 0x02: return ~0U;
-    case 0x03: return 0x01000136;
-    case 0x04: return 0x02000014;
-    }
-
-    return 0;
-}
-
-static const struct x86_cpu_id __initconstrel deadline_match[] = {
-    DEADLINE_MODEL_MATCH(0x3c, 0x22),             /* Haswell */
-    DEADLINE_MODEL_MATCH(0x3f, hsx_deadline_rev), /* Haswell EP/EX */
-    DEADLINE_MODEL_MATCH(0x45, 0x20),             /* Haswell D */
-    DEADLINE_MODEL_MATCH(0x46, 0x17),             /* Haswell H */
-
-    DEADLINE_MODEL_MATCH(0x3d, 0x25),             /* Broadwell */
-    DEADLINE_MODEL_MATCH(0x47, 0x17),             /* Broadwell H */
-    DEADLINE_MODEL_MATCH(0x4f, 0x0b000020),       /* Broadwell EP/EX */
-    DEADLINE_MODEL_MATCH(0x56, bdx_deadline_rev), /* Broadwell D */
-
-    DEADLINE_MODEL_MATCH(0x4e, 0xb2),             /* Skylake M */
-    DEADLINE_MODEL_MATCH(0x55, skx_deadline_rev), /* Skylake X */
-    DEADLINE_MODEL_MATCH(0x5e, 0xb2),             /* Skylake D */
-
-    DEADLINE_MODEL_MATCH(0x8e, 0x52),             /* Kabylake M */
-    DEADLINE_MODEL_MATCH(0x9e, 0x52),             /* Kabylake D */
-
-    {}
-};
-
 static void __init check_deadline_errata(void)
 {
+    static const struct x86_cpu_id __initconst deadline_match[] = {
+        X86_MATCH_VFM (INTEL_HASWELL,          0x22),
+        X86_MATCH_VFMS(INTEL_HASWELL_X,   0x2, 0x3a),
+        X86_MATCH_VFMS(INTEL_HASWELL_X,   0x4, 0x0f),
+        X86_MATCH_VFM (INTEL_HASWELL_L,        0x20),
+        X86_MATCH_VFM (INTEL_HASWELL_G,        0x17),
+        X86_MATCH_VFM (INTEL_BROADWELL,        0x25),
+        X86_MATCH_VFM (INTEL_BROADWELL_G,      0x17),
+        X86_MATCH_VFM (INTEL_BROADWELL_X,      0x0b000020),
+        X86_MATCH_VFMS(INTEL_BROADWELL_D, 0x2, 0x00000011),
+        X86_MATCH_VFMS(INTEL_BROADWELL_D, 0x3, 0x0700000e),
+        X86_MATCH_VFMS(INTEL_BROADWELL_D, 0x4, 0x0f00000c),
+        X86_MATCH_VFMS(INTEL_BROADWELL_D, 0x5, 0x0e000003),
+        X86_MATCH_VFM (INTEL_SKYLAKE_L,        0xb2),
+        X86_MATCH_VFM (INTEL_SKYLAKE,          0xb2),
+        X86_MATCH_VFMS(INTEL_SKYLAKE_X,   0x3, 0x01000136),
+        X86_MATCH_VFMS(INTEL_SKYLAKE_X,   0x4, 0x02000014),
+        X86_MATCH_VFM (INTEL_KABYLAKE_L,       0x52),
+        X86_MATCH_VFM (INTEL_KABYLAKE,         0x52),
+        {}
+    };
+
     const struct x86_cpu_id *m;
     unsigned int rev;
 
-    if ( cpu_has_hypervisor )
+    if ( cpu_has_hypervisor || !boot_cpu_has(X86_FEATURE_TSC_DEADLINE) )
         return;
 
     m = x86_match_cpu(deadline_match);
     if ( !m )
         return;
 
-    /*
-     * Function pointers will have the MSB set due to address layout,
-     * immediate revisions will not.
-     */
-    if ( (long)m->driver_data < 0 )
-        rev = ((unsigned int (*)(void))(m->driver_data))();
-    else
-        rev = (unsigned long)m->driver_data;
+    rev = (unsigned long)m->driver_data;
 
     if ( this_cpu(cpu_sig).rev >= rev )
         return;
