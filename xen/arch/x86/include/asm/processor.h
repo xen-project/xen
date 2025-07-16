@@ -80,14 +80,6 @@
 struct domain;
 struct vcpu;
 
-struct x86_cpu_id {
-    uint16_t vendor;
-    uint16_t family;
-    uint16_t model;
-    uint16_t feature;   /* bit index */
-    const void *driver_data;
-};
-
 extern struct cpuinfo_x86 cpu_data[];
 #define current_cpu_data cpu_data[smp_processor_id()]
 
@@ -103,8 +95,6 @@ extern unsigned int paddr_bits;
 extern unsigned int hap_paddr_bits;
 /* Maximum width of virtual addresses supported by the hardware. */
 extern unsigned int vaddr_bits;
-
-extern const struct x86_cpu_id *x86_match_cpu(const struct x86_cpu_id table[]);
 
 extern void identify_cpu(struct cpuinfo_x86 *c);
 extern void setup_clear_cpu_cap(unsigned int cap);

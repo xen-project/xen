@@ -37,6 +37,7 @@
 #include <asm/io-ports.h>
 #include <asm/io_apic.h>
 #include <asm/irq-vectors.h>
+#include <asm/match-cpu.h>
 #include <asm/mc146818rtc.h>
 #include <asm/microcode.h>
 #include <asm/mpspec.h>

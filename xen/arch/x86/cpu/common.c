@@ -11,9 +11,9 @@
 #include <asm/debugreg.h>
 #include <asm/idt.h>
 #include <asm/io.h>
+#include <asm/match-cpu.h>
 #include <asm/mpspec.h>
 #include <asm/msr.h>
-#include <asm/processor.h>
 #include <asm/prot-key.h>
 #include <asm/random.h>
 #include <asm/setup.h>
@@ -1005,25 +1005,6 @@ void cpu_uninit(unsigned int cpu)
 	cpumask_clear_cpu(cpu, &cpu_initialized);
 }
 
-/*
- * x86_match_cpu - match the current CPU against an array of
- * x86_cpu_ids
- * @match: Pointer to array of x86_cpu_ids. Last entry terminated with
- *         {}.
- * Return the entry if the current CPU matches the entries in the
- * passed x86_cpu_id match table. Otherwise NULL.  The match table
- * contains vendor (X86_VENDOR_*), family, model and feature bits or
- * respective wildcard entries.
- *
- * A typical table entry would be to match a specific CPU
- * { X86_VENDOR_INTEL, 6, 0x12 }
- * or to match a specific CPU feature
- * { X86_FEATURE_MATCH(X86_FEATURE_FOOBAR) }
- *
- * This always matches against the boot cpu, assuming models and
-features are
- * consistent over all CPUs.
- */
 const struct x86_cpu_id *x86_match_cpu(const struct x86_cpu_id table[])
 {
 	const struct x86_cpu_id *m;

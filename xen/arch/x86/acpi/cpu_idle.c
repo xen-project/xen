@@ -50,8 +50,8 @@
 #include <asm/hpet.h>
 #include <asm/io.h>
 #include <asm/iocap.h>
+#include <asm/match-cpu.h>
 #include <asm/mwait.h>
-#include <asm/processor.h>
 #include <asm/spec_ctrl.h>
 
 #include <acpi/cpufreq/cpufreq.h>

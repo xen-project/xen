@@ -8,9 +8,9 @@
 #include <asm/apic.h>
 #include <asm/i387.h>
 #include <asm/intel-family.h>
+#include <asm/match-cpu.h>
 #include <asm/mpspec.h>
 #include <asm/msr.h>
-#include <asm/processor.h>
 #include <asm/trampoline.h>
 
 #include "cpu.h"

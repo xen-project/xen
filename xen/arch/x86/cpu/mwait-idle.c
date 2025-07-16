@@ -52,6 +52,7 @@
 #include <asm/cpuidle.h>
 #include <asm/hpet.h>
 #include <asm/intel-family.h>
+#include <asm/match-cpu.h>
 #include <asm/msr.h>
 #include <asm/mwait.h>
 #include <asm/spec_ctrl.h>
