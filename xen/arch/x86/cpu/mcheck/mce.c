@@ -1005,21 +1005,14 @@ void x86_mc_get_cpu_info(unsigned cpu, uint32_t *chipid, uint16_t *coreid,
                          unsigned *ncores, unsigned *ncores_active,
                          unsigned *nthreads)
 {
-    struct cpuinfo_x86 *c;
+    const struct cpuinfo_x86 *c = &cpu_data[cpu];
 
     *apicid = cpu_physical_id(cpu);
-    c = &cpu_data[cpu];
     if ( c->apicid == BAD_APICID )
     {
         *chipid = cpu;
         *coreid = 0;
         *threadid = 0;
-        if ( ncores != NULL )
-            *ncores = 1;
-        if ( ncores_active != NULL )
-            *ncores_active = 1;
-        if ( nthreads != NULL )
-            *nthreads = 1;
     }
     else
     {
@@ -1029,13 +1022,16 @@ void x86_mc_get_cpu_info(unsigned cpu, uint32_t *chipid, uint16_t *coreid,
         else
             *coreid = 0;
         *threadid = c->apicid & ((1 << (c->x86_num_siblings - 1)) - 1);
-        if ( ncores != NULL )
-            *ncores = c->x86_max_cores;
-        if ( ncores_active != NULL )
-            *ncores_active = c->booted_cores;
-        if ( nthreads != NULL )
-            *nthreads = c->x86_num_siblings;
     }
+
+    if ( ncores )
+        *ncores = c->x86_max_cores ?: 1;
+
+    if ( ncores_active )
+        *ncores_active = c->booted_cores ?: 1;
+
+    if ( nthreads )
+        *nthreads = c->x86_num_siblings ?: 1;
 }
 
 #define INTPOSE_NENT 50
