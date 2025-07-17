@@ -191,9 +191,29 @@ int cpufreq_limit_change(unsigned int cpu)
     return __cpufreq_set_policy(data, &policy);
 }
 
-int cpufreq_add_cpu(unsigned int cpu)
+static int get_psd_info(unsigned int cpu, unsigned int *shared_type,
+                        const struct xen_psd_package **domain_info)
 {
     int ret = 0;
+
+    switch ( processor_pminfo[cpu]->init )
+    {
+    case XEN_PX_INIT:
+        *shared_type = processor_pminfo[cpu]->perf.shared_type;
+        *domain_info = &processor_pminfo[cpu]->perf.domain_info;
+        break;
+
+    default:
+        ret = -EINVAL;
+        break;
+    }
+
+    return ret;
+}
+
+int cpufreq_add_cpu(unsigned int cpu)
+{
+    int ret;
     unsigned int firstcpu;
     unsigned int dom, domexist = 0;
     unsigned int hw_all = 0;
@@ -201,13 +221,12 @@ int cpufreq_add_cpu(unsigned int cpu)
     struct cpufreq_dom *cpufreq_dom = NULL;
     struct cpufreq_policy new_policy;
     struct cpufreq_policy *policy;
-    struct processor_performance *perf;
+    const struct xen_psd_package *domain_info;
+    unsigned int shared_type;
 
     /* to protect the case when Px was not controlled by xen */
     if ( !processor_pminfo[cpu] || !cpu_online(cpu) )
         return -EINVAL;
-
-    perf = &processor_pminfo[cpu]->perf;
 
     if ( !(processor_pminfo[cpu]->init & XEN_PX_INIT) )
         return -EINVAL;
@@ -218,10 +237,14 @@ int cpufreq_add_cpu(unsigned int cpu)
     if (per_cpu(cpufreq_cpu_policy, cpu))
         return 0;
 
-    if (perf->shared_type == CPUFREQ_SHARED_TYPE_HW)
+    ret = get_psd_info(cpu, &shared_type, &domain_info);
+    if ( ret )
+        return ret;
+
+    if ( shared_type == CPUFREQ_SHARED_TYPE_HW )
         hw_all = 1;
 
-    dom = perf->domain_info.domain;
+    dom = domain_info->domain;
 
     list_for_each(pos, &cpufreq_dom_list_head) {
         cpufreq_dom = list_entry(pos, struct cpufreq_dom, node);
@@ -244,21 +267,27 @@ int cpufreq_add_cpu(unsigned int cpu)
         cpufreq_dom->dom = dom;
         list_add(&cpufreq_dom->node, &cpufreq_dom_list_head);
     } else {
+        unsigned int firstcpu_shared_type;
+        const struct xen_psd_package *firstcpu_domain_info;
+
         /* domain sanity check under whatever coordination type */
         firstcpu = cpumask_first(cpufreq_dom->map);
-        if ((perf->domain_info.coord_type !=
-            processor_pminfo[firstcpu]->perf.domain_info.coord_type) ||
-            (perf->domain_info.num_processors !=
-            processor_pminfo[firstcpu]->perf.domain_info.num_processors)) {
+        ret = get_psd_info(firstcpu, &firstcpu_shared_type,
+                           &firstcpu_domain_info);
+        if ( ret )
+            return ret;
 
+        if ( domain_info->coord_type != firstcpu_domain_info->coord_type ||
+             domain_info->num_processors !=
+             firstcpu_domain_info->num_processors )
+        {
             printk(KERN_WARNING "cpufreq fail to add CPU%d:"
                    "incorrect _PSD(%"PRIu64":%"PRIu64"), "
                    "expect(%"PRIu64"/%"PRIu64")\n",
-                   cpu, perf->domain_info.coord_type,
-                   perf->domain_info.num_processors,
-                   processor_pminfo[firstcpu]->perf.domain_info.coord_type,
-                   processor_pminfo[firstcpu]->perf.domain_info.num_processors
-                );
+                   cpu, domain_info->coord_type,
+                   domain_info->num_processors,
+                   firstcpu_domain_info->coord_type,
+                   firstcpu_domain_info->num_processors);
             return -EINVAL;
         }
     }
@@ -304,8 +333,9 @@ int cpufreq_add_cpu(unsigned int cpu)
     if (ret)
         goto err1;
 
-    if (hw_all || (cpumask_weight(cpufreq_dom->map) ==
-                   perf->domain_info.num_processors)) {
+    if ( hw_all || cpumask_weight(cpufreq_dom->map) ==
+                   domain_info->num_processors )
+    {
         memcpy(&new_policy, policy, sizeof(struct cpufreq_policy));
 
         /*
@@ -360,18 +390,18 @@ err0:
 
 int cpufreq_del_cpu(unsigned int cpu)
 {
+    int ret;
     unsigned int dom, domexist = 0;
     unsigned int hw_all = 0;
     struct list_head *pos;
     struct cpufreq_dom *cpufreq_dom = NULL;
     struct cpufreq_policy *policy;
-    struct processor_performance *perf;
+    unsigned int shared_type;
+    const struct xen_psd_package *domain_info;
 
     /* to protect the case when Px was not controlled by xen */
     if ( !processor_pminfo[cpu] || !cpu_online(cpu) )
         return -EINVAL;
-
-    perf = &processor_pminfo[cpu]->perf;
 
     if ( !(processor_pminfo[cpu]->init & XEN_PX_INIT) )
         return -EINVAL;
@@ -379,10 +409,14 @@ int cpufreq_del_cpu(unsigned int cpu)
     if (!per_cpu(cpufreq_cpu_policy, cpu))
         return 0;
 
-    if (perf->shared_type == CPUFREQ_SHARED_TYPE_HW)
+    ret = get_psd_info(cpu, &shared_type, &domain_info);
+    if ( ret )
+        return ret;
+
+    if ( shared_type == CPUFREQ_SHARED_TYPE_HW )
         hw_all = 1;
 
-    dom = perf->domain_info.domain;
+    dom = domain_info->domain;
     policy = per_cpu(cpufreq_cpu_policy, cpu);
 
     list_for_each(pos, &cpufreq_dom_list_head) {
@@ -398,8 +432,8 @@ int cpufreq_del_cpu(unsigned int cpu)
 
     /* for HW_ALL, stop gov for each core of the _PSD domain */
     /* for SW_ALL & SW_ANY, stop gov for the 1st core of the _PSD domain */
-    if (hw_all || (cpumask_weight(cpufreq_dom->map) ==
-                   perf->domain_info.num_processors))
+    if ( hw_all || cpumask_weight(cpufreq_dom->map) ==
+                   domain_info->num_processors )
         __cpufreq_governor(policy, CPUFREQ_GOV_STOP);
 
     cpufreq_statistic_exit(cpu);
@@ -462,6 +496,17 @@ static void print_PSD( struct xen_psd_package *ptr)
 static void print_PPC(unsigned int platform_limit)
 {
     printk("\t_PPC: %d\n", platform_limit);
+}
+
+static bool check_psd_pminfo(unsigned int shared_type)
+{
+    /* Check domain coordination */
+    if ( shared_type != CPUFREQ_SHARED_TYPE_ALL &&
+         shared_type != CPUFREQ_SHARED_TYPE_ANY &&
+         shared_type != CPUFREQ_SHARED_TYPE_HW )
+        return false;
+
+    return true;
 }
 
 int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *perf)
@@ -546,10 +591,7 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *perf)
 
     if ( perf->flags & XEN_PX_PSD )
     {
-        /* check domain coordination */
-        if ( perf->shared_type != CPUFREQ_SHARED_TYPE_ALL &&
-             perf->shared_type != CPUFREQ_SHARED_TYPE_ANY &&
-             perf->shared_type != CPUFREQ_SHARED_TYPE_HW )
+        if ( !check_psd_pminfo(perf->shared_type) )
         {
             ret = -EINVAL;
             goto out;
