@@ -28,6 +28,12 @@ AC_DEFUN([AX_SYSTEMD_OPTIONS], [
 		[set directory for systemd modules load files [PREFIX/lib/modules-load.d/]]),
 		[SYSTEMD_MODULES_LOAD="$withval"], [SYSTEMD_MODULES_LOAD=""])
 	AC_SUBST(SYSTEMD_MODULES_LOAD)
+
+	AC_ARG_WITH(systemd-sleep,
+		AS_HELP_STRING([--with-systemd-sleep=DIR],
+		[set directory for systemd sleep script files [PREFIX/lib/systemd/system-sleep/]]),
+		[SYSTEMD_SLEEP_DIR="$withval"], [SYSTEMD_SLEEP_DIR=""])
+	AC_SUBST(SYSTEMD_SLEEP_DIR)
 ])
 
 AC_DEFUN([AX_ENABLE_SYSTEMD_OPTS], [
@@ -68,6 +74,14 @@ AC_DEFUN([AX_CHECK_SYSTEMD_LIBS], [
 
 	AS_IF([test "x$SYSTEMD_MODULES_LOAD" = x], [
 	    AC_MSG_ERROR([SYSTEMD_MODULES_LOAD is unset])
+	], [])
+
+	AS_IF([test "x$SYSTEMD_SLEEP_DIR" = x], [
+	    PKG_CHECK_VAR([SYSTEMD_SLEEP_DIR], [systemd], [systemdsleepdir])
+	], [])
+
+	AS_IF([test "x$SYSTEMD_SLEEP_DIR" = x], [
+	    AC_MSG_ERROR([SYSTEMD_SLEEP_DIR is unset])
 	], [])
 ])
 

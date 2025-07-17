@@ -652,6 +652,7 @@ ac_subst_vars='LTLIBOBJS
 LIBOBJS
 pvshim
 ninepfs
+SYSTEMD_SLEEP_DIR
 SYSTEMD_MODULES_LOAD
 SYSTEMD_DIR
 systemd
@@ -847,6 +848,7 @@ with_xenstored
 enable_systemd
 with_systemd
 with_systemd_modules_load
+with_systemd_sleep
 enable_9pfs
 enable_pvshim
 '
@@ -881,7 +883,8 @@ pixman_LIBS
 libzstd_CFLAGS
 libzstd_LIBS
 LIBNL3_CFLAGS
-LIBNL3_LIBS'
+LIBNL3_LIBS
+SYSTEMD_SLEEP_DIR'
 
 
 # Initialize some variables set by options.
@@ -1589,6 +1592,9 @@ Optional Packages:
   --with-systemd-modules-load=DIR
                           set directory for systemd modules load files
                           [PREFIX/lib/modules-load.d/]
+  --with-systemd-sleep=DIR
+                          set directory for systemd sleep script files
+                          [PREFIX/lib/systemd/system-sleep/]
 
 Some influential environment variables:
   CC          C compiler command
@@ -1630,6 +1636,8 @@ Some influential environment variables:
   LIBNL3_CFLAGS
               C compiler flags for LIBNL3, overriding pkg-config
   LIBNL3_LIBS linker flags for LIBNL3, overriding pkg-config
+  SYSTEMD_SLEEP_DIR
+              value of systemdsleepdir for systemd, overriding pkg-config
 
 Use these variables to override the choices made by `configure' or to help
 it to find libraries and programs with nonstandard names/locations.
@@ -10138,6 +10146,17 @@ fi
 
 
 
+# Check whether --with-systemd-sleep was given.
+if test ${with_systemd_sleep+y}
+then :
+  withval=$with_systemd_sleep; SYSTEMD_SLEEP_DIR="$withval"
+else $as_nop
+  SYSTEMD_SLEEP_DIR=""
+fi
+
+
+
+
 
 		if test "x$enable_systemd" != "xno"
 then :
@@ -10175,6 +10194,43 @@ fi
 then :
 
 	    as_fn_error $? "SYSTEMD_MODULES_LOAD is unset" "$LINENO" 5
+
+fi
+
+	if test "x$SYSTEMD_SLEEP_DIR" = x
+then :
+
+
+if test -n "$SYSTEMD_SLEEP_DIR"; then
+    pkg_cv_SYSTEMD_SLEEP_DIR="$SYSTEMD_SLEEP_DIR"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"systemd\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "systemd") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_SYSTEMD_SLEEP_DIR=`$PKG_CONFIG --variable="systemdsleepdir" "systemd" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+SYSTEMD_SLEEP_DIR=$pkg_cv_SYSTEMD_SLEEP_DIR
+
+if test "x$SYSTEMD_SLEEP_DIR" = x""
+then :
+
+fi
+
+fi
+
+	if test "x$SYSTEMD_SLEEP_DIR" = x
+then :
+
+	    as_fn_error $? "SYSTEMD_SLEEP_DIR is unset" "$LINENO" 5
 
 fi
 
