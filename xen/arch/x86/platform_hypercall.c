@@ -539,9 +539,14 @@ ret_t do_platform_op(
         case XEN_PM_PX:
             if ( !(xen_processor_pmbits & XEN_PROCESSOR_PM_PX) )
             {
-                ret = -ENOSYS;
+                /*
+                 * Neglect Px-info when registered cpufreq driver
+                 * isn't in Px mode
+                 */
+                ret = 0;
                 break;
             }
+
             ret = set_px_pminfo(op->u.set_pminfo.id, &op->u.set_pminfo.u.perf);
             break;
  
