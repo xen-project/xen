@@ -38,6 +38,9 @@ static bool __initdata need_xenstore;
 
 void __init set_xs_domain(struct domain *d)
 {
+    if ( xs_domid != DOMID_INVALID )
+        panic("Only 1 xenstore domain can be specified! (%u)", xs_domid);
+
     xs_domid = d->domain_id;
     set_global_virq_handler(d, VIRQ_DOM_EXC);
 }
@@ -876,10 +879,6 @@ void __init create_domUs(void)
 
             if ( val & DOMAIN_CAPS_XENSTORE )
             {
-                if ( xs_domid != DOMID_INVALID )
-                    panic("Only 1 xenstore domain can be specified! (%u)\n",
-                            xs_domid);
-
                 d_cfg.flags |= XEN_DOMCTL_CDF_xs_domain;
                 d_cfg.max_evtchn_port = -1;
             }
