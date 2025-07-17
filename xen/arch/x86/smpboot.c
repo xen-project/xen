@@ -370,7 +370,9 @@ void asmlinkage start_secondary(void)
 
     cpu_init();
 
-    initialize_cpu_data(cpu);
+    /* During resume, must not clear previously collected data. */
+    if ( system_state != SYS_STATE_resume )
+        initialize_cpu_data(cpu);
 
     microcode_update_one();
 
