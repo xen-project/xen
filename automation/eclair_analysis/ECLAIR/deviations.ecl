@@ -414,6 +414,14 @@ write or not"
 -doc_end
 
 #
+# Series 12
+#
+
+-doc_begin="Consider the C standard type instead of the essential type for the purposes of determining the width in bits of the operand."
+-config=MC3A2.R12.2,out_of_bounds=negative_or_too_big_for_type
+-doc_end
+
+#
 # Series 13
 #
 

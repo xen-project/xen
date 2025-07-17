@@ -48,6 +48,7 @@
 -enable=MC3A2.R11.7
 -enable=MC3A2.R11.8
 -enable=MC3A2.R11.9
+-enable=MC3A2.R12.2
 -enable=MC3A2.R12.5
 -enable=MC3A2.R13.1
 -enable=MC3A2.R13.2

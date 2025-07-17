@@ -386,6 +386,14 @@ Deviations related to MISRA C:2012 Rules:
        integers for this purpose is allowed.
      - Tagged as `deliberate` for ECLAIR.
 
+   * - R12.2
+     - The width in bits of the C standard type is considered instead of
+       the width of the essential type of the left-hand operand of a shift
+       operator. This is safe because the occurrence of Undefined Behavior
+       only relates to the width of the C standard type, which is possibly
+       wider than its essential type.
+     - Project-wide deviation.
+
    * - R13.5
      - All developers and reviewers can be safely assumed to be well aware of
        the short-circuit evaluation strategy for logical operators.
