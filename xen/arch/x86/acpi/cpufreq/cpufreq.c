@@ -150,7 +150,7 @@ static int __init cf_check cpufreq_driver_init(void)
                     break;
                 }
 
-                if ( ret != -ENODEV )
+                if ( !ret || ret == -EBUSY )
                     break;
             }
             break;
