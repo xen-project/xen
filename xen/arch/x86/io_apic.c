@@ -2758,7 +2758,7 @@ unsigned int __hwdom_init arch_hwdom_irqs(const struct domain *d)
     else
     {
         if ( !d->domain_id )
-            n = min(n, dom0_max_vcpus());
+            n = min(n, d->max_vcpus);
         n = min(nr_irqs_gsi + n * NR_DYNAMIC_VECTORS, max_irqs);
     }
 

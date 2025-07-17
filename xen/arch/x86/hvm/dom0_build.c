@@ -890,19 +890,18 @@ static int __init pvh_setup_acpi_madt(struct domain *d, paddr_t *addr)
     struct acpi_madt_local_x2apic *x2apic;
     acpi_status status;
     unsigned long size;
-    unsigned int i, max_vcpus;
+    unsigned int i;
     int rc;
 
     /* Count number of interrupt overrides in the MADT. */
     acpi_table_parse_madt(ACPI_MADT_TYPE_INTERRUPT_OVERRIDE,
                           acpi_count_intr_ovr, UINT_MAX);
 
-    max_vcpus = dom0_max_vcpus();
     /* Calculate the size of the crafted MADT. */
     size = sizeof(*madt);
     size += sizeof(*io_apic) * nr_ioapics;
     size += sizeof(*intsrcovr) * acpi_intr_overrides;
-    size += sizeof(*x2apic) * max_vcpus;
+    size += sizeof(*x2apic) * d->max_vcpus;
 
     madt = xzalloc_bytes(size);
     if ( !madt )
@@ -942,7 +941,7 @@ static int __init pvh_setup_acpi_madt(struct domain *d, paddr_t *addr)
     }
 
     x2apic = (void *)io_apic;
-    for ( i = 0; i < max_vcpus; i++ )
+    for ( i = 0; i < d->max_vcpus; i++ )
     {
         x2apic->header.type = ACPI_MADT_TYPE_LOCAL_X2APIC;
         x2apic->header.length = sizeof(*x2apic);
