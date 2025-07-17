@@ -8,13 +8,44 @@
 #include <stdlib.h>
 #include <syslog.h>
 
+#include <mini-os/kexec.h>
+
 #include "talloc.h"
 #include "lu.h"
+#include "core.h"
 
 #ifndef NO_LIVE_UPDATE
 char *lu_exec(const void *ctx, int argc, char **argv)
 {
-	return "NYI";
+	int i;
+	int ret;
+	char *errbuf;
+	char *cmdline;
+
+	if (!lu_status->kernel)
+		return "No new kernel";
+
+	cmdline = talloc_strdup(ctx, "");
+	if (!cmdline)
+		return "Allocation failure";
+	for (i = 1; argv[i]; i++) {
+		if (i > 1) {
+			cmdline = talloc_append_string(ctx, cmdline, " ");
+			if (!cmdline)
+				return "Allocation failure";
+		}
+		cmdline = talloc_append_string(ctx, cmdline, argv[i]);
+		if (!cmdline)
+			return "Allocation failure";
+	}
+
+	ret = kexec(lu_status->kernel, lu_status->kernel_size, cmdline);
+
+	errbuf = talloc_asprintf(ctx, "kexec() returned %d", ret);
+	if (!errbuf)
+		errbuf = "kexec() returned";
+
+	return errbuf;
 }
 
 static const char *lu_binary_alloc(const void *ctx, struct connection *conn,
