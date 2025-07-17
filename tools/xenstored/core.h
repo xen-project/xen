@@ -45,6 +45,11 @@
 #endif
 #endif
 
+/* Live update in stubdom case needs kexec support. */
+#if defined(__MINIOS__) && !defined(CONFIG_KEXEC)
+#define NO_LIVE_UPDATE
+#endif
+
 /* DEFAULT_BUFFER_SIZE should be large enough for each errno string. */
 #define DEFAULT_BUFFER_SIZE 16
 
