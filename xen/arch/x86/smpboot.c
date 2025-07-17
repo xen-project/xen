@@ -69,7 +69,8 @@ unsigned int __read_mostly nr_sockets;
 cpumask_t **__read_mostly socket_cpumask;
 static cpumask_t *secondary_socket_cpumask;
 
-struct cpuinfo_x86 cpu_data[NR_CPUS];
+struct cpuinfo_x86 __read_mostly cpu_data[NR_CPUS] =
+    { [0 ... NR_CPUS - 1] = { CPU_DATA_INIT() } };
 
 u32 x86_cpu_to_apicid[NR_CPUS] __read_mostly =
 	{ [0 ... NR_CPUS-1] = BAD_APICID };
@@ -89,7 +90,12 @@ void *stack_base[NR_CPUS];
 
 void initialize_cpu_data(unsigned int cpu)
 {
-    cpu_data[cpu] = boot_cpu_data;
+    struct cpuinfo_x86 c = boot_cpu_data;
+
+    /* Must not partially clear the BSP's collected data. */
+    if ( cpu || system_state > SYS_STATE_smp_boot )
+        reset_cpuinfo(&c, true);
+    cpu_data[cpu] = c;
 }
 
 static bool smp_store_cpu_info(unsigned int id)
@@ -968,9 +974,7 @@ static void cpu_smpboot_free(unsigned int cpu, bool remove)
 
     if ( remove )
     {
-        c[cpu].phys_proc_id = XEN_INVALID_SOCKET_ID;
-        c[cpu].cpu_core_id = XEN_INVALID_CORE_ID;
-        c[cpu].compute_unit_id = INVALID_CUID;
+        reset_cpuinfo(&c[cpu], false);
 
         FREE_CPUMASK_VAR(per_cpu(cpu_sibling_mask, cpu));
         FREE_CPUMASK_VAR(per_cpu(cpu_core_mask, cpu));

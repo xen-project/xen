@@ -41,6 +41,24 @@ struct cpuinfo_x86 {
     unsigned short x86_clflush_size;
 } __cacheline_aligned;
 
+#define CPU_DATA_INIT(what...)                     \
+        what.cpuid_level = 1,                      \
+        what.extended_cpuid_level = 0,             \
+        what.x86_cache_size = -1,                  \
+        what.x86_max_cores = 1,                    \
+        what.x86_num_siblings = 1,                 \
+        what.apicid = BAD_APICID,                  \
+        what.phys_proc_id = XEN_INVALID_SOCKET_ID, \
+        what.cpu_core_id = XEN_INVALID_CORE_ID,    \
+        what.compute_unit_id = INVALID_CUID
+
+/*
+ * @keep_basic set to true retains data firmly assumed to be symmetric
+ * across all CPUs.  With it set to false only CPU_DATA_INIT() will be
+ * invoked on the passed structure.
+ */
+void reset_cpuinfo(struct cpuinfo_x86 *c, bool keep_basic);
+
 extern struct cpuinfo_x86 boot_cpu_data;
 
 static inline bool cpu_has(const struct cpuinfo_x86 *info, unsigned int feat)

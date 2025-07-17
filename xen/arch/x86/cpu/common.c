@@ -415,6 +415,22 @@ void __init early_cpu_init(bool verbose)
 	initialize_cpu_data(0);
 }
 
+void reset_cpuinfo(struct cpuinfo_x86 *c, bool keep_basic)
+{
+    if ( !keep_basic )
+    {
+        c->x86_vendor = 0;
+        c->x86 = 0;
+        c->x86_model = 0;
+        c->x86_mask = 0;
+        memset(&c->x86_capability, 0, sizeof(c->x86_capability));
+        memset(&c->x86_vendor_id, 0, sizeof(c->x86_vendor_id));
+        memset(&c->x86_model_id, 0, sizeof(c->x86_model_id));
+    }
+
+    CPU_DATA_INIT((*c));
+}
+
 static void generic_identify(struct cpuinfo_x86 *c)
 {
 	u32 eax, ebx, ecx, edx, tmp;
@@ -522,16 +538,7 @@ void identify_cpu(struct cpuinfo_x86 *c)
 {
 	int i;
 
-	c->x86_cache_size = -1;
-	c->x86_model = c->x86_mask = 0;	/* So far unknown... */
-	c->x86_model_id[0] = '\0';  /* Unset */
-	c->x86_max_cores = 1;
-	c->x86_num_siblings = 1;
-	c->x86_clflush_size = 0;
-	c->cpu_core_id = XEN_INVALID_CORE_ID;
-	c->compute_unit_id = INVALID_CUID;
-	memset(&c->x86_capability, 0, sizeof c->x86_capability);
-
+	reset_cpuinfo(c, false);
 	generic_identify(c);
 
 #ifdef NOISY_CAPS

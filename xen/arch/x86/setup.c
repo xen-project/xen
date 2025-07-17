@@ -178,7 +178,7 @@ void *stack_start = cpu0_stack + STACK_SIZE - sizeof(struct cpu_info);
 /* Used by the boot asm and EFI to stash the multiboot_info paddr. */
 unsigned int __initdata multiboot_ptr;
 
-struct cpuinfo_x86 __read_mostly boot_cpu_data = { 0, 0, 0, 0, -1 };
+struct cpuinfo_x86 __read_mostly boot_cpu_data = { CPU_DATA_INIT() };
 
 unsigned long __read_mostly mmu_cr4_features = XEN_MINIMAL_CR4;
 
