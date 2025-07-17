@@ -982,7 +982,8 @@ static void cpu_smpboot_free(unsigned int cpu, bool remove)
 
     if ( remove )
     {
-        reset_cpuinfo(&c[cpu], false);
+        if ( system_state != SYS_STATE_suspend )
+            reset_cpuinfo(&c[cpu], false);
 
         FREE_CPUMASK_VAR(per_cpu(cpu_sibling_mask, cpu));
         FREE_CPUMASK_VAR(per_cpu(cpu_core_mask, cpu));
