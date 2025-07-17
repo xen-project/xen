@@ -115,11 +115,6 @@ unsigned int __init dom0_max_vcpus(void)
     return opt_dom0_max_vcpus;
 }
 
-struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
-{
-    return vcpu_create(dom0, 0);
-}
-
 /*
  * Insert the given pages into a memory bank, banks are ordered by address.
  *
@@ -2085,7 +2080,7 @@ void __init create_dom0(void)
     if ( llc_coloring_enabled && (rc = dom0_set_llc_colors(dom0)) )
         panic("Error initializing LLC coloring for domain 0 (rc = %d)\n", rc);
 
-    if ( alloc_dom0_vcpu0(dom0) == NULL )
+    if ( vcpu_create(dom0, 0) == NULL )
         panic("Error creating domain 0 vcpu0\n");
 
     rc = construct_dom0(dom0);
