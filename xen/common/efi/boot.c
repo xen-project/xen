@@ -792,6 +792,8 @@ static bool __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
 
     if ( !name )
         PrintErrMesg(L"No filename", EFI_OUT_OF_RESOURCES);
+
+    what = L"Open";
     if ( dir_handle )
         ret = dir_handle->Open(dir_handle, &FileHandle, name,
                                EFI_FILE_MODE_READ, 0);
@@ -800,54 +802,58 @@ static bool __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
     if ( file == &cfg && ret == EFI_NOT_FOUND )
         return false;
     if ( EFI_ERROR(ret) )
-        what = L"Open";
-    else
-        ret = FileHandle->SetPosition(FileHandle, -1);
-    if ( EFI_ERROR(ret) )
-        what = what ?: L"Seek";
-    else
-        ret = FileHandle->GetPosition(FileHandle, &size);
-    if ( EFI_ERROR(ret) )
-        what = what ?: L"Get size";
-    else
-        ret = FileHandle->SetPosition(FileHandle, 0);
-    if ( EFI_ERROR(ret) )
-        what = what ?: L"Seek";
-    else
-    {
-        file->addr = min(1UL << (32 + PAGE_SHIFT),
-                         HYPERVISOR_VIRT_END - DIRECTMAP_VIRT_START);
-        ret = efi_bs->AllocatePages(AllocateMaxAddress, EfiLoaderData,
-                                    PFN_UP(size), &file->addr);
-    }
-    if ( EFI_ERROR(ret) )
-        what = what ?: L"Allocation";
-    else
-    {
-        file->need_to_free = true;
-        file->size = size;
-        handle_file_info(name, file, options);
+        goto fail;
 
-        ret = FileHandle->Read(FileHandle, &file->size, file->str);
-        if ( !EFI_ERROR(ret) && file->size != size )
-            ret = EFI_ABORTED;
-        if ( EFI_ERROR(ret) )
-            what = L"Read";
-    }
+    what = L"Seek";
+    ret = FileHandle->SetPosition(FileHandle, -1);
+    if ( EFI_ERROR(ret) )
+        goto fail;
 
-    if ( FileHandle )
-        FileHandle->Close(FileHandle);
+    what = L"Get size";
+    ret = FileHandle->GetPosition(FileHandle, &size);
+    if ( EFI_ERROR(ret) )
+        goto fail;
 
-    if ( what )
-    {
-        PrintErr(what);
-        PrintErr(L" failed for ");
-        PrintErrMesg(name, ret);
-    }
+    what = L"Seek";
+    ret = FileHandle->SetPosition(FileHandle, 0);
+    if ( EFI_ERROR(ret) )
+        goto fail;
+
+    what = L"Allocation";
+    file->addr = min(1UL << (32 + PAGE_SHIFT),
+                     HYPERVISOR_VIRT_END - DIRECTMAP_VIRT_START);
+    ret = efi_bs->AllocatePages(AllocateMaxAddress, EfiLoaderData,
+                                PFN_UP(size), &file->addr);
+    if ( EFI_ERROR(ret) )
+        goto fail;
+
+    file->need_to_free = true;
+    file->size = size;
+    handle_file_info(name, file, options);
+
+    what = L"Read";
+    ret = FileHandle->Read(FileHandle, &file->size, file->str);
+    if ( !EFI_ERROR(ret) && file->size != size )
+        ret = EFI_ABORTED;
+    if ( EFI_ERROR(ret) )
+        goto fail;
+
+    FileHandle->Close(FileHandle);
 
     efi_arch_flush_dcache_area(file->ptr, file->size);
 
     return true;
+
+ fail:
+    if ( FileHandle )
+        FileHandle->Close(FileHandle);
+
+    PrintErr(what);
+    PrintErr(L" failed for ");
+    PrintErrMesg(name, ret);
+
+    /* not reached */
+    return false;
 }
 
 static bool __init read_section(const EFI_LOADED_IMAGE *image,
