@@ -610,7 +610,7 @@ int set_hwp_para(struct cpufreq_policy *policy,
         data->desired = 0;
         break;
 
-    case XEN_SYSCTL_CPPC_SET_PRESET_BALANCE:
+    case XEN_SYSCTL_CPPC_SET_PRESET_ONDEMAND:
         data->minimum = data->hw.lowest;
         data->maximum = data->hw.highest;
         data->activity_window = 0;

@@ -1447,9 +1447,9 @@ static int parse_cppc_opts(xc_set_cppc_para_t *set_cppc, int *cpuid,
         set_cppc->set_params = XEN_SYSCTL_CPPC_SET_PRESET_PERFORMANCE;
         i++;
     }
-    else if ( strcasecmp(argv[i], "balance") == 0 )
+    else if ( strcasecmp(argv[i], "ondemand") == 0 )
     {
-        set_cppc->set_params = XEN_SYSCTL_CPPC_SET_PRESET_BALANCE;
+        set_cppc->set_params = XEN_SYSCTL_CPPC_SET_PRESET_ONDEMAND;
         i++;
     }
 
