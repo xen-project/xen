@@ -672,8 +672,7 @@ static void cf_check init_intel(struct cpuinfo_x86 *c)
 	 * latter is not impacted.  Hide CLWB to cause Xen to fall back to
 	 * using CLFLUSHOPT instead.
 	 */
-	if (c == &boot_cpu_data &&
-	    c->x86 == 6 && c->x86_model == INTEL_FAM6_SKYLAKE_X)
+	if (c == &boot_cpu_data && c->vfm == INTEL_SKYLAKE_X)
 		setup_clear_cpu_cap(X86_FEATURE_CLWB);
 }
 

@@ -342,7 +342,7 @@ void calculate_raw_cpu_policy(void)
     x86_cpu_policy_fill_native(p);
 
     /* Nothing good will come from Xen and libx86 disagreeing on vendor. */
-    ASSERT(p->x86_vendor == boot_cpu_data.x86_vendor);
+    ASSERT(p->x86_vendor == boot_cpu_data.vendor);
 
     /*
      * Clear the truly dynamic fields.  These vary with the in-context XCR0
@@ -417,7 +417,7 @@ static void __init guest_common_default_leaves(struct cpu_policy *p)
 
 static void __init guest_common_max_feature_adjustments(uint32_t *fs)
 {
-    switch ( boot_cpu_data.x86_vendor )
+    switch ( boot_cpu_data.vendor )
     {
     case X86_VENDOR_INTEL:
         /*
@@ -460,8 +460,7 @@ static void __init guest_common_max_feature_adjustments(uint32_t *fs)
          * We hid CLWB in the host policy to stop Xen using it, but VMs which
          * have previously seen the CLWB feature can safely run on this CPU.
          */
-        if ( boot_cpu_data.x86 == 6 &&
-             boot_cpu_data.x86_model == INTEL_FAM6_SKYLAKE_X &&
+        if ( boot_cpu_data.vfm == INTEL_SKYLAKE_X &&
              raw_cpu_policy.feat.clwb )
             __set_bit(X86_FEATURE_CLWB, fs);
 
@@ -506,7 +505,7 @@ static void __init guest_common_max_feature_adjustments(uint32_t *fs)
 
 static void __init guest_common_default_feature_adjustments(uint32_t *fs)
 {
-    switch ( boot_cpu_data.x86_vendor )
+    switch ( boot_cpu_data.vendor )
     {
     case X86_VENDOR_INTEL:
         /*
@@ -520,8 +519,7 @@ static void __init guest_common_default_feature_adjustments(uint32_t *fs)
          * (cpuid="host,rdrand=1") in the VM's config file, and VMs which were
          * previously using RDRAND can migrate in.
          */
-        if ( boot_cpu_data.x86 == 6 &&
-             boot_cpu_data.x86_model == INTEL_FAM6_IVYBRIDGE &&
+        if ( boot_cpu_data.vfm == INTEL_IVYBRIDGE &&
              cpu_has_rdrand && !is_forced_cpu_cap(X86_FEATURE_RDRAND) )
             __clear_bit(X86_FEATURE_RDRAND, fs);
 
@@ -548,8 +546,7 @@ static void __init guest_common_default_feature_adjustments(uint32_t *fs)
          * it to the max policy to let VMs migrate in.  Re-hide it in the
          * default policy to disuade VMs from using it in the common case.
          */
-        if ( boot_cpu_data.x86 == 6 &&
-             boot_cpu_data.x86_model == INTEL_FAM6_SKYLAKE_X &&
+        if ( boot_cpu_data.vfm == INTEL_SKYLAKE_X &&
              raw_cpu_policy.feat.clwb )
             __clear_bit(X86_FEATURE_CLWB, fs);
 
@@ -755,7 +752,7 @@ static void __init calculate_hvm_max_policy(void)
      * long mode (and init_amd() has cleared it out of host capabilities), but
      * HVM guests are able if running in protected mode.
      */
-    if ( (boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) &&
+    if ( (boot_cpu_data.vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) &&
          raw_cpu_policy.basic.sep )
         __set_bit(X86_FEATURE_SEP, fs);
 
@@ -983,7 +980,7 @@ void recalculate_cpuid_policy(struct domain *d)
     if ( is_pv_32bit_domain(d) )
     {
         __clear_bit(X86_FEATURE_LM, max_fs);
-        if ( !(boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
+        if ( !(boot_cpu_data.vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
             __clear_bit(X86_FEATURE_SYSCALL, max_fs);
     }
 
