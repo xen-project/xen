@@ -122,7 +122,7 @@ static bool check_digest(const struct container_microcode *mc)
      * microcode updates.  Mitigate by checking the digest of the patch
      * against a list of known provenance.
      */
-    if ( boot_cpu_data.x86 < 0x17 ||
+    if ( boot_cpu_data.family < 0x17 ||
          !opt_digest_check )
         return true;
 
@@ -174,7 +174,7 @@ static bool verify_patch_size(uint32_t patch_size)
 #define F19H_MPB_MAX_SIZE 5568
 #define F1AH_MPB_MAX_SIZE 15296
 
-    switch ( boot_cpu_data.x86 )
+    switch ( boot_cpu_data.family )
     {
     case 0x14:
         max_size = F14H_MPB_MAX_SIZE;
@@ -222,7 +222,7 @@ static bool check_final_patch_levels(const struct cpu_signature *sig)
     };
     unsigned int i;
 
-    if ( boot_cpu_data.x86 != 0x10 )
+    if ( boot_cpu_data.family != 0x10 )
         return false;
 
     for ( i = 0; i < ARRAY_SIZE(final_levels); i++ )
@@ -516,14 +516,14 @@ static const struct microcode_ops __initconst_cf_clobber amd_ucode_ops = {
 
 void __init ucode_probe_amd(struct microcode_ops *ops)
 {
-    if ( !opt_digest_check && boot_cpu_data.x86 >= 0x17 )
+    if ( !opt_digest_check && boot_cpu_data.family >= 0x17 )
     {
         printk(XENLOG_WARNING
                "Microcode patch additional digest checks disabled");
         add_taint(TAINT_CPU_OUT_OF_SPEC);
     }
 
-    if ( boot_cpu_data.x86 < 0x10 )
+    if ( boot_cpu_data.family < 0x10 )
         return;
 
     *ops = amd_ucode_ops;

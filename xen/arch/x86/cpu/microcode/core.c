@@ -198,7 +198,7 @@ static struct microcode_patch *parse_blob(const char *buf, size_t len)
 /* Returns true if ucode should be loaded on a given cpu */
 static bool is_cpu_primary(unsigned int cpu)
 {
-    if ( boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
+    if ( boot_cpu_data.vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
         /* Load ucode on every logical thread/core */
         return true;
 
@@ -876,7 +876,7 @@ int __init early_microcode_init(struct boot_info *bi)
 {
     const struct cpuinfo_x86 *c = &boot_cpu_data;
 
-    switch ( c->x86_vendor )
+    switch ( c->vendor )
     {
     case X86_VENDOR_AMD:
         ucode_probe_amd(&ucode_ops);
