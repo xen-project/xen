@@ -1566,27 +1566,27 @@ static void __init spr_idle_state_table_update(void)
  */
 static void __init mwait_idle_state_table_update(void)
 {
-	switch (boot_cpu_data.x86_model) {
-	case INTEL_FAM6_IVYBRIDGE_X:
+	switch (boot_cpu_data.vfm) {
+	case INTEL_IVYBRIDGE_X:
 		ivt_idle_state_table_update();
 		break;
-	case INTEL_FAM6_ATOM_GOLDMONT:
-	case INTEL_FAM6_ATOM_GOLDMONT_PLUS:
+	case INTEL_ATOM_GOLDMONT:
+	case INTEL_ATOM_GOLDMONT_PLUS:
 		bxt_idle_state_table_update();
 		break;
-	case INTEL_FAM6_SKYLAKE:
+	case INTEL_SKYLAKE:
 		sklh_idle_state_table_update();
 		break;
-	case INTEL_FAM6_SKYLAKE_X:
+	case INTEL_SKYLAKE_X:
 		skx_idle_state_table_update();
 		break;
-	case INTEL_FAM6_SAPPHIRERAPIDS_X:
-	case INTEL_FAM6_EMERALDRAPIDS_X:
+	case INTEL_SAPPHIRERAPIDS_X:
+	case INTEL_EMERALDRAPIDS_X:
 		spr_idle_state_table_update();
 		break;
-	case INTEL_FAM6_ALDERLAKE:
-	case INTEL_FAM6_ALDERLAKE_L:
-	case INTEL_FAM6_ATOM_GRACEMONT:
+	case INTEL_ALDERLAKE:
+	case INTEL_ALDERLAKE_L:
+	case INTEL_ATOM_GRACEMONT:
 		adl_idle_state_table_update();
 		break;
 	}
@@ -1595,12 +1595,16 @@ static void __init mwait_idle_state_table_update(void)
 static int __init mwait_idle_probe(void)
 {
 	unsigned int eax, ebx, ecx;
-	const struct x86_cpu_id *id = x86_match_cpu(intel_idle_ids);
+	const struct x86_cpu_id *id;
 	const char *str;
 
+	if (boot_cpu_data.vendor != X86_VENDOR_INTEL)
+		return -ENODEV;
+
+	id = x86_match_cpu(intel_idle_ids);
 	if (!id) {
 		pr_debug(PREFIX "does not run on family %d model %d\n",
-			 boot_cpu_data.x86, boot_cpu_data.x86_model);
+			 boot_cpu_data.family, boot_cpu_data.model);
 		return -ENODEV;
 	}
 
