@@ -1007,19 +1007,26 @@ void cpu_uninit(unsigned int cpu)
 
 const struct x86_cpu_id *x86_match_cpu(const struct x86_cpu_id table[])
 {
-	const struct x86_cpu_id *m;
-	const struct cpuinfo_x86 *c = &boot_cpu_data;
+    const struct x86_cpu_id *m;
+    const struct cpuinfo_x86 *c = &boot_cpu_data;
 
-	for (m = table; m->vendor | m->family | m->model | m->feature; m++) {
-		if (c->x86_vendor != m->vendor)
-			continue;
-		if (c->x86 != m->family)
-			continue;
-		if (c->x86_model != m->model)
-			continue;
-		if (!cpu_has(c, m->feature))
-			continue;
-		return m;
-	}
-	return NULL;
+    /*
+     * Although derived from Linux originally, Xen has no valid rows where
+     * ->vendor is zero, so used this in place of checking all metadata.
+     */
+    for ( m = table; m->vendor; m++ )
+    {
+        if ( c->vendor != m->vendor )
+            continue;
+        if ( c->family != m->family )
+            continue;
+        if ( c->model != m->model )
+            continue;
+        if ( !cpu_has(c, m->feature) )
+            continue;
+
+        return m;
+    }
+
+    return NULL;
 }
