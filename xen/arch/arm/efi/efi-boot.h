@@ -79,8 +79,7 @@ static int __init setup_chosen_node(void *fdt, int *addr_cells, int *size_cells)
     prop = fdt_get_property(fdt, node, "#address-cells", &len);
     if ( !prop )
     {
-        val = cpu_to_fdt32(2);
-        if ( fdt_setprop(fdt, node, "#address-cells", &val, sizeof(val)) )
+        if ( fdt_setprop_u32(fdt, node, "#address-cells", 2) )
             return -1;
         *addr_cells = 2;
     }
@@ -90,8 +89,7 @@ static int __init setup_chosen_node(void *fdt, int *addr_cells, int *size_cells)
     prop = fdt_get_property(fdt, node, "#size-cells", &len);
     if ( !prop )
     {
-        val = cpu_to_fdt32(2);
-        if ( fdt_setprop(fdt, node, "#size-cells", &val, sizeof(val)) )
+        if ( fdt_setprop_u32(fdt, node, "#size-cells", 2) )
             return -1;
         *size_cells = 2;
     }
@@ -251,8 +249,6 @@ static EFI_STATUS __init fdt_add_uefi_nodes(EFI_SYSTEM_TABLE *sys_table,
 {
     int node;
     int status;
-    u32 fdt_val32;
-    u64 fdt_val64;
     int num_rsv;
 
    /*
@@ -275,33 +271,28 @@ static EFI_STATUS __init fdt_add_uefi_nodes(EFI_SYSTEM_TABLE *sys_table,
         }
     }
 
-    fdt_val64 = cpu_to_fdt64((u64)(uintptr_t)sys_table);
-    status = fdt_setprop(fdt, node, "linux,uefi-system-table",
-                         &fdt_val64, sizeof(fdt_val64));
+    status = fdt_setprop_u64(fdt, node, "linux,uefi-system-table",
+                             (uintptr_t)sys_table);
     if ( status )
         goto fdt_set_fail;
 
-    fdt_val64 = cpu_to_fdt64((u64)(uintptr_t)memory_map);
-    status = fdt_setprop(fdt, node, "linux,uefi-mmap-start",
-                         &fdt_val64,  sizeof(fdt_val64));
+    status = fdt_setprop_u64(fdt, node, "linux,uefi-mmap-start",
+                             (uintptr_t)memory_map);
     if ( status )
         goto fdt_set_fail;
 
-    fdt_val32 = cpu_to_fdt32(map_size);
-    status = fdt_setprop(fdt, node, "linux,uefi-mmap-size",
-                         &fdt_val32,  sizeof(fdt_val32));
+    status = fdt_setprop_u32(fdt, node, "linux,uefi-mmap-size",
+                             map_size);
     if ( status )
         goto fdt_set_fail;
 
-    fdt_val32 = cpu_to_fdt32(desc_size);
-    status = fdt_setprop(fdt, node, "linux,uefi-mmap-desc-size",
-                         &fdt_val32, sizeof(fdt_val32));
+    status = fdt_setprop_u32(fdt, node, "linux,uefi-mmap-desc-size",
+                             desc_size);
     if ( status )
         goto fdt_set_fail;
 
-    fdt_val32 = cpu_to_fdt32(desc_ver);
-    status = fdt_setprop(fdt, node, "linux,uefi-mmap-desc-ver",
-                         &fdt_val32, sizeof(fdt_val32));
+    status = fdt_setprop_u32(fdt, node, "linux,uefi-mmap-desc-ver",
+                             desc_ver);
     if ( status )
         goto fdt_set_fail;
 
