@@ -251,13 +251,13 @@ static EFI_STATUS __init fdt_add_uefi_nodes(EFI_SYSTEM_TABLE *sys_table,
     int status;
     int num_rsv;
 
-   /*
-    * Delete all memory reserve map entries. When booting via UEFI,
-    * kernel will use the UEFI memory map to find reserved regions.
-    */
-   num_rsv = fdt_num_mem_rsv(fdt);
-   while ( num_rsv-- > 0 )
-       fdt_del_mem_rsv(fdt, num_rsv);
+    /*
+     * Delete all memory reserve map entries. When booting via UEFI,
+     * kernel will use the UEFI memory map to find reserved regions.
+     */
+    num_rsv = fdt_num_mem_rsv(fdt);
+    while ( num_rsv-- > 0 )
+        fdt_del_mem_rsv(fdt, num_rsv);
 
     /* Add FDT entries for EFI runtime services in chosen node. */
     node = fdt_subnode_offset(fdt, 0, "chosen");
