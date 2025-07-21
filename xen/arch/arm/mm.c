@@ -24,6 +24,21 @@
 
 unsigned long frametable_base_pdx __read_mostly;
 
+bool flags_has_rwx(unsigned int flags)
+{
+    /*
+     * The hardware was configured to forbid mapping both writable and
+     * executable.
+     * When modifying/creating mapping (i.e _PAGE_PRESENT is set),
+     * prevent any update if this happen.
+     */
+    if ( (flags & _PAGE_PRESENT) && !PAGE_RO_MASK(flags) &&
+         !PAGE_XN_MASK(flags) )
+        return true;
+    else
+        return false;
+}
+
 void flush_page_to_ram(unsigned long mfn, bool sync_icache)
 {
     void *v = map_domain_page(_mfn(mfn));

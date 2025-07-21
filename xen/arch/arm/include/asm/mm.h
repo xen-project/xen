@@ -192,6 +192,8 @@ extern unsigned long frametable_base_pdx;
 
 /* Boot-time pagetable setup */
 extern void setup_pagetables(void);
+/* Check that the mapping flag has no W and X together */
+bool flags_has_rwx(unsigned int flags);
 /* Map FDT in boot pagetable */
 extern void *early_fdt_map(paddr_t fdt_paddr);
 /* Remove early mappings */
