@@ -23,6 +23,8 @@
 #define NUM_MPU_REGIONS_MASK    (NUM_MPU_REGIONS - 1)
 #define MAX_MPU_REGION_NR       NUM_MPU_REGIONS_MASK
 
+#define PRENR_MASK  GENMASK(31, 0)
+
 #ifndef __ASSEMBLY__
 
 /*

@@ -190,6 +190,42 @@ static int xen_mpumap_alloc_entry(uint8_t *idx)
 }
 
 /*
+ * Disable and remove an MPU region from the data structure and MPU registers.
+ *
+ * @param index Index of the MPU region to be disabled.
+ */
+static void disable_mpu_region_from_index(uint8_t index)
+{
+    ASSERT(spin_is_locked(&xen_mpumap_lock));
+    ASSERT(index != INVALID_REGION_IDX);
+
+    if ( !region_is_valid(&xen_mpumap[index]) )
+    {
+        printk(XENLOG_WARNING
+               "MPU memory region[%u] is already disabled\n", index);
+        return;
+    }
+
+    /* Zeroing the region will also zero the region enable */
+    memset(&xen_mpumap[index], 0, sizeof(pr_t));
+    clear_bit(index, xen_mpumap_mask);
+
+    /*
+     * Both Armv8-R AArch64 and AArch32 have direct access to the enable bit for
+     * MPU regions numbered from 0 to 31.
+     */
+    if ( (index & PRENR_MASK) != 0 )
+    {
+        /* Clear respective bit */
+        register_t val = READ_SYSREG(PRENR_EL2) & (~(1UL << index));
+
+        WRITE_SYSREG(val, PRENR_EL2);
+    }
+    else
+        write_protection_region(&xen_mpumap[index], index);
+}
+
+/*
  * Update the entry in the MPU memory region mapping table (xen_mpumap) for the
  * given memory range and flags, creating one if none exists.
  *
@@ -201,27 +237,59 @@ static int xen_mpumap_alloc_entry(uint8_t *idx)
 static int xen_mpumap_update_entry(paddr_t base, paddr_t limit,
                                    unsigned int flags)
 {
+    bool flags_has_page_present;
     uint8_t idx;
     int rc;
 
     ASSERT(spin_is_locked(&xen_mpumap_lock));
 
-    /* Currently only region creation is supported. */
-    if ( !(flags & _PAGE_PRESENT) )
+    rc = mpumap_contains_region(xen_mpumap, max_mpu_regions, base, limit, &idx);
+    if ( rc < 0 )
         return -EINVAL;
 
-    rc = mpumap_contains_region(xen_mpumap, max_mpu_regions, base, limit, &idx);
-    if ( rc != MPUMAP_REGION_NOTFOUND )
+    flags_has_page_present = flags & _PAGE_PRESENT;
+
+    /* Currently we don't support modifying an existing entry. */
+    if ( flags_has_page_present && (rc >= MPUMAP_REGION_FOUND) )
+    {
+        printk("Modifying an existing entry is not supported\n");
         return -EINVAL;
+    }
+
+    /*
+     * Currently, we only support removing/modifying a *WHOLE* MPU memory
+     * region. Part-region removal/modification is not supported as in the worst
+     * case it will leave two/three fragments behind.
+     */
+    if ( rc == MPUMAP_REGION_INCLUSIVE )
+    {
+        printk("Part-region removal/modification is not supported\n");
+        return -EINVAL;
+    }
 
     /* We are inserting a mapping => Create new region. */
-    rc = xen_mpumap_alloc_entry(&idx);
-    if ( rc )
-        return -ENOENT;
+    if ( flags_has_page_present && (MPUMAP_REGION_NOTFOUND == rc) )
+    {
+        rc = xen_mpumap_alloc_entry(&idx);
+        if ( rc )
+            return -ENOENT;
 
-    xen_mpumap[idx] = pr_of_addr(base, limit, flags);
+        xen_mpumap[idx] = pr_of_addr(base, limit, flags);
 
-    write_protection_region(&xen_mpumap[idx], idx);
+        write_protection_region(&xen_mpumap[idx], idx);
+    }
+
+    /* Removing a mapping */
+    if ( !flags_has_page_present )
+    {
+        if ( rc == MPUMAP_REGION_NOTFOUND )
+        {
+            printk("Cannot remove an entry that does not exist\n");
+            return -EINVAL;
+        }
+
+        disable_mpu_region_from_index(idx);
+    }
 
     return 0;
 }
@@ -259,6 +327,15 @@ int xen_mpumap_update(paddr_t base, paddr_t limit, unsigned int flags)
     spin_unlock(&xen_mpumap_lock);
 
     return rc;
+}
+
+int destroy_xen_mappings(unsigned long s, unsigned long e)
+{
+    ASSERT(IS_ALIGNED(s, PAGE_SIZE));
+    ASSERT(IS_ALIGNED(e, PAGE_SIZE));
+    ASSERT(s < e);
+
+    return xen_mpumap_update(s, e, 0);
 }
 
 int map_pages_to_xen(unsigned long virt, mfn_t mfn, unsigned long nr_mfns,
