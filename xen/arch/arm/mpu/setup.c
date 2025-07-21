@@ -96,7 +96,11 @@ void __init copy_from_paddr(void *dst, paddr_t paddr, unsigned long len)
 
 void __init remove_early_mappings(void)
 {
-    BUG_ON("unimplemented");
+    int rc = destroy_xen_mappings(round_pgdown(mapped_fdt_base),
+                                  mapped_fdt_limit);
+
+    if ( rc )
+        panic("Unable to unmap the device-tree\n");
 }
 
 /*
