@@ -6,6 +6,7 @@
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/sizes.h>
+#include <xen/spinlock.h>
 #include <xen/types.h>
 #include <asm/mpu.h>
 #include <asm/mpu/mm.h>
@@ -28,6 +29,8 @@ DECLARE_BITMAP(xen_mpumap_mask, MAX_MPU_REGION_NR) \
 
 /* EL2 Xen MPU memory region mapping table. */
 pr_t __cacheline_aligned __section(".data") xen_mpumap[MAX_MPU_REGION_NR];
+
+static DEFINE_SPINLOCK(xen_mpumap_lock);
 
 static void __init __maybe_unused build_assertions(void)
 {
@@ -163,6 +166,106 @@ int mpumap_contains_region(pr_t *table, uint8_t nr_regions, paddr_t base,
     }
 
     return MPUMAP_REGION_NOTFOUND;
+}
+
+/*
+ * Allocate an entry for a new EL2 MPU region in the bitmap xen_mpumap_mask.
+ * @param idx   Set to the index of the allocated EL2 MPU region on success.
+ * @return      0 on success, otherwise -ENOENT on failure.
+ */
+static int xen_mpumap_alloc_entry(uint8_t *idx)
+{
+    ASSERT(spin_is_locked(&xen_mpumap_lock));
+
+    *idx = find_first_zero_bit(xen_mpumap_mask, max_mpu_regions);
+    if ( *idx == max_mpu_regions )
+    {
+        printk(XENLOG_ERR "EL2 MPU memory region mapping pool exhausted\n");
+        return -ENOENT;
+    }
+
+    set_bit(*idx, xen_mpumap_mask);
+
+    return 0;
+}
+
+/*
+ * Update the entry in the MPU memory region mapping table (xen_mpumap) for the
+ * given memory range and flags, creating one if none exists.
+ *
+ * @param base  Base address (inclusive).
+ * @param limit Limit address (exclusive).
+ * @param flags Region attributes (a combination of PAGE_HYPERVISOR_XXX)
+ * @return      0 on success, otherwise negative on error.
+ */
+static int xen_mpumap_update_entry(paddr_t base, paddr_t limit,
+                                   unsigned int flags)
+{
+    uint8_t idx;
+    int rc;
+
+    ASSERT(spin_is_locked(&xen_mpumap_lock));
+
+    /* Currently only region creation is supported. */
+    if ( !(flags & _PAGE_PRESENT) )
+        return -EINVAL;
+
+    rc = mpumap_contains_region(xen_mpumap, max_mpu_regions, base, limit, &idx);
+    if ( rc != MPUMAP_REGION_NOTFOUND )
+        return -EINVAL;
+
+    /* We are inserting a mapping => Create new region. */
+    rc = xen_mpumap_alloc_entry(&idx);
+    if ( rc )
+        return -ENOENT;
+
+    xen_mpumap[idx] = pr_of_addr(base, limit, flags);
+
+    write_protection_region(&xen_mpumap[idx], idx);
+
+    return 0;
+}
+
+int xen_mpumap_update(paddr_t base, paddr_t limit, unsigned int flags)
+{
+    int rc;
+
+    if ( flags_has_rwx(flags) )
+    {
+        printk("Mappings should not be both Writeable and Executable\n");
+        return -EINVAL;
+    }
+
+    if ( base >= limit )
+    {
+        printk("Base address %#"PRIpaddr" must be smaller than limit address %#"PRIpaddr"\n",
+               base, limit);
+        return -EINVAL;
+    }
+
+    if ( !IS_ALIGNED(base, PAGE_SIZE) || !IS_ALIGNED(limit, PAGE_SIZE) )
+    {
+        printk("base address %#"PRIpaddr", or limit address %#"PRIpaddr" is not page aligned\n",
+               base, limit);
+        return -EINVAL;
+    }
+
+    spin_lock(&xen_mpumap_lock);
+
+    rc = xen_mpumap_update_entry(base, limit, flags);
+    if ( !rc )
+        context_sync_mpu();
+
+    spin_unlock(&xen_mpumap_lock);
+
+    return rc;
+}
+
+int map_pages_to_xen(unsigned long virt, mfn_t mfn, unsigned long nr_mfns,
+                     unsigned int flags)
+{
+    /* MPU systems have no translation, ma == va, so pass virt directly */
+    return xen_mpumap_update(virt, mfn_to_maddr(mfn_add(mfn, nr_mfns)), flags);
 }
 
 void __init setup_mm(void)

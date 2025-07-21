@@ -64,6 +64,7 @@ static inline void context_sync_mpu(void)
  * The following API requires context_sync_mpu() after being used to modify MPU
  * regions:
  *  - write_protection_region
+ *  - xen_mpumap_update
  */
 
 /* Reads the MPU region (into @pr_read) with index @sel from the HW */
@@ -71,6 +72,17 @@ void read_protection_region(pr_t *pr_read, uint8_t sel);
 
 /* Writes the MPU region (from @pr_write) with index @sel to the HW */
 void write_protection_region(const pr_t *pr_write, uint8_t sel);
+
+/*
+ * Maps an address range into the MPU data structure and updates the HW.
+ * Equivalent to xen_pt_update in an MMU system.
+ *
+ * @param base      Base address of the range to map (inclusive).
+ * @param limit     Limit address of the range to map (exclusive).
+ * @param flags     Flags for the memory range to map.
+ * @return          0 on success, negative on error.
+ */
+int xen_mpumap_update(paddr_t base, paddr_t limit, unsigned int flags);
 
 /*
  * Creates a pr_t structure describing a protection region.
