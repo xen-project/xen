@@ -110,6 +110,61 @@ pr_t pr_of_addr(paddr_t base, paddr_t limit, unsigned int flags)
     return region;
 }
 
+int mpumap_contains_region(pr_t *table, uint8_t nr_regions, paddr_t base,
+                           paddr_t limit, uint8_t *index)
+{
+    ASSERT(index);
+    *index = INVALID_REGION_IDX;
+
+    /*
+     * The caller supplies a half-open interval [base, limit), i.e. limit is the
+     * first byte *after* the region. Require limit strictly greater than base,
+     * which is necessarily a non-empty region.
+     */
+    ASSERT(base < limit);
+
+    /*
+     * Internally we use inclusive bounds, so convert range to [base, limit-1].
+     * The prior assertion guarantees the subtraction will not underflow.
+     */
+    limit = limit - 1;
+
+    for ( uint8_t i = 0; i < nr_regions; i++ )
+    {
+        paddr_t iter_base = pr_get_base(&table[i]);
+        paddr_t iter_limit = pr_get_limit(&table[i]);
+
+        /* Skip invalid (disabled) regions */
+        if ( !region_is_valid(&table[i]) )
+            continue;
+
+        /* No match */
+        if ( (iter_limit < base) || (iter_base > limit) )
+            continue;
+
+        /* Exact match */
+        if ( (iter_base == base) && (iter_limit == limit) )
+        {
+            *index = i;
+            return MPUMAP_REGION_FOUND;
+        }
+
+        /* Inclusive match */
+        if ( (base >= iter_base) && (limit <= iter_limit) )
+        {
+            *index = i;
+            return MPUMAP_REGION_INCLUSIVE;
+        }
+
+        /* Overlap */
+        printk("Range %#"PRIpaddr" - %#"PRIpaddr" overlaps with the existing region %#"PRIpaddr" - %#"PRIpaddr"\n",
+               base, limit + 1, iter_base, iter_limit + 1);
+        return MPUMAP_REGION_OVERLAP;
+    }
+
+    return MPUMAP_REGION_NOTFOUND;
+}
+
 void __init setup_mm(void)
 {
     BUG_ON("unimplemented");

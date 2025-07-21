@@ -10,6 +10,13 @@
 #include <asm/mm.h>
 #include <asm/mpu.h>
 
+#define MPUMAP_REGION_OVERLAP      -1
+#define MPUMAP_REGION_NOTFOUND      0
+#define MPUMAP_REGION_FOUND         1
+#define MPUMAP_REGION_INCLUSIVE     2
+
+#define INVALID_REGION_IDX     0xFFU
+
 extern struct page_info *frame_table;
 
 extern uint8_t max_mpu_regions;
@@ -74,6 +81,28 @@ void write_protection_region(const pr_t *pr_write, uint8_t sel);
  * @return: pr_t structure describing a protection region.
  */
 pr_t pr_of_addr(paddr_t base, paddr_t limit, unsigned int flags);
+
+/*
+ * Checks whether a given memory range is present in the provided table of
+ * MPU protection regions.
+ *
+ * @param table         Array of pr_t protection regions.
+ * @param r_regions     Number of elements in `table`.
+ * @param base          Start of the memory region to be checked (inclusive).
+ * @param limit         End of the memory region to be checked (exclusive).
+ * @param index         Set to the index of the region if an exact or inclusive
+ *                      match is found, and INVALID_REGION otherwise.
+ * @return: Return code indicating the result of the search:
+ *          MPUMAP_REGION_NOTFOUND: no part of the range is present in `table`
+ *          MPUMAP_REGION_FOUND: found an exact match in `table`
+ *          MPUMAP_REGION_INCLUSIVE: found an inclusive match in `table`
+ *          MPUMAP_REGION_OVERLAP: found an overlap with a mapping in `table`
+ *
+ * Note: make sure that the range [`base`, `limit`) refers to the memory region
+ * inclusive of `base` and exclusive of `limit`.
+ */
+int mpumap_contains_region(pr_t *table, uint8_t nr_regions, paddr_t base,
+                           paddr_t limit, uint8_t *index);
 
 #endif /* __ARM_MPU_MM_H__ */
 
