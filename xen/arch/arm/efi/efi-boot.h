@@ -61,7 +61,6 @@ static int __init setup_chosen_node(void *fdt, int *addr_cells, int *size_cells)
     int node;
     const struct fdt_property *prop;
     int len;
-    uint32_t val;
 
     if ( !fdt || !addr_cells || !size_cells )
         return -1;
@@ -103,8 +102,7 @@ static int __init setup_chosen_node(void *fdt, int *addr_cells, int *size_cells)
     prop = fdt_get_property(fdt, node, "ranges", &len);
     if ( !prop )
     {
-        val = cpu_to_fdt32(0);
-        if ( fdt_setprop(fdt, node, "ranges", &val, 0) )
+        if ( fdt_setprop(fdt, node, "ranges", NULL, 0) )
             return -1;
     }
     else if ( fdt32_to_cpu(prop->len) )
