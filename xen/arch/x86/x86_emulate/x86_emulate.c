@@ -5264,62 +5264,26 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC(0x0f, 0xbc): /* bsf or tzcnt */
-    {
-        bool zf;
-
-        asm ( "bsf %2,%0" ASM_FLAG_OUT(, "; setz %1")
-              : "=r" (dst.val), ASM_FLAG_OUT("=@ccz", "=qm") (zf)
-              : "rm" (src.val) );
-        _regs.eflags &= ~X86_EFLAGS_ZF;
-        if ( (vex.pfx == vex_f3) && vcpu_has_bmi1() )
+        if ( vex.pfx == vex_f3 )
+            emulate_2op_SrcV_srcmem("rep; bsf", src, dst, _regs.eflags);
+        else
         {
-            _regs.eflags &= ~X86_EFLAGS_CF;
-            if ( zf )
-            {
-                _regs.eflags |= X86_EFLAGS_CF;
-                dst.val = op_bytes * 8;
-            }
-            else if ( !dst.val )
-                _regs.eflags |= X86_EFLAGS_ZF;
-        }
-        else if ( zf )
-        {
-            _regs.eflags |= X86_EFLAGS_ZF;
-            dst.type = OP_NONE;
+            emulate_2op_SrcV_srcmem("bsf", src, dst, _regs.eflags);
+            if ( _regs.eflags & X86_EFLAGS_ZF )
+                dst.type = OP_NONE;
         }
         break;
-    }
 
     case X86EMUL_OPC(0x0f, 0xbd): /* bsr or lzcnt */
-    {
-        bool zf;
-
-        asm ( "bsr %2,%0" ASM_FLAG_OUT(, "; setz %1")
-              : "=r" (dst.val), ASM_FLAG_OUT("=@ccz", "=qm") (zf)
-              : "rm" (src.val) );
-        _regs.eflags &= ~X86_EFLAGS_ZF;
-        if ( (vex.pfx == vex_f3) && vcpu_has_lzcnt() )
+        if ( vex.pfx == vex_f3 )
+            emulate_2op_SrcV_srcmem("rep; bsr", src, dst, _regs.eflags);
+        else
         {
-            _regs.eflags &= ~X86_EFLAGS_CF;
-            if ( zf )
-            {
-                _regs.eflags |= X86_EFLAGS_CF;
-                dst.val = op_bytes * 8;
-            }
-            else
-            {
-                dst.val = op_bytes * 8 - 1 - dst.val;
-                if ( !dst.val )
-                    _regs.eflags |= X86_EFLAGS_ZF;
-            }
-        }
-        else if ( zf )
-        {
-            _regs.eflags |= X86_EFLAGS_ZF;
-            dst.type = OP_NONE;
+            emulate_2op_SrcV_srcmem("bsr", src, dst, _regs.eflags);
+            if ( _regs.eflags & X86_EFLAGS_ZF )
+                dst.type = OP_NONE;
         }
         break;
-    }
 
     case X86EMUL_OPC(0x0f, 0xbe): /* movsx rm8,r{16,32,64} */
         /* Recompute DstReg as we may have decoded AH/BH/CH/DH. */
