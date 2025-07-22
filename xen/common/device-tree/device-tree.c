@@ -538,7 +538,7 @@ int dt_child_n_size_cells(const struct dt_device_node *parent)
 /*
  * Default translator (generic bus)
  */
-static bool dt_bus_default_match(const struct dt_device_node *node)
+static bool cf_check dt_bus_default_match(const struct dt_device_node *node)
 {
     /* Root node doesn't have "ranges" property */
     if ( node->parent == NULL )
@@ -550,8 +550,8 @@ static bool dt_bus_default_match(const struct dt_device_node *node)
     return (dt_get_property(node, "ranges", NULL) != NULL);
 }
 
-static void dt_bus_default_count_cells(const struct dt_device_node *dev,
-                                int *addrc, int *sizec)
+static void cf_check dt_bus_default_count_cells(
+    const struct dt_device_node *dev, int *addrc, int *sizec)
 {
     if ( addrc )
         *addrc = dt_n_addr_cells(dev);
@@ -559,8 +559,8 @@ static void dt_bus_default_count_cells(const struct dt_device_node *dev,
         *sizec = dt_n_size_cells(dev);
 }
 
-static u64 dt_bus_default_map(__be32 *addr, const __be32 *range,
-                              int na, int ns, int pna)
+static u64 cf_check dt_bus_default_map(__be32 *addr, const __be32 *range,
+                                       int na, int ns, int pna)
 {
     u64 cp, s, da;
 
@@ -585,7 +585,7 @@ static u64 dt_bus_default_map(__be32 *addr, const __be32 *range,
     return da - cp;
 }
 
-static int dt_bus_default_translate(__be32 *addr, u64 offset, int na)
+static int cf_check dt_bus_default_translate(__be32 *addr, u64 offset, int na)
 {
     u64 a = dt_read_number(addr, na);
 
@@ -597,7 +597,7 @@ static int dt_bus_default_translate(__be32 *addr, u64 offset, int na)
 
     return 0;
 }
-static unsigned int dt_bus_default_get_flags(const __be32 *addr)
+static unsigned int cf_check dt_bus_default_get_flags(const __be32 *addr)
 {
     return IORESOURCE_MEM;
 }
@@ -616,7 +616,7 @@ static bool dt_node_is_pci(const struct dt_device_node *np)
     return is_pci;
 }
 
-static bool dt_bus_pci_match(const struct dt_device_node *np)
+static bool cf_check dt_bus_pci_match(const struct dt_device_node *np)
 {
     /*
      * "pciex" is PCI Express "vci" is for the /chaos bridge on 1st-gen PCI
@@ -630,8 +630,8 @@ static bool dt_bus_pci_match(const struct dt_device_node *np)
         dt_node_is_pci(np);
 }
 
-static void dt_bus_pci_count_cells(const struct dt_device_node *np,
-				   int *addrc, int *sizec)
+static void cf_check dt_bus_pci_count_cells(const struct dt_device_node *np,
+				                                    int *addrc, int *sizec)
 {
     if (addrc)
         *addrc = 3;
@@ -639,7 +639,7 @@ static void dt_bus_pci_count_cells(const struct dt_device_node *np,
         *sizec = 2;
 }
 
-static unsigned int dt_bus_pci_get_flags(const __be32 *addr)
+static unsigned int cf_check dt_bus_pci_get_flags(const __be32 *addr)
 {
     unsigned int flags = 0;
     u32 w = be32_to_cpu(*addr);
@@ -658,8 +658,8 @@ static unsigned int dt_bus_pci_get_flags(const __be32 *addr)
     return flags;
 }
 
-static u64 dt_bus_pci_map(__be32 *addr, const __be32 *range, int na, int ns,
-		int pna)
+static u64 cf_check dt_bus_pci_map(__be32 *addr, const __be32 *range,
+                                   int na, int ns, int pna)
 {
     u64 cp, s, da;
     unsigned int af, rf;
@@ -685,7 +685,7 @@ static u64 dt_bus_pci_map(__be32 *addr, const __be32 *range, int na, int ns,
     return da - cp;
 }
 
-static int dt_bus_pci_translate(__be32 *addr, u64 offset, int na)
+static int cf_check dt_bus_pci_translate(__be32 *addr, u64 offset, int na)
 {
     return dt_bus_default_translate(addr + 1, offset, na - 1);
 }
