@@ -960,7 +960,8 @@ void __init create_domUs(void)
             panic("'llc-colors' found, but LLC coloring is disabled\n");
 #endif
 
-        arch_parse_dom0less_node(node, &ki.bd);
+        if ( (rc = arch_parse_dom0less_node(node, &ki.bd)) )
+            panic("error parsing arch-specific dom0less props (rc=%d)", rc);
 
         /*
          * The variable max_init_domid is initialized with zero, so here it's

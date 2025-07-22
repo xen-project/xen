@@ -272,8 +272,8 @@ int __init init_vuart(struct domain *d, struct kernel_info *kinfo,
     return rc;
 }
 
-void __init arch_parse_dom0less_node(struct dt_device_node *node,
-                                     struct boot_domain *bd)
+int __init arch_parse_dom0less_node(struct dt_device_node *node,
+                                    struct boot_domain *bd)
 {
     struct xen_domctl_createdomain *d_cfg = &bd->create_cfg;
     unsigned int flags = bd->create_flags;
@@ -354,6 +354,8 @@ void __init arch_parse_dom0less_node(struct dt_device_node *node,
         if ( !val )
             d_cfg->flags &= ~XEN_DOMCTL_CDF_trap_unmapped_accesses;
     }
+
+    return 0;
 }
 
 int __init init_intc_phandle(struct kernel_info *kinfo, const char *name,

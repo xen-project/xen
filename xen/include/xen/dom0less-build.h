@@ -9,7 +9,7 @@ struct domain;
 
 #ifdef CONFIG_DOM0LESS_BOOT
 
-struct xen_domctl_createdomain;
+struct boot_domain;
 struct dt_device_node;
 struct kernel_info;
 
@@ -45,8 +45,8 @@ void create_domUs(void);
 bool is_dom0less_mode(void);
 void set_xs_domain(struct domain *d);
 
-void arch_parse_dom0less_node(struct dt_device_node *node,
-                              struct boot_domain *bd);
+int arch_parse_dom0less_node(struct dt_device_node *node,
+                             struct boot_domain *bd);
 
 int init_vuart(struct domain *d, struct kernel_info *kinfo,
                const struct dt_device_node *node);
