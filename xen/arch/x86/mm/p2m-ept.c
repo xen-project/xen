@@ -1375,6 +1375,8 @@ static void cf_check ept_flush_pml_buffers(struct p2m_domain *p2m)
 
 void ept_vcpu_flush_pml_buffer(struct vcpu *v)
 {
+    struct domain *d = v->domain;
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
     uint64_t *pml_buf;
     unsigned long pml_idx;
 
@@ -1401,6 +1403,12 @@ void ept_vcpu_flush_pml_buffer(struct vcpu *v)
     else
         pml_idx++;
 
+    /*
+     * Take the lock outside of the loop, so all the type changes are done
+     * inside of the same locked region and the EPT flush is deferred until the
+     * end of the loop.
+     */
+    p2m_lock(p2m);
     for ( ; pml_idx < NR_PML_ENTRIES; pml_idx++ )
     {
         unsigned long gfn = pml_buf[pml_idx] >> PAGE_SHIFT;
@@ -1413,11 +1421,12 @@ void ept_vcpu_flush_pml_buffer(struct vcpu *v)
          * are very rare, and additional cost is negligible, but a missing mark
          * is extremely difficult to debug.
          */
-        p2m_change_type_one(v->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
+        p2m_change_type_one(d, gfn, p2m_ram_logdirty, p2m_ram_rw);
 
         /* HVM guest: pfn == gfn */
-        paging_mark_pfn_dirty(v->domain, _pfn(gfn));
+        paging_mark_pfn_dirty(d, _pfn(gfn));
     }
+    p2m_unlock(p2m);
 
     unmap_domain_page(pml_buf);
 
