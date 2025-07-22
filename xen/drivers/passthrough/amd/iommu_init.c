@@ -1540,13 +1540,13 @@ static void invalidate_all_domain_pages(void)
 static int cf_check _invalidate_all_devices(
     u16 seg, struct ivrs_mappings *ivrs_mappings)
 {
-    unsigned int bdf; 
+    unsigned int bdf;
     u16 req_id;
     struct amd_iommu *iommu;
 
     for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
     {
-        iommu = find_iommu_for_device(seg, bdf);
+        iommu = find_iommu_for_device(PCI_SBDF(seg, bdf));
         req_id = ivrs_mappings[bdf].dte_requestor_id;
         if ( iommu )
         {
