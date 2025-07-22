@@ -100,6 +100,15 @@ struct shared_meminfo {
     struct shmem_membank_extra extra[NR_SHMEM_BANKS];
 };
 
+struct boot_domain {
+    struct domain *d;
+
+    struct boot_module *kernel;
+    struct boot_module *initrd;
+
+    const char *cmdline;
+};
+
 #define BOOTMOD_MAX_CMDLINE 1024
 struct boot_module {
     boot_module_kind kind;
