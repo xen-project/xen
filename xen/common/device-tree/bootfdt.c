@@ -349,7 +349,7 @@ static void __init process_multiboot_node(const void *fdt, int node,
               fdt_node_check_compatible(fdt, node, "multiboot,ramdisk") == 0 )
         kind = BOOTMOD_RAMDISK;
     else if ( fdt_node_check_compatible(fdt, node, "xen,xsm-policy") == 0 )
-        kind = BOOTMOD_XSM;
+        kind = BOOTMOD_XSM_POLICY;
     else if ( fdt_node_check_compatible(fdt, node, "multiboot,device-tree") == 0 )
         kind = BOOTMOD_GUEST_DTB;
     else if ( fdt_node_check_compatible(fdt, node, "multiboot,microcode") == 0 )
@@ -377,7 +377,7 @@ static void __init process_multiboot_node(const void *fdt, int node,
         default: break;
         }
         if ( kind_guess > 1 && has_xsm_magic(start) )
-            kind = BOOTMOD_XSM;
+            kind = BOOTMOD_XSM_POLICY;
     }
 
     domU = fdt_node_check_compatible(fdt, parent_node, "xen,domain") == 0;

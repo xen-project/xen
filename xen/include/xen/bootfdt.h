@@ -7,6 +7,10 @@
 #include <xen/macros.h>
 #include <xen/xmalloc.h>
 
+#if __has_include(<asm/bootfdt.h>)
+#include <asm/bootfdt.h>
+#endif
+
 #define MIN_FDT_ALIGN 8
 
 #define NR_MEM_BANKS 256
@@ -19,7 +23,7 @@ typedef enum {
     BOOTMOD_FDT,
     BOOTMOD_KERNEL,
     BOOTMOD_RAMDISK,
-    BOOTMOD_XSM,
+    BOOTMOD_XSM_POLICY,
     BOOTMOD_GUEST_DTB,
     BOOTMOD_MICROCODE,
     BOOTMOD_UNKNOWN
@@ -110,6 +114,10 @@ struct boot_module {
 #endif
     paddr_t start;
     paddr_t size;
+
+#if __has_include(<asm/bootfdt.h>)
+    struct arch_boot_module arch;
+#endif
 };
 
 /* DT_MAX_NAME is the node name max length according the DT spec */

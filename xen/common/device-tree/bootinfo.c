@@ -29,7 +29,7 @@ const char * __init boot_module_kind_as_string(boot_module_kind kind)
     case BOOTMOD_FDT:     return "Device Tree";
     case BOOTMOD_KERNEL:  return "Kernel";
     case BOOTMOD_RAMDISK: return "Ramdisk";
-    case BOOTMOD_XSM:     return "XSM";
+    case BOOTMOD_XSM_POLICY:    return "XSM Policy";
     case BOOTMOD_GUEST_DTB:     return "DTB";
     case BOOTMOD_MICROCODE:     return "Microcode";
     case BOOTMOD_UNKNOWN: return "Unknown";

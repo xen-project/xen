@@ -53,7 +53,7 @@ int __init xsm_multiboot_policy_init(
             printk("Policy len %#lx, start at %p.\n",
                    _policy_len,_policy_start);
 
-            bm->type = BOOTMOD_XSM_POLICY;
+            bm->kind = BOOTMOD_XSM_POLICY;
             break;
 
         }
@@ -68,7 +68,7 @@ int __init xsm_multiboot_policy_init(
 #ifdef CONFIG_HAS_DEVICE_TREE
 int __init xsm_dt_policy_init(void **policy_buffer, size_t *policy_size)
 {
-    struct boot_module *mod = boot_module_find_by_kind(BOOTMOD_XSM);
+    struct boot_module *mod = boot_module_find_by_kind(BOOTMOD_XSM_POLICY);
     paddr_t paddr, len;
 
     if ( !mod || !mod->size )
