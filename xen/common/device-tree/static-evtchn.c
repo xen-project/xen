@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
 #include <xen/bootfdt.h>
+#include <xen/device_tree.h>
 #include <xen/event.h>
 #include <xen/static-evtchn.h>
 
