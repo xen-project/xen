@@ -732,10 +732,10 @@ static inline int __init domain_p2m_set_allocation(
 }
 #endif /* CONFIG_ARCH_PAGING_MEMPOOL */
 
-static int __init construct_domU(struct domain *d,
+static int __init construct_domU(struct kernel_info *kinfo,
                           const struct dt_device_node *node)
 {
-    struct kernel_info kinfo = KERNEL_INFO_INIT;
+    struct domain *d = kinfo->bd.d;
     const char *dom0less_enhanced;
     int rc;
     u64 mem;
@@ -746,7 +746,7 @@ static int __init construct_domU(struct domain *d,
         printk("Error building DomU: cannot read \"memory\" property\n");
         return -EINVAL;
     }
-    kinfo.unassigned_mem = (paddr_t)mem * SZ_1K;
+    kinfo->unassigned_mem = (paddr_t)mem * SZ_1K;
 
     rc = domain_p2m_set_allocation(d, mem, node);
     if ( rc != 0 )
@@ -761,66 +761,64 @@ static int __init construct_domU(struct domain *d,
          (rc == 0 && !strcmp(dom0less_enhanced, "enabled")) )
     {
         need_xenstore = true;
-        kinfo.dom0less_feature = DOM0LESS_ENHANCED;
+        kinfo->dom0less_feature = DOM0LESS_ENHANCED;
     }
     else if ( rc == 0 && !strcmp(dom0less_enhanced, "legacy") )
     {
         need_xenstore = true;
-        kinfo.dom0less_feature = DOM0LESS_ENHANCED_LEGACY;
+        kinfo->dom0less_feature = DOM0LESS_ENHANCED_LEGACY;
     }
     else if ( rc == 0 && !strcmp(dom0less_enhanced, "no-xenstore") )
-        kinfo.dom0less_feature = DOM0LESS_ENHANCED_NO_XS;
+        kinfo->dom0less_feature = DOM0LESS_ENHANCED_NO_XS;
 
     if ( vcpu_create(d, 0) == NULL )
         return -ENOMEM;
 
     d->max_pages = ((paddr_t)mem * SZ_1K) >> PAGE_SHIFT;
 
-    kinfo.bd.d = d;
-
-    rc = kernel_probe(&kinfo, node);
+    rc = kernel_probe(kinfo, node);
     if ( rc < 0 )
         return rc;
 
-    set_domain_type(d, &kinfo);
+    set_domain_type(d, kinfo);
 
     if ( is_hardware_domain(d) )
     {
-        rc = construct_hwdom(&kinfo, node);
+        rc = construct_hwdom(kinfo, node);
         if ( rc < 0 )
             return rc;
     }
     else
     {
         if ( !dt_find_property(node, "xen,static-mem", NULL) )
-            allocate_memory(d, &kinfo);
+            allocate_memory(d, kinfo);
         else if ( !is_domain_direct_mapped(d) )
-            allocate_static_memory(d, &kinfo, node);
+            allocate_static_memory(d, kinfo, node);
         else
-            assign_static_memory_11(d, &kinfo, node);
+            assign_static_memory_11(d, kinfo, node);
 
-        rc = process_shm(d, &kinfo, node);
+        rc = process_shm(d, kinfo, node);
         if ( rc < 0 )
             return rc;
 
-        rc = init_vuart(d, &kinfo, node);
+        rc = init_vuart(d, kinfo, node);
         if ( rc < 0 )
             return rc;
 
-        rc = prepare_dtb_domU(d, &kinfo);
+        rc = prepare_dtb_domU(d, kinfo);
         if ( rc < 0 )
             return rc;
 
-        rc = construct_domain(d, &kinfo);
+        rc = construct_domain(d, kinfo);
         if ( rc < 0 )
             return rc;
     }
 
     domain_vcpu_affinity(d, node);
 
-    rc = alloc_xenstore_params(&kinfo);
+    rc = alloc_xenstore_params(kinfo);
 
-    rangeset_destroy(kinfo.xen_reg_assigned);
+    rangeset_destroy(kinfo->xen_reg_assigned);
 
     return rc;
 }
@@ -837,9 +835,9 @@ void __init create_domUs(void)
     dt_for_each_child_node(chosen, node)
     {
         const char *llc_colors_str = NULL;
-        struct domain *d;
-        struct xen_domctl_createdomain d_cfg = {0};
-        unsigned int flags = 0U;
+        struct kernel_info ki = KERNEL_INFO_INIT;
+        struct xen_domctl_createdomain *d_cfg = &ki.bd.create_cfg;
+        unsigned int *flags = &ki.bd.create_flags;
         bool has_dtb = false;
         uint32_t val;
         int rc;
@@ -850,10 +848,10 @@ void __init create_domUs(void)
         if ( (max_init_domid + 1) >= DOMID_FIRST_RESERVED )
             panic("No more domain IDs available\n");
 
-        d_cfg.max_evtchn_port = 1023;
-        d_cfg.max_grant_frames = -1;
-        d_cfg.max_maptrack_frames = -1;
-        d_cfg.grant_opts = XEN_DOMCTL_GRANT_version(opt_gnttab_max_version);
+        d_cfg->max_evtchn_port = 1023;
+        d_cfg->max_grant_frames = -1;
+        d_cfg->max_maptrack_frames = -1;
+        d_cfg->grant_opts = XEN_DOMCTL_GRANT_version(opt_gnttab_max_version);
 
         if ( dt_property_read_u32(node, "capabilities", &val) )
         {
@@ -861,7 +859,7 @@ void __init create_domUs(void)
                 panic("Invalid capabilities (%"PRIx32")\n", val);
 
             if ( val & DOMAIN_CAPS_CONTROL )
-                flags |= CDF_privileged;
+                *flags |= CDF_privileged;
 
             if ( val & DOMAIN_CAPS_HARDWARE )
             {
@@ -870,17 +868,17 @@ void __init create_domUs(void)
                             hardware_domain);
 
 #ifdef CONFIG_GRANT_TABLE
-                d_cfg.max_grant_frames = gnttab_dom0_frames();
+                d_cfg->max_grant_frames = gnttab_dom0_frames();
 #endif
-                d_cfg.max_evtchn_port = -1;
-                flags |= CDF_hardware;
+                d_cfg->max_evtchn_port = -1;
+                *flags |= CDF_hardware;
                 iommu = true;
             }
 
             if ( val & DOMAIN_CAPS_XENSTORE )
             {
-                d_cfg.flags |= XEN_DOMCTL_CDF_xs_domain;
-                d_cfg.max_evtchn_port = -1;
+                d_cfg->flags |= XEN_DOMCTL_CDF_xs_domain;
+                d_cfg->max_evtchn_port = -1;
             }
         }
 
@@ -889,45 +887,45 @@ void __init create_domUs(void)
             if ( llc_coloring_enabled )
                 panic("LLC coloring and static memory are incompatible\n");
 
-            flags |= CDF_staticmem;
+            *flags |= CDF_staticmem;
         }
 
         if ( dt_property_read_bool(node, "direct-map") )
         {
-            if ( !(flags & CDF_staticmem) )
+            if ( !(*flags & CDF_staticmem) )
                 panic("direct-map is not valid for domain %s without static allocation.\n",
                       dt_node_name(node));
 
-            flags |= CDF_directmap;
+            *flags |= CDF_directmap;
         }
 
-        if ( !dt_property_read_u32(node, "cpus", &d_cfg.max_vcpus) )
+        if ( !dt_property_read_u32(node, "cpus", &d_cfg->max_vcpus) )
             panic("Missing property 'cpus' for domain %s\n",
                   dt_node_name(node));
 
         if ( !dt_property_read_string(node, "passthrough", &dom0less_iommu) )
         {
-            if ( flags & CDF_hardware )
+            if ( *flags & CDF_hardware )
                 panic("Don't specify passthrough for hardware domain\n");
 
             if ( !strcmp(dom0less_iommu, "enabled") )
                 iommu = true;
         }
 
-        if ( (flags & CDF_hardware) && !(flags & CDF_directmap) &&
+        if ( (*flags & CDF_hardware) && !(*flags & CDF_directmap) &&
              !iommu_enabled )
             panic("non-direct mapped hardware domain requires iommu\n");
 
         if ( dt_find_compatible_node(node, NULL, "multiboot,device-tree") )
         {
-            if ( flags & CDF_hardware )
+            if ( *flags & CDF_hardware )
                 panic("\"multiboot,device-tree\" incompatible with hardware domain\n");
 
             has_dtb = true;
         }
 
         if ( iommu_enabled && (iommu || has_dtb) )
-            d_cfg.flags |= XEN_DOMCTL_CDF_iommu;
+            d_cfg->flags |= XEN_DOMCTL_CDF_iommu;
 
         /* Get the optional property domain-cpupool */
         cpupool_node = dt_parse_phandle(node, "domain-cpupool", 0);
@@ -937,57 +935,58 @@ void __init create_domUs(void)
             if ( pool_id < 0 )
                 panic("Error getting cpupool id from domain-cpupool (%d)\n",
                       pool_id);
-            d_cfg.cpupool_id = pool_id;
+            d_cfg->cpupool_id = pool_id;
         }
 
         if ( dt_property_read_u32(node, "max_grant_version", &val) )
-            d_cfg.grant_opts = XEN_DOMCTL_GRANT_version(val);
+            d_cfg->grant_opts = XEN_DOMCTL_GRANT_version(val);
 
         if ( dt_property_read_u32(node, "max_grant_frames", &val) )
         {
             if ( val > INT32_MAX )
                 panic("max_grant_frames (%"PRIu32") overflow\n", val);
-            d_cfg.max_grant_frames = val;
+            d_cfg->max_grant_frames = val;
         }
 
         if ( dt_property_read_u32(node, "max_maptrack_frames", &val) )
         {
             if ( val > INT32_MAX )
                 panic("max_maptrack_frames (%"PRIu32") overflow\n", val);
-            d_cfg.max_maptrack_frames = val;
+            d_cfg->max_maptrack_frames = val;
         }
 
         dt_property_read_string(node, "llc-colors", &llc_colors_str);
         if ( !llc_coloring_enabled && llc_colors_str )
             panic("'llc-colors' found, but LLC coloring is disabled\n");
 
-        arch_create_domUs(node, &d_cfg, flags);
+        arch_create_domUs(node, d_cfg, *flags);
 
         /*
          * The variable max_init_domid is initialized with zero, so here it's
          * very important to use the pre-increment operator to call
          * domain_create() with a domid > 0. (domid == 0 is reserved for Dom0)
          */
-        d = domain_create(++max_init_domid, &d_cfg, flags);
-        if ( IS_ERR(d) )
+        ki.bd.d = domain_create(++max_init_domid,
+                                &ki.bd.create_cfg, ki.bd.create_flags);
+        if ( IS_ERR(ki.bd.d) )
             panic("Error creating domain %s (rc = %ld)\n",
-                  dt_node_name(node), PTR_ERR(d));
+                  dt_node_name(node), PTR_ERR(ki.bd.d));
 
         if ( llc_coloring_enabled &&
-             (rc = domain_set_llc_colors_from_str(d, llc_colors_str)) )
+             (rc = domain_set_llc_colors_from_str(ki.bd.d, llc_colors_str)) )
             panic("Error initializing LLC coloring for domain %s (rc = %d)\n",
                   dt_node_name(node), rc);
 
-        d->is_console = true;
-        dt_device_set_used_by(node, d->domain_id);
+        ki.bd.d->is_console = true;
+        dt_device_set_used_by(node, ki.bd.d->domain_id);
 
-        rc = construct_domU(d, node);
+        rc = construct_domU(&ki, node);
         if ( rc )
             panic("Could not set up domain %s (rc = %d)\n",
                   dt_node_name(node), rc);
 
-        if ( d_cfg.flags & XEN_DOMCTL_CDF_xs_domain )
-            set_xs_domain(d);
+        if ( ki.bd.create_cfg.flags & XEN_DOMCTL_CDF_xs_domain )
+            set_xs_domain(ki.bd.d);
     }
 
     if ( need_xenstore && xs_domid == DOMID_INVALID )
