@@ -12,9 +12,14 @@ config CORE_PARKING
 	bool
 	depends on NR_CPUS > 1
 
+config DEVICE_TREE_PARSE
+	bool
+	select LIBFDT
+
 config DOM0LESS_BOOT
 	bool "Dom0less boot support" if EXPERT
-	depends on HAS_DOM0LESS && HAS_DEVICE_TREE && DOMAIN_BUILD_HELPERS
+	depends on HAS_DOM0LESS && DOMAIN_BUILD_HELPERS
+	select DEVICE_TREE_PARSE
 	default y
 	help
 	  Dom0less boot support enables Xen to create and start domU guests during
@@ -85,9 +90,9 @@ config HAS_ALTERNATIVE
 config HAS_COMPAT
 	bool
 
-config HAS_DEVICE_TREE
+config HAS_DEVICE_TREE_DISCOVERY
 	bool
-	select LIBFDT
+	select DEVICE_TREE_PARSE
 
 config HAS_DOM0LESS
 	bool
@@ -154,7 +159,7 @@ config NUMA
 
 config STATIC_MEMORY
 	bool "Static Allocation Support (UNSUPPORTED)" if UNSUPPORTED
-	depends on DOM0LESS_BOOT
+	depends on DOM0LESS_BOOT && HAS_DEVICE_TREE_DISCOVERY
 	help
 	  Static Allocation refers to system or sub-system(domains) for
 	  which memory areas are pre-defined by configuration using physical
@@ -553,7 +558,7 @@ config DOM0_MEM
 
 config DTB_FILE
 	string "Absolute path to device tree blob"
-	depends on HAS_DEVICE_TREE
+	depends on HAS_DEVICE_TREE_DISCOVERY
 	help
 	  When using a bootloader that has no device tree support or when there
 	  is no bootloader at all, use this option to specify the absolute path
