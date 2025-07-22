@@ -826,14 +826,14 @@ static int __init construct_domU(struct kernel_info *kinfo,
 void __init create_domUs(void)
 {
     struct dt_device_node *node;
-    const char *dom0less_iommu;
-    bool iommu = false;
-    const struct dt_device_node *cpupool_node,
-                                *chosen = dt_find_node_by_path("/chosen");
+    const struct dt_device_node *chosen = dt_find_node_by_path("/chosen");
 
     BUG_ON(chosen == NULL);
     dt_for_each_child_node(chosen, node)
     {
+        const char *dom0less_iommu;
+        bool iommu = false;
+        const struct dt_device_node *cpupool_node;
         struct kernel_info ki = KERNEL_INFO_INIT;
         struct xen_domctl_createdomain *d_cfg = &ki.bd.create_cfg;
         unsigned int *flags = &ki.bd.create_flags;
