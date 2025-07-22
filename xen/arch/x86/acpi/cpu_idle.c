@@ -596,18 +596,24 @@ bool errata_c6_workaround(void)
     {
 #define INTEL_FAM6_MODEL(m) { X86_VENDOR_INTEL, 6, m, X86_FEATURE_ALWAYS }
         /*
-         * Errata AAJ72: EOI Transaction May Not be Sent if Software Enters
-         * Core C6 During an Interrupt Service Routine"
+         * Errata AAJ72, etc: EOI Transaction May Not be Sent if Software
+         * Enters Core C6 During an Interrupt Service Routine
          *
-         * There was an errata with some Core i7 processors that an EOI
-         * transaction may not be sent if software enters core C6 during an
-         * interrupt service routine. So we don't enter deep Cx state if
-         * there is an EOI pending.
+         * If core C6 is entered after the start of an interrupt service
+         * routine but before a write to the APIC EOI (End of Interrupt)
+         * register, and the core is woken up by an event other than a fixed
+         * interrupt source the core may drop the EOI transaction the next
+         * time APIC EOI register is written and further interrupts from the
+         * same or lower priority level will be blocked.
+         *
+         * Software should check the ISR register and if any interrupts are in
+         * service only enter C1.
          */
         static const struct x86_cpu_id eoi_errata[] = {
-            INTEL_FAM6_MODEL(0x1a),
+            INTEL_FAM6_MODEL(0x1a), /* AAJ72 */
             INTEL_FAM6_MODEL(0x1e),
             INTEL_FAM6_MODEL(0x1f),
+            INTEL_FAM6_MODEL(0x2e), /* BA106 */
             INTEL_FAM6_MODEL(0x25),
             INTEL_FAM6_MODEL(0x2c),
             INTEL_FAM6_MODEL(0x2f),
