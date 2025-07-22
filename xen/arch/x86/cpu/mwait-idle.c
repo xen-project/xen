@@ -678,6 +678,40 @@ static struct cpuidle_state __read_mostly adl_l_cstates[] = {
 	{}
 };
 
+static const struct cpuidle_state gmt_cstates[] = {
+	{
+		.name = "C1",
+		.flags = MWAIT2flg(0x00) | CPUIDLE_FLAG_DISABLED,
+		.exit_latency = 1,
+		.target_residency = 1,
+	},
+	{
+		.name = "C1E",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 2,
+		.target_residency = 4,
+	},
+	{
+		.name = "C6",
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 195,
+		.target_residency = 585,
+	},
+	{
+		.name = "C8",
+		.flags = MWAIT2flg(0x40) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 260,
+		.target_residency = 1040,
+	},
+	{
+		.name = "C10",
+		.flags = MWAIT2flg(0x60) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 660,
+		.target_residency = 1980,
+	},
+	{}
+};
+
 static struct cpuidle_state __read_mostly spr_cstates[] = {
 	{
 		.name = "C1",
@@ -1099,6 +1133,10 @@ static struct idle_cpu __read_mostly idle_cpu_adl_l = {
 	.state_table = adl_l_cstates,
 };
 
+static const struct idle_cpu idle_cpu_gmt = {
+	.state_table = gmt_cstates,
+};
+
 static struct idle_cpu __read_mostly idle_cpu_spr = {
 	.state_table = spr_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
@@ -1168,6 +1206,7 @@ static const struct x86_cpu_id intel_idle_ids[] __initconstrel = {
 	ICPU(ICELAKE_D,			icx),
 	ICPU(ALDERLAKE,			adl),
 	ICPU(ALDERLAKE_L,		adl_l),
+	ICPU(ATOM_GRACEMONT,		gmt),
 	ICPU(SAPPHIRERAPIDS_X,		spr),
 	ICPU(XEON_PHI_KNL,		knl),
 	ICPU(XEON_PHI_KNM,		knl),
@@ -1408,6 +1447,7 @@ static void __init mwait_idle_state_table_update(void)
 		break;
 	case INTEL_FAM6_ALDERLAKE:
 	case INTEL_FAM6_ALDERLAKE_L:
+	case INTEL_FAM6_ATOM_GRACEMONT:
 		adl_idle_state_table_update();
 		break;
 	}
