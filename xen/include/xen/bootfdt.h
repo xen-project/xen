@@ -11,6 +11,8 @@
 #include <asm/bootfdt.h>
 #endif
 
+#include <public/domctl.h>
+
 #define MIN_FDT_ALIGN 8
 
 /* Default #address and #size cells */
@@ -119,6 +121,10 @@ struct boot_domain {
     struct boot_module *initrd;
 
     const char *cmdline;
+
+    /* Input arguments to create_domain() */
+    struct xen_domctl_createdomain create_cfg;
+    unsigned int create_flags;
 };
 
 #define BOOTMOD_MAX_CMDLINE 1024
