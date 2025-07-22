@@ -834,7 +834,6 @@ void __init create_domUs(void)
     BUG_ON(chosen == NULL);
     dt_for_each_child_node(chosen, node)
     {
-        const char *llc_colors_str = NULL;
         struct kernel_info ki = KERNEL_INFO_INIT;
         struct xen_domctl_createdomain *d_cfg = &ki.bd.create_cfg;
         unsigned int *flags = &ki.bd.create_flags;
@@ -955,9 +954,11 @@ void __init create_domUs(void)
             d_cfg->max_maptrack_frames = val;
         }
 
-        dt_property_read_string(node, "llc-colors", &llc_colors_str);
-        if ( !llc_coloring_enabled && llc_colors_str )
+#ifdef CONFIG_HAS_LLC_COLORING
+        dt_property_read_string(node, "llc-colors", &ki.bd.llc_colors_str);
+        if ( !llc_coloring_enabled && ki.bd.llc_colors_str )
             panic("'llc-colors' found, but LLC coloring is disabled\n");
+#endif
 
         arch_create_domUs(node, d_cfg, *flags);
 
@@ -972,10 +973,13 @@ void __init create_domUs(void)
             panic("Error creating domain %s (rc = %ld)\n",
                   dt_node_name(node), PTR_ERR(ki.bd.d));
 
+#ifdef CONFIG_HAS_LLC_COLORING
         if ( llc_coloring_enabled &&
-             (rc = domain_set_llc_colors_from_str(ki.bd.d, llc_colors_str)) )
+             (rc = domain_set_llc_colors_from_str(ki.bd.d,
+                                                  ki.bd.llc_colors_str)) )
             panic("Error initializing LLC coloring for domain %s (rc = %d)\n",
                   dt_node_name(node), rc);
+#endif /* CONFIG_HAS_LLC_COLORING */
 
         ki.bd.d->is_console = true;
         dt_device_set_used_by(node, ki.bd.d->domain_id);

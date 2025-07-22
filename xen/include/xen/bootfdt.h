@@ -125,6 +125,11 @@ struct boot_domain {
     /* Input arguments to create_domain() */
     struct xen_domctl_createdomain create_cfg;
     unsigned int create_flags;
+
+#ifdef CONFIG_HAS_LLC_COLORING
+    /* LLC color selection string */
+    const char *llc_colors_str;
+#endif
 };
 
 #define BOOTMOD_MAX_CMDLINE 1024
