@@ -103,6 +103,10 @@ struct shared_meminfo {
 struct boot_domain {
     struct domain *d;
 
+#ifdef CONFIG_X86
+    domid_t domid;
+#endif
+
     struct boot_module *kernel;
     struct boot_module *initrd;
 
