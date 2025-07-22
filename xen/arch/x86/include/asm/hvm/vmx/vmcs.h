@@ -720,7 +720,6 @@ DECLARE_PER_CPU(bool, vmxon);
 bool vmx_vcpu_pml_enabled(const struct vcpu *v);
 int vmx_vcpu_enable_pml(struct vcpu *v);
 void vmx_vcpu_disable_pml(struct vcpu *v);
-void vmx_vcpu_flush_pml_buffer(struct vcpu *v);
 bool vmx_domain_pml_enabled(const struct domain *d);
 int vmx_domain_enable_pml(struct domain *d);
 void vmx_domain_disable_pml(struct domain *d);
