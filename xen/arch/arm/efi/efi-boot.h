@@ -48,7 +48,6 @@ void noreturn efi_xen_start(void *fdt_ptr, uint32_t fdt_size);
 void __flush_dcache_area(const void *vaddr, unsigned long size);
 
 static int get_module_file_index(const char *name, unsigned int name_len);
-static void PrintMessage(const CHAR16 *s);
 
 #define DEVICE_TREE_GUID \
 {0xb1b621d5U, 0xf19c, 0x41a5, {0x83, 0x0b, 0xd9, 0x15, 0x2c, 0x69, 0xaa, 0xe0}}
@@ -490,7 +489,7 @@ static void __init efi_arch_handle_cmdline(CHAR16 *cmdline_options,
 
     if ( cfgfile_options )
     {
-        PrintMessage(L"Using bootargs from Xen configuration file.");
+        PrintStr(L"Using bootargs from Xen configuration file.\r\n");
         prop_len += snprintf(buf + prop_len,
                                EFI_PAGE_SIZE - prop_len, " %s", cfgfile_options);
         if ( prop_len >= EFI_PAGE_SIZE )
@@ -503,7 +502,7 @@ static void __init efi_arch_handle_cmdline(CHAR16 *cmdline_options,
                                                    "xen,xen-bootargs", NULL);
         if ( dt_bootargs_prop )
         {
-            PrintMessage(L"Using bootargs from device tree.");
+            PrintStr(L"Using bootargs from device tree.\r\n");
             prop_len += snprintf(buf + prop_len, EFI_PAGE_SIZE - prop_len,
                                  " %s", dt_bootargs_prop);
             if ( prop_len >= EFI_PAGE_SIZE )
@@ -634,12 +633,6 @@ static int __init get_module_file_index(const char *name,
     return ret;
 }
 
-static void __init PrintMessage(const CHAR16 *s)
-{
-    PrintStr(s);
-    PrintStr(newline);
-}
-
 /*
  * This function allocates a binary and keeps track of its name, it returns the
  * index of the file in the modules array or a negative number on error.
@@ -661,7 +654,7 @@ static int __init allocate_module_file(const EFI_LOADED_IMAGE *loaded_image,
      */
     if ( !modules_available )
     {
-        PrintMessage(L"No space left for modules");
+        PrintStr(L"No space left for modules\r\n");
         return ERROR_ALLOC_MODULE_NO_SPACE;
     }
 
@@ -674,7 +667,7 @@ static int __init allocate_module_file(const EFI_LOADED_IMAGE *loaded_image,
     if ( efi_bs->AllocatePool(EfiLoaderData, (name_len + 1) * sizeof(char),
                               (void**)&file_info->name) != EFI_SUCCESS )
     {
-        PrintMessage(L"Error allocating memory for module binary name");
+        PrintStr(L"Error allocating memory for module binary name\r\n");
         return ERROR_ALLOC_MODULE_NAME;
     }
 
@@ -754,14 +747,14 @@ static int __init handle_module_node(const EFI_LOADED_IMAGE *loaded_image,
     /* Rename the module to be module@{address} */
     if ( fdt_set_name(fdt_efi, module_node_offset, mod_string) < 0 )
     {
-        PrintMessage(L"Unable to modify module node name.");
+        PrintStr(L"Unable to modify module node name.\r\n");
         return ERROR_RENAME_MODULE_NAME;
     }
 
     if ( fdt_set_reg(fdt_efi, module_node_offset, reg_addr_cells, reg_size_cells,
                      file->addr, file->size) < 0 )
     {
-        PrintMessage(L"Unable to set module reg property.");
+        PrintStr(L"Unable to set module reg property.\r\n");
         return ERROR_SET_REG_PROPERTY;
     }
 
@@ -777,7 +770,7 @@ static int __init handle_module_node(const EFI_LOADED_IMAGE *loaded_image,
             */
             if ( kernel.addr )
             {
-                PrintMessage(L"Dom0 kernel already found in cfg file.");
+                PrintStr(L"Dom0 kernel already found in cfg file.\r\n");
                 return ERROR_DOM0_ALREADY_FOUND;
             }
             kernel.need_to_free = false; /* Freed using the module array */
@@ -788,14 +781,14 @@ static int __init handle_module_node(const EFI_LOADED_IMAGE *loaded_image,
                   (fdt_node_check_compatible(fdt_efi, module_node_offset,
                                              "multiboot,ramdisk") == 0) )
         {
-            PrintMessage(L"Dom0 ramdisk already found in cfg file.");
+            PrintStr(L"Dom0 ramdisk already found in cfg file.\r\n");
             return ERROR_DOM0_RAMDISK_FOUND;
         }
         else if ( xsm.addr &&
                   (fdt_node_check_compatible(fdt_efi, module_node_offset,
                                              "xen,xsm-policy") == 0) )
         {
-            PrintMessage(L"XSM policy already found in cfg file.");
+            PrintStr(L"XSM policy already found in cfg file.\r\n");
             return ERROR_XSM_ALREADY_FOUND;
         }
     }
@@ -821,7 +814,7 @@ static int __init handle_dom0less_domain_node(const EFI_LOADED_IMAGE *loaded_ima
     prop = fdt_get_property(fdt_efi, domain_node, "#address-cells", &len);
     if ( !prop )
     {
-        PrintMessage(L"#address-cells not found in domain node.");
+        PrintStr(L"#address-cells not found in domain node.\r\n");
         return ERROR_MISSING_DT_PROPERTY;
     }
 
@@ -830,7 +823,7 @@ static int __init handle_dom0less_domain_node(const EFI_LOADED_IMAGE *loaded_ima
     prop = fdt_get_property(fdt_efi, domain_node, "#size-cells", &len);
     if ( !prop )
     {
-        PrintMessage(L"#size-cells not found in domain node.");
+        PrintStr(L"#size-cells not found in domain node.\r\n");
         return ERROR_MISSING_DT_PROPERTY;
     }
 
@@ -868,7 +861,7 @@ static int __init efi_check_dt_boot(const EFI_LOADED_IMAGE *loaded_image)
     chosen = setup_chosen_node(fdt_efi, &addr_len, &size_len);
     if ( chosen < 0 )
     {
-        PrintMessage(L"Unable to setup chosen node");
+        PrintStr(L"Unable to setup chosen node\r\n");
         return ERROR_DT_CHOSEN_NODE;
     }
 
