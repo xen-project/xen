@@ -23,11 +23,11 @@
 #include "iommu.h"
 
 static int __init get_iommu_msi_capabilities(
-    u16 seg, u8 bus, u8 dev, u8 func, struct amd_iommu *iommu)
+    pci_sbdf_t sbdf, struct amd_iommu *iommu)
 {
     int pos;
 
-    pos = pci_find_cap_offset(PCI_SBDF(seg, bus, dev, func), PCI_CAP_ID_MSI);
+    pos = pci_find_cap_offset(sbdf, PCI_CAP_ID_MSI);
 
     if ( !pos )
         return -ENODEV;
@@ -41,11 +41,11 @@ static int __init get_iommu_msi_capabilities(
 }
 
 static int __init get_iommu_capabilities(
-    u16 seg, u8 bus, u8 dev, u8 func, u16 cap_ptr, struct amd_iommu *iommu)
+    pci_sbdf_t sbdf, u16 cap_ptr, struct amd_iommu *iommu)
 {
     u8 type;
 
-    iommu->cap.header = pci_conf_read32(PCI_SBDF(seg, bus, dev, func), cap_ptr);
+    iommu->cap.header = pci_conf_read32(sbdf, cap_ptr);
     type = get_field_from_reg_u32(iommu->cap.header, PCI_CAP_TYPE_MASK,
                                   PCI_CAP_TYPE_SHIFT);
 
@@ -162,8 +162,8 @@ int __init amd_iommu_detect_one_acpi(
     spin_lock_init(&iommu->lock);
     INIT_LIST_HEAD(&iommu->ats_devices);
 
-    iommu->seg = ivhd_block->pci_segment_group;
-    iommu->bdf = ivhd_block->header.device_id;
+    iommu->sbdf = PCI_SBDF(ivhd_block->pci_segment_group,
+                           ivhd_block->header.device_id);
     iommu->cap_offset = ivhd_block->capability_offset;
     iommu->mmio_base_phys = ivhd_block->base_address;
 
@@ -210,16 +210,15 @@ int __init amd_iommu_detect_one_acpi(
     /* override IOMMU HT flags */
     iommu->ht_flags = ivhd_block->header.flags;
 
-    bus = PCI_BUS(iommu->bdf);
-    dev = PCI_SLOT(iommu->bdf);
-    func = PCI_FUNC(iommu->bdf);
+    bus = PCI_BUS(iommu->sbdf.bdf);
+    dev = PCI_SLOT(iommu->sbdf.bdf);
+    func = PCI_FUNC(iommu->sbdf.bdf);
 
-    rt = get_iommu_capabilities(iommu->seg, bus, dev, func,
-                                iommu->cap_offset, iommu);
+    rt = get_iommu_capabilities(iommu->sbdf, iommu->cap_offset, iommu);
     if ( rt )
         goto out;
 
-    rt = get_iommu_msi_capabilities(iommu->seg, bus, dev, func, iommu);
+    rt = get_iommu_msi_capabilities(iommu->sbdf, iommu);
     if ( rt )
         goto out;
 
@@ -228,10 +227,10 @@ int __init amd_iommu_detect_one_acpi(
     if ( !iommu->domid_map )
         goto out;
 
-    rt = pci_ro_device(iommu->seg, bus, PCI_DEVFN(dev, func));
+    rt = pci_ro_device(iommu->sbdf.seg, bus, PCI_DEVFN(dev, func));
     if ( rt )
         printk(XENLOG_ERR "Could not mark config space of %pp read-only (%d)\n",
-               &PCI_SBDF(iommu->seg, iommu->bdf), rt);
+               &iommu->sbdf, rt);
 
     list_add_tail(&iommu->list, &amd_iommu_head);
     rt = 0;

@@ -558,14 +558,14 @@ void amd_iommu_print_entries(const struct amd_iommu *iommu, unsigned int dev_id,
 
     if ( !dt[dev_id].tv )
     {
-        printk("%pp: no root\n", &PCI_SBDF(iommu->seg, dev_id));
+        printk("%pp: no root\n", &PCI_SBDF(iommu->sbdf.seg, dev_id));
         return;
     }
 
     pt_mfn = _mfn(dt[dev_id].pt_root);
     level = dt[dev_id].paging_mode;
     printk("%pp root @ %"PRI_mfn" (%u levels) dfn=%"PRI_dfn"\n",
-           &PCI_SBDF(iommu->seg, dev_id), mfn_x(pt_mfn), level, dfn_x(dfn));
+           &PCI_SBDF(iommu->sbdf.seg, dev_id), mfn_x(pt_mfn), level, dfn_x(dfn));
 
     while ( level )
     {

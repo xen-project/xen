@@ -77,8 +77,8 @@ struct amd_iommu {
     struct list_head list;
     spinlock_t lock; /* protect iommu */
 
-    u16 seg;
-    u16 bdf;
+    pci_sbdf_t sbdf;
+
     struct msi_desc msi;
 
     u16 cap_offset;

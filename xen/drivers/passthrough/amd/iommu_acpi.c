@@ -58,7 +58,7 @@ static void __init add_ivrs_mapping_entry(
     uint16_t bdf, uint16_t alias_id, uint8_t flags, unsigned int ext_flags,
     bool alloc_irt, struct amd_iommu *iommu)
 {
-    struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(iommu->seg);
+    struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(iommu->sbdf.seg);
 
     ASSERT( ivrs_mappings != NULL );
 
@@ -70,7 +70,7 @@ static void __init add_ivrs_mapping_entry(
     ivrs_mappings[bdf].device_flags = flags;
 
     /* Don't map an IOMMU by itself. */
-    if ( iommu->bdf == bdf )
+    if ( iommu->sbdf.bdf == bdf )
         return;
 
     /* Allocate interrupt remapping table if needed. */
@@ -96,7 +96,7 @@ static void __init add_ivrs_mapping_entry(
 
             if ( !ivrs_mappings[alias_id].intremap_table )
                 panic("No memory for %pp's IRT\n",
-                      &PCI_SBDF(iommu->seg, alias_id));
+                      &PCI_SBDF(iommu->sbdf.seg, alias_id));
         }
     }
 
@@ -112,7 +112,7 @@ static struct amd_iommu * __init find_iommu_from_bdf_cap(
     struct amd_iommu *iommu;
 
     for_each_amd_iommu ( iommu )
-        if ( (iommu->seg == seg) && (iommu->bdf == bdf) &&
+        if ( (iommu->sbdf.sbdf == PCI_SBDF(seg, bdf).sbdf) &&
              (iommu->cap_offset == cap_offset) )
             return iommu;
 
@@ -297,13 +297,13 @@ static int __init register_range_for_iommu_devices(
     /* reserve unity-mapped page entries for devices */
     for ( bdf = rc = 0; !rc && bdf < ivrs_bdf_entries; bdf++ )
     {
-        if ( iommu != find_iommu_for_device(iommu->seg, bdf) )
+        if ( iommu != find_iommu_for_device(iommu->sbdf.seg, bdf) )
             continue;
 
-        req = get_ivrs_mappings(iommu->seg)[bdf].dte_requestor_id;
-        rc = reserve_unity_map_for_device(iommu->seg, bdf, base, length,
+        req = get_ivrs_mappings(iommu->sbdf.seg)[bdf].dte_requestor_id;
+        rc = reserve_unity_map_for_device(iommu->sbdf.seg, bdf, base, length,
                                           iw, ir, false) ?:
-             reserve_unity_map_for_device(iommu->seg, req, base, length,
+             reserve_unity_map_for_device(iommu->sbdf.seg, req, base, length,
                                           iw, ir, false);
     }
 

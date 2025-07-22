@@ -132,7 +132,7 @@ static int get_intremap_requestor_id(int seg, int bdf)
 static unsigned int alloc_intremap_entry(const struct amd_iommu *iommu,
                                          unsigned int bdf, unsigned int nr)
 {
-    const struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(iommu->seg);
+    const struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(iommu->sbdf.seg);
     unsigned long *inuse = ivrs_mappings[bdf].intremap_inuse;
     unsigned int nr_ents =
         intremap_table_entries(ivrs_mappings[bdf].intremap_table, iommu);
@@ -167,7 +167,7 @@ static union irte_ptr get_intremap_entry(const struct amd_iommu *iommu,
                                          unsigned int bdf, unsigned int index)
 {
     union irte_ptr table = {
-        .ptr = get_ivrs_mappings(iommu->seg)[bdf].intremap_table
+        .ptr = get_ivrs_mappings(iommu->sbdf.seg)[bdf].intremap_table
     };
 
     ASSERT(table.ptr && (index < intremap_table_entries(table.ptr, iommu)));
@@ -184,7 +184,7 @@ static void free_intremap_entry(const struct amd_iommu *iommu,
                                 unsigned int bdf, unsigned int index)
 {
     union irte_ptr entry = get_intremap_entry(iommu, bdf, index);
-    struct ivrs_mappings *ivrs = get_ivrs_mappings(iommu->seg);
+    struct ivrs_mappings *ivrs = get_ivrs_mappings(iommu->sbdf.seg);
 
     if ( iommu->ctrl.ga_en )
     {
@@ -281,8 +281,8 @@ static int update_intremap_entry_from_ioapic(
     unsigned int dest, offset;
     bool fresh = false;
 
-    req_id = get_intremap_requestor_id(iommu->seg, bdf);
-    lock = get_intremap_lock(iommu->seg, req_id);
+    req_id = get_intremap_requestor_id(iommu->sbdf.seg, bdf);
+    lock = get_intremap_lock(iommu->sbdf.seg, req_id);
 
     delivery_mode = rte->delivery_mode;
     vector = rte->vector;
@@ -419,10 +419,10 @@ static int update_intremap_entry_from_msi_msg(
     unsigned int dest, offset, i;
     bool fresh = false;
 
-    req_id = get_dma_requestor_id(iommu->seg, bdf);
-    alias_id = get_intremap_requestor_id(iommu->seg, bdf);
+    req_id = get_dma_requestor_id(iommu->sbdf.seg, bdf);
+    alias_id = get_intremap_requestor_id(iommu->sbdf.seg, bdf);
 
-    lock = get_intremap_lock(iommu->seg, req_id);
+    lock = get_intremap_lock(iommu->sbdf.seg, req_id);
     spin_lock_irqsave(lock, flags);
 
     if ( msg == NULL )
@@ -486,10 +486,10 @@ static int update_intremap_entry_from_msi_msg(
      */
 
     if ( ( req_id != alias_id ) &&
-         get_ivrs_mappings(iommu->seg)[alias_id].intremap_table != NULL )
+         get_ivrs_mappings(iommu->sbdf.seg)[alias_id].intremap_table != NULL )
     {
-        BUG_ON(get_ivrs_mappings(iommu->seg)[req_id].intremap_table !=
-               get_ivrs_mappings(iommu->seg)[alias_id].intremap_table);
+        BUG_ON(get_ivrs_mappings(iommu->sbdf.seg)[req_id].intremap_table !=
+               get_ivrs_mappings(iommu->sbdf.seg)[alias_id].intremap_table);
     }
 
     return fresh;
@@ -498,16 +498,17 @@ static int update_intremap_entry_from_msi_msg(
 static struct amd_iommu *_find_iommu_for_device(int seg, int bdf)
 {
     struct amd_iommu *iommu;
+    pci_sbdf_t sbdf = PCI_SBDF(seg, bdf);
 
     for_each_amd_iommu ( iommu )
-        if ( iommu->seg == seg && iommu->bdf == bdf )
+        if ( iommu->sbdf.sbdf == sbdf.sbdf )
             return NULL;
 
     iommu = find_iommu_for_device(seg, bdf);
     if ( iommu )
         return iommu;
 
-    AMD_IOMMU_DEBUG("No IOMMU for MSI dev = %pp\n", &PCI_SBDF(seg, bdf));
+    AMD_IOMMU_DEBUG("No IOMMU for MSI dev = %pp\n", &sbdf);
     return ERR_PTR(-EINVAL);
 }
 
@@ -730,7 +731,7 @@ static void dump_intremap_table(const struct amd_iommu *iommu,
         if ( ivrs_mapping )
         {
             printk("  %pp:\n",
-                   &PCI_SBDF(iommu->seg, ivrs_mapping->dte_requestor_id));
+                   &PCI_SBDF(iommu->sbdf.seg, ivrs_mapping->dte_requestor_id));
             ivrs_mapping = NULL;
         }
 
