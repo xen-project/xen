@@ -11,6 +11,7 @@
 #include <xen/bootinfo.h>
 #include <xen/compile.h>
 #include <xen/device_tree.h>
+#include <xen/dom0less-build.h>
 #include <xen/domain_page.h>
 #include <xen/grant_table.h>
 #include <xen/llc-coloring.h>
@@ -39,7 +40,6 @@
 #include <xen/warning.h>
 #include <xen/hypercall.h>
 #include <asm/alternative.h>
-#include <asm/dom0less-build.h>
 #include <asm/page.h>
 #include <asm/current.h>
 #include <asm/setup.h>

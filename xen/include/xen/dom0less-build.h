@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef __ASM_GENERIC_DOM0LESS_BUILD_H__
-#define __ASM_GENERIC_DOM0LESS_BUILD_H__
+#ifndef XEN_DOM0LESS_BUILD_H
+#define XEN_DOM0LESS_BUILD_H
 
 #include <xen/stdbool.h>
 
@@ -9,8 +9,7 @@ struct domain;
 
 #ifdef CONFIG_DOM0LESS_BOOT
 
-#include <public/domctl.h>
-
+struct xen_domctl_createdomain;
 struct dt_device_node;
 struct kernel_info;
 

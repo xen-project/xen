@@ -2,6 +2,7 @@
 #include <xen/init.h>
 #include <xen/bootinfo.h>
 #include <xen/compile.h>
+#include <xen/dom0less-build.h>
 #include <xen/fdt-domain-build.h>
 #include <xen/fdt-kernel.h>
 #include <xen/lib.h>
@@ -32,7 +33,6 @@
 #include <asm/setup.h>
 #include <asm/arm64/sve.h>
 #include <asm/cpufeature.h>
-#include <asm/dom0less-build.h>
 #include <asm/domain_build.h>
 #include <xen/event.h>
 

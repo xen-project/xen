@@ -3,6 +3,7 @@
 #include <xen/domain_page.h>
 #include <xen/fdt-domain-build.h>
 #include <xen/fdt-kernel.h>
+#include <xen/dom0less-build.h>
 #include <xen/err.h>
 #include <xen/event.h>
 #include <xen/grant_table.h>
@@ -20,7 +21,6 @@
 #include <public/io/xs_wire.h>
 
 #include <asm/arm64/sve.h>
-#include <asm/dom0less-build.h>
 #include <asm/domain_build.h>
 #include <asm/grant_table.h>
 #include <asm/setup.h>

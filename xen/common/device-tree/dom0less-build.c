@@ -2,6 +2,7 @@
 
 #include <xen/bootinfo.h>
 #include <xen/device_tree.h>
+#include <xen/dom0less-build.h>
 #include <xen/domain.h>
 #include <xen/domain_page.h>
 #include <xen/err.h>
@@ -25,7 +26,6 @@
 #include <public/event_channel.h>
 #include <public/io/xs_wire.h>
 
-#include <asm/dom0less-build.h>
 #include <asm/setup.h>
 
 #include <xen/static-memory.h>
