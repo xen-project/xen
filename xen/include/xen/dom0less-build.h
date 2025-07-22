@@ -45,6 +45,9 @@ void create_domUs(void);
 bool is_dom0less_mode(void);
 void set_xs_domain(struct domain *d);
 
+int parse_dom0less_node(struct dt_device_node *node,
+                        struct boot_domain *bd);
+
 int arch_parse_dom0less_node(struct dt_device_node *node,
                              struct boot_domain *bd);
 
