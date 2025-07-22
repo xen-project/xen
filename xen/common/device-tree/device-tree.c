@@ -8,6 +8,7 @@
  */
 
 #include <xen/bitops.h>
+#include <xen/bootfdt.h>
 #include <xen/types.h>
 #include <xen/init.h>
 #include <xen/guest_access.h>
