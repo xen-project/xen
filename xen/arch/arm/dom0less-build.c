@@ -272,10 +272,11 @@ int __init init_vuart(struct domain *d, struct kernel_info *kinfo,
     return rc;
 }
 
-void __init arch_create_domUs(struct dt_device_node *node,
-                       struct xen_domctl_createdomain *d_cfg,
-                       unsigned int flags)
+void __init arch_parse_dom0less_node(struct dt_device_node *node,
+                                     struct boot_domain *bd)
 {
+    struct xen_domctl_createdomain *d_cfg = &bd->create_cfg;
+    unsigned int flags = bd->create_flags;
     uint32_t val;
 
     d_cfg->arch.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE;
