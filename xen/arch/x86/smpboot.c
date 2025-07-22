@@ -978,9 +978,12 @@ static void cpu_smpboot_free(unsigned int cpu, bool remove)
 
     if ( remove )
     {
-        c[cpu].phys_proc_id = XEN_INVALID_SOCKET_ID;
-        c[cpu].cpu_core_id = XEN_INVALID_CORE_ID;
-        c[cpu].compute_unit_id = INVALID_CUID;
+        if ( system_state != SYS_STATE_suspend )
+        {
+            c[cpu].phys_proc_id = XEN_INVALID_SOCKET_ID;
+            c[cpu].cpu_core_id = XEN_INVALID_CORE_ID;
+            c[cpu].compute_unit_id = INVALID_CUID;
+        }
 
         FREE_CPUMASK_VAR(per_cpu(cpu_sibling_mask, cpu));
         FREE_CPUMASK_VAR(per_cpu(cpu_core_mask, cpu));
