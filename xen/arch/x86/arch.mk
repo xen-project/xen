@@ -8,6 +8,9 @@ CFLAGS += -DXEN_IMG_OFFSET=$(XEN_IMG_OFFSET)
 # Prevent floating-point variables from creeping into Xen.
 CFLAGS += -msoft-float
 
+# Don't needlessly over-align larger aggregates.
+CFLAGS-$(CONFIG_CC_IS_GCC) += -malign-data=abi
+
 $(call cc-options-add,CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
 $(call cc-option-add,CFLAGS,CC,-Wnested-externs)
 $(call as-option-add,CFLAGS,CC,".equ \"x\"$(comma)1",-DHAVE_AS_QUOTED_SYM)
