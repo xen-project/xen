@@ -707,8 +707,7 @@ static int __init cf_check parse_ivrs_ioapic(const char *str)
         }
     }
 
-    ioapic_sbdf[idx].bdf = PCI_BDF(bus, dev, func);
-    ioapic_sbdf[idx].seg = seg;
+    ioapic_sbdf[idx].sbdf = PCI_SBDF(seg, bus, dev, func);
     ioapic_sbdf[idx].id = id;
     ioapic_sbdf[idx].cmdline = true;
 
@@ -734,8 +733,7 @@ static int __init cf_check parse_ivrs_hpet(const char *str)
         return -EINVAL;
 
     hpet_sbdf.id = id;
-    hpet_sbdf.bdf = PCI_BDF(bus, dev, func);
-    hpet_sbdf.seg = seg;
+    hpet_sbdf.sbdf = PCI_SBDF(seg, bus, dev, func);
     hpet_sbdf.init = HPET_CMDL;
 
     return 0;
@@ -746,8 +744,9 @@ static u16 __init parse_ivhd_device_special(
     const struct acpi_ivrs_device8c *special, u16 seg,
     u16 header_length, u16 block_length, struct amd_iommu *iommu)
 {
-    u16 dev_length, bdf;
+    uint16_t dev_length;
     unsigned int apic, idx;
+    pci_sbdf_t sbdf;
 
     dev_length = sizeof(*special);
     if ( header_length < (block_length + dev_length) )
@@ -756,16 +755,16 @@ static u16 __init parse_ivhd_device_special(
         return 0;
     }
 
-    bdf = special->used_id;
-    if ( bdf >= ivrs_bdf_entries )
+    sbdf = PCI_SBDF(seg, special->used_id);
+    if ( sbdf.bdf >= ivrs_bdf_entries )
     {
-        AMD_IOMMU_ERROR("IVHD: invalid Device_Entry Dev_Id %#x\n", bdf);
+        AMD_IOMMU_ERROR("IVHD: invalid Device_Entry Dev_Id %#x\n", sbdf.bdf);
         return 0;
     }
 
     AMD_IOMMU_DEBUG("IVHD Special: %pp variety %#x handle %#x\n",
-                    &PCI_SBDF(seg, bdf), special->variety, special->handle);
-    add_ivrs_mapping_entry(bdf, bdf, special->header.data_setting, 0, true,
+                    &sbdf, special->variety, special->handle);
+    add_ivrs_mapping_entry(sbdf.bdf, sbdf.bdf, special->header.data_setting, 0, true,
                            iommu);
 
     switch ( special->variety )
@@ -780,8 +779,7 @@ static u16 __init parse_ivhd_device_special(
          */
         for ( idx = 0; idx < nr_ioapic_sbdf; idx++ )
         {
-            if ( ioapic_sbdf[idx].bdf == bdf &&
-                 ioapic_sbdf[idx].seg == seg &&
+            if ( ioapic_sbdf[idx].sbdf.sbdf == sbdf.sbdf &&
                  ioapic_sbdf[idx].cmdline )
                 break;
         }
@@ -790,7 +788,7 @@ static u16 __init parse_ivhd_device_special(
             AMD_IOMMU_DEBUG("IVHD: Command line override present for IO-APIC %#x"
                             "(IVRS: %#x devID %pp)\n",
                             ioapic_sbdf[idx].id, special->handle,
-                            &PCI_SBDF(seg, bdf));
+                            &sbdf);
             break;
         }
 
@@ -805,8 +803,7 @@ static u16 __init parse_ivhd_device_special(
                                 special->handle);
             else if ( idx != MAX_IO_APICS && ioapic_sbdf[idx].pin_2_idx )
             {
-                if ( ioapic_sbdf[idx].bdf == bdf &&
-                     ioapic_sbdf[idx].seg == seg )
+                if ( ioapic_sbdf[idx].sbdf.sbdf == sbdf.sbdf )
                     AMD_IOMMU_WARN("IVHD: duplicate IO-APIC %#x entries\n",
                                     special->handle);
                 else
@@ -827,8 +824,7 @@ static u16 __init parse_ivhd_device_special(
                 }
 
                 /* set device id of ioapic */
-                ioapic_sbdf[idx].bdf = bdf;
-                ioapic_sbdf[idx].seg = seg;
+                ioapic_sbdf[idx].sbdf = sbdf;
                 ioapic_sbdf[idx].id = special->handle;
 
                 ioapic_sbdf[idx].pin_2_idx = xmalloc_array(
@@ -862,13 +858,12 @@ static u16 __init parse_ivhd_device_special(
             AMD_IOMMU_DEBUG("IVHD: Command line override present for HPET %#x "
                             "(IVRS: %#x devID %pp)\n",
                             hpet_sbdf.id, special->handle,
-                            &PCI_SBDF(seg, bdf));
+                            &sbdf);
             break;
         case HPET_NONE:
             /* set device id of hpet */
             hpet_sbdf.id = special->handle;
-            hpet_sbdf.bdf = bdf;
-            hpet_sbdf.seg = seg;
+            hpet_sbdf.sbdf = sbdf;
             hpet_sbdf.init = HPET_IVHD;
             break;
         default:
@@ -1139,9 +1134,8 @@ static int __init cf_check parse_ivrs_table(struct acpi_table_header *table)
                 return -ENXIO;
         }
 
-        if ( !ioapic_sbdf[idx].seg &&
-             /* SB IO-APIC is always on this device in AMD systems. */
-             ioapic_sbdf[idx].bdf == PCI_BDF(0, 0x14, 0) )
+        /* SB IO-APIC is always on this device in AMD systems. */
+        if ( ioapic_sbdf[idx].sbdf.sbdf == PCI_SBDF(0, 0, 0x14, 0).sbdf )
             sb_ioapic = 1;
 
         if ( ioapic_sbdf[idx].pin_2_idx )
