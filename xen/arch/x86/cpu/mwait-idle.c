@@ -678,6 +678,28 @@ static struct cpuidle_state __read_mostly adl_l_cstates[] = {
 	{}
 };
 
+static const struct cpuidle_state mtl_l_cstates[] = {
+	{
+		.name = "C1E",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 1,
+		.target_residency = 1,
+	},
+	{
+		.name = "C6",
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 140,
+		.target_residency = 420,
+	},
+	{
+		.name = "C10",
+		.flags = MWAIT2flg(0x60) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 310,
+		.target_residency = 930,
+	},
+	{}
+};
+
 static const struct cpuidle_state gmt_cstates[] = {
 	{
 		.name = "C1",
@@ -1133,6 +1155,10 @@ static struct idle_cpu __read_mostly idle_cpu_adl_l = {
 	.state_table = adl_l_cstates,
 };
 
+static const struct idle_cpu idle_cpu_mtl_l = {
+	.state_table = mtl_l_cstates,
+};
+
 static const struct idle_cpu idle_cpu_gmt = {
 	.state_table = gmt_cstates,
 };
@@ -1206,6 +1232,7 @@ static const struct x86_cpu_id intel_idle_ids[] __initconstrel = {
 	ICPU(ICELAKE_D,			icx),
 	ICPU(ALDERLAKE,			adl),
 	ICPU(ALDERLAKE_L,		adl_l),
+	ICPU(METEORLAKE_L,		mtl_l),
 	ICPU(ATOM_GRACEMONT,		gmt),
 	ICPU(SAPPHIRERAPIDS_X,		spr),
 	ICPU(EMERALDRAPIDS_X,		spr),
