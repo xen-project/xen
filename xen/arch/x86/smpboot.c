@@ -960,7 +960,13 @@ static void cpu_smpboot_free(unsigned int cpu, bool remove)
     unsigned int socket = cpu_to_socket(cpu);
     struct cpuinfo_x86 *c = cpu_data;
 
-    if ( cpumask_empty(socket_cpumask[socket]) )
+    /*
+     * We may come here without the CPU having run through CPU identification.
+     * In that case the socket number cannot be relied upon, but the respective
+     * socket_cpumask[] slot also wouldn't have been set.
+     */
+    if ( c[cpu].apicid != boot_cpu_data.apicid &&
+         cpumask_empty(socket_cpumask[socket]) )
     {
         xfree(socket_cpumask[socket]);
         socket_cpumask[socket] = NULL;
