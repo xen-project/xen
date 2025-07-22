@@ -18,7 +18,11 @@
 
 static uint32_t __init output_length(char *image, unsigned long image_len)
 {
-    return *(uint32_t *)&image[image_len - 4];
+    uint32_t val;
+
+    memcpy(&val, &image[image_len - 4], sizeof(val));
+
+    return val;
 }
 
 int __init kernel_decompress(struct boot_module *mod, uint32_t offset)
