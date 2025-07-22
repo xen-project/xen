@@ -1188,6 +1188,7 @@ static const struct x86_cpu_id intel_idle_ids[] __initconstrel = {
 	ICPU(ALDERLAKE_L,		adl_l),
 	ICPU(ATOM_GRACEMONT,		gmt),
 	ICPU(SAPPHIRERAPIDS_X,		spr),
+	ICPU(EMERALDRAPIDS_X,		spr),
 	ICPU(ATOM_GOLDMONT,		bxt),
 	ICPU(ATOM_GOLDMONT_PLUS,	bxt),
 	ICPU(ATOM_GOLDMONT_D,		dnv),
@@ -1421,6 +1422,7 @@ static void __init mwait_idle_state_table_update(void)
 		skx_idle_state_table_update();
 		break;
 	case INTEL_FAM6_SAPPHIRERAPIDS_X:
+	case INTEL_FAM6_EMERALDRAPIDS_X:
 		spr_idle_state_table_update();
 		break;
 	case INTEL_FAM6_ALDERLAKE:
