@@ -501,6 +501,12 @@ static void __init guest_common_max_feature_adjustments(uint32_t *fs)
      */
     __set_bit(X86_FEATURE_HTT, fs);
     __set_bit(X86_FEATURE_CMP_LEGACY, fs);
+
+    /*
+     * ERMS is a performance hint.  A VM which previously saw ERMS will
+     * function correctly when migrated here, even if ERMS isn't available.
+     */
+    __set_bit(X86_FEATURE_ERMS, fs);
 }
 
 static void __init guest_common_default_feature_adjustments(uint32_t *fs)
@@ -588,6 +594,13 @@ static void __init guest_common_default_feature_adjustments(uint32_t *fs)
 
     if ( !cpu_has_cmp_legacy )
         __clear_bit(X86_FEATURE_CMP_LEGACY, fs);
+
+    /*
+     * ERMS is a performance hint, so is set unconditionally in the max
+     * policy.  However, guests should default to the host setting.
+     */
+    if ( !host_cpu_policy.feat.erms )
+        __clear_bit(X86_FEATURE_ERMS, fs);
 }
 
 static void __init guest_common_feature_adjustments(uint32_t *fs)

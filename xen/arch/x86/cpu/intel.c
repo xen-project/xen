@@ -363,7 +363,17 @@ static void cf_check early_init_intel(struct cpuinfo_x86 *c)
 		paddr_bits = 36;
 
 	if (c == &boot_cpu_data) {
+		uint64_t misc_enable;
+
 		check_memory_type_self_snoop_errata();
+
+		/*
+		 * If fast string is not enabled in IA32_MISC_ENABLE for any reason,
+		 * clear the enhanced fast string CPU capability.
+		 */
+		rdmsrl(MSR_IA32_MISC_ENABLE, misc_enable);
+		if (!(misc_enable & MSR_IA32_MISC_ENABLE_FAST_STRING))
+			setup_clear_cpu_cap(X86_FEATURE_ERMS);
 
 		intel_init_levelling();
 	}
