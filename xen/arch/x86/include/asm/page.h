@@ -227,8 +227,8 @@ void copy_page_sse2(void *to, const void *from);
 #define copy_page(_t, _f)   copy_page_sse2(_t, _f)
 
 #ifdef CONFIG_DEBUG
-void scrub_page_hot(void *);
-void scrub_page_cold(void *);
+void scrub_page_hot(void *ptr);
+void scrub_page_cold(void *ptr);
 #endif
 
 /* Convert between Xen-heap virtual addresses and machine addresses. */
