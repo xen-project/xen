@@ -206,20 +206,18 @@ strtoll(const char *s, char **end, int base)
 
     if ( *s == '\0' ) goto out;
 
-    if ( *s == '0' ) {
+    if ( (base == 0 || base == 16) && *s == '0' ) {
         s++;
         if ( *s == '\0' ) goto out;
 
-        if ( *s == 'x' ) {
-            if ( base != 0 && base != 16) goto out;
+        if ( *s == 'x' || *s == 'X' ) {
             base = 16;
             s++;
         } else {
-            if ( base != 0 && base != 8) goto out;
+            if ( base != 0 ) goto out;
             base = 8;
         }
-    } else {
-        if (base != 0 && base != 10) goto out;
+    } else if ( base == 0 ) {
         base = 10;
     }
 
