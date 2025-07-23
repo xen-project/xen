@@ -46,9 +46,8 @@ void svm_asid_handle_vmrun(void)
     if ( vmcb_get_asid(vmcb) != p_asid->asid )
         vmcb_set_asid(vmcb, p_asid->asid);
 
-    vmcb->tlb_control =
-        !need_flush ? TLB_CTRL_NO_FLUSH :
-        cpu_has_svm_flushbyasid ? TLB_CTRL_FLUSH_ASID : TLB_CTRL_FLUSH_ALL;
+    /* We can't rely on TLB_CTRL_FLUSH_ASID as all ASIDs are stale here. */
+    vmcb->tlb_control = need_flush ? TLB_CTRL_FLUSH_ALL : TLB_CTRL_NO_FLUSH;
 }
 
 /*
