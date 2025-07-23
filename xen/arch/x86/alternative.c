@@ -351,6 +351,12 @@ static int init_or_livepatch _apply_alternatives(struct alt_instr *start,
         /* 0xe8/0xe9 are relative branches; fix the offset. */
         if ( a->repl_len >= 5 && (*buf & 0xfe) == 0xe8 )
             *(int32_t *)(buf + 1) += repl - orig;
+        else if ( IS_ENABLED(CONFIG_RETURN_THUNK) &&
+                  a->repl_len > 5 && buf[a->repl_len - 5] == 0xe9 &&
+                  ((long)repl + a->repl_len +
+                   *(int32_t *)(buf + a->repl_len - 4) ==
+                   (long)__x86_return_thunk) )
+            *(int32_t *)(buf + a->repl_len - 4) += repl - orig;
 
         a->priv = 1;
 
