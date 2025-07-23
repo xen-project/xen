@@ -437,7 +437,7 @@ static inline bool p2m_is_nestedp2m(const struct p2m_domain *p2m)
 
 static inline bool p2m_is_altp2m(const struct p2m_domain *p2m)
 {
-    return p2m->p2m_class == p2m_alternate;
+    return IS_ENABLED(CONFIG_ALTP2M) && p2m->p2m_class == p2m_alternate;
 }
 
 #ifdef CONFIG_HVM
