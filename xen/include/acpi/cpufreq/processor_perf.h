@@ -51,7 +51,6 @@ extern struct processor_pminfo *processor_pminfo[NR_CPUS];
 
 struct px_stat {
     uint8_t total;        /* total Px states */
-    uint8_t usable;       /* usable Px states */
     uint8_t last;         /* last Px state */
     uint8_t cur;          /* current Px state */
     uint64_t *trans_pt;   /* Px transition table */

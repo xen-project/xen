@@ -144,7 +144,6 @@ int cpufreq_statistic_init(unsigned int cpu)
     }
 
     pxpt->u.total = count;
-    pxpt->u.usable = count - pmpt->perf.platform_limit;
 
     for ( i = 0; i < count; i++ )
         pxpt->u.pt[i].freq = pmpt->perf.states[i].core_frequency;
@@ -257,7 +256,7 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
     case PMSTAT_get_pxstat:
     {
         uint32_t ct;
-        struct pm_px *pxpt;
+        const struct pm_px *pxpt;
         spinlock_t *cpufreq_statistic_lock = 
                    &per_cpu(cpufreq_statistic_lock, op->cpuid);
 
@@ -269,8 +268,6 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
             spin_unlock(cpufreq_statistic_lock);
             return -ENODATA;
         }
-
-        pxpt->u.usable = pmpt->perf.state_count - pmpt->perf.platform_limit;
 
         cpufreq_residency_update(op->cpuid, pxpt->u.cur);
 
@@ -296,7 +293,7 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
         }
 
         op->u.getpx.total = pxpt->u.total;
-        op->u.getpx.usable = pxpt->u.usable;
+        op->u.getpx.usable = pmpt->perf.state_count - pmpt->perf.platform_limit;
         op->u.getpx.last = pxpt->u.last;
         op->u.getpx.cur = pxpt->u.cur;
 
