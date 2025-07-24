@@ -121,11 +121,14 @@ static void cf_check ns16550_delayed_resume(void *data);
 
 static u8 ns_read_reg(const struct ns16550 *uart, unsigned int reg)
 {
-    void __iomem *addr = uart->remapped_io_base + (reg << uart->reg_shift);
+    const volatile void __iomem *addr;
+
 #ifdef CONFIG_HAS_IOPORTS
     if ( uart->remapped_io_base == NULL )
         return inb(uart->io_base + reg);
 #endif
+
+    addr = uart->remapped_io_base + (reg << uart->reg_shift);
     switch ( uart->reg_width )
     {
     case 1:
@@ -139,11 +142,14 @@ static u8 ns_read_reg(const struct ns16550 *uart, unsigned int reg)
 
 static void ns_write_reg(const struct ns16550 *uart, unsigned int reg, u8 c)
 {
-    void __iomem *addr = uart->remapped_io_base + (reg << uart->reg_shift);
+    volatile void __iomem *addr;
+
 #ifdef CONFIG_HAS_IOPORTS
     if ( uart->remapped_io_base == NULL )
         return outb(c, uart->io_base + reg);
 #endif
+
+    addr = uart->remapped_io_base + (reg << uart->reg_shift);
     switch ( uart->reg_width )
     {
     case 1:
