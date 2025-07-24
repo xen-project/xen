@@ -21,6 +21,7 @@ extern bool llc_coloring_enabled;
 void llc_coloring_init(void);
 void dump_llc_coloring_info(void);
 void domain_dump_llc_colors(const struct domain *d);
+void domain_llc_coloring_init(struct domain *d);
 void domain_llc_coloring_free(struct domain *d);
 #else
 #define llc_coloring_enabled false
@@ -28,6 +29,7 @@ void domain_llc_coloring_free(struct domain *d);
 static inline void llc_coloring_init(void) {}
 static inline void dump_llc_coloring_info(void) {}
 static inline void domain_dump_llc_colors(const struct domain *d) {}
+static inline void domain_llc_coloring_init(struct domain *d) {}
 static inline void domain_llc_coloring_free(struct domain *d) {}
 #endif
 

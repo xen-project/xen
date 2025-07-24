@@ -886,6 +886,12 @@ struct domain *domain_create(domid_t domid,
     rwlock_init(&d->pci_lock);
 #endif
 
+    /*
+     * Doesn't allocate memory itself, but does set up data relevant for
+     * memory allocations.
+     */
+    domain_llc_coloring_init(d);
+
     /* All error paths can depend on the above setup. */
 
     /*

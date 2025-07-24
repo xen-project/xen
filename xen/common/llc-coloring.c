@@ -230,24 +230,12 @@ void domain_dump_llc_colors(const struct domain *d)
     print_colors(d->llc_colors, d->num_llc_colors);
 }
 
-static void domain_set_default_colors(struct domain *d)
-{
-    printk(XENLOG_WARNING
-           "LLC color config not found for %pd, using all colors\n", d);
-
-    d->llc_colors = default_colors;
-    d->num_llc_colors = max_nr_colors;
-}
-
 int __init dom0_set_llc_colors(struct domain *d)
 {
     typeof(*dom0_colors) *colors;
 
     if ( !dom0_num_colors )
-    {
-        domain_set_default_colors(d);
         return 0;
-    }
 
     if ( (dom0_num_colors > max_nr_colors) ||
          !check_colors(dom0_colors, dom0_num_colors) )
@@ -272,14 +260,11 @@ int domain_set_llc_colors(struct domain *d,
 {
     unsigned int *colors;
 
-    if ( d->num_llc_colors )
+    if ( d->llc_colors != default_colors )
         return -EEXIST;
 
     if ( !config->num_llc_colors )
-    {
-        domain_set_default_colors(d);
         return 0;
-    }
 
     if ( config->num_llc_colors > max_nr_colors )
         return -EINVAL;
@@ -307,6 +292,19 @@ int domain_set_llc_colors(struct domain *d,
     return 0;
 }
 
+void domain_llc_coloring_init(struct domain *d)
+{
+    if ( !llc_coloring_enabled )
+        return;
+
+    /*
+     * Any change to this logic needs to consider the position of our call in
+     * domain_create().
+     */
+    d->llc_colors = default_colors;
+    d->num_llc_colors = max_nr_colors;
+}
+
 void domain_llc_coloring_free(struct domain *d)
 {
     d->num_llc_colors = 0;
@@ -321,10 +319,7 @@ int __init domain_set_llc_colors_from_str(struct domain *d, const char *str)
     unsigned int *colors, num_colors;
 
     if ( !str )
-    {
-        domain_set_default_colors(d);
         return 0;
-    }
 
     colors = xmalloc_array(unsigned int, max_nr_colors);
     if ( !colors )
