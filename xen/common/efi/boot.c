@@ -285,7 +285,7 @@ static bool __init match_guid(const EFI_GUID *guid1, const EFI_GUID *guid2)
 }
 
 /* generic routine for printing error messages */
-static void __init PrintErrMesg(const CHAR16 *mesg, EFI_STATUS ErrCode)
+static void __init noreturn PrintErrMesg(const CHAR16 *mesg, EFI_STATUS ErrCode)
 {
     StdOut = StdErr;
     PrintErr(mesg);

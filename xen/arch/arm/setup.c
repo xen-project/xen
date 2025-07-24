@@ -306,7 +306,7 @@ void __init init_pdx(void)
 size_t __read_mostly dcache_line_bytes;
 
 /* C entry point for boot CPU */
-void asmlinkage __init start_xen(unsigned long fdt_paddr)
+void asmlinkage __init noreturn start_xen(unsigned long fdt_paddr)
 {
     size_t fdt_size;
     const char *cmdline;

@@ -315,7 +315,7 @@ smp_prepare_cpus(void)
 }
 
 /* Boot the current CPU */
-void asmlinkage start_secondary(void)
+void asmlinkage noreturn start_secondary(void)
 {
     unsigned int cpuid = init_data.cpuid;
 
