@@ -309,11 +309,8 @@ int domain_set_llc_colors(struct domain *d,
 
 void domain_llc_coloring_free(struct domain *d)
 {
-    if ( !llc_coloring_enabled || d->llc_colors == default_colors )
-        return;
-
-    /* free pointer-to-const using __va(__pa()) */
-    xfree(__va(__pa(d->llc_colors)));
+    if ( d->llc_colors != default_colors )
+        xfree(d->llc_colors);
 }
 
 int __init domain_set_llc_colors_from_str(struct domain *d, const char *str)

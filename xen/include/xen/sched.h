@@ -649,7 +649,7 @@ struct domain
 
 #ifdef CONFIG_LLC_COLORING
     unsigned int num_llc_colors;
-    const unsigned int *llc_colors;
+    unsigned int *llc_colors;
 #endif
 
     /* Console settings. */
