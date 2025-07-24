@@ -79,6 +79,11 @@ static inline bool is_pci_passthrough_enabled(void)
     return false;
 }
 
+static inline bool arch_pci_device_physdevop(void)
+{
+    return false;
+}
+
 #endif
 
 struct pci_dev_info {

@@ -151,6 +151,8 @@ void pci_generic_init_bus_range_child(struct dt_device_node *dev,
                                       struct pci_host_bridge *bridge,
                                       struct pci_config_window *cfg);
 
+bool arch_pci_device_physdevop(void);
+
 #else   /*!CONFIG_HAS_PCI*/
 
 struct pci_dev;

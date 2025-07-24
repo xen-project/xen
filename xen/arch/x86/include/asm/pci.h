@@ -57,6 +57,16 @@ static always_inline bool is_pci_passthrough_enabled(void)
     return true;
 }
 
+/*
+ * Since PCI passthrough is always enabled on x86, physdevop handling doesn't
+ * need special arch-specific behavior. Current call sites work with either
+ * return value, but true is more consistent with passthrough being enabled.
+ */
+static inline bool arch_pci_device_physdevop(void)
+{
+    return true;
+}
+
 void arch_pci_init_pdev(struct pci_dev *pdev);
 
 bool pci_check_bar(const struct pci_dev *pdev, mfn_t start, mfn_t end);
