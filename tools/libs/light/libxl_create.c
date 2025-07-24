@@ -699,19 +699,21 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
             /* A new domain now exists */
             *domid = local_domid;
 
-            ret = xc_domain_set_llc_colors(ctx->xch, local_domid,
-                                           b_info->llc_colors,
-                                           b_info->num_llc_colors);
-            if (ret < 0) {
-                if (errno == EOPNOTSUPP) {
-                    if (b_info->num_llc_colors > 0) {
+            /*
+             * If Cache Coloring is wanted for the guest, it must be
+             * communicated to Xen prior to allocating guest memory.
+             */
+            if (b_info->num_llc_colors) {
+                ret = xc_domain_set_llc_colors(ctx->xch, local_domid,
+                                               b_info->llc_colors,
+                                               b_info->num_llc_colors);
+                if (ret < 0) {
+                    if (errno == EOPNOTSUPP) {
                         LOGED(ERROR, local_domid,
-                            "LLC coloring not enabled in the hypervisor");
-                        rc = ERROR_FAIL;
-                        goto out;
+                              "LLC coloring not enabled in the hypervisor");
+                    } else {
+                        LOGED(ERROR, local_domid, "LLC colors allocation failed");
                     }
-                } else {
-                    LOGED(ERROR, local_domid, "LLC colors allocation failed");
                     rc = ERROR_FAIL;
                     goto out;
                 }
