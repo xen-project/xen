@@ -74,6 +74,9 @@ ret_t pci_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         struct pci_dev *pdev;
         pci_sbdf_t sbdf;
 
+        if ( !is_pci_passthrough_enabled() )
+            return -EOPNOTSUPP;
+
         ret = -EFAULT;
         if ( copy_from_guest(&dev_reset, arg, 1) != 0 )
             break;
