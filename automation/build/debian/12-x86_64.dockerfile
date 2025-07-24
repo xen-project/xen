@@ -54,6 +54,9 @@ RUN <<EOF
         expect
         qemu-system-x86
 
+        # for build-each-commit-gcc
+        ccache
+
         # for qemu-alpine-x86_64-gcc
         busybox-static
         cpio

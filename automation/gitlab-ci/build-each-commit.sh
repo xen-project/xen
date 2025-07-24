@@ -12,6 +12,11 @@ if [[ $? -ne 0 ]]; then
     exit 0
 fi
 
+if [ -d /usr/lib/ccache ]; then
+    echo "Building with ccache"
+    PATH="/usr/lib/ccache:$PATH"
+fi
+
 echo "Building ${BASE}..${TIP}"
 
 NON_SYMBOLIC_REF=1 ./automation/scripts/build-test.sh ${BASE} ${TIP} \
