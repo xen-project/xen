@@ -634,6 +634,9 @@ static int domain_teardown(struct domain *d)
     case PROG_none:
         BUILD_BUG_ON(PROG_none != 0);
 
+        /* Trivial teardown, not long-running enough to need a preemption check. */
+        domain_llc_coloring_free(d);
+
     PROGRESS(gnttab_mappings):
         rc = gnttab_release_mappings(d);
         if ( rc )
@@ -1454,8 +1457,6 @@ static void cf_check complete_domain_destroy(struct rcu_head *head)
 void domain_destroy(struct domain *d)
 {
     BUG_ON(!d->is_dying);
-
-    domain_llc_coloring_free(d);
 
     /* May be already destroyed, or get_domain() can race us. */
     if ( atomic_cmpxchg(&d->refcnt, 0, DOMAIN_DESTROYED) != 0 )
