@@ -218,6 +218,9 @@ static struct arm_smmu_option_prop arm_smmu_options[] = {
 
 static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
 {
+	if ( !dom )
+		return NULL;
+
 	return container_of(dom, struct arm_smmu_domain, domain);
 }
 
