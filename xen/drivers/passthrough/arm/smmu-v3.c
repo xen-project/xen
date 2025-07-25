@@ -2747,11 +2747,6 @@ static int arm_smmu_deassign_dev(struct domain *d, uint8_t devfn, struct device 
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(io_domain);
 	struct arm_smmu_master *master = dev_iommu_priv_get(dev);
 
-	if (!smmu_domain || smmu_domain->d != d) {
-		dev_err(dev, " not attached to domain %d\n", d->domain_id);
-		return -ESRCH;
-	}
-
 #ifdef CONFIG_HAS_PCI
 	if ( dev_is_pci(dev) )
 	{
@@ -2766,6 +2761,11 @@ static int arm_smmu_deassign_dev(struct domain *d, uint8_t devfn, struct device 
 			return 0;
 	}
 #endif
+
+	if (!smmu_domain || smmu_domain->d != d) {
+		dev_err(dev, " not attached to %pd\n", d);
+		return -ESRCH;
+	}
 
 	spin_lock(&xen_domain->lock);
 
