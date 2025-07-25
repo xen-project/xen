@@ -90,5 +90,5 @@ choice
 		bool "basic"
 	config IOMMU_QUARANTINE_SCRATCH_PAGE
 		bool "scratch page"
-		depends on X86
+		depends on AMD_IOMMU || INTEL_IOMMU
 endchoice
