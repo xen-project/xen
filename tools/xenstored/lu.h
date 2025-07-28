@@ -5,7 +5,6 @@
  * Copyright (C) 2022 Juergen Gross, SUSE LLC
  */
 
-#ifndef NO_LIVE_UPDATE
 struct live_update {
 	/* For verification the correct connection is acting. */
 	struct connection *conn;
@@ -32,6 +31,7 @@ struct live_update {
 
 extern struct live_update *lu_status;
 
+#ifndef NO_LIVE_UPDATE
 struct connection *lu_get_connection(void);
 bool lu_is_pending(void);
 void lu_read_state(void);

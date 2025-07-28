@@ -21,6 +21,8 @@
 #include "lu.h"
 #include "watch.h"
 
+struct live_update *lu_status;
+
 #ifndef NO_LIVE_UPDATE
 
 struct lu_dump_state {
@@ -29,8 +31,6 @@ struct lu_dump_state {
 	int fd;
 	char *filename;
 };
-
-struct live_update *lu_status;
 
 static int lu_destroy(void *data)
 {
@@ -128,6 +128,7 @@ void lu_read_state(void)
 	struct xs_state_record_header *head;
 	void *ctx = talloc_new(NULL); /* Work context for subfunctions. */
 	struct xs_state_preamble *pre;
+	unsigned int version;
 
 	syslog(LOG_INFO, "live-update: read state\n");
 	lu_get_dump_state(&state);
@@ -135,8 +136,9 @@ void lu_read_state(void)
 		barf_perror("No state found after live-update");
 
 	pre = state.buf;
+	version = be32toh(pre->version);
 	if (memcmp(pre->ident, XS_STATE_IDENT, sizeof(pre->ident)) ||
-	    !pre->version || be32toh(pre->version) > XS_STATE_VERSION ||
+	    !version || version > XS_STATE_VERSION ||
 	    pre->flags != XS_STATE_FLAGS)
 		barf("Unknown record identifier");
 	for (head = state.buf + sizeof(*pre);
@@ -158,6 +160,9 @@ void lu_read_state(void)
 			break;
 		case XS_STATE_TYPE_NODE:
 			read_state_node(ctx, head + 1);
+			break;
+		case XS_STATE_TYPE_DOMAIN:
+			read_state_domain(ctx, head + 1, version);
 			break;
 		default:
 			xprintf("live-update: unknown state record %08x\n",
@@ -297,6 +302,9 @@ static const char *lu_dump_state(const void *ctx, struct connection *conn)
 	if (ret)
 		goto out;
 	ret = dump_state_nodes(fp, ctx);
+	if (ret)
+		goto out;
+	ret = dump_state_domains(fp);
 	if (ret)
 		goto out;
 

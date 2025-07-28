@@ -162,8 +162,11 @@ void wrl_apply_debit_direct(struct connection *conn);
 void wrl_apply_debit_trans_commit(struct connection *conn);
 
 const char *dump_state_connections(FILE *fp);
+const char *dump_state_domains(FILE *fp);
 
 void read_state_connection(const void *ctx, const void *state);
+void read_state_domain(const void *ctx, const void *state,
+		       unsigned int version);
 
 struct hashtable *domain_check_acc_init(void);
 void domain_check_acc_add(const struct node *node, struct hashtable *domains);

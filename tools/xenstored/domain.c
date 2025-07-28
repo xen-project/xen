@@ -32,6 +32,7 @@
 #include "transaction.h"
 #include "watch.h"
 #include "control.h"
+#include "lu.h"
 
 #include <xenevtchn.h>
 #include <xenmanage.h>
@@ -41,6 +42,8 @@
 #ifdef __MINIOS__
 #include <mini-os/xenbus.h>
 #endif
+
+#define XENSTORE_FEATURES	XENSTORE_SERVER_FEATURE_ERROR
 
 static xenmanage_handle *xm_handle;
 xengnttab_handle **xgt_handle;
@@ -114,6 +117,9 @@ struct domain
 
 	/* Event channel port */
 	evtchn_port_t port;
+
+	/* Server features supported for this domain. */
+	unsigned int features;
 
 	/* Domain path in store. */
 	char *path;
@@ -799,6 +805,7 @@ static struct domain *alloc_domain(const void *context, unsigned int domid,
 	domain->unique_id = unique_id;
 	domain->generation = generation;
 	domain->introduced = false;
+	domain->features = XENSTORE_FEATURES;
 
 	if (hashtable_add(domhash, &domain->domid, domain)) {
 		talloc_free(domain);
@@ -992,7 +999,8 @@ void ignore_connection(struct connection *conn, unsigned int err)
 {
 	trace("CONN %p ignored, reason %u\n", conn, err);
 
-	if (conn->domain && conn->domain->interface)
+	if (conn->domain && conn->domain->interface &&
+	    (conn->domain->features & XENSTORE_SERVER_FEATURE_ERROR))
 		conn->domain->interface->error = err;
 
 	conn->is_ignored = true;
@@ -1032,6 +1040,8 @@ static struct domain *introduce_domain(const void *ctx,
 			return NULL;
 		}
 		domain->interface = interface;
+		if (!restore)
+			interface->server_features = domain->features;
 
 		if (is_master_domain)
 			setup_structure(restore);
@@ -1847,6 +1857,54 @@ void read_state_connection(const void *ctx, const void *state)
 		off = sizeof(*sc) + sc->data_in_len + sc->data_out_len;
 		domain->unique_id = *(uint64_t *)(state + ROUNDUP(off, 3));
 	}
+}
+
+static int dump_state_domain(const void *k, void *v, void *arg)
+{
+	struct domain *domain = v;
+	FILE *fp = arg;
+	struct xs_state_domain sd;
+	struct xs_state_record_header head;
+
+	head.type = XS_STATE_TYPE_DOMAIN;
+	head.length = sizeof(sd);
+	memset(&sd, 0, sizeof(sd));
+	sd.domain_id = domain->domid;
+
+	if (lu_status->version > 1)
+		sd.features = domain->features;
+
+	if (fwrite(&head, sizeof(head), 1, fp) != 1)
+		return 1;
+	if (fwrite(&sd, sizeof(sd), 1, fp) != 1)
+		return 1;
+	if (dump_state_align(fp))
+		return 1;
+
+	return 0;
+}
+
+const char *dump_state_domains(FILE *fp)
+{
+	const char *ret = NULL;
+
+	if (hashtable_iterate(domhash, dump_state_domain, fp))
+		ret = "Dump domain error";
+
+	return ret;
+}
+
+void read_state_domain(const void *ctx, const void *state, unsigned int version)
+{
+	const struct xs_state_domain *sd = state;
+	struct domain *domain;
+
+	domain = find_domain_struct(sd->domain_id);
+	if (!domain)
+		barf("referenced domain not found");
+
+	if (version > 1)
+		domain->features = sd->features;
 }
 
 struct domain_acc {
