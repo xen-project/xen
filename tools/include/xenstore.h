@@ -264,6 +264,19 @@ bool xs_path_is_subpath(const char *parent, const char *child);
  */
 bool xs_is_domain_introduced(struct xs_handle *h, unsigned int domid);
 
+/* Get the features supported by Xenstore.
+ * Returned as a bitmap of XENSTORE_SERVER_FEATURE_* values.
+ */
+bool xs_get_features_supported(struct xs_handle *h, unsigned int *features);
+
+/* Get the features available for a given domain. */
+bool xs_get_features_domain(struct xs_handle *h, unsigned int domid,
+			    unsigned int *features);
+
+/* Set the features available for a given domain. */
+bool xs_set_features_domain(struct xs_handle *h, unsigned int domid,
+			    unsigned int features);
+
 char *xs_control_command(struct xs_handle *h, const char *cmd,
 			 void *data, unsigned int len);
 /* Deprecated: use xs_control_command() instead. */

@@ -2,7 +2,7 @@ XEN_ROOT=$(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 MAJOR = 4
-MINOR = 0
+MINOR = 1
 version-script := libxenstore.map
 
 ifeq ($(CONFIG_Linux),y)

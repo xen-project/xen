@@ -1407,6 +1407,55 @@ out:
 	return port;
 }
 
+static bool xs_uint(char *reply, unsigned int *uintval)
+{
+	if (!reply)
+		return false;
+
+	*uintval = strtoul(reply, NULL, 10);
+	free(reply);
+
+	return true;
+}
+
+bool xs_get_features_supported(struct xs_handle *h, unsigned int *features)
+{
+	struct xsd_sockmsg msg = { .type = XS_GET_FEATURE };
+	struct iovec iov[1];
+
+	iov[0].iov_base = &msg;
+	iov[0].iov_len  = sizeof(msg);
+
+	return xs_uint(xs_talkv(h, iov, ARRAY_SIZE(iov), NULL), features);
+}
+
+bool xs_get_features_domain(struct xs_handle *h, unsigned int domid,
+			    unsigned int *features)
+{
+	return xs_uint(single_with_domid(h, XS_GET_FEATURE, domid), features);
+}
+
+bool xs_set_features_domain(struct xs_handle *h, unsigned int domid,
+			    unsigned int features)
+{
+	struct xsd_sockmsg msg = { .type = XS_SET_FEATURE };
+	char domid_str[MAX_STRLEN(domid)];
+	char feat_str[MAX_STRLEN(features)];
+	struct iovec iov[3];
+
+	snprintf(domid_str, sizeof(domid_str), "%u", domid);
+	snprintf(feat_str, sizeof(feat_str), "%u", features);
+
+	iov[0].iov_base = &msg;
+	iov[0].iov_len  = sizeof(msg);
+	iov[1].iov_base = domid_str;
+	iov[1].iov_len  = strlen(domid_str) + 1;
+	iov[2].iov_base = feat_str;
+	iov[2].iov_len  = strlen(feat_str) + 1;
+
+	return xs_bool(xs_talkv(h, iov, ARRAY_SIZE(iov), NULL));
+}
+
 char *xs_control_command(struct xs_handle *h, const char *cmd,
 			 void *data, unsigned int len)
 {

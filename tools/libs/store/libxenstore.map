@@ -39,3 +39,9 @@ VERS_4.0 {
 		xs_strings_to_perms;
 	local: *; /* Do not expose anything by default */
 };
+VERS_4.1 {
+	global:
+		xs_get_features_supported;
+		xs_get_features_domain;
+		xs_set_features_domain;
+} VERS_4.0;
