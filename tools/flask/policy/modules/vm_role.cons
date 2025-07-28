@@ -3,7 +3,7 @@
 #
 # constrain class_set perm_set expression ;
 #
-# expression : ( expression ) 
+# expression : ( expression )
 #	     | not expression
 #	     | expression and expression
 #	     | expression or expression
@@ -17,7 +17,7 @@
 #	     | t1 op names
 #	     | t2 op names
 #
-# op : == | != 
+# op : == | !=
 # role_op : == | != | eq | dom | domby | incomp
 #
 # names : name | { name_list }

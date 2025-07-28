@@ -1,6 +1,6 @@
 ifdef(`enable_mls',`
 #
-# Define sensitivities 
+# Define sensitivities
 #
 # Domination of sensitivities is in increasin
 # numerical order, with s0 being the lowest

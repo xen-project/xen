@@ -21,7 +21,7 @@ define(`ifndef',`ifdef(`$1',`$3',`$2')')
 #
 # __endline__
 #
-# dummy macro to insert a newline.  used for 
+# dummy macro to insert a newline.  used for
 # errprint, so the close parentheses can be
 # indented correctly.
 #
