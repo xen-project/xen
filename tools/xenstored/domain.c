@@ -1243,6 +1243,66 @@ int do_reset_watches(const void *ctx, struct connection *conn,
 	return 0;
 }
 
+int do_get_feature(const void *ctx, struct connection *conn,
+		   struct buffered_data *in)
+{
+	const char *vec[1];
+	unsigned int n_args;
+	unsigned int domid;
+	const struct domain *domain;
+	unsigned int features;
+	char *result;
+
+	n_args = get_strings(in, vec, ARRAY_SIZE(vec));
+	if (n_args > 1)
+		return EINVAL;
+
+	if (n_args == 1) {
+		domid = atoi(vec[0]);
+		domain = find_or_alloc_existing_domain(domid);
+		if (!domain)
+			return ENOENT;
+		features = domain->features;
+	} else
+		features = XENSTORE_FEATURES;
+
+	result = talloc_asprintf(ctx, "%u", features);
+	if (!result)
+		return ENOMEM;
+
+	send_reply(conn, XS_GET_FEATURE, result, strlen(result) + 1);
+
+	return 0;
+}
+
+int do_set_feature(const void *ctx, struct connection *conn,
+		   struct buffered_data *in)
+{
+	const char *vec[2];
+	unsigned int domid;
+	struct domain *domain;
+	unsigned int features;
+
+	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
+		return EINVAL;
+
+	domid = atoi(vec[0]);
+	features = atoi(vec[1]);
+	domain = find_or_alloc_existing_domain(domid);
+	if (!domain)
+		return ENOENT;
+	if (domain->introduced)
+		return EBUSY;
+	if (features & ~XENSTORE_FEATURES)
+		return EINVAL;
+
+	domain->features = features;
+
+	send_ack(conn, XS_SET_FEATURE);
+
+	return 0;
+}
+
 static int close_xgt_handle(void *_handle)
 {
 	xengnttab_close(*(xengnttab_handle **)_handle);

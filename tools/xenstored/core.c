@@ -2031,6 +2031,10 @@ static struct {
 	    { "SET_TARGET",    do_set_target,   XS_FLAG_PRIV },
 	[XS_RESET_WATCHES]     = { "RESET_WATCHES",     do_reset_watches },
 	[XS_DIRECTORY_PART]    = { "DIRECTORY_PART",    send_directory_part },
+	[XS_GET_FEATURE]       =
+	    { "GET_FEATURE",   do_get_feature,  XS_FLAG_PRIV },
+	[XS_SET_FEATURE]       =
+	    { "SET_FEATURE",   do_set_feature,  XS_FLAG_PRIV },
 };
 
 static const char *sockmsg_string(enum xsd_sockmsg_type type)
