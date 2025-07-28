@@ -6,9 +6,25 @@
 #
 ################################################################################
 define(`declare_domain_common', `
-	allow $1 $2:grant { query setup };
-	allow $1 $2:mmu { adjust physmap map_read map_write stat pinpage updatemp mmuext_op };
-	allow $1 $2:hvm { getparam setparam altp2mhvm_op };
+	allow $1 $2:grant {
+		query
+		setup
+	};
+	allow $1 $2:mmu {
+		adjust
+		physmap
+		map_read
+		map_write
+		stat
+		pinpage
+		updatemp
+		mmuext_op
+	};
+	allow $1 $2:hvm {
+		getparam
+		setparam
+		altp2mhvm_op
+	};
 	allow $1 $2:domain2 get_vnumainfo;
 ')
 
@@ -46,22 +62,65 @@ define(`declare_build_label', `
 ')
 
 define(`create_domain_common', `
-	allow $1 $2:domain { create max_vcpus setdomainmaxmem setaddrsize
-			getdomaininfo hypercall setvcpucontext getscheduler
-			getvcpuinfo getaddrsize getaffinity setaffinity
-			settime setdomainhandle getvcpucontext set_misc_info
-			getpagingmempool setpagingmempool };
-	allow $1 $2:domain2 { set_cpu_policy settsc setscheduler setclaim
-			set_vnumainfo get_vnumainfo cacheflush
-			psr_cmt_op psr_alloc soft_reset
-			resource_map get_cpu_policy vuart_op set_llc_colors
-			get_domain_state };
+	allow $1 $2:domain {
+		create
+		max_vcpus
+		setdomainmaxmem
+		setaddrsize
+		getdomaininfo
+		hypercall
+		setvcpucontext
+		getscheduler
+		getvcpuinfo
+		getaddrsize
+		getaffinity
+		setaffinity
+		settime
+		setdomainhandle
+		getvcpucontext
+		set_misc_info
+		getpagingmempool
+		setpagingmempool
+	};
+	allow $1 $2:domain2 {
+		set_cpu_policy
+		settsc
+		setscheduler
+		setclaim
+		set_vnumainfo
+		get_vnumainfo
+		cacheflush
+		psr_cmt_op
+		psr_alloc
+		soft_reset
+		resource_map
+		get_cpu_policy
+		vuart_op
+		set_llc_colors
+		get_domain_state
+	};
 	allow $1 $2:security check_context;
 	allow $1 $2:shadow enable;
-	allow $1 $2:mmu { map_read map_write adjust memorymap physmap pinpage mmuext_op updatemp };
+	allow $1 $2:mmu {
+		map_read
+		map_write
+		adjust
+		memorymap
+		physmap
+		pinpage
+		mmuext_op
+		updatemp
+	};
 	allow $1 $2:grant setup;
-	allow $1 $2:hvm { getparam hvmctl sethvmc
-			setparam altp2mhvm altp2mhvm_op dm };
+	allow $1 $2:hvm {
+		getparam
+		hvmctl
+		sethvmc
+		setparam
+		altp2mhvm
+		altp2mhvm_op
+		dm
+	};
 ')
 
 # xen_build_domain(target)
@@ -91,11 +150,30 @@ define(`create_domain_build_label', `
 # manage_domain(priv, target)
 #   Allow managing a running domain
 define(`manage_domain', `
-	allow $1 $2:domain { getdomaininfo getvcpuinfo getaffinity
-			getaddrsize pause unpause trigger shutdown destroy
-			setaffinity setdomainmaxmem getscheduler resume
-			setpodtarget getpodtarget getpagingmempool setpagingmempool };
-	allow $1 $2:domain2 { set_vnumainfo dt_overlay get_domain_state };
+	allow $1 $2:domain {
+		getdomaininfo
+		getvcpuinfo
+		getaffinity
+		getaddrsize
+		pause
+		unpause
+		trigger
+		shutdown
+		destroy
+		setaffinity
+		setdomainmaxmem
+		getscheduler
+		resume
+		setpodtarget
+		getpodtarget
+		getpagingmempool
+		setpagingmempool
+	};
+	allow $1 $2:domain2 {
+		set_vnumainfo
+		dt_overlay
+		get_domain_state
+	};
 ')
 
 # migrate_domain_out(priv, target)
@@ -103,11 +181,27 @@ define(`manage_domain', `
 #   (inbound migration is the same as domain creation)
 define(`migrate_domain_out', `
 	allow $1 domxen_t:mmu map_read;
-	allow $1 $2:hvm { gethvmc getparam };
-	allow $1 $2:mmu { stat pageinfo map_read };
-	allow $1 $2:domain { getaddrsize getvcpucontext pause destroy };
+	allow $1 $2:hvm {
+		gethvmc
+		getparam
+	};
+	allow $1 $2:mmu {
+		stat
+		pageinfo
+		map_read
+	};
+	allow $1 $2:domain {
+		getaddrsize
+		getvcpucontext
+		pause
+		destroy
+	};
 	allow $1 $2:domain2 gettsc;
-	allow $1 $2:shadow { enable disable logdirty };
+	allow $1 $2:shadow {
+		enable
+		disable
+		logdirty
+	};
 ')
 
 ################################################################################
@@ -120,8 +214,14 @@ define(`migrate_domain_out', `
 #   This allows an event channel to be created from domains with labels
 #   <source> to <dest> and will label it <chan-label>
 define(`create_channel', `
-	allow $1 $3:event { create send status };
-	allow $3 $2:event { bind };
+	allow $1 $3:event {
+		create
+		send
+		status
+	};
+	allow $3 $2:event {
+		bind
+	};
 ')
 
 # domain_event_comms(dom1, dom2)
@@ -135,8 +235,18 @@ define(`domain_event_comms', `
 #   Allow two domain types to communicate using grants and event channels
 define(`domain_comms', `
 	domain_event_comms($1, $2)
-	allow $1 $2:grant { map_read map_write copy unmap };
-	allow $2 $1:grant { map_read map_write copy unmap };
+	allow $1 $2:grant {
+		map_read
+		map_write
+		copy
+		unmap
+	};
+	allow $2 $1:grant {
+		map_read
+		map_write
+		copy
+		unmap
+	};
 ')
 
 # domain_self_comms(domain)
@@ -144,7 +254,12 @@ define(`domain_comms', `
 #   and event channels
 define(`domain_self_comms', `
 	create_channel($1, $1_self, $1_channel)
-	allow $1 $1_self:grant { map_read map_write copy unmap };
+	allow $1 $1_self:grant {
+		map_read
+		map_write
+		copy
+		unmap
+	};
 ')
 
 # device_model(dm_dom, hvm_dom)
@@ -159,9 +274,23 @@ define(`device_model', `
 	create_channel($2, $1, $2_channel)
 	allow $1 $2_channel:event create;
 
-	allow $1 $2_target:domain { getdomaininfo shutdown };
-	allow $1 $2_target:mmu { map_read map_write adjust physmap target_hack };
-	allow $1 $2_target:hvm { getparam setparam hvmctl dm };
+	allow $1 $2_target:domain {
+		getdomaininfo
+		shutdown
+	};
+	allow $1 $2_target:mmu {
+		map_read
+		map_write
+		adjust
+		physmap
+		target_hack
+	};
+	allow $1 $2_target:hvm {
+		getparam
+		setparam
+		hvmctl
+		dm
+	};
 	allow $1 $2_target:domain2 resource_map;
 ')
 
@@ -184,7 +313,10 @@ define(`make_device_model', `
 define(`use_device_iommu', `
 	allow $1 $1_self:mmu exchange;
 	allow $1 $2:resource use_iommu;
-	allow $1 domio_t:mmu { map_read map_write };
+	allow $1 domio_t:mmu {
+		map_read
+		map_write
+	};
 ')
 
 # use_device_iommu_nointremap(domain, device)
@@ -194,8 +326,14 @@ define(`use_device_iommu', `
 #   Allows acceptance of (typically older) less isolating hardware.
 define(`use_device_iommu_nointremap', `
 	allow $1 $1_self:mmu exchange;
-	allow $1 $2:resource { use_iommu use_iommu_nointremap };
-	allow $1 domio_t:mmu { map_read map_write };
+	allow $1 $2:resource {
+		use_iommu
+		use_iommu_nointremap
+	};
+	allow $1 domio_t:mmu {
+		map_read
+		map_write
+	};
 ')
 
 # use_device_noiommu(domain, device)
@@ -203,14 +341,34 @@ define(`use_device_iommu_nointremap', `
 #   even without an IOMMU available.
 define(`use_device_noiommu', `
 	allow $1 $1_self:mmu exchange;
-	allow $1 $2:resource { use_iommu use_iommu_nointremap use_noiommu };
-	allow $1 domio_t:mmu { map_read map_write };
+	allow $1 $2:resource {
+		use_iommu
+		use_iommu_nointremap
+		use_noiommu
+	};
+	allow $1 domio_t:mmu {
+		map_read
+		map_write
+	};
 ')
 
 # admin_device(domain, device)
 #   Allow a device to be used and delegated by a domain
 define(`admin_device', `
-	allow $1 $2:resource { setup stat_device add_device add_irq add_iomem add_ioport remove_device remove_irq remove_iomem remove_ioport plug unplug };
+	allow $1 $2:resource {
+		setup
+		stat_device
+		add_device
+		add_irq
+		add_iomem
+		add_ioport
+		remove_device
+		remove_irq
+		remove_iomem
+		remove_ioport
+		plug
+		unplug
+	};
 	allow $1 $2:hvm bind_irq;
 	use_device_noiommu($1, $2)
 ')
@@ -218,5 +376,8 @@ define(`admin_device', `
 # delegate_devices(priv-domain, target-domain)
 #   Allow devices to be delegated
 define(`delegate_devices', `
-	allow $1 $2:resource { add remove };
+	allow $1 $2:resource {
+		add
+		remove
+	};
 ')

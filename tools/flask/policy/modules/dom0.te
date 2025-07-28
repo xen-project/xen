@@ -7,23 +7,61 @@
 #
 ################################################################################
 allow dom0_t xen_t:xen {
-	settime tbufcontrol readconsole clearconsole perfcontrol mtrr_add
-	mtrr_del mtrr_read microcode physinfo quirk writeconsole readapic
-	writeapic privprofile nonprivprofile kexec firmware sleep frequency
-	getidle debug getcpuinfo heap pm_op mca_op lockprof cpupool_op
-	getscheduler setscheduler hypfs_op
+	settime
+	tbufcontrol
+	readconsole
+	clearconsole
+	perfcontrol
+	mtrr_add
+	mtrr_del
+	mtrr_read
+	microcode
+	physinfo
+	quirk
+	writeconsole
+	readapic
+	writeapic
+	privprofile
+	nonprivprofile
+	kexec
+	firmware
+	sleep
+	frequency
+	getidle
+	debug
+	getcpuinfo
+	heap
+	pm_op
+	mca_op
+	lockprof
+	cpupool_op
+	getscheduler
+	setscheduler
+	hypfs_op
 };
 allow dom0_t xen_t:xen2 {
-	resource_op psr_cmt_op psr_alloc pmu_ctrl get_symbol
-	get_cpu_levelling_caps get_cpu_featureset livepatch_op
-	coverage_op get_dom0_console
+	resource_op
+	psr_cmt_op
+	psr_alloc
+	pmu_ctrl
+	get_symbol
+	get_cpu_levelling_caps
+	get_cpu_featureset
+	livepatch_op
+	coverage_op
+	get_dom0_console
 };
 
 # Allow dom0 to use all XENVER_ subops that have checks.
 # Note that dom0 is part of domain_type so this has duplicates.
 allow dom0_t xen_t:version {
-	xen_extraversion xen_compile_info xen_capabilities
-	xen_changeset xen_pagesize xen_guest_handle xen_commandline
+	xen_extraversion
+	xen_compile_info
+	xen_capabilities
+	xen_changeset
+	xen_pagesize
+	xen_guest_handle
+	xen_commandline
 	xen_build_id
 };
 
@@ -32,41 +70,83 @@ allow dom0_t xen_t:mmu memorymap;
 # Allow dom0 to use these domctls on itself. For domctls acting on other
 # domains, see the definitions of create_domain and manage_domain.
 allow dom0_t dom0_t:domain {
-	setvcpucontext max_vcpus setaffinity getaffinity getscheduler
-	getdomaininfo getvcpuinfo getvcpucontext setdomainmaxmem setdomainhandle
-	setdebugging hypercall settime setaddrsize getaddrsize trigger
-	getpodtarget setpodtarget getpagingmempool setpagingmempool set_misc_info
+	setvcpucontext
+	max_vcpus
+	setaffinity
+	getaffinity
+	getscheduler
+	getdomaininfo
+	getvcpuinfo
+	getvcpucontext
+	setdomainmaxmem
+	setdomainhandle
+	setdebugging
+	hypercall
+	settime
+	setaddrsize
+	getaddrsize
+	trigger
+	getpodtarget
+	setpodtarget
+	getpagingmempool
+	setpagingmempool
+	set_misc_info
 	set_virq_handler
 };
 allow dom0_t dom0_t:domain2 {
-	set_cpu_policy gettsc settsc setscheduler set_vnumainfo
-	get_vnumainfo psr_cmt_op psr_alloc get_cpu_policy dt_overlay
+	set_cpu_policy
+	gettsc
+	settsc
+	setscheduler
+	set_vnumainfo
+	get_vnumainfo
+	psr_cmt_op
+	psr_alloc
+	get_cpu_policy
+	dt_overlay
 	get_domain_state
 };
-allow dom0_t dom0_t:resource { add remove };
+allow dom0_t dom0_t:resource {
+	add
+	remove
+};
 
 # These permissions allow using the FLASK security server to compute access
 # checks locally, which could be used by a domain or service (such as xenstore)
 # that does not have its own security server to make access decisions based on
 # Xen's security policy.
 allow dom0_t security_t:security {
-	compute_av compute_create compute_member compute_relabel
+	compute_av
+	compute_create
+	compute_member
+	compute_relabel
 };
 
 # Allow string/SID conversions (for "xl list -Z" and similar)
 allow dom0_t security_t:security check_context;
 
 # Allow flask-label-pci to add and change labels
-allow dom0_t security_t:security { add_ocontext del_ocontext };
+allow dom0_t security_t:security {
+	add_ocontext
+	del_ocontext
+};
 
 # Allow performance parameters of the security server to be tweaked
 allow dom0_t security_t:security setsecparam;
 
 # Allow changing the security policy
-allow dom0_t security_t:security { load_policy setenforce setbool };
+allow dom0_t security_t:security {
+	load_policy
+	setenforce
+	setbool
+};
 
 # Audit policy change events even when they are allowed
-auditallow dom0_t security_t:security { load_policy setenforce setbool };
+auditallow dom0_t security_t:security {
+	load_policy
+	setenforce
+	setbool
+};
 
 # Allow dom0 to report platform configuration changes back to the hypervisor
 allow dom0_t xen_t:resource setup;

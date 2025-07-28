@@ -19,7 +19,11 @@ allow xenstore_t domain_type:domain2 get_domain_state;
 # rule between xenstore_t and every domain type that talks to xenstore
 create_channel(xenstore_t, domain_type, xenstore_t_channel)
 allow event_type xenstore_t: event bind;
-allow xenstore_t domain_type:grant { map_read map_write unmap };
+allow xenstore_t domain_type:grant {
+	map_read
+	map_write
+	unmap
+};
 
 # Xenstore is a utility domain, so it should use the system role
 role system_r types xenstore_t;

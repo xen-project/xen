@@ -52,7 +52,11 @@ type device_t, resource_type;
 
 # Domain destruction can result in some access checks for actions performed by
 # the hypervisor.  These should always be allowed.
-allow xen_t resource_type : resource { remove_irq remove_ioport remove_iomem };
+allow xen_t resource_type : resource {
+	remove_irq
+	remove_ioport
+	remove_iomem
+};
 
 ################################################################################
 #
@@ -65,15 +69,26 @@ allow xen_t resource_type : resource { remove_irq remove_ioport remove_iomem };
 ################################################################################
 
 # Domains must be declared using domain_type
-neverallow * ~domain_type:domain { create transition };
+neverallow * ~domain_type:domain {
+	create
+	transition
+};
 
 # Resources must be declared using resource_type
-neverallow * ~resource_type:resource { use use_iommu use_iommu_nointremap
-                                       use_noiommu };
+neverallow * ~resource_type:resource {
+	use
+	use_iommu
+	use_iommu_nointremap
+	use_noiommu
+};
 
 # Events must use event_type (see create_channel for a template)
 neverallow ~event_type *:event bind;
-neverallow * ~event_type:event { create send status };
+neverallow * ~event_type:event {
+	create
+	send
+	status
+};
 
 ################################################################################
 #
