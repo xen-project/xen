@@ -136,7 +136,7 @@ void lu_read_state(void)
 
 	pre = state.buf;
 	if (memcmp(pre->ident, XS_STATE_IDENT, sizeof(pre->ident)) ||
-	    pre->version != htobe32(XS_STATE_VERSION) ||
+	    !pre->version || be32toh(pre->version) > XS_STATE_VERSION ||
 	    pre->flags != XS_STATE_FLAGS)
 		barf("Unknown record identifier");
 	for (head = state.buf + sizeof(*pre);

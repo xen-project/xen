@@ -27,8 +27,10 @@
 #ifndef htobe32
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 #define htobe32(x) __builtin_bswap32(x)
+#define be32toh(x) __builtin_bswap32(x)
 #else
 #define htobe32(x) (x)
+#define be32toh(x) (x)
 #endif
 #endif
 
@@ -36,7 +38,7 @@ struct xs_state_preamble {
     char ident[8];
 #define XS_STATE_IDENT    "xenstore"  /* To be used without the NUL byte. */
     uint32_t version;                 /* Version in big endian format. */
-#define XS_STATE_VERSION  0x00000001
+#define XS_STATE_VERSION  0x00000002
     uint32_t flags;                   /* Endianess. */
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 #define XS_STATE_FLAGS    0x00000000  /* Little endian. */
@@ -59,6 +61,9 @@ struct xs_state_record_header {
 #define XS_STATE_TYPE_WATCH      0x00000003
 #define XS_STATE_TYPE_TA         0x00000004
 #define XS_STATE_TYPE_NODE       0x00000005
+#define XS_STATE_TYPE_GLB_QUOTA  0x00000006
+#define XS_STATE_TYPE_DOMAIN     0x00000007
+#define XS_STATE_TYPE_WATCH_EXT  0x00000008
     uint32_t length;         /* Length of record in bytes. */
 };
 
@@ -98,6 +103,15 @@ struct xs_state_watch {
     uint8_t data[];         /* Path bytes, token bytes, 0-7 pad bytes. */
 };
 
+struct xs_state_watch_ext {
+    uint32_t conn_id;       /* Connection this watch is associated with. */
+    uint16_t path_length;   /* Number of bytes of path watched (incl. 0). */
+    uint16_t token_length;  /* Number of bytes of watch token (incl. 0). */
+    uint16_t depth;         /* Number of directory levels below watched path */
+                            /* to consider for a match. */
+    uint8_t data[];         /* Path bytes, token bytes, 0-7 pad bytes. */
+};
+
 /* Transaction: */
 struct xs_state_transaction {
     uint32_t conn_id;       /* Connection this TA is associated with. */
@@ -128,5 +142,20 @@ struct xs_state_node {
     /* Permissions (first is owner, has full access). */
     struct xs_state_node_perm perms[];
     /* Path and data follows, plus 0-7 pad bytes. */
+};
+
+/* Global quota data: */
+struct xs_state_glb_quota {
+    uint16_t n_dom_quota;   /* Number of quota values applying to domains. */
+    uint16_t n_glob_quota;  /* Number of quota values applying globally only. */
+    uint32_t quota_val[];   /* Array of quota values (domain ones first). */
+};
+
+/* Domain data: */
+struct xs_state_domain {
+    uint16_t domain_id;     /* Domain-id identifying the domain. */
+    uint16_t n_quota;       /* Number of quota values. */
+    uint32_t features;      /* Server features available to the domain. */
+    uint32_t quota_val[];   /* Array of quota values. */
 };
 #endif /* XENSTORE_STATE_H */
