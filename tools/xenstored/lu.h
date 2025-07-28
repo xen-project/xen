@@ -26,6 +26,7 @@ struct live_update {
 	/* Start parameters. */
 	bool force;
 	unsigned int timeout;
+	unsigned int version;
 	time_t started_at;
 };
 

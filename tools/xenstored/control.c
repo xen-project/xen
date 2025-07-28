@@ -289,7 +289,7 @@ static struct cmd_s cmds[] = {
 	 *    Mini-OS: -b <binary-size>
 	 *             -d <size> <data-bytes> (multiple of those)
 	 * 2. New command-line (optional): -c <cmdline>
-	 * 3. Start of update: -s [-F] [-t <timeout>]
+	 * 3. Start of update: -s [-F] [-t <timeout>] [-v <version>]
 	 * Any sub-operation needs to respond with the string "OK" in case
 	 * of success, any other response indicates failure.
 	 * A started live-update sequence can be aborted via "-a" (not
@@ -297,8 +297,8 @@ static struct cmd_s cmds[] = {
 	 * sub-operation).
 	 */
 	{ "live-update", do_control_lu,
-		"[-c <cmdline>] [-F] [-t <timeout>] <file>\n"
-		"    Default timeout is 60 seconds.", 5 },
+		"[-c <cmdline>] [-F] [-t <timeout>] [-v <version>] <file>\n"
+		"    Default timeout is 60 seconds, default version is 1.", 7 },
 #endif
 	{ "logfile", do_control_logfile, "<file>" },
 	{ "memreport", do_control_memreport, "[<file>]" },

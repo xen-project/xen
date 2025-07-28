@@ -283,7 +283,7 @@ static const char *lu_dump_state(const void *ctx, struct connection *conn)
 		return "Dump state open error";
 
 	memcpy(pre.ident, XS_STATE_IDENT, sizeof(pre.ident));
-	pre.version = htobe32(XS_STATE_VERSION);
+	pre.version = htobe32(lu_status->version);
 	pre.flags = XS_STATE_FLAGS;
 	if (fwrite(&pre, sizeof(pre), 1, fp) != 1) {
 		ret = "Dump write error";
@@ -412,12 +412,15 @@ static bool do_lu_start(struct delayed_request *req)
 }
 
 static const char *lu_start(const void *ctx, struct connection *conn,
-			    bool force, unsigned int to)
+			    bool force, unsigned int to, unsigned int vers)
 {
 	syslog(LOG_INFO, "live-update: start, force=%d, to=%u\n", force, to);
 
 	if (!lu_status || lu_status->conn != conn)
 		return "Not in live-update session.";
+
+	if (!vers || vers > XS_STATE_VERSION)
+		return "Migration stream version not supported.";
 
 #ifdef __MINIOS__
 	if (lu_status->kernel_size != lu_status->kernel_off)
@@ -426,6 +429,7 @@ static const char *lu_start(const void *ctx, struct connection *conn,
 
 	lu_status->force = force;
 	lu_status->timeout = to;
+	lu_status->version = vers;
 	lu_status->started_at = time(NULL);
 	lu_status->in = conn->in;
 
@@ -441,6 +445,7 @@ int do_control_lu(const void *ctx, struct connection *conn, const char **vec,
 	unsigned int i;
 	bool force = false;
 	unsigned int to = 0;
+	unsigned int vers = XS_STATE_VERSION;
 
 	if (num < 1)
 		return EINVAL;
@@ -457,15 +462,19 @@ int do_control_lu(const void *ctx, struct connection *conn, const char **vec,
 			return EINVAL;
 	} else if (!strcmp(vec[0], "-s")) {
 		for (i = 1; i < num; i++) {
-			if (!strcmp(vec[i], "-F"))
+			if (!strcmp(vec[i], "-F")) {
 				force = true;
-			else if (!strcmp(vec[i], "-t") && i < num - 1) {
+			} else if (!strcmp(vec[i], "-t") && i < num - 1) {
 				i++;
 				to = atoi(vec[i]);
-			} else
+			} else if (!strcmp(vec[i], "-v") && i < num - 1) {
+				i++;
+				vers = atoi(vec[i]);
+			} else {
 				return EINVAL;
+			}
 		}
-		ret = lu_start(ctx, conn, force, to);
+		ret = lu_start(ctx, conn, force, to, vers);
 		if (!ret)
 			return errno;
 	} else {

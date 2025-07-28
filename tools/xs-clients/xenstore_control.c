@@ -26,7 +26,8 @@ static int add_to_buf(char **buf, const char *val, int len)
     return len + vallen;
 }
 
-static int live_update_start(struct xs_handle *xsh, bool force, unsigned int to)
+static int live_update_start(struct xs_handle *xsh, bool force, unsigned int to,
+                             unsigned int vers)
 {
     int len = 0;
     char *buf = NULL, *ret;
@@ -40,6 +41,15 @@ static int live_update_start(struct xs_handle *xsh, bool force, unsigned int to)
     free(ret);
     if (force)
         len = add_to_buf(&buf, "-F", len);
+    if (vers) {
+        if (asprintf(&ret, "%u", vers) < 0) {
+            free(buf);
+            return 1;
+        }
+        len = add_to_buf(&buf, "-v", len);
+        len = add_to_buf(&buf, ret, len);
+        free(ret);
+    }
     if (len < 0)
         return 1;
 
@@ -197,7 +207,8 @@ static int send_kernel_blob(struct xs_handle *xsh, const char *binary)
  * 3. start update (includes flags)
  */
 static int live_update_stubdom(struct xs_handle *xsh, const char *binary,
-                               const char *cmdline, bool force, unsigned int to)
+                               const char *cmdline, bool force, unsigned int to,
+                               unsigned int vers)
 {
     int rc;
 
@@ -211,7 +222,7 @@ static int live_update_stubdom(struct xs_handle *xsh, const char *binary,
             goto abort;
     }
 
-    rc = live_update_start(xsh, force, to);
+    rc = live_update_start(xsh, force, to, vers);
     if (rc)
         goto abort;
 
@@ -231,7 +242,8 @@ static int live_update_stubdom(struct xs_handle *xsh, const char *binary,
  * 3. start update (includes flags)
  */
 static int live_update_daemon(struct xs_handle *xsh, const char *binary,
-                              const char *cmdline, bool force, unsigned int to)
+                              const char *cmdline, bool force, unsigned int to,
+                              unsigned int vers)
 {
     int len = 0, rc;
     char *buf = NULL, *ret;
@@ -256,7 +268,7 @@ static int live_update_daemon(struct xs_handle *xsh, const char *binary,
             goto abort;
     }
 
-    rc = live_update_start(xsh, force, to);
+    rc = live_update_start(xsh, force, to, vers);
     if (rc)
         goto abort;
 
@@ -270,7 +282,7 @@ static int live_update_daemon(struct xs_handle *xsh, const char *binary,
 static int live_update(struct xs_handle *xsh, int argc, char **argv)
 {
     int rc = 0;
-    unsigned int i, to = 60;
+    unsigned int i, to = 60, vers = 0;
     char *binary = NULL, *cmdline = NULL, *val;
     bool force = false;
 
@@ -291,10 +303,19 @@ static int live_update(struct xs_handle *xsh, int argc, char **argv)
                 goto out;
             }
             to = atoi(argv[i]);
-        } else if (!strcmp(argv[i], "-F"))
+        } else if (!strcmp(argv[i], "-F")) {
             force = true;
-        else
+        } else if (!strcmp(argv[i], "-v")) {
+            i++;
+            if (i == argc) {
+                fprintf(stderr, "Missing version value\n");
+                rc = 2;
+                goto out;
+            }
+            vers = atoi(argv[i]);
+        } else {
             binary = argv[i];
+        }
     }
 
     if (!binary) {
@@ -305,9 +326,9 @@ static int live_update(struct xs_handle *xsh, int argc, char **argv)
 
     val = xs_read(xsh, XBT_NULL, "/tool/xenstored/domid", &i);
     if (val)
-        rc = live_update_stubdom(xsh, binary, cmdline, force, to);
+        rc = live_update_stubdom(xsh, binary, cmdline, force, to, vers);
     else
-        rc = live_update_daemon(xsh, binary, cmdline, force, to);
+        rc = live_update_daemon(xsh, binary, cmdline, force, to, vers);
 
     free(val);
 
