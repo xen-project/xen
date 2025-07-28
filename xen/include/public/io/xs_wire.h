@@ -110,6 +110,7 @@ struct xenstore_domain_interface {
     uint32_t server_features; /* Bitmap of features supported by the server */
     uint32_t connection;
     uint32_t error;
+    uint32_t evtchn_port;
 };
 
 /* Violating this is very bad.  See docs/misc/xenstore.txt. */
@@ -133,6 +134,12 @@ struct xenstore_domain_interface {
 #define XENSTORE_ERROR_COMM    1 /* Communication problem */
 #define XENSTORE_ERROR_RINGIDX 2 /* Invalid ring index */
 #define XENSTORE_ERROR_PROTO   3 /* Protocol violation (payload too long) */
+
+/*
+ * The evtchn_port field is the domain's event channel for xenstored to signal.
+ * It is filled in by Xen for dom0less/Hyperlaunch domains.  It is only used
+ * when non-zero.  Otherwise the event channel from XS_INTRODUCE is used.
+ */
 
 #endif /* _XS_WIRE_H */
 
