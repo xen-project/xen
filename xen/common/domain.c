@@ -195,6 +195,14 @@ static void set_domain_state_info(struct xen_domctl_get_domain_state *info,
         info->state |= XEN_DOMCTL_GETDOMSTATE_STATE_DYING;
     if ( d->is_dying == DOMDYING_dead )
         info->state |= XEN_DOMCTL_GETDOMSTATE_STATE_DEAD;
+
+    info->caps = 0;
+    if ( is_control_domain(d) )
+        info->caps |= XEN_DOMCTL_GETDOMSTATE_CAP_CONTROL;
+    if ( is_hardware_domain(d) )
+        info->caps |= XEN_DOMCTL_GETDOMSTATE_CAP_HARDWARE;
+    if ( is_xenstore_domain(d) )
+        info->caps |= XEN_DOMCTL_GETDOMSTATE_CAP_XENSTORE;
     info->unique_id = d->unique_id;
 }
 
@@ -205,7 +213,7 @@ int get_domain_state(struct xen_domctl_get_domain_state *info, struct domain *d,
     int rc = -ENOENT;
     struct domain *hdl;
 
-    if ( info->pad0 || info->pad1 )
+    if ( info->pad0 )
         return -EINVAL;
 
     if ( d )
