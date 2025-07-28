@@ -7,6 +7,8 @@
 #include <xen/kernel.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
+#include <xen/xvmalloc.h>
+
 #include "lfb.h"
 #include "font.h"
 
@@ -147,9 +149,10 @@ int __init lfb_init(struct lfb_prop *lfbp)
 {
     lfb.lfbp = *lfbp;
 
-    lfb.lbuf = xmalloc_bytes(lfb.lfbp.bytes_per_line);
-    lfb.text_buf = xzalloc_bytes(lfb.lfbp.text_columns * lfb.lfbp.text_rows);
-    lfb.line_len = xzalloc_array(unsigned int, lfb.lfbp.text_columns);
+    lfb.lbuf = xvmalloc_array(unsigned char, lfb.lfbp.bytes_per_line);
+    lfb.text_buf = xvzalloc_array(unsigned char,
+                                  lfb.lfbp.text_columns * lfb.lfbp.text_rows);
+    lfb.line_len = xvzalloc_array(unsigned int, lfb.lfbp.text_columns);
 
     if ( !lfb.lbuf || !lfb.text_buf || !lfb.line_len )
         goto fail;
@@ -165,8 +168,8 @@ fail:
 
 void lfb_free(void)
 {
-    xfree(lfb.lbuf);
-    xfree(lfb.text_buf);
-    xfree(lfb.line_len);
+    XVFREE(lfb.lbuf);
+    XVFREE(lfb.text_buf);
+    XVFREE(lfb.line_len);
     lfb.lfbp.lfb = ZERO_BLOCK_PTR;
 }
