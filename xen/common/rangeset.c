@@ -38,7 +38,7 @@ struct rangeset {
 };
 
 /*****************************
- * Private range functions hide the underlying linked-list implemnetation.
+ * Private range functions hide the underlying linked-list implementation.
  */
 
 /* Find highest range lower than or containing s. NULL if no such range. */
