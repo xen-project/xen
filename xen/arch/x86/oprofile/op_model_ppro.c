@@ -10,9 +10,11 @@
  * @author Graydon Hoare
  */
 
+#include <xen/sched.h>
 #include <xen/types.h>
 #include <xen/xenoprof.h>
-#include <xen/sched.h>
+#include <xen/xvmalloc.h>
+
 #include <asm/msr.h>
 #include <asm/io.h>
 #include <asm/apic.h>
@@ -231,7 +233,7 @@ static int cf_check ppro_allocate_msr(struct vcpu *v)
 	struct vpmu_struct *vpmu = vcpu_vpmu(v);
 	struct arch_msr_pair *msr_content;
 
-	msr_content = xzalloc_array(struct arch_msr_pair, num_counters);
+	msr_content = xvzalloc_array(struct arch_msr_pair, num_counters);
 	if ( !msr_content )
 		goto out;
 	vpmu->context = (void *)msr_content;
@@ -251,7 +253,7 @@ static void cf_check ppro_free_msr(struct vcpu *v)
 
 	if ( !vpmu_is_set(vpmu, VPMU_PASSIVE_DOMAIN_ALLOCATED) )
 		return;
-	xfree(vpmu->context);
+	XVFREE(vpmu->context);
 	vpmu_reset(vpmu, VPMU_PASSIVE_DOMAIN_ALLOCATED);
 }
 

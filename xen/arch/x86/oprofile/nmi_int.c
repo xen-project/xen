@@ -19,7 +19,10 @@
 #include <xen/string.h>
 #include <xen/delay.h>
 #include <xen/xenoprof.h>
+#include <xen/xvmalloc.h>
+
 #include <public/xenoprof.h>
+
 #include <asm/msr.h>
 #include <asm/apic.h>
 #include <asm/regs.h>
@@ -142,30 +145,29 @@ static void cf_check nmi_save_registers(void *dummy)
 
 static void free_msrs(void)
 {
-	int i;
+	unsigned int i;
+
 	for (i = 0; i < nr_cpu_ids; ++i) {
-		xfree(cpu_msrs[i].counters);
-		cpu_msrs[i].counters = NULL;
-		xfree(cpu_msrs[i].controls);
-		cpu_msrs[i].controls = NULL;
+		XVFREE(cpu_msrs[i].counters);
+		XVFREE(cpu_msrs[i].controls);
 	}
 }
 
 
 static int allocate_msrs(void)
 {
+	unsigned int i;
 	int success = 1;
-	size_t controls_size = sizeof(struct op_msr) * model->num_controls;
-	size_t counters_size = sizeof(struct op_msr) * model->num_counters;
 
-	int i;
 	for_each_online_cpu (i) {
-		cpu_msrs[i].counters = xmalloc_bytes(counters_size);
+		cpu_msrs[i].counters = xvmalloc_array(struct op_msr,
+						      model->num_counters);
 		if (!cpu_msrs[i].counters) {
 			success = 0;
 			break;
 		}
-		cpu_msrs[i].controls = xmalloc_bytes(controls_size);
+		cpu_msrs[i].controls = xvmalloc_array(struct op_msr,
+						      model->num_controls);
 		if (!cpu_msrs[i].controls) {
 			success = 0;
 			break;
