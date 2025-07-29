@@ -17,6 +17,7 @@
 #include <xen/paging.h>
 #include <xen/trace.h>
 #include <xen/vm_event.h>
+#include <xen/xvmalloc.h>
 
 #include <asm/altp2m.h>
 #include <asm/event.h>
@@ -2050,7 +2051,7 @@ static int cf_check hvmemul_rep_movs(
         dgpa -= bytes - bytes_per_rep;
 
     /* Allocate temporary buffer. Fall back to slow emulation if this fails. */
-    buf = xmalloc_bytes(bytes);
+    buf = xvmalloc_array(char, bytes);
     if ( buf == NULL )
         return X86EMUL_UNHANDLEABLE;
 
@@ -2060,7 +2061,7 @@ static int cf_check hvmemul_rep_movs(
 
         if ( rc != X86EMUL_OKAY)
         {
-            xfree(buf);
+            xvfree(buf);
             return rc;
         }
 
@@ -2082,7 +2083,7 @@ static int cf_check hvmemul_rep_movs(
     if ( rc == HVMTRANS_okay )
         rc = hvm_copy_to_guest_phys(dgpa, buf, bytes, curr);
 
-    xfree(buf);
+    xvfree(buf);
 
     switch ( rc )
     {
@@ -2162,7 +2163,7 @@ static int cf_check hvmemul_rep_stos(
         for ( ; ; )
         {
             bytes = *reps * bytes_per_rep;
-            buf = xmalloc_bytes(bytes);
+            buf = xvmalloc_array(char, bytes);
             if ( buf || *reps <= 1 )
                 break;
             *reps >>= 1;
@@ -2191,7 +2192,7 @@ static int cf_check hvmemul_rep_stos(
 
             default:
                 ASSERT_UNREACHABLE();
-                xfree(buf);
+                xvfree(buf);
                 return X86EMUL_UNHANDLEABLE;
             }
 
@@ -2202,7 +2203,7 @@ static int cf_check hvmemul_rep_stos(
         rc = hvm_copy_to_guest_phys(gpa, buf, bytes, curr);
 
         if ( buf != p_data )
-            xfree(buf);
+            xvfree(buf);
 
         switch ( rc )
         {
