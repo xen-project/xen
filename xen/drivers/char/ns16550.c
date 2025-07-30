@@ -1,10 +1,10 @@
 /******************************************************************************
  * ns16550.c
- * 
+ *
  * Driver for 16550-series UARTs. This driver is to be kept within Xen as
  * it permits debugging of seriously-toasted machines (e.g., in situations
  * where a device driver within a guest OS would be inaccessible).
- * 
+ *
  * Copyright (c) 2003-2005, K A Fraser
  */
 
@@ -688,13 +688,13 @@ static int __init parse_parity_char(int c)
     {
     case 'n':
         return UART_PARITY_NONE;
-    case 'o': 
+    case 'o':
         return UART_PARITY_ODD;
-    case 'e': 
+    case 'e':
         return UART_PARITY_EVEN;
-    case 'm': 
+    case 'm':
         return UART_PARITY_MARK;
-    case 's': 
+    case 's':
         return UART_PARITY_SPACE;
     }
     return 0;
