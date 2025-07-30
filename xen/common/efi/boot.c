@@ -1313,8 +1313,8 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
     static EFI_GUID __initdata shim_lock_guid = SHIM_LOCK_PROTOCOL_GUID;
     EFI_LOADED_IMAGE *loaded_image;
     EFI_STATUS status;
-    unsigned int i, argc;
-    CHAR16 **argv, *file_name, *cfg_file_name = NULL, *options = NULL;
+    unsigned int i;
+    CHAR16 *file_name, *cfg_file_name = NULL, *options = NULL;
     UINTN gop_mode = ~0;
     EFI_SHIM_LOCK_PROTOCOL *shim_lock;
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
@@ -1345,6 +1345,8 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
 
     if ( use_cfg_file )
     {
+        unsigned int argc;
+        CHAR16 **argv;
         UINTN offset = 0;
 
         argc = get_argv(0, NULL, loaded_image->LoadOptions,
@@ -1397,15 +1399,6 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
 
         if ( !base_video )
             efi_console_set_mode();
-    }
-    else
-    {
-        /*
-         * Some compilers may emit a false "uninitialized use" warning for argc,
-         * so initialize argc/argv here to avoid the warning.
-         */
-        argc = 0;
-        argv = NULL;
     }
 
     PrintStr(L"Xen " XEN_VERSION_STRING XEN_EXTRAVERSION
