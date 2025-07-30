@@ -449,7 +449,7 @@ static int __init cmp_memory_node(const void *key, const void *elem)
     return 0;
 }
 
-static void __init swap_memory_node(void *_a, void *_b, size_t size)
+static void __init swap_memory_node(void *_a, void *_b)
 {
     struct membank *a = _a, *b = _b;
 

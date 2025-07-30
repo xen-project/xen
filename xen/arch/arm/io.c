@@ -100,7 +100,7 @@ static int cmp_mmio_handler(const void *key, const void *elem)
     return 0;
 }
 
-static void swap_mmio_handler(void *_a, void *_b, size_t size)
+static void swap_mmio_handler(void *_a, void *_b)
 {
     struct mmio_handler *a = _a, *b = _b;
 

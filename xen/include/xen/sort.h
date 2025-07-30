@@ -24,7 +24,7 @@ extern gnu_inline
 #endif
 void sort(void *base, size_t num, size_t size,
           int (*cmp)(const void *a, const void *b),
-          void (*swap)(void *a, void *b, size_t size))
+          void (*swap)(void *a, void *b))
 {
     /* pre-scale counters for performance */
     size_t i = (num / 2) * size, n = num * size, c, r;
@@ -39,7 +39,7 @@ void sort(void *base, size_t num, size_t size,
                 c += size;
             if ( cmp(base + r, base + c) >= 0 )
                 break;
-            swap(base + r, base + c, size);
+            swap(base + r, base + c);
         }
     }
 
@@ -47,7 +47,7 @@ void sort(void *base, size_t num, size_t size,
     for ( i = n; i > 0; )
     {
         i -= size;
-        swap(base, base + i, size);
+        swap(base, base + i);
         for ( r = 0; r * 2 + size < i; r = c )
         {
             c = r * 2 + size;
@@ -55,7 +55,7 @@ void sort(void *base, size_t num, size_t size,
                 c += size;
             if ( cmp(base + r, base + c) >= 0 )
                 break;
-            swap(base + r, base + c, size);
+            swap(base + r, base + c);
         }
     }
 }
