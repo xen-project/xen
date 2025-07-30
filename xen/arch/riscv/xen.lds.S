@@ -46,10 +46,9 @@ SECTIONS
 
         *(.rodata)
         *(.rodata.*)
+        VPCI_ARRAY
         *(.data.rel.ro)
         *(.data.rel.ro.*)
-
-        VPCI_ARRAY
 
         . = ALIGN(POINTER_ALIGN);
     } :text

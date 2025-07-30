@@ -703,9 +703,14 @@ static int cf_check init_msix(struct pci_dev *pdev)
     pdev->vpci->msix = msix;
     list_add(&msix->next, &d->arch.hvm.msix_tables);
 
-    return 0;
+    /*
+     * vPCI header initialization will have mapped the whole BAR into the
+     * p2m, as MSI-X capability was not yet initialized.  Crave a hole for
+     * the MSI-X table here, so that Xen can trap accesses.
+     */
+    return vpci_make_msix_hole(pdev);
 }
-REGISTER_VPCI_INIT(init_msix, VPCI_PRIORITY_HIGH);
+REGISTER_VPCI_CAP(MSIX, init_msix, NULL);
 
 /*
  * Local variables:
