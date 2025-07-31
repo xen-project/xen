@@ -3278,13 +3278,14 @@ csched2_unit_remove(const struct scheduler *ops, struct sched_unit *unit)
 /* How long should we let this unit run for? */
 static s_time_t
 csched2_runtime(const struct scheduler *ops, int cpu,
-                struct csched2_unit *snext, s_time_t now)
+                struct csched2_unit *snext, s_time_t now, int inflight_credit)
 {
     s_time_t time, min_time;
     int rt_credit; /* Proposed runtime measured in credits */
     struct csched2_runqueue_data *rqd = c2rqd(cpu);
     struct list_head *runq = &rqd->runq;
     const struct csched2_private *prv = csched2_priv(ops);
+    int swait_credit = 0;
 
     /*
      * If we're idle, just stay so. Others (or external events)
@@ -3320,17 +3321,21 @@ csched2_runtime(const struct scheduler *ops, int cpu,
     /*
      * 2) If there's someone waiting whose credit is positive,
      *    run until your credit ~= his.
+     *    Note that this someone might be the one who was just
+     *    running and is about to be placed back on the runqueue.
      */
     if ( ! list_empty(runq) )
     {
         struct csched2_unit *swait = runq_elem(runq->next);
 
-        if ( ! is_idle_unit(swait->unit)
-             && swait->credit > 0 )
-        {
-            rt_credit = snext->credit - swait->credit;
-        }
+        if ( !is_idle_unit(swait->unit) && swait->credit > 0 )
+            swait_credit = swait->credit;
     }
+    if ( swait_credit < inflight_credit )
+        swait_credit = inflight_credit;
+
+    if ( swait_credit > 0 )
+        rt_credit = snext->credit - swait_credit;
 
     /*
      * The next guy on the runqueue may actually have a higher credit,
@@ -3582,6 +3587,7 @@ static void cf_check csched2_schedule(
     struct csched2_runqueue_data *rqd;
     struct csched2_unit * const scurr = csched2_unit(currunit);
     struct csched2_unit *snext = NULL;
+    int inflight_credit = 0;
     bool tickled;
     bool migrated = false;
 
@@ -3716,6 +3722,13 @@ static void cf_check csched2_schedule(
             balance_load(ops, sched_cpu, now);
         }
 
+        /*
+         * This must occur after the potential credit reset above,
+         * otherwise it would capture a negative credit.
+         */
+        if ( test_bit(__CSFLAG_delayed_runq_add, &scurr->flags) )
+            inflight_credit = scurr->credit;
+
         snext->start_time = now;
         snext->tickled_cpu = -1;
 
@@ -3756,7 +3769,8 @@ static void cf_check csched2_schedule(
     /*
      * Return task to run next...
      */
-    currunit->next_time = csched2_runtime(ops, sched_cpu, snext, now);
+    currunit->next_time = csched2_runtime(ops, sched_cpu, snext, now,
+                                          inflight_credit);
     currunit->next_task = snext->unit;
     snext->unit->migrated = migrated;
 
