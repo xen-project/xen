@@ -642,7 +642,6 @@ int sched_init_vcpu(struct vcpu *v)
 static void vcpu_move_irqs(struct vcpu *v)
 {
     arch_move_irqs(v);
-    evtchn_move_pirqs(v);
 }
 
 static void sched_move_irqs(const struct sched_unit *unit)

@@ -224,7 +224,7 @@ void cleanup_domain_irq_mapping(struct domain *d);
 
 bool cpu_has_pending_apic_eoi(void);
 
-static inline void arch_move_irqs(struct vcpu *v) { }
+#define arch_move_irqs(v) evtchn_move_pirqs(v)
 
 struct msi_info;
 int allocate_and_map_gsi_pirq(struct domain *d, int index, int *pirq_p);

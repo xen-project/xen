@@ -970,6 +970,7 @@ void send_guest_domain_virq(struct domain *d, uint32_t virq)
     read_unlock_irqrestore(&v->virq_lock, flags);
 }
 
+#ifdef CONFIG_HAS_PIRQ
 void send_guest_pirq(struct domain *d, const struct pirq *pirq)
 {
     int port;
@@ -994,6 +995,7 @@ void send_guest_pirq(struct domain *d, const struct pirq *pirq)
         evtchn_read_unlock(chn);
     }
 }
+#endif /* CONFIG_HAS_PIRQ */
 
 static DEFINE_SPINLOCK(global_virq_handlers_lock);
 
@@ -1706,7 +1708,7 @@ void evtchn_destroy_final(struct domain *d)
 #endif
 }
 
-
+#ifdef CONFIG_HAS_PIRQ
 void evtchn_move_pirqs(struct vcpu *v)
 {
     struct domain *d = v->domain;
@@ -1722,7 +1724,7 @@ void evtchn_move_pirqs(struct vcpu *v)
     }
     read_unlock(&d->event_lock);
 }
-
+#endif /* CONFIG_HAS_PIRQ */
 
 static void domain_dump_evtchn_info(struct domain *d)
 {
