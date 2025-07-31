@@ -74,6 +74,7 @@ int osdep_gnttab_open(xengnttab_handle *xgt)
     }
 
     file->dev = gntmap;
+    file->cloexec = true;
     gntmap_init(gntmap);
     xgt->fd = fd;
     return 0;
