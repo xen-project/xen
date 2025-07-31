@@ -28,6 +28,7 @@
 #include <libxl_utils.h>
 #include <libxlutil.h>
 #include <xen-tools/arm-arch-capabilities.h>
+#include <xenstore.h>
 
 #include "xl.h"
 #include "xl_utils.h"
@@ -333,6 +334,25 @@ static void output_topologyinfo(void)
     return;
 }
 
+static void output_xenstore_info(void)
+{
+    struct xs_handle *xsh;
+    unsigned int features = 0;
+
+    xsh = xs_open(0);
+    if (!xsh) {
+        fprintf(stderr, "xs_open failed.\n");
+        return;
+    }
+
+    /* Ignore error, default to "0" for features. */
+    xs_get_features_supported(xsh, &features);
+
+    maybe_printf("xenstore_features      : 0x%08x\n", features);
+
+    xs_close(xsh);
+}
+
 static void print_info(int numa)
 {
     output_nodeinfo();
@@ -344,6 +364,8 @@ static void print_info(int numa)
         output_numainfo();
     }
     output_xeninfo();
+
+    output_xenstore_info();
 
     maybe_printf("xend_config_format     : 4\n");
 
