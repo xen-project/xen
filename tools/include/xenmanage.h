@@ -45,6 +45,12 @@ int xenmanage_close(xenmanage_handle *hdl);
 #define XENMANAGE_GETDOMSTATE_STATE_DYING     0x0004  /* Domain dying. */
 #define XENMANAGE_GETDOMSTATE_STATE_DEAD      0x0008  /* Domain dead. */
 
+/* Control Domain capability. */
+#define XENMANAGE_GETDOMSTATE_CAP_CONTROL     0x0001
+/* Hardware Domain capability. */
+#define XENMANAGE_GETDOMSTATE_CAP_HARDWARE    0x0002
+/* Xenstore Domain capability. */
+#define XENMANAGE_GETDOMSTATE_CAP_XENSTORE    0x0004
 /*
  * Return state information of an existing domain.
  *
@@ -59,7 +65,8 @@ int xenmanage_close(xenmanage_handle *hdl);
  * Return value: 0 if information was stored, -1 else (errno is set)
  */
 int xenmanage_get_domain_info(xenmanage_handle *hdl, unsigned int domid,
-                              unsigned int *state, uint64_t *unique_id);
+                              unsigned int *state, unsigned int *caps,
+                              uint64_t *unique_id);
 
 /*
  * Return information of a domain having changed state recently.
@@ -73,12 +80,15 @@ int xenmanage_get_domain_info(xenmanage_handle *hdl, unsigned int domid,
  *   domid:     where to store the domid of the domain (not NULL)
  *   state:     where to store the state (XENMANAGE_GETDOMSTATE_STATE_ flags,
  *              nothing stored if NULL)
+ *   caps:      where to store the capabilities (XENMANAGE_GETDOMSTATE_CAP_
+ *              flags, nothing stored if NULL)
  *   unique_id: where to store the unique id of the domain (nothing stored if
  *              NULL)
  * Return value: 0 if information was stored, -1 else (errno is set)
  */
 int xenmanage_poll_changed_domain(xenmanage_handle *hdl, unsigned int *domid,
-                                  unsigned int *state, uint64_t *unique_id);
+                                  unsigned int *state, unsigned int *caps,
+                                  uint64_t *unique_id);
 #endif /* XENMANAGE_H */
 
 /*

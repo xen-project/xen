@@ -92,6 +92,7 @@ static int xenmanage_do_domctl_get_domain_state(xenmanage_handle *hdl,
                                                 unsigned int domid_in,
                                                 unsigned int *domid_out,
                                                 unsigned int *state,
+                                                unsigned int *caps,
                                                 uint64_t *unique_id)
 {
     struct xen_domctl *buf;
@@ -130,6 +131,16 @@ static int xenmanage_do_domctl_get_domain_state(xenmanage_handle *hdl,
             if ( st->state & XEN_DOMCTL_GETDOMSTATE_STATE_DEAD )
                 *state |= XENMANAGE_GETDOMSTATE_STATE_DEAD;
         }
+        if ( caps )
+        {
+            *caps = 0;
+            if ( st->caps & XEN_DOMCTL_GETDOMSTATE_CAP_CONTROL )
+                *caps |= XENMANAGE_GETDOMSTATE_CAP_CONTROL;
+            if ( st->caps & XEN_DOMCTL_GETDOMSTATE_CAP_HARDWARE )
+                *caps |= XENMANAGE_GETDOMSTATE_CAP_HARDWARE;
+            if ( st->caps & XEN_DOMCTL_GETDOMSTATE_CAP_XENSTORE )
+                *caps |= XENMANAGE_GETDOMSTATE_CAP_XENSTORE;
+        }
         if ( unique_id )
             *unique_id = st->unique_id;
     }
@@ -142,7 +153,8 @@ static int xenmanage_do_domctl_get_domain_state(xenmanage_handle *hdl,
 }
 
 int xenmanage_get_domain_info(xenmanage_handle *hdl, unsigned int domid,
-                              unsigned int *state, uint64_t *unique_id)
+                              unsigned int *state, unsigned int *caps,
+                              uint64_t *unique_id)
 {
     if ( !hdl || domid >= DOMID_FIRST_RESERVED )
     {
@@ -150,12 +162,13 @@ int xenmanage_get_domain_info(xenmanage_handle *hdl, unsigned int domid,
         return -1;
     }
 
-    return xenmanage_do_domctl_get_domain_state(hdl, domid, NULL, state,
+    return xenmanage_do_domctl_get_domain_state(hdl, domid, NULL, state, caps,
                                                 unique_id);
 }
 
 int xenmanage_poll_changed_domain(xenmanage_handle *hdl, unsigned int *domid,
-                                  unsigned int *state, uint64_t *unique_id)
+                                  unsigned int *state, unsigned int *caps,
+                                  uint64_t *unique_id)
 {
     if ( !hdl || !domid )
     {
@@ -164,5 +177,5 @@ int xenmanage_poll_changed_domain(xenmanage_handle *hdl, unsigned int *domid,
     }
 
     return xenmanage_do_domctl_get_domain_state(hdl, DOMID_INVALID, domid,
-                                                state, unique_id);
+                                                state, caps, unique_id);
 }

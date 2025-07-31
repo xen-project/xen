@@ -673,7 +673,7 @@ static int check_domain(const void *k, void *v, void *arg)
 	unsigned int state;
 	uint64_t unique_id;
 
-	if (xenmanage_get_domain_info(xm_handle, domain->domid, &state,
+	if (xenmanage_get_domain_info(xm_handle, domain->domid, &state, NULL,
 				      &unique_id)) {
 		unique_id = 0;
 		state = 0;
@@ -706,7 +706,7 @@ static void do_check_domains(void)
 	struct domain *domain;
 	bool notify = false;
 
-	while (!xenmanage_poll_changed_domain(xm_handle, &domid, &state,
+	while (!xenmanage_poll_changed_domain(xm_handle, &domid, &state, NULL,
 					      &unique_id)) {
 		domain = find_domain_struct(domid);
 		if (domain)
@@ -836,7 +836,7 @@ static struct domain *find_or_alloc_existing_domain(unsigned int domid)
 	domain = find_domain_struct(domid);
 	if (!domain || !domain->unique_id)
 		dom_valid = !xenmanage_get_domain_info(xm_handle, domid,
-						       NULL, &unique_id);
+						       NULL, NULL, &unique_id);
 
 	if (dom_valid) {
 		if (!domain)
@@ -1447,7 +1447,7 @@ int domain_alloc_permrefs(struct node_perms *perms)
 		domid = perms->p[i].id;
 		d = find_domain_struct(domid);
 		if (!d) {
-			if (xenmanage_get_domain_info(xm_handle, domid,
+			if (xenmanage_get_domain_info(xm_handle, domid, NULL,
 						      NULL, &unique_id))
 				perms->p[i].perms |= XS_PERM_IGNORE;
 			else if (!alloc_domain(NULL, domid, unique_id))
