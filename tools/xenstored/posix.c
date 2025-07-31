@@ -408,6 +408,11 @@ void set_socket_fd(int fd)
 	sock = fd;
 }
 
+xenevtchn_handle *evtchn_fdopen(int fd)
+{
+	return xenevtchn_fdopen(NULL, fd, 0);
+}
+
 const char *xenstore_rundir(void)
 {
 	return xenstore_daemon_rundir();

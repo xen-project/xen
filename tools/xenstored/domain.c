@@ -1396,7 +1396,7 @@ void domain_init(int evtfd)
 	if (evtfd < 0)
 		xce_handle = xenevtchn_open(NULL, XENEVTCHN_NO_CLOEXEC);
 	else
-		xce_handle = xenevtchn_fdopen(NULL, evtfd, 0);
+		xce_handle = evtchn_fdopen(evtfd);
 
 	if (xce_handle == NULL)
 		barf_perror("Failed to open evtchn device");

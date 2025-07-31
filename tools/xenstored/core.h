@@ -29,6 +29,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <errno.h>
+#include <xenevtchn.h>
 
 #include "xenstore_lib.h"
 #include "xenstore_state.h"
@@ -404,6 +405,8 @@ void handle_special_fds(void);
 
 int get_socket_fd(void);
 void set_socket_fd(int fd);
+
+xenevtchn_handle *evtchn_fdopen(int fd);
 
 #ifdef __MINIOS__
 void mount_9pfs(void);

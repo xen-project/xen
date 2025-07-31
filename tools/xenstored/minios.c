@@ -85,6 +85,11 @@ void set_socket_fd(int fd)
 {
 }
 
+xenevtchn_handle *evtchn_fdopen(int fd)
+{
+	return xenevtchn_open(NULL, XENEVTCHN_NO_CLOEXEC);
+}
+
 static void mount_thread(void *p)
 {
 	xenbus_event_queue events = NULL;
