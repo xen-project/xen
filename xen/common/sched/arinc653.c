@@ -361,6 +361,8 @@ a653sched_init(struct scheduler *ops)
     ops->sched_data = prv;
 
     prv->next_major_frame = 0;
+    prv->major_frame = DEFAULT_TIMESLICE;
+    prv->schedule[0].runtime = DEFAULT_TIMESLICE;
     spin_lock_init(&prv->lock);
     INIT_LIST_HEAD(&prv->unit_list);
 
@@ -526,27 +528,31 @@ a653sched_do_schedule(
 
     spin_lock_irqsave(&sched_priv->lock, flags);
 
-    if ( sched_priv->num_schedule_entries < 1 )
-        sched_priv->next_major_frame = now + DEFAULT_TIMESLICE;
-    else if ( now >= sched_priv->next_major_frame )
+    ASSERT(sched_priv->major_frame > 0);
+
+    /* Switch to next major frame using a modulo operation */
+    if ( now >= sched_priv->next_major_frame )
     {
-        /* time to enter a new major frame
-         * the first time this function is called, this will be true */
-        /* start with the first domain in the schedule */
+        s_time_t major_frame = sched_priv->major_frame;
+        s_time_t remainder = (now - sched_priv->next_major_frame) % major_frame;
+
+        /*
+         * major_frame and schedule[0].runtime contain DEFAULT_TIMESLICE
+         * if num_schedule_entries is zero.
+         */
         sched_priv->sched_index = 0;
-        sched_priv->next_major_frame = now + sched_priv->major_frame;
-        sched_priv->next_switch_time = now + sched_priv->schedule[0].runtime;
+        sched_priv->next_major_frame = now - remainder + major_frame;
+        sched_priv->next_switch_time = now - remainder +
+            sched_priv->schedule[0].runtime;
     }
-    else
+
+    /* Switch minor frame or find correct minor frame after a miss */
+    while ( (now >= sched_priv->next_switch_time) &&
+        (sched_priv->sched_index < sched_priv->num_schedule_entries) )
     {
-        while ( (now >= sched_priv->next_switch_time) &&
-                (sched_priv->sched_index < sched_priv->num_schedule_entries) )
-        {
-            /* time to switch to the next domain in this major frame */
-            sched_priv->sched_index++;
-            sched_priv->next_switch_time +=
-                sched_priv->schedule[sched_priv->sched_index].runtime;
-        }
+        sched_priv->sched_index++;
+        sched_priv->next_switch_time +=
+            sched_priv->schedule[sched_priv->sched_index].runtime;
     }
 
     /*
