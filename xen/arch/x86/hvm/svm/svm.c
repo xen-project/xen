@@ -2159,7 +2159,7 @@ static void svm_vmexit_do_pause(struct cpu_user_regs *regs)
      * Do something useful, like reschedule the guest
      */
     perfc_incr(pauseloop_exits);
-    do_sched_op(SCHEDOP_yield, guest_handle_from_ptr(NULL, void));
+    vcpu_yield();
 }
 
 static void

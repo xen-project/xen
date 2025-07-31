@@ -1030,6 +1030,7 @@ static inline bool vcpu_cpu_dirty(const struct vcpu *v)
 }
 
 void vcpu_block(void);
+void vcpu_block_enable_events(void);
 void vcpu_unblock(struct vcpu *v);
 
 void vcpu_pause(struct vcpu *v);

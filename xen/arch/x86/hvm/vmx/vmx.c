@@ -4768,7 +4768,7 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     case EXIT_REASON_PAUSE_INSTRUCTION:
         perfc_incr(pauseloop_exits);
-        do_sched_op(SCHEDOP_yield, guest_handle_from_ptr(NULL, void));
+        vcpu_yield();
         break;
 
     case EXIT_REASON_XSETBV:

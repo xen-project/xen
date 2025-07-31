@@ -959,7 +959,7 @@ int viridian_hypercall(struct cpu_user_regs *regs)
         /*
          * See section 14.5.1 of the specification.
          */
-        do_sched_op(SCHEDOP_yield, guest_handle_from_ptr(NULL, void));
+        vcpu_yield();
         break;
 
     case HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE:

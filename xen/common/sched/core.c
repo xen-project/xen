@@ -1430,7 +1430,7 @@ void vcpu_block(void)
     }
 }
 
-static void vcpu_block_enable_events(void)
+void vcpu_block_enable_events(void)
 {
     local_event_delivery_enable();
     vcpu_block();

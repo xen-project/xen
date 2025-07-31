@@ -1736,7 +1736,7 @@ void hvm_hlt(unsigned int eflags)
     if ( unlikely(!(eflags & X86_EFLAGS_IF)) )
         return hvm_vcpu_down(curr);
 
-    do_sched_op(SCHEDOP_block, guest_handle_from_ptr(NULL, void));
+    vcpu_block_enable_events();
 
     TRACE(TRC_HVM_HLT, /* pending = */ vcpu_runnable(curr));
 }
