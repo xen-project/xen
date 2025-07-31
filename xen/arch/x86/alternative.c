@@ -195,13 +195,18 @@ void *place_ret(void *ptr)
  * You should run this with interrupts disabled or on code that is not
  * executing.
  *
- * "noinline" to cause control flow change and thus invalidate I$ and
- * cause refetch after modification.
+ * While the SDM continues to suggest using "noinline" would be sufficient, it
+ * may not be, e.g. due to errata.  Issue a serializing insn afterwards, unless
+ * this is for live-patching, where we modify code before it goes live.  Issue
+ * a serializing insn which is unlikely to be intercepted by a hypervisor, in
+ * case we run virtualized ourselves.
  */
-static void init_or_livepatch noinline
+static void init_or_livepatch
 text_poke(void *addr, const void *opcode, size_t len)
 {
     memcpy(addr, opcode, len);
+    if ( system_state < SYS_STATE_active )
+        asm volatile ( "mov %0, %%cr2" :: "r" (0L) : "memory" );
 }
 
 extern void *const __initdata_cf_clobber_start[];
