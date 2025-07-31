@@ -173,6 +173,19 @@ int xenevtchn_unmask(xenevtchn_handle *xce, evtchn_port_t port);
  */
 int xenevtchn_restrict(xenevtchn_handle *xce, domid_t domid);
 
+#ifdef __MINIOS__
+/**
+ * Bind an event channel under Mini-OS.
+ *
+ * Bind an event channel specified by its known port after a kexec() of
+ * Mini-OS. This function is available under Mini-OS only!
+ *
+ * @parm xce handle to the open evtchn interface
+ * @parm port the event channel to bind again
+ * @return 0 on success, -1 on failure with errno set appropriately.
+ */
+int xenevtchn_bind(xenevtchn_handle *xce, evtchn_port_t port);
+#endif
 #endif
 
 /*

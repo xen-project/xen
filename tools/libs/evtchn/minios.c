@@ -259,6 +259,23 @@ xenevtchn_port_or_error_t xenevtchn_bind_interdomain(xenevtchn_handle *xce,
     return local_port;
 }
 
+int xenevtchn_bind(xenevtchn_handle *xce, evtchn_port_t port)
+{
+    struct port_info *port_info;
+    port_info = port_alloc(xce);
+    if ( port_info == NULL )
+        return -1;
+
+    printf("xenevtchn_bind(%"PRId32")\n", port);
+    bind_evtchn(port, evtchn_handler, xce);
+
+    port_info->bound = true;
+    port_info->port = port;
+    unmask_evtchn(port);
+
+    return 0;
+}
+
 int xenevtchn_unbind(xenevtchn_handle *xce, evtchn_port_t port)
 {
     int fd = xce->fd;
