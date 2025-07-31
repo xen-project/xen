@@ -114,10 +114,6 @@ static void evtchn_initialize(void)
     ftype_evtchn = alloc_file_type(&evtchn_ops);
 }
 
-/*
- * XENEVTCHN_NO_CLOEXEC is being ignored, as there is no exec() call supported
- * in Mini-OS.
- */
 int osdep_evtchn_open(xenevtchn_handle *xce, unsigned int flags)
 {
     int fd;
@@ -137,6 +133,8 @@ int osdep_evtchn_open(xenevtchn_handle *xce, unsigned int flags)
         return -1;
     }
 
+    if ( !(flags & XENEVTCHN_NO_CLOEXEC) )
+        file->cloexec = true;
     file->dev = ports;
     XEN_LIST_INIT(&ports->list);
     xce->fd = fd;
