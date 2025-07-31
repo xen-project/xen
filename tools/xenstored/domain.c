@@ -1337,7 +1337,7 @@ void dom0_init(void)
 	xenevtchn_notify(xce_handle, dom0->port);
 }
 
-void stubdom_init(void)
+void stubdom_init(bool live_update)
 {
 #ifdef __MINIOS__
 	struct domain *stubdom;
@@ -1345,13 +1345,16 @@ void stubdom_init(void)
 	if (stub_domid < 0)
 		return;
 
-	stubdom = introduce_domain(NULL, stub_domid, xenbus_evtchn, false);
-	if (!stubdom)
-		barf_perror("Failed to initialize stubdom");
+	if (!live_update) {
+		stubdom = introduce_domain(NULL, stub_domid, xenbus_evtchn,
+					   false);
+		if (!stubdom)
+			barf_perror("Failed to initialize stubdom");
 
-	xenevtchn_notify(xce_handle, stubdom->port);
+		xenevtchn_notify(xce_handle, stubdom->port);
+	}
 
-	mount_9pfs();
+	mount_9pfs(live_update);
 #endif
 }
 

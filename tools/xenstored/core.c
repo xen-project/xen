@@ -2774,13 +2774,13 @@ int main(int argc, char *argv[])
 	if (tracefile)
 		tracefile = absolute_filename(NULL, tracefile);
 
+	stubdom_init(live_update);
+
 #ifndef NO_LIVE_UPDATE
 	/* Read state in case of live update. */
 	if (live_update)
 		lu_read_state();
 #endif
-
-	stubdom_init();
 
 	check_store();
 

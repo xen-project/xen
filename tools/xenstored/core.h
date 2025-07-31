@@ -412,7 +412,7 @@ xenevtchn_handle *evtchn_fdopen(int fd);
 int evtchn_rebind(int port);
 
 #ifdef __MINIOS__
-void mount_9pfs(void);
+void mount_9pfs(bool live_update);
 #endif
 
 const char *xenstore_rundir(void);

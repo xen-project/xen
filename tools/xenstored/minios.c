@@ -131,15 +131,21 @@ static void mount_thread(void *p)
 		free(err);
 	}
 
-	p9_device = init_9pfront(0, XENSTORE_LIB_DIR);
+	p9_device = init_9pfront2(0, XENSTORE_LIB_DIR, INIT9P_FLAG_KEXEC);
 
 	/* Start logging if selected. */
 	reopen_log();
 }
 
-void mount_9pfs(void)
+void mount_9pfs(bool live_update)
 {
-	create_thread("mount-9pfs", mount_thread, NULL);
+	if (!live_update)
+		create_thread("mount-9pfs", mount_thread, NULL);
+	else {
+		p9_device = init_9pfront2(0, XENSTORE_LIB_DIR,
+					  INIT9P_FLAG_REINIT);
+		reopen_log();
+	}
 }
 
 const char *xenstore_rundir(void)
