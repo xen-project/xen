@@ -27,9 +27,11 @@ struct live_update *lu_status;
 
 struct lu_dump_state {
 	void *buf;
-	unsigned int size;
-	int fd;
+	unsigned int buf_size;
+	size_t size;
+	size_t offset;
 	char *filename;
+	FILE *fp;
 };
 
 static int lu_destroy(void *data)
@@ -80,9 +82,10 @@ bool lu_is_pending(void)
 	return lu_status != NULL;
 }
 
-static void lu_get_dump_state(struct lu_dump_state *state)
+static void lu_get_dump_state(void *ctx, struct lu_dump_state *state)
 {
 	struct stat statbuf;
+	int fd;
 
 	state->size = 0;
 
@@ -91,82 +94,107 @@ static void lu_get_dump_state(struct lu_dump_state *state)
 	if (!state->filename)
 		barf("Allocation failure");
 
-	state->fd = open(state->filename, O_RDONLY);
-	if (state->fd < 0)
-		return;
-	if (fstat(state->fd, &statbuf) != 0)
-		goto out_close;
+	fd = open(state->filename, O_RDONLY);
+	if (fd < 0)
+		barf("No state file found");
+	if (fstat(fd, &statbuf) != 0)
+		barf("Could not fstat state file");
 	state->size = statbuf.st_size;
 
-	state->buf = mmap(NULL, state->size, PROT_READ, MAP_PRIVATE,
-			  state->fd, 0);
-	if (state->buf == MAP_FAILED) {
-		state->size = 0;
-		goto out_close;
-	}
+	/* Start with a 4k buffer. If needed we'll reallocate a larger one. */
+	state->buf_size = 4096;
+	state->buf = talloc_size(ctx, state->buf_size);
+	if (!state->buf)
+		barf("Allocation failure");
 
-	return;
+	state->fp = fdopen(fd, "r");
+}
 
- out_close:
-	close(state->fd);
+static void lu_dump_close(FILE *fp)
+{
+	fclose(fp);
 }
 
 static void lu_close_dump_state(struct lu_dump_state *state)
 {
 	assert(state->filename != NULL);
 
-	munmap(state->buf, state->size);
-	close(state->fd);
+	lu_dump_close(state->fp);
 
 	unlink(state->filename);
 	talloc_free(state->filename);
+	talloc_free(state->buf);
+}
+
+static void lu_read_data(void *ctx, struct lu_dump_state *state,
+			 unsigned int size)
+{
+	if (state->offset + size > state->size)
+		barf("Inconsistent state data");
+
+	if (size > state->buf_size) {
+		state->buf = talloc_realloc_size(ctx, state->buf, size);
+		if (!state->buf)
+			barf("Allocation failure");
+		state->buf_size = size;
+	}
+
+	if (fread(state->buf, size, 1, state->fp) != 1)
+		barf("State read error");
+
+	state->offset += size;
 }
 
 void lu_read_state(void)
 {
 	struct lu_dump_state state = {};
-	struct xs_state_record_header *head;
+	struct xs_state_record_header head;
 	void *ctx = talloc_new(NULL); /* Work context for subfunctions. */
 	struct xs_state_preamble *pre;
 	unsigned int version;
 
 	syslog(LOG_INFO, "live-update: read state\n");
-	lu_get_dump_state(&state);
+	lu_get_dump_state(ctx, &state);
 	if (state.size == 0)
 		barf_perror("No state found after live-update");
 
+	lu_read_data(ctx, &state, sizeof(*pre));
 	pre = state.buf;
 	version = be32toh(pre->version);
 	if (memcmp(pre->ident, XS_STATE_IDENT, sizeof(pre->ident)) ||
 	    !version || version > XS_STATE_VERSION ||
 	    pre->flags != XS_STATE_FLAGS)
 		barf("Unknown record identifier");
-	for (head = state.buf + sizeof(*pre);
-	     head->type != XS_STATE_TYPE_END &&
-		(void *)head - state.buf < state.size;
-	     head = (void *)head + sizeof(*head) + head->length) {
-		switch (head->type) {
+
+	for (;;) {
+		lu_read_data(ctx, &state, sizeof(head));
+		head = *(struct xs_state_record_header *)(state.buf);
+		if (head.type == XS_STATE_TYPE_END)
+			break;
+		lu_read_data(ctx, &state, head.length);
+
+		switch (head.type) {
 		case XS_STATE_TYPE_GLOBAL:
-			read_state_global(ctx, head + 1);
+			read_state_global(ctx, state.buf);
 			break;
 		case XS_STATE_TYPE_CONN:
-			read_state_connection(ctx, head + 1);
+			read_state_connection(ctx, state.buf);
 			break;
 		case XS_STATE_TYPE_WATCH:
-			read_state_watch(ctx, head + 1);
+			read_state_watch(ctx, state.buf);
 			break;
 		case XS_STATE_TYPE_TA:
 			xprintf("live-update: ignore transaction record\n");
 			break;
 		case XS_STATE_TYPE_NODE:
-			read_state_node(ctx, head + 1);
+			read_state_node(ctx, state.buf);
 			break;
 		case XS_STATE_TYPE_DOMAIN:
-			read_state_domain(ctx, head + 1, version);
+			read_state_domain(ctx, state.buf, version);
 			break;
 		default:
 			xprintf("live-update: unknown state record %08x\n",
-				head->type);
+				head.type);
 			break;
 		}
 	}
@@ -269,11 +297,6 @@ static FILE *lu_dump_open(const void *ctx)
 		return NULL;
 
 	return fdopen(fd, "w");
-}
-
-static void lu_dump_close(FILE *fp)
-{
-	fclose(fp);
 }
 
 static const char *lu_dump_state(const void *ctx, struct connection *conn)
