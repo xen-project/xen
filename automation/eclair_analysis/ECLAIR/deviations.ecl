@@ -122,6 +122,16 @@ it defines would (in the common case) be already defined. Peer reviewed by the c
 -config=MC3A2.R5.5,reports+={deliberate, "any_area(decl(kind(function))||any_loc(macro(name(memcpy||memset||memmove))))&&any_area(any_loc(file(^xen/common/libelf/libelf-private\\.h$)))"}
 -doc_end
 
+-doc_begin="Clashes between bitops functions and macro names are deliberate.
+These macros are needed for input validation and error handling."
+-config=MC3A2.R5.5,ignored_macros+="^(__)?(test|set|clear|change|test_and_(set|clear|change))_bit$"
+-doc_end
+
+-doc_begin="Clashes between grant table functions and macro names in 'xen/common/grant_table.c' are deliberate.
+These macros address differences in argument count during compile-time, effectively discarding unused parameters to avoid warnings or errors related to them."
+-config=MC3A2.R5.5,ignored_macros+="name(update_gnttab_par||parse_gnttab_limit)&&loc(file(^xen/common/grant_table\\.c$))"
+-doc_end
+
 -doc_begin="The type \"ret_t\" is deliberately defined multiple times,
 depending on the guest."
 -config=MC3A2.R5.6,reports+={deliberate,"any_area(any_loc(text(^.*ret_t.*$)))"}

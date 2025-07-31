@@ -153,6 +153,28 @@ Deviations related to MISRA C:2012 Rules:
        memmove.
      - Tagged as `deliberate` for ECLAIR.
 
+   * - R5.5
+     - Clashes between bitops ('__test_and_set_bit', '__test_and_clear_bit',
+       '__test_and_change_bit', 'test_bit', 'set_bit', 'clear_bit', 'change_bit',
+       'test_and_set_bit', 'test_and_clear_bit', 'test_and_change_bit')
+       functions and macro names are intentional. These are necessary for error
+       handling and input validation to ensure that the size of the object being
+       referenced by the memory address (passed as an argument to the macro)
+       meets the minimum requirements for the bit operation. This prevents unsafe
+       operations on improperly sized data types that could lead to undefined
+       behavior or memory corruption. The macros encapsulate this conditional
+       logic into a single, reusable form, simplifying the code and avoiding
+       function call overhead. Also this bit operations API was inherited from
+       Linux and should be kept for familiarity.
+     - ECLAIR has been configured to ignore these macros.
+
+   * - R5.5
+     - Clashes between grant table ('update_gnttab_par', 'parse_gnttab_limit')
+       functions and macro names are intentional. These macros address
+       differences in argument count during compile-time, effectively discarding
+       unused 2nd and 3rd parameters to avoid warnings or errors related to them.
+     - ECLAIR has been configured to ignore these macros.
+
    * - R5.6
      - The type ret_t is deliberately defined multiple times depending on the
        type of guest to service.

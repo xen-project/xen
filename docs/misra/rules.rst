@@ -205,6 +205,23 @@ maintainers if you want to suggest a change.
            #define f(x, y) f(x, y)
            void f(int x, int y);
 
+       Clashes between bitops functions and macro names are allowed
+       because they are used for input validation and error handling.
+       Example::
+
+           static inline void set_bit(int nr, volatile void *addr)
+           {
+               asm volatile ( "lock btsl %1,%0"
+                              : "+m" (ADDR) : "Ir" (nr) : "memory");
+           }
+           #define set_bit(nr, addr) ({                            \
+               if ( bitop_bad_size(addr) ) __bitop_bad_size();     \
+               set_bit(nr, addr);                                  \
+           })
+
+       Clashes between grant table functions and macro names are allowed
+       because they are used for discarding unused parameters.
+
    * - `Rule 5.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_05_06.c>`_
      - Required
      - A typedef name shall be a unique identifier
