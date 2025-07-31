@@ -49,7 +49,6 @@
 #include "control.h"
 #include "lu.h"
 
-extern xenevtchn_handle *xce_handle; /* in domain.c */
 static int xce_pollfd_idx = -1;
 struct pollfd *poll_fds;
 static unsigned int current_array_size;

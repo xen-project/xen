@@ -394,6 +394,8 @@ static inline bool domain_is_unprivileged(const struct connection *conn)
 	return conn && domid_is_unprivileged(conn->id);
 }
 
+extern xenevtchn_handle *xce_handle; /* in domain.c */
+
 /* Return the event channel used by xenbus. */
 evtchn_port_t get_xenbus_evtchn(void);
 void early_init(bool live_update, bool dofork, const char *pidfile);
@@ -407,6 +409,7 @@ int get_socket_fd(void);
 void set_socket_fd(int fd);
 
 xenevtchn_handle *evtchn_fdopen(int fd);
+int evtchn_rebind(int port);
 
 #ifdef __MINIOS__
 void mount_9pfs(void);

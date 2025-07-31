@@ -90,6 +90,11 @@ xenevtchn_handle *evtchn_fdopen(int fd)
 	return xenevtchn_open(NULL, XENEVTCHN_NO_CLOEXEC);
 }
 
+int evtchn_rebind(int port)
+{
+	return xenevtchn_bind(xce_handle, port);
+}
+
 static void mount_thread(void *p)
 {
 	xenbus_event_queue events = NULL;

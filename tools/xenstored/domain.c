@@ -862,9 +862,13 @@ static int new_domain(struct domain *domain, int port, bool restore)
 
 	wrl_domain_new(domain);
 
-	if (restore)
+	if (restore) {
+		if (evtchn_rebind(port)) {
+			errno = ENOMEM;
+			return errno;
+		}
 		domain->port = port;
-	else {
+	} else {
 		/* Tell kernel we're interested in this event. */
 		rc = xenevtchn_bind_interdomain(xce_handle, domain->domid,
 						port);

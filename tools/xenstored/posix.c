@@ -413,6 +413,11 @@ xenevtchn_handle *evtchn_fdopen(int fd)
 	return xenevtchn_fdopen(NULL, fd, 0);
 }
 
+int evtchn_rebind(int port)
+{
+	return 0;
+}
+
 const char *xenstore_rundir(void)
 {
 	return xenstore_daemon_rundir();
