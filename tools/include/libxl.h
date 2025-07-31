@@ -655,6 +655,12 @@
 #define LIBXL_HAVE_DT_OVERLAY_DOMAIN 1
 
 /*
+ * LIBXL_HAVE_XENSTORE_FEATURE_MASK indicates the presence of
+ * xenstore_feature_mask in struct libxl_domain_build_info.
+ */
+#define LIBXL_HAVE_XENSTORE_FEATURE_MASK 1
+
+/*
  * libxl memory management
  *
  * From the point of view of the application (ie, libxl's caller),

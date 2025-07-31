@@ -714,6 +714,42 @@ If this option is not specified then it will default to B<false>.
 
 =back
 
+=head3 Xenstore related settings
+
+=over 4
+
+=item B<xenstore_feature_mask=NUMBER>
+
+Specify which Xenstore features are visible for the guest.
+
+This might be needed when a guest should be able to be migrated to a host
+running a Xenstore implementation with less features than the one the guest
+is created on.
+
+The visible features are specified via a binary or of the following
+values:
+
+=over 4
+
+=item B<0x00000001>
+
+Xenstore is capable to reconnect to a guest.
+
+=item B<0x00000002>
+
+Xenstore will present an error value in case it disconnects due to an error
+condition.
+
+=back
+
+The features supported by the running Xenstore instance can be retrieved
+via the B<xl info> command in dom0.
+
+The default value is B<0xffffffff>, meaning that all possible Xenstore
+features are visible by the guest.
+
+=back
+
 =head2 Devices
 
 The following options define the paravirtual, emulated and physical

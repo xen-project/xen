@@ -1409,6 +1409,9 @@ void parse_config_data(const char *config_source,
     if (!xlu_cfg_get_string (config, "pool", &buf, 0))
         xlu_cfg_replace_string(config, "pool", &c_info->pool_name, 0);
 
+    if (!xlu_cfg_get_long (config, "xenstore_feature_mask", &l, 0))
+        b_info->xenstore_feature_mask = l;
+
     libxl_domain_build_info_init_type(b_info, c_info->type);
 
     if (b_info->type == LIBXL_DOMAIN_TYPE_PVH) {

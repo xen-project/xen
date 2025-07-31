@@ -608,6 +608,7 @@ Altp2MCount uint32
 VmtraceBufKb int
 Vpmu Defbool
 TrapUnmappedAccesses Defbool
+XenstoreFeatureMask uint32
 }
 
 type DomainBuildInfoTypeUnion interface {

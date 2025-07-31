@@ -739,6 +739,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
 
     ("vpmu", libxl_defbool),
     ("trap_unmapped_accesses", libxl_defbool),
+    ("xenstore_feature_mask", uint32, {'init_val': '~0U'}),
 
     ], dir=DIR_IN,
        copy_deprecated_fn="libxl__domain_build_info_copy_deprecated",

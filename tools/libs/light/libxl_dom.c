@@ -494,9 +494,24 @@ retry_transaction:
     if (!xs_transaction_end(ctx->xsh, t, 0))
         if (errno == EAGAIN)
             goto retry_transaction;
+
+    if (info->xenstore_feature_mask != ~0U) {
+        unsigned int features;
+
+        if (xs_get_features_supported(ctx->xsh, &features) &&
+            !xs_set_features_domain(ctx->xsh, domid,
+                                    features & info->xenstore_feature_mask)) {
+            LOGED(ERROR, domid, "Failed to set Xenstore features");
+            rc = ERROR_FAIL;
+            goto out;
+        }
+    }
+
     xs_introduce_domain(ctx->xsh, domid, state->store_mfn, state->store_port);
+
+ out:
     free(vm_path);
-    return 0;
+    return rc;
 }
 
 static int set_vnuma_info(libxl__gc *gc, uint32_t domid,
