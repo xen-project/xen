@@ -37,6 +37,7 @@
 #endif
 
 #include <xenstat.h>
+#include "pcpu.h"
 
 #define XENTOP_VERSION "1.0"
 
@@ -205,6 +206,7 @@ field_id sort_field = FIELD_DOMID;
 unsigned int first_domain_index = 0;
 unsigned int delay = 3;
 unsigned int batch = 0;
+static unsigned int show_pcpus = 0;
 unsigned int loop = 1;
 unsigned int iterations = 0;
 int show_vcpus = 0;
@@ -230,22 +232,23 @@ static WINDOW *cwin;
 /* Print usage message, using given program name */
 static void usage(const char *program)
 {
-	printf("Usage: %s [OPTION]\n"
-	       "Displays ongoing information about xen vm resources \n\n"
-	       "-h, --help           display this help and exit\n"
-	       "-V, --version        output version information and exit\n"
-	       "-d, --delay=SECONDS  seconds between updates (default 3)\n"
-	       "-n, --networks       output vif network data\n"
-	       "-x, --vbds           output vbd block device data\n"
-	       "-r, --repeat-header  repeat table header before each domain\n"
-	       "-v, --vcpus          output vcpu data\n"
-	       "-b, --batch	     output in batch mode, no user input accepted\n"
-	       "-i, --iterations     number of iterations before exiting\n"
-	       "-f, --full-name      output the full domain name (not truncated)\n"
-	       "-z, --dom0-first     display dom0 first (ignore sorting)\n"
-	       "\n" XENTOP_BUGSTO,
-	       program);
-	return;
+    printf("Usage: %s [OPTION]\n"
+           "Displays ongoing information about xen vm resources \n\n"
+           "-h, --help           display this help and exit\n"
+           "-V, --version        output version information and exit\n"
+           "-d, --delay=SECONDS  seconds between updates (default 3)\n"
+           "-n, --networks       output vif network data\n"
+           "-x, --vbds           output vbd block device data\n"
+           "-r, --repeat-header  repeat table header before each domain\n"
+           "-v, --vcpus          output vcpu data\n"
+           "-b, --batch          output in batch mode, no user input accepted\n"
+           "-p, --pcpus          show physical CPU stats\n"
+           "-i, --iterations     number of iterations before exiting\n"
+           "-f, --full-name      output the full domain name (not truncated)\n"
+           "-z, --dom0-first     display dom0 first (ignore sorting)\n"
+           "\n" XENTOP_BUGSTO,
+           program);
+    return;
 }
 
 /* Print program version information */
@@ -267,6 +270,8 @@ static void cleanup(void)
 		xenstat_free_node(cur_node);
 	if(xhandle != NULL)
 		xenstat_uninit(xhandle);
+
+	free_pcpu_stats();
 }
 
 /* Display the given message and gracefully exit */
@@ -311,6 +316,32 @@ static void print(const char *fmt, ...)
 		vprintf(fmt, args);
 		va_end(args);
 	}
+}
+
+/* PCPU statistics display function */
+static void print_pcpu_stats_display(void)
+{
+    int i;
+    int num_cpus;
+
+    if (!has_pcpu_data()) {
+        print("\nNo PCPU data available\n");
+        return;
+    }
+
+    num_cpus = get_pcpu_count();
+
+    /* Use the existing print() function which handles cursor bounds */
+    print("\nPhysical CPU Usage:\n");
+    print("+-------+--------+\n");
+    print("| Core  | Usage  |\n");
+    print("+-------+--------+\n");
+
+    for (i = 0; i < num_cpus; i++) {
+        print("| %-5d | %5.1f%% |\n", i, get_pcpu_usage(i));
+    }
+
+    print("+-------+--------+\n");
 }
 
 static void xentop_attron(int attr)
@@ -1245,6 +1276,14 @@ static void top(void)
 			do_vbd(domains[i]);
 	}
 
+    if (show_pcpus) {
+        if (update_pcpu_stats(&curtime, delay) == 0) {
+            print_pcpu_stats_display();
+        } else {
+            fail("Error getting PCPU stats\n");
+        }
+    }
+
 	if (!batch)
 		do_bottom_line();
 
@@ -1271,13 +1310,14 @@ int main(int argc, char **argv)
 		{ "repeat-header", no_argument,       NULL, 'r' },
 		{ "vcpus",         no_argument,       NULL, 'v' },
 		{ "delay",         required_argument, NULL, 'd' },
-		{ "batch",	   no_argument,	      NULL, 'b' },
+		{ "batch",         no_argument,	      NULL, 'b' },
+		{ "pcpus",         no_argument,       NULL, 'p' },
 		{ "iterations",	   required_argument, NULL, 'i' },
 		{ "full-name",     no_argument,       NULL, 'f' },
 		{ "dom0-first",    no_argument,       NULL, 'z' },
 		{ 0, 0, 0, 0 },
 	};
-	const char *sopts = "hVnxrvd:bi:fz";
+	const char *sopts = "hVnxrvd:bpi:fz";
 
 	if (atexit(cleanup) != 0)
 		fail("Failed to install cleanup handler.\n");
@@ -1311,6 +1351,9 @@ int main(int argc, char **argv)
 			break;
 		case 'b':
 			batch = 1;
+			break;
+		case 'p':
+			show_pcpus = 1;
 			break;
 		case 'i':
 			iterations = atoi(optarg);
