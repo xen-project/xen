@@ -21,9 +21,6 @@ enum {
 /* Cause xs_wire.h to give us xsd_errors[]. */
 #define EINVAL EINVAL
 
-#define __STR(...) #__VA_ARGS__
-#define STR(...) __STR(__VA_ARGS__)
-
 /* GDT selector values. */
 #define SEL_CODE16          0x0008
 #define SEL_DATA16          0x0010
