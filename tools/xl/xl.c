@@ -79,7 +79,7 @@ static int auto_autoballoon(void)
     int ret;
 
     info = libxl_get_version_info(ctx);
-    if (!info)
+    if (!info || !info->commandline)
         return 1; /* default to on */
 
 #define SIZE_PATTERN "-?[0-9]+[bBkKmMgGtT]?"
