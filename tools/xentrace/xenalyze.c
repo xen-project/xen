@@ -321,11 +321,10 @@ void parse_symbol_file(char *fn) {
             (*p)->next=NULL;
         }
 
-        /* FIXME -- use SYMBOL_NAME_SIZE */
         /* FIXME -- use regexp.  This won't work for symbols with spaces (yes they exist) */
         (*p)->symbols[(*p)->count].addr = 0xDEADBEEF;
-        if ( fscanf(symbol_file, "%llx %128s",
-               &(*p)->symbols[(*p)->count].addr,
+        if ( fscanf(symbol_file, "%llx %" STR(SYMBOL_NAME_SIZE) "s",
+                    &(*p)->symbols[(*p)->count].addr,
                     (*p)->symbols[(*p)->count].name) == 0 )
             break;
 
