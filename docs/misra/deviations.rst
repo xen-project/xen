@@ -353,6 +353,13 @@ Deviations related to MISRA C:2012 Rules:
        semantics that do not lead to unexpected behaviour.
      - Tagged as `safe` for ECLAIR.
 
+   * - R11.1
+     - The conversion from 'void noreturn (*)(...)' to 'void (*)(...)' is safe
+       because the semantics of the 'noreturn' attribute do not alter the calling
+       convention or behavior of the resulting code, parameters handling remain
+       consistent.
+     - Tagged as `safe` for ECLAIR.
+
    * - R11.2
      - The conversion from a pointer to an incomplete type to unsigned long
        does not lose any information, provided that the target type has enough

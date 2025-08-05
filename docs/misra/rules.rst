@@ -409,11 +409,12 @@ maintainers if you want to suggest a change.
 
    * - `Rule 11.1 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_11_01.c>`_
      - Required
-     - Conversions shall not be performed between a pointer to a
-       function and any other type
+     - Conversions shall not be performed between a pointer to a function
+       and any other type
      - All conversions to integer types are permitted if the destination
-       type has enough bits to hold the entire value. Conversions to
-       bool and void* are permitted.
+       type has enough bits to hold the entire value. Conversions to bool
+       and void* are permitted. Conversions from 'void noreturn (*)(...)'
+       to 'void (*)(...)' are permitted.
 
    * - `Rule 11.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_11_02.c>`_
      - Required
