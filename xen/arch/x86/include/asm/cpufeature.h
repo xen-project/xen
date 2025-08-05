@@ -91,8 +91,8 @@ struct cpuinfo_x86 {
 
 /*
  * @keep_basic set to true retains data firmly assumed to be symmetric
- * across all CPUs.  With it set to false only CPU_DATA_INIT() will be
- * invoked on the passed structure.
+ * across all CPUs.  Only CPU_DATA_INIT() will be invoked in that case
+ * on the passed structure.
  */
 void reset_cpuinfo(struct cpuinfo_x86 *c, bool keep_basic);
 
