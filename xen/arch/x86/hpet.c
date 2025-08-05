@@ -303,13 +303,6 @@ static unsigned int cf_check hpet_msi_startup(struct irq_desc *desc)
 
 #define hpet_msi_shutdown hpet_msi_mask
 
-static void cf_check hpet_msi_ack(struct irq_desc *desc)
-{
-    irq_complete_move(desc);
-    move_native_irq(desc);
-    ack_APIC_irq();
-}
-
 static void cf_check hpet_msi_set_affinity(
     struct irq_desc *desc, const cpumask_t *mask)
 {
@@ -337,7 +330,8 @@ static hw_irq_controller hpet_msi_type = {
     .shutdown   = hpet_msi_shutdown,
     .enable	    = hpet_msi_unmask,
     .disable    = hpet_msi_mask,
-    .ack        = hpet_msi_ack,
+    .ack        = ack_nonmaskable_msi_irq,
+    .end        = end_nonmaskable_irq,
     .set_affinity   = hpet_msi_set_affinity,
 };
 
