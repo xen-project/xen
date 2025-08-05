@@ -124,6 +124,15 @@ maintainers if you want to suggest a change.
            they are used to generate definitions for asm modules
          - Declarations without initializer are safe, as they are not
            executed
+         - Functions that are no-return due to calls to the `ASSERT_UNREACHABLE()'
+           macro in debug build configurations are not considered violations::
+
+              static inline bool
+              arch_vcpu_ioreq_completion(enum vio_completion completion)
+              {
+                  ASSERT_UNREACHABLE();
+                  return false;
+              }
 
    * - `Rule 2.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_02_06.c>`_
      - Advisory

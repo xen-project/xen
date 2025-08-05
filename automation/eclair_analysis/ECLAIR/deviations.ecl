@@ -36,6 +36,11 @@ not executable, and therefore it is safe for them to be unreachable."
 -config=MC3A2.R2.1,reports+={deliberate, "any_area(any_loc(file(C_runtime_failures)))"}
 -doc_end
 
+-doc_begin="Calls to function `__builtin_unreachable()' in the expansion of macro
+`ASSERT_UNREACHABLE()' are not considered to have the `noreturn' property."
+-call_properties+={"name(__builtin_unreachable)&&stmt(begin(any_exp(macro(name(ASSERT_UNREACHABLE)))))", {"noreturn(false)"}}
+-doc_end
+
 -doc_begin="Proving compliance with respect to Rule 2.2 is generally impossible:
 see https://arxiv.org/abs/2212.13933 for details. Moreover, peer review gives us
 confidence that no evidence of errors in the program's logic has been missed due

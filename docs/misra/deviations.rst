@@ -86,6 +86,17 @@ Deviations related to MISRA C:2012 Rules:
        generate definitions for asm modules.
      - Tagged as `deliberate` for ECLAIR.
 
+   * - R2.1
+     - Calls to the `__builtin_unreachable()` function inside the expansion of
+       the `ASSERT_UNREACHABLE()` macro may cause a function to be marked as
+       non-returning. This behavior occurs only in configurations where
+       assertions are enabled. To address this, the `noreturn` property for
+       `__builtin_unreachable()` is overridden in these contexts, resulting in
+       the absence of reports that do not have an impact on safety, despite
+       being true positives.
+       Xen expects developers to ensure code remains safe and reliable in builds,
+       even when debug-only assertions like `ASSERT_UNREACHABLE() are removed.
+
    * - R2.2
      - Proving compliance with respect to Rule 2.2 is generally impossible:
        see `<https://arxiv.org/abs/2212.13933>`_ for details. Moreover, peer
