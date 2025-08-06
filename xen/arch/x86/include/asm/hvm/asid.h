@@ -13,7 +13,7 @@ struct vcpu;
 struct hvm_vcpu_asid;
 
 /* Initialise ASID management for the current physical CPU. */
-void hvm_asid_init(int nasids);
+void hvm_asid_init(unsigned int nasids);
 
 /* Invalidate a particular ASID allocation: forces re-allocation. */
 void hvm_asid_flush_vcpu_asid(struct hvm_vcpu_asid *asid);

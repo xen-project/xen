@@ -12,7 +12,7 @@
 
 void svm_asid_init(const struct cpuinfo_x86 *c)
 {
-    int nasids = 0;
+    unsigned int nasids = 0;
 
     /* Check for erratum #170, and leave ASIDs disabled if it's present. */
     if ( !cpu_has_amd_erratum(c, AMD_ERRATUM_170) )
