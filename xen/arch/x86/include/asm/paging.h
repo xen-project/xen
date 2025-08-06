@@ -225,7 +225,6 @@ int paging_enable(struct domain *d, u32 mode);
 
 #define paging_get_hostmode(v)		((v)->arch.paging.mode)
 #define paging_get_nestedmode(v)	((v)->arch.paging.nestedmode)
-const struct paging_mode *paging_get_mode(struct vcpu *v);
 void paging_update_nestedmode(struct vcpu *v);
 
 /* Page fault handler

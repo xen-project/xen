@@ -946,14 +946,6 @@ void paging_dump_vcpu_info(struct vcpu *v)
     }
 }
 
-const struct paging_mode *paging_get_mode(struct vcpu *v)
-{
-    if (!nestedhvm_is_n2(v))
-        return paging_get_hostmode(v);
-
-    return paging_get_nestedmode(v);
-}
-
 #ifdef CONFIG_HVM
 void paging_update_nestedmode(struct vcpu *v)
 {
