@@ -109,6 +109,19 @@ int sbi_remote_hfence_gvma(const cpumask_t *cpu_mask, vaddr_t start,
                            size_t size);
 
 /*
+ * Instruct the remote harts to execute one or more HFENCE.GVMA
+ * instructions, covering the range of guest physical addresses
+ * in [start_addr, start_addr + size) only for the given VMID.
+ *
+ * @cpu_mask a cpu mask containing all the target CPUs (in Xen space).
+ * @param start virtual address start
+ * @param size virtual address range size
+ * @param vmid virtual machine id
+ */
+int sbi_remote_hfence_gvma_vmid(const cpumask_t *cpu_mask, vaddr_t start,
+                                size_t size, unsigned long vmid);
+
+/*
  * Initialize SBI library
  *
  * @return 0 on success, otherwise negative errno on failure

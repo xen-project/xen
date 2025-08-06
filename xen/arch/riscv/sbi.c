@@ -265,6 +265,13 @@ int sbi_remote_hfence_gvma(const cpumask_t *cpu_mask, vaddr_t start,
                       cpu_mask, start, size, 0, 0);
 }
 
+int sbi_remote_hfence_gvma_vmid(const cpumask_t *cpu_mask, vaddr_t start,
+                                size_t size, unsigned long vmid)
+{
+    return sbi_rfence(SBI_EXT_RFENCE_REMOTE_HFENCE_GVMA_VMID,
+                      cpu_mask, start, size, vmid, 0);
+}
+
 /* This function must always succeed. */
 #define sbi_get_spec_version()  \
     sbi_ext_base_func(SBI_EXT_BASE_GET_SPEC_VERSION)
