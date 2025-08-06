@@ -90,6 +90,25 @@ int sbi_remote_sfence_vma(const cpumask_t *cpu_mask, vaddr_t start,
                           size_t size);
 
 /*
+ * Instruct the remote harts to execute one or more HFENCE.GVMA
+ * instructions, covering the range of guest physical addresses
+ * in [start_addr, start_addr + size) for all VMIDs.
+ *
+ * Returns 0 if IPI was sent to all the targeted harts successfully
+ * or negative value if start_addr or size is not valid.
+ *
+ * The remote fence operation applies to the entire address space if either:
+ *  - start_addr and size are both 0, or
+ *  - size is equal to 2^XLEN-1.
+ *
+ * @cpu_mask a cpu mask containing all the target CPUs (in Xen space).
+ * @param start virtual address start
+ * @param size virtual address range size
+ */
+int sbi_remote_hfence_gvma(const cpumask_t *cpu_mask, vaddr_t start,
+                           size_t size);
+
+/*
  * Initialize SBI library
  *
  * @return 0 on success, otherwise negative errno on failure
