@@ -1267,12 +1267,12 @@ void console_end_sync(void)
  * This enforces a rate limit: not more than one kernel message
  * every printk_ratelimit_ms (millisecs).
  */
-int __printk_ratelimit(int ratelimit_ms, int ratelimit_burst)
+int __printk_ratelimit(unsigned int ratelimit_ms, unsigned int ratelimit_burst)
 {
     static DEFINE_SPINLOCK(ratelimit_lock);
     static unsigned long toks = 10 * 5 * 1000;
     static unsigned long last_msg;
-    static int missed;
+    static unsigned int missed;
     unsigned long flags;
     unsigned long long now = NOW(); /* ns */
     unsigned long ms;
@@ -1287,14 +1287,16 @@ int __printk_ratelimit(int ratelimit_ms, int ratelimit_burst)
         toks = ratelimit_burst * ratelimit_ms;
     if ( toks >= ratelimit_ms )
     {
-        int lost = missed;
+        unsigned int lost = missed;
+
         missed = 0;
         toks -= ratelimit_ms;
         spin_unlock(&ratelimit_lock);
         if ( lost )
         {
-            char lost_str[8];
-            snprintf(lost_str, sizeof(lost_str), "%d", lost);
+            char lost_str[10];
+
+            snprintf(lost_str, sizeof(lost_str), "%u", lost);
             /* console_lock may already be acquired by printk(). */
             rspin_lock(&console_lock);
             printk_start_of_line(CONSOLE_PREFIX);
@@ -1311,11 +1313,11 @@ int __printk_ratelimit(int ratelimit_ms, int ratelimit_burst)
     return 0;
 }
 
-/* minimum time in ms between messages */
-static int __read_mostly printk_ratelimit_ms = 5 * 1000;
+/* Minimum time in ms between messages */
+static const unsigned int printk_ratelimit_ms = 5 * 1000;
 
-/* number of messages we send before ratelimiting */
-static int __read_mostly printk_ratelimit_burst = 10;
+/* Number of messages we send before ratelimiting */
+static const unsigned int printk_ratelimit_burst = 10;
 
 int printk_ratelimit(void)
 {
