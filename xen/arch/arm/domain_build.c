@@ -249,7 +249,7 @@ fail:
  *
  * We first allocate the largest allocation we can as low as we
  * can. This then becomes the first bank. This bank must be at least
- * 128MB (or dom0_mem if that is smaller).
+ * 128MB (or memory size requested for domain if that is smaller).
  *
  * Then we start allocating more memory, trying to allocate the
  * largest possible size and trying smaller sizes until we
@@ -278,7 +278,7 @@ static void __init allocate_memory_11(struct domain *d,
                                       struct kernel_info *kinfo)
 {
     const unsigned int min_low_order =
-        get_order_from_bytes(min_t(paddr_t, dom0_mem, MB(128)));
+        get_order_from_bytes(min_t(paddr_t, kinfo->unassigned_mem, MB(128)));
     const unsigned int min_order = get_order_from_bytes(MB(4));
     struct membanks *mem = kernel_info_get_mem(kinfo);
     struct page_info *pg;
