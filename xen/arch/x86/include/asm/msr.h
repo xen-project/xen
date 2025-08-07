@@ -39,8 +39,10 @@ static inline void wrmsrl(unsigned int msr, uint64_t val)
 }
 
 /* Non-serialising WRMSR, when available.  Falls back to a serialising WRMSR. */
-static inline void wrmsr_ns(uint32_t msr, uint32_t lo, uint32_t hi)
+static inline void wrmsrns(uint32_t msr, uint64_t val)
 {
+    uint32_t lo = val, hi = val >> 32;
+
     /*
      * WRMSR is 2 bytes.  WRMSRNS is 3 bytes.  Pad WRMSR with a redundant CS
      * prefix to avoid a trailing NOP.

@@ -72,14 +72,14 @@ static inline void wrpkrs(uint32_t pkrs)
     {
         *this_pkrs = pkrs;
 
-        wrmsr_ns(MSR_PKRS, pkrs, 0);
+        wrmsrns(MSR_PKRS, pkrs);
     }
 }
 
 static inline void wrpkrs_and_cache(uint32_t pkrs)
 {
     this_cpu(pkrs) = pkrs;
-    wrmsr_ns(MSR_PKRS, pkrs, 0);
+    wrmsrns(MSR_PKRS, pkrs);
 }
 
 #endif /* ASM_PROT_KEY_H */
