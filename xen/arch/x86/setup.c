@@ -1126,7 +1126,7 @@ void asmlinkage __init noreturn __start_xen(void)
 
     /* Critical region without exception handling.  Any fault is deadly! */
 
-    init_shadow_spec_ctrl_state();
+    init_shadow_spec_ctrl_state(info);
 
     percpu_init_areas();
 

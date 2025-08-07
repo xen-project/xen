@@ -332,7 +332,7 @@ void asmlinkage start_secondary(void)
     set_current(idle_vcpu[cpu]);
     this_cpu(curr_vcpu) = idle_vcpu[cpu];
     rdmsrl(MSR_EFER, this_cpu(efer));
-    init_shadow_spec_ctrl_state();
+    init_shadow_spec_ctrl_state(info);
 
     /*
      * Just as during early bootstrap, it is convenient here to disable

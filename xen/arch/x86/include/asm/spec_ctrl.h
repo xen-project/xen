@@ -99,10 +99,8 @@ extern bool opt_bp_spec_reduce;
  */
 extern paddr_t l1tf_addr_mask, l1tf_safe_maddr;
 
-static inline void init_shadow_spec_ctrl_state(void)
+static inline void init_shadow_spec_ctrl_state(struct cpu_info *info)
 {
-    struct cpu_info *info = get_cpu_info();
-
     info->shadow_spec_ctrl = 0;
     info->xen_spec_ctrl = default_xen_spec_ctrl;
     info->scf = default_scf;

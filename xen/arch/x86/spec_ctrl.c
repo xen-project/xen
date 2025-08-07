@@ -2226,7 +2226,7 @@ void __init init_speculation_mitigations(void)
         opt_eager_fpu = should_use_eager_fpu();
 
     /* (Re)init BSP state now that default_scf has been calculated. */
-    init_shadow_spec_ctrl_state();
+    init_shadow_spec_ctrl_state(get_cpu_info());
 
     /*
      * For microcoded IBRS only (i.e. Intel, pre eIBRS), it is recommended to
