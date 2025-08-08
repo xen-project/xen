@@ -1993,8 +1993,6 @@ _hidden char *libxl__cpupoolid_to_name(libxl__gc *gc, uint32_t poolid);
 _hidden int libxl__enum_from_string(const libxl_enum_string_table *t,
                                     const char *s, int *e) NN(2);
 
-_hidden yajl_gen_status libxl__yajl_gen_asciiz(yajl_gen hand, const char *str);
-
 _hidden yajl_gen_status libxl__string_gen_json(yajl_gen hand, const char *p);
 
 typedef yajl_gen_status (*libxl__gen_json_callback)(yajl_gen hand, void *);
