@@ -310,6 +310,9 @@ extern void printf_info_sexp(int domid, libxl_domain_config *d_config, FILE *fh)
 extern void apply_global_affinity_masks(libxl_domain_type type,
                                         libxl_bitmap *vcpu_affinity_array,
                                         unsigned int size);
+void printf_info(enum output_format output_format,
+                 int domid,
+                 libxl_domain_config *d_config, FILE *fh);
 
 #define XL_GLOBAL_CONFIG XEN_CONFIG_DIR "/xl.conf"
 #define XL_LOCK_FILE XEN_LOCK_DIR "/xl"

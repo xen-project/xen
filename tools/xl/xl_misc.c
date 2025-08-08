@@ -256,9 +256,6 @@ int main_dump_core(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
-extern void printf_info(enum output_format output_format,
-                        int domid,
-                        libxl_domain_config *d_config, FILE *fh);
 int main_config_update(int argc, char **argv)
 {
     uint32_t domid;

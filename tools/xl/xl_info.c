@@ -98,9 +98,6 @@ out:
 
 void printf_info(enum output_format output_format,
                  int domid,
-                 libxl_domain_config *d_config, FILE *fh);
-void printf_info(enum output_format output_format,
-                 int domid,
                  libxl_domain_config *d_config, FILE *fh)
 {
     if (output_format == OUTPUT_FORMAT_SXP)
