@@ -9,6 +9,7 @@
 
 void bsp_early_traps_init(void);
 void traps_init(void);
+void bsp_traps_reinit(void);
 void percpu_traps_init(void);
 
 extern unsigned int ler_msr;

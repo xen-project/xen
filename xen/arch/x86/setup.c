@@ -902,11 +902,7 @@ static void __init noreturn reinit_bsp_stack(void)
     unsigned long *stack = (void*)(get_stack_bottom() & ~(STACK_SIZE - 1));
     int rc;
 
-    /* Update TSS and ISTs */
-    load_system_tables();
-
-    /* Update SYSCALL trampolines */
-    percpu_traps_init();
+    bsp_traps_reinit();
 
     stack_base[0] = stack;
 

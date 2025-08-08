@@ -108,6 +108,15 @@ void __init traps_init(void)
 }
 
 /*
+ * Re-initialise all state referencing the early-boot stack.
+ */
+void __init bsp_traps_reinit(void)
+{
+    load_system_tables();
+    percpu_traps_init();
+}
+
+/*
  * Set up per-CPU linkage registers for exception, interrupt and syscall
  * handling.
  */
