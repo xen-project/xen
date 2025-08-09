@@ -1,0 +1,23 @@
+GCC-14 in Debian Trixie i386 complains:
+
+../../../../newlib-1.16.0/libgloss/i386/cygmon-gmon.c: In function '_mcount':
+../../../../newlib-1.16.0/libgloss/i386/cygmon-gmon.c:227:14: error: type defaults to 'int' in declaration of '_etext' [-Wimplicit-int]
+  227 |       extern _etext();
+      |              ^~~~~~
+../../../../newlib-1.16.0/libgloss/i386/cygmon-gmon.c:228:14: error: type defaults to 'int' in declaration of '_ftext' [-Wimplicit-int]
+  228 |       extern _ftext();
+      |              ^~~~~~
+
+--- newlib-1.16.0/libgloss/i386/cygmon-gmon.c.orig	2025-08-09 22:48:09.864068481 +0100
++++ newlib-1.16.0/libgloss/i386/cygmon-gmon.c	2025-08-09 22:52:18.458393484 +0100
+@@ -224,8 +224,8 @@
+ 
+   if (! already_setup) 
+     {
+-      extern _etext();
+-      extern _ftext();
++      extern char _etext[];
++      extern char _ftext[];
+       already_setup = 1;
+       monstartup(_ftext, _etext);
+       atexit(_mcleanup);
