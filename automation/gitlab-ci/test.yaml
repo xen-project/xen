@@ -90,7 +90,7 @@
 .qemu-ppc64le:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:12-ppc64le
+    CONTAINER: debian:13-ppc64le
     LOGFILE: qemu-smoke-ppc64le.log
   artifacts:
     paths:
@@ -712,4 +712,4 @@ qemu-smoke-ppc64le-powernv9-gcc:
   script:
     - ./automation/scripts/qemu-smoke-ppc64le.sh powernv9 2>&1 | tee ${LOGFILE}
   needs:
-    - debian-12-ppc64le-gcc-debug
+    - debian-13-ppc64le-gcc-debug
