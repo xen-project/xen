@@ -705,7 +705,7 @@ qemu-smoke-riscv64-gcc:
   script:
     - ./automation/scripts/qemu-smoke-riscv64.sh 2>&1 | tee ${LOGFILE}
   needs:
-    - debian-12-riscv64-gcc-debug
+    - debian-13-riscv64-gcc-debug
 
 qemu-smoke-ppc64le-powernv9-gcc:
   extends: .qemu-ppc64le

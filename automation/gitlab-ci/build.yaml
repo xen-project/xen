@@ -329,10 +329,10 @@ debian-12-ppc64le-gcc-debug:
       CONFIG_UBSAN=y
       CONFIG_UBSAN_FATAL=y
 
-debian-12-riscv64-gcc-debug:
+debian-13-riscv64-gcc-debug:
   extends: .gcc-riscv64-cross-build-debug
   variables:
-    CONTAINER: debian:12-riscv64
+    CONTAINER: debian:13-riscv64
     KBUILD_DEFCONFIG: tiny64_defconfig
     HYPERVISOR_ONLY: y
     EXTRA_XEN_CONFIG: |
@@ -713,6 +713,20 @@ debian-12-riscv64-gcc:
     KBUILD_DEFCONFIG: tiny64_defconfig
     HYPERVISOR_ONLY: y
 
+debian-12-riscv64-gcc-debug:
+  extends: .gcc-riscv64-cross-build-debug
+  variables:
+    CONTAINER: debian:12-riscv64
+    KBUILD_DEFCONFIG: tiny64_defconfig
+    HYPERVISOR_ONLY: y
+
+debian-13-riscv64-gcc:
+  extends: .gcc-riscv64-cross-build
+  variables:
+    CONTAINER: debian:13-riscv64
+    KBUILD_DEFCONFIG: tiny64_defconfig
+    HYPERVISOR_ONLY: y
+
 .riscv-fixed-randconfig:
   variables: &riscv-fixed-randconfig
     EXTRA_FIXED_RANDCONFIG: |
@@ -725,10 +739,10 @@ debian-12-riscv64-gcc:
       CONFIG_VM_EVENT=n
       CONFIG_XSM=n
 
-debian-12-riscv64-gcc-randconfig:
+debian-13-riscv64-gcc-randconfig:
   extends: .gcc-riscv64-cross-build
   variables:
-    CONTAINER: debian:12-riscv64
+    CONTAINER: debian:13-riscv64
     KBUILD_DEFCONFIG: tiny64_defconfig
     RANDCONFIG: y
     <<: *riscv-fixed-randconfig
