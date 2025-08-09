@@ -59,7 +59,7 @@
 .qemu-x86-64:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:12-x86_64
+    CONTAINER: debian:13-x86_64
     LOGFILE: qemu-smoke-x86-64.log
   artifacts:
     paths:
@@ -661,35 +661,35 @@ qemu-smoke-x86-64-gcc:
   script:
     - ./automation/scripts/qemu-xtf.sh x86-64 pv64 example 2>&1 | tee ${LOGFILE}
   needs:
-    - debian-12-x86_64-gcc-debug
+    - debian-13-x86_64-gcc-debug
 
 qemu-smoke-x86-64-clang:
   extends: .qemu-smoke-x86-64
   script:
     - ./automation/scripts/qemu-xtf.sh x86-64 pv64 example 2>&1 | tee ${LOGFILE}
   needs:
-    - debian-12-x86_64-clang-debug
+    - debian-13-x86_64-clang-debug
 
 qemu-smoke-x86-64-gcc-pvh:
   extends: .qemu-smoke-x86-64
   script:
     - ./automation/scripts/qemu-xtf.sh x86-64 hvm64 example 2>&1 | tee ${LOGFILE}
   needs:
-    - debian-12-x86_64-gcc-debug
+    - debian-13-x86_64-gcc-debug
 
 qemu-smoke-x86-64-clang-pvh:
   extends: .qemu-smoke-x86-64
   script:
     - ./automation/scripts/qemu-xtf.sh x86-64 hvm64 example 2>&1 | tee ${LOGFILE}
   needs:
-    - debian-12-x86_64-clang-debug
+    - debian-13-x86_64-clang-debug
 
 qemu-smoke-x86-64-gcc-efi:
   extends: .qemu-smoke-x86-64
   script:
     - ./automation/scripts/qemu-xtf.sh x86-64-efi pv64 example 2>&1 | tee ${LOGFILE}
   needs:
-    - debian-12-x86_64-gcc-debug
+    - debian-13-x86_64-gcc-debug
 
 qemu-xtf-argo-x86_64-gcc-debug:
   extends: .qemu-smoke-x86-64

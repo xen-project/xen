@@ -309,15 +309,15 @@ alpine-3.18-gcc-debug:
       CONFIG_UCODE_SCAN_DEFAULT=y
       CONFIG_XHCI=y
 
-debian-12-x86_64-gcc-debug:
+debian-13-x86_64-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: debian:12-x86_64
+    CONTAINER: debian:13-x86_64
 
-debian-12-x86_64-clang-debug:
+debian-13-x86_64-clang-debug:
   extends: .clang-x86-64-build-debug
   variables:
-    CONTAINER: debian:12-x86_64
+    CONTAINER: debian:13-x86_64
 
 debian-13-ppc64le-gcc-debug:
   extends: .gcc-ppc64le-cross-build-debug
@@ -545,24 +545,20 @@ debian-12-x86_64-clang:
   variables:
     CONTAINER: debian:12-x86_64
 
-debian-12-x86_64-clang-randconfig:
-  extends: .clang-x86-64-build
+debian-12-x86_64-clang-debug:
+  extends: .clang-x86-64-build-debug
   variables:
     CONTAINER: debian:12-x86_64
-    RANDCONFIG: y
-    EXTRA_FIXED_RANDCONFIG: |
-      CONFIG_COVERAGE=n # Disable coverage otherwise build times out.
 
 debian-12-x86_64-gcc:
   extends: .gcc-x86-64-build
   variables:
     CONTAINER: debian:12-x86_64
 
-debian-12-x86_64-gcc-randconfig:
-  extends: .gcc-x86-64-build
+debian-12-x86_64-gcc-debug:
+  extends: .gcc-x86-64-build-debug
   variables:
     CONTAINER: debian:12-x86_64
-    RANDCONFIG: y
 
 debian-12-x86_32-clang-debug:
   extends: .clang-x86-32-build-debug
@@ -573,6 +569,40 @@ debian-12-x86_32-gcc-debug:
   extends: .gcc-x86-32-build-debug
   variables:
     CONTAINER: debian:12-x86_32
+
+debian-13-x86_64-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: debian:13-x86_64
+
+debian-13-x86_64-clang-randconfig:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: debian:13-x86_64
+    RANDCONFIG: y
+    EXTRA_FIXED_RANDCONFIG: |
+      CONFIG_COVERAGE=n # Disable coverage otherwise build times out.
+
+debian-13-x86_64-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: debian:13-x86_64
+
+debian-13-x86_64-gcc-randconfig:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: debian:13-x86_64
+    RANDCONFIG: y
+
+debian-13-x86_32-clang-debug:
+  extends: .clang-x86-32-build-debug
+  variables:
+    CONTAINER: debian:13-x86_32
+
+debian-13-x86_32-gcc-debug:
+  extends: .gcc-x86-32-build-debug
+  variables:
+    CONTAINER: debian:13-x86_32
 
 fedora-41-x86_64-gcc:
   extends: .gcc-x86-64-build
