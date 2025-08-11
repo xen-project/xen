@@ -11,6 +11,7 @@
 
 #include <asm/debugreg.h>
 #include <asm/fsgsbase.h>
+#include <asm/traps.h>
 
 long do_set_debugreg(int reg, unsigned long value)
 {
@@ -192,11 +193,13 @@ long do_set_segment_base(unsigned int which, unsigned long base)
 
         case SEGBASE_GS_USER:
             v->arch.pv.gs_base_user = base;
-            write_gs_shadow(base);
-            break;
-
+            fallthrough;
         case SEGBASE_GS_KERNEL:
-            write_gs_base(base);
+            /* Under FRED, GS is automatically swapped on privilege change. */
+            if ( (which == SEGBASE_GS_KERNEL) ^ opt_fred )
+                write_gs_base(base);
+            else
+                write_gs_shadow(base);
             break;
         }
         break;
@@ -206,10 +209,13 @@ long do_set_segment_base(unsigned int which, unsigned long base)
         unsigned int sel = (uint16_t)base;
 
         /*
-         * We wish to update the user %gs from the GDT/LDT.  Currently, the
-         * guest kernel's GS_BASE is in context.
+         * We wish to update the user %gs from the GDT/LDT.  Currently, we are
+         * in guest kernel context.
+         *
+         * Under IDT, this means updating GS_SHADOW.  Under FRED, plain GS.
          */
-        asm volatile ( "swapgs" );
+        if ( !opt_fred )
+            asm volatile ( "swapgs" );
 
         if ( sel > 3 )
             /* Fix up RPL for non-NUL selectors. */
@@ -247,7 +253,8 @@ long do_set_segment_base(unsigned int which, unsigned long base)
         /* Update the cache of the inactive base, as read from the GDT/LDT. */
         v->arch.pv.gs_base_user = read_gs_base();
 
-        asm volatile ( safe_swapgs );
+        if ( !opt_fred )
+            asm volatile ( safe_swapgs );
         break;
     }
 
