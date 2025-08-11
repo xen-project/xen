@@ -28,5 +28,16 @@ config FFA
 
 	  [1] https://developer.arm.com/documentation/den0077/latest
 
+config FFA_VM_TO_VM
+    bool "Enable FF-A between VMs (UNSUPPORTED)" if UNSUPPORTED
+    default n
+    depends on FFA
+    help
+      This option enables to use FF-A between VMs.
+      This is experimental and there is no access control so any
+      guest can communicate with any other guest.
+
+      If unsure, say N.
+
 endmenu
 

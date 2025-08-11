@@ -118,10 +118,18 @@ void *ffa_tx __read_mostly;
 DEFINE_SPINLOCK(ffa_rx_buffer_lock);
 DEFINE_SPINLOCK(ffa_tx_buffer_lock);
 
+LIST_HEAD(ffa_ctx_head);
+/* RW Lock to protect addition/removal and reading in ffa_ctx_head */
+DEFINE_RWLOCK(ffa_ctx_list_rwlock);
+
+#ifdef CONFIG_FFA_VM_TO_VM
+atomic_t ffa_vm_count;
+#endif
 
 /* Used to track domains that could not be torn down immediately. */
 static struct timer ffa_teardown_timer;
-static struct list_head ffa_teardown_head;
+
+static LIST_HEAD(ffa_teardown_head);
 static DEFINE_SPINLOCK(ffa_teardown_lock);
 
 static bool ffa_get_version(uint32_t *vers)
@@ -151,6 +159,7 @@ static void handle_version(struct cpu_user_regs *regs)
     struct domain *d = current->domain;
     struct ffa_ctx *ctx = d->arch.tee;
     uint32_t vers = get_user_reg(regs, 1);
+    uint32_t old_vers;
 
     /*
      * Guest will use the version it requested if it is our major and minor
@@ -160,10 +169,23 @@ static void handle_version(struct cpu_user_regs *regs)
      */
     if ( FFA_VERSION_MAJOR(vers) == FFA_MY_VERSION_MAJOR )
     {
+        spin_lock(&ctx->lock);
+        old_vers = ctx->guest_vers;
+
         if ( FFA_VERSION_MINOR(vers) > FFA_MY_VERSION_MINOR )
             ctx->guest_vers = FFA_MY_VERSION;
         else
             ctx->guest_vers = vers;
+        spin_unlock(&ctx->lock);
+
+        if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) && !old_vers )
+        {
+            /* One more VM with FF-A support available */
+            inc_ffa_vm_count();
+            write_lock(&ffa_ctx_list_rwlock);
+            list_add_tail(&ctx->ctx_list, &ffa_ctx_head);
+            write_unlock(&ffa_ctx_list_rwlock);
+        }
     }
     ffa_set_regs(regs, FFA_MY_VERSION, 0, 0, 0, 0, 0, 0, 0);
 }
@@ -345,6 +367,10 @@ static int ffa_domain_init(struct domain *d)
     ctx->teardown_d = d;
     INIT_LIST_HEAD(&ctx->shm_list);
 
+    ctx->ffa_id = ffa_get_vm_id(d);
+    ctx->num_vcpus = d->max_vcpus;
+    ctx->is_64bit = is_64bit_domain(d);
+
     /*
      * ffa_domain_teardown() will be called if ffa_domain_init() returns an
      * error, so no need for cleanup in this function.
@@ -421,6 +447,14 @@ static int ffa_domain_teardown(struct domain *d)
     if ( !ctx )
         return 0;
 
+    if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) && ctx->guest_vers )
+    {
+        dec_ffa_vm_count();
+        write_lock(&ffa_ctx_list_rwlock);
+        list_del(&ctx->ctx_list);
+        write_unlock(&ffa_ctx_list_rwlock);
+    }
+
     ffa_rxtx_domain_destroy(d);
     ffa_notif_domain_destroy(d);
 
@@ -464,6 +498,18 @@ static bool ffa_probe(void)
     printk(XENLOG_INFO "ARM FF-A Mediator version %u.%u\n",
            FFA_MY_VERSION_MAJOR, FFA_MY_VERSION_MINOR);
 
+    if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) )
+    {
+        /*
+         * When FFA VM to VM is enabled, the current implementation does not
+         * offer any way to limit which VM can communicate with which VM using
+         * FF-A.
+         * Signal this in the xen console and taint the system as insecure.
+         * TODO: Introduce a solution to limit what a VM can do through FFA.
+         */
+        printk(XENLOG_ERR "ffa: VM to VM is enabled, system is insecure !!\n");
+        add_taint(TAINT_MACHINE_INSECURE);
+    }
     /*
      * psci_init_smccc() updates this value with what's reported by EL-3
      * or secure world.
@@ -537,7 +583,6 @@ static bool ffa_probe(void)
         goto err_rxtx_destroy;
 
     ffa_notif_init();
-    INIT_LIST_HEAD(&ffa_teardown_head);
     init_timer(&ffa_teardown_timer, ffa_teardown_timer_callback, NULL, 0);
 
     return true;

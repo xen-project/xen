@@ -150,6 +150,73 @@ out:
     return ret;
 }
 
+static int32_t ffa_get_vm_partinfo(uint32_t *vm_count, void *dst_buf,
+                                   void *end_buf, uint32_t dst_size)
+{
+    struct ffa_ctx *curr_ctx = current->domain->arch.tee;
+    struct ffa_ctx *dest_ctx;
+    uint32_t count = 0;
+    int32_t ret = FFA_RET_OK;
+
+    /*
+     * There could potentially be a lot of VMs in the system and we could
+     * hold the CPU for long here.
+     * Right now there is no solution in FF-A specification to split
+     * the work in this case.
+     * TODO: Check how we could delay the work or have preemption checks.
+     */
+    read_lock(&ffa_ctx_list_rwlock);
+    list_for_each_entry(dest_ctx, &ffa_ctx_head, ctx_list)
+    {
+        /*
+         * Do not include an entry for the caller VM as the spec is not
+         * clearly mandating it and it is not supported by Linux.
+         */
+        if ( dest_ctx != curr_ctx )
+        {
+            /*
+             * We do not have UUID info for VMs so use
+             * the 1.0 structure so that we set UUIDs to
+             * zero using memset
+             */
+            struct ffa_partition_info_1_0 info;
+
+            if  ( dst_buf > (end_buf - dst_size) )
+            {
+                ret = FFA_RET_NO_MEMORY;
+                goto out;
+            }
+
+            /*
+             * Context might has been removed since we go it or being removed
+             * right now so we might return information for a VM not existing
+             * anymore. This is acceptable as we return a view of the system
+             * which could change at any time.
+             */
+            info.id = dest_ctx->ffa_id;
+            info.execution_context = dest_ctx->num_vcpus;
+            info.partition_properties = FFA_PART_VM_PROP;
+            if ( dest_ctx->is_64bit )
+                info.partition_properties |= FFA_PART_PROP_AARCH64_STATE;
+
+            memcpy(dst_buf, &info, MIN(sizeof(info), dst_size));
+
+            if ( dst_size > sizeof(info) )
+                memset(dst_buf + sizeof(info), 0,
+                       dst_size - sizeof(info));
+
+            dst_buf += dst_size;
+            count++;
+        }
+    }
+    *vm_count = count;
+
+out:
+    read_unlock(&ffa_ctx_list_rwlock);
+
+    return ret;
+}
+
 void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
 {
     int32_t ret = FFA_RET_OK;
@@ -164,7 +231,7 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
     };
     uint32_t dst_size = 0;
     void *dst_buf, *end_buf;
-    uint32_t ffa_sp_count = 0;
+    uint32_t ffa_vm_count = 0, ffa_sp_count = 0;
 
     /*
      * If the guest is v1.0, he does not get back the entry size so we must
@@ -191,15 +258,18 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
         }
 
         if ( ffa_fw_supports_fid(FFA_PARTITION_INFO_GET) )
+        {
             ret = ffa_get_sp_count(uuid, &ffa_sp_count);
+            if ( ret )
+                goto out;
+        }
 
-        goto out;
-    }
+        /*
+         * Do not count the caller VM as the spec is not clearly mandating it
+         * and it is not supported by Linux.
+         */
+        ffa_vm_count = get_ffa_vm_count() - 1;
 
-    if ( !ffa_fw_supports_fid(FFA_PARTITION_INFO_GET) )
-    {
-        /* Just give an empty partition list to the caller */
-        ret = FFA_RET_OK;
         goto out;
     }
 
@@ -224,9 +294,19 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
         goto out_rx_release;
     }
 
-    ret = ffa_get_sp_partinfo(uuid, &ffa_sp_count, dst_buf, end_buf,
-                              dst_size);
+    if ( ffa_fw_supports_fid(FFA_PARTITION_INFO_GET) )
+    {
+        ret = ffa_get_sp_partinfo(uuid, &ffa_sp_count, dst_buf, end_buf,
+                                  dst_size);
 
+        if ( ret )
+            goto out_rx_release;
+
+        dst_buf += ffa_sp_count * dst_size;
+    }
+
+    if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) )
+        ret = ffa_get_vm_partinfo(&ffa_vm_count, dst_buf, end_buf, dst_size);
 
 out_rx_release:
     if ( ret )
@@ -235,7 +315,7 @@ out:
     if ( ret )
         ffa_set_regs_error(regs, ret);
     else
-        ffa_set_regs_success(regs, ffa_sp_count, dst_size);
+        ffa_set_regs_success(regs, ffa_sp_count + ffa_vm_count, dst_size);
 }
 
 static int32_t ffa_direct_req_send_vm(uint16_t sp_id, uint16_t vm_id,

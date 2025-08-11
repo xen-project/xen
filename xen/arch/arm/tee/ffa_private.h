@@ -195,6 +195,18 @@
  */
 #define FFA_PARTITION_INFO_GET_COUNT_FLAG BIT(0, U)
 
+/*
+ * Partition properties we give for a normal world VM:
+ * - can send direct message but not receive them
+ * - can handle indirect messages
+ * - can receive notifications
+ * 32/64 bit flag is set depending on the VM
+ */
+#define FFA_PART_VM_PROP    (FFA_PART_PROP_DIRECT_REQ_SEND | \
+                             FFA_PART_PROP_INDIRECT_MSGS | \
+                             FFA_PART_PROP_RECV_NOTIF | \
+                             FFA_PART_PROP_IS_PE_ID)
+
 /* Flags used in calls to FFA_NOTIFICATION_GET interface  */
 #define FFA_NOTIF_FLAG_BITMAP_SP        BIT(0, U)
 #define FFA_NOTIF_FLAG_BITMAP_VM        BIT(1, U)
@@ -297,36 +309,72 @@ struct ffa_ctx_notif {
 };
 
 struct ffa_ctx {
-    void *rx;
-    const void *tx;
-    struct page_info *rx_pg;
-    struct page_info *tx_pg;
+    /*
+     * Chain list of all FF-A contexts.
+     * As we might have several read from the list of context through parallel
+     * partinfo_get but fewer additions/removal as those happen only during a
+     * version negotiation or guest shutdown, access to this list is protected
+     * through a rwlock (addition/removal with write lock, reading through a
+     * read lock).
+     */
+    struct list_head ctx_list; /* chain list of all FF-A contexts */
+
+    /*
+     * Data access unlocked (mainly for part_info_get in VM to VM).
+     * Those should be set before the ctx is added in the list.
+     */
+    /* FF-A Endpoint ID */
+    uint16_t ffa_id;
+    uint16_t num_vcpus;
+    bool is_64bit;
+
+    /*
+     * Global data accessed atomically or using ACCES_ONCE.
+     */
+    struct ffa_ctx_notif notif;
+
+    /*
+     * Global data accessed with lock locked.
+     */
+    spinlock_t lock;
+    /*
+     * FF-A version negotiated by the guest, only modifications to
+     * this field are done with the lock held as this is expected to
+     * be done once at init by a guest.
+     */
+    uint32_t guest_vers;
     /* Number of 4kB pages in each of rx/rx_pg and tx/tx_pg */
     unsigned int page_count;
-    /* FF-A version used by the guest */
-    uint32_t guest_vers;
-    bool rx_is_free;
-    /* Used shared memory objects, struct ffa_shm_mem */
-    struct list_head shm_list;
     /* Number of allocated shared memory object */
     unsigned int shm_count;
-    struct ffa_ctx_notif notif;
+    /* Used shared memory objects, struct ffa_shm_mem */
+    struct list_head shm_list;
+
     /*
-     * tx_lock is used to serialize access to tx
-     * rx_lock is used to serialize access to rx_is_free
-     * lock is used for the rest in this struct
+     * Rx buffer, accessed with rx_lock locked.
+     * rx_is_free is used to serialize access.
+     */
+    spinlock_t rx_lock;
+    bool rx_is_free;
+    void *rx;
+    struct page_info *rx_pg;
+
+    /*
+     * Tx buffer, access with tx_lock locked.
      */
     spinlock_t tx_lock;
-    spinlock_t rx_lock;
-    spinlock_t lock;
-    /* Used if domain can't be torn down immediately */
+    const void *tx;
+    struct page_info *tx_pg;
+
+
+    /*
+     * Domain teardown handling if data shared or used by other domains
+     * do not allow to teardown the domain immediately.
+     */
     struct domain *teardown_d;
     struct list_head teardown_list;
     s_time_t teardown_expire;
-    /*
-     * Used for ffa_domain_teardown() to keep track of which SPs should be
-     * notified that this guest is being destroyed.
-     */
+    /* Keep track of SPs that should be notified of VM destruction */
     unsigned long *vm_destroy_bitmap;
 };
 
@@ -335,6 +383,12 @@ extern void *ffa_tx;
 extern spinlock_t ffa_rx_buffer_lock;
 extern spinlock_t ffa_tx_buffer_lock;
 extern DECLARE_BITMAP(ffa_fw_abi_supported, FFA_ABI_BITMAP_SIZE);
+
+extern struct list_head ffa_ctx_head;
+extern rwlock_t ffa_ctx_list_rwlock;
+#ifdef CONFIG_FFA_VM_TO_VM
+extern atomic_t ffa_vm_count;
+#endif
 
 bool ffa_shm_domain_destroy(struct domain *d);
 void ffa_handle_mem_share(struct cpu_user_regs *regs);
@@ -367,6 +421,29 @@ int ffa_handle_notification_set(struct cpu_user_regs *regs);
 
 void ffa_handle_msg_send_direct_req(struct cpu_user_regs *regs, uint32_t fid);
 int32_t ffa_handle_msg_send2(struct cpu_user_regs *regs);
+
+#ifdef CONFIG_FFA_VM_TO_VM
+static inline uint16_t get_ffa_vm_count(void)
+{
+    return atomic_read(&ffa_vm_count);
+}
+
+static inline void inc_ffa_vm_count(void)
+{
+    atomic_inc(&ffa_vm_count);
+}
+
+static inline void dec_ffa_vm_count(void)
+{
+    ASSERT(atomic_read(&ffa_vm_count) > 0);
+    atomic_dec(&ffa_vm_count);
+}
+#else
+/* Only count the caller VM */
+#define get_ffa_vm_count()  ((uint16_t)1UL)
+#define inc_ffa_vm_count()  do {} while(0)
+#define dec_ffa_vm_count()  do {} while(0)
+#endif
 
 static inline uint16_t ffa_get_vm_id(const struct domain *d)
 {
