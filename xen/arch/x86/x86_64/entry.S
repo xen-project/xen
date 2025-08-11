@@ -871,7 +871,7 @@ handle_exception_saved:
          * reading %cr2. Otherwise a page fault in the nested interrupt handler
          * would corrupt %cr2.
          */
-        DISPATCH(X86_EXC_PF, do_page_fault)
+        DISPATCH(X86_EXC_PF, handle_PF_IDT)
 
         /* Only re-enable IRQs if they were active before taking the fault */
         testb $X86_EFLAGS_IF >> 8, UREGS_eflags + 1(%rsp)

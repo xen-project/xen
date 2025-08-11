@@ -1676,20 +1676,9 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     return 0;
 }
 
-void asmlinkage do_page_fault(struct cpu_user_regs *regs)
+static void handle_PF(struct cpu_user_regs *regs, unsigned long addr /* cr2 */)
 {
-    unsigned long addr;
     unsigned int error_code;
-
-    addr = read_cr2();
-
-    /*
-     * Don't re-enable interrupts if we were running an IRQ-off region when
-     * we hit the page fault, or we'll break that code.
-     */
-    ASSERT(!local_irq_is_enabled());
-    if ( regs->flags & X86_EFLAGS_IF )
-        local_irq_enable();
 
     /* fixup_page_fault() might change regs->error_code, so cache it here. */
     error_code = regs->error_code;
@@ -1749,6 +1738,19 @@ void asmlinkage do_page_fault(struct cpu_user_regs *regs)
     }
 
     pv_inject_page_fault(regs->error_code, addr);
+}
+
+/*
+ * When using IDT delivery, it is our responsibility to read %cr2.
+ */
+void asmlinkage handle_PF_IDT(struct cpu_user_regs *regs)
+{
+    unsigned long addr = read_cr2();
+
+    if ( regs->flags & X86_EFLAGS_IF )
+        local_irq_enable();
+
+    handle_PF(regs, addr);
 }
 
 /*
