@@ -6,15 +6,15 @@
 #ifndef __FFA_PRIVATE_H__
 #define __FFA_PRIVATE_H__
 
-#include <xen/const.h>
-#include <xen/sizes.h>
-#include <xen/types.h>
-#include <xen/mm.h>
-#include <xen/list.h>
-#include <xen/spinlock.h>
-#include <xen/sched.h>
-#include <xen/time.h>
 #include <xen/bitmap.h>
+#include <xen/const.h>
+#include <xen/list.h>
+#include <xen/mm.h>
+#include <xen/sched.h>
+#include <xen/sizes.h>
+#include <xen/spinlock.h>
+#include <xen/time.h>
+#include <xen/types.h>
 
 /* Error codes */
 #define FFA_RET_OK                      0
@@ -107,6 +107,14 @@
  * blocked initially.
  */
 #define FFA_CTX_TEARDOWN_DELAY          SECONDS(1)
+
+/*
+ * The maximum number of Secure partitions we support for partinfo_get.
+ * This prevents holding the CPU during potentially to long time during
+ * a partinfo_get call. Value choosen seems realistic for any configuration
+ * but can be incremented here if needed.
+ */
+#define FFA_MAX_NUM_SP                  64
 
 /*
  * We rely on the convention suggested but not mandated by the FF-A

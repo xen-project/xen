@@ -63,9 +63,96 @@ static int32_t ffa_partition_info_get(uint32_t *uuid, uint32_t flags,
     return ret;
 }
 
-void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
+static int32_t ffa_get_sp_count(uint32_t *uuid, uint32_t *sp_count)
+{
+    uint32_t src_size;
+
+    return ffa_partition_info_get(uuid, FFA_PARTITION_INFO_GET_COUNT_FLAG,
+                                  sp_count, &src_size);
+}
+
+static int32_t ffa_get_sp_partinfo(uint32_t *uuid, uint32_t *sp_count,
+                                   void *dst_buf, void *end_buf,
+                                   uint32_t dst_size)
 {
     int32_t ret;
+    uint32_t src_size, real_sp_count;
+    void *src_buf = ffa_rx;
+    uint32_t count = 0;
+
+    /* Do we have a RX buffer with the SPMC */
+    if ( !ffa_rx )
+        return FFA_RET_DENIED;
+
+    /* We need to use the RX buffer to receive the list */
+    spin_lock(&ffa_rx_buffer_lock);
+
+    ret = ffa_partition_info_get(uuid, 0, &real_sp_count, &src_size);
+    if ( ret )
+        goto out;
+
+    /* We now own the RX buffer */
+
+    /* Validate the src_size we got */
+    if ( src_size < sizeof(struct ffa_partition_info_1_0) ||
+         src_size >= FFA_PAGE_SIZE )
+    {
+        ret = FFA_RET_NOT_SUPPORTED;
+        goto out_release;
+    }
+
+    /*
+     * Limit the maximum time we hold the CPU by limiting the number of SPs.
+     * We just ignore the extra ones as this is tested during init in
+     * ffa_partinfo_init so the only possible reason is SP have been added
+     * since boot.
+     */
+    if ( real_sp_count > FFA_MAX_NUM_SP )
+        real_sp_count = FFA_MAX_NUM_SP;
+
+    /* Make sure the data fits in our buffer */
+    if ( real_sp_count > (FFA_RXTX_PAGE_COUNT * FFA_PAGE_SIZE) / src_size )
+    {
+        ret = FFA_RET_NOT_SUPPORTED;
+        goto out_release;
+    }
+
+    for ( uint32_t sp_num = 0; sp_num < real_sp_count; sp_num++ )
+    {
+        struct ffa_partition_info_1_1 *fpi = src_buf;
+
+        /* filter out SP not following bit 15 convention if any */
+        if ( FFA_ID_IS_SECURE(fpi->id) )
+        {
+            if ( dst_buf > (end_buf - dst_size) )
+            {
+                ret = FFA_RET_NO_MEMORY;
+                goto out_release;
+            }
+
+            memcpy(dst_buf, src_buf, MIN(src_size, dst_size));
+            if ( dst_size > src_size )
+                memset(dst_buf + src_size, 0, dst_size - src_size);
+
+            dst_buf += dst_size;
+            count++;
+        }
+
+        src_buf += src_size;
+    }
+
+    *sp_count = count;
+
+out_release:
+    ffa_hyp_rx_release();
+out:
+    spin_unlock(&ffa_rx_buffer_lock);
+    return ret;
+}
+
+void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
+{
+    int32_t ret = FFA_RET_OK;
     struct domain *d = current->domain;
     struct ffa_ctx *ctx = d->arch.tee;
     uint32_t flags = get_user_reg(regs, 5);
@@ -75,8 +162,8 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
         get_user_reg(regs, 3),
         get_user_reg(regs, 4),
     };
-    uint32_t src_size, dst_size;
-    void *dst_buf;
+    uint32_t dst_size = 0;
+    void *dst_buf, *end_buf;
     uint32_t ffa_sp_count = 0;
 
     /*
@@ -89,28 +176,23 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
     else
         dst_size = sizeof(struct ffa_partition_info_1_1);
 
-    /*
-     * FF-A v1.0 has w5 MBZ while v1.1 allows
-     * FFA_PARTITION_INFO_GET_COUNT_FLAG to be non-zero.
-     *
-     * FFA_PARTITION_INFO_GET_COUNT is only using registers and not the
-     * rxtx buffer so do the partition_info_get directly.
-     */
-    if ( flags == FFA_PARTITION_INFO_GET_COUNT_FLAG &&
-         ctx->guest_vers == FFA_VERSION_1_1 )
-    {
-        if ( ffa_fw_supports_fid(FFA_PARTITION_INFO_GET) )
-            ret = ffa_partition_info_get(uuid, flags, &ffa_sp_count,
-                                        &src_size);
-        else
-            ret = FFA_RET_OK;
-
-        goto out;
-    }
-
+    /* Only count requested */
     if ( flags )
     {
-        ret = FFA_RET_INVALID_PARAMETERS;
+        /*
+         * FF-A v1.0 has w5 MBZ while v1.1 allows
+         * FFA_PARTITION_INFO_GET_COUNT_FLAG to be non-zero.
+         */
+        if ( ctx->guest_vers == FFA_VERSION_1_0 ||
+                flags != FFA_PARTITION_INFO_GET_COUNT_FLAG )
+        {
+            ret = FFA_RET_INVALID_PARAMETERS;
+            goto out;
+        }
+
+        if ( ffa_fw_supports_fid(FFA_PARTITION_INFO_GET) )
+            ret = ffa_get_sp_count(uuid, &ffa_sp_count);
+
         goto out;
     }
 
@@ -121,80 +203,33 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
         goto out;
     }
 
+    /* Get the RX buffer to write the list of partitions */
     ret = ffa_rx_acquire(d);
     if ( ret != FFA_RET_OK )
         goto out;
 
     dst_buf = ctx->rx;
+    end_buf = ctx->rx + ctx->page_count * FFA_PAGE_SIZE;
 
-    if ( !ffa_rx )
+    /* An entry should be smaller than a page */
+    BUILD_BUG_ON(sizeof(struct ffa_partition_info_1_1) > FFA_PAGE_SIZE);
+
+    /*
+     * Check for overflow and that we can at least store one entry.
+     * page_count cannot be 0 so we have at least one page.
+     */
+    if ( dst_buf >= end_buf || dst_buf > (end_buf - dst_size) )
     {
-        ret = FFA_RET_DENIED;
+        ret = FFA_RET_INVALID_PARAMETERS;
         goto out_rx_release;
     }
 
-    spin_lock(&ffa_rx_buffer_lock);
+    ret = ffa_get_sp_partinfo(uuid, &ffa_sp_count, dst_buf, end_buf,
+                              dst_size);
 
-    ret = ffa_partition_info_get(uuid, 0, &ffa_sp_count, &src_size);
 
-    if ( ret )
-        goto out_rx_hyp_unlock;
-
-    /*
-     * ffa_partition_info_get() succeeded so we now own the RX buffer we
-     * share with the SPMC. We must give it back using ffa_hyp_rx_release()
-     * once we've copied the content.
-     */
-
-    /* we cannot have a size smaller than 1.0 structure */
-    if ( src_size < sizeof(struct ffa_partition_info_1_0) )
-    {
-        ret = FFA_RET_NOT_SUPPORTED;
-        goto out_rx_hyp_release;
-    }
-
-    if ( ctx->page_count * FFA_PAGE_SIZE < ffa_sp_count * dst_size )
-    {
-        ret = FFA_RET_NO_MEMORY;
-        goto out_rx_hyp_release;
-    }
-
-    if ( ffa_sp_count > 0 )
-    {
-        uint32_t n, n_limit = ffa_sp_count;
-        void *src_buf = ffa_rx;
-
-        /* copy the secure partitions info */
-        for ( n = 0; n < n_limit; n++ )
-        {
-            struct ffa_partition_info_1_1 *fpi = src_buf;
-
-            /* filter out SP not following bit 15 convention if any */
-            if ( FFA_ID_IS_SECURE(fpi->id) )
-            {
-                memcpy(dst_buf, src_buf, dst_size);
-                dst_buf += dst_size;
-            }
-            else
-                ffa_sp_count--;
-
-            src_buf += src_size;
-        }
-    }
-
-out_rx_hyp_release:
-    ffa_hyp_rx_release();
-out_rx_hyp_unlock:
-    spin_unlock(&ffa_rx_buffer_lock);
 out_rx_release:
-    /*
-     * The calling VM RX buffer only contains data to be used by the VM if the
-     * call was successful, in which case the VM has to release the buffer
-     * once it has used the data.
-     * If something went wrong during the call, we have to release the RX
-     * buffer back to the SPMC as the VM will not do it.
-     */
-    if ( ret != FFA_RET_OK )
+    if ( ret )
         ffa_rx_release(d);
 out:
     if ( ret )
@@ -353,9 +388,10 @@ bool ffa_partinfo_init(void)
         goto out;
     }
 
-    if ( count >= UINT16_MAX )
+    if ( count >= FFA_MAX_NUM_SP )
     {
-        printk(XENLOG_ERR "ffa: Impossible number of SPs: %u\n", count);
+        printk(XENLOG_ERR "ffa: More SPs than the maximum supported: %u - %u\n",
+               count, FFA_MAX_NUM_SP);
         goto out;
     }
 
