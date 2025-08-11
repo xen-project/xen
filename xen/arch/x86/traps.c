@@ -18,6 +18,7 @@
 #include <xen/delay.h>
 #include <xen/domain_page.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/paging.h>
@@ -50,6 +51,8 @@
 #include <asm/system.h>
 #include <asm/traps.h>
 #include <asm/uaccess.h>
+
+#include <public/callback.h>
 
 /*
  * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
@@ -2268,6 +2271,7 @@ void asmlinkage check_ist_exit(const struct cpu_user_regs *regs, bool ist_exit)
 void asmlinkage entry_from_pv(struct cpu_user_regs *regs)
 {
     struct fred_info *fi = cpu_regs_fred_info(regs);
+    struct vcpu *curr = current;
     uint8_t type = regs->fred_ss.type;
     uint8_t vec = regs->fred_ss.vector;
 
@@ -2310,6 +2314,38 @@ void asmlinkage entry_from_pv(struct cpu_user_regs *regs)
 
     switch ( type )
     {
+    case X86_ET_SW_INT:
+        /*
+         * For better or worse, Xen writes IDT vectors 3 and 4 with DPL3 (so
+         * INT3/INTO work), making INT $3/4 indistinguishable, and the guest
+         * choice of DPL for these vectors is ignored.
+         *
+         * Have them fall through into X86_ET_HW_EXC, as #BP in particular
+         * needs handling by do_int3() in case an external debugger is
+         * attached.
+         *
+         * As the event type is provided, INT $N instructions don't need #GP
+         * tricks to spot, and INT $0x80 doesn't need a fastpath.  As the
+         * guest is necessary PV64, INT $0x82 has no special meaning either.
+         *
+         * When converting to a fault, hardware finally gives us enough
+         * information to account for prefixes, so provide the more correct
+         * behaviour rather than assuming the instruction was two bytes long.
+         */
+        if ( vec != X86_EXC_BP && vec != X86_EXC_OF )
+        {
+            const struct trap_info *ti = &curr->arch.pv.trap_ctxt[vec];
+
+            if ( permit_softint(TI_GET_DPL(ti), curr, regs) )
+                pv_inject_sw_interrupt(vec);
+            else
+            {
+                regs->rip -= regs->fred_ss.insnlen;
+                pv_inject_hw_exception(X86_EXC_GP, (vec << 3) | X86_XEC_IDT);
+            }
+            break;
+        }
+        fallthrough;
     case X86_ET_HW_EXC:
     case X86_ET_PRIV_SW_EXC:
     case X86_ET_SW_EXC:
@@ -2333,6 +2369,96 @@ void asmlinkage entry_from_pv(struct cpu_user_regs *regs)
         case X86_EXC_XM:
             do_trap(regs);
             break;
+
+        default:
+            goto fatal;
+        }
+        break;
+
+    case X86_ET_OTHER:
+        switch ( regs->fred_ss.vector )
+        {
+        case 1: /* SYSCALL */
+        {
+            /*
+             * FRED delivery preserves the interrupted %cs/%ss, but previously
+             * SYSCALL lost the interrupted selectors, and SYSRET forced the
+             * use of the ones in MSR_STAR.
+             *
+             * The guest isn't aware of FRED, so recreate the legacy
+             * behaviour.
+             *
+             * The non-FRED SYSCALL path sets TRAP_syscall in entry_vector to
+             * signal that SYSRET can be used, but this isn't relevant in FRED
+             * mode.
+             *
+             * When setting the selectors, clear all upper metadata again for
+             * backwards compatibility.  In particular fred_ss.swint becomes
+             * pend_DB on ERETx, and nothing else in the pv_hypercall() would
+             * clean up.
+             *
+             * When converting to a fault, hardware finally gives us enough
+             * information to account for prefixes, so provide the more
+             * correct behaviour rather than assuming the instruction was two
+             * bytes long.
+             */
+            bool l = regs->fred_ss.l;
+            unsigned int len = regs->fred_ss.insnlen;
+
+            regs->ssx = l ? FLAT_KERNEL_SS   : FLAT_USER_SS32;
+            regs->csx = l ? FLAT_KERNEL_CS64 : FLAT_USER_CS32;
+
+            if ( guest_kernel_mode(curr, regs) )
+                pv_hypercall(regs);
+            else if ( (l ? curr->arch.pv.syscall_callback_eip
+                         : curr->arch.pv.syscall32_callback_eip) == 0 )
+            {
+                regs->rip -= len;
+                pv_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
+            }
+            else
+            {
+                /*
+                 * The PV ABI, given no virtual SYSCALL_MASK, hardcodes that
+                 * DF is cleared.  Other flags are handled in the same way as
+                 * interrupts and exceptions in create_bounce_frame().
+                 */
+                regs->eflags &= ~X86_EFLAGS_DF;
+                pv_inject_callback(l ? CALLBACKTYPE_syscall
+                                     : CALLBACKTYPE_syscall32);
+            }
+            break;
+        }
+
+        case 2: /* SYSENTER */
+        {
+            /*
+             * FRED delivery preserves the interrupted state, but previously
+             * SYSENTER discarded almost everything.
+             *
+             * The guest isn't aware of FRED, so recreate the legacy
+             * behaviour.
+             *
+             * When setting the selectors, clear all upper metadata.  In
+             * particular fred_ss.swint becomes pend_DB on ERETx.
+             *
+             * When converting to a fault, hardware finally gives us enough
+             * information to account for prefixes, so provide the more
+             * correct behaviour rather than assuming the instruction was two
+             * bytes long.
+             */
+            regs->ssx = FLAT_USER_SS;
+            regs->rsp = 0;
+            regs->eflags &= ~(X86_EFLAGS_VM | X86_EFLAGS_IF);
+            regs->csx = 3;
+            regs->rip = 0;
+
+            if ( !curr->arch.pv.sysenter_callback_eip )
+                pv_inject_hw_exception(X86_EXC_GP, 0);
+            else
+                pv_inject_callback(CALLBACKTYPE_sysenter);
+            break;
+        }
 
         default:
             goto fatal;

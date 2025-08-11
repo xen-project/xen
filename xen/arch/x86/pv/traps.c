@@ -20,6 +20,8 @@
 #include <asm/shared.h>
 #include <asm/traps.h>
 
+#include <public/callback.h>
+
 void pv_inject_event(const struct x86_event *event)
 {
     struct vcpu *curr = current;
@@ -94,6 +96,43 @@ void pv_inject_event(const struct x86_event *event)
         if ( vector == X86_EXC_PF )
             show_page_walk(event->cr2);
     }
+}
+
+void pv_inject_callback(unsigned int type)
+{
+    struct vcpu *curr = current;
+    struct trap_bounce *tb = &curr->arch.pv.trap_bounce;
+    unsigned long rip;
+    bool irq;
+
+    ASSERT(is_pv_64bit_vcpu(curr));
+
+    switch ( type )
+    {
+    case CALLBACKTYPE_syscall:
+        rip = curr->arch.pv.syscall_callback_eip;
+        irq = curr->arch.pv.vgc_flags & VGCF_syscall_disables_events;
+        break;
+
+    case CALLBACKTYPE_syscall32:
+        rip = curr->arch.pv.syscall32_callback_eip;
+        irq = curr->arch.pv.syscall32_disables_events;
+        break;
+
+    case CALLBACKTYPE_sysenter:
+        rip = curr->arch.pv.sysenter_callback_eip;
+        irq = curr->arch.pv.sysenter_disables_events;
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        rip = 0;
+        irq = false;
+        break;
+    }
+
+    tb->flags = TBF_EXCEPTION | (irq ? TBF_INTERRUPT : 0);
+    tb->eip = rip;
 }
 
 /*
