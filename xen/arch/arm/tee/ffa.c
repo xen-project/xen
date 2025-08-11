@@ -346,8 +346,9 @@ static int ffa_domain_init(struct domain *d)
     struct ffa_ctx *ctx;
     int ret;
 
-    if ( !ffa_fw_version )
+    if ( !IS_ENABLED(CONFIG_FFA_VM_TO_VM) && !ffa_fw_version )
         return -ENODEV;
+
     /*
      * We are using the domain_id + 1 as the FF-A ID for VMs as FF-A ID 0 is
      * reserved for the hypervisor and we only support secure endpoints using
@@ -478,38 +479,12 @@ static void ffa_init_secondary(void)
     ffa_notif_init_interrupt();
 }
 
-static bool ffa_probe(void)
+static bool ffa_probe_fw(void)
 {
     uint32_t vers;
     unsigned int major_vers;
     unsigned int minor_vers;
 
-    /*
-     * FF-A often works in units of 4K pages and currently it's assumed
-     * that we can map memory using that granularity. See also the comment
-     * above the FFA_PAGE_SIZE define.
-     *
-     * It is possible to support a PAGE_SIZE larger than 4K in Xen, but
-     * until that is fully handled in this code make sure that we only use
-     * 4K page sizes.
-     */
-    BUILD_BUG_ON(PAGE_SIZE != FFA_PAGE_SIZE);
-
-    printk(XENLOG_INFO "ARM FF-A Mediator version %u.%u\n",
-           FFA_MY_VERSION_MAJOR, FFA_MY_VERSION_MINOR);
-
-    if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) )
-    {
-        /*
-         * When FFA VM to VM is enabled, the current implementation does not
-         * offer any way to limit which VM can communicate with which VM using
-         * FF-A.
-         * Signal this in the xen console and taint the system as insecure.
-         * TODO: Introduce a solution to limit what a VM can do through FFA.
-         */
-        printk(XENLOG_ERR "ffa: VM to VM is enabled, system is insecure !!\n");
-        add_taint(TAINT_MACHINE_INSECURE);
-    }
     /*
      * psci_init_smccc() updates this value with what's reported by EL-3
      * or secure world.
@@ -527,11 +502,6 @@ static bool ffa_probe(void)
         gprintk(XENLOG_ERR, "Cannot retrieve the FFA version\n");
         goto err_no_fw;
     }
-
-    /* Some sanity check in case we update the version we support */
-    BUILD_BUG_ON(FFA_MIN_SPMC_VERSION > FFA_MY_VERSION);
-    BUILD_BUG_ON(FFA_VERSION_MAJOR(FFA_MIN_SPMC_VERSION) !=
-                                   FFA_MY_VERSION_MAJOR);
 
     major_vers = FFA_VERSION_MAJOR(vers);
     minor_vers = FFA_VERSION_MINOR(vers);
@@ -583,7 +553,6 @@ static bool ffa_probe(void)
         goto err_rxtx_destroy;
 
     ffa_notif_init();
-    init_timer(&ffa_teardown_timer, ffa_teardown_timer_callback, NULL, 0);
 
     return true;
 
@@ -595,6 +564,56 @@ err_no_fw:
     printk(XENLOG_WARNING "ARM FF-A No firmware support\n");
 
     return false;
+}
+
+static bool ffa_probe_vm_to_vm(void)
+{
+    if ( !IS_ENABLED(CONFIG_FFA_VM_TO_VM) )
+        return false;
+
+    /*
+     * When FFA VM to VM is enabled, the current implementation does not
+     * offer any way to limit which VM can communicate with which VM using
+     * FF-A.
+     * Signal this in the xen console and taint the system as insecure.
+     * TODO: Introduce a solution to limit what a VM can do through FFA.
+     */
+    printk(XENLOG_ERR "ffa: VM to VM is enabled, system is insecure !!\n");
+    add_taint(TAINT_MACHINE_INSECURE);
+
+    return true;
+}
+
+static bool ffa_probe(void)
+{
+    /*
+     * FF-A often works in units of 4K pages and currently it's assumed
+     * that we can map memory using that granularity. See also the comment
+     * above the FFA_PAGE_SIZE define.
+     *
+     * It is possible to support a PAGE_SIZE larger than 4K in Xen, but
+     * until that is fully handled in this code make sure that we only use
+     * 4K page sizes.
+     */
+    BUILD_BUG_ON(PAGE_SIZE != FFA_PAGE_SIZE);
+
+    /* Some sanity check in case we update the version we support */
+    BUILD_BUG_ON(FFA_MIN_SPMC_VERSION > FFA_MY_VERSION);
+    BUILD_BUG_ON(FFA_VERSION_MAJOR(FFA_MIN_SPMC_VERSION) !=
+                                   FFA_MY_VERSION_MAJOR);
+
+    printk(XENLOG_INFO "ARM FF-A Mediator version %u.%u\n",
+           FFA_MY_VERSION_MAJOR, FFA_MY_VERSION_MINOR);
+
+    if ( !ffa_probe_fw() && !ffa_probe_vm_to_vm() )
+        return false;
+
+    if ( !ffa_fw_version )
+        printk(XENLOG_INFO "ARM FF-A only available between VMs\n");
+
+    init_timer(&ffa_teardown_timer, ffa_teardown_timer_callback, NULL, 0);
+
+    return true;
 }
 
 static const struct tee_mediator_ops ffa_ops =
