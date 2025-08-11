@@ -88,43 +88,130 @@ out:
                  resp.a7 & mask);
 }
 
+static int32_t ffa_msg_send2_vm(uint16_t dst_id, const void *src_buf,
+                                struct ffa_part_msg_rxtx *src_msg)
+{
+    struct domain *dst_d;
+    struct ffa_ctx *dst_ctx;
+    struct ffa_part_msg_rxtx *dst_msg;
+    int err;
+    int32_t ret;
+
+    if ( dst_id == 0 )
+        /* FF-A ID 0 is the hypervisor, this is not valid */
+        return FFA_RET_INVALID_PARAMETERS;
+
+    /* This is also checking that dest is not src */
+    err = rcu_lock_live_remote_domain_by_id(dst_id - 1, &dst_d);
+    if ( err )
+        return FFA_RET_INVALID_PARAMETERS;
+
+    if ( dst_d->arch.tee == NULL )
+    {
+        ret = FFA_RET_INVALID_PARAMETERS;
+        goto out_unlock;
+    }
+
+    dst_ctx = dst_d->arch.tee;
+    if ( !dst_ctx->guest_vers )
+    {
+        ret = FFA_RET_INVALID_PARAMETERS;
+        goto out_unlock;
+    }
+
+    /* This also checks that destination has set a Rx buffer */
+    ret = ffa_rx_acquire(dst_d);
+    if ( ret )
+        goto out_unlock;
+
+    /* we need to have enough space in the destination buffer */
+    if ( (dst_ctx->page_count * FFA_PAGE_SIZE -
+          sizeof(struct ffa_part_msg_rxtx)) < src_msg->msg_size )
+    {
+        ret = FFA_RET_NO_MEMORY;
+        ffa_rx_release(dst_d);
+        goto out_unlock;
+    }
+
+    dst_msg = dst_ctx->rx;
+
+    /* prepare destination header */
+    dst_msg->flags = 0;
+    dst_msg->reserved = 0;
+    dst_msg->msg_offset = sizeof(struct ffa_part_msg_rxtx);
+    dst_msg->send_recv_id = src_msg->send_recv_id;
+    dst_msg->msg_size = src_msg->msg_size;
+
+    memcpy(dst_ctx->rx + sizeof(struct ffa_part_msg_rxtx),
+           src_buf + src_msg->msg_offset, src_msg->msg_size);
+
+    /* receiver rx buffer will be released by the receiver*/
+
+out_unlock:
+    rcu_unlock_domain(dst_d);
+    if ( !ret )
+        ffa_raise_rx_buffer_full(dst_d);
+
+    return ret;
+}
+
 int32_t ffa_handle_msg_send2(struct cpu_user_regs *regs)
 {
     struct domain *src_d = current->domain;
     struct ffa_ctx *src_ctx = src_d->arch.tee;
-    const struct ffa_part_msg_rxtx *src_msg;
+    struct ffa_part_msg_rxtx src_msg;
     uint16_t dst_id, src_id;
     int32_t ret;
 
-    if ( !ffa_fw_supports_fid(FFA_MSG_SEND2) )
-        return FFA_RET_NOT_SUPPORTED;
+    BUILD_BUG_ON(sizeof(struct ffa_part_msg_rxtx) >= FFA_PAGE_SIZE);
 
     if ( !spin_trylock(&src_ctx->tx_lock) )
         return FFA_RET_BUSY;
 
-    src_msg = src_ctx->tx;
-    src_id = src_msg->send_recv_id >> 16;
-    dst_id = src_msg->send_recv_id & GENMASK(15,0);
+    /* create a copy of the message header */
+    memcpy(&src_msg, src_ctx->tx, sizeof(src_msg));
 
-    if ( src_id != ffa_get_vm_id(src_d) || !FFA_ID_IS_SECURE(dst_id) )
+    src_id = src_msg.send_recv_id >> 16;
+    dst_id = src_msg.send_recv_id & GENMASK(15,0);
+
+    if ( src_id != ffa_get_vm_id(src_d) )
     {
         ret = FFA_RET_INVALID_PARAMETERS;
-        goto out_unlock_tx;
+        goto out;
     }
 
     /* check source message fits in buffer */
-    if ( src_ctx->page_count * FFA_PAGE_SIZE <
-         src_msg->msg_offset + src_msg->msg_size ||
-         src_msg->msg_offset < sizeof(struct ffa_part_msg_rxtx) )
+    if ( src_msg.msg_offset < sizeof(struct ffa_part_msg_rxtx) ||
+            src_msg.msg_size == 0 ||
+            src_msg.msg_offset > src_ctx->page_count * FFA_PAGE_SIZE ||
+            src_msg.msg_size > (src_ctx->page_count * FFA_PAGE_SIZE -
+                                src_msg.msg_offset) )
     {
         ret = FFA_RET_INVALID_PARAMETERS;
-        goto out_unlock_tx;
+        goto out;
     }
 
-    ret = ffa_simple_call(FFA_MSG_SEND2,
-                          ((uint32_t)ffa_get_vm_id(src_d)) << 16, 0, 0, 0);
+    if ( FFA_ID_IS_SECURE(dst_id) )
+    {
+        /* Message for a secure partition */
+        if ( !ffa_fw_supports_fid(FFA_MSG_SEND2) )
+        {
+            ret = FFA_RET_NOT_SUPPORTED;
+            goto out;
+        }
 
-out_unlock_tx:
+        ret = ffa_simple_call(FFA_MSG_SEND2,
+                              ((uint32_t)ffa_get_vm_id(src_d)) << 16, 0, 0, 0);
+    }
+    else if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) )
+    {
+        /* Message for a VM */
+        ret = ffa_msg_send2_vm(dst_id, src_ctx->tx, &src_msg);
+    }
+    else
+        ret = FFA_RET_INVALID_PARAMETERS;
+
+out:
     spin_unlock(&src_ctx->tx_lock);
     return ret;
 }
