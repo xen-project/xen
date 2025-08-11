@@ -1998,13 +1998,10 @@ void asmlinkage do_device_not_available(struct cpu_user_regs *regs)
 
 void nocall sysenter_eflags_saved(void);
 
-void asmlinkage do_debug(struct cpu_user_regs *regs)
+/* Handle #DB.  @dbg is PENDING_DBG, a.k.a. %dr6 with positive polarity. */
+static void handle_DB(struct cpu_user_regs *regs, unsigned long dbg)
 {
-    unsigned long dr6;
     struct vcpu *v = current;
-
-    /* Stash dr6 as early as possible. */
-    dr6 = read_debugreg(6);
 
     /*
      * At the time of writing (March 2018), on the subject of %dr6:
@@ -2073,13 +2070,13 @@ void asmlinkage do_debug(struct cpu_user_regs *regs)
          * If however we do, safety measures need to be enacted.  Use a big
          * hammer and clear all debug settings.
          */
-        if ( dr6 & (DR_TRAP3 | DR_TRAP2 | DR_TRAP1 | DR_TRAP0) )
+        if ( dbg & (DR_TRAP3 | DR_TRAP2 | DR_TRAP1 | DR_TRAP0) )
         {
             unsigned int bp, dr7 = read_debugreg(7);
 
             for ( bp = 0; bp < 4; ++bp )
             {
-                if ( (dr6 & (1u << bp)) && /* Breakpoint triggered? */
+                if ( (dbg & (1u << bp)) && /* Breakpoint triggered? */
                      (dr7 & (3u << (bp * DR_ENABLE_SIZE))) && /* Enabled? */
                      ((dr7 & (3u << ((bp * DR_CONTROL_SIZE) + /* Insn? */
                                      DR_CONTROL_SHIFT))) == DR_RW_EXECUTE) )
@@ -2100,9 +2097,9 @@ void asmlinkage do_debug(struct cpu_user_regs *regs)
          * so ensure the message is ratelimited.
          */
         gprintk(XENLOG_WARNING,
-                "Hit #DB in Xen context: %04x:%p [%ps], stk %04x:%p, dr6 %lx\n",
+                "Hit #DB in Xen context: %04x:%p [%ps], stk %04x:%p, dbg %lx\n",
                 regs->cs, _p(regs->rip), _p(regs->rip),
-                regs->ss, _p(regs->rsp), dr6);
+                regs->ss, _p(regs->rsp), dbg);
 
         return;
     }
@@ -2114,7 +2111,7 @@ void asmlinkage do_debug(struct cpu_user_regs *regs)
      * by debugging actions completed behind it's back.
      */
     v->arch.dr6 = x86_merge_dr6(v->domain->arch.cpu_policy,
-                                v->arch.dr6, dr6 ^ X86_DR6_DEFAULT);
+                                v->arch.dr6, dbg);
 
     if ( guest_kernel_mode(v, regs) && v->domain->debugger_attached )
     {
@@ -2122,7 +2119,16 @@ void asmlinkage do_debug(struct cpu_user_regs *regs)
         return;
     }
 
-    pv_inject_DB(dr6 ^ X86_DR6_DEFAULT);
+    pv_inject_DB(dbg);
+}
+
+/*
+ * When using IDT delivery, it is our responsibility to read %dr6.  Convert it
+ * to positive polarity.
+ */
+void asmlinkage handle_DB_IDT(struct cpu_user_regs *regs)
+{
+    handle_DB(regs, read_debugreg(6) ^ X86_DR6_DEFAULT);
 }
 
 void asmlinkage do_entry_CP(struct cpu_user_regs *regs)

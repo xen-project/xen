@@ -1171,7 +1171,7 @@ FUNC(handle_ist_exception)
 .L_ ## vec ## _done:
 
         DISPATCH(X86_EXC_NMI, do_nmi)
-        DISPATCH(X86_EXC_DB,  do_debug)
+        DISPATCH(X86_EXC_DB,  handle_DB_IDT)
         DISPATCH(X86_EXC_MC,  do_machine_check)
 #undef DISPATCH
 
