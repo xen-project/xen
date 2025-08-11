@@ -25,6 +25,7 @@
 #include <asm/pv/traps.h>
 #include <asm/shared.h>
 #include <asm/stubs.h>
+#include <asm/traps.h>
 
 #include <xsm/xsm.h>
 
@@ -926,7 +927,8 @@ static int cf_check read_msr(
     case MSR_GS_BASE:
         if ( !cp->extd.lm )
             break;
-        *val = read_gs_base();
+        /* Under FRED, GS is automatically swapped on privilege change. */
+        *val = opt_fred ? rdmsr(MSR_SHADOW_GS_BASE) : read_gs_base();
         return X86EMUL_OKAY;
 
     case MSR_SHADOW_GS_BASE:
@@ -1066,17 +1068,23 @@ static int cf_check write_msr(
         if ( !cp->extd.lm || !is_canonical_address(val) )
             break;
 
-        if ( reg == MSR_FS_BASE )
-            write_fs_base(val);
-        else if ( reg == MSR_GS_BASE )
-            write_gs_base(val);
-        else if ( reg == MSR_SHADOW_GS_BASE )
+        switch ( reg )
         {
-            write_gs_shadow(val);
+        case MSR_FS_BASE:
+            write_fs_base(val);
+            break;
+
+        case MSR_SHADOW_GS_BASE:
             curr->arch.pv.gs_base_user = val;
+            fallthrough;
+        case MSR_GS_BASE:
+            /* Under FRED, GS is automatically swapped on privilege change. */
+            if ( (reg == MSR_GS_BASE) ^ opt_fred )
+                write_gs_base(val);
+            else
+                write_gs_shadow(val);
+            break;
         }
-        else
-            ASSERT_UNREACHABLE();
         return X86EMUL_OKAY;
 
     case MSR_EFER:
