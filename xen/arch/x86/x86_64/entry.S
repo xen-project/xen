@@ -63,7 +63,7 @@ UNLIKELY_END(syscall_no_callback)
         /* Conditionally clear DF */
         and   %esi, UREGS_eflags(%rsp)
 /* %rbx: struct vcpu */
-test_all_events:
+LABEL(test_all_events, 0)
         ASSERT_NOT_IN_ATOMIC
         cli                             # tests must not race interrupts
 /*test_softirqs:*/
@@ -151,6 +151,8 @@ END(switch_to_kernel)
 /* %rbx: struct vcpu, interrupts disabled */
 FUNC_LOCAL(restore_all_guest)
         ASSERT_INTERRUPTS_DISABLED
+
+        ALTERNATIVE "", "jmp eretu_exit_to_guest", X86_FEATURE_XEN_FRED
 
         /* Stash guest SPEC_CTRL value while we can read struct vcpu. */
         mov VCPU_arch_msrs(%rbx), %rdx

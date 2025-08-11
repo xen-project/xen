@@ -15,9 +15,20 @@ FUNC(entry_FRED_R3, 4096)
         mov     %rsp, %rdi
         call    entry_from_pv
 
+#ifdef CONFIG_PV
+        GET_STACK_END(14)
+        movq    STACK_CPUINFO_FIELD(current_vcpu)(%r14), %rbx
+
+        jmp     test_all_events
+#else
+        BUG     /* Not Reached */
+#endif
+END(entry_FRED_R3)
+
+FUNC(eretu_exit_to_guest)
         POP_GPRS
         eretu
-END(entry_FRED_R3)
+END(eretu_exit_to_guest)
 
         /* The Ring0 entrypoint is at Ring3 + 0x100. */
         .org entry_FRED_R3 + 0x100, 0xcc
