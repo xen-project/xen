@@ -94,7 +94,10 @@ static int init_local_irq_data(unsigned int cpu)
         int rc = init_one_irq_desc(desc);
 
         if ( rc )
+        {
+            spin_unlock(&local_irqs_type_lock);
             return rc;
+        }
 
         desc->irq = irq;
         desc->action  = NULL;
