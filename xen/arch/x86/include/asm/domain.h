@@ -710,6 +710,8 @@ void arch_vcpu_regs_init(struct vcpu *v);
 struct vcpu_hvm_context;
 int arch_set_info_hvm_guest(struct vcpu *v, const struct vcpu_hvm_context *ctx);
 
+void pv_inject_callback(unsigned int type);
+
 #ifdef CONFIG_PV
 void pv_inject_event(const struct x86_event *event);
 #else

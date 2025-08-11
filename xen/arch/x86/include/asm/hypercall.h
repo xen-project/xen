@@ -18,9 +18,7 @@
 
 #define __HYPERVISOR_paging_domctl_cont __HYPERVISOR_arch_1
 
-#ifdef CONFIG_PV
 void pv_hypercall(struct cpu_user_regs *regs);
-#endif
 
 void pv_ring1_init_hypercall_page(void *ptr);
 void pv_ring3_init_hypercall_page(void *ptr);
