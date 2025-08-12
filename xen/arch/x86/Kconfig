@@ -162,6 +162,9 @@ config SHADOW_PAGING
 
           If unsure, say Y.
 
+config PAGING
+	def_bool HVM || SHADOW_PAGING
+
 config BIGMEM
 	bool "big memory support"
 	default n

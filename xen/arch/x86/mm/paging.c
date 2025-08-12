@@ -864,6 +864,7 @@ void paging_final_teardown(struct domain *d)
     p2m_final_teardown(d);
 }
 
+#ifdef CONFIG_PAGING
 /* Enable an arbitrary paging-assistance mode.  Call once at domain
  * creation. */
 int paging_enable(struct domain *d, u32 mode)
@@ -889,6 +890,7 @@ int paging_enable(struct domain *d, u32 mode)
     else
         return shadow_enable(d, mode);
 }
+#endif
 
 #ifdef CONFIG_HVM
 /* Called from the guest to indicate that a process is being torn down

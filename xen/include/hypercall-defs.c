@@ -197,9 +197,11 @@ dm_op(domid_t domid, unsigned int nr_bufs, xen_dm_op_buf_t *bufs)
 #ifdef CONFIG_SYSCTL
 sysctl(xen_sysctl_t *u_sysctl)
 #endif
+#if defined(CONFIG_X86) && defined(CONFIG_PAGING)
+paging_domctl_cont(xen_domctl_t *u_domctl)
+#endif
 #ifndef CONFIG_PV_SHIM_EXCLUSIVE
 domctl(xen_domctl_t *u_domctl)
-paging_domctl_cont(xen_domctl_t *u_domctl)
 platform_op(xen_platform_op_t *u_xenpf_op)
 #endif
 #ifdef CONFIG_HVM
@@ -296,7 +298,7 @@ dm_op                              compat   do       compat   do       do
 hypfs_op                           do       do       do       do       do
 #endif
 mca                                do       do       -        -        -
-#ifndef CONFIG_PV_SHIM_EXCLUSIVE
+#if defined(CONFIG_X86) && defined(CONFIG_PAGING)
 paging_domctl_cont                 do       do       do       do       -
 #endif
 

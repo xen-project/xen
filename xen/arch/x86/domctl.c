@@ -213,11 +213,15 @@ long arch_do_domctl(
     {
 
     case XEN_DOMCTL_shadow_op:
+#ifdef CONFIG_PAGING
         ret = paging_domctl(d, &domctl->u.shadow_op, u_domctl, 0);
         if ( ret == -ERESTART )
             return hypercall_create_continuation(
                        __HYPERVISOR_paging_domctl_cont, "h", u_domctl);
         copyback = true;
+#else
+        ret = -EOPNOTSUPP;
+#endif
         break;
 
     case XEN_DOMCTL_ioport_permission:
