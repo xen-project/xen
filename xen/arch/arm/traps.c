@@ -172,7 +172,7 @@ void init_traps(void)
     isb();
 }
 
-void asmlinkage __div0(void)
+void asmlinkage noreturn __div0(void)
 {
     printk("Division by zero in hypervisor.\n");
     BUG();
