@@ -51,7 +51,11 @@ int main(int argc, char **argv)
                 { .start =  0xc7e80000UL, .end =  0xcfe80000UL },
                 { .start = 0x12be80000UL, .end = 0x133e80000UL },
             },
+#ifdef CONFIG_PDX_OFFSET_COMPRESSION
+            .compress = true,
+#else
             .compress = false,
+#endif
         },
         /* Simple hole. */
         {

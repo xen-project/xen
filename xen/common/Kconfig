@@ -59,7 +59,8 @@ config EVTCHN_FIFO
 
 choice
 	prompt "PDX (Page inDeX) compression"
-	default PDX_MASK_COMPRESSION if !X86 && !RISCV
+	default PDX_OFFSET_COMPRESSION if X86
+	default PDX_MASK_COMPRESSION if !RISCV
 	default PDX_NONE
 	help
 	  PDX compression is a technique designed to reduce the memory
@@ -78,11 +79,29 @@ config PDX_MASK_COMPRESSION
 	help
 	  Compression relying on all RAM addresses sharing a zeroed bit region.
 
+config PDX_OFFSET_COMPRESSION
+	bool "Offset compression"
+	help
+	  Compression relying on size and distance between RAM regions being
+	  compressible using an offset lookup table.
+
 config PDX_NONE
 	bool "None"
 	help
 	  No compression
 endchoice
+
+config PDX_OFFSET_TBL_ORDER
+	int "PDX offset compression lookup table order" if EXPERT
+	depends on PDX_OFFSET_COMPRESSION
+	default 6
+	range 0 9
+	help
+	  Order of the PFN to PDX and PDX to PFN translation lookup tables.
+	  Number of table entries is calculated as 2^N.
+
+	  Size of the tables can be adjusted from 1 entry (order 0) to 512
+	  entries (order 9).
 
 config ALTERNATIVE_CALL
 	bool

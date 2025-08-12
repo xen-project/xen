@@ -65,6 +65,46 @@
  * This scheme also holds for multiple regions, where HHHHHHH acts as
  * the region identifier and LLLLLL fully contains the span of every
  * region involved.
+ *
+ * ## PDX offset compression
+ *
+ * Alternative compression mechanism that relies on RAM ranges having a similar
+ * size and offset between them:
+ *
+ * PFN address space:
+ * ┌────────┬──────────┬────────┬──────────┐   ┌────────┬──────────┐
+ * │ RAM 0  │          │ RAM 1  │          │...│ RAM N  │          │
+ * ├────────┼──────────┼────────┴──────────┘   └────────┴──────────┘
+ * │<------>│          │
+ * │  size             │
+ * │<----------------->│
+ *         offset
+ *
+ * The compression reduces the holes between RAM regions:
+ *
+ * PDX address space:
+ * ┌────────┬───┬────────┬───┐   ┌─┬────────┐
+ * │ RAM 0  │   │ RAM 1  │   │...│ │ RAM N  │
+ * ├────────┴───┼────────┴───┘   └─┴────────┘
+ * │<---------->│
+ *   pdx region size
+ *
+ * The offsets to convert from PFN to PDX and from PDX to PFN are stored in a
+ * pair of lookup tables, and the index into those tables to find the offset
+ * for each PFN or PDX is obtained by shifting the to be translated address by
+ * a specific value calculated at boot:
+ *
+ * pdx = pfn - pfn_lookup_table[pfn >> pfn_shift]
+ * pfn = pdx + pdx_lookup_table[pdx >> pdx_shift]
+ *
+ * Note the indexes into the lookup tables are masked to avoid out of bounds
+ * accesses.
+ *
+ * This compression requires the PFN ranges to contain a non-equal most
+ * significant part that's smaller than the lookup table size, so that a valid
+ * shift value can be found to differentiate between PFN regions.  The setup
+ * algorithm might merge otherwise separate PFN ranges to use the same lookup
+ * table entry.
  */
 
 extern unsigned long max_pdx;
@@ -157,7 +197,52 @@ static inline paddr_t directmapoff_to_maddr_xlate(unsigned long offset)
             (offset & ma_va_bottom_mask));
 }
 
-#endif /* CONFIG_PDX_MASK_COMPRESSION */
+#elif defined(CONFIG_PDX_OFFSET_COMPRESSION) /* CONFIG_PDX_MASK_COMPRESSION */
+
+#include <xen/page-size.h>
+
+#define CONFIG_PDX_NR_LOOKUP (1UL << CONFIG_PDX_OFFSET_TBL_ORDER)
+#define PDX_TBL_MASK (CONFIG_PDX_NR_LOOKUP - 1)
+
+#define PFN_TBL_IDX(pfn) \
+    (((pfn) >> pfn_index_shift) & PDX_TBL_MASK)
+#define PDX_TBL_IDX(pdx) \
+    (((pdx) >> pdx_index_shift) & PDX_TBL_MASK)
+#define MADDR_TBL_IDX(ma) \
+    (((ma) >> (pfn_index_shift + PAGE_SHIFT)) & PDX_TBL_MASK)
+#define DMAPOFF_TBL_IDX(off) \
+    (((off) >> (pdx_index_shift + PAGE_SHIFT)) & PDX_TBL_MASK)
+
+extern unsigned int pfn_index_shift;
+extern unsigned int pdx_index_shift;
+extern unsigned long pdx_region_size;
+
+extern unsigned long pfn_pdx_lookup[];
+extern unsigned long pdx_pfn_lookup[];
+extern unsigned long pfn_bases[];
+
+static inline unsigned long pfn_to_pdx_xlate(unsigned long pfn)
+{
+    return pfn - pfn_pdx_lookup[PFN_TBL_IDX(pfn)];
+}
+
+static inline unsigned long pdx_to_pfn_xlate(unsigned long pdx)
+{
+    return pdx + pdx_pfn_lookup[PDX_TBL_IDX(pdx)];
+}
+
+static inline unsigned long maddr_to_directmapoff_xlate(paddr_t ma)
+{
+    return ma - ((paddr_t)pfn_pdx_lookup[MADDR_TBL_IDX(ma)] << PAGE_SHIFT);
+}
+
+static inline paddr_t directmapoff_to_maddr_xlate(unsigned long offset)
+{
+    return offset + ((paddr_t)pdx_pfn_lookup[DMAPOFF_TBL_IDX(offset)] <<
+                     PAGE_SHIFT);
+}
+
+#endif /* CONFIG_PDX_OFFSET_COMPRESSION */
 
 #ifdef CONFIG_PDX_NONE
 

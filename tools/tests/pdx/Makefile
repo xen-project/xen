@@ -1,7 +1,7 @@
 XEN_ROOT=$(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-TARGETS := test-pdx-mask
+TARGETS := test-pdx-mask test-pdx-offset
 
 .PHONY: all
 all: $(TARGETS)
@@ -42,6 +42,7 @@ CFLAGS += $(APPEND_CFLAGS)
 CFLAGS += $(CFLAGS_xeninclude)
 
 test-pdx-mask: CFLAGS += -DCONFIG_PDX_MASK_COMPRESSION
+test-pdx-offset: CFLAGS += -DCONFIG_PDX_OFFSET_COMPRESSION
 
 test-pdx-%: test-pdx.c pdx.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(CFLAGS_$*.o) -o $@ $< $(APPEND_CFLAGS)

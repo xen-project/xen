@@ -44,8 +44,10 @@
 
 #define MAX_RANGES 16
 #define MAX_PFN_RANGES MAX_RANGES
+#define CONFIG_PDX_OFFSET_TBL_ORDER 6
 
 #define ASSERT assert
+#define ASSERT_UNREACHABLE() assert(0)
 
 #define CONFIG_DEBUG
 
@@ -66,9 +68,21 @@ static inline unsigned int find_next(
 #define find_next_zero_bit(a, s, o) find_next(a, s, o, false)
 #define find_next_bit(a, s, o)      find_next(a, s, o, true)
 
+#define flsl(x) ((x) ? BITS_PER_LONG - __builtin_clzl(x) : 0)
+#define ffsl(x) __builtin_ffsl(x)
+
 #define boolean_param(name, func)
 
 typedef uint64_t paddr_t;
+
+#define SWAP(a, b) \
+   do { typeof(a) t_ = (a); (a) = (b); (b) = t_; } while ( 0 )
+
+#define sort(elem, nr, size, cmp, swp) ({                               \
+    /* Consume swp() so compiler doesn't complain it's unused. */       \
+    (void)(swp);                                                        \
+    qsort(elem, nr, size, cmp);                                         \
+})
 
 #include "pdx.h"
 
