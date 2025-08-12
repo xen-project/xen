@@ -39,12 +39,12 @@ fi
     fi
 
     ./configure
-    make clean
+    make -C xen clean
     find . -type f -name "*.safparse" -print -delete
     "${script_dir}/build.sh" "$1"
     # Generate additional configuration files
     "${script_dir}/ECLAIR/generate_ecl.sh"
-    make clean
+    make -C xen clean
     cd xen
     make -f "${script_dir}/Makefile.prepare" prepare
     # Translate the /* SAF-n-safe */ comments into ECLAIR CBTs
