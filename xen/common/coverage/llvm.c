@@ -44,12 +44,8 @@
     ((uint64_t)'f' << 16) | ((uint64_t)'R' << 8)  | ((uint64_t)129)
 #endif
 
-#if __clang_major__ >= 4 || (__clang_major__ == 3 && __clang_minor__ >= 9)
 #define LLVM_PROFILE_VERSION    4
 #define LLVM_PROFILE_NUM_KINDS  2
-#else
-#error "clang version not supported with coverage"
-#endif
 
 struct llvm_profile_data {
     uint64_t name_ref;
