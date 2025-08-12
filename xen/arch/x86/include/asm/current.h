@@ -83,7 +83,7 @@ static inline struct cpu_info *get_cpu_info_from_stack(unsigned long sp)
     return (struct cpu_info *)((sp | (STACK_SIZE - 1)) + 1) - 1;
 }
 
-static inline struct cpu_info *get_cpu_info(void)
+static inline attr_const struct cpu_info *get_cpu_info(void)
 {
 #ifdef __clang__
     /* Clang complains that sp in the else case is not initialised. */
