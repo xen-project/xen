@@ -118,9 +118,24 @@ static void read_registers(struct extra_state *state)
     state->cr3 = read_cr3();
     state->cr4 = read_cr4();
 
-    state->fsb = read_fs_base();
-    state->gsb = read_gs_base();
-    state->gss = read_gs_shadow();
+    /*
+     * Help the optimiser out by opencoding read_*_base() and rearranging the
+     * expression.  -fno-strict-aliasing causes the store into state to
+     * invalidate the read_cr4() address calculation (really cpu_info->cr4
+     * under the hood), forcing the cr4 check to be re-evaluated every time.
+     */
+    if ( state->cr4 & X86_CR4_FSGSBASE )
+    {
+        state->fsb = __rdfsbase();
+        state->gsb = __rdgsbase();
+        state->gss = __rdgs_shadow();
+    }
+    else
+    {
+        state->fsb = rdmsr(MSR_FS_BASE);
+        state->gsb = rdmsr(MSR_GS_BASE);
+        state->gss = rdmsr(MSR_SHADOW_GS_BASE);
+    }
 
     asm ( "mov %%ds, %0" : "=m" (state->ds) );
     asm ( "mov %%es, %0" : "=m" (state->es) );
