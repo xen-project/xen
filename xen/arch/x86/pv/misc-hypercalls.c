@@ -176,27 +176,29 @@ long do_set_segment_base(unsigned int which, unsigned long base)
     switch ( which )
     {
     case SEGBASE_FS:
-        if ( is_canonical_address(base) )
-            write_fs_base(base);
-        else
-            ret = -EINVAL;
-        break;
-
     case SEGBASE_GS_USER:
-        if ( is_canonical_address(base) )
-        {
-            write_gs_shadow(base);
-            v->arch.pv.gs_base_user = base;
-        }
-        else
-            ret = -EINVAL;
-        break;
-
     case SEGBASE_GS_KERNEL:
-        if ( is_canonical_address(base) )
-            write_gs_base(base);
-        else
+        if ( !is_canonical_address(base) )
+        {
             ret = -EINVAL;
+            break;
+        }
+
+        switch ( which )
+        {
+        case SEGBASE_FS:
+            write_fs_base(base);
+            break;
+
+        case SEGBASE_GS_USER:
+            v->arch.pv.gs_base_user = base;
+            write_gs_shadow(base);
+            break;
+
+        case SEGBASE_GS_KERNEL:
+            write_gs_base(base);
+            break;
+        }
         break;
 
     case SEGBASE_GS_USER_SEL:
