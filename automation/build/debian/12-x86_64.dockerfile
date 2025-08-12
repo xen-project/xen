@@ -9,6 +9,8 @@ RUN <<EOF
 #!/bin/bash
     set -eu
 
+    useradd --create-home user
+
     apt-get update
 
     DEPS=(
@@ -70,5 +72,5 @@ RUN <<EOF
     rm -rf /var/lib/apt/lists*
 EOF
 
-USER root
+USER user
 WORKDIR /build
