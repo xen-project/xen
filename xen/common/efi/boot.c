@@ -1534,8 +1534,11 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
 
         efi_arch_cfg_file_late(loaded_image, dir_handle, section.s);
 
-        efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
-        cfg.addr = 0;
+        if ( cfg.need_to_free )
+        {
+            efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
+            cfg.need_to_free = false;
+        }
 
         if ( dir_handle )
             dir_handle->Close(dir_handle);
