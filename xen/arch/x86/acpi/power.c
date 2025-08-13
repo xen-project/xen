@@ -19,6 +19,7 @@
 #include <xen/iommu.h>
 #include <xen/param.h>
 #include <xen/sched.h>
+#include <xen/softirq.h>
 #include <xen/spinlock.h>
 #include <xen/watchdog.h>
 
@@ -310,6 +311,7 @@ static int enter_state(u32 state)
     thaw_domains();
     system_state = SYS_STATE_active;
     spin_unlock(&pm_lock);
+    raise_softirq(TIMER_SOFTIRQ);
     return error;
 }
 
