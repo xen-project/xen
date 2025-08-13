@@ -27,8 +27,21 @@ END(entry_FRED_R3)
 
 FUNC(eretu_exit_to_guest)
         POP_GPRS
+
+        /*
+         * Exceptions here are handled by redirecting either to
+         * entry_FRED_R3() (for an error to be passed to the guest), or to
+         * eretu_error_dom_crash() (for a Xen error handling guest state).
+         */
+LABEL(eretu, 0)
         eretu
 END(eretu_exit_to_guest)
+
+FUNC(eretu_error_dom_crash)
+        PUSH_AND_CLEAR_GPRS
+        sti
+        call    asm_domain_crash_synchronous  /* Does not return */
+END(eretu_error_dom_crash)
 
         /* The Ring0 entrypoint is at Ring3 + 0x100. */
         .org entry_FRED_R3 + 0x100, 0xcc

@@ -2353,6 +2353,113 @@ void asmlinkage entry_from_pv(struct cpu_user_regs *regs)
     fatal_trap(regs, false);
 }
 
+void nocall eretu_error_dom_crash(void);
+
+/*
+ * Classify an event at the ERETU instruction, and handle if possible.
+ * Returns @true if handled, @false if the event should continue down the
+ * normal handlers.
+ */
+static bool handle_eretu_event(struct cpu_user_regs *regs)
+{
+    unsigned long recover;
+
+    /*
+     * WARNING: The GPRs in gregs overlaps with regs.  Only gregs->error_code
+     *          and later are legitimate to access.
+     */
+    struct cpu_user_regs *gregs =
+        _p(regs->rsp - offsetof(struct cpu_user_regs, error_code));
+
+    /*
+     * The asynchronous or fatal events (INTR, NMI, #MC, #DF) have been dealt
+     * with, meaning we only have synchronous ones to consider.  Anything
+     * which isn't a hardware exception (e.g. #BP) wants handling normally.
+     */
+    if ( regs->fred_ss.type != X86_ET_HW_EXC )
+        return false;
+
+    /*
+     * Guests are permitted to write non-present GDT/LDT entries.  Therefore
+     * #NP[sel] (%cs) and #SS[sel] (%ss) must be handled as guest errors.  The
+     * only other source of #SS is for a bad %ss-relative memory access in
+     * Xen, and if the stack is that bad, we'll have escalated to #DF.
+     *
+     * #PF can happen from ERETU accessing the GDT/LDT.  Xen may translate
+     * these into #GP for the guest, so must be handled as guest errors.  In
+     * theory we can get #PF for a bad instruction fetch or bad stack access,
+     * but either of these will be fatal and not end up here.
+     */
+    switch ( regs->fred_ss.vector )
+    {
+    case X86_EXC_GP:
+        /*
+         * #GP[0] can occur because of a NULL %cs or %ss (which are a guest
+         * error), but some #GP[0]'s are errors in Xen (ERETU at SL != 0), or
+         * errors of Xen's handling of guest state (bad metadata).
+         *
+         * These magic numbers came from the FRED Spec; they check that ERETU
+         * is trying to return to Ring 3, and that reserved or inapplicable
+         * bits are 0.
+         */
+        if ( regs->error_code == 0 && (gregs->cs & ~3) && (gregs->ss & ~3) &&
+             (regs->fred_cs.sl != 0 ||
+              (gregs->csx    & 0xffffffffffff0003UL) != 3 ||
+              (gregs->rflags & 0xffffffffffc2b02aUL) != 2 ||
+              (gregs->ssx    &         0xfff80003UL) != 3) )
+        {
+            recover = (unsigned long)eretu_error_dom_crash;
+
+            if ( regs->fred_cs.sl )
+                gprintk(XENLOG_ERR, "ERETU at SL %u\n", regs->fred_cs.sl);
+            else
+                gprintk(XENLOG_ERR, "Bad return state: csx %#lx, rflags %#lx, ssx %#x\n",
+                        gregs->csx, gregs->rflags, (unsigned int)gregs->ssx);
+            break;
+        }
+        fallthrough;
+    case X86_EXC_NP:
+    case X86_EXC_SS:
+    case X86_EXC_PF:
+        recover = (unsigned long)entry_FRED_R3;
+        break;
+
+        /*
+         * Handle everything else normally.  e.g. #DB would be debugging
+         * activities in Xen.  In theory we can get #UD if CR4.FRED gets
+         * cleared, but in practice if that were the case we wouldn't be here
+         * handling the result.
+         */
+    default:
+        return false;
+    }
+
+    this_cpu(last_extable_addr) = regs->rip;
+
+    /*
+     * If an NMI was taken in guest context and the ERETU faulted, NMIs will
+     * still be blocked.  Therefore we copy the interrupted frame's NMI status
+     * into our own, and must ERETS as part of recovery.
+     */
+    regs->fred_ss.nmi = gregs->fred_ss.nmi;
+
+    /*
+     * Next, copy the exception information from the current frame back onto
+     * the interrupted frame, preserving the interrupted frame's %cs and %ss.
+     */
+    *cpu_regs_fred_info(regs) = *cpu_regs_fred_info(gregs);
+    gregs->ssx = (regs->ssx & ~0xffff) | gregs->ss;
+    gregs->csx = (regs->csx & ~0xffff) | gregs->cs;
+    gregs->error_code   = regs->error_code;
+    gregs->entry_vector = regs->entry_vector;
+
+    fixup_exception_return(regs, recover, 0);
+
+    return true;
+}
+
+void nocall eretu(void);
+
 void asmlinkage entry_from_xen(struct cpu_user_regs *regs)
 {
     struct fred_info *fi = cpu_regs_fred_info(regs);
@@ -2393,6 +2500,14 @@ void asmlinkage entry_from_xen(struct cpu_user_regs *regs)
      */
     if ( regs->eflags & X86_EFLAGS_IF )
         local_irq_enable();
+
+    /*
+     * An event taken at the ERETU instruction may be because of bad guest
+     * state.  If so, it will need special handling.
+     */
+    if ( unlikely(regs->rip == (unsigned long)eretu) &&
+         handle_eretu_event(regs) )
+        return;
 
     switch ( type )
     {
