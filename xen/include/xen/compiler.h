@@ -47,11 +47,7 @@
 # define cf_check
 #endif
 
-#if (!defined(__clang__) && (__GNUC__ == 4) && (__GNUC_MINOR__ < 5))
-#define unreachable() do {} while (1)
-#else
 #define unreachable() __builtin_unreachable()
-#endif
 
 /*
  * Compilers estimate the size of an asm() block for inlining purposes.
