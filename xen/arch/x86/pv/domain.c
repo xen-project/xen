@@ -12,6 +12,7 @@
 
 #include <asm/cpu-policy.h>
 #include <asm/cpufeature.h>
+#include <asm/fsgsbase.h>
 #include <asm/invpcid.h>
 #include <asm/spec_ctrl.h>
 #include <asm/pv/domain.h>

@@ -44,6 +44,7 @@
 #include <asm/cpuidle.h>
 #include <asm/debugreg.h>
 #include <asm/desc.h>
+#include <asm/fsgsbase.h>
 #include <asm/guest-msr.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/nestedhvm.h>

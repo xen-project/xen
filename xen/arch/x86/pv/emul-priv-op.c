@@ -16,6 +16,7 @@
 #include <asm/amd.h>
 #include <asm/debugreg.h>
 #include <asm/endbr.h>
+#include <asm/fsgsbase.h>
 #include <asm/hpet.h>
 #include <asm/mc146818rtc.h>
 #include <asm/pv/domain.h>

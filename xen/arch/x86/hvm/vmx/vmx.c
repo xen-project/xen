@@ -22,6 +22,7 @@
 #include <asm/current.h>
 #include <asm/debugreg.h>
 #include <asm/event.h>
+#include <asm/fsgsbase.h>
 #include <asm/gdbsx.h>
 #include <asm/guest-msr.h>
 #include <asm/hvm/emulate.h>

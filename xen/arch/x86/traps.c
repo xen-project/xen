@@ -33,6 +33,7 @@
 #include <asm/debugreg.h>
 #include <asm/desc.h>
 #include <asm/flushtlb.h>
+#include <asm/fsgsbase.h>
 #include <asm/gdbsx.h>
 #include <asm/i387.h>
 #include <asm/io.h>

@@ -10,6 +10,7 @@
 #include <xen/hypercall.h>
 
 #include <asm/debugreg.h>
+#include <asm/fsgsbase.h>
 
 long do_set_debugreg(int reg, unsigned long value)
 {
