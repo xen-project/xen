@@ -27,11 +27,6 @@ extern pr_t xen_mpumap[MAX_MPU_REGION_NR];
 
 #define virt_to_maddr(va) ((paddr_t)((vaddr_t)(va) & PADDR_MASK))
 
-#ifdef CONFIG_ARM_32
-#define is_xen_heap_page(page) ({ BUG_ON("unimplemented"); false; })
-#define is_xen_heap_mfn(mfn) ({ BUG_ON("unimplemented"); false; })
-#endif
-
 /* On MPU systems there is no translation, ma == va. */
 static inline void *maddr_to_virt(paddr_t ma)
 {
