@@ -33,7 +33,7 @@
 #define PAGE_SHIFT    12
 /* Some libcs define PAGE_SIZE in limits.h. */
 #undef  PAGE_SIZE
-#define PAGE_SIZE     (1 << PAGE_SHIFT)
+#define PAGE_SIZE     (1L << PAGE_SHIFT)
 #define MAX_ORDER     18 /* 2 * PAGETABLE_ORDER (9) */
 
 #define PFN_DOWN(x)   ((x) >> PAGE_SHIFT)

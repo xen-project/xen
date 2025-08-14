@@ -274,7 +274,7 @@ bool __init pfn_pdx_compression_setup(paddr_t base)
 
     pfn_pdx_hole_shift  = hole_shift;
     pfn_pdx_bottom_mask = (1UL << bottom_shift) - 1;
-    ma_va_bottom_mask   = ((paddr_t)PAGE_SIZE << bottom_shift) - 1;
+    ma_va_bottom_mask   = (PAGE_SIZE << bottom_shift) - 1;
     pfn_hole_mask       = ((1UL << hole_shift) - 1) << bottom_shift;
     pfn_top_mask        = ~(pfn_pdx_bottom_mask | pfn_hole_mask);
     ma_top_mask         = pfn_top_mask << PAGE_SHIFT;
