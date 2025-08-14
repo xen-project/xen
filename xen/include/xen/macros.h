@@ -40,9 +40,6 @@
 
 #ifndef __ASSEMBLY__
 
-/* All clang versions supported by Xen have _Static_assert. */
-#if defined(__clang__) || \
-    (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6))
 /* Force a compilation error if condition is true */
 #define BUILD_BUG_ON(cond) ({ _Static_assert(!(cond), "!(" #cond ")"); })
 
@@ -54,11 +51,6 @@
  */
 #define BUILD_BUG_ON_ZERO(cond) \
     (sizeof(struct { char c; _Static_assert(!(cond), "!(" #cond ")"); }) & 0)
-#else
-#define BUILD_BUG_ON_ZERO(cond) \
-    (sizeof(struct { unsigned u : !(cond); }) & 0)
-#define BUILD_BUG_ON(cond) ((void)BUILD_BUG_ON_ZERO(cond))
-#endif
 
 /*
  * Force a compilation error.  This is for code which, in the normal case,
