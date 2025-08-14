@@ -43,8 +43,6 @@ SECTIONS
          * Attention should be paid to pointers taking care of possible later
          * relocation.
          */
-        DECLARE_IMPORT(__base_relocs_start);
-        DECLARE_IMPORT(__base_relocs_end);
         DECLARE_IMPORT(__trampoline_rel_start);
         DECLARE_IMPORT(__trampoline_rel_stop);
         DECLARE_IMPORT(__trampoline_seg_start);
