@@ -32,6 +32,17 @@ static inline unsigned long __rdgsbase(void)
     return base;
 }
 
+static inline unsigned long __rdgs_shadow(void)
+{
+    unsigned long base;
+
+    asm_inline volatile ( "swapgs\n\t"
+                          "rdgsbase %0\n\t"
+                          "swapgs" : "=r" (base) );
+
+    return base;
+}
+
 static inline void __wrfsbase(unsigned long base)
 {
     asm volatile ( "wrfsbase %0" :: "r" (base) );
@@ -40,6 +51,14 @@ static inline void __wrfsbase(unsigned long base)
 static inline void __wrgsbase(unsigned long base)
 {
     asm volatile ( "wrgsbase %0" :: "r" (base) );
+}
+
+static inline void __wrgs_shadow(unsigned long base)
+{
+    asm_inline volatile ( "swapgs\n\t"
+                          "wrgsbase %0\n\t"
+                          "swapgs"
+                          :: "r" (base) );
 }
 
 static inline unsigned long read_fs_base(void)
@@ -71,13 +90,9 @@ static inline unsigned long read_gs_shadow(void)
     unsigned long base;
 
     if ( read_cr4() & X86_CR4_FSGSBASE )
-    {
-        asm volatile ( "swapgs" );
-        base = __rdgsbase();
-        asm volatile ( "swapgs" );
-    }
-    else
-        rdmsrl(MSR_SHADOW_GS_BASE, base);
+        return __rdgs_shadow();
+
+    rdmsrl(MSR_SHADOW_GS_BASE, base);
 
     return base;
 }
@@ -101,12 +116,7 @@ static inline void write_gs_base(unsigned long base)
 static inline void write_gs_shadow(unsigned long base)
 {
     if ( read_cr4() & X86_CR4_FSGSBASE )
-    {
-        asm volatile ( "swapgs\n\t"
-                       "wrgsbase %0\n\t"
-                       "swapgs"
-                       :: "r" (base) );
-    }
+        __wrgs_shadow(base);
     else
         wrmsrl(MSR_SHADOW_GS_BASE, base);
 }
