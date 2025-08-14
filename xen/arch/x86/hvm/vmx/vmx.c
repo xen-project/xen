@@ -2800,8 +2800,8 @@ static uint64_t cf_check vmx_get_reg(struct vcpu *v, unsigned int reg)
     case MSR_SHADOW_GS_BASE:
         if ( v != curr )
             return v->arch.hvm.vmx.shadow_gs;
-        rdmsrl(MSR_SHADOW_GS_BASE, val);
-        return val;
+        else
+            return rdmsr(MSR_SHADOW_GS_BASE);
     }
 
     /* Logic which maybe requires remote VMCS acquisition. */

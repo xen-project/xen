@@ -1860,9 +1860,9 @@ static void load_segments(struct vcpu *n)
         }
         else
         {
-            wrmsrl(MSR_FS_BASE, n->arch.pv.fs_base);
-            wrmsrl(MSR_GS_BASE, gsb);
-            wrmsrl(MSR_SHADOW_GS_BASE, gss);
+            wrmsrns(MSR_FS_BASE, n->arch.pv.fs_base);
+            wrmsrns(MSR_GS_BASE, gsb);
+            wrmsrns(MSR_SHADOW_GS_BASE, gss);
         }
     }
 
@@ -1987,8 +1987,8 @@ static void save_segments(struct vcpu *v)
         }
         else
         {
-            rdmsrl(MSR_FS_BASE, fs_base);
-            rdmsrl(MSR_GS_BASE, gs_base);
+            fs_base = rdmsr(MSR_FS_BASE);
+            gs_base = rdmsr(MSR_GS_BASE);
         }
 
         v->arch.pv.fs_base = fs_base;
