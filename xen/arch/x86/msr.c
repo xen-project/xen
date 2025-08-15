@@ -15,6 +15,7 @@
 #include <asm/amd.h>
 #include <asm/cpu-policy.h>
 #include <asm/debugreg.h>
+#include <asm/guest-msr.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/viridian.h>
 #include <asm/msr.h>

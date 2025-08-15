@@ -23,6 +23,7 @@
 #include <asm/debugreg.h>
 #include <asm/event.h>
 #include <asm/gdbsx.h>
+#include <asm/guest-msr.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/monitor.h>

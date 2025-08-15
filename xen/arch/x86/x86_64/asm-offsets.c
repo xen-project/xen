@@ -15,6 +15,7 @@
 #include <asm/hardirq.h>
 #include <xen/multiboot.h>
 #include <xen/multiboot2.h>
+#include <asm/guest-msr.h>
 
 #ifdef CONFIG_VIDEO
 # include "../boot/video.h"

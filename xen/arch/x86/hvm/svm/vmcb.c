@@ -14,6 +14,7 @@
 #include <xen/sched.h>
 #include <xen/softirq.h>
 
+#include <asm/guest-msr.h>
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/svmdebug.h>
 #include <asm/hvm/svm/vmcb.h>

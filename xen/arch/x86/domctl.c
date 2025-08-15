@@ -25,6 +25,7 @@
 #include <asm/acpi.h>
 #include <asm/cpu-policy.h>
 #include <asm/gdbsx.h>
+#include <asm/guest-msr.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/io_apic.h>

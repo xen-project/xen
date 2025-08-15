@@ -7,6 +7,7 @@
 
 #include <asm/cpu-policy.h>
 #include <asm/cpuid.h>
+#include <asm/guest-msr.h>
 #include <asm/hvm/viridian.h>
 #include <asm/xstate.h>
 

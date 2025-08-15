@@ -38,6 +38,7 @@
 #include <asm/current.h>
 #include <asm/debugreg.h>
 #include <asm/e820.h>
+#include <asm/guest-msr.h>
 #include <asm/hap.h>
 #include <asm/hvm/cacheattr.h>
 #include <asm/hvm/emulate.h>

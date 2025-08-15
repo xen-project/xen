@@ -10,6 +10,7 @@
 
 #include <xen/ioreq.h>
 
+#include <asm/guest-msr.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
