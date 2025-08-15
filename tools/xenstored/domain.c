@@ -1312,11 +1312,13 @@ static int close_xgt_handle(void *_handle)
 	return 0;
 }
 
+static char store_domain_path[] = "/local/domain/65535";
+
 /* Returns the implicit path of a connection (only domains have this) */
 const char *get_implicit_path(const struct connection *conn)
 {
 	if (!conn->domain)
-		return "/local/domain/0";
+		return store_domain_path;
 	return conn->domain->path;
 }
 
@@ -1385,6 +1387,9 @@ void init_domains(void)
 
 	if (store_domid == DOMID_INVALID)
 		barf("Could not determine xenstore domid\n");
+
+	snprintf(store_domain_path, sizeof(store_domain_path),
+		 "/local/domain/%u", store_domid);
 
 	/*
 	 * Privileged domid must be first to setup structures for firing the
