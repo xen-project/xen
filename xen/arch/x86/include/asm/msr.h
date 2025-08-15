@@ -98,45 +98,6 @@ static inline void msr_split(struct cpu_user_regs *regs, uint64_t val)
     regs->rax = (uint32_t)val;
 }
 
-static inline uint64_t rdtsc(void)
-{
-    uint64_t low, high;
-
-    __asm__ __volatile__("rdtsc" : "=a" (low), "=d" (high));
-
-    return (high << 32) | low;
-}
-
-static inline uint64_t rdtsc_ordered(void)
-{
-    uint64_t low, high, aux;
-
-    /*
-     * The RDTSC instruction is not serializing.  Make it dispatch serializing
-     * for the purposes here by issuing LFENCE (or MFENCE if necessary) ahead
-     * of it.
-     *
-     * RDTSCP, otoh, "does wait until all previous instructions have executed
-     * and all previous loads are globally visible" (SDM) / "forces all older
-     * instructions to retire before reading the timestamp counter" (APM).
-     */
-    alternative_io_2("lfence; rdtsc",
-                     "mfence; rdtsc", X86_FEATURE_MFENCE_RDTSC,
-                     "rdtscp",        X86_FEATURE_RDTSCP,
-                     ASM_OUTPUT2("=a" (low), "=d" (high), "=c" (aux)),
-                     /* no inputs */);
-
-    return (high << 32) | low;
-}
-
-#define __write_tsc(val) wrmsrl(MSR_IA32_TSC, val)
-#define write_tsc(val) ({                                       \
-    /* Reliable TSCs are in lockstep across all CPUs. We should \
-     * never write to them. */                                  \
-    ASSERT(!boot_cpu_has(X86_FEATURE_TSC_RELIABLE));            \
-    __write_tsc(val);                                           \
-})
-
 #define rdpmc(counter,low,high) \
      __asm__ __volatile__("rdpmc" \
 			  : "=a" (low), "=d" (high) \

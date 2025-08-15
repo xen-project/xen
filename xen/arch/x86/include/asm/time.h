@@ -3,6 +3,7 @@
 #define __X86_TIME_H__
 
 #include <asm/msr.h>
+#include <asm/tsc.h>
 
 typedef u64 cycles_t;
 
