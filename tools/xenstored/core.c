@@ -2567,9 +2567,9 @@ static struct option options[] = {
 #endif
 	{ NULL, 0, NULL, 0 } };
 
-int dom0_domid = 0;
+int dom0_domid = DOMID_INVALID;
 int dom0_event = 0;
-int priv_domid = 0;
+int priv_domid = DOMID_INVALID;
 domid_t stub_domid = DOMID_INVALID;
 
 static unsigned int get_optval_uint(const char *arg)
@@ -2760,7 +2760,7 @@ int main(int argc, char *argv[])
 	/* Listen to hypervisor. */
 	if (!live_update) {
 		domain_init(-1);
-		dom0_init();
+		init_domains();
 	}
 
 	/* redirect to /dev/null now we're ready to accept connections */

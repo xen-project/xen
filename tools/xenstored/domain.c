@@ -1325,43 +1325,97 @@ const char *get_implicit_path(const struct connection *conn)
 	return conn->domain->path;
 }
 
-void dom0_init(void)
+static bool init_domain(unsigned int domid)
 {
 	evtchn_port_t port;
-	struct domain *dom0;
+	struct domain *domain;
 
-	port = get_domain_evtchn(xenbus_master_domid());
+	port = get_domain_evtchn(domid);
 	if (port == -1)
-		barf_perror("Failed to initialize dom0 port");
+		barf_perror("Failed to initialize dom%u port", domid);
 
-	dom0 = introduce_domain(NULL, xenbus_master_domid(), port, false);
-	if (!dom0)
-		barf_perror("Failed to initialize dom0");
+	domain = introduce_domain(NULL, domid, port, false);
+	if (!domain) {
+		xprintf("Could not initialize dom%u", domid);
+		return false;
+	}
 
-	xenevtchn_notify(xce_handle, dom0->port);
+	if (domain->interface)
+		domain->interface->connection = XENSTORE_CONNECTED;
+
+	xenevtchn_notify(xce_handle, domain->port);
+
+	return true;
+}
+void init_domains(void)
+{
+	unsigned int *domids = NULL;
+	unsigned int nr_domids = 0;
+	unsigned int domid;
+	unsigned int state;
+	unsigned int caps;
+	uint64_t unique_id;
+	int introduce_count = 0;
+
+	while (!xenmanage_poll_changed_domain(xm_handle, &domid, &state, &caps,
+					      &unique_id)) {
+		nr_domids++;
+		domids = talloc_realloc(NULL, domids, unsigned int, nr_domids);
+		if (!domids)
+			barf_perror("Failed to reallocate domids");
+
+		domids[nr_domids - 1] = domid;
+
+		if (caps & XENMANAGE_GETDOMSTATE_CAP_CONTROL) {
+			/*
+			 * Only update with first found - otherwise use command
+			 * line.
+			 */
+			if (priv_domid == DOMID_INVALID)
+				priv_domid = domid;
+		}
+
+		if (caps & XENMANAGE_GETDOMSTATE_CAP_XENSTORE) {
+			/*
+			 * Update with last found.  dom0 or dom0less will only
+			 * have 1 domain.  stubdom there will be dom0 and dom1,
+			 * so this will take the second for stubdom.
+			 */
+			dom0_domid = domid;
+		}
+	}
+
+	if (dom0_domid == DOMID_INVALID)
+		dom0_domid = priv_domid;
+
+	if (dom0_domid == DOMID_INVALID)
+		barf("Could not determine xenstore domid\n");
+
+	/*
+	 * Local domid must be first to setup structures for firing the special
+	 * watches.
+	 */
+	if (init_domain(dom0_domid))
+		introduce_count++;
+
+	for (unsigned int i = 0; i < nr_domids; i++) {
+		domid = domids[i];
+		if (domid == dom0_domid)
+			continue;
+
+		if (init_domain(domid))
+			introduce_count++;
+	}
+
+	talloc_free(domids);
+
+	if (introduce_count == 0)
+		barf("Did not initialize any domains");
 }
 
 void stubdom_init(bool live_update)
 {
 #ifdef __MINIOS__
-	struct domain *stubdom;
-	evtchn_port_t port;
-
-	if (stub_domid < 0)
-		return;
-
-	if (!live_update) {
-		port = get_domain_evtchn(stub_domid);
-		if (port == -1)
-			barf_perror("Failed to initialize stubdom port");
-
-		stubdom = introduce_domain(NULL, stub_domid, port, false);
-		if (!stubdom)
-			barf_perror("Failed to initialize stubdom");
-
-		xenevtchn_notify(xce_handle, stubdom->port);
-	}
-
 	mount_9pfs(live_update);
 #endif
 }
