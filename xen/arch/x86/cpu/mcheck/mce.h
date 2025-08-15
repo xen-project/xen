@@ -7,11 +7,11 @@
 #include <xen/sched.h>
 #include <xen/smp.h>
 
-#include <asm/traps.h>
 #include <asm/atomic.h>
+#include <asm/traps.h>
 
-#include "x86_mca.h"
 #include "mctelem.h"
+#include "x86_mca.h"
 
 #define MCE_QUIET       0
 #define MCE_VERBOSE     1

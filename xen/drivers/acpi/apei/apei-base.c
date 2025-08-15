@@ -30,15 +30,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
-#include <xen/kernel.h>
-#include <xen/errno.h>
-#include <xen/delay.h>
-#include <xen/string.h>
-#include <xen/types.h>
-#include <xen/spinlock.h>
-#include <xen/init.h>
+
 #include <xen/cper.h>
+#include <xen/delay.h>
+#include <xen/errno.h>
+#include <xen/init.h>
+#include <xen/kernel.h>
+#include <xen/spinlock.h>
+#include <xen/string.h>
+
 #include <asm/io.h>
+
 #include <acpi/acpi.h>
 #include <acpi/apei.h>
 

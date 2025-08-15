@@ -1,19 +1,20 @@
+#include <xen/acpi.h>
+#include <xen/domain_page.h>
 #include <xen/efi.h>
 #include <xen/init.h>
-#include <xen/types.h>
+#include <xen/iommu.h>
 #include <xen/lib.h>
 #include <xen/param.h>
-#include <xen/sched.h>
-#include <xen/domain_page.h>
-#include <xen/iommu.h>
-#include <xen/acpi.h>
 #include <xen/pfn.h>
+#include <xen/sched.h>
+#include <xen/types.h>
+
+#include <asm/e820.h>
 #include <asm/fixmap.h>
 #include <asm/page.h>
 #include <asm/processor.h>
-#include <asm/e820.h>
-#include <asm/tboot.h>
 #include <asm/setup.h>
+#include <asm/tboot.h>
 #include <asm/trampoline.h>
 
 #include <crypto/vmac.h>

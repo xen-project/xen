@@ -24,11 +24,13 @@
 #include <xen/hypercall.h>
 #include <xen/init.h>
 #include <xen/iocap.h>
+#include <xen/iommu.h>
 #include <xen/irq.h>
 #include <xen/kernel.h>
 #include <xen/lib.h>
 #include <xen/livepatch.h>
 #include <xen/multicall.h>
+#include <xen/numa.h>
 #include <xen/paging.h>
 #include <xen/pci.h>
 #include <xen/percpu.h>
@@ -64,12 +66,10 @@
 #include <asm/system.h>
 #include <asm/traps.h>
 #include <asm/xstate.h>
-#include <xen/iommu.h>
-#include <xen/numa.h>
 
 #include <public/arch-x86/cpuid.h>
-#include <public/sysctl.h>
 #include <public/hvm/hvm_vcpu.h>
+#include <public/sysctl.h>
 
 #ifdef CONFIG_COMPAT
 #include <compat/vcpu.h>

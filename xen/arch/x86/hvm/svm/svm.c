@@ -18,7 +18,6 @@
 #include <asm/cpufeature.h>
 #include <asm/current.h>
 #include <asm/debugreg.h>
-#include <asm/idt.h>
 #include <asm/gdbsx.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
@@ -29,13 +28,14 @@
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/svmdebug.h>
 #include <asm/hvm/svm/vmcb.h>
-#include <asm/iocap.h>
 #include <asm/i387.h>
+#include <asm/idt.h>
+#include <asm/iocap.h>
 #include <asm/monitor.h>
 #include <asm/msr.h>
+#include <asm/p2m.h>
 #include <asm/paging.h>
 #include <asm/processor.h>
-#include <asm/p2m.h>
 #include <asm/x86_emulate.h>
 #include <asm/xenoprof.h>
 

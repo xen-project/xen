@@ -14,8 +14,8 @@
 
 #include <asm/asm_defns.h>
 #include <asm/current.h>
-#include <asm/x86_emulate.h>
 #include <asm/hvm/asid.h>
+#include <asm/x86_emulate.h>
 
 struct pirq; /* needed by pi_update_irte */
 

@@ -7,18 +7,18 @@
  */
 
 #include <xen/init.h>
-#include <xen/lib.h>
 #include <xen/keyhandler.h>
+#include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/rcupdate.h>
 #include <xen/sched.h>
 #include <xen/softirq.h>
 
+#include <asm/hvm/svm/svm.h>
+#include <asm/hvm/svm/svmdebug.h>
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/msr-index.h>
 #include <asm/p2m.h>
-#include <asm/hvm/svm/svm.h>
-#include <asm/hvm/svm/svmdebug.h>
 #include <asm/spec_ctrl.h>
 
 struct vmcb_struct *alloc_vmcb(void)

@@ -10,12 +10,12 @@
 #include <xen/sched.h>
 #include <xen/xvmalloc.h>
 
+#include <asm/asm_defns.h>
 #include <asm/cpu-policy.h>
 #include <asm/current.h>
-#include <asm/processor.h>
 #include <asm/i387.h>
+#include <asm/processor.h>
 #include <asm/xstate.h>
-#include <asm/asm_defns.h>
 
 /*
  * Maximum size (in byte) of the XSAVE/XRSTOR save area required by all

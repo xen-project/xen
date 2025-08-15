@@ -4,51 +4,53 @@
  * Copyright (c) 2004, Intel Corporation.
  */
 
+#include <xen/domain_page.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
 #include <xen/init.h>
+#include <xen/irq.h>
 #include <xen/lib.h>
 #include <xen/param.h>
-#include <xen/trace.h>
-#include <xen/sched.h>
-#include <xen/irq.h>
-#include <xen/softirq.h>
-#include <xen/domain_page.h>
-#include <xen/hypercall.h>
 #include <xen/perfc.h>
-#include <asm/current.h>
-#include <asm/io.h>
-#include <asm/iocap.h>
-#include <asm/regs.h>
+#include <xen/sched.h>
+#include <xen/softirq.h>
+#include <xen/trace.h>
+
+#include <asm/altp2m.h>
+#include <asm/apic.h>
 #include <asm/cpufeature.h>
-#include <asm/processor.h>
+#include <asm/current.h>
 #include <asm/debugreg.h>
-#include <asm/msr.h>
-#include <asm/p2m.h>
-#include <asm/mem_sharing.h>
+#include <asm/event.h>
+#include <asm/gdbsx.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
-#include <asm/hvm/support.h>
-#include <asm/hvm/vmx/vmx.h>
-#include <asm/hvm/vmx/vmcs.h>
-#include <public/sched.h>
-#include <public/hvm/ioreq.h>
-#include <asm/hvm/vlapic.h>
-#include <asm/x86_emulate.h>
-#include <asm/hvm/vpt.h>
-#include <public/hvm/save.h>
 #include <asm/hvm/monitor.h>
-#include <asm/xenoprof.h>
-#include <asm/gdbsx.h>
-#include <asm/apic.h>
 #include <asm/hvm/nestedhvm.h>
-#include <asm/altp2m.h>
-#include <asm/event.h>
+#include <asm/hvm/support.h>
+#include <asm/hvm/vlapic.h>
+#include <asm/hvm/vmx/vmcs.h>
+#include <asm/hvm/vmx/vmx.h>
+#include <asm/hvm/vpt.h>
+#include <asm/io.h>
+#include <asm/iocap.h>
 #include <asm/mce.h>
+#include <asm/mem_sharing.h>
 #include <asm/monitor.h>
+#include <asm/msr.h>
+#include <asm/p2m.h>
+#include <asm/processor.h>
 #include <asm/prot-key.h>
+#include <asm/regs.h>
 #include <asm/spec_ctrl.h>
 #include <asm/stubs.h>
+#include <asm/x86_emulate.h>
+#include <asm/xenoprof.h>
+
 #include <public/arch-x86/cpuid.h>
+#include <public/hvm/ioreq.h>
+#include <public/hvm/save.h>
+#include <public/sched.h>
 
 static bool __initdata opt_force_ept;
 boolean_param("force-ept", opt_force_ept);

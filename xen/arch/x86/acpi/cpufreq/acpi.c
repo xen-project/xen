@@ -11,8 +11,8 @@
  *      porting acpi-cpufreq.c from Linux 2.6.23 to Xen hypervisor
  */
 
-#include <xen/errno.h>
 #include <xen/delay.h>
+#include <xen/errno.h>
 #include <xen/param.h>
 #include <xen/types.h>
 

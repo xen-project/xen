@@ -4,39 +4,41 @@
  * Copyright (c) 2002-2006, K A Fraser
  */
 
-#include <xen/types.h>
+#include <xen/compat.h>
+#include <xen/console.h>
+#include <xen/domain.h>
+#include <xen/domain_page.h>
+#include <xen/event.h>
+#include <xen/guest_access.h>
+#include <xen/hypercall.h>
+#include <xen/iocap.h>
+#include <xen/iommu.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
-#include <xen/guest_access.h>
-#include <xen/compat.h>
-#include <xen/pci.h>
-#include <public/domctl.h>
-#include <xen/sched.h>
-#include <xen/domain.h>
-#include <xen/event.h>
-#include <xen/domain_page.h>
-#include <asm/msr.h>
-#include <xen/trace.h>
-#include <xen/console.h>
-#include <xen/iocap.h>
 #include <xen/paging.h>
+#include <xen/pci.h>
+#include <xen/sched.h>
+#include <xen/trace.h>
+#include <xen/types.h>
+#include <xen/vm_event.h>
 
+#include <asm/acpi.h>
+#include <asm/cpu-policy.h>
 #include <asm/gdbsx.h>
-#include <asm/irq.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
-#include <asm/processor.h>
-#include <asm/acpi.h> /* for hvm_acpi_power_button */
-#include <xen/hypercall.h> /* for arch_do_domctl */
-#include <xsm/xsm.h>
-#include <xen/iommu.h>
-#include <xen/vm_event.h>
-#include <public/vm_event.h>
-#include <asm/mem_sharing.h>
-#include <asm/xstate.h>
-#include <asm/psr.h>
-#include <asm/cpu-policy.h>
 #include <asm/io_apic.h>
+#include <asm/irq.h>
+#include <asm/mem_sharing.h>
+#include <asm/msr.h>
+#include <asm/processor.h>
+#include <asm/psr.h>
+#include <asm/xstate.h>
+
+#include <xsm/xsm.h>
+
+#include <public/domctl.h>
+#include <public/vm_event.h>
 
 static int update_domain_cpu_policy(struct domain *d,
                                     xen_domctl_cpu_policy_t *xdpc)
