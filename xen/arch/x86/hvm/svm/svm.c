@@ -2087,14 +2087,14 @@ static int cf_check svm_msr_write_intercept(
 static void svm_do_msr_access(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
-    bool rdmsr = curr->arch.hvm.svm.vmcb->exitinfo1 == 0;
-    int rc, inst_len = svm_get_insn_len(curr, rdmsr ? INSTR_RDMSR
-                                                    : INSTR_WRMSR);
+    bool is_read = curr->arch.hvm.svm.vmcb->exitinfo1 == 0;
+    int rc, inst_len = svm_get_insn_len(curr, is_read ? INSTR_RDMSR
+                                                      : INSTR_WRMSR);
 
     if ( inst_len == 0 )
         return;
 
-    if ( rdmsr )
+    if ( is_read )
     {
         uint64_t msr_content = 0;
 
