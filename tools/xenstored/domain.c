@@ -1026,7 +1026,7 @@ static struct domain *introduce_domain(const void *ctx,
 	struct domain *domain;
 	int rc;
 	struct xenstore_domain_interface *interface;
-	bool is_master_domain = (domid == xenbus_master_domid());
+	bool is_priv_domain = (domid == priv_domid);
 
 	domain = find_or_alloc_domain(ctx, domid);
 	if (!domain)
@@ -1051,13 +1051,13 @@ static struct domain *introduce_domain(const void *ctx,
 		if (!restore)
 			interface->server_features = domain->features;
 
-		if (is_master_domain)
+		if (is_priv_domain)
 			setup_structure(restore);
 
 		/* Now domain belongs to its connection. */
 		talloc_steal(domain->conn, domain);
 
-		if (!is_master_domain && !restore)
+		if (!is_priv_domain && !restore)
 			fire_special_watches("@introduceDomain");
 	} else {
 		/* Use XS_INTRODUCE for recreating the xenbus event-channel. */
@@ -1392,15 +1392,15 @@ void init_domains(void)
 		barf("Could not determine xenstore domid\n");
 
 	/*
-	 * Local domid must be first to setup structures for firing the special
-	 * watches.
+	 * Privileged domid must be first to setup structures for firing the
+	 * special watches.
 	 */
-	if (init_domain(dom0_domid))
+	if (init_domain(priv_domid))
 		introduce_count++;
 
 	for (unsigned int i = 0; i < nr_domids; i++) {
 		domid = domids[i];
-		if (domid == dom0_domid)
+		if (domid == priv_domid)
 			continue;
 
 		if (init_domain(domid))

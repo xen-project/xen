@@ -2269,7 +2269,7 @@ struct connection *get_connection_by_id(unsigned int conn_id)
 static void manual_node(const char *name, const char *child)
 {
 	struct node *node;
-	struct xs_permissions perms = { .id = dom0_domid,
+	struct xs_permissions perms = { .id = priv_domid,
 					.perms = XS_PERM_NONE };
 
 	node = talloc_zero(NULL, struct node);
@@ -2320,7 +2320,7 @@ void setup_structure(bool live_update)
 		manual_node("/tool/xenstored", NULL);
 		manual_node("@releaseDomain", NULL);
 		manual_node("@introduceDomain", NULL);
-		domain_nbentry_fix(dom0_domid, 5, true);
+		domain_nbentry_fix(priv_domid, 5, true);
 	}
 }
 
