@@ -55,4 +55,15 @@ struct cpu_user_regs
      */
 };
 
+static inline uint64_t msr_fold(const struct cpu_user_regs *regs)
+{
+    return (regs->rdx << 32) | regs->eax;
+}
+
+static inline void msr_split(struct cpu_user_regs *regs, uint64_t val)
+{
+    regs->rdx = val >> 32;
+    regs->rax = (uint32_t)val;
+}
+
 #endif /* X86_CPU_USER_REGS_H */

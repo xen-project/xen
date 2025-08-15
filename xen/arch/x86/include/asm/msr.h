@@ -87,17 +87,6 @@ static inline int wrmsr_safe(unsigned int msr, uint64_t val)
     return -EFAULT;
 }
 
-static inline uint64_t msr_fold(const struct cpu_user_regs *regs)
-{
-    return (regs->rdx << 32) | regs->eax;
-}
-
-static inline void msr_split(struct cpu_user_regs *regs, uint64_t val)
-{
-    regs->rdx = val >> 32;
-    regs->rax = (uint32_t)val;
-}
-
 #define rdpmc(counter,low,high) \
      __asm__ __volatile__("rdpmc" \
 			  : "=a" (low), "=d" (high) \
