@@ -10,7 +10,7 @@
 #include <xen/nospec.h>
 #include <xen/types.h>
 
-#include <asm/msr-index.h>
+#include <asm/msr.h>
 
 #define copy_to_buffer_offset copy_to_guest_offset
 #define copy_from_buffer_offset copy_from_guest_offset

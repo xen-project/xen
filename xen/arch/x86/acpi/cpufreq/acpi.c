@@ -14,7 +14,8 @@
 #include <xen/delay.h>
 #include <xen/errno.h>
 #include <xen/param.h>
-#include <xen/types.h>
+
+#include <asm/msr.h>
 
 #include <acpi/acpi.h>
 #include <acpi/cpufreq/cpufreq.h>

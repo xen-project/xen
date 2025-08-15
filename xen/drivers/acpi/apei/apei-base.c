@@ -36,6 +36,7 @@
 #include <xen/errno.h>
 #include <xen/init.h>
 #include <xen/kernel.h>
+#include <xen/lib.h>
 #include <xen/spinlock.h>
 #include <xen/string.h>
 

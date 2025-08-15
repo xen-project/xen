@@ -16,6 +16,8 @@
 #include <xen/percpu.h>
 #include <xen/spinlock.h>
 
+#include <asm/processor.h>
+
 #define __noreturn    noreturn
 #define pr_err(...) printk(XENLOG_ERR __VA_ARGS__)
 struct xen_ubsan { int in_ubsan; };

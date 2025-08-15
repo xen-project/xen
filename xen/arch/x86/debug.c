@@ -10,6 +10,7 @@
 #include <asm/current.h>
 #include <asm/debugreg.h>
 #include <asm/guest-msr.h>
+#include <asm/msr.h>
 
 /*
  * Merge new bits into dr6.  'new' is always given in positive polarity,

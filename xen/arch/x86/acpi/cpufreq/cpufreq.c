@@ -30,6 +30,9 @@
 #include <xen/errno.h>
 #include <xen/param.h>
 #include <xen/sched.h>
+
+#include <asm/msr.h>
+
 #include <acpi/cpufreq/cpufreq.h>
 
 struct acpi_cpufreq_data *cpufreq_drv_data[NR_CPUS];

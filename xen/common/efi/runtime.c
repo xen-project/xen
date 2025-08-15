@@ -33,6 +33,7 @@ void efi_rs_leave(struct efi_rs_state *state);
 
 #ifndef CONFIG_ARM
 # include <asm/i387.h>
+# include <asm/msr.h>
 # include <asm/xstate.h>
 # include <public/platform.h>
 #endif

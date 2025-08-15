@@ -11,6 +11,7 @@
 
 #include <asm/e820.h>
 #include <asm/fixmap.h>
+#include <asm/msr.h>
 #include <asm/page.h>
 #include <asm/processor.h>
 #include <asm/setup.h>

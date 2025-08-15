@@ -14,6 +14,7 @@
 #include <asm/cpu-policy.h>
 #include <asm/current.h>
 #include <asm/i387.h>
+#include <asm/msr.h>
 #include <asm/processor.h>
 #include <asm/xstate.h>
 

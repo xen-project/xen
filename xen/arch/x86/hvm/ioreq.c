@@ -20,6 +20,7 @@
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/vmx/vmx.h>
+#include <asm/msr.h>
 
 #include <public/hvm/ioreq.h>
 #include <public/hvm/params.h>

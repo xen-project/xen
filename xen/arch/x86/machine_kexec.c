@@ -24,6 +24,7 @@
 #include <asm/hpet.h>
 #include <asm/idt.h>
 #include <asm/machine_kexec.h>
+#include <asm/msr.h>
 #include <asm/page.h>
 
 /*

@@ -42,6 +42,8 @@
  */
 
 #include <xen/init.h>
+#include <xen/inttypes.h>
+
 #include <acpi/acpi.h>
 #include <acpi/actables.h>
 

@@ -1,8 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+#ifndef X86_TIME_H
+#define X86_TIME_H
 
-#ifndef __X86_TIME_H__
-#define __X86_TIME_H__
-
-#include <asm/msr.h>
 #include <asm/tsc.h>
 
 typedef u64 cycles_t;
@@ -38,6 +37,7 @@ uint64_t cf_check acpi_pm_tick_to_ns(uint64_t ticks);
 
 uint64_t tsc_ticks2ns(uint64_t ticks);
 
+struct cpu_user_regs;
 uint64_t pv_soft_rdtsc(const struct vcpu *v, const struct cpu_user_regs *regs);
 uint64_t gtime_to_gtsc(const struct domain *d, uint64_t time);
 uint64_t gtsc_to_gtime(const struct domain *d, uint64_t tsc);
@@ -47,7 +47,6 @@ int tsc_set_info(struct domain *d, uint32_t tsc_mode, uint64_t elapsed_nsec,
 
 void tsc_get_info(struct domain *d, uint32_t *tsc_mode, uint64_t *elapsed_nsec,
                   uint32_t *gtsc_khz, uint32_t *incarnation);
-   
 
 void force_update_vcpu_system_time(struct vcpu *v);
 
@@ -93,4 +92,4 @@ u64 scale_delta(u64 delta, const struct time_scale *scale);
 #define PIT_STATUS_NULL_COUNT (1 << 6)
 /* Lower bits match Timer Control Word. */
 
-#endif /* __X86_TIME_H__ */
+#endif /* X86_TIME_H */

@@ -42,6 +42,9 @@
  */
 
 #include <xen/init.h>
+#include <xen/lib.h>
+#include <xen/stdarg.h>
+
 #include <acpi/acpi.h>
 
 #define _COMPONENT          ACPI_UTILITIES

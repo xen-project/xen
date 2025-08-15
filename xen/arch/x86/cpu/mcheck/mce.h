@@ -8,6 +8,7 @@
 #include <xen/smp.h>
 
 #include <asm/atomic.h>
+#include <asm/msr.h>
 #include <asm/traps.h>
 
 #include "mctelem.h"

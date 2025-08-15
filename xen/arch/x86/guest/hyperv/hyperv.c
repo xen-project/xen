@@ -12,6 +12,7 @@
 #include <asm/fixmap.h>
 #include <asm/guest.h>
 #include <asm/guest/hyperv-tlfs.h>
+#include <asm/msr.h>
 #include <asm/processor.h>
 
 #include "private.h"
