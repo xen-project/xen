@@ -512,11 +512,6 @@ static void *map_interface(domid_t domid)
 	if (domid == store_domid)
 		return xenbus_map();
 
-#ifdef __MINIOS__
-	if (domid == stub_domid)
-		return xenstore_buf;
-#endif
-
 	return xengnttab_map_grant_ref(*xgt_handle, domid,
 				       GNTTAB_RESERVED_XENSTORE,
 				       PROT_READ|PROT_WRITE);

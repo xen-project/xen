@@ -61,13 +61,11 @@ evtchn_port_t get_domain_evtchn(unsigned int domid)
 
 void *xenbus_map(void)
 {
-	return xengnttab_map_grant_ref(*xgt_handle, xenbus_master_domid(),
-			GNTTAB_RESERVED_XENSTORE, PROT_READ|PROT_WRITE);
+	return xenstore_buf;
 }
 
 void unmap_xenbus(void *interface)
 {
-	xengnttab_unmap(*xgt_handle, interface, 1);
 }
 
 void early_init(bool live_update, bool dofork, const char *pidfile)
