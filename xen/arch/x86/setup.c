@@ -1386,6 +1386,8 @@ void asmlinkage __init noreturn __start_xen(void)
     else
         panic("Bootloader provided no memory information\n");
 
+    traps_init();
+
     /* Choose shadow stack early, to set infrastructure up appropriately. */
     if ( !boot_cpu_has(X86_FEATURE_CET_SS) )
         opt_xen_shstk = 0;
@@ -2078,7 +2080,7 @@ void asmlinkage __init noreturn __start_xen(void)
                                            &this_cpu(stubs).mfn);
     BUG_ON(!this_cpu(stubs.addr));
 
-    traps_init(); /* Needs stubs allocated, must be before presmp_initcalls. */
+    bsp_traps_reinit(); /* Needs stubs allocated, must be before presmp_initcalls. */
 
     cpu_init();
 

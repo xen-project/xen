@@ -346,6 +346,10 @@ void __init traps_init(void)
 
 /*
  * Re-initialise all state referencing the early-boot stack.
+ *
+ * This is called twice during boot, first to ensure legacy_syscall_init() has
+ * run (deferred from earlier), and second when the virtual address of the BSP
+ * stack changes.
  */
 void __init bsp_traps_reinit(void)
 {
@@ -359,7 +363,13 @@ void __init bsp_traps_reinit(void)
  */
 void percpu_traps_init(void)
 {
-    legacy_syscall_init();
+    /*
+     * Skip legacy_syscall_init() at early boot.  It requires the stubs being
+     * allocated, limiting the placement of the traps_init() call, and gets
+     * re-done anyway by bsp_traps_reinit().
+     */
+    if ( system_state > SYS_STATE_early_boot )
+        legacy_syscall_init();
 
     if ( cpu_has_xen_lbr )
         wrmsrl(MSR_IA32_DEBUGCTLMSR, IA32_DEBUGCTLMSR_LBR);
