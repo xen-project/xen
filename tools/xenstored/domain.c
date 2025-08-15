@@ -1330,7 +1330,7 @@ void dom0_init(void)
 	evtchn_port_t port;
 	struct domain *dom0;
 
-	port = get_xenbus_evtchn();
+	port = get_domain_evtchn(xenbus_master_domid());
 	if (port == -1)
 		barf_perror("Failed to initialize dom0 port");
 
@@ -1345,13 +1345,17 @@ void stubdom_init(bool live_update)
 {
 #ifdef __MINIOS__
 	struct domain *stubdom;
+	evtchn_port_t port;
 
 	if (stub_domid < 0)
 		return;
 
 	if (!live_update) {
-		stubdom = introduce_domain(NULL, stub_domid, xenbus_evtchn,
-					   false);
+		port = get_domain_evtchn(stub_domid);
+		if (port == -1)
+			barf_perror("Failed to initialize stubdom port");
+
+		stubdom = introduce_domain(NULL, stub_domid, port, false);
 		if (!stubdom)
 			barf_perror("Failed to initialize stubdom");
 

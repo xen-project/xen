@@ -41,9 +41,22 @@ struct connection *add_socket_connection(int fd)
 	barf("socket based connection without sockets");
 }
 
-evtchn_port_t get_xenbus_evtchn(void)
+/*
+ * minios stubdom looks up dom0's event channel from the command line
+ * (--event).  The stubdom's own event channel is returned directly.
+ *
+ * Any other existing domains from dom0less/Hyperlaunch will have
+ * the event channel in the xenstore page, so lookup here isn't necessary.
+ * --event would not be set, so it would default to 0.
+ */
+evtchn_port_t get_domain_evtchn(unsigned int domid)
 {
-	return dom0_event;
+	if (domid == stub_domid)
+		return xenbus_evtchn;
+	else if (domid == priv_domid)
+		return dom0_event;
+
+	return 0;
 }
 
 void *xenbus_map(void)
