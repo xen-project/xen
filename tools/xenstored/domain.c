@@ -1762,7 +1762,7 @@ static bool domain_chk_quota(struct connection *conn, unsigned int mem)
 	time_t now;
 	struct domain *domain;
 
-	if (!conn || !domid_is_unprivileged(conn->id) ||
+	if (!conn || !conn->domain || !domid_is_unprivileged(conn->id) ||
 	    conn->is_ignored)
 		return false;
 
