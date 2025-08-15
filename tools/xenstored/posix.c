@@ -174,7 +174,7 @@ static evtchn_port_t get_xenbus_evtchn(void)
  */
 evtchn_port_t get_domain_evtchn(unsigned int domid)
 {
-	if (domid == xenbus_master_domid())
+	if (domid == store_domid)
 		return get_xenbus_evtchn();
 
 	return 0;
@@ -280,7 +280,7 @@ static void accept_connection(int sock)
 	conn = new_connection(&socket_funcs);
 	if (conn) {
 		conn->fd = fd;
-		conn->id = dom0_domid;
+		conn->id = store_domid;
 	} else
 		close(fd);
 }

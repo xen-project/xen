@@ -509,7 +509,7 @@ static const struct interface_funcs domain_funcs = {
 
 static void *map_interface(domid_t domid)
 {
-	if (domid == xenbus_master_domid())
+	if (domid == store_domid)
 		return xenbus_map();
 
 #ifdef __MINIOS__
@@ -524,7 +524,7 @@ static void *map_interface(domid_t domid)
 
 static void unmap_interface(domid_t domid, void *interface)
 {
-	if (domid == xenbus_master_domid())
+	if (domid == store_domid)
 		unmap_xenbus(interface);
 	else if (domid != stub_domid)
 		xengnttab_unmap(*xgt_handle, interface, 1);
@@ -1158,7 +1158,7 @@ static struct domain *onearg_domain(struct connection *conn,
 		return ERR_PTR(-EINVAL);
 
 	domid = atoi(domid_str);
-	if (domid == dom0_domid)
+	if (domid == store_domid || domid == priv_domid)
 		return ERR_PTR(-EINVAL);
 
 	return find_connected_domain(domid);
@@ -1381,14 +1381,14 @@ void init_domains(void)
 			 * have 1 domain.  stubdom there will be dom0 and dom1,
 			 * so this will take the second for stubdom.
 			 */
-			dom0_domid = domid;
+			store_domid = domid;
 		}
 	}
 
-	if (dom0_domid == DOMID_INVALID)
-		dom0_domid = priv_domid;
+	if (store_domid == DOMID_INVALID)
+		store_domid = priv_domid;
 
-	if (dom0_domid == DOMID_INVALID)
+	if (store_domid == DOMID_INVALID)
 		barf("Could not determine xenstore domid\n");
 
 	/*

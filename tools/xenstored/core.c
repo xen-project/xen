@@ -2539,7 +2539,10 @@ static void usage(void)
 "                          allowed timeout candidates are:\n"
 "                          watch-event: time a watch-event is kept pending\n"
 "  -K, --keep-orphans      don't delete nodes owned by a domain when the\n"
-"                          domain is deleted (this is a security risk!)\n");
+"                          domain is deleted (this is a security risk!)\n"
+"  -m, --master-domid      specify the domid of the domain where xenstored\n"
+"                          is running.  defaults to 0\n"
+);
 }
 
 
@@ -2567,7 +2570,7 @@ static struct option options[] = {
 #endif
 	{ NULL, 0, NULL, 0 } };
 
-int dom0_domid = DOMID_INVALID;
+int store_domid = DOMID_INVALID;
 int dom0_event = 0;
 int priv_domid = DOMID_INVALID;
 domid_t stub_domid = DOMID_INVALID;
@@ -2736,7 +2739,7 @@ int main(int argc, char *argv[])
 			dom0_event = get_optval_uint(optarg);
 			break;
 		case 'm':
-			dom0_domid = get_optval_uint(optarg);
+			store_domid = get_optval_uint(optarg);
 			break;
 		case 'p':
 			priv_domid = get_optval_uint(optarg);

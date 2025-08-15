@@ -365,7 +365,7 @@ do {						\
 		trace("tdb: " __VA_ARGS__);	\
 } while (0)
 
-extern int dom0_domid;
+extern int store_domid;
 extern int dom0_event;
 extern int priv_domid;
 extern domid_t stub_domid;
@@ -382,11 +382,9 @@ uint64_t get_now_msec(void);
 void *xenbus_map(void);
 void unmap_xenbus(void *interface);
 
-static inline int xenbus_master_domid(void) { return dom0_domid; }
-
 static inline bool domid_is_unprivileged(unsigned int domid)
 {
-	return domid != dom0_domid && domid != priv_domid;
+	return domid != priv_domid;
 }
 
 static inline bool domain_is_unprivileged(const struct connection *conn)
