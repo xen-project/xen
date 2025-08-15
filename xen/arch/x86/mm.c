@@ -129,6 +129,7 @@
 #include <asm/shadow.h>
 #include <asm/shared.h>
 #include <asm/trampoline.h>
+#include <asm/traps.h>
 #include <asm/x86_emulate.h>
 
 #include <public/memory.h>
@@ -6441,8 +6442,15 @@ static void write_sss_token(unsigned long *ptr)
 
 void memguard_guard_stack(void *p)
 {
-    /* IST Shadow stacks.  4x 1k in stack page 0. */
-    if ( IS_ENABLED(CONFIG_XEN_SHSTK) )
+    ASSERT(opt_fred >= 0); /* Confirm that FRED-ness has been resolved */
+
+    /*
+     * IST Shadow stacks.  4x 1k in stack page 0.
+     *
+     * With IDT delivery, we need Supervisor Shadow Stack tokens at the base
+     * of each stack.  With FRED delivery, these no longer exist.
+     */
+    if ( IS_ENABLED(CONFIG_XEN_SHSTK) && !opt_fred )
     {
         write_sss_token(p + (IST_MCE * IST_SHSTK_SIZE) - 8);
         write_sss_token(p + (IST_NMI * IST_SHSTK_SIZE) - 8);
@@ -6453,7 +6461,7 @@ void memguard_guard_stack(void *p)
 
     /* Primary Shadow Stack.  1x 4k in stack page 5. */
     p += PRIMARY_SHSTK_SLOT * PAGE_SIZE;
-    if ( IS_ENABLED(CONFIG_XEN_SHSTK) )
+    if ( IS_ENABLED(CONFIG_XEN_SHSTK) && !opt_fred )
         write_sss_token(p + PAGE_SIZE - 8);
 
     map_pages_to_xen((unsigned long)p, virt_to_mfn(p), 1, PAGE_HYPERVISOR_SHSTK);

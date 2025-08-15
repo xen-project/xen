@@ -1412,15 +1412,19 @@ void asmlinkage __init noreturn __start_xen(void)
             boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
             !boot_cpu_has(X86_FEATURE_CET_SSS);
 
+        ASSERT(opt_fred >= 0); /* Confirm that FRED-ness has been resolved */
+
         /*
-         * On bare metal, assume that Xen won't be impacted by shstk
-         * fracturing problems.  Under virt, be more conservative and disable
-         * shstk by default.
+         * If FRED is in use, Supervisor Shadow Stack tokens are not used and
+         * shstk fracturing is of no consequence.  Otherwise:
+         * - On bare metal, assume that Xen won't be impacted by shstk
+         *   fracturing problems.
+         * - Under virt, be more conservative and disable shstk by default.
          */
         if ( opt_xen_shstk == -1 )
             opt_xen_shstk =
-                cpu_has_hypervisor ? !cpu_has_bug_shstk_fracture
-                                   : true;
+                opt_fred || (cpu_has_hypervisor ? !cpu_has_bug_shstk_fracture
+                                                : true);
 
         if ( opt_xen_shstk )
         {
@@ -1925,7 +1929,7 @@ void asmlinkage __init noreturn __start_xen(void)
 
     system_state = SYS_STATE_boot;
 
-    bsp_stack = cpu_alloc_stack(0);
+    bsp_stack = cpu_alloc_stack(0); /* Needs to know IDT vs FRED */
     if ( !bsp_stack )
         panic("No memory for BSP stack\n");
 
