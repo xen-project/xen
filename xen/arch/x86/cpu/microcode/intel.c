@@ -23,8 +23,12 @@
 
 #include <xen/err.h>
 #include <xen/init.h>
+#include <xen/lib.h>
+#include <xen/string.h>
+#include <xen/xmalloc.h>
 
 #include <asm/msr.h>
+#include <asm/processor.h>
 #include <asm/system.h>
 
 #include "private.h"

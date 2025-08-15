@@ -8,8 +8,12 @@
 #include <xen/cpumask.h>
 #include <xen/init.h>
 #include <xen/param.h>
+#include <xen/smp.h>
 #include <xen/xmalloc.h>
+
 #include <asm/msr.h>
+#include <asm/processor.h>
+
 #include <acpi/cpufreq/cpufreq.h>
 
 static bool __ro_after_init hwp_in_use;

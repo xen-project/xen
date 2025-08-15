@@ -1,18 +1,13 @@
-#ifndef __ASM_MSR_H
-#define __ASM_MSR_H
+/* SPDX-License-Identifier: GPL-2.0-only */
+#ifndef X86_MSR_H
+#define X86_MSR_H
 
-#include "msr-index.h"
-
-#include <xen/types.h>
-#include <xen/percpu.h>
 #include <xen/errno.h>
-#include <xen/kernel.h>
+#include <xen/percpu.h>
 
-#include <xen/lib/x86/cpu-policy.h>
-
+#include <asm/alternative.h>
 #include <asm/asm_defns.h>
-#include <asm/cpufeature.h>
-#include <asm/processor.h>
+#include <asm/msr-index.h>
 
 #define rdmsr(msr,val1,val2) \
      __asm__ __volatile__("rdmsr" \
@@ -87,11 +82,6 @@ static inline int wrmsr_safe(unsigned int msr, uint64_t val)
     return -EFAULT;
 }
 
-#define rdpmc(counter,low,high) \
-     __asm__ __volatile__("rdpmc" \
-			  : "=a" (low), "=d" (high) \
-			  : "c" (counter))
-
 DECLARE_PER_CPU(uint64_t, efer);
 static inline uint64_t read_efer(void)
 {
@@ -118,4 +108,4 @@ static inline void wrmsr_tsc_aux(uint32_t val)
     }
 }
 
-#endif /* __ASM_MSR_H */
+#endif /* X86_MSR_H */
