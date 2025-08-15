@@ -743,7 +743,7 @@ condition.
 =back
 
 The features supported by the running Xenstore instance can be retrieved
-via the B<xl info> command in dom0.
+via the B<xl info -x> command in dom0.
 
 The default value is B<0xffffffff>, meaning that all possible Xenstore
 features are visible by the guest.

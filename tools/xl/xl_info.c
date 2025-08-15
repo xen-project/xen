@@ -353,7 +353,7 @@ static void output_xenstore_info(void)
     xs_close(xsh);
 }
 
-static void print_info(int numa)
+static void print_info(int numa, bool xs)
 {
     output_nodeinfo();
 
@@ -365,7 +365,8 @@ static void print_info(int numa)
     }
     output_xeninfo();
 
-    output_xenstore_info();
+    if (xs)
+        output_xenstore_info();
 
     maybe_printf("xend_config_format     : 4\n");
 
@@ -631,13 +632,18 @@ int main_info(int argc, char **argv)
     int opt;
     static struct option opts[] = {
         {"numa", 0, 0, 'n'},
+        {"xenstore", 0, 0, 'x'},
         COMMON_LONG_OPTS
     };
     int numa = 0;
+    bool xs = false;
 
-    SWITCH_FOREACH_OPT(opt, "n", opts, "info", 0) {
+    SWITCH_FOREACH_OPT(opt, "nx", opts, "info", 0) {
     case 'n':
         numa = 1;
+        break;
+    case 'x':
+        xs = true;
         break;
     }
 
@@ -648,7 +654,7 @@ int main_info(int argc, char **argv)
     if (numa == 0 && argc > optind)
         info_name = argv[optind];
 
-    print_info(numa);
+    print_info(numa, xs);
     return 0;
 }
 

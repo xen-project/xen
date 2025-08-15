@@ -996,6 +996,10 @@ B<OPTIONS>
 
 List host NUMA topology information
 
+=item B<-x>, B<--xenstore>
+
+Show Xenstore features available.
+
 =back
 
 =item B<top>
