@@ -1036,6 +1036,10 @@ static struct domain *introduce_domain(const void *ctx,
 		interface = map_interface(domid);
 		if (!interface && !restore)
 			return NULL;
+
+		if (interface->evtchn_port)
+			port = interface->evtchn_port;
+
 		if (new_domain(domain, port, restore)) {
 			rc = errno;
 			if (interface)
