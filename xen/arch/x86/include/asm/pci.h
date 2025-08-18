@@ -74,4 +74,6 @@ bool pci_check_bar(const struct pci_dev *pdev, mfn_t start, mfn_t end);
 struct rangeset;
 int pci_sanitize_bar_memory(struct rangeset *r);
 
+void pci_setup(void);
+
 #endif /* __X86_PCI_H__ */

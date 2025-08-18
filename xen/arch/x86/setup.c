@@ -1938,11 +1938,10 @@ void asmlinkage __init noreturn __start_xen(void)
     setup_system_domains();
 
     /*
-     * Ahead of any ACPI table parsing make sure we have control structures
-     * for PCI segment 0.
+     * Initialize PCI (create segment 0, setup MMCFG access) ahead of IOMMU
+     * setup, as devices in segment > 0 must also be discoverable.
      */
-    if ( pci_add_segment(0) )
-        panic("Could not initialize PCI segment 0\n");
+    pci_setup();
 
     /*
      * IOMMU-related ACPI table parsing has to happen before APIC probing, for

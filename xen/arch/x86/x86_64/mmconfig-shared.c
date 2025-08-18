@@ -402,6 +402,9 @@ void __init acpi_mmcfg_init(void)
 {
     bool valid = true;
 
+    if ( acpi_disabled )
+        return;
+
     /* MMCONFIG disabled */
     if ((pci_probe & PCI_PROBE_MMCONF) == 0)
         return;

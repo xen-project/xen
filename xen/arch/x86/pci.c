@@ -6,7 +6,10 @@
 
 #include <xen/spinlock.h>
 #include <xen/pci.h>
+
+#include <asm/acpi.h>
 #include <asm/io.h>
+
 #include <xsm/xsm.h>
 
 static DEFINE_SPINLOCK(pci_config_lock);
@@ -137,6 +140,19 @@ int pci_sanitize_bar_memory(struct rangeset *r)
     }
 
     return 0;
+}
+
+void __init pci_setup(void)
+{
+    /*
+     * Ahead of any ACPI table parsing make sure we have control structures
+     * for PCI segment 0.
+     */
+    if ( pci_add_segment(0) )
+        panic("Could not initialize PCI segment 0\n");
+
+    /* Parse ACPI MMCFG to see if other segments are available. */
+    acpi_mmcfg_init();
 }
 
 /*
