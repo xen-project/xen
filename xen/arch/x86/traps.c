@@ -123,7 +123,7 @@ static void read_registers(struct extra_state *state)
      * invalidate the read_cr4() address calculation (really cpu_info->cr4
      * under the hood), forcing the cr4 check to be re-evaluated every time.
      */
-    if ( state->cr4 & X86_CR4_FSGSBASE )
+    if ( !(state->cr4 & X86_CR4_FRED) && (state->cr4 & X86_CR4_FSGSBASE) )
     {
         state->fsb = __rdfsbase();
         state->gsb = __rdgsbase();

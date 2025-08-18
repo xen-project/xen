@@ -79,7 +79,9 @@ static inline unsigned long read_gs_base(void)
 
 static inline unsigned long read_gs_shadow(void)
 {
-    if ( read_cr4() & X86_CR4_FSGSBASE )
+    unsigned long cr4 = read_cr4();
+
+    if ( !(cr4 & X86_CR4_FRED) && (cr4 & X86_CR4_FSGSBASE) )
         return __rdgs_shadow();
     else
         return rdmsr(MSR_SHADOW_GS_BASE);
@@ -103,7 +105,9 @@ static inline void write_gs_base(unsigned long base)
 
 static inline void write_gs_shadow(unsigned long base)
 {
-    if ( read_cr4() & X86_CR4_FSGSBASE )
+    unsigned long cr4 = read_cr4();
+
+    if ( !(cr4 & X86_CR4_FRED) && (cr4 & X86_CR4_FSGSBASE) )
         __wrgs_shadow(base);
     else
         wrmsrns(MSR_SHADOW_GS_BASE, base);
