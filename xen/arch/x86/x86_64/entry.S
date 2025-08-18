@@ -241,8 +241,9 @@ iret_exit_to_guest:
         SPEC_CTRL_COND_VERW     /* Req: %rsp=eframe                    Clob: efl */
 
         addq  $8,%rsp
-.Lft0:  iretq
-        _ASM_PRE_EXTABLE(.Lft0, handle_exception)
+
+LABEL(iret_to_guest, 0)
+        iretq
 END(restore_all_guest)
 
 /*
@@ -920,10 +921,23 @@ handle_exception_saved:
 exception_with_ints_disabled:
         testb $3,UREGS_cs(%rsp)         # interrupts disabled outside Xen?
         jnz   FATAL_exception_with_ints_disabled
-        movq  %rsp,%rdi
-        call  search_pre_exception_table
-        testq %rax,%rax                 # no fixup code for faulting EIP?
-        jz    .Ldispatch_exceptions
+
+#ifndef CONFIG_PV
+        /* No PV?  No IRETs-to-guest to worry about. */
+        jmp .Ldispatch_exceptions
+#else
+        /* Check to see if the exception was on the IRET to guest context. */
+        lea   iret_to_guest(%rip), %rax
+        cmp   %rax, UREGS_rip(%rsp)
+        jne   .Ldispatch_exceptions
+
+        /*
+         * Recovery is at handle_exception.  It may be necessary to make space
+         * on the interrupted stack for ec/ev, after which the current ec/ev
+         * is copied to make it appear as if this exception occurred in guest
+         * context.
+         */
+        lea   handle_exception(%rip), %rax
         movq  %rax,UREGS_rip(%rsp)      # fixup regular stack
 
 #ifdef CONFIG_XEN_SHSTK
@@ -940,13 +954,14 @@ exception_with_ints_disabled:
         movq  %rsp,%rsi
         subq  $8,%rsp
         movq  %rsp,%rdi
-        movq  $UREGS_kernel_sizeof/8,%rcx
-        rep;  movsq                     # make room for ec/ev
+        mov   $UREGS_kernel_sizeof/8, %ecx
+        rep movsq                       # make room for ec/ev
 1:      movq  UREGS_error_code(%rsp),%rax # ec/ev
         movq  %rax,UREGS_kernel_sizeof(%rsp)
         mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         mov   %r13b, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         jmp   restore_all_xen           # return to fixup code
+#endif /* !CONFIG_PV */
 
 /* No special register assumptions. */
 FATAL_exception_with_ints_disabled:

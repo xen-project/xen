@@ -167,8 +167,7 @@ FUNC(compat_restore_all_guest)
             scf=STK_REL(CPUINFO_scf,      CPUINFO_rip), \
             sel=STK_REL(CPUINFO_verw_sel, CPUINFO_rip)
 
-.Lft0:  iretq
-        _ASM_PRE_EXTABLE(.Lft0, handle_exception)
+        jmp     iret_to_guest
 END(compat_restore_all_guest)
 
 /* Callers can cope with both %rax and %rcx being clobbered. */
