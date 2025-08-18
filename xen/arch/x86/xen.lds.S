@@ -119,11 +119,6 @@ SECTIONS
        *(.ex_table)
        __stop___ex_table = .;
 
-       /* Pre-exception table */
-       __start___pre_ex_table = .;
-       *(.ex_table.pre)
-       __stop___pre_ex_table = .;
-
        . = ALIGN(PAGE_SIZE);
        __ro_after_init_end = .;
 

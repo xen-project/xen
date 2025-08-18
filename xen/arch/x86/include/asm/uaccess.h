@@ -410,8 +410,6 @@ struct exception_table_entry
 };
 extern struct exception_table_entry __start___ex_table[];
 extern struct exception_table_entry __stop___ex_table[];
-extern struct exception_table_entry __start___pre_ex_table[];
-extern struct exception_table_entry __stop___pre_ex_table[];
 
 union stub_exception_token {
     struct {

@@ -61,7 +61,6 @@ void init_or_livepatch sort_exception_table(struct exception_table_entry *start,
 void __init sort_exception_tables(void)
 {
     sort_exception_table(__start___ex_table, __stop___ex_table);
-    sort_exception_table(__start___pre_ex_table, __stop___pre_ex_table);
 }
 
 static unsigned long
@@ -219,16 +218,3 @@ int __init cf_check stub_selftest(void)
 }
 __initcall(stub_selftest);
 #endif /* CONFIG_SELF_TESTS */
-
-unsigned long asmlinkage search_pre_exception_table(struct cpu_user_regs *regs)
-{
-    unsigned long addr = regs->rip;
-    unsigned long fixup = search_one_extable(
-        __start___pre_ex_table, __stop___pre_ex_table, addr);
-    if ( fixup )
-    {
-        dprintk(XENLOG_INFO, "Pre-exception: %p -> %p\n", _p(addr), _p(fixup));
-        perfc_incr(exception_fixed);
-    }
-    return fixup;
-}
