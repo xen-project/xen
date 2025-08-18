@@ -275,8 +275,6 @@ static void __init assign_io_page(struct page_info *page)
 
 void __init arch_init_memory(void)
 {
-    unsigned long i, pfn, rstart_pfn, rend_pfn, iostart_pfn, ioend_pfn;
-
     /*
      * Basic guest-accessible flags:
      *   PRESENT, R/W, USER, A/D, AVAIL[0,1,2], AVAIL_HIGH, NX (if available).
@@ -292,12 +290,55 @@ void __init arch_init_memory(void)
      * case the low 1MB.
      */
     BUG_ON(pvh_boot && trampoline_phys != 0x1000);
-    for ( i = 0; i < 0x100; i++ )
+    for ( unsigned int i = 0; i < MB(1) >> PAGE_SHIFT; i++ )
         assign_io_page(mfn_to_page(_mfn(i)));
 
-    /* Any areas not specified as RAM by the e820 map are considered I/O. */
-    for ( i = 0, pfn = 0; pfn < max_page; i++ )
+    /*
+     * Any areas not specified as RAM by the e820 map want to have no mappings.
+     * We may have established some by mapping more than necessary in head.S,
+     * due to the use of super-pages there.
+     */
+    for ( unsigned long i = 0, pfn = 0,
+                        rlimit_pfn = PFN_DOWN(PAGE_ALIGN_2M(__pa(_end)));
+          pfn < rlimit_pfn; i++ )
     {
+        unsigned long rstart_pfn, rend_pfn, start_pfn;
+
+        while ( i < e820.nr_map &&
+                e820.map[i].type != E820_RAM )
+            i++;
+
+        if ( i >= e820.nr_map )
+        {
+            /* No more RAM regions: Unmap right to upper boundary. */
+            rstart_pfn = rend_pfn = rlimit_pfn;
+        }
+        else
+        {
+            /* Unmap just up as far as next RAM region. */
+            rstart_pfn = min(rlimit_pfn, PFN_UP(e820.map[i].addr));
+            rend_pfn   = max(rstart_pfn,
+                             PFN_DOWN(e820.map[i].addr + e820.map[i].size));
+        }
+
+        /* NB: _start is already 2Mb-aligned. */
+        start_pfn = max(pfn, PFN_DOWN(__pa(_start)));
+        if ( start_pfn < rstart_pfn )
+            destroy_xen_mappings((unsigned long)mfn_to_virt(start_pfn),
+                                 (unsigned long)mfn_to_virt(rstart_pfn));
+
+        /* Skip the RAM region. */
+        pfn = rend_pfn;
+    }
+
+    /*
+     * Any areas not specified as RAM or UNUSABLE by the e820 map are
+     * considered I/O.
+     */
+    for ( unsigned long i = 0, pfn = 0; pfn < max_page; i++ )
+    {
+        unsigned long rstart_pfn, rend_pfn;
+
         while ( (i < e820.nr_map) &&
                 (e820.map[i].type != E820_RAM) &&
                 (e820.map[i].type != E820_UNUSABLE) )
@@ -316,17 +357,6 @@ void __init arch_init_memory(void)
             rend_pfn   = max_t(unsigned long, rstart_pfn,
                                PFN_DOWN(e820.map[i].addr + e820.map[i].size));
         }
-
-        /*
-         * Make sure any Xen mappings of RAM holes above 1MB are blown away.
-         * In particular this ensures that RAM holes are respected even in
-         * the statically-initialised 1-16MB mapping area.
-         */
-        iostart_pfn = max_t(unsigned long, pfn, 1UL << (20 - PAGE_SHIFT));
-        ioend_pfn = min(rstart_pfn, 16UL << (20 - PAGE_SHIFT));
-        if ( iostart_pfn < ioend_pfn )
-            destroy_xen_mappings((unsigned long)mfn_to_virt(iostart_pfn),
-                                 (unsigned long)mfn_to_virt(ioend_pfn));
 
         /* Mark as I/O up to next RAM region. */
         for ( ; pfn < rstart_pfn; pfn++ )
@@ -365,6 +395,7 @@ void __init arch_init_memory(void)
                     const l3_pgentry_t *l3idle = map_l3t_from_l4e(
                             idle_pg_table[l4_table_offset(split_va)]);
                     l3_pgentry_t *l3tab = map_domain_page(l3mfn);
+                    unsigned int i;
 
                     for ( i = 0; i < l3_table_offset(split_va); ++i )
                         l3tab[i] = l3idle[i];
