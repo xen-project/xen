@@ -63,7 +63,7 @@ static gfn_t hvm_alloc_legacy_ioreq_gfn(struct ioreq_server *s)
 
     for ( i = HVM_PARAM_IOREQ_PFN; i <= HVM_PARAM_BUFIOREQ_PFN; i++ )
     {
-        if ( !test_and_clear_bit(i, &d->arch.hvm.ioreq_gfn.legacy_mask) )
+        if ( test_and_clear_bit(i, &d->arch.hvm.ioreq_gfn.legacy_mask) )
             return _gfn(d->arch.hvm.params[i]);
     }
 
