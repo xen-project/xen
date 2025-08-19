@@ -79,3 +79,19 @@ Comments:
 
 Needs:
  - XenProd
+
+Version hypercall
+-----------------
+
+`XenMkt~version_hypercall~1`
+
+Description:
+Xen shall provide a hypercall for the domains to retrieve Xen's version, type
+and compilation information.
+
+Rationale:
+
+Comments:
+
+Needs:
+ - XenProd
