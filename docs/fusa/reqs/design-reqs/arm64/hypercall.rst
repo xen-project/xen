@@ -58,3 +58,18 @@ Comments:
 Covers:
  - `XenProd~version_hyp_first_param~1`
  - `XenProd~version_hyp_second_param~1`
+
+Return value
+------------
+
+`XenSwdgn~arm64_ret_val~1`
+
+Description:
+Xen shall store the return value in x0.
+
+Rationale:
+
+Comments:
+
+Covers:
+ - `XenProd~hyp_err_ret_val~1`
