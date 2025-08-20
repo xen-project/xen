@@ -600,6 +600,7 @@ static int __init alloc_xenstore_page(struct domain *d)
     d->arch.hvm.params[HVM_PARAM_STORE_PFN] = gfn_x(gfn);
 #endif
     interface = map_domain_page(mfn);
+    clear_page(interface);
     interface->connection = XENSTORE_RECONNECT;
     unmap_domain_page(interface);
 
