@@ -1,29 +1,30 @@
-#include <xen/init.h>
-#include <xen/types.h>
-#include <xen/irq.h>
-#include <xen/event.h>
-#include <xen/kernel.h>
+#include <xen/cpu.h>
 #include <xen/delay.h>
+#include <xen/event.h>
+#include <xen/init.h>
+#include <xen/irq.h>
+#include <xen/kernel.h>
+#include <xen/mm.h>
 #include <xen/param.h>
 #include <xen/smp.h>
-#include <xen/mm.h>
-#include <xen/cpu.h>
-#include <asm/processor.h>
-#include <public/sysctl.h>
-#include <asm/system.h>
+
+#include <asm/apic.h>
+#include <asm/mce.h>
 #include <asm/msr.h>
 #include <asm/p2m.h>
-#include <asm/mce.h>
-#include <asm/apic.h>
+#include <asm/processor.h>
+#include <asm/system.h>
 
 #include <acpi/cpufreq/cpufreq.h>
 
-#include "mce.h"
-#include "x86_mca.h"
+#include <public/sysctl.h>
+
 #include "barrier.h"
+#include "mcaction.h"
+#include "mce.h"
 #include "util.h"
 #include "vmce.h"
-#include "mcaction.h"
+#include "x86_mca.h"
 
 static DEFINE_PER_CPU_READ_MOSTLY(struct mca_banks *, mce_banks_owned);
 static bool __read_mostly ser_support;
