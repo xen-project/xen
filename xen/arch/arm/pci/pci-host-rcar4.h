@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#include <asm/pci.h>
-
 #ifndef __PCI_HOST_RCAR4_H__
 #define __PCI_HOST_RCAR4_H__
 
+#include <asm/pci.h>
+
+#ifdef CONFIG_HAS_PCI
 void rcar4_pcie_osid_bdf_set(struct pci_host_bridge *bridge,
                              unsigned int reg_id, uint32_t osid, uint32_t bdf);
 void rcar4_pcie_osid_bdf_clear(struct pci_host_bridge *bridge,
@@ -14,5 +15,6 @@ int rcar4_pcie_osid_reg_alloc(struct pci_host_bridge *bridge);
 void rcar4_pcie_osid_reg_free(struct pci_host_bridge *bridge,
                               unsigned int reg_id);
 int rcar4_pcie_osid_regs_init(struct pci_host_bridge *bridge);
+#endif
 
 #endif /* __PCI_HOST_RCAR4_H__ */
