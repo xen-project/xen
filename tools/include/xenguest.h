@@ -335,6 +335,8 @@ void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
                            xen_pfn_t count);
 int xc_dom_boot_image(struct xc_dom_image *dom);
 int xc_dom_compat_check(struct xc_dom_image *dom);
+int xc_dom_console_init(xc_interface *xch, uint32_t guest_domid,
+                        xen_pfn_t console_gfn);
 int xc_dom_gnttab_init(struct xc_dom_image *dom);
 int xc_dom_gnttab_seed(xc_interface *xch, uint32_t guest_domid,
                        bool is_hvm,
