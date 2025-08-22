@@ -428,9 +428,10 @@ int xc_dom_gnttab_init(struct xc_dom_image *dom)
                               dom->console_domid, dom->xenstore_domid);
 }
 
-int xc_dom_console_init(xc_interface *xch,
-                        uint32_t domid,
-                        unsigned long dst_pfn)
+static int dom_console_init(xc_interface *xch,
+                            uint32_t domid,
+                            unsigned long dst_pfn,
+                            bool clear)
 {
     const size_t size = PAGE_SIZE;
     struct xencons_interface *xencons = xc_map_foreign_range(
@@ -439,12 +440,27 @@ int xc_dom_console_init(xc_interface *xch,
     if ( xencons == NULL )
         return -1;
 
-    memset(xencons, 0, size);
+    if (clear)
+        memset(xencons, 0, size);
     xencons->connection = XENCONSOLE_DISCONNECTED;
 
     munmap(xencons, size);
     xc_domain_cacheflush(xch, domid, dst_pfn, 1);
     return 0;
+}
+
+int xc_dom_console_init(xc_interface *xch,
+                        uint32_t domid,
+                        unsigned long dst_pfn)
+{
+    return dom_console_init(xch, domid, dst_pfn, true);
+}
+
+int xc_dom_console_set_disconnected(xc_interface *xch,
+                                    uint32_t domid,
+                                    unsigned long dst_pfn)
+{
+    return dom_console_init(xch, domid, dst_pfn, false);
 }
 
 /*

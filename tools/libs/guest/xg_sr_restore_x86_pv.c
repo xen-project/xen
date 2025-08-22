@@ -208,6 +208,7 @@ static int process_start_info(struct xc_sr_context *ctx,
         goto err;
     }
 
+    xc_dom_console_set_disconnected(xch, ctx->domid, mfn);
     ctx->restore.console_gfn = mfn;
     SET_FIELD(guest_start_info, console.domU.mfn, mfn, ctx->x86.pv.width);
     SET_FIELD(guest_start_info, console.domU.evtchn,

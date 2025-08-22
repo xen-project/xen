@@ -62,7 +62,7 @@ static int handle_hvm_params(struct xc_sr_context *ctx,
         {
         case HVM_PARAM_CONSOLE_PFN:
             ctx->restore.console_gfn = entry->value;
-            xc_clear_domain_page(xch, ctx->domid, entry->value);
+            xc_dom_console_init(xch, ctx->domid, entry->value);
             break;
         case HVM_PARAM_STORE_PFN:
             ctx->restore.xenstore_gfn = entry->value;
