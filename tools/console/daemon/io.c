@@ -781,6 +781,10 @@ static int console_create_ring(struct console *con)
 		con->log_fd = create_console_log(con);
 
  out:
+	/* Mark the console connected. */
+	if (!err && con->interface)
+		con->interface->connection = XENCONSOLE_CONNECTED;
+
 	return err;
 }
 
