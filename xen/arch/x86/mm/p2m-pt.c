@@ -519,12 +519,14 @@ int p2m_pt_handle_deferred_changes(uint64_t gpa)
     struct p2m_domain *p2m = p2m_get_hostp2m(current->domain);
     int rc;
 
+#ifdef CONFIG_ALTP2M
     /*
      * Should altp2m ever be enabled for NPT / shadow use, this code
      * should be updated to make use of the active altp2m, like
      * ept_handle_misconfig().
      */
     ASSERT(!altp2m_active(current->domain));
+#endif
 
     p2m_lock(p2m);
     rc = do_recalc(p2m, PFN_DOWN(gpa));

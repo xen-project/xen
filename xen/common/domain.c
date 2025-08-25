@@ -822,6 +822,12 @@ struct domain *domain_create(domid_t domid,
     if ( config )
     {
         d->options = config->flags;
+#ifdef CONFIG_ALTP2M
+        d->nr_altp2m = config->altp2m.nr;
+#else
+        ASSERT(!config->altp2m.nr);
+#endif
+
         d->vmtrace_size = config->vmtrace_size;
     }
 

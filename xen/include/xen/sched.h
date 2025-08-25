@@ -619,6 +619,10 @@ struct domain
         unsigned int guest_request_sync          : 1;
     } monitor;
 
+#ifdef CONFIG_ALTP2M
+    unsigned int nr_altp2m;    /* Number of altp2m tables. */
+#endif
+
     unsigned int vmtrace_size; /* Buffer size in bytes, or 0 to disable. */
 
 #ifdef CONFIG_ARGO
