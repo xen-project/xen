@@ -431,7 +431,8 @@ static int vm_event_resume(struct domain *d, struct vm_event_domain *ved)
             vm_event_toggle_singlestep(d, v, &rsp);
 
             /* Check for altp2m switch */
-            if ( rsp.flags & VM_EVENT_FLAG_ALTERNATE_P2M )
+            if ( IS_ENABLED(CONFIG_ALTP2M) &&
+                 rsp.flags & VM_EVENT_FLAG_ALTERNATE_P2M )
                 p2m_altp2m_check(v, rsp.altp2m_idx);
 
             if ( rsp.flags & VM_EVENT_FLAG_SET_REGISTERS )

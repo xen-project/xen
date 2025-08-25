@@ -88,11 +88,6 @@ static inline bool arch_acquire_resource_check(struct domain *d)
     return false;
 }
 
-static inline void p2m_altp2m_check(struct vcpu *v, uint16_t idx)
-{
-    /* Not supported on RISCV. */
-}
-
 #endif /* ASM__RISCV__P2M_H */
 
 /*

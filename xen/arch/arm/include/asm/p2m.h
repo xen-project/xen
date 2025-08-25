@@ -180,12 +180,6 @@ static inline bool arch_acquire_resource_check(struct domain *d)
     return true;
 }
 
-static inline
-void p2m_altp2m_check(struct vcpu *v, uint16_t idx)
-{
-    /* Not supported on ARM. */
-}
-
 /*
  * Helper to restrict "p2m_ipa_bits" according the external entity
  * (e.g. IOMMU) requirements.
