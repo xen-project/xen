@@ -124,7 +124,7 @@ maintainers if you want to suggest a change.
            they are used to generate definitions for asm modules
          - Declarations without initializer are safe, as they are not
            executed
-         - Functions that are no-return due to calls to the `ASSERT_UNREACHABLE()'
+         - Functions that are no-return due to calls to the `ASSERT_UNREACHABLE()`
            macro in debug build configurations are not considered violations::
 
               static inline bool

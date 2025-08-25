@@ -95,7 +95,8 @@ Deviations related to MISRA C:2012 Rules:
        the absence of reports that do not have an impact on safety, despite
        being true positives.
        Xen expects developers to ensure code remains safe and reliable in builds,
-       even when debug-only assertions like `ASSERT_UNREACHABLE() are removed.
+       even when debug-only assertions like `ASSERT_UNREACHABLE()` are removed.
+     - ECLAIR has been configured to ignore those statements.
 
    * - R2.2
      - Proving compliance with respect to Rule 2.2 is generally impossible:
