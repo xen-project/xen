@@ -853,7 +853,6 @@ static bool __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
     PrintErrMesg(name, ret);
 
     /* not reached */
-    return false;
 }
 
 static bool __init read_section(const EFI_LOADED_IMAGE *image,
