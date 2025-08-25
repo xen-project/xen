@@ -210,33 +210,36 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
     DECLARE_NAMED_HYPERCALL_BOUNCE(scaling_available_governors,
 			 user_para->scaling_available_governors,
 			 user_para->gov_num * CPUFREQ_NAME_LEN * sizeof(char), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
-    bool has_num = user_para->cpu_num && user_para->freq_num;
 
-    if ( has_num )
+    if ( (user_para->cpu_num && !user_para->affected_cpus) ||
+         (user_para->freq_num && !user_para->scaling_available_frequencies) ||
+         (user_para->gov_num && !user_para->scaling_available_governors) )
     {
-        if ( (!user_para->affected_cpus)                    ||
-             (!user_para->scaling_available_frequencies)    ||
-             (user_para->gov_num && !user_para->scaling_available_governors) )
-        {
-            errno = EINVAL;
-            return -1;
-        }
+        errno = EINVAL;
+        return -1;
+    }
+    if ( user_para->cpu_num )
+    {
         ret = xc_hypercall_bounce_pre(xch, affected_cpus);
         if ( ret )
             return ret;
+        set_xen_guest_handle(sys_para->affected_cpus, affected_cpus);
+    }
+    if ( user_para->freq_num )
+    {
         ret = xc_hypercall_bounce_pre(xch, scaling_available_frequencies);
         if ( ret )
             goto unlock_2;
-        if ( user_para->gov_num )
-            ret = xc_hypercall_bounce_pre(xch, scaling_available_governors);
+        set_xen_guest_handle(sys_para->scaling_available_frequencies,
+                             scaling_available_frequencies);
+    }
+    if ( user_para->gov_num )
+    {
+        ret = xc_hypercall_bounce_pre(xch, scaling_available_governors);
         if ( ret )
             goto unlock_3;
-
-        set_xen_guest_handle(sys_para->affected_cpus, affected_cpus);
-        set_xen_guest_handle(sys_para->scaling_available_frequencies, scaling_available_frequencies);
-        if ( user_para->gov_num )
-            set_xen_guest_handle(sys_para->scaling_available_governors,
-                                 scaling_available_governors);
+        set_xen_guest_handle(sys_para->scaling_available_governors,
+                             scaling_available_governors);
     }
 
     sysctl.cmd = XEN_SYSCTL_pm_op;
@@ -256,9 +259,7 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
             user_para->gov_num  = sys_para->gov_num;
         }
 
-        if ( has_num )
-            goto unlock_4;
-        return ret;
+        goto unlock_4;
     }
     else
     {
