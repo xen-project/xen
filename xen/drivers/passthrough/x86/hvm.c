@@ -329,7 +329,8 @@ int pt_irq_create_bind(
                 pirq_dpci->gmsi.gvec = 0;
                 pirq_dpci->dom = NULL;
                 pirq_dpci->flags = 0;
-                pirq_cleanup_check(info, d);
+                if ( !info->evtchn )
+                    pirq_cleanup_check(info, d);
                 write_unlock(&d->event_lock);
                 return rc;
             }
@@ -536,7 +537,8 @@ int pt_irq_create_bind(
                     hvm_irq_dpci->link_cnt[link]--;
                 }
                 pirq_dpci->flags = 0;
-                pirq_cleanup_check(info, d);
+                if ( !info->evtchn )
+                    pirq_cleanup_check(info, d);
                 write_unlock(&d->event_lock);
                 xfree(girq);
                 xfree(digl);
@@ -693,7 +695,8 @@ int pt_irq_destroy_bind(
          */
         pt_pirq_softirq_reset(pirq_dpci);
 
-        pirq_cleanup_check(pirq, d);
+        if ( !pirq->evtchn )
+            pirq_cleanup_check(pirq, d);
     }
 
     write_unlock(&d->event_lock);

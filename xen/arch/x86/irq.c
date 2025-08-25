@@ -1351,7 +1351,8 @@ static void clear_domain_irq_pirq(struct domain *d, int irq, struct pirq *pirq)
 static void cleanup_domain_irq_pirq(struct domain *d, int irq,
                                     struct pirq *pirq)
 {
-    pirq_cleanup_check(pirq, d);
+    if ( !pirq->evtchn )
+        pirq_cleanup_check(pirq, d);
     radix_tree_delete(&d->arch.irq_pirq, irq);
 }
 
@@ -1409,7 +1410,7 @@ struct pirq *alloc_pirq_struct(struct domain *d)
     return pirq;
 }
 
-void (pirq_cleanup_check)(struct pirq *pirq, struct domain *d)
+void pirq_cleanup_check(struct pirq *pirq, struct domain *d)
 {
     /*
      * Check whether all fields have their default values, and delete
@@ -2849,7 +2850,8 @@ int map_domain_emuirq_pirq(struct domain *d, int pirq, int emuirq)
                 radix_tree_int_to_ptr(pirq));
             break;
         default:
-            pirq_cleanup_check(info, d);
+            if ( !info->evtchn )
+                pirq_cleanup_check(info, d);
             return err;
         }
     }
@@ -2884,7 +2886,8 @@ int unmap_domain_pirq_emuirq(struct domain *d, int pirq)
     if ( info )
     {
         info->arch.hvm.emuirq = IRQ_UNBOUND;
-        pirq_cleanup_check(info, d);
+        if ( !info->evtchn )
+            pirq_cleanup_check(info, d);
     }
     if ( emuirq != IRQ_PT )
         radix_tree_delete(&d->arch.hvm.emuirq_pirq, emuirq);
