@@ -72,7 +72,7 @@ void vm_event_toggle_singlestep(struct domain *d, struct vcpu *v,
 
     if ( rsp->flags & VM_EVENT_FLAG_TOGGLE_SINGLESTEP )
         hvm_toggle_singlestep(v);
-    else
+    else if ( IS_ENABLED(CONFIG_ALTP2M) )
         hvm_fast_singlestep(v, rsp->u.fast_singlestep.p2midx);
 }
 

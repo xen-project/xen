@@ -347,6 +347,7 @@ long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
     unsigned long gfn_l;
     long rc = 0;
 
+#ifdef CONFIG_ALTP2M
     /* altp2m view 0 is treated as the hostp2m */
     if ( altp2m_idx )
     {
@@ -357,6 +358,7 @@ long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
 
         ap2m = array_access_nospec(d->arch.altp2m_p2m, altp2m_idx);
     }
+#endif
 
     if ( !xenmem_access_to_p2m_access(p2m, access, &a) )
         return -EINVAL;
@@ -403,6 +405,7 @@ long p2m_set_mem_access_multi(struct domain *d,
     struct p2m_domain *p2m = p2m_get_hostp2m(d), *ap2m = NULL;
     long rc = 0;
 
+#ifdef CONFIG_ALTP2M
     /* altp2m view 0 is treated as the hostp2m */
     if ( altp2m_idx )
     {
@@ -413,6 +416,7 @@ long p2m_set_mem_access_multi(struct domain *d,
 
         ap2m = array_access_nospec(d->arch.altp2m_p2m, altp2m_idx);
     }
+#endif
 
     p2m_lock(p2m);
     if ( ap2m )
@@ -462,6 +466,7 @@ int p2m_get_mem_access(struct domain *d, gfn_t gfn, xenmem_access_t *access,
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
+#ifdef CONFIG_ALTP2M
     if ( !altp2m_active(d) )
     {
         if ( altp2m_idx )
@@ -476,6 +481,7 @@ int p2m_get_mem_access(struct domain *d, gfn_t gfn, xenmem_access_t *access,
 
         p2m = array_access_nospec(d->arch.altp2m_p2m, altp2m_idx);
     }
+#endif
 
     return _p2m_get_mem_access(p2m, gfn, access);
 }
@@ -486,6 +492,7 @@ void arch_p2m_set_access_required(struct domain *d, bool access_required)
 
     p2m_get_hostp2m(d)->access_required = access_required;
 
+#ifdef CONFIG_ALTP2M
     if ( altp2m_active(d) )
     {
         unsigned int i;
@@ -497,6 +504,7 @@ void arch_p2m_set_access_required(struct domain *d, bool access_required)
                 p2m->access_required = access_required;
         }
     }
+#endif
 }
 
 bool p2m_mem_access_sanity_check(const struct domain *d)

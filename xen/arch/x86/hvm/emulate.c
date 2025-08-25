@@ -2704,6 +2704,7 @@ static int cf_check hvmemul_tlb_op(
 static int cf_check hvmemul_vmfunc(
     struct x86_emulate_ctxt *ctxt)
 {
+#ifdef CONFIG_ALTP2M
     int rc;
 
     if ( !hvm_funcs.altp2m_vcpu_emulate_vmfunc )
@@ -2713,6 +2714,9 @@ static int cf_check hvmemul_vmfunc(
         x86_emul_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC, ctxt);
 
     return rc;
+#else
+    return X86EMUL_UNHANDLEABLE;
+#endif
 }
 
 static const struct x86_emulate_ops hvm_emulate_ops = {

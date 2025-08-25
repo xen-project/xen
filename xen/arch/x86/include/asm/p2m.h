@@ -889,6 +889,8 @@ void shadow_p2m_init(struct p2m_domain *p2m);
 void cf_check nestedp2m_write_p2m_entry_post(
     struct p2m_domain *p2m, unsigned int oflags);
 
+#ifdef CONFIG_ALTP2M
+
 /*
  * Alternate p2m: shadow p2m tables used for alternate memory views
  */
@@ -932,11 +934,6 @@ bool p2m_switch_vcpu_altp2m_by_id(struct vcpu *v, unsigned int idx);
 /* Flush all the alternate p2m's for a domain */
 void p2m_flush_altp2m(struct domain *d);
 
-/* Alternate p2m paging */
-bool p2m_altp2m_get_or_propagate(struct p2m_domain *ap2m, unsigned long gfn_l,
-                                 mfn_t *mfn, p2m_type_t *p2mt,
-                                 p2m_access_t *p2ma, unsigned int *page_order);
-
 /* Make a specific alternate p2m valid */
 int p2m_init_altp2m_by_id(struct domain *d, unsigned int idx);
 
@@ -954,17 +951,29 @@ int p2m_switch_domain_altp2m_by_id(struct domain *d, unsigned int idx);
 int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
                           gfn_t old_gfn, gfn_t new_gfn);
 
-/* Propagate a host p2m change to all alternate p2m's */
-int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
-                                mfn_t mfn, unsigned int page_order,
-                                p2m_type_t p2mt, p2m_access_t p2ma);
-
 /* Set a specific p2m view visibility */
 int p2m_set_altp2m_view_visibility(struct domain *d, unsigned int altp2m_idx,
                                    uint8_t visible);
 
-#else /* !CONFIG_HVM */
+#else /* !CONFIG_ALTP2M */
 struct p2m_domain *p2m_get_altp2m(struct vcpu *v);
+bool p2m_set_altp2m(struct vcpu *v, unsigned int idx);
+#endif /* CONFIG_ALTP2M */
+
+/*
+ * Common alternate p2m declarations that need to be visible
+ * regardless of CONFIG_ALTP2M
+ */
+
+/* Alternate p2m paging */
+bool p2m_altp2m_get_or_propagate(struct p2m_domain *ap2m, unsigned long gfn_l,
+                                 mfn_t *mfn, p2m_type_t *p2mt,
+                                 p2m_access_t *p2ma, unsigned int *page_order);
+                                 
+/* Propagate a host p2m change to all alternate p2m's */
+int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
+                                mfn_t mfn, unsigned int page_order,
+                                p2m_type_t p2mt, p2m_access_t p2ma);
 #endif /* CONFIG_HVM */
 
 /* p2m access to IOMMU flags */

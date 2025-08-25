@@ -226,11 +226,13 @@ struct hvm_function_table {
 
     void (*enable_msr_interception)(struct domain *d, uint32_t msr);
 
+#ifdef CONFIG_ALTP2M
     /* Alternate p2m */
     void (*altp2m_vcpu_update_p2m)(struct vcpu *v);
     void (*altp2m_vcpu_update_vmfunc_ve)(struct vcpu *v);
     bool (*altp2m_vcpu_emulate_ve)(struct vcpu *v);
     int (*altp2m_vcpu_emulate_vmfunc)(const struct cpu_user_regs *regs);
+#endif
 
     /* vmtrace */
     int (*vmtrace_control)(struct vcpu *v, bool enable, bool reset);
@@ -704,6 +706,7 @@ static inline bool hvm_nested_virt_supported(void)
     return hvm_funcs.caps.nested_virt;
 }
 
+#ifdef CONFIG_ALTP2M
 /* updates the current hardware p2m */
 static inline void altp2m_vcpu_update_p2m(struct vcpu *v)
 {
@@ -728,6 +731,9 @@ static inline bool altp2m_vcpu_emulate_ve(struct vcpu *v)
     }
     return false;
 }
+#else /* !CONFIG_ALTP2M */
+bool altp2m_vcpu_emulate_ve(struct vcpu *v);
+#endif /* CONFIG_ALTP2M */
 
 static inline int hvm_vmtrace_control(struct vcpu *v, bool enable, bool reset)
 {
