@@ -131,11 +131,11 @@ static int __init cf_check cpufreq_driver_init(void)
 
     if ( cpufreq_controller == FREQCTL_xen )
     {
+        ret = -ENOENT;
+
         switch ( boot_cpu_data.x86_vendor )
         {
         case X86_VENDOR_INTEL:
-            ret = -ENOENT;
-
             for ( unsigned int i = 0; i < cpufreq_xen_cnt; i++ )
             {
                 switch ( cpufreq_xen_opts[i] )
@@ -161,6 +161,10 @@ static int __init cf_check cpufreq_driver_init(void)
         case X86_VENDOR_AMD:
         case X86_VENDOR_HYGON:
             ret = IS_ENABLED(CONFIG_AMD) ? powernow_register_driver() : -ENODEV;
+            break;
+
+        default:
+            printk(XENLOG_ERR "Cpufreq: unsupported x86 vendor\n");
             break;
         }
     }
