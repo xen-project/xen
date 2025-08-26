@@ -266,7 +266,7 @@ static inline bool hwp_active(void) { return false; }
 #endif
 
 int get_hwp_para(unsigned int cpu,
-                 struct xen_cppc_para *cppc_para);
+                 struct xen_get_cppc_para *cppc_para);
 int set_hwp_para(struct cpufreq_policy *policy,
                  struct xen_set_cppc_para *set_cppc);
 

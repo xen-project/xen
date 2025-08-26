@@ -529,7 +529,7 @@ hwp_cpufreq_driver = {
 
 #ifdef CONFIG_PM_OP
 int get_hwp_para(unsigned int cpu,
-                 struct xen_cppc_para *cppc_para)
+                 struct xen_get_cppc_para *cppc_para)
 {
     const struct hwp_drv_data *data = per_cpu(hwp_drv_data, cpu);
 

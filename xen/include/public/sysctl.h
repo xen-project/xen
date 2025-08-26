@@ -336,7 +336,7 @@ struct xen_ondemand {
     uint32_t up_threshold;
 };
 
-struct xen_cppc_para {
+struct xen_get_cppc_para {
     /* OUT */
     /* activity_window supported if set */
 #define XEN_SYSCTL_CPPC_FEAT_ACT_WINDOW  (1 << 0)
@@ -442,7 +442,7 @@ struct xen_set_cppc_para {
          XEN_SYSCTL_CPPC_SET_ACT_WINDOW  )
     /* IN/OUT */
     uint32_t set_params; /* bitflags for valid values */
-    /* See comments in struct xen_cppc_para. */
+    /* See comments in struct xen_get_cppc_para. */
     /* IN */
     uint32_t minimum;
     uint32_t maximum;
@@ -490,7 +490,7 @@ struct xen_get_cpufreq_para {
                 struct  xen_ondemand ondemand;
             } u;
         } s;
-        struct xen_cppc_para cppc_para;
+        struct xen_get_cppc_para cppc_para;
     } u;
 
     int32_t turbo_enabled;
