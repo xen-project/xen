@@ -64,11 +64,48 @@ LIST_HEAD_READ_MOSTLY(cpufreq_governor_list);
 /* set xen as default cpufreq */
 enum cpufreq_controller cpufreq_controller = FREQCTL_xen;
 
-enum cpufreq_xen_opt __initdata cpufreq_xen_opts[2] = { CPUFREQ_xen,
-                                                        CPUFREQ_none };
+enum cpufreq_xen_opt __initdata cpufreq_xen_opts[2] = { [0] = CPUFREQ_xen };
 unsigned int __initdata cpufreq_xen_cnt = 1;
 
 static int __init cpufreq_cmdline_parse(const char *s, const char *e);
+
+static bool __init cpufreq_opts_contain(enum cpufreq_xen_opt option)
+{
+    unsigned int count = cpufreq_xen_cnt;
+
+    while ( count-- )
+    {
+        if ( cpufreq_xen_opts[count] == option )
+            return true;
+    }
+
+    return false;
+}
+
+static int __init handle_cpufreq_cmdline(enum cpufreq_xen_opt option)
+{
+    int ret = 0;
+
+    if ( cpufreq_opts_contain(option) )
+        return 0;
+
+    cpufreq_controller = FREQCTL_xen;
+    cpufreq_xen_opts[cpufreq_xen_cnt++] = option;
+    switch ( option )
+    {
+    case CPUFREQ_hwp:
+    case CPUFREQ_xen:
+        xen_processor_pmbits |= XEN_PROCESSOR_PM_PX;
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        ret = -EINVAL;
+        break;
+    }
+
+    return ret;
+}
 
 static int __init cf_check setup_cpufreq_option(const char *str)
 {
@@ -113,21 +150,15 @@ static int __init cf_check setup_cpufreq_option(const char *str)
 
         if ( choice > 0 || !cmdline_strcmp(str, "xen") )
         {
-            xen_processor_pmbits |= XEN_PROCESSOR_PM_PX;
-            cpufreq_controller = FREQCTL_xen;
-            cpufreq_xen_opts[cpufreq_xen_cnt++] = CPUFREQ_xen;
-            ret = 0;
-            if ( arg[0] && arg[1] )
+            ret = handle_cpufreq_cmdline(CPUFREQ_xen);
+            if ( !ret && arg[0] && arg[1] )
                 ret = cpufreq_cmdline_parse(arg + 1, end);
         }
         else if ( IS_ENABLED(CONFIG_INTEL) && choice < 0 &&
                   !cmdline_strcmp(str, "hwp") )
         {
-            xen_processor_pmbits |= XEN_PROCESSOR_PM_PX;
-            cpufreq_controller = FREQCTL_xen;
-            cpufreq_xen_opts[cpufreq_xen_cnt++] = CPUFREQ_hwp;
-            ret = 0;
-            if ( arg[0] && arg[1] )
+            ret = handle_cpufreq_cmdline(CPUFREQ_hwp);
+            if ( !ret && arg[0] && arg[1] )
                 ret = hwp_cmdline_parse(arg + 1, end);
         }
         else
