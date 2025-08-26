@@ -567,15 +567,6 @@ int __must_check guest_remove_page(struct domain *d, unsigned long gmfn);
 int __must_check steal_page(struct domain *d, struct page_info *page,
                             unsigned int memflags);
 
-#define RAM_TYPE_CONVENTIONAL 0x00000001
-#define RAM_TYPE_RESERVED     0x00000002
-#define RAM_TYPE_UNUSABLE     0x00000004
-#define RAM_TYPE_ACPI         0x00000008
-#define RAM_TYPE_UNKNOWN      0x00000010
-/* TRUE if the whole page at @mfn is of the requested RAM type(s) above. */
-int page_is_ram_type(unsigned long mfn, unsigned long mem_type);
-/* Returns the page type(s). */
-unsigned int page_get_ram_type(mfn_t mfn);
 /* Check if a range falls into a hole in the memory map. */
 bool is_memory_hole(mfn_t start, mfn_t end);
 

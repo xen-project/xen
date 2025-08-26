@@ -464,6 +464,16 @@ static inline int get_page_and_type(struct page_info *page,
     ASSERT(((_p)->count_info & PGC_count_mask) != 0);          \
     ASSERT(page_get_owner(_p) == (_d))
 
+#define RAM_TYPE_CONVENTIONAL 0x00000001
+#define RAM_TYPE_RESERVED     0x00000002
+#define RAM_TYPE_UNUSABLE     0x00000004
+#define RAM_TYPE_ACPI         0x00000008
+#define RAM_TYPE_UNKNOWN      0x00000010
+/* TRUE if the whole page at @mfn is of the requested RAM type(s) above. */
+bool page_is_ram_type(unsigned long mfn, unsigned int mem_type);
+/* Returns the page type(s). */
+unsigned int page_get_ram_type(mfn_t mfn);
+
 /******************************************************************************
  * With shadow pagetables, the different kinds of address start
  * to get get confusing.

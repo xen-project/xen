@@ -378,7 +378,7 @@ void __init arch_init_memory(void)
     ASM_CONSTANT(FIXADDR_X_SIZE, FIXADDR_X_SIZE);
 }
 
-int page_is_ram_type(unsigned long mfn, unsigned long mem_type)
+bool page_is_ram_type(unsigned long mfn, unsigned int mem_type)
 {
     uint64_t maddr = pfn_to_paddr(mfn);
     int i;
@@ -412,10 +412,10 @@ int page_is_ram_type(unsigned long mfn, unsigned long mem_type)
         /* Test the range. */
         if ( (e820.map[i].addr <= maddr) &&
              ((e820.map[i].addr + e820.map[i].size) >= (maddr + PAGE_SIZE)) )
-            return 1;
+            return true;
     }
 
-    return 0;
+    return false;
 }
 
 bool page_is_offlinable(mfn_t mfn)
