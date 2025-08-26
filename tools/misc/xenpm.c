@@ -69,7 +69,7 @@ void show_help(void)
             " set-max-cstate        <num>|'unlimited' [<num2>|'unlimited']\n"
             "                                     set the C-State limitation (<num> >= 0) and\n"
             "                                     optionally the C-sub-state limitation (<num2> >= 0)\n"
-            " set-cpufreq-cppc      [cpuid] [balance|performance|powersave] <param:val>*\n"
+            " set-cpufreq-cppc      [cpuid] [ondemand|performance|powersave] <param:val>*\n"
             "                                     set Hardware P-State (HWP) parameters\n"
             "                                     on CPU <cpuid> or all if omitted.\n"
             "                                     optionally a preset of one of:\n"
