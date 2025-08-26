@@ -1,5 +1,5 @@
 #ifndef __ASM_ARM_PLATFORMS_MIDWAY_H
-#define __ASM_ASM_PLATFORMS_MIDWAY_H
+#define __ASM_ARM_PLATFORMS_MIDWAY_H
 
 /* addresses of SREG registers for resetting the SoC */
 #define MW_SREG_PWR_REQ             0xfff3cf00
