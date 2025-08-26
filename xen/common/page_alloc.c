@@ -1635,7 +1635,7 @@ static unsigned long mark_page_offline(struct page_info *pg, int broken)
 {
     unsigned long nx, x, y = pg->count_info;
 
-    ASSERT(page_is_ram_type(mfn_x(page_to_mfn(pg)), RAM_TYPE_CONVENTIONAL));
+    ASSERT(page_is_offlinable(page_to_mfn(pg)));
     ASSERT(spin_is_locked(&heap_lock));
 
     do {
@@ -1711,7 +1711,7 @@ int offline_page(mfn_t mfn, int broken, uint32_t *status)
      * N.B. xen's txt in x86_64 is marked reserved and handled already.
      * Also kexec range is reserved.
      */
-    if ( !page_is_ram_type(mfn_x(mfn), RAM_TYPE_CONVENTIONAL) )
+    if ( !page_is_offlinable(mfn) )
     {
         *status = PG_OFFLINE_FAILED | PG_OFFLINE_NOT_CONV_RAM;
         return -EINVAL;
@@ -1851,7 +1851,7 @@ int query_page_offline(mfn_t mfn, uint32_t *status)
 {
     struct page_info *pg;
 
-    if ( !mfn_valid(mfn) || !page_is_ram_type(mfn_x(mfn), RAM_TYPE_CONVENTIONAL) )
+    if ( !mfn_valid(mfn) || !page_is_offlinable(mfn) )
     {
         dprintk(XENLOG_WARNING, "call expand_pages() first\n");
         return -EINVAL;

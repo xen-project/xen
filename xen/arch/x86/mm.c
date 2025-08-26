@@ -418,6 +418,11 @@ int page_is_ram_type(unsigned long mfn, unsigned long mem_type)
     return 0;
 }
 
+bool page_is_offlinable(mfn_t mfn)
+{
+    return page_is_ram_type(mfn_x(mfn), RAM_TYPE_CONVENTIONAL);
+}
+
 unsigned int page_get_ram_type(mfn_t mfn)
 {
     uint64_t last = 0, maddr = mfn_to_maddr(mfn);

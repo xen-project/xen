@@ -64,10 +64,9 @@ int steal_page(
     return -EOPNOTSUPP;
 }
 
-int page_is_ram_type(unsigned long mfn, unsigned long mem_type)
+bool page_is_offlinable(mfn_t mfn)
 {
-    ASSERT_UNREACHABLE();
-    return 0;
+    return false;
 }
 
 unsigned long domain_get_maximum_gpfn(struct domain *d)
