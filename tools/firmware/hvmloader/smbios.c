@@ -33,12 +33,18 @@
 #define SMBIOS_HANDLE_TYPE2   0x0200
 #define SMBIOS_HANDLE_TYPE3   0x0300
 #define SMBIOS_HANDLE_TYPE4   0x0400
+#define SMBIOS_HANDLE_TYPE7   0x0700
+#define SMBIOS_HANDLE_TYPE8   0x0800
+#define SMBIOS_HANDLE_TYPE9   0x0900
 #define SMBIOS_HANDLE_TYPE11  0x0B00
 #define SMBIOS_HANDLE_TYPE16  0x1000
 #define SMBIOS_HANDLE_TYPE17  0x1100
 #define SMBIOS_HANDLE_TYPE19  0x1300
 #define SMBIOS_HANDLE_TYPE20  0x1400
 #define SMBIOS_HANDLE_TYPE22  0x1600
+#define SMBIOS_HANDLE_TYPE26  0x1A00
+#define SMBIOS_HANDLE_TYPE27  0x1B00
+#define SMBIOS_HANDLE_TYPE28  0x1C00
 #define SMBIOS_HANDLE_TYPE32  0x2000
 #define SMBIOS_HANDLE_TYPE39  0x2700
 #define SMBIOS_HANDLE_TYPE127 0x7f00
@@ -79,6 +85,12 @@ static void *
 smbios_type_4_init(void *start, unsigned int cpu_number,
                    char *cpu_manufacturer);
 static void *
+smbios_type_7_init(void *start);
+static void *
+smbios_type_8_init(void *start);
+static void *
+smbios_type_9_init(void *start);
+static void *
 smbios_type_11_init(void *start);
 static void *
 smbios_type_16_init(void *start, uint32_t memory_size_mb, int nr_mem_devs);
@@ -90,6 +102,12 @@ static void *
 smbios_type_20_init(void *start, uint32_t memory_size_mb, int instance);
 static void *
 smbios_type_22_init(void *start);
+static void *
+smbios_type_26_init(void *start);
+static void *
+smbios_type_27_init(void *start);
+static void *
+smbios_type_28_init(void *start);
 static void *
 smbios_type_32_init(void *start);
 static void *
@@ -225,6 +243,9 @@ write_smbios_tables(void *ep, void *start,
     do_struct(smbios_type_3_init(p));
     for ( cpu_num = 1; cpu_num <= vcpus; cpu_num++ )
         do_struct(smbios_type_4_init(p, cpu_num, cpu_manufacturer));
+    do_struct(smbios_type_7_init(p));
+    do_struct(smbios_type_8_init(p));
+    do_struct(smbios_type_9_init(p));
     do_struct(smbios_type_11_init(p));
 
     /* Each 'memory device' covers up to 16GB of address space. */
@@ -241,6 +262,9 @@ write_smbios_tables(void *ep, void *start,
     }
 
     do_struct(smbios_type_22_init(p));
+    do_struct(smbios_type_26_init(p));
+    do_struct(smbios_type_27_init(p));
+    do_struct(smbios_type_28_init(p));
     do_struct(smbios_type_32_init(p));
     do_struct(smbios_type_39_init(p));
     do_struct(smbios_type_vendor_oem_init(p));
@@ -728,6 +752,42 @@ smbios_type_4_init(
     return start+1;
 }
 
+/* Type 7 -- Cache Information */
+static void *
+smbios_type_7_init(void *start)
+{
+    /* Specification says Type 7 table has length of 13h for v2.1+. */
+    BUILD_BUG_ON(sizeof(struct smbios_type_7) != 19);
+
+    /* Only present when passed in. */
+    return smbios_pt_copy(start, 7, SMBIOS_HANDLE_TYPE7,
+                          sizeof(struct smbios_type_7));
+}
+
+/* Type 8 -- Port Connector Information */
+static void *
+smbios_type_8_init(void *start)
+{
+    /* Specification says Type 8 table has length of 09h. */
+    BUILD_BUG_ON(sizeof(struct smbios_type_8) != 9);
+
+    /* Only present when passed in. */
+    return smbios_pt_copy(start, 8, SMBIOS_HANDLE_TYPE8,
+                          sizeof(struct smbios_type_8));
+}
+
+/* Type 9 -- System Slots */
+static void *
+smbios_type_9_init(void *start)
+{
+    /* Specification says Type 9 table has length of 0Dh for v2.1-2.5. */
+    BUILD_BUG_ON(sizeof(struct smbios_type_9) != 13);
+
+    /* Only present when passed in. */
+    return smbios_pt_copy(start, 9, SMBIOS_HANDLE_TYPE9,
+                          sizeof(struct smbios_type_9));
+}
+
 /* Type 11 -- OEM Strings */
 static void *
 smbios_type_11_init(void *start)
@@ -957,6 +1017,57 @@ smbios_type_22_init(void *start)
     *((uint8_t *)start) = 0;
 
     return start + 1;
+}
+
+/* Type 26 -- Voltage Probe */
+static void *
+smbios_type_26_init(void *start)
+{
+    /*
+     * Specification says Type 26 table has length of at least 14h,
+     * which corresponds with the end of the "OEM-defined" field.
+     *
+     * Only present when passed in.
+     */
+
+    BUILD_BUG_ON(endof_field(struct smbios_type_26, oem_defined) != 20);
+
+    return smbios_pt_copy(start, 26, SMBIOS_HANDLE_TYPE26,
+                          endof_field(struct smbios_type_26, oem_defined));
+}
+
+/* Type 27 -- Cooling Device */
+static void *
+smbios_type_27_init(void *start)
+{
+    /*
+     * Specification says Type 27 table has length of at least 0Ch,
+     * which corresponds with the end of the "OEM-defined" field.
+     *
+     * Only present when passed in.
+     */
+
+    BUILD_BUG_ON(endof_field(struct smbios_type_27, oem_defined) != 12);
+ 
+    return smbios_pt_copy(start, 27, SMBIOS_HANDLE_TYPE27,
+                          endof_field(struct smbios_type_27, oem_defined));
+}
+
+/* Type 28 -- Temperature Probe */
+static void *
+smbios_type_28_init(void *start)
+{
+    /*
+     * Specification says Type 28 table has length of at least 14h,
+     * which corresponds with the end of the "OEM-defined" field.
+     *
+     * Only present when passed in.
+     */
+
+    BUILD_BUG_ON(endof_field(struct smbios_type_28, oem_defined) != 20);
+
+    return smbios_pt_copy(start, 28, SMBIOS_HANDLE_TYPE28,
+                          endof_field(struct smbios_type_28, oem_defined));
 }
 
 /* Type 32 -- System Boot Information */
