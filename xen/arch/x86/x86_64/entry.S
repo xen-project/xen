@@ -39,10 +39,9 @@ FUNC_LOCAL(switch_to_kernel)
         leal  (,%rcx,TBF_INTERRUPT),%ecx
 
         /*
-         * The PV ABI hardcodes the (guest-inaccessible and virtual)
-         * SYSCALL_MASK MSR such that DF (and nothing else) would be cleared.
-         * Note that the equivalent of IF (VGCF_syscall_disables_events) is
-         * dealt with separately above.
+         * The PV ABI, given no virtual SYSCALL_MASK, hardcodes that DF is
+         * cleared.  Other flags are handled in the same way as interrupts and
+         * exceptions in create_bounce_frame().
          */
         mov   $~X86_EFLAGS_DF, %esi
 
