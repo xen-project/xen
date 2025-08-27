@@ -90,13 +90,13 @@ struct smbios_type_2 {
     uint8_t product_name_str;
     uint8_t version_str;
     uint8_t serial_number_str;
-    uint8_t asset_tag_str;
-    uint8_t feature_flags;
-    uint8_t location_in_chassis_str;
-    uint16_t chassis_handle;
-    uint8_t board_type;
-    uint8_t contained_handle_count;
-    uint16_t contained_handles[];
+    uint8_t asset_tag_str;                  /* Optional */
+    uint8_t feature_flags;                  /* Optional */
+    uint8_t location_in_chassis_str;        /* Optional */
+    uint16_t chassis_handle;                /* Optional */
+    uint8_t board_type;                     /* Optional */
+    uint8_t contained_handle_count;         /* Optional */
+    uint16_t contained_handles[];           /* Optional */
 } __attribute__ ((packed));
 
 /* System Enclosure - Contained Elements */
@@ -118,12 +118,12 @@ struct smbios_type_3 {
     uint8_t power_supply_state;
     uint8_t thermal_state;
     uint8_t security_status;
-    uint32_t oem_specific;
-    uint8_t height;
-    uint8_t number_of_power_cords;
-    uint8_t contained_element_count;
-    uint8_t contained_element_length;
-    struct smbios_contained_element contained_elements[];
+    uint32_t oem_specific;                  /* Optional */
+    uint8_t height;                         /* Optional */
+    uint8_t number_of_power_cords;          /* Optional */
+    uint8_t contained_element_count;        /* Optional */
+    uint8_t contained_element_length;       /* Optional */
+    struct smbios_contained_element contained_elements[]; /* Optional */
 } __attribute__ ((packed));
 
 /* SMBIOS type 4 - Processor Information */
@@ -252,9 +252,9 @@ struct smbios_type_39 {
     uint8_t revision_level_str;
     uint16_t max_capacity;
     uint16_t characteristics;
-    uint16_t input_voltage_probe_handle;
-    uint16_t cooling_device_handle;
-    uint16_t input_current_probe_handle;
+    uint16_t input_voltage_probe_handle;    /* Optional */
+    uint16_t cooling_device_handle;         /* Optional */
+    uint16_t input_current_probe_handle;    /* Optional */
 } __attribute__ ((packed));
 
 /* SMBIOS type 127 -- End-of-table */
