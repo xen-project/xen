@@ -30,6 +30,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
      capability usage is not yet supported on PVH dom0).
    - Smoke tests for the FreeBSD Xen builds in Cirrus CI.
    - PVH xenstore-stubdom now supports Live Update.
+   - Support in hvmloader for new SMBIOS tables: 7 (Cache Info), 8 (Port
+     Connector), 9 (System Slots), 26 (Voltage Probe), 27 (Cooling Device),
+     and 28 (Temperature Probe).
 
  - On Arm:
     - Ability to enable stack protector
