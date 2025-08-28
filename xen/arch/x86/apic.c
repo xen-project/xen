@@ -133,14 +133,6 @@ static bool __read_mostly using_apic_timer;
 
 static bool __read_mostly enabled_via_apicbase;
 
-int get_physical_broadcast(void)
-{
-    if (modern_apic())
-        return 0xff;
-    else
-        return 0xf;
-}
-
 int get_maxlvt(void)
 {
     unsigned int v = apic_read(APIC_LVR);

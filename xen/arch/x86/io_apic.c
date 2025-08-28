@@ -1217,8 +1217,6 @@ static void /*__init*/ __print_IO_APIC(bool boot)
 	printk(KERN_DEBUG ".......    : physical APIC id: %02X\n", reg_00.bits.ID);
 	printk(KERN_DEBUG ".......    : Delivery Type: %X\n", reg_00.bits.delivery_type);
 	printk(KERN_DEBUG ".......    : LTS          : %X\n", reg_00.bits.LTS);
-	if (reg_00.bits.ID >= get_physical_broadcast())
-            UNEXPECTED_IO_APIC();
 	if (reg_00.bits.__reserved_1 || reg_00.bits.__reserved_2)
             UNEXPECTED_IO_APIC();
 
@@ -1475,6 +1473,7 @@ static void __init setup_ioapic_ids_from_mpc(void)
     int i;
     unsigned char old_id;
     unsigned long flags;
+    const uint32_t broadcast_id = 0xf;
 
     /*
      * Don't check I/O APIC IDs for xAPIC systems. They have
@@ -1504,7 +1503,7 @@ static void __init setup_ioapic_ids_from_mpc(void)
 		
         old_id = mp_ioapics[apic].mpc_apicid;
 
-        if (mp_ioapics[apic].mpc_apicid >= get_physical_broadcast()) {
+        if (mp_ioapics[apic].mpc_apicid >= broadcast_id) {
             printk(KERN_ERR "BIOS bug, IO-APIC#%d ID is %d in the MPC table!...\n",
                    apic, mp_ioapics[apic].mpc_apicid);
             printk(KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
@@ -1521,10 +1520,10 @@ static void __init setup_ioapic_ids_from_mpc(void)
         {
             printk(KERN_ERR "BIOS bug, IO-APIC#%d ID %d is already used!...\n",
                    apic, mp_ioapics[apic].mpc_apicid);
-            for (i = 0; i < get_physical_broadcast(); i++)
+            for (i = 0; i < broadcast_id; i++)
                 if (!physid_isset(i, phys_id_present_map))
                     break;
-            if (i >= get_physical_broadcast())
+            if (i >= broadcast_id)
                 panic("Max APIC ID exceeded\n");
             printk(KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
                    i);
@@ -2223,6 +2222,7 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
     static physid_mask_t __initdata apic_id_map = PHYSID_MASK_NONE;
     unsigned long flags;
     int i = 0;
+    const uint32_t broadcast_id = 0xf;
 
     /*
      * The P4 platform supports up to 256 APIC IDs on two separate APIC 
@@ -2240,7 +2240,7 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
     reg_00.raw = io_apic_read(ioapic, 0);
     spin_unlock_irqrestore(&ioapic_lock, flags);
 
-    if (apic_id >= get_physical_broadcast()) {
+    if (apic_id >= broadcast_id) {
         printk(KERN_WARNING "IOAPIC[%d]: Invalid apic_id %d, trying "
                "%d\n", ioapic, apic_id, reg_00.bits.ID);
         apic_id = reg_00.bits.ID;
@@ -2253,12 +2253,12 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
     if ( physid_isset(apic_id, apic_id_map) )
     {
 
-        for (i = 0; i < get_physical_broadcast(); i++) {
+        for (i = 0; i < broadcast_id; i++) {
             if ( !physid_isset(i, apic_id_map) )
                 break;
         }
 
-        if (i == get_physical_broadcast())
+        if (i == broadcast_id)
             panic("Max apic_id exceeded\n");
 
         printk(KERN_WARNING "IOAPIC[%d]: apic_id %d already used, "

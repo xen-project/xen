@@ -153,8 +153,6 @@ static inline u32 get_apic_id(void)
 
 void apic_wait_icr_idle(void);
 
-int get_physical_broadcast(void);
-
 static inline void ack_APIC_irq(void)
 {
 	/* Docs say use 0 for future compatibility */
