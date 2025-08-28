@@ -260,6 +260,41 @@ unsigned long symbols_lookup_by_name(const char *symname)
     return 0;
 }
 
+#ifdef CONFIG_SELF_TESTS
+
+static void __init test_lookup(unsigned long addr, const char *expected)
+{
+    char buf[KSYM_NAME_LEN + 1];
+    const char *name, *symname;
+    unsigned long size, offs;
+
+    name = symbols_lookup(addr, &size, &offs, buf);
+    if ( !name )
+        panic("%s: address not found\n", expected);
+    if ( offs )
+        panic("%s: non-zero offset (%#lx) unexpected\n", expected, offs);
+
+    /* Cope with static symbols, where varying file names/paths may be used. */
+    symname = strchr(name, '#');
+    symname = symname ? symname + 1 : name;
+    if ( strcmp(symname, expected) )
+        panic("%s: unexpected symbol name: '%s'\n", expected, symname);
+
+    offs = symbols_lookup_by_name(name);
+    if ( offs != addr )
+        panic("%s: address %#lx unexpected; wanted %#lx\n",
+              expected, offs, addr);
+}
+
+static void __init __constructor test_symbols(void)
+{
+    /* Be sure to only try this for cf_check functions. */
+    test_lookup((unsigned long)dump_execstate, "dump_execstate");
+    test_lookup((unsigned long)test_symbols, __func__);
+}
+
+#endif /* CONFIG_SELF_TESTS */
+
 /*
  * Local variables:
  * mode: C
