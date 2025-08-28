@@ -131,12 +131,14 @@ static int __init cf_check cpufreq_driver_init(void)
 
     if ( cpufreq_controller == FREQCTL_xen )
     {
+        unsigned int i;
+
         ret = -ENOENT;
 
         switch ( boot_cpu_data.x86_vendor )
         {
         case X86_VENDOR_INTEL:
-            for ( unsigned int i = 0; i < cpufreq_xen_cnt; i++ )
+            for ( i = 0; i < cpufreq_xen_cnt; i++ )
             {
                 switch ( cpufreq_xen_opts[i] )
                 {
@@ -151,6 +153,11 @@ static int __init cf_check cpufreq_driver_init(void)
                 case CPUFREQ_none:
                     ret = 0;
                     break;
+
+                default:
+                    printk(XENLOG_WARNING
+                           "Unsupported cpufreq driver for vendor Intel\n");
+                    break;
                 }
 
                 if ( !ret || ret == -EBUSY )
@@ -160,13 +167,71 @@ static int __init cf_check cpufreq_driver_init(void)
 
         case X86_VENDOR_AMD:
         case X86_VENDOR_HYGON:
-            ret = IS_ENABLED(CONFIG_AMD) ? powernow_register_driver() : -ENODEV;
+#ifdef CONFIG_AMD
+            for ( i = 0; i < cpufreq_xen_cnt; i++ )
+            {
+                switch ( cpufreq_xen_opts[i] )
+                {
+                case CPUFREQ_xen:
+                    ret = powernow_register_driver();
+                    break;
+
+                case CPUFREQ_amd_cppc:
+                    ret = amd_cppc_register_driver();
+                    break;
+
+                case CPUFREQ_none:
+                    ret = 0;
+                    break;
+
+                default:
+                    printk(XENLOG_WARNING
+                           "Unsupported cpufreq driver for vendor AMD or Hygon\n");
+                    break;
+                }
+
+                if ( !ret || ret == -EBUSY )
+                    break;
+            }
+#else
+            ret = -ENODEV;
+#endif /* CONFIG_AMD */
             break;
 
         default:
             printk(XENLOG_ERR "Cpufreq: unsupported x86 vendor\n");
             break;
         }
+
+        /*
+         * After successful cpufreq driver registeration, XEN_PROCESSOR_PM_CPPC
+         * and XEN_PROCESSOR_PM_PX shall become exclusive flags.
+         */
+        if ( !ret )
+        {
+            ASSERT(i < cpufreq_xen_cnt);
+            switch ( cpufreq_xen_opts[i] )
+            {
+            case CPUFREQ_amd_cppc:
+                xen_processor_pmbits &= ~XEN_PROCESSOR_PM_PX;
+                break;
+
+            case CPUFREQ_hwp:
+            case CPUFREQ_xen:
+                xen_processor_pmbits &= ~XEN_PROCESSOR_PM_CPPC;
+                break;
+
+            default:
+                break;
+            }
+        }
+        else if ( ret != -EBUSY )
+            /*
+             * No cpufreq driver gets registered, clear both
+             * XEN_PROCESSOR_PM_CPPC and XEN_PROCESSOR_PM_PX
+             */
+             xen_processor_pmbits &= ~(XEN_PROCESSOR_PM_CPPC |
+                                       XEN_PROCESSOR_PM_PX);
     }
 
     return ret;

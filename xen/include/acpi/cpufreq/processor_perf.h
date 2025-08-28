@@ -5,6 +5,16 @@
 #include <public/sysctl.h>
 #include <xen/acpi.h>
 
+/*
+ * Internal xen-pm options
+ * They are extension to public xen-pm options (XEN_PROCESSOR_PM_xxx) defined
+ * in public/platform.h, guarded by SIF_PM_MASK
+ */
+#define XEN_PROCESSOR_PM_CPPC   0x100
+#if XEN_PROCESSOR_PM_CPPC & MASK_EXTR(~0, SIF_PM_MASK)
+# error "XEN_PROCESSOR_PM_CPPC shall not occupy bits reserved for public xen-pm options"
+#endif
+
 #define XEN_CPPC_INIT 0x40000000U
 #define XEN_PX_INIT   0x80000000U
 

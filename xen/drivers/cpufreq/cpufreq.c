@@ -65,7 +65,7 @@ LIST_HEAD_READ_MOSTLY(cpufreq_governor_list);
 /* set xen as default cpufreq */
 enum cpufreq_controller cpufreq_controller = FREQCTL_xen;
 
-enum cpufreq_xen_opt __initdata cpufreq_xen_opts[2] = { [0] = CPUFREQ_xen };
+enum cpufreq_xen_opt __initdata cpufreq_xen_opts[3] = { [0] = CPUFREQ_xen };
 unsigned int __initdata cpufreq_xen_cnt = 1;
 
 static int __init cpufreq_cmdline_parse(const char *s, const char *e);
@@ -97,6 +97,10 @@ static int __init handle_cpufreq_cmdline(enum cpufreq_xen_opt option)
     case CPUFREQ_hwp:
     case CPUFREQ_xen:
         xen_processor_pmbits |= XEN_PROCESSOR_PM_PX;
+        break;
+
+    case CPUFREQ_amd_cppc:
+        xen_processor_pmbits |= XEN_PROCESSOR_PM_CPPC;
         break;
 
     default:
@@ -161,6 +165,13 @@ static int __init cf_check setup_cpufreq_option(const char *str)
             ret = handle_cpufreq_cmdline(CPUFREQ_hwp);
             if ( !ret && arg[0] && arg[1] )
                 ret = hwp_cmdline_parse(arg + 1, end);
+        }
+        else if ( IS_ENABLED(CONFIG_AMD) && choice < 0 &&
+                  !cmdline_strcmp(str, "amd-cppc") )
+        {
+            ret = handle_cpufreq_cmdline(CPUFREQ_amd_cppc);
+            if ( !ret && arg[0] && arg[1] )
+                ret = amd_cppc_cmdline_parse(arg + 1, end);
         }
         else
             ret = -EINVAL;
