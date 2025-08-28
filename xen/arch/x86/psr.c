@@ -1583,12 +1583,6 @@ static void psr_cpu_init(void)
     if ( !psr_alloc_feat_enabled() || !cpu_has_pqe )
         goto assoc_init;
 
-    if ( boot_cpu_data.cpuid_level < PSR_CPUID_LEVEL_CAT )
-    {
-        setup_clear_cpu_cap(X86_FEATURE_PQE);
-        goto assoc_init;
-    }
-
     socket = cpu_to_socket(cpu);
     info = socket_info + socket;
     if ( info->feat_init )
@@ -1707,6 +1701,9 @@ static int __init cf_check psr_presmp_init(void)
 
     if ( psr_cpu_prepare() )
         psr_free();
+
+    if ( boot_cpu_data.cpuid_level < PSR_CPUID_LEVEL_CAT )
+        setup_clear_cpu_cap(X86_FEATURE_PQE);
 
     psr_cpu_init();
     if ( psr_cmt_enabled() || psr_alloc_feat_enabled() )
