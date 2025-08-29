@@ -7,6 +7,7 @@ CONFIG_PV_SHIM_EXCLUSIVE=y
 CONFIG_NR_CPUS=32
 CONFIG_EXPERT=y
 # Disable features not used by the PV shim
+CONFIG_PDX_NONE=y
 # CONFIG_XEN_SHSTK is not set
 # CONFIG_XEN_IBT is not set
 # CONFIG_GRANT_TABLE is not set
