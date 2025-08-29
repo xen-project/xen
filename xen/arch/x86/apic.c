@@ -91,23 +91,6 @@ static enum apic_mode apic_boot_mode = APIC_MODE_INVALID;
 bool __read_mostly x2apic_enabled;
 bool __read_mostly directed_eoi_enabled;
 
-static int modern_apic(void)
-{
-    unsigned int lvr, version;
-    /* AMD systems use old APIC versions, so check the CPU */
-    if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
-        boot_cpu_data.x86 >= 0xf)
-        return 1;
-
-    /* Hygon systems use modern APIC */
-    if (boot_cpu_data.x86_vendor == X86_VENDOR_HYGON)
-        return 1;
-
-    lvr = apic_read(APIC_LVR);
-    version = GET_APIC_VERSION(lvr);
-    return version >= 0x14;
-}
-
 /*
  * 'what should we do if we get a hw irq event on an illegal vector'.
  * each architecture has to answer this themselves.
@@ -394,21 +377,6 @@ int __init verify_local_APIC(void)
     apic_printk(APIC_DEBUG, "Getting LVT1: %x\n", reg1);
 
     return 1;
-}
-
-void __init sync_Arb_IDs(void)
-{
-    /* Unsupported on P4 - see Intel Dev. Manual Vol. 3, Ch. 8.6.1
-       And not needed on AMD */
-    if (modern_apic())
-        return;
-    /*
-     * Wait for idle.
-     */
-    apic_wait_icr_idle();
-
-    apic_printk(APIC_DEBUG, "Synchronizing Arb IDs.\n");
-    apic_write(APIC_ICR, APIC_DEST_ALLINC | APIC_INT_LEVELTRIG | APIC_DM_INIT);
 }
 
 /*

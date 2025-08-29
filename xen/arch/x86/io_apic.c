@@ -2163,7 +2163,7 @@ void __init setup_IO_APIC(void)
      */
     if (!acpi_ioapic)
         setup_ioapic_ids_from_mpc();
-    sync_Arb_IDs();
+
     setup_IO_APIC_irqs();
     init_IO_APIC_traps();
     check_timer();
