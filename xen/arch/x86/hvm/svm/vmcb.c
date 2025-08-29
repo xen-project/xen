@@ -16,12 +16,12 @@
 
 #include <asm/guest-msr.h>
 #include <asm/hvm/svm/svm.h>
-#include <asm/hvm/svm/svmdebug.h>
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/msr-index.h>
 #include <asm/p2m.h>
 #include <asm/spec_ctrl.h>
 
+#include "svm.h"
 #include "vmcb.h"
 
 struct vmcb_struct *alloc_vmcb(void)

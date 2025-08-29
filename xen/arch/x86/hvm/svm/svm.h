@@ -78,6 +78,23 @@ unsigned int svm_get_task_switch_insn_len(void);
 #define _NPT_PFEC_in_gpt       33
 #define NPT_PFEC_in_gpt        (1UL<<_NPT_PFEC_in_gpt)
 
+/*
+ * VMRUN doesn't switch fs/gs/tr/ldtr and SHADOWGS/SYSCALL/SYSENTER state.
+ * Therefore, guest state is in the hardware registers when servicing a
+ * VMExit.
+ *
+ * Immediately after a VMExit, the vmcb is stale, and needs to be brought
+ * into sync by VMSAVE.  If state in the vmcb is modified, a VMLOAD is
+ * needed before the following VMRUN.
+ */
+enum vmcb_sync_state {
+    vmcb_in_sync,
+    vmcb_needs_vmsave,    /* VMCB out of sync (VMSAVE needed)? */
+    vmcb_needs_vmload,    /* VMCB dirty (VMLOAD needed)? */
+};
+
+void svm_sync_vmcb(struct vcpu *v, enum vmcb_sync_state new_state);
+
 #endif /* __X86_HVM_SVM_SVM_PRIV_H__ */
 
 /*
