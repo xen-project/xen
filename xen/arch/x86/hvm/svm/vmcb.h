@@ -553,6 +553,9 @@ int  svm_create_vmcb(struct vcpu *v);
 void svm_destroy_vmcb(struct vcpu *v);
 
 void setup_vmcb_dump(void);
+void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb);
+bool svm_vmcb_isvalid(const char *from, const struct vmcb_struct *vmcb,
+                      const struct vcpu *v, bool verbose);
 
 /*
  * VMCB accessor functions.
