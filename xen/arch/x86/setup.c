@@ -1073,7 +1073,7 @@ static struct domain *__init create_dom0(struct boot_info *bi)
 
         if ( (strlen(acpi_param) == 0) && acpi_disabled )
         {
-            printk("ACPI is disabled, notifying Domain 0 (acpi=off)\n");
+            printk("ACPI is disabled, notifying %pd (acpi=off)\n", d);
             safe_strcpy(acpi_param, "off");
         }
 
@@ -1088,7 +1088,7 @@ static struct domain *__init create_dom0(struct boot_info *bi)
 
     bd->d = d;
     if ( construct_dom0(bd) != 0 )
-        panic("Could not construct domain 0\n");
+        panic("Could not construct %pd\n", d);
 
     bd->cmdline = NULL;
     xfree(cmdline);

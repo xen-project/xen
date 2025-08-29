@@ -2092,14 +2092,14 @@ void __init create_dom0(void)
         panic("Error creating domain 0 (rc = %ld)\n", PTR_ERR(dom0));
 
     if ( llc_coloring_enabled && (rc = dom0_set_llc_colors(dom0)) )
-        panic("Error initializing LLC coloring for domain 0 (rc = %d)\n", rc);
+        panic("Error initializing LLC coloring for %pd (rc = %d)\n", dom0, rc);
 
     if ( vcpu_create(dom0, 0) == NULL )
-        panic("Error creating domain 0 vcpu0\n");
+        panic("Error creating %pdv0\n", dom0);
 
     rc = construct_dom0(dom0);
     if ( rc )
-        panic("Could not set up DOM0 guest OS (rc = %d)\n", rc);
+        panic("Could not set up %pd guest OS (rc = %d)\n", dom0, rc);
 
     set_xs_domain(dom0);
 }
