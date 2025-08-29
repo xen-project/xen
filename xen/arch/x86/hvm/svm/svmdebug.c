@@ -10,6 +10,8 @@
 #include <asm/msr-index.h>
 #include <asm/hvm/svm/svmdebug.h>
 
+#include "vmcb.h"
+
 static void svm_dump_sel(const char *name, const struct segment_register *s)
 {
     printk("%s: %04x %04x %08x %016"PRIx64"\n",

@@ -26,6 +26,7 @@
 #include <xen/domain_page.h>
 
 #include "nestedhvm.h"
+#include "vmcb.h"
 
 static void svm_inject_nmi(struct vcpu *v)
 {

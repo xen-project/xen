@@ -16,6 +16,7 @@
 
 #include "nestedhvm.h"
 #include "svm.h"
+#include "vmcb.h"
 
 #define NSVM_ERROR_VVMCB        1
 #define NSVM_ERROR_VMENTRY      2

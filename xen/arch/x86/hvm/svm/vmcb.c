@@ -22,6 +22,8 @@
 #include <asm/p2m.h>
 #include <asm/spec_ctrl.h>
 
+#include "vmcb.h"
+
 struct vmcb_struct *alloc_vmcb(void)
 {
     struct vmcb_struct *vmcb;

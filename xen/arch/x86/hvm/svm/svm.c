@@ -44,6 +44,7 @@
 
 #include "nestedhvm.h"
 #include "svm.h"
+#include "vmcb.h"
 
 void noreturn svm_asm_do_resume(void);
 

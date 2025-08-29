@@ -15,6 +15,7 @@
 #include <asm/hvm/svm/vmcb.h>
 
 #include "svm.h"
+#include "vmcb.h"
 
 static unsigned long svm_nextrip_insn_length(struct vcpu *v)
 {

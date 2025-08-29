@@ -9,6 +9,7 @@
 #include <asm/hvm/svm/svm.h>
 
 #include "svm.h"
+#include "vmcb.h"
 
 void svm_asid_init(const struct cpuinfo_x86 *c)
 {
