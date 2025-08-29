@@ -38,6 +38,9 @@ void arch_get_domain_info(const struct domain *d,
 
 domid_t get_initial_domain_id(void);
 
+domid_t domid_alloc(domid_t domid);
+void domid_free(domid_t domid);
+
 /* CDF_* constant. Internal flags for domain creation. */
 /* Is this a privileged domain? */
 #define CDF_privileged           (1U << 0)

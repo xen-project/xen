@@ -838,6 +838,7 @@ void __init create_domUs(void)
     {
         struct kernel_info ki = KERNEL_INFO_INIT;
         int rc = parse_dom0less_node(node, &ki.bd);
+        domid_t domid;
 
         if ( rc == -ENOENT )
             continue;
@@ -847,13 +848,13 @@ void __init create_domUs(void)
         if ( (max_init_domid + 1) >= DOMID_FIRST_RESERVED )
             panic("No more domain IDs available\n");
 
-        /*
-         * The variable max_init_domid is initialized with zero, so here it's
-         * very important to use the pre-increment operator to call
-         * domain_create() with a domid > 0. (domid == 0 is reserved for Dom0)
-         */
-        ki.bd.d = domain_create(++max_init_domid,
-                                &ki.bd.create_cfg, ki.bd.create_flags);
+        domid = domid_alloc(DOMID_INVALID);
+        if ( domid == DOMID_INVALID )
+            panic("Error allocating ID for domain %s\n", dt_node_name(node));
+
+        max_init_domid = max(max_init_domid, domid);
+
+        ki.bd.d = domain_create(domid, &ki.bd.create_cfg, ki.bd.create_flags);
         if ( IS_ERR(ki.bd.d) )
             panic("Error creating domain %s (rc = %ld)\n",
                   dt_node_name(node), PTR_ERR(ki.bd.d));

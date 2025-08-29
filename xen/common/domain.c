@@ -692,6 +692,8 @@ static void _domain_destroy(struct domain *d)
 
     lock_profile_deregister_struct(LOCKPROF_TYPE_PERDOM, d);
 
+    domid_free(d->domain_id);
+
     free_domain_struct(d);
 }
 

@@ -2058,6 +2058,7 @@ void __init create_dom0(void)
         .grant_opts = XEN_DOMCTL_GRANT_version(opt_gnttab_max_version),
     };
     unsigned int flags = CDF_privileged | CDF_hardware;
+    domid_t domid;
     int rc;
 
     /* The vGIC for DOM0 is exactly emulating the hardware GIC */
@@ -2082,7 +2083,11 @@ void __init create_dom0(void)
     if ( !llc_coloring_enabled )
         flags |= CDF_directmap;
 
-    dom0 = domain_create(0, &dom0_cfg, flags);
+    domid = domid_alloc(0);
+    if ( domid == DOMID_INVALID )
+        panic("Error allocating domain ID 0\n");
+
+    dom0 = domain_create(domid, &dom0_cfg, flags);
     if ( IS_ERR(dom0) )
         panic("Error creating domain 0 (rc = %ld)\n", PTR_ERR(dom0));
 

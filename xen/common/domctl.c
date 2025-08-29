@@ -51,20 +51,6 @@ static int xenctl_bitmap_to_nodemask(nodemask_t *nodemask,
                                    MAX_NUMNODES);
 }
 
-static inline int is_free_domid(domid_t dom)
-{
-    struct domain *d;
-
-    if ( dom >= DOMID_FIRST_RESERVED )
-        return 0;
-
-    if ( (d = rcu_lock_domain_by_id(dom)) == NULL )
-        return 1;
-
-    rcu_unlock_domain(d);
-    return 0;
-}
-
 void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
 {
     struct vcpu *v;
@@ -423,36 +409,19 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_createdomain:
     {
-        domid_t        dom;
-        static domid_t rover = 0;
+        /* NB: ID#0 is reserved, find the first suitable ID instead. */
+        domid_t domid = domid_alloc(op->domain ?: DOMID_INVALID);
 
-        dom = op->domain;
-        if ( (dom > 0) && (dom < DOMID_FIRST_RESERVED) )
+        if ( domid == DOMID_INVALID )
         {
             ret = -EEXIST;
-            if ( !is_free_domid(dom) )
-                break;
-        }
-        else
-        {
-            for ( dom = rover + 1; dom != rover; dom++ )
-            {
-                if ( dom == DOMID_FIRST_RESERVED )
-                    dom = 1;
-                if ( is_free_domid(dom) )
-                    break;
-            }
-
-            ret = -ENOMEM;
-            if ( dom == rover )
-                break;
-
-            rover = dom;
+            break;
         }
 
-        d = domain_create(dom, &op->u.createdomain, false);
+        d = domain_create(domid, &op->u.createdomain, false);
         if ( IS_ERR(d) )
         {
+            domid_free(domid);
             ret = PTR_ERR(d);
             d = NULL;
             break;
