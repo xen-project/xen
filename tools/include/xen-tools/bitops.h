@@ -12,6 +12,16 @@
 #define BITS_PER_LONG 32
 #endif
 
+#define ffsl(x)       __builtin_ffsl(x)
+
+#define BIT_WORD(nr)  ((nr) / BITS_PER_LONG)
+
+#define BITS_TO_LONGS(bits) \
+    (((bits) + BITS_PER_LONG - 1) / BITS_PER_LONG)
+
+#define DECLARE_BITMAP(name, bits) \
+    unsigned long name[BITS_TO_LONGS(bits)]
+
 #define BITMAP_ENTRY(_nr,_bmap) ((_bmap))[(_nr) / 8]
 #define BITMAP_SHIFT(_nr) ((_nr) % 8)
 

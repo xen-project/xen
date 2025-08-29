@@ -8,8 +8,13 @@
  * as published by the Free Software Foundation; either version
  * 2 of the License, or (at your option) any later version.
  */
+
+#ifdef __XEN_TOOLS__
+#include <xen-tools/bitops.h>
+#else
 #include <xen/bitops.h>
 #include <xen/byteorder.h>
+#endif
 
 #define __ffs(x) (ffsl(x) - 1)
 #define ffz(x) __ffs(~(x))
