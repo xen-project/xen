@@ -221,10 +221,11 @@ typedef struct { u64 pfn; } pagetable_t;
 
 void clear_page_hot(void *pg);
 void clear_page_cold(void *pg);
-void copy_page_sse2(void *to, const void *from);
+void copy_page_hot(void *to, const void *from);
+void copy_page_cold(void *to, const void *from);
 
 #define clear_page(_p)      clear_page_cold(_p)
-#define copy_page(_t, _f)   copy_page_sse2(_t, _f)
+#define copy_page(_t, _f)   copy_page_cold(_t, _f)
 
 #ifdef CONFIG_DEBUG
 void scrub_page_hot(void *ptr);

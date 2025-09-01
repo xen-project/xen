@@ -13,7 +13,7 @@
 #define tmp3_reg %r10
 #define tmp4_reg %r11
 
-FUNC(copy_page_sse2)
+FUNC(copy_page_cold)
         mov     $PAGE_SIZE/(4*WORD_SIZE)-3, %ecx
 
         prefetchnta 2*4*WORD_SIZE(src_reg)
@@ -44,4 +44,19 @@ FUNC(copy_page_sse2)
 
         sfence
         RET
-END(copy_page_sse2)
+END(copy_page_cold)
+
+        .macro copy_page_movsb
+        mov     $PAGE_SIZE, %ecx
+        rep movsb
+        .endm
+
+        .macro copy_page_movsq
+        mov     $PAGE_SIZE/8, %ecx
+        rep movsq
+        .endm
+
+FUNC(copy_page_hot)
+        ALTERNATIVE copy_page_movsq, copy_page_movsb, X86_FEATURE_ERMS
+        RET
+END(copy_page_hot)
