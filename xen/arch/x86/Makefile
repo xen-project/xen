@@ -113,15 +113,6 @@ notes_phdrs = --notes
 endif
 endif
 
-ifdef CONFIG_LIVEPATCH
-all_symbols = --all-symbols
-ifdef CONFIG_FAST_SYMBOL_LOOKUP
-all_symbols = --all-symbols --sort-by-name
-endif
-else
-all_symbols =
-endif
-
 syms-warn-dup-y := --warn-dup
 syms-warn-dup-$(CONFIG_SUPPRESS_DUPLICATE_SYMBOL_WARNINGS) :=
 syms-warn-dup-$(CONFIG_ENFORCE_UNIQUE_SYMBOLS) := --error-dup
