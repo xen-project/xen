@@ -350,10 +350,11 @@ static unsigned int __init get_argv(unsigned int argc, CHAR16 **argv,
 
     if ( argc )
     {
+        argc = 0;
         cmdline = data + *offset;
         /* EFI_LOAD_OPTION does not supply an image name as first component. */
         if ( *offset )
-            *argv++ = NULL;
+            argv[argc++] = NULL;
     }
     else if ( size > sizeof(*cmdline) && !(size % sizeof(*cmdline)) &&
               (wmemchr(data, 0, size / sizeof(*cmdline)) ==
@@ -414,14 +415,14 @@ static unsigned int __init get_argv(unsigned int argc, CHAR16 **argv,
                 ++argc;
             else if ( prev && wstrcmp(prev, L"--") == 0 )
             {
-                --argv;
+                --argc;
                 if ( options )
                     *options = cmdline;
                 break;
             }
             else
             {
-                *argv++ = prev = ptr;
+                argv[argc++] = prev = ptr;
                 *ptr = *cmdline;
                 *++ptr = 0;
             }
@@ -429,7 +430,7 @@ static unsigned int __init get_argv(unsigned int argc, CHAR16 **argv,
         prev_sep = cur_sep;
     }
     if ( argv )
-        *argv = NULL;
+        argv[argc] = NULL;
     return argc;
 }
 
@@ -1355,8 +1356,8 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
                                   (argc + 1) * sizeof(*argv) +
                                       loaded_image->LoadOptionsSize,
                                   (void **)&argv) == EFI_SUCCESS )
-            get_argv(argc, argv, loaded_image->LoadOptions,
-                     loaded_image->LoadOptionsSize, &offset, &options);
+            argc = get_argv(argc, argv, loaded_image->LoadOptions,
+                            loaded_image->LoadOptionsSize, &offset, &options);
         else
             argc = 0;
         for ( i = 1; i < argc; ++i )
