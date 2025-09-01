@@ -45,6 +45,7 @@ struct sym_entry {
 	unsigned int addr_idx;
 	unsigned int stream_offset;
 	unsigned char type;
+	bool typed;
 };
 #define SYMBOL_NAME(s) ((char *)(s)->sym + 1)
 
@@ -180,6 +181,9 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 		s->type = stype; /* As s->sym[0] ends mangled. */
 	}
 	s->sym[0] = stype;
+	s->typed = strcmp(type, "FUNC") == 0 ||
+	           strcmp(type, "OBJECT") == 0 ||
+	           strcmp(type, "Function") == 0;
 	rc = 0;
 
  skip_tail:
@@ -613,6 +617,13 @@ static int compare_value(const void *p1, const void *p2)
 		return -1;
 	if (sym1->addr > sym2->addr)
 		return +1;
+
+	/* Prefer symbols which have a type. */
+	if (sym1->typed && !sym2->typed)
+		return -1;
+	if (sym2->typed && !sym1->typed)
+		return +1;
+
 	/* Prefer global symbols. */
 	if (isupper(*sym1->sym))
 		return -1;
