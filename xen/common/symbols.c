@@ -10,7 +10,6 @@
  *      compression (see tools/symbols.c for a more complete description)
  */
 
-#include <xen/symbols.h>
 #include <xen/kernel.h>
 #include <xen/init.h>
 #include <xen/lib.h>
@@ -21,22 +20,7 @@
 #include <xen/guest_access.h>
 #include <xen/errno.h>
 
-#ifdef SYMBOLS_ORIGIN
-extern const unsigned int symbols_offsets[];
-#define symbols_address(n) (SYMBOLS_ORIGIN + symbols_offsets[n])
-#else
-extern const unsigned long symbols_addresses[];
-#define symbols_address(n) symbols_addresses[n]
-#endif
-extern const unsigned int symbols_num_syms;
-extern const u8 symbols_names[];
-
-extern const struct symbol_offset symbols_sorted_offsets[];
-
-extern const u8 symbols_token_table[];
-extern const u16 symbols_token_index[];
-
-extern const unsigned int symbols_markers[];
+#include "symbols.h"
 
 /* expand a compressed symbol data into the resulting uncompressed string,
    given the offset to where the symbol is in the compressed stream */
@@ -124,7 +108,7 @@ const char *symbols_lookup(unsigned long addr,
 
         /* do a binary search on the sorted symbols_addresses array */
     low = 0;
-    high = symbols_num_syms;
+    high = symbols_num_addrs;
 
     while (high-low > 1) {
         mid = (low + high) / 2;
@@ -141,7 +125,7 @@ const char *symbols_lookup(unsigned long addr,
     symbols_expand_symbol(get_symbol_offset(low), namebuf);
 
     /* Search for next non-aliased symbol */
-    for (i = low + 1; i < symbols_num_syms; i++) {
+    for (i = low + 1; i < symbols_num_addrs; i++) {
         if (symbols_address(i) > symbols_address(low)) {
             symbol_end = symbols_address(i);
             break;
@@ -182,9 +166,9 @@ int xensyms_read(uint32_t *symnum, char *type,
     static unsigned int next_symbol, next_offset;
     static DEFINE_SPINLOCK(symbols_mutex);
 
-    if ( *symnum > symbols_num_syms )
+    if ( *symnum > symbols_num_addrs )
         return -ERANGE;
-    if ( *symnum == symbols_num_syms )
+    if ( *symnum == symbols_num_addrs )
     {
         /* No more symbols */
         name[0] = '\0';
@@ -227,7 +211,7 @@ unsigned long symbols_lookup_by_name(const char *symname)
 
 #ifdef CONFIG_FAST_SYMBOL_LOOKUP
     low = 0;
-    high = symbols_num_syms;
+    high = symbols_num_names;
     while ( low < high )
     {
         unsigned long mid = low + ((high - low) / 2);

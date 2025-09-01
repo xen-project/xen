@@ -323,7 +323,7 @@ static void write_src(void)
 	}
 	printf("\n");
 
-	output_label("symbols_num_syms");
+	output_label("symbols_num_addrs");
 	printf("\t.long\t%d\n", table_cnt);
 	printf("\n");
 
@@ -372,6 +372,10 @@ static void write_src(void)
 		free(markers);
 		return;
 	}
+
+	output_label("symbols_num_names");
+	printf("\t.long\t%d\n", table_cnt);
+	printf("\n");
 
 	/* Sorted by original symbol names and type. */
 	qsort(table, table_cnt, sizeof(*table), compare_name_orig);
