@@ -354,7 +354,7 @@ def crunch_numbers(state):
 
     for feat in deep_features:
 
-        seen = [feat]
+        seen = []
         to_process = list(deps[feat])
 
         while len(to_process):
@@ -367,14 +367,17 @@ def crunch_numbers(state):
 
             f = to_process.pop(0)
 
+            if f == feat:
+                raise Fail("ERROR: Cycle found when processing %s" %
+                           (state.names[f], ))
+
             if f in seen:
-                raise Fail("ERROR: Cycle found with %s when processing %s"
-                           % (state.names[f], state.names[feat]))
+                continue
 
             seen.append(f)
             to_process = list(set(to_process + deps.get(f, [])))
 
-        state.deep_deps[feat] = seen[1:]
+        state.deep_deps[feat] = seen
 
     state.deep_features = deps.keys()
     state.nr_deep_deps = len(state.deep_deps.keys())
