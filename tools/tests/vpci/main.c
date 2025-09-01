@@ -132,10 +132,10 @@ static void vpci_write32_mask(const struct pci_dev *pdev, unsigned int reg,
                                   rsvdz_mask))
 
 #define VPCI_REMOVE_REG(off, size)                                          \
-    assert(!vpci_remove_register(test_pdev.vpci, off, size))
+    assert(!vpci_remove_registers(test_pdev.vpci, off, size))
 
 #define VPCI_REMOVE_INVALID_REG(off, size)                                  \
-    assert(vpci_remove_register(test_pdev.vpci, off, size))
+    assert(vpci_remove_registers(test_pdev.vpci, off, size))
 
 /* Read a 32b register using all possible sizes. */
 void multiread4_check(unsigned int reg, uint32_t val)
@@ -402,10 +402,10 @@ main(int argc, char **argv)
     VPCI_REMOVE_REG(28, 1);
     VPCI_REMOVE_REG(24, 4);
     VPCI_REMOVE_REG(12, 2);
+    VPCI_REMOVE_REG(16, 2);
+    VPCI_REMOVE_REG(30, 2);
 
     VPCI_REMOVE_INVALID_REG(20, 1);
-    VPCI_REMOVE_INVALID_REG(16, 2);
-    VPCI_REMOVE_INVALID_REG(30, 2);
 
     return 0;
 }
