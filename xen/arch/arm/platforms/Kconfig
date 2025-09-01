@@ -33,6 +33,7 @@ config RCAR3
 config RCAR4
 	bool "Renesas R-Car Gen4 support"
 	depends on ARM_64
+	select GICV3
 	select HAS_SCIF
 	select HAS_ITS
 	select IPMMU_VMSA
