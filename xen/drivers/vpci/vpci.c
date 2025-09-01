@@ -280,7 +280,7 @@ static int vpci_init_capabilities(struct pci_dev *pdev)
 
             if ( capability->cleanup )
             {
-                rc = capability->cleanup(pdev);
+                rc = capability->cleanup(pdev, true);
                 if ( rc )
                 {
                     printk(XENLOG_ERR "%pd %pp: clean %s cap %u fail rc=%d\n",
@@ -320,6 +320,30 @@ void vpci_deassign_device(struct pci_dev *pdev)
         __clear_bit(pdev->vpci->guest_sbdf.dev,
                     &pdev->domain->vpci_dev_assigned_map);
 #endif
+
+    for ( i = 0; i < NUM_VPCI_INIT; i++ )
+    {
+        const vpci_capability_t *capability = &__start_vpci_array[i];
+        const unsigned int cap = capability->id;
+        unsigned int pos = 0;
+
+        if ( !capability->cleanup )
+            continue;
+
+        if ( !capability->is_ext )
+            pos = pci_find_cap_offset(pdev->sbdf, cap);
+        else if ( is_hardware_domain(pdev->domain) )
+            pos = pci_find_ext_capability(pdev->sbdf, cap);
+        if ( pos )
+        {
+            int rc = capability->cleanup(pdev, false);
+
+            if ( rc )
+                printk(XENLOG_ERR "%pd %pp: clean %s cap %u fail rc=%d\n",
+                       pdev->domain, &pdev->sbdf,
+                       capability->is_ext ? "extended" : "legacy", cap, rc);
+        }
+    }
 
     spin_lock(&pdev->vpci->lock);
     while ( !list_empty(&pdev->vpci->handlers) )

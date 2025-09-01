@@ -17,7 +17,7 @@ typedef struct {
     unsigned int id;
     bool is_ext;
     int (* init)(struct pci_dev *pdev);
-    int (* cleanup)(const struct pci_dev *pdev);
+    int (* cleanup)(const struct pci_dev *pdev, bool hide);
 } vpci_capability_t;
 
 #define VPCI_ECAM_BDF(addr)     (((addr) & 0x0ffff000) >> 12)
