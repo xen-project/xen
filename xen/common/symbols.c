@@ -116,6 +116,13 @@ const char *symbols_lookup(unsigned long addr,
         else high = mid;
     }
 
+    /* If we hit an END symbol, move to the previous (real) one. */
+    if (!symbols_names[get_symbol_offset(low)]) {
+        ASSERT(low);
+        symbol_end = symbols_address(low);
+        --low;
+    }
+
     /* search for the first aliased symbol. Aliased symbols are
            symbols with the same address */
     while (low && symbols_address(low - 1) == symbols_address(low))
@@ -124,11 +131,13 @@ const char *symbols_lookup(unsigned long addr,
         /* Grab name */
     symbols_expand_symbol(get_symbol_offset(low), namebuf);
 
-    /* Search for next non-aliased symbol */
-    for (i = low + 1; i < symbols_num_addrs; i++) {
-        if (symbols_address(i) > symbols_address(low)) {
-            symbol_end = symbols_address(i);
-            break;
+    if (!symbol_end) {
+        /* Search for next non-aliased symbol */
+        for (i = low + 1; i < symbols_num_addrs; i++) {
+            if (symbols_address(i) > symbols_address(low)) {
+                symbol_end = symbols_address(i);
+                break;
+            }
         }
     }
 
@@ -170,6 +179,7 @@ int xensyms_read(uint32_t *symnum, char *type,
         return -ERANGE;
     if ( *symnum == symbols_num_addrs )
     {
+    no_symbol:
         /* No more symbols */
         name[0] = '\0';
         return 0;
@@ -183,9 +193,30 @@ int xensyms_read(uint32_t *symnum, char *type,
         /* Non-sequential access */
         next_offset = get_symbol_offset(*symnum);
 
+    /*
+     * If we're at an END symbol, skip to the next (real) one. This can
+     * happen if the caller ignores the *symnum output from an earlier
+     * iteration (Linux'es /proc/xen/xensyms handling does as of 6.14-rc).
+     */
+    if ( !symbols_names[next_offset] )
+    {
+        ++next_offset;
+        if ( ++*symnum == symbols_num_addrs )
+            goto no_symbol;
+    }
+
     *type = symbols_get_symbol_type(next_offset);
     next_offset = symbols_expand_symbol(next_offset, name);
     *address = symbols_address(*symnum);
+
+    /* If next one is an END symbol, skip it. */
+    if ( !symbols_names[next_offset] )
+    {
+        ++next_offset;
+        /* Make sure not to increment past symbols_num_addrs below. */
+        if ( *symnum + 1 < symbols_num_addrs )
+            ++*symnum;
+    }
 
     next_symbol = ++*symnum;
 
