@@ -5,8 +5,6 @@
 
 #include "xg_private.h"
 #include "xg_save_restore.h"
-#include "xc_bitops.h"
-
 #include "xg_sr_stream_format.h"
 
 /* String representation of Domain Header types. */

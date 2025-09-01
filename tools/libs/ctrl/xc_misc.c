@@ -17,8 +17,8 @@
  * License along with this library; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "xc_bitops.h"
 #include "xc_private.h"
+#include <xen-tools/bitops.h>
 #include <xen/hvm/hvm_op.h>
 
 int xc_get_max_cpus(xc_interface *xch)
@@ -94,11 +94,12 @@ xc_cpumap_t xc_cpumap_alloc(xc_interface *xch)
 }
 
 /*
- * xc_bitops.h has macros that do this as well - however they assume that
- * the bitmask is word aligned but xc_cpumap_t is only guaranteed to be
- * byte aligned and so we need byte versions for architectures which do
- * not support misaligned accesses (which is basically everyone
- * but x86, although even on x86 it can be inefficient).
+ * <xen-tools/bitops.h> has macros that do this as well - however they
+ * assume that the bitmask is word aligned but xc_cpumap_t is only
+ * guaranteed to be byte aligned and so we need byte versions for
+ * architectures which do not support misaligned accesses (which is
+ * basically everyone but x86, although even on x86 it can be
+ * inefficient).
  *
  * NOTE: The xc_bitops macros now use byte alignment.
  * TODO: Clean up the users of this interface.

@@ -28,9 +28,9 @@
 #include <sys/stat.h>
 
 #include "xc_private.h"
-#include "xc_bitops.h"
 #include "xenguest.h"
 
+#include <xen-tools/bitops.h>
 #include <xen/memory.h>
 #include <xen/elfnote.h>
 #include <xen/libelf/libelf.h>

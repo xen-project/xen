@@ -25,7 +25,6 @@
 #include <assert.h>
 
 #include "xg_private.h"
-#include "xc_bitops.h"
 
 /* ------------------------------------------------------------------------ */
 /* parse elf binary                                                         */

@@ -1,5 +1,5 @@
-#ifndef XC_BITOPS_H
-#define XC_BITOPS_H 1
+#ifndef __XEN_TOOLS_BITOPS_H__
+#define __XEN_TOOLS_BITOPS_H__
 
 /* bitmap operations for single threaded access */
 
@@ -81,4 +81,4 @@ static inline void bitmap_or(void *_dst, const void *_other,
         dst[i] |= other[i];
 }
 
-#endif  /* XC_BITOPS_H */
+#endif  /* __XEN_TOOLS_BITOPS_H__ */
