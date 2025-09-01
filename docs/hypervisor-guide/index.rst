@@ -9,3 +9,4 @@ Hypervisor documentation
    code-coverage
 
    x86/index
+   arm/index
