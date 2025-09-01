@@ -185,7 +185,7 @@ static int __init assign_shared_memory(struct domain *d, paddr_t gbase,
     return 0;
 
  fail:
-    while ( --i >= 0 )
+    while ( i-- )
         put_page_nr(page + i, nr_borrowers);
     return ret;
 }
