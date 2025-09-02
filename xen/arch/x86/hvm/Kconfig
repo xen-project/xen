@@ -16,8 +16,8 @@ menuconfig HVM
 if HVM
 
 config AMD_SVM
-	bool "AMD-V" if AMD && EXPERT
-	default y
+	bool "AMD-V" if EXPERT
+	default AMD
 	help
 	  Enables virtual machine extensions on platforms that implement the
 	  AMD Virtualization Technology (AMD-V).
@@ -25,8 +25,8 @@ config AMD_SVM
 	  If in doubt, say Y.
 
 config INTEL_VMX
-	bool "Intel VT-x" if INTEL && EXPERT
-	default y
+	bool "Intel VT-x" if EXPERT
+	default INTEL
 	select ARCH_VCPU_IOREQ_COMPLETION
 	help
 	  Enables virtual machine extensions on platforms that implement the
