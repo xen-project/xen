@@ -137,15 +137,6 @@ tools/include/_libxl*.h
 tools/include/xen-xsm/*
 tools/include/xen-foreign/*.(c|h|size)
 tools/include/xen-foreign/checker
-tools/misc/xen-cpuid
-tools/misc/xen-detect
-tools/misc/xen-diag
-tools/misc/xen-livepatch
-tools/misc/xenperf
-tools/misc/xenpm
-tools/misc/xen-hvmctx
-tools/misc/xenlockprof
-tools/misc/xencov
 tools/pkg-config/*
 tools/qemu-xen-build
 tools/xentrace/xenalyze
@@ -253,14 +244,8 @@ tools/include/xen-foreign/x86_64.h
 tools/include/xen-foreign/arm32.h
 tools/include/xen-foreign/arm64.h
 
-tools/misc/xen-hptool
-tools/misc/xen-mfndump
 tools/firmware/etherboot/eb-roms.h
 tools/firmware/etherboot/gpxe-git-snapshot.tar.gz
-tools/misc/xenhypfs
-tools/misc/xenwatchdogd
-tools/misc/xen-hvmcrash
-tools/misc/xen-lowmemd
 tools/vchan/vchan-node[12]
 tools/vchan/vchan-socket-proxy
 tools/debugger/kdd/kdd
