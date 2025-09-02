@@ -1,4 +1,3 @@
-.hg
 .*.cmd
 .*.d
 .*.d2
@@ -62,11 +61,6 @@ tools/config.cache
 config/Tools.mk
 config/Stubdom.mk
 config/Docs.mk
-tools/libs/guest/xc_bitops.h
-tools/libs/guest/xc_core.h
-tools/libs/guest/xc_core_arm.h
-tools/libs/guest/xc_core_x86.h
-tools/libs/guest/xc_private.h
 tools/libs/light/_*.[ch]
 tools/libs/light/*.pyc
 tools/libs/light/_libxl.api-for-check
@@ -84,11 +78,7 @@ tools/libs/store/list.h
 tools/libs/store/utils.h
 tools/libs/store/xs_lib.c
 tools/libs/util/libxlu_cfg_y.output
-tools/debugger/gdb/gdb-6.2.1-linux-i386-xen/*
-tools/debugger/gdb/gdb-6.2.1/*
-tools/debugger/gdb/gdb-6.2.1.tar.bz2
 tools/debugger/gdbsx/gdbsx
-tools/debugger/xenitp/xenitp
 tools/firmware/*/biossums
 tools/firmware/*.bin
 tools/firmware/*.sym
@@ -147,20 +137,14 @@ tools/include/_libxl*.h
 tools/include/xen-xsm/*
 tools/include/xen-foreign/*.(c|h|size)
 tools/include/xen-foreign/checker
-tools/misc/cpuperf/cpuperf-perfcntr
-tools/misc/cpuperf/cpuperf-xen
-tools/misc/xc_shadow
-tools/misc/xen_cpuperf
 tools/misc/xen-cpuid
 tools/misc/xen-detect
 tools/misc/xen-diag
-tools/misc/xen-tmem-list-parse
 tools/misc/xen-livepatch
 tools/misc/xenperf
 tools/misc/xenpm
 tools/misc/xen-hvmctx
 tools/misc/xenlockprof
-tools/misc/lowmemd
 tools/misc/xencov
 tools/pkg-config/*
 tools/qemu-xen-build
@@ -249,7 +233,6 @@ xen/suppression-list.txt
 xen/xen-syms
 xen/xen-syms.map
 xen/xen.*
-LibVNCServer*
 
 tools/qemu-xen-dir-remote
 tools/qemu-xen-dir
@@ -270,7 +253,6 @@ tools/include/xen-foreign/x86_64.h
 tools/include/xen-foreign/arm32.h
 tools/include/xen-foreign/arm64.h
 
-.git
 tools/misc/xen-hptool
 tools/misc/xen-mfndump
 tools/firmware/etherboot/eb-roms.h
