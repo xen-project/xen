@@ -292,7 +292,7 @@ export LOG_MSG="\nWelcome to Alpine Linux"
 export TEST_CMD="ssh $CONTROLLER console"
 export TEST_LOG="smoke.serial"
 export TEST_TIMEOUT="$timeout"
-./automation/scripts/console.exp | sed 's/\r\+$//'
+./automation/scripts/console.exp |& sed 's/\r\+$//'
 TEST_RESULT=$?
 
 if [ -n "$retrieve_xml" ]; then

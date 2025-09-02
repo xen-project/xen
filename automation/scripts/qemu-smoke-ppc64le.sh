@@ -24,4 +24,4 @@ export TEST_CMD="qemu-system-ppc64 \
 export TEST_LOG="${serial_log}"
 export PASSED="Hello, ppc64le!"
 
-./automation/scripts/console.exp | sed 's/\r\+$//'
+./automation/scripts/console.exp |& sed 's/\r\+$//'

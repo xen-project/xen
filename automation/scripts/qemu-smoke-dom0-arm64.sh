@@ -106,4 +106,4 @@ export TEST_LOG="smoke.serial"
 export LOG_MSG="Domain-0"
 export PASSED="BusyBox"
 
-./automation/scripts/console.exp | sed 's/\r\+$//'
+./automation/scripts/console.exp |& sed 's/\r\+$//'

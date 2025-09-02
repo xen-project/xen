@@ -218,4 +218,4 @@ export TEST_LOG="smoke.serial"
 export LOG_MSG="Welcome to Alpine Linux"
 export PASSED="${passed}"
 
-./automation/scripts/console.exp | sed 's/\r\+$//'
+./automation/scripts/console.exp |& sed 's/\r\+$//'

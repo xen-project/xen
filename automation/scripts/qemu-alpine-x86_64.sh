@@ -84,4 +84,4 @@ export BOOT_MSG="Latest ChangeSet: "
 export LOG_MSG="Domain-0"
 export PASSED="BusyBox"
 
-./automation/scripts/console.exp | sed 's/\r\+$//'
+./automation/scripts/console.exp |& sed 's/\r\+$//'

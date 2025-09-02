@@ -173,7 +173,7 @@ export BOOT_MSG="Latest ChangeSet: "
 export TEST_CMD="cat ${SERIAL_DEV}"
 export TEST_LOG="smoke.serial"
 
-./automation/scripts/console.exp | sed 's/\r\+$//'
+./automation/scripts/console.exp |& sed 's/\r\+$//'
 TEST_RESULT=$?
 sh "/scratch/gitlab-runner/${TEST_BOARD}.sh" 2
 exit ${TEST_RESULT}

@@ -149,4 +149,4 @@ export TEST_LOG="${serial_log}"
 export LOG_MSG="${dom0_prompt}"
 export PASSED="${passed}"
 
-../automation/scripts/console.exp | sed 's/\r\+$//'
+../automation/scripts/console.exp |& sed 's/\r\+$//'

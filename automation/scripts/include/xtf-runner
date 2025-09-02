@@ -114,7 +114,7 @@ function xtf_run_test()
 {
     rm -f ${TEST_LOG}
     export BOOT_MSG PASSED TEST_CMD TEST_LOG UBOOT_CMD
-    ./console.exp | sed 's/\r\+$//'
+    ./console.exp |& sed 's/\r\+$//'
 }
 
 # Setup environment and run an XTF test.

@@ -137,7 +137,7 @@ export LOG_MSG="Welcome to Alpine Linux"
 export TEST_CMD="cat ${SERIAL_DEV}"
 export TEST_LOG="smoke.serial"
 
-./automation/scripts/console.exp | sed 's/\r\+$//'
+./automation/scripts/console.exp |& sed 's/\r\+$//'
 TEST_RESULT=$?
 sh "/scratch/gitlab-runner/zcu102.sh" 2
 exit ${TEST_RESULT}
