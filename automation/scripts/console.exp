@@ -35,8 +35,8 @@ expect_after {
     -re "(.*)\r" {
         exp_continue -continue_timer
     }
-    timeout {send_error "ERROR-Timeout!\n"; exit 1}
-    eof {send_error "ERROR-EOF!\n"; exit 1}
+    timeout {send_error "\nERROR-Timeout!\n"; exit 1}
+    eof {send_error "\nERROR-EOF!\n"; exit 1}
 }
 
 if {[info exists env(UBOOT_CMD)]} {
