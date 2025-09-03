@@ -403,6 +403,9 @@ void __init acpi_mmcfg_init(void)
 
     pci_segments_init();
 
+    if ( acpi_disabled )
+        return;
+
     /* MMCONFIG disabled */
     if ((pci_probe & PCI_PROBE_MMCONF) == 0)
         return;
