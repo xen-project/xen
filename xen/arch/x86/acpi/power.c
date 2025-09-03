@@ -23,6 +23,7 @@
 #include <xen/domain.h>
 #include <xen/console.h>
 #include <xen/iommu.h>
+#include <xen/softirq.h>
 #include <xen/watchdog.h>
 #include <xen/cpu.h>
 #include <public/platform.h>
@@ -320,6 +321,7 @@ static int enter_state(u32 state)
     thaw_domains();
     system_state = SYS_STATE_active;
     spin_unlock(&pm_lock);
+    raise_softirq(TIMER_SOFTIRQ);
     return error;
 }
 

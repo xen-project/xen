@@ -63,7 +63,6 @@ static struct {
     unsigned int apic_lvt0;
     unsigned int apic_lvt1;
     unsigned int apic_lvterr;
-    unsigned int apic_tmict;
     unsigned int apic_tdcr;
     unsigned int apic_thmr;
 } apic_pm_state;
@@ -695,7 +694,6 @@ int lapic_suspend(void)
     apic_pm_state.apic_lvt0 = apic_read(APIC_LVT0);
     apic_pm_state.apic_lvt1 = apic_read(APIC_LVT1);
     apic_pm_state.apic_lvterr = apic_read(APIC_LVTERR);
-    apic_pm_state.apic_tmict = apic_read(APIC_TMICT);
     apic_pm_state.apic_tdcr = apic_read(APIC_TDCR);
     if (maxlvt >= 5)
         apic_pm_state.apic_thmr = apic_read(APIC_LVTTHMR);
@@ -755,7 +753,6 @@ int lapic_resume(void)
         apic_write(APIC_LVTPC, apic_pm_state.apic_lvtpc);
     apic_write(APIC_LVTT, apic_pm_state.apic_lvtt);
     apic_write(APIC_TDCR, apic_pm_state.apic_tdcr);
-    apic_write(APIC_TMICT, apic_pm_state.apic_tmict);
     apic_write(APIC_ESR, 0);
     apic_read(APIC_ESR);
     apic_write(APIC_LVTERR, apic_pm_state.apic_lvterr);
