@@ -168,6 +168,10 @@ def crunch_numbers(state):
     state.hvm_shadow_max = state.pv_max         | state.raw['S'] | state.raw['s']
     state.hvm_hap_max =    state.hvm_shadow_max | state.raw['H'] | state.raw['h']
 
+    def feat_range(start, last):
+        """ Select all known features in the given range """
+        return [ x for x in state.names.keys() if start <= x <= last ]
+
     #
     # Feature dependency information.
     #
@@ -334,7 +338,7 @@ def crunch_numbers(state):
         PSFD: [EPSF],
 
         # The ARCH_CAPS CPUID bit enumerates the availability of the whole register.
-        ARCH_CAPS: list(range(RDCL_NO, RDCL_NO + 64)),
+        ARCH_CAPS: feat_range(RDCL_NO, RDCL_NO + 63),
 
         # The behaviour described by RRSBA depend on eIBRS being active.
         EIBRS: [RRSBA],
@@ -353,7 +357,7 @@ def crunch_numbers(state):
             # To debug, uncomment the following lines:
             # def repl(l):
             #     return "[" + ", ".join((state.names[x] for x in l)) + "]"
-            # sys.stderr.write("Feature %s, seen %s, to_process %s \n" % \
+            # sys.stderr.write("Feature %s, seen %s, to_process %s\n" %
             #     (state.names[feat], repl(seen), repl(to_process)))
 
             f = to_process.pop(0)
