@@ -10,6 +10,7 @@
 #include <xen/cpu.h>
 #include <asm/processor.h>
 #include <public/sysctl.h>
+#include <asm/intel-family.h>
 #include <asm/system.h>
 #include <asm/msr.h>
 #include <asm/p2m.h>
@@ -859,7 +860,7 @@ static void intel_init_ppin(const struct cpuinfo_x86 *c)
      * other purposes.  Despite the late addition of a CPUID bit (rendering
      * the MSR architectural), keep using the same detection logic there.
      */
-    switch ( c->x86_model )
+    switch ( c->x86 == 6 ? c->x86_model : 0 )
     {
         uint64_t val;
 
@@ -870,16 +871,17 @@ static void intel_init_ppin(const struct cpuinfo_x86 *c)
             return;
         }
         fallthrough;
-    case 0x3e: /* IvyBridge X */
-    case 0x3f: /* Haswell X */
-    case 0x4f: /* Broadwell X */
-    case 0x55: /* Skylake X */
-    case 0x56: /* Broadwell Xeon D */
-    case 0x57: /* Knights Landing */
-    case 0x6a: /* Icelake X */
-    case 0x6c: /* Icelake D */
-    case 0x85: /* Knights Mill */
-    case 0x8f: /* Sapphire Rapids X */
+    case INTEL_FAM6_IVYBRIDGE_X:
+    case INTEL_FAM6_HASWELL_X:
+    case INTEL_FAM6_BROADWELL_X:
+    case INTEL_FAM6_BROADWELL_D:
+    case INTEL_FAM6_SKYLAKE_X:
+    case INTEL_FAM6_XEON_PHI_KNL:
+    case INTEL_FAM6_XEON_PHI_KNM:
+    case INTEL_FAM6_ICELAKE_X:
+    case INTEL_FAM6_ICELAKE_D:
+    case INTEL_FAM6_SAPPHIRERAPIDS_X:
+    case INTEL_FAM6_EMERALDRAPIDS_X:
 
         if ( (c != &boot_cpu_data && !ppin_msr) ||
              rdmsr_safe(MSR_PPIN_CTL, val) )
