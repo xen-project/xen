@@ -522,6 +522,9 @@ struct arm_smmu_queue {
 
 	u32 __iomem			*prod_reg;
 	u32 __iomem			*cons_reg;
+
+	/* Is the memory access coherent? */
+	bool				non_coherent;
 };
 
 struct arm_smmu_cmdq {

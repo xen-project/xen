@@ -346,10 +346,14 @@ static void queue_write(__le64 *dst, u64 *src, size_t n_dwords)
 
 static int queue_insert_raw(struct arm_smmu_queue *q, u64 *ent)
 {
+	__le64 *q_addr = Q_ENT(q, q->llq.prod);
+
 	if (queue_full(&q->llq))
 		return -ENOSPC;
 
-	queue_write(Q_ENT(q, q->llq.prod), ent, q->ent_dwords);
+	queue_write(q_addr, ent, q->ent_dwords);
+	if (q->non_coherent)
+		clean_dcache_va_range(q_addr, q->ent_dwords * sizeof(*q_addr));
 	queue_inc_prod(&q->llq);
 	queue_sync_prod_out(q);
 	return 0;
@@ -365,10 +369,15 @@ static void queue_read(u64 *dst, __le64 *src, size_t n_dwords)
 
 static int queue_remove_raw(struct arm_smmu_queue *q, u64 *ent)
 {
+	__le64 *q_addr = Q_ENT(q, q->llq.cons);
+
 	if (queue_empty(&q->llq))
 		return -EAGAIN;
 
-	queue_read(ent, Q_ENT(q, q->llq.cons), q->ent_dwords);
+	if (q->non_coherent)
+		invalidate_dcache_va_range(q_addr, q->ent_dwords * sizeof(*q_addr));
+
+	queue_read(ent, q_addr, q->ent_dwords);
 	queue_inc_cons(&q->llq);
 	queue_sync_cons_out(q);
 	return 0;
@@ -463,6 +472,7 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
 	struct arm_smmu_queue *q = &smmu->cmdq.q;
 	u32 cons = readl_relaxed(q->cons_reg);
 	u32 idx = FIELD_GET(CMDQ_CONS_ERR, cons);
+	__le64 *q_addr = Q_ENT(q, cons);
 	struct arm_smmu_cmdq_ent cmd_sync = {
 		.opcode = CMDQ_OP_CMD_SYNC,
 	};
@@ -489,11 +499,14 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
 		break;
 	}
 
+	if (q->non_coherent)
+		invalidate_dcache_va_range(q_addr, q->ent_dwords * sizeof(*q_addr));
+
 	/*
 	 * We may have concurrent producers, so we need to be careful
 	 * not to touch any of the shadow cmdq state.
 	 */
-	queue_read(cmd, Q_ENT(q, cons), q->ent_dwords);
+	queue_read(cmd, q_addr, q->ent_dwords);
 	dev_err(smmu->dev, "skipping command in error state:\n");
 	for (i = 0; i < ARRAY_SIZE(cmd); ++i)
 		dev_err(smmu->dev, "\t0x%016llx\n", (unsigned long long)cmd[i]);
@@ -504,7 +517,10 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
 		return;
 	}
 
-	queue_write(Q_ENT(q, cons), cmd, q->ent_dwords);
+	queue_write(q_addr, cmd, q->ent_dwords);
+
+	if (q->non_coherent)
+		clean_dcache_va_range(q_addr, q->ent_dwords * sizeof(*q_addr));
 }
 
 static void arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
@@ -1634,6 +1650,9 @@ static int __init arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
 	q->q_base |= FIELD_PREP(Q_BASE_LOG2SIZE, q->llq.max_n_shift);
 
 	q->llq.prod = q->llq.cons = 0;
+
+	q->non_coherent = !(smmu->features & ARM_SMMU_FEAT_COHERENCY);
+
 	return 0;
 }
 
