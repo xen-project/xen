@@ -83,6 +83,11 @@
 #define __packed __attribute__((__packed__))
 #endif
 
+#define sizeof_field(type, member) sizeof(((type *)NULL)->member)
+
+#define endof_field(type, member) \
+    (offsetof(type, member) + sizeof_field(type, member))
+
 #define container_of(ptr, type, member) ({              \
     typeof(((type *)0)->member) *mptr__ = (ptr);        \
     (type *)((char *)mptr__ - offsetof(type, member));  \
