@@ -47,6 +47,8 @@ static void
 smbios_pt_init(void);
 static void*
 get_smbios_pt_struct(uint8_t type, uint32_t *length_out);
+static void *
+smbios_pt_copy(void *start, uint8_t type, uint16_t handle, size_t table_size);
 static void
 get_cpu_manufacturer(char *buf, int len);
 static int
@@ -152,6 +154,24 @@ get_smbios_pt_struct(uint8_t type, uint32_t *length_out)
     }
 
     return NULL;
+}
+
+static void *
+smbios_pt_copy(void *start, uint8_t type, uint16_t handle, size_t min_size)
+{
+    struct smbios_structure_header *header = start;
+    void *pts;
+    uint32_t length;
+
+    pts = get_smbios_pt_struct(type, &length);
+    if ( pts != NULL && length >= min_size )
+    {
+        memcpy(start, pts, length);
+        header->handle = handle;
+        return start + length;
+    }
+
+    return start;
 }
 
 static void
@@ -381,16 +401,17 @@ smbios_type_0_init(void *start, const char *xen_version,
     struct smbios_type_0 *p = (struct smbios_type_0 *)start;
     static const char *smbios_release_date = __SMBIOS_DATE__;
     const char *s;
-    void *pts;
-    uint32_t length;
+    void *next;
 
-    pts = get_smbios_pt_struct(0, &length);
-    if ( (pts != NULL)&&(length > 0) )
-    {
-        memcpy(start, pts, length);
-        p->header.handle = SMBIOS_HANDLE_TYPE0;
-        return (start + length);
-    }
+    /*
+     * Specification says Type 0 table has length of at least 18h for v2.4-3.0.
+     */
+
+    BUILD_BUG_ON(sizeof(*p) != 24);
+
+    next = smbios_pt_copy(start, 0, SMBIOS_HANDLE_TYPE0, sizeof(*p));
+    if ( next != start )
+        return next;
 
     memset(p, 0, sizeof(*p));
 
@@ -440,16 +461,14 @@ smbios_type_1_init(void *start, const char *xen_version,
     char uuid_str[37];
     struct smbios_type_1 *p = (struct smbios_type_1 *)start;
     const char *s;
-    void *pts;
-    uint32_t length;
+    void *next;
 
-    pts = get_smbios_pt_struct(1, &length);
-    if ( (pts != NULL)&&(length > 0) )
-    {
-        memcpy(start, pts, length);
-        p->header.handle = SMBIOS_HANDLE_TYPE1;
-        return (start + length);
-    }
+    /* Specification says Type 1 table has length of 1Bh for v2.4 and later. */
+    BUILD_BUG_ON(sizeof(*p) != 27);
+
+    next = smbios_pt_copy(start, 1, SMBIOS_HANDLE_TYPE1, sizeof(*p));
+    if ( next != start )
+        return next;
 
     memset(p, 0, sizeof(*p));
 
@@ -498,26 +517,29 @@ smbios_type_2_init(void *start)
 {
     struct smbios_type_2 *p = (struct smbios_type_2 *)start;
     const char *s;
-    uint8_t *ptr;
-    void *pts;
-    uint32_t length;
+    void *next;
     unsigned int counter = 0;
 
-    pts = get_smbios_pt_struct(2, &length);
-    if ( (pts != NULL)&&(length > 0) )
-    {
-        memcpy(start, pts, length);
-        p->header.handle = SMBIOS_HANDLE_TYPE2;
+    /*
+     * Specification says Type 2 table has length of at least 08h,
+     * which corresponds with the end of the "Serial Number" field.
+     */
 
+    BUILD_BUG_ON(endof_field(struct smbios_type_2, serial_number_str) != 8);
+
+    next = smbios_pt_copy(start, 2, SMBIOS_HANDLE_TYPE2,
+                          endof_field(struct smbios_type_2, serial_number_str));
+    if ( next != start )
+    {
         /* Set current chassis handle if present */
-        if ( p->header.length > 13 )
+        if ( p->header.length >= endof_field(struct smbios_type_2,
+                                             chassis_handle) )
         {
-            ptr = ((uint8_t*)start) + 11;            
-            if ( *((uint16_t*)ptr) != 0 )
-                *((uint16_t*)ptr) = SMBIOS_HANDLE_TYPE3;
+            if ( p->chassis_handle != 0 )
+                p->chassis_handle = SMBIOS_HANDLE_TYPE3;
         }
 
-        return (start + length);
+        return next;
     }
 
     memset(p, 0, sizeof(*p));
@@ -593,18 +615,21 @@ smbios_type_3_init(void *start)
 {
     struct smbios_type_3 *p = (struct smbios_type_3 *)start;
     const char *s;
-    void *pts;
-    uint32_t length;
+    void *next;
     uint32_t counter = 0;
 
-    pts = get_smbios_pt_struct(3, &length);
-    if ( (pts != NULL)&&(length > 0) )
-    {
-        memcpy(start, pts, length);
-        p->header.handle = SMBIOS_HANDLE_TYPE3;
-        return (start + length);
-    }
-    
+    /*
+     * Specification says Type 3 table has length of at least 0Dh (for v2.1+),
+     * which corresponds with the end of the "Security Status" field.
+     */
+
+    BUILD_BUG_ON(endof_field(struct smbios_type_3, security_status) != 13);
+
+    next = smbios_pt_copy(start, 3, SMBIOS_HANDLE_TYPE3,
+                          offsetof(struct smbios_type_3, security_status));
+    if ( next != start )
+        return next;
+
     memset(p, 0, sizeof(*p));
 
     p->header.type = 3;
@@ -655,6 +680,9 @@ smbios_type_4_init(
     char buf[80]; 
     struct smbios_type_4 *p = (struct smbios_type_4 *)start;
     uint32_t eax, ebx, ecx, edx;
+
+    /* Specification says Type 4 table has length of 23h for v2.3+. */
+    BUILD_BUG_ON(sizeof(*p) != 35);
 
     memset(p, 0, sizeof(*p));
 
@@ -707,17 +735,15 @@ smbios_type_11_init(void *start)
     struct smbios_type_11 *p = (struct smbios_type_11 *)start;
     char path[20];
     const char *s;
+    void *next;
     int i;
-    void *pts;
-    uint32_t length;
 
-    pts = get_smbios_pt_struct(11, &length);
-    if ( (pts != NULL)&&(length > 0) )
-    {
-        memcpy(start, pts, length);
-        p->header.handle = SMBIOS_HANDLE_TYPE11;
-        return (start + length);
-    }
+    /* Specification says Type 11 table has length of 05h. */
+    BUILD_BUG_ON(sizeof(*p) != 5);
+    
+    next = smbios_pt_copy(start, 11, SMBIOS_HANDLE_TYPE11, sizeof(*p));
+    if ( next != start )
+        return next;
 
     p->header.type = 11;
     p->header.length = sizeof(struct smbios_type_11);
@@ -756,6 +782,9 @@ smbios_type_16_init(void *start, uint32_t memsize, int nr_mem_devs)
 {
     struct smbios_type_16 *p = (struct smbios_type_16*)start;
 
+    /* Specification says Type 16 table has length of 0Fh for v2.1-2.7. */
+    BUILD_BUG_ON(sizeof(*p) != 15);
+
     memset(p, 0, sizeof(*p));
 
     p->header.type = 16;
@@ -781,6 +810,9 @@ smbios_type_17_init(void *start, uint32_t memory_size_mb, int instance)
     char buf[16];
     struct smbios_type_17 *p = (struct smbios_type_17 *)start;
     
+    /* Specification says Type 17 table has length of 1Bh for v2.3-2.6. */
+    BUILD_BUG_ON(sizeof(*p) != 27);
+
     memset(p, 0, sizeof(*p));
 
     p->header.type = 17;
@@ -816,6 +848,9 @@ smbios_type_19_init(void *start, uint32_t memory_size_mb, int instance)
 {
     struct smbios_type_19 *p = (struct smbios_type_19 *)start;
     
+    /* Specification says Type 19 table has length of 0Fh for v2.1-2.7. */
+    BUILD_BUG_ON(sizeof(*p) != 15);
+
     memset(p, 0, sizeof(*p));
 
     p->header.type = 19;
@@ -837,6 +872,9 @@ static void *
 smbios_type_20_init(void *start, uint32_t memory_size_mb, int instance)
 {
     struct smbios_type_20 *p = (struct smbios_type_20 *)start;
+
+    /* Specification says Type 20 table has length of 13h for v2.1-2.7. */
+    BUILD_BUG_ON(sizeof(*p) != 19);
 
     memset(p, 0, sizeof(*p));
 
@@ -865,16 +903,14 @@ smbios_type_22_init(void *start)
     struct smbios_type_22 *p = (struct smbios_type_22 *)start;
     static const char *smbios_release_date = __SMBIOS_DATE__;
     const char *s;
-    void *pts;
-    uint32_t length;
+    void *next;
 
-    pts = get_smbios_pt_struct(22, &length);
-    if ( (pts != NULL)&&(length > 0) )
-    {
-        memcpy(start, pts, length);
-        p->header.handle = SMBIOS_HANDLE_TYPE22;
-        return (start + length);
-    }
+    /* Specification says Type 22 table has length of 1Ah. */
+    BUILD_BUG_ON(sizeof(*p) != 26);
+
+    next = smbios_pt_copy(start, 22, SMBIOS_HANDLE_TYPE22, sizeof(*p));
+    if ( next != start )
+        return next;
 
     s = xenstore_read(HVM_XS_SMBIOS_DEFAULT_BATTERY, "0");
     if ( strncmp(s, "1", 1) != 0 )
@@ -929,6 +965,9 @@ smbios_type_32_init(void *start)
 {
     struct smbios_type_32 *p = (struct smbios_type_32 *)start;
 
+    /* Specification says Type 32 table has length of at least 0Bh. */
+    BUILD_BUG_ON(sizeof(*p) != 11);
+
     memset(p, 0, sizeof(*p));
 
     p->header.type = 32;
@@ -946,20 +985,17 @@ smbios_type_32_init(void *start)
 static void *
 smbios_type_39_init(void *start)
 {
-    struct smbios_type_39 *p = (struct smbios_type_39 *)start;
-    void *pts;
-    uint32_t length;
+    /*
+     * Specification says Type 39 table has length of at least 10h,
+     * which corresponds with the end of the "Characteristics" field.
+     *
+     * Only present when passed in.
+     */
 
-    pts = get_smbios_pt_struct(39, &length);
-    if ( (pts != NULL)&&(length > 0) )
-    {
-        memcpy(start, pts, length);
-        p->header.handle = SMBIOS_HANDLE_TYPE39;
-        return (start + length);
-    }
+    BUILD_BUG_ON(endof_field(struct smbios_type_39, characteristics) != 16);
 
-    /* Only present when passed in */
-    return start;
+    return smbios_pt_copy(start, 39, SMBIOS_HANDLE_TYPE39,
+                          endof_field(struct smbios_type_39, characteristics));
 }
 
 static void *
