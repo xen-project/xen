@@ -248,7 +248,6 @@ static void do_read(int fd, void *data, int len)
 
 int main(int argc, char **argv)
 {
-    uint64_t   final_exec_addr;
     uint32_t   loadbase, dat_siz, mem_siz, note_base, note_sz, offset;
     char      *inimage, *outimage;
     int        infd, outfd;
@@ -261,22 +260,24 @@ int main(int argc, char **argv)
     Elf64_Ehdr in64_ehdr;
     Elf64_Phdr in64_phdr;
 
-    if ( argc < 5 )
+    if ( argc < 4 )
     {
+    help:
         fprintf(stderr, "Usage: mkelf32 [--notes] <in-image> <out-image> "
-                "<load-base> <final-exec-addr>\n");
+                "<load-base>\n");
         return 1;
     }
 
     if ( !strcmp(argv[1], "--notes") )
     {
+        if ( argc < 5 )
+            goto help;
         i = 2;
         num_phdrs = 2;
     }
     inimage  = argv[i++];
     outimage = argv[i++];
     loadbase = strtoul(argv[i++], NULL, 16);
-    final_exec_addr = strtoull(argv[i++], NULL, 16);
 
     infd = open(inimage, O_RDONLY);
     if ( infd == -1 )
@@ -339,9 +340,12 @@ int main(int argc, char **argv)
     (void)lseek(infd, in64_phdr.p_offset, SEEK_SET);
     dat_siz = (uint32_t)in64_phdr.p_filesz;
 
-    /* Do not use p_memsz: it does not include BSS alignment padding. */
-    /*mem_siz = (uint32_t)in64_phdr.p_memsz;*/
-    mem_siz = (uint32_t)(final_exec_addr - in64_phdr.p_vaddr);
+    /*
+     * We don't pad .bss in the linker script, but during early boot we map
+     * the Xen image using 2M pages.  To avoid running into adjacent non-RAM
+     * regions, pad the segment to the next 2M boundary.
+     */
+    mem_siz = ((uint32_t)in64_phdr.p_memsz + (1U << 20) - 1) & (-1U << 20);
 
     note_sz = note_base = offset = 0;
     if ( num_phdrs > 1 )
