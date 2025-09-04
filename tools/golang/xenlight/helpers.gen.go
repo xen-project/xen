@@ -938,6 +938,35 @@ return fmt.Errorf("converting field Vcpus: %v", err)
  return nil
  }
 
+// NewArmSci returns an instance of ArmSci initialized with defaults.
+func NewArmSci() (*ArmSci, error) {
+var (
+x ArmSci
+xc C.libxl_arm_sci)
+
+C.libxl_arm_sci_init(&xc)
+defer C.libxl_arm_sci_dispose(&xc)
+
+if err := x.fromC(&xc); err != nil {
+return nil, err }
+
+return &x, nil}
+
+func (x *ArmSci) fromC(xc *C.libxl_arm_sci) error {
+ x.Type = ArmSciType(xc._type)
+
+ return nil}
+
+func (x *ArmSci) toC(xc *C.libxl_arm_sci) (err error){defer func(){
+if err != nil{
+C.libxl_arm_sci_dispose(xc)}
+}()
+
+xc._type = C.libxl_arm_sci_type(x.Type)
+
+ return nil
+ }
+
 // NewRdmReserve returns an instance of RdmReserve initialized with defaults.
 func NewRdmReserve() (*RdmReserve, error) {
 var (
@@ -1163,6 +1192,9 @@ x.ArchArm.GicVersion = GicVersion(xc.arch_arm.gic_version)
 x.ArchArm.Vuart = VuartType(xc.arch_arm.vuart)
 x.ArchArm.SveVl = SveType(xc.arch_arm.sve_vl)
 x.ArchArm.NrSpis = uint32(xc.arch_arm.nr_spis)
+if err := x.ArchArm.ArmSci.fromC(&xc.arch_arm.arm_sci);err != nil {
+return fmt.Errorf("converting field ArchArm.ArmSci: %v", err)
+}
 if err := x.ArchX86.MsrRelaxed.fromC(&xc.arch_x86.msr_relaxed);err != nil {
 return fmt.Errorf("converting field ArchX86.MsrRelaxed: %v", err)
 }
@@ -1699,6 +1731,9 @@ xc.arch_arm.gic_version = C.libxl_gic_version(x.ArchArm.GicVersion)
 xc.arch_arm.vuart = C.libxl_vuart_type(x.ArchArm.Vuart)
 xc.arch_arm.sve_vl = C.libxl_sve_type(x.ArchArm.SveVl)
 xc.arch_arm.nr_spis = C.uint32_t(x.ArchArm.NrSpis)
+if err := x.ArchArm.ArmSci.toC(&xc.arch_arm.arm_sci); err != nil {
+return fmt.Errorf("converting field ArchArm.ArmSci: %v", err)
+}
 if err := x.ArchX86.MsrRelaxed.toC(&xc.arch_x86.msr_relaxed); err != nil {
 return fmt.Errorf("converting field ArchX86.MsrRelaxed: %v", err)
 }

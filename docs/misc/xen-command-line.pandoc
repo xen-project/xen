@@ -2382,6 +2382,15 @@ sockets, &c.  This will reduce performance somewhat, particularly on
 systems with hyperthreading enabled, but should reduce power by
 enabling more sockets and cores to go into deeper sleep states.
 
+### scmi-smc-passthrough (ARM)
+> `= <boolean>`
+
+The option is available when `CONFIG_SCMI_SMC` is compiled in, and allows to
+enable SCMI SMC single agent interface for any, but only one guest domain,
+which serves as Driver domain. The SCMI will be disabled for Dom0/hwdom and
+SCMI nodes removed from Dom0/hwdom device tree.
+(for example, thin Dom0 with Driver domain use-case).
+
 ### scrub-domheap
 > `= <boolean>`
 

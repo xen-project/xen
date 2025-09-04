@@ -1284,6 +1284,36 @@ out:
     if (rc) exit(EXIT_FAILURE);
 }
 
+static int parse_arm_sci_config(XLU_Config *cfg, libxl_arm_sci *arm_sci,
+                                const char *str)
+{
+    int ret = 0;
+    char *buf2, *ptr;
+    char *oparg;
+
+    if (NULL == (buf2 = ptr = strdup(str)))
+        return ERROR_NOMEM;
+
+    ptr = strtok(buf2, ",");
+    while (ptr != NULL)
+    {
+        if (MATCH_OPTION("type", ptr, oparg)) {
+            ret = libxl_arm_sci_type_from_string(oparg, &arm_sci->type);
+            if (ret) {
+                fprintf(stderr, "Unknown ARM_SCI type: %s\n", oparg);
+                ret = ERROR_INVAL;
+                goto out;
+            }
+        }
+
+        ptr = strtok(NULL, ",");
+    }
+
+out:
+    free(buf2);
+    return ret;
+}
+
 void parse_config_data(const char *config_source,
                        const char *config_data,
                        int config_len,
@@ -2988,6 +3018,12 @@ skip_usbdev:
 
     xlu_cfg_get_defbool(config, "trap_unmapped_accesses",
                         &b_info->trap_unmapped_accesses, 0);
+
+    if (!xlu_cfg_get_string(config, "arm_sci", &buf, 1)) {
+        if (parse_arm_sci_config(config, &b_info->arch_arm.arm_sci, buf)) {
+            exit(EXIT_FAILURE);
+        }
+    }
 
     parse_vkb_list(config, d_config);
 

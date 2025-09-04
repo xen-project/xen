@@ -3123,6 +3123,40 @@ writes will be ignored.
 
 This option is only implemented for Arm where the default is enabled.
 
+=item B<arm_sci="ARM_SCI_STRING">
+
+Set ARM_SCI specific options for the guest. ARM SCI is System
+Control Protocol allows domain to manage various functions that are provided
+by HW platform firmware.
+
+B<ARM_SCI_STRING> is a comma separated list of C<KEY=VALUE> settings,
+from the following list:
+
+=over 4
+
+=item B<type=STRING>
+
+Specifies an ARM SCI type for the guest.
+
+=over 4
+
+=item B<none>
+
+Don't allow guest to use ARM SCI if present on the platform. This is the
+default value.
+
+=item B<scmi_smc>
+
+Enables ARM SCMI SMC support for the guest by enabling SCMI over SMC calls
+forwarding from domain to the EL3 firmware (like Trusted Firmware-A) with a
+single SCMI OSPM agent support.
+Should be used together with B<scmi-smc-passthrough> Xen command line
+option.
+
+=back
+
+=back
+
 =back
 
 =head3 x86

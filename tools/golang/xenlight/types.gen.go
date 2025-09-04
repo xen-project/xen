@@ -520,6 +520,16 @@ SveType1920 SveType = 1920
 SveType2048 SveType = 2048
 )
 
+type ArmSciType int
+const(
+ArmSciTypeNone ArmSciType = 0
+ArmSciTypeScmiSmc ArmSciType = 1
+)
+
+type ArmSci struct {
+Type ArmSciType
+}
+
 type RdmReserve struct {
 Strategy RdmReserveStrategy
 Policy RdmReservePolicy
@@ -599,6 +609,7 @@ GicVersion GicVersion
 Vuart VuartType
 SveVl SveType
 NrSpis uint32
+ArmSci ArmSci
 }
 ArchX86 struct {
 MsrRelaxed Defbool
