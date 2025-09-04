@@ -13,6 +13,7 @@
 #include <xen/iocap.h>
 #include <xen/lib.h>
 
+#include <asm/firmware/sci.h>
 #include <asm/setup.h>
 
 int map_irq_to_domain(struct domain *d, unsigned int irq,
@@ -303,6 +304,10 @@ int handle_device(struct domain *d, struct dt_device_node *dev, p2m_type_t p2mt,
                 return res;
             }
         }
+
+        res = sci_assign_dt_device(d, dev);
+        if ( res )
+            return res;
     }
 
     res = map_device_irqs_to_domain(d, dev, own_device, irq_ranges);

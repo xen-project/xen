@@ -228,6 +228,10 @@ static int __init handle_passthrough_prop(struct kernel_info *kinfo,
     if ( res < 0 )
         return res;
 
+    res = arch_handle_passthrough_prop(kinfo, node);
+    if ( res )
+        return res;
+
     /* If xen_force, we allow assignment of devices without IOMMU protection. */
     if ( xen_force && !dt_device_is_protected(node) )
         return 0;
