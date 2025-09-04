@@ -42,7 +42,7 @@ should be mentioned.
 
 When referencing other patches (e.g. `similar to patch xy ...`) those
 patches should be referenced via their commit id (at least 12 digits)
-and the patch subject, if the very same patch isn't referenced by the
+and the patch subject, if the very same patch isn't referenced by e.g. a
 `Fixes:` tag, too:
 
     Similar to commit 67d01cdb5518 ("x86: infrastructure to allow converting
@@ -105,6 +105,12 @@ E.g.:
 If git was configured as explained earlier, this can be retrieved using
 ``git log --pretty=fixes`` otherwise ``git log --abbrev=12 --oneline`` will
 give the proper tag and commit-id.
+
+### Amends:
+
+If your patch doesn't quite fix a bug, but still amends a specific commit,
+e.g. because an omission was found, please consider using an `Amends:` tag.
+See the `Fixes:` tag description above for how to use it.
 
 ### Resolves:
 
