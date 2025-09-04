@@ -16,12 +16,12 @@
 #include <xen/sched.h>
 #include <xen/types.h>
 
+#include <asm/device.h>
+#include <asm/firmware/sci.h>
 #include <asm/smccc.h>
-#include <asm/firmware/scmi-smc.h>
 
 #define SCMI_SMC_ID_PROP   "arm,smc-id"
 
-static bool __ro_after_init scmi_enabled;
 static uint32_t __ro_after_init scmi_smc_id;
 
 /*
@@ -41,13 +41,10 @@ static bool scmi_is_valid_smc_id(uint32_t fid)
  *
  * Returns true if SMC was handled (regardless of response), false otherwise.
  */
-bool scmi_handle_smc(struct cpu_user_regs *regs)
+static bool scmi_handle_smc(struct cpu_user_regs *regs)
 {
     uint32_t fid = (uint32_t)get_user_reg(regs, 0);
     struct arm_smccc_res res;
-
-    if ( !scmi_enabled )
-        return false;
 
     if ( !scmi_is_valid_smc_id(fid) )
         return false;
@@ -78,6 +75,25 @@ bool scmi_handle_smc(struct cpu_user_regs *regs)
     return true;
 }
 
+static int scmi_smc_domain_init(struct domain *d,
+                                struct xen_domctl_createdomain *config)
+{
+    if ( !is_hardware_domain(d) )
+        return 0;
+
+    d->arch.sci_enabled = true;
+    printk(XENLOG_DEBUG "SCMI: %pd init\n", d);
+    return 0;
+}
+
+static void scmi_smc_domain_destroy(struct domain *d)
+{
+    if ( !is_hardware_domain(d) )
+        return;
+
+    printk(XENLOG_DEBUG "SCMI: %pd destroy\n", d);
+}
+
 static int __init scmi_check_smccc_ver(void)
 {
     if ( smccc_ver < ARM_SMCCC_VERSION_1_1 )
@@ -90,37 +106,14 @@ static int __init scmi_check_smccc_ver(void)
     return 0;
 }
 
-static int __init scmi_dt_init_smccc(void)
-{
-    static const struct dt_device_match scmi_ids[] __initconst =
-    {
-        /* We only support "arm,scmi-smc" binding for now */
-        DT_MATCH_COMPATIBLE("arm,scmi-smc"),
-        { /* sentinel */ },
-    };
-    const struct dt_device_node *scmi_node;
-    int ret;
-
-    /* If no SCMI firmware node found, fail silently as it's not mandatory */
-    scmi_node = dt_find_matching_node(NULL, scmi_ids);
-    if ( !scmi_node )
-        return -EOPNOTSUPP;
-
-    ret = dt_property_read_u32(scmi_node, SCMI_SMC_ID_PROP, &scmi_smc_id);
-    if ( !ret )
-    {
-        printk(XENLOG_ERR "SCMI: No valid \"%s\" property in \"%s\" DT node\n",
-               SCMI_SMC_ID_PROP, scmi_node->full_name);
-        return -ENOENT;
-    }
-
-    scmi_enabled = true;
-
-    return 0;
-}
+static const struct sci_mediator_ops scmi_smc_ops = {
+    .handle_call = scmi_handle_smc,
+    .domain_init = scmi_smc_domain_init,
+    .domain_destroy = scmi_smc_domain_destroy,
+};
 
 /* Initialize the SCMI layer based on SMCs and Device-tree */
-static int __init scmi_init(void)
+static int __init scmi_dom0_init(struct dt_device_node *dev, const void *data)
 {
     int ret;
 
@@ -134,22 +127,36 @@ static int __init scmi_init(void)
     if ( ret )
         return ret;
 
-    ret = scmi_dt_init_smccc();
-    if ( ret == -EOPNOTSUPP )
-        return ret;
+    ret = dt_property_read_u32(dev, SCMI_SMC_ID_PROP, &scmi_smc_id);
+    if ( !ret )
+    {
+        printk(XENLOG_ERR "SCMI: No valid \"%s\" property in \"%s\" DT node\n",
+               SCMI_SMC_ID_PROP, dt_node_full_name(dev));
+        return -ENOENT;
+    }
+
+    ret = sci_register(&scmi_smc_ops);
     if ( ret )
-        goto err;
+    {
+        printk(XENLOG_ERR "SCMI: mediator already registered (ret = %d)\n",
+               ret);
+        return ret;
+    }
 
     printk(XENLOG_INFO "Using SCMI with SMC ID: 0x%x\n", scmi_smc_id);
 
     return 0;
-
- err:
-    printk(XENLOG_ERR "SCMI: Initialization failed (ret = %d)\n", ret);
-    return ret;
 }
 
-__initcall(scmi_init);
+static const struct dt_device_match scmi_smc_match[] __initconst = {
+    DT_MATCH_COMPATIBLE("arm,scmi-smc"),
+    { /* sentinel */ },
+};
+
+DT_DEVICE_START(scmi_smc, "SCMI SMC DOM0", DEVICE_FIRMWARE)
+    .dt_match = scmi_smc_match,
+    .init = scmi_dom0_init,
+DT_DEVICE_END
 
 /*
  * Local variables:
