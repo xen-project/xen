@@ -38,6 +38,8 @@
   { 0xf2fd1544U, 0x9794, 0x4a2c, {0x99, 0x2e, 0xe5, 0xbb, 0xcf, 0x20, 0xe3, 0x94} }
 #define SHIM_LOCK_PROTOCOL_GUID \
   { 0x605dab50U, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} }
+#define SHIM_IMAGE_LOADER_GUID \
+  { 0x1f492041U, 0xfadb, 0x4e59, {0x9e, 0x57, 0x7c, 0xaf, 0xe7, 0x3a, 0x55, 0xab} }
 #define APPLE_PROPERTIES_PROTOCOL_GUID \
   { 0x91bd12feU, 0xf6c3, 0x44fb, {0xa5, 0xb7, 0x51, 0x22, 0xab, 0x30, 0x3a, 0xe0} }
 #define EFI_SYSTEM_RESOURCE_TABLE_GUID    \
@@ -69,6 +71,13 @@ typedef EFI_STATUS
 typedef struct {
     EFI_SHIM_LOCK_VERIFY Verify;
 } EFI_SHIM_LOCK_PROTOCOL;
+
+typedef struct _SHIM_IMAGE_LOADER {
+    EFI_IMAGE_LOAD LoadImage;
+    EFI_IMAGE_START StartImage;
+    EFI_EXIT Exit;
+    EFI_IMAGE_UNLOAD UnloadImage;
+} SHIM_IMAGE_LOADER;
 
 struct _EFI_APPLE_PROPERTIES;
 
@@ -1047,6 +1056,50 @@ static UINTN __init efi_find_gop_mode(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
     return gop_mode;
 }
 
+static void __init efi_verify_kernel(EFI_HANDLE ImageHandle)
+{
+    static EFI_GUID __initdata shim_image_guid = SHIM_IMAGE_LOADER_GUID;
+    static EFI_GUID __initdata shim_lock_guid = SHIM_LOCK_PROTOCOL_GUID;
+    SHIM_IMAGE_LOADER *shim_loader;
+    EFI_HANDLE loaded_kernel;
+    EFI_SHIM_LOCK_PROTOCOL *shim_lock;
+    EFI_STATUS status;
+    bool verified = false;
+
+    /* Look for SHIM_IMAGE_LOADER first. */
+    if ( !EFI_ERROR(efi_bs->LocateProtocol(&shim_image_guid, NULL,
+                                           (void **)&shim_loader)) )
+    {
+        status = shim_loader->LoadImage(false, ImageHandle, NULL,
+                                        (void *)kernel.ptr, kernel.size,
+                                        &loaded_kernel);
+        if ( !EFI_ERROR(status) )
+            verified = true;
+
+        /*
+         * Always unload the image.  We only needed LoadImage() to perform
+         * verification anyway, and in the case of a failure there may still
+         * be cleanup needing to be performed.
+         */
+        shim_loader->UnloadImage(loaded_kernel);
+    }
+
+    /* Otherwise, fall back to SHIM_LOCK. */
+    if ( !verified &&
+         !EFI_ERROR(efi_bs->LocateProtocol(&shim_lock_guid, NULL,
+                                           (void **)&shim_lock)) &&
+         !EFI_ERROR(shim_lock->Verify(kernel.ptr, kernel.size)) )
+        verified = true;
+
+    if ( !verified )
+    {
+        PrintStr(L"Kernel was not verified\n");
+
+        if ( efi_secure_boot )
+            blexit(L"Refusing to boot unverified kernel with UEFI SecureBoot enabled");
+    }
+}
+
 static void __init efi_tables(void)
 {
     unsigned int i;
@@ -1334,13 +1387,11 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
                                       EFI_SYSTEM_TABLE *SystemTable)
 {
     static EFI_GUID __initdata loaded_image_guid = LOADED_IMAGE_PROTOCOL;
-    static EFI_GUID __initdata shim_lock_guid = SHIM_LOCK_PROTOCOL_GUID;
     EFI_LOADED_IMAGE *loaded_image;
     EFI_STATUS status;
     unsigned int i;
     CHAR16 *file_name, *cfg_file_name = NULL, *options = NULL;
     UINTN gop_mode = ~0;
-    EFI_SHIM_LOCK_PROTOCOL *shim_lock;
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
     union string section = { NULL }, name;
     bool base_video = false;
@@ -1591,12 +1642,8 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
      * device tree through the efi_check_dt_boot function, in this stage
      * verify it.
      */
-    if ( kernel.ptr &&
-         !kernel_verified &&
-         !EFI_ERROR(efi_bs->LocateProtocol(&shim_lock_guid, NULL,
-                                           (void **)&shim_lock)) &&
-         (status = shim_lock->Verify(kernel.ptr, kernel.size)) != EFI_SUCCESS )
-        PrintErrMesg(L"Dom0 kernel image could not be verified", status);
+    if ( kernel.ptr && !kernel_verified )
+        efi_verify_kernel(ImageHandle);
 
     efi_arch_edd();
 
