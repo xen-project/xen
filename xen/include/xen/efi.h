@@ -36,6 +36,8 @@ static inline bool efi_enabled(unsigned int feature)
 }
 #endif
 
+extern bool efi_secure_boot;
+
 void efi_init_memory(void);
 bool efi_boot_mem_unused(unsigned long *start, unsigned long *end);
 bool efi_rs_using_pgtables(void);
