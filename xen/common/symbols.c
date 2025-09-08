@@ -202,7 +202,10 @@ int xensyms_read(uint32_t *symnum, char *type,
     {
         ++next_offset;
         if ( ++*symnum == symbols_num_addrs )
+        {
+            spin_unlock(&symbols_mutex);
             goto no_symbol;
+        }
     }
 
     *type = symbols_get_symbol_type(next_offset);
