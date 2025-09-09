@@ -29,6 +29,7 @@ struct arch_irq_desc {
  */
 #define NR_IRQS		1024
 
+#define SPI_MAX_INTID   1019
 #define LPI_OFFSET      8192
 
 /* LPIs are always numbered starting at 8192, so 0 is a good invalid case. */
