@@ -306,7 +306,7 @@ retry_transaction:
         }
     }
 
-    if (d_config.c_info.type != LIBXL_DOMAIN_TYPE_PV) {
+    if (domid && d_config.c_info.type != LIBXL_DOMAIN_TYPE_PV) {
         r = xc_domain_set_pod_target(ctx->xch, domid,
                 (new_target_memkb + size) / 4, NULL, NULL, NULL);
         if (r != 0) {
