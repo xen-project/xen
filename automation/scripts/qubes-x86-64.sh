@@ -184,7 +184,7 @@ ${domU_check}
 Kernel \r on an \m (\l)
 
 " > etc/issue
-    find . | cpio -H newc -o | gzip >> ../binaries/domU-rootfs.cpio.gz
+    find . | cpio -R 0:0 -H newc -o | gzip >> ../binaries/domU-rootfs.cpio.gz
     cd ..
     rm -rf rootfs
 
@@ -193,7 +193,7 @@ Kernel \r on an \m (\l)
     cd rootfs
     cp ../binaries/bzImage boot/vmlinuz-domU
     cp ../binaries/domU-rootfs.cpio.gz boot/initrd-domU
-    find . | cpio -H newc -o > ../binaries/domU-in-dom0.cpio
+    find . | cpio -R 0:0 -H newc -o > ../binaries/domU-in-dom0.cpio
     cd ..
     rm -rf rootfs
 
@@ -252,7 +252,7 @@ mkdir -p etc/default
 echo "XENCONSOLED_TRACE=all" >> etc/default/xencommons
 echo "QEMU_XEN=/bin/false" >> etc/default/xencommons
 mkdir -p var/log/xen/console
-find . | cpio -H newc -o | gzip >> ../binaries/dom0-rootfs.cpio.gz
+find . | cpio -R 0:0 -H newc -o | gzip >> ../binaries/dom0-rootfs.cpio.gz
 cd ..
 
 

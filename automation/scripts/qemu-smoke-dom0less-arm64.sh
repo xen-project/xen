@@ -111,7 +111,7 @@ ${domU_check}
 /bin/sh" > initrd/init
 chmod +x initrd/init
 cd initrd
-find . | cpio --create --format='newc' | gzip > ../binaries/initrd
+find . | cpio -R 0:0 -o -H newc | gzip > ../binaries/initrd
 cd ..
 
 # Dom0 rootfs
@@ -139,7 +139,7 @@ xl network-attach 1 type=vif
 ${dom0_check}
 " > etc/local.d/xen.start
 chmod +x etc/local.d/xen.start
-find . | cpio -H newc -o | gzip >> ../binaries/dom0-rootfs.cpio.gz
+find . | cpio -R 0:0 -H newc -o | gzip >> ../binaries/dom0-rootfs.cpio.gz
 cd ..
 
 # ImageBuilder

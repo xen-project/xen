@@ -50,7 +50,7 @@ echo "#!/bin/sh
 ${domU_check}
 /bin/sh" > etc/local.d/xen.start
 chmod +x etc/local.d/xen.start
-find . | cpio -H newc -o | gzip >> ../binaries/domU-rootfs.cpio.gz
+find . | cpio -R 0:0 -H newc -o | gzip >> ../binaries/domU-rootfs.cpio.gz
 cd ..
 rm -rf rootfs
 
@@ -71,7 +71,7 @@ bash /etc/init.d/xencommons start
 ${dom0_check}
 " > etc/local.d/xen.start
 chmod +x etc/local.d/xen.start
-find . | cpio -H newc -o | gzip >> ../binaries/dom0-rootfs.cpio.gz
+find . | cpio -R 0:0 -H newc -o | gzip >> ../binaries/dom0-rootfs.cpio.gz
 cd ..
 
 

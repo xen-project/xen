@@ -25,7 +25,7 @@ mount -t devtmpfs devtmpfs /dev
 chmod +x initrd/init
 # DomU rootfs
 cd initrd
-find . | cpio -H newc -o | gzip > ../domU-rootfs.cpio.gz
+find . | cpio -R 0:0 -H newc -o | gzip > ../domU-rootfs.cpio.gz
 cd ..
 
 # Dom0 rootfs
@@ -57,7 +57,7 @@ xl -vvv create -c /root/domU.cfg
 
 " > etc/local.d/xen.start
 chmod +x etc/local.d/xen.start
-find . | cpio -H newc -o | gzip >> ../dom0-rootfs.cpio.gz
+find . | cpio -R 0:0 -H newc -o | gzip >> ../dom0-rootfs.cpio.gz
 cd ../..
 
 cat >> binaries/pxelinux.0 << EOF

@@ -30,13 +30,13 @@ curl --fail --silent --show-error --location --output initrd.tar.gz https://dl-c
 mkdir rootfs
 cd rootfs
 tar xvzf ../initrd.tar.gz
-find . | cpio -H newc -o | gzip > ../root/initrd.cpio.gz
+find . | cpio -R 0:0 -H newc -o | gzip > ../root/initrd.cpio.gz
 cd ..
 rm -rf rootfs
 rm initrd.tar.gz
 
 cp ../zImage ./root
-find . | cpio -H newc -o | gzip > ../initrd.gz
+find . | cpio -R 0:0 -H newc -o | gzip > ../initrd.gz
 cd ..
 
 # XXX QEMU looks for "efi-virtio.rom" even if it is unneeded

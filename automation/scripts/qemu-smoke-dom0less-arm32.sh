@@ -75,7 +75,7 @@ mount -t devtmpfs devtmpfs /dev
 ${domU_check}
 /bin/sh" > init
 chmod +x init
-find . | cpio -H newc -o | gzip > ../initrd.gz
+find . | cpio -R 0:0 -H newc -o | gzip > ../initrd.gz
 cd ..
 
 # XXX QEMU looks for "efi-virtio.rom" even if it is unneeded
