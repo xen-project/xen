@@ -2063,7 +2063,7 @@ void __init create_dom0(void)
 
     /* The vGIC for DOM0 is exactly emulating the hardware GIC */
     dom0_cfg.arch.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE;
-    dom0_cfg.arch.nr_spis = VGIC_DEF_NR_SPIS;
+    dom0_cfg.arch.nr_spis = vgic_def_nr_spis();
     dom0_cfg.arch.tee_type = tee_get_type();
     dom0_cfg.max_vcpus = dom0_max_vcpus();
 

@@ -326,7 +326,7 @@ int __init arch_parse_dom0less_node(struct dt_device_node *node,
     {
         int vpl011_virq = GUEST_VPL011_SPI;
 
-        d_cfg->arch.nr_spis = VGIC_DEF_NR_SPIS;
+        d_cfg->arch.nr_spis = vgic_def_nr_spis();
 
         /*
          * The VPL011 virq is GUEST_VPL011_SPI, unless direct-map is

@@ -357,6 +357,25 @@ extern void vgic_check_inflight_irqs_pending(struct vcpu *v,
 /* Default number of vGIC SPIs. 32 are substracted to cover local IRQs. */
 #define VGIC_DEF_NR_SPIS (min(gic_number_lines(), VGIC_MAX_IRQS) - 32)
 
+static inline unsigned int vgic_def_nr_spis(void)
+{
+#ifdef CONFIG_GICV3_ESPI
+    /*
+     * Check if the hardware supports extended SPIs (even if the appropriate
+     * config is set). If not, the common SPI range will be used. Otherwise
+     * return the maximum eSPI INTID, supported by HW GIC, subtracted by 32.
+     * For Dom0 and started at boot time DomUs we will add back this value
+     * during VGIC initialization. This ensures consistent handling for Dom0
+     * and other domains. For the regular SPI range interrupts in this case,
+     * the maximum value of VGIC_DEF_NR_SPIS will be used.
+     */
+    if ( gic_number_espis() > 0 )
+        return ESPI_BASE_INTID + min(gic_number_espis(), 1024U) - 32;
+#endif
+
+    return VGIC_DEF_NR_SPIS;
+}
+
 extern bool vgic_is_valid_line(struct domain *d, unsigned int virq);
 
 static inline bool vgic_is_spi(struct domain *d, unsigned int virq)
