@@ -182,7 +182,7 @@ ${domU_check}
 Kernel \r on an \m (\l)
 
 " > etc/issue
-    find . | cpio -H newc -o | gzip >> ../binaries/domU-rootfs.cpio.gz
+    find . | cpio -R 0:0 -H newc -o | gzip >> ../binaries/domU-rootfs.cpio.gz
     cd ..
     rm -rf rootfs
 fi
@@ -238,7 +238,7 @@ cp ../binaries/bzImage boot/vmlinuz
 if [ -n "$domU_check" ]; then
     cp ../binaries/domU-rootfs.cpio.gz boot/initrd-domU
 fi
-find . | cpio -H newc -o | gzip >> ../binaries/dom0-rootfs.cpio.gz
+find . | cpio -R 0:0 -H newc -o | gzip >> ../binaries/dom0-rootfs.cpio.gz
 cd ..
 
 
