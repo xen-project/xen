@@ -339,6 +339,10 @@ bool viridian_synic_deliver_timer_msg(struct vcpu *v, unsigned int sintx,
         .DeliveryTime = delivery,
     };
 
+    /* Don't assume SIM page to be mapped. */
+    if ( !msg )
+        return false;
+
     /*
      * To avoid using an atomic test-and-set, and barrier before calling
      * vlapic_set_irq(), this function must be called in context of the
