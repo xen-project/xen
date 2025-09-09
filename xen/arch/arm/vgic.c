@@ -170,6 +170,18 @@ int domain_vgic_register(struct domain *d, unsigned int *mmio_count)
 }
 
 #ifdef CONFIG_GICV3_ESPI
+/*
+ * The function behavior is the same as for regular SPIs (vgic_rank_offset),
+ * but it operates with extended SPI ranks.
+ */
+struct vgic_irq_rank *vgic_ext_rank_offset(struct vcpu *v, unsigned int b,
+                                           unsigned int n, unsigned int s)
+{
+    unsigned int rank = REG_RANK_NR(b, (n >> s));
+
+    return vgic_get_rank(v, rank + EXT_RANK_MIN);
+}
+
 static unsigned int vgic_num_spi_lines(struct domain *d)
 {
     return d->arch.vgic.nr_spis + d->arch.vgic.nr_espis;
@@ -210,6 +222,16 @@ static unsigned int vgic_num_spi_lines(struct domain *d)
     return d->arch.vgic.nr_spis;
 }
 
+/*
+ * It is expected that, in the case of CONFIG_GICV3_ESPI=n, the function will
+ * return NULL. In this scenario, mmio_read/mmio_write will be treated as
+ * RAZ/WI, as expected.
+ */
+struct vgic_irq_rank *vgic_ext_rank_offset(struct vcpu *v, unsigned int b,
+                                           unsigned int n, unsigned int s)
+{
+    return NULL;
+}
 #endif
 
 static unsigned int vgic_num_alloc_irqs(struct domain *d)

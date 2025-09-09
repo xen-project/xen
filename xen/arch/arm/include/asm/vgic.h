@@ -324,6 +324,10 @@ extern struct vgic_irq_rank *vgic_rank_offset(struct vcpu *v,
                                               unsigned int b,
                                               unsigned int n,
                                               unsigned int s);
+extern struct vgic_irq_rank *vgic_ext_rank_offset(struct vcpu *v,
+                                                  unsigned int b,
+                                                  unsigned int n,
+                                                  unsigned int s);
 extern struct vgic_irq_rank *vgic_rank_irq(struct vcpu *v, unsigned int irq);
 extern void vgic_disable_irqs(struct vcpu *v, uint32_t r, unsigned int n);
 extern void vgic_enable_irqs(struct vcpu *v, uint32_t r, unsigned int n);
