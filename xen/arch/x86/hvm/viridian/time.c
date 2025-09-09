@@ -109,8 +109,10 @@ static void time_ref_count_thaw(const struct domain *d)
 
     trc->off = (int64_t)trc->val - trc_val(d, 0);
 
+    spin_lock(&vd->lock);
     if ( vd->reference_tsc.msr.enabled )
         update_reference_tsc(d, false);
+    spin_unlock(&vd->lock);
 }
 
 static uint64_t time_ref_count(const struct domain *d)
@@ -332,6 +334,7 @@ int viridian_time_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
         if ( !(viridian_feature_mask(d) & HVMPV_reference_tsc) )
             return X86EMUL_EXCEPTION;
 
+        spin_lock(&vd->lock);
         viridian_unmap_guest_page(&vd->reference_tsc);
         vd->reference_tsc.msr.raw = val;
         viridian_dump_guest_page(v, "REFERENCE_TSC", &vd->reference_tsc);
@@ -340,6 +343,7 @@ int viridian_time_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
             viridian_map_guest_page(d, &vd->reference_tsc);
             update_reference_tsc(d, true);
         }
+        spin_unlock(&vd->lock);
         break;
 
     case HV_X64_MSR_TIME_REF_COUNT:
