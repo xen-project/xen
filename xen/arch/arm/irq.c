@@ -490,8 +490,7 @@ int route_irq_to_guest(struct domain *d, unsigned int virq,
     if ( !vgic_is_valid_line(d, virq) )
     {
         printk(XENLOG_G_ERR
-               "the vIRQ number %u is too high for domain %u (max = %u)\n",
-               irq, d->domain_id, vgic_num_irqs(d));
+               "invalid vIRQ number %u for domain %pd\n", irq, d);
         return -EINVAL;
     }
 
