@@ -4683,7 +4683,10 @@ uint64_t libxl__get_targetmem_fudge(libxl__gc *gc,
                                 info->max_memkb > info->target_memkb)
                                 ? LIBXL_MAXMEM_CONSTANT : 0;
 
-    return info->video_memkb + mem_target_fudge;
+    if (info->video_memkb != LIBXL_MEMKB_DEFAULT)
+        mem_target_fudge += info->video_memkb;
+
+    return mem_target_fudge;
 }
 
 int libxl__get_memory_target(libxl__gc *gc, uint32_t domid,
