@@ -3108,11 +3108,14 @@ interval of colors (such as "0-4").
 =item B<nr_spis="NR_SPIS">
 
 An optional integer parameter specifying the number of SPIs (Shared
-Peripheral Interrupts) to allocate for the domain. Max is 960 SPIs. If
-the `nr_spis` parameter is not specified, the value calculated by the toolstack
-will be used for the domain. Otherwise, the value specified by the `nr_spis`
-parameter will be used. The number of SPIs should match the highest interrupt
-ID that will be assigned to the domain.
+Peripheral Interrupts) to allocate for the domain. Max is 960 for regular SPIs
+or 5088 for eSPIs (Extended SPIs). The eSPIs includes an additional 1024 SPIs
+from the eSPI range (4096 to 5119) if the hardware supports extended SPIs
+(GICv3.1+) and CONFIG_GICV3_ESPI is enabled. If the `nr_spis` parameter is not
+specified, the value calculated by the toolstack will be used for the domain.
+Otherwise, the value specified by the `nr_spis` parameter will be used. The
+number of SPIs should match the highest interrupt ID that will be assigned to
+the domain.
 
 =item B<trap_unmapped_accesses=BOOLEAN>
 
