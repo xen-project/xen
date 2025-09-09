@@ -71,6 +71,7 @@ struct viridian_domain
     DECLARE_BITMAP(hypercall_flags, _HCALL_nr);
     struct viridian_time_ref_count time_ref_count;
     struct viridian_page reference_tsc;
+    spinlock_t lock;
 };
 
 void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
