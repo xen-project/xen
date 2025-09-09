@@ -618,10 +618,16 @@ struct page_info *p2m_get_page_from_gfn(struct domain *d, gfn_t gfn,
      */
     if ( p2m_is_foreign(p2mt) )
     {
-        struct domain *fdom = page_get_owner_and_reference(page);
-        ASSERT(fdom != NULL);
-        ASSERT(fdom != d);
-        return page;
+        const struct domain *fdom = page_get_owner_and_reference(page);
+
+        if ( fdom )
+        {
+            if ( fdom != d )
+                return page;
+            ASSERT_UNREACHABLE();
+            put_page(page);
+        }
+        return NULL;
     }
 
     return get_page(page, d) ? page : NULL;
