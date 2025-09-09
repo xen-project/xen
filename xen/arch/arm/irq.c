@@ -445,7 +445,7 @@ int route_irq_to_guest(struct domain *d, unsigned int virq,
     unsigned long flags;
     int retval = 0;
 
-    if ( virq >= vgic_num_irqs(d) )
+    if ( !vgic_is_valid_line(d, virq) )
     {
         printk(XENLOG_G_ERR
                "the vIRQ number %u is too high for domain %u (max = %u)\n",
@@ -563,7 +563,7 @@ int release_guest_irq(struct domain *d, unsigned int virq)
     int ret;
 
     /* Only SPIs are supported */
-    if ( virq < NR_LOCAL_IRQS || virq >= vgic_num_irqs(d) )
+    if ( !vgic_is_spi(d, virq) )
         return -EINVAL;
 
     desc = vgic_get_hw_irq_desc(d, NULL, virq);

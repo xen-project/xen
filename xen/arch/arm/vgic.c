@@ -24,6 +24,12 @@
 #include <asm/gic.h>
 #include <asm/vgic.h>
 
+
+bool vgic_is_valid_line(struct domain *d, unsigned int virq)
+{
+    return virq < vgic_num_irqs(d);
+}
+
 static inline struct vgic_irq_rank *vgic_get_rank(struct vcpu *v,
                                                   unsigned int rank)
 {
@@ -582,7 +588,7 @@ void vgic_inject_irq(struct domain *d, struct vcpu *v, unsigned int virq,
     if ( !v )
     {
         /* The IRQ needs to be an SPI if no vCPU is specified. */
-        ASSERT(virq >= 32 && virq <= vgic_num_irqs(d));
+        ASSERT(vgic_is_spi(d, virq));
 
         v = vgic_get_target_vcpu(d->vcpu[0], virq);
     };
@@ -659,7 +665,7 @@ bool vgic_emulate(struct cpu_user_regs *regs, union hsr hsr)
 
 bool vgic_reserve_virq(struct domain *d, unsigned int virq)
 {
-    if ( virq >= vgic_num_irqs(d) )
+    if ( !vgic_is_valid_line(d, virq) )
         return false;
 
     return !test_and_set_bit(virq, d->arch.vgic.allocated_irqs);

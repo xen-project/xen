@@ -134,8 +134,7 @@ int gic_route_irq_to_guest(struct domain *d, unsigned int virq,
 
     ASSERT(spin_is_locked(&desc->lock));
     /* Caller has already checked that the IRQ is an SPI */
-    ASSERT(virq >= 32);
-    ASSERT(virq < vgic_num_irqs(d));
+    ASSERT(vgic_is_spi(d, virq));
     ASSERT(!is_lpi(virq));
 
     ret = vgic_connect_hw_irq(d, NULL, virq, desc, true);

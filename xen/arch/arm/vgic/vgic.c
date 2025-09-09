@@ -718,6 +718,11 @@ bool vgic_reserve_virq(struct domain *d, unsigned int virq)
     return !test_and_set_bit(virq, d->arch.vgic.allocated_irqs);
 }
 
+bool vgic_is_valid_line(struct domain *d, unsigned int virq)
+{
+    return virq < vgic_num_irqs(d);
+}
+
 int vgic_allocate_virq(struct domain *d, bool spi)
 {
     int first, end;
