@@ -53,18 +53,22 @@ mfn_t p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
 struct page_info *p2m_get_page_from_gfn(struct domain *d, gfn_t gfn,
                                         p2m_type_t *t)
 {
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
     struct page_info *page;
     p2m_type_t p2mt;
-    mfn_t mfn = p2m_lookup(d, gfn, &p2mt);
+    mfn_t mfn;
+
+    p2m_read_lock(p2m);
+    mfn = p2m_get_entry(p2m, gfn, &p2mt, NULL, NULL, NULL);
 
     if ( t )
         *t = p2mt;
 
-    if ( !p2m_is_any_ram(p2mt) )
+    if ( !p2m_is_any_ram(p2mt) || !mfn_valid(mfn) )
+    {
+        p2m_read_unlock(p2m);
         return NULL;
-
-    if ( !mfn_valid(mfn) )
-        return NULL;
+    }
 
     page = mfn_to_page(mfn);
 
@@ -76,6 +80,8 @@ struct page_info *p2m_get_page_from_gfn(struct domain *d, gfn_t gfn,
     {
         const struct domain *fdom = page_get_owner_and_reference(page);
 
+        p2m_read_unlock(p2m);
+
         if ( fdom )
         {
             if ( fdom != d )
@@ -85,6 +91,8 @@ struct page_info *p2m_get_page_from_gfn(struct domain *d, gfn_t gfn,
         }
         return NULL;
     }
+
+    p2m_read_unlock(p2m);
 
     return get_page(page, d) ? page : NULL;
 }
