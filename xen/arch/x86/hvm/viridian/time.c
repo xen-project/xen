@@ -27,6 +27,10 @@ static void update_reference_tsc(const struct domain *d, bool initialize)
     HV_REFERENCE_TSC_PAGE *p = rt->ptr;
     uint32_t seq;
 
+    /* Reference TSC page might not be mapped even if the MSR is enabled. */
+    if ( !p )
+        return;
+
     if ( initialize )
         clear_page(p);
 
