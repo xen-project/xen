@@ -12,7 +12,6 @@
   - project: $ARTIFACTS_REPO
     job: alpine-3.18-arm64-rootfs
     ref: $ARTIFACTS_BRANCH
-  - qemu-system-aarch64-6.0.0-arm64-export
 
 .arm32-test-needs: &arm32-test-needs
   # Bodge to ensure binaries/ is non-root.  Can be any artefact which comes
@@ -21,7 +20,6 @@
   - project: $ARTIFACTS_REPO
     job: microcode-x86
     ref: $ARTIFACTS_BRANCH
-  - qemu-system-aarch64-6.0.0-arm32-export
 
 .x86-64-test-needs: &x86-64-test-needs
   - project: $ARTIFACTS_REPO

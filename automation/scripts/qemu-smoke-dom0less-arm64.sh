@@ -78,9 +78,7 @@ if [[ "${test_variant}" == "gicv3" ]]; then
     domU_check="echo \"${passed}\""
 fi
 
-# XXX QEMU looks for "efi-virtio.rom" even if it is unneeded
-curl -fsSLO https://github.com/qemu/qemu/raw/v5.2.0/pc-bios/efi-virtio.rom
-./binaries/qemu-system-aarch64 \
+qemu-system-aarch64 \
    -machine virtualization=true \
    -cpu cortex-a57 -machine type=virt,gic-version=$gic_version \
    -m 2048 -smp 2 -display none \
@@ -203,7 +201,7 @@ bash imagebuilder/scripts/uboot-script-gen -t tftp -d binaries/ -c binaries/conf
 
 # Run the test
 rm -f smoke.serial
-export TEST_CMD="./binaries/qemu-system-aarch64 \
+export TEST_CMD="qemu-system-aarch64 \
     -machine virtualization=true \
     -cpu cortex-a57 -machine type=virt,gic-version=$gic_version \
     -m 2048 -monitor none -serial stdio \

@@ -78,9 +78,7 @@ chmod +x init
 find . | cpio -R 0:0 -H newc -o | gzip > ../initrd.gz
 cd ..
 
-# XXX QEMU looks for "efi-virtio.rom" even if it is unneeded
-curl -fsSLO https://github.com/qemu/qemu/raw/v5.2.0/pc-bios/efi-virtio.rom
-./qemu-system-arm \
+qemu-system-arm \
     -machine virt \
     -machine virtualization=true \
     -smp 4 \
@@ -130,7 +128,7 @@ bash imagebuilder/scripts/uboot-script-gen -t tftp -d . -c config
 
 # Run the test
 rm -f ${serial_log}
-export TEST_CMD="./qemu-system-arm \
+export TEST_CMD="qemu-system-arm \
     -machine virt \
     -machine virtualization=true \
     -smp 4 \

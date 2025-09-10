@@ -7,7 +7,7 @@
 function xtf_arch_prepare()
 {
     export FW_PREFIX="${FW_PREFIX:-/usr/lib/u-boot/qemu_arm64/}"
-    export QEMU_PREFIX="${QEMU_PREFIX:-${WORKDIR}/}"
+    export QEMU_PREFIX="${QEMU_PREFIX:-}"
     export XEN_BINARY="${XEN_BINARY:-${WORKDIR}/xen}"
     export XEN_CMDLINE="${XEN_CMDLINE:-loglvl=all noreboot console_timestamps=boot console=dtuart}"
     export XTF_SRC_BRANCH="${XTF_SRC_BRANCH:-xtf-arm}"
@@ -18,9 +18,6 @@ function xtf_arch_prepare()
 # Perform arch-specific XTF environment setup.
 function xtf_arch_setup()
 {
-    # QEMU looks for "efi-virtio.rom" even if it is unneeded
-    curl -fsSLO https://github.com/qemu/qemu/raw/v5.2.0/pc-bios/efi-virtio.rom
-
     # Crude check for local testing
     if [ ! -d imagebuilder ]; then
         git clone --depth 1 https://gitlab.com/xen-project/imagebuilder.git
@@ -47,7 +44,7 @@ EOF
     cp ${XTF_BINARY} ${WORKDIR}/xtf-test
 
     # Generate virt-gicv2.dtb
-    ${WORKDIR}/qemu-system-aarch64 \
+    ${QEMU_PREFIX}qemu-system-aarch64 \
         -machine virtualization=true \
         -cpu cortex-a57 \
         -machine type=virt \
