@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - The minimum toolchain requirements have increased for some architectures:
    - For x86, GCC 5.1 and Binutils 2.25, or Clang/LLVM 11
    - For ARM32 and ARM64, GCC 5.1 and Binutils 2.25
+   - For RISC-V, GCC 12.2 and Binutils 2.39
+ - Debian Trixie added to CI.  Debian Bullseye retired from CI for RISC-V due
+   to the baseline change.
  - Linux based device model stubdomains are now fully supported.
 
  - On x86:
