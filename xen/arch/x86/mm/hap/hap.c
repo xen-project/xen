@@ -42,7 +42,7 @@
  * Create a dirty vram range on demand when some [begin_pfn:begin_pfn+nr] is
  * first encountered.
  * Collect the guest_dirty bitmask, a bit mask of the dirty vram pages, by
- * calling paging_log_dirty_range(), which interrogates each vram
+ * calling p2m_log_dirty_range(), which interrogates each vram
  * page's p2m type looking for pages that have been made writable.
  */
 
@@ -119,7 +119,7 @@ int hap_track_dirty_vram(struct domain *d,
             p2m_flush_hardware_cached_dirty(d);
 
             /* get the bitmap */
-            paging_log_dirty_range(d, begin_pfn, nr_frames, dirty_bitmap);
+            p2m_log_dirty_range(d, begin_pfn, nr_frames, dirty_bitmap);
 
             domain_unpause(d);
         }

@@ -583,38 +583,6 @@ static int paging_log_dirty_op(struct domain *d,
     return rv;
 }
 
-#ifdef CONFIG_HVM
-void paging_log_dirty_range(struct domain *d,
-                           unsigned long begin_pfn,
-                           unsigned long nr,
-                           uint8_t *dirty_bitmap)
-{
-    struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    int i;
-    unsigned long pfn;
-
-    /*
-     * Set l1e entries of P2M table to be read-only.
-     *
-     * On first write, it page faults, its entry is changed to read-write,
-     * and on retry the write succeeds.
-     *
-     * We populate dirty_bitmap by looking for entries that have been
-     * switched to read-write.
-     */
-
-    p2m_lock(p2m);
-
-    for ( i = 0, pfn = begin_pfn; pfn < begin_pfn + nr; i++, pfn++ )
-        if ( !p2m_change_type_one(d, pfn, p2m_ram_rw, p2m_ram_logdirty) )
-            dirty_bitmap[i >> 3] |= (1 << (i & 7));
-
-    p2m_unlock(p2m);
-
-    guest_flush_tlb_mask(d, d->dirty_cpumask);
-}
-#endif
-
 /*
  * Callers must supply log_dirty_ops for the log dirty code to call. This
  * function usually is invoked when paging is enabled. Check shadow_enable()

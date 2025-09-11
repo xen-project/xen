@@ -133,13 +133,20 @@ struct paging_mode {
     (DIV_ROUND_UP(PADDR_BITS - PAGE_SHIFT - (PAGE_SHIFT + 3), \
                   PAGE_SHIFT - ilog2(sizeof(mfn_t))) + 1)
 
-#if PG_log_dirty
+#ifdef CONFIG_HVM
+/* VRAM dirty tracking support */
+struct sh_dirty_vram {
+    unsigned long begin_pfn;
+    unsigned long end_pfn;
+#ifdef CONFIG_SHADOW_PAGING
+    paddr_t *sl1ma;
+    uint8_t *dirty_bitmap;
+    s_time_t last_dirty;
+#endif
+};
+#endif
 
-/* get the dirty bitmap for a specific range of pfns */
-void paging_log_dirty_range(struct domain *d,
-                            unsigned long begin_pfn,
-                            unsigned long nr,
-                            uint8_t *dirty_bitmap);
+#if PG_log_dirty
 
 /* log dirty initialization */
 void paging_log_dirty_init(struct domain *d, const struct log_dirty_ops *ops);
@@ -170,19 +177,6 @@ bool paging_mfn_is_dirty(const struct domain *d, mfn_t gmfn);
                               (LOGDIRTY_NODE_ENTRIES-1))
 #define L4_LOGDIRTY_IDX(pfn) ((pfn_x(pfn) >> (PAGE_SHIFT + 3 + PAGETABLE_ORDER * 2)) & \
                               (LOGDIRTY_NODE_ENTRIES-1))
-
-#ifdef CONFIG_HVM
-/* VRAM dirty tracking support */
-struct sh_dirty_vram {
-    unsigned long begin_pfn;
-    unsigned long end_pfn;
-#ifdef CONFIG_SHADOW_PAGING
-    paddr_t *sl1ma;
-    uint8_t *dirty_bitmap;
-    s_time_t last_dirty;
-#endif
-};
-#endif
 
 #else /* !PG_log_dirty */
 

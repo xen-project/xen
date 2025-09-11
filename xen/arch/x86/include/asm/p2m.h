@@ -1110,6 +1110,10 @@ static inline int p2m_entry_modify(struct p2m_domain *p2m, p2m_type_t nt,
 
 #endif /* CONFIG_HVM */
 
+/* Get the dirty bitmap for a specific range of pfns */
+void p2m_log_dirty_range(struct domain *d, unsigned long begin_pfn,
+                         unsigned long nr, uint8_t *dirty_bitmap);
+
 #endif /* _XEN_ASM_X86_P2M_H */
 
 /*
