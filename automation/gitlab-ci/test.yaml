@@ -77,7 +77,7 @@
 .qemu-riscv64:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:12-riscv64
+    CONTAINER: debian:13-riscv64
     LOGFILE: qemu-smoke-riscv64.log
   artifacts:
     paths:
