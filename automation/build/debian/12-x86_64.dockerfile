@@ -23,6 +23,7 @@ RUN <<EOF
 
         # Tools (general)
         ca-certificates
+        cpio
         git-core
         pkg-config
         wget
@@ -52,19 +53,14 @@ RUN <<EOF
         ocaml-nox
         ocaml-findlib
 
-        # for test phase, qemu-smoke-* jobs
+        # for test phase, qemu-* jobs
+        busybox-static
         expect
+        ovmf
         qemu-system-x86
 
         # for build-each-commit-gcc
         ccache
-
-        # for qemu-alpine-x86_64-gcc
-        busybox-static
-        cpio
-
-        # For *-efi jobs
-        ovmf
     )
 
     apt-get -y --no-install-recommends install "${DEPS[@]}"
