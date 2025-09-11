@@ -871,7 +871,6 @@ void __init mp_register_ioapic (
 	u32			gsi_base)
 {
 	int			idx = 0;
-	int			tmpid;
 
 	if (nr_ioapics >= MAX_IO_APICS) {
 		printk(KERN_ERR "ERROR: Max # of I/O APICs (%d) exceeded "
@@ -891,16 +890,7 @@ void __init mp_register_ioapic (
 	mp_ioapics[idx].mpc_apicaddr = address;
 
 	set_fixmap_nocache(FIX_IO_APIC_BASE_0 + idx, address);
-	if ((boot_cpu_data.x86_vendor == X86_VENDOR_INTEL)
-		&& !APIC_XAPIC(apic_version[boot_cpu_physical_apicid]))
-		tmpid = io_apic_get_unique_id(idx, id);
-	else
-		tmpid = id;
-	if (tmpid == -1) {
-		nr_ioapics--;
-		return;
-	}
-	mp_ioapics[idx].mpc_apicid = tmpid;
+	mp_ioapics[idx].mpc_apicid = id;
 	mp_ioapics[idx].mpc_apicver = io_apic_get_version(idx);
 	
 	/* 
