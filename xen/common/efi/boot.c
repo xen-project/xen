@@ -1062,7 +1062,7 @@ static void __init efi_verify_kernel(EFI_HANDLE ImageHandle)
     static EFI_GUID __initdata shim_image_guid = SHIM_IMAGE_LOADER_GUID;
     static EFI_GUID __initdata shim_lock_guid = SHIM_LOCK_PROTOCOL_GUID;
     SHIM_IMAGE_LOADER *shim_loader;
-    EFI_HANDLE loaded_kernel;
+    EFI_HANDLE loaded_kernel = NULL;
     EFI_SHIM_LOCK_PROTOCOL *shim_lock;
     EFI_STATUS status;
     bool verified = false;
@@ -1078,11 +1078,13 @@ static void __init efi_verify_kernel(EFI_HANDLE ImageHandle)
             verified = true;
 
         /*
-         * Always unload the image.  We only needed LoadImage() to perform
-         * verification anyway, and in the case of a failure there may still
-         * be cleanup needing to be performed.
+         * If the kernel was loaded, unload it. We only needed LoadImage() to
+         * perform verification anyway, and in the case of a failure there may
+         * still be cleanup needing to be performed.
          */
-        shim_loader->UnloadImage(loaded_kernel);
+        if ( loaded_kernel &&
+             (!EFI_ERROR(status) || status == EFI_SECURITY_VIOLATION) )
+            shim_loader->UnloadImage(loaded_kernel);
     }
 
     /* Otherwise, fall back to SHIM_LOCK. */
