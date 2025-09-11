@@ -1459,119 +1459,6 @@ void disable_IO_APIC(void)
 }
 
 /*
- * function to set the IO-APIC physical IDs based on the
- * values stored in the MPC table.
- *
- * by Matt Domsch <Matt_Domsch@dell.com>  Tue Dec 21 12:25:05 CST 1999
- */
-
-static void __init setup_ioapic_ids_from_mpc(void)
-{
-    union IO_APIC_reg_00 reg_00;
-    static physid_mask_t __initdata phys_id_present_map;
-    int apic;
-    int i;
-    unsigned char old_id;
-    unsigned long flags;
-    const uint32_t broadcast_id = 0xf;
-
-    /*
-     * Don't check I/O APIC IDs for xAPIC systems. They have
-     * no meaning without the serial APIC bus.
-     */
-    if (!(boot_cpu_data.x86_vendor == X86_VENDOR_INTEL)
-        || APIC_XAPIC(apic_version[boot_cpu_physical_apicid]))
-        return;
-
-    /*
-     * This is broken; anything with a real cpu count has to
-     * circumvent this idiocy regardless.
-     */
-    phys_id_present_map = phys_cpu_present_map;
-
-    /*
-     * Set the IOAPIC ID to the value stored in the MPC table.
-     */
-    for (apic = 0; apic < nr_ioapics; apic++) {
-        if (!nr_ioapic_entries[apic])
-            continue;
-
-        /* Read the register 0 value */
-        spin_lock_irqsave(&ioapic_lock, flags);
-        reg_00.raw = io_apic_read(apic, 0);
-        spin_unlock_irqrestore(&ioapic_lock, flags);
-		
-        old_id = mp_ioapics[apic].mpc_apicid;
-
-        if (mp_ioapics[apic].mpc_apicid >= broadcast_id) {
-            printk(KERN_ERR "BIOS bug, IO-APIC#%d ID is %d in the MPC table!...\n",
-                   apic, mp_ioapics[apic].mpc_apicid);
-            printk(KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
-                   reg_00.bits.ID);
-            mp_ioapics[apic].mpc_apicid = reg_00.bits.ID;
-        }
-
-        /*
-         * Sanity check, is the ID really free? Every APIC in a
-         * system must have a unique ID or we get lots of nice
-         * 'stuck on smp_invalidate_needed IPI wait' messages.
-         */
-        if ( physid_isset(mp_ioapics[apic].mpc_apicid, phys_id_present_map) )
-        {
-            printk(KERN_ERR "BIOS bug, IO-APIC#%d ID %d is already used!...\n",
-                   apic, mp_ioapics[apic].mpc_apicid);
-            for (i = 0; i < broadcast_id; i++)
-                if (!physid_isset(i, phys_id_present_map))
-                    break;
-            if (i >= broadcast_id)
-                panic("Max APIC ID exceeded\n");
-            printk(KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
-                   i);
-            mp_ioapics[apic].mpc_apicid = i;
-        } else {
-            apic_printk(APIC_VERBOSE, "Setting %d in the "
-                        "phys_id_present_map\n",
-                        mp_ioapics[apic].mpc_apicid);
-        }
-        physid_set(mp_ioapics[apic].mpc_apicid, phys_id_present_map);
-
-        /*
-         * We need to adjust the IRQ routing table
-         * if the ID changed.
-         */
-        if (old_id != mp_ioapics[apic].mpc_apicid)
-            for (i = 0; i < mp_irq_entries; i++)
-                if (mp_irqs[i].mpc_dstapic == old_id)
-                    mp_irqs[i].mpc_dstapic
-                        = mp_ioapics[apic].mpc_apicid;
-
-        /*
-         * Read the right value from the MPC table and
-         * write it into the ID register.
-         */
-        apic_printk(APIC_VERBOSE, KERN_INFO
-                    "...changing IO-APIC physical APIC ID to %d ...",
-                    mp_ioapics[apic].mpc_apicid);
-
-        reg_00.bits.ID = mp_ioapics[apic].mpc_apicid;
-        spin_lock_irqsave(&ioapic_lock, flags);
-        io_apic_write(apic, 0, reg_00.raw);
-        spin_unlock_irqrestore(&ioapic_lock, flags);
-
-        /*
-         * Sanity check
-         */
-        spin_lock_irqsave(&ioapic_lock, flags);
-        reg_00.raw = io_apic_read(apic, 0);
-        spin_unlock_irqrestore(&ioapic_lock, flags);
-        if (reg_00.bits.ID != mp_ioapics[apic].mpc_apicid)
-            printk("could not set ID!\n");
-        else
-            apic_printk(APIC_VERBOSE, " ok.\n");
-    }
-}
-
-/*
  * There is a nasty bug in some older SMP boards, their mptable lies
  * about the timer IRQ. We do the following to work around the situation:
  *
@@ -2157,12 +2044,6 @@ void __init setup_IO_APIC(void)
         ioapic_level_type.ack = irq_complete_move;
         ioapic_level_type.end = end_level_ioapic_irq_new;
     }
-
-    /*
-     * Set up IO-APIC IRQ routing.
-     */
-    if (!acpi_ioapic)
-        setup_ioapic_ids_from_mpc();
 
     setup_IO_APIC_irqs();
     init_IO_APIC_traps();
