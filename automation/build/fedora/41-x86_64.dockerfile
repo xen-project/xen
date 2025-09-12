@@ -23,6 +23,7 @@ RUN <<EOF
         checkpolicy
 
         # Tools (general)
+        cpio
         git-core
         gzip
         patch

@@ -1,5 +1,7 @@
 #!/bin/bash -ex
 
+set -o pipefail
+
 test -f /etc/os-release && cat "$_"
 
 # Construct $cc such that it matches what `make` will chose when taking

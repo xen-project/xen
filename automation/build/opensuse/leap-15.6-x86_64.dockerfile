@@ -29,6 +29,7 @@ RUN <<EOF
         python311
 
         # Tools (general)
+        cpio
         git-core
         gzip
         patch
