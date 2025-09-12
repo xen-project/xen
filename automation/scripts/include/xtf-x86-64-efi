@@ -20,6 +20,7 @@ function xtf_arch_setup()
 {
     local esp_dir="${WORKDIR}/boot-esp"
     local efi_dir="${esp_dir}/EFI/BOOT"
+    local suff=
 
     # Generate EFI boot environment
     mkdir -p ${efi_dir}
@@ -35,8 +36,13 @@ options=${XEN_CMDLINE}
 kernel=kernel
 EOF
 
+    # Vs older versions, Debian Trixie names the OVMF files with a _4M suffix.
+    if [[ -e ${FW_PREFIX}/OVMF_VARS_4M.fd ]]; then
+        suff=_4M
+    fi
+
     # NB: OVMF_CODE.fd is read-only, no need to copy
-    cp ${FW_PREFIX}OVMF_VARS.fd ${WORKDIR}
+    cp ${FW_PREFIX}OVMF_VARS${suff}.fd ${WORKDIR}
 
     export TEST_CMD="${QEMU_PREFIX}qemu-system-x86_64 \
         -no-reboot \
@@ -45,8 +51,8 @@ EOF
         -serial stdio \
         -m 512 \
         -M q35,kernel-irqchip=split \
-        -drive if=pflash,format=raw,readonly=on,file=${FW_PREFIX}OVMF_CODE.fd \
-        -drive if=pflash,format=raw,file=${WORKDIR}/OVMF_VARS.fd \
+        -drive if=pflash,format=raw,readonly=on,file=${FW_PREFIX}OVMF_CODE${suff}.fd \
+        -drive if=pflash,format=raw,file=${WORKDIR}/OVMF_VARS${suff}.fd \
         -drive file=fat:rw:${esp_dir},media=disk,index=0,format=raw \
     "
 }
