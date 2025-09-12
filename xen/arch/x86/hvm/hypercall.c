@@ -155,7 +155,7 @@ int hvm_hypercall(struct cpu_user_regs *regs)
 
     curr->hcall_preempted = false;
 
-    if ( mode == 8 )
+    if ( mode == X86_MODE_64BIT )
     {
         HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%lu(%lx, %lx, %lx, %lx, %lx)",
                     eax, regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8);
