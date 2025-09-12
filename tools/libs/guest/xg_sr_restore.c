@@ -129,6 +129,35 @@ static int pfn_set_populated(struct xc_sr_context *ctx, xen_pfn_t pfn)
     return 0;
 }
 
+#if defined(__i386__) || defined(__x86_64__)
+/* Order of the smallest superpage */
+#define SMALL_SUPERPAGE_ORDER 9
+#else
+#error Define SMALL_SUPERPAGE_ORDER for this platform
+#endif
+
+static bool populate_small_superpage(struct xc_sr_context *ctx, xen_pfn_t gfn)
+{
+    xen_pfn_t mfn = gfn;
+
+    if ( xc_domain_populate_physmap_exact(
+         ctx->xch, ctx->domid, 1, SMALL_SUPERPAGE_ORDER, 0, &mfn) )
+        return false;
+
+    /*
+     * XENMEM_populate_physmap has no coherent error semantics.
+     * Assume a failure here is ENOMEM, and fall back to allocating
+     * small pages.
+     */
+    if ( mfn == INVALID_MFN )
+        return false;
+
+    for ( size_t i = 0; i < (1UL << SMALL_SUPERPAGE_ORDER); ++i )
+        ctx->restore.ops.set_gfn(ctx, gfn + i, mfn + i);
+
+    return true;
+}
+
 /*
  * Given a set of pfns, obtain memory from Xen to fill the physmap for the
  * unpopulated subset.  If types is NULL, no page type checking is performed
@@ -142,6 +171,9 @@ int populate_pfns(struct xc_sr_context *ctx, unsigned int count,
         *pfns = malloc(count * sizeof(*pfns));
     unsigned int i, nr_pfns = 0;
     int rc = -1;
+    xen_pfn_t prev = 0;
+    unsigned int num_contiguous = 0;
+    xen_pfn_t mask = (1ULL << SMALL_SUPERPAGE_ORDER) - 1;
 
     if ( !mfns || !pfns )
     {
@@ -152,14 +184,33 @@ int populate_pfns(struct xc_sr_context *ctx, unsigned int count,
 
     for ( i = 0; i < count; ++i )
     {
+        xen_pfn_t pfn = original_pfns[i];
+
         if ( (!types || page_type_to_populate(types[i])) &&
-             !pfn_is_populated(ctx, original_pfns[i]) )
+             !pfn_is_populated(ctx, pfn) )
         {
-            rc = pfn_set_populated(ctx, original_pfns[i]);
+            rc = pfn_set_populated(ctx, pfn);
             if ( rc )
                 goto err;
-            pfns[nr_pfns] = mfns[nr_pfns] = original_pfns[i];
+            pfns[nr_pfns] = mfns[nr_pfns] = pfn;
             ++nr_pfns;
+
+            /*
+             * During the first pass for x86 HVM guests, PAGE_DATA
+             * records contain metadata about 4M aligned chunks of GFN
+             * space.  Reconstruct 2M superpages where possible.
+             */
+            if ( pfn != prev + 1 )
+                num_contiguous = 0;
+            num_contiguous++;
+            prev = pfn;
+
+            if ( num_contiguous > mask && (pfn & mask) == mask &&
+                 populate_small_superpage(ctx, pfn - mask) )
+            {
+                nr_pfns -= mask + 1;
+                num_contiguous = 0;
+            }
         }
     }
 
