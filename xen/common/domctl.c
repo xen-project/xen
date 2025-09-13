@@ -421,7 +421,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         d = domain_create(domid, &op->u.createdomain, false);
         if ( IS_ERR(d) )
         {
-            domid_free(domid);
             ret = PTR_ERR(d);
             d = NULL;
             break;
