@@ -1042,6 +1042,7 @@ static int relinquish_memory(struct domain *d, struct page_list_head *list)
  */
 enum {
     PROG_pci = 1,
+    PROG_sci,
     PROG_tee,
     PROG_xen,
     PROG_page,
@@ -1049,7 +1050,6 @@ enum {
     PROG_p2m_root,
     PROG_p2m,
     PROG_p2m_pool,
-    PROG_sci,
     PROG_done,
 };
 
@@ -1090,6 +1090,11 @@ int domain_relinquish_resources(struct domain *d)
             return ret;
 #endif
 
+    PROGRESS(sci):
+        ret = sci_relinquish_resources(d);
+        if ( ret )
+            return ret;
+
     PROGRESS(tee):
         ret = tee_relinquish_resources(d);
         if (ret )
@@ -1107,10 +1112,6 @@ int domain_relinquish_resources(struct domain *d)
 
     PROGRESS(mapping):
         ret = relinquish_p2m_mapping(d);
-        if ( ret )
-            return ret;
-    PROGRESS(sci):
-        ret = sci_relinquish_resources(d);
         if ( ret )
             return ret;
 
