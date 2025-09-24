@@ -131,6 +131,8 @@ struct host_its {
     unsigned int flags;
 };
 
+/* Map a collection for this host CPU to each host ITS. */
+int gicv3_its_setup_collection(unsigned int cpu);
 
 #ifdef CONFIG_HAS_ITS
 
@@ -159,9 +161,6 @@ int gicv3_its_init(void);
 /* Store the physical address and ID for each redistributor as read from DT. */
 void gicv3_set_redist_address(paddr_t address, unsigned int redist_id);
 uint64_t gicv3_get_redist_address(unsigned int cpu, bool use_pta);
-
-/* Map a collection for this host CPU to each host ITS. */
-int gicv3_its_setup_collection(unsigned int cpu);
 
 /* Initialize and destroy the per-domain parts of the virtual ITS support. */
 int vgic_v3_its_init_domain(struct domain *d);
@@ -254,12 +253,6 @@ static inline int gicv3_its_init(void)
 static inline void gicv3_set_redist_address(paddr_t address,
                                             unsigned int redist_id)
 {
-}
-
-static inline int gicv3_its_setup_collection(unsigned int cpu)
-{
-    /* We should never get here without an ITS. */
-    BUG();
 }
 
 static inline int vgic_v3_its_init_domain(struct domain *d)

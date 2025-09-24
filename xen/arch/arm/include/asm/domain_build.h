@@ -15,16 +15,7 @@ void evtchn_allocate(struct domain *d);
 void set_interrupt(gic_interrupt_t interrupt, unsigned int irq,
                    unsigned int cpumask, unsigned int level);
 
-#ifndef CONFIG_ACPI
-static inline int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
-{
-    /* Only booting with ACPI will hit here */
-    BUG();
-    return -EINVAL;
-}
-#else
 int prepare_acpi(struct domain *d, struct kernel_info *kinfo);
-#endif
 
 int add_ext_regions(unsigned long s_gfn, unsigned long e_gfn, void *data);
 
