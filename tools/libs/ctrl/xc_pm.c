@@ -274,25 +274,24 @@ int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
         /*
          * Copy to user_para no matter what cpufreq driver/governor.
          *
-         * First sanity check layout of the union subject to memcpy() below.
+         * First sanity check layout of the struct subject to memcpy() below.
          */
-        BUILD_BUG_ON(sizeof(user_para->u) != sizeof(sys_para->u));
+        BUILD_BUG_ON(sizeof(user_para->s) != sizeof(sys_para->s));
 
 #define CHK_FIELD(fld) \
-        BUILD_BUG_ON(offsetof(typeof(user_para->u), fld) != \
-                     offsetof(typeof(sys_para->u),  fld))
+        BUILD_BUG_ON(offsetof(typeof(user_para->s), fld) != \
+                     offsetof(typeof(sys_para->s),  fld))
 
-        CHK_FIELD(s.scaling_cur_freq);
-        CHK_FIELD(s.scaling_governor);
-        CHK_FIELD(s.scaling_max_freq);
-        CHK_FIELD(s.scaling_min_freq);
-        CHK_FIELD(s.u.userspace);
-        CHK_FIELD(s.u.ondemand);
-        CHK_FIELD(cppc_para);
+        CHK_FIELD(scaling_cur_freq);
+        CHK_FIELD(scaling_governor);
+        CHK_FIELD(scaling_max_freq);
+        CHK_FIELD(scaling_min_freq);
+        CHK_FIELD(u.userspace);
+        CHK_FIELD(u.ondemand);
 
 #undef CHK_FIELD
 
-        memcpy(&user_para->u, &sys_para->u, sizeof(sys_para->u));
+        memcpy(&user_para->s, &sys_para->s, sizeof(sys_para->s));
     }
 
 unlock_4:
@@ -363,6 +362,30 @@ int xc_set_cpufreq_cppc(xc_interface *xch, int cpuid,
 
     *set_cppc = sysctl.u.pm_op.u.set_cppc;
 
+    return ret;
+}
+
+int xc_get_cppc_para(xc_interface *xch, unsigned int cpuid,
+                     xc_cppc_para_t *cppc_para)
+{
+    int ret;
+    struct xen_sysctl sysctl = {};
+
+    if ( !xch  || !cppc_para )
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    sysctl.cmd = XEN_SYSCTL_pm_op;
+    sysctl.u.pm_op.cmd = GET_CPUFREQ_CPPC;
+    sysctl.u.pm_op.cpuid = cpuid;
+
+    ret = xc_sysctl(xch, &sysctl);
+    if ( ret )
+        return ret;
+
+    *cppc_para = sysctl.u.pm_op.u.get_cppc;
     return ret;
 }
 

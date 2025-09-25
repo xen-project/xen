@@ -1924,22 +1924,19 @@ struct xc_get_cpufreq_para {
     uint32_t cpuinfo_cur_freq;
     uint32_t cpuinfo_max_freq;
     uint32_t cpuinfo_min_freq;
-    union {
-        struct {
-            uint32_t scaling_cur_freq;
+    struct {
+        uint32_t scaling_cur_freq;
 
-            char scaling_governor[CPUFREQ_NAME_LEN];
-            uint32_t scaling_max_freq;
-            uint32_t scaling_min_freq;
+        char scaling_governor[CPUFREQ_NAME_LEN];
+        uint32_t scaling_max_freq;
+        uint32_t scaling_min_freq;
 
-            /* for specific governor */
-            union {
-                xc_userspace_t userspace;
-                xc_ondemand_t ondemand;
-            } u;
-        } s;
-        xc_cppc_para_t cppc_para;
-    } u;
+        /* for specific governor */
+        union {
+            xc_userspace_t userspace;
+            xc_ondemand_t ondemand;
+        } u;
+    } s;
 
     int32_t turbo_enabled;
 };
@@ -1953,6 +1950,8 @@ int xc_set_cpufreq_para(xc_interface *xch, int cpuid,
                         int ctrl_type, int ctrl_value);
 int xc_set_cpufreq_cppc(xc_interface *xch, int cpuid,
                         xc_set_cppc_para_t *set_cppc);
+int xc_get_cppc_para(xc_interface *xch, unsigned int cpuid,
+                     xc_cppc_para_t *cppc_para);
 int xc_get_cpufreq_avgfreq(xc_interface *xch, int cpuid, int *avg_freq);
 
 int xc_set_sched_opt_smt(xc_interface *xch, uint32_t value);

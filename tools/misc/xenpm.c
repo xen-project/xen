@@ -801,6 +801,34 @@ static unsigned int calculate_activity_window(const xc_cppc_para_t *cppc,
     return mantissa * multiplier;
 }
 
+/* print out parameters about cpu cppc */
+static void print_cppc_para(unsigned int cpuid,
+                            const xc_cppc_para_t *cppc)
+{
+    printf("cppc variables       :\n");
+    printf("  hardware limits    : lowest [%"PRIu32"] lowest nonlinear [%"PRIu32"]\n",
+           cppc->lowest, cppc->lowest_nonlinear);
+    printf("                     : nominal [%"PRIu32"] highest [%"PRIu32"]\n",
+           cppc->nominal, cppc->highest);
+    printf("  configured limits  : min [%"PRIu32"] max [%"PRIu32"] energy perf [%"PRIu32"]\n",
+           cppc->minimum, cppc->maximum, cppc->energy_perf);
+
+    if ( cppc->features & XEN_SYSCTL_CPPC_FEAT_ACT_WINDOW )
+    {
+        unsigned int activity_window;
+        const char *units;
+
+        activity_window = calculate_activity_window(cppc, &units);
+        printf("                     : activity_window [%"PRIu32" %s]\n",
+               activity_window, units);
+    }
+
+    printf("                     : desired [%"PRIu32"%s]\n",
+           cppc->desired,
+           cppc->desired ? "" : " hw autonomous");
+    printf("\n");
+}
+
 /* print out parameters about cpu frequency */
 static void print_cpufreq_para(int cpuid, struct xc_get_cpufreq_para *p_cpufreq)
 {
@@ -826,76 +854,68 @@ static void print_cpufreq_para(int cpuid, struct xc_get_cpufreq_para *p_cpufreq)
 
     printf("scaling_driver       : %s\n", p_cpufreq->scaling_driver);
 
-    if ( hwp )
-    {
-        const xc_cppc_para_t *cppc = &p_cpufreq->u.cppc_para;
-
-        printf("cppc variables       :\n");
-        printf("  hardware limits    : lowest [%"PRIu32"] lowest nonlinear [%"PRIu32"]\n",
-               cppc->lowest, cppc->lowest_nonlinear);
-        printf("                     : nominal [%"PRIu32"] highest [%"PRIu32"]\n",
-               cppc->nominal, cppc->highest);
-        printf("  configured limits  : min [%"PRIu32"] max [%"PRIu32"] energy perf [%"PRIu32"]\n",
-               cppc->minimum, cppc->maximum, cppc->energy_perf);
-
-        if ( cppc->features & XEN_SYSCTL_CPPC_FEAT_ACT_WINDOW )
-        {
-            unsigned int activity_window;
-            const char *units;
-
-            activity_window = calculate_activity_window(cppc, &units);
-            printf("                     : activity_window [%"PRIu32" %s]\n",
-                   activity_window, units);
-        }
-
-        printf("                     : desired [%"PRIu32"%s]\n",
-               cppc->desired,
-               cppc->desired ? "" : " hw autonomous");
-    }
-    else
+    if ( !hwp )
     {
         if ( p_cpufreq->gov_num )
             printf("scaling_avail_gov    : %s\n",
                    p_cpufreq->scaling_available_governors);
 
-        printf("current_governor     : %s\n", p_cpufreq->u.s.scaling_governor);
-        if ( !strncmp(p_cpufreq->u.s.scaling_governor,
+        printf("current_governor     : %s\n", p_cpufreq->s.scaling_governor);
+        if ( !strncmp(p_cpufreq->s.scaling_governor,
                       "userspace", CPUFREQ_NAME_LEN) )
         {
             printf("  userspace specific :\n");
             printf("    scaling_setspeed : %u\n",
-                   p_cpufreq->u.s.u.userspace.scaling_setspeed);
+                   p_cpufreq->s.u.userspace.scaling_setspeed);
         }
-        else if ( !strncmp(p_cpufreq->u.s.scaling_governor,
+        else if ( !strncmp(p_cpufreq->s.scaling_governor,
                            "ondemand", CPUFREQ_NAME_LEN) )
         {
             printf("  ondemand specific  :\n");
             printf("    sampling_rate    : max [%u] min [%u] cur [%u]\n",
-                   p_cpufreq->u.s.u.ondemand.sampling_rate_max,
-                   p_cpufreq->u.s.u.ondemand.sampling_rate_min,
-                   p_cpufreq->u.s.u.ondemand.sampling_rate);
+                   p_cpufreq->s.u.ondemand.sampling_rate_max,
+                   p_cpufreq->s.u.ondemand.sampling_rate_min,
+                   p_cpufreq->s.u.ondemand.sampling_rate);
             printf("    up_threshold     : %u\n",
-                   p_cpufreq->u.s.u.ondemand.up_threshold);
+                   p_cpufreq->s.u.ondemand.up_threshold);
         }
 
         printf("scaling_avail_freq   :");
         for ( i = 0; i < p_cpufreq->freq_num; i++ )
             if ( p_cpufreq->scaling_available_frequencies[i] ==
-                 p_cpufreq->u.s.scaling_cur_freq )
+                 p_cpufreq->s.scaling_cur_freq )
                 printf(" *%d", p_cpufreq->scaling_available_frequencies[i]);
             else
                 printf(" %d", p_cpufreq->scaling_available_frequencies[i]);
         printf("\n");
 
         printf("scaling frequency    : max [%u] min [%u] cur [%u]\n",
-               p_cpufreq->u.s.scaling_max_freq,
-               p_cpufreq->u.s.scaling_min_freq,
-               p_cpufreq->u.s.scaling_cur_freq);
+               p_cpufreq->s.scaling_max_freq,
+               p_cpufreq->s.scaling_min_freq,
+               p_cpufreq->s.scaling_cur_freq);
     }
 
     printf("turbo mode           : %s\n",
            p_cpufreq->turbo_enabled ? "enabled" : "disabled or n/a");
     printf("\n");
+}
+
+/* show cpu cppc parameters information on CPU cpuid */
+static int show_cppc_para_by_cpuid(xc_interface *xc_handle, unsigned int cpuid)
+{
+    int ret;
+    xc_cppc_para_t cppc_para;
+
+    ret = xc_get_cppc_para(xc_handle, cpuid, &cppc_para);
+    if ( !ret )
+        print_cppc_para(cpuid, &cppc_para);
+    else if ( errno == ENODEV )
+        ret = 0; /* Ignore unsupported platform */
+    else
+        fprintf(stderr, "[CPU%u] failed to get cppc parameter: %s\n",
+                cpuid, strerror(errno));
+
+    return ret;
 }
 
 /* show cpu frequency parameters information on CPU cpuid */
@@ -957,7 +977,12 @@ static int show_cpufreq_para_by_cpuid(xc_interface *xc_handle, int cpuid)
     } while ( ret && errno == EAGAIN );
 
     if ( ret == 0 )
+    {
         print_cpufreq_para(cpuid, p_cpufreq);
+
+        /* Show CPPC parameters if available */
+        ret = show_cppc_para_by_cpuid(xc_handle, cpuid);
+    }
     else if ( errno == ENODEV )
     {
         ret = -ENODEV;

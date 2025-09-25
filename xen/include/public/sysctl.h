@@ -478,22 +478,19 @@ struct xen_get_cpufreq_para {
     uint32_t cpuinfo_cur_freq;
     uint32_t cpuinfo_max_freq;
     uint32_t cpuinfo_min_freq;
-    union {
-        struct {
-            uint32_t scaling_cur_freq;
+    struct {
+        uint32_t scaling_cur_freq;
 
-            char scaling_governor[CPUFREQ_NAME_LEN];
-            uint32_t scaling_max_freq;
-            uint32_t scaling_min_freq;
+        char scaling_governor[CPUFREQ_NAME_LEN];
+        uint32_t scaling_max_freq;
+        uint32_t scaling_min_freq;
 
-            /* for specific governor */
-            union {
-                struct  xen_userspace userspace;
-                struct  xen_ondemand ondemand;
-            } u;
-        } s;
-        struct xen_get_cppc_para cppc_para;
-    } u;
+        /* for specific governor */
+        union {
+            struct  xen_userspace userspace;
+            struct  xen_ondemand ondemand;
+        } u;
+    } s;
 
     int32_t turbo_enabled;
 };
@@ -523,6 +520,7 @@ struct xen_sysctl_pm_op {
     #define SET_CPUFREQ_PARA           (CPUFREQ_PARA | 0x03)
     #define GET_CPUFREQ_AVGFREQ        (CPUFREQ_PARA | 0x04)
     #define SET_CPUFREQ_CPPC           (CPUFREQ_PARA | 0x05)
+    #define GET_CPUFREQ_CPPC           (CPUFREQ_PARA | 0x06)
 
     /* set/reset scheduler power saving option */
     #define XEN_SYSCTL_pm_op_set_sched_opt_smt    0x21
@@ -547,6 +545,7 @@ struct xen_sysctl_pm_op {
     uint32_t cpuid;
     union {
         struct xen_get_cpufreq_para get_para;
+        struct xen_get_cppc_para    get_cppc;
         struct xen_set_cpufreq_gov  set_gov;
         struct xen_set_cpufreq_para set_para;
         struct xen_set_cppc_para    set_cppc;
