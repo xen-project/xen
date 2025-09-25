@@ -274,10 +274,10 @@ Xen X.Y rcZ is tagged. You can check that out from xen.git:
 https://xenbits.xen.org/git-http/xen.git X.Y.0-rcZ
 
 For your convenience there is also a tarball at:
-https://downloads.xenproject.org/release/xen/X.Y.0-rcZ/xen-X.Y.0-rcZ.tar.gz
+https://downloads.xenproject.org/release/xen/X.Y.0-rcZ/xen-X.Y.0-rcZ.tar.[glx]z
 
 And the signature is at:
-https://downloads.xenproject.org/release/xen/X.Y.0-rcZ/xen-X.Y.0-rcZ.tar.gz.sig
+https://downloads.xenproject.org/release/xen/X.Y.0-rcZ/xen-X.Y.0-rcZ.tar.[glx]z.sig
 
 Please send bug reports and test reports to xen-devel@lists.xenproject.org.
 When sending bug reports, please CC relevant maintainers and me

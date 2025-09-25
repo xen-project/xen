@@ -119,7 +119,7 @@ RELEASE TARBALL
        make src-tarball           # uses git-describe (best for RCs)
         # ^find some way to add git-cache-proxy to this (done in ~iwj/.gitconfig)
        mkdir /volatile/iwj/website-thing/xen.org/oss-xen/release/$v
-       mv dist/xen-$v.tar.gz /volatile/iwj/website-thing/xen.org/oss-xen/release/$v/.
+       mv dist/xen-$v.tar.[glx]z /volatile/iwj/website-thing/xen.org/oss-xen/release/$v/.
 
        # website-thing/xen.org is cvs -d mail.xenproject.org:/home/downloads-cvs/cvs-repos co xen.org
 	cd /volatile/iwj/website-thing/xen.org
@@ -139,9 +139,12 @@ RELEASE TARBALL
 	cvs add -kb oss-xen/release/$v/
 
         cd oss-xen/release/$v
-        gpg --digest-algo=SHA256 --detach-sign -u 'xen tree' xen-$v.tar.gz
-	cvs add -kb xen-$v.tar.gz
-        cvs add -kb xen-$v.tar.gz.sig
+        for t in xen-$v.tar.[glx]z
+        do
+            gpg --digest-algo=SHA256 --detach-sign -u 'xen tree' $t
+            cvs add -kb $t
+            cvs add -kb $t.sig
+        done
         cd ../../..
 
 	cvs ci -m $v
@@ -152,6 +155,10 @@ RELEASE TARBALL
 	# should show something like
 	#   U oss-xen/release/4.8.0-rc2/xen-4.8.0-rc2.tar.gz
 	#   U oss-xen/release/4.8.0-rc2/xen-4.8.0-rc2.tar.gz.sig
+	#   U oss-xen/release/4.8.0-rc2/xen-4.8.0-rc2.tar.lz
+	#   U oss-xen/release/4.8.0-rc2/xen-4.8.0-rc2.tar.lz.sig
+	#   U oss-xen/release/4.8.0-rc2/xen-4.8.0-rc2.tar.xz
+	#   U oss-xen/release/4.8.0-rc2/xen-4.8.0-rc2.tar.xz.sig
 
 After a .0 release, update XEN_EXTRAVERSION again (to .1-pre, see above).
 
