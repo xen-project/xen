@@ -923,7 +923,8 @@ static void __init init_secure_boot_mode(void)
 
     if ( status == EFI_NOT_FOUND ||
          (status == EFI_SUCCESS &&
-          attr == (EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS) &&
+          attr == (EFI_VARIABLE_BOOTSERVICE_ACCESS |
+                   EFI_VARIABLE_RUNTIME_ACCESS) &&
           size == 1 && data == 0) )
         /* Platform does not support Secure Boot or it's disabled. */
         efi_secure_boot = false;
