@@ -207,6 +207,17 @@ static int set_cpufreq_gov(struct xen_sysctl_pm_op *op)
     if ( new_policy.governor == NULL )
         return -EINVAL;
 
+    if ( processor_pminfo[op->cpuid]->init & XEN_CPPC_INIT )
+    {
+        new_policy.policy = cpufreq_policy_from_governor(new_policy.governor);
+        if ( new_policy.policy == CPUFREQ_POLICY_UNKNOWN )
+        {
+            printk("Failed to get performance policy from %s, Try \"xenpm set-cpufreq-cppc\"\n",
+                   new_policy.governor->name);
+            return -EINVAL;
+        }
+    }
+
     return __cpufreq_set_policy(old_policy, &new_policy);
 }
 
