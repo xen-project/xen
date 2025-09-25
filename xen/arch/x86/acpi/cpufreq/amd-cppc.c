@@ -67,9 +67,14 @@
  * max_perf.
  * Field des_perf conveys performance level Xen governor is requesting. And it
  * may be set to any performance value in the range [min_perf, max_perf],
- * inclusive.
+ * inclusive. In active mode, des_perf must be zero.
  * Field epp represents energy performance preference, which only has meaning
- * when active mode is enabled.
+ * when active mode is enabled. The EPP is used in the CCLK DPM controller
+ * to drive the frequency that a core is going to operate during short periods
+ * of activity, called minimum active frequency, It could contatin a range of
+ * values from 0 to 0xff. An EPP of zero sets the min active frequency to
+ * maximum frequency, while an EPP of 0xff sets the min active frequency to
+ * approxiately Idle frequency.
  */
 struct amd_cppc_drv_data
 {
@@ -106,6 +111,12 @@ static DEFINE_PER_CPU_READ_MOSTLY(struct amd_cppc_drv_data *,
  */
 static DEFINE_PER_CPU_READ_MOSTLY(unsigned int, pxfreq_mhz);
 static DEFINE_PER_CPU_READ_MOSTLY(uint8_t, epp_init);
+#ifndef NDEBUG
+static bool __ro_after_init opt_active_mode;
+#else
+static bool __initdata opt_active_mode;
+#endif
+
 
 static bool __init amd_cppc_handle_option(const char *s, const char *end)
 {
@@ -115,6 +126,13 @@ static bool __init amd_cppc_handle_option(const char *s, const char *end)
     if ( ret >= 0 )
     {
         cpufreq_verbose = ret;
+        return true;
+    }
+
+    ret = parse_boolean("active", s, end);
+    if ( ret >= 0 )
+    {
+        opt_active_mode = ret;
         return true;
     }
 
@@ -270,6 +288,7 @@ static void amd_cppc_write_request(unsigned int cpu, uint8_t min_perf,
 
     data->req.min_perf = min_perf;
     data->req.max_perf = max_perf;
+    ASSERT(!opt_active_mode || !des_perf);
     data->req.des_perf = des_perf;
     data->req.epp = epp;
 
@@ -417,7 +436,7 @@ static int cf_check amd_cppc_cpufreq_cpu_exit(struct cpufreq_policy *policy)
     return 0;
 }
 
-static int cf_check amd_cppc_cpufreq_cpu_init(struct cpufreq_policy *policy)
+static int amd_cppc_cpufreq_init_perf(struct cpufreq_policy *policy)
 {
     unsigned int cpu = policy->cpu;
     struct amd_cppc_drv_data *data;
@@ -450,9 +469,100 @@ static int cf_check amd_cppc_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
     amd_cppc_boost_init(policy, data);
 
+    return 0;
+}
+
+static int cf_check amd_cppc_cpufreq_cpu_init(struct cpufreq_policy *policy)
+{
+    int ret;
+
+    ret = amd_cppc_cpufreq_init_perf(policy);
+    if ( ret )
+        return ret;
+
     amd_cppc_verbose(policy->cpu,
                      "CPU initialized with amd-cppc passive mode\n");
 
+    return 0;
+}
+
+static int cf_check amd_cppc_epp_cpu_init(struct cpufreq_policy *policy)
+{
+    int ret;
+
+    ret = amd_cppc_cpufreq_init_perf(policy);
+    if ( ret )
+        return ret;
+
+    policy->policy = cpufreq_policy_from_governor(policy->governor);
+
+    amd_cppc_verbose(policy->cpu,
+                     "CPU initialized with amd-cppc active mode\n");
+
+    return 0;
+}
+
+static void amd_cppc_prepare_policy(struct cpufreq_policy *policy,
+                                    uint8_t *max_perf, uint8_t *min_perf,
+                                    uint8_t *epp)
+{
+    const struct amd_cppc_drv_data *data = per_cpu(amd_cppc_drv_data,
+                                                   policy->cpu);
+
+    /*
+     * On default, set min_perf with lowest_nonlinear_perf, and max_perf
+     * with the highest, to ensure performance scaling in P-states range.
+     */
+    *max_perf = data->caps.highest_perf;
+    *min_perf = data->caps.lowest_nonlinear_perf;
+
+    /*
+     * In policy CPUFREQ_POLICY_PERFORMANCE, increase min_perf to
+     * highest_perf to achieve ultmost performance.
+     * In policy CPUFREQ_POLICY_POWERSAVE, decrease max_perf to
+     * lowest_nonlinear_perf to achieve ultmost power saving.
+     * Set governor only to help print proper policy info to users.
+     */
+    switch ( policy->policy )
+    {
+    case CPUFREQ_POLICY_PERFORMANCE:
+        /* Force the epp value to be zero for performance policy */
+        *epp = CPPC_ENERGY_PERF_MAX_PERFORMANCE;
+        *min_perf = *max_perf;
+        policy->governor = &cpufreq_gov_performance;
+        break;
+
+    case CPUFREQ_POLICY_POWERSAVE:
+        /* Force the epp value to be 0xff for powersave policy */
+        *epp = CPPC_ENERGY_PERF_MAX_POWERSAVE;
+        *max_perf = *min_perf;
+        policy->governor = &cpufreq_gov_powersave;
+        break;
+
+    case CPUFREQ_POLICY_ONDEMAND:
+        /*
+         * Set epp with medium value to show no preference over performance
+         * or powersave
+         */
+        *epp = CPPC_ENERGY_PERF_BALANCE;
+        policy->governor = &cpufreq_gov_dbs;
+        break;
+
+    default:
+        *epp = per_cpu(epp_init, policy->cpu);
+        break;
+    }
+}
+
+static int cf_check amd_cppc_epp_set_policy(struct cpufreq_policy *policy)
+{
+    uint8_t max_perf, min_perf, epp;
+
+    amd_cppc_prepare_policy(policy, &max_perf, &min_perf, &epp);
+
+    amd_cppc_write_request(policy->cpu, min_perf,
+                           0 /* no des_perf in active mode */,
+                           max_perf, epp);
     return 0;
 }
 
@@ -466,10 +576,27 @@ amd_cppc_cpufreq_driver =
     .exit   = amd_cppc_cpufreq_cpu_exit,
 };
 
+static const struct cpufreq_driver __initconst_cf_clobber
+amd_cppc_epp_driver =
+{
+    .name       = XEN_AMD_CPPC_EPP_DRIVER_NAME,
+    .verify     = amd_cppc_cpufreq_verify,
+    .setpolicy  = amd_cppc_epp_set_policy,
+    .init       = amd_cppc_epp_cpu_init,
+    .exit       = amd_cppc_cpufreq_cpu_exit,
+};
+
 int __init amd_cppc_register_driver(void)
 {
+    int ret;
+
     if ( !cpu_has_cppc )
         return -ENODEV;
 
-    return cpufreq_register_driver(&amd_cppc_cpufreq_driver);
+    if ( opt_active_mode )
+        ret = cpufreq_register_driver(&amd_cppc_epp_driver);
+    else
+        ret = cpufreq_register_driver(&amd_cppc_cpufreq_driver);
+
+    return ret;
 }
