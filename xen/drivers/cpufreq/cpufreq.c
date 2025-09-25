@@ -765,6 +765,16 @@ int set_cppc_pminfo(unsigned int acpi_id,
         goto out;
     }
 
+    /* Right now, HW_ALL shall be the only expected value in CPPC mode */
+    if ( cppc_data->shared_type != CPUFREQ_SHARED_TYPE_HW )
+    {
+        ret = -EINVAL;
+        printk_once(XENLOG_ERR
+                    "Unsupported sharing type %u in CPPC mode\n",
+                    cppc_data->shared_type);
+        goto out;
+    }
+
     if ( cppc_data->flags & XEN_CPPC_CPC )
     {
         if ( cppc_data->cpc.highest_perf == 0 ||
