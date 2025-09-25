@@ -1089,7 +1089,7 @@ static void __init efi_verify_kernel(EFI_HANDLE ImageHandle)
     if ( !verified &&
          !EFI_ERROR(efi_bs->LocateProtocol(&shim_lock_guid, NULL,
                                            (void **)&shim_lock)) &&
-         !EFI_ERROR(shim_lock->Verify(kernel.ptr, kernel.size)) )
+         shim_lock->Verify(kernel.ptr, kernel.size) == EFI_SUCCESS )
         verified = true;
 
     if ( !verified )
