@@ -578,6 +578,7 @@ F:	xen/include/*/vm_event.h
 
 VPCI
 M:	Roger Pau Monné <roger.pau@citrix.com>
+R:	Stewart Hildebrand <stewart.hildebrand@amd.com>
 S:	Supported
 F:	tools/tests/vpci/
 F:	xen/drivers/vpci/
