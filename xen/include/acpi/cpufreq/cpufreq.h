@@ -294,4 +294,16 @@ int acpi_cpufreq_register(void);
 int amd_cppc_cmdline_parse(const char *s, const char *e);
 int amd_cppc_register_driver(void);
 
+/*
+ * Governor-less cpufreq driver indicates the driver doesn't rely on Xen
+ * governor to do performance tuning, mostly it has hardware built-in
+ * algorithm to calculate runtime workload and adjust cores frequency
+ * automatically, like Intel HWP, or CPPC in AMD.
+ */
+static inline bool cpufreq_is_governorless(unsigned int cpu)
+{
+    return processor_pminfo[cpu]->init && (hwp_active() ||
+                                           cpufreq_driver.setpolicy);
+}
+
 #endif /* __XEN_CPUFREQ_PM_H__ */
