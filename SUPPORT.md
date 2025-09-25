@@ -280,7 +280,7 @@ or itself will not be regarded a security issue.
 ### C xenstore stubdom PVH
 
     Status: Supported
-    Status, Liveupdate: Not implemented
+    Status, Liveupdate: Supported
 
 ### OCaml xenstored daemon
 
