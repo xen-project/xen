@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Linux based device model stubdomains are now fully supported.
  - New dependency on library json-c 0.15 or later, the toolstack will prefer it
    to `YAJL` when available.
+ - Introduce libxenmanage as a stable library, replacing xenstored's
+   dependency on unstable libraries.
 
  - On x86:
    - Restrict the cache flushing done as a result of guest physical memory map
@@ -42,9 +44,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
    - New amd-cppc/amd-cppc-epp cpufreq driver.
 
  - On Arm:
-    - Ability to enable stack protector
+    - Ability to enable stack protector.
     - GICv3.1 eSPI (Extended Shared Peripheral Interrupts) support for Xen
       and guest domains.
+    - SMMU handling for PCIe passthrough.
+    - R-Car Gen4 PCI host controller support.
+    - SCI SCMI SMC single-agent support.
+    - Initial support for MPU, R82, and R52: reaches the early boot stages.
+
+ - On RISC-V:
+    - Basic UART support and external interrupts (APLIC/IMSIC only) handling
+      for hypervisor mode.
 
 ### Removed
  - On x86:
