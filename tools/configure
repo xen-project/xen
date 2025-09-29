@@ -660,6 +660,9 @@ libnl
 LIBNL3_LIBS
 LIBNL3_CFLAGS
 argp_ldflags
+YAJL_LIBS
+libjsonc_LIBS
+libjsonc_CFLAGS
 PTHREAD_LIBS
 PTHREAD_LDFLAGS
 PTHREAD_CFLAGS
@@ -882,6 +885,8 @@ pixman_CFLAGS
 pixman_LIBS
 libzstd_CFLAGS
 libzstd_LIBS
+libjsonc_CFLAGS
+libjsonc_LIBS
 LIBNL3_CFLAGS
 LIBNL3_LIBS
 SYSTEMD_SLEEP_DIR'
@@ -1633,6 +1638,10 @@ Some influential environment variables:
               C compiler flags for libzstd, overriding pkg-config
   libzstd_LIBS
               linker flags for libzstd, overriding pkg-config
+  libjsonc_CFLAGS
+              C compiler flags for libjsonc, overriding pkg-config
+  libjsonc_LIBS
+              linker flags for libjsonc, overriding pkg-config
   LIBNL3_CFLAGS
               C compiler flags for LIBNL3, overriding pkg-config
   LIBNL3_LIBS linker flags for LIBNL3, overriding pkg-config
@@ -9624,6 +9633,99 @@ printf "%s\n" "$ax_cv_pthread_flags" >&6; }
 
 
 
+
+pkg_failed=no
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for libjsonc" >&5
+printf %s "checking for libjsonc... " >&6; }
+
+if test -n "$libjsonc_CFLAGS"; then
+    pkg_cv_libjsonc_CFLAGS="$libjsonc_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"json-c\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "json-c") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_libjsonc_CFLAGS=`$PKG_CONFIG --cflags "json-c" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$libjsonc_LIBS"; then
+    pkg_cv_libjsonc_LIBS="$libjsonc_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"json-c\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "json-c") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_libjsonc_LIBS=`$PKG_CONFIG --libs "json-c" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+   	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        libjsonc_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "json-c" 2>&1`
+        else
+	        libjsonc_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "json-c" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$libjsonc_PKG_ERRORS" >&5
+
+	as_fn_error $? "Package requirements (json-c) were not met:
+
+$libjsonc_PKG_ERRORS
+
+Consider adjusting the PKG_CONFIG_PATH environment variable if you
+installed software in a non-standard prefix.
+
+Alternatively, you may set the environment variables libjsonc_CFLAGS
+and libjsonc_LIBS to avoid the need to call pkg-config.
+See the pkg-config man page for more details." "$LINENO" 5
+elif test $pkg_failed = untried; then
+     	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+	{ { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+printf "%s\n" "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "The pkg-config script could not be found or is too old.  Make sure it
+is in your PATH or set the PKG_CONFIG environment variable to the full
+path to pkg-config.
+
+Alternatively, you may set the environment variables libjsonc_CFLAGS
+and libjsonc_LIBS to avoid the need to call pkg-config.
+See the pkg-config man page for more details.
+
+To get pkg-config, see <http://pkg-config.freedesktop.org/>.
+See \`config.log' for more details" "$LINENO" 5; }
+else
+	libjsonc_CFLAGS=$pkg_cv_libjsonc_CFLAGS
+	libjsonc_LIBS=$pkg_cv_libjsonc_LIBS
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+
+printf "%s\n" "#define HAVE_LIBJSONC 1" >>confdefs.h
+
+fi
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for yajl_alloc in -lyajl" >&5
 printf %s "checking for yajl_alloc in -lyajl... " >&6; }
 if test ${ac_cv_lib_yajl_yajl_alloc+y}
@@ -9661,9 +9763,10 @@ fi
 printf "%s\n" "$ac_cv_lib_yajl_yajl_alloc" >&6; }
 if test "x$ac_cv_lib_yajl_yajl_alloc" = xyes
 then :
-  printf "%s\n" "#define HAVE_LIBYAJL 1" >>confdefs.h
+  YAJL_LIBS=-lyajl
 
-  LIBS="-lyajl $LIBS"
+
+printf "%s\n" "#define HAVE_LIBYAJL 1" >>confdefs.h
 
 else $as_nop
   as_fn_error $? "Could not find yajl" "$LINENO" 5

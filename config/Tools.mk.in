@@ -65,6 +65,7 @@ EXTFS_LIBS          := @EXTFS_LIBS@
 CURSES_LIBS         := @CURSES_LIBS@
 TINFO_LIBS          := @TINFO_LIBS@
 ARGP_LDFLAGS        := @argp_ldflags@
+XEN_JSON_LIBS       := @YAJL_LIBS@ @libjsonc_LIBS@
 
 FILE_OFFSET_BITS    := @FILE_OFFSET_BITS@
 
