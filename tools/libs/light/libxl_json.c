@@ -104,10 +104,12 @@ typedef struct libxl__yajl_ctx {
  * YAJL Helper
  */
 
+#ifdef HAVE_LIBYAJL
 yajl_gen_status libxl__yajl_gen_asciiz(yajl_gen hand, const char *str)
 {
     return yajl_gen_string(hand, (const unsigned char *)str, strlen(str));
 }
+#endif
 
 #ifdef HAVE_LIBJSONC
 int libxl__enum_gen_jso(json_object **jso_r, const char *str)
@@ -1527,6 +1529,29 @@ out:
 char *libxl__json_object_to_json(libxl__gc *gc,
                                  const libxl__json_object *args)
 {
+#ifdef HAVE_LIBJSONC
+    const char *buf;
+    json_object *root;
+    char *ret = NULL;
+    int rc;
+
+    if (!args)
+        return NULL;
+
+    rc = libxl__json_object_to_json_object(gc, &root, args);
+    if (rc)
+        goto out;
+
+    buf = json_object_to_json_string_ext(root, JSON_C_TO_STRING_PRETTY);
+    if (!buf)
+        goto out;
+
+    ret = libxl__strdup(gc, buf);
+
+out:
+    json_object_put(root);
+    return ret;
+#elif defined(HAVE_LIBYAJL)
     const unsigned char *buf;
     libxl_yajl_length len;
     yajl_gen_status s;
@@ -1554,6 +1579,7 @@ char *libxl__json_object_to_json(libxl__gc *gc,
 out:
     yajl_gen_free(hand);
     return ret;
+#endif
 }
 
 #ifdef HAVE_LIBJSONC
