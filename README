@@ -53,7 +53,7 @@ provided by your OS distributor:
     * Development install of Python 2.7 or later (e.g., python-dev)
     * Development install of curses (e.g., libncurses-dev)
     * Development install of uuid (e.g. uuid-dev)
-    * Development install of yajl (e.g. libyajl-dev)
+    * Development install of json-c (e.g. libjson-c-dev) or yajl (e.g. libyajl-dev)
     * Development install of libaio (e.g. libaio-dev) version 0.3.107 or
       greater.
     * Development install of GLib v2.0 (e.g. libglib2.0-dev)

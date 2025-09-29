@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Debian Trixie added to CI.  Debian Bullseye retired from CI for RISC-V due
    to the baseline change.
  - Linux based device model stubdomains are now fully supported.
+ - New dependency on library json-c, the toolstack will prefer it to `YAJL`
+   when available.
 
  - On x86:
    - Restrict the cache flushing done as a result of guest physical memory map
