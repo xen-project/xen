@@ -256,6 +256,30 @@ def libxl_C_type_member_init(ty, field):
     s += "\n"
     return s
 
+# For json-c gen_jso functions
+def libxl_C_type_gen_jso_map_key(f, parent, indent, scope_object, sub_scope_object):
+    s = ""
+    if isinstance(f.type, idl.KeyedUnion):
+        s += "switch (%s) {\n" % (parent + f.type.keyvar.name)
+        for x in f.type.fields:
+            v = f.type.keyvar.name + "." + x.name
+            s += "case %s:\n" % x.enumname
+            s += "    if (json_object_object_add(%s, \"%s\", %s)) {\n" % (scope_object, v, sub_scope_object)
+            s += "        json_object_put(%s);\n" % (sub_scope_object)
+            s += "        goto out;\n"
+            s += "    }\n"
+            s += "    break;\n"
+        s += "}\n"
+    else:
+        s += "if (json_object_object_add(%s, \"%s\", %s)) {\n" % (scope_object, f.name, sub_scope_object)
+        s += "    json_object_put(%s);\n" % (sub_scope_object)
+        s += "    goto out;\n"
+        s += "}\n"
+    if s != "":
+        s = indent + s
+    return s.replace("\n", "\n%s" % indent).rstrip(indent)
+
+# For YAJL gen_json functions
 def libxl_C_type_gen_map_key(f, parent, indent = ""):
     s = ""
     if isinstance(f.type, idl.KeyedUnion):
@@ -352,6 +376,86 @@ def get_default_expr(f, nparent, fexpr):
 
     return "%s" % fexpr
 
+# For json-c gen_json functions
+def libxl_C_type_gen_jso(ty, v, indent = "    ", parent = None, scope_object = "jso"):
+    s = ""
+    if parent is None:
+        s += "json_object *jso;\n"
+        s += "int rc;\n"
+        sub_scope_object = "jso_sub_1"
+    else:
+        sub_scope_object = "jso_sub_%d" % (1+int(scope_object.removeprefix("jso_sub_")))
+
+    if isinstance(ty, idl.Array):
+        if parent is None:
+            raise Exception("Array type must have a parent")
+        s += "{\n"
+        s += "    int i;\n"
+        s += "    %s = json_object_new_array_ext(%s);\n" % (scope_object, parent + ty.lenvar.name)
+        s += "    if (!%s)\n" % (scope_object)
+        s += "        goto out;\n"
+        s += "    for (i=0; i<%s; i++) {\n" % (parent + ty.lenvar.name)
+        s += "        json_object *%s;\n" % (sub_scope_object)
+        # remove some indent, it's over indented at least in one case libxl_vcpu_sched_params_gen_json
+        s += libxl_C_type_gen_jso(ty.elem_type, v+"[i]",
+                                   indent + "    ", parent, sub_scope_object)
+        s += "        if (json_object_array_add(%s, %s)) {\n" % (scope_object, sub_scope_object)
+        s += "            json_object_put(%s);\n" % (sub_scope_object)
+        s += "            goto out;\n"
+        s += "        }\n"
+        s += "    }\n"
+        s += "}\n"
+    elif isinstance(ty, idl.Enumeration):
+        s += "rc = libxl__enum_gen_jso(&%s, %s_to_string(%s));\n" % (scope_object, ty.typename, ty.pass_arg(v, parent is None))
+        s += "if (rc)\n"
+        s += "    goto out;\n"
+    elif isinstance(ty, idl.KeyedUnion):
+        if parent is None:
+            raise Exception("KeyedUnion type must have a parent")
+        s += "switch (%s) {\n" % (parent + ty.keyvar.name)
+        for f in ty.fields:
+            (nparent,fexpr) = ty.member(v, f, parent is None)
+            s += "case %s:\n" % f.enumname
+            if f.type is not None:
+                s += libxl_C_type_gen_jso(f.type, fexpr, indent + "    ", nparent, scope_object)
+            else:
+                s += "    %s = json_object_new_object();\n" % (scope_object)
+                s += "    if (!%s)\n" % (scope_object)
+                s += "        goto out;\n"
+            s += "    break;\n"
+        s += "}\n"
+    elif isinstance(ty, idl.Struct) and (parent is None or ty.json_gen_fn is None):
+        s += "%s = json_object_new_object();\n" % (scope_object)
+        s += "if (!%s)\n" % (scope_object)
+        s += "    goto out;\n"
+        for f in [f for f in ty.fields if not f.const and not f.type.private]:
+            (nparent,fexpr) = ty.member(v, f, parent is None)
+            default_expr = get_default_expr(f, nparent, fexpr)
+            s += "if (%s) {\n" % default_expr
+            s += "    json_object *%s = NULL;\n" % (sub_scope_object)
+            s += libxl_C_type_gen_jso(f.type, fexpr, "    ", nparent, sub_scope_object)
+            s += libxl_C_type_gen_jso_map_key(f, nparent, "    ", scope_object, sub_scope_object)
+
+            s += "}\n"
+
+    else:
+        if ty.json_gen_fn is not None:
+            s += "rc = %s(&%s, %s);\n" % (ty.json_gen_fn, scope_object, ty.pass_arg(v, parent is None))
+            s += "if (rc)\n"
+            s += "    goto out;\n"
+
+    if parent is None:
+        s += "*jso_r = jso;\n"
+        s += "return 0;\n"
+        s += "out:\n"
+        s += "json_object_put(jso);\n"
+        s += "return ERROR_FAIL;\n"
+
+    if s != "":
+        s = indent + s
+    return s.replace("\n", "\n%s" % indent).rstrip(indent)
+
+# For YAJL gen_json functions
 def libxl_C_type_gen_json(ty, v, indent = "    ", parent = None):
     s = ""
     if parent is None:
@@ -426,9 +530,9 @@ def libxl_C_type_gen_json(ty, v, indent = "    ", parent = None):
         s = indent + s
     return s.replace("\n", "\n%s" % indent).rstrip(indent)
 
-def libxl_C_type_to_json(ty, v, indent = "    "):
+def libxl_C_type_to_json(ty, v, indent = "    ", fn_ptr_type="libxl__gen_json_callback", fn_suffix="_gen_json"):
     s = ""
-    gen = "(libxl__gen_json_callback)&%s_gen_json" % ty.typename
+    gen = "(%s)&%s%s" % (fn_ptr_type, ty.typename, fn_suffix)
     s += "return libxl__object_to_json(ctx, \"%s\", %s, (void *)%s);\n" % (ty.typename, gen, ty.pass_arg(v, passby=idl.PASS_BY_REFERENCE))
 
     if s != "":
@@ -589,13 +693,37 @@ def clean_header_define(header_path):
 
 
 if __name__ == '__main__':
+    opt_libjsonc = False
+    if len(sys.argv) == 7:
+        if sys.argv.pop(1) == "--libjsonc":
+            opt_libjsonc = True
     if len(sys.argv) != 6:
         print("Usage: gentypes.py <idl> <header> <header-private> <header-json> <implementation>", file=sys.stderr)
         sys.exit(1)
 
     (_, idlname, header, header_private, header_json, impl) = sys.argv
 
+    # Overwrite `json_gen_fn` for standard types
+    if opt_libjsonc:
+        idl.bool.json_gen_fn = "libxl__boolean_gen_jso"
+        idl.size_t.json_gen_fn = "libxl__int_gen_jso"
+        idl.integer .json_gen_fn = "libxl__int_gen_jso"
+        idl.uint8.json_gen_fn = "libxl__int_gen_jso"
+        idl.uint16.json_gen_fn = "libxl__int_gen_jso"
+        idl.uint32.json_gen_fn = "libxl__int_gen_jso"
+        idl.uint64.json_gen_fn = "libxl__uint64_gen_jso"
+        idl.string.json_gen_fn = "libxl__string_gen_jso"
+
     (builtins,types) = idl.parse(idlname)
+
+    # Overwrite `json_gen_fn` with `jsonc_json_gen_fn` for types from the IDL
+    if opt_libjsonc:
+        for t in builtins:
+            if t.jsonc_json_gen_fn is not None:
+                t.json_gen_fn = t.jsonc_json_gen_fn
+        for t in types:
+            if t.jsonc_json_gen_fn is not None:
+                t.json_gen_fn = t.jsonc_json_gen_fn
 
     print("outputting libxl type definitions to %s" % header)
 
@@ -665,7 +793,11 @@ if __name__ == '__main__':
 """ % (header_json_define, header_json_define, " ".join(sys.argv)))
 
     for ty in [ty for ty in types if ty.json_gen_fn is not None]:
-        f.write("%syajl_gen_status %s_gen_json(yajl_gen hand, %s);\n" % (ty.hidden(), ty.typename, ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
+        if opt_libjsonc:
+            # Always hide JSON generators base on json-c
+            f.write("%sint %s_gen_jso(json_object **jso_r, %s);\n" % ("_hidden ", ty.typename, ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
+        else:
+            f.write("%syajl_gen_status %s_gen_json(yajl_gen hand, %s);\n" % (ty.hidden(), ty.typename, ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
 
     f.write("\n")
     f.write("""#endif /* %s */\n""" % header_json_define)
@@ -769,15 +901,25 @@ if __name__ == '__main__':
         f.write("\n")
 
     for ty in [t for t in types if t.json_gen_fn is not None]:
-        f.write("yajl_gen_status %s_gen_json(yajl_gen hand, %s)\n" % (ty.typename, ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
-        f.write("{\n")
-        f.write(libxl_C_type_gen_json(ty, "p"))
-        f.write("}\n")
-        f.write("\n")
+        if opt_libjsonc:
+            f.write("int %s_gen_jso(json_object **jso_r, %s)\n" % (ty.typename, ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
+            f.write("{\n")
+            f.write(libxl_C_type_gen_jso(ty, "p"))
+            f.write("}\n")
+            f.write("\n")
+        else:
+            f.write("yajl_gen_status %s_gen_json(yajl_gen hand, %s)\n" % (ty.typename, ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
+            f.write("{\n")
+            f.write(libxl_C_type_gen_json(ty, "p"))
+            f.write("}\n")
+            f.write("\n")
 
         f.write("char *%s_to_json(libxl_ctx *ctx, %s)\n" % (ty.typename, ty.make_arg("p")))
         f.write("{\n")
-        f.write(libxl_C_type_to_json(ty, "p"))
+        if opt_libjsonc:
+            f.write(libxl_C_type_to_json(ty, "p", fn_ptr_type="libxl__gen_json_callback", fn_suffix="_gen_jso"))
+        else:
+            f.write(libxl_C_type_to_json(ty, "p", fn_ptr_type="libxl__gen_json_callback", fn_suffix="_gen_json"))
         f.write("}\n")
         f.write("\n")
 

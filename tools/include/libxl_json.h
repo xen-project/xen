@@ -28,6 +28,22 @@
 #endif
 #endif
 
+#ifdef HAVE_LIBJSONC
+#ifndef _hidden
+#define _hidden
+#endif
+_hidden int libxl__uint64_gen_jso(json_object **jso_r, uint64_t val);
+_hidden int libxl_defbool_gen_jso(json_object **jso_r, libxl_defbool *p);
+_hidden int libxl_uuid_gen_jso(json_object **jso_r, libxl_uuid *p);
+_hidden int libxl_mac_gen_jso(json_object **jso_r, libxl_mac *p);
+_hidden int libxl_bitmap_gen_jso(json_object **jso_r, libxl_bitmap *p);
+_hidden int libxl_cpuid_policy_list_gen_jso(json_object **jso_r,libxl_cpuid_policy_list *p);
+_hidden int libxl_string_list_gen_jso(json_object **jso_r,libxl_string_list *p);
+_hidden int libxl_key_value_list_gen_jso(json_object **jso_r, libxl_key_value_list *p);
+_hidden int libxl_hwcap_gen_jso(json_object **jso_r, libxl_hwcap *p);
+_hidden int libxl_ms_vm_genid_gen_jso(json_object **jso_r, libxl_ms_vm_genid *p);
+#endif
+#if defined(HAVE_LIBYAJL)
 yajl_gen_status libxl__uint64_gen_json(yajl_gen hand, uint64_t val);
 yajl_gen_status libxl_defbool_gen_json(yajl_gen hand, libxl_defbool *p);
 yajl_gen_status libxl_uuid_gen_json(yajl_gen hand, libxl_uuid *p);
@@ -40,6 +56,7 @@ yajl_gen_status libxl_key_value_list_gen_json(yajl_gen hand,
                                               libxl_key_value_list *p);
 yajl_gen_status libxl_hwcap_gen_json(yajl_gen hand, libxl_hwcap *p);
 yajl_gen_status libxl_ms_vm_genid_gen_json(yajl_gen hand, libxl_ms_vm_genid *p);
+#endif
 
 #include <_libxl_types_json.h>
 

@@ -545,6 +545,124 @@ static const char *policy_names[4] = { "eax", "ebx", "ecx", "edx" };
  * }
  */
 
+#ifdef HAVE_LIBJSONC
+int libxl_cpuid_policy_list_gen_jso(json_object **jso_r, libxl_cpuid_policy_list *pl)
+{
+    libxl_cpuid_policy_list policy = *pl;
+    struct xc_xend_cpuid *cpuid;
+    const struct xc_msr *msr;
+    json_object *jso_outer;
+    json_object *jso_array;
+    int i, j;
+    int r;
+    int rc = ERROR_FAIL;
+
+    jso_outer = json_object_new_object();
+    if (!jso_outer) goto out;
+
+    jso_array = json_object_new_array();
+    if (!jso_array) goto out;
+
+    r = json_object_object_add(jso_outer, "cpuid", jso_array);
+    if (r < 0) {
+        json_object_put(jso_array);
+        goto out;
+    }
+
+    if (policy == NULL || policy->cpuid == NULL) goto empty;
+    cpuid = policy->cpuid;
+
+    for (i = 0; cpuid[i].input[0] != XEN_CPUID_INPUT_UNUSED; i++) {
+        json_object *jso_inner;
+        jso_inner = json_object_new_object();
+        if (!jso_inner) goto out;
+
+        r = json_object_array_add(jso_array, jso_inner);
+        if (r < 0) {
+            json_object_put(jso_inner);
+            goto out;
+        }
+
+        for (j = 0; j < 2; j++) {
+            if (cpuid[i].input[j] != XEN_CPUID_INPUT_UNUSED) {
+                json_object *jso_value = json_object_new_int(cpuid[i].input[j]);
+                if (!jso_value) goto out;
+                r = json_object_object_add(jso_inner, input_names[j], jso_value);
+                if (r < 0) {
+                    json_object_put(jso_value);
+                    goto out;
+                }
+            }
+        }
+
+        for (j = 0; j < 4; j++) {
+            if (cpuid[i].policy[j] != NULL) {
+                json_object *jso_value = json_object_new_string_len(cpuid[i].policy[j], 32);
+                if (!jso_value) goto out;
+                r = json_object_object_add(jso_inner, policy_names[j], jso_value);
+                if (r < 0) {
+                    json_object_put(jso_value);
+                    goto out;
+                }
+            }
+        }
+    }
+
+empty:
+
+    jso_array = json_object_new_array();
+    if (!jso_array) goto out;
+
+    r = json_object_object_add(jso_outer, "msr", jso_array);
+    if (r < 0) {
+        json_object_put(jso_array);
+        goto out;
+    }
+
+    if (!policy || !policy->msr) goto done;
+    msr = policy->msr;
+
+    for (i = 0; msr[i].index != XC_MSR_INPUT_UNUSED; i++) {
+        json_object *jso_inner;
+        json_object *jso_value;
+
+        jso_inner = json_object_new_object();
+        if (!jso_inner) goto out;
+
+        r = json_object_array_add(jso_array, jso_inner);
+        if (r < 0) {
+            json_object_put(jso_inner);
+            goto out;
+        }
+
+        jso_value = json_object_new_int(msr[i].index);
+        if (!jso_value) goto out;
+        r = json_object_object_add(jso_inner, "index", jso_value);
+        if (r < 0) {
+            json_object_put(jso_value);
+            goto out;
+        }
+
+        jso_value = json_object_new_string_len(msr[i].policy, 64);
+        if (!jso_value) goto out;
+        r = json_object_object_add(jso_inner, "policy", jso_value);
+        if (r < 0) {
+            json_object_put(jso_value);
+            goto out;
+        }
+    }
+
+done:
+    *jso_r = jso_outer;
+    jso_outer = NULL;
+    rc = 0;
+out:
+    json_object_put(jso_outer);
+    return rc;
+}
+#endif
+
+#ifdef HAVE_LIBYAJL
 yajl_gen_status libxl_cpuid_policy_list_gen_json(yajl_gen hand,
                                 libxl_cpuid_policy_list *pl)
 {
@@ -630,6 +748,7 @@ done:
 out:
     return s;
 }
+#endif
 
 int libxl__cpuid_policy_list_parse_json(libxl__gc *gc,
                                         const libxl__json_object *o,

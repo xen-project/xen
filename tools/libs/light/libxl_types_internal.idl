@@ -1,7 +1,8 @@
 namespace("libxl__")
 hidden(True)
 
-libxl_domid = Builtin("domid", namespace="libxl_", json_gen_fn = "yajl_gen_integer",
+libxl_domid = Builtin("domid", namespace="libxl_",
+                      json_gen_fn = "yajl_gen_integer", jsonc_json_gen_fn = "libxl__uint64_gen_jso",
 		      json_parse_fn = "libxl__uint32_parse_json", json_parse_type = "JSON_INTEGER",
 		      autogenerate_json = False, copy_fn = None)
 

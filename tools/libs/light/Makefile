@@ -226,7 +226,7 @@ testidl.o: $(XEN_INCLUDE)/libxl.h
 # This exploits the 'multi-target pattern rule' trick.
 # gentypes.py should be executed only once to make all the targets.
 _libxl_type%.h _libxl_type%_json.h _libxl_type%_private.h _libxl_type%.c: libxl_type%.idl gentypes.py idl.py
-	$(PYTHON) gentypes.py libxl_type$(*F).idl __libxl_type$(*F).h __libxl_type$(*F)_private.h \
+	$(PYTHON) gentypes.py $(if $(filter -ljson-c,$(XEN_JSON_LIBS)),--libjsonc) libxl_type$(*F).idl __libxl_type$(*F).h __libxl_type$(*F)_private.h \
 		__libxl_type$(*F)_json.h  __libxl_type$(*F).c
 	$(call move-if-changed,__libxl_type$(*F).h,_libxl_type$(*F).h)
 	$(call move-if-changed,__libxl_type$(*F)_private.h,_libxl_type$(*F)_private.h)

@@ -1993,9 +1993,11 @@ _hidden char *libxl__cpupoolid_to_name(libxl__gc *gc, uint32_t poolid);
 _hidden int libxl__enum_from_string(const libxl_enum_string_table *t,
                                     const char *s, int *e) NN(2);
 
-_hidden yajl_gen_status libxl__string_gen_json(yajl_gen hand, const char *p);
-
+#ifdef HAVE_LIBJSONC
+typedef int (*libxl__gen_json_callback)(json_object **jso_r, void *);
+#elif defined(HAVE_LIBYAJL)
 typedef yajl_gen_status (*libxl__gen_json_callback)(yajl_gen hand, void *);
+#endif
 _hidden char *libxl__object_to_json(libxl_ctx *ctx, const char *type,
                                     libxl__gen_json_callback gen, void *p);
 
@@ -2084,11 +2086,21 @@ int libxl__recvmsg_fds(libxl__gc *gc, int carrier,
                        void *databuf, size_t datalen,
                        int nfds, int fds[], const char *what);
 
+#ifdef HAVE_LIBJSONC
+_hidden int libxl__enum_gen_jso(json_object **jso_r, const char *str);
+_hidden int libxl__int_gen_jso(json_object **jso_r, int i);
+_hidden int libxl__boolean_gen_jso(json_object **jso_r, bool b);
+_hidden int libxl__string_gen_jso(json_object **jso_r, const char *p);
+#endif
+
+#ifdef HAVE_LIBYAJL
 /* from libxl_json */
 #include <yajl/yajl_gen.h>
 
 _hidden yajl_gen_status libxl__yajl_gen_asciiz(yajl_gen hand, const char *str);
 _hidden yajl_gen_status libxl__yajl_gen_enum(yajl_gen hand, const char *str);
+_hidden yajl_gen_status libxl__string_gen_json(yajl_gen hand, const char *p);
+#endif
 
 typedef enum {
     JSON_NULL    = (1 << 0),

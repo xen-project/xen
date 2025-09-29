@@ -79,6 +79,7 @@ class Type(object):
 
         if self.typename is not None and not self.private:
             self.json_gen_fn = kwargs.setdefault('json_gen_fn', self.typename + "_gen_json")
+            self.jsonc_json_gen_fn = kwargs.setdefault('jsonc_json_gen_fn', self.typename + "_gen_jso")
             self.json_parse_type = kwargs.setdefault('json_parse_type', "JSON_ANY")
             if self.namespace is not None:
                 self.json_parse_fn = kwargs.setdefault('json_parse_fn',
@@ -88,6 +89,7 @@ class Type(object):
                                                        self.typename + "_parse_json")
         else:
             self.json_gen_fn = kwargs.setdefault('json_gen_fn', None)
+            self.jsonc_json_gen_fn = kwargs.setdefault('jsonc_json_gen_fn', None)
             self.json_parse_type = kwargs.setdefault('json_parse_type', None)
             self.json_parse_fn = kwargs.setdefault('json_parse_fn', None)
 
@@ -142,6 +144,7 @@ class Number(Builtin):
         kwargs.setdefault('copy_fn', None)
         kwargs.setdefault('signed', False)
         kwargs.setdefault('json_gen_fn', "yajl_gen_integer")
+        kwargs.setdefault('jsonc_json_gen_fn', "libxl__int_gen_jso")
         kwargs.setdefault('json_parse_type', "JSON_INTEGER")
         # json_parse_fn might be overriden on specific type
         kwargs.setdefault('json_parse_fn', "libxl__int_parse_json")
@@ -290,6 +293,7 @@ void = Builtin("void *", namespace = None)
 bool = Builtin("bool", namespace = None,
                copy_fn=None,
                json_gen_fn = "yajl_gen_bool",
+               jsonc_json_gen_fn = "libxl__boolean_gen_jso",
                json_parse_type = "JSON_BOOL",
                json_parse_fn = "libxl__bool_parse_json",
                autogenerate_json = False)
@@ -301,10 +305,11 @@ integer = Number("int", namespace = None, signed = True)
 uint8 = UInt(8)
 uint16 = UInt(16)
 uint32 = UInt(32)
-uint64 = UInt(64, json_gen_fn = "libxl__uint64_gen_json")
+uint64 = UInt(64, json_gen_fn = "libxl__uint64_gen_json", jsonc_json_gen_fn = "libxl__uint64_gen_jso")
 
 string = Builtin("char *", namespace = None, copy_fn = "libxl_string_copy", dispose_fn = "free",
                  json_gen_fn = "libxl__string_gen_json",
+                 jsonc_json_gen_fn = "libxl__string_gen_jso",
                  json_parse_type = "JSON_STRING | JSON_NULL",
                  json_parse_fn = "libxl__string_parse_json",
                  autogenerate_json = False,

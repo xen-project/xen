@@ -7,9 +7,9 @@ namespace("libxl_")
 
 libxl_defbool = Builtin("defbool", json_parse_type="JSON_STRING", passby=PASS_BY_REFERENCE, copy_fn=None,
                         check_default_fn="libxl__defbool_is_default")
-libxl_domid = Builtin("domid", json_gen_fn = "yajl_gen_integer", json_parse_fn = "libxl__uint32_parse_json",
+libxl_domid = Builtin("domid", json_gen_fn = "yajl_gen_integer", jsonc_json_gen_fn = "libxl__uint64_gen_jso", json_parse_fn = "libxl__uint32_parse_json",
                       json_parse_type = "JSON_INTEGER", autogenerate_json = False, copy_fn=None)
-libxl_devid = Builtin("devid", json_gen_fn = "yajl_gen_integer", json_parse_fn = "libxl__int_parse_json",
+libxl_devid = Builtin("devid", json_gen_fn = "yajl_gen_integer", jsonc_json_gen_fn = "libxl__int_gen_jso", json_parse_fn = "libxl__int_parse_json",
                       json_parse_type = "JSON_INTEGER", autogenerate_json = False, signed = True, init_val="-1",
                       copy_fn=None)
 libxl_uuid = Builtin("uuid", json_parse_type="JSON_STRING", passby=PASS_BY_REFERENCE, check_default_fn="libxl_uuid_is_nil",
@@ -37,7 +37,8 @@ libxl_ms_vm_genid = Builtin("ms_vm_genid", passby=PASS_BY_REFERENCE, check_defau
 # Specific integer types
 #
 
-MemKB = UInt(64, init_val = "LIBXL_MEMKB_DEFAULT", json_gen_fn = "libxl__uint64_gen_json")
+MemKB = UInt(64, init_val = "LIBXL_MEMKB_DEFAULT",
+             json_gen_fn = "libxl__uint64_gen_json", jsonc_json_gen_fn = "libxl__uint64_gen_jso")
 
 #
 # Constants / Enumerations

@@ -60,6 +60,48 @@ static int maybe_printf(const char *fmt, ...)
     return count;
 }
 
+
+#ifdef HAVE_LIBJSONC
+static int printf_info_one_json(json_object **jso_r, int domid,
+                                libxl_domain_config *d_config)
+{
+    json_object *jso = NULL;
+    json_object *jso_config = NULL;
+    enum json_tokener_error error;
+    char *s = NULL;
+    int r = EXIT_FAILURE;
+
+    s = libxl_domain_config_to_json(ctx, d_config);
+    jso_config = json_tokener_parse_verbose(s, &error);
+    if (!jso_config) {
+        fprintf(stderr, "fail to parse JSON from libxl_domain_config_to_json(): %s\n",
+                json_tokener_error_desc(error));
+        goto out;
+    }
+
+    jso = json_object_new_object();
+    if (domid != -1)
+        json_object_object_add(jso, "domid", json_object_new_int(domid));
+    else
+        json_object_object_add(jso, "domid", json_object_new_null());
+
+
+    json_object_object_add(jso, "config", jso_config);
+    jso_config = NULL;
+
+    *jso_r = jso;
+    jso = NULL;
+    r = EXIT_SUCCESS;
+
+out:
+    free(s);
+    json_object_put(jso);
+    json_object_put(jso_config);
+    return r;
+}
+
+#elif defined(HAVE_LIBYAJL)
+
 static yajl_gen_status printf_info_one_json(yajl_gen hand, int domid,
                                             libxl_domain_config *d_config)
 {
@@ -95,6 +137,7 @@ static yajl_gen_status printf_info_one_json(yajl_gen hand, int domid,
 out:
     return s;
 }
+#endif
 
 void printf_info(enum output_format output_format,
                  int domid,
@@ -103,6 +146,27 @@ void printf_info(enum output_format output_format,
     if (output_format == OUTPUT_FORMAT_SXP)
         return printf_info_sexp(domid, d_config, fh);
 
+#ifdef HAVE_LIBJSONC
+    int r;
+    const char *buf;
+    json_object *jso;
+
+    r = printf_info_one_json(&jso, domid, d_config);
+    if (r)
+        goto out;
+
+    buf = json_object_to_json_string_ext(jso, JSON_C_TO_STRING_PRETTY);
+    if (!buf)
+        goto out;
+
+    fputs(buf, fh);
+
+out:
+    json_object_put(jso);
+    flush_stream(fh);
+    return;
+
+#elif defined(HAVE_LIBYAJL)
     const char *buf;
     libxl_yajl_length len = 0;
     yajl_gen_status s;
@@ -132,6 +196,7 @@ out:
                 "unable to format domain config as JSON (YAJL:%d)\n", s);
 
     flush_stream(fh);
+#endif
 }
 
 static void output_xeninfo(void)
@@ -476,11 +541,20 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
 
     int i, rc;
 
+    const char *buf;
+#ifdef HAVE_LIBJSONC
+    json_object *jso = NULL;
+#elif defined(HAVE_LIBYAJL)
     yajl_gen hand = NULL;
     yajl_gen_status s;
-    const char *buf;
     libxl_yajl_length yajl_len = 0;
+#endif
 
+#ifdef HAVE_LIBJSONC
+    if (default_output_format == OUTPUT_FORMAT_JSON) {
+        jso = json_object_new_array();
+    }
+#elif defined(HAVE_LIBYAJL)
     if (default_output_format == OUTPUT_FORMAT_JSON) {
         hand = libxl_yajl_gen_alloc(NULL);
         if (!hand) {
@@ -493,6 +567,7 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
             goto out;
     } else
         s = yajl_gen_status_ok;
+#endif
 
     for (i = 0; i < nb_domain; i++) {
         libxl_domain_config_init(&d_config);
@@ -500,16 +575,32 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
                                                  &d_config, NULL);
         if (rc)
             continue;
-        if (default_output_format == OUTPUT_FORMAT_JSON)
+        if (default_output_format == OUTPUT_FORMAT_JSON) {
+#ifdef HAVE_LIBJSONC
+            json_object *jso_value;
+            rc = printf_info_one_json(&jso_value, info[i].domid, &d_config);
+            json_object_array_add(jso, jso_value);
+#elif defined(HAVE_LIBYAJL)
             s = printf_info_one_json(hand, info[i].domid, &d_config);
-        else
+#endif
+        } else
             printf_info_sexp(info[i].domid, &d_config, stdout);
         libxl_domain_config_dispose(&d_config);
+#ifdef HAVE_LIBJSONC
+        if (rc)
+            goto out;
+#elif defined(HAVE_LIBYAJL)
         if (s != yajl_gen_status_ok)
             goto out;
+#endif
     }
 
     if (default_output_format == OUTPUT_FORMAT_JSON) {
+#ifdef HAVE_LIBJSONC
+        buf = json_object_to_json_string_ext(jso, JSON_C_TO_STRING_PRETTY);
+        if (!buf)
+            goto out;
+#elif defined(HAVE_LIBYAJL)
         s = yajl_gen_array_close(hand);
         if (s != yajl_gen_status_ok)
             goto out;
@@ -517,16 +608,21 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
         s = yajl_gen_get_buf(hand, (const unsigned char **)&buf, &yajl_len);
         if (s != yajl_gen_status_ok)
             goto out;
+#endif
 
         puts(buf);
     }
 
 out:
     if (default_output_format == OUTPUT_FORMAT_JSON) {
+#ifdef HAVE_LIBJSONC
+        json_object_put(jso);
+#elif defined(HAVE_LIBYAJL)
         yajl_gen_free(hand);
         if (s != yajl_gen_status_ok)
             fprintf(stderr,
                     "unable to format domain config as JSON (YAJL:%d)\n", s);
+#endif
     }
 }
 
