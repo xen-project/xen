@@ -631,6 +631,105 @@ const libxl__json_object *libxl__json_map_get(const char *key,
     return NULL;
 }
 
+#ifdef HAVE_LIBJSONC
+int libxl__json_object_to_json_object(libxl__gc *gc,
+                                      json_object **jso_out,
+                                      const libxl__json_object *obj)
+{
+    int idx = 0;
+    int rc, r;
+
+    switch (obj->type) {
+    case JSON_NULL:
+        *jso_out = json_object_new_null();
+        return 0;
+    case JSON_BOOL:
+        *jso_out = json_object_new_boolean(obj->u.b);
+        if (!*jso_out)
+            return ERROR_NOMEM;
+        return 0;
+    case JSON_INTEGER:
+        *jso_out = json_object_new_int64(obj->u.i);
+        if (!*jso_out)
+            return ERROR_NOMEM;
+        return 0;
+    case JSON_DOUBLE:
+        *jso_out = json_object_new_double(obj->u.d);
+        if (!*jso_out)
+            return ERROR_NOMEM;
+        return 0;
+    case JSON_NUMBER:
+        /*
+         * Use json_object_new_double_s() to rewrite the number exactly as
+         * we parsed it. When generating the JSON string the value `0` will
+         * be ignored and `obj->u.string` will be written instead.
+         */
+        *jso_out = json_object_new_double_s(0, obj->u.string);
+        if (!*jso_out)
+            return ERROR_NOMEM;
+        return 0;
+    case JSON_STRING:
+        *jso_out = json_object_new_string(obj->u.string);
+        if (!*jso_out)
+            return ERROR_NOMEM;
+        return 0;
+    case JSON_MAP: {
+        libxl__json_map_node *node = NULL;
+        json_object *map_root = json_object_new_object();
+        json_object *node_value;
+
+        for (idx = 0; idx < obj->u.map->count; idx++) {
+            if (flexarray_get(obj->u.map, idx, (void**)&node) != 0)
+                break;
+
+            rc = libxl__json_object_to_json_object(gc, &node_value, node->obj);
+            if (rc) {
+                json_object_put(map_root);
+                return rc;
+            }
+
+            r = json_object_object_add(map_root, node->map_key, node_value);
+            if (r < 0) {
+                json_object_put(node_value);
+                json_object_put(map_root);
+                return ERROR_FAIL;
+            }
+        }
+        *jso_out = map_root;
+        return 0;
+    }
+    case JSON_ARRAY: {
+        libxl__json_object *node = NULL;
+        json_object *array_root = json_object_new_array_ext(obj->u.array->count);
+        json_object *node_value;
+
+        for (idx = 0; idx < obj->u.array->count; idx++) {
+            if (flexarray_get(obj->u.array, idx, (void**)&node) != 0)
+                break;
+
+            rc = libxl__json_object_to_json_object(gc, &node_value, node);
+            if (rc) {
+                json_object_put(array_root);
+                return rc;
+            }
+            r = json_object_array_add(array_root, node_value);
+            if (r < 0) {
+                json_object_put(node_value);
+                json_object_put(array_root);
+                return ERROR_FAIL;
+            }
+        }
+        *jso_out = array_root;
+        return 0;
+    }
+    case JSON_ANY:
+    default:
+        /* JSON_ANY is not a valid value for obj->type. */
+        return ERROR_FAIL;
+    }
+}
+#endif
+#ifdef HAVE_LIBYAJL
 yajl_status libxl__json_object_to_yajl_gen(libxl__gc *gc,
                                            yajl_gen hand,
                                            const libxl__json_object *obj)
@@ -698,6 +797,7 @@ yajl_status libxl__json_object_to_yajl_gen(libxl__gc *gc,
     abort();
 #undef CONVERT_YAJL_GEN_TO_STATUS
 }
+#endif
 
 
 /*

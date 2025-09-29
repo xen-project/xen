@@ -61,7 +61,11 @@
 
 #include <sys/un.h>
 
+#ifdef HAVE_LIBJSONC
+#include <json-c/json.h>
+#elif defined(HAVE_LIBYAJL)
 #include <yajl/yajl_gen.h>
+#endif
 
 #include "xen_list.h"
 #include "libxl_internal.h"
@@ -481,13 +485,56 @@ static char *qmp_prepare_cmd(libxl__gc *gc, const char *cmd,
                              const libxl__json_object *args,
                              int id)
 {
+#ifdef HAVE_LIBJSONC
+    json_object *jso = NULL;
+    json_object *jso_value = NULL;
+    /* memory for 'buf' is owned by 'jso' */
+    const char *buf;
+    int rc, r;
+#elif defined(HAVE_LIBYAJL)
     yajl_gen hand = NULL;
     /* memory for 'buf' is owned by 'hand' */
     const unsigned char *buf;
     libxl_yajl_length len;
     yajl_gen_status s;
+#else
+#  error Missing JSON library
+#endif
     char *ret = NULL;
 
+#ifdef HAVE_LIBJSONC
+    jso = json_object_new_object();
+    if (!jso)
+        goto out;
+
+    jso_value = json_object_new_string(cmd);
+    if (!jso_value)
+        goto out;
+    r = json_object_object_add(jso, "execute", jso_value);
+    if (r < 0)
+        goto out;
+    jso_value = json_object_new_int(id);
+    if (!jso_value)
+        goto out;
+    r = json_object_object_add(jso, "id", jso_value);
+    if (r < 0)
+        goto out;
+    /* `jso_value` now part of `jso`, shouldn't free it anymore */
+    jso_value = NULL;
+    if (args) {
+        rc = libxl__json_object_to_json_object(gc, &jso_value, args);
+        if (rc)
+            goto out;
+        r = json_object_object_add(jso, "arguments", jso_value);
+        if (r < 0)
+            goto out;
+        jso_value = NULL;
+    }
+
+    buf = json_object_to_json_string_ext(jso, JSON_C_TO_STRING_PLAIN);
+    ret = libxl__sprintf(gc, "%s\r\n", buf);
+
+#elif defined(HAVE_LIBYAJL)
     hand = libxl_yajl_gen_alloc(NULL);
 
     if (!hand) {
@@ -516,9 +563,15 @@ static char *qmp_prepare_cmd(libxl__gc *gc, const char *cmd,
         goto out;
 
     ret = libxl__sprintf(gc, "%*.*s\r\n", (int)len, (int)len, buf);
+#endif
 
 out:
+#ifdef HAVE_LIBJSONC
+    json_object_put(jso_value);
+    json_object_put(jso);
+#elif defined(HAVE_LIBYAJL)
     yajl_gen_free(hand);
+#endif
     return ret;
 }
 

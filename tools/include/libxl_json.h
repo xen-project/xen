@@ -15,11 +15,17 @@
 #ifndef LIBXL_JSON_H
 #define LIBXL_JSON_H
 
+#ifdef HAVE_LIBJSONC
+#include <json-c/json.h>
+#endif
+
+#ifdef HAVE_LIBYAJL
 #include <yajl/yajl_gen.h>
 #include <yajl/yajl_parse.h>
 
 #ifdef HAVE_YAJL_YAJL_VERSION_H
 #  include <yajl/yajl_version.h>
+#endif
 #endif
 
 yajl_gen_status libxl__uint64_gen_json(yajl_gen hand, uint64_t val);

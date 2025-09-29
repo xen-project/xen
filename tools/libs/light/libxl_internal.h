@@ -2234,9 +2234,16 @@ _hidden const libxl__json_object *libxl__json_map_get(const char *key,
  */
 _hidden libxl__json_object *libxl__json_object_alloc(libxl__gc *gc_opt,
                                                      libxl__json_node_type type);
+#ifdef HAVE_LIBJSONC
+_hidden int libxl__json_object_to_json_object(libxl__gc *gc,
+                                              json_object **jso_out,
+                                              const libxl__json_object *obj);
+#endif
+#ifdef HAVE_LIBYAJL
 _hidden yajl_status libxl__json_object_to_yajl_gen(libxl__gc *gc_opt,
                                                    yajl_gen hand,
                                                    const libxl__json_object *param);
+#endif
 _hidden void libxl__json_object_free(libxl__gc *gc_opt,
                                      libxl__json_object *obj);
 
