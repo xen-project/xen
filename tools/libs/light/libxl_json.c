@@ -16,7 +16,25 @@
 
 #include <math.h>
 
+#ifdef HAVE_LIBJSONC
+#include <json-c/json.h>
+#define USE_LIBJSONC_PARSER
+#endif
+
+#ifdef HAVE_LIBYAJL
+#  ifndef USE_LIBJSONC_PARSER
+#    define USE_LIBYAJL_PARSER
+#  endif
+#endif
+
+
+#ifdef USE_LIBJSONC_PARSER
+#include <json-c/json_visit.h>
+#endif
+
+#ifdef USE_LIBYAJL_PARSER
 #include <yajl/yajl_parse.h>
+#endif
 #include <yajl/yajl_gen.h>
 
 #include "libxl_internal.h"
@@ -25,7 +43,9 @@
 
 typedef struct libxl__yajl_ctx {
     libxl__gc *gc;
+#ifdef USE_LIBYAJL_PARSER
     yajl_handle hand;
+#endif
     libxl__json_object *head;
     libxl__json_object *current;
 #ifdef DEBUG_ANSWER
@@ -33,7 +53,7 @@ typedef struct libxl__yajl_ctx {
 #endif
 } libxl__yajl_ctx;
 
-#ifdef DEBUG_ANSWER
+#if defined(DEBUG_ANSWER) && defined(USE_LIBYAJL_PARSER)
 #if YAJL_VERSION < 20000
 #  define DEBUG_GEN_ALLOC(ctx)                  \
     if ((ctx)->g == NULL) {                     \
@@ -759,7 +779,7 @@ error:
     obj = libxl__json_object_alloc(ctx->gc, JSON_NUMBER);
 
     t = libxl__zalloc(ctx->gc, len + 1);
-    strncpy(t, s, len);
+    memcpy(t, s, len);
     t[len] = 0;
 
     obj->u.string = t;
@@ -806,7 +826,7 @@ static int json_callback_map_key(void *opaque, const unsigned char *str,
 
     DEBUG_GEN_STRING(ctx, str, len);
 
-    strncpy(t, (const char *) str, len);
+    memcpy(t, (const char *) str, len);
     t[len] = 0;
 
     if (libxl__json_object_is_map(obj)) {
@@ -890,6 +910,7 @@ static int json_callback_end_array(void *opaque)
     return 1;
 }
 
+#ifdef USE_LIBYAJL_PARSER
 static yajl_callbacks callbacks = {
     json_callback_null,
     json_callback_boolean,
@@ -903,28 +924,111 @@ static yajl_callbacks callbacks = {
     json_callback_start_array,
     json_callback_end_array
 };
+#endif
 
 static void yajl_ctx_free(libxl__yajl_ctx *yajl_ctx)
 {
+#ifdef USE_LIBYAJL_PARSER
     if (yajl_ctx->hand) {
         yajl_free(yajl_ctx->hand);
         yajl_ctx->hand = NULL;
     }
+#endif
     DEBUG_GEN_FREE(yajl_ctx);
 }
 
+#ifdef USE_LIBJSONC_PARSER
+static int jso_visiter(json_object *jso,
+                       int flags,
+                       json_object *parent_jso,
+                       const char *jso_key,
+                       size_t *jso_index,
+                       void *userarg)
+{
+    enum json_type type;
+    int r;
+
+    if (jso_key && flags != JSON_C_VISIT_SECOND) {
+        json_callback_map_key(userarg, (const unsigned char*)jso_key, strlen(jso_key));
+    }
+    type = json_object_get_type(jso);
+    switch (type) {
+    case json_type_null:
+        r = json_callback_null(userarg);
+        break;
+    case json_type_boolean:
+        r = json_callback_boolean(userarg, json_object_get_boolean(jso));
+        break;
+    case json_type_int:
+    case json_type_double: {
+        // it might be better to use on of
+        // json_object_get_{int,int64,uint64,double} instead.
+        // but would need to replace json_callback_number().
+        const char *s = json_object_get_string(jso);
+        r = json_callback_number(userarg, s, strlen(s));
+        break;
+    }
+    case json_type_object:
+        if (flags != JSON_C_VISIT_SECOND) {
+            r = json_callback_start_map(userarg);
+        } else {
+            r = json_callback_end_map(userarg);
+        }
+        break;
+    case json_type_array:
+        if (flags != JSON_C_VISIT_SECOND) {
+            r = json_callback_start_array(userarg);
+        } else {
+            r = json_callback_end_array(userarg);
+        }
+        break;
+    case json_type_string: {
+        const char *s = json_object_get_string(jso);
+        const int len = json_object_get_string_len(jso);
+        r = json_callback_string(userarg, (const unsigned char*)s, len);
+        break;
+    }
+    default:
+        /* error */
+        r = 0;
+    }
+    if (r == 0)
+        return JSON_C_VISIT_RETURN_ERROR;
+    return JSON_C_VISIT_RETURN_CONTINUE;
+}
+#endif
+
 libxl__json_object *libxl__json_parse(libxl__gc *gc, const char *s)
 {
+#ifdef USE_LIBYAJL_PARSER
     yajl_status status;
+    unsigned char *str = NULL;
+#endif
     libxl__yajl_ctx yajl_ctx;
     libxl__json_object *o = NULL;
-    unsigned char *str = NULL;
+#ifdef USE_LIBJSONC_PARSER
+    json_object *jso;
+    enum json_tokener_error error;
+
+    jso = json_tokener_parse_verbose(s, &error);
+    if (!jso) {
+        LOG(ERROR, "json-c parse error: %s", json_tokener_error_desc(error));
+        goto out;
+    }
+#endif
 
     memset(&yajl_ctx, 0, sizeof (yajl_ctx));
     yajl_ctx.gc = gc;
 
     DEBUG_GEN_ALLOC(&yajl_ctx);
 
+#ifdef USE_LIBJSONC_PARSER
+    int r = json_c_visit(jso, 0, jso_visiter, &yajl_ctx);
+    if (r < 0) {
+        LOG(ERROR, "json_c_visit failed");
+        goto out;
+    }
+#elif defined(USE_LIBYAJL_PARSER)
     if (yajl_ctx.hand == NULL) {
         yajl_ctx.hand = libxl__yajl_alloc(&callbacks, NULL, &yajl_ctx);
     }
@@ -935,6 +1039,7 @@ libxl__json_object *libxl__json_parse(libxl__gc *gc, const char *s)
     status = yajl_complete_parse(yajl_ctx.hand);
     if (status != yajl_status_ok)
         goto out;
+#endif
 
     o = yajl_ctx.head;
 
@@ -943,13 +1048,20 @@ libxl__json_object *libxl__json_parse(libxl__gc *gc, const char *s)
     yajl_ctx.head = NULL;
 
     yajl_ctx_free(&yajl_ctx);
+#ifdef USE_LIBJSONC_PARSER
+    json_object_put(jso);
+#endif
     return o;
 
 out:
+#ifdef USE_LIBJSONC_PARSER
+    json_object_put(jso);
+#elif defined(USE_LIBYAJL_PARSER)
     str = yajl_get_error(yajl_ctx.hand, 1, (const unsigned char*)s, strlen(s));
 
     LIBXL__LOG(libxl__gc_owner(gc), LIBXL__LOG_ERROR, "yajl error: %s", str);
     yajl_free_error(yajl_ctx.hand, str);
+#endif
     yajl_ctx_free(&yajl_ctx);
     return NULL;
 }

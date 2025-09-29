@@ -42,6 +42,7 @@ yajl_gen_status libxl_ms_vm_genid_gen_json(yajl_gen hand, libxl_ms_vm_genid *p);
 #  define HAVE_YAJL_V2 1
 #endif
 
+#ifdef HAVE_LIBYAJL
 #ifdef HAVE_YAJL_V2
 
 typedef size_t libxl_yajl_length;
@@ -89,5 +90,8 @@ static inline yajl_gen libxl_yajl_gen_alloc(const yajl_alloc_funcs *allocFuncs)
 }
 
 #endif /* !HAVE_YAJL_V2 */
+#else
+typedef size_t libxl_yajl_length;
+#endif /* !HAVE_LIBYAJL */
 
 #endif /* LIBXL_JSON_H */
