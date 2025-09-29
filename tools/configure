@@ -9692,41 +9692,7 @@ fi
 	# Put the nasty error message in config.log where it belongs
 	echo "$libjsonc_PKG_ERRORS" >&5
 
-	as_fn_error $? "Package requirements (json-c) were not met:
-
-$libjsonc_PKG_ERRORS
-
-Consider adjusting the PKG_CONFIG_PATH environment variable if you
-installed software in a non-standard prefix.
-
-Alternatively, you may set the environment variables libjsonc_CFLAGS
-and libjsonc_LIBS to avoid the need to call pkg-config.
-See the pkg-config man page for more details." "$LINENO" 5
-elif test $pkg_failed = untried; then
-     	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-	{ { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-printf "%s\n" "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "The pkg-config script could not be found or is too old.  Make sure it
-is in your PATH or set the PKG_CONFIG environment variable to the full
-path to pkg-config.
-
-Alternatively, you may set the environment variables libjsonc_CFLAGS
-and libjsonc_LIBS to avoid the need to call pkg-config.
-See the pkg-config man page for more details.
-
-To get pkg-config, see <http://pkg-config.freedesktop.org/>.
-See \`config.log' for more details" "$LINENO" 5; }
-else
-	libjsonc_CFLAGS=$pkg_cv_libjsonc_CFLAGS
-	libjsonc_LIBS=$pkg_cv_libjsonc_LIBS
-        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
-
-printf "%s\n" "#define HAVE_LIBJSONC 1" >>confdefs.h
-
-fi
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for yajl_alloc in -lyajl" >&5
+	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for yajl_alloc in -lyajl" >&5
 printf %s "checking for yajl_alloc in -lyajl... " >&6; }
 if test ${ac_cv_lib_yajl_yajl_alloc+y}
 then :
@@ -9770,6 +9736,67 @@ printf "%s\n" "#define HAVE_LIBYAJL 1" >>confdefs.h
 
 else $as_nop
   as_fn_error $? "Could not find yajl" "$LINENO" 5
+fi
+
+
+elif test $pkg_failed = untried; then
+     	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for yajl_alloc in -lyajl" >&5
+printf %s "checking for yajl_alloc in -lyajl... " >&6; }
+if test ${ac_cv_lib_yajl_yajl_alloc+y}
+then :
+  printf %s "(cached) " >&6
+else $as_nop
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lyajl  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+char yajl_alloc ();
+int
+main (void)
+{
+return yajl_alloc ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"
+then :
+  ac_cv_lib_yajl_yajl_alloc=yes
+else $as_nop
+  ac_cv_lib_yajl_yajl_alloc=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_yajl_yajl_alloc" >&5
+printf "%s\n" "$ac_cv_lib_yajl_yajl_alloc" >&6; }
+if test "x$ac_cv_lib_yajl_yajl_alloc" = xyes
+then :
+  YAJL_LIBS=-lyajl
+
+
+printf "%s\n" "#define HAVE_LIBYAJL 1" >>confdefs.h
+
+else $as_nop
+  as_fn_error $? "Could not find yajl" "$LINENO" 5
+fi
+
+
+else
+	libjsonc_CFLAGS=$pkg_cv_libjsonc_CFLAGS
+	libjsonc_LIBS=$pkg_cv_libjsonc_LIBS
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+
+printf "%s\n" "#define HAVE_LIBJSONC 1" >>confdefs.h
+
 fi
 
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for deflateCopy in -lz" >&5

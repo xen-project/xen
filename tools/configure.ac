@@ -425,11 +425,13 @@ AC_SUBST([ZLIB_LIBS])
 AX_CHECK_EXTFS
 AX_CHECK_PTHREAD
 PKG_CHECK_MODULES([libjsonc], [json-c],
-    [AC_DEFINE([HAVE_LIBJSONC], [1], [Use library json-c])])
-AC_CHECK_LIB([yajl], [yajl_alloc],
-   [AC_SUBST([YAJL_LIBS],[-lyajl])
-    AC_DEFINE([HAVE_LIBYAJL],[1],[Define to 1 if you have the `yajl' library (-lyajl).])],
-    [AC_MSG_ERROR([Could not find yajl])])
+    [AC_DEFINE([HAVE_LIBJSONC], [1], [Use library json-c])],
+    [AC_CHECK_LIB([yajl], [yajl_alloc],
+        [AC_SUBST([YAJL_LIBS],[-lyajl])
+         AC_DEFINE([HAVE_LIBYAJL],[1],[Define to 1 if you have the `yajl' library (-lyajl).])],
+        [AC_MSG_ERROR([Could not find yajl])])
+])
+
 AC_CHECK_LIB([z], [deflateCopy], [], [AC_MSG_ERROR([Could not find zlib])])
 AC_CHECK_HEADER([argp.h], [
 AC_CHECK_LIB([argp], [argp_usage], [argp_ldflags="-largp"])
