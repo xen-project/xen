@@ -24,7 +24,7 @@ OBJS-$(CONFIG_SunOS) += xenstat_solaris.o
 OBJS-$(CONFIG_NetBSD) += xenstat_netbsd.o
 OBJS-$(CONFIG_FreeBSD) += xenstat_freebsd.o
 
-LDLIBS-y += -lyajl
+LDLIBS-y += $(XEN_JSON_LIBS)
 LDLIBS-$(CONFIG_SunOS) += -lkstat
 LDLIBS += $(LDLIBS-y)
 
