@@ -567,9 +567,15 @@ static int cf_check hvm_print_line(
 
     ASSERT(bytes == 1 && port == XEN_HVM_DEBUGCONS_IOPORT);
 
-    /* Deny any input requests. */
-    if ( dir != IOREQ_WRITE )
-        return X86EMUL_UNHANDLEABLE;
+    if ( dir == IOREQ_READ )
+    {
+        /*
+         * According to Bochs documentation, reading from the E9 port should
+         * return 0xE9 if the "port E9 hack" is implemented.
+         */
+        *val = XEN_HVM_DEBUGCONS_IOPORT;
+        return X86EMUL_OKAY;
+    }
 
     if ( !is_console_printable(c) )
         return X86EMUL_OKAY;
