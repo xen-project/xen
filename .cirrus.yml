@@ -50,7 +50,7 @@ task:
 
   install_script: pkg install -y seabios gmake ninja bash
                                  pkgconf bison perl5
-                                 yajl lzo2 pixman argp-standalone
+                                 json-c lzo2 pixman argp-standalone
                                  libxml2 glib git python3 libinotify
 
   configure_script:
