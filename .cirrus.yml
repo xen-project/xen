@@ -167,7 +167,7 @@ task:
     export TEST_LOG="serial-${FREEBSD_BUILD}-${XTF_ARCH}.txt"
     export PASSED="Test result: SUCCESS"
     export TEST_TIMEOUT=120
-    ./automation/scripts/console.exp |& sed 's/\r\+$//'
+    ./automation/scripts/console.exp 2>&1 | sed 's/\r\+$//'
 
   always:
     serial_artifacts:
