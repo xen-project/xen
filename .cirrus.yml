@@ -51,11 +51,12 @@ task:
   install_script: pkg install -y seabios gmake ninja bash
                                  pkgconf bison perl5
                                  yajl lzo2 pixman argp-standalone
-                                 libxml2 glib git python3
+                                 libxml2 glib git python3 libinotify
 
   configure_script:
     - cc --version
     - ./configure --with-system-seabios=/usr/local/share/seabios/bios.bin
+                  --with-extra-qemuu-configure-args="--extra-ldflags=-L${APPEND_LIB} --extra-cflags=-I${APPEND_INCLUDES}"
     - gmake -j`sysctl -n hw.ncpu` -C xen clang=y defconfig
 
   << : *FREEBSD_CONFIGURE_ARTIFACTS
