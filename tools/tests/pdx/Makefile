@@ -35,7 +35,7 @@ uninstall:
 	$(RM) -- $(patsubst %,$(DESTDIR)$(LIBEXEC)/tests/%,$(TARGETS))
 
 pdx.h: $(XEN_ROOT)/xen/include/xen/pdx.h
-	sed -E -e '/^#[[:space:]]*include/d' <$< >$@
+	sed -e '/^#[[:space:]]*include/d' <$< >$@
 
 CFLAGS += -D__XEN_TOOLS__
 CFLAGS += $(APPEND_CFLAGS)
