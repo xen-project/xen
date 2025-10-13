@@ -141,7 +141,6 @@ static void cf_check send_IPI_mask_x2apic_cluster(
 static const struct genapic __initconst_cf_clobber apic_x2apic_phys = {
     APIC_INIT("x2apic_phys", NULL),
     .init_apic_ldr = init_apic_ldr_phys,
-    .vector_allocation_cpumask = vector_allocation_cpumask_phys,
     .send_IPI_mask = send_IPI_mask_x2apic_phys,
     .send_IPI_self = send_IPI_self_x2apic
 };
@@ -155,12 +154,6 @@ static const struct genapic __initconst_cf_clobber apic_x2apic_phys = {
  */
 static const struct genapic __initconst_cf_clobber apic_x2apic_mixed = {
     APIC_INIT("x2apic_mixed", NULL),
-
-    /*
-     * The following fields are exclusively used by external interrupts and
-     * hence are set to use Physical destination mode handlers.
-     */
-    .vector_allocation_cpumask = vector_allocation_cpumask_phys,
 
     /*
      * The following fields are exclusively used by IPIs and hence are set to

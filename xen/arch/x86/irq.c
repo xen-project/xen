@@ -621,15 +621,11 @@ static int _assign_irq_vector(struct irq_desc *desc, const cpumask_t *mask)
 
     for_each_cpu(cpu, mask)
     {
-        const cpumask_t *vec_mask;
-        int new_cpu;
         int vector, offset;
 
         /* Only try and allocate irqs on cpus that are present. */
         if (!cpu_online(cpu))
             continue;
-
-        vec_mask = vector_allocation_cpumask(cpu);
 
         vector = current_vector;
         offset = current_offset;
@@ -650,13 +646,13 @@ next:
             && test_bit(vector, irq_used_vectors) )
             goto next;
 
-        if ( cpumask_test_cpu(0, vec_mask) &&
+        if ( !cpu &&
              vector >= FIRST_LEGACY_VECTOR && vector <= LAST_LEGACY_VECTOR )
             goto next;
 
-        for_each_cpu(new_cpu, vec_mask)
-            if (per_cpu(vector_irq, new_cpu)[vector] >= 0)
-                goto next;
+        if ( per_cpu(vector_irq, cpu)[vector] >= 0 )
+            goto next;
+
         /* Found one! */
         current_vector = vector;
         current_offset = offset;
@@ -688,12 +684,11 @@ next:
                 release_old_vec(desc);
         }
 
-        trace_irq_mask(TRC_HW_IRQ_ASSIGN_VECTOR, irq, vector, vec_mask);
+        trace_irq_mask(TRC_HW_IRQ_ASSIGN_VECTOR, irq, vector, cpumask_of(cpu));
 
-        for_each_cpu(new_cpu, vec_mask)
-            per_cpu(vector_irq, new_cpu)[vector] = irq;
+        per_cpu(vector_irq, cpu)[vector] = irq;
         desc->arch.vector = vector;
-        cpumask_copy(desc->arch.cpu_mask, vec_mask);
+        cpumask_copy(desc->arch.cpu_mask, cpumask_of(cpu));
 
         desc->arch.used = IRQ_USED;
         ASSERT((desc->arch.used_vectors == NULL)

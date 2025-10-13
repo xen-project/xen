@@ -47,7 +47,6 @@ static int __init cf_check probe_bigsmp(void)
 const struct genapic __initconst_cf_clobber apic_bigsmp = {
 	APIC_INIT("bigsmp", probe_bigsmp),
 	.init_apic_ldr = init_apic_ldr_phys,
-	.vector_allocation_cpumask = vector_allocation_cpumask_phys,
 	.send_IPI_mask = send_IPI_mask_phys,
 	.send_IPI_self = send_IPI_self_legacy
 };
