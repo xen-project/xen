@@ -220,6 +220,24 @@ F:	xen/drivers/acpi/
 F:	xen/include/acpi/
 F:	tools/libacpi/
 
+AMD IOMMU
+M:	Jan Beulich <jbeulich@suse.com>
+M:	Andrew Cooper <andrew.cooper3@citrix.com>
+M:	Roger Pau Monné <roger.pau@citrix.com>
+R:	Jason Andryuk <jason.andryuk@amd.com>
+S:	Supported
+F:	xen/drivers/passthrough/amd/
+
+AMD SVM
+M:	Jan Beulich <jbeulich@suse.com>
+M:	Andrew Cooper <andrew.cooper3@citrix.com>
+M:	Roger Pau Monné <roger.pau@citrix.com>
+R:	Jason Andryuk <jason.andryuk@amd.com>
+S:	Supported
+F:	xen/arch/x86/cpu/vpmu_amd.c
+F:	xen/arch/x86/hvm/svm/
+F:	xen/arch/x86/include/asm/hvm/svm/
+
 ARGO
 M:	Christopher Clark <christopher.w.clark@gmail.com>
 R:	Daniel P. Smith <dpsmith@apertussolutions.com>
@@ -601,7 +619,6 @@ M:	Roger Pau Monné <roger.pau@citrix.com>
 S:	Supported
 L:	xen-devel@lists.xenproject.org
 F:	xen/arch/x86/
-F:	xen/drivers/passthrough/amd/
 F:	xen/drivers/passthrough/vtd/
 F:	xen/include/public/arch-x86/
 F:	xen/include/xen/lib/x86/
