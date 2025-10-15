@@ -154,7 +154,7 @@ void printf_info(enum output_format output_format,
 #ifdef HAVE_LIBJSONC
     int r;
     const char *buf;
-    json_object *jso;
+    json_object *jso = NULL;
 
     r = printf_info_one_json(&jso, domid, d_config);
     if (r)
