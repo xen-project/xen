@@ -69,7 +69,7 @@ static int printf_info_one_json(json_object **jso_r, int domid,
     json_object *jso_config = NULL;
     enum json_tokener_error error = json_tokener_error_parse_unexpected;
     char *s = NULL;
-    int r = EXIT_FAILURE;
+    int r = EXIT_FAILURE, rc;
 
     s = libxl_domain_config_to_json(ctx, d_config);
     jso_config = json_tokener_parse_verbose(s, &error);
@@ -81,12 +81,17 @@ static int printf_info_one_json(json_object **jso_r, int domid,
 
     jso = json_object_new_object();
     if (domid != -1)
-        json_object_object_add(jso, "domid", json_object_new_int(domid));
+        rc = json_object_object_add(jso, "domid", json_object_new_int(domid));
     else
-        json_object_object_add(jso, "domid", json_object_new_null());
+        rc = json_object_object_add(jso, "domid", json_object_new_null());
+    if (rc)
+        goto out;
 
 
-    json_object_object_add(jso, "config", jso_config);
+    rc = json_object_object_add(jso, "config", jso_config);
+    if (rc)
+        goto out;
+
     jso_config = NULL;
 
     *jso_r = jso;
