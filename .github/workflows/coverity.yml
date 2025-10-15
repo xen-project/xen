@@ -20,9 +20,9 @@ jobs:
           iasl \
           libbz2-dev \
           libext2fs-dev \
+          libjson-c-dev \
           liblzma-dev \
           libncurses5-dev \
-          libyajl-dev \
           libzstd-dev \
           ocaml \
           ocaml-findlib \
