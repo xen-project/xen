@@ -1366,7 +1366,7 @@ libxl__json_object *libxl__json_parse(libxl__gc *gc, const char *s)
     libxl__json_object *o = NULL;
 #ifdef USE_LIBJSONC_PARSER
     json_object *jso;
-    enum json_tokener_error error;
+    enum json_tokener_error error = json_tokener_error_parse_unexpected;
 
     jso = json_tokener_parse_verbose(s, &error);
     if (!jso) {

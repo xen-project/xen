@@ -67,7 +67,7 @@ static int printf_info_one_json(json_object **jso_r, int domid,
 {
     json_object *jso = NULL;
     json_object *jso_config = NULL;
-    enum json_tokener_error error;
+    enum json_tokener_error error = json_tokener_error_parse_unexpected;
     char *s = NULL;
     int r = EXIT_FAILURE;
 
