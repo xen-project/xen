@@ -1531,7 +1531,7 @@ char *libxl__json_object_to_json(libxl__gc *gc,
 {
 #ifdef HAVE_LIBJSONC
     const char *buf;
-    json_object *root;
+    json_object *root = NULL;
     char *ret = NULL;
     int rc;
 
