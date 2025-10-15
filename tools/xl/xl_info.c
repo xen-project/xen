@@ -584,6 +584,8 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
 #ifdef HAVE_LIBJSONC
             json_object *jso_value;
             rc = printf_info_one_json(&jso_value, info[i].domid, &d_config);
+            if (rc)
+                goto out;
             json_object_array_add(jso, jso_value);
 #elif defined(HAVE_LIBYAJL)
             s = printf_info_one_json(hand, info[i].domid, &d_config);
