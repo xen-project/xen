@@ -25,7 +25,7 @@
 
 get_edd:
         cmpb    $2, bootsym(opt_edd)            # edd=off ?
-        je      edd_done
+        je      .Ledd_done
 
 # Do the BIOS Enhanced Disk Drive calls
 # This consists of two calls:
@@ -48,7 +48,7 @@ edd_check_ext:
         movb    $0x41, %ah                      # 0x41 Check Extensions Present
         movw    $0x55AA, %bx                    # magic
         int     $0x13                           # make the call
-        jc      edd_done                        # no more BIOS devices
+        jc      .Ledd_mbr_sig                   # no more BIOS devices
 
         cmpw    $0xAA55, %bx                    # is magic right?
         jne     edd_next                        # nope, next...
@@ -96,13 +96,13 @@ edd_legacy_done:
 
 edd_next:
         incb    %dl                             # increment to next device
-        jz      edd_done
+        jz      .Ledd_mbr_sig
         cmpb    $EDD_INFO_MAX,bootsym(boot_edd_info_nr)
         jb      edd_check_ext
 
-edd_done:
+.Ledd_mbr_sig:
         cmpb    $1, bootsym(opt_edd)            # edd=skipmbr ?
-        je      .Ledd_mbr_sig_skip
+        je      .Ledd_done
 
 # Read the first sector of each BIOS disk device and store the 4-byte signature
 .Ledd_mbr_sig_start:
@@ -160,7 +160,7 @@ edd_done:
         jb      .Ledd_mbr_sig_read
 .Ledd_mbr_sig_done:
         popw    %es
-.Ledd_mbr_sig_skip:
+.Ledd_done:
         ret
 
 GLOBAL(boot_edd_info_nr)
