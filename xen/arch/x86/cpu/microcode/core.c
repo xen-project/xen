@@ -874,7 +874,7 @@ int __init early_microcode_init(unsigned long *module_map,
              boot_cpu_data.x86 >= 0x17 )
         {
             printk(XENLOG_WARNING
-                   "Microcode patch additional digest checks disabled");
+                   "Microcode patch additional digest checks disabled\n");
             add_taint(TAINT_CPU_OUT_OF_SPEC);
         }
 
