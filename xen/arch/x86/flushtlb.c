@@ -222,8 +222,7 @@ unsigned int flush_area_local(const void *va, unsigned int flags)
                 }
             }
             else
-                asm volatile ( "invlpg %0"
-                               : : "m" (*(const char *)(va)) : "memory" );
+                invlpg(va);
         }
         else
             do_tlb_flush();

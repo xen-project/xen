@@ -98,6 +98,11 @@ static inline unsigned long read_cr3(void)
     return cr3;
 }
 
+static inline void invlpg(const void *p)
+{
+    asm volatile ( "invlpg %0" :: "m" (*(const char *)p) : "memory" );
+}
+
 /* Write pagetable base and implicitly tick the tlbflush clock. */
 void switch_cr3_cr4(unsigned long cr3, unsigned long cr4);
 

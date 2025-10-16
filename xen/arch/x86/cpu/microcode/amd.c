@@ -306,10 +306,18 @@ static int cf_check apply_microcode(const struct microcode_patch *patch,
     sig->rev = rev;
 
     /*
-     * Some processors leave the ucode blob mapping as UC after the update.
-     * Flush the mapping to regain normal cacheability.
+     * Fam17h processors leave the mapping of the ucode as UC after the
+     * update.  Flush the mapping to regain normal cacheability.
+     *
+     * We do not know the granularity of mapping, and at 3200 bytes in size
+     * there is a good chance of crossing a 4k page boundary.  Shoot-down the
+     * start and end just to be safe.
      */
-    flush_area_local(patch, FLUSH_TLB_GLOBAL | FLUSH_ORDER(0));
+    if ( boot_cpu_data.family == 0x17 )
+    {
+        invlpg(patch);
+        invlpg((const void *)patch + F17H_MPB_MAX_SIZE - 1);
+    }
 
     /* check current patch id and patch's id for match */
     if ( hw_err || (rev != patch->patch_id) )
