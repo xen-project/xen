@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
    - Allow controlling the MTRR cache attribute of the Xen platform PCI device
      BAR for HVM guests, to improve performance of guests using it to map the
      grant table or foreign memory.
+   - Allow configuring the number of altp2m tables per domain via vm.cfg.
 
 ### Added
  - Introduce new PDX compression algorithm to cope with Intel Sierra Forest and
