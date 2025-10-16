@@ -520,7 +520,7 @@ void __init ucode_probe_amd(struct microcode_ops *ops)
     if ( !opt_digest_check && boot_cpu_data.x86 >= 0x17 )
     {
         printk(XENLOG_WARNING
-               "Microcode patch additional digest checks disabled");
+               "Microcode patch additional digest checks disabled\n");
         add_taint(TAINT_CPU_OUT_OF_SPEC);
     }
 
