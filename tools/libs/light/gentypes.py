@@ -377,15 +377,14 @@ def get_default_expr(f, nparent, fexpr):
     return "%s" % fexpr
 
 # For json-c gen_json functions
-def libxl_C_type_gen_jso(ty, v, indent = "    ", parent = None, scope_object = "jso"):
+def libxl_C_type_gen_jso(ty, v, indent = "    ", parent = None, scope_object = "jso", depth = 0):
     s = ""
     if parent is None:
         s += "json_object *jso;\n"
         s += "int rc;\n"
-        sub_scope_object = "jso_sub_1"
-    else:
-        sub_scope_object = "jso_sub_%d" % (1+int(scope_object.removeprefix("jso_sub_")))
 
+    depth += 1
+    sub_scope_object = "jso_sub_%d" % depth
     if isinstance(ty, idl.Array):
         if parent is None:
             raise Exception("Array type must have a parent")
@@ -398,7 +397,8 @@ def libxl_C_type_gen_jso(ty, v, indent = "    ", parent = None, scope_object = "
         s += "        json_object *%s;\n" % (sub_scope_object)
         # remove some indent, it's over indented at least in one case libxl_vcpu_sched_params_gen_json
         s += libxl_C_type_gen_jso(ty.elem_type, v+"[i]",
-                                   indent + "    ", parent, sub_scope_object)
+                                  indent + "    ", parent, sub_scope_object,
+                                  depth)
         s += "        if (json_object_array_add(%s, %s)) {\n" % (scope_object, sub_scope_object)
         s += "            json_object_put(%s);\n" % (sub_scope_object)
         s += "            goto out;\n"
@@ -417,7 +417,7 @@ def libxl_C_type_gen_jso(ty, v, indent = "    ", parent = None, scope_object = "
             (nparent,fexpr) = ty.member(v, f, parent is None)
             s += "case %s:\n" % f.enumname
             if f.type is not None:
-                s += libxl_C_type_gen_jso(f.type, fexpr, indent + "    ", nparent, scope_object)
+                s += libxl_C_type_gen_jso(f.type, fexpr, indent + "    ", nparent, scope_object, depth)
             else:
                 s += "    %s = json_object_new_object();\n" % (scope_object)
                 s += "    if (!%s)\n" % (scope_object)
@@ -433,7 +433,7 @@ def libxl_C_type_gen_jso(ty, v, indent = "    ", parent = None, scope_object = "
             default_expr = get_default_expr(f, nparent, fexpr)
             s += "if (%s) {\n" % default_expr
             s += "    json_object *%s = NULL;\n" % (sub_scope_object)
-            s += libxl_C_type_gen_jso(f.type, fexpr, "    ", nparent, sub_scope_object)
+            s += libxl_C_type_gen_jso(f.type, fexpr, "    ", nparent, sub_scope_object, depth)
             s += libxl_C_type_gen_jso_map_key(f, nparent, "    ", scope_object, sub_scope_object)
 
             s += "}\n"
