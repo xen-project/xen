@@ -501,10 +501,10 @@ static int control_thread_fn(const struct microcode_patch *patch)
         atomic_inc(&cpu_updated);
     atomic_inc(&cpu_out);
 
-    if ( ret == -EIO )
+    if ( ret )
     {
         printk(XENLOG_ERR
-               "Late loading aborted: CPU%u failed to update ucode\n", cpu);
+               "Late loading aborted: CPU%u failed to update ucode: %d\n", cpu, ret);
         goto out;
     }
 
