@@ -42,7 +42,10 @@ struct microcode_patch {
     uint8_t  mc_patch_data_id[2];
     uint8_t  mc_patch_data_len;
     uint8_t  init_flag;
-    uint32_t mc_patch_data_checksum;
+    union {
+        uint32_t checksum; /* Fam12h and earlier */
+        uint32_t min_rev;  /* Zen3-5, post Entrysign */
+    };
     uint32_t nb_dev_id;
     uint32_t sb_dev_id;
     uint16_t processor_rev_id;
@@ -270,6 +273,42 @@ static int cf_check amd_compare(
     return compare_revisions(old->patch_id, new->patch_id);
 }
 
+/*
+ * Check whether this patch has a minimum revision given, and whether the
+ * condition is satisfied.
+ *
+ * In linux-firmware for CPUs suffering from the Entrysign vulnerability,
+ * ucodes signed with the updated signature algorithm have reused the checksum
+ * field as a min-revision field.  From public archives, the checksum field
+ * appears to have been unused since Fam12h.
+ *
+ * Returns false if there is a min revision given, and it suggests that that
+ * the patch cannot be loaded on the current system.  True otherwise.
+ */
+static bool check_min_rev(const struct microcode_patch *patch)
+{
+    ASSERT(microcode_fits_cpu(patch));
+
+    if ( patch->processor_rev_id < 0xa000 || /* pre Zen3? */
+         patch->min_rev == 0 )               /* No min rev specified */
+        return true;
+
+    /*
+     * Sanity check, as this is a reused field.  If this is a true
+     * min_revision field, it will differ only in the bottom byte from the
+     * patch_id.  Otherwise, it's probably a checksum.
+     */
+    if ( (patch->patch_id ^ patch->min_rev) & ~0xff )
+    {
+        printk(XENLOG_WARNING
+               "microcode: patch %#x has unexpected min_rev %#x\n",
+               patch->patch_id, patch->min_rev);
+        return true;
+    }
+
+    return this_cpu(cpu_sig).rev >= patch->min_rev;
+}
+
 static int cf_check apply_microcode(const struct microcode_patch *patch,
                                     unsigned int flags)
 {
@@ -296,6 +335,14 @@ static int cf_check apply_microcode(const struct microcode_patch *patch,
         printk(XENLOG_ERR
                "microcode: CPU%u current rev %#x unsafe to update\n",
                cpu, sig->rev);
+        return -ENXIO;
+    }
+
+    if ( !ucode_force && !check_min_rev(patch) )
+    {
+        printk(XENLOG_ERR
+               "microcode: CPU%u current rev %#x below patch min_rev %#x\n",
+               cpu, sig->rev, patch->min_rev);
         return -ENXIO;
     }
 
