@@ -1455,12 +1455,16 @@ void __init smp_intr_init(void)
      */
     for ( seridx = 0; seridx <= SERHND_IDX; seridx++ )
     {
+        struct irq_desc *desc;
+
         if ( (irq = serial_irq(seridx)) < 0 )
             continue;
         vector = alloc_hipriority_vector();
         per_cpu(vector_irq, cpu)[vector] = irq;
-        irq_to_desc(irq)->arch.vector = vector;
-        cpumask_copy(irq_to_desc(irq)->arch.cpu_mask, &cpu_online_map);
+
+        desc = irq_to_desc(irq);
+        desc->arch.vector = vector;
+        cpumask_copy(desc->arch.cpu_mask, &cpu_online_map);
     }
 
     /* Direct IPI vectors. */
