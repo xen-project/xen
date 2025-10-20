@@ -65,7 +65,7 @@ int xc_physdev_map_pirq_msi(xc_interface *xch,
                             int index,
                             int *pirq,
                             int devfn,
-                            int bus,
+                            int segbus,
                             int entry_nr,
                             uint64_t table_base)
 {
@@ -79,10 +79,10 @@ int xc_physdev_map_pirq_msi(xc_interface *xch,
     }
     memset(&map, 0, sizeof(struct physdev_map_pirq));
     map.domid = domid;
-    map.type = MAP_PIRQ_TYPE_MSI;
+    map.type = MAP_PIRQ_TYPE_MSI_SEG;
     map.index = index;
     map.pirq = *pirq;
-    map.bus = bus;
+    map.bus = segbus;
     map.devfn = devfn;
     map.entry_nr = entry_nr;
     map.table_base = table_base;
