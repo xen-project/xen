@@ -191,6 +191,14 @@ static void remove_pin_from_irq(unsigned int irq, int apic, int pin)
     irq_2_pin_free_entry = entry - irq_2_pin;
 }
 
+static struct irq_pin_list *pin_list_next(const struct irq_pin_list *entry)
+{
+    if ( !entry->next )
+        return NULL;
+
+    return irq_2_pin + entry->next;
+}
+
 /*
  * Reroute an IRQ to a different pin.
  */
@@ -1592,13 +1600,9 @@ static bool io_apic_level_ack_pending(unsigned int irq)
     unsigned long flags;
 
     spin_lock_irqsave(&ioapic_lock, flags);
-    entry = &irq_2_pin[irq];
-    for (;;) {
+    for (entry = &irq_2_pin[irq]; entry; entry = pin_list_next(entry)) {
         unsigned int reg;
         int pin;
-
-        if (!entry)
-            break;
 
         pin = entry->pin;
         if (pin == -1)
@@ -1609,9 +1613,6 @@ static bool io_apic_level_ack_pending(unsigned int irq)
             spin_unlock_irqrestore(&ioapic_lock, flags);
             return 1;
         }
-        if (!entry->next)
-            break;
-        entry = irq_2_pin + entry->next;
     }
     spin_unlock_irqrestore(&ioapic_lock, flags);
 
