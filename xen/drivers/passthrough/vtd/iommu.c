@@ -1498,6 +1498,11 @@ int domain_context_mapping_one(
     ASSERT(pcidevs_locked());
     spin_lock(&iommu->lock);
     maddr = bus_to_context_maddr(iommu, bus);
+    if ( !maddr )
+    {
+        spin_unlock(&iommu->lock);
+        return -ENOMEM;
+    }
     context_entries = (struct context_entry *)map_vtd_domain_page(maddr);
     context = &context_entries[devfn];
     old = (lctxt = *context).full;
@@ -1852,6 +1857,12 @@ int domain_context_unmap_one(
     spin_lock(&iommu->lock);
 
     maddr = bus_to_context_maddr(iommu, bus);
+    if ( !maddr )
+    {
+        ASSERT_UNREACHABLE();
+        spin_unlock(&iommu->lock);
+        return 0;
+    }
     context_entries = (struct context_entry *)map_vtd_domain_page(maddr);
     context = &context_entries[devfn];
 
