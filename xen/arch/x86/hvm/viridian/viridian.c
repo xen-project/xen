@@ -577,26 +577,6 @@ static void vpmask_fill(struct hypercall_vpmask *vpmask)
     bitmap_fill(vpmask->mask, HVM_MAX_VCPUS);
 }
 
-static unsigned int vpmask_first(const struct hypercall_vpmask *vpmask)
-{
-    return find_first_bit(vpmask->mask, HVM_MAX_VCPUS);
-}
-
-static unsigned int vpmask_next(const struct hypercall_vpmask *vpmask,
-                                unsigned int vp)
-{
-    /*
-     * If vp + 1 > HVM_MAX_VCPUS then find_next_bit() will return
-     * HVM_MAX_VCPUS, ensuring the for_each_vp ( ... ) loop terminates.
-     */
-    return find_next_bit(vpmask->mask, HVM_MAX_VCPUS, vp + 1);
-}
-
-#define for_each_vp(vpmask, vp) \
-	for ( (vp) = vpmask_first(vpmask); \
-	      (vp) < HVM_MAX_VCPUS; \
-	      (vp) = vpmask_next(vpmask, vp) )
-
 static unsigned int vpmask_nr(const struct hypercall_vpmask *vpmask)
 {
     return bitmap_weight(vpmask->mask, HVM_MAX_VCPUS);
@@ -813,7 +793,7 @@ static void send_ipi(struct hypercall_vpmask *vpmask, uint8_t vector)
     if ( nr > 1 )
         cpu_raise_softirq_batch_begin();
 
-    for_each_vp ( vpmask, vp )
+    for_each_set_bit ( vp, vpmask->mask, currd->max_vcpus )
     {
         struct vlapic *vlapic = vcpu_vlapic(currd->vcpu[vp]);
 
