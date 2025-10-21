@@ -663,7 +663,7 @@ static int mca_cap_init(void)
         if ( !all )
             return -ENOMEM;
         for ( i = 0; i < nr; i++ )
-            mcabanks_set(i, mca_allbanks);
+            mcabanks_set(i, all);
         mcabanks_free(xchg(&mca_allbanks, all));
     }
 
