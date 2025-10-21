@@ -58,6 +58,9 @@ static inline void
 debugtrace_printk(const char *fmt, ...) {}
 #endif
 
+/* Common log prefixes for platform related issues. */
+#define DEV_BUG_PREFIX "DEVICE BUG: "
+
 extern void printk(const char *fmt, ...)
     __attribute__ ((format (printf, 1, 2), cold));
 void vprintk(const char *fmt, va_list args)
