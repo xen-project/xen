@@ -562,7 +562,8 @@ static void vpmask_set(struct hypercall_vpmask *vpmask, unsigned int vp,
 
         if ( mask & 1 )
         {
-            ASSERT(vp < HVM_MAX_VCPUS);
+            if ( vp >= HVM_MAX_VCPUS )
+                break;
             __set_bit(vp, vpmask->mask);
         }
 
