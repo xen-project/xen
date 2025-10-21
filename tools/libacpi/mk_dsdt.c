@@ -237,6 +237,11 @@ int main(int argc, char **argv)
     pop_block();
     /**** Processor end ****/
 #else
+    if (dm_version == QEMU_NONE) {
+        pop_block();
+        pop_block();
+        return 0;
+    }
 
     /* Operation Region 'PRST': bitmask of online CPUs. */
     stmt("OperationRegion", "PRST, SystemIO, %#x, %d",
@@ -285,10 +290,6 @@ int main(int argc, char **argv)
     pop_block();
     pop_block();
 
-    if (dm_version == QEMU_NONE) {
-        pop_block();
-        return 0;
-    }
     /**** Processor end ****/
 
 
