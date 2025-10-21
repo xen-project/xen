@@ -17,7 +17,7 @@ static bool __ro_after_init hwp_in_use;
 static bool __ro_after_init feature_hwp_notification;
 static bool __ro_after_init feature_hwp_activity_window;
 
-static bool __ro_after_init feature_hdc;
+static bool __read_mostly feature_hdc;
 
 static bool __ro_after_init opt_cpufreq_hdc = true;
 
