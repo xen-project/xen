@@ -31,7 +31,6 @@
 
 #include <asm/apic.h>
 #include <asm/io_apic.h>
-#define nr_ioapic_entries(i)  nr_ioapic_entries[i]
 
 /*
  * source validation type (SVT)
@@ -68,7 +67,7 @@ static int init_apic_pin_2_ir_idx(void)
 
     nr_pins = 0;
     for ( i = 0; i < nr_ioapics; i++ )
-        nr_pins += nr_ioapic_entries(i);
+        nr_pins += nr_ioapic_entries[i];
 
     _apic_pin_2_ir_idx = xmalloc_array(int, nr_pins);
     apic_pin_2_ir_idx = xmalloc_array(int *, nr_ioapics);
@@ -86,7 +85,7 @@ static int init_apic_pin_2_ir_idx(void)
     for ( i = 0; i < nr_ioapics; i++ )
     {
         apic_pin_2_ir_idx[i] = &_apic_pin_2_ir_idx[nr_pins];
-        nr_pins += nr_ioapic_entries(i);
+        nr_pins += nr_ioapic_entries[i];
     }
 
     return 0;
