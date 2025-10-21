@@ -10,8 +10,8 @@ include $(XEN_ROOT)/tools/Rules.mk
 TESTS := test-domid
 
 define list-c-headers
-$(shell sed -n -E \
-    's/^[ \t]*# *include[ \t]*[<"]([^">]+)[">].*/\1/p' $(1) 2>/dev/null)
+$(shell sed -n \
+    's/^[ \t]*# *include[ \t]*[<"]\([^">]*\)[">].*/\1/p' $(1) 2>/dev/null)
 endef
 
 # NB: $1 cannot be a list
