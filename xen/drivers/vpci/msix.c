@@ -17,6 +17,7 @@
  * License along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/vpci.h>
 
@@ -721,6 +722,51 @@ static int cf_check init_msix(struct pci_dev *pdev)
     if ( !msix )
         return -ENOMEM;
 
+    msix->tables[VPCI_MSIX_TABLE] =
+        pci_conf_read32(pdev->sbdf, msix_table_offset_reg(msix_offset));
+    msix->tables[VPCI_MSIX_PBA] =
+        pci_conf_read32(pdev->sbdf, msix_pba_offset_reg(msix_offset));
+
+    /* Check that the referenced BAR(s) regions are valid. */
+    for ( i = 0; i < ARRAY_SIZE(msix->tables); i++ )
+    {
+        const char *name = (i == VPCI_MSIX_TABLE) ? "vector" : "PBA";
+        const struct vpci_bar *bars = pdev->vpci->header.bars;
+        unsigned int bir = msix->tables[i] & PCI_MSIX_BIRMASK;
+        unsigned int type;
+        unsigned int offset = msix->tables[i] & ~PCI_MSIX_BIRMASK;
+        unsigned int size =
+            (i == VPCI_MSIX_TABLE) ? max_entries * PCI_MSIX_ENTRY_SIZE
+                                   : ROUNDUP(DIV_ROUND_UP(max_entries, 8), 8);
+
+        if ( bir >= ARRAY_SIZE(pdev->vpci->header.bars) )
+        {
+            printk(XENLOG_ERR DEV_BUG_PREFIX
+                   "%pp: MSI-X %s table with out of range BIR %u\n",
+                   &pdev->sbdf, name, bir);
+ invalid:
+            xfree(msix);
+            return -ENODEV;
+        }
+
+        type = bars[bir].type;
+        if ( type != VPCI_BAR_MEM32 && type != VPCI_BAR_MEM64_LO )
+        {
+            printk(XENLOG_ERR DEV_BUG_PREFIX
+                   "%pp: MSI-X %s table at invalid BAR%u with type %u\n",
+                   &pdev->sbdf, name, bir, type);
+            goto invalid;
+        }
+
+        if ( (uint64_t)offset + size > bars[bir].size )
+        {
+            printk(XENLOG_ERR DEV_BUG_PREFIX
+                   "%pp: MSI-X %s table offset %#x size %#x outside of BAR%u size %#lx\n",
+                   &pdev->sbdf, name, offset, size, bir, bars[bir].size);
+            goto invalid;
+        }
+    }
+
     rc = vpci_add_register(pdev->vpci, control_read, control_write,
                            msix_control_reg(msix_offset), 2, msix);
     if ( rc )
@@ -731,11 +777,6 @@ static int cf_check init_msix(struct pci_dev *pdev)
 
     msix->max_entries = max_entries;
     msix->pdev = pdev;
-
-    msix->tables[VPCI_MSIX_TABLE] =
-        pci_conf_read32(pdev->sbdf, msix_table_offset_reg(msix_offset));
-    msix->tables[VPCI_MSIX_PBA] =
-        pci_conf_read32(pdev->sbdf, msix_pba_offset_reg(msix_offset));
 
     for ( i = 0; i < max_entries; i++)
     {

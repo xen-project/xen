@@ -57,6 +57,9 @@ static inline void
 debugtrace_printk(const char *fmt, ...) {}
 #endif
 
+/* Common log prefixes for platform related issues. */
+#define DEV_BUG_PREFIX "DEVICE BUG: "
+
 /* Allows us to use '%p' as general-purpose machine-word format char. */
 #define _p(_x) ((void *)(unsigned long)(_x))
 extern void printk(const char *fmt, ...)
