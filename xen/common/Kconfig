@@ -653,6 +653,7 @@ menu "Supported hypercall interfaces"
 
 config SYSCTL
 	bool "Enable sysctl hypercall"
+	depends on !PV_SHIM_EXCLUSIVE
 	default y
 	help
 	  This option shall only be disabled on some dom0less systems, or
