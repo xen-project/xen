@@ -1016,7 +1016,7 @@ static int cf_check init_header(struct pci_dev *pdev)
     pci_conf_write16(pdev->sbdf, PCI_COMMAND, cmd);
     return rc;
 }
-REGISTER_VPCI_INIT(init_header, VPCI_PRIORITY_MIDDLE);
+REGISTER_VPCI_INIT(init_header, VPCI_PRIORITY_HIGH);
 
 /*
  * Local variables:
