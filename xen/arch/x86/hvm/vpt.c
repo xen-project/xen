@@ -48,7 +48,7 @@ uint64_t hvm_get_guest_time_fixed(const struct vcpu *v, uint64_t at_tsc)
     return now + v->arch.hvm.stime_offset;
 }
 
-void hvm_set_guest_time(struct vcpu *v, u64 guest_time)
+static void hvm_set_guest_time(struct vcpu *v, u64 guest_time)
 {
     u64 offset = guest_time - hvm_get_guest_time(v);
 

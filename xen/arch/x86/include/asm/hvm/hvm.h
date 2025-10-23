@@ -287,7 +287,6 @@ u64 hvm_scale_tsc(const struct domain *d, u64 tsc);
 u64 hvm_get_tsc_scaling_ratio(u32 gtsc_khz);
 
 void hvm_init_guest_time(struct domain *d);
-void hvm_set_guest_time(struct vcpu *v, u64 guest_time);
 uint64_t hvm_get_guest_time_fixed(const struct vcpu *v, uint64_t at_tsc);
 
 int vmsi_deliver(
