@@ -424,7 +424,7 @@ AC_SUBST([ZLIB_CFLAGS])
 AC_SUBST([ZLIB_LIBS])
 AX_CHECK_EXTFS
 AX_CHECK_PTHREAD
-PKG_CHECK_MODULES([libjsonc], [json-c],
+PKG_CHECK_MODULES([libjsonc], [json-c >= 0.15],
     [AC_DEFINE([HAVE_LIBJSONC], [1], [Use library json-c])],
     [AC_CHECK_LIB([yajl], [yajl_alloc],
         [AC_SUBST([YAJL_LIBS],[-lyajl])
