@@ -2001,7 +2001,8 @@ static void pci_remove_detached(libxl__egc *egc,
 {
     STATE_AO_GC(prs->aodev->ao);
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    unsigned int start = 0, end = 0, flags = 0, size = 0, irq = 0;
+    uint64_t start = 0, end = 0, flags = 0, size = 0;
+    unsigned int irq = 0;
     int i, stubdomid = 0;
     const char *sysfs_path;
     FILE *f;
@@ -2031,7 +2032,8 @@ static void pci_remove_detached(libxl__egc *egc,
     }
 
     for (i = 0; i < PROC_PCI_NUM_RESOURCES; i++) {
-        if (fscanf(f, "0x%x 0x%x 0x%x\n", &start, &end, &flags) != 3)
+        if (fscanf(f, "0x%"SCNx64" 0x%"SCNx64" 0x%"SCNx64"\n",
+                   &start, &end, &flags) != 3)
             continue;
         size = end - start + 1;
         if (start) {
@@ -2040,7 +2042,7 @@ static void pci_remove_detached(libxl__egc *egc,
                                                  size, 0);
                 if (rc < 0)
                     LOGED(ERROR, domid,
-                          "xc_domain_ioport_permission error 0x%x/0x%x",
+                          "xc_domain_ioport_permission error %#"PRIx64"/%#"PRIx64,
                           start,
                           size);
             } else {
@@ -2050,7 +2052,7 @@ static void pci_remove_detached(libxl__egc *egc,
                                                 0);
                 if (rc < 0)
                     LOGED(ERROR, domid,
-                          "xc_domain_iomem_permission error 0x%x/0x%x",
+                          "xc_domain_iomem_permission error %#"PRIx64"/%#"PRIx64,
                           start,
                           size);
             }
