@@ -1464,7 +1464,8 @@ void __init smp_intr_init(void)
 
         desc = irq_to_desc(irq);
         desc->arch.vector = vector;
-        cpumask_copy(desc->arch.cpu_mask, &cpu_online_map);
+        cpumask_copy(desc->arch.cpu_mask, cpumask_of(cpu));
+        cpumask_setall(desc->affinity);
     }
 
     /* Direct IPI vectors. */

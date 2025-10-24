@@ -547,6 +547,20 @@ static int _assign_irq_vector(struct irq_desc *desc, const cpumask_t *mask)
         cpumask_t tmp_mask;
 
         cpumask_and(&tmp_mask, mask, &cpu_online_map);
+
+        /*
+         * High priority vectors are reserved on all CPUs, hence moving them
+         * just requires changing the target CPU.  There's no need for vector
+         * allocation on the destination.
+         */
+        if ( old_vector >= FIRST_HIPRIORITY_VECTOR &&
+             old_vector <= LAST_HIPRIORITY_VECTOR )
+        {
+            cpumask_copy(desc->arch.cpu_mask,
+                         cpumask_of(cpumask_any(&tmp_mask)));
+            return 0;
+        }
+
         if (cpumask_intersects(&tmp_mask, desc->arch.cpu_mask)) {
             desc->arch.vector = old_vector;
             return 0;
@@ -756,12 +770,16 @@ void setup_vector_irq(unsigned int cpu)
         if ( !irq_desc_initialized(desc) )
             continue;
         vector = irq_to_vector(irq);
-        if ( vector >= FIRST_HIPRIORITY_VECTOR &&
-             vector <= LAST_HIPRIORITY_VECTOR )
-            cpumask_set_cpu(cpu, desc->arch.cpu_mask);
-        else if ( !cpumask_test_cpu(cpu, desc->arch.cpu_mask) )
-            continue;
-        per_cpu(vector_irq, cpu)[vector] = irq;
+        if ( cpumask_test_cpu(cpu, desc->arch.cpu_mask) ||
+             /*
+              * High-priority vectors are reserved on all CPUs.  Set
+              * the vector to IRQ assignment on all CPUs, even if the
+              * interrupt is not targeting this CPU.  That makes
+              * shuffling those interrupts around CPUs easier.
+              */
+             (vector >= FIRST_HIPRIORITY_VECTOR &&
+              vector <= LAST_HIPRIORITY_VECTOR) )
+            per_cpu(vector_irq, cpu)[vector] = irq;
     }
 }
 
