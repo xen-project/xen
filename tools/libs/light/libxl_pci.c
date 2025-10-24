@@ -1995,7 +1995,7 @@ static void do_pci_remove(libxl__egc *egc, pci_remove_state *prs)
         char *sysfs_path = GCSPRINTF(SYSFS_PCI_DEV"/"PCI_BDF"/resource", pci->domain,
                                      pci->bus, pci->dev, pci->func);
         FILE *f = fopen(sysfs_path, "r");
-        unsigned int start = 0, end = 0, flags = 0, size = 0;
+        uint64_t start = 0, end = 0, flags = 0, size = 0;
         int irq = 0;
         int i;
 
@@ -2004,7 +2004,8 @@ static void do_pci_remove(libxl__egc *egc, pci_remove_state *prs)
             goto skip1;
         }
         for (i = 0; i < PROC_PCI_NUM_RESOURCES; i++) {
-            if (fscanf(f, "0x%x 0x%x 0x%x\n", &start, &end, &flags) != 3)
+            if (fscanf(f, "0x%"SCNx64" 0x%"SCNx64" 0x%"SCNx64"\n",
+                       &start, &end, &flags) != 3)
                 continue;
             size = end - start + 1;
             if (start) {
@@ -2012,7 +2013,7 @@ static void do_pci_remove(libxl__egc *egc, pci_remove_state *prs)
                     rc = xc_domain_ioport_permission(ctx->xch, domid, start, size, 0);
                     if (rc < 0)
                         LOGED(ERROR, domainid,
-                              "xc_domain_ioport_permission error 0x%x/0x%x",
+                              "xc_domain_ioport_permission error %#"PRIx64"/%#"PRIx64,
                               start,
                               size);
                 } else {
@@ -2020,7 +2021,7 @@ static void do_pci_remove(libxl__egc *egc, pci_remove_state *prs)
                                                     (size+(XC_PAGE_SIZE-1))>>XC_PAGE_SHIFT, 0);
                     if (rc < 0)
                         LOGED(ERROR, domainid,
-                              "xc_domain_iomem_permission error 0x%x/0x%x",
+                              "xc_domain_iomem_permission error %#"PRIx64"/%#"PRIx64,
                               start,
                               size);
                 }
