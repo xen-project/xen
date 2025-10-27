@@ -44,27 +44,65 @@
     ((uint64_t)'f' << 16) | ((uint64_t)'R' << 8)  | ((uint64_t)129)
 #endif
 
-#define LLVM_PROFILE_VERSION    4
+#if __clang_major__ >= 19 && __clang_major__ <= 20
+#define LLVM_PROFILE_VERSION    10
+#define LLVM_PROFILE_NUM_KINDS  3
+#elif __clang_major__ == 18
+#define LLVM_PROFILE_VERSION    9
 #define LLVM_PROFILE_NUM_KINDS  2
+#elif __clang_major__ >= 14
+#define LLVM_PROFILE_VERSION    8
+#define LLVM_PROFILE_NUM_KINDS  2
+#elif __clang_major__ == 13
+#define LLVM_PROFILE_VERSION    7
+#define LLVM_PROFILE_NUM_KINDS  2
+#elif __clang_major__ >= 11
+#define LLVM_PROFILE_VERSION    5
+#define LLVM_PROFILE_NUM_KINDS  2
+#else
+#error "LLVM coverage selected but an unsupported clang version is used"
+#endif
 
 struct llvm_profile_data {
     uint64_t name_ref;
     uint64_t function_hash;
-    void *counter;
+    void *relative_counter;
+#if LLVM_PROFILE_VERSION >= 9
+    void *relative_bitmap;
+#endif
     void *function;
     void *values;
     uint32_t nr_counters;
     uint16_t nr_value_sites[LLVM_PROFILE_NUM_KINDS];
+#if LLVM_PROFILE_VERSION >= 9
+    uint32_t numbitmap_bytes;
+#endif
 };
 
 struct llvm_profile_header {
     uint64_t magic;
     uint64_t version;
-    uint64_t data_size;
-    uint64_t counters_size;
+#if LLVM_PROFILE_VERSION >= 7
+    uint64_t binary_ids_size;
+#endif
+    uint64_t num_data;
+    uint64_t padding_bytes_before_counters;
+    uint64_t num_counters;
+    uint64_t padding_bytes_after_counters;
+#if LLVM_PROFILE_VERSION >= 9
+    uint64_t num_bitmap_bytes;
+    uint64_t padding_bytes_after_bitmap_bytes;
+#endif
     uint64_t names_size;
     uint64_t counters_delta;
+#if LLVM_PROFILE_VERSION >= 9
+    uint64_t bitmap_delta;
+#endif
     uint64_t names_delta;
+#if LLVM_PROFILE_VERSION == 10
+    uint64_t num_vtables;
+    uint64_t vnames_size;
+#endif
     uint64_t value_kind_last;
 };
 
@@ -107,10 +145,14 @@ static int cf_check dump(
     struct llvm_profile_header header = {
         .magic = LLVM_PROFILE_MAGIC,
         .version = LLVM_PROFILE_VERSION,
-        .data_size = (END_DATA - START_DATA) / sizeof(struct llvm_profile_data),
-        .counters_size = (END_COUNTERS - START_COUNTERS) / sizeof(uint64_t),
+        .num_data = DIV_ROUND_UP(END_DATA - START_DATA, sizeof(struct llvm_profile_data)),
+        .num_counters = DIV_ROUND_UP(END_COUNTERS - START_COUNTERS, sizeof(uint64_t)),
         .names_size = END_NAMES - START_NAMES,
+#if LLVM_PROFILE_VERSION >= 8
+        .counters_delta = START_COUNTERS - START_DATA,
+#else
         .counters_delta = (uintptr_t)START_COUNTERS,
+#endif
         .names_delta = (uintptr_t)START_NAMES,
         .value_kind_last = LLVM_PROFILE_NUM_KINDS - 1,
     };

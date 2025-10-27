@@ -81,6 +81,19 @@
   .stab.index 0 : { *(.stab.index) }         \
   .stab.indexstr 0 : { *(.stab.indexstr) }
 
+/* Clang coverage sections. */
+#define LLVM_COV_RW_DATA                                   \
+    DECL_SECTION(__llvm_prf_cnts) { *(__llvm_prf_cnts) }   \
+    DECL_SECTION(__llvm_prf_data) { *(__llvm_prf_data) }   \
+    DECL_SECTION(__llvm_prf_bits) { *(__llvm_prf_bits) }
+
+#define LLVM_COV_RO_DATA                                   \
+    DECL_SECTION(__llvm_prf_names) { *(__llvm_prf_names) }
+
+#define LLVM_COV_DEBUG                                     \
+    DECL_DEBUG(__llvm_covfun, 8)                           \
+    DECL_DEBUG(__llvm_covmap, 8)
+
 /*
  * ELF sections.
  *

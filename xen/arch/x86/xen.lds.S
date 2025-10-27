@@ -186,6 +186,8 @@ SECTIONS
   } PHDR(note) PHDR(text)
 #endif
 
+  LLVM_COV_RO_DATA
+
   _erodata = .;
 
   . = ALIGN(SECTION_ALIGN);
@@ -323,6 +325,8 @@ SECTIONS
        *(.data .data.*)
   } PHDR(text)
 
+  LLVM_COV_RW_DATA
+
   DECL_SECTION(.bss) {
        __bss_start = .;
        *(.bss.page_aligned*)
@@ -356,6 +360,8 @@ SECTIONS
 #endif
 
   DWARF2_DEBUG_SECTIONS
+
+  LLVM_COV_DEBUG
 
 #ifdef CONFIG_HYPERV_GUEST
   hv_hcall_page = ABSOLUTE(HV_HCALL_PAGE - XEN_VIRT_START + __XEN_VIRT_START);
