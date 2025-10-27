@@ -55,7 +55,7 @@
 #define PG_translate   0
 #define PG_external    0
 #endif
-#ifdef CONFIG_PAGING
+#if defined(CONFIG_PAGING) && !defined(CONFIG_PV_SHIM_EXCLUSIVE)
 /* Enable log dirty mode */
 #define PG_log_dirty   (XEN_DOMCTL_SHADOW_ENABLE_LOG_DIRTY << PG_mode_shift)
 #else
