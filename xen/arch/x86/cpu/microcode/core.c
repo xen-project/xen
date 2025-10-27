@@ -870,8 +870,12 @@ int __init early_microcode_init(unsigned long *module_map,
     switch ( c->x86_vendor )
     {
     case X86_VENDOR_AMD:
-        if ( !opt_digest_check &&
-             boot_cpu_data.x86 >= 0x17 )
+        /*
+         * The Entrysign vulnerability (SB-7033, CVE-2024-36347) affects
+         * Zen1-5 CPUs.  Taint Xen if digest checking is turned off.
+         */
+        if ( boot_cpu_data.x86 >= 0x17 && boot_cpu_data.x86 <= 0x1a &&
+             !opt_digest_check )
         {
             printk(XENLOG_WARNING
                    "Microcode patch additional digest checks disabled\n");
