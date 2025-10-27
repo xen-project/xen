@@ -551,6 +551,13 @@ int cf_check amd_iommu_msi_msg_update_ire(
         for ( i = 1; i < nr; ++i )
             msi_desc[i].remap_index = msi_desc->remap_index + i;
         msg->data = data;
+        /*
+         * While the low address bits don't matter, "canonicalize" the address
+         * by zapping the bits that were transferred to the IRTE.  This way
+         * callers can check for there actually needing to be an update to
+         * wherever the address is put.
+         */
+        msg->address_lo &= ~(MSI_ADDR_DESTMODE_MASK | MSI_ADDR_DEST_ID_MASK);
     }
 
     return rc;
