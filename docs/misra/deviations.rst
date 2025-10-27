@@ -366,9 +366,15 @@ Deviations related to MISRA C:2012 Rules:
      - Tagged as `safe` for ECLAIR.
 
    * - R11.1
-     - The conversion from a function pointer to unsigned long or (void \*) does
+     - The conversion from a function pointer to unsigned long or '(void *)' does
        not lose any information, provided that the target type has enough bits
        to store it.
+     - Tagged as `safe` for ECLAIR.
+
+   * - R11.1
+     - Conversion from unsigned long or '(void *)' to a function pointer can
+       restore full information, provided that the source type has enough bits
+       to restore it.
      - Tagged as `safe` for ECLAIR.
 
    * - R11.1

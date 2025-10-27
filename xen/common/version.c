@@ -217,6 +217,25 @@ void __init xen_build_init(void)
 #endif /* CONFIG_X86 */
 }
 #endif /* BUILD_ID */
+
+/*
+ * This assertion checks compatibility between 'unsigned long', 'void *',
+ * and function pointers. This is true for most supported architectures,
+ * including X86 (x86_64) and ARM (arm, aarch64).
+ *
+ * For more context on architecture-specific preprocessor guards, see
+ * docs/misc/C-language-toolchain.rst.
+ *
+ * If porting Xen to a new architecture where this compatibility does not hold,
+ * exclude that architecture from these checks and provide suitable commentary
+ * and/or alternative checks as appropriate.
+ */
+static void __init __maybe_unused build_assertions(void)
+{
+    BUILD_BUG_ON(sizeof(unsigned long) != sizeof(void (*)(void)));
+    BUILD_BUG_ON(sizeof(void *) != sizeof(void (*)(void)));
+}
+
 /*
  * Local variables:
  * mode: C

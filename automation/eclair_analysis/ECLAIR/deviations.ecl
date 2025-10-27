@@ -375,6 +375,14 @@ constant expressions are required.\""
 }
 -doc_end
 
+-doc_begin="Conversion from unsigned long or (void *) to a function pointer can restore full information, provided that the source type has enough bits to restore it."
+-config=MC3A2.R11.1,casts+={safe,
+  "from(type(canonical(builtin(unsigned long)||pointer(builtin(void)))))
+   &&to(type(canonical(__function_pointer_types)))
+   &&relation(definitely_preserves_value)"
+}
+-doc_end
+
 -doc_begin="The conversion from a function pointer to a boolean has a well-known semantics that do not lead to unexpected behaviour."
 -config=MC3A2.R11.1,casts+={safe,
   "from(type(canonical(__function_pointer_types)))
