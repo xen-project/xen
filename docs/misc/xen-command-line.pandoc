@@ -2826,9 +2826,10 @@ stop_machine context. In NMI handler, even NMIs are blocked, which is
 considered safer. The default value is `true`.
 
 The `digest-check=` option is active by default and controls whether to
-perform additional authenticity checks.  Collisions in the signature algorithm
-used by AMD Fam17h/19h processors have been found.  Xen contains a table of
-digests of microcode patches with known-good provenance, and will block
+perform additional authenticity checks.  The Entrysign vulnerability (AMD
+SB-7033, CVE-2024-36347) on Zen1-5 processors allows forging the signature on
+arbitrary microcode such that it is accepted by the CPU.  Xen contains a table
+of digests of microcode patches with known-good provenance, and will block
 loading of patches that do not match.
 
 ### unrestricted_guest (Intel)
