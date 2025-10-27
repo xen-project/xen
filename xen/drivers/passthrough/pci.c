@@ -746,6 +746,7 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
                     printk(XENLOG_WARNING
                            "SR-IOV device %pp with vf BAR%u in IO space\n",
                            &pdev->sbdf, i);
+                    ++i;
                     continue;
                 }
                 ret = pci_size_mem_bar(pdev->sbdf, idx, NULL,
