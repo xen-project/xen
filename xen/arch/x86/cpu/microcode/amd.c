@@ -126,7 +126,7 @@ static bool check_digest(const struct container_microcode *mc)
      * microcode updates.  Mitigate by checking the digest of the patch
      * against a list of known provenance.
      */
-    if ( boot_cpu_data.x86 < 0x17 ||
+    if ( boot_cpu_data.x86 < 0x17 || boot_cpu_data.x86 > 0x1a ||
          !opt_digest_check )
         return true;
 
