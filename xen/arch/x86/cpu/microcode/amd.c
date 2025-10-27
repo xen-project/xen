@@ -126,7 +126,7 @@ static bool check_digest(const struct container_microcode *mc)
      * microcode updates.  Mitigate by checking the digest of the patch
      * against a list of known provenance.
      */
-    if ( boot_cpu_data.x86 < 0x17 ||
+    if ( boot_cpu_data.x86 < 0x17 || boot_cpu_data.x86 > 0x1a ||
          !opt_digest_check )
         return true;
 
@@ -564,7 +564,12 @@ static const struct microcode_ops __initconst_cf_clobber amd_ucode_ops = {
 
 void __init ucode_probe_amd(struct microcode_ops *ops)
 {
-    if ( !opt_digest_check && boot_cpu_data.x86 >= 0x17 )
+    /*
+     * The Entrysign vulnerability (SB-7033, CVE-2024-36347) affects Zen1-5
+     * CPUs.  Taint Xen if digest checking is turned off.
+     */
+    if ( boot_cpu_data.x86 >= 0x17 && boot_cpu_data.x86 <= 0x1a &&
+         !opt_digest_check )
     {
         printk(XENLOG_WARNING
                "Microcode patch additional digest checks disabled\n");
