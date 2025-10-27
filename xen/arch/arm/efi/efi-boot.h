@@ -191,15 +191,16 @@ static bool __init meminfo_add_bank(struct membanks *mem,
     return true;
 }
 
-static EFI_STATUS __init efi_process_memory_map_bootinfo(EFI_MEMORY_DESCRIPTOR *map,
+static EFI_STATUS __init efi_process_memory_map_bootinfo(void *map,
                                                 UINTN mmap_size,
                                                 UINTN desc_size)
 {
     int Index;
-    EFI_MEMORY_DESCRIPTOR *desc_ptr = map;
 
     for ( Index = 0; Index < (mmap_size / desc_size); Index++ )
     {
+        EFI_MEMORY_DESCRIPTOR *desc_ptr = map + desc_size * Index;
+
         if ( !(desc_ptr->Attribute & EFI_MEMORY_RUNTIME) &&
              (desc_ptr->Attribute & EFI_MEMORY_WB) &&
              (desc_ptr->Type == EfiConventionalMemory ||
@@ -227,7 +228,6 @@ static EFI_STATUS __init efi_process_memory_map_bootinfo(EFI_MEMORY_DESCRIPTOR *
             }
         }
 #endif
-        desc_ptr = NextMemoryDescriptor(desc_ptr, desc_size);
     }
 
     return EFI_SUCCESS;
