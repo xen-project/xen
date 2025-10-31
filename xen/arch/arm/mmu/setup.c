@@ -479,9 +479,6 @@ void free_init_memory(void)
 {
     paddr_t pa = virt_to_maddr(__init_begin);
     unsigned long len = __init_end - __init_begin;
-    uint32_t insn;
-    unsigned int i, nr = len / sizeof(insn);
-    uint32_t *p;
     int rc;
 
     rc = modify_xen_mappings((unsigned long)__init_begin,
@@ -495,15 +492,8 @@ void free_init_memory(void)
      */
     invalidate_icache_local();
 
-#ifdef CONFIG_ARM_32
-    /* udf instruction i.e (see A8.8.247 in ARM DDI 0406C.c) */
-    insn = 0xe7f000f0;
-#else
-    insn = AARCH64_BREAK_FAULT;
-#endif
-    p = (uint32_t *)__init_begin;
-    for ( i = 0; i < nr; i++ )
-        *(p + i) = insn;
+    /* Zeroing the memory before returning it */
+    memset(__init_begin, 0, len);
 
     rc = destroy_xen_mappings((unsigned long)__init_begin,
                               (unsigned long)__init_end);
