@@ -176,10 +176,9 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 		*sym++ = '#';
 	}
 	strcpy(sym, str);
-	if (sort_by_name || map_only) {
+	if (sort_by_name || map_only)
 		s->orig_symbol = strdup(SYMBOL_NAME(s));
-		s->type = stype; /* As s->sym[0] ends mangled. */
-	}
+	s->type = stype; /* As s->sym[0] may end up mangled. */
 	s->sym[0] = stype;
 	s->typed = strcmp(type, "FUNC") == 0 ||
 	           strcmp(type, "OBJECT") == 0 ||
@@ -313,6 +312,7 @@ static int compare_name_orig(const void *p1, const void *p2)
 static bool want_symbol_end(unsigned int idx)
 {
 	return table[idx].size &&
+	       toupper(table[idx].type) == 'T' &&
 	       (idx + 1 == table_cnt ||
 	        table[idx].addr + table[idx].size < table[idx + 1].addr);
 }
