@@ -45,6 +45,23 @@ eclair-x86_64:
     LOGFILE: "eclair-x86_64.log"
     VARIANT: "X86_64"
     RULESET: "monitored"
+  allow_failure: true
+
+eclair-x86_64-testing:
+  extends: eclair-x86_64
+  tags:
+    - eclair-analysis-testing
+  rules:
+    - if: $ECLAIR_TESTING
+      when: always
+    - !reference [.eclair-analysis:triggered, rules]
+
+eclair-x86_64-safety:
+  extends: eclair-x86_64
+  tags:
+    - eclair-analysis-safety
+  allow_failure: false
+  variables:
     EXTRA_XEN_CONFIG: |
       CONFIG_AMD=y
       CONFIG_INTEL=n
@@ -75,6 +92,10 @@ eclair-x86_64:
       CONFIG_DEBUG_LOCKS=n
       CONFIG_SCRUB_DEBUG=n
       CONFIG_XMEM_POOL_POISON=n
+  rules:
+    - if: $ECLAIR_SAFETY
+      when: always
+    - !reference [.eclair-analysis:triggered, rules]
 
 eclair-ARM64:
   extends: .eclair-analysis:triggered
@@ -82,6 +103,23 @@ eclair-ARM64:
     LOGFILE: "eclair-ARM64.log"
     VARIANT: "ARM64"
     RULESET: "monitored"
+  allow_failure: true
+
+eclair-ARM64-testing:
+  extends: eclair-ARM64
+  tags:
+    - eclair-analysis-testing
+  rules:
+    - if: $ECLAIR_TESTING
+      when: always
+    - !reference [.eclair-analysis:triggered, rules]
+
+eclair-ARM64-safety:
+  extends: eclair-ARM64
+  tags:
+    - eclair-analysis-safety
+  allow_failure: false
+  variables:
     EXTRA_XEN_CONFIG: |
       CONFIG_NR_CPUS=16
       CONFIG_GICV2=n
@@ -120,6 +158,10 @@ eclair-ARM64:
       CONFIG_DEBUG_LOCKS=n
       CONFIG_SCRUB_DEBUG=n
       CONFIG_XMEM_POOL_POISON=n
+  rules:
+    - if: $ECLAIR_SAFETY
+      when: always
+    - !reference [.eclair-analysis, rules]
 
 .eclair-analysis:on-schedule:
   extends: .eclair-analysis
