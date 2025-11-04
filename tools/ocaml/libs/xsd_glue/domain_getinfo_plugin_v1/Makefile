@@ -11,7 +11,7 @@ OBJS = domain_getinfo_v1
 INTF = $(foreach obj, $(OBJS),$(obj).cmi)
 LIBS = domain_getinfo_v1.cmxa domain_getinfo_v1.cmxs
 
-LIBS_xsd_glue = $(call xenlibs-ldflags-ldlibs,xenctrl)
+LIBS_domain_getinfo_v1 = $(call xenlibs-ldflags-ldlibs,ctrl)
 
 all: $(INTF) $(LIBS) $(PROGRAMS)
 
