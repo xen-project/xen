@@ -1049,11 +1049,25 @@ static void amd_check_bp_cfg(void)
 {
 	uint64_t val, new = 0;
 
-	/*
-	 * AMD Erratum #1485.  Set bit 5, as instructed.
-	 */
-	if (!cpu_has_hypervisor && boot_cpu_data.x86 == 0x19 && is_zen4_uarch())
-		new |= (1 << 5);
+	if (!cpu_has_hypervisor) {
+		/*
+		 * AMD Erratum #1485.  If SMT is enabled and STIBP disabled,
+		 * the CPU may fetch incorrect instruction bytes.
+		 *
+		 * Set bit 5, as instructed.
+		 */
+		if (boot_cpu_data.x86 == 0x19 && is_zen4_uarch())
+			new |= (1 << 5);
+
+		/*
+		 * AMD SB-7052.  CPU OP Cache corruption, causing instructions
+		 * to be executed at a higher privilege.
+		 *
+		 * Set bit 33, as instructed.
+		 */
+		if (boot_cpu_data.x86 == 0x17 && is_zen2_uarch())
+			new |= (1UL << 33);
+	}
 
 	/*
 	 * On hardware supporting SRSO_MSR_FIX, activate BP_SPEC_REDUCE by
