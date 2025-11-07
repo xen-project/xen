@@ -259,6 +259,8 @@ static const char *const str_e21c[32] =
 {
     /* 0 */                       [ 1] = "tsa-sq-no",
     [ 2] = "tsa-l1-no",
+
+                                  [ 7] = "tsa-fill-no",
 };
 
 static const struct {
