@@ -655,10 +655,12 @@ void __init amd_check_entrysign(void)
     case 0x0aa001: fixed_rev = 0x17; break;
     case 0x0aa002: fixed_rev = 0x19; break;
     case 0x0b0021: fixed_rev = 0x47; break;
+    case 0x0b0081: fixed_rev = 0x12; break;
     case 0x0b1010: fixed_rev = 0x47; break;
     case 0x0b2040: fixed_rev = 0x32; break;
     case 0x0b4040: fixed_rev = 0x32; break;
     case 0x0b6000: fixed_rev = 0x32; break;
+    case 0x0b6080: fixed_rev = 0x32; break;
     case 0x0b7000: fixed_rev = 0x32; break;
     default:
         printk(XENLOG_WARNING
