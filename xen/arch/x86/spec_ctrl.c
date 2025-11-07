@@ -1526,11 +1526,11 @@ static void __init rfds_calculations(void)
 }
 
 /*
- * Transient Scheduler Attacks
+ * Transient Scheduler Attacks (Store Queue and L1)
  *
  * https://www.amd.com/content/dam/amd/en/documents/resources/bulletin/technical-guidance-for-mitigating-transient-scheduler-attacks.pdf
  */
-static void __init tsa_calculations(void)
+static void __init tsa_sq_l1_calculations(void)
 {
     unsigned int curr_rev, min_rev;
 
@@ -2327,9 +2327,9 @@ void __init init_speculation_mitigations(void)
      * - March 2023, for RFDS.  Enumerate RFDS_CLEAR to mean that VERW now
      *   scrubs non-architectural entries from certain register files.
      *
-     * - July 2025, for TSA.  Introduces VERW side effects to mitigate
-     *   TSA_{SQ/L1}.  Xen must synthesise the VERW_CLEAR feature based on
-     *   microcode version.
+     * - July 2025, for TSA-L1/SQ.  Introduces VERW side effects on Zen3/4.
+     *   Xen must synthesise the VERW_CLEAR feature based on microcode
+     *   version.
      *
      *   Note, these microcode updates were produced before the remediation of
      *   the microcode signature issues, and are included in the firwmare
@@ -2337,7 +2337,7 @@ void __init init_speculation_mitigations(void)
      */
     mds_calculations();
     rfds_calculations();
-    tsa_calculations();
+    tsa_sq_l1_calculations();
 
     /*
      * Parts which enumerate FB_CLEAR are those with now-updated microcode
