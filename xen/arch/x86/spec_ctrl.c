@@ -515,7 +515,7 @@ static void __init print_details(enum ind_thunk thunk)
      * Hardware read-only information, stating immunity to certain issues, or
      * suggestions of which mitigation to use.
      */
-    printk("  Hardware hints:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
+    printk("  Hardware hints:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
            (caps & ARCH_CAPS_RDCL_NO)                        ? " RDCL_NO"        : "",
            (caps & ARCH_CAPS_EIBRS)                          ? " EIBRS"          : "",
            (caps & ARCH_CAPS_RSBA)                           ? " RSBA"           : "",
@@ -542,7 +542,8 @@ static void __init print_details(enum ind_thunk thunk)
            (e21a & cpufeat_mask(X86_FEATURE_SRSO_NO))        ? " SRSO_NO"        : "",
            (e21a & cpufeat_mask(X86_FEATURE_SRSO_US_NO))     ? " SRSO_US_NO"     : "",
            (e21c & cpufeat_mask(X86_FEATURE_TSA_SQ_NO))      ? " TSA_SQ_NO"      : "",
-           (e21c & cpufeat_mask(X86_FEATURE_TSA_L1_NO))      ? " TSA_L1_NO"      : "");
+           (e21c & cpufeat_mask(X86_FEATURE_TSA_L1_NO))      ? " TSA_L1_NO"      : "",
+           (e21c & cpufeat_mask(X86_FEATURE_TSA_FILL_NO))    ? " TSA_FILL_NO"    : "");
 
     /* Hardware features which need driving to mitigate issues. */
     printk("  Hardware features:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
@@ -1602,6 +1603,33 @@ static void __init tsa_sq_l1_calculations(void)
         setup_force_cpu_cap(X86_FEATURE_VERW_CLEAR);
 }
 
+/*
+ * Transient Scheduler Attacks (L1-Fill)
+ *
+ * https://www.amd.com/content/dam/amd/en/documents/resources/bulletin/technical-guidance-for-mitigating-transient-scheduler-attacks.pdf
+ */
+static void __init tsa_fill_calculations(void)
+{
+    /* TSA is only known to affect AMD processors at this time. */
+    if ( boot_cpu_data.vendor != X86_VENDOR_AMD )
+        return;
+
+    /* If we're virtualised, don't attempt to synthesise anything. */
+    if ( cpu_has_hypervisor )
+        return;
+
+    /*
+     * Zen6 and later CPUs are expected to enumerate TSA_FILL_NO.
+     *
+     * Zen5 CPUs are vulnerable and get VERW_CLEAR in microcode.
+     *
+     * Zen4 and earlier are not believed to be affected, but do not enumerate
+     * TSA_FILL_NO.  Synthesise it.
+     */
+    if ( boot_cpu_data.x86 < 0x1a )
+        setup_force_cpu_cap(X86_FEATURE_TSA_FILL_NO);
+}
+
 static bool __init cpu_has_gds(void)
 {
     /*
@@ -2347,6 +2375,7 @@ void __init init_speculation_mitigations(void)
     mds_calculations();
     rfds_calculations();
     tsa_sq_l1_calculations();
+    tsa_fill_calculations();
 
     /*
      * Parts which enumerate FB_CLEAR are those with now-updated microcode
