@@ -2503,7 +2503,7 @@ guests effectively allowing vCPU hotplug.
 
 This is a special value that enables the default set of groups, which
 is currently the B<base>, B<freq>, B<time_ref_count>, B<apic_assist>,
-B<crash_ctl>, B<stimer>, B<no_vp_limit> and B<cpu_hotplug> groups.
+B<crash_ctl>, B<no_vp_limit> and B<cpu_hotplug> groups.
 
 =item B<all>
 
