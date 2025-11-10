@@ -290,12 +290,6 @@ static int hpet_msi_write(struct hpet_event_channel *ch, struct msi_msg *msg)
     return 0;
 }
 
-static unsigned int cf_check hpet_msi_startup(struct irq_desc *desc)
-{
-    hpet_msi_unmask(desc);
-    return 0;
-}
-
 #define hpet_msi_shutdown hpet_msi_mask
 
 static void cf_check hpet_msi_set_affinity(
@@ -321,7 +315,7 @@ static void cf_check hpet_msi_set_affinity(
  */
 static hw_irq_controller hpet_msi_type = {
     .typename   = "HPET-MSI",
-    .startup    = hpet_msi_startup,
+    .startup    = irq_startup_none,
     .shutdown   = hpet_msi_shutdown,
     .enable	    = hpet_msi_unmask,
     .disable    = hpet_msi_mask,
@@ -521,6 +515,8 @@ static void hpet_detach_channel(unsigned int cpu,
         spin_unlock_irq(&ch->lock);
     else if ( (next = cpumask_first(ch->cpumask)) >= nr_cpu_ids )
     {
+        hpet_write32(hpet_read32(HPET_COUNTER), HPET_Tn_CMP(ch->idx));
+        ch->next_event = STIME_MAX;
         ch->cpu = -1;
         clear_bit(HPET_EVT_USED_BIT, &ch->flags);
         spin_unlock_irq(&ch->lock);
