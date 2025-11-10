@@ -63,6 +63,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
  - Support of qemu-traditional has been removed.
 
+ - The in-tree oxenstored is deprecated and will be removed in a future
+   version of Xen.  It is moving into the Xapi project
+   https://github.com/xapi-project/oxenstored so it can be maintained in line
+   with the other Ocaml projects in the Xen ecosystem.
+
 ## [4.20.0](https://xenbits.xenproject.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.20.0) - 2025-03-05
 
 ### Changed
