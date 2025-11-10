@@ -359,12 +359,6 @@ static int __init check_partial_fdt(void *pfdt, size_t size)
 {
     int res;
 
-    if ( fdt_magic(pfdt) != FDT_MAGIC )
-    {
-        dprintk(XENLOG_ERR, "Partial FDT is not a valid Flat Device Tree");
-        return -EINVAL;
-    }
-
     res = fdt_check_header(pfdt);
     if ( res )
     {
