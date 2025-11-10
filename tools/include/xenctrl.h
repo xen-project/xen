@@ -1633,7 +1633,7 @@ int xc_physdev_map_pirq_msi(xc_interface *xch,
                             int index,
                             int *pirq,
                             int devfn,
-                            int bus,
+                            int segbus,
                             int entry_nr,
                             uint64_t table_base);
 
