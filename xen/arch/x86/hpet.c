@@ -194,7 +194,7 @@ static void evt_do_broadcast(cpumask_t *mask)
 
 static void cf_check handle_hpet_broadcast(struct hpet_event_channel *ch)
 {
-    cpumask_t mask;
+    cpumask_t *scratch = this_cpu(hpet_scratch_cpumask);
     s_time_t now, next_event;
     unsigned int cpu;
     unsigned long flags;
@@ -207,7 +207,7 @@ again:
     spin_unlock_irqrestore(&ch->lock, flags);
 
     next_event = STIME_MAX;
-    cpumask_clear(&mask);
+    cpumask_clear(scratch);
     now = NOW();
 
     /* find all expired events */
@@ -216,13 +216,13 @@ again:
         s_time_t deadline = ACCESS_ONCE(per_cpu(timer_deadline, cpu));
 
         if ( deadline <= now )
-            __cpumask_set_cpu(cpu, &mask);
+            __cpumask_set_cpu(cpu, scratch);
         else if ( deadline < next_event )
             next_event = deadline;
     }
 
     /* wakeup the cpus which have an expired event. */
-    evt_do_broadcast(&mask);
+    evt_do_broadcast(scratch);
 
     if ( next_event != STIME_MAX )
     {
