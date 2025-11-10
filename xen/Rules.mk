@@ -135,7 +135,7 @@ $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS-y += -DINIT_SECTIONS
 non-init-objects = $(filter-out %.init.o, $(obj-y) $(obj-bin-y) $(extra-y))
 
 ifeq ($(CONFIG_CC_IS_CLANG),y)
-    cov-cflags-$(CONFIG_COVERAGE) := -fprofile-instr-generate -fcoverage-mapping
+    cov-cflags-$(CONFIG_COVERAGE) := -fprofile-instr-generate -fcoverage-mapping -fcoverage-mcdc
 else
     cov-cflags-$(CONFIG_COVERAGE) := -fprofile-arcs -ftest-coverage
     cov-cflags-$(CONFIG_CONDITION_COVERAGE) += -fcondition-coverage
