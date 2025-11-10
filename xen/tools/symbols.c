@@ -213,6 +213,16 @@ static int symbol_valid(struct sym_entry *s)
 	if (strstr((char *)s->sym + offset, "_compiled."))
 		return 0;
 
+	/* At least GNU ld 2.25 may emit bogus file symbols referencing a
+	 * section name while linking xen.efi. In COFF symbol tables the
+	 * "value" of file symbols is a link (symbol table index) to the next
+	 * file symbol. Since file (and other) symbols (can) come with one
+	 * (or in principle more) auxiliary symbol table entries, the value in
+	 * this heuristic is bounded to twice the number of symbols we have
+	 * found. See also read_symbol() as to the '?' checked for here. */
+	if (s->sym[0] == '?' && s->sym[1] == '.' && s->addr < table_cnt * 2)
+		return 0;
+
 	return 1;
 }
 
