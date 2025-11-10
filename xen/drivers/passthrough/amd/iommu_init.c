@@ -429,8 +429,6 @@ static void cf_check iommu_msi_mask(struct irq_desc *desc)
     unsigned long flags;
     struct amd_iommu *iommu = desc->action->dev_id;
 
-    irq_complete_move(desc);
-
     spin_lock_irqsave(&iommu->lock, flags);
     amd_iommu_msi_enable(iommu, IOMMU_CONTROL_DISABLED);
     spin_unlock_irqrestore(&iommu->lock, flags);
@@ -441,6 +439,13 @@ static unsigned int cf_check iommu_msi_startup(struct irq_desc *desc)
 {
     iommu_msi_unmask(desc);
     return 0;
+}
+
+static void cf_check iommu_msi_ack(struct irq_desc *desc)
+{
+    irq_complete_move(desc);
+    iommu_msi_mask(desc);
+    move_masked_irq(desc);
 }
 
 static void cf_check iommu_msi_end(struct irq_desc *desc, u8 vector)
@@ -456,7 +461,7 @@ static hw_irq_controller iommu_msi_type = {
     .shutdown = iommu_msi_mask,
     .enable = iommu_msi_unmask,
     .disable = iommu_msi_mask,
-    .ack = iommu_msi_mask,
+    .ack = iommu_msi_ack,
     .end = iommu_msi_end,
     .set_affinity = set_msi_affinity,
 };
