@@ -22,6 +22,9 @@
 #define FIRST_LEGACY_VECTOR     FIRST_DYNAMIC_VECTOR
 #define LAST_LEGACY_VECTOR      (FIRST_LEGACY_VECTOR + 0xf)
 
+/* HPET broadcast is statically allocated and wants to be low priority. */
+#define HPET_BROADCAST_VECTOR   (LAST_LEGACY_VECTOR + 1)
+
 #ifdef CONFIG_PV32
 #define HYPERCALL_VECTOR        0x82
 #endif

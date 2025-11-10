@@ -90,6 +90,7 @@ void hpet_disable_legacy_replacement_mode(void);
  * rather than using the LAPIC timer. Used for Cx state entry.
  */
 void hpet_broadcast_init(void);
+void hpet_broadcast_late_init(void);
 void hpet_broadcast_resume(void);
 void cf_check hpet_broadcast_enter(void);
 void cf_check hpet_broadcast_exit(void);

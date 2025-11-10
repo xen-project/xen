@@ -2546,6 +2546,8 @@ static int __init cf_check disable_pit_irq(void)
                "Force enable with 'cpuidle'.\n");
     }
 
+    hpet_broadcast_late_init();
+
     return 0;
 }
 __initcall(disable_pit_irq);
