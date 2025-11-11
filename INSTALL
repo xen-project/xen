@@ -23,7 +23,7 @@ Xen Hypervisor
 ==============
 
 Xen itself is configured via a `kconfig' system borrowed from Linux.
-See docs/misc/kconfig.txt.
+See https://www.kernel.org/doc/html/v5.4/kbuild/.
 
 Note that unlike with Linux, and contrary to that document, you cannot
 look at Kconfig files, or the default or generated config files etc.,
