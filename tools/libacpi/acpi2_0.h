@@ -140,7 +140,6 @@ struct acpi_20_tpm2 {
 
 #define TPM_LOG_AREA_ADDRESS        0xFED50000
 
-#define TPM_LOG_AREA_MINIMUM_SIZE   (64 << 10)
 #define TPM_LOG_SIZE                (64 << 10)
 
 /*

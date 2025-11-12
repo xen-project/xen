@@ -473,7 +473,7 @@ static int construct_secondary_tables(struct acpi_ctxt *ctxt,
             tpm2->platform_class = TPM2_ACPI_CLASS_CLIENT;
             tpm2->control_area_address = TPM_CRB_CTRL_REQ;
             tpm2->start_method = TPM2_START_METHOD_CRB;
-            tpm2->log_area_minimum_length = TPM_LOG_AREA_MINIMUM_SIZE;
+            tpm2->log_area_minimum_length = TPM_LOG_SIZE;
             tpm2->log_area_start_address = TPM_LOG_AREA_ADDRESS;
 
             set_checksum(tpm2,
