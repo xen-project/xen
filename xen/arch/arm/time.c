@@ -303,9 +303,15 @@ static void check_timer_irq_cfg(unsigned int irq, const char *which)
            "WARNING: %s-timer IRQ%u is not level triggered.\n", which, irq);
 }
 
+static DEFINE_PER_CPU_READ_MOSTLY(struct irqaction, irq_hyp);
+static DEFINE_PER_CPU_READ_MOSTLY(struct irqaction, irq_virt);
+
 /* Set up the timer interrupt on this CPU */
 void init_timer_interrupt(void)
 {
+    struct irqaction *hyp_action = &this_cpu(irq_hyp);
+    struct irqaction *virt_action = &this_cpu(irq_virt);
+
     /* Sensible defaults */
     WRITE_SYSREG64(0, CNTVOFF_EL2);     /* No VM-specific offset */
     /* Do not let the VMs program the physical timer, only read the physical counter */
@@ -314,10 +320,17 @@ void init_timer_interrupt(void)
     WRITE_SYSREG(0, CNTHP_CTL_EL2);   /* Hypervisor's timer disabled */
     isb();
 
-    request_irq(timer_irq[TIMER_HYP_PPI], 0, htimer_interrupt,
-                "hyptimer", NULL);
-    request_irq(timer_irq[TIMER_VIRT_PPI], 0, vtimer_interrupt,
-                   "virtimer", NULL);
+    hyp_action->name = "hyptimer";
+    hyp_action->handler = htimer_interrupt;
+    hyp_action->dev_id = NULL;
+    hyp_action->free_on_release = 0;
+    setup_irq(timer_irq[TIMER_HYP_PPI], 0, hyp_action);
+
+    virt_action->name = "virtimer";
+    virt_action->handler = vtimer_interrupt;
+    virt_action->dev_id = NULL;
+    virt_action->free_on_release = 0;
+    setup_irq(timer_irq[TIMER_VIRT_PPI], 0, virt_action);
 
     check_timer_irq_cfg(timer_irq[TIMER_HYP_PPI], "hypervisor");
     check_timer_irq_cfg(timer_irq[TIMER_VIRT_PPI], "virtual");
