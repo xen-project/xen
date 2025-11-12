@@ -208,15 +208,12 @@ static void __init replace_pin_at_irq(unsigned int irq,
 {
     struct irq_pin_list *entry = irq_2_pin + irq;
 
-    while (1) {
+    for (; entry; entry = pin_list_next(entry)) {
         if (entry->apic == oldapic && entry->pin == oldpin) {
             entry->apic = newapic;
             entry->pin = newpin;
             share_vector_maps(oldapic, newapic);
         }
-        if (!entry->next)
-            break;
-        entry = irq_2_pin + entry->next;
     }
 }
 
@@ -490,7 +487,7 @@ static void modify_IO_APIC_irq(unsigned int irq, unsigned int enable,
 {
     struct irq_pin_list *entry = irq_2_pin + irq;
 
-    for (;;) {
+    for (; entry; entry = pin_list_next(entry)) {
         unsigned int pin = entry->pin;
         struct IO_APIC_route_entry rte;
 
@@ -500,9 +497,6 @@ static void modify_IO_APIC_irq(unsigned int irq, unsigned int enable,
         rte.raw &= ~(uint64_t)disable;
         rte.raw |= enable;
         __ioapic_write_entry(entry->apic, pin, false, rte);
-        if (!entry->next)
-            break;
-        entry = irq_2_pin + entry->next;
     }
 }
 
@@ -553,14 +547,11 @@ static void __eoi_IO_APIC_irq(struct irq_desc *desc)
     struct irq_pin_list *entry = irq_2_pin + desc->irq;
     unsigned int pin, vector = desc->arch.vector;
 
-    for (;;) {
+    for (; entry; entry = pin_list_next(entry)) {
         pin = entry->pin;
         if (pin == -1)
             break;
         __io_apic_eoi(entry->apic, vector, pin);
-        if (!entry->next)
-            break;
-        entry = irq_2_pin + entry->next;
     }
 }
 
@@ -640,7 +631,7 @@ set_ioapic_affinity_irq(struct irq_desc *desc, const cpumask_t *mask)
         if ( !iommu_intremap || !x2apic_enabled )
             dest = SET_APIC_LOGICAL_ID(dest);
         entry = irq_2_pin + irq;
-        for (;;) {
+        for (; entry; entry = pin_list_next(entry)) {
             struct IO_APIC_route_entry rte;
 
             pin = entry->pin;
@@ -651,10 +642,6 @@ set_ioapic_affinity_irq(struct irq_desc *desc, const cpumask_t *mask)
             rte.dest.dest32 = dest;
             rte.vector = desc->arch.vector;
             __ioapic_write_entry(entry->apic, pin, false, rte);
-
-            if (!entry->next)
-                break;
-            entry = irq_2_pin + entry->next;
         }
     }
 
@@ -1316,12 +1303,8 @@ static void /*__init*/ __print_IO_APIC(bool boot)
         if (entry->pin < 0)
             continue;
         printk(KERN_DEBUG "IRQ%d ", irq_to_desc(i)->arch.vector);
-        for (;;) {
+        for (; entry; entry = pin_list_next(entry))
             printk("-> %d:%d", entry->apic, entry->pin);
-            if (!entry->next)
-                break;
-            entry = irq_2_pin + entry->next;
-        }
         printk("\n");
     }
 
@@ -2415,7 +2398,7 @@ void dump_ioapic_irq_info(void)
 
         printk("    IRQ%3d Vec%3d:\n", irq, irq_to_vector(irq));
 
-        for ( ; ; )
+        for ( ; entry; entry = pin_list_next(entry))
         {
             pin = entry->pin;
 
@@ -2432,10 +2415,6 @@ void dump_ioapic_irq_info(void)
                    (x2apic_enabled && iommu_intremap) ? 8 : 2,
                    (x2apic_enabled && iommu_intremap) ?
                        rte.dest.dest32 : rte.dest.logical.logical_dest);
-
-            if ( entry->next == 0 )
-                break;
-            entry = &irq_2_pin[entry->next];
         }
     }
 }
