@@ -40,8 +40,6 @@ struct minimal_dtb_header {
     /* There are other fields but we don't use them yet. */
 };
 
-#define DTB_MAGIC 0xd00dfeedU
-
 static void __init place_modules(struct kernel_info *info,
                                  paddr_t kernbase, paddr_t kernend)
 {
@@ -383,7 +381,7 @@ static int __init kernel_zimage32_probe(struct kernel_info *info,
     if ( addr + end - start + sizeof(dtb_hdr) <= size )
     {
         copy_from_paddr(&dtb_hdr, addr + end - start, sizeof(dtb_hdr));
-        if (be32_to_cpu(dtb_hdr.magic) == DTB_MAGIC) {
+        if (be32_to_cpu(dtb_hdr.magic) == FDT_MAGIC) {
             end += be32_to_cpu(dtb_hdr.total_size);
 
             if ( end > addr + size )
