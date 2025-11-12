@@ -149,12 +149,6 @@ else
 date = $(shell LC_ALL=C date $(1))
 endif
 
-define buildmakevars2shellvars
-    export PREFIX="$(prefix)";                                            \
-    export XEN_SCRIPT_DIR="$(XEN_SCRIPT_DIR)";                            \
-    export XEN_ROOT="$(XEN_ROOT)"
-endef
-
 #
 # Compare $(1) and $(2) and replace $(2) with $(1) if they differ
 #
