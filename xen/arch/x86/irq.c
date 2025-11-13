@@ -450,12 +450,12 @@ int __init init_irq_data(void)
 
 #ifdef CONFIG_PV
     /* Never allocate the Linux/BSD fast-trap vector. */
-    set_bit(LEGACY_SYSCALL_VECTOR, used_vectors);
+    __set_bit(LEGACY_SYSCALL_VECTOR, used_vectors);
 #endif
 
 #ifdef CONFIG_PV32
     /* Never allocate the hypercall vector. */
-    set_bit(HYPERCALL_VECTOR, used_vectors);
+    __set_bit(HYPERCALL_VECTOR, used_vectors);
 #endif
     
     /*
