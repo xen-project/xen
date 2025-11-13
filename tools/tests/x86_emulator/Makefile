@@ -261,7 +261,8 @@ $(TARGET): $(OBJS)
 .PHONY: clean
 clean:
 	rm -rf $(TARGET) *.o *~ core *.bin x86_emulate
-	rm -rf $(TARGET) $(addsuffix .h,$(TESTCASES)) $(addsuffix -opmask.h,$(OPMASK))
+	rm -rf $(addsuffix .h,$(TESTCASES)) $(addsuffix -opmask.h,$(OPMASK))
+	rm -rf $(addsuffix .c,$(filter-out blowfish,$(TESTCASES)))
 
 .PHONY: distclean
 distclean: clean
