@@ -49,6 +49,6 @@ git_archive_into $xen_root/tools/qemu-xen-traditional-dir-remote $tdir/xen-$desc
 
 git_archive_into $xen_root/extras/mini-os-remote $tdir/xen-$desc/extras/mini-os
 
-GZIP=-9v tar cz -f $xen_root/dist/xen-$desc.tar.gz -C $tdir xen-$desc
+GZIP=-9v tar cz -f $xen_root/dist/xen-$desc.tar.gz --owner 0 --group 0 -C $tdir xen-$desc
 
 echo "Source tarball in $xen_root/dist/xen-$desc.tar.gz"
