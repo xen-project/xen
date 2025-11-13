@@ -1,6 +1,6 @@
 #
 # For a description of the syntax of this configuration file,
-# see docs/misc/kconfig-language.txt
+# see https://www.kernel.org/doc/html/v5.4/kbuild/kconfig-language.html
 #
 mainmenu "Xen/$(SRCARCH) $(XEN_FULLVERSION) Configuration"
 
