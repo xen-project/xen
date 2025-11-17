@@ -70,12 +70,13 @@ static unsigned int nr_cores;
  *  - LOADING_ENTER: all CPUs have called in. Initiate ucode loading.
  *  - LOADING_EXIT: ucode loading is done or aborted.
  */
-static enum {
+typedef enum {
     LOADING_PREPARE,
     LOADING_CALLIN,
     LOADING_ENTER,
     LOADING_EXIT,
-} loading_state;
+} loading_state_t;
+static loading_state_t loading_state;
 
 struct patch_with_flags {
     unsigned int flags;
@@ -237,9 +238,9 @@ static bool cf_check wait_cpu_callout(unsigned int nr)
     return atomic_read(&cpu_out) >= nr;
 }
 
-static bool wait_for_state(typeof(loading_state) state)
+static bool wait_for_state(loading_state_t state)
 {
-    typeof(loading_state) cur_state;
+    loading_state_t cur_state;
 
     while ( (cur_state = ACCESS_ONCE(loading_state)) != state )
     {
@@ -251,7 +252,7 @@ static bool wait_for_state(typeof(loading_state) state)
     return true;
 }
 
-static void set_state(typeof(loading_state) state)
+static void set_state(loading_state_t state)
 {
     ACCESS_ONCE(loading_state) = state;
 }
