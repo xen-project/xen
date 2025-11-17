@@ -320,12 +320,10 @@ static int secondary_thread_fn(void)
     self_nmi();
 
     /*
-     * Wait for ucode loading is done in case that the NMI does not arrive
-     * synchronously, which may lead to a not-yet-updated CPU signature is
-     * copied below.
+     * NMIs may not be delivered synchronously.  Wait for the primary threads
+     * to be done.
      */
-    if ( unlikely(!wait_for_state(LOADING_EXIT)) )
-        ASSERT_UNREACHABLE();
+    wait_for_state(LOADING_EXIT);
 
     /* Copy update revision from the primary thread. */
     this_cpu(cpu_sig).rev =
@@ -345,12 +343,10 @@ static int primary_thread_fn(const struct microcode_patch *patch,
         self_nmi();
 
         /*
-         * Wait for ucode loading is done in case that the NMI does not arrive
-         * synchronously, which may lead to a not-yet-updated error is returned
-         * below.
+         * NMIs may not be delivered synchronously.  Wait for the primary
+         * threads to be done.
          */
-        if ( unlikely(!wait_for_state(LOADING_EXIT)) )
-            ASSERT_UNREACHABLE();
+        wait_for_state(LOADING_EXIT);
 
         return this_cpu(loading_err);
     }
