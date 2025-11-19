@@ -1402,11 +1402,6 @@ int vcpu_set_hard_affinity(struct vcpu *v, const cpumask_t *affinity)
     return vcpu_set_affinity(v, affinity, v->sched_unit->cpu_hard_affinity);
 }
 
-static int vcpu_set_soft_affinity(struct vcpu *v, const cpumask_t *affinity)
-{
-    return vcpu_set_affinity(v, affinity, v->sched_unit->cpu_soft_affinity);
-}
-
 /* Block the currently-executing domain until a pertinent event occurs. */
 void vcpu_block(void)
 {
@@ -1762,8 +1757,9 @@ int vcpu_affinity_domctl(struct domain *d, uint32_t cmd,
         {
             ret = xenctl_bitmap_to_bitmap(cpumask_bits(new_affinity),
                                           &vcpuaff->cpumap_soft, nr_cpu_ids);
-            if ( !ret)
-                ret = vcpu_set_soft_affinity(v, new_affinity);
+            if ( !ret )
+                ret = vcpu_set_affinity(v, new_affinity,
+                                        v->sched_unit->cpu_soft_affinity);
             if ( ret )
             {
                 /*
