@@ -5108,7 +5108,7 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0xa5): /* shld %%cl,r,r/m */
     case X86EMUL_OPC(0x0f, 0xac): /* shrd imm8,r,r/m */
     case X86EMUL_OPC(0x0f, 0xad): /* shrd %%cl,r,r/m */ {
-        uint8_t shift, width = dst.bytes << 3;
+        uint8_t shift;
 
         generate_exception_if(lock_prefix, X86_EXC_UD);
 
@@ -5125,28 +5125,13 @@ x86_emulate(
         {
             ea.orig_val = shift;
             state->rmw = b & 8 ? rmw_shrd : rmw_shld;
-            break;
         }
-
-        if ( (shift &= width - 1) == 0 )
-            break;
-        dst.orig_val = dst.val;
-        dst.val = (b & 8) ?
-                  /* shrd */
-                  ((dst.orig_val >> shift) |
-                   truncate_word(src.val << (width - shift), dst.bytes)) :
-                  /* shld */
-                  (truncate_word(dst.orig_val << shift, dst.bytes) |
-                   (src.val >> (width - shift)));
-        _regs.eflags &= ~(X86_EFLAGS_OF | X86_EFLAGS_SF | X86_EFLAGS_ZF |
-                          X86_EFLAGS_PF | X86_EFLAGS_CF);
-        if ( (dst.orig_val >> ((b & 8) ? (shift - 1) : (width - shift))) & 1 )
-            _regs.eflags |= X86_EFLAGS_CF;
-        if ( ((dst.val ^ dst.orig_val) >> (width - 1)) & 1 )
-            _regs.eflags |= X86_EFLAGS_OF;
-        _regs.eflags |= ((dst.val >> (width - 1)) & 1) ? X86_EFLAGS_SF : 0;
-        _regs.eflags |= (dst.val == 0) ? X86_EFLAGS_ZF : 0;
-        _regs.eflags |= even_parity(dst.val) ? X86_EFLAGS_PF : 0;
+        else if ( b & 8 )
+            _emulate_2op_SrcV_nobyte("shrd", src.val, &dst.val, dst.bytes,
+                                     _regs.eflags, "c" (shift));
+        else
+            _emulate_2op_SrcV_nobyte("shld", src.val, &dst.val, dst.bytes,
+                                     _regs.eflags, "c" (shift));
         break;
     }
 
