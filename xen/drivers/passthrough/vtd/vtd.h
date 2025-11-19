@@ -31,9 +31,6 @@
 #define MAP_ERROR_RECOVERY    (1u << 2)
 #define UNMAP_ME_PHANTOM_FUNC (1u << 3)
 
-/* Allow for both IOAPIC and IOSAPIC. */
-#define IO_xAPIC_route_entry IO_APIC_route_entry
-
 struct IO_APIC_route_remap_entry {
     union {
         u64 val;

@@ -268,7 +268,7 @@ static unsigned int alloc_remap_entry(struct vtd_iommu *iommu, unsigned int nr)
 }
 
 static int remap_entry_to_ioapic_rte(
-    struct vtd_iommu *iommu, int index, struct IO_xAPIC_route_entry *old_rte)
+    struct vtd_iommu *iommu, int index, struct IO_APIC_route_entry *old_rte)
 {
     struct iremap_entry *iremap_entry = NULL, *iremap_entries;
     unsigned long flags;
@@ -316,8 +316,8 @@ static int remap_entry_to_ioapic_rte(
 }
 
 static int ioapic_rte_to_remap_entry(struct vtd_iommu *iommu,
-    int apic, unsigned int ioapic_pin, struct IO_xAPIC_route_entry *old_rte,
-    struct IO_xAPIC_route_entry new_rte)
+    int apic, unsigned int ioapic_pin, struct IO_APIC_route_entry *old_rte,
+    struct IO_APIC_route_entry new_rte)
 {
     struct iremap_entry *iremap_entry = NULL, *iremap_entries;
     struct iremap_entry new_ire;
@@ -398,7 +398,7 @@ unsigned int cf_check io_apic_read_remap_rte(
 {
     unsigned int ioapic_pin = (reg - 0x10) / 2;
     int index;
-    struct IO_xAPIC_route_entry old_rte = { };
+    struct IO_APIC_route_entry old_rte = {};
     int rte_upper = (reg & 1) ? 1 : 0;
     struct vtd_iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
 
@@ -420,7 +420,7 @@ unsigned int cf_check io_apic_read_remap_rte(
 void cf_check io_apic_write_remap_rte(
     unsigned int apic, unsigned int pin, uint64_t rte)
 {
-    struct IO_xAPIC_route_entry old_rte = {}, new_rte;
+    struct IO_APIC_route_entry old_rte = {}, new_rte;
     struct vtd_iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
     int rc;
 
