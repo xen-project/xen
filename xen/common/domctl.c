@@ -466,6 +466,12 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_soft_reset:
     case XEN_DOMCTL_soft_reset_cont:
+        if ( !IS_ENABLED(CONFIG_HAS_SOFT_RESET) )
+        {
+            ret = -EOPNOTSUPP;
+            break;
+        }
+
         if ( d == current->domain ) /* no domain_pause() */
         {
             ret = -EINVAL;

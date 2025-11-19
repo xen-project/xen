@@ -155,6 +155,9 @@ config HAS_PMAP
 config HAS_SCHED_GRANULARITY
 	bool
 
+config HAS_SOFT_RESET
+	bool
+
 config HAS_STACK_PROTECTOR
 	bool
 

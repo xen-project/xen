@@ -1030,6 +1030,7 @@ void arch_domain_unpause(struct domain *d)
         viridian_time_domain_thaw(d);
 }
 
+#ifdef CONFIG_HAS_SOFT_RESET
 int arch_domain_soft_reset(struct domain *d)
 {
     struct page_info *page = virt_to_page(d->shared_info), *new_page;
@@ -1131,6 +1132,7 @@ int arch_domain_soft_reset(struct domain *d)
 
     return ret;
 }
+#endif /* CONFIG_HAS_SOFT_RESET */
 
 void arch_domain_creation_finished(struct domain *d)
 {

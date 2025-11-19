@@ -3962,6 +3962,7 @@ int gnttab_release_mappings(struct domain *d)
     return 0;
 }
 
+#ifdef CONFIG_HAS_SOFT_RESET
 void grant_table_warn_active_grants(struct domain *d)
 {
     struct grant_table *gt = d->grant_table;
@@ -4006,6 +4007,7 @@ void grant_table_warn_active_grants(struct domain *d)
 
 #undef WARN_GRANT_MAX
 }
+#endif /* CONFIG_HAS_SOFT_RESET */
 
 void
 grant_table_destroy(

@@ -2351,6 +2351,7 @@ argo_destroy(struct domain *d)
     write_unlock(&L1_global_argo_rwlock);
 }
 
+#ifdef CONFIG_HAS_SOFT_RESET
 void
 argo_soft_reset(struct domain *d)
 {
@@ -2374,3 +2375,4 @@ argo_soft_reset(struct domain *d)
 
     write_unlock(&L1_global_argo_rwlock);
 }
+#endif /* CONFIG_HAS_SOFT_RESET */

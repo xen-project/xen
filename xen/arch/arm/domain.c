@@ -875,11 +875,6 @@ void arch_domain_unpause(struct domain *d)
 {
 }
 
-int arch_domain_soft_reset(struct domain *d)
-{
-    return -ENOSYS;
-}
-
 void arch_domain_creation_finished(struct domain *d)
 {
     p2m_domain_creation_finished(d);
