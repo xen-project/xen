@@ -5458,6 +5458,7 @@ void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
     alternative_vcall(hvm_funcs.set_segment_register, v, seg, reg);
 }
 
+#ifdef CONFIG_MEM_SHARING
 int hvm_copy_context_and_params(struct domain *dst, struct domain *src)
 {
     struct hvm_domain_context c = { .size = hvm_save_size(src) };
@@ -5489,6 +5490,7 @@ int hvm_copy_context_and_params(struct domain *dst, struct domain *src)
 
     return rc;
 }
+#endif /* CONFIG_MEM_SHARING */
 
 /*
  * Local variables:
