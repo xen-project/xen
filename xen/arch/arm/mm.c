@@ -12,7 +12,11 @@
 #include <xen/grant_table.h>
 #include <xen/guest_access.h>
 #include <xen/mm.h>
+#include <xen/static-memory.h>
+#include <xen/static-shmem.h>
 #include <xen/vmap.h>
+
+#include <asm/setup.h>
 
 #include <xsm/xsm.h>
 
@@ -23,6 +27,47 @@
 #define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
 
 unsigned long frametable_base_pdx __read_mostly;
+
+#if defined(CONFIG_ARM_64) || defined(CONFIG_MPU)
+void __init setup_mm(void)
+{
+    const struct membanks *banks = bootinfo_get_mem();
+    paddr_t ram_start = INVALID_PADDR;
+    paddr_t ram_end = 0;
+    paddr_t ram_size = 0;
+    unsigned int i;
+
+    init_pdx();
+
+    for ( i = 0; i < banks->nr_banks; i++ )
+    {
+        const struct membank *bank = &banks->bank[i];
+        paddr_t bank_end = bank->start + bank->size;
+
+        ram_size = ram_size + bank->size;
+        ram_start = min(ram_start, bank->start);
+        ram_end = max(ram_end, bank_end);
+    }
+
+    total_pages = ram_size >> PAGE_SHIFT;
+
+    /*
+     * On MMU systems we need some memory to allocate the page-tables used for
+     * the direct mapmappings. But some regions may contain memory already
+     * allocated for other uses (e.g. modules, reserved-memory...).
+     *
+     * For simplicity, add all the free regions in the boot allocator.
+     */
+    populate_boot_allocator();
+
+    setup_mm_helper();
+
+    setup_frametable_mappings(ram_start, ram_end);
+
+    init_staticmem_pages();
+    init_sharedmem_pages();
+}
+#endif
 
 bool flags_has_rwx(unsigned int flags)
 {

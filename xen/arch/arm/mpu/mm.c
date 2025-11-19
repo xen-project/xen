@@ -5,12 +5,14 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
+#include <xen/pfn.h>
 #include <xen/sizes.h>
 #include <xen/spinlock.h>
 #include <xen/types.h>
 #include <asm/mpu.h>
 #include <asm/mpu/mm.h>
 #include <asm/page.h>
+#include <asm/setup.h>
 #include <asm/sysregs.h>
 
 struct page_info *frame_table;
@@ -378,9 +380,33 @@ int map_pages_to_xen(unsigned long virt, mfn_t mfn, unsigned long nr_mfns,
     return xen_mpumap_update(virt, mfn_to_maddr(mfn_add(mfn, nr_mfns)), flags);
 }
 
-void __init setup_mm(void)
+/*
+ * Heap must be statically configured in Device Tree through "xen,static-heap"
+ * on MPU systems, use setup_mm_helper() for that.
+ */
+void __init setup_mm_helper(void)
 {
-    BUG_ON("unimplemented");
+    const struct membanks *reserved_mem = bootinfo_get_reserved_mem();
+    unsigned int bank = 0;
+
+    for ( ; bank < reserved_mem->nr_banks; bank++ )
+    {
+        if ( reserved_mem->bank[bank].type == MEMBANK_STATIC_HEAP )
+        {
+            paddr_t bank_start = round_pgup(reserved_mem->bank[bank].start);
+            paddr_t bank_size = round_pgdown(reserved_mem->bank[bank].size);
+            paddr_t bank_end = bank_start + bank_size;
+
+            /* Map static heap with one MPU protection region */
+            if ( xen_mpumap_update(bank_start, bank_end, PAGE_HYPERVISOR) )
+                panic("Failed to map static heap\n");
+
+            break;
+        }
+    }
+
+    if ( bank == reserved_mem->nr_banks )
+        panic("No static heap memory bank found\n");
 }
 
 int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)

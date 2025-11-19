@@ -202,6 +202,8 @@ extern void remove_early_mappings(void);
 extern int prepare_secondary_mm(int cpu);
 /* Map a frame table to cover physical addresses ps through pe */
 extern void setup_frametable_mappings(paddr_t ps, paddr_t pe);
+/* Helper function to setup memory management */
+void setup_mm_helper(void);
 /* map a physical range in virtual memory */
 void __iomem *ioremap_attr(paddr_t start, size_t len, unsigned int attributes);
 
