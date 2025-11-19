@@ -473,7 +473,7 @@ static int __init pvh_populate_p2m(struct domain *d)
         }
     }
 
-    if ( cpu_has_vmx && paging_mode_hap(d) && !vmx_unrestricted_guest(v) )
+    if ( using_vmx() && paging_mode_hap(d) && !vmx_unrestricted_guest(v) )
     {
         /*
          * Since Dom0 cannot be migrated, we will only setup the
