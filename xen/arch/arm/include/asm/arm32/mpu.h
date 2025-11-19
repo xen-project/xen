@@ -39,6 +39,8 @@ typedef union {
 typedef struct {
     prbar_t prbar;
     prlar_t prlar;
+    uint8_t refcount;
+    uint8_t pad[7];     /* Pad structure to 16 Bytes */
 } pr_t;
 
 #endif /* __ASSEMBLY__ */

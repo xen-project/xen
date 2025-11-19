@@ -106,6 +106,7 @@ pr_t pr_of_addr(paddr_t base, paddr_t limit, unsigned int flags)
     region = (pr_t) {
         .prbar = prbar,
         .prlar = prlar,
+        .refcount = 0,
     };
 
     /* Set base address and limit address. */
@@ -168,6 +169,35 @@ int mpumap_contains_region(pr_t *table, uint8_t nr_regions, paddr_t base,
     }
 
     return MPUMAP_REGION_NOTFOUND;
+}
+
+static bool is_mm_attr_match(pr_t *region, unsigned int attributes)
+{
+    if ( region->prbar.reg.ro != PAGE_RO_MASK(attributes) )
+    {
+        printk(XENLOG_WARNING
+               "Mismatched Access Permission attributes (%#x instead of %#x)\n",
+               region->prbar.reg.ro, PAGE_RO_MASK(attributes));
+        return false;
+    }
+
+    if ( region->prbar.reg.xn != PAGE_XN_MASK(attributes) )
+    {
+        printk(XENLOG_WARNING
+               "Mismatched Execute Never attributes (%#x instead of %#x)\n",
+               region->prbar.reg.xn, PAGE_XN_MASK(attributes));
+        return false;
+    }
+
+    if ( region->prlar.reg.ai != PAGE_AI_MASK(attributes) )
+    {
+        printk(XENLOG_WARNING
+               "Mismatched Memory Attribute Index (%#x instead of %#x)\n",
+               region->prlar.reg.ai, PAGE_AI_MASK(attributes));
+        return false;
+    }
+
+    return true;
 }
 
 /* Map a frame table to cover physical addresses ps through pe */
@@ -284,22 +314,26 @@ static int xen_mpumap_update_entry(paddr_t base, paddr_t limit,
 
     flags_has_page_present = flags & _PAGE_PRESENT;
 
-    /* Currently we don't support modifying an existing entry. */
+    /*
+    * Currently, we only support removing/modifying a *WHOLE* MPU memory
+    * region. Part-region removal/modification is not supported as in the worst
+    * case it will leave two/three fragments behind.
+    */
     if ( flags_has_page_present && (rc >= MPUMAP_REGION_FOUND) )
     {
-        printk("Modifying an existing entry is not supported\n");
-        return -EINVAL;
-    }
+        if ( !is_mm_attr_match(&xen_mpumap[idx], flags) )
+        {
+            printk("Modifying an existing entry is not supported\n");
+            return -EINVAL;
+        }
 
-    /*
-     * Currently, we only support removing/modifying a *WHOLE* MPU memory
-     * region. Part-region removal/modification is not supported as in the worst
-     * case it will leave two/three fragments behind.
-     */
-    if ( rc == MPUMAP_REGION_INCLUSIVE )
-    {
-        printk("Part-region removal/modification is not supported\n");
-        return -EINVAL;
+        /* Check for overflow of refcount before incrementing.  */
+        if ( xen_mpumap[idx].refcount == 0xFF )
+        {
+            printk("Cannot allocate region as it would cause refcount overflow\n");
+            return -ENOENT;
+        }
+        xen_mpumap[idx].refcount += 1;
     }
 
     /* We are inserting a mapping => Create new region. */
@@ -323,7 +357,18 @@ static int xen_mpumap_update_entry(paddr_t base, paddr_t limit,
             return -EINVAL;
         }
 
-        disable_mpu_region_from_index(idx);
+        if ( xen_mpumap[idx].refcount == 0 )
+        {
+            if ( MPUMAP_REGION_FOUND == rc )
+                disable_mpu_region_from_index(idx);
+            else
+            {
+                printk("Cannot remove a partial region\n");
+                return -EINVAL;
+            }
+        }
+        else
+            xen_mpumap[idx].refcount -= 1;
     }
 
     return 0;

@@ -14,14 +14,12 @@
 #define PRLAR_ELx_EN            0x1
 
 #ifdef CONFIG_ARM_64
-#define XEN_MPUMAP_ENTRY_SHIFT  0x4     /* 16 byte structure */
 
 .macro store_pair reg1, reg2, dst
     stp \reg1, \reg2, [\dst]
 .endm
 
 #else
-#define XEN_MPUMAP_ENTRY_SHIFT  0x3     /* 8 byte structure */
 
 .macro store_pair reg1, reg2, dst
     strd  \reg1, \reg2, [\dst]
@@ -96,6 +94,15 @@
     bitmap_set_bit xen_mpumap_mask, \sel, \base, \limit, \prbar, \prlar
 
 3:
+
+    /* Clear the rest of the xen_mpumap entry. */
+#ifdef CONFIG_ARM_64
+    stp xzr, xzr, [\base, #XEN_MPUMAP_ENTRY_ZERO_OFFSET]
+#else
+    mov \prbar, #0
+    mov \prlar, #0
+    strd \prbar, \prlar, [\base, #XEN_MPUMAP_ENTRY_ZERO_OFFSET]
+#endif
 
     add   \sel, \sel, #1
 
