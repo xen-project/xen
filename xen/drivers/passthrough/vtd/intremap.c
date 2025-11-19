@@ -399,7 +399,7 @@ unsigned int cf_check io_apic_read_remap_rte(
     unsigned int ioapic_pin = (reg - 0x10) / 2;
     int index;
     struct IO_APIC_route_entry old_rte = {};
-    int rte_upper = (reg & 1) ? 1 : 0;
+    bool rte_upper = reg & 1;
     struct vtd_iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
 
     if ( !iommu->intremap.num ||
@@ -410,11 +410,8 @@ unsigned int cf_check io_apic_read_remap_rte(
 
     if ( remap_entry_to_ioapic_rte(iommu, index, &old_rte) )
         return __io_apic_read(apic, reg);
-
-    if ( rte_upper )
-        return (*(((u32 *)&old_rte) + 1));
-    else
-        return (*(((u32 *)&old_rte) + 0));
+    
+    return rte_upper ? old_rte.high : old_rte.low;
 }
 
 void cf_check io_apic_write_remap_rte(

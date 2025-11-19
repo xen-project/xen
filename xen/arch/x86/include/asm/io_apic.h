@@ -122,6 +122,7 @@ struct IO_APIC_route_entry {
             } dest;
         };
         uint64_t raw;
+        struct { uint32_t low, high; };
     };
 };
 

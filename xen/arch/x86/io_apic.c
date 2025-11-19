@@ -254,28 +254,23 @@ nomem:
     return NULL;
 }
 
-union entry_union {
-    struct { u32 w1, w2; };
-    struct IO_APIC_route_entry entry;
-};
-
 struct IO_APIC_route_entry __ioapic_read_entry(
     unsigned int apic, unsigned int pin, bool raw)
 {
-    union entry_union eu;
+    struct IO_APIC_route_entry entry;
 
     if ( raw || !iommu_intremap )
     {
-        eu.w1 = __io_apic_read(apic, 0x10 + 2 * pin);
-        eu.w2 = __io_apic_read(apic, 0x11 + 2 * pin);
+        entry.low  = __io_apic_read(apic, 0x10 + 2 * pin);
+        entry.high = __io_apic_read(apic, 0x11 + 2 * pin);
     }
     else
     {
-        eu.w1 = iommu_read_apic_from_ire(apic, 0x10 + 2 * pin);
-        eu.w2 = iommu_read_apic_from_ire(apic, 0x11 + 2 * pin);
+        entry.low  = iommu_read_apic_from_ire(apic, 0x10 + 2 * pin);
+        entry.high = iommu_read_apic_from_ire(apic, 0x11 + 2 * pin);
     }
 
-    return eu.entry;
+    return entry;
 }
 
 static struct IO_APIC_route_entry ioapic_read_entry(
@@ -294,12 +289,10 @@ void __ioapic_write_entry(
     unsigned int apic, unsigned int pin, bool raw,
     struct IO_APIC_route_entry e)
 {
-    union entry_union eu = { .entry = e };
-
     if ( raw || !iommu_intremap )
     {
-        __io_apic_write(apic, 0x11 + 2 * pin, eu.w2);
-        __io_apic_write(apic, 0x10 + 2 * pin, eu.w1);
+        __io_apic_write(apic, 0x11 + 2 * pin, e.high);
+        __io_apic_write(apic, 0x10 + 2 * pin, e.low);
         /*
          * Might be called before io_apic_pin_eoi is allocated.  Entry will be
          * initialized to the RTE value once the cache is allocated.
@@ -2218,7 +2211,7 @@ int ioapic_guest_read(unsigned long physbase, unsigned int reg, u32 *pval)
     dprintk(XENLOG_INFO, "IO-APIC: apic=%d, pin=%d, irq=%d\n" \
             XENLOG_INFO "IO-APIC: new_entry=%08x\n"           \
             XENLOG_INFO "IO-APIC: " f "\n",                   \
-            apic, pin, irq, *(u32 *)&rte, ##a )
+            apic, pin, irq, rte.low, ##a )
 
 int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 {
@@ -2237,7 +2230,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     pin = (reg - 0x10) >> 1;
 
     /* Write first half from guest; second half is target info. */
-    *(u32 *)&rte = val;
+    rte.low = val;
 
     /*
      * What about weird destination types?
@@ -2288,7 +2281,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
         ret = io_apic_read(apic, 0x10 + 2 * pin);
         spin_unlock_irqrestore(&ioapic_lock, flags);
         rte.vector = desc->arch.vector;
-        if ( *(u32*)&rte != ret )
+        if ( rte.low != ret )
             WARN_BOGUS_WRITE("old_entry=%08x pirq=%d\n" XENLOG_INFO
                              "IO-APIC: Attempt to modify IO-APIC pin for in-use IRQ!",
                              ret, pirq);
