@@ -473,8 +473,14 @@ void free_init_memory(void)
 
 void __iomem *ioremap_attr(paddr_t start, size_t len, unsigned int flags)
 {
-    BUG_ON("unimplemented");
-    return NULL;
+    paddr_t start_pg = round_pgdown(start);
+    paddr_t end_pg = round_pgup(start_pg + len);
+
+    if ( xen_mpumap_update(start_pg, end_pg, flags) )
+        return NULL;
+
+    /* Mapped or already mapped */
+    return maddr_to_virt(start_pg);
 }
 
 /*
