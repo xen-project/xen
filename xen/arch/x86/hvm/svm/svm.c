@@ -2551,7 +2551,7 @@ void asmlinkage svm_vmexit_handler(void)
     uint64_t exit_reason;
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
-    int insn_len, rc;
+    int insn_len;
     vintr_t intr;
     bool vcpu_guestmode = false;
     struct vlapic *vlapic = vcpu_vlapic(v);
@@ -2705,6 +2705,7 @@ void asmlinkage svm_vmexit_handler(void)
         if ( !v->domain->debugger_attached )
         {
             unsigned int trap_type;
+            int rc;
 
             if ( likely(exit_reason != VMEXIT_ICEBP) )
             {
@@ -2748,16 +2749,14 @@ void asmlinkage svm_vmexit_handler(void)
         }
         else
         {
-           rc = hvm_monitor_debug(regs->rip,
-                                  HVM_MONITOR_SOFTWARE_BREAKPOINT,
-                                  X86_ET_SW_EXC,
-                                  insn_len, 0);
-           if ( rc < 0 )
-               goto unexpected_exit_type;
-           if ( !rc )
-               hvm_inject_exception(X86_EXC_BP,
-                                    X86_ET_SW_EXC,
-                                    insn_len, X86_EVENT_NO_EC);
+            int rc = hvm_monitor_debug(regs->rip,
+                                       HVM_MONITOR_SOFTWARE_BREAKPOINT,
+                                       X86_ET_SW_EXC, insn_len, 0);
+            if ( rc < 0 )
+                goto unexpected_exit_type;
+            if ( !rc )
+                hvm_inject_exception(X86_EXC_BP, X86_ET_SW_EXC,
+                                     insn_len, X86_EVENT_NO_EC);
         }
         break;
 
@@ -2768,6 +2767,7 @@ void asmlinkage svm_vmexit_handler(void)
     case VMEXIT_EXCEPTION_PF:
     {
         unsigned long va = vmcb->ei.exc.cr2;
+        int rc;
 
         regs->error_code = vmcb->ei.exc.ec;
         HVM_DBG_LOG(DBG_LEVEL_VMMU,
@@ -2882,6 +2882,9 @@ void asmlinkage svm_vmexit_handler(void)
         break;
 
     case VMEXIT_CPUID:
+    {
+        int rc;
+
         if ( (insn_len = svm_get_insn_len(v, INSTR_CPUID)) == 0 )
             break;
 
@@ -2892,12 +2895,16 @@ void asmlinkage svm_vmexit_handler(void)
         if ( !rc )
             __update_guest_eip(regs, insn_len);
         break;
+    }
 
     case VMEXIT_HLT:
         svm_vmexit_do_hlt(vmcb, regs);
         break;
 
     case VMEXIT_IOIO:
+    {
+        int rc;
+
         rc = hvm_monitor_io(vmcb->ei.io.port,
                             vmcb->ei.io.bytes,
                             vmcb->ei.io.in,
@@ -2917,6 +2924,7 @@ void asmlinkage svm_vmexit_handler(void)
         else if ( !hvm_emulate_one_insn(x86_insn_is_portio, "port I/O") )
             hvm_inject_hw_exception(X86_EXC_GP, 0);
         break;
+    }
 
     case VMEXIT_CR0_READ ... VMEXIT_CR15_READ:
     case VMEXIT_CR0_WRITE ... VMEXIT_CR15_WRITE:
@@ -3008,6 +3016,9 @@ void asmlinkage svm_vmexit_handler(void)
         break;
 
     case VMEXIT_NPF:
+    {
+        int rc;
+
         if ( cpu_has_svm_decode )
             v->arch.hvm.svm.cached_insn_len = vmcb->guest_ins_len & 0xf;
         rc = vmcb->ei.npf.ec & PFEC_page_present
@@ -3021,6 +3032,7 @@ void asmlinkage svm_vmexit_handler(void)
                          v, rc, vmcb->ei.npf.gpa, vmcb->ei.npf.ec);
         v->arch.hvm.svm.cached_insn_len = 0;
         break;
+    }
 
     case VMEXIT_IRET:
     {
