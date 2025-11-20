@@ -297,6 +297,8 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
             if ( v->arch.hvm.guest_cr[4] & X86_CR4_OSXSAVE )
                 res->c |= cpufeat_mask(X86_FEATURE_OSXSAVE);
         }
+        else if ( !IS_ENABLED(CONFIG_PV) )
+            ASSERT_UNREACHABLE();
         else /* PV domain */
         {
             regs = guest_cpu_user_regs();
@@ -509,6 +511,8 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
             if ( !hap_enabled(d) && !hvm_pae_enabled(v) )
                 res->d &= ~cpufeat_mask(X86_FEATURE_PSE36);
         }
+        else if ( !IS_ENABLED(CONFIG_PV) )
+            ASSERT_UNREACHABLE();
         else /* PV domain */
         {
             /*
