@@ -44,6 +44,7 @@
 #include <asm/processor.h>
 #include <asm/prot-key.h>
 #include <asm/regs.h>
+#include <asm/shadow.h>
 #include <asm/spec_ctrl.h>
 #include <asm/stubs.h>
 #include <asm/x86_emulate.h>
@@ -1445,6 +1446,66 @@ static int cf_check vmx_get_guest_pat(struct vcpu *v, u64 *gpat)
     return 1;
 }
 
+/* Exit UC mode only if all VCPUs agree on MTRR/PAT and are not in no_fill. */
+static bool domain_exit_uc_mode(const struct vcpu *v)
+{
+    const struct domain *d = v->domain;
+    const struct vcpu *vs;
+
+    for_each_vcpu(d, vs)
+    {
+        if ( (vs == v) || !vs->is_initialised )
+            continue;
+        if ( (vs->arch.hvm.cache_mode == NO_FILL_CACHE_MODE) ||
+             mtrr_pat_not_equal(vs, v) )
+            return false;
+    }
+
+    return true;
+}
+
+static void set_uc_mode(struct domain *d, bool is_in_uc_mode)
+{
+    d->arch.hvm.is_in_uc_mode = is_in_uc_mode;
+    shadow_blow_tables_per_domain(d);
+}
+
+static void shadow_handle_cd(struct vcpu *v, unsigned long value)
+{
+    struct domain *d = v->domain;
+
+    if ( value & X86_CR0_CD )
+    {
+        /* Entering no fill cache mode. */
+        spin_lock(&d->arch.hvm.uc_lock);
+        v->arch.hvm.cache_mode = NO_FILL_CACHE_MODE;
+
+        if ( !d->arch.hvm.is_in_uc_mode )
+        {
+            domain_pause_nosync(d);
+
+            /* Flush physical caches. */
+            flush_all(FLUSH_CACHE_EVICT);
+            set_uc_mode(d, true);
+
+            domain_unpause(d);
+        }
+        spin_unlock(&d->arch.hvm.uc_lock);
+    }
+    else if ( !(value & X86_CR0_CD) &&
+              (v->arch.hvm.cache_mode == NO_FILL_CACHE_MODE) )
+    {
+        /* Exit from no fill cache mode. */
+        spin_lock(&d->arch.hvm.uc_lock);
+        v->arch.hvm.cache_mode = NORMAL_CACHE_MODE;
+
+        if ( domain_exit_uc_mode(v) )
+            set_uc_mode(d, false);
+
+        spin_unlock(&d->arch.hvm.uc_lock);
+    }
+}
+
 static void cf_check vmx_handle_cd(struct vcpu *v, unsigned long value)
 {
     if ( !paging_mode_hap(v->domain) )
@@ -1454,7 +1515,7 @@ static void cf_check vmx_handle_cd(struct vcpu *v, unsigned long value)
          * set guest memory type as UC via IA32_PAT. Xen drop all shadows
          * so that any new ones would be created on demand.
          */
-        hvm_shadow_handle_cd(v, value);
+        shadow_handle_cd(v, value);
     }
     else
     {
