@@ -571,14 +571,19 @@ int arch_vcpu_create(struct vcpu *v)
 
     if ( is_hvm_domain(d) )
         rc = hvm_vcpu_initialise(v);
-    else if ( !is_idle_domain(d) )
-        rc = pv_vcpu_initialise(v);
-    else
+    else if ( is_idle_domain(d) )
     {
         /* Idle domain */
         v->arch.cr3 = __pa(idle_pg_table);
         rc = 0;
         v->arch.msrs = ZERO_BLOCK_PTR; /* Catch stray misuses */
+    }
+    else if ( IS_ENABLED(CONFIG_PV) )
+        rc = pv_vcpu_initialise(v);
+    else
+    {
+        ASSERT_UNREACHABLE();
+        rc = -EOPNOTSUPP;
     }
 
     if ( rc )
@@ -614,8 +619,10 @@ void arch_vcpu_destroy(struct vcpu *v)
 
     if ( is_hvm_vcpu(v) )
         hvm_vcpu_destroy(v);
-    else
+    else if ( IS_ENABLED(CONFIG_PV) )
         pv_vcpu_destroy(v);
+    else
+        ASSERT_UNREACHABLE();
 }
 
 int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)

@@ -54,8 +54,6 @@ static inline unsigned long get_pcid_bits(const struct vcpu *v, bool is_xpti)
 #endif
 }
 
-#ifdef CONFIG_PV
-
 void pv_vcpu_destroy(struct vcpu *v);
 int pv_vcpu_initialise(struct vcpu *v);
 void pv_domain_destroy(struct domain *d);
@@ -83,29 +81,6 @@ uint64_t pv_get_reg(struct vcpu *v, unsigned int reg);
 void pv_set_reg(struct vcpu *v, unsigned int reg, uint64_t val);
 
 bool xpti_pcid_enabled(void);
-
-#else  /* !CONFIG_PV */
-
-#include <xen/errno.h>
-
-static inline void pv_vcpu_destroy(struct vcpu *v) {}
-static inline int pv_vcpu_initialise(struct vcpu *v) { return -EOPNOTSUPP; }
-static inline void pv_domain_destroy(struct domain *d) {}
-static inline int pv_domain_initialise(struct domain *d) { return -EOPNOTSUPP; }
-
-static inline unsigned long pv_make_cr4(const struct vcpu *v) { return ~0UL; }
-
-static inline uint64_t pv_get_reg(struct vcpu *v, unsigned int reg)
-{
-    ASSERT_UNREACHABLE();
-    return 0;
-}
-static inline void pv_set_reg(struct vcpu *v, unsigned int reg, uint64_t val)
-{
-    ASSERT_UNREACHABLE();
-}
-
-#endif	/* CONFIG_PV */
 
 void cf_check paravirt_ctxt_switch_from(struct vcpu *v);
 void cf_check paravirt_ctxt_switch_to(struct vcpu *v);
