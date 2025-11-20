@@ -383,7 +383,6 @@ static void __init calculate_host_policy(void)
 
     x86_cpu_featureset_to_policy(boot_cpu_data.x86_capability, p);
     recalculate_xstate(p);
-    recalculate_misc(p);
 
     /* When vPMU is disabled, drop it from the host policy. */
     if ( vpmu_mode == XENPMU_MODE_OFF )
@@ -634,6 +633,7 @@ static void __init calculate_pv_max_policy(void)
     unsigned int i;
 
     *p = host_cpu_policy;
+    recalculate_misc(p);
 
     guest_common_max_leaves(p);
 
@@ -736,6 +736,7 @@ static void __init calculate_hvm_max_policy(void)
     const uint32_t *mask;
 
     *p = host_cpu_policy;
+    recalculate_misc(p);
 
     guest_common_max_leaves(p);
 
