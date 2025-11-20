@@ -168,9 +168,6 @@ struct hvm_vcpu {
 
     u8                  evtchn_upcall_vector;
 
-    /* Which cache mode is this VCPU in (CR0:CD/NW)? */
-    u8                  cache_mode;
-
     struct hvm_vcpu_io  hvm_io;
 
     /* Pending hw/sw interrupt (.vector = -1 means nothing pending). */

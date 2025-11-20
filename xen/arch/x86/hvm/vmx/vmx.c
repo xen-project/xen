@@ -590,6 +590,8 @@ static int cf_check vmx_domain_initialise(struct domain *d)
      */
     d->arch.hvm.vmx.exec_sp = is_hardware_domain(d) || opt_ept_exec_sp;
 
+    spin_lock_init(&d->arch.hvm.vmx.uc_lock);
+
     if ( (rc = vmx_alloc_vlapic_mapping(d)) != 0 )
         return rc;
 
@@ -1425,7 +1427,7 @@ static void cf_check vmx_set_segment_register(
 static int cf_check vmx_set_guest_pat(struct vcpu *v, u64 gpat)
 {
     if ( !paging_mode_hap(v->domain) ||
-         unlikely(v->arch.hvm.cache_mode == NO_FILL_CACHE_MODE) )
+         unlikely(v->arch.hvm.vmx.cache_mode == CACHE_MODE_NO_FILL) )
         return 0;
 
     vmx_vmcs_enter(v);
@@ -1437,7 +1439,7 @@ static int cf_check vmx_set_guest_pat(struct vcpu *v, u64 gpat)
 static int cf_check vmx_get_guest_pat(struct vcpu *v, u64 *gpat)
 {
     if ( !paging_mode_hap(v->domain) ||
-         unlikely(v->arch.hvm.cache_mode == NO_FILL_CACHE_MODE) )
+         unlikely(v->arch.hvm.vmx.cache_mode == CACHE_MODE_NO_FILL) )
         return 0;
 
     vmx_vmcs_enter(v);
@@ -1456,7 +1458,7 @@ static bool domain_exit_uc_mode(const struct vcpu *v)
     {
         if ( (vs == v) || !vs->is_initialised )
             continue;
-        if ( (vs->arch.hvm.cache_mode == NO_FILL_CACHE_MODE) ||
+        if ( (vs->arch.hvm.vmx.cache_mode == CACHE_MODE_NO_FILL) ||
              mtrr_pat_not_equal(vs, v) )
             return false;
     }
@@ -1466,7 +1468,7 @@ static bool domain_exit_uc_mode(const struct vcpu *v)
 
 static void set_uc_mode(struct domain *d, bool is_in_uc_mode)
 {
-    d->arch.hvm.is_in_uc_mode = is_in_uc_mode;
+    d->arch.hvm.vmx.in_uc_mode = is_in_uc_mode;
     shadow_blow_tables_per_domain(d);
 }
 
@@ -1477,10 +1479,10 @@ static void shadow_handle_cd(struct vcpu *v, unsigned long value)
     if ( value & X86_CR0_CD )
     {
         /* Entering no fill cache mode. */
-        spin_lock(&d->arch.hvm.uc_lock);
-        v->arch.hvm.cache_mode = NO_FILL_CACHE_MODE;
+        spin_lock(&d->arch.hvm.vmx.uc_lock);
+        v->arch.hvm.vmx.cache_mode = CACHE_MODE_NO_FILL;
 
-        if ( !d->arch.hvm.is_in_uc_mode )
+        if ( !d->arch.hvm.vmx.in_uc_mode )
         {
             domain_pause_nosync(d);
 
@@ -1490,19 +1492,19 @@ static void shadow_handle_cd(struct vcpu *v, unsigned long value)
 
             domain_unpause(d);
         }
-        spin_unlock(&d->arch.hvm.uc_lock);
+        spin_unlock(&d->arch.hvm.vmx.uc_lock);
     }
     else if ( !(value & X86_CR0_CD) &&
-              (v->arch.hvm.cache_mode == NO_FILL_CACHE_MODE) )
+              (v->arch.hvm.vmx.cache_mode == CACHE_MODE_NO_FILL) )
     {
         /* Exit from no fill cache mode. */
-        spin_lock(&d->arch.hvm.uc_lock);
-        v->arch.hvm.cache_mode = NORMAL_CACHE_MODE;
+        spin_lock(&d->arch.hvm.vmx.uc_lock);
+        v->arch.hvm.vmx.cache_mode = CACHE_MODE_NORMAL;
 
         if ( domain_exit_uc_mode(v) )
             set_uc_mode(d, false);
 
-        spin_unlock(&d->arch.hvm.uc_lock);
+        spin_unlock(&d->arch.hvm.vmx.uc_lock);
     }
 }
 
@@ -1543,11 +1545,11 @@ static void cf_check vmx_handle_cd(struct vcpu *v, unsigned long value)
 
             wbinvd();               /* flush possibly polluted cache */
             hvm_asid_flush_vcpu(v); /* invalidate memory type cached in TLB */
-            v->arch.hvm.cache_mode = NO_FILL_CACHE_MODE;
+            v->arch.hvm.vmx.cache_mode = CACHE_MODE_NO_FILL;
         }
         else
         {
-            v->arch.hvm.cache_mode = NORMAL_CACHE_MODE;
+            v->arch.hvm.vmx.cache_mode = CACHE_MODE_NORMAL;
             vmx_set_guest_pat(v, *pat);
             if ( !is_iommu_enabled(v->domain) || iommu_snoop )
                 vmx_clear_msr_intercept(v, MSR_IA32_CR_PAT, VMX_MSR_RW);

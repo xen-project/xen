@@ -7,9 +7,6 @@
 #define MEMORY_NUM_TYPES     MTRR_NUM_TYPES
 #define NO_HARDCODE_MEM_TYPE MTRR_NUM_TYPES
 
-#define NORMAL_CACHE_MODE          0
-#define NO_FILL_CACHE_MODE         2
-
 #define INVALID_MEM_TYPE X86_NUM_MT
 
 /* In the Intel processor's MTRR interface, the MTRR type is always held in

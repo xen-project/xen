@@ -46,6 +46,7 @@ struct ept_data {
 
 #define _VMX_DOMAIN_PML_ENABLED    0
 #define VMX_DOMAIN_PML_ENABLED     (1ul << _VMX_DOMAIN_PML_ENABLED)
+
 struct vmx_domain {
     mfn_t apic_access_mfn;
     /* VMX_DOMAIN_* */
@@ -56,6 +57,13 @@ struct vmx_domain {
      * around CVE-2018-12207 as appropriate.
      */
     bool exec_sp;
+    /*
+     * If one of vcpus of this domain is in no_fill_mode or
+     * mtrr/pat between vcpus is not the same, set in_uc_mode.
+     * Protected by uc_lock.
+     */
+    bool in_uc_mode;
+    spinlock_t uc_lock;
 };
 
 /*
@@ -155,6 +163,11 @@ struct vmx_vcpu {
     uint8_t              vmx_emulate;
 
     uint8_t              lbr_flags;
+
+    /* Which cache mode is this VCPU in (CR0:CD/NW)? */
+    uint8_t              cache_mode;
+#define CACHE_MODE_NORMAL  0
+#define CACHE_MODE_NO_FILL 2
 
     /* Bitmask of segments that we can't safely use in virtual 8086 mode */
     uint16_t             vm86_segment_mask;
