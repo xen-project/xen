@@ -525,7 +525,7 @@ int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn)
     if ( !mfn_valid(mfn) )
         return -EINVAL;
 
-    if ( !is_hvm_domain(d) || !paging_mode_hap(d) )
+    if ( !is_hvm_domain(d) || paging_mode_shadow(d) )
         return -EOPNOTSUPP;
 
     rc = -1;

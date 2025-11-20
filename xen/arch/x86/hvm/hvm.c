@@ -2317,7 +2317,7 @@ int hvm_set_cr0(unsigned long value, bool may_defer)
             hvm_update_guest_efer(v);
         }
 
-        if ( !paging_mode_hap(d) )
+        if ( paging_mode_shadow(d) )
         {
             /* The guest CR3 must be pointing to the guest physical. */
             gfn = v->arch.hvm.guest_cr[3] >> PAGE_SHIFT;
@@ -2368,7 +2368,7 @@ int hvm_set_cr0(unsigned long value, bool may_defer)
             hvm_update_guest_efer(v);
         }
 
-        if ( !paging_mode_hap(d) )
+        if ( paging_mode_shadow(d) )
         {
             put_page(pagetable_get_page(v->arch.guest_table));
             v->arch.guest_table = pagetable_null();
@@ -2422,7 +2422,7 @@ int hvm_set_cr3(unsigned long value, bool noflush, bool may_defer)
         }
     }
 
-    if ( hvm_paging_enabled(curr) && !paging_mode_hap(currd) &&
+    if ( hvm_paging_enabled(curr) && paging_mode_shadow(currd) &&
          ((value ^ curr->arch.hvm.guest_cr[3]) >> PAGE_SHIFT) )
     {
         /* Shadow-mode CR3 change. Check PDBR and update refcounts. */
@@ -3966,7 +3966,7 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     if ( v->is_initialised )
         goto out;
 
-    if ( !paging_mode_hap(d) )
+    if ( paging_mode_shadow(d) )
     {
         if ( v->arch.hvm.guest_cr[0] & X86_CR0_PG )
             put_page(pagetable_get_page(v->arch.guest_table));
@@ -4240,7 +4240,7 @@ static int hvm_set_param(struct domain *d, uint32_t index, uint64_t value)
          * Only actually required for VT-x lacking unrestricted_guest
          * capabilities.  Short circuit the pause if possible.
          */
-        if ( !paging_mode_hap(d) || !using_vmx() )
+        if ( paging_mode_shadow(d) || !using_vmx() )
         {
             d->arch.hvm.params[index] = value;
             break;

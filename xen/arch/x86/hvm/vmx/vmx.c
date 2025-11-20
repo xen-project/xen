@@ -1426,7 +1426,7 @@ static void cf_check vmx_set_segment_register(
 
 static int cf_check vmx_set_guest_pat(struct vcpu *v, u64 gpat)
 {
-    if ( !paging_mode_hap(v->domain) ||
+    if ( paging_mode_shadow(v->domain) ||
          unlikely(v->arch.hvm.vmx.cache_mode == CACHE_MODE_NO_FILL) )
         return 0;
 
@@ -1438,7 +1438,7 @@ static int cf_check vmx_set_guest_pat(struct vcpu *v, u64 gpat)
 
 static int cf_check vmx_get_guest_pat(struct vcpu *v, u64 *gpat)
 {
-    if ( !paging_mode_hap(v->domain) ||
+    if ( paging_mode_shadow(v->domain) ||
          unlikely(v->arch.hvm.vmx.cache_mode == CACHE_MODE_NO_FILL) )
         return 0;
 

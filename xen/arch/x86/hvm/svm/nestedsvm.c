@@ -1341,7 +1341,7 @@ nestedsvm_check_intercepts(struct vcpu *v, struct cpu_user_regs *regs,
             /* l2 guest intercepts #PF unnecessarily */
             return NESTEDHVM_VMEXIT_INJECT;
         }
-        if ( !paging_mode_hap(v->domain) )
+        if ( paging_mode_shadow(v->domain) )
             /* host shadow paging + guest shadow paging */
             return NESTEDHVM_VMEXIT_HOST;
 

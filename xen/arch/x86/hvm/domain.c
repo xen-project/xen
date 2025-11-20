@@ -287,7 +287,7 @@ int arch_set_info_hvm_guest(struct vcpu *v, const struct vcpu_hvm_context *ctx)
     hvm_update_guest_cr(v, 4);
     hvm_update_guest_efer(v);
 
-    if ( hvm_paging_enabled(v) && !paging_mode_hap(v->domain) )
+    if ( hvm_paging_enabled(v) && paging_mode_shadow(v->domain) )
     {
         /* Shadow-mode CR3 change. Check PDBR and update refcounts. */
         struct page_info *page = get_page_from_gfn(v->domain,

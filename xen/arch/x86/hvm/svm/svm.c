@@ -171,7 +171,7 @@ static void cf_check svm_update_guest_cr(
         }
 
         value = v->arch.hvm.guest_cr[0] | hw_cr0_mask;
-        if ( !paging_mode_hap(v->domain) )
+        if ( paging_mode_shadow(v->domain) )
             value |= X86_CR0_PG | X86_CR0_WP;
         vmcb_set_cr0(vmcb, value);
         break;
@@ -440,7 +440,7 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
         }
     }
 
-    if ( !paging_mode_hap(v->domain) )
+    if ( paging_mode_shadow(v->domain) )
     {
         if ( c->cr0 & X86_CR0_PG )
         {
@@ -762,7 +762,7 @@ static int cf_check svm_set_guest_pat(struct vcpu *v, u64 gpat)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
 
-    if ( !paging_mode_hap(v->domain) )
+    if ( paging_mode_shadow(v->domain) )
         return 0;
 
     vmcb_set_g_pat(vmcb, gpat);
@@ -773,7 +773,7 @@ static int cf_check svm_get_guest_pat(struct vcpu *v, u64 *gpat)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
 
-    if ( !paging_mode_hap(v->domain) )
+    if ( paging_mode_shadow(v->domain) )
         return 0;
 
     *gpat = vmcb_get_g_pat(vmcb);

@@ -1270,7 +1270,7 @@ void ept_sync_domain(struct p2m_domain *p2m)
     struct domain *d = p2m->domain;
 
     /* Only if using EPT and this domain has some VCPUs to dirty. */
-    if ( !paging_mode_hap(d) || !d->vcpu || !d->vcpu[0] )
+    if ( paging_mode_shadow(d) || !d->vcpu || !d->vcpu[0] )
         return;
 
     ept_sync_domain_prepare(p2m);

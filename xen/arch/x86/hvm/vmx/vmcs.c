@@ -135,7 +135,7 @@ static int cf_check parse_ept_param_runtime(const char *s)
     for_each_domain ( d )
     {
         /* PV, or HVM Shadow domain?  Not applicable. */
-        if ( !paging_mode_hap(d) )
+        if ( paging_mode_shadow(d) )
             continue;
 
         /* Hardware domain? Not applicable. */
