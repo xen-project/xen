@@ -3,7 +3,6 @@
 
 #include <asm/cpufeatureset.h>
 
-#ifndef __ASSEMBLY__
 #include <xen/types.h>
 #include <xen/kernel.h>
 #include <xen/percpu.h>
@@ -50,7 +49,6 @@ struct cpuid_leaf;
 void guest_cpuid(const struct vcpu *v, uint32_t leaf,
                  uint32_t subleaf, struct cpuid_leaf *res);
 
-#endif /* __ASSEMBLY__ */
 #endif /* !__X86_CPUID_H__ */
 
 /*

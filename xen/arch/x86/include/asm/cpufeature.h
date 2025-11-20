@@ -10,7 +10,11 @@
 #include <xen/const.h>
 #include <xen/macros.h>
 
+#ifndef __ASSEMBLY__
 #include <asm/cpuid.h>
+#else
+#include <asm/cpufeatureset.h>
+#endif
 
 #define cpufeat_word(idx)	((idx) / 32)
 #define cpufeat_bit(idx)	((idx) % 32)
