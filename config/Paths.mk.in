@@ -20,10 +20,6 @@ libexecdir               := @libexecdir@
 datarootdir              := @datarootdir@
 mandir                   := @mandir@
 docdir                   := @docdir@
-dvidir                   := @dvidir@
-htmldir                  := @htmldir@
-pdfdir                   := @pdfdir@
-psdir                    := @psdir@
 includedir               := @includedir@
 localstatedir            := @localstatedir@
 sysconfdir               := @sysconfdir@
@@ -34,8 +30,6 @@ LIBEXEC_LIB              := @LIBEXEC_LIB@
 LIBEXEC_INC              := @LIBEXEC_INC@
 
 SHAREDIR                 := @SHAREDIR@
-MAN1DIR                  := $(mandir)/man1
-MAN8DIR                  := $(mandir)/man8
 
 XEN_RUN_DIR              := @XEN_RUN_DIR@
 XEN_LOG_DIR              := @XEN_LOG_DIR@
