@@ -72,6 +72,9 @@ XENSTOREDLIBS = \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/xsd_glue $(OCAML_TOPLEVEL)/libs/xsd_glue/plugin_interface_v1.cmxa \
 	-ccopt -L -ccopt $(XEN_ROOT)/tools/libs/ctrl
 
+IN_TARGETS := paths.ml
+IN_TARGETS += oxenstored.conf
+
 PROGRAMS = oxenstored
 
 oxenstored_LIBS = $(XENSTOREDLIBS)
@@ -83,7 +86,9 @@ oxenstored_OBJS = $(oxenstored_MLSORTED:.ml=)
 
 OCAML_PROGRAM = oxenstored
 
-all: $(INTF) $(LIBS) $(PROGRAMS)
+all: $(IN_TARGETS) $(INTF) $(LIBS) $(PROGRAMS)
+
+$(foreach file,$(IN_TARGETS),$(eval $(call apply-build-vars,$(file))))
 
 bins: $(PROGRAMS)
 
@@ -98,5 +103,8 @@ install: all
 uninstall:
 	rm -f $(DESTDIR)$(XEN_CONFIG_DIR)/oxenstored.conf
 	rm -f $(DESTDIR)$(sbindir)/oxenstored
+
+distclean:
+	$(RM) $(IN_TARGETS)
 
 include $(OCAML_TOPLEVEL)/Makefile.rules

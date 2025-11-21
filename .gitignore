@@ -47,6 +47,7 @@ config.status
 config.cache
 config/Toplevel.mk
 config/Paths.mk
+config/Tools-paths.mk
 
 dist/*
 extras/

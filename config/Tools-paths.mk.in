@@ -1,0 +1,10 @@
+-include $(XEN_ROOT)/config/Paths.mk
+
+XENSTORED                := @XENSTORED@
+XENSTORED_KVA            := @XENSTORED_KVA@
+XENSTORED_PORT           := @XENSTORED_PORT@
+XEN_RUN_STORED           := @XEN_RUN_STORED@
+
+LINUX_BACKEND_MODULES    := @LINUX_BACKEND_MODULES@
+
+qemu_xen_path            := @qemu_xen_path@

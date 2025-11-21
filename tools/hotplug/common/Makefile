@@ -7,8 +7,15 @@ include $(XEN_ROOT)/tools/Rules.mk
 XEN_SCRIPTS :=
 XEN_SCRIPT_DATA := hotplugpath.sh
 
+IN_TARGETS := hotplugpath.sh
+
 .PHONY: all
-all:
+all: build
+
+$(foreach file,$(IN_TARGETS),$(eval $(call apply-build-vars,$(file))))
+
+.PHONY: build
+build: $(IN_TARGETS)
 
 .PHONY: install
 install: install-scripts
@@ -38,3 +45,4 @@ clean:
 
 .PHONY: distclean
 distclean: clean
+	$(RM) $(IN_TARGETS)

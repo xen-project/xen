@@ -8,6 +8,8 @@ OCAMLOPTFLAGS += -for-pack Xenstore
 .NOTPARALLEL:
 # Ocaml is such a PITA!
 
+IN_TARGETS := paths.ml
+
 PREINTF = xsraw.cmi xst.cmi
 PREOBJS = queueop xsraw xst
 PRELIBS = $(foreach obj, $(PREOBJS),$(obj).cmo) $(foreach obj,$(PREOJBS),$(obj).cmx)
@@ -16,6 +18,10 @@ INTF = xsraw.cmi xst.cmi xs.cmi
 LIBS = xenstore.cma xenstore.cmxa
 
 all: $(PREINTF) $(PRELIBS) $(INTF) $(LIBS) $(PROGRAMS)
+
+$(foreach file,$(IN_TARGETS),$(eval $(call apply-build-vars,$(file))))
+
+$(OBJS): $(IN_TARGETS)
 
 bins: $(PROGRAMS)
 
@@ -42,5 +48,8 @@ install: $(LIBS) META
 .PHONY: uninstall
 uninstall:
 	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenstore
+
+.PHONY: distclean
+	$(RM) $(IN_TARGETS)
 
 include $(OCAML_TOPLEVEL)/Makefile.rules

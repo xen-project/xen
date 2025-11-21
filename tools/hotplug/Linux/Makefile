@@ -26,8 +26,24 @@ XEN_SCRIPT_DATA := xen-script-common.sh locking.sh logging.sh
 XEN_SCRIPT_DATA += xen-hotplug-common.sh xen-network-common.sh vif-common.sh
 XEN_SCRIPT_DATA += block-common.sh
 
+IN_TARGETS := launch-xenstore
+IN_TARGETS += vif-setup
+IN_TARGETS += xendomains
+IN_TARGETS += xen-hotplug-common.sh
+IN_TARGETS += init.d/sysconfig.xendomains
+IN_TARGETS += init.d/xen-watchdog
+IN_TARGETS += init.d/xencommons
+IN_TARGETS += init.d/xendomains
+IN_TARGETS += init.d/xendriverdomain
+IN_TARGETS += init.d/sysconfig.xencommons
+
 .PHONY: all
 all: subdirs-all
+
+$(foreach file,$(IN_TARGETS),$(eval $(call apply-build-vars,$(file))))
+
+.PHONY: build
+build: $(IN_TARGETS)
 
 .PHONY: install
 install: install-initd install-scripts subdirs-install
@@ -37,7 +53,7 @@ uninstall: uninstall-initd uninstall-scripts subdirs-uninstall
 
 # See docs/misc/distro_mapping.txt for INITD_DIR location
 .PHONY: install-initd
-install-initd:
+install-initd: build
 	$(INSTALL_DIR) $(DESTDIR)$(INITD_DIR)
 	$(INSTALL_DIR) $(DESTDIR)$(SYSCONFIG_DIR)
 	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
@@ -60,7 +76,7 @@ uninstall-initd:
 	rm -f $(DESTDIR)$(SYSCONFIG_DIR)/xendomains
 
 .PHONY: install-scripts
-install-scripts:
+install-scripts: build
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_SCRIPT_DIR)
 	set -e; for i in $(XEN_SCRIPTS); \
 	    do \
@@ -81,3 +97,4 @@ clean: subdirs-clean
 
 .PHONY: distclean
 distclean: clean
+	$(RM) $(IN_TARGETS)

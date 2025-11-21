@@ -8,8 +8,16 @@ XEN_SCRIPT_DATA :=
 
 XEN_RCD_PROG := rc.d/xencommons rc.d/xendriverdomain
 
+IN_TARGETS := rc.d/xencommons
+IN_TARGETS += rc.d/xendriverdomain
+
 .PHONY: all
 all:
+
+$(foreach file,$(IN_TARGETS),$(eval $(call apply-build-vars,$(file))))
+
+.PHONY: build
+build: $(IN_TARGETS)
 
 .PHONY: install
 install: install-scripts install-rcd
@@ -18,7 +26,7 @@ install: install-scripts install-rcd
 uninstall: uninstall-script uninstall-rcd
 
 .PHONY: install-scripts
-install-scripts:
+install-scripts: build
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_SCRIPT_DIR)
 	set -e; for i in $(XEN_SCRIPTS); \
 	   do \
@@ -35,7 +43,7 @@ uninstall-scripts:
 	rm -f $(addprefix $(DESTDIR)$(XEN_SCRIPT_DIR)/, $(XEN_SCRIPT_DATA))
 
 .PHONY: install-rcd
-install-rcd:
+install-rcd: build
 	$(INSTALL_DIR) $(DESTDIR)$(INITD_DIR)
 	set -e; for i in $(XEN_RCD_PROG); \
 	   do \
@@ -51,3 +59,4 @@ clean:
 
 .PHONY: distclean
 distclean: clean
+	$(RM) $(IN_TARGETS)
