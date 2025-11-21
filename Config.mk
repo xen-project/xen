@@ -159,6 +159,19 @@ define move-if-changed
 	if ! cmp -s $(1) $(2); then mv -f $(1) $(2); else rm -f $(1); fi
 endef
 
+PATH_FILES := Paths.mk
+INC_FILES = $(foreach f, $(PATH_FILES), $(XEN_ROOT)/config/$(f))
+
+-include $(INC_FILES)
+
+BUILD_MAKE_VARS = $(foreach f, $(PATH_FILES), $(shell awk '$$2 == ":=" { print $$1; }' $(XEN_ROOT)/config/$(f).in))
+
+# Replace @xxx@ markers in $(1).in with $(xxx) variable contents, write to $(1)
+define apply-build-vars
+ $(1): $(1).in $$(INC_FILES)
+	sed $$(foreach v, $$(BUILD_MAKE_VARS), -e 's#@$$(v)@#$$($$(v))#g') <$$< >$$@
+endef
+
 CFLAGS += -fno-strict-aliasing
 
 CFLAGS += -std=gnu99
