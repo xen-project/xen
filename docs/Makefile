@@ -8,8 +8,14 @@ DATE		:= $(call date,"+%Y-%m-%d")
 DOC_ARCHES      := arm ppc riscv x86_32 x86_64
 MAN_SECTIONS    := 1 5 7 8
 
+IN_TARGETS := man/xl-disk-configuration.5.pod
+IN_TARGETS += man/xl-network-configuration.5.pod
+IN_TARGETS += man/xl.1.pod
+IN_TARGETS += man/xl.cfg.5.pod
+IN_TARGETS += man/xl.conf.5.pod
+
 # Documentation sources to build
-MAN-SRC-y := $(sort $(basename $(wildcard man/*.pod man/*.pandoc)))
+MAN-SRC-y := $(sort $(basename $(wildcard man/*.pod man/*.pandoc) $(IN_TARGETS)))
 
 RST-SRC-y := $(sort $(filter-out %index.rst,$(shell find * -type f -name '*.rst' -print)))
 
@@ -77,10 +83,13 @@ clean: clean-man-pages
 distclean: clean
 	rm -rf $(XEN_ROOT)/config/Docs.mk config.log config.status config.cache \
 		autom4te.cache
+	$(RM) $(IN_TARGETS)
 
 # Top level install targets
 
 .PHONY: man-pages install-man-pages clean-man-pages uninstall-man-pages
+
+$(foreach file,$(IN_TARGETS),$(eval $(call apply-build-vars,$(file))))
 
 # Metarules for generating manpages.  Run with $(1) substitued for section
 define GENERATE_MANPAGE_RULES

@@ -5,14 +5,7 @@ AC_PREREQ([2.67])
 AC_INIT([Xen Hypervisor Documentation], m4_esyscmd([../version.sh ../xen/Makefile]),
     [xen-devel@lists.xen.org], [xen], [https://www.xen.org/])
 AC_CONFIG_SRCDIR([misc/xen-command-line.pandoc])
-AC_CONFIG_FILES([
-../config/Docs.mk
-man/xl.cfg.5.pod
-man/xl.1.pod
-man/xl-disk-configuration.5.pod
-man/xl-network-configuration.5.pod
-man/xl.conf.5.pod
-])
+AC_CONFIG_FILES([../config/Docs.mk])
 AC_CONFIG_AUX_DIR([../])
 
 # M4 Macro includes
