@@ -86,11 +86,26 @@ viridian_hypercall(struct cpu_user_regs *regs);
 void viridian_time_domain_freeze(const struct domain *d);
 void viridian_time_domain_thaw(const struct domain *d);
 
+#ifdef CONFIG_VIRIDIAN
 int viridian_vcpu_init(struct vcpu *v);
 int viridian_domain_init(struct domain *d);
 
 void viridian_vcpu_deinit(struct vcpu *v);
 void viridian_domain_deinit(struct domain *d);
+#else
+static inline int viridian_vcpu_init(struct vcpu *v)
+{
+    return 0;
+}
+
+static inline int viridian_domain_init(struct domain *d)
+{
+    return 0;
+}
+
+static inline void viridian_vcpu_deinit(struct vcpu *v) {}
+static inline void viridian_domain_deinit(struct domain *d) {}
+#endif
 
 void viridian_apic_assist_set(const struct vcpu *v);
 bool viridian_apic_assist_completed(const struct vcpu *v);

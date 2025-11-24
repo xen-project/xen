@@ -1097,13 +1097,13 @@ static int cf_check viridian_save_domain_ctxt(
 {
     const struct domain *d = v->domain;
     const struct viridian_domain *vd = d->arch.hvm.viridian;
-    struct hvm_viridian_domain_context ctxt = {
-        .hypercall_gpa = vd->hypercall_gpa.raw,
-        .guest_os_id = vd->guest_os_id.raw,
-    };
+    struct hvm_viridian_domain_context ctxt = {};
 
     if ( !is_viridian_domain(d) )
         return 0;
+
+    ctxt.hypercall_gpa = vd->hypercall_gpa.raw;
+    ctxt.guest_os_id = vd->guest_os_id.raw,
 
     viridian_time_save_domain_ctxt(d, &ctxt);
     viridian_synic_save_domain_ctxt(d, &ctxt);

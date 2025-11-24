@@ -4231,8 +4231,9 @@ static int hvm_set_param(struct domain *d, uint32_t index, uint64_t value)
             rc = -EINVAL;
         break;
     case HVM_PARAM_VIRIDIAN:
-        if ( (value & ~HVMPV_feature_mask) ||
-             !(value & HVMPV_base_freq) )
+        if ( !IS_ENABLED(CONFIG_VIRIDIAN) )
+            rc = -ENODEV;
+        else if ( (value & ~HVMPV_feature_mask) || !(value & HVMPV_base_freq) )
             rc = -EINVAL;
         break;
     case HVM_PARAM_IDENT_PT:
