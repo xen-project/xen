@@ -120,6 +120,8 @@ extern const char __start___llvm_prf_names[];
 extern const char __stop___llvm_prf_names[];
 extern uint64_t __start___llvm_prf_cnts[];
 extern uint64_t __stop___llvm_prf_cnts[];
+extern const char __start___llvm_prf_bits[];
+extern const char __stop___llvm_prf_bits[];
 
 #define START_DATA      ((const void *)__start___llvm_prf_data)
 #define END_DATA        ((const void *)__stop___llvm_prf_data)
@@ -127,16 +129,23 @@ extern uint64_t __stop___llvm_prf_cnts[];
 #define END_NAMES       ((const void *)__stop___llvm_prf_names)
 #define START_COUNTERS  ((void *)__start___llvm_prf_cnts)
 #define END_COUNTERS    ((void *)__stop___llvm_prf_cnts)
+#define START_BITMAP    ((void *)__start___llvm_prf_bits)
+#define END_BITMAP      ((void *)__stop___llvm_prf_bits)
 
 static void cf_check reset_counters(void)
 {
     memset(START_COUNTERS, 0, END_COUNTERS - START_COUNTERS);
+    if ( IS_ENABLED(CONFIG_CONDITION_COVERAGE) )
+        memset(START_BITMAP, 0, END_BITMAP - START_BITMAP);
 }
 
 static uint32_t cf_check get_size(void)
 {
-    return ROUNDUP(sizeof(struct llvm_profile_header) + END_DATA - START_DATA +
+    uint32_t size = ROUNDUP(sizeof(struct llvm_profile_header) + END_DATA - START_DATA +
                    END_COUNTERS - START_COUNTERS + END_NAMES - START_NAMES, 8);
+    if ( IS_ENABLED(CONFIG_CONDITION_COVERAGE) )
+        size += ROUNDUP(END_BITMAP - START_BITMAP, 8);
+    return size;
 }
 
 static int cf_check dump(
@@ -155,6 +164,10 @@ static int cf_check dump(
 #endif
         .names_delta = (uintptr_t)START_NAMES,
         .value_kind_last = LLVM_PROFILE_NUM_KINDS - 1,
+#if defined(CONFIG_CONDITION_COVERAGE) && LLVM_PROFILE_VERSION >= 9
+        .num_bitmap_bytes = END_BITMAP - START_BITMAP,
+        .bitmap_delta = START_BITMAP - START_DATA,
+#endif
     };
     unsigned int off = 0;
 
@@ -168,6 +181,9 @@ static int cf_check dump(
     APPEND_TO_BUFFER(&header, sizeof(header));
     APPEND_TO_BUFFER(START_DATA, END_DATA - START_DATA);
     APPEND_TO_BUFFER(START_COUNTERS, END_COUNTERS - START_COUNTERS);
+#if defined(CONFIG_CONDITION_COVERAGE)
+    APPEND_TO_BUFFER(START_BITMAP, END_BITMAP - START_BITMAP);
+#endif
     APPEND_TO_BUFFER(START_NAMES, END_NAMES - START_NAMES);
 #undef APPEND_TO_BUFFER
 
