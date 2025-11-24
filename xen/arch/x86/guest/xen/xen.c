@@ -233,15 +233,11 @@ static void cf_check xen_evtchn_upcall(void)
     ack_APIC_irq();
 }
 
+static uint8_t __ro_after_init evtchn_upcall_vector;
+
 static int init_evtchn(void)
 {
-    static uint8_t evtchn_upcall_vector;
     int rc;
-
-    if ( !evtchn_upcall_vector )
-        alloc_direct_apic_vector(&evtchn_upcall_vector, xen_evtchn_upcall);
-
-    ASSERT(evtchn_upcall_vector);
 
     rc = xen_hypercall_set_evtchn_upcall_vector(this_cpu(vcpu_id),
                                                 evtchn_upcall_vector);
@@ -251,6 +247,10 @@ static int init_evtchn(void)
         return rc;
     }
 
+    /*
+     * HVM_PARAM_CALLBACK_IRQ is not moved on migrate, so has to be set up
+     * again on resume.
+     */
     if ( smp_processor_id() == 0 )
     {
         struct xen_hvm_param a = {
@@ -292,6 +292,8 @@ static void __init cf_check setup(void)
                "unable to map vCPU info, limiting vCPUs to: %u\n",
                XEN_LEGACY_MAX_VCPUS);
     }
+
+    alloc_direct_apic_vector(&evtchn_upcall_vector, xen_evtchn_upcall);
 
     BUG_ON(init_evtchn());
 }
