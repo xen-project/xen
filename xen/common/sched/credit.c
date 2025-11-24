@@ -1288,7 +1288,7 @@ csched_sys_cntl(const struct scheduler *ops,
         prv->unit_migr_delay = MICROSECS(params->vcpu_migr_delay_us);
         spin_unlock_irqrestore(&prv->lock, flags);
 
-        /* FALLTHRU */
+        fallthrough;
     case XEN_SYSCTL_SCHEDOP_getinfo:
         params->tslice_ms = prv->tslice / MILLISECS(1);
         params->ratelimit_us = prv->ratelimit / MICROSECS(1);
