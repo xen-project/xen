@@ -644,6 +644,7 @@ void __init amd_check_entrysign(void)
     case 0x0b1010: fixed_rev = 0x47; break;
     case 0x0b2040: fixed_rev = 0x32; break;
     case 0x0b4040: fixed_rev = 0x32; break;
+    case 0x0b4041: fixed_rev = 0x02; break;
     case 0x0b6000: fixed_rev = 0x32; break;
     case 0x0b6080: fixed_rev = 0x32; break;
     case 0x0b7000: fixed_rev = 0x32; break;
