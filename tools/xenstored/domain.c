@@ -1388,6 +1388,12 @@ void init_domains(void)
 	if (store_domid == DOMID_INVALID)
 		barf("Could not determine xenstore domid\n");
 
+	if (priv_domid == DOMID_INVALID)
+	{
+		priv_domid = store_domid;
+		xprintf("priv_domid defaulted to %u\n", priv_domid);
+	}
+
 	snprintf(store_domain_path, sizeof(store_domain_path),
 		 "/local/domain/%u", store_domid);
 
