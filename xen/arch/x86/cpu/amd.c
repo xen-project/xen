@@ -1115,8 +1115,9 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 		 * Branch Type Confusion, but predate the allocation of the
 		 * BTC_NO bit.  Fill it back in if we're not virtualised.
 		 */
-		if (!cpu_has_hypervisor && !cpu_has(c, X86_FEATURE_BTC_NO))
-			__set_bit(X86_FEATURE_BTC_NO, c->x86_capability);
+		if (c == &boot_cpu_data && !cpu_has_hypervisor &&
+		    !cpu_has(c, X86_FEATURE_BTC_NO))
+			setup_force_cpu_cap(X86_FEATURE_BTC_NO);
 		break;
 	}
 
