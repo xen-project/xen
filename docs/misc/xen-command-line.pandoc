@@ -587,46 +587,6 @@ applicable.  They can all be ignored.
     in its positive form to override Xen's default behaviour on these systems,
     and make the feature fully usable.
 
-### cpuid_mask_cpu
-> `= fam_0f_rev_[cdefg] | fam_10_rev_[bc] | fam_11_rev_b`
-
-> Applicability: AMD
-
-If none of the other **cpuid_mask_\*** options are given, Xen has a set of
-pre-configured masks to make the current processor appear to be
-family/revision specified.
-
-See below for general information on masking.
-
-**Warning: This option is not fully effective on Family 15h processors or
-later.**
-
-### cpuid_mask_ecx
-### cpuid_mask_edx
-### cpuid_mask_ext_ecx
-### cpuid_mask_ext_edx
-### cpuid_mask_l7s0_eax
-### cpuid_mask_l7s0_ebx
-### cpuid_mask_thermal_ecx
-### cpuid_mask_xsave_eax
-> `= <integer>`
-
-> Applicability: x86.  Default: `~0` (all bits set)
-
-The availability of these options are model specific.  Some processors don't
-support any of them, and no processor supports all of them.  Xen will ignore
-options on processors which are lacking support.
-
-These options can be used to alter the features visible via the `CPUID`
-instruction.  Settings applied here take effect globally, including for Xen
-and all guests.
-
-Note: Since Xen 4.7, it is no longer necessary to mask a host to create
-migration safety in heterogeneous scenarios.  All necessary CPUID settings
-should be provided in the VM configuration file.  Furthermore, it is
-recommended not to use this option, as doing so causes an unnecessary
-reduction of features at Xen's disposal to manage guests.
-
 ### cpuidle (x86)
 > `= <boolean>`
 

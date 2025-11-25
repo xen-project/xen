@@ -20,32 +20,6 @@
 
 #include "cpu.h"
 
-/*
- * Pre-canned values for overriding the CPUID features 
- * and extended features masks.
- *
- * Currently supported processors:
- * 
- * "fam_0f_rev_c"
- * "fam_0f_rev_d"
- * "fam_0f_rev_e"
- * "fam_0f_rev_f"
- * "fam_0f_rev_g"
- * "fam_10_rev_b"
- * "fam_10_rev_c"
- * "fam_11_rev_b"
- */
-static char __initdata opt_famrev[14];
-string_param("cpuid_mask_cpu", opt_famrev);
-
-static unsigned int __initdata opt_cpuid_mask_l7s0_eax = ~0u;
-integer_param("cpuid_mask_l7s0_eax", opt_cpuid_mask_l7s0_eax);
-static unsigned int __initdata opt_cpuid_mask_l7s0_ebx = ~0u;
-integer_param("cpuid_mask_l7s0_ebx", opt_cpuid_mask_l7s0_ebx);
-
-static unsigned int __initdata opt_cpuid_mask_thermal_ecx = ~0u;
-integer_param("cpuid_mask_thermal_ecx", opt_cpuid_mask_thermal_ecx);
-
 /* 1 = allow, 0 = don't allow guest creation, -1 = don't allow boot */
 int8_t __read_mostly opt_allow_unsafe;
 boolean_param("allow_unsafe", opt_allow_unsafe);
@@ -112,51 +86,6 @@ static void wrmsr_amd(unsigned int msr, uint64_t val)
 	asm volatile("wrmsr" ::
 		     "c" (msr), "a" ((uint32_t)val),
 		     "d" (val >> 32), "D" (0x9c5a203a));
-}
-
-static const struct cpuidmask {
-	uint16_t fam;
-	char rev[2];
-	unsigned int ecx, edx, ext_ecx, ext_edx;
-} pre_canned[] __initconst = {
-#define CAN(fam, id, rev) { \
-		fam, #rev, \
-		AMD_FEATURES_##id##_REV_##rev##_ECX, \
-		AMD_FEATURES_##id##_REV_##rev##_EDX, \
-		AMD_EXTFEATURES_##id##_REV_##rev##_ECX, \
-		AMD_EXTFEATURES_##id##_REV_##rev##_EDX \
-	}
-#define CAN_FAM(fam, rev) CAN(0x##fam, FAM##fam##h, rev)
-#define CAN_K8(rev)       CAN(0x0f,    K8,          rev)
-	CAN_FAM(11, B),
-	CAN_FAM(10, C),
-	CAN_FAM(10, B),
-	CAN_K8(G),
-	CAN_K8(F),
-	CAN_K8(E),
-	CAN_K8(D),
-	CAN_K8(C)
-#undef CAN
-};
-
-static const struct cpuidmask *__init noinline get_cpuidmask(const char *opt)
-{
-	unsigned long fam;
-	char rev;
-	unsigned int i;
-
-	if (strncmp(opt, "fam_", 4))
-		return NULL;
-	fam = simple_strtoul(opt + 4, &opt, 16);
-	if (strncmp(opt, "_rev_", 5) || !opt[5] || opt[6])
-		return NULL;
-	rev = toupper(opt[5]);
-
-	for (i = 0; i < ARRAY_SIZE(pre_canned); ++i)
-		if (fam == pre_canned[i].fam && rev == *pre_canned[i].rev)
-			return &pre_canned[i];
-
-	return NULL;
 }
 
 /*
@@ -295,8 +224,6 @@ static const typeof(ctxt_switch_masking) __initconst_cf_clobber __used csm =
  */
 static void __init noinline amd_init_levelling(void)
 {
-	const struct cpuidmask *m = NULL;
-
 	/*
 	 * If there's support for CpuidUserDis or CPUID faulting then
 	 * we can skip levelling because CPUID accesses are trapped anyway.
@@ -318,25 +245,10 @@ static void __init noinline amd_init_levelling(void)
 
 	probe_masking_msrs();
 
-	if (*opt_famrev != '\0') {
-		m = get_cpuidmask(opt_famrev);
-
-		if (!m)
-			printk("Invalid processor string: %s\n", opt_famrev);
-	}
-
 	if ((levelling_caps & LCAP_1cd) == LCAP_1cd) {
 		uint32_t ecx, edx, tmp;
 
 		cpuid(0x00000001, &tmp, &tmp, &ecx, &edx);
-
-		if (~(opt_cpuid_mask_ecx & opt_cpuid_mask_edx)) {
-			ecx &= opt_cpuid_mask_ecx;
-			edx &= opt_cpuid_mask_edx;
-		} else if (m) {
-			ecx &= m->ecx;
-			edx &= m->edx;
-		}
 
 		/* Fast-forward bits - Must be set. */
 		if (ecx & cpufeat_mask(X86_FEATURE_XSAVE))
@@ -351,14 +263,6 @@ static void __init noinline amd_init_levelling(void)
 
 		cpuid(0x80000001, &tmp, &tmp, &ecx, &edx);
 
-		if (~(opt_cpuid_mask_ext_ecx & opt_cpuid_mask_ext_edx)) {
-			ecx &= opt_cpuid_mask_ext_ecx;
-			edx &= opt_cpuid_mask_ext_edx;
-		} else if (m) {
-			ecx &= m->ext_ecx;
-			edx &= m->ext_edx;
-		}
-
 		/* Fast-forward bits - Must be set. */
 		edx |= cpufeat_mask(X86_FEATURE_APIC);
 
@@ -370,19 +274,11 @@ static void __init noinline amd_init_levelling(void)
 
 		cpuid(0x00000007, &eax, &ebx, &tmp, &tmp);
 
-		if (~(opt_cpuid_mask_l7s0_eax & opt_cpuid_mask_l7s0_ebx)) {
-			eax &= opt_cpuid_mask_l7s0_eax;
-			ebx &= opt_cpuid_mask_l7s0_ebx;
-		}
-
 		cpuidmask_defaults._7ab0 &= ((uint64_t)eax << 32) | ebx;
 	}
 
 	if ((levelling_caps & LCAP_6c) == LCAP_6c) {
 		uint32_t ecx = cpuid_ecx(6);
-
-		if (~opt_cpuid_mask_thermal_ecx)
-			ecx &= opt_cpuid_mask_thermal_ecx;
 
 		cpuidmask_defaults._6c &= (~0ULL << 32) | ecx;
 	}
