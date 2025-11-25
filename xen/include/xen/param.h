@@ -90,7 +90,7 @@ extern const struct kernel_param __setup_start[], __setup_end[];
 struct param_hypfs {
     struct hypfs_entry_leaf hypfs;
     void (*init_leaf)(struct param_hypfs *par);
-    int (*func)(const char *);
+    int (*func)(const char *s);
 };
 
 extern struct param_hypfs __paramhypfs_start[], __paramhypfs_end[];
