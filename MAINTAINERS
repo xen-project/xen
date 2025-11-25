@@ -301,7 +301,6 @@ F:	xen/include/xen/iommu.h
 KCONFIG
 M:	Doug Goldstein <cardoe@cardoe.com>
 S:	Supported
-F:	docs/misc/kconfig{,-language}.txt
 F:	xen/tools/kconfig/
 
 KDD DEBUGGER
