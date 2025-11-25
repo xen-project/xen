@@ -260,7 +260,9 @@ static int secondary_nmi_work(void)
 {
     cpumask_set_cpu(smp_processor_id(), &cpu_callin_map);
 
-    return wait_for_state(LOADING_EXIT) ? 0 : -EBUSY;
+    wait_for_state(LOADING_EXIT);
+
+    return 0;
 }
 
 static int primary_thread_work(const struct microcode_patch *patch,
@@ -271,7 +273,7 @@ static int primary_thread_work(const struct microcode_patch *patch,
     cpumask_set_cpu(smp_processor_id(), &cpu_callin_map);
 
     if ( !wait_for_state(LOADING_ENTER) )
-        return -EBUSY;
+        return 0;
 
     ret = alternative_call(ucode_ops.apply_microcode, patch, flags);
     if ( !ret )
@@ -313,7 +315,7 @@ static int cf_check microcode_nmi_callback(
 static int secondary_thread_fn(void)
 {
     if ( !wait_for_state(LOADING_CALLIN) )
-        return -EBUSY;
+        return 0;
 
     self_nmi();
 
@@ -336,7 +338,7 @@ static int primary_thread_fn(const struct microcode_patch *patch,
                              unsigned int flags)
 {
     if ( !wait_for_state(LOADING_CALLIN) )
-        return -EBUSY;
+        return 0;
 
     if ( ucode_in_nmi )
     {
