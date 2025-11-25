@@ -1333,7 +1333,7 @@ static bool init_domain(unsigned int domid)
 
 	domain = introduce_domain(NULL, domid, port, false);
 	if (!domain) {
-		xprintf("Could not initialize dom%u", domid);
+		xprintf("Could not initialize dom%u\n", domid);
 		return false;
 	}
 
