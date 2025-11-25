@@ -81,6 +81,7 @@
   .stab.index 0 : { *(.stab.index) }         \
   .stab.indexstr 0 : { *(.stab.indexstr) }
 
+#if defined(CONFIG_CC_IS_CLANG) && defined(CONFIG_COVERAGE)
 /* Clang coverage sections. */
 #define LLVM_COV_RW_DATA                                   \
     DECL_SECTION(__llvm_prf_cnts) { *(__llvm_prf_cnts) }   \
@@ -93,6 +94,11 @@
 #define LLVM_COV_DEBUG                                     \
     DECL_DEBUG(__llvm_covfun, 8)                           \
     DECL_DEBUG(__llvm_covmap, 8)
+#else
+#define LLVM_COV_RW_DATA
+#define LLVM_COV_RO_DATA
+#define LLVM_COV_DEBUG
+#endif
 
 /*
  * ELF sections.
