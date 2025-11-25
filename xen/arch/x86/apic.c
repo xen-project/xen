@@ -1319,8 +1319,8 @@ static void cf_check error_interrupt(void)
 
 static void cf_check pmu_interrupt(void)
 {
-    ack_APIC_irq();
     vpmu_do_interrupt();
+    ack_APIC_irq();
 }
 
 void __init apic_intr_init(void)
