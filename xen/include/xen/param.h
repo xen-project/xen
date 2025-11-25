@@ -102,8 +102,8 @@ extern struct param_hypfs __paramhypfs_start[], __paramhypfs_end[];
 
 #define custom_runtime_set_var_sz(parfs, var, sz) \
     { \
-        (parfs)->hypfs.u.content = var; \
-        (parfs)->hypfs.e.max_size = sz; \
+        (parfs)->hypfs.u.content = (var); \
+        (parfs)->hypfs.e.max_size = (sz); \
         (parfs)->hypfs.e.size = strlen(var) + 1; \
     }
 #define custom_runtime_set_var(parfs, var) \
