@@ -1,4 +1,5 @@
 #include <xen/init.h>
+
 #include <asm/processor.h>
 #include <asm/spec_ctrl.h>
 

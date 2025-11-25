@@ -1,9 +1,11 @@
-#include <xen/lib.h>
-#include <xen/init.h>
 #include <xen/bitops.h>
-#include <asm/processor.h>
-#include <asm/msr.h>
+#include <xen/init.h>
+#include <xen/lib.h>
+
 #include <asm/e820.h>
+#include <asm/msr.h>
+#include <asm/processor.h>
+
 #include "cpu.h"
 
 #define ACE_PRESENT	(1 << 6)

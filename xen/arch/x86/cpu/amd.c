@@ -1,21 +1,22 @@
+#include <xen/bitops.h>
 #include <xen/cpu.h>
 #include <xen/init.h>
-#include <xen/bitops.h>
 #include <xen/mm.h>
 #include <xen/param.h>
-#include <xen/smp.h>
-#include <xen/softirq.h>
 #include <xen/pci.h>
 #include <xen/sched.h>
+#include <xen/smp.h>
+#include <xen/softirq.h>
 #include <xen/warning.h>
+
+#include <asm/acpi.h>
+#include <asm/amd.h>
+#include <asm/apic.h>
 #include <asm/io.h>
+#include <asm/microcode.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
-#include <asm/amd.h>
 #include <asm/spec_ctrl.h>
-#include <asm/acpi.h>
-#include <asm/apic.h>
-#include <asm/microcode.h>
 
 #include "cpu.h"
 
