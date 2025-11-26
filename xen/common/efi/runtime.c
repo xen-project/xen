@@ -6,6 +6,7 @@
 #include <xen/irq.h>
 #include <xen/sections.h>
 #include <xen/time.h>
+#include <xen/xvmalloc.h>
 
 DEFINE_XEN_GUEST_HANDLE(CHAR16);
 
@@ -502,23 +503,23 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
         len = gwstrlen(guest_handle_cast(op->u.get_variable.name, CHAR16));
         if ( len < 0 )
             return len;
-        name = xmalloc_array(CHAR16, ++len);
+        name = xvmalloc_array(CHAR16, ++len);
         if ( !name )
            return -ENOMEM;
         if ( __copy_from_guest(name, op->u.get_variable.name, len) ||
              wmemchr(name, 0, len) != name + len - 1 )
         {
-            xfree(name);
+            xvfree(name);
             return -EIO;
         }
 
         size = op->u.get_variable.size;
         if ( size )
         {
-            data = xmalloc_bytes(size);
+            data = xvmalloc_array(unsigned char, size);
             if ( !data )
             {
-                xfree(name);
+                xvfree(name);
                 return -ENOMEM;
             }
         }
@@ -541,8 +542,8 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
         else
             rc = -EOPNOTSUPP;
 
-        xfree(data);
-        xfree(name);
+        xvfree(data);
+        xvfree(name);
     }
     break;
 
@@ -555,17 +556,17 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
         len = gwstrlen(guest_handle_cast(op->u.set_variable.name, CHAR16));
         if ( len < 0 )
             return len;
-        name = xmalloc_array(CHAR16, ++len);
+        name = xvmalloc_array(CHAR16, ++len);
         if ( !name )
            return -ENOMEM;
         if ( __copy_from_guest(name, op->u.set_variable.name, len) ||
              wmemchr(name, 0, len) != name + len - 1 )
         {
-            xfree(name);
+            xvfree(name);
             return -EIO;
         }
 
-        data = xmalloc_bytes(op->u.set_variable.size);
+        data = xvmalloc_array(unsigned char, op->u.set_variable.size);
         if ( !data )
             rc = -ENOMEM;
         else if ( copy_from_guest(data, op->u.set_variable.data,
@@ -583,8 +584,8 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
             efi_rs_leave(&state);
         }
 
-        xfree(data);
-        xfree(name);
+        xvfree(data);
+        xvfree(name);
     }
     break;
 
@@ -600,13 +601,13 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
             return -EINVAL;
 
         size = op->u.get_next_variable_name.size;
-        name.raw = xzalloc_bytes(size);
+        name.raw = xvzalloc_array(unsigned char, size);
         if ( !name.raw )
             return -ENOMEM;
         if ( copy_from_guest(name.raw, op->u.get_next_variable_name.name,
                              size) )
         {
-            xfree(name.raw);
+            xvfree(name.raw);
             return -EFAULT;
         }
 
@@ -631,7 +632,7 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
         else
             rc = -EOPNOTSUPP;
 
-        xfree(name.raw);
+        xvfree(name.raw);
     }
     break;
 
