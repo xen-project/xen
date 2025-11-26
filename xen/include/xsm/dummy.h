@@ -640,6 +640,7 @@ static XSM_INLINE int cf_check xsm_hvm_altp2mhvm_op(
     }
 }
 
+#ifdef CONFIG_VM_EVENT
 static XSM_INLINE int cf_check xsm_vm_event_control(
     XSM_DEFAULT_ARG struct domain *d, int mode, int op)
 {
@@ -647,7 +648,6 @@ static XSM_INLINE int cf_check xsm_vm_event_control(
     return xsm_default_action(action, current->domain, d);
 }
 
-#ifdef CONFIG_VM_EVENT
 static XSM_INLINE int cf_check xsm_mem_access(XSM_DEFAULT_ARG struct domain *d)
 {
     XSM_ASSERT_ACTION(XSM_DM_PRIV);
