@@ -22,9 +22,9 @@
 typedef uint32_t xsm_magic_t;
 
 #ifdef CONFIG_XSM_FLASK
-#define XSM_MAGIC 0xf97cff8c
+#define XSM_MAGIC 0xf97cff8cU
 #else
-#define XSM_MAGIC 0x0
+#define XSM_MAGIC 0x0U
 #endif
 
 /*
@@ -815,7 +815,7 @@ int xsm_multiboot_policy_init(
  */
 int xsm_dt_init(void);
 int xsm_dt_policy_init(void **policy_buffer, size_t *policy_size);
-bool has_xsm_magic(paddr_t);
+bool has_xsm_magic(paddr_t start);
 #endif
 
 void xsm_fixup_ops(struct xsm_ops *ops);
