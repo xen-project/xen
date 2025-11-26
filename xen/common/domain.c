@@ -680,7 +680,7 @@ static void _domain_destroy(struct domain *d)
     BUG_ON(!d->is_dying);
     BUG_ON(atomic_read(&d->refcnt) != DOMAIN_DESTROYED);
 
-    xfree(d->pbuf);
+    XVFREE(d->console);
 
     argo_destroy(d);
 
@@ -854,8 +854,6 @@ struct domain *domain_create(domid_t domid,
         flags |= CDF_hardware;
         if ( old_hwdom )
             old_hwdom->cdf &= ~CDF_hardware;
-
-        d->console.input_allowed = true;
     }
 
     /* Holding CDF_* internal flags. */
@@ -884,8 +882,6 @@ struct domain *domain_create(domid_t domid,
 
     spin_lock_init(&d->shutdown_lock);
     d->shutdown_code = SHUTDOWN_CODE_INVALID;
-
-    spin_lock_init(&d->pbuf_lock);
 
     rwlock_init(&d->vnuma_rwlock);
 
@@ -931,6 +927,14 @@ struct domain *domain_create(domid_t domid,
     /* DOMID_{XEN,IO,IDLE,etc} are sufficiently constructed. */
     if ( is_system_domain(d) )
         return d;
+
+    err = -ENOMEM;
+    d->console = xvzalloc(typeof(*d->console));
+    if ( !d->console )
+        goto fail;
+
+    spin_lock_init(&d->console->lock);
+    d->console->input_allowed = is_hardware_domain(d);
 
     /*
      * This assertion helps static analysis tools infer that config cannot be
@@ -982,11 +986,6 @@ struct domain *domain_create(domid_t domid,
     init_status |= INIT_gnttab;
 
     if ( (err = argo_init(d)) != 0 )
-        goto fail;
-
-    err = -ENOMEM;
-    d->pbuf = xzalloc_array(char, DOMAIN_PBUF_SIZE);
-    if ( !d->pbuf )
         goto fail;
 
     if ( (err = sched_init_domain(d, config->cpupool_id)) != 0 )

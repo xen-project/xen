@@ -563,6 +563,7 @@ static int cf_check hvm_print_line(
     int dir, unsigned int port, unsigned int bytes, uint32_t *val)
 {
     struct domain *cd = current->domain;
+    struct domain_console *cons = cd->console;
     char c = *val;
 
     ASSERT(bytes == 1 && port == XEN_HVM_DEBUGCONS_IOPORT);
@@ -580,16 +581,17 @@ static int cf_check hvm_print_line(
     if ( !is_console_printable(c) )
         return X86EMUL_OKAY;
 
-    spin_lock(&cd->pbuf_lock);
+    spin_lock(&cons->lock);
+    ASSERT(cons->idx < ARRAY_SIZE(cons->buf));
     if ( c != '\n' )
-        cd->pbuf[cd->pbuf_idx++] = c;
-    if ( (cd->pbuf_idx == (DOMAIN_PBUF_SIZE - 1)) || (c == '\n') )
+        cons->buf[cons->idx++] = c;
+    if ( (cons->idx == (ARRAY_SIZE(cons->buf) - 1)) || (c == '\n') )
     {
-        cd->pbuf[cd->pbuf_idx] = '\0';
-        guest_printk(cd, XENLOG_G_DEBUG "%s\n", cd->pbuf);
-        cd->pbuf_idx = 0;
+        cons->buf[cons->idx] = '\0';
+        guest_printk(cd, XENLOG_G_DEBUG "%s\n", cons->buf);
+        cons->idx = 0;
     }
-    spin_unlock(&cd->pbuf_lock);
+    spin_unlock(&cons->lock);
 
     return X86EMUL_OKAY;
 }

@@ -239,7 +239,7 @@ void __init pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
      */
     d->max_pages = domain_tot_pages(d);
 
-    d->console.input_allowed = true;
+    d->console->input_allowed = true;
 }
 
 static void write_start_info(struct domain *d)

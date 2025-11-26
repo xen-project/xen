@@ -371,6 +371,17 @@ struct evtchn_port_ops;
 
 #define MAX_NR_IOREQ_SERVERS 8
 
+/* Domain console settings. */
+struct domain_console {
+    /* Permission to take ownership of the physical console input. */
+    bool input_allowed;
+
+    /* hvm_print_line() and guest_console_write() logging. */
+    unsigned int idx;
+    spinlock_t lock;
+    char buf[256];
+};
+
 struct domain
 {
     domid_t          domain_id;
@@ -562,12 +573,6 @@ struct domain
     /* Control-plane tools handle for this domain. */
     xen_domain_handle_t handle;
 
-    /* hvm_print_line() and guest_console_write() logging. */
-#define DOMAIN_PBUF_SIZE 200
-    char       *pbuf;
-    unsigned int pbuf_idx;
-    spinlock_t  pbuf_lock;
-
     /* OProfile support. */
     struct xenoprof *xenoprof;
 
@@ -656,11 +661,8 @@ struct domain
     unsigned int *llc_colors;
 #endif
 
-    /* Console settings. */
-    struct {
-        /* Permission to take ownership of the physical console input. */
-        bool input_allowed;
-    } console;
+    /* Pointer to console settings; NULL for system domains. */
+    struct domain_console *console;
 } __aligned(PAGE_SIZE);
 
 static inline struct page_list_head *page_to_list(

@@ -526,7 +526,7 @@ struct domain *console_get_domain(void)
     if ( !d )
         return NULL;
 
-    if ( d->console.input_allowed )
+    if ( d->console->input_allowed )
         return d;
 
     rcu_unlock_domain(d);
@@ -567,10 +567,13 @@ static void console_switch_input(void)
         d = rcu_lock_domain_by_id(domid);
         if ( d )
         {
-            rcu_unlock_domain(d);
-
-            if ( !d->console.input_allowed )
+            if ( !d->console->input_allowed )
+            {
+                rcu_unlock_domain(d);
                 continue;
+            }
+
+            rcu_unlock_domain(d);
 
             console_rx = next_rx;
             printk("*** Serial input to DOM%u", domid);
@@ -749,6 +752,7 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer,
         else
         {
             char *kin = kbuf, *kout = kbuf, c;
+            struct domain_console *cons = cd->console;
 
             /* Strip non-printable characters */
             do
@@ -761,22 +765,22 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer,
             } while ( --kcount > 0 );
 
             *kout = '\0';
-            spin_lock(&cd->pbuf_lock);
+            spin_lock(&cons->lock);
             kcount = kin - kbuf;
             if ( c != '\n' &&
-                 (cd->pbuf_idx + (kout - kbuf) < (DOMAIN_PBUF_SIZE - 1)) )
+                 (cons->idx + (kout - kbuf) < (ARRAY_SIZE(cons->buf) - 1)) )
             {
                 /* buffer the output until a newline */
-                memcpy(cd->pbuf + cd->pbuf_idx, kbuf, kout - kbuf);
-                cd->pbuf_idx += (kout - kbuf);
+                memcpy(cons->buf + cons->idx, kbuf, kout - kbuf);
+                cons->idx += kout - kbuf;
             }
             else
             {
-                cd->pbuf[cd->pbuf_idx] = '\0';
-                guest_printk(cd, XENLOG_G_DEBUG "%s%s\n", cd->pbuf, kbuf);
-                cd->pbuf_idx = 0;
+                cons->buf[cons->idx] = '\0';
+                guest_printk(cd, XENLOG_G_DEBUG "%s%s\n", cons->buf, kbuf);
+                cons->idx = 0;
             }
-            spin_unlock(&cd->pbuf_lock);
+            spin_unlock(&cons->lock);
         }
 
         guest_handle_add_offset(buffer, kcount);
