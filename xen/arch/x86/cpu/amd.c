@@ -1131,13 +1131,6 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 		wrmsrl(MSR_K8_HWCR, value);
 	}
 
-	/*
-	 * Some AMD CPUs duplicate the 3DNow bit in base and extended CPUID
-	 * leaves.  Unfortunately, this aliases PBE on Intel CPUs. Clobber the
-	 * alias, leaving 3DNow in the extended leaf.
-	 */
-	__clear_bit(X86_FEATURE_PBE, c->x86_capability);
-	
 	if (c->x86 == 0xf && c->x86_model < 0x14
 	    && cpu_has(c, X86_FEATURE_LAHF_LM)) {
 		/*
