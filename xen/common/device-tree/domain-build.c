@@ -406,6 +406,52 @@ void __init initrd_load(struct kernel_info *kinfo,
 }
 
 /*
+ * This function is used as part of the device tree generation for Dom0
+ * on ACPI systems (on platform where CONFIG_ACPI=y), and DomUs started
+ * directly from Xen based on device tree information.
+ */
+int __init make_chosen_node(const struct kernel_info *kinfo)
+{
+    int res;
+    const char *bootargs = NULL;
+    const struct boot_module *initrd = kinfo->bd.initrd;
+    void *fdt = kinfo->fdt;
+
+    dt_dprintk("Create chosen node\n");
+    res = fdt_begin_node(fdt, "chosen");
+    if ( res )
+        return res;
+
+    if ( kinfo->bd.cmdline && kinfo->bd.cmdline[0] )
+    {
+        bootargs = &kinfo->bd.cmdline[0];
+        res = fdt_property(fdt, "bootargs", bootargs, strlen(bootargs) + 1);
+        if ( res )
+           return res;
+    }
+
+    /*
+     * If the bootloader provides an initrd, we must create a placeholder
+     * for the initrd properties. The values will be replaced later.
+     */
+    if ( initrd && initrd->size )
+    {
+        u64 a = 0;
+        res = fdt_property(kinfo->fdt, "linux,initrd-start", &a, sizeof(a));
+        if ( res )
+            return res;
+
+        res = fdt_property(kinfo->fdt, "linux,initrd-end", &a, sizeof(a));
+        if ( res )
+            return res;
+    }
+
+    res = fdt_end_node(fdt);
+
+    return res;
+}
+
+/*
  * Local variables:
  * mode: C
  * c-file-style: "BSD"
