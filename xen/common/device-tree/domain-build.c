@@ -8,6 +8,7 @@
 #include <xen/mm.h>
 #include <xen/sched.h>
 #include <xen/sizes.h>
+#include <xen/static-shmem.h>
 #include <xen/types.h>
 #include <xen/vmap.h>
 
@@ -445,6 +446,80 @@ int __init make_chosen_node(const struct kernel_info *kinfo)
         if ( res )
             return res;
     }
+
+    res = fdt_end_node(fdt);
+
+    return res;
+}
+
+int __init make_memory_node(const struct kernel_info *kinfo, int addrcells,
+                            int sizecells, const struct membanks *mem)
+{
+    void *fdt = kinfo->fdt;
+    unsigned int i;
+    int res, reg_size = addrcells + sizecells;
+    int nr_cells = 0;
+    __be32 reg[DT_MEM_NODE_REG_RANGE_SIZE];
+    __be32 *cells;
+
+    if ( mem->nr_banks == 0 )
+        return -ENOENT;
+
+    /* find the first memory range that is reserved for device (or firmware) */
+    for ( i = 0; i < mem->nr_banks &&
+                 (mem->bank[i].type != MEMBANK_DEFAULT); i++ )
+        ;
+
+    if ( i == mem->nr_banks )
+        return 0;
+
+    dt_dprintk("Create memory node\n");
+
+    res = domain_fdt_begin_node(fdt, "memory", mem->bank[i].start);
+    if ( res )
+        return res;
+
+    res = fdt_property_string(fdt, "device_type", "memory");
+    if ( res )
+        return res;
+
+    cells = &reg[0];
+    for ( ; i < mem->nr_banks; i++ )
+    {
+        u64 start = mem->bank[i].start;
+        u64 size = mem->bank[i].size;
+
+        if ( (mem->bank[i].type == MEMBANK_STATIC_DOMAIN) ||
+             (mem->bank[i].type == MEMBANK_FDT_RESVMEM) )
+            continue;
+
+        nr_cells += reg_size;
+        BUG_ON(nr_cells >= ARRAY_SIZE(reg));
+        dt_child_set_range(&cells, addrcells, sizecells, start, size);
+    }
+
+    /*
+     * static shared memory banks need to be listed as /memory node, so when
+     * this function is handling the normal memory, add the banks.
+     */
+    if ( mem == kernel_info_get_mem_const(kinfo) )
+        shm_mem_node_fill_reg_range(kinfo, reg, &nr_cells, addrcells,
+                                    sizecells);
+
+    for ( cells = reg, i = 0; cells < reg + nr_cells; i++, cells += reg_size )
+    {
+        uint64_t start = dt_read_number(cells, addrcells);
+        uint64_t size = dt_read_number(cells + addrcells, sizecells);
+
+        dt_dprintk("  Bank %u: %#"PRIx64"->%#"PRIx64"\n",
+                   i, start, start + size);
+    }
+
+    dt_dprintk("(reg size %d, nr cells %d)\n", reg_size, nr_cells);
+
+    res = fdt_property(fdt, "reg", reg, nr_cells * sizeof(*reg));
+    if ( res )
+        return res;
 
     res = fdt_end_node(fdt);
 
