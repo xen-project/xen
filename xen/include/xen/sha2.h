@@ -9,8 +9,8 @@
 
 #define SHA2_256_DIGEST_SIZE 32
 
-void sha2_256_digest(uint8_t digest[SHA2_256_DIGEST_SIZE],
-                     const void *msg, size_t len);
+void sha2_256(uint8_t digest[SHA2_256_DIGEST_SIZE],
+              const void *msg, size_t len);
 
 struct sha2_256_state {
     uint32_t state[SHA2_256_DIGEST_SIZE / sizeof(uint32_t)];

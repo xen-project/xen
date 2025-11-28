@@ -139,7 +139,7 @@ static bool check_digest(const struct container_microcode *mc)
         return false;
     }
 
-    sha2_256_digest(digest, patch, mc->len);
+    sha2_256(digest, patch, mc->len);
 
     if ( memcmp(digest, pd->digest, sizeof(digest)) )
     {

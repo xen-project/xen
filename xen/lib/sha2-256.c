@@ -68,7 +68,7 @@ static const uint32_t K[] = {
     0x90befffaU, 0xa4506cebU, 0xbef9a3f7U, 0xc67178f2U,
 };
 
-static void sha2_256_transform(uint32_t *state, const void *_input)
+static void sha2_256_transform(uint32_t state[8], const void *_input)
 {
     const uint32_t *input = _input;
     uint32_t a, b, c, d, e, f, g, h, t1, t2;
@@ -197,8 +197,8 @@ void sha2_256_final(struct sha2_256_state *s, uint8_t digest[SHA2_256_DIGEST_SIZ
         put_unaligned_be32(s->state[i], &dst[i]);
 }
 
-void sha2_256_digest(uint8_t digest[SHA2_256_DIGEST_SIZE],
-                     const void *msg, size_t len)
+void sha2_256(uint8_t digest[SHA2_256_DIGEST_SIZE],
+              const void *msg, size_t len)
 {
     struct sha2_256_state s;
 
@@ -243,7 +243,7 @@ static void __init __constructor test_sha2_256(void)
         const struct test *t = &tests[i];
         uint8_t res[SHA2_256_DIGEST_SIZE] = {};
 
-        sha2_256_digest(res, t->msg, strlen(t->msg));
+        sha2_256(res, t->msg, strlen(t->msg));
 
         if ( memcmp(res, t->digest, sizeof(t->digest)) == 0 )
             continue;
