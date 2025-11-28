@@ -884,9 +884,18 @@ static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
                    "%pv: %s: unhandled word write %#"PRIregister" to ISACTIVER%d\n",
                    v, name, r, reg - GICD_ISACTIVER);
         else
+        {
+#ifdef CONFIG_GICV3_ESPI
+            if ( !v->domain->arch.vgic.nr_espis )
+                goto write_ignore;
+
             printk(XENLOG_G_ERR
                    "%pv: %s: unhandled word write %#"PRIregister" to ISACTIVER%dE\n",
                    v, name, r, reg - GICD_ISACTIVERnE);
+#else
+            goto write_ignore;
+#endif
+        }
         return 0;
 
     case VRANGE32(GICD_ICACTIVER, GICD_ICACTIVERN):
