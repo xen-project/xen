@@ -117,10 +117,12 @@ static void __init noinline probe_masking_msrs(void)
 	/*
 	 * First, work out which masking MSRs we should have, based on
 	 * revision and cpuid.
+	 *
+	 * Fam11h doesn't support masking at all.  FamFh RevD and earlier had
+	 * the feature MSRs in different locations, as can be seen by the
+	 * suggested workaround for Erratum #110, doc 25759.
 	 */
-
-	/* Fam11 doesn't support masking at all. */
-	if (c->x86 == 0x11)
+	if (c->family == 0x11 || (c->family == 0xf && c->model < 0x20))
 		return;
 
 	cpuidmask_defaults._1cd =
