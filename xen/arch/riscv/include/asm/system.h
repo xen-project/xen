@@ -7,7 +7,7 @@
 
 #include <asm/csr.h>
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #define RISCV_FENCE(p, s) \
     __asm__ __volatile__ ( "fence " #p "," #s : : : "memory" )
@@ -76,7 +76,7 @@ static inline bool local_irq_is_enabled(void)
 
 #define arch_fetch_and_add(x, v) __sync_fetch_and_add(x, v)
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* ASM__RISCV__SYSTEM_H */
 

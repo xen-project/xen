@@ -53,7 +53,7 @@ __DeFiNe__ __DECL_REG_LO16(name) e ## name
 #include "xen-x86_64.h"
 #endif
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 typedef unsigned long xen_pfn_t;
 #define PRI_xen_pfn "lx"
 #define PRIu_xen_pfn "lu"
@@ -97,7 +97,7 @@ typedef unsigned long xen_pfn_t;
 /* Maximum number of virtual CPUs in legacy multi-processor guests. */
 #define XEN_LEGACY_MAX_VCPUS 32
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 typedef unsigned long xen_ulong_t;
 #define PRI_xen_ulong "lx"
@@ -335,7 +335,7 @@ typedef struct xen_msr_entry {
 } xen_msr_entry_t;
 DEFINE_XEN_GUEST_HANDLE(xen_msr_entry_t);
 
-#endif /* !__ASSEMBLY__ */
+#endif /* !__ASSEMBLER__ */
 
 /*
  * ` enum neg_errnoval
@@ -359,7 +359,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_msr_entry_t);
  * Prefix forces emulation of some non-trapping instructions.
  * Currently only CPUID.
  */
-#ifdef __ASSEMBLY__
+#ifdef __ASSEMBLER__
 #define XEN_EMULATE_PREFIX .byte 0x0f,0x0b,0x78,0x65,0x6e ;
 #define XEN_CPUID          XEN_EMULATE_PREFIX cpuid
 #else

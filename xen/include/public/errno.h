@@ -30,7 +30,7 @@
 
 #define XEN_ERRNO_DEFAULT_INCLUDE
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #define XEN_ERRNO(name, value) XEN_##name = (value),
 enum xen_errno {
@@ -39,7 +39,7 @@ enum xen_errno {
 
 #define XEN_ERRNO(name, value) .equ XEN_##name, value
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* __XEN_PUBLIC_ERRNO_H__ */
 #endif /* !XEN_ERRNO */
@@ -123,7 +123,7 @@ XEN_ERRNO(ECONNREFUSED,	111)	/* Connection refused */
 /* Clean up from a default include.  Close the enum (for C). */
 #ifdef XEN_ERRNO_DEFAULT_INCLUDE
 #undef XEN_ERRNO_DEFAULT_INCLUDE
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 };
 #endif
 

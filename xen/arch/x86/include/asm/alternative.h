@@ -8,7 +8,7 @@
 #define ALT_FLAG_NOT (1 << 15)
 #define ALT_NOT(x) (ALT_FLAG_NOT | (x))
 
-#ifdef __ASSEMBLY__
+#ifdef __ASSEMBLER__
 #include <asm/alternative-asm.h>
 #else
 
@@ -175,6 +175,6 @@ extern void alternative_instructions(void);
 /* Use this macro(s) if you need more than one output parameter. */
 #define ASM_OUTPUT2(a...) a
 
-#endif /*  !__ASSEMBLY__  */
+#endif /*  !__ASSEMBLER__  */
 
 #endif /* __X86_ALTERNATIVE_H__ */

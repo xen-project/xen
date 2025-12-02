@@ -10,7 +10,7 @@
 #include <xen/const.h>
 #include <asm/riscv_encoding.h>
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #define csr_read(csr)                                           \
 ({                                                              \
@@ -78,6 +78,6 @@
                            : "memory" );                        \
 })
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* ASM__RISCV__CSR_H */

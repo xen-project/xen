@@ -3,7 +3,7 @@
 
 #define KEXEC_RELOC_FLAG_COMPAT 0x1 /* 32-bit image */
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 extern void kexec_reloc(unsigned long reloc_code, unsigned long reloc_pt,
                         unsigned long ind_maddr, unsigned long entry_maddr,

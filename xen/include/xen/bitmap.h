@@ -1,7 +1,7 @@
 #ifndef __XEN_BITMAP_H
 #define __XEN_BITMAP_H
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/lib.h>
 #include <xen/types.h>
@@ -290,6 +290,6 @@ int xenctl_bitmap_to_bitmap(unsigned long *bitmap,
 int bitmap_to_xenctl_bitmap(struct xenctl_bitmap *xenctl_bitmap,
                             const unsigned long *bitmap, unsigned int nbits);
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* __XEN_BITMAP_H */

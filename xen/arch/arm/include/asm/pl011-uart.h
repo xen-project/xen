@@ -21,7 +21,7 @@
 #ifndef __ASM_ARM_PL011_H
 #define __ASM_ARM_PL011_H
 
-#ifdef __ASSEMBLY__
+#ifdef __ASSEMBLER__
 
 /*
  * PL011 registers are 8/16-bit wide. However, there are implementations that
@@ -38,7 +38,7 @@
 #define PL011_LDRH ldrh
 #endif
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 /* PL011 register addresses */
 #define DR     (0x00)

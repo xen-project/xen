@@ -25,11 +25,11 @@
 #define REGION_DATA_PRBAR       0x19    /* SH=11 AP=00 XN=1 */
 #define REGION_DEVICE_PRBAR     0x11    /* SH=10 AP=00 XN=1 */
 
-#ifdef __ASSEMBLY__
+#ifdef __ASSEMBLER__
 
 #define WRITE_SYSREG_ASM(v, name) mcr CP32(v, name)
 
-#else /* __ASSEMBLY__ */
+#else /* __ASSEMBLER__ */
 
 /* C wrappers */
 #define READ_CP32(name...) ({                                   \
@@ -93,7 +93,7 @@
 /* MVFR2 is not defined on ARMv7 */
 #define MVFR2_MAYBE_UNDEFINED
 
-#endif /* !__ASSEMBLY__ */
+#endif /* !__ASSEMBLER__ */
 
 #endif /* __ASM_ARM_ARM32_SYSREGS_H */
 /*

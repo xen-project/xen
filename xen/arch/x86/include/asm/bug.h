@@ -19,12 +19,12 @@
  *  ...
  */
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #define BUG_INSTR       "ud2"
 #define BUG_ASM_CONST   "c"
 
-#else  /* !__ASSEMBLY__ */
+#else  /* !__ASSEMBLER__ */
 
 /*
  * Construct a bugframe, suitable for using in assembly code.  Should always
@@ -66,6 +66,6 @@
 #define ASSERT_FAILED(msg)                                      \
      BUG_FRAME BUGFRAME_assert, __LINE__, __FILE__, 1, msg
 
-#endif /* !__ASSEMBLY__ */
+#endif /* !__ASSEMBLER__ */
 
 #endif /* __X86_BUG_H__ */

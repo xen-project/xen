@@ -105,7 +105,7 @@
 #define VGCF_in_syscall  (1<<_VGCF_in_syscall)
 #define VGCF_IN_SYSCALL  VGCF_in_syscall
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 struct iret_context {
     /* Top of stack (%rsp at point of hypercall). */
@@ -218,7 +218,7 @@ typedef struct arch_vcpu_info arch_vcpu_info_t;
 
 typedef unsigned long xen_callback_t;
 
-#endif /* !__ASSEMBLY__ */
+#endif /* !__ASSEMBLER__ */
 
 #endif /* __XEN_PUBLIC_ARCH_X86_XEN_X86_64_H__ */
 

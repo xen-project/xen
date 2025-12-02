@@ -9,7 +9,7 @@
 #define L1_CACHE_SHIFT	(CONFIG_X86_L1_CACHE_SHIFT)
 #define L1_CACHE_BYTES	(1 << L1_CACHE_SHIFT)
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 void cache_flush(const void *addr, unsigned int size);
 void cache_writeback(const void *addr, unsigned int size);

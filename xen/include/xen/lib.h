@@ -3,7 +3,7 @@
 
 #include <xen/macros.h>
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/inttypes.h>
 #include <xen/stdarg.h>
@@ -165,6 +165,6 @@ void cf_check dump_execstate(const struct cpu_user_regs *regs);
 
 void init_constructors(void);
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* __LIB_H__ */

@@ -3,7 +3,7 @@
 #ifndef ARM_ARM64_MPU_H
 #define ARM_ARM64_MPU_H
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #define MPU_REGION_RES0        (0xFFFFULL << 48)
 
@@ -42,7 +42,7 @@ typedef struct {
     uint8_t pad[15];    /* Pad structure to 32 Bytes */
 } pr_t;
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* ARM_ARM64_MPU_H */
 

@@ -8,7 +8,7 @@
 #ifndef __X86_SPEC_CTRL_ASM_H__
 #define __X86_SPEC_CTRL_ASM_H__
 
-#ifdef __ASSEMBLY__
+#ifdef __ASSEMBLER__
 #include <asm/msr-index.h>
 #include <asm/spec_ctrl.h>
 
@@ -500,7 +500,7 @@
 .L\@_skip_ist_exit:
 .endm
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 #endif /* !__X86_SPEC_CTRL_ASM_H__ */
 
 /*

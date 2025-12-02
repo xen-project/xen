@@ -45,7 +45,7 @@
  */
 #define SCF_DOM_MASK (SCF_verw | SCF_entry_ibpb | SCF_entry_bhb)
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <asm/alternative.h>
 #include <asm/current.h>
@@ -201,7 +201,7 @@ static always_inline void spec_ctrl_exit_idle(struct cpu_info *info)
      */
 }
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 #endif /* !__X86_SPEC_CTRL_H__ */
 
 /*

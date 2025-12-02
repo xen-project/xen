@@ -1,7 +1,7 @@
 #ifndef __ASM_ARM_ARM64_PROCESSOR_H
 #define __ASM_ARM_ARM64_PROCESSOR_H
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 /* Anonymous union includes both 32- and 64-bit names (e.g., r0/x0). */
 
@@ -86,7 +86,7 @@ struct cpu_user_regs
 
 #undef __DECL_REG
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* __ASM_ARM_ARM64_PROCESSOR_H */
 /*

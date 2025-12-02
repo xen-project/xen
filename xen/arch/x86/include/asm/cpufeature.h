@@ -10,7 +10,7 @@
 #include <xen/const.h>
 #include <xen/macros.h>
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 #include <asm/cpuid.h>
 #else
 #include <asm/cpufeatureset.h>
@@ -38,7 +38,7 @@
 #define VFM_FAMILY(vfm) MASK_EXTR(vfm, VFM_FAMILY_MASK)
 #define VFM_VENDOR(vfm) MASK_EXTR(vfm, VFM_VENDOR_MASK)
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 struct cpuinfo_x86 {
     /* TODO: Phase out the x86 prefixed names. */
@@ -349,7 +349,7 @@ struct cpuid4_info {
 };
 
 int cpuid4_cache_lookup(int index, struct cpuid4_info *this_leaf);
-#endif /* !__ASSEMBLY__ */
+#endif /* !__ASSEMBLER__ */
 
 #endif /* __ASM_I386_CPUFEATURE_H */
 

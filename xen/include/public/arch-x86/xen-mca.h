@@ -74,7 +74,7 @@
 /* Applicable to all mc_vcpuid fields below. */
 #define XEN_MC_VCPUID_INVALID 0xffff
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #define VIRQ_MCA VIRQ_ARCH_0 /* G. (DOM0) Machine Check Architecture */
 
@@ -433,6 +433,6 @@ struct xen_mc {
 typedef struct xen_mc xen_mc_t;
 DEFINE_XEN_GUEST_HANDLE(xen_mc_t);
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* __XEN_PUBLIC_ARCH_X86_MCA_H__ */

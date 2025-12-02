@@ -17,7 +17,7 @@
 #define FIXADDR_TOP (VMAP_VIRT_END - PAGE_SIZE)
 #define FIXADDR_X_TOP (XEN_VIRT_END - PAGE_SIZE)
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/acpi.h>
 #include <xen/pfn.h>
@@ -118,6 +118,6 @@ extern void __set_fixmap_x(
 #define __fix_x_to_virt(x) (FIXADDR_X_TOP - ((x) << PAGE_SHIFT))
 #define fix_x_to_virt(x)   ((void *)__fix_x_to_virt(x))
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif

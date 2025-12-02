@@ -3,7 +3,7 @@
 #ifndef ASM__RISCV__PAGE_H
 #define ASM__RISCV__PAGE_H
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/bug.h>
 #include <xen/const.h>
@@ -213,6 +213,6 @@ static inline pte_t pte_from_mfn(mfn_t mfn, pte_attr_t flags)
 
 pte_t pt_walk(vaddr_t va, unsigned int *pte_level);
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* ASM__RISCV__PAGE_H */

@@ -28,7 +28,7 @@
 /* The "recalculate timings" flag */
 #define VIDEO_RECALC        0x8000
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 struct boot_video_info {
     uint8_t  orig_x;             /* 0x00 */
     uint8_t  orig_y;             /* 0x01 */
@@ -69,6 +69,6 @@ struct boot_video_info {
 };
 
 extern struct boot_video_info boot_vid_info;
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* __BOOT_VIDEO_H__ */

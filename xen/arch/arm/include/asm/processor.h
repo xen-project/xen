@@ -1,7 +1,7 @@
 #ifndef __ASM_ARM_PROCESSOR_H
 #define __ASM_ARM_PROCESSOR_H
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 #include <xen/types.h>
 #endif
 #include <public/arch-arm.h>
@@ -463,7 +463,7 @@
 #define MM64_VMID_16_BITS_SUPPORT   0x2
 #endif
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 extern register_t __cpu_logical_map[];
 #define cpu_logical_map(cpu) __cpu_logical_map[cpu]
@@ -570,7 +570,7 @@ extern register_t __cpu_logical_map[];
 # error "unknown ARM variant"
 #endif
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 void noreturn panic_PAR(uint64_t par);
 
 /* Debugging functions are declared with external linkage to aid development. */
@@ -631,7 +631,7 @@ register_t get_default_cptr_flags(void);
         WRITE_SYSREG((v)->arch.hcr_el2, HCR_EL2);   \
     } while (0)
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 #endif /* __ASM_ARM_PROCESSOR_H */
 /*
  * Local variables:

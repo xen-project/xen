@@ -32,7 +32,7 @@
 #define OPT_CONSOLE_STR "vga"
 
 /* Linkage for x86 */
-#ifdef __ASSEMBLY__
+#ifdef __ASSEMBLER__
 #define CODE_FILL 0x90
 #endif
 
@@ -195,7 +195,7 @@
 #endif
 #define DIRECTMAP_VIRT_END      (DIRECTMAP_VIRT_START + DIRECTMAP_SIZE)
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #ifdef CONFIG_PV32
 
@@ -237,7 +237,7 @@
 #define __OS          "q"  /* Operation Suffix */
 #define __OP          "r"  /* Operand Prefix */
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 extern unsigned long xen_phys_start;
 #endif
 

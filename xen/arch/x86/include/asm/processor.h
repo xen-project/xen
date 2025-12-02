@@ -4,7 +4,7 @@
 #ifndef __ASM_X86_PROCESSOR_H
 #define __ASM_X86_PROCESSOR_H
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 #include <xen/types.h>
 #include <xen/smp.h>
 #include <xen/percpu.h>
@@ -75,7 +75,7 @@
                      (_AC(X86_MT_UC,  ULL) << 0x30) | \
                      (_AC(X86_MT_UC,  ULL) << 0x38))
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 struct domain;
 struct vcpu;
@@ -435,7 +435,7 @@ enum ap_boot_method {
 };
 extern enum ap_boot_method ap_boot_method;
 
-#endif /* !__ASSEMBLY__ */
+#endif /* !__ASSEMBLER__ */
 
 #endif /* __ASM_X86_PROCESSOR_H */
 

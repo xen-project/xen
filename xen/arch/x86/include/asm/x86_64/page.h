@@ -9,7 +9,7 @@
 
 #define is_canonical_address(x) (((long)(x) >> 47) == ((long)(x) >> 63))
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 static inline unsigned long canonicalise_addr(unsigned long addr)
 {
@@ -68,7 +68,7 @@ typedef struct { intpte_t l3; } l3_pgentry_t;
 typedef struct { intpte_t l4; } l4_pgentry_t;
 typedef l4_pgentry_t root_pgentry_t;
 
-#endif /* !__ASSEMBLY__ */
+#endif /* !__ASSEMBLER__ */
 
 /* Given a virtual address, get an entry offset into a linear page table. */
 #define l1_linear_offset(_a) (((_a) & VADDR_MASK) >> L1_PAGETABLE_SHIFT)
@@ -100,7 +100,7 @@ typedef l4_pgentry_t root_pgentry_t;
  */
 
 /* Extract flags into 24-bit integer, or turn 24-bit flags into a pte mask. */
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 static inline unsigned int get_pte_flags(intpte_t x)
 {
     return ((x >> 40) & ~0xfff) | (x & 0xfff);

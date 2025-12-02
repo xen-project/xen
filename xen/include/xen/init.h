@@ -54,7 +54,7 @@
  * Also note, that this data cannot be "const".
  */
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 /*
  * Used for initialization calls..
@@ -72,7 +72,7 @@ typedef void (*exitcall_t)(void);
 void do_presmp_initcalls(void);
 void do_initcalls(void);
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #ifdef CONFIG_LATE_HWDOM
 #define __hwdom_init

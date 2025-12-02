@@ -1,7 +1,7 @@
 #ifndef XEN_SOFTIRQ_H
 #define XEN_SOFTIRQ_H
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 /* Low-latency softirqs come first in the following list. */
 enum {
@@ -58,6 +58,6 @@ void cpu_raise_softirq_batch_finish(void);
  */
 void process_pending_softirqs(void);
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* XEN_SOFTIRQ_H */

@@ -2,7 +2,7 @@
 #ifndef ASM__RISCV__CPUFEATURE_H
 #define ASM__RISCV__CPUFEATURE_H
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/stdbool.h>
 
@@ -46,7 +46,7 @@ void riscv_fill_hwcap(void);
 bool riscv_isa_extension_available(const unsigned long *isa_bitmap,
                                    enum riscv_isa_ext_id id);
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* ASM__RISCV__CPUFEATURE_H */
 

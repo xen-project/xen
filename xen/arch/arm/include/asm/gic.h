@@ -158,7 +158,7 @@
 #define GICH_LR_PENDING         1
 #define GICH_LR_ACTIVE          2
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 #include <xen/device_tree.h>
 #include <xen/irq.h>
 
@@ -479,7 +479,7 @@ unsigned long gic_get_hwdom_madt_size(const struct domain *d);
 int gic_map_hwdom_extra_mappings(struct domain *d);
 int gic_iomem_deny_access(struct domain *d);
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 #endif
 
 /*

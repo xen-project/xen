@@ -1,7 +1,7 @@
 #ifndef XEN_ERR_H
 #define XEN_ERR_H
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/compiler.h>
 #include <xen/errno.h>
@@ -43,6 +43,6 @@ static inline int __must_check PTR_RET(const void *ptr)
 	return IS_ERR(ptr) ? PTR_ERR(ptr) : 0;
 }
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* XEN_ERR_H */

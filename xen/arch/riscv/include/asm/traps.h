@@ -5,12 +5,12 @@
 
 #include <asm/processor.h>
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 void do_trap(struct cpu_user_regs *cpu_regs);
 void handle_trap(void);
 void trap_init(void);
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* ASM__RISCV__TRAPS_H */

@@ -20,7 +20,7 @@
 #define FIXADDR_START FIXMAP_ADDR(0)
 #define FIXADDR_TOP FIXMAP_ADDR(FIX_LAST + 1)
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 /*
  * Direct access to xen_fixmap[] should only happen when {set,
@@ -43,6 +43,6 @@ static inline unsigned int virt_to_fix(vaddr_t vaddr)
     return ((vaddr - FIXADDR_START) >> PAGE_SHIFT);
 }
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* __ASM_FIXMAP_H */

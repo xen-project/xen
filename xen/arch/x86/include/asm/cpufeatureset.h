@@ -1,7 +1,7 @@
 #ifndef __XEN_X86_CPUFEATURESET_H__
 #define __XEN_X86_CPUFEATURESET_H__
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/stringify.h>
 
@@ -17,13 +17,13 @@ enum {
 #include <public/arch-x86/cpufeatureset.h>
 #include <asm/cpufeatures.h>
 
-#else /* !__ASSEMBLY__ */
+#else /* !__ASSEMBLER__ */
 
 #define XEN_CPUFEATURE(name, value) .equ X86_FEATURE_##name, value
 #include <public/arch-x86/cpufeatureset.h>
 #include <asm/cpufeatures.h>
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #undef XEN_CPUFEATURE
 

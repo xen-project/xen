@@ -6,7 +6,7 @@
 
 #include <asm/processor.h>
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 struct vcpu;
 
@@ -44,6 +44,6 @@ static inline struct cpu_info *get_cpu_info(void)
 
 #define get_per_cpu_offset()    smp_processor_id() /* TODO: Fix this */
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* __ASM_PPC_CURRENT_H__ */

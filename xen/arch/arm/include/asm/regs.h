@@ -3,7 +3,7 @@
 
 #define PSR_MODE_MASK 0x1f
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/bug.h>
 #include <xen/types.h>

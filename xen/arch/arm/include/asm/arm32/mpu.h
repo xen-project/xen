@@ -3,7 +3,7 @@
 #ifndef ARM_ARM32_MPU_H
 #define ARM_ARM32_MPU_H
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 /*
  * Unlike arm64, there are no reserved 0 bits beyond base and limit bitfield in
@@ -43,7 +43,7 @@ typedef struct {
     uint8_t pad[7];     /* Pad structure to 16 Bytes */
 } pr_t;
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* ARM_ARM32_MPU_H */
 

@@ -3,7 +3,7 @@
 
 #include <asm/nops.h>
 
-#ifdef __ASSEMBLY__
+#ifdef __ASSEMBLER__
 
 /*
  * Issue one struct alt_instr descriptor entry (need to put it into
@@ -120,7 +120,7 @@
 #undef decl_orig
 #undef as_true
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 #endif /* _ASM_X86_ALTERNATIVE_ASM_H_ */
 
 /*

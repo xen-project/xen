@@ -12,7 +12,7 @@
 #define uint64_aligned_t uint64_t __attribute__((__aligned__(8)))
 #endif
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 #define ___DEFINE_XEN_GUEST_HANDLE(name, type)                  \
     typedef union { type *p; unsigned long q; }                 \
         __guest_handle_ ## name;                                \

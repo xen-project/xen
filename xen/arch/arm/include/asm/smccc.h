@@ -54,7 +54,7 @@
 
 #define ARM_SMCCC_FUNC_MASK             _AC(0xFFFF,U)
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 extern uint32_t smccc_ver;
 
@@ -307,7 +307,7 @@ void arm_smccc_1_2_smc(const struct arm_smccc_1_2_regs *args,
                        struct arm_smccc_1_2_regs *res);
 #endif /* CONFIG_ARM_64 */
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 /*
  * Construct function identifier from call type (fast or standard),

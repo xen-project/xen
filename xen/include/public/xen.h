@@ -24,7 +24,7 @@
 #error "Unsupported architecture"
 #endif
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 /* Guest handles for primitive C types. */
 DEFINE_XEN_GUEST_HANDLE(char);
 __DEFINE_XEN_GUEST_HANDLE(uchar, unsigned char);
@@ -437,7 +437,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define MMUEXT_UNMARK_SUPER     20
 /* ` } */
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 struct mmuext_op {
     unsigned int cmd; /* => enum mmuext_cmd */
     union {
@@ -614,7 +614,7 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 /* Mask for valid domain id values */
 #define DOMID_MASK           xen_mk_uint(0x7FFF)
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 typedef uint16_t domid_t;
 
@@ -1011,7 +1011,7 @@ typedef struct {
     XEN_DEFINE_UUID_(a, b, c, d, e1, e2, e3, e4, e5, e6)
 #endif /* __STDC_VERSION__ / __GNUC__ */
 
-#endif /* !__ASSEMBLY__ */
+#endif /* !__ASSEMBLER__ */
 
 /* Default definitions for macros used by domctl/sysctl. */
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
@@ -1026,7 +1026,7 @@ typedef struct {
 #define XEN_GUEST_HANDLE_64(name) XEN_GUEST_HANDLE(name)
 #endif
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 struct xenctl_bitmap {
     XEN_GUEST_HANDLE_64(uint8) bitmap;
     uint32_t nr_bits;

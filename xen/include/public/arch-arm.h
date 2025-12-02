@@ -184,7 +184,7 @@
 #define uint64_aligned_t uint64_t __attribute__((__aligned__(8)))
 #endif
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 #define ___DEFINE_XEN_GUEST_HANDLE(name, type)                  \
     typedef union { type *p; unsigned long q; }                 \
         __guest_handle_ ## name;                                \
@@ -542,7 +542,7 @@ typedef uint64_t xen_callback_t;
 
 #endif
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 /* Stub definition of PMU structure */
 typedef struct xen_pmu_arch { uint8_t dummy; } xen_pmu_arch_t;
 #endif

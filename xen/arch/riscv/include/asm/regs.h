@@ -2,7 +2,7 @@
 #ifndef ASM__RISCV__REGS_H
 #define ASM__RISCV__REGS_H
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/bug.h>
 
@@ -15,7 +15,7 @@ static inline bool guest_mode(const struct cpu_user_regs *r)
     BUG_ON("unimplemented");
 }
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* ASM__RISCV__REGS_H */
 

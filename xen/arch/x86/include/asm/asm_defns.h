@@ -12,7 +12,7 @@
 #include <asm/cpufeature.h>
 #include <asm/alternative.h>
 
-#ifdef __ASSEMBLY__
+#ifdef __ASSEMBLER__
 #include <xen/linkage.h>
 #include <asm/asm-defns.h>
 #ifndef CONFIG_INDIRECT_THUNK
@@ -24,7 +24,7 @@ asm ( "\t.equ CONFIG_INDIRECT_THUNK, "
       __stringify(IS_ENABLED(CONFIG_INDIRECT_THUNK)) );
 #endif
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 /*
  * This output constraint should be used for any inline asm which has a "call"
@@ -57,14 +57,14 @@ register unsigned long current_stack_pointer asm("rsp");
 #define ASSERT_INTERRUPTS_DISABLED \
     ASSERT_INTERRUPT_STATUS(z, "INTERRUPTS DISABLED")
 
-#ifdef __ASSEMBLY__
+#ifdef __ASSEMBLER__
 # define _ASM_EX(p) p-.
 #else
 # define _ASM_EX(p) #p "-."
 #endif
 
 /* Exception table entry */
-#ifdef __ASSEMBLY__
+#ifdef __ASSEMBLER__
 # define _ASM__EXTABLE(sfx, from, to)             \
     .section .ex_table##sfx, "a" ;                \
     .balign 4 ;                                   \
@@ -81,7 +81,7 @@ register unsigned long current_stack_pointer asm("rsp");
 #define _ASM_EXTABLE(from, to)     _ASM__EXTABLE(, from, to)
 #define _ASM_PRE_EXTABLE(from, to) _ASM__EXTABLE(.pre, from, to)
 
-#ifdef __ASSEMBLY__
+#ifdef __ASSEMBLER__
 
 .macro BUILD_BUG_ON condstr, cond:vararg
         .if \cond
@@ -221,7 +221,7 @@ static always_inline void stac(void)
 }
 #endif
 
-#ifdef __ASSEMBLY__
+#ifdef __ASSEMBLER__
 .macro SAVE_ALL compat=0
         addq  $-(UREGS_error_code-UREGS_r15), %rsp
         cld

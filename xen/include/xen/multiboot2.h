@@ -113,7 +113,7 @@
 #define MULTIBOOT2_FRAMEBUFFER_TYPE_RGB                 1
 #define MULTIBOOT2_FRAMEBUFFER_TYPE_EGA_TEXT            2
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/stdint.h>
 
@@ -233,6 +233,6 @@ typedef struct {
     uint32_t mod_end;
     char cmdline[];
 } multiboot2_tag_module_t;
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* __MULTIBOOT2_H__ */

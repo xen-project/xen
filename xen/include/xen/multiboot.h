@@ -43,7 +43,7 @@
 #define MBI_LOADERNAME (_AC(1,u) << 9)
 #define MBI_APM        (_AC(1,u) << 10)
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/stdint.h>
 
@@ -130,6 +130,6 @@ struct memory_map {
 typedef struct memory_map memory_map_t;
 
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* __MULTIBOOT_H__ */

@@ -137,7 +137,7 @@
 #define INVALID_VCPU_ID MAX_VIRT_CPUS
 
 /* Linkage for RISCV */
-#ifdef __ASSEMBLY__
+#ifdef __ASSEMBLER__
 #define CODE_FILL /* empty */
 #endif
 
@@ -147,7 +147,7 @@
 
 #define IDENT_AREA_SIZE 64
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 extern unsigned long phys_offset; /* = load_start - XEN_VIRT_START */
 #endif
 

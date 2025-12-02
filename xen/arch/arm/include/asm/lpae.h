@@ -1,7 +1,7 @@
 #ifndef __ARM_LPAE_H__
 #define __ARM_LPAE_H__
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/page-defs.h>
 #include <xen/mm-frame.h>
@@ -176,7 +176,7 @@ static inline bool lpae_is_superpage(lpae_t pte, unsigned int level)
  */
 lpae_t mfn_to_xen_entry(mfn_t mfn, unsigned int attr);
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 /*
  * AArch64 supports pages with different sizes (4K, 16K, and 64K).

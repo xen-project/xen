@@ -42,7 +42,7 @@
 #define LDT_SELECTOR     (LDT_ENTRY << 3)
 #define PER_CPU_SELECTOR (PER_CPU_GDT_ENTRY << 3)
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #define GUEST_KERNEL_RPL(d) (is_pv_32bit_domain(d) ? 1 : 3)
 
@@ -76,7 +76,7 @@
                 FLAT_COMPAT_KERNEL_CS)) ||                              \
      ((sel) & 4))                               /* LDT seg? */
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 /* These are bitmasks for the high 32 bits of a descriptor table entry. */
 #define _SEGMENT_TYPE    (15<< 8)
@@ -92,7 +92,7 @@
 #define _SEGMENT_DB      ( 1<<22) /* 16- or 32-bit segment */
 #define _SEGMENT_G       ( 1<<23) /* Granularity */
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 /* System Descriptor types for GDT and IDT entries. */
 #define SYS_DESC_tss16_avail  1
@@ -162,6 +162,6 @@ static inline void ltr(unsigned int sel)
     __asm__ __volatile__ ( "ltr %w0" :: "rm" (sel) : "memory" );
 }
 
-#endif /* !__ASSEMBLY__ */
+#endif /* !__ASSEMBLER__ */
 
 #endif /* __ARCH_DESC_H */

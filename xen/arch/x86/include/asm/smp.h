@@ -4,7 +4,7 @@
 /*
  * We need the APIC definitions automatically as part of 'smp.h'
  */
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 #include <xen/bitops.h>
 #include <xen/kernel.h>
 #include <xen/cpumask.h>
@@ -14,7 +14,7 @@
 
 #define BAD_APICID   (-1U)
 #define INVALID_CUID (~0U)   /* AMD Compute Unit ID */
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 /*
  * Private routines/data
@@ -80,6 +80,6 @@ extern bool unaccounted_cpus;
 
 void *cpu_alloc_stack(unsigned int cpu);
 
-#endif /* !__ASSEMBLY__ */
+#endif /* !__ASSEMBLER__ */
 
 #endif

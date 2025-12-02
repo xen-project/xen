@@ -7,7 +7,7 @@
 #define IND_SOURCE       0x8
 #define IND_ZERO        0x10
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/list.h>
 #include <xen/mm.h>
@@ -53,7 +53,7 @@ unsigned long kimage_entry_ind(kimage_entry_t *entry, bool compat);
 int kimage_build_ind(struct kexec_image *image, mfn_t ind_mfn,
                      bool compat);
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* __XEN_KIMAGE_H__ */
 

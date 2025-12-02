@@ -1,7 +1,7 @@
 #ifndef __ARM_ARM64_PAGE_H__
 #define __ARM_ARM64_PAGE_H__
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <asm/alternative.h>
 
@@ -77,7 +77,7 @@ static inline uint64_t gva_to_ipa_par(vaddr_t va, unsigned int flags)
 
 extern void clear_page(void *to);
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* __ARM_ARM64_PAGE_H__ */
 

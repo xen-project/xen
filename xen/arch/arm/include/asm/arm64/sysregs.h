@@ -467,11 +467,11 @@
 #define REGION_DATA_PRBAR       0x32    /* SH=11 AP=00 XN=10 */
 #define REGION_DEVICE_PRBAR     0x22    /* SH=10 AP=00 XN=10 */
 
-#ifdef __ASSEMBLY__
+#ifdef __ASSEMBLER__
 
 #define WRITE_SYSREG_ASM(v, name) "msr " __stringify(name,) #v
 
-#else /* __ASSEMBLY__ */
+#else /* __ASSEMBLER__ */
 
 /* Access to system registers */
 
@@ -492,7 +492,7 @@
 #define WRITE_SYSREG_LR(v, index)  WRITE_SYSREG(v, ICH_LR_REG(index))
 #define READ_SYSREG_LR(index)      READ_SYSREG(ICH_LR_REG(index))
 
-#endif /* !__ASSEMBLY__ */
+#endif /* !__ASSEMBLER__ */
 
 #endif /* _ASM_ARM_ARM64_SYSREGS_H */
 

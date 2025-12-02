@@ -44,7 +44,7 @@
 #define CONFIG_AEABI
 
 /* Linkage for ARM */
-#ifdef __ASSEMBLY__
+#ifdef __ASSEMBLER__
 #define GLOBAL(name)                            \
   .globl name;                                  \
   name:
@@ -69,7 +69,7 @@
 #define watchdog_disable() ((void)0)
 #define watchdog_enable()  ((void)0)
 
-#if defined(__ASSEMBLY__) && !defined(LINKER_SCRIPT)
+#if defined(__ASSEMBLER__) && !defined(LINKER_SCRIPT)
 #include <asm/asm_defns.h>
 #include <asm/macros.h>
 #endif

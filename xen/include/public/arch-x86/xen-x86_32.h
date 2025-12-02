@@ -90,7 +90,7 @@
 #define XEN_GUEST_HANDLE_64(name) __XEN_GUEST_HANDLE_64(name)
 #endif
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #if defined(XEN_GENERATING_COMPAT_HEADERS)
 /* nothing */
@@ -171,7 +171,7 @@ struct xen_callback {
 };
 typedef struct xen_callback xen_callback_t;
 
-#endif /* !__ASSEMBLY__ */
+#endif /* !__ASSEMBLER__ */
 
 #endif /* __XEN_PUBLIC_ARCH_X86_XEN_X86_32_H__ */
 

@@ -1,7 +1,7 @@
 #ifndef __LINKAGE_H__
 #define __LINKAGE_H__
 
-#ifdef __ASSEMBLY__
+#ifdef __ASSEMBLER__
 
 #include <xen/macros.h>
 
@@ -62,6 +62,6 @@
 
 #define ASM_INT(label, val)    DATA(label, 4) .long (val); END(label)
 
-#endif /*  __ASSEMBLY__ */
+#endif /*  __ASSEMBLER__ */
 
 #endif /* __LINKAGE_H__ */

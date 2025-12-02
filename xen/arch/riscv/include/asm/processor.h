@@ -10,7 +10,7 @@
 #ifndef ASM__RISCV__PROCESSOR_H
 #define ASM__RISCV__PROCESSOR_H
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 /* On stack VCPU state */
 struct cpu_user_regs
@@ -93,7 +93,7 @@ static inline void sfence_vma(void)
 
 #define dump_execution_state() run_in_exception_handler(show_execution_state)
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* ASM__RISCV__PROCESSOR_H */
 

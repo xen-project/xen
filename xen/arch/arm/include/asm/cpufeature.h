@@ -79,7 +79,7 @@
 
 #define ARM_NCAPS           18
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/types.h>
 #include <xen/lib.h>
@@ -461,7 +461,7 @@ extern struct cpuinfo_arm cpu_data[];
 
 extern struct cpuinfo_arm domain_cpuinfo;
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif
 /*

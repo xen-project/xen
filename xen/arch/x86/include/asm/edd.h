@@ -23,7 +23,7 @@
 #ifndef __XEN_EDD_H__
 #define __XEN_EDD_H__
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 struct __packed edd_info {
     /* Int13, Fn48: Check Extensions Present. */
@@ -149,7 +149,7 @@ extern u8 boot_mbr_signature_nr;
 extern struct edd_info boot_edd_info[];
 extern u8 boot_edd_info_nr;
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 /* Maximum number of EDD information structures at boot_edd_info. */
 #define EDD_INFO_MAX            6

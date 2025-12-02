@@ -25,7 +25,7 @@
 
 #define PRENR_MASK  GENMASK(31, 0)
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 /*
  * Set base address of MPU protection region.
@@ -87,7 +87,7 @@ static inline bool region_is_valid(const pr_t *pr)
     return pr->prlar.reg.en;
 }
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* __ARM_MPU_H__ */
 

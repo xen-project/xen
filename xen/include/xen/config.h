@@ -13,7 +13,7 @@
 
 #include <xen/kconfig.h>
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 #include <xen/compiler.h>
 
 #if defined(CONFIG_ENFORCE_UNIQUE_SYMBOLS) || defined(__clang__)

@@ -1,7 +1,7 @@
 #ifndef __ASM_MACROS_H
 #define __ASM_MACROS_H
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 # error "This file should only be included in assembly file"
 #endif
 

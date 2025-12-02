@@ -58,7 +58,7 @@ struct xen_tmem_oid {
 typedef struct xen_tmem_oid xen_tmem_oid_t;
 DEFINE_XEN_GUEST_HANDLE(xen_tmem_oid_t);
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 #if __XEN_INTERFACE_VERSION__ < 0x00040400
 typedef xen_pfn_t tmem_cli_mfn_t;
 #endif

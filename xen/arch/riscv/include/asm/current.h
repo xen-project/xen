@@ -9,7 +9,7 @@
 
 #include <asm/processor.h>
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 register struct pcpu_info *tp asm ( "tp" );
 
@@ -52,6 +52,6 @@ DECLARE_PER_CPU(struct vcpu *, curr_vcpu);
 
 #define get_per_cpu_offset() __per_cpu_offset[smp_processor_id()]
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* ASM__RISCV__CURRENT_H */

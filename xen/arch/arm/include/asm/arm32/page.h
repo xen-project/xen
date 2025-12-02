@@ -1,7 +1,7 @@
 #ifndef __ARM_ARM32_PAGE_H__
 #define __ARM_ARM32_PAGE_H__
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 /* Inline ASM to invalidate dcache on register R (may be an inline asm operand) */
 #define __invalidate_dcache_one(R) STORE_CP32(R, DCIMVAC)
@@ -87,7 +87,7 @@ static inline uint64_t gva_to_ipa_par(vaddr_t va, unsigned int flags)
 
 #define clear_page(page) memset((void *)(page), 0, PAGE_SIZE)
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* __ARM_ARM32_PAGE_H__ */
 

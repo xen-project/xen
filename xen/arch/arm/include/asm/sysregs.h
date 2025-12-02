@@ -9,7 +9,7 @@
 # error "unknown ARM variant"
 #endif
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <asm/alternative.h>
 
@@ -33,7 +33,7 @@ static inline register_t read_sysreg_par(void)
     return par_el1;
 }
 
-#endif /*  !__ASSEMBLY__  */
+#endif /*  !__ASSEMBLER__  */
 
 #endif /* __ASM_ARM_SYSREGS_H */
 /*

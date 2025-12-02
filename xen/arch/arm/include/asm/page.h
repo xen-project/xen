@@ -121,7 +121,7 @@
 #define GV2M_WRITE (1u<<0)
 #define GV2M_EXEC  (1u<<1)
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/errno.h>
 #include <xen/types.h>
@@ -320,7 +320,7 @@ static inline int gva_to_ipa(vaddr_t va, paddr_t *paddr, unsigned int flags)
 /* Bits in the PAR returned by va_to_par */
 #define PAR_FAULT 0x1
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* __ARM_PAGE_H__ */
 

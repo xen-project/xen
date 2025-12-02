@@ -47,7 +47,7 @@
 #define P6_NOP8 0x0f,0x1f,0x84,0x00,0,0,0,0
 #define P6_NOP9 0x66,0x0f,0x1f,0x84,0x00,0,0,0,0
 
-#ifdef __ASSEMBLY__
+#ifdef __ASSEMBLER__
 #define _ASM_MK_NOP(x) .byte x
 #else
 #define _ASM_MK_NOP(x) ".byte " __stringify(x) "\n"

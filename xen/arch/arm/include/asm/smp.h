@@ -1,7 +1,7 @@
 #ifndef __ASM_SMP_H
 #define __ASM_SMP_H
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 #include <xen/percpu.h>
 #include <xen/cpumask.h>
 #include <asm/current.h>

@@ -7,7 +7,7 @@
 #ifndef ASM__RISCV__BUG_H
 #define ASM__RISCV__BUG_H
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #define BUG_INSTR "unimp"
 
@@ -30,6 +30,6 @@
 #define GET_INSN_LENGTH(insn)                               \
     (((insn) & INSN_LENGTH_MASK) == INSN_LENGTH_32 ? 4 : 2) \
 
-#endif /* !__ASSEMBLY__ */
+#endif /* !__ASSEMBLER__ */
 
 #endif /* ASM__RISCV__BUG_H */

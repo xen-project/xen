@@ -1,7 +1,7 @@
 #ifndef __ARCH_ARM_INSN
 #define __ARCH_ARM_INSN
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/types.h>
 
@@ -13,7 +13,7 @@
 # error "unknown ARM variant"
 #endif
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 /* On ARM32,64 instructions are always 4 bytes long. */
 #define ARCH_PATCH_INSN_SIZE 4

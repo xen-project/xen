@@ -11,7 +11,7 @@
 #define CPUINFO_WORKAROUND_2_FLAG_SHIFT   0
 #define CPUINFO_WORKAROUND_2_FLAG (_AC(1, U) << CPUINFO_WORKAROUND_2_FLAG_SHIFT)
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 struct vcpu;
 

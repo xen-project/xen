@@ -31,7 +31,7 @@ Revision History
 
 #define EFI_STUB_ERROR      MAX_ADDRESS
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 //
 // Basic int types of various widths
 //

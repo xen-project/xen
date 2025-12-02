@@ -35,7 +35,7 @@
  */
 #define NUM_FIXMAP_ACPI_PAGES  64
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/errno.h>
 #include <xen/list.h>
@@ -202,6 +202,6 @@ static inline void acpi_dmar_zap(void) {}
 static inline void acpi_dmar_reinstate(void) {}
 #endif
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /*_LINUX_ACPI_H*/

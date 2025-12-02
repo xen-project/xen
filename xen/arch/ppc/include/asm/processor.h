@@ -134,7 +134,7 @@
 /* Base address of interrupt vector table when LPCR[AIL]=3 */
 #define AIL_VECTOR_BASE _AC(0xc000000000004000, UL)
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 #include <xen/types.h>
 
@@ -221,6 +221,6 @@ static inline void noreturn die(void)
 
 #define dump_execution_state() run_in_exception_handler(show_execution_state)
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* _ASM_PPC_PROCESSOR_H */

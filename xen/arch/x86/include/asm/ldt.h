@@ -2,7 +2,7 @@
 #ifndef __ARCH_LDT_H
 #define __ARCH_LDT_H
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 static inline void load_LDT(struct vcpu *v)
 {
@@ -20,7 +20,7 @@ static inline void load_LDT(struct vcpu *v)
     }
 }
 
-#endif /* !__ASSEMBLY__ */
+#endif /* !__ASSEMBLER__ */
 
 #endif
 

@@ -3,7 +3,7 @@
 
 #define ACTLR_CAXX_SMP      (1<<6)
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 /* On stack VCPU state */
 struct cpu_user_regs
 {

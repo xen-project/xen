@@ -136,7 +136,7 @@
 #define IMAGE_DEBUG_TYPE_CODEVIEW              2
 #define IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS 20
 
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 
 struct mz_hdr {
     uint16_t magic;              /* MZ_MAGIC */
@@ -286,6 +286,6 @@ struct section_header {
     uint32_t flags;
 };
 
-#endif /* __ASSEMBLY__ */
+#endif /* __ASSEMBLER__ */
 
 #endif /* EFI__PE_H */
