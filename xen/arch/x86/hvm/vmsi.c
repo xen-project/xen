@@ -758,7 +758,7 @@ out:
     return;
 
 found:
-    if ( !atomic_dec_and_test(&entry->refcnt) )
+    if ( atomic_dec_and_test(&entry->refcnt) )
         del_msixtbl_entry(entry);
 
     spin_unlock_irq(&irqd->lock);
