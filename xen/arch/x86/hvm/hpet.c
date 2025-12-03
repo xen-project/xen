@@ -48,6 +48,8 @@
 #define timer_is_32bit(h, n)     (timer_config(h, n) & HPET_TN_32BIT)
 #define hpet_enabled(h)          ((h)->hpet.config & HPET_CFG_ENABLE)
 #define timer_level(h, n)        (timer_config(h, n) & HPET_TN_LEVEL)
+#define timer_is_legacy(h, n) \
+    (((n) <= 1) && ((h)->hpet.config & HPET_CFG_LEGACY))
 
 #define timer_int_route(h, n)    MASK_EXTR(timer_config(h, n), HPET_TN_ROUTE)
 
@@ -55,7 +57,8 @@
     MASK_EXTR(timer_config(h, n), HPET_TN_INT_ROUTE_CAP)
 
 #define timer_int_route_valid(h, n) \
-    ((1u << timer_int_route(h, n)) & timer_int_route_cap(h, n))
+    (timer_is_legacy(h, n) || \
+     ((1u << timer_int_route(h, n)) & timer_int_route_cap(h, n)))
 
 static inline uint64_t hpet_read_maincounter(HPETState *h, uint64_t guest_time)
 {
@@ -275,7 +278,7 @@ static void hpet_set_timer(HPETState *h, unsigned int tn,
             ? (uint32_t)diff : 0;
 
     destroy_periodic_time(&h->pt[tn]);
-    if ( (tn <= 1) && (h->hpet.config & HPET_CFG_LEGACY) )
+    if ( timer_is_legacy(h, tn) )
     {
         /* if LegacyReplacementRoute bit is set, HPET specification requires
            timer0 be routed to IRQ0 in NON-APIC or IRQ2 in the I/O APIC,
@@ -378,6 +381,14 @@ static int cf_check hpet_write(
     case HPET_CFG:
         h->hpet.config = hpet_fixup_reg(new_val, old_val,
                                         HPET_CFG_ENABLE | HPET_CFG_LEGACY);
+
+        /*
+         * The first 2 channels' interrupt route values only matter when
+         * HPET_CFG_LEGACY is disabled. However, for simplicity's sake, always
+         * resanitize all channels anyway.
+         */
+        for ( i = 0; i < HPET_TIMER_NUM; i++ )
+            timer_sanitize_int_route(h, i);
 
         if ( !(old_val & HPET_CFG_ENABLE) && (new_val & HPET_CFG_ENABLE) )
         {
