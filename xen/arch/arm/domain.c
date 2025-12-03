@@ -111,12 +111,6 @@ static void ctxt_switch_from(struct vcpu *p)
     p->arch.cntkctl = READ_SYSREG(CNTKCTL_EL1);
     virt_timer_save(p);
 
-    if ( is_32bit_domain(p->domain) && cpu_has_thumbee )
-    {
-        p->arch.teecr = READ_SYSREG(TEECR32_EL1);
-        p->arch.teehbr = READ_SYSREG(TEEHBR32_EL1);
-    }
-
 #ifdef CONFIG_ARM_32
     p->arch.joscr = READ_CP32(JOSCR);
     p->arch.jmcr = READ_CP32(JMCR);
@@ -243,12 +237,6 @@ static void ctxt_switch_to(struct vcpu *n)
     WRITE_SYSREG(n->arch.tpidr_el0, TPIDR_EL0);
     WRITE_SYSREG(n->arch.tpidrro_el0, TPIDRRO_EL0);
     WRITE_SYSREG(n->arch.tpidr_el1, TPIDR_EL1);
-
-    if ( is_32bit_domain(n->domain) && cpu_has_thumbee )
-    {
-        WRITE_SYSREG(n->arch.teecr, TEECR32_EL1);
-        WRITE_SYSREG(n->arch.teehbr, TEEHBR32_EL1);
-    }
 
 #ifdef CONFIG_ARM_32
     WRITE_CP32(n->arch.joscr, JOSCR);

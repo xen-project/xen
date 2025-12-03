@@ -158,8 +158,8 @@ void init_traps(void)
     WRITE_SYSREG(HDCR_TDRA|HDCR_TDOSA|HDCR_TDA|HDCR_TPM|HDCR_TPMCR,
                  MDCR_EL2);
 
-    /* Trap CP15 c15 used for implementation defined registers */
-    WRITE_SYSREG(HSTR_T(15), HSTR_EL2);
+    /* Trap CP15 c15 used for implementation defined registers, and ThumbEE. */
+    WRITE_SYSREG(HSTR_T(15) | (cpu_has_thumbee ? HSTR_TTEE : 0), HSTR_EL2);
 
     WRITE_SYSREG(get_default_cptr_flags(), CPTR_EL2);
 
