@@ -913,7 +913,7 @@ void __init detect_zen2_null_seg_behaviour(void)
 
 }
 
-void amd_check_zenbleed(void)
+static void amd_check_zenbleed(void)
 {
 	const struct cpu_signature *sig = &this_cpu(cpu_sig);
 	unsigned int good_rev;
