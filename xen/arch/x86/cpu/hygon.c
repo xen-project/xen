@@ -31,7 +31,11 @@ static void cf_check init_hygon(struct cpuinfo_x86 *c)
 {
 	unsigned long long value;
 
-	amd_init_lfence(c);
+	amd_init_de_cfg(c);
+
+	if (c == &boot_cpu_data)
+		amd_init_lfence_dispatch(); /* Needs amd_init_de_cfg() */
+
 	amd_init_ssbd(c);
 
 	/* Probe for NSCB on Zen2 CPUs when not virtualised */
