@@ -66,9 +66,9 @@ void vmcoreinfo_append_str(const char *fmt, ...)
 #define VMCOREINFO_PAGESIZE(value) \
        vmcoreinfo_append_str("PAGESIZE=%ld\n", value)
 #define VMCOREINFO_SYMBOL(name) \
-       vmcoreinfo_append_str("SYMBOL(%s)=%lx\n", #name, (unsigned long)&name)
+       vmcoreinfo_append_str("SYMBOL(%s)=%lx\n", #name, (unsigned long)&(name))
 #define VMCOREINFO_SYMBOL_ALIAS(alias, name) \
-       vmcoreinfo_append_str("SYMBOL(%s)=%lx\n", #alias, (unsigned long)&name)
+       vmcoreinfo_append_str("SYMBOL(%s)=%lx\n", #alias, (unsigned long)&(name))
 #define VMCOREINFO_STRUCT_SIZE(name) \
        vmcoreinfo_append_str("SIZE(%s)=%zu\n", #name, sizeof(struct name))
 #define VMCOREINFO_OFFSET(name, field) \

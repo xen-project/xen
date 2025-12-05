@@ -636,9 +636,9 @@ prev_pinned_shadow(struct page_info *page,
 }
 
 #define foreach_pinned_shadow(dom, pos, tmp)                    \
-    for ( pos = prev_pinned_shadow(NULL, (dom));                \
-          pos ? (tmp = prev_pinned_shadow(pos, (dom)), 1) : 0;  \
-          pos = tmp )
+    for ( (pos) = prev_pinned_shadow(NULL, dom);                \
+          (pos) ? ((tmp) = prev_pinned_shadow(pos, dom), 1) : 0;\
+          (pos) = (tmp) )
 
 /*
  * Pin a shadow page: take an extra refcount, set the pin bit,

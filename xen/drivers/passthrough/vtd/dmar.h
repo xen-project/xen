@@ -124,7 +124,7 @@ struct acpi_atsr_unit *acpi_find_matched_atsr_unit(const struct pci_dev *);
 do {                                                \
     s_time_t start_time = NOW();                    \
     while (1) {                                     \
-        sts = op(iommu->reg, offset);               \
+        sts = op((iommu)->reg, offset);             \
         if ( cond )                                 \
             break;                                  \
         if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT ) {    \
@@ -147,7 +147,7 @@ do {                                                               \
                                                                    \
     for ( ; ; )                                                    \
     {                                                              \
-        sts = op(iommu->reg, offset);                              \
+        sts = op((iommu)->reg, offset);                            \
         if ( cond )                                                \
             break;                                                 \
         if ( timeout && NOW() > timeout )                          \
@@ -155,7 +155,7 @@ do {                                                               \
             threshold |= threshold << 1;                           \
             printk(XENLOG_WARNING VTDPREFIX                        \
                    " IOMMU#%u: %s flush taking too long\n",        \
-                   iommu->index, what);                            \
+                   (iommu)->index, what);                          \
             timeout = 0;                                           \
         }                                                          \
         cpu_relax();                                               \
@@ -164,7 +164,7 @@ do {                                                               \
     if ( !timeout )                                                \
         printk(XENLOG_WARNING VTDPREFIX                            \
                " IOMMU#%u: %s flush took %lums\n",                 \
-               iommu->index, what, (NOW() - start) / 10000000);    \
+               (iommu)->index, what, (NOW() - start) / 10000000);  \
 } while ( false )
 
 int vtd_hw_check(void);
