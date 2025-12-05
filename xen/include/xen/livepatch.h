@@ -62,7 +62,7 @@ struct livepatch_fstate {
     uint8_t insn_buffer[LIVEPATCH_OPAQUE_SIZE];
 };
 
-int livepatch_op(struct xen_sysctl_livepatch_op *);
+int livepatch_op(struct xen_sysctl_livepatch_op *op);
 void check_for_livepatch_work(void);
 unsigned long livepatch_symbols_lookup_by_name(const char *symname);
 bool is_patch(const void *addr);

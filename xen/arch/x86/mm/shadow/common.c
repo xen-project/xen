@@ -69,11 +69,11 @@ const uint8_t sh_type_to_size[] = {
 
 DEFINE_PER_CPU(uint32_t,trace_shadow_path_flags);
 
-static int cf_check sh_enable_log_dirty(struct domain *);
-static int cf_check sh_disable_log_dirty(struct domain *);
-static void cf_check sh_clean_dirty_bitmap(struct domain *);
+static int cf_check sh_enable_log_dirty(struct domain *d);
+static int cf_check sh_disable_log_dirty(struct domain *d);
+static void cf_check sh_clean_dirty_bitmap(struct domain *d);
 
-static void cf_check shadow_update_paging_modes(struct vcpu *);
+static void cf_check shadow_update_paging_modes(struct vcpu *v);
 
 /* Set up the shadow-specific parts of a domain struct at start of day.
  * Called for every domain from arch_domain_create() */

@@ -2196,30 +2196,30 @@ static int livepatch_action(struct xen_sysctl_livepatch_action *action)
     return rc;
 }
 
-int livepatch_op(struct xen_sysctl_livepatch_op *livepatch)
+int livepatch_op(struct xen_sysctl_livepatch_op *op)
 {
     int rc;
 
-    if ( (livepatch->flags & ~LIVEPATCH_FLAGS_MASK) &&
-         !(livepatch->flags & LIVEPATCH_FLAG_FORCE) )
+    if ( (op->flags & ~LIVEPATCH_FLAGS_MASK) &&
+         !(op->flags & LIVEPATCH_FLAG_FORCE) )
         return -EINVAL;
 
-    switch ( livepatch->cmd )
+    switch ( op->cmd )
     {
     case XEN_SYSCTL_LIVEPATCH_UPLOAD:
-        rc = livepatch_upload(&livepatch->u.upload);
+        rc = livepatch_upload(&op->u.upload);
         break;
 
     case XEN_SYSCTL_LIVEPATCH_GET:
-        rc = livepatch_get(&livepatch->u.get);
+        rc = livepatch_get(&op->u.get);
         break;
 
     case XEN_SYSCTL_LIVEPATCH_LIST:
-        rc = livepatch_list(&livepatch->u.list);
+        rc = livepatch_list(&op->u.list);
         break;
 
     case XEN_SYSCTL_LIVEPATCH_ACTION:
-        rc = livepatch_action(&livepatch->u.action);
+        rc = livepatch_action(&op->u.action);
         break;
 
     default:

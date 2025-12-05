@@ -40,10 +40,10 @@ struct priv_op_ctxt {
 };
 
 /* I/O emulation helpers.  Use non-standard calling conventions. */
-void nocall load_guest_gprs(struct cpu_user_regs *);
+void nocall load_guest_gprs(struct cpu_user_regs *regs);
 void nocall save_guest_gprs(void);
 
-typedef void io_emul_stub_t(struct cpu_user_regs *);
+typedef void io_emul_stub_t(struct cpu_user_regs *regs);
 
 static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
                                           unsigned int port, unsigned int bytes)
