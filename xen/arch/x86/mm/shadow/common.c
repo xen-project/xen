@@ -1961,7 +1961,7 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
              /* FreeBSD 64bit: linear map 0xffff800000000000 */
              switch ( level )
              {
-             case 1: GUESS(0xffff800000000000
+             case 1: GUESS(0xffff800000000000UL
                            + ((fault_addr & VADDR_MASK) >> 9), 6); break;
              case 2: GUESS(0xffff804000000000UL
                            + ((fault_addr & VADDR_MASK) >> 18), 6); break;
@@ -1969,7 +1969,7 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
                            + ((fault_addr & VADDR_MASK) >> 27), 6); break;
              }
              /* FreeBSD 64bit: direct map at 0xffffff0000000000 */
-             GUESS(0xffffff0000000000 + gfn_to_gaddr(gfn), 6);
+             GUESS(0xffffff0000000000UL + gfn_to_gaddr(gfn), 6);
         }
 
 #undef GUESS

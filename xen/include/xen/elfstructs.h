@@ -360,7 +360,7 @@ typedef struct {
 } Elf64_Rela;
 
 #define	ELF64_R_SYM(info)	((info) >> 32)
-#define	ELF64_R_TYPE(info)	((info) & 0xFFFFFFFF)
+#define	ELF64_R_TYPE(info)	((info) & 0xFFFFFFFFU)
 #define ELF64_R_INFO(s,t) 	(((s) << 32) + (uint32_t)(t))
 
 /*

@@ -43,6 +43,6 @@
 #define SZ_512M                         0x20000000
 
 #define SZ_1G                           0x40000000
-#define SZ_2G                           0x80000000
+#define SZ_2G                           0x80000000U
 
 #endif /* __XEN_SIZES_H__ */

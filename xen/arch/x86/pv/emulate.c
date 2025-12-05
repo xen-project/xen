@@ -37,7 +37,7 @@ int pv_emul_read_descriptor(unsigned int sel, const struct vcpu *v,
     if ( !(desc.b & _SEGMENT_L) )
     {
         *base = ((desc.a >> 16) + ((desc.b & 0xff) << 16) +
-                 (desc.b & 0xff000000));
+                 (desc.b & 0xff000000U));
         *limit = (desc.a & 0xffff) | (desc.b & 0x000f0000);
         if ( desc.b & _SEGMENT_G )
             *limit = ((*limit + 1) << 12) - 1;
