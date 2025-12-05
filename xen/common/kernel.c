@@ -483,13 +483,13 @@ static int __init cf_check buildinfo_init(void)
 }
 __initcall(buildinfo_init);
 
-static HYPFS_DIR_INIT(params, "params");
+static HYPFS_DIR_INIT(params_dir, "params");
 
 static int __init cf_check param_init(void)
 {
     struct param_hypfs *param;
 
-    hypfs_add_dir(&hypfs_root, &params, true);
+    hypfs_add_dir(&hypfs_root, &params_dir, true);
 
     for ( param = __paramhypfs_start; param < __paramhypfs_end; param++ )
     {
@@ -497,7 +497,7 @@ static int __init cf_check param_init(void)
             param->init_leaf(param);
         else if ( param->hypfs.e.type == XEN_HYPFS_TYPE_STRING )
             param->hypfs.e.size = strlen(param->hypfs.u.content) + 1;
-        hypfs_add_leaf(&params, &param->hypfs, true);
+        hypfs_add_leaf(&params_dir, &param->hypfs, true);
     }
 
     return 0;
