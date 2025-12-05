@@ -95,9 +95,9 @@ struct hypfs_dyndir_id {
         .e.name = (nam),                          \
         .e.size = 0,                              \
         .e.max_size = 0,                          \
-        .e.list = LIST_HEAD_INIT(var.e.list),     \
+        .e.list = LIST_HEAD_INIT((var).e.list),   \
         .e.funcs = (fn),                          \
-        .dirlist = LIST_HEAD_INIT(var.dirlist),   \
+        .dirlist = LIST_HEAD_INIT((var).dirlist), \
     }
 
 #define HYPFS_DIR_INIT(var, nam)                  \
