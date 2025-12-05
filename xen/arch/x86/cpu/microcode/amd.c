@@ -106,7 +106,7 @@ static bool __ro_after_init entrysign_mitigiated_in_firmware;
 static int cf_check cmp_patch_id(const void *key, const void *elem)
 {
     const struct patch_digest *pd = elem;
-    uint32_t patch_id = *(uint32_t *)key;
+    uint32_t patch_id = *(const uint32_t *)key;
 
     if ( patch_id == pd->patch_id )
         return 0;
