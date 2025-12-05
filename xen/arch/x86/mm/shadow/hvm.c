@@ -268,6 +268,7 @@ hvm_emulate_cmpxchg(enum x86_segment seg,
     default:
         SHADOW_PRINTK("cmpxchg size %u is not supported\n", bytes);
         prev = ~old;
+        break;
     }
 
     if ( prev != old )

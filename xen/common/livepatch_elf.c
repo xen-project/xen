@@ -347,6 +347,7 @@ int livepatch_elf_resolve_symbols(struct livepatch_elf *elf)
                 dprintk(XENLOG_DEBUG, LIVEPATCH "%s: Symbol resolved: %s => %#"PRIxElfAddr" (%s)\n",
                        elf->name, elf->sym[i].name,
                        st_value, elf->sec[idx].name);
+            break;
         }
 
         if ( rc )

@@ -407,6 +407,7 @@ static void _guest_io_write(unsigned int port, unsigned int bytes,
 
     default:
         ASSERT_UNREACHABLE();
+        break;
     }
 }
 

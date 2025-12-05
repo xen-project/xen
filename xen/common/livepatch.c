@@ -1924,7 +1924,6 @@ static void noinline do_livepatch_work(void)
                             p->name);
                     ASSERT_UNREACHABLE();
                 }
-            default:
                 break;
             }
         }

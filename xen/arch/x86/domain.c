@@ -1517,6 +1517,7 @@ int arch_set_info_guest(
         {
         case -EINTR:
             rc = -ERESTART;
+            fallthrough;
         case -ERESTART:
             break;
         case 0:
