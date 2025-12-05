@@ -10360,7 +10360,7 @@ fi
 	if test "x$SYSTEMD_SLEEP_DIR" = x
 then :
 
-	    as_fn_error $? "SYSTEMD_SLEEP_DIR is unset" "$LINENO" 5
+	    SYSTEMD_SLEEP_DIR="\$(prefix)/lib/systemd/system-sleep/"
 
 fi
 

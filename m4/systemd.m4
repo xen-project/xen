@@ -81,7 +81,7 @@ AC_DEFUN([AX_CHECK_SYSTEMD_LIBS], [
 	], [])
 
 	AS_IF([test "x$SYSTEMD_SLEEP_DIR" = x], [
-	    AC_MSG_ERROR([SYSTEMD_SLEEP_DIR is unset])
+	    SYSTEMD_SLEEP_DIR="\$(prefix)/lib/systemd/system-sleep/"
 	], [])
 ])
 
