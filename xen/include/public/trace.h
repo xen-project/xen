@@ -157,7 +157,7 @@
  */
 #define TRC_PV_HYPERCALL_V2_ARG_32(i) (0x1 << (20 + 2*(i)))
 #define TRC_PV_HYPERCALL_V2_ARG_64(i) (0x2 << (20 + 2*(i)))
-#define TRC_PV_HYPERCALL_V2_ARG_MASK  (0xfff00000)
+#define TRC_PV_HYPERCALL_V2_ARG_MASK  0xfff00000U
 
 #define TRC_SHADOW_NOT_SHADOW                 (TRC_SHADOW +  1)
 #define TRC_SHADOW_FAST_PROPAGATE             (TRC_SHADOW +  2)
