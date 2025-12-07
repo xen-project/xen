@@ -1,6 +1,6 @@
 .container-build-tmpl:
   stage: containers
-  image: docker:stable
+  image: docker:cli
   tags:
     - container-builder
   rules:
