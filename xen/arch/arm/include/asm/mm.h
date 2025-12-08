@@ -313,8 +313,6 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
 /* Arch-specific portion of memory_op hypercall. */
 long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg);
 
-#define domain_clamp_alloc_bitsize(d, b) (b)
-
 unsigned long domain_get_maximum_gpfn(struct domain *d);
 
 /* Release all __init and __initdata ranges to be reused */

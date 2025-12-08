@@ -96,8 +96,6 @@ static inline struct page_info *virt_to_page(const void *v)
 /* TODO: implement */
 #define mfn_valid(mfn) ({ (void) (mfn); 0; })
 
-#define domain_clamp_alloc_bitsize(d, b) (b)
-
 #define PFN_ORDER(pfn_) ((pfn_)->v.free.order)
 
 struct page_info

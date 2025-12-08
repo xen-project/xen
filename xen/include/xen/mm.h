@@ -641,4 +641,8 @@ static inline void put_page_alloc_ref(struct page_info *page)
     }
 }
 
+#ifndef domain_clamp_alloc_bitsize
+#define domain_clamp_alloc_bitsize(d, bits) ((void)(d), (bits))
+#endif
+
 #endif /* __XEN_MM_H__ */
