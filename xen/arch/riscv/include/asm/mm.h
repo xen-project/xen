@@ -292,7 +292,6 @@ static inline bool arch_mfns_in_directmap(unsigned long mfn, unsigned long nr)
 /* TODO: implement */
 #define mfn_valid(mfn) ({ (void)(mfn); 0; })
 
-#define domain_set_alloc_bitsize(d) ((void)(d))
 #define domain_clamp_alloc_bitsize(d, b) ((void)(d), (b))
 
 #define PFN_ORDER(pg) ((pg)->v.free.order)
