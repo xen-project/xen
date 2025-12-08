@@ -74,8 +74,6 @@ ifneq ($(CONFIG_PV_SHIM_EXCLUSIVE),y)
 obj-y += domctl.o
 endif
 
-extra-y := symbols-dummy.o
-
 obj-$(CONFIG_COVERAGE) += coverage/
 obj-y += sched/
 obj-$(CONFIG_UBSAN) += ubsan/

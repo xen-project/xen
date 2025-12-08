@@ -170,10 +170,6 @@
             "comment": "Imported from Linux, ignore for now"
         },
         {
-            "rel_path": "common/symbols-dummy.c",
-            "comment": "The resulting code is not included in the final Xen binary, ignore for now"
-        },
-        {
             "rel_path": "crypto/*",
             "comment": "Origin is external and documented in crypto/README.source"
         },
