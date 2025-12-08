@@ -165,7 +165,7 @@
   variables:
     PCIDEV: "00:1f.6"
     PCIDEV_INTR: "MSI"
-    CONSOLE_OPTS: "console=com1 com1=115200,8n1,pci,msi"
+    CONSOLE_OPTS: "console=com1 com1=115200,8n1,pci,0"
     SUT_ADDR: test-3.testnet
   tags:
     - qubes-hw3
