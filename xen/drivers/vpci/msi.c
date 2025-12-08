@@ -193,6 +193,66 @@ static void cf_check mask_write(
     msi->mask = val;
 }
 
+static int cf_check cleanup_msi(const struct pci_dev *pdev, bool hide)
+{
+    int rc;
+    unsigned int end;
+    struct vpci *vpci = pdev->vpci;
+    const unsigned int msi_pos = pdev->msi_pos;
+    const unsigned int ctrl = msi_control_reg(msi_pos);
+
+    if ( !hide )
+    {
+        XFREE(vpci->msi);
+        return 0;
+    }
+
+    if ( vpci->msi )
+    {
+        uint16_t control = pci_conf_read16(pdev->sbdf, ctrl);
+        bool address64 = is_64bit_address(control);
+
+        if ( is_mask_bit_support(control) )
+            end = msi_pending_bits_reg(msi_pos, address64);
+        else
+            /*
+            * "-2" here is to cut the reserved 2 bytes of Message Data when
+            * there is no masking support.
+            */
+            end = msi_mask_bits_reg(msi_pos, address64) - 2;
+
+        rc = vpci_remove_registers(vpci, ctrl, end - ctrl);
+        if ( rc )
+        {
+            printk(XENLOG_ERR "%pd %pp: fail to remove MSI handlers rc=%d\n",
+                pdev->domain, &pdev->sbdf, rc);
+            ASSERT_UNREACHABLE();
+            return rc;
+        }
+
+        XFREE(vpci->msi);
+    }
+
+    /*
+     * Unprivileged domains have a deny by default register access policy, no
+     * need to add any further handlers for them.
+     */
+    if ( !is_hardware_domain(pdev->domain) )
+        return 0;
+
+    /*
+     * The driver may not traverse the capability list and think device
+     * supports MSI by default. So here let the control register of MSI
+     * be Read-Only is to ensure MSI disabled.
+     */
+    rc = vpci_add_register(vpci, vpci_hw_read16, NULL, ctrl, 2, NULL);
+    if ( rc )
+        printk(XENLOG_ERR "%pd %pp: fail to add MSI ctrl handler rc=%d\n",
+               pdev->domain, &pdev->sbdf, rc);
+
+    return rc;
+}
+
 static int cf_check init_msi(struct pci_dev *pdev)
 {
     unsigned int pos = pdev->msi_pos;
@@ -270,7 +330,7 @@ static int cf_check init_msi(struct pci_dev *pdev)
 
     return 0;
 }
-REGISTER_VPCI_CAP(MSI, init_msi, NULL);
+REGISTER_VPCI_CAP(MSI, init_msi, cleanup_msi);
 
 void vpci_dump_msi(void)
 {

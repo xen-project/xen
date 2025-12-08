@@ -368,7 +368,6 @@ void vpci_deassign_device(struct pci_dev *pdev)
         rangeset_destroy(pdev->vpci->header.bars[i].mem);
 
     xfree(pdev->vpci->msix);
-    xfree(pdev->vpci->msi);
     xfree(pdev->vpci);
     pdev->vpci = NULL;
 }
