@@ -877,6 +877,7 @@ void vcpu_wake(struct vcpu *v);
 long vcpu_yield(void);
 void vcpu_sleep_nosync(struct vcpu *v);
 void vcpu_sleep_sync(struct vcpu *v);
+void vcpu_kick(struct vcpu *v);
 
 /*
  * Force synchronisation of given VCPU's state. If it is currently descheduled,
