@@ -891,7 +891,7 @@ int arch_domain_create(struct domain *d,
     d->arch.emulation_flags = emflags;
 
 #ifdef CONFIG_PV32
-    HYPERVISOR_COMPAT_VIRT_START(d) =
+    d->arch.hv_compat_vstart =
         is_pv_domain(d) ? __HYPERVISOR_COMPAT_VIRT_START : ~0u;
 #endif
 

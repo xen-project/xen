@@ -521,7 +521,7 @@ static int __init dom0_construct(const struct boot_domain *bd)
                 printk("Dom0 expects too high a hypervisor start address\n");
                 return -ERANGE;
             }
-            HYPERVISOR_COMPAT_VIRT_START(d) =
+            d->arch.hv_compat_vstart =
                 max_t(unsigned int, m2p_compat_vstart, value);
         }
 
