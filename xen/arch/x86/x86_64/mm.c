@@ -1119,19 +1119,6 @@ unmap:
     return ret;
 }
 
-void domain_set_alloc_bitsize(struct domain *d)
-{
-    if ( !is_pv_32bit_domain(d) ||
-         (MACH2PHYS_COMPAT_NR_ENTRIES(d) >= max_page) ||
-         d->arch.physaddr_bitsize > 0 )
-        return;
-    d->arch.physaddr_bitsize =
-        /* 2^n entries can be contained in guest's p2m mapping space */
-        fls(MACH2PHYS_COMPAT_NR_ENTRIES(d)) - 1
-        /* 2^n pages -> 2^(n+PAGE_SHIFT) bits */
-        + PAGE_SHIFT;
-}
-
 unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits)
 {
     if ( (d == NULL) || (d->arch.physaddr_bitsize == 0) )

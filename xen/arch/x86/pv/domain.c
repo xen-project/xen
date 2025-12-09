@@ -254,7 +254,11 @@ int switch_compat(struct domain *d)
             goto undo_and_fail;
     }
 
-    domain_set_alloc_bitsize(d);
+    if ( MACH2PHYS_COMPAT_NR_ENTRIES(d) < max_page )
+        d->arch.physaddr_bitsize =
+            /* 2^n entries can be contained in guest's p2m mapping space */
+            fls(MACH2PHYS_COMPAT_NR_ENTRIES(d)) - 1 + PAGE_SHIFT;
+
     recalculate_cpuid_policy(d);
 
     d->arch.x87_fip_width = 4;

@@ -619,7 +619,6 @@ void __iomem *ioremap_wc(paddr_t pa, size_t len);
 
 extern int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm);
 
-void domain_set_alloc_bitsize(struct domain *d);
 unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits);
 #define domain_clamp_alloc_bitsize(d, bits) domain_clamp_alloc_bitsize(d, bits)
 
