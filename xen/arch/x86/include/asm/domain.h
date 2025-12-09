@@ -288,6 +288,10 @@ struct pv_domain
     /* Mitigate L1TF with shadow/crashing? */
     bool check_l1tf;
 
+#ifdef CONFIG_PV32
+    unsigned int hv_compat_vstart;
+#endif
+
     /* map_domain_page() mapping cache. */
     struct mapcache_domain mapcache;
 
@@ -314,10 +318,6 @@ struct monitor_write_data {
 struct arch_domain
 {
     struct page_info *perdomain_l3_pg;
-
-#ifdef CONFIG_PV32
-    unsigned int hv_compat_vstart;
-#endif
 
     /* Maximum physical-address bitwidth supported by this guest. */
     unsigned int physaddr_bitsize;

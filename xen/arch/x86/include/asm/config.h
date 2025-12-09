@@ -201,7 +201,7 @@
 
 /* This is not a fixed value, just a lower limit. */
 #define __HYPERVISOR_COMPAT_VIRT_START 0xF5800000
-#define HYPERVISOR_COMPAT_VIRT_START(d) ((d)->arch.hv_compat_vstart)
+#define HYPERVISOR_COMPAT_VIRT_START(d) ((d)->arch.pv.hv_compat_vstart)
 
 #else /* !CONFIG_PV32 */
 

@@ -890,11 +890,6 @@ int arch_domain_create(struct domain *d,
     }
     d->arch.emulation_flags = emflags;
 
-#ifdef CONFIG_PV32
-    d->arch.hv_compat_vstart =
-        is_pv_domain(d) ? __HYPERVISOR_COMPAT_VIRT_START : ~0u;
-#endif
-
     spec_ctrl_init_domain(d);
 
     if ( (rc = paging_domain_init(d)) != 0 )
