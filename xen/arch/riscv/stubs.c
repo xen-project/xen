@@ -121,11 +121,6 @@ void startup_cpu_idle_loop(void)
     BUG_ON("unimplemented");
 }
 
-void free_domain_struct(struct domain *d)
-{
-    BUG_ON("unimplemented");
-}
-
 void dump_pageframe_info(struct domain *d)
 {
     BUG_ON("unimplemented");
@@ -239,11 +234,6 @@ void vcpu_block_unless_event_pending(struct vcpu *v)
 }
 
 void vcpu_kick(struct vcpu *v)
-{
-    BUG_ON("unimplemented");
-}
-
-struct domain *alloc_domain_struct(void)
 {
     BUG_ON("unimplemented");
 }

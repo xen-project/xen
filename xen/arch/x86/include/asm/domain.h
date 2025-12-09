@@ -12,6 +12,9 @@
 #include <public/vcpu.h>
 #include <public/hvm/hvm_info_table.h>
 
+unsigned int arch_domain_struct_memflags(void);
+#define arch_domain_struct_memflags arch_domain_struct_memflags
+
 #define has_32bit_shinfo(d)    ((d)->arch.has_32bit_shinfo)
 
 /*

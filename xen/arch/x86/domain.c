@@ -463,10 +463,8 @@ void domain_cpu_policy_changed(struct domain *d)
     }
 }
 
-struct domain *alloc_domain_struct(void)
+unsigned int arch_domain_struct_memflags(void)
 {
-    struct domain *d;
-
     /*
      * Without CONFIG_BIGMEM, we pack the PDX of the domain structure into
      * a 32-bit field within the page_info structure. Hence the MEMF_bits()
@@ -492,16 +490,7 @@ struct domain *alloc_domain_struct(void)
                 - 1;
 #endif
 
-    BUILD_BUG_ON(sizeof(*d) > PAGE_SIZE);
-    d = alloc_xenheap_pages(0, MEMF_bits(bits));
-    if ( d != NULL )
-        clear_page(d);
-    return d;
-}
-
-void free_domain_struct(struct domain *d)
-{
-    free_xenheap_page(d);
+    return MEMF_bits(bits);
 }
 
 struct vcpu *alloc_vcpu_struct(const struct domain *d)
