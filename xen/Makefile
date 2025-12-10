@@ -461,6 +461,7 @@ ALL_OBJS-y                += xsm/built_in.o
 ALL_OBJS-y                += arch/$(SRCARCH)/built_in.o
 ALL_OBJS-$(CONFIG_CRYPTO) += crypto/built_in.o
 
+ARCH_LIBS-y               :=
 ALL_LIBS-y                := lib/lib.a
 
 all-symbols-y :=
@@ -620,7 +621,8 @@ $(TARGET): outputmakefile asm-generic FORCE
 	$(Q)$(MAKE) $(build)=arch/$(SRCARCH) include
 	$(Q)$(MAKE) $(build)=. arch/$(SRCARCH)/include/asm/asm-offsets.h
 	$(Q)$(MAKE) $(build)=. MKRELOC=$(MKRELOC) 'ALL_OBJS=$(ALL_OBJS-y)' \
-	            'ALL_LIBS=$(ALL_LIBS-y)' 'all_symbols=$(all-symbols-y)' $@
+	            'ALL_LIBS=$(ARCH_LIBS-y) $(ALL_LIBS-y)' \
+	            'all_symbols=$(all-symbols-y)' $@
 
 SUBDIRS = xsm arch common crypto drivers lib test
 define all_sources

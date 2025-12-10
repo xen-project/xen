@@ -3,6 +3,8 @@
 
 export XEN_IMG_OFFSET := 0x200000
 
+ARCH_LIBS-y += arch/x86/lib/lib.a
+
 CFLAGS += -DXEN_IMG_OFFSET=$(XEN_IMG_OFFSET)
 
 # Prevent floating-point variables from creeping into Xen.
