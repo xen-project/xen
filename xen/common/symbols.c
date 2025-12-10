@@ -15,12 +15,29 @@
 #include <xen/lib.h>
 #include <xen/string.h>
 #include <xen/spinlock.h>
+#include <xen/symbols.h>
 #include <xen/virtual_region.h>
 #include <public/platform.h>
 #include <xen/guest_access.h>
 #include <xen/errno.h>
 
-#include "symbols.h"
+#ifdef SYMBOLS_ORIGIN
+extern const unsigned int symbols_offsets[];
+#define symbols_address(n) (SYMBOLS_ORIGIN + symbols_offsets[n])
+#else
+extern const unsigned long symbols_addresses[];
+#define symbols_address(n) symbols_addresses[n]
+#endif
+extern const unsigned int symbols_num_addrs;
+extern const unsigned char symbols_names[];
+
+extern const unsigned int symbols_num_names;
+extern const struct symbol_offset symbols_sorted_offsets[];
+
+extern const uint8_t symbols_token_table[];
+extern const uint16_t symbols_token_index[];
+
+extern const unsigned int symbols_markers[];
 
 /* expand a compressed symbol data into the resulting uncompressed string,
    given the offset to where the symbol is in the compressed stream */
