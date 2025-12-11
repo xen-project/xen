@@ -39,7 +39,7 @@
       allow_failure: true
     - !reference [.eclair-analysis, rules]
 
-eclair-x86_64:
+eclair-x86_64-allcode:
   extends: .eclair-analysis:triggered
   variables:
     LOGFILE: "eclair-x86_64.log"
@@ -48,7 +48,7 @@ eclair-x86_64:
   allow_failure: true
 
 eclair-x86_64-testing:
-  extends: eclair-x86_64
+  extends: eclair-x86_64-allcode
   tags:
     - eclair-analysis-testing
   rules:
@@ -58,8 +58,8 @@ eclair-x86_64-testing:
       when: always
     - !reference [.eclair-analysis:triggered, rules]
 
-eclair-x86_64-safety:
-  extends: eclair-x86_64
+eclair-x86_64-amd:
+  extends: eclair-x86_64-allcode
   tags:
     - eclair-analysis-safety
   allow_failure: false
@@ -99,7 +99,7 @@ eclair-x86_64-safety:
       when: always
     - !reference [.eclair-analysis:triggered, rules]
 
-eclair-ARM64:
+eclair-ARM64-allcode:
   extends: .eclair-analysis:triggered
   variables:
     LOGFILE: "eclair-ARM64.log"
@@ -108,7 +108,7 @@ eclair-ARM64:
   allow_failure: true
 
 eclair-ARM64-testing:
-  extends: eclair-ARM64
+  extends: eclair-ARM64-allcode
   tags:
     - eclair-analysis-testing
   rules:
@@ -118,8 +118,8 @@ eclair-ARM64-testing:
       when: always
     - !reference [.eclair-analysis:triggered, rules]
 
-eclair-ARM64-safety:
-  extends: eclair-ARM64
+eclair-ARM64-amd:
+  extends: eclair-ARM64-allcode
   tags:
     - eclair-analysis-safety
   allow_failure: false
@@ -174,7 +174,7 @@ eclair-ARM64-safety:
       when: never
     - !reference [.eclair-analysis, rules]
 
-eclair-x86_64:on-schedule:
+eclair-x86_64-allrules:on-schedule:
   extends: .eclair-analysis:on-schedule
   variables:
     VARIANT: "X86_64"
@@ -183,7 +183,7 @@ eclair-x86_64:on-schedule:
     LOGFILE: "eclair-${VARIANT}-${RULESET}.log"
   allow_failure: true
 
-eclair-ARM64:on-schedule:
+eclair-ARM64-allrules:on-schedule:
   extends: .eclair-analysis:on-schedule
   variables:
     VARIANT: "ARM64"
