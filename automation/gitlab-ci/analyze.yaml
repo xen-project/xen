@@ -52,6 +52,8 @@ eclair-x86_64-testing:
   tags:
     - eclair-analysis-testing
   rules:
+    - if: $CI_PROJECT_PATH !~ /^xen-project\/people\/.*$/
+      when: never
     - if: $ECLAIR_TESTING
       when: always
     - !reference [.eclair-analysis:triggered, rules]
@@ -110,6 +112,8 @@ eclair-ARM64-testing:
   tags:
     - eclair-analysis-testing
   rules:
+    - if: $CI_PROJECT_PATH !~ /^xen-project\/people\/.*$/
+      when: never
     - if: $ECLAIR_TESTING
       when: always
     - !reference [.eclair-analysis:triggered, rules]
