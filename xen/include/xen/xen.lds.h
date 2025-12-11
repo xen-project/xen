@@ -173,6 +173,12 @@
        _edevice = .;        \
   } :text
 
+#define SCHEDULER_ARRAY              \
+       . = ALIGN(POINTER_ALIGN);     \
+       __start_schedulers_array = .; \
+       *(.data.schedulers)           \
+       __end_schedulers_array = .;
+
 #ifdef CONFIG_HYPFS
 #define HYPFS_PARAM              \
        . = ALIGN(POINTER_ALIGN); \

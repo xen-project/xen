@@ -309,11 +309,8 @@ SECTIONS
   . = ALIGN(SMP_CACHE_BYTES);
   DECL_SECTION(.data.read_mostly) {
        *(.data.read_mostly)
-       . = ALIGN(8);
-       __start_schedulers_array = .;
-       *(.data.schedulers)
-       __end_schedulers_array = .;
 
+       SCHEDULER_ARRAY
        HYPFS_PARAM
   } PHDR(text)
 

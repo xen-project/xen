@@ -78,11 +78,8 @@ SECTIONS
     . = ALIGN(PAGE_SIZE);
     .data : {                    /* Data */
         *(.data.page_aligned)
-        . = ALIGN(8);
-        __start_schedulers_array = .;
-        *(.data.schedulers)
-        __end_schedulers_array = .;
 
+        SCHEDULER_ARRAY
         HYPFS_PARAM
 
         *(.data .data.*)
