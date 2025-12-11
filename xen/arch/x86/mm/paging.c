@@ -249,7 +249,7 @@ static int paging_log_dirty_disable(struct domain *d, bool resuming)
 }
 
 /* Mark a page as dirty, with taking guest pfn as parameter */
-void paging_mark_pfn_dirty(struct domain *d, pfn_t pfn)
+static void set_pfn_logdirty(struct domain *d, pfn_t pfn, bool dirty)
 {
     bool changed;
     mfn_t mfn, *l4, *l3, *l2;
@@ -260,7 +260,7 @@ void paging_mark_pfn_dirty(struct domain *d, pfn_t pfn)
         return;
 
     /* Shared MFNs should NEVER be marked dirty */
-    BUG_ON(paging_mode_translate(d) && SHARED_M2P(pfn_x(pfn)));
+    BUG_ON(dirty && paging_mode_translate(d) && SHARED_M2P(pfn_x(pfn)));
 
     /*
      * Values with the MSB set denote MFNs that aren't really part of the
@@ -281,14 +281,15 @@ void paging_mark_pfn_dirty(struct domain *d, pfn_t pfn)
 
     if ( unlikely(mfn_eq(d->arch.paging.log_dirty.top, INVALID_MFN)) )
     {
-         d->arch.paging.log_dirty.top = paging_new_log_dirty_node(d);
+         if ( dirty )
+             d->arch.paging.log_dirty.top = paging_new_log_dirty_node(d);
          if ( unlikely(mfn_eq(d->arch.paging.log_dirty.top, INVALID_MFN)) )
              goto out;
     }
 
     l4 = paging_map_log_dirty_bitmap(d);
     mfn = l4[i4];
-    if ( mfn_eq(mfn, INVALID_MFN) )
+    if ( mfn_eq(mfn, INVALID_MFN) && dirty )
         l4[i4] = mfn = paging_new_log_dirty_node(d);
     unmap_domain_page(l4);
     if ( mfn_eq(mfn, INVALID_MFN) )
@@ -296,7 +297,7 @@ void paging_mark_pfn_dirty(struct domain *d, pfn_t pfn)
 
     l3 = map_domain_page(mfn);
     mfn = l3[i3];
-    if ( mfn_eq(mfn, INVALID_MFN) )
+    if ( mfn_eq(mfn, INVALID_MFN) && dirty )
         l3[i3] = mfn = paging_new_log_dirty_node(d);
     unmap_domain_page(l3);
     if ( mfn_eq(mfn, INVALID_MFN) )
@@ -304,27 +305,38 @@ void paging_mark_pfn_dirty(struct domain *d, pfn_t pfn)
 
     l2 = map_domain_page(mfn);
     mfn = l2[i2];
-    if ( mfn_eq(mfn, INVALID_MFN) )
+    if ( mfn_eq(mfn, INVALID_MFN) && dirty )
         l2[i2] = mfn = paging_new_log_dirty_leaf(d);
     unmap_domain_page(l2);
     if ( mfn_eq(mfn, INVALID_MFN) )
         goto out;
 
     l1 = map_domain_page(mfn);
-    changed = !__test_and_set_bit(i1, l1);
+    changed = dirty ? !__test_and_set_bit(i1, l1)
+                    : __test_and_clear_bit(i1, l1);
     unmap_domain_page(l1);
     if ( changed )
     {
         PAGING_DEBUG(LOGDIRTY,
-                     "d%d: marked mfn %" PRI_mfn " (pfn %" PRI_pfn ")\n",
-                     d->domain_id, mfn_x(mfn), pfn_x(pfn));
-        d->arch.paging.log_dirty.dirty_count++;
+                     "%pd: marked mfn %" PRI_mfn " (pfn %" PRI_pfn ") %s\n",
+                     d, mfn_x(mfn), pfn_x(pfn), dirty ? "dirty" : "clean");
+        d->arch.paging.log_dirty.dirty_count += dirty ? 1 : -1;
     }
 
 out:
     /* We've already recorded any failed allocations */
     paging_unlock(d);
     return;
+}
+
+void paging_mark_pfn_dirty(struct domain *d, pfn_t pfn)
+{
+    set_pfn_logdirty(d, pfn, true);
+}
+
+void paging_mark_pfn_clean(struct domain *d, pfn_t pfn)
+{
+    set_pfn_logdirty(d, pfn, false);
 }
 
 /* Mark a page as dirty */
@@ -339,7 +351,7 @@ void paging_mark_dirty(struct domain *d, mfn_t gmfn)
     /* We /really/ mean PFN here, even for non-translated guests. */
     pfn = _pfn(get_gpfn_from_mfn(mfn_x(gmfn)));
 
-    paging_mark_pfn_dirty(d, pfn);
+    set_pfn_logdirty(d, pfn, true);
 }
 
 #ifdef CONFIG_SHADOW_PAGING

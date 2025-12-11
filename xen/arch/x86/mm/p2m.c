@@ -562,7 +562,10 @@ p2m_remove_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
         {
             p2m->get_entry(p2m, gfn_add(gfn, i), &t, &a, 0, NULL, NULL);
             if ( !p2m_is_special(t) && !p2m_is_shared(t) )
+            {
                 set_gpfn_from_mfn(mfn_x(mfn) + i, INVALID_M2P_ENTRY);
+                paging_mark_pfn_clean(p2m->domain, _pfn(gfn_x(gfn) + i));
+            }
         }
     }
 
@@ -753,8 +756,11 @@ p2m_add_page(struct domain *d, gfn_t gfn, mfn_t mfn,
         if ( !p2m_is_grant(t) )
         {
             for ( i = 0; i < (1UL << page_order); i++ )
+            {
                 set_gpfn_from_mfn(mfn_x(mfn_add(mfn, i)),
                                   gfn_x(gfn_add(gfn, i)));
+                paging_mark_pfn_dirty(d, _pfn(gfn_x(gfn) + i));
+            }
         }
     }
     else
@@ -1121,6 +1127,7 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn_l,
                 {
                     ASSERT(mfn_valid(mfn_add(omfn, i)));
                     set_gpfn_from_mfn(mfn_x(omfn) + i, INVALID_M2P_ENTRY);
+                    paging_mark_pfn_clean(d, _pfn(gfn_x(gfn) + i));
 
                     ioreq_request_mapcache_invalidate(d);
                 }
@@ -1142,6 +1149,7 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn_l,
         {
             ASSERT(mfn_valid(mfn_add(omfn, i)));
             set_gpfn_from_mfn(mfn_x(omfn) + i, INVALID_M2P_ENTRY);
+            paging_mark_pfn_clean(d, _pfn(gfn_x(gfn) + i));
         }
 
         ioreq_request_mapcache_invalidate(d);

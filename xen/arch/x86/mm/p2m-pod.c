@@ -655,7 +655,10 @@ decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
             }
             p2m_tlb_flush_sync(p2m);
             for ( j = 0; j < n; ++j )
+            {
                 set_gpfn_from_mfn(mfn_x(mfn) + j, INVALID_M2P_ENTRY);
+                paging_mark_pfn_clean(d, _pfn(gfn_x(gfn) + i + j));
+            }
             p2m_pod_cache_add(p2m, page, cur_order);
 
             ioreq_request_mapcache_invalidate(d);
