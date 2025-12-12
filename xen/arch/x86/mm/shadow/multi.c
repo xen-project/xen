@@ -316,7 +316,7 @@ static void sh_audit_gw(struct vcpu *v, const walk_t *gw)
     struct domain *d = v->domain;
     mfn_t smfn;
 
-    if ( !(SHADOW_AUDIT_ENABLE) )
+    if ( !shadow_audit_enable )
         return;
 
 #if GUEST_PAGING_LEVELS >= 4 /* 64-bit only... */

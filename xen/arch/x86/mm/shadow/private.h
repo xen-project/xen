@@ -33,11 +33,10 @@
 
 #ifdef NDEBUG
 #define SHADOW_AUDIT                   0
-#define SHADOW_AUDIT_ENABLE            0
+#define shadow_audit_enable        false
 #else
 #define SHADOW_AUDIT                0x15  /* Basic audit of all */
-#define SHADOW_AUDIT_ENABLE         shadow_audit_enable
-extern int shadow_audit_enable;
+extern bool shadow_audit_enable;
 #endif
 
 /******************************************************************************

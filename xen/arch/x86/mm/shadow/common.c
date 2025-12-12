@@ -126,7 +126,7 @@ void shadow_vcpu_init(struct vcpu *v)
 }
 
 #if SHADOW_AUDIT
-int shadow_audit_enable = 0;
+bool __read_mostly shadow_audit_enable;
 
 static void cf_check shadow_audit_key(unsigned char key)
 {
@@ -884,7 +884,7 @@ static void sh_hash_audit_bucket(struct domain *d, int bucket)
     struct page_info *sp, *x;
 
     if ( !(SHADOW_AUDIT & (SHADOW_AUDIT_HASH|SHADOW_AUDIT_HASH_FULL)) ||
-         !SHADOW_AUDIT_ENABLE )
+         !shadow_audit_enable )
         return;
 
     sp = d->arch.paging.shadow.hash_table[bucket];
@@ -953,7 +953,7 @@ static void sh_hash_audit(struct domain *d)
 {
     int i;
 
-    if ( !(SHADOW_AUDIT & SHADOW_AUDIT_HASH_FULL) || !SHADOW_AUDIT_ENABLE )
+    if ( !(SHADOW_AUDIT & SHADOW_AUDIT_HASH_FULL) || !shadow_audit_enable )
         return;
 
     for ( i = 0; i < SHADOW_HASH_BUCKETS; i++ )
@@ -2619,7 +2619,7 @@ void shadow_audit_tables(struct vcpu *v)
     unsigned int mask;
 
     if ( !(SHADOW_AUDIT & (SHADOW_AUDIT_ENTRIES | SHADOW_AUDIT_ENTRIES_FULL)) ||
-         !SHADOW_AUDIT_ENABLE )
+         !shadow_audit_enable )
         return;
 
     if ( SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES_FULL )
