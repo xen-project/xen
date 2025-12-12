@@ -242,6 +242,9 @@ struct xc_dom_image {
 
     /* Number of vCPUs */
     unsigned int max_vcpus;
+
+    /* Caller provided memflags to use when populating physmap. */
+    unsigned int memflags;
 };
 
 /* --- arch specific hooks ----------------------------------------- */
@@ -611,6 +614,8 @@ struct restore_callbacks {
  *        specific data
  * @param send_back_fd Only used for XC_STREAM_COLO.  Contains backchannel to
  *        the source side.
+ * @param memflags Optional memflags to pass in
+ *        xc_domain_populate_physmap{_exact}() calls.
  * @return 0 on success, -1 on failure
  */
 int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
@@ -618,7 +623,8 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       uint32_t store_domid, unsigned int console_evtchn,
                       unsigned long *console_mfn, uint32_t console_domid,
                       xc_stream_type_t stream_type,
-                      struct restore_callbacks *callbacks, int send_back_fd);
+                      struct restore_callbacks *callbacks, int send_back_fd,
+                      unsigned int memflags);
 
 /**
  * This function will create a domain for a paravirtualized Linux

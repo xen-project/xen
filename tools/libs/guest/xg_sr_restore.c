@@ -141,7 +141,8 @@ static bool populate_small_superpage(struct xc_sr_context *ctx, xen_pfn_t gfn)
     xen_pfn_t mfn = gfn;
 
     if ( xc_domain_populate_physmap_exact(
-         ctx->xch, ctx->domid, 1, SMALL_SUPERPAGE_ORDER, 0, &mfn) )
+         ctx->xch, ctx->domid, 1, SMALL_SUPERPAGE_ORDER, ctx->restore.memflags,
+         &mfn) )
         return false;
 
     /*
@@ -217,7 +218,7 @@ int populate_pfns(struct xc_sr_context *ctx, unsigned int count,
     if ( nr_pfns )
     {
         rc = xc_domain_populate_physmap_exact(
-            xch, ctx->domid, nr_pfns, 0, 0, mfns);
+            xch, ctx->domid, nr_pfns, 0, ctx->restore.memflags, mfns);
         if ( rc )
         {
             PERROR("Failed to populate physmap");
@@ -901,7 +902,8 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       uint32_t store_domid, unsigned int console_evtchn,
                       unsigned long *console_gfn, uint32_t console_domid,
                       xc_stream_type_t stream_type,
-                      struct restore_callbacks *callbacks, int send_back_fd)
+                      struct restore_callbacks *callbacks, int send_back_fd,
+                      unsigned int memflags)
 {
     bool hvm;
     xen_pfn_t nr_pfns;
@@ -918,6 +920,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     ctx.restore.xenstore_domid = store_domid;
     ctx.restore.callbacks = callbacks;
     ctx.restore.send_back_fd = send_back_fd;
+    ctx.restore.memflags = memflags;
 
     /* Sanity check stream_type-related parameters */
     switch ( stream_type )

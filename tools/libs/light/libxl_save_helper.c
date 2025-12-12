@@ -285,7 +285,7 @@ int main(int argc, char **argv)
 
         r = xc_domain_restore(xch, io_fd, dom, store_evtchn, &store_mfn,
                               store_domid, console_evtchn, &console_mfn,
-                              console_domid, stream_type, &cb, send_back_fd);
+                              console_domid, stream_type, &cb, send_back_fd, 0);
         helper_stub_restore_results(store_mfn,console_mfn,0);
         complete(r);
 

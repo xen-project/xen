@@ -1260,14 +1260,15 @@ static int meminit_pv(struct xc_dom_image *dom)
     /* allocate guest memory */
     for ( i = 0; i < nr_vmemranges; i++ )
     {
-        unsigned int memflags;
+        unsigned int memflags = dom->memflags;
         uint64_t pages, super_pages;
         unsigned int pnode = vnode_to_pnode[vmemranges[i].nid];
         xen_pfn_t extents[SUPERPAGE_BATCH_SIZE];
         xen_pfn_t pfn_base_idx;
 
-        memflags = 0;
-        if ( pnode != XC_NUMA_NO_NODE )
+        if ( pnode != XC_NUMA_NO_NODE &&
+             /* Only set the node if the caller hasn't done so. */
+             XENMEMF_get_node(memflags) == XENMEMF_get_node(0) )
             memflags |= XENMEMF_exact_node(pnode);
 
         pages = (vmemranges[i].end - vmemranges[i].start) >> PAGE_SHIFT;
@@ -1354,7 +1355,7 @@ static int meminit_hvm(struct xc_dom_image *dom)
     int rc;
     unsigned long stat_normal_pages = 0, stat_2mb_pages = 0,
         stat_1gb_pages = 0;
-    unsigned int memflags = 0;
+    unsigned int memflags = dom->memflags;
     int claim_enabled = dom->claim_enabled;
     uint64_t total_pages;
     xen_vmemrange_t dummy_vmemrange[2];
@@ -1500,7 +1501,9 @@ static int meminit_hvm(struct xc_dom_image *dom)
         unsigned int vnode = vmemranges[vmemid].nid;
         unsigned int pnode = vnode_to_pnode[vnode];
 
-        if ( pnode != XC_NUMA_NO_NODE )
+        if ( pnode != XC_NUMA_NO_NODE &&
+             /* Only set the node if the caller hasn't done so. */
+             XENMEMF_get_node(new_memflags) == XENMEMF_get_node(0) )
             new_memflags |= XENMEMF_exact_node(pnode);
 
         end_pages = vmemranges[vmemid].end >> PAGE_SHIFT;

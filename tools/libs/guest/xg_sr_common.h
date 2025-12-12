@@ -295,6 +295,9 @@ struct xc_sr_context
 
             /* Sender has invoked verify mode on the stream. */
             bool verify;
+
+            /* memflags to pass to xc_domain_populate_physmap{_exact}(). */
+            unsigned int memflags;
         } restore;
     };
 
