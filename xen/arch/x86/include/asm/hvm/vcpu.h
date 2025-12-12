@@ -12,8 +12,7 @@
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/hvm/vmx/vvmx.h>
-#include <asm/hvm/svm/vmcb.h>
-#include <asm/hvm/svm/nestedsvm.h>
+#include <asm/hvm/svm-types.h>
 #include <asm/mtrr.h>
 #include <public/hvm/ioreq.h>
 

@@ -7,7 +7,6 @@
 
 #include <asm/hvm/support.h>
 #include <asm/hvm/svm.h>
-#include <asm/hvm/svm/vmcb.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/paging.h> /* paging_mode_hap */
 #include <asm/event.h> /* for local_event_delivery_(en|dis)able */

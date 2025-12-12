@@ -16,7 +16,6 @@
 
 #include <asm/guest-msr.h>
 #include <asm/hvm/svm.h>
-#include <asm/hvm/svm/vmcb.h>
 #include <asm/msr-index.h>
 #include <asm/p2m.h>
 #include <asm/spec_ctrl.h>

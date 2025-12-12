@@ -15,7 +15,7 @@
 
 #include <asm/hvm/io.h>
 #include <asm/hvm/vmx/vmcs.h>
-#include <asm/hvm/svm/vmcb.h>
+#include <asm/hvm/svm-types.h>
 
 #ifdef CONFIG_MEM_SHARING
 struct mem_sharing_domain
