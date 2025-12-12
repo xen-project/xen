@@ -184,7 +184,7 @@ mca(xen_mc_t *u_xen_mc)
 set_trap_table(const_trap_info_t *traps)
 set_gdt(xen_ulong_t *frame_list, unsigned int entries)
 set_callbacks(unsigned long event_address, unsigned long failsafe_address, unsigned long syscall_address)
-update_descriptor(uint64_t gaddr, seg_desc_t desc)
+update_descriptor(uint64_t gaddr, uint64_t desc)
 update_va_mapping(unsigned long va, uint64_t val64, unsigned long flags)
 update_va_mapping_otherdomain(unsigned long va, uint64_t val64, unsigned long flags, domid_t domid)
 #endif

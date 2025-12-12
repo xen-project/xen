@@ -179,11 +179,8 @@ int compat_set_gdt(
 int compat_update_descriptor(
     uint32_t pa_lo, uint32_t pa_hi, uint32_t desc_lo, uint32_t desc_hi)
 {
-    seg_desc_t d;
-
-    d.raw = ((uint64_t)desc_hi << 32) | desc_lo;
-
-    return do_update_descriptor(pa_lo | ((uint64_t)pa_hi << 32), d);
+    return do_update_descriptor(pa_lo | ((uint64_t)pa_hi << 32),
+                                desc_lo | ((uint64_t)desc_hi << 32));
 }
 
 #endif /* CONFIG_PV32 */
@@ -288,9 +285,10 @@ int validate_segdesc_page(struct page_info *page)
     return i == 512 ? 0 : -EINVAL;
 }
 
-long do_update_descriptor(uint64_t gaddr, seg_desc_t d)
+long do_update_descriptor(uint64_t gaddr, uint64_t desc)
 {
     struct domain *currd = current->domain;
+    seg_desc_t d = { .raw = desc };
     gfn_t gfn = gaddr_to_gfn(gaddr);
     mfn_t mfn;
     seg_desc_t *entry;
