@@ -751,7 +751,7 @@ void shadow_promote(struct domain *d, mfn_t gmfn, unsigned int type)
     TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_PROMOTE);
 }
 
-void shadow_demote(struct domain *d, mfn_t gmfn, u32 type)
+void shadow_demote(struct domain *d, mfn_t gmfn, unsigned int type)
 {
     struct page_info *page = mfn_to_page(gmfn);
 
@@ -2615,11 +2615,11 @@ pagetable_t sh_set_toplevel_shadow(struct vcpu *v,
  * Helper invoked when releasing of a top-level shadow's reference was
  * deferred in sh_set_toplevel_shadow() above.
  */
-void shadow_put_top_level(struct domain *d, pagetable_t old_entry)
+void shadow_put_top_level(struct domain *d, pagetable_t old)
 {
-    ASSERT(!pagetable_is_null(old_entry));
+    ASSERT(!pagetable_is_null(old));
     paging_lock(d);
-    sh_put_ref(d, pagetable_get_mfn(old_entry), 0);
+    sh_put_ref(d, pagetable_get_mfn(old), 0);
     paging_unlock(d);
 }
 

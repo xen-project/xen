@@ -66,7 +66,7 @@
 static int kimage_is_destination_range(struct kexec_image *image,
                                        paddr_t start, paddr_t end);
 static struct page_info *kimage_alloc_page(struct kexec_image *image,
-                                           paddr_t dest);
+                                           paddr_t destination);
 
 static struct page_info *kimage_alloc_zeroed_page(unsigned memflags)
 {

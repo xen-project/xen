@@ -4566,7 +4566,7 @@ static int __do_update_va_mapping(
 }
 
 long do_update_va_mapping(
-    unsigned long va, u64 val64, unsigned long flags)
+    unsigned long va, uint64_t val64, unsigned long flags)
 {
     int rc = __do_update_va_mapping(va, val64, flags, current->domain);
 
@@ -4578,7 +4578,7 @@ long do_update_va_mapping(
 }
 
 long do_update_va_mapping_otherdomain(
-    unsigned long va, u64 val64, unsigned long flags, domid_t domid)
+    unsigned long va, uint64_t val64, unsigned long flags, domid_t domid)
 {
     struct domain *pg_owner;
     int rc;

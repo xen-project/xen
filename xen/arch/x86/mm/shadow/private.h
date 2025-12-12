@@ -371,11 +371,11 @@ bool  shadow_hash_delete(struct domain *d,
                          unsigned long n, unsigned int t, mfn_t smfn);
 
 /* shadow promotion */
-void shadow_promote(struct domain *d, mfn_t gmfn, u32 type);
-void shadow_demote(struct domain *d, mfn_t gmfn, u32 type);
+void shadow_promote(struct domain *d, mfn_t gmfn, unsigned int type);
+void shadow_demote(struct domain *d, mfn_t gmfn, unsigned int type);
 
 /* Shadow page allocation functions */
-bool __must_check shadow_prealloc(struct domain *d, unsigned int shadow_type,
+bool __must_check shadow_prealloc(struct domain *d, unsigned int type,
                                   unsigned int count);
 mfn_t shadow_alloc(struct domain *d,
                     u32 shadow_type,
@@ -399,11 +399,11 @@ int sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size);
  * Returns non-zero if we need to flush TLBs.
  * level and fault_addr desribe how we found this to be a pagetable;
  * level==0 means we have some other reason for revoking write access. */
-extern int sh_remove_write_access(struct domain *d, mfn_t readonly_mfn,
+extern int sh_remove_write_access(struct domain *d, mfn_t gmfn,
                                   unsigned int level,
                                   unsigned long fault_addr);
 #else
-static inline int sh_remove_write_access(struct domain *d, mfn_t readonly_mfn,
+static inline int sh_remove_write_access(struct domain *d, mfn_t gmfn,
                                          unsigned int level,
                                          unsigned long fault_addr)
 {

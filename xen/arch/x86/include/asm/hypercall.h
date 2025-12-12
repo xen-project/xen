@@ -22,8 +22,8 @@
 void pv_hypercall(struct cpu_user_regs *regs);
 #endif
 
-void pv_ring1_init_hypercall_page(void *ptr);
-void pv_ring3_init_hypercall_page(void *ptr);
+void pv_ring1_init_hypercall_page(void *p);
+void pv_ring3_init_hypercall_page(void *p);
 
 /*
  * Both do_mmuext_op() and do_mmu_update():

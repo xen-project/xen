@@ -107,7 +107,7 @@ static int verify_payload(const struct xen_sysctl_livepatch_upload *upload, char
     return 0;
 }
 
-bool is_patch(const void *ptr)
+bool is_patch(const void *addr)
 {
     const struct payload *data;
     bool r = false;
@@ -115,12 +115,12 @@ bool is_patch(const void *ptr)
     rcu_read_lock(&rcu_payload_lock);
     list_for_each_entry_rcu ( data, &payload_list, list )
     {
-        if ( (ptr >= data->rw_addr &&
-              ptr < (data->rw_addr + data->rw_size)) ||
-             (ptr >= data->ro_addr &&
-              ptr < (data->ro_addr + data->ro_size)) ||
-             (ptr >= data->text_addr &&
-              ptr < (data->text_addr + data->text_size)) )
+        if ( (addr >= data->rw_addr &&
+              addr < (data->rw_addr + data->rw_size)) ||
+             (addr >= data->ro_addr &&
+              addr < (data->ro_addr + data->ro_size)) ||
+             (addr >= data->text_addr &&
+              addr < (data->text_addr + data->text_size)) )
         {
             r = 1;
             break;

@@ -89,7 +89,7 @@ enum va_type {
  * Function to secure the allocate pages (from arch_livepatch_alloc_payload)
  * with the right page permissions.
  */
-int arch_livepatch_secure(const void *va, unsigned int pages, enum va_type types);
+int arch_livepatch_secure(const void *va, unsigned int pages, enum va_type type);
 
 void arch_livepatch_init(void);
 

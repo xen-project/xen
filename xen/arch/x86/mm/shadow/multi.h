@@ -89,11 +89,11 @@ SHADOW_INTERNAL_NAME(sh_paging_mode, GUEST_LEVELS);
 #if SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC
 extern void
 SHADOW_INTERNAL_NAME(sh_resync_l1, GUEST_LEVELS)
-     (struct vcpu *v, mfn_t gmfn, mfn_t snpmfn);
+     (struct vcpu *v, mfn_t gl1mfn, mfn_t snpmfn);
 
 extern int
 SHADOW_INTERNAL_NAME(sh_safe_not_to_sync, GUEST_LEVELS)
-     (struct vcpu*v, mfn_t gmfn);
+     (struct vcpu*v, mfn_t gl1mfn);
 
 extern int
 SHADOW_INTERNAL_NAME(sh_rm_write_access_from_sl1p, GUEST_LEVELS)
