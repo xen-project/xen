@@ -165,7 +165,7 @@ eclair-ARM64-amd:
   rules:
     - if: $ECLAIR_SAFETY
       when: always
-    - !reference [.eclair-analysis, rules]
+    - !reference [.eclair-analysis:triggered, rules]
 
 .eclair-analysis:on-schedule:
   extends: .eclair-analysis
