@@ -17,7 +17,6 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/vlapic.h>
-#include <asm/hvm/svm/svm.h>
 #include <asm/hvm/nestedhvm.h> /* for nestedhvm_vcpu_in_guestmode */
 #include <asm/vm_event.h>
 #include <xen/event.h>

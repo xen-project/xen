@@ -11,7 +11,7 @@
 #include <xen/warning.h>
 
 #include <asm/amd.h>
-#include <asm/hvm/svm/svm.h>
+#include <asm/hvm/svm.h>
 #include <asm/intel-family.h>
 #include <asm/microcode.h>
 #include <asm/msr.h>

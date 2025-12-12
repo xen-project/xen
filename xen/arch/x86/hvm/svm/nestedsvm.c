@@ -6,7 +6,7 @@
  */
 
 #include <asm/hvm/support.h>
-#include <asm/hvm/svm/svm.h>
+#include <asm/hvm/svm.h>
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/paging.h> /* paging_mode_hap */

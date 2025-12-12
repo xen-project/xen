@@ -9,7 +9,7 @@
 #include <asm/amd.h>
 #include <asm/cpu-policy.h>
 #include <asm/hvm/nestedhvm.h>
-#include <asm/hvm/svm/svm.h>
+#include <asm/hvm/svm.h>
 #include <asm/intel-family.h>
 #include <asm/msr-index.h>
 #include <asm/paging.h>

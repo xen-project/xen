@@ -6,7 +6,7 @@
 
 #include <asm/amd.h>
 #include <asm/hvm/nestedhvm.h>
-#include <asm/hvm/svm/svm.h>
+#include <asm/hvm/svm.h>
 
 #include "svm.h"
 #include "vmcb.h"
