@@ -99,7 +99,7 @@ void pv_inject_event(const struct x86_event *event)
  * Called from asm to set up the MCE trapbounce info.
  * Returns false no callback is set up, else true.
  */
-bool set_guest_machinecheck_trapbounce(void)
+bool asmlinkage set_guest_machinecheck_trapbounce(void)
 {
     struct vcpu *curr = current;
     struct trap_bounce *tb = &curr->arch.pv.trap_bounce;
@@ -114,7 +114,7 @@ bool set_guest_machinecheck_trapbounce(void)
  * Called from asm to set up the NMI trapbounce info.
  * Returns false if no callback is set up, else true.
  */
-bool set_guest_nmi_trapbounce(void)
+bool asmlinkage set_guest_nmi_trapbounce(void)
 {
     struct vcpu *curr = current;
     struct trap_bounce *tb = &curr->arch.pv.trap_bounce;

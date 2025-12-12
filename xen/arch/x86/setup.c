@@ -877,6 +877,8 @@ static void noreturn init_done(void)
     startup_cpu_idle_loop();
 }
 
+unsigned int xen_msr_s_cet_value(void); /* To avoid ifdefary, and placate MISRA */
+
 #if defined(CONFIG_XEN_SHSTK) || defined(CONFIG_XEN_IBT)
 /*
  * Used by AP and S3 asm code to calcualte the appropriate MSR_S_CET setting.
@@ -888,8 +890,6 @@ unsigned int xen_msr_s_cet_value(void)
     return ((cpu_has_xen_shstk ? CET_SHSTK_EN | CET_WRSS_EN : 0) |
             (cpu_has_xen_ibt   ? CET_ENDBR_EN : 0));
 }
-#else
-unsigned int xen_msr_s_cet_value(void); /* To avoid ifdefary */
 #endif
 
 /* Reinitalise all state referring to the old virtual address of the stack. */
