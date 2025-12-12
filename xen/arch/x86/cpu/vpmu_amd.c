@@ -13,10 +13,13 @@
 #include <xen/err.h>
 #include <xen/sched.h>
 #include <xen/xenoprof.h>
+
 #include <asm/apic.h>
-#include <asm/vpmu.h>
 #include <asm/hvm/save.h>
+#include <asm/hvm/svm.h>
 #include <asm/hvm/vlapic.h>
+#include <asm/vpmu.h>
+
 #include <public/pmu.h>
 
 #define MSR_F10H_EVNTSEL_GO_SHIFT   40

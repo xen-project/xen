@@ -42,14 +42,6 @@ struct svm_vcpu {
     uint64_t guest_sysenter_eip;
 };
 
-#define MSR_INTERCEPT_NONE    0
-#define MSR_INTERCEPT_READ    1
-#define MSR_INTERCEPT_WRITE   2
-#define MSR_INTERCEPT_RW      (MSR_INTERCEPT_WRITE | MSR_INTERCEPT_READ)
-void svm_intercept_msr(struct vcpu *v, uint32_t msr, int flags);
-#define svm_disable_intercept_for_msr(v, msr) svm_intercept_msr((v), (msr), MSR_INTERCEPT_NONE)
-#define svm_enable_intercept_for_msr(v, msr) svm_intercept_msr((v), (msr), MSR_INTERCEPT_RW)
-
 #endif /* ASM_X86_HVM_SVM_VMCS_H__ */
 
 /*
