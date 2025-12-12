@@ -7,7 +7,37 @@
 
 #include <xen/types.h>
 
-#include <asm/hvm/svm/vmcb.h>
+struct svm_domain {
+    union {
+        uint64_t raw[2];
+        struct {
+            uint64_t length;
+            uint64_t status;
+        };
+    } osvw;
+};
+
+struct svm_vcpu {
+    struct vmcb_struct *vmcb;
+    unsigned long *msrpm;
+    uint64_t vmcb_pa;
+    int     launch_core;
+
+    uint8_t vmcb_sync_state; /* enum vmcb_sync_state */
+
+    /* VMCB has a cached instruction from #PF/#NPF Decode Assist? */
+    uint8_t cached_insn_len; /* Zero if no cached instruction. */
+
+    /*
+     * Upper four bytes are undefined in the VMCB, therefore we can't use the
+     * fields in the VMCB. Write a 64bit value and then read a 64bit value is
+     * fine unless there's a VMRUN/VMEXIT in between which clears the upper
+     * four bytes.
+     */
+    uint64_t guest_sysenter_cs;
+    uint64_t guest_sysenter_esp;
+    uint64_t guest_sysenter_eip;
+};
 
 struct nestedsvm {
     uint64_t ns_msr_hsavepa; /* MSR HSAVE_PA value */
