@@ -26,7 +26,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
         pv_inject_page_fault(0, eip + sizeof(sig) - rc);
         return EXCRET_fault_fixed;
     }
-    if ( memcmp(sig, "\xf\xbxen", sizeof(sig)) )
+    if ( memcmp(sig, "\xf\xb" "xen", sizeof(sig)) )
         return 0;
     eip += sizeof(sig);
 
