@@ -229,6 +229,7 @@
   rules:
     - if: $CI_JOB_NAME =~ $SELECTED_JOBS_ONLY
       when: manual
+      allow_failure: true
 
 .yocto-test-arm64:
   extends: .yocto-test
