@@ -226,6 +226,9 @@
       - binaries/
     when: always
   needs: []
+  rules:
+    - if: $CI_JOB_NAME =~ $SELECTED_JOBS_ONLY
+      when: manual
 
 .yocto-test-arm64:
   extends: .yocto-test
@@ -261,6 +264,9 @@
 .test-jobs-artifact-common:
   stage: build
   needs: []
+  rules:
+    - if: $CI_JOB_NAME =~ $SELECTED_JOBS_ONLY
+      when: on_success
 
 # Arm test artifacts
 
@@ -468,20 +474,17 @@ yocto-qemuarm64:
   extends: .yocto-test-arm64
   variables:
     YOCTO_BOARD: qemuarm64
-  when: manual
 
 yocto-qemuarm:
   extends: .yocto-test-arm64
   variables:
     YOCTO_BOARD: qemuarm
     YOCTO_OUTPUT: --copy-output
-  when: manual
 
 yocto-qemux86-64:
   extends: .yocto-test-x86-64
   variables:
     YOCTO_BOARD: qemux86-64
-  when: manual
 
 # Cppcheck analysis jobs
 
