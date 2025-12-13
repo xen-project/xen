@@ -2,10 +2,8 @@
   stage: test
   image: ${XEN_REGISTRY}/${CONTAINER}
   rules:
-  - if: $SELECTED_JOBS_ONLY && $CI_JOB_NAME =~ $SELECTED_JOBS_ONLY
-  - if: $SELECTED_JOBS_ONLY
-    when: never
-  - when: on_success
+  - if: $CI_JOB_NAME =~ $SELECTED_JOBS_ONLY
+    when: on_success
 
 .arm64-test-needs: &arm64-test-needs
   - project: xen-project/hardware/test-artifacts
@@ -113,10 +111,9 @@
       - '*.dtb'
     when: always
   rules:
-    - if: $SELECTED_JOBS_ONLY && $CI_JOB_NAME =~ $SELECTED_JOBS_ONLY
-    - if: $SELECTED_JOBS_ONLY
-      when: never
-    - if: $XILINX_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
+    - if: $CI_JOB_NAME =~ $SELECTED_JOBS_ONLY && $XILINX_JOBS == "true"
+          && $CI_COMMIT_REF_PROTECTED == "true"
+      when: on_success
   tags:
     - xilinx
 
@@ -134,10 +131,9 @@
       - '*.log'
     when: always
   rules:
-    - if: $SELECTED_JOBS_ONLY && $CI_JOB_NAME =~ $SELECTED_JOBS_ONLY
-    - if: $SELECTED_JOBS_ONLY
-      when: never
-    - if: $XILINX_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
+    - if: $CI_JOB_NAME =~ $SELECTED_JOBS_ONLY && $XILINX_JOBS == "true"
+          && $CI_COMMIT_REF_PROTECTED == "true"
+      when: on_success
   tags:
     - xilinx
 
@@ -157,10 +153,9 @@
       - '*.log'
     when: always
   rules:
-    - if: $SELECTED_JOBS_ONLY && $CI_JOB_NAME =~ $SELECTED_JOBS_ONLY
-    - if: $SELECTED_JOBS_ONLY
-      when: never
-    - if: $QUBES_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
+    - if: $CI_JOB_NAME =~ $SELECTED_JOBS_ONLY && $QUBES_JOBS == "true"
+          && $CI_COMMIT_REF_PROTECTED == "true"
+      when: on_success
   tags:
     - qubes-hw2
 
