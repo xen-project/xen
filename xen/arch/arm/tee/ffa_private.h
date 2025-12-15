@@ -344,6 +344,11 @@ struct ffa_ctx {
     /* FF-A Endpoint ID */
     uint16_t ffa_id;
     uint16_t num_vcpus;
+    /*
+     * Must only be accessed with the ffa_ctx_list_rwlock taken as it set
+     * when guest_vers is set and other accesses could see a partially set
+     * value.
+     */
     bool is_64bit;
 
     /*

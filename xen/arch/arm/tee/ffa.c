@@ -181,6 +181,14 @@ static bool ffa_negotiate_version(struct cpu_user_regs *regs)
         }
 
         /*
+         * We cannot set is_64bit during domain init because the field is not
+         * yet initialized.
+         * This field is only used during partinfo_get with the rwlock taken
+         * so there is no ordering issue with guest_vers.
+         */
+        ctx->is_64bit = is_64bit_domain(d);
+
+        /*
          * A successful FFA_VERSION call does not freeze negotiation. Guests
          * are allowed to issue multiple FFA_VERSION attempts (e.g. probing
          * several minor versions). Negotiation becomes final only when a
@@ -433,7 +441,6 @@ static int ffa_domain_init(struct domain *d)
 
     ctx->ffa_id = ffa_get_vm_id(d);
     ctx->num_vcpus = d->max_vcpus;
-    ctx->is_64bit = is_64bit_domain(d);
 
     /*
      * ffa_domain_teardown() will be called if ffa_domain_init() returns an
