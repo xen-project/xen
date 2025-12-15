@@ -49,6 +49,30 @@ static void ffa_finish_direct_req_run(struct cpu_user_regs *regs,
     case FFA_MSG_YIELD:
     case FFA_INTERRUPT:
         break;
+    case FFA_MSG_SEND_DIRECT_RESP2:
+        /*
+         * REQ2 / RESP2 use a 17-register payload (x1–x17). Copy all of them
+         * back to the guest context.
+         */
+        set_user_reg(regs, 0, resp.a0);
+        set_user_reg(regs, 1, resp.a1);
+        set_user_reg(regs, 2, resp.a2);
+        set_user_reg(regs, 3, resp.a3);
+        set_user_reg(regs, 4, resp.a4);
+        set_user_reg(regs, 5, resp.a5);
+        set_user_reg(regs, 6, resp.a6);
+        set_user_reg(regs, 7, resp.a7);
+        set_user_reg(regs, 8, resp.a8);
+        set_user_reg(regs, 9, resp.a9);
+        set_user_reg(regs, 10, resp.a10);
+        set_user_reg(regs, 11, resp.a11);
+        set_user_reg(regs, 12, resp.a12);
+        set_user_reg(regs, 13, resp.a13);
+        set_user_reg(regs, 14, resp.a14);
+        set_user_reg(regs, 15, resp.a15);
+        set_user_reg(regs, 16, resp.a16);
+        set_user_reg(regs, 17, resp.a17);
+        return;
     default:
         /* Bad fid, report back to the caller. */
         ffa_set_regs_error(regs, FFA_RET_ABORTED);
@@ -106,6 +130,21 @@ void ffa_handle_msg_send_direct_req(struct cpu_user_regs *regs, uint32_t fid)
     arg.a5 = get_user_reg(regs, 5) & mask;
     arg.a6 = get_user_reg(regs, 6) & mask;
     arg.a7 = get_user_reg(regs, 7) & mask;
+
+    if ( fid == FFA_MSG_SEND_DIRECT_REQ2 )
+    {
+        /* 17 registers are used for REQ2 */
+        arg.a8 = get_user_reg(regs, 8);
+        arg.a9 = get_user_reg(regs, 9);
+        arg.a10 = get_user_reg(regs, 10);
+        arg.a11 = get_user_reg(regs, 11);
+        arg.a12 = get_user_reg(regs, 12);
+        arg.a13 = get_user_reg(regs, 13);
+        arg.a14 = get_user_reg(regs, 14);
+        arg.a15 = get_user_reg(regs, 15);
+        arg.a16 = get_user_reg(regs, 16);
+        arg.a17 = get_user_reg(regs, 17);
+    }
 
     ffa_finish_direct_req_run(regs, &arg);
     return;

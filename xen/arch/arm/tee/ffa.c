@@ -237,6 +237,8 @@ out_continue:
 static void handle_features(struct cpu_user_regs *regs)
 {
     uint32_t a1 = get_user_reg(regs, 1);
+    struct domain *d = current->domain;
+    struct ffa_ctx *ctx = d->arch.tee;
     unsigned int n;
 
     for ( n = 2; n <= 7; n++ )
@@ -267,6 +269,16 @@ static void handle_features(struct cpu_user_regs *regs)
     case FFA_INTERRUPT:
     case FFA_MSG_YIELD:
         ffa_set_regs_success(regs, 0, 0);
+        break;
+    case FFA_MSG_SEND_DIRECT_REQ2:
+        if ( ACCESS_ONCE(ctx->guest_vers) >= FFA_VERSION_1_2 )
+        {
+            ffa_set_regs_success(regs, 0, 0);
+        }
+        else
+        {
+            ffa_set_regs_error(regs, FFA_RET_NOT_SUPPORTED);
+        }
         break;
     case FFA_MEM_SHARE_64:
     case FFA_MEM_SHARE_32:
@@ -353,6 +365,14 @@ static bool ffa_handle_call(struct cpu_user_regs *regs)
     case FFA_MSG_SEND_DIRECT_REQ_64:
         ffa_handle_msg_send_direct_req(regs, fid);
         return true;
+    case FFA_MSG_SEND_DIRECT_REQ2:
+        if ( ACCESS_ONCE(ctx->guest_vers) >= FFA_VERSION_1_2 )
+        {
+            ffa_handle_msg_send_direct_req(regs, fid);
+            return true;
+        }
+        e = FFA_RET_NOT_SUPPORTED;
+        break;
     case FFA_RUN:
         ffa_handle_run(regs, fid);
         return true;
