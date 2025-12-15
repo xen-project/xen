@@ -13,12 +13,22 @@
 #include "ffa_private.h"
 
 /* Encoding of partition message in RX/TX buffer */
-struct ffa_part_msg_rxtx {
+struct ffa_part_msg_rxtx_1_1 {
     uint32_t flags;
     uint32_t reserved;
     uint32_t msg_offset;
     uint32_t send_recv_id;
     uint32_t msg_size;
+};
+
+struct ffa_part_msg_rxtx_1_2 {
+    uint32_t flags;
+    uint32_t reserved;
+    uint32_t msg_offset;
+    uint32_t send_recv_id;
+    uint32_t msg_size;
+    uint32_t reserved2;
+    uint64_t uuid[2];
 };
 
 static void ffa_finish_direct_req_run(struct cpu_user_regs *regs,
@@ -105,11 +115,11 @@ out:
 }
 
 static int32_t ffa_msg_send2_vm(uint16_t dst_id, const void *src_buf,
-                                struct ffa_part_msg_rxtx *src_msg)
+                                struct ffa_part_msg_rxtx_1_2 *src_msg)
 {
     struct domain *dst_d;
     struct ffa_ctx *dst_ctx;
-    struct ffa_part_msg_rxtx *dst_msg;
+    struct ffa_part_msg_rxtx_1_2 *dst_msg;
     void *rx_buf;
     size_t rx_size;
     int err;
@@ -143,7 +153,7 @@ static int32_t ffa_msg_send2_vm(uint16_t dst_id, const void *src_buf,
         goto out_unlock;
 
     /* we need to have enough space in the destination buffer */
-    if ( (rx_size - sizeof(struct ffa_part_msg_rxtx)) < src_msg->msg_size )
+    if ( (rx_size - sizeof(struct ffa_part_msg_rxtx_1_2)) < src_msg->msg_size )
     {
         ret = FFA_RET_NO_MEMORY;
         ffa_rx_release(dst_ctx);
@@ -155,11 +165,14 @@ static int32_t ffa_msg_send2_vm(uint16_t dst_id, const void *src_buf,
     /* prepare destination header */
     dst_msg->flags = 0;
     dst_msg->reserved = 0;
-    dst_msg->msg_offset = sizeof(struct ffa_part_msg_rxtx);
+    dst_msg->msg_offset = sizeof(struct ffa_part_msg_rxtx_1_2);
     dst_msg->send_recv_id = src_msg->send_recv_id;
     dst_msg->msg_size = src_msg->msg_size;
+    dst_msg->reserved2 = 0;
+    dst_msg->uuid[0] = src_msg->uuid[0];
+    dst_msg->uuid[1] = src_msg->uuid[1];
 
-    memcpy(rx_buf + sizeof(struct ffa_part_msg_rxtx),
+    memcpy(rx_buf + sizeof(struct ffa_part_msg_rxtx_1_2),
            src_buf + src_msg->msg_offset, src_msg->msg_size);
 
     /* receiver rx buffer will be released by the receiver*/
@@ -178,11 +191,17 @@ int32_t ffa_handle_msg_send2(struct cpu_user_regs *regs)
     struct ffa_ctx *src_ctx = src_d->arch.tee;
     const void *tx_buf;
     size_t tx_size;
-    struct ffa_part_msg_rxtx src_msg;
+    /*
+     * src_msg is interpreted as v1.2 header, but:
+     * - for v1.1 guests, uuid[] is ignored and may contain payload bytes
+     * - for v1.2 guests, uuid[] carries the FF-A v1.2 UUID fields
+     */
+    struct ffa_part_msg_rxtx_1_2 src_msg;
     uint16_t dst_id, src_id;
     int32_t ret;
 
-    BUILD_BUG_ON(sizeof(struct ffa_part_msg_rxtx) >= FFA_PAGE_SIZE);
+    BUILD_BUG_ON(sizeof(struct ffa_part_msg_rxtx_1_1) >= FFA_PAGE_SIZE);
+    BUILD_BUG_ON(sizeof(struct ffa_part_msg_rxtx_1_2) >= FFA_PAGE_SIZE);
 
     ret = ffa_tx_acquire(src_ctx, &tx_buf, &tx_size);
     if ( ret != FFA_RET_OK )
@@ -194,15 +213,32 @@ int32_t ffa_handle_msg_send2(struct cpu_user_regs *regs)
     src_id = src_msg.send_recv_id >> 16;
     dst_id = src_msg.send_recv_id & GENMASK(15,0);
 
-    if ( src_id != ffa_get_vm_id(src_d) )
+    if ( src_id != ffa_get_vm_id(src_d) ||
+         dst_id == ffa_get_vm_id(src_d) )
+    {
+        ret = FFA_RET_INVALID_PARAMETERS;
+        goto out;
+    }
+
+    if ( ACCESS_ONCE(src_ctx->guest_vers) < FFA_VERSION_1_2 )
+    {
+        if (src_msg.msg_offset < sizeof(struct ffa_part_msg_rxtx_1_1))
+        {
+            ret = FFA_RET_INVALID_PARAMETERS;
+            goto out;
+        }
+        /* Set uuid to Nil UUID for v1.1 guests */
+        src_msg.uuid[0] = 0;
+        src_msg.uuid[1] = 0;
+    }
+    else if ( src_msg.msg_offset < sizeof(struct ffa_part_msg_rxtx_1_2) )
     {
         ret = FFA_RET_INVALID_PARAMETERS;
         goto out;
     }
 
     /* check source message fits in buffer */
-    if ( src_msg.msg_offset < sizeof(struct ffa_part_msg_rxtx) ||
-            src_msg.msg_size == 0 || src_msg.msg_offset > tx_size ||
+    if ( src_msg.msg_size == 0 || src_msg.msg_offset > tx_size ||
             src_msg.msg_size > (tx_size - src_msg.msg_offset) )
     {
         ret = FFA_RET_INVALID_PARAMETERS;
