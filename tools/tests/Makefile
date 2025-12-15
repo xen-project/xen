@@ -3,6 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS-y :=
 SUBDIRS-y += domid
+SUBDIRS-y += mem-claim
 SUBDIRS-y += paging-mempool
 SUBDIRS-y += pdx
 SUBDIRS-y += rangeset
