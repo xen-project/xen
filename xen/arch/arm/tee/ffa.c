@@ -451,6 +451,10 @@ static int ffa_domain_init(struct domain *d)
     if ( ret )
         return ret;
 
+    ret = ffa_rxtx_domain_init(d);
+    if ( ret )
+        return ret;
+
     return ffa_notif_domain_init(d);
 }
 
