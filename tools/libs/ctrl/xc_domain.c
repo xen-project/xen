@@ -1074,7 +1074,6 @@ int xc_domain_claim_pages(xc_interface *xch,
                                uint32_t domid,
                                unsigned long nr_pages)
 {
-    int err;
     struct xen_memory_reservation reservation = {
         .nr_extents   = nr_pages,
         .extent_order = 0,
@@ -1082,13 +1081,7 @@ int xc_domain_claim_pages(xc_interface *xch,
         .domid        = domid
     };
 
-    set_xen_guest_handle(reservation.extent_start, HYPERCALL_BUFFER_NULL);
-
-    err = xc_memory_op(xch, XENMEM_claim_pages, &reservation, sizeof(reservation));
-    /* Ignore it if the hypervisor does not support the call. */
-    if (err == -1 && errno == ENOSYS)
-        err = errno = 0;
-    return err;
+    return xc_memory_op(xch, XENMEM_claim_pages, &reservation, sizeof(reservation));
 }
 
 int xc_domain_populate_physmap(xc_interface *xch,
