@@ -238,7 +238,7 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
      * use the v1.0 structure size in the destination buffer.
      * Otherwise use the size of the highest version we support, here 1.1.
      */
-    if ( ctx->guest_vers == FFA_VERSION_1_0 )
+    if ( ACCESS_ONCE(ctx->guest_vers) == FFA_VERSION_1_0 )
         dst_size = sizeof(struct ffa_partition_info_1_0);
     else
         dst_size = sizeof(struct ffa_partition_info_1_1);
@@ -250,7 +250,7 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
          * FF-A v1.0 has w5 MBZ while v1.1 allows
          * FFA_PARTITION_INFO_GET_COUNT_FLAG to be non-zero.
          */
-        if ( ctx->guest_vers == FFA_VERSION_1_0 ||
+        if ( ACCESS_ONCE(ctx->guest_vers) == FFA_VERSION_1_0 ||
                 flags != FFA_PARTITION_INFO_GET_COUNT_FLAG )
         {
             ret = FFA_RET_INVALID_PARAMETERS;

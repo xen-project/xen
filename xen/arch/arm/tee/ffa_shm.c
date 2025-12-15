@@ -495,7 +495,8 @@ void ffa_handle_mem_share(struct cpu_user_regs *regs)
     if ( frag_len > ctx->page_count * FFA_PAGE_SIZE )
         goto out_unlock;
 
-    ret = read_mem_transaction(ctx->guest_vers, ctx->tx, frag_len, &trans);
+    ret = read_mem_transaction(ACCESS_ONCE(ctx->guest_vers), ctx->tx,
+                               frag_len, &trans);
     if ( ret )
         goto out_unlock;
 

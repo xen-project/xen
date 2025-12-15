@@ -158,31 +158,38 @@ static bool ffa_abi_supported(uint32_t id)
     return !ffa_simple_call(FFA_FEATURES, id, 0, 0, 0);
 }
 
-static void handle_version(struct cpu_user_regs *regs)
+static bool ffa_negotiate_version(struct cpu_user_regs *regs)
 {
     struct domain *d = current->domain;
     struct ffa_ctx *ctx = d->arch.tee;
-    uint32_t vers = get_user_reg(regs, 1);
-    uint32_t old_vers;
+    uint32_t fid = get_user_reg(regs, 0);
+    uint32_t in_vers = get_user_reg(regs, 1);
+    uint32_t out_vers = FFA_MY_VERSION;
 
-    /*
-     * Guest will use the version it requested if it is our major and minor
-     * lower or equals to ours. If the minor is greater, our version will be
-     * used.
-     * In any case return our version to the caller.
-     */
-    if ( FFA_VERSION_MAJOR(vers) == FFA_MY_VERSION_MAJOR )
+    spin_lock(&ctx->guest_vers_lock);
+
+    /* If negotiation already published, continue without handling. */
+    if ( ACCESS_ONCE(ctx->guest_vers) )
+        goto out_continue;
+
+    if ( fid != FFA_VERSION )
     {
-        spin_lock(&ctx->lock);
-        old_vers = ctx->guest_vers;
+        if ( !ctx->guest_vers_tmp )
+        {
+            out_vers = 0;
+            goto out_handled;
+        }
 
-        if ( FFA_VERSION_MINOR(vers) > FFA_MY_VERSION_MINOR )
-            ctx->guest_vers = FFA_MY_VERSION;
-        else
-            ctx->guest_vers = vers;
-        spin_unlock(&ctx->lock);
+        /*
+         * A successful FFA_VERSION call does not freeze negotiation. Guests
+         * are allowed to issue multiple FFA_VERSION attempts (e.g. probing
+         * several minor versions). Negotiation becomes final only when a
+         * non-VERSION ABI is invoked, as required by the FF-A specification.
+         * Finalize negotiation: publish guest_vers once, then never change.
+         */
+        ACCESS_ONCE(ctx->guest_vers) = ctx->guest_vers_tmp;
 
-        if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) && !old_vers )
+        if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) )
         {
             /* One more VM with FF-A support available */
             inc_ffa_vm_count();
@@ -190,8 +197,48 @@ static void handle_version(struct cpu_user_regs *regs)
             list_add_tail(&ctx->ctx_list, &ffa_ctx_head);
             write_unlock(&ffa_ctx_list_rwlock);
         }
+
+        goto out_continue;
     }
-    ffa_set_regs(regs, FFA_MY_VERSION, 0, 0, 0, 0, 0, 0, 0);
+
+    /*
+     * guest_vers_tmp stores the version selected by the guest (lower minor may
+     * require reduced data structures). However, the value returned to the
+     * guest via FFA_VERSION is always FFA_MY_VERSION, the implementation
+     * version, as required by FF-A. The two values intentionally differ.
+     */
+
+    /*
+     * Return our highest implementation version on request different than our
+     * major and mark negotiated version as our implementation version.
+     */
+    if ( FFA_VERSION_MAJOR(in_vers) != FFA_MY_VERSION_MAJOR )
+    {
+        ctx->guest_vers_tmp = FFA_MY_VERSION;
+        goto out_handled;
+    }
+
+    /*
+     * Use our minor version if a greater minor was requested or the requested
+     * minor if it is lower than ours was requested.
+     */
+    if ( FFA_VERSION_MINOR(in_vers) > FFA_MY_VERSION_MINOR )
+        ctx->guest_vers_tmp = FFA_MY_VERSION;
+    else
+        ctx->guest_vers_tmp = in_vers;
+
+out_handled:
+    spin_unlock(&ctx->guest_vers_lock);
+    if ( out_vers )
+        ffa_set_regs(regs, out_vers, 0, 0, 0, 0, 0, 0, 0);
+    else
+        ffa_set_regs_error(regs, FFA_RET_NOT_SUPPORTED);
+    return true;
+
+out_continue:
+    spin_unlock(&ctx->guest_vers_lock);
+
+    return false;
 }
 
 static void handle_features(struct cpu_user_regs *regs)
@@ -274,10 +321,17 @@ static bool ffa_handle_call(struct cpu_user_regs *regs)
     if ( !ctx )
         return false;
 
+    /* A version must be negotiated first */
+    if ( !ACCESS_ONCE(ctx->guest_vers) )
+    {
+        if ( ffa_negotiate_version(regs) )
+            return true;
+    }
+
     switch ( fid )
     {
     case FFA_VERSION:
-        handle_version(regs);
+        ffa_set_regs(regs, FFA_MY_VERSION, 0, 0, 0, 0, 0, 0, 0);
         return true;
     case FFA_ID_GET:
         ffa_set_regs_success(regs, ffa_get_vm_id(d), 0);
@@ -371,6 +425,11 @@ static int ffa_domain_init(struct domain *d)
     d->arch.tee = ctx;
     ctx->teardown_d = d;
     INIT_LIST_HEAD(&ctx->shm_list);
+    spin_lock_init(&ctx->lock);
+    spin_lock_init(&ctx->guest_vers_lock);
+    ctx->guest_vers = 0;
+    ctx->guest_vers_tmp = 0;
+    INIT_LIST_HEAD(&ctx->ctx_list);
 
     ctx->ffa_id = ffa_get_vm_id(d);
     ctx->num_vcpus = d->max_vcpus;
@@ -452,7 +511,7 @@ static int ffa_domain_teardown(struct domain *d)
     if ( !ctx )
         return 0;
 
-    if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) && ctx->guest_vers )
+    if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) && ACCESS_ONCE(ctx->guest_vers) )
     {
         dec_ffa_vm_count();
         write_lock(&ffa_ctx_list_rwlock);

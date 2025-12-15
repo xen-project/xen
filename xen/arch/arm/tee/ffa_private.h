@@ -355,18 +355,33 @@ struct ffa_ctx {
      * Global data accessed with lock locked.
      */
     spinlock_t lock;
-    /*
-     * FF-A version negotiated by the guest, only modifications to
-     * this field are done with the lock held as this is expected to
-     * be done once at init by a guest.
-     */
-    uint32_t guest_vers;
     /* Number of 4kB pages in each of rx/rx_pg and tx/tx_pg */
     unsigned int page_count;
     /* Number of allocated shared memory object */
     unsigned int shm_count;
     /* Used shared memory objects, struct ffa_shm_mem */
     struct list_head shm_list;
+
+    /*
+     * FF-A version handling
+     * guest_vers is the single published negotiated version. It is 0 until
+     * negotiation completes, after which it is set once and never changes.
+     * Negotiation uses guest_vers_tmp under guest_vers_lock; when a
+     * non-VERSION ABI is invoked, Xen finalizes negotiation by publishing
+     * guest_vers using ACCESS_ONCE() store.
+     * Readers use ACCESS_ONCE(guest_vers) != 0 to detect availability and
+     * can consume guest_vers without barriers because it never changes once
+     * published.
+     */
+    spinlock_t guest_vers_lock;
+    /*
+     * Published negotiated version. Zero means "not negotiated yet".
+     * Once non-zero, it never changes.
+     * Must always be accessed using ACCESS_ONCE().
+     */
+    uint32_t guest_vers;
+    /* Temporary version used during negotiation under guest_vers_lock */
+    uint32_t guest_vers_tmp;
 
     /*
      * Rx buffer, accessed with rx_lock locked.

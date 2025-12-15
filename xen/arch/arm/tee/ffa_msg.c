@@ -113,7 +113,7 @@ static int32_t ffa_msg_send2_vm(uint16_t dst_id, const void *src_buf,
     }
 
     dst_ctx = dst_d->arch.tee;
-    if ( !dst_ctx->guest_vers )
+    if ( !ACCESS_ONCE(dst_ctx->guest_vers) )
     {
         ret = FFA_RET_INVALID_PARAMETERS;
         goto out_unlock;
