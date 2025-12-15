@@ -15,8 +15,9 @@
 #include <asm/smccc.h>
 #include <asm/types.h>
 
+/* FF-A Function ID range (AArch32 function number field) as of FF-A v1.2 */
 #define FFA_FNUM_MIN_VALUE              _AC(0x60,U)
-#define FFA_FNUM_MAX_VALUE              _AC(0x86,U)
+#define FFA_FNUM_MAX_VALUE              _AC(0x8E,U)
 
 static inline bool is_ffa_fid(uint32_t fid)
 {

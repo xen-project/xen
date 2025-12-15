@@ -15,6 +15,7 @@
 #include <xen/spinlock.h>
 #include <xen/time.h>
 #include <xen/types.h>
+#include <asm/tee/ffa.h>
 
 /* Error codes */
 #define FFA_RET_OK                      0
@@ -42,6 +43,7 @@
 
 #define FFA_VERSION_1_0         MAKE_FFA_VERSION(1, 0)
 #define FFA_VERSION_1_1         MAKE_FFA_VERSION(1, 1)
+#define FFA_VERSION_1_2         MAKE_FFA_VERSION(1, 2)
 /* The minimal FF-A version of the SPMC that can be supported */
 #define FFA_MIN_SPMC_VERSION    FFA_VERSION_1_1
 
@@ -270,21 +272,24 @@
 #define FFA_RX_ACQUIRE                  0x84000084U
 #define FFA_SPM_ID_GET                  0x84000085U
 #define FFA_MSG_SEND2                   0x84000086U
+#define FFA_CONSOLE_LOG_32              0x8400008AU
+#define FFA_CONSOLE_LOG_64              0xC400008AU
+#define FFA_PARTITION_INFO_GET_REGS     0x8400008BU
+#define FFA_MSG_SEND_DIRECT_REQ2        0xC400008DU
+#define FFA_MSG_SEND_DIRECT_RESP2       0xC400008EU
 
 /**
  * Encoding of features supported or not by the fw in a bitmap:
- * - Function IDs are going from 0x60 to 0xFF
+ * - Function IDs are going from 0x60 to 0xEF in SMCCC standard
  * - A function can be supported in 32 and/or 64bit
  * The bitmap has one bit for each function in 32 and 64 bit.
  */
 #define FFA_ABI_ID(id)        ((id) & ARM_SMCCC_FUNC_MASK)
 #define FFA_ABI_CONV(id)      (((id) >> ARM_SMCCC_CONV_SHIFT) & BIT(0,U))
 
-#define FFA_ABI_MIN           FFA_ABI_ID(FFA_ERROR)
-#define FFA_ABI_MAX           FFA_ABI_ID(FFA_MSG_SEND2)
-
-#define FFA_ABI_BITMAP_SIZE   (2 * (FFA_ABI_MAX - FFA_ABI_MIN + 1))
-#define FFA_ABI_BITNUM(id)    ((FFA_ABI_ID(id) - FFA_ABI_MIN) << 1 | \
+#define FFA_ABI_BITMAP_SIZE   (2 * (FFA_FNUM_MAX_VALUE - FFA_FNUM_MIN_VALUE \
+                               + 1))
+#define FFA_ABI_BITNUM(id)    ((FFA_ABI_ID(id) - FFA_FNUM_MIN_VALUE) << 1 | \
                                FFA_ABI_CONV(id))
 
 /* Constituent memory region descriptor */
@@ -549,9 +554,9 @@ static inline int32_t ffa_hyp_rx_release(void)
 
 static inline bool ffa_fw_supports_fid(uint32_t fid)
 {
-    BUILD_BUG_ON(FFA_ABI_MIN > FFA_ABI_MAX);
+    BUILD_BUG_ON(FFA_FNUM_MIN_VALUE > FFA_FNUM_MAX_VALUE);
 
-    if ( FFA_ABI_BITNUM(fid) > FFA_ABI_BITMAP_SIZE)
+    if ( FFA_ABI_BITNUM(fid) >= FFA_ABI_BITMAP_SIZE)
         return false;
     return test_bit(FFA_ABI_BITNUM(fid), ffa_fw_abi_supported);
 }

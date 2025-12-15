@@ -11,6 +11,8 @@
  *               https://developer.arm.com/documentation/den0077/a
  * FF-A-1.1-REL0: FF-A specification version 1.1 available at
  *                https://developer.arm.com/documentation/den0077/e
+ * FF-A-1.2-REL0: FF-A specification version 1.2 available at
+ *                https://developer.arm.com/documentation/den0077/j
  * TEEC-1.0C: TEE Client API Specification version 1.0c available at
  *            https://globalplatform.org/specs-library/tee-client-api-specification/
  *
@@ -102,6 +104,8 @@ static const struct ffa_fw_abi ffa_fw_abi_needed[] = {
     FW_ABI(FFA_MSG_SEND_DIRECT_REQ_32),
     FW_ABI(FFA_MSG_SEND_DIRECT_REQ_64),
     FW_ABI(FFA_MSG_SEND2),
+    FW_ABI(FFA_MSG_SEND_DIRECT_REQ2),
+    FW_ABI(FFA_RUN),
 };
 
 /*
