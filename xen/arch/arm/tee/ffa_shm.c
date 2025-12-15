@@ -460,6 +460,8 @@ void ffa_handle_mem_share(struct cpu_user_regs *regs)
     struct ffa_mem_transaction_int trans;
     struct domain *d = current->domain;
     struct ffa_ctx *ctx = d->arch.tee;
+    const void *tx_buf;
+    size_t tx_size;
     struct ffa_shm_mem *shm = NULL;
     register_t handle_hi = 0;
     register_t handle_lo = 0;
@@ -498,16 +500,14 @@ void ffa_handle_mem_share(struct cpu_user_regs *regs)
         goto out_set_ret;
     }
 
-    if ( !spin_trylock(&ctx->tx_lock) )
-    {
-        ret = FFA_RET_BUSY;
+    ret = ffa_tx_acquire(ctx, &tx_buf, &tx_size);
+    if ( ret != FFA_RET_OK )
         goto out_set_ret;
-    }
 
-    if ( frag_len > ctx->page_count * FFA_PAGE_SIZE )
+    if ( frag_len > tx_size )
         goto out_unlock;
 
-    ret = read_mem_transaction(ACCESS_ONCE(ctx->guest_vers), ctx->tx,
+    ret = read_mem_transaction(ACCESS_ONCE(ctx->guest_vers), tx_buf,
                                frag_len, &trans);
     if ( ret )
         goto out_unlock;
@@ -535,7 +535,7 @@ void ffa_handle_mem_share(struct cpu_user_regs *regs)
     if ( trans.mem_access_offs + trans.mem_access_size > frag_len )
         goto out_unlock;
 
-    mem_access = ctx->tx + trans.mem_access_offs;
+    mem_access = tx_buf + trans.mem_access_offs;
 
     dst_id = ACCESS_ONCE(mem_access->access_perm.endpoint_id);
     if ( !FFA_ID_IS_SECURE(dst_id) )
@@ -558,7 +558,7 @@ void ffa_handle_mem_share(struct cpu_user_regs *regs)
         goto out_unlock;
     }
 
-    region_descr = ctx->tx + region_offs;
+    region_descr = tx_buf + region_offs;
     range_count = ACCESS_ONCE(region_descr->address_range_count);
     page_count = ACCESS_ONCE(region_descr->total_page_count);
 
@@ -605,7 +605,7 @@ out:
     if ( ret )
         free_ffa_shm_mem(d, shm);
 out_unlock:
-    spin_unlock(&ctx->tx_lock);
+    ffa_tx_release(ctx);
 
 out_set_ret:
     if ( ret == 0)

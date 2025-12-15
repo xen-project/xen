@@ -445,8 +445,10 @@ void ffa_rxtx_domain_destroy(struct domain *d);
 int32_t ffa_handle_rxtx_map(uint32_t fid, register_t tx_addr,
 			     register_t rx_addr, uint32_t page_count);
 int32_t ffa_handle_rxtx_unmap(void);
-int32_t ffa_rx_acquire(struct domain *d);
-int32_t ffa_rx_release(struct domain *d);
+int32_t ffa_rx_acquire(struct ffa_ctx *ctx, void **buf, size_t *buf_size);
+int32_t ffa_rx_release(struct ffa_ctx *ctx);
+int32_t ffa_tx_acquire(struct ffa_ctx *ctx, const void **buf, size_t *buf_size);
+int32_t ffa_tx_release(struct ffa_ctx *ctx);
 
 void ffa_notif_init(void);
 void ffa_notif_init_interrupt(void);

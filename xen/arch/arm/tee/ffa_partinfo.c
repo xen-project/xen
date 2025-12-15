@@ -224,6 +224,7 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
         get_user_reg(regs, 4),
     };
     uint32_t dst_size = 0;
+    size_t buf_size;
     void *dst_buf, *end_buf;
     uint32_t ffa_vm_count = 0, ffa_sp_count = 0;
 
@@ -268,12 +269,11 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
     }
 
     /* Get the RX buffer to write the list of partitions */
-    ret = ffa_rx_acquire(d);
+    ret = ffa_rx_acquire(ctx, &dst_buf, &buf_size);
     if ( ret != FFA_RET_OK )
         goto out;
 
-    dst_buf = ctx->rx;
-    end_buf = ctx->rx + ctx->page_count * FFA_PAGE_SIZE;
+    end_buf = dst_buf + buf_size;
 
     /* An entry should be smaller than a page */
     BUILD_BUG_ON(sizeof(struct ffa_partition_info_1_1) > FFA_PAGE_SIZE);
@@ -304,7 +304,7 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
 
 out_rx_release:
     if ( ret )
-        ffa_rx_release(d);
+        ffa_rx_release(ctx);
 out:
     if ( ret )
         ffa_set_regs_error(regs, ret);

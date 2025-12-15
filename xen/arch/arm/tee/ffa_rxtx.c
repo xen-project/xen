@@ -257,10 +257,9 @@ int32_t ffa_handle_rxtx_unmap(void)
     return rxtx_unmap(current->domain);
 }
 
-int32_t ffa_rx_acquire(struct domain *d)
+int32_t ffa_rx_acquire(struct ffa_ctx *ctx, void **buf, size_t *buf_size)
 {
     int32_t ret = FFA_RET_OK;
-    struct ffa_ctx *ctx = d->arch.tee;
 
     spin_lock(&ctx->rx_lock);
 
@@ -278,21 +277,22 @@ int32_t ffa_rx_acquire(struct domain *d)
 
     if ( ffa_fw_supports_fid(FFA_RX_ACQUIRE) )
     {
-        ret = ffa_simple_call(FFA_RX_ACQUIRE, ffa_get_vm_id(d), 0, 0, 0);
+        ret = ffa_simple_call(FFA_RX_ACQUIRE, ctx->ffa_id, 0, 0, 0);
         if ( ret != FFA_RET_OK )
             goto out;
     }
     ctx->rx_is_free = false;
+    *buf = ctx->rx;
+    *buf_size = ctx->page_count * FFA_PAGE_SIZE;
 out:
     spin_unlock(&ctx->rx_lock);
 
     return ret;
 }
 
-int32_t ffa_rx_release(struct domain *d)
+int32_t ffa_rx_release(struct ffa_ctx *ctx)
 {
     int32_t ret = FFA_RET_DENIED;
-    struct ffa_ctx *ctx = d->arch.tee;
 
     spin_lock(&ctx->rx_lock);
 
@@ -301,7 +301,7 @@ int32_t ffa_rx_release(struct domain *d)
 
     if ( ffa_fw_supports_fid(FFA_RX_ACQUIRE) )
     {
-        ret = ffa_simple_call(FFA_RX_RELEASE, ffa_get_vm_id(d), 0, 0, 0);
+        ret = ffa_simple_call(FFA_RX_RELEASE, ctx->ffa_id, 0, 0, 0);
         if ( ret != FFA_RET_OK )
             goto out;
     }
@@ -311,6 +311,37 @@ out:
     spin_unlock(&ctx->rx_lock);
 
     return ret;
+}
+
+int32_t ffa_tx_acquire(struct ffa_ctx *ctx, const void **buf, size_t *buf_size)
+{
+    int32_t ret = FFA_RET_DENIED;
+
+    if ( !spin_trylock(&ctx->tx_lock) )
+        return FFA_RET_BUSY;
+
+    if ( !ctx->page_count )
+        goto err_unlock;
+
+    if ( !ctx->tx )
+        goto err_unlock;
+
+    *buf = ctx->tx;
+    *buf_size = ctx->page_count * FFA_PAGE_SIZE;
+    return FFA_RET_OK;
+
+err_unlock:
+    spin_unlock(&ctx->tx_lock);
+
+    return ret;
+}
+
+int32_t ffa_tx_release(struct ffa_ctx *ctx)
+{
+    ASSERT(spin_is_locked(&ctx->tx_lock));
+
+    spin_unlock(&ctx->tx_lock);
+    return FFA_RET_OK;
 }
 
 int32_t ffa_rxtx_domain_init(struct domain *d)

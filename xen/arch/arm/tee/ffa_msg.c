@@ -94,6 +94,8 @@ static int32_t ffa_msg_send2_vm(uint16_t dst_id, const void *src_buf,
     struct domain *dst_d;
     struct ffa_ctx *dst_ctx;
     struct ffa_part_msg_rxtx *dst_msg;
+    void *rx_buf;
+    size_t rx_size;
     int err;
     int32_t ret;
 
@@ -120,20 +122,19 @@ static int32_t ffa_msg_send2_vm(uint16_t dst_id, const void *src_buf,
     }
 
     /* This also checks that destination has set a Rx buffer */
-    ret = ffa_rx_acquire(dst_d);
+    ret = ffa_rx_acquire(dst_ctx , &rx_buf, &rx_size);
     if ( ret )
         goto out_unlock;
 
     /* we need to have enough space in the destination buffer */
-    if ( (dst_ctx->page_count * FFA_PAGE_SIZE -
-          sizeof(struct ffa_part_msg_rxtx)) < src_msg->msg_size )
+    if ( (rx_size - sizeof(struct ffa_part_msg_rxtx)) < src_msg->msg_size )
     {
         ret = FFA_RET_NO_MEMORY;
-        ffa_rx_release(dst_d);
+        ffa_rx_release(dst_ctx);
         goto out_unlock;
     }
 
-    dst_msg = dst_ctx->rx;
+    dst_msg = rx_buf;
 
     /* prepare destination header */
     dst_msg->flags = 0;
@@ -142,7 +143,7 @@ static int32_t ffa_msg_send2_vm(uint16_t dst_id, const void *src_buf,
     dst_msg->send_recv_id = src_msg->send_recv_id;
     dst_msg->msg_size = src_msg->msg_size;
 
-    memcpy(dst_ctx->rx + sizeof(struct ffa_part_msg_rxtx),
+    memcpy(rx_buf + sizeof(struct ffa_part_msg_rxtx),
            src_buf + src_msg->msg_offset, src_msg->msg_size);
 
     /* receiver rx buffer will be released by the receiver*/
@@ -159,17 +160,20 @@ int32_t ffa_handle_msg_send2(struct cpu_user_regs *regs)
 {
     struct domain *src_d = current->domain;
     struct ffa_ctx *src_ctx = src_d->arch.tee;
+    const void *tx_buf;
+    size_t tx_size;
     struct ffa_part_msg_rxtx src_msg;
     uint16_t dst_id, src_id;
     int32_t ret;
 
     BUILD_BUG_ON(sizeof(struct ffa_part_msg_rxtx) >= FFA_PAGE_SIZE);
 
-    if ( !spin_trylock(&src_ctx->tx_lock) )
-        return FFA_RET_BUSY;
+    ret = ffa_tx_acquire(src_ctx, &tx_buf, &tx_size);
+    if ( ret != FFA_RET_OK )
+        return ret;
 
     /* create a copy of the message header */
-    memcpy(&src_msg, src_ctx->tx, sizeof(src_msg));
+    memcpy(&src_msg, tx_buf, sizeof(src_msg));
 
     src_id = src_msg.send_recv_id >> 16;
     dst_id = src_msg.send_recv_id & GENMASK(15,0);
@@ -182,10 +186,8 @@ int32_t ffa_handle_msg_send2(struct cpu_user_regs *regs)
 
     /* check source message fits in buffer */
     if ( src_msg.msg_offset < sizeof(struct ffa_part_msg_rxtx) ||
-            src_msg.msg_size == 0 ||
-            src_msg.msg_offset > src_ctx->page_count * FFA_PAGE_SIZE ||
-            src_msg.msg_size > (src_ctx->page_count * FFA_PAGE_SIZE -
-                                src_msg.msg_offset) )
+            src_msg.msg_size == 0 || src_msg.msg_offset > tx_size ||
+            src_msg.msg_size > (tx_size - src_msg.msg_offset) )
     {
         ret = FFA_RET_INVALID_PARAMETERS;
         goto out;
@@ -206,12 +208,12 @@ int32_t ffa_handle_msg_send2(struct cpu_user_regs *regs)
     else if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) )
     {
         /* Message for a VM */
-        ret = ffa_msg_send2_vm(dst_id, src_ctx->tx, &src_msg);
+        ret = ffa_msg_send2_vm(dst_id, tx_buf, &src_msg);
     }
     else
         ret = FFA_RET_INVALID_PARAMETERS;
 
 out:
-    spin_unlock(&src_ctx->tx_lock);
+    ffa_tx_release(src_ctx);
     return ret;
 }
