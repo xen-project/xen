@@ -475,6 +475,7 @@ static inline void ffa_raise_rx_buffer_full(struct domain *d)
 
 void ffa_handle_msg_send_direct_req(struct cpu_user_regs *regs, uint32_t fid);
 int32_t ffa_handle_msg_send2(struct cpu_user_regs *regs);
+void ffa_handle_run(struct cpu_user_regs *regs, uint32_t fid);
 
 #ifdef CONFIG_FFA_VM_TO_VM
 static inline uint16_t get_ffa_vm_count(void)
