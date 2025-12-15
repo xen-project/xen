@@ -33,7 +33,7 @@ static uint16_t subscr_vm_created_count __read_mostly;
 static uint16_t *subscr_vm_destroyed __read_mostly;
 static uint16_t subscr_vm_destroyed_count __read_mostly;
 
-static int32_t ffa_partition_info_get(uint32_t *uuid, uint32_t flags,
+static int32_t ffa_partition_info_get(struct ffa_uuid uuid, uint32_t flags,
                                       uint32_t *count, uint32_t *fpi_size)
 {
     struct arm_smccc_1_2_regs arg = {
@@ -41,15 +41,12 @@ static int32_t ffa_partition_info_get(uint32_t *uuid, uint32_t flags,
         .a5 = flags,
     };
     struct arm_smccc_1_2_regs resp;
-    uint32_t ret;
+    int32_t ret;
 
-    if ( uuid )
-    {
-        arg.a1 = uuid[0];
-        arg.a2 = uuid[1];
-        arg.a3 = uuid[2];
-        arg.a4 = uuid[3];
-    }
+    arg.a1 = uuid.val[0] & GENMASK(31, 0);
+    arg.a2 = (uuid.val[0] >> 32) & GENMASK(31, 0);
+    arg.a3 = uuid.val[1] & GENMASK(31, 0);
+    arg.a4 = (uuid.val[1] >> 32) & GENMASK(31, 0);
 
     arm_smccc_1_2_smc(&arg, &resp);
 
@@ -63,7 +60,26 @@ static int32_t ffa_partition_info_get(uint32_t *uuid, uint32_t flags,
     return ret;
 }
 
-static int32_t ffa_get_sp_count(uint32_t *uuid, uint32_t *sp_count)
+static int32_t ffa_copy_info(void **dst, void *dst_end, const void *src,
+                             uint32_t dst_size, uint32_t src_size)
+{
+    uint8_t *pos = *dst;
+    uint8_t *end = dst_end;
+
+    if ( pos > end - dst_size )
+        return FFA_RET_NO_MEMORY;
+
+    memcpy(pos, src, MIN(dst_size, src_size));
+
+    if ( dst_size > src_size )
+        memset(pos + src_size, 0, dst_size - src_size);
+
+    *dst = pos + dst_size;
+
+    return FFA_RET_OK;
+}
+
+static int32_t ffa_get_sp_count(struct ffa_uuid uuid, uint32_t *sp_count)
 {
     uint32_t src_size;
 
@@ -71,8 +87,8 @@ static int32_t ffa_get_sp_count(uint32_t *uuid, uint32_t *sp_count)
                                   sp_count, &src_size);
 }
 
-static int32_t ffa_get_sp_partinfo(uint32_t *uuid, uint32_t *sp_count,
-                                   void *dst_buf, void *end_buf,
+static int32_t ffa_get_sp_partinfo(struct ffa_uuid uuid, uint32_t *sp_count,
+                                   void **dst_buf, void *end_buf,
                                    uint32_t dst_size)
 {
     int32_t ret;
@@ -120,17 +136,18 @@ static int32_t ffa_get_sp_partinfo(uint32_t *uuid, uint32_t *sp_count,
         /* filter out SP not following bit 15 convention if any */
         if ( FFA_ID_IS_SECURE(fpi->id) )
         {
-            if ( dst_buf > (end_buf - dst_size) )
-            {
-                ret = FFA_RET_NO_MEMORY;
+            /*
+             * If VM is 1.0 but firmware is 1.1 we could have several entries
+             * with the same ID but different UUIDs. In this case the VM will
+             * get a list with several time the same ID.
+             * This is a non-compliance to the specification but 1.0 VMs should
+             * handle that on their own to simplify Xen implementation.
+             */
+
+            ret = ffa_copy_info(dst_buf, end_buf, src_buf, dst_size, src_size);
+            if ( ret )
                 goto out;
-            }
 
-            memcpy(dst_buf, src_buf, MIN(src_size, dst_size));
-            if ( dst_size > src_size )
-                memset(dst_buf + src_size, 0, dst_size - src_size);
-
-            dst_buf += dst_size;
             count++;
         }
 
@@ -144,69 +161,90 @@ out:
     return ret;
 }
 
-static int32_t ffa_get_vm_partinfo(uint32_t *vm_count, void *dst_buf,
-                                   void *end_buf, uint32_t dst_size)
+static int32_t ffa_get_vm_partinfo(struct ffa_uuid uuid, uint32_t *vm_count,
+                                   void **dst_buf, void *end_buf,
+                                   uint32_t dst_size)
 {
-    struct ffa_ctx *curr_ctx = current->domain->arch.tee;
+    struct domain *d = current->domain;
+    struct ffa_ctx *curr_ctx = d->arch.tee;
     struct ffa_ctx *dest_ctx;
     uint32_t count = 0;
     int32_t ret = FFA_RET_OK;
+    /*
+     * We do not have UUID info for VMs so use the 1.0 structure so that we set
+     * UUIDs to zero using memset
+     */
+    struct ffa_partition_info_1_0 info;
 
     /*
-     * There could potentially be a lot of VMs in the system and we could
-     * hold the CPU for long here.
-     * Right now there is no solution in FF-A specification to split
-     * the work in this case.
-     * TODO: Check how we could delay the work or have preemption checks.
+     * We do not have protocol UUIDs for VMs so if a request has non Nil UUID
+     * we must return an empty list.
      */
-    read_lock(&ffa_ctx_list_rwlock);
-    list_for_each_entry(dest_ctx, &ffa_ctx_head, ctx_list)
+    if ( !ffa_uuid_is_nil(uuid) )
+    {
+        *vm_count = 0;
+        return FFA_RET_OK;
+    }
+
+    /*
+     * Workaround for Linux FF-A Driver not accepting to have its own
+     * entry in the list before FF-A v1.2 was supported.
+     * This workaround is generally acceptable for other implementations
+     * as the specification was not completely clear on wether or not
+     * the requester endpoint information should be included or not
+     */
+    if ( ACCESS_ONCE(curr_ctx->guest_vers) >= FFA_VERSION_1_2 )
+    {
+        /* Add caller VM information */
+        info.id = curr_ctx->ffa_id;
+        info.execution_context = curr_ctx->num_vcpus;
+        info.partition_properties = FFA_PART_VM_PROP;
+        if ( is_64bit_domain(d) )
+            info.partition_properties |= FFA_PART_PROP_AARCH64_STATE;
+
+        ret = ffa_copy_info(dst_buf, end_buf, &info, dst_size, sizeof(info));
+        if ( ret )
+            return ret;
+
+        count++;
+    }
+
+    if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) )
     {
         /*
-         * Do not include an entry for the caller VM as the spec is not
-         * clearly mandating it and it is not supported by Linux.
+         * There could potentially be a lot of VMs in the system and we could
+         * hold the CPU for long here.
+         * Right now there is no solution in FF-A specification to split
+         * the work in this case.
+         * TODO: Check how we could delay the work or have preemption checks.
          */
-        if ( dest_ctx != curr_ctx )
+        read_lock(&ffa_ctx_list_rwlock);
+        list_for_each_entry(dest_ctx, &ffa_ctx_head, ctx_list)
         {
-            /*
-             * We do not have UUID info for VMs so use
-             * the 1.0 structure so that we set UUIDs to
-             * zero using memset
-             */
-            struct ffa_partition_info_1_0 info;
+            /* Ignore the caller entry as it was already added */
+            if ( dest_ctx == curr_ctx )
+                continue;
 
-            if  ( dst_buf > (end_buf - dst_size) )
-            {
-                ret = FFA_RET_NO_MEMORY;
-                goto out;
-            }
-
-            /*
-             * Context might has been removed since we go it or being removed
-             * right now so we might return information for a VM not existing
-             * anymore. This is acceptable as we return a view of the system
-             * which could change at any time.
-             */
             info.id = dest_ctx->ffa_id;
             info.execution_context = dest_ctx->num_vcpus;
             info.partition_properties = FFA_PART_VM_PROP;
             if ( dest_ctx->is_64bit )
                 info.partition_properties |= FFA_PART_PROP_AARCH64_STATE;
 
-            memcpy(dst_buf, &info, MIN(sizeof(info), dst_size));
+            ret = ffa_copy_info(dst_buf, end_buf, &info, dst_size,
+                                sizeof(info));
+            if ( ret )
+            {
+                read_unlock(&ffa_ctx_list_rwlock);
+                return ret;
+            }
 
-            if ( dst_size > sizeof(info) )
-                memset(dst_buf + sizeof(info), 0,
-                       dst_size - sizeof(info));
-
-            dst_buf += dst_size;
             count++;
         }
+        read_unlock(&ffa_ctx_list_rwlock);
     }
-    *vm_count = count;
 
-out:
-    read_unlock(&ffa_ctx_list_rwlock);
+    *vm_count = count;
 
     return ret;
 }
@@ -217,16 +255,17 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
     struct domain *d = current->domain;
     struct ffa_ctx *ctx = d->arch.tee;
     uint32_t flags = get_user_reg(regs, 5);
-    uint32_t uuid[4] = {
-        get_user_reg(regs, 1),
-        get_user_reg(regs, 2),
-        get_user_reg(regs, 3),
-        get_user_reg(regs, 4),
-    };
+    struct ffa_uuid uuid;
     uint32_t dst_size = 0;
     size_t buf_size;
     void *dst_buf, *end_buf;
     uint32_t ffa_vm_count = 0, ffa_sp_count = 0;
+
+    ffa_uuid_set(&uuid,
+             get_user_reg(regs, 1),
+             get_user_reg(regs, 2),
+             get_user_reg(regs, 3),
+             get_user_reg(regs, 4));
 
     /*
      * If the guest is v1.0, he does not get back the entry size so we must
@@ -260,10 +299,23 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
         }
 
         /*
-         * Do not count the caller VM as the spec is not clearly mandating it
-         * and it is not supported by Linux.
+         * We do not have protocol UUIDs for VMs so if a request has non Nil
+         * UUID we must return a vm_count of 0
          */
-        ffa_vm_count = get_ffa_vm_count() - 1;
+        if ( ffa_uuid_is_nil(uuid) )
+        {
+            ffa_vm_count = get_ffa_vm_count();
+
+            /*
+             * Workaround for Linux FF-A Driver not accepting to have its own
+             * entry in the list before FF-A v1.2 was supported.
+             * This workaround is generally acceptable for other implementations
+             * as the specification was not completely clear on wether or not
+             * the requester endpoint information should be included or not
+             */
+            if ( ACCESS_ONCE(ctx->guest_vers) < FFA_VERSION_1_2 )
+                ffa_vm_count -= 1;
+        }
 
         goto out;
     }
@@ -290,17 +342,15 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
 
     if ( ffa_fw_supports_fid(FFA_PARTITION_INFO_GET) )
     {
-        ret = ffa_get_sp_partinfo(uuid, &ffa_sp_count, dst_buf, end_buf,
+        ret = ffa_get_sp_partinfo(uuid, &ffa_sp_count, &dst_buf, end_buf,
                                   dst_size);
 
         if ( ret )
             goto out_rx_release;
-
-        dst_buf += ffa_sp_count * dst_size;
     }
 
-    if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) )
-        ret = ffa_get_vm_partinfo(&ffa_vm_count, dst_buf, end_buf, dst_size);
+    ret = ffa_get_vm_partinfo(uuid, &ffa_vm_count, &dst_buf, end_buf,
+                              dst_size);
 
 out_rx_release:
     if ( ret )
@@ -309,7 +359,13 @@ out:
     if ( ret )
         ffa_set_regs_error(regs, ret);
     else
+    {
+        /* Size should be 0 on count request and was not supported in 1.0 */
+        if ( flags || ACCESS_ONCE(ctx->guest_vers) == FFA_VERSION_1_0 )
+            dst_size = 0;
+
         ffa_set_regs_success(regs, ffa_sp_count + ffa_vm_count, dst_size);
+    }
 }
 
 static int32_t ffa_direct_req_send_vm(uint16_t sp_id, uint16_t vm_id,
@@ -450,6 +506,7 @@ bool ffa_partinfo_init(void)
     uint32_t count;
     int32_t e;
     void *spmc_rx;
+    struct ffa_uuid nil_uuid = { .val = { 0ULL, 0ULL } };
 
     if ( !ffa_fw_supports_fid(FFA_PARTITION_INFO_GET) ||
          !ffa_fw_supports_fid(FFA_MSG_SEND_DIRECT_REQ_32))
@@ -459,7 +516,7 @@ bool ffa_partinfo_init(void)
     if (!spmc_rx)
         return false;
 
-    e = ffa_partition_info_get(NULL, 0, &count, &fpi_size);
+    e = ffa_partition_info_get(nil_uuid, 0, &count, &fpi_size);
     if ( e )
     {
         printk(XENLOG_ERR "ffa: Failed to get list of SPs: %d\n", e);

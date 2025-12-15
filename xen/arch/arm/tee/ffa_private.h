@@ -307,6 +307,10 @@ struct ffa_mem_region {
     struct ffa_address_range address_range_array[];
 };
 
+struct ffa_uuid {
+    uint64_t val[2];
+};
+
 struct ffa_ctx_notif {
     /*
      * True if domain is reported by FFA_NOTIFICATION_INFO_GET to have
@@ -579,6 +583,23 @@ static inline bool ffa_fw_supports_fid(uint32_t fid)
     if ( FFA_ABI_BITNUM(fid) >= FFA_ABI_BITMAP_SIZE)
         return false;
     return test_bit(FFA_ABI_BITNUM(fid), ffa_fw_abi_supported);
+}
+
+static inline bool ffa_uuid_is_nil(struct ffa_uuid id)
+{
+    return id.val[0] == 0 && id.val[1] == 0;
+}
+
+static inline bool ffa_uuid_equal(struct ffa_uuid id1, struct ffa_uuid id2)
+{
+    return id1.val[0] == id2.val[0] && id1.val[1] == id2.val[1];
+}
+
+static inline void ffa_uuid_set(struct ffa_uuid *id, uint32_t val0,
+                                uint32_t val1, uint32_t val2, uint32_t val3)
+{
+    id->val[0] = ((uint64_t)val1 << 32U) | val0;
+    id->val[1] = ((uint64_t)val3 << 32U) | val2;
 }
 
 #endif /*__FFA_PRIVATE_H__*/
