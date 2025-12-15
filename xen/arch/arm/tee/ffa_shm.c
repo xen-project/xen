@@ -286,9 +286,8 @@ static void init_range(struct ffa_address_range *addr_range,
 }
 
 /*
- * This function uses the ffa_tx buffer to transmit the memory transaction
- * descriptor. The function depends ffa_tx_buffer_lock to be used to guard
- * the buffer from concurrent use.
+ * This function uses the ffa_spmc tx buffer to transmit the memory transaction
+ * descriptor.
  */
 static int share_shm(struct ffa_shm_mem *shm)
 {
@@ -298,17 +297,22 @@ static int share_shm(struct ffa_shm_mem *shm)
     struct ffa_address_range *addr_range;
     struct ffa_mem_region *region_descr;
     const unsigned int region_count = 1;
-    void *buf = ffa_tx;
     uint32_t frag_len;
     uint32_t tot_len;
     paddr_t last_pa;
     unsigned int n;
     paddr_t pa;
+    int32_t ret;
+    void *buf;
 
-    ASSERT(spin_is_locked(&ffa_tx_buffer_lock));
     ASSERT(shm->page_count);
 
+    buf = ffa_rxtx_spmc_tx_acquire();
+    if ( !buf )
+        return FFA_RET_NOT_SUPPORTED;
+
     descr = buf;
+
     memset(descr, 0, sizeof(*descr));
     descr->sender_id = shm->sender_id;
     descr->handle = shm->handle;
@@ -340,7 +344,10 @@ static int share_shm(struct ffa_shm_mem *shm)
     tot_len = ADDR_RANGE_OFFSET(descr->mem_access_count, region_count,
                                 region_descr->address_range_count);
     if ( tot_len > max_frag_len )
-        return FFA_RET_NOT_SUPPORTED;
+    {
+        ret = FFA_RET_NOT_SUPPORTED;
+        goto out;
+    }
 
     addr_range = region_descr->address_range_array;
     frag_len = ADDR_RANGE_OFFSET(descr->mem_access_count, region_count, 1);
@@ -360,7 +367,12 @@ static int share_shm(struct ffa_shm_mem *shm)
         init_range(addr_range, pa);
     }
 
-    return ffa_mem_share(tot_len, frag_len, 0, 0, &shm->handle);
+    ret = ffa_mem_share(tot_len, frag_len, 0, 0, &shm->handle);
+
+out:
+    ffa_rxtx_spmc_tx_release();
+
+    return ret;
 }
 
 static int read_mem_transaction(uint32_t ffa_vers, const void *buf, size_t blen,
@@ -579,10 +591,7 @@ void ffa_handle_mem_share(struct cpu_user_regs *regs)
     if ( ret )
         goto out;
 
-    /* Note that share_shm() uses our tx buffer */
-    spin_lock(&ffa_tx_buffer_lock);
     ret = share_shm(shm);
-    spin_unlock(&ffa_tx_buffer_lock);
     if ( ret )
         goto out;
 

@@ -30,6 +30,20 @@ struct ffa_endpoint_rxtx_descriptor_1_1 {
     uint32_t tx_region_offs;
 };
 
+/*
+ * Our rx/tx buffers shared with the SPMC. FFA_RXTX_PAGE_COUNT is the
+ * number of pages used in each of these buffers.
+ * Each buffer has its own lock to protect from concurrent usage.
+ *
+ * Note that the SPMC is also tracking the ownership of our RX buffer so
+ * for calls which uses our RX buffer to deliver a result we must do an
+ * FFA_RX_RELEASE to let the SPMC know that we're done with the buffer.
+ */
+static void *ffa_spmc_rx __read_mostly;
+static void *ffa_spmc_tx __read_mostly;
+static DEFINE_SPINLOCK(ffa_spmc_rx_lock);
+static DEFINE_SPINLOCK(ffa_spmc_tx_lock);
+
 static int32_t ffa_rxtx_map(paddr_t tx_addr, paddr_t rx_addr,
                             uint32_t page_count)
 {
@@ -126,8 +140,9 @@ int32_t ffa_handle_rxtx_map(uint32_t fid, register_t tx_addr,
                      sizeof(struct ffa_address_range) * 2 >
                      FFA_MAX_RXTX_PAGE_COUNT * FFA_PAGE_SIZE);
 
-        spin_lock(&ffa_tx_buffer_lock);
-        rxtx_desc = ffa_tx;
+        rxtx_desc = ffa_rxtx_spmc_tx_acquire();
+        if ( !rxtx_desc )
+            goto err_unmap_rx;
 
         /*
          * We have only one page for each so we pack everything:
@@ -144,7 +159,7 @@ int32_t ffa_handle_rxtx_map(uint32_t fid, register_t tx_addr,
                                              address_range_array[1]);
 
         /* rx buffer */
-        mem_reg = ffa_tx + sizeof(*rxtx_desc);
+        mem_reg = (void *)rxtx_desc + rxtx_desc->rx_region_offs;
         mem_reg->total_page_count = 1;
         mem_reg->address_range_count = 1;
         mem_reg->reserved = 0;
@@ -154,7 +169,7 @@ int32_t ffa_handle_rxtx_map(uint32_t fid, register_t tx_addr,
         mem_reg->address_range_array[0].reserved = 0;
 
         /* tx buffer */
-        mem_reg = ffa_tx + rxtx_desc->tx_region_offs;
+        mem_reg = (void *)rxtx_desc + rxtx_desc->tx_region_offs;
         mem_reg->total_page_count = 1;
         mem_reg->address_range_count = 1;
         mem_reg->reserved = 0;
@@ -165,7 +180,7 @@ int32_t ffa_handle_rxtx_map(uint32_t fid, register_t tx_addr,
 
         ret = ffa_rxtx_map(0, 0, 0);
 
-        spin_unlock(&ffa_tx_buffer_lock);
+        ffa_rxtx_spmc_tx_release();
 
         if ( ret != FFA_RET_OK )
             goto err_unmap_rx;
@@ -319,49 +334,108 @@ void ffa_rxtx_domain_destroy(struct domain *d)
     rxtx_unmap(d);
 }
 
-void ffa_rxtx_destroy(void)
+void *ffa_rxtx_spmc_rx_acquire(void)
 {
-    bool need_unmap = ffa_tx && ffa_rx;
+    spin_lock(&ffa_spmc_rx_lock);
 
-    if ( ffa_tx )
+    if ( ffa_spmc_rx )
+        return ffa_spmc_rx;
+
+    return NULL;
+}
+
+void ffa_rxtx_spmc_rx_release(void)
+{
+    int32_t ret;
+
+    ASSERT(spin_is_locked(&ffa_spmc_rx_lock));
+
+    /* Inform the SPMC that we are done with our RX buffer */
+    ret = ffa_simple_call(FFA_RX_RELEASE, 0, 0, 0, 0);
+    if ( ret != FFA_RET_OK )
+        printk(XENLOG_DEBUG "Error releasing SPMC RX buffer: %d\n", ret);
+
+    spin_unlock(&ffa_spmc_rx_lock);
+}
+
+void *ffa_rxtx_spmc_tx_acquire(void)
+{
+    spin_lock(&ffa_spmc_tx_lock);
+
+    if ( ffa_spmc_tx )
+        return ffa_spmc_tx;
+
+    return NULL;
+}
+
+void ffa_rxtx_spmc_tx_release(void)
+{
+    ASSERT(spin_is_locked(&ffa_spmc_tx_lock));
+
+    spin_unlock(&ffa_spmc_tx_lock);
+}
+
+void ffa_rxtx_spmc_destroy(void)
+{
+    bool need_unmap;
+
+    spin_lock(&ffa_spmc_rx_lock);
+    spin_lock(&ffa_spmc_tx_lock);
+    need_unmap = ffa_spmc_tx && ffa_spmc_rx;
+
+    if ( ffa_spmc_tx )
     {
-        free_xenheap_pages(ffa_tx, 0);
-        ffa_tx = NULL;
+        free_xenheap_pages(ffa_spmc_tx, 0);
+        ffa_spmc_tx = NULL;
     }
-    if ( ffa_rx )
+    if ( ffa_spmc_rx )
     {
-        free_xenheap_pages(ffa_rx, 0);
-        ffa_rx = NULL;
+        free_xenheap_pages(ffa_spmc_rx, 0);
+        ffa_spmc_rx = NULL;
     }
 
     if ( need_unmap )
         ffa_rxtx_unmap(0);
+
+    spin_unlock(&ffa_spmc_tx_lock);
+    spin_unlock(&ffa_spmc_rx_lock);
 }
 
-bool ffa_rxtx_init(void)
+bool ffa_rxtx_spmc_init(void)
 {
     int32_t e;
+    bool ret = false;
 
     /* Firmware not there or not supporting */
     if ( !ffa_fw_supports_fid(FFA_RXTX_MAP_64) )
         return false;
 
-    ffa_rx = alloc_xenheap_pages(get_order_from_pages(FFA_RXTX_PAGE_COUNT), 0);
-    if ( !ffa_rx )
-        return false;
+    spin_lock(&ffa_spmc_rx_lock);
+    spin_lock(&ffa_spmc_tx_lock);
 
-    ffa_tx = alloc_xenheap_pages(get_order_from_pages(FFA_RXTX_PAGE_COUNT), 0);
-    if ( !ffa_tx )
-        goto err;
+    ffa_spmc_rx = alloc_xenheap_pages(
+                            get_order_from_pages(FFA_RXTX_PAGE_COUNT), 0);
+    if ( !ffa_spmc_rx )
+        goto exit;
 
-    e = ffa_rxtx_map(__pa(ffa_tx), __pa(ffa_rx), FFA_RXTX_PAGE_COUNT);
+    ffa_spmc_tx = alloc_xenheap_pages(
+                            get_order_from_pages(FFA_RXTX_PAGE_COUNT), 0);
+    if ( !ffa_spmc_tx )
+        goto exit;
+
+    e = ffa_rxtx_map(__pa(ffa_spmc_tx), __pa(ffa_spmc_rx),
+                     FFA_RXTX_PAGE_COUNT);
     if ( e )
-        goto err;
+        goto exit;
 
-    return true;
+    ret = true;
 
-err:
-    ffa_rxtx_destroy();
+exit:
+    spin_unlock(&ffa_spmc_tx_lock);
+    spin_unlock(&ffa_spmc_rx_lock);
 
-    return false;
+    if ( !ret )
+        ffa_rxtx_spmc_destroy();
+
+    return ret;
 }

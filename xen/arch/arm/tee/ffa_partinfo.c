@@ -77,28 +77,24 @@ static int32_t ffa_get_sp_partinfo(uint32_t *uuid, uint32_t *sp_count,
 {
     int32_t ret;
     uint32_t src_size, real_sp_count;
-    void *src_buf = ffa_rx;
+    void *src_buf;
     uint32_t count = 0;
 
-    /* Do we have a RX buffer with the SPMC */
-    if ( !ffa_rx )
-        return FFA_RET_DENIED;
-
     /* We need to use the RX buffer to receive the list */
-    spin_lock(&ffa_rx_buffer_lock);
+    src_buf = ffa_rxtx_spmc_rx_acquire();
+    if ( !src_buf )
+        return FFA_RET_DENIED;
 
     ret = ffa_partition_info_get(uuid, 0, &real_sp_count, &src_size);
     if ( ret )
         goto out;
-
-    /* We now own the RX buffer */
 
     /* Validate the src_size we got */
     if ( src_size < sizeof(struct ffa_partition_info_1_0) ||
          src_size >= FFA_PAGE_SIZE )
     {
         ret = FFA_RET_NOT_SUPPORTED;
-        goto out_release;
+        goto out;
     }
 
     /*
@@ -114,7 +110,7 @@ static int32_t ffa_get_sp_partinfo(uint32_t *uuid, uint32_t *sp_count,
     if ( real_sp_count > (FFA_RXTX_PAGE_COUNT * FFA_PAGE_SIZE) / src_size )
     {
         ret = FFA_RET_NOT_SUPPORTED;
-        goto out_release;
+        goto out;
     }
 
     for ( uint32_t sp_num = 0; sp_num < real_sp_count; sp_num++ )
@@ -127,7 +123,7 @@ static int32_t ffa_get_sp_partinfo(uint32_t *uuid, uint32_t *sp_count,
             if ( dst_buf > (end_buf - dst_size) )
             {
                 ret = FFA_RET_NO_MEMORY;
-                goto out_release;
+                goto out;
             }
 
             memcpy(dst_buf, src_buf, MIN(src_size, dst_size));
@@ -143,10 +139,8 @@ static int32_t ffa_get_sp_partinfo(uint32_t *uuid, uint32_t *sp_count,
 
     *sp_count = count;
 
-out_release:
-    ffa_hyp_rx_release();
 out:
-    spin_unlock(&ffa_rx_buffer_lock);
+    ffa_rxtx_spmc_rx_release();
     return ret;
 }
 
@@ -378,7 +372,7 @@ static void uninit_subscribers(void)
         XFREE(subscr_vm_destroyed);
 }
 
-static bool init_subscribers(uint16_t count, uint32_t fpi_size)
+static bool init_subscribers(void *buf, uint16_t count, uint32_t fpi_size)
 {
     uint16_t n;
     uint16_t c_pos;
@@ -395,7 +389,7 @@ static bool init_subscribers(uint16_t count, uint32_t fpi_size)
     subscr_vm_destroyed_count = 0;
     for ( n = 0; n < count; n++ )
     {
-        fpi = ffa_rx + n * fpi_size;
+        fpi = buf + n * fpi_size;
 
         /*
          * We need to have secure partitions using bit 15 set convention for
@@ -433,7 +427,7 @@ static bool init_subscribers(uint16_t count, uint32_t fpi_size)
 
     for ( c_pos = 0, d_pos = 0, n = 0; n < count; n++ )
     {
-        fpi = ffa_rx + n * fpi_size;
+        fpi = buf + n * fpi_size;
 
         if ( FFA_ID_IS_SECURE(fpi->id) )
         {
@@ -455,10 +449,14 @@ bool ffa_partinfo_init(void)
     uint32_t fpi_size;
     uint32_t count;
     int e;
+    void *spmc_rx;
 
     if ( !ffa_fw_supports_fid(FFA_PARTITION_INFO_GET) ||
-         !ffa_fw_supports_fid(FFA_MSG_SEND_DIRECT_REQ_32) ||
-         !ffa_rx || !ffa_tx )
+         !ffa_fw_supports_fid(FFA_MSG_SEND_DIRECT_REQ_32))
+        return false;
+
+    spmc_rx = ffa_rxtx_spmc_rx_acquire();
+    if (!spmc_rx)
         return false;
 
     e = ffa_partition_info_get(NULL, 0, &count, &fpi_size);
@@ -475,10 +473,10 @@ bool ffa_partinfo_init(void)
         goto out;
     }
 
-    ret = init_subscribers(count, fpi_size);
+    ret = init_subscribers(spmc_rx, count, fpi_size);
 
 out:
-    ffa_hyp_rx_release();
+    ffa_rxtx_spmc_rx_release();
     return ret;
 }
 

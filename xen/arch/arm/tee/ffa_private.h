@@ -416,10 +416,6 @@ struct ffa_ctx {
     unsigned long *vm_destroy_bitmap;
 };
 
-extern void *ffa_rx;
-extern void *ffa_tx;
-extern spinlock_t ffa_rx_buffer_lock;
-extern spinlock_t ffa_tx_buffer_lock;
 extern DECLARE_BITMAP(ffa_fw_abi_supported, FFA_ABI_BITMAP_SIZE);
 
 extern struct list_head ffa_ctx_head;
@@ -437,8 +433,13 @@ int ffa_partinfo_domain_init(struct domain *d);
 bool ffa_partinfo_domain_destroy(struct domain *d);
 void ffa_handle_partition_info_get(struct cpu_user_regs *regs);
 
-bool ffa_rxtx_init(void);
-void ffa_rxtx_destroy(void);
+bool ffa_rxtx_spmc_init(void);
+void ffa_rxtx_spmc_destroy(void);
+void *ffa_rxtx_spmc_rx_acquire(void);
+void ffa_rxtx_spmc_rx_release(void);
+void *ffa_rxtx_spmc_tx_acquire(void);
+void ffa_rxtx_spmc_tx_release(void);
+
 int32_t ffa_rxtx_domain_init(struct domain *d);
 void ffa_rxtx_domain_destroy(struct domain *d);
 int32_t ffa_handle_rxtx_map(uint32_t fid, register_t tx_addr,
@@ -566,11 +567,6 @@ static inline int32_t ffa_simple_call(uint32_t fid, register_t a1,
     arm_smccc_1_2_smc(&arg, &resp);
 
     return ffa_get_ret_code(&resp);
-}
-
-static inline int32_t ffa_hyp_rx_release(void)
-{
-    return ffa_simple_call(FFA_RX_RELEASE, 0, 0, 0, 0);
 }
 
 static inline bool ffa_fw_supports_fid(uint32_t fid)

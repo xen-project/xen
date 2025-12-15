@@ -48,8 +48,8 @@
  *     notification for secure partitions
  *   - doesn't support notifications for Xen itself
  *
- * There are some large locked sections with ffa_tx_buffer_lock and
- * ffa_rx_buffer_lock. Especially the ffa_tx_buffer_lock spinlock used
+ * There are some large locked sections with ffa_spmc_tx_lock and
+ * ffa_spmc_rx_lock. Especially the ffa_spmc_tx_lock spinlock used
  * around share_shm() is a very large locked section which can let one VM
  * affect another VM.
  */
@@ -107,20 +107,6 @@ static const struct ffa_fw_abi ffa_fw_abi_needed[] = {
     FW_ABI(FFA_MSG_SEND_DIRECT_REQ2),
     FW_ABI(FFA_RUN),
 };
-
-/*
- * Our rx/tx buffers shared with the SPMC. FFA_RXTX_PAGE_COUNT is the
- * number of pages used in each of these buffers.
- *
- * The RX buffer is protected from concurrent usage with ffa_rx_buffer_lock.
- * Note that the SPMC is also tracking the ownership of our RX buffer so
- * for calls which uses our RX buffer to deliver a result we must call
- * ffa_rx_release() to let the SPMC know that we're done with the buffer.
- */
-void *ffa_rx __read_mostly;
-void *ffa_tx __read_mostly;
-DEFINE_SPINLOCK(ffa_rx_buffer_lock);
-DEFINE_SPINLOCK(ffa_tx_buffer_lock);
 
 LIST_HEAD(ffa_ctx_head);
 /* RW Lock to protect addition/removal and reading in ffa_ctx_head */
@@ -617,7 +603,7 @@ static bool ffa_probe_fw(void)
                    ffa_fw_abi_needed[i].name);
     }
 
-    if ( !ffa_rxtx_init() )
+    if ( !ffa_rxtx_spmc_init() )
     {
         printk(XENLOG_ERR "ffa: Error during RXTX buffer init\n");
         goto err_no_fw;
@@ -631,7 +617,7 @@ static bool ffa_probe_fw(void)
     return true;
 
 err_rxtx_destroy:
-    ffa_rxtx_destroy();
+    ffa_rxtx_spmc_destroy();
 err_no_fw:
     ffa_fw_version = 0;
     bitmap_zero(ffa_fw_abi_supported, FFA_ABI_BITMAP_SIZE);
