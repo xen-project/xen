@@ -367,10 +367,10 @@ static int libxl__device_usbctrl_add_hvm(libxl__egc *egc, libxl__ev_qmp *qmp,
     case 3:
         libxl__qmp_param_add_string(gc, &qmp_args,
                                     "driver", "nec-usb-xhci");
-        libxl__qmp_param_add_string(gc, &qmp_args, "p2",
-                                    GCSPRINTF("%d", usbctrl->ports));
-        libxl__qmp_param_add_string(gc, &qmp_args, "p3",
-                                    GCSPRINTF("%d", usbctrl->ports));
+        libxl__qmp_param_add_integer(gc, &qmp_args, "p2",
+                                     usbctrl->ports);
+        libxl__qmp_param_add_integer(gc, &qmp_args, "p3",
+                                     usbctrl->ports);
         break;
     default:
         abort(); /* Should not be possible. */
@@ -411,10 +411,10 @@ static int libxl__device_usbdev_add_hvm(libxl__egc *egc, libxl__ev_qmp *qmp,
         GCSPRINTF("xenusb-%d.0", usbdev->ctrl));
     libxl__qmp_param_add_string(gc, &qmp_args, "port",
         GCSPRINTF("%d", usbdev->port));
-    libxl__qmp_param_add_string(gc, &qmp_args, "hostbus",
-        GCSPRINTF("%d", usbdev->u.hostdev.hostbus));
-    libxl__qmp_param_add_string(gc, &qmp_args, "hostaddr",
-        GCSPRINTF("%d", usbdev->u.hostdev.hostaddr));
+    libxl__qmp_param_add_integer(gc, &qmp_args, "hostbus",
+                                 usbdev->u.hostdev.hostbus);
+    libxl__qmp_param_add_integer(gc, &qmp_args, "hostaddr",
+                                 usbdev->u.hostdev.hostaddr);
 
     return libxl__ev_qmp_send(egc, qmp, "device_add", qmp_args);
 }
