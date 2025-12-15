@@ -31,9 +31,9 @@
 
 /* FFA_VERSION helpers */
 #define FFA_VERSION_MAJOR_SHIFT         16U
-#define FFA_VERSION_MAJOR_MASK          0x7FFFU
+#define FFA_VERSION_MAJOR_MASK          GENMASK(14, 0)
 #define FFA_VERSION_MINOR_SHIFT         0U
-#define FFA_VERSION_MINOR_MASK          0xFFFFU
+#define FFA_VERSION_MINOR_MASK          GENMASK(15, 0)
 #define MAKE_FFA_VERSION(major, minor)  \
         ((((major) & FFA_VERSION_MAJOR_MASK) << FFA_VERSION_MAJOR_SHIFT) | \
          ((minor) & FFA_VERSION_MINOR_MASK))
@@ -426,10 +426,10 @@ extern atomic_t ffa_vm_count;
 
 bool ffa_shm_domain_destroy(struct domain *d);
 void ffa_handle_mem_share(struct cpu_user_regs *regs);
-int ffa_handle_mem_reclaim(uint64_t handle, uint32_t flags);
+int32_t ffa_handle_mem_reclaim(uint64_t handle, uint32_t flags);
 
 bool ffa_partinfo_init(void);
-int ffa_partinfo_domain_init(struct domain *d);
+int32_t ffa_partinfo_domain_init(struct domain *d);
 bool ffa_partinfo_domain_destroy(struct domain *d);
 void ffa_handle_partition_info_get(struct cpu_user_regs *regs);
 
@@ -455,11 +455,11 @@ void ffa_notif_init_interrupt(void);
 int ffa_notif_domain_init(struct domain *d);
 void ffa_notif_domain_destroy(struct domain *d);
 
-int ffa_handle_notification_bind(struct cpu_user_regs *regs);
-int ffa_handle_notification_unbind(struct cpu_user_regs *regs);
+int32_t ffa_handle_notification_bind(struct cpu_user_regs *regs);
+int32_t ffa_handle_notification_unbind(struct cpu_user_regs *regs);
 void ffa_handle_notification_info_get(struct cpu_user_regs *regs);
 void ffa_handle_notification_get(struct cpu_user_regs *regs);
-int ffa_handle_notification_set(struct cpu_user_regs *regs);
+int32_t ffa_handle_notification_set(struct cpu_user_regs *regs);
 
 #ifdef CONFIG_FFA_VM_TO_VM
 void ffa_raise_rx_buffer_full(struct domain *d);
@@ -525,9 +525,10 @@ static inline void ffa_set_regs(struct cpu_user_regs *regs, register_t v0,
 }
 
 static inline void ffa_set_regs_error(struct cpu_user_regs *regs,
-                                      uint32_t error_code)
+                                      int32_t error_code)
 {
-    ffa_set_regs(regs, FFA_ERROR, 0, error_code, 0, 0, 0, 0, 0);
+    ffa_set_regs(regs, FFA_ERROR, 0, error_code & GENMASK_ULL(31, 0), 0, 0, 0,
+                 0, 0);
 }
 
 static inline void ffa_set_regs_success(struct cpu_user_regs *regs,
@@ -542,7 +543,7 @@ static inline int32_t ffa_get_ret_code(const struct arm_smccc_1_2_regs *resp)
     {
     case FFA_ERROR:
         if ( resp->a2 )
-            return resp->a2;
+            return resp->a2 & GENMASK_ULL(31, 0);
         else
             return FFA_RET_NOT_SUPPORTED;
     case FFA_SUCCESS_32:

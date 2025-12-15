@@ -448,7 +448,7 @@ bool ffa_partinfo_init(void)
     bool ret = false;
     uint32_t fpi_size;
     uint32_t count;
-    int e;
+    int32_t e;
     void *spmc_rx;
 
     if ( !ffa_fw_supports_fid(FFA_PARTITION_INFO_GET) ||
@@ -515,7 +515,7 @@ static void vm_destroy_bitmap_init(struct ffa_ctx *ctx,
     }
 }
 
-int ffa_partinfo_domain_init(struct domain *d)
+int32_t ffa_partinfo_domain_init(struct domain *d)
 {
     unsigned int count = BITS_TO_LONGS(subscr_vm_destroyed_count);
     struct ffa_ctx *ctx = d->arch.tee;

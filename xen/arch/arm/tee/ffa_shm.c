@@ -626,14 +626,14 @@ static struct ffa_shm_mem *find_shm_mem(struct ffa_ctx *ctx, uint64_t handle)
     return NULL;
 }
 
-int ffa_handle_mem_reclaim(uint64_t handle, uint32_t flags)
+int32_t ffa_handle_mem_reclaim(uint64_t handle, uint32_t flags)
 {
     struct domain *d = current->domain;
     struct ffa_ctx *ctx = d->arch.tee;
     struct ffa_shm_mem *shm;
     register_t handle_hi;
     register_t handle_lo;
-    int ret;
+    int32_t ret;
 
     if ( !ffa_fw_supports_fid(FFA_MEM_RECLAIM) )
         return FFA_RET_NOT_SUPPORTED;

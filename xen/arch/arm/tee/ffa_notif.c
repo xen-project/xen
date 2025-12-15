@@ -19,7 +19,7 @@
 static bool __ro_after_init fw_notif_enabled;
 static unsigned int __ro_after_init notif_sri_irq;
 
-int ffa_handle_notification_bind(struct cpu_user_regs *regs)
+int32_t ffa_handle_notification_bind(struct cpu_user_regs *regs)
 {
     struct domain *d = current->domain;
     uint32_t src_dst = get_user_reg(regs, 1);
@@ -27,7 +27,7 @@ int ffa_handle_notification_bind(struct cpu_user_regs *regs)
     uint32_t bitmap_lo = get_user_reg(regs, 3);
     uint32_t bitmap_hi = get_user_reg(regs, 4);
 
-    if ( (src_dst & 0xFFFFU) != ffa_get_vm_id(d) )
+    if ( (src_dst & GENMASK(15, 0)) != ffa_get_vm_id(d) )
         return FFA_RET_INVALID_PARAMETERS;
 
     if ( flags )    /* Only global notifications are supported */
@@ -40,14 +40,14 @@ int ffa_handle_notification_bind(struct cpu_user_regs *regs)
     return FFA_RET_NOT_SUPPORTED;
 }
 
-int ffa_handle_notification_unbind(struct cpu_user_regs *regs)
+int32_t ffa_handle_notification_unbind(struct cpu_user_regs *regs)
 {
     struct domain *d = current->domain;
     uint32_t src_dst = get_user_reg(regs, 1);
     uint32_t bitmap_lo = get_user_reg(regs, 3);
     uint32_t bitmap_hi = get_user_reg(regs, 4);
 
-    if ( (src_dst & 0xFFFFU) != ffa_get_vm_id(d) )
+    if ( (src_dst & GENMASK(15, 0)) != ffa_get_vm_id(d) )
         return FFA_RET_INVALID_PARAMETERS;
 
     if ( FFA_ID_IS_SECURE(src_dst >> 16) && fw_notif_enabled )
@@ -106,7 +106,7 @@ void ffa_handle_notification_get(struct cpu_user_regs *regs)
         return;
     }
 
-    if ( (recv & 0xFFFFU) != ffa_get_vm_id(d) )
+    if ( (recv & GENMASK(15, 0)) != ffa_get_vm_id(d) )
     {
         ffa_set_regs_error(regs, FFA_RET_INVALID_PARAMETERS);
         return;
@@ -162,7 +162,7 @@ void ffa_handle_notification_get(struct cpu_user_regs *regs)
     ffa_set_regs(regs, FFA_SUCCESS_32, 0, w2, w3, w4, w5, w6, w7);
 }
 
-int ffa_handle_notification_set(struct cpu_user_regs *regs)
+int32_t ffa_handle_notification_set(struct cpu_user_regs *regs)
 {
     struct domain *d = current->domain;
     uint32_t src_dst = get_user_reg(regs, 1);
@@ -173,7 +173,7 @@ int ffa_handle_notification_set(struct cpu_user_regs *regs)
     if ( (src_dst >> 16) != ffa_get_vm_id(d) )
         return FFA_RET_INVALID_PARAMETERS;
 
-    if ( FFA_ID_IS_SECURE(src_dst >> 16) && fw_notif_enabled )
+    if ( FFA_ID_IS_SECURE(src_dst & GENMASK(15, 0)) && fw_notif_enabled )
         return ffa_simple_call(FFA_NOTIFICATION_SET, src_dst, flags, bitmap_lo,
                                bitmap_hi);
 

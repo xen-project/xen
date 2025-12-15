@@ -129,12 +129,14 @@ static bool ffa_get_version(uint32_t *vers)
         .a1 = FFA_MY_VERSION,
     };
     struct arm_smccc_1_2_regs resp;
+    int32_t ret;
 
     arm_smccc_1_2_smc(&arg, &resp);
-    if ( resp.a0 == FFA_RET_NOT_SUPPORTED )
+    ret = resp.a0 & GENMASK_ULL(31, 0);
+    if ( ret == FFA_RET_NOT_SUPPORTED )
         return false;
 
-    *vers = resp.a0;
+    *vers = resp.a0 & GENMASK_ULL(31, 0);
 
     return true;
 }
@@ -310,7 +312,7 @@ static bool ffa_handle_call(struct cpu_user_regs *regs)
     uint32_t fid = get_user_reg(regs, 0);
     struct domain *d = current->domain;
     struct ffa_ctx *ctx = d->arch.tee;
-    int e;
+    int32_t e;
 
     if ( !ctx )
         return false;
@@ -382,8 +384,8 @@ static bool ffa_handle_call(struct cpu_user_regs *regs)
 
     default:
         gprintk(XENLOG_ERR, "ffa: unhandled fid 0x%x\n", fid);
-        ffa_set_regs_error(regs, FFA_RET_NOT_SUPPORTED);
-        return true;
+        e = FFA_RET_NOT_SUPPORTED;
+        break;
     }
 
     if ( e )
