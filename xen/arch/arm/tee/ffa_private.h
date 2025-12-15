@@ -53,7 +53,7 @@
  * that particular guest or SP.
  */
 #define FFA_MY_VERSION_MAJOR    1U
-#define FFA_MY_VERSION_MINOR    1U
+#define FFA_MY_VERSION_MINOR    2U
 #define FFA_MY_VERSION          MAKE_FFA_VERSION(FFA_MY_VERSION_MAJOR, \
                                                  FFA_MY_VERSION_MINOR)
 
@@ -519,14 +519,25 @@ static inline void ffa_set_regs(struct cpu_user_regs *regs, register_t v0,
                                 register_t v4, register_t v5, register_t v6,
                                 register_t v7)
 {
-        set_user_reg(regs, 0, v0);
-        set_user_reg(regs, 1, v1);
-        set_user_reg(regs, 2, v2);
-        set_user_reg(regs, 3, v3);
-        set_user_reg(regs, 4, v4);
-        set_user_reg(regs, 5, v5);
-        set_user_reg(regs, 6, v6);
-        set_user_reg(regs, 7, v7);
+    struct domain *d = current->domain;
+    struct ffa_ctx *ctx = d->arch.tee;
+    int i;
+
+    set_user_reg(regs, 0, v0);
+    set_user_reg(regs, 1, v1);
+    set_user_reg(regs, 2, v2);
+    set_user_reg(regs, 3, v3);
+    set_user_reg(regs, 4, v4);
+    set_user_reg(regs, 5, v5);
+    set_user_reg(regs, 6, v6);
+    set_user_reg(regs, 7, v7);
+
+    if ( ctx && ACCESS_ONCE(ctx->guest_vers) >= FFA_VERSION_1_2 &&
+         is_64bit_domain(d) )
+    {
+        for (i = 8; i <= 17; i++)
+            set_user_reg(regs, i, 0);
+    }
 }
 
 static inline void ffa_set_regs_error(struct cpu_user_regs *regs,

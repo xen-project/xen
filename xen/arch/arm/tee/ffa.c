@@ -65,7 +65,6 @@
 #include <asm/event.h>
 #include <asm/regs.h>
 #include <asm/smccc.h>
-#include <asm/tee/ffa.h>
 #include <asm/tee/tee.h>
 
 #include "ffa_private.h"
@@ -296,7 +295,16 @@ static void handle_features(struct cpu_user_regs *regs)
          * differs from FFA_PAGE_SIZE (SZ_4K).
          */
         BUILD_BUG_ON(PAGE_SIZE != FFA_PAGE_SIZE);
-        ffa_set_regs_success(regs, 0, 0);
+
+        /*
+         * From FFA v1.2, we can give the maximum number of pages we support
+         * for the RX/TX buffers.
+         */
+        if ( ACCESS_ONCE(ctx->guest_vers) < FFA_VERSION_1_2 )
+            ffa_set_regs_success(regs, 0, 0);
+        else
+            ffa_set_regs_success(regs, FFA_MAX_RXTX_PAGE_COUNT << 16, 0);
+
         break;
     case FFA_FEATURE_NOTIF_PEND_INTR:
         ffa_set_regs_success(regs, GUEST_FFA_NOTIF_PEND_INTR_ID, 0);
@@ -328,6 +336,13 @@ static bool ffa_handle_call(struct cpu_user_regs *regs)
 
     if ( !ctx )
         return false;
+
+    if ( !is_64bit_domain(d) && smccc_is_conv_64(fid) )
+    {
+        /* 32bit guests should only use 32bit convention calls */
+        ffa_set_regs_error(regs, FFA_RET_NOT_SUPPORTED);
+        return true;
+    }
 
     /* A version must be negotiated first */
     if ( !ACCESS_ONCE(ctx->guest_vers) )
