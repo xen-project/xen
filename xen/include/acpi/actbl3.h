@@ -78,8 +78,10 @@
 #define ACPI_SIG_CSRT           "CSRT"	/* Core System Resources Table */
 #define ACPI_SIG_MATR           "MATR"	/* Memory Address Translation Table */
 #define ACPI_SIG_MSDM           "MSDM"	/* Microsoft Data Management Table */
-#define ACPI_SIG_WPBT           "WPBT"	/* Windows Platform Binary Table */
+#define ACPI_SIG_TCPA           "TCPA"	/* Trusted Computing Platform Alliance table */
+#define ACPI_SIG_TPM2           "TPM2"	/* Trusted Platform Module 2.0 H/W interface table */
 #define ACPI_SIG_VFCT           "VFCT"	/* AMD Video BIOS */
+#define ACPI_SIG_WPBT           "WPBT"	/* Windows Platform Binary Table */
 
 /*
  * All tables must be byte-packed to match the ACPI specification, since
