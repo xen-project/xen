@@ -22,6 +22,7 @@
 #include <asm/early_printk.h>
 #include <asm/fixmap.h>
 #include <asm/intc.h>
+#include <asm/p2m.h>
 #include <asm/sbi.h>
 #include <asm/setup.h>
 #include <asm/traps.h>
@@ -147,6 +148,8 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
     local_irq_enable();
 
     console_init_postirq();
+
+    guest_mm_init();
 
     printk("All set up\n");
 

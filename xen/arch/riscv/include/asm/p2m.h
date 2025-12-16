@@ -8,6 +8,12 @@
 
 #define paddr_bits PADDR_BITS
 
+struct gstage_mode_desc {
+    unsigned char mode;
+    unsigned int paging_levels;
+    char name[8];
+};
+
 /*
  * List of possible type for each page in the p2m entry.
  * The number of available bit per page in the pte for this purpose is 2 bits.
@@ -87,6 +93,9 @@ static inline bool arch_acquire_resource_check(struct domain *d)
      */
     return false;
 }
+
+void guest_mm_init(void);
+unsigned char get_max_supported_mode(void);
 
 #endif /* ASM__RISCV__P2M_H */
 
