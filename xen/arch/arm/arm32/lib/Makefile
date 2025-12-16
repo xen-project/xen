@@ -1,5 +1,5 @@
-obj-y += memcpy.o memmove.o memset.o memchr.o
-obj-y += findbit.o
-obj-y += bitops.o
-obj-y += strchr.o strrchr.o
-obj-y += lib1funcs.o lshrdi3.o div64.o
+lib-y += memcpy.o memmove.o memset.o memchr.o
+lib-y += findbit.o
+lib-y += bitops.o
+lib-y += strchr.o strrchr.o
+lib-y += lib1funcs.o lshrdi3.o div64.o
