@@ -70,7 +70,28 @@ struct p2m_domain {
 typedef enum {
     p2m_invalid = 0,    /* Nothing mapped here */
     p2m_ram_rw,         /* Normal read/write domain RAM */
+    p2m_mmio_direct_io, /* Read/write mapping of genuine Device MMIO area,
+                           PTE_PBMT_IO will be used for such mappings */
+    p2m_ext_storage,    /* Following types'll be stored outsude PTE bits: */
+
+    /* Sentinel — not a real type, just a marker for comparison */
+    p2m_first_external = p2m_ext_storage,
 } p2m_type_t;
+
+static inline p2m_type_t arch_dt_passthrough_p2m_type(void)
+{
+    return p2m_mmio_direct_io;
+}
+
+/* We use bitmaps and mask to handle groups of types */
+#define p2m_to_mask(t) BIT(t, UL)
+
+/* RAM types, which map to real machine frames */
+#define P2M_RAM_TYPES (p2m_to_mask(p2m_ram_rw))
+
+/* Useful predicates */
+#define p2m_is_ram(t) (p2m_to_mask(t) & P2M_RAM_TYPES)
+#define p2m_is_any_ram(t) (p2m_to_mask(t) & P2M_RAM_TYPES)
 
 #include <xen/p2m-common.h>
 
