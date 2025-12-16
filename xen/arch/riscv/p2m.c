@@ -9,6 +9,7 @@
 #include <asm/flushtlb.h>
 #include <asm/p2m.h>
 #include <asm/riscv_encoding.h>
+#include <asm/vmid.h>
 
 static struct gstage_mode_desc __ro_after_init max_gstage_mode = {
     .mode = HGATP_MODE_OFF,
@@ -68,9 +69,11 @@ void __init guest_mm_init(void)
 {
     gstage_mode_detect();
 
+    vmid_init();
+
     /*
-     * As gstage_mode_detect() is changing CSR_HGATP, it is necessary to flush
-     * guest TLB because:
+     * As gstage_mode_detect() and vmid_init() are changing CSR_HGATP, it is
+     * necessary to flush guest TLB because:
      *
      * From RISC-V spec:
      *   Speculative executions of the address-translation algorithm behave as

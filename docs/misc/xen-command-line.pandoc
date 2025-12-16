@@ -2863,6 +2863,15 @@ to disable the feature.  Value is in units of crystal clock cycles.
 Note the hardware might add a threshold to the provided value in order to make
 it safe, and hence using 0 is fine.
 
+### vmid (RISC-V)
+> `= <boolean>`
+
+> Default: `true`
+
+Permit Xen to use Virtual Machine Identifiers. This is an optimisation which
+tags the TLB entries with an ID per vcpu. This allows for guest TLB flushes
+to be performed without the overhead of a complete TLB flush.
+
 ### vpid (Intel)
 > `= <boolean>`
 
