@@ -11,6 +11,7 @@
 #include <xen/sections.h>
 #include <xen/xvmalloc.h>
 
+#include <asm/cpufeature.h>
 #include <asm/csr.h>
 #include <asm/flushtlb.h>
 #include <asm/p2m.h>
@@ -356,6 +357,18 @@ int p2m_set_allocation(struct domain *d, unsigned long pages, bool *preempted)
     return rc;
 }
 
+static int p2m_set_type(pte_t *pte, p2m_type_t t)
+{
+    int rc = 0;
+
+    if ( t > p2m_first_external )
+        panic("unimplemeted\n");
+    else
+        pte->pte |= MASK_INSR(t, P2M_TYPE_PTE_BITS_MASK);
+
+    return rc;
+}
+
 static p2m_type_t p2m_get_type(const pte_t pte)
 {
     p2m_type_t type = MASK_EXTR(pte.pte, P2M_TYPE_PTE_BITS_MASK);
@@ -386,11 +399,102 @@ static inline void p2m_clean_pte(pte_t *p, bool clean_cache)
     p2m_write_pte(p, pte, clean_cache);
 }
 
-static pte_t p2m_pte_from_mfn(mfn_t mfn, p2m_type_t t)
+static void p2m_set_permission(pte_t *e, p2m_type_t t)
 {
-    panic("%s: hasn't been implemented yet\n", __func__);
+    e->pte &= ~PTE_ACCESS_MASK;
 
-    return (pte_t) { .pte = 0 };
+    e->pte |= PTE_USER;
+
+    /*
+     * Two schemes to manage the A and D bits are defined:
+     *   • The Svade extension: when a virtual page is accessed and the A bit
+     *     is clear, or is written and the D bit is clear, a page-fault
+     *     exception is raised.
+     *   • When the Svade extension is not implemented, the following scheme
+     *     applies.
+     *     When a virtual page is accessed and the A bit is clear, the PTE is
+     *     updated to set the A bit. When the virtual page is written and the
+     *     D bit is clear, the PTE is updated to set the D bit. When G-stage
+     *     address translation is in use and is not Bare, the G-stage virtual
+     *     pages may be accessed or written by implicit accesses to VS-level
+     *     memory management data structures, such as page tables.
+     * Thereby to avoid a page-fault in case of Svade is available, it is
+     * necessary to set A and D bits.
+     *
+     * TODO: For now, it’s fine to simply set the A/D bits, since OpenSBI
+     *       delegates page faults to a lower privilege mode and so OpenSBI
+     *       isn't expect to handle page-faults occured in lower modes.
+     *       By setting the A/D bits here, page faults that would otherwise
+     *       be generated due to unset A/D bits will not occur in Xen.
+     *
+     *       Currently, Xen on RISC-V does not make use of the information
+     *       that could be obtained from handling such page faults, which
+     *       could otherwise be useful for several use cases such as demand
+     *       paging, cache-flushing optimizations, memory access tracking,etc.
+     *
+     *       To support the more general case and the optimizations mentioned
+     *       above, it would be better to stop setting the A/D bits here and
+     *       instead handle page faults that occur due to unset A/D bits.
+     */
+    if ( riscv_isa_extension_available(NULL, RISCV_ISA_EXT_svade) )
+        e->pte |= PTE_ACCESSED | PTE_DIRTY;
+
+    switch ( t )
+    {
+    case p2m_map_foreign_rw:
+    case p2m_mmio_direct_io:
+        e->pte |= PTE_READABLE | PTE_WRITABLE;
+        break;
+
+    case p2m_ram_rw:
+        e->pte |= PTE_ACCESS_MASK;
+        break;
+
+    case p2m_invalid:
+        e->pte &= ~PTE_VALID;
+        break;
+
+    case p2m_map_foreign_ro:
+        e->pte |= PTE_READABLE;
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        break;
+    }
+}
+
+static pte_t p2m_pte_from_mfn(mfn_t mfn, p2m_type_t t, bool is_table)
+{
+    pte_t e = (pte_t) { PTE_VALID };
+
+    pte_set_mfn(&e, mfn);
+
+    ASSERT(!(mfn_to_maddr(mfn) & ~PADDR_MASK) || mfn_eq(mfn, INVALID_MFN));
+
+    if ( !is_table )
+    {
+        switch ( t )
+        {
+        case p2m_mmio_direct_io:
+            e.pte |= PTE_PBMT_IO;
+            break;
+
+        default:
+            break;
+        }
+
+        p2m_set_permission(&e, t);
+        p2m_set_type(&e, t);
+    }
+    else
+        /*
+         * According to the spec and table "Encoding of PTE R/W/X fields":
+         *   X=W=R=0 -> Pointer to next level of page table.
+         */
+        e.pte &= ~PTE_ACCESS_MASK;
+
+    return e;
 }
 
 #define P2M_TABLE_MAP_NONE 0
@@ -645,7 +749,7 @@ static int p2m_set_entry(struct p2m_domain *p2m,
         p2m_clean_pte(entry, p2m->clean_dcache);
     else
     {
-        pte_t pte = p2m_pte_from_mfn(mfn, t);
+        pte_t pte = p2m_pte_from_mfn(mfn, t, false);
 
         p2m_write_pte(entry, pte, p2m->clean_dcache);
 
