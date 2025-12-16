@@ -110,6 +110,41 @@ void __init guest_mm_init(void)
     local_hfence_gvma_all();
 }
 
+/*
+ * Force a synchronous P2M TLB flush.
+ *
+ * Must be called with the p2m lock held.
+ */
+static void p2m_tlb_flush(struct p2m_domain *p2m)
+{
+    const struct domain *d = p2m->domain;
+
+    ASSERT(p2m_is_write_locked(p2m));
+
+    p2m->need_flush = false;
+
+    sbi_remote_hfence_gvma(d->dirty_cpumask, 0, 0);
+}
+
+void p2m_tlb_flush_sync(struct p2m_domain *p2m)
+{
+    if ( p2m->need_flush )
+        p2m_tlb_flush(p2m);
+}
+
+/* Unlock the P2M and do a P2M TLB flush if necessary */
+void p2m_write_unlock(struct p2m_domain *p2m)
+{
+    /*
+     * The final flush is done with the P2M write lock taken to avoid
+     * someone else modifying the P2M before the TLB invalidation has
+     * completed.
+     */
+    p2m_tlb_flush_sync(p2m);
+
+    write_unlock(&p2m->lock);
+}
+
 static void clear_and_clean_page(struct page_info *page, bool clean_dcache)
 {
     void *p = __map_domain_page(page);
@@ -235,6 +270,31 @@ int p2m_set_allocation(struct domain *d, unsigned long pages, bool *preempted)
      */
     if ( !p2m->root )
         rc = p2m_alloc_root_table(p2m);
+
+    return rc;
+}
+
+static int p2m_set_range(struct p2m_domain *p2m,
+                         gfn_t sgfn,
+                         unsigned long nr,
+                         mfn_t smfn,
+                         p2m_type_t t)
+{
+    return -EOPNOTSUPP;
+}
+
+int map_regions_p2mt(struct domain *d,
+                     gfn_t gfn,
+                     unsigned long nr,
+                     mfn_t mfn,
+                     p2m_type_t p2mt)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    int rc;
+
+    p2m_write_lock(p2m);
+    rc = p2m_set_range(p2m, gfn, nr, mfn, p2mt);
+    p2m_write_unlock(p2m);
 
     return rc;
 }
