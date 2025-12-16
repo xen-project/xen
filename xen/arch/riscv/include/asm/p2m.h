@@ -8,10 +8,38 @@
 #include <xen/rwlock.h>
 #include <xen/types.h>
 
+#include <asm/page.h>
 #include <asm/page-bits.h>
 
 #define P2M_ROOT_ORDER  (ilog2(GSTAGE_ROOT_PAGE_TABLE_SIZE) - PAGE_SHIFT)
 #define P2M_ROOT_PAGES  BIT(P2M_ROOT_ORDER, U)
+#define P2M_ROOT_LEVEL(p2m) ((p2m)->mode.paging_levels)
+
+/*
+ * According to the RISC-V spec:
+ *   When hgatp.MODE specifies a translation scheme of Sv32x4, Sv39x4, Sv48x4,
+ *   or Sv57x4, G-stage address translation is a variation on the usual
+ *   page-based virtual address translation scheme of Sv32, Sv39, Sv48, or
+ *   Sv57, respectively. In each case, the size of the incoming address is
+ *   widened by 2 bits (to 34, 41, 50, or 59 bits).
+ *
+ * P2M_LEVEL_ORDER(lvl) defines the bit position in the GFN from which
+ * the index for this level of the P2M page table starts. The extra 2
+ * bits added by the "x4" schemes only affect the root page table width.
+ *
+ * Therefore, this macro can safely reuse XEN_PT_LEVEL_ORDER() for all
+ * levels: the extra 2 bits do not change the indices of lower levels.
+ */
+#define P2M_LEVEL_ORDER(lvl) XEN_PT_LEVEL_ORDER(lvl)
+
+#define P2M_ROOT_EXTRA_BITS(p2m, lvl) (2 * ((lvl) == P2M_ROOT_LEVEL(p2m)))
+
+#define P2M_PAGETABLE_ENTRIES(p2m, lvl) \
+    (BIT(PAGETABLE_ORDER + P2M_ROOT_EXTRA_BITS(p2m, lvl), UL))
+
+#define P2M_TABLE_OFFSET(p2m, lvl) (P2M_PAGETABLE_ENTRIES(p2m, lvl) - 1UL)
+
+#define P2M_GFN_LEVEL_SHIFT(lvl) (P2M_LEVEL_ORDER(lvl) + PAGE_SHIFT)
 
 #define paddr_bits PADDR_BITS
 
@@ -58,6 +86,16 @@ struct p2m_domain {
      * when a page is needed to be fully cleared and cleaned.
      */
     bool clean_dcache;
+
+    /* Highest guest frame that's ever been mapped in the p2m */
+    gfn_t max_mapped_gfn;
+
+    /*
+     * Lowest mapped gfn in the p2m. When releasing mapped gfn's in a
+     * preemptible manner this is updated to track where to resume
+     * the search. Apart from during teardown this can only decrease.
+     */
+    gfn_t lowest_mapped_gfn;
 };
 
 /*
