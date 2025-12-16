@@ -180,6 +180,8 @@
 #define HGATP_MODE_MASK			HGATP32_MODE_MASK
 #endif
 
+#define GSTAGE_ROOT_PAGE_TABLE_SIZE	KB(16)
+
 #define TOPI_IID_SHIFT			16
 #define TOPI_IID_MASK			0xfff
 #define TOPI_IPRIO_MASK		0xff

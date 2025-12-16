@@ -3,6 +3,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/macros.h>
+#include <xen/domain_page.h>
 #include <xen/mm.h>
 #include <xen/paging.h>
 #include <xen/rwlock.h>
@@ -109,6 +110,74 @@ void __init guest_mm_init(void)
     local_hfence_gvma_all();
 }
 
+static void clear_and_clean_page(struct page_info *page, bool clean_dcache)
+{
+    void *p = __map_domain_page(page);
+
+    clear_page(p);
+
+    /*
+     * If the IOMMU doesn't support coherent walks and the p2m tables are
+     * shared between the CPU and IOMMU, it is necessary to clean the
+     * d-cache.
+     */
+    if ( clean_dcache )
+        clean_dcache_va_range(p, PAGE_SIZE);
+
+    unmap_domain_page(p);
+}
+
+unsigned long construct_hgatp(const struct p2m_domain *p2m, uint16_t vmid)
+{
+    return MASK_INSR(mfn_x(page_to_mfn(p2m->root)), HGATP_PPN_MASK) |
+           MASK_INSR(p2m->mode.mode, HGATP_MODE_MASK) |
+           MASK_INSR(vmid, HGATP_VMID_MASK);
+}
+
+static int p2m_alloc_root_table(struct p2m_domain *p2m)
+{
+    struct domain *d = p2m->domain;
+    struct page_info *page;
+    int rc;
+
+    /*
+     * Return back P2M_ROOT_PAGES to assure the root table memory is also
+     * accounted against the P2M pool of the domain.
+     */
+    if ( (rc = paging_ret_to_domheap(d, P2M_ROOT_PAGES)) )
+        return rc;
+
+    /*
+     * As mentioned in the Priviliged Architecture Spec (version 20240411)
+     * in Section 18.5.1, for the paged virtual-memory schemes  (Sv32x4,
+     * Sv39x4, Sv48x4, and Sv57x4), the root page table is 16 KiB and must
+     * be aligned to a 16-KiB boundary.
+     */
+    page = alloc_domheap_pages(d, P2M_ROOT_ORDER, MEMF_no_owner);
+    if ( !page )
+    {
+        /*
+         * If allocation of root table pages fails, the pages acquired above
+         * must be returned to the freelist to maintain proper freelist
+         * balance.
+         */
+        paging_refill_from_domheap(d, P2M_ROOT_PAGES);
+
+        return -ENOMEM;
+    }
+
+    for ( unsigned int i = 0; i < P2M_ROOT_PAGES; i++ )
+    {
+        clear_and_clean_page(page + i, p2m->clean_dcache);
+
+        page_list_add(page + i, &p2m->pages);
+    }
+
+    p2m->root = page;
+
+    return 0;
+}
+
 int p2m_init(struct domain *d)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
@@ -124,6 +193,24 @@ int p2m_init(struct domain *d)
     rwlock_init(&p2m->lock);
     INIT_PAGE_LIST_HEAD(&p2m->pages);
 
+    /*
+     * Currently, the infrastructure required to enable CONFIG_HAS_PASSTHROUGH
+     * is not ready for RISC-V support.
+     *
+     * When CONFIG_HAS_PASSTHROUGH=y, p2m->clean_dcache must be properly
+     * initialized.
+     * At the moment, it defaults to false because the p2m structure is
+     * zero-initialized.
+     */
+#ifdef CONFIG_HAS_PASSTHROUGH
+#   error "Add init of p2m->clean_dcache"
+#endif
+
+    /* TODO: don't hardcode used for a domain g-stage mode. */
+    p2m->mode.mode = HGATP_MODE_SV39X4;
+    p2m->mode.paging_levels = 2;
+    safe_strcpy(p2m->mode.name, "Sv39x4");
+
     return 0;
 }
 
@@ -134,10 +221,20 @@ int p2m_init(struct domain *d)
  */
 int p2m_set_allocation(struct domain *d, unsigned long pages, bool *preempted)
 {
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int rc;
 
     if ( (rc = paging_freelist_adjust(d, pages, preempted)) )
         return rc;
 
-    return 0;
+    /*
+     * First, initialize p2m pool. Then allocate the root
+     * table so that the necessary pages can be returned from the p2m pool,
+     * since the root table must be allocated using alloc_domheap_pages(...)
+     * to meet its specific requirements.
+     */
+    if ( !p2m->root )
+        rc = p2m_alloc_root_table(p2m);
+
+    return rc;
 }

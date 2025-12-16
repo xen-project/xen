@@ -2,12 +2,16 @@
 #ifndef ASM__RISCV__P2M_H
 #define ASM__RISCV__P2M_H
 
+#include <xen/bitops.h>
 #include <xen/errno.h>
 #include <xen/mm.h>
 #include <xen/rwlock.h>
 #include <xen/types.h>
 
 #include <asm/page-bits.h>
+
+#define P2M_ROOT_ORDER  (ilog2(GSTAGE_ROOT_PAGE_TABLE_SIZE) - PAGE_SHIFT)
+#define P2M_ROOT_PAGES  BIT(P2M_ROOT_ORDER, U)
 
 #define paddr_bits PADDR_BITS
 
@@ -30,6 +34,11 @@ struct p2m_domain {
     /* Pages used to construct the p2m */
     struct page_list_head pages;
 
+    /* The root of the p2m tree. May be concatenated */
+    struct page_info *root;
+
+    struct gstage_mode_desc mode;
+
     /* Back pointer to domain */
     struct domain *domain;
 
@@ -43,6 +52,12 @@ struct p2m_domain {
      * shattered), call p2m_tlb_flush_sync().
      */
     bool need_flush;
+
+    /*
+     * Indicate if it is required to clean the cache when writing an entry or
+     * when a page is needed to be fully cleared and cleaned.
+     */
+    bool clean_dcache;
 };
 
 /*
@@ -129,6 +144,8 @@ void guest_mm_init(void);
 unsigned char get_max_supported_mode(void);
 
 int p2m_init(struct domain *d);
+
+unsigned long construct_hgatp(const struct p2m_domain *p2m, uint16_t vmid);
 
 #endif /* ASM__RISCV__P2M_H */
 

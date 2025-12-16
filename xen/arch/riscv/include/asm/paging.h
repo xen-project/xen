@@ -10,4 +10,7 @@ int paging_domain_init(struct domain *d);
 int paging_freelist_adjust(struct domain *d, unsigned long pages,
                            bool *preempted);
 
+int paging_ret_to_domheap(struct domain *d, unsigned int nr_pages);
+int paging_refill_from_domheap(struct domain *d, unsigned int nr_pages);
+
 #endif /* ASM_RISCV_PAGING_H */
