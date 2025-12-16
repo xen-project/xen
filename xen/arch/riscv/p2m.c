@@ -12,6 +12,7 @@
 #include <asm/csr.h>
 #include <asm/flushtlb.h>
 #include <asm/p2m.h>
+#include <asm/paging.h>
 #include <asm/riscv_encoding.h>
 #include <asm/vmid.h>
 
@@ -118,8 +119,25 @@ int p2m_init(struct domain *d)
      */
     p2m->domain = d;
 
+    paging_domain_init(d);
+
     rwlock_init(&p2m->lock);
     INIT_PAGE_LIST_HEAD(&p2m->pages);
+
+    return 0;
+}
+
+/*
+ * Set the pool of pages to the required number of pages.
+ * Returns 0 for success, non-zero for failure.
+ * Call with d->arch.paging.lock held.
+ */
+int p2m_set_allocation(struct domain *d, unsigned long pages, bool *preempted)
+{
+    int rc;
+
+    if ( (rc = paging_freelist_adjust(d, pages, preempted)) )
+        return rc;
 
     return 0;
 }
