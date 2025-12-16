@@ -3,6 +3,10 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/macros.h>
+#include <xen/mm.h>
+#include <xen/paging.h>
+#include <xen/rwlock.h>
+#include <xen/sched.h>
 #include <xen/sections.h>
 
 #include <asm/csr.h>
@@ -102,4 +106,20 @@ void __init guest_mm_init(void)
      * so it could be that we polluted local TLB so flush all guest TLB.
      */
     local_hfence_gvma_all();
+}
+
+int p2m_init(struct domain *d)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+    /*
+     * "Trivial" initialisation is now complete.  Set the backpointer so the
+     * users of p2m could get an access to domain structure.
+     */
+    p2m->domain = d;
+
+    rwlock_init(&p2m->lock);
+    INIT_PAGE_LIST_HEAD(&p2m->pages);
+
+    return 0;
 }

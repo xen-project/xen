@@ -3,15 +3,46 @@
 #define ASM__RISCV__P2M_H
 
 #include <xen/errno.h>
+#include <xen/mm.h>
+#include <xen/rwlock.h>
+#include <xen/types.h>
 
 #include <asm/page-bits.h>
 
 #define paddr_bits PADDR_BITS
 
+/* Get host p2m table */
+#define p2m_get_hostp2m(d) (&(d)->arch.p2m)
+
 struct gstage_mode_desc {
     unsigned char mode;
     unsigned int paging_levels;
     char name[8];
+};
+
+/* Per-p2m-table state */
+struct p2m_domain {
+    /*
+     * Lock that protects updates to the p2m.
+     */
+    rwlock_t lock;
+
+    /* Pages used to construct the p2m */
+    struct page_list_head pages;
+
+    /* Back pointer to domain */
+    struct domain *domain;
+
+    /*
+     * P2M updates may required TLBs to be flushed (invalidated).
+     *
+     * Flushes may be deferred by setting 'need_flush' and then flushing
+     * when the p2m write lock is released.
+     *
+     * If an immediate flush is required (e.g, if a super page is
+     * shattered), call p2m_tlb_flush_sync().
+     */
+    bool need_flush;
 };
 
 /*
@@ -96,6 +127,8 @@ static inline bool arch_acquire_resource_check(struct domain *d)
 
 void guest_mm_init(void);
 unsigned char get_max_supported_mode(void);
+
+int p2m_init(struct domain *d);
 
 #endif /* ASM__RISCV__P2M_H */
 
