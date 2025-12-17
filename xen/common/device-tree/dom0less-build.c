@@ -439,14 +439,24 @@ static int __init domain_handle_dtb_boot_module(struct domain *d,
 
 /*
  * The max size for DT is 2MB. However, the generated DT is small (not including
- * domU passthrough DT nodes whose size we account separately), 4KB are enough
- * for now, but we might have to increase it in the future.
+ * domU passthrough DT nodes whose size we account separately). The size is
+ * calculated from a fixed baseline plus a scalable portion for each potential
+ * vCPU node up to the system limit (MAX_VIRT_CPUS), as the vCPU nodes are
+ * the primary consumer of space.
+ *
+ * The baseline of 2KiB is a safe buffer for all non-vCPU FDT content.
+ * Empirical testing with the maximum number of other device tree nodes shows
+ * a final compacted base size of ~1.5KiB. The 128 bytes per vCPU is derived
+ * from a worst-case analysis of the FDT construction-time size for a single
+ * vCPU node.
  */
-#define DOMU_DTB_SIZE 4096
+#define DOMU_DTB_SIZE (2048 + (MAX_VIRT_CPUS * 128))
 static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
 {
     int addrcells, sizecells;
     int ret, fdt_size = DOMU_DTB_SIZE;
+
+    BUILD_BUG_ON(DOMU_DTB_SIZE > SZ_2M);
 
     kinfo->phandle_intc = GUEST_PHANDLE_GIC;
 
