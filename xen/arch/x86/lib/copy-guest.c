@@ -1,4 +1,4 @@
-/* 
+/*
  * User address space access functions.
  *
  * Copyright 1997 Andi Kleen <ak@muc.de>
@@ -6,8 +6,8 @@
  * Copyright 2002 Andi Kleen <ak@suse.de>
  */
 
-#include <xen/lib.h>
 #include <xen/sched.h>
+
 #include <asm/uaccess.h>
 
 #ifndef GUARD
@@ -138,14 +138,6 @@ unsigned int copy_from_guest_pv(void *to, const void __user *from,
         memset(to, 0, n);
     return n;
 }
-
-# undef GUARD
-# define GUARD UA_DROP
-# define copy_to_guest_ll copy_to_unsafe_ll
-# define copy_from_guest_ll copy_from_unsafe_ll
-# undef __user
-# define __user
-# include __FILE__
 
 #endif /* GUARD(1) */
 
