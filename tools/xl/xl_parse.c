@@ -1518,14 +1518,22 @@ void parse_config_data(const char *config_source,
 
     if (!xlu_cfg_get_long (config, "vcpus", &l, 0)) {
         vcpus = l;
-        if (libxl_cpu_bitmap_alloc(ctx, &b_info->avail_vcpus, l)) {
-            fprintf(stderr, "Unable to allocate cpumap\n");
-            exit(1);
-        }
-        libxl_bitmap_set_none(&b_info->avail_vcpus);
-        while (l-- > 0)
-            libxl_bitmap_set((&b_info->avail_vcpus), l);
     }
+    if (vcpus < 1) {
+        /*
+         * Default to 1 vCPU, libxl is already assuming this
+         * when vcpus == 0 and parse_vcpu_affinity() also assume there's at
+         * least one vcpu.
+         */
+        vcpus = 1;
+    }
+    if (libxl_cpu_bitmap_alloc(ctx, &b_info->avail_vcpus, vcpus)) {
+        fprintf(stderr, "Unable to allocate cpumap\n");
+        exit(1);
+    }
+    libxl_bitmap_set_none(&b_info->avail_vcpus);
+    for (long vcpu = vcpus; vcpu-- > 0;)
+        libxl_bitmap_set((&b_info->avail_vcpus), vcpu);
 
     if (!xlu_cfg_get_long (config, "maxvcpus", &l, 0))
         b_info->max_vcpus = l;
