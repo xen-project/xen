@@ -400,7 +400,7 @@ The table columns are as follows:
      - See Section "4.15 Architecture" of GCC_MANUAL and Section "3.1.2 Data Representation" of X86_64_ABI_MANUAL.
 
    * - Character not in the basic source character set is encountered in a source file, except in an identifier, a character constant, a string literal, a header name, a comment, or a preprocessing token that is never converted to a token
-     - ARM64
+     - ARM64, X86_64
      - UTF-8
      - See Section "1.1 Character sets" of CPP_MANUAL.
        We assume the locale is not restricting any UTF-8 characters being part of the source character set.

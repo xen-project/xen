@@ -210,6 +210,7 @@ ext_sizeof_alignof_void_type"
 
 -doc_begin="See Section \"1.1 Character sets\" of "CPP_MANUAL".  We assume the locale is not restricting any UTF-8 characters being part of the source character set."
 -config=STD.charset,behavior={c99, GCC_ARM64, "utf8"}
+-config=STD.charset,behavior={c99, GCC_X86_64, "utf8"}
 -doc_end
 
 -doc_begin="See Section \"4.3 Identifiers\" of "GCC_MANUAL"."
