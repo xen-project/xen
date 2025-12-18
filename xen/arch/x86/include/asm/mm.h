@@ -623,8 +623,8 @@ extern int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm);
 #define domain_clamp_alloc_bitsize(d, bits) ({                 \
     const struct domain *_d = (d);                             \
                                                                \
-    ((_d && _d->arch.physaddr_bitsize)                         \
-     ? min_t(unsigned int, _d->arch.physaddr_bitsize, bits)    \
+    ((_d && _d->arch.pv.physaddr_bitsize)                      \
+     ? min_t(unsigned int, _d->arch.pv.physaddr_bitsize, bits) \
      : (bits));                                                \
 })
 #endif

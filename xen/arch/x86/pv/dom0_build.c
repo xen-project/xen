@@ -626,8 +626,10 @@ static int __init dom0_construct(const struct boot_domain *bd)
         initrd_mfn = paddr_to_pfn(initrd->start);
         mfn = initrd_mfn;
         count = PFN_UP(initrd_len);
-        if ( d->arch.physaddr_bitsize &&
-             ((mfn + count - 1) >> (d->arch.physaddr_bitsize - PAGE_SHIFT)) )
+
+#ifdef CONFIG_PV32
+        if ( d->arch.pv.physaddr_bitsize &&
+             ((mfn + count - 1) >> (d->arch.pv.physaddr_bitsize - PAGE_SHIFT)) )
         {
             order = get_order_from_pages(count);
             page = alloc_domheap_pages(d, order, MEMF_no_scrub);
@@ -650,6 +652,7 @@ static int __init dom0_construct(const struct boot_domain *bd)
             initrd->start = pfn_to_paddr(initrd_mfn);
         }
         else
+#endif
         {
             while ( count-- )
                 if ( assign_pages(mfn_to_page(_mfn(mfn++)), 1, d, 0) )

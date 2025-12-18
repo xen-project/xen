@@ -257,7 +257,7 @@ int switch_compat(struct domain *d)
     d->arch.pv.hv_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
 
     if ( MACH2PHYS_COMPAT_NR_ENTRIES(d) < max_page )
-        d->arch.physaddr_bitsize =
+        d->arch.pv.physaddr_bitsize =
             /* 2^n entries can be contained in guest's p2m mapping space */
             fls(MACH2PHYS_COMPAT_NR_ENTRIES(d)) - 1 + PAGE_SHIFT;
 

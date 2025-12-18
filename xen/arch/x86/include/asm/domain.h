@@ -290,6 +290,9 @@ struct pv_domain
 
 #ifdef CONFIG_PV32
     unsigned int hv_compat_vstart;
+
+    /* Maximum physical-address bitwidth supported by this guest. */
+    unsigned int physaddr_bitsize;
 #endif
 
     /* map_domain_page() mapping cache. */
@@ -318,9 +321,6 @@ struct monitor_write_data {
 struct arch_domain
 {
     struct page_info *perdomain_l3_pg;
-
-    /* Maximum physical-address bitwidth supported by this guest. */
-    unsigned int physaddr_bitsize;
 
     /* I/O-port admin-specified access capabilities. */
     struct rangeset *ioport_caps;
