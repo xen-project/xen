@@ -1,16 +1,14 @@
 XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
+vpath %.c $(XEN_ROOT)/xen/common/libelf
+
 LIBELF_OBJS := libelf-tools.o libelf-loader.o libelf-dominfo.o
 
-CFLAGS += -iquote ../../../xen/common/libelf
 $(LIBELF_OBJS): CFLAGS += -Wno-pointer-sign
 $(LIBELF_OBJS): CFLAGS += -DFUZZ_NO_LIBXC $(CFLAGS_xeninclude)
 
 libelf-fuzzer.o: CFLAGS += $(CFLAGS_xeninclude)
-
-$(LIBELF_OBJS:.o=.c): libelf-%.c: ../../../xen/common/libelf/libelf-%.c FORCE
-	ln -nsf $< $@
 
 libelf.a: libelf-fuzzer.o $(LIBELF_OBJS)
 	$(AR) rc $@ $^
@@ -30,7 +28,7 @@ distclean: clean
 
 .PHONY: clean
 clean:
-	rm -f *.o .*.d *.a *-libelf-fuzzer $(LIBELF_OBJS:.o=.c)
+	rm -f *.o .*.d *.a *-libelf-fuzzer
 
 .PHONY: install
 install: all

@@ -9,8 +9,7 @@ x86-insn-fuzz-all:
 endif
 
 # Add libx86 to the build
-%.c: $(XEN_ROOT)/xen/lib/x86/%.c FORCE
-	ln -nsf $< $@
+vpath %.c $(XEN_ROOT)/xen/lib/x86
 
 x86_emulate: FORCE
 	mkdir -p $@
@@ -25,7 +24,6 @@ x86_emulate/%.h: x86_emulate ;
 	ln -nsf $< $@
 
 CFLAGS += $(CFLAGS_xeninclude) -D__XEN_TOOLS__ -iquote .
-cpuid.o: CFLAGS += -iquote $(XEN_ROOT)/xen/lib/x86
 
 GCOV_FLAGS := --coverage
 %-cov.o: %.c
@@ -72,7 +70,7 @@ distclean: clean
 clean:
 	rm -f *.a *.o $(DEPS_RM) *.gcda *.gcno *.gcov
 	rm -f afl-harness afl-harness-cov libfuzzer-harness
-	rm -rf x86_emulate x86-emulate.c x86-emulate.h wrappers.c cpuid.c
+	rm -rf x86_emulate x86-emulate.c x86-emulate.h wrappers.c
 
 .PHONY: install
 install: all
