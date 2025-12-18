@@ -1119,13 +1119,6 @@ unmap:
     return ret;
 }
 
-unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits)
-{
-    if ( (d == NULL) || (d->arch.physaddr_bitsize == 0) )
-        return bits;
-    return min(d->arch.physaddr_bitsize, bits);
-}
-
 static int transfer_pages_to_heap(struct mem_hotadd_info *info)
 {
     unsigned long i;

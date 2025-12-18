@@ -619,8 +619,15 @@ void __iomem *ioremap_wc(paddr_t pa, size_t len);
 
 extern int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm);
 
-unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits);
-#define domain_clamp_alloc_bitsize(d, bits) domain_clamp_alloc_bitsize(d, bits)
+#ifdef CONFIG_PV32
+#define domain_clamp_alloc_bitsize(d, bits) ({                 \
+    const struct domain *_d = (d);                             \
+                                                               \
+    ((_d && _d->arch.physaddr_bitsize)                         \
+     ? min_t(unsigned int, _d->arch.physaddr_bitsize, bits)    \
+     : (bits));                                                \
+})
+#endif
 
 unsigned long domain_get_maximum_gpfn(struct domain *d);
 
