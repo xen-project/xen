@@ -2,13 +2,6 @@
 
 uint64_t generic_muldiv64(uint64_t a, uint32_t b, uint32_t c)
 {
-#ifdef CONFIG_X86
-    asm ( "mulq %1; divq %2" : "+a" (a)
-                             : "rm" ((uint64_t)b), "rm" ((uint64_t)c)
-                             : "rdx" );
-
-    return a;
-#else
     union {
         uint64_t ll;
         struct {
@@ -31,7 +24,6 @@ uint64_t generic_muldiv64(uint64_t a, uint32_t b, uint32_t c)
     res.l.low = (((rh % c) << 32) + (uint32_t)rl) / c;
 
     return res.ll;
-#endif
 }
 
 /*

@@ -4,6 +4,10 @@
 
 #include <xen/stdint.h>
 
+#if __has_include(<asm/muldiv64.h>)
+# include <asm/muldiv64.h>
+#endif
+
 uint64_t attr_const generic_muldiv64(uint64_t a, uint32_t b, uint32_t c);
 
 /*
@@ -12,7 +16,11 @@ uint64_t attr_const generic_muldiv64(uint64_t a, uint32_t b, uint32_t c);
  */
 static inline uint64_t attr_const muldiv64(uint64_t a, uint32_t b, uint32_t c)
 {
+#ifdef arch_muldiv64
+    return arch_muldiv64(a, b, c);
+#else
     return generic_muldiv64(a, b, c);
+#endif
 }
 
 #endif /* XEN_MULDIV64_H */
