@@ -17,7 +17,7 @@ unsigned int arch_domain_struct_memflags(void);
 
 /*
  * This structure contains embedded PAE PDPTEs, used when an HVM guest
- * runs on shadow pagetables outside of 64-bit mode. In this case the CPU
+ * runs on shadow pagetables outside of Long mode. In this case the CPU
  * may require that the shadow CR3 points below 4GB, and hence the whole
  * structure must satisfy this restriction. Thus we specify MEMF_bits(32).
  */
