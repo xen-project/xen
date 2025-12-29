@@ -24,19 +24,19 @@
  * IN THE SOFTWARE.
  */
 
-#include <xen/types.h>
-#include <xen/mm.h>
-#include <xen/xmalloc.h>
-#include <xen/lib.h>
 #include <xen/errno.h>
+#include <xen/lib.h>
+#include <xen/mm.h>
 #include <xen/sched.h>
 #include <xen/trace.h>
-#include <asm/time.h>
+#include <xen/xmalloc.h>
+
+#include <asm/current.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/save.h>
 #include <asm/hvm/vpt.h>
-#include <asm/current.h>
+#include <asm/time.h>
 
 #define domain_vpit(x) (&(x)->arch.vpit)
 #define vcpu_vpit(x)   (domain_vpit((x)->domain))

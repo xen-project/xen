@@ -9,38 +9,40 @@
  * Copyright (c) 1991, 1992, 1995  Linus Torvalds
  */
 
+#include <xen/cpuidle.h>
+#include <xen/efi.h>
 #include <xen/errno.h>
 #include <xen/event.h>
-#include <xen/sched.h>
-#include <xen/lib.h>
+#include <xen/guest_access.h>
 #include <xen/init.h>
+#include <xen/irq.h>
+#include <xen/keyhandler.h>
+#include <xen/lib.h>
 #include <xen/param.h>
+#include <xen/pci_ids.h>
+#include <xen/sched.h>
+#include <xen/smp.h>
+#include <xen/softirq.h>
+#include <xen/symbols.h>
 #include <xen/time.h>
 #include <xen/timer.h>
-#include <xen/smp.h>
-#include <xen/irq.h>
-#include <xen/pci_ids.h>
-#include <xen/softirq.h>
-#include <xen/efi.h>
-#include <xen/cpuidle.h>
-#include <xen/symbols.h>
-#include <xen/keyhandler.h>
-#include <xen/guest_access.h>
+
+#include <asm/acpi.h>
 #include <asm/apic.h>
-#include <asm/io.h>
-#include <asm/iocap.h>
-#include <asm/msr.h>
-#include <asm/mpspec.h>
-#include <asm/processor.h>
+#include <asm/div64.h>
 #include <asm/fixmap.h>
 #include <asm/guest.h>
-#include <asm/mc146818rtc.h>
-#include <asm/mwait.h>
-#include <asm/div64.h>
-#include <asm/acpi.h>
 #include <asm/hpet.h>
 #include <asm/io-ports.h>
-#include <asm/setup.h> /* for early_time_init */
+#include <asm/io.h>
+#include <asm/iocap.h>
+#include <asm/mc146818rtc.h>
+#include <asm/mpspec.h>
+#include <asm/msr.h>
+#include <asm/mwait.h>
+#include <asm/processor.h>
+#include <asm/setup.h>
+
 #include <public/arch-x86/cpuid.h>
 
 /* opt_clocksource: Force clocksource to one of: pit, hpet, acpi. */
