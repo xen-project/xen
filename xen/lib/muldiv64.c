@@ -13,10 +13,12 @@ uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c)
     union {
         uint64_t ll;
         struct {
-#ifdef WORDS_BIGENDIAN
+#if defined(__BIG_ENDIAN)
             uint32_t high, low;
-#else
+#elif defined(__LITTLE_ENDIAN)
             uint32_t low, high;
+#else
+# error Unknown Endianness
 #endif
         } l;
     } u, res;
