@@ -1,5 +1,6 @@
 #include <asm/page-bits.h>
 
+/* binutils >= 2.26 or Clang >= 3.8 */
 .macro clzero
     .byte 0x0f, 0x01, 0xfc
 .endm

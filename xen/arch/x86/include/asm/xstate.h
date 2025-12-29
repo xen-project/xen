@@ -118,8 +118,7 @@ static inline uint64_t xgetbv(unsigned int index)
     uint32_t lo, hi;
 
     ASSERT(index); /* get_xcr0() should be used instead. */
-    asm volatile ( ".byte 0x0f,0x01,0xd0" /* xgetbv */
-                   : "=a" (lo), "=d" (hi) : "c" (index) );
+    asm volatile ( "xgetbv" : "=a" (lo), "=d" (hi) : "c" (index) );
 
     return lo | ((uint64_t)hi << 32);
 }

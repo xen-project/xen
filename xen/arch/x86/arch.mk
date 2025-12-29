@@ -17,7 +17,11 @@ CFLAGS-$(CONFIG_CC_IS_GCC) += -malign-data=abi
 $(call cc-options-add,CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
 $(call cc-option-add,CFLAGS,CC,-Wnested-externs)
 $(call as-option-add,CFLAGS,CC,".equ \"x\"$(comma)1",-DHAVE_AS_QUOTED_SYM)
+
+# Binutils >= 2.31, Clang >= 7
 $(call as-option-add,CFLAGS,CC,"movdiri %rax$(comma)(%rax)",-DHAVE_AS_MOVDIR)
+
+# Binutils >= 2.33, Clang >= 9
 $(call as-option-add,CFLAGS,CC,"enqcmd (%rax)$(comma)%rax",-DHAVE_AS_ENQCMD)
 
 # Check to see whether the assembler supports the .nop directive.

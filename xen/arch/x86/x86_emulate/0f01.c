@@ -122,7 +122,7 @@ int x86emul_0f01(struct x86_emulate_state *s,
         {
         case vex_none: /* serialize */
             host_and_vcpu_must_have(serialize);
-            asm volatile ( ".byte 0x0f, 0x01, 0xe8" );
+            asm volatile ( ".byte 0x0f, 0x01, 0xe8" ); /* Binutils >= 2.34, Clang >= 11 */
             break;
         case vex_f2: /* xsusldtrk */
             vcpu_must_have(tsxldtrk);

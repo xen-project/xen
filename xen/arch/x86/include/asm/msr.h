@@ -63,6 +63,8 @@ static inline void wrmsrns(uint32_t msr, uint64_t val)
     /*
      * WRMSR is 2 bytes.  WRMSRNS is 3 bytes.  Pad WRMSR with a redundant CS
      * prefix to avoid a trailing NOP.
+     *
+     * Binutils >= 2.40, Clang >= 16
      */
     alternative_input(".byte 0x2e; wrmsr",
                       ".byte 0x0f,0x01,0xc6", X86_FEATURE_WRMSRNS,
