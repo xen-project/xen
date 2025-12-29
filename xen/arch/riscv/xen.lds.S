@@ -61,6 +61,13 @@ SECTIONS
         __note_gnu_build_id_end = .;
     } :note :text
     #endif
+
+    . = ALIGN(POINTER_ALIGN);
+    DECL_SECTION(.vsbi.exts) {
+        _svsbi_exts = .;
+        *(.vsbi.exts)
+        _evsbi_exts = .;
+    } :text
     _erodata = .;                /* End of read-only data */
 
     . = ALIGN(PAGE_SIZE);

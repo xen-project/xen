@@ -26,6 +26,7 @@
 #include <asm/sbi.h>
 #include <asm/setup.h>
 #include <asm/traps.h>
+#include <asm/vsbi.h>
 
 /* Xen stack for bringing up the first CPU. */
 unsigned char __initdata cpu0_boot_stack[STACK_SIZE]
@@ -109,6 +110,8 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
     vm_init();
 
     end_boot_allocator();
+
+    check_vsbi_ext_ranges();
 
     /*
      * The memory subsystem has been initialized, we can now switch from

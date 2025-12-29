@@ -48,11 +48,17 @@ save_to_stack:
         csrr    t0, CSR_SSTATUS
         REG_S   t0, CPU_USER_REGS_SSTATUS(sp)
 
+        csrr    t0, CSR_HSTATUS
+        REG_S   t0, CPU_USER_REGS_HSTATUS(sp)
+
         mv      a0, sp
         call    do_trap
 
 restore_registers:
         /* Restore stack_cpu_regs */
+        REG_L	t0, CPU_USER_REGS_HSTATUS(sp)
+        csrw	CSR_HSTATUS, t0
+
         REG_L   t0, CPU_USER_REGS_SEPC(sp)
         csrw    CSR_SEPC, t0
         REG_L   t0, CPU_USER_REGS_SSTATUS(sp)

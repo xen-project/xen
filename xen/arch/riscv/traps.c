@@ -15,6 +15,7 @@
 #include <asm/processor.h>
 #include <asm/riscv_encoding.h>
 #include <asm/traps.h>
+#include <asm/vsbi.h>
 
 /*
  * Initialize the trap handling.
@@ -114,6 +115,13 @@ void do_trap(struct cpu_user_regs *cpu_regs)
 
     switch ( cause )
     {
+    case CAUSE_VIRTUAL_SUPERVISOR_ECALL:
+        /* CAUSE_VIRTUAL_SUPERVISOR_ECALL should come from VS-mode */
+        BUG_ON(!(cpu_regs->hstatus & HSTATUS_SPV));
+
+        vsbi_handle_ecall(cpu_regs);
+        break;
+
     case CAUSE_ILLEGAL_INSTRUCTION:
         if ( do_bug_frame(cpu_regs, pc) >= 0 )
         {

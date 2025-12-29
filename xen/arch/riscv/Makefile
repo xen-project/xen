@@ -20,6 +20,7 @@ obj-y += time.o
 obj-y += traps.o
 obj-y += vmid.o
 obj-y += vm_event.o
+obj-y += vsbi/
 
 $(TARGET): $(TARGET)-syms
 	$(OBJCOPY) -O binary -S $< $@

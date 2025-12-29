@@ -49,6 +49,7 @@ struct cpu_user_regs
     unsigned long t6;
     unsigned long sepc;
     unsigned long sstatus;
+    unsigned long hstatus;
     /* pointer to previous stack_cpu_regs */
     unsigned long pregs;
 };
