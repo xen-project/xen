@@ -8,26 +8,27 @@
  * Copyright (c) 2011 Citrix Systems.
  */
 
+#include <xen/acpi.h>
 #include <xen/console.h>
+#include <xen/cpu.h>
+#include <xen/delay.h>
 #include <xen/device_tree.h>
+#include <xen/event.h>
 #include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
-#include <xen/softirq.h>
-#include <xen/sched.h>
-#include <xen/time.h>
-#include <xen/delay.h>
-#include <xen/sched.h>
-#include <xen/event.h>
-#include <xen/acpi.h>
-#include <xen/cpu.h>
 #include <xen/notifier.h>
+#include <xen/sched.h>
+#include <xen/sched.h>
+#include <xen/softirq.h>
+#include <xen/time.h>
+
+#include <asm/cpufeature.h>
+#include <asm/platform.h>
 #include <asm/system.h>
 #include <asm/time.h>
 #include <asm/vgic.h>
-#include <asm/cpufeature.h>
-#include <asm/platform.h>
 
 uint64_t __read_mostly boot_count;
 
