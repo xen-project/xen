@@ -14,8 +14,15 @@
 
 #include <xen/cpumask.h>
 
-#define SBI_EXT_0_1_CONSOLE_PUTCHAR		0x1
-#define SBI_EXT_0_1_SHUTDOWN			0x8
+#define SBI_EXT_0_1_SET_TIMER               0x0
+#define SBI_EXT_0_1_CONSOLE_PUTCHAR         0x1
+#define SBI_EXT_0_1_CONSOLE_GETCHAR         0x2
+#define SBI_EXT_0_1_CLEAR_IPI               0x3
+#define SBI_EXT_0_1_SEND_IPI                0x4
+#define SBI_EXT_0_1_REMOTE_FENCE_I          0x5
+#define SBI_EXT_0_1_REMOTE_SFENCE_VMA       0x6
+#define SBI_EXT_0_1_REMOTE_SFENCE_VMA_ASID  0x7
+#define SBI_EXT_0_1_SHUTDOWN                0x8
 
 #define SBI_EXT_BASE                    0x10
 #define SBI_EXT_RFENCE                  0x52464E43
