@@ -247,3 +247,15 @@ static void __init __constructor test_bitops(void)
     test_multiple_bits_set();
     test_hweight();
 }
+
+#include <xen/muldiv64.h>
+
+/* Not a bitop, but here in lieu of any any better location */
+static void __init __constructor test_muldiv64(void)
+{
+    uint64_t res = muldiv64(0xffffffffffffffffULL,
+                            HIDE(0xffffffffU),
+                            HIDE(0xffffffffU));
+    if ( res != 0xffffffffffffffffULL )
+        panic("muldiv64(), expecting -1ULL, got %#"PRIx64"\n", res);
+}

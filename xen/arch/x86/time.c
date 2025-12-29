@@ -17,7 +17,7 @@
 #include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/keyhandler.h>
-#include <xen/lib.h>
+#include <xen/muldiv64.h>
 #include <xen/param.h>
 #include <xen/pci_ids.h>
 #include <xen/sched.h>

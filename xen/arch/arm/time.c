@@ -16,8 +16,8 @@
 #include <xen/event.h>
 #include <xen/init.h>
 #include <xen/irq.h>
-#include <xen/lib.h>
 #include <xen/mm.h>
+#include <xen/muldiv64.h>
 #include <xen/notifier.h>
 #include <xen/sched.h>
 #include <xen/sched.h>

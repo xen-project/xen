@@ -25,8 +25,8 @@
  */
 
 #include <xen/errno.h>
-#include <xen/lib.h>
 #include <xen/mm.h>
+#include <xen/muldiv64.h>
 #include <xen/sched.h>
 #include <xen/trace.h>
 #include <xen/xmalloc.h>

@@ -3,8 +3,8 @@
 #define ASM__RISCV__TIME_H
 
 #include <xen/bug.h>
-#include <xen/lib.h>
-#include <xen/types.h>
+#include <xen/muldiv64.h>
+
 #include <asm/csr.h>
 
 /* Clock cycles count at Xen startup */
