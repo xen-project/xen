@@ -573,6 +573,14 @@ int vpci_add_register_mask(struct vpci *vpci, vpci_read_t *read_handler,
     return 0;
 }
 
+int vpci_add_register(struct vpci *vpci, vpci_read_t *read_handler,
+                      vpci_write_t *write_handler, unsigned int offset,
+                      unsigned int size, void *data)
+{
+    return vpci_add_register_mask(vpci, read_handler, write_handler, offset,
+                                  size, data, 0, 0, 0, 0);
+}
+
 int vpci_remove_registers(struct vpci *vpci, unsigned int start,
                           unsigned int size)
 {

@@ -60,15 +60,11 @@ int __must_check vpci_add_register_mask(struct vpci *vpci,
                                         void *data, uint32_t ro_mask,
                                         uint32_t rw1c_mask, uint32_t rsvdp_mask,
                                         uint32_t rsvdz_mask);
-static inline int __must_check vpci_add_register(struct vpci *vpci,
-                                                 vpci_read_t *read_handler,
-                                                 vpci_write_t *write_handler,
-                                                 unsigned int offset,
-                                                 unsigned int size, void *data)
-{
-    return vpci_add_register_mask(vpci, read_handler, write_handler, offset,
-                                  size, data, 0, 0, 0, 0);
-}
+int __must_check vpci_add_register(struct vpci *vpci,
+                                   vpci_read_t *read_handler,
+                                   vpci_write_t *write_handler,
+                                   unsigned int offset, unsigned int size,
+                                   void *data);
 
 int vpci_remove_registers(struct vpci *vpci, unsigned int start,
                           unsigned int size);
