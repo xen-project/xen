@@ -570,8 +570,10 @@ Deviations related to MISRA C:2012 Rules:
      - Tagged as `deliberate` for ECLAIR.
 
    * - R17.1
-     - printf()-like functions  are allowed to use the variadic features provided
-       by `stdarg.h`.
+     - printf()-like or scanf()-like functions are allowed to use the variadic
+       features provided by `stdarg.h`, provided that they are declared using
+       __attribute__((format(...))) which enables compiler type-checking of
+       the variadic parameters.
      - Tagged as `deliberate` for ECLAIR.
 
    * - R17.7

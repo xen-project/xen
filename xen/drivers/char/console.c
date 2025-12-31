@@ -969,7 +969,9 @@ static void printk_start_of_line(const char *prefix)
     __putstr(tstr);
 }
 
-static void vprintk_common(const char *fmt, va_list args, const char *prefix)
+static void
+__attribute__ ((format (printf, 1, 0)))
+vprintk_common(const char *fmt, va_list args, const char *prefix)
 {
     struct vps {
         bool continued, do_print;
