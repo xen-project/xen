@@ -21,6 +21,7 @@
 #include <xen/errno.h>
 #include <xen/event.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
 #include <xen/lib.h>
 #include <xen/nospec.h>
 #include <xen/param.h>
@@ -2084,18 +2085,17 @@ sendv(struct domain *src_d, xen_argo_addr_t *src_addr,
 
 long
 do_argo_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg1,
-           XEN_GUEST_HANDLE_PARAM(void) arg2, unsigned long raw_arg3,
-           unsigned long raw_arg4)
+           XEN_GUEST_HANDLE_PARAM(void) arg2, unsigned long arg3,
+           unsigned long arg4)
 {
     struct domain *currd = current->domain;
     long rc;
-    unsigned int arg3 = raw_arg3, arg4 = raw_arg4;
 
     argo_dprintk("->do_argo_op(%u,%p,%p,%lu,0x%lx)\n", cmd,
-                 (void *)arg1.p, (void *)arg2.p, raw_arg3, raw_arg4);
+                 arg1.p, arg2.p, arg3, arg4);
 
     /* Reject numeric hypercall args outside 32-bit range */
-    if ( (arg3 != raw_arg3) || (arg4 != raw_arg4) )
+    if ( (arg3 != (uint32_t)arg3) || (arg4 != (uint32_t)arg4) )
         return -EINVAL;
 
     if ( unlikely(!opt_argo) )
@@ -2248,7 +2248,7 @@ compat_argo_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg1,
         return rc;
 
     argo_dprintk("->compat_argo_op(%u,%p,%p,%lu,0x%lx)\n", cmd,
-                 (void *)arg1.p, (void *)arg2.p, arg3, arg4);
+                 arg1.p, arg2.p, arg3, arg4);
 
     send_addr_hnd = guest_handle_cast(arg1, xen_argo_send_addr_t);
     /* arg2: iovs, arg3: niov, arg4: message_type */
