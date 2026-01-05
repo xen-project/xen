@@ -4,7 +4,7 @@
 BEGIN {
     printf("#ifndef XEN_HYPERCALL_DEFS_H\n");
     printf("#define XEN_HYPERCALL_DEFS_H\n\n");
-    printf("/* Generated file, do not edit! */\n\n");
+    printf("/* Automatically generated from xen/include/hypercall-defs.c - do not edit! */\n\n");
     e = 0;
     n = 0;
     p = 0;
