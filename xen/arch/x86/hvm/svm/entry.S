@@ -155,7 +155,6 @@ __UNLIKELY_END(nsvm_hap)
          * to safely resolve any Spectre-v1 concerns in the above logic.
          */
         stgi
-LABEL(svm_stgi_label, 0)
         call svm_vmexit_handler
         jmp  .Lsvm_do_resume
 

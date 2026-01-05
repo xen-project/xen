@@ -12,7 +12,6 @@
 
 #include <xen/err.h>
 #include <xen/sched.h>
-#include <xen/xenoprof.h>
 
 #include <asm/apic.h>
 #include <asm/hvm/save.h>
@@ -363,8 +362,6 @@ static int cf_check amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
     if ( (type == MSR_TYPE_CTRL) &&
         is_pmu_enabled(msr_content) && !vpmu_is_set(vpmu, VPMU_RUNNING) )
     {
-        if ( !acquire_pmu_ownership(PMU_OWNER_HVM) )
-            return 0;
         vpmu_set(vpmu, VPMU_RUNNING);
 
         if ( is_svm_vcpu(v) && is_msr_bitmap_on(vpmu) )
@@ -378,7 +375,6 @@ static int cf_check amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
         vpmu_reset(vpmu, VPMU_RUNNING);
         if ( is_svm_vcpu(v) && is_msr_bitmap_on(vpmu) )
              amd_vpmu_unset_msr_bitmap(v);
-        release_pmu_ownership(PMU_OWNER_HVM);
     }
 
     if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED)
@@ -426,9 +422,6 @@ static void cf_check amd_vpmu_destroy(struct vcpu *v)
     vpmu->context = NULL;
     vpmu->priv_context = NULL;
 
-    if ( vpmu_is_set(vpmu, VPMU_RUNNING) )
-        release_pmu_ownership(PMU_OWNER_HVM);
-
     vpmu_clear(vpmu);
 }
 
@@ -449,8 +442,6 @@ static void cf_check amd_vpmu_dump(const struct vcpu *v)
     }
 
     printk("(");
-    if ( vpmu_is_set(vpmu, VPMU_PASSIVE_DOMAIN_ALLOCATED) )
-        printk("PASSIVE_DOMAIN_ALLOCATED, ");
     if ( vpmu_is_set(vpmu, VPMU_FROZEN) )
         printk("FROZEN, ");
     if ( vpmu_is_set(vpmu, VPMU_CONTEXT_SAVE) )

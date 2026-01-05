@@ -36,7 +36,6 @@
 #include <asm/paging.h>
 #include <asm/processor.h>
 #include <asm/x86_emulate.h>
-#include <asm/xenoprof.h>
 
 #include <public/sched.h>
 
@@ -1152,7 +1151,6 @@ static int cf_check svm_vcpu_initialise(struct vcpu *v)
 static void cf_check svm_vcpu_destroy(struct vcpu *v)
 {
     svm_destroy_vmcb(v);
-    passive_domain_destroy(v);
 }
 
 /*

@@ -65,7 +65,7 @@ struct vpmu_struct {
 #define VPMU_RUNNING                        0x0008
 #define VPMU_CONTEXT_SAVE                   0x0010  /* Force context save */
 #define VPMU_FROZEN                         0x0020  /* Stop counters while VCPU is not running */
-#define VPMU_PASSIVE_DOMAIN_ALLOCATED       0x0040
+/* 0x0040 available */
 /* PV(H) guests: VPMU registers are accessed by guest from shared page */
 #define VPMU_CACHED                         0x0080
 #define VPMU_AVAILABLE                      0x0100

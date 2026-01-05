@@ -21,8 +21,6 @@ allow dom0_t xen_t:xen {
 	writeconsole
 	readapic
 	writeapic
-	privprofile
-	nonprivprofile
 	kexec
 	firmware
 	sleep

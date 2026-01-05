@@ -19,7 +19,6 @@
 #include <xen/cpumask.h>
 #include <xen/errno.h>
 #include <xen/guest_access.h>
-#include <xen/xenoprof.h>
 #include <xen/iommu.h>
 #ifdef CONFIG_HAS_PCI_MSI
 #include <asm/msi.h>
@@ -507,38 +506,6 @@ static int cf_check flask_console_io(struct domain *d, int cmd)
         break;
     default:
         return avc_unknown_permission("console_io", cmd);
-    }
-
-    return domain_has_xen(d, perm);
-}
-
-static int cf_check flask_profile(struct domain *d, int op)
-{
-    uint32_t perm;
-
-    switch ( op )
-    {
-    case XENOPROF_init:
-    case XENOPROF_enable_virq:
-    case XENOPROF_disable_virq:
-    case XENOPROF_get_buffer:
-        perm = XEN__NONPRIVPROFILE;
-        break;
-    case XENOPROF_reset_active_list:
-    case XENOPROF_reset_passive_list:
-    case XENOPROF_set_active:
-    case XENOPROF_set_passive:
-    case XENOPROF_reserve_counters:
-    case XENOPROF_counter:
-    case XENOPROF_setup_events:
-    case XENOPROF_start:
-    case XENOPROF_stop:
-    case XENOPROF_release_counters:
-    case XENOPROF_shutdown:
-        perm = XEN__PRIVPROFILE;
-        break;
-    default:
-        return avc_unknown_permission("xenoprof op", op);
     }
 
     return domain_has_xen(d, perm);
@@ -1929,8 +1896,6 @@ static const struct xsm_ops __initconst_cf_clobber flask_ops = {
     .claim_pages = flask_claim_pages,
 
     .console_io = flask_console_io,
-
-    .profile = flask_profile,
 
     .kexec = flask_kexec,
     .schedop_shutdown = flask_schedop_shutdown,

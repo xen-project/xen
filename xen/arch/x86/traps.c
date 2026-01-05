@@ -50,7 +50,6 @@
 #include <asm/system.h>
 #include <asm/traps.h>
 #include <asm/uaccess.h>
-#include <asm/xenoprof.h>
 
 /*
  * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
@@ -1941,9 +1940,6 @@ bool nmi_check_continuation(void)
     bool ret = false;
 
     if ( pci_serr_nmicont() )
-        ret = true;
-
-    if ( nmi_oprofile_send_virq() )
         ret = true;
 
     return ret;

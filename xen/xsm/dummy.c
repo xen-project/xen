@@ -61,8 +61,6 @@ static const struct xsm_ops __initconst_cf_clobber dummy_ops = {
 
     .console_io                    = xsm_console_io,
 
-    .profile                       = xsm_profile,
-
     .kexec                         = xsm_kexec,
     .schedop_shutdown              = xsm_schedop_shutdown,
 

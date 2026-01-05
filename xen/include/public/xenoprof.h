@@ -3,7 +3,7 @@
  * xenoprof.h
  *
  * Interface for enabling system wide profiling based on hardware performance
- * counters
+ * counters.  Dropped from Xen in 4.22.
  *
  * Copyright (C) 2005 Hewlett-Packard Co.
  * Written by Aravind Menon & Jose Renato Santos

@@ -31,7 +31,6 @@ headers-$(CONFIG_HVM)     += compat/hvm/hvm_vcpu.h
 headers-$(CONFIG_HYPFS)   += compat/hypfs.h
 headers-$(CONFIG_KEXEC)   += compat/kexec.h
 headers-$(CONFIG_TRACEBUFFER) += compat/trace.h
-headers-$(CONFIG_XENOPROF) += compat/xenoprof.h
 headers-$(CONFIG_XSM_FLASK) += compat/xsm/flask_op.h
 
 headers-n := $(sort $(filter-out $(headers-y),$(headers-n) $(headers-)))

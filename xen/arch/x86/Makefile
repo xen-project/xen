@@ -7,7 +7,6 @@ obj-$(CONFIG_GUEST) += guest/
 obj-$(CONFIG_HVM) += hvm/
 obj-y += lib/
 obj-y += mm/
-obj-$(CONFIG_XENOPROF) += oprofile/
 obj-$(CONFIG_PV) += pv/
 obj-y += x86_64/
 obj-y += x86_emulate/

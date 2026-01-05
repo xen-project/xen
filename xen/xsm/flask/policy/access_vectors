@@ -38,10 +38,6 @@ class xen
     readapic
 # PHYSDEVOP_apic_write
     writeapic
-# Most XENOPROF_*
-    privprofile
-# XENOPROF_{init,enable_virq,disable_virq,get_buffer}
-    nonprivprofile
 # kexec hypercall
     kexec
 # XENPF_firmware_info, XENPF_efi_runtime_call

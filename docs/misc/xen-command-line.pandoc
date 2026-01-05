@@ -508,12 +508,6 @@ character, but for xen to keep the console.
 
 > Default: `power`
 
-### cpu_type (x86)
-> `= arch_perfmon`
-
-If set, force use of the performance counters for oprofile, rather than detecting
-available support.
-
 ### cpufreq
 > `= none | {{ <boolean> | xen } { [:[powersave|performance|ondemand|userspace][,[<maxfreq>]][,[<minfreq>]]] } [,verbose]} | dom0-kernel | hwp[:[<hdc>][,verbose]] | amd-cppc[:[active][,verbose]]`
 

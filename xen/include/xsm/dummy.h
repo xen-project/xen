@@ -278,13 +278,6 @@ static XSM_INLINE int cf_check xsm_console_io(
     return xsm_default_action(XSM_PRIV, d, NULL);
 }
 
-static XSM_INLINE int cf_check xsm_profile(
-    XSM_DEFAULT_ARG struct domain *d, int op)
-{
-    XSM_ASSERT_ACTION(XSM_HOOK);
-    return xsm_default_action(action, d, NULL);
-}
-
 static XSM_INLINE int cf_check xsm_kexec(XSM_DEFAULT_VOID)
 {
     XSM_ASSERT_ACTION(XSM_PRIV);

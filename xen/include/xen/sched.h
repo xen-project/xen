@@ -574,9 +574,6 @@ struct domain
     /* Control-plane tools handle for this domain. */
     xen_domain_handle_t handle;
 
-    /* OProfile support. */
-    struct xenoprof *xenoprof;
-
     /* Domain watchdog. */
 #define NR_DOMAIN_WATCHDOG_TIMERS 2
     spinlock_t watchdog_lock;

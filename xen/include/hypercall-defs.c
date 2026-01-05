@@ -127,9 +127,6 @@ argo_op(unsigned int cmd, void *arg1, void *arg2, unsigned long arg3, unsigned l
 #ifdef CONFIG_PV
 iret()
 nmi_op(unsigned int cmd, void *arg)
-#ifdef CONFIG_XENOPROF
-xenoprof_op(int op, void *arg)
-#endif
 #endif /* CONFIG_PV */
 
 #ifdef CONFIG_COMPAT
@@ -269,9 +266,6 @@ xsm_op                             compat   do       compat   do       do
 nmi_op                             compat   do       -        -        -
 sched_op                           compat   do       compat   do       do
 callback_op                        compat   do       -        -        -
-#ifdef CONFIG_XENOPROF
-xenoprof_op                        compat   do       -        -        -
-#endif
 event_channel_op                   do       do       do:1     do:1     do:1
 physdev_op                         compat   do       hvm      hvm      do_arm
 #ifdef CONFIG_HVM

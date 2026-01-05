@@ -48,7 +48,6 @@
 #include <asm/spec_ctrl.h>
 #include <asm/stubs.h>
 #include <asm/x86_emulate.h>
-#include <asm/xenoprof.h>
 
 #include <public/arch-x86/cpuid.h>
 #include <public/hvm/ioreq.h>
@@ -692,7 +691,6 @@ static void cf_check vmx_vcpu_destroy(struct vcpu *v)
      */
     vmx_vcpu_disable_pml(v);
     vmx_destroy_vmcs(v);
-    passive_domain_destroy(v);
 }
 
 /*
@@ -3560,9 +3558,6 @@ static int cf_check vmx_msr_read_intercept(
         break;
 
     default:
-        if ( passive_domain_do_rdmsr(msr, msr_content) )
-            goto done;
-
         if ( vmx_read_guest_msr(curr, msr, msr_content) == 0 )
             break;
 
@@ -3582,7 +3577,6 @@ static int cf_check vmx_msr_read_intercept(
         goto gp_fault;
     }
 
-done:
     HVM_DBG_LOG(DBG_LEVEL_MSR, "returns: ecx=%#x, msr_value=%#"PRIx64,
                 msr, *msr_content);
     return X86EMUL_OKAY;
@@ -3875,9 +3869,6 @@ static int cf_check vmx_msr_write_intercept(
         break;
 
     default:
-        if ( passive_domain_do_wrmsr(msr, msr_content) )
-            return X86EMUL_OKAY;
-
         if ( vmx_write_guest_msr(v, msr, msr_content) == 0 ||
              is_last_branch_msr(msr) )
             break;

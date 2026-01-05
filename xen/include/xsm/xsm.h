@@ -101,8 +101,6 @@ struct xsm_ops {
 
     int (*console_io)(struct domain *d, int cmd);
 
-    int (*profile)(struct domain *d, int op);
-
     int (*kexec)(void);
     int (*schedop_shutdown)(struct domain *d1, struct domain *d2);
 
@@ -448,11 +446,6 @@ static inline int xsm_claim_pages(xsm_default_t def, struct domain *d)
 static inline int xsm_console_io(xsm_default_t def, struct domain *d, int cmd)
 {
     return alternative_call(xsm_ops.console_io, d, cmd);
-}
-
-static inline int xsm_profile(xsm_default_t def, struct domain *d, int op)
-{
-    return alternative_call(xsm_ops.profile, d, op);
 }
 
 static inline int xsm_kexec(xsm_default_t def)

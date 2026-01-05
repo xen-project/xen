@@ -31,7 +31,6 @@
 #include <xen/rcupdate.h>
 #include <xen/wait.h>
 #include <xen/grant_table.h>
-#include <xen/xenoprof.h>
 #include <xen/irq.h>
 #include <xen/argo.h>
 #include <xen/llc-coloring.h>
@@ -1471,11 +1470,6 @@ static void cf_check complete_domain_destroy(struct rcu_head *head)
     watchdog_domain_destroy(d);
 
     sched_destroy_domain(d);
-
-    /* Free page used by xen oprofile buffer. */
-#ifdef CONFIG_XENOPROF
-    free_xenoprof_pages(d);
-#endif
 
 #ifdef CONFIG_MEM_PAGING
     xfree(d->vm_event_paging);

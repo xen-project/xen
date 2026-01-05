@@ -15,6 +15,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
    - The cpuid_mask_* command line options for legacy AMD CPUs.  These were
      deprecated in Xen 4.7 and noted not to work correctly with AMD CPUs from
      2011 onwards.
+   - Xenoprofile support.  Oprofile themselves removed support for Xen in 2014
+     prior to the version 1.0 release, and there has been no development since
+     before then in Xen.
 
 ## [4.21.0](https://xenbits.xenproject.org/gitweb/?p=xen.git;a=shortlog;h=RELEASE-4.21.0) - 2025-11-19
 
