@@ -390,10 +390,9 @@ int vcpu_vgic_init(struct vcpu *v)
     return 0;
 }
 
-int vcpu_vgic_free(struct vcpu *v)
+void vcpu_vgic_free(struct vcpu *v)
 {
-    xfree(v->arch.vgic.private_irqs);
-    return 0;
+    XFREE(v->arch.vgic.private_irqs);
 }
 
 struct vcpu *vgic_get_target_vcpu(struct vcpu *v, unsigned int virq)
