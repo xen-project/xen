@@ -218,6 +218,10 @@ The table columns are as follows:
      - All architectures
      - See Section "6.3 Labels as Values" of GCC_MANUAL.
 
+   * - Binary constants
+     - ARM64, X86_64
+     - See Section "6.65 Binary Constants using the '0b' Prefix"
+
 Translation Limits
 __________________
 

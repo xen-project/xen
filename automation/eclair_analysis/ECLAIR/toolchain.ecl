@@ -332,3 +332,8 @@ ext_sizeof_alignof_void_type"
 -doc_begin="See Section \"4.13 Preprocessing Directives\" of "GCC_MANUAL" and Section \"11.1 Implementation-defined behavior\" of "CPP_MANUAL"."
 -config=STD.inclexpd,behavior={c99, GCC_X86_64, "specified"}
 -doc_end
+
+-doc_begin="See Section \"6.65 Binary Constants using the '0b' Prefix\" of "GCC_MANUAL"."
+-config=STD.ltrlbin,behavior={c99, GCC_ARM64, "specified"}
+-config=STD.ltrlbin,behavior={c99, GCC_X86_64, "specified"}
+-doc_end
