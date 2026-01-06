@@ -11,6 +11,11 @@ all:
 run: $(TARGET)
 	./$(TARGET)
 
+# Add the core emulator to the build
+vpath x86_emulate/%.c $(XEN_ROOT)/xen/arch/x86
+vpath x86_emulate/%.h $(XEN_ROOT)/xen/arch/x86
+HOSTCFLAGS += -iquote $(XEN_ROOT)/xen/arch/x86
+
 # Add libx86 to the build
 vpath %.c $(XEN_ROOT)/xen/lib/x86
 
@@ -287,12 +292,8 @@ else
 run32 clean32: %32: %
 endif
 
-.PHONY: x86_emulate
 x86_emulate:
 	mkdir -p $@
-	ln -sf $(XEN_ROOT)/xen/arch/x86/$@/*.[ch] $@/
-
-x86_emulate/%: x86_emulate ;
 
 HOSTCFLAGS-x86_64 := -fno-PIE
 $(call cc-option-add,HOSTCFLAGS-x86_64,HOSTCC,-no-pie)
@@ -306,6 +307,8 @@ x86_emulate.h := x86-emulate.h x86_emulate/x86_emulate.h x86_emulate/private.h $
 
 $(OBJS): %.o: %.c $(x86_emulate.h)
 	$(HOSTCC) $(HOSTCFLAGS) -c -g -o $@ $<
+
+$(filter x86_emulate/%.o,$(OBJS)): x86_emulate
 
 x86-emulate.o: x86_emulate/x86_emulate.c
 x86-emulate.o x86_emulate/%.o: HOSTCFLAGS += -D__XEN_TOOLS__
