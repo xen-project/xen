@@ -14,6 +14,9 @@
 
 #include <xen/cpumask.h>
 
+/* SBI-defined implementation ID */
+#define SBI_XEN_IMPID 7
+
 #define SBI_EXT_0_1_SET_TIMER               0x0
 #define SBI_EXT_0_1_CONSOLE_PUTCHAR         0x1
 #define SBI_EXT_0_1_CONSOLE_GETCHAR         0x2
@@ -32,6 +35,9 @@
 #define SBI_EXT_BASE_GET_IMP_ID         0x1
 #define SBI_EXT_BASE_GET_IMP_VERSION    0x2
 #define SBI_EXT_BASE_PROBE_EXT          0x3
+#define SBI_EXT_BASE_GET_MVENDORID      0x4
+#define SBI_EXT_BASE_GET_MARCHID        0x5
+#define SBI_EXT_BASE_GET_MIMPID         0x6
 
 /* SBI function IDs for RFENCE extension */
 #define SBI_EXT_RFENCE_REMOTE_FENCE_I           0x0
