@@ -23,10 +23,9 @@ boolean_param("ats", ats_enabled);
 
 int enable_ats_device(struct pci_dev *pdev, struct list_head *ats_list)
 {
-    u32 value;
-    int pos;
+    uint16_t value;
+    unsigned int pos = pci_find_ext_capability(pdev->sbdf, PCI_EXT_CAP_ID_ATS);
 
-    pos = pci_find_ext_capability(pdev->sbdf, PCI_EXT_CAP_ID_ATS);
     BUG_ON(!pos);
 
     if ( iommu_verbose )
@@ -35,7 +34,7 @@ int enable_ats_device(struct pci_dev *pdev, struct list_head *ats_list)
     value = pci_conf_read16(pdev->sbdf, pos + ATS_REG_CTL);
     if ( value & ATS_ENABLE )
     {
-        struct pci_dev *other;
+        const struct pci_dev *other;
 
         list_for_each_entry ( other, ats_list, ats.list )
             if ( other == pdev )
@@ -44,8 +43,7 @@ int enable_ats_device(struct pci_dev *pdev, struct list_head *ats_list)
                 break;
             }
     }
-
-    if ( !(value & ATS_ENABLE) )
+    else
     {
         value |= ATS_ENABLE;
         pci_conf_write16(pdev->sbdf, pos + ATS_REG_CTL, value);
@@ -69,7 +67,7 @@ int enable_ats_device(struct pci_dev *pdev, struct list_head *ats_list)
 
 void disable_ats_device(struct pci_dev *pdev)
 {
-    u32 value;
+    uint16_t value;
 
     BUG_ON(!pdev->ats.cap_pos);
 
