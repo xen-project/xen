@@ -65,12 +65,6 @@ struct acpi_drhd_unit *ioapic_to_drhd(unsigned int apic_id);
 struct acpi_drhd_unit *hpet_to_drhd(unsigned int hpet_id);
 struct acpi_rhsa_unit *drhd_to_rhsa(const struct acpi_drhd_unit *drhd);
 
-int dev_invalidate_iotlb(struct vtd_iommu *iommu, u16 did,
-                         u64 addr, unsigned int size_order, u64 type);
-
-int __must_check qinval_device_iotlb_sync(struct vtd_iommu *iommu,
-                                          struct pci_dev *pdev,
-                                          u16 did, u16 size, u64 addr);
 
 uint64_t alloc_pgtable_maddr(unsigned long npages, nodeid_t node);
 void free_pgtable_maddr(u64 maddr);

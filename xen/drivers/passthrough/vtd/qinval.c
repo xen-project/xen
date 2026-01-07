@@ -251,8 +251,9 @@ static int __must_check dev_invalidate_sync(struct vtd_iommu *iommu,
     return rc;
 }
 
-int qinval_device_iotlb_sync(struct vtd_iommu *iommu, struct pci_dev *pdev,
-                             u16 did, u16 size, u64 addr)
+static int qinval_device_iotlb_sync(struct vtd_iommu *iommu,
+                                    struct pci_dev *pdev, uint16_t did,
+                                    uint16_t size, paddr_t addr)
 {
     unsigned long flags;
     unsigned int index;
@@ -280,6 +281,103 @@ int qinval_device_iotlb_sync(struct vtd_iommu *iommu, struct pci_dev *pdev,
     unmap_vtd_domain_page(qinval_entry);
 
     return dev_invalidate_sync(iommu, pdev, did);
+}
+
+static bool device_in_domain(const struct vtd_iommu *iommu,
+                             const struct pci_dev *pdev, uint16_t did)
+{
+    struct root_entry *root_entry;
+    struct context_entry *ctxt_entry = NULL;
+    unsigned int tt;
+    bool found = false;
+
+    if ( unlikely(!iommu->root_maddr) )
+    {
+        ASSERT_UNREACHABLE();
+        return false;
+    }
+
+    root_entry = map_vtd_domain_page(iommu->root_maddr);
+    if ( !root_present(root_entry[pdev->bus]) )
+        goto out;
+
+    ctxt_entry = map_vtd_domain_page(root_entry[pdev->bus].val);
+    if ( context_domain_id(ctxt_entry[pdev->devfn]) != did )
+        goto out;
+
+    tt = context_translation_type(ctxt_entry[pdev->devfn]);
+    if ( tt != CONTEXT_TT_DEV_IOTLB )
+        goto out;
+
+    found = true;
+ out:
+    if ( root_entry )
+        unmap_vtd_domain_page(root_entry);
+
+    if ( ctxt_entry )
+        unmap_vtd_domain_page(ctxt_entry);
+
+    return found;
+}
+
+static int dev_invalidate_iotlb(struct vtd_iommu *iommu, uint16_t did,
+                                paddr_t addr, unsigned int size_order,
+                                uint64_t type)
+{
+    struct pci_dev *pdev, *temp;
+    int ret = 0;
+
+    if ( !ecap_dev_iotlb(iommu->ecap) )
+        return ret;
+
+    list_for_each_entry_safe ( pdev, temp, &iommu->ats_devices, ats.list )
+    {
+        bool sbit;
+        int rc = 0;
+
+        switch ( type )
+        {
+        case DMA_TLB_DSI_FLUSH:
+            if ( !device_in_domain(iommu, pdev, did) )
+                break;
+            /* fall through if DSI condition met */
+        case DMA_TLB_GLOBAL_FLUSH:
+            /* invalidate all translations: sbit=1,bit_63=0,bit[62:12]=1 */
+            sbit = 1;
+            addr = (~0UL << PAGE_SHIFT_4K) & 0x7FFFFFFFFFFFFFFFUL;
+            rc = qinval_device_iotlb_sync(iommu, pdev, did, sbit, addr);
+            break;
+
+        case DMA_TLB_PSI_FLUSH:
+            if ( !device_in_domain(iommu, pdev, did) )
+                break;
+
+            /* if size <= 4K, set sbit = 0, else set sbit = 1 */
+            sbit = size_order ? 1 : 0;
+
+            /* clear lower bits */
+            addr &= ~0UL << PAGE_SHIFT_4K;
+
+            /* if sbit == 1, zero out size_order bit and set lower bits to 1 */
+            if ( sbit )
+            {
+                addr &= ~((u64)PAGE_SIZE_4K << (size_order - 1));
+                addr |= (((u64)1 << (size_order - 1)) - 1) << PAGE_SHIFT_4K;
+            }
+
+            rc = qinval_device_iotlb_sync(iommu, pdev, did, sbit, addr);
+            break;
+
+        default:
+            dprintk(XENLOG_WARNING VTDPREFIX, "invalid vt-d flush type\n");
+            return -EOPNOTSUPP;
+        }
+
+        if ( !ret )
+            ret = rc;
+    }
+
+    return ret;
 }
 
 static int __must_check queue_invalidate_iec_sync(struct vtd_iommu *iommu,
