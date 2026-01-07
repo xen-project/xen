@@ -484,6 +484,7 @@ struct vtd_iommu {
     spinlock_t register_lock; /* protect iommu register handling */
     u64 root_maddr; /* root entry machine address */
     nodeid_t node;
+    bool flush_dev_iotlb;
     struct msi_desc msi;
     struct acpi_drhd_unit *drhd;
 

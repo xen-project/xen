@@ -65,8 +65,6 @@ struct acpi_drhd_unit *ioapic_to_drhd(unsigned int apic_id);
 struct acpi_drhd_unit *hpet_to_drhd(unsigned int hpet_id);
 struct acpi_rhsa_unit *drhd_to_rhsa(const struct acpi_drhd_unit *drhd);
 
-struct acpi_drhd_unit *find_ats_dev_drhd(struct vtd_iommu *iommu);
-
 int ats_device(const struct pci_dev *, const struct acpi_drhd_unit *);
 
 int dev_invalidate_iotlb(struct vtd_iommu *iommu, u16 did,

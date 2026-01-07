@@ -28,22 +28,8 @@
 #include "../extern.h"
 #include "../../ats.h"
 
-static LIST_HEAD(ats_dev_drhd_units);
-
-struct acpi_drhd_unit *find_ats_dev_drhd(struct vtd_iommu *iommu)
-{
-    struct acpi_drhd_unit *drhd;
-    list_for_each_entry ( drhd, &ats_dev_drhd_units, list )
-    {
-        if ( drhd->iommu == iommu )
-            return drhd;
-    }
-    return NULL;
-}
-
 int ats_device(const struct pci_dev *pdev, const struct acpi_drhd_unit *drhd)
 {
-    struct acpi_drhd_unit *ats_drhd;
     unsigned int pos, expfl = 0;
 
     if ( !ats_enabled || !iommu_qinval )
@@ -61,17 +47,10 @@ int ats_device(const struct pci_dev *pdev, const struct acpi_drhd_unit *drhd)
          !acpi_find_matched_atsr_unit(pdev) )
         return 0;
 
-    ats_drhd = find_ats_dev_drhd(drhd->iommu);
     pos = pci_find_ext_capability(pdev->sbdf, PCI_EXT_CAP_ID_ATS);
+    if ( pos )
+        drhd->iommu->flush_dev_iotlb = true;
 
-    if ( pos && (ats_drhd == NULL) )
-    {
-        ats_drhd = xmalloc(struct acpi_drhd_unit);
-        if ( !ats_drhd )
-            return -ENOMEM;
-        *ats_drhd = *drhd;
-        list_add_tail(&ats_drhd->list, &ats_dev_drhd_units);
-    }
     return pos;
 }
 
