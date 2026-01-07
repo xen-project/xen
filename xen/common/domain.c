@@ -316,6 +316,27 @@ static void vcpu_info_reset(struct vcpu *v)
          : &dummy_vcpu_info);
 }
 
+static struct domain *alloc_domain_struct(void)
+{
+#ifndef arch_domain_struct_memflags
+# define arch_domain_struct_memflags() 0
+#endif
+
+    struct domain *d = alloc_xenheap_pages(0, arch_domain_struct_memflags());
+
+    BUILD_BUG_ON(sizeof(*d) > PAGE_SIZE);
+
+    if ( d )
+        clear_page(d);
+
+    return d;
+}
+
+static void free_domain_struct(struct domain *d)
+{
+    free_xenheap_page(d);
+}
+
 static struct vcpu *alloc_vcpu_struct(const struct domain *d)
 {
 #ifndef arch_vcpu_struct_memflags
@@ -817,27 +838,6 @@ static int sanitise_domain_config(struct xen_domctl_createdomain *config)
     }
 
     return arch_sanitise_domain_config(config);
-}
-
-struct domain *alloc_domain_struct(void)
-{
-#ifndef arch_domain_struct_memflags
-# define arch_domain_struct_memflags() 0
-#endif
-
-    struct domain *d = alloc_xenheap_pages(0, arch_domain_struct_memflags());
-
-    BUILD_BUG_ON(sizeof(*d) > PAGE_SIZE);
-
-    if ( d )
-        clear_page(d);
-
-    return d;
-}
-
-void free_domain_struct(struct domain *d)
-{
-    free_xenheap_page(d);
 }
 
 struct domain *domain_create(domid_t domid,
