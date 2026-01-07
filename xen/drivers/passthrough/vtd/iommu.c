@@ -569,8 +569,7 @@ static int __must_check iommu_flush_context_device(struct vtd_iommu *iommu,
 /* return value determine if we need a write buffer flush */
 int cf_check vtd_flush_iotlb_reg(
     struct vtd_iommu *iommu, uint16_t did, uint64_t addr,
-    unsigned int size_order, uint64_t type, bool flush_non_present_entry,
-    bool flush_dev_iotlb)
+    unsigned int size_order, uint64_t type, bool flush_non_present_entry)
 {
     int tlb_offset = ecap_iotlb_offset(iommu->ecap);
     uint64_t val = type | DMA_TLB_IVT;
@@ -635,7 +634,7 @@ static int __must_check iommu_flush_iotlb_global(struct vtd_iommu *iommu,
     vtd_ops_preamble_quirk(iommu);
 
     status = iommu->flush.iotlb(iommu, 0, 0, 0, DMA_TLB_GLOBAL_FLUSH,
-                                flush_non_present_entry, iommu->flush_dev_iotlb);
+                                flush_non_present_entry);
 
     /* undo platform specific errata workarounds */
     vtd_ops_postamble_quirk(iommu);
@@ -652,7 +651,7 @@ static int __must_check iommu_flush_iotlb_dsi(struct vtd_iommu *iommu, u16 did,
     vtd_ops_preamble_quirk(iommu);
 
     status = iommu->flush.iotlb(iommu, did, 0, 0, DMA_TLB_DSI_FLUSH,
-                                flush_non_present_entry, iommu->flush_dev_iotlb);
+                                flush_non_present_entry);
 
     /* undo platform specific errata workarounds */
     vtd_ops_postamble_quirk(iommu);
@@ -678,7 +677,7 @@ static int __must_check iommu_flush_iotlb_psi(struct vtd_iommu *iommu, u16 did,
     vtd_ops_preamble_quirk(iommu);
 
     status = iommu->flush.iotlb(iommu, did, addr, order, DMA_TLB_PSI_FLUSH,
-                                flush_non_present_entry, iommu->flush_dev_iotlb);
+                                flush_non_present_entry);
 
     /* undo platform specific errata workarounds */
     vtd_ops_postamble_quirk(iommu);

@@ -57,8 +57,7 @@ int __must_check cf_check vtd_flush_context_reg(
     uint8_t function_mask, uint64_t type, bool flush_non_present_entry);
 int __must_check cf_check vtd_flush_iotlb_reg(
     struct vtd_iommu *iommu, uint16_t did, uint64_t addr,
-    unsigned int size_order, uint64_t type, bool flush_non_present_entry,
-    bool flush_dev_iotlb);
+    unsigned int size_order, uint64_t type, bool flush_non_present_entry);
 
 struct vtd_iommu *ioapic_to_iommu(unsigned int apic_id);
 struct vtd_iommu *hpet_to_iommu(unsigned int hpet_id);

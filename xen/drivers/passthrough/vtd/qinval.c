@@ -452,7 +452,7 @@ static int __must_check cf_check flush_context_qi(
 
 static int __must_check cf_check flush_iotlb_qi(
     struct vtd_iommu *iommu, u16 did, u64 addr, unsigned int size_order,
-    u64 type, bool flush_non_present_entry, bool flush_dev_iotlb)
+    u64 type, bool flush_non_present_entry)
 {
     u8 dr = 0, dw = 0;
     int ret = 0, rc;
@@ -478,7 +478,7 @@ static int __must_check cf_check flush_iotlb_qi(
     if ( !ret )
         ret = rc;
 
-    if ( flush_dev_iotlb )
+    if ( iommu->flush_dev_iotlb )
     {
         rc = dev_invalidate_iotlb(iommu, did, addr, size_order, type);
         if ( !ret )
@@ -573,8 +573,7 @@ static int cf_check vtd_flush_context_noop(
 
 static int cf_check vtd_flush_iotlb_noop(
     struct vtd_iommu *iommu, uint16_t did, uint64_t addr,
-    unsigned int size_order, uint64_t type, bool flush_non_present_entry,
-    bool flush_dev_iotlb)
+    unsigned int size_order, uint64_t type, bool flush_non_present_entry)
 {
     WARN();
     return -EIO;

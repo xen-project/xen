@@ -502,8 +502,7 @@ struct vtd_iommu {
                                     bool non_present_entry_flush);
         int __must_check (*iotlb)(struct vtd_iommu *iommu, u16 did, u64 addr,
                                   unsigned int size_order, u64 type,
-                                  bool flush_non_present_entry,
-                                  bool flush_dev_iotlb);
+                                  bool flush_non_present_entry);
     } flush;
 
     struct list_head ats_devices;
