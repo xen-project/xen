@@ -152,11 +152,6 @@ void dump_pageframe_info(struct domain *d)
     BUG_ON("unimplemented");
 }
 
-void free_vcpu_struct(struct vcpu *v)
-{
-    BUG_ON("unimplemented");
-}
-
 int arch_vcpu_create(struct vcpu *v)
 {
     BUG_ON("unimplemented");
@@ -260,11 +255,6 @@ void vcpu_block_unless_event_pending(struct vcpu *v)
 }
 
 void vcpu_kick(struct vcpu *v)
-{
-    BUG_ON("unimplemented");
-}
-
-struct vcpu *alloc_vcpu_struct(const struct domain *d)
 {
     BUG_ON("unimplemented");
 }

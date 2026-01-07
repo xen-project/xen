@@ -473,23 +473,6 @@ void dump_pageframe_info(struct domain *d)
 
 }
 
-struct vcpu *alloc_vcpu_struct(const struct domain *d)
-{
-    struct vcpu *v;
-
-    BUILD_BUG_ON(sizeof(*v) > PAGE_SIZE);
-    v = alloc_xenheap_page();
-    if ( v != NULL )
-        clear_page(v);
-
-    return v;
-}
-
-void free_vcpu_struct(struct vcpu *v)
-{
-    free_xenheap_page(v);
-}
-
 int arch_vcpu_create(struct vcpu *v)
 {
     int rc = 0;

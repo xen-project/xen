@@ -15,6 +15,18 @@
 unsigned int arch_domain_struct_memflags(void);
 #define arch_domain_struct_memflags arch_domain_struct_memflags
 
+/*
+ * This structure contains embedded PAE PDPTEs, used when an HVM guest
+ * runs on shadow pagetables outside of 64-bit mode. In this case the CPU
+ * may require that the shadow CR3 points below 4GB, and hence the whole
+ * structure must satisfy this restriction. Thus we specify MEMF_bits(32).
+ */
+#define arch_vcpu_struct_memflags(d) ({                                 \
+    const struct domain *d_ = (d);                                      \
+                                                                        \
+    (is_hvm_domain(d_) && paging_mode_shadow(d_) ? MEMF_bits(32) : 0);  \
+})
+
 #define has_32bit_shinfo(d)    ((d)->arch.has_32bit_shinfo)
 
 /*
