@@ -155,7 +155,7 @@ struct vgic_dist {
 };
 
 struct vgic_cpu {
-    struct vgic_irq private_irqs[VGIC_NR_PRIVATE_IRQS];
+    struct vgic_irq *private_irqs;
 
     struct list_head ap_list_head;
     spinlock_t ap_list_lock;    /* Protects the ap_list */

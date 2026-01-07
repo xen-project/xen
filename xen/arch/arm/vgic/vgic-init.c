@@ -202,6 +202,11 @@ int vcpu_vgic_init(struct vcpu *v)
 {
     int ret = 0;
 
+    v->arch.vgic.private_irqs =
+        xzalloc_array(struct vgic_irq, VGIC_NR_PRIVATE_IRQS);
+    if ( !v->arch.vgic.private_irqs )
+        return -ENOMEM;
+
     vgic_vcpu_early_init(v);
 
     if ( gic_hw_version() == GIC_V2 )
@@ -244,6 +249,8 @@ void vcpu_vgic_free(struct vcpu *v)
     struct vgic_cpu *vgic_cpu = &v->arch.vgic;
 
     INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
+
+    XFREE(v->arch.vgic.private_irqs);
 }
 
 /*
