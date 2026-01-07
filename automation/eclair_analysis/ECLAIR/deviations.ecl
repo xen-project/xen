@@ -58,9 +58,9 @@ removed by the compiler, the resulting slowdown is negligible."
 # Series 3.
 #
 
--doc_begin="Comments starting with '/*' and containing hyperlinks are safe as
+-doc_begin="Comments starting with '/*' and containing URLs are safe as
 they are not instances of commented-out code."
--config=MC3A2.R3.1,reports+={safe, "first_area(text(^.*https?://.*$))"}
+-config=MC3A2.R3.1,reports+={safe, "first_area(text(^.*(https?|git)://.*$))"}
 -doc_end
 
 #

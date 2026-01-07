@@ -117,8 +117,8 @@ Deviations related to MISRA C:2012 Rules:
      - Tagged as `deliberate` for ECLAIR.
 
    * - R3.1
-     - Comments starting with '/\*' and containing hyperlinks are safe as they
-       are not instances of commented-out code.
+     - Comments starting with '/\*' and containing URLs are safe as they are
+       not instances of commented-out code.
      - Tagged as `safe` for ECLAIR.
 
    * - R5.3

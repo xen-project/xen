@@ -143,7 +143,7 @@ maintainers if you want to suggest a change.
      - Required
      - The character sequences /* and // shall not be used within a
        comment
-     - Comments containing hyperlinks inside C-style block comments are safe
+     - Comments containing URLs inside C-style block comments are safe
 
    * - `Rule 3.2 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_03_02.c>`_
      - Required
