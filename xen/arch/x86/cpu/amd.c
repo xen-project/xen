@@ -1269,6 +1269,10 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 
 	check_syscfg_dram_mod_en();
 
+	if (c == &boot_cpu_data && cpu_has(c, X86_FEATURE_ERMS)
+	    && c->family != 0x19 /* Zen3/4 */)
+		setup_force_cpu_cap(X86_FEATURE_XEN_REP_MOVSB);
+
 	amd_log_freq(c);
 }
 

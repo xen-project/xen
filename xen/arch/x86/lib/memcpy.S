@@ -10,7 +10,7 @@ FUNC(memcpy)
          * precautions were taken).
          */
         ALTERNATIVE "and $7, %edx; shr $3, %rcx", \
-                    STR(rep movsb; RET), X86_FEATURE_ERMS
+                    STR(rep movsb; RET), X86_FEATURE_XEN_REP_MOVSB
         rep movsq
         or      %edx, %ecx
         jz      1f
