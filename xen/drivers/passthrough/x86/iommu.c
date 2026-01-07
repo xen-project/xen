@@ -19,6 +19,7 @@
 #include <xen/paging.h>
 #include <xen/guest_access.h>
 #include <xen/event.h>
+#include <xen/param.h>
 #include <xen/softirq.h>
 #include <xen/vm_event.h>
 #include <xsm/xsm.h>
@@ -35,6 +36,12 @@ bool __read_mostly iommu_non_coherent;
 bool __initdata iommu_superpages = true;
 
 enum iommu_intremap __read_mostly iommu_intremap = iommu_intremap_full;
+
+/*
+ * iommu_inclusive_mapping: When set, all memory below 4GB is included in dom0
+ * 1:1 iommu mappings except xen and unusable regions.
+ */
+boolean_param("iommu_inclusive_mapping", iommu_hwdom_inclusive);
 
 #ifdef CONFIG_PV
 /* Possible unfiltered LAPIC/MSI messages from untrusted sources? */

@@ -1651,7 +1651,7 @@ Specify the timeout of the device IOTLB invalidation in milliseconds.
 By default, the timeout is 1000 ms. When you see error 'Queue invalidate
 wait descriptor timed out', try increasing this value.
 
-### iommu_inclusive_mapping
+### iommu_inclusive_mapping (x86)
 > `= <boolean>`
 
 **WARNING: This command line option is deprecated, and superseded by

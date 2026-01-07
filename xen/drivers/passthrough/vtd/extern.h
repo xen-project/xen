@@ -21,6 +21,7 @@
 #define DRIVERS__PASSTHROUGH__VTD__EXTERN_H
 
 #include "dmar.h"
+#include <xen/domain_page.h>
 #include <xen/keyhandler.h>
 
 #define VTDPREFIX "[VT-D]"
@@ -68,8 +69,6 @@ struct acpi_rhsa_unit *drhd_to_rhsa(const struct acpi_drhd_unit *drhd);
 
 uint64_t alloc_pgtable_maddr(unsigned long npages, nodeid_t node);
 void free_pgtable_maddr(u64 maddr);
-void *map_vtd_domain_page(u64 maddr);
-void unmap_vtd_domain_page(const void *va);
 int domain_context_mapping_one(struct domain *domain, struct vtd_iommu *iommu,
                                uint8_t bus, uint8_t devfn,
                                const struct pci_dev *pdev, domid_t domid,
@@ -78,6 +77,16 @@ int domain_context_unmap_one(struct domain *domain, struct vtd_iommu *iommu,
                              uint8_t bus, uint8_t devfn);
 int cf_check intel_iommu_get_reserved_device_memory(
     iommu_grdm_t *func, void *ctxt);
+
+static inline void *map_vtd_domain_page(paddr_t maddr)
+{
+    return map_domain_page(_mfn(paddr_to_pfn(maddr)));
+}
+
+static inline void unmap_vtd_domain_page(const void *va)
+{
+    unmap_domain_page(va);
+}
 
 unsigned int cf_check io_apic_read_remap_rte(
     unsigned int apic, unsigned int reg);
