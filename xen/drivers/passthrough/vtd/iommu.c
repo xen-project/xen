@@ -1458,6 +1458,33 @@ static void __hwdom_init cf_check intel_iommu_hwdom_init(struct domain *d)
     }
 }
 
+static int ats_device(const struct pci_dev *pdev,
+                      const struct acpi_drhd_unit *drhd)
+{
+    unsigned int pos, expfl = 0;
+
+    if ( !ats_enabled || !iommu_qinval )
+        return 0;
+
+    if ( !ecap_queued_inval(drhd->iommu->ecap) ||
+         !ecap_dev_iotlb(drhd->iommu->ecap) )
+        return 0;
+
+    pos = pci_find_cap_offset(pdev->sbdf, PCI_CAP_ID_EXP);
+    if ( pos )
+        expfl = pci_conf_read16(pdev->sbdf, pos + PCI_EXP_FLAGS);
+
+    if ( MASK_EXTR(expfl, PCI_EXP_FLAGS_TYPE) != PCI_EXP_TYPE_RC_END &&
+         !acpi_find_matched_atsr_unit(pdev) )
+        return 0;
+
+    pos = pci_find_ext_capability(pdev->sbdf, PCI_EXT_CAP_ID_ATS);
+    if ( pos )
+        drhd->iommu->flush_dev_iotlb = true;
+
+    return pos;
+}
+
 /*
  * This function returns
  * - a negative errno value upon error,
