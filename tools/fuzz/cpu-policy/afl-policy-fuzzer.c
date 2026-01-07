@@ -133,6 +133,7 @@ int main(int argc, char **argv)
 #endif
     {
         struct cpu_policy *cp = NULL;
+        size_t size;
 
         if ( fp != stdin )
         {
@@ -150,9 +151,9 @@ int main(int argc, char **argv)
         if ( !cp )
             goto skip;
 
-        fread(cp, sizeof(*cp), 1, fp);
+        size = fread(cp, sizeof(*cp), 1, fp);
 
-        if ( !feof(fp) )
+        if ( !size || !feof(fp) )
             goto skip;
 
         check_policy(cp);
