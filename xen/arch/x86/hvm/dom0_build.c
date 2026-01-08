@@ -1310,7 +1310,7 @@ static int __init pvh_setup_acpi(struct domain *d, paddr_t start_info)
     return 0;
 }
 
-static void __hwdom_init pvh_setup_mmcfg(struct domain *d)
+static void __init pvh_setup_mmcfg(struct domain *d)
 {
     unsigned int i;
     int rc;
