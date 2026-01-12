@@ -3115,6 +3115,7 @@ static bool __init has_if_pschange_mc(void)
     case 0x75: /* Lightning Mountain */
     case 0x7a: /* Gemini Lake */
     case 0x86: /* Jacobsville */
+        return false;
 
     default:
         printk("Unrecognised CPU model %#x - assuming vulnerable to IF_PSCHANGE_MC\n",
