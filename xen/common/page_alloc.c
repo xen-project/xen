@@ -792,7 +792,7 @@ static void page_list_add_scrub(struct page_info *pg, unsigned int node,
 # define scrub_page_cold clear_page_cold
 #endif
 
-static void scrub_one_page(const struct page_info *pg, bool cold)
+void scrub_one_page(const struct page_info *pg, bool cold)
 {
     void *ptr;
 
