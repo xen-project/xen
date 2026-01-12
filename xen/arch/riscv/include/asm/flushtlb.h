@@ -38,7 +38,7 @@ static inline void tlbflush_filter(cpumask_t *mask, uint32_t page_timestamp) {}
 
 static inline void page_set_tlbflush_timestamp(struct page_info *page)
 {
-    BUG_ON("unimplemented");
+    page->tlbflush_timestamp = tlbflush_current_time();
 }
 
 static inline void arch_flush_tlb_mask(const cpumask_t *mask)

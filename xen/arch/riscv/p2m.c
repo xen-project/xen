@@ -51,6 +51,18 @@ static struct gstage_mode_desc __ro_after_init max_gstage_mode = {
     .name = "Bare",
 };
 
+static void p2m_free_page(struct p2m_domain *p2m, struct page_info *pg);
+
+static inline void p2m_free_metadata_page(struct p2m_domain *p2m,
+                                          struct page_info **md_pg)
+{
+    if ( *md_pg )
+    {
+        p2m_free_page(p2m, *md_pg);
+        *md_pg = NULL;
+    }
+}
+
 unsigned char get_max_supported_mode(void)
 {
     return max_gstage_mode.mode;
@@ -448,16 +460,27 @@ static void p2m_set_type(pte_t *pte, p2m_type_t t,
 
     if ( t >= p2m_first_external )
     {
+        if ( metadata[ctx->index].type == p2m_invalid )
+            ctx->pt_page->u.md.used_entries++;
+
         metadata[ctx->index].type = t;
 
         t = p2m_ext_storage;
     }
     else if ( metadata )
+    {
+        if ( metadata[ctx->index].type != p2m_invalid )
+            ctx->pt_page->u.md.used_entries--;
+
         metadata[ctx->index].type = p2m_invalid;
+    }
 
     pte->pte |= MASK_INSR(t, P2M_TYPE_PTE_BITS_MASK);
 
     unmap_domain_page(metadata);
+
+    if ( *md_pg && !ctx->pt_page->u.md.used_entries )
+        p2m_free_metadata_page(ctx->p2m, md_pg);
 }
 
 /*
@@ -624,18 +647,13 @@ static pte_t page_to_p2m_table(const struct page_info *page)
     return p2m_pte_from_mfn(page_to_mfn(page), p2m_invalid, NULL);
 }
 
-static void p2m_free_page(struct p2m_domain *p2m, struct page_info *pg);
-
 /*
  * Free page table's page and metadata page linked to page table's page.
  */
 static void p2m_free_table(struct p2m_domain *p2m, struct page_info *tbl_pg)
 {
-    if ( tbl_pg->v.md.pg )
-    {
-        p2m_free_page(p2m, tbl_pg->v.md.pg);
-        tbl_pg->v.md.pg = NULL;
-    }
+    p2m_free_metadata_page(p2m, &tbl_pg->v.md.pg);
+
     p2m_free_page(p2m, tbl_pg);
 }
 

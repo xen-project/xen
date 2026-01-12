@@ -113,6 +113,18 @@ struct page_info
             unsigned long type_info;
         } inuse;
 
+        /* Page is used as an intermediate P2M page table: count_info == 0 */
+        struct {
+            /*
+            * Tracks the number of used entries in the metadata page table.
+            *
+            * If used_entries == 0, then `page_info.v.md.pg` can be freed and
+            * returned to the P2M pool.
+            */
+            unsigned long used_entries;
+        } md;
+
+
         /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
         union {
             struct {
