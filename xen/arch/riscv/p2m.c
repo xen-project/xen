@@ -1057,3 +1057,188 @@ int map_regions_p2mt(struct domain *d,
 
     return rc;
 }
+
+/*
+ * p2m_get_entry() should always return the correct order value, even if an
+ * entry is not present (i.e. the GFN is outside the range):
+ *   [p2m->lowest_mapped_gfn, p2m->max_mapped_gfn]    (1)
+ *
+ * This ensures that callers of p2m_get_entry() can determine what range of
+ * address space would be altered by a corresponding p2m_set_entry().
+ * Also, it would help to avoid costly page walks for GFNs outside range (1).
+ *
+ * Therefore, this function returns true for GFNs outside range (1), and in
+ * that case the corresponding level is returned via the level_out argument.
+ * Otherwise, it returns false and p2m_get_entry() performs a page walk to
+ * find the proper entry.
+ */
+static bool check_outside_boundary(const struct p2m_domain *p2m, gfn_t gfn,
+                                   gfn_t boundary, bool is_lower,
+                                   unsigned int *level_out)
+{
+    unsigned int level = P2M_MAX_ROOT_LEVEL + 1;
+    bool ret = false;
+
+    ASSERT(p2m);
+
+    if ( is_lower ? gfn_x(gfn) < gfn_x(boundary)
+                  : gfn_x(gfn) > gfn_x(boundary) )
+    {
+        for ( level = P2M_ROOT_LEVEL(p2m) ; level; level-- )
+        {
+            unsigned long mask = BIT(P2M_GFN_LEVEL_SHIFT(level), UL) - 1;
+
+            if ( is_lower ? (gfn_x(gfn) | mask) < gfn_x(boundary)
+                          : (gfn_x(gfn) & ~mask) > gfn_x(boundary) )
+                break;
+        }
+
+        ret = true;
+    }
+
+    if ( level_out )
+        *level_out = level;
+
+    return ret;
+}
+
+/*
+ * Get the details of a given gfn.
+ *
+ * If the entry is present, the associated MFN, the p2m type of the mapping,
+ * and the page order of the mapping in the page table (i.e., it could be a
+ * superpage) will be returned.
+ *
+ * If the entry is not present, INVALID_MFN will be returned, page_order will
+ * be set according to the order of the invalid range, and the type will be
+ * p2m_invalid.
+ */
+static mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
+                           p2m_type_t *t,
+                           unsigned int *page_order)
+{
+    unsigned int level = P2M_ROOT_LEVEL(p2m);
+    unsigned int gfn_limit_bits =
+        P2M_LEVEL_ORDER(level + 1) + P2M_ROOT_EXTRA_BITS(p2m, level);
+    pte_t entry, *table;
+    int rc;
+    mfn_t mfn = INVALID_MFN;
+
+    P2M_BUILD_LEVEL_OFFSETS(p2m, offsets, gfn_to_gaddr(gfn));
+
+    ASSERT(p2m_is_locked(p2m));
+
+    *t = p2m_invalid;
+
+    if ( gfn_x(gfn) > (BIT(gfn_limit_bits, UL) - 1) )
+    {
+        if ( page_order )
+            *page_order = gfn_limit_bits;
+
+        return mfn;
+    }
+
+    if ( check_outside_boundary(p2m, gfn, p2m->lowest_mapped_gfn, true,
+                                &level) )
+        goto out;
+
+    if ( check_outside_boundary(p2m, gfn, p2m->max_mapped_gfn, false, &level) )
+        goto out;
+
+    table = p2m_get_root_pointer(p2m, gfn);
+
+    /*
+     * The table should always be non-NULL because the gfn is below
+     * p2m->max_mapped_gfn and the root table pages are always present.
+     */
+    if ( !table )
+    {
+        ASSERT_UNREACHABLE();
+        goto out;
+    }
+
+    for ( level = P2M_ROOT_LEVEL(p2m); level; level-- )
+    {
+        rc = p2m_next_level(p2m, false, level, &table, offsets[level]);
+        if ( rc == P2M_TABLE_MAP_NONE )
+            goto out_unmap;
+
+        if ( rc != P2M_TABLE_NORMAL )
+            break;
+    }
+
+    entry = table[offsets[level]];
+
+    if ( pte_is_valid(entry) )
+    {
+        *t = p2m_get_type(entry);
+
+        mfn = pte_get_mfn(entry);
+
+        ASSERT(!(mfn_x(mfn) & (BIT(P2M_LEVEL_ORDER(level), UL) - 1)));
+
+        /*
+         * The entry may point to a superpage. Find the MFN associated
+         * to the GFN.
+         */
+        mfn = mfn_add(mfn,
+                      gfn_x(gfn) & (BIT(P2M_LEVEL_ORDER(level), UL) - 1));
+    }
+
+ out_unmap:
+    unmap_domain_page(table);
+
+ out:
+    if ( page_order )
+        *page_order = P2M_LEVEL_ORDER(level);
+
+    return mfn;
+}
+
+struct page_info *p2m_get_page_from_gfn(struct p2m_domain *p2m, gfn_t gfn,
+                                        p2m_type_t *t)
+{
+    struct page_info *page;
+    p2m_type_t p2mt;
+    mfn_t mfn;
+
+    p2m_read_lock(p2m);
+    mfn = p2m_get_entry(p2m, gfn, &p2mt, NULL);
+
+    if ( t )
+        *t = p2mt;
+
+    if ( !mfn_valid(mfn) )
+    {
+        p2m_read_unlock(p2m);
+        return NULL;
+    }
+
+    page = mfn_to_page(mfn);
+
+    /*
+     * get_page won't work on foreign mapping because the page doesn't
+     * belong to the current domain.
+     */
+    if ( unlikely(p2m_is_foreign(p2mt)) )
+    {
+        const struct domain *fdom = page_get_owner_and_reference(page);
+
+        p2m_read_unlock(p2m);
+
+        if ( fdom )
+        {
+            if ( likely(fdom != p2m->domain) )
+                return page;
+
+            ASSERT_UNREACHABLE();
+            put_page(page);
+        }
+
+        return NULL;
+    }
+
+    p2m_read_unlock(p2m);
+
+    return get_page(page, p2m->domain) ? page : NULL;
+}
