@@ -26,6 +26,25 @@
  */
 #define P2M_MAX_SUPPORTED_LEVEL_MAPPING _AC(2, U)
 
+struct md_t {
+    /*
+     * Describes a type stored outside PTE bits.
+     * Look at the comment above definition of enum p2m_type_t.
+     */
+    p2m_type_t type : 4;
+};
+
+/*
+ * P2M PTE context is used only when a PTE's P2M type is p2m_ext_storage.
+ * In this case, the P2M type is stored separately in the metadata page.
+ */
+struct p2m_pte_ctx {
+    struct p2m_domain *p2m;
+    struct page_info *pt_page;   /* Page table page containing the PTE. */
+    unsigned int index;          /* Index of the PTE within that page. */
+    unsigned int level;          /* Paging level at which the PTE resides. */
+};
+
 static struct gstage_mode_desc __ro_after_init max_gstage_mode = {
     .mode = HGATP_MODE_OFF,
     .paging_levels = 0,
@@ -37,6 +56,10 @@ unsigned char get_max_supported_mode(void)
     return max_gstage_mode.mode;
 }
 
+/*
+ * If anything is changed here, it may also require updates to
+ * p2m_{get,set}_type().
+ */
 static inline unsigned int calc_offset(const struct p2m_domain *p2m,
                                        const unsigned int lvl,
                                        const paddr_t gpa)
@@ -79,6 +102,9 @@ static inline unsigned int calc_offset(const struct p2m_domain *p2m,
  * The caller is responsible for unmapping the page after use.
  *
  * Returns NULL if the calculated offset into the root table is invalid.
+ *
+ * If anything is changed here, it may also require updates to
+ * p2m_{get,set}_type().
  */
 static pte_t *p2m_get_root_pointer(struct p2m_domain *p2m, gfn_t gfn)
 {
@@ -370,24 +396,94 @@ static struct page_info *p2m_alloc_page(struct p2m_domain *p2m)
     return pg;
 }
 
-static int p2m_set_type(pte_t *pte, p2m_type_t t)
+/*
+ * `pte` – PTE entry for which the type `t` will be stored.
+ *
+ * If `t` >= p2m_first_external, a valid `ctx` must be provided.
+ */
+static void p2m_set_type(pte_t *pte, p2m_type_t t,
+                         const struct p2m_pte_ctx *ctx)
 {
-    int rc = 0;
+    struct page_info **md_pg;
+    struct md_t *metadata = NULL;
 
-    if ( t > p2m_first_external )
-        panic("unimplemeted\n");
-    else
-        pte->pte |= MASK_INSR(t, P2M_TYPE_PTE_BITS_MASK);
+    /*
+     * It is sufficient to compare ctx->index with PAGETABLE_ENTRIES because,
+     * even for the p2m root page table (which is a 16 KB page allocated as
+     * four 4 KB pages), calc_offset() guarantees that the page-table index
+     * will always fall within the range [0, 511].
+     */
+    ASSERT(ctx && ctx->index < PAGETABLE_ENTRIES && ctx->p2m);
 
-    return rc;
+    /*
+     * At the moment, p2m_get_root_pointer() returns one of four possible p2m
+     * root pages, so there is no need to search for the correct ->pt_page
+     * here.
+     * Non-root page tables are 4 KB pages, so simply using ->pt_page is
+     * sufficient.
+     */
+    md_pg = &ctx->pt_page->v.md.pg;
+
+    if ( !*md_pg && (t >= p2m_first_external) )
+    {
+        /*
+         * Since p2m_alloc_page() initializes an allocated page with
+         * zeros, p2m_invalid is expected to have the value 0 as well.
+         */
+        BUILD_BUG_ON(p2m_invalid);
+
+        *md_pg = p2m_alloc_page(ctx->p2m);
+        if ( !*md_pg )
+        {
+            printk("%pd: can't allocate metadata page\n",
+                    ctx->p2m->domain);
+            domain_crash(ctx->p2m->domain);
+
+            return;
+        }
+    }
+
+    if ( *md_pg )
+        metadata = __map_domain_page(*md_pg);
+
+    if ( t >= p2m_first_external )
+    {
+        metadata[ctx->index].type = t;
+
+        t = p2m_ext_storage;
+    }
+    else if ( metadata )
+        metadata[ctx->index].type = p2m_invalid;
+
+    pte->pte |= MASK_INSR(t, P2M_TYPE_PTE_BITS_MASK);
+
+    unmap_domain_page(metadata);
 }
 
-static p2m_type_t p2m_get_type(const pte_t pte)
+/*
+ * `pte` -> PTE entry that stores the PTE's type.
+ *
+ * If the PTE's type is `p2m_ext_storage`, `ctx` should be provided;
+ * otherwise it could be NULL.
+ */
+static p2m_type_t p2m_get_type(const pte_t pte, const struct p2m_pte_ctx *ctx)
 {
     p2m_type_t type = MASK_EXTR(pte.pte, P2M_TYPE_PTE_BITS_MASK);
 
     if ( type == p2m_ext_storage )
-        panic("unimplemented\n");
+    {
+        const struct md_t *md = __map_domain_page(ctx->pt_page->v.md.pg);
+
+        type = md[ctx->index].type;
+
+        /*
+         * Since p2m_set_type() guarantees that the type will be greater than
+         * p2m_first_external, just check that we received a valid type here.
+         */
+        ASSERT(type > p2m_first_external);
+
+        unmap_domain_page(md);
+    }
 
     return type;
 }
@@ -477,7 +573,14 @@ static void p2m_set_permission(pte_t *e, p2m_type_t t)
     }
 }
 
-static pte_t p2m_pte_from_mfn(mfn_t mfn, p2m_type_t t, bool is_table)
+/*
+ * If p2m_pte_from_mfn() is called with ctx = NULL,
+ * it means the function is working with a page table for which the `t`
+ * should not be applicable. Otherwise, the function is handling a leaf PTE
+ * for which `t` is applicable.
+ */
+static pte_t p2m_pte_from_mfn(mfn_t mfn, p2m_type_t t,
+                              struct p2m_pte_ctx *ctx)
 {
     pte_t e = (pte_t) { PTE_VALID };
 
@@ -485,7 +588,7 @@ static pte_t p2m_pte_from_mfn(mfn_t mfn, p2m_type_t t, bool is_table)
 
     ASSERT(!(mfn_to_maddr(mfn) & ~PADDR_MASK) || mfn_eq(mfn, INVALID_MFN));
 
-    if ( !is_table )
+    if ( ctx )
     {
         switch ( t )
         {
@@ -498,7 +601,7 @@ static pte_t p2m_pte_from_mfn(mfn_t mfn, p2m_type_t t, bool is_table)
         }
 
         p2m_set_permission(&e, t);
-        p2m_set_type(&e, t);
+        p2m_set_type(&e, t, ctx);
     }
     else
         /*
@@ -518,7 +621,22 @@ static pte_t page_to_p2m_table(const struct page_info *page)
      * set to true and p2m_type_t shouldn't be applied for PTEs which
      * describe an intermediate table.
      */
-    return p2m_pte_from_mfn(page_to_mfn(page), p2m_invalid, true);
+    return p2m_pte_from_mfn(page_to_mfn(page), p2m_invalid, NULL);
+}
+
+static void p2m_free_page(struct p2m_domain *p2m, struct page_info *pg);
+
+/*
+ * Free page table's page and metadata page linked to page table's page.
+ */
+static void p2m_free_table(struct p2m_domain *p2m, struct page_info *tbl_pg)
+{
+    if ( tbl_pg->v.md.pg )
+    {
+        p2m_free_page(p2m, tbl_pg->v.md.pg);
+        tbl_pg->v.md.pg = NULL;
+    }
+    p2m_free_page(p2m, tbl_pg);
 }
 
 /* Allocate a new page table page and hook it in via the given entry. */
@@ -679,12 +797,14 @@ static void p2m_free_page(struct p2m_domain *p2m, struct page_info *pg)
 
 /* Free pte sub-tree behind an entry */
 static void p2m_free_subtree(struct p2m_domain *p2m,
-                             pte_t entry, unsigned int level)
+                             pte_t entry,
+                             const struct p2m_pte_ctx *ctx)
 {
     unsigned int i;
     pte_t *table;
     mfn_t mfn;
     struct page_info *pg;
+    unsigned int level = ctx->level;
 
     /*
      * Check if the level is valid: only 4K - 2M - 1G mappings are supported.
@@ -700,7 +820,7 @@ static void p2m_free_subtree(struct p2m_domain *p2m,
 
     if ( pte_is_mapping(entry) )
     {
-        p2m_type_t p2mt = p2m_get_type(entry);
+        p2m_type_t p2mt = p2m_get_type(entry, ctx);
 
 #ifdef CONFIG_IOREQ_SERVER
         /*
@@ -719,10 +839,22 @@ static void p2m_free_subtree(struct p2m_domain *p2m,
         return;
     }
 
-    table = map_domain_page(pte_get_mfn(entry));
+    mfn = pte_get_mfn(entry);
+    ASSERT(mfn_valid(mfn));
+    table = map_domain_page(mfn);
+    pg = mfn_to_page(mfn);
 
     for ( i = 0; i < P2M_PAGETABLE_ENTRIES(p2m, level); i++ )
-        p2m_free_subtree(p2m, table[i], level - 1);
+    {
+        struct p2m_pte_ctx tmp_ctx = {
+            .pt_page = pg,
+            .index = i,
+            .level = level - 1,
+            .p2m = p2m,
+        };
+
+        p2m_free_subtree(p2m, table[i], &tmp_ctx);
+    }
 
     unmap_domain_page(table);
 
@@ -734,17 +866,13 @@ static void p2m_free_subtree(struct p2m_domain *p2m,
      */
     p2m_tlb_flush_sync(p2m);
 
-    mfn = pte_get_mfn(entry);
-    ASSERT(mfn_valid(mfn));
-
-    pg = mfn_to_page(mfn);
-
-    p2m_free_page(p2m, pg);
+    p2m_free_table(p2m, pg);
 }
 
 static bool p2m_split_superpage(struct p2m_domain *p2m, pte_t *entry,
                                 unsigned int level, unsigned int target,
-                                const unsigned int *offsets)
+                                const unsigned int *offsets,
+                                struct page_info *tbl_pg)
 {
     struct page_info *page;
     unsigned long i;
@@ -755,6 +883,14 @@ static bool p2m_split_superpage(struct p2m_domain *p2m, pte_t *entry,
     mfn_t mfn = pte_get_mfn(*entry);
     unsigned int next_level = level - 1;
     unsigned int level_order = P2M_LEVEL_ORDER(next_level);
+
+    struct p2m_pte_ctx p2m_pte_ctx = {
+        .p2m = p2m,
+        .level = level,
+    };
+
+    /* Init with p2m_invalid just to make compiler happy. */
+    p2m_type_t old_type = p2m_invalid;
 
     /*
      * This should only be called with target != level and the entry is
@@ -777,6 +913,17 @@ static bool p2m_split_superpage(struct p2m_domain *p2m, pte_t *entry,
 
     table = __map_domain_page(page);
 
+    if ( MASK_EXTR(entry->pte, P2M_TYPE_PTE_BITS_MASK) == p2m_ext_storage )
+    {
+        p2m_pte_ctx.pt_page = tbl_pg;
+        p2m_pte_ctx.index = offsets[level];
+
+        old_type = p2m_get_type(*entry, &p2m_pte_ctx);
+    }
+
+    p2m_pte_ctx.pt_page = page;
+    p2m_pte_ctx.level = next_level;
+
     for ( i = 0; i < P2M_PAGETABLE_ENTRIES(p2m, next_level); i++ )
     {
         pte_t *new_entry = table + i;
@@ -787,6 +934,13 @@ static bool p2m_split_superpage(struct p2m_domain *p2m, pte_t *entry,
          */
         pte = *entry;
         pte_set_mfn(&pte, mfn_add(mfn, i << level_order));
+
+        if ( MASK_EXTR(pte.pte, P2M_TYPE_PTE_BITS_MASK) == p2m_ext_storage )
+        {
+            p2m_pte_ctx.index = i;
+
+            p2m_set_type(&pte, old_type, &p2m_pte_ctx);
+        }
 
         write_pte(new_entry, pte);
     }
@@ -799,7 +953,7 @@ static bool p2m_split_superpage(struct p2m_domain *p2m, pte_t *entry,
      */
     if ( next_level != target )
         rv = p2m_split_superpage(p2m, table + offsets[next_level],
-                                 next_level, target, offsets);
+                                 next_level, target, offsets, page);
 
     if ( p2m->clean_dcache )
         clean_dcache_va_range(table, PAGE_SIZE);
@@ -840,6 +994,9 @@ static int p2m_set_entry(struct p2m_domain *p2m,
      * are still allowed.
      */
     bool removing_mapping = mfn_eq(mfn, INVALID_MFN);
+    struct p2m_pte_ctx tmp_ctx = {
+        .p2m = p2m,
+    };
     P2M_BUILD_LEVEL_OFFSETS(p2m, offsets, gfn_to_gaddr(gfn));
 
     ASSERT(p2m_is_write_locked(p2m));
@@ -890,13 +1047,19 @@ static int p2m_set_entry(struct p2m_domain *p2m,
     {
         /* We need to split the original page. */
         pte_t split_pte = *entry;
+        struct page_info *tbl_pg = mfn_to_page(domain_page_map_to_mfn(table));
 
         ASSERT(pte_is_superpage(*entry, level));
 
-        if ( !p2m_split_superpage(p2m, &split_pte, level, target, offsets) )
+        if ( !p2m_split_superpage(p2m, &split_pte, level, target, offsets,
+                                  tbl_pg) )
         {
+            tmp_ctx.pt_page = tbl_pg;
+            tmp_ctx.index = offsets[level];
+            tmp_ctx.level = level;
+
             /* Free the allocated sub-tree */
-            p2m_free_subtree(p2m, split_pte, level);
+            p2m_free_subtree(p2m, split_pte, &tmp_ctx);
 
             rc = -ENOMEM;
             goto out;
@@ -922,6 +1085,10 @@ static int p2m_set_entry(struct p2m_domain *p2m,
         entry = table + offsets[level];
     }
 
+    tmp_ctx.pt_page = mfn_to_page(domain_page_map_to_mfn(table));
+    tmp_ctx.index = offsets[level];
+    tmp_ctx.level = level;
+
     /*
      * We should always be there with the correct level because all the
      * intermediate tables have been installed if necessary.
@@ -934,7 +1101,7 @@ static int p2m_set_entry(struct p2m_domain *p2m,
         p2m_clean_pte(entry, p2m->clean_dcache);
     else
     {
-        pte_t pte = p2m_pte_from_mfn(mfn, t, false);
+        pte_t pte = p2m_pte_from_mfn(mfn, t, &tmp_ctx);
 
         p2m_write_pte(entry, pte, p2m->clean_dcache);
 
@@ -970,7 +1137,7 @@ static int p2m_set_entry(struct p2m_domain *p2m,
     if ( pte_is_valid(orig_pte) &&
          (!pte_is_valid(*entry) ||
           !mfn_eq(pte_get_mfn(*entry), pte_get_mfn(orig_pte))) )
-        p2m_free_subtree(p2m, orig_pte, level);
+        p2m_free_subtree(p2m, orig_pte, &tmp_ctx);
 
  out:
     unmap_domain_page(table);
@@ -1171,7 +1338,14 @@ static mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
 
     if ( pte_is_valid(entry) )
     {
-        *t = p2m_get_type(entry);
+        struct p2m_pte_ctx p2m_pte_ctx = {
+            .pt_page = mfn_to_page(domain_page_map_to_mfn(table)),
+            .index = offsets[level],
+            .level = level,
+            .p2m = p2m,
+        };
+
+        *t = p2m_get_type(entry, &p2m_pte_ctx);
 
         mfn = pte_get_mfn(entry);
 
