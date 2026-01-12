@@ -296,9 +296,9 @@ static void __init allocate_memory_11(struct domain *d,
      */
     BUG_ON(!is_domain_direct_mapped(d));
 
-    printk("Allocating 1:1 mappings totalling %ldMB for dom0:\n",
+    printk("Allocating 1:1 mappings totalling %ldMB for %pd:\n",
            /* Don't want format this as PRIpaddr (16 digit hex) */
-           (unsigned long)(kinfo->unassigned_mem >> 20));
+           (unsigned long)(kinfo->unassigned_mem >> 20), d);
 
     mem->nr_banks = 0;
 
