@@ -7,7 +7,7 @@
 #define FSCAPINTS FEATURESET_NR_ENTRIES
 
 /* Synthetic words follow the featureset words. */
-#define X86_NR_SYNTH 1
+#define X86_NR_SYNTH 2
 #define X86_SYNTH(x) (FSCAPINTS * 32 + (x))
 
 /* Synthetic features */
@@ -43,6 +43,7 @@ XEN_CPUFEATURE(IBPB_ENTRY_PV,     X86_SYNTH(28)) /* MSR_PRED_CMD used by Xen for
 XEN_CPUFEATURE(IBPB_ENTRY_HVM,    X86_SYNTH(29)) /* MSR_PRED_CMD used by Xen for HVM */
 XEN_CPUFEATURE(USE_VMCALL,        X86_SYNTH(30)) /* Use VMCALL instead of VMMCALL */
 XEN_CPUFEATURE(PDX_COMPRESSION,   X86_SYNTH(31)) /* PDX compression */
+XEN_CPUFEATURE(XEN_REP_MOVSB,     X86_SYNTH(32)) /* REP MOVSB used for memcpy() */
 
 /* Bug words follow the synthetic words. */
 #define X86_NR_BUG 1

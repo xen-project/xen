@@ -684,6 +684,9 @@ static void cf_check init_intel(struct cpuinfo_x86 *c)
 	 */
 	if (c == &boot_cpu_data && c->vfm == INTEL_SKYLAKE_X)
 		setup_clear_cpu_cap(X86_FEATURE_CLWB);
+
+	if (c == &boot_cpu_data && cpu_has(c, X86_FEATURE_ERMS))
+		setup_force_cpu_cap(X86_FEATURE_XEN_REP_MOVSB);
 }
 
 const struct cpu_dev __initconst_cf_clobber intel_cpu_dev = {
