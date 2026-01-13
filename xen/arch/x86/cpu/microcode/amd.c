@@ -101,7 +101,7 @@ static const struct patch_digest {
 } patch_digests[] = {
 #include "amd-patch-digests.c"
 };
-static bool __ro_after_init entrysign_mitigiated_in_firmware;
+static bool __ro_after_init entrysign_mitigated_in_firmware;
 
 static int cf_check cmp_patch_id(const void *key, const void *elem)
 {
@@ -127,7 +127,7 @@ static bool check_digest(const struct container_microcode *mc)
      * the digest of the patch against a list of known provenance.
      */
     if ( boot_cpu_data.family < 0x17 || boot_cpu_data.family > 0x1a ||
-         entrysign_mitigiated_in_firmware || !opt_digest_check )
+         entrysign_mitigated_in_firmware || !opt_digest_check )
         return true;
 
     pd = bsearch(&patch->patch_id, patch_digests, ARRAY_SIZE(patch_digests),
@@ -676,7 +676,7 @@ void __init amd_check_entrysign(void)
      */
     if ( (uint8_t)curr_rev >= fixed_rev )
     {
-        entrysign_mitigiated_in_firmware = true;
+        entrysign_mitigated_in_firmware = true;
         return;
     }
 
