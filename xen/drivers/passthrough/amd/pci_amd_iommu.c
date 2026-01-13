@@ -121,7 +121,7 @@ static bool use_ats(
 {
     return !ivrs_dev->block_ats &&
            iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) &&
-           pci_ats_device(iommu->sbdf.seg, pdev->bus, pdev->devfn);
+           pci_ats_device(pdev);
 }
 
 static int __must_check amd_iommu_setup_domain_device(
@@ -274,8 +274,7 @@ static int __must_check amd_iommu_setup_domain_device(
 
     ASSERT(pcidevs_locked());
 
-    if ( use_ats(pdev, iommu, ivrs_dev) &&
-         !pci_ats_enabled(iommu->sbdf.seg, bus, pdev->devfn) )
+    if ( use_ats(pdev, iommu, ivrs_dev) && !pci_ats_enabled(pdev) )
     {
         if ( devfn == pdev->devfn )
             enable_ats_device(pdev, &iommu->ats_devices);
@@ -418,8 +417,7 @@ static void amd_iommu_disable_domain_device(const struct domain *domain,
 
     ASSERT(pcidevs_locked());
 
-    if ( pci_ats_device(iommu->sbdf.seg, bus, pdev->devfn) &&
-         pci_ats_enabled(iommu->sbdf.seg, bus, pdev->devfn) )
+    if ( pci_ats_device(pdev) && pci_ats_enabled(pdev) )
         disable_ats_device(pdev);
 
     BUG_ON ( iommu->dev_table.buffer == NULL );

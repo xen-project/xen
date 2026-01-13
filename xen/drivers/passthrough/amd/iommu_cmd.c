@@ -285,7 +285,7 @@ void amd_iommu_flush_iotlb(u8 devfn, const struct pci_dev *pdev,
     if ( !ats_enabled )
         return;
 
-    if ( !pci_ats_enabled(pdev->seg, pdev->bus, pdev->devfn) )
+    if ( !pci_ats_enabled(pdev) )
         return;
 
     iommu = find_iommu_for_device(pdev->sbdf);
