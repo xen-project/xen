@@ -345,9 +345,13 @@ void calculate_raw_cpu_policy(void)
     ASSERT(p->x86_vendor == boot_cpu_data.vendor);
 
     /*
-     * Clear the truly dynamic fields.  These vary with the in-context XCR0
-     * and MSR_XSS, and aren't interesting fields in the raw policy.
+     * Clear the truly dynamic fields.
+     *
+     * - The OS* bits are forwards from CR4.
+     * - The xstate fields are calculated from XCR0 and MSR_XSS.
      */
+    p->basic.raw[1].c &= ~cpufeat_mask(X86_FEATURE_OSXSAVE);
+    p->feat.raw[0].c  &= ~cpufeat_mask(X86_FEATURE_OSPKE);
     p->xstate.raw[0].b = 0;
     p->xstate.raw[1].b = 0;
 
