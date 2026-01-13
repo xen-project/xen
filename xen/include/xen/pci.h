@@ -260,8 +260,10 @@ unsigned int pci_find_next_cap_ttl(pci_sbdf_t sbdf, unsigned int pos,
                                    unsigned int *ttl);
 unsigned int pci_find_next_cap(pci_sbdf_t sbdf, unsigned int pos,
                                unsigned int cap);
-unsigned int pci_find_ext_capability(pci_sbdf_t sbdf, unsigned int cap);
-unsigned int pci_find_next_ext_capability(pci_sbdf_t sbdf, unsigned int start,
+unsigned int pci_find_ext_capability(const struct pci_dev *pdev,
+                                     unsigned int cap);
+unsigned int pci_find_next_ext_capability(const struct pci_dev *pdev,
+                                          unsigned int start,
                                           unsigned int cap);
 const char *parse_pci(const char *s, unsigned int *seg_p, unsigned int *bus_p,
                       unsigned int *dev_p, unsigned int *func_p);

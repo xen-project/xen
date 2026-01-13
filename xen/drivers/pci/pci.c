@@ -89,9 +89,10 @@ unsigned int pci_find_next_cap(pci_sbdf_t sbdf, unsigned int pos,
  * within the device's PCI configuration space or 0 if the device does
  * not support it.
  */
-unsigned int pci_find_ext_capability(pci_sbdf_t sbdf, unsigned int cap)
+unsigned int pci_find_ext_capability(const struct pci_dev *pdev,
+                                     unsigned int cap)
 {
-    return pci_find_next_ext_capability(sbdf, 0, cap);
+    return pci_find_next_ext_capability(pdev, 0, cap);
 }
 
 /**
@@ -104,14 +105,15 @@ unsigned int pci_find_ext_capability(pci_sbdf_t sbdf, unsigned int cap)
  * within the device's PCI configuration space or 0 if the device does
  * not support it.
  */
-unsigned int pci_find_next_ext_capability(pci_sbdf_t sbdf, unsigned int start,
+unsigned int pci_find_next_ext_capability(const struct pci_dev *pdev,
+                                          unsigned int start,
                                           unsigned int cap)
 {
     u32 header;
     int ttl = 480; /* 3840 bytes, minimum 8 bytes per capability */
-    unsigned int pos = max(start, 0x100U);
+    unsigned int pos = max(start, PCI_CFG_SPACE_SIZE + 0U);
 
-    header = pci_conf_read32(sbdf, pos);
+    header = pci_conf_read32(pdev->sbdf, pos);
 
     /*
      * If we have no capabilities, this is indicated by cap ID,
@@ -125,9 +127,9 @@ unsigned int pci_find_next_ext_capability(pci_sbdf_t sbdf, unsigned int start,
         if ( PCI_EXT_CAP_ID(header) == cap && pos != start )
             return pos;
         pos = PCI_EXT_CAP_NEXT(header);
-        if ( pos < 0x100 )
+        if ( pos < PCI_CFG_SPACE_SIZE )
             break;
-        header = pci_conf_read32(sbdf, pos);
+        header = pci_conf_read32(pdev->sbdf, pos);
     }
     return 0;
 }

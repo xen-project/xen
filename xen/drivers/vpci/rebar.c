@@ -53,7 +53,7 @@ static int cf_check init_rebar(struct pci_dev *pdev)
 {
     uint32_t ctrl;
     unsigned int nbars;
-    unsigned int rebar_offset = pci_find_ext_capability(pdev->sbdf,
+    unsigned int rebar_offset = pci_find_ext_capability(pdev,
                                                         PCI_EXT_CAP_ID_REBAR);
 
     if ( !rebar_offset )

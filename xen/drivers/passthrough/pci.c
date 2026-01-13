@@ -581,7 +581,7 @@ static void pci_enable_acs(struct pci_dev *pdev)
     if ( !is_iommu_enabled(pdev->domain) )
         return;
 
-    pos = pci_find_ext_capability(pdev->sbdf, PCI_EXT_CAP_ID_ACS);
+    pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_ACS);
     if (!pos)
         return;
 
@@ -722,8 +722,7 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
 
     if ( !pdev->info.is_virtfn && !pdev->physfn.vf_rlen[0] )
     {
-        unsigned int pos = pci_find_ext_capability(pdev->sbdf,
-                                                   PCI_EXT_CAP_ID_SRIOV);
+        unsigned int pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_SRIOV);
         uint16_t ctrl = pci_conf_read16(pdev->sbdf, pos + PCI_SRIOV_CTRL);
 
         if ( !pos )

@@ -32,7 +32,7 @@ static inline int pci_ats_enabled(const struct pci_dev *pdev)
     u32 value;
     int pos;
 
-    pos = pci_find_ext_capability(pdev->sbdf, PCI_EXT_CAP_ID_ATS);
+    pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_ATS);
     BUG_ON(!pos);
 
     value = pci_conf_read16(pdev->sbdf, pos + ATS_REG_CTL);
@@ -45,7 +45,7 @@ static inline int pci_ats_device(const struct pci_dev *pdev)
     if ( !ats_enabled )
         return 0;
 
-    return pci_find_ext_capability(pdev->sbdf, PCI_EXT_CAP_ID_ATS);
+    return pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_ATS);
 }
 
 #endif /* DRIVERS__PASSTHROUGH__ATS_H */

@@ -24,7 +24,7 @@ boolean_param("ats", ats_enabled);
 int enable_ats_device(struct pci_dev *pdev, struct list_head *ats_list)
 {
     uint16_t value;
-    unsigned int pos = pci_find_ext_capability(pdev->sbdf, PCI_EXT_CAP_ID_ATS);
+    unsigned int pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_ATS);
 
     BUG_ON(!pos);
 

@@ -196,7 +196,7 @@ static struct vpci_register *vpci_get_previous_ext_cap_register(
 static int vpci_ext_capability_hide(
     const struct pci_dev *pdev, unsigned int cap)
 {
-    const unsigned int offset = pci_find_ext_capability(pdev->sbdf, cap);
+    const unsigned int offset = pci_find_ext_capability(pdev, cap);
     struct vpci_register *r, *prev_r;
     struct vpci *vpci = pdev->vpci;
     uint32_t header, pre_header;
@@ -264,7 +264,7 @@ static int vpci_init_capabilities(struct pci_dev *pdev)
         if ( !is_ext )
             pos = pci_find_cap_offset(pdev->sbdf, cap);
         else if ( is_hardware_domain(pdev->domain) )
-            pos = pci_find_ext_capability(pdev->sbdf, cap);
+            pos = pci_find_ext_capability(pdev, cap);
 
         if ( !pos )
             continue;
@@ -333,7 +333,7 @@ void vpci_deassign_device(struct pci_dev *pdev)
         if ( !capability->is_ext )
             pos = pci_find_cap_offset(pdev->sbdf, cap);
         else if ( is_hardware_domain(pdev->domain) )
-            pos = pci_find_ext_capability(pdev->sbdf, cap);
+            pos = pci_find_ext_capability(pdev, cap);
         if ( pos )
         {
             int rc = capability->cleanup(pdev, false);

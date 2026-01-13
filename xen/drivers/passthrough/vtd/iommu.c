@@ -1477,7 +1477,7 @@ static int ats_device(const struct pci_dev *pdev,
          !acpi_find_matched_atsr_unit(pdev) )
         return 0;
 
-    pos = pci_find_ext_capability(pdev->sbdf, PCI_EXT_CAP_ID_ATS);
+    pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_ATS);
     if ( pos )
         drhd->iommu->flush_dev_iotlb = true;
 
