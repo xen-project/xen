@@ -101,7 +101,7 @@ static struct microcode_patch *microcode_cache;
  * location we require that they are not both active together.
  */
 static int __initdata opt_mod_idx;
-static bool __initdata opt_scan = IS_ENABLED(CONFIG_UCODE_SCAN_DEFAULT);
+static bool __initdata opt_scan = IS_ENABLED(CONFIG_MICROCODE_SCAN_DEFAULT);
 bool __ro_after_init opt_digest_check = true;
 
 /*

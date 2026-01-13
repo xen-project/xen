@@ -331,7 +331,7 @@ config REQUIRE_NX
 	  was unavailable. However, if enabled, Xen will no longer boot on
 	  any CPU which is lacking NX support.
 
-config UCODE_SCAN_DEFAULT
+config MICROCODE_SCAN_DEFAULT
 	bool "Scan for microcode by default"
 	help
 	  During boot, Xen can scan the multiboot images for a CPIO archive
