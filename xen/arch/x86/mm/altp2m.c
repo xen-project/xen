@@ -194,6 +194,9 @@ int altp2m_get_effective_entry(struct p2m_domain *ap2m, gfn_t gfn, mfn_t *mfn,
             gfn_t gfn_aligned = _gfn(gfn_x(gfn) & mask);
             mfn_t mfn_aligned = _mfn(mfn_x(*mfn) & mask);
 
+            /* Override the altp2m entry with its default access. */
+            *a = ap2m->default_access;
+
             rc = ap2m->set_entry(ap2m, gfn_aligned, mfn_aligned, page_order, *t, *a, 1);
             if ( rc )
                 return rc;
