@@ -16,6 +16,7 @@
 #include <xen/iocap.h>
 #include <xen/ioreq.h>
 #include <xen/lib.h>
+#include <xen/llc-coloring.h>
 #include <xen/mem_access.h>
 #include <xen/mm.h>
 #include <xen/numa.h>
@@ -1658,6 +1659,9 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
 
     case XENMEM_claim_pages:
+        if ( llc_coloring_enabled )
+            return -EOPNOTSUPP;
+
         if ( unlikely(start_extent) )
             return -EINVAL;
 
