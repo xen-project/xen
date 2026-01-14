@@ -415,10 +415,9 @@ ret_t do_platform_op(
         }
         case XEN_FW_VBEDDC_INFO:
             ret = -ESRCH;
-#ifdef CONFIG_VIDEO
-            if ( op->u.firmware_info.index != 0 )
-                break;
-            if ( *(u32 *)bootsym(boot_edid_info) == 0x13131313 )
+            if ( !IS_ENABLED(CONFIG_VIDEO) ||
+                 op->u.firmware_info.index != 0 ||
+                 *(uint32_t *)bootsym(boot_edid_info) == 0x13131313 )
                 break;
 
             op->u.firmware_info.u.vbeddc_info.capabilities =
@@ -434,7 +433,6 @@ ret_t do_platform_op(
                  copy_to_compat(op->u.firmware_info.u.vbeddc_info.edid,
                                 bootsym(boot_edid_info), 128) )
                 ret = -EFAULT;
-#endif
             break;
         case XEN_FW_EFI_INFO:
             ret = efi_get_info(op->u.firmware_info.index,
@@ -905,20 +903,19 @@ ret_t do_platform_op(
         break;
     }
 
-#ifdef CONFIG_VIDEO
     case XENPF_get_dom0_console:
         BUILD_BUG_ON(sizeof(op->u.dom0_console) > sizeof(op->u.pad));
-        ret = sizeof(op->u.dom0_console);
-        if ( !fill_console_start_info(&op->u.dom0_console) )
-        {
-            ret = -ENODEV;
+
+        ret = -ENODEV;
+        if ( !IS_ENABLED(CONFIG_VIDEO) ||
+             !fill_console_start_info(&op->u.dom0_console) )
             break;
-        }
+
+        ret = sizeof(op->u.dom0_console);
 
         if ( copy_field_to_guest(u_xenpf_op, op, u.dom0_console) )
             ret = -EFAULT;
         break;
-#endif
 
     default:
         ret = -ENOSYS;

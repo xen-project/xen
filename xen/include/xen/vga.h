@@ -11,9 +11,10 @@
 
 #include <xen/video.h>
 
-#ifdef CONFIG_VGA
 extern struct xen_vga_console_info vga_console_info;
 int fill_console_start_info(struct dom0_vga_console_info *ci);
+
+#ifdef CONFIG_VGA
 void vesa_init(void);
 void vesa_early_init(void);
 void vesa_endboot(bool keep);
