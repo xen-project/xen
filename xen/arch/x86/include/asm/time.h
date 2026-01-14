@@ -56,7 +56,6 @@ u64 stime2tsc(s_time_t stime);
 
 struct time_scale;
 void set_time_scale(struct time_scale *ts, u64 ticks_per_sec);
-u64 scale_delta(u64 delta, const struct time_scale *scale);
 
 /* Programmable Interval Timer (8254) */
 

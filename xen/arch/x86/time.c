@@ -133,9 +133,9 @@ static inline u32 mul_frac(u32 multiplicand, u32 multiplier)
  * Scale a 64-bit delta by scaling and multiplying by a 32-bit fraction,
  * yielding a 64-bit result.
  */
-u64 scale_delta(u64 delta, const struct time_scale *scale)
+static uint64_t scale_delta(uint64_t delta, const struct time_scale *scale)
 {
-    u64 product;
+    uint64_t product;
 
     if ( scale->shift < 0 )
         delta >>= -scale->shift;
