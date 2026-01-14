@@ -2837,14 +2837,13 @@ uint64_t gtime_to_gtsc(const struct domain *d, uint64_t time)
     return scale_delta(time, &d->arch.ns_to_vtsc);
 }
 
+#ifdef CONFIG_HVM
 uint64_t gtsc_to_gtime(const struct domain *d, uint64_t tsc)
 {
-    u64 time = scale_delta(tsc, &d->arch.vtsc_to_ns);
-
-    if ( !is_hvm_domain(d) )
-        time += d->arch.vtsc_offset;
-    return time;
+    ASSERT(is_hvm_domain(d));
+    return scale_delta(tsc, &d->arch.vtsc_to_ns);
 }
+#endif /* CONFIG_HVM */
 
 uint64_t pv_soft_rdtsc(const struct vcpu *v, const struct cpu_user_regs *regs)
 {
