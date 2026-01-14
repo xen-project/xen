@@ -291,6 +291,43 @@ static void disable_mpu_region_from_index(uint8_t index)
 }
 
 /*
+ * Free a xen_mpumap entry given the index. A mpu region is actually disabled
+ * when the refcount is 0 and the region type is MPUMAP_REGION_FOUND.
+ *
+ * @param idx                   Index of the mpumap entry.
+ * @param region_found_type     MPUMAP_REGION_* value.
+ * @return                      0 on success, otherwise negative on error.
+ */
+static int xen_mpumap_free_entry(uint8_t idx, int region_found_type)
+{
+    ASSERT(spin_is_locked(&xen_mpumap_lock));
+    ASSERT(idx != INVALID_REGION_IDX);
+    ASSERT(MPUMAP_REGION_OVERLAP != region_found_type);
+
+    if ( MPUMAP_REGION_NOTFOUND == region_found_type )
+    {
+        printk(XENLOG_ERR "Cannot remove entry that does not exist\n");
+        return -EINVAL;
+    }
+
+    if ( xen_mpumap[idx].refcount )
+    {
+        xen_mpumap[idx].refcount -= 1;
+        return 0;
+    }
+
+    if ( MPUMAP_REGION_FOUND != region_found_type )
+    {
+        printk(XENLOG_ERR "Cannot remove a partial region\n");
+        return -EINVAL;
+    }
+
+    disable_mpu_region_from_index(idx);
+
+    return 0;
+}
+
+/*
  * Update the entry in the MPU memory region mapping table (xen_mpumap) for the
  * given memory range and flags, creating one if none exists.
  *
@@ -357,18 +394,7 @@ static int xen_mpumap_update_entry(paddr_t base, paddr_t limit,
             return -EINVAL;
         }
 
-        if ( xen_mpumap[idx].refcount == 0 )
-        {
-            if ( MPUMAP_REGION_FOUND == rc )
-                disable_mpu_region_from_index(idx);
-            else
-            {
-                printk("Cannot remove a partial region\n");
-                return -EINVAL;
-            }
-        }
-        else
-            xen_mpumap[idx].refcount -= 1;
+        return xen_mpumap_free_entry(idx, rc);
     }
 
     return 0;
@@ -416,6 +442,39 @@ int destroy_xen_mappings(unsigned long s, unsigned long e)
     ASSERT(s < e);
 
     return xen_mpumap_update(s, e, 0);
+}
+
+int destroy_xen_mapping_containing(paddr_t s)
+{
+    int rc;
+    uint8_t idx;
+
+    ASSERT(IS_ALIGNED(s, PAGE_SIZE));
+
+    spin_lock(&xen_mpumap_lock);
+
+    rc = mpumap_contains_region(xen_mpumap, max_mpu_regions, s, s + PAGE_SIZE,
+                                &idx);
+
+    /*
+     * Since only entire regions can be freed using `xen_mpumap_free_entry` we
+     * must first check the region exists.
+     */
+    if ( MPUMAP_REGION_NOTFOUND == rc )
+    {
+        printk(XENLOG_ERR "Cannot remove entry that does not exist");
+        rc = -EINVAL;
+        goto out;
+    }
+
+    /* As we are unmapping entire region use MPUMAP_REGION_FOUND instead */
+    rc = xen_mpumap_free_entry(idx, MPUMAP_REGION_FOUND);
+    if ( !rc )
+        context_sync_mpu();
+ out:
+    spin_unlock(&xen_mpumap_lock);
+
+    return rc;
 }
 
 int map_pages_to_xen(unsigned long virt, mfn_t mfn, unsigned long nr_mfns,

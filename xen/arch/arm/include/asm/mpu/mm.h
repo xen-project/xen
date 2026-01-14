@@ -111,6 +111,16 @@ pr_t pr_of_addr(paddr_t base, paddr_t limit, unsigned int flags);
 int mpumap_contains_region(pr_t *table, uint8_t nr_regions, paddr_t base,
                            paddr_t limit, uint8_t *index);
 
+
+/*
+ * Destroys and frees (if reference count is 0) an entire xen mapping on MPU
+ * systems where only the start address is known.
+ *
+ * @param s     Start address of memory region to be destroyed.
+ * @return:     0 on success, negative on error.
+ */
+int destroy_xen_mapping_containing(paddr_t s);
+
 #endif /* __ARM_MPU_MM_H__ */
 
 /*
