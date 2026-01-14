@@ -2982,8 +2982,7 @@ int tsc_set_info(struct domain *d,
              */
             d->arch.hvm.sync_tsc = rdtsc();
             hvm_set_tsc_offset(d->vcpu[0],
-                               d->vcpu[0]->arch.hvm.cache_tsc_offset,
-                               d->arch.hvm.sync_tsc);
+                               d->vcpu[0]->arch.hvm.cache_tsc_offset);
         }
     }
 

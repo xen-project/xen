@@ -778,7 +778,7 @@ static int cf_check svm_get_guest_pat(struct vcpu *v, u64 *gpat)
     return 1;
 }
 
-static void cf_check svm_set_tsc_offset(struct vcpu *v, u64 offset, u64 at_tsc)
+static void cf_check svm_set_tsc_offset(struct vcpu *v, uint64_t offset)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     struct vmcb_struct *n1vmcb, *n2vmcb;

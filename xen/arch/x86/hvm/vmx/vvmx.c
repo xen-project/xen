@@ -1114,7 +1114,7 @@ static void load_shadow_guest_state(struct vcpu *v)
             hvm_inject_hw_exception(X86_EXC_GP, 0);
     }
 
-    hvm_set_tsc_offset(v, v->arch.hvm.cache_tsc_offset, 0);
+    hvm_set_tsc_offset(v, v->arch.hvm.cache_tsc_offset);
 
     vvmcs_to_shadow_bulk(v, ARRAY_SIZE(vmentry_fields), vmentry_fields);
 
@@ -1330,7 +1330,7 @@ static void load_vvmcs_host_state(struct vcpu *v)
             hvm_inject_hw_exception(X86_EXC_GP, 0);
     }
 
-    hvm_set_tsc_offset(v, v->arch.hvm.cache_tsc_offset, 0);
+    hvm_set_tsc_offset(v, v->arch.hvm.cache_tsc_offset);
 
     set_vvmcs(v, VM_ENTRY_INTR_INFO, 0);
 

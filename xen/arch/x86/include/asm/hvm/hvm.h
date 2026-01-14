@@ -165,7 +165,7 @@ struct hvm_function_table {
     int  (*get_guest_pat)(struct vcpu *v, uint64_t *gpat);
     int  (*set_guest_pat)(struct vcpu *v, uint64_t gpat);
 
-    void (*set_tsc_offset)(struct vcpu *v, u64 offset, u64 at_tsc);
+    void (*set_tsc_offset)(struct vcpu *v, uint64_t offset);
 
     void (*inject_event)(const struct x86_event *event);
 
@@ -482,10 +482,9 @@ static inline void hvm_cpuid_policy_changed(struct vcpu *v)
     alternative_vcall(hvm_funcs.cpuid_policy_changed, v);
 }
 
-static inline void hvm_set_tsc_offset(struct vcpu *v, uint64_t offset,
-                                      uint64_t at_tsc)
+static inline void hvm_set_tsc_offset(struct vcpu *v, uint64_t offset)
 {
-    alternative_vcall(hvm_funcs.set_tsc_offset, v, offset, at_tsc);
+    alternative_vcall(hvm_funcs.set_tsc_offset, v, offset);
 }
 
 /*
@@ -847,7 +846,7 @@ static inline void hvm_sync_pir_to_irr(struct vcpu *v)
  */
 int hvm_guest_x86_mode(struct vcpu *v);
 void hvm_cpuid_policy_changed(struct vcpu *v);
-void hvm_set_tsc_offset(struct vcpu *v, uint64_t offset, uint64_t at_tsc);
+void hvm_set_tsc_offset(struct vcpu *v, uint64_t offset);
 
 /* End of prototype list */
 
