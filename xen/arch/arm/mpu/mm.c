@@ -15,6 +15,9 @@
 #include <asm/setup.h>
 #include <asm/sysregs.h>
 
+#define MPU_ATTR_XN_RO_MISMATCH     -1
+#define MPU_ATTR_AI_MISMATCH        -2
+
 struct page_info *frame_table;
 
 /* Maximum number of supported MPU memory regions by the EL2 MPU. */
@@ -171,33 +174,16 @@ int mpumap_contains_region(pr_t *table, uint8_t nr_regions, paddr_t base,
     return MPUMAP_REGION_NOTFOUND;
 }
 
-static bool is_mm_attr_match(pr_t *region, unsigned int attributes)
+static int is_mm_attr_match(pr_t *region, unsigned int attributes)
 {
-    if ( region->prbar.reg.ro != PAGE_RO_MASK(attributes) )
-    {
-        printk(XENLOG_WARNING
-               "Mismatched Access Permission attributes (%#x instead of %#x)\n",
-               region->prbar.reg.ro, PAGE_RO_MASK(attributes));
-        return false;
-    }
-
-    if ( region->prbar.reg.xn != PAGE_XN_MASK(attributes) )
-    {
-        printk(XENLOG_WARNING
-               "Mismatched Execute Never attributes (%#x instead of %#x)\n",
-               region->prbar.reg.xn, PAGE_XN_MASK(attributes));
-        return false;
-    }
+    if ( (region->prbar.reg.xn != PAGE_XN_MASK(attributes)) ||
+         (region->prbar.reg.ro != PAGE_RO_MASK(attributes)) )
+        return MPU_ATTR_XN_RO_MISMATCH;
 
     if ( region->prlar.reg.ai != PAGE_AI_MASK(attributes) )
-    {
-        printk(XENLOG_WARNING
-               "Mismatched Memory Attribute Index (%#x instead of %#x)\n",
-               region->prlar.reg.ai, PAGE_AI_MASK(attributes));
-        return false;
-    }
+        return MPU_ATTR_AI_MISMATCH;
 
-    return true;
+    return 0;
 }
 
 /* Map a frame table to cover physical addresses ps through pe */
@@ -358,10 +344,42 @@ static int xen_mpumap_update_entry(paddr_t base, paddr_t limit,
     */
     if ( flags_has_page_present && (rc >= MPUMAP_REGION_FOUND) )
     {
-        if ( !is_mm_attr_match(&xen_mpumap[idx], flags) )
+        int attr_match = is_mm_attr_match(&xen_mpumap[idx], flags);
+
+        /* We do not support modifying AI attribute. */
+        if ( MPU_ATTR_AI_MISMATCH == attr_match )
         {
-            printk("Modifying an existing entry is not supported\n");
+            printk(XENLOG_ERR
+                   "Modifying AI attribute is not supported\n");
             return -EINVAL;
+        }
+
+        /*
+         * Attributes RO and XN can be changed only by the full region.
+         * Attributes that match can continue and just increment refcount.
+         */
+        if ( MPU_ATTR_XN_RO_MISMATCH == attr_match )
+        {
+            if ( rc == MPUMAP_REGION_INCLUSIVE )
+            {
+                printk(XENLOG_ERR
+                       "Cannot modify partial region attributes\n");
+                return -EINVAL;
+            }
+
+            if ( xen_mpumap[idx].refcount != 0 )
+            {
+                printk(XENLOG_ERR
+                       "Cannot modify RO,XN attributes for a region mapped multiple times\n");
+                return -EINVAL;
+            }
+
+            /* Set new attributes */
+            xen_mpumap[idx].prbar.reg.ro = PAGE_RO_MASK(flags);
+            xen_mpumap[idx].prbar.reg.xn = PAGE_XN_MASK(flags);
+
+            write_protection_region(&xen_mpumap[idx], idx);
+            return 0;
         }
 
         /* Check for overflow of refcount before incrementing.  */
@@ -515,8 +533,7 @@ void __init setup_mm_helper(void)
 
 int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
 {
-    BUG_ON("unimplemented");
-    return -EINVAL;
+    return xen_mpumap_update(s, e, nf);
 }
 
 void dump_hyp_walk(vaddr_t addr)
@@ -527,7 +544,53 @@ void dump_hyp_walk(vaddr_t addr)
 /* Release all __init and __initdata ranges to be reused */
 void free_init_memory(void)
 {
-    BUG_ON("unimplemented");
+    unsigned long inittext_end = (unsigned long)__init_data_begin;
+    unsigned long len = __init_end - __init_begin;
+    uint8_t idx;
+    int rc;
+
+    /* Modify inittext region to be read/write instead of read/execute. */
+    rc = modify_xen_mappings((unsigned long)__init_begin, inittext_end,
+                             PAGE_HYPERVISOR_RW);
+    if ( rc )
+        panic("Unable to map RW the init text section (rc = %d)\n", rc);
+
+    /*
+     * From now on, init will not be used for execution anymore,
+     * so nuke the instruction cache to remove entries related to init.
+     */
+    invalidate_icache_local();
+
+    /*
+     * The initdata region already has read/write permissions so it can just be
+     * zeroed out.
+     */
+    memset(__init_begin, 0, len);
+
+    rc = destroy_xen_mappings((unsigned long)__init_begin, inittext_end);
+    if ( rc )
+        panic("Unable to remove init text section (rc = %d)\n", rc);
+
+    /*
+     * The initdata and bss sections are mapped using a single MPU region, so
+     * modify the start of this region to remove the initdata section.
+     */
+    spin_lock(&xen_mpumap_lock);
+
+    rc = mpumap_contains_region(xen_mpumap, max_mpu_regions,
+                                (unsigned long)__init_data_begin,
+                                (unsigned long)__bss_end,
+                                &idx);
+    if ( rc < MPUMAP_REGION_FOUND )
+        panic("Unable to find bss data section (rc = %d)\n", rc);
+
+    /* bss data section is shrunk and now starts from __bss_start */
+    pr_set_base(&xen_mpumap[idx], (unsigned long)__bss_start);
+
+    write_protection_region(&xen_mpumap[idx], idx);
+    context_sync_mpu();
+
+    spin_unlock(&xen_mpumap_lock);
 }
 
 void __iomem *ioremap_attr(paddr_t start, size_t len, unsigned int flags)

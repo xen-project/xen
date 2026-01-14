@@ -65,6 +65,8 @@ int map_irq_to_domain(struct domain *d, unsigned int irq,
 int map_range_to_domain(const struct dt_device_node *dev,
                         uint64_t addr, uint64_t len, void *data);
 
+extern const char __init_data_begin[], __bss_start[], __bss_end[];
+
 struct init_info
 {
     /* Pointer to the stack, used by head.S when entering in C */
