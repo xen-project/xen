@@ -35,7 +35,7 @@ DECLARE_BITMAP(xen_mpumap_mask, MAX_MPU_REGION_NR) \
 /* EL2 Xen MPU memory region mapping table. */
 pr_t __cacheline_aligned __section(".data") xen_mpumap[MAX_MPU_REGION_NR];
 
-static DEFINE_SPINLOCK(xen_mpumap_lock);
+DEFINE_SPINLOCK(xen_mpumap_lock);
 
 static void __init __maybe_unused build_assertions(void)
 {

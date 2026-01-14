@@ -213,6 +213,21 @@ void __init remove_early_mappings(void)
     BUG_ON(rc);
 }
 
+void __init modify_after_init_mappings(void)
+{
+    /*
+     * We have finished booting. Mark the section .data.ro_after_init
+     * read-only.
+     */
+    int rc = modify_xen_mappings((unsigned long)&__ro_after_init_start,
+                                 (unsigned long)&__ro_after_init_end,
+                                 PAGE_HYPERVISOR_RO);
+
+    if ( rc )
+        panic("Unable to mark the .data.ro_after_init section read-only (rc = %d)\n",
+              rc);
+}
+
 /*
  * After boot, Xen page-tables should not contain mapping that are both
  * Writable and eXecutables.

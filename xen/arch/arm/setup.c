@@ -66,23 +66,12 @@ domid_t __read_mostly max_init_domid;
 
 static __used void noreturn init_done(void)
 {
-    int rc;
-
     /* Must be done past setting system_state. */
     unregister_init_virtual_region();
 
-    free_init_memory();
+    modify_after_init_mappings();
 
-    /*
-     * We have finished booting. Mark the section .data.ro_after_init
-     * read-only.
-     */
-    rc = modify_xen_mappings((unsigned long)&__ro_after_init_start,
-                             (unsigned long)&__ro_after_init_end,
-                             PAGE_HYPERVISOR_RO);
-    if ( rc )
-        panic("Unable to mark the .data.ro_after_init section read-only (rc = %d)\n",
-              rc);
+    free_init_memory();
 
     startup_cpu_idle_loop();
 }

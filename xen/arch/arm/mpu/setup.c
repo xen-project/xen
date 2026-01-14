@@ -8,10 +8,13 @@
 #include <xen/pfn.h>
 #include <xen/types.h>
 #include <xen/sizes.h>
+#include <xen/spinlock.h>
 #include <asm/setup.h>
 
 static paddr_t __initdata mapped_fdt_base = INVALID_PADDR;
 static paddr_t __initdata mapped_fdt_limit = INVALID_PADDR;
+
+extern spinlock_t xen_mpumap_lock;
 
 void __init setup_pagetables(void) {}
 
@@ -104,6 +107,43 @@ void __init copy_from_paddr(void *dst, paddr_t paddr, unsigned long len)
 
     if ( destroy_xen_mappings(start_pg, end_pg) )
         panic("Unable to unmap range for copy_from_paddr\n");
+}
+
+void __init modify_after_init_mappings(void)
+{
+    int rc;
+    uint8_t idx_rodata;
+    uint8_t idx_rwdata;
+
+    spin_lock(&xen_mpumap_lock);
+
+    rc = mpumap_contains_region(xen_mpumap, max_mpu_regions,
+                                (unsigned long)_srodata,
+                                (unsigned long)_erodata,
+                                &idx_rodata);
+
+    if ( rc < MPUMAP_REGION_FOUND )
+        panic("Unable to find rodata section (rc = %d)\n", rc);
+
+    rc = mpumap_contains_region(xen_mpumap, max_mpu_regions,
+                                (unsigned long)__ro_after_init_start,
+                                (unsigned long)__init_begin,
+                                &idx_rwdata);
+
+    if ( rc < MPUMAP_REGION_FOUND )
+        panic("Unable to find rwdata section (rc = %d)\n", rc);
+
+    /* Shrink rwdata section to begin at __ro_after_init_end */
+    pr_set_base(&xen_mpumap[idx_rwdata], (unsigned long)__ro_after_init_end);
+
+    /* Extend rodata section to end at __ro_after_init_end */
+    pr_set_limit(&xen_mpumap[idx_rodata], (unsigned long)__ro_after_init_end);
+
+    write_protection_region(&xen_mpumap[idx_rwdata], idx_rwdata);
+    write_protection_region(&xen_mpumap[idx_rodata], idx_rodata);
+    context_sync_mpu();
+
+    spin_unlock(&xen_mpumap_lock);
 }
 
 void __init remove_early_mappings(void)
