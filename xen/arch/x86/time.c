@@ -2845,19 +2845,6 @@ uint64_t gtsc_to_gtime(const struct domain *d, uint64_t tsc)
 }
 #endif /* CONFIG_HVM */
 
-uint64_t pv_soft_rdtsc(const struct vcpu *v, const struct cpu_user_regs *regs)
-{
-    s_time_t old, new, now = get_s_time();
-    struct domain *d = v->domain;
-
-    do {
-        old = d->arch.vtsc_last;
-        new = now > d->arch.vtsc_last ? now : old + 1;
-    } while ( cmpxchg(&d->arch.vtsc_last, old, new) != old );
-
-    return gtime_to_gtsc(d, new);
-}
-
 bool clocksource_is_tsc(void)
 {
     return plt_src.read_counter == READ_TSC_POISON;

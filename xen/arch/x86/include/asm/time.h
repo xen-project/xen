@@ -37,8 +37,6 @@ uint64_t cf_check acpi_pm_tick_to_ns(uint64_t ticks);
 
 uint64_t tsc_ticks2ns(uint64_t ticks);
 
-struct cpu_user_regs;
-uint64_t pv_soft_rdtsc(const struct vcpu *v, const struct cpu_user_regs *regs);
 uint64_t gtime_to_gtsc(const struct domain *d, uint64_t time);
 uint64_t gtsc_to_gtime(const struct domain *d, uint64_t tsc);
 
