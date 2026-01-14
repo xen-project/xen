@@ -91,7 +91,19 @@ void * __init early_fdt_map(paddr_t fdt_paddr)
  */
 void __init copy_from_paddr(void *dst, paddr_t paddr, unsigned long len)
 {
-    BUG_ON("unimplemented");
+    paddr_t start_pg = round_pgdown(paddr);
+    paddr_t end_pg   = round_pgup(paddr + len);
+    unsigned long nr_mfns = (end_pg - start_pg) >> PAGE_SHIFT;
+    mfn_t mfn = maddr_to_mfn(start_pg);
+
+    if ( map_pages_to_xen(start_pg, mfn, nr_mfns, PAGE_HYPERVISOR_WC) )
+        panic("Unable to map range for copy_from_paddr\n");
+
+    memcpy(dst, maddr_to_virt(paddr), len);
+    clean_dcache_va_range(dst, len);
+
+    if ( destroy_xen_mappings(start_pg, end_pg) )
+        panic("Unable to unmap range for copy_from_paddr\n");
 }
 
 void __init remove_early_mappings(void)
