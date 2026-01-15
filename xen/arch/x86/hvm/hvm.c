@@ -52,6 +52,7 @@
 #include <asm/i387.h>
 #include <asm/mc146818rtc.h>
 #include <asm/mce.h>
+#include <asm/mem_access.h>
 #include <asm/monitor.h>
 #include <asm/msr.h>
 #include <asm/mtrr.h>
@@ -2082,7 +2083,12 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
 #endif
     }
 
-    if ( req_ptr )
+    /*
+     * req_ptr being constant NULL when !CONFIG_VM_EVENT, CONFIG_UBSAN=y
+     * builds have been observed to still hit undefined-ness at runtime.
+     * Hence do a seemingly redundant vm_event_is_enabled() check here.
+     */
+    if ( req_ptr && vm_event_is_enabled(curr) )
     {
         if ( monitor_traps(curr, sync, req_ptr) < 0 )
             rc = 0;
@@ -4804,6 +4810,12 @@ static int do_altp2m_op(
         break;
 
     case HVMOP_altp2m_set_mem_access:
+        if ( !vm_event_is_enabled(current) )
+        {
+            rc = -EOPNOTSUPP;
+            break;
+        }
+
         if ( a.u.mem_access.pad )
             rc = -EINVAL;
         else
@@ -4813,6 +4825,12 @@ static int do_altp2m_op(
         break;
 
     case HVMOP_altp2m_set_mem_access_multi:
+        if ( !vm_event_is_enabled(current) )
+        {
+            rc = -EOPNOTSUPP;
+            break;
+        }
+
         if ( a.u.set_mem_access_multi.pad ||
              a.u.set_mem_access_multi.opaque > a.u.set_mem_access_multi.nr )
         {
@@ -4844,6 +4862,12 @@ static int do_altp2m_op(
         break;
 
     case HVMOP_altp2m_get_mem_access:
+        if ( !vm_event_is_enabled(current) )
+        {
+            rc = -EOPNOTSUPP;
+            break;
+        }
+
         if ( a.u.mem_access.pad )
             rc = -EINVAL;
         else
