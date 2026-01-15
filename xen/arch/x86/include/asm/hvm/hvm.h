@@ -192,7 +192,11 @@ struct hvm_function_table {
     void (*handle_cd)(struct vcpu *v, unsigned long value);
     void (*set_info_guest)(struct vcpu *v);
     void (*set_rdtsc_exiting)(struct vcpu *v, bool enable);
+
+#ifdef CONFIG_VM_EVENT
     void (*set_descriptor_access_exiting)(struct vcpu *v, bool enable);
+    void (*enable_msr_interception)(struct domain *d, uint32_t msr);
+#endif
 
     /* Nested HVM */
     int (*nhvm_vcpu_initialise)(struct vcpu *v);
@@ -223,8 +227,6 @@ struct hvm_function_table {
     int (*nhvm_hap_walk_L1_p2m)(struct vcpu *v, paddr_t L2_gpa,
                                 paddr_t *L1_gpa, unsigned int *page_order,
                                 uint8_t *p2m_acc, struct npfec npfec);
-
-    void (*enable_msr_interception)(struct domain *d, uint32_t msr);
 
 #ifdef CONFIG_ALTP2M
     /* Alternate p2m */
@@ -435,10 +437,17 @@ static inline bool using_svm(void)
 
 #define hvm_long_mode_active(v) (!!((v)->arch.hvm.guest_efer & EFER_LMA))
 
+#ifdef CONFIG_VM_EVENT
 static inline bool hvm_has_set_descriptor_access_exiting(void)
 {
     return hvm_funcs.set_descriptor_access_exiting;
 }
+
+static inline void hvm_enable_msr_interception(struct domain *d, uint32_t msr)
+{
+    alternative_vcall(hvm_funcs.enable_msr_interception, d, msr);
+}
+#endif /* CONFIG_VM_EVENT */
 
 static inline void hvm_domain_creation_finished(struct domain *d)
 {
@@ -679,11 +688,6 @@ static inline int nhvm_hap_walk_L1_p2m(
 {
     return alternative_call(hvm_funcs.nhvm_hap_walk_L1_p2m,
         v, L2_gpa, L1_gpa, page_order, p2m_acc, npfec);
-}
-
-static inline void hvm_enable_msr_interception(struct domain *d, uint32_t msr)
-{
-    alternative_vcall(hvm_funcs.enable_msr_interception, d, msr);
 }
 
 static inline bool hvm_is_singlestep_supported(void)
