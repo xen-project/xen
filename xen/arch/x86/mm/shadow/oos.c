@@ -51,13 +51,10 @@
  *
  * Currently out-of-sync pages are listed in a simple open-addressed
  * hash table with a second chance (must resist temptation to radically
- * over-engineer hash tables...)  The virtual address of the access
- * which caused us to unsync the page is also kept in the hash table, as
- * a hint for finding the writable mappings later.
+ * over-engineer hash tables...).
  *
  * We keep a hash per vcpu, because we want as much as possible to do
- * the re-sync on the save vcpu we did the unsync on, so the VA hint
- * will be valid.
+ * the re-sync on the same vcpu we did the unsync on.
  */
 
 #if SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES_FULL
