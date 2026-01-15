@@ -130,7 +130,7 @@ void asmlinkage svm_intr_assist(void)
     enum hvm_intblk intblk;
 
     /* Block event injection while handling a sync vm_event. */
-    if ( unlikely(v->arch.vm_event) && v->arch.vm_event->sync_event )
+    if ( unlikely(vm_event_is_enabled(v)) && v->arch.vm_event->sync_event )
         return;
 
     /* Crank the handle on interrupt state. */

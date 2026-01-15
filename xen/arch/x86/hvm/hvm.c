@@ -532,7 +532,7 @@ void hvm_do_resume(struct vcpu *v)
     if ( !vcpu_ioreq_handle_completion(v) )
         return;
 
-    if ( unlikely(v->arch.vm_event) )
+    if ( unlikely(vm_event_is_enabled(v)) )
         hvm_vm_event_do_resume(v);
 
     /* Inject pending hw/sw event */
@@ -546,7 +546,8 @@ void hvm_do_resume(struct vcpu *v)
         v->arch.hvm.inject_event.vector = HVM_EVENT_VECTOR_UNSET;
     }
 
-    if ( unlikely(v->arch.vm_event) && v->arch.monitor.next_interrupt_enabled )
+    if ( unlikely(vm_event_is_enabled(v)) &&
+         v->arch.monitor.next_interrupt_enabled )
     {
         struct x86_event info;
 
@@ -2095,7 +2096,7 @@ int hvm_handle_xsetbv(u32 index, u64 new_bv)
 {
     int rc;
 
-    if ( index == 0 )
+    if ( index == 0 && vm_event_is_enabled(current) )
         hvm_monitor_crX(XCR0, new_bv, current->arch.xcr0);
 
     rc = x86emul_write_xcr(index, new_bv, NULL);
@@ -2266,6 +2267,8 @@ int hvm_set_cr0(unsigned long value, bool may_defer)
 
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx", value);
 
+    may_defer &= vm_event_is_enabled(v);
+
     if ( (u32)value != value )
     {
         HVM_DBG_LOG(DBG_LEVEL_1,
@@ -2401,6 +2404,8 @@ int hvm_set_cr3(unsigned long value, bool noflush, bool may_defer)
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
 
+    may_defer &= vm_event_is_enabled(curr);
+
     if ( value >> currd->arch.cpuid->extd.maxphysaddr )
     {
         HVM_DBG_LOG(DBG_LEVEL_1,
@@ -2455,6 +2460,8 @@ int hvm_set_cr4(unsigned long value, bool may_defer)
 {
     struct vcpu *v = current;
     unsigned long old_cr, valid = hvm_cr4_guest_valid_bits(v->domain);
+
+    may_defer &= vm_event_is_enabled(v);
 
     if ( value & ~valid )
     {
@@ -3356,7 +3363,7 @@ static enum hvm_translation_result __hvm_copy(
             return HVMTRANS_bad_gfn_to_mfn;
         }
 
-        if ( unlikely(v->arch.vm_event) &&
+        if ( unlikely(vm_event_is_enabled(v)) &&
              (flags & HVMCOPY_linear) &&
              v->arch.vm_event->send_event &&
              hvm_monitor_check_p2m(addr, gfn, pfec, npfec_kind_with_gla) )
@@ -3503,7 +3510,9 @@ int hvm_vmexit_cpuid(struct cpu_user_regs *regs, unsigned int inst_len)
     regs->rcx = res.c;
     regs->rdx = res.d;
 
-    return hvm_monitor_cpuid(inst_len, leaf, subleaf);
+    return vm_event_is_enabled(curr)
+           ? hvm_monitor_cpuid(inst_len, leaf, subleaf)
+           : 0;
 }
 
 void hvm_rdtsc_intercept(struct cpu_user_regs *regs)
@@ -3635,6 +3644,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
 
     TRACE(TRC_HVM_MSR_WRITE, msr, msr_content, msr_content >> 32);
 
+    may_defer &= vm_event_is_enabled(v);
     if ( may_defer && unlikely(monitored_msr(v->domain, msr)) )
     {
         uint64_t msr_old_content;
@@ -3803,7 +3813,8 @@ int hvm_descriptor_access_intercept(uint64_t exit_info,
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
 
-    if ( currd->arch.monitor.descriptor_access_enabled )
+    if ( vm_event_is_enabled(curr) &&
+         currd->arch.monitor.descriptor_access_enabled )
     {
         ASSERT(curr->arch.vm_event);
         hvm_monitor_descriptor_access(exit_info, vmx_exit_qualification,

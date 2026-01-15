@@ -45,4 +45,9 @@ void vm_event_sync_event(struct vcpu *v, bool value);
 
 void vm_event_reset_vmtrace(struct vcpu *v);
 
+static inline bool vm_event_is_enabled(const struct vcpu *v)
+{
+    return IS_ENABLED(CONFIG_VM_EVENT) && v->arch.vm_event != NULL;
+}
+
 #endif /* __ASM_X86_VM_EVENT_H__ */

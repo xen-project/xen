@@ -648,6 +648,9 @@ int mem_sharing_notify_enomem(struct domain *d, unsigned long gfn,
         .u.mem_sharing.p2mt = p2m_ram_shared,
     };
 
+    if ( !vm_event_is_enabled(current) )
+        return -EOPNOTSUPP;
+
     if ( (rc = __vm_event_claim_slot(
               d, d->vm_event_share, allow_sleep)) < 0 )
         return rc;

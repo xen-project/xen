@@ -239,7 +239,7 @@ void asmlinkage vmx_intr_assist(void)
     }
 
     /* Block event injection while handling a sync vm_event. */
-    if ( unlikely(v->arch.vm_event) && v->arch.vm_event->sync_event )
+    if ( unlikely(vm_event_is_enabled(v)) && v->arch.vm_event->sync_event )
         return;
 
 #ifdef CONFIG_MEM_SHARING

@@ -105,7 +105,7 @@ static int set_context_data(void *buffer, unsigned int size)
 {
     struct vcpu *curr = current;
 
-    if ( curr->arch.vm_event )
+    if ( vm_event_is_enabled(curr) )
     {
         unsigned int safe_size =
             min(size, curr->arch.vm_event->emul.read.size);
@@ -771,7 +771,7 @@ static void *hvmemul_map_linear_addr(
             ASSERT(p2mt == p2m_ram_logdirty || !p2m_is_readonly(p2mt));
         }
 
-        if ( unlikely(curr->arch.vm_event) &&
+        if ( unlikely(vm_event_is_enabled(curr)) &&
              curr->arch.vm_event->send_event &&
              hvm_monitor_check_p2m(addr, gfn, pfec, npfec_kind_with_gla) )
         {
@@ -1863,16 +1863,17 @@ static int hvmemul_rep_outs_set_context(
     unsigned int bytes_per_rep,
     unsigned long *reps)
 {
-    const struct arch_vm_event *ev = current->arch.vm_event;
+    const struct arch_vm_event *ev;
     const uint8_t *ptr;
     unsigned int avail;
     unsigned long done;
     int rc = X86EMUL_OKAY;
 
     ASSERT(bytes_per_rep <= 4);
-    if ( !ev )
+    if ( !vm_event_is_enabled(current) )
         return X86EMUL_UNHANDLEABLE;
 
+    ev = current->arch.vm_event;
     ptr = ev->emul.read.data;
     avail = ev->emul.read.size;
 

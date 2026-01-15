@@ -47,6 +47,7 @@
 #include <asm/shadow.h>
 #include <asm/spec_ctrl.h>
 #include <asm/stubs.h>
+#include <asm/vm_event.h>
 #include <asm/x86_emulate.h>
 
 #include <public/arch-x86/cpuid.h>
@@ -3335,7 +3336,8 @@ static int vmx_cr_access(cr_access_qual_t qual)
          * VM_EVENT_FLAG_DENY-capable application, so the hvm_monitor_crX()
          * return value is ignored for now.
          */
-        hvm_monitor_crX(CR0, value, old);
+        if ( vm_event_is_enabled(curr) )
+            hvm_monitor_crX(CR0, value, old);
         curr->arch.hvm.guest_cr[0] = value;
         vmx_update_guest_cr(curr, 0, 0);
         TRACE(TRC_HVM_CLTS);
@@ -4322,7 +4324,8 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
         p2m_set_altp2m(v, idx);
     }
 
-    if ( unlikely(currd->arch.monitor.vmexit_enabled) )
+    if ( vm_event_is_enabled(v) &&
+         unlikely(currd->arch.monitor.vmexit_enabled) )
     {
         int rc;
 
@@ -4470,19 +4473,21 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
             if ( !v->domain->debugger_attached )
             {
                 unsigned long insn_len = 0;
-                int rc;
+                int rc = 0;
                 unsigned long trap_type = MASK_EXTR(intr_info,
                                                     INTR_INFO_INTR_TYPE_MASK);
 
                 if ( trap_type >= X86_ET_SW_INT )
                     __vmread(VM_EXIT_INSTRUCTION_LEN, &insn_len);
 
-                rc = hvm_monitor_debug(regs->rip,
-                                       HVM_MONITOR_DEBUG_EXCEPTION,
-                                       trap_type, insn_len, 0);
-
-                if ( rc < 0 )
-                    goto exit_and_crash;
+                if ( vm_event_is_enabled(v) )
+                {
+                    rc = hvm_monitor_debug(regs->rip,
+                                           HVM_MONITOR_DEBUG_EXCEPTION,
+                                           trap_type, insn_len, 0);
+                    if ( rc < 0 )
+                        goto exit_and_crash;
+                }
                 if ( !rc )
                     vmx_propagate_intr(intr_info);
             }
@@ -4494,16 +4499,19 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
             if ( !v->domain->debugger_attached )
             {
                 unsigned long insn_len;
-                int rc;
+                int rc = 0;
 
                 __vmread(VM_EXIT_INSTRUCTION_LEN, &insn_len);
-                rc = hvm_monitor_debug(regs->rip,
-                                       HVM_MONITOR_SOFTWARE_BREAKPOINT,
-                                       X86_ET_SW_EXC,
-                                       insn_len, 0);
+                if ( vm_event_is_enabled(v) )
+                {
+                    rc = hvm_monitor_debug(regs->rip,
+                                           HVM_MONITOR_SOFTWARE_BREAKPOINT,
+                                           X86_ET_SW_EXC,
+                                           insn_len, 0);
 
-                if ( rc < 0 )
-                    goto exit_and_crash;
+                    if ( rc < 0 )
+                        goto exit_and_crash;
+                }
                 if ( !rc )
                     vmx_propagate_intr(intr_info);
             }
@@ -4758,16 +4766,20 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
             };
         } io_qual;
         unsigned int bytes;
-        int rc;
 
         __vmread(EXIT_QUALIFICATION, &io_qual.raw);
         bytes = io_qual.size + 1;
 
-        rc = hvm_monitor_io(io_qual.port, bytes, io_qual.in, io_qual.str);
-        if ( rc < 0 )
-            goto exit_and_crash;
-        if ( rc )
-            break;
+        if ( vm_event_is_enabled(v) )
+        {
+            int rc;
+
+            rc = hvm_monitor_io(io_qual.port, bytes, io_qual.in, io_qual.str);
+            if ( rc < 0 )
+                goto exit_and_crash;
+            if ( rc )
+                break;
+        }
 
         if ( io_qual.str )
         {
@@ -4821,9 +4833,10 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
         vmx_update_cpu_exec_control(v);
         if ( v->arch.hvm.single_step )
         {
-            hvm_monitor_debug(regs->rip,
-                              HVM_MONITOR_SINGLESTEP_BREAKPOINT,
-                              0, 0, 0);
+            if ( vm_event_is_enabled(v) )
+                hvm_monitor_debug(regs->rip,
+                                  HVM_MONITOR_SINGLESTEP_BREAKPOINT,
+                                  0, 0, 0);
 
             if ( v->domain->debugger_attached )
                 domain_pause_for_debugger();

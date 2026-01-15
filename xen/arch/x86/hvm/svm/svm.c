@@ -35,6 +35,7 @@
 #include <asm/p2m.h>
 #include <asm/paging.h>
 #include <asm/processor.h>
+#include <asm/vm_event.h>
 #include <asm/x86_emulate.h>
 
 #include <public/sched.h>
@@ -2702,7 +2703,7 @@ void asmlinkage svm_vmexit_handler(void)
         if ( !v->domain->debugger_attached )
         {
             unsigned int trap_type;
-            int rc;
+            int rc = 0;
 
             if ( likely(exit_reason != VMEXIT_ICEBP) )
             {
@@ -2718,11 +2719,14 @@ void asmlinkage svm_vmexit_handler(void)
                     break;
             }
 
-            rc = hvm_monitor_debug(regs->rip,
-                                   HVM_MONITOR_DEBUG_EXCEPTION,
-                                   trap_type, insn_len, 0);
-            if ( rc < 0 )
-                goto unexpected_exit_type;
+            if ( vm_event_is_enabled(v) )
+            {
+                rc = hvm_monitor_debug(regs->rip,
+                                       HVM_MONITOR_DEBUG_EXCEPTION,
+                                       trap_type, insn_len, 0);
+                if ( rc < 0 )
+                    goto unexpected_exit_type;
+            }
             if ( !rc )
                 hvm_inject_exception(X86_EXC_DB,
                                      trap_type, insn_len, X86_EVENT_NO_EC);
@@ -2746,9 +2750,10 @@ void asmlinkage svm_vmexit_handler(void)
         }
         else
         {
-            int rc = hvm_monitor_debug(regs->rip,
-                                       HVM_MONITOR_SOFTWARE_BREAKPOINT,
-                                       X86_ET_SW_EXC, insn_len, 0);
+            int rc = vm_event_is_enabled(v) ?
+                        hvm_monitor_debug(regs->rip,
+                                          HVM_MONITOR_SOFTWARE_BREAKPOINT,
+                                          X86_ET_SW_EXC, insn_len, 0) : 0;
             if ( rc < 0 )
                 goto unexpected_exit_type;
             if ( !rc )
@@ -2899,17 +2904,19 @@ void asmlinkage svm_vmexit_handler(void)
         break;
 
     case VMEXIT_IOIO:
-    {
-        int rc;
+        if ( vm_event_is_enabled(v) )
+        {
+            int rc;
 
-        rc = hvm_monitor_io(vmcb->ei.io.port,
-                            vmcb->ei.io.bytes,
-                            vmcb->ei.io.in,
-                            vmcb->ei.io.str);
-        if ( rc < 0 )
-            goto unexpected_exit_type;
-        if ( rc )
-            break;
+            rc = hvm_monitor_io(vmcb->ei.io.port,
+                                vmcb->ei.io.bytes,
+                                vmcb->ei.io.in,
+                                vmcb->ei.io.str);
+            if ( rc < 0 )
+                goto unexpected_exit_type;
+            if ( rc )
+                break;
+        }
 
         if ( !vmcb->ei.io.str )
         {
@@ -2921,7 +2928,6 @@ void asmlinkage svm_vmexit_handler(void)
         else if ( !hvm_emulate_one_insn(x86_insn_is_portio, "port I/O") )
             hvm_inject_hw_exception(X86_EXC_GP, 0);
         break;
-    }
 
     case VMEXIT_CR0_READ ... VMEXIT_CR15_READ:
     case VMEXIT_CR0_WRITE ... VMEXIT_CR15_WRITE:
