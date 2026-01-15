@@ -74,7 +74,7 @@ int apei_write_mce(struct mce *m)
 	rcd.hdr.record_id = cper_next_record_id();
 	rcd.hdr.flags = CPER_HW_ERROR_FLAGS_PREVERR;
 
-	rcd.sec_hdr.section_offset = (void *)&rcd.mce - (void *)&rcd;
+	rcd.sec_hdr.section_offset = offsetof(struct cper_mce_record, mce);
 	rcd.sec_hdr.section_length = sizeof(rcd.mce);
 	rcd.sec_hdr.revision = CPER_SEC_REV;
 	/* fru_id and fru_text is invalid */
