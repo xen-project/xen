@@ -439,6 +439,7 @@ int sh_unsync(struct vcpu *v, mfn_t gmfn);
 /* Pull an out-of-sync page back into sync. */
 void sh_resync(struct domain *d, mfn_t gmfn);
 
+void oos_hash_remove(struct domain *d, mfn_t gmfn);
 void oos_fixup_add(struct domain *d, mfn_t gmfn, mfn_t smfn, unsigned long off);
 
 /* Pull all out-of-sync shadows back into sync.  If skip != 0, we try
@@ -464,6 +465,7 @@ shadow_sync_other_vcpus(struct vcpu *v)
     sh_resync_all(v, 1 /* skip */, 0 /* this */, 1 /* others */);
 }
 
+void sh_oos_audit(struct domain *d);
 void oos_audit_hash_is_present(struct domain *d, mfn_t gmfn);
 mfn_t oos_snapshot_lookup(struct domain *d, mfn_t gmfn);
 
