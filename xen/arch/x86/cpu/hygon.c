@@ -81,7 +81,7 @@ static void cf_check init_hygon(struct cpuinfo_x86 *c)
 
 	/* Hygon processors have APIC timer running in deep C states. */
 	if (opt_arat)
-		__set_bit(X86_FEATURE_ARAT, c->x86_capability);
+		__set_bit(X86_FEATURE_XEN_ARAT, c->x86_capability);
 
 	if (cpu_has(c, X86_FEATURE_EFRO)) {
 		rdmsrl(MSR_K8_HWCR, value);

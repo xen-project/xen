@@ -109,7 +109,7 @@ void (*__read_mostly lapic_timer_on)(void);
 
 bool lapic_timer_init(void)
 {
-    if ( boot_cpu_has(X86_FEATURE_ARAT) )
+    if ( boot_cpu_has(X86_FEATURE_XEN_ARAT) )
     {
         lapic_timer_off = lapic_timer_nop;
         lapic_timer_on = lapic_timer_nop;
@@ -1463,7 +1463,7 @@ static void amd_cpuidle_init(struct acpi_processor_power *power)
 
         if ( !vendor_override )
         {
-            if ( !boot_cpu_has(X86_FEATURE_ARAT) )
+            if ( !boot_cpu_has(X86_FEATURE_XEN_ARAT) )
                 hpet_broadcast_init();
 
             if ( !lapic_timer_init() )

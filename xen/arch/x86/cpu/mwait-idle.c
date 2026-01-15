@@ -1633,7 +1633,7 @@ static int __init mwait_idle_probe(void)
 	icpu = id->driver_data;
 	cpuidle_state_table = icpu->state_table;
 
-	if (boot_cpu_has(X86_FEATURE_ARAT))
+	if (boot_cpu_has(X86_FEATURE_XEN_ARAT))
 		lapic_timer_reliable_states = LAPIC_TIMER_ALWAYS_RELIABLE;
 
 	pr_debug(PREFIX "v" MWAIT_IDLE_VERSION " model %#x\n",
@@ -1792,7 +1792,7 @@ int __init mwait_idle_init(struct notifier_block *nfb)
 		return -ENODEV;
 
 	err = mwait_idle_probe();
-	if (!err && !boot_cpu_has(X86_FEATURE_ARAT)) {
+	if (!err && !boot_cpu_has(X86_FEATURE_XEN_ARAT)) {
 		hpet_broadcast_init();
 		if (xen_cpuidle < 0 && !hpet_broadcast_is_available())
 			err = -ENODEV;

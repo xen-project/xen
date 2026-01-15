@@ -1239,7 +1239,7 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 	 * running in deep C states.
 	 */
 	if ( opt_arat && c->x86 > 0x11 )
-		__set_bit(X86_FEATURE_ARAT, c->x86_capability);
+		__set_bit(X86_FEATURE_XEN_ARAT, c->x86_capability);
 
 	/*
 	 * Prior to Family 0x14, perf counters are not reset during warm reboot.
