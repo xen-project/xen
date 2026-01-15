@@ -877,8 +877,7 @@ static uint64_t guest_efer(const struct domain *d)
     return val;
 }
 
-static uint64_t soft_rdtsc(
-    const struct vcpu *v, const struct cpu_user_regs *regs)
+static uint64_t soft_rdtsc(const struct vcpu *v)
 {
     s_time_t old, new, now = get_s_time();
     struct domain *d = v->domain;
@@ -938,7 +937,7 @@ static int cf_check read_msr(
         return X86EMUL_OKAY;
 
     case MSR_IA32_TSC:
-        *val = currd->arch.vtsc ? soft_rdtsc(curr, ctxt->regs) : rdtsc();
+        *val = currd->arch.vtsc ? soft_rdtsc(curr) : rdtsc();
         return X86EMUL_OKAY;
 
     case MSR_EFER:
