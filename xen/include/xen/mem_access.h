@@ -33,10 +33,6 @@
  */
 struct vm_event_st;
 
-#ifdef CONFIG_VM_EVENT
-#include <asm/mem_access.h>
-#endif
-
 /*
  * Additional access types, which are used to further restrict
  * the permissions given my the p2m_type_t memory type.  Violations
@@ -73,10 +69,9 @@ typedef enum {
     /* NOTE: Assumed to be only 4 bits right now on x86. */
 } p2m_access_t;
 
-struct p2m_domain;
-bool xenmem_access_to_p2m_access(const struct p2m_domain *p2m,
-                                 xenmem_access_t xaccess,
-                                 p2m_access_t *paccess);
+#if defined(CONFIG_VM_EVENT) || defined(CONFIG_ALTP2M)
+#include <asm/mem_access.h>
+#endif
 
 /*
  * Set access type for a region of gfns.

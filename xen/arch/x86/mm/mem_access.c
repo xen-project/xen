@@ -298,42 +298,6 @@ static int set_mem_access(struct domain *d, struct p2m_domain *p2m,
     return rc;
 }
 
-bool xenmem_access_to_p2m_access(const struct p2m_domain *p2m,
-                                 xenmem_access_t xaccess,
-                                 p2m_access_t *paccess)
-{
-    static const p2m_access_t memaccess[] = {
-#define ACCESS(ac) [XENMEM_access_##ac] = p2m_access_##ac
-        ACCESS(n),
-        ACCESS(r),
-        ACCESS(w),
-        ACCESS(rw),
-        ACCESS(x),
-        ACCESS(rx),
-        ACCESS(wx),
-        ACCESS(rwx),
-        ACCESS(rx2rw),
-        ACCESS(n2rwx),
-        ACCESS(r_pw),
-#undef ACCESS
-    };
-
-    switch ( xaccess )
-    {
-    case 0 ... ARRAY_SIZE(memaccess) - 1:
-        xaccess = array_index_nospec(xaccess, ARRAY_SIZE(memaccess));
-        *paccess = memaccess[xaccess];
-        break;
-    case XENMEM_access_default:
-        *paccess = p2m->default_access;
-        break;
-    default:
-        return false;
-    }
-
-    return true;
-}
-
 /*
  * Set access type for a region of gfns.
  * If gfn == INVALID_GFN, sets the default access type.
