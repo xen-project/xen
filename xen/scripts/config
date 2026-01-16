@@ -16,8 +16,8 @@ Manipulate options in a .config file from the command line.
 Usage:
 $myname options command ...
 commands:
-	--enable|-e option   Enable option
-	--disable|-d option  Disable option
+	--enable|-e|-y|--yes    option   Enable option
+	--disable|-d|-n|--no    option   Disable option
 	--set-str option string
 	                     Set option to "string"
 	--set-val option value
@@ -166,11 +166,11 @@ while [ "$1" != "" ] ; do
 		;;
 	esac
 	case "$CMD" in
-	--enable|-e)
+	--enable|-e|-y|--yes)
 		set_var "${CONFIG_}$ARG" "${CONFIG_}$ARG=y"
 		;;
 
-	--disable|-d)
+	--disable|-d|-n|--no)
 		set_var "${CONFIG_}$ARG" "# ${CONFIG_}$ARG is not set"
 		;;
 
