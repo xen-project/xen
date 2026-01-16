@@ -18,7 +18,6 @@ $myname options command ...
 commands:
 	--enable|-e option   Enable option
 	--disable|-d option  Disable option
-	--module|-m option   Turn option into a module
 	--set-str option string
 	                     Set option to "string"
 	--set-val option value
@@ -30,8 +29,6 @@ commands:
                              Enable option directly after other option
 	--disable-after|-D beforeopt option
                              Disable option directly after other option
-	--module-after|-M beforeopt option
-                             Turn option into module directly after other option
 	--refresh            Refresh the config using old settings
 
 	commands can be repeated multiple times
@@ -177,10 +174,6 @@ while [ "$1" != "" ] ; do
 		set_var "${CONFIG_}$ARG" "# ${CONFIG_}$ARG is not set"
 		;;
 
-	--module|-m)
-		set_var "${CONFIG_}$ARG" "${CONFIG_}$ARG=m"
-		;;
-
 	--set-str)
 		# sed swallows one level of escaping, so we need double-escaping
 		set_var "${CONFIG_}$ARG" "${CONFIG_}$ARG=\"${1//\"/\\\\\"}\""
@@ -218,10 +211,6 @@ while [ "$1" != "" ] ; do
 
 	--disable-after|-D)
 		set_var "${CONFIG_}$B" "# ${CONFIG_}$B is not set" "${CONFIG_}$A"
-		;;
-
-	--module-after|-M)
-		set_var "${CONFIG_}$B" "${CONFIG_}$B=m" "${CONFIG_}$A"
 		;;
 
 	--refresh)
