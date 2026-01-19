@@ -99,15 +99,6 @@ bool __init is_forced_cpu_cap(unsigned int cap)
 	return test_bit(cap, forced_caps) || test_bit(cap, cleared_caps);
 }
 
-static void cf_check default_init(struct cpuinfo_x86 * c)
-{
-	/* Not much we can do here... */
-	__clear_bit(X86_FEATURE_SEP, c->x86_capability);
-}
-
-static const struct cpu_dev __initconst_cf_clobber __used default_cpu = {
-	.c_init	= default_init,
-};
 static struct cpu_dev __ro_after_init actual_cpu;
 
 static DEFINE_PER_CPU(uint64_t, msr_misc_features);
@@ -336,7 +327,6 @@ void __init early_cpu_init(bool verbose)
 	case X86_VENDOR_SHANGHAI: actual_cpu = shanghai_cpu_dev; break;
 	case X86_VENDOR_HYGON:    actual_cpu = hygon_cpu_dev;    break;
 	default:
-		actual_cpu = default_cpu;
 		if (!verbose)
 			break;
 		printk(XENLOG_ERR
