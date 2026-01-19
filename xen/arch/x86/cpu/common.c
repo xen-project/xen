@@ -571,13 +571,6 @@ void identify_cpu(struct cpuinfo_x86 *c)
 	reset_cpuinfo(c, false);
 	generic_identify(c);
 
-#ifdef NOISY_CAPS
-	printk(KERN_DEBUG "CPU: After vendor identify, caps:");
-	for (i = 0; i < NCAPINTS; i++)
-		printk(" %08x", c->x86_capability[i]);
-	printk("\n");
-#endif
-
 	/*
 	 * Vendor-specific initialization.  In this section we
 	 * canonicalize the feature flags, meaning if there are
@@ -613,13 +606,6 @@ void identify_cpu(struct cpuinfo_x86 *c)
 	/* Now the feature flags better reflect actual CPU features! */
 
 	xstate_init(c);
-
-#ifdef NOISY_CAPS
-	printk(KERN_DEBUG "CPU: After all inits, caps:");
-	for (i = 0; i < NCAPINTS; i++)
-		printk(" %08x", c->x86_capability[i]);
-	printk("\n");
-#endif
 
 	/*
 	 * If RDRAND is available, make an attempt to check that it actually
