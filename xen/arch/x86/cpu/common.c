@@ -31,19 +31,6 @@ bool __read_mostly opt_dom0_cpuid_faulting = true;
 bool opt_arat = true;
 boolean_param("arat", opt_arat);
 
-unsigned int opt_cpuid_mask_ecx = ~0u;
-integer_param("cpuid_mask_ecx", opt_cpuid_mask_ecx);
-unsigned int opt_cpuid_mask_edx = ~0u;
-integer_param("cpuid_mask_edx", opt_cpuid_mask_edx);
-
-unsigned int opt_cpuid_mask_xsave_eax = ~0u;
-integer_param("cpuid_mask_xsave_eax", opt_cpuid_mask_xsave_eax);
-
-unsigned int opt_cpuid_mask_ext_ecx = ~0u;
-integer_param("cpuid_mask_ext_ecx", opt_cpuid_mask_ext_ecx);
-unsigned int opt_cpuid_mask_ext_edx = ~0u;
-integer_param("cpuid_mask_ext_edx", opt_cpuid_mask_ext_edx);
-
 unsigned int __initdata expected_levelling_cap;
 unsigned int __read_mostly levelling_caps;
 

@@ -251,14 +251,10 @@ static const typeof(ctxt_switch_masking) __initconst_cf_clobber __used csm =
     intel_ctxt_switch_masking;
 #endif
 
-/*
- * opt_cpuid_mask_ecx/edx: cpuid.1[ecx, edx] feature mask.
- * For example, E8400[Intel Core 2 Duo Processor series] ecx = 0x0008E3FD,
- * edx = 0xBFEBFBFF when executing CPUID.EAX = 1 normally. If you want to
- * 'rev down' to E8400, you can set these values in these Xen boot parameters.
- */
 static void __init noinline intel_init_levelling(void)
 {
+	uint32_t eax, ecx, edx, tmp;
+
 	/*
 	 * Intel Fam0f is old enough that probing for CPUID faulting support
 	 * introduces spurious #GP(0) when the appropriate MSRs are read,
@@ -275,12 +271,7 @@ static void __init noinline intel_init_levelling(void)
 	probe_masking_msrs();
 
 	if (msr_basic) {
-		uint32_t ecx, edx, tmp;
-
 		cpuid(0x00000001, &tmp, &tmp, &ecx, &edx);
-
-		ecx &= opt_cpuid_mask_ecx;
-		edx &= opt_cpuid_mask_edx;
 
 		/* Fast-forward bits - Must be set. */
 		if (ecx & cpufeat_mask(X86_FEATURE_XSAVE))
@@ -291,23 +282,12 @@ static void __init noinline intel_init_levelling(void)
 	}
 
 	if (msr_ext) {
-		uint32_t ecx, edx, tmp;
-
 		cpuid(0x80000001, &tmp, &tmp, &ecx, &edx);
-
-		ecx &= opt_cpuid_mask_ext_ecx;
-		edx &= opt_cpuid_mask_ext_edx;
-
 		cpuidmask_defaults.e1cd &= ((u64)edx << 32) | ecx;
 	}
 
 	if (msr_xsave) {
-		uint32_t eax, tmp;
-
 		cpuid_count(0x0000000d, 1, &eax, &tmp, &tmp, &tmp);
-
-		eax &= opt_cpuid_mask_xsave_eax;
-
 		cpuidmask_defaults.Da1 &= (~0ULL << 32) | eax;
 	}
 

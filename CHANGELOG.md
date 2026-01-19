@@ -12,9 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Removed
  - On x86:
-   - The cpuid_mask_* command line options for legacy AMD CPUs.  These were
+   - The cpuid_mask_* command line options for legacy CPUs.  These were
      deprecated in Xen 4.7 and noted not to work correctly with AMD CPUs from
-     2011 onwards.
+     2011 onwards, nor work at all with Intel CPUs from 2012.
    - Xenoprofile support.  Oprofile themselves removed support for Xen in 2014
      prior to the version 1.0 release, and there has been no development since
      before then in Xen.
