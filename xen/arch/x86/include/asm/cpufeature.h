@@ -11,7 +11,9 @@
 #include <xen/macros.h>
 
 #ifndef __ASSEMBLER__
+#include <asm/cpu-policy.h>
 #include <asm/cpuid.h>
+#include <xen/lib/x86/cpu-policy.h>
 #else
 #include <asm/cpufeatureset.h>
 #endif
@@ -121,7 +123,6 @@ static inline bool boot_cpu_has(unsigned int feat)
 #define CPUID6_EAX_HDC                               BIT(13, U)
 #define CPUID6_EAX_HWP_PECI                          BIT(16, U)
 #define CPUID6_EAX_HW_FEEDBACK                       BIT(19, U)
-#define CPUID6_ECX_APERFMPERF_CAPABILITY             BIT(0, U)
 
 /* CPUID level 0x00000001.edx */
 #define cpu_has_fpu             1
@@ -174,6 +175,9 @@ static inline bool boot_cpu_has(unsigned int feat)
 #define cpu_has_skinit          boot_cpu_has(X86_FEATURE_SKINIT)
 #define cpu_has_fma4            boot_cpu_has(X86_FEATURE_FMA4)
 #define cpu_has_tbm             boot_cpu_has(X86_FEATURE_TBM)
+
+/* CPUID level 0x00000006.ecx */
+#define cpu_has_hw_feedback_cap host_cpu_policy.basic.hw_feedback_cap
 
 /* CPUID level 0x0000000D:1.eax */
 #define cpu_has_xsaveopt        boot_cpu_has(X86_FEATURE_XSAVEOPT)
@@ -292,7 +296,6 @@ static inline bool boot_cpu_has(unsigned int feat)
 /* Synthesized. */
 #define cpu_has_arch_perfmon    boot_cpu_has(X86_FEATURE_ARCH_PERFMON)
 #define cpu_has_cpuid_faulting  boot_cpu_has(X86_FEATURE_CPUID_FAULTING)
-#define cpu_has_aperfmperf      boot_cpu_has(X86_FEATURE_APERFMPERF)
 #define cpu_has_xen_lbr         boot_cpu_has(X86_FEATURE_XEN_LBR)
 #define cpu_has_xen_shstk       (IS_ENABLED(CONFIG_XEN_SHSTK) && \
                                  boot_cpu_has(X86_FEATURE_XEN_SHSTK))

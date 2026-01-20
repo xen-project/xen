@@ -80,7 +80,7 @@ unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
         return 0;
 
     policy = per_cpu(cpufreq_cpu_policy, cpu);
-    if ( !policy || !cpu_has_aperfmperf )
+    if ( !policy || !cpu_has_hw_feedback_cap )
         return 0;
 
     switch (flag)
