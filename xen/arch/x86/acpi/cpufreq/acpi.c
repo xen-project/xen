@@ -220,14 +220,11 @@ static unsigned int cf_check get_cur_freq_on_cpu(unsigned int cpu)
 
 void intel_feature_detect(struct cpufreq_policy *policy)
 {
-    unsigned int eax;
-
-    eax = cpuid_eax(6);
-    if (eax & 0x2) {
+    if ( cpu_has_turbo_boost )
+    {
         policy->turbo = CPUFREQ_TURBO_ENABLED;
-        if (cpufreq_verbose)
-            printk(XENLOG_INFO "CPU%u: Turbo Mode detected and enabled\n",
-                   smp_processor_id());
+        if ( cpufreq_verbose )
+            printk_once(XENLOG_INFO "Turbo Mode detected and enabled\n");
     }
 }
 
