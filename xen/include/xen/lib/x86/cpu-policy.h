@@ -126,7 +126,7 @@ struct cpu_policy
             union {
                 uint32_t _6a;
                 struct {
-                    bool :1,
+                    bool digital_temp_sensor:1,
                         turbo_boost:1,
                         arat:1,
                         :1,

@@ -27,6 +27,7 @@
 #include <asm/current.h>
 #include <public/platform.h>
 #include <acpi/cpufreq/processor_perf.h>
+#include <asm/cpu-policy.h>
 #include <asm/edd.h>
 #include <asm/microcode.h>
 #include <asm/mtrr.h>
@@ -86,6 +87,11 @@ static bool msr_read_allowed(unsigned int msr)
 
     case MSR_MCU_OPT_CTRL:
         return cpu_has_srbds_ctrl;
+
+    case MSR_IA32_THERM_STATUS:
+    case MSR_TEMPERATURE_TARGET:
+    case MSR_PACKAGE_THERM_STATUS:
+        return host_cpu_policy.basic.digital_temp_sensor;
     }
 
     if ( ppin_msr && msr == ppin_msr )
