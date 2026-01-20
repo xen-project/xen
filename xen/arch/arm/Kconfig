@@ -128,8 +128,7 @@ config GICV2
 config GICV3
 	bool "GICv3 driver"
 	depends on !NEW_VGIC
-	default n if ARM_32
-	default y if ARM_64
+	default y if ARM_64 || MPU
 	help
 
 	  Driver for the ARM Generic Interrupt Controller v3.
