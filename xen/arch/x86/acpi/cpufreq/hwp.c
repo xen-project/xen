@@ -18,9 +18,6 @@
 
 static bool __ro_after_init hwp_in_use;
 
-static bool __ro_after_init feature_hwp_notification;
-static bool __ro_after_init feature_hwp_activity_window;
-
 static bool __read_mostly feature_hdc;
 
 static bool __ro_after_init opt_cpufreq_hdc = true;
@@ -165,8 +162,6 @@ bool hwp_active(void)
 
 static bool __init hwp_available(void)
 {
-    unsigned int eax;
-
     if ( boot_cpu_data.cpuid_level < CPUID_PM_LEAF )
     {
         hwp_verbose("cpuid_level (%#x) lacks HWP support\n",
@@ -183,29 +178,22 @@ static bool __init hwp_available(void)
         return false;
     }
 
-    eax = cpuid_eax(CPUID_PM_LEAF);
-
     hwp_verbose("%d notify: %d act-window: %d energy-perf: %d pkg-level: %d peci: %d\n",
-                !!(eax & CPUID6_EAX_HWP),
-                !!(eax & CPUID6_EAX_HWP_NOTIFICATION),
-                !!(eax & CPUID6_EAX_HWP_ACTIVITY_WINDOW),
-                !!(eax & CPUID6_EAX_HWP_ENERGY_PERFORMANCE_PREFERENCE),
-                !!(eax & CPUID6_EAX_HWP_PACKAGE_LEVEL_REQUEST),
-                !!(eax & CPUID6_EAX_HWP_PECI));
+                cpu_has_hwp, cpu_has_hwp_interrupt,
+                cpu_has_hwp_activity_window, cpu_has_hwp_epp,
+                cpu_has_hwp_request_pkg, cpu_has_hwp_peci_override);
 
-    if ( !(eax & CPUID6_EAX_HWP) )
+    if ( !cpu_has_hwp )
         return false;
 
-    if ( !(eax & CPUID6_EAX_HWP_ENERGY_PERFORMANCE_PREFERENCE) )
+    if ( !cpu_has_hwp_epp )
     {
         hwp_verbose("disabled: No energy/performance preference available");
 
         return false;
     }
 
-    feature_hwp_notification    = eax & CPUID6_EAX_HWP_NOTIFICATION;
-    feature_hwp_activity_window = eax & CPUID6_EAX_HWP_ACTIVITY_WINDOW;
-    feature_hdc                 = eax & CPUID6_EAX_HDC;
+    feature_hdc = cpu_has_hdc;
 
     hwp_verbose("Hardware Duty Cycling (HDC) %ssupported%s\n",
                 feature_hdc ? "" : "not ",
@@ -213,7 +201,7 @@ static bool __init hwp_available(void)
                             : "");
 
     hwp_verbose("HW_FEEDBACK %ssupported\n",
-                (eax & CPUID6_EAX_HW_FEEDBACK) ? "" : "not ");
+                cpu_has_hw_feedback ? "" : "not ");
 
     hwp_in_use = true;
 
@@ -226,7 +214,7 @@ static int cf_check hwp_cpufreq_verify(struct cpufreq_policy *policy)
 {
     struct hwp_drv_data *data = per_cpu(hwp_drv_data, policy->cpu);
 
-    if ( !feature_hwp_activity_window && data->activity_window )
+    if ( !cpu_has_hwp_activity_window && data->activity_window )
     {
         hwp_verbose("HWP activity window not supported\n");
 
@@ -268,7 +256,7 @@ static int cf_check hwp_cpufreq_target(struct cpufreq_policy *policy,
     hwp_req.max_perf = data->maximum;
     hwp_req.desired = data->desired;
     hwp_req.energy_perf = data->energy_perf;
-    if ( feature_hwp_activity_window )
+    if ( cpu_has_hwp_activity_window )
         hwp_req.activity_window = data->activity_window;
 
     if ( hwp_req.raw == data->curr_req.raw )
@@ -365,7 +353,7 @@ static void cf_check hwp_init_msrs(void *info)
     }
 
     /* Ensure we don't generate interrupts */
-    if ( feature_hwp_notification )
+    if ( cpu_has_hwp_interrupt )
         wrmsr_safe(MSR_HWP_INTERRUPT, 0);
 
     if ( !(val & PM_ENABLE_HWP_ENABLE) )
@@ -537,7 +525,7 @@ int get_hwp_para(unsigned int cpu,
         return -ENODATA;
 
     cppc_para->features         =
-        (feature_hwp_activity_window ? XEN_SYSCTL_CPPC_FEAT_ACT_WINDOW : 0);
+        (cpu_has_hwp_activity_window ? XEN_SYSCTL_CPPC_FEAT_ACT_WINDOW : 0);
     cppc_para->lowest           = data->hw.lowest;
     cppc_para->lowest_nonlinear = data->hw.most_efficient;
     cppc_para->nominal          = data->hw.guaranteed;
@@ -585,7 +573,7 @@ int set_hwp_para(struct cpufreq_policy *policy,
 
     /* Clear out activity window if lacking HW supported. */
     if ( (set_cppc->set_params & XEN_SYSCTL_CPPC_SET_ACT_WINDOW) &&
-         !feature_hwp_activity_window )
+         !cpu_has_hwp_activity_window )
     {
         set_cppc->set_params &= ~XEN_SYSCTL_CPPC_SET_ACT_WINDOW;
         cleared_act_window = true;

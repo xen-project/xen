@@ -115,14 +115,6 @@ static inline bool boot_cpu_has(unsigned int feat)
 }
 
 #define CPUID_PM_LEAF                                6
-#define CPUID6_EAX_HWP                               BIT(7, U)
-#define CPUID6_EAX_HWP_NOTIFICATION                  BIT(8, U)
-#define CPUID6_EAX_HWP_ACTIVITY_WINDOW               BIT(9, U)
-#define CPUID6_EAX_HWP_ENERGY_PERFORMANCE_PREFERENCE BIT(10, U)
-#define CPUID6_EAX_HWP_PACKAGE_LEVEL_REQUEST         BIT(11, U)
-#define CPUID6_EAX_HDC                               BIT(13, U)
-#define CPUID6_EAX_HWP_PECI                          BIT(16, U)
-#define CPUID6_EAX_HW_FEEDBACK                       BIT(19, U)
 
 /* CPUID level 0x00000001.edx */
 #define cpu_has_fpu             1
@@ -179,6 +171,14 @@ static inline bool boot_cpu_has(unsigned int feat)
 /* CPUID level 0x00000006.eax */
 #define cpu_has_turbo_boost     host_cpu_policy.basic.turbo_boost
 #define cpu_has_arat            host_cpu_policy.basic.arat
+#define cpu_has_hwp             host_cpu_policy.basic.hwp
+#define cpu_has_hwp_interrupt   host_cpu_policy.basic.hwp_interrupt
+#define cpu_has_hwp_activity_window host_cpu_policy.basic.hwp_activity_window
+#define cpu_has_hwp_epp         host_cpu_policy.basic.hwp_epp
+#define cpu_has_hwp_request_pkg host_cpu_policy.basic.hwp_request_pkg
+#define cpu_has_hdc             host_cpu_policy.basic.hdc
+#define cpu_has_hwp_peci_override host_cpu_policy.basic.hwp_peci_override
+#define cpu_has_hw_feedback     host_cpu_policy.basic.hw_feedback
 
 /* CPUID level 0x00000006.ecx */
 #define cpu_has_hw_feedback_cap host_cpu_policy.basic.hw_feedback_cap
