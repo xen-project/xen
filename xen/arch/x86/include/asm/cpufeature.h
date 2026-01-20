@@ -176,6 +176,9 @@ static inline bool boot_cpu_has(unsigned int feat)
 #define cpu_has_fma4            boot_cpu_has(X86_FEATURE_FMA4)
 #define cpu_has_tbm             boot_cpu_has(X86_FEATURE_TBM)
 
+/* CPUID level 0x00000006.eax */
+#define cpu_has_arat            host_cpu_policy.basic.arat
+
 /* CPUID level 0x00000006.ecx */
 #define cpu_has_hw_feedback_cap host_cpu_policy.basic.hw_feedback_cap
 

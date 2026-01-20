@@ -665,10 +665,6 @@ static void cf_check init_intel(struct cpuinfo_x86 *c)
 		__set_bit(X86_FEATURE_NONSTOP_TSC, c->x86_capability);
 		__set_bit(X86_FEATURE_TSC_RELIABLE, c->x86_capability);
 	}
-	if ( opt_arat &&
-	     ( c->cpuid_level >= 0x00000006 ) &&
-	     ( cpuid_eax(0x00000006) & (1u<<2) ) )
-		__set_bit(X86_FEATURE_XEN_ARAT, c->x86_capability);
 
 	if ((opt_cpu_info && !(c->apicid & (c->x86_num_siblings - 1))) ||
 	    c == &boot_cpu_data )
@@ -693,3 +689,9 @@ const struct cpu_dev __initconst_cf_clobber intel_cpu_dev = {
 	.c_early_init	= early_init_intel,
 	.c_init		= init_intel,
 };
+
+void __init intel_init_arat(void)
+{
+    if ( opt_arat && cpu_has_arat )
+        setup_force_cpu_cap(X86_FEATURE_XEN_ARAT);
+}

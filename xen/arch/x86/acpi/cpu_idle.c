@@ -1666,6 +1666,9 @@ static int __init cf_check cpuidle_presmp_init(void)
 {
     void *cpu = (void *)(long)smp_processor_id();
 
+    if ( boot_cpu_data.vendor == X86_VENDOR_INTEL )
+        intel_init_arat();
+
     if ( !xen_cpuidle )
         return 0;
 
