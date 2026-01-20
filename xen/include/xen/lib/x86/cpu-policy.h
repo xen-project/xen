@@ -121,7 +121,42 @@ struct cpu_policy
             uint64_t :64, :64; /* Leaf 0x3 - PSN. */
             uint64_t :64, :64; /* Leaf 0x4 - Structured Cache. */
             uint64_t :64, :64; /* Leaf 0x5 - MONITOR. */
-            uint64_t :64, :64; /* Leaf 0x6 - Therm/Perf. */
+
+            /* Leaf 0x6 - Therm/Perf. */
+            union {
+                uint32_t _6a;
+                struct {
+                    bool :1,
+                        turbo_boost:1,
+                        arat:1,
+                        :1,
+                        :1,
+                        :1,
+                        :1,
+                        hwp:1,
+                        hwp_interrupt:1,
+                        hwp_activity_window:1,
+                        hwp_epp:1,
+                        hwp_request_pkg:1,
+                        :1,
+                        hdc:1,
+                        :1,
+                        :1,
+                        hwp_peci_override:1,
+                        :1,
+                        :1,
+                        hw_feedback:1;
+                };
+            };
+            uint32_t /* b */:32;
+            union {
+                uint32_t _6c;
+                struct {
+                    bool hw_feedback_cap:1; /* aperf/mperf */
+                };
+            };
+            uint32_t /* d */:32;
+
             uint64_t :64, :64; /* Leaf 0x7 - Structured Features. */
             uint64_t :64, :64; /* Leaf 0x8 - rsvd */
             uint64_t :64, :64; /* Leaf 0x9 - DCA */
