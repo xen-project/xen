@@ -331,8 +331,22 @@ config REQUIRE_NX
 	  was unavailable. However, if enabled, Xen will no longer boot on
 	  any CPU which is lacking NX support.
 
+config MICROCODE_LOADING
+	bool "Microcode loading"
+	default y
+	help
+	  Microcode updates for CPUs fix errata and provide new functionality for
+	  software to work around bugs, such as the speculative execution
+	  vulnerabilities. It is common for OSes to carry updated microcode as
+	  software tends to get updated more frequently than firmware.
+
+	  For embedded environments where a full firmware/software stack is being
+	  provided, it might not be necessary for Xen to need to load microcode
+	  itself.
+
 config MICROCODE_SCAN_DEFAULT
 	bool "Scan for microcode by default"
+	depends on MICROCODE_LOADING
 	help
 	  During boot, Xen can scan the multiboot images for a CPIO archive
 	  containing CPU microcode to be loaded, which is Linux's mechanism for

@@ -2751,9 +2751,10 @@ performance.
     Applicability: x86
     Default: `scan` is selectable via Kconfig, `nmi,digest-check`
 
-Controls for CPU microcode loading. For early loading, this parameter can
-specify how and where to find the microcode update blob. For late loading,
-this parameter specifies if the update happens within a NMI handler.
+Controls for CPU microcode loading, available when `CONFIG_MICROCODE_LOADING`
+is enabled. For early loading, this parameter can specify how and where to
+find the microcode update blob. For late loading, this parameter specifies if
+the update happens within a NMI handler.
 
 'integer' specifies the CPU microcode update blob module index. When positive,
 this specifies the n-th module (in the GrUB entry, zero based) to be used

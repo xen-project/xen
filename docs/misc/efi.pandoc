@@ -104,6 +104,8 @@ Specifies an XSM module to load.
 
 Specifies a CPU microcode blob to load. (x86 only)
 
+Only available when Xen is compiled with CONFIG_MICROCODE_LOADING enabled.
+
 ###`dtb=<filename>`
 
 Specifies a device tree file to load.  The platform firmware may provide a

@@ -295,7 +295,8 @@ static void __init efi_arch_cfg_file_late(const EFI_LOADED_IMAGE *image,
 {
     union string name;
 
-    if ( read_section(image, L"ucode", &ucode, NULL) )
+    if ( !IS_ENABLED(CONFIG_MICROCODE_LOADING) ||
+         read_section(image, L"ucode", &ucode, NULL) )
         return;
 
     name.s = get_value(&cfg, section, "ucode");

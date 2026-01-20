@@ -561,11 +561,11 @@ static const char __initconst amd_cpio_path[] =
     "kernel/x86/microcode/AuthenticAMD.bin";
 
 static const struct microcode_ops __initconst_cf_clobber amd_ucode_ops = {
-    .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
-    .apply_microcode                  = apply_microcode,
-    .compare                          = amd_compare,
-    .cpio_path                        = amd_cpio_path,
+    .cpu_request_microcode            = MICROCODE_OP(cpu_request_microcode),
+    .apply_microcode                  = MICROCODE_OP(apply_microcode),
+    .compare                          = MICROCODE_OP(amd_compare),
+    .cpio_path                        = MICROCODE_OP(amd_cpio_path),
 };
 
 void __init ucode_probe_amd(struct microcode_ops *ops)
@@ -574,7 +574,8 @@ void __init ucode_probe_amd(struct microcode_ops *ops)
      * The Entrysign vulnerability (SB-7033, CVE-2024-36347) affects Zen1-5
      * CPUs.  Taint Xen if digest checking is turned off.
      */
-    if ( boot_cpu_data.family >= 0x17 && boot_cpu_data.family <= 0x1a &&
+    if ( IS_ENABLED(CONFIG_MICROCODE_LOADING) &&
+         boot_cpu_data.family >= 0x17 && boot_cpu_data.family <= 0x1a &&
          !opt_digest_check )
     {
         printk(XENLOG_WARNING
@@ -614,8 +615,9 @@ void __init amd_check_entrysign(void)
     unsigned int curr_rev;
     uint8_t fixed_rev;
 
-    if ( boot_cpu_data.vendor != X86_VENDOR_AMD ||
-         boot_cpu_data.family < 0x17 ||
+    if ( !IS_ENABLED(CONFIG_MICROCODE_LOADING)  ||
+         boot_cpu_data.vendor != X86_VENDOR_AMD ||
+         boot_cpu_data.family < 0x17            ||
          boot_cpu_data.family > 0x1a )
         return;
 

@@ -23,6 +23,8 @@ TSX errata which necessitated disabling the feature entirely), or the addition
 of brand new features (e.g. the Spectre v2 controls to work around speculative
 execution vulnerabilities).
 
+Microcode loading support in Xen is controlled by the
+``CONFIG_MICROCODE_LOADING`` Kconfig option.
 
 Boot time microcode loading
 ---------------------------

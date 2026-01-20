@@ -8,6 +8,9 @@
 /* Opaque.  Internals are vendor-specific. */
 struct microcode_patch;
 
+/* Aids dead-code elimination of the static hooks */
+#define MICROCODE_OP(x) (IS_ENABLED(CONFIG_MICROCODE_LOADING) ? (x) : NULL)
+
 struct microcode_ops {
     /*
      * Parse a microcode container.  Format is vendor-specific.
