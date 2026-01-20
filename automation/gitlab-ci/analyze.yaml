@@ -93,6 +93,7 @@ eclair-x86_64-amd:
       CONFIG_DEBUG_LOCKS=n
       CONFIG_SCRUB_DEBUG=n
       CONFIG_XMEM_POOL_POISON=n
+      CONFIG_MICROCODE_LOADING=n
   rules:
     - if: $ECLAIR_SAFETY
       when: always
