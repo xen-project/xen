@@ -66,6 +66,13 @@ static int construct_vmcb(struct vcpu *v)
         GENERAL2_INTERCEPT_XSETBV      | GENERAL2_INTERCEPT_ICEBP       |
         GENERAL2_INTERCEPT_RDPRU;
 
+    /*
+     * Well behaved logic shouldn't ever Bus Lock, but we care about rate
+     * limiting buggy/malicious cases.
+     */
+    if ( cpu_has_svm_bus_lock )
+        vmcb->_general3_intercepts |= GENERAL3_INTERCEPT_BUS_LOCK;
+
     /* Intercept all debug-register writes. */
     vmcb->_dr_intercepts = ~0u;
 

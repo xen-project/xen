@@ -2524,6 +2524,7 @@ const struct hvm_function_table * __init start_svm(void)
     P(cpu_has_tsc_ratio, "TSC Rate MSR");
     P(cpu_has_svm_sss, "NPT Supervisor Shadow Stack");
     P(cpu_has_svm_spec_ctrl, "MSR_SPEC_CTRL virtualisation");
+    P(cpu_has_svm_bus_lock, "Bus Lock Filter");
 #undef P
 
     if ( !printed )
@@ -3086,6 +3087,16 @@ void asmlinkage svm_vmexit_handler(void)
         hvm_descriptor_access_intercept(0, 0, desc, write);
         break;
     }
+
+    case VMEXIT_BUS_LOCK:
+        /*
+         * This is a fault and blocked the Bus Lock inducing action.  We're
+         * only interested in rate limiting the guest, so credit it one "lock"
+         * in order to re-execute the instruction.
+         */
+        perfc_incr(buslock);
+        vmcb->bus_lock_count = 1;
+        break;
 
     default:
     unexpected_exit_type:
