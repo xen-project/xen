@@ -122,10 +122,6 @@
             "comment": "Imported from Linux, ignore for now"
         },
         {
-            "rel_path": "common/earlycpio.c",
-            "comment": "Imported from Linux, ignore for now"
-        },
-        {
             "rel_path": "common/gzip/*",
             "comment": "Imported from Linux, ignore for now"
         },
@@ -223,6 +219,10 @@
         },
         {
             "rel_path": "include/xen/decompress.h",
+            "comment": "Imported from Linux, ignore for now"
+        },
+        {
+            "rel_path": "lib/earlycpio.c",
             "comment": "Imported from Linux, ignore for now"
         },
         {
