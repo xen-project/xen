@@ -63,6 +63,11 @@ enum GenericIntercept2bits
     GENERAL2_INTERCEPT_RDPRU   = 1 << 14,
 };
 
+enum GenericIntercept3bits
+{
+    GENERAL3_INTERCEPT_BUS_LOCK = 1 << 5,
+};
+
 enum CRInterceptBits
 {
     CR_INTERCEPT_CR0_READ   = 1 << 0,
@@ -283,6 +288,7 @@ enum VMEXIT_EXITCODE
     VMEXIT_MWAIT_CONDITIONAL= 140, /* 0x8c */
     VMEXIT_XSETBV           = 141, /* 0x8d */
     VMEXIT_RDPRU            = 142, /* 0x8e */
+    VMEXIT_BUS_LOCK         = 165, /* 0xa5 */
     /* Remember to also update VMEXIT_NPF_PERFC! */
     VMEXIT_NPF              = 1024, /* 0x400, nested paging fault */
     /* Remember to also update SVM_PERF_EXIT_REASON_SIZE! */
@@ -400,7 +406,8 @@ struct vmcb_struct {
     u32 _exception_intercepts;  /* offset 0x08 - cleanbit 0 */
     u32 _general1_intercepts;   /* offset 0x0C - cleanbit 0 */
     u32 _general2_intercepts;   /* offset 0x10 - cleanbit 0 */
-    u32 res01[10];
+    u32 _general3_intercepts;   /* offset 0x14 - cleanbit 0 */
+    u32 res01[9];
     u16 _pause_filter_thresh;   /* offset 0x3C - cleanbit 0 */
     u16 _pause_filter_count;    /* offset 0x3E - cleanbit 0 */
     u64 _iopm_base_pa;          /* offset 0x40 - cleanbit 1 */
@@ -484,7 +491,10 @@ struct vmcb_struct {
     u64 nextrip;                /* offset 0xC8 */
     u8  guest_ins_len;          /* offset 0xD0 */
     u8  guest_ins[15];          /* offset 0xD1 */
-    u64 res10a[100];            /* offset 0xE0 pad to save area */
+    u64 res10a[8];              /* offset 0xE0 */
+    u16 bus_lock_count;         /* offset 0x120 */
+    u16 res10b[3];              /* offset 0x122 */
+    u64 res10c[91];             /* offset 0x128 pad to save area */
 
     /* State Save area */
     union {
@@ -579,6 +589,7 @@ VMCB_ACCESSORS(dr_intercepts, intercepts)
 VMCB_ACCESSORS(exception_intercepts, intercepts)
 VMCB_ACCESSORS(general1_intercepts, intercepts)
 VMCB_ACCESSORS(general2_intercepts, intercepts)
+VMCB_ACCESSORS(general3_intercepts, intercepts)
 VMCB_ACCESSORS(pause_filter_count, intercepts)
 VMCB_ACCESSORS(pause_filter_thresh, intercepts)
 VMCB_ACCESSORS(tsc_offset, intercepts)
