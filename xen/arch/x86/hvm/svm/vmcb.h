@@ -8,7 +8,6 @@
 
 struct vcpu;
 
-/* general 1 intercepts */
 enum GenericIntercept1bits
 {
     GENERAL1_INTERCEPT_INTR          = 1 << 0,
@@ -45,7 +44,6 @@ enum GenericIntercept1bits
     GENERAL1_INTERCEPT_SHUTDOWN_EVT  = 1u << 31
 };
 
-/* general 2 intercepts */
 enum GenericIntercept2bits
 {
     GENERAL2_INTERCEPT_VMRUN   = 1 << 0,
@@ -65,8 +63,6 @@ enum GenericIntercept2bits
     GENERAL2_INTERCEPT_RDPRU   = 1 << 14,
 };
 
-
-/* control register intercepts */
 enum CRInterceptBits
 {
     CR_INTERCEPT_CR0_READ   = 1 << 0,
@@ -103,8 +99,6 @@ enum CRInterceptBits
     CR_INTERCEPT_CR15_WRITE = 1u << 31,
 };
 
-
-/* debug register intercepts */
 enum DRInterceptBits
 {
     DR_INTERCEPT_DR0_READ   = 1 << 0,
@@ -400,6 +394,7 @@ typedef union
 #define MSRPM_SIZE  (8  * 1024)
 
 struct vmcb_struct {
+    /* Control area */
     u32 _cr_intercepts;         /* offset 0x00 - cleanbit 0 */
     u32 _dr_intercepts;         /* offset 0x04 - cleanbit 0 */
     u32 _exception_intercepts;  /* offset 0x08 - cleanbit 0 */
@@ -491,6 +486,7 @@ struct vmcb_struct {
     u8  guest_ins[15];          /* offset 0xD1 */
     u64 res10a[100];            /* offset 0xE0 pad to save area */
 
+    /* State Save area */
     union {
         struct segment_register sreg[6];
         struct {
