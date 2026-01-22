@@ -130,7 +130,7 @@ endif
 
 targets += $(targets-for-builtin)
 
-$(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS-y += -DINIT_SECTIONS_ONLY
+$(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y) $(lib-y)): CFLAGS-y += -DINIT_SECTIONS_ONLY
 
 non-init-objects = $(filter-out %.init.o, $(obj-y) $(obj-bin-y) $(extra-y))
 
@@ -146,7 +146,7 @@ endif
 $(call cc-option-add,cov-cflags-$(CONFIG_COVERAGE),CC,-fprofile-update=atomic)
 
 # Reset cov-cflags-y in cases where an objects has another one as prerequisite
-$(nocov-y) $(filter %.init.o, $(obj-y) $(obj-bin-y) $(extra-y)): \
+$(nocov-y) $(filter %.init.o, $(obj-y) $(obj-bin-y) $(extra-y) $(lib-y)): \
     cov-cflags-y :=
 
 $(non-init-objects): _c_flags += $(cov-cflags-y)
@@ -156,7 +156,7 @@ ifeq ($(CONFIG_UBSAN),y)
 UBSAN_FLAGS := $(filter-out -fno-%,$(CFLAGS_UBSAN)) $(filter -fno-%,$(CFLAGS_UBSAN))
 
 # Reset UBSAN_FLAGS in cases where an objects has another one as prerequisite
-$(noubsan-y) $(filter %.init.o, $(obj-y) $(obj-bin-y) $(extra-y)): \
+$(noubsan-y) $(filter %.init.o, $(obj-y) $(obj-bin-y) $(extra-y) $(lib-y)): \
     UBSAN_FLAGS :=
 
 $(non-init-objects): _c_flags += $(UBSAN_FLAGS)
@@ -273,7 +273,7 @@ define cmd_obj_init_o
     $(OBJCOPY) $(foreach s,$(SPECIAL_DATA_SECTIONS),--rename-section .$(s)=.init.$(s)) $< $@
 endef
 
-$(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): $(obj)/%.init.o: $(obj)/%.o FORCE
+$(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y) $(lib-y)): $(obj)/%.init.o: $(obj)/%.o FORCE
 	$(call if_changed,obj_init_o)
 
 quiet_cmd_cpp_i_c = CPP     $@
