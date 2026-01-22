@@ -40,7 +40,7 @@ struct hpet_event_channel
     s_time_t      next_event;
     cpumask_var_t cpumask;
     spinlock_t    lock;
-    void          (*event_handler)(struct hpet_event_channel *ch);
+    bool          event_handler;
 
     unsigned int idx;   /* physical channel idx */
     unsigned int cpu;   /* msi target */
@@ -194,7 +194,7 @@ static void evt_do_broadcast(cpumask_t *mask)
        cpumask_raise_softirq(mask, TIMER_SOFTIRQ);
 }
 
-static void cf_check handle_hpet_broadcast(struct hpet_event_channel *ch)
+static void handle_hpet_broadcast(struct hpet_event_channel *ch)
 {
     cpumask_t *scratch = this_cpu(hpet_scratch_cpumask);
     s_time_t now, next_event;
@@ -250,7 +250,7 @@ static void cf_check hpet_interrupt_handler(int irq, void *data)
         return;
     }
 
-    ch->event_handler(ch);
+    handle_hpet_broadcast(ch);
 }
 
 static void hpet_enable_channel(struct hpet_event_channel *ch)
@@ -657,7 +657,7 @@ void __init hpet_broadcast_init(void)
         hpet_events[i].next_event = STIME_MAX;
         spin_lock_init(&hpet_events[i].lock);
         smp_wmb();
-        hpet_events[i].event_handler = handle_hpet_broadcast;
+        hpet_events[i].event_handler = true;
 
         hpet_events[i].msi.msi_attrib.maskbit = 1;
         hpet_events[i].msi.msi_attrib.pos = MSI_TYPE_HPET;
@@ -814,7 +814,9 @@ int hpet_legacy_irq_tick(void)
          (hpet_events->flags & (HPET_EVT_DISABLE|HPET_EVT_LEGACY)) !=
          HPET_EVT_LEGACY )
         return 0;
-    hpet_events->event_handler(hpet_events);
+
+    handle_hpet_broadcast(hpet_events);
+
     return 1;
 }
 
