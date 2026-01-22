@@ -23,7 +23,6 @@
 #include <asm/irq-vectors.h>
 #include <asm/msi.h>
 
-#define MAX_DELTA_NS MILLISECS(10*1000)
 #define MIN_DELTA_NS MICROSECS(20)
 
 #define HPET_EVT_USED_BIT    0
@@ -164,9 +163,14 @@ static int reprogram_hpet_evt_channel(
 
     ASSERT(expire != STIME_MAX);
 
-    delta = min_t(int64_t, delta, MAX_DELTA_NS);
     delta = max_t(int64_t, delta, MIN_DELTA_NS);
     delta = ns2ticks(delta, ch->shift, ch->mult);
+
+    if ( delta > UINT32_MAX )
+    {
+        hpet_write32(hpet_read32(HPET_COUNTER), HPET_Tn_CMP(ch->idx));
+        return 0;
+    }
 
     do {
         ret = hpet_next_event(delta, ch->idx);
