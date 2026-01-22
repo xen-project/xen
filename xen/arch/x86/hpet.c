@@ -162,12 +162,7 @@ static int reprogram_hpet_evt_channel(
 
     ch->next_event = expire;
 
-    if ( expire == STIME_MAX )
-    {
-        /* We assume it will take a long time for the timer to wrap. */
-        hpet_write32(0, HPET_Tn_CMP(ch->idx));
-        return 0;
-    }
+    ASSERT(expire != STIME_MAX);
 
     delta = min_t(int64_t, delta, MAX_DELTA_NS);
     delta = max_t(int64_t, delta, MIN_DELTA_NS);
