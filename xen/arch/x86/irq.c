@@ -51,7 +51,7 @@ static vmask_t global_used_vector_map;
 
 struct irq_desc __read_mostly *irq_desc = NULL;
 
-static DECLARE_BITMAP(used_vectors, X86_IDT_VECTORS);
+static DECLARE_BITMAP(used_vectors, X86_IDT_VECTORS) __ro_after_init;
 
 static DEFINE_SPINLOCK(vector_lock);
 
@@ -2644,13 +2644,17 @@ void fixup_irqs(void)
         spin_lock(&desc->lock);
 
         vector = irq_to_vector(irq);
-        if ( vector >= FIRST_HIPRIORITY_VECTOR &&
-             vector <= LAST_HIPRIORITY_VECTOR &&
-             desc->handler == &no_irq_type )
+        if ( (vector >= FIRST_HIPRIORITY_VECTOR &&
+              vector <= LAST_HIPRIORITY_VECTOR &&
+              desc->handler == &no_irq_type) ||
+             test_bit(vector, used_vectors) )
         {
             /*
              * This can in particular happen when parking secondary threads
              * during boot and when the serial console wants to use a PCI IRQ.
+             *
+             * Globally used vectors (like the HPET broadcast IRQ ones), need
+             * to be left alone in any event.
              */
             spin_unlock(&desc->lock);
             continue;

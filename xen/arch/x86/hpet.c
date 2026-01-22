@@ -296,22 +296,6 @@ static int hpet_msi_write(struct hpet_event_channel *ch, struct msi_msg *msg)
 
 #define hpet_msi_shutdown hpet_msi_mask
 
-static void cf_check hpet_msi_set_affinity(
-    struct irq_desc *desc, const cpumask_t *mask)
-{
-    struct hpet_event_channel *ch = desc->action->dev_id;
-    struct msi_msg msg = ch->msi.msg;
-
-    /* This really is only for dump_irqs(). */
-    cpumask_copy(desc->arch.cpu_mask, mask);
-
-    msg.dest32 = cpu_mask_to_apicid(mask);
-    msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
-    msg.address_lo |= MSI_ADDR_DEST_ID(msg.dest32);
-    if ( msg.dest32 != ch->msi.msg.dest32 )
-        hpet_msi_write(ch, &msg);
-}
-
 /*
  * IRQ Chip for MSI HPET Devices,
  */
@@ -323,7 +307,6 @@ static hw_irq_controller hpet_msi_type = {
     .disable    = hpet_msi_mask,
     .ack        = irq_actor_none,
     .end        = end_nonmaskable_irq,
-    .set_affinity   = hpet_msi_set_affinity,
 };
 
 static int __hpet_setup_msi_irq(struct irq_desc *desc)
