@@ -124,7 +124,7 @@ static inline unsigned long ns2ticks(unsigned long nsec, int shift,
     return (unsigned long) tmp;
 }
 
-static int hpet_next_event(unsigned long delta, int timer)
+static int hpet_next_event(unsigned long delta, unsigned int timer)
 {
     uint32_t cnt, cmp;
     unsigned long flags;
@@ -173,12 +173,10 @@ static int reprogram_hpet_evt_channel(
     delta = max_t(int64_t, delta, MIN_DELTA_NS);
     delta = ns2ticks(delta, ch->shift, ch->mult);
 
-    ret = hpet_next_event(delta, ch->idx);
-    while ( ret && force )
-    {
-        delta += delta;
+    do {
         ret = hpet_next_event(delta, ch->idx);
-    }
+        delta += delta;
+    } while ( ret && force );
 
     return ret;
 }
