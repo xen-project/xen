@@ -569,8 +569,6 @@ F:	tools/
 
 VM EVENT, MEM ACCESS and MONITOR
 M:	Tamas K Lengyel <tamas@tklengyel.com>
-R:	Alexandru Isaila <aisaila@bitdefender.com>
-R:	Petre Pircalabu <ppircalabu@bitdefender.com>
 S:	Supported
 F:	tools/misc/xen-access.c
 F:	xen/arch/*/*/mem_access.c
