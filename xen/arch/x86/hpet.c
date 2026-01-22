@@ -147,12 +147,12 @@ static int reprogram_hpet_evt_channel(
     int64_t delta;
     int ret;
 
-    if ( (ch->flags & HPET_EVT_DISABLE) || (expire == 0) )
+    if ( ch->flags & HPET_EVT_DISABLE )
         return 0;
 
-    if ( unlikely(expire < 0) )
+    if ( unlikely(expire <= 0) )
     {
-        printk(KERN_DEBUG "reprogram: expire <= 0\n");
+        ASSERT_UNREACHABLE();
         return -ETIME;
     }
 
