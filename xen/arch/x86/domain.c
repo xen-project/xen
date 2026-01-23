@@ -303,7 +303,7 @@ void domain_cpu_policy_changed(struct domain *d)
 
     if ( is_pv_domain(d) )
     {
-        if ( ((levelling_caps & LCAP_1cd) == LCAP_1cd) )
+        if ( levelling_caps & LCAP_1cd )
         {
             uint64_t mask = cpuidmask_defaults._1cd;
             uint32_t ecx = p->basic._1c;
@@ -368,7 +368,7 @@ void domain_cpu_policy_changed(struct domain *d)
             d->arch.pv.cpuidmasks->_1cd = mask;
         }
 
-        if ( ((levelling_caps & LCAP_6c) == LCAP_6c) )
+        if ( levelling_caps & LCAP_6c )
         {
             uint64_t mask = cpuidmask_defaults._6c;
 
@@ -378,7 +378,7 @@ void domain_cpu_policy_changed(struct domain *d)
             d->arch.pv.cpuidmasks->_6c = mask;
         }
 
-        if ( ((levelling_caps & LCAP_7ab0) == LCAP_7ab0) )
+        if ( levelling_caps & LCAP_7ab0 )
         {
             uint64_t mask = cpuidmask_defaults._7ab0;
 
@@ -395,7 +395,7 @@ void domain_cpu_policy_changed(struct domain *d)
             d->arch.pv.cpuidmasks->_7ab0 = mask;
         }
 
-        if ( ((levelling_caps & LCAP_Da1) == LCAP_Da1) )
+        if ( levelling_caps & LCAP_Da1 )
         {
             uint64_t mask = cpuidmask_defaults.Da1;
             uint32_t eax = p->xstate.Da1;
@@ -406,7 +406,7 @@ void domain_cpu_policy_changed(struct domain *d)
             d->arch.pv.cpuidmasks->Da1 = mask;
         }
 
-        if ( ((levelling_caps & LCAP_e1cd) == LCAP_e1cd) )
+        if ( levelling_caps & LCAP_e1cd )
         {
             uint64_t mask = cpuidmask_defaults.e1cd;
             uint32_t ecx = p->extd.e1c;

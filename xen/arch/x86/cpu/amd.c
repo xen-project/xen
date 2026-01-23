@@ -170,7 +170,7 @@ static void cf_check amd_ctxt_switch_masking(const struct vcpu *next)
 		(nextd && is_pv_domain(nextd) && nextd->arch.pv.cpuidmasks)
 		? nextd->arch.pv.cpuidmasks : &cpuidmask_defaults;
 
-	if ((levelling_caps & LCAP_1cd) == LCAP_1cd) {
+	if (levelling_caps & LCAP_1cd) {
 		uint64_t val = masks->_1cd;
 
 		/*
@@ -191,7 +191,7 @@ static void cf_check amd_ctxt_switch_masking(const struct vcpu *next)
 #define LAZY(cap, msr, field)						\
 	({								\
 		if (unlikely(these_masks->field != masks->field) &&	\
-		    ((levelling_caps & cap) == cap))			\
+		    (levelling_caps & cap))				\
 		{							\
 			wrmsr_amd(msr, masks->field);			\
 			these_masks->field = masks->field;		\
@@ -247,7 +247,7 @@ static void __init noinline amd_init_levelling(void)
 
 	probe_masking_msrs();
 
-	if ((levelling_caps & LCAP_1cd) == LCAP_1cd) {
+	if (levelling_caps & LCAP_1cd) {
 		uint32_t ecx, edx, tmp;
 
 		cpuid(0x00000001, &tmp, &tmp, &ecx, &edx);
@@ -260,7 +260,7 @@ static void __init noinline amd_init_levelling(void)
 		cpuidmask_defaults._1cd = ((uint64_t)ecx << 32) | edx;
 	}
 
-	if ((levelling_caps & LCAP_e1cd) == LCAP_e1cd) {
+	if (levelling_caps & LCAP_e1cd) {
 		uint32_t ecx, edx, tmp;
 
 		cpuid(0x80000001, &tmp, &tmp, &ecx, &edx);
@@ -271,7 +271,7 @@ static void __init noinline amd_init_levelling(void)
 		cpuidmask_defaults.e1cd = ((uint64_t)ecx << 32) | edx;
 	}
 
-	if ((levelling_caps & LCAP_7ab0) == LCAP_7ab0) {
+	if (levelling_caps & LCAP_7ab0) {
 		uint32_t eax, ebx, tmp;
 
 		cpuid(0x00000007, &eax, &ebx, &tmp, &tmp);
@@ -279,7 +279,7 @@ static void __init noinline amd_init_levelling(void)
 		cpuidmask_defaults._7ab0 &= ((uint64_t)eax << 32) | ebx;
 	}
 
-	if ((levelling_caps & LCAP_6c) == LCAP_6c) {
+	if (levelling_caps & LCAP_6c) {
 		uint32_t ecx = cpuid_ecx(6);
 
 		cpuidmask_defaults._6c &= (~0ULL << 32) | ecx;
