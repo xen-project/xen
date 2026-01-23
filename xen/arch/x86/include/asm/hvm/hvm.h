@@ -19,6 +19,8 @@
 #include <asm/x86_emulate.h>
 
 struct pirq; /* needed by pi_update_irte */
+struct hvm_hw_cpu;
+struct xen_domctl_createdomain;
 
 #ifdef CONFIG_HVM_FEP
 /* Permit use of the Forced Emulation Prefix in HVM guests */

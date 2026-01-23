@@ -7,8 +7,6 @@
 #include <xen/kernel.h>
 #include <xen/percpu.h>
 
-#include <public/sysctl.h>
-
 extern const uint32_t known_features[FSCAPINTS];
 
 /*

@@ -12,6 +12,8 @@
 #include <xen/list.h>
 #include <xen/rwlock.h>
 
+#include <public/hvm/save.h>
+
 /*
  * Abstract layer of periodic time, one short time.
  */
