@@ -43,7 +43,6 @@ allow dom0_t xen_t:xen2 {
 	psr_alloc
 	pmu_ctrl
 	get_symbol
-	get_cpu_levelling_caps
 	get_cpu_featureset
 	livepatch_op
 	coverage_op

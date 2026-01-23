@@ -933,25 +933,6 @@ struct xen_sysctl_psr_alloc {
 };
 
 /*
- * XEN_SYSCTL_get_cpu_levelling_caps (x86 specific)
- *
- * Return hardware capabilities concerning masking or faulting of the cpuid
- * instruction for PV guests.
- */
-struct xen_sysctl_cpu_levelling_caps {
-#define XEN_SYSCTL_CPU_LEVELCAP_faulting    (1UL <<  0) /* CPUID faulting    */
-#define XEN_SYSCTL_CPU_LEVELCAP_ecx         (1UL <<  1) /* 0x00000001.ecx    */
-#define XEN_SYSCTL_CPU_LEVELCAP_edx         (1UL <<  2) /* 0x00000001.edx    */
-#define XEN_SYSCTL_CPU_LEVELCAP_extd_ecx    (1UL <<  3) /* 0x80000001.ecx    */
-#define XEN_SYSCTL_CPU_LEVELCAP_extd_edx    (1UL <<  4) /* 0x80000001.edx    */
-#define XEN_SYSCTL_CPU_LEVELCAP_xsave_eax   (1UL <<  5) /* 0x0000000D:1.eax  */
-#define XEN_SYSCTL_CPU_LEVELCAP_thermal_ecx (1UL <<  6) /* 0x00000006.ecx    */
-#define XEN_SYSCTL_CPU_LEVELCAP_l7s0_eax    (1UL <<  7) /* 0x00000007:0.eax  */
-#define XEN_SYSCTL_CPU_LEVELCAP_l7s0_ebx    (1UL <<  8) /* 0x00000007:0.ebx  */
-    uint32_t caps;
-};
-
-/*
  * XEN_SYSCTL_get_cpu_featureset (x86 specific)
  *
  * Return information about featuresets available on this host.
@@ -1269,8 +1250,8 @@ struct xen_sysctl {
 #define XEN_SYSCTL_psr_cmt_op                    21
 #define XEN_SYSCTL_pcitopoinfo                   22
 #define XEN_SYSCTL_psr_alloc                     23
-/* #define XEN_SYSCTL_tmem_op                       24 */
-#define XEN_SYSCTL_get_cpu_levelling_caps        25
+/* #define XEN_SYSCTL_tmem_op                    24 */
+/* #define XEN_SYSCTL_get_cpu_levelling_caps     25 */
 #define XEN_SYSCTL_get_cpu_featureset            26
 #define XEN_SYSCTL_livepatch_op                  27
 /* #define XEN_SYSCTL_set_parameter              28 */
@@ -1300,7 +1281,6 @@ struct xen_sysctl {
         struct xen_sysctl_coverage_op       coverage_op;
         struct xen_sysctl_psr_cmt_op        psr_cmt_op;
         struct xen_sysctl_psr_alloc         psr_alloc;
-        struct xen_sysctl_cpu_levelling_caps cpu_levelling_caps;
         struct xen_sysctl_cpu_featureset    cpu_featureset;
         struct xen_sysctl_livepatch_op      livepatch;
 #if defined(__i386__) || defined(__x86_64__)

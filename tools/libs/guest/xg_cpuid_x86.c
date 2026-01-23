@@ -36,20 +36,6 @@ enum {
 #define bitmaskof(idx)      (1u << ((idx) & 31))
 #define featureword_of(idx) ((idx) >> 5)
 
-int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps)
-{
-    struct xen_sysctl sysctl = {};
-    int ret;
-
-    sysctl.cmd = XEN_SYSCTL_get_cpu_levelling_caps;
-    ret = do_sysctl(xch, &sysctl);
-
-    if ( !ret )
-        *caps = sysctl.u.cpu_levelling_caps.caps;
-
-    return ret;
-}
-
 int xc_get_cpu_featureset(xc_interface *xch, uint32_t index,
                           uint32_t *nr_features, uint32_t *featureset)
 {

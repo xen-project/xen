@@ -15,15 +15,12 @@ extern const uint32_t known_features[FSCAPINTS];
  * Expected levelling capabilities (given cpuid vendor/family information),
  * and levelling capabilities actually available (given MSR probing).
  */
-#define LCAP_faulting XEN_SYSCTL_CPU_LEVELCAP_faulting
-#define LCAP_1cd      (XEN_SYSCTL_CPU_LEVELCAP_ecx |        \
-                       XEN_SYSCTL_CPU_LEVELCAP_edx)
-#define LCAP_e1cd     (XEN_SYSCTL_CPU_LEVELCAP_extd_ecx |   \
-                       XEN_SYSCTL_CPU_LEVELCAP_extd_edx)
-#define LCAP_Da1      XEN_SYSCTL_CPU_LEVELCAP_xsave_eax
-#define LCAP_6c       XEN_SYSCTL_CPU_LEVELCAP_thermal_ecx
-#define LCAP_7ab0     (XEN_SYSCTL_CPU_LEVELCAP_l7s0_eax |   \
-                       XEN_SYSCTL_CPU_LEVELCAP_l7s0_ebx)
+#define LCAP_faulting (1U <<  0) /* CPUID Faulting       */
+#define LCAP_1cd      (1U <<  1) /* 0x00000001.ecx/edx   */
+#define LCAP_e1cd     (1U <<  2) /* 0x80000001.ecx/edx   */
+#define LCAP_Da1      (1U <<  3) /* 0x0000000D:1.eax     */
+#define LCAP_6c       (1U <<  4) /* 0x00000006.ecx       */
+#define LCAP_7ab0     (1U <<  5) /* 0x00000007:0.eax/ebx */
 extern unsigned int expected_levelling_cap, levelling_caps;
 
 struct cpuidmasks

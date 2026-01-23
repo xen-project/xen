@@ -884,10 +884,6 @@ static int cf_check flask_sysctl(int cmd)
         return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
                                     XEN2__PSR_ALLOC, NULL);
 
-    case XEN_SYSCTL_get_cpu_levelling_caps:
-        return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
-                                    XEN2__GET_CPU_LEVELLING_CAPS, NULL);
-
     case XEN_SYSCTL_get_cpu_featureset:
         return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
                                     XEN2__GET_CPU_FEATURESET, NULL);

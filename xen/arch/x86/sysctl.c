@@ -289,12 +289,6 @@ long arch_do_sysctl(
         break;
     }
 
-    case XEN_SYSCTL_get_cpu_levelling_caps:
-        sysctl->u.cpu_levelling_caps.caps = levelling_caps;
-        if ( __copy_field_to_guest(u_sysctl, sysctl, u.cpu_levelling_caps.caps) )
-            ret = -EFAULT;
-        break;
-
     case XEN_SYSCTL_get_cpu_featureset:
     {
         static const struct cpu_policy *const policy_table[6] = {
