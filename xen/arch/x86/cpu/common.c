@@ -446,10 +446,13 @@ void reset_cpuinfo(struct cpuinfo_x86 *c, bool keep_basic)
     CPU_DATA_INIT((*c));
 }
 
-static void generic_identify(struct cpuinfo_x86 *c)
+void identify_cpu(struct cpuinfo_x86 *c)
 {
 	uint64_t val;
 	u32 eax, ebx, ecx, edx, tmp;
+	unsigned int i;
+
+	reset_cpuinfo(c, false);
 
 	/* Get vendor name */
 	cpuid(0, &c->cpuid_level, &ebx, &ecx, &edx);
@@ -549,17 +552,6 @@ static void generic_identify(struct cpuinfo_x86 *c)
 		c->x86_capability[FEATURESET_m10Al] = val;
 		c->x86_capability[FEATURESET_m10Ah] = val >> 32;
 	}
-}
-
-/*
- * This does the hard work of actually picking apart the CPU stuff...
- */
-void identify_cpu(struct cpuinfo_x86 *c)
-{
-	int i;
-
-	reset_cpuinfo(c, false);
-	generic_identify(c);
 
 	/*
 	 * Vendor-specific initialization.  In this section we
