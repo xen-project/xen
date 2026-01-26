@@ -165,6 +165,10 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 	else if (str[0] == '$')
 		goto skip_tail;
 
+	/* We want fake "end" symbols only for text / code. */
+	if (toupper((uint8_t)stype) != 'T')
+		s->size = 0;
+
 	/* include the type field in the symbol name, so that it gets
 	 * compressed together */
 	s->len = strlen(str) + 1;
@@ -316,7 +320,6 @@ static int compare_name_orig(const void *p1, const void *p2)
 static bool want_symbol_end(unsigned int idx)
 {
 	return table[idx].size &&
-	       toupper(table[idx].type) == 'T' &&
 	       (idx + 1 == table_cnt ||
 	        table[idx].addr + table[idx].size < table[idx + 1].addr);
 }
