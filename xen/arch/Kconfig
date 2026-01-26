@@ -9,11 +9,11 @@ config NR_CPUS
 	range 1 1 if ARM && MPU
 	range 1 16383
 	default "256" if X86
-	default "1" if ARM && MPU
-	default "8" if ARM && RCAR3
-	default "4" if ARM && QEMU
-	default "4" if ARM && MPSOC
-	default "128" if ARM
+	default "1" if !ARM || MPU
+	default "8" if RCAR3
+	default "4" if QEMU
+	default "4" if MPSOC
+	default "128"
 	help
 	  Controls the build-time size of various arrays and bitmaps
 	  associated with multiple-cpu management.  It is the upper bound of
