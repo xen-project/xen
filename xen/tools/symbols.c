@@ -40,6 +40,7 @@ struct sym_entry {
 	unsigned long long addr;
 	unsigned long size;
 	unsigned int len;
+	unsigned int orig_idx;
 	unsigned char *sym;
 	char *orig_symbol;
 	unsigned int addr_idx;
@@ -247,6 +248,9 @@ static void read_map(FILE *in)
 				exit (1);
 			}
 		}
+
+		table[table_cnt].orig_idx = table_cnt;
+
 		if (read_symbol(in, &table[table_cnt]) == 0)
 			table_cnt++;
 	}
@@ -639,7 +643,11 @@ static int compare_value(const void *p1, const void *p2)
 		return -1;
 	if (isupper(*sym2->sym))
 		return +1;
-	return 0;
+
+	/* Explicitly request "keep original order" otherwise. */
+	if (sym1->orig_idx < sym2->orig_idx)
+		return -1;
+	return sym1->orig_idx > sym2->orig_idx;
 }
 
 static int compare_name(const void *p1, const void *p2)
