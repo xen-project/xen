@@ -35,8 +35,6 @@
 
 #include <acpi/cpufreq/cpufreq.h>
 
-struct acpi_cpufreq_data *cpufreq_drv_data[NR_CPUS];
-
 struct perf_pair {
     union {
         struct {

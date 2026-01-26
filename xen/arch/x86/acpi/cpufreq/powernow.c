@@ -84,16 +84,14 @@ static int cf_check powernow_cpufreq_target(
     struct cpufreq_policy *policy,
     unsigned int target_freq, unsigned int relation)
 {
-    struct acpi_cpufreq_data *data = cpufreq_drv_data[policy->cpu];
+    struct acpi_cpufreq_data *data = &policy->drv_data.acpi;
     struct processor_performance *perf;
     unsigned int next_state; /* Index into freq_table */
     unsigned int next_perf_state; /* Index into perf table */
     int result;
 
-    if (unlikely(data == NULL ||
-        data->acpi_data == NULL || data->freq_table == NULL)) {
+    if ( !data->acpi_data || !data->freq_table )
         return -ENODEV;
-    }
 
     perf = data->acpi_data;
     result = cpufreq_frequency_table_target(policy,
@@ -187,11 +185,9 @@ static void cf_check get_cpu_data(void *arg)
 
 static int cf_check powernow_cpufreq_verify(struct cpufreq_policy *policy)
 {
-    struct acpi_cpufreq_data *data;
     struct processor_performance *perf;
 
-    if (!policy || !(data = cpufreq_drv_data[policy->cpu]) ||
-        !processor_pminfo[policy->cpu])
+    if ( !policy || !processor_pminfo[policy->cpu] )
         return -EINVAL;
 
     perf = &processor_pminfo[policy->cpu]->perf;
@@ -199,7 +195,8 @@ static int cf_check powernow_cpufreq_verify(struct cpufreq_policy *policy)
     cpufreq_verify_within_limits(policy, 0, 
         perf->states[perf->platform_limit].core_frequency * 1000);
 
-    return cpufreq_frequency_table_verify(policy, data->freq_table);
+    return cpufreq_frequency_table_verify(policy,
+                                          policy->drv_data.acpi.freq_table);
 }
 
 static int cf_check powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
@@ -207,17 +204,11 @@ static int cf_check powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
     unsigned int i;
     unsigned int valid_states = 0;
     unsigned int cpu = policy->cpu;
-    struct acpi_cpufreq_data *data;
+    struct acpi_cpufreq_data *data = &policy->drv_data.acpi;
     unsigned int result = 0;
     struct processor_performance *perf;
     struct amd_cpu_data info;
     struct cpuinfo_x86 *c = &cpu_data[policy->cpu];
-
-    data = xzalloc(struct acpi_cpufreq_data);
-    if (!data)
-        return -ENOMEM;
-
-    cpufreq_drv_data[cpu] = data;
 
     data->acpi_data = &processor_pminfo[cpu]->perf;
 
@@ -230,8 +221,7 @@ static int cf_check powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
         if (cpumask_weight(policy->cpus) != 1) {
             printk(XENLOG_WARNING "Unsupported sharing type %d (%u CPUs)\n",
                    policy->shared_type, cpumask_weight(policy->cpus));
-            result = -ENODEV;
-            goto err_unreg;
+            return -ENODEV;
         }
     } else {
         cpumask_copy(policy->cpus, cpumask_of(cpu));
@@ -240,21 +230,16 @@ static int cf_check powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
     /* capability check */
     if (perf->state_count <= 1) {
         printk("No P-States\n");
-        result = -ENODEV;
-        goto err_unreg;
+        return -ENODEV;
     }
 
-    if (perf->control_register.space_id != perf->status_register.space_id) {
-        result = -ENODEV;
-        goto err_unreg;
-    }
+    if ( perf->control_register.space_id != perf->status_register.space_id )
+        return -ENODEV;
 
     data->freq_table = xmalloc_array(struct cpufreq_frequency_table, 
                                     (perf->state_count+1));
-    if (!data->freq_table) {
-        result = -ENOMEM;
-        goto err_unreg;
-    }
+    if ( !data->freq_table )
+        return -ENOMEM;
 
     /* detect transition latency */
     policy->cpuinfo.transition_latency = 0;
@@ -300,23 +285,14 @@ static int cf_check powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
     return result;
 
 err_freqfree:
-    xfree(data->freq_table);
-err_unreg:
-    xfree(data);
-    cpufreq_drv_data[cpu] = NULL;
+    XFREE(data->freq_table);
 
     return result;
 }
 
 static int cf_check powernow_cpufreq_cpu_exit(struct cpufreq_policy *policy)
 {
-    struct acpi_cpufreq_data *data = cpufreq_drv_data[policy->cpu];
-
-    if (data) {
-        cpufreq_drv_data[policy->cpu] = NULL;
-        xfree(data->freq_table);
-        xfree(data);
-    }
+    XFREE(policy->drv_data.acpi.freq_table);
 
     return 0;
 }

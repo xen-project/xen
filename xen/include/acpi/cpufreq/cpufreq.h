@@ -38,8 +38,6 @@ struct acpi_cpufreq_data {
     unsigned int arch_cpu_flags;
 };
 
-extern struct acpi_cpufreq_data *cpufreq_drv_data[NR_CPUS];
-
 struct cpufreq_cpuinfo {
     unsigned int        max_freq;
     unsigned int        second_max_freq;    /* P1 if Turbo Mode is on */
@@ -82,6 +80,10 @@ struct cpufreq_policy {
                                  * -1 for disable, 1 for enabled
                                  * See CPUFREQ_TURBO_* below for defines */
     unsigned int        policy; /* CPUFREQ_POLICY_* */
+
+    union {
+        struct acpi_cpufreq_data acpi;
+    }                   drv_data;
 };
 DECLARE_PER_CPU(struct cpufreq_policy *, cpufreq_cpu_policy);
 
