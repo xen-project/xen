@@ -2174,33 +2174,15 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
         ctxt_switch_levelling(next);
 
-        if ( opt_ibpb_ctxt_switch && !is_idle_domain(nextd) )
-        {
-            static DEFINE_PER_CPU(unsigned int, last);
-            unsigned int *last_id = &this_cpu(last);
-
-            /*
-             * Squash the domid and vcpu id together for comparison
-             * efficiency.  We could in principle stash and compare the struct
-             * vcpu pointer, but this risks a false alias if a domain has died
-             * and the same 4k page gets reused for a new vcpu.
-             */
-            unsigned int next_id = (((unsigned int)nextd->domain_id << 16) |
-                                    (uint16_t)next->vcpu_id);
-            BUILD_BUG_ON(MAX_VIRT_CPUS > 0xffff);
-
-            /*
-             * When scheduling from a vcpu, to idle, and back to the same vcpu
-             * (which might be common in a lightly loaded system, or when
-             * using vcpu pinning), there is no need to issue IBPB, as we are
-             * returning to the same security context.
-             */
-            if ( *last_id != next_id )
-            {
-                spec_ctrl_new_guest_context();
-                *last_id = next_id;
-            }
-        }
+        /*
+         * Issue an IBPB when scheduling a different vCPU if required.
+         *
+         * IBPB clears the RSB/RAS/RAP, but that's fine as we leave this
+         * function via reset_stack_and_call_ind() rather than via a RET
+         * instruction.
+         */
+        if ( opt_ibpb_ctxt_switch )
+            spec_ctrl_new_guest_context();
 
         /* Update the top-of-stack block with the new speculation settings. */
         info->scf =
