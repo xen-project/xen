@@ -80,10 +80,12 @@ static int read_scaling_available_governors(char *scaling_available_governors,
 static int get_cpufreq_cppc(unsigned int cpu,
                             struct xen_get_cppc_para *cppc_para)
 {
+    const struct cpufreq_policy *policy =
+        per_cpu(cpufreq_cpu_policy, cpu);
     int ret = -ENODEV;
 
-    if ( hwp_active() )
-        ret = get_hwp_para(cpu, cppc_para);
+    if ( policy && hwp_active() )
+        ret = get_hwp_para(policy, cppc_para);
 
     return ret;
 }

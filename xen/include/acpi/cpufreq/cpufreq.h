@@ -38,6 +38,42 @@ struct acpi_cpufreq_data {
     unsigned int arch_cpu_flags;
 };
 
+struct hwp_drv_data {
+    union {
+        uint64_t hwp_caps;
+        struct {
+            unsigned int highest:8;
+            unsigned int guaranteed:8;
+            unsigned int most_efficient:8;
+            unsigned int lowest:8;
+            unsigned int :32;
+        } hw;
+    };
+    union hwp_request {
+        struct {
+            unsigned int min_perf:8;
+            unsigned int max_perf:8;
+            unsigned int desired:8;
+            unsigned int energy_perf:8;
+            unsigned int activity_window:10;
+            bool package_control:1;
+            unsigned int :16;
+            bool activity_window_valid:1;
+            bool energy_perf_valid:1;
+            bool desired_valid:1;
+            bool max_perf_valid:1;
+            bool min_perf_valid:1;
+        };
+        uint64_t raw;
+    } curr_req;
+    int ret;
+    uint16_t activity_window;
+    uint8_t minimum;
+    uint8_t maximum;
+    uint8_t desired;
+    uint8_t energy_perf;
+};
+
 struct cpufreq_cpuinfo {
     unsigned int        max_freq;
     unsigned int        second_max_freq;    /* P1 if Turbo Mode is on */
@@ -83,6 +119,7 @@ struct cpufreq_policy {
 
     union {
         struct acpi_cpufreq_data acpi;
+        struct hwp_drv_data hwp;
     }                   drv_data;
 };
 DECLARE_PER_CPU(struct cpufreq_policy *, cpufreq_cpu_policy);
@@ -286,7 +323,7 @@ bool hwp_active(void);
 static inline bool hwp_active(void) { return false; }
 #endif
 
-int get_hwp_para(unsigned int cpu,
+int get_hwp_para(const struct cpufreq_policy *policy,
                  struct xen_get_cppc_para *cppc_para);
 int set_hwp_para(struct cpufreq_policy *policy,
                  struct xen_set_cppc_para *set_cppc);

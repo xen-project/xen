@@ -22,50 +22,6 @@ static bool __read_mostly feature_hdc;
 
 static bool __ro_after_init opt_cpufreq_hdc = true;
 
-union hwp_request
-{
-    struct
-    {
-        unsigned int min_perf:8;
-        unsigned int max_perf:8;
-        unsigned int desired:8;
-        unsigned int energy_perf:8;
-        unsigned int activity_window:10;
-        bool package_control:1;
-        unsigned int :16;
-        bool activity_window_valid:1;
-        bool energy_perf_valid:1;
-        bool desired_valid:1;
-        bool max_perf_valid:1;
-        bool min_perf_valid:1;
-    };
-    uint64_t raw;
-};
-
-struct hwp_drv_data
-{
-    union
-    {
-        uint64_t hwp_caps;
-        struct
-        {
-            unsigned int highest:8;
-            unsigned int guaranteed:8;
-            unsigned int most_efficient:8;
-            unsigned int lowest:8;
-            unsigned int :32;
-        } hw;
-    };
-    union hwp_request curr_req;
-    int ret;
-    uint16_t activity_window;
-    uint8_t minimum;
-    uint8_t maximum;
-    uint8_t desired;
-    uint8_t energy_perf;
-};
-static DEFINE_PER_CPU_READ_MOSTLY(struct hwp_drv_data *, hwp_drv_data);
-
 #define hwp_err(cpu, fmt, args...) \
     printk(XENLOG_ERR "HWP: CPU%u error: " fmt, cpu, ## args)
 #define hwp_info(fmt, args...)    printk(XENLOG_INFO "HWP: " fmt, ## args)
@@ -212,7 +168,7 @@ static bool __init hwp_available(void)
 
 static int cf_check hwp_cpufreq_verify(struct cpufreq_policy *policy)
 {
-    struct hwp_drv_data *data = per_cpu(hwp_drv_data, policy->cpu);
+    struct hwp_drv_data *data = &policy->drv_data.hwp;
 
     if ( !cpu_has_hwp_activity_window && data->activity_window )
     {
@@ -226,8 +182,8 @@ static int cf_check hwp_cpufreq_verify(struct cpufreq_policy *policy)
 
 static void cf_check hwp_write_request(void *info)
 {
-    const struct cpufreq_policy *policy = info;
-    struct hwp_drv_data *data = this_cpu(hwp_drv_data);
+    struct cpufreq_policy *policy = info;
+    struct hwp_drv_data *data = &policy->drv_data.hwp;
     union hwp_request hwp_req = data->curr_req;
 
     data->ret = 0;
@@ -247,7 +203,7 @@ static int cf_check hwp_cpufreq_target(struct cpufreq_policy *policy,
                                        unsigned int relation)
 {
     unsigned int cpu = policy->cpu;
-    struct hwp_drv_data *data = per_cpu(hwp_drv_data, cpu);
+    struct hwp_drv_data *data = &policy->drv_data.hwp;
     /* Zero everything to ensure reserved bits are zero... */
     union hwp_request hwp_req = { .raw = 0 };
 
@@ -338,7 +294,7 @@ static void hwp_get_cpu_speeds(struct cpufreq_policy *policy)
 static void cf_check hwp_init_msrs(void *info)
 {
     struct cpufreq_policy *policy = info;
-    struct hwp_drv_data *data = this_cpu(hwp_drv_data);
+    struct hwp_drv_data *data = &policy->drv_data.hwp;
     uint64_t val;
 
     /*
@@ -406,23 +362,15 @@ static int cf_check hwp_cpufreq_cpu_init(struct cpufreq_policy *policy)
     static bool __read_mostly first_run = true;
     static union hwp_request initial_req;
     unsigned int cpu = policy->cpu;
-    struct hwp_drv_data *data;
-
-    data = xzalloc(struct hwp_drv_data);
-    if ( !data )
-        return -ENOMEM;
+    struct hwp_drv_data *data = &policy->drv_data.hwp;
 
     policy->governor = &cpufreq_gov_hwp;
-
-    per_cpu(hwp_drv_data, cpu) = data;
 
     on_selected_cpus(cpumask_of(cpu), hwp_init_msrs, policy, 1);
 
     if ( data->curr_req.raw == -1 )
     {
         hwp_err(cpu, "Could not initialize HWP properly\n");
-        per_cpu(hwp_drv_data, cpu) = NULL;
-        xfree(data);
         return -ENODEV;
     }
 
@@ -450,11 +398,6 @@ static int cf_check hwp_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
 static int cf_check hwp_cpufreq_cpu_exit(struct cpufreq_policy *policy)
 {
-    struct hwp_drv_data *data = per_cpu(hwp_drv_data, policy->cpu);
-
-    per_cpu(hwp_drv_data, policy->cpu) = NULL;
-    xfree(data);
-
     return 0;
 }
 
@@ -467,8 +410,8 @@ static int cf_check hwp_cpufreq_cpu_exit(struct cpufreq_policy *policy)
  */
 static void cf_check hwp_set_misc_turbo(void *info)
 {
-    const struct cpufreq_policy *policy = info;
-    struct hwp_drv_data *data = per_cpu(hwp_drv_data, policy->cpu);
+    struct cpufreq_policy *policy = info;
+    struct hwp_drv_data *data = &policy->drv_data.hwp;
     uint64_t msr;
 
     data->ret = 0;
@@ -499,7 +442,7 @@ static int cf_check hwp_cpufreq_update(unsigned int cpu, struct cpufreq_policy *
 {
     on_selected_cpus(cpumask_of(cpu), hwp_set_misc_turbo, policy, 1);
 
-    return per_cpu(hwp_drv_data, cpu)->ret;
+    return policy->drv_data.hwp.ret;
 }
 #endif /* CONFIG_PM_OP */
 
@@ -516,12 +459,12 @@ hwp_cpufreq_driver = {
 };
 
 #ifdef CONFIG_PM_OP
-int get_hwp_para(unsigned int cpu,
+int get_hwp_para(const struct cpufreq_policy *policy,
                  struct xen_get_cppc_para *cppc_para)
 {
-    const struct hwp_drv_data *data = per_cpu(hwp_drv_data, cpu);
+    const struct hwp_drv_data *data = &policy->drv_data.hwp;
 
-    if ( data == NULL )
+    if ( !data->maximum )
         return -ENODATA;
 
     cppc_para->features         =
@@ -542,11 +485,10 @@ int get_hwp_para(unsigned int cpu,
 int set_hwp_para(struct cpufreq_policy *policy,
                  struct xen_set_cppc_para *set_cppc)
 {
-    unsigned int cpu = policy->cpu;
-    struct hwp_drv_data *data = per_cpu(hwp_drv_data, cpu);
+    struct hwp_drv_data *data = &policy->drv_data.hwp;
     bool cleared_act_window = false;
 
-    if ( data == NULL )
+    if ( !data->maximum )
         return -ENOENT;
 
     /* Validate all parameters - Disallow reserved bits. */
