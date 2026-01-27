@@ -35,7 +35,6 @@
  * for freq-to-perf transition
  */
 static DEFINE_PER_CPU_READ_MOSTLY(unsigned int, pxfreq_mhz);
-static DEFINE_PER_CPU_READ_MOSTLY(uint8_t, epp_init);
 #ifndef NDEBUG
 static bool __ro_after_init opt_active_mode;
 #else
@@ -248,7 +247,7 @@ static int cf_check amd_cppc_cpufreq_target(struct cpufreq_policy *policy,
     amd_cppc_write_request(policy, data->caps.lowest_nonlinear_perf,
                            des_perf, data->caps.highest_perf,
                            /* Pre-defined BIOS value for passive mode */
-                           per_cpu(epp_init, policy->cpu));
+                           data->epp_init);
     return 0;
 }
 
@@ -326,7 +325,7 @@ static void cf_check amd_cppc_init_msrs(void *info)
 
     /* Store pre-defined BIOS value for passive mode */
     rdmsrl(MSR_AMD_CPPC_REQ, val);
-    this_cpu(epp_init) = MASK_EXTR(val, AMD_CPPC_EPP_MASK);
+    data->epp_init = MASK_EXTR(val, AMD_CPPC_EPP_MASK);
 
     return;
 
@@ -465,7 +464,7 @@ static void amd_cppc_prepare_policy(struct cpufreq_policy *policy,
         break;
 
     default:
-        *epp = per_cpu(epp_init, policy->cpu);
+        *epp = data->epp_init;
         break;
     }
 }

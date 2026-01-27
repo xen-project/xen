@@ -143,6 +143,8 @@ struct amd_cppc_drv_data {
         };
     } req;
 
+    uint8_t epp_init;
+
     int err;
 };
 
