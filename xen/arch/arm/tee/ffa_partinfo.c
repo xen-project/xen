@@ -167,14 +167,15 @@ out:
     return ret;
 }
 
-static int32_t ffa_get_vm_partinfo(struct ffa_uuid uuid, uint32_t *vm_count,
-                                   void **dst_buf, void *end_buf,
-                                   uint32_t dst_size)
+static int32_t ffa_get_vm_partinfo(struct ffa_uuid uuid, uint32_t start_index,
+                                   uint32_t *vm_count, void **dst_buf,
+                                   void *end_buf, uint32_t dst_size)
 {
     struct domain *d = current->domain;
     struct ffa_ctx *curr_ctx = d->arch.tee;
     struct ffa_ctx *dest_ctx;
     uint32_t count = 0;
+    uint32_t idx = 0;
     int32_t ret = FFA_RET_OK;
     /*
      * We do not have UUID info for VMs so use the 1.0 structure so that we set
@@ -202,17 +203,21 @@ static int32_t ffa_get_vm_partinfo(struct ffa_uuid uuid, uint32_t *vm_count,
     if ( ACCESS_ONCE(curr_ctx->guest_vers) >= FFA_VERSION_1_2 )
     {
         /* Add caller VM information */
-        info.id = curr_ctx->ffa_id;
-        info.execution_context = curr_ctx->num_vcpus;
-        info.partition_properties = FFA_PART_VM_PROP;
-        if ( is_64bit_domain(d) )
-            info.partition_properties |= FFA_PART_PROP_AARCH64_STATE;
+        if ( start_index == 0)
+        {
+            info.id = curr_ctx->ffa_id;
+            info.execution_context = curr_ctx->num_vcpus;
+            info.partition_properties = FFA_PART_VM_PROP;
+            if ( is_64bit_domain(d) )
+                info.partition_properties |= FFA_PART_PROP_AARCH64_STATE;
 
-        ret = ffa_copy_info(dst_buf, end_buf, &info, dst_size, sizeof(info));
-        if ( ret )
-            return ret;
-
-        count++;
+            ret = ffa_copy_info(dst_buf, end_buf, &info, dst_size,
+                                sizeof(info));
+            if ( ret )
+                return ret;
+            count++;
+        }
+        idx++;
     }
 
     if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) )
@@ -231,21 +236,25 @@ static int32_t ffa_get_vm_partinfo(struct ffa_uuid uuid, uint32_t *vm_count,
             if ( dest_ctx == curr_ctx )
                 continue;
 
-            info.id = dest_ctx->ffa_id;
-            info.execution_context = dest_ctx->num_vcpus;
-            info.partition_properties = FFA_PART_VM_PROP;
-            if ( dest_ctx->is_64bit )
-                info.partition_properties |= FFA_PART_PROP_AARCH64_STATE;
-
-            ret = ffa_copy_info(dst_buf, end_buf, &info, dst_size,
-                                sizeof(info));
-            if ( ret )
+            if ( idx >= start_index )
             {
-                read_unlock(&ffa_ctx_list_rwlock);
-                return ret;
+                info.id = dest_ctx->ffa_id;
+                info.execution_context = dest_ctx->num_vcpus;
+                info.partition_properties = FFA_PART_VM_PROP;
+                if ( dest_ctx->is_64bit )
+                    info.partition_properties |= FFA_PART_PROP_AARCH64_STATE;
+
+                ret = ffa_copy_info(dst_buf, end_buf, &info, dst_size,
+                                    sizeof(info));
+                if ( ret )
+                {
+                    read_unlock(&ffa_ctx_list_rwlock);
+                    return ret;
+                }
+                count++;
             }
 
-            count++;
+            idx++;
         }
         read_unlock(&ffa_ctx_list_rwlock);
     }
@@ -355,7 +364,7 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
             goto out_rx_release;
     }
 
-    ret = ffa_get_vm_partinfo(uuid, &ffa_vm_count, &dst_buf, end_buf,
+    ret = ffa_get_vm_partinfo(uuid, 0, &ffa_vm_count, &dst_buf, end_buf,
                               dst_size);
 
 out_rx_release:
