@@ -30,11 +30,6 @@
         printk(XENLOG_DEBUG "AMD-CPPC: CPU%u " fmt, cpu, ## args);  \
 })
 
-/*
- * Core max frequency read from PstateDef as anchor point
- * for freq-to-perf transition
- */
-static DEFINE_PER_CPU_READ_MOSTLY(unsigned int, pxfreq_mhz);
 #ifndef NDEBUG
 static bool __ro_after_init opt_active_mode;
 #else
@@ -117,7 +112,7 @@ static int amd_cppc_khz_to_perf(const struct amd_cppc_drv_data *data,
     {
         /* Read Processor Max Speed(MHz) as anchor point */
         mul = data->caps.highest_perf;
-        div = this_cpu(pxfreq_mhz);
+        div = data->pxfreq_mhz;
         if ( !div )
             return -EOPNOTSUPP;
     }
@@ -160,7 +155,7 @@ static int amd_get_cpc_freq(const struct amd_cppc_drv_data *data,
     }
 
     /* Read Processor Max Speed(MHz) as anchor point */
-    mul = this_cpu(pxfreq_mhz);
+    mul = data->pxfreq_mhz;
     if ( !mul )
         return -EOPNOTSUPP;
     div = data->caps.highest_perf;
@@ -287,7 +282,7 @@ static void cf_check amd_cppc_init_msrs(void *info)
     }
 
     amd_process_freq(&cpu_data[policy->cpu],
-                     NULL, NULL, &this_cpu(pxfreq_mhz));
+                     NULL, NULL, &data->pxfreq_mhz);
 
     data->err = amd_get_cpc_freq(data, data->cppc_data->cpc.lowest_mhz,
                                  data->caps.lowest_perf, &min_freq);

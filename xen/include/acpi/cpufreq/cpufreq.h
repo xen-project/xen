@@ -145,6 +145,12 @@ struct amd_cppc_drv_data {
 
     uint8_t epp_init;
 
+    /*
+     * Core max frequency read from PstateDef as anchor point
+     * for freq-to-perf transition
+     */
+    unsigned int pxfreq_mhz;
+
     int err;
 };
 
