@@ -289,7 +289,7 @@
 #define FFA_MSG_SEND2                   0x84000086U
 #define FFA_CONSOLE_LOG_32              0x8400008AU
 #define FFA_CONSOLE_LOG_64              0xC400008AU
-#define FFA_PARTITION_INFO_GET_REGS     0x8400008BU
+#define FFA_PARTITION_INFO_GET_REGS     0xC400008BU
 #define FFA_MSG_SEND_DIRECT_REQ2        0xC400008DU
 #define FFA_MSG_SEND_DIRECT_RESP2       0xC400008EU
 
@@ -452,6 +452,8 @@ bool ffa_partinfo_init(void);
 int32_t ffa_partinfo_domain_init(struct domain *d);
 bool ffa_partinfo_domain_destroy(struct domain *d);
 void ffa_handle_partition_info_get(struct cpu_user_regs *regs);
+void ffa_handle_partition_info_get_regs(struct cpu_user_regs *regs);
+void ffa_partinfo_inc_tag(void);
 
 int32_t ffa_endpoint_domain_lookup(uint16_t endpoint_id, struct domain **d_out,
                                    struct ffa_ctx **ctx_out);

@@ -44,6 +44,11 @@
  *   - doesn't support signalling the secondary scheduler of pending
  *     notification for secure partitions
  *   - doesn't support notifications for Xen itself
+ * o FFA_PARTITION_INFO_GET/GET_REGS:
+ *   - v1.0 guests may see duplicate SP IDs when firmware provides UUIDs
+ *   - SP list is cached at init; SPMC tag changes are not tracked
+ *     between calls
+ *   - SP list is capped at FFA_MAX_NUM_SP entries
  *
  * There are some large locked sections with ffa_spmc_tx_lock and
  * ffa_spmc_rx_lock. Especially the ffa_spmc_tx_lock spinlock used
@@ -184,10 +189,11 @@ static bool ffa_negotiate_version(struct cpu_user_regs *regs)
 
         if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) )
         {
-            /* One more VM with FF-A support available */
-            inc_ffa_vm_count();
             write_lock(&ffa_ctx_list_rwlock);
+            /* Publish VM membership changes atomically with tag updates. */
+            inc_ffa_vm_count();
             list_add_tail(&ctx->ctx_list, &ffa_ctx_head);
+            ffa_partinfo_inc_tag();
             write_unlock(&ffa_ctx_list_rwlock);
         }
 
@@ -342,6 +348,12 @@ static void handle_features(struct cpu_user_regs *regs)
     case FFA_FEATURE_SCHEDULE_RECV_INTR:
         ffa_set_regs_success(regs, GUEST_FFA_SCHEDULE_RECV_INTR_ID, 0);
         break;
+    case FFA_PARTITION_INFO_GET_REGS:
+        if ( ACCESS_ONCE(ctx->guest_vers) >= FFA_VERSION_1_2 )
+            ffa_set_regs_success(regs, 0, 0);
+        else
+            ffa_set_regs_error(regs, FFA_RET_NOT_SUPPORTED);
+        break;
 
     case FFA_NOTIFICATION_BIND:
     case FFA_NOTIFICATION_UNBIND:
@@ -402,6 +414,9 @@ static bool ffa_handle_call(struct cpu_user_regs *regs)
         break;
     case FFA_PARTITION_INFO_GET:
         ffa_handle_partition_info_get(regs);
+        return true;
+    case FFA_PARTITION_INFO_GET_REGS:
+        ffa_handle_partition_info_get_regs(regs);
         return true;
     case FFA_RX_RELEASE:
         e = ffa_rx_release(ctx);
@@ -626,9 +641,11 @@ static int ffa_domain_teardown(struct domain *d)
 
     if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) && ACCESS_ONCE(ctx->guest_vers) )
     {
-        dec_ffa_vm_count();
         write_lock(&ffa_ctx_list_rwlock);
+        /* Publish VM membership changes atomically with tag updates. */
+        dec_ffa_vm_count();
         list_del(&ctx->ctx_list);
+        ffa_partinfo_inc_tag();
         write_unlock(&ffa_ctx_list_rwlock);
     }
 

@@ -29,10 +29,40 @@ struct ffa_partition_info_1_1 {
     uint8_t uuid[16];
 };
 
+/* Registers a3..a17 (15 regs) carry partition descriptors, 3 regs each. */
+#define FFA_PARTINFO_REG_MAX_ENTRIES \
+    ((15 * sizeof(uint64_t)) / sizeof(struct ffa_partition_info_1_1))
+
 /* SP list cache (secure endpoints only); populated at init. */
 static void *sp_list __read_mostly;
 static uint32_t sp_list_count __read_mostly;
 static uint32_t sp_list_entry_size __read_mostly;
+
+/* SP list is static; tag only moves when VMs are added/removed. */
+static atomic_t ffa_partinfo_tag = ATOMIC_INIT(1);
+
+void ffa_partinfo_inc_tag(void)
+{
+    atomic_inc(&ffa_partinfo_tag);
+}
+
+static inline uint16_t ffa_partinfo_get_tag(void)
+{
+    /*
+     * Tag moves with VM list changes only.
+     *
+     * Limitation: we cannot detect an SPMC tag change between calls because we
+     * do not retain the previous SPMC tag; we only refresh it via the mandatory
+     * start_index=0 call and assume it stays stable while combined_tag (our
+     * VM/SP-count tag) is used for guest validation. This means SPMC tag
+     * changes alone will not trigger RETRY.
+     */
+    if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) )
+        return atomic_read(&ffa_partinfo_tag) & GENMASK(15, 0);
+    else
+        return 1;
+}
+
 static int32_t ffa_partition_info_get(struct ffa_uuid uuid, uint32_t flags,
                                       uint32_t *count, uint32_t *fpi_size)
 {
@@ -140,6 +170,7 @@ static int32_t ffa_get_sp_partinfo(struct ffa_uuid uuid, uint32_t *sp_count,
     for ( n = 0; n < sp_list_count; n++ )
     {
         void *entry = sp_list + n * sp_list_entry_size;
+        void *dst_pos;
 
         if ( !ffa_sp_entry_matches_uuid(entry, uuid) )
             continue;
@@ -151,10 +182,19 @@ static int32_t ffa_get_sp_partinfo(struct ffa_uuid uuid, uint32_t *sp_count,
          * This is a non-compliance to the specification but 1.0 VMs should
          * handle that on their own to simplify Xen implementation.
          */
+        dst_pos = *dst_buf;
         ret = ffa_copy_info(dst_buf, end_buf, entry, dst_size,
                             sp_list_entry_size);
         if ( ret )
             return ret;
+
+        if ( !ffa_uuid_is_nil(uuid) &&
+             dst_size >= sizeof(struct ffa_partition_info_1_1) )
+        {
+            struct ffa_partition_info_1_1 *fpi = dst_pos;
+
+            memset(fpi->uuid, 0, sizeof(fpi->uuid));
+        }
 
         count++;
     }
@@ -165,6 +205,38 @@ static int32_t ffa_get_sp_partinfo(struct ffa_uuid uuid, uint32_t *sp_count,
         return FFA_RET_INVALID_PARAMETERS;
 
     return FFA_RET_OK;
+}
+
+static uint16_t ffa_get_sp_partinfo_regs(struct ffa_uuid uuid,
+                                         uint16_t start_index,
+                                         uint64_t *out_regs,
+                                         uint16_t max_entries)
+{
+    uint32_t idx = 0;
+    uint16_t filled = 0;
+    uint32_t n;
+
+    for ( n = 0; n < sp_list_count && filled < max_entries; n++ )
+    {
+        void *entry = sp_list + n * sp_list_entry_size;
+
+        if ( !ffa_sp_entry_matches_uuid(entry, uuid) )
+            continue;
+
+        if ( idx++ < start_index )
+            continue;
+
+        memcpy(&out_regs[filled * 3], entry,
+               sizeof(struct ffa_partition_info_1_1));
+        if ( !ffa_uuid_is_nil(uuid) )
+        {
+            out_regs[filled * 3 + 1] = 0;
+            out_regs[filled * 3 + 2] = 0;
+        }
+        filled++;
+    }
+
+    return filled;
 }
 
 static int32_t ffa_get_vm_partinfo(struct ffa_uuid uuid, uint32_t start_index,
@@ -381,6 +453,135 @@ out:
 
         ffa_set_regs_success(regs, ffa_sp_count + ffa_vm_count, dst_size);
     }
+}
+
+void ffa_handle_partition_info_get_regs(struct cpu_user_regs *regs)
+{
+    struct domain *d = current->domain;
+    struct ffa_ctx *ctx = d->arch.tee;
+    struct ffa_uuid uuid;
+    uint32_t sp_count = 0, vm_count = 0, total_count;
+    uint16_t start_index, tag;
+    uint16_t num_entries = 0;
+    uint64_t x3 = get_user_reg(regs, 3);
+    int32_t ret = FFA_RET_OK;
+    uint64_t out_regs[18] = { 0 };
+    unsigned int n;
+    uint16_t tag_out, tag_end;
+
+    if ( ACCESS_ONCE(ctx->guest_vers) < FFA_VERSION_1_2 )
+    {
+        ret = FFA_RET_NOT_SUPPORTED;
+        goto out;
+    }
+
+    /*
+     * Registers a3..a17 (15 regs) carry partition descriptors, 3 regs each.
+     * For FF-A 1.2, that yields a maximum of 5 entries per GET_REGS call.
+     * Enforce the assumed layout so window sizing stays correct.
+     */
+    BUILD_BUG_ON(FFA_PARTINFO_REG_MAX_ENTRIES != 5);
+
+    start_index = x3 & GENMASK(15, 0);
+    tag = (x3 >> 16) & GENMASK(15, 0);
+
+    /* Start index must allow room for up to 5 entries without overflow. */
+    if ( start_index > (GENMASK(15, 0) - (FFA_PARTINFO_REG_MAX_ENTRIES - 1)) )
+    {
+        ret = FFA_RET_INVALID_PARAMETERS;
+        goto out;
+    }
+
+    uuid.val[0] = get_user_reg(regs, 1);
+    uuid.val[1] = get_user_reg(regs, 2);
+
+    tag_out = ffa_partinfo_get_tag();
+
+    if ( start_index == 0 )
+    {
+        if ( tag )
+        {
+            ret = FFA_RET_INVALID_PARAMETERS;
+            goto out;
+        }
+    }
+    else if ( tag != tag_out )
+    {
+        ret = FFA_RET_RETRY;
+        goto out;
+    }
+
+    if ( ffa_uuid_is_nil(uuid) )
+    {
+        if ( IS_ENABLED(CONFIG_FFA_VM_TO_VM) )
+            vm_count = get_ffa_vm_count();
+        else
+            vm_count = 1; /* Caller VM only */
+    }
+
+    ret = ffa_get_sp_count(uuid, &sp_count);
+    if ( ret )
+        goto out;
+
+    total_count = sp_count + vm_count;
+
+    if ( total_count == 0 || start_index >= total_count )
+    {
+        ret = FFA_RET_INVALID_PARAMETERS;
+        goto out;
+    }
+
+    if ( start_index < sp_count )
+        num_entries = ffa_get_sp_partinfo_regs(uuid, start_index, &out_regs[3],
+                                               FFA_PARTINFO_REG_MAX_ENTRIES);
+
+    if ( num_entries < FFA_PARTINFO_REG_MAX_ENTRIES )
+    {
+        uint32_t vm_start = start_index > sp_count ?
+                            start_index - sp_count : 0;
+        uint32_t filled = 0;
+        void *vm_dst = &out_regs[3 + num_entries * 3];
+        void *vm_end = &out_regs[18];
+
+        ret = ffa_get_vm_partinfo(uuid, vm_start, &filled, &vm_dst, vm_end,
+                                  sizeof(struct ffa_partition_info_1_1));
+        if ( ret != FFA_RET_OK && ret != FFA_RET_NO_MEMORY )
+            goto out;
+
+        num_entries += filled;
+    }
+
+    if ( num_entries == 0 )
+    {
+        ret = FFA_RET_INVALID_PARAMETERS;
+        goto out;
+    }
+
+    /*
+     * Detect list changes while building the response so the caller can retry
+     * with a coherent snapshot tag.
+     */
+    tag_end = ffa_partinfo_get_tag();
+    if ( tag_end != tag_out )
+    {
+        ret = FFA_RET_RETRY;
+        goto out;
+    }
+
+    out_regs[0] = FFA_SUCCESS_64;
+    out_regs[2] = ((uint64_t)sizeof(struct ffa_partition_info_1_1) << 48) |
+                  ((uint64_t)tag_end << 32) |
+                  ((uint64_t)(start_index + num_entries - 1) << 16) |
+                  ((uint64_t)(total_count - 1) & GENMASK(15, 0));
+
+    for ( n = 0; n < ARRAY_SIZE(out_regs); n++ )
+        set_user_reg(regs, n, out_regs[n]);
+
+    return;
+
+out:
+    if ( ret )
+        ffa_set_regs_error(regs, ret);
 }
 
 static int32_t ffa_direct_req_send_vm(uint16_t sp_id, uint16_t vm_id,
