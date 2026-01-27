@@ -28,7 +28,7 @@ config ARCH_DEFCONFIG
 	default "arch/arm/configs/arm64_defconfig" if ARM_64
 
 config XEN_START_ADDRESS
-	hex "Xen start address: keep default to use platform defined address"
+	hex "Xen start address"
 	default 0xFFFFFFFF
 	depends on MPU
 	help
