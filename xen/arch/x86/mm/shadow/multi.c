@@ -1970,14 +1970,14 @@ static void sh_prefetch(struct vcpu *v, walk_t *gw,
 
 #if GUEST_PAGING_LEVELS == 4
 typedef u64 guest_va_t;
-typedef u64 guest_pa_t;
 #elif GUEST_PAGING_LEVELS == 3
 typedef u32 guest_va_t;
-typedef u64 guest_pa_t;
 #else
 typedef u32 guest_va_t;
-typedef u32 guest_pa_t;
 #endif
+
+/* Size (in bytes) of a guest PTE */
+#define GUEST_PTE_SIZE sizeof(guest_l1e_t)
 
 /* Shadow trace event with GUEST_PAGING_LEVELS folded into the event field. */
 static void sh_trace(uint32_t event, unsigned int extra, const void *extra_data)
@@ -2048,11 +2048,14 @@ static void __maybe_unused sh_trace_gfn_va(uint32_t event, gfn_t gfn,
 static DEFINE_PER_CPU(guest_va_t,trace_emulate_initial_va);
 static DEFINE_PER_CPU(int,trace_extra_emulation_count);
 #endif
-static DEFINE_PER_CPU(guest_pa_t,trace_emulate_write_val);
+static DEFINE_PER_CPU(guest_l1e_t, trace_emulate_write_val);
 
 static void cf_check trace_emulate_write_val(
     const void *ptr, unsigned long vaddr, const void *src, unsigned int bytes)
 {
+    if ( bytes > sizeof(this_cpu(trace_emulate_write_val)) )
+        bytes = sizeof(this_cpu(trace_emulate_write_val));
+
 #if GUEST_PAGING_LEVELS == 3
     if ( vaddr == this_cpu(trace_emulate_initial_va) )
         memcpy(&this_cpu(trace_emulate_write_val), src, bytes);
@@ -2077,13 +2080,16 @@ static inline void sh_trace_emulate(guest_l1e_t gl1e, unsigned long va)
             /*
              * For GUEST_PAGING_LEVELS=3 (PAE paging), guest_l1e is 64 while
              * guest_va is 32.  Put it first to avoid padding.
+             *
+             * Note: .write_val is an arbitrary set of written bytes, possibly
+             * misaligned and possibly spanning the next gl1e.
              */
             guest_l1e_t gl1e, write_val;
             guest_va_t va;
             uint32_t flags:29, emulation_count:3;
         } d = {
             .gl1e            = gl1e,
-            .write_val.l1    = this_cpu(trace_emulate_write_val),
+            .write_val       = this_cpu(trace_emulate_write_val),
             .va              = va,
 #if GUEST_PAGING_LEVELS == 3
             .emulation_count = this_cpu(trace_extra_emulation_count),
@@ -2672,7 +2678,7 @@ static int cf_check sh_page_fault(
     paging_unlock(d);
     put_gfn(d, gfn_x(gfn));
 
-    this_cpu(trace_emulate_write_val) = 0;
+    this_cpu(trace_emulate_write_val) = (guest_l1e_t){};
 
 #if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
  early_emulation:
