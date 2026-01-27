@@ -31,81 +31,6 @@
 })
 
 /*
- * Field highest_perf, nominal_perf, lowest_nonlinear_perf, and lowest_perf
- * contain the values read from CPPC capability MSR. They represent the limits
- * of managed performance range as well as the dynamic capability, which may
- * change during processor operation
- * Field highest_perf represents highest performance, which is the absolute
- * maximum performance an individual processor may reach, assuming ideal
- * conditions. This performance level may not be sustainable for long
- * durations and may only be achievable if other platform components
- * are in a specific state; for example, it may require other processors be
- * in an idle state. This would be equivalent to the highest frequencies
- * supported by the processor.
- * Field nominal_perf represents maximum sustained performance level of the
- * processor, assuming ideal operating conditions. All cores/processors are
- * expected to be able to sustain their nominal performance state
- * simultaneously.
- * Field lowest_nonlinear_perf represents Lowest Nonlinear Performance, which
- * is the lowest performance level at which nonlinear power savings are
- * achieved. Above this threshold, lower performance levels should be
- * generally more energy efficient than higher performance levels. So in
- * traditional terms, this represents the P-state range of performance levels.
- * Field lowest_perf represents the absolute lowest performance level of the
- * platform. Selecting it may cause an efficiency penalty but should reduce
- * the instantaneous power consumption of the processor. So in traditional
- * terms, this represents the T-state range of performance levels.
- *
- * Field max_perf, min_perf, des_perf store the values for CPPC request MSR.
- * Software passes performance goals through these fields.
- * Field max_perf conveys the maximum performance level at which the platform
- * may run. And it may be set to any performance value in the range
- * [lowest_perf, highest_perf], inclusive.
- * Field min_perf conveys the minimum performance level at which the platform
- * may run. And it may be set to any performance value in the range
- * [lowest_perf, highest_perf], inclusive but must be less than or equal to
- * max_perf.
- * Field des_perf conveys performance level Xen governor is requesting. And it
- * may be set to any performance value in the range [min_perf, max_perf],
- * inclusive. In active mode, des_perf must be zero.
- * Field epp represents energy performance preference, which only has meaning
- * when active mode is enabled. The EPP is used in the CCLK DPM controller
- * to drive the frequency that a core is going to operate during short periods
- * of activity, called minimum active frequency, It could contatin a range of
- * values from 0 to 0xff. An EPP of zero sets the min active frequency to
- * maximum frequency, while an EPP of 0xff sets the min active frequency to
- * approxiately Idle frequency.
- */
-struct amd_cppc_drv_data
-{
-    const struct xen_processor_cppc *cppc_data;
-    union {
-        uint64_t raw;
-        struct {
-            unsigned int lowest_perf:8;
-            unsigned int lowest_nonlinear_perf:8;
-            unsigned int nominal_perf:8;
-            unsigned int highest_perf:8;
-            unsigned int :32;
-        };
-    } caps;
-    union {
-        uint64_t raw;
-        struct {
-            unsigned int max_perf:8;
-            unsigned int min_perf:8;
-            unsigned int des_perf:8;
-            unsigned int epp:8;
-            unsigned int :32;
-        };
-    } req;
-
-    int err;
-};
-
-static DEFINE_PER_CPU_READ_MOSTLY(struct amd_cppc_drv_data *,
-                                  amd_cppc_drv_data);
-/*
  * Core max frequency read from PstateDef as anchor point
  * for freq-to-perf transition
  */
@@ -279,11 +204,11 @@ static void cf_check amd_cppc_write_request_msrs(void *info)
     wrmsrl(MSR_AMD_CPPC_REQ, data->req.raw);
 }
 
-static void amd_cppc_write_request(unsigned int cpu, uint8_t min_perf,
-                                   uint8_t des_perf, uint8_t max_perf,
-                                   uint8_t epp)
+static void amd_cppc_write_request(struct cpufreq_policy *policy,
+                                   uint8_t min_perf, uint8_t des_perf,
+                                   uint8_t max_perf, uint8_t epp)
 {
-    struct amd_cppc_drv_data *data = per_cpu(amd_cppc_drv_data, cpu);
+    struct amd_cppc_drv_data *data = &policy->drv_data.amd_cppc;
     uint64_t prev = data->req.raw;
 
     data->req.min_perf = min_perf;
@@ -295,15 +220,15 @@ static void amd_cppc_write_request(unsigned int cpu, uint8_t min_perf,
     if ( prev == data->req.raw )
         return;
 
-    on_selected_cpus(cpumask_of(cpu), amd_cppc_write_request_msrs, data, 1);
+    on_selected_cpus(cpumask_of(policy->cpu), amd_cppc_write_request_msrs,
+                     data, 1);
 }
 
 static int cf_check amd_cppc_cpufreq_target(struct cpufreq_policy *policy,
                                             unsigned int target_freq,
                                             unsigned int relation)
 {
-    unsigned int cpu = policy->cpu;
-    const struct amd_cppc_drv_data *data = per_cpu(amd_cppc_drv_data, cpu);
+    const struct amd_cppc_drv_data *data = &policy->drv_data.amd_cppc;
     uint8_t des_perf;
     int res;
 
@@ -320,7 +245,7 @@ static int cf_check amd_cppc_cpufreq_target(struct cpufreq_policy *policy,
      * may actually cause an efficiency penalty, So when deciding the min_perf
      * value, we prefer lowest nonlinear performance over lowest performance.
      */
-    amd_cppc_write_request(policy->cpu, data->caps.lowest_nonlinear_perf,
+    amd_cppc_write_request(policy, data->caps.lowest_nonlinear_perf,
                            des_perf, data->caps.highest_perf,
                            /* Pre-defined BIOS value for passive mode */
                            per_cpu(epp_init, policy->cpu));
@@ -330,7 +255,7 @@ static int cf_check amd_cppc_cpufreq_target(struct cpufreq_policy *policy,
 static void cf_check amd_cppc_init_msrs(void *info)
 {
     struct cpufreq_policy *policy = info;
-    struct amd_cppc_drv_data *data = this_cpu(amd_cppc_drv_data);
+    struct amd_cppc_drv_data *data = &policy->drv_data.amd_cppc;
     uint64_t val;
     unsigned int min_freq = 0, nominal_freq = 0, max_freq;
 
@@ -431,23 +356,15 @@ static void amd_cppc_boost_init(struct cpufreq_policy *policy,
 
 static int cf_check amd_cppc_cpufreq_cpu_exit(struct cpufreq_policy *policy)
 {
-    XVFREE(per_cpu(amd_cppc_drv_data, policy->cpu));
-
     return 0;
 }
 
 static int amd_cppc_cpufreq_init_perf(struct cpufreq_policy *policy)
 {
     unsigned int cpu = policy->cpu;
-    struct amd_cppc_drv_data *data;
-
-    data = xvzalloc(struct amd_cppc_drv_data);
-    if ( !data )
-        return -ENOMEM;
+    struct amd_cppc_drv_data *data = &policy->drv_data.amd_cppc;
 
     data->cppc_data = &processor_pminfo[cpu]->cppc_data;
-
-    per_cpu(amd_cppc_drv_data, cpu) = data;
 
     on_selected_cpus(cpumask_of(cpu), amd_cppc_init_msrs, policy, 1);
 
@@ -506,8 +423,7 @@ static void amd_cppc_prepare_policy(struct cpufreq_policy *policy,
                                     uint8_t *max_perf, uint8_t *min_perf,
                                     uint8_t *epp)
 {
-    const struct amd_cppc_drv_data *data = per_cpu(amd_cppc_drv_data,
-                                                   policy->cpu);
+    const struct amd_cppc_drv_data *data = &policy->drv_data.amd_cppc;
 
     /*
      * On default, set min_perf with lowest_nonlinear_perf, and max_perf
@@ -560,7 +476,7 @@ static int cf_check amd_cppc_epp_set_policy(struct cpufreq_policy *policy)
 
     amd_cppc_prepare_policy(policy, &max_perf, &min_perf, &epp);
 
-    amd_cppc_write_request(policy->cpu, min_perf,
+    amd_cppc_write_request(policy, min_perf,
                            0 /* no des_perf in active mode */,
                            max_perf, epp);
     return 0;
