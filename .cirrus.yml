@@ -2,8 +2,8 @@
 freebsd_versions: &FREEBSD_VERSIONS
   env:
     FREEBSD_LEGACY:     freebsd-13-5
-    FREEBSD_PRODUCTION: freebsd-14-2
-    FREEBSD_CURRENT:    freebsd-15-0-snap
+    FREEBSD_PRODUCTION: freebsd-14-3
+    FREEBSD_CURRENT:    freebsd-15-0-amd64-ufs
 
 # Build jobs
 
