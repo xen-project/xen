@@ -491,6 +491,7 @@ static unsigned long per_node_avail_pages[MAX_NUMNODES];
 
 static DEFINE_SPINLOCK(heap_lock);
 static long outstanding_claims; /* total outstanding claims by all domains */
+static unsigned long per_node_outstanding_claims[MAX_NUMNODES];
 
 static unsigned long avail_heap_pages(
     unsigned int zone_lo, unsigned int zone_hi, unsigned int node)
@@ -521,10 +522,18 @@ unsigned long domain_adjust_tot_pages(struct domain *d, long pages)
     return d->tot_pages;
 }
 
-int domain_set_outstanding_pages(struct domain *d, unsigned long pages)
+int domain_set_outstanding_pages(struct domain *d, nodeid_t node,
+                                 unsigned long pages)
 {
     int ret = -ENOMEM;
     unsigned long claim, avail_pages;
+
+    if ( node != NUMA_NO_NODE &&
+         (node >= MAX_NUMNODES || !node_online(node)) )
+        return -ENOENT;
+
+    if ( !pages && node != NUMA_NO_NODE )
+        return -EINVAL;
 
     /*
      * Two locks are needed here:
@@ -539,7 +548,12 @@ int domain_set_outstanding_pages(struct domain *d, unsigned long pages)
     if ( pages == 0 )
     {
         outstanding_claims -= d->outstanding_pages;
+
+        if ( d->claim_node != NUMA_NO_NODE )
+            per_node_outstanding_claims[d->claim_node] -= d->outstanding_pages;
+
         d->outstanding_pages = 0;
+        d->claim_node = NUMA_NO_NODE;
         ret = 0;
         goto out;
     }
@@ -570,6 +584,19 @@ int domain_set_outstanding_pages(struct domain *d, unsigned long pages)
     claim = pages - domain_tot_pages(d);
     if ( claim > avail_pages )
         goto out;
+
+    if ( node != NUMA_NO_NODE )
+    {
+        avail_pages = per_node_avail_pages[node] -
+                      per_node_outstanding_claims[node];
+
+        if ( claim > avail_pages )
+            goto out;
+
+        /* Success, stake the claim against this node. */
+        d->claim_node = node;
+        per_node_outstanding_claims[node] += claim;
+    }
 
     /* yay, claim fits in available memory, stake the claim, success! */
     d->outstanding_pages = claim;
@@ -908,6 +935,20 @@ static struct page_info *get_free_buddy(unsigned int zone_lo,
      */
     for ( ; ; )
     {
+        /*
+         * Check if the node have enough available memory taking into account
+         * any active per-node claims.
+         */
+        unsigned long avail_pages = per_node_avail_pages[node] -
+                                    per_node_outstanding_claims[node];
+
+        BUG_ON(per_node_outstanding_claims[node] > per_node_avail_pages[node]);
+
+        if ( d && d->claim_node == node && !(memflags & MEMF_no_refcount) )
+            avail_pages += d->outstanding_pages;
+        if ( avail_pages < (1UL << order) )
+            goto next_node;
+
         zone = zone_hi;
         do {
             /* Check if target node can support the allocation. */
@@ -937,6 +978,7 @@ static struct page_info *get_free_buddy(unsigned int zone_lo,
             }
         } while ( zone-- > zone_lo ); /* careful: unsigned zone may wrap */
 
+ next_node:
         if ( (memflags & MEMF_exact_node) && req_node != NUMA_NO_NODE )
             return NULL;
 
@@ -1053,7 +1095,8 @@ static struct page_info *alloc_heap_pages(
     total_avail_pages -= request;
     ASSERT(total_avail_pages >= 0);
 
-    if ( d && d->outstanding_pages && !(memflags & MEMF_no_refcount) )
+    if ( d && d->outstanding_pages && !(memflags & MEMF_no_refcount) &&
+         (d->claim_node == NUMA_NO_NODE || d->claim_node == node) )
     {
         /*
          * Adjust claims in the same locked region where total_avail_pages is
@@ -1071,6 +1114,15 @@ static struct page_info *alloc_heap_pages(
          * of the claim makes no difference.
          */
         unsigned long outstanding = min(d->outstanding_pages + 0UL, request);
+
+        if ( d->claim_node != NUMA_NO_NODE )
+        {
+            BUG_ON(outstanding > per_node_outstanding_claims[node]);
+            per_node_outstanding_claims[node] -= outstanding;
+            /* Reset claim node if depleted. */
+            if ( !d->outstanding_pages )
+                d->claim_node = NUMA_NO_NODE;
+        }
 
         BUG_ON(outstanding > outstanding_claims);
         outstanding_claims -= outstanding;
