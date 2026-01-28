@@ -94,12 +94,14 @@ void *stack_base[NR_CPUS];
 
 void initialize_cpu_data(unsigned int cpu)
 {
-    struct cpuinfo_x86 c = boot_cpu_data;
+    struct cpuinfo_x86 *c = &cpu_data[cpu];
 
-    /* Must not partially clear the BSP's collected data. */
+    /* First, inherit from boot_cpu_data */
+    *c = boot_cpu_data;
+
+    /* Second, reset most of it, except if we're the BSP at early boot. */
     if ( cpu || system_state > SYS_STATE_smp_boot )
-        reset_cpuinfo(&c, true);
-    cpu_data[cpu] = c;
+        reset_cpuinfo(c, true);
 }
 
 static bool smp_store_cpu_info(unsigned int id)
