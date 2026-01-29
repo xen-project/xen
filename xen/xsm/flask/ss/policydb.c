@@ -1272,7 +1272,10 @@ static int cf_check role_read(struct policydb *p, struct hashtab *h, void *fp)
     if ( ver >= POLICYDB_VERSION_BOUNDARY )
         rc = next_entry(buf, fp, sizeof(buf[0]) * 3);
     else
+    {
         rc = next_entry(buf, fp, sizeof(buf[0]) * 2);
+        buf[2] = cpu_to_le32(0); /* gcc14 onwards */
+    }
 
     if ( rc < 0 )
         goto bad;
@@ -1343,7 +1346,10 @@ static int cf_check type_read(struct policydb *p, struct hashtab *h, void *fp)
     if ( ver >= POLICYDB_VERSION_BOUNDARY )
         rc = next_entry(buf, fp, sizeof(buf[0]) * 4);
     else
+    {
         rc = next_entry(buf, fp, sizeof(buf[0]) * 3);
+        buf[3] = cpu_to_le32(0); /* gcc14 onwards */
+    }
 
     if ( rc < 0 )
         goto bad;
@@ -1437,7 +1443,10 @@ static int cf_check user_read(struct policydb *p, struct hashtab *h, void *fp)
     if ( ver >= POLICYDB_VERSION_BOUNDARY )
         rc = next_entry(buf, fp, sizeof(buf[0]) * 3);
     else
+    {
         rc = next_entry(buf, fp, sizeof(buf[0]) * 2);
+        buf[2] = cpu_to_le32(0); /* gcc14 onwards */
+    }
 
     if ( rc < 0 )
         goto bad;
