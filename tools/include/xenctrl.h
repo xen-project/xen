@@ -1131,6 +1131,8 @@ int xc_send_debug_keys(xc_interface *xch, const char *keys);
 
 typedef struct xen_sysctl_physinfo xc_physinfo_t;
 typedef struct xen_sysctl_cputopo xc_cputopo_t;
+typedef struct xen_sysctl_host_meminfo xc_host_meminfo_t;
+typedef struct xen_sysctl_node_meminfo xc_node_meminfo_t;
 typedef struct xen_sysctl_numainfo xc_numainfo_t;
 typedef struct xen_sysctl_meminfo xc_meminfo_t;
 typedef struct xen_sysctl_pcitopoinfo xc_pcitopoinfo_t;
@@ -1150,6 +1152,8 @@ int xc_microcode_update(xc_interface *xch, const void *buf,
 int xc_get_cpu_version(xc_interface *xch, struct xenpf_pcpu_version *cpu_ver);
 int xc_get_ucode_revision(xc_interface *xch,
                           struct xenpf_ucode_revision *ucode_rev);
+int xc_meminfo(xc_interface *xch, unsigned *max_nodes,
+               xc_host_meminfo_t *meminfo);
 int xc_numainfo(xc_interface *xch, unsigned *max_nodes,
                 xc_meminfo_t *meminfo, uint32_t *distance);
 int xc_pcitopoinfo(xc_interface *xch, unsigned num_devs,

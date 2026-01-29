@@ -666,10 +666,33 @@ struct xen_sysctl_cputopoinfo {
     XEN_GUEST_HANDLE_64(xen_sysctl_cputopo_t) cputopo;
 };
 
-/* XEN_SYSCTL_numainfo */
+/* XEN_SYSCTL_numainfo and XEN_SYSCTL_host_meminfo */
 #define XEN_INVALID_MEM_SZ     (~0U)
 #define XEN_INVALID_NODE_DIST  (~0U)
 
+/* XEN_SYSCTL_host_meminfo */
+struct xen_sysctl_node_meminfo {
+    uint64_t memsize;
+    uint64_t memfree;
+    uint64_t claimed;
+};
+typedef struct xen_sysctl_node_meminfo xen_sysctl_node_meminfo_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_node_meminfo_t);
+
+/*
+ * IN:
+ *  - 'num_nodes' is maximum number of entries to populate in 'meminfo'.
+ *
+ * OUT:
+ *  - 'num_nodes' is updated to be limited by last NUMA node of the host.
+ *  - 'num_nodes' entries are written to 'meminfo'.
+ */
+struct xen_sysctl_host_meminfo {
+    uint32_t num_nodes;
+    XEN_GUEST_HANDLE_64(xen_sysctl_node_meminfo_t) meminfo;
+};
+
+/* XEN_SYSCTL_numainfo */
 struct xen_sysctl_meminfo {
     uint64_t memsize;
     uint64_t memfree;
@@ -1276,6 +1299,7 @@ struct xen_sysctl {
 /* #define XEN_SYSCTL_set_parameter              28 */
 #define XEN_SYSCTL_get_cpu_policy                29
 #define XEN_SYSCTL_dt_overlay                    30
+#define XEN_SYSCTL_host_meminfo                  31
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
     union {
         struct xen_sysctl_readconsole       readconsole;
@@ -1284,6 +1308,7 @@ struct xen_sysctl {
         struct xen_sysctl_cputopoinfo       cputopoinfo;
         struct xen_sysctl_pcitopoinfo       pcitopoinfo;
         struct xen_sysctl_numainfo          numainfo;
+        struct xen_sysctl_host_meminfo      host_meminfo;
         struct xen_sysctl_sched_id          sched_id;
         struct xen_sysctl_perfc_op          perfc_op;
         struct xen_sysctl_getdomaininfolist getdomaininfolist;
