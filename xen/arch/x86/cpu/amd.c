@@ -1023,6 +1023,13 @@ void amd_init_de_cfg(const struct cpuinfo_x86 *c)
     if ( zenbleed_use_chickenbit() )
         new |= (1 << 9);
 
+    /*
+     * Erratum #665, doc 44739.  Integer divide instructions may cause
+     * unpredictable behaviour.
+     */
+    if ( c->family == 0x12 )
+        new |= 1U << 31;
+
     /* Avoid reading DE_CFG if we don't intend to change anything. */
     if ( !new )
         return;
@@ -1309,15 +1316,6 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 					    "CPU%u: Applying workaround for erratum 793\n",
 					    smp_processor_id());
 			wrmsrl(MSR_AMD64_LS_CFG, value | (1 << 15));
-		}
-	} else if (c->x86 == 0x12) {
-		rdmsrl(MSR_AMD64_DE_CFG, value);
-		if (!(value & (1U << 31))) {
-			if (c == &boot_cpu_data || opt_cpu_info)
-				printk_once(XENLOG_WARNING
-					    "CPU%u: Applying workaround for erratum 665\n",
-					    smp_processor_id());
-			wrmsrl(MSR_AMD64_DE_CFG, value | (1U << 31));
 		}
 	}
 
