@@ -2044,6 +2044,7 @@ static void __maybe_unused sh_trace_gfn_va(uint32_t event, gfn_t gfn,
 }
 
 #ifdef CONFIG_HVM
+#ifdef CONFIG_TRACEBUFFER
 #if GUEST_PAGING_LEVELS == 3
 static DEFINE_PER_CPU(guest_va_t,trace_emulate_initial_va);
 static DEFINE_PER_CPU(int,trace_extra_emulation_count);
@@ -2071,9 +2072,11 @@ static void cf_check trace_emulate_write_val(
     memcpy(&this_cpu(trace_emulate_write_val), src, bytes);
 #endif
 }
+#endif /* CONFIG_TRACEBUFFER */
 
 static inline void sh_trace_emulate(guest_l1e_t gl1e, unsigned long va)
 {
+#ifdef CONFIG_TRACEBUFFER
     if ( tb_init_done )
     {
         struct __packed {
@@ -2099,6 +2102,7 @@ static inline void sh_trace_emulate(guest_l1e_t gl1e, unsigned long va)
 
         sh_trace(TRC_SHADOW_EMULATE, sizeof(d), &d);
     }
+#endif /* CONFIG_TRACEBUFFER */
 }
 #endif /* CONFIG_HVM */
 
@@ -2678,7 +2682,9 @@ static int cf_check sh_page_fault(
     paging_unlock(d);
     put_gfn(d, gfn_x(gfn));
 
+#ifdef CONFIG_TRACEBUFFER
     this_cpu(trace_emulate_write_val) = (guest_l1e_t){};
+#endif
 
 #if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
  early_emulation:
@@ -2794,7 +2800,10 @@ static int cf_check sh_page_fault(
     if ( r == X86EMUL_OKAY && !emul_ctxt.ctxt.retire.raw )
     {
         int i, emulation_count=0;
+
+#ifdef CONFIG_TRACEBUFFER
         this_cpu(trace_emulate_initial_va) = va;
+#endif
 
         for ( i = 0 ; i < 4 ; i++ )
         {
@@ -2830,7 +2839,10 @@ static int cf_check sh_page_fault(
                 break; /* Don't emulate again if we failed! */
             }
         }
+
+#ifdef CONFIG_TRACEBUFFER
         this_cpu(trace_extra_emulation_count)=emulation_count;
+#endif
     }
 #endif /* PAE guest */
 
@@ -4130,7 +4142,9 @@ const struct paging_mode sh_paging_mode = {
     .shadow.guess_wrmap            = sh_guess_wrmap,
 #endif
     .shadow.pagetable_dying        = sh_pagetable_dying,
+#ifdef CONFIG_TRACEBUFFER
     .shadow.trace_emul_write_val   = trace_emulate_write_val,
+#endif /* CONFIG_TRACEBUFFER */
 #endif /* CONFIG_HVM */
     .shadow.shadow_levels          = SHADOW_PAGING_LEVELS,
 };

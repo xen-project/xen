@@ -211,9 +211,11 @@ hvm_emulate_write(enum x86_segment seg,
     default: memcpy(ptr, p_data, bytes);                break;
     }
 
+#ifdef CONFIG_TRACEBUFFER
     if ( tb_init_done )
         v->arch.paging.mode->shadow.trace_emul_write_val(ptr, addr,
                                                          p_data, bytes);
+#endif
 
     sh_emulate_unmap_dest(v, ptr, bytes, sh_ctxt);
     shadow_audit_tables(v);

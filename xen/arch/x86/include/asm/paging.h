@@ -90,10 +90,12 @@ struct shadow_paging_mode {
     int           (*guess_wrmap           )(struct vcpu *v, 
                                             unsigned long vaddr, mfn_t gmfn);
     void          (*pagetable_dying       )(paddr_t gpa);
+#ifdef CONFIG_TRACEBUFFER
     void          (*trace_emul_write_val  )(const void *ptr, unsigned long vaddr,
                                             const void *src, unsigned int bytes);
-#endif
-#endif
+#endif /* CONFIG_TRACEBUFFER */
+#endif /* CONFIG_HVM */
+#endif /* CONFIG_SHADOW_PAGING */
     /* For outsiders to tell what mode we're in */
     unsigned int shadow_levels;
 };
