@@ -494,7 +494,8 @@ static long outstanding_claims; /* total outstanding claims by all domains */
 static unsigned long per_node_outstanding_claims[MAX_NUMNODES];
 
 static unsigned long avail_heap_pages(
-    unsigned int zone_lo, unsigned int zone_hi, unsigned int node)
+    unsigned int zone_lo, unsigned int zone_hi, unsigned int node,
+    unsigned long *claimed)
 {
     unsigned int i, zone;
     unsigned long free_pages = 0;
@@ -510,6 +511,9 @@ static unsigned long avail_heap_pages(
             if ( (node == -1) || (node == i) )
                 free_pages += avail[i][zone];
     }
+
+    if ( node != NUMA_NO_NODE && node < MAX_NUMNODES && claimed )
+        *claimed = per_node_outstanding_claims[node];
 
     return free_pages;
 }
@@ -614,7 +618,7 @@ void get_outstanding_claims(uint64_t *free_pages, uint64_t *outstanding_pages)
 {
     spin_lock(&heap_lock);
     *outstanding_pages = outstanding_claims;
-    *free_pages = avail_heap_pages(MEMZONE_XEN + 1, NR_ZONES - 1, -1);
+    *free_pages = avail_heap_pages(MEMZONE_XEN + 1, NR_ZONES - 1, -1, NULL);
     spin_unlock(&heap_lock);
 }
 #endif /* CONFIG_SYSCTL */
@@ -2865,12 +2869,18 @@ unsigned long avail_domheap_pages_region(
     zone_hi = max_width ? bits_to_zone(max_width) : (NR_ZONES - 1);
     zone_hi = max_t(int, MEMZONE_XEN + 1, min_t(int, NR_ZONES - 1, zone_hi));
 
-    return avail_heap_pages(zone_lo, zone_hi, node);
+    return avail_heap_pages(zone_lo, zone_hi, node, NULL);
 }
 
-unsigned long avail_node_heap_pages(unsigned int nodeid)
+unsigned long avail_node_heap_pages(unsigned int nodeid, unsigned long *claimed)
 {
-    return avail_heap_pages(MEMZONE_XEN, NR_ZONES -1, nodeid);
+    unsigned long avail;
+
+    spin_lock(&heap_lock);
+    avail = avail_heap_pages(MEMZONE_XEN, NR_ZONES -1, nodeid, claimed);
+    spin_unlock(&heap_lock);
+
+    return avail;
 }
 
 
@@ -2881,7 +2891,7 @@ static void cf_check pagealloc_info(unsigned char key)
 
     printk("Physical memory information:\n");
     printk("    Xen heap: %lukB free\n",
-           avail_heap_pages(zone, zone, -1) << (PAGE_SHIFT-10));
+           avail_heap_pages(zone, zone, -1, NULL) << (PAGE_SHIFT-10));
 
     while ( ++zone < NR_ZONES )
     {
@@ -2891,7 +2901,7 @@ static void cf_check pagealloc_info(unsigned char key)
             total = 0;
         }
 
-        if ( (n = avail_heap_pages(zone, zone, -1)) != 0 )
+        if ( (n = avail_heap_pages(zone, zone, -1, NULL)) != 0 )
         {
             total += n;
             printk("    heap[%02u]: %lukB free\n", zone, n << (PAGE_SHIFT-10));
