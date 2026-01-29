@@ -85,8 +85,10 @@ ifeq ($(CONFIG_ARM_64),y)
 endif
 
 $(TARGET)-syms: $(objtree)/prelink.o $(obj)/xen.lds
+	$(objtree)/tools/symbols $(all_symbols) --empty > $(dot-target).0.S
+	$(MAKE) $(build)=$(@D) $(dot-target).0.o
 	$(LD) $(XEN_LDFLAGS) -T $(obj)/xen.lds $< \
-	    $(objtree)/common/symbols-dummy.o -o $(dot-target).0
+	      $(dot-target).0.o -o $(dot-target).0
 	$(NM) -pa --format=sysv $(dot-target).0 \
 		| $(objtree)/tools/symbols $(all_symbols) --sysv --sort \
 		> $(dot-target).1.S

@@ -675,7 +675,10 @@ int main(int argc, char **argv)
 				warn_dup = true;
 			else if (strcmp(argv[i], "--error-dup") == 0)
 				warn_dup = error_dup = true;
-			else if (strcmp(argv[i], "--xensyms") == 0)
+			else if (strcmp(argv[i], "--empty") == 0) {
+				write_src();
+				return 0;
+			} else if (strcmp(argv[i], "--xensyms") == 0)
 				map_only = true;
 			else
 				usage();
