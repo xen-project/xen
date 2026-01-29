@@ -1683,6 +1683,9 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         rc = xsm_claim_pages(XSM_PRIV, d);
 
+        if ( !rc && d->is_dying )
+            rc = -EINVAL;
+
         if ( !rc )
             rc = domain_set_outstanding_pages(d, reservation.nr_extents);
 
