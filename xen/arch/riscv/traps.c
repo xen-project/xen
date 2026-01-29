@@ -99,11 +99,66 @@ static const char *decode_cause(unsigned long cause)
     return decode_trap_cause(cause);
 }
 
+static void dump_general_regs(const struct cpu_user_regs *regs)
+{
+#define X(regs, name, delim) \
+    printk("%-4s: %016lx" delim, #name, (regs)->name)
+
+    X(regs, ra, " "); X(regs, sp, "\n");
+    X(regs, gp, " "); X(regs, tp, "\n");
+    X(regs, t0, " "); X(regs, t1, "\n");
+    X(regs, t2, " "); X(regs, s0, "\n");
+    X(regs, s1, " "); X(regs, a0, "\n");
+    X(regs, a1, " "); X(regs, a2, "\n");
+    X(regs, a3, " "); X(regs, a4, "\n");
+    X(regs, a5, " "); X(regs, a6, "\n");
+    X(regs, a7, " "); X(regs, s2, "\n");
+    X(regs, s3, " "); X(regs, s4, "\n");
+    X(regs, s5, " "); X(regs, s6, "\n");
+    X(regs, s7, " "); X(regs, s8, "\n");
+    X(regs, s9, " "); X(regs, s10, "\n");
+    X(regs, s11, " "); X(regs, t3, "\n");
+    X(regs, t4, " "); X(regs, t5, "\n");
+    X(regs, t6, "\n");
+
+#undef X
+}
+
+static void dump_csrs(const char *ctx)
+{
+    unsigned long v;
+
+#define X(name, csr, fmt, ...) \
+    v = csr_read(csr); \
+    printk("%-10s: %016lx" fmt, #name, v, ##__VA_ARGS__)
+
+    X(scause, CSR_SCAUSE, " %s[%s]\n", ctx, decode_cause(v));
+
+    X(htval, CSR_HTVAL, " ");  X(htinst, CSR_HTINST, "\n");
+    X(hedeleg, CSR_HEDELEG, " "); X(hideleg, CSR_HIDELEG, "\n");
+    X(hstatus, CSR_HSTATUS, " [%s%s%s%s%s%s ]\n",
+      (v & HSTATUS_VTSR) ? " VTSR" : "",
+      (v & HSTATUS_VTVM) ? " VTVM" : "",
+      (v & HSTATUS_HU)   ? " HU"   : "",
+      (v & HSTATUS_SPVP) ? " SPVP" : "",
+      (v & HSTATUS_SPV)  ? " SPV"  : "",
+      (v & HSTATUS_GVA)  ? " GVA"  : "");
+    X(hgatp, CSR_HGATP, "\n");
+    X(hstateen0, CSR_HSTATEEN0, "\n");
+    X(stvec, CSR_STVEC, " "); X(vstvec, CSR_VSTVEC, "\n");
+    X(sepc, CSR_SEPC, " "); X(vsepc, CSR_VSEPC, "\n");
+    X(stval, CSR_STVAL, " "); X(vstval, CSR_VSTVAL, "\n");
+    X(status, CSR_SSTATUS, " "); X(vsstatus, CSR_VSSTATUS, "\n");
+    X(satp, CSR_SATP, "\n");
+    X(vscause, CSR_VSCAUSE, " [%s]\n", decode_cause(v));
+
+#undef X
+}
+
 static void do_unexpected_trap(const struct cpu_user_regs *regs)
 {
-    unsigned long cause = csr_read(CSR_SCAUSE);
-
-    printk("Unhandled exception: %s\n", decode_cause(cause));
+    dump_csrs("Unhandled exception");
+    dump_general_regs(regs);
 
     die();
 }
