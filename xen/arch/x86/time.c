@@ -1649,8 +1649,13 @@ s_time_t get_s_time_fixed(u64 at_tsc)
         tsc = at_tsc;
     else
         tsc = rdtsc_ordered();
-    delta = tsc - t->stamp.local_tsc;
-    return t->stamp.local_stime + scale_delta(delta, &t->tsc_scale);
+
+    if ( likely(tsc >= t->stamp.local_tsc) )
+        delta = scale_delta(tsc - t->stamp.local_tsc, &t->tsc_scale);
+    else
+        delta = -scale_delta(t->stamp.local_tsc - tsc, &t->tsc_scale);
+
+    return t->stamp.local_stime + delta;
 }
 
 s_time_t get_s_time(void)
