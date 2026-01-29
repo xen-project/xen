@@ -104,7 +104,7 @@ void __init setup_force_cpu_cap(unsigned int cap)
 
 bool __init is_forced_cpu_cap(unsigned int cap)
 {
-	return test_bit(cap, forced_caps);
+	return test_bit(cap, forced_caps) || test_bit(cap, cleared_caps);
 }
 
 static void cf_check default_init(struct cpuinfo_x86 * c)
