@@ -919,6 +919,7 @@ struct domain *domain_create(domid_t domid,
     spin_lock_init(&d->node_affinity_lock);
     d->node_affinity = NODE_MASK_ALL;
     d->auto_node_affinity = 1;
+    d->claim_node = NUMA_NO_NODE;
 
     spin_lock_init(&d->shutdown_lock);
     d->shutdown_code = SHUTDOWN_CODE_INVALID;
@@ -1286,7 +1287,7 @@ int domain_kill(struct domain *d)
         rspin_barrier(&d->domain_lock);
         argo_destroy(d);
         vnuma_destroy(d->vnuma);
-        domain_set_outstanding_pages(d, 0);
+        domain_set_outstanding_pages(d, NUMA_NO_NODE, 0);
         /* fallthrough */
     case DOMDYING_dying:
         rc = domain_teardown(d);

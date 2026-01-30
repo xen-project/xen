@@ -295,6 +295,45 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
     }
     break;
 
+    /*
+     * Same as XEN_SYSCTL_numainfo with meminfo only, but with claimed memory.
+     * memsize is node_present_pages(), not spanned: memory holes are excluded.
+     */
+    case XEN_SYSCTL_host_meminfo:
+    {
+        struct xen_sysctl_host_meminfo *host = &op->u.host_meminfo;
+        struct xen_sysctl_node_meminfo node;
+        unsigned long claimed;
+        unsigned int i, num_nodes =
+            max_t(uint32_t, host->num_nodes, last_node(node_online_map) + 1);
+
+        for ( i = 0; i < num_nodes; ++i )
+        {
+            if ( node_online(i) )
+            {
+                node.memsize = node_present_pages(i) << PAGE_SHIFT;
+                node.memfree = avail_node_heap_pages(i, &claimed) << PAGE_SHIFT;
+                node.claimed = claimed << PAGE_SHIFT;
+            }
+            else
+                node.memsize = node.memfree = node.claimed = XEN_INVALID_MEM_SZ;
+            if ( copy_to_guest_offset(host->meminfo, i, &node, 1) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+        }
+
+        if ( !ret && (host->num_nodes != i) )
+        {
+            host->num_nodes = i;
+            if ( __copy_field_to_guest(u_sysctl, op,
+                                       u.host_meminfo.num_nodes) )
+                ret = -EFAULT;
+        }
+    }
+    break;
+
     case XEN_SYSCTL_numainfo:
     {
         unsigned int i, j, num_nodes;
@@ -319,7 +358,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
                     if ( node_online(i) )
                     {
                         meminfo.memsize = node_spanned_pages(i) << PAGE_SHIFT;
-                        meminfo.memfree = avail_node_heap_pages(i) << PAGE_SHIFT;
+                        meminfo.memfree = avail_node_heap_pages(i, NULL) << PAGE_SHIFT;
                     }
                     else
                         meminfo.memsize = meminfo.memfree = XEN_INVALID_MEM_SZ;

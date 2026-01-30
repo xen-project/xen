@@ -291,6 +291,32 @@ out:
     return ret;
 }
 
+int xc_meminfo(xc_interface *xch, unsigned *max_nodes,
+               xc_host_meminfo_t *meminfo)
+{
+    int ret;
+    struct xen_sysctl sysctl = {};
+    DECLARE_HYPERCALL_BOUNCE(meminfo, *max_nodes * sizeof(*meminfo),
+                             XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+
+    if ( (ret = xc_hypercall_bounce_pre(xch, meminfo)) )
+        goto out;
+
+    sysctl.u.host_meminfo.num_nodes = *max_nodes;
+    set_xen_guest_handle(sysctl.u.host_meminfo.meminfo, meminfo);
+
+    sysctl.cmd = XEN_SYSCTL_host_meminfo;
+    if ( (ret = do_sysctl(xch, &sysctl)) != 0 )
+        goto out;
+
+    *max_nodes = sysctl.u.host_meminfo.num_nodes;
+
+out:
+    xc_hypercall_bounce_post(xch, meminfo);
+
+    return ret;
+}
+
 int xc_numainfo(xc_interface *xch, unsigned *max_nodes,
                 xc_meminfo_t *meminfo, uint32_t *distance)
 {

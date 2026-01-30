@@ -67,6 +67,7 @@
 #include <xen/mm-types.h>
 #include <xen/types.h>
 #include <xen/list.h>
+#include <xen/numa.h>
 #include <xen/spinlock.h>
 #include <xen/perfc.h>
 #include <public/memory.h>
@@ -131,7 +132,8 @@ int populate_pt_range(unsigned long virt, unsigned long nr_mfns);
 /* Claim handling */
 unsigned long __must_check domain_adjust_tot_pages(struct domain *d,
     long pages);
-int domain_set_outstanding_pages(struct domain *d, unsigned long pages);
+int domain_set_outstanding_pages(struct domain *d, nodeid_t node,
+    unsigned long pages);
 void get_outstanding_claims(uint64_t *free_pages, uint64_t *outstanding_pages);
 
 /* Domain suballocator. These functions are *not* interrupt-safe.*/
@@ -141,7 +143,8 @@ struct page_info *alloc_domheap_pages(
 void free_domheap_pages(struct page_info *pg, unsigned int order);
 unsigned long avail_domheap_pages_region(
     unsigned int node, unsigned int min_width, unsigned int max_width);
-unsigned long avail_node_heap_pages(unsigned int nodeid);
+unsigned long avail_node_heap_pages(unsigned int nodeid,
+                                    unsigned long *claimed);
 #define alloc_domheap_page(d,f) (alloc_domheap_pages(d,0,f))
 #define free_domheap_page(p)  (free_domheap_pages(p,0))
 
