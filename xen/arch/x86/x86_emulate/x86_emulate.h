@@ -470,13 +470,15 @@ struct x86_emulate_ops
         struct x86_emulate_ctxt *ctxt);
 
     /*
-     * write_dr: Write to model-specific register.
-     *  @reg:   [IN ] Register to write.
+     * write_msr: Write to model-specific register.
+     *  @reg:      [IN ] Register to write.
+     *  @explicit: [IN ] Whether this is an explicit WRMSR or alike.
      */
     int (*write_msr)(
         unsigned int reg,
         uint64_t val,
-        struct x86_emulate_ctxt *ctxt);
+        struct x86_emulate_ctxt *ctxt,
+        bool explicit);
 
     /*
      * cache_op: Write-back and/or invalidate cache contents.

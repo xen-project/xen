@@ -569,7 +569,8 @@ static int fuzz_read_msr(
 static int fuzz_write_msr(
     unsigned int reg,
     uint64_t val,
-    struct x86_emulate_ctxt *ctxt)
+    struct x86_emulate_ctxt *ctxt,
+    bool explicit)
 {
     struct fuzz_state *s = ctxt->data;
     struct fuzz_corpus *c = s->corpus;

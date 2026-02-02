@@ -40,7 +40,7 @@ int x86emul_0f01(struct x86_emulate_state *s,
             fail_if(!ops->write_msr);
             rc = ops->write_msr(regs->ecx,
                                 ((uint64_t)regs->r(dx) << 32) | regs->eax,
-                                ctxt);
+                                ctxt, true);
             goto done;
         }
         generate_exception(X86_EXC_UD);
@@ -194,7 +194,7 @@ int x86emul_0f01(struct x86_emulate_state *s,
              (rc = ops->read_msr(MSR_SHADOW_GS_BASE, &msr_val,
                                  ctxt)) != X86EMUL_OKAY ||
              (rc = ops->write_msr(MSR_SHADOW_GS_BASE, sreg.base,
-                                  ctxt)) != X86EMUL_OKAY )
+                                  ctxt, false)) != X86EMUL_OKAY )
             goto done;
         sreg.base = msr_val;
         if ( (rc = ops->write_segment(x86_seg_gs, &sreg,
@@ -202,7 +202,7 @@ int x86emul_0f01(struct x86_emulate_state *s,
         {
             /* Best effort unwind (i.e. no real error checking). */
             if ( ops->write_msr(MSR_SHADOW_GS_BASE, msr_val,
-                                ctxt) == X86EMUL_EXCEPTION )
+                                ctxt, false) == X86EMUL_EXCEPTION )
                 x86_emul_reset_event(ctxt);
             goto done;
         }

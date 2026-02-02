@@ -1038,7 +1038,8 @@ static int cf_check read_msr(
 }
 
 static int cf_check write_msr(
-    unsigned int reg, uint64_t val, struct x86_emulate_ctxt *ctxt)
+    unsigned int reg, uint64_t val, struct x86_emulate_ctxt *ctxt,
+    bool explicit)
 {
     struct vcpu *curr = current;
     const struct domain *currd = curr->domain;

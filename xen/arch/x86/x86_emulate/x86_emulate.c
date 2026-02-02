@@ -3814,7 +3814,7 @@ x86_emulate(
         fail_if(ops->write_msr == NULL);
         if ( (rc = ops->write_msr(_regs.ecx,
                                   ((uint64_t)_regs.r(dx) << 32) | _regs.eax,
-                                  ctxt)) != 0 )
+                                  ctxt, true)) != 0 )
             goto done;
         break;
 

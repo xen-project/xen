@@ -1705,7 +1705,8 @@ static int cf_check hvmemul_write_io_discard(
 static int cf_check hvmemul_write_msr_discard(
     unsigned int reg,
     uint64_t val,
-    struct x86_emulate_ctxt *ctxt)
+    struct x86_emulate_ctxt *ctxt,
+    bool explicit)
 {
     return X86EMUL_OKAY;
 }
@@ -2427,9 +2428,10 @@ static int cf_check hvmemul_read_msr(
 static int cf_check hvmemul_write_msr(
     unsigned int reg,
     uint64_t val,
-    struct x86_emulate_ctxt *ctxt)
+    struct x86_emulate_ctxt *ctxt,
+    bool explicit)
 {
-    int rc = hvm_msr_write_intercept(reg, val, true);
+    int rc = hvm_msr_write_intercept(reg, val, explicit);
 
     if ( rc == X86EMUL_EXCEPTION )
         x86_emul_hw_exception(X86_EXC_GP, 0, ctxt);
