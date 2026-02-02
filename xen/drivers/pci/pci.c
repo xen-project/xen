@@ -113,6 +113,12 @@ unsigned int pci_find_next_ext_capability(const struct pci_dev *pdev,
     int ttl = 480; /* 3840 bytes, minimum 8 bytes per capability */
     unsigned int pos = max(start, PCI_CFG_SPACE_SIZE + 0U);
 
+    if ( !pdev->ext_cfg )
+    {
+        ASSERT(!start);
+        return 0;
+    }
+
     header = pci_conf_read32(pdev->sbdf, pos);
 
     /*
