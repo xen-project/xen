@@ -381,7 +381,7 @@
 #define  PCI_X_STATUS_MAX_CUM	0x1c000000	/* Designed Max Cumulative Read Size */
 #define  PCI_X_STATUS_SPL_ERR	0x20000000	/* Rcvd Split Completion Error Msg */
 #define  PCI_X_STATUS_266MHZ	0x40000000	/* 266 MHz capable */
-#define  PCI_X_STATUS_533MHZ	0x80000000	/* 533 MHz capable */
+#define  PCI_X_STATUS_533MHZ	0x80000000U	/* 533 MHz capable */
 
 /* PCI Express capability registers */
 

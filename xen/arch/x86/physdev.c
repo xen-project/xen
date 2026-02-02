@@ -22,6 +22,8 @@ int physdev_map_pirq(struct domain *d, int type, int *index, int *pirq_p,
                      struct msi_info *msi);
 int physdev_unmap_pirq(struct domain *d, int pirq);
 
+int cf_check physdev_check_pci_extcfg(struct pci_dev *pdev, void *arg);
+
 #include "x86_64/mmconfig.h"
 
 #ifndef COMPAT
@@ -159,6 +161,17 @@ int physdev_unmap_pirq(struct domain *d, int pirq)
     pcidevs_unlock();
 
     return ret;
+}
+
+int cf_check physdev_check_pci_extcfg(struct pci_dev *pdev, void *arg)
+{
+    const struct physdev_pci_mmcfg_reserved *info = arg;
+
+    ASSERT(pdev->seg == info->segment);
+    if ( pdev->bus >= info->start_bus && pdev->bus <= info->end_bus )
+        pci_check_extcfg(pdev);
+
+    return 0;
 }
 #endif /* COMPAT */
 
@@ -511,6 +524,11 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         ret = pci_mmcfg_reserved(info.address, info.segment,
                                  info.start_bus, info.end_bus, info.flags);
+
+        if ( !ret )
+            ret = pci_segment_iterate(info.segment, physdev_check_pci_extcfg,
+                                      &info);
+
         if ( !ret && has_vpci(currd) && (info.flags & XEN_PCI_MMCFG_RESERVED) )
         {
             /*

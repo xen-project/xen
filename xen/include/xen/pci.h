@@ -126,6 +126,9 @@ struct pci_dev {
 
     nodeid_t node; /* NUMA node */
 
+    /* Whether the device has (accessible) extended config space. */
+    bool ext_cfg;
+
     /* Device to be quarantined, don't automatically re-assign to dom0 */
     bool quarantine;
 
@@ -242,6 +245,11 @@ void pci_check_disable_device(u16 seg, u8 bus, u8 devfn);
 int pci_iterate_devices(int (*handler)(struct pci_dev *pdev, void *arg),
                         void *arg);
 
+/* Iterate a single PCI segment, with locking but without preemption. */
+int pci_segment_iterate(unsigned int segment,
+                        int (*handler)(struct pci_dev *pdev, void *arg),
+                        void *arg);
+
 uint8_t pci_conf_read8(pci_sbdf_t sbdf, unsigned int reg);
 uint16_t pci_conf_read16(pci_sbdf_t sbdf, unsigned int reg);
 uint32_t pci_conf_read32(pci_sbdf_t sbdf, unsigned int reg);
@@ -260,6 +268,7 @@ unsigned int pci_find_next_cap_ttl(pci_sbdf_t sbdf, unsigned int pos,
                                    unsigned int *ttl);
 unsigned int pci_find_next_cap(pci_sbdf_t sbdf, unsigned int pos,
                                unsigned int cap);
+void pci_check_extcfg(struct pci_dev *pdev);
 unsigned int pci_find_ext_capability(const struct pci_dev *pdev,
                                      unsigned int cap);
 unsigned int pci_find_next_ext_capability(const struct pci_dev *pdev,

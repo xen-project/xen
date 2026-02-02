@@ -183,6 +183,7 @@ custom_param("pci-phantom", parse_phantom_dev);
 
 static u16 __read_mostly command_mask;
 static u16 __read_mostly bridge_ctl_mask;
+static bool __ro_after_init opt_pci_quirks = true;
 
 static int __init cf_check parse_pci_param(const char *s)
 {
@@ -207,6 +208,8 @@ static int __init cf_check parse_pci_param(const char *s)
             cmd_mask = PCI_COMMAND_PARITY;
             brctl_mask = PCI_BRIDGE_CTL_PARITY;
         }
+        else if ( (val = parse_boolean("quirks", s, ss)) >= 0 )
+            opt_pci_quirks = val;
         else
             rc = -EINVAL;
 
@@ -422,6 +425,9 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
     }
 
     apply_quirks(pdev);
+
+    pci_check_extcfg(pdev);
+
     check_pdev(pdev);
 
     return pdev;
@@ -719,6 +725,11 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
 
                 list_add(&pdev->vf_list, &pf_pdev->vf_list);
             }
+
+            if ( !pdev->ext_cfg )
+                printk(XENLOG_WARNING
+                       "%pp: VF without extended config space?\n",
+                       &pdev->sbdf);
         }
     }
 
@@ -1040,6 +1051,79 @@ enum pdev_type pdev_type(u16 seg, u8 bus, u8 devfn)
 
     /* NB: treat legacy pre PCI 2.0 devices (class_device == 0) as endpoints. */
     return pos ? DEV_TYPE_PCIe_ENDPOINT : DEV_TYPE_PCI;
+}
+
+void pci_check_extcfg(struct pci_dev *pdev)
+{
+    unsigned int pos;
+
+    pdev->ext_cfg = false;
+
+    switch ( pdev->type )
+    {
+    case DEV_TYPE_PCIe_ENDPOINT:
+    case DEV_TYPE_PCIe_BRIDGE:
+    case DEV_TYPE_PCI_HOST_BRIDGE:
+    case DEV_TYPE_PCIe2PCI_BRIDGE:
+    case DEV_TYPE_PCI2PCIe_BRIDGE:
+        break;
+
+    case DEV_TYPE_LEGACY_PCI_BRIDGE:
+    case DEV_TYPE_PCI:
+        pos = pci_find_cap_offset(pdev->sbdf, PCI_CAP_ID_PCIX);
+        if ( !pos ||
+             !(pci_conf_read32(pdev->sbdf, pos + PCI_X_STATUS) &
+               (PCI_X_STATUS_266MHZ | PCI_X_STATUS_533MHZ)) )
+            return;
+        break;
+
+    default:
+        return;
+    }
+
+    /*
+     * Regular PCI devices have 256 bytes, but PCI-X 2 and PCI Express devices
+     * have 4096 bytes.  Even if the device is capable, that doesn't mean we
+     * can access it.  Maybe we don't have a way to generate extended config
+     * space accesses, or the device is behind a reverse Express bridge.  So
+     * we try reading the dword at PCI_CFG_SPACE_SIZE which must either be 0
+     * or a valid extended capability header.
+     */
+    if ( pci_conf_read32(pdev->sbdf, PCI_CFG_SPACE_SIZE) == 0xffffffffU )
+        return;
+
+    if ( opt_pci_quirks )
+    {
+        /*
+         * PCI Express to PCI/PCI-X Bridge Specification, rev 1.0, 4.1.4 says
+         * that when forwarding a type1 configuration request the bridge must
+         * check that the extended register address field is zero.  The bridge
+         * is not permitted to forward the transactions and must handle it as
+         * an Unsupported Request.  Some bridges do not follow this rule and
+         * simply drop the extended register bits, resulting in the standard
+         * config space being aliased, every 256 bytes across the entire
+         * configuration space.  Test for this condition by comparing the first
+         * dword of each potential alias to the vendor/device ID.
+         * Known offenders:
+         *   ASM1083/1085 PCIe-to-PCI Reversible Bridge (1b21:1080, rev 01 & 03)
+         *   AMD/ATI SBx00 PCI to PCI Bridge (1002:4384, rev 40)
+         */
+        unsigned int sig = pci_conf_read32(pdev->sbdf, PCI_VENDOR_ID);
+
+        for ( pos = PCI_CFG_SPACE_SIZE;
+              pos < PCI_CFG_SPACE_EXP_SIZE; pos += PCI_CFG_SPACE_SIZE )
+            if ( pci_conf_read32(pdev->sbdf, pos) != sig )
+                break;
+
+        if ( pos >= PCI_CFG_SPACE_EXP_SIZE )
+        {
+            printk(XENLOG_WARNING "%pp: extended config space aliases base one\n",
+                   &pdev->sbdf);
+            return;
+        }
+    }
+
+    pdev->ext_cfg = true;
 }
 
 /*
@@ -1840,6 +1924,29 @@ int pci_iterate_devices(int (*handler)(struct pci_dev *pdev, void *arg),
     };
 
     return pci_segments_iterate(iterate_all, &iter) ?: iter.rc;
+}
+
+/* Iterate a single PCI segment, with locking but without preemption. */
+int pci_segment_iterate(unsigned int segment,
+                        int (*handler)(struct pci_dev *pdev, void *arg),
+                        void *arg)
+{
+    struct pci_seg *seg = get_pseg(segment);
+    struct segment_iter iter = {
+        .handler = handler,
+        .arg = arg,
+    };
+
+    if ( !seg )
+        return -ENODEV;
+
+    pcidevs_lock();
+
+    iter.rc = iterate_all(seg, &iter) ?: iter.rc;
+
+    pcidevs_unlock();
+
+    return iter.rc;
 }
 
 /*

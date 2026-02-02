@@ -2009,12 +2009,21 @@ Only effective if CONFIG_PARTIAL_EMULATION is enabled.
 behavior.**
 
 ### pci
-    = List of [ serr=<bool>, perr=<bool> ]
+    = List of [ serr=<bool>, perr=<bool>, quirks=<bool> ]
+
+* `serr` and `perr`
 
     Default: Signaling left as set by firmware.
 
-Override the firmware settings, and explicitly enable or disable the
-signalling of PCI System and Parity errors.
+  Override the firmware settings, and explicitly enable or disable the
+  signalling of PCI System and Parity errors.
+
+* `quirks`
+
+    Default: `on`
+
+  In its negative form, allows to suppress certain quirk workarounds, in case
+  they cause issues.
 
 ### pci-phantom
 > `=[<seg>:]<bus>:<device>,<stride>`
