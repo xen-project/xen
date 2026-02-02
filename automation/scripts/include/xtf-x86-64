@@ -23,7 +23,8 @@ function xtf_arch_setup()
         -nographic \
         -monitor none \
         -serial stdio \
-        -m 512 \
+        -m 2048 \
+        -smp 2 \
         -kernel ${XEN_BINARY} \
         -initrd ${XTF_BINARY} \
         -append \"${XEN_CMDLINE}\" \
