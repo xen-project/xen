@@ -339,6 +339,25 @@ SECTIONS
     *(.reloc)
     __base_relocs_end = .;
   }
+
+  /*
+   * When efi/relocs-dummy.o is linked into the first-pass binary, the two
+   * symbols supplied by it (for ./Makefile to use) may appear in the symbol
+   * table (GNU ld 2.37 and newer strip them, for not being properly
+   * representable).  No such symbols would appear during subsequent passes.
+   * At least some of those older ld versions emit VIRT_START as absolute, but
+   * ALT_START as if it was part of .text.  The symbols tool generating our
+   * own symbol table would hence not ignore it when passed --all-symbols,
+   * leading to the 2nd pass binary having one more symbol than the final (3rd
+   * pass) one.
+   *
+   * Arrange for both (just in case) symbols to always be there, and to always
+   * be absolute (zero).
+   */
+  PROVIDE(VIRT_START = 0);
+  PROVIDE(ALT_START = 0);
+  VIRT_START &= 0;
+  ALT_START &= 0;
 #elif defined(XEN_BUILD_EFI)
   /*
    * Due to the way EFI support is currently implemented, these two symbols
