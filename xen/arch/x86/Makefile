@@ -139,6 +139,7 @@ $(TARGET)-syms: $(objtree)/prelink.o $(obj)/xen.lds
 		| $(objtree)/tools/symbols $(all_symbols) --sysv --sort $(syms-warn-dup-y) \
 		> $(dot-target).2.S
 	$(MAKE) $(build)=$(@D) $(dot-target).2.o
+	$(call compare-symbol-tables, $(dot-target).1.o, $(dot-target).2.o)
 	$(LD) $(XEN_LDFLAGS) -T $(obj)/xen.lds $< $(build_id_linker) \
 	    $(orphan-handling-y) $(dot-target).2.o -o $@
 	$(NM) -pa --format=sysv $@ \
@@ -221,6 +222,8 @@ endif
 		| $(objtree)/tools/symbols $(all_symbols) --sysv --sort \
 		> $(dot-target).2s.S
 	$(MAKE) $(build)=$(@D) .$(@F).2r.o .$(@F).2s.o
+	$(call compare-symbol-tables, $(dot-target).1r.o, $(dot-target).2r.o)
+	$(call compare-symbol-tables, $(dot-target).1s.o, $(dot-target).2s.o)
 	$(LD) $(call EFI_LDFLAGS,$(VIRT_BASE)) -T $(obj)/efi.lds $< \
 	      $(dot-target).2r.o $(dot-target).2s.o $(orphan-handling-y) \
 	      $(note_file_option) -o $@
