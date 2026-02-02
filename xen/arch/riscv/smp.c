@@ -1,3 +1,4 @@
+#include <xen/cpumask.h>
 #include <xen/smp.h>
 
 /*
@@ -13,3 +14,9 @@
 struct pcpu_info pcpu_info[NR_CPUS] = { [0 ... NR_CPUS - 1] = {
     .processor_id = NR_CPUS,
 }};
+
+void smp_send_event_check_mask(const cpumask_t *mask)
+{
+    /* Catch missing implementation once SMP support is introduced */
+    BUG_ON(!cpumask_subset(mask, cpumask_of(0)));
+}

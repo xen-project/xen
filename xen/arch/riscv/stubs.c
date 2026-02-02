@@ -65,11 +65,6 @@ int arch_monitor_domctl_event(struct domain *d,
 
 /* smp.c */
 
-void smp_send_event_check_mask(const cpumask_t *mask)
-{
-    BUG_ON("unimplemented");
-}
-
 void smp_send_call_function_mask(const cpumask_t *mask)
 {
     BUG_ON("unimplemented");
