@@ -829,6 +829,9 @@ static int vpci_init_ext_capability_list(const struct pci_dev *pdev)
 {
     unsigned int pos = PCI_CFG_SPACE_SIZE;
 
+    if ( !pdev->ext_cfg )
+        return 0;
+
     if ( !is_hardware_domain(pdev->domain) )
         /* Extended capabilities read as zero, write ignore for DomU */
         return vpci_add_register(pdev->vpci, vpci_read_val, NULL,
@@ -841,10 +844,9 @@ static int vpci_init_ext_capability_list(const struct pci_dev *pdev)
 
         if ( header == 0xffffffffU )
         {
-            if ( pos != PCI_CFG_SPACE_SIZE )
-                printk(XENLOG_WARNING
-                       "%pd %pp: broken extended cap list, offset %#x\n",
-                       pdev->domain, &pdev->sbdf, pos);
+            printk(XENLOG_WARNING
+                   "%pd %pp: broken extended cap list, offset %#x\n",
+                   pdev->domain, &pdev->sbdf, pos);
             return 0;
         }
 
