@@ -196,6 +196,7 @@ void do_trap(struct cpu_user_regs *cpu_regs)
         {
             /* Handle interrupt */
             unsigned long icause = cause & ~CAUSE_IRQ_FLAG;
+            bool intr_handled = true;
 
             switch ( icause )
             {
@@ -204,10 +205,12 @@ void do_trap(struct cpu_user_regs *cpu_regs)
                 break;
 
             default:
+                intr_handled = false;
                 break;
             }
 
-            break;
+            if ( intr_handled )
+                break;
         }
 
         do_unexpected_trap(cpu_regs);
