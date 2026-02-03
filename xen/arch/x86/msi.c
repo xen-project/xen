@@ -158,7 +158,7 @@ void msi_compose_msg(unsigned vector, const cpumask_t *cpu_mask, struct msi_msg 
 {
     memset(msg, 0, sizeof(*msg));
 
-    if ( vector < FIRST_DYNAMIC_VECTOR )
+    if ( vector < FIRST_IRQ_VECTOR )
         return;
 
     if ( cpu_mask )
