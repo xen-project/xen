@@ -272,7 +272,7 @@
 #define PCI_AGP_VERSION		2	/* BCD version number */
 #define PCI_AGP_RFU		3	/* Rest of capability flags */
 #define PCI_AGP_STATUS		4	/* Status register */
-#define  PCI_AGP_STATUS_RQ_MASK	0xff000000	/* Maximum number of requests - 1 */
+#define  PCI_AGP_STATUS_RQ_MASK	0xff000000U /* Maximum number of requests - 1 */
 #define  PCI_AGP_STATUS_SBA	0x0200	/* Sideband addressing supported */
 #define  PCI_AGP_STATUS_64BIT	0x0020	/* 64-bit addressing supported */
 #define  PCI_AGP_STATUS_FW	0x0010	/* FW transfers supported */
@@ -280,7 +280,7 @@
 #define  PCI_AGP_STATUS_RATE2	0x0002	/* 2x transfer rate supported */
 #define  PCI_AGP_STATUS_RATE1	0x0001	/* 1x transfer rate supported */
 #define PCI_AGP_COMMAND		8	/* Control register */
-#define  PCI_AGP_COMMAND_RQ_MASK 0xff000000  /* Master: Maximum number of requests */
+#define  PCI_AGP_COMMAND_RQ_MASK 0xff000000U /* Master: Maximum number of requests */
 #define  PCI_AGP_COMMAND_SBA	0x0200	/* Sideband addressing enabled */
 #define  PCI_AGP_COMMAND_AGP	0x0100	/* Allow processing of AGP transactions */
 #define  PCI_AGP_COMMAND_64BIT	0x0020 	/* Allow processing of 64-bit addresses */
@@ -582,7 +582,7 @@
 #define  HT_MSI_FLAGS_FIXED	0x2		/* Fixed mapping only */
 #define  HT_MSI_FIXED_ADDR	0x00000000FEE00000ULL	/* Fixed addr */
 #define  HT_MSI_ADDR_LO		0x04		/* Offset to low addr bits */
-#define  HT_MSI_ADDR_LO_MASK	0xFFF00000	/* Low address bit mask */
+#define  HT_MSI_ADDR_LO_MASK	0xFFF00000U	/* Low address bit mask */
 #define  HT_MSI_ADDR_HI		0x08		/* Offset to high addr bits */
 #define HT_CAPTYPE_DIRECT_ROUTE	0xB0	/* Direct routing configuration */
 #define HT_CAPTYPE_VCSET	0xB8	/* Virtual Channel configuration */
