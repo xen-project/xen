@@ -52,13 +52,13 @@ DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_sibling_mask);
 /* representing HT and core siblings of each logical CPU */
 DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_core_mask);
 
-DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, scratch_cpumask);
+DEFINE_PER_CPU_CPUMASK_VAR(scratch_cpumask);
 static cpumask_t scratch_cpu0mask;
 
-DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, hpet_scratch_cpumask);
+DEFINE_PER_CPU_CPUMASK_VAR(hpet_scratch_cpumask);
 static cpumask_t hpet_scratch_cpu0mask;
 
-DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, send_ipi_cpumask);
+DEFINE_PER_CPU_CPUMASK_VAR(send_ipi_cpumask);
 static cpumask_t send_ipi_cpu0mask;
 
 DEFINE_PER_CPU_READ_MOSTLY(struct stubs, stubs);

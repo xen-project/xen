@@ -20,7 +20,7 @@
 static DEFINE_PER_CPU_READ_MOSTLY(u32, cpu_2_logical_apicid);
 static DEFINE_PER_CPU_READ_MOSTLY(cpumask_t *, cluster_cpus);
 static cpumask_t *cluster_cpus_spare;
-static DEFINE_PER_CPU(cpumask_var_t, scratch_mask);
+static DEFINE_PER_CPU_CPUMASK_VAR(scratch_mask);
 
 static inline u32 x2apic_cluster(unsigned int cpu)
 {

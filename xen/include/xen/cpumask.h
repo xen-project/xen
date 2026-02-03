@@ -311,6 +311,9 @@ extern const cpumask_t cpumask_all;
 
 typedef cpumask_t *cpumask_var_t;
 
+#define DEFINE_PER_CPU_CPUMASK_VAR(sym) \
+	DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, sym)
+
 static inline bool alloc_cpumask_var(cpumask_var_t *mask)
 {
 	*mask = _xmalloc(nr_cpumask_bits / 8, sizeof(long));
@@ -348,6 +351,9 @@ static inline void free_cpumask_var(cpumask_var_t mask)
 #define FREE_CPUMASK_VAR(m) XFREE(m)
 #else
 typedef cpumask_t cpumask_var_t[1];
+
+#define DEFINE_PER_CPU_CPUMASK_VAR(sym) \
+	DEFINE_PER_CPU(cpumask_var_t, sym)
 
 static inline bool alloc_cpumask_var(cpumask_var_t *mask)
 {
