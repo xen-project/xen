@@ -1036,7 +1036,7 @@ int shadow_track_dirty_vram(struct domain *d,
     p2m_lock(p2m_get_hostp2m(d));
     paging_lock(d);
 
-    dirty_vram = d->arch.hvm.dirty_vram;
+    dirty_vram = d->arch.hvm.dirty_vram.sh;
 
     if ( dirty_vram && (!nr_frames ||
              ( begin_pfn != dirty_vram->begin_pfn
@@ -1046,8 +1046,8 @@ int shadow_track_dirty_vram(struct domain *d,
         gdprintk(XENLOG_INFO, "stopping tracking VRAM %lx - %lx\n", dirty_vram->begin_pfn, dirty_vram->end_pfn);
         xfree(dirty_vram->sl1ma);
         xfree(dirty_vram->dirty_bitmap);
-        xfree(dirty_vram);
-        dirty_vram = d->arch.hvm.dirty_vram = NULL;
+        d->arch.hvm.dirty_vram.sh = NULL;
+        XFREE(dirty_vram);
     }
 
     if ( !nr_frames )
@@ -1078,7 +1078,7 @@ int shadow_track_dirty_vram(struct domain *d,
             goto out;
         dirty_vram->begin_pfn = begin_pfn;
         dirty_vram->end_pfn = end_pfn;
-        d->arch.hvm.dirty_vram = dirty_vram;
+        d->arch.hvm.dirty_vram.sh = dirty_vram;
 
         if ( (dirty_vram->sl1ma = xmalloc_array(paddr_t, nr_frames)) == NULL )
             goto out_dirty_vram;
@@ -1205,8 +1205,8 @@ int shadow_track_dirty_vram(struct domain *d,
  out_sl1ma:
     xfree(dirty_vram->sl1ma);
  out_dirty_vram:
-    xfree(dirty_vram);
-    dirty_vram = d->arch.hvm.dirty_vram = NULL;
+    d->arch.hvm.dirty_vram.sh = NULL;
+    XFREE(dirty_vram);
 
  out:
     paging_unlock(d);
@@ -1229,7 +1229,7 @@ void shadow_vram_get_mfn(mfn_t mfn, unsigned int l1f,
                          const struct domain *d)
 {
     unsigned long gfn;
-    struct sh_dirty_vram *dirty_vram = d->arch.hvm.dirty_vram;
+    struct sh_dirty_vram *dirty_vram = d->arch.hvm.dirty_vram.sh;
 
     ASSERT(is_hvm_domain(d));
 
@@ -1259,7 +1259,7 @@ void shadow_vram_put_mfn(mfn_t mfn, unsigned int l1f,
                          const struct domain *d)
 {
     unsigned long gfn;
-    struct sh_dirty_vram *dirty_vram = d->arch.hvm.dirty_vram;
+    struct sh_dirty_vram *dirty_vram = d->arch.hvm.dirty_vram.sh;
 
     ASSERT(is_hvm_domain(d));
 

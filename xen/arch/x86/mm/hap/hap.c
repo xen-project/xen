@@ -36,6 +36,11 @@
 /*          HAP VRAM TRACKING SUPPORT           */
 /************************************************/
 
+struct hap_dirty_vram {
+    unsigned long begin_pfn;
+    unsigned long end_pfn;
+};
+
 /*
  * hap_track_dirty_vram()
  * Create the domain's dv_dirty_vram struct on demand.
@@ -52,7 +57,7 @@ int hap_track_dirty_vram(struct domain *d,
                          XEN_GUEST_HANDLE(void) guest_dirty_bitmap)
 {
     long rc = 0;
-    struct sh_dirty_vram *dirty_vram;
+    struct hap_dirty_vram *dirty_vram;
     uint8_t *dirty_bitmap = NULL;
 
     if ( nr_frames )
@@ -66,17 +71,17 @@ int hap_track_dirty_vram(struct domain *d,
 
         paging_lock(d);
 
-        dirty_vram = d->arch.hvm.dirty_vram;
+        dirty_vram = d->arch.hvm.dirty_vram.hap;
         if ( !dirty_vram )
         {
             rc = -ENOMEM;
-            if ( (dirty_vram = xzalloc(struct sh_dirty_vram)) == NULL )
+            if ( (dirty_vram = xzalloc(struct hap_dirty_vram)) == NULL )
             {
                 paging_unlock(d);
                 goto out;
             }
 
-            d->arch.hvm.dirty_vram = dirty_vram;
+            d->arch.hvm.dirty_vram.hap = dirty_vram;
         }
 
         if ( begin_pfn != dirty_vram->begin_pfn ||
@@ -132,7 +137,7 @@ int hap_track_dirty_vram(struct domain *d,
     {
         paging_lock(d);
 
-        dirty_vram = d->arch.hvm.dirty_vram;
+        dirty_vram = d->arch.hvm.dirty_vram.hap;
         if ( dirty_vram )
         {
             /*
@@ -142,7 +147,7 @@ int hap_track_dirty_vram(struct domain *d,
             begin_pfn = dirty_vram->begin_pfn;
             nr_frames = dirty_vram->end_pfn - dirty_vram->begin_pfn;
             xfree(dirty_vram);
-            d->arch.hvm.dirty_vram = NULL;
+            d->arch.hvm.dirty_vram.hap = NULL;
         }
 
         paging_unlock(d);
@@ -630,7 +635,7 @@ void hap_teardown(struct domain *d, bool *preempted)
 
     d->arch.paging.mode &= ~PG_log_dirty;
 
-    XFREE(d->arch.hvm.dirty_vram);
+    XFREE(d->arch.hvm.dirty_vram.hap);
 
 out:
     paging_unlock(d);

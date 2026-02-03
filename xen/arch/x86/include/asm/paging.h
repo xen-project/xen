@@ -135,19 +135,6 @@ struct paging_mode {
     (DIV_ROUND_UP(PADDR_BITS - PAGE_SHIFT - (PAGE_SHIFT + 3), \
                   PAGE_SHIFT - ilog2(sizeof(mfn_t))) + 1)
 
-#ifdef CONFIG_HVM
-/* VRAM dirty tracking support */
-struct sh_dirty_vram {
-    unsigned long begin_pfn;
-    unsigned long end_pfn;
-#ifdef CONFIG_SHADOW_PAGING
-    paddr_t *sl1ma;
-    uint8_t *dirty_bitmap;
-    s_time_t last_dirty;
-#endif
-};
-#endif
-
 #if PG_log_dirty
 
 /* log dirty initialization */

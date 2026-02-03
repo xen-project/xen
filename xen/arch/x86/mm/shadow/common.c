@@ -2316,11 +2316,11 @@ void shadow_teardown(struct domain *d, bool *preempted)
     d->arch.paging.mode &= ~PG_log_dirty;
 
 #ifdef CONFIG_HVM
-    if ( is_hvm_domain(d) && d->arch.hvm.dirty_vram )
+    if ( is_hvm_domain(d) && d->arch.hvm.dirty_vram.sh )
     {
-        xfree(d->arch.hvm.dirty_vram->sl1ma);
-        xfree(d->arch.hvm.dirty_vram->dirty_bitmap);
-        XFREE(d->arch.hvm.dirty_vram);
+        xfree(d->arch.hvm.dirty_vram.sh->sl1ma);
+        xfree(d->arch.hvm.dirty_vram.sh->dirty_bitmap);
+        XFREE(d->arch.hvm.dirty_vram.sh);
     }
 #endif
 

@@ -416,7 +416,15 @@ mfn_t sh_make_monitor_table(const struct vcpu *v, unsigned int shadow_levels);
 void sh_destroy_monitor_table(const struct vcpu *v, mfn_t mmfn,
                               unsigned int shadow_levels);
 
-/* VRAM dirty tracking helpers. */
+/* VRAM dirty tracking support */
+struct sh_dirty_vram {
+    unsigned long begin_pfn;
+    unsigned long end_pfn;
+    paddr_t *sl1ma;
+    uint8_t *dirty_bitmap;
+    s_time_t last_dirty;
+};
+
 void shadow_vram_get_mfn(mfn_t mfn, unsigned int l1f,
                          mfn_t sl1mfn, const void *sl1e,
                          const struct domain *d);

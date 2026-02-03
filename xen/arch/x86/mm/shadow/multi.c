@@ -608,7 +608,7 @@ _sh_propagate(struct vcpu *v,
 #ifdef CONFIG_HVM
     if ( unlikely(level == 1) && is_hvm_domain(d) )
     {
-        struct sh_dirty_vram *dirty_vram = d->arch.hvm.dirty_vram;
+        struct sh_dirty_vram *dirty_vram = d->arch.hvm.dirty_vram.sh;
 
         if ( dirty_vram && dirty_vram->last_dirty == -1 &&
              gfn_x(target_gfn) >= dirty_vram->begin_pfn &&

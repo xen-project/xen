@@ -95,7 +95,10 @@ struct hvm_domain {
     struct list_head       pinned_cacheattr_ranges;
 
     /* VRAM dirty support.  Protect with the domain paging lock. */
-    struct sh_dirty_vram *dirty_vram;
+    union {
+        struct sh_dirty_vram *sh;
+        struct hap_dirty_vram *hap;
+    } dirty_vram;
 
     bool                   is_s3_suspended;
 
