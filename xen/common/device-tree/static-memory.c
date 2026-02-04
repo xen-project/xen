@@ -118,6 +118,8 @@ void __init allocate_static_memory(struct domain *d, struct kernel_info *kinfo,
         if ( mfn_eq(smfn, INVALID_MFN) )
             goto fail;
 
+        tot_size += psize;
+
         printk(XENLOG_INFO "%pd: STATIC BANK[%u] %#"PRIpaddr"-%#"PRIpaddr"\n",
                d, bank, pbase, pbase + psize);
 
@@ -158,8 +160,6 @@ void __init allocate_static_memory(struct domain *d, struct kernel_info *kinfo,
                 mem->bank[gbank].start = rambase[gbank];
             }
         }
-
-        tot_size += psize;
     }
 
     mem->nr_banks = ++gbank;
