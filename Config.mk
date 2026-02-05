@@ -162,7 +162,9 @@ endef
 PATH_FILES := Paths.mk
 INC_FILES = $(foreach f, $(PATH_FILES), $(XEN_ROOT)/config/$(f))
 
+ifndef XEN_FULLVERSION
 -include $(INC_FILES)
+endif
 
 BUILD_MAKE_VARS = $(foreach f, $(PATH_FILES), $(shell awk '$$2 == ":=" { print $$1; }' $(XEN_ROOT)/config/$(f).in))
 
