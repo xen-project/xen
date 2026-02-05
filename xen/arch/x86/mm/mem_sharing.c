@@ -1891,7 +1891,9 @@ static int fork(struct domain *cd, struct domain *d)
         domain_pause(d);
         cd->max_pages = d->max_pages;
         *cd->arch.cpu_policy = *d->arch.cpu_policy;
+#ifdef CONFIG_VMTRACE
         cd->vmtrace_size = d->vmtrace_size;
+#endif
         cd->parent = d;
     }
 

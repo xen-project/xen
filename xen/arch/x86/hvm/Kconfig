@@ -34,6 +34,18 @@ config INTEL_VMX
 	  If your system includes a processor with Intel VT-x support, say Y.
 	  If in doubt, say Y.
 
+config VMTRACE
+	bool "HW VM tracing support"
+	depends on INTEL_VMX
+	default y
+	help
+	  Enables HW VM tracing support which allows to configure HW processor
+	  features (vmtrace_op) to enable capturing information about software
+	  execution using dedicated hardware facilities with minimal interference
+	  to the software being traced. The trace data can be retrieved using buffer
+	  shared between Xen and domain
+	  (see XENMEM_acquire_resource(XENMEM_resource_vmtrace_buf)).
+
 config HVM_FEP
 	bool "HVM Forced Emulation Prefix support (UNSUPPORTED)" if UNSUPPORTED
 	default DEBUG

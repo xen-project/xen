@@ -50,6 +50,7 @@ struct vcpu_msrs
         };
     } misc_features_enables;
 
+#ifdef CONFIG_VMTRACE
     /*
      * 0x00000560 ... 57x - MSR_RTIT_*
      *
@@ -81,6 +82,7 @@ struct vcpu_msrs
             };
         };
     } rtit;
+#endif
 
     /*
      * 0x000006e1 - MSR_PKRS - Protection Key Supervisor.

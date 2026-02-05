@@ -306,6 +306,7 @@ static int vmx_init_vmcs_config(bool bsp)
 
     rdmsrl(MSR_IA32_VMX_MISC, _vmx_misc_cap);
 
+#ifdef CONFIG_VMTRACE
     /* Check whether IPT is supported in VMX operation. */
     if ( bsp )
         vmtrace_available = cpu_has_proc_trace &&
@@ -317,6 +318,7 @@ static int vmx_init_vmcs_config(bool bsp)
                smp_processor_id());
         return -EINVAL;
     }
+#endif
 
     if ( caps.cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS )
     {

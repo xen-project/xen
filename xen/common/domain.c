@@ -135,7 +135,9 @@ struct vcpu *idle_vcpu[NR_CPUS] __read_mostly;
 
 vcpu_info_t dummy_vcpu_info;
 
+#ifdef CONFIG_VMTRACE
 bool __read_mostly vmtrace_available;
+#endif
 
 bool __read_mostly vpmu_is_available;
 
@@ -358,6 +360,7 @@ static void free_vcpu_struct(struct vcpu *v)
 
 static void vmtrace_free_buffer(struct vcpu *v)
 {
+#ifdef CONFIG_VMTRACE
     const struct domain *d = v->domain;
     struct page_info *pg = v->vmtrace.pg;
     unsigned int i;
@@ -372,10 +375,12 @@ static void vmtrace_free_buffer(struct vcpu *v)
         put_page_alloc_ref(&pg[i]);
         put_page_and_type(&pg[i]);
     }
+#endif
 }
 
 static int vmtrace_alloc_buffer(struct vcpu *v)
 {
+#ifdef CONFIG_VMTRACE
     struct domain *d = v->domain;
     struct page_info *pg;
     unsigned int i;
@@ -417,6 +422,9 @@ static int vmtrace_alloc_buffer(struct vcpu *v)
     }
 
     return -ENODATA;
+#else
+    return 0;
+#endif
 }
 
 /*
@@ -884,7 +892,9 @@ struct domain *domain_create(domid_t domid,
         ASSERT(!config->altp2m.nr);
 #endif
 
+#ifdef CONFIG_VMTRACE
         d->vmtrace_size = config->vmtrace_size;
+#endif
     }
 
     /* Sort out our idea of is_control_domain(). */

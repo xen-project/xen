@@ -622,6 +622,7 @@ static void cf_check domain_creation_finished(struct domain *d)
 
 static void vmx_init_ipt(struct vcpu *v)
 {
+#ifdef CONFIG_VMTRACE
     unsigned int size = v->domain->vmtrace_size;
 
     if ( !size )
@@ -632,6 +633,7 @@ static void vmx_init_ipt(struct vcpu *v)
     ASSERT(size >= PAGE_SIZE && (size & (size - 1)) == 0);
 
     v->arch.msrs->rtit.output_limit = size - 1;
+#endif
 }
 
 static int cf_check vmx_vcpu_initialise(struct vcpu *v)
@@ -723,11 +725,13 @@ static void vmx_save_guest_msrs(struct vcpu *v)
      */
     v->arch.hvm.vmx.shadow_gs = read_gs_shadow();
 
+#ifdef CONFIG_VMTRACE
     if ( v->arch.hvm.vmx.ipt_active )
     {
         rdmsrl(MSR_RTIT_OUTPUT_MASK, msrs->rtit.output_mask);
         rdmsrl(MSR_RTIT_STATUS, msrs->rtit.status);
     }
+#endif
 
     if ( cp->feat.pks )
         msrs->pkrs = rdpkrs_and_cache();
@@ -746,12 +750,14 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
     if ( cpu_has_msr_tsc_aux )
         wrmsr_tsc_aux(msrs->tsc_aux);
 
+#ifdef CONFIG_VMTRACE
     if ( v->arch.hvm.vmx.ipt_active )
     {
         wrmsrl(MSR_RTIT_OUTPUT_BASE, page_to_maddr(v->vmtrace.pg));
         wrmsrl(MSR_RTIT_OUTPUT_MASK, msrs->rtit.output_mask);
         wrmsrl(MSR_RTIT_STATUS, msrs->rtit.status);
     }
+#endif
 
     if ( cp->feat.pks )
         wrpkrs(msrs->pkrs);
@@ -2629,6 +2635,7 @@ static bool cf_check vmx_get_pending_event(
     return true;
 }
 
+#ifdef CONFIG_VMTRACE
 /*
  * We only let vmtrace agents see and modify a subset of bits in MSR_RTIT_CTL.
  * These all pertain to data-emitted into the trace buffer(s).  Must not
@@ -2771,6 +2778,7 @@ static int cf_check vmtrace_reset(struct vcpu *v)
     v->arch.msrs->rtit.status = 0;
     return 0;
 }
+#endif
 
 static uint64_t cf_check vmx_get_reg(struct vcpu *v, unsigned int reg)
 {
@@ -2945,11 +2953,14 @@ static struct hvm_function_table __initdata_cf_clobber vmx_function_table = {
     .altp2m_vcpu_emulate_ve = vmx_vcpu_emulate_ve,
     .altp2m_vcpu_emulate_vmfunc = vmx_vcpu_emulate_vmfunc,
 #endif
+
+#ifdef CONFIG_VMTRACE
     .vmtrace_control = vmtrace_control,
     .vmtrace_output_position = vmtrace_output_position,
     .vmtrace_set_option = vmtrace_set_option,
     .vmtrace_get_option = vmtrace_get_option,
     .vmtrace_reset = vmtrace_reset,
+#endif
 
     .get_reg = vmx_get_reg,
     .set_reg = vmx_set_reg,

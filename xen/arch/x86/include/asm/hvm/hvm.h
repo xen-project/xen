@@ -236,12 +236,14 @@ struct hvm_function_table {
     int (*altp2m_vcpu_emulate_vmfunc)(const struct cpu_user_regs *regs);
 #endif
 
+#ifdef CONFIG_VMTRACE
     /* vmtrace */
     int (*vmtrace_control)(struct vcpu *v, bool enable, bool reset);
     int (*vmtrace_output_position)(struct vcpu *v, uint64_t *pos);
     int (*vmtrace_set_option)(struct vcpu *v, uint64_t key, uint64_t value);
     int (*vmtrace_get_option)(struct vcpu *v, uint64_t key, uint64_t *value);
     int (*vmtrace_reset)(struct vcpu *v);
+#endif
 
     uint64_t (*get_reg)(struct vcpu *v, unsigned int reg);
     void (*set_reg)(struct vcpu *v, unsigned int reg, uint64_t val);
@@ -741,6 +743,7 @@ static inline bool altp2m_vcpu_emulate_ve(struct vcpu *v)
 bool altp2m_vcpu_emulate_ve(struct vcpu *v);
 #endif /* CONFIG_ALTP2M */
 
+#ifdef CONFIG_VMTRACE
 static inline int hvm_vmtrace_control(struct vcpu *v, bool enable, bool reset)
 {
     if ( hvm_funcs.vmtrace_control )
@@ -775,11 +778,20 @@ static inline int hvm_vmtrace_get_option(
 
     return -EOPNOTSUPP;
 }
+#else
+/*
+ * Function declaration(s) here are used without definition(s) to make compiler
+ * happy when VMTRACE=n, compiler DCE will eliminate unused code.
+ */
+int hvm_vmtrace_output_position(struct vcpu *v, uint64_t *pos);
+#endif
 
 static inline int hvm_vmtrace_reset(struct vcpu *v)
 {
+#ifdef CONFIG_VMTRACE
     if ( hvm_funcs.vmtrace_reset )
         return alternative_call(hvm_funcs.vmtrace_reset, v);
+#endif
 
     return -EOPNOTSUPP;
 }
@@ -935,28 +947,6 @@ static inline void hvm_inject_hw_exception(unsigned int vector, int errcode)
 static inline bool hvm_has_set_descriptor_access_exiting(void)
 {
     return false;
-}
-
-static inline int hvm_vmtrace_control(struct vcpu *v, bool enable, bool reset)
-{
-    return -EOPNOTSUPP;
-}
-
-static inline int hvm_vmtrace_output_position(struct vcpu *v, uint64_t *pos)
-{
-    return -EOPNOTSUPP;
-}
-
-static inline int hvm_vmtrace_set_option(
-    struct vcpu *v, uint64_t key, uint64_t value)
-{
-    return -EOPNOTSUPP;
-}
-
-static inline int hvm_vmtrace_get_option(
-    struct vcpu *v, uint64_t key, uint64_t *value)
-{
-    return -EOPNOTSUPP;
 }
 
 static inline uint64_t hvm_get_reg(struct vcpu *v, unsigned int reg)

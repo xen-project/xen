@@ -441,7 +441,8 @@ static int vm_event_resume(struct domain *d, struct vm_event_domain *ved)
             if ( rsp.flags & VM_EVENT_FLAG_GET_NEXT_INTERRUPT )
                 vm_event_monitor_next_interrupt(v);
 
-            if ( rsp.flags & VM_EVENT_FLAG_RESET_VMTRACE )
+            if ( IS_ENABLED(CONFIG_VMTRACE) &&
+                 (rsp.flags & VM_EVENT_FLAG_RESET_VMTRACE) )
                 vm_event_reset_vmtrace(v);
 
             if ( rsp.flags & VM_EVENT_FLAG_VCPU_PAUSED )

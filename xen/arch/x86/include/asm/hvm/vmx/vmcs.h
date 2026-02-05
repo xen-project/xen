@@ -154,8 +154,10 @@ struct vmx_vcpu {
     /* Do we need to tolerate a spurious EPT_MISCONFIG VM exit? */
     bool                 ept_spurious_misconfig;
 
+#ifdef CONFIG_VMTRACE
     /* Processor Trace configured and enabled for the vcpu. */
     bool                 ipt_active;
+#endif
 
     /* Is the guest in real mode? */
     uint8_t              vmx_realmode;

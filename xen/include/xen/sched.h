@@ -300,9 +300,11 @@ struct vcpu
     /* vPCI per-vCPU area, used to store data for long running operations. */
     struct vpci_vcpu vpci;
 
+#ifdef CONFIG_VMTRACE
     struct {
         struct page_info *pg; /* One contiguous allocation of d->vmtrace_size */
     } vmtrace;
+#endif
 
     struct arch_vcpu arch;
 
@@ -626,7 +628,9 @@ struct domain
     unsigned int nr_altp2m;    /* Number of altp2m tables. */
 #endif
 
+#ifdef CONFIG_VMTRACE
     unsigned int vmtrace_size; /* Buffer size in bytes, or 0 to disable. */
+#endif
 
 #ifdef CONFIG_ARGO
     /* Argo interdomain communication support */

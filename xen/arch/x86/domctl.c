@@ -154,6 +154,7 @@ void arch_get_domain_info(const struct domain *d,
 static int do_vmtrace_op(struct domain *d, struct xen_domctl_vmtrace_op *op,
                          XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
+#ifdef CONFIG_VMTRACE
     struct vcpu *v;
     int rc;
 
@@ -198,6 +199,9 @@ static int do_vmtrace_op(struct domain *d, struct xen_domctl_vmtrace_op *op,
     vcpu_unpause(v);
 
     return rc;
+#else
+    return -EOPNOTSUPP;
+#endif
 }
 
 #define MAX_IOPORTS 0x10000
