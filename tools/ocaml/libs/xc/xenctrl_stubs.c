@@ -947,7 +947,7 @@ CAMLprim value stub_xc_domain_setmaxmem(value xch_val, value domid,
 	int retval;
 
 	uint32_t c_domid = Int_val(domid);
-	unsigned int c_max_memkb = Int64_val(max_memkb);
+	uint64_t c_max_memkb = Int64_val(max_memkb);
 	caml_enter_blocking_section();
 	retval = xc_domain_setmaxmem(xch, c_domid, c_max_memkb);
 	caml_leave_blocking_section();
