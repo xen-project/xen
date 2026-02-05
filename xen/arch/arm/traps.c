@@ -1915,6 +1915,14 @@ static void do_trap_stage2_abort_guest(struct cpu_user_regs *regs,
         if ( info.dabt_instr.state == INSTR_ERROR )
             goto inject_abt;
 
+        /*
+         * If the instruction syndrome was invalid, then we already checked if
+         * this was due to a P2M fault. So no point to check again as the result
+         * will be the same.
+         */
+        if ( (info.dabt_instr.state == INSTR_VALID) && check_p2m(is_data, gpa) )
+            return;
+
         state = try_handle_mmio(regs, &info);
 
         switch ( state )
@@ -1938,14 +1946,6 @@ static void do_trap_stage2_abort_guest(struct cpu_user_regs *regs,
                 /* IO unhandled, try another way to handle it. */
                 break;
         }
-
-        /*
-         * If the instruction syndrome was invalid, then we already checked if
-         * this was due to a P2M fault. So no point to check again as the result
-         * will be the same.
-         */
-        if ( (info.dabt_instr.state == INSTR_VALID) && check_p2m(is_data, gpa) )
-            return;
 
         break;
     }
