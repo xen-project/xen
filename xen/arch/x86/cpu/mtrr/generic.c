@@ -1,17 +1,19 @@
 /* This only handles 32bit MTRR on 32bit hosts. This is strictly wrong
    because MTRRs can span upto 40 bits (36bits on most modern x86) */ 
-#include <xen/lib.h>
+
 #include <xen/init.h>
+#include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/param.h>
-#include <xen/stdbool.h>
+
+#include <asm/cpufeature.h>
 #include <asm/flushtlb.h>
 #include <asm/invpcid.h>
 #include <asm/io.h>
-#include <asm/mtrr.h>
 #include <asm/msr.h>
+#include <asm/mtrr.h>
 #include <asm/system.h>
-#include <asm/cpufeature.h>
+
 #include "mtrr.h"
 
 static const struct fixed_range_block {

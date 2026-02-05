@@ -5,22 +5,24 @@
  */
 
 #include <xen/domain_page.h>
+#include <xen/iommu.h>
+#include <xen/keyhandler.h>
 #include <xen/sched.h>
-#include <public/hvm/dm_op.h>
+#include <xen/softirq.h>
+
 #include <asm/altp2m.h>
 #include <asm/current.h>
-#include <asm/iocap.h>
-#include <asm/paging.h>
 #include <asm/domain.h>
-#include <asm/p2m.h>
-#include <asm/hvm/vmx/vmx.h>
-#include <asm/hvm/vmx/vmcs.h>
-#include <asm/hvm/nestedhvm.h>
-#include <xen/iommu.h>
-#include <asm/mtrr.h>
 #include <asm/hvm/cacheattr.h>
-#include <xen/keyhandler.h>
-#include <xen/softirq.h>
+#include <asm/hvm/nestedhvm.h>
+#include <asm/hvm/vmx/vmcs.h>
+#include <asm/hvm/vmx/vmx.h>
+#include <asm/iocap.h>
+#include <asm/mtrr.h>
+#include <asm/p2m.h>
+#include <asm/paging.h>
+
+#include <public/hvm/dm_op.h>
 
 #include "mm-locks.h"
 #include "p2m.h"
