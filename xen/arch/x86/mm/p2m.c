@@ -338,9 +338,9 @@ mfn_t p2m_get_gfn_type_access(struct p2m_domain *p2m, gfn_t gfn,
 
 void p2m_put_gfn(struct p2m_domain *p2m, gfn_t gfn)
 {
-    ASSERT(gfn_locked_by_me(p2m, gfn_x(gfn)));
+    ASSERT(gfn_locked_by_me(p2m, gfn));
 
-    gfn_unlock(p2m, gfn_x(gfn), 0);
+    gfn_unlock(p2m, gfn, 0);
 }
 
 static struct page_info *get_page_from_mfn_and_type(
