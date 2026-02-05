@@ -342,11 +342,8 @@ void sync_vcpu_execstate(struct vcpu *v)
      * Per vcpu_context_saved(), the context can be observed when
      * v->is_running is false (the caller should check it before calling
      * this function).
-     *
-     * Note this is a full barrier to also prevent update of the context
-     * to happen before it was observed.
      */
-    smp_mb();
+    smp_rmb();
 }
 
 #define NEXT_ARG(fmt, args)                                                 \
