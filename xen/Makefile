@@ -242,7 +242,7 @@ include $(XEN_ROOT)/Config.mk
 
 ARCH := $(XEN_TARGET_ARCH)
 SRCARCH := $(shell echo $(ARCH) | \
-    sed -e 's/x86.*/x86/' -e 's/arm\(32\|64\)/arm/g' \
+    sed -e 's/x86.*/x86/' -e 's/arm.*/arm/g' \
         -e 's/riscv.*/riscv/g' -e 's/ppc.*/ppc/g')
 export ARCH SRCARCH
 
