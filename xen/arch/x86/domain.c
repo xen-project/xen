@@ -627,6 +627,12 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
+    if ( hvm && !hap && !IS_ENABLED(CONFIG_SHADOW_PAGING) )
+    {
+        dprintk(XENLOG_INFO, "Shadow paging requested but not available\n");
+        return -EINVAL;
+    }
+
     if ( !hvm )
         /*
          * It is only meaningful for XEN_DOMCTL_CDF_oos_off to be clear
