@@ -123,3 +123,8 @@ endif
 
 # Set up the assembler include path properly for older toolchains.
 CFLAGS += -Wa,-I$(objtree)/include -Wa,-I$(srctree)/include
+
+# The GNU assembler will interpret '/' as a comment start marker instead of a
+# divide for some ELF targets.  Pass --divide when when available to signal '/'
+# is always used as an operator in assembly.
+$(call cc-option-add,CFLAGS,CC,-Wa$$(comma)--divide)
