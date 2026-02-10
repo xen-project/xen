@@ -126,17 +126,6 @@ static int cf_check parse_console_timestamps(const char *s);
 custom_runtime_param("console_timestamps", parse_console_timestamps,
                      con_timestamp_mode_upd);
 
-/* conring_size: allows a large console ring than default (16kB). */
-static uint32_t __initdata opt_conring_size;
-size_param("conring_size", opt_conring_size);
-
-#define _CONRING_SIZE 16384
-#define CONRING_IDX_MASK(i) ((i)&(conring_size-1))
-static char __initdata _conring[_CONRING_SIZE];
-static char *__read_mostly conring = _conring;
-static uint32_t __read_mostly conring_size = _CONRING_SIZE;
-static uint32_t conringc, conringp;
-
 static int __read_mostly sercon_handle = -1;
 
 #ifdef CONFIG_X86
@@ -350,6 +339,17 @@ static void cf_check do_dec_thresh(unsigned char key, bool unused)
  * ********************************************************
  */
 
+/* conring_size: allows a larger console ring than default (16kB). */
+static uint32_t __initdata opt_conring_size;
+size_param("conring_size", opt_conring_size);
+
+#define _CONRING_SIZE 16384
+#define CONRING_IDX_MASK(i) ((i)&(conring_size-1))
+static char __initdata _conring[_CONRING_SIZE];
+static char *__read_mostly conring = _conring;
+static uint32_t __read_mostly conring_size = _CONRING_SIZE;
+static uint32_t conringc, conringp;
+
 static void cf_check conring_notify(void *unused)
 {
     send_global_virq(VIRQ_CON_RING);
@@ -416,47 +416,6 @@ long read_console_ring(struct xen_sysctl_readconsole *op)
 }
 #endif /* CONFIG_SYSCTL */
 
-
-/*
- * *******************************************************
- * *************** ACCESS TO SERIAL LINE *****************
- * *******************************************************
- */
-
-/* Characters received over the serial line are buffered for domain 0. */
-#define SERIAL_RX_SIZE 128
-#define SERIAL_RX_MASK(_i) ((_i)&(SERIAL_RX_SIZE-1))
-static char serial_rx_ring[SERIAL_RX_SIZE];
-static unsigned int serial_rx_cons, serial_rx_prod;
-
-static void (*serial_steal_fn)(const char *str, size_t nr) = early_puts;
-
-int console_steal(int handle, void (*fn)(const char *str, size_t nr))
-{
-    if ( (handle == -1) || (handle != sercon_handle) )
-        return 0;
-
-    if ( serial_steal_fn != NULL )
-        return -EBUSY;
-
-    serial_steal_fn = fn;
-    return 1;
-}
-
-void console_giveback(int id)
-{
-    if ( id == 1 )
-        serial_steal_fn = NULL;
-}
-
-void console_serial_puts(const char *s, size_t nr)
-{
-    if ( serial_steal_fn != NULL )
-        serial_steal_fn(s, nr);
-    else
-        serial_puts(sercon_handle, s, nr);
-}
-
 /*
  * Flush contents of the conring to the selected console devices.
  */
@@ -499,6 +458,75 @@ static void cf_check conring_dump_keyhandler(unsigned char key)
     rc = conring_flush(CONSOLE_SERIAL | CONSOLE_VIDEO | CONSOLE_PV);
     if ( rc )
         printk("failed to dump console ring buffer: %d\n", rc);
+}
+
+void __init console_init_ring(void)
+{
+    char *ring;
+    unsigned int i, order, memflags;
+    unsigned long flags;
+
+    if ( !opt_conring_size )
+        return;
+
+    order = get_order_from_bytes(max(opt_conring_size, conring_size));
+    memflags = MEMF_bits(crashinfo_maxaddr_bits);
+    while ( (ring = alloc_xenheap_pages(order, memflags)) == NULL )
+    {
+        BUG_ON(order == 0);
+        order--;
+    }
+    opt_conring_size = PAGE_SIZE << order;
+
+    nrspin_lock_irqsave(&console_lock, flags);
+    for ( i = conringc ; i != conringp; i++ )
+        ring[i & (opt_conring_size - 1)] = conring[i & (conring_size - 1)];
+    conring = ring;
+    smp_wmb(); /* Allow users of console_force_unlock() to see larger buffer. */
+    conring_size = opt_conring_size;
+    nrspin_unlock_irqrestore(&console_lock, flags);
+
+    printk("Allocated console ring of %u KiB.\n", opt_conring_size >> 10);
+}
+
+/*
+ * *******************************************************
+ * *************** ACCESS TO SERIAL LINE *****************
+ * *******************************************************
+ */
+
+/* Characters received over the serial line are buffered for domain 0. */
+#define SERIAL_RX_SIZE 128
+#define SERIAL_RX_MASK(_i) ((_i)&(SERIAL_RX_SIZE-1))
+static char serial_rx_ring[SERIAL_RX_SIZE];
+static unsigned int serial_rx_cons, serial_rx_prod;
+
+static void (*serial_steal_fn)(const char *str, size_t nr) = early_puts;
+
+int console_steal(int handle, void (*fn)(const char *str, size_t nr))
+{
+    if ( (handle == -1) || (handle != sercon_handle) )
+        return 0;
+
+    if ( serial_steal_fn != NULL )
+        return -EBUSY;
+
+    serial_steal_fn = fn;
+    return 1;
+}
+
+void console_giveback(int id)
+{
+    if ( id == 1 )
+        serial_steal_fn = NULL;
+}
+
+void console_serial_puts(const char *s, size_t nr)
+{
+    if ( serial_steal_fn != NULL )
+        serial_steal_fn(s, nr);
+    else
+        serial_puts(sercon_handle, s, nr);
 }
 
 /*
@@ -1123,35 +1151,6 @@ void __init console_init_preirq(void)
         printk("Console output is synchronous.\n");
         warning_add(warning_sync_console);
     }
-}
-
-void __init console_init_ring(void)
-{
-    char *ring;
-    unsigned int i, order, memflags;
-    unsigned long flags;
-
-    if ( !opt_conring_size )
-        return;
-
-    order = get_order_from_bytes(max(opt_conring_size, conring_size));
-    memflags = MEMF_bits(crashinfo_maxaddr_bits);
-    while ( (ring = alloc_xenheap_pages(order, memflags)) == NULL )
-    {
-        BUG_ON(order == 0);
-        order--;
-    }
-    opt_conring_size = PAGE_SIZE << order;
-
-    nrspin_lock_irqsave(&console_lock, flags);
-    for ( i = conringc ; i != conringp; i++ )
-        ring[i & (opt_conring_size - 1)] = conring[i & (conring_size - 1)];
-    conring = ring;
-    smp_wmb(); /* Allow users of console_force_unlock() to see larger buffer. */
-    conring_size = opt_conring_size;
-    nrspin_unlock_irqrestore(&console_lock, flags);
-
-    printk("Allocated console ring of %u KiB.\n", opt_conring_size >> 10);
 }
 
 void __init console_init_irq(void)
