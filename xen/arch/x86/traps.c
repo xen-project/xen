@@ -1376,8 +1376,7 @@ void asmlinkage do_invalid_op(struct cpu_user_regs *regs)
     if ( likely(extable_fixup(regs, true)) )
         return;
 
-    show_execution_state(regs);
-    panic("FATAL TRAP: vector = %d (invalid opcode)\n", X86_EXC_UD);
+    fatal_trap(regs, false);
 }
 
 void asmlinkage do_int3(struct cpu_user_regs *regs)
@@ -1476,8 +1475,7 @@ void do_general_protection(struct cpu_user_regs *regs)
         return;
 
  hardware_gp:
-    show_execution_state(regs);
-    panic("GENERAL PROTECTION FAULT\n[error_code=%04x]\n", regs->error_code);
+    fatal_trap(regs, false);
 }
 
 #ifdef CONFIG_PV
