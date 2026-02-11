@@ -221,19 +221,15 @@ static inline bool arch_mfns_in_directmap(unsigned long mfn, unsigned long nr)
 #define PGT_count_width   PG_shift(2)
 #define PGT_count_mask    ((1UL << PGT_count_width) - 1)
 
-/*
- * Page needs to be scrubbed. Since this bit can only be set on a page that is
- * free (i.e. in PGC_state_free) we can reuse PGC_allocated bit.
- */
-#define _PGC_need_scrub   _PGC_allocated
-#define PGC_need_scrub    PGC_allocated
-
 /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated    PG_shift(1)
 #define PGC_allocated     PG_mask(1, 1)
 /* Page is Xen heap? */
 #define _PGC_xen_heap     PG_shift(2)
 #define PGC_xen_heap      PG_mask(1, 2)
+/* Page needs to be scrubbed. */
+#define _PGC_need_scrub   PG_shift(4)
+#define PGC_need_scrub    PG_mask(1, 4)
 /* Page is broken? */
 #define _PGC_broken       PG_shift(7)
 #define PGC_broken        PG_mask(1, 7)
