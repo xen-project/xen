@@ -40,6 +40,7 @@ $(TARGET)-syms: $(objtree)/prelink.o $(obj)/xen.lds
 		| $(objtree)/tools/symbols $(all_symbols) --sysv --sort \
 		> $(dot-target).2.S
 	$(MAKE) $(build)=$(@D) $(dot-target).2.o
+	$(call compare-symbol-tables, $(dot-target).1.o, $(dot-target).2.o)
 	$(LD) $(XEN_LDFLAGS) -T $(obj)/xen.lds $< $(build_id_linker) \
 	    $(dot-target).2.o -o $@
 	$(NM) -pa --format=sysv $@ \
