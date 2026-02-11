@@ -138,8 +138,9 @@ int pci_mmcfg_arch_enable(unsigned int idx)
     const typeof(pci_mmcfg_config[0]) *cfg = pci_mmcfg_virt[idx].cfg;
     unsigned long start_mfn, end_mfn;
 
-    if (pci_mmcfg_virt[idx].virt)
-        return 0;
+    if ( pci_mmcfg_virt[idx].virt )
+        return 1;
+
     pci_mmcfg_virt[idx].virt = mcfg_ioremap(cfg, idx, PAGE_HYPERVISOR_UC);
     if (!pci_mmcfg_virt[idx].virt) {
         printk(KERN_ERR "PCI: Cannot map MCFG aperture for segment %04x\n",
@@ -160,9 +161,10 @@ int pci_mmcfg_arch_enable(unsigned int idx)
     return 0;
 }
 
-void pci_mmcfg_arch_disable(unsigned int idx)
+int pci_mmcfg_arch_disable(unsigned int idx)
 {
     const typeof(pci_mmcfg_config[0]) *cfg = pci_mmcfg_virt[idx].cfg;
+    int ret = !pci_mmcfg_virt[idx].virt;
 
     pci_mmcfg_virt[idx].virt = NULL;
     /*
@@ -173,6 +175,8 @@ void pci_mmcfg_arch_disable(unsigned int idx)
     mcfg_ioremap(cfg, idx, 0);
     printk(KERN_WARNING "PCI: Not using MCFG for segment %04x bus %02x-%02x\n",
            cfg->pci_segment, cfg->start_bus_number, cfg->end_bus_number);
+
+    return ret;
 }
 
 bool pci_mmcfg_decode(unsigned long mfn, unsigned int *seg, unsigned int *bdf)

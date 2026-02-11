@@ -528,6 +528,8 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( !ret )
             ret = pci_segment_iterate(info.segment, physdev_check_pci_extcfg,
                                       &info);
+        else if ( ret > 0 ) /* Indication of "no change". */
+            ret = 0;
 
         if ( !ret && has_vpci(currd) && (info.flags & XEN_PCI_MMCFG_RESERVED) )
         {
