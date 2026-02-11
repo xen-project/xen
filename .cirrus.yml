@@ -161,18 +161,19 @@ task:
 ## Test Jobs
 
 task:
-  name: 'FreeBSD: XTF selftest'
+  name: 'XTF selftest'
 
   << : *FREEBSD_ENV_PRODUCTION
 
   env:
     matrix:
-      FREEBSD_BUILD: $FREEBSD_LEGACY
-      FREEBSD_BUILD: $FREEBSD_PRODUCTION
-      FREEBSD_BUILD: $FREEBSD_CURRENT
+      BUILD: freebsd_full_$FREEBSD_LEGACY
+      BUILD: freebsd_full_$FREEBSD_PRODUCTION
+      BUILD: freebsd_full_$FREEBSD_CURRENT
+      BUILD: macos-x86_64
 
   depends_on:
-    - freebsd_full_$FREEBSD_BUILD
+    - $BUILD
     - xtf
 
   install_script: pkg install -y qemu-nox11 expect
@@ -187,7 +188,7 @@ task:
 
   fetch_script:
     - fetch https://api.cirrus-ci.com/v1/artifact/build/$CIRRUS_BUILD_ID/xtf/xtf.zip
-    - fetch https://api.cirrus-ci.com/v1/artifact/build/$CIRRUS_BUILD_ID/freebsd_full_$FREEBSD_BUILD/xen.zip
+    - fetch https://api.cirrus-ci.com/v1/artifact/build/$CIRRUS_BUILD_ID/$BUILD/xen.zip
     - unzip xtf.zip
     - unzip xen.zip
 
