@@ -439,6 +439,7 @@ static void free_pdev(struct pci_seg *pseg, struct pci_dev *pdev)
         unsigned long flags;
 
         case DEV_TYPE_PCIe2PCI_BRIDGE:
+        case DEV_TYPE_PCI2PCIe_BRIDGE:
         case DEV_TYPE_LEGACY_PCI_BRIDGE:
             sec_bus = pci_conf_read8(pdev->sbdf, PCI_SECONDARY_BUS);
             sub_bus = pci_conf_read8(pdev->sbdf, PCI_SUBORDINATE_BUS);
