@@ -107,8 +107,9 @@ if $perl_re
 then
     LC_ALL=C grep -aobP '\xf3\x0f\x1e(\xfa|\xfb)|\x66\x0f\x1f\x01' $TEXT_BIN
 else
-    grep -aob -e "$(printf '\363\17\36\372')" -e "$(printf '\363\17\36\373')" \
-         -e "$(printf '\146\17\37\1')" $TEXT_BIN
+    LC_ALL=C grep -aob -e "$(printf '\363\17\36\372')" \
+                       -e "$(printf '\363\17\36\373')" \
+                       -e "$(printf '\146\17\37\1')" $TEXT_BIN
 fi | $AWK -F':' '{printf "%s%07x\n", "'$vma_hi'", int('$((0x$vma_lo))') + $1}' > $ALL
 
 # Wait for $VALID to become complete
