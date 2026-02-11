@@ -914,11 +914,7 @@ int arch_domain_create(struct domain *d,
     if ( d->arch.ioport_caps == NULL )
         goto fail;
 
-    /*
-     * The shared_info machine address must fit in a 32-bit field within a
-     * 32-bit guest's start_info structure. Hence we specify MEMF_bits(32).
-     */
-    if ( (d->shared_info = alloc_xenheap_pages(0, MEMF_bits(32))) == NULL )
+    if ( (d->shared_info = alloc_xenheap_page()) == NULL )
         goto fail;
 
     clear_page(d->shared_info);
