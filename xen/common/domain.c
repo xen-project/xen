@@ -177,7 +177,7 @@ static void vcpu_check_shutdown(struct vcpu *v)
     spin_unlock(&d->shutdown_lock);
 }
 
-static void vcpu_info_reset(struct vcpu *v)
+void vcpu_info_reset(struct vcpu *v)
 {
     struct domain *d = v->domain;
 
