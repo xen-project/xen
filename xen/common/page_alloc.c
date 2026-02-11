@@ -764,7 +764,7 @@ static void page_list_add_scrub(struct page_info *pg, unsigned int node,
 #endif
 #define SCRUB_BYTE_PATTERN   (SCRUB_PATTERN & 0xff)
 
-static void scrub_one_page(const struct page_info *pg)
+void scrub_one_page(const struct page_info *pg)
 {
     if ( unlikely(pg->count_info & PGC_broken) )
         return;

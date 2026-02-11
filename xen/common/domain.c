@@ -446,6 +446,18 @@ static int __init cf_check parse_dom0_param(const char *s)
 }
 custom_param("dom0", parse_dom0_param);
 
+static void domain_pending_scrub_free(struct domain *d)
+{
+    rspin_lock(&d->page_alloc_lock);
+    if ( d->pending_scrub )
+    {
+        FREE_DOMHEAP_PAGES(d->pending_scrub, d->pending_scrub_order);
+        d->pending_scrub_order = 0;
+        d->pending_scrub_index = 0;
+    }
+    rspin_unlock(&d->page_alloc_lock);
+}
+
 /*
  * Release resources held by a domain.  There may or may not be live
  * references to the domain, and it may or may not be fully constructed.
@@ -505,6 +517,9 @@ static int domain_teardown(struct domain *d)
     case PROG_none:
         BUILD_BUG_ON(PROG_none != 0);
 
+        /* Trivial teardown, not long-running enough to need a preemption check. */
+        domain_pending_scrub_free(d);
+
     PROGRESS(gnttab_mappings):
         rc = gnttab_release_mappings(d);
         if ( rc )
@@ -547,6 +562,7 @@ static void _domain_destroy(struct domain *d)
 {
     BUG_ON(!d->is_dying);
     BUG_ON(atomic_read(&d->refcnt) != DOMAIN_DESTROYED);
+    ASSERT(!d->pending_scrub);
 
     xfree(d->pbuf);
 
@@ -1478,6 +1494,15 @@ int domain_unpause_by_systemcontroller(struct domain *d)
      */
     if ( new == 0 && !d->creation_finished )
     {
+        if ( d->pending_scrub )
+        {
+            printk(XENLOG_ERR
+                   "%pd: cannot be started with pending unscrubbed pages, destroying\n",
+                   d);
+            domain_crash(d);
+            domain_pending_scrub_free(d);
+            return -EBUSY;
+        }
         d->creation_finished = true;
         arch_domain_creation_finished(d);
     }
