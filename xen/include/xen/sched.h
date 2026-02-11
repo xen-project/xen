@@ -636,6 +636,11 @@ struct domain
     } ioreq_server;
 #endif
 
+    /* Pointer to allocated domheap page that possibly needs scrubbing. */
+    struct page_info *pending_scrub;
+    unsigned int pending_scrub_order;
+    unsigned int pending_scrub_index;
+
     /* Holding CDF_* constant. Internal flags for domain creation. */
     unsigned int cdf;
 };
