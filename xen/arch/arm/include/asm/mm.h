@@ -144,6 +144,9 @@ struct page_info
 #define _PGC_colored      PG_shift(4)
 #define PGC_colored       PG_mask(1, 4)
 #endif
+/* Page needs to be scrubbed. */
+#define _PGC_need_scrub   PG_shift(5)
+#define PGC_need_scrub    PG_mask(1, 5)
 /* ... */
 /* Page is broken? */
 #define _PGC_broken       PG_shift(7)
@@ -162,13 +165,6 @@ struct page_info
 /* Count of references to this frame. */
 #define PGC_count_width   PG_shift(10)
 #define PGC_count_mask    ((1UL<<PGC_count_width)-1)
-
-/*
- * Page needs to be scrubbed. Since this bit can only be set on a page that is
- * free (i.e. in PGC_state_free) we can reuse PGC_allocated bit.
- */
-#define _PGC_need_scrub   _PGC_allocated
-#define PGC_need_scrub    PGC_allocated
 
 #if defined(CONFIG_ARM_64) || defined(CONFIG_MPU)
 #define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)

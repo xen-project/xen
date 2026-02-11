@@ -170,7 +170,7 @@
 /*
  * Flags that are preserved in assign_pages() (and only there)
  */
-#define PGC_preserved (PGC_extra | PGC_static | PGC_colored)
+#define PGC_preserved (PGC_extra | PGC_static | PGC_colored | PGC_need_scrub)
 
 #ifndef PGT_TYPE_INFO_INITIALIZER
 #define PGT_TYPE_INFO_INITIALIZER 0
