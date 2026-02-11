@@ -145,6 +145,16 @@ unsigned long avail_node_heap_pages(unsigned int nodeid);
 #define alloc_domheap_page(d,f) (alloc_domheap_pages(d,0,f))
 #define free_domheap_page(p)  (free_domheap_pages(p,0))
 
+/* Free an allocation, and zero the pointer to it. */
+#define FREE_DOMHEAP_PAGES(p, o) do { \
+    void *_ptr_ = (p);                \
+    (p) = NULL;                       \
+    free_domheap_pages(_ptr_, o);     \
+} while ( false )
+#define FREE_DOMHEAP_PAGE(p) FREE_DOMHEAP_PAGES(p, 0)
+
+void scrub_one_page(const struct page_info *pg, bool cold);
+
 int online_page(mfn_t mfn, uint32_t *status);
 int offline_page(mfn_t mfn, int broken, uint32_t *status);
 int query_page_offline(mfn_t mfn, uint32_t *status);

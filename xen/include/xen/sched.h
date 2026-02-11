@@ -662,6 +662,11 @@ struct domain
         /* Permission to take ownership of the physical console input. */
         bool input_allowed;
     } console;
+
+    /* Pointer to allocated domheap page that possibly needs scrubbing. */
+    struct page_info *pending_scrub;
+    unsigned int pending_scrub_order;
+    unsigned int pending_scrub_index;
 } __aligned(PAGE_SIZE);
 
 static inline struct page_list_head *page_to_list(
