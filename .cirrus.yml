@@ -1,3 +1,5 @@
+## FreeBSD Build Jobs
+
 # https://cirrus-ci.org/guide/tips-and-tricks/#sharing-configuration-between-tasks
 freebsd_versions: &FREEBSD_VERSIONS
   env:
@@ -122,7 +124,41 @@ task:
     path: xtf/tests/selftest/test-*-selftest
     type: application/octet-stream
 
-# Test jobs
+## macOS Build Jobs
+
+task:
+  name: 'macOS: hypervisor build'
+
+  env:
+    matrix:
+      ARCH: x86_64
+      ARCH: aarch64
+
+  alias: macos-$ARCH
+  macos_instance:
+    image: ghcr.io/cirruslabs/macos-runner:sonoma
+
+  environment:
+    CIRRUS_CLONE_DEPTH: 1
+    CIRRUS_LOG_TIMESTAMP: true
+
+  install_script:
+    - brew install $ARCH-elf-gcc $ARCH-elf-binutils
+
+  build_script:
+    - make -j`sysctl -n hw.ncpu`
+           XEN_TARGET_ARCH=`echo $ARCH | sed -e s/aarch64/arm64/`
+           CROSS_COMPILE=$ARCH-elf- HOSTCC=clang -C xen
+
+  xen_artifacts:
+    path: xen/xen
+    type: application/octet-stream
+
+  debug_artifacts:
+    path: xen/xen-syms
+    type: application/octet-stream
+
+## Test Jobs
 
 task:
   name: 'FreeBSD: XTF selftest'
