@@ -1217,7 +1217,7 @@ static int do_kexec_op_internal(unsigned long op,
                                 XEN_GUEST_HANDLE_PARAM(void) uarg,
                                 bool compat)
 {
-    int ret = -EINVAL;
+    int ret;
 
     ret = xsm_kexec(XSM_PRIV);
     if ( ret )
@@ -1257,6 +1257,10 @@ static int do_kexec_op_internal(unsigned long op,
         break;
     case KEXEC_CMD_kexec_status:
         ret = kexec_status(uarg);
+        break;
+
+    default:
+        ret = -EOPNOTSUPP;
         break;
     }
 
