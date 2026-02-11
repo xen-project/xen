@@ -11,6 +11,7 @@
 #include <xen/nospec.h>
 #include <xen/sched.h>
 
+#include <asm/cpufeature.h>
 #include <asm/intc.h>
 #include <asm/processor.h>
 #include <asm/riscv_encoding.h>
@@ -144,7 +145,12 @@ static void dump_csrs(const char *ctx)
       (v & HSTATUS_SPV)  ? " SPV"  : "",
       (v & HSTATUS_GVA)  ? " GVA"  : "");
     X(hgatp, CSR_HGATP, "\n");
-    X(hstateen0, CSR_HSTATEEN0, "\n");
+
+    if ( riscv_isa_extension_available(NULL, RISCV_ISA_EXT_smstateen) )
+    {
+        X(hstateen0, CSR_HSTATEEN0, "\n");
+    }
+
     X(stvec, CSR_STVEC, " "); X(vstvec, CSR_VSTVEC, "\n");
     X(sepc, CSR_SEPC, " "); X(vsepc, CSR_VSEPC, "\n");
     X(stval, CSR_STVAL, " "); X(vstval, CSR_VSTVAL, "\n");

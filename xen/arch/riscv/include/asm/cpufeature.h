@@ -36,6 +36,7 @@ enum riscv_isa_ext_id {
     RISCV_ISA_EXT_zbb,
     RISCV_ISA_EXT_zbs,
     RISCV_ISA_EXT_smaia,
+    RISCV_ISA_EXT_smstateen,
     RISCV_ISA_EXT_ssaia,
     RISCV_ISA_EXT_svade,
     RISCV_ISA_EXT_svpbmt,
