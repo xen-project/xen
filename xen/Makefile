@@ -113,10 +113,11 @@ else
     Q := @
 endif
 
-# If the user is running make -s (silent mode), suppress echoing of
-# commands
-
-ifneq ($(findstring s,$(filter-out --%,$(MAKEFLAGS))),)
+# If the user is running make -s (silent mode), suppress echoing of commands.
+# Use MFLAGS (options only). MAKEFLAGS may include variable overrides after
+# “--” (GNU make 4.4 and newer), which can contain an “s” and falsely trigger
+# silent mode.
+ifneq ($(findstring s,$(filter-out --%,$(MFLAGS))),)
     quiet := silent_
 endif
 
