@@ -92,13 +92,12 @@ ${OBJDUMP} -j .text $1 -d -w | grep '	endbr64 *$' | cut -f 1 -d ':' > $VALID &
 #    check nevertheless.
 #
 eval $(${OBJDUMP} -j .text $1 -h |
-    $AWK '$2 == ".text" {printf "vma_hi=%s\nvma_lo=%s\n", substr($4, 1, 9), substr($4, 10, 16)}')
+    $AWK '$2 == ".text" {printf "bin_sz=%s\nvma_hi=%s\nvma_lo=%s\n", "0x" $3, substr($4, 1, 9), substr($4, 10, 16)}')
+
+[ "$(($bin_sz))" -ge $(((1 << 28) - $vma_lo)) ] &&
+    { echo "$MSG_PFX Error: .text offsets must not exceed 256M" >&2; exit 1; }
 
 ${OBJCOPY} -j .text $1 -O binary $TEXT_BIN
-
-bin_sz=$(stat -c '%s' $TEXT_BIN)
-[ "$bin_sz" -ge $(((1 << 28) - $vma_lo)) ] &&
-    { echo "$MSG_PFX Error: .text offsets must not exceed 256M" >&2; exit 1; }
 
 # instruction:    hex:           oct:
 # endbr64         f3 0f 1e fa    363 017 036 372
@@ -116,8 +115,8 @@ fi | $AWK -F':' '{printf "%s%07x\n", "'$vma_hi'", int('$((0x$vma_lo))') + $1}' >
 wait
 
 # Sanity check $VALID and $ALL, in case the string parsing bitrots
-val_sz=$(stat -c '%s' $VALID)
-all_sz=$(stat -c '%s' $ALL)
+val_sz=$(wc -l < $VALID)
+all_sz=$(wc -l < $ALL)
 [ "$val_sz" -eq 0 ]         && { echo "$MSG_PFX Error: Empty valid-addrs" >&2; exit 1; }
 [ "$all_sz" -eq 0 ]         && { echo "$MSG_PFX Error: Empty all-addrs" >&2; exit 1; }
 [ "$all_sz" -lt "$val_sz" ] && { echo "$MSG_PFX Error: More valid-addrs than all-addrs" >&2; exit 1; }
