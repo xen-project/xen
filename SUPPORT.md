@@ -12,7 +12,7 @@ for the definitions of the support status levels etc.
     Xen-Version: 4.18
     Initial-Release: 2023-11-16
     Supported-Until: 2025-05-16
-    Security-Support-Until: 2026-11-16
+    Security-Support-Until: 2028-11-16
 
 Release Notes
 : <a href="https://wiki.xenproject.org/wiki/Xen_Project_4.18_Release_Notes">RN</a>
