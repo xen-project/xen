@@ -69,7 +69,7 @@ function xtf_build_cmdline()
     local xtf_name=$2
     declare -a cmdline=()
     declare -A per_test_args=(
-        [argo]="argo=1 mac-permissive=1"
+        [argo]="argo=1,mac-permissive=1"
     )
 
     cmdline+=("${XEN_CMDLINE}")
