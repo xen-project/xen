@@ -131,14 +131,6 @@ enum {
     TRCE_SFLAG_OOS_FIXUP_EVICT,
 };
 
-
-/* Size (in bytes) of a guest PTE */
-#if GUEST_PAGING_LEVELS >= 3
-# define GUEST_PTE_SIZE 8
-#else
-# define GUEST_PTE_SIZE 4
-#endif
-
 /******************************************************************************
  * Auditing routines
  */
