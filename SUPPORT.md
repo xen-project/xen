@@ -12,7 +12,7 @@ for the definitions of the support status levels etc.
     Xen-Version: 4.17
     Initial-Release: 2022-12-12
     Supported-Until: 2024-06-12
-    Security-Support-Until: 2025-12-12
+    Security-Support-Until: 2027-12-12
 
 Release Notes
 : <a href="https://wiki.xenproject.org/wiki/Xen_Project_4.17_Release_Notes">RN</a>
