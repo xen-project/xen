@@ -220,15 +220,15 @@ long arch_do_domctl(
     {
 
     case XEN_DOMCTL_shadow_op:
-#ifdef CONFIG_PAGING
+        ret = -EOPNOTSUPP;
+        if ( !IS_ENABLED(CONFIG_PAGING) )
+            break;
+
         ret = paging_domctl(d, &domctl->u.shadow_op, u_domctl, 0);
         if ( ret == -ERESTART )
             return hypercall_create_continuation(
                        __HYPERVISOR_paging_domctl_cont, "h", u_domctl);
         copyback = true;
-#else
-        ret = -EOPNOTSUPP;
-#endif
         break;
 
     case XEN_DOMCTL_ioport_permission:
@@ -842,10 +842,13 @@ long arch_do_domctl(
         }
         break;
 
-#ifdef CONFIG_HVM
     case XEN_DOMCTL_debug_op:
     {
         struct vcpu *v;
+
+        ret = -EOPNOTSUPP;
+        if ( !IS_ENABLED(CONFIG_HVM) )
+            break;
 
         ret = -EINVAL;
         if ( (domctl->u.debug_op.vcpu >= d->max_vcpus) ||
@@ -860,7 +863,6 @@ long arch_do_domctl(
         ret = hvm_debug_op(v, domctl->u.debug_op.op);
         break;
     }
-#endif
 
     case XEN_DOMCTL_gdbsx_guestmemio:
     case XEN_DOMCTL_gdbsx_pausevcpu:
@@ -1033,15 +1035,18 @@ long arch_do_domctl(
         break;
     }
 
-#ifdef CONFIG_MEM_SHARING
     case XEN_DOMCTL_mem_sharing_op:
+        ret = -EOPNOTSUPP;
+        if ( !IS_ENABLED(CONFIG_MEM_SHARING) )
+            break;
+
         ret = mem_sharing_domctl(d, &domctl->u.mem_sharing_op);
         break;
-#endif
 
-#if P2M_AUDIT
     case XEN_DOMCTL_audit_p2m:
-        if ( d == currd )
+        if ( !P2M_AUDIT )
+            ret = -EOPNOTSUPP;
+        else if ( d == currd )
             ret = -EPERM;
         else
         {
@@ -1052,7 +1057,6 @@ long arch_do_domctl(
             copyback = true;
         }
         break;
-#endif /* P2M_AUDIT */
 
     case XEN_DOMCTL_set_broken_page_p2m:
     {
@@ -1240,9 +1244,12 @@ long arch_do_domctl(
         break;
 
     case XEN_DOMCTL_psr_alloc:
+        ret = -EOPNOTSUPP;
+        if ( !IS_ENABLED(CONFIG_X86_PSR) )
+            break;
+
         switch ( domctl->u.psr_alloc.cmd )
         {
-#ifdef CONFIG_X86_PSR
         case XEN_DOMCTL_PSR_SET_L3_CBM:
             ret = psr_set_val(d, domctl->u.psr_alloc.target,
                               domctl->u.psr_alloc.data,
@@ -1304,8 +1311,6 @@ long arch_do_domctl(
             break;
 
 #undef domctl_psr_get_val
-
-#endif /* CONFIG_X86_PSR */
 
         default:
             ret = -EOPNOTSUPP;

@@ -9,10 +9,12 @@
 #ifndef __MEM_SHARING_H__
 #define __MEM_SHARING_H__
 
-#include <public/domctl.h>
-#include <public/memory.h>
+struct xen_domctl_mem_sharing_op;
 
 #ifdef CONFIG_MEM_SHARING
+#include <xen/sched.h>
+
+struct xen_mem_sharing_op;
 
 #define mem_sharing_enabled(d) ((d)->arch.hvm.mem_sharing.enabled)
 
@@ -92,8 +94,6 @@ int mem_sharing_fork_reset(struct domain *d, bool reset_state,
 int mem_sharing_notify_enomem(struct domain *d, unsigned long gfn,
                               bool allow_sleep);
 int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg);
-int mem_sharing_domctl(struct domain *d,
-                       struct xen_domctl_mem_sharing_op *mec);
 
 /*
  * Scans the p2m and relinquishes any shared pages, destroying
@@ -103,6 +103,7 @@ int mem_sharing_domctl(struct domain *d,
 int relinquish_shared_pages(struct domain *d);
 
 #else
+struct domain;
 
 #define mem_sharing_enabled(d) false
 
@@ -146,5 +147,8 @@ static inline int mem_sharing_fork_reset(struct domain *d, bool reset_state,
 }
 
 #endif
+
+int mem_sharing_domctl(struct domain *d,
+                       struct xen_domctl_mem_sharing_op *mec);
 
 #endif /* __MEM_SHARING_H__ */

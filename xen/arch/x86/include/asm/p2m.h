@@ -806,12 +806,8 @@ static inline void p2m_pt_init(struct p2m_domain *p2m) {}
 void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
                      p2m_query_t q, uint32_t *pfec);
 
-#if P2M_AUDIT
-extern void audit_p2m(struct domain *d,
-                      uint64_t *orphans,
-                      uint64_t *m2p_bad,
-                      uint64_t *p2m_bad);
-#endif /* P2M_AUDIT */
+void audit_p2m(struct domain *d, uint64_t *orphans,
+               uint64_t *m2p_bad, uint64_t *p2m_bad);
 
 /* Printouts */
 #define P2M_PRINTK(f, a...)                                \
