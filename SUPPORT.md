@@ -12,7 +12,7 @@ for the definitions of the support status levels etc.
     Xen-Version: 4.19
     Initial-Release: 2024-07-29
     Supported-Until: 2026-01-29
-    Security-Support-Until: 2027-07-29
+    Security-Support-Until: 2029-07-29
 
 Release Notes
 : <a href="https://wiki.xenproject.org/wiki/Xen_Project_4.19_Release_Notes">RN</a>
