@@ -956,6 +956,9 @@ void vcpu_sleep_sync(struct vcpu *v)
     while ( !vcpu_runnable(v) && v->is_running )
         cpu_relax();
 
+    /* Sync state /after/ observing the running flag clear. */
+    smp_rmb();
+
     sync_vcpu_execstate(v);
 }
 
@@ -2308,11 +2311,13 @@ static struct sched_unit *do_schedule(struct sched_unit *prev, s_time_t now,
 
 static void vcpu_context_saved(struct vcpu *vprev, struct vcpu *vnext)
 {
-    /* Clear running flag /after/ writing context to memory. */
-    smp_wmb();
-
     if ( vprev != vnext )
+    {
+        /* Clear running flag /after/ writing context to memory. */
+        smp_wmb();
+
         vprev->is_running = false;
+    }
 }
 
 static void unit_context_saved(struct sched_resource *sr)

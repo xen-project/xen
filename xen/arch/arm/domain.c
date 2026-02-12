@@ -333,17 +333,7 @@ void sync_local_execstate(void)
 
 void sync_vcpu_execstate(struct vcpu *v)
 {
-    /*
-     * We don't support lazy switching.
-     *
-     * However the context may have been saved from a remote pCPU so we
-     * need a barrier to ensure it is observed before continuing.
-     *
-     * Per vcpu_context_saved(), the context can be observed when
-     * v->is_running is false (the caller should check it before calling
-     * this function).
-     */
-    smp_rmb();
+    /* Nothing to do -- no lazy switching */
 }
 
 #define NEXT_ARG(fmt, args)                                                 \
