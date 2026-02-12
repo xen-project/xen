@@ -11,8 +11,8 @@ for the definitions of the support status levels etc.
 
     Xen-Version: 4.21
     Initial-Release: 2025-11-19
-    Supported-Until: 2027-05-19
-    Security-Support-Until: 2028-11-19
+    Supported-Until: 2028-11-19
+    Security-Support-Until: 2030-11-19
 
 Release Notes
 : <a href="https://wiki.xenproject.org/wiki/Xen_Project_4.21_Release_Notes">RN</a>
