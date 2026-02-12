@@ -1242,11 +1242,10 @@ const char *canonicalize(struct connection *conn, const void *ctx,
 	 * - illegal character in node
 	 * - starts with '@' but no special node allowed
 	 */
-	errno = EINVAL;
 	if (!node ||
 	    !valid_chars(node) ||
 	    (node[0] == '@' && !allow_special))
-		return NULL;
+		goto inval;
 
 	if (node[0] != '/' && node[0] != '@') {
 		name = talloc_asprintf(ctx, "%s/%s", get_implicit_path(conn),
@@ -1274,6 +1273,8 @@ const char *canonicalize(struct connection *conn, const void *ctx,
 	if (name != node)
 		talloc_free(name);
 
+ inval:
+	errno = EINVAL;
 	return NULL;
 }
 
