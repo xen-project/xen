@@ -675,7 +675,8 @@ static size_t __init get_esrt_size(const EFI_MEMORY_DESCRIPTOR *desc)
     if ( esrt_ptr->FwResourceCount > available_len / sizeof(esrt_ptr->Entries[0]) )
         return 0;
 
-    return esrt_ptr->FwResourceCount * sizeof(esrt_ptr->Entries[0]);
+    return offsetof(EFI_SYSTEM_RESOURCE_TABLE,
+                    Entries[esrt_ptr->FwResourceCount]);
 }
 
 static EFI_GUID __initdata esrt_guid = EFI_SYSTEM_RESOURCE_TABLE_GUID;
