@@ -413,7 +413,7 @@ ifneq ($(CONFIG_CC_IS_CLANG),y)
 CFLAGS += -Wa,--strip-local-absolute
 endif
 
-$(call cc-option-add,AFLAGS,CC,-Wa$$(comma)--noexecstack)
+$(call cc-option-add,CFLAGS,CC,-Wa$$(comma)--noexecstack)
 
 LDFLAGS-$(call ld-option,--warn-rwx-segments) += --no-warn-rwx-segments
 
