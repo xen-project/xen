@@ -1065,7 +1065,8 @@ static int __init add_user_rmrr(void)
 static int __init cf_check add_one_extra_rmrr(xen_pfn_t start, xen_ulong_t nr, u32 id, void *ctxt)
 {
     u32 sbdf_array[] = { id };
-    return add_one_user_rmrr(start, start+nr, 1, sbdf_array);
+
+    return add_one_user_rmrr(start, start + nr - 1, 1, sbdf_array);
 }
 
 static int __init add_extra_rmrr(void)
