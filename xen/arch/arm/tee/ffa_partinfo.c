@@ -29,12 +29,6 @@ struct ffa_partition_info_1_1 {
     uint8_t uuid[16];
 };
 
-/* SPs subscribing to VM_CREATE and VM_DESTROYED events */
-static uint16_t *subscr_vm_created __read_mostly;
-static uint16_t subscr_vm_created_count __read_mostly;
-static uint16_t *subscr_vm_destroyed __read_mostly;
-static uint16_t subscr_vm_destroyed_count __read_mostly;
-
 /* SP list cache (secure endpoints only); populated at init. */
 static void *sp_list __read_mostly;
 static uint32_t sp_list_count __read_mostly;
@@ -90,6 +84,14 @@ static uint16_t ffa_sp_entry_read_id(const void *entry)
     return get_unaligned_t(uint16_t,
                            (const uint8_t *)entry +
                            offsetof(struct ffa_partition_info_1_0, id));
+}
+
+static uint32_t ffa_sp_entry_read_partition_properties(const void *entry)
+{
+    return get_unaligned_t(uint32_t,
+                           (const uint8_t *)entry +
+                           offsetof(struct ffa_partition_info_1_0,
+                                    partition_properties));
 }
 
 static bool ffa_sp_entry_matches_uuid(const void *entry, struct ffa_uuid uuid)
@@ -440,14 +442,6 @@ static void ffa_sp_list_cache_free(void)
     sp_list_entry_size = 0;
 }
 
-static void uninit_subscribers(void)
-{
-        subscr_vm_created_count = 0;
-        subscr_vm_destroyed_count = 0;
-        XFREE(subscr_vm_created);
-        XFREE(subscr_vm_destroyed);
-}
-
 static bool ffa_sp_list_cache_init(const void *buf, uint32_t count,
                                    uint32_t fpi_size)
 {
@@ -505,79 +499,6 @@ static bool ffa_sp_list_cache_init(const void *buf, uint32_t count,
     return true;
 }
 
-static bool init_subscribers(void *buf, uint16_t count, uint32_t fpi_size)
-{
-    uint16_t n;
-    uint16_t c_pos;
-    uint16_t d_pos;
-    struct ffa_partition_info_1_1 *fpi;
-
-    if ( fpi_size < sizeof(struct ffa_partition_info_1_1) )
-    {
-        printk(XENLOG_ERR "ffa: partition info size invalid: %u\n", fpi_size);
-        return false;
-    }
-
-    subscr_vm_created_count = 0;
-    subscr_vm_destroyed_count = 0;
-    for ( n = 0; n < count; n++ )
-    {
-        fpi = buf + n * fpi_size;
-
-        /*
-         * We need to have secure partitions using bit 15 set convention for
-         * secure partition IDs.
-         * Inform the user with a log and discard giving created or destroy
-         * event to those IDs.
-         */
-        if ( !FFA_ID_IS_SECURE(fpi->id) )
-        {
-            printk_once(XENLOG_ERR
-                        "ffa: Firmware is not using bit 15 convention for IDs !!\n");
-            printk(XENLOG_ERR
-                   "ffa: Secure partition with id 0x%04x cannot be used\n",
-                   fpi->id);
-        }
-        else
-        {
-            if ( fpi->partition_properties & FFA_PART_PROP_NOTIF_CREATED )
-                subscr_vm_created_count++;
-            if ( fpi->partition_properties & FFA_PART_PROP_NOTIF_DESTROYED )
-                subscr_vm_destroyed_count++;
-        }
-    }
-
-    if ( subscr_vm_created_count )
-        subscr_vm_created = xzalloc_array(uint16_t, subscr_vm_created_count);
-    if ( subscr_vm_destroyed_count )
-        subscr_vm_destroyed = xzalloc_array(uint16_t,
-                                            subscr_vm_destroyed_count);
-    if ( (subscr_vm_created_count && !subscr_vm_created) ||
-         (subscr_vm_destroyed_count && !subscr_vm_destroyed) )
-    {
-        printk(XENLOG_ERR "ffa: Failed to allocate subscription lists\n");
-        uninit_subscribers();
-        return false;
-    }
-
-    for ( c_pos = 0, d_pos = 0, n = 0; n < count; n++ )
-    {
-        fpi = buf + n * fpi_size;
-
-        if ( FFA_ID_IS_SECURE(fpi->id) )
-        {
-            if ( fpi->partition_properties & FFA_PART_PROP_NOTIF_CREATED )
-                subscr_vm_created[c_pos++] = fpi->id;
-            if ( fpi->partition_properties & FFA_PART_PROP_NOTIF_DESTROYED )
-                subscr_vm_destroyed[d_pos++] = fpi->id;
-        }
-    }
-
-    return true;
-}
-
-
-
 bool ffa_partinfo_init(void)
 {
     bool ret = false;
@@ -617,52 +538,39 @@ bool ffa_partinfo_init(void)
         goto out_release_rx;
     }
 
-    if ( !init_subscribers(sp_list, sp_list_count, sp_list_entry_size) )
-        goto out_free_sp_cache;
-
     ret = true;
     goto out_release_rx;
-
-out_free_sp_cache:
-    ffa_sp_list_cache_free();
 
 out_release_rx:
     e = ffa_rxtx_spmc_rx_release(notify_fw);
     if ( e )
         printk(XENLOG_WARNING "ffa: Error releasing SPMC RX buffer: %d\n", e);
-
+    if ( !ret )
+        ffa_sp_list_cache_free();
     return ret;
 }
 
-static bool is_in_subscr_list(const uint16_t *subscr, uint16_t start,
-                              uint16_t end, uint16_t sp_id)
-{
-    unsigned int n;
-
-    for ( n = start; n < end; n++ )
-    {
-        if ( subscr[n] == sp_id )
-            return true;
-    }
-
-    return false;
-}
-
 static void vm_destroy_bitmap_init(struct ffa_ctx *ctx,
-                                   unsigned int create_signal_count)
+                                   unsigned int first_unnotified)
 {
     unsigned int n;
 
-    for ( n = 0; n < subscr_vm_destroyed_count; n++ )
+    for ( n = 0; n < sp_list_count; n++ )
     {
+        const void *entry = sp_list + n * sp_list_entry_size;
+        uint32_t partition_props =
+            ffa_sp_entry_read_partition_properties(entry);
+
+        if ( !(partition_props & FFA_PART_PROP_NOTIF_DESTROYED) )
+            continue;
+
         /*
          * Skip SPs subscribed to the VM created event that never was
          * notified of the VM creation due to an error during
          * ffa_domain_init().
          */
-        if ( is_in_subscr_list(subscr_vm_created, create_signal_count,
-                               subscr_vm_created_count,
-                               subscr_vm_destroyed[n]) )
+        if ( (partition_props & FFA_PART_PROP_NOTIF_CREATED) &&
+             n >= first_unnotified )
             continue;
 
         set_bit(n, ctx->vm_destroy_bitmap);
@@ -671,32 +579,42 @@ static void vm_destroy_bitmap_init(struct ffa_ctx *ctx,
 
 int32_t ffa_partinfo_domain_init(struct domain *d)
 {
-    unsigned int count = BITS_TO_LONGS(subscr_vm_destroyed_count);
+    unsigned int count = BITS_TO_LONGS(sp_list_count);
     struct ffa_ctx *ctx = d->arch.tee;
     unsigned int n;
+    unsigned int first_unnotified = sp_list_count;
     int32_t res;
 
-    if ( !ffa_fw_supports_fid(FFA_MSG_SEND_DIRECT_REQ_32) )
+    if ( !ffa_fw_supports_fid(FFA_MSG_SEND_DIRECT_REQ_32) || !sp_list_count )
         return 0;
 
     ctx->vm_destroy_bitmap = xzalloc_array(unsigned long, count);
     if ( !ctx->vm_destroy_bitmap )
         return -ENOMEM;
 
-    for ( n = 0; n < subscr_vm_created_count; n++ )
+    for ( n = 0; n < sp_list_count; n++ )
     {
-        res = ffa_direct_req_send_vm(subscr_vm_created[n], ffa_get_vm_id(d),
+        const void *entry = sp_list + n * sp_list_entry_size;
+        uint32_t partition_props =
+            ffa_sp_entry_read_partition_properties(entry);
+        uint16_t id = ffa_sp_entry_read_id(entry);
+
+        if ( !(partition_props & FFA_PART_PROP_NOTIF_CREATED) )
+            continue;
+
+        res = ffa_direct_req_send_vm(id, ffa_get_vm_id(d),
                                      FFA_MSG_SEND_VM_CREATED);
         if ( res )
         {
             printk(XENLOG_ERR "ffa: Failed to report creation of vm_id %u to  %u: res %d\n",
-                   ffa_get_vm_id(d), subscr_vm_created[n], res);
+                   ffa_get_vm_id(d), id, res);
+            first_unnotified = n;
             break;
         }
     }
-    vm_destroy_bitmap_init(ctx, n);
+    vm_destroy_bitmap_init(ctx, first_unnotified);
 
-    if ( n != subscr_vm_created_count )
+    if ( first_unnotified != sp_list_count )
         return -EIO;
 
     return 0;
@@ -711,18 +629,24 @@ bool ffa_partinfo_domain_destroy(struct domain *d)
     if ( !ctx->vm_destroy_bitmap )
         return true;
 
-    for ( n = 0; n < subscr_vm_destroyed_count; n++ )
+    for ( n = 0; n < sp_list_count; n++ )
     {
+        const void *entry;
+        uint16_t id;
+
         if ( !test_bit(n, ctx->vm_destroy_bitmap) )
             continue;
 
-        res = ffa_direct_req_send_vm(subscr_vm_destroyed[n], ffa_get_vm_id(d),
+        entry = sp_list + n * sp_list_entry_size;
+        id = ffa_sp_entry_read_id(entry);
+
+        res = ffa_direct_req_send_vm(id, ffa_get_vm_id(d),
                                      FFA_MSG_SEND_VM_DESTROYED);
 
         if ( res && printk_ratelimit() )
             printk(XENLOG_WARNING
                    "%pd: ffa: Failed to report destruction of vm_id %u to %u: res %d\n",
-                   d, ffa_get_vm_id(d), subscr_vm_destroyed[n], res);
+                   d, ffa_get_vm_id(d), id, res);
 
         /*
          * For these two error codes the hypervisor is expected to resend
@@ -734,7 +658,7 @@ bool ffa_partinfo_domain_destroy(struct domain *d)
             clear_bit(n, ctx->vm_destroy_bitmap);
     }
 
-    if ( bitmap_empty(ctx->vm_destroy_bitmap, subscr_vm_destroyed_count) )
+    if ( bitmap_empty(ctx->vm_destroy_bitmap, sp_list_count) )
         XFREE(ctx->vm_destroy_bitmap);
 
     return !ctx->vm_destroy_bitmap;
