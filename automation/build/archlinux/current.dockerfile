@@ -6,7 +6,6 @@ LABEL maintainer.name="The Xen Project" \
 RUN pacman-key --init
 
 RUN pacman -S --refresh --sysupgrade --noconfirm --noprogressbar --needed \
-        bridge-utils \
         bzip2 \
         cpio \
         discount \
