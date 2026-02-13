@@ -6,6 +6,8 @@
 #include <xen/const.h>
 #include <xen/sizes.h>
 #include <xen/types.h>
+#include <xen/unaligned.h>
+#include <xen/xmalloc.h>
 
 #include <asm/smccc.h>
 #include <asm/regs.h>
@@ -33,6 +35,10 @@ static uint16_t subscr_vm_created_count __read_mostly;
 static uint16_t *subscr_vm_destroyed __read_mostly;
 static uint16_t subscr_vm_destroyed_count __read_mostly;
 
+/* SP list cache (secure endpoints only); populated at init. */
+static void *sp_list __read_mostly;
+static uint32_t sp_list_count __read_mostly;
+static uint32_t sp_list_entry_size __read_mostly;
 static int32_t ffa_partition_info_get(struct ffa_uuid uuid, uint32_t flags,
                                       uint32_t *count, uint32_t *fpi_size)
 {
@@ -79,12 +85,46 @@ static int32_t ffa_copy_info(void **dst, void *dst_end, const void *src,
     return FFA_RET_OK;
 }
 
+static uint16_t ffa_sp_entry_read_id(const void *entry)
+{
+    return get_unaligned_t(uint16_t,
+                           (const uint8_t *)entry +
+                           offsetof(struct ffa_partition_info_1_0, id));
+}
+
+static bool ffa_sp_entry_matches_uuid(const void *entry, struct ffa_uuid uuid)
+{
+    struct ffa_uuid sp_uuid;
+
+    if ( ffa_uuid_is_nil(uuid) )
+        return true;
+
+    memcpy(&sp_uuid,
+           (const uint8_t *)entry +
+           offsetof(struct ffa_partition_info_1_1, uuid),
+           sizeof(sp_uuid));
+    return ffa_uuid_equal(uuid, sp_uuid);
+}
+
 static int32_t ffa_get_sp_count(struct ffa_uuid uuid, uint32_t *sp_count)
 {
-    uint32_t src_size;
+    uint32_t count = 0;
+    uint32_t n;
 
-    return ffa_partition_info_get(uuid, FFA_PARTITION_INFO_GET_COUNT_FLAG,
-                                  sp_count, &src_size);
+    for ( n = 0; n < sp_list_count; n++ )
+    {
+        void *entry = sp_list + n * sp_list_entry_size;
+
+        if ( ffa_sp_entry_matches_uuid(entry, uuid) )
+            count++;
+    }
+
+    *sp_count = count;
+
+    if ( !ffa_uuid_is_nil(uuid) && !count )
+        return FFA_RET_INVALID_PARAMETERS;
+
+    return FFA_RET_OK;
 }
 
 static int32_t ffa_get_sp_partinfo(struct ffa_uuid uuid, uint32_t *sp_count,
@@ -92,79 +132,37 @@ static int32_t ffa_get_sp_partinfo(struct ffa_uuid uuid, uint32_t *sp_count,
                                    uint32_t dst_size)
 {
     int32_t ret;
-    int32_t release_ret;
-    uint32_t src_size, real_sp_count;
-    void *src_buf;
     uint32_t count = 0;
-    bool notify_fw = false;
+    uint32_t n;
 
-    /* We need to use the RX buffer to receive the list */
-    src_buf = ffa_rxtx_spmc_rx_acquire();
-    if ( !src_buf )
-        return FFA_RET_DENIED;
-
-    ret = ffa_partition_info_get(uuid, 0, &real_sp_count, &src_size);
-    if ( ret )
-        goto out;
-    notify_fw = true;
-
-    /* Validate the src_size we got */
-    if ( src_size < sizeof(struct ffa_partition_info_1_0) ||
-         src_size >= FFA_PAGE_SIZE )
+    for ( n = 0; n < sp_list_count; n++ )
     {
-        ret = FFA_RET_NOT_SUPPORTED;
-        goto out;
-    }
+        void *entry = sp_list + n * sp_list_entry_size;
 
-    /*
-     * Limit the maximum time we hold the CPU by limiting the number of SPs.
-     * We just ignore the extra ones as this is tested during init in
-     * ffa_partinfo_init so the only possible reason is SP have been added
-     * since boot.
-     */
-    if ( real_sp_count > FFA_MAX_NUM_SP )
-        real_sp_count = FFA_MAX_NUM_SP;
+        if ( !ffa_sp_entry_matches_uuid(entry, uuid) )
+            continue;
 
-    /* Make sure the data fits in our buffer */
-    if ( real_sp_count > (FFA_RXTX_PAGE_COUNT * FFA_PAGE_SIZE) / src_size )
-    {
-        ret = FFA_RET_NOT_SUPPORTED;
-        goto out;
-    }
+        /*
+         * If VM is 1.0 but firmware is 1.1 we could have several entries
+         * with the same ID but different UUIDs. In this case the VM will
+         * get a list with several time the same ID.
+         * This is a non-compliance to the specification but 1.0 VMs should
+         * handle that on their own to simplify Xen implementation.
+         */
+        ret = ffa_copy_info(dst_buf, end_buf, entry, dst_size,
+                            sp_list_entry_size);
+        if ( ret )
+            return ret;
 
-    for ( uint32_t sp_num = 0; sp_num < real_sp_count; sp_num++ )
-    {
-        struct ffa_partition_info_1_1 *fpi = src_buf;
-
-        /* filter out SP not following bit 15 convention if any */
-        if ( FFA_ID_IS_SECURE(fpi->id) )
-        {
-            /*
-             * If VM is 1.0 but firmware is 1.1 we could have several entries
-             * with the same ID but different UUIDs. In this case the VM will
-             * get a list with several time the same ID.
-             * This is a non-compliance to the specification but 1.0 VMs should
-             * handle that on their own to simplify Xen implementation.
-             */
-
-            ret = ffa_copy_info(dst_buf, end_buf, src_buf, dst_size, src_size);
-            if ( ret )
-                goto out;
-
-            count++;
-        }
-
-        src_buf += src_size;
+        count++;
     }
 
     *sp_count = count;
 
-out:
-    release_ret = ffa_rxtx_spmc_rx_release(notify_fw);
-    if ( release_ret )
-        gprintk(XENLOG_WARNING,
-                "ffa: Error releasing SPMC RX buffer: %d\n", release_ret);
-    return ret;
+    if ( !ffa_uuid_is_nil(uuid) && !count )
+        return FFA_RET_INVALID_PARAMETERS;
+
+    return FFA_RET_OK;
 }
 
 static int32_t ffa_get_vm_partinfo(struct ffa_uuid uuid, uint32_t start_index,
@@ -435,12 +433,76 @@ static int32_t ffa_direct_req_send_vm(uint16_t sp_id, uint16_t vm_id,
     return res;
 }
 
+static void ffa_sp_list_cache_free(void)
+{
+    XFREE(sp_list);
+    sp_list_count = 0;
+    sp_list_entry_size = 0;
+}
+
 static void uninit_subscribers(void)
 {
         subscr_vm_created_count = 0;
         subscr_vm_destroyed_count = 0;
         XFREE(subscr_vm_created);
         XFREE(subscr_vm_destroyed);
+}
+
+static bool ffa_sp_list_cache_init(const void *buf, uint32_t count,
+                                   uint32_t fpi_size)
+{
+    const uint8_t *src = buf;
+    uint32_t secure_count = 0;
+    uint32_t n, idx = 0;
+
+    if ( fpi_size < sizeof(struct ffa_partition_info_1_1) ||
+         fpi_size >= FFA_PAGE_SIZE )
+        return false;
+
+    if ( count > (FFA_RXTX_PAGE_COUNT * FFA_PAGE_SIZE) / fpi_size )
+        return false;
+
+    for ( n = 0; n < count; n++ )
+    {
+        const uint8_t *entry = src + n * fpi_size;
+        uint16_t id = ffa_sp_entry_read_id(entry);
+
+        if ( !FFA_ID_IS_SECURE(id) )
+        {
+            printk_once(XENLOG_ERR
+                        "ffa: Firmware is not using bit 15 convention for IDs !!\n");
+            printk(XENLOG_ERR
+                   "ffa: Secure partition with id 0x%04x cannot be used\n",
+                   id);
+            continue;
+        }
+
+        secure_count++;
+    }
+
+    if ( secure_count )
+    {
+        sp_list = xzalloc_bytes(secure_count * fpi_size);
+        if ( !sp_list )
+            return false;
+    }
+
+    sp_list_count = secure_count;
+    sp_list_entry_size = fpi_size;
+
+    for ( n = 0; n < count; n++ )
+    {
+        const uint8_t *entry = src + n * fpi_size;
+        uint16_t id = ffa_sp_entry_read_id(entry);
+
+        if ( !FFA_ID_IS_SECURE(id) )
+            continue;
+
+        memcpy(sp_list + idx * fpi_size, entry, fpi_size);
+        idx++;
+    }
+
+    return true;
 }
 
 static bool init_subscribers(void *buf, uint16_t count, uint32_t fpi_size)
@@ -538,7 +600,7 @@ bool ffa_partinfo_init(void)
     if ( e )
     {
         printk(XENLOG_ERR "ffa: Failed to get list of SPs: %d\n", e);
-        goto out;
+        goto out_release_rx;
     }
     notify_fw = true;
 
@@ -546,15 +608,29 @@ bool ffa_partinfo_init(void)
     {
         printk(XENLOG_ERR "ffa: More SPs than the maximum supported: %u - %u\n",
                count, FFA_MAX_NUM_SP);
-        goto out;
+        goto out_release_rx;
     }
 
-    ret = init_subscribers(spmc_rx, count, fpi_size);
+    if ( !ffa_sp_list_cache_init(spmc_rx, count, fpi_size) )
+    {
+        printk(XENLOG_ERR "ffa: Failed to cache SP list\n");
+        goto out_release_rx;
+    }
 
-out:
+    if ( !init_subscribers(sp_list, sp_list_count, sp_list_entry_size) )
+        goto out_free_sp_cache;
+
+    ret = true;
+    goto out_release_rx;
+
+out_free_sp_cache:
+    ffa_sp_list_cache_free();
+
+out_release_rx:
     e = ffa_rxtx_spmc_rx_release(notify_fw);
     if ( e )
         printk(XENLOG_WARNING "ffa: Error releasing SPMC RX buffer: %d\n", e);
+
     return ret;
 }
 
