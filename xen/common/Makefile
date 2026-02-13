@@ -61,7 +61,7 @@ obj-y += virtual_region.o
 obj-$(CONFIG_VM_EVENT) += vm_event.o
 obj-$(CONFIG_HAS_VMAP) += vmap.o
 obj-y += vsprintf.o
-obj-y += wait.o
+obj-$(CONFIG_VM_EVENT) += wait.o
 obj-bin-y += warning.init.o
 obj-y += xmalloc_tlsf.o
 

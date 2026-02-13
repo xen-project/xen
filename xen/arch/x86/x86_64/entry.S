@@ -664,7 +664,9 @@ FUNC(continue_pv_domain)
         ALTERNATIVE "", "mov $2, %eax; incsspd %eax", X86_FEATURE_XEN_SHSTK
 #endif
 
+#ifdef CONFIG_VM_EVENT
         call  check_wakeup_from_wait
+#endif
 ret_from_intr:
         GET_CURRENT(bx)
         testb $3, UREGS_cs(%rsp)

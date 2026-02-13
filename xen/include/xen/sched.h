@@ -293,7 +293,9 @@ struct vcpu
     /* Multicall information. */
     struct mc_state  mc_state;
 
+#ifdef CONFIG_VM_EVENT
     struct waitqueue_vcpu *waitqueue_vcpu;
+#endif
 
     struct evtchn_fifo_vcpu *evtchn_fifo;
 
