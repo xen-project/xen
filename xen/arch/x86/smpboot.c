@@ -1167,6 +1167,17 @@ void __init smp_prepare_cpus(void)
     initialize_cpu_data(0); /* Final full version of the data */
     print_cpu_info(0);
 
+    /*
+     * Cache {,compat_}gdt_l1e for the BSP now that physically relocation is
+     * done.  It must be after physical relocation of Xen, and before the
+     * first context_switch().
+     */
+    this_cpu(gdt_l1e) =
+        l1e_from_pfn(virt_to_mfn(boot_gdt), __PAGE_HYPERVISOR_RW);
+    if ( IS_ENABLED(CONFIG_PV32) )
+        this_cpu(compat_gdt_l1e) =
+            l1e_from_pfn(virt_to_mfn(boot_compat_gdt), __PAGE_HYPERVISOR_RW);
+
     boot_cpu_physical_apicid = get_apic_id();
     x86_cpu_to_apicid[0] = boot_cpu_physical_apicid;
 

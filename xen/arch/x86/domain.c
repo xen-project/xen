@@ -2053,6 +2053,8 @@ static always_inline bool need_full_gdt(const struct domain *d)
 
 static void update_xen_slot_in_full_gdt(const struct vcpu *v, unsigned int cpu)
 {
+    ASSERT(per_cpu(gdt_l1e, cpu).l1); /* Confirm these have been cached. */
+
     l1e_write(pv_gdt_ptes(v) + FIRST_RESERVED_GDT_PAGE,
               !is_pv_32bit_vcpu(v) ? per_cpu(gdt_l1e, cpu)
                                    : per_cpu(compat_gdt_l1e, cpu));
