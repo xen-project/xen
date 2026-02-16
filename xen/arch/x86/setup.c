@@ -2078,7 +2078,7 @@ void asmlinkage __init noreturn __start_xen(void)
                                            &this_cpu(stubs).mfn);
     BUG_ON(!this_cpu(stubs.addr));
 
-    traps_init(); /* Needs stubs allocated. */
+    traps_init(); /* Needs stubs allocated, must be before presmp_initcalls. */
 
     cpu_init();
 

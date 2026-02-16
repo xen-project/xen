@@ -1581,6 +1581,20 @@ static int _svm_cpu_up(bool bsp)
     /* Initialize OSVW bits to be used by guests */
     svm_host_osvw_init();
 
+    /*
+     * VMSAVE writes out the current full FS, GS, LDTR and TR segments, and
+     * the GS_SHADOW, SYSENTER and SYSCALL linkage MSRs.
+     *
+     * The segment data gets modified by the svm_load_segs() optimisation for
+     * PV context switches, but all values get reloaded at that point, as well
+     * as during context switch from SVM.
+     *
+     * If PV guests are available, it is critical that the SYSCALL linkage
+     * MSRs been configured at this juncture even in FRED mode.
+     */
+    if ( IS_ENABLED(CONFIG_PV) )
+        ASSERT(rdmsr(MSR_STAR) == XEN_MSR_STAR);
+
     svm_vmsave_pa(per_cpu(host_vmcb, cpu));
 
     return 0;
