@@ -260,7 +260,7 @@ static void read_map(FILE *in)
 	}
 }
 
-static void output_label(const char *label, bool keep)
+static void output_label(const char *label, const char *align, bool keep)
 {
 	static bool pending;
 
@@ -274,10 +274,10 @@ static void output_label(const char *label, bool keep)
 		return;
 
 	if (symbol_prefix_char) {
-		printf("DATA(%c%s, ALGN)\n", symbol_prefix_char, label);
+		printf("DATA(%c%s, %s)\n", symbol_prefix_char, label, align);
 		printf("#define CURRENT %c%s\n", symbol_prefix_char, label);
 	} else {
-		printf("DATA(%s, ALGN)\n", label);
+		printf("DATA(%s, %s)\n", label, align);
 		printf("#define CURRENT %s\n", label);
 	}
 }
@@ -360,9 +360,9 @@ static void write_src(void)
 
 	printf("#ifndef SYMBOLS_ORIGIN\n");
 	printf("#define SYMBOLS_ORIGIN 0\n");
-	output_label("symbols_addresses", false);
+	output_label("symbols_addresses", "ALGN", false);
 	printf("#else\n");
-	output_label("symbols_offsets", true);
+	output_label("symbols_offsets", "ALGN", true);
 	printf("#endif\n");
 	for (i = 0, ends = 0; i < table_cnt; i++) {
 		printf("\tPTR\t%#llx - SYMBOLS_ORIGIN\n", table[i].addr);
@@ -387,14 +387,14 @@ static void write_src(void)
 		       table[i].addr + table[i].size);
 	}
 
-	output_label("symbols_num_addrs", false);
+	output_label("symbols_num_addrs", "4", false);
 	printf("\t.long\t%d\n", table_cnt + ends);
 
 	/* table of offset markers, that give the offset in the compressed stream
 	 * every 256 symbols */
 	markers = malloc(sizeof(*markers) * ((table_cnt + ends + 255) >> 8));
 
-	output_label("symbols_names", false);
+	output_label("symbols_names", "1", false);
 	for (i = 0, off = 0, ends = 0; i < table_cnt; i++) {
 		if (((i + ends) & 0xFF) == 0)
 			markers[(i + ends) >> 8] = off;
@@ -419,11 +419,11 @@ static void write_src(void)
 		++off;
 	}
 
-	output_label("symbols_markers", false);
+	output_label("symbols_markers", "4", false);
 	for (i = 0; i < ((table_cnt + ends + 255) >> 8); i++)
 		printf("\t.long\t%d\n", markers[i]);
 
-	output_label("symbols_token_table", false);
+	output_label("symbols_token_table", "1", false);
 	off = 0;
 	for (i = 0; i < 256; i++) {
 		best_idx[i] = off;
@@ -432,12 +432,12 @@ static void write_src(void)
 		off += strlen(buf) + 1;
 	}
 
-	output_label("symbols_token_index", false);
+	output_label("symbols_token_index", "2", false);
 	for (i = 0; i < 256; i++)
 		printf("\t.short\t%d\n", best_idx[i]);
 
 	if (sort_by_name) {
-		output_label("symbols_num_names", false);
+		output_label("symbols_num_names", "4", false);
 		printf("\t.long\t%d\n", table_cnt);
 
 		/* Sorted by original symbol names and type. */
@@ -446,12 +446,12 @@ static void write_src(void)
 		/* A fixed sized array with two entries: offset in the
 		 * compressed stream (for symbol name), and offset in
 		 * symbols_addresses (or symbols_offset). */
-		output_label("symbols_sorted_offsets", false);
+		output_label("symbols_sorted_offsets", "4", false);
 		for (i = 0; i < table_cnt; i++)
 			printf("\t.long %u, %u\n", table[i].stream_offset, table[i].addr_idx);
 	}
 
-	output_label(NULL, false);
+	output_label(NULL, NULL, false);
 	free(markers);
 }
 
