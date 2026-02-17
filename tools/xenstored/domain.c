@@ -1344,7 +1344,7 @@ static bool init_domain(unsigned int domid)
 
 	return true;
 }
-void init_domains(void)
+void init_domains(bool live_update)
 {
 	unsigned int *domids = NULL;
 	unsigned int nr_domids = 0;
@@ -1356,12 +1356,15 @@ void init_domains(void)
 
 	while (!xenmanage_poll_changed_domain(xm_handle, &domid, &state, &caps,
 					      &unique_id)) {
-		nr_domids++;
-		domids = talloc_realloc(NULL, domids, unsigned int, nr_domids);
-		if (!domids)
-			barf_perror("Failed to reallocate domids");
+		if (!live_update) {
+			nr_domids++;
+			domids = talloc_realloc(NULL, domids,
+						unsigned int, nr_domids);
+			if (!domids)
+				barf_perror("Failed to reallocate domids");
 
-		domids[nr_domids - 1] = domid;
+			domids[nr_domids - 1] = domid;
+		}
 
 		if (caps & XENMANAGE_GETDOMSTATE_CAP_CONTROL) {
 			/*
@@ -1396,6 +1399,9 @@ void init_domains(void)
 
 	snprintf(store_domain_path, sizeof(store_domain_path),
 		 "/local/domain/%u", store_domid);
+
+	if (live_update)
+		return;
 
 	/*
 	 * Privileged domid must be first to setup structures for firing the

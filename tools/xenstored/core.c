@@ -2763,7 +2763,7 @@ int main(int argc, char *argv[])
 	/* Listen to hypervisor. */
 	if (!live_update) {
 		domain_init(-1);
-		init_domains();
+		init_domains(false);
 	}
 
 	/* redirect to /dev/null now we're ready to accept connections */
@@ -3109,6 +3109,7 @@ void read_state_global(const void *ctx, const void *state)
 	set_socket_fd(glb->socket_fd);
 
 	domain_init(glb->evtchn_fd);
+	init_domains(true);
 }
 
 static void add_buffered_data(struct buffered_data *bdata,
