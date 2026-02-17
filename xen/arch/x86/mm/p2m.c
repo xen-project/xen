@@ -464,6 +464,11 @@ void p2m_free_ptp(struct p2m_domain *p2m, struct page_info *pg)
     ASSERT(p2m->domain);
     ASSERT(p2m->domain->arch.paging.free_page);
 
+    /*
+     * Issue any pending flush here, in case it was deferred before.  The page
+     * will be returned to the paging pool now.
+     */
+    p2m_tlb_flush_sync(p2m);
     page_list_del(pg, &p2m->pages);
     p2m->domain->arch.paging.free_page(p2m->domain, pg);
 
