@@ -21,6 +21,12 @@ struct pcpu_info {
 /* tp points to one of these */
 extern struct pcpu_info pcpu_info[NR_CPUS];
 
+/* Per-VCPU state that lives at the top of the stack */
+struct cpu_info {
+    /* This should be the first member. */
+    struct cpu_user_regs guest_cpu_user_regs;
+};
+
 #define set_processor_id(id)    do { \
     tp->processor_id = (id);         \
 } while (0)

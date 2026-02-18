@@ -24,6 +24,30 @@ struct arch_vcpu_io {
 
 struct arch_vcpu {
     struct vcpu_vmid vmid;
+
+    /*
+     * Callee saved registers for Xen's state used to switch from
+     * prev's stack to the next's stack during context switch.
+     */
+    struct
+    {
+        register_t s0;
+        register_t s1;
+        register_t s2;
+        register_t s3;
+        register_t s4;
+        register_t s5;
+        register_t s6;
+        register_t s7;
+        register_t s8;
+        register_t s9;
+        register_t s10;
+        register_t s11;
+        register_t sp;
+        register_t ra;
+    } xen_saved_context;
+
+    struct cpu_info *cpu_info;
 };
 
 struct paging_domain {

@@ -143,7 +143,7 @@
 
 #define SMP_CACHE_BYTES (1 << 6)
 
-#define STACK_SIZE PAGE_SIZE
+#define STACK_SIZE (PAGE_SIZE << 3)
 
 #define IDENT_AREA_SIZE 64
 
