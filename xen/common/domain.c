@@ -475,12 +475,6 @@ struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
     v->vcpu_id = vcpu_id;
     v->dirty_cpu = VCPU_CPU_CLEAN;
 
-    rwlock_init(&v->virq_lock);
-
-    tasklet_init(&v->continue_hypercall_tasklet, NULL, NULL);
-
-    grant_table_init_vcpu(v);
-
     if ( is_idle_domain(d) )
     {
         v->runstate.state = RUNSTATE_running;
@@ -488,6 +482,12 @@ struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
     }
     else
     {
+        rwlock_init(&v->virq_lock);
+
+        tasklet_init(&v->continue_hypercall_tasklet, NULL, NULL);
+
+        grant_table_init_vcpu(v);
+
         v->runstate.state = RUNSTATE_offline;
         v->runstate.state_entry_time = NOW();
         set_bit(_VPF_down, &v->pause_flags);
@@ -516,7 +516,8 @@ struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
     }
 
     /* Must be called after making new vcpu visible to for_each_vcpu(). */
-    vcpu_check_shutdown(v);
+    if ( !is_idle_domain(d) )
+        vcpu_check_shutdown(v);
 
     return v;
 
