@@ -44,7 +44,7 @@ static struct page_info *translate_get_page(copy_info_t info, uint64_t addr,
     if ( !page )
         return NULL;
 
-    if ( !p2m_is_ram(p2mt) )
+    if ( write ? p2mt != p2m_ram_rw : !p2m_is_ram(p2mt) )
     {
         put_page(page);
         return NULL;
