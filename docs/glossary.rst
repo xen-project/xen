@@ -43,6 +43,9 @@ Glossary
      Sapphire Rapids (Server, 2023) CPUs.  AMD support only CET-SS, starting
      with Zen3 (Both client and server, 2020) CPUs.
 
+   event channel
+     A paravirtual facility for guests to send and receive interrupts.
+
    guest
      The term 'guest' has two different meanings, depending on context, and
      should not be confused with :term:`domain`.
