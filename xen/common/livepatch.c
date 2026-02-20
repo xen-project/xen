@@ -664,7 +664,8 @@ static inline int livepatch_check_expectations(const struct payload *payload)
     const struct livepatch_elf_sec *__sec = livepatch_elf_sec_by_name(elf, section_name); \
     if ( !__sec )                                                                         \
         break;                                                                            \
-    if ( !section_ok(elf, __sec, sizeof(*hook)) || __sec->sec->sh_size != sizeof(*hook) ) \
+    if ( !section_ok(elf, __sec, sizeof(*(hook))) ||                                      \
+         __sec->sec->sh_size != sizeof(*(hook)) )                                         \
         return -EINVAL;                                                                   \
     hook = __sec->addr;                                                                   \
 } while (0)
@@ -678,10 +679,10 @@ static inline int livepatch_check_expectations(const struct payload *payload)
     const struct livepatch_elf_sec *__sec = livepatch_elf_sec_by_name(elf, section_name); \
     if ( !__sec )                                                                         \
         break;                                                                            \
-    if ( !section_ok(elf, __sec, sizeof(*hook)) )                                         \
+    if ( !section_ok(elf, __sec, sizeof(*(hook))) )                                       \
         return -EINVAL;                                                                   \
     hook = __sec->addr;                                                                   \
-    nhooks = __sec->sec->sh_size / sizeof(*hook);                                         \
+    nhooks = __sec->sec->sh_size / sizeof(*(hook));                                       \
 } while (0)
 
 static int prepare_payload(struct payload *payload,

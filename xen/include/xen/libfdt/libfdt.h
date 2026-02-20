@@ -230,9 +230,9 @@ int fdt_next_subnode(const void *fdt, int offset);
  * literal.
  */
 #define fdt_for_each_subnode(node, fdt, parent)		\
-	for (node = fdt_first_subnode(fdt, parent);	\
-	     node >= 0;					\
-	     node = fdt_next_subnode(fdt, node))
+	for ((node) = fdt_first_subnode(fdt, parent);	\
+	     (node) >= 0;				\
+	     (node) = fdt_next_subnode(fdt, node))
 
 /**********************************************************************/
 /* General functions                                                  */

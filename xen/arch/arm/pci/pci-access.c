@@ -16,7 +16,7 @@
 #include <asm/io.h>
 
 #define INVALID_VALUE (~0U)
-#define PCI_ERR_VALUE(len) GENMASK(0, len * 8)
+#define PCI_ERR_VALUE(len) GENMASK(0, (len) * 8)
 
 static const struct pci_ops *get_ops(struct pci_host_bridge *bridge,
                                      pci_sbdf_t sbdf)
@@ -139,14 +139,14 @@ static void pci_config_write(pci_sbdf_t sbdf, unsigned int reg,
     void pci_conf_write##size(pci_sbdf_t sbdf,              \
                               unsigned int reg, type data)  \
 {                                                           \
-    pci_config_write(sbdf, reg, size / 8, data);            \
+    pci_config_write(sbdf, reg, (size) / 8, data);          \
 }
 
 #define PCI_OP_READ(size, type)                             \
     type pci_conf_read##size(pci_sbdf_t sbdf,               \
                               unsigned int reg)             \
 {                                                           \
-    return pci_config_read(sbdf, reg, size / 8);            \
+    return pci_config_read(sbdf, reg, (size) / 8);          \
 }
 
 PCI_OP_READ(8, uint8_t)

@@ -203,7 +203,7 @@ const uint64_t mpoly = UINT64_C(0x1fffffff1fffffff);  /* Poly key mask     */
 #define nh_16(mp, kp, nw, rh, rl)                                            \
 {   int i; uint64_t th, tl;                                                  \
     rh = rl = 0;                                                             \
-    for (i = 0; i < nw; i+= 2) {                                             \
+    for (i = 0; i < (nw); i+= 2) {                                           \
         MUL64(th,tl,get64PE((mp)+i  )+(kp)[i  ],get64PE((mp)+i+1)+(kp)[i+1]);\
         ADD128(rh,rl,th,tl);                                                 \
     }                                                                        \
@@ -211,7 +211,7 @@ const uint64_t mpoly = UINT64_C(0x1fffffff1fffffff);  /* Poly key mask     */
 #define nh_16_2(mp, kp, nw, rh, rl, rh1, rl1)                                \
 {   int i; uint64_t th, tl;                                                  \
     rh1 = rl1 = rh = rl = 0;                                                 \
-    for (i = 0; i < nw; i+= 2) {                                             \
+    for (i = 0; i < (nw); i+= 2) {                                           \
         MUL64(th,tl,get64PE((mp)+i  )+(kp)[i  ],get64PE((mp)+i+1)+(kp)[i+1]);\
         ADD128(rh,rl,th,tl);                                                 \
         MUL64(th,tl,get64PE((mp)+i  )+(kp)[i+2],get64PE((mp)+i+1)+(kp)[i+3]);\
@@ -223,7 +223,7 @@ const uint64_t mpoly = UINT64_C(0x1fffffff1fffffff);  /* Poly key mask     */
 #define nh_vmac_nhbytes(mp, kp, nw, rh, rl)                                  \
 {   int i; uint64_t th, tl;                                                  \
     rh = rl = 0;                                                             \
-    for (i = 0; i < nw; i+= 8) {                                             \
+    for (i = 0; i < (nw); i+= 8) {                                           \
         MUL64(th,tl,get64PE((mp)+i  )+(kp)[i  ],get64PE((mp)+i+1)+(kp)[i+1]);\
         ADD128(rh,rl,th,tl);                                                 \
         MUL64(th,tl,get64PE((mp)+i+2)+(kp)[i+2],get64PE((mp)+i+3)+(kp)[i+3]);\
@@ -237,7 +237,7 @@ const uint64_t mpoly = UINT64_C(0x1fffffff1fffffff);  /* Poly key mask     */
 #define nh_vmac_nhbytes_2(mp, kp, nw, rh, rl, rh1, rl1)                      \
 {   int i; uint64_t th, tl;                                                  \
     rh1 = rl1 = rh = rl = 0;                                                 \
-    for (i = 0; i < nw; i+= 8) {                                             \
+    for (i = 0; i < (nw); i+= 8) {                                           \
         MUL64(th,tl,get64PE((mp)+i  )+(kp)[i  ],get64PE((mp)+i+1)+(kp)[i+1]);\
         ADD128(rh,rl,th,tl);                                                 \
         MUL64(th,tl,get64PE((mp)+i  )+(kp)[i+2],get64PE((mp)+i+1)+(kp)[i+3]);\

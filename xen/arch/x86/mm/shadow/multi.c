@@ -796,7 +796,7 @@ do {                                                                    \
 do {                                                                    \
     int __done = 0;                                                     \
     _FOREACH_PRESENT_L1E(_sl1mfn, _sl1e, _gl1p,                         \
-                         ({ (__done = _done); }), _code);               \
+                         ({ __done = (_done); }), _code);               \
     _sl1mfn = sh_next_page(_sl1mfn);                                    \
     if ( !__done )                                                      \
         _FOREACH_PRESENT_L1E(_sl1mfn, _sl1e, _gl1p, _done, _code);      \

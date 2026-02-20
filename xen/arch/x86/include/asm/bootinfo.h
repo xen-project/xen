@@ -75,7 +75,7 @@ static inline unsigned int __init next_boot_module_index(
 #define for_each_boot_module_by_type(i, b, t)           \
     for ( (i) = first_boot_module_index(b, t);          \
           (i) <= (b)->nr_modules;                       \
-          (i) = next_boot_module_index(b, t, i + 1) )
+          (i) = next_boot_module_index(b, t, (i) + 1) )
 
 #endif /* X86_BOOTINFO_H */
 
