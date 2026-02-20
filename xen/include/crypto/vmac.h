@@ -1,6 +1,8 @@
 #ifndef HEADER_VMAC_H
 #define HEADER_VMAC_H
 
+#include <xen/types.h>
+
 /* --------------------------------------------------------------------------
  * VMAC and VHASH Implementation by Ted Krovetz (tdk@acm.org) and Wei Dai.
  * This implementation is herby placed in the public domain.
@@ -34,29 +36,6 @@
 #define hz (266e6)   ppc/arm
 #define hz (400e6)   mips
 */
-
-/* --------------------------------------------------------------------------
- * This implementation uses uint32_t and uint64_t as names for unsigned 32-
- * and 64-bit integer types. These are defined in C99 stdint.h. The
- * following may need adaptation if you are not running a C99 or
- * Microsoft C environment.
- * ----------------------------------------------------------------------- */
-#define VMAC_USE_STDINT 1  /* Set to zero if system has no stdint.h        */
- 
-#if VMAC_USE_STDINT && !_MSC_VER /* Try stdint.h if non-Microsoft          */
-#ifdef  __cplusplus
-#define __STDC_CONSTANT_MACROS
-#endif
-//#include <stdint.h>
-#elif (_MSC_VER)                  /* Microsoft C does not have stdint.h    */
-typedef unsigned __int32 uint32_t;
-typedef unsigned __int64 uint64_t;
-#define UINT64_C(v) v ## UI64
-#else                             /* Guess sensibly - may need adaptation  */
-typedef unsigned int uint32_t;
-typedef unsigned long long uint64_t;
-#define UINT64_C(v) v ## ULL
-#endif
 
 /* --------------------------------------------------------------------------
  * This implementation supports two free AES implementations: OpenSSL's and
