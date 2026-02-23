@@ -189,22 +189,24 @@ int x86emul_0f01(struct x86_emulate_state *s,
         generate_exception_if(!mode_ring0(), X86_EXC_GP, 0);
         fail_if(!ops->read_segment || !ops->read_msr ||
                 !ops->write_segment || !ops->write_msr);
-        if ( (rc = ops->read_segment(x86_seg_gs, &sreg,
-                                     ctxt)) != X86EMUL_OKAY ||
-             (rc = ops->read_msr(MSR_SHADOW_GS_BASE, &msr_val,
+        if ( (rc = ops->read_msr(MSR_GS_BASE, &sreg.base,
                                  ctxt)) != X86EMUL_OKAY ||
-             (rc = ops->write_msr(MSR_SHADOW_GS_BASE, sreg.base,
+             (rc = ops->read_msr(MSR_SHADOW_GS_BASE, &msr_val,
+                                 ctxt)) != X86EMUL_OKAY )
+            goto done;
+        if ( (rc = ops->write_msr(MSR_SHADOW_GS_BASE, sreg.base,
+                                  ctxt, false)) != X86EMUL_OKAY ||
+             (rc = ops->write_msr(MSR_GS_BASE, msr_val,
                                   ctxt, false)) != X86EMUL_OKAY )
-            goto done;
-        sreg.base = msr_val;
-        if ( (rc = ops->write_segment(x86_seg_gs, &sreg,
-                                      ctxt)) != X86EMUL_OKAY )
         {
-            /* Best effort unwind (i.e. no real error checking). */
-            if ( ops->write_msr(MSR_SHADOW_GS_BASE, msr_val,
-                                ctxt, false) == X86EMUL_EXCEPTION )
-                x86_emul_reset_event(ctxt);
-            goto done;
+            /*
+             * In real hardware, access to the registers cannot fail.  It is
+             * an error in Xen if the writes fail given that both MSRs have
+             * equivalent checks.
+             */
+            ASSERT_UNREACHABLE();
+            x86_emul_reset_event(ctxt);
+            generate_exception(X86_EXC_DF, 0);
         }
         break;
 
