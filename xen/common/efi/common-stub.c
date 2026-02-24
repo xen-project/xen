@@ -18,7 +18,6 @@ unsigned long efi_get_time(void)
     return 0;
 }
 
-void efi_halt_system(void) { }
 void efi_reset_system(bool warm) { }
 
 int efi_get_info(uint32_t idx, union xenpf_efi_info *info)

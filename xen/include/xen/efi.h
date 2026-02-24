@@ -42,7 +42,6 @@ void efi_init_memory(void);
 bool efi_boot_mem_unused(unsigned long *start, unsigned long *end);
 bool efi_rs_using_pgtables(void);
 unsigned long efi_get_time(void);
-void efi_halt_system(void);
 void efi_reset_system(bool warm);
 #ifndef COMPAT
 int efi_get_info(uint32_t idx, union xenpf_efi_info *info);

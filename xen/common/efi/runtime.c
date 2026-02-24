@@ -188,19 +188,6 @@ unsigned long efi_get_time(void)
                   time.Hour, time.Minute, time.Second);
 }
 
-void efi_halt_system(void)
-{
-    EFI_STATUS status;
-    struct efi_rs_state state = efi_rs_enter();
-
-    if ( !state.cr3 )
-        return;
-    status = efi_rs->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
-    efi_rs_leave(&state);
-
-    printk(XENLOG_WARNING "EFI: could not halt system (%#lx)\n", status);
-}
-
 void efi_reset_system(bool warm)
 {
     EFI_STATUS status;
