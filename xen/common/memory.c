@@ -991,7 +991,9 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
          * guaranteeing that it won't fall in the middle of the
          * [xatp->gpfn, xatp->gpfn + xatp->size) range checked above.
          */
-        BUILD_BUG_ON(INVALID_GFN_RAW + 1);
+        if ( gfn_x(INVALID_GFN) + 1 )
+            BUILD_ERROR("bad INVALID_GFN");
+
         return -EOVERFLOW;
     }
 

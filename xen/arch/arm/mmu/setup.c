@@ -59,7 +59,7 @@ DEFINE_BOOT_PAGE_TABLE(xen_fixmap);
 static DEFINE_PAGE_TABLES(xen_xenmap, XEN_NR_ENTRIES(2));
 
 /* Limits of the Xen heap */
-mfn_t directmap_mfn_start __read_mostly = INVALID_MFN_INITIALIZER;
+mfn_t directmap_mfn_start __read_mostly = INVALID_MFN;
 mfn_t directmap_mfn_end __read_mostly;
 vaddr_t directmap_virt_end __read_mostly;
 #ifdef CONFIG_ARM_64

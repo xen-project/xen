@@ -7,7 +7,7 @@
 #include <asm/mc146818rtc.h>
 
 #ifndef COMPAT
-mfn_t __read_mostly efi_l4_mfn = INVALID_MFN_INITIALIZER;
+mfn_t __read_mostly efi_l4_mfn = INVALID_MFN;
 
 void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t l4e)
 {
