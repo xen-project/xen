@@ -6,13 +6,7 @@
 
 TYPE_SAFE(unsigned long, mfn);
 #define PRI_mfn          "05lx"
-#define INVALID_MFN_RAW  (~0UL)
-#define INVALID_MFN      _mfn(INVALID_MFN_RAW)
-/*
- * To be used for global variable initialization. This workaround a bug
- * in GCC < 5.0.
- */
-#define INVALID_MFN_INITIALIZER { INVALID_MFN_RAW }
+#define INVALID_MFN      ((mfn_t){ ~0UL })
 
 #if 0
 #define mfn_t /* Grep fodder: mfn_t, _mfn() and mfn_x() are defined above */
@@ -42,13 +36,7 @@ static inline bool mfn_eq(mfn_t x, mfn_t y)
 
 TYPE_SAFE(unsigned long, gfn);
 #define PRI_gfn          "05lx"
-#define INVALID_GFN_RAW  (~0UL)
-#define INVALID_GFN      _gfn(INVALID_GFN_RAW)
-/*
- * To be used for global variable initialization. This workaround a bug
- * in GCC < 5.0 https://gcc.gnu.org/bugzilla/show_bug.cgi?id=64856
- */
-#define INVALID_GFN_INITIALIZER { INVALID_GFN_RAW }
+#define INVALID_GFN      ((gfn_t){ ~0UL })
 
 #if 0
 #define gfn_t /* Grep fodder: gfn_t, _gfn() and gfn_x() are defined above */

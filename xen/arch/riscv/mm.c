@@ -480,7 +480,7 @@ static void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
 static void __init setup_directmap_mappings(unsigned long base_mfn,
                                             unsigned long nr_mfns)
 {
-    static mfn_t __initdata directmap_mfn_start = INVALID_MFN_INITIALIZER;
+    static mfn_t __initdata directmap_mfn_start = INVALID_MFN;
 
     mfn_t base_mfn_t = _mfn(base_mfn);
     unsigned long base_addr = mfn_to_maddr(base_mfn_t);

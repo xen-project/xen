@@ -275,7 +275,7 @@ static PAGE_LIST_HEAD(page_broken_list);
  * When !CONFIG_NUMA first_valid_mfn is non-static, for use by respective
  * stubs.
  */
-STATIC_IF(CONFIG_NUMA) mfn_t first_valid_mfn = INVALID_MFN_INITIALIZER;
+STATIC_IF(CONFIG_NUMA) mfn_t first_valid_mfn = INVALID_MFN;
 
 struct bootmem_region {
     unsigned long s, e; /* MFNs @s through @e-1 inclusive are free */
