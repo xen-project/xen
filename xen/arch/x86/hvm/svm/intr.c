@@ -33,6 +33,12 @@ static void svm_inject_nmi(struct vcpu *v)
     u32 general1_intercepts = vmcb_get_general1_intercepts(vmcb);
     intinfo_t event;
 
+    if ( vmcb->_vintr.fields.vnmi_enable )
+    {
+        vmcb->_vintr.fields.vnmi_pending = true;
+        return;
+    }
+
     event.raw = 0;
     event.v = true;
     event.type = X86_ET_NMI;
@@ -142,6 +148,19 @@ void asmlinkage svm_intr_assist(void)
             return;
 
         intblk = hvm_interrupt_blocked(v, intack);
+
+        /*
+         * When vNMI is active, NMIs can be injected by setting vnmi_pending
+         * and hardware will deliver them at the next appropriate opportunity.
+         * Consider them not blocked, to avoid trying to open an NMI Window.
+         *
+         * Correctness here relies on the fact that all vNMI capable hardware
+         * has vGIF, and vGIF is always activated when appropriate.
+         */
+        if ( intblk == hvm_intblk_nmi_iret &&
+             vmcb->_vintr.fields.vnmi_enable )
+            intblk = hvm_intblk_none;
+
         if ( intblk == hvm_intblk_svm_gif )
         {
             ASSERT(nestedhvm_enabled(v->domain));
