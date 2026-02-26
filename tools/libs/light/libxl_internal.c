@@ -204,7 +204,7 @@ char *libxl__strndup(libxl__gc *gc, const char *c, size_t n)
 
 char *libxl__dirname(libxl__gc *gc, const char *s)
 {
-    char *c = strrchr(s, '/');
+    const char *c = strrchr(s, '/');
 
     if (!c)
         return NULL;
