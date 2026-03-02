@@ -39,7 +39,10 @@ static void cf_check init_hygon(struct cpuinfo_x86 *c)
 
 	amd_init_ssbd(c);
 
-	/* Probe for NSCB on Zen2 CPUs when not virtualised */
+	/*
+	 * Zen3 and later enumerate NullSelectorClearsBase.  Zen2 has this
+	 * behaviour but doesn't enumerate it.  Probe when not virtualised.
+	 */
 	if (!cpu_has_hypervisor && !cpu_has_nscb && c == &boot_cpu_data &&
 	    c->family == 0x18)
 		detect_zen2_null_seg_behaviour();

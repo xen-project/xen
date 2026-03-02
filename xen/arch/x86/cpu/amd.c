@@ -828,15 +828,11 @@ void amd_init_spectral_chicken(void)
 
 void __init detect_zen2_null_seg_behaviour(void)
 {
-	uint64_t base;
+    wrmsr(MSR_FS_BASE, 1);
+    asm volatile ( "mov %0, %%fs" :: "r" (0) );
 
-	wrmsrl(MSR_FS_BASE, 1);
-	asm volatile ( "mov %0, %%fs" :: "r" (0) );
-	rdmsrl(MSR_FS_BASE, base);
-
-	if (base == 0)
-		setup_force_cpu_cap(X86_FEATURE_NSCB);
-
+    if ( rdmsr(MSR_FS_BASE) == 0 )
+        setup_force_cpu_cap(X86_FEATURE_NSCB);
 }
 
 static void cf_check fam17_disable_c6(void *arg)
@@ -1110,7 +1106,10 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 	if (c->family == 0x17)
 		amd_init_spectral_chicken();
 
-	/* Probe for NSCB on Zen2 CPUs when not virtualised */
+	/*
+	 * Zen3 and later enumerate NullSelectorClearsBase.  Zen2 has this
+	 * behaviour but doesn't enumerate it.  Probe when not virtualised.
+	 */
 	if (!cpu_has_hypervisor && !cpu_has_nscb && c == &boot_cpu_data &&
 	    c->family == 0x17)
 		detect_zen2_null_seg_behaviour();
