@@ -117,10 +117,11 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 
     cur_ns = NOW();
     total_ns = cur_ns - this_dbs_info->prev_cpu_wall;
-    this_dbs_info->prev_cpu_wall = NOW();
 
     if (total_ns < MIN_DBS_INTERVAL)
         return;
+
+    this_dbs_info->prev_cpu_wall = cur_ns;
 
     /* Get Idle Time */
     for_each_cpu(j, policy->cpus) {
