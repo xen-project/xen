@@ -1100,7 +1100,7 @@ int main(int argc, char **argv)
     regs.edi    = (unsigned long)res;
     rc = x86_emulate(&ctxt, &emulops);
     if ( (rc != X86EMUL_OKAY) ||
-         (*res != ((0x2233445F << 2) | 2)) ||
+         (*res != ((0x2233445FU << 2) | 2)) ||
          ((regs.eflags & (EFLAGS_MASK & ~X86_EFLAGS_OF))
           != EFLAGS_ALWAYS_SET) ||
          (regs.eip != (unsigned long)&instr[3]) )
