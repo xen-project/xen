@@ -209,7 +209,7 @@ static void set_domain_state_info(struct xen_domctl_get_domain_state *info,
 int get_domain_state(struct xen_domctl_get_domain_state *info, struct domain *d,
                      domid_t *domid)
 {
-    unsigned int dom;
+    unsigned int dom = -1;
     int rc = -ENOENT;
     struct domain *hdl;
 
@@ -218,6 +218,10 @@ int get_domain_state(struct xen_domctl_get_domain_state *info, struct domain *d,
 
     if ( d )
     {
+        rc = xsm_get_domain_state(XSM_XS_PRIV, d);
+        if ( rc )
+            return rc;
+
         set_domain_state_info(info, d);
 
         return 0;
@@ -237,28 +241,31 @@ int get_domain_state(struct xen_domctl_get_domain_state *info, struct domain *d,
 
     while ( dom_state_changed )
     {
-        dom = find_first_bit(dom_state_changed, DOMID_MASK + 1);
+        dom = find_next_bit(dom_state_changed, DOMID_MASK + 1, dom + 1);
         if ( dom >= DOMID_FIRST_RESERVED )
             break;
-        if ( test_and_clear_bit(dom, dom_state_changed) )
+
+        d = rcu_lock_domain_by_id(dom);
+        if ( (d && xsm_get_domain_state(XSM_XS_PRIV, d)) ||
+             !test_and_clear_bit(dom, dom_state_changed) )
         {
-            *domid = dom;
-
-            d = rcu_lock_domain_by_id(dom);
-
             if ( d )
-            {
-                set_domain_state_info(info, d);
-
                 rcu_unlock_domain(d);
-            }
-            else
-                memset(info, 0, sizeof(*info));
-
-            rc = 0;
-
-            break;
+            continue;
         }
+
+        *domid = dom;
+
+        if ( d )
+        {
+            set_domain_state_info(info, d);
+            rcu_unlock_domain(d);
+        }
+        else
+            memset(info, 0, sizeof(*info));
+
+        rc = 0;
+        break;
     }
 
  out:
