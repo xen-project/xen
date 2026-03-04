@@ -17,8 +17,9 @@
  * License along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "private.h"
+
 #include <xen/sched.h>
-#include <xen/vpci.h>
 #include <xen/vmap.h>
 
 /* Internal struct to store the emulated PCI registers. */

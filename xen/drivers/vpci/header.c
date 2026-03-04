@@ -17,11 +17,12 @@
  * License along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "private.h"
+
 #include <xen/iocap.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/softirq.h>
-#include <xen/vpci.h>
 
 #include <xsm/xsm.h>
 

@@ -5,8 +5,9 @@
  * Author: Jiqian Chen <Jiqian.Chen@amd.com>
  */
 
+#include "private.h"
+
 #include <xen/sched.h>
-#include <xen/vpci.h>
 
 static void cf_check rebar_ctrl_write(const struct pci_dev *pdev,
                                       unsigned int reg,

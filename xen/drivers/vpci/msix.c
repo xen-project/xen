@@ -17,10 +17,11 @@
  * License along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "private.h"
+
 #include <xen/io.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
-#include <xen/vpci.h>
 
 #include <asm/msi.h>
 #include <asm/p2m.h>

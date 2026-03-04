@@ -86,6 +86,7 @@ typedef union {
 
 #define CONFIG_HAS_VPCI
 #include "vpci.h"
+#include "private.h"
 
 #define __hwdom_init
 

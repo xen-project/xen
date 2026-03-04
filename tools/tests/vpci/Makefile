@@ -14,12 +14,12 @@ else
 	$(warning HOSTCC != CC, will not run test)
 endif
 
-$(TARGET): vpci.c vpci.h list.h main.c emul.h
-	$(CC) $(CFLAGS_xeninclude) -g -o $@ vpci.c main.c
+$(TARGET): vpci.c vpci.h list.h private.h main.c emul.h
+	$(CC) $(CFLAGS_xeninclude) -include emul.h -g -o $@ vpci.c main.c
 
 .PHONY: clean
 clean:
-	rm -rf $(TARGET) *.o *~ vpci.h vpci.c list.h
+	rm -rf $(TARGET) *.o *~ vpci.h vpci.c list.h private.h
 
 .PHONY: distclean
 distclean: clean
@@ -34,10 +34,10 @@ uninstall:
 	$(RM) -- $(DESTDIR)$(LIBEXEC)/tests/$(TARGET)
 
 vpci.c: $(XEN_ROOT)/xen/drivers/vpci/vpci.c
-	# Remove includes and add the test harness header
-	sed -e '/#include/d' -e '1s/^/#include "emul.h"/' <$< >$@
+	sed -e '/#include/d' <$< >$@
 
-list.h: $(XEN_ROOT)/xen/include/xen/list.h
-vpci.h: $(XEN_ROOT)/xen/include/xen/vpci.h
-list.h vpci.h:
+private.h: %.h: $(XEN_ROOT)/xen/drivers/vpci/%.h
+	sed -e '/#include/d' <$< >$@
+
+list.h vpci.h: %.h: $(XEN_ROOT)/xen/include/xen/%.h
 	sed -e '/#include/d' <$< >$@

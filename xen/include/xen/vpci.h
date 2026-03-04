@@ -7,18 +7,7 @@
 #include <xen/types.h>
 #include <xen/list.h>
 
-typedef uint32_t vpci_read_t(const struct pci_dev *pdev, unsigned int reg,
-                             void *data);
-
-typedef void vpci_write_t(const struct pci_dev *pdev, unsigned int reg,
-                          uint32_t val, void *data);
-
-typedef struct {
-    unsigned int id;
-    bool is_ext;
-    int (* init)(struct pci_dev *pdev);
-    int (* cleanup)(const struct pci_dev *pdev, bool hide);
-} vpci_capability_t;
+#include <asm/vpci.h>
 
 #define VPCI_ECAM_BDF(addr)     (((addr) & 0x0ffff000) >> 12)
 
@@ -30,65 +19,16 @@ typedef struct {
  */
 #define VPCI_MAX_VIRT_DEV       (PCI_SLOT(~0) + 1)
 
-#define REGISTER_VPCI_CAPABILITY(cap, name, finit, fclean, ext) \
-    static const vpci_capability_t name##_entry \
-        __used_section(".data.rel.ro.vpci") = { \
-        .id = (cap), \
-        .init = (finit), \
-        .cleanup = (fclean), \
-        .is_ext = (ext), \
-    }
-
-#define REGISTER_VPCI_CAP(name, finit, fclean) \
-    REGISTER_VPCI_CAPABILITY(PCI_CAP_ID_##name, name, finit, fclean, false)
-#define REGISTER_VPCI_EXTCAP(name, finit, fclean) \
-    REGISTER_VPCI_CAPABILITY(PCI_EXT_CAP_ID_##name, name, finit, fclean, true)
-
-int __must_check vpci_init_header(struct pci_dev *pdev);
-
 /* Assign vPCI to device by adding handlers. */
 int __must_check vpci_assign_device(struct pci_dev *pdev);
 
 /* Remove all handlers and free vpci related structures. */
 void vpci_deassign_device(struct pci_dev *pdev);
 
-/* Add/remove a register handler. */
-int __must_check vpci_add_register_mask(struct vpci *vpci,
-                                        vpci_read_t *read_handler,
-                                        vpci_write_t *write_handler,
-                                        unsigned int offset, unsigned int size,
-                                        void *data, uint32_t ro_mask,
-                                        uint32_t rw1c_mask, uint32_t rsvdp_mask,
-                                        uint32_t rsvdz_mask);
-int __must_check vpci_add_register(struct vpci *vpci,
-                                   vpci_read_t *read_handler,
-                                   vpci_write_t *write_handler,
-                                   unsigned int offset, unsigned int size,
-                                   void *data);
-
-int vpci_remove_registers(struct vpci *vpci, unsigned int start,
-                          unsigned int size);
-
 /* Generic read/write handlers for the PCI config space. */
 uint32_t vpci_read(pci_sbdf_t sbdf, unsigned int reg, unsigned int size);
 void vpci_write(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
                 uint32_t data);
-
-/* Helper to return the value passed in data. */
-uint32_t cf_check vpci_read_val(
-    const struct pci_dev *pdev, unsigned int reg, void *data);
-
-/* Passthrough handlers. */
-uint32_t cf_check vpci_hw_read8(
-    const struct pci_dev *pdev, unsigned int reg, void *data);
-uint32_t cf_check vpci_hw_read16(
-    const struct pci_dev *pdev, unsigned int reg, void *data);
-uint32_t cf_check vpci_hw_read32(
-    const struct pci_dev *pdev, unsigned int reg, void *data);
-void cf_check vpci_hw_write8(
-    const struct pci_dev *pdev, unsigned int reg, uint32_t val, void *data);
-void cf_check vpci_hw_write16(
-    const struct pci_dev *pdev, unsigned int reg, uint32_t val, void *data);
 
 /*
  * Check for pending vPCI operations on this vcpu. Returns true if the vcpu
@@ -213,9 +153,6 @@ struct vpci_vcpu {
 #ifdef __XEN__
 void vpci_dump_msi(void);
 
-/* Make sure there's a hole in the p2m for the MSIX mmio areas. */
-int vpci_make_msix_hole(const struct pci_dev *pdev);
-
 /* Arch-specific vPCI MSI helpers. */
 void vpci_msi_arch_mask(struct vpci_msi *msi, const struct pci_dev *pdev,
                         unsigned int entry, bool mask);
@@ -237,48 +174,6 @@ int __must_check vpci_msix_arch_disable_entry(struct vpci_msix_entry *entry,
                                               const struct pci_dev *pdev);
 void vpci_msix_arch_init_entry(struct vpci_msix_entry *entry);
 int vpci_msix_arch_print(const struct vpci_msix *msix);
-
-/*
- * Helper functions to fetch MSIX related data. They are used by both the
- * emulated MSIX code and the BAR handlers.
- */
-static inline paddr_t vmsix_table_host_base(const struct vpci *vpci,
-                                            unsigned int nr)
-{
-    return vpci->header.bars[vpci->msix->tables[nr] & PCI_MSIX_BIRMASK].addr;
-}
-
-static inline paddr_t vmsix_table_host_addr(const struct vpci *vpci,
-                                            unsigned int nr)
-{
-    return vmsix_table_host_base(vpci, nr) +
-           (vpci->msix->tables[nr] & ~PCI_MSIX_BIRMASK);
-}
-
-static inline paddr_t vmsix_table_base(const struct vpci *vpci, unsigned int nr)
-{
-    return vpci->header.bars[vpci->msix->tables[nr] &
-                             PCI_MSIX_BIRMASK].guest_addr;
-}
-
-static inline paddr_t vmsix_table_addr(const struct vpci *vpci, unsigned int nr)
-{
-    return vmsix_table_base(vpci, nr) +
-           (vpci->msix->tables[nr] & ~PCI_MSIX_BIRMASK);
-}
-
-/*
- * Note regarding the size calculation of the PBA: the spec mentions "The last
- * QWORD will not necessarily be fully populated", so it implies that the PBA
- * size is 64-bit aligned.
- */
-static inline size_t vmsix_table_size(const struct vpci *vpci, unsigned int nr)
-{
-    return
-        (nr == VPCI_MSIX_TABLE) ? vpci->msix->max_entries * PCI_MSIX_ENTRY_SIZE
-                                : ROUNDUP(DIV_ROUND_UP(vpci->msix->max_entries,
-                                                       8), 8);
-}
 
 static inline unsigned int vmsix_entry_nr(const struct vpci_msix *msix,
                                           const struct vpci_msix_entry *entry)
