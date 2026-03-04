@@ -9,6 +9,20 @@ typedef uint32_t vpci_read_t(const struct pci_dev *pdev, unsigned int reg,
 typedef void vpci_write_t(const struct pci_dev *pdev, unsigned int reg,
                           uint32_t val, void *data);
 
+/* Internal struct to store the emulated PCI registers. */
+struct vpci_register {
+    vpci_read_t *read;
+    vpci_write_t *write;
+    unsigned int size;
+    unsigned int offset;
+    void *private;
+    struct list_head node;
+    uint32_t ro_mask;
+    uint32_t rw1c_mask;
+    uint32_t rsvdp_mask;
+    uint32_t rsvdz_mask;
+};
+
 typedef struct {
     unsigned int id;
     bool is_ext;
@@ -32,6 +46,9 @@ typedef struct {
 
 int __must_check vpci_init_header(struct pci_dev *pdev);
 
+int vpci_init_capabilities(struct pci_dev *pdev);
+void vpci_cleanup_capabilities(struct pci_dev *pdev);
+
 /* Add/remove a register handler. */
 int __must_check vpci_add_register_mask(struct vpci *vpci,
                                         vpci_read_t *read_handler,
@@ -48,6 +65,10 @@ int __must_check vpci_add_register(struct vpci *vpci,
 
 int vpci_remove_registers(struct vpci *vpci, unsigned int start,
                           unsigned int size);
+
+struct vpci_register *vpci_get_register(const struct vpci *vpci,
+                                        unsigned int offset,
+                                        unsigned int size);
 
 /* Helper to return the value passed in data. */
 uint32_t cf_check vpci_read_val(
