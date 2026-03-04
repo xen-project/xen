@@ -611,7 +611,8 @@ static int fetch(
     if ( verbose )
         printf("** %s(CS:%p,, %u,)\n", __func__, (void *)offset, bytes);
 
-    memcpy(p_data, (void *)offset, bytes);
+    if ( bytes )
+        memcpy(p_data, (void *)offset, bytes);
     return X86EMUL_OKAY;
 }
 
