@@ -135,6 +135,13 @@ struct vpci {
             struct vpci_arch_msix_entry arch;
         } entries[];
     } *msix;
+
+    /* Resizable BARs data */
+    struct vpci_rebar {
+        unsigned int offset:12;
+        unsigned int nbars:3;
+    } rebar;
+
 #ifdef CONFIG_HAS_VPCI_GUEST_SUPPORT
     /* Guest SBDF of the device. */
 #define INVALID_GUEST_SBDF ((pci_sbdf_t){ .sbdf = ~0U })

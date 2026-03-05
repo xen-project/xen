@@ -53,16 +53,11 @@ static void cf_check rebar_ctrl_write(const struct pci_dev *pdev,
 static int cf_check cleanup_rebar(const struct pci_dev *pdev, bool hide)
 {
     int rc;
-    uint32_t ctrl;
-    unsigned int nbars;
-    unsigned int rebar_offset = pci_find_ext_capability(pdev,
-                                                        PCI_EXT_CAP_ID_REBAR);
+    unsigned int nbars = pdev->vpci->rebar.nbars;
+    unsigned int rebar_offset = pdev->vpci->rebar.offset;
 
-    if ( !hide )
+    if ( !rebar_offset || !nbars || !hide )
         return 0;
-
-    ctrl = pci_conf_read32(pdev->sbdf, rebar_offset + PCI_REBAR_CTRL(0));
-    nbars = MASK_EXTR(ctrl, PCI_REBAR_CTRL_NBAR_MASK);
 
     rc = vpci_remove_registers(pdev->vpci, rebar_offset + PCI_REBAR_CAP(0),
                                PCI_REBAR_CTRL(nbars - 1));
@@ -121,6 +116,10 @@ static int cf_check init_rebar(struct pci_dev *pdev)
 
     ctrl = pci_conf_read32(pdev->sbdf, rebar_offset + PCI_REBAR_CTRL(0));
     nbars = MASK_EXTR(ctrl, PCI_REBAR_CTRL_NBAR_MASK);
+
+    pdev->vpci->rebar.offset = rebar_offset;
+    pdev->vpci->rebar.nbars  = nbars;
+
     for ( unsigned int i = 0; i < nbars; i++ )
     {
         int rc;
