@@ -1475,7 +1475,7 @@ static void cf_check complete_domain_destroy(struct rcu_head *head)
 {
     struct domain *d = container_of(head, struct domain, rcu);
     struct vcpu *v;
-    int i;
+    unsigned int i;
 
     /*
      * Flush all state for the vCPU previously having run on the current CPU.
@@ -1485,7 +1485,11 @@ static void cf_check complete_domain_destroy(struct rcu_head *head)
      */
     sync_local_execstate();
 
-    for ( i = d->max_vcpus - 1; i >= 0; i-- )
+    /*
+     * Iterating downwards is a requirement here, as e.g. sched_destroy_vcpu()
+     * relies on this.
+     */
+    for ( i = d->max_vcpus; i-- > 0; )
     {
         if ( (v = d->vcpu[i]) == NULL )
             continue;
@@ -1511,7 +1515,7 @@ static void cf_check complete_domain_destroy(struct rcu_head *head)
     xfree(d->vm_event_share);
 #endif
 
-    for ( i = d->max_vcpus - 1; i >= 0; i-- )
+    for ( i = d->max_vcpus; i-- > 0; )
         if ( (v = d->vcpu[i]) != NULL )
             vcpu_destroy(v);
 
