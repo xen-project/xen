@@ -278,6 +278,16 @@ void vcpu_kick(struct vcpu *v)
     }
 }
 
+void sync_local_execstate(void)
+{
+    /* Nothing to do -- no lazy switching */
+}
+
+void sync_vcpu_execstate(struct vcpu *v)
+{
+    /* Nothing to do -- no lazy switching */
+}
+
 static void __init __maybe_unused build_assertions(void)
 {
     /*
