@@ -231,6 +231,33 @@ void vcpu_sync_interrupts(struct vcpu *curr)
     }
 }
 
+void vcpu_flush_interrupts(struct vcpu *curr)
+{
+    ASSERT(curr == current);
+
+    if ( ACCESS_ONCE(curr->arch.irqs_pending_mask[0]) )
+    {
+        unsigned long mask = xchg(&curr->arch.irqs_pending_mask[0], 0UL);
+        unsigned long val = ACCESS_ONCE(curr->arch.irqs_pending[0]) & mask;
+        register_t *hvip = &curr->arch.hvip;
+
+        *hvip &= ~mask;
+        *hvip |= val;
+
+        csr_write(CSR_HVIP, *hvip);
+    }
+
+#ifdef CONFIG_RISCV_32
+    /*
+     * Flush AIA high interrupts.
+     *
+     * It is necessary to do only for CONFIG_RISCV_32 which isn't
+     * supported now.
+     */
+#   error "Update v->arch.hviph"
+#endif
+}
+
 static void __init __maybe_unused build_assertions(void)
 {
     /*

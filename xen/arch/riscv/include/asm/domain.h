@@ -115,6 +115,7 @@ int vcpu_set_interrupt(struct vcpu *v, unsigned int irq);
 int vcpu_unset_interrupt(struct vcpu *v, unsigned int irq);
 
 void vcpu_sync_interrupts(struct vcpu *curr);
+void vcpu_flush_interrupts(struct vcpu *curr);
 
 #endif /* ASM__RISCV__DOMAIN_H */
 
