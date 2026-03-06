@@ -12,6 +12,7 @@
 #include <xen/serial.h>
 #include <xen/shutdown.h>
 #include <xen/smp.h>
+#include <xen/tasklet.h>
 #include <xen/timer.h>
 #include <xen/vmap.h>
 #include <xen/xvmalloc.h>
@@ -132,6 +133,8 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
         device_tree_flattened = NULL;
         panic("Booting using ACPI isn't supported\n");
     }
+
+    tasklet_subsys_init();
 
     init_IRQ();
 
