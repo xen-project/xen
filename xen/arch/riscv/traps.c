@@ -10,6 +10,7 @@
 #include <xen/lib.h>
 #include <xen/nospec.h>
 #include <xen/sched.h>
+#include <xen/softirq.h>
 
 #include <asm/cpufeature.h>
 #include <asm/intc.h>
@@ -180,6 +181,15 @@ static void check_for_pcpu_work(void)
     p2m_handle_vmenter();
 }
 
+static void timer_interrupt(void)
+{
+    /* Disable the timer to avoid more interrupts */
+    csr_clear(CSR_SIE, BIT(IRQ_S_TIMER, UL));
+
+    /* Signal the generic timer code to do its work */
+    raise_softirq(TIMER_SOFTIRQ);
+}
+
 void do_trap(struct cpu_user_regs *cpu_regs)
 {
     register_t pc = cpu_regs->sepc;
@@ -219,6 +229,10 @@ void do_trap(struct cpu_user_regs *cpu_regs)
             {
             case IRQ_S_EXT:
                 intc_handle_external_irqs(cpu_regs);
+                break;
+
+            case IRQ_S_TIMER:
+                timer_interrupt();
                 break;
 
             default:
