@@ -8,6 +8,7 @@
 #include <public/hvm/params.h>
 
 #include <asm/p2m.h>
+#include <asm/vtimer.h>
 
 struct vcpu_vmid {
     uint64_t generation;
@@ -48,6 +49,8 @@ struct arch_vcpu {
     } xen_saved_context;
 
     struct cpu_info *cpu_info;
+
+    struct vtimer vtimer;
 
     register_t hcounteren;
     register_t hedeleg;
