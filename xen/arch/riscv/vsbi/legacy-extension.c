@@ -7,6 +7,7 @@
 
 #include <asm/processor.h>
 #include <asm/vsbi.h>
+#include <asm/vtimer.h>
 
 static void vsbi_print_char(char c)
 {
@@ -42,6 +43,11 @@ static int vsbi_legacy_ecall_handler(unsigned long eid, unsigned long fid,
 
     case SBI_EXT_0_1_CONSOLE_GETCHAR:
         ret = SBI_ERR_NOT_SUPPORTED;
+        break;
+
+    case SBI_EXT_0_1_SET_TIMER:
+        vtimer_set_timer(&current->arch.vtimer, regs->a0);
+        regs->a0 = SBI_SUCCESS;
         break;
 
     default:
