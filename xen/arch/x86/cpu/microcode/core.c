@@ -749,6 +749,7 @@ static int __init early_microcode_load(struct boot_info *bi)
     void *data = NULL;
     size_t size;
     struct microcode_patch *patch;
+    struct cpio_data cd;
     int idx = opt_mod_idx;
     int rc;
 
@@ -765,7 +766,6 @@ static int __init early_microcode_load(struct boot_info *bi)
         for ( idx = 0; idx < bi->nr_modules; ++idx )
         {
             const struct boot_module *bm = &bi->mods[idx];
-            struct cpio_data cd;
 
             /* Search anything unclaimed or likely to be a CPIO archive. */
             if ( bm->type != BOOTMOD_UNKNOWN &&
@@ -834,6 +834,24 @@ static int __init early_microcode_load(struct boot_info *bi)
                    idx, size);
             return -ENODEV;
         }
+
+        /*
+         * If this blob appears to be a CPIO archive, try interpreting it as
+         * one.  Otherwise treat it as a raw vendor blob.
+         */
+        cd = find_cpio_data(ucode_ops.cpio_path, data, size);
+        if ( cd.data )
+        {
+            data = cd.data;
+            size = cd.size;
+
+            /*
+             * (Ab)use opt_scan to inform microcode_init_cache() that
+             * early_mod_idx refers to a CPIO archive.
+             */
+            opt_scan = true;
+        }
+
         goto found;
     }
 
