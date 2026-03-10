@@ -8,6 +8,7 @@
  */
 
 #include <xen/domain_page.h>
+#include <xen/err.h>
 #include <xen/event.h>
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
@@ -1382,6 +1383,54 @@ int pv_emulate_privileged_op(struct cpu_user_regs *regs)
     }
 
     return 0;
+}
+
+/*
+ * Hardware already decoded the INT $N instruction and determined that there
+ * was a permission issue (i.e. the DPL violation intended to trigger #GP).
+ * Xen has already determined that the guest kernel has permitted this
+ * software interrupt.
+ *
+ * All that is needed is the instruction length, to turn the fault into a
+ * trap.  All errors are turned back into the original #GP, as that's the
+ * action that really happened.
+ */
+void pv_emulate_sw_interrupt(struct cpu_user_regs *regs)
+{
+    struct vcpu *curr = current;
+    struct domain *currd = curr->domain;
+    struct priv_op_ctxt ctxt = {
+        .ctxt.regs = regs,
+        .ctxt.lma = !is_pv_32bit_domain(currd),
+    };
+    struct x86_emulate_state *state;
+    uint8_t vector = regs->error_code >> 3;
+    unsigned int len, ar;
+
+    if ( !pv_emul_read_descriptor(regs->cs, curr, &ctxt.cs.base,
+                                  &ctxt.cs.limit, &ar, 1) ||
+         !(ar & _SEGMENT_S) ||
+         !(ar & _SEGMENT_P) ||
+         !(ar & _SEGMENT_CODE) )
+        goto error;
+
+    state = x86_decode_insn(&ctxt.ctxt, insn_fetch);
+    if ( IS_ERR_OR_NULL(state) )
+        goto error;
+
+    len = x86_insn_length(state, &ctxt.ctxt);
+    x86_emulate_free_state(state);
+
+    /* Note: Checked slightly late to simplify 'state' handling. */
+    if ( ctxt.ctxt.opcode != 0xcd /* INT $imm8 */ )
+        goto error;
+
+    regs->rip += len;
+    pv_inject_sw_interrupt(vector);
+    return;
+
+ error:
+    pv_inject_hw_exception(X86_EXC_GP, regs->error_code);
 }
 
 /*
