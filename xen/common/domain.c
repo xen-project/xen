@@ -500,12 +500,12 @@ struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
         set_bit(_VPF_down, &v->pause_flags);
         vcpu_info_reset(v);
         init_waitqueue_vcpu(v);
+
+        if ( vmtrace_alloc_buffer(v) != 0 )
+            goto fail_wq;
     }
 
     if ( sched_init_vcpu(v) != 0 )
-        goto fail_wq;
-
-    if ( vmtrace_alloc_buffer(v) != 0 )
         goto fail_wq;
 
     if ( arch_vcpu_create(v) != 0 )
