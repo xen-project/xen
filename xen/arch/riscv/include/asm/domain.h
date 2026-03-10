@@ -54,8 +54,25 @@ struct arch_vcpu {
     register_t hideleg;
     register_t henvcfg;
     register_t hstateen0;
+    register_t hvip;
 
     register_t vsatp;
+
+    /*
+     * VCPU interrupts
+     *
+     * We have a lockless approach for tracking pending VCPU interrupts
+     * implemented using atomic bitops. The irqs_pending bitmap represent
+     * pending interrupts whereas irqs_pending_mask represent bits changed
+     * in irqs_pending. Our approach is modeled around multiple producer
+     * and single consumer problem where the consumer is the VCPU itself.
+     *
+     * DECLARE_BITMAP() is needed here to support 64 vCPU local interrupts
+     * on RV32 host.
+     */
+#define RISCV_VCPU_NR_IRQS MAX(BITS_PER_LONG, 64)
+    DECLARE_BITMAP(irqs_pending, RISCV_VCPU_NR_IRQS);
+    DECLARE_BITMAP(irqs_pending_mask, RISCV_VCPU_NR_IRQS);
 };
 
 struct paging_domain {
@@ -93,6 +110,11 @@ static inline void update_guest_memory_policy(struct vcpu *v,
 {}
 
 static inline void arch_vcpu_block(struct vcpu *v) {}
+
+int vcpu_set_interrupt(struct vcpu *v, unsigned int irq);
+int vcpu_unset_interrupt(struct vcpu *v, unsigned int irq);
+
+void vcpu_sync_interrupts(struct vcpu *curr);
 
 #endif /* ASM__RISCV__DOMAIN_H */
 

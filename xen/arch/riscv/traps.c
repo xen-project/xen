@@ -171,6 +171,10 @@ static void do_unexpected_trap(const struct cpu_user_regs *regs)
 
 static void check_for_pcpu_work(void)
 {
+    struct vcpu *curr = current;
+
+    vcpu_sync_interrupts(curr);
+
     p2m_handle_vmenter();
 }
 

@@ -6,6 +6,7 @@
 #include <xen/sched.h>
 #include <xen/vmap.h>
 
+#include <asm/bitops.h>
 #include <asm/cpufeature.h>
 #include <asm/csr.h>
 #include <asm/riscv_encoding.h>
@@ -166,6 +167,68 @@ int arch_vcpu_create(struct vcpu *v)
 void arch_vcpu_destroy(struct vcpu *v)
 {
     vfree((void *)&v->arch.cpu_info[1] - STACK_SIZE);
+}
+
+int vcpu_set_interrupt(struct vcpu *v, unsigned int irq)
+{
+    bool kick_vcpu;
+
+    /* We only allow VS-mode software, timer, and external interrupts */
+    if ( irq != IRQ_VS_SOFT &&
+         irq != IRQ_VS_TIMER &&
+         irq != IRQ_VS_EXT )
+        return -EINVAL;
+
+    kick_vcpu = !test_and_set_bit(irq, v->arch.irqs_pending);
+
+    /*
+     * The counterpart of this barrier is the one encoded implicitly in xchg()
+     * which is used in consumer part (vcpu_flush_interrupts()).
+     */
+    smp_wmb();
+
+    kick_vcpu |= !test_and_set_bit(irq, v->arch.irqs_pending_mask);
+
+    if ( kick_vcpu )
+        vcpu_kick(v);
+
+    return 0;
+}
+
+int vcpu_unset_interrupt(struct vcpu *v, unsigned int irq)
+{
+    /* We only allow VS-mode software, timer, external interrupts */
+    if ( irq != IRQ_VS_SOFT &&
+         irq != IRQ_VS_TIMER &&
+         irq != IRQ_VS_EXT )
+        return -EINVAL;
+
+    clear_bit(irq, v->arch.irqs_pending);
+    /*
+     * The counterpart of this barrier is the one encoded implicitly in xchg()
+     * which is used in consumer part (vcpu_flush_interrupts()).
+     */
+    smp_wmb();
+    set_bit(irq, v->arch.irqs_pending_mask);
+
+    return 0;
+}
+
+void vcpu_sync_interrupts(struct vcpu *curr)
+{
+    unsigned long hvip = csr_read(CSR_HVIP);
+
+    ASSERT(curr == current);
+
+    /* Sync-up HVIP.VSSIP bit changes done by Guest */
+    if ( ((curr->arch.hvip ^ hvip) & BIT(IRQ_VS_SOFT, UL)) &&
+         !test_and_set_bit(IRQ_VS_SOFT, &curr->arch.irqs_pending_mask) )
+    {
+        if ( hvip & BIT(IRQ_VS_SOFT, UL) )
+            set_bit(IRQ_VS_SOFT, &curr->arch.irqs_pending);
+        else
+            clear_bit(IRQ_VS_SOFT, &curr->arch.irqs_pending);
+    }
 }
 
 static void __init __maybe_unused build_assertions(void)
