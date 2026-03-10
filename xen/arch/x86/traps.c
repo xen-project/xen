@@ -1300,8 +1300,7 @@ void do_general_protection(struct cpu_user_regs *regs)
 
         if ( permit_softint(TI_GET_DPL(ti), v, regs) )
         {
-            regs->rip += 2;
-            pv_inject_sw_interrupt(vector);
+            pv_emulate_sw_interrupt(regs);
             return;
         }
     }
