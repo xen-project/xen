@@ -25,6 +25,8 @@ int __must_check vpci_assign_device(struct pci_dev *pdev);
 /* Remove all handlers and free vpci related structures. */
 void vpci_deassign_device(struct pci_dev *pdev);
 
+int vpci_reinit_ext_capabilities(struct pci_dev *pdev);
+
 /* Generic read/write handlers for the PCI config space. */
 uint32_t vpci_read(pci_sbdf_t sbdf, unsigned int reg, unsigned int size);
 void vpci_write(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
@@ -201,6 +203,11 @@ bool vpci_ecam_read(pci_sbdf_t sbdf, unsigned int reg, unsigned int len,
 
 #else /* !CONFIG_HAS_VPCI */
 struct vpci_vcpu {};
+
+static inline int vpci_reinit_ext_capabilities(struct pci_dev *pdev)
+{
+    return 0;
+}
 
 static inline int vpci_assign_device(struct pci_dev *pdev)
 {

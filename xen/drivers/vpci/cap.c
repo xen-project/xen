@@ -285,13 +285,16 @@ static int vpci_init_ext_capability_list(const struct pci_dev *pdev)
     return 0;
 }
 
-int vpci_init_capabilities(struct pci_dev *pdev)
+int vpci_init_capabilities(struct pci_dev *pdev, bool ext_only)
 {
-    int rc;
+    int rc, accum_rc = 0;
 
-    rc = vpci_init_capability_list(pdev);
-    if ( rc )
-        return rc;
+    if ( !ext_only )
+    {
+        rc = vpci_init_capability_list(pdev);
+        if ( rc )
+            return rc;
+    }
 
     rc = vpci_init_ext_capability_list(pdev);
     if ( rc )
@@ -305,7 +308,7 @@ int vpci_init_capabilities(struct pci_dev *pdev)
         unsigned int pos = 0;
 
         if ( !is_ext )
-            pos = pci_find_cap_offset(pdev->sbdf, cap);
+            pos = !ext_only ? pci_find_cap_offset(pdev->sbdf, cap) : 0;
         else if ( is_hardware_domain(pdev->domain) )
             pos = pci_find_ext_capability(pdev, cap);
 
@@ -341,30 +344,40 @@ int vpci_init_capabilities(struct pci_dev *pdev)
             {
                 printk(XENLOG_ERR "%pd %pp: hide %s cap %u fail rc=%d\n",
                        pdev->domain, &pdev->sbdf, type, cap, rc);
-                return rc;
+
+                /* Best effort for the re-init case. */
+                if ( !ext_only )
+                    return rc;
+
+                if ( !accum_rc )
+                    accum_rc = rc;
             }
         }
     }
 
-    return 0;
+    return accum_rc;
 }
 
-void vpci_cleanup_capabilities(struct pci_dev *pdev)
+void vpci_cleanup_capabilities(struct pci_dev *pdev, bool ext_only)
 {
     for ( unsigned int i = 0; i < NUM_VPCI_INIT; i++ )
     {
         const vpci_capability_t *capability = &__start_vpci_array[i];
         const unsigned int cap = capability->id;
-        unsigned int pos = 0;
 
         if ( !capability->cleanup )
             continue;
 
-        if ( !capability->is_ext )
-            pos = pci_find_cap_offset(pdev->sbdf, cap);
-        else if ( is_hardware_domain(pdev->domain) )
-            pos = pci_find_ext_capability(pdev, cap);
-        if ( pos )
+        /*
+         * Cannot call pci_find_ext_capability() here, as extended config space
+         * may (no longer) be accessible.  As a result, extended capability
+         * ->cleanup() handlers need to cope with being called despite ->init()
+         * never having been called.  Which in turn allows calling them even
+         * for DomU-s, no matter that vpci_init_capabilities() excludes them
+         * there for now.
+         */
+        if ( capability->is_ext
+             || (!ext_only && pci_find_cap_offset(pdev->sbdf, cap)) )
         {
             int rc = capability->cleanup(pdev, false);
 
@@ -374,6 +387,27 @@ void vpci_cleanup_capabilities(struct pci_dev *pdev)
                        capability->is_ext ? "extended" : "legacy", cap, rc);
         }
     }
+}
+
+int vpci_reinit_ext_capabilities(struct pci_dev *pdev)
+{
+    if ( !pdev->vpci )
+        return 0;
+
+    /*
+     * FIXME: DomU support is missing.  For already running domains we may
+     * need to pause them around the entire re-evaluation of extended config
+     * space accessibility.
+     */
+    ASSERT(pdev->domain == hardware_domain);
+
+    if ( vpci_remove_registers(pdev->vpci, PCI_CFG_SPACE_SIZE,
+                               PCI_CFG_SPACE_EXP_SIZE - PCI_CFG_SPACE_SIZE) )
+        ASSERT_UNREACHABLE();
+
+    vpci_cleanup_capabilities(pdev, true);
+
+    return vpci_init_capabilities(pdev, true);
 }
 
 /*

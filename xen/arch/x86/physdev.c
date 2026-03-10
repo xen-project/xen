@@ -8,6 +8,8 @@
 #include <xen/guest_access.h>
 #include <xen/iocap.h>
 #include <xen/serial.h>
+#include <xen/vpci.h>
+
 #include <asm/current.h>
 #include <asm/io_apic.h>
 #include <asm/msi.h>
@@ -169,7 +171,18 @@ int cf_check physdev_check_pci_extcfg(struct pci_dev *pdev, void *arg)
 
     ASSERT(pdev->seg == info->segment);
     if ( pdev->bus >= info->start_bus && pdev->bus <= info->end_bus )
+    {
         pci_check_extcfg(pdev);
+
+        /*
+         * The re-init failing doesn't mean the device becomes entirely non-
+         * functional.  In case of failure, a message was already logged.
+         * Hence don't otherwise act upon failure.
+         *
+         * FIXME: Re-visit when DomU support is added to vPCI.
+         */
+        vpci_reinit_ext_capabilities(pdev);
+    }
 
     return 0;
 }

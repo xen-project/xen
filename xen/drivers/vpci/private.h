@@ -46,8 +46,8 @@ typedef struct {
 
 int __must_check vpci_init_header(struct pci_dev *pdev);
 
-int vpci_init_capabilities(struct pci_dev *pdev);
-void vpci_cleanup_capabilities(struct pci_dev *pdev);
+int vpci_init_capabilities(struct pci_dev *pdev, bool ext_only);
+void vpci_cleanup_capabilities(struct pci_dev *pdev, bool ext_only);
 
 /* Add/remove a register handler. */
 int __must_check vpci_add_register_mask(struct vpci *vpci,

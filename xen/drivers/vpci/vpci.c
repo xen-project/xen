@@ -102,7 +102,7 @@ void vpci_deassign_device(struct pci_dev *pdev)
                     &pdev->domain->vpci_dev_assigned_map);
 #endif
 
-    vpci_cleanup_capabilities(pdev);
+    vpci_cleanup_capabilities(pdev, false);
 
     spin_lock(&pdev->vpci->lock);
     while ( !list_empty(&pdev->vpci->handlers) )
@@ -159,7 +159,7 @@ int vpci_assign_device(struct pci_dev *pdev)
     if ( rc )
         goto out;
 
-    rc = vpci_init_capabilities(pdev);
+    rc = vpci_init_capabilities(pdev, false);
 
  out:
     if ( rc )
