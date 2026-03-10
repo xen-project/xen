@@ -11,6 +11,8 @@ void setup_mm(void);
 
 void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len);
 
+void init_csr_masks(void);
+
 #endif /* ASM__RISCV__SETUP_H */
 
 /*

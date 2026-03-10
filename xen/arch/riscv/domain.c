@@ -2,8 +2,65 @@
 
 #include <xen/init.h>
 #include <xen/mm.h>
+#include <xen/sections.h>
 #include <xen/sched.h>
 #include <xen/vmap.h>
+
+#include <asm/cpufeature.h>
+#include <asm/csr.h>
+
+struct csr_masks {
+    register_t hedeleg;
+    register_t henvcfg;
+    register_t hideleg;
+    register_t hstateen0;
+
+    struct {
+        register_t hstateen0;
+    } ro_one;
+};
+
+static struct csr_masks __ro_after_init csr_masks;
+
+#define HEDELEG_AVAIL_MASK ULONG_MAX
+#define HIDELEG_AVAIL_MASK ULONG_MAX
+#define HENVCFG_AVAIL_MASK _UL(0xE0000003000000FF)
+#define HSTATEEN0_AVAIL_MASK _UL(0xDE00000000000007)
+
+void __init init_csr_masks(void)
+{
+    /*
+     * The mask specifies the bits that may be safely modified without
+     * causing side effects.
+     *
+     * For example, registers such as henvcfg or hstateen0 contain WPRI
+     * fields that must be preserved. Any write to the full register must
+     * therefore retain the original values of those fields.
+     */
+#define INIT_CSR_MASK(csr, field, mask) do { \
+        register_t old = csr_read_set(CSR_ ## csr, mask); \
+        csr_masks.field = csr_swap(CSR_ ## csr, old); \
+    } while (0)
+
+#define INIT_RO_ONE_MASK(csr, field, mask) do { \
+        register_t old = csr_read_clear(CSR_ ## csr, mask); \
+        csr_masks.ro_one.field = csr_swap(CSR_ ## csr, old) & mask; \
+    } while (0)
+
+    INIT_CSR_MASK(HEDELEG, hedeleg, HEDELEG_AVAIL_MASK);
+    INIT_CSR_MASK(HIDELEG, hideleg, HIDELEG_AVAIL_MASK);
+
+    INIT_CSR_MASK(HENVCFG, henvcfg, HENVCFG_AVAIL_MASK);
+
+    if ( riscv_isa_extension_available(NULL, RISCV_ISA_EXT_smstateen) )
+    {
+        INIT_CSR_MASK(HSTATEEN0, hstateen0, HSTATEEN0_AVAIL_MASK);
+        INIT_RO_ONE_MASK(HSTATEEN0, hstateen0, HSTATEEN0_AVAIL_MASK);
+    }
+
+#undef INIT_CSR_MASK
+#undef INIT_RO_ONE_MASK
+}
 
 static void continue_new_vcpu(struct vcpu *prev)
 {
