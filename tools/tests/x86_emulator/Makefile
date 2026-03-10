@@ -323,4 +323,11 @@ x86-emulate.o x86_emulate/%.o: HOSTCFLAGS += -D__XEN_TOOLS__
 $(call cc-option-add,HOSTCFLAGS-toplevel,HOSTCC,-fno-toplevel-reorder)
 test_x86_emulator.o: HOSTCFLAGS += $(HOSTCFLAGS-toplevel)
 
+# When unrolling loops, compilers may duplicate inline assembly. put_insn()
+# emits labels, which may not be emitted multiple times.
+# The default HOSTCFLAGS from $(XEN_ROOT)/Config.mk would set a non-zero
+# optimisation level.
+# Until a better solution is found: reduce optimizations in the test runner.
+test_x86_emulator.o: HOSTCFLAGS += -Og
+
 test_x86_emulator.o: $(addsuffix .h,$(TESTCASES)) $(addsuffix -opmask.h,$(OPMASK))
