@@ -858,6 +858,22 @@ void *x86_mcinfo_reserve(struct mc_info *mi,
     return mic_index;
 }
 
+/* Linux values need using when reporting CPU vendors to the outside. */
+static unsigned int xen2linux_vendor(unsigned int vendor)
+{
+    switch ( vendor )
+    {
+    case X86_VENDOR_INTEL:    return 0;
+    case X86_VENDOR_AMD:      return 2;
+    case X86_VENDOR_CENTAUR:  return 5;
+    case X86_VENDOR_HYGON:    return 9;
+    case X86_VENDOR_SHANGHAI: return 10; /* X86_VENDOR_ZHAOXIN */
+    default: break;
+    }
+
+    return 0xff; /* X86_VENDOR_UNKNOWN */
+}
+
 static void x86_mcinfo_apei_save(
     struct mcinfo_global *mc_global, struct mcinfo_bank *mc_bank)
 {
@@ -866,7 +882,7 @@ static void x86_mcinfo_apei_save(
     memset(&m, 0, sizeof(struct mce));
 
     m.cpu = mc_global->mc_coreid;
-    m.cpuvendor = boot_cpu_data.x86_vendor;
+    m.cpuvendor = xen2linux_vendor(boot_cpu_data.x86_vendor);
     m.cpuid = cpuid_eax(1);
     m.socketid = mc_global->mc_socketid;
     m.apicid = mc_global->mc_apicid;
@@ -968,7 +984,7 @@ static void cf_check __maybe_unused do_mc_get_cpu_info(void *v)
                         &xcp->mc_ncores_active, &xcp->mc_nthreads);
     xcp->mc_cpuid_level = c->cpuid_level;
     xcp->mc_family = c->x86;
-    xcp->mc_vendor = c->x86_vendor;
+    xcp->mc_vendor = xen2linux_vendor(c->x86_vendor);
     xcp->mc_model = c->x86_model;
     xcp->mc_step = c->x86_mask;
     xcp->mc_cache_size = c->x86_cache_size;
