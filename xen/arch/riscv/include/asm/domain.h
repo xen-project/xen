@@ -49,6 +49,12 @@ struct arch_vcpu {
 
     struct cpu_info *cpu_info;
 
+    register_t hcounteren;
+    register_t hedeleg;
+    register_t hideleg;
+    register_t henvcfg;
+    register_t hstateen0;
+
     register_t vsatp;
 };
 

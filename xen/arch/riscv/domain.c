@@ -8,6 +8,7 @@
 
 #include <asm/cpufeature.h>
 #include <asm/csr.h>
+#include <asm/riscv_encoding.h>
 
 struct csr_masks {
     register_t hedeleg;
@@ -19,6 +20,21 @@ struct csr_masks {
         register_t hstateen0;
     } ro_one;
 };
+
+#define HEDELEG_DEFAULT (BIT(CAUSE_MISALIGNED_FETCH, U) | \
+                         BIT(CAUSE_FETCH_ACCESS, U) | \
+                         BIT(CAUSE_ILLEGAL_INSTRUCTION, U) | \
+                         BIT(CAUSE_BREAKPOINT, U) | \
+                         BIT(CAUSE_MISALIGNED_LOAD, U) | \
+                         BIT(CAUSE_LOAD_ACCESS, U) | \
+                         BIT(CAUSE_MISALIGNED_STORE, U) | \
+                         BIT(CAUSE_STORE_ACCESS, U) | \
+                         BIT(CAUSE_USER_ECALL, U) | \
+                         BIT(CAUSE_FETCH_PAGE_FAULT, U) | \
+                         BIT(CAUSE_LOAD_PAGE_FAULT, U) | \
+                         BIT(CAUSE_STORE_PAGE_FAULT, U))
+
+#define HIDELEG_DEFAULT (MIP_VSSIP | MIP_VSTIP | MIP_VSEIP)
 
 static struct csr_masks __ro_after_init csr_masks;
 
@@ -62,6 +78,51 @@ void __init init_csr_masks(void)
 #undef INIT_RO_ONE_MASK
 }
 
+static void vcpu_csr_init(struct vcpu *v)
+{
+    v->arch.hedeleg = HEDELEG_DEFAULT & csr_masks.hedeleg;
+
+    vcpu_guest_cpu_user_regs(v)->hstatus = HSTATUS_SPV | HSTATUS_SPVP;
+
+    v->arch.hideleg = HIDELEG_DEFAULT & csr_masks.hideleg;
+
+    /*
+     * VS should access only the time counter directly.
+     * Everything else should trap.
+     */
+    v->arch.hcounteren = HCOUNTEREN_TM;
+
+    if ( riscv_isa_extension_available(NULL, RISCV_ISA_EXT_svpbmt) )
+        v->arch.henvcfg = ENVCFG_PBMTE & csr_masks.henvcfg;
+
+    if ( riscv_isa_extension_available(NULL, RISCV_ISA_EXT_smstateen) )
+    {
+        /* Allow guest to access CSR_SENVCFG */
+        register_t hstateen0 = SMSTATEEN0_HSENVCFG;
+
+        if ( riscv_isa_extension_available(NULL, RISCV_ISA_EXT_ssaia) )
+            /*
+             * If the hypervisor extension is implemented, the same three
+             * bits are defined also in hypervisor CSR hstateen0 but concern
+             * only the state potentially accessible to a virtual machine
+             * executing in privilege modes VS and VU:
+             *      bit 60 CSRs siselect and sireg (really vsiselect and
+             *             vsireg)
+             *      bit 59 CSRs siph and sieh (RV32 only) and stopi (really
+             *             vsiph, vsieh, and vstopi)
+             *      bit 58 all state of IMSIC guest interrupt files, including
+             *             CSR stopei (really vstopei)
+             * If one of these bits is zero in hstateen0, and the same bit is
+             * one in mstateen0, then an attempt to access the corresponding
+             * state from VS or VU-mode raises a virtual instruction exception.
+             */
+            hstateen0 |= SMSTATEEN0_AIA | SMSTATEEN0_IMSIC | SMSTATEEN0_SVSLCT;
+
+        v->arch.hstateen0 = (hstateen0 & csr_masks.hstateen0) |
+                            csr_masks.ro_one.hstateen0;
+    }
+}
+
 static void continue_new_vcpu(struct vcpu *prev)
 {
     BUG_ON("unimplemented\n");
@@ -83,6 +144,8 @@ int arch_vcpu_create(struct vcpu *v)
     /* Idle VCPUs don't need the rest of this setup */
     if ( is_idle_vcpu(v) )
         return 0;
+
+    vcpu_csr_init(v);
 
     /*
      * As the vtimer and interrupt controller (IC) are not yet implemented,
