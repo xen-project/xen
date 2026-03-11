@@ -175,7 +175,7 @@ static int __init cf_check pge_init(void)
 {
     if ( opt_global_pages == -1 )
         opt_global_pages = !cpu_has_hypervisor ||
-                           !(boot_cpu_data.x86_vendor &
+                           !(boot_cpu_data.vendor &
                              (X86_VENDOR_AMD | X86_VENDOR_HYGON));
 
     return 0;

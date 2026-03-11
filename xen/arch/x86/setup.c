@@ -1409,7 +1409,7 @@ void asmlinkage __init noreturn __start_xen(void)
          * supervisor shadow stacks are now safe to use.
          */
         bool cpu_has_bug_shstk_fracture =
-            boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
+            boot_cpu_data.vendor == X86_VENDOR_INTEL &&
             !boot_cpu_has(X86_FEATURE_CET_SSS);
 
         ASSERT(opt_fred >= 0); /* Confirm that FRED-ness has been resolved */
@@ -2044,10 +2044,10 @@ void asmlinkage __init noreturn __start_xen(void)
 
     /* Do not enable SMEP/SMAP in PV shim on AMD and Hygon by default */
     if ( opt_smep == -1 )
-        opt_smep = !pv_shim || !(boot_cpu_data.x86_vendor &
+        opt_smep = !pv_shim || !(boot_cpu_data.vendor &
                                  (X86_VENDOR_AMD | X86_VENDOR_HYGON));
     if ( opt_smap == -1 )
-        opt_smap = !pv_shim || !(boot_cpu_data.x86_vendor &
+        opt_smap = !pv_shim || !(boot_cpu_data.vendor &
                                  (X86_VENDOR_AMD | X86_VENDOR_HYGON));
 
     if ( !opt_smep )

@@ -840,9 +840,9 @@ static void amd_iommu_erratum_746_workaround(struct amd_iommu *iommu)
 {
     u32 value;
 
-    if ( (boot_cpu_data.x86 != 0x15) ||
-         (boot_cpu_data.x86_model < 0x10) ||
-         (boot_cpu_data.x86_model > 0x1f) )
+    if ( (boot_cpu_data.family != 0x15) ||
+         (boot_cpu_data.model < 0x10) ||
+         (boot_cpu_data.model > 0x1f) )
         return;
 
     pci_conf_write32(iommu->sbdf, 0xf0, 0x90);

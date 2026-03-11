@@ -572,10 +572,10 @@ int __init dom0_setup_permissions(struct domain *d)
             rc |= iomem_deny_access(d, mfn, mfn);
     }
     /* HyperTransport range. */
-    if ( boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
+    if ( boot_cpu_data.vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
     {
         mfn = paddr_to_pfn(1UL <<
-                           (boot_cpu_data.x86 < 0x17 ? 40 : paddr_bits));
+                           (boot_cpu_data.family < 0x17 ? 40 : paddr_bits));
         rc |= iomem_deny_access(d, mfn - paddr_to_pfn(3UL << 32), mfn - 1);
     }
 

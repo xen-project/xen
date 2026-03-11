@@ -319,7 +319,7 @@ void domain_cpu_policy_changed(struct domain *d)
             if ( cpu_has_htt )
                 edx |= cpufeat_mask(X86_FEATURE_HTT);
 
-            switch ( boot_cpu_data.x86_vendor )
+            switch ( boot_cpu_data.vendor )
             {
             case X86_VENDOR_INTEL:
                 /*
@@ -372,7 +372,7 @@ void domain_cpu_policy_changed(struct domain *d)
         {
             uint64_t mask = cpuidmask_defaults._6c;
 
-            if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+            if ( boot_cpu_data.vendor == X86_VENDOR_AMD )
                 mask &= (~0ULL << 32) | p->basic.raw[6].c;
 
             d->arch.pv.cpuidmasks->_6c = mask;
@@ -387,7 +387,7 @@ void domain_cpu_policy_changed(struct domain *d)
              * wholesale from the policy, but clamp the features in 7[0].ebx
              * per usual.
              */
-            if ( boot_cpu_data.x86_vendor &
+            if ( boot_cpu_data.vendor &
                  (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
                 mask = (((uint64_t)p->feat.max_subleaf << 32) |
                         ((uint32_t)mask & p->feat._7b0));
@@ -400,7 +400,7 @@ void domain_cpu_policy_changed(struct domain *d)
             uint64_t mask = cpuidmask_defaults.Da1;
             uint32_t eax = p->xstate.Da1;
 
-            if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+            if ( boot_cpu_data.vendor == X86_VENDOR_INTEL )
                 mask &= (~0ULL << 32) | eax;
 
             d->arch.pv.cpuidmasks->Da1 = mask;
@@ -427,7 +427,7 @@ void domain_cpu_policy_changed(struct domain *d)
             if ( !(p->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
                 edx &= ~CPUID_COMMON_1D_FEATURES;
 
-            switch ( boot_cpu_data.x86_vendor )
+            switch ( boot_cpu_data.vendor )
             {
             case X86_VENDOR_INTEL:
                 mask &= ((uint64_t)edx << 32) | ecx;
@@ -457,7 +457,7 @@ void domain_cpu_policy_changed(struct domain *d)
         cpu_policy_updated(v);
 
         /* If PMU version is zero then the guest doesn't have VPMU */
-        if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
+        if ( boot_cpu_data.vendor == X86_VENDOR_INTEL &&
              p->basic.pmu_version == 0 )
             vpmu_destroy(v);
     }

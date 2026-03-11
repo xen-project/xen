@@ -426,7 +426,7 @@ static uint64_t __init mtrr_top_of_ram(void)
 
     /* By default we check only Intel systems. */
     if ( e820_mtrr_clip == -1 )
-        e820_mtrr_clip = boot_cpu_data.x86_vendor == X86_VENDOR_INTEL;
+        e820_mtrr_clip = boot_cpu_data.vendor == X86_VENDOR_INTEL;
 
     if ( !e820_mtrr_clip )
         return 0;

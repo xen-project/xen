@@ -148,8 +148,8 @@ void tsx_init(void)
             {
                 printk(XENLOG_ERR
                        "FIRMWARE BUG: CPU %02x-%02x-%02x, ucode 0x%08x: RTM_ALWAYS_ABORT vs RTM mismatch\n",
-                       boot_cpu_data.x86, boot_cpu_data.x86_model,
-                       boot_cpu_data.x86_mask, this_cpu(cpu_sig).rev);
+                       boot_cpu_data.family, boot_cpu_data.model,
+                       boot_cpu_data.stepping, this_cpu(cpu_sig).rev);
 
                 setup_clear_cpu_cap(X86_FEATURE_RTM_ALWAYS_ABORT);
                 setup_clear_cpu_cap(X86_FEATURE_TSX_FORCE_ABORT);

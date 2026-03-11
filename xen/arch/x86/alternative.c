@@ -89,7 +89,7 @@ static bool init_or_livepatch_read_mostly toolchain_nops_are_ideal;
 
 static void __init arch_init_ideal_nops(void)
 {
-    switch ( boot_cpu_data.x86_vendor )
+    switch ( boot_cpu_data.vendor )
     {
     case X86_VENDOR_INTEL:
         /*
@@ -97,10 +97,10 @@ static void __init arch_init_ideal_nops(void)
          * actually perform better with the "k8_nops" than with the SDM-
          * recommended NOPs.
          */
-        if ( boot_cpu_data.x86 != 6 )
+        if ( boot_cpu_data.family != 6 )
             break;
 
-        switch ( boot_cpu_data.x86_model )
+        switch ( boot_cpu_data.model )
         {
         case 0x0f ... 0x1b:
         case 0x1d ... 0x25:
@@ -111,7 +111,7 @@ static void __init arch_init_ideal_nops(void)
         break;
 
     case X86_VENDOR_AMD:
-        if ( boot_cpu_data.x86 <= 0xf )
+        if ( boot_cpu_data.family <= 0xf )
             ideal_nops = k8_nops;
         break;
     }

@@ -511,9 +511,9 @@ static inline void __init construct_default_ISA_mptable(int mpc_default_type)
 	/* Either an integrated APIC or a discrete 82489DX. */
 	processor.mpc_apicver = mpc_default_type > 4 ? 0x10 : 0x01;
 	processor.mpc_cpuflag = CPU_ENABLED;
-	processor.mpc_cpufeature = (boot_cpu_data.x86 << 8) |
-				   (boot_cpu_data.x86_model << 4) |
-				   boot_cpu_data.x86_mask;
+	processor.mpc_cpufeature = (boot_cpu_data.family << 8) |
+				   (boot_cpu_data.model << 4) |
+				   boot_cpu_data.stepping;
 	processor.mpc_featureflag =
             boot_cpu_data.x86_capability[FEATURESET_1d];
 	processor.mpc_reserved[0] = 0;

@@ -437,7 +437,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
 
     case 0xa:
         /* TODO: Rework vPMU control in terms of toolstack choices. */
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
+        if ( boot_cpu_data.vendor != X86_VENDOR_INTEL ||
              !vpmu_available(v) )
             *res = EMPTY_LEAF;
         else

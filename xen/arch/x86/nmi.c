@@ -216,12 +216,14 @@ void disable_lapic_nmi_watchdog(void)
 {
     if (nmi_active <= 0)
         return;
-    switch (boot_cpu_data.x86_vendor) {
+    switch ( boot_cpu_data.vendor )
+    {
     case X86_VENDOR_AMD:
         wrmsrns(MSR_K7_EVNTSEL0, 0);
         break;
     case X86_VENDOR_INTEL:
-        switch (boot_cpu_data.x86) {
+        switch ( boot_cpu_data.family )
+        {
         case 6:
             wrmsrns(MSR_P6_EVNTSEL(0), 0);
             break;
@@ -362,7 +364,7 @@ static void setup_p4_watchdog(void)
         clear_msr_range(0x3F1, 2);
     /* MSR 0x3F0 seems to have a default value of 0xFC00, but current
        docs doesn't fully define it, so leave it alone for now. */
-    if (boot_cpu_data.x86_model >= 0x3) {
+    if (boot_cpu_data.model >= 0x3) {
         /* MSR_P4_IQ_ESCR0/1 (0x3ba/0x3bb) removed */
         clear_msr_range(0x3A0, 26);
         clear_msr_range(0x3BC, 3);
@@ -387,16 +389,17 @@ void setup_apic_nmi_watchdog(void)
     if ( nmi_watchdog == NMI_NONE )
         return;
 
-    switch ( boot_cpu_data.x86_vendor )
+    switch ( boot_cpu_data.vendor )
     {
     case X86_VENDOR_AMD:
         setup_k7_watchdog();
         break;
 
     case X86_VENDOR_INTEL:
-        switch (boot_cpu_data.x86) {
+        switch ( boot_cpu_data.family )
+        {
         case 6:
-            setup_p6_watchdog((boot_cpu_data.x86_model < 14) 
+            setup_p6_watchdog((boot_cpu_data.model < 14)
                               ? P6_EVENT_CPU_CLOCKS_NOT_HALTED
                               : CORE_EVENT_CPU_CLOCKS_NOT_HALTED);
             break;

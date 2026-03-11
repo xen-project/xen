@@ -419,7 +419,7 @@ void __init init_IRQ(void)
          * the interrupt.
          */
         cpumask_copy(desc->arch.cpu_mask,
-                     (boot_cpu_data.x86_vendor &
+                     (boot_cpu_data.vendor &
                       (X86_VENDOR_AMD | X86_VENDOR_HYGON) ? &cpumask_all
                                                           : cpumask_of(cpu)));
         desc->arch.vector = LEGACY_VECTOR(irq);

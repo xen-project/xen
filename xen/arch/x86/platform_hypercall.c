@@ -104,7 +104,7 @@ static bool msr_read_allowed(unsigned int msr)
      * the platform doesn't actually support this MSR.
      */
     case MSR_TEMPERATURE_TARGET:
-        return boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
+        return boot_cpu_data.vendor == X86_VENDOR_INTEL &&
                host_cpu_policy.basic.digital_temp_sensor;
 
     case MSR_PACKAGE_THERM_STATUS:
@@ -688,9 +688,9 @@ ret_t do_platform_op(
             const struct cpuinfo_x86 *c = &cpu_data[ver->xen_cpuid];
 
             memcpy(ver->vendor_id, c->x86_vendor_id, sizeof(ver->vendor_id));
-            ver->family = c->x86;
-            ver->model = c->x86_model;
-            ver->stepping = c->x86_mask;
+            ver->family = c->family;
+            ver->model = c->model;
+            ver->stepping = c->stepping;
         }
 
         ver->max_present = cpumask_last(&cpu_present_map);

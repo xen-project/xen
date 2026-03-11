@@ -170,7 +170,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
 
     case MSR_IA32_PLATFORM_ID:
         if ( !(cp->x86_vendor & X86_VENDOR_INTEL) ||
-             !(boot_cpu_data.x86_vendor & X86_VENDOR_INTEL) )
+             !(boot_cpu_data.vendor & X86_VENDOR_INTEL) )
             goto gp_fault;
         rdmsrl(MSR_IA32_PLATFORM_ID, *val);
         break;
@@ -190,7 +190,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
          * the guest.
          */
         if ( !(cp->x86_vendor & (X86_VENDOR_INTEL | X86_VENDOR_AMD)) ||
-             !(boot_cpu_data.x86_vendor &
+             !(boot_cpu_data.vendor &
                (X86_VENDOR_INTEL | X86_VENDOR_AMD)) ||
              rdmsr_safe(MSR_AMD_PATCHLEVEL, val) )
             goto gp_fault;
