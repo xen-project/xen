@@ -20,6 +20,7 @@
 #include <xen/cpumask.h>
 #include <xen/init.h>
 #include <xen/param.h>
+#include <xen/xvmalloc.h>
 
 #include <asm/smp.h>
 
@@ -27,8 +28,8 @@
 #define CORE_PARKING_DECREMENT 2
 
 static DEFINE_SPINLOCK(accounting_lock);
-static uint32_t cur_idle_nums;
-static unsigned int core_parking_cpunum[NR_CPUS] = {[0 ... NR_CPUS-1] = -1};
+static unsigned int cur_idle_nums;
+static unsigned int *__ro_after_init core_parking_cpunum;
 
 struct cp_policy {
     char name[30];
@@ -188,7 +189,7 @@ long cf_check core_parking_helper(void *data)
             return ret;
 
         spin_lock(&accounting_lock);
-        BUG_ON(cur_idle_nums >= ARRAY_SIZE(core_parking_cpunum));
+        BUG_ON(cur_idle_nums >= nr_cpu_ids);
         core_parking_cpunum[cur_idle_nums++] = cpu;
         spin_unlock(&accounting_lock);
     }
@@ -263,9 +264,12 @@ static int __init register_core_parking_policy(const struct cp_policy *policy)
 
 static int __init cf_check core_parking_init(void)
 {
-    int ret = 0;
+    int ret;
 
-    if ( core_parking_controller == PERFORMANCE_FIRST )
+    core_parking_cpunum = xvzalloc_array(unsigned int, nr_cpu_ids);
+    if ( !core_parking_cpunum )
+        ret = -ENOMEM;
+    else if ( core_parking_controller == PERFORMANCE_FIRST )
         ret = register_core_parking_policy(&performance_first);
     else
         ret = register_core_parking_policy(&power_first);
