@@ -77,6 +77,17 @@ int main(int argc, char **argv)
             },
             .compress = true,
         },
+        /* Two ranges with the same high bit set. */
+        {
+        .ranges = {
+                { .start = (1UL << (51 - PAGE_SHIFT)) + (1 << MAX_ORDER) * 0,
+                  .end =   (1UL << (51 - PAGE_SHIFT)) + (1 << MAX_ORDER) * 1 },
+                { .start = (1UL << (51 - PAGE_SHIFT)) + (1 << MAX_ORDER) * 3,
+                  .end =   (1UL << (51 - PAGE_SHIFT)) + (1 << MAX_ORDER) * 4 },
+            },
+            .compress = true,
+        },
+#endif
         /* PDX compression, 2 ranges covered by the lower mask. */
         {
             .ranges = {
@@ -132,17 +143,6 @@ int main(int argc, char **argv)
             },
             .compress = true,
         },
-        /* Two ranges with the same high bit set. */
-        {
-        .ranges = {
-                { .start = (1UL << (51 - PAGE_SHIFT)) + (1 << MAX_ORDER) * 0,
-                  .end =   (1UL << (51 - PAGE_SHIFT)) + (1 << MAX_ORDER) * 1 },
-                { .start = (1UL << (51 - PAGE_SHIFT)) + (1 << MAX_ORDER) * 3,
-                  .end =   (1UL << (51 - PAGE_SHIFT)) + (1 << MAX_ORDER) * 4 },
-            },
-            .compress = true,
-        },
-#endif
         /* AMD Naples Epyc 7281 2 sockets, 8 NUMA nodes. */
         {
             .ranges = {
