@@ -1,0 +1,28 @@
+=head1 NAME
+
+xenstore-list - list Xenstore key children
+
+=head1 SYNOPSIS
+
+B<xenstore-list> [I<OPTION>]... [I<PATH>]...
+
+=head1 DESCRIPTION
+
+List direct children of one or more Xenstore I<PATH>s, one child per line.
+
+=over
+
+=item B<-h>
+
+Show the usage information for xenstore-list and exit the program.
+
+=item B<-p>
+
+List the full Xenstore path of each listed path.
+
+=back
+
+=head1 BUGS
+
+Send bugs to xen-devel@lists.xenproject.org, see
+https://wiki.xenproject.org/wiki/Reporting_Bugs_against_Xen_Project on how to send bug reports.
