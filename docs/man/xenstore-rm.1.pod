@@ -1,0 +1,28 @@
+=head1 NAME
+
+xenstore-rm - remove Xenstore keys
+
+=head1 SYNOPSIS
+
+B<xenstore-rm> [I<OPTION>]... [I<PATH>]...
+
+=head1 DESCRIPTION
+
+Remove one or more Xenstore B<PATH>s.
+
+=over
+
+=item B<-h>
+
+Show the usage information for xenstore-rm and exit the program.
+
+=item B<-t>
+
+Tidy up (i.e. remove) Xenstore keys which had all children removed.
+
+=back
+
+=head1 BUGS
+
+Send bugs to xen-devel@lists.xenproject.org, see
+https://wiki.xenproject.org/wiki/Reporting_Bugs_against_Xen_Project on how to send bug reports.
