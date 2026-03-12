@@ -232,7 +232,7 @@ usage(int err_val, enum mode mode, int incl_mode, const char *progname)
 	errx(err_val, "Usage: %s %s[-h] [-t] key [...]", progname, mstr);
     case MODE_exists:
 	mstr = incl_mode ? "exists " : "";
-	/* fallthrough */
+	errx(err_val, "Usage: %s %s[-h] key", progname, mstr);
     case MODE_list:
 	mstr = mstr ? : incl_mode ? "list " : "";
 	errx(err_val, "Usage: %s %s[-h] [-p] key [...]", progname, mstr);
