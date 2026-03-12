@@ -1,0 +1,29 @@
+=head1 NAME
+
+xenstore-watch - wait for Xenstore watch events
+
+=head1 SYNOPSIS
+
+B<xenstore-watch> [I<OPTION>]... [I<PATH>]...
+
+=head1 DESCRIPTION
+
+Set Xenstore watches to the specified I<PATH>s and print the path for each
+event happening.
+
+=over
+
+=item B<-h>
+
+Show the usage information for xenstore-watch and exit the program.
+
+=item B<-n> B<NR>
+
+Stop waiting after having received B<NR> watch events.
+
+=back
+
+=head1 BUGS
+
+Send bugs to xen-devel@lists.xenproject.org, see
+https://wiki.xenproject.org/wiki/Reporting_Bugs_against_Xen_Project on how to send bug reports.
