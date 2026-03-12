@@ -208,8 +208,8 @@ int main(int argc, char **argv)
             if ( !tests[i].ranges[j].start && !tests[i].ranges[j].end )
                 break;
 
-            pfn_pdx_add_region(tests[i].ranges[j].start << PAGE_SHIFT,
-                               size << PAGE_SHIFT);
+            pfn_pdx_add_region(pfn_to_paddr(tests[i].ranges[j].start),
+                               pfn_to_paddr(size));
         }
 
         if ( pfn_pdx_compression_setup(0) != tests[i].compress )
@@ -233,8 +233,8 @@ int main(int argc, char **argv)
             if ( !start && !end )
                 break;
 
-            if ( !pdx_is_region_compressible(start << PAGE_SHIFT, 1) ||
-                 !pdx_is_region_compressible((end - 1) << PAGE_SHIFT, 1) )
+            if ( !pdx_is_region_compressible(pfn_to_paddr(start), 1) ||
+                 !pdx_is_region_compressible(pfn_to_paddr(end - 1), 1) )
             {
                 printf(
     "PFN compression invalid, pages %#lx and %#lx should be compressible\n",
