@@ -568,13 +568,17 @@ perform(enum mode mode, int optind, int argc, char **argv, struct xs_handle *xsh
         case MODE_list: {
             unsigned int i, num;
             char **list = xs_directory(xsh, xth, argv[optind], &num);
+            const char *pref = argv[optind];
+
             if (list == NULL) {
                 warnx("could not list path %s", argv[optind]);
                 return 1;
             }
+            if (prefix && !strcmp(pref, "/"))
+                pref = "";
             for (i = 0; i < num; i++) {
                 if (prefix)
-                    output("%s/", argv[optind]);
+                    output("%s/", pref);
                 output("%s\n", list[i]);
             }
             free(list);
