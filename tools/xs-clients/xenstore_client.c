@@ -214,37 +214,37 @@ output_raw(const char *data, int len)
 }
 
 static void
-usage(enum mode mode, int incl_mode, const char *progname)
+usage(int err_val, enum mode mode, int incl_mode, const char *progname)
 {
     const char *mstr = NULL;
 
     switch (mode) {
     case MODE_unknown:
-	errx(1, "Usage: %s <mode> [-h] [...]", progname);
+	errx(err_val, "Usage: %s <mode> [-h] [...]", progname);
     case MODE_read:
 	mstr = incl_mode ? "read " : "";
-	errx(1, "Usage: %s %s[-h] [-p] [-R] key [...]", progname, mstr);
+	errx(err_val, "Usage: %s %s[-h] [-p] [-R] key [...]", progname, mstr);
     case MODE_write:
 	mstr = incl_mode ? "write " : "";
-	errx(1, "Usage: %s %s[-h] [-R] key value [...]", progname, mstr);
+	errx(err_val, "Usage: %s %s[-h] [-R] key value [...]", progname, mstr);
     case MODE_rm:
 	mstr = incl_mode ? "rm " : "";
-	errx(1, "Usage: %s %s[-h] [-t] key [...]", progname, mstr);
+	errx(err_val, "Usage: %s %s[-h] [-t] key [...]", progname, mstr);
     case MODE_exists:
 	mstr = incl_mode ? "exists " : "";
 	/* fallthrough */
     case MODE_list:
 	mstr = mstr ? : incl_mode ? "list " : "";
-	errx(1, "Usage: %s %s[-h] [-p] key [...]", progname, mstr);
+	errx(err_val, "Usage: %s %s[-h] [-p] key [...]", progname, mstr);
     case MODE_ls:
 	mstr = mstr ? : incl_mode ? "ls " : "";
-	errx(1, "Usage: %s %s[-h] [-f] [-p] [path]", progname, mstr);
+	errx(err_val, "Usage: %s %s[-h] [-f] [-p] [path]", progname, mstr);
     case MODE_chmod:
 	mstr = incl_mode ? "chmod " : "";
-	errx(1, "Usage: %s %s[-h] [-u] [-r] key <mode [modes...]>", progname, mstr);
+	errx(err_val, "Usage: %s %s[-h] [-u] [-r] key <mode [modes...]>", progname, mstr);
     case MODE_watch:
 	mstr = incl_mode ? "watch " : "";
-	errx(1, "Usage: %s %s[-h] [-n NR] key", progname, mstr);
+	errx(err_val, "Usage: %s %s[-h] [-n NR] key", progname, mstr);
     }
 }
 
@@ -685,7 +685,7 @@ main(int argc, char **argv)
 	command = command + strlen("xenstore-");
     }
     else if (argc < 2)
-	usage(MODE_unknown, 0, argv[0]);
+	usage(1, MODE_unknown, 0, argv[0]);
     else
     {
 	command = argv[1];
@@ -715,7 +715,7 @@ main(int argc, char **argv)
 
 	switch (c) {
 	case 'h':
-	    usage(mode, switch_argv, argv[0]);
+	    usage(0, mode, switch_argv, argv[0]);
 	    /* NOTREACHED */
         case 'f':
 	    if ( mode == MODE_ls ) {
@@ -723,44 +723,44 @@ main(int argc, char **argv)
 		desired_width = 0;
 		show_whole_path = 1;
 	    } else {
-		usage(mode, switch_argv, argv[0]);
+		usage(1, mode, switch_argv, argv[0]);
 	    }
             break;
 	case 'p':
 	    if ( mode == MODE_read || mode == MODE_list || mode == MODE_ls )
 		prefix = 1;
 	    else
-		usage(mode, switch_argv, argv[0]);
+		usage(1, mode, switch_argv, argv[0]);
 	    break;
 	case 't':
 	    if ( mode == MODE_rm )
 		tidy = 1;
 	    else
-		usage(mode, switch_argv, argv[0]);
+		usage(1, mode, switch_argv, argv[0]);
 	    break;
 	case 'u':
 	    if ( mode == MODE_chmod )
 		upto = 1;
 	    else
-		usage(mode, switch_argv, argv[0]);
+		usage(1, mode, switch_argv, argv[0]);
 	    break;
 	case 'r':
 	    if ( mode == MODE_chmod )
 		recurse = 1;
 	    else
-		usage(mode, switch_argv, argv[0]);
+		usage(1, mode, switch_argv, argv[0]);
 	    break;
 	case 'n':
 	    if ( mode == MODE_watch )
 		nr_watches = atoi(optarg);
 	    else
-		usage(mode, switch_argv, argv[0]);
+		usage(1, mode, switch_argv, argv[0]);
 	    break;
 	case 'R':
 	    if ( mode == MODE_read || mode == MODE_write )
 		raw = 1;
 	    else
-		usage(mode, switch_argv, argv[0]);
+		usage(1, mode, switch_argv, argv[0]);
 	    break;
 	}
     }
@@ -770,13 +770,13 @@ main(int argc, char **argv)
 	break;
     case MODE_write:
 	if ((argc - switch_argv - optind) % 2 == 1) {
-	    usage(mode, switch_argv, argv[0]);
+	    usage(1, mode, switch_argv, argv[0]);
 	    /* NOTREACHED */
 	}
 	/* DROP-THRU */
     default:
 	if (optind == argc - switch_argv) {
-	    usage(mode, switch_argv, argv[0]);
+	    usage(1, mode, switch_argv, argv[0]);
 	    /* NOTREACHED */
 	}
     }
