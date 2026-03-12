@@ -1,0 +1,25 @@
+=head1 NAME
+
+xenstore-exists - test whether Xenstore key exists
+
+=head1 SYNOPSIS
+
+B<xenstore-exists> I<PATH>
+
+=head1 DESCRIPTION
+
+Tests whether the specified Xenstore I<PATH> is readable and sets
+the exit value accordingly (B<0> if I<PTAH> is readable, B<1> if not).
+
+=over
+
+=item B<-h>
+
+Show the usage information for xenstore-exists and exit the program.
+
+=back
+
+=head1 BUGS
+
+Send bugs to xen-devel@lists.xenproject.org, see
+https://wiki.xenproject.org/wiki/Reporting_Bugs_against_Xen_Project on how to send bug reports.
