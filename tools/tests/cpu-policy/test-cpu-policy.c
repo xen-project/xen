@@ -586,6 +586,19 @@ static void test_is_compatible_success(void)
                 .platform_info.cpuid_faulting = true,
             },
         },
+        {
+            .name = "Host CPU vendor == Guest CPU vendor (both unknown)",
+            .host = {
+                .basic.vendor_ebx = X86_VENDOR_AMD_EBX + 1,
+                .basic.vendor_ecx = X86_VENDOR_AMD_ECX,
+                .basic.vendor_edx = X86_VENDOR_AMD_EDX,
+            },
+            .guest = {
+                .basic.vendor_ebx = X86_VENDOR_AMD_EBX + 1,
+                .basic.vendor_ecx = X86_VENDOR_AMD_ECX,
+                .basic.vendor_edx = X86_VENDOR_AMD_EDX,
+            },
+        },
     };
     struct cpu_policy_errors no_errors = INIT_CPU_POLICY_ERRORS;
 
@@ -628,6 +641,20 @@ static void test_is_compatible_failure(void)
                 .platform_info.cpuid_faulting = true,
             },
             .e = { -1, -1, 0xce },
+        },
+        {
+            .name = "Host CPU vendor != Guest CPU vendor (both unknown)",
+            .host = {
+                .basic.vendor_ebx = X86_VENDOR_AMD_EBX + 1,
+                .basic.vendor_ecx = X86_VENDOR_AMD_ECX,
+                .basic.vendor_edx = X86_VENDOR_AMD_EDX,
+            },
+            .guest = {
+                .basic.vendor_ebx = X86_VENDOR_AMD_EBX + 2,
+                .basic.vendor_ecx = X86_VENDOR_AMD_ECX,
+                .basic.vendor_edx = X86_VENDOR_AMD_EDX,
+            },
+            .e = { 0, -1, -1 },
         },
     };
 

@@ -15,7 +15,10 @@ int x86_cpu_policies_are_compatible(const struct cpu_policy *host,
 #define FAIL_MSR(m) \
     do { e.msr = (m); goto out; } while ( 0 )
 
-    if ( guest->basic.max_leaf > host->basic.max_leaf )
+    if ( (guest->basic.vendor_ebx != host->basic.vendor_ebx) ||
+         (guest->basic.vendor_ecx != host->basic.vendor_ecx) ||
+         (guest->basic.vendor_edx != host->basic.vendor_edx) ||
+         (guest->basic.max_leaf   >  host->basic.max_leaf) )
         FAIL_CPUID(0, NA);
 
     if ( guest->feat.max_subleaf > host->feat.max_subleaf )
