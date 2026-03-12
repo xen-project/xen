@@ -42,6 +42,10 @@ write, and set permissions).
 
 =over
 
+=item B<-h>
+
+Show the usage information for xenstore-chmod and exit the program.
+
 =item B<-r>
 
 Apply the permissions to the key and all its I<children>.

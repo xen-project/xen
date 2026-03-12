@@ -12,6 +12,10 @@ Read values of one or more Xenstore I<PATH>s.
 
 =over
 
+=item B<-h>
+
+Show the usage information for xenstore-read and exit the program.
+
 =item B<-p>
 
 Prefix value with key name.

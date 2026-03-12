@@ -13,6 +13,10 @@ provided to write them at once - in one Xenstore transaction.
 
 =over
 
+=item B<-h>
+
+Show the usage information for xenstore-write and exit the program.
+
 =item B<-R>
 
 Write raw value, skip parsing escaped characters (\x..).

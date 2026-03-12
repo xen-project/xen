@@ -13,6 +13,10 @@ using a nested, tree-like view.
 
 =over
 
+=item B<-h>
+
+Show the usage information for xenstore-ls and exit the program.
+
 =item B<-f>
 
 Show the full path for all keys.
