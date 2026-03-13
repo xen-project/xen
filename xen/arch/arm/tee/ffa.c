@@ -80,6 +80,7 @@ struct ffa_fw_abi {
     const char *name;
 };
 
+/* SAF-6-safe Rule 20.12 expansion of macro FFA_* with FW_ABI */
 #define FW_ABI(abi) {abi,#abi}
 
 /* List of ABI we use from the firmware */
