@@ -324,6 +324,7 @@ void start_secondary(void *unused)
 
     set_current(idle_vcpu[cpu]);
     this_cpu(curr_vcpu) = idle_vcpu[cpu];
+    this_cpu(pgtable_vcpu) = idle_vcpu[cpu];
     rdmsrl(MSR_EFER, this_cpu(efer));
     init_shadow_spec_ctrl_state();
 
