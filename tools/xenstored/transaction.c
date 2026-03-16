@@ -432,16 +432,22 @@ static int finalize_transaction(struct connection *conn,
 static int destroy_transaction(void *_transaction)
 {
 	struct transaction *trans = _transaction;
+	struct connection *conn = trans->conn;
 	struct accessed_node *i;
 
 	wrl_ntransactions--;
 	trace_destroy(trans, "transaction");
 	while ((i = list_top(&trans->accessed, struct accessed_node, list))) {
 		if (i->ta_node)
-			db_delete(trans->conn, i->trans_name, NULL);
+			db_delete(conn, i->trans_name, NULL);
 		list_del(&i->list);
 		talloc_free(i);
 	}
+
+	list_del(&trans->list);
+	domain_transaction_dec(conn);
+	if (list_empty(&conn->transaction_list))
+		conn->ta_start_time = 0;
 
 	return 0;
 }
@@ -523,10 +529,6 @@ int do_transaction_end(const void *ctx, struct connection *conn,
 		return ENOENT;
 
 	conn->transaction = NULL;
-	list_del(&trans->list);
-	domain_transaction_dec(conn);
-	if (list_empty(&conn->transaction_list))
-		conn->ta_start_time = 0;
 
 	chk_quota = trans->node_created && domain_is_unprivileged(conn);
 
@@ -572,14 +574,10 @@ void conn_delete_all_transactions(struct connection *conn)
 	struct transaction *trans;
 
 	while ((trans = list_top(&conn->transaction_list,
-				 struct transaction, list))) {
-		list_del(&trans->list);
+				 struct transaction, list)))
 		talloc_free(trans);
-	}
 
-	assert(conn->transaction == NULL);
-
-	conn->ta_start_time = 0;
+	conn->transaction = NULL;
 }
 
 int check_transactions(struct hashtable *hash)
