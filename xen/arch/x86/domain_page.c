@@ -18,48 +18,40 @@
 #include <asm/hardirq.h>
 #include <asm/setup.h>
 
-static DEFINE_PER_CPU(struct vcpu *, override);
-
 static inline struct vcpu *mapcache_current_vcpu(void)
 {
-    /* In the common case we use the mapcache of the running VCPU. */
-    struct vcpu *v = this_cpu(override) ?: current;
+    struct vcpu *v = this_cpu(pgtable_vcpu);
+    struct vcpu *curr = current;
 
     /*
-     * When current isn't properly set up yet, this is equivalent to
-     * running in an idle vCPU (callers must check for NULL).
+     * During early boot pgtable_vcpu is not set, callers must handle NULL.
+     * Non-PV domains don't have a mapcache, the directmap covers all physical
+     * address space.
      */
-    if ( !v )
+    if ( !v || !is_pv_vcpu(v) )
         return NULL;
 
     /*
-     * When using efi runtime page tables, we have the equivalent of the idle
-     * domain's page tables but current may point at another domain's VCPU.
-     * Return NULL as though current is not properly set up yet.
+     * If we are in a lazy context-switch state from a PV vCPU do a full switch
+     * to the idle vCPU now, otherwise an incoming FLUSH_VCPU_STATE IPI would
+     * change the page tables under our feet an invalidate any in-use mapcache
+     * entries.
      */
-    if ( efi_rs_using_pgtables() )
-        return NULL;
-
-    /*
-     * If guest_table is NULL, and we are running a paravirtualised guest,
-     * then it means we are running on the idle domain's page table and must
-     * therefore use its mapcache.
-     */
-    if ( unlikely(pagetable_is_null(v->arch.guest_table)) && is_pv_vcpu(v) )
+    if ( unlikely(this_cpu(curr_vcpu) != curr) )
     {
-        /* If we really are idling, perform lazy context switch now. */
-        if ( (v = idle_vcpu[smp_processor_id()]) == current )
-            sync_local_execstate();
+        ASSERT(curr == idle_vcpu[smp_processor_id()]);
+        sync_local_execstate();
         /* We must now be running on the idle page table. */
         ASSERT(cr3_pa(read_cr3()) == __pa(idle_pg_table));
     }
 
-    return v;
-}
-
-void __init mapcache_override_current(struct vcpu *v)
-{
-    this_cpu(override) = v;
+    /*
+     * At this point we can guarantee Xen is not in lazy context switch: either
+     * the code above will have synced the state, or an incoming
+     * FLUSH_VCPU_STATE IPI has done so behind our back.  Use ACCESS_ONCE to
+     * ensure the compiler never returns the locally cached pgtable_vcpu value.
+     */
+    return ACCESS_ONCE(this_cpu(pgtable_vcpu));
 }
 
 #define mapcache_l2_entry(e) ((e) >> PAGETABLE_ORDER)

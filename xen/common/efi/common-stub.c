@@ -7,11 +7,6 @@ bool efi_enabled(unsigned int feature)
     return false;
 }
 
-bool efi_rs_using_pgtables(void)
-{
-    return false;
-}
-
 unsigned long efi_get_time(void)
 {
     BUG();

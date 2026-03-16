@@ -465,6 +465,9 @@ extern idt_entry_t *idt_tables[];
 
 DECLARE_PER_CPU(root_pgentry_t *, root_pgt);
 
+/* vCPU of the currently loaded page-tables. */
+DECLARE_PER_CPU(struct vcpu *, pgtable_vcpu);
+
 extern void write_ptbase(struct vcpu *v);
 
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */

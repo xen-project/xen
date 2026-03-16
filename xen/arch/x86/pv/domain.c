@@ -428,6 +428,8 @@ static void _toggle_guest_pt(struct vcpu *v)
     pagetable_t old_shadow;
     unsigned long cr3;
 
+    ASSERT(local_irq_is_enabled());
+
     v->arch.flags ^= TF_kernel_mode;
     guest_update = v->arch.flags & TF_kernel_mode;
     old_shadow = update_cr3(v);
@@ -450,15 +452,22 @@ static void _toggle_guest_pt(struct vcpu *v)
     {
         cr3 &= ~X86_CR3_NOFLUSH;
 
+        local_irq_disable();
         if ( unlikely(mfn_eq(pagetable_get_mfn(old_shadow),
                              maddr_to_mfn(cr3))) )
         {
-            cr3 = idle_vcpu[v->processor]->arch.cr3;
             /* Also suppress runstate/time area updates below. */
             guest_update = false;
+
+            cr3 = idle_vcpu[v->processor]->arch.cr3;
+            this_cpu(pgtable_vcpu) = idle_vcpu[v->processor];
         }
+
+        write_cr3(cr3);
+        local_irq_enable();
     }
-    write_cr3(cr3);
+    else
+        write_cr3(cr3);
 
     if ( !pagetable_is_null(old_shadow) )
         shadow_put_top_level(v->domain, old_shadow);
