@@ -329,6 +329,9 @@ DECLARE_PER_CPU(struct tss_page, tss_page);
 
 DECLARE_PER_CPU(root_pgentry_t *, root_pgt);
 
+/* vCPU of the currently loaded page-tables. */
+DECLARE_PER_CPU(struct vcpu *, pgtable_vcpu);
+
 extern void write_ptbase(struct vcpu *v);
 
 /* PAUSE (encoding: REP NOP) is a good thing to insert into busy-wait loops. */

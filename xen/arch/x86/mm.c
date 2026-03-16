@@ -535,7 +535,7 @@ void write_ptbase(struct vcpu *v)
         cpu_info->pv_cr3 = __pa(this_cpu(root_pgt));
         if ( new_cr4 & X86_CR4_PCIDE )
             cpu_info->pv_cr3 |= get_pcid_bits(v, true);
-        switch_cr3_cr4(v->arch.cr3, new_cr4);
+        switch_cr3_cr4(v, v->arch.cr3, new_cr4);
     }
     else
     {
@@ -543,7 +543,7 @@ void write_ptbase(struct vcpu *v)
         cpu_info->use_pv_cr3 = false;
         cpu_info->xen_cr3 = 0;
         /* switch_cr3_cr4() serializes. */
-        switch_cr3_cr4(v->arch.cr3, new_cr4);
+        switch_cr3_cr4(v, v->arch.cr3, new_cr4);
         cpu_info->pv_cr3 = 0;
     }
 }

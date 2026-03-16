@@ -90,7 +90,6 @@ struct mapcache_domain {
 
 int mapcache_domain_init(struct domain *d);
 int mapcache_vcpu_init(struct vcpu *v);
-void mapcache_override_current(struct vcpu *v);
 
 /* x86/64: toggle guest between kernel and user modes. */
 void toggle_guest_mode(struct vcpu *v);

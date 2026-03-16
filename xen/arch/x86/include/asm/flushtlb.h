@@ -104,7 +104,7 @@ static inline void invlpg(const void *p)
 }
 
 /* Write pagetable base and implicitly tick the tlbflush clock. */
-void switch_cr3_cr4(unsigned long cr3, unsigned long cr4);
+void switch_cr3_cr4(struct vcpu *v, unsigned long cr3, unsigned long cr4);
 
 /* flush_* flag fields: */
  /*
