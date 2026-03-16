@@ -114,9 +114,11 @@ FUNC(kexec_reloc, PAGE_SIZE)
 .L_call_32_bit:
 
         /* Load compat GDT. */
-        leaq    compat_mode_gdt(%rip), %rax
-        movq    %rax, (compat_mode_gdt_desc + 2)(%rip)
-        lgdt    compat_mode_gdt_desc(%rip)
+        lea     compat_mode_gdt(%rip), %rax
+        push    %rax
+        pushw   $.Lcompat_mode_gdt_end - 1 - compat_mode_gdt
+        lgdt    (%rsp)
+        add     $10, %rsp
 
         /* Enter compatibility mode. */
         lea     compatibility_mode(%rip), %rax
@@ -205,11 +207,6 @@ END(compatibility_mode)
 
         /* Separate code and data into into different cache lines */
         .balign L1_CACHE_BYTES
-
-DATA_LOCAL(compat_mode_gdt_desc, 4)
-        .word .Lcompat_mode_gdt_end - compat_mode_gdt -1
-        .quad 0x0000000000000000     /* set in call_32_bit above */
-END(compat_mode_gdt_desc)
 
 DATA_LOCAL(compat_mode_gdt, 8)
         .quad 0x0000000000000000     /* null                              */
