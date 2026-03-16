@@ -20,6 +20,7 @@
 #include <xen/mm.h> /* TODO: Fix asm/tlbflush.h breakage */
 #include <xen/sha2.h>
 
+#include <asm/amd.h>
 #include <asm/msr.h>
 
 #include "private.h"
@@ -576,7 +577,7 @@ void __init ucode_probe_amd(struct microcode_ops *ops)
      */
     if ( IS_ENABLED(CONFIG_MICROCODE_LOADING) &&
          boot_cpu_data.family >= 0x17 && boot_cpu_data.family <= 0x1a &&
-         !opt_digest_check )
+         !is_zen6_uarch() && !opt_digest_check )
     {
         printk(XENLOG_WARNING
                "Microcode patch additional digest checks disabled\n");
@@ -618,7 +619,8 @@ void __init amd_check_entrysign(void)
     if ( !IS_ENABLED(CONFIG_MICROCODE_LOADING)  ||
          boot_cpu_data.vendor != X86_VENDOR_AMD ||
          boot_cpu_data.family < 0x17            ||
-         boot_cpu_data.family > 0x1a )
+         boot_cpu_data.family > 0x1a            ||
+         is_zen6_uarch() )
         return;
 
     /*
