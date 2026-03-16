@@ -45,6 +45,16 @@ FUNC(kexec_reloc, PAGE_SIZE)
         movq    %rcx, %rbp
 
         /*
+         * Invalidate the IDT.  After switching off Xen's stacks, the
+         * exception handlers are unsafe to use, because there's no way to
+         * perform arithmetic on the stack pointer to find the cpu_info block.
+         */
+        push    $0
+        pushw   $0
+        lidt    (%rsp)
+        add     $10, %rsp
+
+        /*
          * Move to the identity mapped stack.
          *
          * Note this mapping doesn't exist until the pagetable switch.
@@ -94,8 +104,6 @@ FUNC(kexec_reloc, PAGE_SIZE)
         jmp     *%rbp
 
 .L_call_32_bit:
-        /* Setup IDT. */
-        lidt    compat_mode_idt(%rip)
 
         /* Load compat GDT. */
         leaq    compat_mode_gdt(%rip), %rax
@@ -201,11 +209,6 @@ DATA_LOCAL(compat_mode_gdt, 8)
         .quad 0x00cf9b000000ffff     /* 0x0010 ring 0 code, compatibility */
 .Lcompat_mode_gdt_end:
 END(compat_mode_gdt)
-
-DATA_LOCAL(compat_mode_idt)
-        .word 0                      /* limit */
-        .long 0                      /* base */
-END(compat_mode_idt)
 
         /*
          * 16 words of stack are more than enough.
