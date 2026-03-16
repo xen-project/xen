@@ -383,7 +383,9 @@ void __init early_cpu_init(bool verbose)
 			      c->x86_capability[FEATURESET_m10Ah]);
 
 		if (max_subleaf >= 1)
-			cpuid_count(7, 1, &eax, &ebx, &ecx,
+			cpuid_count(7, 1,
+				    &c->x86_capability[FEATURESET_7a1],
+				    &ebx, &ecx,
 				    &c->x86_capability[FEATURESET_7d1]);
 	}
 

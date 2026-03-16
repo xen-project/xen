@@ -149,6 +149,8 @@
  * For Zen3 and Zen4 (Fam19h) the heuristic is the presence of AutoIBRS, as
  * it's Zen4-specific.
  *
+ * For Zen5 and Zen6 (Fam1ah) the heuristic is the presence of FRED.
+ *
  * The caller is required to perform the appropriate vendor/family checks
  * first.
  */
@@ -156,6 +158,8 @@
 #define is_zen2_uarch()   boot_cpu_has(X86_FEATURE_AMD_STIBP)
 #define is_zen3_uarch() (!boot_cpu_has(X86_FEATURE_AUTO_IBRS))
 #define is_zen4_uarch()   boot_cpu_has(X86_FEATURE_AUTO_IBRS)
+#define is_zen5_uarch() (!boot_cpu_has(X86_FEATURE_FRED))
+#define is_zen6_uarch()   boot_cpu_has(X86_FEATURE_FRED)
 
 struct cpuinfo_x86;
 int cpu_has_amd_erratum(const struct cpuinfo_x86 *cpu, int osvw_id, ...);
