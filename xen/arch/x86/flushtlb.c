@@ -111,7 +111,9 @@ static void do_tlb_flush(void)
     local_irq_restore(flags);
 }
 
-void switch_cr3_cr4(unsigned long cr3, unsigned long cr4)
+DEFINE_PER_CPU(struct vcpu *, pgtable_vcpu);
+
+void switch_cr3_cr4(struct vcpu *v, unsigned long cr3, unsigned long cr4)
 {
     unsigned long flags, old_cr4;
     u32 t = 0;
@@ -155,6 +157,7 @@ void switch_cr3_cr4(unsigned long cr3, unsigned long cr4)
     if ( (old_cr4 & X86_CR4_PCIDE) > (cr4 & X86_CR4_PCIDE) )
         cr3 |= X86_CR3_NOFLUSH;
     write_cr3(cr3);
+    this_cpu(pgtable_vcpu) = v;
 
     if ( old_cr4 != cr4 )
         write_cr4(cr4);

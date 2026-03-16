@@ -49,7 +49,6 @@ const CHAR16 *__read_mostly efi_fw_vendor;
 const EFI_RUNTIME_SERVICES *__read_mostly efi_rs;
 #ifndef CONFIG_ARM /* TODO - disabled until implemented on ARM */
 static DEFINE_SPINLOCK(efi_rs_lock);
-static unsigned int efi_rs_on_cpu = NR_CPUS;
 #endif
 
 UINTN __read_mostly efi_memmap_size;
@@ -92,14 +91,17 @@ struct efi_rs_state efi_rs_enter(void)
     if ( mfn_eq(efi_l4_mfn, INVALID_MFN) )
         return state;
 
+    /*
+     * If in lazy idle context switch state sync now to avoid an incoming
+     * FLUSH_VCPU_STATE IPI changing the loaded page-tables.
+     */
+    sync_local_execstate();
     state.cr3 = read_cr3();
     save_fpu_enable();
     asm volatile ( "fnclex; fldcw %0" :: "m" (fcw) );
     asm volatile ( "ldmxcsr %0" :: "m" (mxcsr) );
 
     spin_lock(&efi_rs_lock);
-
-    efi_rs_on_cpu = smp_processor_id();
 
     /* prevent fixup_page_fault() from doing anything */
     irq_enter();
@@ -115,7 +117,8 @@ struct efi_rs_state efi_rs_enter(void)
         lgdt(&gdt_desc);
     }
 
-    switch_cr3_cr4(mfn_to_maddr(efi_l4_mfn), read_cr4());
+    switch_cr3_cr4(idle_vcpu[smp_processor_id()], mfn_to_maddr(efi_l4_mfn),
+                   read_cr4());
 
     /*
      * At the time of writing (2022), no UEFI firwmare is CET-IBT compatible.
@@ -143,7 +146,7 @@ void efi_rs_leave(struct efi_rs_state *state)
     if ( state->msr_s_cet )
         wrmsrl(MSR_S_CET, state->msr_s_cet);
 
-    switch_cr3_cr4(state->cr3, read_cr4());
+    switch_cr3_cr4(curr, state->cr3, read_cr4());
     if ( is_pv_vcpu(curr) && !is_idle_vcpu(curr) )
     {
         struct desc_ptr gdt_desc = {
@@ -154,16 +157,8 @@ void efi_rs_leave(struct efi_rs_state *state)
         lgdt(&gdt_desc);
     }
     irq_exit();
-    efi_rs_on_cpu = NR_CPUS;
     spin_unlock(&efi_rs_lock);
     vcpu_restore_fpu_nonlazy(curr, true);
-}
-
-bool efi_rs_using_pgtables(void)
-{
-    return !mfn_eq(efi_l4_mfn, INVALID_MFN) &&
-           (smp_processor_id() == efi_rs_on_cpu) &&
-           (read_cr3() == mfn_to_maddr(efi_l4_mfn));
 }
 
 unsigned long efi_get_time(void)

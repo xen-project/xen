@@ -828,8 +828,7 @@ static int __init dom0_construct(const struct boot_domain *bd)
     update_cr3(v);
 
     /* We run on dom0's page tables for the final part of the build process. */
-    switch_cr3_cr4(cr3_pa(v->arch.cr3), read_cr4());
-    mapcache_override_current(v);
+    switch_cr3_cr4(v, cr3_pa(v->arch.cr3), read_cr4());
 
     /* Copy the OS image and free temporary buffer. */
     elf.dest_base = (void*)vkern_start;
@@ -838,8 +837,7 @@ static int __init dom0_construct(const struct boot_domain *bd)
     rc = elf_load_binary(&elf);
     if ( rc < 0 )
     {
-        mapcache_override_current(NULL);
-        switch_cr3_cr4(current->arch.cr3, read_cr4());
+        switch_cr3_cr4(current, current->arch.cr3, read_cr4());
         printk("Failed to load the kernel binary\n");
         goto out;
     }
@@ -850,8 +848,7 @@ static int __init dom0_construct(const struct boot_domain *bd)
         if ( (parms.virt_hypercall < v_start) ||
              (parms.virt_hypercall >= v_end) )
         {
-            mapcache_override_current(NULL);
-            switch_cr3_cr4(current->arch.cr3, read_cr4());
+            switch_cr3_cr4(current, current->arch.cr3, read_cr4());
             printk("Invalid HYPERCALL_PAGE field in ELF notes.\n");
             return -EINVAL;
         }
@@ -992,8 +989,7 @@ static int __init dom0_construct(const struct boot_domain *bd)
 #endif
 
     /* Return to idle domain's page tables. */
-    mapcache_override_current(NULL);
-    switch_cr3_cr4(current->arch.cr3, read_cr4());
+    switch_cr3_cr4(current, current->arch.cr3, read_cr4());
 
     update_domain_wallclock_time(d);
 
