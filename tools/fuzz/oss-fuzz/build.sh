@@ -11,5 +11,5 @@ make clang=y -C tools/fuzz/x86_instruction_emulator libfuzzer-harness
 cp tools/fuzz/x86_instruction_emulator/libfuzzer-harness $OUT/x86_instruction_emulator
 
 # Runtime coverage collection requires access to source files and symlinks don't work
-cp xen/lib/x86/*.c tools/fuzz/x86_instruction_emulator
+cp xen/arch/x86/lib/cpu-policy/*.c tools/fuzz/x86_instruction_emulator
 cp tools/tests/x86_emulator/*.c tools/fuzz/x86_instruction_emulator
