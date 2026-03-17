@@ -27,6 +27,14 @@
         .section .text.kexec, "ax", @progbits
         .code64
 
+        /*
+         * kexec_reloc() is entered in it's natural position within Xen.
+         *
+         * A copy of .text.kexec is identity mapped at %rdi within the
+         * pagetables in %rsi.  Xen's .text is mapped into %rsi at it's high
+         * alias allowing to pivot, but most other things including the stacks
+         * are not mapped.
+         */
 FUNC(kexec_reloc, PAGE_SIZE)
         /* %rdi - code page maddr */
         /* %rsi - page table maddr */
@@ -36,10 +44,17 @@ FUNC(kexec_reloc, PAGE_SIZE)
 
         movq    %rcx, %rbp
 
-        /* Setup stack. */
+        /*
+         * Move to the identity mapped stack.
+         *
+         * Note this mapping doesn't exist until the pagetable switch.
+         */
         leaq    (.Lreloc_stack_base - kexec_reloc)(%rdi), %rsp
 
-        /* Load reloc page table. */
+        /*
+         * Move to the relocation pagetables.  Xen's .text is mapped allowing
+         * the pivot, but very little else is.
+         */
         movq    %rsi, %cr3
 
         /* Jump to identity mapped code. */
@@ -153,12 +168,12 @@ FUNC_LOCAL(compatibility_mode)
         movl    %eax, %gs
         movl    %eax, %ss
 
-        /* Disable paging and therefore leave 64 bit mode. */
+        /* Disable paging and therefore leave long mode. */
         movl    %cr0, %eax
         andl    $~X86_CR0_PG, %eax
         movl    %eax, %cr0
 
-        /* Disable long mode */
+        /* Clear EFER.LME */
         movl    $MSR_EFER, %ecx
         rdmsr
         andl    $~EFER_LME, %eax
