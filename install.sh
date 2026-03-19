@@ -27,7 +27,7 @@ tmp="`mktemp -d`"
 echo "Installing Xen from '$src' to '$dst'..."
 (cd $src; tar -cf - * ) | tar -C "$tmp" -xf -
 
-(cd $tmp; tar -cf - *) | tar --no-same-owner -C "$dst" -xf -
+(cd $tmp; tar -cf - *) | tar --no-same-owner -C "$dst" -xhf -
 rm -rf "$tmp"
 
 echo "All done."
