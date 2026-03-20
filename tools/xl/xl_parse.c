@@ -1354,7 +1354,7 @@ void parse_config_data(const char *config_source,
     XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids, *vtpms,
                    *usbctrls, *usbdevs, *p9devs, *vdispls, *pvcallsifs_devs;
     XLU_ConfigList *channels, *ioports, *irqs, *iomem, *viridian, *dtdevs,
-                   *mca_caps, *smbios, *llc_colors;
+                   *mca_caps, *smbios, *llc_colors, *xs_quota;
     int num_ioports, num_irqs, num_iomem, num_cpus, num_viridian, num_mca_caps;
     int num_smbios;
     int pci_power_mgmt = 0;
@@ -1363,6 +1363,7 @@ void parse_config_data(const char *config_source,
     int pci_seize = 0;
     int i, e;
     int num_llc_colors;
+    int num_xs_quota;
     char *kernel_basename;
 
     libxl_domain_create_info *c_info = &d_config->c_info;
@@ -1469,6 +1470,22 @@ void parse_config_data(const char *config_source,
 
     if (!xlu_cfg_get_long (config, "xenstore_feature_mask", &l, 0))
         b_info->xenstore_feature_mask = l;
+
+    if (!xlu_cfg_get_list(config, "xenstore_quota", &xs_quota, &num_xs_quota, 0)) {
+        b_info->xenstore_quota.num_quota = num_xs_quota;
+        b_info->xenstore_quota.quota = xcalloc(num_xs_quota, sizeof(* b_info->xenstore_quota.quota));
+
+        for (i = 0; i < num_xs_quota; i++) {
+           buf = xlu_cfg_get_listitem(xs_quota, i);
+           if (!buf) {
+                fprintf(stderr,
+                        "xl: Can't get element %d in Xenstore quota list\n", i);
+                exit(1);
+            }
+            if (parse_xsquota_item(buf, b_info->xenstore_quota.quota + i))
+                exit(1);
+        }
+    }
 
     libxl_domain_build_info_init_type(b_info, c_info->type);
 

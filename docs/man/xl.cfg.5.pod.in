@@ -748,6 +748,19 @@ via the B<xl info -x> command in dom0.
 The default value is B<0xffffffff>, meaning that all possible Xenstore
 features are visible by the guest.
 
+=item B<xenstore_quota=[ QUOTA_SPEC, QUOTA_SPEC, ...]>
+
+Specifies Xenstore quota values of the domain, overriding the default
+values of Xenstore.
+
+Each B<QUOTA_SPEC> is a B<quota-name>=B<value> specification. The supported
+B<quota-name> identifiers can be obtained by the B<xl xenstore-quota-get -g>
+command. B<value> is a non-negative integer.
+
+As per-domain Xenstore quota are an optional Xenstore feature, the
+B<xenstore_quota> config parameter may not be supported by all Xenstore
+implementations.
+
 =back
 
 =head2 Devices
