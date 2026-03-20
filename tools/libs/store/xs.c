@@ -1456,6 +1456,117 @@ bool xs_set_features_domain(struct xs_handle *h, unsigned int domid,
 	return xs_bool(xs_talkv(h, iov, ARRAY_SIZE(iov), NULL));
 }
 
+const char **xs_get_quota_names(struct xs_handle *h, unsigned int *num)
+{
+	struct xsd_sockmsg msg = { .type = XS_GET_QUOTA };
+	struct iovec iov[1];
+	const char **quota;
+	char *reply;
+	char *c;
+	unsigned int i;
+
+	iov[0].iov_base = &msg;
+	iov[0].iov_len  = sizeof(msg);
+
+	reply = xs_talkv(h, iov, ARRAY_SIZE(iov), NULL);
+	if (!reply)
+		return NULL;
+
+	*num = 1;
+	for (c = reply; *c; c++)
+		if (*c == ' ')
+			(*num)++;
+
+	quota = malloc(*num * sizeof(char *) + strlen(reply) + 1);
+	c = (char *)(quota + *num);
+	strcpy(c, reply);
+	for (i = 0; i < *num; i++) {
+		quota[i] = c;
+		c = strchr(c, ' ');
+		if (c) {
+			*c = 0;
+			c++;
+		}
+	}
+
+	return quota;
+}
+
+bool xs_get_global_quota(struct xs_handle *h, const char *quota,
+			 unsigned int *value)
+{
+	struct xsd_sockmsg msg = { .type = XS_GET_QUOTA };
+	struct iovec iov[2];
+
+	iov[0].iov_base = &msg;
+	iov[0].iov_len  = sizeof(msg);
+	iov[1].iov_base = (char *)quota;
+	iov[1].iov_len  = strlen(quota) + 1;
+
+	return xs_uint(xs_talkv(h, iov, ARRAY_SIZE(iov), NULL), value);
+}
+
+bool xs_set_global_quota(struct xs_handle *h, const char *quota,
+			 unsigned int value)
+{
+	struct xsd_sockmsg msg = { .type = XS_SET_QUOTA };
+	char val_str[MAX_STRLEN(value)];
+	struct iovec iov[3];
+
+	snprintf(val_str, sizeof(val_str), "%u", value);
+
+	iov[0].iov_base = &msg;
+	iov[0].iov_len  = sizeof(msg);
+	iov[1].iov_base = (char *)quota;
+	iov[1].iov_len  = strlen(quota) + 1;
+	iov[2].iov_base = val_str;
+	iov[2].iov_len  = strlen(val_str) + 1;
+
+	return xs_bool(xs_talkv(h, iov, ARRAY_SIZE(iov), NULL));
+}
+
+bool xs_get_domain_quota(struct xs_handle *h, unsigned int domid,
+			 const char *quota, unsigned int *value)
+{
+	struct xsd_sockmsg msg = { .type = XS_GET_QUOTA };
+	char domid_str[MAX_STRLEN(domid)];
+	struct iovec iov[3];
+
+	snprintf(domid_str, sizeof(domid_str), "%u", domid);
+
+	iov[0].iov_base = &msg;
+	iov[0].iov_len  = sizeof(msg);
+	iov[1].iov_base = domid_str;
+	iov[1].iov_len  = strlen(domid_str) + 1;
+	iov[2].iov_base = (char *)quota;
+	iov[2].iov_len  = strlen(quota) + 1;
+
+	return xs_uint(xs_talkv(h, iov, ARRAY_SIZE(iov), NULL), value);
+}
+
+bool xs_set_domain_quota(struct xs_handle *h, unsigned int domid,
+			 const char *quota, unsigned int value)
+{
+	struct xsd_sockmsg msg = { .type = XS_SET_QUOTA };
+	char domid_str[MAX_STRLEN(domid)];
+	char val_str[MAX_STRLEN(value)];
+	struct iovec iov[4];
+
+	snprintf(domid_str, sizeof(domid_str), "%u", domid);
+	snprintf(val_str, sizeof(val_str), "%u", value);
+
+	iov[0].iov_base = &msg;
+	iov[0].iov_len  = sizeof(msg);
+	iov[1].iov_base = domid_str;
+	iov[1].iov_len  = strlen(domid_str) + 1;
+	iov[2].iov_base = (char *)quota;
+	iov[2].iov_len  = strlen(quota) + 1;
+	iov[3].iov_base = val_str;
+	iov[3].iov_len  = strlen(val_str) + 1;
+
+	return xs_bool(xs_talkv(h, iov, ARRAY_SIZE(iov), NULL));
+}
+
 char *xs_control_command(struct xs_handle *h, const char *cmd,
 			 void *data, unsigned int len)
 {

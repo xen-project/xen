@@ -277,6 +277,43 @@ bool xs_get_features_domain(struct xs_handle *h, unsigned int domid,
 bool xs_set_features_domain(struct xs_handle *h, unsigned int domid,
 			    unsigned int features);
 
+/* Get names of supported quota.
+ * Returns an array of quota names supported by Xenstore. On return
+ * num will contain the number of quota names in the array.
+ * Will return NULL on failure.
+ * The returned array should be freed via free() after usage, this will
+ * free the array AND the strings of the quota names.
+ */
+const char **xs_get_quota_names(struct xs_handle *h, unsigned int *num);
+
+/* Get the value of one global quota.
+ * Returns the global quota value specified by "quota" in "value".
+ * Return false on failure.
+ */
+bool xs_get_global_quota(struct xs_handle *h, const char *quota,
+			 unsigned int *value);
+
+/* Set the value of one global quota.
+ * Sets the global quota value specified by "quota" to "value".
+ * Return false on failure.
+ */
+bool xs_set_global_quota(struct xs_handle *h, const char *quota,
+			 unsigned int value);
+
+/* Get the value of one domain quota.
+ * Returns a domain's quota value specified by "quota" in "value".
+ * Return false on failure.
+ */
+bool xs_get_domain_quota(struct xs_handle *h, unsigned int domid,
+			 const char *quota, unsigned int *value);
+
+/* Set the value of one domain quota.
+ * Sets a domain's quota value specified by "quota" to "value".
+ * Return false on failure.
+ */
+bool xs_set_domain_quota(struct xs_handle *h, unsigned int domid,
+			 const char *quota, unsigned int value);
+
 char *xs_control_command(struct xs_handle *h, const char *cmd,
 			 void *data, unsigned int len);
 /* Deprecated: use xs_control_command() instead. */

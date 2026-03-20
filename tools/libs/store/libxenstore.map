@@ -45,3 +45,11 @@ VERS_4.1 {
 		xs_get_features_domain;
 		xs_set_features_domain;
 } VERS_4.0;
+VERS_4.2 {
+	global:
+		xs_get_quota_names;
+		xs_get_global_quota;
+		xs_set_global_quota;
+		xs_get_domain_quota;
+		xs_set_domain_quota;
+} VERS_4.1;
