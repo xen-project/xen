@@ -192,6 +192,9 @@ void lu_read_state(void)
 		case XS_STATE_TYPE_DOMAIN:
 			read_state_domain(ctx, state.buf, version);
 			break;
+		case XS_STATE_TYPE_GLB_QUOTA:
+			read_state_glb_quota(ctx, state.buf);
+			break;
 		default:
 			xprintf("live-update: unknown state record %08x\n",
 				head.type);
@@ -319,6 +322,9 @@ static const char *lu_dump_state(const void *ctx, struct connection *conn)
 	}
 
 	ret = dump_state_global(fp);
+	if (ret)
+		goto out;
+	ret = dump_state_glb_quota(fp);
 	if (ret)
 		goto out;
 	ret = dump_state_connections(fp);

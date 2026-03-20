@@ -172,10 +172,12 @@ void wrl_apply_debit_trans_commit(struct connection *conn);
 
 const char *dump_state_connections(FILE *fp);
 const char *dump_state_domains(FILE *fp);
+const char *dump_state_glb_quota(FILE *fp);
 
 void read_state_connection(const void *ctx, const void *state);
 void read_state_domain(const void *ctx, const void *state,
 		       unsigned int version);
+void read_state_glb_quota(const void *ctx, const void *state);
 
 struct hashtable *domain_check_acc_init(void);
 void domain_check_acc_add(const struct node *node, struct hashtable *domains);

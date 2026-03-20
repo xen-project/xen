@@ -107,6 +107,9 @@ struct quota quotas[ACC_N] = {
 	[ACC_NODESZ] =     { .val = { 2048, Q_VAL_DISABLED }, },
 };
 
+#define SOFT_PREFIX	"soft-"
+#define SOFT_PREFIX_LEN	(sizeof(SOFT_PREFIX) - 1)
+
 typedef int32_t wrl_creditt;
 
 struct domain
@@ -1363,6 +1366,29 @@ int do_set_feature(const void *ctx, struct connection *conn,
 	return 0;
 }
 
+static bool parse_quota_name(const char *name, unsigned int *qidx,
+			     unsigned int *idx)
+{
+	unsigned int q;
+
+	if (strncmp(name, SOFT_PREFIX, SOFT_PREFIX_LEN)) {
+		*idx = Q_IDX_HARD;
+	} else {
+		*idx = Q_IDX_SOFT;
+		name += SOFT_PREFIX_LEN;
+	}
+	for (q = 0; q < ACC_N; q++) {
+		if (quota_adm[q].name && !strcmp(quota_adm[q].name, name)) {
+			if (quotas[q].val[*idx] == Q_VAL_DISABLED)
+				return true;
+			*qidx = q;
+			return false;
+		}
+	}
+
+	return true;
+}
+
 static int close_xgt_handle(void *_handle)
 {
 	xengnttab_close(*(xengnttab_handle **)_handle);
@@ -2032,6 +2058,64 @@ void read_state_connection(const void *ctx, const void *state)
 	}
 }
 
+/* Returns number of quota and adds length of quota names to *len. */
+static unsigned int get_quota_size(struct quota *quota, unsigned int *len)
+{
+	unsigned int q;
+	unsigned int n = 0;
+
+	*len = 0;
+	for (q = 0; q < ACC_N; q++) {
+		if (!quota_adm[q].name)
+			continue;
+		if (quota[q].val[Q_IDX_HARD] != Q_VAL_DISABLED) {
+			n++;
+			*len += strlen(quota_adm[q].name) + 1;
+		}
+		if (quota[q].val[Q_IDX_SOFT] != Q_VAL_DISABLED) {
+			n++;
+			*len += strlen(quota_adm[q].name) + SOFT_PREFIX_LEN + 1;
+		}
+	}
+
+	return n;
+}
+
+static void build_quota_data(struct quota *quota, uint32_t *val,
+			     char *names_buf)
+{
+	unsigned int q;
+	unsigned int n = 0;
+
+	for (q = 0; q < ACC_N; q++) {
+		if (!quota_adm[q].name)
+			continue;
+		if (quota[q].val[Q_IDX_HARD] != Q_VAL_DISABLED) {
+			val[n++] = quota[q].val[Q_IDX_HARD];
+			strcpy(names_buf, quota_adm[q].name);
+			names_buf += strlen(names_buf) + 1;
+		}
+		if (quota[q].val[Q_IDX_SOFT] != Q_VAL_DISABLED) {
+			val[n++] = quota[q].val[Q_IDX_SOFT];
+			strcpy(names_buf, SOFT_PREFIX);
+			strcpy(names_buf + SOFT_PREFIX_LEN, quota_adm[q].name);
+			names_buf += strlen(names_buf) + 1;
+		}
+	}
+}
+
+static void parse_quota_data(const uint32_t *val, const char *name,
+			     unsigned int n, struct quota *quota)
+{
+	unsigned int i, q, idx;
+
+	for (i = 0; i < n; i++) {
+		if (!parse_quota_name(name, &q, &idx))
+			quota[q].val[idx] = val[i];
+		name += strlen(name) + 1;
+	}
+}
+
 static int dump_state_domain(const void *k, void *v, void *arg)
 {
 	struct domain *domain = v;
@@ -2078,6 +2162,54 @@ void read_state_domain(const void *ctx, const void *state, unsigned int version)
 
 	if (version > 1)
 		domain->features = sd->features;
+}
+
+const char *dump_state_glb_quota(FILE *fp)
+{
+	struct xs_state_record_header *head;
+	struct xs_state_glb_quota *glb;
+	void *record;
+	unsigned int n_quota;
+	unsigned int rec_len;
+	size_t ret;
+
+	n_quota = get_quota_size(quotas, &rec_len);
+	rec_len += n_quota * sizeof(glb->quota_val[0]);
+	rec_len += sizeof(*glb);
+	rec_len = ROUNDUP(rec_len, 3);
+
+	record = talloc_size(NULL, rec_len + sizeof(*head));
+	if (!record)
+		return "Dump global quota allocation error";
+
+	head = record;
+	head->type = XS_STATE_TYPE_GLB_QUOTA;
+	head->length = rec_len;
+
+	glb = (struct xs_state_glb_quota *)(head + 1);
+	glb->n_dom_quota = n_quota;
+	glb->n_glob_quota = 0;
+
+	build_quota_data(quotas, glb->quota_val,
+			 (char *)(glb->quota_val + n_quota));
+
+	ret = fwrite(record, rec_len + sizeof(*head), 1, fp);
+
+	talloc_free(record);
+
+	if (ret != 1 || dump_state_align(fp))
+		return "Dump global quota error";
+
+	return NULL;
+}
+
+void read_state_glb_quota(const void *ctx, const void *state)
+{
+	const struct xs_state_glb_quota *glb = state;
+	unsigned int n_quota = glb->n_dom_quota + glb->n_glob_quota;
+	const char *name = (const char *)(glb->quota_val + n_quota);
+
+	parse_quota_data(glb->quota_val, name, n_quota, quotas);
 }
 
 struct domain_acc {
