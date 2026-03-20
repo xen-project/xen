@@ -897,6 +897,9 @@ static int translate_params(struct optee_domain *ctx,
         case OPTEE_MSG_ATTR_TYPE_RMEM_OUTPUT:
         case OPTEE_MSG_ATTR_TYPE_RMEM_INOUT:
             continue;
+        default:
+            /* Ignore unsupported parameter type. */
+            continue;
         }
     }
 
@@ -1027,6 +1030,9 @@ static void copy_std_request_back(struct optee_domain *ctx,
         case OPTEE_MSG_ATTR_TYPE_RMEM_INPUT:
         case OPTEE_MSG_ATTR_TYPE_TMEM_INPUT:
             continue;
+        default:
+            /* No output fields to copy for unsupported parameter type. */
+            continue;
         }
     }
 
@@ -1050,6 +1056,7 @@ static void free_shm_buffers(struct optee_domain *ctx,
             free_optee_shm_buf(ctx, arg->params[i].u.tmem.shm_ref);
             break;
         default:
+            /* No temporary SHM buffer to free for other parameter types. */
             break;
         }
     }
@@ -1503,6 +1510,7 @@ static void handle_rpc_cmd(struct optee_domain *ctx, struct cpu_user_regs *regs,
         case OPTEE_RPC_CMD_SHM_FREE:
             break;
         default:
+            /* Other RPC commands need no Xen-side post-processing here. */
             break;
         }
     }
@@ -1591,6 +1599,9 @@ static void handle_rpc(struct optee_domain *ctx, struct cpu_user_regs *regs)
     case OPTEE_SMC_RPC_FUNC_CMD:
         handle_rpc_cmd(ctx, regs, call);
         return;
+    default:
+        /* Resume the call unchanged for unknown RPC function IDs. */
+        break;
     }
 
     do_call_with_arg(ctx, call, regs, OPTEE_SMC_CALL_RETURN_FROM_RPC,
