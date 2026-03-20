@@ -2533,6 +2533,17 @@ static void retrieve_domain_configuration_end(libxl__egc *egc,
         }
     }
 
+    /* Xenstore quota */
+    {
+        libxl_xs_quota_list_dispose(&d_config->b_info.xenstore_quota);
+        rc = libxl_xs_quota_domain_get(CTX, domid,
+                                       &d_config->b_info.xenstore_quota);
+        if (rc) {
+            LOGED(ERROR, domid, "Fail to get xenstore quota");
+            goto out;
+        }
+    }
+
     /* Devices: disk, nic, vtpm, pcidev etc. */
 
     /* The MERGE macro implements following logic:

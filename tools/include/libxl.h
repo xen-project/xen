@@ -1545,6 +1545,7 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
  * libxl_xs_quota_global_set()
  * libxl_xs_quota_domain_get()
  * libxl_xs_quota_domain_set()
+ * and the xenstore_quota member of struct domain_build_info
  * are available.
  */
 #define LIBXL_HAVE_XENSTORE_QUOTA

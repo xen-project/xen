@@ -509,6 +509,14 @@ retry_transaction:
 
     xs_introduce_domain(ctx->xsh, domid, state->store_mfn, state->store_port);
 
+    if (info->xenstore_quota.num_quota) {
+        rc = libxl_xs_quota_domain_set(ctx, domid, &info->xenstore_quota);
+        if (rc) {
+            LOGED(ERROR, domid, "Failed to set Xenstore quota");
+            goto out;
+        }
+    }
+
  out:
     free(vm_path);
     return rc;

@@ -629,6 +629,7 @@ VmtraceBufKb int
 Vpmu Defbool
 TrapUnmappedAccesses Defbool
 XenstoreFeatureMask uint32
+XenstoreQuota XsQuotaList
 }
 
 type DomainBuildInfoTypeUnion interface {

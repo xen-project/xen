@@ -1286,6 +1286,9 @@ if err := x.TrapUnmappedAccesses.fromC(&xc.trap_unmapped_accesses);err != nil {
 return fmt.Errorf("converting field TrapUnmappedAccesses: %v", err)
 }
 x.XenstoreFeatureMask = uint32(xc.xenstore_feature_mask)
+if err := x.XenstoreQuota.fromC(&xc.xenstore_quota);err != nil {
+return fmt.Errorf("converting field XenstoreQuota: %v", err)
+}
 
  return nil}
 
@@ -1825,6 +1828,9 @@ if err := x.TrapUnmappedAccesses.toC(&xc.trap_unmapped_accesses); err != nil {
 return fmt.Errorf("converting field TrapUnmappedAccesses: %v", err)
 }
 xc.xenstore_feature_mask = C.uint32_t(x.XenstoreFeatureMask)
+if err := x.XenstoreQuota.toC(&xc.xenstore_quota); err != nil {
+return fmt.Errorf("converting field XenstoreQuota: %v", err)
+}
 
  return nil
  }
