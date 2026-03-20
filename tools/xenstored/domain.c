@@ -732,6 +732,18 @@ static char *talloc_domain_path(const void *context, unsigned int domid)
 	return talloc_asprintf(context, "/local/domain/%u", domid);
 }
 
+/* Parse a domid. Sets errno either to 0 or EINVAL. */
+static unsigned int parse_domid(const char *input)
+{
+	unsigned long domid;
+	char *endptr;
+
+	domid = strtoul(input, &endptr, 10);
+	errno = (*endptr != 0 || domid > 65535) ? EINVAL : 0;
+
+	return domid;
+}
+
 int domain_get_quota(const void *ctx, struct connection *conn,
 		     unsigned int domid)
 {
@@ -1077,7 +1089,10 @@ int do_introduce(const void *ctx, struct connection *conn,
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec))
 		return EINVAL;
 
-	domid = atoi(vec[0]);
+	domid = parse_domid(vec[0]);
+	if (errno)
+		return errno;
+
 	/* Ignore the gfn, we don't need it. */
 	port = atoi(vec[2]);
 
@@ -1124,8 +1139,12 @@ int do_set_target(const void *ctx, struct connection *conn,
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec))
 		return EINVAL;
 
-	domid = atoi(vec[0]);
-	tdomid = atoi(vec[1]);
+	domid = parse_domid(vec[0]);
+	if (errno)
+		return errno;
+	tdomid = parse_domid(vec[1]);
+	if (errno)
+		return errno;
 
         domain = find_connected_domain(domid);
 	if (IS_ERR(domain))
@@ -1152,7 +1171,9 @@ static struct domain *onearg_domain(struct connection *conn,
 	if (!domid_str)
 		return ERR_PTR(-EINVAL);
 
-	domid = atoi(domid_str);
+	domid = parse_domid(domid_str);
+	if (errno)
+		return ERR_PTR(-errno);
 	if (domid == store_domid || domid == priv_domid)
 		return ERR_PTR(-EINVAL);
 
@@ -1200,11 +1221,15 @@ int do_get_domain_path(const void *ctx, struct connection *conn,
 {
 	char *path;
 	const char *domid_str = onearg(in);
+	unsigned int domid;
 
 	if (!domid_str)
 		return EINVAL;
 
-	path = talloc_domain_path(ctx, atoi(domid_str));
+	domid = parse_domid(domid_str);
+	if (errno)
+		return errno;
+	path = talloc_domain_path(ctx, domid);
 	if (!path)
 		return errno;
 
@@ -1223,7 +1248,9 @@ int do_is_domain_introduced(const void *ctx, struct connection *conn,
 	if (!domid_str)
 		return EINVAL;
 
-	domid = atoi(domid_str);
+	domid = parse_domid(domid_str);
+	if (errno)
+		return errno;
 	if (domid == DOMID_SELF)
 		result = 1;
 	else
@@ -1261,7 +1288,9 @@ int do_get_feature(const void *ctx, struct connection *conn,
 		return EINVAL;
 
 	if (n_args == 1) {
-		domid = atoi(vec[0]);
+		domid = parse_domid(vec[0]);
+		if (errno)
+			return errno;
 		domain = find_or_alloc_existing_domain(domid);
 		if (!domain)
 			return ENOENT;
@@ -1289,7 +1318,9 @@ int do_set_feature(const void *ctx, struct connection *conn,
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
 		return EINVAL;
 
-	domid = atoi(vec[0]);
+	domid = parse_domid(vec[0]);
+	if (errno)
+		return errno;
 	features = atoi(vec[1]);
 	domain = find_or_alloc_existing_domain(domid);
 	if (!domain)
