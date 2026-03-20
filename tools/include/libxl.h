@@ -1537,6 +1537,18 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
  */
 #define LIBXL_HAVE_XEN_PLATFORM_PCI_BAR_UC
 
+/*
+ * LIBXL_HAVE_XENSTORE_QUOTA
+ *
+ * If this is defined the Xenstore quota related functions
+ * libxl_xs_quota_global_get()
+ * libxl_xs_quota_global_set()
+ * libxl_xs_quota_domain_get()
+ * libxl_xs_quota_domain_set()
+ * are available.
+ */
+#define LIBXL_HAVE_XENSTORE_QUOTA
+
 typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
 int libxl_string_list_length(const libxl_string_list *sl);
@@ -3010,6 +3022,14 @@ static inline int libxl_qemu_monitor_command_0x041200(libxl_ctx *ctx,
 }
 #define libxl_qemu_monitor_command libxl_qemu_monitor_command_0x041200
 #endif
+
+/* Get/set global and per-domain Xenstore quota. */
+int libxl_xs_quota_global_get(libxl_ctx *ctx, libxl_xs_quota_list *q_out);
+int libxl_xs_quota_global_set(libxl_ctx *ctx, libxl_xs_quota_list *q);
+int libxl_xs_quota_domain_get(libxl_ctx *ctx, uint32_t domid,
+                              libxl_xs_quota_list *q_out);
+int libxl_xs_quota_domain_set(libxl_ctx *ctx, uint32_t domid,
+                              libxl_xs_quota_list *q);
 
 #include <libxl_event.h>
 

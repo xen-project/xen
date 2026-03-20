@@ -543,6 +543,15 @@ Altp2MModeExternal Altp2MMode = 2
 Altp2MModeLimited Altp2MMode = 3
 )
 
+type XsQuotaItem struct {
+Name string
+Val uint32
+}
+
+type XsQuotaList struct {
+Quota []XsQuotaItem
+}
+
 type DomainBuildInfo struct {
 MaxVcpus int
 AvailVcpus Bitmap

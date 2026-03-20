@@ -574,6 +574,15 @@ libxl_altp2m_mode = Enumeration("altp2m_mode", [
     (3, "limited"),
     ], init_val = "LIBXL_ALTP2M_MODE_DISABLED")
 
+libxl_xs_quota_item = Struct("xs_quota_item", [
+    ("name", string),
+    ("val",  uint32),
+    ])
+
+libxl_xs_quota_list = Struct("xs_quota_list", [
+    ("quota", Array(libxl_xs_quota_item, "num_quota"))
+    ])
+
 libxl_domain_build_info = Struct("domain_build_info",[
     ("max_vcpus",       integer),
     ("avail_vcpus",     libxl_bitmap),

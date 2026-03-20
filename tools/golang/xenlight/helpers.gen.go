@@ -998,6 +998,84 @@ xc.policy = C.libxl_rdm_reserve_policy(x.Policy)
  return nil
  }
 
+// NewXsQuotaItem returns an instance of XsQuotaItem initialized with defaults.
+func NewXsQuotaItem() (*XsQuotaItem, error) {
+var (
+x XsQuotaItem
+xc C.libxl_xs_quota_item)
+
+C.libxl_xs_quota_item_init(&xc)
+defer C.libxl_xs_quota_item_dispose(&xc)
+
+if err := x.fromC(&xc); err != nil {
+return nil, err }
+
+return &x, nil}
+
+func (x *XsQuotaItem) fromC(xc *C.libxl_xs_quota_item) error {
+ x.Name = C.GoString(xc.name)
+x.Val = uint32(xc.val)
+
+ return nil}
+
+func (x *XsQuotaItem) toC(xc *C.libxl_xs_quota_item) (err error){defer func(){
+if err != nil{
+C.libxl_xs_quota_item_dispose(xc)}
+}()
+
+if x.Name != "" {
+xc.name = C.CString(x.Name)}
+xc.val = C.uint32_t(x.Val)
+
+ return nil
+ }
+
+// NewXsQuotaList returns an instance of XsQuotaList initialized with defaults.
+func NewXsQuotaList() (*XsQuotaList, error) {
+var (
+x XsQuotaList
+xc C.libxl_xs_quota_list)
+
+C.libxl_xs_quota_list_init(&xc)
+defer C.libxl_xs_quota_list_dispose(&xc)
+
+if err := x.fromC(&xc); err != nil {
+return nil, err }
+
+return &x, nil}
+
+func (x *XsQuotaList) fromC(xc *C.libxl_xs_quota_list) error {
+ x.Quota = nil
+if n := int(xc.num_quota); n > 0 {
+cQuota := (*[1<<28]C.libxl_xs_quota_item)(unsafe.Pointer(xc.quota))[:n:n]
+x.Quota = make([]XsQuotaItem, n)
+for i, v := range cQuota {
+if err := x.Quota[i].fromC(&v); err != nil {
+return fmt.Errorf("converting field Quota: %v", err) }
+}
+}
+
+ return nil}
+
+func (x *XsQuotaList) toC(xc *C.libxl_xs_quota_list) (err error){defer func(){
+if err != nil{
+C.libxl_xs_quota_list_dispose(xc)}
+}()
+
+if numQuota := len(x.Quota); numQuota > 0 {
+xc.quota = (*C.libxl_xs_quota_item)(C.malloc(C.ulong(numQuota)*C.sizeof_libxl_xs_quota_item))
+xc.num_quota = C.int(numQuota)
+cQuota := (*[1<<28]C.libxl_xs_quota_item)(unsafe.Pointer(xc.quota))[:numQuota:numQuota]
+for i,v := range x.Quota {
+if err := v.toC(&cQuota[i]); err != nil {
+return fmt.Errorf("converting field Quota: %v", err)
+}
+}
+}
+
+ return nil
+ }
+
 // NewDomainBuildInfo returns an instance of DomainBuildInfo initialized with defaults.
 func NewDomainBuildInfo(dtype DomainType) (*DomainBuildInfo, error) {
 var (
