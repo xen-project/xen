@@ -649,6 +649,16 @@ const struct cmd_spec cmd_table[] = {
       "-h print this help\n"
     },
 #endif
+    { "xenstore-quota-get",
+      &main_xsquota_get, 0, 0,
+      "List global or domain specific Xenstore quotas",
+      "<Domain>|-g",
+    },
+    { "xenstore-quota-set",
+      &main_xsquota_set, 0, 1,
+      "Set global or domain specific Xenstore quotas",
+      "<Domain>|-g <quota>=<val>...",
+    },
 };
 
 const int cmdtable_len = ARRAY_SIZE(cmd_table);

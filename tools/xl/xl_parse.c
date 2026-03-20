@@ -1314,6 +1314,34 @@ out:
     return ret;
 }
 
+int parse_xsquota_item(const char *buf, struct libxl_xs_quota_item *item)
+{
+    const char *eq;
+    char *endptr;
+    unsigned long val;
+
+    eq = strchr(buf, '=');
+    if (!eq) {
+        fprintf(stderr, "Quota specification \"%s\" lacks \"=\".\n", buf);
+        return ERROR_INVAL;
+    }
+    errno = 0;
+    item->name = strndup(buf, eq - buf);
+    if (!item->name)
+        return ERROR_NOMEM;
+    val = strtoul(eq + 1, &endptr, 0);
+    if (errno || !eq[1] || *endptr || (unsigned int)val != val) {
+        fprintf(stderr,
+                "Quota specification \"%s\" uses illegal value \"%s\".\n",
+                buf, eq + 1);
+        return ERROR_INVAL;
+    }
+
+    item->val = val;
+
+    return 0;
+}
+
 void parse_config_data(const char *config_source,
                        const char *config_data,
                        int config_len,
