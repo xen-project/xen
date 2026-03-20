@@ -220,8 +220,8 @@ int do_watch(const void *ctx, struct connection *conn, struct buffered_data *in)
 			return EEXIST;
 	}
 
-	if (domain_watch(conn) > hard_quotas[ACC_WATCH].val)
-		return E2BIG;
+	if (domain_quota_add_exceeds(conn->domain, ACC_WATCH, 1))
+		return ENOSPC;
 
 	watch = add_watch(conn, vec[0], vec[1], relative, false);
 	if (!watch)

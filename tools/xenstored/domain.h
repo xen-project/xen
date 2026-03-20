@@ -113,8 +113,7 @@ int domain_alloc_permrefs(struct node_perms *perms);
 /* Quota manipulation */
 int domain_nbentry_inc(struct connection *conn, unsigned int domid);
 int domain_nbentry_dec(struct connection *conn, unsigned int domid);
-int domain_nbentry_fix(unsigned int domid, int num, bool update);
-unsigned int domain_nbentry(struct connection *conn);
+int domain_nbentry_fix(unsigned int domid, int num);
 int domain_memory_add(struct connection *conn, unsigned int domid, int mem,
 		      bool no_quota_check);
 
@@ -141,12 +140,10 @@ static inline void domain_memory_add_nochk(struct connection *conn,
 }
 void domain_watch_inc(struct connection *conn);
 void domain_watch_dec(struct connection *conn);
-int domain_watch(struct connection *conn);
 void domain_outstanding_inc(struct connection *conn);
 void domain_outstanding_dec(struct connection *conn, unsigned int domid);
 void domain_transaction_inc(struct connection *conn);
 void domain_transaction_dec(struct connection *conn);
-unsigned int domain_transaction_get(struct connection *conn);
 int domain_get_quota(const void *ctx, struct connection *conn,
 		     unsigned int domid);
 
@@ -161,6 +158,7 @@ int domain_max_global_acc(const void *ctx, struct connection *conn);
 void domain_reset_global_acc(void);
 bool domain_max_chk(const struct connection *conn, enum accitem what,
 		    unsigned int val);
+bool domain_quota_add_exceeds(struct domain *d, enum accitem what, int add);
 
 extern long wrl_ntransactions;
 

@@ -470,7 +470,7 @@ int do_transaction_start(const void *ctx, struct connection *conn,
 	if (conn->transaction)
 		return EBUSY;
 
-	if (domain_transaction_get(conn) > hard_quotas[ACC_TRANS].val)
+	if (domain_quota_add_exceeds(conn->domain, ACC_TRANS, 1))
 		return ENOSPC;
 
 	/* Attach transaction to ctx for autofree until it's complete */

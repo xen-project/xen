@@ -389,6 +389,25 @@ void wrl_apply_debit_trans_commit(struct connection *conn)
 	wrl_apply_debit_actual(conn->domain);
 }
 
+static bool domain_quota_val_exceeds(struct domain *d, enum accitem what,
+				     unsigned int val)
+{
+	unsigned int quota = hard_quotas[what].val;
+
+	if (!quota || !domid_is_unprivileged(d->domid))
+		return false;
+
+	return val >= quota;
+}
+
+bool domain_quota_add_exceeds(struct domain *d, enum accitem what, int add)
+{
+	if (add < 0 || !d)
+		return false;
+
+	return domain_quota_val_exceeds(d, what, d->acc[what].val + add);
+}
+
 static bool check_indexes(XENSTORE_RING_IDX cons, XENSTORE_RING_IDX prod)
 {
 	return ((prod - cons) <= XENSTORE_RING_SIZE);
@@ -490,10 +509,9 @@ static bool domain_can_read(struct connection *conn)
 	if (domain_is_unprivileged(conn)) {
 		if (domain->wrl_credit < 0)
 			return false;
-		if (domain->acc[ACC_OUTST].val >= hard_quotas[ACC_OUTST].val)
+		if (domain_quota_add_exceeds(domain, ACC_OUTST, 0))
 			return false;
-		if (domain->acc[ACC_MEM].val >= hard_quotas[ACC_MEM].val &&
-		    hard_quotas[ACC_MEM].val)
+		if (domain_quota_add_exceeds(domain, ACC_MEM, 0))
 			return false;
 	}
 
@@ -916,16 +934,20 @@ do {						\
 
 int acc_fix_domains(struct list_head *head, bool chk_quota, bool update)
 {
+	struct domain *d;
 	struct changed_domain *cd;
-	int cnt;
 
 	list_for_each_entry(cd, head, list) {
-		cnt = domain_nbentry_fix(cd->domid, cd->acc[ACC_NODES], update);
-		if (!update) {
-			if (chk_quota && cnt >= hard_quotas[ACC_NODES].val)
-				return ENOSPC;
-			if (cnt < 0)
+		if (update) {
+			domain_nbentry_fix(cd->domid, cd->acc[ACC_NODES]);
+		} else if (chk_quota) {
+			d = find_or_alloc_existing_domain(cd->domid);
+
+			if (!d)
 				return ENOMEM;
+			if (domain_quota_add_exceeds(d, ACC_NODES,
+						     cd->acc[ACC_NODES]))
+				return ENOSPC;
 		}
 	}
 
@@ -1763,7 +1785,7 @@ bool domain_max_chk(const struct connection *conn, enum accitem what,
 	if (!conn || !conn->domain)
 		return false;
 
-	if (domain_is_unprivileged(conn) && val > hard_quotas[what].val)
+	if (domain_quota_val_exceeds(conn->domain, what, val))
 		return true;
 
 	domain_acc_valid_max(conn->domain, what, val);
@@ -1783,21 +1805,9 @@ int domain_nbentry_dec(struct connection *conn, unsigned int domid)
 	       ? errno : 0;
 }
 
-int domain_nbentry_fix(unsigned int domid, int num, bool update)
+int domain_nbentry_fix(unsigned int domid, int num)
 {
-	int ret;
-
-	ret = domain_acc_add(NULL, domid, ACC_NODES, update ? num : 0, update);
-	if (ret < 0 || update)
-		return ret;
-
-	return domid_is_unprivileged(domid) ? ret + num : 0;
-}
-
-unsigned int domain_nbentry(struct connection *conn)
-{
-	return domain_is_unprivileged(conn)
-	       ? domain_acc_add(conn, conn->id, ACC_NODES, 0, true) : 0;
+	return domain_acc_add(NULL, domid, ACC_NODES, num, true);
 }
 
 static bool domain_chk_quota(struct connection *conn, unsigned int mem)
@@ -1812,7 +1822,7 @@ static bool domain_chk_quota(struct connection *conn, unsigned int mem)
 	domain = conn->domain;
 	now = time(NULL);
 
-	if (mem >= hard_quotas[ACC_MEM].val && hard_quotas[ACC_MEM].val) {
+	if (domain_quota_val_exceeds(domain, ACC_MEM, mem)) {
 		if (domain->hard_quota_reported)
 			return true;
 		syslog(LOG_ERR, "Domain %u exceeds hard memory quota, Xenstore interface to domain stalled\n",
@@ -1888,13 +1898,6 @@ void domain_watch_dec(struct connection *conn)
 	domain_acc_add(conn, conn->id, ACC_WATCH, -1, true);
 }
 
-int domain_watch(struct connection *conn)
-{
-	return (domain_is_unprivileged(conn))
-		? domain_acc_add(conn, conn->id, ACC_WATCH, 0, true)
-		: 0;
-}
-
 void domain_outstanding_inc(struct connection *conn)
 {
 	domain_acc_add(conn, conn->id, ACC_OUTST, 1, true);
@@ -1913,13 +1916,6 @@ void domain_transaction_inc(struct connection *conn)
 void domain_transaction_dec(struct connection *conn)
 {
 	domain_acc_add(conn, conn->id, ACC_TRANS, -1, true);
-}
-
-unsigned int domain_transaction_get(struct connection *conn)
-{
-	return (domain_is_unprivileged(conn))
-		? domain_acc_add(conn, conn->id, ACC_TRANS, 0, true)
-		: 0;
 }
 
 const char *dump_state_connections(FILE *fp)

@@ -1539,7 +1539,7 @@ static struct node *create_node(struct connection *conn, const void *ctx,
 	for (i = node; i; i = i->parent) {
 		/* i->parent is set for each new node, so check quota. */
 		if (i->parent &&
-		    domain_nbentry(conn) >= hard_quotas[ACC_NODES].val) {
+		    domain_quota_add_exceeds(conn->domain, ACC_NODES, 1)) {
 			ret = ENOSPC;
 			goto err;
 		}
@@ -2321,7 +2321,7 @@ void setup_structure(bool live_update)
 		manual_node("/tool/xenstored", NULL);
 		manual_node("@releaseDomain", NULL);
 		manual_node("@introduceDomain", NULL);
-		domain_nbentry_fix(priv_domid, 5, true);
+		domain_nbentry_fix(priv_domid, 5);
 	}
 }
 
