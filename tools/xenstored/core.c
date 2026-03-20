@@ -2614,10 +2614,9 @@ static void set_timeout(const char *arg)
 		barf("unknown timeout \"%s\"\n", arg);
 }
 
-static void set_quota(const char *arg, bool soft)
+static void set_quota(const char *arg, unsigned int idx)
 {
 	const char *eq = strchr(arg, '=');
-	struct quota *q = soft ? soft_quotas : hard_quotas;
 	unsigned int val;
 	unsigned int i;
 
@@ -2626,13 +2625,19 @@ static void set_quota(const char *arg, bool soft)
 	val = get_optval_uint(eq + 1);
 
 	for (i = 0; i < ACC_N; i++) {
-		if (what_matches(arg, q[i].name)) {
-			q[i].val = val;
+		if (what_matches(arg, quota_adm[i].name) &&
+		    quotas[i].val[idx] != Q_VAL_DISABLED) {
+			quotas[i].val[idx] = val;
 			return;
 		}
 	}
 
 	barf("unknown quota \"%s\"\n", arg);
+}
+
+static void set_one_quota(const char *arg, unsigned int idx, enum accitem what)
+{
+	quotas[what].val[idx] = get_optval_uint(arg);
 }
 
 /* Sorted by bit values of TRACE_* flags. Flag is (1u << index). */
@@ -2688,7 +2693,7 @@ int main(int argc, char *argv[])
 				  options, NULL)) != -1) {
 		switch (opt) {
 		case 'E':
-			hard_quotas[ACC_NODES].val = get_optval_uint(optarg);
+			set_one_quota(optarg, Q_IDX_HARD, ACC_NODES);
 			break;
 		case 'F':
 			pidfile = optarg;
@@ -2700,10 +2705,10 @@ int main(int argc, char *argv[])
 			dofork = false;
 			break;
 		case 'S':
-			hard_quotas[ACC_NODESZ].val = get_optval_uint(optarg);
+			set_one_quota(optarg, Q_IDX_HARD, ACC_NODESZ);
 			break;
 		case 't':
-			hard_quotas[ACC_TRANS].val = get_optval_uint(optarg);
+			set_one_quota(optarg, Q_IDX_HARD, ACC_TRANS);
 			break;
 		case 'T':
 			tracefile = optarg;
@@ -2716,22 +2721,22 @@ int main(int argc, char *argv[])
 			keep_orphans = true;
 			break;
 		case 'W':
-			hard_quotas[ACC_WATCH].val = get_optval_uint(optarg);
+			set_one_quota(optarg, Q_IDX_HARD, ACC_WATCH);
 			break;
 		case 'A':
-			hard_quotas[ACC_NPERM].val = get_optval_uint(optarg);
+			set_one_quota(optarg, Q_IDX_HARD, ACC_NPERM);
 			break;
 		case 'M':
-			hard_quotas[ACC_PATHLEN].val = get_optval_uint(optarg);
-			hard_quotas[ACC_PATHLEN].val =
+			set_one_quota(optarg, Q_IDX_HARD, ACC_PATHLEN);
+			quotas[ACC_PATHLEN].val[Q_IDX_HARD] =
 				 min((unsigned int)XENSTORE_REL_PATH_MAX,
-				     hard_quotas[ACC_PATHLEN].val);
+				     quotas[ACC_PATHLEN].val[Q_IDX_HARD]);
 			break;
 		case 'Q':
-			set_quota(optarg, false);
+			set_quota(optarg, Q_IDX_HARD);
 			break;
 		case 'q':
-			set_quota(optarg, true);
+			set_quota(optarg, Q_IDX_SOFT);
 			break;
 		case 'w':
 			set_timeout(optarg);

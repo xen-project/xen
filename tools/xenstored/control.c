@@ -101,7 +101,7 @@ static int do_control_log(const void *ctx, struct connection *conn,
 }
 
 static int quota_show_current(const void *ctx, struct connection *conn,
-			      const struct quota *quotas)
+			      unsigned int idx)
 {
 	char *resp;
 	unsigned int i;
@@ -111,11 +111,12 @@ static int quota_show_current(const void *ctx, struct connection *conn,
 		return ENOMEM;
 
 	for (i = 0; i < ACC_N; i++) {
-		if (!quotas[i].name)
+		if (!quota_adm[i].name || quotas[i].val[idx] == Q_VAL_DISABLED)
 			continue;
 		resp = talloc_asprintf_append(resp, "%-17s: %8d %s\n",
-					      quotas[i].name, quotas[i].val,
-					      quotas[i].descr);
+					      quota_adm[i].name,
+					      quotas[i].val[idx],
+					      quota_adm[i].descr);
 		if (!resp)
 			return ENOMEM;
 	}
@@ -126,7 +127,7 @@ static int quota_show_current(const void *ctx, struct connection *conn,
 }
 
 static int quota_set(const void *ctx, struct connection *conn,
-		     const char **vec, int num, struct quota *quotas)
+		     const char **vec, int num, unsigned int idx)
 {
 	unsigned int i;
 	int val;
@@ -139,8 +140,9 @@ static int quota_set(const void *ctx, struct connection *conn,
 		return EINVAL;
 
 	for (i = 0; i < ACC_N; i++) {
-		if (quotas[i].name && !strcmp(vec[0], quotas[i].name)) {
-			quotas[i].val = val;
+		if (quota_adm[i].name && !strcmp(vec[0], quota_adm[i].name) &&
+		    quotas[i].val[idx] != Q_VAL_DISABLED) {
+			quotas[i].val[idx] = val;
 			send_ack(conn, XS_CONTROL);
 			return 0;
 		}
@@ -178,10 +180,10 @@ static int do_control_quota(const void *ctx, struct connection *conn,
 			    const char **vec, int num)
 {
 	if (num == 0)
-		return quota_show_current(ctx, conn, hard_quotas);
+		return quota_show_current(ctx, conn, Q_IDX_HARD);
 
 	if (!strcmp(vec[0], "set"))
-		return quota_set(ctx, conn, vec + 1, num - 1, hard_quotas);
+		return quota_set(ctx, conn, vec + 1, num - 1, Q_IDX_HARD);
 
 	if (!strcmp(vec[0], "max"))
 		return quota_max(ctx, conn, vec + 1, num - 1);
@@ -193,10 +195,10 @@ static int do_control_quota_s(const void *ctx, struct connection *conn,
 			      const char **vec, int num)
 {
 	if (num == 0)
-		return quota_show_current(ctx, conn, soft_quotas);
+		return quota_show_current(ctx, conn, Q_IDX_SOFT);
 
 	if (!strcmp(vec[0], "set"))
-		return quota_set(ctx, conn, vec + 1, num - 1, soft_quotas);
+		return quota_set(ctx, conn, vec + 1, num - 1, Q_IDX_SOFT);
 
 	return EINVAL;
 }

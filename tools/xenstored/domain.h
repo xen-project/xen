@@ -40,15 +40,18 @@ enum accitem {
 	ACC_N,			/* Number of elements per domain. */
 };
 
-struct quota {
+extern struct quotaadm {
 	const char *name;
 	const char *descr;
-	unsigned int val;
-	unsigned int max;
-};
+} quota_adm[ACC_N];
 
-extern struct quota hard_quotas[ACC_N];
-extern struct quota soft_quotas[ACC_N];
+extern struct quota {
+	unsigned int val[2];
+#define Q_IDX_HARD      0
+#define Q_IDX_SOFT      1
+#define Q_VAL_DISABLED  UINT_MAX
+	unsigned int max;
+} quotas[ACC_N];
 
 void handle_event(void);
 

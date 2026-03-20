@@ -51,60 +51,60 @@ static evtchn_port_t virq_port;
 
 xenevtchn_handle *xce_handle = NULL;
 
-struct quota hard_quotas[ACC_N] = {
+struct quotaadm quota_adm[ACC_N] = {
 	[ACC_NODES] = {
 		.name = "nodes",
 		.descr = "Nodes per domain",
-		.val = 1000,
 	},
 	[ACC_WATCH] = {
 		.name = "watches",
 		.descr = "Watches per domain",
-		.val = 128,
 	},
 	[ACC_OUTST] = {
 		.name = "outstanding",
 		.descr = "Outstanding requests per domain",
-		.val = 20,
 	},
 	[ACC_MEM] = {
 		.name = "memory",
-		.descr = "Total Xenstore memory per domain (error level)",
-		.val = 2 * 1024 * 1024 + 512 * 1024,	/* 2.5 MB */
+		.descr = "Total Xenstore memory per domain",
 	},
 	[ACC_TRANS] = {
 		.name = "transactions",
 		.descr = "Active transactions per domain",
-		.val = 10,
 	},
 	[ACC_TRANSNODES] = {
 		.name = "transaction-nodes",
 		.descr = "Max. number of accessed nodes per transaction",
-		.val = 1024,
 	},
 	[ACC_NPERM] = {
 		.name = "node-permissions",
 		.descr = "Max. number of permissions per node",
-		.val = 5,
 	},
 	[ACC_PATHLEN] = {
 		.name = "path-max",
 		.descr = "Max. length of a node path",
-		.val = XENSTORE_REL_PATH_MAX,
 	},
 	[ACC_NODESZ] = {
 		.name = "node-size",
 		.descr = "Max. size of a node",
-		.val = 2048,
 	},
 };
 
-struct quota soft_quotas[ACC_N] = {
-	[ACC_MEM] = {
-		.name = "memory",
-		.descr = "Total Xenstore memory per domain (warning level)",
-		.val = 2 * 1024 * 1024,			/* 2.0 MB */
+struct quota quotas[ACC_N] = {
+	[ACC_NODES] =      { .val = { 1000, Q_VAL_DISABLED }, },
+	[ACC_WATCH] =      { .val = {  128, Q_VAL_DISABLED }, },
+	[ACC_OUTST] =      { .val = {   20, Q_VAL_DISABLED }, },
+	[ACC_MEM] =        {
+		.val = { 2 * 1024 * 1024 + 512 * 1024,	/* 2.5 MB */
+			 2 * 1024 * 1024		/* 2.0 MB */ },
 	},
+	[ACC_TRANS] =      { .val = {   10, Q_VAL_DISABLED }, },
+	[ACC_TRANSNODES] = { .val = { 1024, Q_VAL_DISABLED }, },
+	[ACC_NPERM] =      { .val = {    5, Q_VAL_DISABLED }, },
+	[ACC_PATHLEN] =    {
+		.val = { XENSTORE_REL_PATH_MAX, Q_VAL_DISABLED },
+	},
+	[ACC_NODESZ] =     { .val = { 2048, Q_VAL_DISABLED }, },
 };
 
 typedef int32_t wrl_creditt;
@@ -389,10 +389,15 @@ void wrl_apply_debit_trans_commit(struct connection *conn)
 	wrl_apply_debit_actual(conn->domain);
 }
 
+static unsigned int domain_get_soft_quota(struct domain *d, enum accitem what)
+{
+	return quotas[what].val[Q_IDX_SOFT];
+}
+
 static bool domain_quota_val_exceeds(struct domain *d, enum accitem what,
 				     unsigned int val)
 {
-	unsigned int quota = hard_quotas[what].val;
+	unsigned int quota = quotas[what].val[Q_IDX_HARD];
 
 	if (!quota || !domid_is_unprivileged(d->domid))
 		return false;
@@ -777,10 +782,10 @@ int domain_get_quota(const void *ctx, struct connection *conn,
 		return ENOMEM;
 
 	for (i = 0; i < ACC_N; i++) {
-		if (!hard_quotas[i].name)
+		if (!quota_adm[i].name)
 			continue;
 		resp = talloc_asprintf_append(resp, "%-17s: %8u (max %8u)\n",
-					      hard_quotas[i].name,
+					      quota_adm[i].name,
 					      d->acc[i].val, d->acc[i].max);
 		if (!resp)
 			return ENOMEM;
@@ -801,11 +806,10 @@ int domain_max_global_acc(const void *ctx, struct connection *conn)
 		return ENOMEM;
 
 	for (i = 0; i < ACC_N; i++) {
-		if (!hard_quotas[i].name)
+		if (!quota_adm[i].name)
 			continue;
 		resp = talloc_asprintf_append(resp, "%-17s: %8u\n",
-					      hard_quotas[i].name,
-					      hard_quotas[i].max);
+					      quota_adm[i].name, quotas[i].max);
 		if (!resp)
 			return ENOMEM;
 	}
@@ -1631,12 +1635,12 @@ static void domain_acc_valid_max(struct domain *d, enum accitem what,
 				 unsigned int val)
 {
 	assert(what < ARRAY_SIZE(d->acc));
-	assert(what < ARRAY_SIZE(hard_quotas));
+	assert(what < ARRAY_SIZE(quotas));
 
 	if (val > d->acc[what].max)
 		d->acc[what].max = val;
-	if (val > hard_quotas[what].max && domid_is_unprivileged(d->domid))
-		hard_quotas[what].max = val;
+	if (val > quotas[what].max && domid_is_unprivileged(d->domid))
+		quotas[what].max = val;
 }
 
 static int domain_acc_add_valid(struct domain *d, enum accitem what, int add)
@@ -1773,7 +1777,7 @@ void domain_reset_global_acc(void)
 	unsigned int i;
 
 	for (i = 0; i < ACC_N; i++)
-		hard_quotas[i].max = 0;
+		quotas[i].max = 0;
 
 	/* Set current max values seen. */
 	hashtable_iterate(domhash, domain_reset_global_acc_sub, NULL);
@@ -1833,21 +1837,22 @@ static bool domain_chk_quota(struct connection *conn, unsigned int mem)
 	}
 
 	if (now - domain->mem_last_msg >= MEM_WARN_MINTIME_SEC) {
+		unsigned int soft_mem = domain_get_soft_quota(domain, ACC_MEM);
+
 		if (domain->hard_quota_reported) {
 			domain->mem_last_msg = now;
 			domain->hard_quota_reported = false;
 			syslog(LOG_INFO, "Domain %u below hard memory quota again\n",
 			       domain->domid);
 		}
-		if (mem >= soft_quotas[ACC_MEM].val &&
-		    soft_quotas[ACC_MEM].val && !domain->soft_quota_reported) {
+		if (mem >= soft_mem && soft_mem &&
+		    !domain->soft_quota_reported) {
 			domain->mem_last_msg = now;
 			domain->soft_quota_reported = true;
 			syslog(LOG_WARNING, "Domain %u exceeds soft memory quota\n",
 			       domain->domid);
 		}
-		if (mem < soft_quotas[ACC_MEM].val &&
-		    domain->soft_quota_reported) {
+		if (mem < soft_mem && domain->soft_quota_reported) {
 			domain->mem_last_msg = now;
 			domain->soft_quota_reported = false;
 			syslog(LOG_INFO, "Domain %u below soft memory quota again\n",
