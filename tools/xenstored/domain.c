@@ -143,10 +143,8 @@ struct domain
 	bool introduced;
 
 	/* Accounting data for this domain. */
-	struct acc {
-		unsigned int val;
-		unsigned int max;
-	} acc[ACC_N];
+	unsigned int acc_val[ACC_N];
+	struct quota acc[ACC_N];
 
 	/* Memory quota data for this domain. */
 	bool soft_quota_reported;
@@ -413,7 +411,7 @@ bool domain_quota_add_exceeds(struct domain *d, enum accitem what, int add)
 	if (add < 0 || !d)
 		return false;
 
-	return domain_quota_val_exceeds(d, what, d->acc[what].val + add);
+	return domain_quota_val_exceeds(d, what, d->acc_val[what] + add);
 }
 
 static bool check_indexes(XENSTORE_RING_IDX cons, XENSTORE_RING_IDX prod)
@@ -585,7 +583,7 @@ static int domain_tree_remove_sub(const void *ctx, struct connection *conn,
 		ret = WALK_TREE_SKIP_CHILDREN;
 	}
 
-	return domain->acc[ACC_NODES].val ? ret : WALK_TREE_SUCCESS_STOP;
+	return domain->acc_val[ACC_NODES] ? ret : WALK_TREE_SUCCESS_STOP;
 }
 
 static void domain_tree_remove(struct domain *domain)
@@ -593,7 +591,7 @@ static void domain_tree_remove(struct domain *domain)
 	int ret;
 	struct walk_funcs walkfuncs = { .enter = domain_tree_remove_sub };
 
-	if (domain->acc[ACC_NODES].val) {
+	if (domain->acc_val[ACC_NODES]) {
 		ret = walk_node_tree(domain, NULL, "/", &walkfuncs, domain);
 		if (ret == WALK_TREE_ERROR_STOP)
 			syslog(LOG_ERR,
@@ -789,7 +787,7 @@ int domain_get_quota(const void *ctx, struct connection *conn,
 			continue;
 		resp = talloc_asprintf_append(resp, "%-17s: %8u (max %8u)\n",
 					      quota_adm[i].name,
-					      d->acc[i].val, d->acc[i].max);
+					      d->acc_val[i], d->acc[i].max);
 		if (!resp)
 			return ENOMEM;
 	}
@@ -1673,10 +1671,10 @@ static int domain_acc_add_valid(struct domain *d, enum accitem what, int add)
 {
 	unsigned int val;
 
-	assert(what < ARRAY_SIZE(d->acc));
+	assert(what < ARRAY_SIZE(d->acc_val));
 
-	if ((add < 0 && -add > d->acc[what].val) ||
-	    (add > 0 && (INT_MAX - d->acc[what].val) < add)) {
+	if ((add < 0 && -add > d->acc_val[what]) ||
+	    (add > 0 && (INT_MAX - d->acc_val[what]) < add)) {
 		/*
 		 * In a transaction when a node is being added/removed AND the
 		 * same node has been added/removed outside the transaction in
@@ -1687,7 +1685,7 @@ static int domain_acc_add_valid(struct domain *d, enum accitem what, int add)
 		return (add < 0) ? 0 : INT_MAX;
 	}
 
-	val = d->acc[what].val + add;
+	val = d->acc_val[what] + add;
 	domain_acc_valid_max(d, what, val);
 
 	return val;
@@ -1746,10 +1744,10 @@ static int domain_acc_add(struct connection *conn, unsigned int domid,
 	}
 
 	trace_acc("global change domid %u: what=%u %u add %d\n", domid, what,
-		  d->acc[what].val, add);
-	d->acc[what].val = domain_acc_add_valid(d, what, add);
+		  d->acc_val[what], add);
+	d->acc_val[what] = domain_acc_add_valid(d, what, add);
 
-	return d->acc[what].val;
+	return d->acc_val[what];
 }
 
 void acc_drop(struct connection *conn)
@@ -1793,7 +1791,7 @@ static int domain_reset_global_acc_sub(const void *k, void *v, void *arg)
 	unsigned int i;
 
 	for (i = 0; i < ACC_N; i++)
-		d->acc[i].max = d->acc[i].val;
+		d->acc[i].max = d->acc_val[i];
 
 	return 0;
 }
@@ -2233,7 +2231,7 @@ static int domain_check_acc_init_sub(const void *k, void *v, void *arg)
 	 * If everything is correct incrementing the value for each node will
 	 * result in dom->nodes being 0 at the end.
 	 */
-	dom->nodes = -d->acc[ACC_NODES].val;
+	dom->nodes = -d->acc_val[ACC_NODES];
 
 	if (hashtable_add(domains, &dom->domid, dom)) {
 		talloc_free(dom);
@@ -2288,7 +2286,7 @@ static int domain_check_acc_cb(const void *k, void *v, void *arg)
 	if (!d)
 		return 0;
 
-	d->acc[ACC_NODES].val += dom->nodes;
+	d->acc_val[ACC_NODES] += dom->nodes;
 
 	return 0;
 }
