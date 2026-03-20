@@ -1399,6 +1399,117 @@ static bool parse_quota_name(const char *name, unsigned int *qidx,
 	return true;
 }
 
+int do_get_quota(const void *ctx, struct connection *conn,
+		 struct buffered_data *in)
+{
+	const char *vec[2];
+	unsigned int n_pars;
+	unsigned int domid;
+	unsigned int q;
+	unsigned int idx;
+	char *resp;
+	const char *name;
+	const struct quota *quota;
+	const struct domain *domain;
+
+	n_pars = get_strings(in, vec, ARRAY_SIZE(vec));
+
+	if (n_pars > 2)
+		return EINVAL;
+
+	if (n_pars == 0) {
+		resp = talloc_strdup(ctx, "");
+		if (!resp)
+			return ENOMEM;
+		for (q = 0; q < ACC_N; q++) {
+			if (!quota_adm[q].name)
+				continue;
+			if (quotas[q].val[Q_IDX_HARD] != Q_VAL_DISABLED) {
+				resp = talloc_asprintf_append(resp, "%s%s",
+					*resp ? " " : "", quota_adm[q].name);
+				if (!resp)
+					return ENOMEM;
+			}
+			if (quotas[q].val[Q_IDX_SOFT] != Q_VAL_DISABLED) {
+				resp = talloc_asprintf_append(resp, "%s%s%s",
+					*resp ? " " : "", SOFT_PREFIX,
+					quota_adm[q].name);
+				if (!resp)
+					return ENOMEM;
+			}
+		}
+	} else {
+		if (n_pars == 1) {
+			quota = quotas;
+			name = vec[0];
+		} else {
+			domid = parse_domid(vec[0]);
+			if (errno)
+				return errno;
+			domain = find_or_alloc_existing_domain(domid);
+			if (!domain)
+				return ENOENT;
+			quota = domain->acc;
+			name = vec[1];
+		}
+
+		if (parse_quota_name(name, &q, &idx))
+			return EINVAL;
+
+		resp = talloc_asprintf(ctx, "%u", quota[q].val[idx]);
+		if (!resp)
+			return ENOMEM;
+	}
+
+	send_reply(conn, XS_GET_QUOTA, resp, strlen(resp) + 1);
+
+	return 0;
+}
+
+int do_set_quota(const void *ctx, struct connection *conn,
+		 struct buffered_data *in)
+{
+	const char *vec[3];
+	unsigned int n_pars;
+	unsigned int domid;
+	unsigned int q;
+	unsigned int idx;
+	const char *name;
+	unsigned int val;
+	struct quota *quota;
+	struct domain *domain;
+
+	n_pars = get_strings(in, vec, ARRAY_SIZE(vec));
+
+	if (n_pars < 2 || n_pars > 3)
+		return EINVAL;
+
+	if (n_pars == 2) {
+		quota = quotas;
+		name = vec[0];
+		val = atoi(vec[1]);
+	} else {
+		domid = parse_domid(vec[0]);
+		if (errno)
+			return errno;
+		domain = find_or_alloc_existing_domain(domid);
+		if (!domain)
+			return ENOENT;
+		quota = domain->acc;
+		name = vec[1];
+		val = atoi(vec[2]);
+	}
+
+	if (parse_quota_name(name, &q, &idx) || val == Q_VAL_DISABLED)
+		return EINVAL;
+
+	quota[q].val[idx] = val;
+
+	send_ack(conn, XS_SET_QUOTA);
+
+	return 0;
+}
+
 static int close_xgt_handle(void *_handle)
 {
 	xengnttab_close(*(xengnttab_handle **)_handle);

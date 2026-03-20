@@ -93,6 +93,11 @@ int do_get_feature(const void *ctx, struct connection *conn,
 int do_set_feature(const void *ctx, struct connection *conn,
 		   struct buffered_data *in);
 
+int do_get_quota(const void *ctx, struct connection *conn,
+		 struct buffered_data *in);
+int do_set_quota(const void *ctx, struct connection *conn,
+		 struct buffered_data *in);
+
 void domain_early_init(void);
 void domain_init(int evtfd);
 void init_domains(bool live_update);

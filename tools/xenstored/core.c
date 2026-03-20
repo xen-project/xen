@@ -2035,6 +2035,10 @@ static struct {
 	    { "GET_FEATURE",   do_get_feature,  XS_FLAG_PRIV },
 	[XS_SET_FEATURE]       =
 	    { "SET_FEATURE",   do_set_feature,  XS_FLAG_PRIV },
+	[XS_GET_QUOTA]         =
+	    { "GET_QUOTA",     do_get_quota,    XS_FLAG_PRIV },
+	[XS_SET_QUOTA]         =
+	    { "SET_QUOTA",     do_set_quota,    XS_FLAG_PRIV },
 };
 
 static const char *sockmsg_string(enum xsd_sockmsg_type type)
