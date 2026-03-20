@@ -392,6 +392,9 @@ void wrl_apply_debit_trans_commit(struct connection *conn)
 
 static unsigned int domain_get_soft_quota(struct domain *d, enum accitem what)
 {
+	if (d && d->acc[what].val[Q_IDX_SOFT] != Q_VAL_DISABLED)
+		return d->acc[what].val[Q_IDX_SOFT];
+
 	return quotas[what].val[Q_IDX_SOFT];
 }
 
@@ -399,6 +402,9 @@ static bool domain_quota_val_exceeds(struct domain *d, enum accitem what,
 				     unsigned int val)
 {
 	unsigned int quota = quotas[what].val[Q_IDX_HARD];
+
+	if (d->acc[what].val[Q_IDX_HARD] != Q_VAL_DISABLED)
+		quota = d->acc[what].val[Q_IDX_HARD];
 
 	if (!quota || !domid_is_unprivileged(d->domid))
 		return false;
@@ -824,6 +830,7 @@ static struct domain *alloc_domain(const void *context, unsigned int domid,
 				   uint64_t unique_id)
 {
 	struct domain *domain;
+	unsigned int q;
 
 	domain = talloc_zero(context, struct domain);
 	if (!domain) {
@@ -836,6 +843,11 @@ static struct domain *alloc_domain(const void *context, unsigned int domid,
 	domain->generation = generation;
 	domain->introduced = false;
 	domain->features = XENSTORE_FEATURES;
+
+	for (q = 0; q < ACC_N; q++) {
+		domain->acc[q].val[Q_IDX_HARD] = quotas[q].val[Q_IDX_HARD];
+		domain->acc[q].val[Q_IDX_SOFT] = quotas[q].val[Q_IDX_SOFT];
+	}
 
 	if (hashtable_add(domhash, &domain->domid, domain)) {
 		talloc_free(domain);
@@ -2118,25 +2130,39 @@ static int dump_state_domain(const void *k, void *v, void *arg)
 {
 	struct domain *domain = v;
 	FILE *fp = arg;
-	struct xs_state_domain sd;
-	struct xs_state_record_header head;
+	struct xs_state_domain *sd;
+	struct xs_state_record_header *head;
+	void *record;
+	unsigned int n_quota;
+	unsigned int rec_len;
+	size_t ret;
 
-	head.type = XS_STATE_TYPE_DOMAIN;
-	head.length = sizeof(sd);
-	memset(&sd, 0, sizeof(sd));
-	sd.domain_id = domain->domid;
+	n_quota = get_quota_size(domain->acc, &rec_len);
+	rec_len += n_quota * sizeof(sd->quota_val[0]);
+	rec_len += sizeof(*sd);
+	rec_len = ROUNDUP(rec_len, 3);
 
-	if (lu_status->version > 1)
-		sd.features = domain->features;
-
-	if (fwrite(&head, sizeof(head), 1, fp) != 1)
-		return 1;
-	if (fwrite(&sd, sizeof(sd), 1, fp) != 1)
-		return 1;
-	if (dump_state_align(fp))
+	record = talloc_size(NULL, rec_len + sizeof(*head));
+	if (!record)
 		return 1;
 
-	return 0;
+	head = record;
+	head->type = XS_STATE_TYPE_DOMAIN;
+	head->length = rec_len;
+
+	sd = (struct xs_state_domain *)(head + 1);
+	sd->domain_id = domain->domid;
+	sd->n_quota = n_quota;
+	sd->features = (lu_status->version > 1) ? domain->features : 0;
+
+	build_quota_data(domain->acc, sd->quota_val,
+			 (char *)(sd->quota_val + n_quota));
+
+	ret = fwrite(record, rec_len + sizeof(*head), 1, fp);
+
+	talloc_free(record);
+
+	return (ret != 1 || dump_state_align(fp)) ? 1 : 0;
 }
 
 const char *dump_state_domains(FILE *fp)
@@ -2153,6 +2179,8 @@ void read_state_domain(const void *ctx, const void *state, unsigned int version)
 {
 	const struct xs_state_domain *sd = state;
 	struct domain *domain;
+	unsigned int n_quota = sd->n_quota;
+	const char *name = (const char *)(sd->quota_val + n_quota);
 
 	domain = find_domain_struct(sd->domain_id);
 	if (!domain)
@@ -2160,6 +2188,8 @@ void read_state_domain(const void *ctx, const void *state, unsigned int version)
 
 	if (version > 1)
 		domain->features = sd->features;
+
+	parse_quota_data(sd->quota_val, name, n_quota, domain->acc);
 }
 
 const char *dump_state_glb_quota(FILE *fp)
