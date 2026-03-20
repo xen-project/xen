@@ -346,7 +346,7 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
     uint32_t dst_size = 0;
     size_t buf_size;
     void *dst_buf, *end_buf;
-    uint32_t ffa_vm_count = 0, ffa_sp_count = 0;
+    uint32_t vm_count = 0, sp_count = 0;
 
     ffa_uuid_set(&uuid,
              get_user_reg(regs, 1),
@@ -380,7 +380,7 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
 
         if ( ffa_fw_supports_fid(FFA_PARTITION_INFO_GET) )
         {
-            ret = ffa_get_sp_count(uuid, &ffa_sp_count);
+            ret = ffa_get_sp_count(uuid, &sp_count);
             if ( ret )
                 goto out;
         }
@@ -391,7 +391,7 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
          */
         if ( ffa_uuid_is_nil(uuid) )
         {
-            ffa_vm_count = get_ffa_vm_count();
+            vm_count = get_ffa_vm_count();
 
             /*
              * Workaround for Linux FF-A Driver not accepting to have its own
@@ -401,7 +401,7 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
              * the requester endpoint information should be included or not
              */
             if ( ACCESS_ONCE(ctx->guest_vers) < FFA_VERSION_1_2 )
-                ffa_vm_count -= 1;
+                vm_count -= 1;
         }
 
         goto out;
@@ -429,14 +429,14 @@ void ffa_handle_partition_info_get(struct cpu_user_regs *regs)
 
     if ( ffa_fw_supports_fid(FFA_PARTITION_INFO_GET) )
     {
-        ret = ffa_get_sp_partinfo(uuid, &ffa_sp_count, &dst_buf, end_buf,
+        ret = ffa_get_sp_partinfo(uuid, &sp_count, &dst_buf, end_buf,
                                   dst_size);
 
         if ( ret )
             goto out_rx_release;
     }
 
-    ret = ffa_get_vm_partinfo(uuid, 0, &ffa_vm_count, &dst_buf, end_buf,
+    ret = ffa_get_vm_partinfo(uuid, 0, &vm_count, &dst_buf, end_buf,
                               dst_size);
 
 out_rx_release:
@@ -451,7 +451,7 @@ out:
         if ( flags || ACCESS_ONCE(ctx->guest_vers) == FFA_VERSION_1_0 )
             dst_size = 0;
 
-        ffa_set_regs_success(regs, ffa_sp_count + ffa_vm_count, dst_size);
+        ffa_set_regs_success(regs, sp_count + vm_count, dst_size);
     }
 }
 
