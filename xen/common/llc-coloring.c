@@ -193,8 +193,6 @@ void __init llc_coloring_init(void)
 
     if ( !xen_num_colors )
     {
-        unsigned int i;
-
         xen_num_colors = MIN(XEN_DEFAULT_NUM_COLORS, max_nr_colors);
 
         printk(XENLOG_WARNING
