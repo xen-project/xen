@@ -814,15 +814,33 @@ static void cf_check hap_update_paging_modes(struct vcpu *v)
 static void cf_check
 hap_write_p2m_entry_post(struct p2m_domain *p2m, unsigned int oflags)
 {
-    struct domain *d = p2m->domain;
+    if ( !(oflags & _PAGE_PRESENT) )
+        return;
 
-    if ( oflags & _PAGE_PRESENT )
+    if ( unlikely(!p2m->defer_flush) )
+    {
+        const struct domain *d = p2m->domain;
+
+        ASSERT_UNREACHABLE();
         guest_flush_tlb_mask(d, d->dirty_cpumask);
+        return;
+    }
+
+    p2m->need_flush = true;
+}
+
+static void cf_check
+hap_p2m_tlb_flush(struct p2m_domain *p2m)
+{
+    const struct domain *d = p2m->domain;
+
+    guest_flush_tlb_mask(d, d->dirty_cpumask);
 }
 
 void hap_p2m_init(struct p2m_domain *p2m)
 {
     p2m->write_p2m_entry_post = hap_write_p2m_entry_post;
+    p2m->tlb_flush = hap_p2m_tlb_flush;
 }
 
 static unsigned long cf_check hap_gva_to_gfn_real_mode(
