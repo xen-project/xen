@@ -160,8 +160,6 @@ typedef uint64_t tsc_timestamp_t; /* RDTSC timestamp */
 struct vcpu_guest_context {
     /* FPU registers come first so they can be aligned for FXSAVE/FXRSTOR. */
     struct { char x[512]; } fpu_ctxt;       /* User-level FPU registers     */
-#define VGCF_I387_VALID                (1<<0)
-#define VGCF_IN_KERNEL                 (1<<2)
 #define _VGCF_i387_valid               0
 #define VGCF_i387_valid                (1<<_VGCF_i387_valid)
 #define _VGCF_in_kernel                2

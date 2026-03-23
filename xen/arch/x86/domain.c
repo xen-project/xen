@@ -1246,7 +1246,7 @@ int arch_set_info_guest(
          is_pv_64bit_domain(d) )
         v->arch.flags &= ~TF_kernel_mode;
 
-    if ( flags & VGCF_I387_VALID )
+    if ( flags & VGCF_i387_valid )
         vcpu_setup_fpu(v, &c.nat->fpu_ctxt);
     else
         vcpu_reset_fpu(v);

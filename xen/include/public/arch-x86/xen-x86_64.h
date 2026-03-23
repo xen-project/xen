@@ -103,7 +103,6 @@
 /* Guest exited in SYSCALL context? Return to guest with SYSRET? */
 #define _VGCF_in_syscall 8
 #define VGCF_in_syscall  (1<<_VGCF_in_syscall)
-#define VGCF_IN_SYSCALL  VGCF_in_syscall
 
 #ifndef __ASSEMBLER__
 
