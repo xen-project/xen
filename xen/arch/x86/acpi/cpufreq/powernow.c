@@ -143,7 +143,7 @@ static void amd_fixup_frequency(struct xen_processor_px *px)
     int index = px->control & 0x00000007;
     const struct cpuinfo_x86 *c = &current_cpu_data;
 
-    if ((c->x86 != 0x10 || c->x86_model >= 10) && c->x86 != 0x11)
+    if ((c->family != 0x10 || c->model >= 10) && c->family != 0x11)
         return;
 
     val = rdmsr(MSR_PSTATE_DEF_BASE + index);
@@ -157,7 +157,7 @@ static void amd_fixup_frequency(struct xen_processor_px *px)
 
     fid = val & 0x3f;
     did = (val >> 6) & 7;
-    if (c->x86 == 0x10)
+    if (c->family == 0x10)
         px->core_frequency = (100 * (fid + 16)) >> did;
     else
         px->core_frequency = (100 * (fid + 8)) >> did;
