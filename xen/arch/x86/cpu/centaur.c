@@ -41,7 +41,7 @@ static void init_c3(struct cpuinfo_x86 *c)
 		}
 	}
 
-	if (c->x86 == 0x6 && c->x86_model >= 0xf) {
+	if (c->family == 0x6 && c->model >= 0xf) {
 		c->x86_cache_alignment = c->x86_clflush_size * 2;
 		__set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
 	}
@@ -52,7 +52,7 @@ static void init_c3(struct cpuinfo_x86 *c)
 
 static void cf_check init_centaur(struct cpuinfo_x86 *c)
 {
-	if (c->x86 == 6)
+	if (c->family == 6)
 		init_c3(c);
 }
 

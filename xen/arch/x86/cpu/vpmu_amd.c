@@ -532,7 +532,7 @@ static const struct arch_vpmu_ops *__init common_init(void)
     if ( !num_counters )
     {
         printk(XENLOG_WARNING "VPMU: Unsupported CPU family %#x\n",
-               current_cpu_data.x86);
+               current_cpu_data.family);
         return ERR_PTR(-EINVAL);
     }
 
@@ -557,7 +557,7 @@ static const struct arch_vpmu_ops *__init common_init(void)
 
 const struct arch_vpmu_ops *__init amd_vpmu_init(void)
 {
-    switch ( current_cpu_data.x86 )
+    switch ( current_cpu_data.family )
     {
     case 0x15:
     case 0x17:
@@ -585,7 +585,7 @@ const struct arch_vpmu_ops *__init amd_vpmu_init(void)
 
 const struct arch_vpmu_ops *__init hygon_vpmu_init(void)
 {
-    switch ( current_cpu_data.x86 )
+    switch ( current_cpu_data.family )
     {
     case 0x18:
         num_counters = F15H_NUM_COUNTERS;

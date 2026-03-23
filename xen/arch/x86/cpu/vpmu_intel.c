@@ -917,7 +917,7 @@ const struct arch_vpmu_ops *__init core2_vpmu_init(void)
         return ERR_PTR(-EINVAL);
     }
 
-    if ( current_cpu_data.x86 != 6 )
+    if ( current_cpu_data.family != 6 )
     {
         printk(XENLOG_WARNING "VPMU: only family 6 is supported\n");
         return ERR_PTR(-EINVAL);
@@ -958,7 +958,7 @@ const struct arch_vpmu_ops *__init core2_vpmu_init(void)
               sizeof(struct xen_pmu_cntr_pair) * arch_pmc_cnt;
 
     /* TODO: It's clearly incorrect for this to quirk all Intel Fam6 CPUs. */
-    pmc_quirk = current_cpu_data.x86 == 6;
+    pmc_quirk = current_cpu_data.family == 6;
 
     if ( sizeof(struct xen_pmu_data) + sizeof(uint64_t) * fixed_pmc_cnt +
          sizeof(struct xen_pmu_cntr_pair) * arch_pmc_cnt > PAGE_SIZE )

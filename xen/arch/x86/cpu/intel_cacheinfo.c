@@ -168,15 +168,15 @@ void init_intel_cacheinfo(struct cpuinfo_x86 *c)
 	 * Don't use cpuid2 if cpuid4 is supported. For P4, we use cpuid2 for
 	 * trace cache
 	 */
-	if ((num_cache_leaves == 0 || c->x86 == 15) && c->cpuid_level > 1 &&
-	    c->x86_vendor != X86_VENDOR_SHANGHAI)
+	if ((num_cache_leaves == 0 || c->family == 15) && c->cpuid_level > 1 &&
+	    c->vendor != X86_VENDOR_SHANGHAI)
 	{
 		/* supports eax=2  call */
 		unsigned int i, j, n, regs[4];
 		unsigned char *dp = (unsigned char *)regs;
 		int only_trace = 0;
 
-		if (num_cache_leaves != 0 && c->x86 == 15)
+		if (num_cache_leaves != 0 && c->family == 15)
 			only_trace = 1;
 
 		/* Number of times to iterate */

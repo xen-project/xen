@@ -41,12 +41,12 @@ static void cf_check init_hygon(struct cpuinfo_x86 *c)
 
 	/* Probe for NSCB on Zen2 CPUs when not virtualised */
 	if (!cpu_has_hypervisor && !cpu_has_nscb && c == &boot_cpu_data &&
-	    c->x86 == 0x18)
+	    c->family == 0x18)
 		detect_zen2_null_seg_behaviour();
 
 	/*
 	 * TODO: Check heuristic safety with Hygon first
-	if (c->x86 == 0x18)
+	if (c->family == 0x18)
 		amd_init_spectral_chicken();
 	 */
 
