@@ -777,13 +777,7 @@ void mcheck_init(struct cpuinfo_x86 *c, bool bsp)
 
 #ifdef CONFIG_INTEL
     case X86_VENDOR_INTEL:
-        switch ( c->x86 )
-        {
-        case 6:
-        case 15:
-            inited = intel_mcheck_init(c, bsp);
-            break;
-        }
+        inited = intel_mcheck_init(c, bsp);
         break;
 #endif
 

@@ -1059,9 +1059,8 @@ static void acpi_processor_power_init_bm_check(struct acpi_processor_flags *flag
      * is not required while entering C3 type state on
      * P4, Core and beyond CPUs
      */
-    if ( c->x86_vendor == X86_VENDOR_INTEL &&
-        (c->x86 > 0x6 || (c->x86 == 6 && c->x86_model >= 14)) )
-            flags->bm_control = 0;
+    if ( c->x86_vendor == X86_VENDOR_INTEL )
+        flags->bm_control = 0;
 }
 
 #define VENDOR_INTEL                   (1)
