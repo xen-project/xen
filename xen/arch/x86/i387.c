@@ -108,25 +108,18 @@ static inline void fpu_fxrstor(struct vcpu *v)
 /*      FPU Save Functions     */
 /*******************************/
 
-static inline uint64_t vcpu_xsave_mask(const struct vcpu *v)
-{
-    return v->arch.nonlazy_xstate_used ? XSTATE_ALL : XSTATE_LAZY;
-}
-
 /* Save x87 extended state */
 static inline void fpu_xsave(struct vcpu *v)
 {
     bool ok;
-    uint64_t mask = vcpu_xsave_mask(v);
 
-    ASSERT(mask);
     /*
      * XCR0 normally represents what guest OS set. In case of Xen itself,
      * we set the accumulated feature mask before doing save/restore.
      */
     ok = set_xcr0(v->arch.xcr0_accum | XSTATE_FP_SSE);
     ASSERT(ok);
-    xsave(v, mask);
+    xsave(v, XSTATE_ALL);
     ok = set_xcr0(v->arch.xcr0 ?: XSTATE_FP_SSE);
     ASSERT(ok);
 }
@@ -202,9 +195,6 @@ void vcpu_restore_fpu(struct vcpu *v)
  */
 static bool _vcpu_save_fpu(struct vcpu *v)
 {
-    if ( !v->arch.nonlazy_xstate_used )
-        return false;
-
     ASSERT(!is_idle_vcpu(v));
 
     /* This can happen, if a paravirtualised guest OS has set its CR0.TS. */

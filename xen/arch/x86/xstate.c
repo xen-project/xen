@@ -1002,9 +1002,6 @@ int handle_xsetbv(u32 index, u64 new_bv)
     curr->arch.xcr0 = new_bv;
     curr->arch.xcr0_accum |= new_bv;
 
-    if ( new_bv & XSTATE_NONLAZY )
-        curr->arch.nonlazy_xstate_used = 1;
-
     mask &= ~XSTATE_FP_SSE;
     if ( mask )
     {
