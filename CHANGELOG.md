@@ -17,6 +17,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
      misusing atomic instructions.
    - Support for CPIO microcode in discrete multiboot modules.
 
+ - On Arm:
+   - Support for guest suspend and resume to/from RAM via vPSCI.
+     Applies only to non-hardware domain guests.
+
 ### Removed
  - On x86:
    - The cpuid_mask_* command line options for legacy CPUs.  These were
