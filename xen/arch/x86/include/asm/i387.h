@@ -29,7 +29,6 @@ struct ix87_env {
 
 void vcpu_restore_fpu(struct vcpu *v);
 void vcpu_save_fpu(struct vcpu *v);
-void save_fpu_enable(void);
 int vcpu_init_fpu(struct vcpu *v);
 void vcpu_destroy_fpu(struct vcpu *v);
 

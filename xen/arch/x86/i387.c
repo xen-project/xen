@@ -176,9 +176,6 @@ void vcpu_restore_fpu(struct vcpu *v)
 {
     ASSERT(!is_idle_vcpu(v));
 
-    /* Avoid recursion */
-    clts();
-
     if ( cpu_has_xsave )
         fpu_xrstor(v, XSTATE_ALL);
     else
@@ -193,7 +190,7 @@ void vcpu_restore_fpu(struct vcpu *v)
  * On each context switch, save the necessary FPU info of VCPU being switch 
  * out. It dispatches saving operation based on CPU's capability.
  */
-static bool _vcpu_save_fpu(struct vcpu *v)
+void vcpu_save_fpu(struct vcpu *v)
 {
     ASSERT(!is_idle_vcpu(v));
 
@@ -204,20 +201,6 @@ static bool _vcpu_save_fpu(struct vcpu *v)
         fpu_xsave(v);
     else
         fpu_fxsave(v);
-
-    return true;
-}
-
-void vcpu_save_fpu(struct vcpu *v)
-{
-    _vcpu_save_fpu(v);
-    stts();
-}
-
-void save_fpu_enable(void)
-{
-    if ( !_vcpu_save_fpu(current) )
-        clts();
 }
 
 /* Initialize FPU's context save area */

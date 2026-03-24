@@ -94,7 +94,7 @@ struct efi_rs_state efi_rs_enter(void)
         return state;
 
     state.cr3 = read_cr3();
-    save_fpu_enable();
+    vcpu_save_fpu(current);
     asm volatile ( "fnclex; fldcw %0" :: "m" (fcw) );
     asm volatile ( "ldmxcsr %0" :: "m" (mxcsr) );
 

@@ -887,9 +887,6 @@ void cpu_init(void)
 	/* Install correct page table. */
 	write_ptbase(current);
 
-	/* Ensure FPU gets initialised for each domain. */
-	stts();
-
 	/* Reset debug registers: */
 	write_debugreg(0, 0);
 	write_debugreg(1, 0);
