@@ -2411,6 +2411,8 @@ void asmlinkage entry_from_pv(struct cpu_user_regs *regs)
 
             regs->ssx = l ? FLAT_KERNEL_SS   : FLAT_USER_SS32;
             regs->csx = l ? FLAT_KERNEL_CS64 : FLAT_USER_CS32;
+            regs->rcx = regs->rip;
+            regs->r11 = regs->rflags;
 
             if ( guest_kernel_mode(curr, regs) )
                 pv_hypercall(regs);
