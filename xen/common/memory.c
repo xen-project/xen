@@ -345,7 +345,8 @@ static void populate_physmap(struct memop_args *a)
                 unsigned int scrub_start = 0;
                 unsigned int memflags =
                     a->memflags | (d->creation_finished ? 0
-                                                        : MEMF_no_scrub);
+                                                        : (MEMF_no_scrub |
+                                                           MEMF_keep_scrub));
                 nodeid_t node =
                     (a->memflags & MEMF_exact_node) ? MEMF_get_node(a->memflags)
                                                     : NUMA_NO_NODE;

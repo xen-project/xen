@@ -208,6 +208,9 @@ struct npfec {
 #define  MEMF_no_refcount (1U<<_MEMF_no_refcount)
 #define _MEMF_populate_on_demand 1
 #define  MEMF_populate_on_demand (1U<<_MEMF_populate_on_demand)
+/* MEMF_keep_scrub is only valid when specified together with MEMF_no_scrub. */
+#define _MEMF_keep_scrub  2
+#define  MEMF_keep_scrub  (1U << _MEMF_keep_scrub)
 #define _MEMF_no_dma      3
 #define  MEMF_no_dma      (1U<<_MEMF_no_dma)
 #define _MEMF_exact_node  4

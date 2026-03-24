@@ -989,6 +989,8 @@ static struct page_info *alloc_heap_pages(
     ASSERT(zone_lo <= zone_hi);
     ASSERT(zone_hi < NR_ZONES);
 
+    ASSERT(!(memflags & MEMF_keep_scrub) || (memflags & MEMF_no_scrub));
+
     if ( unlikely(order > MAX_ORDER) )
         return NULL;
 
@@ -1110,17 +1112,26 @@ static struct page_info *alloc_heap_pages(
     {
         bool cold = d && d != current->domain;
 
-        for ( i = 0; i < (1U << order); i++ )
+        if ( !(memflags & MEMF_no_scrub) )
         {
-            if ( test_and_clear_bit(_PGC_need_scrub, &pg[i].count_info) )
+            for ( i = 0; i < (1U << order); i++ )
             {
-                if ( !(memflags & MEMF_no_scrub) )
+                if ( test_and_clear_bit(_PGC_need_scrub, &pg[i].count_info) )
+                {
                     scrub_one_page(&pg[i], cold);
-
-                dirty_cnt++;
+                    dirty_cnt++;
+                }
+                else
+                    check_one_page(&pg[i]);
             }
-            else if ( !(memflags & MEMF_no_scrub) )
-                check_one_page(&pg[i]);
+        }
+        else
+        {
+            for ( i = 0; i < (1U << order); i++ )
+                if ( (memflags & MEMF_keep_scrub)
+                     ? test_bit(_PGC_need_scrub, &pg[i].count_info)
+                     : test_and_clear_bit(_PGC_need_scrub, &pg[i].count_info) )
+                    dirty_cnt++;
         }
 
         if ( dirty_cnt )
@@ -2696,8 +2707,10 @@ struct page_info *alloc_domheap_pages(
 
             for ( i = 0; i < (1UL << order); i++ )
             {
-                ASSERT(!pg[i].count_info);
-                pg[i].count_info = PGC_extra;
+                ASSERT(!(pg[i].count_info &
+                         ~((memflags & MEMF_keep_scrub) ? PGC_need_scrub
+                                                        : 0UL)));
+                pg[i].count_info |= PGC_extra;
             }
         }
         if ( assign_page(pg, order, d, memflags) )
