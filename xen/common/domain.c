@@ -1824,8 +1824,6 @@ int vcpu_reset(struct vcpu *v)
     clear_bit(v->vcpu_id, d->poll_mask);
     v->poll_evtchn = 0;
 
-    v->fpu_initialised = 0;
-    v->fpu_dirtied     = 0;
     v->is_initialised  = 0;
     if ( v->affinity_broken & VCPU_AFFINITY_OVERRIDE )
         vcpu_temporary_affinity(v, NR_CPUS, VCPU_AFFINITY_OVERRIDE);

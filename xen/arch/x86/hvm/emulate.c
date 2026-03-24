@@ -2517,9 +2517,7 @@ static int cf_check hvmemul_get_fpu(
 {
     struct vcpu *curr = current;
 
-    if ( !curr->fpu_dirtied )
-        alternative_vcall(hvm_funcs.fpu_dirty_intercept);
-    else if ( type == X86EMUL_FPU_fpu )
+    if ( type == X86EMUL_FPU_fpu )
     {
         /* Has a fastpath for `current`, so there's no actual map */
         const struct xsave_struct *xsave_area = VCPU_MAP_XSAVE_AREA(curr);
@@ -2537,8 +2535,6 @@ static int cf_check hvmemul_get_fpu(
          * masking of all exceptions by FNSTENV.)
          */
         save_fpu_enable();
-        curr->fpu_initialised = true;
-        curr->fpu_dirtied = true;
         if ( (fpu_ctxt->fcw & 0x3f) != 0x3f )
         {
             uint16_t fcw;

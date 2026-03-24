@@ -110,22 +110,7 @@ static inline void fpu_fxrstor(struct vcpu *v)
 
 static inline uint64_t vcpu_xsave_mask(const struct vcpu *v)
 {
-    if ( v->fpu_dirtied )
-        return v->arch.nonlazy_xstate_used ? XSTATE_ALL : XSTATE_LAZY;
-
-    ASSERT(v->arch.nonlazy_xstate_used);
-
-    /*
-     * The offsets of components which live in the extended region of
-     * compact xsave area are not fixed. Xsave area may be overwritten
-     * when a xsave with v->fpu_dirtied set is followed by one with
-     * v->fpu_dirtied clear.
-     * In such case, if hypervisor uses compact xsave area and guest
-     * has ever used lazy states (checking xcr0_accum excluding
-     * XSTATE_FP_SSE), vcpu_xsave_mask will return XSTATE_ALL. Otherwise
-     * return XSTATE_NONLAZY.
-     */
-    return xstate_all(v) ? XSTATE_ALL : XSTATE_NONLAZY;
+    return v->arch.nonlazy_xstate_used ? XSTATE_ALL : XSTATE_LAZY;
 }
 
 /* Save x87 extended state */
@@ -201,18 +186,10 @@ void vcpu_restore_fpu(struct vcpu *v)
     /* Avoid recursion */
     clts();
 
-    /*
-     * When saving full state even with !v->fpu_dirtied (see vcpu_xsave_mask()
-     * above) we also need to restore full state, to prevent subsequently
-     * saving state belonging to another vCPU.
-     */
     if ( cpu_has_xsave )
         fpu_xrstor(v, XSTATE_ALL);
     else
         fpu_fxrstor(v);
-
-    v->fpu_initialised = 1;
-    v->fpu_dirtied = 1;
 
     /* Xen doesn't need TS set, but the guest might. */
     if ( is_pv_vcpu(v) && (v->arch.pv.ctrlreg[0] & X86_CR0_TS) )
@@ -225,7 +202,7 @@ void vcpu_restore_fpu(struct vcpu *v)
  */
 static bool _vcpu_save_fpu(struct vcpu *v)
 {
-    if ( !v->fpu_dirtied && !v->arch.nonlazy_xstate_used )
+    if ( !v->arch.nonlazy_xstate_used )
         return false;
 
     ASSERT(!is_idle_vcpu(v));
@@ -237,8 +214,6 @@ static bool _vcpu_save_fpu(struct vcpu *v)
         fpu_xsave(v);
     else
         fpu_fxsave(v);
-
-    v->fpu_dirtied = 0;
 
     return true;
 }
@@ -265,7 +240,6 @@ void vcpu_reset_fpu(struct vcpu *v)
 {
     struct xsave_struct *xsave_area = VCPU_MAP_XSAVE_AREA(v);
 
-    v->fpu_initialised = false;
     *xsave_area = (struct xsave_struct) {
         .xsave_hdr.xstate_bv = X86_XCR0_X87,
     };
@@ -282,7 +256,6 @@ void vcpu_setup_fpu(struct vcpu *v, const void *data)
 {
     struct xsave_struct *xsave_area = VCPU_MAP_XSAVE_AREA(v);
 
-    v->fpu_initialised = true;
     *xsave_area = (struct xsave_struct) {
         .fpu_sse = *(const fpusse_t*)data,
         .xsave_hdr.xstate_bv = XSTATE_FP_SSE,

@@ -132,17 +132,6 @@ xsave_area_compressed(const struct xsave_struct *xsave_area)
     return xsave_area->xsave_hdr.xcomp_bv & XSTATE_COMPACTION_ENABLED;
 }
 
-static inline bool xstate_all(const struct vcpu *v)
-{
-    /*
-     * XSTATE_FP_SSE may be excluded, because the offsets of XSTATE_FP_SSE
-     * (in the legacy region of xsave area) are fixed, so saving
-     * XSTATE_FP_SSE will not cause overwriting problem with XSAVES/XSAVEC.
-     */
-    return xsave_area_compressed(v->arch.xsave_area) &&
-           (v->arch.xcr0_accum & XSTATE_LAZY & ~XSTATE_FP_SSE);
-}
-
 /*
  * Fetch a pointer to a vCPU's XSAVE area
  *

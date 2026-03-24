@@ -1406,11 +1406,10 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     VCPU_UNMAP_XSAVE_AREA(v, xsave_area);
 
     if ( is_pv_domain(d) )
-        c(flags = v->arch.pv.vgc_flags & ~(VGCF_i387_valid|VGCF_in_kernel));
+        c(flags = v->arch.pv.vgc_flags & ~VGCF_in_kernel);
     else
         c(flags = 0);
-    if ( v->fpu_initialised )
-        c(flags |= VGCF_i387_valid);
+    c(flags |= VGCF_i387_valid);
     if ( !(v->pause_flags & VPF_down) )
         c(flags |= VGCF_online);
     if ( !compat )

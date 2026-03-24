@@ -866,6 +866,7 @@ static int cf_check hvm_save_cpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
         .dr7 = v->arch.dr7,
         .msr_efer = v->arch.hvm.guest_efer,
     };
+    const struct xsave_struct *xsave_area;
 
     /*
      * We don't need to save state for a vcpu that is down; the restore
@@ -933,15 +934,11 @@ static int cf_check hvm_save_cpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
     ctxt.ldtr_base = seg.base;
     ctxt.ldtr_arbytes = seg.attr;
 
-    if ( v->fpu_initialised )
-    {
-        const struct xsave_struct *xsave_area = VCPU_MAP_XSAVE_AREA(v);
-
-        BUILD_BUG_ON(sizeof(ctxt.fpu_regs) != sizeof(xsave_area->fpu_sse));
-        memcpy(ctxt.fpu_regs, &xsave_area->fpu_sse, sizeof(ctxt.fpu_regs));
-        VCPU_UNMAP_XSAVE_AREA(v, xsave_area);
-        ctxt.flags = XEN_X86_FPU_INITIALISED;
-    }
+    xsave_area = VCPU_MAP_XSAVE_AREA(v);
+    BUILD_BUG_ON(sizeof(ctxt.fpu_regs) != sizeof(xsave_area->fpu_sse));
+    memcpy(ctxt.fpu_regs, &xsave_area->fpu_sse, sizeof(ctxt.fpu_regs));
+    VCPU_UNMAP_XSAVE_AREA(v, xsave_area);
+    ctxt.flags = XEN_X86_FPU_INITIALISED;
 
     return hvm_save_entry(CPU, v->vcpu_id, h, &ctxt);
 }

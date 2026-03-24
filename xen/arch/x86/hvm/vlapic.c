@@ -276,7 +276,6 @@ static void vlapic_init_sipi_one(struct vcpu *target, uint32_t icr)
     switch ( icr & APIC_DM_MASK )
     {
     case APIC_DM_INIT: {
-        bool fpu_initialised;
         int rc;
 
         /* No work on INIT de-assert for P4-type APIC. */
@@ -289,10 +288,8 @@ static void vlapic_init_sipi_one(struct vcpu *target, uint32_t icr)
         hvm_vcpu_down(target);
         domain_lock(target->domain);
         /* Reset necessary VCPU state. This does not include FPU state. */
-        fpu_initialised = target->fpu_initialised;
         rc = vcpu_reset(target);
         ASSERT(!rc);
-        target->fpu_initialised = fpu_initialised;
         vlapic_do_init(vcpu_vlapic(target));
         domain_unlock(target->domain);
         break;

@@ -1005,28 +1005,17 @@ int handle_xsetbv(u32 index, u64 new_bv)
     if ( new_bv & XSTATE_NONLAZY )
         curr->arch.nonlazy_xstate_used = 1;
 
-    mask &= curr->fpu_dirtied ? ~XSTATE_FP_SSE : XSTATE_NONLAZY;
+    mask &= ~XSTATE_FP_SSE;
     if ( mask )
     {
         unsigned long cr0 = read_cr0();
+        /* Has a fastpath for `current`, so there's no actual map */
+        struct xsave_struct *xsave_area = VCPU_MAP_XSAVE_AREA(curr);
 
         clts();
-        if ( curr->fpu_dirtied )
-        {
-            /* Has a fastpath for `current`, so there's no actual map */
-            struct xsave_struct *xsave_area = VCPU_MAP_XSAVE_AREA(curr);
 
-            asm ( "stmxcsr %0" : "=m" (xsave_area->fpu_sse.mxcsr) );
-            VCPU_UNMAP_XSAVE_AREA(curr, xsave_area);
-        }
-        else if ( xstate_all(curr) )
-        {
-            /* See the comment in i387.c:vcpu_restore_fpu_eager(). */
-            mask |= XSTATE_LAZY;
-            curr->fpu_initialised = 1;
-            curr->fpu_dirtied = 1;
-            cr0 &= ~X86_CR0_TS;
-        }
+        asm ( "stmxcsr %0" : "=m" (xsave_area->fpu_sse.mxcsr) );
+        VCPU_UNMAP_XSAVE_AREA(curr, xsave_area);
         xrstor(curr, mask);
         if ( cr0 & X86_CR0_TS )
             write_cr0(cr0);

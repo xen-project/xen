@@ -184,7 +184,6 @@ struct hvm_function_table {
 
     /* Instruction intercepts: non-void return values are X86EMUL codes. */
     void (*wbinvd_intercept)(void);
-    void (*fpu_dirty_intercept)(void);
     int (*msr_read_intercept)(unsigned int msr, uint64_t *msr_content);
     int (*msr_write_intercept)(unsigned int msr, uint64_t msr_content);
     void (*handle_cd)(struct vcpu *v, unsigned long value);

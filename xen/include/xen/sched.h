@@ -212,10 +212,6 @@ struct vcpu
     struct guest_area runstate_guest_area;
     unsigned int     new_state;
 
-    /* Has the FPU been initialised? */
-    bool             fpu_initialised;
-    /* Has the FPU been used since it was last saved? */
-    bool             fpu_dirtied;
     /* Initialization completed for this VCPU? */
     bool             is_initialised;
     /* Currently running on a CPU? */
