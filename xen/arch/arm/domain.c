@@ -12,6 +12,8 @@
 #include <xen/softirq.h>
 #include <xen/wait.h>
 
+#include <public/sched.h>
+
 #include <asm/arm64/sve.h>
 #include <asm/cpuerrata.h>
 #include <asm/cpufeature.h>
@@ -24,10 +26,12 @@
 #include <asm/platform.h>
 #include <asm/procinfo.h>
 #include <asm/regs.h>
+#include <asm/suspend.h>
 #include <asm/firmware/sci.h>
 #include <asm/tee/tee.h>
 #include <asm/vfp.h>
 #include <asm/vgic.h>
+#include <asm/vpsci.h>
 #include <asm/vtimer.h>
 
 #include "vpci.h"
@@ -770,8 +774,18 @@ int arch_domain_teardown(struct domain *d)
     return 0;
 }
 
+static void resume_ctx_reset(struct resume_info *ctx)
+{
+    if ( ctx->ctxt )
+        free_vcpu_guest_context(ctx->ctxt);
+
+    memset(ctx, 0, sizeof(*ctx));
+}
+
 void arch_domain_destroy(struct domain *d)
 {
+    resume_ctx_reset(&d->arch.resume_ctx);
+
     tee_free_domain_ctx(d);
     /* IOMMU page table is shared with P2M, always call
      * iommu_domain_destroy() before p2m_final_teardown().
@@ -804,6 +818,28 @@ void arch_domain_unpause(struct domain *d)
 void arch_domain_creation_finished(struct domain *d)
 {
     p2m_domain_creation_finished(d);
+}
+
+void arch_domain_resume(struct domain *d)
+{
+    struct resume_info *ctx = &d->arch.resume_ctx;
+
+    /*
+     * It is still possible to call domain_shutdown() with a suspend reason
+     * via some hypercalls, such as SCHEDOP_shutdown or SCHEDOP_remote_shutdown.
+     * In these cases, the resume context will be empty, so there is no
+     * suspend-specific state to restore.
+     */
+    if ( !ctx->wake_cpu )
+        return;
+
+    ASSERT(d->shutdown_code == SHUTDOWN_suspend);
+
+    domain_lock(d);
+    arch_vcpu_apply_guest_context(ctx->wake_cpu, ctx->ctxt);
+    domain_unlock(d);
+
+    resume_ctx_reset(ctx);
 }
 
 static int is_guest_pv32_psr(uint32_t psr)
@@ -848,15 +884,32 @@ static int is_guest_pv64_psr(uint64_t psr)
 }
 #endif
 
+void arch_vcpu_apply_guest_context(struct vcpu *v,
+                                   const struct vcpu_guest_context *ctxt)
+{
+    vcpu_regs_user_to_hyp(v, &ctxt->user_regs);
+
+    v->arch.sctlr = ctxt->sctlr;
+    v->arch.ttbr0 = ctxt->ttbr0;
+    v->arch.ttbr1 = ctxt->ttbr1;
+    v->arch.ttbcr = ctxt->ttbcr;
+
+    v->is_initialised = 1;
+
+    if ( ctxt->flags & VGCF_online )
+        clear_bit(_VPF_down, &v->pause_flags);
+    else
+        set_bit(_VPF_down, &v->pause_flags);
+}
+
 /*
  * Initialise vCPU state. The context may be supplied by an external entity, so
  * we need to validate it.
  */
-int arch_set_info_guest(
-    struct vcpu *v, vcpu_guest_context_u c)
+int arch_vcpu_validate_guest_context(const struct vcpu *v,
+                                     const struct vcpu_guest_context *ctxt)
 {
-    struct vcpu_guest_context *ctxt = c.nat;
-    struct vcpu_guest_core_regs *regs = &c.nat->user_regs;
+    const struct vcpu_guest_core_regs *regs = &ctxt->user_regs;
 
     if ( is_32bit_domain(v->domain) )
     {
@@ -885,19 +938,24 @@ int arch_set_info_guest(
     }
 #endif
 
-    vcpu_regs_user_to_hyp(v, regs);
+    return 0;
+}
 
-    v->arch.sctlr = ctxt->sctlr;
-    v->arch.ttbr0 = ctxt->ttbr0;
-    v->arch.ttbr1 = ctxt->ttbr1;
-    v->arch.ttbcr = ctxt->ttbcr;
+/*
+ * Initialise vCPU state. The context may be supplied by an external entity, so
+ * we need to validate it.
+ */
+int arch_set_info_guest(
+    struct vcpu *v, vcpu_guest_context_u c)
+{
+    struct vcpu_guest_context *ctxt = c.nat;
+    int rc;
 
-    v->is_initialised = 1;
+    rc = arch_vcpu_validate_guest_context(v, ctxt);
+    if ( rc )
+        return rc;
 
-    if ( ctxt->flags & VGCF_online )
-        clear_bit(_VPF_down, &v->pause_flags);
-    else
-        set_bit(_VPF_down, &v->pause_flags);
+    arch_vcpu_apply_guest_context(v, ctxt);
 
     return 0;
 }

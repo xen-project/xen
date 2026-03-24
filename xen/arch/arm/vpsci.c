@@ -4,38 +4,24 @@
 #include <xen/types.h>
 
 #include <asm/current.h>
+#include <asm/domain.h>
 #include <asm/vgic.h>
 #include <asm/vpsci.h>
 #include <asm/event.h>
 
 #include <public/sched.h>
 
-static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
-                            register_t context_id)
+static int vpsci_build_guest_context(struct vcpu *v, register_t entry_point,
+                                     register_t context_id,
+                                     struct vcpu_guest_context **out)
 {
-    struct vcpu *v;
-    struct domain *d = current->domain;
+    bool is_thumb = entry_point & 1;
     struct vcpu_guest_context *ctxt;
     int rc;
-    bool is_thumb = entry_point & 1;
-    register_t vcpuid;
 
-    vcpuid = vaffinity_to_vcpuid(target_cpu);
-
-    if ( (v = domain_vcpu(d, vcpuid)) == NULL )
-        return PSCI_INVALID_PARAMETERS;
-
-    /* THUMB set is not allowed with 64-bit domain */
-    if ( is_64bit_domain(d) && is_thumb )
-        return PSCI_INVALID_ADDRESS;
-
-    if ( !test_bit(_VPF_down, &v->pause_flags) )
-        return PSCI_ALREADY_ON;
-
-    if ( (ctxt = alloc_vcpu_guest_context()) == NULL )
-        return PSCI_DENIED;
-
-    vgic_clear_pending_irqs(v);
+    ctxt = alloc_vcpu_guest_context();
+    if ( ctxt == NULL )
+        return -ENOMEM;
 
     memset(ctxt, 0, sizeof(*ctxt));
     ctxt->user_regs.pc64 = (u64) entry_point;
@@ -48,7 +34,7 @@ static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
      * x0/r0_usr are always updated because for PSCI 0.1 the general
      * purpose registers are undefined upon CPU_on.
      */
-    if ( is_32bit_domain(d) )
+    if ( is_32bit_domain(v->domain) )
     {
         ctxt->user_regs.cpsr = PSR_GUEST32_INIT;
         /* Start the VCPU with THUMB set if it's requested by the kernel */
@@ -69,14 +55,50 @@ static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
 #endif
     ctxt->flags = VGCF_online;
 
+    rc = arch_vcpu_validate_guest_context(v, ctxt);
+    if ( rc )
+    {
+        free_vcpu_guest_context(ctxt);
+        return rc;
+    }
+
+    *out = ctxt;
+    return 0;
+}
+
+static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
+                            register_t context_id)
+{
+    struct vcpu *v;
+    struct domain *d = current->domain;
+    struct vcpu_guest_context *ctxt = NULL;
+    int rc;
+    bool is_thumb = entry_point & 1;
+    register_t vcpuid;
+
+    vcpuid = vaffinity_to_vcpuid(target_cpu);
+
+    if ( (v = domain_vcpu(d, vcpuid)) == NULL )
+        return PSCI_INVALID_PARAMETERS;
+
+    /* THUMB set is not allowed with 64-bit domain */
+    if ( is_64bit_domain(d) && is_thumb )
+        return PSCI_INVALID_ADDRESS;
+
+    if ( !test_bit(_VPF_down, &v->pause_flags) )
+        return PSCI_ALREADY_ON;
+
+    rc = vpsci_build_guest_context(v, entry_point, context_id, &ctxt);
+    if ( rc < 0 )
+        return PSCI_DENIED;
+
+    vgic_clear_pending_irqs(v);
+
     domain_lock(d);
-    rc = arch_set_info_guest(v, ctxt);
+    arch_vcpu_apply_guest_context(v, ctxt);
     domain_unlock(d);
 
     free_vcpu_guest_context(ctxt);
-
-    if ( rc < 0 )
-        return PSCI_DENIED;
 
     vcpu_wake(v);
 
@@ -197,6 +219,56 @@ static void do_psci_0_2_system_reset(void)
     domain_shutdown(d,SHUTDOWN_reboot);
 }
 
+static int32_t do_psci_1_0_system_suspend(register_t epoint, register_t cid)
+{
+    int32_t rc;
+    struct vcpu_guest_context *ctxt;
+    struct vcpu *v;
+    struct domain *d = current->domain;
+    bool is_thumb = epoint & 1;
+    struct resume_info *rctx = &d->arch.resume_ctx;
+
+    /* THUMB set is not allowed with 64-bit domain */
+    if ( is_64bit_domain(d) && is_thumb )
+        return PSCI_INVALID_ADDRESS;
+
+    /* SYSTEM_SUSPEND is not supported for the hardware domain yet */
+    if ( is_hardware_domain(d) )
+        return PSCI_NOT_SUPPORTED;
+
+    /* Ensure that all CPUs other than the calling one are offline */
+    domain_lock(d);
+    for_each_vcpu ( d, v )
+    {
+        if ( v != current && is_vcpu_online(v) )
+        {
+            domain_unlock(d);
+            return PSCI_DENIED;
+        }
+    }
+    domain_unlock(d);
+
+    rc = vpsci_build_guest_context(current, epoint, cid, &ctxt);
+    if ( rc )
+        return PSCI_DENIED;
+
+    rc = domain_shutdown(d, SHUTDOWN_suspend);
+    if ( rc )
+    {
+        free_vcpu_guest_context(ctxt);
+        return PSCI_DENIED;
+    }
+
+    rctx->ctxt = ctxt;
+    rctx->wake_cpu = current;
+
+    gprintk(XENLOG_DEBUG,
+            "SYSTEM_SUSPEND requested, epoint=%#"PRIregister", cid=%#"PRIregister"\n",
+            epoint, cid);
+
+    return rc;
+}
+
 static int32_t do_psci_1_0_features(uint32_t psci_func_id)
 {
     /* /!\ Ordered by function ID and not name */
@@ -216,6 +288,9 @@ static int32_t do_psci_1_0_features(uint32_t psci_func_id)
     case PSCI_1_0_FN32_PSCI_FEATURES:
     case ARM_SMCCC_VERSION_FID:
         return 0;
+    case PSCI_1_0_FN32_SYSTEM_SUSPEND:
+    case PSCI_1_0_FN64_SYSTEM_SUSPEND:
+        return is_hardware_domain(current->domain) ? PSCI_NOT_SUPPORTED : 0;
     default:
         return PSCI_NOT_SUPPORTED;
     }
@@ -341,6 +416,23 @@ bool do_vpsci_0_2_call(struct cpu_user_regs *regs, uint32_t fid)
 
         perfc_incr(vpsci_features);
         PSCI_SET_RESULT(regs, do_psci_1_0_features(psci_func_id));
+        return true;
+    }
+
+    case PSCI_1_0_FN32_SYSTEM_SUSPEND:
+    case PSCI_1_0_FN64_SYSTEM_SUSPEND:
+    {
+        register_t epoint = PSCI_ARG(regs, 1);
+        register_t cid = PSCI_ARG(regs, 2);
+
+        if ( fid == PSCI_1_0_FN32_SYSTEM_SUSPEND )
+        {
+            epoint &= GENMASK(31, 0);
+            cid &= GENMASK(31, 0);
+        }
+
+        perfc_incr(vpsci_system_suspend);
+        PSCI_SET_RESULT(regs, do_psci_1_0_system_suspend(epoint, cid));
         return true;
     }
 
