@@ -297,7 +297,7 @@ void save_fpu_enable(void)
 /* Initialize FPU's context save area */
 int vcpu_init_fpu(struct vcpu *v)
 {
-    v->arch.fully_eager_fpu = opt_eager_fpu;
+    v->arch.fully_eager_fpu = true;
 
     return xstate_alloc_save_area(v);
 }

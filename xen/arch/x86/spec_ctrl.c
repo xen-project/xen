@@ -61,7 +61,6 @@ static int8_t __initdata opt_psfd = -1;
 int8_t __ro_after_init opt_bhi_dis_s = -1;
 
 int8_t __ro_after_init opt_ibpb_ctxt_switch = -1;
-int8_t __ro_after_init opt_eager_fpu = -1;
 int8_t __ro_after_init opt_l1d_flush = -1;
 static bool __initdata opt_branch_harden =
     IS_ENABLED(CONFIG_SPECULATIVE_HARDEN_BRANCH);
@@ -103,8 +102,6 @@ static int __init cf_check parse_spec_ctrl(const char *s)
         {
             opt_msr_sc_pv = false;
             opt_msr_sc_hvm = false;
-
-            opt_eager_fpu = 0;
 
             if ( opt_xpti_hwdom < 0 )
                 opt_xpti_hwdom = 0;
@@ -336,8 +333,6 @@ static int __init cf_check parse_spec_ctrl(const char *s)
         /* Misc settings. */
         else if ( (val = parse_boolean("ibpb", s, ss)) >= 0 )
             opt_ibpb_ctxt_switch = val;
-        else if ( (val = parse_boolean("eager-fpu", s, ss)) >= 0 )
-            opt_eager_fpu = val;
         else if ( (val = parse_boolean("l1d-flush", s, ss)) >= 0 )
             opt_l1d_flush = val;
         else if ( (val = parse_boolean("branch-harden", s, ss)) >= 0 )
@@ -648,32 +643,30 @@ static void __init print_details(enum ind_thunk thunk)
      * mitigation support for guests.
      */
 #ifdef CONFIG_HVM
-    printk("  Support for HVM VMs:%s%s%s%s%s%s%s%s\n",
+    printk("  Support for HVM VMs:%s%s%s%s%s%s%s\n",
            (boot_cpu_has(X86_FEATURE_SC_MSR_HVM) ||
             boot_cpu_has(X86_FEATURE_SC_RSB_HVM) ||
             boot_cpu_has(X86_FEATURE_IBPB_ENTRY_HVM) ||
             opt_bhb_entry_hvm || amd_virt_spec_ctrl ||
-            opt_eager_fpu || opt_verw_hvm)           ? ""               : " None",
+            opt_verw_hvm)                            ? ""               : " None",
            boot_cpu_has(X86_FEATURE_SC_MSR_HVM)      ? " MSR_SPEC_CTRL" : "",
            (boot_cpu_has(X86_FEATURE_SC_MSR_HVM) ||
             amd_virt_spec_ctrl)                      ? " MSR_VIRT_SPEC_CTRL" : "",
            boot_cpu_has(X86_FEATURE_SC_RSB_HVM)      ? " RSB"           : "",
-           opt_eager_fpu                             ? " EAGER_FPU"     : "",
            opt_verw_hvm                              ? " VERW"          : "",
            boot_cpu_has(X86_FEATURE_IBPB_ENTRY_HVM)  ? " IBPB-entry"    : "",
            opt_bhb_entry_hvm                         ? " BHB-entry"     : "");
 
 #endif
 #ifdef CONFIG_PV
-    printk("  Support for PV VMs:%s%s%s%s%s%s%s\n",
+    printk("  Support for PV VMs:%s%s%s%s%s%s\n",
            (boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
             boot_cpu_has(X86_FEATURE_SC_RSB_PV) ||
             boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV) ||
             opt_bhb_entry_pv ||
-            opt_eager_fpu || opt_verw_pv)            ? ""               : " None",
+            opt_verw_pv)                             ? ""               : " None",
            boot_cpu_has(X86_FEATURE_SC_MSR_PV)       ? " MSR_SPEC_CTRL" : "",
            boot_cpu_has(X86_FEATURE_SC_RSB_PV)       ? " RSB"           : "",
-           opt_eager_fpu                             ? " EAGER_FPU"     : "",
            opt_verw_pv                               ? " VERW"          : "",
            boot_cpu_has(X86_FEATURE_IBPB_ENTRY_PV)   ? " IBPB-entry"    : "",
            opt_bhb_entry_pv                          ? " BHB-entry"     : "");
@@ -957,75 +950,6 @@ static bool __init rsb_is_full_width(void)
     }
 
     return true;
-}
-
-/* Calculate whether this CPU speculates past #NM */
-static bool __init should_use_eager_fpu(void)
-{
-    /*
-     * Assume all unrecognised processors are ok.  This is only known to
-     * affect Intel Family 6 processors.
-     */
-    if ( boot_cpu_data.vendor != X86_VENDOR_INTEL ||
-         boot_cpu_data.family != 6 )
-        return false;
-
-    switch ( boot_cpu_data.model )
-    {
-        /*
-         * Core processors since at least Nehalem are vulnerable.
-         */
-    case 0x1e: /* Nehalem */
-    case 0x1f: /* Auburndale / Havendale */
-    case 0x1a: /* Nehalem EP */
-    case 0x2e: /* Nehalem EX */
-    case 0x25: /* Westmere */
-    case 0x2c: /* Westmere EP */
-    case 0x2f: /* Westmere EX */
-    case 0x2a: /* SandyBridge */
-    case 0x2d: /* SandyBridge EP/EX */
-    case 0x3a: /* IvyBridge */
-    case 0x3e: /* IvyBridge EP/EX */
-    case 0x3c: /* Haswell */
-    case 0x3f: /* Haswell EX/EP */
-    case 0x45: /* Haswell D */
-    case 0x46: /* Haswell H */
-    case 0x3d: /* Broadwell */
-    case 0x47: /* Broadwell H */
-    case 0x4f: /* Broadwell EP/EX */
-    case 0x56: /* Broadwell D */
-    case 0x4e: /* Skylake M */
-    case 0x55: /* Skylake X */
-    case 0x5e: /* Skylake D */
-    case 0x66: /* Cannonlake */
-    case 0x67: /* Cannonlake? */
-    case 0x8e: /* Kabylake M */
-    case 0x9e: /* Kabylake D */
-        return true;
-
-        /*
-         * Atom processors are not vulnerable.
-         */
-    case 0x1c: /* Pineview */
-    case 0x26: /* Lincroft */
-    case 0x27: /* Penwell */
-    case 0x35: /* Cloverview */
-    case 0x36: /* Cedarview */
-    case 0x37: /* Baytrail / Valleyview (Silvermont) */
-    case 0x4d: /* Avaton / Rangely (Silvermont) */
-    case 0x4c: /* Cherrytrail / Brasswell */
-    case 0x4a: /* Merrifield */
-    case 0x5a: /* Moorefield */
-    case 0x5c: /* Goldmont */
-    case 0x5f: /* Denverton */
-    case 0x7a: /* Gemini Lake */
-        return false;
-
-    default:
-        printk("Unrecognised CPU model %#x - assuming vulnerable to LazyFPU\n",
-               boot_cpu_data.model);
-        return true;
-    }
 }
 
 /*
@@ -2220,10 +2144,6 @@ void __init init_speculation_mitigations(void)
     ibpb_calculations();
 
     div_calculations(hw_smt_enabled);
-
-    /* Check whether Eager FPU should be enabled by default. */
-    if ( opt_eager_fpu == -1 )
-        opt_eager_fpu = should_use_eager_fpu();
 
     /* (Re)init BSP state now that default_scf has been calculated. */
     init_shadow_spec_ctrl_state(get_cpu_info());
