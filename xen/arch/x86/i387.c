@@ -235,30 +235,6 @@ void vcpu_restore_fpu_nonlazy(struct vcpu *v, bool need_stts)
 }
 
 /* 
- * Restore FPU state when #NM is triggered.
- */
-void vcpu_restore_fpu_lazy(struct vcpu *v)
-{
-    ASSERT(!is_idle_vcpu(v));
-
-    /* Avoid recursion. */
-    clts();
-
-    if ( v->fpu_dirtied )
-        return;
-
-    ASSERT(!v->arch.fully_eager_fpu);
-
-    if ( cpu_has_xsave )
-        fpu_xrstor(v, XSTATE_LAZY);
-    else
-        fpu_fxrstor(v);
-
-    v->fpu_initialised = 1;
-    v->fpu_dirtied = 1;
-}
-
-/* 
  * On each context switch, save the necessary FPU info of VCPU being switch 
  * out. It dispatches saving operation based on CPU's capability.
  */

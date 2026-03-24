@@ -2045,15 +2045,21 @@ void asmlinkage do_device_not_available(struct cpu_user_regs *regs)
     }
 
 #ifdef CONFIG_PV
-    vcpu_restore_fpu_lazy(curr);
-
-    if ( curr->arch.pv.ctrlreg[0] & X86_CR0_TS )
+    if ( !(curr->arch.pv.ctrlreg[0] & X86_CR0_TS) )
     {
-        pv_inject_hw_exception(X86_EXC_NM, X86_EVENT_NO_EC);
-        curr->arch.pv.ctrlreg[0] &= ~X86_CR0_TS;
+        ASSERT_UNREACHABLE();
+        domain_crash(curr->domain, "#NM but vCR0.TS clear\n");
+        return;
     }
-    else
-        TRACE_TIME(TRC_PV_MATH_STATE_RESTORE);
+
+    /*
+     * For better or worse, Xen's ABI with PV guests always clears TS on an #NM
+     * exception. Classic-xen Linux depends on this.
+     */
+    clts();
+    curr->arch.pv.ctrlreg[0] &= ~X86_CR0_TS;
+
+    pv_inject_hw_exception(X86_EXC_NM, X86_EVENT_NO_EC);
 #else
     ASSERT_UNREACHABLE();
 #endif
