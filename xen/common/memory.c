@@ -388,6 +388,12 @@ static void populate_physmap(struct memop_args *a)
                             goto out;
                         }
                     }
+
+                    if ( assign_page(page, a->extent_order, d, memflags) )
+                    {
+                        free_domheap_pages(page, a->extent_order);
+                        goto out;
+                    }
                 }
 
                 if ( unlikely(a->memflags & MEMF_no_tlbflush) )

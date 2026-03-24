@@ -2713,7 +2713,14 @@ struct page_info *alloc_domheap_pages(
                 pg[i].count_info |= PGC_extra;
             }
         }
-        if ( assign_page(pg, order, d, memflags) )
+        /*
+         * Don't add pages with the PGC_need_scrub bit set to the domain, the
+         * caller must clean the bit and then manually call assign_pages().
+         * Otherwise pages still subject to scrubbing would be reachable using
+         * get_page().
+         */
+        if ( !(memflags & MEMF_keep_scrub) &&
+             assign_page(pg, order, d, memflags) )
         {
             free_heap_pages(pg, order, memflags & MEMF_no_scrub);
             return NULL;
