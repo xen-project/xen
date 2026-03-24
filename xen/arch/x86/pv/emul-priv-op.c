@@ -992,7 +992,7 @@ static int cf_check read_msr(
         return X86EMUL_OKAY;
 
     case MSR_P6_PERFCTR(0) ... MSR_P6_PERFCTR(7):
-    case MSR_P6_EVNTSEL(0) ... MSR_P6_EVNTSEL(3):
+    case MSR_P6_EVNTSEL(0) ... MSR_P6_EVNTSEL(7):
     case MSR_CORE_PERF_FIXED_CTR0 ... MSR_CORE_PERF_FIXED_CTR2:
     case MSR_CORE_PERF_FIXED_CTR_CTRL ... MSR_CORE_PERF_GLOBAL_OVF_CTRL:
         if ( boot_cpu_data.vendor == X86_VENDOR_INTEL )
@@ -1175,7 +1175,7 @@ static int cf_check write_msr(
         break;
 
     case MSR_P6_PERFCTR(0) ... MSR_P6_PERFCTR(7):
-    case MSR_P6_EVNTSEL(0) ... MSR_P6_EVNTSEL(3):
+    case MSR_P6_EVNTSEL(0) ... MSR_P6_EVNTSEL(7):
     case MSR_CORE_PERF_FIXED_CTR0 ... MSR_CORE_PERF_FIXED_CTR2:
     case MSR_CORE_PERF_FIXED_CTR_CTRL ... MSR_CORE_PERF_GLOBAL_OVF_CTRL:
         if ( boot_cpu_data.vendor == X86_VENDOR_INTEL )
