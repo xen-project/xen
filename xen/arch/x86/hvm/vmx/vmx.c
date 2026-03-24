@@ -68,7 +68,6 @@ static void cf_check vmx_update_guest_cr(
     struct vcpu *v, unsigned int cr, unsigned int flags);
 static void cf_check vmx_update_guest_efer(struct vcpu *v);
 static void cf_check vmx_wbinvd_intercept(void);
-static void cf_check vmx_fpu_dirty_intercept(void);
 static int cf_check vmx_msr_read_intercept(
     unsigned int msr, uint64_t *msr_content);
 static int cf_check vmx_msr_write_intercept(
@@ -1130,41 +1129,6 @@ static int cf_check vmx_load_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
     return 0;
 }
 
-static void vmx_fpu_enter(struct vcpu *v)
-{
-    vcpu_restore_fpu_lazy(v);
-    v->arch.hvm.vmx.exception_bitmap &= ~(1u << X86_EXC_NM);
-    vmx_update_exception_bitmap(v);
-    v->arch.hvm.vmx.host_cr0 &= ~X86_CR0_TS;
-    __vmwrite(HOST_CR0, v->arch.hvm.vmx.host_cr0);
-}
-
-static void cf_check vmx_fpu_leave(struct vcpu *v)
-{
-    ASSERT(!v->fpu_dirtied);
-    ASSERT(read_cr0() & X86_CR0_TS);
-
-    if ( !(v->arch.hvm.vmx.host_cr0 & X86_CR0_TS) )
-    {
-        v->arch.hvm.vmx.host_cr0 |= X86_CR0_TS;
-        __vmwrite(HOST_CR0, v->arch.hvm.vmx.host_cr0);
-    }
-
-    /*
-     * If the guest does not have TS enabled then we must cause and handle an
-     * exception on first use of the FPU. If the guest *does* have TS enabled
-     * then this is not necessary: no FPU activity can occur until the guest
-     * clears CR0.TS, and we will initialise the FPU when that happens.
-     */
-    if ( !(v->arch.hvm.guest_cr[0] & X86_CR0_TS) )
-    {
-        v->arch.hvm.hw_cr[0] |= X86_CR0_TS;
-        __vmwrite(GUEST_CR0, v->arch.hvm.hw_cr[0]);
-        v->arch.hvm.vmx.exception_bitmap |= (1u << X86_EXC_NM);
-        vmx_update_exception_bitmap(v);
-    }
-}
-
 static void cf_check vmx_ctxt_switch_from(struct vcpu *v)
 {
     /*
@@ -1187,8 +1151,6 @@ static void cf_check vmx_ctxt_switch_from(struct vcpu *v)
         vmx_vmcs_reload(v);
     }
 
-    if ( !v->arch.fully_eager_fpu )
-        vmx_fpu_leave(v);
     vmx_save_guest_msrs(v);
     vmx_restore_host_msrs();
     vmx_save_dr(v);
@@ -1770,17 +1732,6 @@ static void cf_check vmx_update_guest_cr(
             __vmwrite(CR0_READ_SHADOW, v->arch.hvm.guest_cr[0]);
         else
             nvmx_set_cr_read_shadow(v, 0);
-
-        if ( !(v->arch.hvm.guest_cr[0] & X86_CR0_TS) )
-        {
-            if ( v != current )
-            {
-                if ( !v->arch.fully_eager_fpu )
-                    hw_cr0_mask |= X86_CR0_TS;
-            }
-            else if ( v->arch.hvm.hw_cr[0] & X86_CR0_TS )
-                vmx_fpu_enter(v);
-        }
 
         realmode = !(v->arch.hvm.guest_cr[0] & X86_CR0_PE);
 
@@ -2915,7 +2866,6 @@ static struct hvm_function_table __initdata_cf_clobber vmx_function_table = {
     .update_guest_cr      = vmx_update_guest_cr,
     .update_guest_efer    = vmx_update_guest_efer,
     .cpuid_policy_changed = vmx_cpuid_policy_changed,
-    .fpu_leave            = vmx_fpu_leave,
     .set_guest_pat        = vmx_set_guest_pat,
     .get_guest_pat        = vmx_get_guest_pat,
     .set_tsc_offset       = vmx_set_tsc_offset,
@@ -2927,7 +2877,6 @@ static struct hvm_function_table __initdata_cf_clobber vmx_function_table = {
     .cpu_up               = vmx_cpu_up,
     .cpu_down             = vmx_cpu_down,
     .wbinvd_intercept     = vmx_wbinvd_intercept,
-    .fpu_dirty_intercept  = vmx_fpu_dirty_intercept,
     .msr_read_intercept   = vmx_msr_read_intercept,
     .msr_write_intercept  = vmx_msr_write_intercept,
     .handle_cd            = vmx_handle_cd,
@@ -3279,20 +3228,6 @@ void update_guest_eip(void)
 
     if ( regs->eflags & X86_EFLAGS_TF )
         hvm_inject_hw_exception(X86_EXC_DB, X86_EVENT_NO_EC);
-}
-
-static void cf_check vmx_fpu_dirty_intercept(void)
-{
-    struct vcpu *curr = current;
-
-    vmx_fpu_enter(curr);
-
-    /* Disable TS in guest CR0 unless the guest wants the exception too. */
-    if ( !(curr->arch.hvm.guest_cr[0] & X86_CR0_TS) )
-    {
-        curr->arch.hvm.hw_cr[0] &= ~X86_CR0_TS;
-        __vmwrite(GUEST_CR0, curr->arch.hvm.hw_cr[0]);
-    }
 }
 
 static void vmx_dr_access(unsigned long exit_qualification,
@@ -4543,10 +4478,7 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
                 domain_pause_for_debugger();
             }
             break;
-        case X86_EXC_NM:
-            TRACE(TRC_HVM_TRAP, vector);
-            vmx_fpu_dirty_intercept();
-            break;
+
         case X86_EXC_PF:
             __vmread(EXIT_QUALIFICATION, &exit_qualification);
             __vmread(VM_EXIT_INTR_ERROR_CODE, &ecode);

@@ -1238,9 +1238,6 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
     regs->rsp = get_vvmcs(v, GUEST_RSP);
     regs->rflags = get_vvmcs(v, GUEST_RFLAGS);
 
-    /* updating host cr0 to sync TS bit */
-    __vmwrite(HOST_CR0, v->arch.hvm.vmx.host_cr0);
-
     /* Setup virtual ETP for L2 guest*/
     if ( nestedhvm_paging_mode_hap(v) )
         /* This will setup the initial np2m for the nested vCPU */
@@ -1467,9 +1464,6 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     regs->rsp = get_vvmcs(v, HOST_RSP);
     /* VM exit clears all bits except bit 1 */
     regs->rflags = X86_EFLAGS_MBS;
-
-    /* updating host cr0 to sync TS bit */
-    __vmwrite(HOST_CR0, v->arch.hvm.vmx.host_cr0);
 
     if ( cpu_has_vmx_virtual_intr_delivery )
         nvmx_update_apicv(v);
@@ -2458,17 +2452,12 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
         __vmread(VM_EXIT_INTR_INFO, &intr_info);
         vector = intr_info & INTR_INFO_VECTOR_MASK;
         /*
-         * decided by L0 and L1 exception bitmap, if the vetor is set by
-         * both, L0 has priority on #PF and #NM, L1 has priority on others
+         * decided by L0 and L1 exception bitmap, if the vector is set by
+         * both, L0 has priority on #PF, L1 has priority on others
          */
         if ( vector == X86_EXC_PF )
         {
             if ( paging_mode_hap(v->domain) )
-                nvcpu->nv_vmexit_pending = 1;
-        }
-        else if ( vector == X86_EXC_NM )
-        {
-            if ( v->fpu_dirtied )
                 nvcpu->nv_vmexit_pending = 1;
         }
         else if ( (intr_info & valid_mask) == valid_mask )

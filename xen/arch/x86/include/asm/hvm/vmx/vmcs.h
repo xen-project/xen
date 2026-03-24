@@ -149,8 +149,6 @@ struct vmx_vcpu {
     DECLARE_BITMAP(eoi_exit_bitmap, X86_IDT_VECTORS);
     struct pi_desc       pi_desc;
 
-    unsigned long        host_cr0;
-
     /* Do we need to tolerate a spurious EPT_MISCONFIG VM exit? */
     bool                 ept_spurious_misconfig;
 
