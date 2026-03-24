@@ -165,58 +165,6 @@ int cf_check nsvm_vcpu_reset(struct vcpu *v)
     return 0;
 }
 
-static uint64_t nestedsvm_fpu_vmentry(uint64_t n1cr0,
-    struct vmcb_struct *vvmcb,
-    struct vmcb_struct *n1vmcb, struct vmcb_struct *n2vmcb)
-{
-    uint64_t vcr0;
-
-    vcr0 = vvmcb->_cr0;
-    if ( !(n1cr0 & X86_CR0_TS) && (n1vmcb->_cr0 & X86_CR0_TS) )
-    {
-        /*
-         * svm_fpu_leave() run while l1 guest was running.
-         * Sync FPU state with l2 guest.
-         */
-        vcr0 |= X86_CR0_TS;
-        n2vmcb->_exception_intercepts |= (1U << X86_EXC_NM);
-    }
-    else if ( !(vcr0 & X86_CR0_TS) && (n2vmcb->_cr0 & X86_CR0_TS) )
-    {
-        /*
-         * svm_fpu_enter() run while l1 guest was running.
-         * Sync FPU state with l2 guest.
-         */
-        vcr0 &= ~X86_CR0_TS;
-        n2vmcb->_exception_intercepts &= ~(1U << X86_EXC_NM);
-    }
-
-    return vcr0;
-}
-
-static void nestedsvm_fpu_vmexit(struct vmcb_struct *n1vmcb,
-    struct vmcb_struct *n2vmcb, uint64_t n1cr0, uint64_t guest_cr0)
-{
-    if ( !(guest_cr0 & X86_CR0_TS) && (n2vmcb->_cr0 & X86_CR0_TS) )
-    {
-        /*
-         * svm_fpu_leave() run while l2 guest was running.
-         * Sync FPU state with l1 guest.
-         */
-        n1vmcb->_cr0 |= X86_CR0_TS;
-        n1vmcb->_exception_intercepts |= (1U << X86_EXC_NM);
-    }
-    else if ( !(n1cr0 & X86_CR0_TS) && (n1vmcb->_cr0 & X86_CR0_TS) )
-    {
-        /*
-         * svm_fpu_enter() run while l2 guest was running.
-         * Sync FPU state with l1 guest.
-         */
-        n1vmcb->_cr0 &= ~X86_CR0_TS;
-        n1vmcb->_exception_intercepts &= ~(1U << X86_EXC_NM);
-    }
-}
-
 static int nsvm_vcpu_hostsave(struct vcpu *v, unsigned int inst_len)
 {
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
@@ -246,7 +194,6 @@ static int nsvm_vcpu_hostsave(struct vcpu *v, unsigned int inst_len)
 static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
-    struct nestedsvm *svm = &vcpu_nestedsvm(v);
     struct vmcb_struct *n1vmcb, *n2vmcb;
     int rc;
 
@@ -281,8 +228,6 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
         gdprintk(XENLOG_ERR, "hvm_set_cr4 failed, rc: %u\n", rc);
 
     /* CR0 */
-    nestedsvm_fpu_vmexit(n1vmcb, n2vmcb,
-        svm->ns_cr0, v->arch.hvm.guest_cr[0]);
     v->arch.hvm.guest_cr[0] = n1vmcb->_cr0 | X86_CR0_PE;
     n1vmcb->rflags &= ~X86_EFLAGS_VM;
     rc = hvm_set_cr0(n1vmcb->_cr0 | X86_CR0_PE, true);
@@ -290,7 +235,6 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
         hvm_inject_hw_exception(X86_EXC_GP, 0);
     if ( rc != X86EMUL_OKAY )
         gdprintk(XENLOG_ERR, "hvm_set_cr0 failed, rc: %u\n", rc);
-    svm->ns_cr0 = v->arch.hvm.guest_cr[0];
 
     /* CR2 */
     v->arch.hvm.guest_cr[2] = n1vmcb->_cr2;
@@ -418,7 +362,6 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     struct vmcb_struct *ns_vmcb, *n1vmcb, *n2vmcb;
     vmcbcleanbits_t clean = {};
     int rc;
-    uint64_t cr0;
 
     ns_vmcb = nv->nv_vvmcx;
     n1vmcb = nv->nv_n1vmcx;
@@ -452,7 +395,6 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
      *   safed here.
      * The overhead comes from (ordered from highest to lowest):
      * - svm_ctxt_switch_to (CPU context switching)
-     * - svm_fpu_enter, svm_fpu_leave (lazy FPU switching)
      * - emulated CLGI (clears VINTR intercept)
      * - host clears VINTR intercept
      * Test results show that the overhead is high enough that the
@@ -551,10 +493,8 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
         gdprintk(XENLOG_ERR, "hvm_set_cr4 failed, rc: %u\n", rc);
 
     /* CR0 */
-    svm->ns_cr0 = v->arch.hvm.guest_cr[0];
-    cr0 = nestedsvm_fpu_vmentry(svm->ns_cr0, ns_vmcb, n1vmcb, n2vmcb);
     v->arch.hvm.guest_cr[0] = ns_vmcb->_cr0;
-    rc = hvm_set_cr0(cr0, true);
+    rc = hvm_set_cr0(ns_vmcb->_cr0, true);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(X86_EXC_GP, 0);
     if ( rc != X86EMUL_OKAY )
@@ -1304,11 +1244,6 @@ nestedsvm_check_intercepts(struct vcpu *v, struct cpu_user_regs *regs,
 
     case VMEXIT_INTR:
     case VMEXIT_NMI:
-        return NESTEDHVM_VMEXIT_HOST;
-    case VMEXIT_EXCEPTION_NM:
-        /* Host must handle lazy fpu context switching first.
-         * Then inject the VMEXIT if L1 guest intercepts this.
-         */
         return NESTEDHVM_VMEXIT_HOST;
 
     case VMEXIT_NPF:

@@ -104,38 +104,6 @@ static void cf_check svm_cpu_down(void)
     write_efer(read_efer() & ~EFER_SVME);
 }
 
-static void svm_fpu_enter(struct vcpu *v)
-{
-    struct vmcb_struct *n1vmcb = vcpu_nestedhvm(v).nv_n1vmcx;
-
-    vcpu_restore_fpu_lazy(v);
-    vmcb_set_exception_intercepts(
-        n1vmcb,
-        vmcb_get_exception_intercepts(n1vmcb) & ~(1U << X86_EXC_NM));
-}
-
-static void cf_check svm_fpu_leave(struct vcpu *v)
-{
-    struct vmcb_struct *n1vmcb = vcpu_nestedhvm(v).nv_n1vmcx;
-
-    ASSERT(!v->fpu_dirtied);
-    ASSERT(read_cr0() & X86_CR0_TS);
-
-    /*
-     * If the guest does not have TS enabled then we must cause and handle an
-     * exception on first use of the FPU. If the guest *does* have TS enabled
-     * then this is not necessary: no FPU activity can occur until the guest
-     * clears CR0.TS, and we will initialise the FPU when that happens.
-     */
-    if ( !(v->arch.hvm.guest_cr[0] & X86_CR0_TS) )
-    {
-        vmcb_set_exception_intercepts(
-            n1vmcb,
-            vmcb_get_exception_intercepts(n1vmcb) | (1U << X86_EXC_NM));
-        vmcb_set_cr0(n1vmcb, vmcb_get_cr0(n1vmcb) | X86_CR0_TS);
-    }
-}
-
 static void cf_check svm_update_guest_cr(
     struct vcpu *v, unsigned int cr, unsigned int flags)
 {
@@ -145,20 +113,6 @@ static void cf_check svm_update_guest_cr(
     switch ( cr )
     {
     case 0:
-    {
-        unsigned long hw_cr0_mask = 0;
-
-        if ( !(v->arch.hvm.guest_cr[0] & X86_CR0_TS) )
-        {
-            if ( v != current )
-            {
-                if ( !v->arch.fully_eager_fpu )
-                    hw_cr0_mask |= X86_CR0_TS;
-            }
-            else if ( vmcb_get_cr0(vmcb) & X86_CR0_TS )
-                svm_fpu_enter(v);
-        }
-
         if ( paging_mode_hap(v->domain) )
         {
             uint32_t intercepts = vmcb_get_cr_intercepts(vmcb);
@@ -169,12 +123,12 @@ static void cf_check svm_update_guest_cr(
                vmcb_set_cr_intercepts(vmcb, intercepts | CR_INTERCEPT_CR3_WRITE);
         }
 
-        value = v->arch.hvm.guest_cr[0] | hw_cr0_mask;
+        value = v->arch.hvm.guest_cr[0];
         if ( paging_mode_shadow(v->domain) )
             value |= X86_CR0_PG | X86_CR0_WP;
         vmcb_set_cr0(vmcb, value);
         break;
-    }
+
     case 2:
         vmcb_set_cr2(vmcb, v->arch.hvm.guest_cr[2]);
         break;
@@ -908,9 +862,6 @@ static void cf_check svm_ctxt_switch_from(struct vcpu *v)
      */
     if ( unlikely((read_efer() & EFER_SVME) == 0) )
         return;
-
-    if ( !v->arch.fully_eager_fpu )
-        svm_fpu_leave(v);
 
     svm_save_dr(v);
     svm_tsc_ratio_save(v);
@@ -1678,28 +1629,6 @@ static void svm_do_nested_pgfault(struct vcpu *v,
     domain_crash(v->domain);
 }
 
-static void cf_check svm_fpu_dirty_intercept(void)
-{
-    struct vcpu *v = current;
-    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
-    struct vmcb_struct *n1vmcb = vcpu_nestedhvm(v).nv_n1vmcx;
-
-    svm_fpu_enter(v);
-
-    if ( vmcb != n1vmcb )
-    {
-       /* Check if l1 guest must make FPU ready for the l2 guest */
-       if ( v->arch.hvm.guest_cr[0] & X86_CR0_TS )
-           hvm_inject_hw_exception(X86_EXC_NM, X86_EVENT_NO_EC);
-       else
-           vmcb_set_cr0(n1vmcb, vmcb_get_cr0(n1vmcb) & ~X86_CR0_TS);
-       return;
-    }
-
-    if ( !(v->arch.hvm.guest_cr[0] & X86_CR0_TS) )
-        vmcb_set_cr0(vmcb, vmcb_get_cr0(vmcb) & ~X86_CR0_TS);
-}
-
 static void svm_vmexit_do_cr_access(
     struct vmcb_struct *vmcb, struct cpu_user_regs *regs)
 {
@@ -2459,7 +2388,6 @@ static struct hvm_function_table __initdata_cf_clobber svm_function_table = {
     .update_guest_cr      = svm_update_guest_cr,
     .update_guest_efer    = svm_update_guest_efer,
     .cpuid_policy_changed = svm_cpuid_policy_changed,
-    .fpu_leave            = svm_fpu_leave,
     .set_guest_pat        = svm_set_guest_pat,
     .get_guest_pat        = svm_get_guest_pat,
     .set_tsc_offset       = svm_set_tsc_offset,
@@ -2469,7 +2397,6 @@ static struct hvm_function_table __initdata_cf_clobber svm_function_table = {
     .get_pending_event    = svm_get_pending_event,
     .invlpg               = svm_invlpg,
     .wbinvd_intercept     = svm_wbinvd_intercept,
-    .fpu_dirty_intercept  = svm_fpu_dirty_intercept,
     .msr_read_intercept   = svm_msr_read_intercept,
     .msr_write_intercept  = svm_msr_write_intercept,
 #ifdef CONFIG_VM_EVENT
@@ -2781,10 +2708,6 @@ void asmlinkage svm_vmexit_handler(void)
                 hvm_inject_exception(X86_EXC_BP, X86_ET_SW_EXC,
                                      insn_len, X86_EVENT_NO_EC);
         }
-        break;
-
-    case VMEXIT_EXCEPTION_NM:
-        svm_fpu_dirty_intercept();
         break;
 
     case VMEXIT_EXCEPTION_PF:
