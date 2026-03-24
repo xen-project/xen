@@ -157,7 +157,7 @@ void efi_rs_leave(struct efi_rs_state *state)
     irq_exit();
     efi_rs_on_cpu = NR_CPUS;
     spin_unlock(&efi_rs_lock);
-    vcpu_restore_fpu_nonlazy(curr, true);
+    vcpu_restore_fpu(curr);
 }
 
 bool efi_rs_using_pgtables(void)

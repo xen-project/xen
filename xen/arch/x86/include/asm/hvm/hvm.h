@@ -160,8 +160,6 @@ struct hvm_function_table {
 
     void (*cpuid_policy_changed)(struct vcpu *v);
 
-    void (*fpu_leave)(struct vcpu *v);
-
     int  (*get_guest_pat)(struct vcpu *v, uint64_t *gpat);
     int  (*set_guest_pat)(struct vcpu *v, uint64_t gpat);
 

@@ -194,12 +194,8 @@ static inline void fpu_fxsave(struct vcpu *v)
 /*       VCPU FPU Functions    */
 /*******************************/
 /* Restore FPU state whenever VCPU is schduled in. */
-void vcpu_restore_fpu_nonlazy(struct vcpu *v, bool need_stts)
+void vcpu_restore_fpu(struct vcpu *v)
 {
-    /* Restore nonlazy extended state (i.e. parts not tracked by CR0.TS). */
-    if ( !v->arch.fully_eager_fpu && !v->arch.nonlazy_xstate_used )
-        goto maybe_stts;
-
     ASSERT(!is_idle_vcpu(v));
 
     /* Avoid recursion */
@@ -210,27 +206,16 @@ void vcpu_restore_fpu_nonlazy(struct vcpu *v, bool need_stts)
      * above) we also need to restore full state, to prevent subsequently
      * saving state belonging to another vCPU.
      */
-    if ( v->arch.fully_eager_fpu || xstate_all(v) )
-    {
-        if ( cpu_has_xsave )
-            fpu_xrstor(v, XSTATE_ALL);
-        else
-            fpu_fxrstor(v);
-
-        v->fpu_initialised = 1;
-        v->fpu_dirtied = 1;
-
-        /* Xen doesn't need TS set, but the guest might. */
-        need_stts = is_pv_vcpu(v) && (v->arch.pv.ctrlreg[0] & X86_CR0_TS);
-    }
+    if ( cpu_has_xsave )
+        fpu_xrstor(v, XSTATE_ALL);
     else
-    {
-        fpu_xrstor(v, XSTATE_NONLAZY);
-        need_stts = true;
-    }
+        fpu_fxrstor(v);
 
- maybe_stts:
-    if ( need_stts )
+    v->fpu_initialised = 1;
+    v->fpu_dirtied = 1;
+
+    /* Xen doesn't need TS set, but the guest might. */
+    if ( is_pv_vcpu(v) && (v->arch.pv.ctrlreg[0] & X86_CR0_TS) )
         stts();
 }
 
@@ -273,8 +258,6 @@ void save_fpu_enable(void)
 /* Initialize FPU's context save area */
 int vcpu_init_fpu(struct vcpu *v)
 {
-    v->arch.fully_eager_fpu = true;
-
     return xstate_alloc_save_area(v);
 }
 

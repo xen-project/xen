@@ -27,7 +27,7 @@ struct ix87_env {
     uint16_t fds, _res6;
 };
 
-void vcpu_restore_fpu_nonlazy(struct vcpu *v, bool need_stts);
+void vcpu_restore_fpu(struct vcpu *v);
 void vcpu_save_fpu(struct vcpu *v);
 void save_fpu_enable(void);
 int vcpu_init_fpu(struct vcpu *v);
