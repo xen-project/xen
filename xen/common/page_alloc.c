@@ -169,7 +169,7 @@
 /*
  * Flags that are preserved in assign_pages() (and only there)
  */
-#define PGC_preserved (PGC_extra | PGC_static | PGC_colored | PGC_need_scrub)
+#define PGC_preserved (PGC_extra | PGC_static | PGC_colored)
 
 #ifndef PGT_TYPE_INFO_INITIALIZER
 #define PGT_TYPE_INFO_INITIALIZER 0
@@ -764,7 +764,7 @@ static void page_list_add_scrub(struct page_info *pg, unsigned int node,
 #endif
 #define SCRUB_BYTE_PATTERN   (SCRUB_PATTERN & 0xff)
 
-void scrub_one_page(const struct page_info *pg)
+static void scrub_one_page(const struct page_info *pg)
 {
     if ( unlikely(pg->count_info & PGC_broken) )
         return;
