@@ -411,6 +411,7 @@
 
 /* HSTR Hyp. System Trap Register */
 #define HSTR_T(x)       ((_AC(1,U)<<(x)))       /* Trap Cp15 c<x> */
+#define HSTR_TTEE       (_AC(1,U)<<16)          /* Trap ThumbEE */
 
 /* HDCR Hyp. Debug Configuration Register */
 #define HDCR_TDRA       (_AC(1,U)<<11)          /* Trap Debug ROM access */

@@ -211,7 +211,6 @@ struct arch_vcpu
     register_t hcr_el2;
     register_t mdcr_el2;
 
-    uint32_t teecr, teehbr; /* ThumbEE, 32-bit guests only */
 #ifdef CONFIG_ARM_32
     /*
      * ARMv8 only supports a trivial implementation on Jazelle when in AArch32
