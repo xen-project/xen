@@ -89,36 +89,13 @@ the hypervisors, and in different configurations.  Specifically:
 A populated Xen hypervisor file system might look like the following example:
 
     /
-        buildinfo/           directory containing build-time data
-            config           contents of .config file used to build Xen
-        cpu-bugs/            x86: directory of cpu bug information
-            l1tf             "Vulnerable" or "Not vulnerable"
-            mds              "Vulnerable" or "Not vulnerable"
-            meltdown         "Vulnerable" or "Not vulnerable"
-            spec-store-bypass "Vulnerable" or "Not vulnerable"
-            spectre-v1       "Vulnerable" or "Not vulnerable"
-            spectre-v2       "Vulnerable" or "Not vulnerable"
-            mitigations/     directory of mitigation settings
-                bti-thunk    "N/A", "RETPOLINE", "LFENCE" or "JMP"
-                spec-ctrl    "No", "IBRS+" or "IBRS-"
-                ibpb         "No" or "Yes"
-                l1d-flush    "No" or "Yes"
-                md-clear     "No" or "VERW"
-                l1tf-barrier "No" or "Yes"
-            active-hvm/      directory for mitigations active in hvm doamins
-                msr-spec-ctrl "No" or "Yes"
-                rsb          "No" or "Yes"
-                eager-fpu    "No" or "Yes"
-                md-clear     "No" or "Yes"
-            active-pv/       directory for mitigations active in pv doamins
-                msr-spec-ctrl "No" or "Yes"
-                rsb          "No" or "Yes"
-                eager-fpu    "No" or "Yes"
-                md-clear     "No" or "Yes"
-                xpti         "No" or list of "dom0", "domU", "PCID-on"
-                l1tf-shadow  "No" or list of "dom0", "domU"
-        params/              directory with hypervisor parameter values
-                             (boot/runtime parameters)
+      buildinfo/             directory containing build-time data
+        config               contents of .config file used to build Xen
+      cpupool/               directory containing CPU Pool data
+        0/                   directory for cpupool 0
+          sched-gran         "cpu", "core" or "socket"
+      params/                directory with hypervisor parameter values
+        loglvl               "none", "error", "warning", "info", "all"
 
 ## General Paths
 
