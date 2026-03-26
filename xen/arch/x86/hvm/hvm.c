@@ -1019,6 +1019,7 @@ unsigned long hvm_cr4_guest_valid_bits(const struct domain *d)
             (p->feat.pku      ? X86_CR4_PKE               : 0) |
             (cet              ? X86_CR4_CET               : 0) |
             (p->feat.pks      ? X86_CR4_PKS               : 0) |
+            (p->feat.lass     ? X86_CR4_LASS              : 0) |
             0);
 }
 
