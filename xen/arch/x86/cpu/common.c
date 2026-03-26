@@ -659,16 +659,20 @@ void identify_cpu(struct cpuinfo_x86 *c)
 			       smp_processor_id());
 	}
 
-	if (system_state == SYS_STATE_resume)
-		return;
+	if (system_state == SYS_STATE_resume) {
+		unsigned int cpu = smp_processor_id();
 
+		/* The BSP has this done right from enter_state(). */
+		if (cpu)
+			mcheck_init(&cpu_data[cpu], false);
+	}
 	/*
 	 * On SMP, boot_cpu_data holds the common feature set between
 	 * all CPUs; so make sure that we indicate which features are
 	 * common between the CPUs.  The first time this routine gets
 	 * executed, c == &boot_cpu_data.
 	 */
-	if ( c != &boot_cpu_data ) {
+	else if (c != &boot_cpu_data) {
 		/* AND the already accumulated flags with these */
 		for ( i = 0 ; i < NCAPINTS ; i++ )
 			boot_cpu_data.x86_capability[i] &= c->x86_capability[i];
