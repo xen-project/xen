@@ -227,6 +227,9 @@ static int __init create_domain_cpuinfo(void)
 #endif
     domain_cpuinfo.pfr32.amu = 0;
 
+    /* Hide ThumbEE support */
+    domain_cpuinfo.pfr32.thumbee = 0;
+
     /* Hide RAS support as Xen does not support it */
 #ifdef CONFIG_ARM_64
     domain_cpuinfo.pfr64.ras = 0;
