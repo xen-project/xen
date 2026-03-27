@@ -1362,6 +1362,23 @@ out:
     unit_schedule_unlock_irq(lock, unit);
 }
 
+static int
+rt_validate_params(const struct xen_domctl_sched_rtds *rtds,
+                   s_time_t *period, s_time_t *budget)
+{
+    s_time_t p = MICROSECS(rtds->period);
+    s_time_t b = MICROSECS(rtds->budget);
+
+    if ( p < RTDS_MIN_PERIOD || p > RTDS_MAX_PERIOD ||
+         b < RTDS_MIN_BUDGET || b > p )
+        return -EINVAL;
+
+    *period = p;
+    *budget = b;
+
+    return 0;
+}
+
 /*
  * set/get each unit info of each domain
  */
@@ -1388,17 +1405,16 @@ rt_dom_cntl(
         op->u.rtds.budget = RTDS_DEFAULT_BUDGET / MICROSECS(1);
         break;
     case XEN_DOMCTL_SCHEDOP_putinfo:
-        if ( op->u.rtds.period == 0 || op->u.rtds.budget == 0 )
-        {
-            rc = -EINVAL;
+        rc = rt_validate_params(&op->u.rtds, &period, &budget);
+        if ( rc )
             break;
-        }
+
         spin_lock_irqsave(&prv->lock, flags);
         for_each_sched_unit ( d, unit )
         {
             svc = rt_unit(unit);
-            svc->period = MICROSECS(op->u.rtds.period); /* transfer to nanosec */
-            svc->budget = MICROSECS(op->u.rtds.budget);
+            svc->period = period;
+            svc->budget = budget;
         }
         spin_unlock_irqrestore(&prv->lock, flags);
         break;
@@ -1440,14 +1456,9 @@ rt_dom_cntl(
             }
             else
             {
-                period = MICROSECS(local_sched.u.rtds.period);
-                budget = MICROSECS(local_sched.u.rtds.budget);
-                if ( period > RTDS_MAX_PERIOD || budget < RTDS_MIN_BUDGET ||
-                     budget > period || period < RTDS_MIN_PERIOD )
-                {
-                    rc = -EINVAL;
+                rc = rt_validate_params(&local_sched.u.rtds, &period, &budget);
+                if ( rc )
                     break;
-                }
 
                 spin_lock_irqsave(&prv->lock, flags);
                 svc = rt_unit(d->vcpu[local_sched.vcpuid]->sched_unit);
