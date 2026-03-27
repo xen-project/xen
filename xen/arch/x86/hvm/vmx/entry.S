@@ -22,7 +22,7 @@
 #include <asm/page.h>
 
 FUNC(vmx_asm_vmexit_handler)
-        SAVE_ALL
+        PUSH_AND_CLEAR_GPRS
 
         mov  %cr2,%rax
         GET_CURRENT(bx)
@@ -157,7 +157,7 @@ UNLIKELY_END(realmode)
 
 .Lvmx_vmentry_fail:
         sti
-        SAVE_ALL
+        PUSH_AND_CLEAR_GPRS
 
         /*
          * SPEC_CTRL_ENTRY notes

@@ -89,7 +89,7 @@ __UNLIKELY_END(nsvm_hap)
 
         vmrun
 
-        SAVE_ALL
+        PUSH_AND_CLEAR_GPRS
 
         GET_CURRENT(bx)
 
