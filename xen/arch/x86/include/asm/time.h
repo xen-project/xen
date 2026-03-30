@@ -50,7 +50,12 @@ void force_update_vcpu_system_time(struct vcpu *v);
 
 bool clocksource_is_tsc(void);
 int host_tsc_is_safe(void);
-u64 stime2tsc(s_time_t stime);
+
+/*
+ * Note: This function "caps" times ahead of the local CPU's stime stamp,
+ * supplying the corresponding TSC stamp in that case.
+ */
+uint64_t stime2tsc(s_time_t stime);
 
 struct time_scale;
 void set_time_scale(struct time_scale *ts, u64 ticks_per_sec);

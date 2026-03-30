@@ -1176,20 +1176,26 @@ uint64_t __init calibrate_apic_timer(void)
     return elapsed * CALIBRATE_FRAC;
 }
 
-u64 stime2tsc(s_time_t stime)
+uint64_t stime2tsc(s_time_t stime)
 {
-    struct cpu_time *t;
-    struct time_scale sys_to_tsc;
-    s_time_t stime_delta;
+    const struct cpu_time *t = &this_cpu(cpu_time);
+    s_time_t stime_delta = stime - t->stamp.local_stime;
+    uint64_t delta = 0;
 
-    t = &this_cpu(cpu_time);
-    sys_to_tsc = scale_reciprocal(t->tsc_scale);
+    /*
+     * While for reprogram_timer() the capping at 0 isn't relevant (the returned
+     * value is likely in the past anyway then, by the time it is used), for
+     * cstate_restore_tsc() this is relevant: We need to avoid moving the TSC
+     * backwards (relative to when it may last have been read).
+     */
+    if ( stime_delta > 0 )
+    {
+        struct time_scale sys_to_tsc = scale_reciprocal(t->tsc_scale);
 
-    stime_delta = stime - t->stamp.local_stime;
-    if ( stime_delta < 0 )
-        stime_delta = 0;
+        delta = scale_delta(stime_delta, &sys_to_tsc);
+    }
 
-    return t->stamp.local_tsc + scale_delta(stime_delta, &sys_to_tsc);
+    return t->stamp.local_tsc + delta;
 }
 
 void cstate_restore_tsc(void)
