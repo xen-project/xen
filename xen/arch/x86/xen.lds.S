@@ -113,11 +113,7 @@ SECTIONS
        __ro_after_init_start = .;
        *(.data.ro_after_init)
 
-       . = ALIGN(8);
-       /* Exception table */
-       __start___ex_table = .;
-       *(.ex_table)
-       __stop___ex_table = .;
+       EX_TABLE
 
        . = ALIGN(PAGE_SIZE);
        __ro_after_init_end = .;

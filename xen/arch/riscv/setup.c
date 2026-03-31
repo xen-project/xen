@@ -19,6 +19,7 @@
 
 #include <public/version.h>
 
+#include <asm/extable.h>
 #include <asm/cpufeature.h>
 #include <asm/early_printk.h>
 #include <asm/fixmap.h>
@@ -80,6 +81,8 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
     remove_identity_mapping();
 
     smp_prepare_boot_cpu();
+
+    sort_exception_tables();
 
     set_cpuid_to_hartid(0, bootcpu_id);
 

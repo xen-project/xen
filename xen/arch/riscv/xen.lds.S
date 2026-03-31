@@ -74,6 +74,9 @@ SECTIONS
     .data.ro_after_init : {
         __ro_after_init_start = .;
         *(.data.ro_after_init)
+
+        EX_TABLE
+
         . = ALIGN(PAGE_SIZE);
         __ro_after_init_end = .;
     } : text

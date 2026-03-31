@@ -3,6 +3,7 @@ obj-y += cpufeature.o
 obj-y += domain.o
 obj-$(CONFIG_EARLY_PRINTK) += early_printk.o
 obj-y += entry.o
+obj-y += extable.o
 obj-y += imsic.o
 obj-y += intc.o
 obj-y += irq.o

@@ -9,6 +9,8 @@
 
 #ifndef __ASSEMBLER__
 
+#include <asm/extable.h>
+
 #define BUG_INSTR "unimp"
 
 /*

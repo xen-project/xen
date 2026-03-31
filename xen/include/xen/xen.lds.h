@@ -219,4 +219,10 @@
 #define VPCI_ARRAY
 #endif
 
+#define EX_TABLE                  \
+        . = ALIGN(4);             \
+        __start___ex_table = .;   \
+        *(.ex_table)              \
+        __stop___ex_table = .;
+
 #endif /* __XEN_LDS_H__ */

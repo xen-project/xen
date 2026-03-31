@@ -12,6 +12,7 @@
 #include <xen/sched.h>
 #include <xen/softirq.h>
 
+#include <asm/extable.h>
 #include <asm/cpufeature.h>
 #include <asm/intc.h>
 #include <asm/processor.h>
@@ -217,6 +218,10 @@ void do_trap(struct cpu_user_regs *cpu_regs)
 
             break;
         }
+
+        if ( fixup_exception(cpu_regs) )
+            break;
+
         fallthrough;
     default:
         if ( cause & CAUSE_IRQ_FLAG )
