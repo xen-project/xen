@@ -6,8 +6,10 @@
 #ifndef ASM__RISCV__CSR_H
 #define ASM__RISCV__CSR_H
 
-#include <asm/asm.h>
 #include <xen/const.h>
+
+#include <asm/asm.h>
+#include <asm/extable.h>
 #include <asm/riscv_encoding.h>
 
 #ifndef __ASSEMBLER__
@@ -77,6 +79,37 @@
                            : "rK" (__v)                         \
                            : "memory" );                        \
 })
+
+static always_inline bool csr_read_safe(unsigned long csr,
+                                        unsigned long *val)
+{
+#ifdef CONFIG_CC_HAS_ASM_GOTO_OUTPUT
+    asm_inline goto (
+        "1: csrr %[val], %[csr]\n"
+        ASM_EXTABLE(1b, %l[fault])
+        : [val] "=r" (*val)
+        : [csr] "i" (csr)
+        :
+        : fault );
+
+    return true;
+
+ fault:
+    return false;
+#else
+    bool allowed = false;
+
+    asm_inline volatile (
+        "1: csrr %[val], %[csr]\n"
+        "   li %[allowed], 1\n"
+        "2:\n"
+        ASM_EXTABLE(1b, 2b)
+        : [val] "=&r" (*val), [allowed] "+r" (allowed)
+        : [csr] "i" (csr) );
+
+    return allowed;
+#endif
+}
 
 #endif /* __ASSEMBLER__ */
 
