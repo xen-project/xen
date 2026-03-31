@@ -3,6 +3,18 @@ variables:
   SELECTED_JOBS_ONLY:
     description: "Regex to select only some jobs, must be enclosed with /. For example /job1|job2/"
     value: "/.*/"
+  ARTIFACTS_REPO:
+    description: "Path to the test-artifacts repo"
+    value: xen-project/hardware/test-artifacts
+  ARTIFACTS_BRANCH:
+    description: "Branch in test-artifacts to use"
+    value: master
+  LINUX_JOB_X86_64:
+    description: "Job name in test-artifacts to use for Linux x86_64"
+    value: linux-6.6.56-x86_64
+  LINUX_JOB_ARM64:
+    description: "Job name in test-artifacts to use for Linux arm64"
+    value: linux-6.6.86-arm64
 
 workflow:
   name: "$CI_PIPELINE_SCHEDULE_DESCRIPTION"
