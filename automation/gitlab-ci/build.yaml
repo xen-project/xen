@@ -13,6 +13,14 @@
     when: always
   needs: []
   rules:
+    - if: $BUILD_FOR_TESTS_ONLY
+      when: never
+    - if: $CI_JOB_NAME =~ $SELECTED_JOBS_ONLY
+      when: on_success
+
+# override BUILD_FOR_TESTS_ONLY exclusion
+.build-test-tpl: &build-test
+  rules:
     - if: $CI_JOB_NAME =~ $SELECTED_JOBS_ONLY
       when: on_success
 
@@ -296,11 +304,13 @@ qemu-system-aarch64-6.0.0-arm32-export:
 
 alpine-3.18-gcc:
   extends: .gcc-x86-64-build
+  <<: *build-test
   variables:
     CONTAINER: alpine:3.18
 
 alpine-3.18-gcc-debug:
   extends: .gcc-x86-64-build-debug
+  <<: *build-test
   variables:
     CONTAINER: alpine:3.18
     BUILD_QEMU_XEN: y
@@ -315,16 +325,19 @@ alpine-3.18-gcc-debug:
 
 debian-13-x86_64-gcc-debug:
   extends: .gcc-x86-64-build-debug
+  <<: *build-test
   variables:
     CONTAINER: debian:13-x86_64
 
 debian-13-x86_64-clang-debug:
   extends: .clang-x86-64-build-debug
+  <<: *build-test
   variables:
     CONTAINER: debian:13-x86_64
 
 debian-13-ppc64le-gcc-debug:
   extends: .gcc-ppc64le-cross-build-debug
+  <<: *build-test
   variables:
     CONTAINER: debian:13-ppc64le
     KBUILD_DEFCONFIG: ppc64_defconfig
@@ -335,6 +348,7 @@ debian-13-ppc64le-gcc-debug:
 
 debian-13-riscv64-gcc-debug:
   extends: .gcc-riscv64-cross-build-debug
+  <<: *build-test
   variables:
     CONTAINER: debian:13-riscv64
     KBUILD_DEFCONFIG: tiny64_defconfig
@@ -347,12 +361,14 @@ debian-13-riscv64-gcc-debug:
 
 debian-bookworm-gcc-arm32:
   extends: .gcc-arm32-cross-build
+  <<: *build-test
   variables:
     CONTAINER: debian:bookworm-arm64v8-arm32-gcc
     HYPERVISOR_ONLY: y
 
 debian-bookworm-gcc-arm32-debug:
   extends: .gcc-arm32-cross-build-debug
+  <<: *build-test
   variables:
     CONTAINER: debian:bookworm-arm64v8-arm32-gcc
     HYPERVISOR_ONLY: y
@@ -366,6 +382,7 @@ debian-bookworm-gcc-arm32-randconfig:
 
 debian-bookworm-gcc-arm32-debug-staticmem:
   extends: .gcc-arm32-cross-build-debug
+  <<: *build-test
   variables:
     CONTAINER: debian:bookworm-arm64v8-arm32-gcc
     HYPERVISOR_ONLY: y
@@ -376,6 +393,7 @@ debian-bookworm-gcc-arm32-debug-staticmem:
 
 debian-bookworm-gcc-arm32-debug-earlyprintk:
   extends: .gcc-arm32-cross-build-debug
+  <<: *build-test
   variables:
     CONTAINER: debian:bookworm-arm64v8-arm32-gcc
     HYPERVISOR_ONLY: y
@@ -407,11 +425,13 @@ debian-bookworm-gcc-debug-arm64:
 
 alpine-3.18-gcc-arm64:
   extends: .gcc-arm64-build
+  <<: *build-test
   variables:
     CONTAINER: alpine:3.18-arm64v8
 
 alpine-3.18-gcc-debug-arm64:
   extends: .gcc-arm64-build-debug
+  <<: *build-test
   variables:
     CONTAINER: alpine:3.18-arm64v8
     EXTRA_XEN_CONFIG: |
@@ -426,6 +446,7 @@ alpine-3.18-gcc-arm64-randconfig:
 
 alpine-3.18-gcc-debug-arm64-staticmem:
   extends: .gcc-arm64-build-debug
+  <<: *build-test
   variables:
     CONTAINER: alpine:3.18-arm64v8
     EXTRA_XEN_CONFIG: |
@@ -435,6 +456,7 @@ alpine-3.18-gcc-debug-arm64-staticmem:
 
 alpine-3.18-gcc-debug-arm64-static-shared-mem:
   extends: .gcc-arm64-build-debug
+  <<: *build-test
   variables:
     CONTAINER: alpine:3.18-arm64v8
     EXTRA_XEN_CONFIG: |
@@ -444,6 +466,7 @@ alpine-3.18-gcc-debug-arm64-static-shared-mem:
 
 alpine-3.18-gcc-debug-arm64-boot-cpupools:
   extends: .gcc-arm64-build-debug
+  <<: *build-test
   variables:
     CONTAINER: alpine:3.18-arm64v8
     EXTRA_XEN_CONFIG: |
@@ -451,6 +474,7 @@ alpine-3.18-gcc-debug-arm64-boot-cpupools:
 
 alpine-3.18-gcc-debug-arm64-earlyprintk:
   extends: .gcc-arm64-build-debug
+  <<: *build-test
   variables:
     CONTAINER: alpine:3.18-arm64v8
     EXTRA_XEN_CONFIG: |

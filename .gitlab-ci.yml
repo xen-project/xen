@@ -3,6 +3,8 @@ variables:
   SELECTED_JOBS_ONLY:
     description: "Regex to select only some jobs, must be enclosed with /. For example /job1|job2/"
     value: "/.*/"
+  BUILD_FOR_TESTS_ONLY:
+    description: "Include only build jobs necessary for running tests"
   ARTIFACTS_REPO:
     description: "Path to the test-artifacts repo"
     value: xen-project/hardware/test-artifacts
