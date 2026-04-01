@@ -27,7 +27,7 @@ static int __init nwl_cfg_reg_index(struct dt_device_node *np)
 }
 
 /* ECAM ops */
-const struct pci_ecam_ops nwl_pcie_ops = {
+static const struct pci_ecam_ops nwl_pcie_ops = {
     .bus_shift  = 20,
     .cfg_reg_index = nwl_cfg_reg_index,
     .pci_ops    = {

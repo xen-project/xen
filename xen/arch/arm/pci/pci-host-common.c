@@ -158,7 +158,7 @@ err_exit:
     return NULL;
 }
 
-struct pci_host_bridge *pci_alloc_host_bridge(void)
+static struct pci_host_bridge *pci_alloc_host_bridge(void)
 {
     struct pci_host_bridge *bridge = xzalloc(struct pci_host_bridge);
 
@@ -170,7 +170,7 @@ struct pci_host_bridge *pci_alloc_host_bridge(void)
     return bridge;
 }
 
-void pci_add_host_bridge(struct pci_host_bridge *bridge)
+static void pci_add_host_bridge(struct pci_host_bridge *bridge)
 {
     list_add_tail(&bridge->node, &pci_host_bridges);
 }

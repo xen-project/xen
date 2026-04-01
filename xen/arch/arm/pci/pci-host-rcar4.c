@@ -13,6 +13,7 @@
 #include <asm/pci.h>
 
 #include "pci-designware.h"
+#include "pci-host-rcar4.h"
 
 #define RCAR4_DWC_VERSION       0x520A
 
@@ -61,7 +62,7 @@ static int __init rcar4_child_cfg_reg_index(struct dt_device_node *np)
 }
 
 /* ECAM ops */
-const struct pci_ecam_ops rcar4_pcie_ops = {
+static const struct pci_ecam_ops rcar4_pcie_ops = {
     .bus_shift  = 20,
     .cfg_reg_index = rcar4_cfg_reg_index,
     .pci_ops    = {
@@ -73,7 +74,7 @@ const struct pci_ecam_ops rcar4_pcie_ops = {
     }
 };
 
-const struct pci_ecam_ops rcar4_pcie_child_ops = {
+static const struct pci_ecam_ops rcar4_pcie_child_ops = {
     .bus_shift  = 20,
     .cfg_reg_index = rcar4_child_cfg_reg_index,
     .pci_ops    = {
