@@ -31,10 +31,10 @@
 #include <asm/tee/tee.h>
 #include <asm/vfp.h>
 #include <asm/vgic.h>
+#include <asm/vpci.h>
 #include <asm/vpsci.h>
 #include <asm/vtimer.h>
 
-#include "vpci.h"
 #include "vuart.h"
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
