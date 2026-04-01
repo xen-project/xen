@@ -447,18 +447,18 @@ static int __init acpi_create_fadt(struct domain *d, struct membank tbl_add[])
 static int __init estimate_acpi_efi_size(struct domain *d,
                                          const struct kernel_info *kinfo)
 {
-    size_t efi_size, acpi_size, madt_size;
+    size_t efi_size, acpi_len, madt_size;
     u64 addr;
     struct acpi_table_rsdp *rsdp_tbl;
     struct acpi_table_header *table;
 
     efi_size = estimate_efi_size(kernel_info_get_mem_const(kinfo)->nr_banks);
 
-    acpi_size = ROUNDUP(sizeof(struct acpi_table_fadt), 8);
-    acpi_size += ROUNDUP(sizeof(struct acpi_table_stao), 8);
+    acpi_len = ROUNDUP(sizeof(struct acpi_table_fadt), 8);
+    acpi_len += ROUNDUP(sizeof(struct acpi_table_stao), 8);
 
     madt_size = gic_get_hwdom_madt_size(d);
-    acpi_size += ROUNDUP(madt_size, 8);
+    acpi_len += ROUNDUP(madt_size, 8);
 
     addr = acpi_os_get_root_pointer();
     if ( !addr )
@@ -484,12 +484,12 @@ static int __init estimate_acpi_efi_size(struct domain *d,
     }
 
     /* Add place for STAO table in XSDT table */
-    acpi_size += ROUNDUP(table->length + sizeof(u64), 8);
+    acpi_len += ROUNDUP(table->length + sizeof(u64), 8);
     acpi_os_unmap_memory(table, sizeof(struct acpi_table_header));
 
-    acpi_size += ROUNDUP(sizeof(struct acpi_table_rsdp), 8);
+    acpi_len += ROUNDUP(sizeof(struct acpi_table_rsdp), 8);
     d->arch.efi_acpi_len = PAGE_ALIGN(ROUNDUP(efi_size, 8)
-                                      + ROUNDUP(acpi_size, 8));
+                                      + ROUNDUP(acpi_len, 8));
 
     return 0;
 }
