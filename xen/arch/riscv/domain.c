@@ -42,10 +42,10 @@ struct csr_masks {
 
 static struct csr_masks __ro_after_init csr_masks;
 
-#define HEDELEG_AVAIL_MASK ULONG_MAX
-#define HIDELEG_AVAIL_MASK ULONG_MAX
-#define HENVCFG_AVAIL_MASK _UL(0xE0000003000000FF)
-#define HSTATEEN0_AVAIL_MASK _UL(0xDE00000000000007)
+#define HEDELEG_VALID_MASK ULONG_MAX
+#define HIDELEG_VALID_MASK ULONG_MAX
+#define HENVCFG_VALID_MASK 0xe0000003000000ffUL
+#define HSTATEEN0_VALID_MASK 0xde00000000000007UL
 
 void __init init_csr_masks(void)
 {
@@ -57,25 +57,26 @@ void __init init_csr_masks(void)
      * fields that must be preserved. Any write to the full register must
      * therefore retain the original values of those fields.
      */
-#define INIT_CSR_MASK(csr, field, mask) do { \
-        register_t old = csr_read_set(CSR_ ## csr, mask); \
+#define INIT_CSR_MASK(csr, field) do { \
+        register_t old = csr_read_set(CSR_ ## csr, csr ## _VALID_MASK); \
         csr_masks.field = csr_swap(CSR_ ## csr, old); \
     } while (0)
 
-#define INIT_RO_ONE_MASK(csr, field, mask) do { \
-        register_t old = csr_read_clear(CSR_ ## csr, mask); \
-        csr_masks.ro_one.field = csr_swap(CSR_ ## csr, old) & mask; \
+#define INIT_RO_ONE_MASK(csr, field) do { \
+        register_t old = csr_read_clear(CSR_ ## csr, csr ## _VALID_MASK); \
+        csr_masks.ro_one.field = csr_swap(CSR_ ## csr, old) & \
+                                 csr ## _VALID_MASK; \
     } while (0)
 
-    INIT_CSR_MASK(HEDELEG, hedeleg, HEDELEG_AVAIL_MASK);
-    INIT_CSR_MASK(HIDELEG, hideleg, HIDELEG_AVAIL_MASK);
+    INIT_CSR_MASK(HEDELEG, hedeleg);
+    INIT_CSR_MASK(HIDELEG, hideleg);
 
-    INIT_CSR_MASK(HENVCFG, henvcfg, HENVCFG_AVAIL_MASK);
+    INIT_CSR_MASK(HENVCFG, henvcfg);
 
     if ( riscv_isa_extension_available(NULL, RISCV_ISA_EXT_smstateen) )
     {
-        INIT_CSR_MASK(HSTATEEN0, hstateen0, HSTATEEN0_AVAIL_MASK);
-        INIT_RO_ONE_MASK(HSTATEEN0, hstateen0, HSTATEEN0_AVAIL_MASK);
+        INIT_CSR_MASK(HSTATEEN0, hstateen0);
+        INIT_RO_ONE_MASK(HSTATEEN0, hstateen0);
     }
 
 #undef INIT_CSR_MASK
