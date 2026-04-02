@@ -838,7 +838,7 @@ void __init shm_mem_node_fill_reg_range(const struct kernel_info *kinfo,
         paddr_t size = mem->bank[i].size;
 
         *nr_cells += addrcells + sizecells;
-        BUG_ON(*nr_cells >= DT_MEM_NODE_REG_RANGE_SIZE);
+        BUG_ON(*nr_cells > DT_MEM_NODE_REG_RANGE_SIZE);
         dt_child_set_range(&cells, addrcells, sizecells, start, size);
     }
 }
