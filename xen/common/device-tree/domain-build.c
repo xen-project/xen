@@ -494,7 +494,7 @@ int __init make_memory_node(const struct kernel_info *kinfo, int addrcells,
             continue;
 
         nr_cells += reg_size;
-        BUG_ON(nr_cells >= ARRAY_SIZE(reg));
+        BUG_ON(nr_cells > ARRAY_SIZE(reg));
         dt_child_set_range(&cells, addrcells, sizecells, start, size);
     }
 
