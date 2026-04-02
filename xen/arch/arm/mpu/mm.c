@@ -596,13 +596,13 @@ void free_init_memory(void)
 void __iomem *ioremap_attr(paddr_t start, size_t len, unsigned int flags)
 {
     paddr_t start_pg = round_pgdown(start);
-    paddr_t end_pg = round_pgup(start_pg + len);
+    paddr_t end_pg = round_pgup(start + len);
 
     if ( xen_mpumap_update(start_pg, end_pg, flags) )
         return NULL;
 
     /* Mapped or already mapped */
-    return maddr_to_virt(start_pg);
+    return maddr_to_virt(start);
 }
 
 /*
