@@ -581,6 +581,31 @@ static char * __init split_string(char *s)
     return NULL;
 }
 
+static void __init pre_parse(const struct file *file)
+{
+    char *ptr = file->str, *end = ptr + file->size;
+    bool start = true, comment = false;
+
+    for ( ; ptr < end; ++ptr )
+    {
+        if ( iscntrl(*ptr) )
+        {
+            comment = false;
+            start = true;
+            *ptr = 0;
+        }
+        else if ( comment || (start && isspace(*ptr)) )
+            *ptr = 0;
+        else if ( *ptr == '#' || (start && *ptr == ';') )
+        {
+            comment = true;
+            *ptr = 0;
+        }
+        else
+            start = 0;
+    }
+}
+
 static char *__init get_value(const struct file *file, const char *section,
                               const char *item)
 {
@@ -902,31 +927,6 @@ static bool __init read_section(const EFI_LOADED_IMAGE *image,
     handle_file_info(name, file, options);
 
     return true;
-}
-
-static void __init pre_parse(const struct file *file)
-{
-    char *ptr = file->str, *end = ptr + file->size;
-    bool start = true, comment = false;
-
-    for ( ; ptr < end; ++ptr )
-    {
-        if ( iscntrl(*ptr) )
-        {
-            comment = false;
-            start = true;
-            *ptr = 0;
-        }
-        else if ( comment || (start && isspace(*ptr)) )
-            *ptr = 0;
-        else if ( *ptr == '#' || (start && *ptr == ';') )
-        {
-            comment = true;
-            *ptr = 0;
-        }
-        else
-            start = 0;
-    }
 }
 
 static void __init init_secure_boot_mode(void)
