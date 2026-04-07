@@ -65,8 +65,8 @@
         printk(lvl "ipmmu: %s: " fmt, dev_name((dev)), ## __VA_ARGS__);  \
     else                                                                \
     {                                                                   \
-        struct pci_dev *pdev = dev_to_pci((dev));                       \
-        printk(lvl "ipmmu: %pp: " fmt, &pdev->sbdf, ## __VA_ARGS__);     \
+        struct pci_dev *pci_dev = dev_to_pci((dev));                       \
+        printk(lvl "ipmmu: %pp: " fmt, &pci_dev->sbdf, ## __VA_ARGS__);     \
     }                                                                   \
 })
 #endif
@@ -1171,8 +1171,6 @@ static int ipmmu_assign_device(struct domain *d, u8 devfn, struct device *dev,
         /* dom_io is used as a sentinel for quarantined devices */
         if ( d == dom_io )
         {
-            int ret;
-
             /*
              * Try to de-assign: do not return error if it was already
              * de-assigned.
