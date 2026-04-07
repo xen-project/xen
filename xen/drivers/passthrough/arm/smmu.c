@@ -130,8 +130,8 @@ typedef enum irqreturn irqreturn_t;
         printk(lvl "smmu: %s: " fmt, dev_name((dev)), ## __VA_ARGS__);  \
     else                                                                \
     {                                                                   \
-        struct pci_dev *pdev = dev_to_pci((dev));                       \
-        printk(lvl "smmu: %pp: " fmt, &pdev->sbdf, ## __VA_ARGS__);     \
+        struct pci_dev *pci_dev = dev_to_pci((dev));                    \
+        printk(lvl "smmu: %pp: " fmt, &pci_dev->sbdf, ## __VA_ARGS__);  \
     }                                                                   \
 })
 #endif
@@ -927,7 +927,6 @@ static int arm_smmu_dt_add_device_generic(u8 devfn, struct device *dev)
 	if ( dev_is_pci(dev) )
 	{
 		struct pci_dev *pdev = dev_to_pci(dev);
-		int ret;
 
 		/* Ignore calls for phantom functions */
 		if ( devfn != pdev->devfn )
@@ -2788,7 +2787,7 @@ static int arm_smmu_assign_dev(struct domain *d, u8 devfn,
 		/* dom_io is used as a sentinel for quarantined devices */
 		if ( d == dom_io )
 		{
-			struct iommu_domain *domain = dev_iommu_domain(dev);
+			domain = dev_iommu_domain(dev);
 			if ( !iommu_quarantine )
 				return 0;
 
