@@ -1463,7 +1463,7 @@ static int gicv3_iomem_deny_access(struct domain *d)
 
     mfn = dbase >> PAGE_SHIFT;
     nr = PFN_UP(SZ_64K);
-    rc = iomem_deny_access(d, mfn, mfn + nr);
+    rc = iomem_deny_access(d, mfn, mfn + nr - 1);
     if ( rc )
         return rc;
 
@@ -1475,7 +1475,7 @@ static int gicv3_iomem_deny_access(struct domain *d)
     {
         mfn = gicv3.rdist_regions[i].base >> PAGE_SHIFT;
         nr = PFN_UP(gicv3.rdist_regions[i].size);
-        rc = iomem_deny_access(d, mfn, mfn + nr);
+        rc = iomem_deny_access(d, mfn, mfn + nr - 1);
         if ( rc )
             return rc;
     }
@@ -1484,7 +1484,7 @@ static int gicv3_iomem_deny_access(struct domain *d)
     {
         mfn = cbase >> PAGE_SHIFT;
         nr = PFN_UP(csize);
-        rc = iomem_deny_access(d, mfn, mfn + nr);
+        rc = iomem_deny_access(d, mfn, mfn + nr - 1);
         if ( rc )
             return rc;
     }
@@ -1493,7 +1493,7 @@ static int gicv3_iomem_deny_access(struct domain *d)
     {
         mfn = vbase >> PAGE_SHIFT;
         nr = PFN_UP(csize);
-        return iomem_deny_access(d, mfn, mfn + nr);
+        return iomem_deny_access(d, mfn, mfn + nr - 1);
     }
 
     return 0;
