@@ -48,7 +48,7 @@ static int __init acpi_iomem_deny_access(struct domain *d)
     {
         mfn = spcr->serial_port.address >> PAGE_SHIFT;
         /* Deny MMIO access for UART */
-        rc = iomem_deny_access(d, mfn, mfn + 1);
+        rc = iomem_deny_access(d, mfn, mfn);
         if ( rc )
             return rc;
     }
