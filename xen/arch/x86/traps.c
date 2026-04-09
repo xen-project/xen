@@ -1338,7 +1338,7 @@ void asmlinkage do_trap(struct cpu_user_regs *regs)
 
 void asmlinkage do_invalid_op(struct cpu_user_regs *regs)
 {
-    u8 bug_insn[2];
+    uint8_t bug_insn;
     const void *eip = (const void *)regs->rip;
     int id;
 
@@ -1350,8 +1350,8 @@ void asmlinkage do_invalid_op(struct cpu_user_regs *regs)
     }
 
     if ( !is_active_kernel_text(regs->rip) ||
-         copy_from_unsafe(bug_insn, eip, sizeof(bug_insn)) ||
-         memcmp(bug_insn, "\xf\xb", sizeof(bug_insn)) )
+         copy_from_unsafe(&bug_insn, eip, sizeof(bug_insn)) ||
+         bug_insn != 0xd6 /* UDB */ )
         goto die;
 
     id = do_bug_frame(regs, regs->rip);

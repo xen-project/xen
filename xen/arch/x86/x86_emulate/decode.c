@@ -652,7 +652,7 @@ decode_onebyte(struct x86_emulate_state *s,
     case 0xce: /* into */
     case 0xd4: /* aam */
     case 0xd5: /* aad */
-    case 0xd6: /* salc */
+    case 0xd6: /* salc / udb */
         s->not_64bit = true;
         break;
 

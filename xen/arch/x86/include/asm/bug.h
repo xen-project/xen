@@ -21,7 +21,7 @@
 
 #ifndef __ASSEMBLER__
 
-#define BUG_INSTR       "ud2"
+#define BUG_INSTR       ".byte 0xd6" /* UDB, requiring gas 2.46 */
 #define BUG_ASM_CONST   "c"
 
 #else  /* !__ASSEMBLER__ */
@@ -37,7 +37,7 @@
         .error "Invalid BUGFRAME index"
     .endif
 
-    .L\@ud: ud2a
+    .L\@ud: .byte 0xd6 /* UDB, requiring gas 2.46 */
 
     .pushsection .rodata.str1, "aMS", @progbits, 1
          .L\@s1: .asciz "\file_str"
