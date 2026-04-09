@@ -1951,9 +1951,8 @@ static void load_segments(struct vcpu *n)
  * changes to bases can also be made with the WR{FS,GS}BASE instructions, when
  * enabled.
  *
- * Guests however cannot use SWAPGS, so there is no mechanism to modify the
- * inactive GS base behind Xen's back.  Therefore, Xen's copy of the inactive
- * GS base is still accurate, and doesn't need reading back from hardware.
+ * Guests cannot modify the inactive GS base behind Xen's back.  Therefore
+ * Xen's copy is still accurate and doesn't need reading back.
  *
  * Under FRED, hardware automatically swaps GS for us, so SHADOW_GS is the
  * active GS from the guest's point of view.
