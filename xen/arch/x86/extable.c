@@ -157,7 +157,7 @@ int __init cf_check stub_selftest(void)
         union stub_exception_token res;
     } tests[] __initconst = {
 #define endbr64 0xf3, 0x0f, 0x1e, 0xfa
-        { .opc = { endbr64, 0x0f, 0xb9, 0x90 }, /* ud1 */
+        { .opc = { endbr64, 0x0f, 0xb9, 0xc0 }, /* ud1 %eax,%eax */
           .res.fields.trapnr = X86_EXC_UD },
         { .opc = { endbr64, 0x90, 0x02, 0x00 }, /* nop; add (%rax),%al */
           .rax = 0x0123456789abcdef,
