@@ -225,6 +225,7 @@ M:	Jan Beulich <jbeulich@suse.com>
 M:	Andrew Cooper <andrew.cooper3@citrix.com>
 M:	Roger Pau Monné <roger.pau@citrix.com>
 R:	Jason Andryuk <jason.andryuk@amd.com>
+R:	Teddy Astie <teddy.astie@vates.tech>
 S:	Supported
 F:	xen/drivers/passthrough/amd/
 
@@ -233,6 +234,7 @@ M:	Jan Beulich <jbeulich@suse.com>
 M:	Andrew Cooper <andrew.cooper3@citrix.com>
 M:	Roger Pau Monné <roger.pau@citrix.com>
 R:	Jason Andryuk <jason.andryuk@amd.com>
+R:	Teddy Astie <teddy.astie@vates.tech>
 S:	Supported
 F:	xen/arch/x86/cpu/vpmu_amd.c
 F:	xen/arch/x86/hvm/svm/
@@ -613,6 +615,7 @@ X86 ARCHITECTURE
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Andrew Cooper <andrew.cooper3@citrix.com>
 M:	Roger Pau Monné <roger.pau@citrix.com>
+R:	Teddy Astie <teddy.astie@vates.tech>
 S:	Supported
 L:	xen-devel@lists.xenproject.org
 F:	xen/arch/x86/
