@@ -1335,9 +1335,7 @@ static void __init efi_exit_boot(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *Syste
     EFI_STATUS status;
     UINTN info_size = 0, map_key;
     bool retry;
-#ifdef CONFIG_EFI_SET_VIRTUAL_ADDRESS_MAP
     unsigned int i;
-#endif
 
     efi_bs->GetMemoryMap(&info_size, NULL, &map_key,
                          &efi_mdesc_size, &mdesc_ver);
@@ -1371,31 +1369,33 @@ static void __init efi_exit_boot(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *Syste
     if ( EFI_ERROR(status) )
         PrintErrMesg(L"Cannot exit boot services", status);
 
-#ifdef CONFIG_EFI_SET_VIRTUAL_ADDRESS_MAP
-    for ( i = 0; i < efi_memmap_size; i += efi_mdesc_size )
+    if ( IS_ENABLED(CONFIG_EFI_SET_VIRTUAL_ADDRESS_MAP) )
     {
-        EFI_MEMORY_DESCRIPTOR *desc = efi_memmap + i;
+        for ( i = 0; i < efi_memmap_size; i += efi_mdesc_size )
+        {
+            EFI_MEMORY_DESCRIPTOR *desc = efi_memmap + i;
 
-        /*
-         * Runtime services regions are always mapped here.
-         * Attributes may be adjusted in efi_init_memory().
-         */
-        if ( (desc->Attribute & EFI_MEMORY_RUNTIME) ||
-             desc->Type == EfiRuntimeServicesCode ||
-             desc->Type == EfiRuntimeServicesData )
-            desc->VirtualStart = desc->PhysicalStart;
-        else
-            desc->VirtualStart = INVALID_VIRTUAL_ADDRESS;
+            /*
+             * Runtime services regions are always mapped here.
+             * Attributes may be adjusted in efi_init_memory().
+             */
+            if ( (desc->Attribute & EFI_MEMORY_RUNTIME) ||
+                 desc->Type == EfiRuntimeServicesCode ||
+                 desc->Type == EfiRuntimeServicesData )
+                desc->VirtualStart = desc->PhysicalStart;
+            else
+                desc->VirtualStart = INVALID_VIRTUAL_ADDRESS;
+        }
+        status = efi_rs->SetVirtualAddressMap(efi_memmap_size, efi_mdesc_size,
+                                              mdesc_ver, efi_memmap);
+        if ( status != EFI_SUCCESS )
+        {
+            printk(XENLOG_ERR
+                   "EFI: SetVirtualAddressMap() failed (%#lx), disabling runtime services\n",
+                   status);
+            __clear_bit(EFI_RS, &efi_flags);
+        }
     }
-    status = efi_rs->SetVirtualAddressMap(efi_memmap_size, efi_mdesc_size,
-                                          mdesc_ver, efi_memmap);
-    if ( status != EFI_SUCCESS )
-    {
-        printk(XENLOG_ERR "EFI: SetVirtualAddressMap() failed (%#lx), disabling runtime services\n",
-               status);
-        __clear_bit(EFI_RS, &efi_flags);
-    }
-#endif
 
     /* Adjust pointers into EFI. */
     efi_ct = (const void *)efi_ct + DIRECTMAP_VIRT_START;
