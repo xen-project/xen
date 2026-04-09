@@ -1631,7 +1631,7 @@ static int gicv3_iomem_deny_access(struct domain *d)
     if ( vbase != INVALID_PADDR )
     {
         mfn = vbase >> PAGE_SHIFT;
-        nr = PFN_UP(csize);
+        nr = PFN_UP(vsize);
         return iomem_deny_access(d, mfn, mfn + nr - 1);
     }
 
