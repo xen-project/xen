@@ -1079,23 +1079,23 @@ static int gicv2_iomem_deny_access(struct domain *d)
     unsigned long mfn, nr;
 
     mfn = dbase >> PAGE_SHIFT;
-    rc = iomem_deny_access(d, mfn, mfn + 1);
+    rc = iomem_deny_access(d, mfn, mfn);
     if ( rc )
         return rc;
 
     mfn = hbase >> PAGE_SHIFT;
-    rc = iomem_deny_access(d, mfn, mfn + 1);
+    rc = iomem_deny_access(d, mfn, mfn);
     if ( rc )
         return rc;
 
     mfn = cbase >> PAGE_SHIFT;
     nr = DIV_ROUND_UP(csize, PAGE_SIZE);
-    rc = iomem_deny_access(d, mfn, mfn + nr);
+    rc = iomem_deny_access(d, mfn, mfn + nr - 1);
     if ( rc )
         return rc;
 
     mfn = vbase >> PAGE_SHIFT;
-    return iomem_deny_access(d, mfn, mfn + nr);
+    return iomem_deny_access(d, mfn, mfn + nr - 1);
 }
 
 #ifdef CONFIG_ACPI

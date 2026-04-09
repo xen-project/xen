@@ -1009,7 +1009,7 @@ int gicv3_its_deny_access(struct domain *d)
     {
         mfn = paddr_to_pfn(its_data->addr);
         nr = PFN_UP(its_data->size);
-        rc = iomem_deny_access(d, mfn, mfn + nr);
+        rc = iomem_deny_access(d, mfn, mfn + nr - 1);
         if ( rc )
         {
             printk("iomem_deny_access failed for %lx:%lx \r\n", mfn, nr);
