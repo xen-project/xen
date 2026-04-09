@@ -566,6 +566,7 @@ amd_like(const struct x86_emulate_ctxt *ctxt)
 #define vcpu_has_clzero()      (ctxt->cpuid->extd.clzero)
 #define vcpu_has_wbnoinvd()    (ctxt->cpuid->extd.wbnoinvd)
 #define vcpu_has_nscb()        (ctxt->cpuid->extd.nscb)
+#define vcpu_has_avx512_bmm()  (ctxt->cpuid->extd.avx512_bmm)
 
 #define vcpu_has_bmi1()        (ctxt->cpuid->feat.bmi1)
 #define vcpu_has_hle()         (ctxt->cpuid->feat.hle)

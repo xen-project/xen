@@ -7859,6 +7859,19 @@ x86_emulate(
         goto simd_zmm;
     }
 
+    case X86EMUL_OPC_EVEX(6, 0x80): /* vbmac{,x}or16x16x16 [xyz]mm/mem,[xyz]mm,[xyz]mm */
+        vcpu_must_have(avx512_bmm);
+        generate_exception_if(!evex.lr || evex.brs || evex.opmsk, X86_EXC_UD);
+        avx512_vlen_check(false);
+        goto simd_zmm;
+
+    case X86EMUL_OPC_EVEX(6, 0x81): /* vbitrev [xyz]mm/mem,[xyz]mm */
+        vcpu_must_have(avx512_bmm);
+        generate_exception_if(evex.w || evex.brs || evex.reg != 0xf || !evex.RX,
+                              X86_EXC_UD);
+        avx512_vlen_check(false);
+        goto simd_zmm;
+
     case X86EMUL_OPC_XOP(08, 0x85): /* vpmacssww xmm,xmm/m128,xmm,xmm */
     case X86EMUL_OPC_XOP(08, 0x86): /* vpmacsswd xmm,xmm/m128,xmm,xmm */
     case X86EMUL_OPC_XOP(08, 0x87): /* vpmacssdql xmm,xmm/m128,xmm,xmm */

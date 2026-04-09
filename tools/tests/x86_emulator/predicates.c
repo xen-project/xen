@@ -2140,6 +2140,9 @@ static const struct evex {
     { { 0x56 }, 2, T, R, pfx_f2, W0, Ln }, /* vfcmaddcph */
     { { 0x57 }, 2, T, R, pfx_f3, W0, LIG }, /* vfmaddcsh */
     { { 0x57 }, 2, T, R, pfx_f2, W0, LIG }, /* vfcmaddcsh */
+    { { 0x80 }, 2, T, R, pfx_no, W0, L1 | L2 }, /* vbmacor16x16x16 */
+    { { 0x80 }, 2, T, R, pfx_no, W1, L1 | L2 }, /* vbmacxor16x16x16 */
+    { { 0x81 }, 2, T, R, pfx_no, W0, Ln }, /* vbitrev */
     { { 0x96 }, 2, T, R, pfx_66, W0, Ln }, /* vfmaddsub132ph */
     { { 0x97 }, 2, T, R, pfx_66, W0, Ln }, /* vfmsubadd132ph */
     { { 0x98 }, 2, T, R, pfx_66, W0, Ln }, /* vfmadd132ph */

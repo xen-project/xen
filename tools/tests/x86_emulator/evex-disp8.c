@@ -689,6 +689,15 @@ static const struct test avx512_fp16_128[] = {
     INSN(movw, 66, map5, 7e, el, fp16, el),
 };
 
+static const struct test avx512_bmm_all[] = {
+    INSN(bitrev,   , map6, 81, vl, b, vl),
+};
+
+static const struct test avx512_bmm_no128[] = {
+    INSN(bmacor16x16x16,    , map6, 81, vl, w, vl),
+    INSN(bmacxor16x16x16,   , map6, 81, vl, w, vl),
+};
+
 static const struct test gfni_all[] = {
     INSN(gf2p8affineinvqb, 66, 0f3a, cf, vl, q, vl),
     INSN(gf2p8affineqb,    66, 0f3a, ce, vl, q, vl),
@@ -817,6 +826,12 @@ static void test_one(const struct test *test, enum vl vl,
 
     case ESZ_w:
         evex.w = 1;
+        /*
+         * VBMAC{,X}OR16x16x16 don't follow the general pattern: EVEX.W controls
+         * reduction kind there, not element size.
+         */
+        if ( test->spc == SPC_map6 && !test->pfx && test->opc == 0x80 )
+            evex.w = test->mnemonic[4] == 'x';
         /* fall through */
     case ESZ_fp16:
         esz = 2;
@@ -1087,6 +1102,8 @@ void evex_disp8_test(void *instr, struct x86_emulate_ctxt *ctxt,
     RUN(avx512_vpopcntdq, all);
     RUN(avx512_fp16, all);
     RUN(avx512_fp16, 128);
+    RUN(avx512_bmm, all);
+    RUN(avx512_bmm, no128);
 
     if ( cpu_has_avx512f )
     {

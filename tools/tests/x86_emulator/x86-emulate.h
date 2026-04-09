@@ -223,6 +223,8 @@ void wrpkru(unsigned int val);
 #define cpu_has_xop                 (cpu_policy.extd.xop  && xcr0_mask(6))
 #define cpu_has_fma4                (cpu_policy.extd.fma4 && xcr0_mask(6))
 #define cpu_has_tbm                  cpu_policy.extd.tbm
+#define cpu_has_avx512_bmm          (cpu_policy.extd.avx512_bmm && \
+                                     xcr0_mask(0xe6))
 
 int emul_test_cpuid(
     uint32_t leaf,
