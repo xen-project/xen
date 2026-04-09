@@ -187,8 +187,7 @@ int x86emul_0f01(struct x86_emulate_state *s,
     case 0xf8: /* swapgs */
         generate_exception_if(!mode_64bit(), X86_EXC_UD);
         generate_exception_if(!mode_ring0(), X86_EXC_GP, 0);
-        fail_if(!ops->read_segment || !ops->read_msr ||
-                !ops->write_segment || !ops->write_msr);
+        fail_if(!ops->read_msr || !ops->write_msr);
         if ( (rc = ops->read_msr(MSR_GS_BASE, &sreg.base,
                                  ctxt)) != X86EMUL_OKAY ||
              (rc = ops->read_msr(MSR_SHADOW_GS_BASE, &msr_val,
