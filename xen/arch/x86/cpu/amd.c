@@ -1048,6 +1048,42 @@ void amd_init_de_cfg(const struct cpuinfo_x86 *c)
     wrmsrl(MSR_AMD64_DE_CFG, val | new);
 }
 
+static void amd_init_fp_cfg(const struct cpuinfo_x86 *c)
+{
+    uint64_t val, new = 0;
+
+    /* If virtualised, we won't have mutable access even if we can read it. */
+    if ( cpu_has_hypervisor )
+        return;
+
+    /*
+     * On Zen1, mitigate SB-7053 / FP-DSS Floating Point Divider State
+     * Sampling by setting bit 9 as instructed.
+     */
+    if ( c->family == 0x17 && is_zen1_uarch() )
+        new |= 1 << 9;
+
+    /*
+     * Avoid reading FP_CFG if we don't intend to change anything.  The
+     * register doesn't exist on all families.
+     */
+    if ( !new )
+        return;
+
+    val = rdmsr(MSR_AMD64_FP_CFG);
+
+    if ( (val & new) == new )
+        return;
+
+    /*
+     * FP_CFG is a Core-scoped MSR, and this write is racy.  However, both
+     * threads calculate the new value from state which expected to be
+     * consistent across CPUs and unrelated to the old value, so the result
+     * should be consistent.
+     */
+    wrmsr(MSR_AMD64_FP_CFG, val | new);
+}
+
 void __init amd_init_lfence_dispatch(void)
 {
     struct cpuinfo_x86 *c = &boot_cpu_data;
@@ -1120,6 +1156,7 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 	uint64_t value;
 
 	amd_init_de_cfg(c);
+	amd_init_fp_cfg(c);
 
 	if (c == &boot_cpu_data)
 		amd_init_lfence_dispatch(); /* Needs amd_init_de_cfg() */
