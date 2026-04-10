@@ -78,7 +78,7 @@ static int __init parse_color_config(const char *buf, unsigned int colors[],
 
         if ( end >= NR_LLC_COLORS || start > end ||
              (end - start) >= (UINT_MAX - *num_colors) ||
-             (*num_colors + (end - start + 1)) >= max_num_colors )
+             (*num_colors + (end - start)) >= max_num_colors )
             return -EINVAL;
 
         /* Colors are range checked in check_colors() */
