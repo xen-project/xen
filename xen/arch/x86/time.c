@@ -2728,7 +2728,7 @@ int time_suspend(void)
     {
         cmos_utc_offset = -get_wallclock_time();
         cmos_utc_offset += get_sec();
-        kill_timer(&calibration_timer);
+        stop_timer(&calibration_timer);
 
         /* Sync platform timer stamps. */
         platform_time_calibration();
