@@ -1009,6 +1009,42 @@ static void cf_check fam17_disable_c6(void *arg)
 	wrmsrl(MSR_AMD_CSTATE_CFG, val & mask);
 }
 
+static void amd_init_fp_cfg(const struct cpuinfo_x86 *c)
+{
+    uint64_t val, new = 0;
+
+    /* If virtualised, we won't have mutable access even if we can read it. */
+    if ( cpu_has_hypervisor )
+        return;
+
+    /*
+     * On Zen1, mitigate SB-7053 / FP-DSS Floating Point Divider State
+     * Sampling by setting bit 9 as instructed.
+     */
+    if ( c->x86 == 0x17 && is_zen1_uarch() )
+        new |= 1 << 9;
+
+    /*
+     * Avoid reading FP_CFG if we don't intend to change anything.  The
+     * register doesn't exist on all families.
+     */
+    if ( !new )
+        return;
+
+    rdmsrl(MSR_AMD64_FP_CFG, val);
+
+    if ( (val & new) == new )
+        return;
+
+    /*
+     * FP_CFG is a Core-scoped MSR, and this write is racy.  However, both
+     * threads calculate the new value from state which expected to be
+     * consistent across CPUs and unrelated to the old value, so the result
+     * should be consistent.
+     */
+    wrmsrl(MSR_AMD64_FP_CFG, val | new);
+}
+
 static void amd_check_bp_cfg(void)
 {
 	uint64_t val, new = 0;
@@ -1052,6 +1088,8 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 	u32 l, h;
 
 	unsigned long long value;
+
+	amd_init_fp_cfg(c);
 
 	/* Disable TLB flush filter by setting HWCR.FFDIS on K8
 	 * bit 6 of msr C001_0015
