@@ -895,7 +895,7 @@ static int gicv3_cpu_init(void)
 
 static void gicv3_cpu_disable(void)
 {
-    WRITE_SYSREG(0, ICC_CTLR_EL1);
+    WRITE_SYSREG(0, ICC_IGRPEN1_EL1);
     isb();
 }
 
