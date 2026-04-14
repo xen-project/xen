@@ -57,6 +57,9 @@ static inline void __flush_xen_tlb_one(vaddr_t va)
     asm volatile(STORE_CP32(0, TLBIMVAHIS) : : "r" (va) : "memory");
 }
 
+/* Only for ARM64_WORKAROUND_REPEAT_TLBI */
+static inline void __tlb_repeat_sync(void) {}
+
 #endif /* __ASM_ARM_ARM32_FLUSHTLB_H__ */
 /*
  * Local variables:

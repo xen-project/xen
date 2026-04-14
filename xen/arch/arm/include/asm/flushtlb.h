@@ -65,6 +65,7 @@ static inline void flush_xen_tlb_range_va(vaddr_t va,
         va += PAGE_SIZE;
     }
     dsb(ish); /* Ensure the TLB invalidation has completed */
+    __tlb_repeat_sync();
     isb();
 }
 
