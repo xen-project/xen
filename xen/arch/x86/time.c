@@ -2642,7 +2642,7 @@ void __init early_time_init(void)
     set_time_scale(&t->tsc_scale, tmp);
     t->stamp.local_tsc = boot_tsc_stamp;
 
-    cpu_khz = tmp / 1000;
+    cpu_khz = DIV_ROUND(tmp, 1000);
     printk("Detected %lu.%03lu MHz processor.\n", 
            cpu_khz / 1000, cpu_khz % 1000);
 

@@ -118,7 +118,7 @@ static void __init preinit_dt_xen_time(void)
     res = dt_property_read_u32(timer, "clock-frequency", &rate);
     if ( res )
     {
-        cpu_khz = rate / 1000;
+        cpu_khz = DIV_ROUND(rate, 1000);
         validate_timer_frequency();
         timer_dt_clock_frequency = rate;
     }
@@ -136,7 +136,7 @@ void __init preinit_xen_time(void)
 
     if ( !cpu_khz )
     {
-        cpu_khz = (READ_SYSREG(CNTFRQ_EL0) & CNTFRQ_MASK) / 1000;
+        cpu_khz = DIV_ROUND(READ_SYSREG(CNTFRQ_EL0) & CNTFRQ_MASK, 1000);
         validate_timer_frequency();
     }
 

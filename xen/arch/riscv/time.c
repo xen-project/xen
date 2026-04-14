@@ -40,7 +40,7 @@ static void __init preinit_dt_xen_time(void)
     if ( !dt_property_read_u32(timer, "timebase-frequency", &rate) )
         panic("Unable to find clock frequency\n");
 
-    cpu_khz = rate / 1000;
+    cpu_khz = DIV_ROUND(rate, 1000);
 }
 
 int reprogram_timer(s_time_t timeout)
