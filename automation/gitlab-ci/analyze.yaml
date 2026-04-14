@@ -149,7 +149,11 @@ eclair-ARM64-allcode:
       CONFIG_STACK_PROTECTOR=y
       CONFIG_UNSUPPORTED=y
       CONFIG_VM_EVENT=y
-  allow_failure: true
+      CONFIG_STATIC_MEMORY=y
+      CONFIG_STATIC_SHM=y
+      CONFIG_EARLY_UART_CHOICE_PL011=y
+      CONFIG_EARLY_UART_BASE_ADDRESS=0x0
+  allow_failure: false
 
 eclair-ARM64-testing:
   extends: eclair-ARM64-allcode
