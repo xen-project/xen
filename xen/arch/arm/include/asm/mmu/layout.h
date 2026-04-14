@@ -23,6 +23,10 @@
  *
  *  Reserved to identity map Xen
  *
+ *  Note: As part of ARM64_WORKAROUND_REPEAT_TLBI, VA 0 is used for an extra
+ *  TLBI operation given its rare use (only identity mapping) and thus
+ *  negligible performance impact.
+ *
  * 0x0000020000000000 - 0x0000027fffffffff (512GB, L0 slot [4])
  *  (Relative offsets)
  *   0  -   2M   Unmapped
