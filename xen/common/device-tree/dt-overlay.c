@@ -910,7 +910,9 @@ static long handle_attach_overlay_nodes(struct domain *d,
     if ( entry )
     {
         rangeset_destroy(entry->irq_ranges);
+        entry->irq_ranges = NULL;
         rangeset_destroy(entry->iomem_ranges);
+        entry->iomem_ranges = NULL;
     }
 
     return rc;
