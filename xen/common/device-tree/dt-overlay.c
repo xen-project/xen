@@ -841,6 +841,30 @@ static long handle_add_overlay_nodes(void *overlay_fdt,
     return rc;
 }
 
+static int handle_device_and_children(struct domain *d,
+                                      struct dt_device_node *dev,
+                                      p2m_type_t p2mt,
+                                      struct rangeset *iomem_ranges,
+                                      struct rangeset *irq_ranges)
+{
+    int rc;
+    struct dt_device_node *child;
+
+    rc = handle_device(d, dev, p2mt, iomem_ranges, irq_ranges);
+    if ( rc )
+        return rc;
+
+    dt_for_each_child_node(dev, child)
+    {
+        rc = handle_device_and_children(d, child, p2mt,
+                                        iomem_ranges, irq_ranges);
+        if ( rc )
+            return rc;
+    }
+
+    return 0;
+}
+
 static long handle_attach_overlay_nodes(struct domain *d,
                                         const void *overlay_fdt,
                                         uint32_t overlay_fdt_size)
@@ -898,8 +922,9 @@ static long handle_attach_overlay_nodes(struct domain *d,
         }
 
         write_lock(&dt_host_lock);
-        rc = handle_device(d, overlay_node, p2m_mmio_direct_c,
-                           entry->iomem_ranges, entry->irq_ranges);
+        rc = handle_device_and_children(d, overlay_node, p2m_mmio_direct_c,
+                                        entry->iomem_ranges,
+                                        entry->irq_ranges);
         write_unlock(&dt_host_lock);
         if ( rc )
         {
@@ -915,6 +940,11 @@ static long handle_attach_overlay_nodes(struct domain *d,
  out:
     spin_unlock(&overlay_lock);
 
+    /*
+     * TODO: IRQ/MMIO permissions and IOMMU assignments granted by
+     * handle_device() before the failure are not revoked here.  We only
+     * destroy the tracking rangesets, leaking the actual grants.
+     */
     if ( entry )
     {
         rangeset_destroy(entry->irq_ranges);
