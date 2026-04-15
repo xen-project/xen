@@ -861,6 +861,13 @@ static long handle_attach_overlay_nodes(struct domain *d,
         goto out;
     }
 
+    if ( entry->irq_ranges || entry->iomem_ranges )
+    {
+        printk(XENLOG_ERR "Overlay is already attached\n");
+        spin_unlock(&overlay_lock);
+        return -EEXIST;
+    }
+
     entry->irq_ranges = rangeset_new(d, "Overlays: Interrupts", 0);
     if (entry->irq_ranges == NULL)
     {
@@ -991,10 +998,7 @@ long dt_overlay_domctl(struct domain *d, struct xen_domctl_dt_overlay *op)
         return -EFAULT;
     }
 
-    if ( op->overlay_op == XEN_DOMCTL_DT_OVERLAY_ATTACH )
-        ret = handle_attach_overlay_nodes(d, overlay_fdt, op->overlay_fdt_size);
-    else
-        ret = -EOPNOTSUPP;
+    ret = handle_attach_overlay_nodes(d, overlay_fdt, op->overlay_fdt_size);
 
     xfree(overlay_fdt);
 
