@@ -125,11 +125,11 @@ static int dt_overlay_remove_node(struct dt_device_node *device_node)
             else
                 np->allnext = np->allnext->allnext;
 
-            break;
+            return 0;
         }
     }
 
-    return 0;
+    return -ENODEV;
 }
 
 static int dt_overlay_add_node(struct dt_device_node *device_node,
