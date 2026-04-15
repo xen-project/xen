@@ -287,6 +287,63 @@ static unsigned int overlay_node_count(const void *overlay_fdt)
 }
 
 /*
+ * Resolve the target path for an overlay fragment.
+ *
+ * This is called before fdt_overlay_apply(), so phandle-based targets
+ * (target = <&label>) are still unresolved (compiled as 0xffffffff by DTC).
+ * Handle the two cases that actually occur:
+ *  - target-path property: the path string is used directly,
+ *  - target = <&label>: the label is looked up in the overlay's __fixups__
+ *    node, then resolved to a path via the base DTB's __symbols__ node.
+ *
+ * Returns a pointer into the FDT on success, NULL on failure.
+ */
+static const char *overlay_get_target_path(const void *fdt, const void *fdto,
+                                           int fragment)
+{
+    const char *path, *fragment_name;
+    int fixups_off, symbols_off, property;
+    int fragment_name_len;
+
+    /* Try target-path first (string-based targeting) */
+    path = fdt_getprop(fdto, fragment, "target-path", NULL);
+    if ( path )
+        return path;
+
+    /* Phandle-based target: resolve via __fixups__ and __symbols__ */
+    fixups_off = fdt_path_offset(fdto, "/__fixups__");
+    if ( fixups_off < 0 )
+        return NULL;
+
+    symbols_off = fdt_path_offset(fdt, "/__symbols__");
+    if ( symbols_off < 0 )
+        return NULL;
+
+    fragment_name = fdt_get_name(fdto, fragment, &fragment_name_len);
+    if ( !fragment_name )
+        return NULL;
+
+    fdt_for_each_property_offset(property, fdto, fixups_off)
+    {
+        const char *val, *label, *p;
+        int val_len;
+
+        val = fdt_getprop_by_offset(fdto, property, &label, &val_len);
+        if ( !val || !val_len || (val[val_len - 1] != '\0') )
+            continue;
+
+        /* Match entries of the form "/<fragment_name>:target:0" */
+        for ( p = val; p < (val + val_len); p += (strlen(p) + 1) )
+            if ( p[0] == '/' &&
+                 !strncmp(p + 1, fragment_name, fragment_name_len) &&
+                 !strcmp(p + 1 + fragment_name_len, ":target:0") )
+                return fdt_getprop(fdt, symbols_off, label, NULL);
+    }
+
+    return NULL;
+}
+
+/*
  * overlay_get_nodes_info gets full name with path for all the nodes which
  * are in one level of __overlay__ tag. This is useful when checking node for
  * duplication i.e. dtbo tries to add nodes which already exists in device tree.
@@ -298,7 +355,6 @@ static int overlay_get_nodes_info(const void *fdto, char **nodes_full_path)
 
     fdt_for_each_subnode(fragment, fdto, 0)
     {
-        int target;
         int overlay;
         int subnode;
         const char *target_path;
@@ -307,11 +363,8 @@ static int overlay_get_nodes_info(const void *fdto, char **nodes_full_path)
         if ( overlay < 0 )
             continue;
 
-        target = fdt_overlay_target_offset(device_tree_flattened, fdto,
-                                           fragment, &target_path);
-        if ( target < 0 )
-            return target;
-
+        target_path = overlay_get_target_path(device_tree_flattened, fdto,
+                                              fragment);
         if ( target_path == NULL )
             return -EINVAL;
 

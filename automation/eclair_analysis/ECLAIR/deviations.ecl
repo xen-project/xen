@@ -629,8 +629,10 @@ of the IS_ENABLED or STATIC_IF/STATIC_IF_NOT macros, so it always receives a lit
 not in scope for compliance are allowed, as that is imported code."
 -file_tag+={gnu_efi_include, "^xen/include/efi/.*$"}
 -file_tag+={acpi_cpu_idle, "^xen/arch/x86/acpi/cpu_idle\\.c$"}
+-file_tag+={libfdt, "^xen/include/xen/libfdt/libfdt\\.h$"}
 -config=MC3A2.R20.7,reports+={safe, "any_area(any_loc(file(gnu_efi_include)||any_exp(macro(^NextMemoryDescriptor$))))"}
 -config=MC3A2.R20.7,reports+={safe, "any_area(any_loc(file(acpi_cpu_idle)))"}
+-config=MC3A2.R20.7,reports+={safe, "any_area(any_loc(any_exp(file(libfdt))))"}
 -doc_end
 
 -doc_begin="To avoid compromising readability, the macros alternative_(v)?call[0-9] are allowed
