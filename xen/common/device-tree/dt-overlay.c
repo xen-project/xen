@@ -379,7 +379,8 @@ find_track_entry_from_tracker(const void *overlay_fdt,
      */
     list_for_each_entry_safe( entry, temp, &overlay_tracker, entry )
     {
-        if ( memcmp(entry->overlay_fdt, overlay_fdt, overlay_fdt_size) == 0 )
+        if ( (fdt_totalsize(entry->overlay_fdt) == overlay_fdt_size) &&
+             !memcmp(entry->overlay_fdt, overlay_fdt, overlay_fdt_size) )
         {
             found_entry = true;
             break;
