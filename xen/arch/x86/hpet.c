@@ -685,12 +685,18 @@ void hpet_broadcast_resume(void)
     for ( i = 0; i < n; i++ )
     {
         if ( hpet_events[i].msi.irq >= 0 )
-            __hpet_setup_msi_irq(irq_to_desc(hpet_events[i].msi.irq));
+        {
+            struct irq_desc *desc = irq_to_desc(hpet_events[i].msi.irq);
+
+            cpumask_copy(desc->arch.cpu_mask, cpumask_of(smp_processor_id()));
+
+            __hpet_setup_msi_irq(desc);
+        }
 
         /* set HPET Tn as oneshot */
         cfg = hpet_read32(HPET_Tn_CFG(hpet_events[i].idx));
         cfg &= ~(HPET_TN_LEVEL | HPET_TN_PERIODIC);
-        cfg |= HPET_TN_ENABLE | HPET_TN_32BIT;
+        cfg |= HPET_TN_32BIT;
         if ( !(hpet_events[i].flags & HPET_EVT_LEGACY) )
             cfg |= HPET_TN_FSB;
         hpet_write32(cfg, HPET_Tn_CFG(hpet_events[i].idx));
