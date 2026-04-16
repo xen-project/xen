@@ -513,12 +513,12 @@ static int msi_msg_to_remap_entry(
 
         if ( rc )
             return rc;
+
+        if ( msi_desc->msi_attrib.type == PCI_CAP_ID_MSI )
+            nr = msi_desc->msi.nvec;
     }
     else
         set_hpet_source_id(msi_desc->hpet_id, &new_ire);
-
-    if ( msi_desc->msi_attrib.type == PCI_CAP_ID_MSI )
-        nr = msi_desc->msi.nvec;
 
     spin_lock_irqsave(&iommu->intremap.lock, flags);
 
