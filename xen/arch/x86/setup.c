@@ -1648,7 +1648,8 @@ void asmlinkage __init noreturn __start_xen(void)
     {
         uint64_t s = bi->mods[i].start, l = bi->mods[i].size;
 
-        reserve_e820_ram(&boot_e820, s, s + PAGE_ALIGN(l));
+        if ( !reserve_e820_ram(&boot_e820, s, s + PAGE_ALIGN(l)) )
+            panic("Failed to reserve boot module %u in E820\n", i);
     }
 
     if ( !xen_phys_start )
@@ -1661,11 +1662,13 @@ void asmlinkage __init noreturn __start_xen(void)
     /* This needs to remain in sync with remove_xen_ranges(). */
     if ( efi_boot_mem_unused(&eb_start, &eb_end) )
     {
-        reserve_e820_ram(&boot_e820, __pa(_stext), __pa(eb_start));
-        reserve_e820_ram(&boot_e820, __pa(eb_end), __pa(__2M_rwdata_end));
+        if ( !reserve_e820_ram(&boot_e820, __pa(_stext), __pa(eb_start)) ||
+             !reserve_e820_ram(&boot_e820, __pa(eb_end), __pa(__2M_rwdata_end)) )
+            panic("Failed to reserve Xen in E820\n");
     }
     else
-        reserve_e820_ram(&boot_e820, __pa(_stext), __pa(__2M_rwdata_end));
+        if ( !reserve_e820_ram(&boot_e820, __pa(_stext), __pa(__2M_rwdata_end)) )
+            panic("Failed to reserve Xen in E820\n");
 
     /* Late kexec reservation (dynamic start address). */
     kexec_reserve_area();
