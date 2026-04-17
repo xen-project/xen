@@ -133,9 +133,9 @@ static int __init add_hwdom_free_regions(unsigned long s_gfn,
     e += 1;
     size = (e - start) & ~(SZ_2M - 1);
 
-    /* Find the insert position (descending order). */
-    for ( i = 0; i < free_regions->nr_banks ; i++ )
-        if ( size > free_regions->bank[i].size )
+    /* Find the insert position (ascending address order). */
+    for ( i = 0; i < free_regions->nr_banks; i++ )
+        if ( start < free_regions->bank[i].start )
             break;
 
     /* Move the other banks to make space. */
@@ -234,82 +234,123 @@ out:
     return res;
 }
 
+/*
+ * Allocate memory for the hardware domain using the host memory layout, when
+ * the domain is not direct mapped. The only case for this is when LLC coloring
+ * is enabled.
+ *
+ * Banks are sorted by ascending address from add_hwdom_free_regions(), so
+ * low memory banks are naturally allocated first (if any). This allows the
+ * hardware domain to have memory reachable by devices with limited DMA address
+ * capabilities (e.g. 32-bit DMA).
+ *
+ * The first bank allocated must be large enough for place_modules() to fit
+ * the kernel, DTB and initrd.
+ */
+static bool __init allocate_hwdom_memory(struct kernel_info *kinfo)
+{
+    const paddr_t min_bank_size =
+        min_t(paddr_t, kinfo->unassigned_mem, MB(128));
+    struct membanks *mem = kernel_info_get_mem(kinfo);
+    unsigned int i, nr_banks;
+    struct membanks *hwdom_free_mem;
+    struct membanks *gnttab =
+        IS_ENABLED(CONFIG_GRANT_TABLE)
+        ? membanks_xzalloc(1, MEMORY)
+        : NULL;
+
+    /*
+     * Exclude the following regions:
+     * 1) Remove reserved memory
+     * 2) Grant table assigned to hwdom
+     */
+    const struct membanks *mem_banks[] = {
+        bootinfo_get_reserved_mem(),
+        gnttab,
+    };
+
+#ifdef CONFIG_GRANT_TABLE
+    if ( !gnttab )
+        return false;
+
+    gnttab->nr_banks = 1;
+    gnttab->bank[0].start = kinfo->gnttab_start;
+    gnttab->bank[0].size = kinfo->gnttab_size;
+#endif
+
+    hwdom_free_mem = membanks_xzalloc(NR_MEM_BANKS, MEMORY);
+    if ( !hwdom_free_mem )
+    {
+        xfree(gnttab);
+        return false;
+    }
+
+    if ( find_unallocated_memory(kinfo, mem_banks, ARRAY_SIZE(mem_banks),
+                                 hwdom_free_mem, add_hwdom_free_regions) )
+    {
+        xfree(gnttab);
+        xfree(hwdom_free_mem);
+        return false;
+    }
+
+    xfree(gnttab);
+    nr_banks = hwdom_free_mem->nr_banks;
+
+    for ( i = 0; (kinfo->unassigned_mem > 0) && (i < nr_banks); i++ )
+    {
+        paddr_t bank_size;
+
+        /*
+         * The first bank must be large enough for place_modules() to
+         * fit the kernel, DTB and initrd.  Skip small regions to avoid
+         * ending up with a tiny first bank.
+         */
+        if ( !mem->nr_banks && (hwdom_free_mem->bank[i].size < min_bank_size) )
+            continue;
+
+        bank_size = MIN(hwdom_free_mem->bank[i].size, kinfo->unassigned_mem);
+        if ( !allocate_bank_memory(kinfo,
+                                   gaddr_to_gfn(hwdom_free_mem->bank[i].start),
+                                   bank_size) )
+        {
+            xfree(hwdom_free_mem);
+            return false;
+        }
+    }
+
+    xfree(hwdom_free_mem);
+    return true;
+}
+
 void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
 {
     struct membanks *mem = kernel_info_get_mem(kinfo);
-    unsigned int i, nr_banks = GUEST_RAM_BANKS;
-    struct membanks *hwdom_free_mem = NULL;
+    unsigned int i;
 
     printk(XENLOG_INFO "Allocating mappings totalling %ldMB for %pd:\n",
            /* Don't want format this as PRIpaddr (16 digit hex) */
            (unsigned long)(kinfo->unassigned_mem >> 20), d);
 
     mem->nr_banks = 0;
-    /*
-     * Use host memory layout for hwdom. Only case for this is when LLC coloring
-     * is enabled.
-     */
+
     if ( is_hardware_domain(d) )
     {
-        struct membanks *gnttab =
-            IS_ENABLED(CONFIG_GRANT_TABLE)
-            ? membanks_xzalloc(1, MEMORY)
-            : NULL;
-        /*
-         * Exclude the following regions:
-         * 1) Remove reserved memory
-         * 2) Grant table assigned to hwdom
-         */
-        const struct membanks *mem_banks[] = {
-            bootinfo_get_reserved_mem(),
-            gnttab,
-        };
-
-#ifdef CONFIG_GRANT_TABLE
-        if ( !gnttab )
+        if ( !allocate_hwdom_memory(kinfo) )
             goto fail;
-
-        gnttab->nr_banks = 1;
-        gnttab->bank[0].start = kinfo->gnttab_start;
-        gnttab->bank[0].size = kinfo->gnttab_size;
-#endif
-
-        hwdom_free_mem = membanks_xzalloc(NR_MEM_BANKS, MEMORY);
-        if ( !hwdom_free_mem )
-            goto fail;
-
-        if ( find_unallocated_memory(kinfo, mem_banks, ARRAY_SIZE(mem_banks),
-                                     hwdom_free_mem, add_hwdom_free_regions) )
-            goto fail;
-
-        nr_banks = hwdom_free_mem->nr_banks;
-        xfree(gnttab);
     }
-
-    for ( i = 0; kinfo->unassigned_mem > 0 && nr_banks > 0; i++, nr_banks-- )
+    else
     {
-        paddr_t bank_start, bank_size;
-
-        if ( is_hardware_domain(d) )
-        {
-            bank_start = hwdom_free_mem->bank[i].start;
-            bank_size = hwdom_free_mem->bank[i].size;
-        }
-        else
+        for ( i = 0; kinfo->unassigned_mem > 0 && i < GUEST_RAM_BANKS; i++ )
         {
             const uint64_t bankbase[] = GUEST_RAM_BANK_BASES;
             const uint64_t banksize[] = GUEST_RAM_BANK_SIZES;
+            paddr_t bank_size;
 
-            if ( i >= GUEST_RAM_BANKS )
+            bank_size = MIN(banksize[i], kinfo->unassigned_mem);
+            if ( !allocate_bank_memory(kinfo, gaddr_to_gfn(bankbase[i]),
+                                       bank_size) )
                 goto fail;
-
-            bank_start = bankbase[i];
-            bank_size = banksize[i];
         }
-
-        bank_size = MIN(bank_size, kinfo->unassigned_mem);
-        if ( !allocate_bank_memory(kinfo, gaddr_to_gfn(bank_start), bank_size) )
-            goto fail;
     }
 
     if ( kinfo->unassigned_mem )
@@ -326,7 +367,6 @@ void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
                (unsigned long)(mem->bank[i].size >> 20));
     }
 
-    xfree(hwdom_free_mem);
     return;
 
   fail:
