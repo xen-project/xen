@@ -51,7 +51,7 @@ $(ACPI_BUILD_DIR)/dsdt_%cpu.asl: dsdt.asl dsdt_acpi_info.asl  $(MK_DSDT)
 	# Remove last bracket
 	awk 'NR > 1 {print s} {s=$$0}' $< > $@.$(TMP_SUFFIX)
 	cat dsdt_acpi_info.asl >> $@.$(TMP_SUFFIX)
-	$(MK_DSDT) --debug=$(debug) --maxcpu $* --dm-version qemu-xen >> $@.$(TMP_SUFFIX)
+	$(MK_DSDT) --debug=$(debug) --maxcpu $*  >> $@.$(TMP_SUFFIX)
 	mv -f $@.$(TMP_SUFFIX) $@
 
 $(ACPI_BUILD_DIR)/dsdt_pvh.asl: dsdt_acpi_info.asl $(MK_DSDT)
