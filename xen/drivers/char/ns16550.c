@@ -345,9 +345,16 @@ static void ns16550_setup_preirq(struct ns16550 *uart)
         if ( divisor )
             uart->baud = uart->clock_hz / (divisor << 4);
         else
+        {
+            uart->baud = 115200;
             printk(XENLOG_ERR
                    "Automatic baud rate determination was requested,"
-                   " but a baud rate was not set up\n");
+                   " but a baud rate was not set up\n"
+                   "Setting baudrate to %u\n", uart->baud);
+            divisor = uart->clock_hz / (uart->baud << 4);
+            ns_write_reg(uart, UART_DLL, (uint8_t)divisor);
+            ns_write_reg(uart, UART_DLM, (uint8_t)(divisor >> 8));
+        }
     }
     ns_write_reg(uart, UART_LCR, lcr);
 
