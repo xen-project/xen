@@ -273,16 +273,16 @@ static int cf_check ns16550_getc(struct serial_port *port, char *pc)
 static void pci_serial_early_init(struct ns16550 *uart)
 {
 #ifdef NS16550_PCI
-    if ( uart->bar && uart->io_base >= 0x10000 )
+    if ( !uart->ps_bdf_enable )
+        return;
+
+    if ( uart->io_base >= 0x10000 )
     {
         pci_conf_write16(PCI_SBDF(0, uart->ps_bdf[0], uart->ps_bdf[1],
                                   uart->ps_bdf[2]),
                          PCI_COMMAND, PCI_COMMAND_MEMORY);
         return;
     }
-
-    if ( !uart->ps_bdf_enable || uart->io_base >= 0x10000 )
-        return;
 
     if ( uart->pb_bdf_enable )
         pci_conf_write16(PCI_SBDF(0, uart->pb_bdf[0], uart->pb_bdf[1],
@@ -428,7 +428,7 @@ static void __init cf_check ns16550_init_postirq(struct serial_port *port)
         unsigned int, 1, (bits * uart->fifo_size * 1000) / uart->baud);
 
 #ifdef NS16550_PCI
-    if ( uart->bar || uart->ps_bdf_enable )
+    if ( uart->ps_bdf_enable )
     {
         if ( uart->param && uart->param->mmio &&
              rangeset_add_range(mmio_ro_ranges, PFN_DOWN(uart->io_base),
@@ -1320,6 +1320,7 @@ pci_uart_config(struct ns16550 *uart, bool skip_amt, unsigned int idx)
                 uart->ps_bdf[0] = b;
                 uart->ps_bdf[1] = d;
                 uart->ps_bdf[2] = f;
+                uart->ps_bdf_enable = true;
                 uart->bar_idx = bar_idx;
                 uart->bar = bar;
                 uart->bar64 = bar_64;
