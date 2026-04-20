@@ -1674,6 +1674,8 @@ static bool __init parse_namevalue_pairs(char *str, struct ns16550 *uart)
                 pci_uart_config(uart, 0, uart - ns16550_com);
                 dev_set = true;
             }
+            else
+                PARSE_ERR_RET("Unknown device type %s\n", param_value);
             break;
 
         case port_bdf:
