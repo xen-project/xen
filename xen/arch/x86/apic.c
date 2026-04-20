@@ -1311,10 +1311,21 @@ int reprogram_timer(s_time_t timeout)
     }
 
     if ( timeout && ((expire = timeout - NOW()) > 0) )
-        apic_tmict = min_t(uint64_t, (bus_scale * expire) >> BUS_SCALE_SHIFT,
-                           UINT32_MAX);
+    {
+        unsigned long product;
+        bool overflow;
 
-    apic_write(APIC_TMICT, (unsigned long)apic_tmict);
+        apic_tmict = UINT32_MAX;
+        asm ( "mul %[expire]\n\t"
+              ASM_FLAG_OUT(, "setc %[cf]")
+              : "=a" (product), [cf] ASM_FLAG_OUT("=@ccc", "=qm") (overflow)
+              : "0" ((unsigned long)bus_scale), [expire] "r" (expire) );
+        if ( !overflow &&
+             (product >>= BUS_SCALE_SHIFT) < apic_tmict )
+            apic_tmict = product;
+    }
+
+    apic_write(APIC_TMICT, apic_tmict);
 
     return apic_tmict || !timeout;
 }
