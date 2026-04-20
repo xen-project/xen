@@ -550,11 +550,22 @@ int xstate_alloc_save_area(struct vcpu *v)
         return -ENOMEM;
 
     /*
-     * Set the memory image to default values, but don't force the context
-     * to be loaded from memory (i.e. keep save_area->xsave_hdr.xstate_bv
-     * clear).
+     * We're creating a vCPU, so conceptually we should be choosing the
+     * architectural #RESET values.
+     *
+     * However for historical reasons of configuring the external
+     * co-processor, FCW's #RESET state is different to what F(N)INIT and
+     * XSTATE consider the "initial configuration".
+     *
+     * Guests won't care about the difference; all software tends to executes
+     * FNINIT very early during setup.
+     *
+     * Use XSTATE's idea of initial configuration.  This allows XSTATE_BV to
+     * remain clear and for CPUs to use the INIT optimisation where
+     * applicable.
      */
     save_area->fpu_sse.fcw = FCW_DEFAULT;
+    save_area->fpu_sse.ftw = FXSAVE_FTW_RESET;
     save_area->fpu_sse.mxcsr = MXCSR_DEFAULT;
 
     v->arch.xsave_area = save_area;
