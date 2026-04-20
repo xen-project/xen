@@ -425,7 +425,8 @@ a653sched_alloc_udata(const struct scheduler *ops, struct sched_unit *unit,
             sched_priv->schedule[entry].runtime = DEFAULT_TIMESLICE;
             sched_priv->schedule[entry].unit = unit;
 
-            sched_priv->major_frame += DEFAULT_TIMESLICE;
+            if ( entry )
+                sched_priv->major_frame += DEFAULT_TIMESLICE;
             ++sched_priv->num_schedule_entries;
         }
     }
