@@ -550,12 +550,9 @@ a653sched_do_schedule(
 
     /* Switch minor frame or find correct minor frame after a miss */
     while ( (now >= sched_priv->next_switch_time) &&
-        (sched_priv->sched_index < sched_priv->num_schedule_entries) )
-    {
-        sched_priv->sched_index++;
+            (++sched_priv->sched_index < sched_priv->num_schedule_entries) )
         sched_priv->next_switch_time +=
             sched_priv->schedule[sched_priv->sched_index].runtime;
-    }
 
     /*
      * If we exhausted the domains in the schedule and still have time left
