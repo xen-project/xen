@@ -1313,14 +1313,15 @@ int reprogram_timer(s_time_t timeout)
     if ( timeout && ((expire = timeout - NOW()) > 0) )
     {
         unsigned long product;
-        bool overflow;
+        bool carry;
 
         apic_tmict = UINT32_MAX;
         asm ( "mul %[expire]\n\t"
               ASM_FLAG_OUT(, "setc %[cf]")
-              : "=a" (product), [cf] ASM_FLAG_OUT("=@ccc", "=qm") (overflow)
-              : "0" ((unsigned long)bus_scale), [expire] "r" (expire) );
-        if ( !overflow &&
+              : "=&a" (product), [cf] ASM_FLAG_OUT("=@ccc", "=qm") (carry)
+              : "0" ((unsigned long)bus_scale), [expire] "r" (expire)
+              : "rdx" );
+        if ( !carry &&
              (product >>= BUS_SCALE_SHIFT) < apic_tmict )
             apic_tmict = product;
     }
