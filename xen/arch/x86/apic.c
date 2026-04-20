@@ -1224,10 +1224,16 @@ int reprogram_timer(s_time_t timeout)
     }
 
     if ( timeout && ((expire = timeout - NOW()) > 0) )
-        apic_tmict = min_t(uint64_t, (bus_scale * expire) >> BUS_SCALE_SHIFT,
-                           UINT32_MAX);
+    {
+        unsigned long product;
 
-    apic_write(APIC_TMICT, (unsigned long)apic_tmict);
+        apic_tmict = UINT32_MAX;
+        if ( !__builtin_umull_overflow(bus_scale, expire, &product) &&
+             (product >>= BUS_SCALE_SHIFT) < apic_tmict )
+            apic_tmict = product;
+    }
+
+    apic_write(APIC_TMICT, apic_tmict);
 
     return apic_tmict || !timeout;
 }
