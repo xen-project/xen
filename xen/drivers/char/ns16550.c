@@ -1529,6 +1529,9 @@ static bool __init parse_positional(struct ns16550 *uart, char **str)
     {
         uart->data_bits = simple_strtoul(conf, &conf, 10);
 
+        if ( !*conf )
+            PARSE_ERR_RET("bad DPS setting");
+
         uart->parity = parse_parity_char(*conf);
 
         uart->stop_bits = simple_strtoul(conf + 1, &conf, 10);
