@@ -345,7 +345,7 @@ int main(int argc, char **argv)
      * the Xen image using 2M pages.  To avoid running into adjacent non-RAM
      * regions, pad the segment to the next 2M boundary.
      */
-    mem_siz = ((uint32_t)in64_phdr.p_memsz + (1U << 20) - 1) & (-1U << 20);
+    mem_siz = ((uint32_t)in64_phdr.p_memsz + (1U << 21) - 1) & (-1U << 21);
 
     note_sz = note_base = offset = 0;
     if ( num_phdrs > 1 )
