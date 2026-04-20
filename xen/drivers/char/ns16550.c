@@ -1454,7 +1454,7 @@ static enum __init serial_param_type get_token(char *token, char **value)
     unsigned int i;
 
     param_name = strsep(&token, "=");
-    if ( param_name == NULL )
+    if ( !param_name || !token )
         return num_serial_params;
 
     /* Linear search for the parameter. */
