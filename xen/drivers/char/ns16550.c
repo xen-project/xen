@@ -273,14 +273,19 @@ static int cf_check ns16550_getc(struct serial_port *port, char *pc)
 static void pci_serial_early_init(struct ns16550 *uart)
 {
 #ifdef NS16550_PCI
+    uint16_t cmd;
+
     if ( !uart->ps_bdf_enable )
         return;
+
+    cmd = pci_conf_read16(PCI_SBDF(0, uart->ps_bdf[0], uart->ps_bdf[1],
+                                  uart->ps_bdf[2]), PCI_COMMAND);
 
     if ( uart->io_base >= 0x10000 )
     {
         pci_conf_write16(PCI_SBDF(0, uart->ps_bdf[0], uart->ps_bdf[1],
                                   uart->ps_bdf[2]),
-                         PCI_COMMAND, PCI_COMMAND_MEMORY);
+                         PCI_COMMAND, cmd | PCI_COMMAND_MEMORY);
         return;
     }
 
@@ -297,7 +302,7 @@ static void pci_serial_early_init(struct ns16550 *uart)
                      uart->io_base | PCI_BASE_ADDRESS_SPACE_IO);
     pci_conf_write16(PCI_SBDF(0, uart->ps_bdf[0], uart->ps_bdf[1],
                               uart->ps_bdf[2]),
-                     PCI_COMMAND, PCI_COMMAND_IO);
+                     PCI_COMMAND, cmd | PCI_COMMAND_IO);
 #endif
 }
 
