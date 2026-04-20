@@ -502,14 +502,8 @@ static int __init dom0_construct(struct boot_info *bi, struct domain *d)
         return -EINVAL;
     }
 
-    if ( parms.elf_notes[XEN_ELFNOTE_SUPPORTED_FEATURES].type != XEN_ENT_NONE )
-    {
-        if ( !pv_shim && !test_bit(XENFEAT_dom0, parms.f_supported) )
-        {
-            printk("Kernel does not support Dom0 operation\n");
-            return -EINVAL;
-        }
-    }
+    if ( (rc = initdom_check_parms(d, &parms)) != 0 )
+        return rc;
 
     nr_pages = dom0_compute_nr_pages(d, &parms, initrd_len);
 

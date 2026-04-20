@@ -690,6 +690,9 @@ static int __init pvh_load_kernel(
         return -EINVAL;
     }
 
+    if ( (rc = initdom_check_parms(d, &parms)) != 0 )
+        return rc;
+
     /* Copy the OS image and free temporary buffer. */
     elf.dest_base = (void *)(parms.virt_kstart - parms.virt_base);
     elf.dest_size = parms.virt_kend - parms.virt_kstart;

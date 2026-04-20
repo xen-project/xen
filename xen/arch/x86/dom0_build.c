@@ -319,6 +319,18 @@ unsigned long __init dom0_paging_pages(const struct domain *d,
     return DIV_ROUND_UP(memkb, 1024) << (20 - PAGE_SHIFT);
 }
 
+int __init initdom_check_parms(
+    const struct domain *d, const struct elf_dom_parms *parms)
+{
+    if ( parms->elf_notes[XEN_ELFNOTE_SUPPORTED_FEATURES].type != XEN_ENT_NONE &&
+         is_hardware_domain(d) && !test_bit(XENFEAT_dom0, parms->f_supported) )
+    {
+        printk("Kernel does not support Dom0 operation\n");
+        return -EINVAL;
+    }
+
+    return 0;
+}
 
 /*
  * If allocation isn't specified, reserve 1/16th of available memory for
