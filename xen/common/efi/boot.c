@@ -774,8 +774,9 @@ static bool __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
     {
         file->addr = min(1UL << (32 + PAGE_SHIFT),
                          HYPERVISOR_VIRT_END - DIRECTMAP_VIRT_START);
+        /* For config files allocate an extra byte to put a NUL there. */
         ret = efi_bs->AllocatePages(AllocateMaxAddress, EfiLoaderData,
-                                    PFN_UP(size), &file->addr);
+                                    PFN_UP(size + (file == &cfg)), &file->addr);
     }
     if ( EFI_ERROR(ret) )
         what = what ?: L"Allocation";
@@ -804,6 +805,9 @@ static bool __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
 
     efi_arch_flush_dcache_area(file->ptr, file->size);
 
+    if ( file == &cfg )
+        file->str[file->size] = 0;
+
     return true;
 }
 
@@ -818,6 +822,23 @@ static bool __init read_section(const EFI_LOADED_IMAGE *image,
         return false;
 
     file->ptr = ptr;
+
+    /* For cfg file, if necessary allocate space to put an extra NUL there. */
+    if ( file == &cfg && file->size && !iscntrl(file->str[file->size - 1]) )
+    {
+        EFI_PHYSICAL_ADDRESS addr;
+        EFI_STATUS ret = efi_bs->AllocatePages(AllocateMaxAddress,
+                                               EfiLoaderData,
+                                               PFN_UP(file->size + 1), &addr);
+
+        if ( EFI_ERROR(ret) )
+            return false;
+
+        memcpy((void *)addr, ptr, file->size);
+        file->addr = addr;
+        file->need_to_free = true;
+        file->str[file->size] = 0;
+    }
 
     handle_file_info(name, file, options);
 
@@ -847,9 +868,6 @@ static void __init pre_parse(const struct file *file)
         else
             start = 0;
     }
-    if ( file->size && end[-1] )
-         PrintStr(L"No newline at end of config file,"
-                   " last line will be ignored.\r\n");
 }
 
 static void __init efi_init(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
