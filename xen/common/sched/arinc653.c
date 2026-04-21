@@ -411,10 +411,10 @@ a653sched_alloc_udata(const struct scheduler *ops, struct sched_unit *unit,
     spin_lock_irqsave(&sched_priv->lock, flags);
 
     /*
-     * Add every one of dom0's units to the schedule, as long as there are
-     * slots available.
+     * Add every one of the control domain's units to the schedule, as long as
+     * there are slots available.
      */
-    if ( unit->domain->domain_id == 0 )
+    if ( is_control_domain(unit->domain) && !is_idle_domain(unit->domain) )
     {
         entry = sched_priv->num_schedule_entries;
 
