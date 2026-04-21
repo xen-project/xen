@@ -436,7 +436,7 @@ struct ffa_ctx {
 };
 
 extern DECLARE_BITMAP(ffa_fw_abi_supported, FFA_ABI_BITMAP_SIZE);
-extern uint32_t __ro_after_init ffa_fw_version;
+extern uint32_t ffa_fw_version;
 
 extern struct list_head ffa_ctx_head;
 extern rwlock_t ffa_ctx_list_rwlock;
