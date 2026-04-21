@@ -616,7 +616,12 @@ static void domain_tree_remove(struct domain *domain)
 	walk_node_tree(domain, NULL, "@introduceDomain", &walkfuncs, domain);
 }
 
-static void fire_special_watches(const char *name)
+#define WATCH_NODOM	1	/* Fire watches without <domid> extension. */
+#define WATCH_DOM	2	/* Fire watches with <domid> extension. */
+#define WATCH_BOTH	(WATCH_NODOM | WATCH_DOM)
+
+static void fire_special_watches(const char *name, unsigned int domid,
+				 unsigned int watchdom_flag)
 {
 	void *ctx = talloc_new(NULL);
 	const struct node *node;
@@ -626,9 +631,19 @@ static void fire_special_watches(const char *name)
 
 	node = read_node_const(NULL, ctx, name);
 
-	if (node)
-		fire_watches(NULL, ctx, name, node, true, NULL);
-	else
+	if (node) {
+		if (watchdom_flag & WATCH_NODOM)
+			fire_watches(NULL, ctx, name, node, MATCH_NODEPTH,
+				     NULL);
+		if (watchdom_flag & WATCH_DOM) {
+			char name_dom[24]; /* max. "@introduceDomain/domid" */
+
+			snprintf(name_dom, sizeof(name_dom),
+				 "%s/%u", name, domid);
+			fire_watches(NULL, ctx, name_dom, node, MATCH_DEPTH,
+				     NULL);
+		}
+	} else
 		log("special node %s not found\n", name);
 
 	talloc_free(ctx);
@@ -653,7 +668,7 @@ static int destroy_domain(void *_domain)
 	if (domain->interface)
 		unmap_interface(domain->domid, domain->interface);
 
-	fire_special_watches("@releaseDomain");
+	fire_special_watches("@releaseDomain", domain->domid, WATCH_BOTH);
 
 	wrl_domain_destroy(domain);
 
@@ -681,6 +696,8 @@ static int do_check_domain(struct domain *domain, bool *notify,
 		if ((state & XENMANAGE_GETDOMSTATE_STATE_SHUTDOWN)
 		    && !domain->shutdown) {
 			domain->shutdown = true;
+			fire_special_watches("@releaseDomain", domain->domid,
+					     WATCH_DOM);
 			*notify = true;
 		}
 		if (!(state & XENMANAGE_GETDOMSTATE_STATE_DEAD))
@@ -723,7 +740,7 @@ void check_domains(void)
 		;
 
 	if (notify)
-		fire_special_watches("@releaseDomain");
+		fire_special_watches("@releaseDomain", 0, WATCH_NODOM);
 }
 
 static struct domain *find_domain_struct(unsigned int domid)
@@ -747,7 +764,7 @@ static void do_check_domains(void)
 	}
 
 	if (notify)
-		fire_special_watches("@releaseDomain");
+		fire_special_watches("@releaseDomain", 0, WATCH_NODOM);
 }
 
 /* We scan all domains rather than use the information given here. */
@@ -1112,7 +1129,8 @@ static struct domain *introduce_domain(const void *ctx,
 		talloc_steal(domain->conn, domain);
 
 		if (!is_priv_domain && !restore)
-			fire_special_watches("@introduceDomain");
+			fire_special_watches("@introduceDomain", domid,
+					     WATCH_BOTH);
 	} else {
 		/* Use XS_INTRODUCE for recreating the xenbus event-channel. */
 		if (domain->port)
