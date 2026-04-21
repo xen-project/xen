@@ -134,7 +134,7 @@ struct accessed_node
 
 	/* Watch event flags. */
 	bool fire_watch;
-	bool watch_exact;
+	enum watch_match watch_match;
 };
 
 struct transaction
@@ -327,8 +327,10 @@ err:
  * A watch event should be fired for a node modified inside a transaction.
  * Set the corresponding information. A non-exact event is replacing an exact
  * one, but not the other way round.
+ * No special watch handling needed here, so MATCH_DEPTH is no issue.
  */
-void queue_watches(struct connection *conn, const char *name, bool watch_exact)
+void queue_watches(struct connection *conn, const char *name,
+		   enum watch_match watch_match)
 {
 	struct accessed_node *i;
 
@@ -340,9 +342,9 @@ void queue_watches(struct connection *conn, const char *name, bool watch_exact)
 
 	if (!i->fire_watch) {
 		i->fire_watch = true;
-		i->watch_exact = watch_exact;
-	} else if (!watch_exact) {
-		i->watch_exact = false;
+		i->watch_match = watch_match;
+	} else if (watch_match == MATCH_SUBTREE) {
+		i->watch_match = MATCH_SUBTREE;
 	}
 }
 
@@ -419,7 +421,7 @@ static int finalize_transaction(struct connection *conn,
 				db_delete(conn, i->node, NULL);
 		}
 		if (i->fire_watch)
-			fire_watches(conn, trans, i->node, NULL, i->watch_exact,
+			fire_watches(conn, trans, i->node, NULL, i->watch_match,
 				     i->perms.p ? &i->perms : NULL);
 
 		list_del(&i->list);

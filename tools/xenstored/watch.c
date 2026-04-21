@@ -128,7 +128,8 @@ static bool watch_permitted(struct connection *conn, const void *ctx,
  * watch event, too.
  */
 void fire_watches(struct connection *conn, const void *ctx, const char *name,
-		  const struct node *node, bool exact, struct node_perms *perms)
+		  const struct node *node, enum watch_match match,
+		  struct node_perms *perms)
 {
 	struct connection *i;
 	struct buffered_data *req;
@@ -136,7 +137,7 @@ void fire_watches(struct connection *conn, const void *ctx, const char *name,
 
 	/* During transactions, don't fire watches, but queue them. */
 	if (conn && conn->transaction) {
-		queue_watches(conn, name, exact);
+		queue_watches(conn, name, match);
 		return;
 	}
 
@@ -148,17 +149,34 @@ void fire_watches(struct connection *conn, const void *ctx, const char *name,
 			continue;
 
 		list_for_each_entry(watch, &i->watches, list) {
-			if (exact) {
-				if (streq(name, watch->node))
-					send_event(req, i,
-						   get_watch_path(watch, name),
-						   watch->token);
-			} else {
-				if (is_child(name, watch->node, watch->depth))
-					send_event(req, i,
-						   get_watch_path(watch, name),
-						   watch->token);
+			bool send = false;
+
+			switch (match) {
+			case MATCH_EXACT:
+				send = streq(name, watch->node);
+				break;
+
+			case MATCH_SUBTREE:
+				send = is_child(name, watch->node,
+						watch->depth);
+				break;
+
+			case MATCH_DEPTH:
+				send = streq(name, watch->node) ||
+				       (watch->depth > 0 &&
+					is_child(name, watch->node,
+						 watch->depth));
+				break;
+
+			case MATCH_NODEPTH:
+				send = streq(name, watch->node) &&
+				       watch->depth < 0;
+				break;
 			}
+
+			if (send)
+				send_event(req, i, get_watch_path(watch, name),
+					   watch->token);
 		}
 	}
 }

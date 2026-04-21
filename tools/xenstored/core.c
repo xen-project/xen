@@ -1613,7 +1613,7 @@ static int do_write(const void *ctx, struct connection *conn,
 			return errno;
 	}
 
-	fire_watches(conn, ctx, name, node, false, NULL);
+	fire_watches(conn, ctx, name, node, MATCH_SUBTREE, NULL);
 	send_ack(conn, XS_WRITE);
 
 	return 0;
@@ -1637,7 +1637,7 @@ static int do_mkdir(const void *ctx, struct connection *conn,
 		node = create_node(conn, ctx, name, NULL, 0);
 		if (!node)
 			return errno;
-		fire_watches(conn, ctx, name, node, false, NULL);
+		fire_watches(conn, ctx, name, node, MATCH_SUBTREE, NULL);
 	}
 	send_ack(conn, XS_MKDIR);
 
@@ -1683,7 +1683,7 @@ static int delnode_sub(const void *ctx, struct connection *conn,
 		       struct node *node, void *arg)
 {
 	const char *root = arg;
-	bool watch_exact;
+	enum watch_match watch_match;
 	int ret;
 	const char *db_name;
 
@@ -1703,8 +1703,8 @@ static int delnode_sub(const void *ctx, struct connection *conn,
 	 * This fine as we are single threaded and the next possible read will
 	 * be handled only after the node has been really removed.
 	*/
-	watch_exact = strcmp(root, node->name);
-	fire_watches(conn, ctx, node->name, node, watch_exact, NULL);
+	watch_match = strcmp(root, node->name) ? MATCH_EXACT : MATCH_SUBTREE;
+	fire_watches(conn, ctx, node->name, node, watch_match, NULL);
 
 	return WALK_TREE_RM_CHILDENTRY;
 }
@@ -1858,7 +1858,7 @@ static int do_set_perms(const void *ctx, struct connection *conn,
 	if (write_node(conn, node, NODE_MODIFY, false))
 		return errno;
 
-	fire_watches(conn, ctx, name, node, false, &old_perms);
+	fire_watches(conn, ctx, name, node, MATCH_SUBTREE, &old_perms);
 	send_ack(conn, XS_SET_PERMS);
 
 	return 0;

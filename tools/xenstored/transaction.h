@@ -18,6 +18,7 @@
 #ifndef _XENSTORED_TRANSACTION_H
 #define _XENSTORED_TRANSACTION_H
 #include "core.h"
+#include "watch.h"
 
 enum node_access_type {
     NODE_ACCESS_READ,
@@ -44,7 +45,8 @@ int __must_check access_node(struct connection *conn, struct node *node,
                              enum node_access_type type, const char **db_name);
 
 /* Queue watches for a modified node. */
-void queue_watches(struct connection *conn, const char *name, bool watch_exact);
+void queue_watches(struct connection *conn, const char *name,
+		   enum watch_match watch_match);
 
 /* Prepend the transaction to name if appropriate. */
 const char *transaction_prepend(struct connection *conn, const char *name);

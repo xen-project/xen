@@ -27,8 +27,15 @@ int do_unwatch(const void *ctx, struct connection *conn,
 	       struct buffered_data *in);
 
 /* Fire all watches: !exact means all the children are affected (ie. rm). */
+enum watch_match {
+	MATCH_EXACT,
+	MATCH_SUBTREE,
+	MATCH_DEPTH,	/* watches with depth > 0, MATCH_SUBTREE semantics */
+	MATCH_NODEPTH	/* watches with no depth, MATCH_EXACT semantics */
+};
+
 void fire_watches(struct connection *conn, const void *tmp, const char *name,
-		  const struct node *node, bool exact,
+		  const struct node *node, enum watch_match match,
 		  struct node_perms *perms);
 
 void conn_delete_all_watches(struct connection *conn);
