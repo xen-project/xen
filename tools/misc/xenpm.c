@@ -32,11 +32,14 @@
 
 #include <xen-tools/common-macros.h>
 
+#include <xen/asm/msr-index.h>
+
 #define MAX_PKG_RESIDENCIES 12
 #define MAX_CORE_RESIDENCIES 8
 
 static xc_interface *xc_handle;
 static unsigned int max_cpu_nr;
+static xc_physinfo_t physinfo;
 
 /* help message */
 void show_help(void)
@@ -93,6 +96,7 @@ void show_help(void)
             "                                           units default to \"us\" if unspecified.\n"
             "                                           truncates un-representable values.\n"
             "                                           0 lets the hardware decide.\n"
+            " get-core-temp          [cpuid]      get CPU temperature for <cpuid> or all (Intel only)\n"
             " start [seconds]                     start collect Cx/Px statistics,\n"
             "                                     output after CTRL-C or SIGINT or several seconds.\n"
             " enable-turbo-mode     [cpuid]       enable Turbo Mode for processors that support it.\n"
@@ -1354,6 +1358,121 @@ void enable_turbo_mode(int argc, char *argv[])
                 errno, strerror(errno));
 }
 
+static int fetch_dts_temp(xc_interface *xch, uint32_t cpu, bool package, int *temp)
+{
+    xc_resource_entry_t entries[] = {
+        { .idx = package ? MSR_PACKAGE_THERM_STATUS : MSR_IA32_THERM_STATUS },
+        { .idx = MSR_TEMPERATURE_TARGET },
+    };
+    struct xc_resource_op ops = {
+        .cpu = cpu,
+        .entries = entries,
+        .nr_entries = ARRAY_SIZE(entries),
+    };
+    int tjmax;
+
+    int ret = xc_resource_op(xch, 1, &ops);
+
+    switch ( ret )
+    {
+    case 0:
+        /* This CPU isn't online or can't query this MSR */
+        errno = ENODATA;
+        return -1;
+
+    case 1:
+    {
+        /*
+         * The CPU doesn't support MSR_TEMPERATURE_TARGET, we assume it's 100
+         * which is correct aside a few selected Atom CPUs. Check Linux
+         * kernel's coretemp.c for more information.
+         */
+        static bool has_reported_once = false;
+
+        if ( !has_reported_once )
+        {
+            fprintf(stderr, "MSR_TEMPERATURE_TARGET is not supported, assume "
+                            "tjmax = 100, readings may be incorrect.\n");
+            has_reported_once = true;
+        }
+
+        tjmax = 100;
+        break;
+    }
+
+    case 2:
+        tjmax = (entries[1].val >> 16) & 0xff;
+        break;
+
+    default:
+        if ( ret > 0 )
+        {
+            fprintf(stderr, "Got unexpected xc_resource_op return value: %d", ret);
+            errno = EINVAL;
+        }
+        return -1;
+    }
+
+    *temp = tjmax - ((entries[0].val >> 16) & 0xff);
+    return 0;
+}
+
+static void get_core_temp(int argc, char *argv[])
+{
+    int temp = -1, cpu = -1;
+    unsigned int socket;
+    bool has_data = false;
+
+    if ( argc > 0 )
+        parse_cpuid(argv[0], &cpu);
+
+    if ( cpu != -1 )
+    {
+        if ( fetch_dts_temp(xc_handle, cpu, false, &temp) )
+        {
+            fprintf(stderr, "Unable to fetch temperature (%d - %s)\n",
+                    errno, strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+        else
+            printf("CPU%d: %d°C\n", cpu, temp);
+        return;
+    }
+
+    /* Per socket measurement */
+    for ( socket = 0, cpu = 0; cpu < max_cpu_nr;
+          socket++, cpu += physinfo.cores_per_socket * physinfo.threads_per_core )
+    {
+        if ( fetch_dts_temp(xc_handle, cpu, true, &temp) )
+        {
+            fprintf(stderr,
+                    "[Package%u] Unable to fetch temperature (%d - %s)\n",
+                    cpu, errno, strerror(errno));
+            /* CPU may not support package temperatures, but still support DTS */
+            break;
+        }
+
+        has_data = true;
+        printf("Package%u: %d°C\n", socket, temp);
+    }
+
+    for ( cpu = 0; cpu < max_cpu_nr; cpu += physinfo.threads_per_core )
+    {
+        if ( fetch_dts_temp(xc_handle, cpu, false, &temp) )
+        {
+            fprintf(stderr, "[CPU%d] Unable to fetch temperature (%d - %s)\n",
+                    cpu, errno, strerror(errno));
+            continue;
+        }
+
+        has_data = true;
+        printf("CPU%d: %d°C\n", cpu, temp);
+    }
+
+    if ( !has_data )
+        exit(EXIT_FAILURE);
+}
+
 void disable_turbo_mode(int argc, char *argv[])
 {
     int cpuid = -1;
@@ -1618,12 +1737,12 @@ struct {
     { "set-max-cstate", set_max_cstate_func},
     { "enable-turbo-mode", enable_turbo_mode },
     { "disable-turbo-mode", disable_turbo_mode },
+    { "get-core-temp", get_core_temp },
 };
 
 int main(int argc, char *argv[])
 {
     int i, ret = 0;
-    xc_physinfo_t physinfo;
     int nr_matches = 0;
     int matches_main_options[ARRAY_SIZE(main_options)];
 

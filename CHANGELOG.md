@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
      mitigate (by rate-limiting) the system wide impact of an HVM guest
      misusing atomic instructions.
    - Support for CPIO microcode in discrete multiboot modules.
+   - Introduce get-core-temp command to xenpm to query CPU temperatures on
+     Intel platforms.
 
  - On Arm:
    - Support for guest suspend and resume to/from RAM via vPSCI.
