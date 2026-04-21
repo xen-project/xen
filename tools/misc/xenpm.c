@@ -1377,7 +1377,7 @@ static int fetch_dts_temp(xc_interface *xch, uint32_t cpu, bool package, int *te
     {
     case 0:
         /* This CPU isn't online or can't query this MSR */
-        errno = ENODATA;
+        errno = ENODEV;
         return -1;
 
     case 1:
