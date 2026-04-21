@@ -43,7 +43,8 @@
 #include <mini-os/xenbus.h>
 #endif
 
-#define XENSTORE_FEATURES	XENSTORE_SERVER_FEATURE_ERROR
+#define XENSTORE_FEATURES	(XENSTORE_SERVER_FEATURE_ERROR |	\
+				 XENSTORE_SERVER_FEATURE_WATCHDEPTH)
 
 static xenmanage_handle *xm_handle;
 xengnttab_handle **xgt_handle;
