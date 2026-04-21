@@ -858,7 +858,8 @@ static bool __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
     what = L"Allocation";
     file->addr = min(1UL << (32 + PAGE_SHIFT),
                      HYPERVISOR_VIRT_END - DIRECTMAP_VIRT_START);
-    /* For config files allocate an extra byte to put a NUL there. */
+
+    /* For config file buffers, allocate space for the terminating NUL byte */
     ret = efi_bs->AllocatePages(AllocateMaxAddress, EfiLoaderData,
                                 PFN_UP(size + (file == &cfg)), &file->addr);
     if ( EFI_ERROR(ret) )
@@ -877,10 +878,12 @@ static bool __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
 
     FileHandle->Close(FileHandle);
 
-    efi_arch_flush_dcache_area(file->ptr, file->size);
-
     if ( file == &cfg )
-        file->str[file->size] = 0;
+    {
+        file->str[file->size] = 0; /* NUL-terminate the config data buffer. */
+        file->size += 1;           /* Free the same page count as allocated. */
+    }
+    efi_arch_flush_dcache_area(file->ptr, file->size);
 
     return true;
 
@@ -907,9 +910,9 @@ static bool __init read_section(const EFI_LOADED_IMAGE *image,
 
     file->ptr = ptr;
 
-    /* For cfg file, if necessary allocate space to put an extra NUL there. */
     if ( file == &cfg && file->size && !iscntrl(file->str[file->size - 1]) )
     {
+        /* Create a copy the config section for terminating the config buffer */
         EFI_PHYSICAL_ADDRESS addr;
         EFI_STATUS ret = efi_bs->AllocatePages(AllocateMaxAddress,
                                                EfiLoaderData,
@@ -922,6 +925,7 @@ static bool __init read_section(const EFI_LOADED_IMAGE *image,
         file->addr = addr;
         file->need_to_free = true;
         file->str[file->size] = 0;
+        file->size += 1; /* Free the same page count as allocated. */
     }
 
     handle_file_info(name, file, options);
