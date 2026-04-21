@@ -183,6 +183,9 @@ void lu_read_state(void)
 		case XS_STATE_TYPE_WATCH:
 			read_state_watch(ctx, state.buf);
 			break;
+		case XS_STATE_TYPE_WATCH_EXT:
+			read_state_watch_ext(ctx, state.buf);
+			break;
 		case XS_STATE_TYPE_TA:
 			xprintf("live-update: ignore transaction record\n");
 			break;

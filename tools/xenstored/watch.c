@@ -39,26 +39,35 @@ struct watch
 	/* Offset into path for skipping prefix (used for relative paths). */
 	unsigned int prefix_len;
 
+	int depth;	/* -1: no depth limit. */
 	char *token;
 	char *node;
 };
 
 /* Is child a subnode of parent, or equal? */
-static bool is_child(const char *child, const char *parent)
+static bool is_child(const char *child, const char *parent, int depth)
 {
-	unsigned int len = strlen(parent);
-
-	/*
-	 * / should really be "" for this algorithm to work, but that's a
-	 * usability nightmare.
-	 */
-	if (streq(parent, "/"))
-		return true;
+	unsigned int len = strlen(parent);	/* len == 1 if parent is "/". */
+	unsigned int sub_levels = (len == 1) ? 1 : 0;
 
 	if (strncmp(child, parent, len) != 0)
 		return false;
 
-	return child[len] == '/' || child[len] == '\0';
+	if (child[len] != '/' && child[len] != '\0' && len > 1)
+		return false;
+
+	if (depth < 0 || child[len] == '\0')
+		return true;
+
+	while (sub_levels <= depth) {
+		if (child[len] == '\0')
+			return true;
+		if (child[len] == '/')
+			sub_levels++;
+		len++;
+	}
+
+	return false;
 }
 
 static const char *get_watch_path(const struct watch *watch, const char *name)
@@ -145,7 +154,7 @@ void fire_watches(struct connection *conn, const void *ctx, const char *name,
 						   get_watch_path(watch, name),
 						   watch->token);
 			} else {
-				if (is_child(name, watch->node))
+				if (is_child(name, watch->node, watch->depth))
 					send_event(req, i,
 						   get_watch_path(watch, name),
 						   watch->token);
@@ -170,7 +179,7 @@ static int check_watch_path(struct connection *conn, const void *ctx,
 }
 
 static struct watch *add_watch(struct connection *conn, const char *path,
-			       const char *token, bool relative,
+			       const char *token, int depth, bool relative,
 			       bool no_quota_check)
 {
 	struct watch *watch;
@@ -178,6 +187,7 @@ static struct watch *add_watch(struct connection *conn, const char *path,
 	watch = talloc(conn, struct watch);
 	if (!watch)
 		goto nomem;
+	watch->depth = depth;
 	watch->node = talloc_strdup(watch, path);
 	watch->token = talloc_strdup(watch, token);
 	if (!watch->node || !watch->token)
@@ -204,6 +214,7 @@ int do_watch(const void *ctx, struct connection *conn, struct buffered_data *in)
 {
 	struct watch *watch;
 	const char *vec[2];
+	int depth = -1;
 	bool relative;
 
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
@@ -223,7 +234,7 @@ int do_watch(const void *ctx, struct connection *conn, struct buffered_data *in)
 	if (domain_quota_add_exceeds(conn->domain, ACC_WATCH, 1))
 		return ENOSPC;
 
-	watch = add_watch(conn, vec[0], vec[1], relative, false);
+	watch = add_watch(conn, vec[0], vec[1], depth, relative, false);
 	if (!watch)
 		return errno;
 
@@ -287,28 +298,47 @@ const char *dump_state_watches(FILE *fp, struct connection *conn,
 	const char *ret = NULL;
 	struct watch *watch;
 	struct xs_state_watch sw;
+	struct xs_state_watch_ext swe;
 	struct xs_state_record_header head;
 	const char *path;
-
-	head.type = XS_STATE_TYPE_WATCH;
+	size_t path_len, token_len;
 
 	list_for_each_entry(watch, &conn->watches, list) {
-		head.length = sizeof(sw);
-
-		sw.conn_id = conn_id;
 		path = get_watch_path(watch, watch->node);
-		sw.path_length = strlen(path) + 1;
-		sw.token_length = strlen(watch->token) + 1;
-		head.length += sw.path_length + sw.token_length;
+		path_len = strlen(path) + 1;
+		token_len = strlen(watch->token) + 1;
+
+		if (watch->depth >= 0) {
+			head.type = XS_STATE_TYPE_WATCH_EXT;
+			head.length = sizeof(swe);
+			swe.conn_id = conn_id;
+			swe.path_length = path_len;
+			swe.token_length = token_len;
+			swe.depth = watch->depth;
+		} else {
+			head.type = XS_STATE_TYPE_WATCH;
+			head.length = sizeof(sw);
+			sw.conn_id = conn_id;
+			sw.path_length = path_len;
+			sw.token_length = token_len;
+		}
+
+		head.length += path_len + token_len;
 		head.length = ROUNDUP(head.length, 3);
 		if (fwrite(&head, sizeof(head), 1, fp) != 1)
 			return "Dump watch state error";
-		if (fwrite(&sw, sizeof(sw), 1, fp) != 1)
-			return "Dump watch state error";
 
-		if (fwrite(path, sw.path_length, 1, fp) != 1)
+		if (watch->depth >= 0) {
+			if (fwrite(&swe, sizeof(sw), 1, fp) != 1)
+				return "Dump watch state ext error";
+		} else {
+			if (fwrite(&sw, sizeof(sw), 1, fp) != 1)
+				return "Dump watch state error";
+		}
+
+		if (fwrite(path, path_len, 1, fp) != 1)
 			return "Dump watch path error";
-		if (fwrite(watch->token, sw.token_length, 1, fp) != 1)
+		if (fwrite(watch->token, token_len, 1, fp) != 1)
 			return "Dump watch token error";
 
 		ret = dump_state_align(fp);
@@ -319,27 +349,41 @@ const char *dump_state_watches(FILE *fp, struct connection *conn,
 	return ret;
 }
 
-void read_state_watch(const void *ctx, const void *state)
+static void process_state_watch(const void *ctx, unsigned int conn_id,
+				const char *path, const char *token,
+				int depth)
 {
-	const struct xs_state_watch *sw = state;
 	struct connection *conn;
-	const char *path, *token;
 	bool relative;
 
-	conn = get_connection_by_id(sw->conn_id);
+	conn = get_connection_by_id(conn_id);
 	if (!conn)
 		barf("connection not found for read watch");
-
-	path = (char *)sw->data;
-	token = path + sw->path_length;
 
 	/* Don't check success, we want the relative information only. */
 	check_watch_path(conn, ctx, &path, &relative);
 	if (!path)
 		barf("allocation error for read watch");
 
-	if (!add_watch(conn, path, token, relative, true))
+	if (!add_watch(conn, path, token, depth, relative, true))
 		barf("error adding watch");
+
+}
+
+void read_state_watch(const void *ctx, const void *state)
+{
+	const struct xs_state_watch *sw = state;
+
+	process_state_watch(ctx, sw->conn_id, (char *)sw->data,
+			    (char *)sw->data + sw->path_length, -1);
+}
+
+void read_state_watch_ext(const void *ctx, const void *state)
+{
+	const struct xs_state_watch_ext *swe = state;
+
+	process_state_watch(ctx, swe->conn_id, (char *)swe->data,
+			    (char *)swe->data + swe->path_length, swe->depth);
 }
 
 /*
