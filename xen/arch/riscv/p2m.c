@@ -1534,3 +1534,16 @@ void p2m_handle_vmenter(void)
      * won't be reused until need_flush is set to true.
      */
 }
+
+struct page_info *get_page_from_gfn(struct domain *d, unsigned long gfn,
+                                    p2m_type_t *t, p2m_query_t q)
+{
+    /*
+     * System domains are domains which don't have p2m translation tables,
+     * so they can't use p2m_get_page_from_gfn() and extra care should be
+     * taken for them.
+     */
+    ASSERT(!is_system_domain(d));
+
+    return p2m_get_page_from_gfn(p2m_get_hostp2m(d), _gfn(gfn), t);
+}
