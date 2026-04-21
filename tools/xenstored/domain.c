@@ -1323,10 +1323,17 @@ int do_get_feature(const void *ctx, struct connection *conn,
 	char *result;
 
 	n_args = get_strings(in, vec, ARRAY_SIZE(vec));
-	if (n_args > 1)
-		return EINVAL;
 
-	if (n_args == 1) {
+	if (!n_args) {
+		features = conn->domain ? conn->domain->features
+					: XENSTORE_FEATURES;
+	} else {
+		if (domain_is_unprivileged(conn))
+			return EACCES;
+
+		if (n_args > 1)
+			return EINVAL;
+
 		domid = parse_domid(vec[0]);
 		if (errno)
 			return errno;
@@ -1334,8 +1341,7 @@ int do_get_feature(const void *ctx, struct connection *conn,
 		if (!domain)
 			return ENOENT;
 		features = domain->features;
-	} else
-		features = XENSTORE_FEATURES;
+	}
 
 	result = talloc_asprintf(ctx, "%u", features);
 	if (!result)

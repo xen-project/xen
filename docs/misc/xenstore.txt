@@ -430,13 +430,14 @@ SET_FEATURE		<domid>|<value>|
 	to set a bit for a feature not being supported by the running
 	Xenstore will be denied. Providing no <domid> with the
 	GET_FEATURE command will return the features which are supported
-	by Xenstore.
+	by Xenstore for the domain issuing the command.
 
 	SET_FEATURE for a domain will be rejected after the INTRODUCE
-	command for this domain has been sent to xenstored.
+	command for this domain has been sent to xenstored. This has the
+	effect that dom0 will always have all supported features enabled.
 
-	xenstored prevents the use of GET_FEATURE and SET_FEATURE other
-	than by dom0.
+	xenstored prevents the use of GET_FEATURE with a domid specified
+	and SET_FEATURE other than by dom0.
 
 GET_QUOTA		[[<domid>|]<quota>|]	<value>|
 SET_QUOTA		[<domid>|]<quota>|<value>|
