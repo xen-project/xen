@@ -445,7 +445,7 @@ do_watch(struct xs_handle *xsh, int max_events)
 static int
 perform(enum mode mode, int optind, int argc, char **argv, struct xs_handle *xsh,
         xs_transaction_t xth, int prefix, int tidy, int upto, int recurse, int nr_watches,
-        int raw)
+        int raw, int depth)
 {
     switch (mode) {
     case MODE_ls:
@@ -627,8 +627,11 @@ perform(enum mode mode, int optind, int argc, char **argv, struct xs_handle *xsh
             for (; argv[optind]; optind++) {
                 const char *w = argv[optind];
 
-                if (!xs_watch(xsh, w, w))
+                if (depth < 0 && !xs_watch(xsh, w, w))
                     errx(1, "Unable to add watch on %s\n", w);
+                if (depth >= 0 && !xs_watch_depth(xsh, w, w, depth))
+                    errx(1, "Unable to add watch on %s with depth %d\n", w,
+                         depth);
             }
             do_watch(xsh, nr_watches);
         }
@@ -676,6 +679,7 @@ main(int argc, char **argv)
     int nr_watches = -1;
     int transaction;
     int raw = 0;
+    int depth = -1;
     struct winsize ws;
     enum mode mode;
 
@@ -709,10 +713,11 @@ main(int argc, char **argv)
 	    {"recurse", 0, 0, 'r'}, /* MODE_chmod */
 	    {"number",  1, 0, 'n'}, /* MODE_watch */
 	    {"raw",     0, 0, 'R'}, /* MODE_read || MODE_write */
+	    {"depth",   1, 0, 'd'}, /* MODE_watch */
 	    {0, 0, 0, 0}
 	};
 
-	c = getopt_long(argc - switch_argv, argv + switch_argv, "hfspturn:R",
+	c = getopt_long(argc - switch_argv, argv + switch_argv, "hfspturn:Rd:",
 			long_options, &index);
 	if (c == -1)
 	    break;
@@ -763,6 +768,12 @@ main(int argc, char **argv)
 	case 'R':
 	    if ( mode == MODE_read || mode == MODE_write )
 		raw = 1;
+	    else
+		usage(1, mode, switch_argv, argv[0]);
+	    break;
+	case 'd':
+	    if ( mode == MODE_watch )
+		depth = atoi(optarg);
 	    else
 		usage(1, mode, switch_argv, argv[0]);
 	    break;
@@ -819,7 +830,7 @@ again:
 	    errx(1, "couldn't start transaction");
     }
 
-    ret = perform(mode, optind, argc - switch_argv, argv + switch_argv, xsh, xth, prefix, tidy, upto, recurse, nr_watches, raw);
+    ret = perform(mode, optind, argc - switch_argv, argv + switch_argv, xsh, xth, prefix, tidy, upto, recurse, nr_watches, raw, depth);
 
     if (transaction && !xs_transaction_end(xsh, xth, ret)) {
 	if (ret == 0 && errno == EAGAIN) {

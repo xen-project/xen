@@ -17,6 +17,15 @@ event happening.
 
 Show the usage information for xenstore-watch and exit the program.
 
+=item B<-d> B<depth>
+
+Limit the number of sub-directories below the specified I<PATH>s to be
+watched. A B<depth> of 0 will watch only the specified nodes, a B<depth>
+of 1 will watch the specified nodes and their direct children, etc.
+
+Using this option requires xenstored to support the Xenstore watch depth
+feature. In case it is not supported, the B<-d> usage will be rejected.
+
 =item B<-n> B<NR>
 
 Stop waiting after having received B<NR> watch events.
