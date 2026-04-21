@@ -177,6 +177,22 @@ bool xs_set_permissions(struct xs_handle *h, xs_transaction_t t,
  */
 bool xs_watch(struct xs_handle *h, const char *path, const char *token);
 
+/* Same as xs_watch(), but with limiting the matching for modified
+ * children to a specified depth (depth 0 only matches the node itself,
+ * depth 1 will additionally match direct children of the node, etc.).
+ * Only supported if the XENSTORE_SERVER_FEATURE_WATCHDEPTH (4) is set
+ * in the returned features of xs_get_features_supported().
+ */
+bool xs_watch_depth(struct xs_handle *h, const char *path, const char *token,
+		    unsigned int depth);
+
+/* If supported, same as xs_watch_depth(), use xs_watch() otherwise.
+ * As a result watches might trigger for nodes below the watched path, too.
+ * Not to be used for special watches!
+ */
+bool xs_watch_try_depth(struct xs_handle *h, const char *path,
+			const char *token, unsigned int depth);
+
 /* Return the FD to poll on to see if a watch has fired. */
 int xs_fileno(struct xs_handle *h);
 

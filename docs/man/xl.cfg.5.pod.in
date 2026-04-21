@@ -740,6 +740,12 @@ Xenstore is capable to reconnect to a guest.
 Xenstore will present an error value in case it disconnects due to an error
 condition.
 
+=item B<0x00000004>
+
+Xenstore supports to set watches with a limited depth (depth 0 matches
+only the watched node, depth 1 matches the node and its direct children,
+etc.).
+
 =back
 
 The features supported by the running Xenstore instance can be retrieved

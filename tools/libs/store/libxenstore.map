@@ -52,4 +52,6 @@ VERS_4.2 {
 		xs_set_global_quota;
 		xs_get_domain_quota;
 		xs_set_domain_quota;
+		xs_watch_depth;
+		xs_watch_try_depth;
 } VERS_4.1;

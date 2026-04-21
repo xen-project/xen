@@ -984,16 +984,8 @@ bool xs_restrict(struct xs_handle *h, unsigned domid)
 	return false;
 }
 
-/* Watch a node for changes (poll on fd to detect, or call read_watch()).
- * When the node (or any child) changes, fd will become readable.
- * Token is returned when watch is read, to allow matching.
- * Returns false on failure.
- */
-bool xs_watch(struct xs_handle *h, const char *path, const char *token)
+static bool xs_watch_helper(struct xs_handle *h)
 {
-	struct xsd_sockmsg msg = { .type = XS_WATCH };
-	struct iovec iov[3];
-
 #ifdef USE_PTHREAD
 #define DEFAULT_THREAD_STACKSIZE (16 * 1024)
 /* NetBSD doesn't have PTHREAD_STACK_MIN. */
@@ -1001,8 +993,8 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token)
 # define PTHREAD_STACK_MIN 0
 #endif
 
-#define READ_THREAD_STACKSIZE 					\
-	((DEFAULT_THREAD_STACKSIZE < PTHREAD_STACK_MIN) ? 	\
+#define READ_THREAD_STACKSIZE					\
+	((DEFAULT_THREAD_STACKSIZE < PTHREAD_STACK_MIN) ?	\
 	 PTHREAD_STACK_MIN : DEFAULT_THREAD_STACKSIZE)
 
 	/* We dynamically create a reader thread on demand. */
@@ -1050,6 +1042,22 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token)
 	mutex_unlock(&h->request_mutex);
 #endif
 
+	return true;
+}
+
+/* Watch a node for changes (poll on fd to detect, or call read_watch()).
+ * When the node (or any child) changes, fd will become readable.
+ * Token is returned when watch is read, to allow matching.
+ * Returns false on failure.
+ */
+bool xs_watch(struct xs_handle *h, const char *path, const char *token)
+{
+	struct xsd_sockmsg msg = { .type = XS_WATCH };
+	struct iovec iov[3];
+
+	if (!xs_watch_helper(h))
+		return false;
+
 	iov[0].iov_base = &msg;
 	iov[0].iov_len  = sizeof(msg);
 	iov[1].iov_base = (void *)path;
@@ -1060,6 +1068,63 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token)
 	return xs_bool(xs_talkv(h, iov, ARRAY_SIZE(iov), NULL));
 }
 
+/* Same as xs_watch(), but with limiting the matching for modified
+ * children to a specified depth (depth 0 only matches the node itself,
+ * depth 1 will additionally match direct children of the node, etc.).
+ * Only supported if the XENSTORE_SERVER_FEATURE_WATCHDEPTH (4) is set
+ * in the returned features of xs_get_features_supported().
+ */
+bool xs_watch_depth(struct xs_handle *h, const char *path, const char *token,
+		    unsigned int depth)
+{
+	struct xsd_sockmsg msg = { .type = XS_WATCH };
+	struct iovec iov[4];
+	char depthstr[MAX_STRLEN(depth)];
+	static bool depth_supported;
+
+	if (!xs_watch_helper(h))
+		return false;
+
+	if (!depth_supported) {
+		unsigned int features;
+
+		if (!xs_get_features_supported(h, &features))
+			return false;
+		if (!(features & XENSTORE_SERVER_FEATURE_WATCHDEPTH))
+			return false;
+		depth_supported = true;
+	}
+
+	snprintf(depthstr, sizeof(depthstr), "%u", depth);
+
+	iov[0].iov_base = &msg;
+	iov[0].iov_len  = sizeof(msg);
+	iov[1].iov_base = (void *)path;
+	iov[1].iov_len  = strlen(path) + 1;
+	iov[2].iov_base = (void *)token;
+	iov[2].iov_len  = strlen(token) + 1;
+	iov[3].iov_base = depthstr;
+	iov[3].iov_len = strlen(depthstr) + 1;
+
+	return xs_bool(xs_talkv(h, iov, ARRAY_SIZE(iov), NULL));
+}
+
+/* If supported, same as xs_watch_depth(), use xs_watch() otherwise.
+ * As a result watches might trigger for nodes below the watched path, too.
+ * Not to be used for special watches!
+ */
+bool xs_watch_try_depth(struct xs_handle *h, const char *path,
+			const char *token, unsigned int depth)
+{
+	unsigned int features;
+
+	if (xs_get_features_supported(h, &features) &&
+	    (features & XENSTORE_SERVER_FEATURE_WATCHDEPTH) &&
+	    xs_watch_depth(h, path, token, depth))
+		return true;
+
+	return xs_watch(h, path, token);
+}
 
 /* Clear the pipe token if there are no more pending watchs.
  * We suppose the watch_mutex is already taken.
@@ -1420,13 +1485,26 @@ static bool xs_uint(char *reply, unsigned int *uintval)
 
 bool xs_get_features_supported(struct xs_handle *h, unsigned int *features)
 {
+	static unsigned int own_features = 0;
+	static bool features_valid = false;
 	struct xsd_sockmsg msg = { .type = XS_GET_FEATURE };
 	struct iovec iov[1];
+
+	if (features_valid) {
+		*features = own_features;
+		return true;
+	}
 
 	iov[0].iov_base = &msg;
 	iov[0].iov_len  = sizeof(msg);
 
-	return xs_uint(xs_talkv(h, iov, ARRAY_SIZE(iov), NULL), features);
+	if (!xs_uint(xs_talkv(h, iov, ARRAY_SIZE(iov), NULL), &own_features))
+		return false;
+
+	features_valid = true;
+	*features = own_features;
+
+	return true;
 }
 
 bool xs_get_features_domain(struct xs_handle *h, unsigned int domid,

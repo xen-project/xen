@@ -124,6 +124,8 @@ struct xenstore_domain_interface {
 #define XENSTORE_SERVER_FEATURE_RECONNECTION 1
 /* The presence of the "error" field in the ring page */
 #define XENSTORE_SERVER_FEATURE_ERROR        2
+/* The XS_WATCH command can be used with a <depth> parameter */
+#define XENSTORE_SERVER_FEATURE_WATCHDEPTH   4
 
 /* Valid values for the connection field */
 #define XENSTORE_CONNECTED 0 /* the steady-state */
