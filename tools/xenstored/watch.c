@@ -213,11 +213,18 @@ static struct watch *add_watch(struct connection *conn, const char *path,
 int do_watch(const void *ctx, struct connection *conn, struct buffered_data *in)
 {
 	struct watch *watch;
-	const char *vec[2];
+	const char *vec[3];
+	unsigned int n_pars;
 	int depth = -1;
 	bool relative;
 
-	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
+	n_pars = get_strings(in, vec, ARRAY_SIZE(vec));
+	if (n_pars == 3 &&
+	    feature_available(conn, XENSTORE_SERVER_FEATURE_WATCHDEPTH)) {
+		depth = atoi(vec[2]);
+		if (depth < 0)
+			return EINVAL;
+	} else if (n_pars != 2)
 		return EINVAL;
 
 	errno = check_watch_path(conn, ctx, &(vec[0]), &relative);

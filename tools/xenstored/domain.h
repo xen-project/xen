@@ -188,4 +188,6 @@ struct hashtable *domain_check_acc_init(void);
 void domain_check_acc_add(const struct node *node, struct hashtable *domains);
 void domain_check_acc(struct hashtable *domains);
 
+bool feature_available(const struct connection *conn, unsigned int feature);
+
 #endif /* _XENSTORED_DOMAIN_H */

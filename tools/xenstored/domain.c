@@ -390,6 +390,14 @@ void wrl_apply_debit_trans_commit(struct connection *conn)
 	wrl_apply_debit_actual(conn->domain);
 }
 
+bool feature_available(const struct connection *conn, unsigned int feature)
+{
+	if (!conn->domain)
+		return XENSTORE_FEATURES & feature;
+
+	return conn->domain->features & feature;
+}
+
 static unsigned int domain_get_soft_quota(struct domain *d, enum accitem what)
 {
 	if (d && d->acc[what].val[Q_IDX_SOFT] != Q_VAL_DISABLED)
