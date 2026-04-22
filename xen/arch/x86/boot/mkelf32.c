@@ -17,7 +17,9 @@
 #include <unistd.h>
 #include <inttypes.h>
 
+#include "../../../include/xen/const.h"
 #include "../../../include/xen/elfstructs.h"
+#include "../../../include/xen/macros.h"
 
 #define DYNAMICALLY_FILLED   0
 #define RAW_OFFSET         128
@@ -345,7 +347,7 @@ int main(int argc, char **argv)
      * the Xen image using 2M pages.  To avoid running into adjacent non-RAM
      * regions, pad the segment to the next 2M boundary.
      */
-    mem_siz = ((uint32_t)in64_phdr.p_memsz + (1U << 21) - 1) & (-1U << 21);
+    mem_siz = ROUNDUP((uint32_t)in64_phdr.p_memsz, MB(2));
 
     note_sz = note_base = offset = 0;
     if ( num_phdrs > 1 )
