@@ -4,6 +4,7 @@
 
 #include <xen/bug.h>
 #include <xen/muldiv64.h>
+#include <xen/sections.h>
 
 #include <asm/csr.h>
 
@@ -25,6 +26,8 @@ static inline cycles_t get_cycles(void)
 }
 
 void preinit_xen_time(void);
+
+extern int (* __ro_after_init set_xen_timer)(uint64_t deadline);
 
 #endif /* ASM__RISCV__TIME_H */
 

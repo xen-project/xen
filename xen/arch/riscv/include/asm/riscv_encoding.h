@@ -395,6 +395,8 @@
 #define CSR_VSCAUSE			0x242
 #define CSR_VSTVAL			0x243
 #define CSR_VSIP			0x244
+#define CSR_VSTIMECMP		0x24d
+#define CSR_VSTIMECMPH		0x25d
 #define CSR_VSATP			0x280
 
 /* Virtual Interrupts and Interrupt Priorities (H-extension with AIA) */

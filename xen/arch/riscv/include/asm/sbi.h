@@ -13,7 +13,6 @@
 #define ASM__RISCV__SBI_H
 
 #include <xen/cpumask.h>
-#include <xen/sections.h>
 
 /* SBI-defined implementation ID */
 #define SBI_XEN_IMPID 7
@@ -138,23 +137,6 @@ int sbi_remote_hfence_gvma(const cpumask_t *cpu_mask, vaddr_t start,
  */
 int sbi_remote_hfence_gvma_vmid(const cpumask_t *cpu_mask, vaddr_t start,
                                 size_t size, unsigned long vmid);
-
-/*
- * Programs the clock for next event at (or after) stime_value. stime_value is
- * in absolute time. This function must clear the pending timer interrupt bit
- * as well.
- *
- * If the supervisor wishes to clear the timer interrupt without scheduling the
- * next timer event, it can either request a timer interrupt infinitely far
- * into the future (i.e., (uint64_t)-1), or it can instead mask the timer
- * interrupt by clearing sie.STIE CSR bit.
- *
- * The stime_value parameter represents absolute time measured in ticks.
- *
- * This SBI call returns 0 upon success or an implementation specific negative
- * error code.
- */
-extern int (* __ro_after_init sbi_set_timer)(uint64_t stime_value);
 
 /*
  * Initialize SBI library

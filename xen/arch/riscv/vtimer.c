@@ -4,6 +4,7 @@
 #include <xen/sched.h>
 #include <xen/timer.h>
 
+#include <asm/cpufeature.h>
 #include <asm/vtimer.h>
 
 static void vtimer_expired(void *data)

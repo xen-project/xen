@@ -7,11 +7,20 @@
 #include <xen/time.h>
 #include <xen/types.h>
 
+#include <asm/cpufeature.h>
 #include <asm/csr.h>
-#include <asm/sbi.h>
 
 unsigned long __ro_after_init cpu_khz; /* CPU clock frequency in kHz. */
 uint64_t __ro_after_init boot_clock_cycles;
+
+static int cf_check sstc_set_xen_timer(uint64_t deadline)
+{
+    csr_write64(CSR_STIMECMP, deadline);
+
+    return 0;
+}
+
+int (* __ro_after_init set_xen_timer)(uint64_t deadline);
 
 s_time_t get_s_time(void)
 {
@@ -61,20 +70,7 @@ int reprogram_timer(s_time_t timeout)
     if ( deadline <= now )
         return 0;
 
-    /*
-     * TODO: When the SSTC extension is supported, it would be preferable to
-     *       use the supervisor timer registers directly here for better
-     *       performance, since an SBI call and mode switch would no longer
-     *       be required.
-     *
-     *       This would also reduce reliance on a specific SBI implementation.
-     *       For example, it is not ideal to panic() if sbi_set_timer() returns
-     *       a non-zero value. Currently it can return 0 or -ENOSUPP, and
-     *       without SSTC we still need an implementation because only the
-     *       M-mode timer is available, and it can only be programmed in
-     *       M-mode.
-     */
-    if ( (rc = sbi_set_timer(deadline)) )
+    if ( (rc = set_xen_timer(deadline)) )
         panic("%s: timer wasn't set because: %d\n", __func__, rc);
 
     /* Enable timer interrupt */
@@ -91,4 +87,20 @@ void __init preinit_xen_time(void)
         panic("%s: ACPI isn't supported\n", __func__);
 
     boot_clock_cycles = get_cycles();
+
+    /* set_xen_timer must have been set by sbi_init() already */
+    ASSERT(set_xen_timer);
+
+    if ( riscv_isa_extension_available(NULL, RISCV_ISA_EXT_sstc) )
+    {
+        set_xen_timer = sstc_set_xen_timer;
+
+        /*
+         * A VS-timer interrupt becomes pending whenever the value of
+         * (time + htimedelta) is greater than or equal to vstimecmp CSR.
+         * Thereby to avoid spurious VS-timer irqs set vstimecmp CSR to
+         * ULONG_MAX.
+         */
+        csr_write64(CSR_STIMECMP, ULONG_MAX);
+    }
 }

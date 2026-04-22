@@ -17,6 +17,7 @@
 #include <xen/sections.h>
 
 #include <asm/cpufeature.h>
+#include <asm/csr.h>
 
 #ifdef CONFIG_ACPI
 # error "cpufeature.c functions should be updated to support ACPI"
@@ -139,6 +140,7 @@ const struct riscv_isa_ext_data __initconst riscv_isa_ext[] = {
     RISCV_ISA_EXT_DATA(smaia),
     RISCV_ISA_EXT_DATA(smstateen),
     RISCV_ISA_EXT_DATA(ssaia),
+    RISCV_ISA_EXT_DATA(sstc),
     RISCV_ISA_EXT_DATA(svade),
     RISCV_ISA_EXT_DATA(svpbmt),
 };
@@ -483,6 +485,7 @@ void __init riscv_fill_hwcap(void)
     unsigned int i;
     const size_t req_extns_amount = ARRAY_SIZE(required_extensions);
     bool all_extns_available = true;
+    unsigned long tmp;
 
     riscv_fill_hwcap_from_isa_string();
 
@@ -493,6 +496,21 @@ void __init riscv_fill_hwcap(void)
                                   "\"riscv,isa\" parsing failed";
 
         panic("HW capabilities parsing failed: %s\n", failure_msg);
+    }
+
+    if ( csr_read_safe(CSR_STIMECMP, &tmp) )
+    {
+        dprintk(XENLOG_DEBUG,
+                "SSTC detected; supported for Xen use, but not for guests\n");
+
+        /*
+         * As there is no any guarantee that SSTC will be added to riscv,isa
+         * property by OpenSBI(it doesn't add it now) or whatever ran before
+         * Xen, it is needed to set this bit manually.
+         *
+         * Guest isolation is maintained by not setting ENVCFG_STCE in henvcfg.
+         */
+        __set_bit(RISCV_ISA_EXT_sstc, riscv_isa);
     }
 
     for ( i = 0; i < req_extns_amount; i++ )
