@@ -225,22 +225,22 @@ u32 __kprobes aarch64_insn_gen_nop(void)
  */
 int32_t aarch64_get_branch_offset(uint32_t insn)
 {
-	int32_t imm;
+	uint32_t imm;
 
 	if (aarch64_insn_is_b(insn) || aarch64_insn_is_bl(insn)) {
 		imm = aarch64_insn_decode_immediate(AARCH64_INSN_IMM_26, insn);
-		return (imm << 6) >> 4;
+		return (int32_t)(imm << 6) >> 4;
 	}
 
 	if (aarch64_insn_is_cbz(insn) || aarch64_insn_is_cbnz(insn) ||
 	    aarch64_insn_is_bcond(insn)) {
 		imm = aarch64_insn_decode_immediate(AARCH64_INSN_IMM_19, insn);
-		return (imm << 13) >> 11;
+		return (int32_t)(imm << 13) >> 11;
 	}
 
 	if (aarch64_insn_is_tbz(insn) || aarch64_insn_is_tbnz(insn)) {
 		imm = aarch64_insn_decode_immediate(AARCH64_INSN_IMM_14, insn);
-		return (imm << 18) >> 16;
+		return (int32_t)(imm << 18) >> 16;
 	}
 
 	/* Unhandled instruction */
