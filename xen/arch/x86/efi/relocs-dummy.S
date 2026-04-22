@@ -1,3 +1,4 @@
+#include <xen/macros.h>
 
 	.section .reloc, "a", @progbits
 	.balign 4

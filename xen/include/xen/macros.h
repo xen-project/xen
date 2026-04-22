@@ -38,6 +38,10 @@
 #define __STR(...) #__VA_ARGS__
 #define STR(...) __STR(__VA_ARGS__)
 
+#define KB(_kb)     (_AC(_kb, ULL) << 10)
+#define MB(_mb)     (_AC(_mb, ULL) << 20)
+#define GB(_gb)     (_AC(_gb, ULL) << 30)
+
 #ifndef __ASSEMBLER__
 
 /* Force a compilation error if condition is true */
