@@ -72,18 +72,24 @@ static void __init cuart_init_postirq(struct serial_port *port)
     struct cuart *uart = port->uart;
     int rc;
 
-    if ( uart->irq > 0 )
-    {
-        uart->irqaction.handler = cuart_interrupt;
-        uart->irqaction.name    = "cadence-uart";
-        uart->irqaction.dev_id  = port;
-        if ( (rc = setup_irq(uart->irq, 0, &uart->irqaction)) != 0 )
-            printk("ERROR: Failed to allocate cadence-uart IRQ %d\n", uart->irq);
-    }
+    /* Don't unmask interrupts if no valid irq was provided */
+    if ( uart->irq == 0 )
+        return;
+
+    uart->irqaction.handler = cuart_interrupt;
+    uart->irqaction.name    = "cadence-uart";
+    uart->irqaction.dev_id  = port;
 
     /* Clear pending error interrupts */
     cuart_write(uart, R_UART_RTRIG, 1);
     cuart_write(uart, R_UART_CISR, ~0);
+
+    if ( (rc = setup_irq(uart->irq, 0, &uart->irqaction)) != 0 )
+    {
+        printk("ERROR: Failed to allocate cadence-uart IRQ %u\n", uart->irq);
+        /* Do not unmask interrupts if irq handler wasn't set */
+        return;
+    }
 
     /* Unmask interrupts */
     cuart_write(uart, R_UART_IDR, ~0);
