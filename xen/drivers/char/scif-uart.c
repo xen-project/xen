@@ -187,15 +187,19 @@ static void __init scif_uart_init_postirq(struct serial_port *port)
     uart->irqaction.name    = "scif_uart";
     uart->irqaction.dev_id  = port;
 
-    if ( (rc = setup_irq(uart->irq, 0, &uart->irqaction)) != 0 )
-        dprintk(XENLOG_ERR, "Failed to allocated scif_uart IRQ %d\n",
-                uart->irq);
-
     /* Clear all errors */
     if ( scif_readw(uart, params->status_reg) & params->error_mask )
         scif_writew(uart, params->status_reg, ~params->error_mask);
     if ( scif_readw(uart, params->overrun_reg) & params->overrun_mask )
         scif_writew(uart, params->overrun_reg, ~params->overrun_mask);
+
+    if ( (rc = setup_irq(uart->irq, 0, &uart->irqaction)) != 0 )
+    {
+        dprintk(XENLOG_ERR, "Failed to allocated scif_uart IRQ %u\n",
+                uart->irq);
+        /* Do not unmask interrupts if irq handler wasn't set */
+        return;
+    }
 
     /* Enable TX/RX and Error Interrupts  */
     scif_writew(uart, SCIF_SCSCR, scif_readw(uart, SCIF_SCSCR) |
