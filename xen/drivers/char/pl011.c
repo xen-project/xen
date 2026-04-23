@@ -150,17 +150,23 @@ static void __init pl011_init_postirq(struct serial_port *port)
     struct pl011 *uart = port->uart;
     int rc;
 
-    if ( uart->irq > 0 )
-    {
-        uart->irqaction.handler = pl011_interrupt;
-        uart->irqaction.name    = "pl011";
-        uart->irqaction.dev_id  = port;
-        if ( (rc = setup_irq(uart->irq, 0, &uart->irqaction)) != 0 )
-            printk("ERROR: Failed to allocate pl011 IRQ %d\n", uart->irq);
-    }
+    /* Don't unmask interrupts if no valid irq was provided */
+    if ( uart->irq == 0 )
+        return;
+
+    uart->irqaction.handler = pl011_interrupt;
+    uart->irqaction.name    = "pl011";
+    uart->irqaction.dev_id  = port;
 
     /* Clear pending error interrupts */
     pl011_write(uart, ICR, OEI|BEI|PEI|FEI);
+
+    if ( (rc = setup_irq(uart->irq, 0, &uart->irqaction)) != 0 )
+    {
+        printk("ERROR: Failed to allocate pl011 IRQ %u\n", uart->irq);
+        /* Do not unmask interrupts if irq handler wasn't set */
+        return;
+    }
 
     /* Unmask interrupts */
     pl011_write(uart, IMSC, RTI|OEI|BEI|PEI|FEI|TXI|RXI);
