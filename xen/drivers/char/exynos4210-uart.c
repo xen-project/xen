@@ -199,8 +199,12 @@ static void __init exynos4210_uart_init_postirq(struct serial_port *port)
     uart->irqaction.dev_id  = port;
 
     if ( (rc = setup_irq(uart->irq, 0, &uart->irqaction)) != 0 )
-        dprintk(XENLOG_ERR, "Failed to allocated exynos4210_uart IRQ %d\n",
+    {
+        dprintk(XENLOG_ERR, "Failed to allocated exynos4210_uart IRQ %u\n",
                 uart->irq);
+        /* Do not unmask interrupts if irq handler wasn't set */
+        return;
+    }
 
     /* Unmask interrupts */
     exynos4210_write(uart, UINTM, ~UINTM_ALLI);
