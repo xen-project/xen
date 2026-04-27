@@ -534,7 +534,7 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     if ( ret )
         goto err;
 
-    ret = make_cpus_node(d, kinfo->fdt);
+    ret = make_cpus_node(d, kinfo);
     if ( ret )
         goto err;
 

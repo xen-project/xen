@@ -1163,7 +1163,7 @@ int __init make_psci_node(void *fdt)
     return res;
 }
 
-int __init make_cpus_node(const struct domain *d, void *fdt)
+int __init make_cpus_node(const struct domain *d, struct kernel_info *kinfo)
 {
     int res;
     const struct dt_device_node *cpus = dt_find_node_by_path("/cpus");
@@ -1177,6 +1177,7 @@ int __init make_cpus_node(const struct domain *d, void *fdt)
     /* Keep the compiler happy with -Og */
     bool clock_valid = false;
     uint64_t mpidr_aff;
+    void *fdt = kinfo->fdt;
 
     dt_dprintk("Create cpus node\n");
 
@@ -1625,7 +1626,7 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
         if ( res )
             return res;
 
-        res = make_cpus_node(d, kinfo->fdt);
+        res = make_cpus_node(d, kinfo);
         if ( res )
             return res;
 
