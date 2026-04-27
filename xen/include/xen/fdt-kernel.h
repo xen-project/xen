@@ -44,6 +44,12 @@ struct kernel_info {
     /* Interrupt controller phandle */
     uint32_t phandle_intc;
 
+    /*
+     * Next free phandle for guest device nodes; do not access directly, use
+     * alloc_phandle().
+     */
+    uint32_t next_phandle;
+
     /* loader to use for this kernel */
     void (*load)(struct kernel_info *info);
 
