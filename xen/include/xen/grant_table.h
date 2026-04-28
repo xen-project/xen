@@ -60,8 +60,13 @@ int gnttab_release_mappings(struct domain *d);
 int mem_sharing_gref_to_gfn(struct grant_table *gt, grant_ref_t ref,
                             gfn_t *gfn, uint16_t *status);
 
-int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn,
-                     mfn_t *mfn);
+/*
+ * These need to be used as a pair, as the first (in the success case) returns
+ * with a lock and page reference held which the second needs to drop.
+ */
+int gnttab_map_frame_begin(struct domain *d, unsigned long idx, gfn_t gfn,
+                           mfn_t *mfn);
+void gnttab_map_frame_end(struct domain *d, mfn_t mfn);
 
 unsigned int gnttab_resource_max_frames(const struct domain *d, unsigned int id);
 
@@ -100,11 +105,13 @@ static inline int mem_sharing_gref_to_gfn(struct grant_table *gt,
     return -EINVAL;
 }
 
-static inline int gnttab_map_frame(struct domain *d, unsigned long idx,
-                                   gfn_t gfn, mfn_t *mfn)
+static inline int gnttab_map_frame_begin(struct domain *d, unsigned long idx,
+                                         gfn_t gfn, mfn_t *mfn)
 {
     return -EINVAL;
 }
+
+static inline void gnttab_map_frame_end(struct domain *d, mfn_t mfn) {}
 
 static inline unsigned int gnttab_resource_max_frames(
     const struct domain *d, unsigned int id)

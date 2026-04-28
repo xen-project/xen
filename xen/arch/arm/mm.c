@@ -129,12 +129,10 @@ int xenmem_add_to_physmap_one(
     switch ( space )
     {
     case XENMAPSPACE_grant_table:
-        rc = gnttab_map_frame(d, idx, gfn, &mfn);
+        rc = gnttab_map_frame_begin(d, idx, gfn, &mfn);
         if ( rc )
             return rc;
 
-        /* Need to take care of the reference obtained in gnttab_map_frame(). */
-        page = mfn_to_page(mfn);
         t = p2m_ram_rw;
 
         break;
@@ -236,10 +234,23 @@ int xenmem_add_to_physmap_one(
      * to drop the reference we took earlier. In all other cases we need to
      * drop any reference we took earlier (perhaps indirectly).
      */
-    if ( space == XENMAPSPACE_gmfn_foreign ? rc : page != NULL )
+    switch ( space )
     {
+    default:
+        if ( page )
+            put_page(page);
+        break;
+
+    case XENMAPSPACE_grant_table:
+        gnttab_map_frame_end(d, mfn);
+        break;
+
+    case XENMAPSPACE_gmfn_foreign:
+        if ( !rc )
+            break;
         ASSERT(page != NULL);
         put_page(page);
+        break;
     }
 
     return rc;
