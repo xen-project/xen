@@ -4250,7 +4250,8 @@ int gnttab_acquire_resource(
     return rc;
 }
 
-int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn, mfn_t *mfn)
+int gnttab_map_frame_begin(
+    struct domain *d, unsigned long idx, gfn_t gfn, mfn_t *mfn)
 {
     int rc = 0;
     struct grant_table *gt = d->grant_table;
@@ -4288,9 +4289,17 @@ int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn, mfn_t *mfn)
             put_page(pg);
     }
 
-    grant_write_unlock(gt);
+    if ( rc )
+        grant_write_unlock(d->grant_table);
 
     return rc;
+}
+
+void gnttab_map_frame_end(struct domain *d, mfn_t mfn)
+{
+    put_page(mfn_to_page(mfn));
+
+    grant_write_unlock(d->grant_table);
 }
 
 static void gnttab_usage_print(struct domain *rd)
