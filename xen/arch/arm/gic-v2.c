@@ -408,7 +408,17 @@ static void gicv2_cpu_init(void)
 
 static void gicv2_cpu_disable(void)
 {
-    writel_gicc(0x0, GICC_CTLR);
+    uint32_t ctlr = readl_gicc(GICC_CTLR);
+
+    if ( readl_gicd(GICD_TYPER) & GICD_TYPE_SEC )
+        ctlr |= GICC_NS_CTLR_BYPASS_DISABLE_GRP1_MASK;
+    else
+        ctlr |= GICC_CTLR_BYPASS_DISABLE_GRP0_MASK |
+                GICC_CTLR_BYPASS_DISABLE_GRP1_MASK;
+
+    ctlr &= ~GICC_CTL_ENABLE;
+
+    writel_gicc(ctlr, GICC_CTLR);
 }
 
 static void gicv2_hyp_init(void)

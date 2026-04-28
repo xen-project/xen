@@ -102,8 +102,29 @@
 #define GICD_TYPE_SEC   0x400
 #define GICD_TYPER_DVIS (1U << 18)
 
-#define GICC_CTL_ENABLE 0x1
-#define GICC_CTL_EOI    (0x1 << 9)
+/*
+ * Xen runs in the Non-secure world. When Security Extensions are present,
+ * Xen accesses the Non-secure GICC_CTLR view, where bit[0] is EnableGrp1
+ * and bits[6:5] are the Group 1 bypass-disable bits. Otherwise Xen sees the
+ * common GICC_CTLR layout, where bit[0] is EnableGrp0, bit[1] is EnableGrp1,
+ * bits[6:5] are the Group 0 bypass-disable bits, and bits[8:7] are the
+ * Group 1 bypass-disable bits.
+ */
+#define GICC_CTL_ENABLE        (0x1 << 0)
+#define GICC_CTL_ENABLE_GRP1   (0x1 << 1)
+#define GICC_CTL_FIQBypDisGrp0 (0x1 << 5)
+#define GICC_CTL_IRQBypDisGrp0 (0x1 << 6)
+#define GICC_CTL_FIQBypDisGrp1 (0x1 << 7)
+#define GICC_CTL_IRQBypDisGrp1 (0x1 << 8)
+
+#define GICC_CTLR_BYPASS_DISABLE_GRP0_MASK              \
+    (GICC_CTL_FIQBypDisGrp0 | GICC_CTL_IRQBypDisGrp0)
+#define GICC_CTLR_BYPASS_DISABLE_GRP1_MASK              \
+    (GICC_CTL_FIQBypDisGrp1 | GICC_CTL_IRQBypDisGrp1)
+#define GICC_NS_CTLR_BYPASS_DISABLE_GRP1_MASK           \
+    GICC_CTLR_BYPASS_DISABLE_GRP0_MASK
+
+#define GICC_CTL_EOI           (0x1 << 9)
 
 #define GICC_IA_IRQ       0x03ff
 #define GICC_IA_CPU_MASK  0x1c00
