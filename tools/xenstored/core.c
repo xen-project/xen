@@ -2279,19 +2279,19 @@ struct connection *get_connection_by_id(unsigned int conn_id)
 }
 
 /* We create initial nodes manually. */
-static void manual_node(const char *name, const char *child)
+static void manual_node_perms(const char *name, const char *child,
+			      struct xs_permissions *perms,
+			      unsigned int n_perms)
 {
 	struct node *node;
-	struct xs_permissions perms = { .id = priv_domid,
-					.perms = XS_PERM_NONE };
 
 	node = talloc_zero(NULL, struct node);
 	if (!node)
 		barf_perror("Could not allocate initial node %s", name);
 
 	node->name = name;
-	node->perms = &perms;
-	node->hdr.num_perms = 1;
+	node->perms = perms;
+	node->hdr.num_perms = n_perms;
 	node->children = (char *)child;
 	if (child)
 		node->hdr.childlen = strlen(child) + 1;
@@ -2299,6 +2299,14 @@ static void manual_node(const char *name, const char *child)
 	if (write_node(NULL, node, NODE_CREATE, false))
 		barf_perror("Could not create initial node %s", name);
 	talloc_free(node);
+}
+
+static void manual_node(const char *name, const char *child)
+{
+	struct xs_permissions perms = { .id = priv_domid,
+					.perms = XS_PERM_NONE };
+
+	manual_node_perms(name, child, &perms, 1);
 }
 
 static unsigned int hash_from_key_fn(const void *k)
@@ -2320,6 +2328,11 @@ static int keys_equal_fn(const void *key1, const void *key2)
 
 void setup_structure(bool live_update)
 {
+	struct xs_permissions perms[] = {
+		{ .id = priv_domid,	.perms = XS_PERM_NONE },
+		{ .id = DOMID_ANY,	.perms = XS_PERM_READ },
+	};
+
 	nodes = create_hashtable(NULL, "nodes", hash_from_key_fn, keys_equal_fn,
 				 HASHTABLE_FREE_KEY | HASHTABLE_FREE_VALUE);
 	if (!nodes)
@@ -2331,7 +2344,8 @@ void setup_structure(bool live_update)
 		manual_node("/", "tool");
 		manual_node("/tool", "xenstored");
 		manual_node("/tool/xenstored", NULL);
-		manual_node("@releaseDomain", NULL);
+		manual_node_perms("@releaseDomain", NULL,
+				  perms, ARRAY_SIZE(perms));
 		manual_node("@introduceDomain", NULL);
 		domain_nbentry_fix(priv_domid, 5);
 	}
