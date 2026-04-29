@@ -44,7 +44,8 @@
 #endif
 
 #define XENSTORE_FEATURES	(XENSTORE_SERVER_FEATURE_ERROR |	\
-				 XENSTORE_SERVER_FEATURE_WATCHDEPTH)
+				 XENSTORE_SERVER_FEATURE_WATCHDEPTH |	\
+				 XENSTORE_SERVER_FEATURE_DOMID_ANY)
 
 static xenmanage_handle *xm_handle;
 xengnttab_handle **xgt_handle;
@@ -1754,8 +1755,12 @@ static bool chk_domain_generation(unsigned int domid, uint64_t gen)
  * Allocate all missing struct domain referenced by a permission set.
  * Any permission entries for not existing domains will be marked to be
  * ignored.
+ * A DOMID_ANY entry will be marked to be ignored, if the writing
+ * domain doesn't have the XENSTORE_SERVER_FEATURE_DOMID_ANY enabled. Note
+ * that Xen tools will never set DOMID_ANY for a guest owned node.
  */
-int domain_alloc_permrefs(struct node_perms *perms)
+int domain_alloc_permrefs(const struct connection *conn,
+			  struct node_perms *perms)
 {
 	unsigned int i, domid;
 	struct domain *d;
@@ -1763,6 +1768,12 @@ int domain_alloc_permrefs(struct node_perms *perms)
 
 	for (i = 0; i < perms->num; i++) {
 		domid = perms->p[i].id;
+		if (domid == DOMID_ANY) {
+			if (!(conn->domain->features &
+			      XENSTORE_SERVER_FEATURE_DOMID_ANY))
+				perms->p[i].perms |= XS_PERM_IGNORE;
+			continue;
+		}
 		d = find_domain_struct(domid);
 		if (!d) {
 			if (xenmanage_get_domain_info(xm_handle, domid, NULL,
@@ -1788,6 +1799,7 @@ int domain_adjust_node_perms(struct node *node)
 
 	for (i = 1; i < node->hdr.num_perms; i++) {
 		if ((perms[i].perms & XS_PERM_IGNORE) ||
+		    perms[i].id == DOMID_ANY ||
 		    chk_domain_generation(perms[i].id, node->hdr.generation))
 			continue;
 

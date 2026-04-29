@@ -116,7 +116,8 @@ const char *get_implicit_path(const struct connection *conn);
  */
 int domain_adjust_node_perms(struct node *node);
 
-int domain_alloc_permrefs(struct node_perms *perms);
+int domain_alloc_permrefs(const struct connection *conn,
+			  struct node_perms *perms);
 
 /* Quota manipulation */
 int domain_nbentry_inc(struct connection *conn, unsigned int domid);

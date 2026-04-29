@@ -126,6 +126,8 @@ struct xenstore_domain_interface {
 #define XENSTORE_SERVER_FEATURE_ERROR        2
 /* The XS_WATCH command can be used with a <depth> parameter */
 #define XENSTORE_SERVER_FEATURE_WATCHDEPTH   4
+/* The capability to use DOMID_ANY for node permissions */
+#define XENSTORE_SERVER_FEATURE_DOMID_ANY    8
 
 /* Valid values for the connection field */
 #define XENSTORE_CONNECTED 0 /* the steady-state */

@@ -882,6 +882,16 @@ static int write_node(struct connection *conn, struct node *node,
 	return ret;
 }
 
+/* Check one node permission to match a connection. */
+static bool perm_allows_conn(const struct connection *conn,
+			     const struct xs_permissions *p)
+{
+	if (p->id == conn->id || (conn->target && p->id == conn->target->id))
+		return true;
+
+	return p->id == DOMID_ANY;
+}
+
 unsigned int perm_for_conn(struct connection *conn,
 			   const struct node_perms *perms)
 {
@@ -889,14 +899,13 @@ unsigned int perm_for_conn(struct connection *conn,
 	unsigned int mask = XS_PERM_READ|XS_PERM_WRITE|XS_PERM_OWNER;
 
 	/* Owners and tools get it all... */
-	if (!domain_is_unprivileged(conn) || perms->p[0].id == conn->id
-                || (conn->target && perms->p[0].id == conn->target->id))
+	if (!domain_is_unprivileged(conn) ||
+	    perm_allows_conn(conn, perms->p))
 		return (XS_PERM_READ|XS_PERM_WRITE|XS_PERM_OWNER) & mask;
 
 	for (i = 1; i < perms->num; i++)
 		if (!(perms->p[i].perms & XS_PERM_IGNORE) &&
-		    (perms->p[i].id == conn->id ||
-		     (conn->target && perms->p[i].id == conn->target->id)))
+		    perm_allows_conn(conn, perms->p + i))
 			return perms->p[i].perms & mask;
 
 	return perms->p[0].perms & mask;
@@ -1832,7 +1841,7 @@ static int do_set_perms(const void *ctx, struct connection *conn,
 	if (!xenstore_strings_to_perms(perms.p, perms.num, permstr))
 		return errno;
 
-	if (domain_alloc_permrefs(&perms))
+	if (domain_alloc_permrefs(conn, &perms))
 		return ENOMEM;
 	if (perms.p[0].perms & XS_PERM_IGNORE)
 		return ENOENT;

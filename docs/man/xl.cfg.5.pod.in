@@ -746,6 +746,10 @@ Xenstore supports to set watches with a limited depth (depth 0 matches
 only the watched node, depth 1 matches the node and its direct children,
 etc.).
 
+=item B<0x00000008>
+
+Xenstore supports the B<all domains> node access permission.
+
 =back
 
 The features supported by the running Xenstore instance can be retrieved
