@@ -569,24 +569,10 @@ static int domain_tree_remove_sub(const void *ctx, struct connection *conn,
 				  struct node *node, void *arg)
 {
 	struct domain *domain = arg;
-	int ret = WALK_TREE_OK;
+	bool node_changed = false;
+	unsigned int i;
 
-	if (node->perms[0].id != domain->domid)
-		return WALK_TREE_OK;
-
-	if (keep_orphans) {
-		domain_nbentry_dec(NULL, domain->domid);
-		node->perms[0].id = priv_domid;
-		node->acc.memory = 0;
-		domain_nbentry_inc(NULL, priv_domid);
-		if (write_node_raw(NULL, node->name, node, NODE_MODIFY, true)) {
-			/* That's unfortunate. We only can try to continue. */
-			syslog(LOG_ERR,
-			       "error when moving orphaned node %s to dom0\n",
-			       node->name);
-		} else
-			trace("orphaned node %s moved to dom0\n", node->name);
-	} else {
+	if (node->perms[0].id == domain->domid && !keep_orphans) {
 		if (rm_node(NULL, ctx, node->name)) {
 			/* That's unfortunate. We only can try to continue. */
 			syslog(LOG_ERR,
@@ -596,10 +582,39 @@ static int domain_tree_remove_sub(const void *ctx, struct connection *conn,
 			trace("orphaned node %s deleted\n", node->name);
 
 		/* Skip children in all cases in order to avoid more errors. */
-		ret = WALK_TREE_SKIP_CHILDREN;
+		return WALK_TREE_SKIP_CHILDREN;
 	}
 
-	return domain->acc_val[ACC_NODES] ? ret : WALK_TREE_SUCCESS_STOP;
+	if (node->perms[0].id == domain->domid) {
+		domain_nbentry_dec(NULL, domain->domid);
+		node->perms[0].id = priv_domid;
+		node->acc.memory = 0;
+		domain_nbentry_inc(NULL, priv_domid);
+		trace("moving orphaned node %s to dom%d\n", node->name,
+		      priv_domid);
+		node_changed = true;
+	}
+
+	for (i = 1; i < node->hdr.num_perms; i++) {
+		if (node->perms[i].id != domain->domid)
+			continue;
+		memmove(node->perms + i, node->perms + i + 1,
+			sizeof(*node->perms) * (node->hdr.num_perms - i - 1));
+		node->hdr.num_perms--;
+		i--;
+		node_changed = true;
+	}
+
+	if (node_changed) {
+		if (write_node_raw(NULL, node->name, node, NODE_MODIFY, true)) {
+			/* That's unfortunate. We only can try to continue. */
+			syslog(LOG_ERR,
+			       "error when writing modified node %s\n",
+			       node->name);
+		}
+	}
+
+	return WALK_TREE_OK;
 }
 
 static void domain_tree_remove(struct domain *domain)
@@ -607,12 +622,9 @@ static void domain_tree_remove(struct domain *domain)
 	int ret;
 	struct walk_funcs walkfuncs = { .enter = domain_tree_remove_sub };
 
-	if (domain->acc_val[ACC_NODES]) {
-		ret = walk_node_tree(domain, NULL, "/", &walkfuncs, domain);
-		if (ret == WALK_TREE_ERROR_STOP)
-			syslog(LOG_ERR,
-			       "error when looking for orphaned nodes\n");
-	}
+	ret = walk_node_tree(domain, NULL, "/", &walkfuncs, domain);
+	if (ret == WALK_TREE_ERROR_STOP)
+		syslog(LOG_ERR, "error when looking for orphaned nodes\n");
 
 	walk_node_tree(domain, NULL, "@releaseDomain", &walkfuncs, domain);
 	walk_node_tree(domain, NULL, "@introduceDomain", &walkfuncs, domain);
