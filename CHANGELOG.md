@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
    represent a wildcard input.
  - On x86:
    - Enable pf-fixup option by default for PVH dom0.
+   - The libxenguest bzImage loader now uses the system liblz4 library.
 
 ### Added
  - Support for per-domain Xenstore quota in C xenstored (includes

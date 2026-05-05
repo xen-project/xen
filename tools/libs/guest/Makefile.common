@@ -46,7 +46,6 @@ OBJS-y                 += xg_dom_core.o
 OBJS-y                 += xg_dom_boot.o
 OBJS-y                 += xg_dom_elfloader.o
 OBJS-$(CONFIG_X86)     += xg_dom_bzimageloader.o
-OBJS-$(CONFIG_X86)     += xg_dom_decompress_lz4.o
 OBJS-$(CONFIG_X86)     += xg_dom_hvmloader.o
 OBJS-$(CONFIG_ARM)     += xg_dom_armzimageloader.o
 OBJS-y                 += xg_dom_binloader.o
@@ -59,6 +58,7 @@ OBJS-$(CONFIG_ARM)     += xg_dom_arm.o
 ifeq ($(CONFIG_LIBXC_MINIOS),y)
 OBJS-y                 += xg_dom_decompress_unsafe.o
 OBJS-y                 += xg_dom_decompress_unsafe_bzip2.o
+OBJS-y                 += xg_dom_decompress_unsafe_lz4.o
 OBJS-y                 += xg_dom_decompress_unsafe_lzma.o
 OBJS-y                 += xg_dom_decompress_unsafe_lzo1x.o
 OBJS-y                 += xg_dom_decompress_unsafe_xz.o

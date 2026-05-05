@@ -32,7 +32,6 @@
 #include <inttypes.h>
 
 #include "xg_private.h"
-#include "xg_dom_decompress.h"
 
 #include <xen-tools/common-macros.h>
 
@@ -617,6 +616,133 @@ static int xc_try_zstd_decode(
 {
     xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
                  "%s: ZSTD decompress support unavailable\n",
+                 __FUNCTION__);
+    return -1;
+}
+
+#endif
+
+#if defined(HAVE_LZ4)
+
+#include <lz4.h>
+
+#define ARCHIVE_MAGICNUMBER 0x184C2102
+
+static int xc_try_lz4_decode(struct xc_dom_image *dom, void **blob, size_t *size)
+{
+    size_t outsize, insize;
+    unsigned char *outbuf = NULL, *inp = *blob, *outp;
+    uint32_t chunksize;
+
+    /* Magic, descriptor byte, and trailing size field. */
+    if ( *size <= 8 )
+    {
+        DOMPRINTF("LZ4: insufficient input data");
+        goto err;
+    }
+
+    insize = *size - 4;
+    outsize = get_unaligned_le32(*blob + insize);
+
+    if ( xc_dom_kernel_check_size(dom, outsize) )
+    {
+        DOMPRINTF("LZ4: output too large");
+        goto err;
+    }
+
+    outbuf = malloc(outsize);
+    if ( !outbuf )
+    {
+        DOMPRINTF("LZ4: failed to alloc memory");
+        goto err;
+    }
+    outp = outbuf;
+
+    chunksize = get_unaligned_le32(inp);
+    if ( chunksize == ARCHIVE_MAGICNUMBER )
+    {
+        inp    += 4;
+        insize -= 4;
+    }
+    else
+    {
+        DOMPRINTF("LZ4: invalid header");
+        goto err;
+    }
+
+    for ( ;; )
+    {
+        int dst_len, len;
+
+        if ( insize < 4 )
+        {
+            DOMPRINTF("LZ4: missing data");
+            goto err;
+        }
+
+        chunksize = get_unaligned_le32(inp);
+        inp    += 4;
+        insize -= 4;
+
+        if ( chunksize == ARCHIVE_MAGICNUMBER )
+            continue;
+
+        if ( chunksize > insize )
+        {
+            DOMPRINTF("LZ4: insufficient input data");
+            goto err;
+        }
+
+        dst_len = outsize - (outp - outbuf);
+        len = LZ4_decompress_safe((const void *)inp,
+                                  (void *)outp, chunksize, dst_len);
+
+        if ( len < 0 )
+        {
+            DOMPRINTF("LZ4: decoding failed");
+            goto err;
+        }
+
+        outp   += len;
+        inp    += chunksize;
+        insize -= chunksize;
+
+        if ( insize == 0 )
+            break;
+    }
+
+    if ( (outp - outbuf) != outsize )
+    {
+        DOMPRINTF("LZ4: got 0x%zx bytes instead of 0x%zx",
+                  outp - outbuf, outsize);
+        goto err;
+    }
+
+    if ( xc_dom_register_external(dom, outbuf, outsize) )
+    {
+        DOMPRINTF("LZ4: error registering stream output");
+        goto err;
+    }
+
+    DOMPRINTF("%s: LZ4 decompress OK, 0x%zx -> 0x%zx",
+              __FUNCTION__, insize, outsize);
+
+    *blob = outbuf;
+    *size = outsize;
+
+    return 0;
+
+ err:
+    free(outbuf);
+    return -1;
+}
+
+#else /* !defined(HAVE_LZ4) */
+
+static int xc_try_lz4_decode(struct xc_dom_image *dom, void **blob, size_t *size)
+{
+    xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                 "%s: LZ4 decompress support unavailable\n",
                  __FUNCTION__);
     return -1;
 }

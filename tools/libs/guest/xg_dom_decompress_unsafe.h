@@ -16,6 +16,8 @@ int xc_dom_decompress_unsafe(
 
 int xc_try_bzip2_decode(struct xc_dom_image *dom, void **blob, size_t *size)
     __attribute__((visibility("internal")));
+int xc_try_lz4_decode(struct xc_dom_image *dom, void **blob, size_t *size)
+    __attribute__((visibility("internal")));
 int xc_try_lzma_decode(struct xc_dom_image *dom, void **blob, size_t *size)
     __attribute__((visibility("internal")));
 int xc_try_lzo1x_decode(struct xc_dom_image *dom, void **blob, size_t *size)
