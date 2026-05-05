@@ -403,6 +403,10 @@ PKG_CHECK_MODULES([libzstd], [libzstd],
     [ZLIB_CFLAGS="$ZLIB_CFLAGS -DHAVE_ZSTD $libzstd_CFLAGS"
      ZLIB_LIBS="$ZLIB_LIBS $libzstd_LIBS"],
     [true])
+PKG_CHECK_MODULES([liblz4], [liblz4],
+    [ZLIB_CFLAGS="$ZLIB_CFLAGS -DHAVE_LZ4 $liblz4_CFLAGS"
+     ZLIB_LIBS="$ZLIB_LIBS $liblz4_LIBS"],
+    [true])
 AC_SUBST([ZLIB_CFLAGS])
 AC_SUBST([ZLIB_LIBS])
 AX_CHECK_EXTFS

@@ -669,6 +669,8 @@ PTHREAD_CFLAGS
 EXTFS_LIBS
 ZLIB_LIBS
 ZLIB_CFLAGS
+liblz4_LIBS
+liblz4_CFLAGS
 libzstd_LIBS
 libzstd_CFLAGS
 FETCHER
@@ -885,6 +887,8 @@ pixman_CFLAGS
 pixman_LIBS
 libzstd_CFLAGS
 libzstd_LIBS
+liblz4_CFLAGS
+liblz4_LIBS
 libjsonc_CFLAGS
 libjsonc_LIBS
 LIBNL3_CFLAGS
@@ -1638,6 +1642,9 @@ Some influential environment variables:
               C compiler flags for libzstd, overriding pkg-config
   libzstd_LIBS
               linker flags for libzstd, overriding pkg-config
+  liblz4_CFLAGS
+              C compiler flags for liblz4, overriding pkg-config
+  liblz4_LIBS linker flags for liblz4, overriding pkg-config
   libjsonc_CFLAGS
               C compiler flags for libjsonc, overriding pkg-config
   libjsonc_LIBS
@@ -9456,6 +9463,78 @@ else
 printf "%s\n" "yes" >&6; }
 	ZLIB_CFLAGS="$ZLIB_CFLAGS -DHAVE_ZSTD $libzstd_CFLAGS"
      ZLIB_LIBS="$ZLIB_LIBS $libzstd_LIBS"
+fi
+
+pkg_failed=no
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for liblz4" >&5
+printf %s "checking for liblz4... " >&6; }
+
+if test -n "$liblz4_CFLAGS"; then
+    pkg_cv_liblz4_CFLAGS="$liblz4_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"liblz4\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "liblz4") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_liblz4_CFLAGS=`$PKG_CONFIG --cflags "liblz4" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$liblz4_LIBS"; then
+    pkg_cv_liblz4_LIBS="$liblz4_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"liblz4\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "liblz4") 2>&5
+  ac_status=$?
+  printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_liblz4_LIBS=`$PKG_CONFIG --libs "liblz4" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+   	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        liblz4_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "liblz4" 2>&1`
+        else
+	        liblz4_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "liblz4" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$liblz4_PKG_ERRORS" >&5
+
+	true
+elif test $pkg_failed = untried; then
+     	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+	true
+else
+	liblz4_CFLAGS=$pkg_cv_liblz4_CFLAGS
+	liblz4_LIBS=$pkg_cv_liblz4_LIBS
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+	ZLIB_CFLAGS="$ZLIB_CFLAGS -DHAVE_LZ4 $liblz4_CFLAGS"
+     ZLIB_LIBS="$ZLIB_LIBS $liblz4_LIBS"
 fi
 
 

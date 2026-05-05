@@ -29,6 +29,7 @@ RUN <<EOF
         wget
         # libxenguest dombuilder
         libbz2-dev
+        liblz4-dev
         liblzma-dev
         liblzo2-dev
         libzstd-dev
