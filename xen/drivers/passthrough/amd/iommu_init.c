@@ -42,18 +42,6 @@ static bool iommu_has_ht_flag(struct amd_iommu *iommu, u8 mask)
     return iommu->ht_flags & mask;
 }
 
-static int __init map_iommu_mmio_region(struct amd_iommu *iommu)
-{
-    iommu->mmio_base = ioremap(iommu->mmio_base_phys,
-                               IOMMU_MMIO_REGION_LENGTH);
-    if ( !iommu->mmio_base )
-        return -ENOMEM;
-
-    memset(iommu->mmio_base, 0, IOMMU_MMIO_REGION_LENGTH);
-
-    return 0;
-}
-
 static void __init unmap_iommu_mmio_region(struct amd_iommu *iommu)
 {
     if ( iommu->mmio_base )
@@ -1367,10 +1355,13 @@ static int __init amd_iommu_prepare_one(struct amd_iommu *iommu)
 {
     int rc = alloc_ivrs_mappings(iommu->sbdf.seg);
 
-    if ( !rc )
-        rc = map_iommu_mmio_region(iommu);
     if ( rc )
         return rc;
+
+    iommu->mmio_base = ioremap(iommu->mmio_base_phys,
+                               IOMMU_MMIO_REGION_LENGTH);
+    if ( !iommu->mmio_base )
+        return -ENOMEM;
 
     get_iommu_features(iommu);
 
@@ -1380,6 +1371,20 @@ static int __init amd_iommu_prepare_one(struct amd_iommu *iommu)
      */
     if ( amd_iommu_max_paging_mode < amd_iommu_min_paging_mode )
         return -ERANGE;
+
+    /*
+     * Check whether the IOMMU is already enabled and unconditionally disable
+     * it (zero the control register) ahead of Xen setup.  Needs to be
+     * revisited to support Preboot DMA Protection.
+     */
+    iommu->ctrl.raw = readq(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
+    if ( iommu->ctrl.iommu_en )
+        printk(XENLOG_WARNING
+               "AMD-Vi: IOMMU %pp enabled by firmware (ctrl %016lx)\n",
+               &iommu->sbdf, iommu->ctrl.raw);
+
+    iommu->ctrl.raw = 0;
+    writeq(0, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
 
     return 0;
 }
