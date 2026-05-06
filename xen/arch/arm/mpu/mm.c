@@ -186,16 +186,15 @@ static int is_mm_attr_match(pr_t *region, unsigned int attributes)
     return 0;
 }
 
-/* Map a frame table to cover physical addresses ps through pe */
-void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
+/*
+ * Allocate a contiguous frame table covering ram_start through max_pdx.
+ * Unlike the MMU version, MPU cannot skip holes because there is no virtual
+ * address translation (ma == va).
+ */
+void __init init_frametable(paddr_t ram_start)
 {
+    unsigned long nr_pdxs, frametable_size;
     mfn_t base_mfn;
-    paddr_t aligned_ps = ROUNDUP(ps, PAGE_SIZE);
-    paddr_t aligned_pe = ROUNDDOWN(pe, PAGE_SIZE);
-
-    unsigned long nr_pdxs = mfn_to_pdx(mfn_add(maddr_to_mfn(aligned_pe), -1)) -
-                            mfn_to_pdx(maddr_to_mfn(aligned_ps)) + 1;
-    unsigned long frametable_size = nr_pdxs * sizeof(struct page_info);
 
     /*
      * The size of paddr_t should be sufficient for the complete range of
@@ -204,11 +203,13 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     BUILD_BUG_ON((sizeof(paddr_t) * BITS_PER_BYTE) < PADDR_BITS);
     BUILD_BUG_ON(sizeof(struct page_info) != PAGE_INFO_SIZE);
 
-    if ( frametable_size > FRAMETABLE_SIZE )
-        panic("The frametable cannot cover the physical region %#"PRIpaddr" - %#"PRIpaddr"\n",
-              ps, pe);
+    frametable_base_pdx = mfn_to_pdx(maddr_to_mfn(ram_start));
+    nr_pdxs = max_pdx - frametable_base_pdx;
+    frametable_size = nr_pdxs * sizeof(struct page_info);
 
-    frametable_base_pdx = paddr_to_pdx(aligned_ps);
+    if ( frametable_size > FRAMETABLE_SIZE )
+        panic("Frametable too small\n");
+
     frametable_size = ROUNDUP(frametable_size, PAGE_SIZE);
 
     base_mfn = alloc_boot_pages(frametable_size >> PAGE_SHIFT, 1);

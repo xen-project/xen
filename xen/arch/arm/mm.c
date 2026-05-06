@@ -33,7 +33,6 @@ void __init setup_mm(void)
 {
     const struct membanks *banks = bootinfo_get_mem();
     paddr_t ram_start = INVALID_PADDR;
-    paddr_t ram_end = 0;
     paddr_t ram_size = 0;
     unsigned int i;
 
@@ -42,11 +41,9 @@ void __init setup_mm(void)
     for ( i = 0; i < banks->nr_banks; i++ )
     {
         const struct membank *bank = &banks->bank[i];
-        paddr_t bank_end = bank->start + bank->size;
 
         ram_size = ram_size + bank->size;
         ram_start = min(ram_start, bank->start);
-        ram_end = max(ram_end, bank_end);
     }
 
     total_pages = ram_size >> PAGE_SHIFT;
@@ -62,7 +59,7 @@ void __init setup_mm(void)
 
     setup_mm_helper();
 
-    setup_frametable_mappings(ram_start, ram_end);
+    init_frametable(ram_start);
 
     init_staticmem_pages();
     init_sharedmem_pages();
