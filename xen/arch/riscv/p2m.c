@@ -11,6 +11,8 @@
 #include <xen/sections.h>
 #include <xen/xvmalloc.h>
 
+#include <public/domctl.h>
+
 #include <asm/cpufeature.h>
 #include <asm/csr.h>
 #include <asm/flushtlb.h>
@@ -66,6 +68,12 @@ static const struct gstage_mode_desc gstage_modes[] = {
 
 const struct gstage_mode_desc *__ro_after_init max_gstage_mode =
     &gstage_modes[0];
+
+/*
+ * Set to the maximum configured support for GPA bits, so the number of GPA
+ * bits can be restricted by an external entity (e.g. IOMMU).
+ */
+unsigned int __ro_after_init p2m_gpa_bits = PADDR_BITS;
 
 static void p2m_free_page(struct p2m_domain *p2m, struct page_info *pg);
 
@@ -355,6 +363,7 @@ int p2m_init(struct domain *d, const struct xen_domctl_createdomain *config)
      */
     static const struct gstage_mode_desc __ro_after_init *m = &gstage_modes[0];
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    unsigned int gpa_bits;
 
     /*
      * "Trivial" initialisation is now complete.  Set the backpointer so the
@@ -409,6 +418,12 @@ int p2m_init(struct domain *d, const struct xen_domctl_createdomain *config)
 #ifdef CONFIG_HAS_PASSTHROUGH
 #   error "Add init of p2m->clean_dcache"
 #endif
+
+    gpa_bits = P2M_GFN_LEVEL_SHIFT(p2m->mode->paging_levels + 1) +
+               P2M_ROOT_EXTRA_BITS;
+
+    if ( gpa_bits < p2m_gpa_bits )
+        p2m_gpa_bits = gpa_bits;
 
     return 0;
 }

@@ -47,6 +47,9 @@
 #define P2M_LEVEL_MASK(p2m, lvl) \
     (P2M_TABLE_OFFSET(p2m, lvl) << P2M_GFN_LEVEL_SHIFT(lvl))
 
+/* Holds the bit size of GPAs in p2m tables */
+extern unsigned int p2m_gpa_bits;
+
 #define paddr_bits PADDR_BITS
 
 /* Get host p2m table */
