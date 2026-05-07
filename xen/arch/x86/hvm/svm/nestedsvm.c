@@ -717,9 +717,9 @@ nsvm_vcpu_vmexit_inject(struct vcpu *v, struct cpu_user_regs *regs,
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
 
     if ( vmcb->_vintr.fields.vgif_enable )
-        ASSERT(vmcb->_vintr.fields.vgif == 0);
+        vmcb->_vintr.fields.vgif = 0;
     else
-        ASSERT(svm->ns_gif == 0);
+        svm->ns_gif = 0;
 
     ns_vmcb = nv->nv_vvmcx;
 
