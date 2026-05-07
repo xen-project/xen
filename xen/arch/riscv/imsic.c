@@ -451,11 +451,11 @@ int __init imsic_init(const struct dt_device_node *node)
             continue;
         }
 
-        if ( !IS_ALIGNED(mmios[cpu].base_addr + reloff,
-                         IMSIC_MMIO_PAGE_SZ) )
+        if ( !IS_ALIGNED(mmios[index].base_addr + reloff, IMSIC_MMIO_PAGE_SZ) )
         {
             printk(XENLOG_WARNING "%s: MMIO address %#lx is not aligned on a page\n",
-                   node->name, msi[cpu].base_addr + reloff);
+                   node->name, mmios[index].base_addr + reloff);
+
             continue;
         }
 
