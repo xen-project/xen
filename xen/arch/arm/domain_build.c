@@ -2,6 +2,7 @@
 #include <xen/init.h>
 #include <xen/bootinfo.h>
 #include <xen/compile.h>
+#include <xen/domain-layout.h>
 #include <xen/dom0less-build.h>
 #include <xen/fdt-domain-build.h>
 #include <xen/fdt-kernel.h>

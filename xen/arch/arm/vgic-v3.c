@@ -10,6 +10,7 @@
  */
 
 #include <xen/bitops.h>
+#include <xen/domain-layout.h>
 #include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/lib.h>

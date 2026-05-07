@@ -4,6 +4,7 @@
 #include <asm-generic/paging.h>
 
 struct domain;
+struct page_info;
 
 int paging_domain_init(struct domain *d);
 
