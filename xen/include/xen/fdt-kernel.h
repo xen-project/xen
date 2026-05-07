@@ -63,7 +63,7 @@ struct kernel_info {
             paddr_t text_offset; /* 64-bit Image only */
 #endif
             paddr_t start; /* Must be 0 for 64-bit Image */
-        } zimage;
+        } image;
     };
 
 #ifdef CONFIG_HAS_DOMAIN_TYPE
@@ -113,7 +113,7 @@ kernel_info_get_mem_const(const struct kernel_info *kinfo)
  * Probe the kernel to detemine its type and select a loader.
  *
  * Sets in info:
- *  ->load hook, and sets loader specific variables ->zimage
+ *  ->load hook, and sets loader specific variables ->image
  */
 int kernel_probe(struct kernel_info *info, const struct dt_device_node *domain);
 
@@ -133,7 +133,7 @@ void kernel_load(struct kernel_info *info);
 
 int kernel_decompress(struct boot_module *mod, uint32_t offset);
 
-int kernel_zimage_probe(struct kernel_info *info, paddr_t addr, paddr_t size);
+int kernel_image_probe(struct kernel_info *info, paddr_t addr, paddr_t size);
 
 /*
  * uImage isn't really used nowadays thereby leave kernel_uimage_probe()

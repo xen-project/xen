@@ -101,8 +101,8 @@ static paddr_t __init kernel_zimage_place(struct kernel_info *info)
     paddr_t load_addr;
 
 #ifdef CONFIG_HAS_DOMAIN_TYPE
-    if ( (info->type == DOMAIN_64BIT) && (info->zimage.start == 0) )
-        return mem->bank[0].start + info->zimage.text_offset;
+    if ( (info->type == DOMAIN_64BIT) && (info->image.start == 0) )
+        return mem->bank[0].start + info->image.text_offset;
 #endif
 
     /*
@@ -111,19 +111,19 @@ static paddr_t __init kernel_zimage_place(struct kernel_info *info)
      * and above 32MiB. Load it as high as possible within these
      * constraints, while also avoiding the DTB.
      */
-    if ( info->zimage.start == 0 )
+    if ( info->image.start == 0 )
     {
         paddr_t load_end;
 
         load_end = mem->bank[0].start + mem->bank[0].size;
         load_end = MIN(mem->bank[0].start + MB(128), load_end);
 
-        load_addr = load_end - info->zimage.len;
+        load_addr = load_end - info->image.len;
         /* Align to 2MB */
         load_addr &= ~((2 << 20) - 1);
     }
     else
-        load_addr = info->zimage.start;
+        load_addr = info->image.start;
 
     return load_addr;
 }
@@ -131,8 +131,8 @@ static paddr_t __init kernel_zimage_place(struct kernel_info *info)
 static void __init kernel_zimage_load(struct kernel_info *info)
 {
     paddr_t load_addr = kernel_zimage_place(info);
-    paddr_t paddr = info->zimage.kernel_addr;
-    paddr_t len = info->zimage.len;
+    paddr_t paddr = info->image.kernel_addr;
+    paddr_t len = info->image.len;
     void *kernel;
     int rc;
 
@@ -215,7 +215,7 @@ int __init kernel_uimage_probe(struct kernel_info *info,
         return -EOPNOTSUPP;
     }
 
-    info->zimage.start = be32_to_cpu(uimage.load);
+    info->image.start = be32_to_cpu(uimage.load);
     info->entry = be32_to_cpu(uimage.ep);
 
     /*
@@ -224,20 +224,20 @@ int __init kernel_uimage_probe(struct kernel_info *info,
      * independent image. That means Xen is free to load such an image at
      * any valid address.
      */
-    if ( info->zimage.start == 0 )
+    if ( info->image.start == 0 )
         printk(XENLOG_INFO
                "No load address provided. Xen will decide where to load it.\n");
     else
         printk(XENLOG_INFO
                "Provided load address: %"PRIpaddr" and entry address: %"PRIpaddr"\n",
-               info->zimage.start, info->entry);
+               info->image.start, info->entry);
 
     /*
      * If the image supports position independent execution, then user cannot
      * provide an entry point as Xen will load such an image at any appropriate
      * memory address. Thus, we need to return error.
      */
-    if ( (info->zimage.start == 0) && (info->entry != 0) )
+    if ( (info->image.start == 0) && (info->entry != 0) )
     {
         printk(XENLOG_ERR
                "Entry point cannot be non zero for PIE image.\n");
@@ -257,13 +257,13 @@ int __init kernel_uimage_probe(struct kernel_info *info,
         if ( rc )
             return rc;
 
-        info->zimage.kernel_addr = mod->start;
-        info->zimage.len = mod->size;
+        info->image.kernel_addr = mod->start;
+        info->image.len = mod->size;
     }
     else
     {
-        info->zimage.kernel_addr = addr + sizeof(uimage);
-        info->zimage.len = len;
+        info->image.kernel_addr = addr + sizeof(uimage);
+        info->image.len = len;
     }
 
     info->load = kernel_zimage_load;
@@ -287,9 +287,9 @@ int __init kernel_uimage_probe(struct kernel_info *info,
      * header. In other words if the user provides a uImage header on top of
      * zImage or zImage64 header, Xen uses the attributes of uImage header only.
      * Thus, Xen uses uimage.load attribute to determine the load address and
-     * zimage.text_offset is ignored.
+     * image.text_offset is ignored.
      */
-    info->zimage.text_offset = 0;
+    info->image.text_offset = 0;
 #endif
 
     return 0;
@@ -338,10 +338,10 @@ static int __init kernel_zimage64_probe(struct kernel_info *info,
     if ( (end - start) > size )
         return -EINVAL;
 
-    info->zimage.kernel_addr = addr;
-    info->zimage.len = end - start;
-    info->zimage.text_offset = zimage.text_offset;
-    info->zimage.start = 0;
+    info->image.kernel_addr = addr;
+    info->image.len = end - start;
+    info->image.text_offset = zimage.text_offset;
+    info->image.start = 0;
 
     info->load = kernel_zimage_load;
 
@@ -389,10 +389,10 @@ static int __init kernel_zimage32_probe(struct kernel_info *info,
         }
     }
 
-    info->zimage.kernel_addr = addr;
+    info->image.kernel_addr = addr;
 
-    info->zimage.start = start;
-    info->zimage.len = end - start;
+    info->image.start = start;
+    info->image.len = end - start;
 
     info->load = kernel_zimage_load;
 
@@ -403,7 +403,7 @@ static int __init kernel_zimage32_probe(struct kernel_info *info,
     return 0;
 }
 
-int __init kernel_zimage_probe(struct kernel_info *info, paddr_t addr,
+int __init kernel_image_probe(struct kernel_info *info, paddr_t addr,
                                paddr_t size)
 {
     int rc;

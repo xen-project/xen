@@ -235,7 +235,7 @@ int __init kernel_probe(struct kernel_info *info,
     if ( rc && rc != -EINVAL )
         return rc;
 
-    rc = kernel_zimage_probe(info, mod->start, mod->size);
+    rc = kernel_image_probe(info, mod->start, mod->size);
 
     return rc;
 }
