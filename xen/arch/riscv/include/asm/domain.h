@@ -7,6 +7,7 @@
 #include <xen/xmalloc.h>
 #include <public/hvm/params.h>
 
+#include <asm/guest-layout.h>
 #include <asm/p2m.h>
 #include <asm/vtimer.h>
 
