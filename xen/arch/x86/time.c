@@ -2597,6 +2597,11 @@ int __init init_xen_time(void)
     /* Finish platform timer initialization. */
     try_platform_timer_tail();
 
+    /*
+     * While early_time_init() called this already, call it again here to
+     * reduce the gap until local_time_calibration() gets to run for the
+     * first time.
+     */
     init_percpu_time();
 
     init_timer(&calibration_timer, time_calibration, NULL, 0);
@@ -2641,6 +2646,8 @@ void __init early_time_init(void)
 
     set_time_scale(&t->tsc_scale, tmp);
     t->stamp.local_tsc = boot_tsc_stamp;
+
+    init_percpu_time();
 
     cpu_khz = DIV_ROUND(tmp, 1000);
     printk("Detected %lu.%03lu MHz processor.\n", 
