@@ -8,6 +8,7 @@ obj-y += guestcopy.o
 obj-y += imsic.o
 obj-y += intc.o
 obj-y += irq.o
+obj-y += kernel.init.o
 obj-y += mm.o
 obj-y += p2m.o
 obj-y += paging.o

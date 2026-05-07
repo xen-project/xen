@@ -59,8 +59,15 @@ struct kernel_info {
         struct {
             paddr_t kernel_addr;
             paddr_t len;
-#if defined(CONFIG_ARM_64) || defined(CONFIG_RISCV_64)
-            paddr_t text_offset; /* 64-bit Image only */
+#if defined(CONFIG_ARM_64) || defined(CONFIG_RISCV)
+            /*
+             * ARM: 64-bit Image only.
+             * RISC-V: both 32-bit and 64-bit Images.
+             */
+            paddr_t text_offset;
+#endif
+#if defined(CONFIG_RISCV)
+            size_t image_size; /* Effective size of Image */
 #endif
             paddr_t start; /* Must be 0 for 64-bit Image */
         } image;
