@@ -2575,6 +2575,8 @@ __initcall(verify_tsc_reliability);
 /* Late init function (after interrupts are enabled). */
 int __init init_xen_time(void)
 {
+    unsigned long wc;
+
     tsc_check_writability();
 
     open_softirq(TIME_CALIBRATE_SOFTIRQ, local_time_calibration);
@@ -2592,7 +2594,8 @@ int __init init_xen_time(void)
     printk(XENLOG_INFO "Wallclock source: %s\n", wallclock_type_to_string());
 
     /* NB. get_wallclock_time() can take over one second to execute. */
-    do_settime(get_wallclock_time(), 0, NOW());
+    wc = get_wallclock_time();
+    do_settime(wc, 0,  NOW());
 
     /* Finish platform timer initialization. */
     try_platform_timer_tail();
@@ -2752,6 +2755,8 @@ int time_suspend(void)
 
 int time_resume(void)
 {
+    unsigned long wc;
+
     preinit_pit();
 
     resume_platform_timer();
@@ -2763,7 +2768,8 @@ int time_resume(void)
 
     set_timer(&calibration_timer, NOW() + EPOCH);
 
-    do_settime(get_wallclock_time() + cmos_utc_offset, 0, NOW());
+    wc = get_wallclock_time();
+    do_settime(wc + cmos_utc_offset, 0, NOW());
 
     update_vcpu_system_time(current);
 
