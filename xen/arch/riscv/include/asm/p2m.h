@@ -13,7 +13,7 @@
 
 #define P2M_ROOT_ORDER  (ilog2(GSTAGE_ROOT_PAGE_TABLE_SIZE) - PAGE_SHIFT)
 #define P2M_ROOT_PAGES  BIT(P2M_ROOT_ORDER, U)
-#define P2M_ROOT_LEVEL(p2m) ((p2m)->mode.paging_levels)
+#define P2M_ROOT_LEVEL(p2m) ((p2m)->mode->paging_levels)
 
 /*
  * According to the RISC-V spec:
@@ -32,10 +32,13 @@
  */
 #define P2M_LEVEL_ORDER(lvl) XEN_PT_LEVEL_ORDER(lvl)
 
-#define P2M_ROOT_EXTRA_BITS(p2m, lvl) (2 * ((lvl) == P2M_ROOT_LEVEL(p2m)))
+#define P2M_ROOT_EXTRA_BITS 2
+
+#define P2M_LEVEL_EXTRA_BITS(p2m, lvl) \
+    (P2M_ROOT_EXTRA_BITS * ((lvl) == P2M_ROOT_LEVEL(p2m)))
 
 #define P2M_PAGETABLE_ENTRIES(p2m, lvl) \
-    (BIT(PAGETABLE_ORDER + P2M_ROOT_EXTRA_BITS(p2m, lvl), UL))
+    (BIT(PAGETABLE_ORDER + P2M_LEVEL_EXTRA_BITS(p2m, lvl), UL))
 
 #define P2M_TABLE_OFFSET(p2m, lvl) (P2M_PAGETABLE_ENTRIES(p2m, lvl) - 1UL)
 
@@ -55,6 +58,8 @@ struct gstage_mode_desc {
     char name[8];
 };
 
+extern const struct gstage_mode_desc *max_gstage_mode;
+
 /* Per-p2m-table state */
 struct p2m_domain {
     /*
@@ -68,7 +73,7 @@ struct p2m_domain {
     /* The root of the p2m tree. May be concatenated */
     struct page_info *root;
 
-    struct gstage_mode_desc mode;
+    const struct gstage_mode_desc *mode;
 
     /* Back pointer to domain */
     struct domain *domain;
@@ -215,9 +220,10 @@ static inline bool arch_acquire_resource_check(struct domain *d)
 }
 
 void guest_mm_init(void);
-unsigned char get_max_supported_mode(void);
 
-int p2m_init(struct domain *d);
+struct xen_domctl_createdomain;
+
+int p2m_init(struct domain *d, const struct xen_domctl_createdomain *config);
 
 static inline void p2m_write_lock(struct p2m_domain *p2m)
 {

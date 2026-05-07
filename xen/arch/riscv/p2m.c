@@ -45,11 +45,27 @@ struct p2m_pte_ctx {
     unsigned int level;          /* Paging level at which the PTE resides. */
 };
 
-static struct gstage_mode_desc __ro_after_init max_gstage_mode = {
-    .mode = HGATP_MODE_OFF,
-    .paging_levels = 0,
-    .name = "Bare",
+/* Values should be sorted by ->mode in this array */
+static const struct gstage_mode_desc gstage_modes[] = {
+    /*
+     * Based on the RISC-V spec:
+     *   Bare mode is always supported, regardless of SXLEN.
+     *   When SXLEN=32, the only other valid setting for MODE is Sv32.
+     *   When SXLEN=64, three paged virtual-memory schemes are defined:
+     *   Sv39, Sv48, and Sv57.
+     */
+    { HGATP_MODE_OFF,    0, "none" },
+#ifdef CONFIG_RISCV_32
+    { HGATP_MODE_SV32X4, 1, "sv32" },
+#else
+    { HGATP_MODE_SV39X4, 2, "sv39" },
+    { HGATP_MODE_SV48X4, 3, "sv48" },
+    { HGATP_MODE_SV57X4, 4, "sv57" },
+#endif
 };
+
+const struct gstage_mode_desc *__ro_after_init max_gstage_mode =
+    &gstage_modes[0];
 
 static void p2m_free_page(struct p2m_domain *p2m, struct page_info *pg);
 
@@ -61,11 +77,6 @@ static inline void p2m_free_metadata_page(struct p2m_domain *p2m,
         p2m_free_page(p2m, *md_pg);
         *md_pg = NULL;
     }
-}
-
-unsigned char get_max_supported_mode(void)
-{
-    return max_gstage_mode.mode;
 }
 
 /*
@@ -148,41 +159,24 @@ static pte_t *p2m_get_root_pointer(struct p2m_domain *p2m, gfn_t gfn)
 
 static void __init gstage_mode_detect(void)
 {
-    static const struct gstage_mode_desc modes[] __initconst = {
-        /*
-         * Based on the RISC-V spec:
-         *   Bare mode is always supported, regardless of SXLEN.
-         *   When SXLEN=32, the only other valid setting for MODE is Sv32.
-         *   When SXLEN=64, three paged virtual-memory schemes are defined:
-         *   Sv39, Sv48, and Sv57.
-         */
-#ifdef CONFIG_RISCV_32
-        { HGATP_MODE_SV32X4, 2, "Sv32x4" }
-#else
-        { HGATP_MODE_SV39X4, 3, "Sv39x4" },
-        { HGATP_MODE_SV48X4, 4, "Sv48x4" },
-        { HGATP_MODE_SV57X4, 5, "Sv57x4" },
-#endif
-    };
-
-    for ( unsigned int mode_idx = ARRAY_SIZE(modes); mode_idx-- > 0; )
+    for ( unsigned int mode_idx = ARRAY_SIZE(gstage_modes); mode_idx-- > 0; )
     {
-        unsigned long mode = modes[mode_idx].mode;
+        unsigned long mode = gstage_modes[mode_idx].mode;
 
         csr_write(CSR_HGATP, MASK_INSR(mode, HGATP_MODE_MASK));
 
         if ( MASK_EXTR(csr_read(CSR_HGATP), HGATP_MODE_MASK) == mode )
         {
-            max_gstage_mode = modes[mode_idx];
+            max_gstage_mode = &gstage_modes[mode_idx];
 
             break;
         }
     }
 
-    if ( max_gstage_mode.mode == HGATP_MODE_OFF )
+    if ( max_gstage_mode->mode == HGATP_MODE_OFF )
         panic("Xen expects that G-stage won't be Bare mode\n");
 
-    printk("Max supported G-stage mode is %s\n", max_gstage_mode.name);
+    printk("Max supported G-stage mode is %sx4\n", max_gstage_mode->name);
 
     csr_write(CSR_HGATP, 0);
 
@@ -283,7 +277,7 @@ static void clear_and_clean_page(struct page_info *page, bool clean_dcache)
 unsigned long construct_hgatp(const struct p2m_domain *p2m, uint16_t vmid)
 {
     return MASK_INSR(mfn_x(page_to_mfn(p2m->root)), HGATP_PPN_MASK) |
-           MASK_INSR(p2m->mode.mode, HGATP_MODE_MASK) |
+           MASK_INSR(p2m->mode->mode, HGATP_MODE_MASK) |
            MASK_INSR(vmid, HGATP_VMID_MASK);
 }
 
@@ -331,8 +325,35 @@ static int p2m_alloc_root_table(struct p2m_domain *p2m)
     return 0;
 }
 
-int p2m_init(struct domain *d)
+static const struct gstage_mode_desc *find_gstage_mode(
+    unsigned char gpa_bits)
 {
+    ASSERT(gstage_modes[0].mode == HGATP_MODE_OFF);
+
+    for ( unsigned int i = 1; i < ARRAY_SIZE(gstage_modes); i++ )
+    {
+        unsigned int lvl = gstage_modes[i].paging_levels + 1;
+        unsigned int bits = P2M_GFN_LEVEL_SHIFT(lvl) + P2M_ROOT_EXTRA_BITS;
+
+        if ( gpa_bits == bits )
+        {
+            if ( gstage_modes[i].mode > max_gstage_mode->mode )
+                return NULL;
+            return &gstage_modes[i];
+        }
+    }
+
+    return NULL;
+}
+
+int p2m_init(struct domain *d, const struct xen_domctl_createdomain *config)
+{
+    /*
+     * TODO: This static is a temporary constraint: all guests must use the
+     * same MMU mode because p2m_gpa_bits is not yet per-domain.
+     * Drop this once per-domain p2m_gpa_bits is introduced.
+     */
+    static const struct gstage_mode_desc __ro_after_init *m = &gstage_modes[0];
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     /*
@@ -340,6 +361,33 @@ int p2m_init(struct domain *d)
      * users of p2m could get an access to domain structure.
      */
     p2m->domain = d;
+
+    if ( !config )
+    {
+        dprintk(XENLOG_ERR, "NULL config is passed\n");
+        return -EINVAL;
+    }
+
+    p2m->mode = find_gstage_mode(config->arch.gaddr_bits);
+
+    if ( !p2m->mode )
+    {
+        dprintk(XENLOG_ERR,
+                "Unsupported or unavailable gstage addr bits: %u\n",
+                config->arch.gaddr_bits);
+
+        return -EINVAL;
+    }
+
+    if ( m->mode == HGATP_MODE_OFF )
+        m = p2m->mode;
+
+    if ( m != p2m->mode )
+    {
+        dprintk(XENLOG_ERR,
+                "Mode should be the same for all guests at the moment\n");
+        return -EINVAL;
+    }
 
     paging_domain_init(d);
 
@@ -361,11 +409,6 @@ int p2m_init(struct domain *d)
 #ifdef CONFIG_HAS_PASSTHROUGH
 #   error "Add init of p2m->clean_dcache"
 #endif
-
-    /* TODO: don't hardcode used for a domain g-stage mode. */
-    p2m->mode.mode = HGATP_MODE_SV39X4;
-    p2m->mode.paging_levels = 2;
-    safe_strcpy(p2m->mode.name, "Sv39x4");
 
     return 0;
 }
@@ -1304,7 +1347,7 @@ static mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
 {
     unsigned int level = P2M_ROOT_LEVEL(p2m);
     unsigned int gfn_limit_bits =
-        P2M_LEVEL_ORDER(level + 1) + P2M_ROOT_EXTRA_BITS(p2m, level);
+        P2M_LEVEL_ORDER(level + 1) + P2M_LEVEL_EXTRA_BITS(p2m, level);
     pte_t entry, *table;
     int rc;
     mfn_t mfn = INVALID_MFN;

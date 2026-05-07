@@ -52,7 +52,7 @@ static DEFINE_PER_CPU(struct vmid_data, vmid_data);
 static unsigned int vmidlen_detect(void)
 {
     unsigned int vmid_bits;
-    unsigned char gstage_mode = get_max_supported_mode();
+    unsigned char gstage_mode = max_gstage_mode->mode;
 
     /*
      * According to the RISC-V Privileged Architecture Spec:

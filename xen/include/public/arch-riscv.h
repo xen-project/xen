@@ -56,6 +56,11 @@ typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 
 struct xen_arch_domainconfig {
+    /*
+     * G-stage GPA address width in bits.
+     * Valid values: 34 (sv32x4), 41 (sv39x4), 50 (sv48x4), 59 (sv57x4).
+     */
+    uint8_t gaddr_bits;
 };
 
 #endif
