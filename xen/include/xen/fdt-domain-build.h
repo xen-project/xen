@@ -47,7 +47,7 @@ static inline int get_allocation_size(paddr_t size)
 typedef unsigned long (*copy_to_guest_phys_cb)(struct domain *d,
                                                paddr_t gpa,
                                                void *buf,
-                                               unsigned int len);
+                                               unsigned long len);
 
 void initrd_load(struct kernel_info *kinfo,
                  copy_to_guest_phys_cb cb);

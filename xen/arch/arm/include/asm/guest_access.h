@@ -14,7 +14,7 @@ unsigned long raw_clear_guest(void *to, unsigned int len);
 unsigned long copy_to_guest_phys_flush_dcache(struct domain *d,
                                               paddr_t gpa,
                                               void *buf,
-                                              unsigned int len);
+                                              unsigned long len);
 
 int access_guest_memory_by_gpa(struct domain *d, paddr_t gpa, void *buf,
                                uint32_t size, bool is_write);
