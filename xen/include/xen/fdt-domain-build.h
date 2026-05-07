@@ -7,6 +7,7 @@
 #include <xen/device_tree.h>
 #include <xen/fdt-kernel.h>
 #include <xen/mm.h>
+#include <xen/sched.h>
 #include <xen/types.h>
 
 struct domain;
@@ -67,6 +68,15 @@ int find_unallocated_memory(const struct kernel_info *kinfo,
 static inline uint32_t alloc_phandle(struct kernel_info *kinfo)
 {
     return kinfo->next_phandle >= GUEST_PHANDLE_GIC ? 0 : kinfo->next_phandle++;
+}
+
+static inline void set_domain_type(struct domain *d, const struct kernel_info *kinfo)
+{
+#ifdef CONFIG_HAS_DOMAIN_TYPE
+    /* Type must be set before allocating memory. */
+    ASSERT(!domain_tot_pages(d));
+    d->type = kinfo->type;
+#endif
 }
 
 #endif /* __XEN_FDT_DOMAIN_BUILD_H__ */

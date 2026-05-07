@@ -100,8 +100,8 @@ static paddr_t __init kernel_zimage_place(struct kernel_info *info)
     const struct membanks *mem = kernel_info_get_mem(info);
     paddr_t load_addr;
 
-#ifdef CONFIG_ARM_64
-    if ( (info->arch.type == DOMAIN_64BIT) && (info->zimage.start == 0) )
+#ifdef CONFIG_HAS_DOMAIN_TYPE
+    if ( (info->type == DOMAIN_64BIT) && (info->zimage.start == 0) )
         return mem->bank[0].start + info->zimage.text_offset;
 #endif
 
@@ -268,14 +268,14 @@ int __init kernel_uimage_probe(struct kernel_info *info,
 
     info->load = kernel_zimage_load;
 
-#ifdef CONFIG_ARM_64
+#ifdef CONFIG_HAS_DOMAIN_TYPE
     switch ( uimage.arch )
     {
     case IH_ARCH_ARM:
-        info->arch.type = DOMAIN_32BIT;
+        info->type = DOMAIN_32BIT;
         break;
     case IH_ARCH_ARM64:
-        info->arch.type = DOMAIN_64BIT;
+        info->type = DOMAIN_64BIT;
         break;
     default:
         printk(XENLOG_ERR "Unsupported uImage arch type %d\n", uimage.arch);
@@ -345,7 +345,7 @@ static int __init kernel_zimage64_probe(struct kernel_info *info,
 
     info->load = kernel_zimage_load;
 
-    info->arch.type = DOMAIN_64BIT;
+    info->type = DOMAIN_64BIT;
 
     return 0;
 }
@@ -396,8 +396,8 @@ static int __init kernel_zimage32_probe(struct kernel_info *info,
 
     info->load = kernel_zimage_load;
 
-#ifdef CONFIG_ARM_64
-    info->arch.type = DOMAIN_32BIT;
+#ifdef CONFIG_HAS_DOMAIN_TYPE
+    info->type = DOMAIN_32BIT;
 #endif
 
     return 0;

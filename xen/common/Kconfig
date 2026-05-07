@@ -128,6 +128,9 @@ config HAS_DEVICE_TREE_DISCOVERY
 config HAS_DOM0LESS
 	bool
 
+config HAS_DOMAIN_TYPE
+	bool
+
 config HAS_DIT # Data Independent Timing
 	bool
 

@@ -9,6 +9,7 @@
 
 #include <xen/bootinfo.h>
 #include <xen/device_tree.h>
+#include <xen/domain.h>
 #include <xen/types.h>
 
 #if __has_include(<asm/kernel.h>)
@@ -64,6 +65,10 @@ struct kernel_info {
             paddr_t start; /* Must be 0 for 64-bit Image */
         } zimage;
     };
+
+#ifdef CONFIG_HAS_DOMAIN_TYPE
+    enum domain_type type;
+#endif
 
 #if __has_include(<asm/kernel.h>)
     struct arch_kernel_info arch;

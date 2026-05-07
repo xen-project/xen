@@ -386,6 +386,10 @@ struct domain
 {
     domid_t          domain_id;
 
+#ifdef CONFIG_HAS_DOMAIN_TYPE
+    enum domain_type type;
+#endif
+
     unsigned int     max_vcpus;
 
     uint64_t         unique_id;       /* Unique domain identifier */

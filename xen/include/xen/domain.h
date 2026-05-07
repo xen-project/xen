@@ -13,6 +13,19 @@ struct guest_area {
     void *map;
 };
 
+#ifdef CONFIG_HAS_DOMAIN_TYPE
+enum __packed domain_type {
+    DOMAIN_32BIT,
+    DOMAIN_64BIT,
+};
+#define is_32bit_domain(d) ((d)->type == DOMAIN_32BIT)
+#define is_64bit_domain(d) ((d)->type == DOMAIN_64BIT)
+#elif !defined(CONFIG_64BIT)
+/* At the moment on 32-bit-only platforms all domains are 32-bit. */
+#define is_32bit_domain(d) true
+#define is_64bit_domain(d) false
+#endif
+
 #include <asm/domain.h>
 
 typedef union {

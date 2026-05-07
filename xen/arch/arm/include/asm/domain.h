@@ -18,18 +18,6 @@ struct hvm_domain
     uint64_t              params[HVM_NR_PARAMS];
 };
 
-#ifdef CONFIG_ARM_64
-enum domain_type {
-    DOMAIN_32BIT,
-    DOMAIN_64BIT,
-};
-#define is_32bit_domain(d) ((d)->arch.type == DOMAIN_32BIT)
-#define is_64bit_domain(d) ((d)->arch.type == DOMAIN_64BIT)
-#else
-#define is_32bit_domain(d) (1)
-#define is_64bit_domain(d) (0)
-#endif
-
 /*
  * Is the domain using the host memory layout?
  *
@@ -62,10 +50,6 @@ struct paging_domain {
 
 struct arch_domain
 {
-#ifdef CONFIG_ARM_64
-    enum domain_type type;
-#endif
-
 #ifdef CONFIG_ARM64_SVE
     /* max SVE encoded vector length */
     uint8_t sve_vl;
