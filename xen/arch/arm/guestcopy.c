@@ -53,7 +53,7 @@ static struct page_info *translate_get_page(copy_info_t info, uint64_t addr,
     return page;
 }
 
-static unsigned long copy_guest(void *buf, uint64_t addr, unsigned int len,
+static unsigned long copy_guest(void *buf, uint64_t addr, unsigned long len,
                                 copy_info_t info, unsigned int flags)
 {
     /* XXX needs to handle faults */
@@ -65,7 +65,7 @@ static unsigned long copy_guest(void *buf, uint64_t addr, unsigned int len,
     while ( len )
     {
         void *p;
-        unsigned int size = min(len, (unsigned int)PAGE_SIZE - offset);
+        unsigned long size = min(len, PAGE_SIZE + 0UL - offset);
         struct page_info *page;
 
         page = translate_get_page(info, addr, flags & COPY_linear,
@@ -136,7 +136,7 @@ unsigned long raw_copy_from_guest(void *to, const void __user *from,
 unsigned long copy_to_guest_phys_flush_dcache(struct domain *d,
                                               paddr_t gpa,
                                               void *buf,
-                                              unsigned int len)
+                                              unsigned long len)
 {
     return copy_guest(buf, gpa, len, GPA_INFO(d),
                       COPY_to_guest | COPY_ipa | COPY_flush_dcache);
