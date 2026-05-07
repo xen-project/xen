@@ -19,22 +19,6 @@
 #define NSVM_ERROR_VVMCB        1
 #define NSVM_ERROR_VMENTRY      2
 
-static void
-nestedsvm_vcpu_clgi(struct vcpu *v)
-{
-    /* clear gif flag */
-    vcpu_nestedsvm(v).ns_gif = 0;
-    local_event_delivery_disable(); /* mask events for PV drivers */
-}
-
-static void
-nestedsvm_vcpu_stgi(struct vcpu *v)
-{
-    /* enable gif flag */
-    vcpu_nestedsvm(v).ns_gif = 1;
-    local_event_delivery_enable(); /* unmask events for PV drivers */
-}
-
 int nestedsvm_vmcb_map(struct vcpu *v, uint64_t vmcbaddr)
 {
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
@@ -161,7 +145,7 @@ int cf_check nsvm_vcpu_reset(struct vcpu *v)
 
     svm->ns_iomap = NULL;
 
-    nestedsvm_vcpu_stgi(v);
+    svm->ns_gif = 1;
     return 0;
 }
 
@@ -667,7 +651,7 @@ nsvm_vcpu_vmentry(struct vcpu *v, struct cpu_user_regs *regs,
         return ret;
     }
 
-    nestedsvm_vcpu_stgi(v);
+    svm->ns_gif = 1;
     return 0;
 }
 
@@ -1214,7 +1198,7 @@ nestedsvm_vmexit_defer(struct vcpu *v,
     if ( vmcb->_vintr.fields.vgif_enable )
         vmcb->_vintr.fields.vgif = 0;
     else
-        nestedsvm_vcpu_clgi(v);
+        svm->ns_gif = 0;
 
     svm->ns_vmexit.exitcode = exitcode;
     svm->ns_vmexit.exitinfo1 = exitinfo1;
@@ -1502,7 +1486,7 @@ void svm_vmexit_do_stgi(struct cpu_user_regs *regs, struct vcpu *v)
     if ( (inst_len = svm_get_insn_len(v, INSTR_STGI)) == 0 )
         return;
 
-    nestedsvm_vcpu_stgi(v);
+    vcpu_nestedsvm(v).ns_gif = 1;
 
     __update_guest_eip(regs, inst_len);
 }
@@ -1523,7 +1507,7 @@ void svm_vmexit_do_clgi(struct cpu_user_regs *regs, struct vcpu *v)
     if ( (inst_len = svm_get_insn_len(v, INSTR_CLGI)) == 0 )
         return;
 
-    nestedsvm_vcpu_clgi(v);
+    vcpu_nestedsvm(v).ns_gif = 0;
 
     /* After a CLGI no interrupts should come */
     intr = vmcb_get_vintr(vmcb);
