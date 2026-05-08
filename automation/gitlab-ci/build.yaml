@@ -424,6 +424,16 @@ debian-12-arm64-gcc-debug:
   variables:
     CONTAINER: debian:12-arm64v8
 
+debian-13-arm64-gcc:
+  extends: .gcc-arm64-build
+  variables:
+    CONTAINER: debian:13-arm64v8
+
+debian-13-arm64-gcc-debug:
+  extends: .gcc-arm64-build-debug
+  variables:
+    CONTAINER: debian:13-arm64v8
+
 alpine-3.18-gcc-arm64:
   extends: .gcc-arm64-build
   <<: *build-test

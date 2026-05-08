@@ -37,7 +37,7 @@
 .qemu-arm64:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:12-arm64v8
+    CONTAINER: debian:13-arm64v8
     LOGFILE: qemu-smoke-arm64.log
   artifacts:
     paths:
@@ -50,7 +50,7 @@
 .qemu-arm32:
   extends: .test-jobs-common
   variables:
-    CONTAINER: debian:12-arm64v8
+    CONTAINER: debian:13-arm64v8
     LOGFILE: qemu-smoke-arm32.log
   artifacts:
     paths:
