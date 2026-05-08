@@ -40,11 +40,21 @@ int libxl__cpuid_legacy(libxl_ctx *ctx, uint32_t domid, bool restore,
     return 0;
 }
 
+#ifdef HAVE_LIBJSONC
+int libxl_cpuid_policy_list_gen_jso(json_object **jso_r, libxl_cpuid_policy_list *pl)
+{
+    *jso_r = NULL;
+    return 0;
+}
+#endif
+
+#ifdef HAVE_LIBYAJL
 yajl_gen_status libxl_cpuid_policy_list_gen_json(yajl_gen hand,
                                 libxl_cpuid_policy_list *pcpuid)
 {
     return 0;
 }
+#endif
 
 int libxl__cpuid_policy_list_parse_json(libxl__gc *gc,
                                         const libxl__json_object *o,
