@@ -15,6 +15,12 @@
   - qemu-system-aarch64-6.0.0-arm64-export
 
 .arm32-test-needs: &arm32-test-needs
+  # Bodge to ensure binaries/ is non-root.  Can be any artefact which comes
+  # from a non-root container, and microcode-x86 is the smallest.  Remove when
+  # all build containers have become non-root.
+  - project: $ARTIFACTS_REPO
+    job: microcode-x86
+    ref: $ARTIFACTS_BRANCH
   - qemu-system-aarch64-6.0.0-arm32-export
 
 .x86-64-test-needs: &x86-64-test-needs
@@ -569,16 +575,16 @@ qemu-xtf-dom0less-arm64-gcc-hyp-xen-version:
   script:
     - ./automation/scripts/qemu-xtf.sh arm64 mmu64le hyp-xen-version 2>&1 | tee ${LOGFILE}
   needs:
+    - *arm64-test-needs
     - alpine-3.18-gcc-arm64
-    - qemu-system-aarch64-6.0.0-arm64-export
 
 qemu-xtf-dom0less-arm64-gcc-debug-hyp-xen-version:
   extends: .qemu-arm64
   script:
     - ./automation/scripts/qemu-xtf.sh arm64 mmu64le hyp-xen-version 2>&1 | tee ${LOGFILE}
   needs:
+    - *arm64-test-needs
     - alpine-3.18-gcc-debug-arm64
-    - qemu-system-aarch64-6.0.0-arm64-export
 
 qemu-smoke-dom0-arm32-gcc:
   extends: .qemu-arm32
