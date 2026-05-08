@@ -165,7 +165,7 @@ void hvmemul_cancel(struct vcpu *v)
     hvmemul_cache_disable(v);
 }
 
-bool __ro_after_init opt_dom0_pf_fixup;
+bool __ro_after_init opt_dom0_pf_fixup = true;
 static int hwdom_fixup_p2m(paddr_t addr)
 {
     unsigned long gfn = paddr_to_pfn(addr);
