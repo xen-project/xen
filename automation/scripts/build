@@ -44,30 +44,15 @@ cp xen/.config xen-config
 # Directory for the artefacts to be dumped into
 mkdir -p binaries
 
-collect_xen_artefacts()
-{
-    local f
-
-    for f in xen/xen xen/xen.efi; do
-        if [[ -f $f ]]; then
-            cp $f binaries/
-        fi
-    done
-}
-
 if [[ "${CPPCHECK}" == "y" ]] && [[ "${HYPERVISOR_ONLY}" == "y" ]]; then
     # Cppcheck analysis invokes Xen-only build
     xen/scripts/xen-analysis.py --run-cppcheck --cppcheck-misra -- -j$(nproc)
 
     # Preserve artefacts
-    collect_xen_artefacts
     cp xen/cppcheck-report/xen-cppcheck.txt xen-cppcheck.txt
 elif [[ "${HYPERVISOR_ONLY}" == "y" ]]; then
     # Xen-only build
     make -j$(nproc) xen
-
-    # Preserve artefacts
-    collect_xen_artefacts
 else
     # Full build.  Figure out our ./configure options
     cfgargs=("--prefix=/usr")
@@ -108,9 +93,16 @@ else
     make -j$(nproc) dist
 
     # Preserve artefacts
-    # Note: Some smoke tests depending on finding binaries/xen on a full build
-    # even though dist/ contains everything, while some containers don't even
-    # build Xen
     (cd dist/install; find | cpio -R 0:0 -o -H newc | gzip) > binaries/xen-tools.cpio.gz
-    collect_xen_artefacts
 fi
+
+# Preserve Xen artefacts
+#
+# Note: Some smoke tests depend on finding binaries/xen on a full build
+# even though dist/ contains everything, while some containers don't even
+# build Xen.
+for f in xen/xen xen/xen-syms xen/xen.efi; do
+    if [[ -f $f ]]; then
+        cp $f binaries/
+    fi
+done
