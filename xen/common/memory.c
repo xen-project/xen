@@ -962,7 +962,7 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
     unsigned int done = 0;
     long rc = 0, adjust = 1;
     union add_to_physmap_extra extra = {};
-    struct page_info *pages[16];
+    struct page_info *pages[16]; /* If changing this, adjust test-paging-mempool too */
 
     if ( !paging_mode_translate(d) )
     {

@@ -25,9 +25,13 @@ uninstall:
 
 CFLAGS += $(CFLAGS_xeninclude)
 CFLAGS += $(CFLAGS_libxenctrl)
+CFLAGS += $(CFLAGS_libxendevicemodel)
+CFLAGS += $(CFLAGS_libxenforeignmemory)
 CFLAGS += $(APPEND_CFLAGS)
 
 LDFLAGS += $(LDLIBS_libxenctrl)
+LDFLAGS += $(LDLIBS_libxendevicemodel)
+LDFLAGS += $(LDLIBS_libxenforeignmemory)
 LDFLAGS += $(APPEND_LDFLAGS)
 
 %.o: Makefile
