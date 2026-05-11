@@ -15,6 +15,7 @@ static unsigned int nr_failures;
 ({                                              \
     nr_failures++;                              \
     (void)printf(fmt, ##__VA_ARGS__);           \
+    -1;                                         \
 })
 
 static xc_interface *xch;
@@ -40,7 +41,7 @@ static uint64_t default_mempool_size_bytes =
     16 << 12;
 #endif
 
-static void run_tests(void)
+static int test_paging_mempool_size(void)
 {
     xen_pfn_t physmap[] = { 0 };
     uint64_t size_bytes, old_size_bytes;
@@ -80,7 +81,9 @@ static void run_tests(void)
         return fail("  Fail: setmaxmem: : %d - %s\n",
                     errno, strerror(errno));
 
-    rc = xc_domain_populate_physmap_exact(xch, domid, 1, 0, 0, physmap);
+    rc = xc_domain_populate_physmap_exact(
+        xch, domid, ARRAY_SIZE(physmap),
+        0 /* order 4k */, 0 /* flags */, physmap);
     if ( rc )
         return fail("  Fail: populate physmap: %d - %s\n",
                     errno, strerror(errno));
@@ -98,6 +101,11 @@ static void run_tests(void)
         return fail("  Fail: mempool size changed %"PRIu64" => %"PRIu64"\n",
                     old_size_bytes, size_bytes);
 
+    /* We added one 4k page.  Check we can remove it. */
+    rc = xc_domain_remove_from_physmap(xch, domid, physmap[0]);
+    if ( rc )
+        return fail("  Fail: remove from physmap: %d - %s\n",
+                    errno, strerror(errno));
 
 
     printf("Test bad set size\n");
@@ -134,6 +142,19 @@ static void run_tests(void)
     if ( size_bytes != 64 << 20 )
         return fail("  Fail: expected mempool size %u, got %"PRIu64"\n",
                     64 << 20, size_bytes);
+
+    return 0;
+}
+
+static int run_tests(void)
+{
+    int rc;
+
+    rc = test_paging_mempool_size();
+    if ( rc )
+        return rc;
+
+    return 0;
 }
 
 int main(int argc, char **argv)
@@ -143,7 +164,6 @@ int main(int argc, char **argv)
     printf("Paging mempool tests\n");
 
     xch = xc_interface_open(NULL, NULL, 0);
-
     if ( !xch )
         err(1, "xc_interface_open");
 
