@@ -6,6 +6,7 @@
   artifacts:
     paths:
       - binaries/
+      - intermediates/
       - xen-config
       - xen-cppcheck.txt
       - '*.log'

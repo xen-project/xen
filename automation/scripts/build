@@ -37,22 +37,24 @@ else
     make -j$(nproc) -C xen olddefconfig
 fi
 
-# Save the config file before building because build failure causes the script
-# to exit early -- bash is invoked with -e.
+# Save the config file before building, just in case.
 cp xen/.config xen-config
 
-# Directory for the artefacts to be dumped into
-mkdir -p binaries
+# Directories for artefacts to be dumped into
+mkdir -p binaries intermediates
+
+# Script exit status, to be overridden by the main make's status below.
+ret=0
 
 if [[ "${CPPCHECK}" == "y" ]] && [[ "${HYPERVISOR_ONLY}" == "y" ]]; then
     # Cppcheck analysis invokes Xen-only build
-    xen/scripts/xen-analysis.py --run-cppcheck --cppcheck-misra -- -j$(nproc)
+    xen/scripts/xen-analysis.py --run-cppcheck --cppcheck-misra -- -j$(nproc) || ret=$?
 
     # Preserve artefacts
     cp xen/cppcheck-report/xen-cppcheck.txt xen-cppcheck.txt
 elif [[ "${HYPERVISOR_ONLY}" == "y" ]]; then
     # Xen-only build
-    make -j$(nproc) xen
+    make -j$(nproc) xen || ret=$?
 else
     # Full build.  Figure out our ./configure options
     cfgargs=("--prefix=/usr")
@@ -90,7 +92,7 @@ else
     fi
 
     ./configure "${cfgargs[@]}"
-    make -j$(nproc) dist
+    make -j$(nproc) dist || ret=$?
 
     # Preserve artefacts
     (cd dist/install; find | cpio -R 0:0 -o -H newc | gzip) > binaries/xen-tools.cpio.gz
@@ -106,3 +108,12 @@ for f in xen/xen xen/xen-syms xen/xen.efi; do
         cp $f binaries/
     fi
 done
+
+# Preserve Xen intermediate files.  Some may be there only upon build failure.
+for f in xen/.xen-syms.* xen/.xen.efi.*; do
+    if [[ -f $f ]]; then
+        cp $f intermediates/
+    fi
+done
+
+exit $ret
