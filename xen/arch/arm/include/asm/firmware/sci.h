@@ -148,6 +148,8 @@ int sci_dt_finalize(struct domain *d, void *fdt);
 int sci_assign_dt_device(struct domain *d, struct dt_device_node *dev);
 #else
 
+#include <public/arch-arm.h>
+
 static inline bool sci_domain_is_enabled(struct domain *d)
 {
     return false;
@@ -162,6 +164,9 @@ static inline int sci_domain_init(struct domain *d,
 static inline int
 sci_domain_sanitise_config(struct xen_domctl_createdomain *config)
 {
+    if ( config->arch.arm_sci_type != XEN_DOMCTL_CONFIG_ARM_SCI_NONE )
+        return -EINVAL;
+
     return 0;
 }
 
