@@ -2899,8 +2899,37 @@ x86_emulate(
                 break;
             }
             break;
-        default:
-            generate_exception_if(true, X86_EXC_UD);
+
+        case 6: /* lkgs */
+            generate_exception_if((modrm_reg & 1) || vex.pfx != vex_f2,
+                                  X86_EXC_UD);
+            generate_exception_if(!mode_64bit() || !mode_ring0(), X86_EXC_UD);
+            vcpu_must_have(lkgs);
+            fail_if(!ops->read_msr || !ops->write_segment || !ops->write_msr);
+            if ( (rc = ops->read_msr(MSR_SHADOW_GS_BASE, &msr_val,
+                                     ctxt)) != X86EMUL_OKAY ||
+                 (rc = ops->read_msr(MSR_GS_BASE, &sreg.base,
+                                     ctxt)) != X86EMUL_OKAY )
+                goto done;
+            dst.orig_val = sreg.base; /* Preserve current GS Base. */
+            if ( (rc = protmode_load_seg(x86_seg_gs, src.val, false, &sreg,
+                                         ctxt, ops)) != X86EMUL_OKAY )
+                goto done;
+            /* Write new base into SHADOW_GS, zero extended from GDT/LDT. */
+            if ( (rc = ops->write_msr(MSR_SHADOW_GS_BASE, sreg.base,
+                                      ctxt, false)) != X86EMUL_OKAY ||
+                 (sreg.base = dst.orig_val, /* Reinstate original GS Base. */
+                  (rc = ops->write_segment(x86_seg_gs, &sreg,
+                                           ctxt)) != X86EMUL_OKAY) )
+            {
+                /*
+                 * In real hardware, access to the registers cannot fail.  It
+                 * is an error in Xen if the writes fail.
+                 */
+                ASSERT_UNREACHABLE();
+                x86_emul_reset_event(ctxt);
+                generate_exception(X86_EXC_DF, 0);
+            }
             break;
         }
         break;

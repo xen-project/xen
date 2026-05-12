@@ -85,6 +85,7 @@ bool emul_test_init(void)
     cpu_policy.feat.invpcid = true;
     cpu_policy.feat.adx = true;
     cpu_policy.feat.rdpid = true;
+    cpu_policy.feat.lkgs = true;
     cpu_policy.feat.wrmsrns = true;
     cpu_policy.extd.clzero = true;
 
