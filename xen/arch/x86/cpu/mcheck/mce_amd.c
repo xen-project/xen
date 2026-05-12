@@ -318,7 +318,7 @@ amd_mcheck_init(const struct cpuinfo_x86 *c, bool bsp)
         mcequirk_amd_apply(quirkflag);
 
     if ( cpu_has(c, X86_FEATURE_AMD_PPIN) &&
-         (c == &boot_cpu_data || ppin_msr) )
+         (bsp || ppin_msr) )
     {
         uint64_t val;
 
@@ -333,7 +333,7 @@ amd_mcheck_init(const struct cpuinfo_x86 *c, bool bsp)
 
         if ( !(val & PPIN_ENABLE) )
             ppin_msr = 0;
-        else if ( c == &boot_cpu_data )
+        else if ( bsp )
             ppin_msr = MSR_AMD_PPIN;
     }
 

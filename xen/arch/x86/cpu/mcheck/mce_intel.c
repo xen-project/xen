@@ -87,7 +87,7 @@ static void cf_check intel_thermal_interrupt(void)
 }
 
 /* Thermal monitoring depends on APIC, ACPI and clock modulation */
-static bool intel_thermal_supported(struct cpuinfo_x86 *c)
+static bool intel_thermal_supported(const struct cpuinfo_x86 *c)
 {
     if ( !cpu_has_apic )
         return false;
@@ -110,7 +110,7 @@ static void __init mcheck_intel_therm_init(void)
 }
 
 /* P4/Xeon Thermal regulation detect and init */
-static void intel_init_thermal(struct cpuinfo_x86 *c)
+static void intel_init_thermal(const struct cpuinfo_x86 *c, bool bsp)
 {
     uint64_t msr_content;
     uint32_t val;
@@ -143,7 +143,7 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
     if ( (msr_content & (1ULL<<3))
          && (val & APIC_DM_MASK) == APIC_DM_SMI )
     {
-        if ( c == &boot_cpu_data )
+        if ( bsp )
             printk(KERN_DEBUG "Thermal monitoring handled by SMI\n");
         return; /* -EBUSY */
     }
@@ -154,7 +154,7 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
     /* check whether a vector already exists, temporarily masked? */
     if ( val & APIC_VECTOR_MASK )
     {
-        if ( c == &boot_cpu_data )
+        if ( bsp )
             printk(KERN_DEBUG "Thermal LVT vector (%#x) already installed\n",
                    val & APIC_VECTOR_MASK);
         return; /* -EBUSY */
@@ -852,7 +852,7 @@ static void intel_init_mce(bool bsp)
     mce_uhandler_num = ARRAY_SIZE(intel_mce_uhandlers);
 }
 
-static void intel_init_ppin(const struct cpuinfo_x86 *c)
+static void intel_init_ppin(const struct cpuinfo_x86 *c, bool bsp)
 {
     /*
      * Even if testing the presence of the MSR would be enough, we don't
@@ -881,7 +881,7 @@ static void intel_init_ppin(const struct cpuinfo_x86 *c)
     case INTEL_SAPPHIRERAPIDS_X:
     case INTEL_EMERALDRAPIDS_X:
 
-        if ( (c != &boot_cpu_data && !ppin_msr) ||
+        if ( (!bsp && !ppin_msr) ||
              rdmsr_safe(MSR_PPIN_CTL, &val) )
             return;
 
@@ -894,7 +894,7 @@ static void intel_init_ppin(const struct cpuinfo_x86 *c)
 
         if ( !(val & PPIN_ENABLE) )
             ppin_msr = 0;
-        else if ( c == &boot_cpu_data )
+        else if ( bsp )
             ppin_msr = MSR_PPIN;
 
         break;
@@ -995,9 +995,9 @@ enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool bsp)
 
     intel_init_cmci(c);
 
-    intel_init_thermal(c);
+    intel_init_thermal(c, bsp);
 
-    intel_init_ppin(c);
+    intel_init_ppin(c, bsp);
 
     return mcheck_intel;
 }
