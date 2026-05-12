@@ -287,8 +287,7 @@ static int __init domu_dt_sci_parse(struct dt_device_node *node,
 
     d_cfg->arch.arm_sci_type = XEN_DOMCTL_CONFIG_ARM_SCI_NONE;
 
-    if ( !IS_ENABLED(CONFIG_ARM_SCI) ||
-         !dt_property_read_bool(node, "xen,sci_type") )
+    if ( !dt_property_read_bool(node, "xen,sci_type") )
         return 0;
 
     ret = dt_property_read_string(node, "xen,sci_type", &sci_type);
@@ -298,7 +297,15 @@ static int __init domu_dt_sci_parse(struct dt_device_node *node,
     if ( !strcmp(sci_type, "none") )
         d_cfg->arch.arm_sci_type = XEN_DOMCTL_CONFIG_ARM_SCI_NONE;
     else if ( !strcmp(sci_type, "scmi_smc") )
+    {
+        if ( !IS_ENABLED(CONFIG_SCMI_SMC) )
+        {
+            printk(XENLOG_ERR "xen,sci_type=scmi_smc requested, but CONFIG_SCMI_SMC not set\n");
+            return -EINVAL;
+        }
+
         d_cfg->arch.arm_sci_type = XEN_DOMCTL_CONFIG_ARM_SCI_SCMI_SMC;
+    }
     else
     {
         printk(XENLOG_ERR "xen,sci_type in not valid (%s) for domain %s\n",
