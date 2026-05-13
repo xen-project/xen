@@ -32,6 +32,11 @@
         break;                                                  \
     }
 
+bool has_v8r_vmsa_support(void)
+{
+    return system_cpuinfo.mm64.msa_frac == MM64_MSA_FRAC_VMSA_SUPPORT;
+}
+
 /*
  * Armv8-R supports direct access and indirect access to the MPU regions through
  * registers:

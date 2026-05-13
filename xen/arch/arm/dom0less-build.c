@@ -302,6 +302,65 @@ static int __init domu_dt_sci_parse(struct dt_device_node *node,
     return 0;
 }
 
+static int __init
+domu_dt_v8r_el1_msa_parse(const struct dt_device_node *node,
+                          struct xen_domctl_createdomain *d_cfg,
+                          unsigned int flags)
+{
+    const char *value;
+    int ret;
+
+    if ( !IS_ENABLED(CONFIG_MPU) )
+    {
+        d_cfg->arch.v8r_el1_msa = XEN_DOMCTL_CONFIG_ARM_V8R_EL1_MSA_NONE;
+
+        if ( !dt_property_read_bool(node, "v8r_el1_msa") )
+            return 0;
+
+        printk(XENLOG_ERR
+               "v8r_el1_msa not supported on this build for domain %s\n",
+               dt_node_full_name(node));
+        return -EINVAL;
+    }
+
+    ret = dt_property_read_string(node, "v8r_el1_msa", &value);
+    /* Property absent: PMSA is the default */
+    if ( ret == -EINVAL )
+        value = "mpu";
+    else if ( ret )
+        return ret;
+
+    if ( !strcmp(value, "mpu") )
+    {
+        if ( !(flags & CDF_staticmem) || !(flags & CDF_directmap) )
+        {
+            printk(XENLOG_ERR
+                   "v8r_el1_msa=mpu requires static-mem and direct-map for domain %s\n",
+                   dt_node_full_name(node));
+            return -EINVAL;
+        }
+        d_cfg->arch.v8r_el1_msa = XEN_DOMCTL_CONFIG_ARM_V8R_EL1_MSA_PMSA;
+        return 0;
+    }
+
+    if ( !strcmp(value, "mmu") )
+    {
+        if ( !has_v8r_vmsa_support() )
+        {
+            printk(XENLOG_ERR
+                   "v8r_el1_msa=mmu unsupported by platform for domain %s\n",
+                   dt_node_full_name(node));
+            return -EINVAL;
+        }
+        d_cfg->arch.v8r_el1_msa = XEN_DOMCTL_CONFIG_ARM_V8R_EL1_MSA_VMSA;
+        return 0;
+    }
+
+    printk(XENLOG_ERR "v8r_el1_msa value '%s' not valid for domain %s\n",
+           value, dt_node_full_name(node));
+    return -EINVAL;
+}
+
 int __init arch_parse_dom0less_node(struct dt_device_node *node,
                                     struct boot_domain *bd)
 {
@@ -314,6 +373,9 @@ int __init arch_parse_dom0less_node(struct dt_device_node *node,
 
     if ( domu_dt_sci_parse(node, d_cfg) )
         panic("Error getting SCI configuration\n");
+
+    if ( domu_dt_v8r_el1_msa_parse(node, d_cfg, flags) )
+        panic("Error getting v8r_el1_msa configuration\n");
 
     if ( !dt_property_read_u32(node, "nr_spis", &d_cfg->arch.nr_spis) )
     {

@@ -322,6 +322,20 @@ with the following properties:
     Should be used together with scmi-smc-passthrough Xen command line
     option.
 
+- v8r_el1_msa
+
+    A string property specifying whether, on Armv8-R systems at EL1, a domain
+    should use PMSAv8 (MPU) or VMSAv8 (MMU).
+
+    - "mmu"
+    Enables VMSAv8 at EL1. This requires hardware support and is only
+    optionally available on AArch64. Not supported on AArch32.
+
+    - "mpu"
+    Enables PMSAv8 at EL1. This is the default behavior when the property is
+    not passed. This configuration requires static allocation (xen,static-mem)
+    and direct mapping (direct-map).
+
 Under the "xen,domain" compatible node, one or more sub-nodes are present
 for the DomU kernel and ramdisk.
 

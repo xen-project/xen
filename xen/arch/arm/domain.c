@@ -538,6 +538,25 @@ void vcpu_switch_to_aarch64_mode(struct vcpu *v)
     v->arch.hcr_el2 |= HCR_RW;
 }
 
+static bool v8r_el1_msa_domain_sanitise_config(
+    const struct xen_domctl_createdomain *config)
+{
+    switch ( config->arch.v8r_el1_msa )
+    {
+    case XEN_DOMCTL_CONFIG_ARM_V8R_EL1_MSA_NONE:
+        return !IS_ENABLED(CONFIG_MPU);
+
+    case XEN_DOMCTL_CONFIG_ARM_V8R_EL1_MSA_PMSA:
+        return IS_ENABLED(CONFIG_MPU);
+
+    case XEN_DOMCTL_CONFIG_ARM_V8R_EL1_MSA_VMSA:
+        return IS_ENABLED(CONFIG_MPU) && IS_ENABLED(CONFIG_ARM_64);
+
+    default:
+        return false;
+    }
+}
+
 int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
 {
     unsigned int max_vcpus;
@@ -551,6 +570,14 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
     {
         dprintk(XENLOG_INFO, "Unsupported configuration %#x\n",
                 config->flags);
+        return -EINVAL;
+    }
+
+    /* Check config structure padding */
+    if ( config->arch.pad )
+    {
+        dprintk(XENLOG_INFO,
+                "Invalid domain configuration during domain creation\n");
         return -EINVAL;
     }
 
@@ -627,6 +654,12 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
     if ( config->altp2m.opts || config->altp2m.nr )
     {
         dprintk(XENLOG_INFO, "Altp2m not supported\n");
+        return -EINVAL;
+    }
+
+    if ( !v8r_el1_msa_domain_sanitise_config(config) )
+    {
+        dprintk(XENLOG_INFO, "Unsupported v8r_el1_msa value\n");
         return -EINVAL;
     }
 
@@ -720,6 +753,10 @@ int arch_domain_create(struct domain *d,
 #ifdef CONFIG_ARM64_SVE
     /* Copy the encoded vector length sve_vl from the domain configuration */
     d->arch.sve_vl = config->arch.sve_vl;
+#endif
+
+#ifdef CONFIG_MPU
+    d->arch.v8r_el1_msa = config->arch.v8r_el1_msa;
 #endif
 
     if ( (rc = sci_domain_init(d, config)) != 0 )
