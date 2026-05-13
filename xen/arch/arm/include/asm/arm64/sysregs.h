@@ -462,6 +462,10 @@
 #define ZCR_ELx_LEN_SIZE             9
 #define ZCR_ELx_LEN_MASK             0x1ff
 
+/* Virtualization Secure Translation Control Register */
+#define VSTCR_EL2_SA                 (_AC(0x1,U) << 30)
+#define VSTCR_EL2_SC                 (_AC(0x1,U) << 20)
+
 #ifdef CONFIG_MPU
 /*
  * The Armv8-R AArch64 architecture always executes code in Secure

@@ -248,6 +248,12 @@ struct cpuinfo_arm {
             unsigned long tgranule_16K:4;
             unsigned long tgranule_64K:4;
             unsigned long tgranule_4K:4;
+#ifdef CONFIG_MPU
+            unsigned long __res0:16;
+            unsigned long msa:4;
+            unsigned long msa_frac:4;
+            unsigned long __res1:8;
+#else
             unsigned long tgranule_16k_2:4;
             unsigned long tgranule_64k_2:4;
             unsigned long tgranule_4k_2:4;
@@ -255,6 +261,7 @@ struct cpuinfo_arm {
             unsigned long __res0:8;
             unsigned long fgt:4;
             unsigned long ecv:4;
+#endif
 
             /* MMFR1 */
             unsigned long hafdbs:4;
@@ -267,13 +274,13 @@ struct cpuinfo_arm {
             unsigned long xnx:4;
             unsigned long twed:4;
             unsigned long ets:4;
-            unsigned long __res1:4;
+            unsigned long __res2:4;
             unsigned long afp:4;
-            unsigned long __res2:12;
+            unsigned long __res3:12;
             unsigned long ecbhb:4;
 
             /* MMFR2 */
-            unsigned long __res3:64;
+            unsigned long __res4:64;
         };
     } mm64;
 
