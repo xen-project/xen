@@ -66,6 +66,7 @@ int token_profit[0x10000];
 unsigned char best_table[256][2];
 unsigned char best_table_len[256];
 
+static const char *srcname = "xen-syms.S";
 
 static void usage(void)
 {
@@ -356,6 +357,7 @@ static void write_src(void)
 	printf("#define ALGN 4\n");
 	printf("#endif\n");
 
+	printf("\t.file \"%s\"\n", srcname);
 	printf("\t.section .rodata, \"a\"\n");
 
 	printf("#ifndef SYMBOLS_ORIGIN\n");
@@ -679,6 +681,8 @@ int main(int argc, char **argv)
 				unsorted = true;
 			else if (strcmp(argv[i], "--sort-by-name") == 0)
 				sort_by_name = 1;
+			else if (strncmp(argv[i], "--source-name=", 14) == 0)
+				srcname = argv[i] + 14;
 			else if (strcmp(argv[i], "--warn-dup") == 0)
 				warn_dup = true;
 			else if (strcmp(argv[i], "--error-dup") == 0)
