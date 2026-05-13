@@ -348,6 +348,7 @@ static struct hypfs_entry *hypfs_get_entry_rel(struct hypfs_entry_dir *dir,
         dir = container_of(entry, struct hypfs_entry_dir, e);
     }
 
+    ASSERT_UNREACHABLE();
     return ERR_PTR(-ENOENT);
 }
 
