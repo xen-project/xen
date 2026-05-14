@@ -274,16 +274,20 @@ static void gicv3_enable_sre(void)
     isb();
 }
 
-/* Wait for completion of a distributor change */
-static void gicv3_do_wait_for_rwp(void __iomem *base)
+/* Wait for completion of a distributor/redistributor change */
+static void gicv3_do_wait_for_rwp(void __iomem *base, uint32_t rwp_bit)
 {
     uint32_t val;
     bool timeout = false;
     s_time_t deadline = NOW() + MILLISECS(1000);
 
     do {
+        /*
+         * GICD_CTLR and GICR_CTLR are both at offset 0, so this is
+         * valid for either a distributor or redistributor base.
+         */
         val = readl_relaxed(base + GICD_CTLR);
-        if ( !(val & GICD_CTLR_RWP) )
+        if ( !(val & rwp_bit) )
             break;
         if ( NOW() > deadline )
         {
@@ -300,12 +304,12 @@ static void gicv3_do_wait_for_rwp(void __iomem *base)
 
 static void gicv3_dist_wait_for_rwp(void)
 {
-    gicv3_do_wait_for_rwp(GICD);
+    gicv3_do_wait_for_rwp(GICD, GICD_CTLR_RWP);
 }
 
 static void gicv3_redist_wait_for_rwp(void)
 {
-    gicv3_do_wait_for_rwp(GICD_RDIST_BASE);
+    gicv3_do_wait_for_rwp(GICD_RDIST_BASE, GICR_CTLR_RWP);
 }
 
 static void gicv3_wait_for_rwp(int irq)
