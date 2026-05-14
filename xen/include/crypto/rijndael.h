@@ -50,9 +50,8 @@ int	rijndael_set_key_enc_only(rijndael_ctx *ctx, const unsigned char *key, int b
 void	rijndael_decrypt(rijndael_ctx *ctx, const unsigned char *src, unsigned char *dst);
 void	rijndael_encrypt(rijndael_ctx *ctx, const unsigned char *src, unsigned char *dst);
 
-int	rijndaelKeySetupEnc(unsigned int rk[], const unsigned char cipherKey[], int keyBits);
-int	rijndaelKeySetupDec(unsigned int rk[], const unsigned char cipkerKey[], int keyBits);
-void	rijndaelEncrypt(const unsigned int rk[], int Nr, const unsigned char pt[16],
-			unsigned char ct[16]);
+int	rijndaelKeySetupEnc(u32 rk[], const u8 cipherKey[], int keyBits);
+int	rijndaelKeySetupDec(u32 rk[], const u8 cipherKey[], int keyBits);
+void	rijndaelEncrypt(const u32 rk[], int Nr, const u8 pt[16], u8 ct[16]);
 
 #endif /* __RIJNDAEL_H */
