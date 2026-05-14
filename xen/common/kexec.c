@@ -333,7 +333,7 @@ void kexec_crash_save_cpu(void)
 }
 
 /* Set up the single Xen-specific-info crash note. */
-crash_xen_info_t *kexec_crash_save_info(void)
+struct crash_xen_info *kexec_crash_save_info(void)
 {
     int cpu = smp_processor_id();
     crash_xen_info_t info;
