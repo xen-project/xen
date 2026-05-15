@@ -424,7 +424,8 @@ static void *its_map_cbaser(struct host_its *its)
      * If the command queue memory is mapped as uncached, we need to flush
      * it on every access.
      */
-    if ( !(reg & GITS_BASER_INNER_CACHEABILITY_MASK) )
+    if ( MASK_EXTR(reg, GITS_BASER_INNER_CACHEABILITY_MASK) <=
+         GIC_BASER_CACHE_nC )
     {
         its->flags |= HOST_ITS_FLUSH_CMD_QUEUE;
         printk(XENLOG_WARNING "using non-cacheable ITS command queue\n");
