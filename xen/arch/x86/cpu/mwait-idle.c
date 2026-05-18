@@ -103,7 +103,6 @@ struct idle_cpu {
 	 * Indicate which enable bits to clear here.
 	 */
 	unsigned long auto_demotion_disable_flags;
-	bool byt_auto_demotion_disable_flag;
 	enum c1e_promotion c1e_promotion;
 };
 
@@ -1144,7 +1143,7 @@ static void cf_check auto_demotion_disable(void *dummy)
 	wrmsrl(MSR_PKG_CST_CONFIG_CONTROL, msr_bits);
 }
 
-static void cf_check byt_auto_demotion_disable(void *dummy)
+static void byt_cht_auto_demotion_disable(void)
 {
 	wrmsrl(MSR_CC6_DEMOTION_POLICY_CONFIG, 0);
 	wrmsrl(MSR_MC6_DEMOTION_POLICY_CONFIG, 0);
@@ -1195,13 +1194,11 @@ static const struct idle_cpu idle_cpu_snb = {
 static const struct idle_cpu idle_cpu_byt = {
 	.state_table = byt_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
-	.byt_auto_demotion_disable_flag = true,
 };
 
 static const struct idle_cpu idle_cpu_cht = {
 	.state_table = cht_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
-	.byt_auto_demotion_disable_flag = true,
 };
 
 static const struct idle_cpu idle_cpu_ivb = {
@@ -1677,13 +1674,10 @@ static int __init mwait_idle_probe(void)
 	return 0;
 }
 
-static void mwait_idle_cpu_tweak(unsigned int cpu)
+static void mwait_idle_cpu_tweak(unsigned int cpu, bool bsp)
 {
 	if (icpu->auto_demotion_disable_flags)
 		on_selected_cpus(cpumask_of(cpu), auto_demotion_disable, NULL, 1);
-
-	if (icpu->byt_auto_demotion_disable_flag)
-		on_selected_cpus(cpumask_of(cpu), byt_auto_demotion_disable, NULL, 1);
 
 	switch (icpu->c1e_promotion) {
 	case C1E_PROMOTION_DISABLE:
@@ -1697,12 +1691,24 @@ static void mwait_idle_cpu_tweak(unsigned int cpu)
 	case C1E_PROMOTION_PRESERVE:
 		break;
 	}
+
+	/* Pkg-scope MSRs on 1-socket-only systems need writing only once. */
+	if (!bsp)
+		return;
+
+	switch (boot_cpu_data.vfm) {
+	case INTEL_ATOM_SILVERMONT:
+	case INTEL_ATOM_AIRMONT:
+		byt_cht_auto_demotion_disable();
+		break;
+	}
 }
 
 static int cf_check mwait_idle_cpu_init(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
 	unsigned int cpu = (unsigned long)hcpu, cstate;
+	static bool first = true;
 	struct acpi_processor_power *dev = processor_powers[cpu];
 
 	switch (action) {
@@ -1781,7 +1787,8 @@ static int cf_check mwait_idle_cpu_init(
 		dev->count++;
 	}
 
-	mwait_idle_cpu_tweak(cpu);
+	mwait_idle_cpu_tweak(cpu, first);
+	first = false;
 
 	return NOTIFY_DONE;
 }
@@ -1818,7 +1825,7 @@ void mwait_idle_resume(void)
 	if (!icpu)
 		return;
 
-	mwait_idle_cpu_tweak(smp_processor_id());
+	mwait_idle_cpu_tweak(smp_processor_id(), true);
 }
 
 /* Helper function for HPET. */
