@@ -106,14 +106,14 @@ struct idle_cpu {
 	enum c1e_promotion c1e_promotion;
 };
 
-static const struct idle_cpu *__ro_after_init icpu;
+static struct idle_cpu __ro_after_init icpu;
 
-static const struct cpuidle_state {
+struct cpuidle_state {
 	char		name[16];
 	unsigned int	flags;
 	unsigned int	exit_latency; /* in US */
 	unsigned int	target_residency; /* in US */
-} *__ro_after_init cpuidle_state_table;
+};
 
 #define CPUIDLE_FLAG_DISABLED		0x1
 /*
@@ -1097,7 +1097,7 @@ static void cf_check mwait_idle(void)
 	 * leave_mm() to avoid costly and often unnecessary wakeups
 	 * for flushing the user TLB's associated with the active mm.
 	 */
-	if (cpuidle_state_table[].flags & CPUIDLE_FLAG_TLB_FLUSHED)
+	if (icpu.state_table[].flags & CPUIDLE_FLAG_TLB_FLUSHED)
 		leave_mm(cpu);
 #endif
 
@@ -1139,7 +1139,7 @@ static void cf_check auto_demotion_disable(void *dummy)
 	u64 msr_bits;
 
 	rdmsrl(MSR_PKG_CST_CONFIG_CONTROL, msr_bits);
-	msr_bits &= ~(icpu->auto_demotion_disable_flags);
+	msr_bits &= ~icpu.auto_demotion_disable_flags;
 	wrmsrl(MSR_PKG_CST_CONFIG_CONTROL, msr_bits);
 }
 
@@ -1371,10 +1371,10 @@ static void __init ivt_idle_state_table_update(void)
 		/* 1 and 2 socket systems use default ivt_cstates */
 		break;
 	case 2: case 3:
-		cpuidle_state_table = ivt_cstates_4s;
+		icpu.state_table = ivt_cstates_4s;
 		break;
 	default:
-		cpuidle_state_table = ivt_cstates_8s;
+		icpu.state_table = ivt_cstates_8s;
 		break;
 	}
 }
@@ -1525,14 +1525,12 @@ static void __init adl_idle_state_table_update(void)
 		adl_l_cstates[1].flags |= CPUIDLE_FLAG_DISABLED;
 
 		/* Disable C1E by clearing the "C1E promotion" bit. */
-		idle_cpu_adl.c1e_promotion = C1E_PROMOTION_DISABLE;
-		idle_cpu_adl_l.c1e_promotion = C1E_PROMOTION_DISABLE;
+		icpu.c1e_promotion = C1E_PROMOTION_DISABLE;
 		return;
 	}
 
 	/* Make sure C1E is enabled by default */
-	idle_cpu_adl.c1e_promotion = C1E_PROMOTION_ENABLE;
-	idle_cpu_adl_l.c1e_promotion = C1E_PROMOTION_ENABLE;
+	icpu.c1e_promotion = C1E_PROMOTION_ENABLE;
 }
 
 /*
@@ -1593,6 +1591,7 @@ static int __init mwait_idle_probe(void)
 {
 	unsigned int eax, ebx, ecx;
 	const struct x86_cpu_id *id;
+	const struct idle_cpu *idle_cpu;
 	const char *str;
 
 	if (boot_cpu_data.vendor != X86_VENDOR_INTEL)
@@ -1627,8 +1626,8 @@ static int __init mwait_idle_probe(void)
 
 	pr_debug(PREFIX "MWAIT substates: %#x\n", mwait_substates);
 
-	icpu = id->driver_data;
-	cpuidle_state_table = icpu->state_table;
+	idle_cpu = id->driver_data;
+	icpu = *idle_cpu;
 
 	if (boot_cpu_has(X86_FEATURE_XEN_ARAT))
 		lapic_timer_reliable_states = LAPIC_TIMER_ALWAYS_RELIABLE;
@@ -1644,7 +1643,7 @@ static int __init mwait_idle_probe(void)
 		const char *ss;
 
 		do {
-			const struct cpuidle_state *state = icpu->state_table;
+			const struct cpuidle_state *state = idle_cpu->state_table;
 			unsigned int bit = 1;
 
 			ss = strchr(str, ',');
@@ -1676,10 +1675,10 @@ static int __init mwait_idle_probe(void)
 
 static void mwait_idle_cpu_tweak(unsigned int cpu, bool bsp)
 {
-	if (icpu->auto_demotion_disable_flags)
+	if (icpu.auto_demotion_disable_flags)
 		on_selected_cpus(cpumask_of(cpu), auto_demotion_disable, NULL, 1);
 
-	switch (icpu->c1e_promotion) {
+	switch (icpu.c1e_promotion) {
 	case C1E_PROMOTION_DISABLE:
 		on_selected_cpus(cpumask_of(cpu), c1e_promotion_disable, NULL, 1);
 		break;
@@ -1732,11 +1731,11 @@ static int cf_check mwait_idle_cpu_init(
 
 	dev->count = 1;
 
-	for (cstate = 0; cpuidle_state_table[cstate].target_residency; ++cstate) {
+	for (cstate = 0; icpu.state_table[cstate].target_residency; ++cstate) {
 		unsigned int num_substates, hint, state;
 		struct acpi_processor_cx *cx;
 
-		hint = flg2MWAIT(cpuidle_state_table[cstate].flags);
+		hint = flg2MWAIT(icpu.state_table[cstate].flags);
 		state = MWAIT_HINT2CSTATE(hint) + 1;
 
 		if (state > max_cstate()) {
@@ -1752,10 +1751,10 @@ static int cf_check mwait_idle_cpu_init(
 			continue;
 
 		/* if state marked as disabled, skip it */
-		if (cpuidle_state_table[cstate].flags &
+		if (icpu.state_table[cstate].flags &
 		    CPUIDLE_FLAG_DISABLED) {
 			printk(XENLOG_DEBUG PREFIX "state %s is disabled\n",
-			       cpuidle_state_table[cstate].name);
+			       icpu.state_table[cstate].name);
 			continue;
 		}
 
@@ -1773,15 +1772,15 @@ static int cf_check mwait_idle_cpu_init(
 		cx->type = state;
 		cx->address = hint;
 		cx->entry_method = ACPI_CSTATE_EM_FFH;
-		cx->latency = cpuidle_state_table[cstate].exit_latency;
+		cx->latency = icpu.state_table[cstate].exit_latency;
 		cx->target_residency =
-			cpuidle_state_table[cstate].target_residency;
-		if ((cpuidle_state_table[cstate].flags &
+			icpu.state_table[cstate].target_residency;
+		if ((icpu.state_table[cstate].flags &
 		     CPUIDLE_FLAG_IRQ_ENABLE) &&
 		    /* cstate_restore_tsc() needs to be a no-op */
 		    boot_cpu_has(X86_FEATURE_NONSTOP_TSC))
 			cx->irq_enable_early = true;
-		if (cpuidle_state_table[cstate].flags & CPUIDLE_FLAG_IBRS)
+		if (icpu.state_table[cstate].flags & CPUIDLE_FLAG_IBRS)
 			cx->ibrs_disable = true;
 
 		dev->count++;
@@ -1822,7 +1821,7 @@ int __init mwait_idle_init(struct notifier_block *nfb)
 
 void mwait_idle_resume(void)
 {
-	if (!icpu)
+	if (!icpu.state_table)
 		return;
 
 	mwait_idle_cpu_tweak(smp_processor_id(), true);
