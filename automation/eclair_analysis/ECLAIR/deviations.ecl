@@ -143,6 +143,11 @@ number of guest paging levels."
 -config=MC3A2.R5.6,reports+={deliberate,"any_area(any_loc(file(^xen/arch/x86/include/asm/guest_pt\\.h$)))&&any_area(any_loc(text(^.*(guest_intpte_t|guest_l[12]e_t).*$)))"}
 -doc_end
 
+-doc_begin="In x86 shadow code, the type \"guest_va_t\" is deliberately defined
+multiple times, depending on the number of guest paging levels."
+-config=MC3A2.R5.6,reports+={deliberate,"any_area(any_loc(file(^xen/arch/x86/mm/shadow/multi\\.c$)))&&any_area(any_loc(text(^.*guest_va_t.*$)))"}
+-doc_end
+
 -doc_begin="The following files are imported from the gnu-efi package."
 -file_tag+={adopted_r5_6,"^xen/include/efi/.*$"}
 -file_tag+={adopted_r5_6,"^xen/arch/.*/include/asm/.*/efibind\\.h$"}
