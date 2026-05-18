@@ -1167,132 +1167,132 @@ static void cf_check c1e_promotion_disable(void *dummy)
 	wrmsrl(MSR_IA32_POWER_CTL, msr_bits);
 }
 
-static const struct idle_cpu idle_cpu_nehalem = {
+static const struct idle_cpu __initconstrel idle_cpu_nehalem = {
 	.state_table = nehalem_cstates,
 	.auto_demotion_disable_flags = NHM_C1_AUTO_DEMOTE | NHM_C3_AUTO_DEMOTE,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_atom = {
+static const struct idle_cpu __initconstrel idle_cpu_atom = {
 	.state_table = atom_cstates,
 };
 
-static const struct idle_cpu idle_cpu_tangier = {
+static const struct idle_cpu __initconstrel idle_cpu_tangier = {
 	.state_table = tangier_cstates,
 };
 
-static const struct idle_cpu idle_cpu_lincroft = {
+static const struct idle_cpu __initconstrel idle_cpu_lincroft = {
 	.state_table = atom_cstates,
 	.auto_demotion_disable_flags = ATM_LNC_C6_AUTO_DEMOTE,
 };
 
-static const struct idle_cpu idle_cpu_snb = {
+static const struct idle_cpu __initconstrel idle_cpu_snb = {
 	.state_table = snb_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_byt = {
+static const struct idle_cpu __initconstrel idle_cpu_byt = {
 	.state_table = byt_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_cht = {
+static const struct idle_cpu __initconstrel idle_cpu_cht = {
 	.state_table = cht_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_ivb = {
+static const struct idle_cpu __initconstrel idle_cpu_ivb = {
 	.state_table = ivb_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_ivt = {
+static const struct idle_cpu __initconstrel idle_cpu_ivt = {
 	.state_table = ivt_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_hsw = {
+static const struct idle_cpu __initconstrel idle_cpu_hsw = {
 	.state_table = hsw_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_bdw = {
+static const struct idle_cpu __initconstrel idle_cpu_bdw = {
 	.state_table = bdw_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_skl = {
+static const struct idle_cpu __initconstrel idle_cpu_skl = {
 	.state_table = skl_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_skx = {
+static const struct idle_cpu __initconstrel idle_cpu_skx = {
 	.state_table = skx_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_icx = {
+static const struct idle_cpu __initconstrel idle_cpu_icx = {
 	.state_table = icx_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static struct idle_cpu __ro_after_init idle_cpu_adl = {
+static const struct idle_cpu __initconstrel idle_cpu_adl = {
 	.state_table = adl_cstates,
 };
 
-static struct idle_cpu __ro_after_init idle_cpu_adl_l = {
+static const struct idle_cpu __initconstrel idle_cpu_adl_l = {
 	.state_table = adl_l_cstates,
 };
 
-static const struct idle_cpu idle_cpu_mtl_l = {
+static const struct idle_cpu __initconstrel idle_cpu_mtl_l = {
 	.state_table = mtl_l_cstates,
 };
 
-static const struct idle_cpu idle_cpu_gmt = {
+static const struct idle_cpu __initconstrel idle_cpu_gmt = {
 	.state_table = gmt_cstates,
 };
 
-static const struct idle_cpu idle_cpu_spr = {
+static const struct idle_cpu __initconstrel idle_cpu_spr = {
 	.state_table = spr_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_gnr = {
+static const struct idle_cpu __initconstrel idle_cpu_gnr = {
 	.state_table = gnr_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_gnrd = {
+static const struct idle_cpu __initconstrel idle_cpu_gnrd = {
 	.state_table = gnrd_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_avn = {
+static const struct idle_cpu __initconstrel idle_cpu_avn = {
 	.state_table = avn_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_bxt = {
+static const struct idle_cpu __initconstrel idle_cpu_bxt = {
 	.state_table = bxt_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_dnv = {
+static const struct idle_cpu __initconstrel idle_cpu_dnv = {
 	.state_table = dnv_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_snr = {
+static const struct idle_cpu __initconstrel idle_cpu_snr = {
 	.state_table = snr_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_grr = {
+static const struct idle_cpu __initconstrel idle_cpu_grr = {
 	.state_table = grr_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
-static const struct idle_cpu idle_cpu_srf = {
+static const struct idle_cpu __initconstrel idle_cpu_srf = {
 	.state_table = srf_cstates,
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
