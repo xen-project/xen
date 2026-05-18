@@ -180,7 +180,7 @@ void pv_ring1_init_hypercall_page(void *p)
     }
 }
 
-void do_entry_int82(struct cpu_user_regs *regs)
+void asmlinkage do_entry_int82(struct cpu_user_regs *regs)
 {
     if ( unlikely(untrusted_msi) )
         check_for_unexpected_msi((uint8_t)regs->entry_vector);

@@ -40,7 +40,7 @@ DEFINE_PER_CPU(struct vcpu_info *, vcpu_info);
  *     0 vmcall
  *   > 0 vmmcall
  */
-int8_t __initdata early_hypercall_insn = -1;
+int8_t asmlinkage __initdata early_hypercall_insn = -1;
 
 /*
  * Called once during the first hypercall to figure out which instruction to

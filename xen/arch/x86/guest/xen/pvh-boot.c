@@ -22,7 +22,7 @@
 
 /* Initialised in head.S, before .bss is zeroed. */
 bool __initdata pvh_boot;
-uint32_t __initdata pvh_start_info_pa;
+uint32_t asmlinkage __initdata pvh_start_info_pa;
 
 static multiboot_info_t __initdata pvh_mbi;
 static module_t __initdata pvh_mbi_mods[8];
