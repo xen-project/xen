@@ -83,7 +83,7 @@ enum c1e_promotion {
 };
 
 struct idle_cpu {
-	const struct cpuidle_state *state_table;
+	struct cpuidle_state *state_table;
 
 	/*
 	 * Hardware C-state auto-demotion may not always be optimal.
@@ -139,7 +139,7 @@ struct cpuidle_state {
  * which is also the index into the MWAIT hint array.
  * Thus C0 is a dummy.
  */
-static const struct cpuidle_state nehalem_cstates[] = {
+static struct cpuidle_state __ro_after_init nehalem_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -167,7 +167,7 @@ static const struct cpuidle_state nehalem_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state snb_cstates[] = {
+static struct cpuidle_state __ro_after_init snb_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -201,7 +201,7 @@ static const struct cpuidle_state snb_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state byt_cstates[] = {
+static struct cpuidle_state __ro_after_init byt_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -235,7 +235,7 @@ static const struct cpuidle_state byt_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state cht_cstates[] = {
+static struct cpuidle_state __ro_after_init cht_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -269,7 +269,7 @@ static const struct cpuidle_state cht_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state ivb_cstates[] = {
+static struct cpuidle_state __ro_after_init ivb_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -303,7 +303,7 @@ static const struct cpuidle_state ivb_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state ivt_cstates[] = {
+static struct cpuidle_state __ro_after_init ivt_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -331,7 +331,7 @@ static const struct cpuidle_state ivt_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state ivt_cstates_4s[] = {
+static struct cpuidle_state __ro_after_init ivt_cstates_4s[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -359,7 +359,7 @@ static const struct cpuidle_state ivt_cstates_4s[] = {
 	{}
 };
 
-static const struct cpuidle_state ivt_cstates_8s[] = {
+static struct cpuidle_state __ro_after_init ivt_cstates_8s[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -387,7 +387,7 @@ static const struct cpuidle_state ivt_cstates_8s[] = {
 	{}
 };
 
-static const struct cpuidle_state hsw_cstates[] = {
+static struct cpuidle_state __ro_after_init hsw_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -439,7 +439,7 @@ static const struct cpuidle_state hsw_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state bdw_cstates[] = {
+static struct cpuidle_state __ro_after_init bdw_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -565,7 +565,7 @@ static struct cpuidle_state __ro_after_init skx_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state icx_cstates[] = {
+static struct cpuidle_state __ro_after_init icx_cstates[] = {
        {
                .name = "C1",
                .flags = MWAIT2flg(0x00) | CPUIDLE_FLAG_IRQ_ENABLE,
@@ -665,7 +665,7 @@ static struct cpuidle_state __ro_after_init adl_l_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state mtl_l_cstates[] = {
+static struct cpuidle_state __ro_after_init mtl_l_cstates[] = {
 	{
 		.name = "C1E",
 		.flags = MWAIT2flg(0x01),
@@ -687,7 +687,7 @@ static const struct cpuidle_state mtl_l_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state gmt_cstates[] = {
+static struct cpuidle_state __ro_after_init gmt_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00) | CPUIDLE_FLAG_DISABLED,
@@ -743,7 +743,7 @@ static struct cpuidle_state __ro_after_init spr_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state gnr_cstates[] = {
+static struct cpuidle_state __ro_after_init gnr_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -771,7 +771,7 @@ static const struct cpuidle_state gnr_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state gnrd_cstates[] = {
+static struct cpuidle_state __ro_after_init gnrd_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -799,7 +799,7 @@ static const struct cpuidle_state gnrd_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state atom_cstates[] = {
+static struct cpuidle_state __ro_after_init atom_cstates[] = {
 	{
 		.name = "C1E",
 		.flags = MWAIT2flg(0x00),
@@ -827,7 +827,7 @@ static const struct cpuidle_state atom_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state tangier_cstates[] = {
+static struct cpuidle_state __ro_after_init tangier_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -861,7 +861,7 @@ static const struct cpuidle_state tangier_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state avn_cstates[] = {
+static struct cpuidle_state __ro_after_init avn_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -923,7 +923,7 @@ static struct cpuidle_state __ro_after_init bxt_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state dnv_cstates[] = {
+static struct cpuidle_state __ro_after_init dnv_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -949,7 +949,7 @@ static const struct cpuidle_state dnv_cstates[] = {
  * Note, depending on HW and FW revision, SnowRidge SoC may or may not support
  * C6, and this is indicated in the CPUID mwait leaf.
  */
-static const struct cpuidle_state snr_cstates[] = {
+static struct cpuidle_state __ro_after_init snr_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -971,7 +971,7 @@ static const struct cpuidle_state snr_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state grr_cstates[] = {
+static struct cpuidle_state __ro_after_init grr_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
@@ -993,7 +993,7 @@ static const struct cpuidle_state grr_cstates[] = {
 	{}
 };
 
-static const struct cpuidle_state srf_cstates[] = {
+static struct cpuidle_state __ro_after_init srf_cstates[] = {
 	{
 		.name = "C1",
 		.flags = MWAIT2flg(0x00),
