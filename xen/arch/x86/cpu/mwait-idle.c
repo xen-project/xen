@@ -72,6 +72,11 @@ boolean_param("mwait-idle", opt_mwait_idle);
 
 /* The maximum allowed length for the 'table' module parameter  */
 #define MAX_CMDLINE_TABLE_LEN 256
+/* Maximum allowed C-state latency */
+#define MAX_CMDLINE_LATENCY_US (5 * 1000 /* USEC_PER_MSEC */)
+/* Maximum allowed C-state target residency */
+#define MAX_CMDLINE_RESIDENCY_US (100 * 1000 /* USEC_PER_MSEC */)
+
 static char cmdline_table_str[MAX_CMDLINE_TABLE_LEN] __initdata;
 string_param("mwait-idle.table", cmdline_table_str);
 
@@ -1590,6 +1595,41 @@ static char *__init get_cmdline_field(char *args, char **field, char sep)
 }
 
 /**
+ * validate_cmdline_cstate - Validate a C-state from cmdline.
+ * @state: The C-state to validate.
+ * @prev_state: The previous C-state in the table or NULL.
+ *
+ * Return: 0 if the C-state is valid or -EINVAL otherwise.
+ */
+static int __init validate_cmdline_cstate(const struct cpuidle_state *state,
+					  const struct cpuidle_state *prev_state)
+{
+	if (state->exit_latency == 0)
+		/* Exit latency 0 can only be used for the POLL state */
+		return -EINVAL;
+
+	if (state->exit_latency > MAX_CMDLINE_LATENCY_US)
+		return -EINVAL;
+
+	if (state->target_residency > MAX_CMDLINE_RESIDENCY_US)
+		return -EINVAL;
+
+	if (state->target_residency < state->exit_latency)
+		return -EINVAL;
+
+	if (!prev_state)
+		return 0;
+
+	if (state->exit_latency <= prev_state->exit_latency)
+		return -EINVAL;
+
+	if (state->target_residency <= prev_state->target_residency)
+		return -EINVAL;
+
+	return 0;
+}
+
+/**
  * cmdline_table_adjust - Adjust the C-states table with data from cmdline.
  *
  * Adjust the C-states table with data from the 'mwait-idle.table' parameter
@@ -1695,6 +1735,21 @@ static void __init cmdline_table_adjust(void)
 		printk(XENLOG_INFO PREFIX
 		       "C-state from cmdline: name=%s, latency=%u, residency=%u\n",
 		       state->name, state->exit_latency, state->target_residency);
+	}
+
+	/* Validate the adjusted C-states */
+	for (i = 0; i < state_count; i++) {
+		const struct cpuidle_state *prev_state;
+
+		state = &cmdline_states[i];
+		prev_state = i ? &cmdline_states[i - 1] : NULL;
+
+		if (validate_cmdline_cstate(state, prev_state)) {
+			printk(XENLOG_ERR PREFIX
+			       "C-state '%s' validation failed\n",
+			       state->name);
+			goto error;
+		}
 	}
 
 	/* Copy the adjusted C-states table back */
