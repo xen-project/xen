@@ -70,6 +70,11 @@
 static __initdata bool opt_mwait_idle = true;
 boolean_param("mwait-idle", opt_mwait_idle);
 
+/* The maximum allowed length for the 'table' module parameter  */
+#define MAX_CMDLINE_TABLE_LEN 256
+static char cmdline_table_str[MAX_CMDLINE_TABLE_LEN] __initdata;
+string_param("mwait-idle.table", cmdline_table_str);
+
 static unsigned int mwait_substates;
 
 #define LAPIC_TIMER_ALWAYS_RELIABLE 0xFFFFFFFF
@@ -121,6 +126,9 @@ struct cpuidle_state {
  * above.
  */
 #define CPUIDLE_FLAG_IBRS		0x20000
+
+/* C-states data from the 'mwait-idle.table' cmdline parameter */
+static struct cpuidle_state cmdline_states[ACPI_PROCESSOR_MAX_POWER] __initdata;
 
 /*
  * MWAIT takes an 8-bit "hint" in EAX "suggesting"
@@ -1547,6 +1555,161 @@ static void __init mwait_idle_state_table_update(void)
 	}
 }
 
+ /**
+  * get_cmdline_field - Get the current field from a cmdline string.
+  * @args: The cmdline string to get the current field from.
+  * @field: Pointer to the current field upon return.
+  * @sep: The fields separator character.
+  *
+  * Examples:
+  *   Input: args="C1:1:1,C1E:2:10", sep=':'
+  *   Output: field="C1", return "1:1,C1E:2:10"
+  *   Input: args="C1:1:1,C1E:2:10", sep=','
+  *   Output: field="C1:1:1", return "C1E:2:10"
+  *   Ipnut: args="::", sep=':'
+  *   Output: field="", return ":"
+  *
+  * Return: The continuation of the cmdline string after the field or NULL.
+  */
+static char *__init get_cmdline_field(char *args, char **field, char sep)
+{
+	unsigned int i;
+
+	for (i = 0; args[i] && !isspace(args[i]); i++) {
+		if (args[i] == sep)
+			break;
+	}
+
+	*field = args;
+
+	if (args[i] != sep)
+		return NULL;
+
+	args[i] = '\0';
+	return args + i + 1;
+}
+
+/**
+ * cmdline_table_adjust - Adjust the C-states table with data from cmdline.
+ *
+ * Adjust the C-states table with data from the 'mwait-idle.table' parameter
+ * (if specified).
+ */
+static void __init cmdline_table_adjust(void)
+{
+	char *args = cmdline_table_str;
+	struct cpuidle_state *state;
+	unsigned int i, state_count;
+
+	if (args[0] == '\0')
+		/* The 'mwait-idle.table' module parameter was not specified */
+		return;
+
+	/* Create a copy of the C-states table */
+	for (i = 0;
+	     i < ARRAY_SIZE(cmdline_states) && icpu.state_table[i].name[0];
+	     i++)
+		cmdline_states[i] = icpu.state_table[i];
+
+	state_count = i;
+
+	/*
+	 * Adjust the C-states table copy with data from the 'mwait-idle.table'
+	 * module parameter.
+	 */
+	while (args) {
+		char *fields, *name, *val;
+
+		/*
+		 * Get the next C-state definition, which is expected to be
+		 * '<name>:<latency_us>:<target_residency_us>'. Treat "empty"
+		 * fields as unchanged. For example,
+		 * '<name>::<target_residency_us>' leaves the latency unchanged.
+		 */
+		args = get_cmdline_field(args, &fields, ',');
+
+		/* name */
+		fields = get_cmdline_field(fields, &name, ':');
+		if (!fields)
+			goto error;
+
+		/* Find the C-state by its name */
+		state = NULL;
+		for (i = 0; i < state_count; i++) {
+			if (!strcmp(name, cmdline_states[i].name)) {
+				state = &cmdline_states[i];
+				break;
+			}
+		}
+
+		if (!state) {
+			printk(XENLOG_ERR PREFIX "C-state '%s' was not found\n",
+			       name);
+			continue;
+		}
+
+		/* Latency */
+		fields = get_cmdline_field(fields, &val, ':');
+		if (!fields)
+			goto error;
+
+		if (*val) {
+			const char *end;
+			unsigned long n = simple_strtoul(val, &end, 0);
+
+			state->exit_latency = n;
+			if (*end || state->exit_latency != n)
+				goto error;
+		}
+
+		/* Target residency */
+		fields = get_cmdline_field(fields, &val, ':');
+
+		if (*val) {
+			const char *end;
+			unsigned long n = simple_strtoul(val, &end, 0);
+
+			state->target_residency = n;
+			if (*end || state->target_residency != n)
+				goto error;
+		}
+
+		/*
+		 * Allow for 3 more fields, but ignore them. Helps to make
+		 * possible future extensions of the cmdline format backward
+		 * compatible.
+		 */
+		for (i = 0; fields && i < 3; i++) {
+			fields = get_cmdline_field(fields, &val, ':');
+			if (!fields)
+				break;
+		}
+
+		if (fields) {
+			printk(XENLOG_ERR PREFIX
+			       "Too many fields for C-state '%s'\n",
+			       state->name);
+			goto error;
+		}
+
+		printk(XENLOG_INFO PREFIX
+		       "C-state from cmdline: name=%s, latency=%u, residency=%u\n",
+		       state->name, state->exit_latency, state->target_residency);
+	}
+
+	/* Copy the adjusted C-states table back */
+	for (i = 0; i < state_count; i++)
+		icpu.state_table[i] = cmdline_states[i];
+
+	printk(XENLOG_INFO PREFIX
+	       "Adjusted C-states with data from 'mwait-idle.table'\n");
+	return;
+
+ error:
+	printk(XENLOG_WARNING PREFIX
+	       "Failed to adjust C-states with data from 'mwait-idle.table'\n");
+}
+
 static int __init mwait_idle_probe(void)
 {
 	unsigned int eax, ebx, ecx;
@@ -1595,6 +1758,8 @@ static int __init mwait_idle_probe(void)
 		 lapic_timer_reliable_states);
 
 	mwait_idle_state_table_update();
+
+	cmdline_table_adjust();
 
 	return 0;
 }

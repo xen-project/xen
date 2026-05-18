@@ -1920,6 +1920,23 @@ Print boot time MTRR state.
 Use the MWAIT idle driver (with model specific C-state knowledge) instead
 of the ACPI based one.
 
+### mwait-idle.table (x86)
+> `= <string>`
+
+ Define the C-states table from a user input string. Expected format is
+ 'name:latency:residency', where:
+ - name: The C-state name.
+ - latency: The C-state exit latency in us.
+ - residency: The C-state target residency in us.
+
+ Multiple C-states can be defined by separating them with commas:
+ 'name1:latency1:residency1,name2:latency2:residency2'
+
+ Example: mwait-idle.table=C1:1:1,C1E:5:10,C6:100:600
+
+ To leave latency or residency unchanged, use an empty field, for example:
+ 'C1:1:1,C1E::10' - leaves C1E latency unchanged.
+
 ### nmi (x86)
 > `= ignore | dom0 | fatal`
 
