@@ -12,6 +12,8 @@
  * GNU Lesser General Public License for more details.
  */
 
+#define _GNU_SOURCE
+
 #include <ctype.h>
 #include <inttypes.h>
 #include <limits.h>
