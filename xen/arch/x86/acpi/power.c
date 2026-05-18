@@ -28,6 +28,7 @@
 #include <asm/io_apic.h>
 #include <asm/irq.h>
 #include <asm/microcode.h>
+#include <asm/mwait.h>
 #include <asm/prot-key.h>
 #include <asm/spec_ctrl.h>
 #include <asm/tboot.h>
@@ -299,6 +300,7 @@ static int enter_state(u32 state)
     acpi_sleep_post(state);
     if ( hvm_cpu_up() )
         BUG();
+    mwait_idle_resume();
     cpufreq_add_cpu(0);
 
  enable_cpu:

@@ -1677,6 +1677,28 @@ static int __init mwait_idle_probe(void)
 	return 0;
 }
 
+static void mwait_idle_cpu_tweak(unsigned int cpu)
+{
+	if (icpu->auto_demotion_disable_flags)
+		on_selected_cpus(cpumask_of(cpu), auto_demotion_disable, NULL, 1);
+
+	if (icpu->byt_auto_demotion_disable_flag)
+		on_selected_cpus(cpumask_of(cpu), byt_auto_demotion_disable, NULL, 1);
+
+	switch (icpu->c1e_promotion) {
+	case C1E_PROMOTION_DISABLE:
+		on_selected_cpus(cpumask_of(cpu), c1e_promotion_disable, NULL, 1);
+		break;
+
+	case C1E_PROMOTION_ENABLE:
+		on_selected_cpus(cpumask_of(cpu), c1e_promotion_enable, NULL, 1);
+		break;
+
+	case C1E_PROMOTION_PRESERVE:
+		break;
+	}
+}
+
 static int cf_check mwait_idle_cpu_init(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
@@ -1759,24 +1781,7 @@ static int cf_check mwait_idle_cpu_init(
 		dev->count++;
 	}
 
-	if (icpu->auto_demotion_disable_flags)
-		on_selected_cpus(cpumask_of(cpu), auto_demotion_disable, NULL, 1);
-
-	if (icpu->byt_auto_demotion_disable_flag)
-		on_selected_cpus(cpumask_of(cpu), byt_auto_demotion_disable, NULL, 1);
-
-	switch (icpu->c1e_promotion) {
-	case C1E_PROMOTION_DISABLE:
-		on_selected_cpus(cpumask_of(cpu), c1e_promotion_disable, NULL, 1);
-		break;
-
-	case C1E_PROMOTION_ENABLE:
-		on_selected_cpus(cpumask_of(cpu), c1e_promotion_enable, NULL, 1);
-		break;
-
-	case C1E_PROMOTION_PRESERVE:
-		break;
-	}
+	mwait_idle_cpu_tweak(cpu);
 
 	return NOTIFY_DONE;
 }
@@ -1806,6 +1811,14 @@ int __init mwait_idle_init(struct notifier_block *nfb)
 	}
 
 	return err;
+}
+
+void mwait_idle_resume(void)
+{
+	if (!icpu)
+		return;
+
+	mwait_idle_cpu_tweak(smp_processor_id());
 }
 
 /* Helper function for HPET. */
