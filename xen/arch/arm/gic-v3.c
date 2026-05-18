@@ -704,11 +704,11 @@ static int gicv3_enable_redist(void)
         }
         cpu_relax();
         udelay(1);
-    } while ( timeout );
+    } while ( 1 );
 
     if ( timeout )
     {
-        dprintk(XENLOG_ERR, "GICv3: Redist enable RWP timeout\n");
+        dprintk(XENLOG_ERR, "GICv3: Redist wakeup timeout\n");
         return 1;
     }
 
