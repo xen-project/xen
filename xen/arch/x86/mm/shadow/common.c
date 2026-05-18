@@ -767,11 +767,12 @@ static unsigned int sh_min_allocation(const struct domain *d)
      * megabyte of RAM (for the p2m table, minimally enough for HVM's setting
      * up of slot zero and an LAPIC page), plus one for HVM's 1-to-1 pagetable.
      */
+    unsigned int extra = max(domain_tot_pages(d) / 256,
+                             is_hvm_domain(d) ? CONFIG_PAGING_LEVELS + 2 : 0U) +
+                         is_hvm_domain(d);
+
     return shadow_min_acceptable_pages(d) +
-           max(max(domain_tot_pages(d) / 256,
-                   is_hvm_domain(d) ? CONFIG_PAGING_LEVELS + 2 : 0U) +
-               is_hvm_domain(d),
-               d->arch.paging.p2m_pages);
+           max(extra, d->arch.paging.p2m_pages);
 }
 
 int shadow_set_allocation(struct domain *d, unsigned int pages, bool *preempted)
