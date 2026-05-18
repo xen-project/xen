@@ -72,19 +72,6 @@ boolean_param("mwait-idle", opt_mwait_idle);
 
 static unsigned int mwait_substates;
 
-/*
- * Some platforms come with mutually exclusive C-states, so that if one is
- * enabled, the other C-states must not be used. Example: C1 and C1E on
- * Sapphire Rapids platform. This parameter allows for selecting the
- * preferred C-states among the groups of mutually exclusive C-states - the
- * selected C-states will be registered, the other C-states from the mutually
- * exclusive group won't be registered. If the platform has no mutually
- * exclusive C-states, this parameter has no effect.
- */
-static unsigned int __ro_after_init preferred_states_mask;
-static char __initdata preferred_states[64];
-string_param("preferred-cstates", preferred_states);
-
 #define LAPIC_TIMER_ALWAYS_RELIABLE 0xFFFFFFFF
 /* Reliable LAPIC Timer States, bit 1 for C1 etc. Default to only C1. */
 static unsigned int lapic_timer_reliable_states = (1 << 1);
@@ -1512,28 +1499,6 @@ static void __init skx_idle_state_table_update(void)
 }
 
 /*
- * adl_idle_state_table_update - Adjust AlderLake idle states table.
- */
-static void __init adl_idle_state_table_update(void)
-{
-	/* Check if user prefers C1 over C1E. */
-	if ((preferred_states_mask & BIT(1, U)) &&
-	    !(preferred_states_mask & BIT(2, U))) {
-		adl_cstates[0].flags &= ~CPUIDLE_FLAG_DISABLED;
-		adl_cstates[1].flags |= CPUIDLE_FLAG_DISABLED;
-		adl_l_cstates[0].flags &= ~CPUIDLE_FLAG_DISABLED;
-		adl_l_cstates[1].flags |= CPUIDLE_FLAG_DISABLED;
-
-		/* Disable C1E by clearing the "C1E promotion" bit. */
-		icpu.c1e_promotion = C1E_PROMOTION_DISABLE;
-		return;
-	}
-
-	/* Make sure C1E is enabled by default */
-	icpu.c1e_promotion = C1E_PROMOTION_ENABLE;
-}
-
-/*
  * spr_idle_state_table_update - Adjust Sapphire Rapids idle states table.
  */
 static void __init spr_idle_state_table_update(void)
@@ -1579,11 +1544,6 @@ static void __init mwait_idle_state_table_update(void)
 	case INTEL_EMERALDRAPIDS_X:
 		spr_idle_state_table_update();
 		break;
-	case INTEL_ALDERLAKE:
-	case INTEL_ALDERLAKE_L:
-	case INTEL_ATOM_GRACEMONT:
-		adl_idle_state_table_update();
-		break;
 	}
 }
 
@@ -1592,7 +1552,6 @@ static int __init mwait_idle_probe(void)
 	unsigned int eax, ebx, ecx;
 	const struct x86_cpu_id *id;
 	const struct idle_cpu *idle_cpu;
-	const char *str;
 
 	if (boot_cpu_data.vendor != X86_VENDOR_INTEL)
 		return -ENODEV;
@@ -1634,39 +1593,6 @@ static int __init mwait_idle_probe(void)
 
 	pr_debug(PREFIX "lapic_timer_reliable_states %#x\n",
 		 lapic_timer_reliable_states);
-
-	str = preferred_states;
-	if (isdigit(str[0]))
-		preferred_states_mask = simple_strtoul(str, &str, 0);
-	else if (str[0])
-	{
-		const char *ss;
-
-		do {
-			const struct cpuidle_state *state = idle_cpu->state_table;
-			unsigned int bit = 1;
-
-			ss = strchr(str, ',');
-			if (!ss)
-				ss = strchr(str, '\0');
-
-			for (; state->name[0]; ++state) {
-				bit <<= 1;
-				if (!cmdline_strcmp(str, state->name)) {
-					preferred_states_mask |= bit;
-					break;
-				}
-			}
-			if (!state->name[0])
-				break;
-
-			str = ss + 1;
-		} while (*ss);
-
-		str -= str == ss + 1;
-	}
-	if (str[0])
-		printk("unrecognized \"preferred-cstates=%s\"\n", str);
 
 	mwait_idle_state_table_update();
 
