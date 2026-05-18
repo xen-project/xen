@@ -203,11 +203,11 @@ static void __init init_memmap(void)
 
 static void cf_check xen_evtchn_upcall(void)
 {
-    struct vcpu_info *vcpu_info = this_cpu(vcpu_info);
+    struct vcpu_info *vi = this_cpu(vcpu_info);
     unsigned long pending;
 
-    vcpu_info->evtchn_upcall_pending = 0;
-    pending = xchg(&vcpu_info->evtchn_pending_sel, 0);
+    vi->evtchn_upcall_pending = 0;
+    pending = xchg(&vi->evtchn_pending_sel, 0);
 
     while ( pending )
     {
