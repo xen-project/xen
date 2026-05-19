@@ -2578,6 +2578,7 @@ void asmlinkage svm_vmexit_handler(void)
     hvm_sanitize_regs_fields(
         regs, !(vmcb_get_efer(vmcb) & EFER_LMA) || !(vmcb->cs.l));
 
+    v->arch.hvm.guest_cr[2] = vmcb_get_cr2(vmcb);
     if ( paging_mode_hap(v->domain) )
         v->arch.hvm.guest_cr[3] = v->arch.hvm.hw_cr[3] = vmcb_get_cr3(vmcb);
 
