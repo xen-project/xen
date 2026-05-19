@@ -961,8 +961,7 @@ static void cpu_smpboot_free(unsigned int cpu, bool remove)
      * In that case the socket number cannot be relied upon, but the respective
      * socket_cpumask[] slot also wouldn't have been set.
      */
-    if ( c[cpu].apicid != boot_cpu_data.apicid &&
-         cpumask_empty(socket_cpumask[socket]) )
+    if ( c[cpu].apicid != BAD_APICID && cpumask_empty(socket_cpumask[socket]) )
     {
         xfree(socket_cpumask[socket]);
         socket_cpumask[socket] = NULL;
