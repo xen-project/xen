@@ -101,6 +101,6 @@ void __init preinit_xen_time(void)
          * Thereby to avoid spurious VS-timer irqs set vstimecmp CSR to
          * ULONG_MAX.
          */
-        csr_write64(CSR_STIMECMP, ULONG_MAX);
+        csr_write64(CSR_VSTIMECMP, ULONG_MAX);
     }
 }
