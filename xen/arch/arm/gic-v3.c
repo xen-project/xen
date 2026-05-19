@@ -749,12 +749,17 @@ static void __init gicv3_dist_espi_init_aff(uint64_t affinity) { }
 static void __init gicv3_dist_init(void)
 {
     uint32_t type;
+    uint32_t ctlr;
     uint64_t affinity;
     unsigned int nr_lines;
     int i;
 
-    /* Disable the distributor */
-    writel_relaxed(0, GICD + GICD_CTLR);
+    /*
+     * Disable the distributor without clearing ARE_NS. The GIC architecture
+     * makes changing ARE_NS from 1 to 0 UNPREDICTABLE.
+     */
+    ctlr = readl_relaxed(GICD + GICD_CTLR);
+    writel_relaxed(ctlr & GICD_CTLR_ARE_NS, GICD + GICD_CTLR);
 
     type = readl_relaxed(GICD + GICD_TYPER);
     nr_lines = 32 * ((type & GICD_TYPE_LINES) + 1);
