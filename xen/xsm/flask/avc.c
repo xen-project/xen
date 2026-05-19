@@ -152,7 +152,8 @@ static void __attribute__ ((format (printf, 2, 3)))
  */
 static void avc_dump_av(struct avc_dump_buf *buf, u16 tclass, u32 av)
 {
-    int i, i2, perm;
+    int i, i2;
+    uint32_t perm;
 
     if ( av == 0 )
     {
