@@ -216,6 +216,7 @@ endif
 		> $(dot-target).0r.S
 	$(NM) -pa --format=sysv $(dot-target).$(VIRT_BASE).0 \
 		| $(objtree)/tools/symbols $(all_symbols) --sysv --sort \
+                  --source-name=$(@F).S \
 		> $(dot-target).0s.S
 	$(MAKE) $(build)=$(@D) .$(@F).0r.o .$(@F).0s.o
 	$(foreach base, $(VIRT_BASE) $(ALT_BASE), \
@@ -226,6 +227,7 @@ endif
 		> $(dot-target).1r.S
 	$(NM) -pa --format=sysv $(dot-target).$(VIRT_BASE).1 \
 		| $(objtree)/tools/symbols $(all_symbols) --sysv --sort \
+                  --source-name=$(@F).S \
 		> $(dot-target).1s.S
 	$(MAKE) $(build)=$(@D) .$(@F).1r.o .$(@F).1s.o
 	$(LD) $(call EFI_LDFLAGS,$(VIRT_BASE)) -T $(obj)/efi.lds $< \
