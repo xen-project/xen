@@ -1264,7 +1264,8 @@ static void cf_check __maybe_unused x86_mc_mceinject(void *data)
 
 #if BITS_PER_LONG == 64
 
-#define ID2COOKIE(id) ((mctelem_cookie_t)(id))
+/* Two layers of casting to cover Misra C:2012 rule 11.2. */
+#define ID2COOKIE(id) ((mctelem_cookie_t)(void *)(id))
 #define COOKIE2ID(c) ((uint64_t)(c))
 
 #elif defined(BITS_PER_LONG)
