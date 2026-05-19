@@ -568,12 +568,16 @@ int dm_op(const struct dmop_args *op_args)
 
         rc = xenmem_add_to_physmap(d, &xatp, 0);
         if ( rc == 0 && data->size != xatp.size )
+        {
             rc = xatp.size;
+            xatp.idx += rc;
+            xatp.gpfn += rc;
+        }
         if ( rc > 0 )
         {
             data->size -= rc;
-            data->src_gfn += rc;
-            data->dst_gfn += rc;
+            data->src_gfn = xatp.idx;
+            data->dst_gfn = xatp.gpfn;
             const_op = false;
             rc = -ERESTART;
         }

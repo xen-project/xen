@@ -848,7 +848,7 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
                           unsigned int start)
 {
     unsigned int done = 0;
-    long rc = 0;
+    long rc = 0, adjust = 1;
     union add_to_physmap_extra extra = {};
     struct page_info *pages[16];
 
@@ -883,8 +883,25 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
         return -EOVERFLOW;
     }
 
-    xatp->idx += start;
-    xatp->gpfn += start;
+    /*
+     * Overlapping ranges need processing backwards when destination is above
+     * source.
+     */
+    if ( xatp->gpfn > xatp->idx &&
+         unlikely(xatp->gpfn < xatp->idx + xatp->size) )
+    {
+        adjust = -1;
+
+        /* Both fields store "next item to process". */
+        xatp->idx += xatp->size - start - 1;
+        xatp->gpfn += xatp->size - start - 1;
+    }
+    else
+    {
+        xatp->idx += start;
+        xatp->gpfn += start;
+    }
+
     xatp->size -= start;
 
 #ifdef CONFIG_HAS_PASSTHROUGH
@@ -902,8 +919,8 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
         if ( rc < 0 )
             break;
 
-        xatp->idx++;
-        xatp->gpfn++;
+        xatp->idx += adjust;
+        xatp->gpfn += adjust;
 
         if ( extra.ppage )
             ++extra.ppage;
@@ -926,7 +943,10 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
 
         this_cpu(iommu_dont_flush_iotlb) = 0;
 
-        ret = iommu_iotlb_flush(d, _dfn(xatp->idx - done), done,
+        if ( likely(adjust > 0) )
+            adjust = done;
+
+        ret = iommu_iotlb_flush(d, _dfn(xatp->idx - adjust), done,
                                 IOMMU_FLUSHF_modified);
         if ( unlikely(ret) && rc >= 0 )
             rc = ret;
@@ -940,12 +960,25 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
         for ( i = 0; i < done; ++i )
             put_page(pages[i]);
 
-        ret = iommu_iotlb_flush(d, _dfn(xatp->gpfn - done), done,
+        ret = iommu_iotlb_flush(d, _dfn(xatp->gpfn - adjust), done,
                                 IOMMU_FLUSHF_added | IOMMU_FLUSHF_modified);
         if ( unlikely(ret) && rc >= 0 )
             rc = ret;
     }
 #endif
+
+    /*
+     * For internal callers (e.g. XEN_DMOP_relocate_memory handling) leave
+     * the GFNs from where to resume in *xatp (they're correct already when
+     * we worked forwards). These are the values not biased for a possible
+     * non-zero "start" that a subsequent invocation might use, so also do
+     * this updating only when incoming "start" was 0.
+     */
+    if ( rc > 0 && !start && unlikely(adjust < 0) )
+    {
+        xatp->idx -= xatp->size - rc - 1;
+        xatp->gpfn -= xatp->size - rc - 1;
+    }
 
     return rc;
 }
