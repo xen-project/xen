@@ -753,6 +753,16 @@ static void __init efi_relocate_esrt(EFI_SYSTEM_TABLE *SystemTable)
  */
 #include "efi-boot.h"
 
+static void __init free_cfg(void)
+{
+    if ( !cfg.need_to_free )
+        return;
+
+    /* One extra byte was allocated to put a nul character there. */
+    efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size + 1));
+    cfg.need_to_free = false;
+}
+
 void __init noreturn blexit(const CHAR16 *str)
 {
     if ( str )
@@ -762,8 +772,7 @@ void __init noreturn blexit(const CHAR16 *str)
     if ( !efi_bs )
         efi_arch_halt();
 
-    if ( cfg.need_to_free )
-        efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
+    free_cfg();
     if ( kernel.need_to_free )
         efi_bs->FreePages(kernel.addr, PFN_UP(kernel.size));
     if ( ramdisk.need_to_free )
@@ -1557,11 +1566,7 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
             name.s = get_value(&cfg, "global", "chain");
             if ( !name.s )
                 break;
-            if ( cfg.need_to_free )
-            {
-                efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
-                cfg.need_to_free = false;
-            }
+            free_cfg();
             if ( !read_file(dir_handle, s2w(&name), &cfg, NULL) )
             {
                 PrintStr(L"Chained configuration file '");
@@ -1631,11 +1636,7 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
 
         efi_arch_cfg_file_late(loaded_image, dir_handle, section.s);
 
-        if ( cfg.need_to_free )
-        {
-            efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
-            cfg.need_to_free = false;
-        }
+        free_cfg();
 
         if ( dir_handle )
             dir_handle->Close(dir_handle);
