@@ -142,30 +142,34 @@ int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
 
 #ifdef	CONFIG_ACPI_CSTATE
 /*
- * max_cstate sets the highest legal C-state.
- * max_cstate = 0: C0 okay, but not C1
- * max_cstate = 1: C1 okay, but not C2
- * max_cstate = 2: C2 okay, but not C3 etc.
-
- * max_csubstate sets the highest legal C-state sub-state. Only applies to the
- * highest legal C-state.
- * max_cstate = 1, max_csubstate = 0 ==> C0, C1 okay, but not C1E
- * max_cstate = 1, max_csubstate = 1 ==> C0, C1 and C1E okay, but not C2
- * max_cstate = 2, max_csubstate = 0 ==> C0, C1, C1E, C2 okay, but not C3
- * max_cstate = 2, max_csubstate = 1 ==> C0, C1, C1E, C2 okay, but not C3
+ * max_{allowed,usable}_cstate sets the highest allowed / usable C-state.
+ * max_usable_cstate, while affected by the command line, is internally driven,
+ * whereas max_allowed_cstate can be set from both command line and systcl.
+ * max_*_cstate = 0: C0 okay, but not C1
+ * max_*_cstate = 1: C1 okay, but not C2
+ * max_*_cstate = 2: C2 okay, but not C3 etc.
+ *
+ * max_csubstate sets the highest allowed C-state sub-state. Only applies to
+ * the highest allowed C-state.
+ * max_allowed_cstate = 1, max_csubstate = 0 ==> C0, C1 okay, but not C1E
+ * max_allowed_cstate = 1, max_csubstate = 1 ==> C0, C1 and C1E okay, but not C2
+ * max_allowed_cstate = 2, max_csubstate = 0 ==> C0, C1, C1E, C2 okay, but not C3
+ * max_allowed_cstate = 2, max_csubstate = 1 ==> C0, C1, C1E, C2 okay, but not C3
  */
 
-extern unsigned int max_cstate;
+extern unsigned int max_usable_cstate;
+extern unsigned int max_allowed_cstate;
 extern unsigned int max_csubstate;
+
+#define max_cstate() min(max_usable_cstate, max_allowed_cstate)
 
 static inline unsigned int acpi_get_cstate_limit(void)
 {
-	return max_cstate;
+	return max_allowed_cstate;
 }
 static inline void acpi_set_cstate_limit(unsigned int new_limit)
 {
-	max_cstate = new_limit;
-	return;
+	max_allowed_cstate = new_limit;
 }
 
 static inline unsigned int acpi_get_csubstate_limit(void)

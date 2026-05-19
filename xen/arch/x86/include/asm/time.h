@@ -31,7 +31,6 @@ int cpu_frequency_change(u64 freq);
 
 void cf_check pit_broadcast_enter(void);
 void cf_check pit_broadcast_exit(void);
-int pit_broadcast_is_available(void);
 
 uint64_t cf_check acpi_pm_tick_to_ns(uint64_t ticks);
 
