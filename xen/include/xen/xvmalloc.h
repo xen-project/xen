@@ -71,8 +71,9 @@ void *_xvrealloc(void *va, size_t size, unsigned int align);
 
 /* Free an allocation, and zero the pointer to it. */
 #define XVFREE(p) do { \
-    xvfree(p);         \
+    void *_ptr_ = (p); \
     (p) = NULL;        \
+    xvfree(_ptr_);     \
 } while ( false )
 
 static inline void *_xvmalloc_array(
