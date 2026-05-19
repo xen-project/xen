@@ -89,7 +89,7 @@ struct cpuidle_governor
 extern int8_t xen_cpuidle;
 extern struct cpuidle_governor *cpuidle_current_governor;
 
-bool cpuidle_using_deep_cstate(void);
+bool cpuidle_usable_deep_cstate(void);
 void cpuidle_disable_deep_cstate(void);
 
 #define CPUIDLE_DRIVER_STATE_START  1

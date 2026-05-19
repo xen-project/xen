@@ -1043,15 +1043,16 @@ static void cf_check mwait_idle(void)
 	u64 before, after;
 	u32 exp = 0, pred = 0, irq_traced[4] = { 0 };
 
-	if (max_cstate > 0 && power &&
+	if (max_cstate() > 0 && power &&
 	    (next_state = cpuidle_current_governor->select(power)) > 0) {
 		unsigned int max_state = sched_has_urgent_vcpu() ? ACPI_STATE_C1
-								 : max_cstate;
+								 : max_cstate();
 
 		do {
 			cx = &power->states[next_state];
-		} while ((cx->type > max_state || (cx->type == max_cstate &&
-			  MWAIT_HINT2SUBSTATE(cx->address) > max_csubstate)) &&
+		} while ((cx->type > max_state ||
+			  (cx->type == max_allowed_cstate &&
+			   MWAIT_HINT2SUBSTATE(cx->address) > max_csubstate)) &&
 			 --next_state);
 		if (!next_state)
 			cx = NULL;
@@ -1457,7 +1458,7 @@ static void __init sklh_idle_state_table_update(void)
 	u64 msr;
 
 	/* if PC10 disabled via cmdline max_cstate=7 or shallower */
-	if (max_cstate <= 7)
+	if (max_cstate() <= 7)
 		return;
 
 	/* if PC10 not present in CPUID.MWAIT.EDX */
@@ -1618,7 +1619,7 @@ static int __init mwait_idle_probe(void)
 	    !mwait_substates)
 		return -ENODEV;
 
-	if (!max_cstate || !opt_mwait_idle) {
+	if (!max_cstate() || !opt_mwait_idle) {
 		pr_debug(PREFIX "disabled\n");
 		return -EPERM;
 	}
@@ -1709,8 +1710,8 @@ static int cf_check mwait_idle_cpu_init(
 		hint = flg2MWAIT(cpuidle_state_table[cstate].flags);
 		state = MWAIT_HINT2CSTATE(hint) + 1;
 
-		if (state > max_cstate) {
-			printk(PREFIX "max C-state %u reached\n", max_cstate);
+		if (state > max_cstate()) {
+			printk(PREFIX "max C-state %u reached\n", max_cstate());
 			break;
 		}
 

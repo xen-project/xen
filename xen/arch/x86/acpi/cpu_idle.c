@@ -118,7 +118,7 @@ bool lapic_timer_init(void)
         lapic_timer_off = hpet_broadcast_enter;
         lapic_timer_on = hpet_broadcast_exit;
     }
-    else if ( pit_broadcast_is_available() )
+    else if ( cpuidle_usable_deep_cstate() )
     {
         lapic_timer_off = pit_broadcast_enter;
         lapic_timer_on = pit_broadcast_exit;
@@ -130,12 +130,15 @@ bool lapic_timer_init(void)
 }
 
 void (*__read_mostly pm_idle_save)(void);
-unsigned int max_cstate __read_mostly = UINT_MAX;
+
+unsigned int max_usable_cstate __read_mostly = UINT_MAX;
+unsigned int max_allowed_cstate __read_mostly = UINT_MAX;
 unsigned int max_csubstate __read_mostly = UINT_MAX;
 
 static int __init cf_check parse_cstate(const char *s)
 {
-    max_cstate = simple_strtoul(s, &s, 0);
+    max_allowed_cstate = simple_strtoul(s, &s, 0);
+    max_usable_cstate = max_allowed_cstate;
     if ( *s == ',' )
         max_csubstate = simple_strtoul(s + 1, NULL, 0);
     return 0;
@@ -412,10 +415,11 @@ static void cf_check dump_cx(unsigned char key)
     unsigned int cpu;
 
     printk("'%c' pressed -> printing ACPI Cx structures\n", key);
-    if ( max_cstate < UINT_MAX )
+    if ( max_cstate() < UINT_MAX )
     {
-        printk("max state: C%u\n", max_cstate);
-        if ( max_csubstate < UINT_MAX )
+        printk("max state: C%u\n", max_cstate());
+        if ( max_allowed_cstate <= max_usable_cstate &&
+             max_csubstate < UINT_MAX )
             printk("max sub-state: %u\n", max_csubstate);
         else
             printk("max sub-state: unlimited\n");
@@ -697,18 +701,18 @@ static void cf_check acpi_processor_idle(void)
     u32 exp = 0, pred = 0;
     u32 irq_traced[4] = { 0 };
 
-    if ( max_cstate > 0 && power &&
+    if ( max_cstate() > 0 && power &&
          (next_state = cpuidle_current_governor->select(power)) > 0 )
     {
         unsigned int max_state = sched_has_urgent_vcpu() ? ACPI_STATE_C1
-                                                         : max_cstate;
+                                                         : max_cstate();
 
         do {
             cx = &power->states[next_state];
         } while ( (cx->type > max_state ||
                    cx->entry_method == ACPI_CSTATE_EM_NONE ||
                    (cx->entry_method == ACPI_CSTATE_EM_FFH &&
-                    cx->type == max_cstate &&
+                    cx->type == max_allowed_cstate &&
                     (cx->address & MWAIT_SUBSTATE_MASK) > max_csubstate)) &&
                   --next_state );
         if ( next_state )
@@ -1456,7 +1460,7 @@ static void amd_cpuidle_init(struct acpi_processor_power *power)
 
     for ( i = 0; i < nr; ++i )
     {
-        if ( cx[i].type > max_cstate )
+        if ( cx[i].type > max_cstate() )
             break;
         power->states[i + 1] = cx[i];
         power->states[i + 1].idx = i + 1;
@@ -1617,21 +1621,22 @@ int pmstat_reset_cx_stat(unsigned int cpu)
 
 void cpuidle_disable_deep_cstate(void)
 {
-    if ( max_cstate > ACPI_STATE_C1 )
+    if ( max_usable_cstate > ACPI_STATE_C1 )
     {
         if ( local_apic_timer_c2_ok )
-            max_cstate = ACPI_STATE_C2;
+            max_usable_cstate = ACPI_STATE_C2;
         else
-            max_cstate = ACPI_STATE_C1;
+            max_usable_cstate = ACPI_STATE_C1;
     }
 
     hpet_disable_legacy_broadcast();
 }
 
-bool cpuidle_using_deep_cstate(void)
+bool cpuidle_usable_deep_cstate(void)
 {
-    return xen_cpuidle && max_cstate > (local_apic_timer_c2_ok ? ACPI_STATE_C2
-                                                               : ACPI_STATE_C1);
+    return xen_cpuidle &&
+           max_usable_cstate > (local_apic_timer_c2_ok ? ACPI_STATE_C2
+                                                       : ACPI_STATE_C1);
 }
 
 static int cf_check cpu_callback(

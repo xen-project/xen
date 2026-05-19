@@ -399,12 +399,12 @@ static void probe_c3_errata(const struct cpuinfo_x86 *c)
     };
 
     /* Serialized by the AP bringup code. */
-    if ( max_cstate > 1 && (c->apicid & (c->x86_num_siblings - 1)) &&
+    if ( max_usable_cstate > 1 && (c->apicid & (c->x86_num_siblings - 1)) &&
          x86_match_cpu(models) )
     {
         printk(XENLOG_WARNING
 	       "Disabling C-states C3 and C6 due to CPU errata\n");
-        max_cstate = 1;
+        max_usable_cstate = 1;
     }
 }
 
