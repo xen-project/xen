@@ -208,7 +208,8 @@ $(TARGET).efi: $(objtree)/prelink.o $(note_file) $(obj)/efi.lds $(obj)/efi/reloc
 ifeq ($(CONFIG_DEBUG_INFO),y)
 	$(if $(filter --strip-debug,$(EFI_LDFLAGS)),echo,:) "Will strip debug info from $(@F)"
 endif
-	$(objtree)/tools/symbols $(all_symbols) --empty > $(dot-target).0s.S
+	$(objtree)/tools/symbols $(all_symbols) --source-name=$(@F).S --empty \
+		> $(dot-target).0s.S
 	$(MAKE) $(build)=$(@D) .$(@F).0s.o
 	$(foreach base, $(VIRT_BASE) $(ALT_BASE), \
 	          $(LD) $(call EFI_LDFLAGS,$(base)) -T $(obj)/efi.lds $< $(relocs-dummy) \
@@ -218,6 +219,7 @@ endif
 		> $(dot-target).1r.S
 	$(NM) -pa --format=sysv $(dot-target).$(VIRT_BASE).0 \
 		| $(objtree)/tools/symbols $(all_symbols) --sysv --sort \
+                  --source-name=$(@F).S \
 		> $(dot-target).1s.S
 	$(MAKE) $(build)=$(@D) .$(@F).1r.o .$(@F).1s.o
 	$(foreach base, $(VIRT_BASE) $(ALT_BASE), \
@@ -228,6 +230,7 @@ endif
 		> $(dot-target).2r.S
 	$(NM) -pa --format=sysv $(dot-target).$(VIRT_BASE).1 \
 		| $(objtree)/tools/symbols $(all_symbols) --sysv --sort \
+                  --source-name=$(@F).S \
 		> $(dot-target).2s.S
 	$(MAKE) $(build)=$(@D) .$(@F).2r.o .$(@F).2s.o
 	$(LD) $(call EFI_LDFLAGS,$(VIRT_BASE)) -T $(obj)/efi.lds $< \
