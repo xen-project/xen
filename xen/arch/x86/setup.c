@@ -904,10 +904,19 @@ static void __init noreturn reinit_bsp_stack(void)
 
     if ( cpu_has_xen_shstk )
     {
+        /*
+         * Immediately after enabling CET, SSP is 0 and most interrupts and
+         * exceptions are fatal.  Like the SYSCALL/SYSENTER gaps, IST vectors
+         * (including NMI and #MC) are safe owing to IST switching the shstk.
+         */
+        local_irq_disable();
+
         wrmsrl(MSR_PL0_SSP,
                (unsigned long)stack + (PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8);
         wrmsrl(MSR_S_CET, xen_msr_s_cet_value());
         asm volatile ("setssbsy" ::: "memory");
+
+        local_irq_enable();
     }
 
     reset_stack_and_jump(init_done);
