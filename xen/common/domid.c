@@ -19,7 +19,7 @@ static DECLARE_BITMAP(domid_bitmap, DOMID_FIRST_RESERVED);
  * @param domid Domain ID hint:
  * - If an explicit domain ID is provided, verify its availability and use it
  *   if ID is not used;
- * - If DOMID_INVALID is provided, search [1..DOMID_FIRST_RESERVED-1] range,
+ * - If DOMID_ANY is provided, search [1..DOMID_FIRST_RESERVED-1] range,
  *   starting from the last used ID. Implementation guarantees that two
  *   consecutive calls will never return the same ID. ID#0 is reserved for
  *   the first boot domain (currently, dom0) and excluded from the allocation
@@ -30,6 +30,9 @@ static DECLARE_BITMAP(domid_bitmap, DOMID_FIRST_RESERVED);
 domid_t domid_alloc(domid_t domid)
 {
     static domid_t domid_last;
+
+    if ( domid >= DOMID_FIRST_RESERVED && domid != DOMID_ANY )
+        return DOMID_INVALID;
 
     spin_lock(&domid_lock);
 

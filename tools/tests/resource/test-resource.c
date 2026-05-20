@@ -178,7 +178,7 @@ static void test_domain_configurations(void)
     for ( unsigned int i = 0; i < ARRAY_SIZE(tests); ++i )
     {
         struct test *t = &tests[i];
-        uint32_t domid = 0;
+        uint32_t domid = DOMID_ANY;
         int rc;
         xen_pfn_t ram[1] = { 0 };
 

@@ -22,7 +22,7 @@ static unsigned int nr_failures;
 static xc_interface *xch;
 static xendevicemodel_handle *dh;
 static xenforeignmemory_handle *fh;
-static uint32_t domid;
+static uint32_t domid = DOMID_ANY;
 
 static struct xen_domctl_createdomain create = {
     .flags = (XEN_DOMCTL_CDF_hvm |

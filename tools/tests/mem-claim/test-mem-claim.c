@@ -21,7 +21,7 @@ static unsigned int nr_failures;
 #define MB_PAGES(x) (MB(x) / XC_PAGE_SIZE)
 
 static xc_interface *xch;
-static uint32_t domid = DOMID_INVALID;
+static uint32_t domid = DOMID_ANY;
 
 static xc_physinfo_t physinfo;
 
@@ -142,7 +142,7 @@ static void run_tests(void)
     rc = xc_domain_destroy(xch, domid);
 
     /* Cancel the cleanup path, even in the case of an error. */
-    domid = DOMID_INVALID;
+    domid = DOMID_ANY;
 
     if ( rc )
         return fail("  Failed to destroy domain: %d - %s\n",
@@ -171,7 +171,7 @@ int main(int argc, char **argv)
 
     run_tests();
 
-    if ( domid != DOMID_INVALID )
+    if ( domid != DOMID_ANY )
     {
         rc = xc_domain_destroy(xch, domid);
         if ( rc )

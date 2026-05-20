@@ -362,7 +362,7 @@ static void test_def_max_policies(void)
 
 static void test_guest(struct xen_domctl_createdomain *c)
 {
-    uint32_t domid = 0;
+    uint32_t domid = DOMID_ANY;
     int rc;
 
     rc = xc_domain_create(xch, &domid, c);
