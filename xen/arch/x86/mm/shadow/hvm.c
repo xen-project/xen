@@ -1068,18 +1068,18 @@ int shadow_track_dirty_vram(struct domain *d,
         if ( (dirty_vram->dirty_bitmap = xzalloc_array(uint8_t, dirty_size)) == NULL )
             goto out_sl1ma;
 
-        dirty_vram->last_dirty = NOW();
+        dirty_vram->last_dirty = -1;
 
         /* Tell the caller that this time we could not track dirty bits. */
         rc = -ENODATA;
     }
-    else if ( dirty_vram->last_dirty == -1 )
-        /* still completely clean, just copy our empty bitmap */
-        memcpy(dirty_bitmap, dirty_vram->dirty_bitmap, dirty_size);
-    else
+    /* Nothing to do when the bitmap is still completely clean. */
+    else if ( dirty_vram->last_dirty != -1 )
     {
         mfn_t map_mfn = INVALID_MFN;
         void *map_sl1p = NULL;
+        bool any_dirty = false;
+        s_time_t now;
 
         /* Iterate over VRAM to track dirty bits. */
         for ( i = 0; i < nr_frames; i++ )
@@ -1155,16 +1155,20 @@ int shadow_track_dirty_vram(struct domain *d,
             if ( dirty )
             {
                 dirty_vram->dirty_bitmap[i / 8] |= 1 << (i % 8);
-                dirty_vram->last_dirty = NOW();
+                any_dirty = true;
             }
         }
+
+        now = NOW();
+        if ( any_dirty )
+            dirty_vram->last_dirty = now;
 
         if ( map_sl1p )
             unmap_domain_page(map_sl1p);
 
         memcpy(dirty_bitmap, dirty_vram->dirty_bitmap, dirty_size);
         memset(dirty_vram->dirty_bitmap, 0, dirty_size);
-        if ( dirty_vram->last_dirty + SECONDS(2) < NOW() )
+        if ( dirty_vram->last_dirty + SECONDS(2) < now )
         {
             /*
              * Was clean for more than two seconds, try to disable guest
@@ -1197,6 +1201,7 @@ int shadow_track_dirty_vram(struct domain *d,
         paging_lock(d);
         for ( i = 0; i < dirty_size; i++ )
             dirty_vram->dirty_bitmap[i] |= dirty_bitmap[i];
+        dirty_vram->last_dirty = NOW();
         paging_unlock(d);
         rc = -EFAULT;
     }
