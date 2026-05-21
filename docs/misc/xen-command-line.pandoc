@@ -446,8 +446,9 @@ the converse; transmitted and received characters will have their MSB
 cleared.  This allows a single port to be shared by two subsystems
 (e.g. console and debugger).
 
-`pv` indicates that Xen should use Xen's PV console. This option is
-only available when used together with `pv-in-pvh`.
+`pv` indicates that Xen should use Xen's PV console. This option requires
+Xen running as a Xen guest. and is only available if the hypervisor was
+compiled with `CONFIG_XEN_GUEST` enabled.
 
 `dbgp` or `ehci` indicates that Xen should use a USB2 debug port.
 
