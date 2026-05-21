@@ -64,3 +64,5 @@ clean:
 	$(RM) *.o $(TARGETS) $(DEPS_RM)
 
 distclean: clean
+
+-include $(DEPS_INCLUDE)
