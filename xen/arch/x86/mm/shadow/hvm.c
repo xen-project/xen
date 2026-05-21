@@ -1003,7 +1003,6 @@ int shadow_track_dirty_vram(struct domain *d,
     int rc = 0;
     unsigned long end_pfn = begin_pfn + nr_frames;
     unsigned int dirty_size = DIV_ROUND_UP(nr_frames, BITS_PER_BYTE);
-    int flush_tlb = 0;
     unsigned long i;
     p2m_type_t t;
     struct sh_dirty_vram *dirty_vram;
@@ -1078,7 +1077,7 @@ int shadow_track_dirty_vram(struct domain *d,
     {
         mfn_t map_mfn = INVALID_MFN;
         void *map_sl1p = NULL;
-        bool any_dirty = false;
+        bool any_dirty = false, flush_tlb = false;
         s_time_t now;
 
         /* Iterate over VRAM to track dirty bits. */
@@ -1139,7 +1138,7 @@ int shadow_track_dirty_vram(struct domain *d,
                              * _PAGE_ACCESSED set by another processor.
                              */
                             l1e_remove_flags(*sl1e, _PAGE_DIRTY);
-                            flush_tlb = 1;
+                            flush_tlb = true;
                         }
                     }
                     break;
@@ -1182,9 +1181,10 @@ int shadow_track_dirty_vram(struct domain *d,
             }
             dirty_vram->last_dirty = -1;
         }
+
+        if ( flush_tlb )
+            guest_flush_tlb_mask(d, d->dirty_cpumask);
     }
-    if ( flush_tlb )
-        guest_flush_tlb_mask(d, d->dirty_cpumask);
     goto out;
 
  out_sl1ma:
