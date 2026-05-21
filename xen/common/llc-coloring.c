@@ -64,14 +64,21 @@ static int __init parse_color_config(const char *buf, unsigned int colors[],
 
     while ( *s != '\0' )
     {
+        const char *endp;
         unsigned int color, start, end;
 
-        start = simple_strtoul(s, &s, 0);
+        start = simple_strtoul(s, &endp, 0);
+        if ( endp == s )
+            goto fail;
+        s = endp;
 
         if ( *s == '-' )    /* Range */
         {
             s++;
-            end = simple_strtoul(s, &s, 0);
+            end = simple_strtoul(s, &endp, 0);
+            if ( endp == s )
+                goto fail;
+            s = endp;
         }
         else                /* Single value */
             end = start;
@@ -334,7 +341,7 @@ int __init domain_set_llc_colors_from_str(struct domain *d, const char *str)
     err = parse_color_config(str, colors, max_nr_colors, &num_colors);
     if ( err )
     {
-        printk(XENLOG_ERR "Error parsing LLC color configuration");
+        printk(XENLOG_ERR "%pd: error parsing LLC color configuration\n", d);
         xfree(colors);
         return err;
     }
