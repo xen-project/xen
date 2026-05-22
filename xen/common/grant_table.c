@@ -3184,11 +3184,12 @@ gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t) uop)
     if ( op.version == 2 && gt->max_version == 1 )
         goto out; /* Behave as before set_version was introduced. */
 
+    grant_write_lock(gt);
+
     res = 0;
     if ( gt->gt_version == op.version )
-        goto out;
+        goto out_unlock;
 
-    grant_write_lock(gt);
     /*
      * Make sure that the grant table isn't currently in use when we
      * change the version number, except for the first 8 entries which
