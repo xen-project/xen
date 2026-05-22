@@ -1332,6 +1332,7 @@ int set_shared_p2m_entry(struct domain *d, unsigned long gfn_l, mfn_t mfn)
     p2m_access_t a;
     p2m_type_t ot;
     mfn_t omfn;
+    const struct page_info *pg;
     unsigned long pg_type;
 
     if ( !paging_mode_translate(p2m->domain) )
@@ -1345,7 +1346,8 @@ int set_shared_p2m_entry(struct domain *d, unsigned long gfn_l, mfn_t mfn)
     ASSERT(mfn_valid(omfn));
     /* Set the m2p entry to invalid only if there are no further type
      * refs to this page as shared */
-    pg_type = read_atomic(&(mfn_to_page(omfn)->u.inuse.type_info));
+    pg = mfn_to_page(omfn);
+    pg_type = read_atomic(&pg->u.inuse.type_info);
     if ( (pg_type & PGT_count_mask) == 0
          || (pg_type & PGT_type_mask) != PGT_shared_page )
         set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
