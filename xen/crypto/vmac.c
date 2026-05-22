@@ -926,41 +926,41 @@ uint64_t vmac(unsigned char m[],
 
 void vmac_set_key(const unsigned char user_key[], vmac_ctx_t *ctx)
 {
-    uint64_t in[2] = {0}, out[2];
+    union {
+        uint64_t q[2];
+        uint8_t b[16];
+    } in = {}, out;
     unsigned i;
     aes_key_setup(user_key, &ctx->cipher_key);
     
     /* Fill nh key */
-    ((unsigned char *)in)[0] = 0x80; 
+    in.b[0] = 0x80;
     for (i = 0; i < sizeof(ctx->nhkey)/8; i+=2) {
-        aes_encryption((unsigned char *)in, (unsigned char *)out,
-                                                         &ctx->cipher_key);
-        ctx->nhkey[i  ] = get64BE(out);
-        ctx->nhkey[i+1] = get64BE(out+1);
-        ((unsigned char *)in)[15] += 1;
+        aes_encryption(in.b, out.b, &ctx->cipher_key);
+        ctx->nhkey[i  ] = get64BE(out.q);
+        ctx->nhkey[i+1] = get64BE(out.q + 1);
+        in.b[15] += 1;
     }
 
     /* Fill poly key */
-    ((unsigned char *)in)[0] = 0xC0; 
-    in[1] = 0;
+    in.b[0] = 0xC0;
+    in.q[1] = 0;
     for (i = 0; i < sizeof(ctx->polykey)/8; i+=2) {
-        aes_encryption((unsigned char *)in, (unsigned char *)out,
-                                                         &ctx->cipher_key);
-        ctx->polytmp[i  ] = ctx->polykey[i  ] = get64BE(out) & mpoly;
-        ctx->polytmp[i+1] = ctx->polykey[i+1] = get64BE(out+1) & mpoly;
-        ((unsigned char *)in)[15] += 1;
+        aes_encryption(in.b, out.b, &ctx->cipher_key);
+        ctx->polytmp[i  ] = ctx->polykey[i  ] = get64BE(out.q) & mpoly;
+        ctx->polytmp[i+1] = ctx->polykey[i+1] = get64BE(out.q + 1) & mpoly;
+        in.b[15] += 1;
     }
 
     /* Fill ip key */
-    ((unsigned char *)in)[0] = 0xE0;
-    in[1] = 0;
+    in.b[0] = 0xE0;
+    in.q[1] = 0;
     for (i = 0; i < sizeof(ctx->l3key)/8; i+=2) {
         do {
-            aes_encryption((unsigned char *)in, (unsigned char *)out,
-                                                         &ctx->cipher_key);
-            ctx->l3key[i  ] = get64BE(out);
-            ctx->l3key[i+1] = get64BE(out+1);
-            ((unsigned char *)in)[15] += 1;
+            aes_encryption(in.b, out.b, &ctx->cipher_key);
+            ctx->l3key[i  ] = get64BE(out.q);
+            ctx->l3key[i+1] = get64BE(out.q + 1);
+            in.b[15] += 1;
         } while (ctx->l3key[i] >= p64 || ctx->l3key[i+1] >= p64);
     }
     
