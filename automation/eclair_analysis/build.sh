@@ -58,10 +58,21 @@ runtime_failures_docs() {
 (
   runtime_failures_docs
 
+  ret=0
+  mkdir -p intermediates
   make "-j${PROCESSORS}" "-l${PROCESSORS}.0"    \
        "CROSS_COMPILE=${CROSS_COMPILE}"         \
        "CC=${CC}"                               \
        "CXX=${CXX}"                             \
        "XEN_TARGET_ARCH=${XEN_TARGET_ARCH}"     \
-       -C xen
+       -C xen || ret=$?
+
+  # Preserve Xen intermediate files.  Some may be there only upon build failure.
+  for f in xen/.config xen/.xen-syms.* xen/.xen.efi.*; do
+      if [[ -f $f ]]; then
+          cp $f intermediates/
+      fi
+  done
+
+  exit $ret
 )
