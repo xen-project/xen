@@ -536,6 +536,92 @@ static const struct arm_cpu_capabilities arm_errata[] = {
         MIDR_RANGE(MIDR_NEOVERSE_N1, 0, 3 << MIDR_VARIANT_SHIFT),
     },
 #endif
+#ifdef CONFIG_ARM64_ERRATUM_CVE_2025_10263
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A76),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A76AE),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A77),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A78),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A78AE),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A78C),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A710),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_X1),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_X1C),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_X2),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_X3),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_X4),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_X925),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_NEOVERSE_N1),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_NEOVERSE_N2),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_NEOVERSE_V1),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_NEOVERSE_V2),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_NEOVERSE_V3),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_NEOVERSE_V3AE),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_C1_ULTRA),
+    },
+    {
+        .capability = ARM64_WORKAROUND_REPEAT_TLBI,
+        MIDR_ALL_VERSIONS(MIDR_C1_PREMIUM),
+    },
+#endif
 #ifdef CONFIG_ARM64_HARDEN_BRANCH_PREDICTOR
     {
         .capability = ARM_HARDEN_BRANCH_PREDICTOR,
