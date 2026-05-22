@@ -402,46 +402,39 @@ guest_index(const void *ptr)
     return (u32)((unsigned long)ptr & ~PAGE_MASK) / sizeof(guest_l1e_t);
 }
 
-static u32 cf_check shadow_l1_index(mfn_t *smfn, u32 guest_index)
+static uint32_t cf_check shadow_l1_index(mfn_t *smfn, uint32_t gidx)
 {
 #if (GUEST_PAGING_LEVELS == 2)
     ASSERT(mfn_to_page(*smfn)->u.sh.head);
-    if ( guest_index >= SHADOW_L1_PAGETABLE_ENTRIES )
+    if ( gidx >= SHADOW_L1_PAGETABLE_ENTRIES )
         *smfn = sh_next_page(*smfn);
-    return (guest_index % SHADOW_L1_PAGETABLE_ENTRIES);
+    return (gidx % SHADOW_L1_PAGETABLE_ENTRIES);
 #else
-    return guest_index;
+    return gidx;
 #endif
 }
 
-static u32 cf_check shadow_l2_index(mfn_t *smfn, u32 guest_index)
-{
 #if (GUEST_PAGING_LEVELS == 2)
+static uint32_t cf_check shadow_l2_index(mfn_t *smfn, uint32_t gidx)
+{
     int i;
     ASSERT(mfn_to_page(*smfn)->u.sh.head);
     // Because we use 2 shadow l2 entries for each guest entry, the number of
     // guest entries per shadow page is SHADOW_L2_PAGETABLE_ENTRIES/2
-    for ( i = 0; i < guest_index / (SHADOW_L2_PAGETABLE_ENTRIES / 2); i++ )
+    for ( i = 0; i < gidx / (SHADOW_L2_PAGETABLE_ENTRIES / 2); i++ )
         *smfn = sh_next_page(*smfn);
     // We multiply by two to get the index of the first of the two entries
     // used to shadow the specified guest entry.
-    return (guest_index % (SHADOW_L2_PAGETABLE_ENTRIES / 2)) * 2;
-#else
-    return guest_index;
-#endif
+    return (gidx % (SHADOW_L2_PAGETABLE_ENTRIES / 2)) * 2;
 }
+#else
+#define shadow_l2_index shadow_l1_index
+#endif
 
 #if GUEST_PAGING_LEVELS >= 4
 
-static u32 cf_check shadow_l3_index(mfn_t *smfn, u32 guest_index)
-{
-    return guest_index;
-}
-
-static u32 cf_check shadow_l4_index(mfn_t *smfn, u32 guest_index)
-{
-    return guest_index;
-}
+#define shadow_l3_index shadow_l1_index
+#define shadow_l4_index shadow_l1_index
 
 #endif // GUEST_PAGING_LEVELS >= 4
 
