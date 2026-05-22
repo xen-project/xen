@@ -65,7 +65,7 @@ define compare-symbol-tables
     $(OBJDUMP) -t $(@D)/.cst.$$$$ > $(1).sym; \
     ln -f $(2) $(@D)/.cst.$$$$; \
     $(OBJDUMP) -t $(@D)/.cst.$$$$ > $(2).sym; \
-    rm -f $(@D)/.cst.$$$$
+    rm -f $(@D)/.cst.$$$$; \
     diff -u $(1).sym $(2).sym
 endef
 
