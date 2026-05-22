@@ -2057,22 +2057,24 @@ static DEFINE_PER_CPU(guest_l1e_t, trace_emulate_write_val);
 static void cf_check trace_emulate_write_val(
     const void *ptr, unsigned long vaddr, const void *src, unsigned int bytes)
 {
-    if ( bytes > sizeof(this_cpu(trace_emulate_write_val)) )
-        bytes = sizeof(this_cpu(trace_emulate_write_val));
+    guest_l1e_t *pval = &this_cpu(trace_emulate_write_val);
+
+    if ( bytes > sizeof(*pval) )
+        bytes = sizeof(*pval);
 
 #if GUEST_PAGING_LEVELS == 3
     if ( vaddr == this_cpu(trace_emulate_initial_va) )
-        memcpy(&this_cpu(trace_emulate_write_val), src, bytes);
+        memcpy(pval, src, bytes);
     else if ( (vaddr & ~(GUEST_PTE_SIZE - 1)) ==
               this_cpu(trace_emulate_initial_va) )
     {
         TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_EMULATE_FULL_PT);
-        memcpy(&this_cpu(trace_emulate_write_val),
+        memcpy(pval,
                (typeof(ptr))((unsigned long)ptr & ~(GUEST_PTE_SIZE - 1)),
                GUEST_PTE_SIZE);
     }
 #else
-    memcpy(&this_cpu(trace_emulate_write_val), src, bytes);
+    memcpy(pval, src, bytes);
 #endif
 }
 #endif /* CONFIG_TRACEBUFFER */
