@@ -111,6 +111,12 @@
 #define RTDS_MIN_BUDGET     (MICROSECS(10))
 
 /*
+ * Maximum extratime demotion level. Saturating at this value avoids
+ * unsigned wraparound back to 0 (highest scheduling priority).
+ */
+#define RTDS_MAX_PRIORITY_LEVEL (~0U)
+
+/*
  * UPDATE_LIMIT_SHIFT: a constant used in rt_update_deadline(). When finding
  * the next deadline, performing addition could be faster if the difference
  * between cur_deadline and now is small. If the difference is bigger than
@@ -976,7 +982,9 @@ burn_budget(const struct scheduler *ops, struct rt_unit *svc, s_time_t now)
     {
         if ( has_extratime(svc) )
         {
-            svc->priority_level++;
+            if ( svc->priority_level < RTDS_MAX_PRIORITY_LEVEL )
+                svc->priority_level++;
+
             svc->cur_budget = svc->budget;
         }
         else
