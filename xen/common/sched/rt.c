@@ -749,6 +749,14 @@ rt_switch_sched(struct scheduler *new_ops, unsigned int cpu,
     {
         init_timer(&prv->repl_timer, repl_timer_handler, (void *)new_ops, cpu);
         dprintk(XENLOG_DEBUG, "RTDS: timer initialized on cpu %u\n", cpu);
+
+        /*
+         * cpupool_unassign_cpu_start() refuses to remove the last pCPU from
+         * a populated cpupool, so by the time this path runs (timer was
+         * killed because all RTDS pCPUs were removed) the pool must have
+         * been empty of domains, which implies replq is empty too.
+         */
+        ASSERT(list_empty(rt_replq(new_ops)));
     }
 
     sched_idle_unit(cpu)->priv = vdata;
