@@ -896,7 +896,7 @@ static int cf_check read_msr(
     struct vcpu *curr = current;
     const struct domain *currd = curr->domain;
     const struct cpu_policy *cp = currd->arch.cpu_policy;
-    bool vpmu_msr = false, warn = false;
+    bool warn = false;
     uint64_t tmp;
     int ret;
 
@@ -995,21 +995,21 @@ static int cf_check read_msr(
     case MSR_CORE_PERF_FIXED_CTR0 ... MSR_CORE_PERF_FIXED_CTR2:
     case MSR_CORE_PERF_FIXED_CTR_CTRL ... MSR_CORE_PERF_GLOBAL_OVF_CTRL:
         if ( boot_cpu_data.vendor == X86_VENDOR_INTEL )
-        {
-            vpmu_msr = true;
-            /* fall through */
+            goto vpmu;
+        goto check_relaxed;
+
     case MSR_AMD_FAM15H_EVNTSEL0 ... MSR_AMD_FAM15H_PERFCTR5:
     case MSR_K7_EVNTSEL0 ... MSR_K7_PERFCTR3:
-            if ( vpmu_msr || (boot_cpu_data.vendor &
-                              (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
-            {
-                if ( vpmu_do_rdmsr(reg, val) )
-                    break;
-                return X86EMUL_OKAY;
-            }
+        if ( boot_cpu_data.vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
+        {
+    vpmu:
+            if ( vpmu_do_rdmsr(reg, val) )
+                break;
+            return X86EMUL_OKAY;
         }
         /* fall through */
     default:
+    check_relaxed:
         if ( currd->arch.msr_relaxed && !rdmsr_safe(reg, &tmp) )
         {
             *val = 0;
@@ -1048,7 +1048,6 @@ static int cf_check write_msr(
     const struct domain *currd = curr->domain;
     const struct cpu_policy *cp = currd->arch.cpu_policy;
     uint64_t temp = 0;
-    bool vpmu_msr = false;
     int ret;
 
     if ( (ret = guest_wrmsr(curr, reg, val)) != X86EMUL_UNHANDLEABLE )
@@ -1178,24 +1177,25 @@ static int cf_check write_msr(
     case MSR_CORE_PERF_FIXED_CTR0 ... MSR_CORE_PERF_FIXED_CTR2:
     case MSR_CORE_PERF_FIXED_CTR_CTRL ... MSR_CORE_PERF_GLOBAL_OVF_CTRL:
         if ( boot_cpu_data.vendor == X86_VENDOR_INTEL )
-        {
-            vpmu_msr = true;
+            goto vpmu;
+        goto check_relaxed;
+
     case MSR_AMD_FAM15H_EVNTSEL0 ... MSR_AMD_FAM15H_PERFCTR5:
     case MSR_K7_EVNTSEL0 ... MSR_K7_PERFCTR3:
-            if ( vpmu_msr || (boot_cpu_data.vendor &
-                              (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
-            {
-                if ( (vpmu_mode & XENPMU_MODE_ALL) &&
-                     !is_hardware_domain(currd) )
-                    return X86EMUL_OKAY;
-
-                if ( vpmu_do_wrmsr(reg, val) )
-                    break;
+        if ( boot_cpu_data.vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
+        {
+    vpmu:
+            if ( (vpmu_mode & XENPMU_MODE_ALL) &&
+                 !is_hardware_domain(currd) )
                 return X86EMUL_OKAY;
-            }
+
+            if ( vpmu_do_wrmsr(reg, val) )
+                break;
+            return X86EMUL_OKAY;
         }
         /* fall through */
     default:
+    check_relaxed:
         if ( currd->arch.msr_relaxed && !rdmsr_safe(reg, &val) )
             return X86EMUL_OKAY;
 
