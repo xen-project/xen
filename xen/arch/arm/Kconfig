@@ -468,6 +468,27 @@ config ARM64_ERRATUM_1508412
 
 	  If unsure, say Y.
 
+config ARM64_ERRATUM_CVE_2025_10263
+	bool "Cortex-*/Neoverse-*/C1-*: Completion of affected memory accesses might not be guaranteed by completion of a TLBI"
+	default y
+	depends on ARM_64
+	select ARM64_WORKAROUND_REPEAT_TLBI
+	help
+	  This option adds a workaround for CVE-2025-10263.
+
+	  A broadcast TLBI on another PE may complete before affected memory
+	  accesses are globally observed. This may permit bypass of Stage 1
+	  translation, Stage-2 translation, or GPT protection.
+
+	  The workaround repeats the TLBI VALE2IS, XZR + DSB ISH operation for all
+	  the broadcast TLB flush operations. A single additional TLBI and DSB are
+	  sufficient regardless of how many TLBIs are completed by the DSB.
+
+	  Note that software workarounds are required at all execution levels for
+	  affected parts to fully mitigate this issue.
+
+	  If unsure, say Y.
+
 endmenu
 
 config ARM64_HARDEN_BRANCH_PREDICTOR
