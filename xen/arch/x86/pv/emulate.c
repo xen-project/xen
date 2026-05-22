@@ -29,8 +29,14 @@ int pv_emul_read_descriptor(unsigned int sel, const struct vcpu *v,
           */
          ((sel & 4) && (sel >> 3) >= v->arch.pv.ldt_ents) )
         desc.b = desc.a = 0;
-    else if ( get_unsafe(desc, gdt_ldt_desc_ptr(sel)) )
-        return 0;
+    else
+    {
+        const seg_desc_t *pdesc = gdt_ldt_desc_ptr(sel);
+
+        if ( get_unsafe(desc, pdesc) )
+            return 0;
+    }
+
     if ( !insn_fetch )
         desc.b &= ~_SEGMENT_L;
 
