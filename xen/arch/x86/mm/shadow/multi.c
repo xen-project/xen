@@ -857,13 +857,13 @@ do {                                                                       \
 /* 64-bit l2: touch all entries except for PAE compat guests. */
 #define FOREACH_PRESENT_L2E(_sl2mfn, _sl2e, _gl2p, _done, _dom, _code)      \
 do {                                                                        \
-    unsigned int _i, _end = SHADOW_L2_PAGETABLE_ENTRIES;                    \
+    unsigned int _i, _nr = SHADOW_L2_PAGETABLE_ENTRIES;                     \
     shadow_l2e_t *_sp = map_domain_page((_sl2mfn));                         \
     ASSERT_VALID_L2(mfn_to_page(_sl2mfn)->u.sh.type);                       \
     if ( is_pv_32bit_domain(_dom) /* implies !paging_mode_external */ &&    \
          mfn_to_page(_sl2mfn)->u.sh.type != SH_type_l2_64_shadow )          \
-        _end = COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(_dom);                    \
-    for ( _i = 0; _i < _end; ++_i )                                         \
+        _nr = COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(_dom);                     \
+    for ( _i = 0; _i < _nr; ++_i )                                          \
     {                                                                       \
         (_sl2e) = _sp + _i;                                                 \
         if ( shadow_l2e_get_flags(*(_sl2e)) & _PAGE_PRESENT )               \
@@ -3352,7 +3352,9 @@ static pagetable_t cf_check sh_update_cr3(struct vcpu *v, bool noflush)
 #if SHADOW_PAGING_LEVELS == 3
         {
             mfn_t smfn = pagetable_get_mfn(v->arch.paging.shadow.shadow_table[0]);
+#if GUEST_PAGING_LEVELS != 3
             unsigned int i;
+#endif
 
             for_each_shadow_table(v, i)
             {
