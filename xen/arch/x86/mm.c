@@ -2663,15 +2663,17 @@ static int validate_page(struct page_info *page, unsigned long type,
                  get_gpfn_from_mfn(mfn_x(page_to_mfn(page))),
                  type, page->count_info, page->u.inuse.type_info);
         if ( page != current->arch.old_guest_table )
-            page->u.inuse.type_info = 0;
-        else
         {
-            ASSERT((page->u.inuse.type_info &
-                    (PGT_count_mask | PGT_validated)) == 1);
-    case -ERESTART:
-            get_page_light(page);
-            page->u.inuse.type_info |= PGT_partial;
+            page->u.inuse.type_info = 0;
+            break;
         }
+
+        ASSERT((page->u.inuse.type_info &
+                (PGT_count_mask | PGT_validated)) == 1);
+        fallthrough;
+    case -ERESTART:
+        get_page_light(page);
+        page->u.inuse.type_info |= PGT_partial;
         break;
     }
 
