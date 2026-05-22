@@ -50,13 +50,6 @@ int replace_grant_host_mapping(uint64_t gpaddr, mfn_t frame,
 #define gnttab_dom0_frames()                                             \
     min_t(unsigned int, opt_max_grant_frames, PFN_DOWN(_etext - _stext))
 
-#define gnttab_set_frame_gfn(gt, st, idx, gfn, mfn)                      \
-    (gfn_eq(gfn, INVALID_GFN)                                            \
-     ? guest_physmap_remove_page((gt)->domain,                           \
-                                 gnttab_get_frame_gfn(gt, st, idx),      \
-                                 mfn, 0)                                 \
-     : 0)
-
 #define gnttab_get_frame_gfn(gt, st, idx) ({                             \
    (st) ? gnttab_status_gfn(NULL, gt, idx)                               \
         : gnttab_shared_gfn(NULL, gt, idx);                              \

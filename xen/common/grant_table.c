@@ -1844,8 +1844,7 @@ gnttab_unpopulate_status_frames(struct domain *d, struct grant_table *gt)
         {
             int rc = gfn_eq(gfn, INVALID_GFN)
                      ? 0
-                     : gnttab_set_frame_gfn(gt, true, i, INVALID_GFN,
-                                            page_to_mfn(pg));
+                     : guest_physmap_remove_page(d, gfn, page_to_mfn(pg), 0);
 
             if ( rc )
             {
@@ -4285,8 +4284,6 @@ int gnttab_map_frame_begin(
          */
         if ( !get_page(pg, d) )
             rc = -EBUSY;
-        else if ( (rc = gnttab_set_frame_gfn(gt, status, idx, gfn, *mfn)) )
-            put_page(pg);
     }
 
     if ( rc )

@@ -32,12 +32,6 @@ static inline int replace_grant_host_mapping(uint64_t addr, mfn_t frame,
     return replace_grant_pv_mapping(addr, frame, new_addr, flags);
 }
 
-#define gnttab_set_frame_gfn(gt, st, idx, gfn, mfn)                      \
-    (gfn_eq(gfn, INVALID_GFN)                                            \
-     ? guest_physmap_remove_page((gt)->domain,                           \
-                                 gnttab_get_frame_gfn(gt, st, idx),      \
-                                 mfn, 0)                                 \
-     : 0 /* Handled in add_to_physmap_one(). */)
 #define gnttab_get_frame_gfn(gt, st, idx) ({                             \
     mfn_t mfn_ = (st) ? gnttab_status_mfn(gt, idx)                       \
                       : gnttab_shared_mfn(gt, idx);                      \
