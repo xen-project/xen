@@ -33,7 +33,6 @@ struct vcpu;
 typedef int64_t s_time_t;
 #define PRI_stime PRId64
 
-s_time_t get_s_time_fixed(u64 at_tick);
 s_time_t get_s_time(void);
 unsigned long get_localtime(struct domain *d);
 uint64_t get_localtime_us(struct domain *d);

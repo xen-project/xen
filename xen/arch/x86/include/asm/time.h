@@ -13,6 +13,8 @@ static inline cycles_t get_cycles(void)
     return rdtsc_ordered();
 }
 
+s_time_t get_s_time_fixed(uint64_t at_tsc);
+
 unsigned long
 mktime (unsigned int year, unsigned int mon,
         unsigned int day, unsigned int hour,

@@ -95,7 +95,7 @@ static u32 pit_stamp32;
 static bool __read_mostly using_pit;
 
 /* Boot timestamp, filled in head.S */
-u64 __initdata boot_tsc_stamp;
+uint64_t __initdata boot_tsc_stamp;
 
 /* Per-socket TSC_ADJUST values, for secondary cores/threads to sync to. */
 static uint64_t *__read_mostly tsc_adjust;
@@ -1656,10 +1656,10 @@ static unsigned long get_wallclock_time(void)
  * System Time
  ***************************************************************************/
 
-s_time_t get_s_time_fixed(u64 at_tsc)
+s_time_t get_s_time_fixed(uint64_t at_tsc)
 {
     const struct cpu_time *t = &this_cpu(cpu_time);
-    u64 tsc, delta;
+    uint64_t tsc, delta;
 
     if ( at_tsc )
         tsc = at_tsc;
