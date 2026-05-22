@@ -208,7 +208,7 @@ static int check_guest_marks(xen_pfn_t gfn, uint32_t mark_start, size_t count)
         if ( errs[i] )
         {
             rc = -1;
-            fail("    Fail: check mark unable to map gfn %05lx: %d\n",
+            fail("    Fail: check mark unable to map gfn %05"PRI_xen_pfn": %d\n",
                  gfns[i], errs[i]);
             continue;
         }
@@ -216,7 +216,7 @@ static int check_guest_marks(xen_pfn_t gfn, uint32_t mark_start, size_t count)
         if ( *mark == exp )
             continue;
 
-        fail("    Fail: check mark: gfn %05lx expecting %08x (%u), got %08x (%u)\n",
+        fail("    Fail: check mark: gfn %05"PRI_xen_pfn" expecting %08x (%u), got %08x (%u)\n",
                gfns[i], exp, ~exp, *mark, ~*mark);
         rc = -1;
     }
