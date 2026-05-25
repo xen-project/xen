@@ -22,22 +22,32 @@ unsigned int __init get_llc_way_size(void)
     register_t id_aa64mmfr2_el1 = READ_SYSREG(ID_AA64MMFR2_EL1);
     uint32_t ccsidr_numsets_shift = CCSIDR_NUMSETS_SHIFT;
     uint32_t ccsidr_numsets_mask = CCSIDR_NUMSETS_MASK;
-    unsigned int n, line_size, num_sets;
+    unsigned int n, line_size, num_sets, llc_level = 0;
 
-    for ( n = CLIDR_CTYPEn_LEVELS; n != 0; n-- )
+    /*
+     * CLIDR_EL1 Ctype fields are interpreted from Ctype1 upwards. Once a
+     * no-cache level is seen, higher Ctype fields are architecturally ignored
+     * for the CLIDR/CCSIDR set/way manageable cache hierarchy.
+     *
+     * Keep the outermost unified cache before that point.
+     */
+    for ( n = 1; n <= CLIDR_CTYPEn_LEVELS; n++ )
     {
         uint8_t ctype_n = (clidr_el1 >> CLIDR_CTYPEn_SHIFT(n)) &
                            CLIDR_CTYPEn_MASK;
 
+        if ( ctype_n == 0b000 )
+            break;
+
         /* Unified cache (see Arm ARM DDI 0487J.a D19.2.27) */
         if ( ctype_n == 0b100 )
-            break;
+            llc_level = n;
     }
 
-    if ( n == 0 )
+    if ( !llc_level )
         return 0;
 
-    WRITE_SYSREG((n - 1) << CSSELR_LEVEL_SHIFT, CSSELR_EL1);
+    WRITE_SYSREG((llc_level - 1) << CSSELR_LEVEL_SHIFT, CSSELR_EL1);
     isb();
 
     ccsidr_el1 = READ_SYSREG(CCSIDR_EL1);
@@ -56,7 +66,7 @@ unsigned int __init get_llc_way_size(void)
     num_sets = ((ccsidr_el1 >> ccsidr_numsets_shift) & ccsidr_numsets_mask) + 1;
 
     printk(XENLOG_INFO "LLC found: L%u (line size: %u bytes, sets num: %u)\n",
-           n, line_size, num_sets);
+           llc_level, line_size, num_sets);
 
     /* Restore value in CSSELR_EL1 */
     WRITE_SYSREG(csselr_el1, CSSELR_EL1);
