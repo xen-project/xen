@@ -284,13 +284,13 @@ static void __init noreturn efi_arch_post_exit_boot(void)
 }
 
 static void __init efi_arch_cfg_file_early(const EFI_LOADED_IMAGE *image,
-                                           EFI_FILE_HANDLE dir_handle,
+                                           EFI_FILE_HANDLE *dir_handle,
                                            const char *section)
 {
 }
 
 static void __init efi_arch_cfg_file_late(const EFI_LOADED_IMAGE *image,
-                                          EFI_FILE_HANDLE dir_handle,
+                                          EFI_FILE_HANDLE *dir_handle,
                                           const char *section)
 {
     union string name;
@@ -304,9 +304,12 @@ static void __init efi_arch_cfg_file_late(const EFI_LOADED_IMAGE *image,
         name.s = get_value(&cfg, "global", "ucode");
     if ( name.s )
     {
+        CHAR16 *fname;
+
         microcode_set_module(mbi.mods_count);
         split_string(name.s);
-        read_file(dir_handle, s2w(&name), &ucode, NULL);
+        ensure_dir_handle(image, dir_handle, &fname);
+        read_file(*dir_handle, s2w(&name), &ucode, NULL);
         efi_bs->FreePool(name.w);
     }
 }
