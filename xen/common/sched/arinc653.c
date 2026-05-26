@@ -1,5 +1,4 @@
 /******************************************************************************
- * sched_arinc653.c
  *
  * An ARINC653-compatible scheduling algorithm for use in Xen.
  *

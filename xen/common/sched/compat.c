@@ -1,8 +1,3 @@
-/****************************************************************************
- * schedule.c
- *
- */
-
 #ifndef __COMMON_SCHED_COMPAT_C__
 #define __COMMON_SCHED_COMPAT_C__
 

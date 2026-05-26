@@ -4,7 +4,6 @@
  * (C) 2004      - Mark Williamson - Intel Research Cambridge
  ****************************************************************************
  *
- *        File: common/schedule.c
  *      Author: Rolf Neugebauer & Keir Fraser
  *              Updated for generic API by Mark Williamson
  *

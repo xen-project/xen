@@ -2,7 +2,6 @@
  * (C) 2005-2006 - Emmanuel Ackaouy - XenSource Inc.
  ****************************************************************************
  *
- *        File: common/csched_credit.c
  *      Author: Emmanuel Ackaouy
  *
  * Description: Credit-based SMP CPU scheduler

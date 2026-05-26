@@ -1,7 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * xen/common/boot_cpupools.c
- *
  * Code to create cpupools at boot time.
  *
  * Copyright (C) 2022 Arm Ltd.

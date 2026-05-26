@@ -1,6 +1,4 @@
 /*
- * xen/common/sched_null.c
- *
  *  Copyright (c) 2017, Dario Faggioli, Citrix Ltd
  *
  * This program is free software; you can redistribute it and/or

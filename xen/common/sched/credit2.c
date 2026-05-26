@@ -3,7 +3,6 @@
  * (C) 2009 - George Dunlap - Citrix Systems R&D UK, Ltd
  ****************************************************************************
  *
- *        File: common/sched_credit2.c
  *      Author: George Dunlap
  *
  * Description: Credit-based SMP CPU scheduler
