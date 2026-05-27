@@ -21,7 +21,7 @@
 
 #define LAPIC_BASE_ADDRESS  0xfee00000UL
 
-static uint32_t domid = ~0;
+static uint32_t domid = DOMID_ANY;
 static char *kernel;
 static char *ramdisk;
 static char *flask;

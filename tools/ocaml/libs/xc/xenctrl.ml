@@ -208,7 +208,9 @@ let with_intf f =
 external domain_create_stub: handle -> domid -> domctl_create_config -> domid
   = "stub_xc_domain_create"
 
-let domain_create handle ?(domid=0) config =
+let domid_any = 0x7ff5 (* DOMID_ANY from public/xen.h *)
+
+let domain_create handle ?(domid=domid_any) config =
   domain_create_stub handle domid config
 
 external domain_sethandle: handle -> domid -> string -> unit
