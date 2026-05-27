@@ -1824,7 +1824,7 @@ static int vgic_v3_domain_init(struct domain *d)
          * not match the number of pCPUs). Update the number of regions to
          * avoid exposing unused region as they will not get emulated.
          */
-        d->arch.vgic.nr_regions = i + 1;
+        d->arch.vgic.nr_regions = min(i + 1U, vgic_v3_hw.nr_rdist_regions);
 
         d->arch.vgic.intid_bits = vgic_v3_hw.intid_bits;
     }
