@@ -198,7 +198,7 @@ void domain_vgic_free(struct domain *d)
 
 int vcpu_vgic_init(struct vcpu *v)
 {
-    int i;
+    int i, ret;
 
     v->arch.vgic.private_irqs = xzalloc(struct vgic_irq_rank);
     if ( v->arch.vgic.private_irqs == NULL )
@@ -207,7 +207,12 @@ int vcpu_vgic_init(struct vcpu *v)
     /* SGIs/PPIs are always routed to this VCPU */
     vgic_rank_init(v->arch.vgic.private_irqs, 0, v->vcpu_id);
 
-    v->domain->arch.vgic.handler->vcpu_init(v);
+    ret = v->domain->arch.vgic.handler->vcpu_init(v);
+    if ( ret )
+    {
+        XFREE(v->arch.vgic.private_irqs);
+        return ret;
+    }
 
     memset(&v->arch.vgic.pending_irqs, 0, sizeof(v->arch.vgic.pending_irqs));
     for (i = 0; i < 32; i++)
