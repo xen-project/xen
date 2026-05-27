@@ -1000,6 +1000,9 @@ For example, with `dom0_max_vcpus=4-8`:
 >      8    |  8
 >     10    |  8
 
+The resulting number of Dom0 VCPUs is still subject to Xen's generic
+and architecture-specific domain limits.
+
 ### dom0_mem (ARM)
 > `= <size>`
 

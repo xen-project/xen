@@ -162,6 +162,15 @@ with the following properties:
 
     An integer specifying the number of vcpus to allocate to the guest.
 
+    The resulting number of vcpus is still subject to Xen's generic and
+    architecture-specific domain limits. On Arm GICv3 systems, each vcpu
+    needs a virtual redistributor frame. Domains using the host GIC layout,
+    such as the hardware domain or direct-mapped domains, can only use vcpus
+    whose virtual redistributor frame is covered by the redistributor MMIO
+    regions exposed for that layout. If the requested number of vcpus exceeds
+    that limit, Xen will create fewer vcpus than requested, stopping at the
+    first vcpu whose virtual redistributor frame is not covered.
+
 - llc-colors
     A string specifying the LLC color configuration for the guest.
     Refer to docs/misc/cache_coloring.rst for syntax. This option is applicable
