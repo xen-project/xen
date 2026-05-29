@@ -668,7 +668,8 @@ static int suspend_and_send_dirty(struct xc_sr_context *ctx)
     else
         xc_set_progress_prefix(xch, "Checkpointed save");
 
-    bitmap_or(dirty_bitmap, ctx->save.deferred_pages, ctx->save.p2m_size);
+    bitmap_or(dirty_bitmap, dirty_bitmap, ctx->save.deferred_pages,
+              ctx->save.p2m_size);
 
     if ( !ctx->save.live && ctx->stream_type == XC_STREAM_COLO )
     {

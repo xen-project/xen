@@ -81,14 +81,15 @@ static inline int test_and_set_bit(unsigned long nr, void *addr)
     return oldbit;
 }
 
-static inline void bitmap_or(void *_dst, const void *_other,
+static inline void bitmap_or(void *_dst, const void *_src1, const void *_src2,
                              unsigned long nr_bits)
 {
     char *dst = _dst;
-    const char *other = _other;
+    const char *src1 = _src1, *src2 = _src2;
     unsigned long i;
+
     for ( i = 0; i < bitmap_size(nr_bits); ++i )
-        dst[i] |= other[i];
+        dst[i] = src1[i] | src2[i];
 }
 
 #endif  /* __XEN_TOOLS_BITOPS_H__ */
