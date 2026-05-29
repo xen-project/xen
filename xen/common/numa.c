@@ -405,6 +405,12 @@ static int __init populate_memnodemap(const struct node *nodes,
         if ( (epdx >> shift) >= memnodemapsize )
             return 0;
 
+        /*
+         * Round down start address: if start is not aligned to the memnodemap
+         * chunk size the tail remainder might not be added.  Overlaps created
+         * by rounding will fall into the same NUMA region.
+         */
+        spdx = ROUNDDOWN(spdx, 1UL << shift);
         do {
             if ( memnodemap[spdx >> shift] != NUMA_NO_NODE &&
                  (!nodeids || memnodemap[spdx >> shift] != nodeids[i]) )

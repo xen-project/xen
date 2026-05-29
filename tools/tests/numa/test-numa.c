@@ -154,6 +154,51 @@ int main(int argc, char **argv)
                 { .start = 0x183f8800000ULL, .end = 0x183faabffffULL },
             },
         },
+        /* Found on a pre-production system. */
+        {
+            .affinity = {
+                { .nid = 0, .start = 0x00000000000ULL, .end = 0x000afffffffULL },
+                { .nid = 0, .start = 0x00100000000ULL, .end = 0x0fc4fffffffULL },
+                { .nid = 0, .start = 0x10000000000ULL, .end = 0x103ffffffffULL },
+                { .nid = 1, .start = 0x10400000000ULL, .end = 0x203ffffffffULL },
+            },
+            .ram = {
+                { .start = 0x00000000000ULL, .end = 0x0000009ffffULL },
+                { .start = 0x00000100000ULL, .end = 0x000165bffffULL },
+                { .start = 0x00016600000ULL, .end = 0x0001aa1dfffULL },
+                { .start = 0x0001aa1f000ULL, .end = 0x0001aa53fffULL },
+                { .start = 0x0001aab8000ULL, .end = 0x0001aac6fffULL },
+                { .start = 0x0001aacc000ULL, .end = 0x0006f3fefffULL },
+                { .start = 0x00075dff000ULL, .end = 0x00075dfffffULL },
+                { .start = 0x00076000000ULL, .end = 0x000a7ffffffULL },
+                { .start = 0x00100010000ULL, .end = 0x0fc43ffffffULL },
+                { .start = 0x0fc45000000ULL, .end = 0x0fc47ffffffULL },
+                { .start = 0x0fc49000000ULL, .end = 0x0fc4bffffffULL },
+                { .start = 0x0fc4d000000ULL, .end = 0x0fc4d3bffffULL },
+                { .start = 0x0fc4f000000ULL, .end = 0x0fc4f0fffffULL },
+                { .start = 0x10000000000ULL, .end = 0x203fd7fffffULL },
+            },
+        },
+        /*
+         * Reduction of the issue above: introduce an unaligned middle region
+         * with regards to the hash shift.
+         */
+        {
+            .affinity = {
+                { .nid = 0, .start = 0x00000ULL, .end = 0x00fffULL },
+                /*
+                 * The offset of the region below is not aligned with the hash
+                 * shift: the shift calculation only takes into account the
+                 * start of node address.
+                 */
+                { .nid = 0, .start = 0x01000ULL, .end = 0x04fffULL },
+                { .nid = 1, .start = 0x14000ULL, .end = 0x14fffULL },
+            },
+            .ram = {
+                { .start = 0x00000ULL, .end = 0x04fffULL },
+                { .start = 0x14000ULL, .end = 0x14fffULL },
+            },
+        },
     };
     int ret_code = EXIT_SUCCESS;
 
