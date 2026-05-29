@@ -4,6 +4,7 @@
  * Adapted for Xen: Ryan Harper <ryanh@us.ibm.com>
  */
 
+#ifdef __XEN__
 #include <xen/init.h>
 #include <xen/keyhandler.h>
 #include <xen/mm.h>
@@ -13,6 +14,7 @@
 #include <xen/pfn.h>
 #include <xen/sched.h>
 #include <xen/softirq.h>
+#endif /* __XEN__ */
 
 static nodemask_t __initdata processor_nodes_parsed;
 static nodemask_t __initdata memory_nodes_parsed;
@@ -561,6 +563,12 @@ void __init numa_init_array(void)
     }
 }
 
+void numa_set_node(unsigned int cpu, nodeid_t node)
+{
+    cpu_to_node[cpu] = node;
+}
+
+#ifdef __XEN__
 #ifdef CONFIG_NUMA_EMU
 static unsigned int __initdata numa_fake;
 
@@ -659,11 +667,6 @@ void __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 void numa_add_cpu(unsigned int cpu)
 {
     cpumask_set_cpu(cpu, &node_to_cpumask[cpu_to_node(cpu)]);
-}
-
-void numa_set_node(unsigned int cpu, nodeid_t node)
-{
-    cpu_to_node[cpu] = node;
 }
 
 /* [numa=off] */
@@ -830,3 +833,4 @@ static int __init cf_check register_numa_trigger(void)
     return 0;
 }
 __initcall(register_numa_trigger);
+#endif /* __XEN__ */
