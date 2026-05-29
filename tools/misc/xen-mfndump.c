@@ -10,7 +10,7 @@
 
 #include <xen-tools/common-macros.h>
 
-#define M2P_SIZE(_m)    ROUNDUP(((_m) * sizeof(xen_pfn_t)), 21)
+#define M2P_SIZE(_m)    ROUNDUP(((_m) * sizeof(xen_pfn_t)), MB(2))
 #define is_mapped(pfn_type) (!((pfn_type) & 0x80000000UL))
 
 #define ERROR(msg, args...) fprintf(stderr, msg, ## args)

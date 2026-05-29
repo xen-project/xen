@@ -364,12 +364,12 @@ static int meminit(struct xc_dom_image *dom)
 
     /* Convenient */
     const uint64_t kernbase = dom->kernel_seg.vstart;
-    const uint64_t kernend = ROUNDUP(dom->kernel_seg.vend, 21/*2MB*/);
+    const uint64_t kernend = ROUNDUP(dom->kernel_seg.vend, MB(2));
     const uint64_t kernsize = kernend - kernbase;
     const uint64_t dtb_size = dom->devicetree_blob ?
-        ROUNDUP(dom->devicetree_size, XC_PAGE_SHIFT) : 0;
+        ROUNDUP(dom->devicetree_size, XC_PAGE_SIZE) : 0;
     const uint64_t ramdisk_size = dom->modules[0].blob ?
-        ROUNDUP(dom->modules[0].size, XC_PAGE_SHIFT) : 0;
+        ROUNDUP(dom->modules[0].size, XC_PAGE_SIZE) : 0;
     const uint64_t modsize = dtb_size + ramdisk_size;
     const uint64_t ram128mb = bankbase[0] + (128<<20);
 

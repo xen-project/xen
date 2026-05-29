@@ -511,7 +511,7 @@ static void record_header_done(libxl__egc *egc,
         return;
     }
 
-    size_t bytes_to_read = ROUNDUP(rec->hdr.length, REC_ALIGN_ORDER);
+    size_t bytes_to_read = ROUNDUP(rec->hdr.length, REC_ALIGN);
     rec->body = libxl__malloc(NOGC, bytes_to_read);
 
     rc = setup_read(stream, "record body",

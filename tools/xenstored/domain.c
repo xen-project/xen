@@ -2159,7 +2159,7 @@ const char *dump_state_connections(FILE *fp)
 		if (ret)
 			return ret;
 		head.length += sc.data_in_len + sc.data_out_len;
-		head.length = ROUNDUP(head.length, 3);
+		head.length = ROUNDUP(head.length, 8);
 		if (c->domain) {
 			sc.fields |= XS_STATE_CONN_FIELDS_UNIQ_ID;
 			head.length += sizeof(uint64_t);
@@ -2232,7 +2232,8 @@ void read_state_connection(const void *ctx, const void *state)
 		unsigned long off;
 
 		off = sizeof(*sc) + sc->data_in_len + sc->data_out_len;
-		domain->unique_id = *(uint64_t *)(state + ROUNDUP(off, 3));
+		domain->unique_id =
+		    *(uint64_t *)(state + ROUNDUP(off, 8));
 	}
 }
 
@@ -2308,7 +2309,7 @@ static int dump_state_domain(const void *k, void *v, void *arg)
 	n_quota = get_quota_size(domain->acc, &rec_len);
 	rec_len += n_quota * sizeof(sd->quota_val[0]);
 	rec_len += sizeof(*sd);
-	rec_len = ROUNDUP(rec_len, 3);
+	rec_len = ROUNDUP(rec_len, 8);
 
 	record = talloc_size(NULL, rec_len + sizeof(*head));
 	if (!record)
@@ -2372,7 +2373,7 @@ const char *dump_state_glb_quota(FILE *fp)
 	n_quota = get_quota_size(quotas, &rec_len);
 	rec_len += n_quota * sizeof(glb->quota_val[0]);
 	rec_len += sizeof(*glb);
-	rec_len = ROUNDUP(rec_len, 3);
+	rec_len = ROUNDUP(rec_len, 8);
 
 	record = talloc_size(NULL, rec_len + sizeof(*head));
 	if (!record)

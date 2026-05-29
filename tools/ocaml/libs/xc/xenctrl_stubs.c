@@ -221,7 +221,7 @@ CAMLprim value stub_xc_domain_create(value xch_val, value wanted_domid, value co
 	if ( altp2m_nr != (uint16_t)altp2m_nr )
 		caml_invalid_argument("altp2m_count");
 
-	vmtrace_size = ROUNDUP(vmtrace_size << 10, XC_PAGE_SHIFT);
+	vmtrace_size = ROUNDUP(vmtrace_size << 10, XC_PAGE_SIZE);
 	if ( vmtrace_size != (uint32_t)vmtrace_size )
 		caml_invalid_argument("vmtrace_buf_kb");
 

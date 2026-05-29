@@ -198,7 +198,7 @@ void *osdep_xenforeignmemory_map(xenforeignmemory_handle *fmem,
          */
         privcmd_mmapbatch_t ioctlx;
         xen_pfn_t *pfn;
-        unsigned int pfn_arr_size = ROUNDUP((num * sizeof(*pfn)), XC_PAGE_SHIFT);
+        unsigned int pfn_arr_size = ROUNDUP(num * sizeof(*pfn), XC_PAGE_SIZE);
         int os_page_size = sysconf(_SC_PAGESIZE);
 
         if ( pfn_arr_size <= os_page_size )

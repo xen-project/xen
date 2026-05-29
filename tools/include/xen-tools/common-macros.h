@@ -68,9 +68,7 @@
     })
 #endif
 
-#ifndef ROUNDUP
-#define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
-#endif
+#define ROUNDUP(x, a) (((x) + (a) - 1) & ~((a) - 1))
 
 #define MASK_EXTR(v, m) (((v) & (m)) / ((m) & -(m)))
 #define MASK_INSR(v, m) (((v) * ((m) & -(m))) & (m))

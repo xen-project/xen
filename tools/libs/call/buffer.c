@@ -155,7 +155,8 @@ struct allocation_header {
 
 void *xencall_alloc_buffer(xencall_handle *xcall, size_t size)
 {
-    size_t actual_size = ROUNDUP(size + sizeof(struct allocation_header), PAGE_SHIFT);
+    size_t actual_size = ROUNDUP(size + sizeof(struct allocation_header),
+                                 PAGE_SIZE);
     int nr_pages = actual_size >> PAGE_SHIFT;
     struct allocation_header *hdr;
 

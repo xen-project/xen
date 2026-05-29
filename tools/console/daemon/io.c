@@ -1233,7 +1233,7 @@ static int set_fds(int fd, short events)
 		/* Round up to 2^8 boundary, in practice this just
 		 * make newsize larger than current_array_size.
 		 */
-		newsize = ROUNDUP(nr_fds + 1, 8);
+		newsize = ROUNDUP(nr_fds + 1, 1U << 8);
 
 		new_fds = realloc(fds, sizeof(struct pollfd)*newsize);
 		if (!new_fds)

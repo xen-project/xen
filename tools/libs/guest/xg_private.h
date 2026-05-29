@@ -135,7 +135,7 @@ typedef uint64_t x86_pgentry_t;
 #define PAGE_SIZE_X86           (1UL << PAGE_SHIFT_X86)
 #define PAGE_MASK_X86           (~(PAGE_SIZE_X86-1))
 
-#define NRPAGES(x) (ROUNDUP(x, PAGE_SHIFT) >> PAGE_SHIFT)
+#define NRPAGES(x) (ROUNDUP(x, PAGE_SIZE) >> PAGE_SHIFT)
 
 static inline xen_pfn_t xc_pfn_to_mfn(xen_pfn_t pfn, xen_pfn_t *p2m,
                                       unsigned gwidth)
@@ -167,7 +167,7 @@ int pin_table(xc_interface *xch, unsigned int type, unsigned long mfn,
  */
 #define M2P_SHIFT       L2_PAGETABLE_SHIFT_PAE
 #define M2P_CHUNK_SIZE  (1 << M2P_SHIFT)
-#define M2P_SIZE(_m)    ROUNDUP(((_m) * sizeof(xen_pfn_t)), M2P_SHIFT)
+#define M2P_SIZE(_m)    ROUNDUP(((_m) * sizeof(xen_pfn_t)), M2P_CHUNK_SIZE)
 #define M2P_CHUNKS(_m)  (M2P_SIZE((_m)) >> M2P_SHIFT)
 
 #if defined(__x86_64__) || defined(__i386__)

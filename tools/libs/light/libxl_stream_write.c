@@ -119,7 +119,7 @@ static void setup_generic_write(libxl__egc *egc,
                                 void *body,
                                 sws_record_done_cb cb)
 {
-    static const uint8_t zero_padding[1U << REC_ALIGN_ORDER] = { 0 };
+    static const uint8_t zero_padding[REC_ALIGN] = {};
 
     libxl__datacopier_state *dc = &stream->dc;
     int rc;
@@ -136,7 +136,7 @@ static void setup_generic_write(libxl__egc *egc,
         return;
     }
 
-    size_t padsz = ROUNDUP(hdr->length, REC_ALIGN_ORDER) - hdr->length;
+    size_t padsz = ROUNDUP(hdr->length, REC_ALIGN) - hdr->length;
     uint32_t length = hdr->length;
 
     /* Insert header */

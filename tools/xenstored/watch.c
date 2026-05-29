@@ -349,7 +349,7 @@ const char *dump_state_watches(FILE *fp, struct connection *conn,
 		}
 
 		head.length += path_len + token_len;
-		head.length = ROUNDUP(head.length, 3);
+		head.length = ROUNDUP(head.length, 8);
 		if (fwrite(&head, sizeof(head), 1, fp) != 1)
 			return "Dump watch state error";
 

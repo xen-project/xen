@@ -56,11 +56,11 @@ const char *rec_type_to_str(uint32_t type)
 int write_split_record(struct xc_sr_context *ctx, struct xc_sr_record *rec,
                        void *buf, size_t sz)
 {
-    static const char zeroes[(1u << REC_ALIGN_ORDER) - 1] = { 0 };
+    static const char zeroes[REC_ALIGN] = {};
 
     xc_interface *xch = ctx->xch;
     typeof(rec->length) combined_length = rec->length + sz;
-    size_t record_length = ROUNDUP(combined_length, REC_ALIGN_ORDER);
+    size_t record_length = ROUNDUP(combined_length, REC_ALIGN);
     struct iovec parts[] = {
         { &rec->type,       sizeof(rec->type) },
         { &combined_length, sizeof(combined_length) },
@@ -110,7 +110,7 @@ int read_record(struct xc_sr_context *ctx, int fd, struct xc_sr_record *rec)
         return -1;
     }
 
-    datasz = ROUNDUP(rhdr.length, REC_ALIGN_ORDER);
+    datasz = ROUNDUP(rhdr.length, REC_ALIGN);
 
     if ( datasz )
     {

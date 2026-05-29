@@ -466,7 +466,7 @@ int set_fd(int fd, short events)
 		/* Round up to 2^8 boundary, in practice this just
 		 * make newsize larger than current_array_size.
 		 */
-		newsize = ROUNDUP(nr_fds + 1, 8);
+		newsize = ROUNDUP(nr_fds + 1, 1U << 8);
 
 		new_fds = realloc(poll_fds, sizeof(struct pollfd)*newsize);
 		if (!new_fds)
@@ -3067,7 +3067,7 @@ static int dump_state_node(const void *ctx, struct connection *conn,
 	head.length += node->hdr.num_perms * sizeof(*sn.perms);
 	head.length += pathlen;
 	head.length += node->hdr.datalen;
-	head.length = ROUNDUP(head.length, 3);
+	head.length = ROUNDUP(head.length, 8);
 
 	if (fwrite(&head, sizeof(head), 1, fp) != 1)
 		return dump_state_node_err(data, "Dump node head error");

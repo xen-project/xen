@@ -74,7 +74,7 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
     int domids_stride;
     unsigned int refs_size = ROUNDUP(count *
                                      sizeof(struct ioctl_gntdev_grant_ref),
-                                     XC_PAGE_SHIFT);
+                                     XC_PAGE_SIZE);
     int os_page_size = getpagesize();
 
     domids_stride = (flags & XENGNTTAB_GRANT_MAP_SINGLE_DOMAIN) ? 0 : 1;

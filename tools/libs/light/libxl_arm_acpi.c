@@ -107,12 +107,12 @@ int libxl__get_acpi_size(libxl__gc *gc,
     if (rc < 0)
         goto out;
 
-    *out = ROUNDUP(size, 3) +
-           ROUNDUP(sizeof(struct acpi_table_rsdp), 3) +
-           ROUNDUP(sizeof(struct acpi_table_xsdt), 3) +
-           ROUNDUP(sizeof(struct acpi_table_gtdt), 3) +
-           ROUNDUP(sizeof(struct acpi_table_fadt), 3) +
-           ROUNDUP(sizeof(dsdt_anycpu_arm_len), 3);
+    *out = ROUNDUP(size, 8) +
+           ROUNDUP(sizeof(struct acpi_table_rsdp), 8) +
+           ROUNDUP(sizeof(struct acpi_table_xsdt), 8) +
+           ROUNDUP(sizeof(struct acpi_table_gtdt), 8) +
+           ROUNDUP(sizeof(struct acpi_table_fadt), 8) +
+           ROUNDUP(sizeof(dsdt_anycpu_arm_len), 8);
 
 out:
     return rc;
@@ -128,7 +128,7 @@ static int libxl__allocate_acpi_tables(libxl__gc *gc,
 
     acpitables[RSDP].addr = GUEST_ACPI_BASE;
     acpitables[RSDP].size = sizeof(struct acpi_table_rsdp);
-    dom->acpi_modules[0].length += ROUNDUP(acpitables[RSDP].size, 3);
+    dom->acpi_modules[0].length += ROUNDUP(acpitables[RSDP].size, 8);
 
     acpitables[XSDT].addr = GUEST_ACPI_BASE + dom->acpi_modules[0].length;
     /*
@@ -137,11 +137,11 @@ static int libxl__allocate_acpi_tables(libxl__gc *gc,
      */
     acpitables[XSDT].size = sizeof(struct acpi_table_xsdt) +
                             sizeof(uint64_t) * 2;
-    dom->acpi_modules[0].length += ROUNDUP(acpitables[XSDT].size, 3);
+    dom->acpi_modules[0].length += ROUNDUP(acpitables[XSDT].size, 8);
 
     acpitables[GTDT].addr = GUEST_ACPI_BASE + dom->acpi_modules[0].length;
     acpitables[GTDT].size = sizeof(struct acpi_table_gtdt);
-    dom->acpi_modules[0].length += ROUNDUP(acpitables[GTDT].size, 3);
+    dom->acpi_modules[0].length += ROUNDUP(acpitables[GTDT].size, 8);
 
     acpitables[MADT].addr = GUEST_ACPI_BASE + dom->acpi_modules[0].length;
 
@@ -150,15 +150,15 @@ static int libxl__allocate_acpi_tables(libxl__gc *gc,
         goto out;
 
     acpitables[MADT].size = size;
-    dom->acpi_modules[0].length += ROUNDUP(acpitables[MADT].size, 3);
+    dom->acpi_modules[0].length += ROUNDUP(acpitables[MADT].size, 8);
 
     acpitables[FADT].addr = GUEST_ACPI_BASE + dom->acpi_modules[0].length;
     acpitables[FADT].size = sizeof(struct acpi_table_fadt);
-    dom->acpi_modules[0].length += ROUNDUP(acpitables[FADT].size, 3);
+    dom->acpi_modules[0].length += ROUNDUP(acpitables[FADT].size, 8);
 
     acpitables[DSDT].addr = GUEST_ACPI_BASE + dom->acpi_modules[0].length;
     acpitables[DSDT].size = dsdt_anycpu_arm_len;
-    dom->acpi_modules[0].length += ROUNDUP(acpitables[DSDT].size, 3);
+    dom->acpi_modules[0].length += ROUNDUP(acpitables[DSDT].size, 8);
 
     assert(dom->acpi_modules[0].length <= GUEST_ACPI_SIZE);
     dom->acpi_modules[0].data = libxl__zalloc(gc, dom->acpi_modules[0].length);

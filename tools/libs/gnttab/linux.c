@@ -101,7 +101,7 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
         map = alloca(map_size);
     else
     {
-        map_size = ROUNDUP(map_size, XC_PAGE_SHIFT);
+        map_size = ROUNDUP(map_size, XC_PAGE_SIZE);
         map = mmap(NULL, map_size, PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANON | MAP_POPULATE, -1, 0);
         if ( map == MAP_FAILED )

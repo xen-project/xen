@@ -696,7 +696,7 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
     for ( i = 1; i < sheaders->num; i++ )
         sheaders->shdrs[i].sh_offset += fixup;
     offset += fixup;
-    dummy_len = ROUNDUP(offset, PAGE_SHIFT) - offset; /* padding length */
+    dummy_len = ROUNDUP(offset, PAGE_SIZE) - offset; /* padding length */
     offset += dummy_len;
 
     /* pages */
