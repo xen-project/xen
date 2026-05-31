@@ -26,7 +26,6 @@
 #include <xen/trace.h>
 #include <xen/cpu.h>
 #include <xen/keyhandler.h>
-#include <xen/trace.h>
 #include <xen/err.h>
 #include <xen/guest_access.h>
 
