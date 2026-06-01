@@ -97,7 +97,7 @@ appropriate distro package, and add ``ucode=scan`` to Xen's command line.
 
 Xen is compatible with the Linux initrd microcode protocol.  The initrd is
 expected to be generated with an uncompressed CPIO archive at the beginning
-which contains contains one of these two files::
+which contains one of these two files::
 
   kernel/x86/microcode/GenuineIntel.bin
   kernel/x86/microcode/AuthenticAMD.bin
