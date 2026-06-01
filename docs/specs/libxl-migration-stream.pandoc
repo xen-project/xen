@@ -218,8 +218,8 @@ tuples.  Each (key, value) tuple is a packed pair of NUL terminated octets,
 conforming to xenstore protocol character encoding (keys strictly as
 alphanumeric ASCII and `-/_@`, values expected to be human-readable ASCII).
 
-Keys shall be relative to to the device models xenstore tree for the new
-domain.  At the time of writing, keys are relative to the path
+Keys shall be relative to the device models xenstore tree for the new domain.
+At the time of writing, keys are relative to the path
 
 > `/local/domain/$dm_domid/device-model/$domid/`
 
