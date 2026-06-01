@@ -753,7 +753,7 @@ A v3 stream is compatible with a v2 stream, but mandates the presense of a
 STATIC_DATA_END record ahead of any memory/register content.  This is to ease
 the introduction of new static configuration records over time.
 
-A v3-compatible reciever interpreting a v2 stream should infer the position of
+A v3-compatible receiver interpreting a v2 stream should infer the position of
 STATIC_DATA_END based on finding the first X86_PV_P2M_FRAMES record (for PV
 guests), or PAGE_DATA record (for HVM guests) and behave as if STATIC_DATA_END
 had been sent.
@@ -807,7 +807,7 @@ never change size or location.
 Errata
 ======
 
-1. For compatibility with older code, the receving side of a stream should
+1. For compatibility with older code, the receiving side of a stream should
    tolerate and ignore variable sized records with zero content.  Xen releases
    between 4.6 and 4.8 could end up generating valid HVM_PARAMS or
    X86_PV_VCPU_{EXTENDED,XSAVE,MSRS} records with zero-length content.
