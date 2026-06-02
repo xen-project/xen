@@ -63,7 +63,6 @@ eclair-x86_64-allcode:
       CONFIG_XEN_GUEST=y
       CONFIG_XHCI=y
       CONFIG_XSM=y
-  allow_failure: true
 
 eclair-x86_64-testing:
   extends: eclair-x86_64-allcode
