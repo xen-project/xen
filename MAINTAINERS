@@ -453,8 +453,9 @@ F:	xen/arch/arm/include/asm/linflex-uart.h
 F:	xen/drivers/char/linflex-uart.c
 
 OCAML TOOLS
-M:	Christian Lindig <christian.lindig@citrix.com>
-M:	David Scott <dave@recoil.org>
+M:	Andrew Cooper <andrew.cooper3@citrix.com>
+M:	Andrii Sultanov <andriy.sultanov@vates.tech>
+R:	Guillaume Thouvenin <guillaume.thouvenin@vates.tech>
 S:	Supported
 F:	tools/ocaml/
 
