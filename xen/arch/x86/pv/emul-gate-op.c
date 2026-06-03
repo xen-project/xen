@@ -284,12 +284,14 @@ void pv_emulate_gate_op(struct cpu_user_regs *regs)
     if ( !jump )
     {
         unsigned int ss, esp, *stkp;
+        uint32_t value;
         int rc;
 #define push(item) do \
         { \
+            value = (item); \
             --stkp; \
             esp -= 4; \
-            rc = __put_guest(item, stkp); \
+            rc = __copy_to_guest_pv(stkp, &value, sizeof(value)); \
             if ( rc ) \
             { \
                 pv_inject_page_fault(PFEC_write_access, \
@@ -357,7 +359,7 @@ void pv_emulate_gate_op(struct cpu_user_regs *regs)
                     unsigned int parm;
 
                     --ustkp;
-                    rc = __get_guest(parm, ustkp);
+                    rc = __copy_from_guest_pv(&parm, ustkp, sizeof(parm));
                     if ( rc )
                     {
                         pv_inject_page_fault(0, (unsigned long)(ustkp + 1) - rc);
