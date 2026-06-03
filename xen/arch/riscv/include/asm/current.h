@@ -54,7 +54,7 @@ DECLARE_PER_CPU(struct vcpu *, curr_vcpu);
 #define switch_stack_and_jump(stack, fn) do {               \
     asm volatile (                                          \
             "mv sp, %0\n"                                   \
-            "j " #fn :: "r" (stack), "X" (fn) : "memory" ); \
+            "jr %1" :: "r" (stack), "r" (fn) : "memory" );  \
     unreachable();                                          \
 } while ( false )
 
