@@ -287,7 +287,6 @@ void pv_emulate_gate_op(struct cpu_user_regs *regs)
     {
         unsigned int ss, esp, *stkp;
         uint32_t value;
-        int rc;
 #define push(item) do \
         { \
             value = (item); \
