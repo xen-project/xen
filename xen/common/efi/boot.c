@@ -547,6 +547,17 @@ static EFI_FILE_HANDLE __init get_parent_handle(const EFI_LOADED_IMAGE *loaded_i
     return dir_handle;
 }
 
+static void __init ensure_dir_handle(const EFI_LOADED_IMAGE *loaded_image,
+                                     EFI_FILE_HANDLE *dir_handle,
+                                     CHAR16 **file_name)
+{
+    if ( *dir_handle )
+        return;
+    *dir_handle = get_parent_handle(loaded_image, file_name);
+    if ( !*dir_handle )
+        blexit(L"Cannot load files without a usable file system");
+}
+
 static CHAR16 *__init point_tail(CHAR16 *fn)
 {
     CHAR16 *tail = NULL;
@@ -813,12 +824,12 @@ static bool __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
     if ( !name )
         PrintErrMesg(L"No filename", EFI_OUT_OF_RESOURCES);
 
+    if ( !dir_handle )
+        blexit(L"BUG: !dir_handle in read_file()");
+
     what = L"Open";
-    if ( dir_handle )
-        ret = dir_handle->Open(dir_handle, &FileHandle, name,
-                               EFI_FILE_MODE_READ, 0);
-    else
-        ret = EFI_NOT_FOUND;
+    ret = dir_handle->Open(dir_handle, &FileHandle, name,
+                           EFI_FILE_MODE_READ, 0);
     if ( file == &cfg && ret == EFI_NOT_FOUND )
         return false;
     if ( EFI_ERROR(ret) )
@@ -1514,7 +1525,7 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
 
     if ( use_cfg_file )
     {
-        EFI_FILE_HANDLE dir_handle;
+        EFI_FILE_HANDLE dir_handle = NULL;
         EFI_HANDLE gop_handle;
         UINTN depth, cols, rows;
 
@@ -1526,31 +1537,33 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
 
         gop = efi_get_gop(&gop_handle);
 
-        /* Get the file system interface. */
-        dir_handle = get_parent_handle(loaded_image, &file_name);
-
         /* Read and parse the config file. */
         if ( read_section(loaded_image, L"config", &cfg, NULL) )
             PrintStr(L"Using builtin config file\r\n");
-        else if ( !cfg_file_name && file_name )
+        else
         {
-            CHAR16 *tail;
+            ensure_dir_handle(loaded_image, &dir_handle, &file_name);
 
-            while ( (tail = point_tail(file_name)) != NULL )
+            if ( !cfg_file_name )
             {
-                wstrcpy(tail, L".cfg");
-                if ( read_file(dir_handle, file_name, &cfg, NULL) )
-                    break;
-                *tail = 0;
+                CHAR16 *tail;
+
+                while ( (tail = point_tail(file_name)) != NULL )
+                {
+                    wstrcpy(tail, L".cfg");
+                    if ( read_file(dir_handle, file_name, &cfg, NULL) )
+                        break;
+                    *tail = 0;
+                }
+                if ( !tail )
+                    blexit(L"No configuration file found.");
+                PrintStr(L"Using configuration file '");
+                PrintStr(file_name);
+                PrintStr(L"'\r\n");
             }
-            if ( !tail )
-                blexit(L"No configuration file found.");
-            PrintStr(L"Using configuration file '");
-            PrintStr(file_name);
-            PrintStr(L"'\r\n");
+            else if ( !read_file(dir_handle, cfg_file_name, &cfg, NULL) )
+                blexit(L"Configuration file not found.");
         }
-        else if ( !read_file(dir_handle, cfg_file_name, &cfg, NULL) )
-            blexit(L"Configuration file not found.");
         pre_parse(&cfg);
 
         if ( section.w )
@@ -1567,6 +1580,7 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
             if ( !name.s )
                 break;
             free_cfg();
+            ensure_dir_handle(loaded_image, &dir_handle, &file_name);
             if ( !read_file(dir_handle, s2w(&name), &cfg, NULL) )
             {
                 PrintStr(L"Chained configuration file '");
@@ -1578,13 +1592,14 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
             efi_bs->FreePool(name.w);
         }
 
-        efi_arch_cfg_file_early(loaded_image, dir_handle, section.s);
+        efi_arch_cfg_file_early(loaded_image, &dir_handle, section.s);
 
         option_str = name.s ? split_string(name.s) : NULL;
 
         if ( !read_section(loaded_image, L"kernel", &kernel, option_str) &&
              name.s )
         {
+            ensure_dir_handle(loaded_image, &dir_handle, &file_name);
             read_file(dir_handle, s2w(&name), &kernel, option_str);
             efi_bs->FreePool(name.w);
         }
@@ -1599,6 +1614,7 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
             name.s = get_value(&cfg, section.s, "ramdisk");
             if ( name.s )
             {
+                ensure_dir_handle(loaded_image, &dir_handle, &file_name);
                 read_file(dir_handle, s2w(&name), &ramdisk, NULL);
                 efi_bs->FreePool(name.w);
             }
@@ -1609,6 +1625,7 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
             name.s = get_value(&cfg, section.s, "xsm");
             if ( name.s )
             {
+                ensure_dir_handle(loaded_image, &dir_handle, &file_name);
                 read_file(dir_handle, s2w(&name), &xsm, NULL);
                 efi_bs->FreePool(name.w);
             }
@@ -1634,7 +1651,7 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
             }
         }
 
-        efi_arch_cfg_file_late(loaded_image, dir_handle, section.s);
+        efi_arch_cfg_file_late(loaded_image, &dir_handle, section.s);
 
         free_cfg();
 

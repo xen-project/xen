@@ -403,7 +403,7 @@ static void __init noreturn efi_arch_post_exit_boot(void)
 }
 
 static void __init efi_arch_cfg_file_early(const EFI_LOADED_IMAGE *image,
-                                           EFI_FILE_HANDLE dir_handle,
+                                           EFI_FILE_HANDLE *dir_handle,
                                            const char *section)
 {
     union string name;
@@ -419,8 +419,11 @@ static void __init efi_arch_cfg_file_early(const EFI_LOADED_IMAGE *image,
         name.s = get_value(&cfg, section, "dtb");
         if ( name.s )
         {
+            CHAR16 *fname;
+
             split_string(name.s);
-            read_file(dir_handle, s2w(&name), &dtbfile, NULL);
+            ensure_dir_handle(image, dir_handle, &fname);
+            read_file(*dir_handle, s2w(&name), &dtbfile, NULL);
             efi_bs->FreePool(name.w);
         }
     }
@@ -430,7 +433,7 @@ static void __init efi_arch_cfg_file_early(const EFI_LOADED_IMAGE *image,
 }
 
 static void __init efi_arch_cfg_file_late(const EFI_LOADED_IMAGE *image,
-                                          EFI_FILE_HANDLE dir_handle,
+                                          EFI_FILE_HANDLE *dir_handle,
                                           const char *section)
 {
 }
@@ -665,8 +668,7 @@ static int __init allocate_module_file(const EFI_LOADED_IMAGE *loaded_image,
     file_info->name_len = name_len;
 
     /* Get the file system interface. */
-    if ( !*dir_handle )
-        *dir_handle = get_parent_handle(loaded_image, &fname);
+    ensure_dir_handle(loaded_image, dir_handle, &fname);
 
     /* Load the binary in memory */
     read_file(*dir_handle, s2w(&module_name), &module_binary, NULL);
