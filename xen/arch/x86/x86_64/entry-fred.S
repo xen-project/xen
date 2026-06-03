@@ -4,6 +4,7 @@
 
 #include <asm/asm_defns.h>
 #include <asm/page.h>
+#include <asm/processor.h>
 
         .section .text.entry, "ax", @progbits
 
@@ -26,7 +27,16 @@ FUNC(entry_FRED_R3, 4096)
 END(entry_FRED_R3)
 
 FUNC(eretu_exit_to_guest)
-        POP_GPRS
+        /*
+         * PV guests aren't aware of FRED.  If Xen in IDT mode would have used
+         * a SYSRET instruction, preserve the legacy behaviour for %rcx/%r11
+         */
+        testb   $TRAP_syscall >> 8, UREGS_entry_vector + 1(%rsp)
+
+        POP_GPRS /* Preserves flags */
+
+        cmovnz  EFRAME_rip(%rsp), %rcx
+        cmovnz  EFRAME_eflags(%rsp), %r11
 
         /*
          * Exceptions here are handled by redirecting either to
