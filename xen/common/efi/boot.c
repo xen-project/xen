@@ -849,7 +849,8 @@ static bool __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
     if ( !name )
         PrintErrMesg(L"No filename", EFI_OUT_OF_RESOURCES);
 
-    BUG_ON(!dir_handle);
+    if ( !dir_handle )
+        blexit(L"BUG: !dir_handle in read_file()");
 
     what = L"Open";
     ret = dir_handle->Open(dir_handle, &FileHandle, name,
