@@ -13,6 +13,7 @@
  */
 
 #include <xen/acpi.h>
+#include <xen/dmi.h>
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/param.h>
@@ -369,11 +370,14 @@ static bool __init pci_mmcfg_reject_broken(void)
     typeof(pci_mmcfg_config[0]) *cfg;
     int i;
     bool valid = true;
+    int year;
 
     if ((pci_mmcfg_config_num == 0) ||
         (pci_mmcfg_config == NULL) ||
         (pci_mmcfg_config[0].address == 0))
         return 0;
+
+    dmi_get_date(DMI_BIOS_DATE, &year, NULL, NULL);
 
     for (i = 0; i < pci_mmcfg_config_num; i++) {
         u64 addr, size;
@@ -390,7 +394,13 @@ static bool __init pci_mmcfg_reject_broken(void)
                (unsigned int)cfg->start_bus_number,
                (unsigned int)cfg->end_bus_number);
 
-        if ( !is_mmconf_reserved(addr, size, i, cfg) ||
+        /*
+         * For firmwares prior to 2016, confirm that MMCFG is marked as
+         * reserved.  For 2016 and later, also allow MMCFG being in a hole.
+         */
+        if ( ((year < 2016 || !is_memory_hole(maddr_to_mfn(addr),
+                                              maddr_to_mfn(addr + size - 1))) &&
+              !is_mmconf_reserved(addr, size, i, cfg)) ||
              pci_mmcfg_arch_enable(i) < 0 )
         {
             pci_mmcfg_arch_disable(i);
