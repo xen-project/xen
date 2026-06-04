@@ -169,7 +169,6 @@ struct xsm_ops {
 
 #ifdef CONFIG_X86
     int (*do_mca)(void);
-    int (*shadow_control)(struct domain *d, uint32_t op);
     int (*mem_sharing_op)(struct domain *d, struct domain *cd, int op);
     int (*apic)(struct domain *d, int cmd);
     int (*machine_memory_map)(void);
@@ -655,12 +654,6 @@ static inline int xsm_platform_op(xsm_default_t def, uint32_t op)
 static inline int xsm_do_mca(xsm_default_t def)
 {
     return alternative_call(xsm_ops.do_mca);
-}
-
-static inline int xsm_shadow_control(
-    xsm_default_t def, struct domain *d, uint32_t op)
-{
-    return alternative_call(xsm_ops.shadow_control, d, op);
 }
 
 static inline int xsm_mem_sharing_op(
