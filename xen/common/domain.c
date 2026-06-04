@@ -218,12 +218,8 @@ int get_domain_state(struct xen_domctl_get_domain_state *info, struct domain *d,
     if ( info->pad0 )
         return -EINVAL;
 
-    if ( d )
+    if ( d != dom_xen )
     {
-        rc = xsm_get_domain_state(XSM_XS_PRIV, d);
-        if ( rc )
-            return rc;
-
         set_domain_state_info(info, d);
 
         return 0;

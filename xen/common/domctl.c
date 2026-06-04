@@ -304,10 +304,16 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         fallthrough;
     case XEN_DOMCTL_test_assign_device:
     case XEN_DOMCTL_vm_event_op:
-    case XEN_DOMCTL_get_domain_state:
         if ( op->domain == DOMID_INVALID )
         {
             d = NULL;
+            break;
+        }
+        fallthrough;
+    case XEN_DOMCTL_get_domain_state:
+        if ( op->domain == DOMID_INVALID )
+        {
+            d = dom_xen;
             break;
         }
         fallthrough;
@@ -868,7 +874,9 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         break;
 
     case XEN_DOMCTL_get_domain_state:
-        ret = get_domain_state(&op->u.get_domain_state, d, &op->domain);
+        ret = xsm_get_domain_state(XSM_XS_PRIV, d);
+        if ( !ret )
+            ret = get_domain_state(&op->u.get_domain_state, d, &op->domain);
         if ( !ret )
             copyback = true;
         break;
@@ -881,7 +889,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     domctl_lock_release();
 
  domctl_out_unlock_domonly:
-    if ( d && d != dom_io )
+    if ( d && !is_system_domain(d) )
         rcu_unlock_domain(d);
 
     if ( copyback && __copy_to_guest(u_domctl, op, 1) )
