@@ -276,10 +276,13 @@ long arch_do_domctl(
             break;
         }
 
+        ret = xsm_irq_permission(XSM_PRIV, d, irq, flags);
+        if ( ret )
+            break;
+
         iocaps_double_lock(d, true);
 
-        if ( !irq_access_permitted(currd, irq) ||
-             xsm_irq_permission(XSM_HOOK, d, irq, flags) )
+        if ( !irq_access_permitted(currd, irq) )
             ret = -EPERM;
         else if ( flags )
             ret = irq_permit_access(d, irq);
