@@ -496,6 +496,23 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     }
 #endif
 
+    case XEN_DOMCTL_vm_event_op:
+        if ( op->u.vm_event_op.op == XEN_VM_EVENT_GET_VERSION )
+        {
+            /* No XSM check (and potentially d == NULL) here. */
+            ret = vm_event_domctl(d, &op->u.vm_event_op);
+            if ( !ret )
+                copyback = true;
+            goto domctl_out_unlock_domonly;
+        }
+        if ( !d )
+        {
+            ret = -ESRCH;
+            goto domctl_out_unlock_domonly;
+        }
+        /* Other sub-ops handled further down. */
+        break;
+
     case XEN_DOMCTL_ioport_permission:
     case XEN_DOMCTL_ioport_mapping:
     case XEN_DOMCTL_gsi_permission:
