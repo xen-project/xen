@@ -56,7 +56,6 @@ struct xsm_ops {
                                 struct xen_domctl_getdomaininfo *info);
     int (*domain_create)(struct domain *d, uint32_t ssidref);
     int (*getdomaininfo)(struct domain *d);
-    int (*domctl_scheduler_op)(struct domain *d, int op);
 #ifdef CONFIG_SYSCTL
     int (*sysctl_scheduler_op)(int op);
 #endif
@@ -236,12 +235,6 @@ static inline int xsm_getdomaininfo(xsm_default_t def, struct domain *d)
 static inline int xsm_get_domain_state(xsm_default_t def, struct domain *d)
 {
     return alternative_call(xsm_ops.get_domain_state, d);
-}
-
-static inline int xsm_domctl_scheduler_op(
-    xsm_default_t def, struct domain *d, int cmd)
-{
-    return alternative_call(xsm_ops.domctl_scheduler_op, d, cmd);
 }
 
 #ifdef CONFIG_SYSCTL
