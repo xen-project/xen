@@ -367,6 +367,34 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
         goto domctl_out_unlock_domonly;
 
+    case XEN_DOMCTL_iomem_permission:
+    {
+        unsigned long mfn = op->u.iomem_permission.first_mfn;
+        unsigned long nr_mfns = op->u.iomem_permission.nr_mfns;
+        bool allow = op->u.iomem_permission.allow_access;
+
+        ret = -EINVAL;
+        if ( (mfn + nr_mfns - 1) < mfn ) /* Wrap? */
+            goto domctl_out_unlock_domonly;
+
+        ret = xsm_iomem_permission(XSM_PRIV, d, mfn, mfn + nr_mfns - 1, allow);
+        if ( ret )
+            goto domctl_out_unlock_domonly;
+
+        iocaps_double_lock(d, true);
+
+        if ( !iomem_access_permitted(current->domain,
+                                     mfn, mfn + nr_mfns - 1) )
+            ret = -EPERM;
+        else if ( allow )
+            ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
+        else
+            ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
+
+        iocaps_double_unlock(d, true);
+        goto domctl_out_unlock_domonly;
+    }
+
     case XEN_DOMCTL_memory_mapping:
     {
         unsigned long gfn = op->u.memory_mapping.first_gfn;
@@ -427,6 +455,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         goto domctl_out_unlock_domonly;
     }
 
+    case XEN_DOMCTL_ioport_permission:
     case XEN_DOMCTL_ioport_mapping:
     case XEN_DOMCTL_bind_pt_irq:
     case XEN_DOMCTL_unbind_pt_irq:
@@ -785,31 +814,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         break;
     }
 #endif
-
-    case XEN_DOMCTL_iomem_permission:
-    {
-        unsigned long mfn = op->u.iomem_permission.first_mfn;
-        unsigned long nr_mfns = op->u.iomem_permission.nr_mfns;
-        int allow = op->u.iomem_permission.allow_access;
-
-        ret = -EINVAL;
-        if ( (mfn + nr_mfns - 1) < mfn ) /* wrap? */
-            break;
-
-        iocaps_double_lock(d, true);
-
-        if ( !iomem_access_permitted(current->domain,
-                                     mfn, mfn + nr_mfns - 1) ||
-             xsm_iomem_permission(XSM_HOOK, d, mfn, mfn + nr_mfns - 1, allow) )
-            ret = -EPERM;
-        else if ( allow )
-            ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
-        else
-            ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
-
-        iocaps_double_unlock(d, true);
-        break;
-    }
 
     case XEN_DOMCTL_settimeoffset:
         domain_set_time_offset(d, op->u.settimeoffset.time_offset_seconds);
