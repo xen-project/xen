@@ -2144,9 +2144,12 @@ void __hwdom_init setup_io_bitmap(struct domain *d)
         return;
 
     bitmap_fill(d->arch.hvm.io_bitmap, 0x10000);
+
+    read_lock(&d->caps_lock);
     if ( rangeset_report_ranges(d->arch.ioport_caps, 0, 0x10000,
                                 io_bitmap_cb, d) )
         BUG();
+    read_unlock(&d->caps_lock);
 
     /*
      * We need to trap 4-byte accesses to 0xcf8 (see admin_io_okay(),
