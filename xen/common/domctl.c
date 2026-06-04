@@ -556,7 +556,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( d == NULL )
             goto getdomaininfo_out;
 
-        ret = xsm_getdomaininfo(XSM_HOOK, d);
+        ret = xsm_getdomaininfo(XSM_XS_PRIV, d);
         if ( ret )
             goto getdomaininfo_out;
 
