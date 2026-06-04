@@ -16,6 +16,7 @@
 #include <xen/radix-tree.h>
 #include <xen/multicall.h>
 #include <xen/nospec.h>
+#include <xen/seqcount.h>
 #include <xen/tasklet.h>
 #include <xen/mm.h>
 #include <xen/smp.h>
@@ -192,7 +193,6 @@ struct vcpu
 
     struct sched_unit *sched_unit;
 
-    struct vcpu_runstate_info runstate;
 #ifndef CONFIG_COMPAT
 # define runstate_guest(v) ((v)->runstate_guest)
     XEN_GUEST_HANDLE(vcpu_runstate_info_t) runstate_guest; /* guest address */
@@ -204,6 +204,8 @@ struct vcpu
     } runstate_guest; /* guest address */
 #endif
     struct guest_area runstate_guest_area;
+    struct vcpu_runstate_info runstate;
+    struct seqcount  runstate_seq;
     unsigned int     new_state;
 
     /* Has the FPU been initialised? */

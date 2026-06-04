@@ -281,13 +281,18 @@ static inline void vcpu_runstate_change(
     }
 
     delta = new_entry_time - v->runstate.state_entry_time;
-    if ( delta > 0 )
-    {
-        v->runstate.time[v->runstate.state] += delta;
-        v->runstate.state_entry_time = new_entry_time;
-    }
 
-    v->runstate.state = new_state;
+    /* Serialization: ->schedule_lock (see ASSERT() above). */
+    with_seq_write(&v->runstate_seq)
+    {
+        if ( delta > 0 )
+        {
+            v->runstate.time[v->runstate.state] += delta;
+            v->runstate.state_entry_time = new_entry_time;
+        }
+
+        v->runstate.state = new_state;
+    }
 }
 
 void sched_guest_idle(void (*idle) (void), unsigned int cpu)
@@ -307,30 +312,18 @@ void sched_guest_idle(void (*idle) (void), unsigned int cpu)
 void vcpu_runstate_get(const struct vcpu *v,
                        struct vcpu_runstate_info *runstate)
 {
-    spinlock_t *lock;
-    s_time_t delta;
-    struct sched_unit *unit;
+    struct seqcount seq = SEQCNT_ZERO();
+    const struct seqcount *s = likely(v == current) ? &seq : &v->runstate_seq;
 
-    rcu_read_lock(&sched_res_rculock);
+    until_seq_read(s)
+    {
+        s_time_t delta;
 
-    /*
-     * Be careful in case of an idle vcpu: the assignment to a unit might
-     * change even with the scheduling lock held, so be sure to use the
-     * correct unit for locking in order to avoid triggering an ASSERT() in
-     * the unlock function.
-     */
-    unit = is_idle_vcpu(v) ? get_sched_res(v->processor)->sched_unit_idle
-                           : v->sched_unit;
-    lock = likely(v == current) ? NULL : unit_schedule_lock_irq(unit);
-    memcpy(runstate, &v->runstate, sizeof(*runstate));
-    delta = NOW() - runstate->state_entry_time;
-    if ( delta > 0 )
-        runstate->time[runstate->state] += delta;
-
-    if ( unlikely(lock != NULL) )
-        unit_schedule_unlock_irq(lock, unit);
-
-    rcu_read_unlock(&sched_res_rculock);
+        *runstate = v->runstate;
+        delta = NOW() - runstate->state_entry_time;
+        if ( delta > 0 )
+            runstate->time[runstate->state] += delta;
+    }
 }
 
 uint64_t get_cpu_idle_time(unsigned int cpu)
