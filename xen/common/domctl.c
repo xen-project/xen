@@ -318,6 +318,56 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             return -ESRCH;
     }
 
+    /* Handle sub-ops not requiring the domctl lock. */
+    switch ( op->cmd )
+    {
+    case XEN_DOMCTL_getdomaininfo:
+    {
+        domid_t dom = DOMID_INVALID;
+
+        if ( !d )
+        {
+            ret = -EINVAL;
+            if ( op->domain >= DOMID_FIRST_RESERVED )
+                goto domctl_out_unlock_domonly;
+
+            rcu_read_lock(&domlist_read_lock);
+
+            dom = op->domain;
+            for_each_domain ( d )
+                if ( d->domain_id >= dom )
+                    break;
+        }
+
+        ret = -ESRCH;
+        if ( !d )
+            goto getdomaininfo_out;
+
+        ret = xsm_getdomaininfo(XSM_XS_PRIV, d);
+        if ( !ret )
+        {
+            getdomaininfo(d, &op->u.getdomaininfo);
+
+            op->domain = op->u.getdomaininfo.domain;
+            copyback = true;
+
+    getdomaininfo_out:
+            /* When d was non-NULL upon entry, no cleanup is needed. */
+            if ( dom == DOMID_INVALID )
+                goto domctl_out_unlock_domonly;
+
+            rcu_read_unlock(&domlist_read_lock);
+            d = NULL;
+        }
+
+        goto domctl_out_unlock_domonly;
+    }
+
+    default:
+        /* Everything else handled further down. */
+        break;
+    }
+
     ret = xsm_domctl(XSM_OTHER, d, op->cmd,
                      /* SSIDRef only applicable for cmd == createdomain */
                      op->u.createdomain.ssidref);
@@ -533,47 +583,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         ret = sched_adjust(d, &op->u.scheduler_op);
         copyback = 1;
         break;
-
-    case XEN_DOMCTL_getdomaininfo:
-    {
-        domid_t dom = DOMID_INVALID;
-
-        if ( !d )
-        {
-            ret = -EINVAL;
-            if ( op->domain >= DOMID_FIRST_RESERVED )
-                break;
-
-            rcu_read_lock(&domlist_read_lock);
-
-            dom = op->domain;
-            for_each_domain ( d )
-                if ( d->domain_id >= dom )
-                    break;
-        }
-
-        ret = -ESRCH;
-        if ( d == NULL )
-            goto getdomaininfo_out;
-
-        ret = xsm_getdomaininfo(XSM_XS_PRIV, d);
-        if ( ret )
-            goto getdomaininfo_out;
-
-        getdomaininfo(d, &op->u.getdomaininfo);
-
-        op->domain = op->u.getdomaininfo.domain;
-        copyback = 1;
-
-    getdomaininfo_out:
-        /* When d was non-NULL upon entry, no cleanup is needed. */
-        if ( dom == DOMID_INVALID )
-            break;
-
-        rcu_read_unlock(&domlist_read_lock);
-        d = NULL;
-        break;
-    }
 
     case XEN_DOMCTL_getvcpucontext:
     {
