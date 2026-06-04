@@ -156,8 +156,6 @@ struct xsm_ops {
     int (*get_vnumainfo)(struct domain *d);
 
 #ifdef CONFIG_VM_EVENT
-    int (*vm_event_control)(struct domain *d, int mode, int op);
-
     int (*mem_access)(struct domain *d);
 #endif
 
@@ -651,12 +649,6 @@ static inline int xsm_get_vnumainfo(xsm_default_t def, struct domain *d)
 }
 
 #ifdef CONFIG_VM_EVENT
-static inline int xsm_vm_event_control(
-    xsm_default_t def, struct domain *d, int mode, int op)
-{
-    return alternative_call(xsm_ops.vm_event_control, d, mode, op);
-}
-
 static inline int xsm_mem_access(xsm_default_t def, struct domain *d)
 {
     return alternative_call(xsm_ops.mem_access, d);

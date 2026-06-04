@@ -115,8 +115,6 @@ static const struct xsm_ops __initconst_cf_clobber dummy_ops = {
     .map_gmfn_foreign              = xsm_map_gmfn_foreign,
 
 #ifdef CONFIG_VM_EVENT
-    .vm_event_control              = xsm_vm_event_control,
-
     .mem_access                    = xsm_mem_access,
 #endif
 
