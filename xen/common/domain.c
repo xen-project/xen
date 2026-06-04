@@ -332,10 +332,15 @@ static int late_hwdom_init(struct domain *d)
      * may be modified after this hypercall returns if a more complex
      * device model is desired.
      */
+    write_lock(&dom0->caps_lock);
     rangeset_swap(d->irq_caps, dom0->irq_caps);
     rangeset_swap(d->iomem_caps, dom0->iomem_caps);
 #ifdef CONFIG_X86
     rangeset_swap(d->arch.ioport_caps, dom0->arch.ioport_caps);
+#endif
+    write_unlock(&dom0->caps_lock);
+
+#ifdef CONFIG_X86
     setup_io_bitmap(d);
     setup_io_bitmap(dom0);
 #endif
@@ -602,6 +607,7 @@ struct domain *domain_create(domid_t domid,
     spin_lock_init_prof(d, domain_lock);
     spin_lock_init_prof(d, page_alloc_lock);
     spin_lock_init(&d->hypercall_deadlock_mutex);
+    rwlock_init(&d->caps_lock);
     INIT_PAGE_LIST_HEAD(&d->page_list);
     INIT_PAGE_LIST_HEAD(&d->extra_page_list);
     INIT_PAGE_LIST_HEAD(&d->xenpage_list);
