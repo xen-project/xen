@@ -682,6 +682,7 @@ static int cf_check flask_domctl(struct domain *d, struct xen_domctl *op)
     /* These have individual XSM hooks and don't make it here. */
     case XEN_DOMCTL_bind_pt_irq:
     case XEN_DOMCTL_getdomaininfo:
+    case XEN_DOMCTL_get_device_group:
     case XEN_DOMCTL_iomem_permission:
     case XEN_DOMCTL_ioport_mapping:
     case XEN_DOMCTL_ioport_permission:
@@ -699,7 +700,6 @@ static int cf_check flask_domctl(struct domain *d, struct xen_domctl *op)
      * These have individual XSM hooks
      * (drivers/passthrough/{pci,device_tree.c)
      */
-    case XEN_DOMCTL_get_device_group:
     case XEN_DOMCTL_test_assign_device:
     case XEN_DOMCTL_assign_device:
     case XEN_DOMCTL_deassign_device:
