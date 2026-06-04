@@ -596,6 +596,7 @@ int hvm_domain_initialise(struct domain *d,
     spin_lock_init(&d->arch.hvm.irq_lock);
     spin_lock_init(&d->arch.hvm.uc_lock);
     spin_lock_init(&d->arch.hvm.write_map.lock);
+    rwlock_init(&d->arch.hvm.g2m_ioport_lock);
     rwlock_init(&d->arch.hvm.mmcfg_lock);
     INIT_LIST_HEAD(&d->arch.hvm.write_map.list);
     INIT_LIST_HEAD(&d->arch.hvm.g2m_ioport_list);
