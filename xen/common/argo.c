@@ -322,7 +322,7 @@ static DEFINE_RWLOCK(L1_global_argo_rwlock); /* L1 */
 #define argo_dprintk(fmt, args...)                      \
     do {                                                \
         if ( ARGO_DEBUG )                               \
-            printk(XENLOG_DEBUG "argo: " fmt, ##args);  \
+            gprintk(XENLOG_DEBUG, "argo: " fmt, ##args);\
     } while ( 0 )
 
 /*
