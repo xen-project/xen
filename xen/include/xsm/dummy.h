@@ -168,13 +168,11 @@ static XSM_INLINE int cf_check xsm_domctl(
     switch ( cmd )
     {
     case XEN_DOMCTL_bind_pt_irq:
-    case XEN_DOMCTL_unbind_pt_irq:
-        return xsm_default_action(XSM_DM_PRIV, current->domain, d);
-
     case XEN_DOMCTL_getdomaininfo:
     case XEN_DOMCTL_get_domain_state:
     case XEN_DOMCTL_ioport_mapping:
     case XEN_DOMCTL_memory_mapping:
+    case XEN_DOMCTL_unbind_pt_irq:
         ASSERT_UNREACHABLE();
         return -EILSEQ;
 
@@ -541,14 +539,14 @@ static XSM_INLINE int cf_check xsm_unmap_domain_pirq(
 static XSM_INLINE int cf_check xsm_bind_pt_irq(
     XSM_DEFAULT_ARG struct domain *d, struct xen_domctl_bind_pt_irq *bind)
 {
-    XSM_ASSERT_ACTION(XSM_HOOK);
+    XSM_ASSERT_ACTION(XSM_DM_PRIV);
     return xsm_default_action(action, current->domain, d);
 }
 
 static XSM_INLINE int cf_check xsm_unbind_pt_irq(
     XSM_DEFAULT_ARG struct domain *d, struct xen_domctl_bind_pt_irq *bind)
 {
-    XSM_ASSERT_ACTION(XSM_HOOK);
+    XSM_ASSERT_ACTION(XSM_DM_PRIV);
     return xsm_default_action(action, current->domain, d);
 }
 
