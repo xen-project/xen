@@ -1950,6 +1950,7 @@ static const struct xsm_ops __initconst_cf_clobber flask_ops = {
     .irq_permission = flask_irq_permission,
     .iomem_permission = flask_iomem_permission,
     .iomem_mapping = flask_iomem_mapping,
+    .iomem_mapping_vpci = flask_iomem_mapping,
     .pci_config_permission = flask_pci_config_permission,
 
     .resource_plug_core = flask_resource_plug_core,
