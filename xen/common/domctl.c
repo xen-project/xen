@@ -339,6 +339,14 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
         goto domctl_out_unlock_domonly;
 
+    case XEN_DOMCTL_get_domain_state:
+        ret = xsm_get_domain_state(XSM_XS_PRIV, d);
+        if ( !ret )
+            ret = get_domain_state(&op->u.get_domain_state, d, &op->domain);
+        if ( !ret )
+            copyback = true;
+        goto domctl_out_unlock_domonly;
+
     default:
         /* Everything else handled further down. */
         break;
@@ -871,14 +879,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             ret = domain_set_llc_colors(d, &op->u.set_llc_colors);
         else
             ret = -EOPNOTSUPP;
-        break;
-
-    case XEN_DOMCTL_get_domain_state:
-        ret = xsm_get_domain_state(XSM_XS_PRIV, d);
-        if ( !ret )
-            ret = get_domain_state(&op->u.get_domain_state, d, &op->domain);
-        if ( !ret )
-            copyback = true;
         break;
 
     default:
