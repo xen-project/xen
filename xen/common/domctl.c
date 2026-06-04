@@ -427,6 +427,10 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         goto domctl_out_unlock_domonly;
     }
 
+    case XEN_DOMCTL_ioport_mapping:
+        ret = arch_do_domctl(op, d, u_domctl);
+        goto domctl_out_unlock_domonly;
+
     default:
         /* Everything else handled further down. */
         break;
