@@ -61,7 +61,7 @@ struct xsm_ops {
     int (*sysctl_scheduler_op)(int op);
 #endif
     int (*set_target)(struct domain *d, struct domain *e);
-    int (*domctl)(struct domain *d, unsigned int cmd, uint32_t ssidref);
+    int (*domctl)(struct domain *d, struct xen_domctl *op);
     int (*sysctl)(int cmd);
     int (*readconsole)(uint32_t clear);
 
@@ -258,9 +258,9 @@ static inline int xsm_set_target(
 }
 
 static inline int xsm_domctl(xsm_default_t def, struct domain *d,
-                             unsigned int cmd, uint32_t ssidref)
+                             struct xen_domctl *op)
 {
-    return alternative_call(xsm_ops.domctl, d, cmd, ssidref);
+    return alternative_call(xsm_ops.domctl, d, op);
 }
 
 static inline int xsm_sysctl(xsm_default_t def, int cmd)
