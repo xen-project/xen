@@ -677,10 +677,6 @@ int paging_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
         return -EBUSY;
     }
 
-    rc = xsm_shadow_control(XSM_HOOK, d, sc->op);
-    if ( rc )
-        return rc;
-
     /* Code to handle log-dirty. Note that some log dirty operations
      * piggy-back on shadow operations. For example, when
      * XEN_DOMCTL_SHADOW_OP_OFF is called, it first checks whether log dirty
