@@ -700,6 +700,9 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             ret = -EINVAL;
             break;
         }
+
+        iocaps_double_lock(d, true);
+
         irq = pirq_access_permitted(current->domain, pirq);
         if ( !irq || xsm_irq_permission(XSM_HOOK, d, irq, allow) )
             ret = -EPERM;
@@ -707,6 +710,8 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             ret = irq_permit_access(d, irq);
         else
             ret = irq_deny_access(d, irq);
+
+        iocaps_double_unlock(d, true);
         break;
     }
 #endif
