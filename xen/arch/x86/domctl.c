@@ -539,20 +539,27 @@ long arch_do_domctl(
             break;
 
         irq = domain_pirq_to_irq(d, bind->machine_irq);
-        ret = -EPERM;
-        if ( irq <= 0 || !irq_access_permitted(currd, irq) )
-            break;
+        if ( irq <= 0 )
+            ret = -EPERM;
 
-        ret = -ESRCH;
-        if ( is_iommu_enabled(d) )
+        read_lock(&currd->caps_lock);
+
+        if ( !irq_access_permitted(currd, irq) )
+            ret = -EPERM;
+        else if ( is_iommu_enabled(d) )
         {
             pcidevs_lock();
             ret = pt_irq_create_bind(d, bind);
             pcidevs_unlock();
+
+            if ( ret < 0 )
+                printk(XENLOG_G_ERR "pt_irq_create_bind failed (%ld) for %pd\n",
+                       ret, d);
         }
-        if ( ret < 0 )
-            printk(XENLOG_G_ERR "pt_irq_create_bind failed (%ld) for dom%d\n",
-                   ret, d->domain_id);
+        else
+            ret = -ESRCH;
+
+        read_unlock(&currd->caps_lock);
         break;
     }
 
@@ -565,23 +572,26 @@ long arch_do_domctl(
         if ( !is_hvm_domain(d) )
             break;
 
-        ret = -EPERM;
-        if ( irq <= 0 || !irq_access_permitted(currd, irq) )
-            break;
-
         ret = xsm_unbind_pt_irq(XSM_HOOK, d, bind);
         if ( ret )
             break;
 
-        if ( is_iommu_enabled(d) )
+        read_lock(&currd->caps_lock);
+
+        if ( !irq_access_permitted(currd, irq) )
+            ret = -EPERM;
+        else if ( is_iommu_enabled(d) )
         {
             pcidevs_lock();
             ret = pt_irq_destroy_bind(d, bind);
             pcidevs_unlock();
+
+            if ( ret < 0 )
+                printk(XENLOG_G_ERR "pt_irq_destroy_bind failed (%ld) for %pd\n",
+                       ret, d);
         }
-        if ( ret < 0 )
-            printk(XENLOG_G_ERR "pt_irq_destroy_bind failed (%ld) for dom%d\n",
-                   ret, d->domain_id);
+
+        read_unlock(&currd->caps_lock);
         break;
     }
 
