@@ -30,15 +30,10 @@
 
 int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
 {
-    int rc;
     bool requested_status = false;
 
     if ( unlikely(current->domain == d) ) /* no domain_pause() */
         return -EPERM;
-
-    rc = xsm_vm_event_control(XSM_PRIV, d, mop->op, mop->event);
-    if ( unlikely(rc) )
-        return rc;
 
     switch ( mop->op )
     {
