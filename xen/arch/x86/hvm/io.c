@@ -144,36 +144,56 @@ bool handle_pio(uint16_t port, unsigned int size, int dir)
     return true;
 }
 
-static bool cf_check g2m_portio_accept(
-    const struct hvm_io_handler *handler, const ioreq_t *p)
+/* NB: Returns with the lock held in the success case. */
+static const struct g2m_ioport *g2m_portio_find_and_lock(struct hvm_domain *hvm,
+                                                         uint64_t addr,
+                                                         uint32_t size)
 {
-    struct vcpu *curr = current;
-    const struct hvm_domain *hvm = &curr->domain->arch.hvm;
-    struct hvm_vcpu_io *hvio = &curr->arch.hvm.hvm_io;
-    struct g2m_ioport *g2m_ioport;
-    unsigned int start, end;
+    const struct g2m_ioport *g2m_ioport;
+
+    read_lock(&hvm->g2m_ioport_lock);
 
     list_for_each_entry( g2m_ioport, &hvm->g2m_ioport_list, list )
     {
-        start = g2m_ioport->gport;
-        end = start + g2m_ioport->np;
-        if ( (p->addr >= start) && (p->addr + p->size <= end) )
-        {
-            hvio->g2m_ioport = g2m_ioport;
-            return 1;
-        }
+        unsigned int start = g2m_ioport->gport;
+
+        if ( addr >= start && addr + size <= start + g2m_ioport->np )
+            return g2m_ioport;
     }
 
-    return 0;
+    read_unlock(&hvm->g2m_ioport_lock);
+
+    return NULL;
+}
+
+static bool cf_check g2m_portio_accept(
+    const struct hvm_io_handler *handler, const ioreq_t *p)
+{
+    struct hvm_domain *hvm = &current->domain->arch.hvm;
+    const struct g2m_ioport *g2m_ioport =
+        g2m_portio_find_and_lock(hvm, p->addr, p->size);
+
+    if ( !g2m_ioport )
+        return false;
+
+    read_unlock(&hvm->g2m_ioport_lock);
+
+    return true;
 }
 
 static int cf_check g2m_portio_read(
     const struct hvm_io_handler *handler, uint64_t addr, uint32_t size,
     uint64_t *data)
 {
-    struct hvm_vcpu_io *hvio = &current->arch.hvm.hvm_io;
-    const struct g2m_ioport *g2m_ioport = hvio->g2m_ioport;
-    unsigned int mport = (addr - g2m_ioport->gport) + g2m_ioport->mport;
+    struct hvm_domain *hvm = &current->domain->arch.hvm;
+    const struct g2m_ioport *g2m_ioport =
+        g2m_portio_find_and_lock(hvm, addr, size);
+    unsigned int mport;
+
+    if ( !g2m_ioport )
+        return X86EMUL_RETRY;
+
+    mport = addr - g2m_ioport->gport + g2m_ioport->mport;
 
     switch ( size )
     {
@@ -190,6 +210,8 @@ static int cf_check g2m_portio_read(
         BUG();
     }
 
+    read_unlock(&hvm->g2m_ioport_lock);
+
     return X86EMUL_OKAY;
 }
 
@@ -197,9 +219,15 @@ static int cf_check g2m_portio_write(
     const struct hvm_io_handler *handler, uint64_t addr, uint32_t size,
     uint64_t data)
 {
-    struct hvm_vcpu_io *hvio = &current->arch.hvm.hvm_io;
-    const struct g2m_ioport *g2m_ioport = hvio->g2m_ioport;
-    unsigned int mport = (addr - g2m_ioport->gport) + g2m_ioport->mport;
+    struct hvm_domain *hvm = &current->domain->arch.hvm;
+    const struct g2m_ioport *g2m_ioport =
+        g2m_portio_find_and_lock(hvm, addr, size);
+    unsigned int mport;
+
+    if ( !g2m_ioport )
+        return X86EMUL_RETRY;
+
+    mport = addr - g2m_ioport->gport + g2m_ioport->mport;
 
     switch ( size )
     {
@@ -215,6 +243,8 @@ static int cf_check g2m_portio_write(
     default:
         BUG();
     }
+
+    read_unlock(&hvm->g2m_ioport_lock);
 
     return X86EMUL_OKAY;
 }
