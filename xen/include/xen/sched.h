@@ -536,6 +536,7 @@ struct domain
 #endif
 
     /* I/O capabilities (access to IRQs and memory-mapped I/O). */
+    rwlock_t         caps_lock;
     struct rangeset *iomem_caps;
     struct rangeset *irq_caps;
 

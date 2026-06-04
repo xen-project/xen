@@ -12,6 +12,9 @@
 #include <asm/iocap.h>
 #include <asm/p2m.h>
 
+void iocaps_double_lock(struct domain *d, bool write);
+void iocaps_double_unlock(struct domain *d, bool write);
+
 static inline int iomem_permit_access(struct domain *d, unsigned long s,
                                       unsigned long e)
 {

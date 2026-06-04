@@ -267,6 +267,35 @@ static struct vnuma_info *vnuma_init(const struct xen_domctl_vnuma *uinfo,
     return ERR_PTR(ret);
 }
 
+void iocaps_double_lock(struct domain *d, bool write)
+{
+    struct domain *currd = current->domain;
+
+    if ( d->domain_id > currd->domain_id )
+        read_lock(&currd->caps_lock);
+
+    if ( write )
+        write_lock(&d->caps_lock);
+    else
+        read_lock(&d->caps_lock);
+
+    if ( d->domain_id < currd->domain_id )
+        read_lock(&currd->caps_lock);
+}
+
+void iocaps_double_unlock(struct domain *d, bool write)
+{
+    struct domain *currd = current->domain;
+
+    if ( d != currd )
+        read_unlock(&currd->caps_lock);
+
+    if ( write )
+        write_unlock(&d->caps_lock);
+    else
+        read_unlock(&d->caps_lock);
+}
+
 static bool is_stable_domctl(uint32_t cmd)
 {
     return cmd == XEN_DOMCTL_get_domain_state;
@@ -687,6 +716,8 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( (mfn + nr_mfns - 1) < mfn ) /* wrap? */
             break;
 
+        iocaps_double_lock(d, true);
+
         if ( !iomem_access_permitted(current->domain,
                                      mfn, mfn + nr_mfns - 1) ||
              xsm_iomem_permission(XSM_HOOK, d, mfn, mfn + nr_mfns - 1, allow) )
@@ -695,6 +726,8 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
         else
             ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
+
+        iocaps_double_unlock(d, true);
         break;
     }
 
@@ -719,19 +752,15 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             break;
 #endif
 
+        iocaps_double_lock(d, false);
+
         ret = -EPERM;
         if ( !iomem_access_permitted(current->domain, mfn, mfn_end) ||
-             !iomem_access_permitted(d, mfn, mfn_end) )
-            break;
-
-        ret = xsm_iomem_mapping(XSM_HOOK, d, mfn, mfn_end, add);
-        if ( ret )
-            break;
-
-        if ( !paging_mode_translate(d) )
-            break;
-
-        if ( add )
+             !iomem_access_permitted(d, mfn, mfn_end) ||
+             (ret = xsm_iomem_mapping(XSM_HOOK, d, mfn, mfn_end, add)) ||
+             !paging_mode_translate(d) )
+            /* Nothing. */;
+        else if ( add )
         {
             printk(XENLOG_G_DEBUG
                    "memory_map:add: dom%d gfn=%lx mfn=%lx nr=%lx\n",
@@ -755,6 +784,8 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
                        "memory_map: error %ld removing dom%d access to [%lx,%lx]\n",
                        ret, d->domain_id, mfn, mfn_end);
         }
+
+        iocaps_double_unlock(d, false);
         break;
     }
 
