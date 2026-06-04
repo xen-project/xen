@@ -705,13 +705,10 @@ static int cf_check flask_domctl(struct domain *d, struct xen_domctl *op)
     case XEN_DOMCTL_ioport_permission:
     case XEN_DOMCTL_irq_permission:
     case XEN_DOMCTL_memory_mapping:
+    case XEN_DOMCTL_set_target:
     case XEN_DOMCTL_unbind_pt_irq:
         ASSERT_UNREACHABLE();
         return -EILSEQ;
-
-    /* These have individual XSM hooks (common/domctl.c) */
-    case XEN_DOMCTL_set_target:
-        return 0;
 
     case XEN_DOMCTL_destroydomain:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__DESTROY);

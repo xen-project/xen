@@ -150,7 +150,7 @@ static XSM_INLINE int cf_check xsm_sysctl_scheduler_op(XSM_DEFAULT_ARG int cmd)
 static XSM_INLINE int cf_check xsm_set_target(
     XSM_DEFAULT_ARG struct domain *d, struct domain *e)
 {
-    XSM_ASSERT_ACTION(XSM_HOOK);
+    XSM_ASSERT_ACTION(XSM_PRIV);
     return xsm_default_action(action, current->domain, NULL);
 }
 
@@ -170,6 +170,7 @@ static XSM_INLINE int cf_check xsm_domctl(
     case XEN_DOMCTL_ioport_permission:
     case XEN_DOMCTL_irq_permission:
     case XEN_DOMCTL_memory_mapping:
+    case XEN_DOMCTL_set_target:
     case XEN_DOMCTL_unbind_pt_irq:
         ASSERT_UNREACHABLE();
         return -EILSEQ;
