@@ -681,13 +681,6 @@ static XSM_INLINE int cf_check xsm_do_mca(XSM_DEFAULT_VOID)
     return xsm_default_action(action, current->domain, NULL);
 }
 
-static XSM_INLINE int cf_check xsm_shadow_control(
-    XSM_DEFAULT_ARG struct domain *d, uint32_t op)
-{
-    XSM_ASSERT_ACTION(XSM_HOOK);
-    return xsm_default_action(action, current->domain, d);
-}
-
 static XSM_INLINE int cf_check xsm_mem_sharing_op(
     XSM_DEFAULT_ARG struct domain *d, struct domain *cd, int op)
 {
