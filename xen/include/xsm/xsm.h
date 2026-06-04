@@ -116,6 +116,8 @@ struct xsm_ops {
                             uint8_t allow);
     int (*iomem_mapping)(struct domain *d, uint64_t s, uint64_t e,
                          uint8_t allow);
+    int (*iomem_mapping_vpci)(struct domain *d, uint64_t s, uint64_t e,
+                              uint8_t allow);
     int (*pci_config_permission)(struct domain *d, uint32_t machine_bdf,
                                  uint16_t start, uint16_t end, uint8_t access);
 
@@ -501,6 +503,12 @@ static inline int xsm_iomem_mapping(
     xsm_default_t def, struct domain *d, uint64_t s, uint64_t e, uint8_t allow)
 {
     return alternative_call(xsm_ops.iomem_mapping, d, s, e, allow);
+}
+
+static inline int xsm_iomem_mapping_vpci(
+    xsm_default_t def, struct domain *d, uint64_t s, uint64_t e, uint8_t allow)
+{
+    return alternative_call(xsm_ops.iomem_mapping_vpci, d, s, e, allow);
 }
 
 static inline int xsm_pci_config_permission(
