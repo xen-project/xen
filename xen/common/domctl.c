@@ -376,6 +376,66 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             copyback = true;
         goto domctl_out_unlock_domonly;
 
+    case XEN_DOMCTL_memory_mapping:
+    {
+        unsigned long gfn = op->u.memory_mapping.first_gfn;
+        unsigned long mfn = op->u.memory_mapping.first_mfn;
+        unsigned long nr_mfns = op->u.memory_mapping.nr_mfns;
+        unsigned long mfn_end = mfn + nr_mfns - 1;
+        bool add = op->u.memory_mapping.add_mapping;
+
+        ret = -EINVAL;
+        if ( mfn_end < mfn || /* Wrap? */
+             ((mfn | mfn_end) >> (paddr_bits - PAGE_SHIFT)) ||
+             (gfn + nr_mfns - 1) < gfn ) /* Wrap? */
+            goto domctl_out_unlock_domonly;
+
+        ret = xsm_iomem_mapping(XSM_DM_PRIV, d, mfn, mfn_end, add);
+        if ( ret || !paging_mode_translate(d) )
+            goto domctl_out_unlock_domonly;
+
+#ifndef CONFIG_X86 /* XXX ARM!? */
+        ret = -E2BIG;
+        /* Must break hypercall up as this could take a while. */
+        if ( nr_mfns > 64 )
+            goto domctl_out_unlock_domonly;
+#endif
+
+        iocaps_double_lock(d, false);
+
+        ret = -EPERM;
+        if ( !iomem_access_permitted(current->domain, mfn, mfn_end) ||
+             !iomem_access_permitted(d, mfn, mfn_end) )
+            /* Nothing. */;
+        else if ( add )
+        {
+            printk(XENLOG_G_DEBUG
+                   "memory_map:add: %pd gfn=%lx mfn=%lx nr=%lx\n",
+                   d, gfn, mfn, nr_mfns);
+
+            ret = map_mmio_regions(d, _gfn(gfn), nr_mfns, _mfn(mfn));
+            if ( ret < 0 )
+                printk(XENLOG_G_WARNING
+                       "memory_map:fail: %pd gfn=%lx mfn=%lx nr=%lx ret:%ld\n",
+                       d, gfn, mfn, nr_mfns, ret);
+        }
+        else
+        {
+            printk(XENLOG_G_DEBUG
+                   "memory_map:remove: %pd gfn=%lx mfn=%lx nr=%lx\n",
+                   d, gfn, mfn, nr_mfns);
+
+            ret = unmap_mmio_regions(d, _gfn(gfn), nr_mfns, _mfn(mfn));
+            if ( ret < 0 && is_hardware_domain(current->domain) )
+                printk(XENLOG_ERR
+                       "memory_map: error %ld removing %pd access to [%lx,%lx]\n",
+                       ret, d, mfn, mfn_end);
+        }
+
+        iocaps_double_unlock(d, false);
+        goto domctl_out_unlock_domonly;
+    }
+
     default:
         /* Everything else handled further down. */
         break;
@@ -733,64 +793,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
 
         iocaps_double_unlock(d, true);
-        break;
-    }
-
-    case XEN_DOMCTL_memory_mapping:
-    {
-        unsigned long gfn = op->u.memory_mapping.first_gfn;
-        unsigned long mfn = op->u.memory_mapping.first_mfn;
-        unsigned long nr_mfns = op->u.memory_mapping.nr_mfns;
-        unsigned long mfn_end = mfn + nr_mfns - 1;
-        int add = op->u.memory_mapping.add_mapping;
-
-        ret = -EINVAL;
-        if ( mfn_end < mfn || /* wrap? */
-             ((mfn | mfn_end) >> (paddr_bits - PAGE_SHIFT)) ||
-             (gfn + nr_mfns - 1) < gfn ) /* wrap? */
-            break;
-
-#ifndef CONFIG_X86 /* XXX ARM!? */
-        ret = -E2BIG;
-        /* Must break hypercall up as this could take a while. */
-        if ( nr_mfns > 64 )
-            break;
-#endif
-
-        iocaps_double_lock(d, false);
-
-        ret = -EPERM;
-        if ( !iomem_access_permitted(current->domain, mfn, mfn_end) ||
-             !iomem_access_permitted(d, mfn, mfn_end) ||
-             (ret = xsm_iomem_mapping(XSM_HOOK, d, mfn, mfn_end, add)) ||
-             !paging_mode_translate(d) )
-            /* Nothing. */;
-        else if ( add )
-        {
-            printk(XENLOG_G_DEBUG
-                   "memory_map:add: dom%d gfn=%lx mfn=%lx nr=%lx\n",
-                   d->domain_id, gfn, mfn, nr_mfns);
-
-            ret = map_mmio_regions(d, _gfn(gfn), nr_mfns, _mfn(mfn));
-            if ( ret < 0 )
-                printk(XENLOG_G_WARNING
-                       "memory_map:fail: dom%d gfn=%lx mfn=%lx nr=%lx ret:%ld\n",
-                       d->domain_id, gfn, mfn, nr_mfns, ret);
-        }
-        else
-        {
-            printk(XENLOG_G_DEBUG
-                   "memory_map:remove: dom%d gfn=%lx mfn=%lx nr=%lx\n",
-                   d->domain_id, gfn, mfn, nr_mfns);
-
-            ret = unmap_mmio_regions(d, _gfn(gfn), nr_mfns, _mfn(mfn));
-            if ( ret < 0 && is_hardware_domain(current->domain) )
-                printk(XENLOG_ERR
-                       "memory_map: error %ld removing dom%d access to [%lx,%lx]\n",
-                       ret, d->domain_id, mfn, mfn_end);
-        }
-
-        iocaps_double_unlock(d, false);
         break;
     }
 

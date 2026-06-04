@@ -168,13 +168,13 @@ static XSM_INLINE int cf_check xsm_domctl(
     switch ( cmd )
     {
     case XEN_DOMCTL_ioport_mapping:
-    case XEN_DOMCTL_memory_mapping:
     case XEN_DOMCTL_bind_pt_irq:
     case XEN_DOMCTL_unbind_pt_irq:
         return xsm_default_action(XSM_DM_PRIV, current->domain, d);
 
     case XEN_DOMCTL_getdomaininfo:
     case XEN_DOMCTL_get_domain_state:
+    case XEN_DOMCTL_memory_mapping:
         ASSERT_UNREACHABLE();
         return -EILSEQ;
 
@@ -576,7 +576,7 @@ static XSM_INLINE int cf_check xsm_iomem_permission(
 static XSM_INLINE int cf_check xsm_iomem_mapping(
     XSM_DEFAULT_ARG struct domain *d, uint64_t s, uint64_t e, uint8_t allow)
 {
-    XSM_ASSERT_ACTION(XSM_HOOK);
+    XSM_ASSERT_ACTION(XSM_DM_PRIV);
     return xsm_default_action(action, current->domain, d);
 }
 
