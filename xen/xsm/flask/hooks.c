@@ -665,10 +665,9 @@ static int cf_check flask_set_target(struct domain *d, struct domain *t)
     return rc;
 }
 
-static int cf_check flask_domctl(struct domain *d, unsigned int cmd,
-                                 uint32_t ssidref)
+static int cf_check flask_domctl(struct domain *d, struct xen_domctl *op)
 {
-    switch ( cmd )
+    switch ( op->cmd )
     {
     case XEN_DOMCTL_createdomain:
         /*
@@ -678,7 +677,8 @@ static int cf_check flask_domctl(struct domain *d, unsigned int cmd,
          * Note that d is NULL because we haven't even allocated memory for it
          * this early in XEN_DOMCTL_createdomain.
          */
-        return avc_current_has_perm(ssidref, SECCLASS_DOMAIN, DOMAIN__CREATE, NULL);
+        return avc_current_has_perm(op->u.createdomain.ssidref, SECCLASS_DOMAIN,
+                                    DOMAIN__CREATE, NULL);
 
     /* These have individual XSM hooks and don't make it here. */
     case XEN_DOMCTL_bind_pt_irq:
@@ -852,7 +852,7 @@ static int cf_check flask_domctl(struct domain *d, unsigned int cmd,
         return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__SET_LLC_COLORS);
 
     default:
-        return avc_unknown_permission("domctl", cmd);
+        return avc_unknown_permission("domctl", op->cmd);
     }
 }
 

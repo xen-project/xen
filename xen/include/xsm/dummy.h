@@ -162,10 +162,10 @@ static XSM_INLINE int cf_check xsm_set_target(
 }
 
 static XSM_INLINE int cf_check xsm_domctl(
-    XSM_DEFAULT_ARG struct domain *d, unsigned int cmd, uint32_t ssidref)
+    XSM_DEFAULT_ARG struct domain *d, struct xen_domctl *op)
 {
     XSM_ASSERT_ACTION(XSM_OTHER);
-    switch ( cmd )
+    switch ( op->cmd )
     {
     case XEN_DOMCTL_bind_pt_irq:
     case XEN_DOMCTL_getdomaininfo:
