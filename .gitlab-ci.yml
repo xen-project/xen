@@ -20,9 +20,6 @@ include:
   - local: 'automation/gitlab-ci/containers.yaml'
     rules:
       - if: $XEN_CI_REBUILD_CONTAINERS
-  - local: 'automation/gitlab-ci/analyze.yaml'
-    rules:
-      - if: $XEN_CI_REBUILD_CONTAINERS == null
   - local: 'automation/gitlab-ci/build.yaml'
     rules:
       - if: $XEN_CI_REBUILD_CONTAINERS == null
