@@ -74,6 +74,7 @@ static const struct xsm_ops __initconst_cf_clobber dummy_ops = {
     .irq_permission                = xsm_irq_permission,
     .iomem_permission              = xsm_iomem_permission,
     .iomem_mapping                 = xsm_iomem_mapping,
+    .iomem_mapping_vpci            = xsm_iomem_mapping_vpci,
     .pci_config_permission         = xsm_pci_config_permission,
     .get_vnumainfo                 = xsm_get_vnumainfo,
 

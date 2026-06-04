@@ -68,7 +68,7 @@ static int cf_check map_range(
             return -EPERM;
         }
 
-        rc = xsm_iomem_mapping(XSM_HOOK, map->d, map_mfn, m_end, map->map);
+        rc = xsm_iomem_mapping_vpci(XSM_HOOK, map->d, map_mfn, m_end, map->map);
         if ( rc )
         {
             printk(XENLOG_G_WARNING
