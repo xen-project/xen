@@ -74,6 +74,7 @@ long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
     case XEN_DOMCTL_bind_pt_irq:
     {
         int rc;
+        struct domain *currd = current->domain;
         struct xen_domctl_bind_pt_irq *bind = &domctl->u.bind_pt_irq;
         uint32_t irq = bind->u.spi.spi;
         uint32_t virq = bind->machine_irq;
@@ -105,21 +106,26 @@ long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
         if ( rc )
             return rc;
 
-        if ( !irq_access_permitted(current->domain, irq) )
-            return -EPERM;
+        read_lock(&currd->caps_lock);
 
-        if ( !vgic_reserve_virq(d, virq) )
-            return -EBUSY;
+        if ( !irq_access_permitted(currd, irq) )
+            rc = -EPERM;
+        else if ( !vgic_reserve_virq(d, virq) )
+            rc = -EBUSY;
+        else
+        {
+            rc = route_irq_to_guest(d, virq, irq, "routed IRQ");
+            if ( rc )
+                vgic_free_virq(d, virq);
+        }
 
-        rc = route_irq_to_guest(d, virq, irq, "routed IRQ");
-        if ( rc )
-            vgic_free_virq(d, virq);
-
+        read_unlock(&currd->caps_lock);
         return rc;
     }
     case XEN_DOMCTL_unbind_pt_irq:
     {
         int rc;
+        struct domain *currd = current->domain;
         struct xen_domctl_bind_pt_irq *bind = &domctl->u.bind_pt_irq;
         uint32_t irq = bind->u.spi.spi;
         uint32_t virq = bind->machine_irq;
@@ -136,16 +142,15 @@ long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
         if ( rc )
             return rc;
 
-        if ( !irq_access_permitted(current->domain, irq) )
-            return -EPERM;
+        read_lock(&currd->caps_lock);
 
-        rc = release_guest_irq(d, virq);
-        if ( rc )
-            return rc;
+        if ( !irq_access_permitted(currd, irq) )
+            rc = -EPERM;
+        else if ( !(rc = release_guest_irq(d, virq)) )
+            vgic_free_virq(d, virq);
 
-        vgic_free_virq(d, virq);
-
-        return 0;
+        read_unlock(&currd->caps_lock);
+        return rc;
     }
 
     case XEN_DOMCTL_vuart_op:
