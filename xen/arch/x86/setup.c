@@ -2103,9 +2103,13 @@ void __hwdom_init setup_io_bitmap(struct domain *d)
     if ( is_hvm_domain(d) )
     {
         bitmap_fill(d->arch.hvm.io_bitmap, 0x10000);
+
+        read_lock(&d->caps_lock);
         rc = rangeset_report_ranges(d->arch.ioport_caps, 0, 0x10000,
                                     io_bitmap_cb, d);
         BUG_ON(rc);
+        read_unlock(&d->caps_lock);
+
         /*
          * NB: we need to trap accesses to 0xcf8 in order to intercept
          * 4 byte accesses, that need to be handled by Xen in order to

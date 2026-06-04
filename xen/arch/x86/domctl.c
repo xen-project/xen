@@ -226,6 +226,8 @@ long arch_do_domctl(
         unsigned int np = domctl->u.ioport_permission.nr_ports;
         int allow = domctl->u.ioport_permission.allow_access;
 
+        iocaps_double_lock(d, true);
+
         if ( (fp + np) <= fp || (fp + np) > MAX_IOPORTS )
             ret = -EINVAL;
         else if ( !ioports_access_permitted(currd, fp, fp + np - 1) ||
@@ -235,6 +237,8 @@ long arch_do_domctl(
             ret = ioports_permit_access(d, fp, fp + np - 1);
         else
             ret = ioports_deny_access(d, fp, fp + np - 1);
+
+        iocaps_double_unlock(d, true);
         break;
     }
 
@@ -605,16 +609,13 @@ long arch_do_domctl(
             break;
         }
 
-        ret = -EPERM;
-        if ( !ioports_access_permitted(currd, fmp, fmp + np - 1) )
-            break;
-
-        ret = xsm_ioport_mapping(XSM_HOOK, d, fmp, fmp + np - 1, add);
-        if ( ret )
-            break;
-
         hvm = &d->arch.hvm;
-        if ( add )
+        iocaps_double_lock(d, true);
+
+        if ( !ioports_access_permitted(currd, fmp, fmp + np - 1) ||
+             (ret = xsm_ioport_mapping(XSM_HOOK, d, fmp, fmp + np - 1, add)) )
+            ret = ret ?: -EPERM;
+        else if ( add )
         {
             printk(XENLOG_G_INFO
                    "ioport_map:add: dom%d gport=%x mport=%x nr=%x\n",
@@ -675,6 +676,8 @@ long arch_do_domctl(
                        "ioport_map: error %ld denying dom%d access to [%x,%x]\n",
                        ret, d->domain_id, fmp, fmp + np - 1);
         }
+
+        iocaps_double_unlock(d, true);
         break;
     }
 
