@@ -454,6 +454,38 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         goto domctl_out_unlock_domonly;
     }
 
+#ifdef CONFIG_HAS_PIRQ
+    case XEN_DOMCTL_irq_permission:
+    {
+        unsigned int pirq = op->u.irq_permission.pirq, irq;
+        bool allow = op->u.irq_permission.allow_access;
+
+        ret = -EINVAL;
+        if ( pirq >= current->domain->nr_pirqs )
+            goto domctl_out_unlock_domonly;
+
+        irq = domain_pirq_to_irq(current->domain, pirq);
+
+        ret = -EPERM;
+        if ( irq )
+            ret = xsm_irq_permission(XSM_PRIV, d, irq, allow);
+        if ( ret )
+            goto domctl_out_unlock_domonly;
+
+        iocaps_double_lock(d, true);
+
+        if ( !irq_access_permitted(current->domain, irq) )
+            ret = -EPERM;
+        else if ( allow )
+            ret = irq_permit_access(d, irq);
+        else
+            ret = irq_deny_access(d, irq);
+
+        iocaps_double_unlock(d, true);
+        goto domctl_out_unlock_domonly;
+    }
+#endif
+
     case XEN_DOMCTL_ioport_permission:
     case XEN_DOMCTL_ioport_mapping:
     case XEN_DOMCTL_bind_pt_irq:
@@ -786,33 +818,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             domain_unpause(d); /* causes guest to latch new status */
         }
         break;
-
-#ifdef CONFIG_HAS_PIRQ
-    case XEN_DOMCTL_irq_permission:
-    {
-        unsigned int pirq = op->u.irq_permission.pirq, irq;
-        int allow = op->u.irq_permission.allow_access;
-
-        if ( pirq >= current->domain->nr_pirqs )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        iocaps_double_lock(d, true);
-
-        irq = pirq_access_permitted(current->domain, pirq);
-        if ( !irq || xsm_irq_permission(XSM_HOOK, d, irq, allow) )
-            ret = -EPERM;
-        else if ( allow )
-            ret = irq_permit_access(d, irq);
-        else
-            ret = irq_deny_access(d, irq);
-
-        iocaps_double_unlock(d, true);
-        break;
-    }
-#endif
 
     case XEN_DOMCTL_settimeoffset:
         domain_set_time_offset(d, op->u.settimeoffset.time_offset_seconds);
