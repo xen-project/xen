@@ -237,12 +237,17 @@ long arch_do_domctl(
         unsigned int np = domctl->u.ioport_permission.nr_ports;
         int allow = domctl->u.ioport_permission.allow_access;
 
+        ret = -EINVAL;
+        if ( (fp + np) <= fp || (fp + np) > MAX_IOPORTS )
+            break;
+
+        ret = xsm_ioport_permission(XSM_PRIV, d, fp, fp + np - 1, allow);
+        if ( ret )
+            break;
+
         iocaps_double_lock(d, true);
 
-        if ( (fp + np) <= fp || (fp + np) > MAX_IOPORTS )
-            ret = -EINVAL;
-        else if ( !ioports_access_permitted(currd, fp, fp + np - 1) ||
-                  xsm_ioport_permission(XSM_HOOK, d, fp, fp + np - 1, allow) )
+        if ( !ioports_access_permitted(currd, fp, fp + np - 1) )
             ret = -EPERM;
         else if ( allow )
             ret = ioports_permit_access(d, fp, fp + np - 1);
