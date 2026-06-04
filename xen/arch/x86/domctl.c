@@ -663,12 +663,15 @@ long arch_do_domctl(
             break;
         }
 
+        ret = xsm_ioport_mapping(XSM_DM_PRIV, d, fmp, fmp + np - 1, add);
+        if ( ret )
+            break;
+
         hvm = &d->arch.hvm;
         iocaps_double_lock(d, true);
 
-        if ( !ioports_access_permitted(currd, fmp, fmp + np - 1) ||
-             (ret = xsm_ioport_mapping(XSM_HOOK, d, fmp, fmp + np - 1, add)) )
-            ret = ret ?: -EPERM;
+        if ( !ioports_access_permitted(currd, fmp, fmp + np - 1) )
+            ret = -EPERM;
         else if ( add )
         {
             printk(XENLOG_G_INFO
