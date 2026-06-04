@@ -340,15 +340,15 @@ int iommu_do_dt_domctl(struct xen_domctl *domctl, struct domain *d,
         if ( (d && d->is_dying) || domctl->u.assign_device.flags )
             break;
 
-        ret = dt_find_node_by_gpath(domctl->u.assign_device.u.dt.path,
-                                    domctl->u.assign_device.u.dt.size,
-                                    &dev);
-        if ( ret )
-            break;
-
-        ret = xsm_assign_dtdevice(XSM_HOOK, d, dt_node_full_name(dev));
-        if ( ret )
-            break;
+        dev = domctl->u.assign_device.u.dt.dev;
+        if ( !dev )
+        {
+            ret = dt_find_node_by_gpath(domctl->u.assign_device.u.dt.path,
+                                        domctl->u.assign_device.u.dt.size,
+                                        &dev);
+            if ( ret )
+                break;
+        }
 
         if ( domctl->cmd == XEN_DOMCTL_test_assign_device )
         {
@@ -396,15 +396,15 @@ int iommu_do_dt_domctl(struct xen_domctl *domctl, struct domain *d,
         if ( domctl->u.assign_device.flags )
             break;
 
-        ret = dt_find_node_by_gpath(domctl->u.assign_device.u.dt.path,
-                                    domctl->u.assign_device.u.dt.size,
-                                    &dev);
-        if ( ret )
-            break;
-
-        ret = xsm_deassign_dtdevice(XSM_HOOK, d, dt_node_full_name(dev));
-        if ( ret )
-            break;
+        dev = domctl->u.assign_device.u.dt.dev;
+        if ( !dev )
+        {
+            ret = dt_find_node_by_gpath(domctl->u.assign_device.u.dt.path,
+                                        domctl->u.assign_device.u.dt.size,
+                                        &dev);
+            if ( ret )
+                break;
+        }
 
         if ( d == dom_io )
         {

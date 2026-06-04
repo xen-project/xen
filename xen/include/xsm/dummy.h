@@ -405,39 +405,7 @@ static XSM_INLINE int cf_check xsm_get_device_group(
     XSM_ASSERT_ACTION(XSM_PRIV);
     return xsm_default_action(action, current->domain, NULL);
 }
-
-static XSM_INLINE int cf_check xsm_assign_device(
-    XSM_DEFAULT_ARG struct domain *d, uint32_t machine_bdf)
-{
-    XSM_ASSERT_ACTION(XSM_HOOK);
-    return xsm_default_action(action, current->domain, d);
-}
-
-static XSM_INLINE int cf_check xsm_deassign_device(
-    XSM_DEFAULT_ARG struct domain *d, uint32_t machine_bdf)
-{
-    XSM_ASSERT_ACTION(XSM_HOOK);
-    return xsm_default_action(action, current->domain, d);
-}
-
 #endif /* HAS_PASSTHROUGH && HAS_PCI */
-
-#if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_DEVICE_TREE_DISCOVERY)
-static XSM_INLINE int cf_check xsm_assign_dtdevice(
-    XSM_DEFAULT_ARG struct domain *d, const char *dtpath)
-{
-    XSM_ASSERT_ACTION(XSM_HOOK);
-    return xsm_default_action(action, current->domain, d);
-}
-
-static XSM_INLINE int cf_check xsm_deassign_dtdevice(
-    XSM_DEFAULT_ARG struct domain *d, const char *dtpath)
-{
-    XSM_ASSERT_ACTION(XSM_HOOK);
-    return xsm_default_action(action, current->domain, d);
-}
-
-#endif /* HAS_PASSTHROUGH && HAS_DEVICE_TREE_DISCOVERY */
 
 static XSM_INLINE int cf_check xsm_resource_plug_core(XSM_DEFAULT_VOID)
 {
