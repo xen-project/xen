@@ -172,8 +172,11 @@ static XSM_INLINE int cf_check xsm_domctl(
     case XEN_DOMCTL_bind_pt_irq:
     case XEN_DOMCTL_unbind_pt_irq:
         return xsm_default_action(XSM_DM_PRIV, current->domain, d);
+
     case XEN_DOMCTL_getdomaininfo:
-        return xsm_default_action(XSM_XS_PRIV, current->domain, d);
+        ASSERT_UNREACHABLE();
+        return -EILSEQ;
+
     default:
         return xsm_default_action(XSM_PRIV, current->domain, d);
     }
