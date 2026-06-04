@@ -331,6 +331,10 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_deassign_device:
         if ( op->domain == DOMID_IO )
         {
+#ifdef CONFIG_HAS_DEVICE_TREE
+            if ( op->u.assign_device.dev == XEN_DOMCTL_DEV_DT )
+                op->u.assign_device.u.dt.dev = NULL;
+#endif
             d = dom_io;
             break;
         }
@@ -338,6 +342,11 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             return -ESRCH;
         fallthrough;
     case XEN_DOMCTL_test_assign_device:
+#ifdef CONFIG_HAS_DEVICE_TREE
+        if ( op->u.assign_device.dev == XEN_DOMCTL_DEV_DT )
+            op->u.assign_device.u.dt.dev = NULL;
+        fallthrough;
+#endif
     case XEN_DOMCTL_vm_event_op:
         if ( op->domain == DOMID_INVALID )
         {

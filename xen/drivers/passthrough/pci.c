@@ -1746,10 +1746,6 @@ int iommu_do_pci_domctl(
 
         machine_sbdf = domctl->u.assign_device.u.pci.machine_sbdf;
 
-        ret = xsm_assign_device(XSM_HOOK, d, machine_sbdf);
-        if ( ret )
-            break;
-
         seg = machine_sbdf >> 16;
         bus = PCI_BUS(machine_sbdf);
         devfn = PCI_DEVFN(machine_sbdf);
@@ -1790,10 +1786,6 @@ int iommu_do_pci_domctl(
             break;
 
         machine_sbdf = domctl->u.assign_device.u.pci.machine_sbdf;
-
-        ret = xsm_deassign_device(XSM_HOOK, d, machine_sbdf);
-        if ( ret )
-            break;
 
         seg = machine_sbdf >> 16;
         bus = PCI_BUS(machine_sbdf);

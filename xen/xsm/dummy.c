@@ -77,13 +77,6 @@ static const struct xsm_ops __initconst_cf_clobber dummy_ops = {
 
 #if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_PCI)
     .get_device_group              = xsm_get_device_group,
-    .assign_device                 = xsm_assign_device,
-    .deassign_device               = xsm_deassign_device,
-#endif
-
-#if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_DEVICE_TREE)
-    .assign_dtdevice               = xsm_assign_dtdevice,
-    .deassign_dtdevice             = xsm_deassign_dtdevice,
 #endif
 
     .resource_plug_core            = xsm_resource_plug_core,

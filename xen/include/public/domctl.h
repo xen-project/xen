@@ -567,7 +567,10 @@ struct xen_domctl_assign_device {
         } pci;
         struct {
             uint32_t size; /* Length of the path */
-            XEN_GUEST_HANDLE_64(char) path; /* path to the device tree node */
+            XEN_GUEST_HANDLE_64(char) path; /* Path to the device tree node */
+#ifdef __XEN__
+            struct dt_device_node *dev; /* Resolved device node of the above */
+#endif
         } dt;
     } u;
 };
