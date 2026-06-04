@@ -159,7 +159,6 @@ void hvmemul_cancel(struct vcpu *v)
     hvio->mmio_insn_bytes = 0;
     hvio->mmio_access = (struct npfec){};
     hvio->mmio_retry = false;
-    hvio->g2m_ioport = NULL;
 
     hvmemul_cache_disable(v);
 }

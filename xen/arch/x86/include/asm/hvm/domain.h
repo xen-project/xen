@@ -125,6 +125,7 @@ struct hvm_domain {
 
     /* List of guest to machine IO ports mapping. */
     struct list_head g2m_ioport_list;
+    rwlock_t g2m_ioport_lock;
 
     /* List of MMCFG regions trapped by Xen. */
     struct list_head mmcfg_regions;
