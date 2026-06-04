@@ -45,6 +45,17 @@ static int flask_shadow_control(struct domain *d, unsigned int op);
 #define pv_shim false
 #endif
 
+#ifdef CONFIG_HAS_PASSTHROUGH
+#ifdef CONFIG_HAS_PCI
+static int flask_assign_device(struct domain *d, unsigned int machine_bdf);
+static int flask_deassign_device(struct domain *d, unsigned int machine_bdf);
+#endif
+#ifdef CONFIG_HAS_DEVICE_TREE
+static int flask_assign_dtdevice(struct domain *d, const char *dtpath);
+static int flask_deassign_dtdevice(struct domain *d, const char *dtpath);
+#endif
+#endif /* CONFIG_HAS_PASSTHROUGH */
+
 static uint32_t domain_sid(const struct domain *dom)
 {
     struct domain_security_struct *dsec = dom->ssid;
@@ -694,16 +705,6 @@ static int cf_check flask_domctl(struct domain *d, struct xen_domctl *op)
 
     /* These have individual XSM hooks (common/domctl.c) */
     case XEN_DOMCTL_set_target:
-
-#ifdef CONFIG_HAS_PASSTHROUGH
-    /*
-     * These have individual XSM hooks
-     * (drivers/passthrough/{pci,device_tree.c)
-     */
-    case XEN_DOMCTL_test_assign_device:
-    case XEN_DOMCTL_assign_device:
-    case XEN_DOMCTL_deassign_device:
-#endif
         return 0;
 
     case XEN_DOMCTL_destroydomain:
@@ -782,6 +783,49 @@ static int cf_check flask_domctl(struct domain *d, struct xen_domctl *op)
     case XEN_DOMCTL_shadow_op:
         return flask_shadow_control(d, op->u.shadow_op.op);
 #endif
+
+#ifdef CONFIG_HAS_PASSTHROUGH
+
+    case XEN_DOMCTL_test_assign_device:
+    case XEN_DOMCTL_assign_device:
+    case XEN_DOMCTL_deassign_device:
+        switch ( op->u.assign_device.dev )
+        {
+#ifdef CONFIG_HAS_PCI
+        case XEN_DOMCTL_DEV_PCI:
+            return op->cmd != XEN_DOMCTL_deassign_device
+                   ? flask_assign_device(
+                         d, op->u.assign_device.u.pci.machine_sbdf)
+                   : flask_deassign_device(
+                         d, op->u.assign_device.u.pci.machine_sbdf);
+#endif
+
+#ifdef CONFIG_HAS_DEVICE_TREE
+        case XEN_DOMCTL_DEV_DT:
+        {
+            struct dt_device_node *dev;
+            int ret = dt_find_node_by_gpath(op->u.assign_device.u.dt.path,
+                                            op->u.assign_device.u.dt.size,
+                                            &dev);
+
+            if ( ret )
+                return ret;
+
+            op->u.assign_device.u.dt.dev = dev;
+
+            return op->cmd != XEN_DOMCTL_deassign_device
+                   ? flask_assign_dtdevice(d, dt_node_full_name(dev))
+                   : flask_deassign_dtdevice(d, dt_node_full_name(dev));
+        }
+#endif
+
+        default:
+            /* Unknown type. */
+            break;
+        }
+        return avc_unknown_permission("assign_device", op->cmd);
+
+#endif /* CONFIG_HAS_PASSTHROUGH */
 
     case XEN_DOMCTL_mem_sharing_op:
         return current_has_perm(d, SECCLASS_HVM, HVM__MEM_SHARING);
@@ -1397,7 +1441,7 @@ static int flask_test_assign_device(uint32_t machine_bdf)
     return avc_current_has_perm(rsid, SECCLASS_RESOURCE, RESOURCE__STAT_DEVICE, NULL);
 }
 
-static int cf_check flask_assign_device(struct domain *d, uint32_t machine_bdf)
+static int flask_assign_device(struct domain *d, uint32_t machine_bdf)
 {
     uint32_t dsid, rsid;
     int rc = -EPERM;
@@ -1427,7 +1471,7 @@ static int cf_check flask_assign_device(struct domain *d, uint32_t machine_bdf)
     return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, dperm, &ad);
 }
 
-static int cf_check flask_deassign_device(
+static int flask_deassign_device(
     struct domain *d, uint32_t machine_bdf)
 {
     uint32_t rsid;
@@ -1459,7 +1503,7 @@ static int flask_test_assign_dtdevice(const char *dtpath)
                                 NULL);
 }
 
-static int cf_check flask_assign_dtdevice(struct domain *d, const char *dtpath)
+static int flask_assign_dtdevice(struct domain *d, const char *dtpath)
 {
     uint32_t dsid, rsid;
     int rc = -EPERM;
@@ -1489,7 +1533,7 @@ static int cf_check flask_assign_dtdevice(struct domain *d, const char *dtpath)
     return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, dperm, &ad);
 }
 
-static int cf_check flask_deassign_dtdevice(
+static int flask_deassign_dtdevice(
     struct domain *d, const char *dtpath)
 {
     uint32_t rsid;
@@ -1955,13 +1999,6 @@ static const struct xsm_ops __initconst_cf_clobber flask_ops = {
 
 #if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_PCI)
     .get_device_group = flask_get_device_group,
-    .assign_device = flask_assign_device,
-    .deassign_device = flask_deassign_device,
-#endif
-
-#if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_DEVICE_TREE)
-    .assign_dtdevice = flask_assign_dtdevice,
-    .deassign_dtdevice = flask_deassign_dtdevice,
 #endif
 
     .platform_op = flask_platform_op,
