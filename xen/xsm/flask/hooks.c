@@ -40,6 +40,7 @@
 
 #ifdef CONFIG_X86
 #include <asm/pv/shim.h>
+static int flask_shadow_control(struct domain *d, unsigned int op);
 #else
 #define pv_shim false
 #endif
@@ -693,10 +694,6 @@ static int cf_check flask_domctl(struct domain *d, struct xen_domctl *op)
     /* These have individual XSM hooks (common/domctl.c) */
     case XEN_DOMCTL_set_target:
 
-#ifdef CONFIG_X86
-    /* These have individual XSM hooks (arch/x86/domctl.c) */
-    case XEN_DOMCTL_shadow_op:
-#endif
 #ifdef CONFIG_HAS_PASSTHROUGH
     /*
      * These have individual XSM hooks
@@ -780,6 +777,11 @@ static int cf_check flask_domctl(struct domain *d, struct xen_domctl *op)
 
     case XEN_DOMCTL_get_address_size:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETADDRSIZE);
+
+#ifdef CONFIG_X86
+    case XEN_DOMCTL_shadow_op:
+        return flask_shadow_control(d, op->u.shadow_op.op);
+#endif
 
     case XEN_DOMCTL_mem_sharing_op:
         return current_has_perm(d, SECCLASS_HVM, HVM__MEM_SHARING);
@@ -1584,7 +1586,7 @@ static int cf_check flask_do_mca(void)
     return domain_has_xen(current->domain, XEN__MCA_OP);
 }
 
-static int cf_check flask_shadow_control(struct domain *d, uint32_t op)
+static int flask_shadow_control(struct domain *d, unsigned int op)
 {
     uint32_t perm;
 
@@ -1965,7 +1967,6 @@ static const struct xsm_ops __initconst_cf_clobber flask_ops = {
     .platform_op = flask_platform_op,
 #ifdef CONFIG_X86
     .do_mca = flask_do_mca,
-    .shadow_control = flask_shadow_control,
     .mem_sharing_op = flask_mem_sharing_op,
     .apic = flask_apic,
     .machine_memory_map = flask_machine_memory_map,

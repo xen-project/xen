@@ -124,7 +124,6 @@ static const struct xsm_ops __initconst_cf_clobber dummy_ops = {
     .platform_op                   = xsm_platform_op,
 #ifdef CONFIG_X86
     .do_mca                        = xsm_do_mca,
-    .shadow_control                = xsm_shadow_control,
     .mem_sharing_op                = xsm_mem_sharing_op,
     .apic                          = xsm_apic,
     .machine_memory_map            = xsm_machine_memory_map,
