@@ -1512,7 +1512,7 @@ static int iommu_get_device_group(
         if ( (pdev->seg != seg) || ((b == bus) && (df == devfn)) )
             continue;
 
-        if ( xsm_get_device_group(XSM_HOOK, (seg << 16) | (b << 8) | df) )
+        if ( xsm_get_device_group(XSM_PRIV, (seg << 16) | (b << 8) | df) )
             continue;
 
         sdev_id = iommu_call(ops, get_device_group_id, seg, b, df);
@@ -1582,7 +1582,7 @@ int iommu_do_pci_domctl(
         u32 max_sdevs;
         XEN_GUEST_HANDLE_64(uint32) sdevs;
 
-        ret = xsm_get_device_group(XSM_HOOK, domctl->u.get_device_group.machine_sbdf);
+        ret = xsm_get_device_group(XSM_PRIV, domctl->u.get_device_group.machine_sbdf);
         if ( ret )
             break;
 
