@@ -609,7 +609,7 @@ static int cf_check flask_getdomaininfo(struct domain *d)
     return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETDOMAININFO);
 }
 
-static int cf_check flask_domctl_scheduler_op(struct domain *d, int op)
+static int flask_domctl_scheduler_op(struct domain *d, int op)
 {
     switch ( op )
     {
@@ -697,7 +697,6 @@ static int cf_check flask_domctl(struct domain *d, struct xen_domctl *op)
         return -EILSEQ;
 
     /* These have individual XSM hooks (common/domctl.c) */
-    case XEN_DOMCTL_scheduler_op:
     case XEN_DOMCTL_set_target:
 
 #ifdef CONFIG_X86
@@ -744,6 +743,9 @@ static int cf_check flask_domctl(struct domain *d, struct xen_domctl *op)
 
     case XEN_DOMCTL_setdomainhandle:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETDOMAINHANDLE);
+
+    case XEN_DOMCTL_scheduler_op:
+        return flask_domctl_scheduler_op(d, op->u.scheduler_op.cmd);
 
     case XEN_DOMCTL_set_ext_vcpucontext:
     case XEN_DOMCTL_set_vcpu_msrs:
@@ -1884,7 +1886,6 @@ static const struct xsm_ops __initconst_cf_clobber flask_ops = {
     .security_domaininfo = flask_security_domaininfo,
     .domain_create = flask_domain_create,
     .getdomaininfo = flask_getdomaininfo,
-    .domctl_scheduler_op = flask_domctl_scheduler_op,
 #ifdef CONFIG_SYSCTL
     .sysctl_scheduler_op = flask_sysctl_scheduler_op,
 #endif
