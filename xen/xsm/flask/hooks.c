@@ -680,6 +680,7 @@ static int cf_check flask_domctl(struct domain *d, unsigned int cmd,
 
     /* These have individual XSM hooks and don't make it here. */
     case XEN_DOMCTL_getdomaininfo:
+    case XEN_DOMCTL_ioport_mapping:
     case XEN_DOMCTL_memory_mapping:
         ASSERT_UNREACHABLE();
         return -EILSEQ;
@@ -698,7 +699,6 @@ static int cf_check flask_domctl(struct domain *d, unsigned int cmd,
     /* These have individual XSM hooks (arch/x86/domctl.c) */
     case XEN_DOMCTL_shadow_op:
     case XEN_DOMCTL_ioport_permission:
-    case XEN_DOMCTL_ioport_mapping:
 #endif
 #ifdef CONFIG_HAS_PASSTHROUGH
     /*
