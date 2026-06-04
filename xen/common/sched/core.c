@@ -2058,10 +2058,6 @@ long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op)
 {
     long ret;
 
-    ret = xsm_domctl_scheduler_op(XSM_HOOK, d, op->cmd);
-    if ( ret )
-        return ret;
-
     if ( op->sched_id != dom_scheduler(d)->sched_id )
         return -EINVAL;
 
