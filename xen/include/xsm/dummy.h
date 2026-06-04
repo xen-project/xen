@@ -162,6 +162,7 @@ static XSM_INLINE int cf_check xsm_domctl(
     {
     case XEN_DOMCTL_bind_pt_irq:
     case XEN_DOMCTL_getdomaininfo:
+    case XEN_DOMCTL_get_device_group:
     case XEN_DOMCTL_get_domain_state:
     case XEN_DOMCTL_gsi_permission:
     case XEN_DOMCTL_iomem_permission:
@@ -401,7 +402,7 @@ static XSM_INLINE int cf_check xsm_get_vnumainfo(
 static XSM_INLINE int cf_check xsm_get_device_group(
     XSM_DEFAULT_ARG uint32_t machine_bdf)
 {
-    XSM_ASSERT_ACTION(XSM_HOOK);
+    XSM_ASSERT_ACTION(XSM_PRIV);
     return xsm_default_action(action, current->domain, NULL);
 }
 
