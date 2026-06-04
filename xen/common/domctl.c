@@ -428,6 +428,8 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     }
 
     case XEN_DOMCTL_ioport_mapping:
+    case XEN_DOMCTL_bind_pt_irq:
+    case XEN_DOMCTL_unbind_pt_irq:
         ret = arch_do_domctl(op, d, u_domctl);
         goto domctl_out_unlock_domonly;
 

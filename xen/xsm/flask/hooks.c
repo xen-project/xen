@@ -681,9 +681,11 @@ static int cf_check flask_domctl(struct domain *d, unsigned int cmd,
         return avc_current_has_perm(ssidref, SECCLASS_DOMAIN, DOMAIN__CREATE, NULL);
 
     /* These have individual XSM hooks and don't make it here. */
+    case XEN_DOMCTL_bind_pt_irq:
     case XEN_DOMCTL_getdomaininfo:
     case XEN_DOMCTL_ioport_mapping:
     case XEN_DOMCTL_memory_mapping:
+    case XEN_DOMCTL_unbind_pt_irq:
         ASSERT_UNREACHABLE();
         return -EILSEQ;
 
@@ -694,9 +696,6 @@ static int cf_check flask_domctl(struct domain *d, unsigned int cmd,
     case XEN_DOMCTL_set_target:
     case XEN_DOMCTL_vm_event_op:
 
-    /* These have individual XSM hooks (arch/../domctl.c) */
-    case XEN_DOMCTL_bind_pt_irq:
-    case XEN_DOMCTL_unbind_pt_irq:
 #ifdef CONFIG_X86
     /* These have individual XSM hooks (arch/x86/domctl.c) */
     case XEN_DOMCTL_shadow_op:
