@@ -318,10 +318,9 @@ static DEFINE_RWLOCK(L1_global_argo_rwlock); /* L1 */
     ((LOCKING_Read_L1 && spin_is_locked(&(d)->argo->send_L2_lock)) || \
      LOCKING_Write_L1)
 
-#define ARGO_DEBUG 0
 #define argo_dprintk(fmt, args...)                      \
     do {                                                \
-        if ( ARGO_DEBUG )                               \
+        if ( IS_ENABLED(CONFIG_ARGO_DEBUG) )            \
             gprintk(XENLOG_DEBUG, "argo: " fmt, ##args);\
     } while ( 0 )
 

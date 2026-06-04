@@ -491,6 +491,12 @@ config ARGO
 
 	  If unsure, say N.
 
+config ARGO_DEBUG
+	bool "Argo: enable debug traces (UNSUPPORTED)"
+	depends on ARGO
+	help
+	  Enables extra debug traces for Argo debugging.
+
 source "common/sched/Kconfig"
 
 config CRYPTO
