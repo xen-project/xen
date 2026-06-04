@@ -693,7 +693,6 @@ static int cf_check flask_domctl(struct domain *d, unsigned int cmd,
     /* These have individual XSM hooks (common/domctl.c) */
     case XEN_DOMCTL_scheduler_op:
     case XEN_DOMCTL_set_target:
-    case XEN_DOMCTL_vm_event_op:
 
 #ifdef CONFIG_X86
     /* These have individual XSM hooks (arch/x86/domctl.c) */
@@ -787,9 +786,8 @@ static int cf_check flask_domctl(struct domain *d, unsigned int cmd,
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__TRIGGER);
 
     case XEN_DOMCTL_set_access_required:
-        return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__VM_EVENT);
-
     case XEN_DOMCTL_monitor_op:
+    case XEN_DOMCTL_vm_event_op:
         return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__VM_EVENT);
 
     case XEN_DOMCTL_debug_op:
@@ -1347,11 +1345,6 @@ static int cf_check flask_hvm_altp2mhvm_op(struct domain *d, uint64_t mode, uint
     };
 
     return current_has_perm(d, SECCLASS_HVM, HVM__ALTP2MHVM_OP);
-}
-
-static int cf_check flask_vm_event_control(struct domain *d, int mode, int op)
-{
-    return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__VM_EVENT);
 }
 
 #ifdef CONFIG_MEM_ACCESS
@@ -1936,8 +1929,6 @@ static const struct xsm_ops __initconst_cf_clobber flask_ops = {
 
     .do_xsm_op = do_flask_op,
     .get_vnumainfo = flask_get_vnumainfo,
-
-    .vm_event_control = flask_vm_event_control,
 
 #ifdef CONFIG_MEM_ACCESS
     .mem_access = flask_mem_access,
