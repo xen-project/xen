@@ -519,6 +519,30 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         goto domctl_out_unlock_domonly;
     }
 
+    case XEN_DOMCTL_set_target:
+    {
+        struct domain *e = get_domain_by_id(op->u.set_target.target);
+
+        ret = -ESRCH;
+        if ( !e )
+            goto domctl_out_unlock_domonly;
+
+        if ( d == e )
+            ret = -EINVAL;
+        else if ( !is_hvm_domain(e) )
+            ret = -EOPNOTSUPP;
+        else
+            ret = xsm_set_target(XSM_PRIV, d, e);
+
+        /* Hold reference on @e until we destroy @d. */
+        if ( !ret && cmpxchgptr(&d->target, NULL, e) )
+            ret = -EINVAL;
+
+        if ( ret )
+            put_domain(e);
+        goto domctl_out_unlock_domonly;
+    }
+
     case XEN_DOMCTL_vm_event_op:
         if ( op->u.vm_event_op.op == XEN_VM_EVENT_GET_VERSION )
         {
@@ -874,36 +898,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_settimeoffset:
         domain_set_time_offset(d, op->u.settimeoffset.time_offset_seconds);
         break;
-
-    case XEN_DOMCTL_set_target:
-    {
-        struct domain *e;
-
-        ret = -ESRCH;
-        e = get_domain_by_id(op->u.set_target.target);
-        if ( e == NULL )
-            break;
-
-        ret = -EINVAL;
-        if ( (d == e) || (d->target != NULL) )
-        {
-            put_domain(e);
-            break;
-        }
-
-        ret = -EOPNOTSUPP;
-        if ( is_hvm_domain(e) )
-            ret = xsm_set_target(XSM_HOOK, d, e);
-        if ( ret )
-        {
-            put_domain(e);
-            break;
-        }
-
-        /* Hold reference on @e until we destroy @d. */
-        d->target = e;
-        break;
-    }
 
     case XEN_DOMCTL_subscribe:
         d->suspend_evtchn = op->u.subscribe.port;
