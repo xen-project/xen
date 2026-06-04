@@ -663,6 +663,7 @@ long arch_do_domctl(
                    "ioport_map:add: dom%d gport=%x mport=%x nr=%x\n",
                    d->domain_id, fgp, fmp, np);
 
+            write_lock(&hvm->g2m_ioport_lock);
             list_for_each_entry(g2m_ioport, &hvm->g2m_ioport_list, list)
                 if (g2m_ioport->mport == fmp )
                 {
@@ -684,11 +685,14 @@ long arch_do_domctl(
                 g2m_ioport->np = np;
                 list_add_tail(&g2m_ioport->list, &hvm->g2m_ioport_list);
             }
+            write_unlock(&hvm->g2m_ioport_lock);
             if ( !ret )
                 ret = ioports_permit_access(d, fmp, fmp + np - 1);
             if ( ret && !found && g2m_ioport )
             {
+                write_lock(&hvm->g2m_ioport_lock);
                 list_del(&g2m_ioport->list);
+                write_unlock(&hvm->g2m_ioport_lock);
                 xfree(g2m_ioport);
             }
         }
@@ -697,6 +701,8 @@ long arch_do_domctl(
             printk(XENLOG_G_INFO
                    "ioport_map:remove: dom%d gport=%x mport=%x nr=%x\n",
                    d->domain_id, fgp, fmp, np);
+
+            write_lock(&hvm->g2m_ioport_lock);
             list_for_each_entry(g2m_ioport, &hvm->g2m_ioport_list, list)
                 if ( g2m_ioport->mport == fmp )
                 {
@@ -704,6 +710,8 @@ long arch_do_domctl(
                     xfree(g2m_ioport);
                     break;
                 }
+            write_unlock(&hvm->g2m_ioport_lock);
+
             ret = ioports_deny_access(d, fmp, fmp + np - 1);
             if ( ret && is_hardware_domain(currd) )
                 printk(XENLOG_ERR
