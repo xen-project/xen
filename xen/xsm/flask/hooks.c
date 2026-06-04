@@ -682,6 +682,7 @@ static int cf_check flask_domctl(struct domain *d, unsigned int cmd,
 
     /* These have individual XSM hooks and don't make it here. */
     case XEN_DOMCTL_getdomaininfo:
+    case XEN_DOMCTL_memory_mapping:
         ASSERT_UNREACHABLE();
         return -EILSEQ;
 
@@ -689,7 +690,6 @@ static int cf_check flask_domctl(struct domain *d, unsigned int cmd,
     case XEN_DOMCTL_scheduler_op:
     case XEN_DOMCTL_irq_permission:
     case XEN_DOMCTL_iomem_permission:
-    case XEN_DOMCTL_memory_mapping:
     case XEN_DOMCTL_set_target:
     case XEN_DOMCTL_vm_event_op:
 
