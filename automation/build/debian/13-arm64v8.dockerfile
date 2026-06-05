@@ -47,7 +47,7 @@ RUN <<EOF
         # Golang bindings
         golang-go
         # Ocaml bindings/oxenstored
-        ocaml-nox
+        ocaml
         ocaml-findlib
 
         # for test phase, qemu-* jobs
