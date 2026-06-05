@@ -1,9 +1,8 @@
 # syntax=docker/dockerfile:1
-FROM --platform=linux/amd64 opensuse/leap:15.6
+FROM --platform=linux/amd64 opensuse/leap:16.0
 LABEL maintainer.name="The Xen Project"
 LABEL maintainer.email="xen-devel@lists.xenproject.org"
 
-ENV PYTHON=python3.11
 ENV XEN_TARGET_ARCH=x86_64
 
 RUN <<EOF
@@ -26,7 +25,7 @@ RUN <<EOF
         gawk
         gcc
         make
-        python311
+        python3
 
         # Tools (general)
         cpio
@@ -38,25 +37,23 @@ RUN <<EOF
         wget
         # libxenguest dombuilder
         'pkgconfig(bzip2)'
+        'pkgconfig(liblz4)'
+        'pkgconfig(liblzma)'
         'pkgconfig(libzstd)'
         'pkgconfig(lzo2)'
-        'pkgconfig(liblzma)'
         'pkgconfig(zlib)'
         # libacpi
         acpica
         # libxl
         'pkgconfig(uuid)'
-        'pkgconfig(yajl)'
-        # RomBIOS
-        bin86
-        dev86
+        'pkgconfig(json-c)'
         # Header Check
         gcc-c++
         # xentop
         'pkgconfig(ncurses)'
         # Python bindings
-        python311-devel
-        python311-setuptools
+        python3-devel
+        python3-setuptools
         # Ocaml bindings/oxenstored
         ocaml
         ocaml-findlib
@@ -70,7 +67,7 @@ RUN <<EOF
         ninja
         'pkgconfig(glib-2.0)'
         'pkgconfig(pixman-1)'
-        python311-packaging
+        python3-packaging
     )
 
     zypper install -y --no-recommends "${DEPS[@]}"
