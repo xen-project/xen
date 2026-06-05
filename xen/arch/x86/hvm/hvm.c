@@ -4789,7 +4789,7 @@ static int do_altp2m_op(
         break;
 
     case HVMOP_altp2m_set_mem_access:
-        if ( !vm_event_is_enabled(current) )
+        if ( !IS_ENABLED(CONFIG_VM_EVENT) )
         {
             rc = -EOPNOTSUPP;
             break;
@@ -4804,7 +4804,7 @@ static int do_altp2m_op(
         break;
 
     case HVMOP_altp2m_set_mem_access_multi:
-        if ( !vm_event_is_enabled(current) )
+        if ( !IS_ENABLED(CONFIG_VM_EVENT) )
         {
             rc = -EOPNOTSUPP;
             break;
@@ -4841,7 +4841,7 @@ static int do_altp2m_op(
         break;
 
     case HVMOP_altp2m_get_mem_access:
-        if ( !vm_event_is_enabled(current) )
+        if ( !IS_ENABLED(CONFIG_VM_EVENT) )
         {
             rc = -EOPNOTSUPP;
             break;
