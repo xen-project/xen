@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM --platform=linux/amd64 fedora:41
+FROM --platform=linux/amd64 fedora:43
 LABEL maintainer.name="The Xen Project"
 LABEL maintainer.email="xen-devel@lists.xenproject.org"
 
@@ -34,6 +34,7 @@ RUN <<EOF
         # libxenguest dombuilder
         bzip2-devel
         libzstd-devel
+        lz4-devel
         lzo-devel
         xz-devel
         zlib-devel
@@ -41,7 +42,7 @@ RUN <<EOF
         acpica-tools
         # libxl
         libuuid-devel
-        yajl-devel
+        json-c-devel
         # xen-foreign
         diffutils
         # RomBIOS
