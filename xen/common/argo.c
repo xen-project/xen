@@ -318,10 +318,11 @@ static DEFINE_RWLOCK(L1_global_argo_rwlock); /* L1 */
     ((LOCKING_Read_L1 && spin_is_locked(&(d)->argo->send_L2_lock)) || \
      LOCKING_Write_L1)
 
+#define ARGO_DEBUG 0
 #define argo_dprintk(fmt, args...)                      \
     do {                                                \
-        if ( IS_ENABLED(CONFIG_ARGO_DEBUG) )            \
-            gprintk(XENLOG_DEBUG, "argo: " fmt, ##args);\
+        if ( ARGO_DEBUG )                               \
+            printk(XENLOG_DEBUG "argo: " fmt, ##args);  \
     } while ( 0 )
 
 /*
@@ -473,7 +474,7 @@ ring_unmap(const struct domain *d, struct argo_ring_info *ring_info)
             continue;
 
         ASSERT(!mfn_eq(ring_info->mfns[i], INVALID_MFN));
-        argo_dprintk("unmapping page %"PRI_mfn" from %p\n",
+        argo_dprintk(XENLOG_ERR "argo: unmapping page %"PRI_mfn" from %p\n",
                      mfn_x(ring_info->mfns[i]), ring_info->mfn_mapping[i]);
 
         unmap_domain_page_global(ring_info->mfn_mapping[i]);
@@ -1466,7 +1467,7 @@ find_ring_mfns(struct domain *d, struct argo_ring_info *ring_info,
     if ( ring_info->mfns )
     {
         /* Ring already existed: drop the previous mapping. */
-        argo_dprintk("vm%u re-register existing ring "
+        argo_dprintk("argo: vm%u re-register existing ring "
                      "(vm%u:%x vm%u) clears mapping\n",
                      d->domain_id, ring_info->id.domain_id,
                      ring_info->id.aport, ring_info->id.partner_id);
@@ -1526,7 +1527,7 @@ find_ring_mfns(struct domain *d, struct argo_ring_info *ring_info,
     {
         ASSERT(ring_info->nmfns == NPAGES_RING(len));
 
-        argo_dprintk("vm%u ring (vm%u:%x vm%u) %p "
+        argo_dprintk("argo: vm%u ring (vm%u:%x vm%u) %p "
                      "mfn_mapping %p len %u nmfns %u\n",
                      d->domain_id, ring_info->id.domain_id,
                      ring_info->id.aport, ring_info->id.partner_id, ring_info,
@@ -1740,7 +1741,7 @@ register_ring(struct domain *currd,
         list_add(&ring_info->node,
                  &currd->argo->ring_hash[hash_index(&ring_info->id)]);
 
-        argo_dprintk("vm%u registering ring (vm%u:%x vm%u)\n",
+        argo_dprintk("argo: vm%u registering ring (vm%u:%x vm%u)\n",
                      currd->domain_id, ring_id.domain_id, ring_id.aport,
                      ring_id.partner_id);
     }
@@ -1780,7 +1781,7 @@ register_ring(struct domain *currd,
             goto out_unlock2;
         }
 
-        argo_dprintk("vm%u re-registering existing ring (vm%u:%x vm%u)\n",
+        argo_dprintk("argo: vm%u re-registering existing ring (vm%u:%x vm%u)\n",
                      currd->domain_id, ring_id.domain_id, ring_id.aport,
                      ring_id.partner_id);
     }
@@ -2033,9 +2034,10 @@ sendv(struct domain *src_d, xen_argo_addr_t *src_addr,
                                         src_id.domain_id);
     if ( !ring_info )
     {
-        argo_dprintk("vm%u connection refused, src (vm%u:%x) dst (vm%u:%x)\n",
-                     current->domain->domain_id, src_id.domain_id, src_id.aport,
-                     dst_addr->domain_id, dst_addr->aport);
+        gprintk(XENLOG_ERR,
+                "argo: vm%u connection refused, src (vm%u:%x) dst (vm%u:%x)\n",
+                current->domain->domain_id, src_id.domain_id, src_id.aport,
+                dst_addr->domain_id, dst_addr->aport);
 
         ret = -ECONNREFUSED;
     }
