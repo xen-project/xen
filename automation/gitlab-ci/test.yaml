@@ -105,7 +105,7 @@
 .xilinx-arm64:
   extends: .test-jobs-common
   variables:
-    CONTAINER: ubuntu:xenial-xilinx
+    CONTAINER: ubuntu:xilinx-hw-runner
     LOGFILE: qemu-smoke-xilinx.log
     TEST_TIMEOUT_OVERRIDE: 120
   artifacts:
@@ -124,7 +124,7 @@
 .xilinx-x86_64:
   extends: .test-jobs-common
   variables:
-    CONTAINER: ubuntu:xenial-xilinx
+    CONTAINER: ubuntu:xilinx-hw-runner
     LOGFILE: xilinx-smoke-x86_64.log
     XEN_CMD_CONSOLE: "console=com2 com2=57600,8n1,0x2F8,4"
     TEST_BOARD: "crater"
