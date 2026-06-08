@@ -2082,7 +2082,7 @@ for all of them (`true`), only for those subject to XPTI (`xpti`) or for
 those not subject to XPTI (`no-xpti`). The feature is used only in case
 INVPCID is supported and not disabled via `invpcid=false`.
 
-### pdx-compress
+### pdx-compress
 > `= <boolean>`
 
 > Default: `true` if CONFIG_PDX_NONE is unset
