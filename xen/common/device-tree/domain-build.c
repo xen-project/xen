@@ -299,20 +299,31 @@ static bool __init allocate_hwdom_memory(struct kernel_info *kinfo)
 
     for ( i = 0; (kinfo->unassigned_mem > 0) && (i < nr_banks); i++ )
     {
-        paddr_t bank_size;
+        const paddr_t bank_start = hwdom_free_mem->bank[i].start;
+        paddr_t bank_size = hwdom_free_mem->bank[i].size;
+
+        /*
+         * Check the size that would actually be assigned, not just the size
+         * of the host region.
+         */
+        bank_size = min(bank_size, kinfo->unassigned_mem);
 
         /*
          * The first bank must be large enough for place_dtb_initrd() to
          * fit the kernel, DTB and initrd.  Skip small regions to avoid
          * ending up with a tiny first bank.
          */
-        if ( !mem->nr_banks && (hwdom_free_mem->bank[i].size < min_bank_size) )
-            continue;
+        if ( !mem->nr_banks )
+        {
+            if ( bank_size < min_bank_size )
+                continue;
 
-        bank_size = MIN(hwdom_free_mem->bank[i].size, kinfo->unassigned_mem);
-        if ( !allocate_bank_memory(kinfo,
-                                   gaddr_to_gfn(hwdom_free_mem->bank[i].start),
-                                   bank_size) )
+            if ( !arch_hwdom_first_bank_can_fit_modules(kinfo, bank_start,
+                                                        bank_size) )
+                continue;
+        }
+
+        if ( !allocate_bank_memory(kinfo, gaddr_to_gfn(bank_start), bank_size) )
         {
             xfree(hwdom_free_mem);
             return false;

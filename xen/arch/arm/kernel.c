@@ -64,6 +64,9 @@ kernel_zimage_place_in_bank(const struct kernel_info *info,
         load_end = bank_start + bank_size;
         load_end = MIN(bank_start + MB(128), load_end);
 
+        if ( load_end - bank_start < info->image.len )
+            return INVALID_PADDR;
+
         load_addr = load_end - info->image.len;
         /* Align to 2MB */
         load_addr &= ~(MB(2) - 1);
@@ -164,9 +167,55 @@ static void __init place_dtb_initrd(struct kernel_info *info,
 static paddr_t __init kernel_zimage_place(struct kernel_info *info)
 {
     const struct membanks *mem = kernel_info_get_mem(info);
+    paddr_t load_addr;
 
-    return kernel_zimage_place_in_bank(info, mem->bank[0].start,
-                                       mem->bank[0].size);
+    load_addr = kernel_zimage_place_in_bank(info, mem->bank[0].start,
+                                            mem->bank[0].size);
+    if ( load_addr == INVALID_PADDR )
+        panic("Unable to find suitable location for the kernel\n");
+
+    return load_addr;
+}
+
+bool __init arch_hwdom_first_bank_can_fit_modules(const struct kernel_info *info,
+                                                  paddr_t bank_start,
+                                                  paddr_t bank_size)
+{
+    const struct boot_module *initrd = info->bd.initrd;
+    /*
+     * place_dtb_initrd() rounds the DTB and initrd placement to 2MB boundaries;
+     * use the same granularity when checking whether the first bank can hold
+     * them.
+     */
+    const paddr_t initrd_len = ROUNDUP(initrd ? initrd->size : 0, MB(2));
+    /*
+     * The hardware domain FDT has not been generated yet. Use the allocation
+     * size as a conservative upper bound for the final DTB size.
+     */
+    const paddr_t dtb_len = ROUNDUP(hwdom_get_fdt_alloc_size(), MB(2));
+    const paddr_t rambase = bank_start;
+    const paddr_t ramsize = bank_size;
+    const paddr_t dtb_initrd_size = initrd_len + dtb_len;
+    const paddr_t ramend = rambase + ramsize;
+    paddr_t kernbase;
+    paddr_t kernend;
+    paddr_t dtb_base;
+
+    kernbase = kernel_zimage_place_in_bank(info, bank_start, bank_size);
+    if ( kernbase == INVALID_PADDR )
+        return false;
+
+    kernend = kernbase + info->image.len;
+
+    if ( (kernbase < rambase) || (kernend > ramend) )
+        return false;
+
+    if ( !first_bank_can_fit_modules(ramsize, kernbase, kernend,
+                                     dtb_initrd_size) )
+        return false;
+
+    return find_dtb_initrd_placement(rambase, ramend, kernbase, kernend,
+                                     dtb_initrd_size, &dtb_base);
 }
 
 static void __init kernel_zimage_load(struct kernel_info *info)

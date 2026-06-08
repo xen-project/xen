@@ -26,8 +26,6 @@
 #undef virt_to_mfn
 #define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
 
-#define ACPI_DOM0_FDT_MIN_SIZE 4096
-
 static int __init acpi_iomem_deny_access(struct domain *d)
 {
     acpi_status status;

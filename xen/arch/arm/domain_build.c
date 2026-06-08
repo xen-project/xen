@@ -115,6 +115,14 @@ int __init parse_arch_dom0_param(const char *s, const char *e)
                              (IS_ENABLED(CONFIG_STATIC_SHM) ?         \
                               (NR_SHMEM_BANKS * (160 + 16)) : 0))
 
+paddr_t __init hwdom_get_fdt_alloc_size(void)
+{
+    if ( acpi_disabled )
+        return fdt_totalsize(device_tree_flattened) + DOM0_FDT_EXTRA_SIZE;
+
+    return ACPI_DOM0_FDT_MIN_SIZE;
+}
+
 unsigned int __init dom0_max_vcpus(void)
 {
     if ( opt_dom0_max_vcpus == 0 )
