@@ -245,8 +245,8 @@ out:
  * hardware domain to have memory reachable by devices with limited DMA address
  * capabilities (e.g. 32-bit DMA).
  *
- * The first bank allocated must be large enough for place_modules() to fit
- * the kernel, DTB and initrd.
+ * The first bank allocated must be large enough for place_dtb_initrd() to
+ * fit the kernel, DTB and initrd.
  */
 static bool __init allocate_hwdom_memory(struct kernel_info *kinfo)
 {
@@ -302,7 +302,7 @@ static bool __init allocate_hwdom_memory(struct kernel_info *kinfo)
         paddr_t bank_size;
 
         /*
-         * The first bank must be large enough for place_modules() to
+         * The first bank must be large enough for place_dtb_initrd() to
          * fit the kernel, DTB and initrd.  Skip small regions to avoid
          * ending up with a tiny first bank.
          */

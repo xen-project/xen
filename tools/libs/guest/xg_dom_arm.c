@@ -429,7 +429,7 @@ static int meminit(struct xc_dom_image *dom)
      * just before the kernel.
      *
      * If changing this then consider
-     * xen/arch/arm/kernel.c:place_modules as well.
+     * xen/arch/arm/kernel.c:place_dtb_initrd as well.
      */
     bank0end = bankbase[0] + ((uint64_t)dom->rambank_size[0] << XC_PAGE_SHIFT);
 
