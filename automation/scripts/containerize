@@ -27,8 +27,7 @@ case "_${CONTAINER}" in
     _alpine) CONTAINER="${BASE}/alpine:3.18" ;;
     _alpine-arm64v8) CONTAINER="${BASE}/alpine:3.18-arm64v8" ;;
     _archlinux|_arch) CONTAINER="${BASE}/archlinux:current" ;;
-    _centos7) CONTAINER="${BASE}/centos:7" ;;
-    _fedora) CONTAINER="${BASE}/fedora:41-x86_64";;
+    _fedora) CONTAINER="${BASE}/fedora:43-x86_64";;
     _bullseye-ppc64le) CONTAINER="${BASE}/debian:11-ppc64le" ;;
     _bookworm-ppc64le) CONTAINER="${BASE}/debian:12-ppc64le" ;;
     _trixie-ppc64le) CONTAINER="${BASE}/debian:13-ppc64le" ;;
@@ -42,13 +41,13 @@ case "_${CONTAINER}" in
     _bookworm-arm64v8) CONTAINER="${BASE}/debian:12-arm64v8" ;;
     _bookworm-cppcheck) CONTAINER="${BASE}/debian:12-arm64v8-cppcheck" ;;
     _trixie-arm64v8) CONTAINER="${BASE}/debian:13-arm64v8" ;;
-    _opensuse-leap|_leap) CONTAINER="${BASE}/opensuse:leap-15.6-x86_64" ;;
+    _opensuse-leap|_leap) CONTAINER="${BASE}/opensuse:leap-16.0-x86_64" ;;
     _opensuse-tumbleweed|_tumbleweed) CONTAINER="${BASE}/opensuse:tumbleweed-x86_64" ;;
-    _xenial) CONTAINER="${BASE}/ubuntu:16.04-x86_64" ;;
     _bionic) CONTAINER="${BASE}/ubuntu:18.04-x86_64" ;;
     _focal)  CONTAINER="${BASE}/ubuntu:20.04-x86_64" ;;
     _jammy)  CONTAINER="${BASE}/ubuntu:22.04-x86_64" ;;
     _noble)  CONTAINER="${BASE}/ubuntu:24.04-x86_64" ;;
+    _resolute) CONTAINER="${BASE}/ubuntu:26.04-x86_64" ;;
 esac
 
 # Use this variable to control whether root should be used
