@@ -372,6 +372,26 @@ void vm_event_sync_pickup(struct vcpu *v)
             return;
         }
 
+        /*
+         * Dispatch on the *request* reason -- which Xen stamped in
+         * vm_event_sync_put() and the consumer cannot alter -- not the
+         * consumer-supplied response reason.  Non-monitor event classes
+         * (paging, sharing) carried on the shared sync slots take their own
+         * resume action and skip the monitor response handling below.  This
+         * mirrors the reason dispatch the legacy ring does in
+         * vm_event_resume().  The vCPU was already unpaused by
+         * sync_slot_notification(); here we only perform the resume side
+         * effect before the guest re-runs the faulting instruction.
+         */
+#ifdef CONFIG_MEM_PAGING
+        if ( slot->req.reason == VM_EVENT_REASON_MEM_PAGING )
+        {
+            p2m_mem_paging_resume(d, &rsp);
+            slot->state = VM_EVENT_SYNC_STATE_IDLE;
+            break;
+        }
+#endif
+
         atomic_inc(&v->vm_event_pause_count);
 
         vm_event_emulate_check(v, &rsp);

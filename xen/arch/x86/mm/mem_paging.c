@@ -89,21 +89,41 @@ void p2m_mem_paging_populate(struct domain *d, gfn_t gfn)
     p2m_access_t a;
     mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    int rc = vm_event_claim_slot(d, d->vm_event_paging);
+    int rc;
+    /*
+     * v2 routing (additive, Shape A): a faulting vCPU of this domain is served
+     * through the monitor's per-vCPU sync slots when (a) no legacy paging ring
+     * is set up and (b) the monitor has sync slots.  This leaves an existing v1
+     * pager -- which sets up d->vm_event_paging -- behaving exactly as before,
+     * while letting a v2 consumer receive paging populate events on the shared
+     * sync slots (dispatched by req.reason).  The vCPU pauses and resumes via
+     * the sync-slot request/response protocol; p2m_mem_paging_resume() is driven
+     * from vm_event_sync_pickup().
+     */
+    bool use_sync = ( v->domain == d ) &&
+                    !vm_event_check_ring(d->vm_event_paging) &&
+                    vm_event_has_sync_slots(d->vm_event_monitor);
 
-    /* We're paging. There should be a ring. */
-    if ( rc == -EOPNOTSUPP )
+    if ( !use_sync )
     {
-        gdprintk(XENLOG_ERR, "%pd paging gfn %"PRI_gfn" yet no ring in place\n",
-                 d, gfn_x(gfn));
-        /* Prevent the vcpu from faulting repeatedly on the same gfn */
-        if ( v->domain == d )
-            vcpu_pause_nosync(v);
-        domain_crash(d);
-        return;
+        rc = vm_event_claim_slot(d, d->vm_event_paging);
+
+        /* We're paging. There should be a ring (or v2 sync slots). */
+        if ( rc == -EOPNOTSUPP )
+        {
+            gdprintk(XENLOG_ERR, "%pd paging gfn %"PRI_gfn" yet no ring in place\n",
+                     d, gfn_x(gfn));
+            /* Prevent the vcpu from faulting repeatedly on the same gfn */
+            if ( v->domain == d )
+                vcpu_pause_nosync(v);
+            domain_crash(d);
+            return;
+        }
+        else if ( rc < 0 )
+            return;
     }
-    else if ( rc < 0 )
-        return;
+    else
+        rc = 0;
 
     /* Fix p2m mapping */
     gfn_lock(p2m, gfn, 0);
@@ -124,19 +144,36 @@ void p2m_mem_paging_populate(struct domain *d, gfn_t gfn)
     /* Pause domain if request came from guest and gfn has paging type */
     if ( p2m_is_paging(p2mt) && v->domain == d )
     {
-        vm_event_vcpu_pause(v);
+        req.u.mem_paging.p2mt = p2mt;
+        req.vcpu_id = v->vcpu_id;
         req.flags |= VM_EVENT_FLAG_VCPU_PAUSED;
+
+        if ( use_sync )
+        {
+            /* sync_put pauses the vCPU and publishes the request itself. */
+            vm_event_sync_put(v, &req);
+            return;
+        }
+
+        vm_event_vcpu_pause(v);
+        vm_event_put_request(d, d->vm_event_paging, &req);
+        return;
     }
     /* No need to inform pager if the gfn is not in the page-out path */
     else if ( p2mt != p2m_ram_paging_out && p2mt != p2m_ram_paged )
     {
         /* gfn is already on its way back and vcpu is not paused */
     out_cancel:
-        vm_event_cancel_slot(d, d->vm_event_paging);
+        if ( !use_sync )
+            vm_event_cancel_slot(d, d->vm_event_paging);
         return;
     }
 
-    /* Send request to pager */
+    /*
+     * Send request to pager (foreign caller / non-pausing notification).
+     * use_sync is necessarily false here (it requires v->domain == d, handled
+     * by the pausing branch above), so this always uses the legacy ring.
+     */
     req.u.mem_paging.p2mt = p2mt;
     req.vcpu_id = v->vcpu_id;
 
