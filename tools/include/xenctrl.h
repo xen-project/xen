@@ -2075,6 +2075,17 @@ int xc_vm_event_get_version(xc_interface *xch);
 void *xc_monitor_enable(xc_interface *xch, uint32_t domain_id, uint32_t *port);
 int xc_monitor_disable(xc_interface *xch, uint32_t domain_id);
 int xc_monitor_resume(xc_interface *xch, uint32_t domain_id);
+
+/*
+ * Set up the shared-memory monitor interface.  flags is a transport selector
+ * (XEN_VM_EVENT_SETUP_* from xen/domctl.h); at least one transport must be
+ * requested.  sync_slot_size is the per-vCPU sync slot size in bytes.  The
+ * mapped region is acquired separately via xenforeignmemory_map_resource().
+ */
+int xc_monitor_setup(xc_interface *xch, uint32_t domain_id,
+                     uint32_t flags, uint32_t sync_slot_size,
+                     uint32_t async_ring_pages);
+
 /*
  * Get a bitmap of supported monitor events in the form
  * (1 << XEN_DOMCTL_MONITOR_EVENT_*).

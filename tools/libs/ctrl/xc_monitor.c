@@ -36,6 +36,24 @@ int xc_monitor_disable(xc_interface *xch, uint32_t domain_id)
                                NULL);
 }
 
+int xc_monitor_setup(xc_interface *xch, uint32_t domain_id,
+                     uint32_t flags, uint32_t sync_slot_size,
+                     uint32_t async_ring_pages)
+{
+    struct xen_domctl domctl = {};
+
+    domctl.cmd = XEN_DOMCTL_vm_event_op;
+    domctl.domain = domain_id;
+    domctl.u.vm_event_op.op = XEN_VM_EVENT_SETUP;
+    domctl.u.vm_event_op.mode = XEN_DOMCTL_VM_EVENT_OP_MONITOR;
+    domctl.u.vm_event_op.u.setup.flags = flags;
+    domctl.u.vm_event_op.u.setup.sync_slot_size = sync_slot_size;
+    domctl.u.vm_event_op.u.setup.async_ring_pages = async_ring_pages;
+    domctl.u.vm_event_op.u.setup.reserved = 0;
+
+    return do_domctl(xch, &domctl);
+}
+
 int xc_monitor_resume(xc_interface *xch, uint32_t domain_id)
 {
     return xc_vm_event_control(xch, domain_id,
