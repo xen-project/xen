@@ -58,6 +58,7 @@ obj-$(CONFIG_TRACEBUFFER) += trace.o
 obj-y += version.o
 obj-y += virtual_region.o
 obj-$(CONFIG_VM_EVENT) += vm_event.o
+obj-$(CONFIG_VM_EVENT) += vm_event_sync.o
 obj-$(CONFIG_HAS_VMAP) += vmap.o
 obj-y += vsprintf.o
 obj-$(CONFIG_VM_EVENT) += wait.o

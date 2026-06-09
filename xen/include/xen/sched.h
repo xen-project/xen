@@ -265,6 +265,7 @@ struct vcpu
 
     /* VCPU paused for vm_event replies. */
     atomic_t         vm_event_pause_count;
+    bool             vm_event_sync_paused;
     /* VCPU paused by system controller. */
     int              controller_pause_count;
 

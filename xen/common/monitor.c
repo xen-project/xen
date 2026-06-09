@@ -72,6 +72,14 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
         if ( unlikely(old_status == requested_status) )
             return -EEXIST;
 
+        /*
+         * Asynchronous delivery needs a transport that can carry it; on a v2
+         * sync monitor it would be silently dropped.  Fail loudly instead.
+         */
+        if ( requested_status && !mop->u.guest_request.sync &&
+             !vm_event_monitor_async_capable(d) )
+            return -EOPNOTSUPP;
+
         domain_pause(d);
         d->monitor.guest_request_sync = mop->u.guest_request.sync;
         d->monitor.guest_request_enabled = requested_status;
@@ -92,6 +100,28 @@ int monitor_traps(struct vcpu *v, bool sync, vm_event_request_t *req)
 {
     int rc;
     struct domain *d = v->domain;
+
+    if ( vm_event_has_new_api(d->vm_event_monitor) )
+    {
+        if ( !sync )
+            return 0;
+
+        req->vcpu_id = v->vcpu_id;
+        req->flags |= VM_EVENT_FLAG_VCPU_PAUSED;
+        /*
+         * Mark a sync event in flight so the arch interrupt-injection assist
+         * holds off until the monitor has responded, as in the v1 path.
+         * Cleared in vm_event_sync_pickup() once the response is taken.
+         */
+        vm_event_sync_event(v, true);
+        if ( altp2m_active(d) )
+        {
+            req->flags |= VM_EVENT_FLAG_ALTERNATE_P2M;
+            req->altp2m_idx = altp2m_vcpu_idx(v);
+        }
+        vm_event_fill_regs(req);
+        return vm_event_sync_put(v, req);
+    }
 
     rc = vm_event_claim_slot(d, d->vm_event_monitor);
     switch ( rc )

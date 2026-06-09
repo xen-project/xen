@@ -19,6 +19,7 @@
  * License along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/vm_event.h>
 #include <asm/monitor.h>
 #include <public/vm_event.h>
 
@@ -166,6 +167,10 @@ int arch_monitor_domctl_event(struct domain *d,
         if ( unlikely(old_status == requested_status) )
             return -EEXIST;
 
+        if ( requested_status && !mop->u.mov_to_cr.sync &&
+             !vm_event_monitor_async_capable(d) )
+            return -EOPNOTSUPP;
+
         domain_pause(d);
 
         if ( mop->u.mov_to_cr.sync )
@@ -297,6 +302,10 @@ int arch_monitor_domctl_event(struct domain *d,
         if ( unlikely(old_status == requested_status) )
             return -EEXIST;
 
+        if ( requested_status && !mop->u.debug_exception.sync &&
+             !vm_event_monitor_async_capable(d) )
+            return -EOPNOTSUPP;
+
         domain_pause(d);
         ad->monitor.debug_exception_enabled = requested_status;
         ad->monitor.debug_exception_sync = requested_status ?
@@ -338,6 +347,10 @@ int arch_monitor_domctl_event(struct domain *d,
 
         if ( unlikely(old_status == requested_status) )
             return -EEXIST;
+
+        if ( requested_status && !mop->u.vmexit.sync &&
+             !vm_event_monitor_async_capable(d) )
+            return -EOPNOTSUPP;
 
         domain_pause(d);
         ad->monitor.vmexit_enabled = requested_status;

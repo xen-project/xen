@@ -223,6 +223,51 @@ static int vm_event_disable(struct domain *d, struct vm_event_domain **p_ved)
     return 0;
 }
 
+/*
+ * Create the shared-memory (v2) monitor domain.  This establishes the
+ * struct vm_event_domain and marks it as the new API, but brings up no
+ * transport yet -- the SETUP dispatcher attaches sync slots and/or the async
+ * ring onto it.  Publishing d->vm_event_monitor up front lets a follow-up
+ * SETUP find the monitor to add a second transport; readers that race the
+ * window before a transport is attached are handled by the no-transport
+ * backstops in monitor_traps().
+ */
+static int vm_event_monitor_create(struct domain *d)
+{
+    struct vm_event_domain *ved;
+    int rc;
+
+    ved = xzalloc(struct vm_event_domain);
+    if ( !ved )
+        return -ENOMEM;
+
+    spin_lock_init(&ved->lock);
+    ved->new_api = true;
+
+    rc = vm_event_init_domain(d);
+    if ( rc < 0 )
+    {
+        xfree(ved);
+        return rc;
+    }
+
+    smp_wmb();
+    d->vm_event_monitor = ved;
+
+    return 0;
+}
+
+/* Tear down the v2 monitor domain once both transports are gone. */
+static void vm_event_monitor_destroy(struct domain *d)
+{
+    if ( d->vm_event_monitor == NULL )
+        return;
+
+    vm_event_cleanup_domain(d);
+    xfree(d->vm_event_monitor);
+    d->vm_event_monitor = NULL;
+}
+
 static void vm_event_release_slot(struct domain *d,
                                   struct vm_event_domain *ved)
 {
@@ -578,7 +623,12 @@ void vm_event_cleanup(struct domain *d)
         (void)vm_event_disable(d, &d->vm_event_paging);
     }
 #endif
-    if ( vm_event_check_ring(d->vm_event_monitor) )
+    if ( vm_event_has_new_api(d->vm_event_monitor) )
+    {
+        (void)vm_event_sync_disable(d);
+        vm_event_monitor_destroy(d);
+    }
+    else if ( vm_event_check_ring(d->vm_event_monitor) )
     {
         destroy_waitqueue_head(&d->vm_event_monitor->wq);
         (void)vm_event_disable(d, &d->vm_event_monitor);
@@ -703,13 +753,100 @@ int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec)
             rc = arch_monitor_init_domain(d);
             if ( rc )
                 break;
-            rc = vm_event_enable(d, vec, &d->vm_event_monitor, _VPF_mem_access,
+            rc = vm_event_enable(d, vec, &d->vm_event_monitor,
+                                 _VPF_mem_access,
                                  HVM_PARAM_MONITOR_RING_PFN,
                                  monitor_notification);
             break;
 
+        case XEN_VM_EVENT_SETUP:
+        {
+            /* domain_pause() not required here, see XSA-99 */
+            uint32_t flags = vec->u.setup.flags;
+            const uint32_t valid_flags = XEN_VM_EVENT_SETUP_SYNC;
+            bool first, did_sync = false;
+
+            /*
+             * flags selects which transport(s) to bring up; at least one is
+             * required.  A transport's size field must be zero unless that
+             * transport is requested.  reserved must be zero.
+             */
+            if ( (flags & ~valid_flags) || !(flags & valid_flags) ||
+                 vec->u.setup.reserved )
+            {
+                rc = -EINVAL;
+                break;
+            }
+            if ( (!(flags & XEN_VM_EVENT_SETUP_SYNC) &&
+                  vec->u.setup.sync_slot_size) ||
+                 (!(flags & XEN_VM_EVENT_SETUP_ASYNC) &&
+                  vec->u.setup.async_ring_pages) )
+            {
+                rc = -EINVAL;
+                break;
+            }
+
+            /* A legacy v1 ring monitor occupies the same slot; don't mix. */
+            if ( d->vm_event_monitor &&
+                 !vm_event_has_new_api(d->vm_event_monitor) )
+            {
+                rc = -EBUSY;
+                break;
+            }
+
+            rc = arch_monitor_init_domain(d);
+            if ( rc )
+                break;
+
+            /*
+             * The first SETUP creates the monitor; a later one adds a missing
+             * transport to it.  Each transport enable rejects a redundant
+             * request with -EBUSY, so SETUP never re-initialises a live one.
+             */
+            first = (d->vm_event_monitor == NULL);
+            if ( first )
+            {
+                rc = vm_event_monitor_create(d);
+                if ( rc )
+                {
+                    arch_monitor_cleanup_domain(d);
+                    break;
+                }
+            }
+
+            if ( flags & XEN_VM_EVENT_SETUP_SYNC )
+            {
+                rc = vm_event_sync_enable(d, vec);
+                if ( rc )
+                    goto setup_unwind;
+                did_sync = true;
+            }
+            break;
+
+         setup_unwind:
+            /* Undo only the transports this call brought up. */
+            if ( did_sync )
+                vm_event_sync_disable(d);
+            /* Destroy the monitor only if this call created it. */
+            if ( first )
+            {
+                vm_event_monitor_destroy(d);
+                arch_monitor_cleanup_domain(d);
+            }
+            break;
+        }
+
         case XEN_VM_EVENT_DISABLE:
-            if ( vm_event_check_ring(d->vm_event_monitor) )
+            if ( vm_event_has_new_api(d->vm_event_monitor) )
+            {
+                domain_pause(d);
+                vm_event_sync_disable(d);
+                vm_event_monitor_destroy(d);
+                arch_monitor_cleanup_domain(d);
+                domain_unpause(d);
+                rc = 0;
+            }
+            else if ( vm_event_check_ring(d->vm_event_monitor) )
             {
                 domain_pause(d);
                 rc = vm_event_disable(d, &d->vm_event_monitor);
