@@ -301,6 +301,10 @@ long arch_do_domctl(
         /* Games to allow this code block to handle a compat guest. */
         void __user *guest_handle = domctl->u.getpageframeinfo3.array.p;
 
+        ret = xsm_domctl(XSM_OTHER, d, domctl);
+        if ( ret )
+            break;
+
         if ( unlikely(num > 1024) ||
              unlikely(num != domctl->u.getpageframeinfo3.num) )
         {
