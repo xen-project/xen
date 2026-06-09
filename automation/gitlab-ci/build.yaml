@@ -523,16 +523,16 @@ alpine-3.18-clang-debug:
   variables:
     CONTAINER: alpine:3.18
 
-archlinux-gcc:
+archlinux-x86_64-gcc:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: archlinux:current
+    CONTAINER: archlinux:current-x86_64
   allow_failure: true
 
-archlinux-gcc-debug:
+archlinux-x86_64-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: archlinux:current
+    CONTAINER: archlinux:current-x86_64
   allow_failure: true
 
 debian-12-x86_64-gcc-ibt:

@@ -16,11 +16,11 @@
   after_script:
     - docker logout
 
-container-archlinux-current:
+container-archlinux-current-x86_64:
   extends:
     - .container-build-tmpl
   variables:
-    CONTAINER: "archlinux:current"
+    CONTAINER: "archlinux:current-x86_64"
 
 container-opensuse-tumbleweed-x86_64:
   extends:
