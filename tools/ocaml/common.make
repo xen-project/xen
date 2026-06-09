@@ -11,6 +11,7 @@ OCAMLFIND ?= ocamlfind
 
 CFLAGS += -fPIC -I$(shell ocamlc -where)
 
+OCAMLINCLUDE += -I +unix -I +dynlink
 OCAMLOPTFLAGS = -g -ccopt "$(LDFLAGS)" -dtypes $(OCAMLINCLUDE) -w F -warn-error F
 OCAMLCFLAGS += -g $(OCAMLINCLUDE) -w F -warn-error F
 
