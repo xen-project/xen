@@ -73,11 +73,15 @@ int monitor_domctl(struct domain *d, struct xen_domctl_monitor_op *mop)
             return -EEXIST;
 
         /*
-         * Asynchronous delivery needs a transport that can carry it; on a v2
-         * sync monitor it would be silently dropped.  Fail loudly instead.
+         * Each delivery mode needs a transport that can carry it; on a v2
+         * monitor lacking the matching transport the event would be silently
+         * dropped.  Fail loudly instead.
          */
         if ( requested_status && !mop->u.guest_request.sync &&
              !vm_event_monitor_async_capable(d) )
+            return -EOPNOTSUPP;
+        if ( requested_status && mop->u.guest_request.sync &&
+             !vm_event_monitor_sync_capable(d) )
             return -EOPNOTSUPP;
 
         domain_pause(d);
@@ -104,6 +108,27 @@ int monitor_traps(struct vcpu *v, bool sync, vm_event_request_t *req)
     if ( vm_event_has_new_api(d->vm_event_monitor) )
     {
         if ( !sync )
+        {
+            if ( !vm_event_has_async_ring(d->vm_event_monitor) )
+                return 0;
+
+            req->vcpu_id = v->vcpu_id;
+            if ( altp2m_active(d) )
+            {
+                req->flags |= VM_EVENT_FLAG_ALTERNATE_P2M;
+                req->altp2m_idx = altp2m_vcpu_idx(v);
+            }
+            vm_event_fill_regs(req);
+            return vm_event_async_put(v, req);
+        }
+
+        /*
+         * Sync delivery needs the per-vCPU sync slots; an async-only monitor
+         * has none.  Mirror the no-async-ring case above and drop rather than
+         * dereference a missing transport (config-time guards reject enabling
+         * sync events on such a monitor, so this is a backstop).
+         */
+        if ( !vm_event_has_sync_slots(d->vm_event_monitor) )
             return 0;
 
         req->vcpu_id = v->vcpu_id;

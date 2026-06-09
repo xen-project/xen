@@ -50,10 +50,10 @@ struct vm_event_domain
     unsigned int last_vcpu_wake_up;
 
     /*
-     * True once this domain's monitor is the v2 shared-memory interface, as
-     * opposed to the legacy v1 ring.  Set when the monitor is created, before
-     * a transport is attached, so the discriminator does not depend on which
-     * transport (currently only sync slots) is present.
+     * True once this domain's monitor is the v2 shared-memory interface
+     * (sync slots and/or async ring), as opposed to the legacy v1 ring.
+     * Set when the monitor is created, before any transport is attached, so
+     * an async-only monitor (sync_region == NULL) is still recognised as v2.
      */
     bool new_api;
 
@@ -71,6 +71,23 @@ struct vm_event_domain
     uint32_t sync_slot_size;
     uint32_t sync_slot_array_offset;
     uint32_t sync_nr_vcpus;
+
+    void *async_region;
+    unsigned int async_region_nr_pages;
+    evtchn_port_t async_port;
+
+    /*
+     * Private, immutable copy of the async ring layout (same rationale as
+     * the sync cache above: the shared header is consumer-writable and must
+     * never be trusted for Xen's pointer arithmetic).  The live ring
+     * indices prod_idx/cons_idx remain in the shared header -- they are
+     * protocol state, not layout -- and the cached nr_slots keeps the slot
+     * index bounded regardless of what the consumer writes there.
+     */
+    uint32_t async_slot_size;
+    uint32_t async_slot_array_offset;
+    uint32_t async_nr_slots;
+    uint32_t async_max_outstanding;
 };
 
 static inline bool vm_event_has_new_api(const struct vm_event_domain *ved)
@@ -81,6 +98,11 @@ static inline bool vm_event_has_new_api(const struct vm_event_domain *ved)
 static inline bool vm_event_has_sync_slots(const struct vm_event_domain *ved)
 {
     return ved && ved->sync_region;
+}
+
+static inline bool vm_event_has_async_ring(const struct vm_event_domain *ved)
+{
+    return ved && ved->async_region;
 }
 
 /* Returns whether a ring has been set up */
@@ -106,15 +128,38 @@ static inline bool vm_event_check(struct vm_event_domain *ved)
 
 /*
  * Whether the monitor can deliver an asynchronous (non-paused) event without
- * losing it.  The legacy v1 ring carries async events inline; the v2 sync
- * interface has no asynchronous path.  Used to reject configuring async event
- * delivery that would otherwise be silently dropped.  A NULL monitor counts
- * as capable: the transport is configured separately, and the no-listener
- * case is handled where events are produced.
+ * losing it.  The legacy v1 ring carries async events inline; the v2
+ * interface needs a dedicated async ring.  Used to reject configuring async
+ * event delivery that would otherwise be silently dropped.  A NULL monitor
+ * counts as capable: the transport is configured separately, and the
+ * no-listener case is handled where events are produced.
  */
 static inline bool vm_event_monitor_async_capable(const struct domain *d)
 {
-    return !vm_event_has_new_api(d->vm_event_monitor);
+    const struct vm_event_domain *ved = d->vm_event_monitor;
+
+    if ( !vm_event_has_new_api(ved) )
+        return true;
+
+    return vm_event_has_async_ring(ved);
+}
+
+/*
+ * Whether the monitor can deliver a synchronous (vCPU-paused) event.  The
+ * mirror of vm_event_monitor_async_capable(): a v2 monitor needs the per-vCPU
+ * sync slots, which an async-only monitor does not bring up.  Used to reject
+ * configuring sync event delivery that would otherwise be silently dropped.
+ * A NULL or legacy v1 monitor counts as capable (the v1 ring carries sync
+ * events inline; the no-listener case is handled where events are produced).
+ */
+static inline bool vm_event_monitor_sync_capable(const struct domain *d)
+{
+    const struct vm_event_domain *ved = d->vm_event_monitor;
+
+    if ( !vm_event_has_new_api(ved) )
+        return true;
+
+    return vm_event_has_sync_slots(ved);
 }
 
 /* Returns 0 on success, -ENOSYS if there is no ring, -EBUSY if there is no
@@ -165,6 +210,16 @@ int vm_event_acquire_sync_resource(struct domain *d, unsigned int id,
 
 int vm_event_sync_put(struct vcpu *v, const vm_event_request_t *req);
 void vm_event_sync_pickup(struct vcpu *v);
+
+int vm_event_async_enable(struct domain *d, uint32_t async_ring_pages);
+int vm_event_async_disable(struct domain *d);
+
+unsigned int vm_event_async_resource_max_frames(const struct domain *d);
+int vm_event_acquire_async_resource(struct domain *d, unsigned int id,
+                                    unsigned int frame, unsigned int nr_frames,
+                                    xen_pfn_t mfn_list[]);
+
+int vm_event_async_put(struct vcpu *v, const vm_event_request_t *req);
 #else /* !CONFIG_VM_EVENT */
 static inline void vm_event_cleanup(struct domain *d) {}
 static inline int vm_event_domctl(struct domain *d,
@@ -199,6 +254,32 @@ static inline int vm_event_sync_put(struct vcpu *v,
     return 0;
 }
 static inline void vm_event_sync_pickup(struct vcpu *v) {}
+static inline int vm_event_async_enable(struct domain *d,
+                                        uint32_t async_ring_pages)
+{
+    return -EOPNOTSUPP;
+}
+static inline int vm_event_async_disable(struct domain *d)
+{
+    return 0;
+}
+static inline unsigned int
+vm_event_async_resource_max_frames(const struct domain *d)
+{
+    return 0;
+}
+static inline int
+vm_event_acquire_async_resource(struct domain *d, unsigned int id,
+                                unsigned int frame, unsigned int nr_frames,
+                                xen_pfn_t mfn_list[])
+{
+    return -EOPNOTSUPP;
+}
+static inline int vm_event_async_put(struct vcpu *v,
+                                     const vm_event_request_t *req)
+{
+    return 0;
+}
 #endif /* !CONFIG_VM_EVENT */
 
 void vm_event_vcpu_pause(struct vcpu *v);

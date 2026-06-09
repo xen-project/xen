@@ -170,6 +170,9 @@ int arch_monitor_domctl_event(struct domain *d,
         if ( requested_status && !mop->u.mov_to_cr.sync &&
              !vm_event_monitor_async_capable(d) )
             return -EOPNOTSUPP;
+        if ( requested_status && mop->u.mov_to_cr.sync &&
+             !vm_event_monitor_sync_capable(d) )
+            return -EOPNOTSUPP;
 
         domain_pause(d);
 
@@ -305,6 +308,9 @@ int arch_monitor_domctl_event(struct domain *d,
         if ( requested_status && !mop->u.debug_exception.sync &&
              !vm_event_monitor_async_capable(d) )
             return -EOPNOTSUPP;
+        if ( requested_status && mop->u.debug_exception.sync &&
+             !vm_event_monitor_sync_capable(d) )
+            return -EOPNOTSUPP;
 
         domain_pause(d);
         ad->monitor.debug_exception_enabled = requested_status;
@@ -350,6 +356,9 @@ int arch_monitor_domctl_event(struct domain *d,
 
         if ( requested_status && !mop->u.vmexit.sync &&
              !vm_event_monitor_async_capable(d) )
+            return -EOPNOTSUPP;
+        if ( requested_status && mop->u.vmexit.sync &&
+             !vm_event_monitor_sync_capable(d) )
             return -EOPNOTSUPP;
 
         domain_pause(d);

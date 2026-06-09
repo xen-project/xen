@@ -1275,6 +1275,9 @@ static unsigned int resource_max_frames(const struct domain *d,
 #ifdef CONFIG_VM_EVENT
     case XENMEM_resource_vm_event_sync:
         return vm_event_sync_resource_max_frames(d);
+
+    case XENMEM_resource_vm_event_async:
+        return vm_event_async_resource_max_frames(d);
 #endif
 
     default:
@@ -1368,6 +1371,10 @@ static int _acquire_resource(
     case XENMEM_resource_vm_event_sync:
         return vm_event_acquire_sync_resource(d, id, frame, nr_frames,
                                               mfn_list);
+
+    case XENMEM_resource_vm_event_async:
+        return vm_event_acquire_async_resource(d, id, frame, nr_frames,
+                                               mfn_list);
 #endif
 
     default:

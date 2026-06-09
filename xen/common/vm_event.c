@@ -625,6 +625,7 @@ void vm_event_cleanup(struct domain *d)
 #endif
     if ( vm_event_has_new_api(d->vm_event_monitor) )
     {
+        (void)vm_event_async_disable(d);
         (void)vm_event_sync_disable(d);
         vm_event_monitor_destroy(d);
     }
@@ -763,8 +764,9 @@ int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec)
         {
             /* domain_pause() not required here, see XSA-99 */
             uint32_t flags = vec->u.setup.flags;
-            const uint32_t valid_flags = XEN_VM_EVENT_SETUP_SYNC;
-            bool first, did_sync = false;
+            const uint32_t valid_flags =
+                XEN_VM_EVENT_SETUP_SYNC | XEN_VM_EVENT_SETUP_ASYNC;
+            bool first, did_sync = false, did_async = false;
 
             /*
              * flags selects which transport(s) to bring up; at least one is
@@ -821,10 +823,19 @@ int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec)
                     goto setup_unwind;
                 did_sync = true;
             }
+            if ( flags & XEN_VM_EVENT_SETUP_ASYNC )
+            {
+                rc = vm_event_async_enable(d, vec->u.setup.async_ring_pages);
+                if ( rc )
+                    goto setup_unwind;
+                did_async = true;
+            }
             break;
 
          setup_unwind:
             /* Undo only the transports this call brought up. */
+            if ( did_async )
+                vm_event_async_disable(d);
             if ( did_sync )
                 vm_event_sync_disable(d);
             /* Destroy the monitor only if this call created it. */
@@ -840,6 +851,7 @@ int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec)
             if ( vm_event_has_new_api(d->vm_event_monitor) )
             {
                 domain_pause(d);
+                vm_event_async_disable(d);
                 vm_event_sync_disable(d);
                 vm_event_monitor_destroy(d);
                 arch_monitor_cleanup_domain(d);
