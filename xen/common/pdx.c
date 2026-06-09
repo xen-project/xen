@@ -391,10 +391,7 @@ bool __init pfn_pdx_compression_setup(paddr_t base)
         if ( !i ||
              ranges[i].base_pfn >=
              (ranges[i - 1].base_pfn + ranges[i - 1].pages) )
-        {
-            mask |= pdx_region_mask(ranges[i].base_pfn, ranges[i].pages);
             continue;
-        }
 
         ranges[i - 1].pages = ranges[i].base_pfn + ranges[i].pages -
                               ranges[i - 1].base_pfn;
@@ -402,19 +399,21 @@ bool __init pfn_pdx_compression_setup(paddr_t base)
         if ( i + 1 < nr_ranges )
             memmove(&ranges[i], &ranges[i + 1],
                     (nr_ranges - (i + 1)) * sizeof(ranges[0]));
-        else /* last range */
-            mask |= pdx_region_mask(ranges[i].base_pfn, ranges[i].pages);
         nr_ranges--;
         i--;
     }
 
     /*
-     * Populate a mask with the non-equal bits of the different ranges, do this
-     * to calculate the maximum PFN shift to use as the lookup table index.
+     * Populate two masks: one with the non-equal bits of the different ranges,
+     * another with the bits that change inside ranges.  Do this to calculate
+     * the maximum PFN shift to use as the lookup table index.
      */
     for ( i = 0; i < nr_ranges; i++ )
+    {
+        mask |= pdx_region_mask(ranges[i].base_pfn, ranges[i].pages);
         for ( unsigned int j = i + 1; j < nr_ranges; j++ )
             idx_mask |= ranges[i].base_pfn ^ ranges[j].base_pfn;
+    }
     /* Mask out the bits that change inside of ranges. */
     idx_mask &= ~mask;
 

@@ -191,6 +191,20 @@ int main(int argc, char **argv)
             },
             .compress = false,
         },
+        /*
+         * Dell R740, dual socket.  Merging of ranges causes mask differences
+         * in PDX offset mode.  Useful for checking mask calculations.
+         */
+        {
+            .ranges = {
+                { .start = 0x0000000UL, .end = 0x0080000UL },
+                { .start = 0x0100000UL, .end = 0x3070000UL },
+                { .start = 0x3070000UL, .end = 0x3870000UL },
+                { .start = 0x3870000UL, .end = 0x6870000UL },
+                { .start = 0x6870000UL, .end = 0x7070000UL },
+            },
+            .compress = false,
+        },
     };
     int ret_code = EXIT_SUCCESS;
 
