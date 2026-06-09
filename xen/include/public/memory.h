@@ -627,6 +627,8 @@ struct xen_mem_acquire_resource {
 #define XENMEM_resource_ioreq_server 0
 #define XENMEM_resource_grant_table 1
 #define XENMEM_resource_vmtrace_buf 2
+#define XENMEM_resource_vm_event_sync 3
+#define XENMEM_resource_vm_event_async 4
 
     /*
      * IN - a type-specific resource identifier, which must be zero

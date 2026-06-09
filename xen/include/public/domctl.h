@@ -32,7 +32,7 @@
  *
  * Last version bump: Xen 4.19
  */
-#define XEN_DOMCTL_INTERFACE_VERSION 0x00000017
+#define XEN_DOMCTL_INTERFACE_VERSION 0x00000018
 
 /*
  * NB. xen_domctl.domain is an IN/OUT parameter for this operation.
@@ -833,6 +833,26 @@ struct xen_domctl_gdbsx_domstatus {
 #define XEN_VM_EVENT_DISABLE              1
 #define XEN_VM_EVENT_RESUME               2
 #define XEN_VM_EVENT_GET_VERSION          3
+/*
+ * Set up the shared-memory monitor interface.  u.setup.flags selects which
+ * transport(s) to bring up (see XEN_VM_EVENT_SETUP_* below).  A distinct
+ * sub-op rather than a flag on ENABLE, so the choice never depends on the
+ * value of an output-only union field (u.enable.port).  Reads u.setup.
+ * MONITOR mode only.
+ */
+#define XEN_VM_EVENT_SETUP                4
+
+/*
+ * Transport selector for u.setup.flags.  At least one transport must be
+ * requested.  SYNC brings up the per-vCPU sync slots (request/response; the
+ * vCPU is paused awaiting a reply).  ASYNC brings up the lossless async ring
+ * (high-volume, response-free events).  The two transports are independent: a
+ * consumer may request either or both, and a SETUP that requests a transport
+ * not already present adds it to a monitor already established by an earlier
+ * SETUP.
+ */
+#define XEN_VM_EVENT_SETUP_SYNC          (1u << 0)
+#define XEN_VM_EVENT_SETUP_ASYNC         (1u << 1)
 
 /*
  * Domain memory paging
@@ -901,6 +921,14 @@ struct xen_domctl_vm_event_op {
         } enable;
 
         uint32_t version;
+
+        /* IN: used by XEN_VM_EVENT_SETUP. */
+        struct {
+            uint32_t flags;            /* XEN_VM_EVENT_SETUP_* transport sel. */
+            uint32_t async_ring_pages; /* ASYNC ring size; 0 unless ASYNC set */
+            uint32_t sync_slot_size;   /* per-vCPU slot size; 0 unless SYNC set */
+            uint32_t reserved;         /* must be zero */
+        } setup;
     } u;
 };
 

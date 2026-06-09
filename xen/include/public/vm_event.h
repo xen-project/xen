@@ -439,6 +439,126 @@ typedef struct vm_event_st {
 
 DEFINE_RING_TYPES(vm_event, vm_event_request_t, vm_event_response_t);
 
+#define VM_EVENT_SYNC_MAGIC       0x5645564DU
+#define VM_EVENT_SYNC_VERSION     1
+
+#define VM_EVENT_SYNC_STATE_IDLE       0U
+#define VM_EVENT_SYNC_STATE_REQUEST    1U
+#define VM_EVENT_SYNC_STATE_RESPONSE   2U
+#define VM_EVENT_SYNC_STATE_ABANDONED  3U
+
+struct vm_event_sync_header {
+    uint32_t magic;
+    uint32_t version;
+    uint32_t header_size;
+    uint32_t port_array_size;
+    uint32_t slot_size;
+    uint32_t slot_array_offset;
+    uint32_t nr_vcpus;
+    uint32_t flags;
+    uint64_aligned_t reserved[8];
+};
+
+struct vm_event_sync_slot {
+    uint32_t request_seq;
+    uint32_t response_seq;
+    uint32_t state;
+    uint32_t pad;
+    vm_event_request_t  req;
+    vm_event_response_t rsp;
+};
+
+static inline struct vm_event_sync_slot *
+vm_event_sync_slot(void *ring_base, uint32_t vcpu_id)
+{
+    const struct vm_event_sync_header *hdr =
+        (const struct vm_event_sync_header *)ring_base;
+    return (struct vm_event_sync_slot *)
+        ((char *)ring_base + hdr->slot_array_offset +
+         vcpu_id * hdr->slot_size);
+}
+
+static inline uint32_t
+vm_event_sync_port(void *ring_base, uint32_t vcpu_id)
+{
+    const struct vm_event_sync_header *hdr =
+        (const struct vm_event_sync_header *)ring_base;
+    const uint32_t *ports = (const uint32_t *)
+        ((char *)ring_base + hdr->header_size);
+    return ports[vcpu_id];
+}
+
+static inline int
+vm_event_sync_header_valid(const struct vm_event_sync_header *hdr,
+                           uint32_t required_version)
+{
+    if ( hdr->magic != VM_EVENT_SYNC_MAGIC ) return -1;
+    if ( hdr->version < required_version )  return -2;
+    return 0;
+}
+
+/* --- vm_event v2 async ring (opt-in via async_ring_pages > 0) --- */
+
+#define VM_EVENT_ASYNC_MAGIC       0x5341564DU /* "MVAS" */
+#define VM_EVENT_ASYNC_VERSION     1
+
+/*
+ * Async-ring loss policy.
+ *
+ * v1: PAUSE only.  When the consumer falls behind, Xen pauses the
+ * offending vCPU via vcpu_pause_nosync before the ring can overflow
+ * (structural no-loss invariant: nr_slots >= nr_vcpus AND
+ * max_outstanding == nr_vcpus).  hdr->flags is reserved and must be
+ * zero.  dropped_count and overwritten_count are diagnostic canaries
+ * expected to remain zero in production.
+ *
+ * Future policies (DROP_NEWEST, OVERWRITE) will be encoded as a 2-bit
+ * enum in the low bits of hdr->flags without changing this layout.
+ */
+
+struct vm_event_async_header {
+    uint32_t magic;
+    uint32_t version;
+    uint32_t header_size;
+    uint32_t slot_size;
+    uint32_t slot_array_offset;
+    uint32_t nr_slots;
+    uint32_t max_outstanding;
+    uint32_t flags;
+    uint32_t evtchn_port;
+    uint32_t prod_idx;
+    uint32_t cons_idx;
+    uint32_t pad;
+    uint64_aligned_t dropped_count;
+    uint64_aligned_t overwritten_count;
+    uint64_aligned_t reserved[6];
+};
+
+struct vm_event_async_slot {
+    uint32_t seqcount;
+    uint32_t pad;
+    vm_event_request_t req;
+};
+
+static inline struct vm_event_async_slot *
+vm_event_async_slot(void *ring_base, uint32_t i)
+{
+    const struct vm_event_async_header *hdr =
+        (const struct vm_event_async_header *)ring_base;
+    return (struct vm_event_async_slot *)
+        ((char *)ring_base + hdr->slot_array_offset +
+         (i % hdr->nr_slots) * hdr->slot_size);
+}
+
+static inline int
+vm_event_async_header_valid(const struct vm_event_async_header *hdr,
+                            uint32_t required_version)
+{
+    if ( hdr->magic != VM_EVENT_ASYNC_MAGIC ) return -1;
+    if ( hdr->version < required_version )   return -2;
+    return 0;
+}
+
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 #endif /* _XEN_PUBLIC_VM_EVENT_H */
 
