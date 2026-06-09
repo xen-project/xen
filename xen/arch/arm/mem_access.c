@@ -282,7 +282,7 @@ bool p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
     }
 
     /* Otherwise, check if there is a vm_event monitor subscriber */
-    if ( !vm_event_check_ring(v->domain->vm_event_monitor) )
+    if ( !vm_event_check(v->domain->vm_event_monitor) )
     {
         /* No listener */
         if ( p2m->access_required )

@@ -52,7 +52,7 @@ int mem_access_memop(unsigned long cmd,
         goto out;
 
     rc = -ENODEV;
-    if ( unlikely(!vm_event_check_ring(d->vm_event_monitor)) )
+    if ( unlikely(!vm_event_check(d->vm_event_monitor)) )
         goto out;
 
     switch ( mao.op )
