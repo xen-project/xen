@@ -27,6 +27,7 @@
 #include <xen/sections.h>
 #include <xen/trace.h>
 #include <xen/types.h>
+#include <xen/vm_event.h>
 #include <xen/xvmalloc.h>
 
 #include <asm/current.h>
@@ -1271,6 +1272,11 @@ static unsigned int resource_max_frames(const struct domain *d,
         return d->vmtrace_size >> PAGE_SHIFT;
 #endif
 
+#ifdef CONFIG_VM_EVENT
+    case XENMEM_resource_vm_event_sync:
+        return vm_event_sync_resource_max_frames(d);
+#endif
+
     default:
         return 0;
     }
@@ -1356,6 +1362,12 @@ static int _acquire_resource(
 #ifdef CONFIG_VMTRACE
     case XENMEM_resource_vmtrace_buf:
         return acquire_vmtrace_buf(d, id, frame, nr_frames, mfn_list);
+#endif
+
+#ifdef CONFIG_VM_EVENT
+    case XENMEM_resource_vm_event_sync:
+        return vm_event_acquire_sync_resource(d, id, frame, nr_frames,
+                                              mfn_list);
 #endif
 
     default:
