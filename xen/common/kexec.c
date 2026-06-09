@@ -6,31 +6,33 @@
  * - Magnus Damm <magnus@valinux.co.jp>
  */
 
-#include <xen/init.h>
-#include <xen/lib.h>
 #include <xen/acpi.h>
-#include <xen/ctype.h>
+#include <xen/console.h>
+#include <xen/cpu.h>
+#include <xen/cpumask.h>
 #include <xen/elfcore.h>
 #include <xen/errno.h>
 #include <xen/guest_access.h>
-#include <xen/param.h>
-#include <xen/watchdog.h>
-#include <xen/sched.h>
-#include <xen/types.h>
 #include <xen/hypercall.h>
+#include <xen/init.h>
 #include <xen/kexec.h>
 #include <xen/keyhandler.h>
-#include <public/kexec.h>
-#include <xen/cpumask.h>
-#include <asm/atomic.h>
-#include <xen/spinlock.h>
-#include <xen/version.h>
-#include <xen/console.h>
-#include <xen/kexec.h>
 #include <xen/kimage.h>
-#include <public/elfnote.h>
+#include <xen/lib.h>
+#include <xen/param.h>
+#include <xen/sched.h>
+#include <xen/spinlock.h>
+#include <xen/types.h>
+#include <xen/version.h>
+#include <xen/watchdog.h>
+
+#include <asm/atomic.h>
+
 #include <xsm/xsm.h>
-#include <xen/cpu.h>
+
+#include <public/elfnote.h>
+#include <public/kexec.h>
+
 #ifdef CONFIG_COMPAT
 #include <compat/kexec.h>
 #endif
@@ -38,8 +40,11 @@
 bool __read_mostly kexecing;
 
 /* Memory regions to store the per cpu register state etc. on a crash. */
-typedef struct { Elf_Note * start; size_t size; } crash_note_range_t;
-static crash_note_range_t * crash_notes;
+typedef struct {
+    Elf_Note *start;
+    size_t size;
+} crash_note_range_t;
+static crash_note_range_t *crash_notes;
 
 /* Lock to prevent race conditions when allocating the crash note buffers.
  * It also serves to protect calls to alloc_from_crash_heap when allocating
@@ -65,7 +70,7 @@ static size_t vmcoreinfo_size = 0;
 xen_kexec_reserve_t kexec_crash_area;
 paddr_t __initdata kexec_crash_area_limit = ~(paddr_t)0;
 static struct {
-    u64 start, end;
+    uint64_t start, end;
     unsigned long size;
 } ranges[16] __initdata;
 
@@ -162,6 +167,7 @@ static int __init cf_check parse_crashkernel(const char *str)
 
             ++idx;
         } while ( *str == ',' );
+
         if ( idx < ARRAY_SIZE(ranges) )
             ranges[idx].size = 0;
     }
@@ -232,7 +238,7 @@ custom_param("low_crashinfo", parse_low_crashinfo);
  */
 static int __init cf_check parse_crashinfo_maxaddr(const char *str)
 {
-    u64 addr;
+    uint64_t addr;
     const char *q;
 
     /* if low_crashinfo_mode is unset, default to min. */
@@ -252,7 +258,7 @@ static int __init cf_check parse_crashinfo_maxaddr(const char *str)
 }
 custom_param("crashinfo_maxaddr", parse_crashinfo_maxaddr);
 
-void __init set_kexec_crash_area_size(u64 system_ram)
+void __init set_kexec_crash_area_size(uint64_t system_ram)
 {
     unsigned int idx;
 
@@ -317,7 +323,7 @@ void kexec_crash_save_cpu(void)
     ELF_Prstatus *prstatus;
     crash_xen_core_t *xencore;
 
-    BUG_ON ( ! crash_notes );
+    BUG_ON(!crash_notes);
 
     if ( cpumask_test_and_set_cpu(cpu, &crash_saved_cpus) )
         return;
@@ -418,6 +424,7 @@ static void cf_check do_crashdump_trigger(unsigned char key)
 static void setup_note(Elf_Note *n, const char *name, int type, int descsz)
 {
     int l = strlen(name) + 1;
+
     strlcpy(ELFNOTE_NAME(n), name, l);
     n->namesz = l;
     n->descsz = descsz;
@@ -427,7 +434,7 @@ static void setup_note(Elf_Note *n, const char *name, int type, int descsz)
 static size_t sizeof_note(const char *name, int descsz)
 {
     return (sizeof(Elf_Note) +
-            ELFNOTE_ALIGN(strlen(name)+1) +
+            ELFNOTE_ALIGN(strlen(name) + 1) +
             ELFNOTE_ALIGN(descsz));
 }
 
@@ -439,7 +446,7 @@ static size_t sizeof_cpu_notes(const unsigned long cpu)
         + sizeof_note("Xen", sizeof(crash_xen_core_t));
 
     /* CPU0 also presents the crash_xen_info note. */
-    if ( ! cpu )
+    if ( !cpu )
         bytes = bytes +
             sizeof_note("Xen", sizeof(crash_xen_info_t));
 
@@ -450,24 +457,27 @@ static size_t sizeof_cpu_notes(const unsigned long cpu)
  * crash heap if the user has requested that crash notes be allocated
  * in lower memory.  There is currently no case where the crash notes
  * should be free()'d. */
-static void * alloc_from_crash_heap(const size_t bytes)
+static void *alloc_from_crash_heap(const size_t bytes)
 {
-    void * ret;
+    void *ret;
+
     if ( crash_heap_current + bytes > crash_heap_end )
         return NULL;
-    ret = (void*)crash_heap_current;
+
+    ret = crash_heap_current;
     crash_heap_current += bytes;
+
     return ret;
 }
 
 /* Allocate a crash note buffer for a newly onlined cpu. */
 static int kexec_init_cpu_notes(const unsigned long cpu)
 {
-    Elf_Note * note = NULL;
+    Elf_Note *note = NULL;
     int ret = 0;
     int nr_bytes = 0;
 
-    BUG_ON( cpu >= nr_cpu_ids || ! crash_notes );
+    BUG_ON(cpu >= nr_cpu_ids || !crash_notes);
 
     /* If already allocated, nothing to do. */
     if ( crash_notes[cpu].start )
@@ -505,7 +515,7 @@ static int kexec_init_cpu_notes(const unsigned long cpu)
 
         /* If the allocation failed, and another CPU did not beat us, give
          * up with ENOMEM. */
-        if ( ! note )
+        if ( !note )
             ret = -ENOMEM;
         /* else all is good so lets set up the notes. */
         else
@@ -518,7 +528,7 @@ static int kexec_init_cpu_notes(const unsigned long cpu)
             setup_note(note, "Xen", XEN_ELFNOTE_CRASH_REGS,
                        sizeof(crash_xen_core_t));
 
-            if ( ! cpu )
+            if ( !cpu )
             {
                 /* Set up Xen Crash Info note. */
                 xen_crash_note = note = ELFNOTE_NEXT(note);
@@ -548,9 +558,8 @@ static int cf_check cpu_callback(
          * fail the CPU_UP_PREPARE */
         kexec_init_cpu_notes(cpu);
         break;
-    default:
-        break;
     }
+
     return NOTIFY_DONE;
 }
 
@@ -592,7 +601,7 @@ static int __init cf_check kexec_init(void)
             get_order_from_bytes(crash_heap_size),
             MEMF_bits(crashinfo_maxaddr_bits) );
 
-        if ( ! crash_heap_current )
+        if ( !crash_heap_current )
             return -ENOMEM;
 
         memset(crash_heap_current, 0, crash_heap_size);
@@ -604,7 +613,7 @@ static int __init cf_check kexec_init(void)
        Only the individual CPU crash notes themselves must be allocated
        in lower memory if requested. */
     crash_notes = xzalloc_array(crash_note_range_t, nr_cpu_ids);
-    if ( ! crash_notes )
+    if ( !crash_notes )
         return -ENOMEM;
 
     register_keyhandler('C', do_crashdump_trigger, "trigger a crashdump", 0);
@@ -620,7 +629,8 @@ presmp_initcall(kexec_init);
 
 static int kexec_get_reserve(xen_kexec_range_t *range)
 {
-    if ( kexec_crash_area.size > 0 && kexec_crash_area.start > 0) {
+    if ( kexec_crash_area.size > 0 && kexec_crash_area.start > 0 )
+    {
         range->start = kexec_crash_area.start;
         range->size = kexec_crash_area.size;
     }
@@ -636,7 +646,7 @@ static int kexec_get_cpu(xen_kexec_range_t *range)
     if ( nr < 0 || nr >= nr_cpu_ids )
         return -ERANGE;
 
-    if ( ! crash_notes )
+    if ( !crash_notes )
         return -EINVAL;
 
     /* Try once again to allocate room for the crash notes.  It is just possible
@@ -726,7 +736,7 @@ static int kexec_get_range_compat(XEN_GUEST_HANDLE_PARAM(void) uarg)
     {
         XLAT_kexec_range(&compat_range, &range);
         if ( unlikely(__copy_to_guest(uarg, &compat_range, 1)) )
-             ret = -EFAULT;
+            ret = -EFAULT;
     }
 
     return ret;
@@ -760,7 +770,7 @@ void vmcoreinfo_append_str(const char *fmt, ...)
     int r;
     size_t note_size = sizeof(Elf_Note) + ELFNOTE_ALIGN(strlen(VMCOREINFO_NOTE_NAME) + 1);
 
-    if (vmcoreinfo_size + note_size + sizeof(buf) > VMCOREINFO_BYTES)
+    if ( vmcoreinfo_size + note_size + sizeof(buf) > VMCOREINFO_BYTES )
         return;
 
     va_start(args, fmt);
@@ -776,7 +786,7 @@ static void crash_save_vmcoreinfo(void)
 {
     size_t data_size;
 
-    if (vmcoreinfo_size > 0)    /* already saved */
+    if ( vmcoreinfo_size > 0 )
         return;
 
     data_size = VMCOREINFO_BYTES - (sizeof(Elf_Note) + ELFNOTE_ALIGN(strlen(VMCOREINFO_NOTE_NAME) + 1));
@@ -835,12 +845,13 @@ static int kexec_exec(XEN_GUEST_HANDLE_PARAM(void) uarg)
     if ( !test_bit(base + pos, &kexec_flags) )
         return -ENOENT;
 
-    switch (exec.type)
+    switch ( exec.type )
     {
     case KEXEC_TYPE_DEFAULT:
         image = kexec_image[base + pos];
         ret = continue_hypercall_on_cpu(0, kexec_reboot, image);
         break;
+
     case KEXEC_TYPE_CRASH:
         kexec_crash(CRASHREASON_KEXECCMD); /* Does not return */
         break;
@@ -939,7 +950,7 @@ static int kexec_load(XEN_GUEST_HANDLE_PARAM(void) uarg)
     return 0;
 
 error:
-    if ( ! kimage )
+    if ( !kimage )
         xfree(segments);
     kimage_free(kimage);
     return ret;
@@ -1001,21 +1012,24 @@ static int do_kexec_op_internal(unsigned long op,
     switch ( op )
     {
     case KEXEC_CMD_kexec_get_range:
-        if (compat)
-                ret = kexec_get_range_compat(uarg);
+        if ( compat )
+            ret = kexec_get_range_compat(uarg);
         else
-                ret = kexec_get_range(uarg);
+            ret = kexec_get_range(uarg);
         break;
 
     case KEXEC_CMD_kexec:
         ret = kexec_exec(uarg);
         break;
+
     case KEXEC_CMD_kexec_load:
         ret = kexec_load(uarg);
         break;
+
     case KEXEC_CMD_kexec_unload:
         ret = kexec_unload(uarg);
         break;
+
     case KEXEC_CMD_kexec_status:
         ret = kexec_status(uarg);
         break;

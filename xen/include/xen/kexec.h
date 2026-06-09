@@ -19,7 +19,7 @@ extern paddr_t kexec_crash_area_limit;
 
 extern bool kexecing;
 
-void set_kexec_crash_area_size(u64 system_ram);
+void set_kexec_crash_area_size(uint64_t system_ram);
 
 /* We have space for 4 images to support atomic update
  * of images. This is important for CRASH images since

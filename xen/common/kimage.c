@@ -11,15 +11,13 @@
  * Version 2.  See the file COPYING for more details.
  */
 
-#include <xen/types.h>
-#include <xen/init.h>
-#include <xen/kernel.h>
 #include <xen/errno.h>
-#include <xen/spinlock.h>
 #include <xen/guest_access.h>
-#include <xen/mm.h>
+#include <xen/init.h>
 #include <xen/kexec.h>
 #include <xen/kimage.h>
+#include <xen/mm.h>
+#include <xen/spinlock.h>
 
 #include <asm/page.h>
 
@@ -166,7 +164,7 @@ static int do_kimage_alloc(struct kexec_image **rimage, paddr_t entry,
             goto out;
     }
 
-    /* 
+    /*
      * Page for the relocation code must still be accessible after the
      * processor has switched to 32-bit mode.
      */
@@ -221,8 +219,8 @@ static int kimage_crash_alloc(struct kexec_image **rimage, paddr_t entry,
     unsigned long i;
 
     /* Verify we have a valid entry point */
-    if ( (entry < kexec_crash_area.start)
-         || (entry > kexec_crash_area.start + kexec_crash_area.size))
+    if ( entry < kexec_crash_area.start ||
+         entry > kexec_crash_area.start + kexec_crash_area.size )
         return -EADDRNOTAVAIL;
 
     /*
@@ -244,8 +242,8 @@ static int kimage_crash_alloc(struct kexec_image **rimage, paddr_t entry,
         mstart = segments[i].dest_maddr;
         mend = mstart + segments[i].dest_size;
         /* Ensure we are within the crash kernel limits. */
-        if ( (mstart < kexec_crash_area.start )
-             || (mend > kexec_crash_area.start + kexec_crash_area.size))
+        if ( mstart < kexec_crash_area.start ||
+             mend   > kexec_crash_area.start + kexec_crash_area.size )
             return -EADDRNOTAVAIL;
     }
 
@@ -606,7 +604,7 @@ static struct page_info *kimage_alloc_page(struct kexec_image *image,
         }
     }
     page = NULL;
-    for (;;)
+    for ( ;; )
     {
         kimage_entry_t *old;
 
@@ -825,7 +823,8 @@ int kimage_load_segments(struct kexec_image *image)
     int s;
     int result;
 
-    for ( s = 0; s < image->nr_segments; s++ ) {
+    for ( s = 0; s < image->nr_segments; s++ )
+    {
         result = kimage_load_segment(image, &image->segments[s]);
         if ( result < 0 )
             return result;
