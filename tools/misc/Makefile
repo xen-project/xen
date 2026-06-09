@@ -32,6 +32,7 @@ INSTALL_SBIN                   += xenperf
 INSTALL_SBIN-$(CONFIG_X86)     += xenpm
 INSTALL_SBIN                   += xenwatchdogd
 INSTALL_SBIN                   += xen-access
+INSTALL_SBIN                   += xen-access-v2
 INSTALL_SBIN                   += xen-livepatch
 INSTALL_SBIN                   += xen-diag
 INSTALL_SBIN += $(INSTALL_SBIN-y)
@@ -70,6 +71,11 @@ distclean: clean
 
 xen-access: xen-access.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenevtchn) $(APPEND_LDFLAGS)
+
+xen-access-v2: xen-access-v2.o
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(LDLIBS_libxenforeignmemory) $(LDLIBS_libxenevtchn) $(APPEND_LDFLAGS)
+
+xen-access-v2.o: CFLAGS += $(CFLAGS_libxenforeignmemory)
 
 xen-cpuid: xen-cpuid.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(APPEND_LDFLAGS)
