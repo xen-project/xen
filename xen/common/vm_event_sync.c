@@ -9,6 +9,9 @@
 
 #include <asm/p2m.h>
 #include <asm/vm_event.h>
+#ifdef CONFIG_MEM_SHARING
+#include <asm/mem_sharing.h>
+#endif
 
 #include <public/domctl.h>
 #include <public/vm_event.h>
@@ -387,6 +390,22 @@ void vm_event_sync_pickup(struct vcpu *v)
         if ( slot->req.reason == VM_EVENT_REASON_MEM_PAGING )
         {
             p2m_mem_paging_resume(d, &rsp);
+            slot->state = VM_EVENT_SYNC_STATE_IDLE;
+            break;
+        }
+#endif
+#ifdef CONFIG_MEM_SHARING
+        if ( slot->req.reason == VM_EVENT_REASON_MEM_SHARING )
+        {
+            if ( mem_sharing_is_fork(d) )
+            {
+                bool reset_state = rsp.flags & VM_EVENT_FLAG_RESET_FORK_STATE;
+                bool reset_mem = rsp.flags & VM_EVENT_FLAG_RESET_FORK_MEMORY;
+
+                if ( (reset_state || reset_mem) &&
+                     mem_sharing_fork_reset(d, reset_state, reset_mem) )
+                    ASSERT_UNREACHABLE();
+            }
             slot->state = VM_EVENT_SYNC_STATE_IDLE;
             break;
         }

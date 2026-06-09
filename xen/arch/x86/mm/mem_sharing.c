@@ -651,6 +651,24 @@ int mem_sharing_notify_enomem(struct domain *d, unsigned long gfn,
     if ( !vm_event_is_enabled(current) )
         return -EOPNOTSUPP;
 
+    /*
+     * v2 routing (additive, Shape A): when the faulting vCPU belongs to this
+     * domain and no legacy sharing ring is set up, deliver the ENOMEM event
+     * through the monitor's per-vCPU sync slots.  The sharing ENOMEM path
+     * pauses the vCPU and relies on the consumer's response to unpause it, so
+     * it is a request/response (sync) event -- the async ring cannot carry it.
+     * An existing v1 sharer (which sets up d->vm_event_share) is unaffected.
+     */
+    if ( ( v->domain == d ) &&
+         !vm_event_check_ring(d->vm_event_share) &&
+         vm_event_has_sync_slots(d->vm_event_monitor) )
+    {
+        req.flags = VM_EVENT_FLAG_VCPU_PAUSED;
+        /* sync_put pauses the vCPU and publishes the request itself. */
+        vm_event_sync_put(v, &req);
+        return 0;
+    }
+
     if ( (rc = __vm_event_claim_slot(
               d, d->vm_event_share, allow_sleep)) < 0 )
         return rc;
