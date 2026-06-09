@@ -533,6 +533,9 @@ void hvm_do_resume(struct vcpu *v)
     if ( !vcpu_ioreq_handle_completion(v) )
         return;
 
+    if ( unlikely(vm_event_has_new_api(v->domain->vm_event_monitor)) )
+        vm_event_sync_pickup(v);
+
     if ( unlikely(vm_event_is_enabled(v)) )
         hvm_vm_event_do_resume(v);
 
