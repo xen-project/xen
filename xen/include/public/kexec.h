@@ -41,10 +41,6 @@
 
 #include "xen.h"
 
-#if defined(__i386__) || defined(__x86_64__)
-#define KEXEC_XEN_NO_PAGES 17
-#endif
-
 /*
  * Prototype for this hypercall is:
  *  int kexec_op(unsigned long cmd, void *args)
@@ -65,24 +61,6 @@
 
 #define KEXEC_TYPE_DEFAULT 0
 #define KEXEC_TYPE_CRASH   1
-
-
-/* The kexec implementation for Xen allows the user to load two
- * types of kernels, KEXEC_TYPE_DEFAULT and KEXEC_TYPE_CRASH.
- * All data needed for a kexec reboot is kept in one xen_kexec_image_t
- * per "instance". The data mainly consists of machine address lists to pages
- * together with destination addresses. The data in xen_kexec_image_t
- * is passed to the "code page" which is one page of code that performs
- * the final relocations before jumping to the new kernel.
- */
-
-typedef struct xen_kexec_image {
-#if defined(__i386__) || defined(__x86_64__)
-    unsigned long page_list[KEXEC_XEN_NO_PAGES];
-#endif
-    unsigned long indirection_page;
-    unsigned long start_address;
-} xen_kexec_image_t;
 
 /*
  * Perform kexec having previously loaded a kexec or kdump kernel
@@ -109,16 +87,11 @@ typedef struct xen_kexec_exec {
 } xen_kexec_exec_t;
 
 /*
- * Load/Unload kernel image for kexec or kdump.
- * type  == KEXEC_TYPE_DEFAULT or KEXEC_TYPE_CRASH [in]
- * image == relocation information for kexec (ignored for unload) [in]
+ * Obsolete since Xen 4.4.  Removed in Xen 4.23
+ *
+#define KEXEC_CMD_kexec_load_v1         1
+#define KEXEC_CMD_kexec_unload_v1       2
  */
-#define KEXEC_CMD_kexec_load_v1         1 /* obsolete since 0x00040400 */
-#define KEXEC_CMD_kexec_unload_v1       2 /* obsolete since 0x00040400 */
-typedef struct xen_kexec_load_v1 {
-    int type;
-    xen_kexec_image_t image;
-} xen_kexec_load_v1_t;
 
 #define KEXEC_RANGE_MA_CRASH      0 /* machine address and size of crash area */
 #define KEXEC_RANGE_MA_XEN        1 /* machine address and size of Xen itself */
@@ -149,7 +122,6 @@ typedef struct xen_kexec_range {
     unsigned long start;
 } xen_kexec_range_t;
 
-#if __XEN_INTERFACE_VERSION__ >= 0x00040400
 /*
  * A contiguous chunk of a kexec image and it's destination machine
  * address.
@@ -223,15 +195,6 @@ typedef struct xen_kexec_status {
     uint8_t type;
 } xen_kexec_status_t;
 DEFINE_XEN_GUEST_HANDLE(xen_kexec_status_t);
-
-#else /* __XEN_INTERFACE_VERSION__ < 0x00040400 */
-
-#define KEXEC_CMD_kexec_load KEXEC_CMD_kexec_load_v1
-#define KEXEC_CMD_kexec_unload KEXEC_CMD_kexec_unload_v1
-#define xen_kexec_load xen_kexec_load_v1
-#define xen_kexec_load_t xen_kexec_load_v1_t
-
-#endif
 
 #endif /* _XEN_PUBLIC_KEXEC_H */
 

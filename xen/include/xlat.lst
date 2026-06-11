@@ -127,7 +127,6 @@
 ?	hypfs_dirlistentry		hypfs.h
 
 ?	kexec_exec			kexec.h
-!	kexec_image			kexec.h
 !	kexec_range			kexec.h
 
 !	add_to_physmap			memory.h
