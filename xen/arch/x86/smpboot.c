@@ -20,6 +20,7 @@
 #include <xen/serial.h>
 #include <xen/softirq.h>
 #include <xen/tasklet.h>
+#include <xen/xvmalloc.h>
 
 #include <asm/apic.h>
 #include <asm/cpuidle.h>
@@ -641,41 +642,64 @@ static int do_boot_cpu(int apicid, int cpu)
     return rc;
 }
 
-#define STUB_BUF_CPU_OFFS(cpu) (((cpu) & (STUBS_PER_PAGE - 1)) * STUB_BUF_SIZE)
+/* Dynamically allocated, indexed by CPU.  Store physical address of stubs. */
+static paddr_t *__ro_after_init stubs;
 
-unsigned long alloc_stub_page(unsigned int cpu, unsigned long *mfn)
+static bool assign_stub_page(unsigned int cpu)
 {
     unsigned long stub_va;
-    struct page_info *pg;
+    paddr_t addr = stubs[cpu];
 
-    BUILD_BUG_ON(STUBS_PER_PAGE & (STUBS_PER_PAGE - 1));
-
-    if ( *mfn )
-        pg = mfn_to_page(_mfn(*mfn));
-    else
+    if ( addr == INVALID_PADDR )
     {
-        nodeid_t node = cpu_to_node(cpu);
-        unsigned int memflags = node != NUMA_NO_NODE ? MEMF_node(node) : 0;
+        nodeid_t nid = cpu_to_node(cpu);
 
-        pg = alloc_domheap_page(NULL, memflags);
-        if ( !pg )
-            return 0;
+        /*
+         * Attempt to use the same page as the previous CPU if possible,
+         * otherwise allocate a new one.
+         */
+        if ( cpu && nid == cpu_to_node(cpu - 1) &&
+             stubs[cpu - 1] != INVALID_PADDR &&
+             PAGE_OFFSET(stubs[cpu - 1] + STUB_BUF_SIZE) )
+            addr = stubs[cpu - 1] + STUB_BUF_SIZE;
+        else
+        {
+            struct page_info *pg = alloc_domheap_page(NULL, MEMF_node(nid));
 
-        unmap_domain_page(memset(__map_domain_page(pg), 0xcc, PAGE_SIZE));
+            if ( !pg )
+                return false;
+
+            unmap_domain_page(memset(__map_domain_page(pg), 0xcc, PAGE_SIZE));
+            addr = page_to_maddr(pg);
+        }
+        stubs[cpu] = addr;
     }
 
     stub_va = XEN_VIRT_END - FIXADDR_X_SIZE - (cpu + 1) * PAGE_SIZE;
-    if ( map_pages_to_xen(stub_va, page_to_mfn(pg), 1,
+    if ( map_pages_to_xen(stub_va, maddr_to_mfn(addr), 1,
                           PAGE_HYPERVISOR_RX | MAP_SMALL_PAGES) )
-    {
-        if ( !*mfn )
-            free_domheap_page(pg);
-        stub_va = 0;
-    }
-    else if ( !*mfn )
-        *mfn = mfn_x(page_to_mfn(pg));
+        return false;
 
-    return stub_va;
+    per_cpu(stubs.mfn, cpu) = PFN_DOWN(addr);
+    per_cpu(stubs.addr, cpu) = stub_va + PAGE_OFFSET(addr);
+    return true;
+}
+
+void __init init_stubs(void)
+{
+    const unsigned int num_cpus = num_present_cpus();
+    unsigned int i;
+
+    ASSERT(!stubs);
+    stubs = xvmalloc_array(typeof(*stubs), num_cpus);
+    if ( !stubs )
+        panic("Unable to allocate stub array\n");
+
+    for ( i = 0; i < num_cpus; i++ )
+        stubs[i] = INVALID_PADDR;
+
+    if ( !assign_stub_page(0) )
+        panic("Unable to initialize BSP stub region\n");
 }
 
 void cpu_exit_clear(unsigned int cpu)
@@ -990,19 +1014,12 @@ static void cpu_smpboot_free(unsigned int cpu, bool remove)
     {
         mfn_t mfn = _mfn(per_cpu(stubs.mfn, cpu));
         unsigned char *stub_page = map_domain_page(mfn);
-        unsigned int i;
 
-        memset(stub_page + STUB_BUF_CPU_OFFS(cpu), 0xcc, STUB_BUF_SIZE);
-        for ( i = 0; i < STUBS_PER_PAGE; ++i )
-            if ( stub_page[i * STUB_BUF_SIZE] != 0xcc )
-                break;
+        memset(stub_page + PAGE_OFFSET(stubs[cpu]), 0xcc, STUB_BUF_SIZE);
         unmap_domain_page(stub_page);
         destroy_xen_mappings(per_cpu(stubs.addr, cpu) & PAGE_MASK,
                              (per_cpu(stubs.addr, cpu) | ~PAGE_MASK) + 1);
         per_cpu(stubs.addr, cpu) = 0;
-        per_cpu(stubs.mfn, cpu) = 0;
-        if ( i == STUBS_PER_PAGE )
-            free_domheap_page(mfn_to_page(mfn));
     }
 
     if ( IS_ENABLED(CONFIG_PV32) )
@@ -1041,10 +1058,9 @@ void *cpu_alloc_stack(unsigned int cpu)
 static int cpu_smpboot_alloc(unsigned int cpu)
 {
     struct cpu_info *info;
-    unsigned int i, memflags = 0;
+    unsigned int memflags = 0;
     nodeid_t node = cpu_to_node(cpu);
     seg_desc_t *gdt;
-    unsigned long stub_page;
     int rc = -ENOMEM;
 
     if ( node != NUMA_NO_NODE )
@@ -1092,18 +1108,8 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     memcpy(per_cpu(idt, cpu), bsp_idt, sizeof(bsp_idt));
     disable_each_ist(per_cpu(idt, cpu));
 
-    for ( stub_page = 0, i = cpu & ~(STUBS_PER_PAGE - 1);
-          i < nr_cpu_ids && i <= (cpu | (STUBS_PER_PAGE - 1)); ++i )
-        if ( cpu_online(i) && cpu_to_node(i) == node )
-        {
-            per_cpu(stubs.mfn, cpu) = per_cpu(stubs.mfn, i);
-            break;
-        }
-    BUG_ON(i == cpu);
-    stub_page = alloc_stub_page(cpu, &per_cpu(stubs.mfn, cpu));
-    if ( !stub_page )
+    if ( !assign_stub_page(cpu) )
         goto out;
-    per_cpu(stubs.addr, cpu) = stub_page + STUB_BUF_CPU_OFFS(cpu);
 
     rc = setup_cpu_root_pgt(cpu);
     if ( rc )
