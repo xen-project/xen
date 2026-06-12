@@ -21,7 +21,7 @@
     job: microcode-x86
     ref: $ARTIFACTS_BRANCH
 
-.x86-64-test-needs: &x86-64-test-needs
+.x86_64-test-needs: &x86_64-test-needs
   - project: $ARTIFACTS_REPO
     job: $LINUX_JOB_X86_64
     ref: $ARTIFACTS_BRANCH
@@ -58,11 +58,11 @@
   tags:
     - arm64
 
-.qemu-x86-64:
+.qemu-x86_64:
   extends: .test-jobs-common
   variables:
     CONTAINER: debian:13-x86_64
-    LOGFILE: qemu-smoke-x86-64.log
+    LOGFILE: qemu-smoke-x86_64.log
   artifacts:
     paths:
       - smoke.serial
@@ -71,8 +71,8 @@
   tags:
     - x86_64
 
-.qemu-smoke-x86-64:
-  extends: .qemu-x86-64
+.qemu-smoke-x86_64:
+  extends: .qemu-x86_64
   variables:
     TEST_TIMEOUT_OVERRIDE: 120
 
@@ -141,7 +141,7 @@
   tags:
     - xilinx-crater-001
 
-.adl-x86-64:
+.adl-x86_64:
   extends: .test-jobs-common
   variables:
     # the test controller runs on RPi4
@@ -164,9 +164,9 @@
   tags:
     - qubes-hw2
 
-.kbl-x86-64:
+.kbl-x86_64:
   # it's really similar to the ADL one
-  extends: .adl-x86-64
+  extends: .adl-x86_64
   variables:
     PCIDEV: "00:1f.6"
     PCIDEV_INTR: "MSI"
@@ -175,9 +175,9 @@
   tags:
     - qubes-hw3
 
-.zen2-x86-64:
+.zen2-x86_64:
   # it's really similar to the above
-  extends: .adl-x86-64
+  extends: .adl-x86_64
   variables:
     PCIDEV: "01:00.0"
     PCIDEV_INTR: "MSI-X"
@@ -186,9 +186,9 @@
   tags:
     - qubes-hw1
 
-.zen3p-x86-64:
+.zen3p-x86_64:
   # it's really similar to the above
-  extends: .adl-x86-64
+  extends: .adl-x86_64
   variables:
     PCIDEV: "01:00.0"
     PCIDEV_INTR: "MSI-X"
@@ -235,7 +235,7 @@ xilinx-smoke-dom0-x86_64-gcc-debug:
   script:
     - ./automation/scripts/xilinx-smoke-dom0-x86_64.sh ping 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
 xilinx-smoke-dom0-x86_64-gcc-debug-argo:
@@ -254,238 +254,238 @@ xilinx-smoke-dom0-x86_64-gcc-debug-argo:
       job: microcode-x86
       ref: master
 
-adl-smoke-x86-64-gcc-debug:
-  extends: .adl-x86-64
+adl-smoke-x86_64-gcc-debug:
+  extends: .adl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh dom0pv 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh dom0pv 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-adl-smoke-x86-64-dom0pvh-gcc-debug:
-  extends: .adl-x86-64
+adl-smoke-x86_64-dom0pvh-gcc-debug:
+  extends: .adl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh dom0pvh 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh dom0pvh 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-adl-smoke-x86-64-dom0pvh-hvm-gcc-debug:
-  extends: .adl-x86-64
+adl-smoke-x86_64-dom0pvh-hvm-gcc-debug:
+  extends: .adl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh dom0pvh-hvm 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh dom0pvh-hvm 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-adl-suspend-x86-64-gcc-debug:
-  extends: .adl-x86-64
+adl-suspend-x86_64-gcc-debug:
+  extends: .adl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh s3 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh s3 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-adl-pci-pv-x86-64-gcc-debug:
-  extends: .adl-x86-64
+adl-pci-pv-x86_64-gcc-debug:
+  extends: .adl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh pci-pv 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh pci-pv 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-adl-pci-hvm-x86-64-gcc-debug:
-  extends: .adl-x86-64
+adl-pci-hvm-x86_64-gcc-debug:
+  extends: .adl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh pci-hvm 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh pci-hvm 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-adl-pvshim-x86-64-gcc-debug:
-  extends: .adl-x86-64
+adl-pvshim-x86_64-gcc-debug:
+  extends: .adl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh pvshim 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh pvshim 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-adl-tools-tests-pv-x86-64-gcc-debug:
-  extends: .adl-x86-64
+adl-tools-tests-pv-x86_64-gcc-debug:
+  extends: .adl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh tools-tests-pv 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh tools-tests-pv 2>&1 | tee ${LOGFILE}
   artifacts:
     reports:
       junit: tests-junit.xml
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-adl-tools-tests-pvh-x86-64-gcc-debug:
-  extends: .adl-x86-64
+adl-tools-tests-pvh-x86_64-gcc-debug:
+  extends: .adl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh tools-tests-pvh 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh tools-tests-pvh 2>&1 | tee ${LOGFILE}
   artifacts:
     reports:
       junit: tests-junit.xml
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-kbl-smoke-x86-64-gcc-debug:
-  extends: .kbl-x86-64
+kbl-smoke-x86_64-gcc-debug:
+  extends: .kbl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh dom0pv 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh dom0pv 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-kbl-smoke-x86-64-dom0pvh-gcc-debug:
-  extends: .kbl-x86-64
+kbl-smoke-x86_64-dom0pvh-gcc-debug:
+  extends: .kbl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh dom0pvh 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh dom0pvh 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-kbl-smoke-x86-64-dom0pvh-hvm-gcc-debug:
-  extends: .kbl-x86-64
+kbl-smoke-x86_64-dom0pvh-hvm-gcc-debug:
+  extends: .kbl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh dom0pvh-hvm 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh dom0pvh-hvm 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-kbl-suspend-x86-64-gcc-debug:
-  extends: .kbl-x86-64
+kbl-suspend-x86_64-gcc-debug:
+  extends: .kbl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh s3 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh s3 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-kbl-pci-pv-x86-64-gcc-debug:
-  extends: .kbl-x86-64
+kbl-pci-pv-x86_64-gcc-debug:
+  extends: .kbl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh pci-pv 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh pci-pv 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-kbl-pci-hvm-x86-64-gcc-debug:
-  extends: .kbl-x86-64
+kbl-pci-hvm-x86_64-gcc-debug:
+  extends: .kbl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh pci-hvm 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh pci-hvm 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-kbl-pvshim-x86-64-gcc-debug:
-  extends: .kbl-x86-64
+kbl-pvshim-x86_64-gcc-debug:
+  extends: .kbl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh pvshim 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh pvshim 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-kbl-tools-tests-pv-x86-64-gcc-debug:
-  extends: .kbl-x86-64
+kbl-tools-tests-pv-x86_64-gcc-debug:
+  extends: .kbl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh tools-tests-pv 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh tools-tests-pv 2>&1 | tee ${LOGFILE}
   artifacts:
     reports:
       junit: tests-junit.xml
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-kbl-tools-tests-pvh-x86-64-gcc-debug:
-  extends: .kbl-x86-64
+kbl-tools-tests-pvh-x86_64-gcc-debug:
+  extends: .kbl-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh tools-tests-pvh 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh tools-tests-pvh 2>&1 | tee ${LOGFILE}
   artifacts:
     reports:
       junit: tests-junit.xml
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-zen2-smoke-x86-64-gcc-debug:
-  extends: .zen2-x86-64
+zen2-smoke-x86_64-gcc-debug:
+  extends: .zen2-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh dom0pv 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh dom0pv 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-zen2-suspend-x86-64-gcc-debug:
-  extends: .zen2-x86-64
+zen2-suspend-x86_64-gcc-debug:
+  extends: .zen2-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh s3 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh s3 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-zen3p-smoke-x86-64-gcc-debug:
-  extends: .zen3p-x86-64
+zen3p-smoke-x86_64-gcc-debug:
+  extends: .zen3p-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh dom0pv 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh dom0pv 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-zen3p-smoke-x86-64-dom0pvh-gcc-debug:
-  extends: .zen3p-x86-64
+zen3p-smoke-x86_64-dom0pvh-gcc-debug:
+  extends: .zen3p-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh dom0pvh 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh dom0pvh 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-zen3p-smoke-x86-64-dom0pvh-hvm-gcc-debug:
-  extends: .zen3p-x86-64
+zen3p-smoke-x86_64-dom0pvh-hvm-gcc-debug:
+  extends: .zen3p-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh dom0pvh-hvm 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh dom0pvh-hvm 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-zen3p-pci-hvm-x86-64-gcc-debug:
-  extends: .zen3p-x86-64
+zen3p-pci-hvm-x86_64-gcc-debug:
+  extends: .zen3p-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh pci-hvm 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh pci-hvm 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-zen3p-pvshim-x86-64-gcc-debug:
-  extends: .zen3p-x86-64
+zen3p-pvshim-x86_64-gcc-debug:
+  extends: .zen3p-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh pvshim 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh pvshim 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-zen3p-tools-tests-pv-x86-64-gcc-debug:
-  extends: .zen3p-x86-64
+zen3p-tools-tests-pv-x86_64-gcc-debug:
+  extends: .zen3p-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh tools-tests-pv 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh tools-tests-pv 2>&1 | tee ${LOGFILE}
   artifacts:
     reports:
       junit: tests-junit.xml
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
-zen3p-tools-tests-pvh-x86-64-gcc-debug:
-  extends: .zen3p-x86-64
+zen3p-tools-tests-pvh-x86_64-gcc-debug:
+  extends: .zen3p-x86_64
   script:
-    - ./automation/scripts/qubes-x86-64.sh tools-tests-pvh 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qubes-x86_64.sh tools-tests-pvh 2>&1 | tee ${LOGFILE}
   artifacts:
     reports:
       junit: tests-junit.xml
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc-debug
 
 qemu-smoke-dom0-arm64-gcc:
@@ -649,54 +649,54 @@ qemu-smoke-dom0less-arm32-gcc-debug-earlyprintk:
     - debian-12-arm32-gcc-debug-earlyprintk
 
 qemu-alpine-x86_64-gcc:
-  extends: .qemu-x86-64
+  extends: .qemu-x86_64
   script:
     - ./automation/scripts/qemu-alpine-x86_64.sh 2>&1 | tee ${LOGFILE}
   needs:
-    - *x86-64-test-needs
+    - *x86_64-test-needs
     - alpine-3.24-x86_64-gcc
 
-qemu-smoke-x86-64-gcc:
-  extends: .qemu-smoke-x86-64
+qemu-smoke-x86_64-gcc:
+  extends: .qemu-smoke-x86_64
   script:
-    - ./automation/scripts/qemu-xtf.sh x86-64 pv64 example 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qemu-xtf.sh x86_64 pv64 example 2>&1 | tee ${LOGFILE}
   needs:
     - debian-13-x86_64-gcc-debug
 
-qemu-smoke-x86-64-clang:
-  extends: .qemu-smoke-x86-64
+qemu-smoke-x86_64-clang:
+  extends: .qemu-smoke-x86_64
   script:
-    - ./automation/scripts/qemu-xtf.sh x86-64 pv64 example 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qemu-xtf.sh x86_64 pv64 example 2>&1 | tee ${LOGFILE}
   needs:
     - debian-13-x86_64-clang-debug
 
-qemu-smoke-x86-64-gcc-pvh:
-  extends: .qemu-smoke-x86-64
+qemu-smoke-x86_64-gcc-pvh:
+  extends: .qemu-smoke-x86_64
   script:
-    - ./automation/scripts/qemu-xtf.sh x86-64 hvm64 example 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qemu-xtf.sh x86_64 hvm64 example 2>&1 | tee ${LOGFILE}
   needs:
     - debian-13-x86_64-gcc-debug
 
-qemu-smoke-x86-64-clang-pvh:
-  extends: .qemu-smoke-x86-64
+qemu-smoke-x86_64-clang-pvh:
+  extends: .qemu-smoke-x86_64
   script:
-    - ./automation/scripts/qemu-xtf.sh x86-64 hvm64 example 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qemu-xtf.sh x86_64 hvm64 example 2>&1 | tee ${LOGFILE}
   needs:
     - debian-13-x86_64-clang-debug
 
-qemu-smoke-x86-64-gcc-efi:
-  extends: .qemu-smoke-x86-64
+qemu-smoke-x86_64-gcc-efi:
+  extends: .qemu-smoke-x86_64
   script:
-    - ./automation/scripts/qemu-xtf.sh x86-64-efi pv64 example 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qemu-xtf.sh x86_64-efi pv64 example 2>&1 | tee ${LOGFILE}
   needs:
     - debian-13-x86_64-gcc-debug
 
 qemu-xtf-argo-x86_64-gcc-debug:
-  extends: .qemu-smoke-x86-64
+  extends: .qemu-smoke-x86_64
   variables:
     TEST_TIMEOUT_OVERRIDE: 60
   script:
-    - ./automation/scripts/qemu-xtf.sh x86-64 pv64 argo 2>&1 | tee ${LOGFILE}
+    - ./automation/scripts/qemu-xtf.sh x86_64 pv64 argo 2>&1 | tee ${LOGFILE}
   needs:
     - alpine-3.24-x86_64-gcc-debug
 

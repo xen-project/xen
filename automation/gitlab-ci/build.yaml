@@ -36,77 +36,77 @@
     CXX: clang++
     clang: y
 
-.x86-64-build-tmpl:
+.x86_64-build-tmpl:
   <<: *build
   variables:
     XEN_TARGET_ARCH: x86_64
   tags:
     - x86_64
 
-.x86-64-build:
-  extends: .x86-64-build-tmpl
+.x86_64-build:
+  extends: .x86_64-build-tmpl
   variables:
     debug: n
 
-.x86-64-build-debug:
-  extends: .x86-64-build-tmpl
+.x86_64-build-debug:
+  extends: .x86_64-build-tmpl
   variables:
     debug: y
 
-.x86-32-build-tmpl:
+.x86_32-build-tmpl:
   <<: *build
   variables:
     XEN_TARGET_ARCH: x86_32
   tags:
     - x86_32
 
-.x86-32-build:
-  extends: .x86-32-build-tmpl
+.x86_32-build:
+  extends: .x86_32-build-tmpl
   variables:
     debug: n
 
-.x86-32-build-debug:
-  extends: .x86-32-build-tmpl
+.x86_32-build-debug:
+  extends: .x86_32-build-tmpl
   variables:
     debug: y
 
-.gcc-x86-64-build:
-  extends: .x86-64-build
+.gcc-x86_64-build:
+  extends: .x86_64-build
   variables:
     <<: *gcc
 
-.gcc-x86-64-build-debug:
-  extends: .x86-64-build-debug
+.gcc-x86_64-build-debug:
+  extends: .x86_64-build-debug
   variables:
     <<: *gcc
 
-.gcc-x86-32-build:
-  extends: .x86-32-build
+.gcc-x86_32-build:
+  extends: .x86_32-build
   variables:
     <<: *gcc
 
-.gcc-x86-32-build-debug:
-  extends: .x86-32-build-debug
+.gcc-x86_32-build-debug:
+  extends: .x86_32-build-debug
   variables:
     <<: *gcc
 
-.clang-x86-64-build:
-  extends: .x86-64-build
+.clang-x86_64-build:
+  extends: .x86_64-build
   variables:
     <<: *clang
 
-.clang-x86-64-build-debug:
-  extends: .x86-64-build-debug
+.clang-x86_64-build-debug:
+  extends: .x86_64-build-debug
   variables:
     <<: *clang
 
-.clang-x86-32-build:
-  extends: .x86-32-build
+.clang-x86_32-build:
+  extends: .x86_32-build
   variables:
     <<: *clang
 
-.clang-x86-32-build-debug:
-  extends: .x86-32-build-debug
+.clang-x86_32-build-debug:
+  extends: .x86_32-build-debug
   variables:
     <<: *clang
 
@@ -244,25 +244,25 @@
   tags:
     - arm64
 
-.yocto-test-x86-64:
+.yocto-test-x86_64:
   extends: .yocto-test
   tags:
     - x86_64
 
-.x86-64-cross-build-tmpl:
+.x86_64-cross-build-tmpl:
   <<: *build
   variables:
     XEN_TARGET_ARCH: x86_64
   tags:
     - arm64
 
-.x86-64-cross-build:
-  extends: .x86-64-cross-build-tmpl
+.x86_64-cross-build:
+  extends: .x86_64-cross-build-tmpl
   variables:
     debug: n
 
-.gcc-x86-64-cross-build:
-  extends: .x86-64-cross-build
+.gcc-x86_64-cross-build:
+  extends: .x86_64-cross-build
   variables:
     <<: *gcc
 
@@ -271,13 +271,13 @@
 # Build jobs needed for tests
 
 alpine-3.24-x86_64-gcc:
-  extends: .gcc-x86-64-build
+  extends: .gcc-x86_64-build
   <<: *build-test
   variables:
     CONTAINER: alpine:3.24-x86_64
 
 alpine-3.24-x86_64-gcc-debug:
-  extends: .gcc-x86-64-build-debug
+  extends: .gcc-x86_64-build-debug
   <<: *build-test
   variables:
     CONTAINER: alpine:3.24-x86_64
@@ -292,13 +292,13 @@ alpine-3.24-x86_64-gcc-debug:
       CONFIG_XHCI=y
 
 debian-13-x86_64-gcc-debug:
-  extends: .gcc-x86-64-build-debug
+  extends: .gcc-x86_64-build-debug
   <<: *build-test
   variables:
     CONTAINER: debian:13-x86_64
 
 debian-13-x86_64-clang-debug:
-  extends: .clang-x86-64-build-debug
+  extends: .clang-x86_64-build-debug
   <<: *build-test
   variables:
     CONTAINER: debian:13-x86_64
@@ -482,14 +482,14 @@ yocto-qemuarm:
     YOCTO_OUTPUT: --copy-output
 
 yocto-qemux86-64:
-  extends: .yocto-test-x86-64
+  extends: .yocto-test-x86_64
   variables:
     YOCTO_BOARD: qemux86-64
 
 # Cppcheck analysis jobs
 
 debian-12-x86_64-gcc-cppcheck:
-  extends: .gcc-x86-64-cross-build
+  extends: .gcc-x86_64-cross-build
   variables:
     CONTAINER: debian:12-arm64v8-cppcheck
     CROSS_COMPILE: /usr/bin/x86_64-linux-gnu-
@@ -514,29 +514,29 @@ debian-12-arm64-gcc-cppcheck:
 # Build jobs not needed for tests
 
 alpine-3.24-x86_64-clang:
-  extends: .clang-x86-64-build
+  extends: .clang-x86_64-build
   variables:
     CONTAINER: alpine:3.24-x86_64
 
 alpine-3.24-x86_64-clang-debug:
-  extends: .clang-x86-64-build-debug
+  extends: .clang-x86_64-build-debug
   variables:
     CONTAINER: alpine:3.24-x86_64
 
 archlinux-x86_64-gcc:
-  extends: .gcc-x86-64-build
+  extends: .gcc-x86_64-build
   variables:
     CONTAINER: archlinux:current-x86_64
   allow_failure: true
 
 archlinux-x86_64-gcc-debug:
-  extends: .gcc-x86-64-build-debug
+  extends: .gcc-x86_64-build-debug
   variables:
     CONTAINER: archlinux:current-x86_64
   allow_failure: true
 
 debian-12-x86_64-gcc-ibt:
-  extends: .gcc-x86-64-build
+  extends: .gcc-x86_64-build
   variables:
     CONTAINER: debian:12-x86_64-gcc-ibt
     RANDCONFIG: y
@@ -544,42 +544,42 @@ debian-12-x86_64-gcc-ibt:
       CONFIG_XEN_IBT=y
 
 debian-12-x86_64-clang:
-  extends: .clang-x86-64-build
+  extends: .clang-x86_64-build
   variables:
     CONTAINER: debian:12-x86_64
 
 debian-12-x86_64-clang-debug:
-  extends: .clang-x86-64-build-debug
+  extends: .clang-x86_64-build-debug
   variables:
     CONTAINER: debian:12-x86_64
 
 debian-12-x86_64-gcc:
-  extends: .gcc-x86-64-build
+  extends: .gcc-x86_64-build
   variables:
     CONTAINER: debian:12-x86_64
 
 debian-12-x86_64-gcc-debug:
-  extends: .gcc-x86-64-build-debug
+  extends: .gcc-x86_64-build-debug
   variables:
     CONTAINER: debian:12-x86_64
 
 debian-12-x86_32-clang-debug:
-  extends: .clang-x86-32-build-debug
+  extends: .clang-x86_32-build-debug
   variables:
     CONTAINER: debian:12-x86_32
 
 debian-12-x86_32-gcc-debug:
-  extends: .gcc-x86-32-build-debug
+  extends: .gcc-x86_32-build-debug
   variables:
     CONTAINER: debian:12-x86_32
 
 debian-13-x86_64-clang:
-  extends: .clang-x86-64-build
+  extends: .clang-x86_64-build
   variables:
     CONTAINER: debian:13-x86_64
 
 debian-13-x86_64-clang-randconfig:
-  extends: .clang-x86-64-build
+  extends: .clang-x86_64-build
   variables:
     CONTAINER: debian:13-x86_64
     RANDCONFIG: y
@@ -587,136 +587,136 @@ debian-13-x86_64-clang-randconfig:
       CONFIG_COVERAGE=n # Disable coverage otherwise build times out.
 
 debian-13-x86_64-gcc:
-  extends: .gcc-x86-64-build
+  extends: .gcc-x86_64-build
   variables:
     CONTAINER: debian:13-x86_64
 
 debian-13-x86_64-gcc-randconfig:
-  extends: .gcc-x86-64-build
+  extends: .gcc-x86_64-build
   variables:
     CONTAINER: debian:13-x86_64
     RANDCONFIG: y
 
 debian-13-x86_32-clang-debug:
-  extends: .clang-x86-32-build-debug
+  extends: .clang-x86_32-build-debug
   variables:
     CONTAINER: debian:13-x86_32
 
 debian-13-x86_32-gcc-debug:
-  extends: .gcc-x86-32-build-debug
+  extends: .gcc-x86_32-build-debug
   variables:
     CONTAINER: debian:13-x86_32
 
 fedora-43-x86_64-gcc:
-  extends: .gcc-x86-64-build
+  extends: .gcc-x86_64-build
   variables:
     CONTAINER: fedora:43-x86_64
 
 fedora-43-x86_64-gcc-debug:
-  extends: .gcc-x86-64-build-debug
+  extends: .gcc-x86_64-build-debug
   variables:
     CONTAINER: fedora:43-x86_64
 
 ubuntu-18.04-x86_64-gcc:
-  extends: .gcc-x86-64-build
+  extends: .gcc-x86_64-build
   variables:
     CONTAINER: ubuntu:18.04-x86_64
 
 ubuntu-18.04-x86_64-gcc-debug:
-  extends: .gcc-x86-64-build-debug
+  extends: .gcc-x86_64-build-debug
   variables:
     CONTAINER: ubuntu:18.04-x86_64
 
 ubuntu-20.04-x86_64-gcc:
-  extends: .gcc-x86-64-build
+  extends: .gcc-x86_64-build
   variables:
     CONTAINER: ubuntu:20.04-x86_64
 
 ubuntu-22.04-x86_64-clang:
-  extends: .clang-x86-64-build
+  extends: .clang-x86_64-build
   variables:
     CONTAINER: ubuntu:22.04-x86_64
 
 ubuntu-22.04-x86_64-clang-debug:
-  extends: .clang-x86-64-build-debug
+  extends: .clang-x86_64-build-debug
   variables:
     CONTAINER: ubuntu:22.04-x86_64
 
 ubuntu-22.04-x86_64-gcc:
-  extends: .gcc-x86-64-build
+  extends: .gcc-x86_64-build
   variables:
     CONTAINER: ubuntu:22.04-x86_64
 
 ubuntu-24.04-x86_64-clang:
-  extends: .clang-x86-64-build
+  extends: .clang-x86_64-build
   variables:
     CONTAINER: ubuntu:24.04-x86_64
 
 ubuntu-24.04-x86_64-gcc:
-  extends: .gcc-x86-64-build
+  extends: .gcc-x86_64-build
   variables:
     CONTAINER: ubuntu:24.04-x86_64
 
 ubuntu-26.04-x86_64-clang:
-  extends: .clang-x86-64-build
+  extends: .clang-x86_64-build
   variables:
     CONTAINER: ubuntu:26.04-x86_64
 
 ubuntu-26.04-x86_64-clang-debug:
-  extends: .clang-x86-64-build-debug
+  extends: .clang-x86_64-build-debug
   variables:
     CONTAINER: ubuntu:26.04-x86_64
 
 ubuntu-26.04-x86_64-gcc:
-  extends: .gcc-x86-64-build
+  extends: .gcc-x86_64-build
   variables:
     CONTAINER: ubuntu:26.04-x86_64
 
 ubuntu-26.04-x86_64-gcc-debug:
-  extends: .gcc-x86-64-build-debug
+  extends: .gcc-x86_64-build-debug
   variables:
     CONTAINER: ubuntu:26.04-x86_64
 
 opensuse-leap-16.0-clang:
-  extends: .clang-x86-64-build
+  extends: .clang-x86_64-build
   variables:
     CONTAINER: opensuse:leap-16.0-x86_64
 
 opensuse-leap-16.0-clang-debug:
-  extends: .clang-x86-64-build-debug
+  extends: .clang-x86_64-build-debug
   variables:
     CONTAINER: opensuse:leap-16.0-x86_64
 
 opensuse-leap-16.0-gcc:
-  extends: .gcc-x86-64-build
+  extends: .gcc-x86_64-build
   variables:
     CONTAINER: opensuse:leap-16.0-x86_64
 
 opensuse-leap-16.0-gcc-debug:
-  extends: .gcc-x86-64-build-debug
+  extends: .gcc-x86_64-build-debug
   variables:
     CONTAINER: opensuse:leap-16.0-x86_64
 
 opensuse-tumbleweed-clang:
-  extends: .clang-x86-64-build
+  extends: .clang-x86_64-build
   variables:
     CONTAINER: opensuse:tumbleweed-x86_64
   allow_failure: true
 
 opensuse-tumbleweed-clang-debug:
-  extends: .clang-x86-64-build-debug
+  extends: .clang-x86_64-build-debug
   variables:
     CONTAINER: opensuse:tumbleweed-x86_64
   allow_failure: true
 
 opensuse-tumbleweed-gcc:
-  extends: .gcc-x86-64-build
+  extends: .gcc-x86_64-build
   variables:
     CONTAINER: opensuse:tumbleweed-x86_64
   allow_failure: true
 
 opensuse-tumbleweed-gcc-debug:
-  extends: .gcc-x86-64-build-debug
+  extends: .gcc-x86_64-build-debug
   variables:
     CONTAINER: opensuse:tumbleweed-x86_64
   allow_failure: true
