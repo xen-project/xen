@@ -515,12 +515,6 @@ S:	Supported
 F:	config/riscv64.mk
 F:	xen/arch/riscv/
 
-RTDS SCHEDULER
-M:	Dario Faggioli <dfaggioli@suse.com>
-M:	Meng Xu <mengxu@cis.upenn.edu>
-S:	Supported
-F:	xen/common/sched/rt.c
-
 SCHEDULING
 M:	Dario Faggioli <dfaggioli@suse.com>
 M:	Juergen Gross <jgross@suse.com>
