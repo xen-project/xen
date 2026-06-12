@@ -14,12 +14,7 @@
     ref: $ARTIFACTS_BRANCH
 
 .arm32-test-needs: &arm32-test-needs
-  # Bodge to ensure binaries/ is non-root.  Can be any artefact which comes
-  # from a non-root container, and microcode-x86 is the smallest.  Remove when
-  # all build containers have become non-root.
-  - project: $ARTIFACTS_REPO
-    job: microcode-x86
-    ref: $ARTIFACTS_BRANCH
+  -
 
 .x86_64-test-needs: &x86_64-test-needs
   - project: $ARTIFACTS_REPO
