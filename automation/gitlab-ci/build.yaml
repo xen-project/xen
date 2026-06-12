@@ -401,68 +401,68 @@ debian-13-arm64-gcc-debug:
   variables:
     CONTAINER: debian:13-arm64v8
 
-alpine-3.18-gcc-arm64:
+alpine-3.24-arm64-gcc:
   extends: .gcc-arm64-build
   <<: *build-test
   variables:
-    CONTAINER: alpine:3.18-arm64v8
+    CONTAINER: alpine:3.24-arm64v8
 
-alpine-3.18-gcc-debug-arm64:
+alpine-3.24-arm64-gcc-debug:
   extends: .gcc-arm64-build-debug
   <<: *build-test
   variables:
-    CONTAINER: alpine:3.18-arm64v8
+    CONTAINER: alpine:3.24-arm64v8
     EXTRA_XEN_CONFIG: |
       CONFIG_UBSAN=y
       CONFIG_UBSAN_FATAL=y
 
-alpine-3.18-gcc-arm64-randconfig:
+alpine-3.24-arm64-gcc-randconfig:
   extends: .gcc-arm64-build
   variables:
-    CONTAINER: alpine:3.18-arm64v8
+    CONTAINER: alpine:3.24-arm64v8
     RANDCONFIG: y
 
-alpine-3.18-gcc-debug-arm64-staticmem:
+alpine-3.24-arm64-gcc-debug-staticmem:
   extends: .gcc-arm64-build-debug
   <<: *build-test
   variables:
-    CONTAINER: alpine:3.18-arm64v8
+    CONTAINER: alpine:3.24-arm64v8
     EXTRA_XEN_CONFIG: |
       CONFIG_EXPERT=y
       CONFIG_UNSUPPORTED=y
       CONFIG_STATIC_MEMORY=y
 
-alpine-3.18-gcc-debug-arm64-static-shared-mem:
+alpine-3.24-arm64-gcc-debug-static-shared-mem:
   extends: .gcc-arm64-build-debug
   <<: *build-test
   variables:
-    CONTAINER: alpine:3.18-arm64v8
+    CONTAINER: alpine:3.24-arm64v8
     EXTRA_XEN_CONFIG: |
       CONFIG_UNSUPPORTED=y
       CONFIG_STATIC_MEMORY=y
       CONFIG_STATIC_SHM=y
 
-alpine-3.18-gcc-debug-arm64-boot-cpupools:
+alpine-3.24-arm64-gcc-debug-boot-cpupools:
   extends: .gcc-arm64-build-debug
   <<: *build-test
   variables:
-    CONTAINER: alpine:3.18-arm64v8
+    CONTAINER: alpine:3.24-arm64v8
     EXTRA_XEN_CONFIG: |
       CONFIG_BOOT_TIME_CPUPOOLS=y
 
-alpine-3.18-gcc-debug-arm64-earlyprintk:
+alpine-3.24-arm64-gcc-debug-earlyprintk:
   extends: .gcc-arm64-build-debug
   <<: *build-test
   variables:
-    CONTAINER: alpine:3.18-arm64v8
+    CONTAINER: alpine:3.24-arm64v8
     EXTRA_XEN_CONFIG: |
       CONFIG_EARLY_UART_CHOICE_PL011=y
       CONFIG_EARLY_UART_BASE_ADDRESS=0x9000000
 
-alpine-3.18-gcc-debug-arm64-mpu:
+alpine-3.24-arm64-gcc-debug-mpu:
   extends: .gcc-arm64-build-debug
   variables:
-    CONTAINER: alpine:3.18-arm64v8
+    CONTAINER: alpine:3.24-arm64v8
     HYPERVISOR_ONLY: y
     EXTRA_XEN_CONFIG: |
       CONFIG_XEN_START_ADDRESS=0x0
