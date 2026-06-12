@@ -94,7 +94,7 @@
     variables:
       - $XILINX_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
   tags:
-    - xilinx
+    - xilinx-zynq-423
 
 .adl-x86-64:
   extends: .test-jobs-common
