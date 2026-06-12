@@ -9,11 +9,8 @@
 #include <xen/types.h>
 #include <xen/xmalloc.h>
 
-#define malloc xmalloc_bytes
-#define free xfree
-
-#define large_malloc xmalloc_bytes
-#define large_free xfree
+#define malloc(s) xmalloc_bytes(s)
+#define free(p) xfree(p)
 
 #else
 
@@ -21,9 +18,9 @@
 #define __init
 #define __initdata
 
-#define large_malloc malloc
-#define large_free free
-
 #endif
+
+#define large_malloc(s) malloc(s)
+#define large_free(p) free(p)
 
 #endif /* DECOMPRESS_H */
