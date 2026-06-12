@@ -26,7 +26,7 @@
     job: $LINUX_JOB_X86_64
     ref: $ARTIFACTS_BRANCH
   - project: $ARTIFACTS_REPO
-    job: alpine-3.18-x86_64-rootfs
+    job: alpine-3.24-x86_64-rootfs
     ref: $ARTIFACTS_BRANCH
   - project: $ARTIFACTS_REPO
     job: microcode-x86
@@ -236,19 +236,19 @@ xilinx-smoke-dom0-x86_64-gcc-debug:
     - ./automation/scripts/xilinx-smoke-dom0-x86_64.sh ping 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 xilinx-smoke-dom0-x86_64-gcc-debug-argo:
   extends: .xilinx-x86_64
   script:
     - ./automation/scripts/xilinx-smoke-dom0-x86_64.sh argo 2>&1 | tee ${LOGFILE}
   needs:
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
     - project: xen-project/hardware/test-artifacts
       job: linux-6.6.56-x86_64
       ref: master
     - project: xen-project/hardware/test-artifacts
-      job: alpine-3.18-x86_64-rootfs
+      job: alpine-3.24-x86_64-rootfs
       ref: master
     - project: xen-project/hardware/test-artifacts
       job: microcode-x86
@@ -260,7 +260,7 @@ adl-smoke-x86-64-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh dom0pv 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 adl-smoke-x86-64-dom0pvh-gcc-debug:
   extends: .adl-x86-64
@@ -268,7 +268,7 @@ adl-smoke-x86-64-dom0pvh-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh dom0pvh 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 adl-smoke-x86-64-dom0pvh-hvm-gcc-debug:
   extends: .adl-x86-64
@@ -276,7 +276,7 @@ adl-smoke-x86-64-dom0pvh-hvm-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh dom0pvh-hvm 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 adl-suspend-x86-64-gcc-debug:
   extends: .adl-x86-64
@@ -284,7 +284,7 @@ adl-suspend-x86-64-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh s3 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 adl-pci-pv-x86-64-gcc-debug:
   extends: .adl-x86-64
@@ -292,7 +292,7 @@ adl-pci-pv-x86-64-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh pci-pv 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 adl-pci-hvm-x86-64-gcc-debug:
   extends: .adl-x86-64
@@ -300,7 +300,7 @@ adl-pci-hvm-x86-64-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh pci-hvm 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 adl-pvshim-x86-64-gcc-debug:
   extends: .adl-x86-64
@@ -308,7 +308,7 @@ adl-pvshim-x86-64-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh pvshim 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 adl-tools-tests-pv-x86-64-gcc-debug:
   extends: .adl-x86-64
@@ -319,7 +319,7 @@ adl-tools-tests-pv-x86-64-gcc-debug:
       junit: tests-junit.xml
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 adl-tools-tests-pvh-x86-64-gcc-debug:
   extends: .adl-x86-64
@@ -330,7 +330,7 @@ adl-tools-tests-pvh-x86-64-gcc-debug:
       junit: tests-junit.xml
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 kbl-smoke-x86-64-gcc-debug:
   extends: .kbl-x86-64
@@ -338,7 +338,7 @@ kbl-smoke-x86-64-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh dom0pv 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 kbl-smoke-x86-64-dom0pvh-gcc-debug:
   extends: .kbl-x86-64
@@ -346,7 +346,7 @@ kbl-smoke-x86-64-dom0pvh-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh dom0pvh 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 kbl-smoke-x86-64-dom0pvh-hvm-gcc-debug:
   extends: .kbl-x86-64
@@ -354,7 +354,7 @@ kbl-smoke-x86-64-dom0pvh-hvm-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh dom0pvh-hvm 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 kbl-suspend-x86-64-gcc-debug:
   extends: .kbl-x86-64
@@ -362,7 +362,7 @@ kbl-suspend-x86-64-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh s3 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 kbl-pci-pv-x86-64-gcc-debug:
   extends: .kbl-x86-64
@@ -370,7 +370,7 @@ kbl-pci-pv-x86-64-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh pci-pv 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 kbl-pci-hvm-x86-64-gcc-debug:
   extends: .kbl-x86-64
@@ -378,7 +378,7 @@ kbl-pci-hvm-x86-64-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh pci-hvm 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 kbl-pvshim-x86-64-gcc-debug:
   extends: .kbl-x86-64
@@ -386,7 +386,7 @@ kbl-pvshim-x86-64-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh pvshim 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 kbl-tools-tests-pv-x86-64-gcc-debug:
   extends: .kbl-x86-64
@@ -397,7 +397,7 @@ kbl-tools-tests-pv-x86-64-gcc-debug:
       junit: tests-junit.xml
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 kbl-tools-tests-pvh-x86-64-gcc-debug:
   extends: .kbl-x86-64
@@ -408,7 +408,7 @@ kbl-tools-tests-pvh-x86-64-gcc-debug:
       junit: tests-junit.xml
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 zen2-smoke-x86-64-gcc-debug:
   extends: .zen2-x86-64
@@ -416,7 +416,7 @@ zen2-smoke-x86-64-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh dom0pv 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 zen2-suspend-x86-64-gcc-debug:
   extends: .zen2-x86-64
@@ -424,7 +424,7 @@ zen2-suspend-x86-64-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh s3 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 zen3p-smoke-x86-64-gcc-debug:
   extends: .zen3p-x86-64
@@ -432,7 +432,7 @@ zen3p-smoke-x86-64-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh dom0pv 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 zen3p-smoke-x86-64-dom0pvh-gcc-debug:
   extends: .zen3p-x86-64
@@ -440,7 +440,7 @@ zen3p-smoke-x86-64-dom0pvh-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh dom0pvh 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 zen3p-smoke-x86-64-dom0pvh-hvm-gcc-debug:
   extends: .zen3p-x86-64
@@ -448,7 +448,7 @@ zen3p-smoke-x86-64-dom0pvh-hvm-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh dom0pvh-hvm 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 zen3p-pci-hvm-x86-64-gcc-debug:
   extends: .zen3p-x86-64
@@ -456,7 +456,7 @@ zen3p-pci-hvm-x86-64-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh pci-hvm 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 zen3p-pvshim-x86-64-gcc-debug:
   extends: .zen3p-x86-64
@@ -464,7 +464,7 @@ zen3p-pvshim-x86-64-gcc-debug:
     - ./automation/scripts/qubes-x86-64.sh pvshim 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 zen3p-tools-tests-pv-x86-64-gcc-debug:
   extends: .zen3p-x86-64
@@ -475,7 +475,7 @@ zen3p-tools-tests-pv-x86-64-gcc-debug:
       junit: tests-junit.xml
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 zen3p-tools-tests-pvh-x86-64-gcc-debug:
   extends: .zen3p-x86-64
@@ -486,7 +486,7 @@ zen3p-tools-tests-pvh-x86-64-gcc-debug:
       junit: tests-junit.xml
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 qemu-smoke-dom0-arm64-gcc:
   extends: .qemu-arm64
@@ -654,7 +654,7 @@ qemu-alpine-x86_64-gcc:
     - ./automation/scripts/qemu-alpine-x86_64.sh 2>&1 | tee ${LOGFILE}
   needs:
     - *x86-64-test-needs
-    - alpine-3.18-gcc
+    - alpine-3.24-x86_64-gcc
 
 qemu-smoke-x86-64-gcc:
   extends: .qemu-smoke-x86-64
@@ -698,7 +698,7 @@ qemu-xtf-argo-x86_64-gcc-debug:
   script:
     - ./automation/scripts/qemu-xtf.sh x86-64 pv64 argo 2>&1 | tee ${LOGFILE}
   needs:
-    - alpine-3.18-gcc-debug
+    - alpine-3.24-x86_64-gcc-debug
 
 qemu-smoke-riscv64-gcc:
   extends: .qemu-riscv64
