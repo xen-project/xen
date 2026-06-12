@@ -8767,7 +8767,7 @@ void dump_raw(const char * s, struct record_info *ri)
 
 void error(enum error_level l, struct record_info *ri)
 {
-    if ( l > opt.tolerance )
+    if ( l > ERR_MAX_TOLERABLE || l > opt.tolerance )
     {
         if ( ri )
             dump_generic(warn, ri);
