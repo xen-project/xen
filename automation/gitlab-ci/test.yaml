@@ -115,7 +115,7 @@
       when: never
     - if: $XILINX_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
   tags:
-    - xilinx
+    - xilinx-zynq-423
 
 .xilinx-x86_64:
   extends: .test-jobs-common
@@ -136,7 +136,7 @@
       when: never
     - if: $XILINX_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
   tags:
-    - xilinx
+    - xilinx-crater-001
 
 .adl-x86-64:
   extends: .test-jobs-common
