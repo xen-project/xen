@@ -98,7 +98,8 @@ struct efi_rs_state efi_rs_enter(void)
      */
     sync_local_execstate();
     state.cr3 = read_cr3();
-    vcpu_save_fpu(current);
+    if ( !is_idle_vcpu(current) )
+        vcpu_save_fpu(current);
     asm volatile ( "fnclex; fldcw %0" :: "m" (fcw) );
     asm volatile ( "ldmxcsr %0" :: "m" (mxcsr) );
 
@@ -159,7 +160,8 @@ void efi_rs_leave(struct efi_rs_state *state)
     }
     irq_exit();
     spin_unlock(&efi_rs_lock);
-    vcpu_restore_fpu(curr);
+    if ( !is_idle_vcpu(curr) )
+        vcpu_restore_fpu(curr);
 }
 
 unsigned long efi_get_time(void)
