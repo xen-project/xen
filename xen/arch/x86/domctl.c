@@ -258,6 +258,36 @@ long arch_do_domctl(
         break;
     }
 
+    case XEN_DOMCTL_irq_permission:
+    {
+        unsigned int pirq = domctl->u.irq_permission.pirq, irq;
+        bool allow = domctl->u.irq_permission.allow_access;
+
+        ret = -EINVAL;
+        if ( pirq >= currd->nr_pirqs )
+            break;
+
+        irq = domain_pirq_to_irq(currd, pirq);
+
+        ret = -EPERM;
+        if ( irq )
+            ret = xsm_irq_permission(XSM_PRIV, d, irq, allow);
+        if ( ret )
+            break;
+
+        iocaps_double_lock(d, true);
+
+        if ( !irq_access_permitted(currd, irq) )
+            ret = -EPERM;
+        else if ( allow )
+            ret = irq_permit_access(d, irq);
+        else
+            ret = irq_deny_access(d, irq);
+
+        iocaps_double_unlock(d, true);
+        break;
+    }
+
     case XEN_DOMCTL_gsi_permission:
     {
         int irq;
