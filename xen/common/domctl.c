@@ -375,7 +375,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             copyback = true;
         }
 
-        goto domctl_out_unlock_domonly;
+        goto domctl_out_unlock_rcuonly;
 
     case XEN_DOMCTL_get_domain_state:
         ret = xsm_get_domain_state(XSM_XS_PRIV, d);
@@ -383,7 +383,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             ret = get_domain_state(&op->u.get_domain_state, d, &op->domain);
         if ( !ret )
             copyback = true;
-        goto domctl_out_unlock_domonly;
+        goto domctl_out_unlock_rcuonly;
 
     case XEN_DOMCTL_iomem_permission:
     {
@@ -393,11 +393,11 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
         ret = -EINVAL;
         if ( (mfn + nr_mfns - 1) < mfn ) /* Wrap? */
-            goto domctl_out_unlock_domonly;
+            goto domctl_out_unlock_rcuonly;
 
         ret = xsm_iomem_permission(XSM_PRIV, d, mfn, mfn + nr_mfns - 1, allow);
         if ( ret )
-            goto domctl_out_unlock_domonly;
+            goto domctl_out_unlock_rcuonly;
 
         iocaps_double_lock(d, true);
 
@@ -410,7 +410,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
 
         iocaps_double_unlock(d, true);
-        goto domctl_out_unlock_domonly;
+        goto domctl_out_unlock_rcuonly;
     }
 
     case XEN_DOMCTL_memory_mapping:
@@ -425,17 +425,17 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( mfn_end < mfn || /* Wrap? */
              ((mfn | mfn_end) >> (paddr_bits - PAGE_SHIFT)) ||
              (gfn + nr_mfns - 1) < gfn ) /* Wrap? */
-            goto domctl_out_unlock_domonly;
+            goto domctl_out_unlock_rcuonly;
 
         ret = xsm_iomem_mapping(XSM_DM_PRIV, d, mfn, mfn_end, add);
         if ( ret || !paging_mode_translate(d) )
-            goto domctl_out_unlock_domonly;
+            goto domctl_out_unlock_rcuonly;
 
 #ifndef CONFIG_X86 /* XXX ARM!? */
         ret = -E2BIG;
         /* Must break hypercall up as this could take a while. */
         if ( nr_mfns > 64 )
-            goto domctl_out_unlock_domonly;
+            goto domctl_out_unlock_rcuonly;
 #endif
 
         iocaps_double_lock(d, false);
@@ -470,7 +470,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         }
 
         iocaps_double_unlock(d, false);
-        goto domctl_out_unlock_domonly;
+        goto domctl_out_unlock_rcuonly;
     }
 
     case XEN_DOMCTL_set_target:
@@ -479,7 +479,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
         ret = -ESRCH;
         if ( !e )
-            goto domctl_out_unlock_domonly;
+            goto domctl_out_unlock_rcuonly;
 
         if ( d == e )
             ret = -EINVAL;
@@ -494,7 +494,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
         if ( ret )
             put_domain(e);
-        goto domctl_out_unlock_domonly;
+        goto domctl_out_unlock_rcuonly;
     }
 
     case XEN_DOMCTL_vm_event_op:
@@ -504,12 +504,12 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             ret = vm_event_domctl(d, &op->u.vm_event_op);
             if ( !ret )
                 copyback = true;
-            goto domctl_out_unlock_domonly;
+            goto domctl_out_unlock_rcuonly;
         }
         if ( !d )
         {
             ret = -ESRCH;
-            goto domctl_out_unlock_domonly;
+            goto domctl_out_unlock_rcuonly;
         }
         /* Other sub-ops handled further down. */
         break;
@@ -519,17 +519,15 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
              op->u.shadow_op.op == XEN_DOMCTL_SHADOW_OP_PEEK )
         {
             ret = xsm_domctl(XSM_OTHER, d, op);
-            if ( ret )
-                goto domctl_out_unlock_domonly;
-
-            ret = arch_do_domctl(op, d, u_domctl);
-            goto domctl_out_unlock_domonly;
+            if ( !ret )
+                ret = arch_do_domctl(op, d, u_domctl);
+            goto domctl_out_unlock_rcuonly;
         }
         break;
 
     case XEN_DOMCTL_get_device_group:
         ret = iommu_do_domctl(op, d, u_domctl);
-        goto domctl_out_unlock_domonly;
+        goto domctl_out_unlock_rcuonly;
 
     case XEN_DOMCTL_ioport_permission:
     case XEN_DOMCTL_ioport_mapping:
@@ -539,7 +537,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_unbind_pt_irq:
     case XEN_DOMCTL_getpageframeinfo3:
         ret = arch_do_domctl(op, d, u_domctl);
-        goto domctl_out_unlock_domonly;
+        goto domctl_out_unlock_rcuonly;
 
     default:
         /* Everything else handled further down. */
@@ -548,7 +546,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     ret = xsm_domctl(XSM_OTHER, d, op);
     if ( ret )
-        goto domctl_out_unlock_domonly;
+        goto domctl_out_unlock_rcuonly;
 
     if ( !domctl_lock_acquire() )
     {
@@ -946,7 +944,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     domctl_lock_release();
 
- domctl_out_unlock_domonly:
+ domctl_out_unlock_rcuonly:
     if ( d && !is_system_domain(d) )
         rcu_unlock_domain(d);
 
