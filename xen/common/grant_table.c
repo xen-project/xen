@@ -4255,7 +4255,6 @@ int gnttab_map_frame_begin(
 {
     int rc = 0;
     struct grant_table *gt = d->grant_table;
-    bool status = false;
 
     if ( gfn_eq(gfn, INVALID_GFN) )
     {
@@ -4268,8 +4267,6 @@ int gnttab_map_frame_begin(
     if ( evaluate_nospec(gt->gt_version == 2) && (idx & XENMAPIDX_grant_table_status) )
     {
         idx &= ~XENMAPIDX_grant_table_status;
-        status = true;
-
         rc = gnttab_get_status_frame_mfn(d, idx, mfn);
     }
     else
