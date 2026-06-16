@@ -128,7 +128,8 @@ static bool check_digest(const struct container_microcode *mc)
      * the digest of the patch against a list of known provenance.
      */
     if ( boot_cpu_data.family < 0x17 || boot_cpu_data.family > 0x1a ||
-         entrysign_mitigated_in_firmware || !opt_digest_check )
+         is_zen6_uarch() || entrysign_mitigated_in_firmware ||
+         !opt_digest_check )
         return true;
 
     pd = bsearch(&patch->patch_id, patch_digests, ARRAY_SIZE(patch_digests),
