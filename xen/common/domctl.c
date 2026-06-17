@@ -518,7 +518,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( op->u.shadow_op.op == XEN_DOMCTL_SHADOW_OP_CLEAN ||
              op->u.shadow_op.op == XEN_DOMCTL_SHADOW_OP_PEEK )
         {
-            ret = xsm_domctl(XSM_OTHER, d, op);
+            ret = xsm_domctl(XSM_PRIV, d, op);
             if ( !ret )
                 ret = arch_do_domctl(op, d, u_domctl);
             goto domctl_out_unlock_rcuonly;
@@ -544,7 +544,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         break;
     }
 
-    ret = xsm_domctl(XSM_OTHER, d, op);
+    ret = xsm_domctl(XSM_PRIV, d, op);
     if ( ret )
         goto domctl_out_unlock_rcuonly;
 

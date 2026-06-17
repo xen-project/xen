@@ -157,7 +157,7 @@ static XSM_INLINE int cf_check xsm_set_target(
 static XSM_INLINE int cf_check xsm_domctl(
     XSM_DEFAULT_ARG struct domain *d, struct xen_domctl *op)
 {
-    XSM_ASSERT_ACTION(XSM_OTHER);
+    XSM_ASSERT_ACTION(XSM_PRIV);
     switch ( op->cmd )
     {
     case XEN_DOMCTL_bind_pt_irq:
@@ -176,7 +176,7 @@ static XSM_INLINE int cf_check xsm_domctl(
         return -EILSEQ;
 
     default:
-        return xsm_default_action(XSM_PRIV, current->domain, d);
+        return xsm_default_action(action, current->domain, d);
     }
 }
 

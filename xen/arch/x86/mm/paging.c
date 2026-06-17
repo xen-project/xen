@@ -743,7 +743,7 @@ long do_paging_domctl_cont(
     if ( d == NULL )
         return -ESRCH;
 
-    ret = xsm_domctl(XSM_OTHER, d, &op);
+    ret = xsm_domctl(XSM_PRIV, d, &op);
     if ( !ret )
     {
         bool lock = !(op.u.shadow_op.op == XEN_DOMCTL_SHADOW_OP_CLEAN ||

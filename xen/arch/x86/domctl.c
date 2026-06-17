@@ -331,7 +331,7 @@ long arch_do_domctl(
         /* Games to allow this code block to handle a compat guest. */
         void __user *guest_handle = domctl->u.getpageframeinfo3.array.p;
 
-        ret = xsm_domctl(XSM_OTHER, d, domctl);
+        ret = xsm_domctl(XSM_PRIV, d, domctl);
         if ( ret )
             break;
 
