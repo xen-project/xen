@@ -546,6 +546,33 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     if ( ret )
         goto domctl_out_unlock_rcuonly;
 
+    switch ( op->cmd )
+    {
+    case XEN_DOMCTL_getvcpuinfo:
+    {
+        const struct vcpu *v = domain_vcpu(d, op->u.getvcpuinfo.vcpu);
+
+        if ( !v )
+        {
+            ret = -ENOENT;
+            goto domctl_out_unlock_rcuonly;
+        }
+
+        op->u.getvcpuinfo.online   = !(v->pause_flags & VPF_down);
+        op->u.getvcpuinfo.blocked  = !!(v->pause_flags & VPF_blocked);
+        op->u.getvcpuinfo.running  = v->is_running;
+        op->u.getvcpuinfo.cpu_time = vcpu_runstate_get_running(v);
+        op->u.getvcpuinfo.cpu      = v->processor;
+
+        copyback = true;
+        goto domctl_out_unlock_rcuonly;
+    }
+
+    default:
+        /* Everything else handled further up or further down. */
+        break;
+    }
+
     if ( !domctl_lock_acquire() )
     {
         if ( d && d != dom_io )
@@ -789,28 +816,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     getvcpucontext_out:
         xfree(c.nat);
-        break;
-    }
-
-    case XEN_DOMCTL_getvcpuinfo:
-    {
-        const struct vcpu *v;
-
-        ret = -EINVAL;
-        if ( op->u.getvcpuinfo.vcpu >= d->max_vcpus )
-            break;
-
-        ret = -ESRCH;
-        if ( (v = d->vcpu[op->u.getvcpuinfo.vcpu]) == NULL )
-            break;
-
-        op->u.getvcpuinfo.online   = !(v->pause_flags & VPF_down);
-        op->u.getvcpuinfo.blocked  = !!(v->pause_flags & VPF_blocked);
-        op->u.getvcpuinfo.running  = v->is_running;
-        op->u.getvcpuinfo.cpu_time = vcpu_runstate_get_running(v);
-        op->u.getvcpuinfo.cpu      = v->processor;
-        ret = 0;
-        copyback = 1;
         break;
     }
 
