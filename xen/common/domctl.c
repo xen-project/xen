@@ -56,7 +56,6 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
     struct vcpu *v;
     u64 cpu_time = 0;
     int flags = XEN_DOMINF_blocked;
-    struct vcpu_runstate_info runstate;
 
     memset(info, 0, sizeof(*info));
 
@@ -69,8 +68,7 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
      */
     for_each_vcpu ( d, v )
     {
-        vcpu_runstate_get(v, &runstate);
-        cpu_time += runstate.time[RUNSTATE_running];
+        cpu_time += vcpu_runstate_get_running(v);
         info->max_vcpu_id = v->vcpu_id;
         if ( !(v->pause_flags & VPF_down) )
         {
@@ -796,8 +794,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_getvcpuinfo:
     {
-        struct vcpu   *v;
-        struct vcpu_runstate_info runstate;
+        const struct vcpu *v;
 
         ret = -EINVAL;
         if ( op->u.getvcpuinfo.vcpu >= d->max_vcpus )
@@ -807,12 +804,10 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( (v = d->vcpu[op->u.getvcpuinfo.vcpu]) == NULL )
             break;
 
-        vcpu_runstate_get(v, &runstate);
-
         op->u.getvcpuinfo.online   = !(v->pause_flags & VPF_down);
         op->u.getvcpuinfo.blocked  = !!(v->pause_flags & VPF_blocked);
         op->u.getvcpuinfo.running  = v->is_running;
-        op->u.getvcpuinfo.cpu_time = runstate.time[RUNSTATE_running];
+        op->u.getvcpuinfo.cpu_time = vcpu_runstate_get_running(v);
         op->u.getvcpuinfo.cpu      = v->processor;
         ret = 0;
         copyback = 1;

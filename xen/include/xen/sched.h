@@ -1121,6 +1121,7 @@ int vcpu_affinity_domctl(struct domain *d, uint32_t cmd,
 
 void vcpu_runstate_get(const struct vcpu *v,
                        struct vcpu_runstate_info *runstate);
+uint64_t vcpu_runstate_get_running(const struct vcpu *v);
 uint64_t get_cpu_idle_time(unsigned int cpu);
 void sched_guest_idle(void (*idle) (void), unsigned int cpu);
 void scheduler_enable(void);
