@@ -330,7 +330,8 @@ int fdt_property(void *fdt, const char *name, const void *val, int len)
 	ret = fdt_property_placeholder(fdt, name, len, &ptr);
 	if (ret)
 		return ret;
-	memcpy(ptr, val, len);
+	if (len)
+		memcpy(ptr, val, len);
 	return 0;
 }
 
