@@ -1708,7 +1708,7 @@ int vcpu_affinity_domctl(struct domain *d, uint32_t cmd,
 {
     struct vcpu *v;
     const struct sched_unit *unit;
-    int ret = 0;
+    int ret = 0, hret = 0;
 
     if ( vcpuaff->vcpu >= d->max_vcpus )
         return -EINVAL;
@@ -1746,19 +1746,17 @@ int vcpu_affinity_domctl(struct domain *d, uint32_t cmd,
         if ( vcpuaff->flags & XEN_VCPUAFFINITY_FORCE )
             vcpu_temporary_affinity(v, NR_CPUS, VCPU_AFFINITY_OVERRIDE);
 
-        ret = 0;
-
         /*
          * We both set a new affinity and report back to the caller what
          * the scheduler will be effectively using.
          */
         if ( vcpuaff->flags & XEN_VCPUAFFINITY_HARD )
         {
-            ret = xenctl_bitmap_to_bitmap(cpumask_bits(new_affinity),
-                                          &vcpuaff->cpumap_hard, nr_cpu_ids);
-            if ( !ret )
-                ret = vcpu_set_hard_affinity(v, new_affinity);
-            if ( ret )
+            hret = xenctl_bitmap_to_bitmap(cpumask_bits(new_affinity),
+                                           &vcpuaff->cpumap_hard, nr_cpu_ids);
+            if ( !hret )
+                hret = vcpu_set_hard_affinity(v, new_affinity);
+            if ( hret )
                 goto setvcpuaffinity_out;
 
             /*
@@ -1766,7 +1764,7 @@ int vcpu_affinity_domctl(struct domain *d, uint32_t cmd,
              * cpupool's online mask and the new hard affinity.
              */
             cpumask_and(new_affinity, online, unit->cpu_hard_affinity);
-            ret = cpumask_to_xenctl_bitmap(&vcpuaff->cpumap_hard, new_affinity);
+            hret = cpumask_to_xenctl_bitmap(&vcpuaff->cpumap_hard, new_affinity);
         }
         if ( vcpuaff->flags & XEN_VCPUAFFINITY_SOFT )
         {
@@ -1804,14 +1802,14 @@ int vcpu_affinity_domctl(struct domain *d, uint32_t cmd,
     else
     {
         if ( vcpuaff->flags & XEN_VCPUAFFINITY_HARD )
-            ret = cpumask_to_xenctl_bitmap(&vcpuaff->cpumap_hard,
-                                           unit->cpu_hard_affinity);
+            hret = cpumask_to_xenctl_bitmap(&vcpuaff->cpumap_hard,
+                                            unit->cpu_hard_affinity);
         if ( vcpuaff->flags & XEN_VCPUAFFINITY_SOFT )
             ret = cpumask_to_xenctl_bitmap(&vcpuaff->cpumap_soft,
                                            unit->cpu_soft_affinity);
     }
 
-    return ret;
+    return hret ?: ret;
 }
 
 bool alloc_affinity_masks(struct affinity_masks *affinity)
