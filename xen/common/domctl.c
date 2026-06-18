@@ -436,25 +436,16 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             goto domctl_out_unlock_rcuonly;
 #endif
 
+        /*
+         * NB: The double lock isn't really needed when !add, but is used anyway
+         * to keep things simple.
+         */
         iocaps_double_lock(d, false);
 
         ret = -EPERM;
-        if ( !iomem_access_permitted(current->domain, mfn, mfn_end) ||
-             !iomem_access_permitted(d, mfn, mfn_end) )
+        if ( !iomem_access_permitted(current->domain, mfn, mfn_end) )
             /* Nothing. */;
-        else if ( add )
-        {
-            printk(XENLOG_G_DEBUG
-                   "memory_map:add: %pd gfn=%lx mfn=%lx nr=%lx\n",
-                   d, gfn, mfn, nr_mfns);
-
-            ret = map_mmio_regions(d, _gfn(gfn), nr_mfns, _mfn(mfn));
-            if ( ret < 0 )
-                printk(XENLOG_G_WARNING
-                       "memory_map:fail: %pd gfn=%lx mfn=%lx nr=%lx ret:%ld\n",
-                       d, gfn, mfn, nr_mfns, ret);
-        }
-        else
+        else if ( !add )
         {
             printk(XENLOG_G_DEBUG
                    "memory_map:remove: %pd gfn=%lx mfn=%lx nr=%lx\n",
@@ -465,6 +456,18 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
                 printk(XENLOG_ERR
                        "memory_map: error %ld removing %pd access to [%lx,%lx]\n",
                        ret, d, mfn, mfn_end);
+        }
+        else if ( iomem_access_permitted(d, mfn, mfn_end) )
+        {
+            printk(XENLOG_G_DEBUG
+                   "memory_map:add: %pd gfn=%lx mfn=%lx nr=%lx\n",
+                   d, gfn, mfn, nr_mfns);
+
+            ret = map_mmio_regions(d, _gfn(gfn), nr_mfns, _mfn(mfn));
+            if ( ret < 0 )
+                printk(XENLOG_G_WARNING
+                       "memory_map:fail: %pd gfn=%lx mfn=%lx nr=%lx ret:%ld\n",
+                       d, gfn, mfn, nr_mfns, ret);
         }
 
         iocaps_double_unlock(d, false);
