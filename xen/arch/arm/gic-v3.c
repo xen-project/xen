@@ -764,9 +764,6 @@ static void __init gicv3_dist_init(void)
     type = readl_relaxed(GICD + GICD_TYPER);
     nr_lines = 32 * ((type & GICD_TYPE_LINES) + 1);
 
-    if ( type & GICD_TYPE_LPIS )
-        gicv3_lpi_init_host_lpis(GICD_TYPE_ID_BITS(type));
-
     /* Only 1020 interrupts are supported */
     nr_lines = min(1020U, nr_lines);
     gicv3_info.nr_lines = nr_lines;
@@ -1990,6 +1987,17 @@ static int __init gicv3_init(void)
         res = gicv3_its_init();
         if ( res )
             panic("GICv3: ITS: initialization failed: %d\n", res);
+
+        /*
+         * Host LPI allocation uses ITS-derived memory attributes, so defer it
+         * until after gicv3_its_init() has discovered ITS workarounds.
+         */
+        if ( gicv3_its_host_has_its() )
+        {
+            res = gicv3_lpi_init_host_lpis(intid_bits);
+            if ( res )
+                panic("GICv3: LPI initialization failed: %d\n", res);
+        }
     }
 
     res = gicv3_cpu_init();
