@@ -96,9 +96,18 @@ static int write_batch(struct xc_sr_context *ctx)
     void *page, *orig_page;
     uint64_t *rec_pfns = NULL;
     struct iovec *iov = NULL; int iovcnt = 0;
-    struct xc_sr_rec_page_data_header hdr = { 0 };
-    struct xc_sr_record rec = {
-        .type = REC_TYPE_PAGE_DATA,
+    struct {
+        struct xc_sr_rhdr rec;
+        struct xc_sr_rec_page_data_header page_data;
+    } hdrs = {
+        .rec = {
+            .type = REC_TYPE_PAGE_DATA,
+            .length = offsetof(struct xc_sr_rec_page_data_header,
+                               pfn[nr_pfns]), /* + the pages to send */
+        },
+        .page_data = {
+            .count = nr_pfns,
+        },
     };
 
     assert(nr_pfns != 0);
@@ -114,7 +123,7 @@ static int write_batch(struct xc_sr_context *ctx)
     /* Pointers to locally allocated pages.  Need freeing. */
     local_pages = calloc(nr_pfns, sizeof(*local_pages));
     /* iovec[] for writev(). */
-    iov = malloc((nr_pfns + 4) * sizeof(*iov));
+    iov = malloc((nr_pfns + 2) * sizeof(*iov));
     /* page_data record PFNs list */
     rec_pfns = malloc(nr_pfns * sizeof(*rec_pfns));
 
@@ -124,6 +133,14 @@ static int write_batch(struct xc_sr_context *ctx)
               nr_pfns);
         goto err;
     }
+
+    iov[0].iov_base = &hdrs;
+    iov[0].iov_len = sizeof(hdrs);
+
+    iov[1].iov_base = rec_pfns;
+    iov[1].iov_len = nr_pfns * sizeof(*rec_pfns);
+
+    iovcnt = 2;
 
     for ( i = 0; i < nr_pfns; ++i )
     {
@@ -209,28 +226,10 @@ static int write_batch(struct xc_sr_context *ctx)
         }
     }
 
-    hdr.count = nr_pfns;
-
-    rec.length = sizeof(hdr);
-    rec.length += nr_pfns * sizeof(*rec_pfns);
-    rec.length += nr_pages * PAGE_SIZE;
+    hdrs.rec.length += nr_pages * PAGE_SIZE;
 
     for ( i = 0; i < nr_pfns; ++i )
         rec_pfns[i] = ((uint64_t)(types[i]) << 32) | ctx->save.batch_pfns[i];
-
-    iov[0].iov_base = &rec.type;
-    iov[0].iov_len = sizeof(rec.type);
-
-    iov[1].iov_base = &rec.length;
-    iov[1].iov_len = sizeof(rec.length);
-
-    iov[2].iov_base = &hdr;
-    iov[2].iov_len = sizeof(hdr);
-
-    iov[3].iov_base = rec_pfns;
-    iov[3].iov_len = nr_pfns * sizeof(*rec_pfns);
-
-    iovcnt = 4;
 
     if ( nr_pages )
     {
