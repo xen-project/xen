@@ -18,6 +18,7 @@
 #include <xen/domain_page.h>
 #include <xen/elfstructs.h>
 #include <xen/kexec.h>
+#include <xen/percpu.h>
 #include <xen/types.h>
 
 #include <asm/fixmap.h>
@@ -159,19 +160,19 @@ void machine_kexec(struct kexec_image *image)
      */
     local_irq_disable();
 
-    /* Now regular interrupts are disabled, we need to reduce the impact
-     * of interrupts not disabled by 'cli'.
-     *
-     * The NMI handlers have already been set up nmi_shootdown_cpus().  All
-     * pcpus other than us have the nmi_crash handler, while we have the nop
-     * handler.
-     *
+    /*
      * The MCE handlers touch extensive areas of Xen code and data.  At this
-     * point, there is nothing we can usefully do, so set the nop handler.
+     * point, there is nothing we can usefully do, so set the NOP handler even
+     * for parked CPUs.
      */
     for ( i = 0; i < nr_cpu_ids; i++ )
     {
-        idt_entry_t *idt = per_cpu(idt, i);
+        idt_entry_t *idt;
+
+        if ( __per_cpu_offset[i] == INVALID_PERCPU_AREA )
+            continue;
+
+        idt = per_cpu(idt, i);
 
         if ( !idt )
             continue;

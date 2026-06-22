@@ -13,7 +13,6 @@
 
 #define PERCPU_ORDER get_order_from_bytes(__per_cpu_data_end - __per_cpu_start)
 
-extern char __per_cpu_start[];
 extern const char __per_cpu_data_end[];
 
 unsigned long __read_mostly __per_cpu_offset[NR_CPUS];

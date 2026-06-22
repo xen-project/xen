@@ -43,6 +43,7 @@
 #endif
 
 extern unsigned long __per_cpu_offset[];
+extern char __per_cpu_start[];
 
 #define per_cpu(var, cpu)  \
     (*RELOC_HIDE(&per_cpu__##var, __per_cpu_offset[cpu]))
