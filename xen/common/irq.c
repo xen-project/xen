@@ -54,3 +54,15 @@ unsigned int cf_check irq_startup_none(struct irq_desc *desc)
 {
     return 0;
 }
+
+void disable_irq(unsigned int irq)
+{
+    struct irq_desc *desc = irq_to_desc(irq);
+    unsigned long flags;
+
+    spin_lock_irqsave(&desc->lock, flags);
+    if ( desc->handler->disable )
+        desc->handler->disable(desc);
+    desc->status |= IRQ_DISABLED;
+    spin_unlock_irqrestore(&desc->lock, flags);
+}

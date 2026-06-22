@@ -62,6 +62,7 @@ static struct ns16550 {
 #endif
     unsigned int timeout_ms;
     bool intr_works;
+    bool force_polling;
     bool dw_usr_bsy;
 #ifdef NS16550_PCI
     /* PCI card parameters. */
@@ -190,12 +191,38 @@ static void cf_check ns16550_interrupt(int irq, void *dev_id)
 {
     struct serial_port *port = dev_id;
     struct ns16550 *uart = port->uart;
+    /*
+     * Set quite arbitrarily as 4x the time to drain the TX or fill RX FIFOs,
+     * set the upper bound as 5ms or the timeout_ms value, whatever is higher.
+     */
+    const unsigned int delta = min(uart->timeout_ms * 4,
+                                   max(5u, uart->timeout_ms));
+    const s_time_t timeout = NOW() + MILLISECS(delta);
 
+    ASSERT(!uart->force_polling);
     uart->intr_works = 1;
 
     while ( !(ns_read_reg(uart, UART_IIR) & UART_IIR_NOINT) )
     {
         u8 lsr = ns_read_reg(uart, UART_LSR);
+        s_time_t now = NOW();
+
+        /* Break out of the loop if spending too much time. */
+        if ( now > timeout )
+        {
+            /* Disable the interrupt source - it's never shared. */
+            disable_irq(irq);
+
+            /* Disable interrupt generation on the device and arm the timer. */
+            uart->force_polling = true;
+            ns_write_reg(uart, UART_IER, 0);
+            set_timer(&uart->timer, now + MILLISECS(uart->timeout_ms));
+            printk(XENLOG_WARNING
+                   "uart interrupt taking more than %ums, switched to polling\n",
+                   delta);
+
+            return;
+        }
 
         if ( (lsr & uart->lsr_mask) == uart->lsr_mask )
             serial_tx_interrupt(port);
@@ -223,7 +250,7 @@ static void cf_check __ns16550_poll(const struct cpu_user_regs *regs)
     struct ns16550 *uart = port->uart;
     const struct cpu_user_regs *old_regs;
 
-    if ( uart->intr_works )
+    if ( uart->intr_works && !uart->force_polling )
         return; /* Interrupts work - no more polling */
 
     /* Mimic interrupt context. */
@@ -313,6 +340,7 @@ static void ns16550_setup_preirq(struct ns16550 *uart)
     unsigned int  divisor;
 
     uart->intr_works = 0;
+    uart->force_polling = false;
 
     pci_serial_early_init(uart);
 
