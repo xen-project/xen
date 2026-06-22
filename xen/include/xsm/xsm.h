@@ -61,8 +61,10 @@ struct xsm_ops {
 #endif
     int (*set_target)(struct domain *d, struct domain *e);
     int (*domctl)(struct domain *d, struct xen_domctl *op);
+#ifdef CONFIG_SYSCTL
     int (*sysctl)(int cmd);
     int (*readconsole)(uint32_t clear);
+#endif
 
     int (*evtchn_unbound)(struct domain *d, struct evtchn *chn, domid_t id2);
     int (*evtchn_interdomain)(struct domain *d1, struct evtchn *chn1,
@@ -248,23 +250,17 @@ static inline int xsm_domctl(xsm_default_t def, struct domain *d,
     return alternative_call(xsm_ops.domctl, d, op);
 }
 
+#ifdef CONFIG_SYSCTL
 static inline int xsm_sysctl(xsm_default_t def, int cmd)
 {
-#ifdef CONFIG_SYSCTL
     return alternative_call(xsm_ops.sysctl, cmd);
-#else
-    return -EOPNOTSUPP;
-#endif
 }
 
 static inline int xsm_readconsole(xsm_default_t def, uint32_t clear)
 {
-#ifdef CONFIG_SYSCTL
     return alternative_call(xsm_ops.readconsole, clear);
-#else
-    return -EOPNOTSUPP;
-#endif
 }
+#endif
 
 static inline int xsm_evtchn_unbound(
     xsm_default_t def, struct domain *d1, struct evtchn *chn, domid_t id2)
@@ -558,14 +554,12 @@ static inline int xsm_resource_setup_misc(xsm_default_t def)
     return alternative_call(xsm_ops.resource_setup_misc);
 }
 
+#ifdef CONFIG_SYSCTL
 static inline int xsm_page_offline(xsm_default_t def, uint32_t cmd)
 {
-#ifdef CONFIG_SYSCTL
     return alternative_call(xsm_ops.page_offline, cmd);
-#else
-    return -EOPNOTSUPP;
-#endif
 }
+#endif
 
 static inline int xsm_hypfs_op(xsm_default_t def)
 {
