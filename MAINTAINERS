@@ -544,7 +544,7 @@ F:	stubdom/
 TEE MEDIATORS
 M:	Volodymyr Babchuk <volodymyr_babchuk@epam.com>
 M:	Bertrand Marquis <bertrand.marquis@arm.com>
-R:	Jens Wiklander <jens.wiklander@linaro.org>
+R:	Jens Wiklander <jenswi@kernel.org>
 S:	Supported
 F:	xen/arch/arm/include/asm/tee/
 F:	xen/arch/arm/tee/
