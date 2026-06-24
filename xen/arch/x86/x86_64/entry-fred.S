@@ -20,6 +20,12 @@ FUNC(entry_FRED_R3, 4096)
         GET_STACK_END(14)
         movq    STACK_CPUINFO_FIELD(current_vcpu)(%r14), %rbx
 
+        /* NMIs need special handling on return to guest. */
+        movzbl  UREGS_ss + 6(%rsp), %eax
+        and     $0xf, %eax
+        cmp     $X86_ET_NMI, %al
+        je      nmi_exit_to_guest
+
         jmp     test_all_events
 #else
         BUG     /* Not Reached */
