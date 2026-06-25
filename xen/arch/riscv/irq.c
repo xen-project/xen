@@ -19,6 +19,12 @@
 
 static irq_desc_t irq_desc[NR_IRQS];
 
+struct irq_desc *irq_to_desc(unsigned int irq)
+{
+    ASSERT(irq < ARRAY_SIZE(irq_desc));
+    return &irq_desc[irq];
+}
+
 static bool irq_validate_new_type(unsigned int curr, unsigned int new)
 {
     return curr == IRQ_TYPE_INVALID || curr == new;

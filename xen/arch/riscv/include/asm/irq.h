@@ -35,6 +35,9 @@ struct arch_irq_desc {
     unsigned int type;
 };
 
+struct irq_desc *irq_to_desc(unsigned int irq);
+#define irq_to_desc irq_to_desc
+
 struct cpu_user_regs;
 struct dt_device_node;
 
