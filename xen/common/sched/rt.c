@@ -1480,7 +1480,41 @@ rt_dom_cntl(
                 svc->period = period;
                 svc->budget = budget;
                 if ( local_sched.u.rtds.flags & XEN_DOMCTL_SCHEDRT_extra )
+                {
+                    /*
+                     * Turning extratime on while the vCPU is depleted
+                     * (cur_budget <= 0) leaves cur_budget unchanged. The
+                     * next runq_insert() on this vCPU - from
+                     * rt_unit_wake() after a domain unpause,
+                     * rt_context_saved() following a delayed runq add, or
+                     * repl_timer_handler() - then places it on the run
+                     * queue because has_extratime() is now true, even
+                     * though cur_budget is 0. The very next rt_schedule()
+                     * iterates the run queue from runq_pick() and trips
+                     * the ASSERT(iter_svc->cur_budget > 0).
+                     *
+                     * Apply the same priority-demotion-and-refill that
+                     * burn_budget() would have performed if the flag had
+                     * been set when the budget ran out, clear the
+                     * depleted state, and - if the vCPU is currently on
+                     * the depleted queue - move it to the run queue so
+                     * the new extratime allocation is picked up
+                     * immediately instead of waiting for the next
+                     * replenishment.
+                     */
+                    if ( !has_extratime(svc) && svc->cur_budget <= 0 )
+                    {
+                        svc->priority_level++;
+                        svc->cur_budget = svc->budget;
+                        __clear_bit(__RTDS_depleted, &svc->flags);
+                        if ( unit_on_q(svc) )
+                        {
+                            q_remove(svc);
+                            runq_insert(ops, svc);
+                        }
+                    }
                     __set_bit(__RTDS_extratime, &svc->flags);
+                }
                 else
                     __clear_bit(__RTDS_extratime, &svc->flags);
                 spin_unlock_irqrestore(&prv->lock, flags);
