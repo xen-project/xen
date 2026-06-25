@@ -2088,7 +2088,9 @@ void do_IRQ(struct cpu_user_regs *regs)
     desc->status |= IRQ_INPROGRESS;
 
     action = desc->action;
-    while ( desc->status & IRQ_PENDING )
+
+    /* Deal with IRQ_DISABLED being set while inside the loop body. */
+    while ( (desc->status & (IRQ_PENDING | IRQ_DISABLED)) == IRQ_PENDING )
     {
         desc->status &= ~IRQ_PENDING;
         spin_unlock_irq(&desc->lock);
