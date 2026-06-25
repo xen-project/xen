@@ -30,4 +30,10 @@ static inline int platform_get_irq(const struct dt_device_node *device, int inde
     BUG_ON("unimplemented");
 }
 
+static inline void *irq_to_desc(unsigned int irq)
+{
+    BUG_ON("unimplemented");
+}
+#define irq_to_desc irq_to_desc
+
 #endif /* __ASM_PPC_IRQ_H__ */
