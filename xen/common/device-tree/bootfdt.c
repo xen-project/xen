@@ -250,23 +250,28 @@ int __init device_tree_for_each_node(const void *fdt, int node,
         {
             printk("Warning: device tree node `%s' is nested too deep\n",
                    name);
-            continue;
         }
-
-        as = depth > 0 ? address_cells[depth-1] : DT_ROOT_NODE_ADDR_CELLS_DEFAULT;
-        ss = depth > 0 ? size_cells[depth-1] : DT_ROOT_NODE_SIZE_CELLS_DEFAULT;
-
-        address_cells[depth] = device_tree_get_u32(fdt, node,
-                                                   "#address-cells", as);
-        size_cells[depth] = device_tree_get_u32(fdt, node,
-                                                "#size-cells", ss);
-
-        /* skip the first node */
-        if ( node != first_node )
+        else
         {
-            ret = func(fdt, node, name, depth, as, ss, data);
-            if ( ret != 0 )
-                return ret;
+            as = depth > 0 ?
+                 address_cells[depth - 1] :
+                 DT_ROOT_NODE_ADDR_CELLS_DEFAULT;
+            ss = depth > 0 ?
+                 size_cells[depth - 1] :
+                 DT_ROOT_NODE_SIZE_CELLS_DEFAULT;
+
+            address_cells[depth] = device_tree_get_u32(fdt, node,
+                                                       "#address-cells", as);
+            size_cells[depth] = device_tree_get_u32(fdt, node,
+                                                    "#size-cells", ss);
+
+            /* skip the first node */
+            if ( node != first_node )
+            {
+                ret = func(fdt, node, name, depth, as, ss, data);
+                if ( ret != 0 )
+                    return ret;
+            }
         }
 
         node = fdt_next_node(fdt, node, &depth);
