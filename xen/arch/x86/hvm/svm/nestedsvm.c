@@ -127,8 +127,6 @@ void cf_check nsvm_vcpu_destroy(struct vcpu *v)
         svm->ns_merged_msrpm = NULL;
     }
 
-    hvm_unmap_guest_frame(nv->nv_vvmcx, 1);
-    nv->nv_vvmcx = NULL;
     if ( nv->nv_n2vmcx )
     {
         free_vmcb(nv->nv_n2vmcx);
@@ -137,6 +135,19 @@ void cf_check nsvm_vcpu_destroy(struct vcpu *v)
     }
 
     svm->ns_iomap = NULL;
+}
+
+void cf_check nsvm_domain_relinquish_resources(struct domain *d)
+{
+    struct vcpu *v;
+    struct nestedvcpu *nv;
+
+    for_each_vcpu ( d, v )
+    {
+        nv = &vcpu_nestedhvm(v);
+        hvm_unmap_guest_frame(nv->nv_vvmcx, 1);
+        nv->nv_vvmcx = NULL;
+    }
 }
 
 int cf_check nsvm_vcpu_reset(struct vcpu *v)
