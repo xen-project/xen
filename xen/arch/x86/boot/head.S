@@ -133,7 +133,9 @@ multiboot2_header:
 .Lbad_ldr_nbs: .asciz "ERR: Bootloader shutdown EFI x64 boot services!"
 .Lbad_efi_msg: .asciz "ERR: EFI IA-32 platforms are not supported!"
 .Lbag_alg_msg: .asciz "ERR: Xen must be loaded at a 2Mb boundary!"
+#ifdef CONFIG_REQUIRE_NX
 .Lno_nx_msg:   .asciz "ERR: Not an NX-capable CPU!"
+#endif
 
         .section .init.data, "aw", @progbits
         .subsection 1 /* Put data here after the page tables (in x86_64.S). */
