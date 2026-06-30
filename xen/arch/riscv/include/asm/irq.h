@@ -25,6 +25,12 @@ static inline void arch_move_irqs(struct vcpu *v)
     BUG_ON("unimplemented");
 }
 
+static inline void *irq_to_desc(unsigned int irq)
+{
+    BUG_ON("unimplemented");
+}
+#define irq_to_desc irq_to_desc
+
 #endif /* ASM__RISCV__IRQ_H */
 
 /*
