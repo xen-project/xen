@@ -79,7 +79,6 @@
  * from all physical cpus.
  *
  * The lock is already grabbed when calling wake/sleep/schedule/ functions
- * in schedule.c
  *
  * The functions involes RunQ and needs to grab locks are:
  *    unit_insert, unit_remove, context_saved, runq_insert
@@ -893,8 +892,7 @@ rt_free_udata(const struct scheduler *ops, void *priv)
 }
 
 /*
- * It is called in sched_move_domain() and sched_init_vcpu
- * in schedule.c.
+ * It is called in sched_move_domain() and sched_init_vcpu()
  * When move a domain to a new cpupool.
  * It inserts units of moving domain to the scheduler's RunQ in
  * dest. cpupool.
@@ -1073,7 +1071,7 @@ runq_pick(const struct scheduler *ops, const cpumask_t *mask, unsigned int cpu)
 
 /*
  * schedule function for rt scheduler.
- * The lock is already grabbed in schedule.c, no need to lock here
+ * The lock is already grabbed by the caller, no need to lock here
  */
 static void cf_check
 rt_schedule(const struct scheduler *ops, struct sched_unit *currunit,
@@ -1167,7 +1165,7 @@ rt_schedule(const struct scheduler *ops, struct sched_unit *currunit,
 
 /*
  * Remove UNIT from RunQ
- * The lock is already grabbed in schedule.c, no need to lock here
+ * The lock is already grabbed by the caller, no need to lock here
  */
 static void cf_check
 rt_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
@@ -1280,7 +1278,7 @@ runq_tickle(const struct scheduler *ops, const struct rt_unit *new)
 /*
  * Should always wake up runnable unit, put it back to RunQ.
  * Check priority to raise interrupt
- * The lock is already grabbed in schedule.c, no need to lock here
+ * The lock is already grabbed by the caller, no need to lock here
  * TODO: what if these two units belongs to the same domain?
  */
 static void cf_check

@@ -873,11 +873,12 @@ csched_res_pick(const struct scheduler *ops, const struct sched_unit *unit)
     struct csched_unit *svc = CSCHED_UNIT(unit);
 
     /*
-     * We have been called by vcpu_migrate() (in schedule.c), as part
-     * of the process of seeing if vc can be migrated to another pcpu.
+     * We have been called, as part of the process of seeing if vc can be
+     * migrated to another pcpu.
+     *
      * We make a note about this in svc->flags so that later, in
-     * csched_unit_wake() (still called from vcpu_migrate()) we won't
-     * get boosted, which we don't deserve as we are "only" migrating.
+     * csched_unit_wake() we won't get boosted, which we don't deserve
+     * as we are "only" migrating.
      */
     set_bit(CSCHED_FLAG_UNIT_MIGRATING, &svc->flags);
     return get_sched_res(_csched_cpu_pick(ops, unit, true));

@@ -666,15 +666,15 @@ static inline bool has_cap(const struct csched2_unit *svc)
  * runq, _always_ happens by means of tickling:
  *  - when an unit wakes up, it calls csched2_unit_wake(), which calls
  *    runq_tickle();
- *  - when a migration is initiated in schedule.c, we call csched2_res_pick(),
+ *  - when a migration is initiated, we call csched2_res_pick(),
  *    csched2_unit_migrate() (which calls migrate()) and csched2_unit_wake().
  *    csched2_res_pick() looks for the least loaded runq and return just any
  *    of its processors. Then, csched2_unit_migrate() just moves the unit to
  *    the chosen runq, and it is again runq_tickle(), called by
  *    csched2_unit_wake() that actually decides what pcpu to use within the
  *    chosen runq;
- *  - when a migration is initiated in sched_credit2.c, by calling  migrate()
- *    directly, that again temporarily use a random pcpu from the new runq,
+ *  - when a migration is initiated, by calling migrate() directly,
+ *    that again temporarily use a random pcpu from the new runq,
  *    and then calls runq_tickle(), by itself.
  */
 
