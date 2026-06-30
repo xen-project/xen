@@ -339,7 +339,7 @@ static multiboot_info_t *mbi2_reloc(uint32_t mbi_in, memctx *ctx)
  end:
 
 #ifdef CONFIG_VIDEO
-    if ( video )
+    if ( video && video->lfb_size )
         video->orig_video_isVGA = 0x23;
 #endif
 
