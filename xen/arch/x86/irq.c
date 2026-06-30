@@ -2075,7 +2075,6 @@ void do_IRQ(struct cpu_user_regs *regs)
         goto out_no_end;
     }
 
-    desc->status &= ~IRQ_REPLAY;
     desc->status |= IRQ_PENDING;
 
     /*
