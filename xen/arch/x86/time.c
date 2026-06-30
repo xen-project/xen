@@ -1257,6 +1257,7 @@ struct rtc_time {
 static bool __get_cmos_time(struct rtc_time *rtc)
 {
     s_time_t start, t1, t2;
+    bool bcd;
     unsigned int century = 0;
     unsigned long flags;
 
@@ -1283,8 +1284,12 @@ static bool __get_cmos_time(struct rtc_time *rtc)
     rtc->year = CMOS_READ(RTC_YEAR);
     if ( acpi_gbl_FADT.century && acpi_gbl_FADT.century < 0x80 )
         century = CMOS_READ(acpi_gbl_FADT.century);
-    
-    if ( RTC_ALWAYS_BCD || !(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY) )
+
+    bcd = RTC_ALWAYS_BCD || !(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY);
+
+    spin_unlock_irqrestore(&rtc_lock, flags);
+
+    if ( bcd )
     {
         BCD_TO_BIN(rtc->sec);
         BCD_TO_BIN(rtc->min);
@@ -1293,8 +1298,6 @@ static bool __get_cmos_time(struct rtc_time *rtc)
         BCD_TO_BIN(rtc->mon);
         BCD_TO_BIN(rtc->year);
     }
-
-    spin_unlock_irqrestore(&rtc_lock, flags);
 
     if ( century )
     {
