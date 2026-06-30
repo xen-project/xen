@@ -247,18 +247,18 @@ static void cf_check rtc_update_timer2(void *opaque)
 
 static unsigned int to_bcd(const RTCState *s, unsigned int a)
 {
-    if ( s->hw.cmos_data[RTC_REG_B] & RTC_DM_BINARY )
-        return a;
+    if ( !(s->hw.cmos_data[RTC_REG_B] & RTC_DM_BINARY) )
+        BIN_TO_BCD(a);
 
-    return ((a / 10) << 4) | (a % 10);
+    return a;
 }
 
 static unsigned int from_bcd(const RTCState *s, unsigned int a)
 {
-    if ( s->hw.cmos_data[RTC_REG_B] & RTC_DM_BINARY )
-        return a;
+    if ( !(s->hw.cmos_data[RTC_REG_B] & RTC_DM_BINARY) )
+        BCD_TO_BIN(a);
 
-    return ((a >> 4) * 10) + (a & 0x0f);
+    return a;
 }
 
 /*
