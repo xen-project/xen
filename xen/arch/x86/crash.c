@@ -37,14 +37,18 @@ static cpumask_t waiting_to_crash;
 static unsigned int crashing_cpu;
 static DEFINE_PER_CPU_READ_MOSTLY(bool, crash_save_done);
 
-/* This becomes the NMI handler for non-crashing CPUs, when Xen is crashing. */
-static int noreturn cf_check do_nmi_crash(
+/* This becomes the NMI handler for all CPUs when Xen is crashing. */
+static int cf_check do_nmi_crash(
     const struct cpu_user_regs *regs, int cpu)
 {
     stac();
 
-    /* nmi_shootdown_cpus() should ensure that this assertion is correct. */
-    ASSERT(cpu != crashing_cpu);
+    /*
+     * If we are the crashing CPU, do nothing.  We need to get back to the
+     * interrupted codepath to contine with the kexec transition.
+     */
+    if ( cpu == crashing_cpu )
+        return 1;
 
     /* Save crash information and shut down CPU.  Attempt only once. */
     if ( !this_cpu(crash_save_done) )
@@ -114,6 +118,8 @@ static int noreturn cf_check do_nmi_crash(
 
     for ( ; ; )
         halt();
+
+    unreachable();
 }
 
 static void nmi_shootdown_cpus(void)
@@ -130,11 +136,7 @@ static void nmi_shootdown_cpus(void)
 
     cpumask_andnot(&waiting_to_crash, &cpu_online_map, cpumask_of(cpu));
 
-    /*
-     * Disable IST for MCEs to avoid stack corruption race conditions, and
-     * change the NMI handler to a nop to avoid deviation from this codepath.
-     */
-    _set_gate_lower(&idt[X86_EXC_NMI], SYS_DESC_irq_gate, 0, &trap_nop);
+    /* Disable IST for MCEs to avoid stack corruption race conditions */
     set_ist(&idt[X86_EXC_MC], IST_NONE);
 
     set_nmi_callback(do_nmi_crash);
