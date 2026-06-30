@@ -32,6 +32,6 @@ struct stubs {
 };
 
 DECLARE_PER_CPU(struct stubs, stubs);
-unsigned long alloc_stub_page(unsigned int cpu, unsigned long *mfn);
+void init_stubs(void);
 
 #endif /* X86_ASM_STUBS_H */
