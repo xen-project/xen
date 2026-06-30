@@ -46,6 +46,21 @@ FUNC(kexec_reloc, PAGE_SIZE)
         lidt    (%rsp)
         add     $10, %rsp
 
+        /* Move to PCID 0 if necessary, as a prerequisite to clearing CR4.PCIDE */
+        mov     %cr3, %rax
+        test    $0xfff, %eax
+        jz      1f
+        and     $~0xfff, %rax
+        mov     %rax, %cr3
+1:
+
+        /*
+         * Set CR4 to PAE only.  This may disable FRED, which must happen
+         * before switching off Xen's stack.
+         */
+        mov     $X86_CR4_PAE, %eax
+        mov     %rax, %cr4
+
         /* Setup stack. */
         leaq    (.Lreloc_stack_base - kexec_reloc)(%rdi), %rsp
 
@@ -70,13 +85,6 @@ FUNC(kexec_reloc, PAGE_SIZE)
         andl    $~(X86_CR0_AM | X86_CR0_WP | X86_CR0_TS | X86_CR0_EM), %eax
         orl     $(X86_CR0_PG | X86_CR0_PE), %eax
         movq    %rax, %cr0
-
-        /*
-         * Set cr4 to a known state:
-         *  - physical address extension enabled
-         */
-        movl    $X86_CR4_PAE, %eax
-        movq    %rax, %cr4
 
         movq    %rdx, %rdi
         call    relocate_pages
