@@ -147,6 +147,35 @@ process_trap:
         jmp  test_all_events
 END(switch_to_kernel)
 
+/*
+ * When returning to guest from an NMI, we must execute an IRET/ERETU to
+ * re-enable NMIs, and must not process softirqs which can e.g. schedule
+ * rather than returning to guest context.
+ *
+ * If a softirq is pending, send ourselves an EVENT_CHECK IPI to compensate.
+ * This will cause softirq processing to occur upon leaving NMI context.
+ *
+ * %rbx: struct vcpu, %r14 stack_end
+ */
+FUNC(nmi_exit_to_guest)
+        mov     STACK_CPUINFO_FIELD(processor_id)(%r14), %eax
+        shl     $IRQSTAT_shift, %eax
+        lea     irq_stat + IRQSTAT_softirq_pending(%rip), %rcx
+        cmpl    $0, (%rcx, %rax, 1)
+        je      1f
+        mov     $EVENT_CHECK_VECTOR, %edi
+        call    send_IPI_self
+1:
+        /* For restore_all_guest. */
+        mov     STACK_CPUINFO_FIELD(current_vcpu)(%r14), %rbx
+#ifdef CONFIG_PV32
+        mov     VCPU_domain(%rbx), %rax
+        cmpb    $0, DOMAIN_is_32bit_pv(%rax)
+        jne     compat_restore_all_guest
+#endif
+        jmp     restore_all_guest
+END(nmi_exit_to_guest)
+
         .section .text.entry, "ax", @progbits
 
 /* %rbx: struct vcpu, interrupts disabled */
@@ -1193,25 +1222,7 @@ FUNC(handle_ist_exception)
 #ifdef CONFIG_PV
         testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen
-        /* Send an IPI to ourselves to cover for the lack of event checking. */
-        mov   STACK_CPUINFO_FIELD(processor_id)(%r14), %eax
-        shll  $IRQSTAT_shift,%eax
-        leaq  irq_stat+IRQSTAT_softirq_pending(%rip),%rcx
-        cmpl  $0,(%rcx,%rax,1)
-        je    1f
-        movl  $EVENT_CHECK_VECTOR,%edi
-        call  send_IPI_self
-1:
-        /* For restore_all_guest. */
-        mov   STACK_CPUINFO_FIELD(current_vcpu)(%r14), %rbx
-#ifdef CONFIG_PV32
-        movq  VCPU_domain(%rbx),%rax
-        cmpb  $0,DOMAIN_is_32bit_pv(%rax)
-        je    restore_all_guest
-        jmp   compat_restore_all_guest
-#else
-        jmp   restore_all_guest
-#endif
+        jmp   nmi_exit_to_guest
 #else
         ASSERT_CONTEXT_IS_XEN
         jmp   restore_all_xen
