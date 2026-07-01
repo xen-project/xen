@@ -720,13 +720,6 @@ sub get_maintainers {
 	$suppress_the_rest = 0 if $file_maintained_by_the_rest;
     }
 
-    if ($keywords) {
-	@keyword_tvi = sort_and_uniq(@keyword_tvi);
-	foreach my $line (@keyword_tvi) {
-	    add_categories($line);
-	}
-    }
-
     if ($email_drop_the_rest_supporter_if_supporter_found &&
 	$suppress_the_rest && $#email_to > 0) {
         my @email_new;
@@ -746,6 +739,13 @@ sub get_maintainers {
         }
         @email_to = @email_new
             if $do_replace;
+    }
+
+    if ($keywords) {
+	@keyword_tvi = sort_and_uniq(@keyword_tvi);
+	foreach my $line (@keyword_tvi) {
+	    add_categories($line);
+	}
     }
 
     foreach my $email (@email_to, @list_to) {
