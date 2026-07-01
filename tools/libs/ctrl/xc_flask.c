@@ -186,7 +186,8 @@ int xc_flask_getbool_byname(xc_interface *xch, char *name, int *curr, int *pend)
 {
     int rv;
     struct xen_flask_op op = {};
-    DECLARE_HYPERCALL_BOUNCE(name, strlen(name), XC_HYPERCALL_BUFFER_BOUNCE_IN);
+    size_t size = strlen(name) + 1;
+    DECLARE_HYPERCALL_BOUNCE(name, size, XC_HYPERCALL_BUFFER_BOUNCE_IN);
 
     if ( xc_hypercall_bounce_pre(xch, name) )
     {
@@ -196,7 +197,7 @@ int xc_flask_getbool_byname(xc_interface *xch, char *name, int *curr, int *pend)
 
     op.cmd = FLASK_GETBOOL;
     op.u.boolean.bool_id = -1;
-    op.u.boolean.size = strlen(name);
+    op.u.boolean.size = size;
     set_xen_guest_handle(op.u.boolean.name, name);
 
     rv = xc_flask_op(xch, &op);
@@ -218,7 +219,8 @@ int xc_flask_setbool(xc_interface *xch, char *name, int value, int commit)
 {
     int rv;
     struct xen_flask_op op = {};
-    DECLARE_HYPERCALL_BOUNCE(name, strlen(name), XC_HYPERCALL_BUFFER_BOUNCE_IN);
+    size_t size = strlen(name) + 1;
+    DECLARE_HYPERCALL_BOUNCE(name, size, XC_HYPERCALL_BUFFER_BOUNCE_IN);
 
     if ( xc_hypercall_bounce_pre(xch, name) )
     {
@@ -230,7 +232,7 @@ int xc_flask_setbool(xc_interface *xch, char *name, int value, int commit)
     op.u.boolean.bool_id = -1;
     op.u.boolean.new_value = value;
     op.u.boolean.commit = 1;
-    op.u.boolean.size = strlen(name);
+    op.u.boolean.size = size;
     set_xen_guest_handle(op.u.boolean.name, name);
 
     rv = xc_flask_op(xch, &op);
