@@ -1592,7 +1592,7 @@ int xc_assign_dt_device(
     char *path)
 {
     int rc;
-    size_t size = strlen(path);
+    size_t size = strlen(path) + 1;
     struct xen_domctl domctl = {};
     DECLARE_HYPERCALL_BOUNCE(path, size, XC_HYPERCALL_BUFFER_BOUNCE_IN);
 
@@ -1624,7 +1624,7 @@ int xc_test_assign_dt_device(
     char *path)
 {
     int rc;
-    size_t size = strlen(path);
+    size_t size = strlen(path) + 1;
     struct xen_domctl domctl = {};
     DECLARE_HYPERCALL_BOUNCE(path, size, XC_HYPERCALL_BUFFER_BOUNCE_IN);
 
@@ -1652,7 +1652,7 @@ int xc_deassign_dt_device(
     char *path)
 {
     int rc;
-    size_t size = strlen(path);
+    size_t size = strlen(path) + 1;
     struct xen_domctl domctl = {};
     DECLARE_HYPERCALL_BOUNCE(path, size, XC_HYPERCALL_BUFFER_BOUNCE_IN);
 
