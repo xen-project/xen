@@ -58,7 +58,7 @@ bool opt_dom0_vcpus_pin;
 boolean_param("dom0_vcpus_pin", opt_dom0_vcpus_pin);
 
 /* Protect updates/reads (resp.) of domain_list and domain_hash. */
-DEFINE_SPINLOCK(domlist_update_lock);
+static DEFINE_SPINLOCK(domlist_update_lock);
 DEFINE_RCU_READ_LOCK(domlist_read_lock);
 
 #define DOMAIN_HASH_SIZE 256

@@ -697,8 +697,10 @@ static inline unsigned int domain_tot_pages(const struct domain *d)
     return d->tot_pages - d->extra_pages;
 }
 
-/* Protect updates/reads (resp.) of domain_list and domain_hash. */
-extern spinlock_t domlist_update_lock;
+/*
+ * Protect updates/reads (resp.) of domain_list and domain_hash, together with
+ * domlist_update_lock.
+ */
 extern rcu_read_lock_t domlist_read_lock;
 
 extern struct vcpu *idle_vcpu[NR_CPUS];
