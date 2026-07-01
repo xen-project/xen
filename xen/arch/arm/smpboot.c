@@ -242,7 +242,9 @@ static void __init dt_smp_init_cpus(void)
         if ( (rc = arch_cpu_init(i, cpu)) < 0 )
         {
             printk("cpu%d init failed (hwid %"PRIregister"): %d\n", i, hwid, rc);
-            tmp_map[i] = MPIDR_INVALID;
+
+            if ( i != 0 )
+                cpuidx--;
         }
         else
             tmp_map[i] = hwid;
@@ -255,10 +257,9 @@ static void __init dt_smp_init_cpus(void)
         return;
     }
 
-    for ( i = 0; i < cpuidx; i++ )
+    /* Skip CPU 0 as it was already initialized in smp_prepare_boot_cpu(). */
+    for ( i = 1; i < cpuidx; i++ )
     {
-        if ( tmp_map[i] == MPIDR_INVALID )
-            continue;
         cpumask_set_cpu(i, &cpu_possible_map);
         cpu_logical_map(i) = tmp_map[i];
     }
