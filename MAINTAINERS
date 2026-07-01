@@ -241,7 +241,6 @@ F:	xen/arch/x86/hvm/svm/
 F:	xen/arch/x86/include/asm/hvm/svm/
 
 ARGO
-M:	Christopher Clark <christopher.w.clark@gmail.com>
 R:	Daniel P. Smith <dpsmith@apertussolutions.com>
 S:	Maintained
 F:	xen/include/public/argo.h
