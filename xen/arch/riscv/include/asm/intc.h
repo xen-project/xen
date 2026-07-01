@@ -10,7 +10,7 @@
 
 struct dt_device_node;
 
-enum intc_version {
+enum intc_variant {
     INTC_APLIC,
 };
 
@@ -18,7 +18,7 @@ struct cpu_user_regs;
 struct irq_desc;
 
 struct intc_info {
-    enum intc_version hw_version;
+    enum intc_variant hw_variant;
     const struct dt_device_node *node;
 
     /* number of irqs */

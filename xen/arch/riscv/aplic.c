@@ -35,7 +35,7 @@ static struct aplic_priv aplic = {
 };
 
 static struct intc_info __ro_after_init aplic_info = {
-    .hw_version = INTC_APLIC,
+    .hw_variant = INTC_APLIC,
 };
 
 static void __init aplic_init_hw_interrupts(void)
