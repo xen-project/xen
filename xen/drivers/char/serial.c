@@ -76,17 +76,15 @@ void serial_tx_interrupt(struct serial_port *port)
     int i, n;
     unsigned long flags;
 
-    local_irq_save(flags);
-
     /*
      * Avoid spinning for a long time: if there is a long-term lock holder
      * then we know that they'll be stuffing bytes into the transmitter which
      * will therefore not be empty for long.
      */
-    while ( !spin_trylock(&port->tx_lock) )
+    while ( !spin_trylock_irqsave(&port->tx_lock, flags) )
     {
         if ( port->driver->tx_ready(port) <= 0 )
-            goto out;
+            return;
         cpu_relax();
     }
 
@@ -94,7 +92,6 @@ void serial_tx_interrupt(struct serial_port *port)
     {
         /* Disable TX. nothing to send */
         serial_stop_tx(port);
-        spin_unlock(&port->tx_lock);
         goto out;
     }
     else
@@ -112,10 +109,8 @@ void serial_tx_interrupt(struct serial_port *port)
     if ( i && port->driver->flush )
         port->driver->flush(port);
 
-    spin_unlock(&port->tx_lock);
-
  out:
-    local_irq_restore(flags);
+    spin_unlock_irqrestore(&port->tx_lock, flags);
 }
 
 static void __serial_putc(struct serial_port *port, char c)

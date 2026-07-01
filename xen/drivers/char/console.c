@@ -1010,8 +1010,7 @@ vprintk_common(const char *fmt, va_list args, const char *prefix)
     unsigned long flags;
 
     /* console_lock can be acquired recursively from __printk_ratelimit(). */
-    local_irq_save(flags);
-    rspin_lock(&console_lock);
+    flags = rspin_lock_irqsave(&console_lock);
     state = &this_cpu(state);
 
     (void)vsnprintf(buf, sizeof(buf), fmt, args);
@@ -1047,8 +1046,7 @@ vprintk_common(const char *fmt, va_list args, const char *prefix)
         state->continued = 1;
     }
 
-    rspin_unlock(&console_lock);
-    local_irq_restore(flags);
+    rspin_unlock_irqrestore(&console_lock, flags);
 }
 
 void vprintk(const char *fmt, va_list args)
