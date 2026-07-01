@@ -66,9 +66,6 @@
 #define PREV_FREE       (0x2)
 #define PREV_USED       (0x0)
 
-static DEFINE_SPINLOCK(pool_list_lock);
-static LIST_HEAD(pool_list_head);
-
 struct free_ptr {
     struct bhdr *prev;
     struct bhdr *next;
@@ -112,8 +109,6 @@ struct xmem_pool {
     /* User provided functions for expanding/shrinking pool */
     xmem_pool_get_memory *get_mem;
     xmem_pool_put_memory *put_mem;
-
-    struct list_head list;
 
     char name[MAX_POOL_NAME_LEN];
 };
@@ -340,10 +335,6 @@ struct xmem_pool *xmem_pool_create(
 
     spin_lock_init(&pool->lock);
 
-    spin_lock(&pool_list_lock);
-    list_add_tail(&pool->list, &pool_list_head);
-    spin_unlock(&pool_list_lock);
-
     return pool;
 }
 
@@ -372,10 +363,6 @@ void xmem_pool_destroy(struct xmem_pool *pool)
         printk("memory leak in pool: %s (%p). "
                "%lu bytes still in use.\n",
                pool->name, pool, xmem_pool_get_used_size(pool));
-
-    spin_lock(&pool_list_lock);
-    list_del_init(&pool->list);
-    spin_unlock(&pool_list_lock);
 
     pool_bytes = ROUNDUP_SIZE(sizeof(*pool));
     pool_order = get_order_from_bytes(pool_bytes);
