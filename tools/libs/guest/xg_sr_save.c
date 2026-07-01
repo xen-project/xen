@@ -115,8 +115,10 @@ static int write_batch(struct xc_sr_context *ctx)
     local_pages = calloc(nr_pfns, sizeof(*local_pages));
     /* iovec[] for writev(). */
     iov = malloc((nr_pfns + 4) * sizeof(*iov));
+    /* page_data record PFNs list */
+    rec_pfns = malloc(nr_pfns * sizeof(*rec_pfns));
 
-    if ( !mfns || !types || !errors || !guest_data || !local_pages || !iov )
+    if ( !mfns || !types || !errors || !guest_data || !local_pages || !iov || !rec_pfns )
     {
         ERROR("Unable to allocate arrays for a batch of %u pages",
               nr_pfns);
@@ -207,14 +209,6 @@ static int write_batch(struct xc_sr_context *ctx)
         }
     }
 
-    rec_pfns = malloc(nr_pfns * sizeof(*rec_pfns));
-    if ( !rec_pfns )
-    {
-        ERROR("Unable to allocate %zu bytes of memory for page data pfn list",
-              nr_pfns * sizeof(*rec_pfns));
-        goto err;
-    }
-
     hdr.count = nr_pfns;
 
     rec.length = sizeof(hdr);
@@ -263,11 +257,11 @@ static int write_batch(struct xc_sr_context *ctx)
     rc = ctx->save.nr_batch_pfns = 0;
 
  err:
-    free(rec_pfns);
     if ( guest_mapping )
         xenforeignmemory_unmap(xch->fmem, guest_mapping, nr_pages_mapped);
     for ( i = 0; local_pages && i < nr_pfns; ++i )
         free(local_pages[i]);
+    free(rec_pfns);
     free(iov);
     free(local_pages);
     free(guest_data);
