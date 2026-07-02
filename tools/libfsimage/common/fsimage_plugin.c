@@ -121,16 +121,13 @@ fail:
 
 int fsi_init(void)
 {
-	const char *fsdir = getenv("XEN_FSIMAGE_FSDIR");
+	const char *fsdir = FSIMAGE_FSDIR;
 	struct dirent *dp = NULL;
 	DIR *dir = NULL;
 	char *tmp = NULL;
 	size_t name_max;
 	int err;
 	int ret = -1;
-
-	if (fsdir == NULL)
-		fsdir = FSIMAGE_FSDIR;
 
 	if ((name_max = pathconf(fsdir, _PC_NAME_MAX)) == -1)
 		goto fail;
