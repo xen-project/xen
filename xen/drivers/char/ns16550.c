@@ -786,7 +786,7 @@ static const struct ns16550_config_param __initconst uart_param[] = {
         .reg_width = 1,
         .fifo_size = 16,
         .lsr_mask = (UART_LSR_THRE | UART_LSR_TEMT),
-        .mmio = 1,
+        .mmio = true,
         .max_ports = 1,
     },
     [param_oxford] = {
@@ -796,7 +796,7 @@ static const struct ns16550_config_param __initconst uart_param[] = {
         .reg_width = 1,
         .fifo_size = 16,
         .lsr_mask = UART_LSR_THRE,
-        .mmio = 1,
+        .mmio = true,
         .max_ports = 1, /* It can do more, but we would need more custom code.*/
     },
     [param_oxford_2port] = {
@@ -806,7 +806,7 @@ static const struct ns16550_config_param __initconst uart_param[] = {
         .reg_width = 1,
         .fifo_size = 16,
         .lsr_mask = UART_LSR_THRE,
-        .mmio = 1,
+        .mmio = true,
         .max_ports = 2,
     },
     [param_pericom_1port] = {
@@ -815,7 +815,7 @@ static const struct ns16550_config_param __initconst uart_param[] = {
         .reg_width = 1,
         .fifo_size = 16,
         .lsr_mask = UART_LSR_THRE,
-        .bar0 = 1,
+        .bar0 = true,
         .max_ports = 1,
     },
     [param_pericom_2port] = {
@@ -824,7 +824,7 @@ static const struct ns16550_config_param __initconst uart_param[] = {
         .reg_width = 1,
         .fifo_size = 16,
         .lsr_mask = UART_LSR_THRE,
-        .bar0 = 1,
+        .bar0 = true,
         .max_ports = 2,
     },
     /*
@@ -837,7 +837,7 @@ static const struct ns16550_config_param __initconst uart_param[] = {
         .reg_width = 1,
         .fifo_size = 16,
         .lsr_mask = UART_LSR_THRE,
-        .bar0 = 1,
+        .bar0 = true,
         .max_ports = 4,
     },
     [param_pericom_8port] = {
@@ -846,7 +846,7 @@ static const struct ns16550_config_param __initconst uart_param[] = {
         .reg_width = 1,
         .fifo_size = 16,
         .lsr_mask = UART_LSR_THRE,
-        .bar0 = 1,
+        .bar0 = true,
         .max_ports = 8,
     },
     [param_exar_xr17v352] = {
@@ -855,8 +855,8 @@ static const struct ns16550_config_param __initconst uart_param[] = {
         .reg_width = 1,
         .fifo_size = 256,
         .lsr_mask = UART_LSR_THRE,
-        .bar0 = 1,
-        .mmio = 1,
+        .bar0 = true,
+        .mmio = true,
         .max_ports = 2,
     },
     [param_exar_xr17v354] = {
@@ -865,8 +865,8 @@ static const struct ns16550_config_param __initconst uart_param[] = {
         .reg_width = 1,
         .fifo_size = 256,
         .lsr_mask = UART_LSR_THRE,
-        .bar0 = 1,
-        .mmio = 1,
+        .bar0 = true,
+        .mmio = true,
         .max_ports = 4,
     },
     [param_exar_xr17v358] = {
@@ -875,8 +875,8 @@ static const struct ns16550_config_param __initconst uart_param[] = {
         .reg_width = 1,
         .fifo_size = 256,
         .lsr_mask = UART_LSR_THRE,
-        .bar0 = 1,
-        .mmio = 1,
+        .bar0 = true,
+        .mmio = true,
         .max_ports = 8,
     },
     [param_intel_lpss] = {
@@ -885,8 +885,8 @@ static const struct ns16550_config_param __initconst uart_param[] = {
         .reg_width = 1,
         .fifo_size = 64,
         .lsr_mask = UART_LSR_THRE,
-        .bar0 = 1,
-        .mmio = 1,
+        .bar0 = true,
+        .mmio = true,
         .max_ports = 1,
     },
 };
