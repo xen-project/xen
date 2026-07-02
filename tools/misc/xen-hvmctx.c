@@ -107,26 +107,26 @@ static void dump_fpu(void *p)
     struct fpu_regs *r = p;
     int i;
 
-    printf("    FPU:    fcw 0x%4.4x fsw 0x%4.4x\n"  
-           "            ftw 0x%2.2x (0x%2.2x) fop 0x%4.4x\n"
-           "          fpuip 0x%16.16"PRIx64" fpudp 0x%16.16"PRIx64"\n"
-           "          mxcsr 0x%8.8lx mask 0x%8.8lx\n",
+    printf("    FPU:    fcw 0x%04x fsw 0x%04x\n"
+           "            ftw 0x%02x (0x%02x) fop 0x%04x\n"
+           "          fpuip 0x%016"PRIx64" fpudp 0x%016"PRIx64"\n"
+           "          mxcsr 0x%08lx mask 0x%08lx\n",
            (unsigned)r->fcw, (unsigned)r->fsw, 
            (unsigned)r->ftw, (unsigned)r->res0, (unsigned)r->fop, 
            r->fpuip, r->fpudp, 
            (unsigned long)r->mxcsr, (unsigned long)r->mxcsr_mask);
 
     for ( i = 0 ; i < 8 ; i++ ) 
-        printf("            mm%i 0x%4.4x%16.16"PRIx64" (0x%4.4x%4.4x%4.4x)\n",
+        printf("            mm%i 0x%04x%016"PRIx64" (0x%04x%04x%04x)\n",
                i, r->mm[i].hi, r->mm[i].lo,
                r->mm[i].pad[2], r->mm[i].pad[1], r->mm[i].pad[0]);
 
     for ( i = 0 ; i < 16 ; i++ ) 
-        printf("          xmm%2.2i 0x%16.16"PRIx64"%16.16"PRIx64"\n",
+        printf("          xmm%-2i 0x%016"PRIx64"%016"PRIx64"\n",
                i, r->xmm[i].hi, r->xmm[i].lo);
     
     for ( i = 0 ; i < 6 ; i++ ) 
-        printf("               (0x%16.16"PRIx64"%16.16"PRIx64")\n",
+        printf("               (0x%016"PRIx64"%016"PRIx64")\n",
                r->res1[2*i+1], r->res1[2*i]);
 }
 
@@ -134,20 +134,20 @@ static void dump_cpu(void)
 {
     HVM_SAVE_TYPE(CPU) c;
     READ(c);
-    printf("    CPU:    rax 0x%16.16llx     rbx 0x%16.16llx\n"
-           "            rcx 0x%16.16llx     rdx 0x%16.16llx\n"
-           "            rbp 0x%16.16llx     rsi 0x%16.16llx\n"
-           "            rdi 0x%16.16llx     rsp 0x%16.16llx\n"
-           "             r8 0x%16.16llx      r9 0x%16.16llx\n"
-           "            r10 0x%16.16llx     r11 0x%16.16llx\n"
-           "            r12 0x%16.16llx     r13 0x%16.16llx\n"
-           "            r14 0x%16.16llx     r15 0x%16.16llx\n"
-           "            rip 0x%16.16llx  rflags 0x%16.16llx\n"
-           "            cr0 0x%16.16llx     cr2 0x%16.16llx\n"
-           "            cr3 0x%16.16llx     cr4 0x%16.16llx\n"
-           "            dr0 0x%16.16llx     dr1 0x%16.16llx\n"
-           "            dr2 0x%16.16llx     dr3 0x%16.16llx\n"
-           "            dr6 0x%16.16llx     dr7 0x%16.16llx\n"
+    printf("    CPU:    rax 0x%016llx     rbx 0x%016llx\n"
+           "            rcx 0x%016llx     rdx 0x%016llx\n"
+           "            rbp 0x%016llx     rsi 0x%016llx\n"
+           "            rdi 0x%016llx     rsp 0x%016llx\n"
+           "             r8 0x%016llx      r9 0x%016llx\n"
+           "            r10 0x%016llx     r11 0x%016llx\n"
+           "            r12 0x%016llx     r13 0x%016llx\n"
+           "            r14 0x%016llx     r15 0x%016llx\n"
+           "            rip 0x%016llx  rflags 0x%016llx\n"
+           "            cr0 0x%016llx     cr2 0x%016llx\n"
+           "            cr3 0x%016llx     cr4 0x%016llx\n"
+           "            dr0 0x%016llx     dr1 0x%016llx\n"
+           "            dr2 0x%016llx     dr3 0x%016llx\n"
+           "            dr6 0x%016llx     dr7 0x%016llx\n"
            "             cs %#6.4" PRIx32 " (%#18.8" PRIx64 " + %#10.8" PRIx32 " / %#7.4" PRIx32 ")\n"
            "             es %#6.4" PRIx32 " (%#18.8" PRIx64 " + %#10.8" PRIx32 " / %#7.4" PRIx32 ")\n"
            "             ds %#6.4" PRIx32 " (%#18.8" PRIx64 " + %#10.8" PRIx32 " / %#7.4" PRIx32 ")\n"
@@ -158,12 +158,12 @@ static void dump_cpu(void)
            "           ldtr %#6.4" PRIx32 " (%#18.8" PRIx64 " + %#10.4" PRIx32 " / %#7.4" PRIx32 ")\n"
            "           idtr        (%#18.8" PRIx64 " + %#10.4" PRIx32 ")\n"
            "           gdtr        (%#18.8" PRIx64 " + %#10.4" PRIx32 ")\n"
-           "    sysenter cs 0x%8.8llx  eip 0x%16.16llx  esp 0x%16.16llx\n"
+           "    sysenter cs 0x%08llx  eip 0x%016llx  esp 0x%016llx\n"
            "      shadow gs %#18.16" PRIx64 "   efer %#18.8" PRIx64 "\n"
            "          lstar %#18.16" PRIx64 "  cstar %#18.16" PRIx64 "\n"
            "           star %#18.16" PRIx64 " sfmask %#18.8" PRIx64 "\n"
-           "            tsc 0x%16.16llx\n"
-           "          event 0x%8.8lx error 0x%8.8lx\n",
+           "            tsc 0x%016llx\n"
+           "          event 0x%08lx error 0x%08lx\n",
            (unsigned long long) c.rax, (unsigned long long) c.rbx,
            (unsigned long long) c.rcx, (unsigned long long) c.rdx,
            (unsigned long long) c.rbp, (unsigned long long) c.rsi,
@@ -260,7 +260,7 @@ static void dump_pci_irq(void)
 {
     HVM_SAVE_TYPE(PCI_IRQ) i;
     READ(i);
-    printf("    PCI IRQs: 0x%16.16llx%16.16llx\n", 
+    printf("    PCI IRQs: 0x%016llx%016llx\n",
            (unsigned long long) i.pad[0], (unsigned long long) i.pad[1]);
 }
 
@@ -268,7 +268,7 @@ static void dump_isa_irq(void)
 {
     HVM_SAVE_TYPE(ISA_IRQ) i;
     READ(i);
-    printf("    ISA IRQs: 0x%4.4llx\n", 
+    printf("    ISA IRQs: 0x%04llx\n",
            (unsigned long long) i.pad[0]);
 }
 
@@ -305,10 +305,10 @@ static void dump_rtc(void)
 {
     HVM_SAVE_TYPE(RTC) r;
     READ(r);
-    printf("    RTC: regs 0x%2.2x 0x%2.2x 0x%2.2x 0x%2.2x 0x%2.2x 0x%2.2x 0x%2.2x 0x%2.2x\n",
+    printf("    RTC: regs 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
            r.cmos_data[0], r.cmos_data[1], r.cmos_data[2], r.cmos_data[3], 
            r.cmos_data[4], r.cmos_data[5], r.cmos_data[6], r.cmos_data[7]);
-    printf("              0x%2.2x 0x%2.2x 0x%2.2x 0x%2.2x 0x%2.2x 0x%2.2x, index 0x%2.2x\n",
+    printf("              0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x, index 0x%02x\n",
            r.cmos_data[8], r.cmos_data[9], r.cmos_data[10], r.cmos_data[11], 
            r.cmos_data[12], r.cmos_data[13], r.cmos_index);
 
