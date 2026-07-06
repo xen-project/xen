@@ -108,7 +108,7 @@ static int build(xc_interface *xch)
 
     if ( flask )
     {
-        rv = xc_flask_context_to_sid(xch, flask, strlen(flask), &config.ssidref);
+        rv = xc_flask_context_to_sid(xch, flask, &config.ssidref);
         if ( rv )
         {
             fprintf(stderr, "xc_flask_context_to_sid failed\n");

@@ -1754,7 +1754,7 @@ static PyObject *pyflask_context_to_sid(PyObject *self, PyObject *args,
         return PyErr_SetFromErrno(xc_error_obj);
     }
 
-    ret = xc_flask_context_to_sid(xc_handle, ctx, strlen(ctx), &sid);
+    ret = xc_flask_context_to_sid(xc_handle, ctx, &sid);
 
     xc_interface_close(xc_handle);
 

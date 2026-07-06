@@ -83,10 +83,11 @@ int xc_flask_load(xc_interface *xch, char *buf, uint32_t size)
     return err;
 }
 
-int xc_flask_context_to_sid(xc_interface *xch, char *buf, uint32_t size, uint32_t *sid)
+int xc_flask_context_to_sid(xc_interface *xch, char *buf, uint32_t *sid)
 {
     int err;
     struct xen_flask_op op = {};
+    size_t size = strlen(buf) + 1;
     DECLARE_HYPERCALL_BOUNCE(buf, size, XC_HYPERCALL_BUFFER_BOUNCE_IN);
 
     if ( xc_hypercall_bounce_pre(xch, buf) )
@@ -249,7 +250,7 @@ static int xc_flask_add(xc_interface *xch, uint32_t ocon, uint64_t low, uint64_t
     int err;
     struct xen_flask_op op = {};
 
-    err = xc_flask_context_to_sid(xch, scontext, strlen(scontext), &sid);
+    err = xc_flask_context_to_sid(xch, scontext, &sid);
     if ( err )
         return err;
 
@@ -325,10 +326,10 @@ int xc_flask_access(xc_interface *xch, const char *scon, const char *tcon,
     struct xen_flask_op op = {};
     int err;
 
-    err = xc_flask_context_to_sid(xch, (char*)scon, strlen(scon), &op.u.access.ssid);
+    err = xc_flask_context_to_sid(xch, (char*)scon, &op.u.access.ssid);
     if ( err )
         return err;
-    err = xc_flask_context_to_sid(xch, (char*)tcon, strlen(tcon), &op.u.access.tsid);
+    err = xc_flask_context_to_sid(xch, (char*)tcon, &op.u.access.tsid);
     if ( err )
         return err;
 

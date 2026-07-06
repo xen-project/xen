@@ -21,7 +21,10 @@ int libxl_flask_context_to_sid(libxl_ctx *ctx, char *buf, size_t len,
 {
     int rc;
 
-    rc = xc_flask_context_to_sid(ctx->xch, buf, len, ssidref);
+    if (len != strlen(buf))
+        return ERROR_INVAL;
+
+    rc = xc_flask_context_to_sid(ctx->xch, buf, ssidref);
 
     return rc;
 }

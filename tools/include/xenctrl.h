@@ -2377,7 +2377,7 @@ long xc_sharing_used_frames(xc_interface *xch);
 /*** End sharing interface ***/
 
 int xc_flask_load(xc_interface *xc_handle, char *buf, uint32_t size);
-int xc_flask_context_to_sid(xc_interface *xc_handle, char *buf, uint32_t size, uint32_t *sid);
+int xc_flask_context_to_sid(xc_interface *xc_handle, char *buf, uint32_t *sid);
 int xc_flask_sid_to_context(xc_interface *xc_handle, int sid, char *buf, uint32_t size);
 int xc_flask_getenforce(xc_interface *xc_handle);
 int xc_flask_setenforce(xc_interface *xc_handle, int mode);
