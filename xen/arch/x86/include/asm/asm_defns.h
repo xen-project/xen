@@ -219,51 +219,6 @@ static always_inline void stac(void)
 #endif
 
 #ifdef __ASSEMBLER__
-.macro SAVE_ALL compat=0
-        addq  $-(UREGS_error_code-UREGS_r15), %rsp
-        cld
-        movq  %rdi,UREGS_rdi(%rsp)
-        xor   %edi, %edi
-        movq  %rsi,UREGS_rsi(%rsp)
-        xor   %esi, %esi
-        movq  %rdx,UREGS_rdx(%rsp)
-        xor   %edx, %edx
-        movq  %rcx,UREGS_rcx(%rsp)
-        xor   %ecx, %ecx
-        movq  %rax,UREGS_rax(%rsp)
-        xor   %eax, %eax
-.if !\compat
-        movq  %r8,UREGS_r8(%rsp)
-        movq  %r9,UREGS_r9(%rsp)
-        movq  %r10,UREGS_r10(%rsp)
-        movq  %r11,UREGS_r11(%rsp)
-.endif
-        xor   %r8d, %r8d
-        xor   %r9d, %r9d
-        xor   %r10d, %r10d
-        xor   %r11d, %r11d
-        movq  %rbx,UREGS_rbx(%rsp)
-        xor   %ebx, %ebx
-        movq  %rbp,UREGS_rbp(%rsp)
-#ifdef CONFIG_FRAME_POINTER
-/* Indicate special exception stack frame by inverting the frame pointer. */
-        leaq  UREGS_rbp(%rsp), %rbp
-        notq  %rbp
-#else
-        xor   %ebp, %ebp
-#endif
-.if !\compat
-        movq  %r12,UREGS_r12(%rsp)
-        movq  %r13,UREGS_r13(%rsp)
-        movq  %r14,UREGS_r14(%rsp)
-        movq  %r15,UREGS_r15(%rsp)
-.endif
-        xor   %r12d, %r12d
-        xor   %r13d, %r13d
-        xor   %r14d, %r14d
-        xor   %r15d, %r15d
-.endm
-
 /*
  * Push and clear GPRs
  */

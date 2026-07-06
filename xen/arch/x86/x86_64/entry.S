@@ -305,7 +305,7 @@ FUNC(lstar_enter)
         pushq $0
         BUILD_BUG_ON(TRAP_syscall & 0xff)
         movb  $TRAP_syscall >> 8, EFRAME_entry_vector + 1(%rsp)
-        SAVE_ALL
+        PUSH_AND_CLEAR_GPRS
 
         GET_STACK_END(14)
 
@@ -345,7 +345,7 @@ FUNC(cstar_enter)
         pushq $0
         BUILD_BUG_ON(TRAP_syscall & 0xff)
         movb  $TRAP_syscall >> 8, EFRAME_entry_vector + 1(%rsp)
-        SAVE_ALL
+        PUSH_AND_CLEAR_GPRS
 
         GET_STACK_END(14)
 
@@ -383,13 +383,14 @@ FUNC(sysenter_entry)
         pushq $0
         pushfq
 LABEL(sysenter_eflags_saved, 0)
+        cld
         ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
         pushq $3 /* ring 3 null cs */
         pushq $0 /* null rip */
         pushq $0
         BUILD_BUG_ON(TRAP_syscall & 0xff)
         movb  $TRAP_syscall >> 8, EFRAME_entry_vector + 1(%rsp)
-        SAVE_ALL
+        PUSH_AND_CLEAR_GPRS
 
         GET_STACK_END(14)
 
@@ -442,10 +443,11 @@ END(sysenter_entry)
 
 FUNC(entry_int80)
         ENDBR64
+        cld
         ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
         pushq $0
         movb  $0x80, EFRAME_entry_vector(%rsp)
-        SAVE_ALL
+        PUSH_AND_CLEAR_GPRS
 
         GET_STACK_END(14)
 
@@ -722,8 +724,9 @@ END(ret_from_intr)
         .section .init.text, "ax", @progbits
 FUNC(early_page_fault)
         ENDBR64
+        cld
         movb  $X86_EXC_PF, EFRAME_entry_vector(%rsp)
-        SAVE_ALL
+        PUSH_AND_CLEAR_GPRS
         movq  %rsp, %rdi
         call  do_early_page_fault
         jmp   restore_all_xen
@@ -769,8 +772,9 @@ UNLIKELY_END(exit_cr3)
 END(restore_all_xen)
 
 FUNC(common_interrupt)
+        cld
         ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
-        SAVE_ALL
+        PUSH_AND_CLEAR_GPRS
 
         GET_STACK_END(14)
 
@@ -805,8 +809,9 @@ FUNC(entry_PF)
 END(entry_PF)
 /* No special register assumptions. */
 FUNC(handle_exception, 0)
+        cld
         ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
-        SAVE_ALL
+        PUSH_AND_CLEAR_GPRS
 
         GET_STACK_END(14)
 
@@ -1103,9 +1108,10 @@ END(entry_CP)
 FUNC(entry_DF)
         ENDBR64
         movb  $X86_EXC_DF, EFRAME_entry_vector(%rsp)
+        cld
         /* Set AC to reduce chance of further SMAP faults */
         ALTERNATIVE "", stac, X86_FEATURE_XEN_SMAP
-        SAVE_ALL
+        PUSH_AND_CLEAR_GPRS
 
         GET_STACK_END(14)
 
@@ -1132,8 +1138,9 @@ FUNC(entry_NMI)
 END(entry_NMI)
 
 FUNC(handle_ist_exception)
+        cld
         ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
-        SAVE_ALL
+        PUSH_AND_CLEAR_GPRS
 
         GET_STACK_END(14)
 

@@ -11,12 +11,14 @@
 #include <asm/desc.h>
 #include <public/xen.h>
 
+/* DPL1 gate, restricted to 32bit PV guest kernels only. */
 FUNC(entry_int82)
         ENDBR64
+        cld
         ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
         pushq $0
         movb  $HYPERCALL_VECTOR, EFRAME_entry_vector(%rsp)
-        SAVE_ALL compat=1 /* DPL1 gate, restricted to 32bit PV guests only. */
+        PUSH_AND_CLEAR_GPRS
 
         GET_STACK_END(14)
 
