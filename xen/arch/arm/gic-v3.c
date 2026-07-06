@@ -178,6 +178,15 @@ static inline void gicv3_restore_lrs(const struct vcpu *v)
 
 static uint64_t gicv3_ich_read_lr(int lr)
 {
+    if ( lr < 0 || lr >= gicv3_info.nr_lrs )
+    {
+        gprintk(XENLOG_ERR, "GICv3: LR read index %d out of range (nr_lrs %u)\n",
+                lr, gicv3_info.nr_lrs);
+        ASSERT_UNREACHABLE();
+        WARN();
+        return 0;
+    }
+
     switch ( lr )
     {
     case 0: return READ_SYSREG_LR(0);
@@ -203,6 +212,15 @@ static uint64_t gicv3_ich_read_lr(int lr)
 
 static void gicv3_ich_write_lr(int lr, uint64_t val)
 {
+    if ( lr < 0 || lr >= gicv3_info.nr_lrs )
+    {
+        gprintk(XENLOG_ERR, "GICv3: LR write index %d out of range (nr_lrs %u)\n",
+                lr, gicv3_info.nr_lrs);
+        ASSERT_UNREACHABLE();
+        WARN();
+        return;
+    }
+
     switch ( lr )
     {
     case 0:
@@ -1043,9 +1061,39 @@ static void gicv3_cpu_disable(void)
 static void gicv3_hyp_init(void)
 {
     register_t vtr;
+    uint8_t hw_nr_lrs;
 
     vtr = READ_SYSREG(ICH_VTR_EL2);
-    gicv3_info.nr_lrs  = (vtr & ICH_VTR_NRLRGS) + 1;
+    hw_nr_lrs = (vtr & ICH_VTR_NRLRGS) + 1;
+
+    if ( CONFIG_GICV3_NR_LRS && CONFIG_GICV3_NR_LRS > hw_nr_lrs )
+        panic("GICv3: CONFIG_GICV3_NR_LRS (%u) exceeds hardware nr_lrs (%u)\n",
+              CONFIG_GICV3_NR_LRS, hw_nr_lrs);
+
+    gicv3_info.nr_lrs = CONFIG_GICV3_NR_LRS ?: hw_nr_lrs;
+
+    /* Zero all hardware LRs. */
+    switch ( hw_nr_lrs )
+    {
+    case 16: WRITE_SYSREG_LR(0, 15); fallthrough;
+    case 15: WRITE_SYSREG_LR(0, 14); fallthrough;
+    case 14: WRITE_SYSREG_LR(0, 13); fallthrough;
+    case 13: WRITE_SYSREG_LR(0, 12); fallthrough;
+    case 12: WRITE_SYSREG_LR(0, 11); fallthrough;
+    case 11: WRITE_SYSREG_LR(0, 10); fallthrough;
+    case 10: WRITE_SYSREG_LR(0, 9); fallthrough;
+    case 9:  WRITE_SYSREG_LR(0, 8); fallthrough;
+    case 8:  WRITE_SYSREG_LR(0, 7); fallthrough;
+    case 7:  WRITE_SYSREG_LR(0, 6); fallthrough;
+    case 6:  WRITE_SYSREG_LR(0, 5); fallthrough;
+    case 5:  WRITE_SYSREG_LR(0, 4); fallthrough;
+    case 4:  WRITE_SYSREG_LR(0, 3); fallthrough;
+    case 3:  WRITE_SYSREG_LR(0, 2); fallthrough;
+    case 2:  WRITE_SYSREG_LR(0, 1); fallthrough;
+    case 1:  WRITE_SYSREG_LR(0, 0); break;
+    default: BUG();
+    }
+
     gicv3.nr_priorities = ((vtr >> ICH_VTR_PRIBITS_SHIFT) &
                           ICH_VTR_PRIBITS_MASK) + 1;
 

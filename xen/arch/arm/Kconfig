@@ -145,6 +145,15 @@ config GICV3_ESPI
 	  range, from 4096 to 5119. This feature is introduced in GICv3.1
 	  architecture.
 
+config GICV3_NR_LRS
+	int "Number of GICv3 List Registers used" if EXPERT
+	depends on GICV3
+	range 0 16
+	default 0
+	help
+	  Controls the number of List registers to be used.
+	  Keep it set to 0 to use a value obtained from a hardware register.
+
 config HAS_ITS
         bool "GICv3 ITS MSI controller support (UNSUPPORTED)" if UNSUPPORTED
         depends on GICV3 && !NEW_VGIC && !ARM_32
