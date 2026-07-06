@@ -226,7 +226,8 @@ FUNC_LOCAL(restore_all_guest)
         /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
         SPEC_CTRL_EXIT_TO_PV    /* Req: a=spec_ctrl %rsp=regs/cpuinfo, Clob: cd */
 
-        RESTORE_ALL
+        POP_GPRS
+
         BUILD_BUG_ON(TRAP_syscall & 0xff)
         testb $TRAP_syscall >> 8, EFRAME_entry_vector + 1(%rsp)
         jz    iret_exit_to_guest
@@ -753,20 +754,17 @@ UNLIKELY_END(exit_cr3)
         /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
         SPEC_CTRL_EXIT_TO_XEN /* Req: %r12=ist_exit %r14=end %rsp=regs, Clob: abcd */
 
-        RESTORE_ALL adj=8
+        POP_GPRS
 
         /*
          * When the CPU pushed this exception frame, it zero-extended eflags.
          * For an IST exit, SPEC_CTRL_EXIT_TO_XEN stashed shadow copies of
          * scf and ver_sel above eflags, as we can't use any GPRs,
          * and we're at a random place on the stack, not in a CPUFINFO block.
-         *
-         * Account for ev/ec having already been popped off the stack.
          */
-        SPEC_CTRL_COND_VERW \
-            scf=STK_REL(EFRAME_shadow_scf, EFRAME_rip), \
-            sel=STK_REL(EFRAME_shadow_sel, EFRAME_rip)
+        SPEC_CTRL_COND_VERW     /* Req: %rsp=eframe                    Clob: efl */
 
+        add     $8, %rsp        /* Pop ev/ec off the stack */
         iretq
 END(restore_all_xen)
 

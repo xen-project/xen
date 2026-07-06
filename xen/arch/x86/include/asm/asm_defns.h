@@ -264,54 +264,6 @@ static always_inline void stac(void)
         xor   %r15d, %r15d
 .endm
 
-#define LOAD_ONE_REG(reg, compat) \
-.if !(compat); \
-        movq  UREGS_r##reg(%rsp),%r##reg; \
-.else; \
-        movl  UREGS_r##reg(%rsp),%e##reg; \
-.endif
-
-/*
- * Restore all previously saved registers.
- *
- * @adj: extra stack pointer adjustment to be folded into the adjustment done
- *       anyway at the end of the macro
- * @compat: R8-R15 don't need reloading, but they are clobbered for added
- *          safety against information leaks.
- */
-.macro RESTORE_ALL adj=0, compat=0
-.if !\compat
-        movq  UREGS_r15(%rsp), %r15
-        movq  UREGS_r14(%rsp), %r14
-        movq  UREGS_r13(%rsp), %r13
-        movq  UREGS_r12(%rsp), %r12
-.else
-        xor %r15d, %r15d
-        xor %r14d, %r14d
-        xor %r13d, %r13d
-        xor %r12d, %r12d
-.endif
-        LOAD_ONE_REG(bp, \compat)
-        LOAD_ONE_REG(bx, \compat)
-.if !\compat
-        movq  UREGS_r11(%rsp),%r11
-        movq  UREGS_r10(%rsp),%r10
-        movq  UREGS_r9(%rsp),%r9
-        movq  UREGS_r8(%rsp),%r8
-.else
-        xor %r11d, %r11d
-        xor %r10d, %r10d
-        xor %r9d, %r9d
-        xor %r8d, %r8d
-.endif
-        LOAD_ONE_REG(ax, \compat)
-        LOAD_ONE_REG(cx, \compat)
-        LOAD_ONE_REG(dx, \compat)
-        LOAD_ONE_REG(si, \compat)
-        LOAD_ONE_REG(di, \compat)
-        subq  $-(UREGS_error_code-UREGS_r15+\adj), %rsp
-.endm
-
 /*
  * Push and clear GPRs
  */
@@ -369,7 +321,7 @@ static always_inline void stac(void)
         pop   %r9
         pop   %r8
  .if \skip_rax
-        pop   %rcx
+        pop   %rcx /* Any register yet to restore. */
  .else
         pop   %rax
  .endif

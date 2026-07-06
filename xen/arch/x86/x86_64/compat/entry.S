@@ -160,12 +160,11 @@ FUNC(compat_restore_all_guest)
         /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
         SPEC_CTRL_EXIT_TO_PV    /* Req: a=spec_ctrl %rsp=regs/cpuinfo, Clob: cd */
 
-        RESTORE_ALL adj=8, compat=1
+        POP_GPRS
 
-        /* Account for ev/ec having already been popped off the stack. */
-        SPEC_CTRL_COND_VERW \
-            scf=STK_REL(CPUINFO_scf,      CPUINFO_rip), \
-            sel=STK_REL(CPUINFO_verw_sel, CPUINFO_rip)
+        SPEC_CTRL_COND_VERW     /* Req: %rsp=eframe                    Clob: efl */
+
+        add     $8, %rsp        /* Pop ev/ec off the stack */
 
         jmp     iret_to_guest
 END(compat_restore_all_guest)
