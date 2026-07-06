@@ -357,7 +357,7 @@ static always_inline void stac(void)
 /*
  * POP GPRs from a UREGS_* frame on the stack.  Does not modify flags.
  */
-.macro POP_GPRS
+.macro POP_GPRS skip_rax=0
         pop   %r15
         pop   %r14
         pop   %r13
@@ -368,7 +368,11 @@ static always_inline void stac(void)
         pop   %r10
         pop   %r9
         pop   %r8
+ .if \skip_rax
+        pop   %rcx
+ .else
         pop   %rax
+ .endif
         pop   %rcx
         pop   %rdx
         pop   %rsi

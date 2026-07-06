@@ -82,22 +82,8 @@ __UNLIKELY_END(nsvm_hap)
          */
         sti
 
-        pop  %r15
-        pop  %r14
-        pop  %r13
-        pop  %r12
-        pop  %rbp
         mov  VCPU_svm_vmcb_pa(%rbx),%rax
-        pop  %rbx
-        pop  %r11
-        pop  %r10
-        pop  %r9
-        pop  %r8
-        pop  %rcx /* Skip %rax: restored by VMRUN. */
-        pop  %rcx
-        pop  %rdx
-        pop  %rsi
-        pop  %rdi
+        POP_GPRS skip_rax=1 /* %rax restored by VMRUN. */
 
         SPEC_CTRL_COND_VERW     /* Req: %rsp=eframe                    Clob: efl */
 
