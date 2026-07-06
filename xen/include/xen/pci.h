@@ -218,7 +218,7 @@ static always_inline bool pcidevs_trylock(void)
 #endif
 
 bool pci_known_segment(u16 seg);
-bool pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func);
+bool pci_device_detect(pci_sbdf_t sbdf);
 int scan_pci_devices(void);
 enum pdev_type pdev_type(u16 seg, u8 bus, u8 devfn);
 int find_upstream_bridge(u16 seg, u8 *bus, u8 *devfn, u8 *secbus);

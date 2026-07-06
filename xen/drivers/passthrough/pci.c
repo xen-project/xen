@@ -1166,11 +1166,11 @@ out:
     return ret;
 }
 
-bool __init pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func)
+bool __init pci_device_detect(pci_sbdf_t sbdf)
 {
     u32 vendor;
 
-    vendor = pci_conf_read32(PCI_SBDF(seg, bus, dev, func), PCI_VENDOR_ID);
+    vendor = pci_conf_read32(sbdf, PCI_VENDOR_ID);
     /* some broken boards return 0 or ~0 if a slot is empty: */
     if ( (vendor == 0xffffffffU) || (vendor == 0x00000000U) ||
          (vendor == 0x0000ffffU) || (vendor == 0xffff0000U) )
@@ -1221,7 +1221,7 @@ static int __init cf_check _scan_pci_devices(struct pci_seg *pseg, void *arg)
         {
             for ( func = 0; func < 8; func++ )
             {
-                if ( !pci_device_detect(pseg->nr, bus, dev, func) )
+                if ( !pci_device_detect(PCI_SBDF(pseg->nr, bus, dev, func)) )
                 {
                     if ( !func )
                         break;

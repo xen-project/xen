@@ -706,7 +706,7 @@ static unsigned int __init find_dbgp(struct ehci_dbgp *dbgp,
             {
                 unsigned int cap;
 
-                if ( !pci_device_detect(0, bus, slot, func) )
+                if ( !pci_device_detect(PCI_SBDF(0, bus, slot, func)) )
                 {
                     if ( !func )
                         break;
@@ -1520,7 +1520,7 @@ void __init ehci_dbgp_init(void)
         dbgp->slot = slot;
         dbgp->func = func;
 
-        if ( !pci_device_detect(0, bus, slot, func) )
+        if ( !pci_device_detect(PCI_SBDF(0, bus, slot, func)) )
             return;
 
         dbgp->cap = __find_dbgp(bus, slot, func);

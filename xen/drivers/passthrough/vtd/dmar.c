@@ -389,7 +389,8 @@ static int __init acpi_parse_dev_scope(
                 printk(VTDPREFIX " endpoint: %pp\n",
                        &PCI_SBDF(seg, bus, path->dev, path->fn));
 
-            if ( drhd && pci_device_detect(seg, bus, path->dev, path->fn) )
+            if ( drhd &&
+                 pci_device_detect(PCI_SBDF(seg, bus, path->dev, path->fn)) )
             {
                 if ( pci_conf_read8(PCI_SBDF(seg, bus, path->dev, path->fn),
                                     PCI_CLASS_DEVICE + 1) != 0x03
@@ -537,7 +538,7 @@ acpi_parse_one_drhd(struct acpi_dmar_header *header)
             d = PCI_SLOT(dmaru->scope.devices[i]);
             f = PCI_FUNC(dmaru->scope.devices[i]);
 
-            if ( !pci_device_detect(drhd->segment, b, d, f) )
+            if ( !pci_device_detect(PCI_SBDF(drhd->segment, b, d, f)) )
                 printk(XENLOG_WARNING VTDPREFIX
                        " Non-existent device (%pp) in this DRHD's scope!\n",
                        &PCI_SBDF(drhd->segment, b, d, f));
@@ -573,7 +574,7 @@ static int __init register_one_rmrr(struct acpi_rmrr_unit *rmrru)
         u8 d = PCI_SLOT(rmrru->scope.devices[i]);
         u8 f = PCI_FUNC(rmrru->scope.devices[i]);
 
-        if ( pci_device_detect(rmrru->segment, b, d, f) == 0 )
+        if ( pci_device_detect(PCI_SBDF(rmrru->segment, b, d, f)) == 0 )
         {
             dprintk(XENLOG_WARNING VTDPREFIX,
                     " Non-existent device (%pp) is reported"
@@ -767,7 +768,7 @@ static int __init register_one_satc(struct acpi_satc_unit *satcu)
         uint8_t d = PCI_SLOT(satcu->scope.devices[i]);
         uint8_t f = PCI_FUNC(satcu->scope.devices[i]);
 
-        if ( !pci_device_detect(satcu->segment, b, d, f) )
+        if ( !pci_device_detect(PCI_SBDF(satcu->segment, b, d, f)) )
         {
             dprintk(XENLOG_WARNING VTDPREFIX,
                     " Non-existent device (%pp) is reported in SATC scope!\n",
