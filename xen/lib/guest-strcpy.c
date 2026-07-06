@@ -3,8 +3,8 @@
 #include <xen/err.h>
 
 /*
- * The function copies a string from the guest and adds a NUL to
- * make sure the string is correctly terminated.
+ * The function copies a string from the guest and checks there's a NUL
+ * terminating the string.
  */
 char *safe_copy_string_from_guest(XEN_GUEST_HANDLE(char) u_buf,
                                   size_t size, size_t max_size)
@@ -14,8 +14,7 @@ char *safe_copy_string_from_guest(XEN_GUEST_HANDLE(char) u_buf,
     if ( size > max_size )
         return ERR_PTR(-ENOBUFS);
 
-    /* Add an extra +1 to append \0 */
-    tmp = xmalloc_array(char, size + 1);
+    tmp = xmalloc_array(char, size);
     if ( !tmp )
         return ERR_PTR(-ENOMEM);
 
@@ -24,7 +23,12 @@ char *safe_copy_string_from_guest(XEN_GUEST_HANDLE(char) u_buf,
         xfree(tmp);
         return ERR_PTR(-EFAULT);
     }
-    tmp[size] = '\0';
+
+    if ( !memchr(tmp, 0, size) )
+    {
+        xfree(tmp);
+        return ERR_PTR(-EMSGSIZE);
+    }
 
     return tmp;
 }

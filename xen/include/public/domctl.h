@@ -574,7 +574,7 @@ struct xen_domctl_assign_device {
             uint32_t machine_sbdf;   /* machine PCI ID of assigned device */
         } pci;
         struct {
-            uint32_t size; /* Length of the path */
+            uint32_t size; /* Length of the path, including nul terminator */
             XEN_GUEST_HANDLE_64(char) path; /* Path to the device tree node */
 #ifdef __XEN__
             struct dt_device_node *dev; /* Resolved device node of the above */

@@ -26,7 +26,8 @@ typedef struct xen_flask_setenforce xen_flask_setenforce_t;
 struct xen_flask_sid_context {
     /* IN/OUT: sid to convert to/from string */
     uint32_t sid;
-    /* IN: size of the context buffer
+    /*
+     * IN: size of the context buffer, including nul terminator
      * OUT: actual size of the output context string
      */
     uint32_t size;
@@ -86,8 +87,11 @@ struct xen_flask_boolean {
     uint8_t new_value;
     /* IN: commit new value instead of only setting pending [SET] */
     uint8_t commit;
-    /* IN: size of boolean name buffer [GET/SET]
-     * OUT: actual size of name [GET only] */
+    /*
+     * IN: size of boolean name buffer [GET/SET]; must cover nul terminator
+     *     if "name" (below) is an input
+     * OUT: actual size of name [GET only]
+     */
     uint32_t size;
     /* IN: if bool_id is -1, used to find boolean [GET/SET]
      * OUT: textual name of boolean [GET only]
@@ -150,7 +154,7 @@ typedef struct xen_flask_relabel xen_flask_relabel_t;
 struct xen_flask_devicetree_label {
     /* IN */
     uint32_t sid;
-    uint32_t length;
+    uint32_t length; /* length of the path, including nul terminator */
     XEN_GUEST_HANDLE(char) path;
 };
 typedef struct xen_flask_devicetree_label xen_flask_devicetree_label_t;
