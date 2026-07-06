@@ -1390,6 +1390,11 @@ int xc_lockprof_query(xc_interface *xch,
                       uint64_t *time,
                       xc_hypercall_buffer_t *data);
 
+/**
+ * Allocate memory with a given alignment.
+ * The alignment must be a power of 2 and at least sizeof(void*).
+ * It returns NULL on error, errno is not set.
+ */
 void *xc_memalign(xc_interface *xch, size_t alignment, size_t size);
 
 /**

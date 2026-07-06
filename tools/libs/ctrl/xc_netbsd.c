@@ -60,7 +60,14 @@ void discard_file_cache(xc_interface *xch, int fd, int flush)
 
 void *xc_memalign(xc_interface *xch, size_t alignment, size_t size)
 {
-    return valloc(size);
+    int ret;
+    void *ptr;
+
+    ret = posix_memalign(&ptr, alignment, size);
+    if (ret != 0 || !ptr)
+        return NULL;
+
+    return ptr;
 }
 
 int xc_pcidev_get_gsi(xc_interface *xch, uint32_t sbdf)
