@@ -53,7 +53,7 @@ bool pv_map_ldt_shadow_page(unsigned int offset)
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
     struct page_info *page;
-    l1_pgentry_t gl1e, *pl1e;
+    l1_pgentry_t gl1e, *pl1e, nl1e;
     unsigned long linear = curr->arch.pv.ldt_base + offset;
 
     BUG_ON(in_irq());
@@ -88,9 +88,9 @@ bool pv_map_ldt_shadow_page(unsigned int offset)
     }
 
     pl1e = &pv_ldt_ptes(curr)[offset >> PAGE_SHIFT];
-    l1e_add_flags(gl1e, _PAGE_RW);
+    nl1e = l1e_from_pfn(l1e_get_pfn(gl1e), __PAGE_HYPERVISOR_RW);
 
-    l1e_write(pl1e, gl1e);
+    l1e_write(pl1e, nl1e);
 
     return true;
 }
