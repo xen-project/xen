@@ -661,7 +661,6 @@ debug
 xenstorepvh
 xenstore
 grub
-c
 host_os
 host_vendor
 host_cpu
@@ -712,7 +711,6 @@ SHELL'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
-enable_c_stubdom
 enable_pv_grub
 enable_xenstore_stubdom
 enable_xenstorepvh_stubdom
@@ -1360,7 +1358,6 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
-  --enable-c-stubdom      Build and install c-stubdom (default is DISABLED)
   --enable-pv-grub        Build and install pv-grub (default is DISABLED)
   --disable-xenstore-stubdom
                           Build and install xenstore-stubdom (default is
@@ -2405,47 +2402,6 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 
 # Enable/disable stub domains
-
-# Check whether --enable-c-stubdom was given.
-if test ${enable_c_stubdom+y}
-then :
-  enableval=$enable_c_stubdom;
-
-if test "x$enableval" = "xyes"
-then :
-
-
-c=y
-STUBDOM_TARGETS="$STUBDOM_TARGETS c"
-STUBDOM_BUILD="$STUBDOM_BUILD c-stubdom"
-STUBDOM_INSTALL="$STUBDOM_INSTALL install-c"
-STUBDOM_UNINSTALL="$STUBDOM_UNINSTALL install-c"
-
-
-else $as_nop
-
-if test "x$enableval" = "xno"
-then :
-
-
-c=n
-
-
-fi
-
-fi
-
-
-else $as_nop
-
-
-c=n
-
-
-fi
-
-
-
 
 # Check whether --enable-pv-grub was given.
 if test ${enable_pv_grub+y}
