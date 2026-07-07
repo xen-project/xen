@@ -11,6 +11,7 @@
 #include <xen/device_tree.h>
 #include <xen/dt-overlay.h>
 #include <xen/errno.h>
+#include <xen/fdt-domain-build.h>
 #include <xen/iocap.h>
 #include <xen/lib.h>
 
@@ -117,14 +118,6 @@ int __overlay_init map_range_to_domain(const struct dt_device_node *dev,
     return 0;
 }
 
-/*
- * map_device_irqs_to_domain retrieves the interrupts configuration from
- * a device tree node and maps those interrupts to the target domain.
- *
- * Returns:
- *   < 0 error
- *   0   success
- */
 int __overlay_init map_device_irqs_to_domain(struct domain *d,
                                              struct dt_device_node *dev,
                                              bool need_mapping,
