@@ -245,7 +245,7 @@ static void __init init_ler(void)
 
     /*
      * Intel Pentium 4 is the only known CPU to not use the architectural MSR
-     * indicies.
+     * indices.
      */
     switch ( boot_cpu_data.vendor )
     {
