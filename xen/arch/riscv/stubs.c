@@ -101,24 +101,7 @@ void dump_pageframe_info(struct domain *d)
     BUG_ON("unimplemented");
 }
 
-int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
-{
-    BUG_ON("unimplemented");
-}
-
-int arch_domain_create(struct domain *d,
-                       struct xen_domctl_createdomain *config,
-                       unsigned int flags)
-{
-    BUG_ON("unimplemented");
-}
-
 int arch_domain_teardown(struct domain *d)
-{
-    BUG_ON("unimplemented");
-}
-
-void arch_domain_destroy(struct domain *d)
 {
     BUG_ON("unimplemented");
 }
