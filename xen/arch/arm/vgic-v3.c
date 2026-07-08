@@ -1111,10 +1111,10 @@ static struct vcpu *get_vcpu_from_rdist(struct domain *d,
     unsigned int vcpu_id;
 
     vcpu_id = region->first_cpu + ((gpa - region->base) / GICV3_GICR_SIZE);
-    if ( unlikely(vcpu_id >= d->max_vcpus) )
-        return NULL;
 
-    v = d->vcpu[vcpu_id];
+    v = domain_vcpu(d, vcpu_id);
+    if ( !v )
+        return NULL;
 
     *offset = gpa - v->arch.vgic.rdist_base;
 
