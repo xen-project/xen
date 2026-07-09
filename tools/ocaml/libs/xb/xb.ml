@@ -249,6 +249,11 @@ let can_input con = Queue.can_push con.pkt_out CommandReply
 
 (* NB: can throw Reconnect *)
 let input con =
+  let reset_and_return partial_pkt =
+    let pkt = Packet.of_partialpkt partial_pkt in
+    con.partial_in <- init_partial_in ();
+    Some pkt
+  in
   if not (can_input con) then None
   else
     let to_read = to_read con in
@@ -264,17 +269,25 @@ let input con =
         if sz > 0 then
           Partial.append partial_pkt (Bytes.to_string b) sz;
         if Partial.to_complete partial_pkt = 0 then (
-          let pkt = Packet.of_partialpkt partial_pkt in
-          con.partial_in <- init_partial_in ();
-          Some pkt
+          reset_and_return partial_pkt
         ) else None
       | NoHdr (i, buf)      ->
         (* we complete the partial header *)
         if sz > 0 then
           Bytes.blit b 0 buf (Partial.header_size () - i) sz;
-        con.partial_in <- if sz = i then
-            HaveHdr (Partial.of_string (Bytes.to_string buf)) else NoHdr (i - sz, buf);
-        None
+        if sz = i then
+          let partial_pkt = Partial.of_string (Bytes.to_string buf) in
+          (* If there is no body, we can return the full request immediately *)
+          if Partial.to_complete partial_pkt = 0 then
+            reset_and_return partial_pkt
+          else (
+            con.partial_in <- HaveHdr partial_pkt;
+            None
+          )
+        else (
+          con.partial_in <- NoHdr (i - sz, buf);
+          None
+        )
     )
 
 let classify t =
