@@ -1947,7 +1947,7 @@ int __init construct_domain(struct domain *d, struct kernel_info *kinfo)
         if ( vcpu_create(d, i) == NULL )
         {
             printk("Failed to allocate d%dv%d\n", d->domain_id, i);
-            break;
+            return -ENOMEM;
         }
 
         if ( is_64bit_domain(d) )
