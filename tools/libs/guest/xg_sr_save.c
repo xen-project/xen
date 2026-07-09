@@ -88,7 +88,6 @@ static int write_batch(struct xc_sr_context *ctx)
     xc_interface *xch = ctx->xch;
     xen_pfn_t *mfns = NULL, *types = NULL;
     void *guest_mapping = NULL;
-    void **guest_data = NULL;
     void **local_pages = NULL;
     int *errors = NULL, rc = -1;
     unsigned int i, p, nr_pages = 0, nr_pages_mapped = 0;
@@ -118,8 +117,6 @@ static int write_batch(struct xc_sr_context *ctx)
     types = malloc(nr_pfns * sizeof(*types));
     /* Errors from attempting to map the gfns. */
     errors = malloc(nr_pfns * sizeof(*errors));
-    /* Pointers to page data to send.  Mapped gfns or local allocations. */
-    guest_data = calloc(nr_pfns, sizeof(*guest_data));
     /* Pointers to locally allocated pages.  Need freeing. */
     local_pages = calloc(nr_pfns, sizeof(*local_pages));
     /* iovec[] for writev(). */
@@ -127,7 +124,7 @@ static int write_batch(struct xc_sr_context *ctx)
     /* page_data record PFNs list */
     rec_pfns = malloc(nr_pfns * sizeof(*rec_pfns));
 
-    if ( !mfns || !types || !errors || !guest_data || !local_pages || !iov || !rec_pfns )
+    if ( !mfns || !types || !errors || !local_pages || !iov || !rec_pfns )
     {
         ERROR("Unable to allocate arrays for a batch of %u pages",
               nr_pfns);
@@ -218,8 +215,17 @@ static int write_batch(struct xc_sr_context *ctx)
                 else
                     goto err;
             }
+            else if ( iov[iovcnt - 1].iov_base + iov[iovcnt - 1].iov_len !=
+                      page )
+            {
+                iov[iovcnt].iov_base = page;
+                iov[iovcnt].iov_len = PAGE_SIZE;
+                iovcnt++;
+            }
             else
-                guest_data[i] = page;
+            {
+                iov[iovcnt - 1].iov_len += PAGE_SIZE;
+            }
 
             rc = -1;
             ++p;
@@ -231,28 +237,12 @@ static int write_batch(struct xc_sr_context *ctx)
     for ( i = 0; i < nr_pfns; ++i )
         rec_pfns[i] = ((uint64_t)(types[i]) << 32) | ctx->save.batch_pfns[i];
 
-    if ( nr_pages )
-    {
-        for ( i = 0; i < nr_pfns; ++i )
-        {
-            if ( guest_data[i] )
-            {
-                iov[iovcnt].iov_base = guest_data[i];
-                iov[iovcnt].iov_len = PAGE_SIZE;
-                iovcnt++;
-                --nr_pages;
-            }
-        }
-    }
-
     if ( writev_exact(ctx->fd, iov, iovcnt) )
     {
         PERROR("Failed to write page data to stream");
         goto err;
     }
 
-    /* Sanity check we have sent all the pages we expected to. */
-    assert(nr_pages == 0);
     rc = ctx->save.nr_batch_pfns = 0;
 
  err:
@@ -263,7 +253,6 @@ static int write_batch(struct xc_sr_context *ctx)
     free(rec_pfns);
     free(iov);
     free(local_pages);
-    free(guest_data);
     free(errors);
     free(types);
     free(mfns);
