@@ -175,6 +175,17 @@
   tags:
     - qubes-hw3
 
+.ptl-x86_64:
+  # it's really similar to the ADL one
+  extends: .adl-x86-64
+  variables:
+    PCIDEV: "56:00.0"
+    PCIDEV_INTR: "MSI-X"
+    CONSOLE_OPTS: "console=com1 com1=115200,8n1"
+    SUT_ADDR: test-22.testnet
+  tags:
+    - qubes-hw22
+
 .zen2-x86-64:
   # it's really similar to the above
   extends: .adl-x86-64
@@ -401,6 +412,76 @@ kbl-tools-tests-pv-x86-64-gcc-debug:
 
 kbl-tools-tests-pvh-x86-64-gcc-debug:
   extends: .kbl-x86-64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh tools-tests-pvh 2>&1 | tee ${LOGFILE}
+  artifacts:
+    reports:
+      junit: tests-junit.xml
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+ptl-smoke-x86_64-gcc-debug:
+  extends: .ptl-x86_64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+ptl-smoke-x86_64-dom0pvh-gcc-debug:
+  extends: .ptl-x86_64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh dom0pvh 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+ptl-smoke-x86_64-dom0pvh-hvm-gcc-debug:
+  extends: .ptl-x86_64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh dom0pvh-hvm 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+ptl-pci-pv-x86_64-gcc-debug:
+  extends: .ptl-x86_64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh pci-pv 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+ptl-pci-hvm-x86_64-gcc-debug:
+  extends: .ptl-x86_64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh pci-hvm 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+ptl-pvshim-x86_64-gcc-debug:
+  extends: .ptl-x86_64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh pvshim 2>&1 | tee ${LOGFILE}
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+ptl-tools-tests-pv-x86_64-gcc-debug:
+  extends: .ptl-x86_64
+  script:
+    - ./automation/scripts/qubes-x86-64.sh tools-tests-pv 2>&1 | tee ${LOGFILE}
+  artifacts:
+    reports:
+      junit: tests-junit.xml
+  needs:
+    - *x86-64-test-needs
+    - alpine-3.18-gcc-debug
+
+ptl-tools-tests-pvh-x86_64-gcc-debug:
+  extends: .ptl-x86_64
   script:
     - ./automation/scripts/qubes-x86-64.sh tools-tests-pvh 2>&1 | tee ${LOGFILE}
   artifacts:
