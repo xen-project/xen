@@ -177,6 +177,7 @@
     PCIDEV: "56:00.0"
     PCIDEV_INTR: "MSI-X"
     CONSOLE_OPTS: "console=com1 com1=115200,8n1"
+    EXTRA_XEN_OPTS: "fred"
     SUT_ADDR: test-22.testnet
   tags:
     - qubes-hw22
