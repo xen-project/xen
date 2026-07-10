@@ -155,6 +155,14 @@ static void start_stimer(struct viridian_stimer *vs)
         printk(XENLOG_G_INFO "%pv: VIRIDIAN STIMER%u: enabled\n", v,
                stimerx);
 
+    if ( !vs->count )
+    {
+        gprintk(XENLOG_ERR, "VIRIDIAN STIMER started with 0 count\n");
+        ASSERT_UNREACHABLE();
+        domain_crash(v->domain);
+        return;
+    }
+
     if ( vs->config.periodic )
     {
         /*
@@ -364,7 +372,7 @@ int viridian_time_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
 
         vs->config.as_uint64 = val;
 
-        if ( !vs->config.sintx )
+        if ( !vs->config.sintx || !vs->count )
             vs->config.enable = 0;
 
         if ( vs->config.enable )
@@ -575,6 +583,9 @@ void viridian_time_load_vcpu_ctxt(
 
         vs->config.as_uint64 = ctxt->stimer_config_msr[i];
         vs->count = ctxt->stimer_count_msr[i];
+        if ( !vs->config.sintx || !vs->count )
+            /* Reject enabling with a zero sintx or count fields. */
+            vs->config.enable = 0;
     }
 }
 
