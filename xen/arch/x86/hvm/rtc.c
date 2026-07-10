@@ -469,9 +469,8 @@ static void cf_check rtc_alarm_cb(void *opaque)
     spin_unlock(&s->lock);
 }
 
-static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
+static int rtc_ioport_write(RTCState *s, uint32_t addr, uint32_t data)
 {
-    RTCState *s = opaque;
     struct domain *d = vrtc_domain(s);
     uint32_t orig;
 
