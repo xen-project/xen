@@ -152,10 +152,23 @@ static int __init handle_passthrough_prop(struct kernel_info *kinfo,
             return -ENOMEM;
     }
 
+    /*
+     * xen,reg holds flat host/guest physical addresses and sizes, so the
+     * inherited #address-cells/#size-cells must each be 1 or 2. This also
+     * guards the len division below against a zero or wrapped divisor.
+     */
+    if ( (address_cells < 1) || (address_cells > 2) ||
+         (size_cells < 1) || (size_cells > 2) )
+    {
+        printk(XENLOG_ERR "Invalid address_cells %u or size_cells %u\n",
+               address_cells, size_cells);
+        return -EINVAL;
+    }
+
     /* xen,reg specifies where to map the MMIO region */
     cell = (const __be32 *)xen_reg->data;
     len = fdt32_to_cpu(xen_reg->len) / ((address_cells * 2 + size_cells) *
-                                        sizeof(uint32_t));
+                                        sizeof(*cell));
 
     for ( i = 0; i < len; i++ )
     {
