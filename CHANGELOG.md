@@ -51,6 +51,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - On Arm:
    - Support for guest suspend and resume to/from RAM via vPSCI.
      Applies only to non-hardware domain guests.
+   - Continued Armv8-R MPU enablement.
+   - Drop ThumbEE support.
+   - FF-A v1.2 support.
+
+ - On RISC-V:
+   - SSTC extension support for Xen (not for guest yet).
+   - Introduce domain build helpers (CONFIG_DOMAIN_BUILD_HELPERS) which allows
+     to load Linux kernel, initrd and allocation related things forfor device
+     tree-based domains, laying the groundwork for guest boot support.
 
 ### Removed
  - On x86:
