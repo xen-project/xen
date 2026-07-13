@@ -86,15 +86,12 @@ static int write_checkpoint_record(struct xc_sr_context *ctx)
 static int write_batch(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
-    xen_pfn_t *mfns = NULL, *types = NULL;
     void *guest_mapping = NULL;
-    void **local_pages = NULL;
-    int *errors = NULL, rc = -1;
+    int rc = -1;
     unsigned int i, p, nr_pages = 0, nr_pages_mapped = 0;
     unsigned int nr_pfns = ctx->save.nr_batch_pfns;
     void *page, *orig_page;
-    uint64_t *rec_pfns = NULL;
-    struct iovec *iov = NULL; int iovcnt = 0;
+    int iovcnt = 0;
     xen_pfn_t *const batch_pfns = ctx->save.buffers->batch_pfns;
     struct {
         struct xc_sr_rhdr rec;
@@ -110,28 +107,21 @@ static int write_batch(struct xc_sr_context *ctx)
         },
     };
 
+    /* Mfns of the batch pfns. */
+    xen_pfn_t *const mfns = ctx->save.buffers->mfns;
+    /* Types of the batch pfns. */
+    xen_pfn_t *const types = ctx->save.buffers->types;
+    /* Errors from attempting to map the gfns. */
+    int *const errors = ctx->save.buffers->errors;
+    /* Pointers to locally allocated pages.  Need freeing. */
+    void **const local_pages = ctx->save.buffers->local_pages;
+    /* iovec[] for writev(). */
+    struct iovec *const iov = ctx->save.buffers->iov;
+    /* page_data record PFNs list */
+    uint64_t *const rec_pfns = ctx->save.buffers->rec_pfns;
+
     assert(nr_pfns != 0);
     assert(nr_pfns <= MAX_BATCH_SIZE);
-
-    /* Mfns of the batch pfns. */
-    mfns = malloc(nr_pfns * sizeof(*mfns));
-    /* Types of the batch pfns. */
-    types = malloc(nr_pfns * sizeof(*types));
-    /* Errors from attempting to map the gfns. */
-    errors = malloc(nr_pfns * sizeof(*errors));
-    /* Pointers to locally allocated pages.  Need freeing. */
-    local_pages = calloc(nr_pfns, sizeof(*local_pages));
-    /* iovec[] for writev(). */
-    iov = malloc((nr_pfns + 2) * sizeof(*iov));
-    /* page_data record PFNs list */
-    rec_pfns = malloc(nr_pfns * sizeof(*rec_pfns));
-
-    if ( !mfns || !types || !errors || !local_pages || !iov || !rec_pfns )
-    {
-        ERROR("Unable to allocate arrays for a batch of %u pages",
-              nr_pfns);
-        goto err;
-    }
 
     iov[0].iov_base = &hdrs;
     iov[0].iov_len = sizeof(hdrs);
@@ -249,14 +239,11 @@ static int write_batch(struct xc_sr_context *ctx)
  err:
     if ( guest_mapping )
         xenforeignmemory_unmap(xch->fmem, guest_mapping, nr_pages_mapped);
-    for ( i = 0; local_pages && i < nr_pfns; ++i )
+    for ( i = 0; i < nr_pfns; ++i )
+    {
         free(local_pages[i]);
-    free(rec_pfns);
-    free(iov);
-    free(local_pages);
-    free(errors);
-    free(types);
-    free(mfns);
+        local_pages[i] = NULL;
+    }
 
     return rc;
 }
@@ -790,8 +777,8 @@ static int setup(struct xc_sr_context *ctx)
 
     if ( !ctx->save.buffers || !dirty_bitmap || !ctx->save.deferred_pages )
     {
-        ERROR("Unable to allocate memory for dirty bitmaps, batch pfns and"
-              " deferred pages");
+        ERROR("Unable to allocate memory for dirty bitmaps, deferred pages"
+              " and various batch buffers");
         rc = -1;
         errno = ENOMEM;
         goto err;

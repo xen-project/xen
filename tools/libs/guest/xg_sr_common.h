@@ -246,6 +246,12 @@ struct xc_sr_context
             struct xc_sr_context_save_buffers
             {
                 xen_pfn_t batch_pfns[MAX_BATCH_SIZE];
+                xen_pfn_t mfns[MAX_BATCH_SIZE];
+                xen_pfn_t types[MAX_BATCH_SIZE];
+                void *local_pages[MAX_BATCH_SIZE];
+                struct iovec iov[MAX_BATCH_SIZE + 2]; /* Headers + data. */
+                uint64_t rec_pfns[MAX_BATCH_SIZE];
+                int errors[MAX_BATCH_SIZE];
             } *buffers;
         } save;
 
