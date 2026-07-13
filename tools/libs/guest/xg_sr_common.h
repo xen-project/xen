@@ -239,11 +239,14 @@ struct xc_sr_context
 
             struct precopy_stats stats;
 
-            xen_pfn_t *batch_pfns;
             unsigned int nr_batch_pfns;
             unsigned long *deferred_pages;
             unsigned long nr_deferred_pages;
             xc_hypercall_buffer_t dirty_bitmap_hbuf;
+            struct xc_sr_context_save_buffers
+            {
+                xen_pfn_t batch_pfns[MAX_BATCH_SIZE];
+            } *buffers;
         } save;
 
         struct /* Restore data. */
