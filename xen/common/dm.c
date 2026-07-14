@@ -26,6 +26,9 @@ long do_dm_op(
     struct dmop_args args;
     int rc;
 
+    if ( !nr_bufs )
+        return -ENODATA;
+
     if ( nr_bufs > ARRAY_SIZE(args.buf) )
         return -E2BIG;
 
