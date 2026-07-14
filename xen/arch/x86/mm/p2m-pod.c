@@ -547,12 +547,13 @@ decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
         p2m_access_t a;
         p2m_type_t t;
         unsigned int cur_order;
+        mfn_t mfn = p2m->get_entry(p2m, gfn_add(gfn, i), &t, &a, 0, &cur_order,
+                                   NULL);
 
-        p2m->get_entry(p2m, gfn_add(gfn, i), &t, &a, 0, &cur_order, NULL);
         n = 1UL << min(order, cur_order);
         if ( p2m_is_pod(t) )
             pod += n;
-        else if ( p2m_is_ram(t) )
+        else if ( p2m_is_ram(t) && !is_special_page(mfn_to_page(mfn)) )
             ram += n;
     }
 
@@ -655,6 +656,9 @@ decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
             ASSERT(mfn_valid(mfn));
 
             page = mfn_to_page(mfn);
+            if ( is_special_page(page) )
+                /* Do not touch special pages, let generic code handle them. */
+                continue;
 
             /* This shouldn't be able to fail */
             if ( p2m_set_entry(p2m, gfn_add(gfn, i), INVALID_MFN, cur_order,
