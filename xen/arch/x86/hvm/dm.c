@@ -504,6 +504,12 @@ int dm_op(const struct dmop_args *op_args)
         struct xen_dm_op_modified_memory *data =
             &op.u.modified_memory;
 
+        if ( op_args->nr_bufs != 2 )
+        {
+            rc = -EINVAL;
+            break;
+        }
+
         rc = modified_memory(d, op_args, data);
         const_op = !rc;
         break;
@@ -660,6 +666,9 @@ int compat_dm_op(
     struct dmop_args args;
     unsigned int i;
     int rc;
+
+    if ( !nr_bufs )
+        return -ENODATA;
 
     if ( nr_bufs > ARRAY_SIZE(args.buf) )
         return -E2BIG;
