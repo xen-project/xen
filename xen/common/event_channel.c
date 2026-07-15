@@ -523,7 +523,8 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
     if ( rc < 0 )
     {
         gdprintk(XENLOG_WARNING, "EVTCHNOP failure: error %d\n", rc);
-        domain_deinit_states(d);
+        if ( virq == VIRQ_DOM_EXC )
+            domain_deinit_states(d);
         goto out;
     }
 
