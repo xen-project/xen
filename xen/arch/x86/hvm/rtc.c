@@ -647,15 +647,23 @@ static int update_in_progress(RTCState *s)
     return 0;
 }
 
-static uint32_t rtc_ioport_read(RTCState *s, uint32_t addr)
+static bool rtc_ioport_read(RTCState *s, uint32_t addr, uint32_t *val)
 {
     int ret;
     struct domain *d = vrtc_domain(s);
 
+    *val = ~0;
+
     if ( (addr & 1) == 0 )
-        return 0xff;
+        return true;
 
     spin_lock(&s->lock);
+
+    if ( s->hw.cmos_index >= RTC_CMOS_SIZE )
+    {
+        spin_unlock(&s->lock);
+        return false;
+    }
 
     switch ( s->hw.cmos_index )
     {
@@ -696,7 +704,9 @@ static uint32_t rtc_ioport_read(RTCState *s, uint32_t addr)
 
     spin_unlock(&s->lock);
 
-    return ret;
+    *val = ret;
+
+    return true;
 }
 
 static int cf_check handle_rtc_io(
@@ -716,11 +726,8 @@ static int cf_check handle_rtc_io(
         if ( rtc_ioport_write(vrtc, port, (uint8_t)*val) )
             return X86EMUL_OKAY;
     }
-    else if ( vrtc->hw.cmos_index < RTC_CMOS_SIZE )
-    {
-        *val = rtc_ioport_read(vrtc, port);
+    else if ( rtc_ioport_read(vrtc, port, val) )
         return X86EMUL_OKAY;
-    }
 
     return X86EMUL_UNHANDLEABLE;
 }
