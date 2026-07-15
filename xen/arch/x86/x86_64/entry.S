@@ -765,7 +765,9 @@ UNLIKELY_END(exit_cr3)
          * scf and ver_sel above eflags, as we can't use any GPRs,
          * and we're at a random place on the stack, not in a CPUFINFO block.
          */
-        SPEC_CTRL_COND_VERW     /* Req: %rsp=eframe                    Clob: efl */
+        SPEC_CTRL_COND_VERW     /* Req: %rsp=eframe                    Clob: efl */ \
+            scf=STK_REL(EFRAME_shadow_scf, EFRAME_error_code),                      \
+            sel=STK_REL(EFRAME_shadow_sel, EFRAME_error_code)
 
         add     $8, %rsp        /* Pop ev/ec off the stack */
         iretq

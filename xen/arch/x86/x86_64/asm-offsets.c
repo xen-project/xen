@@ -64,6 +64,7 @@ void __dummy__(void)
     DEFINE(sym, offsetof(struct cpu_user_regs, mem) -                   \
                 offsetof(struct cpu_user_regs, error_code) __VA_ARGS__)
 
+    OFFSET_EF(EFRAME_error_code,      error_code);
     OFFSET_EF(EFRAME_entry_vector,    entry_vector);
     OFFSET_EF(EFRAME_rip,             rip);
     OFFSET_EF(EFRAME_cs,              cs);
