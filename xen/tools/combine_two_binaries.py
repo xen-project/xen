@@ -33,7 +33,7 @@ parser.add_argument('--map', dest='mapfile',
 parser.add_argument('--exports', dest='exports',
                     help='Symbols to export')
 parser.add_argument('--section-header', dest='section_header',
-                    default='.section .init.text, "ax", @progbits',
+                    default='.section .init.multiboot, "ax", @progbits',
                     help='Section header declaration')
 parser.add_argument('-v', '--verbose',
                     action='store_true')
