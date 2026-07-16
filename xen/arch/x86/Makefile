@@ -1,3 +1,7 @@
+# Put this ahead of the sorted list below, as it takes long to build and hence
+# we'd like parallel make to schedule its building early.
+obj-y += x86_emulate/
+
 obj-y += acpi/
 obj-y += boot/
 obj-y += cpu/
@@ -9,7 +13,6 @@ obj-y += lib/
 obj-y += mm/
 obj-$(CONFIG_PV) += pv/
 obj-y += x86_64/
-obj-y += x86_emulate/
 
 obj-y += alternative.o
 obj-y += apic.o
