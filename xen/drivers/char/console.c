@@ -340,15 +340,15 @@ static void cf_check do_dec_thresh(unsigned char key, bool unused)
  */
 
 /* conring_size: allows a larger console ring than default (16kB). */
-static uint32_t __initdata opt_conring_size;
+static unsigned int __initdata opt_conring_size;
 size_param("conring_size", opt_conring_size);
 
 #define _CONRING_SIZE 16384
 #define CONRING_IDX_MASK(i) ((i)&(conring_size-1))
 static char __initdata _conring[_CONRING_SIZE];
-static char *__read_mostly conring = _conring;
-static uint32_t __read_mostly conring_size = _CONRING_SIZE;
-static uint32_t conringc, conringp;
+static char *__ro_after_init conring = _conring;
+static unsigned int __ro_after_init conring_size = _CONRING_SIZE;
+static unsigned int conringc, conringp;
 
 static void cf_check conring_notify(void *unused)
 {
