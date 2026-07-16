@@ -463,7 +463,8 @@ static void cf_check conring_dump_keyhandler(unsigned char key)
 void __init console_init_ring(void)
 {
     char *ring;
-    unsigned int i, order, memflags;
+    XENCONS_RING_IDX done, size, n;
+    unsigned int order, memflags;
     unsigned long flags;
 
     if ( !opt_conring_size )
@@ -479,8 +480,19 @@ void __init console_init_ring(void)
     opt_conring_size = PAGE_SIZE << order;
 
     nrspin_lock_irqsave(&console_lock, flags);
-    for ( i = conringc ; i != conringp; i++ )
-        ring[i & (opt_conring_size - 1)] = conring[i & (conring_size - 1)];
+
+    size = conringp - conringc;
+    for ( done = 0; done < size; done += n )
+    {
+        XENCONS_RING_IDX src = (conringc + done) & (conring_size - 1);
+        XENCONS_RING_IDX dst = (conringc + done) & (opt_conring_size - 1);
+
+        n = min(opt_conring_size - dst, conring_size - src);
+        n = min(size - done, n);
+
+        memcpy(&ring[dst], &conring[src], n);
+    }
+
     conring = ring;
     smp_wmb(); /* Allow users of console_force_unlock() to see larger buffer. */
     conring_size = opt_conring_size;
