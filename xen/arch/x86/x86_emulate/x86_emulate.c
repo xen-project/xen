@@ -8,7 +8,51 @@
  * Copyright (c) 2005-2007 XenSource Inc.
  */
 
+#ifdef __XEN__
+
+# include <xen/event.h>
+
+# include <asm/amd.h> /* cpu_has_amd_erratum() */
+# include <asm/processor.h> /* current_cpu_info */
+# include <asm/x86_emulate.h>
+# include <asm/xstate.h>
+
+/* Avoid namespace pollution. */
+# undef cmpxchg
+# undef cpuid
+# undef wbinvd
+
+# define cpu_has_amd_erratum(nr) \
+         cpu_has_amd_erratum(&current_cpu_data, AMD_ERRATUM_##nr)
+
+#else /* !__XEN__ */
+
+/* See gcc bug 100680, but here don't bother making this version dependent. */
+# define gcc11_wrap(x) ({                  \
+     unsigned long x_;                     \
+     __asm__ ( "" : "=g" (x_) : "0" (x) ); \
+     (typeof(x))x_;                        \
+})
+
+# define cpu_has_amd_erratum(nr) 0
+# define cpu_has_mpx false
+# define read_bndcfgu() 0
+# define xstate_set_init(what)
+
+/* For generic assembly code: use macros to define operation/operand sizes. */
+# ifdef __i386__
+#  define __OS          "l"  /* Operation Suffix */
+#  define __OP          "e"  /* Operand Prefix */
+# else
+#  define __OS          "q"  /* Operation Suffix */
+#  define __OP          "r"  /* Operand Prefix */
+# endif
+
+#endif /* __XEN__ */
+
 #include "private.h"
+
+#ifndef X86EMUL_NO_MMX
 
 /*
  * The next two tables are indexed by high opcode extension byte (the one
@@ -45,8 +89,14 @@ static const uint16_t _3dnow_ext_table[16] = {
     [0xb] = (1 << 0xb) /* pswapd */,
 };
 
+#endif /* !X86EMUL_NO_MMX */
+
+#ifndef X86EMUL_NO_SIMD
+
 /* Shift values between src and dst sizes of pmov{s,z}x{b,w,d}{w,d,q}. */
 static const uint8_t pmov_convert_delta[] = { 1, 2, 3, 1, 2, 1 };
+
+#endif /* !X86EMUL_NO_SIMD */
 
 static const uint8_t sse_prefix[] = { 0x66, 0xf3, 0xf2 };
 

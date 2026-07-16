@@ -3,27 +3,6 @@
 #include <errno.h>
 #include <sys/mman.h>
 
-/* See gcc bug 100680, but here don't bother making this version dependent. */
-#define gcc11_wrap(x) ({                  \
-    unsigned long x_;                     \
-    __asm__ ( "" : "=g" (x_) : "0" (x) ); \
-    (typeof(x))x_;                        \
-})
-
-#define cpu_has_amd_erratum(nr) 0
-#define cpu_has_mpx false
-#define read_bndcfgu() 0
-#define xstate_set_init(what)
-
-/* For generic assembly code: use macros to define operation/operand sizes. */
-#ifdef __i386__
-# define __OS          "l"  /* Operation Suffix */
-# define __OP          "e"  /* Operand Prefix */
-#else
-# define __OS          "q"  /* Operation Suffix */
-# define __OP          "r"  /* Operand Prefix */
-#endif
-
 uint32_t mxcsr_mask = 0x0000ffbf;
 struct cpu_policy cpu_policy;
 

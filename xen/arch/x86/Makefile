@@ -69,7 +69,6 @@ obj-y += traps-setup.o
 obj-y += traps.o
 obj-$(CONFIG_INTEL) += tsx.o
 obj-$(CONFIG_VM_EVENT) += vm_event.o
-obj-y += x86_emulate.o
 obj-y += xstate.o
 
 ifneq ($(CONFIG_PV_SHIM_EXCLUSIVE),y)
@@ -85,13 +84,6 @@ hostprogs-y += boot/mkelf32
 hostprogs-y += efi/mkreloc
 
 $(obj)/efi/mkreloc: HOSTCFLAGS += -I$(srctree)/include
-
-ifneq ($(CONFIG_HVM),y)
-$(obj)/x86_emulate.o: CFLAGS-y += -Wno-unused-label
-endif
-ifeq ($(CONFIG_CONDITION_COVERAGE)$(CONFIG_CC_IS_GCC),yy)
-$(obj)/x86_emulate.o: CFLAGS-y += -Wno-error=coverage-too-many-conditions
-endif
 
 efi-y := $(shell if [ ! -r $(objtree)/include/xen/compile.h -o \
                       -O $(objtree)/include/xen/compile.h ]; then \
