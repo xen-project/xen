@@ -366,6 +366,16 @@ This is typically done by a guest kernel agent known as a "balloon driver".
 
     Status: Supported
 
+### Shadow paging
+
+Allows fully virtualized guests (HVM / PVH) to be run without (host side) page
+translation support by hardware (AMD: NPT, Intel: EPT).
+
+It is also required to migrate PV guests, and to allow L1TF-vulnerable guests
+to continue to run without compromising host security.
+
+    Status: Supported, not security supported
+
 ### Populate-on-demand memory
 
 This is a mechanism that allows normal operating systems with only a balloon driver
@@ -498,7 +508,7 @@ This feature is independent
 of the ARM "page granularity" feature (see below).
 
     Status, x86 HVM/PVH, HAP: Supported
-    Status, x86 HVM/PVH, Shadow, 2MiB: Supported
+    Status, x86 HVM/PVH, Shadow, 2MiB: Supported, not security supported
     Status, ARM: Supported
 
 On x86 in shadow mode, only 2MiB (L2) superpages are available;

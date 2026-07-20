@@ -59,6 +59,7 @@ eclair-x86_64-allcode:
       CONFIG_PERF_ARRAYS=y
       CONFIG_PERF_COUNTERS=y
       CONFIG_PV32=y
+      CONFIG_SHADOW_PAGING=y
       CONFIG_UNSUPPORTED=y
       CONFIG_XEN_GUEST=y
       CONFIG_XHCI=y
@@ -91,7 +92,6 @@ eclair-x86_64-amd:
       CONFIG_PV=n
       CONFIG_XEN_IBT=n
       CONFIG_XEN_SHSTK=n
-      CONFIG_SHADOW_PAGING=n
       CONFIG_HVM_FEP=n
       CONFIG_TBOOT=n
       CONFIG_HYPFS=n
