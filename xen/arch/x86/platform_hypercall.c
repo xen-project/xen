@@ -673,10 +673,6 @@ ret_t do_platform_op(
     {
         int cpu = op->u.cpu_ol.cpuid;
 
-        ret = xsm_resource_plug_core(XSM_HOOK);
-        if ( ret )
-            break;
-
         if ( cpu >= nr_cpu_ids || !cpu_present(cpu) ||
              clocksource_is_tsc() )
         {
@@ -698,10 +694,6 @@ ret_t do_platform_op(
     case XENPF_cpu_offline:
     {
         int cpu = op->u.cpu_ol.cpuid;
-
-        ret = xsm_resource_unplug_core(XSM_HOOK);
-        if ( ret )
-            break;
 
         if ( cpu == 0 )
         {
@@ -728,20 +720,12 @@ ret_t do_platform_op(
     break;
 
     case XENPF_cpu_hotadd:
-        ret = xsm_resource_plug_core(XSM_HOOK);
-        if ( ret )
-            break;
-
         ret = cpu_add(op->u.cpu_add.apic_id,
                       op->u.cpu_add.acpi_id,
                       op->u.cpu_add.pxm);
-    break;
+        break;
 
     case XENPF_mem_hotadd:
-        ret = xsm_resource_plug_core(XSM_HOOK);
-        if ( ret )
-            break;
-
         ret = memory_add(op->u.mem_add.spfn,
                       op->u.mem_add.epfn,
                       op->u.mem_add.pxm);
