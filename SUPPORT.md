@@ -288,6 +288,12 @@ or itself will not be regarded a security issue.
     Status, untrusted driver domains: Supported, not security supported
     Status, Liveupdate: Not functional
 
+## Guest boot loaders
+
+### Pygrub
+
+    Status: Supported, security supported only when run de-privileged
+
 ## Toolstack/3rd party
 
 ### libvirt driver for xl
