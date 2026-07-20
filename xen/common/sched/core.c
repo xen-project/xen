@@ -2086,10 +2086,6 @@ long sched_adjust_global(struct xen_sysctl_scheduler_op *op)
     struct cpupool *pool;
     int rc;
 
-    rc = xsm_sysctl_scheduler_op(XSM_HOOK, op->cmd);
-    if ( rc )
-        return rc;
-
     if ( (op->cmd != XEN_SYSCTL_SCHEDOP_putinfo) &&
          (op->cmd != XEN_SYSCTL_SCHEDOP_getinfo) )
         return -EINVAL;
