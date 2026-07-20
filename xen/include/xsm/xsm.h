@@ -60,7 +60,6 @@ struct xsm_ops {
     int (*domctl)(struct domain *d, struct xen_domctl *op);
 #ifdef CONFIG_SYSCTL
     int (*sysctl)(const struct xen_sysctl *op);
-    int (*readconsole)(uint32_t clear);
 #endif
 
     int (*evtchn_unbound)(struct domain *d, struct evtchn *chn, domid_t id2);
@@ -244,11 +243,6 @@ static inline int xsm_domctl(xsm_default_t def, struct domain *d,
 static inline int xsm_sysctl(xsm_default_t def, const struct xen_sysctl *op)
 {
     return alternative_call(xsm_ops.sysctl, op);
-}
-
-static inline int xsm_readconsole(xsm_default_t def, uint32_t clear)
-{
-    return alternative_call(xsm_ops.readconsole, clear);
 }
 #endif
 
