@@ -179,7 +179,8 @@ static XSM_INLINE int cf_check xsm_domctl(
     }
 }
 
-static XSM_INLINE int cf_check xsm_sysctl(XSM_DEFAULT_ARG int cmd)
+static XSM_INLINE int cf_check xsm_sysctl(
+    XSM_DEFAULT_ARG const struct xen_sysctl *op)
 {
     XSM_ASSERT_ACTION(XSM_PRIV);
     return xsm_default_action(action, current->domain, NULL);
