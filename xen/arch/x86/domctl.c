@@ -1485,17 +1485,17 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         c.nat->user_regs.r14               = v->arch.user_regs.r14;
         c.nat->user_regs.r13               = v->arch.user_regs.r13;
         c.nat->user_regs.r12               = v->arch.user_regs.r12;
+        c.nat->user_regs.rbp               = v->arch.user_regs.rbp;
+        c.nat->user_regs.rbx               = v->arch.user_regs.rbx;
         c.nat->user_regs.r11               = v->arch.user_regs.r11;
         c.nat->user_regs.r10               = v->arch.user_regs.r10;
         c.nat->user_regs.r9                = v->arch.user_regs.r9;
         c.nat->user_regs.r8                = v->arch.user_regs.r8;
-        c.nat->user_regs.rbx               = v->arch.user_regs.rbx;
+        c.nat->user_regs.rax               = v->arch.user_regs.rax;
         c.nat->user_regs.rcx               = v->arch.user_regs.rcx;
         c.nat->user_regs.rdx               = v->arch.user_regs.rdx;
         c.nat->user_regs.rsi               = v->arch.user_regs.rsi;
         c.nat->user_regs.rdi               = v->arch.user_regs.rdi;
-        c.nat->user_regs.rbp               = v->arch.user_regs.rbp;
-        c.nat->user_regs.rax               = v->arch.user_regs.rax;
         c.nat->user_regs.rip               = v->arch.user_regs.rip;
         c.nat->user_regs.cs                = v->arch.user_regs.cs;
         c.nat->user_regs.rflags            = v->arch.user_regs.rflags;
@@ -1514,13 +1514,13 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     else
     {
         /* Backing memory is pre-zeroed. */
+        c.cmp->user_regs.ebp               = v->arch.user_regs.ebp;
         c.cmp->user_regs.ebx               = v->arch.user_regs.ebx;
+        c.cmp->user_regs.eax               = v->arch.user_regs.eax;
         c.cmp->user_regs.ecx               = v->arch.user_regs.ecx;
         c.cmp->user_regs.edx               = v->arch.user_regs.edx;
         c.cmp->user_regs.esi               = v->arch.user_regs.esi;
         c.cmp->user_regs.edi               = v->arch.user_regs.edi;
-        c.cmp->user_regs.ebp               = v->arch.user_regs.ebp;
-        c.cmp->user_regs.eax               = v->arch.user_regs.eax;
         c.cmp->user_regs.eip               = v->arch.user_regs.eip;
         c.cmp->user_regs.cs                = v->arch.user_regs.cs;
         c.cmp->user_regs.eflags            = v->arch.user_regs.eflags;
