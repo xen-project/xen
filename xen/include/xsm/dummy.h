@@ -395,18 +395,6 @@ static XSM_INLINE int cf_check xsm_get_device_group(
 }
 #endif /* HAS_PASSTHROUGH && HAS_PCI */
 
-static XSM_INLINE int cf_check xsm_resource_plug_core(XSM_DEFAULT_VOID)
-{
-    XSM_ASSERT_ACTION(XSM_HOOK);
-    return xsm_default_action(action, current->domain, NULL);
-}
-
-static XSM_INLINE int cf_check xsm_resource_unplug_core(XSM_DEFAULT_VOID)
-{
-    XSM_ASSERT_ACTION(XSM_HOOK);
-    return xsm_default_action(action, current->domain, NULL);
-}
-
 static XSM_INLINE int cf_check xsm_resource_plug_pci(
     XSM_DEFAULT_ARG uint32_t machine_bdf)
 {
