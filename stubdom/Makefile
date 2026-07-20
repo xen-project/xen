@@ -31,15 +31,7 @@ endef
 $(foreach lib,$(LIBS_LIBS),$(eval $(call LIB_deps,$(lib))))
 
 GNU_TARGET_ARCH:=$(XEN_TARGET_ARCH)
-ifeq ($(XEN_TARGET_ARCH),x86_32)
-GNU_TARGET_ARCH:=i686
-endif
 
-ifeq ($(GNU_TARGET_ARCH), i686)
-TARGET_CFLAGS=
-NEWLIB_CFLAGS+=-D_I386MACH_ALLOW_HW_INTERRUPTS
-STUBDOM_SUPPORTED=1
-endif
 ifeq ($(GNU_TARGET_ARCH), x86_64)
 TARGET_CFLAGS=-mno-red-zone
 NEWLIB_CFLAGS+=-D_I386MACH_ALLOW_HW_INTERRUPTS
@@ -179,9 +171,6 @@ gmp-$(GMP_VERSION).tar.bz2:
 	$(FETCHER) $@ $(GMP_URL)/$@
 
 .PHONY: cross-gmp
-ifeq ($(XEN_TARGET_ARCH), x86_32)
-   GMPEXT=ABI=32
-endif
 gmp-$(XEN_TARGET_ARCH): gmp-$(GMP_VERSION).tar.bz2 $(NEWLIB_STAMPFILE)
 	tar xjf $<
 	rm $@ -rf || :
