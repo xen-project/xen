@@ -56,6 +56,11 @@ static int flask_deassign_dtdevice(struct domain *d, const char *dtpath);
 #endif
 #endif /* CONFIG_HAS_PASSTHROUGH */
 
+#if defined(CONFIG_SYSCTL) || defined(CONFIG_X86)
+static int flask_resource_plug_core(void);
+static int flask_resource_unplug_core(void);
+#endif
+
 static uint32_t domain_sid(const struct domain *dom)
 {
     struct domain_security_struct *dsec = dom->ssid;
@@ -911,9 +916,6 @@ static int cf_check flask_sysctl(const struct xen_sysctl *op)
     {
     /* These have individual XSM hooks */
     case XEN_SYSCTL_page_offline_op:
-#ifdef CONFIG_X86
-    case XEN_SYSCTL_cpu_hotplug:
-#endif
         return 0;
 
     case XEN_SYSCTL_readconsole:
@@ -964,6 +966,23 @@ static int cf_check flask_sysctl(const struct xen_sysctl *op)
 
     case XEN_SYSCTL_getdomaininfolist:
         return flask_getdomaininfo(dom_xen);
+
+#ifdef CONFIG_X86
+    case XEN_SYSCTL_cpu_hotplug:
+        switch ( op->u.cpu_hotplug.op )
+        {
+        case XEN_SYSCTL_CPU_HOTPLUG_ONLINE:
+        case XEN_SYSCTL_CPU_HOTPLUG_SMT_ENABLE:
+            return flask_resource_plug_core();
+
+        case XEN_SYSCTL_CPU_HOTPLUG_OFFLINE:
+        case XEN_SYSCTL_CPU_HOTPLUG_SMT_DISABLE:
+            return flask_resource_unplug_core();
+
+        default:
+            return avc_unknown_permission("cpu_hotplug", op->u.cpu_hotplug.op);
+        }
+#endif
 
     case XEN_SYSCTL_psr_cmt_op:
         return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
@@ -1244,12 +1263,12 @@ static int cf_check flask_pci_config_permission(
 }
 
 #if defined(CONFIG_SYSCTL) || defined(CONFIG_X86)
-static int cf_check flask_resource_plug_core(void)
+static int flask_resource_plug_core(void)
 {
     return avc_current_has_perm(SECINITSID_DOMXEN, SECCLASS_RESOURCE, RESOURCE__PLUG, NULL);
 }
 
-static int cf_check flask_resource_unplug_core(void)
+static int flask_resource_unplug_core(void)
 {
     return avc_current_has_perm(SECINITSID_DOMXEN, SECCLASS_RESOURCE, RESOURCE__UNPLUG, NULL);
 }
@@ -1987,8 +2006,6 @@ static const struct xsm_ops __initconst_cf_clobber flask_ops = {
     .iomem_mapping_vpci = flask_iomem_mapping,
     .pci_config_permission = flask_pci_config_permission,
 
-    .resource_plug_core = flask_resource_plug_core,
-    .resource_unplug_core = flask_resource_unplug_core,
     .resource_plug_pci = flask_resource_plug_pci,
     .resource_unplug_pci = flask_resource_unplug_pci,
     .resource_setup_pci = flask_resource_setup_pci,
