@@ -150,6 +150,7 @@ define(`create_domain_build_label', `
 # manage_domain(priv, target)
 #   Allow managing a running domain
 define(`manage_domain', `
+	allow $1 domxen_t:domain getdomaininfo;
 	allow $1 $2:domain {
 		getdomaininfo
 		getvcpuinfo
