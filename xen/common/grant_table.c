@@ -2805,6 +2805,21 @@ acquire_grant_for_copy(
             act->trans_gref = trans_gref;
             act->mfn = grant_mfn;
         }
+        else if ( !mfn_eq(act->mfn, grant_mfn) ||
+                  act->src_domid != td->domain_id ||
+                  act->trans_gref != trans_gref ||
+                  (act->is_sub_page &&
+                   (!is_sub_page ||
+                    act->start != trans_page_off ||
+                    act->length != trans_length)) )
+        {
+            put_page(*page);
+            *page = NULL;
+            rc = GNTST_general_error;
+            goto unlock_out_clear;
+        }
+        else
+            ASSERT(act->domid == ldom);
     }
     else
     {
