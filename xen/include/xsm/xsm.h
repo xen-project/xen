@@ -62,7 +62,7 @@ struct xsm_ops {
     int (*set_target)(struct domain *d, struct domain *e);
     int (*domctl)(struct domain *d, struct xen_domctl *op);
 #ifdef CONFIG_SYSCTL
-    int (*sysctl)(int cmd);
+    int (*sysctl)(const struct xen_sysctl *op);
     int (*readconsole)(uint32_t clear);
 #endif
 
@@ -253,9 +253,9 @@ static inline int xsm_domctl(xsm_default_t def, struct domain *d,
 }
 
 #ifdef CONFIG_SYSCTL
-static inline int xsm_sysctl(xsm_default_t def, int cmd)
+static inline int xsm_sysctl(xsm_default_t def, const struct xen_sysctl *op)
 {
-    return alternative_call(xsm_ops.sysctl, cmd);
+    return alternative_call(xsm_ops.sysctl, op);
 }
 
 static inline int xsm_readconsole(xsm_default_t def, uint32_t clear)

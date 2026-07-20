@@ -905,9 +905,9 @@ static int cf_check flask_domctl(struct domain *d, struct xen_domctl *op)
 }
 
 #ifdef CONFIG_SYSCTL
-static int cf_check flask_sysctl(int cmd)
+static int cf_check flask_sysctl(const struct xen_sysctl *op)
 {
-    switch ( cmd )
+    switch ( op->cmd )
     {
     /* These have individual XSM hooks */
     case XEN_SYSCTL_readconsole:
@@ -979,7 +979,7 @@ static int cf_check flask_sysctl(int cmd)
                                     XEN2__COVERAGE_OP, NULL);
 
     default:
-        return avc_unknown_permission("sysctl", cmd);
+        return avc_unknown_permission("sysctl", op->cmd);
     }
 }
 
