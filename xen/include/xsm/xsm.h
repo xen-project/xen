@@ -122,8 +122,6 @@ struct xsm_ops {
     int (*get_device_group)(uint32_t machine_bdf);
 #endif
 
-    int (*resource_plug_core)(void);
-    int (*resource_unplug_core)(void);
     int (*resource_plug_pci)(uint32_t machine_bdf);
     int (*resource_unplug_pci)(uint32_t machine_bdf);
     int (*resource_setup_pci)(uint32_t machine_bdf);
@@ -505,16 +503,6 @@ static inline int xsm_resource_unplug_pci(
     xsm_default_t def, uint32_t machine_bdf)
 {
     return alternative_call(xsm_ops.resource_unplug_pci, machine_bdf);
-}
-
-static inline int xsm_resource_plug_core(xsm_default_t def)
-{
-    return alternative_call(xsm_ops.resource_plug_core);
-}
-
-static inline int xsm_resource_unplug_core(xsm_default_t def)
-{
-    return alternative_call(xsm_ops.resource_unplug_core);
 }
 
 static inline int xsm_resource_setup_pci(
