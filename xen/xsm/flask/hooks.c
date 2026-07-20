@@ -1207,6 +1207,7 @@ static int cf_check flask_pci_config_permission(
 
 }
 
+#if defined(CONFIG_SYSCTL) || defined(CONFIG_X86)
 static int cf_check flask_resource_plug_core(void)
 {
     return avc_current_has_perm(SECINITSID_DOMXEN, SECCLASS_RESOURCE, RESOURCE__PLUG, NULL);
@@ -1216,6 +1217,7 @@ static int cf_check flask_resource_unplug_core(void)
 {
     return avc_current_has_perm(SECINITSID_DOMXEN, SECCLASS_RESOURCE, RESOURCE__UNPLUG, NULL);
 }
+#endif /* CONFIG_SYSCTL || CONFIG_X86 */
 
 #ifdef CONFIG_SYSCTL
 static int flask_resource_use_core(void)
@@ -1536,12 +1538,13 @@ static int cf_check flask_platform_op(uint32_t op)
     switch ( op )
     {
 #ifdef CONFIG_X86
-    /* These operations have their own XSM hooks */
     case XENPF_cpu_online:
-    case XENPF_cpu_offline:
     case XENPF_cpu_hotadd:
     case XENPF_mem_hotadd:
-        return 0;
+        return flask_resource_plug_core();
+
+    case XENPF_cpu_offline:
+        return flask_resource_unplug_core();
 #endif
 
     case XENPF_settime32:
