@@ -61,6 +61,10 @@ static int flask_resource_plug_core(void);
 static int flask_resource_unplug_core(void);
 #endif
 
+#ifdef CONFIG_SYSCTL
+static int flask_resource_use_core(void);
+#endif
+
 static uint32_t domain_sid(const struct domain *dom)
 {
     struct domain_security_struct *dsec = dom->ssid;
@@ -914,10 +918,6 @@ static int cf_check flask_sysctl(const struct xen_sysctl *op)
 {
     switch ( op->cmd )
     {
-    /* These have individual XSM hooks */
-    case XEN_SYSCTL_page_offline_op:
-        return 0;
-
     case XEN_SYSCTL_readconsole:
         return domain_has_xen(current->domain,
                               XEN__READCONSOLE |
@@ -947,6 +947,23 @@ static int cf_check flask_sysctl(const struct xen_sysctl *op)
 
     case XEN_SYSCTL_pm_op:
         return domain_has_xen(current->domain, XEN__PM_OP);
+
+    case XEN_SYSCTL_page_offline_op:
+        switch ( op->u.page_offline.cmd )
+        {
+        case sysctl_page_offline:
+            return flask_resource_unplug_core();
+
+        case sysctl_page_online:
+            return flask_resource_plug_core();
+
+        case sysctl_query_page_offline:
+            return flask_resource_use_core();
+
+        default:
+            return avc_unknown_permission("page_offline",
+                                          op->u.page_offline.cmd);
+        }
 
     case XEN_SYSCTL_lockprof_op:
         return domain_has_xen(current->domain, XEN__LOCKPROF);
@@ -1343,23 +1360,6 @@ static int cf_check flask_resource_setup_misc(void)
 {
     return avc_current_has_perm(SECINITSID_XEN, SECCLASS_RESOURCE, RESOURCE__SETUP, NULL);
 }
-
-#ifdef CONFIG_SYSCTL
-static inline int cf_check flask_page_offline(uint32_t cmd)
-{
-    switch ( cmd )
-    {
-    case sysctl_page_offline:
-        return flask_resource_unplug_core();
-    case sysctl_page_online:
-        return flask_resource_plug_core();
-    case sysctl_query_page_offline:
-        return flask_resource_use_core();
-    default:
-        return avc_unknown_permission("page_offline", cmd);
-    }
-}
-#endif /* CONFIG_SYSCTL */
 
 static inline int cf_check flask_hypfs_op(void)
 {
@@ -2012,9 +2012,6 @@ static const struct xsm_ops __initconst_cf_clobber flask_ops = {
     .resource_setup_gsi = flask_resource_setup_gsi,
     .resource_setup_misc = flask_resource_setup_misc,
 
-#ifdef CONFIG_SYSCTL
-    .page_offline = flask_page_offline,
-#endif
     .hypfs_op = flask_hypfs_op,
     .hvm_param = flask_hvm_param,
     .hvm_param_altp2mhvm = flask_hvm_param_altp2mhvm,
