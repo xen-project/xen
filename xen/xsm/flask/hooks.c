@@ -894,12 +894,17 @@ static int cf_check flask_sysctl(const struct xen_sysctl *op)
     switch ( op->cmd )
     {
     /* These have individual XSM hooks */
-    case XEN_SYSCTL_readconsole:
     case XEN_SYSCTL_page_offline_op:
 #ifdef CONFIG_X86
     case XEN_SYSCTL_cpu_hotplug:
 #endif
         return 0;
+
+    case XEN_SYSCTL_readconsole:
+        return domain_has_xen(current->domain,
+                              XEN__READCONSOLE |
+                              (op->u.readconsole.clear ? XEN__CLEARCONSOLE
+                                                       : 0));
 
     case XEN_SYSCTL_tbuf_op:
         return domain_has_xen(current->domain, XEN__TBUFCONTROL);
@@ -969,16 +974,6 @@ static int cf_check flask_sysctl(const struct xen_sysctl *op)
     default:
         return avc_unknown_permission("sysctl", op->cmd);
     }
-}
-
-static int cf_check flask_readconsole(uint32_t clear)
-{
-    uint32_t perms = XEN__READCONSOLE;
-
-    if ( clear )
-        perms |= XEN__CLEARCONSOLE;
-
-    return domain_has_xen(current->domain, perms);
 }
 
 static inline uint32_t resource_to_perm(uint8_t access)
@@ -1902,7 +1897,6 @@ static const struct xsm_ops __initconst_cf_clobber flask_ops = {
     .set_target = flask_set_target,
     .domctl = flask_domctl,
     .sysctl = flask_sysctl,
-    .readconsole = flask_readconsole,
 
     .evtchn_unbound = flask_evtchn_unbound,
     .evtchn_interdomain = flask_evtchn_interdomain,
