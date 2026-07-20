@@ -273,6 +273,12 @@ Support for running qemu-xen device model in a linux stubdomain.
     Status, untrusted driver domains: Supported, not security supported
     Status, Liveupdate: Not functional
 
+## Guest boot loaders
+
+### Pygrub
+
+    Status: Supported, security supported only when run de-privileged
+
 ## Toolstack/3rd party
 
 ### libvirt driver for xl
