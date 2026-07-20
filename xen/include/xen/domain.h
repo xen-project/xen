@@ -159,9 +159,10 @@ struct vnuma_info {
 };
 
 #ifndef CONFIG_PV_SHIM_EXCLUSIVE
-void vnuma_destroy(struct vnuma_info *vnuma);
+void vnuma_replace(struct domain *d, struct vnuma_info *vnuma);
 #else
-static inline void vnuma_destroy(struct vnuma_info *vnuma) { ASSERT(!vnuma); }
+static inline void vnuma_replace(struct domain *d, struct vnuma_info *vnuma)
+{ ASSERT(!vnuma); }
 #endif
 
 extern bool vmtrace_available;

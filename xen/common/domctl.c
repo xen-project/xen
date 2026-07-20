@@ -153,7 +153,7 @@ void domctl_lock_release(void)
     spin_unlock(&current->domain->hypercall_deadlock_mutex);
 }
 
-void vnuma_destroy(struct vnuma_info *vnuma)
+static void vnuma_destroy(struct vnuma_info *vnuma)
 {
     if ( vnuma )
     {
@@ -163,6 +163,19 @@ void vnuma_destroy(struct vnuma_info *vnuma)
         xfree(vnuma->vnode_to_pnode);
         xfree(vnuma);
     }
+}
+
+/* Overwrite (replace) vnuma topology for a domain. */
+void vnuma_replace(struct domain *d, struct vnuma_info *vnuma)
+{
+    struct vnuma_info *old;
+
+    write_lock(&d->vnuma_rwlock);
+    old = d->vnuma;
+    d->vnuma = vnuma;
+    write_unlock(&d->vnuma_rwlock);
+
+    vnuma_destroy(old);
 }
 
 /*
@@ -908,12 +921,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             break;
         }
 
-        /* overwrite vnuma topology for domain. */
-        write_lock(&d->vnuma_rwlock);
-        vnuma_destroy(d->vnuma);
-        d->vnuma = vnuma;
-        write_unlock(&d->vnuma_rwlock);
-
+        vnuma_replace(d, vnuma);
         break;
     }
 
