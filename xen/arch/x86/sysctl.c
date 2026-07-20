@@ -118,20 +118,17 @@ long arch_do_sysctl(
     {
         unsigned int cpu = sysctl->u.cpu_hotplug.cpu;
         unsigned int op  = sysctl->u.cpu_hotplug.op;
-        bool plug;
         long (*fn)(void *);
         void *hcpu;
 
         switch ( op )
         {
         case XEN_SYSCTL_CPU_HOTPLUG_ONLINE:
-            plug = true;
             fn = cpu_up_helper;
             hcpu = _p(cpu);
             break;
 
         case XEN_SYSCTL_CPU_HOTPLUG_OFFLINE:
-            plug = false;
             fn = cpu_down_helper;
             hcpu = _p(cpu);
             break;
@@ -151,19 +148,14 @@ long arch_do_sysctl(
             if ( CONFIG_NR_CPUS <= 1 )
                 /* Mimic behavior of smt_up_down_helper(). */
                 return 0;
-            plug = op == XEN_SYSCTL_CPU_HOTPLUG_SMT_ENABLE;
             fn = smt_up_down_helper;
-            hcpu = _p(plug);
+            hcpu = _p(op == XEN_SYSCTL_CPU_HOTPLUG_SMT_ENABLE);
             break;
 
         default:
             ret = -EOPNOTSUPP;
             break;
         }
-
-        if ( !ret )
-            ret = plug ? xsm_resource_plug_core(XSM_HOOK)
-                       : xsm_resource_unplug_core(XSM_HOOK);
 
         if ( !ret )
             ret = continue_hypercall_on_cpu(0, fn, hcpu);
