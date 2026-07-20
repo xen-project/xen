@@ -77,8 +77,6 @@ static const struct xsm_ops __initconst_cf_clobber dummy_ops = {
     .get_device_group              = xsm_get_device_group,
 #endif
 
-    .resource_plug_core            = xsm_resource_plug_core,
-    .resource_unplug_core          = xsm_resource_unplug_core,
     .resource_plug_pci             = xsm_resource_plug_pci,
     .resource_unplug_pci           = xsm_resource_unplug_pci,
     .resource_setup_pci            = xsm_resource_setup_pci,
