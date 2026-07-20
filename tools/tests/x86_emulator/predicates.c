@@ -1945,7 +1945,7 @@ static const struct evex {
     { { 0x83 }, 2, T, R, pfx_66, W1, Ln }, /* vpmultishiftqb */
     { { 0x88 }, 2, T, R, pfx_66, Wn, Ln }, /* vpexpandp{s,d} */
     { { 0x89 }, 2, T, R, pfx_66, Wn, Ln }, /* vpexpand{d,q} */
-    { { 0x8a }, 2, T, W, pfx_66, Wn, Ln }, /* vpcompressp{s,d} */
+    { { 0x8a }, 2, T, W, pfx_66, Wn, Ln }, /* vcompressp{s,d} */
     { { 0x8b }, 2, T, W, pfx_66, Wn, Ln }, /* vpcompress{d,q} */
     { { 0x8d }, 2, F, R, pfx_66, Wn, Ln }, /* vperm{b,w} */
     { { 0x8f }, 2, F, R, pfx_66, W0, Ln }, /* vpshufbitqmb */
