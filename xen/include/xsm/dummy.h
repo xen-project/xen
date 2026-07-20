@@ -179,12 +179,6 @@ static XSM_INLINE int cf_check xsm_sysctl(
     return xsm_default_action(action, current->domain, NULL);
 }
 
-static XSM_INLINE int cf_check xsm_readconsole(XSM_DEFAULT_ARG uint32_t clear)
-{
-    XSM_ASSERT_ACTION(XSM_HOOK);
-    return xsm_default_action(action, current->domain, NULL);
-}
-
 static XSM_INLINE int cf_check xsm_alloc_security_domain(struct domain *d)
 {
     return 0;
