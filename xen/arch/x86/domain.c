@@ -1255,6 +1255,14 @@ int arch_set_info_guest(
 
     if ( !compat )
     {
+        v->arch.user_regs.r15               = c.nat->user_regs.r15;
+        v->arch.user_regs.r14               = c.nat->user_regs.r14;
+        v->arch.user_regs.r13               = c.nat->user_regs.r13;
+        v->arch.user_regs.r12               = c.nat->user_regs.r12;
+        v->arch.user_regs.r11               = c.nat->user_regs.r11;
+        v->arch.user_regs.r10               = c.nat->user_regs.r10;
+        v->arch.user_regs.r9                = c.nat->user_regs.r9;
+        v->arch.user_regs.r8                = c.nat->user_regs.r8;
         v->arch.user_regs.rbx               = c.nat->user_regs.rbx;
         v->arch.user_regs.rcx               = c.nat->user_regs.rcx;
         v->arch.user_regs.rdx               = c.nat->user_regs.rdx;
