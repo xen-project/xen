@@ -1282,7 +1282,8 @@ void console_end_sync(void)
  * This enforces a rate limit: not more than one kernel message
  * every printk_ratelimit_ms (millisecs).
  */
-int __printk_ratelimit(unsigned int ratelimit_ms, unsigned int ratelimit_burst)
+bool __printk_ratelimit(unsigned int ratelimit_ms,
+                        unsigned int ratelimit_burst)
 {
     static DEFINE_SPINLOCK(ratelimit_lock);
     static unsigned long toks = 10 * 5 * 1000;
@@ -1321,11 +1322,11 @@ int __printk_ratelimit(unsigned int ratelimit_ms, unsigned int ratelimit_burst)
             rspin_unlock(&console_lock);
         }
         local_irq_restore(flags);
-        return 1;
+        return true;
     }
     missed++;
     spin_unlock_irqrestore(&ratelimit_lock, flags);
-    return 0;
+    return false;
 }
 
 /* Minimum time in ms between messages */
@@ -1334,7 +1335,7 @@ static const unsigned int printk_ratelimit_ms = 5 * 1000;
 /* Number of messages we send before ratelimiting */
 static const unsigned int printk_ratelimit_burst = 10;
 
-int printk_ratelimit(void)
+bool printk_ratelimit(void)
 {
     return __printk_ratelimit(printk_ratelimit_ms, printk_ratelimit_burst);
 }

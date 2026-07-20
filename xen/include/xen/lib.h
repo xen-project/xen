@@ -82,9 +82,9 @@ extern void guest_printk(const struct domain *d, const char *fmt, ...)
     __attribute__ ((format (printf, 2, 3)));
 extern void noreturn panic(const char *fmt, ...)
     __attribute__ ((format (printf, 1, 2)));
-extern int __printk_ratelimit(unsigned int ratelimit_ms,
-                              unsigned int ratelimit_burst);
-extern int printk_ratelimit(void);
+extern bool __printk_ratelimit(unsigned int ratelimit_ms,
+                               unsigned int ratelimit_burst);
+extern bool printk_ratelimit(void);
 
 #define gprintk(lvl, fmt, args...) \
     printk(XENLOG_GUEST lvl "%pv " fmt, current, ## args)
