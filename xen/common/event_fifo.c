@@ -692,13 +692,11 @@ static int add_page_to_event_array(struct domain *d, unsigned long gfn)
 int evtchn_fifo_expand_array(const struct evtchn_expand_array *expand_array)
 {
     struct domain *d = current->domain;
-    int rc;
-
-    if ( !d->evtchn_fifo )
-        return -EOPNOTSUPP;
+    int rc = -EOPNOTSUPP;
 
     write_lock(&d->event_lock);
-    rc = add_page_to_event_array(d, expand_array->array_gfn);
+    if ( d->evtchn_fifo )
+        rc = add_page_to_event_array(d, expand_array->array_gfn);
     write_unlock(&d->event_lock);
 
     return rc;
