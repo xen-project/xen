@@ -961,7 +961,7 @@ int domain_kill(struct domain *d)
         d->is_dying = DOMDYING_dying;
         spin_barrier(&d->domain_lock);
         argo_destroy(d);
-        vnuma_destroy(d->vnuma);
+        vnuma_replace(d, NULL);
         domain_set_outstanding_pages(d, 0);
         /* fallthrough */
     case DOMDYING_dying:
