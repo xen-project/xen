@@ -60,7 +60,7 @@ struct xsm_ops {
     int (*sysctl_scheduler_op)(int op);
     int (*set_target)(struct domain *d, struct domain *e);
     int (*domctl)(struct domain *d, struct xen_domctl *op);
-    int (*sysctl)(int cmd);
+    int (*sysctl)(const struct xen_sysctl *op);
     int (*readconsole)(uint32_t clear);
 
     int (*evtchn_unbound)(struct domain *d, struct evtchn *chn, domid_t id2);
@@ -237,9 +237,9 @@ static inline int xsm_domctl(xsm_default_t def, struct domain *d,
     return alternative_call(xsm_ops.domctl, d, op);
 }
 
-static inline int xsm_sysctl(xsm_default_t def, int cmd)
+static inline int xsm_sysctl(xsm_default_t def, const struct xen_sysctl *op)
 {
-    return alternative_call(xsm_ops.sysctl, cmd);
+    return alternative_call(xsm_ops.sysctl, op);
 }
 
 static inline int xsm_readconsole(xsm_default_t def, uint32_t clear)
