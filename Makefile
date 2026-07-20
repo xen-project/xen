@@ -71,9 +71,6 @@ build-tools-oxenstored: build-tools-public-headers
 .PHONY: build-stubdom
 build-stubdom: mini-os-dir build-tools-public-headers
 	$(MAKE) -C stubdom build
-ifeq (x86_64,$(XEN_TARGET_ARCH))
-	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom pv-grub-if-enabled
-endif
 
 define do-subtree
 $(1)/%: FORCE
@@ -149,9 +146,6 @@ install-tools: install-tools-public-headers
 .PHONY: install-stubdom
 install-stubdom: mini-os-dir install-tools-public-headers
 	$(MAKE) -C stubdom install
-ifeq (x86_64,$(XEN_TARGET_ARCH))
-	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom install-grub-if-enabled
-endif
 
 .PHONY: tools/firmware/seabios-dir-force-update
 tools/firmware/seabios-dir-force-update:

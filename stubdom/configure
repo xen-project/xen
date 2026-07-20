@@ -630,8 +630,6 @@ POLARSSL_VERSION
 POLARSSL_URL
 GMP_VERSION
 GMP_URL
-GRUB_VERSION
-GRUB_URL
 LWIP_VERSION
 LWIP_URL
 NEWLIB_VERSION
@@ -660,7 +658,6 @@ extfiles
 debug
 xenstorepvh
 xenstore
-grub
 host_os
 host_vendor
 host_cpu
@@ -711,7 +708,6 @@ SHELL'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
-enable_pv_grub
 enable_xenstore_stubdom
 enable_xenstorepvh_stubdom
 enable_vtpm_stubdom
@@ -732,7 +728,6 @@ ZLIB_URL
 LIBPCI_URL
 NEWLIB_URL
 LWIP_URL
-GRUB_URL
 GMP_URL
 POLARSSL_URL
 TPMEMU_URL'
@@ -1358,7 +1353,6 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
-  --enable-pv-grub        Build and install pv-grub (default is DISABLED)
   --disable-xenstore-stubdom
                           Build and install xenstore-stubdom (default is
                           ENABLED)
@@ -1385,7 +1379,6 @@ Some influential environment variables:
   LIBPCI_URL  Download url for libpci
   NEWLIB_URL  Download url for newlib
   LWIP_URL    Download url for lwip
-  GRUB_URL    Download url for grub
   GMP_URL     Download url for libgmp
   POLARSSL_URL
               Download url for polarssl
@@ -2402,47 +2395,6 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 
 # Enable/disable stub domains
-
-# Check whether --enable-pv-grub was given.
-if test ${enable_pv_grub+y}
-then :
-  enableval=$enable_pv_grub;
-
-if test "x$enableval" = "xyes"
-then :
-
-
-grub=y
-STUBDOM_TARGETS="$STUBDOM_TARGETS grub"
-STUBDOM_BUILD="$STUBDOM_BUILD pv-grub"
-STUBDOM_INSTALL="$STUBDOM_INSTALL install-grub"
-STUBDOM_UNINSTALL="$STUBDOM_UNINSTALL install-grub"
-
-
-else $as_nop
-
-if test "x$enableval" = "xno"
-then :
-
-
-grub=n
-
-
-fi
-
-fi
-
-
-else $as_nop
-
-
-grub=n
-
-
-fi
-
-
-
 
 # Check whether --enable-xenstore-stubdom was given.
 if test ${enable_xenstore_stubdom+y}
@@ -4132,23 +4084,6 @@ fi
 
 fi
 LWIP_VERSION="1.3.0"
-
-
-
-
-
-if test "x$GRUB_URL" = "x"
-then :
-
-	if test "x$extfiles" = "xy"
-then :
-  GRUB_URL=\$\(XEN_EXTFILES_URL\)
-else $as_nop
-  GRUB_URL="https://alpha.gnu.org/gnu/grub"
-fi
-
-fi
-GRUB_VERSION="0.97"
 
 
 

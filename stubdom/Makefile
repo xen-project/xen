@@ -361,32 +361,6 @@ vtpmmgr-minios-config.mk: $(CURDIR)/vtpmmgr/minios.cfg
 vtpmmgr: cross-polarssl vtpmmgr-minios-config.mk
 	XEN_TARGET_ARCH="$(XEN_TARGET_ARCH)" CPPFLAGS="$(TARGET_CPPFLAGS) $(shell cat vtpmmgr-minios-config.mk)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@
 
-######
-# Grub
-######
-
-grub-$(GRUB_VERSION).tar.gz:
-	$(FETCHER) $@ $(GRUB_URL)/$@
-
-grub-upstream: grub-$(GRUB_VERSION).tar.gz
-	tar xzf $<
-	mv grub-$(GRUB_VERSION) $@
-	for i in grub.patches/* ; do \
-		patch -d $@ -p1 < $$i || exit 1; \
-	done
-
-grub/minios.gen.cfg: APP_LIBS = guest ctrl toollog
-grub/minios.gen.cfg: grub/minios.cfg Makefile
-	$(GEN_config) >$@
-
-grub-$(XEN_TARGET_ARCH)-minios-config.mk: grub/minios.gen.cfg
-	MINIOS_CONFIG="$(CURDIR)/$<" CONFIG_FILE="$(CURDIR)/$@" $(MAKE) DESTDIR= -C $(MINI_OS) config
-
-.PHONY: grub
-grub: cross-polarssl grub-upstream $(CROSS_ROOT) grub-$(XEN_TARGET_ARCH)-minios-config.mk
-	mkdir -p grub-$(XEN_TARGET_ARCH)
-	CPPFLAGS="$(TARGET_CPPFLAGS) $(shell cat grub-$(XEN_TARGET_ARCH)-minios-config.mk)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C $@ OBJ_DIR=$(CURDIR)/grub-$(XEN_TARGET_ARCH)
-
 ##########
 # xenstore
 ##########
@@ -429,17 +403,6 @@ vtpm-stubdom: mini-os-$(XEN_TARGET_ARCH)-vtpm vtpm
 vtpmmgr-stubdom: mini-os-$(XEN_TARGET_ARCH)-vtpmmgr vtpmmgr
 	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/vtpmmgr/minios.cfg" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS="$(CURDIR)/vtpmmgr/vtpmmgr.a" APP_LDLIBS="-lm -lpolarssl"
 
-.PHONY: pv-grub
-pv-grub: mini-os-$(XEN_TARGET_ARCH)-grub libxenguest grub
-	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/grub/minios.gen.cfg" $(MAKE) DESTDIR= -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS=$(CURDIR)/grub-$(XEN_TARGET_ARCH)/main.a
-
-.PHONY: pv-grub-if-enabled
-ifneq ($(filter grub,$(STUBDOM_TARGETS)),)
-pv-grub-if-enabled: pv-grub
-else
-pv-grub-if-enabled:
-endif
-
 XENSTORE_DEPS := libxenevtchn libxengnttab libxenmanage
 
 .PHONY: xenstore-stubdom
@@ -458,16 +421,6 @@ ifeq ($(STUBDOM_SUPPORTED),1)
 install: $(STUBDOM_INSTALL)
 else
 install:
-endif
-
-install-grub: pv-grub
-	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
-	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-grub/mini-os.gz "$(DESTDIR)$(XENFIRMWAREDIR)/pv-grub-$(XEN_TARGET_ARCH).gz"
-
-ifneq ($(filter grub,$(STUBDOM_TARGETS)),)
-install-grub-if-enabled: install-grub
-else
-install-grub-if-enabled:
 endif
 
 install-xenstore: xenstore-stubdom
@@ -500,9 +453,6 @@ else
 uninstall:
 endif
 
-uninstall-grub:
-	rm -f $(DESTDIR)$(XENFIRMWAREDIR)/pv-grub-$(XEN_TARGET_ARCH).gz
-
 uninstall-xenstore:
 	rm -f $(DESTDIR)$(XENFIRMWAREDIR)/xenstore-stubdom.gz
 
@@ -523,14 +473,12 @@ uninstall-vtpmmgr:
 .PHONY: clean
 clean: $(foreach lib,$(STUB_LIBS),clean-libxen$(lib))
 clean:
-	rm -fr mini-os-$(XEN_TARGET_ARCH)-grub
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-xenstore
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-xenstorepvh
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-vtpm
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-vtpmmgr
 	$(MAKE) -C vtpm clean
 	$(MAKE) -C vtpmmgr clean
-	rm -fr grub-$(XEN_TARGET_ARCH)
 	rm -f *-minios-config.mk
 	rm -f *.gen.cfg
 	rm -fr pkg-config
@@ -559,7 +507,6 @@ patchclean: crossclean
 	rm -fr polarssl-$(XEN_TARGET_ARCH)
 	rm -fr tpm_emulator-$(XEN_TARGET_ARCH)
 	rm -fr lwip-$(XEN_TARGET_ARCH)
-	rm -fr grub-upstream
 
 # clean downloads
 .PHONY: downloadclean
@@ -569,7 +516,6 @@ downloadclean: patchclean
 	rm -f gmp-$(GMP_VERSION).tar.bz2
 	rm -f tpm_emulator-$(TPMEMU_VERSION).tar.gz
 	rm -f pciutils-$(LIBPCI_VERSION).tar.bz2
-	rm -f grub-$(GRUB_VERSION).tar.gz
 	rm -f lwip-$(LWIP_VERSION).tar.gz
 	rm -f polarssl-$(POLARSSL_VERSION)-gpl.tgz
 
