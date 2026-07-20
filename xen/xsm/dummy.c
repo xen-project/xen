@@ -21,7 +21,6 @@ static const struct xsm_ops __initconst_cf_clobber dummy_ops = {
     .set_target                    = xsm_set_target,
     .domctl                        = xsm_domctl,
     .sysctl                        = xsm_sysctl,
-    .readconsole                   = xsm_readconsole,
 
     .evtchn_unbound                = xsm_evtchn_unbound,
     .evtchn_interdomain            = xsm_evtchn_interdomain,

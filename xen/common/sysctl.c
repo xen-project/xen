@@ -59,10 +59,6 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
     switch ( op->cmd )
     {
     case XEN_SYSCTL_readconsole:
-        ret = xsm_readconsole(XSM_HOOK, op->u.readconsole.clear);
-        if ( ret )
-            break;
-
         ret = read_console_ring(&op->u.readconsole);
         break;
 
