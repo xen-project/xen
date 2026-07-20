@@ -256,9 +256,7 @@ $(CROSS_ROOT): cross-newlib cross-zlib cross-libpci
 # libraries under tools/libs
 #######
 
-STUB_LIBS := toolcore toollog evtchn gnttab call foreignmemory devicemodel ctrl guest manage
-
-LIBDEP_guest := cross-zlib
+STUB_LIBS := toolcore toollog evtchn gnttab call foreignmemory devicemodel manage
 
 #######
 # common handling
