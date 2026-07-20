@@ -1922,12 +1922,24 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             goto vnumainfo_out;
         }
 
+        read_lock(&d->vnuma_rwlock);
+
+        /*
+         * Check d->vnuma again after re-acquiring the lock as we can race
+         * with domain destruction.
+         */
+        if ( !d->vnuma )
+        {
+            ASSERT(d->is_dying);
+            read_unlock(&d->vnuma_rwlock);
+            rc = -ESRCH;
+            goto vnumainfo_out;
+        }
+
         /*
          * Check if vnuma info has changed and if the allocated arrays
          * are not big enough.
          */
-        read_lock(&d->vnuma_rwlock);
-
         if ( dom_vnodes < d->vnuma->nr_vnodes ||
              dom_vranges < d->vnuma->nr_vmemranges ||
              dom_vcpus < d->max_vcpus )
