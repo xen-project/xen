@@ -606,7 +606,7 @@ static int flask_domctl_scheduler_op(struct domain *d, int op)
 }
 
 #ifdef CONFIG_SYSCTL
-static int cf_check flask_sysctl_scheduler_op(int op)
+static int flask_sysctl_scheduler_op(unsigned int op)
 {
     switch ( op )
     {
@@ -880,7 +880,6 @@ static int cf_check flask_sysctl(const struct xen_sysctl *op)
     case XEN_SYSCTL_readconsole:
     case XEN_SYSCTL_getdomaininfolist:
     case XEN_SYSCTL_page_offline_op:
-    case XEN_SYSCTL_scheduler_op:
 #ifdef CONFIG_X86
     case XEN_SYSCTL_cpu_hotplug:
 #endif
@@ -915,6 +914,9 @@ static int cf_check flask_sysctl(const struct xen_sysctl *op)
 
     case XEN_SYSCTL_cpupool_op:
         return domain_has_xen(current->domain, XEN__CPUPOOL_OP);
+
+    case XEN_SYSCTL_scheduler_op:
+        return flask_sysctl_scheduler_op(op->u.scheduler_op.cmd);
 
     case XEN_SYSCTL_physinfo:
     case XEN_SYSCTL_cputopoinfo:
@@ -1895,9 +1897,6 @@ static const struct xsm_ops __initconst_cf_clobber flask_ops = {
     .security_domaininfo = flask_security_domaininfo,
     .domain_create = flask_domain_create,
     .getdomaininfo = flask_getdomaininfo,
-#ifdef CONFIG_SYSCTL
-    .sysctl_scheduler_op = flask_sysctl_scheduler_op,
-#endif
     .set_target = flask_set_target,
     .domctl = flask_domctl,
 #ifdef CONFIG_SYSCTL
