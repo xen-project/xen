@@ -6236,9 +6236,11 @@ x86_emulate(
             ASSERT(op_bytes == n * elem_bytes);
             op_mask &= ~0ULL >> (64 - n);
             n = hweight64(op_mask);
-            op_bytes = n * elem_bytes;
             if ( n )
+            {
+                op_bytes = n * elem_bytes;
                 op_mask = ~0ULL >> (64 - n);
+            }
         }
         goto simd_zmm;
 
