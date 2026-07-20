@@ -187,10 +187,6 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         if ( op->u.page_offline.end < op->u.page_offline.start )
             break;
 
-        ret = xsm_page_offline(XSM_HOOK, op->u.page_offline.cmd);
-        if ( ret )
-            break;
-
         ptr = status = xmalloc_array(uint32_t,
                                      (op->u.page_offline.end -
                                       op->u.page_offline.start + 1));
