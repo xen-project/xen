@@ -177,7 +177,6 @@ config XEN_IBT
 
 config SHADOW_PAGING
 	bool "Shadow Paging"
-	default !PV_SHIM_EXCLUSIVE
 	depends on PV || HVM
 	help
 
@@ -193,7 +192,8 @@ config SHADOW_PAGING
           Under a small number of specific workloads, shadow paging may be
           deliberately used as a performance optimisation.
 
-          If unsure, say Y.
+	  NOTE: This feature is now deprecated. It is in particular no longer
+	        security supported.
 
 config BIGMEM
 	bool "big memory support"

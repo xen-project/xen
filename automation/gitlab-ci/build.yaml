@@ -312,11 +312,15 @@ debian-12-x86_64-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
     CONTAINER: debian:12-x86_64
+    EXTRA_XEN_CONFIG: |
+      CONFIG_SHADOW_PAGING=y
 
 debian-12-x86_64-clang-debug:
   extends: .clang-x86-64-build-debug
   variables:
     CONTAINER: debian:12-x86_64
+    EXTRA_XEN_CONFIG: |
+      CONFIG_SHADOW_PAGING=y
 
 debian-12-ppc64le-gcc-debug:
   extends: .gcc-ppc64le-cross-build-debug
