@@ -128,7 +128,6 @@ struct xsm_ops {
     int (*resource_setup_gsi)(int gsi);
     int (*resource_setup_misc)(void);
 
-    int (*page_offline)(uint32_t cmd);
     int (*hypfs_op)(void);
 
     long (*do_xsm_op)(XEN_GUEST_HANDLE_PARAM(void) op);
@@ -519,11 +518,6 @@ static inline int xsm_resource_setup_gsi(xsm_default_t def, int gsi)
 static inline int xsm_resource_setup_misc(xsm_default_t def)
 {
     return alternative_call(xsm_ops.resource_setup_misc);
-}
-
-static inline int xsm_page_offline(xsm_default_t def, uint32_t cmd)
-{
-    return alternative_call(xsm_ops.page_offline, cmd);
 }
 
 static inline int xsm_hypfs_op(xsm_default_t def)
