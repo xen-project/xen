@@ -878,7 +878,6 @@ static int cf_check flask_sysctl(const struct xen_sysctl *op)
     {
     /* These have individual XSM hooks */
     case XEN_SYSCTL_readconsole:
-    case XEN_SYSCTL_getdomaininfolist:
     case XEN_SYSCTL_page_offline_op:
 #ifdef CONFIG_X86
     case XEN_SYSCTL_cpu_hotplug:
@@ -924,6 +923,9 @@ static int cf_check flask_sysctl(const struct xen_sysctl *op)
     case XEN_SYSCTL_pcitopoinfo:
     case XEN_SYSCTL_get_cpu_policy:
         return domain_has_xen(current->domain, XEN__PHYSINFO);
+
+    case XEN_SYSCTL_getdomaininfolist:
+        return flask_getdomaininfo(dom_xen);
 
     case XEN_SYSCTL_psr_cmt_op:
         return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
