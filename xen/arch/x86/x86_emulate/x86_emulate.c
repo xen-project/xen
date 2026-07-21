@@ -7350,7 +7350,7 @@ x86_emulate(
         if ( evex_encoded() )
         {
             generate_exception_if((evex.w || evex.reg != 0xf || !evex.RX ||
-                                   (ea.type != OP_REG && (evex.z || evex.brs))),
+                                   (ea.type != OP_REG && evex.brs)),
                                   X86_EXC_UD);
             host_and_vcpu_must_have(avx512f);
             avx512_vlen_check(false);
