@@ -223,7 +223,7 @@ F:	tools/libacpi/
 AMD IOMMU
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Andrew Cooper <andrew.cooper3@citrix.com>
-M:	Roger Pau Monné <roger.pau@citrix.com>
+M:	Roger Pau Monné <roger@xenproject.org>
 R:	Jason Andryuk <jason.andryuk@amd.com>
 R:	Teddy Astie <teddy.astie@vates.tech>
 S:	Supported
@@ -232,7 +232,7 @@ F:	xen/drivers/passthrough/amd/
 AMD SVM
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Andrew Cooper <andrew.cooper3@citrix.com>
-M:	Roger Pau Monné <roger.pau@citrix.com>
+M:	Roger Pau Monné <roger@xenproject.org>
 R:	Jason Andryuk <jason.andryuk@amd.com>
 R:	Teddy Astie <teddy.astie@vates.tech>
 S:	Supported
@@ -379,7 +379,7 @@ F:	xen/arch/x86/tboot.c
 
 IOMMU VENDOR INDEPENDENT CODE
 M:	Jan Beulich <jbeulich@suse.com>
-R:	Roger Pau Monné <roger.pau@citrix.com>
+R:	Roger Pau Monné <roger@xenproject.com>
 S:	Supported
 F:	xen/drivers/passthrough/
 X:	xen/drivers/passthrough/amd/
@@ -426,7 +426,7 @@ F:	tools/include/xentoollog.h
 F:	tools/libs/
 
 LIVEPATCH
-M:	Roger Pau Monné <roger.pau@citrix.com>
+M:	Roger Pau Monné <roger@xenproject.org>
 M:	Ross Lagerwall <ross.lagerwall@citrix.com>
 S:	Supported
 F:	docs/misc/livepatch.pandoc
@@ -589,7 +589,7 @@ F:	xen/include/*/monitor.h
 F:	xen/include/*/vm_event.h
 
 VPCI
-M:	Roger Pau Monné <roger.pau@citrix.com>
+M:	Roger Pau Monné <roger@xenproject.org>
 R:	Stewart Hildebrand <stewart.hildebrand@amd.com>
 S:	Supported
 F:	tools/tests/vpci/
@@ -609,7 +609,7 @@ F:	docs/misc/vtpm-platforms.txt
 X86 ARCHITECTURE
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Andrew Cooper <andrew.cooper3@citrix.com>
-M:	Roger Pau Monné <roger.pau@citrix.com>
+M:	Roger Pau Monné <roger@xenproject.org>
 R:	Teddy Astie <teddy.astie@vates.tech>
 S:	Supported
 L:	xen-devel@lists.xenproject.org
@@ -694,7 +694,7 @@ M:	Anthony PERARD <anthony.perard@vates.tech>
 M:	Michal Orzel <michal.orzel@amd.com>
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Julien Grall <julien@xen.org>
-M:	Roger Pau Monné <roger.pau@citrix.com>
+M:	Roger Pau Monné <roger@xenproject.org>
 M:	Stefano Stabellini <sstabellini@kernel.org>
 L:	xen-devel@lists.xenproject.org
 S:	Supported
