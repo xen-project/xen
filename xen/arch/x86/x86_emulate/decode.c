@@ -1082,7 +1082,7 @@ int x86emul_decode(struct x86_emulate_state *s,
 
     /* Opcode byte(s). */
     d = opcode_table[b];
-    if ( d == 0 && b == 0x0f )
+    if ( b == 0x0f )
     {
         /* Two-byte opcode. */
         b = insn_fetch_type(uint8_t);
