@@ -762,10 +762,16 @@ rt_switch_sched(struct scheduler *new_ops, unsigned int cpu,
     return &prv->lock;
 }
 
-static void move_repl_timer(struct rt_private *prv, unsigned int old_cpu)
+static void move_repl_timer(const struct scheduler *ops, unsigned int old_cpu)
 {
-    cpumask_t *online = get_sched_res(old_cpu)->cpupool->res_valid;
-    unsigned int new_cpu = cpumask_cycle(old_cpu, online);
+    struct rt_private *prv = rt_priv(ops);
+    /*
+     * Use the cpupool of the scheduler: the one of the scheduling resource
+     * is already cleared when this is called from rt_deinit_pdata().
+     */
+    const struct cpupool *c = ops->cpupool;
+    unsigned int new_cpu = c ? cpumask_cycle(old_cpu, c->res_valid)
+                             : nr_cpu_ids;
 
     /*
      * Make sure the timer run on one of the cpus that are still available
@@ -792,7 +798,7 @@ rt_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     spin_lock_irqsave(&prv->lock, flags);
 
     if ( prv->repl_timer.cpu == cpu )
-        move_repl_timer(prv, cpu);
+        move_repl_timer(ops, cpu);
 
     spin_unlock_irqrestore(&prv->lock, flags);
 }
@@ -810,7 +816,7 @@ rt_move_timers(const struct scheduler *ops, struct sched_resource *sr)
     if ( prv->repl_timer.status != TIMER_STATUS_invalid &&
          prv->repl_timer.status != TIMER_STATUS_killed &&
          !cpumask_test_cpu(old_cpu, sr->cpupool->res_valid) )
-        move_repl_timer(prv, old_cpu);
+        move_repl_timer(ops, old_cpu);
 
     spin_unlock_irqrestore(&prv->lock, flags);
 }
