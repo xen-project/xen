@@ -71,6 +71,10 @@ struct grant_table {
     unsigned int          nr_grant_frames;
     /* Number of grant status frames shared with guest (for version 2) */
     unsigned int          nr_status_frames;
+
+    /* Number of version 2 operations in progress. */
+    atomic_t              nr_v2_ops;
+
     /*
      * Number of available maptrack entries.  For cleanup purposes it is
      * important to realize that this field and @maptrack further down will
@@ -933,6 +937,9 @@ static void reduce_status_for_pin(struct domain *rd,
 {
     unsigned int clear_flags = act->pin ? 0 : GTF_reading;
 
+    if ( unlikely(!status) )
+        return;
+
     if ( !readonly && !(act->pin & (GNTPIN_hstw_mask | GNTPIN_devw_mask)) )
         clear_flags |= GTF_writing;
 
@@ -1341,6 +1348,22 @@ map_grant_ref(
 
     grant_read_lock(rgt);
 
+    if ( unlikely(evaluate_nospec((rgt->gt_version == 1) !=
+                                  (status == &shah->flags))) )
+    {
+        /*
+         * After a v1 -> v2 change behind our backs "ref" may now be out of
+         * bounds.  Recalculate it, but only for reserved entries.  Others
+         * will have been cleared anyway by the version change.
+         */
+        if ( ref < GNTTAB_NR_RESERVED_ENTRIES )
+            status = evaluate_nospec(rgt->gt_version == 1)
+                     ? &shah->flags
+                     : &status_entry(rgt, ref);
+        else
+            status = NULL;
+    }
+
     act = active_entry_acquire(rgt, op->ref);
     act->pin -= pin_incr;
 
@@ -1584,9 +1607,8 @@ unmap_common_complete(struct gnttab_unmap_common *op)
     struct domain *ld, *rd = op->rd;
     struct grant_table *rgt;
     struct active_grant_entry *act;
-    grant_entry_header_t *sha;
     struct page_info *pg;
-    uint16_t *status;
+    uint16_t *status = NULL;
 
     if ( evaluate_nospec(!op->done) )
     {
@@ -1602,11 +1624,10 @@ unmap_common_complete(struct gnttab_unmap_common *op)
     grant_read_lock(rgt);
 
     act = active_entry_acquire(rgt, op->ref);
-    sha = shared_entry_header(rgt, op->ref);
 
     if ( evaluate_nospec(rgt->gt_version == 1) )
-        status = &sha->flags;
-    else
+        status = &shared_entry_v1(rgt, op->ref).flags;
+    else if ( evaluate_nospec(op->ref < nr_grant_entries(rgt)) )
         status = &status_entry(rgt, op->ref);
 
     pg = !is_iomem_page(act->mfn) ? mfn_to_page(op->mfn) : NULL;
@@ -2195,14 +2216,14 @@ gnttab_query_size(
  * Check that the given grant reference (rd,ref) allows 'ld' to transfer
  * ownership of a page frame. If so, lock down the grant entry.
  */
-static int
+static unsigned int
 gnttab_prepare_for_transfer(
     struct domain *rd, struct domain *ld, grant_ref_t ref)
 {
     struct grant_table *rgt = rd->grant_table;
     uint32_t *raw_shah;
     union grant_combo scombo;
-    int                 retries = 0;
+    unsigned int retries = 0, ver;
 
     grant_read_lock(rgt);
 
@@ -2247,8 +2268,11 @@ gnttab_prepare_for_transfer(
         scombo = prev;
     }
 
+    ver = rgt->gt_version;
+
     grant_read_unlock(rgt);
-    return 1;
+
+    return ver;
 
  fail:
     grant_read_unlock(rgt);
@@ -2273,7 +2297,7 @@ gnttab_transfer(
 
     for ( i = 0; i < count; i++ )
     {
-        bool okay;
+        unsigned int ver;
         int rc;
 
         if ( i && hypercall_preempt_check() )
@@ -2413,14 +2437,14 @@ gnttab_transfer(
          * pagelist.
          */
         nrspin_unlock(&e->page_alloc_lock);
-        okay = gnttab_prepare_for_transfer(e, d, gop.ref);
+        ver = gnttab_prepare_for_transfer(e, d, gop.ref);
 
         /*
          * Make sure the reference bound check in gnttab_prepare_for_transfer
          * is respected and speculative execution is blocked accordingly
          */
-        if ( unlikely(!evaluate_nospec(okay)) ||
-            unlikely(assign_pages(page, 1, e, MEMF_no_refcount)) )
+        if ( unlikely(!evaluate_nospec(ver)) ||
+             unlikely(assign_pages(page, 1, e, MEMF_no_refcount)) )
         {
             bool drop_dom_ref;
 
@@ -2432,7 +2456,7 @@ gnttab_transfer(
             drop_dom_ref = !domain_adjust_tot_pages(e, -1);
             nrspin_unlock(&e->page_alloc_lock);
 
-            if ( okay /* i.e. e->is_dying due to the surrounding if() */ )
+            if ( ver /* i.e. e->is_dying due to the surrounding if() */ )
                 gdprintk(XENLOG_INFO, "Transferee d%d is now dying\n",
                          e->domain_id);
 
@@ -2452,7 +2476,13 @@ gnttab_transfer(
         grant_read_lock(e->grant_table);
         act = active_entry_acquire(e->grant_table, gop.ref);
 
-        if ( evaluate_nospec(e->grant_table->gt_version == 1) )
+        if ( unlikely(evaluate_nospec(e->grant_table->gt_version != ver)) )
+        {
+            rc = -EILSEQ;
+            goto release;
+        }
+
+        if ( evaluate_nospec(ver == 1) )
         {
             grant_entry_v1_t *sha = &shared_entry_v1(e->grant_table, gop.ref);
 
@@ -2472,6 +2502,7 @@ gnttab_transfer(
         shared_entry_header(e->grant_table, gop.ref)->flags |=
             GTF_transfer_completed;
 
+    release:
         active_entry_release(act);
         grant_read_unlock(e->grant_table);
 
@@ -2500,28 +2531,27 @@ release_grant_for_copy(
     struct domain *rd, grant_ref_t gref, bool readonly)
 {
     struct grant_table *rgt = rd->grant_table;
-    grant_entry_header_t *sha;
     struct active_grant_entry *act;
     mfn_t mfn;
-    uint16_t *status;
+    uint16_t *status = NULL;
     grant_ref_t trans_gref;
     struct domain *td;
 
     grant_read_lock(rgt);
 
     act = active_entry_acquire(rgt, gref);
-    sha = shared_entry_header(rgt, gref);
     mfn = act->mfn;
 
     if ( evaluate_nospec(rgt->gt_version == 1) )
     {
-        status = &sha->flags;
+        status = &shared_entry_v1(rgt, gref).flags;
         td = rd;
         trans_gref = gref;
     }
     else
     {
-        status = &status_entry(rgt, gref);
+        if ( evaluate_nospec(gref < nr_grant_entries(rgt)) )
+            status = &status_entry(rgt, gref);
         td = (act->src_domid == rd->domain_id)
              ? rd : knownalive_domain_from_domid(act->src_domid);
         trans_gref = act->trans_gref;
@@ -2539,6 +2569,9 @@ release_grant_for_copy(
     }
 
     reduce_status_for_pin(rd, act, status, readonly);
+
+    if ( !act->pin && act->is_sub_page )
+        atomic_dec(&rgt->nr_v2_ops);
 
     active_entry_release(act);
     grant_read_unlock(rgt);
@@ -2671,8 +2704,10 @@ acquire_grant_for_copy(
 
         /*
          * acquire_grant_for_copy() will take the lock on the remote table,
-         * so we have to drop the lock here and reacquire.
+         * so we have to drop the lock here and reacquire.  Before doing so,
+         * record that a v2 operation is in progress.
          */
+        atomic_inc(&rgt->nr_v2_ops);
         active_entry_release(act);
         grant_read_unlock(rgt);
 
@@ -2686,6 +2721,7 @@ acquire_grant_for_copy(
 
         if ( rc != GNTST_okay )
         {
+            atomic_dec(&rgt->nr_v2_ops);
             rcu_unlock_domain(td);
             reduce_status_for_pin(rd, act, status, readonly);
             active_entry_release(act);
@@ -2722,6 +2758,8 @@ acquire_grant_for_copy(
             rcu_unlock_domain(td);
 
             grant_read_lock(rgt);
+            atomic_dec(&rgt->nr_v2_ops);
+
             act = active_entry_acquire(rgt, gref);
             reduce_status_for_pin(rd, act, status, readonly);
             active_entry_release(act);
@@ -2748,6 +2786,8 @@ acquire_grant_for_copy(
              */
             act->is_sub_page = true;
         }
+        else
+            atomic_dec(&rgt->nr_v2_ops);
     }
     else if ( !old_pin ||
               (!readonly && !(old_pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask))) )
@@ -2802,6 +2842,9 @@ acquire_grant_for_copy(
             act->src_domid = td->domain_id;
             act->trans_gref = trans_gref;
             act->mfn = grant_mfn;
+
+            if ( is_sub_page )
+                atomic_inc(&rgt->nr_v2_ops);
         }
         else if ( !mfn_eq(act->mfn, grant_mfn) ||
                   act->src_domid != td->domain_id ||
@@ -3231,7 +3274,17 @@ gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t) uop)
         if ( res < 0)
             goto out_unlock;
         break;
+
     case 2:
+        if ( atomic_read(&gt->nr_v2_ops) )
+        {
+            gdprintk(XENLOG_WARNING,
+                     "tried to change to grant table v1, but %d v2 operations still in progress\n",
+                     atomic_read(&gt->nr_v2_ops));
+            res = -EAGAIN;
+            goto out_unlock;
+        }
+
         for ( i = 0; i < GNTTAB_NR_RESERVED_ENTRIES; i++ )
         {
             switch ( shared_entry_v2(gt, i).hdr.flags & GTF_type_mask )
