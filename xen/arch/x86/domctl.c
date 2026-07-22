@@ -728,12 +728,14 @@ long arch_do_domctl(
                    "ioport_map:remove: %pd gport=%x mport=%x nr=%x\n",
                    d, fgp, fmp, np);
 
+            ret = -ENOENT;
             write_lock(&hvm->g2m_ioport_lock);
             list_for_each_entry(g2m_ioport, &hvm->g2m_ioport_list, list)
-                if ( g2m_ioport->mport == fmp )
+                if ( g2m_ioport->mport == fmp && g2m_ioport->np == np )
                 {
                     list_del(&g2m_ioport->list);
                     xfree(g2m_ioport);
+                    ret = 0;
                     break;
                 }
             write_unlock(&hvm->g2m_ioport_lock);
@@ -746,14 +748,21 @@ long arch_do_domctl(
 
             write_lock(&hvm->g2m_ioport_lock);
             list_for_each_entry(g2m_ioport, &hvm->g2m_ioport_list, list)
-                if (g2m_ioport->mport == fmp )
+            {
+                if ( g2m_ioport->mport == fmp && g2m_ioport->np == np )
                 {
                     g2m_ioport->gport = fgp;
-                    g2m_ioport->np = np;
                     found = 1;
                     break;
                 }
-            if ( !found )
+                if ( fmp + np >= g2m_ioport->mport &&
+                     g2m_ioport->mport + g2m_ioport->np >= fmp )
+                {
+                    ret = -EBUSY;
+                    break;
+                }
+            }
+            if ( !found && !ret )
             {
                 g2m_ioport = xmalloc(struct g2m_ioport);
                 if ( !g2m_ioport )
