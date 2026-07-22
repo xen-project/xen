@@ -9,6 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Changed
  - XEN_DOMCTL_DEV_DT's, FLASK_[GS]ETBOOL's, and FLASK_DEVICETREE_LABEL's input
    string sizes need to include the nul terminator.
+ - On x86:
+   - XEN_DOMCTL_ioport_mapping no longer implicitly grants or revokes
+     permissions for the port range in question.
+     XEN_DOMCTL_ioport_permission now needs invoking up front /
+     afterwards.
 
 ### Added
 

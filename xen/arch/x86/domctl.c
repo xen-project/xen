@@ -714,15 +714,35 @@ long arch_do_domctl(
             break;
 
         hvm = &d->arch.hvm;
-        iocaps_double_lock(d, true);
+        /*
+         * NB: The double lock isn't really needed when !add, but is used anyway
+         * to keep things simple.
+         */
+        iocaps_double_lock(d, false);
 
         if ( !ioports_access_permitted(currd, fmp, fmp + np - 1) )
             ret = -EPERM;
-        else if ( add )
+        else if ( !add )
         {
             printk(XENLOG_G_INFO
-                   "ioport_map:add: dom%d gport=%x mport=%x nr=%x\n",
-                   d->domain_id, fgp, fmp, np);
+                   "ioport_map:remove: %pd gport=%x mport=%x nr=%x\n",
+                   d, fgp, fmp, np);
+
+            write_lock(&hvm->g2m_ioport_lock);
+            list_for_each_entry(g2m_ioport, &hvm->g2m_ioport_list, list)
+                if ( g2m_ioport->mport == fmp )
+                {
+                    list_del(&g2m_ioport->list);
+                    xfree(g2m_ioport);
+                    break;
+                }
+            write_unlock(&hvm->g2m_ioport_lock);
+        }
+        else if ( ioports_access_permitted(d, fmp, fmp + np - 1) )
+        {
+            printk(XENLOG_G_INFO
+                   "ioport_map:add: %pd gport=%x mport=%x nr=%x\n",
+                   d, fgp, fmp, np);
 
             write_lock(&hvm->g2m_ioport_lock);
             list_for_each_entry(g2m_ioport, &hvm->g2m_ioport_list, list)
@@ -747,40 +767,11 @@ long arch_do_domctl(
                 list_add_tail(&g2m_ioport->list, &hvm->g2m_ioport_list);
             }
             write_unlock(&hvm->g2m_ioport_lock);
-            if ( !ret )
-                ret = ioports_permit_access(d, fmp, fmp + np - 1);
-            if ( ret && !found && g2m_ioport )
-            {
-                write_lock(&hvm->g2m_ioport_lock);
-                list_del(&g2m_ioport->list);
-                write_unlock(&hvm->g2m_ioport_lock);
-                xfree(g2m_ioport);
-            }
         }
         else
-        {
-            printk(XENLOG_G_INFO
-                   "ioport_map:remove: dom%d gport=%x mport=%x nr=%x\n",
-                   d->domain_id, fgp, fmp, np);
+            ret = -EPERM;
 
-            write_lock(&hvm->g2m_ioport_lock);
-            list_for_each_entry(g2m_ioport, &hvm->g2m_ioport_list, list)
-                if ( g2m_ioport->mport == fmp )
-                {
-                    list_del(&g2m_ioport->list);
-                    xfree(g2m_ioport);
-                    break;
-                }
-            write_unlock(&hvm->g2m_ioport_lock);
-
-            ret = ioports_deny_access(d, fmp, fmp + np - 1);
-            if ( ret && is_hardware_domain(currd) )
-                printk(XENLOG_ERR
-                       "ioport_map: error %ld denying dom%d access to [%x,%x]\n",
-                       ret, d->domain_id, fmp, fmp + np - 1);
-        }
-
-        iocaps_double_unlock(d, true);
+        iocaps_double_unlock(d, false);
         break;
     }
 
