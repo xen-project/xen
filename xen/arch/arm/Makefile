@@ -117,7 +117,7 @@ $(TARGET)-syms: $(objtree)/prelink.o $(obj)/xen.lds
 	$(NM) -pa --format=sysv $@ \
 		| $(objtree)/tools/symbols --all-symbols --xensyms --sysv --sort \
 		> $@.map
-	rm -f $(@D)/.$(@F).[0-9]*
+	rm -f $(dot-target).[0-9]* $(@D)/..$(@F).[0-9]*
 
 .PHONY: include
 include:
