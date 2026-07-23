@@ -659,6 +659,7 @@ XENSTORE
 M:	Juergen Gross <jgross@suse.com>
 R:	Julien Grall <julien@xen.org>
 S:	Supported
+F:	docs/*/xenstore*
 F:	tools/helpers/init-xenstore-domain.c
 F:	tools/include/xenstore-compat/
 F:	tools/include/xenstore.h
