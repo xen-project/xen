@@ -564,6 +564,16 @@ address written in one of these paths to, for example, establish a VNC
 session to the guest (although clearly some level of trust is placed
 in the value supplied by the guest in this case).
 
+#### ~/attr/vif/$DEVID/ipv4/$INDEX/prefix = INTEGER [w]
+#### ~/attr/vif/$DEVID/ipv6/$INDEX/prefix = INTEGER [w]
+
+Paths of this form may be written by the guest to indicate the network
+prefix length of the IP address at the corresponding $INDEX.
+
+An IPv4 prefix value can be in the range of 0 to 32.
+
+An IPv6 prefix value can be in the range of 0 to 128.
+
 #### ~/error [w]
 
 A domain writable path used by some PV drivers to pass error messages
