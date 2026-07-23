@@ -8039,12 +8039,13 @@ void sched_process(struct pcpu_info *p)
             if(opt.dump_all) {
                 struct {
                     unsigned int vcpuid:16, domid:16;
+                    uint32_t priority_level;
                     uint64_t cur_dl, cur_bg;
                 } __attribute__((packed)) *r = (typeof(r))ri->d;
 
                 printf(" %s rtds:repl_budget d%uv%u, deadline = %"PRIu64", "
-                       "budget = %"PRIu64"\n", ri->dump_header,
-                       r->domid, r->vcpuid, r->cur_dl, r->cur_bg);
+                       "budget = %"PRIu64", priority = %u\n", ri->dump_header,
+                       r->domid, r->vcpuid, r->cur_dl, r->cur_bg, r->priority_level);
             }
             break;
         case TRC_SCHED_CLASS_EVT(RTDS, 5): /* SCHED_TASKLET    */
