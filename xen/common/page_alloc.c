@@ -1538,8 +1538,13 @@ static bool mark_page_free(struct page_info *pg, mfn_t mfn)
         BUG();
     }
 
-    /* If a page has no owner it will need no safety TLB flush. */
-    pg->u.free.need_tlbflush = (page_get_owner(pg) != NULL);
+    /*
+     * If a page has no owner and there's no PV domain support it does not need
+     * a safety TLB flush.  PV domains are the only domain types that can keep
+     * stale entries on the TLB, as they have (limited) control over the host
+     * MMU and when flushes are performed.
+     */
+    pg->u.free.need_tlbflush = IS_ENABLED(CONFIG_PV) && page_get_owner(pg);
     if ( pg->u.free.need_tlbflush )
         page_set_tlbflush_timestamp(pg);
 
