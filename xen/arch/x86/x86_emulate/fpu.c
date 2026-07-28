@@ -96,13 +96,13 @@ int x86emul_fpu(struct x86_emulate_state *s,
         unsigned long dummy;
 
     case 0x9b:  /* wait/fwait */
-        host_and_vcpu_must_have(fpu);
+        vcpu_must_have(fpu);
         get_fpu(X86EMUL_FPU_wait);
         emulate_fpu_insn_stub(b);
         break;
 
     case 0xd8: /* FPU 0xd8 */
-        host_and_vcpu_must_have(fpu);
+        vcpu_must_have(fpu);
         get_fpu(X86EMUL_FPU_fpu);
         switch ( s->modrm )
         {
@@ -128,7 +128,7 @@ int x86emul_fpu(struct x86_emulate_state *s,
         break;
 
     case 0xd9: /* FPU 0xd9 */
-        host_and_vcpu_must_have(fpu);
+        vcpu_must_have(fpu);
         get_fpu(X86EMUL_FPU_fpu);
         switch ( s->modrm )
         {
@@ -229,7 +229,7 @@ int x86emul_fpu(struct x86_emulate_state *s,
         break;
 
     case 0xda: /* FPU 0xda */
-        host_and_vcpu_must_have(fpu);
+        vcpu_must_have(fpu);
         get_fpu(X86EMUL_FPU_fpu);
         switch ( s->modrm )
         {
@@ -250,7 +250,7 @@ int x86emul_fpu(struct x86_emulate_state *s,
         break;
 
     case 0xdb: /* FPU 0xdb */
-        host_and_vcpu_must_have(fpu);
+        vcpu_must_have(fpu);
         get_fpu(X86EMUL_FPU_fpu);
         switch ( s->modrm )
         {
@@ -279,7 +279,7 @@ int x86emul_fpu(struct x86_emulate_state *s,
             case 0: /* fild m32i */
                 goto fpu_memsrc32;
             case 1: /* fisttp m32i */
-                host_and_vcpu_must_have(sse3);
+                vcpu_must_have(sse3);
                 /* fall through */
             case 2: /* fist m32i */
             case 3: /* fistp m32i */
@@ -308,7 +308,7 @@ int x86emul_fpu(struct x86_emulate_state *s,
         break;
 
     case 0xdc: /* FPU 0xdc */
-        host_and_vcpu_must_have(fpu);
+        vcpu_must_have(fpu);
         get_fpu(X86EMUL_FPU_fpu);
         switch ( s->modrm )
         {
@@ -334,7 +334,7 @@ int x86emul_fpu(struct x86_emulate_state *s,
         break;
 
     case 0xdd: /* FPU 0xdd */
-        host_and_vcpu_must_have(fpu);
+        vcpu_must_have(fpu);
         get_fpu(X86EMUL_FPU_fpu);
         switch ( s->modrm )
         {
@@ -353,7 +353,7 @@ int x86emul_fpu(struct x86_emulate_state *s,
             case 0: /* fld m64fp */;
                 goto fpu_memsrc64;
             case 1: /* fisttp m64i */
-                host_and_vcpu_must_have(sse3);
+                vcpu_must_have(sse3);
                 /* fall through */
             case 2: /* fst m64fp */
             case 3: /* fstp m64fp */
@@ -399,7 +399,7 @@ int x86emul_fpu(struct x86_emulate_state *s,
         break;
 
     case 0xde: /* FPU 0xde */
-        host_and_vcpu_must_have(fpu);
+        vcpu_must_have(fpu);
         get_fpu(X86EMUL_FPU_fpu);
         switch ( s->modrm )
         {
@@ -421,7 +421,7 @@ int x86emul_fpu(struct x86_emulate_state *s,
         break;
 
     case 0xdf: /* FPU 0xdf */
-        host_and_vcpu_must_have(fpu);
+        vcpu_must_have(fpu);
         get_fpu(X86EMUL_FPU_fpu);
         switch ( s->modrm )
         {
@@ -451,7 +451,7 @@ int x86emul_fpu(struct x86_emulate_state *s,
             case 0: /* fild m16i */
                 goto fpu_memsrc16;
             case 1: /* fisttp m16i */
-                host_and_vcpu_must_have(sse3);
+                vcpu_must_have(sse3);
                 /* fall through */
             case 2: /* fist m16i */
             case 3: /* fistp m16i */

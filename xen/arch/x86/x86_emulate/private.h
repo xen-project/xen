@@ -620,26 +620,6 @@ amd_like(const struct x86_emulate_ctxt *ctxt)
 #define vcpu_must_have(feat) \
     generate_exception_if(!vcpu_has_##feat(), X86_EXC_UD)
 
-#ifdef __XEN__
-/*
- * Note the difference between vcpu_must_have(<feature>) and
- * host_and_vcpu_must_have(<feature>): The latter needs to be used when
- * emulation code is using the same instruction class for carrying out
- * the actual operation.
- */
-# define host_and_vcpu_must_have(feat) ({ \
-    generate_exception_if(!cpu_has_##feat, X86_EXC_UD); \
-    vcpu_must_have(feat); \
-})
-#else
-/*
- * For the test harness both are fine to be used interchangeably, i.e.
- * features known to always be available (e.g. SSE/SSE2) to (64-bit) Xen
- * may be checked for by just vcpu_must_have().
- */
-# define host_and_vcpu_must_have(feat) vcpu_must_have(feat)
-#endif
-
 /*
  * Instruction emulation:
  * Most instructions are emulated directly via a fragment of inline assembly

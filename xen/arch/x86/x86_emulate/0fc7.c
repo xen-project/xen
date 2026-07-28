@@ -33,7 +33,7 @@ int x86emul_0fc7(struct x86_emulate_state *s,
 
         case 6: /* rdrand */
             generate_exception_if(s->vex.pfx >= vex_f3, X86_EXC_UD);
-            host_and_vcpu_must_have(rdrand);
+            vcpu_must_have(rdrand);
             *dst = s->ea;
             switch ( s->op_bytes )
             {
@@ -75,7 +75,7 @@ int x86emul_0fc7(struct x86_emulate_state *s,
             }
 
             generate_exception_if(s->vex.pfx >= vex_f3, X86_EXC_UD);
-            host_and_vcpu_must_have(rdseed);
+            vcpu_must_have(rdseed);
             *dst = s->ea;
             switch ( s->op_bytes )
             {
@@ -112,7 +112,7 @@ int x86emul_0fc7(struct x86_emulate_state *s,
         fail_if(!ops->cmpxchg);
         if ( s->rex_prefix & REX_W )
         {
-            host_and_vcpu_must_have(cx16);
+            vcpu_must_have(cx16);
             generate_exception_if(!is_aligned(s->ea.mem.seg, s->ea.mem.off, 16,
                                               ctxt, ops),
                                   X86_EXC_GP, 0);
