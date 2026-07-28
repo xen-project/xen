@@ -134,6 +134,15 @@ static void cf_check aplic_irq_enable(struct irq_desc *desc)
 
     spin_lock(&aplic.lock);
 
+    desc->status &= ~IRQ_DISABLED;
+    /*
+     * wmb() (fence ow,ow) orders the ->status memory write (w) before the
+     * CSR write inside imsic_irq_enable() (device output, o on RISC-V).
+     * arch_lock_release_barrier() uses fence rw,rw which does not cover
+     * device output (o), so wmb() is required to close that gap.
+     */
+    wmb();
+
     /* Enable interrupt in IMSIC */
     imsic_irq_enable(desc->irq);
 
@@ -161,6 +170,16 @@ static void cf_check aplic_irq_disable(struct irq_desc *desc)
 
     /* Disable interrupt in IMSIC */
     imsic_irq_disable(desc->irq);
+    /*
+     * wmb() (fence ow,ow) ensures the CSR write (device output, o) inside
+     * imsic_irq_disable() is globally visible before ->status is marked
+     * IRQ_DISABLED. imsic_irq_disable()'s spin_unlock uses fence rw,rw
+     * which does not order device output (o) writes before subsequent
+     * memory writes (w), so an explicit wmb() is needed here.
+     */
+    wmb();
+
+    desc->status |= IRQ_DISABLED;
 
     spin_unlock(&aplic.lock);
 }
