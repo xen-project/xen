@@ -319,6 +319,7 @@ XEN_CPUFEATURE(AVX_IFMA,     10*32+23) /*A  AVX-IFMA Instructions */
 XEN_CPUFEATURE(LAM,          10*32+26) /*   Linear Address Masking */
 XEN_CPUFEATURE(MSRLIST,      10*32+27) /*   {RD,WR}MSRLIST instructions */
 XEN_CPUFEATURE(NO_INVD,      10*32+30) /*   INVD instruction unusable */
+XEN_CPUFEATURE(MOVRS,        10*32+31) /*a  MOV-read-shared instructions */
 
 /* AMD-defined CPU features, CPUID level 0x80000021.eax, word 11 */
 XEN_CPUFEATURE(NO_NEST_BP,         11*32+ 0) /*A  No Nested Data Breakpoints */

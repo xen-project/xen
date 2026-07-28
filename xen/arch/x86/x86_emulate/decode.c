@@ -902,7 +902,8 @@ decode_0f38(struct x86_emulate_state *s,
 {
     switch ( ctxt->opcode & X86EMUL_OPC_MASK )
     {
-    case 0x00 ... 0xef:
+    case 0x00 ... 0x89:
+    case 0x8c ... 0xef:
     case 0xf2 ... 0xf5:
     case 0xf7 ... 0xf8:
     case 0xfa ... 0xff:
@@ -911,6 +912,13 @@ decode_0f38(struct x86_emulate_state *s,
     case 0xf6: /* adcx / adox */
     case 0xf9: /* movdiri */
         ctxt->opcode |= MASK_INSR(s->vex.pfx, X86EMUL_OPC_PFX_MASK);
+        break;
+
+    case 0x8a ... 0x8b: /* movrs */
+        s->desc = DstReg | SrcMem | Mov;
+        if ( !(ctxt->opcode & 1) )
+            s->desc |= ByteOp;
+        s->simd_size = simd_none;
         break;
 
     case X86EMUL_OPC_VEX_66(0, 0x2d): /* vmaskmovpd */

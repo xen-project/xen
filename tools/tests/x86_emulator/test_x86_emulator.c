@@ -1704,6 +1704,29 @@ int main(int argc, char **argv)
     }
     else
         printf("skipped\n");
+
+    {
+        /* For the non-SIMD forms the emulator doesn't itself use MOVRS. */
+        bool movrs = cpu_policy.feat.movrs;
+
+        cpu_policy.feat.movrs = true;
+
+        printf("%-40s", "Testing movrs 6(%rdi),%si...");
+        instr[0] = 0x66; instr[1] = 0x0f; instr[2] = 0x38;
+        instr[3] = 0x8b; instr[4] = 0x77; instr[5] = 0x06;
+        regs.rip = (unsigned long)&instr[0];
+        regs.rsi = 0x8888777766665555UL;
+        regs.rdi = (unsigned long)res;
+        res[1]   = 0x88777788U;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( (rc != X86EMUL_OKAY) ||
+             (regs.rip != (unsigned long)&instr[6]) ||
+             (regs.rsi != 0x8888777766668877UL) )
+            goto fail;
+        printf("okay\n");
+
+        cpu_policy.feat.movrs = movrs;
+    }
 #endif /* x86-64 */
 
     printf("%-40s", "Testing shld $1,%ecx,(%edx)...");

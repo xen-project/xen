@@ -841,6 +841,9 @@ static const struct {
     { { 0x80 }, { 2, 2 }, T, R, pfx_66 }, /* invept */
     { { 0x81 }, { 2, 2 }, T, R, pfx_66 }, /* invvpid */
     { { 0x82 }, { 2, 2 }, T, R, pfx_66 }, /* invpcid */
+    { { 0x8a }, { 2, 2 }, T, R, pfx_no }, /* movrsb */
+    { { 0x8b }, { 2, 2 }, T, R, pfx_no }, /* movrs{d,q} */
+    { { 0x8b }, { 2, 2 }, T, R, pfx_66 }, /* movrsw */
     { { 0xc8 }, { 2, 2 }, T, R, pfx_no }, /* sha1nexte */
     { { 0xc9 }, { 2, 2 }, T, R, pfx_no }, /* sha1msg1 */
     { { 0xca }, { 2, 2 }, T, R, pfx_no }, /* sha1msg2 */

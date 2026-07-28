@@ -6375,6 +6375,16 @@ x86_emulate(
         fault_suppression = false;
         goto avx512f_no_sae;
 
+#endif /* !X86EMUL_NO_SIMD */
+
+    case X86EMUL_OPC(0x0f38, 0x8a)
+     ... X86EMUL_OPC(0x0f38, 0x8b): /* movrs */
+        vcpu_must_have(movrs);
+        dst.val = src.val;
+        break;
+
+#ifndef X86EMUL_NO_SIMD
+
     case X86EMUL_OPC_VEX_66(0x0f38, 0x8c): /* vpmaskmov{d,q} mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x8e): /* vpmaskmov{d,q} {x,y}mm,{x,y}mm,mem */
         generate_exception_if(ea.type != OP_MEM, X86_EXC_UD);
