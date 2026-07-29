@@ -359,10 +359,17 @@ void calculate_raw_cpu_policy(void)
     /* Was already added by probe_cpuid_faulting() */
 }
 
-static void __init calculate_host_policy(void)
+void __init calculate_host_cpu_policy(void)
 {
     struct cpu_policy *p = &host_cpu_policy;
     unsigned int max_extd_leaf;
+
+    /*
+     * Bail if the raw policy wasn't set up yet. At least recalculate_xstate()
+     * can't be used yet in that case.
+     */
+    if ( !raw_cpu_policy.basic.max_leaf )
+        return;
 
     *p = raw_cpu_policy;
 
@@ -904,8 +911,6 @@ static void __init calculate_hvm_def_policy(void)
 
 void __init init_guest_cpu_policies(void)
 {
-    calculate_host_policy();
-
     if ( IS_ENABLED(CONFIG_PV) )
     {
         calculate_pv_max_policy();

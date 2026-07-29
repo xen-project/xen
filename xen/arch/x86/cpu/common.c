@@ -66,8 +66,10 @@ void __init setup_clear_cpu_cap(unsigned int cap)
 	__clear_bit(cap, boot_cpu_data.x86_capability);
 	dfs = x86_cpu_policy_lookup_deep_deps(cap);
 
-	if (!dfs)
+	if (!dfs) {
+		calculate_host_cpu_policy();
 		return;
+	}
 
 	for (i = 0; i < FSCAPINTS; ++i) {
 		cleared_caps[i] |= dfs[i];
@@ -78,6 +80,8 @@ void __init setup_clear_cpu_cap(unsigned int cap)
 		       __builtin_return_address(0),
 		       i, forced_caps[i] & dfs[i]);
 	}
+
+	calculate_host_cpu_policy();
 }
 
 void __init setup_force_cpu_cap(unsigned int cap)
@@ -92,6 +96,10 @@ void __init setup_force_cpu_cap(unsigned int cap)
 	}
 
 	__set_bit(cap, boot_cpu_data.x86_capability);
+
+	/* Don't recalculate when the bit isn't represented in the policy. */
+	if (cap < FSCAPINTS * 32)
+		calculate_host_cpu_policy();
 }
 
 bool __init is_forced_cpu_cap(unsigned int cap)
@@ -586,6 +594,8 @@ void identify_cpu(struct cpuinfo_x86 *c)
 	}
 
 	/* Now the feature flags better reflect actual CPU features! */
+	if (c == &boot_cpu_data)
+		calculate_host_cpu_policy();
 
 	xstate_init(c);
 

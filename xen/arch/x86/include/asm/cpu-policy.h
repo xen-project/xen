@@ -30,4 +30,10 @@ void recalculate_cpuid_policy(struct domain *d);
  */
 void calculate_raw_cpu_policy(void);
 
+/*
+ * Collect the host CPU policy.  Called after collecting enough CPUID output,
+ * and again after all feature overrides have been put in place.
+ */
+void calculate_host_cpu_policy(void);
+
 #endif /* X86_CPU_POLICY_H */
