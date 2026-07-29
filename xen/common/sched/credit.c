@@ -1588,6 +1588,10 @@ static void cf_check csched_tick(void *_cpu)
     struct csched_pcpu *spc = CSCHED_PCPU(cpu);
     struct csched_private *prv = CSCHED_PRIV(sr->scheduler);
 
+    /* Handle race of timer disabling vs. firing when switching scheduler. */
+    if ( !spc )
+        return;
+
     spc->tick++;
 
     /*
