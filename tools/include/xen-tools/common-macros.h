@@ -68,6 +68,8 @@
     })
 #endif
 
+#define IS_ALIGNED(val, align) (!((val) & ((align) - 1)))
+
 #define ROUNDUP(x, a) (((x) + (a) - 1) & ~((a) - 1))
 #define ROUNDDOWN(x, a) ((x) & ~((a) - 1))
 

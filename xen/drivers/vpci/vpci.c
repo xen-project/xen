@@ -685,6 +685,8 @@ void vpci_write(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
 /* Helper function to check an access size and alignment on vpci space. */
 bool vpci_access_allowed(unsigned int reg, unsigned int len)
 {
+    const struct domain *currd = current->domain;
+
     /* Check access size. */
     if ( len != 1 && len != 2 && len != 4 && len != 8 )
         return false;
@@ -695,8 +697,8 @@ bool vpci_access_allowed(unsigned int reg, unsigned int len)
         return false;
 #endif
 
-    /* Check that access is size aligned. */
-    if ( (reg & (len - 1)) )
+    /* Refuse unaligned accesses for non-hardware domains. */
+    if ( !is_hardware_domain(currd) && !IS_ALIGNED(reg, len) )
         return false;
 
     return true;
