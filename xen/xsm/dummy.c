@@ -16,124 +16,37 @@
 static const struct xsm_ops __initconst_cf_clobber dummy_ops = {
     .set_system_active             = xsm_set_system_active,
     .security_domaininfo           = xsm_security_domaininfo,
-    .domain_create                 = xsm_domain_create,
-    .getdomaininfo                 = xsm_getdomaininfo,
-    .set_target                    = xsm_set_target,
-    .domctl                        = xsm_domctl,
-#ifdef CONFIG_SYSCTL
-    .sysctl                        = xsm_sysctl,
-#endif
 
-    .evtchn_unbound                = xsm_evtchn_unbound,
-    .evtchn_interdomain            = xsm_evtchn_interdomain,
+#define XSM_HOOK0(rtype, name) .name = xsm_ ## name,
+#define XSM_HOOK1(rtype, name, ...) XSM_HOOK0(rtype, name)
+#define XSM_HOOK2(rtype, name, ...) XSM_HOOK0(rtype, name)
+#define XSM_HOOK3(rtype, name, ...) XSM_HOOK0(rtype, name)
+#define XSM_HOOK4(rtype, name, ...) XSM_HOOK0(rtype, name)
+#define XSM_HOOK5(rtype, name, ...) XSM_HOOK0(rtype, name)
+
+#include <xsm/hooks.h>
+
     .evtchn_close_post             = xsm_evtchn_close_post,
-    .evtchn_send                   = xsm_evtchn_send,
-    .evtchn_status                 = xsm_evtchn_status,
-    .evtchn_reset                  = xsm_evtchn_reset,
-
-    .grant_mapref                  = xsm_grant_mapref,
-    .grant_unmapref                = xsm_grant_unmapref,
-    .grant_setup                   = xsm_grant_setup,
-    .grant_transfer                = xsm_grant_transfer,
-    .grant_copy                    = xsm_grant_copy,
-    .grant_query_size              = xsm_grant_query_size,
 
     .alloc_security_domain         = xsm_alloc_security_domain,
     .free_security_domain          = xsm_free_security_domain,
     .alloc_security_evtchns        = xsm_alloc_security_evtchns,
     .free_security_evtchns         = xsm_free_security_evtchns,
     .show_security_evtchn          = xsm_show_security_evtchn,
-    .init_hardware_domain          = xsm_init_hardware_domain,
-
-    .get_pod_target                = xsm_get_pod_target,
-    .set_pod_target                = xsm_set_pod_target,
-
-    .memory_exchange               = xsm_memory_exchange,
-    .memory_adjust_reservation     = xsm_memory_adjust_reservation,
-    .memory_stat_reservation       = xsm_memory_stat_reservation,
-    .memory_pin_page               = xsm_memory_pin_page,
-    .claim_pages                   = xsm_claim_pages,
-
-    .console_io                    = xsm_console_io,
-
-    .kexec                         = xsm_kexec,
-    .schedop_shutdown              = xsm_schedop_shutdown,
 
     .show_irq_sid                  = xsm_show_irq_sid,
-    .map_domain_pirq               = xsm_map_domain_pirq,
-    .map_domain_irq                = xsm_map_domain_irq,
-    .unmap_domain_pirq             = xsm_unmap_domain_pirq,
-    .unmap_domain_irq              = xsm_unmap_domain_irq,
-    .bind_pt_irq                   = xsm_bind_pt_irq,
-    .unbind_pt_irq                 = xsm_unbind_pt_irq,
-    .irq_permission                = xsm_irq_permission,
-    .iomem_permission              = xsm_iomem_permission,
-    .iomem_mapping                 = xsm_iomem_mapping,
-    .iomem_mapping_vpci            = xsm_iomem_mapping_vpci,
-    .pci_config_permission         = xsm_pci_config_permission,
-    .get_vnumainfo                 = xsm_get_vnumainfo,
-
-#if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_PCI)
-    .get_device_group              = xsm_get_device_group,
-#endif
-
-    .resource_plug_pci             = xsm_resource_plug_pci,
-    .resource_unplug_pci           = xsm_resource_unplug_pci,
-    .resource_setup_pci            = xsm_resource_setup_pci,
-    .resource_setup_gsi            = xsm_resource_setup_gsi,
-    .resource_setup_misc           = xsm_resource_setup_misc,
-
-    .hypfs_op                      = xsm_hypfs_op,
-    .hvm_param                     = xsm_hvm_param,
-    .hvm_param_altp2mhvm           = xsm_hvm_param_altp2mhvm,
-    .hvm_altp2mhvm_op              = xsm_hvm_altp2mhvm_op,
 
     .do_xsm_op                     = xsm_do_xsm_op,
 #ifdef CONFIG_COMPAT
     .do_compat_op                  = xsm_do_compat_op,
 #endif
 
-    .add_to_physmap                = xsm_add_to_physmap,
-    .remove_from_physmap           = xsm_remove_from_physmap,
-    .map_gmfn_foreign              = xsm_map_gmfn_foreign,
-
-#ifdef CONFIG_VM_EVENT
-    .mem_access                    = xsm_mem_access,
-#endif
-
-#ifdef CONFIG_MEM_PAGING
-    .mem_paging                    = xsm_mem_paging,
-#endif
-
-#ifdef CONFIG_MEM_SHARING
-    .mem_sharing                   = xsm_mem_sharing,
-#endif
-
-    .platform_op                   = xsm_platform_op,
-#ifdef CONFIG_X86
-    .do_mca                        = xsm_do_mca,
-    .mem_sharing_op                = xsm_mem_sharing_op,
-    .apic                          = xsm_apic,
-    .machine_memory_map            = xsm_machine_memory_map,
-    .domain_memory_map             = xsm_domain_memory_map,
-    .mmu_update                    = xsm_mmu_update,
-    .mmuext_op                     = xsm_mmuext_op,
-    .update_va_mapping             = xsm_update_va_mapping,
-    .priv_mapping                  = xsm_priv_mapping,
-    .ioport_permission             = xsm_ioport_permission,
-    .ioport_mapping                = xsm_ioport_mapping,
-    .pmu_op                        = xsm_pmu_op,
-#endif
-    .dm_op                         = xsm_dm_op,
-    .xen_version                   = xsm_xen_version,
-    .domain_resource_map           = xsm_domain_resource_map,
 #ifdef CONFIG_ARGO
     .argo_enable                   = xsm_argo_enable,
     .argo_register_single_source   = xsm_argo_register_single_source,
     .argo_register_any_source      = xsm_argo_register_any_source,
     .argo_send                     = xsm_argo_send,
 #endif
-    .get_domain_state              = xsm_get_domain_state,
 };
 
 void __init xsm_fixup_ops(struct xsm_ops *ops)

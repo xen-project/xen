@@ -1215,6 +1215,7 @@ static int cf_check flask_iomem_mapping(struct domain *d, uint64_t start, uint64
 {
     return flask_iomem_permission(d, start, end, access);
 }
+#define flask_iomem_mapping_vpci flask_iomem_mapping
 
 static int cf_check flask_pci_config_permission(
     struct domain *d, uint32_t machine_bdf, uint16_t start, uint16_t end,
@@ -1713,6 +1714,7 @@ static int cf_check flask_ioport_mapping(
     return flask_ioport_permission(d, start, end, access);
 }
 
+#ifdef CONFIG_MEM_SHARING
 static int cf_check flask_mem_sharing_op(
     struct domain *d, struct domain *cd, int op)
 {
@@ -1721,6 +1723,7 @@ static int cf_check flask_mem_sharing_op(
         return rc;
     return domain_has_perm(d, cd, SECCLASS_HVM, HVM__SHARE_MEM);
 }
+#endif
 
 static int cf_check flask_apic(struct domain *d, int cmd)
 {
@@ -1911,125 +1914,38 @@ static int cf_check flask_get_domain_state(struct domain *d)
 static const struct xsm_ops __initconst_cf_clobber flask_ops = {
     .set_system_active = flask_set_system_active,
     .security_domaininfo = flask_security_domaininfo,
-    .domain_create = flask_domain_create,
-    .getdomaininfo = flask_getdomaininfo,
-    .set_target = flask_set_target,
-    .domctl = flask_domctl,
-#ifdef CONFIG_SYSCTL
-    .sysctl = flask_sysctl,
-#endif
 
-    .evtchn_unbound = flask_evtchn_unbound,
-    .evtchn_interdomain = flask_evtchn_interdomain,
+#define XSM_HOOK0(rtype, name) .name = flask_ ## name,
+#define XSM_HOOK1(rtype, name, ...) XSM_HOOK0(rtype, name)
+#define XSM_HOOK2(rtype, name, ...) XSM_HOOK0(rtype, name)
+#define XSM_HOOK3(rtype, name, ...) XSM_HOOK0(rtype, name)
+#define XSM_HOOK4(rtype, name, ...) XSM_HOOK0(rtype, name)
+#define XSM_HOOK5(rtype, name, ...) XSM_HOOK0(rtype, name)
+
+#include <xsm/hooks.h>
+
     .evtchn_close_post = flask_evtchn_close_post,
-    .evtchn_send = flask_evtchn_send,
-    .evtchn_status = flask_evtchn_status,
-    .evtchn_reset = flask_evtchn_reset,
-
-    .grant_mapref = flask_grant_mapref,
-    .grant_unmapref = flask_grant_unmapref,
-    .grant_setup = flask_grant_setup,
-    .grant_transfer = flask_grant_transfer,
-    .grant_copy = flask_grant_copy,
-    .grant_query_size = flask_grant_query_size,
 
     .alloc_security_domain = flask_domain_alloc_security,
     .free_security_domain = flask_domain_free_security,
     .alloc_security_evtchns = flask_alloc_security_evtchns,
     .free_security_evtchns = flask_free_security_evtchns,
     .show_security_evtchn = flask_show_security_evtchn,
-    .init_hardware_domain = flask_init_hardware_domain,
-
-    .get_pod_target = flask_get_pod_target,
-    .set_pod_target = flask_set_pod_target,
-    .memory_exchange = flask_memory_exchange,
-    .memory_adjust_reservation = flask_memory_adjust_reservation,
-    .memory_stat_reservation = flask_memory_stat_reservation,
-    .memory_pin_page = flask_memory_pin_page,
-    .claim_pages = flask_claim_pages,
-
-    .console_io = flask_console_io,
-
-    .kexec = flask_kexec,
-    .schedop_shutdown = flask_schedop_shutdown,
 
     .show_irq_sid = flask_show_irq_sid,
 
-    .map_domain_pirq = flask_map_domain_pirq,
-    .map_domain_irq = flask_map_domain_irq,
-    .unmap_domain_pirq = flask_unmap_domain_pirq,
-    .unmap_domain_irq = flask_unmap_domain_irq,
-    .bind_pt_irq = flask_bind_pt_irq,
-    .unbind_pt_irq = flask_unbind_pt_irq,
-    .irq_permission = flask_irq_permission,
-    .iomem_permission = flask_iomem_permission,
-    .iomem_mapping = flask_iomem_mapping,
-    .iomem_mapping_vpci = flask_iomem_mapping,
-    .pci_config_permission = flask_pci_config_permission,
-
-    .resource_plug_pci = flask_resource_plug_pci,
-    .resource_unplug_pci = flask_resource_unplug_pci,
-    .resource_setup_pci = flask_resource_setup_pci,
-    .resource_setup_gsi = flask_resource_setup_gsi,
-    .resource_setup_misc = flask_resource_setup_misc,
-
-    .hypfs_op = flask_hypfs_op,
-    .hvm_param = flask_hvm_param,
-    .hvm_param_altp2mhvm = flask_hvm_param_altp2mhvm,
-    .hvm_altp2mhvm_op = flask_hvm_altp2mhvm_op,
-
     .do_xsm_op = do_flask_op,
-    .get_vnumainfo = flask_get_vnumainfo,
-
-#ifdef CONFIG_VM_EVENT
-    .mem_access = flask_mem_access,
-#endif
-
-#ifdef CONFIG_MEM_PAGING
-    .mem_paging = flask_mem_paging,
-#endif
-
-#ifdef CONFIG_MEM_SHARING
-    .mem_sharing = flask_mem_sharing,
-#endif
 
 #ifdef CONFIG_COMPAT
     .do_compat_op = compat_flask_op,
 #endif
 
-    .add_to_physmap = flask_add_to_physmap,
-    .remove_from_physmap = flask_remove_from_physmap,
-    .map_gmfn_foreign = flask_map_gmfn_foreign,
-
-#if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_PCI)
-    .get_device_group = flask_get_device_group,
-#endif
-
-    .platform_op = flask_platform_op,
-#ifdef CONFIG_X86
-    .do_mca = flask_do_mca,
-    .mem_sharing_op = flask_mem_sharing_op,
-    .apic = flask_apic,
-    .machine_memory_map = flask_machine_memory_map,
-    .domain_memory_map = flask_domain_memory_map,
-    .mmu_update = flask_mmu_update,
-    .mmuext_op = flask_mmuext_op,
-    .update_va_mapping = flask_update_va_mapping,
-    .priv_mapping = flask_priv_mapping,
-    .ioport_permission = flask_ioport_permission,
-    .ioport_mapping = flask_ioport_mapping,
-    .pmu_op = flask_pmu_op,
-#endif
-    .dm_op = flask_dm_op,
-    .xen_version = flask_xen_version,
-    .domain_resource_map = flask_domain_resource_map,
 #ifdef CONFIG_ARGO
     .argo_enable = flask_argo_enable,
     .argo_register_single_source = flask_argo_register_single_source,
     .argo_register_any_source = flask_argo_register_any_source,
     .argo_send = flask_argo_send,
 #endif
-    .get_domain_state = flask_get_domain_state,
 };
 
 const struct xsm_ops *__init flask_init(
