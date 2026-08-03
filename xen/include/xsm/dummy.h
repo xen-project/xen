@@ -191,6 +191,8 @@ static XSM_INLINE void cf_check xsm_free_security_domain(struct domain *d)
     return;
 }
 
+#ifdef CONFIG_GRANT_TABLE
+
 static XSM_INLINE int cf_check xsm_grant_mapref(
     XSM_DEFAULT_ARG struct domain *d1, struct domain *d2, uint32_t flags)
 {
@@ -232,6 +234,8 @@ static XSM_INLINE int cf_check xsm_grant_query_size(
     XSM_ASSERT_ACTION(XSM_TARGET);
     return xsm_default_action(action, d1, d2);
 }
+
+#endif /* CONFIG_GRANT_TABLE */
 
 static XSM_INLINE int cf_check xsm_memory_exchange(
     XSM_DEFAULT_ARG struct domain *d)

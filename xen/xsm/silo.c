@@ -60,6 +60,8 @@ static int cf_check silo_evtchn_interdomain(
     return -EPERM;
 }
 
+#ifdef CONFIG_GRANT_TABLE
+
 static int cf_check silo_grant_mapref(
     struct domain *d1, struct domain *d2, uint32_t flags)
 {
@@ -81,6 +83,8 @@ static int cf_check silo_grant_copy(struct domain *d1, struct domain *d2)
         return xsm_grant_copy(d1, d2);
     return -EPERM;
 }
+
+#endif /* CONFIG_GRANT_TABLE */
 
 #ifdef CONFIG_ARGO
 
@@ -105,9 +109,11 @@ static int cf_check silo_argo_send(
 static const struct xsm_ops __initconst_cf_clobber silo_xsm_ops = {
     .evtchn_unbound = silo_evtchn_unbound,
     .evtchn_interdomain = silo_evtchn_interdomain,
+#ifdef CONFIG_GRANT_TABLE
     .grant_mapref = silo_grant_mapref,
     .grant_transfer = silo_grant_transfer,
     .grant_copy = silo_grant_copy,
+#endif
 #ifdef CONFIG_ARGO
     .argo_register_single_source = silo_argo_register_single_source,
     .argo_send = silo_argo_send,

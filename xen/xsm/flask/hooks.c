@@ -434,6 +434,8 @@ static int cf_check flask_init_hardware_domain(struct domain *d)
     return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__CREATE_HARDWARE_DOMAIN);
 }
 
+#ifdef CONFIG_GRANT_TABLE
+
 static int cf_check flask_grant_mapref(
     struct domain *d1, struct domain *d2, uint32_t flags)
 {
@@ -469,6 +471,8 @@ static int cf_check flask_grant_query_size(struct domain *d1, struct domain *d2)
 {
     return domain_has_perm(d1, d2, SECCLASS_GRANT, GRANT__QUERY);
 }
+
+#endif /* CONFIG_GRANT_TABLE */
 
 static int cf_check flask_get_pod_target(struct domain *d)
 {

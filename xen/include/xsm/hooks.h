@@ -35,12 +35,14 @@ XSM_HOOK(int, evtchn_send, struct domain *, struct evtchn *)
 XSM_HOOK(int, evtchn_status, struct domain *, struct evtchn *)
 XSM_HOOK(int, evtchn_reset, struct domain *, struct domain *)
 
+#ifdef CONFIG_GRANT_TABLE
 XSM_HOOK(int, grant_mapref, struct domain *, struct domain *, uint32_t)
 XSM_HOOK(int, grant_unmapref, struct domain *, struct domain *)
 XSM_HOOK(int, grant_setup, struct domain *, struct domain *)
 XSM_HOOK(int, grant_transfer, struct domain *, struct domain *)
 XSM_HOOK(int, grant_copy, struct domain *, struct domain *)
 XSM_HOOK(int, grant_query_size, struct domain *, struct domain *)
+#endif
 
 XSM_HOOK(int, init_hardware_domain, struct domain *)
 
