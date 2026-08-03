@@ -43,5 +43,13 @@ int __must_check check_get_page_from_gfn(struct domain *d, gfn_t gfn,
                                          bool readonly, p2m_type_t *p2mt_p,
                                          struct page_info **page_p);
 
+/*
+ * Set the pool of pages to the required number of pages.
+ * Returns 0 for success, -ERESTART if preempted (only when can_preempt is
+ * true), or a negative error code on failure.
+ * Call with d->arch.paging.lock held.
+ */
+int __must_check p2m_set_allocation(struct domain *d, unsigned long pages,
+                                    bool can_preempt);
 
 #endif /* _XEN_P2M_COMMON_H */

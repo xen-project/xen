@@ -428,17 +428,12 @@ int p2m_init(struct domain *d, const struct xen_domctl_createdomain *config)
     return 0;
 }
 
-/*
- * Set the pool of pages to the required number of pages.
- * Returns 0 for success, non-zero for failure.
- * Call with d->arch.paging.lock held.
- */
-int p2m_set_allocation(struct domain *d, unsigned long pages, bool *preempted)
+int p2m_set_allocation(struct domain *d, unsigned long pages, bool can_preempt)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int rc;
 
-    if ( (rc = paging_freelist_adjust(d, pages, preempted)) )
+    if ( (rc = paging_freelist_adjust(d, pages, can_preempt)) )
         return rc;
 
     /*
