@@ -77,21 +77,24 @@ XSM_HOOK(int, unbind_pt_irq, struct domain *, struct xen_domctl_bind_pt_irq *)
 
 XSM_HOOK(int, irq_permission, struct domain *, int, uint8_t)
 XSM_HOOK(int, iomem_permission, struct domain *, uint64_t, uint64_t, uint8_t)
-XSM_HOOK(int, pci_config_permission, struct domain *, uint32_t, uint16_t,
-                                     uint16_t, uint8_t)
 
 XSM_HOOK(int, iomem_mapping, struct domain *, uint64_t, uint64_t, uint8_t)
 XSM_HOOK(int, iomem_mapping_vpci, struct domain *, uint64_t, uint64_t, uint8_t)
 
 #if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_PCI)
+XSM_HOOK(int, resource_plug_pci, uint32_t)
+XSM_HOOK(int, resource_unplug_pci, uint32_t)
 XSM_HOOK(int, get_device_group, uint32_t)
 #endif
 
-XSM_HOOK(int, resource_plug_pci, uint32_t)
-XSM_HOOK(int, resource_unplug_pci, uint32_t)
+XSM_HOOK(int, resource_setup_misc)
+
+#ifdef CONFIG_HAS_PCI
 XSM_HOOK(int, resource_setup_pci, uint32_t)
 XSM_HOOK(int, resource_setup_gsi, int)
-XSM_HOOK(int, resource_setup_misc)
+XSM_HOOK(int, pci_config_permission, struct domain *, uint32_t, uint16_t,
+                                     uint16_t, uint8_t)
+#endif
 
 XSM_HOOK(int, hypfs_op)
 

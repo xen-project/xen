@@ -394,6 +394,8 @@ static XSM_INLINE int cf_check xsm_get_device_group(
 }
 #endif /* HAS_PASSTHROUGH && HAS_PCI */
 
+#if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_PCI)
+
 static XSM_INLINE int cf_check xsm_resource_plug_pci(
     XSM_DEFAULT_ARG uint32_t machine_bdf)
 {
@@ -408,6 +410,10 @@ static XSM_INLINE int cf_check xsm_resource_unplug_pci(
     return xsm_default_action(action, current->domain, NULL);
 }
 
+#endif /* CONFIG_HAS_PASSTHROUGH && CONFIG_HAS_PCI */
+
+#ifdef CONFIG_HAS_PCI
+
 static XSM_INLINE int cf_check xsm_resource_setup_pci(
     XSM_DEFAULT_ARG uint32_t machine_bdf)
 {
@@ -420,6 +426,8 @@ static XSM_INLINE int cf_check xsm_resource_setup_gsi(XSM_DEFAULT_ARG int gsi)
     XSM_ASSERT_ACTION(XSM_PRIV);
     return xsm_default_action(action, current->domain, NULL);
 }
+
+#endif /* CONFIG_HAS_PCI */
 
 static XSM_INLINE int cf_check xsm_resource_setup_misc(XSM_DEFAULT_VOID)
 {
@@ -524,6 +532,7 @@ static XSM_INLINE int cf_check xsm_iomem_mapping_vpci(
     return xsm_default_action(action, current->domain, d);
 }
 
+#ifdef CONFIG_HAS_PCI
 static XSM_INLINE int cf_check xsm_pci_config_permission(
     XSM_DEFAULT_ARG struct domain *d, uint32_t machine_bdf, uint16_t start,
     uint16_t end, uint8_t access)
@@ -531,6 +540,7 @@ static XSM_INLINE int cf_check xsm_pci_config_permission(
     XSM_ASSERT_ACTION(XSM_HOOK);
     return xsm_default_action(action, current->domain, d);
 }
+#endif /* CONFIG_HAS_PCI */
 
 static XSM_INLINE int cf_check xsm_add_to_physmap(
     XSM_DEFAULT_ARG struct domain *d1, struct domain *d2)

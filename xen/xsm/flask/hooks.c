@@ -1225,6 +1225,7 @@ static int cf_check flask_iomem_mapping(struct domain *d, uint64_t start, uint64
 }
 #define flask_iomem_mapping_vpci flask_iomem_mapping
 
+#ifdef CONFIG_HAS_PCI
 static int cf_check flask_pci_config_permission(
     struct domain *d, uint32_t machine_bdf, uint16_t start, uint16_t end,
     uint8_t access)
@@ -1250,6 +1251,7 @@ static int cf_check flask_pci_config_permission(
     return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, perm, &ad);
 
 }
+#endif /* CONFIG_HAS_PCI */
 
 #if defined(CONFIG_SYSCTL) || defined(CONFIG_X86)
 static int flask_resource_plug_core(void)
@@ -1269,6 +1271,8 @@ static int flask_resource_use_core(void)
     return avc_current_has_perm(SECINITSID_DOMXEN, SECCLASS_RESOURCE, RESOURCE__USE, NULL);
 }
 #endif /* CONFIG_SYSCTL */
+
+#if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_PCI)
 
 static int cf_check flask_resource_plug_pci(uint32_t machine_bdf)
 {
@@ -1300,6 +1304,10 @@ static int cf_check flask_resource_unplug_pci(uint32_t machine_bdf)
     return avc_current_has_perm(rsid, SECCLASS_RESOURCE, RESOURCE__UNPLUG, &ad);
 }
 
+#endif /* CONFIG_HAS_PASSTHROUGH && CONFIG_HAS_PCI */
+
+#ifdef CONFIG_HAS_PCI
+
 static int cf_check flask_resource_setup_pci(uint32_t machine_bdf)
 {
     uint32_t rsid;
@@ -1327,6 +1335,8 @@ static int cf_check flask_resource_setup_gsi(int gsi)
 
     return avc_current_has_perm(rsid, SECCLASS_RESOURCE, RESOURCE__SETUP, &ad);
 }
+
+#endif /* CONFIG_HAS_PCI */
 
 static int cf_check flask_resource_setup_misc(void)
 {
