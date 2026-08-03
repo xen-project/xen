@@ -79,7 +79,9 @@ XSM_HOOK(int, irq_permission, struct domain *, int, uint8_t)
 XSM_HOOK(int, iomem_permission, struct domain *, uint64_t, uint64_t, uint8_t)
 
 XSM_HOOK(int, iomem_mapping, struct domain *, uint64_t, uint64_t, uint8_t)
+#ifdef CONFIG_HAS_VPCI
 XSM_HOOK(int, iomem_mapping_vpci, struct domain *, uint64_t, uint64_t, uint8_t)
+#endif
 
 #if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_PCI)
 XSM_HOOK(int, resource_plug_pci, uint32_t)

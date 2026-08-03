@@ -525,12 +525,14 @@ static XSM_INLINE int cf_check xsm_iomem_mapping(
     return xsm_default_action(action, current->domain, d);
 }
 
+#ifdef CONFIG_HAS_VPCI
 static XSM_INLINE int cf_check xsm_iomem_mapping_vpci(
     XSM_DEFAULT_ARG struct domain *d, uint64_t s, uint64_t e, uint8_t allow)
 {
     XSM_ASSERT_ACTION(XSM_HOOK);
     return xsm_default_action(action, current->domain, d);
 }
+#endif
 
 #ifdef CONFIG_HAS_PCI
 static XSM_INLINE int cf_check xsm_pci_config_permission(
