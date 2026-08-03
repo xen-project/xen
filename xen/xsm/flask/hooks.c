@@ -1393,6 +1393,7 @@ static int cf_check flask_hvm_param_altp2mhvm(struct domain *d)
     return current_has_perm(d, SECCLASS_HVM, HVM__ALTP2MHVM);
 }
 
+#ifdef CONFIG_ALTP2M
 static int cf_check flask_hvm_altp2mhvm_op(struct domain *d, uint64_t mode, uint32_t op)
 {
     /*
@@ -1416,6 +1417,7 @@ static int cf_check flask_hvm_altp2mhvm_op(struct domain *d, uint64_t mode, uint
 
     return current_has_perm(d, SECCLASS_HVM, HVM__ALTP2MHVM_OP);
 }
+#endif /* CONFIG_ALTP2M */
 
 #ifdef CONFIG_VM_EVENT
 static int cf_check flask_mem_access(struct domain *d)

@@ -106,7 +106,11 @@ XSM_HOOK(int, hypfs_op)
 
 XSM_HOOK(int, hvm_param, struct domain *, unsigned long)
 XSM_HOOK(int, hvm_param_altp2mhvm, struct domain *)
+
+#ifdef CONFIG_ALTP2M
 XSM_HOOK(int, hvm_altp2mhvm_op, struct domain *, uint64_t, uint32_t)
+#endif
+
 XSM_HOOK(int, get_vnumainfo, struct domain *)
 
 #ifdef CONFIG_VM_EVENT

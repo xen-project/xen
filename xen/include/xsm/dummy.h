@@ -583,6 +583,7 @@ static XSM_INLINE int cf_check xsm_hvm_param_altp2mhvm(
     return xsm_default_action(action, current->domain, d);
 }
 
+#ifdef CONFIG_ALTP2M
 static XSM_INLINE int cf_check xsm_hvm_altp2mhvm_op(
     XSM_DEFAULT_ARG struct domain *d, uint64_t mode, uint32_t op)
 {
@@ -602,6 +603,7 @@ static XSM_INLINE int cf_check xsm_hvm_altp2mhvm_op(
         return -EPERM;
     }
 }
+#endif /* CONFIG_ALTP2M */
 
 #ifdef CONFIG_VM_EVENT
 static XSM_INLINE int cf_check xsm_mem_access(XSM_DEFAULT_ARG struct domain *d)
