@@ -569,6 +569,8 @@ static XSM_INLINE int cf_check xsm_map_gmfn_foreign(
     return xsm_default_action(action, d, t);
 }
 
+#ifdef CONFIG_HVM
+
 static XSM_INLINE int cf_check xsm_hvm_param(
     XSM_DEFAULT_ARG struct domain *d, unsigned long op)
 {
@@ -582,6 +584,8 @@ static XSM_INLINE int cf_check xsm_hvm_param_altp2mhvm(
     XSM_ASSERT_ACTION(XSM_PRIV);
     return xsm_default_action(action, current->domain, d);
 }
+
+#endif /* CONFIG_HVM */
 
 #ifdef CONFIG_ALTP2M
 static XSM_INLINE int cf_check xsm_hvm_altp2mhvm_op(

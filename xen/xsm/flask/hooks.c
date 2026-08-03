@@ -1368,6 +1368,8 @@ static int cf_check flask_map_gmfn_foreign(struct domain *d, struct domain *t)
     return domain_has_perm(d, t, SECCLASS_MMU, MMU__MAP_READ | MMU__MAP_WRITE);
 }
 
+#ifdef CONFIG_HVM
+
 static int cf_check flask_hvm_param(struct domain *d, unsigned long op)
 {
     uint32_t perm;
@@ -1392,6 +1394,8 @@ static int cf_check flask_hvm_param_altp2mhvm(struct domain *d)
 {
     return current_has_perm(d, SECCLASS_HVM, HVM__ALTP2MHVM);
 }
+
+#endif /* CONFIG_HVM */
 
 #ifdef CONFIG_ALTP2M
 static int cf_check flask_hvm_altp2mhvm_op(struct domain *d, uint64_t mode, uint32_t op)
