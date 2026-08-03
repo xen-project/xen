@@ -450,6 +450,8 @@ static XSM_INLINE char *cf_check xsm_show_irq_sid(int irq)
     return NULL;
 }
 
+#ifdef CONFIG_HAS_PIRQ
+
 static XSM_INLINE int cf_check xsm_map_domain_pirq(
     XSM_DEFAULT_ARG struct domain *d)
 {
@@ -457,17 +459,19 @@ static XSM_INLINE int cf_check xsm_map_domain_pirq(
     return xsm_default_action(action, current->domain, d);
 }
 
-static XSM_INLINE int cf_check xsm_map_domain_irq(
-    XSM_DEFAULT_ARG struct domain *d, int irq, const void *data)
-{
-    XSM_ASSERT_ACTION(XSM_HOOK);
-    return xsm_default_action(action, current->domain, d);
-}
-
 static XSM_INLINE int cf_check xsm_unmap_domain_pirq(
     XSM_DEFAULT_ARG struct domain *d)
 {
     XSM_ASSERT_ACTION(XSM_DM_PRIV);
+    return xsm_default_action(action, current->domain, d);
+}
+
+#endif /* CONFIG_HAS_PIRQ */
+
+static XSM_INLINE int cf_check xsm_map_domain_irq(
+    XSM_DEFAULT_ARG struct domain *d, int irq, const void *data)
+{
+    XSM_ASSERT_ACTION(XSM_HOOK);
     return xsm_default_action(action, current->domain, d);
 }
 

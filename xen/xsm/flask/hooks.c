@@ -1018,10 +1018,19 @@ static char *cf_check flask_show_irq_sid(int irq)
     return ctx;
 }
 
+#ifdef CONFIG_HAS_PIRQ
+
 static int cf_check flask_map_domain_pirq(struct domain *d)
 {
     return current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
 }
+
+static int cf_check flask_unmap_domain_pirq(struct domain *d)
+{
+    return current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__REMOVE);
+}
+
+#endif /* CONFIG_HAS_PIRQ */
 
 static int flask_map_domain_msi (
     struct domain *d, int irq, const void *data, uint32_t *sid,
@@ -1083,11 +1092,6 @@ static int cf_check flask_map_domain_irq(
 
     rc = avc_has_perm(dsid, sid, SECCLASS_RESOURCE, dperm, &ad);
     return rc;
-}
-
-static int cf_check flask_unmap_domain_pirq(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__REMOVE);
 }
 
 static int flask_unmap_domain_msi (

@@ -65,9 +65,12 @@ XSM_HOOK(int, kexec)
 
 XSM_HOOK(int, schedop_shutdown, struct domain *, struct domain *)
 
+#ifdef CONFIG_HAS_PIRQ
 XSM_HOOK(int, map_domain_pirq, struct domain *)
-XSM_HOOK(int, map_domain_irq, struct domain *, int, const void *)
 XSM_HOOK(int, unmap_domain_pirq, struct domain *)
+#endif
+
+XSM_HOOK(int, map_domain_irq, struct domain *, int, const void *)
 XSM_HOOK(int, unmap_domain_irq, struct domain *, int, const void *)
 XSM_HOOK(int, bind_pt_irq, struct domain *, struct xen_domctl_bind_pt_irq *)
 XSM_HOOK(int, unbind_pt_irq, struct domain *, struct xen_domctl_bind_pt_irq *)
