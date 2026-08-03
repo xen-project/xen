@@ -131,14 +131,16 @@ XSM_HOOK(int, mem_sharing_op, struct domain *, struct domain *, int)
 XSM_HOOK(int, platform_op, uint32_t)
 
 #ifdef CONFIG_X86
-XSM_HOOK(int, do_mca)
 XSM_HOOK(int, apic, struct domain *, int)
 XSM_HOOK(int, machine_memory_map)
 XSM_HOOK(int, domain_memory_map, struct domain *)
+#ifdef CONFIG_PV
+XSM_HOOK(int, do_mca)
 XSM_HOOK(int, mmu_update, struct domain *, struct domain *, struct domain *,
                           uint32_t)
 XSM_HOOK(int, mmuext_op, struct domain *, struct domain *)
 XSM_HOOK(int, update_va_mapping, struct domain *, struct domain *, l1_pgentry_t)
+#endif /* CONFIG_PV */
 XSM_HOOK(int, priv_mapping, struct domain *, struct domain *)
 XSM_HOOK(int, ioport_permission, struct domain *, uint32_t, uint32_t, uint8_t)
 XSM_HOOK(int, ioport_mapping, struct domain *, uint32_t, uint32_t, uint8_t)

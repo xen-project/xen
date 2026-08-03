@@ -640,11 +640,6 @@ static XSM_INLINE int cf_check xsm_platform_op(XSM_DEFAULT_ARG uint32_t op)
 }
 
 #ifdef CONFIG_X86
-static XSM_INLINE int cf_check xsm_do_mca(XSM_DEFAULT_VOID)
-{
-    XSM_ASSERT_ACTION(XSM_PRIV);
-    return xsm_default_action(action, current->domain, NULL);
-}
 
 static XSM_INLINE int cf_check xsm_mem_sharing_op(
     XSM_DEFAULT_ARG struct domain *d, struct domain *cd, int op)
@@ -673,6 +668,14 @@ static XSM_INLINE int cf_check xsm_domain_memory_map(
     return xsm_default_action(action, current->domain, d);
 }
 
+#ifdef CONFIG_PV
+
+static XSM_INLINE int cf_check xsm_do_mca(XSM_DEFAULT_VOID)
+{
+    XSM_ASSERT_ACTION(XSM_PRIV);
+    return xsm_default_action(action, current->domain, NULL);
+}
+
 static XSM_INLINE int cf_check xsm_mmu_update(
     XSM_DEFAULT_ARG struct domain *d, struct domain *t, struct domain *f,
     uint32_t flags)
@@ -699,6 +702,8 @@ static XSM_INLINE int cf_check xsm_update_va_mapping(
     XSM_ASSERT_ACTION(XSM_TARGET);
     return xsm_default_action(action, d, f);
 }
+
+#endif /* CONFIG_PV */
 
 static XSM_INLINE int cf_check xsm_priv_mapping(
     XSM_DEFAULT_ARG struct domain *d, struct domain *t)

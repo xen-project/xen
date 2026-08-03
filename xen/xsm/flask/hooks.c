@@ -1654,10 +1654,6 @@ static int cf_check flask_platform_op(uint32_t op)
 }
 
 #ifdef CONFIG_X86
-static int cf_check flask_do_mca(void)
-{
-    return domain_has_xen(current->domain, XEN__MCA_OP);
-}
 
 static int flask_shadow_control(struct domain *d, unsigned int op)
 {
@@ -1783,6 +1779,13 @@ static int cf_check flask_domain_memory_map(struct domain *d)
     return current_has_perm(d, SECCLASS_MMU, MMU__MEMORYMAP);
 }
 
+#ifdef CONFIG_PV
+
+static int cf_check flask_do_mca(void)
+{
+    return domain_has_xen(current->domain, XEN__MCA_OP);
+}
+
 static int cf_check flask_mmu_update(
     struct domain *d, struct domain *t, struct domain *f, uint32_t flags)
 {
@@ -1822,6 +1825,8 @@ static int cf_check flask_update_va_mapping(
 
     return domain_has_perm(d, f, SECCLASS_MMU, map_perms);
 }
+
+#endif /* CONFIG_PV */
 
 static int cf_check flask_priv_mapping(struct domain *d, struct domain *t)
 {
