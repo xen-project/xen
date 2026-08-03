@@ -536,10 +536,12 @@ static int cf_check flask_console_io(struct domain *d, int cmd)
     return domain_has_xen(d, perm);
 }
 
+#ifdef CONFIG_KEXEC
 static int cf_check flask_kexec(void)
 {
     return domain_has_xen(current->domain, XEN__KEXEC);
 }
+#endif
 
 static int cf_check flask_schedop_shutdown(struct domain *d1, struct domain *d2)
 {

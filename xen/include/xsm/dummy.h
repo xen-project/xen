@@ -271,11 +271,13 @@ static XSM_INLINE int cf_check xsm_console_io(
     return xsm_default_action(XSM_PRIV, d, NULL);
 }
 
+#ifdef CONFIG_KEXEC
 static XSM_INLINE int cf_check xsm_kexec(XSM_DEFAULT_VOID)
 {
     XSM_ASSERT_ACTION(XSM_PRIV);
     return xsm_default_action(action, current->domain, NULL);
 }
+#endif
 
 static XSM_INLINE int cf_check xsm_schedop_shutdown(
     XSM_DEFAULT_ARG struct domain *d1, struct domain *d2)

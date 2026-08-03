@@ -61,7 +61,9 @@ XSM_HOOK(int, claim_pages, struct domain *)
 
 XSM_HOOK(int, console_io, struct domain *, int)
 
+#ifdef CONFIG_KEXEC
 XSM_HOOK(int, kexec)
+#endif
 
 XSM_HOOK(int, schedop_shutdown, struct domain *, struct domain *)
 
