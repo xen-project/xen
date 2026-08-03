@@ -414,7 +414,7 @@ static mfn_t hap_make_monitor_table(struct vcpu *v)
 
  oom:
     if ( !d->is_dying &&
-         (!d->is_shutting_down || d->shutdown_code != SHUTDOWN_crash) )
+         (!domain_shutting_down(d) || d->shutdown_code != SHUTDOWN_crash) )
     {
         printk(XENLOG_G_ERR "%pd: out of memory building monitor pagetable\n",
                d);

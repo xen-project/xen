@@ -1746,7 +1746,7 @@ void iommu_dev_iotlb_flush_timeout(struct domain *d, struct pci_dev *pdev)
 
     pdev->broken = true;
 
-    if ( !d->is_shutting_down && printk_ratelimit() )
+    if ( !domain_shutting_down(d) && printk_ratelimit() )
         printk(XENLOG_ERR "dom%d: ATS device %pp flush failed\n",
                d->domain_id, &pdev->sbdf);
     if ( !is_hardware_domain(d) )

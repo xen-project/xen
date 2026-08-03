@@ -191,7 +191,7 @@ static void set_domain_state_info(struct xen_domctl_get_domain_state *info,
                                   const struct domain *d)
 {
     info->state = XEN_DOMCTL_GETDOMSTATE_STATE_EXIST;
-    if ( d->is_shut_down )
+    if ( domain_shutdown_completed(d) )
         info->state |= XEN_DOMCTL_GETDOMSTATE_STATE_SHUTDOWN;
     if ( d->is_dying == DOMDYING_dying )
         info->state |= XEN_DOMCTL_GETDOMSTATE_STATE_DYING;
@@ -278,14 +278,14 @@ static void __domain_finalise_shutdown(struct domain *d)
 
     BUG_ON(!spin_is_locked(&d->shutdown_lock));
 
-    if ( d->is_shut_down )
+    if ( domain_shutdown_completed(d) )
         return;
 
     for_each_vcpu ( d, v )
         if ( !v->paused_for_shutdown )
             return;
 
-    d->is_shut_down = 1;
+    d->shutdown_state = DOMSHUTDOWN_complete;
     domain_changed_state(d);
     if ( (d->shutdown_code == SHUTDOWN_suspend) && d->suspend_evtchn )
         evtchn_send(d, d->suspend_evtchn);
@@ -299,7 +299,7 @@ static void vcpu_check_shutdown(struct vcpu *v)
 
     spin_lock(&d->shutdown_lock);
 
-    if ( d->is_shutting_down )
+    if ( domain_shutting_down(d) )
     {
         if ( !v->paused_for_shutdown )
             vcpu_pause_nosync(v);
@@ -1358,7 +1358,7 @@ int domain_kill(struct domain *d)
 
 void __domain_crash(struct domain *d)
 {
-    if ( d->is_shutting_down )
+    if ( domain_shutting_down(d) )
     {
         /* Print nothing: the domain is already shutting down. */
     }
@@ -1396,13 +1396,13 @@ int domain_shutdown(struct domain *d, u8 reason)
     if ( is_hardware_domain(d) )
         hwdom_shutdown(reason);
 
-    if ( d->is_shutting_down )
+    if ( domain_shutting_down(d) )
     {
         spin_unlock(&d->shutdown_lock);
         return 0;
     }
 
-    d->is_shutting_down = 1;
+    d->shutdown_state = DOMSHUTDOWN_in_progress;
 
     smp_mb(); /* set shutdown status /then/ check for per-cpu deferrals */
 
@@ -1437,7 +1437,7 @@ void domain_resume(struct domain *d)
 
     spin_lock(&d->shutdown_lock);
 
-    d->is_shutting_down = d->is_shut_down = 0;
+    d->shutdown_state = DOMSHUTDOWN_none;
 
     arch_domain_resume(d);
 
@@ -1462,7 +1462,7 @@ int vcpu_start_shutdown_deferral(struct vcpu *v)
 
     v->defer_shutdown = 1;
     smp_mb(); /* set deferral status /then/ check for shutdown */
-    if ( unlikely(v->domain->is_shutting_down) )
+    if ( unlikely(domain_shutting_down(v->domain)) )
         vcpu_check_shutdown(v);
 
     return v->defer_shutdown;
@@ -1472,7 +1472,7 @@ void vcpu_end_shutdown_deferral(struct vcpu *v)
 {
     v->defer_shutdown = 0;
     smp_mb(); /* clear deferral status /then/ check for shutdown */
-    if ( unlikely(v->domain->is_shutting_down) )
+    if ( unlikely(domain_shutting_down(v->domain)) )
         vcpu_check_shutdown(v);
 }
 

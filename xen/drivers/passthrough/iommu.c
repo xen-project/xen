@@ -355,7 +355,7 @@ long iommu_map(struct domain *d, dfn_t dfn0, mfn_t mfn0,
         if ( likely(!rc) )
             continue;
 
-        if ( !d->is_shutting_down && printk_ratelimit() )
+        if ( !domain_shutting_down(d) && printk_ratelimit() )
             printk(XENLOG_ERR
                    "d%d: IOMMU mapping dfn %"PRI_dfn" to mfn %"PRI_mfn" failed: %d\n",
                    d->domain_id, dfn_x(dfn), mfn_x(mfn), rc);
@@ -427,7 +427,7 @@ long iommu_unmap(struct domain *d, dfn_t dfn0, unsigned long page_count,
         if ( likely(!err) )
             continue;
 
-        if ( !d->is_shutting_down && printk_ratelimit() )
+        if ( !domain_shutting_down(d) && printk_ratelimit() )
             printk(XENLOG_ERR
                    "d%d: IOMMU unmapping dfn %"PRI_dfn" failed: %d\n",
                    d->domain_id, dfn_x(dfn), err);
@@ -492,7 +492,7 @@ int iommu_iotlb_flush(struct domain *d, dfn_t dfn, unsigned long page_count,
                     flush_flags);
     if ( unlikely(rc) )
     {
-        if ( !d->is_shutting_down && printk_ratelimit() )
+        if ( !domain_shutting_down(d) && printk_ratelimit() )
             printk(XENLOG_ERR
                    "d%d: IOMMU IOTLB flush failed: %d, dfn %"PRI_dfn", page count %lu flags %x\n",
                    d->domain_id, rc, dfn_x(dfn), page_count, flush_flags);
@@ -517,7 +517,7 @@ int iommu_iotlb_flush_all(struct domain *d, unsigned int flush_flags)
                     flush_flags | IOMMU_FLUSHF_all);
     if ( unlikely(rc) )
     {
-        if ( !d->is_shutting_down && printk_ratelimit() )
+        if ( !domain_shutting_down(d) && printk_ratelimit() )
             printk(XENLOG_ERR
                    "d%d: IOMMU IOTLB flush all failed: %d\n",
                    d->domain_id, rc);

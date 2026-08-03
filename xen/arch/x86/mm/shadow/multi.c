@@ -2370,7 +2370,8 @@ static int cf_check sh_page_fault(
      * already used for some special purpose (ioreq pages, or granted pages).
      * If that happens we'll have killed the guest already but it's still not
      * safe to propagate entries out of the guest PT so get out now. */
-    if ( unlikely(d->is_shutting_down && d->shutdown_code == SHUTDOWN_crash) )
+    if ( unlikely(domain_shutting_down(d)) &&
+         d->shutdown_code == SHUTDOWN_crash )
     {
         SHADOW_PRINTK("guest is shutting down\n");
         goto propagate;
@@ -2480,7 +2481,7 @@ static int cf_check sh_page_fault(
 #if GUEST_PAGING_LEVELS == 3
         sh_update_cr3(v, false);
 #else
-        ASSERT(d->is_shutting_down);
+        ASSERT(domain_shutting_down(d));
         sh_trace_va(TRC_SHADOW_DOMF_DYING, va);
 #endif
         paging_unlock(d);
@@ -2494,7 +2495,8 @@ static int cf_check sh_page_fault(
          && ft == ft_demand_write )
         sh_unsync(v, gmfn);
 
-    if ( unlikely(d->is_shutting_down && d->shutdown_code == SHUTDOWN_crash) )
+    if ( unlikely(domain_shutting_down(d)) &&
+         d->shutdown_code == SHUTDOWN_crash )
     {
         /* We might end up with a crashed domain here if
          * sh_remove_shadows() in a previous sh_resync() call has
@@ -3265,7 +3267,7 @@ static pagetable_t cf_check sh_update_cr3(struct vcpu *v, bool noflush)
                                        sh_make_shadow);
     if ( unlikely(pagetable_is_null(v->arch.paging.shadow.shadow_table[0])) )
     {
-        ASSERT(d->is_dying || d->is_shutting_down);
+        ASSERT(d->is_dying || domain_shutting_down(d));
         return old_entry;
     }
     if ( !paging_mode_external(d) && !is_pv_32bit_domain(d) )
@@ -3332,7 +3334,7 @@ static pagetable_t cf_check sh_update_cr3(struct vcpu *v, bool noflush)
     ASSERT(pagetable_is_null(old_entry));
     if ( unlikely(pagetable_is_null(v->arch.paging.shadow.shadow_table[0])) )
     {
-        ASSERT(d->is_dying || d->is_shutting_down);
+        ASSERT(d->is_dying || domain_shutting_down(d));
         return old_entry;
     }
 #else

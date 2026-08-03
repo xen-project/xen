@@ -224,7 +224,7 @@ struct vcpu
     bool             force_context_switch;
     /* Require shutdown to be deferred for some asynchronous operation? */
     bool             defer_shutdown;
-    /* VCPU is paused following shutdown request (d->is_shutting_down)? */
+    /* VCPU is paused following a domain shutdown request? */
     bool             paused_for_shutdown;
     /* VCPU need affinity restored */
     uint8_t          affinity_broken;
@@ -382,6 +382,12 @@ struct domain_console {
     unsigned int idx;
     spinlock_t lock;
     char buf[256];
+};
+
+enum __packed domain_shutdown_state {
+    DOMSHUTDOWN_none, /* Must remain first, as domains are zero-initialized. */
+    DOMSHUTDOWN_in_progress,
+    DOMSHUTDOWN_complete,
 };
 
 struct domain
@@ -555,10 +561,9 @@ struct domain
     struct rangeset *iomem_caps;
     struct rangeset *irq_caps;
 
-    /* Guest has shut down (inc. reason code)? */
+    /* Guest shutdown state and associated reason code. */
     spinlock_t       shutdown_lock;
-    bool             is_shutting_down; /* in process of shutting down? */
-    bool             is_shut_down;     /* fully shut down? */
+    enum domain_shutdown_state shutdown_state;
 #define SHUTDOWN_CODE_INVALID ~0u
     unsigned int     shutdown_code;
 
@@ -676,6 +681,16 @@ struct domain
     unsigned int pending_scrub_order;
     unsigned int pending_scrub_index;
 } __aligned(PAGE_SIZE);
+
+static inline bool domain_shutting_down(const struct domain *d)
+{
+    return d->shutdown_state != DOMSHUTDOWN_none;
+}
+
+static inline bool domain_shutdown_completed(const struct domain *d)
+{
+    return d->shutdown_state == DOMSHUTDOWN_complete;
+}
 
 static inline struct page_list_head *page_to_list(
     struct domain *d, const struct page_info *pg)

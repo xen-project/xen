@@ -164,7 +164,7 @@ void shadow_promote(struct domain *d, mfn_t gmfn, unsigned int type)
     /* We should never try to promote a gmfn that has writeable mappings */
     ASSERT((page->u.inuse.type_info & PGT_type_mask) != PGT_writable_page
            || (page->u.inuse.type_info & PGT_count_mask) == 0
-           || d->is_shutting_down);
+           || domain_shutting_down(d));
 
     /* Is the page already shadowed? */
     if ( !test_and_set_bit(_PGC_shadowed_pt, &page->count_info) )
@@ -442,7 +442,8 @@ bool shadow_prealloc(struct domain *d, unsigned int type, unsigned int count)
         count += paging_logdirty_levels();
 
     ret = _shadow_prealloc(d, count);
-    if ( !ret && (!d->is_shutting_down || d->shutdown_code != SHUTDOWN_crash) )
+    if ( !ret &&
+         (!domain_shutting_down(d) || d->shutdown_code != SHUTDOWN_crash) )
         /*
          * Failing to allocate memory required for shadow usage can only result in
          * a domain crash, do it here rather that relying on every caller to do it.

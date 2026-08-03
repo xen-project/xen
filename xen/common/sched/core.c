@@ -1552,7 +1552,7 @@ static void cf_check domain_watchdog_timeout(void *data)
 
     BUILD_BUG_ON(alignof(*d) < PAGE_SIZE);
 
-    if ( d->is_shutting_down || d->is_dying )
+    if ( domain_shutting_down(d) || d->is_dying )
         return;
 
     printk("Watchdog timer %u fired for %pd\n", id, d);

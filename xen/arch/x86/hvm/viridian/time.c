@@ -102,7 +102,7 @@ static void time_ref_count_thaw(const struct domain *d)
     struct viridian_domain *vd = d->arch.hvm.viridian;
     struct viridian_time_ref_count *trc = &vd->time_ref_count;
 
-    if ( d->is_shutting_down ||
+    if ( domain_shutting_down(d) ||
          test_and_set_bit(_TRC_running, &trc->flags) )
         return;
 
