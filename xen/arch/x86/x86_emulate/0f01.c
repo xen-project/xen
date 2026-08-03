@@ -34,7 +34,7 @@ int x86emul_0f01(struct x86_emulate_state *s,
     case 0xc6:
         switch ( s->vex.pfx )
         {
-        case vex_none: /* wrmsrns */
+        case vex_np: /* wrmsrns */
             vcpu_must_have(wrmsrns);
             generate_exception_if(!mode_ring0(), X86_EXC_GP, 0);
             fail_if(!ops->write_msr);
@@ -120,7 +120,7 @@ int x86emul_0f01(struct x86_emulate_state *s,
     case 0xe8:
         switch ( s->vex.pfx )
         {
-        case vex_none: /* serialize */
+        case vex_np: /* serialize */
             vcpu_must_have(serialize);
             asm volatile ( ".byte 0x0f, 0x01, 0xe8" ); /* Binutils >= 2.34, Clang >= 11 */
             break;
@@ -154,7 +154,7 @@ int x86emul_0f01(struct x86_emulate_state *s,
     case 0xee:
         switch ( s->vex.pfx )
         {
-        case vex_none: /* rdpkru */
+        case vex_np: /* rdpkru */
             if ( !ops->read_cr ||
                  ops->read_cr(4, &cr4, ctxt) != X86EMUL_OKAY )
                 cr4 = 0;
@@ -171,7 +171,7 @@ int x86emul_0f01(struct x86_emulate_state *s,
     case 0xef:
         switch ( s->vex.pfx )
         {
-        case vex_none: /* wrpkru */
+        case vex_np: /* wrpkru */
             if ( !ops->read_cr ||
                  ops->read_cr(4, &cr4, ctxt) != X86EMUL_OKAY )
                 cr4 = 0;

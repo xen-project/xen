@@ -195,10 +195,9 @@ enum simd_opsize {
 };
 typedef uint8_t simd_opsize_t;
 
-#define vex_none 0
-
 enum vex_opcx {
-    vex_0f = vex_none + 1,
+    vex_none,
+    vex_0f,
     vex_0f38,
     vex_0f3a,
     evex_map5 = 5,
@@ -206,7 +205,8 @@ enum vex_opcx {
 };
 
 enum vex_pfx {
-    vex_66 = vex_none + 1,
+    vex_np,
+    vex_66,
     vex_f3,
     vex_f2
 };

@@ -6031,7 +6031,7 @@ x86_emulate(
         pvex = copy_VEX(opc, vex);
         pvex->opcx = vex_0f;
         if ( elem_bytes == 4 )
-            pvex->pfx = vex_none;
+            pvex->pfx = vex_np;
         opc[0] = 0x50; /* vmovmskp{s,d} */
         /* Use %rax as GPR destination and VEX.vvvv as source. */
         pvex->r = 1;

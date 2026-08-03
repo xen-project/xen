@@ -1862,7 +1862,7 @@ int x86emul_decode(struct x86_emulate_state *s,
     case simd_packed_int:
         switch ( s->vex.pfx )
         {
-        case vex_none:
+        case vex_np:
             if ( !s->vex.opcx )
             {
                 s->op_bytes = 8;
