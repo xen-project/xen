@@ -485,6 +485,7 @@ static unsigned long node_need_scrub[MAX_NUMNODES];
 
 static unsigned long *avail[MAX_NUMNODES];
 static unsigned long total_avail_pages;
+static unsigned long node_avail_pages[MAX_NUMNODES];
 
 static DEFINE_SPINLOCK(heap_lock);
 /* Total outstanding claims by all domains */
@@ -1050,6 +1051,8 @@ static struct page_info *alloc_heap_pages(
     avail[node][zone] -= request;
     ASSERT(total_avail_pages >= request);
     total_avail_pages -= request;
+    ASSERT(node_avail_pages[node] >= request);
+    node_avail_pages[node] -= request;
 
     if ( d && d->outstanding_pages && !(memflags & MEMF_no_refcount) )
     {
@@ -1250,6 +1253,8 @@ static int reserve_offlined_page(struct page_info *head)
         avail[node][zone]--;
         ASSERT(total_avail_pages > 0);
         total_avail_pages--;
+        ASSERT(node_avail_pages[node] > 0);
+        node_avail_pages[node]--;
 
         /*
          * All offlined pages are standalone pages: If this offlined page was
@@ -1579,6 +1584,7 @@ static void free_heap_pages(
 
     avail[node][zone] += 1 << order;
     total_avail_pages += 1 << order;
+    node_avail_pages[node] += 1 << order;
     if ( need_scrub )
     {
         node_need_scrub[node] += 1 << order;
@@ -2844,7 +2850,10 @@ unsigned long avail_domheap_pages_region(
 
 unsigned long avail_node_heap_pages(unsigned int nodeid)
 {
-    return avail_heap_pages(MEMZONE_XEN, NR_ZONES -1, nodeid);
+    if ( nodeid < MAX_NUMNODES && node_online(nodeid) )
+        return node_avail_pages[nodeid];
+
+    return 0;
 }
 
 
