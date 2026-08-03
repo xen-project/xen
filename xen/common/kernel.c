@@ -34,7 +34,7 @@ bool __ro_after_init opt_dit = IS_ENABLED(CONFIG_DIT_DEFAULT);
 boolean_param("dit", opt_dit);
 #endif
 
-static xen_commandline_t saved_cmdline;
+static xen_commandline_t __ro_after_init saved_cmdline;
 static const char __initconst opt_builtin_cmdline[] = CONFIG_CMDLINE;
 char __ro_after_init xen_cap_info[128];
 
