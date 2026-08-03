@@ -20,7 +20,6 @@
 #include <xen/symbols.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
-#include <xen/livepatch.h>
 #include <asm/div64.h>
 #include <asm/page.h>
 

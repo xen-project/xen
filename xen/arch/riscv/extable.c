@@ -3,7 +3,6 @@
 #include <xen/init.h>
 #include <xen/bsearch.h>
 #include <xen/lib.h>
-#include <xen/livepatch.h>
 #include <xen/sort.h>
 #include <xen/virtual_region.h>
 

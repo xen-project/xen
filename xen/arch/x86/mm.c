@@ -101,7 +101,6 @@
 #include <xen/irq.h>
 #include <xen/kernel.h>
 #include <xen/lib.h>
-#include <xen/livepatch.h>
 #include <xen/mm.h>
 #include <xen/param.h>
 #include <xen/perfc.h>

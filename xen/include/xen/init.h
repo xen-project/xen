@@ -19,6 +19,25 @@
 #define __initdata_cf_clobber  __section(".init.data.cf_clobber")
 #define __initconst_cf_clobber __section(".init.rodata.cf_clobber")
 
+/*
+ * Various pieces of functionality are needed at runtime only if livepatching
+ * is enabled.  Provide tags which resolve to the appropriate section
+ * annotation in either configuration.
+ */
+#ifdef CONFIG_LIVEPATCH
+# define init_or_livepatch_const
+# define init_or_livepatch_constrel
+# define init_or_livepatch_data
+# define init_or_livepatch_read_mostly __read_mostly
+# define init_or_livepatch
+#else /* !CONFIG_LIVEPATCH */
+# define init_or_livepatch_const       __initconst
+# define init_or_livepatch_constrel    __initconstrel
+# define init_or_livepatch_data        __initdata
+# define init_or_livepatch_read_mostly __initdata
+# define init_or_livepatch             __init
+#endif /* !CONFIG_LIVEPATCH */
+
 /* These macros are used to mark some functions or 
  * initialized data (doesn't apply to uninitialized data)
  * as `initialization' functions. The kernel can take this

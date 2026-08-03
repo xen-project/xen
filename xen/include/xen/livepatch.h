@@ -22,17 +22,6 @@ struct xen_sysctl_livepatch_op;
 
 #include <public/sysctl.h>
 
-/*
- * We use alternative and exception table code - which by default are __init
- * only, however we need them during runtime. These macros allows us to build
- * the image with these functions built-in. (See the #else below).
- */
-#define init_or_livepatch_const
-#define init_or_livepatch_constrel
-#define init_or_livepatch_data
-#define init_or_livepatch_read_mostly __read_mostly
-#define init_or_livepatch
-
 /* Convenience define for printk. */
 #define LIVEPATCH             "livepatch: "
 /* ELF payload special section names. */
@@ -144,16 +133,6 @@ int revert_payload(struct payload *data);
 void revert_payload_tail(struct payload *data);
 
 #else /* !CONFIG_LIVEPATCH */
-
-/*
- * If not compiling with Live Patch certain functionality should stay as
- * __init.
- */
-#define init_or_livepatch_const       __initconst
-#define init_or_livepatch_constrel    __initconstrel
-#define init_or_livepatch_data        __initdata
-#define init_or_livepatch_read_mostly __initdata
-#define init_or_livepatch             __init
 
 static inline int livepatch_op(struct xen_sysctl_livepatch_op *op)
 {

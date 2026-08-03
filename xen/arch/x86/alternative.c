@@ -5,7 +5,6 @@
 
 #include <xen/delay.h>
 #include <xen/init.h>
-#include <xen/livepatch.h>
 
 #include <asm/alternative.h>
 #include <asm/apic.h>

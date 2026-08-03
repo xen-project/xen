@@ -2,7 +2,6 @@
 #include <xen/domain_page.h>
 #include <xen/init.h>
 #include <xen/list.h>
-#include <xen/livepatch.h>
 #include <xen/perfc.h>
 #include <xen/rcupdate.h>
 #include <xen/sort.h>
