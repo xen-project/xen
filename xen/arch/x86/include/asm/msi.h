@@ -83,7 +83,7 @@ struct msi_desc;
 extern int pci_enable_msi(struct pci_dev *pdev, struct msi_info *msi,
                           struct msi_desc **desc);
 extern void pci_disable_msi(struct msi_desc *msi_desc);
-extern int pci_prepare_msix(u16 seg, u8 bus, u8 devfn, bool off);
+extern int pci_prepare_msix(pci_sbdf_t sbdf, bool off);
 extern void pci_cleanup_msi(struct pci_dev *pdev);
 extern void pci_disable_msi_all(void);
 extern int setup_msi_irq(struct irq_desc *desc, struct msi_desc *msidesc);

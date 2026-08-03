@@ -512,15 +512,17 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case PHYSDEVOP_prepare_msix:
     case PHYSDEVOP_release_msix: {
         struct physdev_pci_device dev;
+        pci_sbdf_t sbdf;
 
+        ret = -EFAULT;
         if ( copy_from_guest(&dev, arg, 1) )
-            ret = -EFAULT;
-        else
-            ret = xsm_resource_setup_pci(XSM_PRIV,
-                                         (dev.seg << 16) | (dev.bus << 8) |
-                                         dev.devfn) ?:
-                  pci_prepare_msix(dev.seg, dev.bus, dev.devfn,
-                                   cmd != PHYSDEVOP_prepare_msix);
+            break;
+        
+        sbdf = PCI_SBDF(dev.seg, dev.bus, dev.devfn);
+
+        ret = xsm_resource_setup_pci(XSM_PRIV, sbdf.sbdf);
+        if ( !ret )
+            ret = pci_prepare_msix(sbdf, cmd != PHYSDEVOP_prepare_msix);
         break;
     }
 

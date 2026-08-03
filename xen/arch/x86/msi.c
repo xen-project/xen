@@ -1153,7 +1153,7 @@ static void __pci_disable_msix(struct msi_desc *entry)
     _pci_cleanup_msix(dev->msix);
 }
 
-int pci_prepare_msix(u16 seg, u8 bus, u8 devfn, bool off)
+int pci_prepare_msix(pci_sbdf_t sbdf, bool off)
 {
     int rc;
     struct pci_dev *pdev;
@@ -1162,7 +1162,7 @@ int pci_prepare_msix(u16 seg, u8 bus, u8 devfn, bool off)
         return 0;
 
     pcidevs_lock();
-    pdev = pci_get_pdev(NULL, PCI_SBDF(seg, bus, devfn));
+    pdev = pci_get_pdev(NULL, sbdf);
     if ( !pdev )
         rc = -ENODEV;
     else if ( pdev->msix->used_entries != !!off )
