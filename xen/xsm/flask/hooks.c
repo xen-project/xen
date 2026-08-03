@@ -1345,10 +1345,12 @@ static int cf_check flask_resource_setup_misc(void)
     return avc_current_has_perm(SECINITSID_XEN, SECCLASS_RESOURCE, RESOURCE__SETUP, NULL);
 }
 
+#ifdef CONFIG_HYPFS
 static inline int cf_check flask_hypfs_op(void)
 {
     return domain_has_xen(current->domain, XEN__HYPFS_OP);
 }
+#endif
 
 static int cf_check flask_add_to_physmap(struct domain *d1, struct domain *d2)
 {

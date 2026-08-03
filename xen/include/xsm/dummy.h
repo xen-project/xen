@@ -437,11 +437,13 @@ static XSM_INLINE int cf_check xsm_resource_setup_misc(XSM_DEFAULT_VOID)
     return xsm_default_action(action, current->domain, NULL);
 }
 
+#ifdef CONFIG_HYPFS
 static XSM_INLINE int cf_check xsm_hypfs_op(XSM_DEFAULT_VOID)
 {
     XSM_ASSERT_ACTION(XSM_PRIV);
     return xsm_default_action(action, current->domain, NULL);
 }
+#endif
 
 static XSM_INLINE long cf_check xsm_do_xsm_op(XEN_GUEST_HANDLE_PARAM(void) op)
 {

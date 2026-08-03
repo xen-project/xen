@@ -100,7 +100,9 @@ XSM_HOOK(int, pci_config_permission, struct domain *, uint32_t, uint16_t,
                                      uint16_t, uint8_t)
 #endif
 
+#ifdef CONFIG_HYPFS
 XSM_HOOK(int, hypfs_op)
+#endif
 
 XSM_HOOK(int, hvm_param, struct domain *, unsigned long)
 XSM_HOOK(int, hvm_param_altp2mhvm, struct domain *)
