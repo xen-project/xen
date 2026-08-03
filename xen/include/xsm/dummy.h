@@ -739,11 +739,13 @@ static XSM_INLINE int cf_check xsm_pmu_op(
 
 #endif /* CONFIG_X86 */
 
+#ifdef CONFIG_IOREQ_SERVER
 static XSM_INLINE int cf_check xsm_dm_op(XSM_DEFAULT_ARG struct domain *d)
 {
     XSM_ASSERT_ACTION(XSM_DM_PRIV);
     return xsm_default_action(action, current->domain, d);
 }
+#endif
 
 #ifdef CONFIG_ARGO
 static XSM_INLINE int cf_check xsm_argo_enable(const struct domain *d)

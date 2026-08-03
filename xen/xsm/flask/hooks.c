@@ -1852,10 +1852,12 @@ static int cf_check flask_pmu_op(struct domain *d, unsigned int op)
 }
 #endif /* CONFIG_X86 */
 
+#ifdef CONFIG_IOREQ_SERVER
 static int cf_check flask_dm_op(struct domain *d)
 {
     return current_has_perm(d, SECCLASS_HVM, HVM__DM);
 }
+#endif
 
 static int cf_check flask_xen_version(uint32_t op)
 {

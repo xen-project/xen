@@ -145,7 +145,10 @@ XSM_HOOK(int, ioport_mapping, struct domain *, uint32_t, uint32_t, uint8_t)
 XSM_HOOK(int, pmu_op, struct domain *, unsigned int)
 #endif /* CONFIG_X86 */
 
+#ifdef CONFIG_IOREQ_SERVER
 XSM_HOOK(int, dm_op, struct domain *)
+#endif
+
 XSM_HOOK(int, xen_version, uint32_t)
 XSM_HOOK(int, domain_resource_map, struct domain *)
 
