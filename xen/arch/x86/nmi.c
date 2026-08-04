@@ -246,29 +246,20 @@ static inline void write_watchdog_counter(const char *descr)
 
 static void setup_k7_watchdog(void)
 {
-    unsigned int evntsel;
-
     nmi_perfctr_msr = MSR_K7_PERFCTR0;
 
     clear_msr_range(MSR_K7_EVNTSEL0, 4);
     clear_msr_range(MSR_K7_PERFCTR0, 4);
 
-    evntsel = K7_EVNTSEL_INT
-        | K7_EVNTSEL_OS
-        | K7_EVNTSEL_USR
-        | K7_EVENT_CYCLES_PROCESSOR_IS_RUNNING;
-
-    wrmsrns(MSR_K7_EVNTSEL0, evntsel);
     write_watchdog_counter("K7_PERFCTR0");
     apic_write(APIC_LVTPC, APIC_DM_NMI);
-    evntsel |= K7_EVNTSEL_ENABLE;
-    wrmsrns(MSR_K7_EVNTSEL0, evntsel);
+    wrmsrns(MSR_K7_EVNTSEL0,
+            K7_EVNTSEL_ENABLE | K7_EVNTSEL_INT | K7_EVNTSEL_OS |
+            K7_EVNTSEL_USR | K7_EVENT_CYCLES_PROCESSOR_IS_RUNNING);
 }
 
-static void setup_p6_watchdog(unsigned counter)
+static void setup_p6_watchdog(unsigned int event)
 {
-    unsigned int evntsel;
-
     if ( !nmi_p6_event_width && boot_cpu_data.cpuid_level >= 0xa )
         nmi_p6_event_width = MASK_EXTR(cpuid_eax(0xa), P6_EVENT_WIDTH_MASK);
     if ( !nmi_p6_event_width )
@@ -283,16 +274,11 @@ static void setup_p6_watchdog(unsigned counter)
     clear_msr_range(MSR_P6_EVNTSEL(0), 2);
     clear_msr_range(MSR_P6_PERFCTR(0), 2);
 
-    evntsel = P6_EVNTSEL_INT
-        | P6_EVNTSEL_OS
-        | P6_EVNTSEL_USR
-        | counter;
-
-    wrmsrns(MSR_P6_EVNTSEL(0), evntsel);
     write_watchdog_counter("P6_PERFCTR0");
     apic_write(APIC_LVTPC, APIC_DM_NMI);
-    evntsel |= P6_EVNTSEL0_ENABLE;
-    wrmsrns(MSR_P6_EVNTSEL(0), evntsel);
+    wrmsrns(MSR_P6_EVNTSEL(0),
+            P6_EVNTSEL0_ENABLE | P6_EVNTSEL_INT | P6_EVNTSEL_OS |
+            P6_EVNTSEL_USR | event);
 }
 
 static void setup_p4_watchdog(uint64_t misc_enable)
@@ -316,7 +302,6 @@ static void setup_p4_watchdog(uint64_t misc_enable)
     clear_msr_range(MSR_P4_BPU_PERFCTR0, 18);
 
     wrmsrl(MSR_P4_CRU_ESCR0, P4_NMI_CRU_ESCR0);
-    wrmsrl(MSR_P4_IQ_CCCR0, P4_NMI_IQ_CCCR0 & ~P4_CCCR_ENABLE);
     write_watchdog_counter("P4_IQ_COUNTER0");
     apic_write(APIC_LVTPC, APIC_DM_NMI);
     wrmsrl(MSR_P4_IQ_CCCR0, nmi_p4_cccr_val);
