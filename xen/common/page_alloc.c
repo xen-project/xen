@@ -1101,14 +1101,16 @@ static struct page_info *alloc_heap_pages(
         /* Preserve PGC_need_scrub so we can check it after lock is dropped. */
         pg[i].count_info = PGC_state_inuse | (pg[i].count_info & PGC_need_scrub);
 
-        if ( !(memflags & MEMF_no_tlbflush) )
-            accumulate_tlbflush(&need_tlbflush, &pg[i],
-                                &tlbflush_timestamp);
+        accumulate_tlbflush(&need_tlbflush, &pg[i], &tlbflush_timestamp);
 
         init_free_page_fields(&pg[i]);
     }
 
     spin_unlock(&heap_lock);
+
+    /* Flush ahead of scrubbing: ensure no PV domain has a stale TLB entry. */
+    if ( need_tlbflush )
+        filtered_flush_tlb_mask(tlbflush_timestamp);
 
     if ( first_dirty != INVALID_DIRTY_IDX ||
          (scrub_debug && !(memflags & MEMF_no_scrub)) )
@@ -1144,9 +1146,6 @@ static struct page_info *alloc_heap_pages(
             spin_unlock(&heap_lock);
         }
     }
-
-    if ( need_tlbflush )
-        filtered_flush_tlb_mask(tlbflush_timestamp);
 
     /*
      * Ensure cache and RAM are consistent for platforms where the guest
@@ -1409,6 +1408,13 @@ bool scrub_free_pages(void)
                 {
                     if ( test_bit(_PGC_need_scrub, &pg[i].count_info) )
                     {
+                        bool need_tlbflush = false;
+                        uint32_t tlbflush_ts = 0;
+
+                        accumulate_tlbflush(&need_tlbflush, &pg[i], &tlbflush_ts);
+                        if ( need_tlbflush )
+                            filtered_flush_tlb_mask(tlbflush_ts);
+
                         scrub_one_page(&pg[i], true);
                         /*
                          * We can modify count_info without holding heap
@@ -2077,7 +2083,7 @@ static struct page_info *alloc_color_heap_page(unsigned int memflags,
     uint32_t tlbflush_timestamp = 0;
     bool need_scrub;
 
-    if ( memflags & ~(MEMF_no_refcount | MEMF_no_owner | MEMF_no_tlbflush |
+    if ( memflags & ~(MEMF_no_refcount | MEMF_no_owner |
                       MEMF_no_icache_flush | MEMF_no_scrub) )
         return NULL;
 
@@ -2106,12 +2112,15 @@ static struct page_info *alloc_color_heap_page(unsigned int memflags,
     free_colored_pages[color]--;
     page_list_del(pg, color_heap(color));
 
-    if ( !(memflags & MEMF_no_tlbflush) )
-        accumulate_tlbflush(&need_tlbflush, pg, &tlbflush_timestamp);
+    accumulate_tlbflush(&need_tlbflush, pg, &tlbflush_timestamp);
 
     init_free_page_fields(pg);
 
     spin_unlock(&heap_lock);
+
+    /* Flush ahead of scrubbing: ensure no PV domain has a stale TLB entry. */
+    if ( need_tlbflush )
+        filtered_flush_tlb_mask(tlbflush_timestamp);
 
     if ( !(memflags & MEMF_no_scrub) )
     {
@@ -2120,9 +2129,6 @@ static struct page_info *alloc_color_heap_page(unsigned int memflags,
         else
             check_one_page(pg);
     }
-
-    if ( need_tlbflush )
-        filtered_flush_tlb_mask(tlbflush_timestamp);
 
     flush_page_to_ram(mfn_x(page_to_mfn(pg)),
                       !(memflags & MEMF_no_icache_flush));
@@ -3041,9 +3047,7 @@ static bool prepare_staticmem_pages(struct page_info *pg, unsigned long nr_mfns,
             goto out_err;
         }
 
-        if ( !(memflags & MEMF_no_tlbflush) )
-            accumulate_tlbflush(&need_tlbflush, &pg[i],
-                                &tlbflush_timestamp);
+        accumulate_tlbflush(&need_tlbflush, &pg[i], &tlbflush_timestamp);
 
         /*
          * Preserve flag PGC_static and change page state

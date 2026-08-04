@@ -222,8 +222,6 @@ struct npfec {
 #define  MEMF_exact_node  (1U<<_MEMF_exact_node)
 #define _MEMF_no_owner    5
 #define  MEMF_no_owner    (1U<<_MEMF_no_owner)
-#define _MEMF_no_tlbflush 6
-#define  MEMF_no_tlbflush (1U<<_MEMF_no_tlbflush)
 #define _MEMF_no_icache_flush 7
 #define  MEMF_no_icache_flush (1U<<_MEMF_no_icache_flush)
 #define _MEMF_no_scrub    8
