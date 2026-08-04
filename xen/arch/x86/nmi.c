@@ -13,26 +13,25 @@
  *  Mikael Pettersson : PM converted to driver model. Disable/enable API.
  */
 
+#include <xen/console.h>
+#include <xen/cpu.h>
+#include <xen/delay.h>
 #include <xen/init.h>
+#include <xen/irq.h>
+#include <xen/keyhandler.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/param.h>
-#include <xen/irq.h>
-#include <xen/delay.h>
-#include <xen/time.h>
 #include <xen/sched.h>
-#include <xen/console.h>
 #include <xen/smp.h>
-#include <xen/keyhandler.h>
+#include <xen/time.h>
 #include <xen/watchdog.h>
-#include <xen/cpu.h>
-#include <asm/current.h>
-#include <asm/mc146818rtc.h>
-#include <asm/msr.h>
-#include <asm/mpspec.h>
-#include <asm/nmi.h>
-#include <asm/div64.h>
+
 #include <asm/apic.h>
+#include <asm/current.h>
+#include <asm/mpspec.h>
+#include <asm/msr.h>
+#include <asm/nmi.h>
 
 unsigned int nmi_watchdog = NMI_NONE;
 static unsigned int nmi_hz = HZ;
@@ -124,10 +123,10 @@ static int nmi_active;
 #define P4_CCCR_REQUIRED	(3<<16)
 #define P4_CCCR_ESCR_SELECT(N)	((N)<<13)
 #define P4_CCCR_ENABLE		(1<<12)
-/* 
+/*
  * Set up IQ_PERFCTR0 to behave like a clock, by having IQ_CCCR0 filter
  * CRU_ESCR0 (with any non-null event selector) through a complemented
- * max threshold. [IA32-Vol3, Section 14.9.9] 
+ * max threshold. [IA32-Vol3, Section 14.9.9]
  */
 #define P4_NMI_CRU_ESCR0	P4_ESCR_EVENT_SELECT(0x3F)
 #define P4_NMI_IQ_CCCR0	\
@@ -182,7 +181,7 @@ void __init check_nmi_watchdog(void)
      * There's a limit to how slow we can go because writing the perfctr
      * MSRs only sets the low 32 bits, with the top 8 bits sign-extended
      * from those, so it's not possible to set up a delay larger than
-     * 2^31 cycles and smaller than (2^40 - 2^31) cycles. 
+     * 2^31 cycles and smaller than (2^40 - 2^31) cycles.
      * (Intel SDM, section 18.22.2)
      */
     if ( nmi_watchdog == NMI_LOCAL_APIC )
@@ -199,8 +198,9 @@ static void cf_check nmi_timer_fn(void *unused)
 
 void disable_lapic_nmi_watchdog(void)
 {
-    if (nmi_active <= 0)
+    if ( nmi_active <= 0 )
         return;
+
     switch ( boot_cpu_data.vendor )
     {
     case X86_VENDOR_AMD:
@@ -231,9 +231,7 @@ void disable_lapic_nmi_watchdog(void)
 
 static void clear_msr_range(unsigned int base, unsigned int n)
 {
-    unsigned int i;
-
-    for (i = 0; i < n; i++)
+    for ( unsigned int i = 0; i < n; i++ )
         wrmsrns(base + i, 0);
 }
 
@@ -302,7 +300,7 @@ static void setup_p4_watchdog(void)
     uint64_t misc_enable;
 
     rdmsrl(MSR_IA32_MISC_ENABLE, misc_enable);
-    if (!(misc_enable & MSR_IA32_MISC_ENABLE_PERF_AVAIL))
+    if ( !(misc_enable & MSR_IA32_MISC_ENABLE_PERF_AVAIL) )
         return;
 
     nmi_perfctr_msr = MSR_P4_IQ_PERFCTR0;
@@ -310,7 +308,7 @@ static void setup_p4_watchdog(void)
     if ( boot_cpu_data.x86_num_siblings == 2 )
         nmi_p4_cccr_val |= P4_CCCR_OVF_PMI1;
 
-    if (!(misc_enable & MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL))
+    if ( !(misc_enable & MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL) )
         clear_msr_range(0x3F1, 2);
     /* MSR 0x3F0 seems to have a default value of 0xFC00, but current
        docs doesn't fully define it, so leave it alone for now. */
@@ -389,7 +387,7 @@ static int cf_check cpu_nmi_callback(
 }
 
 static struct notifier_block cpu_nmi_nfb = {
-    .notifier_call = cpu_nmi_callback
+    .notifier_call = cpu_nmi_callback,
 };
 
 static DEFINE_PER_CPU(unsigned int, last_irq_sums);
@@ -440,15 +438,15 @@ bool nmi_watchdog_tick(const struct cpu_user_regs *regs)
          * before doing the oops ...
          */
         this_cpu(alert_counter)++;
-        if ( this_cpu(alert_counter) == opt_watchdog_timeout*nmi_hz )
+        if ( this_cpu(alert_counter) == opt_watchdog_timeout * nmi_hz )
         {
             console_force_unlock();
             printk("Watchdog timer detects that CPU%d is stuck!\n",
                    smp_processor_id());
             fatal_trap(regs, 1);
         }
-    } 
-    else 
+    }
+    else
     {
         this_cpu(last_irq_sums) = sum;
         this_cpu(alert_counter) = 0;
@@ -508,7 +506,8 @@ bool nmi_watchdog_tick(const struct cpu_user_regs *regs)
 void self_nmi(void)
 {
     unsigned long flags;
-    u32 id = get_apic_id();
+    uint32_t id = get_apic_id();
+
     local_irq_save(flags);
     apic_wait_icr_idle();
     apic_icr_write(APIC_DM_NMI | APIC_DEST_PHYSICAL, id);
