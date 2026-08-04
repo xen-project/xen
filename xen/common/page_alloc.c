@@ -1030,9 +1030,7 @@ static struct page_info *alloc_heap_pages(
         /* Preserve PGC_need_scrub so we can check it after lock is dropped. */
         pg[i].count_info = PGC_state_inuse | (pg[i].count_info & PGC_need_scrub);
 
-        if ( !(memflags & MEMF_no_tlbflush) )
-            accumulate_tlbflush(&need_tlbflush, &pg[i],
-                                &tlbflush_timestamp);
+        accumulate_tlbflush(&need_tlbflush, &pg[i], &tlbflush_timestamp);
 
         /* Initialise fields which have other uses for free pages. */
         pg[i].u.inuse.type_info = PGT_TYPE_INFO_INITIALIZER;
@@ -1041,6 +1039,10 @@ static struct page_info *alloc_heap_pages(
     }
 
     spin_unlock(&heap_lock);
+
+    /* Flush ahead of scrubbing: ensure no PV domain has a stale TLB entry. */
+    if ( need_tlbflush )
+        filtered_flush_tlb_mask(tlbflush_timestamp);
 
     if ( first_dirty != INVALID_DIRTY_IDX ||
          (scrub_debug && !(memflags & MEMF_no_scrub)) )
@@ -1065,9 +1067,6 @@ static struct page_info *alloc_heap_pages(
             spin_unlock(&heap_lock);
         }
     }
-
-    if ( need_tlbflush )
-        filtered_flush_tlb_mask(tlbflush_timestamp);
 
     /*
      * Ensure cache and RAM are consistent for platforms where the guest
@@ -1315,6 +1314,13 @@ bool scrub_free_pages(void)
                 {
                     if ( test_bit(_PGC_need_scrub, &pg[i].count_info) )
                     {
+                        bool need_tlbflush = false;
+                        uint32_t tlbflush_ts = 0;
+
+                        accumulate_tlbflush(&need_tlbflush, &pg[i], &tlbflush_ts);
+                        if ( need_tlbflush )
+                            filtered_flush_tlb_mask(tlbflush_ts);
+
                         scrub_one_page(&pg[i]);
                         /*
                          * We can modify count_info without holding heap
@@ -2791,9 +2797,7 @@ static bool prepare_staticmem_pages(struct page_info *pg, unsigned long nr_mfns,
             goto out_err;
         }
 
-        if ( !(memflags & MEMF_no_tlbflush) )
-            accumulate_tlbflush(&need_tlbflush, &pg[i],
-                                &tlbflush_timestamp);
+        accumulate_tlbflush(&need_tlbflush, &pg[i], &tlbflush_timestamp);
 
         /*
          * Preserve flag PGC_static and change page state
