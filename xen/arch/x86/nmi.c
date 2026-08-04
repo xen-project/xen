@@ -295,14 +295,8 @@ static void setup_p6_watchdog(unsigned counter)
     wrmsrns(MSR_P6_EVNTSEL(0), evntsel);
 }
 
-static void setup_p4_watchdog(void)
+static void setup_p4_watchdog(uint64_t misc_enable)
 {
-    uint64_t misc_enable;
-
-    rdmsrl(MSR_IA32_MISC_ENABLE, misc_enable);
-    if ( !(misc_enable & MSR_IA32_MISC_ENABLE_PERF_AVAIL) )
-        return;
-
     nmi_perfctr_msr = MSR_P4_IQ_PERFCTR0;
     nmi_p4_cccr_val = P4_NMI_IQ_CCCR0;
     if ( boot_cpu_data.x86_num_siblings == 2 )
@@ -330,6 +324,8 @@ static void setup_p4_watchdog(void)
 
 void setup_apic_nmi_watchdog(void)
 {
+    uint64_t misc;
+
     if ( nmi_watchdog == NMI_NONE )
         return;
 
@@ -340,6 +336,14 @@ void setup_apic_nmi_watchdog(void)
         break;
 
     case X86_VENDOR_INTEL:
+        misc = rdmsr(MSR_IA32_MISC_ENABLE);
+
+        if ( !(misc & MSR_IA32_MISC_ENABLE_PERF_AVAIL) )
+        {
+            printk(XENLOG_WARNING "Intel Perfmon unavailable\n");
+            break;
+        }
+
         switch ( boot_cpu_data.family )
         {
         case 6:
@@ -348,7 +352,7 @@ void setup_apic_nmi_watchdog(void)
                               : CORE_EVENT_CPU_CLOCKS_NOT_HALTED);
             break;
         case 15:
-            setup_p4_watchdog();
+            setup_p4_watchdog(misc);
             break;
         }
         break;
