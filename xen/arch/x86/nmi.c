@@ -102,7 +102,6 @@ static int nmi_active;
 #define K7_EVNTSEL_OS		(1 << 17)
 #define K7_EVNTSEL_USR		(1 << 16)
 #define K7_EVENT_CYCLES_PROCESSOR_IS_RUNNING	0x76
-#define K7_NMI_EVENT		K7_EVENT_CYCLES_PROCESSOR_IS_RUNNING
 #define K7_EVENT_WIDTH          32
 
 #define P6_EVNTSEL0_ENABLE	(1 << 22)
@@ -259,7 +258,7 @@ static void setup_k7_watchdog(void)
     evntsel = K7_EVNTSEL_INT
         | K7_EVNTSEL_OS
         | K7_EVNTSEL_USR
-        | K7_NMI_EVENT;
+        | K7_EVENT_CYCLES_PROCESSOR_IS_RUNNING;
 
     wrmsrns(MSR_K7_EVNTSEL0, evntsel);
     write_watchdog_counter("K7_PERFCTR0");
