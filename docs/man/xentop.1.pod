@@ -27,7 +27,7 @@ output version information and exit
 
 =item B<-d>, B<--delay>=I<SECONDS>
 
-seconds between updates (default 3)
+seconds between updates (default 3); must be a non-negative integer
 
 =item B<-n>, B<--networks>
 
@@ -55,7 +55,8 @@ output data in batch mode (to stdout)
 
 =item B<-i>, B<--iterations>=I<ITERATIONS>
 
-maximum number of iterations xentop should produce before ending
+maximum number of iterations xentop should produce before ending; must
+be a positive integer
 
 =item B<-z>, B<--dom0-first>
 

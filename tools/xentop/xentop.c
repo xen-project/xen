@@ -23,6 +23,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <limits.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1297,6 +1298,28 @@ static void signal_exit_handler(int sig)
 	signal_exit = 1;
 }
 
+/* Parse a numeric command line argument as a plain decimal integer no
+ * smaller than min_val.  Anything else - a sign, a fractional part,
+ * trailing junk, overflow - is fatal, rather than being silently
+ * accepted as a wrong value the way atoi() would.
+ */
+static unsigned int parse_uint_arg(const char *name, const char *arg,
+				   unsigned int min_val)
+{
+	unsigned long long val;
+	char *end;
+
+	errno = 0;
+	if (isdigit((unsigned char)arg[0])) {
+		val = strtoull(arg, &end, 10);
+		if (!errno && !*end && val >= min_val && val <= UINT_MAX)
+			return val;
+	}
+	fprintf(stderr, "xentop: invalid %s argument '%s': expected a %s decimal integer\n",
+		name, arg, min_val ? "positive" : "non-negative");
+	exit(1);
+}
+
 int main(int argc, char **argv)
 {
 	int opt, optind = 0;
@@ -1347,7 +1370,7 @@ int main(int argc, char **argv)
 			show_vcpus = 1;
 			break;
 		case 'd':
-			delay = atoi(optarg);
+			delay = parse_uint_arg("--delay", optarg, 0);
 			break;
 		case 'b':
 			batch = 1;
@@ -1356,7 +1379,7 @@ int main(int argc, char **argv)
 			show_pcpus = 1;
 			break;
 		case 'i':
-			iterations = atoi(optarg);
+			iterations = parse_uint_arg("--iterations", optarg, 1);
 			loop = 0;
 			break;
 		case 'f':
