@@ -349,6 +349,12 @@ static int __init process_domain_node(const void *fdt, int node,
         /* No "xen,static-mem" present. */
         return 0;
 
+    if ( !IS_ENABLED(CONFIG_STATIC_MEMORY) )
+    {
+        printk("CONFIG_STATIC_MEMORY must be enabled for parsing xen,static-mem\n");
+        return -EINVAL;
+    }
+
     return device_tree_get_meminfo(fdt, node, "xen,static-mem", address_cells,
                                    size_cells, bootinfo_get_reserved_mem(),
                                    MEMBANK_STATIC_DOMAIN);
