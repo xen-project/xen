@@ -129,7 +129,7 @@ guest_walk_tables(const struct vcpu *v, struct p2m_domain *p2m,
             guest_l4_table_offset(va) * sizeof(gw->l4e);
     if ( !hvmemul_read_cache(v, l4gpa, &gw->l4e, sizeof(gw->l4e)) )
     {
-        gw->l4e = l4p[guest_l4_table_offset(va)];
+        gw->l4e = (guest_l4e_t){ ACCESS_ONCE(l4p[guest_l4_table_offset(va)].l4) };
         hvmemul_write_cache(v, l4gpa, &gw->l4e, sizeof(gw->l4e));
     }
     gflags = guest_l4e_get_flags(gw->l4e);
@@ -164,7 +164,7 @@ guest_walk_tables(const struct vcpu *v, struct p2m_domain *p2m,
             guest_l3_table_offset(va) * sizeof(gw->l3e);
     if ( !hvmemul_read_cache(v, l3gpa, &gw->l3e, sizeof(gw->l3e)) )
     {
-        gw->l3e = l3p[guest_l3_table_offset(va)];
+        gw->l3e = (guest_l3e_t){ ACCESS_ONCE(l3p[guest_l3_table_offset(va)].l3) };
         hvmemul_write_cache(v, l3gpa, &gw->l3e, sizeof(gw->l3e));
     }
     gflags = guest_l3e_get_flags(gw->l3e);
@@ -264,7 +264,7 @@ guest_walk_tables(const struct vcpu *v, struct p2m_domain *p2m,
     l2gpa += guest_l2_table_offset(va) * sizeof(gw->l2e);
     if ( !hvmemul_read_cache(v, l2gpa, &gw->l2e, sizeof(gw->l2e)) )
     {
-        gw->l2e = l2p[guest_l2_table_offset(va)];
+        gw->l2e = (guest_l2e_t){ ACCESS_ONCE(l2p[guest_l2_table_offset(va)].l2) };
         hvmemul_write_cache(v, l2gpa, &gw->l2e, sizeof(gw->l2e));
     }
 
@@ -353,7 +353,7 @@ guest_walk_tables(const struct vcpu *v, struct p2m_domain *p2m,
             guest_l1_table_offset(va) * sizeof(gw->l1e);
     if ( !hvmemul_read_cache(v, l1gpa, &gw->l1e, sizeof(gw->l1e)) )
     {
-        gw->l1e = l1p[guest_l1_table_offset(va)];
+        gw->l1e = (guest_l1e_t){ ACCESS_ONCE(l1p[guest_l1_table_offset(va)].l1) };
         hvmemul_write_cache(v, l1gpa, &gw->l1e, sizeof(gw->l1e));
     }
 
