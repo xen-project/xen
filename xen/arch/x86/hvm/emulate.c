@@ -249,6 +249,7 @@ static int hvmemul_do_io(
     switch ( rc )
     {
     case X86EMUL_OKAY:
+    case X86EMUL_RETRY:
         vio->req.state = STATE_IOREQ_NONE;
         break;
     case X86EMUL_UNHANDLEABLE:
