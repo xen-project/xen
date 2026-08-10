@@ -5,7 +5,7 @@
 #
 # Author: Tom Roeder <tmroeder@google.com>
 #
-"""A tool for generating compile_commands.json in the Linux kernel."""
+"""A tool for generating compile_commands.json for the Xen hypervisor."""
 
 import argparse
 import json
@@ -19,7 +19,11 @@ _DEFAULT_OUTPUT = 'compile_commands.json'
 _DEFAULT_LOG_LEVEL = 'WARNING'
 
 _FILENAME_PATTERN = r'^\..*\.cmd$'
-_LINE_PATTERN = r'^(saved)?cmd_[^ ]*\.o := (?P<command_prefix>.* )(?P<file_path>[^ ]*\.[cS]) *(;|$)'
+# Capture the command up to and including "-c" plus the source file, and
+# drop the remainder: all that follows the source file is the output
+# location and dependency-tracking arguments ("-o ...", "-MQ ..."), which
+# database consumers do not need.
+_LINE_PATTERN = r'^(saved)?cmd_[^ ]*\.o := (?P<command_prefix>.* -c )(?P<file_path>[^ ]*\.[cS])( .*)?$'
 _VALID_LOG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
 # The tools/ directory adopts a different build system, and produces .cmd
 # files in a different format. Do not support it.
@@ -35,10 +39,10 @@ def parse_arguments():
         output: Where to write the compile-commands JSON file.
         paths: The list of files/directories to handle to find .cmd files.
     """
-    usage = 'Creates a compile_commands.json database from kernel .cmd files'
+    usage = 'Creates a compile_commands.json database from Xen .cmd files'
     parser = argparse.ArgumentParser(description=usage)
 
-    directory_help = ('specify the output directory used for the kernel build '
+    directory_help = ('specify the output directory used for the Xen build '
                       '(defaults to the working directory)')
     parser.add_argument('-d', '--directory', type=str, default='.',
                         help=directory_help)
