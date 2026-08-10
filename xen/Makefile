@@ -685,6 +685,9 @@ cloc:
 	    done; \
 	done | cloc --list-file=-
 
+compile_commands.json: FORCE
+	$(PYTHON) $(srctree)/scripts/gen_compile_commands.py -d $(objtree)
+
 # Target used by xen-analysis.sh script to retrieve Xen build system variables
 export-variable-%:
 	$(info $*=$($*))

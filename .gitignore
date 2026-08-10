@@ -192,6 +192,7 @@ xen/arch/*/include/generated
 xen/build-dir-cppcheck/
 xen/common/config_data.S
 xen/common/config.gz
+xen/compile_commands.json
 xen/cppcheck-htmlreport/
 xen/cppcheck-report/
 xen/cppcheck-misra.*
