@@ -291,7 +291,7 @@ extern void gic_preinit(void);
 /* Bring up the interrupt controller, and report # cpus attached */
 extern void gic_init(void);
 /* Bring up a secondary CPU's per-CPU GIC interface */
-extern void gic_init_secondary_cpu(void);
+extern int gic_init_secondary_cpu(void);
 /* Take down a CPU's per-CPU GIC interface */
 extern void gic_disable_cpu(void);
 /* setup the gic virtual interface for a guest */

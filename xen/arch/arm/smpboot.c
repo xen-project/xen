@@ -319,6 +319,7 @@ smp_prepare_cpus(void)
 void asmlinkage noreturn start_secondary(void)
 {
     unsigned int cpuid = init_data.cpuid;
+    int rc;
 
     memset(get_cpu_info(), 0, sizeof (struct cpu_info));
 
@@ -366,14 +367,20 @@ void asmlinkage noreturn start_secondary(void)
         stop_cpu();
     }
 
+    rc = gic_init_secondary_cpu();
+    if ( rc )
+    {
+        printk(XENLOG_ERR "CPU%u: Failed to initialize the GIC: %d\n",
+               smp_processor_id(), rc);
+        stop_cpu();
+    }
+
     /*
      * system features must be updated only if we do not stop the core or
      * we might disable features due to a non used core (for example when
      * booting on big cores on a big.LITTLE system with hmp_unsafe)
      */
     update_system_features(&current_cpu_data);
-
-    gic_init_secondary_cpu();
 
     set_current(idle_vcpu[cpuid]);
 

@@ -282,11 +282,17 @@ void smp_send_state_dump(unsigned int cpu)
 }
 
 /* Set up the per-CPU parts of the GIC for a secondary CPU */
-void gic_init_secondary_cpu(void)
+int gic_init_secondary_cpu(void)
 {
-    gic_hw_ops->secondary_init();
+    int rc = gic_hw_ops->secondary_init();
+
+    if ( rc )
+        return rc;
+
     /* Clear LR mask for secondary cpus */
     clear_cpu_lr_mask();
+
+    return 0;
 }
 
 /* Shut down the per-CPU GIC interface */
