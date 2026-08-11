@@ -292,7 +292,6 @@ void do_cp15_32(struct cpu_user_regs *regs, const union hsr hsr)
             return handle_raz_wi(regs, regidx, cp32.read, hsr, 1);
     case HSR_CPREG32(PMINTENSET):
     case HSR_CPREG32(PMINTENCLR):
-        /* EL1 only, however MDCR_EL2.TPM==1 means EL0 may trap here also. */
         return handle_raz_wi(regs, regidx, cp32.read, hsr, 1);
     case HSR_CPREG32(PMCR):
     case HSR_CPREG32(PMCNTENSET):
