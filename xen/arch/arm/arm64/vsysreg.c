@@ -94,8 +94,6 @@ void do_sysreg(struct cpu_user_regs *regs,
      * ARMv8 (DDI 0487A.d): D7.2.1
      */
     case HSR_SYSREG_ACTLR_EL1:
-        if ( regs_mode_is_user(regs) )
-            return inject_undef_exception(regs);
         if ( hsr.sysreg.read )
             set_user_reg(regs, regidx, v->arch.actlr);
         break;

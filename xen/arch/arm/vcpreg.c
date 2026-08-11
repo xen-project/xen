@@ -216,8 +216,6 @@ void do_cp15_32(struct cpu_user_regs *regs, const union hsr hsr)
      * ARMv8 (DDI 0487A.d): G6.2.1
      */
     case HSR_CPREG32(ACTLR):
-        if ( regs_mode_is_user(regs) )
-            return inject_undef_exception(regs);
         if ( cp32.read )
             set_user_reg(regs, regidx, v->arch.actlr);
         break;
