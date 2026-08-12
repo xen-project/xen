@@ -375,7 +375,7 @@ static void conring_puts(const char *str, size_t len)
 long read_console_ring(struct xen_sysctl_readconsole *op)
 {
     XEN_GUEST_HANDLE_PARAM(char) str;
-    uint32_t idx, len, max, sofar, c, p;
+    unsigned int idx, len, max, sofar, c, p;
 
     str   = guest_handle_cast(op->buffer, char),
     max   = op->count;
@@ -421,7 +421,7 @@ long read_console_ring(struct xen_sysctl_readconsole *op)
  */
 static int conring_flush(unsigned int flags)
 {
-    uint32_t idx, len, sofar, c;
+    unsigned int idx, len, sofar, c;
     unsigned int order;
     char *buf;
 
