@@ -1037,11 +1037,10 @@ static void cf_check null_dump(const struct scheduler *ops)
     spin_unlock_irqrestore(&prv->lock, flags);
 }
 
-static const struct scheduler sched_null_def = {
+static const struct sched_ops sched_null_def = {
     .name           = "null Scheduler",
     .opt_name       = "null",
     .sched_id       = XEN_SCHEDULER_NULL,
-    .sched_data     = NULL,
 
     .init           = null_init,
     .deinit         = null_deinit,

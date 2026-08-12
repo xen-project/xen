@@ -87,7 +87,8 @@ DEFINE_PER_CPU(cpumask_t, cpumask_scratch);
 /* How many urgent vcpus. */
 DEFINE_PER_CPU(atomic_t, sched_urgent_count);
 
-extern const struct scheduler *__start_schedulers_array[], *__end_schedulers_array[];
+extern const struct sched_ops *__start_schedulers_array[];
+extern const struct sched_ops *__end_schedulers_array[];
 #define NUM_SCHEDULERS (__end_schedulers_array - __start_schedulers_array)
 #define schedulers __start_schedulers_array
 
@@ -127,16 +128,20 @@ static void cf_check sched_idle_schedule(
     unit->next_task = sched_idle_unit(cpu);
 }
 
-static struct scheduler sched_idle_ops = {
+static struct sched_ops sched_idle_sched_ops = {
     .name           = "Idle Scheduler",
     .opt_name       = "idle",
-    .sched_data     = NULL,
 
     .pick_resource  = sched_idle_res_pick,
     .do_schedule    = sched_idle_schedule,
 
     .alloc_udata    = sched_idle_alloc_udata,
     .free_udata     = sched_idle_free_udata,
+};
+
+static struct scheduler sched_idle_ops = {
+    .ops        = &sched_idle_sched_ops,
+    .sched_data = NULL,
 };
 
 static inline struct vcpu *unit2vcpu_cpu(const struct sched_unit *unit,
@@ -2081,7 +2086,7 @@ long do_set_timer_op(s_time_t timeout)
 /* scheduler_id - fetch ID of current scheduler */
 int scheduler_id(void)
 {
-    return operations.sched_id;
+    return operations.ops->sched_id;
 }
 #endif
 
@@ -2090,7 +2095,7 @@ long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op)
 {
     long ret;
 
-    if ( op->sched_id != dom_scheduler(d)->sched_id )
+    if ( op->sched_id != dom_scheduler(d)->ops->sched_id )
         return -EINVAL;
 
     switch ( op->cmd )
@@ -2132,7 +2137,7 @@ long sched_adjust_global(struct xen_sysctl_scheduler_op *op)
 
     rcu_read_lock(&sched_res_rculock);
 
-    rc = ((op->sched_id == pool->sched->sched_id)
+    rc = ((op->sched_id == pool->sched->ops->sched_id)
           ? sched_adjust_cpupool(pool->sched, op) : -EINVAL);
 
     rcu_read_unlock(&sched_res_rculock);
@@ -2299,7 +2304,7 @@ static struct sched_unit *do_schedule(struct sched_unit *prev, s_time_t now,
     struct sched_unit *next;
 
     /* get policy-specific decision on scheduling... */
-    sched->do_schedule(sched, prev, now, sched_tasklet_check(cpu));
+    sched->ops->do_schedule(sched, prev, now, sched_tasklet_check(cpu));
 
     next = prev->next_task;
 
@@ -2989,7 +2994,7 @@ void scheduler_enable(void)
 }
 
 static inline
-const struct scheduler *__init sched_get_by_name(const char *sched_name)
+const struct sched_ops *__init sched_ops_get_by_name(const char *sched_name)
 {
     unsigned int i;
 
@@ -3002,16 +3007,16 @@ const struct scheduler *__init sched_get_by_name(const char *sched_name)
 
 int __init sched_get_id_by_name(const char *sched_name)
 {
-    const struct scheduler *scheduler = sched_get_by_name(sched_name);
+    const struct sched_ops *ops = sched_ops_get_by_name(sched_name);
 
-    return scheduler ? scheduler->sched_id : -1;
+    return ops ? ops->sched_id : -1;
 }
 
 /* Initialise the data structures. */
 void __init scheduler_init(void)
 {
     struct domain *idle_domain;
-    const struct scheduler *scheduler;
+    const struct sched_ops *ops;
     int i;
 
     scheduler_enable();
@@ -3044,21 +3049,23 @@ void __init scheduler_init(void)
         }
     }
 
-    scheduler = sched_get_by_name(opt_sched);
-    if ( !scheduler )
+    ops = sched_ops_get_by_name(opt_sched);
+    if ( !ops )
     {
         printk("Could not find scheduler: %s\n", opt_sched);
-        scheduler = sched_get_by_name(CONFIG_SCHED_DEFAULT);
-        BUG_ON(!scheduler);
-        printk("Using '%s' (%s)\n", scheduler->name, scheduler->opt_name);
+        ops = sched_ops_get_by_name(CONFIG_SCHED_DEFAULT);
+        BUG_ON(!ops);
+        printk("Using '%s' (%s)\n", ops->name, ops->opt_name);
     }
-    operations = *scheduler;
+
+    operations.ops = ops;
 
     if ( cpu_schedule_up(0) )
         BUG();
     register_cpu_notifier(&cpu_schedule_nfb);
 
-    printk("Using scheduler: %s (%s)\n", operations.name, operations.opt_name);
+    printk("Using scheduler: %s (%s)\n",
+           operations.ops->name, operations.ops->opt_name);
     if ( sched_init(&operations) )
         panic("scheduler returned error on init\n");
 
@@ -3411,12 +3418,14 @@ struct scheduler *scheduler_alloc(unsigned int sched_id)
     for ( i = 0; i < NUM_SCHEDULERS; i++ )
         if ( schedulers[i] && schedulers[i]->sched_id == sched_id )
             goto found;
+
     return ERR_PTR(-ENOENT);
 
  found:
-    if ( (sched = xmalloc(struct scheduler)) == NULL )
+    if ( (sched = xzalloc(struct scheduler)) == NULL )
         return ERR_PTR(-ENOMEM);
-    memcpy(sched, schedulers[i], sizeof(*sched));
+    sched->ops = schedulers[i];
+
     if ( (ret = sched_init(sched)) != 0 )
     {
         xfree(sched);
@@ -3447,7 +3456,7 @@ void schedule_dump(struct cpupool *c)
     {
         sched = c->sched;
         cpus = c->res_valid;
-        printk("Scheduler: %s (%s)\n", sched->name, sched->opt_name);
+        printk("Scheduler: %s (%s)\n", sched->ops->name, sched->ops->opt_name);
         sched_dump_settings(sched);
     }
     else

@@ -2277,11 +2277,10 @@ csched_deinit(struct scheduler *ops)
     }
 }
 
-static const struct scheduler sched_credit_def = {
+static const struct sched_ops sched_credit_def = {
     .name           = "SMP Credit Scheduler",
     .opt_name       = "credit",
     .sched_id       = XEN_SCHEDULER_CREDIT,
-    .sched_data     = NULL,
 
     .global_init    = csched_global_init,
 

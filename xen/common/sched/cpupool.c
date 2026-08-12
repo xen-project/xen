@@ -338,7 +338,8 @@ static struct cpupool *cpupool_create(unsigned int poolid,
     spin_unlock(&cpupool_lock);
 
     debugtrace_printk("Created cpupool %u with scheduler %s (%s)\n",
-                      c->cpupool_id, c->sched->name, c->sched->opt_name);
+                      c->cpupool_id, c->sched->ops->name,
+                      c->sched->ops->opt_name);
 
     return c;
 
@@ -862,7 +863,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
         if ( c == NULL )
             break;
         op->cpupool_id = c->cpupool_id;
-        op->sched_id = c->sched->sched_id;
+        op->sched_id = c->sched->ops->sched_id;
         op->n_dom = c->n_dom;
         ret = cpumask_to_xenctl_bitmap(&op->cpumap, c->cpu_valid);
         cpupool_put(c);
@@ -1294,7 +1295,7 @@ struct cpupool *__init cpupool_create_pool(unsigned int pool_id, int sched_id)
     struct cpupool *pool;
 
     if ( sched_id < 0 )
-        sched_id = scheduler_get_default()->sched_id;
+        sched_id = scheduler_get_default()->ops->sched_id;
 
     pool = cpupool_create(pool_id, sched_id);
 

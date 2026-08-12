@@ -294,12 +294,10 @@ static inline spinlock_t *pcpu_schedule_trylock(unsigned int cpu)
     return NULL;
 }
 
-struct scheduler {
-    const char *name;       /* full name for this scheduler      */
-    const char *opt_name;   /* option name for this scheduler    */
-    unsigned int sched_id;  /* ID for this scheduler             */
-    void *sched_data;       /* global data pointer               */
-    struct cpupool *cpupool;/* points to this scheduler's pool   */
+struct sched_ops {
+    const char *name;       /* full name for this sched_ops      */
+    const char *opt_name;   /* option name for this sched_ops    */
+    unsigned int sched_id;  /* ID for this sched_ops             */
 
     int          (*global_init)    (void);
 
@@ -366,127 +364,133 @@ struct scheduler {
                                     struct sched_resource *sr);
 };
 
+struct scheduler {
+    const struct sched_ops *ops; /* shared, read-only dispatch table   */
+    void *sched_data;            /* per-cpupool scheduler-private data */
+    struct cpupool *cpupool;     /* points to this scheduler's pool    */
+};
+
 static inline int sched_init(struct scheduler *s)
 {
-    return s->init(s);
+    return s->ops->init(s);
 }
 
 static inline void sched_deinit(struct scheduler *s)
 {
-    s->deinit(s);
+    s->ops->deinit(s);
 }
 
 static inline spinlock_t *sched_switch_sched(struct scheduler *s,
                                              unsigned int cpu,
                                              void *pdata, void *vdata)
 {
-    return s->switch_sched(s, cpu, pdata, vdata);
+    return s->ops->switch_sched(s, cpu, pdata, vdata);
 }
 
 static inline void sched_dump_settings(const struct scheduler *s)
 {
-    if ( s->dump_settings )
-        s->dump_settings(s);
+    if ( s->ops->dump_settings )
+        s->ops->dump_settings(s);
 }
 
 static inline void sched_dump_cpu_state(const struct scheduler *s, int cpu)
 {
-    if ( s->dump_cpu_state )
-        s->dump_cpu_state(s, cpu);
+    if ( s->ops->dump_cpu_state )
+        s->ops->dump_cpu_state(s, cpu);
 }
 
 static inline void *sched_alloc_domdata(const struct scheduler *s,
                                         struct domain *d)
 {
-    return s->alloc_domdata ? s->alloc_domdata(s, d) : NULL;
+    return s->ops->alloc_domdata ? s->ops->alloc_domdata(s, d) : NULL;
 }
 
 static inline void sched_free_domdata(const struct scheduler *s,
                                       void *data)
 {
-    ASSERT(s->free_domdata || !data);
-    if ( s->free_domdata )
-        s->free_domdata(s, data);
+    ASSERT(s->ops->free_domdata || !data);
+    if ( s->ops->free_domdata )
+        s->ops->free_domdata(s, data);
 }
 
 static inline void *sched_alloc_pdata(const struct scheduler *s, int cpu)
 {
-    return s->alloc_pdata ? s->alloc_pdata(s, cpu) : NULL;
+    return s->ops->alloc_pdata ? s->ops->alloc_pdata(s, cpu) : NULL;
 }
 
 static inline void sched_free_pdata(const struct scheduler *s, void *data,
                                     int cpu)
 {
-    ASSERT(s->free_pdata || !data);
-    if ( s->free_pdata )
-        s->free_pdata(s, data, cpu);
+    ASSERT(s->ops->free_pdata || !data);
+    if ( s->ops->free_pdata )
+        s->ops->free_pdata(s, data, cpu);
 }
 
 static inline void sched_deinit_pdata(const struct scheduler *s, void *data,
                                       int cpu)
 {
-    if ( s->deinit_pdata )
-        s->deinit_pdata(s, data, cpu);
+    if ( s->ops->deinit_pdata )
+        s->ops->deinit_pdata(s, data, cpu);
 }
 
 static inline void *sched_alloc_udata(const struct scheduler *s,
                                       struct sched_unit *unit, void *dom_data)
 {
-    return s->alloc_udata(s, unit, dom_data);
+    return s->ops->alloc_udata(s, unit, dom_data);
 }
 
 static inline void sched_free_udata(const struct scheduler *s, void *data)
 {
-    s->free_udata(s, data);
+    s->ops->free_udata(s, data);
 }
 
 static inline void sched_insert_unit(const struct scheduler *s,
                                      struct sched_unit *unit)
 {
-    if ( s->insert_unit )
-        s->insert_unit(s, unit);
+    if ( s->ops->insert_unit )
+        s->ops->insert_unit(s, unit);
 }
 
 static inline void sched_remove_unit(const struct scheduler *s,
                                      struct sched_unit *unit)
 {
-    if ( s->remove_unit )
-        s->remove_unit(s, unit);
+    if ( s->ops->remove_unit )
+        s->ops->remove_unit(s, unit);
 }
 
 static inline void sched_sleep(const struct scheduler *s,
                                struct sched_unit *unit)
 {
-    if ( s->sleep )
-        s->sleep(s, unit);
+    if ( s->ops->sleep )
+        s->ops->sleep(s, unit);
 }
 
 static inline void sched_wake(const struct scheduler *s,
                               struct sched_unit *unit)
 {
-    if ( s->wake )
-        s->wake(s, unit);
+    if ( s->ops->wake )
+        s->ops->wake(s, unit);
 }
 
 static inline void sched_yield(const struct scheduler *s,
                                struct sched_unit *unit)
 {
-    if ( s->yield )
-        s->yield(s, unit);
+    if ( s->ops->yield )
+        s->ops->yield(s, unit);
 }
 
 static inline void sched_context_saved(const struct scheduler *s,
                                        struct sched_unit *unit)
 {
-    if ( s->context_saved )
-        s->context_saved(s, unit);
+    if ( s->ops->context_saved )
+        s->ops->context_saved(s, unit);
 }
 
 static inline void sched_migrate(const struct scheduler *s,
                                  struct sched_unit *unit, unsigned int cpu)
 {
-    if ( s->migrate )
-        s->migrate(s, unit, cpu);
+    if ( s->ops->migrate )
+        s->ops->migrate(s, unit, cpu);
     else
         sched_set_res(unit, get_sched_res(cpu));
 }
@@ -494,7 +498,7 @@ static inline void sched_migrate(const struct scheduler *s,
 static inline struct sched_resource *sched_pick_resource(
     const struct scheduler *s, const struct sched_unit *unit)
 {
-    return s->pick_resource(s, unit);
+    return s->ops->pick_resource(s, unit);
 }
 
 static inline void sched_adjust_affinity(const struct scheduler *s,
@@ -502,29 +506,29 @@ static inline void sched_adjust_affinity(const struct scheduler *s,
                                          const cpumask_t *hard,
                                          const cpumask_t *soft)
 {
-    if ( s->adjust_affinity )
-        s->adjust_affinity(s, unit, hard, soft);
+    if ( s->ops->adjust_affinity )
+        s->ops->adjust_affinity(s, unit, hard, soft);
 }
 
 static inline int sched_adjust_dom(const struct scheduler *s, struct domain *d,
                                    struct xen_domctl_scheduler_op *op)
 {
-    return s->adjust ? s->adjust(s, d, op) : 0;
+    return s->ops->adjust ? s->ops->adjust(s, d, op) : 0;
 }
 
 #ifdef CONFIG_SYSCTL
 static inline int sched_adjust_cpupool(const struct scheduler *s,
                                        struct xen_sysctl_scheduler_op *op)
 {
-    return s->adjust_global ? s->adjust_global(s, op) : 0;
+    return s->ops->adjust_global ? s->ops->adjust_global(s, op) : 0;
 }
 #endif
 
 static inline void sched_move_timers(const struct scheduler *s,
                                      struct sched_resource *sr)
 {
-    if ( s->move_timers )
-        s->move_timers(s, sr);
+    if ( s->ops->move_timers )
+        s->ops->move_timers(s, sr);
 }
 
 static inline void sched_unit_pause_nosync(const struct sched_unit *unit)
@@ -543,7 +547,7 @@ static inline void sched_unit_unpause(const struct sched_unit *unit)
         vcpu_unpause(v);
 }
 
-#define REGISTER_SCHEDULER(x) static const struct scheduler *x##_entry \
+#define REGISTER_SCHEDULER(x) static const struct sched_ops *x##_entry \
   __used_section(".data.schedulers") = &(x)
 
 struct cpupool

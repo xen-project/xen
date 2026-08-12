@@ -4230,11 +4230,10 @@ csched2_deinit(struct scheduler *ops)
     xfree(prv);
 }
 
-static const struct scheduler sched_credit2_def = {
+static const struct sched_ops sched_credit2_def = {
     .name           = "SMP Credit Scheduler rev2",
     .opt_name       = "credit2",
     .sched_id       = XEN_SCHEDULER_CREDIT2,
-    .sched_data     = NULL,
 
     .global_init    = csched2_global_init,
 
