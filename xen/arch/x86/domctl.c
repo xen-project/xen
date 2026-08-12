@@ -1347,7 +1347,7 @@ long arch_do_domctl(
             break;
 
 #define domctl_psr_get_val(d, domctl, type, copyback) ({    \
-    uint32_t v_;                                            \
+    uint32_t v_ = 0;                                        \
     int r_ = psr_get_val((d), (domctl)->u.psr_alloc.target, \
                          &v_, (type));                      \
                                                             \
