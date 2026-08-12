@@ -463,7 +463,7 @@ static void cf_check conring_dump_keyhandler(unsigned char key)
 void __init console_init_ring(void)
 {
     char *ring;
-    XENCONS_RING_IDX done, size, n;
+    unsigned int done, size, n;
     unsigned int order, memflags;
     unsigned long flags;
 
@@ -484,8 +484,8 @@ void __init console_init_ring(void)
     size = conringp - conringc;
     for ( done = 0; done < size; done += n )
     {
-        XENCONS_RING_IDX src = (conringc + done) & (conring_size - 1);
-        XENCONS_RING_IDX dst = (conringc + done) & (opt_conring_size - 1);
+        unsigned int src = (conringc + done) & (conring_size - 1);
+        unsigned int dst = (conringc + done) & (opt_conring_size - 1);
 
         n = min(opt_conring_size - dst, conring_size - src);
         n = min(size - done, n);
