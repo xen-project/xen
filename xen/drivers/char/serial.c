@@ -12,6 +12,7 @@
 #include <xen/param.h>
 #include <xen/sections.h>
 #include <xen/serial.h>
+#include <xen/xvmalloc.h>
 
 #include <asm/processor.h>
 
@@ -524,8 +525,7 @@ void __init serial_async_transmit(struct serial_port *port)
         serial_txbufsz = PAGE_SIZE;
     while ( serial_txbufsz & (serial_txbufsz - 1) )
         serial_txbufsz &= serial_txbufsz - 1;
-    port->txbuf = alloc_xenheap_pages(
-        get_order_from_bytes(serial_txbufsz), 0);
+    port->txbuf = xvmalloc_array(char, serial_txbufsz);
 }
 
 /*
