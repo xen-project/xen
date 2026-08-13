@@ -9,6 +9,7 @@
 #include <xen/mm.h>
 
 #include <asm/p2m.h>
+#include <asm/x86_emulate.h>
 
 static int cf_check subpage_mmio_accept(struct vcpu *v, unsigned long addr)
 {

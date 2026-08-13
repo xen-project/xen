@@ -4,7 +4,7 @@
 
 #include <xen/types.h>
 
-#include <asm/x86_emulate.h>
+#include <asm/x86-types.h>
 
 struct vcpu;
 

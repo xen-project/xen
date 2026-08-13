@@ -8,7 +8,8 @@
 #include <asm/e820.h>
 #include <asm/mce.h>
 #include <asm/vpmu.h>
-#include <asm/x86_emulate.h>
+#include <asm/x86-types.h>
+
 #include <public/vcpu.h>
 #include <public/hvm/hvm_info_table.h>
 

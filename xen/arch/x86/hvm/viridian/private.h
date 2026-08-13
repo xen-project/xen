@@ -5,6 +5,8 @@
 
 #include <asm/hvm/save.h>
 #include <asm/hvm/viridian.h>
+#include <asm/x86_emulate.h>
+
 #include <public/hvm/params.h>
 
 int viridian_synic_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val);

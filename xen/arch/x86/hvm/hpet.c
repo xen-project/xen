@@ -11,6 +11,8 @@
 #include <asm/current.h>
 #include <asm/hpet.h>
 #include <asm/mc146818rtc.h>
+#include <asm/x86_emulate.h>
+
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <xen/trace.h>

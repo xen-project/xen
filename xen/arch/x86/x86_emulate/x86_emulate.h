@@ -13,6 +13,11 @@
 
 #include <xen/lib/x86/cpu-policy.h>
 
+#ifdef __XEN__
+# include <asm/x86-event.h>
+# include <asm/x86-types.h>
+#endif
+
 #define MAX_INST_LEN 15
 
 #if defined(__i386__)
@@ -24,77 +29,6 @@
 #endif
 
 struct x86_emulate_ctxt;
-
-/*
- * Comprehensive enumeration of x86 segment registers.  Various bits of code
- * rely on this order (general purpose before system, tr at the beginning of
- * system).
- */
-enum x86_segment {
-    /* General purpose.  Matches the SReg3 encoding in opcode/ModRM bytes. */
-    x86_seg_es,
-    x86_seg_cs,
-    x86_seg_ss,
-    x86_seg_ds,
-    x86_seg_fs,
-    x86_seg_gs,
-    /* System: Valid to use for implicit table references. */
-    x86_seg_tr,
-    x86_seg_ldtr,
-    x86_seg_gdtr,
-    x86_seg_idtr,
-    /* No Segment: For (system/normal) accesses which are already linear. */
-    x86_seg_sys,
-    x86_seg_none
-};
-
-static inline bool is_x86_user_segment(enum x86_segment seg)
-{
-    unsigned int idx = seg;
-
-    return idx <= x86_seg_gs;
-}
-static inline bool is_x86_system_segment(enum x86_segment seg)
-{
-    return seg >= x86_seg_tr && seg < x86_seg_none;
-}
-
-#define X86_EVENT_NO_EC (-1)        /* No error code. */
-
-struct x86_event {
-    int16_t       vector;
-    uint8_t       type;         /* X86_ET_* */
-    uint8_t       insn_len;     /* Instruction length */
-    int32_t       error_code;   /* X86_EVENT_NO_EC if n/a */
-    union {
-        unsigned long cr2;         /* #PF */
-        unsigned long pending_dbg; /* #DB (new DR6 bits, positive polarity) */
-    };
-};
-
-/*
- * Full state of a segment register (visible and hidden portions).
- * Chosen to match the format of an AMD SVM VMCB.
- */
-struct segment_register {
-    uint16_t   sel;
-    union {
-        uint16_t attr;
-        struct {
-            uint16_t type:4;
-            uint16_t s:   1;
-            uint16_t dpl: 2;
-            uint16_t p:   1;
-            uint16_t avl: 1;
-            uint16_t l:   1;
-            uint16_t db:  1;
-            uint16_t g:   1;
-            uint16_t pad: 4;
-        };
-    };
-    uint32_t   limit;
-    uint64_t   base;
-};
 
 struct x86_emul_fpu_aux {
     unsigned long ip, dp;

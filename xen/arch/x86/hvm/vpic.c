@@ -33,6 +33,7 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/save.h>
+#include <asm/x86_emulate.h>
 
 #define vpic_domain(v) (container_of((v), struct domain, \
                                      arch.hvm.vpic[!(v)->is_master]))

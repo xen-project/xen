@@ -16,11 +16,13 @@
 #include <asm/current.h>
 #include <asm/hvm/asid.h>
 #include <asm/msr-index.h>
-#include <asm/x86_emulate.h>
+#include <asm/x86-event.h>
+#include <asm/x86-types.h>
 
 struct pirq; /* needed by pi_update_irte */
 struct hvm_hw_cpu;
 struct xen_domctl_createdomain;
+struct x86_event;
 
 #ifdef CONFIG_HVM_FEP
 /* Permit use of the Forced Emulation Prefix in HVM guests */

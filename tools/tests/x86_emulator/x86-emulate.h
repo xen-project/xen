@@ -38,6 +38,8 @@
 
 #include <xen/asm/msr-index.h>
 #include <xen/asm/x86-defns.h>
+#include <xen/asm/x86-event.h>
+#include <xen/asm/x86-types.h>
 #include <xen/asm/x86-vendors.h>
 
 #include <xen-tools/common-macros.h>

@@ -9,6 +9,8 @@
 
 #include <xen/mm.h>
 
+#include <asm/x86-types.h>
+
 extern void vmcs_dump_vcpu(struct vcpu *v);
 extern int vmx_vmcs_init(void);
 int cf_check vmx_cpu_up_prepare(unsigned int cpu);

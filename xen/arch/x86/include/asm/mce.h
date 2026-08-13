@@ -35,6 +35,7 @@ struct vmce {
 
 struct domain;
 struct vcpu;
+struct hvm_vmce_vcpu;
 
 /* Guest vMCE MSRs virtualization */
 extern void vmce_init_vcpu(struct vcpu *v);

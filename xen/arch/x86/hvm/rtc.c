@@ -23,12 +23,15 @@
  */
 
 #include <xen/sched.h>
-#include <asm/mc146818rtc.h>
-#include <asm/hvm/vpt.h>
+#include <xen/trace.h>
+
 #include <asm/hvm/io.h>
 #include <asm/hvm/save.h>
+#include <asm/hvm/vpt.h>
 #include <asm/iocap.h>
-#include <xen/trace.h>
+#include <asm/mc146818rtc.h>
+#include <asm/x86_emulate.h>
+
 #include <public/hvm/params.h>
 
 #define USEC_PER_SEC    1000000UL

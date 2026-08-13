@@ -25,6 +25,7 @@
 
 #include <asm/msi.h>
 #include <asm/p2m.h>
+#include <asm/x86_emulate.h>
 
 #define VMSIX_ADDR_IN_RANGE(addr, vpci, nr)                               \
     ((addr) >= vmsix_table_addr(vpci, nr) &&                              \

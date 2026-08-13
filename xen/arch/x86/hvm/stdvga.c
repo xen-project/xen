@@ -34,6 +34,8 @@
 #include <xen/numa.h>
 #include <xen/paging.h>
 
+#include <asm/x86_emulate.h>
+
 #define VGA_MEM_BASE 0xa0000
 #define VGA_MEM_SIZE 0x20000
 

@@ -11,6 +11,8 @@
 #include <asm/hvm/io.h>
 #include <asm/hvm/save.h>
 #include <asm/acpi.h> /* for hvm_acpi_power_button prototype */
+#include <asm/x86_emulate.h>
+
 #include <public/hvm/params.h>
 
 /* Slightly more readable port I/O addresses for the registers we intercept */

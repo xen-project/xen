@@ -22,6 +22,7 @@
 #include <asm/p2m.h>
 #include <asm/pv/domain.h>
 #include <asm/setup.h>
+#include <asm/x86_emulate.h>
 #include <asm/xstate.h>
 
 #include <public/hvm/params.h>

@@ -12,6 +12,7 @@
 #include <asm/debugreg.h>
 #include <asm/fsgsbase.h>
 #include <asm/traps.h>
+#include <asm/x86_emulate.h>
 
 long do_set_debugreg(int reg, unsigned long value)
 {

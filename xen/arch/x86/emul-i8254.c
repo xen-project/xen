@@ -37,6 +37,7 @@
 #include <asm/hvm/save.h>
 #include <asm/hvm/vpt.h>
 #include <asm/time.h>
+#include <asm/x86_emulate.h>
 
 #define domain_vpit(x) (&(x)->arch.vpit)
 #define vcpu_vpit(x)   (domain_vpit((x)->domain))

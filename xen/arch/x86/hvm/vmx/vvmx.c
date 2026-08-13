@@ -18,6 +18,7 @@
 #include <asm/msr.h>
 #include <asm/mtrr.h>
 #include <asm/p2m.h>
+#include <asm/x86_emulate.h>
 
 static DEFINE_PER_CPU(u64 *, vvmcs_buf);
 

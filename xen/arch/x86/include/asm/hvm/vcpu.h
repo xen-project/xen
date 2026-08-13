@@ -14,6 +14,8 @@
 #include <asm/hvm/vmx/vvmx.h>
 #include <asm/hvm/svm-types.h>
 #include <asm/mtrr.h>
+#include <asm/x86-event.h>
+
 #include <public/hvm/ioreq.h>
 
 struct hvm_vcpu_asid {
