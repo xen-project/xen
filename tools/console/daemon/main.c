@@ -181,10 +181,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (!log_dir) {
-		log_dir = strdup(XEN_LOG_DIR "/console");
-	}
-
 	if (geteuid() != 0) {
 		fprintf(stderr, "%s requires root to run.\n", argv[0]);
 		exit(EPERM);
@@ -199,6 +195,10 @@ int main(int argc, char **argv)
 
 	if (!is_interactive) {
 		daemonize(pidfile ? pidfile : XEN_RUN_DIR "/xenconsoled.pid");
+	}
+
+	if (!log_dir) {
+		log_dir = strdup(XEN_LOG_DIR "/console");
 	}
 
 	if (!xen_setup())
