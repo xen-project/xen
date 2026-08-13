@@ -896,7 +896,7 @@ const struct arch_vpmu_ops *__init core2_vpmu_init(void)
     unsigned int version = 0;
     unsigned int i;
 
-    if ( current_cpu_data.cpuid_level >= 0xa )
+    if ( boot_cpu_data.cpuid_level >= 0xa )
         version = MASK_EXTR(cpuid_eax(0xa), PMU_VERSION_MASK);
 
     switch ( version )
