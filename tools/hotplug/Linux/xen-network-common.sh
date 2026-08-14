@@ -161,7 +161,7 @@ set_mtu () {
     local mtu=$(xenstore_read_default "$XENBUS_PATH/mtu" "")
     if [ -z "$mtu" ]
     then
-        mtu="`ip link show dev ${bridge}| awk '/mtu/ { print $5 }'`"
+        mtu="$(ip link show dev ${bridge}| awk '/mtu/ { print $5 }')"
         if [ -n "$mtu" ]
         then
             log debug "$bridge MTU is $mtu"
@@ -174,11 +174,7 @@ set_mtu () {
 
         if [ ${type_if} = vif ]
         then
-            local dev_=${dev#vif}
-            local domid=${dev_%.*}
-            local devid=${dev_#*.}
-
-            local FRONTEND_PATH="/local/domain/$domid/device/vif/$devid"
+            local FRONTEND_PATH="$(xenstore_read "$XENBUS_PATH/frontend")"
 
             xenstore_write "$FRONTEND_PATH/mtu" ${mtu}
         fi
