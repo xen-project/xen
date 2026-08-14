@@ -2106,7 +2106,7 @@ static void cf_check vmx_inject_event(const struct x86_event *event)
 
     case X86_EXC_PF:
         ASSERT(_event.type == X86_ET_HW_EXC);
-        curr->arch.hvm.guest_cr[2] = _event.cr2;
+        curr->arch.hvm.guest_cr[2] = _event.data;
         break;
     }
 

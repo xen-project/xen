@@ -22,10 +22,16 @@ struct x86_event {
     uint8_t       type;         /* X86_ET_* */
     uint8_t       insn_len;     /* Instruction length */
     int32_t       error_code;   /* X86_EVENT_NO_EC if n/a */
-    union {
-        unsigned long cr2;         /* #PF */
-        unsigned long pending_dbg; /* #DB (new DR6 bits, positive polarity) */
-    };
+
+    /*
+     * As per the FRED spec.
+     *
+     * A subset of uses occur in IDT mode as well:
+     * - #PF: CR2
+     * - #DB: PENDING_DBG (new DR6 bits with positive polarity)
+     * - #NM: XFD_ERR (AMX)
+     */
+    unsigned long data;
 };
 
 #endif /* X86_X86_EVENT_H */

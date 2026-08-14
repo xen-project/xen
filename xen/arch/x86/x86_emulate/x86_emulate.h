@@ -758,7 +758,7 @@ static inline void x86_emul_pagefault(
     ctxt->event.vector = X86_EXC_PF;
     ctxt->event.type = X86_ET_HW_EXC;
     ctxt->event.error_code = error_code;
-    ctxt->event.cr2 = cr2;
+    ctxt->event.data = cr2;
 
     ctxt->event_pending = true;
 }

@@ -747,9 +747,8 @@ static inline void pv_inject_DB(unsigned long pending_dbg)
         .vector      = X86_EXC_DB,
         .type        = X86_ET_HW_EXC,
         .error_code  = X86_EVENT_NO_EC,
+        .data        = pending_dbg,
     };
-
-    event.pending_dbg = pending_dbg;
 
     pv_inject_event(&event);
 }
@@ -760,9 +759,8 @@ static inline void pv_inject_page_fault(int errcode, unsigned long cr2)
         .vector = X86_EXC_PF,
         .type = X86_ET_HW_EXC,
         .error_code = errcode,
+        .data = cr2,
     };
-
-    event.cr2 = cr2;
 
     pv_inject_event(&event);
 }

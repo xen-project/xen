@@ -58,20 +58,20 @@ void pv_inject_event(const struct x86_event *event)
     switch ( vector | -(event->type == X86_ET_SW_INT) )
     {
     case X86_EXC_PF:
-        curr->arch.pv.ctrlreg[2] = event->cr2;
-        arch_set_cr2(curr, event->cr2);
+        curr->arch.pv.ctrlreg[2] = event->data;
+        arch_set_cr2(curr, event->data);
 
         /* Re-set error_code.user flag appropriately for the guest. */
         error_code &= ~PFEC_user_mode;
         if ( !guest_kernel_mode(curr, regs) )
             error_code |= PFEC_user_mode;
 
-        trace_pv_page_fault(event->cr2, error_code);
+        trace_pv_page_fault(event->data, error_code);
         break;
 
     case X86_EXC_DB:
         curr->arch.dr6 = x86_merge_dr6(curr->domain->arch.cpu_policy,
-                                       curr->arch.dr6, event->pending_dbg);
+                                       curr->arch.dr6, event->data);
         fallthrough;
     default:
         trace_pv_trap(vector, regs->rip, use_error_code, error_code);
@@ -94,7 +94,7 @@ void pv_inject_event(const struct x86_event *event)
                 vector, vector_name(vector), error_code);
 
         if ( vector == X86_EXC_PF )
-            show_page_walk(event->cr2);
+            show_page_walk(event->data);
     }
 }
 

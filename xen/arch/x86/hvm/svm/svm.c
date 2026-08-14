@@ -1177,7 +1177,7 @@ static void svm_emul_swint_injection(struct x86_event *event)
         {
             fault = X86_EXC_PF;
             ec = pfinfo.ec;
-            event->cr2 = pfinfo.linear;
+            event->data = pfinfo.linear;
         }
 
         goto raise_exception;
@@ -1270,8 +1270,8 @@ static void cf_check svm_inject_event(const struct x86_event *event)
 
     case X86_EXC_PF:
         ASSERT(_event.type == X86_ET_HW_EXC);
-        curr->arch.hvm.guest_cr[2] = _event.cr2;
-        vmcb_set_cr2(vmcb, _event.cr2);
+        curr->arch.hvm.guest_cr[2] = _event.data;
+        vmcb_set_cr2(vmcb, _event.data);
         break;
     }
 
@@ -1354,7 +1354,7 @@ static void cf_check svm_inject_event(const struct x86_event *event)
 
     if ( _event.vector == X86_EXC_PF && _event.type == X86_ET_HW_EXC )
         TRACE(TRC_HVM_PF_INJECT64, _event.error_code,
-              _event.cr2, _event.cr2 >> 32);
+              _event.data, _event.data >> 32);
     else
         TRACE(TRC_HVM_INJ_EXC, _event.vector, _event.error_code);
 }

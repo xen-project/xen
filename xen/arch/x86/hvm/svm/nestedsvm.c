@@ -775,7 +775,7 @@ int cf_check nsvm_vcpu_vmexit_event(
     ASSERT(vcpu_nestedhvm(v).nv_vvmcx != NULL);
 
     nestedsvm_vmexit_defer(v, VMEXIT_EXCEPTION_DE + event->vector,
-                           event->error_code, event->cr2);
+                           event->error_code, event->data);
     return NESTEDHVM_VMEXIT_DONE;
 }
 

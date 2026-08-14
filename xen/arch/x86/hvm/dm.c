@@ -315,7 +315,7 @@ static int inject_event(struct domain *d,
     v->arch.hvm.inject_event.type = data->type;
     v->arch.hvm.inject_event.insn_len = data->insn_len;
     v->arch.hvm.inject_event.error_code = data->error_code;
-    v->arch.hvm.inject_event.cr2 = data->cr2;
+    v->arch.hvm.inject_event.data = data->cr2;
     smp_wmb();
     v->arch.hvm.inject_event.vector = data->vector;
 

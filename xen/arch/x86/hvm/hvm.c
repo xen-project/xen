@@ -513,7 +513,7 @@ void hvm_migrate_pirqs(struct vcpu *v)
 
 static bool hvm_get_pending_event(struct vcpu *v, struct x86_event *info)
 {
-    info->cr2 = v->arch.hvm.guest_cr[2];
+    info->data = v->arch.hvm.guest_cr[2];
 
     return alternative_call(hvm_funcs.get_pending_event, v, info);
 }
@@ -555,7 +555,7 @@ void hvm_do_resume(struct vcpu *v)
         if ( hvm_get_pending_event(v, &info) )
         {
             hvm_monitor_interrupt(info.vector, info.type, info.error_code,
-                                  info.cr2);
+                                  info.data);
             v->arch.monitor.next_interrupt_enabled = false;
         }
     }
