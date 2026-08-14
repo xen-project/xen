@@ -167,7 +167,7 @@ set_mtu () {
             log debug "$bridge MTU is $mtu"
         fi
     fi
-    if [ -n "$mtu" ] && [ "$mtu" -gt 0 ]
+    if [ -n "$mtu" ] && [ "$mtu" -ge 68 ]
     then
         log debug "setting $dev MTU to $mtu"
         ip link set dev ${dev} mtu ${mtu} || :
