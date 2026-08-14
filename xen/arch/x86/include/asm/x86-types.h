@@ -16,9 +16,10 @@
 #endif
 
 /*
- * Comprehensive enumeration of x86 segment registers.  Various bits of code
- * rely on this order (general purpose before system, tr at the beginning of
- * system).
+ * x86 Segments.
+ *
+ * Various areas of code rely on this order (general purpose before system,
+ * tr at the beginning of system).
  */
 enum x86_segment {
     /* General purpose.  Matches the SReg3 encoding in opcode/ModRM bytes. */
@@ -73,4 +74,4 @@ struct segment_register {
     uint64_t   base;
 };
 
-#endif	/* X86_X86_TYPES_H */
+#endif /* X86_X86_TYPES_H */
