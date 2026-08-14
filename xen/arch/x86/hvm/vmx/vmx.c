@@ -1227,20 +1227,20 @@ static void cf_check vmx_get_segment_register(
     }
 
     /*
-     * Xen's x86_seg_* enumeration *almost* matches the VMCS encoding order.
+     * Xen's x86_segment encoding *almost* matches the VMCS encoding order.
      *
-     * tr and ldtr are reversed, and other areas of code rely on this, so we
+     * TSS and LDT are reversed, and other areas of code rely on this, so we
      * can't just re-enumerate.
      */
-    BUILD_BUG_ON(x86_seg_tr   != 6);
-    BUILD_BUG_ON(x86_seg_ldtr != 7);
-    BUILD_BUG_ON(x86_seg_gdtr != 8);
-    BUILD_BUG_ON(x86_seg_idtr != 9);
+    BUILD_BUG_ON(x86_seg_tss != 6);
+    BUILD_BUG_ON(x86_seg_ldt != 7);
+    BUILD_BUG_ON(x86_seg_gdt != 8);
+    BUILD_BUG_ON(x86_seg_idt != 9);
     switch ( tmp_seg = seg )
     {
-    case x86_seg_tr:
-    case x86_seg_ldtr:
-        tmp_seg ^= 1; /* Flip tr and ldtr so GUEST_SEG_*() works. */
+    case x86_seg_tss:
+    case x86_seg_ldt:
+        tmp_seg ^= 1; /* Flip TSS and LDT so GUEST_SEG_*() works. */
         fallthrough;
 
     case x86_seg_es ... x86_seg_gs:
@@ -1248,8 +1248,8 @@ static void cf_check vmx_get_segment_register(
         __vmread(GUEST_SEG_AR_BYTES(tmp_seg), &attr);
         fallthrough;
 
-    case x86_seg_gdtr:
-    case x86_seg_idtr:
+    case x86_seg_gdt:
+    case x86_seg_idt:
         __vmread(GUEST_SEG_LIMIT(tmp_seg),    &limit);
         __vmread(GUEST_SEG_BASE(tmp_seg),     &reg->base);
         break;
@@ -1272,11 +1272,11 @@ static void cf_check vmx_get_segment_register(
         (!(attr & (1u << 16)) << 7) | (attr & 0x7f) | ((attr >> 4) & 0xf00);
 
     /* Adjust for virtual 8086 mode */
-    if ( v->arch.hvm.vmx.vmx_realmode && seg <= x86_seg_tr
+    if ( v->arch.hvm.vmx.vmx_realmode && seg <= x86_seg_tss
          && !(v->arch.hvm.vmx.vm86_segment_mask & (1u << seg)) )
     {
         struct segment_register *sreg = &v->arch.hvm.vmx.vm86_saved_seg[seg];
-        if ( seg == x86_seg_tr ) 
+        if ( seg == x86_seg_tss )
             *reg = *sreg;
         else if ( reg->base != sreg->base || seg == x86_seg_ss )
         {
@@ -1312,12 +1312,12 @@ static void cf_check vmx_set_segment_register(
     base = reg->base;
 
     /* Adjust CS/SS/DS/ES/FS/GS/TR for virtual 8086 mode */
-    if ( v->arch.hvm.vmx.vmx_realmode && seg <= x86_seg_tr )
+    if ( v->arch.hvm.vmx.vmx_realmode && seg <= x86_seg_tss )
     {
         /* Remember the proper contents */
         v->arch.hvm.vmx.vm86_saved_seg[seg] = *reg;
         
-        if ( seg == x86_seg_tr ) 
+        if ( seg == x86_seg_tss )
         {
             const struct domain *d = v->domain;
             uint64_t val = d->arch.hvm.params[HVM_PARAM_VM86_TSS_SIZED];
@@ -1367,9 +1367,9 @@ static void cf_check vmx_set_segment_register(
 
     switch ( seg )
     {
-    case x86_seg_tr:
-    case x86_seg_ldtr:
-        seg ^= 1; /* Flip tr and ldtr so GUEST_SEG_*() works. */
+    case x86_seg_tss:
+    case x86_seg_ldt:
+        seg ^= 1; /* Flip TSS and LDT so GUEST_SEG_*() works. */
         fallthrough;
 
     case x86_seg_es ... x86_seg_gs:
@@ -1377,8 +1377,8 @@ static void cf_check vmx_set_segment_register(
         __vmwrite(GUEST_SEG_AR_BYTES(seg), attr);
         fallthrough;
 
-    case x86_seg_gdtr:
-    case x86_seg_idtr:
+    case x86_seg_gdt:
+    case x86_seg_idt:
         __vmwrite(GUEST_SEG_LIMIT(seg),    limit);
         __vmwrite(GUEST_SEG_BASE(seg),     base);
         break;
@@ -1738,9 +1738,9 @@ static void cf_check vmx_update_guest_cr(
              (realmode != v->arch.hvm.vmx.vmx_realmode) )
         {
             enum x86_segment s;
-            struct segment_register reg[x86_seg_tr + 1];
+            struct segment_register reg[x86_seg_tss + 1];
 
-            BUILD_BUG_ON(x86_seg_tr != x86_seg_gs + 1);
+            BUILD_BUG_ON(x86_seg_tss != x86_seg_gs + 1);
 
             /* Entering or leaving real mode: adjust the segment registers.
              * Need to read them all either way, as realmode reads can update

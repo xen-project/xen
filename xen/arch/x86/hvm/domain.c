@@ -34,7 +34,7 @@ static int check_segment(struct segment_register *reg, enum x86_segment seg)
         return 0;
     }
 
-    if ( seg == x86_seg_tr )
+    if ( seg == x86_seg_tss )
     {
         if ( reg->s )
         {
@@ -88,7 +88,7 @@ static int check_segment(struct segment_register *reg, enum x86_segment seg)
         }
         break;
 
-    case x86_seg_tr:
+    case x86_seg_tss:
         break;
 
     default:
@@ -131,17 +131,20 @@ int arch_set_info_hvm_guest(struct vcpu *v, const struct vcpu_hvm_context *ctx)
 #define SEG(s, r) ({                                                        \
     s = (struct segment_register)                                           \
         { 0, { (r)->s ## _ar }, (r)->s ## _limit, (r)->s ## _base };        \
-    /* Set accessed / busy bit for present segments. */                     \
+    /* Set accessed bit for present segments. */                            \
     if ( (s).p )                                                            \
-        (s).type |= (x86_seg_ ## s != x86_seg_tr ? 1 : 2);                  \
+        (s).type |= 1;                                                      \
     check_segment(&(s), x86_seg_ ## s); })
 
         rc = SEG(cs, regs);
         rc |= SEG(ds, regs);
         rc |= SEG(ss, regs);
         rc |= SEG(es, regs);
-        rc |= SEG(tr, regs);
 #undef SEG
+
+        tr = (struct segment_register){
+            0, { regs->tr_ar | 2 /* Busy */ }, regs->tr_limit, regs->tr_base };
+        rc |= check_segment(&tr, x86_seg_tss);
 
         if ( rc != 0 )
             return rc;
@@ -307,7 +310,7 @@ int arch_set_info_hvm_guest(struct vcpu *v, const struct vcpu_hvm_context *ctx)
     hvm_set_segment_register(v, x86_seg_ds, &ds);
     hvm_set_segment_register(v, x86_seg_ss, &ss);
     hvm_set_segment_register(v, x86_seg_es, &es);
-    hvm_set_segment_register(v, x86_seg_tr, &tr);
+    hvm_set_segment_register(v, x86_seg_tss, &tr);
 
     /* Sync AP's TSC with BSP's. */
     v->arch.hvm.cache_tsc_offset =

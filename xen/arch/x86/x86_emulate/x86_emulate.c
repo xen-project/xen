@@ -814,13 +814,13 @@ static int ioport_access_check(
      * X86EMUL_DONE coming back here may be used to defer the port
      * permission check to the respective ioport hook.
      */
-    if ( (rc = ops->read_segment(x86_seg_tr, &tr, ctxt)) != 0 )
+    if ( (rc = ops->read_segment(x86_seg_tss, &tr, ctxt)) != 0 )
         return rc == X86EMUL_DONE ? X86EMUL_OKAY : rc;
 
     /* Ensure the TSS has an io-bitmap-offset field. */
     generate_exception_if(tr.type != 0xb, X86_EXC_GP, 0);
 
-    switch ( rc = read_ulong(x86_seg_tr, 0x66, &iobmp, 2, ctxt, ops) )
+    switch ( rc = read_ulong(x86_seg_tss, 0x66, &iobmp, 2, ctxt, ops) )
     {
     case X86EMUL_OKAY:
         break;
@@ -834,7 +834,7 @@ static int ioport_access_check(
     }
 
     /* Read two bytes including byte containing first port. */
-    switch ( rc = read_ulong(x86_seg_tr, iobmp + first_port / 8,
+    switch ( rc = read_ulong(x86_seg_tss, iobmp + first_port / 8,
                              &iobmp, 2, ctxt, ops) )
     {
     case X86EMUL_OKAY:
@@ -891,7 +891,7 @@ protmode_load_seg(
     const struct x86_emulate_ops *ops)
 {
     const struct cpu_policy *cp = ctxt->cpu_policy;
-    enum x86_segment sel_seg = (sel & 4) ? x86_seg_ldtr : x86_seg_gdtr;
+    enum x86_segment sel_seg = (sel & 4) ? x86_seg_ldt : x86_seg_gdt;
     struct { uint32_t a, b; } desc, desc_hi = {};
     uint8_t dpl, rpl;
     int cpl = x86emul_get_cpl(ctxt, ops);
@@ -912,7 +912,7 @@ protmode_load_seg(
                 break;
             /* fall through */
         case x86_seg_cs:
-        case x86_seg_tr:
+        case x86_seg_tss:
             goto raise_exn;
         }
         if ( seg == x86_seg_none || !_amd_like(cp) || vcpu_has_nscb() ||
@@ -992,13 +992,13 @@ protmode_load_seg(
         if ( (dpl != cpl) || (dpl != rpl) )
             goto raise_exn;
         break;
-    case x86_seg_ldtr:
+    case x86_seg_ldt:
         /* LDT system segment? */
         if ( (desc.b & (15u<<8)) != (2u<<8) )
             goto raise_exn;
         a_flag = 0;
         break;
-    case x86_seg_tr:
+    case x86_seg_tss:
         /* Available TSS system segment? */
         if ( (desc.b & (15u<<8)) != (9u<<8) )
             goto raise_exn;
@@ -2914,7 +2914,7 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC(0x0f, 0x00): /* Grp6 */
-        seg = (modrm_reg & 1) ? x86_seg_tr : x86_seg_ldtr;
+        seg = (modrm_reg & 1) ? x86_seg_tss : x86_seg_ldt;
         generate_exception_if(!in_protmode(ctxt, ops), X86_EXC_UD);
         switch ( modrm_reg & 6 )
         {

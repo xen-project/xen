@@ -504,7 +504,7 @@ static int cf_check read_segment(
     struct x86_emulate_ctxt *ctxt)
 {
     /* Check if this is an attempt to access the I/O bitmap. */
-    if ( seg == x86_seg_tr )
+    if ( seg == x86_seg_tss )
     {
         switch ( ctxt->opcode )
         {

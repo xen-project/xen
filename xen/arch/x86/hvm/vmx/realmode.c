@@ -34,7 +34,7 @@ static void realmode_deliver_exception(
     uint16_t frame[3];
     unsigned int last_byte;
 
-    idtr = hvmemul_get_seg_reg(x86_seg_idtr, hvmemul_ctxt);
+    idtr = hvmemul_get_seg_reg(x86_seg_idt,  hvmemul_ctxt);
     csr  = hvmemul_get_seg_reg(x86_seg_cs,   hvmemul_ctxt);
     __set_bit(x86_seg_cs, &hvmemul_ctxt->seg_reg_dirty);
 

@@ -19,7 +19,7 @@
  * x86 Segments.
  *
  * Various areas of code rely on this order (general purpose before system,
- * tr at the beginning of system).
+ * tss at the beginning of system).
  */
 enum x86_segment {
     /* General purpose.  Matches the SReg3 encoding in opcode/ModRM bytes. */
@@ -30,10 +30,10 @@ enum x86_segment {
     x86_seg_fs,
     x86_seg_gs,
     /* System: Valid to use for implicit table references. */
-    x86_seg_tr,
-    x86_seg_ldtr,
-    x86_seg_gdtr,
-    x86_seg_idtr,
+    x86_seg_tss,
+    x86_seg_ldt,
+    x86_seg_gdt,
+    x86_seg_idt,
     /* No Segment: For (system/normal) accesses which are already linear. */
     x86_seg_sys,
     x86_seg_none
@@ -47,7 +47,7 @@ static inline bool is_x86_user_segment(enum x86_segment seg)
 }
 static inline bool is_x86_system_segment(enum x86_segment seg)
 {
-    return seg >= x86_seg_tr && seg < x86_seg_none;
+    return seg >= x86_seg_tss && seg < x86_seg_none;
 }
 
 /*

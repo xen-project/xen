@@ -183,7 +183,7 @@ static void vm_event_pack_segment_register(enum x86_segment segment,
         reg->es_sel = seg.sel;
         break;
 
-    case x86_seg_gdtr:
+    case x86_seg_gdt:
         reg->gdtr_base = seg.base;
         reg->gdtr_limit = seg.limit;
         break;
@@ -248,7 +248,7 @@ void vm_event_fill_regs(vm_event_request_t *req)
     vm_event_pack_segment_register(x86_seg_ss, &req->data.regs.x86);
     vm_event_pack_segment_register(x86_seg_ds, &req->data.regs.x86);
     vm_event_pack_segment_register(x86_seg_es, &req->data.regs.x86);
-    vm_event_pack_segment_register(x86_seg_gdtr, &req->data.regs.x86);
+    vm_event_pack_segment_register(x86_seg_gdt, &req->data.regs.x86);
 
     req->data.regs.x86.shadow_gs = ctxt.shadow_gs;
     req->data.regs.x86.dr6 = ctxt.dr6;

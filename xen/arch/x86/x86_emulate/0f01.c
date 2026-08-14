@@ -22,7 +22,7 @@ int x86emul_0f01(struct x86_emulate_state *s,
                  struct x86_emulate_ctxt *ctxt,
                  const struct x86_emulate_ops *ops)
 {
-    enum x86_segment seg = (s->modrm_reg & 1) ? x86_seg_idtr : x86_seg_gdtr;
+    enum x86_segment seg = (s->modrm_reg & 1) ? x86_seg_idt : x86_seg_gdt;
     int rc;
 
     switch ( s->modrm )

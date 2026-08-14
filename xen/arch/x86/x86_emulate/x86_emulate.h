@@ -51,7 +51,7 @@ struct x86_emul_fpu_aux {
  /*
   * Operation fully done by one of the hooks:
   * - validate(): operation completed (except common insn retire logic)
-  * - read_segment(x86_seg_tr, ...): bypass I/O bitmap access
+  * - read_segment(x86_seg_tss, ...): bypass I/O bitmap access
   * - read_io() / write_io(): bypass GPR update (non-string insns only)
   * Undefined behavior when used anywhere else.
   */

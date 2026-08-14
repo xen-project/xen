@@ -43,7 +43,7 @@
 /* Internally used only flags. */
 #define PFEC_page_paged     (1U<<16)
 #define PFEC_page_shared    (1U<<17)
-#define PFEC_implicit       (1U<<18) /* Pagewalk input for ldt/gdt/idt/tr accesses. */
+#define PFEC_implicit       (1U<<18) /* Pagewalk input for ldt/gdt/idt/tss accesses. */
 #define PFEC_synth_mask     (~PFEC_arch_mask) /* Synthetic PFEC values. */
 
 /* Other exception error code values. */

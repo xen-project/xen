@@ -173,7 +173,7 @@ static int fuzz_read(
     /* Reads expected for all user and system segments. */
     if ( is_x86_user_segment(seg) )
         assert(ctxt->addr_size == 64 || !(offset >> 32));
-    else if ( seg == x86_seg_tr )
+    else if ( seg == x86_seg_tss )
         /*
          * The TSS is special in that accesses below the segment base are
          * possible, as the Interrupt Redirection Bitmap starts 32 bytes
@@ -362,7 +362,7 @@ static int fuzz_cmpxchg(
     if ( is_x86_user_segment(seg) )
         assert(ctxt->addr_size == 64 || !(offset >> 32));
     else
-        assert((seg == x86_seg_gdtr || seg == x86_seg_ldtr) && !(offset >> 16));
+        assert((seg == x86_seg_gdt || seg == x86_seg_ldt) && !(offset >> 16));
 
     return maybe_fail(ctxt, "cmpxchg", true);
 }

@@ -622,20 +622,20 @@ static void cf_check svm_get_segment_register(
             reg->dpl = vmcb_get_cpl(vmcb);
         break;
 
-    case x86_seg_tr:
+    case x86_seg_tss:
         svm_sync_vmcb(v, vmcb_in_sync);
         *reg = vmcb->tr;
         break;
 
-    case x86_seg_gdtr:
+    case x86_seg_gdt:
         *reg = vmcb->gdtr;
         break;
 
-    case x86_seg_idtr:
+    case x86_seg_idt:
         *reg = vmcb->idtr;
         break;
 
-    case x86_seg_ldtr:
+    case x86_seg_ldt:
         svm_sync_vmcb(v, vmcb_in_sync);
         *reg = vmcb->ldtr;
         break;
@@ -664,15 +664,15 @@ static void cf_check svm_set_segment_register(
         vmcb->cleanbits.seg = false;
         break;
 
-    case x86_seg_gdtr:
-    case x86_seg_idtr:
+    case x86_seg_gdt:
+    case x86_seg_idt:
         vmcb->cleanbits.dt = false;
         break;
 
     case x86_seg_fs:
     case x86_seg_gs:
-    case x86_seg_tr:
-    case x86_seg_ldtr:
+    case x86_seg_tss:
+    case x86_seg_ldt:
         if ( v == current )
             svm_sync_vmcb(v, vmcb_needs_vmload);
         break;
@@ -694,21 +694,21 @@ static void cf_check svm_set_segment_register(
         vmcb->sreg[seg] = *reg;
         break;
 
-    case x86_seg_tr:
+    case x86_seg_tss:
         vmcb->tr = *reg;
         break;
 
-    case x86_seg_gdtr:
+    case x86_seg_gdt:
         vmcb->gdtr.base = reg->base;
         vmcb->gdtr.limit = reg->limit;
         break;
 
-    case x86_seg_idtr:
+    case x86_seg_idt:
         vmcb->idtr.base = reg->base;
         vmcb->idtr.limit = reg->limit;
         break;
 
-    case x86_seg_ldtr:
+    case x86_seg_ldt:
         vmcb->ldtr = *reg;
         break;
 
@@ -1163,8 +1163,8 @@ static void svm_emul_swint_injection(struct x86_event *event)
      * this entry, even though we don't look at all the words read.
      */
     hvm_get_segment_register(curr, x86_seg_cs, &cs);
-    hvm_get_segment_register(curr, x86_seg_idtr, &idtr);
-    if ( !hvm_virtual_to_linear_addr(x86_seg_idtr, &idtr, idte_offset,
+    hvm_get_segment_register(curr, x86_seg_idt, &idtr);
+    if ( !hvm_virtual_to_linear_addr(x86_seg_idt, &idtr, idte_offset,
                                      idte_size, hvm_access_read,
                                      &cs, &idte_linear_addr) )
         goto raise_exception;

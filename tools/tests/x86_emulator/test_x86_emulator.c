@@ -559,7 +559,7 @@ static int read(
     {
         uint64_t value;
 
-    case x86_seg_gdtr:
+    case x86_seg_gdt:
         /* Fake system segment type matching table index. */
         if ( (offset & 7) || (bytes > 8) )
             return X86EMUL_UNHANDLEABLE;
@@ -579,7 +579,7 @@ static int read(
         memcpy(p_data, &value, bytes);
         return X86EMUL_OKAY;
 
-    case x86_seg_ldtr:
+    case x86_seg_ldt:
         /* Fake user segment type matching table index. */
         if ( (offset & 7) || (bytes > 8) )
             return X86EMUL_UNHANDLEABLE;

@@ -174,7 +174,7 @@ struct vmx_vcpu {
     /* Bitmask of segments that we can't safely use in virtual 8086 mode */
     uint16_t             vm86_segment_mask;
     /* Shadow CS, SS, DS, ES, FS, GS, TR while in virtual 8086 mode */
-    struct segment_register vm86_saved_seg[x86_seg_tr + 1];
+    struct segment_register vm86_saved_seg[x86_seg_tss + 1];
     /* Remember EFLAGS while in virtual 8086 mode */
     uint32_t             vm86_saved_eflags;
     int                  hostenv_migrated;

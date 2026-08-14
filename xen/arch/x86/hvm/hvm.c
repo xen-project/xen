@@ -879,11 +879,11 @@ static int cf_check hvm_save_cpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
     /* Architecture-specific vmcs/vmcb bits */
     alternative_vcall(hvm_funcs.save_cpu_ctxt, v, &ctxt);
 
-    hvm_get_segment_register(v, x86_seg_idtr, &seg);
+    hvm_get_segment_register(v, x86_seg_idt, &seg);
     ctxt.idtr_limit = seg.limit;
     ctxt.idtr_base = seg.base;
 
-    hvm_get_segment_register(v, x86_seg_gdtr, &seg);
+    hvm_get_segment_register(v, x86_seg_gdt, &seg);
     ctxt.gdtr_limit = seg.limit;
     ctxt.gdtr_base = seg.base;
 
@@ -923,13 +923,13 @@ static int cf_check hvm_save_cpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
     ctxt.gs_base = seg.base;
     ctxt.gs_arbytes = seg.attr;
 
-    hvm_get_segment_register(v, x86_seg_tr, &seg);
+    hvm_get_segment_register(v, x86_seg_tss, &seg);
     ctxt.tr_sel = seg.sel;
     ctxt.tr_limit = seg.limit;
     ctxt.tr_base = seg.base;
     ctxt.tr_arbytes = seg.attr;
 
-    hvm_get_segment_register(v, x86_seg_ldtr, &seg);
+    hvm_get_segment_register(v, x86_seg_ldt, &seg);
     ctxt.ldtr_sel = seg.sel;
     ctxt.ldtr_limit = seg.limit;
     ctxt.ldtr_base = seg.base;
@@ -1129,11 +1129,11 @@ static int cf_check hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 
     seg.limit = ctxt.idtr_limit;
     seg.base = ctxt.idtr_base;
-    hvm_set_segment_register(v, x86_seg_idtr, &seg);
+    hvm_set_segment_register(v, x86_seg_idt, &seg);
 
     seg.limit = ctxt.gdtr_limit;
     seg.base = ctxt.gdtr_base;
-    hvm_set_segment_register(v, x86_seg_gdtr, &seg);
+    hvm_set_segment_register(v, x86_seg_gdt, &seg);
 
     seg.sel = ctxt.cs_sel;
     seg.limit = ctxt.cs_limit;
@@ -1175,13 +1175,13 @@ static int cf_check hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     seg.limit = ctxt.tr_limit;
     seg.base = ctxt.tr_base;
     seg.attr = ctxt.tr_arbytes;
-    hvm_set_segment_register(v, x86_seg_tr, &seg);
+    hvm_set_segment_register(v, x86_seg_tss, &seg);
 
     seg.sel = ctxt.ldtr_sel;
     seg.limit = ctxt.ldtr_limit;
     seg.base = ctxt.ldtr_base;
     seg.attr = ctxt.ldtr_arbytes;
-    hvm_set_segment_register(v, x86_seg_ldtr, &seg);
+    hvm_set_segment_register(v, x86_seg_ldt, &seg);
 
     if ( ctxt.flags & XEN_X86_FPU_INITIALISED )
         vcpu_setup_fpu(v, &ctxt.fpu_regs);
@@ -2875,11 +2875,11 @@ static int task_switch_load_seg(
     }
 
     /* LDT descriptor must be in the GDT. */
-    if ( (seg == x86_seg_ldtr) && (sel & 4) )
+    if ( (seg == x86_seg_ldt) && (sel & 4) )
         goto fault;
 
     hvm_get_segment_register(
-        v, (sel & 4) ? x86_seg_ldtr : x86_seg_gdtr, &desctab);
+        v, (sel & 4) ? x86_seg_ldt : x86_seg_gdt, &desctab);
 
     /* Segment not valid for use (cooked meaning of .p)? */
     if ( !desctab.p )
@@ -2897,7 +2897,7 @@ static int task_switch_load_seg(
         desc = *pdesc;
 
         /* LDT descriptor is a system segment. All others are code/data. */
-        if ( (desc.b & (1u<<12)) == ((seg == x86_seg_ldtr) << 12) )
+        if ( (desc.b & (1 << 12)) == ((seg == x86_seg_ldt) << 12) )
             goto fault;
 
         dpl = (desc.b >> 13) & 3;
@@ -2920,7 +2920,7 @@ static int task_switch_load_seg(
             if ( (dpl != cpl) || (dpl != rpl) )
                 goto fault;
             break;
-        case x86_seg_ldtr:
+        case x86_seg_ldt:
             /* LDT system segment? */
             if ( (desc.b & _SEGMENT_TYPE) != (2u<<8) )
                 goto fault;
@@ -3035,8 +3035,8 @@ void hvm_task_switch(
     unsigned int token = hvmemul_cache_disable(v);
     struct tss32 tss;
 
-    hvm_get_segment_register(v, x86_seg_gdtr, &gdt);
-    hvm_get_segment_register(v, x86_seg_tr, &prev_tr);
+    hvm_get_segment_register(v, x86_seg_gdt, &gdt);
+    hvm_get_segment_register(v, x86_seg_tss, &prev_tr);
 
     if ( ((tss_sel & 0xfff8) + 7) > gdt.limit )
     {
@@ -3120,7 +3120,7 @@ void hvm_task_switch(
     tss.fs = segr.sel;
     hvm_get_segment_register(v, x86_seg_gs, &segr);
     tss.gs = segr.sel;
-    hvm_get_segment_register(v, x86_seg_ldtr, &segr);
+    hvm_get_segment_register(v, x86_seg_ldt, &segr);
     tss.ldt = segr.sel;
 
     rc = hvm_copy_to_guest_linear(prev_tr.base + offsetof(typeof(tss), eip),
@@ -3146,7 +3146,7 @@ void hvm_task_switch(
 
     new_cpl = tss.eflags & X86_EFLAGS_VM ? 3 : tss.cs & 3;
 
-    if ( task_switch_load_seg(x86_seg_ldtr, tss.ldt, new_cpl, 0) )
+    if ( task_switch_load_seg(x86_seg_ldt, tss.ldt, new_cpl, 0) )
         goto out;
 
     rc = hvm_set_cr3(tss.cr3, false, true);
@@ -3193,7 +3193,7 @@ void hvm_task_switch(
     }
 
     tr.type = 0xb; /* busy 32-bit tss */
-    hvm_set_segment_register(v, x86_seg_tr, &tr);
+    hvm_set_segment_register(v, x86_seg_tss, &tr);
 
     v->arch.hvm.guest_cr[0] |= X86_CR0_TS;
     hvm_update_guest_cr(v, 0);
@@ -4011,14 +4011,14 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     hvm_set_segment_register(v, x86_seg_ss, &reg);
 
     reg.attr = 0x82; /* LDT */
-    hvm_set_segment_register(v, x86_seg_ldtr, &reg);
+    hvm_set_segment_register(v, x86_seg_ldt, &reg);
 
     reg.attr = 0x8b; /* 32-bit TSS (busy) */
-    hvm_set_segment_register(v, x86_seg_tr, &reg);
+    hvm_set_segment_register(v, x86_seg_tss, &reg);
 
     reg.attr = 0;
-    hvm_set_segment_register(v, x86_seg_gdtr, &reg);
-    hvm_set_segment_register(v, x86_seg_idtr, &reg);
+    hvm_set_segment_register(v, x86_seg_gdt, &reg);
+    hvm_set_segment_register(v, x86_seg_idt, &reg);
 
     /* Sync AP's TSC with BSP's. */
     v->arch.hvm.cache_tsc_offset =
@@ -5278,7 +5278,7 @@ void hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
             reg->db = 0;
         break;
 
-    case x86_seg_tr:
+    case x86_seg_tss:
         /*
          * SVM doesn't track %tr.B. Architecturally, a loaded TSS segment will
          * always be busy.
@@ -5294,8 +5294,8 @@ void hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
         reg->p = 1;
         break;
 
-    case x86_seg_gdtr:
-    case x86_seg_idtr:
+    case x86_seg_gdt:
+    case x86_seg_idt:
         /*
          * Treat GDTR/IDTR as being present system segments.  This avoids them
          * needing special casing for segmentation checks.
@@ -5382,7 +5382,7 @@ void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         }
         break;
 
-    case x86_seg_tr:
+    case x86_seg_tss:
         ASSERT(reg->p);                              /* Usable. */
         ASSERT(!reg->s);                             /* System segment. */
         ASSERT(!(reg->sel & 0x4));                   /* !TI. */
@@ -5394,7 +5394,7 @@ void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
             ASSERT(!"%tr typecheck failure");
         break;
 
-    case x86_seg_ldtr:
+    case x86_seg_ldt:
         if ( reg->p )
         {
             ASSERT(!reg->s);                         /* System segment. */
@@ -5404,8 +5404,8 @@ void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         }
         break;
 
-    case x86_seg_gdtr:
-    case x86_seg_idtr:
+    case x86_seg_gdt:
+    case x86_seg_idt:
         ASSERT(is_canonical_address(reg->base));
         ASSERT((reg->limit >> 16) == 0);             /* Upper bits clear. */
         break;
