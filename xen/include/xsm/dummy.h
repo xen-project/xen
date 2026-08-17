@@ -123,9 +123,7 @@ static XSM_INLINE int xsm_set_system_active(void)
 
 static XSM_INLINE void xsm_security_domaininfo(
     struct domain *d, struct xen_domctl_getdomaininfo *info)
-{
-    return;
-}
+{}
 
 static XSM_INLINE int xsm_domain_create(
     XSM_DEFAULT_ARG struct domain *d, uint32_t ssidref)
@@ -187,9 +185,7 @@ static XSM_INLINE int xsm_alloc_security_domain(struct domain *d)
 }
 
 static XSM_INLINE void xsm_free_security_domain(struct domain *d)
-{
-    return;
-}
+{}
 
 #ifdef CONFIG_GRANT_TABLE
 
@@ -316,9 +312,7 @@ static XSM_INLINE int xsm_evtchn_interdomain(
 }
 
 static XSM_INLINE void xsm_evtchn_close_post(struct evtchn *chn)
-{
-    return;
-}
+{}
 
 static XSM_INLINE int xsm_evtchn_send(
     XSM_DEFAULT_ARG struct domain *d, struct evtchn *chn)
@@ -349,9 +343,7 @@ static XSM_INLINE int xsm_alloc_security_evtchns(
 
 static XSM_INLINE void xsm_free_security_evtchns(
     struct evtchn chn[], unsigned int nr)
-{
-    return;
-}
+{}
 
 static XSM_INLINE char *xsm_show_security_evtchn(
     struct domain *d, const struct evtchn *chn)
