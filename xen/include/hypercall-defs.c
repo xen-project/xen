@@ -119,7 +119,9 @@ prefix: do PREFIX_compat
 xen_version(int cmd, void *arg)
 vcpu_op(int cmd, unsigned int vcpuid, void *arg)
 sched_op(int cmd, void *arg)
+#ifdef CONFIG_XSM
 xsm_op(void *op)
+#endif
 callback_op(int cmd, const void *arg)
 #ifdef CONFIG_ARGO
 argo_op(unsigned int cmd, void *arg1, void *arg2, unsigned long arg3, unsigned long arg4)
@@ -264,7 +266,9 @@ set_segment_base                   do:2     do:2     -        -        -
 #ifdef CONFIG_PV
 mmuext_op                          compat:2 do:2     compat   do       -
 #endif
+#ifdef CONFIG_XSM
 xsm_op                             compat   do       compat   do       do
+#endif
 nmi_op                             compat   do       -        -        -
 sched_op                           compat   do       compat   do       do
 callback_op                        compat   do       -        -        -

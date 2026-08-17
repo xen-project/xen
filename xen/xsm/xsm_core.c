@@ -18,8 +18,6 @@
 #include <xen/hypercall.h>
 #include <xsm/xsm.h>
 
-#ifdef CONFIG_XSM
-
 #ifdef CONFIG_MULTIBOOT
 #include <asm/bootinfo.h>
 #include <asm/setup.h>
@@ -214,8 +212,6 @@ bool __init has_xsm_magic(paddr_t start)
 
     return false;
 }
-#endif
-
 #endif
 
 long do_xsm_op(XEN_GUEST_HANDLE_PARAM(void) op)

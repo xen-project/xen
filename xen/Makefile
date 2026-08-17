@@ -458,7 +458,7 @@ CFLAGS += -I$(objtree)/arch/$(SRCARCH)/include/generated
 ALL_OBJS-y                := common/built_in.o
 ALL_OBJS-y                += drivers/built_in.o
 ALL_OBJS-y                += lib/built_in.o
-ALL_OBJS-y                += xsm/built_in.o
+ALL_OBJS-$(CONFIG_XSM)    += xsm/built_in.o
 ALL_OBJS-y                += arch/$(SRCARCH)/built_in.o
 ALL_OBJS-$(CONFIG_CRYPTO) += crypto/built_in.o
 
