@@ -314,13 +314,9 @@ static void setup_p4_watchdog(void)
         clear_msr_range(0x3F1, 2);
     /* MSR 0x3F0 seems to have a default value of 0xFC00, but current
        docs doesn't fully define it, so leave it alone for now. */
-    if (boot_cpu_data.model >= 0x3) {
-        /* MSR_P4_IQ_ESCR0/1 (0x3ba/0x3bb) removed */
-        clear_msr_range(0x3A0, 26);
-        clear_msr_range(0x3BC, 3);
-    } else {
-        clear_msr_range(0x3A0, 31);
-    }
+    /* MSR_P4_IQ_ESCR0/1 (0x3ba/0x3bb) removed */
+    clear_msr_range(0x3A0, 26);
+    clear_msr_range(0x3BC, 3);
     clear_msr_range(0x3C0, 6);
     clear_msr_range(0x3C8, 6);
     clear_msr_range(0x3E0, 2);
