@@ -23,7 +23,6 @@
 #include <conditional.h>
 #include "private.h"
 
-#define ret_t long
 #define _copy_to_guest copy_to_guest
 #define _copy_from_guest copy_from_guest
 
@@ -606,7 +605,7 @@ static int flask_relabel_domain(const struct xen_flask_relabel *arg)
 
 #endif /* !COMPAT */
 
-ret_t cf_check do_flask_op(XEN_GUEST_HANDLE_PARAM(void) u_flask_op)
+int cf_check flask_do_xsm_op(XEN_GUEST_HANDLE_PARAM(void) u_flask_op)
 {
     xen_flask_op_t op;
     int rv;
@@ -772,9 +771,7 @@ CHECK_flask_transition;
 #define flask_devicetree_label compat_devicetree_label
 
 #define xen_flask_op_t compat_flask_op_t
-#undef ret_t
-#define ret_t int
-#define do_flask_op compat_flask_op
+#define flask_do_xsm_op flask_do_compat_op
 
 #include "flask_op.c"
 #endif

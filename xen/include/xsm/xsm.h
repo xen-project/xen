@@ -86,11 +86,6 @@ struct xsm_ops {
 
     char *(*show_irq_sid)(int irq);
 
-    long (*do_xsm_op)(XEN_GUEST_HANDLE_PARAM(void) op);
-#ifdef CONFIG_COMPAT
-    int (*do_compat_op)(XEN_GUEST_HANDLE_PARAM(void) op);
-#endif
-
 #ifdef CONFIG_ARGO
     int (*argo_enable)(const struct domain *d);
     int (*argo_register_single_source)(const struct domain *d,
@@ -200,18 +195,6 @@ static inline char *xsm_show_irq_sid(int irq)
 {
     return alternative_call(xsm_ops.show_irq_sid, irq);
 }
-
-static inline long xsm_do_xsm_op(XEN_GUEST_HANDLE_PARAM(void) op)
-{
-    return alternative_call(xsm_ops.do_xsm_op, op);
-}
-
-#ifdef CONFIG_COMPAT
-static inline int xsm_do_compat_op(XEN_GUEST_HANDLE_PARAM(void) op)
-{
-    return alternative_call(xsm_ops.do_compat_op, op);
-}
-#endif
 
 #ifdef CONFIG_ARGO
 static inline int xsm_argo_enable(const struct domain *d)

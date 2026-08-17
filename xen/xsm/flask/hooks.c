@@ -1969,12 +1969,6 @@ static const struct xsm_ops __initconst_cf_clobber flask_ops = {
 
     .show_irq_sid = flask_show_irq_sid,
 
-    .do_xsm_op = do_flask_op,
-
-#ifdef CONFIG_COMPAT
-    .do_compat_op = compat_flask_op,
-#endif
-
 #ifdef CONFIG_ARGO
     .argo_enable = flask_argo_enable,
     .argo_register_single_source = flask_argo_register_single_source,

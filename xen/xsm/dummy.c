@@ -36,11 +36,6 @@ static const struct xsm_ops __initconst_cf_clobber dummy_ops = {
 
     .show_irq_sid                  = xsm_show_irq_sid,
 
-    .do_xsm_op                     = xsm_do_xsm_op,
-#ifdef CONFIG_COMPAT
-    .do_compat_op                  = xsm_do_compat_op,
-#endif
-
 #ifdef CONFIG_ARGO
     .argo_enable                   = xsm_argo_enable,
     .argo_register_single_source   = xsm_argo_register_single_source,

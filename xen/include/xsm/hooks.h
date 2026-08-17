@@ -154,6 +154,11 @@ XSM_HOOK(int, dm_op, struct domain *)
 XSM_HOOK(int, xen_version, uint32_t)
 XSM_HOOK(int, domain_resource_map, struct domain *)
 
+XSM_HOOK(int, do_xsm_op, XEN_GUEST_HANDLE_PARAM(void))
+#ifdef CONFIG_COMPAT
+XSM_HOOK(int, do_compat_op, XEN_GUEST_HANDLE_PARAM(void))
+#endif
+
 #undef XSM_HOOK0
 #undef XSM_HOOK1
 #undef XSM_HOOK2

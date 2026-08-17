@@ -439,7 +439,7 @@ static XSM_INLINE int xsm_hypfs_op(XSM_DEFAULT_VOID)
 
 #ifdef CONFIG_XSM
 
-static XSM_INLINE long xsm_do_xsm_op(XEN_GUEST_HANDLE_PARAM(void) op)
+static XSM_INLINE int xsm_do_xsm_op(XEN_GUEST_HANDLE_PARAM(void) op)
 {
     return -ENOSYS;
 }

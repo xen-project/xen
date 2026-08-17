@@ -216,12 +216,12 @@ bool __init has_xsm_magic(paddr_t start)
 
 long do_xsm_op(XEN_GUEST_HANDLE_PARAM(void) op)
 {
-    return xsm_do_xsm_op(op);
+    return xsm_do_xsm_op(XSM_HOOK, op);
 }
 
 #ifdef CONFIG_COMPAT
 int compat_xsm_op(XEN_GUEST_HANDLE_PARAM(void) op)
 {
-    return xsm_do_compat_op(op);
+    return xsm_do_compat_op(XSM_HOOK, op);
 }
 #endif
