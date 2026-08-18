@@ -258,6 +258,9 @@ int32_t ffa_handle_msg_send2(struct cpu_user_regs *regs)
     /* create a copy of the message header */
     memcpy(&src_msg, tx_buf, sizeof(src_msg));
 
+    /* Ensure validation and use of the message header use the same snapshot */
+    barrier();
+
     src_id = src_msg.send_recv_id >> 16;
     dst_id = src_msg.send_recv_id & GENMASK(15,0);
 
