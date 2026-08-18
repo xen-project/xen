@@ -28,7 +28,7 @@ static unsigned char keypress_key;
 static bool alt_key_handling;
 
 static keyhandler_fn_t cf_check show_handlers, cf_check dump_hwdom_registers,
-    cf_check dump_domains, cf_check read_clocks;
+    cf_check dump_domains, cf_check read_clocks, cf_check show_system_info;
 static irq_keyhandler_fn_t cf_check do_toggle_alt_key, cf_check dump_registers,
     cf_check reboot_machine, cf_check run_all_keyhandlers;
 
@@ -57,6 +57,7 @@ static struct keyhandler {
     IRQ_KEYHANDLER('R', reboot_machine, "reboot machine", 0),
         KEYHANDLER('t', read_clocks, "display multi-cpu clock info", 1),
         KEYHANDLER('0', dump_hwdom_registers, "dump Dom0 registers", 1),
+        KEYHANDLER('?', show_system_info, "show system information", false),
     IRQ_KEYHANDLER('*', run_all_keyhandlers, "print all diagnostics", 0),
 
 #ifdef CONFIG_PERF_COUNTERS
@@ -136,6 +137,13 @@ static void cf_check show_handlers(unsigned char key)
         if ( key_table[i].fn )
             printk(" key '%c' (ascii '%02x') => %s\n",
                    isprint(i) ? i : ' ', i, key_table[i].desc);
+}
+
+static void cf_check show_system_info(unsigned char key)
+{
+    printk("'%c' pressed -> showing system information\n", key);
+
+    print_cmdline();
 }
 
 static cpumask_t dump_execstate_mask;

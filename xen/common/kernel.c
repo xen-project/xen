@@ -35,7 +35,7 @@ boolean_param("dit", opt_dit);
 #endif
 
 static xen_commandline_t __ro_after_init saved_cmdline;
-static const char __initconst opt_builtin_cmdline[] = CONFIG_CMDLINE;
+static const char opt_builtin_cmdline[] = CONFIG_CMDLINE;
 char __ro_after_init xen_cap_info[128];
 
 static int assign_integer_param(const struct kernel_param *param, uint64_t val)
@@ -756,6 +756,24 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     }
 
     return -ENOSYS;
+}
+
+void print_cmdline(void)
+{
+    const char *cmdline;
+
+    if ( opt_builtin_cmdline[0] )
+        printk("Built-in command line: %s\n", opt_builtin_cmdline);
+
+    if ( IS_ENABLED(CONFIG_CMDLINE_OVERRIDE) )
+        cmdline = "<ignored> (CONFIG_CMDLINE_OVERRIDE=y)";
+    else if ( saved_cmdline[0] )
+        cmdline = saved_cmdline;
+    else
+        cmdline = NULL;
+
+    if ( cmdline )
+        printk("Command line: %s\n", cmdline);
 }
 
 /*
