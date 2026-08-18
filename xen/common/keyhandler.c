@@ -131,8 +131,6 @@ static void cf_check show_handlers(unsigned char key)
 
     printk("'%c' pressed -> showing installed handlers\n", key);
 
-    print_version();
-
     for ( i = 0; i < ARRAY_SIZE(key_table); i++ )
         if ( key_table[i].fn )
             printk(" key '%c' (ascii '%02x') => %s\n",
@@ -142,6 +140,8 @@ static void cf_check show_handlers(unsigned char key)
 static void cf_check show_system_info(unsigned char key)
 {
     printk("'%c' pressed -> showing system information\n", key);
+
+    print_version();
 
     print_cmdline();
 }
