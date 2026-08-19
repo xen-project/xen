@@ -22,6 +22,8 @@
 #include <asm/div64.h>
 #include <asm/domain.h>
 
+bool __ro_after_init NOW_good;
+
 /* Nonzero if YEAR is a leap year (every 4 years,
    except every 100th isn't, and every 400th is).  */
 #define __isleap(year) \

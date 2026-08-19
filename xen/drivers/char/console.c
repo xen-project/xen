@@ -987,11 +987,11 @@ static void printk_start_of_line(const char *prefix)
         }
         /* fall through */
     case TSM_BOOT:
-        sec = NOW();
-        nsec = do_div(sec, 1000000000);
-
-        if ( sec | nsec )
+        if ( NOW_good )
         {
+            smp_rmb();
+            sec = NOW();
+            nsec = do_div(sec, 1000000000);
             snprintf(tstr, sizeof(tstr), "[%5"PRIu64".%06"PRIu64"] ",
                      sec, nsec / 1000);
             break;

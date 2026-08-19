@@ -87,6 +87,8 @@ void __init preinit_xen_time(void)
         panic("%s: ACPI isn't supported\n", __func__);
 
     boot_clock_cycles = get_cycles();
+    smp_wmb();
+    NOW_good = true;
 
     /* set_xen_timer must have been set by sbi_init() already */
     ASSERT(set_xen_timer);

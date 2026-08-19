@@ -62,6 +62,12 @@ struct tm wallclock_time(uint64_t *ns);
 /* Chosen so (NOW() + delta) wont overflow without an uptime of 200 years */
 #define STIME_DELTA_MAX ((s_time_t)((uint64_t)~0ULL>>2))
 
+/*
+ * Indicator that the value returned by NOW() is good (earlier invocations may
+ * return zero or very small, merely monotonically increasing values).
+ */
+extern bool NOW_good;
+
 /* Explicitly OR with 1 just in case version number gets out of sync. */
 #define version_update_begin(v) (((v) + 1) | 1)
 #define version_update_end(v)   ((v) + 1)

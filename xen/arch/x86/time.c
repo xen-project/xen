@@ -2660,6 +2660,8 @@ void __init early_time_init(void)
 
     set_time_scale(&t->tsc_scale, tmp);
     t->stamp.local_tsc = boot_tsc_stamp;
+    barrier();
+    NOW_good = true;
 
     init_percpu_time();
 

@@ -145,6 +145,8 @@ void __init preinit_xen_time(void)
         panic("Timer: Cannot initialize platform timer\n");
 
     boot_count = get_cycles();
+    smp_wmb();
+    NOW_good = true;
 }
 
 static void __init init_dt_xen_time(void)
