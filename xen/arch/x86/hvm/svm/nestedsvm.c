@@ -283,7 +283,7 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
     return 0;
 }
 
-static int nsvm_vmrun_permissionmap(struct vcpu *v, bool viopm)
+static int nsvm_vmrun_permissionmap(struct vcpu *v)
 {
     struct svm_vcpu *arch_svm = &v->arch.hvm.svm;
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
@@ -295,6 +295,17 @@ static int nsvm_vmrun_permissionmap(struct vcpu *v, bool viopm)
     enum hvm_translation_result ret;
     unsigned long *ns_viomap;
     bool ioport_80 = true, ioport_ed = true;
+    /* IOPM is structured as a linear array of 64K+3 bits. */
+    gfn_t ns_iopm_end =
+        gfn_add(gaddr_to_gfn(ns_vmcb->_iopm_base_pa),
+                PFN_DOWN((0x10000 + 3) / 8));
+
+    if ( !gfn_valid(v->domain, ns_iopm_end) )
+    {
+        gdprintk(XENLOG_ERR, "%s invalid _iopm_base_pa address (%#"PRIx64")\n",
+                 __func__, ns_vmcb->_iopm_base_pa);
+        return NSVM_ERROR_VVMCB;
+    }
 
     ns_msrpm_ptr = (unsigned long *)svm->ns_cached_msrpm;
 
@@ -303,13 +314,12 @@ static int nsvm_vmrun_permissionmap(struct vcpu *v, bool viopm)
     if ( ret != HVMTRANS_okay )
     {
         gdprintk(XENLOG_ERR, "hvm_copy_from_guest_phys msrpm %u\n", ret);
-        return 1;
+        return NSVM_ERROR_VVMCB;
     }
 
     /* Check l1 guest io permission map and get a shadow one based on
      * if l1 guest intercepts io ports 0x80 and/or 0xED.
      */
-    svm->ns_oiomap_pa = svm->ns_iomap_pa;
     svm->ns_iomap_pa = ns_vmcb->_iopm_base_pa;
 
     ns_viomap = hvm_map_guest_frame_ro(svm->ns_iomap_pa >> PAGE_SHIFT, 0);
@@ -419,7 +429,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     n2vmcb->_tsc_offset = n1vmcb->_tsc_offset + ns_vmcb->_tsc_offset;
 
     /* Nested IO permission bitmaps */
-    rc = nsvm_vmrun_permissionmap(v, clean.iopm);
+    rc = nsvm_vmrun_permissionmap(v);
     if ( rc )
         return rc;
 

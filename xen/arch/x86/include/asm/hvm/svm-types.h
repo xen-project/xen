@@ -51,7 +51,7 @@ struct nestedsvm {
     unsigned long *ns_merged_msrpm;
 
     /* guest physical address of virtual io permission map */
-    paddr_t ns_iomap_pa, ns_oiomap_pa;
+    paddr_t ns_iomap_pa;
     /* Shadow io permission map */
     unsigned long *ns_iomap;
 
