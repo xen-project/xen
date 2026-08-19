@@ -476,51 +476,14 @@ static int num_cpu_cores(struct cpuinfo_x86 *c)
 		return 1;
 }
 
-static void intel_log_freq(const struct cpuinfo_x86 *c)
+static void intel_process_freq(const struct cpuinfo_x86 *c,
+                               unsigned int *min_mhz, unsigned int *max_mhz)
 {
-    unsigned int eax, ebx, ecx, edx, factor;
     uint64_t msrval;
     uint8_t max_ratio, min_ratio;
+    unsigned int factor;
 
-    if ( c->cpuid_level >= 0x15 )
-    {
-        cpuid(0x15, &eax, &ebx, &ecx, &edx);
-        if ( ecx && ebx && eax )
-        {
-            unsigned long long val = ecx;
-
-            val *= ebx;
-            printk("CPU%u: TSC: %u Hz * %u / %u = %Lu Hz\n",
-                   smp_processor_id(), ecx, ebx, eax, val / eax);
-        }
-        else if ( ecx | eax | ebx )
-        {
-            printk("CPU%u: TSC:", smp_processor_id());
-            if ( ecx )
-                printk(" core: %u Hz", ecx);
-            if ( ebx && eax )
-                printk(" ratio: %u / %u", ebx, eax);
-            printk("\n");
-        }
-    }
-
-    if ( c->cpuid_level >= 0x16 )
-    {
-        cpuid(0x16, &eax, &ebx, &ecx, &edx);
-        if ( ecx | eax | ebx )
-        {
-            printk("CPU%u:", smp_processor_id());
-            if ( ecx )
-                printk(" bus: %u MHz", ecx);
-            if ( eax )
-                printk(" base: %u MHz", eax);
-            if ( ebx )
-                printk(" max: %u MHz", ebx);
-            printk("\n");
-        }
-    }
-
-    switch ( c->x86 )
+    switch ( c->family )
     {
         static const unsigned short core_factors[] =
             { 26667, 13333, 20000, 16667, 33333, 10000, 40000 };
@@ -533,7 +496,7 @@ static void intel_log_freq(const struct cpuinfo_x86 *c)
         if ( !max_ratio )
             return;
 
-        switch ( c->x86_model )
+        switch ( c->model )
         {
         case 0x0e: /* Core */
         case 0x0f: case 0x16: case 0x17: case 0x1d: /* Core2 */
@@ -578,10 +541,61 @@ static void intel_log_freq(const struct cpuinfo_x86 *c)
         return;
     }
 
+    if ( min_mhz )
+        *min_mhz = DIV_ROUND_UP(factor * min_ratio, 100);
+    *max_mhz = DIV_ROUND_UP(factor * max_ratio, 100);
+}
+
+static void intel_log_freq(const struct cpuinfo_x86 *c)
+{
+    unsigned int eax, ebx, ecx, edx, min_mhz = 0, max_mhz = 0;
+
+    if ( c->cpuid_level >= 0x15 )
+    {
+        cpuid(0x15, &eax, &ebx, &ecx, &edx);
+        if ( ecx && ebx && eax )
+        {
+            unsigned long long val = ecx;
+
+            val *= ebx;
+            printk("CPU%u: TSC: %u Hz * %u / %u = %Lu Hz\n",
+                   smp_processor_id(), ecx, ebx, eax, val / eax);
+        }
+        else if ( ecx | eax | ebx )
+        {
+            printk("CPU%u: TSC:", smp_processor_id());
+            if ( ecx )
+                printk(" core: %u Hz", ecx);
+            if ( ebx && eax )
+                printk(" ratio: %u / %u", ebx, eax);
+            printk("\n");
+        }
+    }
+
+    if ( c->cpuid_level >= 0x16 )
+    {
+        cpuid(0x16, &eax, &ebx, &ecx, &edx);
+        if ( ecx | eax | ebx )
+        {
+            printk("CPU%u:", smp_processor_id());
+            if ( ecx )
+                printk(" bus: %u MHz", ecx);
+            if ( eax )
+                printk(" base: %u MHz", eax);
+            if ( ebx )
+                printk(" max: %u MHz", ebx);
+            printk("\n");
+        }
+    }
+
+    intel_process_freq(c, &min_mhz, &max_mhz);
+    if ( !max_mhz )
+        return;
+
     printk("CPU%u: ", smp_processor_id());
-    if ( min_ratio )
-        printk("%u ... ", (factor * min_ratio + 50) / 100);
-    printk("%u MHz\n", (factor * max_ratio + 50) / 100);
+    if ( min_mhz )
+        printk("%u ... ", min_mhz);
+    printk("%u MHz\n", max_mhz);
 }
 
 static void init_intel_perf(struct cpuinfo_x86 *c)
