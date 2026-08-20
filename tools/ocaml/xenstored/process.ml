@@ -345,15 +345,18 @@ let do_isintroduced con _t domains _cons data =
   in
   if domid = Define.domid_self || Domains.exist domains domid then "T\000" else "F\000"
 
-(* only in xen >= 4.2 *)
-let do_reset_watches con _t _domains cons _data =
+let reset_watches_and_transactions cons con =
   Connections.del_watches cons con;
-  Connection.del_transactions con
+  Connection.del_transactions con;
+  History.trim ()
+
+let do_reset_watches con _t _domains cons _data =
+  reset_watches_and_transactions cons con
 
 let do_reconnect cons con =
   let domstr = Connection.get_domstr con in
   info "%s requests a reconnect" domstr;
-  History.trim ();
+  reset_watches_and_transactions cons con;
   Connection.do_reconnect con;
   info "%s reconnection complete" domstr
 
