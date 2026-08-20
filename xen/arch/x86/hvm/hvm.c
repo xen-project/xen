@@ -3067,7 +3067,8 @@ void hvm_task_switch(
     if ( tr.g )
         tr.limit = (tr.limit << 12) | 0xfffu;
 
-    if ( tr.type != ((taskswitch_reason == TSW_iret) ? 0xb : 0x9) )
+    if ( tr.type != (taskswitch_reason == TSW_iret
+                     ? SYS_DESC_tss_busy : SYS_DESC_tss_avail) )
     {
         hvm_inject_hw_exception(
             (taskswitch_reason == TSW_iret) ? X86_EXC_TS : X86_EXC_GP,
@@ -3193,7 +3194,7 @@ void hvm_task_switch(
             goto out;
     }
 
-    tr.type = 0xb; /* busy 32-bit tss */
+    tr.type = SYS_DESC_tss_busy;
     hvm_set_segment_register(v, x86_seg_tss, &tr);
 
     v->arch.hvm.guest_cr[0] |= X86_CR0_TS;
