@@ -148,13 +148,11 @@ let mark_as_bad con =
 let initial_next_tid = 1
 
 let do_reconnect con =
+	(* transactions and watches handled by caller *)
 	Xenbus.Xb.reconnect con.xb;
 	(* dom is the same *)
-	Hashtbl.clear con.transactions;
 	con.next_tid <- initial_next_tid;
-	Hashtbl.clear con.watches;
 	(* anonid is the same *)
-	con.nb_watches <- 0;
 	con.stat_nb_ops <- 0;
 	(* perm is the same *)
 	()
