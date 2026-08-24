@@ -71,11 +71,10 @@ static inline event_word_t *evtchn_fifo_word_from_port(const struct domain *d,
      */
     smp_rmb();
 
-    p = array_index_nospec(port / EVTCHN_FIFO_EVENT_WORDS_PER_PAGE,
-                           d->evtchn_fifo->num_evtchns);
+    p = array_index_nospec(port, d->evtchn_fifo->num_evtchns);
     w = port % EVTCHN_FIFO_EVENT_WORDS_PER_PAGE;
 
-    return d->evtchn_fifo->event_array[p] + w;
+    return d->evtchn_fifo->event_array[p / EVTCHN_FIFO_EVENT_WORDS_PER_PAGE] + w;
 }
 
 static void cf_check evtchn_fifo_init(struct domain *d, struct evtchn *evtchn)
