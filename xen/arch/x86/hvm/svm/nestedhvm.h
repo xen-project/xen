@@ -48,6 +48,7 @@ bool cf_check nsvm_vmcb_guest_intercepts_event(
     struct vcpu *v, unsigned int vector, int errcode);
 bool cf_check nsvm_vmcb_hap_enabled(struct vcpu *v);
 enum hvm_intblk cf_check nsvm_intr_blocked(struct vcpu *v);
+void cf_check nsvm_domain_relinquish_resources(struct domain *d);
 
 /* Interrupts, vGIF */
 void svm_vmexit_do_clgi(struct cpu_user_regs *regs, struct vcpu *v);

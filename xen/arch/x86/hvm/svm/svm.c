@@ -2420,6 +2420,7 @@ static struct hvm_function_table __initdata_cf_clobber svm_function_table = {
     .nhvm_vmcx_hap_enabled = nsvm_vmcb_hap_enabled,
     .nhvm_intr_blocked = nsvm_intr_blocked,
     .nhvm_hap_walk_L1_p2m = nsvm_hap_walk_L1_p2m,
+    .nhvm_domain_relinquish_resources = nsvm_domain_relinquish_resources,
 
     .get_reg = svm_get_reg,
     .set_reg = svm_set_reg,
