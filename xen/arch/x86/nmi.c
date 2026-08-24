@@ -321,7 +321,7 @@ static void setup_p6_watchdog(unsigned counter)
 {
     unsigned int evntsel;
 
-    if ( !nmi_p6_event_width && current_cpu_data.cpuid_level >= 0xa )
+    if ( !nmi_p6_event_width && boot_cpu_data.cpuid_level >= 0xa )
         nmi_p6_event_width = MASK_EXTR(cpuid_eax(0xa), P6_EVENT_WIDTH_MASK);
     if ( !nmi_p6_event_width )
         nmi_p6_event_width = P6_EVENT_WIDTH_MIN;
