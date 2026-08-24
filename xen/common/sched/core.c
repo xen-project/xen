@@ -3412,7 +3412,7 @@ void schedule_dump(struct cpupool *c)
     }
     else
     {
-        sched = &operations;
+        sched = &sched_idle_ops;
         cpus = &cpupool_free_cpus;
     }
 
