@@ -32,12 +32,6 @@ struct radix_tree_path {
 #define RADIX_TREE_MAX_PATH (DIV_ROUND_UP(RADIX_TREE_INDEX_BITS, \
 					  RADIX_TREE_MAP_SHIFT))
 
-/*
- * The height_to_maxindex array needs to be one deeper than the maximum
- * path as height 0 holds only 1 entry.
- */
-static unsigned long height_to_maxindex[RADIX_TREE_MAX_PATH + 1] __read_mostly;
-
 static inline void *ptr_to_indirect(void *ptr)
 {
 	return (void *)((unsigned long)ptr | RADIX_TREE_INDIRECT_PTR);
@@ -80,7 +74,16 @@ static void radix_tree_node_free(struct radix_tree_node *node)
  */
 static inline unsigned long radix_tree_maxindex(unsigned int height)
 {
-	return height_to_maxindex[height];
+	unsigned int width = height * RADIX_TREE_MAP_SHIFT;
+	int shift = RADIX_TREE_INDEX_BITS - width;
+
+	if (shift < 0)
+		return ~0UL;
+
+	if (shift >= BITS_PER_LONG)
+		return 0UL;
+
+	return ~0UL >> shift;
 }
 
 /*
@@ -705,27 +708,3 @@ void radix_tree_init(struct radix_tree_root *root)
 {
 	*root = (struct radix_tree_root)RADIX_TREE_INIT();
 }
-
-static __init unsigned long __maxindex(unsigned int height)
-{
-	unsigned int width = height * RADIX_TREE_MAP_SHIFT;
-	int shift = RADIX_TREE_INDEX_BITS - width;
-
-	if (shift < 0)
-		return ~0UL;
-	if (shift >= BITS_PER_LONG)
-		return 0UL;
-	return ~0UL >> shift;
-}
-
-static int __init cf_check radix_tree_init_maxindex(void)
-{
-	unsigned int i;
-
-	for (i = 0; i < ARRAY_SIZE(height_to_maxindex); i++)
-		height_to_maxindex[i] = __maxindex(i);
-
-	return 0;
-}
-/* pre-SMP just so it runs before 'normal' initcalls */
-presmp_initcall(radix_tree_init_maxindex);
