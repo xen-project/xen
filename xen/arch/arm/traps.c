@@ -307,6 +307,10 @@ static const char *decode_fsc(uint32_t fsc, int *level)
 
     switch ( fsc & 0x3f )
     {
+    case FSC_FLT_ADDR_SIZE ... FSC_FLT_ADDR_SIZE + 3:
+        msg = "Address size fault";
+        *level = fsc & FSC_LL_MASK;
+        break;
     case FSC_FLT_TRANS ... FSC_FLT_TRANS + 3:
         msg = "Translation fault";
         *level = fsc & FSC_LL_MASK;
@@ -363,6 +367,7 @@ static const char *fsc_level_str(int level)
     switch ( level )
     {
     case -1: return "";
+    case 0:  return " at level 0 or TTBR";
     case 1:  return " at level 1";
     case 2:  return " at level 2";
     case 3:  return " at level 3";
