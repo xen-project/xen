@@ -507,7 +507,6 @@ extern register_t __cpu_logical_map[];
 /* .... If F == 1 */
 #define PAR_FSC_SHIFT   (1)
 #define PAR_FSC_MASK    (_AC(0x3f,U)<<PAR_FSC_SHIFT)
-#define PAR_STAGE21     (_AC(1,U)<<8)     /* Stage 2 Fault During Stage 1 Walk */
 #define PAR_STAGE2      (_AC(1,U)<<9)     /* Stage 2 Fault */
 
 /* If F == 0 */

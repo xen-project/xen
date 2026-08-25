@@ -379,16 +379,17 @@ void panic_PAR(uint64_t par)
 {
     const char *msg;
     int level = -1;
-    int stage = par & PAR_STAGE2 ? 2 : 1;
-    int second_in_first = !!(par & PAR_STAGE21);
 
-    msg = decode_fsc( (par&PAR_FSC_MASK) >> PAR_FSC_SHIFT, &level);
+    /*
+     * The only caller translates using "at s1e2r" (arm64) or ATS1HR
+     * (arm32), i.e. an EL2 stage 1 only translation.
+     */
+    ASSERT(!(par & PAR_STAGE2));
 
-    printk("PAR: %016"PRIx64": %s stage %d%s%s\n",
-           par, msg,
-           stage,
-           second_in_first ? " during second stage lookup" : "",
-           fsc_level_str(level));
+    msg = decode_fsc((par & PAR_FSC_MASK) >> PAR_FSC_SHIFT, &level);
+
+    printk("PAR: %016"PRIx64": %s stage 1%s\n",
+           par, msg, fsc_level_str(level));
 
     panic("Error during Hypervisor-to-physical address translation\n");
 }
