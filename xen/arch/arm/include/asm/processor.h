@@ -521,6 +521,7 @@ extern register_t __cpu_logical_map[];
 /*
  * 543210 BIT
  * 00XXLL -- XX Fault Level LL
+ * ..00LL -- Address Size Fault LL
  * ..01LL -- Translation Fault LL
  * ..10LL -- Access Fault LL
  * ..11LL -- Permission Fault LL
@@ -534,6 +535,7 @@ extern register_t __cpu_logical_map[];
 #define FSC_TYPE_OTH   (_AC(0x02,U)<<4)
 #define FSC_TYPE_IMPL  (_AC(0x03,U)<<4)
 
+#define FSC_FLT_ADDR_SIZE (0x00)
 #define FSC_FLT_TRANS  (0x04)
 #define FSC_FLT_ACCESS (0x08)
 #define FSC_FLT_PERM   (0x0c)
