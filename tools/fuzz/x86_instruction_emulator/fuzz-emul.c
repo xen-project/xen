@@ -825,6 +825,58 @@ static void sanitize_input(struct x86_emulate_ctxt *ctxt)
     regs->entry_vector = 0;
 
     /*
+     * Most CR4 bits can only be set when corresponding CPUID bits are set.
+     * (In such cases the emulator may only check the CR4 bit.)
+     */
+    if ( !cpu_policy.basic.vme )
+        c->cr[4] &= ~(X86_CR4_VME | X86_CR4_PVI);
+
+    if ( !cpu_policy.basic.tsc )
+        c->cr[4] &= ~X86_CR4_TSD;
+
+    if ( !cpu_policy.basic.de )
+        c->cr[4] &= ~X86_CR4_DE;
+
+    if ( !cpu_policy.basic.fxsr )
+        c->cr[4] &= ~X86_CR4_OSFXSR;
+
+    if ( !cpu_policy.basic.sse )
+        c->cr[4] &= ~X86_CR4_OSXMMEXCPT;
+
+    if ( !cpu_policy.feat.umip )
+        c->cr[4] &= ~X86_CR4_UMIP;
+
+    if ( !cpu_policy.feat.la57 )
+        c->cr[4] &= ~X86_CR4_LA57;
+
+    if ( !cpu_policy.basic.vmx )
+        c->cr[4] &= ~X86_CR4_VMXE;
+
+    if ( !cpu_policy.basic.smx )
+        c->cr[4] &= ~X86_CR4_SMXE;
+
+    if ( !cpu_policy.feat.fsgsbase )
+        c->cr[4] &= ~X86_CR4_FSGSBASE;
+
+    if ( !cpu_policy.basic.pcid )
+        c->cr[4] &= ~X86_CR4_PCIDE;
+
+    if ( !cpu_policy.basic.xsave || !cpu_has_xsave )
+        c->cr[4] &= ~X86_CR4_OSXSAVE;
+
+    if ( !cpu_policy.feat.pku )
+        c->cr[4] &= ~X86_CR4_PKE;
+
+    if ( !cpu_policy.feat.cet_ss && !cpu_policy.feat.cet_ibt )
+        c->cr[4] &= ~X86_CR4_CET;
+
+    if ( !cpu_policy.feat.pks )
+        c->cr[4] &= ~X86_CR4_PKS;
+
+    if ( !cpu_policy.feat.fred )
+        c->cr[4] &= ~X86_CR4_FRED;
+
+    /*
      * For both RIP and RSP make sure we test with canonical values in at
      * least a fair number of cases. As all other registers aren't tied to
      * special addressing purposes, leave everything else alone.
@@ -839,9 +891,13 @@ static void sanitize_input(struct x86_emulate_ctxt *ctxt)
     if ( c->cr[0] & X86_CR0_PG )
         c->cr[0] |= X86_CR0_PE;
 
-    /* EFLAGS.VM not available in long mode */
+    /* EFLAGS.VM not available in long mode, but CR4.PAE is required. */
     if ( long_mode_active(ctxt) )
+    {
         regs->rflags &= ~X86_EFLAGS_VM;
+
+        c->cr[4] |= X86_CR4_PAE;
+    }
 
     /* EFLAGS.VM implies 16-bit mode */
     if ( regs->rflags & X86_EFLAGS_VM )
@@ -862,10 +918,61 @@ static bool check_state(struct x86_emulate_ctxt *ctxt)
     const struct fuzz_corpus *c = s->corpus;
     const struct cpu_user_regs *regs = &c->regs;
 
-    if ( long_mode_active(ctxt) && !(c->cr[0] & X86_CR0_PG) )
+    if ( long_mode_active(ctxt) &&
+         (!(c->cr[0] & X86_CR0_PG) || !(c->cr[4] & X86_CR4_PAE)) )
         return false;
 
     if ( (c->cr[0] & X86_CR0_PG) && !(c->cr[0] & X86_CR0_PE) )
+        return false;
+
+    if ( (c->cr[4] & (X86_CR4_VME | X86_CR4_PVI)) && !cpu_policy.basic.vme )
+        return false;
+
+    if ( (c->cr[4] & X86_CR4_TSD) && !cpu_policy.basic.tsc )
+        return false;
+
+    if ( (c->cr[4] & X86_CR4_DE) && !cpu_policy.basic.de )
+        return false;
+
+    if ( (c->cr[4] & X86_CR4_OSFXSR) && !cpu_policy.basic.fxsr )
+        return false;
+
+    if ( (c->cr[4] & X86_CR4_OSXMMEXCPT) && !cpu_policy.basic.sse )
+        return false;
+
+    if ( (c->cr[4] & X86_CR4_UMIP) && !cpu_policy.feat.umip )
+        return false;
+
+    if ( (c->cr[4] & X86_CR4_LA57) && !cpu_policy.feat.la57 )
+        return false;
+
+    if ( (c->cr[4] & X86_CR4_VMXE) && !cpu_policy.basic.vmx )
+        return false;
+
+    if ( (c->cr[4] & X86_CR4_SMXE) && !cpu_policy.basic.smx )
+        return false;
+
+    if ( (c->cr[4] & X86_CR4_FSGSBASE) && !cpu_policy.feat.fsgsbase )
+        return false;
+
+    if ( (c->cr[4] & X86_CR4_PCIDE) && !cpu_policy.basic.pcid )
+        return false;
+
+    if ( (c->cr[4] & X86_CR4_OSXSAVE) &&
+         (!cpu_policy.basic.xsave || !cpu_has_xsave) )
+        return false;
+
+    if ( (c->cr[4] & X86_CR4_PKE) && !cpu_policy.feat.pku )
+        return false;
+
+    if ( (c->cr[4] & X86_CR4_CET) &&
+         !cpu_policy.feat.cet_ss && !cpu_policy.feat.cet_ibt )
+        return false;
+
+    if ( (c->cr[4] & X86_CR4_PKS) && !cpu_policy.feat.pks )
+        return false;
+
+    if ( (c->cr[4] & X86_CR4_FRED) && !cpu_policy.feat.fred )
         return false;
 
     if ( (regs->rflags & X86_EFLAGS_VM) &&
