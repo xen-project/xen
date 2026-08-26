@@ -1269,6 +1269,11 @@ static always_inline bool is_iommu_enabled(const struct domain *d)
     return evaluate_nospec(d->options & XEN_DOMCTL_CDF_iommu);
 }
 
+static inline bool is_vpmu_domain(const struct domain *d)
+{
+    return d->options & XEN_DOMCTL_CDF_vpmu;
+}
+
 #ifdef CONFIG_MEM_PAGING
 # define mem_paging_enabled(d) vm_event_check_ring((d)->vm_event_paging)
 #else

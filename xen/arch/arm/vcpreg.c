@@ -276,10 +276,7 @@ void do_cp15_32(struct cpu_user_regs *regs, const union hsr hsr)
      *
      * NB: Both MDCR_EL2.TPM and MDCR_EL2.TPMCR cause trapping of PMCR.
      */
-    /* We could trap ID_DFR0 and tell the guest we don't support
-     * performance monitoring, but Linux doesn't check the ID_DFR0.
-     * Therefore it will read PMCR.
-     *
+    /*
      * We tell the guest we have 0 counters. Unfortunately we must
      * always support PMCCNTR (the cyle counter): we just RAZ/WI for all
      * PM register, which doesn't crash the kernel at least
@@ -292,6 +289,7 @@ void do_cp15_32(struct cpu_user_regs *regs, const union hsr hsr)
             return handle_raz_wi(regs, regidx, cp32.read, hsr, 1);
     case HSR_CPREG32(PMINTENSET):
     case HSR_CPREG32(PMINTENCLR):
+    case HSR_CPREG32(PMMIR):
         return handle_raz_wi(regs, regidx, cp32.read, hsr, 1);
     case HSR_CPREG32(PMCR):
     case HSR_CPREG32(PMCNTENSET):
@@ -320,8 +318,32 @@ void do_cp15_32(struct cpu_user_regs *regs, const union hsr hsr)
     GENERATE_TID3_INFO(ID_PFR0, pfr32, 0)
     GENERATE_TID3_INFO(ID_PFR1, pfr32, 1)
     GENERATE_TID3_INFO(ID_PFR2, pfr32, 2)
-    GENERATE_TID3_INFO(ID_DFR0, dbg32, 0)
-    GENERATE_TID3_INFO(ID_DFR1, dbg32, 1)
+
+    case HSR_CPREG32(ID_DFR0):
+    {
+        union cpuinfo_dbg32 info_dbg32 = domain_cpuinfo.dbg32;
+
+        if ( !is_vpmu_domain(v->domain) )
+            info_dbg32.perfmon = 0;
+
+        return handle_ro_read_val(regs, regidx, cp32.read, hsr, 1,
+                                  info_dbg32.bits[0]);
+    }
+
+    case HSR_CPREG32(ID_DFR1):
+    {
+        union cpuinfo_dbg32 info_dbg32 = domain_cpuinfo.dbg32;
+
+        if ( !is_vpmu_domain(v->domain) )
+        {
+            info_dbg32.mtpmu = 0;
+            info_dbg32.hpmn0 = 0;
+        }
+
+        return handle_ro_read_val(regs, regidx, cp32.read, hsr, 1,
+                                  info_dbg32.bits[1]);
+    }
+
     GENERATE_TID3_INFO(ID_AFR0, aux32, 0)
     GENERATE_TID3_INFO(ID_MMFR0, mm32, 0)
     GENERATE_TID3_INFO(ID_MMFR1, mm32, 1)

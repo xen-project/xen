@@ -501,7 +501,7 @@ int arch_vcpu_create(struct vcpu *v)
     v->arch.hcr_el2 = get_default_hcr_flags();
 
     v->arch.mdcr_el2 = HDCR_TDRA | HDCR_TDOSA | HDCR_TDA;
-    if ( !(v->domain->options & XEN_DOMCTL_CDF_vpmu) )
+    if ( !is_vpmu_domain(v->domain) )
         v->arch.mdcr_el2 |= HDCR_TPM | HDCR_TPMCR;
 
     if ( (rc = vcpu_vgic_init(v)) != 0 )

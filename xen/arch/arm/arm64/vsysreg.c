@@ -227,6 +227,7 @@ void do_sysreg(struct cpu_user_regs *regs,
      */
     case HSR_SYSREG_PMINTENSET_EL1:
     case HSR_SYSREG_PMINTENCLR_EL1:
+    case HSR_SYSREG_PMMIR_EL1:
         return handle_raz_wi(regs, regidx, hsr.sysreg.read, hsr, 1);
     case HSR_SYSREG_PMUSERENR_EL0:
         /* RO at EL0. RAZ/WI at EL1 */
@@ -300,8 +301,32 @@ void do_sysreg(struct cpu_user_regs *regs,
     GENERATE_TID3_INFO(ID_PFR0_EL1, pfr32, 0)
     GENERATE_TID3_INFO(ID_PFR1_EL1, pfr32, 1)
     GENERATE_TID3_INFO(ID_PFR2_EL1, pfr32, 2)
-    GENERATE_TID3_INFO(ID_DFR0_EL1, dbg32, 0)
-    GENERATE_TID3_INFO(ID_DFR1_EL1, dbg32, 1)
+
+    case HSR_SYSREG_ID_DFR0_EL1:
+    {
+        union cpuinfo_dbg32 info_dbg32 = domain_cpuinfo.dbg32;
+
+        if ( !is_vpmu_domain(v->domain) )
+            info_dbg32.perfmon = 0;
+
+        return handle_ro_read_val(regs, regidx, hsr.sysreg.read, hsr, 1,
+                                  info_dbg32.bits[0]);
+    }
+
+    case HSR_SYSREG_ID_DFR1_EL1:
+    {
+        union cpuinfo_dbg32 info_dbg32 = domain_cpuinfo.dbg32;
+
+        if ( !is_vpmu_domain(v->domain) )
+        {
+            info_dbg32.mtpmu = 0;
+            info_dbg32.hpmn0 = 0;
+        }
+
+        return handle_ro_read_val(regs, regidx, hsr.sysreg.read, hsr, 1,
+                                  info_dbg32.bits[1]);
+    }
+
     GENERATE_TID3_INFO(ID_AFR0_EL1, aux32, 0)
     GENERATE_TID3_INFO(ID_MMFR0_EL1, mm32, 0)
     GENERATE_TID3_INFO(ID_MMFR1_EL1, mm32, 1)
@@ -342,8 +367,34 @@ void do_sysreg(struct cpu_user_regs *regs,
     }
 
     GENERATE_TID3_INFO(ID_AA64PFR1_EL1, pfr64, 1)
-    GENERATE_TID3_INFO(ID_AA64DFR0_EL1, dbg64, 0)
-    GENERATE_TID3_INFO(ID_AA64DFR1_EL1, dbg64, 1)
+
+    case HSR_SYSREG_ID_AA64DFR0_EL1:
+    {
+        union cpuinfo_dbg64 info_dbg64 = domain_cpuinfo.dbg64;
+
+        if ( !is_vpmu_domain(v->domain) )
+        {
+            info_dbg64.pmu_ver = 0;
+            info_dbg64.pmss = 0;
+            info_dbg64.mtpmu = 0;
+            info_dbg64.hpmn0 = 0;
+        }
+
+        return handle_ro_read_val(regs, regidx, hsr.sysreg.read, hsr, 1,
+                                  info_dbg64.bits[0]);
+    }
+
+    case HSR_SYSREG_ID_AA64DFR1_EL1:
+    {
+        union cpuinfo_dbg64 info_dbg64 = domain_cpuinfo.dbg64;
+
+        if ( !is_vpmu_domain(v->domain) )
+            info_dbg64.pmicntr = 0;
+
+        return handle_ro_read_val(regs, regidx, hsr.sysreg.read, hsr, 1,
+                                  info_dbg64.bits[1]);
+    }
+
     GENERATE_TID3_INFO(ID_AA64ISAR0_EL1, isa64, 0)
     GENERATE_TID3_INFO(ID_AA64ISAR1_EL1, isa64, 1)
     GENERATE_TID3_INFO(ID_AA64MMFR0_EL1, mm64, 0)
