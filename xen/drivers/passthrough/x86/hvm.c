@@ -231,6 +231,12 @@ int pt_irq_create_bind(
  restart:
     write_lock(&d->event_lock);
 
+    if ( d->is_dying )
+    {
+        write_unlock(&d->event_lock);
+        return -ESRCH;
+    }
+
     hvm_irq_dpci = domain_get_irq_dpci(d);
     if ( !hvm_irq_dpci && !is_hardware_domain(d) )
     {
