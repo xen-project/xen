@@ -365,13 +365,6 @@ F:	tools/misc/xenhypfs.c
 F:	xen/common/hypfs.c
 F:	xen/include/xen/hypfs.h
 
-IMX8M SUPPORT
-R:	Wig Cheng <onlywig@gmail.com>
-F:	xen/arch/arm/arm64/debug-imx-uart.inc
-F:	xen/arch/arm/include/asm/imx-uart.h
-F:	xen/arch/arm/platforms/imx8m.c
-F:	xen/drivers/char/imx-uart.c
-
 IMX8QM/QXP SUPPORT
 R:	John Ernberg <john.ernberg@actia.se>
 F:	xen/arch/arm/platforms/imx8qm.c

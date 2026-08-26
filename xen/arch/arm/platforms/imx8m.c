@@ -111,8 +111,14 @@ static bool imx8m_smc(struct cpu_user_regs *regs)
          * NoC QoS priority setup.  Only i.MX8MQ issues this at boot;
          * i.MX8MP issues no NoC call, but the platform covers both.
          */
-        if ( subfunction_id != IMX_SIP_NOC_SF_PRIORITY )
+        switch ( subfunction_id )
+        {
+        case IMX_SIP_NOC_SF_PRIORITY:
+            break;
+
+        default:
             return false;
+        }
         break;
 
     default:
