@@ -157,7 +157,7 @@ static void cpuid_hypervisor_leaves(const struct vcpu *v, uint32_t leaf,
         break;
 
     case 5: /* PV-specific parameters */
-        if ( is_hvm_domain(d) || subleaf != 0 )
+        if ( !is_pv_domain(d) || subleaf != 0 )
             break;
 
         res->b = flsl(get_upper_mfn_bound()) + PAGE_SHIFT;
