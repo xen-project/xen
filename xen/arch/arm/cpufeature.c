@@ -219,7 +219,25 @@ static int __init create_domain_cpuinfo(void)
     domain_cpuinfo.isa64.api = 0;
     domain_cpuinfo.isa64.gpa = 0;
     domain_cpuinfo.isa64.gpi = 0;
+
+    /* Hide SPE, DPFZS, TRBE, BRBE, Trace Extensions, SPMU, ITE and EBEP */
+    domain_cpuinfo.dbg64.trace_ver = 0;
+    domain_cpuinfo.dbg64.pms_ver = 0;
+    domain_cpuinfo.dbg64.dpfzs = 0;
+    domain_cpuinfo.dbg64.trace_filt = 0;
+    domain_cpuinfo.dbg64.trace_buffer = 0;
+    domain_cpuinfo.dbg64.ext_trc_buff = 0;
+    domain_cpuinfo.dbg64.brbe = 0;
+    domain_cpuinfo.dbg64.syspmuid = 0;
+    domain_cpuinfo.dbg64.spmu = 0;
+    domain_cpuinfo.dbg64.ite = 0;
+    domain_cpuinfo.dbg64.ebep = 0;
 #endif
+
+    /* Hide Trace Extensions for AArch32 domain */
+    domain_cpuinfo.dbg32.coptrc = 0;
+    domain_cpuinfo.dbg32.mmaptrc = 0;
+    domain_cpuinfo.dbg32.tracefilt = 0;
 
     /* Hide AMU support */
 #ifdef CONFIG_ARM_64

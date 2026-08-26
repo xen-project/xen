@@ -208,7 +208,7 @@ struct cpuinfo_arm {
         };
     } pfr64;
 
-    union {
+    union cpuinfo_dbg64 {
         register_t bits[2];
         struct {
             /* DFR0 */
@@ -216,19 +216,31 @@ struct cpuinfo_arm {
             unsigned long trace_ver:4;
             unsigned long pmu_ver:4;
             unsigned long brps:4;
-            unsigned long __res0:4;
+            unsigned long pmss:4;
             unsigned long wrps:4;
             unsigned long __res1:4;
             unsigned long ctx_cmps:4;
             unsigned long pms_ver:4;
             unsigned long double_lock:4;
             unsigned long trace_filt:4;
-            unsigned long __res2:4;
+            unsigned long trace_buffer:4;
             unsigned long mtpmu:4;
-            unsigned long __res3:12;
+            unsigned long brbe:4;
+            unsigned long ext_trc_buff:4;
+            unsigned long hpmn0:4;
 
             /* DFR1 */
-            unsigned long __res4:64;
+            unsigned long syspmuid:8;
+            unsigned long brps1:8;
+            unsigned long wrps1:8;
+            unsigned long ctx_cmps1:8;
+            unsigned long spmu:4;
+            unsigned long pmicntr:4;
+            unsigned long able:4;
+            unsigned long ite:4;
+            unsigned long ebep:4;
+            unsigned long dpfzs:4;
+            unsigned long abl_cmps:8;
         };
     } dbg64;
 
@@ -408,7 +420,7 @@ struct cpuinfo_arm {
         };
     } pfr32;
 
-    union {
+    union cpuinfo_dbg32 {
         register_t bits[2];
         struct {
             /* DFR0 */
@@ -426,7 +438,8 @@ struct cpuinfo_arm {
 
             /* DFR1 */
             unsigned long mtpmu:4;
-            unsigned long __res1:28;
+            unsigned long hpmn0:4;
+            unsigned long __res1:24;
 #ifdef CONFIG_ARM_64
             unsigned long __res2:32;
 #endif
