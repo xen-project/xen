@@ -843,6 +843,7 @@ static void __init calculate_hvm_max_policy(void)
         p->extd.raw[0xa].d &= ((1u << SVM_FEATURE_NPT) |
                                (1u << SVM_FEATURE_LBRV) |
                                (1u << SVM_FEATURE_NRIPS) |
+                               (1u << SVM_FEATURE_FLUSHBYASID) |
                                (1u << SVM_FEATURE_PAUSEFILTER) |
                                (1u << SVM_FEATURE_DECODEASSISTS));
         /* Enable features which are always emulated. */
