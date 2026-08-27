@@ -3833,49 +3833,48 @@ int hvm_descriptor_access_intercept(uint64_t exit_info,
 void hvm_ud_intercept(struct cpu_user_regs *regs)
 {
     struct vcpu *cur = current;
-    bool should_emulate = false;
     struct hvm_emulate_ctxt ctxt;
+    const struct segment_register *cs;
+    uint32_t walk;
+    unsigned long addr;
+    char sig[5]; /* ud2; .ascii "xen" */
+
+    if ( !opt_hvm_fep )
+    {
+        ASSERT_UNREACHABLE();
+        goto reinject;
+    }
 
     hvm_emulate_init_once(&ctxt, NULL, regs);
 
-    if ( opt_hvm_fep )
+    cs = &ctxt.seg_reg[x86_seg_cs];
+    walk = ((ctxt.seg_reg[x86_seg_ss].dpl == 3)
+            ? PFEC_user_mode : 0) | PFEC_insn_fetch;
+
+    if ( hvm_virtual_to_linear_addr(x86_seg_cs, cs, regs->rip,
+                                    sizeof(sig), hvm_access_insn_fetch,
+                                    cs, &addr) &&
+         (hvm_copy_from_guest_linear(sig, addr, sizeof(sig),
+                                     walk, NULL) == HVMTRANS_okay) &&
+         (memcmp(sig, "\xf\xb" "xen", sizeof(sig)) == 0) )
     {
-        const struct segment_register *cs = &ctxt.seg_reg[x86_seg_cs];
-        uint32_t walk = ((ctxt.seg_reg[x86_seg_ss].dpl == 3)
-                         ? PFEC_user_mode : 0) | PFEC_insn_fetch;
-        unsigned long addr;
-        char sig[5]; /* ud2; .ascii "xen" */
+        regs->rip += sizeof(sig);
+        regs->eflags &= ~X86_EFLAGS_RF;
 
-        if ( hvm_virtual_to_linear_addr(x86_seg_cs, cs, regs->rip,
-                                        sizeof(sig), hvm_access_insn_fetch,
-                                        cs, &addr) &&
-             (hvm_copy_from_guest_linear(sig, addr, sizeof(sig),
-                                         walk, NULL) == HVMTRANS_okay) &&
-             (memcmp(sig, "\xf\xb" "xen", sizeof(sig)) == 0) )
-        {
-            regs->rip += sizeof(sig);
-            regs->eflags &= ~X86_EFLAGS_RF;
+        /* Zero the upper 32 bits of %rip if not in 64bit mode. */
+        if ( !(hvm_long_mode_active(cur) && cs->l) )
+            regs->rip = (uint32_t)regs->rip;
 
-            /* Zero the upper 32 bits of %rip if not in 64bit mode. */
-            if ( !(hvm_long_mode_active(cur) && cs->l) )
-                regs->rip = (uint32_t)regs->rip;
-
-            add_taint(TAINT_HVM_FEP);
-
-            should_emulate = true;
-        }
+        add_taint(TAINT_HVM_FEP);
     }
-
-    if ( !should_emulate )
-    {
-        hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
-        return;
-    }
+    else
+        goto reinject;
 
     switch ( hvm_emulate_one(&ctxt, VIO_no_completion) )
     {
     case X86EMUL_UNHANDLEABLE:
     case X86EMUL_UNIMPLEMENTED:
+    reinject:
         hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
         break;
     case X86EMUL_EXCEPTION:
