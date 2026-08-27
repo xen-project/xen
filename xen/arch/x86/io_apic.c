@@ -1089,10 +1089,8 @@ static void __init setup_IO_APIC_irqs(void)
             entry.trigger = irq_trigger(idx);
             entry.polarity = irq_polarity(idx);
 
-            if (irq_trigger(idx)) {
-                entry.trigger = 1;
+            if (entry.trigger)
                 entry.mask = 1;
-            }
 
             irq = pin_2_irq(idx, apic, pin);
 
