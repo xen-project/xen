@@ -25,7 +25,6 @@
 #include <asm/vreg.h>
 
 static struct {
-    bool enabled;
     /* Distributor interface address */
     paddr_t dbase;
     /* CPU interface address & size */
@@ -36,10 +35,11 @@ static struct {
 
     /* Offset to add to get an 8kB contiguous region if GIC is aliased */
     uint32_t aliased_offset;
-} vgic_v2_hw;
+    bool enabled;
+} vgic_v2_hw __ro_after_init;
 
-void vgic_v2_setup_hw(paddr_t dbase, paddr_t cbase, paddr_t csize,
-                      paddr_t vbase, uint32_t aliased_offset)
+void __init vgic_v2_setup_hw(paddr_t dbase, paddr_t cbase, paddr_t csize,
+                             paddr_t vbase, uint32_t aliased_offset)
 {
     vgic_v2_hw.enabled = true;
     vgic_v2_hw.dbase = dbase;

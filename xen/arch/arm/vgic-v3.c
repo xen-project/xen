@@ -44,19 +44,18 @@
 #define VGICD_CTLR_DEFAULT  (GICD_CTLR_ARE_NS)
 
 static struct {
-    bool enabled;
     /* Distributor interface address */
     paddr_t dbase;
     /* Re-distributor regions */
     unsigned int nr_rdist_regions;
     const struct rdist_region *regions;
     unsigned int intid_bits;  /* Number of interrupt ID bits */
-} vgic_v3_hw;
+    bool enabled;
+} vgic_v3_hw __ro_after_init;
 
-void vgic_v3_setup_hw(paddr_t dbase,
-                      unsigned int nr_rdist_regions,
-                      const struct rdist_region *regions,
-                      unsigned int intid_bits)
+void __init vgic_v3_setup_hw(paddr_t dbase, unsigned int nr_rdist_regions,
+                             const struct rdist_region *regions,
+                             unsigned int intid_bits)
 {
     vgic_v3_hw.enabled = true;
     vgic_v3_hw.dbase = dbase;
