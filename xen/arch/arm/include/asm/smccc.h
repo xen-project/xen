@@ -56,6 +56,8 @@
 
 #ifndef __ASSEMBLER__
 
+#include <xen/macros.h>
+
 extern uint32_t smccc_ver;
 
 /* Check if this is fast call. */
@@ -115,24 +117,24 @@ struct arm_smccc_res {
  * This is manual register scheduling for the asm() statement, and any other
  * logic to evaluate may clobber the already-scheduled registers.
  */
-#define __declare_arg_0(a0, res)                            \
-    auto __a0 = (uint32_t)(a0);                             \
-    struct arm_smccc_res    *___res = (res);                \
+#define __declare_arg_0(a0, res)                        \
+    auto __a0 = (uint32_t)(a0);                         \
+    struct arm_smccc_res    *___res = (res);            \
     register unsigned long  arg0 ASM_REG(0) = __a0
 
-#define __declare_arg_1(a0, a1, res)                        \
-    auto __a1 = (a1);                                       \
-    __declare_arg_0(a0, res);                               \
+#define __declare_arg_1(a0, a1, res)                    \
+    auto __a1 = (a1);                                   \
+    __declare_arg_0(a0, res);                           \
     register auto           arg1 ASM_REG(1) = __a1
 
-#define __declare_arg_2(a0, a1, a2, res)                    \
-    auto __a2 = (a2);                                       \
-    __declare_arg_1(a0, a1, res);                           \
+#define __declare_arg_2(a0, a1, a2, res)                \
+    auto __a2 = (a2);                                   \
+    __declare_arg_1(a0, a1, res);                       \
     register auto           arg2 ASM_REG(2) = __a2
 
-#define __declare_arg_3(a0, a1, a2, a3, res)                \
-    auto __a3 = (a3);                                       \
-    __declare_arg_2(a0, a1, a2, res);                       \
+#define __declare_arg_3(a0, a1, a2, a3, res)            \
+    auto __a3 = (a3);                                   \
+    __declare_arg_2(a0, a1, a2, res);                   \
     register auto           arg3 ASM_REG(3) = __a3
 
 #define __declare_arg_4(a0, a1, a2, a3, a4, res)        \
@@ -157,12 +159,6 @@ struct arm_smccc_res {
 
 #define ___declare_args(count, ...) __declare_arg_ ## count(__VA_ARGS__)
 #define __declare_args(count, ...)  ___declare_args(count, __VA_ARGS__)
-
-#define ___constraints(count)                       \
-    : "=r" (r0), "=r" (r1), "=r" (r2), "=r" (r3)     \
-    : __constraint_read_ ## count                   \
-    : "memory"
-#define __constraints(count)    ___constraints(count)
 
 /*
  * arm_smccc_1_1_smc() - make an SMCCC v1.1 compliant SMC call
@@ -189,10 +185,14 @@ struct arm_smccc_res {
         register unsigned long r2 ASM_REG(2);                   \
         register unsigned long r3 ASM_REG(3);                   \
         __declare_args(__count_args(__VA_ARGS__), __VA_ARGS__); \
-        asm volatile("smc #0\n"                                 \
-                     __constraints(__count_args(__VA_ARGS__))); \
+        asm volatile (                                          \
+            "smc #0"                                            \
+            : "=r" (r0), "=r" (r1), "=r" (r2), "=r" (r3)        \
+            : PASTE(__constraint_read_,                         \
+                    __count_args(__VA_ARGS__))                  \
+            : "memory" );                                       \
         if ( ___res )                                           \
-        *___res = (typeof(*___res)){r0, r1, r2, r3};            \
+            *___res = (struct arm_smccc_res){ r0, r1, r2, r3 }; \
     } while ( 0 )
 
 /*
@@ -200,7 +200,6 @@ struct arm_smccc_res {
  * v1.1.
  */
 #ifdef CONFIG_ARM_32
-#define arm_smccc_1_0_smc(...) arm_smccc_1_1_smc(__VA_ARGS__)
 #define arm_smccc_smc(...) arm_smccc_1_1_smc(__VA_ARGS__)
 
 /* Make an SMCCC v1.1 compliant SMC call with guest register state. */
@@ -217,7 +216,7 @@ static inline void arm_smccc_guest_smc(struct cpu_user_regs *regs)
     regs->r3 = res.a3;
 }
 
-#else
+#else /* CONFIG_ARM_64 */
 
 void __arm_smccc_1_0_smc(register_t a0, register_t a1, register_t a2,
                          register_t a3, register_t a4, register_t a5,
