@@ -47,7 +47,7 @@ SECTIONS
 
        *(.gnu.warning)
        _etext = .;             /* End of text section */
-  } :text = 0x9090
+  } :text
 
   . = ALIGN(PAGE_SIZE);
   .rodata : {
