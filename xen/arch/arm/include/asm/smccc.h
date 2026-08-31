@@ -95,20 +95,14 @@ struct arm_smccc_res {
     unsigned long a3;
 };
 
-/* SMCCC v1.1 implementation madness follows */
-#define ___count_args(_0, _1, _2, _3, _4, _5, _6, _7, _8, x, ...) x
-
-#define __count_args(...)                               \
-    ___count_args(__VA_ARGS__, 7, 6, 5, 4, 3, 2, 1, 0)
-
-#define __constraint_read_0 "r" (arg0)
-#define __constraint_read_1 __constraint_read_0, "r" (arg1)
-#define __constraint_read_2 __constraint_read_1, "r" (arg2)
-#define __constraint_read_3 __constraint_read_2, "r" (arg3)
-#define __constraint_read_4 __constraint_read_3, "r" (arg4)
-#define __constraint_read_5 __constraint_read_4, "r" (arg5)
-#define __constraint_read_6 __constraint_read_5, "r" (arg6)
-#define __constraint_read_7 __constraint_read_6, "r" (arg7)
+#define __constraint_read_1 "r" (arg0)
+#define __constraint_read_2 __constraint_read_1, "r" (arg1)
+#define __constraint_read_3 __constraint_read_2, "r" (arg2)
+#define __constraint_read_4 __constraint_read_3, "r" (arg3)
+#define __constraint_read_5 __constraint_read_4, "r" (arg4)
+#define __constraint_read_6 __constraint_read_5, "r" (arg5)
+#define __constraint_read_7 __constraint_read_6, "r" (arg6)
+#define __constraint_read_8 __constraint_read_7, "r" (arg7)
 
 /*
  * Macro arguments MUST be evaluated before being assigned to a register
@@ -117,44 +111,43 @@ struct arm_smccc_res {
  * This is manual register scheduling for the asm() statement, and any other
  * logic to evaluate may clobber the already-scheduled registers.
  */
-#define __declare_arg_0(a0, res)                        \
+#define __declare_arg_1(a0)                             \
     auto __a0 = (uint32_t)(a0);                         \
-    struct arm_smccc_res    *___res = (res);            \
     register unsigned long  arg0 ASM_REG(0) = __a0
 
-#define __declare_arg_1(a0, a1, res)                    \
+#define __declare_arg_2(a0, a1)                         \
     auto __a1 = (a1);                                   \
-    __declare_arg_0(a0, res);                           \
+    __declare_arg_1(a0);                                \
     register auto           arg1 ASM_REG(1) = __a1
 
-#define __declare_arg_2(a0, a1, a2, res)                \
+#define __declare_arg_3(a0, a1, a2)                     \
     auto __a2 = (a2);                                   \
-    __declare_arg_1(a0, a1, res);                       \
+    __declare_arg_2(a0, a1);                            \
     register auto           arg2 ASM_REG(2) = __a2
 
-#define __declare_arg_3(a0, a1, a2, a3, res)            \
+#define __declare_arg_4(a0, a1, a2, a3)                 \
     auto __a3 = (a3);                                   \
-    __declare_arg_2(a0, a1, a2, res);                   \
+    __declare_arg_3(a0, a1, a2);                        \
     register auto           arg3 ASM_REG(3) = __a3
 
-#define __declare_arg_4(a0, a1, a2, a3, a4, res)        \
+#define __declare_arg_5(a0, a1, a2, a3, a4)             \
     auto __a4 = (a4);                                   \
-    __declare_arg_3(a0, a1, a2, a3, res);               \
+    __declare_arg_4(a0, a1, a2, a3);                    \
     register auto           arg4 ASM_REG(4) = __a4
 
-#define __declare_arg_5(a0, a1, a2, a3, a4, a5, res)    \
+#define __declare_arg_6(a0, a1, a2, a3, a4, a5)         \
     auto __a5 = (a5);                                   \
-    __declare_arg_4(a0, a1, a2, a3, a4, res);           \
+    __declare_arg_5(a0, a1, a2, a3, a4);                \
     register auto           arg5 ASM_REG(5) = __a5
 
-#define __declare_arg_6(a0, a1, a2, a3, a4, a5, a6, res)    \
-    auto __a6 = (a6);                                       \
-    __declare_arg_5(a0, a1, a2, a3, a4, a5, res);           \
+#define __declare_arg_7(a0, a1, a2, a3, a4, a5, a6)     \
+    auto __a6 = (a6);                                   \
+    __declare_arg_6(a0, a1, a2, a3, a4, a5);            \
     register auto           arg6 ASM_REG(6) = __a6
 
-#define __declare_arg_7(a0, a1, a2, a3, a4, a5, a6, a7, res)    \
-    auto __a7 = (a7);                                           \
-    __declare_arg_6(a0, a1, a2, a3, a4, a5, a6, res);           \
+#define __declare_arg_8(a0, a1, a2, a3, a4, a5, a6, a7) \
+    auto __a7 = (a7);                                   \
+    __declare_arg_7(a0, a1, a2, a3, a4, a5, a6);        \
     register auto           arg7 ASM_REG(7) = __a7
 
 #define ___declare_args(count, ...) __declare_arg_ ## count(__VA_ARGS__)
@@ -166,36 +159,34 @@ struct arm_smccc_res {
  * arm_smccc_1_1_smc() - make an SMCCC v1.1 compliant SMC call
  *
  * This is a variadic macro taking one to eight source arguments, and
- * an optional return structure.
+ * returns four values.
  *
  * @a0-a7: arguments passed in registers 0 to 7
  * @res: result values from registers 0 to 3
  *
  * This macro is used to make SMC calls following SMC Calling Convention v1.1.
  * The content of the supplied param are copied to registers 0 to 7 prior
- * to the SMC instruction. The return values are updated with the content
- * from register 0 to 3 on return from the SMC instruction if not NULL.
+ * to the SMC instruction.
  *
  * We have an output list that is not necessarily used, and GCC feels
  * entitled to optimise the whole sequence away. "volatile" is what
  * makes it stick.
  */
 #define arm_smccc_1_1_smc(...)                                  \
-    do {                                                        \
+    ({                                                          \
         register unsigned long r0 ASM_REG(0);                   \
         register unsigned long r1 ASM_REG(1);                   \
         register unsigned long r2 ASM_REG(2);                   \
         register unsigned long r3 ASM_REG(3);                   \
-        __declare_args(__count_args(__VA_ARGS__), __VA_ARGS__); \
+        __declare_args(count_args(__VA_ARGS__), __VA_ARGS__);   \
         asm volatile (                                          \
             "smc #0"                                            \
             : "=r" (r0), "=r" (r1), "=r" (r2), "=r" (r3)        \
             : PASTE(__constraint_read_,                         \
-                    __count_args(__VA_ARGS__))                  \
+                    count_args(__VA_ARGS__))                    \
             : "memory" );                                       \
-        if ( ___res )                                           \
-            *___res = (struct arm_smccc_res){ r0, r1, r2, r3 }; \
-    } while ( 0 )
+        (struct arm_smccc_res){ r0, r1, r2, r3 };               \
+    })
 
 /*
  * The calling convention for arm32 is the same for both SMCCC v1.0 and
@@ -208,8 +199,8 @@ static inline void arm_smccc_guest_smc(struct cpu_user_regs *regs)
 {
     struct arm_smccc_res res;
 
-    arm_smccc_1_1_smc(regs->r0, regs->r1, regs->r2, regs->r3,
-                      regs->r4, regs->r5, regs->r6, regs->r7, &res);
+    res = arm_smccc_1_1_smc(regs->r0, regs->r1, regs->r2, regs->r3,
+                            regs->r4, regs->r5, regs->r6, regs->r7);
 
     regs->r0 = res.a0;
     regs->r1 = res.a1;
@@ -226,7 +217,7 @@ static inline void arm_smccc_guest_smc(struct cpu_user_regs *regs)
  * are strictly preserved.  Always mark x4 through x17 as clobbered.
  */
 #define arm_smccc_smc(...)                                      \
-    do {                                                        \
+    ({                                                          \
         register unsigned long r0  ASM_REG(0);                  \
         register unsigned long r1  ASM_REG(1);                  \
         register unsigned long r2  ASM_REG(2);                  \
@@ -246,7 +237,7 @@ static inline void arm_smccc_guest_smc(struct cpu_user_regs *regs)
         register unsigned long c15 ASM_REG(15);                 \
         register unsigned long c16 ASM_REG(16);                 \
         register unsigned long c17 ASM_REG(17);                 \
-        __declare_args(__count_args(__VA_ARGS__), __VA_ARGS__); \
+        __declare_args(count_args(__VA_ARGS__), __VA_ARGS__);   \
         asm volatile (                                          \
             "smc #0"                                            \
             : "=r" (r0),  "=r" (r1),  "=r" (r2),  "=r" (r3),    \
@@ -255,11 +246,10 @@ static inline void arm_smccc_guest_smc(struct cpu_user_regs *regs)
               "=r" (c12), "=r" (c13), "=r" (c14), "=r" (c15),   \
               "=r" (c16), "=r" (c17)                            \
             : PASTE(__constraint_read_,                         \
-                    __count_args(__VA_ARGS__))                  \
+                    count_args(__VA_ARGS__))                    \
             : "memory" );                                       \
-        if ( ___res )                                           \
-            *___res = (struct arm_smccc_res){ r0, r1, r2, r3 }; \
-    } while ( 0 )
+        (struct arm_smccc_res){ r0, r1, r2, r3 };               \
+    })
 
 #define arm_smccc_1_1_smc(...) arm_smccc_smc(__VA_ARGS__)
 
@@ -268,8 +258,8 @@ static inline void arm_smccc_guest_smc(struct cpu_user_regs *regs)
 {
     struct arm_smccc_res res;
 
-    arm_smccc_1_1_smc(regs->x0, regs->x1, regs->x2, regs->x3,
-                      regs->x4, regs->x5, regs->x6, regs->x7, &res);
+    res = arm_smccc_1_1_smc(regs->x0, regs->x1, regs->x2, regs->x3,
+                            regs->x4, regs->x5, regs->x6, regs->x7);
 
     regs->x0 = res.a0;
     regs->x1 = res.a1;

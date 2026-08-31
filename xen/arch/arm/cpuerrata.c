@@ -179,8 +179,8 @@ static int enable_smccc_arch_workaround_1(void *data)
     if ( smccc_ver < SMCCC_VERSION(1, 1) )
         goto warn;
 
-    arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FID,
-                      ARM_SMCCC_ARCH_WORKAROUND_1_FID, &res);
+    res = arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FID,
+                            ARM_SMCCC_ARCH_WORKAROUND_1_FID);
     /* The return value is in the lower 32-bits. */
     if ( (int)res.a0 < 0 )
         goto warn;
@@ -256,8 +256,8 @@ static int enable_spectre_bhb_workaround(void *data)
         if ( smccc_ver < SMCCC_VERSION(1, 1) )
             goto warn;
 
-        arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FID,
-                          ARM_SMCCC_ARCH_WORKAROUND_3_FID, &res);
+        res = arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FID,
+                                ARM_SMCCC_ARCH_WORKAROUND_3_FID);
         /* The return value is in the lower 32-bits. */
         if ( (int)res.a0 < 0 )
         {
@@ -398,8 +398,8 @@ static bool has_ssbd_mitigation(const struct arm_cpu_capabilities *entry)
     if ( smccc_ver < SMCCC_VERSION(1, 1) )
         return false;
 
-    arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FID,
-                      ARM_SMCCC_ARCH_WORKAROUND_2_FID, &res);
+    res = arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FID,
+                            ARM_SMCCC_ARCH_WORKAROUND_2_FID);
 
     switch ( (int)res.a0 )
     {
@@ -429,7 +429,7 @@ static bool has_ssbd_mitigation(const struct arm_cpu_capabilities *entry)
     case ARM_SSBD_FORCE_DISABLE:
         printk_once("%s disabled from command-line\n", entry->desc);
 
-        arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 0, NULL);
+        arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 0);
         required = false;
         break;
 
@@ -437,7 +437,7 @@ static bool has_ssbd_mitigation(const struct arm_cpu_capabilities *entry)
         if ( required )
         {
             this_cpu(ssbd_callback_required) = 1;
-            arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 1, NULL);
+            arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 1);
         }
 
         break;
@@ -445,7 +445,7 @@ static bool has_ssbd_mitigation(const struct arm_cpu_capabilities *entry)
     case ARM_SSBD_FORCE_ENABLE:
         printk_once("%s forced from command-line\n", entry->desc);
 
-        arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 1, NULL);
+        arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 1);
         required = true;
         break;
 

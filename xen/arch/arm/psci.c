@@ -41,8 +41,8 @@ int call_psci_cpu_on(int cpu)
 {
     struct arm_smccc_res res;
 
-    arm_smccc_smc(psci_cpu_on_nr, cpu_logical_map(cpu), __pa(init_secondary),
-                  &res);
+    res = arm_smccc_smc(psci_cpu_on_nr, cpu_logical_map(cpu),
+                        __pa(init_secondary));
 
     return PSCI_RET(res);
 }
@@ -54,7 +54,7 @@ void call_psci_cpu_off(void)
         struct arm_smccc_res res;
 
         /* If successfull the PSCI cpu_off call doesn't return */
-        arm_smccc_smc(PSCI_0_2_FN32_CPU_OFF, &res);
+        res = arm_smccc_smc(PSCI_0_2_FN32_CPU_OFF);
         panic("PSCI cpu off failed for CPU%d err=%d\n", smp_processor_id(),
               PSCI_RET(res));
     }
@@ -63,13 +63,13 @@ void call_psci_cpu_off(void)
 void call_psci_system_off(void)
 {
     if ( psci_ver > PSCI_VERSION(0, 1) )
-        arm_smccc_smc(PSCI_0_2_FN32_SYSTEM_OFF, NULL);
+        arm_smccc_smc(PSCI_0_2_FN32_SYSTEM_OFF);
 }
 
 void call_psci_system_reset(void)
 {
     if ( psci_ver > PSCI_VERSION(0, 1) )
-        arm_smccc_smc(PSCI_0_2_FN32_SYSTEM_RESET, NULL);
+        arm_smccc_smc(PSCI_0_2_FN32_SYSTEM_RESET);
 }
 
 static int __init psci_features(uint32_t psci_func_id)
@@ -79,7 +79,7 @@ static int __init psci_features(uint32_t psci_func_id)
     if ( psci_ver < PSCI_VERSION(1, 0) )
         return PSCI_NOT_SUPPORTED;
 
-    arm_smccc_smc(PSCI_1_0_FN32_PSCI_FEATURES, psci_func_id, &res);
+    res = arm_smccc_smc(PSCI_1_0_FN32_PSCI_FEATURES, psci_func_id);
 
     return PSCI_RET(res);
 }
@@ -116,9 +116,8 @@ static void __init psci_init_smccc(void)
 
     if ( psci_features(ARM_SMCCC_VERSION_FID) != PSCI_NOT_SUPPORTED )
     {
-        struct arm_smccc_res res;
+        struct arm_smccc_res res = arm_smccc_smc(ARM_SMCCC_VERSION_FID);
 
-        arm_smccc_smc(ARM_SMCCC_VERSION_FID, &res);
         if ( PSCI_RET(res) != ARM_SMCCC_NOT_SUPPORTED )
             smccc_ver = PSCI_RET(res);
     }
@@ -191,7 +190,7 @@ static int __init psci_init_0_2(void)
         }
     }
 
-    arm_smccc_smc(PSCI_0_2_FN32_PSCI_VERSION, &res);
+    res = arm_smccc_smc(PSCI_0_2_FN32_PSCI_VERSION);
     psci_ver = PSCI_RET(res);
 
     /* For the moment, we only support PSCI 0.2 and PSCI 1.x */

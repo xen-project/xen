@@ -249,7 +249,7 @@ static int exynos5_cpu_up(int cpu)
     iounmap(power);
 
     if ( secure_firmware )
-        arm_smccc_smc(SMC_CMD_CPU1BOOT, cpu, NULL);
+        arm_smccc_smc(SMC_CMD_CPU1BOOT, cpu);
 
     return cpu_up_send_sgi(cpu);
 }

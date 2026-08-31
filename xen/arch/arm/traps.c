@@ -1991,7 +1991,7 @@ void asmlinkage enter_hypervisor_from_guest_preirq(void)
 
     /* If the guest has disabled the workaround, bring it back on. */
     if ( needs_ssbd_flip(v) )
-        arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 1, NULL);
+        arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 1);
 }
 
 /*
@@ -2334,7 +2334,7 @@ void asmlinkage leave_hypervisor_to_guest(void)
      * If the guest wants it disabled, so be it...
      */
     if ( needs_ssbd_flip(current) )
-        arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 0, NULL);
+        arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 0);
 }
 
 /*

@@ -178,7 +178,7 @@ static bool optee_probe(void)
         return false;
 
     /* Check UID */
-    arm_smccc_smc(ARM_SMCCC_CALL_UID_FID(TRUSTED_OS_END), &resp);
+    resp = arm_smccc_smc(ARM_SMCCC_CALL_UID_FID(TRUSTED_OS_END));
 
     if ( (uint32_t)resp.a0 != OPTEE_MSG_UID_0 ||
          (uint32_t)resp.a1 != OPTEE_MSG_UID_1 ||
@@ -187,7 +187,7 @@ static bool optee_probe(void)
         return false;
 
     /* Read number of threads */
-    arm_smccc_smc(OPTEE_SMC_GET_THREAD_COUNT, &resp);
+    resp = arm_smccc_smc(OPTEE_SMC_GET_THREAD_COUNT);
     if ( resp.a0 == OPTEE_SMC_RETURN_OK )
     {
         max_optee_threads = resp.a1;
@@ -209,7 +209,7 @@ static bool optee_probe(void)
      * call. It will return OPTEE_SMC_RETURN_UNKNOWN_FUNCTION if
      * OP-TEE have no virtualization support enabled.
      */
-    arm_smccc_smc(OPTEE_SMC_VM_DESTROYED, 0, 0, 0, 0, 0, 0, 0, &resp);
+    resp = arm_smccc_smc(OPTEE_SMC_VM_DESTROYED, 0, 0, 0, 0, 0, 0, 0);
     if ( resp.a0 == OPTEE_SMC_RETURN_UNKNOWN_FUNCTION )
         return false;
 
@@ -243,8 +243,8 @@ static int optee_domain_init(struct domain *d)
      *
      * a7 should be 0, so we can't skip last 6 parameters of arm_smccc_smc()
      */
-    arm_smccc_smc(OPTEE_SMC_VM_CREATED, OPTEE_CLIENT_ID(d), 0, 0, 0, 0, 0, 0,
-                  &resp);
+    resp = arm_smccc_smc(OPTEE_SMC_VM_CREATED, OPTEE_CLIENT_ID(d),
+                         0, 0, 0, 0, 0, 0);
     if ( resp.a0 != OPTEE_SMC_RETURN_OK )
     {
         printk(XENLOG_WARNING "%pd: Unable to create OPTEE client: rc = 0x%X\n",
@@ -681,8 +681,8 @@ static int optee_relinquish_resources(struct domain *d)
      *
      * a7 should be 0, so we can't skip last 6 parameters of arm_smccc_smc()
      */
-    arm_smccc_smc(OPTEE_SMC_VM_DESTROYED, OPTEE_CLIENT_ID(d), 0, 0, 0, 0, 0, 0,
-                  &resp);
+    resp = arm_smccc_smc(OPTEE_SMC_VM_DESTROYED, OPTEE_CLIENT_ID(d),
+                         0, 0, 0, 0, 0, 0);
 
     ASSERT(!spin_is_locked(&ctx->lock));
     ASSERT(!atomic_read(&ctx->call_count));
@@ -1171,15 +1171,15 @@ static void do_call_with_arg(struct optee_domain *ctx,
 {
     struct arm_smccc_res res;
 
-    arm_smccc_smc(a0, a1, a2, a3, a4, a5, 0, OPTEE_CLIENT_ID(current->domain),
-                  &res);
+    res = arm_smccc_smc(a0, a1, a2, a3, a4, a5, 0,
+                        OPTEE_CLIENT_ID(current->domain));
 
     if ( OPTEE_SMC_RETURN_IS_RPC(res.a0) )
     {
         while ( handle_rpc_return(ctx, &res, regs, call)  == -ERESTART )
         {
-            arm_smccc_smc(res.a0, res.a1, res.a2, res.a3, 0, 0, 0,
-                          OPTEE_CLIENT_ID(current->domain), &res);
+            res = arm_smccc_smc(res.a0, res.a1, res.a2, res.a3, 0, 0, 0,
+                                OPTEE_CLIENT_ID(current->domain));
 
             if ( !OPTEE_SMC_RETURN_IS_RPC(res.a0) )
                 break;
@@ -1619,8 +1619,8 @@ static void handle_exchange_capabilities(struct cpu_user_regs *regs)
     caps = get_user_reg(regs, 1);
     caps &= OPTEE_KNOWN_NSEC_CAPS;
 
-    arm_smccc_smc(OPTEE_SMC_EXCHANGE_CAPABILITIES, caps, 0, 0, 0, 0, 0,
-                  OPTEE_CLIENT_ID(current->domain), &resp);
+    resp = arm_smccc_smc(OPTEE_SMC_EXCHANGE_CAPABILITIES, caps, 0, 0, 0, 0, 0,
+                         OPTEE_CLIENT_ID(current->domain));
     if ( resp.a0 != OPTEE_SMC_RETURN_OK ) {
         set_user_reg(regs, 0, resp.a0);
         return;
@@ -1664,8 +1664,8 @@ static bool optee_handle_call(struct cpu_user_regs *regs)
         return true;
 
     case OPTEE_SMC_CALLS_UID:
-        arm_smccc_smc(OPTEE_SMC_CALLS_UID, 0, 0, 0, 0, 0, 0,
-                      OPTEE_CLIENT_ID(current->domain), &resp);
+        resp = arm_smccc_smc(OPTEE_SMC_CALLS_UID, 0, 0, 0, 0, 0, 0,
+                             OPTEE_CLIENT_ID(current->domain));
         set_user_reg(regs, 0, resp.a0);
         set_user_reg(regs, 1, resp.a1);
         set_user_reg(regs, 2, resp.a2);
@@ -1673,15 +1673,15 @@ static bool optee_handle_call(struct cpu_user_regs *regs)
         return true;
 
     case OPTEE_SMC_CALLS_REVISION:
-        arm_smccc_smc(OPTEE_SMC_CALLS_REVISION, 0, 0, 0, 0, 0, 0,
-                      OPTEE_CLIENT_ID(current->domain), &resp);
+        resp = arm_smccc_smc(OPTEE_SMC_CALLS_REVISION, 0, 0, 0, 0, 0, 0,
+                             OPTEE_CLIENT_ID(current->domain));
         set_user_reg(regs, 0, resp.a0);
         set_user_reg(regs, 1, resp.a1);
         return true;
 
     case OPTEE_SMC_CALL_GET_OS_UUID:
-        arm_smccc_smc(OPTEE_SMC_CALL_GET_OS_UUID, 0, 0, 0, 0, 0, 0,
-                      OPTEE_CLIENT_ID(current->domain),&resp);
+        resp = arm_smccc_smc(OPTEE_SMC_CALL_GET_OS_UUID, 0, 0, 0, 0, 0, 0,
+                             OPTEE_CLIENT_ID(current->domain));
         set_user_reg(regs, 0, resp.a0);
         set_user_reg(regs, 1, resp.a1);
         set_user_reg(regs, 2, resp.a2);
@@ -1689,21 +1689,21 @@ static bool optee_handle_call(struct cpu_user_regs *regs)
         return true;
 
     case OPTEE_SMC_CALL_GET_OS_REVISION:
-        arm_smccc_smc(OPTEE_SMC_CALL_GET_OS_REVISION, 0, 0, 0, 0, 0, 0,
-                      OPTEE_CLIENT_ID(current->domain), &resp);
+        resp = arm_smccc_smc(OPTEE_SMC_CALL_GET_OS_REVISION, 0, 0, 0, 0, 0, 0,
+                             OPTEE_CLIENT_ID(current->domain));
         set_user_reg(regs, 0, resp.a0);
         set_user_reg(regs, 1, resp.a1);
         return true;
 
     case OPTEE_SMC_ENABLE_SHM_CACHE:
-        arm_smccc_smc(OPTEE_SMC_ENABLE_SHM_CACHE, 0, 0, 0, 0, 0, 0,
-                      OPTEE_CLIENT_ID(current->domain), &resp);
+        resp = arm_smccc_smc(OPTEE_SMC_ENABLE_SHM_CACHE, 0, 0, 0, 0, 0, 0,
+                             OPTEE_CLIENT_ID(current->domain));
         set_user_reg(regs, 0, resp.a0);
         return true;
 
     case OPTEE_SMC_DISABLE_SHM_CACHE:
-        arm_smccc_smc(OPTEE_SMC_DISABLE_SHM_CACHE, 0, 0, 0, 0, 0, 0,
-                      OPTEE_CLIENT_ID(current->domain), &resp);
+        resp = arm_smccc_smc(OPTEE_SMC_DISABLE_SHM_CACHE, 0, 0, 0, 0, 0, 0,
+                             OPTEE_CLIENT_ID(current->domain));
         set_user_reg(regs, 0, resp.a0);
         if ( resp.a0 == OPTEE_SMC_RETURN_OK ) {
             free_shm_rpc(ctx,  regpair_to_uint64(resp.a1, resp.a2));
