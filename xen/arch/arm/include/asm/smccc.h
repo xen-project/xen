@@ -16,9 +16,6 @@
 #ifndef __ASM_ARM_SMCCC_H__
 #define __ASM_ARM_SMCCC_H__
 
-#include <asm/alternative.h>
-#include <asm/cpufeature.h>
-
 #define SMCCC_VERSION_MAJOR_SHIFT            16
 #define SMCCC_VERSION_MINOR_MASK             \
         ((1U << SMCCC_VERSION_MAJOR_SHIFT) - 1)
@@ -57,6 +54,9 @@
 #ifndef __ASSEMBLER__
 
 #include <xen/macros.h>
+#include <xen/types.h>
+
+#include <asm/asm_defns.h>
 
 extern uint32_t smccc_ver;
 
@@ -160,6 +160,8 @@ struct arm_smccc_res {
 #define ___declare_args(count, ...) __declare_arg_ ## count(__VA_ARGS__)
 #define __declare_args(count, ...)  ___declare_args(count, __VA_ARGS__)
 
+#ifdef CONFIG_ARM_32
+
 /*
  * arm_smccc_1_1_smc() - make an SMCCC v1.1 compliant SMC call
  *
@@ -199,7 +201,6 @@ struct arm_smccc_res {
  * The calling convention for arm32 is the same for both SMCCC v1.0 and
  * v1.1.
  */
-#ifdef CONFIG_ARM_32
 #define arm_smccc_smc(...) arm_smccc_1_1_smc(__VA_ARGS__)
 
 /* Make an SMCCC v1.1 compliant SMC call with guest register state. */
@@ -218,52 +219,49 @@ static inline void arm_smccc_guest_smc(struct cpu_user_regs *regs)
 
 #else /* CONFIG_ARM_64 */
 
-void __arm_smccc_1_0_smc(register_t a0, register_t a1, register_t a2,
-                         register_t a3, register_t a4, register_t a5,
-                         register_t a6, register_t a7,
-                         struct arm_smccc_res *res);
-
-/* Macros to handle variadic parameter for SMCCC v1.0 helper */
-#define __arm_smccc_1_0_smc_7(a0, a1, a2, a3, a4, a5, a6, a7, res)  \
-    __arm_smccc_1_0_smc(a0, a1, a2, a3, a4, a5, a6, a7, res)
-
-#define __arm_smccc_1_0_smc_6(a0, a1, a2, a3, a4, a5, a6, res)  \
-    __arm_smccc_1_0_smc_7(a0, a1, a2, a3, a4, a5, a6, 0, res)
-
-#define __arm_smccc_1_0_smc_5(a0, a1, a2, a3, a4, a5, res)  \
-    __arm_smccc_1_0_smc_6(a0, a1, a2, a3, a4, a5, 0, res)
-
-#define __arm_smccc_1_0_smc_4(a0, a1, a2, a3, a4, res)  \
-    __arm_smccc_1_0_smc_5(a0, a1, a2, a3, a4, 0, res)
-
-#define __arm_smccc_1_0_smc_3(a0, a1, a2, a3, res)  \
-    __arm_smccc_1_0_smc_4(a0, a1, a2, a3, 0, res)
-
-#define __arm_smccc_1_0_smc_2(a0, a1, a2, res)  \
-    __arm_smccc_1_0_smc_3(a0, a1, a2, 0, res)
-
-#define __arm_smccc_1_0_smc_1(a0, a1, res)  \
-    __arm_smccc_1_0_smc_2(a0, a1, 0, res)
-
-#define __arm_smccc_1_0_smc_0(a0, res)  \
-    __arm_smccc_1_0_smc_1(a0, 0, res)
-
-#define ___arm_smccc_1_0_smc_count(count, ...)    \
-    __arm_smccc_1_0_smc_ ## count(__VA_ARGS__)
-
-#define __arm_smccc_1_0_smc_count(count, ...)   \
-    ___arm_smccc_1_0_smc_count(count, __VA_ARGS__)
-
-#define arm_smccc_1_0_smc(...)                                              \
-        __arm_smccc_1_0_smc_count(__count_args(__VA_ARGS__), __VA_ARGS__)
-
+/*
+ * Make an SMC call compatible with both SMCCC v1.1 and v1.0.
+ *
+ * SMCCC v1.0 says that x4 through x17 are clobbered.  SMCCC v1.1 says they
+ * are strictly preserved.  Always mark x4 through x17 as clobbered.
+ */
 #define arm_smccc_smc(...)                                      \
     do {                                                        \
-        if ( cpus_have_const_cap(ARM_SMCCC_1_1) )               \
-            arm_smccc_1_1_smc(__VA_ARGS__);                     \
-        else                                                    \
-            arm_smccc_1_0_smc(__VA_ARGS__);                     \
+        register unsigned long r0  ASM_REG(0);                  \
+        register unsigned long r1  ASM_REG(1);                  \
+        register unsigned long r2  ASM_REG(2);                  \
+        register unsigned long r3  ASM_REG(3);                  \
+        /* Potentially clobbered in SMCCC v1.0 */               \
+        register unsigned long c4  ASM_REG(4);                  \
+        register unsigned long c5  ASM_REG(5);                  \
+        register unsigned long c6  ASM_REG(6);                  \
+        register unsigned long c7  ASM_REG(7);                  \
+        register unsigned long c8  ASM_REG(8);                  \
+        register unsigned long c9  ASM_REG(9);                  \
+        register unsigned long c10 ASM_REG(10);                 \
+        register unsigned long c11 ASM_REG(11);                 \
+        register unsigned long c12 ASM_REG(12);                 \
+        register unsigned long c13 ASM_REG(13);                 \
+        register unsigned long c14 ASM_REG(14);                 \
+        register unsigned long c15 ASM_REG(15);                 \
+        register unsigned long c16 ASM_REG(16);                 \
+        register unsigned long c17 ASM_REG(17);                 \
+        __declare_args(__count_args(__VA_ARGS__), __VA_ARGS__); \
+        asm volatile (                                          \
+            "smc #0"                                            \
+            : "=r" (r0),  "=r" (r1),  "=r" (r2),  "=r" (r3),    \
+              "=r" (c4),  "=r" (c5),  "=r" (c6),  "=r" (c7),    \
+              "=r" (c8),  "=r" (c9),  "=r" (c10), "=r" (c11),   \
+              "=r" (c12), "=r" (c13), "=r" (c14), "=r" (c15),   \
+              "=r" (c16), "=r" (c17)                            \
+            : PASTE(__constraint_read_,                         \
+                    __count_args(__VA_ARGS__))                  \
+            : "memory" );                                       \
+        if ( ___res )                                           \
+            *___res = (struct arm_smccc_res){ r0, r1, r2, r3 }; \
     } while ( 0 )
+
+#define arm_smccc_1_1_smc(...) arm_smccc_smc(__VA_ARGS__)
 
 /* Make an SMCCC v1.1 compliant SMC call with guest register state. */
 static inline void arm_smccc_guest_smc(struct cpu_user_regs *regs)
