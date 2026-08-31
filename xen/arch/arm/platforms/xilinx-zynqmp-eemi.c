@@ -51,7 +51,6 @@ static inline bool domain_has_reset_access(struct domain *d, uint32_t rst)
 
 bool zynqmp_eemi(struct cpu_user_regs *regs)
 {
-    struct arm_smccc_res res;
     uint32_t fid = get_user_reg(regs, 0);
     uint32_t nodeid = get_user_reg(regs, 1);
     unsigned int pm_fn = fid & 0xFFFF;
@@ -187,20 +186,8 @@ forward_to_fw:
      * can forward the whole command to firmware without additional
      * parameters checks.
      */
-    arm_smccc_1_1_smc(get_user_reg(regs, 0),
-                      get_user_reg(regs, 1),
-                      get_user_reg(regs, 2),
-                      get_user_reg(regs, 3),
-                      get_user_reg(regs, 4),
-                      get_user_reg(regs, 5),
-                      get_user_reg(regs, 6),
-                      get_user_reg(regs, 7),
-                      &res);
+    arm_smccc_guest_smc(regs);
 
-    set_user_reg(regs, 0, res.a0);
-    set_user_reg(regs, 1, res.a1);
-    set_user_reg(regs, 2, res.a2);
-    set_user_reg(regs, 3, res.a3);
     return true;
 
 done:

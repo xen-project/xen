@@ -202,6 +202,21 @@ struct arm_smccc_res {
 #ifdef CONFIG_ARM_32
 #define arm_smccc_1_0_smc(...) arm_smccc_1_1_smc(__VA_ARGS__)
 #define arm_smccc_smc(...) arm_smccc_1_1_smc(__VA_ARGS__)
+
+/* Make an SMCCC v1.1 compliant SMC call with guest register state. */
+static inline void arm_smccc_guest_smc(struct cpu_user_regs *regs)
+{
+    struct arm_smccc_res res;
+
+    arm_smccc_1_1_smc(regs->r0, regs->r1, regs->r2, regs->r3,
+                      regs->r4, regs->r5, regs->r6, regs->r7, &res);
+
+    regs->r0 = res.a0;
+    regs->r1 = res.a1;
+    regs->r2 = res.a2;
+    regs->r3 = res.a3;
+}
+
 #else
 
 void __arm_smccc_1_0_smc(register_t a0, register_t a1, register_t a2,
@@ -250,6 +265,20 @@ void __arm_smccc_1_0_smc(register_t a0, register_t a1, register_t a2,
         else                                                    \
             arm_smccc_1_0_smc(__VA_ARGS__);                     \
     } while ( 0 )
+
+/* Make an SMCCC v1.1 compliant SMC call with guest register state. */
+static inline void arm_smccc_guest_smc(struct cpu_user_regs *regs)
+{
+    struct arm_smccc_res res;
+
+    arm_smccc_1_1_smc(regs->x0, regs->x1, regs->x2, regs->x3,
+                      regs->x4, regs->x5, regs->x6, regs->x7, &res);
+
+    regs->x0 = res.a0;
+    regs->x1 = res.a1;
+    regs->x2 = res.a2;
+    regs->x3 = res.a3;
+}
 
 /*
  * struct arm_smccc_1_2_regs - Arguments for or Results from SMC call

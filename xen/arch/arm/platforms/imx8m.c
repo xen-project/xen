@@ -50,7 +50,6 @@ static bool imx8m_smc(struct cpu_user_regs *regs)
 {
     uint32_t function_id = get_user_reg(regs, 0);
     uint32_t subfunction_id = get_user_reg(regs, 1);
-    struct arm_smccc_res res;
 
     if ( !cpus_have_const_cap(ARM_SMCCC_1_1) )
     {
@@ -122,20 +121,7 @@ static bool imx8m_smc(struct cpu_user_regs *regs)
         return false;
     }
 
-    arm_smccc_1_1_smc(function_id,
-                      subfunction_id,
-                      get_user_reg(regs, 2),
-                      get_user_reg(regs, 3),
-                      get_user_reg(regs, 4),
-                      get_user_reg(regs, 5),
-                      get_user_reg(regs, 6),
-                      get_user_reg(regs, 7),
-                      &res);
-
-    set_user_reg(regs, 0, res.a0);
-    set_user_reg(regs, 1, res.a1);
-    set_user_reg(regs, 2, res.a2);
-    set_user_reg(regs, 3, res.a3);
+    arm_smccc_guest_smc(regs);
 
     return true;
 }
