@@ -76,7 +76,7 @@ void __xsm_action_mismatch_detected(void);
 #endif /* CONFIG_XSM */
 
 static always_inline int xsm_default_action(
-    xsm_default_t action, struct domain *src, struct domain *target)
+    xsm_default_t action, const struct domain *src, const struct domain *target)
 {
     switch ( action ) {
     case XSM_HOOK:
