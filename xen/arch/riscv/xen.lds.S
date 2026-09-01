@@ -44,6 +44,8 @@ SECTIONS
 
         BUGFRAMES
 
+        *(.srodata)
+        *(.srodata.*)
         *(.rodata)
         *(.rodata.*)
         VPCI_ARRAY
@@ -92,6 +94,7 @@ SECTIONS
         SCHEDULER_ARRAY
         HYPFS_PARAM
 
+        *(.sdata .sdata.*)
         *(.data .data.*)
         CONSTRUCTORS
     } :text
@@ -161,6 +164,8 @@ SECTIONS
 
     /* Section for the device tree blob (if any). */
     .dtb : { *(.dtb) } :text
+
+    .riscv.attributes : { *(.riscv.attributes) }
 
     DWARF2_DEBUG_SECTIONS
 
