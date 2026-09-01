@@ -813,7 +813,8 @@ out:
  * Returns -%EINVAL if the context is invalid, -%ENOMEM if insufficient
  * memory is available, or 0 on success.
  */
-int security_context_to_sid(char *scontext, u32 scontext_len, u32 *sid)
+int security_context_to_sid(
+    const char *scontext, uint32_t scontext_len, uint32_t *sid)
 {
     char *scontext2;
     struct context context;
