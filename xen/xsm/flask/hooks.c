@@ -998,7 +998,7 @@ static int cf_check flask_sysctl(const struct xen_sysctl *op)
 }
 #endif /* CONFIG_SYSCTL */
 
-static inline uint32_t resource_to_perm(uint8_t access)
+static inline uint32_t resource_to_perm(bool access)
 {
     if ( access )
         return RESOURCE__ADD;
@@ -1166,7 +1166,7 @@ static int cf_check flask_unbind_pt_irq(
 }
 
 static int cf_check flask_irq_permission(
-    struct domain *d, int pirq, uint8_t access)
+    struct domain *d, int pirq, bool access)
 {
     /* the PIRQ number is not useful; real IRQ is checked during mapping */
     return current_has_perm(d, SECCLASS_RESOURCE, resource_to_perm(access));
@@ -1199,7 +1199,7 @@ static int cf_check _iomem_has_perm(
 }
 
 static int cf_check flask_iomem_permission(
-    struct domain *d, uint64_t start, uint64_t end, uint8_t access)
+    struct domain *d, uint64_t start, uint64_t end, bool access)
 {
     struct iomem_has_perm_data data;
     int rc;
@@ -1221,16 +1221,17 @@ static int cf_check flask_iomem_permission(
     return security_iterate_iomem_sids(start, end, _iomem_has_perm, &data);
 }
 
-static int cf_check flask_iomem_mapping(struct domain *d, uint64_t start, uint64_t end, uint8_t access)
+static int cf_check flask_iomem_mapping(
+    struct domain *d, uint64_t start, uint64_t end, bool map)
 {
-    return flask_iomem_permission(d, start, end, access);
+    return flask_iomem_permission(d, start, end, map);
 }
 #define flask_iomem_mapping_vpci flask_iomem_mapping
 
 #ifdef CONFIG_HAS_PCI
 static int cf_check flask_pci_config_permission(
     struct domain *d, uint32_t machine_bdf, uint16_t start, uint16_t end,
-    uint8_t access)
+    bool access)
 {
     uint32_t dsid, rsid;
     int rc = -EPERM;
@@ -1709,7 +1710,7 @@ static int cf_check _ioport_has_perm(
 }
 
 static int cf_check flask_ioport_permission(
-    struct domain *d, uint32_t start, uint32_t end, uint8_t access)
+    struct domain *d, uint32_t start, uint32_t end, bool access)
 {
     int rc;
     struct ioport_has_perm_data data;
@@ -1733,9 +1734,9 @@ static int cf_check flask_ioport_permission(
 }
 
 static int cf_check flask_ioport_mapping(
-    struct domain *d, uint32_t start, uint32_t end, uint8_t access)
+    struct domain *d, uint32_t start, uint32_t end, bool map)
 {
-    return flask_ioport_permission(d, start, end, access);
+    return flask_ioport_permission(d, start, end, map);
 }
 
 #ifdef CONFIG_MEM_SHARING

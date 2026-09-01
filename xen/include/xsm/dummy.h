@@ -505,21 +505,21 @@ static XSM_INLINE int xsm_unmap_domain_irq(
 }
 
 static XSM_INLINE int xsm_irq_permission(
-    XSM_DEFAULT_ARG struct domain *d, int pirq, uint8_t allow)
+    XSM_DEFAULT_ARG struct domain *d, int pirq, bool allow)
 {
     XSM_ASSERT_ACTION(XSM_PRIV);
     return xsm_default_action(action, current->domain, d);
 }
 
 static XSM_INLINE int xsm_iomem_permission(
-    XSM_DEFAULT_ARG struct domain *d, uint64_t s, uint64_t e, uint8_t allow)
+    XSM_DEFAULT_ARG struct domain *d, uint64_t s, uint64_t e, bool allow)
 {
     XSM_ASSERT_ACTION(XSM_PRIV);
     return xsm_default_action(action, current->domain, d);
 }
 
 static XSM_INLINE int xsm_iomem_mapping(
-    XSM_DEFAULT_ARG struct domain *d, uint64_t s, uint64_t e, uint8_t allow)
+    XSM_DEFAULT_ARG struct domain *d, uint64_t s, uint64_t e, bool allow)
 {
     XSM_ASSERT_ACTION(XSM_DM_PRIV);
     return xsm_default_action(action, current->domain, d);
@@ -527,7 +527,7 @@ static XSM_INLINE int xsm_iomem_mapping(
 
 #ifdef CONFIG_HAS_VPCI
 static XSM_INLINE int xsm_iomem_mapping_vpci(
-    XSM_DEFAULT_ARG struct domain *d, uint64_t s, uint64_t e, uint8_t allow)
+    XSM_DEFAULT_ARG struct domain *d, uint64_t s, uint64_t e, bool allow)
 {
     XSM_ASSERT_ACTION(XSM_HOOK);
     return xsm_default_action(action, current->domain, d);
@@ -537,7 +537,7 @@ static XSM_INLINE int xsm_iomem_mapping_vpci(
 #ifdef CONFIG_HAS_PCI
 static XSM_INLINE int xsm_pci_config_permission(
     XSM_DEFAULT_ARG struct domain *d, uint32_t machine_bdf, uint16_t start,
-    uint16_t end, uint8_t access)
+    uint16_t end, bool access)
 {
     XSM_ASSERT_ACTION(XSM_HOOK);
     return xsm_default_action(action, current->domain, d);
@@ -709,14 +709,14 @@ static XSM_INLINE int xsm_priv_mapping(
 }
 
 static XSM_INLINE int xsm_ioport_permission(
-    XSM_DEFAULT_ARG struct domain *d, uint32_t s, uint32_t e, uint8_t allow)
+    XSM_DEFAULT_ARG struct domain *d, uint32_t s, uint32_t e, bool allow)
 {
     XSM_ASSERT_ACTION(XSM_PRIV);
     return xsm_default_action(action, current->domain, d);
 }
 
 static XSM_INLINE int xsm_ioport_mapping(
-    XSM_DEFAULT_ARG struct domain *d, uint32_t s, uint32_t e, uint8_t allow)
+    XSM_DEFAULT_ARG struct domain *d, uint32_t s, uint32_t e, bool allow)
 {
     XSM_ASSERT_ACTION(XSM_DM_PRIV);
     return xsm_default_action(action, current->domain, d);

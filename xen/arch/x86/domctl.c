@@ -235,7 +235,7 @@ long arch_do_domctl(
     {
         unsigned int fp = domctl->u.ioport_permission.first_port;
         unsigned int np = domctl->u.ioport_permission.nr_ports;
-        int allow = domctl->u.ioport_permission.allow_access;
+        bool allow = domctl->u.ioport_permission.allow_access;
 
         ret = -EINVAL;
         if ( (fp + np) <= fp || (fp + np) > MAX_IOPORTS )
@@ -306,7 +306,8 @@ long arch_do_domctl(
             break;
         }
 
-        ret = xsm_irq_permission(XSM_PRIV, d, irq, flags);
+        ret = xsm_irq_permission(XSM_PRIV, d, irq,
+                                 flags & XEN_DOMCTL_GSI_ACTION_MASK);
         if ( ret )
             break;
 
@@ -687,7 +688,7 @@ long arch_do_domctl(
         unsigned int fgp = domctl->u.ioport_mapping.first_gport;
         unsigned int fmp = domctl->u.ioport_mapping.first_mport;
         unsigned int np = domctl->u.ioport_mapping.nr_ports;
-        unsigned int add = domctl->u.ioport_mapping.add_mapping;
+        bool add = domctl->u.ioport_mapping.add_mapping;
         struct hvm_domain *hvm;
         struct g2m_ioport *g2m_ioport;
         int found = 0;

@@ -78,7 +78,7 @@ int pci_conf_write_intercept(unsigned int seg, unsigned int bdf,
 {
     struct pci_dev *pdev;
     int rc = xsm_pci_config_permission(XSM_HOOK, current->domain, bdf,
-                                       reg, reg + size - 1, 1);
+                                       reg, reg + size - 1, true);
 
     if ( rc < 0 )
         return rc;
