@@ -114,7 +114,7 @@ ret_t pci_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             break;
 
         default:
-            ret = -EINVAL;
+            BUILD_ERROR("PCI_DEVICE_RESET_* inconsistency");
             break;
         }
         write_unlock(&pdev->domain->pci_lock);
