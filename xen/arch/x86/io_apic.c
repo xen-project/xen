@@ -804,65 +804,47 @@ static int __init MPBIOS_polarity(int idx)
     switch (mp_irqs[idx].mpc_irqflag & 3)
     {
     case 0: /* conforms, ie. bus-type dependent polarity */
-    {
         switch (mp_bus_id_to_type[bus])
         {
         case MP_BUS_ISA: /* ISA pin */
-        {
             polarity = default_ISA_polarity(idx);
             break;
-        }
+
         case MP_BUS_EISA: /* EISA pin */
-        {
             polarity = default_EISA_polarity(idx);
             break;
-        }
+
         case MP_BUS_PCI: /* PCI pin */
-        {
             polarity = default_PCI_polarity(idx);
             break;
-        }
+
         case MP_BUS_MCA: /* MCA pin */
-        {
             polarity = default_MCA_polarity(idx);
             break;
-        }
+
         case MP_BUS_NEC98: /* NEC 98 pin */
-        {
             polarity = default_NEC98_polarity(idx);
             break;
-        }
+
         default:
-        {
             printk(KERN_WARNING "broken BIOS!!\n");
             polarity = 1;
             break;
         }
-        }
         break;
-    }
+
     case 1: /* high active */
-    {
         polarity = 0;
         break;
-    }
-    case 2: /* reserved */
-    {
-        printk(KERN_WARNING "broken BIOS!!\n");
-        polarity = 1;
-        break;
-    }
+
     case 3: /* low active */
-    {
         polarity = 1;
         break;
-    }
-    default: /* invalid */
-    {
+
+    default: /* reserved */
         printk(KERN_WARNING "broken BIOS!!\n");
         polarity = 1;
         break;
-    }
     }
     return polarity;
 }
@@ -878,65 +860,47 @@ static int MPBIOS_trigger(int idx)
     switch ((mp_irqs[idx].mpc_irqflag>>2) & 3)
     {
     case 0: /* conforms, ie. bus-type dependent */
-    {
         switch (mp_bus_id_to_type[bus])
         {
         case MP_BUS_ISA: /* ISA pin */
-        {
             trigger = default_ISA_trigger(idx);
             break;
-        }
+
         case MP_BUS_EISA: /* EISA pin */
-        {
             trigger = default_EISA_trigger(idx);
             break;
-        }
+
         case MP_BUS_PCI: /* PCI pin */
-        {
             trigger = default_PCI_trigger(idx);
             break;
-        }
+
         case MP_BUS_MCA: /* MCA pin */
-        {
             trigger = default_MCA_trigger(idx);
             break;
-        }
+
         case MP_BUS_NEC98: /* NEC 98 pin */
-        {
             trigger = default_NEC98_trigger(idx);
             break;
-        }
+
         default:
-        {
             printk(KERN_WARNING "broken BIOS!!\n");
             trigger = 1;
             break;
         }
-        }
         break;
-    }
+
     case 1: /* edge */
-    {
         trigger = 0;
         break;
-    }
-    case 2: /* reserved */
-    {
-        printk(KERN_WARNING "broken BIOS!!\n");
-        trigger = 1;
-        break;
-    }
+
     case 3: /* level */
-    {
         trigger = 1;
         break;
-    }
-    default: /* invalid */
-    {
+
+    default: /* reserved */
         printk(KERN_WARNING "broken BIOS!!\n");
         trigger = 0;
         break;
-    }
     }
     return trigger;
 }
