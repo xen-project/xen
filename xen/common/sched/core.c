@@ -589,7 +589,7 @@ int sched_init_vcpu(struct vcpu *v)
     unit->priv = sched_alloc_udata(dom_scheduler(d), unit, d->sched_priv);
     if ( unit->priv == NULL )
     {
-        sched_free_unit(unit, v);
+        sched_destroy_vcpu(v);
         rcu_read_unlock(&sched_res_rculock);
         return 1;
     }
@@ -869,8 +869,11 @@ void sched_destroy_vcpu(struct vcpu *v)
     {
         rcu_read_lock(&sched_res_rculock);
 
-        sched_remove_unit(vcpu_scheduler(v), unit);
-        sched_free_udata(vcpu_scheduler(v), unit->priv);
+        if ( unit->priv )
+        {
+            sched_remove_unit(vcpu_scheduler(v), unit);
+            sched_free_udata(vcpu_scheduler(v), unit->priv);
+        }
         sched_free_unit(unit, v);
 
         rcu_read_unlock(&sched_res_rculock);
