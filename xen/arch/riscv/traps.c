@@ -214,7 +214,7 @@ void do_trap(struct cpu_user_regs *cpu_regs)
                 die();
             }
 
-            cpu_regs->sepc += GET_INSN_LENGTH(*(uint16_t *)pc);
+            cpu_regs->sepc += INSN_LEN(*(const uint16_t *)pc);
 
             break;
         }
