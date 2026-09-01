@@ -19,6 +19,7 @@ Constant expressions and unreachable branches of if and switch statements are ex
 
 -doc_begin="Unreachability inside an ASSERT_UNREACHABLE() and analogous macro calls is deliberate and safe."
 -config=MC3A2.R2.1,reports+={deliberate, "any_area(any_loc(any_exp(macro(name(ASSERT_UNREACHABLE||PARSE_ERR_RET||PARSE_ERR||FAIL_MSR||FAIL_CPUID)))))"}
+-config=MC3A2.R2.1,reports+={deliberate, "any_area(any_loc(any_exp(macro(^BUILD_ERROR(|_IF(|_NOT))$))))"}
 -doc_end
 
 -doc_begin="The asm-offset files are not linked deliberately, since they are used to generate definitions for asm modules."
@@ -667,6 +668,7 @@ deliberate."
 to the # or ## operators within the following macros are deliberate, to provide
 useful diagnostic messages to the user."
 -config=MC3A2.R20.12,macros+={deliberate, "name(ASSERT||BUILD_BUG_ON||BUILD_BUG_ON_ZERO||RUNTIME_CHECK)"}
+-config=MC3A2.R20.12,macros+={deliberate, "^BUILD_ERROR(|_IF(|_NOT))$"}
 -doc_end
 
 -doc_begin="The helper macro GENERATE_CASE may use a macro parameter for ordinary

@@ -64,6 +64,21 @@
  */
 #define BUILD_ERROR(msg) asm ( ".error \"" msg "\"" )
 
+/*
+ * Like above, but conditional upon @cfg (not) being enabled.  @cfg must be
+ * suitable to pass to IS_ENABLED().
+ */
+#define BUILD_ERROR_IF(cfg)                               \
+    (IS_ENABLED(cfg)                                      \
+     ? ({ BUILD_ERROR( #cfg " unexpectedly enabled"); })  \
+     : (void)0)
+
+#define BUILD_ERROR_IF_NOT(cfg)                           \
+    (!IS_ENABLED(cfg)                                     \
+     ? ({ BUILD_ERROR( #cfg " unexpectedly disabled"); }) \
+     : (void)0)
+
+
 /* Hide a value from the optimiser. */
 #define HIDE(x)                                 \
     ({                                          \
