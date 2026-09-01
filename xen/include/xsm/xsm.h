@@ -85,14 +85,6 @@ struct xsm_ops {
     char *(*show_security_evtchn)(struct domain *d, const struct evtchn *chn);
 
     char *(*show_irq_sid)(int irq);
-
-#ifdef CONFIG_ARGO
-    int (*argo_enable)(const struct domain *d);
-    int (*argo_register_single_source)(const struct domain *d,
-                                       const struct domain *t);
-    int (*argo_register_any_source)(const struct domain *d);
-    int (*argo_send)(const struct domain *d, const struct domain *t);
-#endif
 };
 
 #ifdef CONFIG_XSM
@@ -195,30 +187,6 @@ static inline char *xsm_show_irq_sid(int irq)
 {
     return alternative_call(xsm_ops.show_irq_sid, irq);
 }
-
-#ifdef CONFIG_ARGO
-static inline int xsm_argo_enable(const struct domain *d)
-{
-    return alternative_call(xsm_ops.argo_enable, d);
-}
-
-static inline int xsm_argo_register_single_source(
-    const struct domain *d, const struct domain *t)
-{
-    return alternative_call(xsm_ops.argo_register_single_source, d, t);
-}
-
-static inline int xsm_argo_register_any_source(const struct domain *d)
-{
-    return alternative_call(xsm_ops.argo_register_any_source, d);
-}
-
-static inline int xsm_argo_send(const struct domain *d, const struct domain *t)
-{
-    return alternative_call(xsm_ops.argo_send, d, t);
-}
-
-#endif /* CONFIG_ARGO */
 
 #endif /* XSM_NO_WRAPPERS */
 

@@ -35,13 +35,6 @@ static const struct xsm_ops __initconst_cf_clobber dummy_ops = {
     .show_security_evtchn          = xsm_show_security_evtchn,
 
     .show_irq_sid                  = xsm_show_irq_sid,
-
-#ifdef CONFIG_ARGO
-    .argo_enable                   = xsm_argo_enable,
-    .argo_register_single_source   = xsm_argo_register_single_source,
-    .argo_register_any_source      = xsm_argo_register_any_source,
-    .argo_send                     = xsm_argo_send,
-#endif
 };
 
 void __init xsm_fixup_ops(struct xsm_ops *ops)

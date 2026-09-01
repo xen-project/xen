@@ -1969,13 +1969,6 @@ static const struct xsm_ops __initconst_cf_clobber flask_ops = {
     .show_security_evtchn = flask_show_security_evtchn,
 
     .show_irq_sid = flask_show_irq_sid,
-
-#ifdef CONFIG_ARGO
-    .argo_enable = flask_argo_enable,
-    .argo_register_single_source = flask_argo_register_single_source,
-    .argo_register_any_source = flask_argo_register_any_source,
-    .argo_send = flask_argo_send,
-#endif
 };
 
 const struct xsm_ops *__init flask_init(

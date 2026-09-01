@@ -159,6 +159,14 @@ XSM_HOOK(int, do_xsm_op, XEN_GUEST_HANDLE_PARAM(void))
 XSM_HOOK(int, do_compat_op, XEN_GUEST_HANDLE_PARAM(void))
 #endif
 
+#ifdef CONFIG_ARGO
+XSM_HOOK(int, argo_enable, const struct domain *)
+XSM_HOOK(int, argo_register_single_source, const struct domain *,
+                                           const struct domain *)
+XSM_HOOK(int, argo_register_any_source, const struct domain *)
+XSM_HOOK(int, argo_send, const struct domain *, const struct domain *)
+#endif
+
 #undef XSM_HOOK0
 #undef XSM_HOOK1
 #undef XSM_HOOK2

@@ -749,27 +749,32 @@ static XSM_INLINE int xsm_dm_op(XSM_DEFAULT_ARG struct domain *d)
 #endif
 
 #ifdef CONFIG_ARGO
-static XSM_INLINE int xsm_argo_enable(const struct domain *d)
+
+static XSM_INLINE int xsm_argo_enable(XSM_DEFAULT_ARG const struct domain *d)
 {
-    return 0;
+    XSM_ASSERT_ACTION(XSM_HOOK);
+    return xsm_default_action(action, d, NULL);
 }
 
 static XSM_INLINE int xsm_argo_register_single_source(
-    const struct domain *d, const struct domain *t)
+    XSM_DEFAULT_ARG const struct domain *d, const struct domain *t)
 {
-    return 0;
+    XSM_ASSERT_ACTION(XSM_HOOK);
+    return xsm_default_action(action, d, t);
 }
 
 static XSM_INLINE int xsm_argo_register_any_source(
-    const struct domain *d)
+    XSM_DEFAULT_ARG const struct domain *d)
 {
-    return 0;
+    XSM_ASSERT_ACTION(XSM_HOOK);
+    return xsm_default_action(action, d, NULL);
 }
 
 static XSM_INLINE int xsm_argo_send(
-    const struct domain *d, const struct domain *t)
+    XSM_DEFAULT_ARG const struct domain *d, const struct domain *t)
 {
-    return 0;
+    XSM_ASSERT_ACTION(XSM_HOOK);
+    return xsm_default_action(action, d, t);
 }
 
 #endif /* CONFIG_ARGO */
