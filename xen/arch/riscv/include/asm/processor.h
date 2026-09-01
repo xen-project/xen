@@ -50,8 +50,6 @@ struct cpu_user_regs
     unsigned long sepc;
     unsigned long sstatus;
     unsigned long hstatus;
-    /* pointer to previous stack_cpu_regs */
-    unsigned long pregs;
 };
 
 /* TODO: need to implement */
