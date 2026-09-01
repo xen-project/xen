@@ -14,13 +14,8 @@ static inline bool altp2m_active(const struct domain *d)
     return false;
 }
 
-/* Alternate p2m VCPU */
-static inline unsigned int altp2m_vcpu_idx(const struct vcpu *v)
-{
-    /* Not implemented on GENERIC, should not be reached. */
-    BUG();
-    return 0;
-}
+/* Alternate p2m VCPU - placeholder on GENERIC */
+unsigned int altp2m_vcpu_idx(const struct vcpu *v);
 
 #endif /* __ASM_GENERIC_ALTP2M_H */
 
