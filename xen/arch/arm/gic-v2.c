@@ -1315,7 +1315,7 @@ static int __init gicv2_init(void)
     return 0;
 }
 
-static void gicv2_do_LPI(unsigned int lpi)
+static void noreturn gicv2_do_LPI(unsigned int lpi)
 {
     /* No LPIs in a GICv2 */
     BUG();

@@ -229,7 +229,7 @@ static inline unsigned int vgic_v3_its_count(const struct domain *d)
     return 0;
 }
 
-static inline void gicv3_do_LPI(unsigned int lpi)
+static inline void noreturn gicv3_do_LPI(unsigned int lpi)
 {
     /* We don't enable LPIs without an ITS. */
     BUG();

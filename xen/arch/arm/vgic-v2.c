@@ -718,14 +718,15 @@ static void vgic_v2_domain_free(struct domain *d)
     /* Nothing to be cleanup for this driver */
 }
 
-static struct pending_irq *vgic_v2_lpi_to_pending(struct domain *d,
-                                                  unsigned int vlpi)
+static struct pending_irq *noreturn vgic_v2_lpi_to_pending(struct domain *d,
+                                                           unsigned int vlpi)
 {
     /* Dummy function, no LPIs on a VGICv2. */
     BUG();
 }
 
-static int vgic_v2_lpi_get_priority(struct domain *d, unsigned int vlpi)
+static int noreturn vgic_v2_lpi_get_priority(struct domain *d,
+                                             unsigned int vlpi)
 {
     /* Dummy function, no LPIs on a VGICv2. */
     BUG();
