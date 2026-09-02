@@ -212,7 +212,8 @@ maintainers if you want to suggest a change.
            static inline void set_bit(int nr, volatile void *addr)
            {
                asm volatile ( "lock btsl %1,%0"
-                              : "+m" (ADDR) : "Ir" (nr) : "memory");
+                              : "+m" (*(volatile int *)addr)
+                              : "Ir" (nr) : "memory" );
            }
            #define set_bit(nr, addr) ({                            \
                if ( bitop_bad_size(addr) ) __bitop_bad_size();     \
