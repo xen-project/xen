@@ -23,6 +23,7 @@ mktime (unsigned int year, unsigned int mon,
 int time_suspend(void);
 int time_resume(void);
 
+void preset_tsc_scale(unsigned long freq);
 void init_percpu_time(void);
 void time_latch_stamps(void);
 

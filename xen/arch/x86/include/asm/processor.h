@@ -417,6 +417,9 @@ static inline uint8_t get_cpu_family(uint32_t raw, uint8_t *model,
     return fam;
 }
 
+void intel_process_freq(const struct cpuinfo_x86 *c,
+                        unsigned int *min_mhz, unsigned int *max_mhz);
+
 #ifdef CONFIG_INTEL
 extern int8_t opt_tsx;
 extern bool rtm_disabled;

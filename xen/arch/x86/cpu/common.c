@@ -19,6 +19,7 @@
 #include <asm/random.h>
 #include <asm/setup.h>
 #include <asm/shstk.h>
+#include <asm/time.h>
 #include <asm/xstate.h>
 
 #include <public/sysctl.h>
@@ -444,6 +445,39 @@ void __init early_cpu_init(bool verbose)
 
 	if (!(c->vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)))
 		park_offline_cpus = opt_mce;
+
+	/*
+	 * If nominal freq isn't available, use highest, thus causing NOW()
+	 * output to move more slowly.  See preset_tsc_scale().
+	 */
+	if (c->cpuid_level >= 0x15) {
+		cpuid(0x15, &eax, &ebx, &ecx, &edx);
+
+		if (ecx && ebx && eax)
+			preset_tsc_scale(DIV_ROUND_UP(ecx * 1UL * ebx, eax));
+		else if (c->cpuid_level >= 0x16) {
+			/* Assume CPU base freq ≈ TSC freq. */
+			cpuid(0x16, &eax, &ebx, &ecx, &edx);
+			if (eax)
+				preset_tsc_scale(eax * 1000000UL);
+			else if (ebx)
+				preset_tsc_scale(ebx * 1000000UL);
+		}
+	} else if (c->vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) {
+		unsigned int nom_mhz = 0, hi_mhz = 0;
+
+		amd_process_freq(c, NULL, &nom_mhz, &hi_mhz);
+		if (nom_mhz)
+			preset_tsc_scale(nom_mhz * 1000000UL);
+		else if (hi_mhz)
+			preset_tsc_scale(hi_mhz * 1000000UL);
+	} else if (c->vendor & X86_VENDOR_INTEL) {
+		unsigned int hi_mhz = 0;
+
+		intel_process_freq(c, NULL, &hi_mhz);
+		if (hi_mhz)
+			preset_tsc_scale(hi_mhz * 1000000UL);
+	}
 }
 
 void reset_cpuinfo(struct cpuinfo_x86 *c, bool keep_basic)

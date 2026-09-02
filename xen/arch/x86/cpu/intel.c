@@ -476,8 +476,8 @@ static int num_cpu_cores(struct cpuinfo_x86 *c)
 		return 1;
 }
 
-static void intel_process_freq(const struct cpuinfo_x86 *c,
-                               unsigned int *min_mhz, unsigned int *max_mhz)
+void intel_process_freq(const struct cpuinfo_x86 *c,
+                        unsigned int *min_mhz, unsigned int *max_mhz)
 {
     uint64_t msrval;
     uint8_t max_ratio, min_ratio;

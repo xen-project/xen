@@ -1713,6 +1713,9 @@ s_time_t get_s_time_fixed(uint64_t at_tsc)
     const struct cpu_time *t = &this_cpu(cpu_time);
     uint64_t tsc, delta;
 
+    /* scale_delta() degenerates when the scale wasn't set yet. */
+    ASSERT(t->tsc_scale.mul_frac);
+
     if ( at_tsc )
         tsc = at_tsc;
     else
@@ -1728,6 +1731,20 @@ s_time_t get_s_time_fixed(uint64_t at_tsc)
 
 s_time_t get_s_time(void)
 {
+    /*
+     * Before the TSC scale is set, avoid returning constant 0 (or whatever
+     * this_cpu(cpu_time).stamp.local_stime is set to).  While the returned
+     * value is in no way representing time, it at least increases
+     * monotonically, thus avoiding e.g. waiting loops to degenerate to
+     * entirely infinite ones.
+     */
+    if ( unlikely(!this_cpu(cpu_time).tsc_scale.mul_frac) )
+    {
+        static s_time_t counter;
+
+        return arch_fetch_and_add(&counter, 1);
+    }
+
     return get_s_time_fixed(0);
 }
 
@@ -2681,6 +2698,22 @@ int __init init_xen_time(void)
     return 0;
 }
 
+/* BSP-only function to pre-set an approximate TSC scale. */
+void __init preset_tsc_scale(unsigned long freq)
+{
+    struct cpu_time *t = &this_cpu(cpu_time);
+
+    /*
+     * The incoming frequency is only approximate (nominal).  Increase it by
+     * 1% to make NOW() output rather a little too slow than too fast, thus
+     * avoiding a possible backwards jump once the final scale is set.
+     */
+    freq += DIV_ROUND_UP(freq, 100);
+
+    set_time_scale(&t->tsc_scale, freq);
+    t->stamp.local_tsc = boot_tsc_stamp;
+    NOW_good = true;
+}
 
 /* Early init function. */
 void __init early_time_init(void)
@@ -2698,6 +2731,9 @@ void __init early_time_init(void)
                    "TSC ADJUST set to %lx on boot CPU - clearing\n", tmp);
             wrmsrl(MSR_IA32_TSC_ADJUST, 0);
             boot_tsc_stamp -= tmp;
+
+            if ( t->stamp.local_tsc )
+                t->stamp.local_tsc -= tmp;
         }
     }
 
