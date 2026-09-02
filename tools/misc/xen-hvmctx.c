@@ -311,7 +311,7 @@ static void dump_rtc(void)
     printf("              0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x, index 0x%02x\n",
            r.cmos_data[8], r.cmos_data[9], r.cmos_data[10], r.cmos_data[11], 
            r.cmos_data[12], r.cmos_data[13], r.cmos_index);
-
+    printf("         century 0x%02x  offset %"PRId64"\n", r.century, r.rtc_offset);
 }
 
 static void dump_hpet(void)

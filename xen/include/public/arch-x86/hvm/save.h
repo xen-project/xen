@@ -488,6 +488,8 @@ struct hvm_hw_rtc {
     uint8_t pad0;
     /* RTC offset from host time */
     int64_t rtc_offset;
+    uint8_t century;
+    uint8_t pad1[7];
 };
 
 DECLARE_HVM_SAVE_TYPE(RTC, 11, struct hvm_hw_rtc);

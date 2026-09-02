@@ -484,16 +484,27 @@ static int rtc_ioport_write(RTCState *s, uint32_t addr, uint32_t data)
         data &= 0x7f;
         s->hw.cmos_index = data;
         spin_unlock(&s->lock);
-        return (data < RTC_CMOS_SIZE);
+        return data < RTC_CMOS_SIZE || (s->has_century && data == RTC_CENTURY);
     }
 
-    if ( s->hw.cmos_index >= RTC_CMOS_SIZE )
+    switch ( s->hw.cmos_index )
     {
+    case 0 ... RTC_CMOS_SIZE - 1:
+        orig = s->hw.cmos_data[s->hw.cmos_index];
+        break;
+
+    case RTC_CENTURY:
+        if ( s->has_century )
+        {
+            orig = s->hw.century;
+            break;
+        }
+        fallthrough;
+    default:
         spin_unlock(&s->lock);
         return 0;
     }
 
-    orig = s->hw.cmos_data[s->hw.cmos_index];
     switch ( s->hw.cmos_index )
     {
     case RTC_SECONDS_ALARM:
@@ -509,6 +520,7 @@ static int rtc_ioport_write(RTCState *s, uint32_t addr, uint32_t data)
     case RTC_DAY_OF_MONTH:
     case RTC_MONTH:
     case RTC_YEAR:
+    case RTC_CENTURY:
         /* if in set mode, just write the register */
         if ( (s->hw.cmos_data[RTC_REG_B] & RTC_SET) )
             s->hw.cmos_data[s->hw.cmos_index] = data;
@@ -517,7 +529,10 @@ static int rtc_ioport_write(RTCState *s, uint32_t addr, uint32_t data)
             /* Fetch the current time and update just this field. */
             s->current_tm = gmtime(get_localtime(d));
             rtc_copy_date(s);
-            s->hw.cmos_data[s->hw.cmos_index] = data;
+            if ( s->hw.cmos_index != RTC_CENTURY )
+                s->hw.cmos_data[s->hw.cmos_index] = data;
+            else
+                s->hw.century = data;
             rtc_set_time(s);
         }
         alarm_timer_update(s);
@@ -593,7 +608,16 @@ static void rtc_set_time(RTCState *s)
     tm->tm_wday = from_bcd(s, s->hw.cmos_data[RTC_DAY_OF_WEEK]);
     tm->tm_mday = from_bcd(s, s->hw.cmos_data[RTC_DAY_OF_MONTH]);
     tm->tm_mon = from_bcd(s, s->hw.cmos_data[RTC_MONTH]) - 1;
-    tm->tm_year = from_bcd(s, s->hw.cmos_data[RTC_YEAR]) + 100;
+    tm->tm_year = from_bcd(s, s->hw.cmos_data[RTC_YEAR]);
+    if ( s->has_century )
+    {
+        unsigned int century = s->hw.century;
+
+        BCD_TO_BIN(century);
+        tm->tm_year += century * 100 - epoch_year;
+    }
+    else
+        tm->tm_year += 100;
 
     after = mktime(get_year(tm->tm_year), tm->tm_mon + 1, tm->tm_mday,
                    tm->tm_hour, tm->tm_min, tm->tm_sec);
@@ -631,6 +655,12 @@ static void rtc_copy_date(RTCState *s)
     s->hw.cmos_data[RTC_DAY_OF_MONTH] = to_bcd(s, tm->tm_mday);
     s->hw.cmos_data[RTC_MONTH] = to_bcd(s, tm->tm_mon + 1);
     s->hw.cmos_data[RTC_YEAR] = to_bcd(s, tm->tm_year % 100);
+
+    if ( s->has_century )
+    {
+        s->hw.century = get_year(tm->tm_year) / 100;
+        BIN_TO_BCD(s->hw.century);
+    }
 }
 
 static int update_in_progress(RTCState *s)
@@ -658,7 +688,8 @@ static bool rtc_ioport_read(RTCState *s, uint32_t *val)
 
     spin_lock(&s->lock);
 
-    if ( s->hw.cmos_index >= RTC_CMOS_SIZE )
+    if ( s->hw.cmos_index >= RTC_CMOS_SIZE &&
+         (!s->has_century || s->hw.cmos_index != RTC_CENTURY) )
     {
         spin_unlock(&s->lock);
         return false;
@@ -673,13 +704,17 @@ static bool rtc_ioport_read(RTCState *s, uint32_t *val)
     case RTC_DAY_OF_MONTH:
     case RTC_MONTH:
     case RTC_YEAR:
+    case RTC_CENTURY:
         /* if not in set mode, adjust cmos before reading*/
         if (!(s->hw.cmos_data[RTC_REG_B] & RTC_SET))
         {
             s->current_tm = gmtime(get_localtime(d));
             rtc_copy_date(s);
         }
-        ret = s->hw.cmos_data[s->hw.cmos_index];
+        if ( s->hw.cmos_index != RTC_CENTURY )
+            ret = s->hw.cmos_data[s->hw.cmos_index];
+        else
+            ret = s->hw.century;
         break;
     case RTC_REG_A:
         ret = s->hw.cmos_data[s->hw.cmos_index];
@@ -769,6 +804,32 @@ static int cf_check rtc_save(struct vcpu *v, hvm_domain_context_t *h)
     return rc;
 }
 
+static int cf_check rtc_check(const struct domain *d, hvm_domain_context_t *h)
+{
+    const struct hvm_save_descriptor *desc =
+        (const struct hvm_save_descriptor *)&h->data[h->cur];
+    struct hvm_hw_rtc s;
+
+    if ( !has_vrtc(d) )
+        return -ENODEV;
+
+    if ( hvm_load_entry_zeroextend(RTC, h, &s) != 0 )
+        return -ENODATA;
+
+    if ( s.pad0 )
+        return -EINVAL;
+
+    for ( unsigned int i = 0; i < ARRAY_SIZE(s.pad1); ++i )
+        if ( s.pad1[i] )
+            return -EINVAL;
+
+    if ( desc->length >= endof_field(struct hvm_hw_rtc, century) &&
+         ((s.century & 0xf) >= 10 || (s.century >> 4) >= 10) )
+        return -EINVAL;
+
+    return 0;
+}
+
 /* Reload the hardware state from a saved domain */
 static int cf_check rtc_load(struct domain *d, hvm_domain_context_t *h)
 {
@@ -802,12 +863,15 @@ static int cf_check rtc_load(struct domain *d, hvm_domain_context_t *h)
     check_update_timer(s);
     alarm_timer_update(s);
 
+    if ( !s->hw.century )
+        s->has_century = false;
+
     spin_unlock(&s->lock);
 
     return 0;
 }
 
-HVM_REGISTER_SAVE_RESTORE(RTC, rtc_save, NULL, rtc_load, 1, HVMSR_PER_DOM);
+HVM_REGISTER_SAVE_RESTORE(RTC, rtc_save, rtc_check, rtc_load, 1, HVMSR_PER_DOM);
 
 void rtc_reset(struct domain *d)
 {
@@ -881,6 +945,12 @@ void rtc_init(struct domain *d)
     s->hw.cmos_data[RTC_REG_B] = RTC_24H;
     s->hw.cmos_data[RTC_REG_C] = 0;
     s->hw.cmos_data[RTC_REG_D] = RTC_VRT;
+
+    /*
+     * By default we make the century byte available, unless an incoming save
+     * record says otherwise.
+     */
+    s->has_century = true;
 
     s->current_tm = gmtime(get_localtime(d));
     s->start_time = NOW();

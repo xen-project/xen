@@ -109,6 +109,8 @@ typedef struct RTCState {
 
     bool use_timer;
 
+    bool has_century;
+
     spinlock_t lock;
 } RTCState;
 

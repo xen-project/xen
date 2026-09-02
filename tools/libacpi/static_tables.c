@@ -33,6 +33,8 @@ struct acpi_20_facs Facs = {
 #define ACPI_PM_TMR_BLK_BIT_WIDTH           0x20
 #define ACPI_PM_TMR_BLK_BIT_OFFSET          0x00
 
+#define CMOS_CENTURY 0x32 /* Conventional index used also without ACPI */
+
 struct acpi_fadt Fadt = {
     .header = {
         .signature    = ACPI_FADT_SIGNATURE,
@@ -88,7 +90,9 @@ struct acpi_fadt Fadt = {
         .register_bit_width  = ACPI_PM_TMR_BLK_BIT_WIDTH,
         .register_bit_offset = ACPI_PM_TMR_BLK_BIT_OFFSET,
         .address             = ACPI_PM_TMR_BLK_ADDRESS_V1,
-    }
+    },
+
+    .century = CMOS_CENTURY,
 };
 
 struct acpi_20_rsdt Rsdt = {

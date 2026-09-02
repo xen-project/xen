@@ -37,6 +37,9 @@ bool is_cmos_port(unsigned int port, unsigned int bytes,
 #define RTC_REG_C               12
 #define RTC_REG_D               13
 
+/* Conventional index used without (and typically also with) ACPI. */
+#define RTC_CENTURY             0x32
+
 /**********************************************************************
  * register details
  **********************************************************************/
