@@ -432,10 +432,18 @@ void __init early_cpu_init(bool verbose)
 		paddr_bits -= (ebx >> 6) & 0x3f;
 	}
 
+	initialize_cpu_data(0);
+
+	if (!verbose)
+		return;
+
+	/*
+	 * Work which doesn't need repeating after microcode load goes below
+	 * here.
+	 */
+
 	if (!(c->vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)))
 		park_offline_cpus = opt_mce;
-
-	initialize_cpu_data(0);
 }
 
 void reset_cpuinfo(struct cpuinfo_x86 *c, bool keep_basic)
