@@ -38,9 +38,6 @@ static void __init dt_uart_init(void)
     const char *options;
     char *split;
 
-    if ( !console_has("dtuart") )
-        return; /* Not for us */
-
     if ( !strcmp(opt_dtuart, "") )
     {
         const struct dt_device_node *chosen = dt_find_node_by_path("/chosen");
@@ -121,6 +118,9 @@ static void __init acpi_uart_init(void) { }
 
 void __init uart_init(void)
 {
+    if ( !console_has("dtuart") )
+        return; /* Not for us */
+
     if ( acpi_disabled )
         dt_uart_init();
     else
