@@ -77,8 +77,8 @@ struct rcu_head {
 } while (0)
 
 
-int rcu_pending(int cpu);
-int rcu_needs_cpu(int cpu);
+bool rcu_pending(unsigned int cpu);
+bool rcu_needs_cpu(unsigned int cpu);
 
 /*
  * Dummy lock type for passing to rcu_read_{lock,unlock}. Currently exists
@@ -168,10 +168,10 @@ static inline void rcu_read_unlock(rcu_read_lock_t *lock)
 #define rcu_assign_pointer(p, v) ({ smp_wmb(); (p) = (v); })
 
 void rcu_init(void);
-void rcu_check_callbacks(int cpu);
+void rcu_check_callbacks(unsigned int cpu);
 
 /* Exported interfaces */
-void call_rcu(struct rcu_head *head, 
+void call_rcu(struct rcu_head *head,
               void (*func)(struct rcu_head *head));
 
 void rcu_barrier(void);

@@ -509,18 +509,18 @@ static int __rcu_pending(struct rcu_ctrlblk *rcp, struct rcu_data *rdp)
     return 0;
 }
 
-int rcu_pending(int cpu)
+bool rcu_pending(unsigned int cpu)
 {
-    return __rcu_pending(&rcu_ctrlblk, &per_cpu(rcu_data, cpu));
+    return !!__rcu_pending(&rcu_ctrlblk, &per_cpu(rcu_data, cpu));
 }
 
 /*
  * Check to see if any future RCU-related work will need to be done
  * by the current CPU, even if none need be done immediately, returning
- * 1 if so.  This function is part of the RCU implementation; it is -not-
+ * true if so.  This function is part of the RCU implementation; it is -not-
  * an exported member of the RCU API.
  */
-int rcu_needs_cpu(int cpu)
+bool rcu_needs_cpu(unsigned int cpu)
 {
     struct rcu_data *rdp = &per_cpu(rcu_data, cpu);
 
@@ -529,7 +529,7 @@ int rcu_needs_cpu(int cpu)
 
 /*
  * Timer for making sure the CPU where a callback is queued does
- * periodically poke rcu_pedning(), so that it will invoke the callback
+ * periodically poke rcu_pending(), so that it will invoke the callback
  * not too late after the end of the grace period.
  */
 static void rcu_idle_timer_start(void)
@@ -588,7 +588,7 @@ static void cf_check rcu_idle_timer_handler(void* data)
                                 IDLE_TIMER_PERIOD_MIN);
 }
 
-void rcu_check_callbacks(int cpu)
+void rcu_check_callbacks(unsigned int cpu)
 {
     struct rcu_data *rdp = &this_cpu(rcu_data);
 
