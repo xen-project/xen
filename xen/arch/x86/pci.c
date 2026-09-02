@@ -76,8 +76,9 @@ int pci_conf_write_intercept(unsigned int seg, unsigned int bdf,
                              unsigned int reg, unsigned int size,
                              uint32_t *data)
 {
+    pci_sbdf_t sbdf = PCI_SBDF(seg, bdf);
     struct pci_dev *pdev;
-    int rc = xsm_pci_config_permission(XSM_HOOK, current->domain, bdf,
+    int rc = xsm_pci_config_permission(XSM_HOOK, current->domain, sbdf.sbdf,
                                        reg, reg + size - 1, true);
 
     if ( rc < 0 )
@@ -93,7 +94,7 @@ int pci_conf_write_intercept(unsigned int seg, unsigned int bdf,
 
     pcidevs_lock();
 
-    pdev = pci_get_pdev(NULL, PCI_SBDF(seg, bdf));
+    pdev = pci_get_pdev(NULL, sbdf);
     if ( pdev )
         rc = pci_msi_conf_write_intercept(pdev, reg, size, data);
 
