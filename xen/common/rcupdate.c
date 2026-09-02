@@ -31,21 +31,22 @@
  * For detailed explanation of Read-Copy Update mechanism see -
  * http://lse.sourceforge.net/locking/rcupdate.html
  */
-#include <xen/types.h>
-#include <xen/kernel.h>
+#include <xen/bitops.h>
+#include <xen/cpu.h>
 #include <xen/init.h>
+#include <xen/kernel.h>
 #include <xen/param.h>
-#include <xen/sections.h>
-#include <xen/spinlock.h>
-#include <xen/smp.h>
+#include <xen/percpu.h>
 #include <xen/rcupdate.h>
 #include <xen/sched.h>
-#include <asm/atomic.h>
-#include <xen/bitops.h>
-#include <xen/percpu.h>
+#include <xen/sections.h>
+#include <xen/smp.h>
 #include <xen/softirq.h>
-#include <xen/cpu.h>
+#include <xen/spinlock.h>
 #include <xen/stop_machine.h>
+#include <xen/types.h>
+
+#include <asm/atomic.h>
 
 DEFINE_PER_CPU(unsigned int, rcu_lock_cnt);
 
