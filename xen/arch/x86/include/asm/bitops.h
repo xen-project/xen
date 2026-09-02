@@ -191,7 +191,9 @@ static inline int arch__test_and_set_bit(int nr, volatile void *addr)
     asm volatile ( "btsl %[nr], %[addr]\n\t"
                    ASM_FLAG_OUT(, "sbbl %[old], %[old]\n\t")
                    : [old] ASM_FLAG_OUT("=@ccc", "=r") (oldbit),
-                     [addr] "+m" (*(int *)addr) : [nr] "Ir" (nr) : "memory" );
+                     [addr] "+m" (*(volatile int *)addr)
+                   : [nr] "Ir" (nr)
+                   : "memory" );
 
     return oldbit;
 }
@@ -239,7 +241,9 @@ static inline int arch__test_and_clear_bit(int nr, volatile void *addr)
     asm volatile ( "btrl %[nr], %[addr]\n\t"
                    ASM_FLAG_OUT(, "sbbl %[old], %[old]\n\t")
                    : [old] ASM_FLAG_OUT("=@ccc", "=r") (oldbit),
-                     [addr] "+m" (*(int *)addr) : [nr] "Ir" (nr) : "memory" );
+                     [addr] "+m" (*(volatile int *)addr)
+                   : [nr] "Ir" (nr)
+                   : "memory" );
 
     return oldbit;
 }
@@ -253,7 +257,9 @@ static inline int arch__test_and_change_bit(int nr, volatile void *addr)
     asm volatile ( "btcl %[nr], %[addr]\n\t"
                    ASM_FLAG_OUT(, "sbbl %[old], %[old]\n\t")
                    : [old] ASM_FLAG_OUT("=@ccc", "=r") (oldbit),
-                     [addr] "+m" (*(int *)addr) : [nr] "Ir" (nr) : "memory" );
+                     [addr] "+m" (*(volatile int *)addr)
+                   : [nr] "Ir" (nr)
+                   : "memory" );
 
     return oldbit;
 }
