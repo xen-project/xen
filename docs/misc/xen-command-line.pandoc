@@ -438,9 +438,10 @@ The following are examples of correct specifications:
 Specify the size of the console ring buffer.
 
 ### console
-> `= List of [ vga | com1[H,L] | com2[H,L] | pv | dbgp | ehci | xhci | none ]`
+> `= List of [ vga | com1[H,L] | com2[H,L] | pv | dbgp | ehci | xhci | dtuart | none ]`
 
-> Default: `console=com1,vga`
+> Default (x86): `console=vga`
+> Default (Arm, RISC-V): `console=dtuart`
 
 Specify which console(s) Xen should use.
 
@@ -461,6 +462,10 @@ compiled with `CONFIG_XEN_GUEST` enabled.
 `dbgp` or `ehci` indicates that Xen should use a USB2 debug port.
 
 `xhci` indicates that Xen should use a USB3 debug port.
+
+`dtuart` indicates that Xen should use a generic UART (parsed from a device
+tree or ACPI SPCR table). Only available if Xen was compiled with
+`CONFIG_GENERIC_UART_INIT` enabled.
 
 `none` indicates that Xen should not use a console.  This option only
 makes sense on its own.
@@ -1077,13 +1082,15 @@ affinities to prefer but be not limited to the specified node(s).
 
 Pin dom0 vcpus to their respective pcpus
 
-### dtuart (ARM)
+### dtuart (ARM, RISC-V)
 > `= path [:options]`
 
 > Default: `""`
 
 Specify the full path in the device tree for the UART.  If the path doesn't
 start with `/`, it is assumed to be an alias.  The options are device specific.
+If the option is left empty, Xen will try to probe the device from the DT
+property /chosen/stdout-path if present.
 
 ### e820-mtrr-clip (x86)
 > `= <boolean>`
