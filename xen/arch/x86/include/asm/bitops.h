@@ -18,7 +18,6 @@
  */
 
 #define ADDR (*(volatile int *) addr)
-#define CONST_ADDR (*(const volatile int *) addr)
 
 /**
  * set_bit - Atomically set a bit in memory
@@ -285,7 +284,9 @@ static inline int variable_test_bit(int nr, const volatile void *addr)
     asm volatile ( "btl %[nr], %[addr]\n\t"
                    ASM_FLAG_OUT(, "sbbl %[old], %[old]\n\t")
                    : [old] ASM_FLAG_OUT("=@ccc", "=r") (oldbit)
-                   : [addr] "m" (CONST_ADDR), [nr] "Ir" (nr) : "memory" );
+                   : [addr] "m" (*(const volatile int *)addr),
+                     [nr] "Ir" (nr)
+                   : "memory" );
 
     return oldbit;
 }
