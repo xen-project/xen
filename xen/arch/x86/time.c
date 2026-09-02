@@ -1250,6 +1250,9 @@ mktime (unsigned int year, unsigned int mon,
         )*60 + sec; /* finally seconds */
 }
 
+static bool __ro_after_init opt_cmos_rtc_bcd;
+boolean_param("cmos-rtc-bcd", opt_cmos_rtc_bcd);
+
 struct rtc_time {
     unsigned int year, mon, day, hour, min, sec;
 };
@@ -1285,7 +1288,7 @@ static bool __get_cmos_time(struct rtc_time *rtc)
     if ( acpi_gbl_FADT.century && acpi_gbl_FADT.century < 0x80 )
         century = CMOS_READ(acpi_gbl_FADT.century);
 
-    bcd = RTC_ALWAYS_BCD || !(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY);
+    bcd = opt_cmos_rtc_bcd || !(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY);
 
     spin_unlock_irqrestore(&rtc_lock, flags);
 
@@ -1353,6 +1356,48 @@ static bool __init cmos_rtc_probe(void)
     return false;
 }
 
+static inline bool __init attr_const is_bcd(unsigned int x)
+{
+    return (x & 0xf) < 10 && (x >> 4) < 10;
+}
+
+static void __init cmos_rtc_probe_bcd(void)
+{
+    bool bcd;
+    unsigned long flags;
+
+    if ( opt_cmos_rtc_bcd )
+        return;
+
+    spin_lock_irqsave(&rtc_lock, flags);
+    bcd = !(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY);
+    spin_unlock_irqrestore(&rtc_lock, flags);
+
+    if ( bcd )
+        return;
+
+    for ( unsigned int seclo = 0; ; )
+    {
+        struct rtc_time rtc;
+
+        if ( !__get_cmos_time(&rtc) ||
+             !is_bcd(rtc.sec) ||
+             !is_bcd(rtc.min) ||
+             !is_bcd(rtc.hour) ||
+             !is_bcd(rtc.day) ||
+             !is_bcd(rtc.mon) )
+            return;
+
+        if ( seclo > (rtc.sec & 0xf) )
+            break;
+
+        seclo = rtc.sec & 0xf;
+    }
+
+    printk(XENLOG_WARNING "CMOS RTC indicates binary mode but uses BCD\n");
+
+    opt_cmos_rtc_bcd = true;
+}
 
 static unsigned long cmos_rtc_read(void)
 {
@@ -1614,6 +1659,10 @@ static void __init probe_wallclock(void)
     if ( cmos_rtc_probe() )
     {
         wallclock_source = WALLCLOCK_CMOS;
+
+        if ( opt_cmos_rtc_probe )
+            cmos_rtc_probe_bcd();
+
         return;
     }
     if ( efi_enabled(EFI_RS) && efi_get_time() )

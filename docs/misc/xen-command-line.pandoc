@@ -339,6 +339,14 @@ parameter to "stable:socket".
 Specify the event count threshold for raising Corrected Machine Check
 Interrupts.  Specifying zero disables CMCI handling.
 
+### cmos-rtc-bcd (x86)
+> `= <boolean>`
+
+> Default: `false`
+
+Flag to indicate the CMOS Real Time Clock uses BCD mode irrespective of
+control register B indicating binary mode.
+
 ### cmos-rtc-probe (x86)
 > `= <boolean>`
 

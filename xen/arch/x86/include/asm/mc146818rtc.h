@@ -96,7 +96,6 @@ bool is_cmos_port(unsigned int port, unsigned int bytes,
 
 #ifndef RTC_PORT
 #define RTC_PORT(x)	(0x70 + (x))
-#define RTC_ALWAYS_BCD	1	/* RTC operates in binary mode */
 #endif
 
 /*
