@@ -22,9 +22,6 @@
 #define __set_bit(n,p)            set_bit(n,p)
 #define __clear_bit(n,p)          clear_bit(n,p)
 
-#define ADDR (*(volatile int *) addr)
-#define CONST_ADDR (*(const volatile int *) addr)
-
 #if defined(CONFIG_ARM_32)
 # include <asm/arm32/bitops.h>
 #elif defined(CONFIG_ARM_64)
