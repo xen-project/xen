@@ -29,6 +29,8 @@ bool __ro_after_init NOW_good;
 #define __isleap(year) \
   ((year) % 4 == 0 && ((year) % 100 != 0 || (year) % 400 == 0))
 
+#define DAYS_IN_400_YEARS (365 * 303 + 366 * 97)
+
 /* How many days are in each month.  */
 static const unsigned short int __mon_lengths[2][12] = {
     /* Normal years.  */
@@ -59,7 +61,7 @@ struct tm gmtime(unsigned long t)
     while ( t & (1UL<<39) )
     {
         y -= 400;
-        t += ((unsigned long)(365 * 303 + 366 * 97)) * SECS_PER_DAY;
+        t += (unsigned long)DAYS_IN_400_YEARS * SECS_PER_DAY;
     }
     t &= (1UL << 40) - 1;
 #endif
@@ -73,6 +75,11 @@ struct tm gmtime(unsigned long t)
     tbuf.tm_sec = rem % 60;
     /* January 1, 1970 was a Thursday.  */
     tbuf.tm_wday = (4 + days) % 7;
+    if ( days >= DAYS_IN_400_YEARS )
+    {
+        y += (days / DAYS_IN_400_YEARS) * 400;
+        days %= DAYS_IN_400_YEARS;
+    }
     while ( days >= (rem = __isleap(y) ? 366 : 365) )
     {
         ++y;
