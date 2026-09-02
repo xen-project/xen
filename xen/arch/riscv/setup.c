@@ -77,6 +77,7 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
 {
     const char *cmdline;
     size_t fdt_size;
+    int rc;
 
     remove_identity_mapping();
 
@@ -149,7 +150,10 @@ void __init noreturn start_xen(unsigned long bootcpu_id,
 
     intc_preinit();
 
-    uart_init();
+    rc = uart_init();
+    if ( rc )
+        panic("Failed to initialize the requested UART (%d)\n", rc);
+
     console_init_preirq();
 
     intc_init();

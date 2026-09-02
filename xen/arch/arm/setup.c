@@ -377,7 +377,10 @@ void asmlinkage __init noreturn start_xen(unsigned long fdt_paddr)
 
     gic_preinit();
 
-    uart_init();
+    rc = uart_init();
+    if ( rc )
+        panic("Failed to initialize the requested UART (%d)\n", rc);
+
     console_init_preirq();
     console_init_ring();
 

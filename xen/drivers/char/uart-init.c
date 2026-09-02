@@ -30,15 +30,17 @@
 static char __initdata opt_dtuart[256] = "";
 string_param("dtuart", opt_dtuart);
 
-static void __init dt_uart_init(void)
+static int __init dt_uart_init(void)
 {
     struct dt_device_node *dev;
     int ret;
     const char *devpath = opt_dtuart;
     const char *options;
     char *split;
+    /* Set on the command line, as opposed to inherited from /chosen */
+    bool explicit_request = strcmp(opt_dtuart, "") != 0;
 
-    if ( !strcmp(opt_dtuart, "") )
+    if ( !explicit_request )
     {
         const struct dt_device_node *chosen = dt_find_node_by_path("/chosen");
 
@@ -62,7 +64,12 @@ static void __init dt_uart_init(void)
     if ( !strcmp(opt_dtuart, "") )
     {
         printk("No dtuart path configured\n");
-        return;
+
+        /*
+         * console=dtuart is the compiled-in default, so an absent dtuart= is
+         * not a failed user request.
+         */
+        return 0;
     }
 
     split = strchr(opt_dtuart, ':');
@@ -83,48 +90,49 @@ static void __init dt_uart_init(void)
     if ( !dev )
     {
         printk("Unable to find device \"%s\"\n", devpath);
-        return;
+        return explicit_request ? -ENODEV : 0;
     }
 
     ret = device_init(dev, DEVICE_SERIAL, options);
-
     if ( ret )
         printk("Unable to initialize dtuart: %d\n", ret);
+
+    return explicit_request ? ret : 0;
 }
 
 #ifdef CONFIG_ACPI
-static void __init acpi_uart_init(void)
+static int __init acpi_uart_init(void)
 {
-    struct acpi_table_spcr *spcr = NULL;
+    struct acpi_table_spcr *spcr;
+    acpi_status status;
     int ret;
 
-    acpi_get_table(ACPI_SIG_SPCR, 0, (struct acpi_table_header **)&spcr);
+    /* SPCR is firmware provided, so nothing here is a failed user request */
+    status = acpi_get_table(ACPI_SIG_SPCR, 0,
+                            (struct acpi_table_header **)&spcr);
 
-    if ( spcr == NULL )
+    if ( ACPI_FAILURE(status) )
     {
         printk("Unable to get spcr table\n");
+        return 0;
     }
-    else
-    {
-        ret = acpi_device_init(DEVICE_SERIAL, NULL, spcr->interface_type);
 
-        if ( ret )
-            printk("Unable to initialize acpi uart: %d\n", ret);
-    }
+    ret = acpi_device_init(DEVICE_SERIAL, NULL, spcr->interface_type);
+    if ( ret )
+        printk("Unable to initialize acpi uart: %d\n", ret);
+
+    return 0;
 }
 #else
-static void __init acpi_uart_init(void) { }
+static int __init acpi_uart_init(void) { return 0; }
 #endif
 
-void __init uart_init(void)
+int __init uart_init(void)
 {
     if ( !console_has("dtuart") )
-        return; /* Not for us */
+        return 0; /* Not for us */
 
-    if ( acpi_disabled )
-        dt_uart_init();
-    else
-        acpi_uart_init();
+    return acpi_disabled ? dt_uart_init() : acpi_uart_init();
 }
 
 /*
