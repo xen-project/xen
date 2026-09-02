@@ -189,7 +189,7 @@ static void check_update_timer(RTCState *s)
     if (!(s->hw.cmos_data[RTC_REG_C] & RTC_UF) &&
             !(s->hw.cmos_data[RTC_REG_B] & RTC_SET))
     {
-        s->use_timer = 1;
+        s->use_timer = true;
         guest_usec = get_localtime_us(d) % USEC_PER_SEC;
         if (guest_usec >= (USEC_PER_SEC - 244))
         {
@@ -217,7 +217,7 @@ static void check_update_timer(RTCState *s)
         }
     }
     else
-        s->use_timer = 0;
+        s->use_timer = false;
 }
 
 static void cf_check rtc_update_timer(void *opaque)
@@ -683,7 +683,7 @@ static bool rtc_ioport_read(RTCState *s, uint32_t *val)
         break;
     case RTC_REG_A:
         ret = s->hw.cmos_data[s->hw.cmos_index];
-        if ((s->use_timer == 0) && update_in_progress(s))
+        if ( !s->use_timer && update_in_progress(s) )
             ret |= RTC_UIP;
         break;
     case RTC_REG_C:

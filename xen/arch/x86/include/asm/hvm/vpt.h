@@ -106,7 +106,9 @@ typedef struct RTCState {
     s_time_t check_ticks_since;
     int period;
     uint8_t pt_dead_ticks;
-    uint32_t use_timer;
+
+    bool use_timer;
+
     spinlock_t lock;
 } RTCState;
 
