@@ -134,7 +134,7 @@ static int __apply_alternatives(const struct alt_region *region,
             BUG_ON(alt->repl_len != alt->orig_len);
 
         origptr = ALT_ORIG_PTR(alt);
-        updptr = (void *)origptr + update_offset;
+        updptr = (void *)(unsigned long)origptr + update_offset;
 
         nr_inst = alt->orig_len / ARCH_PATCH_INSN_SIZE;
 
