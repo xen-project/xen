@@ -84,14 +84,14 @@ static const struct its_quirk its_quirks[] = {
     }
 };
 
-static struct its_quirk* gicv3_its_find_quirk(uint32_t iidr)
+static const struct its_quirk *gicv3_its_find_quirk(uint32_t iidr)
 {
     const struct its_quirk *quirks = its_quirks;
 
     for ( ; quirks->desc; quirks++ )
     {
         if ( quirks->iidr == (quirks->mask & iidr) )
-            return (struct its_quirk *)quirks;
+            return quirks;
     }
 
     return NULL;
