@@ -464,7 +464,7 @@ static unsigned int __initdata alt_todo;
 static unsigned int __initdata alt_done;
 
 extern struct alt_instr __alt_instructions[], __alt_instructions_end[];
-extern struct alt_call __alt_call_sites_start[], __alt_call_sites_end[];
+extern const struct alt_call __alt_call_sites_start[], __alt_call_sites_end[];
 
 /*
  * At boot time, we patch alternatives in NMI context.  This means that the

@@ -59,7 +59,7 @@
 .macro ALTERNATIVE oldinstr, newinstr, feature
     decl_orig(\oldinstr, repl_len(1) - orig_len)
 
-    .pushsection .altinstructions, "a", @progbits
+    .pushsection .altinstructions, "aw", @progbits
     altinstruction_entry .L\@_orig_s, .L\@_repl_s1, \feature, \
         orig_len, repl_len(1), pad_len
 
@@ -82,7 +82,7 @@
 .macro ALTERNATIVE_2 oldinstr, newinstr1, feature1, newinstr2, feature2
     decl_orig(\oldinstr, as_max(repl_len(1), repl_len(2)) - orig_len)
 
-    .pushsection .altinstructions, "a", @progbits
+    .pushsection .altinstructions, "aw", @progbits
 
     altinstruction_entry .L\@_orig_s, .L\@_repl_s1, \feature1, \
         orig_len, repl_len(1), pad_len

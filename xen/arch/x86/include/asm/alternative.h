@@ -90,7 +90,7 @@ extern void alternative_instructions(void);
 /* alternative assembly primitive: */
 #define ALTERNATIVE(oldinstr, newinstr, feature)                        \
         OLDINSTR_1(oldinstr, 1)                                         \
-        ".pushsection .altinstructions, \"a\", @progbits\n"             \
+        ".pushsection .altinstructions, \"aw\", @progbits\n"            \
         ALTINSTR_ENTRY(feature, 1)                                      \
         ".section .discard, \"a\", @progbits\n"                         \
         ".byte " alt_total_len "\n" /* total_len <= 255 */              \
@@ -101,7 +101,7 @@ extern void alternative_instructions(void);
 
 #define ALTERNATIVE_2(oldinstr, newinstr1, feature1, newinstr2, feature2) \
         OLDINSTR_2(oldinstr, 1, 2)                                      \
-        ".pushsection .altinstructions, \"a\", @progbits\n"             \
+        ".pushsection .altinstructions, \"aw\", @progbits\n"            \
         ALTINSTR_ENTRY(feature1, 1)                                     \
         ALTINSTR_ENTRY(feature2, 2)                                     \
         ".section .discard, \"a\", @progbits\n"                         \
