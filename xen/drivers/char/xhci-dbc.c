@@ -384,16 +384,15 @@ static bool __init dbc_init_xhc(struct dbc *dbc)
  */
 static struct dbc_reg __iomem *xhci_find_dbc(struct dbc *dbc)
 {
-    const uint32_t __iomem *xcap;
     uint32_t xcap_val;
     uint32_t next;
     uint32_t id = 0;
-    const void __iomem *mmio = dbc->xhc_mmio;
+    void __iomem *mmio = dbc->xhc_mmio;
     const uint32_t __iomem *hccp1 = mmio + 0x10;
+    uint32_t __iomem *xcap = mmio;
     const uint32_t DBC_ID = 0xA;
     int ttl = 48;
 
-    xcap = mmio;
     /*
      * This is initially an offset to the first capability. All the offsets
      * (both in HCCP1 and then next capability pointer) are dword-based.
