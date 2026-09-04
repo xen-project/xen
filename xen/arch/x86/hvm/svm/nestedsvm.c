@@ -923,7 +923,7 @@ nsvm_vmcb_guest_intercepts_exitcode(struct vcpu *v,
 
     default:
         gdprintk(XENLOG_ERR, "Illegal exitcode %#"PRIx64"\n", exitcode);
-        BUG();
+        domain_crash(v->domain);
         break;
     }
 
