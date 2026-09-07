@@ -77,12 +77,12 @@ static int strncmp(const char *cs, const char *ct, size_t count)
     return 0;
 }
 
-static char *strchr(const char *s, int c)
+static const char *strchr(const char *s, int c)
 {
     for ( ; *s != (char)c; ++s )
         if ( *s == '\0' )
             return NULL;
-    return (char *)s;
+    return s;
 }
 
 static size_t strspn(const char *s, const char *accept)
