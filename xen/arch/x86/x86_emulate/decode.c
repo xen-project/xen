@@ -2,7 +2,7 @@
 /******************************************************************************
  * decode.c - helper for x86_emulate.c
  *
- * Generic x86 (32-bit and 64-bit) instruction decoder and emulator.
+ * Generic x86 (32-bit and 64-bit) instruction decoder.
  *
  * Copyright (c) 2005-2007 Keir Fraser
  * Copyright (c) 2005-2007 XenSource Inc.
