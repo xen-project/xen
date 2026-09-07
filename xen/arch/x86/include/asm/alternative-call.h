@@ -9,7 +9,7 @@
 struct alt_call {
     int32_t offset;
 };
-#define ALT_CALL_PTR(a) ((void *)&(a)->offset + (a)->offset)
+#define ALT_CALL_PTR(a) ((void *)((long)&(a)->offset + (a)->offset))
 #define ALT_CALL_LEN(a) (6)
 
 /*
