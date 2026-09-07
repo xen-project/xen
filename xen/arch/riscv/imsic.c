@@ -346,7 +346,7 @@ int __init imsic_init(const struct dt_device_node *node)
         goto imsic_init_err;
     }
 
-    msi = xvzalloc_array(struct imsic_msi, nr_parent_irqs);
+    msi = xvzalloc_array(struct imsic_msi, nr_cpu_ids);
     if ( !msi )
     {
         rc = -ENOMEM;
@@ -405,7 +405,18 @@ int __init imsic_init(const struct dt_device_node *node)
             continue;
         }
 
+        /*
+         * hartid_to_cpuid() returns NR_CPUS for a hart Xen doesn't know, so
+         * the range has to be checked before msi[] is indexed at all.
+         */
         cpu = hartid_to_cpuid(hartid);
+        if ( cpu >= nr_cpu_ids )
+        {
+            printk(XENLOG_WARNING
+                   "%s: unsupported hart ID=%#lx for parent irq%u\n",
+                   node->name, hartid, i);
+            continue;
+        }
 
         /*
          * If .base_addr is not 0, it indicates that the CPU has already been
@@ -418,13 +429,6 @@ int __init imsic_init(const struct dt_device_node *node)
         {
             printk("%s: cpu%u is found twice in interrupts-extended prop\n",
                    node->name, cpu);
-            continue;
-        }
-
-        if ( cpu >= num_possible_cpus() )
-        {
-            printk(XENLOG_WARNING "%s: unsupported hart ID=%#lx for parent irq%u\n",
-                   node->name, hartid, i);
             continue;
         }
 
