@@ -301,10 +301,10 @@ static int ptwr_do_page_fault(struct x86_emulate_ctxt *ctxt,
 
 struct mmio_ro_emulate_ctxt {
     unsigned long cr2;
-    /* Used only for mmcfg case */
-    unsigned int seg, bdf;
     /* Used only for non-mmcfg case */
     mfn_t mfn;
+    /* Used only for mmcfg case */
+    pci_sbdf_t sbdf;
 };
 
 static int cf_check mmcfg_intercept_write(
@@ -329,10 +329,10 @@ static int cf_check mmcfg_intercept_write(
     }
 
     offset &= 0xfff;
-    if ( pci_conf_write_intercept(mmio_ctxt->seg, mmio_ctxt->bdf,
+    if ( pci_conf_write_intercept(mmio_ctxt->sbdf.seg, mmio_ctxt->sbdf.bdf,
                                   offset, bytes, p_data) >= 0 )
-        pci_mmcfg_write(mmio_ctxt->seg, PCI_BUS(mmio_ctxt->bdf),
-                        PCI_DEVFN(mmio_ctxt->bdf), offset, bytes,
+        pci_mmcfg_write(mmio_ctxt->sbdf.seg, mmio_ctxt->sbdf.bus,
+                        mmio_ctxt->sbdf.devfn, offset, bytes,
                         *(uint32_t *)p_data);
 
     return X86EMUL_OKAY;
@@ -390,6 +390,7 @@ static int mmio_ro_do_page_fault(struct x86_emulate_ctxt *ctxt,
                                  unsigned long addr, l1_pgentry_t pte)
 {
     struct mmio_ro_emulate_ctxt mmio_ro_ctxt = { .cr2 = addr };
+    unsigned int seg, bdf;
     mfn_t mfn = l1e_get_mfn(pte);
 
     if ( mfn_valid(mfn) )
@@ -404,8 +405,12 @@ static int mmio_ro_do_page_fault(struct x86_emulate_ctxt *ctxt,
     }
 
     ctxt->data = &mmio_ro_ctxt;
-    if ( pci_ro_mmcfg_decode(mfn_x(mfn), &mmio_ro_ctxt.seg, &mmio_ro_ctxt.bdf) )
+    if ( pci_ro_mmcfg_decode(mfn_x(mfn), &seg, &bdf) )
+    {
+        mmio_ro_ctxt.sbdf = PCI_SBDF(seg, bdf);
+
         return x86_emulate(ctxt, &mmcfg_intercept_ops);
+    }
 
     mmio_ro_ctxt.mfn = mfn;
 
