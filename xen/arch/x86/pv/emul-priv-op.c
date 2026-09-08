@@ -228,7 +228,7 @@ static bool admin_io_okay(unsigned int port, unsigned int bytes,
 static bool pci_cfg_ok(struct domain *currd, unsigned int start,
                        unsigned int size, uint32_t *write)
 {
-    uint32_t machine_bdf;
+    pci_sbdf_t sbdf = {}; /* Seg always 0 for IO port CFG accesses. */
 
     if ( !is_hardware_domain(currd) )
         return false;
@@ -236,12 +236,12 @@ static bool pci_cfg_ok(struct domain *currd, unsigned int start,
     if ( !CF8_ENABLED(currd->arch.pci_cf8) )
         return true;
 
-    machine_bdf = CF8_BDF(currd->arch.pci_cf8);
+    sbdf.bdf = CF8_BDF(currd->arch.pci_cf8);
     if ( write )
     {
         const unsigned long *ro_map = pci_get_ro_map(0);
 
-        if ( ro_map && test_bit(machine_bdf, ro_map) )
+        if ( ro_map && test_bit(sbdf.bdf, ro_map) )
             return false;
     }
     start |= CF8_ADDR_LO(currd->arch.pci_cf8);
@@ -259,9 +259,9 @@ static bool pci_cfg_ok(struct domain *currd, unsigned int start,
     }
 
     return !write ?
-           xsm_pci_config_permission(XSM_HOOK, currd, machine_bdf,
+           xsm_pci_config_permission(XSM_HOOK, currd, sbdf.sbdf,
                                      start, start + size - 1, false) == 0 :
-           pci_conf_write_intercept(0, machine_bdf, start, size, write) >= 0;
+           pci_conf_write_intercept(sbdf, start, size, write) >= 0;
 }
 
 static uint32_t guest_io_read(unsigned int port, unsigned int bytes,

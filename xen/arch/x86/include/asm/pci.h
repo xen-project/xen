@@ -36,9 +36,8 @@ struct arch_pci_dev {
     struct page_list_head pgtables_list;
 };
 
-int pci_conf_write_intercept(unsigned int seg, unsigned int bdf,
-                             unsigned int reg, unsigned int size,
-                             uint32_t *data);
+int pci_conf_write_intercept(
+    pci_sbdf_t sbdf, unsigned int reg, unsigned int size, uint32_t *data);
 int pci_msi_conf_write_intercept(struct pci_dev *pdev, unsigned int reg,
                                  unsigned int size, uint32_t *data);
 bool pci_mmcfg_decode(unsigned long mfn, unsigned int *seg,

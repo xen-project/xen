@@ -329,8 +329,7 @@ static int cf_check mmcfg_intercept_write(
     }
 
     offset &= 0xfff;
-    if ( pci_conf_write_intercept(mmio_ctxt->sbdf.seg, mmio_ctxt->sbdf.bdf,
-                                  offset, bytes, p_data) >= 0 )
+    if ( pci_conf_write_intercept(mmio_ctxt->sbdf, offset, bytes, p_data) >= 0 )
         pci_mmcfg_write(mmio_ctxt->sbdf, offset, bytes, *(uint32_t *)p_data);
 
     return X86EMUL_OKAY;

@@ -72,11 +72,9 @@ void pci_conf_write(uint32_t cf8, uint8_t offset, uint8_t bytes, uint32_t data)
     spin_unlock_irqrestore(&pci_config_lock, flags);
 }
 
-int pci_conf_write_intercept(unsigned int seg, unsigned int bdf,
-                             unsigned int reg, unsigned int size,
-                             uint32_t *data)
+int pci_conf_write_intercept(
+    pci_sbdf_t sbdf, unsigned int reg, unsigned int size, uint32_t *data)
 {
-    pci_sbdf_t sbdf = PCI_SBDF(seg, bdf);
     struct pci_dev *pdev;
     int rc = xsm_pci_config_permission(XSM_HOOK, current->domain, sbdf.sbdf,
                                        reg, reg + size - 1, true);
