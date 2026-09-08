@@ -55,19 +55,18 @@ static char __iomem *pci_dev_base(unsigned int seg, unsigned int bus, unsigned i
      return addr + ((bus << 20) | (devfn << 12));
 }
 
-int pci_mmcfg_read(unsigned int seg, unsigned int bus,
-              unsigned int devfn, int reg, int len, u32 *value)
+int pci_mmcfg_read(
+    pci_sbdf_t sbdf, unsigned int reg, unsigned int len, uint32_t *value)
 {
     char __iomem *addr;
 
     /* Why do we have this when nobody checks it. How about a BUG()!? -AK */
-    if (unlikely((bus > 255) || (devfn > 255) ||
-                 (reg + len > PCI_CFG_SPACE_EXP_SIZE))) {
+    if (unlikely(reg + len > PCI_CFG_SPACE_EXP_SIZE)) {
 err:        *value = -1;
         return -EINVAL;
     }
 
-    addr = pci_dev_base(seg, bus, devfn);
+    addr = pci_dev_base(sbdf.seg, sbdf.bus, sbdf.devfn);
     if (!addr)
         goto err;
 
@@ -86,17 +85,16 @@ err:        *value = -1;
     return 0;
 }
 
-int pci_mmcfg_write(unsigned int seg, unsigned int bus,
-               unsigned int devfn, int reg, int len, u32 value)
+int pci_mmcfg_write(
+    pci_sbdf_t sbdf, unsigned int reg, unsigned int len, uint32_t value)
 {
     char __iomem *addr;
 
     /* Why do we have this when nobody checks it. How about a BUG()!? -AK */
-    if (unlikely((bus > 255) || (devfn > 255) ||
-                 (reg + len > PCI_CFG_SPACE_EXP_SIZE)))
+    if (unlikely(reg + len > PCI_CFG_SPACE_EXP_SIZE))
         return -EINVAL;
 
-    addr = pci_dev_base(seg, bus, devfn);
+    addr = pci_dev_base(sbdf.seg, sbdf.bus, sbdf.devfn);
     if (!addr)
         return -EINVAL;
 
