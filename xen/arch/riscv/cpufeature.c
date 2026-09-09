@@ -14,7 +14,9 @@
 #include <xen/errno.h>
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/sched.h>
 #include <xen/sections.h>
+#include <xen/xvmalloc.h>
 
 #include <asm/cpufeature.h>
 #include <asm/csr.h>
@@ -34,8 +36,63 @@ struct riscv_isa_ext_data {
     .name = #ext_name,                          \
 }
 
+/*
+ * Which guests an extension may be handed out to, by guest XLEN.
+ *
+ * These flags express Xen's policy, not the ISA's rules: extensions which
+ * are architecturally tied to one XLEN (Zilsd on RV32, say) need no special
+ * treatment here, as they can only ever appear in the "riscv,isa" of a host
+ * of that XLEN, and guest_isa is masked against the host ISA bitmap anyway.
+ * They are only of use for extensions Xen chooses not to expose to guests of
+ * a given width despite the hardware implementing them.
+ */
+#define RISCV_ISA_EXT_GUEST_NONE 0
+#define RISCV_ISA_EXT_GUEST_RV32 (1U << 0)
+#define RISCV_ISA_EXT_GUEST_RV64 (1U << 1)
+#define RISCV_ISA_EXT_GUEST_ANY  (RISCV_ISA_EXT_GUEST_RV32 | \
+                                  RISCV_ISA_EXT_GUEST_RV64)
+
+/*
+ * Guests are of the same width as Xen itself for the time being; once guest
+ * XLEN can differ from host XLEN (hstatus.VSXL), this becomes a per-domain
+ * property, just as guest_isa below does.
+ */
+#if defined(CONFIG_RISCV_32)
+#define RISCV_ISA_EXT_GUEST_XLEN RISCV_ISA_EXT_GUEST_RV32
+#elif defined(CONFIG_RISCV_64)
+#define RISCV_ISA_EXT_GUEST_XLEN RISCV_ISA_EXT_GUEST_RV64
+#else
+# error "Unsupported RISC-V bitness"
+#endif
+
+struct riscv_isa_ext_entry {
+    unsigned int id;
+    const char *name;
+    unsigned int guest_flags;
+};
+
+#define RISCV_ISA_EXT_ENTRY(ext_name, guest)        \
+{                                                   \
+    .id          = RISCV_ISA_EXT_ ## ext_name,      \
+    .name        = #ext_name,                       \
+    .guest_flags = RISCV_ISA_EXT_GUEST_ ## guest,   \
+}
+
 /* Host ISA bitmap */
 static __ro_after_init DECLARE_BITMAP(riscv_isa, RISCV_ISA_EXT_MAX);
+
+/*
+ * ISA bitmap handed out to every guest.
+ *
+ * All guests are given the same extensions for the time being, so this is
+ * computed once out of riscv_isa_ext[] and riscv_isa, rather than redoing
+ * the walk for every domain created.  Should per-domain ISA policy ever be
+ * introduced, this will need to become per-domain again.
+ */
+static __ro_after_init DECLARE_BITMAP(guest_isa, RISCV_ISA_EXT_MAX);
+
+/* "riscv,isa" string corresponding to guest_isa, shared by all domains. */
+static char *__ro_after_init guest_isa_str;
 
 static int __init dt_get_cpuid_from_node(const struct dt_device_node *cpu,
                                          unsigned long *dt_cpuid)
@@ -120,29 +177,30 @@ static int __init dt_get_cpuid_from_node(const struct dt_device_node *cpu,
  * and strncmp() is used in match_isa_ext() to compare extension names instead
  * of strncasecmp().
  */
-const struct riscv_isa_ext_data __initconst riscv_isa_ext[] = {
-    RISCV_ISA_EXT_DATA(i),
-    RISCV_ISA_EXT_DATA(m),
-    RISCV_ISA_EXT_DATA(a),
-    RISCV_ISA_EXT_DATA(f),
-    RISCV_ISA_EXT_DATA(d),
-    RISCV_ISA_EXT_DATA(q),
-    RISCV_ISA_EXT_DATA(c),
-    RISCV_ISA_EXT_DATA(h),
-    RISCV_ISA_EXT_DATA(zicntr),
-    RISCV_ISA_EXT_DATA(zicsr),
-    RISCV_ISA_EXT_DATA(zifencei),
-    RISCV_ISA_EXT_DATA(zihintpause),
-    RISCV_ISA_EXT_DATA(zihpm),
-    RISCV_ISA_EXT_DATA(zba),
-    RISCV_ISA_EXT_DATA(zbb),
-    RISCV_ISA_EXT_DATA(zbs),
-    RISCV_ISA_EXT_DATA(smaia),
-    RISCV_ISA_EXT_DATA(smstateen),
-    RISCV_ISA_EXT_DATA(ssaia),
-    RISCV_ISA_EXT_DATA(sstc),
-    RISCV_ISA_EXT_DATA(svade),
-    RISCV_ISA_EXT_DATA(svpbmt),
+static const struct riscv_isa_ext_entry __initconstrel riscv_isa_ext[] = {
+    RISCV_ISA_EXT_ENTRY(i,              ANY),
+    RISCV_ISA_EXT_ENTRY(m,              ANY),
+    RISCV_ISA_EXT_ENTRY(a,              ANY),
+    RISCV_ISA_EXT_ENTRY(f,              NONE),
+    RISCV_ISA_EXT_ENTRY(d,              NONE),
+    RISCV_ISA_EXT_ENTRY(q,              NONE),
+    RISCV_ISA_EXT_ENTRY(c,              ANY),
+    RISCV_ISA_EXT_ENTRY(v,              NONE),
+    RISCV_ISA_EXT_ENTRY(h,              NONE),
+    RISCV_ISA_EXT_ENTRY(zicntr,         ANY),
+    RISCV_ISA_EXT_ENTRY(zicsr,          ANY),
+    RISCV_ISA_EXT_ENTRY(zifencei,       ANY),
+    RISCV_ISA_EXT_ENTRY(zihintpause,    ANY),
+    RISCV_ISA_EXT_ENTRY(zihpm,          ANY),
+    RISCV_ISA_EXT_ENTRY(zba,            ANY),
+    RISCV_ISA_EXT_ENTRY(zbb,            ANY),
+    RISCV_ISA_EXT_ENTRY(zbs,            ANY),
+    RISCV_ISA_EXT_ENTRY(smaia,          ANY),
+    RISCV_ISA_EXT_ENTRY(smstateen,      ANY),
+    RISCV_ISA_EXT_ENTRY(ssaia,          ANY),
+    RISCV_ISA_EXT_ENTRY(sstc,           NONE),
+    RISCV_ISA_EXT_ENTRY(svade,          NONE),
+    RISCV_ISA_EXT_ENTRY(svpbmt,         NONE),
 };
 
 static const struct riscv_isa_ext_data __initconst required_extensions[] = {
@@ -181,7 +239,7 @@ static void __init match_isa_ext(const char *name, const char *name_end,
 
     for ( unsigned int i = 0; i < riscv_isa_ext_count; i++ )
     {
-        const struct riscv_isa_ext_data *ext = &riscv_isa_ext[i];
+        const struct riscv_isa_ext_entry *ext = &riscv_isa_ext[i];
 
         /*
          * `ext->name` (according to initialization of riscv_isa_ext[]
@@ -480,6 +538,98 @@ bool riscv_isa_extension_available(const unsigned long *isa_bitmap,
     return test_bit(id, isa_bitmap);
 }
 
+static int __init build_guest_isa_str(char *buf, size_t size)
+{
+    char *p = buf;
+    size_t left = size;
+    int total;
+
+#if defined(CONFIG_RISCV_32)
+    total = snprintf(p, left, "rv32");
+#elif defined(CONFIG_RISCV_64)
+    total = snprintf(p, left, "rv64");
+#else
+#   error "Unsupported RISC-V bitness"
+#endif
+
+    if ( total < 0 )
+        return total;
+
+    if ( buf )
+    {
+        if ( (size_t)total >= left )
+            return -ENOSPC;
+
+        p += total;
+        left -= total;
+    }
+
+    for ( unsigned int i = 0; i < ARRAY_SIZE(riscv_isa_ext); i++ )
+    {
+        const struct riscv_isa_ext_entry *ext = &riscv_isa_ext[i];
+        int ret;
+
+        if ( !riscv_isa_extension_available(guest_isa, ext->id) )
+            continue;
+
+        ret = snprintf(p, left, "%s%s",
+                       ext->id >= RISCV_ISA_EXT_BASE ? "_" : "",
+                       ext->name);
+        if ( ret < 0 )
+            return ret;
+
+        total += ret;
+
+        if ( buf )
+        {
+            if ( (size_t)ret >= left )
+                return -ENOSPC;
+
+            p += ret;
+            left -= ret;
+        }
+    }
+
+    return total;
+}
+
+static void __init compute_guest_isa(void)
+{
+    int len;
+
+    for ( unsigned int i = 0; i < ARRAY_SIZE(riscv_isa_ext); i++ )
+    {
+        const struct riscv_isa_ext_entry *ext = &riscv_isa_ext[i];
+
+        if ( (ext->guest_flags & RISCV_ISA_EXT_GUEST_XLEN) &&
+             riscv_isa_extension_available(NULL, ext->id) )
+            __set_bit(ext->id, guest_isa);
+    }
+
+    /*
+     * All domains are given the same guest ISA, so the "riscv,isa" string
+     * is built only once here and then shared by all of them.
+     */
+    if ( (len = build_guest_isa_str(NULL, 0)) < 0 )
+        panic("Failed to calculate guest \"riscv,isa\" length: %d\n", len);
+
+    if ( !(guest_isa_str = xvmalloc_array(char, len + 1)) )
+        panic("Failed to allocate guest \"riscv,isa\" string\n");
+
+    if ( build_guest_isa_str(guest_isa_str, len + 1) != len )
+        panic("Failed to build guest \"riscv,isa\" string\n");
+}
+
+void init_guest_isa(struct domain *d)
+{
+    d->arch.isa = guest_isa;
+}
+
+const char *get_guest_isa_str(void)
+{
+    return guest_isa_str;
+}
+
 void __init riscv_fill_hwcap(void)
 {
     unsigned int i;
@@ -527,4 +677,6 @@ void __init riscv_fill_hwcap(void)
     if ( !all_extns_available )
         panic("Look why the extensions above are needed in "
               "https://xenbits.xenproject.org/docs/unstable/misc/riscv/booting.txt\n");
+
+    compute_guest_isa();
 }
