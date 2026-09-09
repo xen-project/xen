@@ -27,7 +27,9 @@
 
 #define get_per_cpu_var(var)  (per_cpu__##var)
 
-#include <asm/percpu.h>
+#if __has_include(<asm/percpu.h>)
+# include <asm/percpu.h>
+#endif
 
 #ifndef __ASSEMBLER__
 
