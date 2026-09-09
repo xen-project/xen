@@ -3,6 +3,7 @@
 #include <xen/acpi.h>
 #include <xen/bug.h>
 #include <xen/device_tree.h>
+#include <xen/fdt-kernel.h>
 #include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/lib.h>
@@ -71,4 +72,11 @@ void intc_route_irq_to_xen(struct irq_desc *desc, unsigned int priority)
 
     intc_set_irq_type(desc, desc->arch.type);
     intc_set_irq_priority(desc, priority);
+}
+
+int __init make_intc_domU_node(struct kernel_info *kinfo)
+{
+    const struct vintc *vintc = kinfo->bd.d->arch.vintc;
+
+    return vintc->init_ops->make_domu_dt_node(kinfo);
 }

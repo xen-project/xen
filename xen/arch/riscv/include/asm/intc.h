@@ -16,6 +16,7 @@ enum intc_variant {
 
 struct cpu_user_regs;
 struct irq_desc;
+struct kernel_info;
 
 struct intc_info {
     enum intc_variant hw_variant;
@@ -45,6 +46,15 @@ struct intc_hw_init_ops {
     const struct intc_hw_operations *ops;
     /* Initialize the intc and the boot CPU */
     int (*init)(void);
+};
+
+struct vintc_init_ops {
+    /* Create interrupt controller node for domain */
+    int (*make_domu_dt_node)(struct kernel_info *kinfo);
+};
+
+struct vintc {
+    const struct vintc_init_ops *init_ops;
 };
 
 void intc_preinit(void);

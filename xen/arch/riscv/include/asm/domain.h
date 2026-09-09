@@ -97,6 +97,8 @@ struct arch_domain {
     struct paging_domain paging;
 
     const unsigned long *isa;
+
+    struct vintc *vintc;
 };
 
 #include <xen/sched.h>
