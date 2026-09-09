@@ -318,7 +318,7 @@ static int imsic_parse_node(const struct dt_device_node *node,
     return 0;
 }
 
-int vcpu_imsic_init(struct vcpu *v)
+int cf_check vcpu_imsic_init(struct vcpu *v)
 {
     struct vimsic_state *imsic_state;
 
@@ -342,7 +342,7 @@ int vcpu_imsic_init(struct vcpu *v)
     return 0;
 }
 
-void vcpu_imsic_deinit(struct vcpu *v)
+void cf_check vcpu_imsic_deinit(struct vcpu *v)
 {
     XVFREE(v->arch.vimsic_state);
 }

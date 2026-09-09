@@ -15,8 +15,15 @@
 
 #include <asm/imsic.h>
 
+/*
+ * domaincfg read-only fields (AIA spec):
+ *  - bits [31:24] -> read-only 0x80
+ *  - bit 7        -> read-only 0
+ */
+#define APLIC_DOMAINCFG_RO      (0x80U << 24)
 #define APLIC_DOMAINCFG_IE      BIT(8, U)
 #define APLIC_DOMAINCFG_DM      BIT(2, U)
+#define APLIC_DOMAINCFG_BE      BIT(0, U)
 
 #define APLIC_SOURCECFG_SM_INACTIVE     0x0
 #define APLIC_SOURCECFG_SM_DETACH       0x1

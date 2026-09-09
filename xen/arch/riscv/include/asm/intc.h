@@ -17,6 +17,7 @@ enum intc_variant {
 struct cpu_user_regs;
 struct irq_desc;
 struct kernel_info;
+struct vcpu;
 
 struct intc_info {
     enum intc_variant hw_variant;
@@ -53,8 +54,19 @@ struct vintc_init_ops {
     int (*make_domu_dt_node)(struct kernel_info *kinfo);
 };
 
+struct vintc_ops {
+    /* Initialize some vINTC-related stuff for a vCPU */
+    int (*vcpu_init)(struct vcpu *v);
+
+    /* Deinitialize some vINTC-related stuff for a vCPU */
+    void (*vcpu_deinit)(struct vcpu *v);
+};
+
 struct vintc {
+    /* Callbacks invoked during domain construction only. */
     const struct vintc_init_ops *init_ops;
+    /* Runtime callbacks used for the lifetime of the guest. */
+    const struct vintc_ops *ops;
 };
 
 void intc_preinit(void);
