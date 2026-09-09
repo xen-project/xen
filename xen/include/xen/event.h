@@ -211,7 +211,7 @@ static bool evtchn_usable(const struct evtchn *evtchn)
 
 void evtchn_check_pollers(struct domain *d, unsigned int port);
 
-/* Close all event channels and reset to 2-level ABI. */
+/* Close all event channels and reset to the default ABI. */
 int evtchn_reset(struct domain *d, bool resuming);
 
 /*

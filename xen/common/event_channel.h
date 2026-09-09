@@ -70,6 +70,12 @@ static inline void evtchn_fifo_destroy(struct domain *d)
 }
 #endif /* CONFIG_EVTCHN_FIFO */
 
+/*
+ * Declaration only when !CONFIG_EVTCHN_FIFO; the call in evtchn_preinit() is
+ * DCE'd in that case.
+ */
+void evtchn_fifo_init_ops(struct domain *d);
+
 #endif /* EVENT_CHANNEL_H */
 
 /*

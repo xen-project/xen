@@ -404,7 +404,9 @@ struct domain
 
     struct vcpu    **vcpu;
 
+#ifdef CONFIG_HAS_SHARED_INFO
     shared_info_t   *shared_info;     /* shared data area */
+#endif
 
     rcu_read_lock_t  rcu_lock;
 

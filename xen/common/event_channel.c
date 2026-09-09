@@ -40,6 +40,54 @@
 
 #define consumer_is_xen(e) (!!(e)->xen_consumer)
 
+#if !defined(CONFIG_HAS_SHARED_INFO) && !defined(CONFIG_EVTCHN_FIFO)
+/*
+ * Placeholder ops for domains with neither a shared_info page nor a FIFO
+ * control block. Such a domain has no ABI to record event state in, so these
+ * are reachable whenever an event is delivered to (or queried on) one of its
+ * ports; they just discard/no-op it. They exist to keep d->evtchn_port_ops
+ * non-NULL.
+ */
+static void cf_check evtchn_none_set_pending(
+    struct vcpu *v, struct evtchn *evtchn) {}
+static void cf_check evtchn_none_noop(
+    struct domain *d, struct evtchn *evtchn) {}
+static bool cf_check evtchn_none_false(
+    const struct domain *d, const struct evtchn *evtchn) { return false; }
+static void cf_check evtchn_none_print_state(
+    struct domain *d, const struct evtchn *evtchn) {}
+
+static const struct evtchn_port_ops evtchn_port_ops_none = {
+    .set_pending   = evtchn_none_set_pending,
+    .clear_pending = evtchn_none_noop,
+    .unmask        = evtchn_none_noop,
+    .is_pending    = evtchn_none_false,
+    .is_masked     = evtchn_none_false,
+    .print_state   = evtchn_none_print_state,
+};
+
+static void evtchn_none_init(struct domain *d)
+{
+    d->evtchn_port_ops = &evtchn_port_ops_none;
+}
+#else /* CONFIG_HAS_SHARED_INFO || CONFIG_EVTCHN_FIFO */
+/*
+ * Declaration only; the call in evtchn_preinit() is DCE'd unless both
+ * configs are off.
+ */
+void evtchn_none_init(struct domain *d);
+#endif /* !CONFIG_HAS_SHARED_INFO && !CONFIG_EVTCHN_FIFO */
+
+static void evtchn_preinit(struct domain *d)
+{
+    if ( IS_ENABLED(CONFIG_HAS_SHARED_INFO) )
+        evtchn_2l_init(d);
+    else if ( IS_ENABLED(CONFIG_EVTCHN_FIFO) )
+        evtchn_fifo_init_ops(d);
+    else
+        evtchn_none_init(d);
+}
+
 /*
  * Lock an event channel exclusively. This is allowed only when the channel is
  * free or unbound either when taking or when releasing the lock, as any
@@ -1324,9 +1372,9 @@ int evtchn_reset(struct domain *d, bool resuming)
         rc = -EAGAIN;
     else if ( d->evtchn_fifo )
     {
-        /* Switching back to 2-level ABI. */
+        /* Switching back to the default ABI. */
         evtchn_fifo_destroy(d);
-        evtchn_2l_init(d);
+        evtchn_preinit(d);
     }
 
     write_unlock(&d->event_lock);
@@ -1625,7 +1673,8 @@ void evtchn_check_pollers(struct domain *d, unsigned int port)
 
 int evtchn_init(struct domain *d, unsigned int max_port)
 {
-    evtchn_2l_init(d);
+    evtchn_preinit(d);
+
     d->max_evtchn_port = min_t(unsigned int, max_port, INT_MAX);
 
     d->evtchn = alloc_evtchn_bucket(d, 0);

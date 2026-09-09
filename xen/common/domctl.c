@@ -102,9 +102,13 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
 #ifdef CONFIG_MEM_PAGING
     info->paged_pages       = atomic_read(&d->paged_pages);
 #endif
+#ifdef CONFIG_HAS_SHARED_INFO
     info->shared_info_frame =
         gfn_x(mfn_to_gfn(d, _mfn(virt_to_mfn(d->shared_info))));
     BUG_ON(SHARED_M2P(info->shared_info_frame));
+#else
+    info->shared_info_frame = ~0;
+#endif
 
     info->cpupool = cpupool_get_id(d);
 
