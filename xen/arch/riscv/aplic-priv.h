@@ -34,4 +34,17 @@ struct aplic_priv {
     const struct imsic_config *imsic_cfg;
 };
 
+/*
+ * Value is inspired by what QEMU is using for riscv,num-sources property for
+ * APLIC node.
+ */
+#define GUEST_APLIC_MAX_SOURCES 96U
+
+/*
+ * Specifies the number of interrupt sources supported by guest APLIC domain.
+ * Could be limited by host interrupt controller and is identical for every
+ * domain for now.
+ */
+extern unsigned int guest_aplic_num_sources;
+
 #endif /* ASM_RISCV_APLIC_PRIV_H */
