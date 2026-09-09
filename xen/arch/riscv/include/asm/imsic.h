@@ -78,6 +78,7 @@ struct vimsic_state {
 };
 
 struct dt_device_node;
+struct kernel_info;
 struct vcpu;
 
 int imsic_init(const struct dt_device_node *node);
@@ -92,5 +93,7 @@ void imsic_ids_local_delivery(bool enable);
 int vcpu_imsic_init(struct vcpu *v);
 void vcpu_imsic_deinit(struct vcpu *v);
 unsigned int vcpu_guest_file_id(const struct vcpu *v);
+
+int vimsic_make_domu_dt_node(struct kernel_info *kinfo, unsigned int *phandle);
 
 #endif /* ASM_RISCV_IMSIC_H */
