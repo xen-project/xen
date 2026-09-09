@@ -129,6 +129,8 @@ struct hvm_vcpu {
     spinlock_t          tm_lock;
     struct list_head    tm_list;
 
+    uint8_t             evtchn_upcall_vector;
+
     bool                flag_dr_dirty;
     bool                debug_state_latch;
     bool                single_step;
@@ -164,8 +166,6 @@ struct hvm_vcpu {
 
     /* In mode delay_for_missed_ticks, VCPUs have differing guest times. */
     int64_t             stime_offset;
-
-    u8                  evtchn_upcall_vector;
 
     struct hvm_vcpu_io  hvm_io;
 
