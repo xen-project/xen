@@ -291,7 +291,9 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
 
 void arch_domain_destroy(struct domain *d)
 {
-    printk(XENLOG_WARNING "%s: unimplemented\n", __func__);
+    printk(XENLOG_WARNING "%s: not fully implemented\n", __func__);
+
+    domain_vintc_deinit(d);
 }
 
 int arch_domain_create(struct domain *d,
@@ -306,6 +308,9 @@ int arch_domain_create(struct domain *d,
     init_guest_isa(d);
 
     if ( (rc = p2m_init(d, config)) != 0)
+        goto fail;
+
+    if ( (rc = domain_vintc_init(d)) )
         goto fail;
 
     return rc;
