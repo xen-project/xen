@@ -68,6 +68,8 @@
     })
 #endif
 
+#define IS_ALIGNED(val, align) (!((val) & ((align) - 1)))
+
 #ifndef ROUNDUP
 #define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
 #endif
