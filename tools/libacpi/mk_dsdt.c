@@ -15,7 +15,6 @@
 #endif
 
 static unsigned int indent_level;
-static bool debug = false;
 
 typedef enum dm_version {
     QEMU_NONE,
@@ -73,7 +72,6 @@ static struct option options[] = {
 #ifdef CONFIG_X86
     { "dm-version", 1, 0, 'q' },
 #endif
-    { "debug", 1, 0, 'd' },
     { 0, 0, 0, 0 }
 };
 
@@ -125,10 +123,7 @@ int main(int argc, char **argv)
             }
             break;
 #endif
-        case 'd':
-            if (*optarg == 'y')
-                debug = true;
-            break;
+
         default:
             return -1;
         }
