@@ -98,18 +98,16 @@ int create_grant_pv_mapping(uint64_t addr, mfn_t frame,
         goto out_unlock;
 
     ol1e = *pl1e;
-    if ( UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr, 0) )
-    {
-        /*
-         * We always create mappings in this path.  However, our caller,
-         * map_grant_ref(), only passes potentially non-zero cache_flags for
-         * MMIO frames, so this path doesn't create non-coherent mappings of
-         * RAM frames and there's no need to calculate PGT_non_coherent.
-         */
-        ASSERT(!cache_flags || is_iomem_page(frame));
+    UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr, 0);
+    /*
+     * We always create mappings in this path.  However, our caller,
+     * map_grant_ref(), only passes potentially non-zero cache_flags for
+     * MMIO frames, so this path doesn't create non-coherent mappings of
+     * RAM frames and there's no need to calculate PGT_non_coherent.
+     */
+    ASSERT(!cache_flags || is_iomem_page(frame));
 
-        rc = GNTST_okay;
-    }
+    rc = GNTST_okay;
 
  out_unlock:
     page_unlock(page);
@@ -165,10 +163,9 @@ static bool steal_linear_address(unsigned long linear, l1_pgentry_t *out)
         goto out_unlock;
 
     ol1e = *pl1e;
-    okay = UPDATE_ENTRY(l1, pl1e, ol1e, l1e_empty(), gl1mfn, curr, 0);
-
-    if ( okay )
-        *out = ol1e;
+    UPDATE_ENTRY(l1, pl1e, ol1e, l1e_empty(), gl1mfn, curr, 0);
+    *out = ol1e;
+    okay = true;
 
  out_unlock:
     page_unlock(page);
@@ -293,19 +290,17 @@ int replace_grant_pv_mapping(uint64_t addr, mfn_t frame,
                  "PTE flags %x for %"PRIx64" don't match grant (%x)\n",
                  l1e_get_flags(ol1e), addr, grant_pte_flags);
 
-    if ( UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr, 0) )
-    {
-        /*
-         * Generally, replace_grant_pv_mapping() is used to destroy mappings
-         * (n1le = l1e_empty()), but it can be a present mapping on the
-         * GNTABOP_unmap_and_replace path.
-         *
-         * In such cases, the PTE is fully transplanted from its old location
-         * via steal_linear_addr(), so we need not perform PGT_non_coherent
-         * checking here.
-         */
-        rc = GNTST_okay;
-    }
+    UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr, 0);
+    /*
+     * Generally, replace_grant_pv_mapping() is used to destroy mappings
+     * (n1le = l1e_empty()), but it can be a present mapping on the
+     * GNTABOP_unmap_and_replace path.
+     *
+     * In such cases, the PTE is fully transplanted from its old location
+     * via steal_linear_addr(), so we need not perform PGT_non_coherent
+     * checking here.
+     */
+    rc = GNTST_okay;
 
  out_unlock:
     page_unlock(page);

@@ -67,13 +67,10 @@ static inline intpte_t paging_cmpxchg_guest_entry(
 
 /*
  * How to write an entry to the guest pagetables.
- * Returns false for failure (pointer not valid), true for success.
  */
-static inline bool update_intpte(intpte_t *p, intpte_t old, intpte_t new,
+static inline void update_intpte(intpte_t *p, intpte_t old, intpte_t new,
                                  mfn_t mfn, struct vcpu *v, unsigned int flags)
 {
-    bool rv = true;
-
 #ifndef PTE_UPDATE_WITH_CMPXCHG
     if ( !(flags & PTE_UPDATE_PRESERVE_AD) )
         paging_write_guest_entry(v, p, new, mfn);
@@ -98,7 +95,6 @@ static inline bool update_intpte(intpte_t *p, intpte_t old, intpte_t new,
             old = t;
         }
     }
-    return rv;
 }
 
 /*

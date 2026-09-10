@@ -200,8 +200,7 @@ static int ptwr_emulated_update(unsigned long addr, intpte_t *p_old,
     else
     {
         ol1e = *pl1e;
-        if ( !UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, mfn, v, 0) )
-            BUG();
+        UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, mfn, v, 0);
     }
 
     trace_ptwr_emulation(addr, nl1e);
