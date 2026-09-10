@@ -4,6 +4,9 @@
 #define XEN_DOM0LESS_BUILD_H
 
 #include <xen/stdbool.h>
+#include <xen/types.h>
+
+#include <public/xen.h>
 
 struct domain;
 
@@ -12,6 +15,9 @@ struct domain;
 struct boot_domain;
 struct dt_device_node;
 struct kernel_info;
+
+/* Highest domain ID assigned to a boot-time (dom0less) domain. */
+extern domid_t max_init_domid;
 
 /*
  * List of possible features for dom0less domUs
@@ -71,6 +77,8 @@ static inline bool is_dom0less_mode(void)
     return false;
 }
 static inline void set_xs_domain(struct domain *d) {}
+
+#define max_init_domid 0
 
 #endif /* CONFIG_DOM0LESS_BOOT */
 
