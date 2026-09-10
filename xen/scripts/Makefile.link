@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: GPL-2.0
+# ==========================================================================
+# Helper rules for linking xen-syms
+# ==========================================================================
+
+syms-warn-dup-y := --warn-dup
+syms-warn-dup-$(CONFIG_SUPPRESS_DUPLICATE_SYMBOL_WARNINGS) :=
+syms-warn-dup-$(CONFIG_ENFORCE_UNIQUE_SYMBOLS) := --error-dup
+
+orphan-handling-$(call ld-option,--orphan-handling=warn) := --orphan-handling=warn
+
+final-image-check-y ?= true
+
+.INTERMEDIATE: $(addprefix .$(TARGET)-syms.,$(foreach n,0 1 2 3,$(n) $(n).o $(n).S))
+
+.$(TARGET)-syms.%.o: .$(TARGET)-syms.%.S
+	$(call cmd,cc_o_S)
+
+.$(TARGET)-syms.0.S:
+	$(objtree)/tools/symbols $(all_symbols) --empty > $@
+
+.$(TARGET)-syms.1.S: .$(TARGET)-syms.0
+.$(TARGET)-syms.2.S: .$(TARGET)-syms.1
+.$(TARGET)-syms.3.S: .$(TARGET)-syms.2
+
+.$(TARGET)-syms.%.S:
+	$(NM) -pa --format=sysv $< \
+	  | $(objtree)/tools/symbols $(all_symbols) --sysv --sort \
+	    $(if $(filter $(LAST_LINKING_PASS),$*), $(syms-warn-dup-y)) \
+	  > $@
+
+.$(TARGET)-syms.%: $(objtree)/prelink.o .$(TARGET)-syms.%.o $(obj)/xen.lds
+	$(LD) $(XEN_LDFLAGS) -T $(obj)/xen.lds $(filter %.o,$^) \
+	      $(build_id_linker) --strip-debug -o $@
+
+.$(TARGET)-syms.$(LAST_LINKING_PASS): $(objtree)/prelink.o \
+                                      .$(TARGET)-syms.$(LAST_LINKING_PASS).o \
+                                      $(obj)/xen.lds
+	$(call compare-symbol-tables, \
+	       .$(TARGET)-syms.$(shell expr $(LAST_LINKING_PASS) - 1).o, \
+	       .$(TARGET)-syms.$(LAST_LINKING_PASS).o)
+	$(LD) $(XEN_LDFLAGS) -T $(obj)/xen.lds $(filter %.o,$^) \
+	      $(build_id_linker) $(orphan-handling-y) -o $@
+
+$(TARGET)-syms: .$(TARGET)-syms.$(LAST_LINKING_PASS)
+	$(NM) -pa --format=sysv $< \
+	  | $(objtree)/tools/symbols --all-symbols --xensyms --sysv --sort \
+	  > $@.map
+	$(call final-image-check-y, $<)
+	mv $< $@
+	rm -f $(dot-target).[0-9]* $(@D)/..$(@F).[0-9]*

@@ -102,12 +102,6 @@ notes_phdrs = --notes
 endif
 endif
 
-syms-warn-dup-y := --warn-dup
-syms-warn-dup-$(CONFIG_SUPPRESS_DUPLICATE_SYMBOL_WARNINGS) :=
-syms-warn-dup-$(CONFIG_ENFORCE_UNIQUE_SYMBOLS) := --error-dup
-
-orphan-handling-$(call ld-option,--orphan-handling=warn) += --orphan-handling=warn
-
 $(TARGET): TMP = $(dot-target).elf32
 $(TARGET): $(TARGET)-syms $(efi-y) $(obj)/boot/mkelf32
 	$(obj)/boot/mkelf32 $(notes_phdrs) $(TARGET)-syms $(TMP) $(XEN_IMG_OFFSET)
@@ -119,31 +113,11 @@ $(TARGET): $(TARGET)-syms $(efi-y) $(obj)/boot/mkelf32
 
 CFLAGS-$(XEN_BUILD_EFI) += -DXEN_BUILD_EFI
 
-$(TARGET)-syms: $(objtree)/prelink.o $(obj)/xen.lds
-	$(objtree)/tools/symbols $(all_symbols) --empty > $(dot-target).0.S
-	$(MAKE) $(build)=$(@D) $(dot-target).0.o
-	$(LD) $(XEN_LDFLAGS) -T $(obj)/xen.lds $< $(build_id_linker) --strip-debug \
-	      $(dot-target).0.o -o $(dot-target).0
-	$(NM) -pa --format=sysv $(dot-target).0 \
-		| $(objtree)/tools/symbols $(all_symbols) --sysv --sort \
-		> $(dot-target).1.S
-	$(MAKE) $(build)=$(@D) $(dot-target).1.o
-	$(LD) $(XEN_LDFLAGS) -T $(obj)/xen.lds $< $(build_id_linker) --strip-debug \
-	    $(dot-target).1.o -o $(dot-target).1
-	$(NM) -pa --format=sysv $(dot-target).1 \
-		| $(objtree)/tools/symbols $(all_symbols) --sysv --sort $(syms-warn-dup-y) \
-		> $(dot-target).2.S
-	$(MAKE) $(build)=$(@D) $(dot-target).2.o
-	$(call compare-symbol-tables, $(dot-target).1.o, $(dot-target).2.o)
-	$(LD) $(XEN_LDFLAGS) -T $(obj)/xen.lds $< $(build_id_linker) \
-	    $(orphan-handling-y) $(dot-target).2.o -o $@
-	$(NM) -pa --format=sysv $@ \
-		| $(objtree)/tools/symbols --all-symbols --xensyms --sysv --sort \
-		> $@.map
-	rm -f $(dot-target).[0-9]* $(@D)/..$(@F).[0-9]*
-ifeq ($(CONFIG_XEN_IBT),y)
-	$(SHELL) $(srctree)/tools/check-endbr.sh $@
-endif
+LAST_LINKING_PASS := 2
+
+final-image-check-$(CONFIG_XEN_IBT) = $(SHELL) $(srctree)/tools/check-endbr.sh $(1)
+
+include scripts/Makefile.link
 
 $(obj)/note.o: $(TARGET)-syms
 	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id $< $@.bin
@@ -191,51 +165,69 @@ note_file_option ?= $(note_file)
 
 extra-$(XEN_BUILD_PE) += efi.lds
 ifeq ($(XEN_BUILD_PE),y)
-$(TARGET).efi: $(obj)/efi/relocs-dummy.o $(obj)/efi/relocs-empty.o $(obj)/efi/mkreloc
-$(TARGET).efi: $(objtree)/prelink.o $(note_file) $(obj)/efi.lds
+
+.INTERMEDIATE: $(addprefix .$(TARGET).efi., \
+                           $(foreach n, 0 1 2, \
+                                     $(n) alt.$(n) $(n)r.o $(n)s.o $(n)r.S $(n)s.S))
+
+.$(TARGET).efi.%.o: .$(TARGET).efi.%.S
+	$(call cmd,cc_o_S)
+
+.$(TARGET).efi.1r.S: .$(TARGET).efi.0 $(if $(relocs-dummy),.$(TARGET).efi.alt.0)
+.$(TARGET).efi.2r.S: .$(TARGET).efi.1 $(if $(relocs-dummy),.$(TARGET).efi.alt.1)
+
+.$(TARGET).efi.0r.o: $(obj)/efi/relocs-dummy.o
+	ln -sf $< $@
+
+.$(TARGET).efi.%r.S: $(obj)/efi/mkreloc
+	$(MKRELOC) $(filter .$(TARGET).efi.%, $^) > $@
+
+.$(TARGET).efi.0s.S:
+	$(objtree)/tools/symbols $(all_symbols) --empty > $@
+
+.$(TARGET).efi.1s.S: .$(TARGET).efi.0
+.$(TARGET).efi.2s.S: .$(TARGET).efi.1
+
+.$(TARGET).efi.%s.S:
+	$(NM) -pa --format=sysv $< \
+	  | $(objtree)/tools/symbols $(all_symbols) --sysv --sort \
+ 	    --source-name=$(TARGET).efi.S \
+	  > $@
+
+# See above for why $(note_file) needs removing here.
+efi-objs = $(filter-out $(note_file),$(filter %.o,$^))
+
+.$(TARGET).efi.%: $(objtree)/prelink.o .$(TARGET).efi.%r.o \
+                  .$(TARGET).efi.%s.o $(note_file) $(obj)/efi.lds
+	$(LD) $(call EFI_LDFLAGS,$(VIRT_BASE)) -T $(obj)/efi.lds $(efi-objs) \
+	      --strip-debug $(note_file_option) -o $@
+
+.$(TARGET).efi.alt.%: $(objtree)/prelink.o .$(TARGET).efi.%r.o \
+                      .$(TARGET).efi.%s.o $(note_file) $(obj)/efi.lds
+	$(LD) $(call EFI_LDFLAGS,$(ALT_BASE)) -T $(obj)/efi.lds $(efi-objs) \
+	      --strip-debug $(note_file_option) -o $@
+
+.$(TARGET).efi.2: $(objtree)/prelink.o $(obj)/efi/relocs-empty.o \
+                  .$(TARGET).efi.2r.o .$(TARGET).efi.2s.o $(note_file) \
+                  $(obj)/efi.lds
+	$(call compare-symbol-tables, .$(TARGET).efi.1r.o, .$(TARGET).efi.2r.o)
+	$(call compare-symbol-tables, .$(TARGET).efi.1s.o, .$(TARGET).efi.2s.o)
+	$(LD) $(call EFI_LDFLAGS,$(VIRT_BASE)) -T $(obj)/efi.lds $(efi-objs) \
+	      $(orphan-handling-y) $(note_file_option) -o $@
+
+$(TARGET).efi: .$(TARGET).efi.2
 ifeq ($(CONFIG_DEBUG_INFO),y)
-	$(if $(filter --strip-debug,$(EFI_LDFLAGS)),echo,:) "Will strip debug info from $(@F)"
+	$(if $(filter --strip-debug,$(EFI_LDFLAGS)),echo,:) "No debug info in $(@F)"
 endif
-	$(objtree)/tools/symbols $(all_symbols) --source-name=$(@F).S --empty \
-		> $(dot-target).0s.S
-	$(MAKE) $(build)=$(@D) .$(@F).0s.o
-	$(foreach base, $(VIRT_BASE) $(ALT_BASE), \
-	          $(LD) $(call EFI_LDFLAGS,$(base)) -T $(obj)/efi.lds $< $(relocs-dummy) \
-	                $(dot-target).0s.o $(note_file_option) --strip-debug \
-	                -o $(dot-target).$(base).0 &&) :
-	$(MKRELOC) $(foreach base,$(VIRT_BASE) $(ALT_BASE),$(dot-target).$(base).0) \
-		> $(dot-target).1r.S
-	$(NM) -pa --format=sysv $(dot-target).$(VIRT_BASE).0 \
-		| $(objtree)/tools/symbols $(all_symbols) --sysv --sort \
-                  --source-name=$(@F).S \
-		> $(dot-target).1s.S
-	$(MAKE) $(build)=$(@D) .$(@F).1r.o .$(@F).1s.o
-	$(foreach base, $(VIRT_BASE) $(ALT_BASE), \
-	          $(LD) $(call EFI_LDFLAGS,$(base)) -T $(obj)/efi.lds $<  --strip-debug \
-	                $(dot-target).1r.o $(dot-target).1s.o $(note_file_option) \
-	                -o $(dot-target).$(base).1 &&) :
-	$(MKRELOC) $(foreach base,$(VIRT_BASE) $(ALT_BASE),$(dot-target).$(base).1) \
-		> $(dot-target).2r.S
-	$(NM) -pa --format=sysv $(dot-target).$(VIRT_BASE).1 \
-		| $(objtree)/tools/symbols $(all_symbols) --sysv --sort \
-                  --source-name=$(@F).S \
-		> $(dot-target).2s.S
-	$(MAKE) $(build)=$(@D) .$(@F).2r.o .$(@F).2s.o
-	$(call compare-symbol-tables, $(dot-target).1r.o, $(dot-target).2r.o)
-	$(call compare-symbol-tables, $(dot-target).1s.o, $(dot-target).2s.o)
-	$(LD) $(call EFI_LDFLAGS,$(VIRT_BASE)) -T $(obj)/efi.lds $< $(obj)/efi/relocs-empty.o \
-	      $(dot-target).2r.o $(dot-target).2s.o $(orphan-handling-y) \
-	      $(note_file_option) -o $@
-	$(NM) -pa --format=sysv $@ \
-		| $(objtree)/tools/symbols --all-symbols --xensyms --sysv --sort \
-		> $@.map
+	$(NM) -pa --format=sysv $< \
+	  | $(objtree)/tools/symbols --all-symbols --xensyms --sysv --sort \
+	  > $@.map
 ifeq ($(CONFIG_DEBUG_INFO),y)
-	$(if $(filter --strip-debug,$(EFI_LDFLAGS)),:$(space))$(OBJCOPY) -O elf64-x86-64 $@ $@.elf
+	$(if $(filter --strip-debug,$(EFI_LDFLAGS)),:$(space))$(OBJCOPY) -O elf64-x86-64 $< $@.elf
 endif
+	$(call final-image-check-y, $<)
+	mv $< $@
 	rm -f $(dot-target).[0-9]* $(@D)/..$(@F).[0-9]*
-ifeq ($(CONFIG_XEN_IBT),y)
-	$(SHELL) $(srctree)/tools/check-endbr.sh $@
-endif
 else
 $(TARGET).efi: FORCE
 	rm -f $@
