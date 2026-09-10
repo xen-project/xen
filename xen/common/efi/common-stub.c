@@ -28,10 +28,14 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
 
 #ifdef CONFIG_COMPAT
 
-int efi_compat_get_info(uint32_t idx, union compat_pf_efi_info *)
-    __attribute__((__alias__("efi_get_info")));
+int efi_compat_get_info(uint32_t idx, union compat_pf_efi_info *info)
+{
+    return -ENOSYS;
+}
 
-int efi_compat_runtime_call(struct compat_pf_efi_runtime_call *)
-    __attribute__((__alias__("efi_runtime_call")));
+int efi_compat_runtime_call(struct compat_pf_efi_runtime_call *op)
+{
+    return -ENOSYS;
+}
 
 #endif
