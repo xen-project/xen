@@ -45,14 +45,15 @@ static char __iomem *get_virt(unsigned int seg, unsigned int *bus)
     return NULL;
 }
 
-static char __iomem *pci_dev_base(unsigned int seg, unsigned int bus, unsigned int devfn)
+static char __iomem *pci_dev_base(pci_sbdf_t sbdf)
 {
-    char __iomem *addr;
+    unsigned int bus = sbdf.bus;
+    char __iomem *addr = get_virt(sbdf.seg, &bus);
 
-    addr = get_virt(seg, &bus);
     if (!addr)
         return NULL;
-     return addr + ((bus << 20) | (devfn << 12));
+
+    return addr + ((bus << 20) | (sbdf.devfn << 12));
 }
 
 int pci_mmcfg_read(
@@ -66,7 +67,7 @@ err:        *value = -1;
         return -EINVAL;
     }
 
-    addr = pci_dev_base(sbdf.seg, sbdf.bus, sbdf.devfn);
+    addr = pci_dev_base(sbdf);
     if (!addr)
         goto err;
 
@@ -94,7 +95,7 @@ int pci_mmcfg_write(
     if (unlikely(reg + len > PCI_CFG_SPACE_EXP_SIZE))
         return -EINVAL;
 
-    addr = pci_dev_base(sbdf.seg, sbdf.bus, sbdf.devfn);
+    addr = pci_dev_base(sbdf);
     if (!addr)
         return -EINVAL;
 
