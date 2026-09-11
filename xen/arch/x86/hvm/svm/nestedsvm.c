@@ -830,7 +830,7 @@ nsvm_vmcb_guest_intercepts_ioio(paddr_t iopm_pa, uint64_t exitinfo1)
     ioio_info_t ioinfo;
     uint16_t port;
     unsigned int size;
-    bool enabled;
+    bool intercepted;
 
     ioinfo.bytes = exitinfo1;
     port = ioinfo.fields.port;
@@ -851,8 +851,8 @@ nsvm_vmcb_guest_intercepts_ioio(paddr_t iopm_pa, uint64_t exitinfo1)
 
     for ( io_bitmap = hvm_map_guest_frame_ro(gfn, 0); ; )
     {
-        enabled = io_bitmap && test_bit(port, io_bitmap);
-        if ( !enabled || !--size )
+        intercepted = !io_bitmap || test_bit(port, io_bitmap);
+        if ( intercepted || !--size )
             break;
         if ( unlikely(++port == 8 * PAGE_SIZE) )
         {
@@ -863,7 +863,7 @@ nsvm_vmcb_guest_intercepts_ioio(paddr_t iopm_pa, uint64_t exitinfo1)
     }
     hvm_unmap_guest_frame(io_bitmap, 0);
 
-    if ( !enabled )
+    if ( !intercepted )
         return NESTEDHVM_VMEXIT_HOST;
 
     return NESTEDHVM_VMEXIT_INJECT;
