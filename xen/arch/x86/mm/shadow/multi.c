@@ -1789,34 +1789,29 @@ sh_map_and_validate(struct vcpu *v, mfn_t gmfn,
     return result;
 }
 
+#if GUEST_PAGING_LEVELS >= 4
 
 int
 sh_map_and_validate_gl4e(struct vcpu *v, mfn_t gl4mfn,
                           void *new_gl4p, u32 size)
 {
-#if GUEST_PAGING_LEVELS >= 4
     return sh_map_and_validate(v, gl4mfn, new_gl4p, size,
                                 SH_type_l4_shadow,
                                 shadow_l4_index,
                                 validate_gl4e);
-#else // ! GUEST_PAGING_LEVELS >= 4
-    BUG(); /* Called in wrong paging mode! */
-#endif
 }
 
 int
 sh_map_and_validate_gl3e(struct vcpu *v, mfn_t gl3mfn,
                           void *new_gl3p, u32 size)
 {
-#if GUEST_PAGING_LEVELS >= 4
     return sh_map_and_validate(v, gl3mfn, new_gl3p, size,
                                 SH_type_l3_shadow,
                                 shadow_l3_index,
                                 validate_gl3e);
-#else // ! GUEST_PAGING_LEVELS >= 4
-    BUG(); /* Called in wrong paging mode! */
-#endif
 }
+
+#endif /* GUEST_PAGING_LEVELS >= 4 */
 
 int
 sh_map_and_validate_gl2e(struct vcpu *v, mfn_t gl2mfn,
@@ -1828,19 +1823,17 @@ sh_map_and_validate_gl2e(struct vcpu *v, mfn_t gl2mfn,
                                 validate_gl2e);
 }
 
+#if defined(CONFIG_PV32) && GUEST_PAGING_LEVELS >= 4
 int
 sh_map_and_validate_gl2he(struct vcpu *v, mfn_t gl2mfn,
                            void *new_gl2p, u32 size)
 {
-#if GUEST_PAGING_LEVELS >= 4 && defined(CONFIG_PV32)
     return sh_map_and_validate(v, gl2mfn, new_gl2p, size,
                                 SH_type_l2h_shadow,
                                 shadow_l2_index,
                                 validate_gl2e);
-#else /* Non-PAE guests don't have different kinds of l2 table */
-    BUG(); /* Called in wrong paging mode! */
-#endif
 }
+#endif /* CONFIG_PV32 && GUEST_PAGING_LEVELS >= 4 */
 
 int
 sh_map_and_validate_gl1e(struct vcpu *v, mfn_t gl1mfn,
