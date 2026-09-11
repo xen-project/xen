@@ -221,7 +221,7 @@
  * These encodings were first used in VMCB/VMCS fields, but have become
  * architectural in the FRED spec.
  */
-#define X86_ET_EXT_INTR    0 /* External Interrupt */
+#define X86_ET_INTR        0 /* External Interrupt */
 #define X86_ET_NMI         2 /* NMI */
 #define X86_ET_HW_EXC      3 /* Hardware Exception (#PF/#GP/etc) */
 #define X86_ET_SW_INT      4 /* Software Interrupt (INT $n) */

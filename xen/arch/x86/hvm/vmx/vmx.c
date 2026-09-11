@@ -2022,7 +2022,7 @@ static void __vmx_inject_exception(int trap, int type, int error_code)
         curr->arch.hvm.vmx.vmx_emulate = 1;
 }
 
-void vmx_inject_extint(int trap, uint8_t source)
+void vmx_inject_intr(int trap, uint8_t source)
 {
     struct vcpu *v = current;
     u32    pin_based_cntrl;
@@ -2032,13 +2032,13 @@ void vmx_inject_extint(int trap, uint8_t source)
         if ( pin_based_cntrl & PIN_BASED_EXT_INTR_MASK ) {
             nvmx_enqueue_n2_exceptions (v, 
                INTR_INFO_VALID_MASK |
-               MASK_INSR(X86_ET_EXT_INTR, INTR_INFO_INTR_TYPE_MASK) |
+               MASK_INSR(X86_ET_INTR, INTR_INFO_INTR_TYPE_MASK) |
                MASK_INSR(trap, INTR_INFO_VECTOR_MASK),
                X86_EVENT_NO_EC, source);
             return;
         }
     }
-    __vmx_inject_exception(trap, X86_ET_EXT_INTR, X86_EVENT_NO_EC);
+    __vmx_inject_exception(trap, X86_ET_INTR, X86_EVENT_NO_EC);
 }
 
 void vmx_inject_nmi(void)
@@ -3846,7 +3846,7 @@ gp_fault:
     return X86EMUL_EXCEPTION;
 }
 
-static void vmx_do_extint(struct cpu_user_regs *regs)
+static void vmx_do_intr(struct cpu_user_regs *regs)
 {
     unsigned long vector;
 
@@ -4219,7 +4219,7 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
     switch ( (uint16_t)exit_reason )
     {
     case EXIT_REASON_EXTERNAL_INTERRUPT:
-        vmx_do_extint(regs);
+        vmx_do_intr(regs);
         break;
     case EXIT_REASON_EXCEPTION_NMI:
         __vmread(VM_EXIT_INTR_INFO, &intr_info);

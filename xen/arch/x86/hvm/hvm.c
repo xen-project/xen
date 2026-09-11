@@ -230,7 +230,7 @@ int hvm_event_needs_reinjection(uint8_t type, uint8_t vector)
 {
     switch ( type )
     {
-    case X86_ET_EXT_INTR:
+    case X86_ET_INTR:
     case X86_ET_NMI:
         return 1;
     case X86_ET_HW_EXC:

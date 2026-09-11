@@ -1346,7 +1346,7 @@ static void sync_exception_state(struct vcpu *v)
 
     switch ( MASK_EXTR(nvmx->intr.intr_info, INTR_INFO_INTR_TYPE_MASK) )
     {
-    case X86_ET_EXT_INTR:
+    case X86_ET_INTR:
         /* rename exit_reason to EXTERNAL_INTERRUPT */
         set_vvmcs(v, VM_EXIT_REASON, EXIT_REASON_EXTERNAL_INTERRUPT);
         set_vvmcs(v, EXIT_QUALIFICATION, 0);

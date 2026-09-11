@@ -2808,7 +2808,7 @@ void asmlinkage svm_vmexit_handler(void)
                      vmcb->exit_int_info.vector == X86_EXC_OF )
                     break;
                 /* Fallthrough */
-            case X86_ET_EXT_INTR:
+            case X86_ET_INTR:
             case X86_ET_NMI:
                 insn_len = 0;
                 break;

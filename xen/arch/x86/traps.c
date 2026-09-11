@@ -1041,7 +1041,7 @@ void show_execution_state_nmi(const cpumask_t *mask, bool show_all)
 static const char *x86_et_name(unsigned int type)
 {
     static const char *const names[] = {
-        [X86_ET_EXT_INTR]    = "EXT_INTR",
+        [X86_ET_INTR]        = "INTR",
         [X86_ET_NMI]         = "NMI",
         [X86_ET_HW_EXC]      = "HW_EXC",
         [X86_ET_SW_INT]      = "SW_INT",
@@ -2295,7 +2295,7 @@ void asmlinkage entry_from_pv(struct cpu_user_regs *regs)
 
     switch ( type )
     {
-    case X86_ET_EXT_INTR:
+    case X86_ET_INTR:
         return do_IRQ(regs);
 
     case X86_ET_NMI:
@@ -2606,7 +2606,7 @@ void asmlinkage entry_from_xen(struct cpu_user_regs *regs)
 
     switch ( type )
     {
-    case X86_ET_EXT_INTR:
+    case X86_ET_INTR:
         return do_IRQ(regs);
 
     case X86_ET_NMI:

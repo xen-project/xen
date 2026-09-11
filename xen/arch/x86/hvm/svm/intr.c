@@ -55,14 +55,14 @@ static void svm_inject_nmi(struct vcpu *v)
         vmcb, general1_intercepts | GENERAL1_INTERCEPT_IRET);
 }
 
-static void svm_inject_extint(struct vcpu *v, int vector)
+static void svm_inject_intr(struct vcpu *v, int vector)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     intinfo_t event;
 
     event.raw = 0;
     event.v = true;
-    event.type = X86_ET_EXT_INTR;
+    event.type = X86_ET_INTR;
     event.vector = vector;
 
     ASSERT(!vmcb->event_inj.v);
@@ -225,7 +225,7 @@ void asmlinkage svm_intr_assist(void)
     else
     {
         TRACE(TRC_HVM_INJ_VIRQ, intack.vector, /*fake=*/ 0);
-        svm_inject_extint(v, intack.vector);
+        svm_inject_intr(v, intack.vector);
         pt_intr_post(v, intack);
     }
 

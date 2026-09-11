@@ -484,7 +484,7 @@ static inline void vpid_sync_all(void)
 int cf_check vmx_guest_x86_mode(struct vcpu *v);
 unsigned int vmx_get_cpl(void);
 
-void vmx_inject_extint(int trap, uint8_t source);
+void vmx_inject_intr(int trap, uint8_t source);
 void vmx_inject_nmi(void);
 
 void ept_walk_table(struct domain *d, unsigned long gfn);

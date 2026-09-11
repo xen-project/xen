@@ -182,7 +182,7 @@ static int nvmx_intr_intercept(struct vcpu *v, struct hvm_intack intack)
         if ( intack.source == hvm_intsrc_pic ||
                  intack.source == hvm_intsrc_lapic )
         {
-            vmx_inject_extint(intack.vector, intack.source);
+            vmx_inject_intr(intack.vector, intack.source);
 
             ctrl = get_vvmcs(v, VM_EXIT_CONTROLS);
             if ( ctrl & VM_EXIT_ACK_INTR_ON_EXIT )
@@ -202,7 +202,7 @@ static int nvmx_intr_intercept(struct vcpu *v, struct hvm_intack intack)
         }
         else if ( intack.source == hvm_intsrc_vector )
         {
-            vmx_inject_extint(intack.vector, intack.source);
+            vmx_inject_intr(intack.vector, intack.source);
             return 1;
         }
     }
@@ -389,7 +389,7 @@ void asmlinkage vmx_intr_assist(void)
     else
     {
         TRACE(TRC_HVM_INJ_VIRQ, intack.vector, /*fake=*/ 0);
-        vmx_inject_extint(intack.vector, intack.source);
+        vmx_inject_intr(intack.vector, intack.source);
         pt_intr_post(v, intack);
     }
 

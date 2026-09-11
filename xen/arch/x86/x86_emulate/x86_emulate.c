@@ -8691,7 +8691,7 @@ static void __init __maybe_unused build_assertions(void)
     BUILD_BUG_ON(x86_seg_gs != 5);
 
     /* Check X86_ET_* against VMCB EVENTINJ and VMCS INTR_INFO type fields. */
-    BUILD_BUG_ON(X86_ET_EXT_INTR    != 0);
+    BUILD_BUG_ON(X86_ET_INTR        != 0);
     BUILD_BUG_ON(X86_ET_NMI         != 2);
     BUILD_BUG_ON(X86_ET_HW_EXC      != 3);
     BUILD_BUG_ON(X86_ET_SW_INT      != 4);
