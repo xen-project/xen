@@ -389,6 +389,11 @@ static int hvm_set_viridian_features(libxl__gc *gc, uint32_t domid,
     if (libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_CPU_HOTPLUG))
         mask |= HVMPV_cpu_hotplug;
 
+    if (libxl_bitmap_test(&enlightenments,
+                          LIBXL_VIRIDIAN_ENLIGHTENMENT_STIMER_DIRECT))
+        mask |= HVMPV_time_ref_count | HVMPV_synic | HVMPV_stimer |
+                HVMPV_stimer_direct;
+
     if (mask != 0 &&
         xc_hvm_param_set(CTX->xch,
                          domid,

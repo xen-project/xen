@@ -2496,6 +2496,11 @@ ticks and hence enabling this group will ensure that ticks will be
 consistent with use of an enlightened time source (B<time_ref_count> or
 B<reference_tsc>).
 
+=item B<stimer_direct>
+
+This set is the same as the B<stimer> set but additionally supports
+using synthetic timers in direct mode.
+
 =item B<hcall_ipi>
 
 This set incorporates use of a hypercall for interprocessor interrupts.

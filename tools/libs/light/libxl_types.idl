@@ -260,6 +260,7 @@ libxl_viridian_enlightenment = Enumeration("viridian_enlightenment", [
     (10, "ex_processor_masks"),
     (11, "no_vp_limit"),
     (12, "cpu_hotplug"),
+    (13, "stimer_direct"),
     ])
 
 libxl_hdtype = Enumeration("hdtype", [

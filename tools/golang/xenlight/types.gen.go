@@ -234,6 +234,7 @@ ViridianEnlightenmentHcallIpi ViridianEnlightenment = 9
 ViridianEnlightenmentExProcessorMasks ViridianEnlightenment = 10
 ViridianEnlightenmentNoVpLimit ViridianEnlightenment = 11
 ViridianEnlightenmentCpuHotplug ViridianEnlightenment = 12
+ViridianEnlightenmentStimerDirect ViridianEnlightenment = 13
 )
 
 type Hdtype int
