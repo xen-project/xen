@@ -845,7 +845,7 @@ nsvm_vmcb_guest_intercepts_ioio(paddr_t iopm_pa, uint64_t exitinfo1)
         ++gfn;
         break;
     default:
-        BUG();
+        BUILD_ERROR("I/O port range not fully covered");
         break;
     }
 
