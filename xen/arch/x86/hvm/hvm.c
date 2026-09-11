@@ -2455,6 +2455,7 @@ int hvm_set_cr3(unsigned long value, bool noflush, bool may_defer)
     return X86EMUL_OKAY;
 
  bad_cr3:
+    BUILD_ERROR_IF_NOT(CONFIG_SHADOW_PAGING);
     gdprintk(XENLOG_ERR, "Invalid CR3\n");
     domain_crash(currd);
     return X86EMUL_UNHANDLEABLE;
@@ -5200,6 +5201,8 @@ int hvm_debug_op(struct vcpu *v, int32_t op)
         default:
             return -ENOSYS;
     }
+
+    BUILD_ERROR_IF_NOT(CONFIG_INTEL_VMX);
 
     vcpu_pause(v);
 
