@@ -24,6 +24,8 @@ void arch_get_domain_info(const struct domain *d,
     info->flags |= XEN_DOMINF_hap;
 
     info->gpaddr_bits = p2m_ipa_bits;
+
+    info->arch_config.gic_version = d->arch.vgic.version;
 }
 
 static int handle_vuart_init(struct domain *d, 
