@@ -191,7 +191,7 @@ ifeq ($(XEN_BUILD_PE),y)
 .$(TARGET).efi.%s.S:
 	$(NM) -pa --format=sysv $< \
 	  | $(objtree)/tools/symbols $(all_symbols) --sysv --sort \
- 	    --source-name=$(TARGET).efi.S \
+	    --source-name=$(TARGET).efi.S \
 	  > $@
 
 # See above for why $(note_file) needs removing here.
