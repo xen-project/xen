@@ -872,22 +872,18 @@ int paging_enable(struct domain *d, u32 mode)
 }
 #endif
 
-#ifdef CONFIG_HVM
+#if defined(CONFIG_HVM) && defined(CONFIG_SHADOW_PAGING)
 /* Called from the guest to indicate that a process is being torn down
  * and therefore its pagetables will soon be discarded */
 void pagetable_dying(paddr_t gpa)
 {
-#ifdef CONFIG_SHADOW_PAGING
     struct vcpu *curr = current;
 
     ASSERT(paging_mode_shadow(curr->domain));
 
     curr->arch.paging.mode->shadow.pagetable_dying(gpa);
-#else
-    BUG();
-#endif
 }
-#endif /* CONFIG_HVM */
+#endif /* HVM && SHADOW_PAGING */
 
 /* Print paging-assistance info to the console */
 void paging_dump_domain_info(struct domain *d)
