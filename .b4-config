@@ -1,0 +1,10 @@
+#
+# Common b4 settings for sending patches to the Xen Project upstream.
+# https://b4.docs.kernel.org/
+#
+
+[b4]
+	send-series-to = xen-devel@lists.xenproject.org
+	send-auto-to-cmd = echo
+	send-auto-cc-cmd = ./scripts/get_maintainer.pl
+	midmask = https://lore.kernel.org/xen-devel/%s
