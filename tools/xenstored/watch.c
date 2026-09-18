@@ -354,7 +354,7 @@ const char *dump_state_watches(FILE *fp, struct connection *conn,
 			return "Dump watch state error";
 
 		if (watch->depth >= 0) {
-			if (fwrite(&swe, sizeof(sw), 1, fp) != 1)
+			if (fwrite(&swe, sizeof(swe), 1, fp) != 1)
 				return "Dump watch state ext error";
 		} else {
 			if (fwrite(&sw, sizeof(sw), 1, fp) != 1)
