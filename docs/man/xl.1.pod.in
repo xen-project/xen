@@ -1230,6 +1230,16 @@ the unreserved system resource.
 
 Restrict output to domains in the specified cpupool.
 
+=item B<-s>, B<--schedparam>
+
+Specify to list or set pool-wide scheduler parameters.
+
+=item B<-a ADMISSION_CONTROL>, B<--admission=ADMISSION_CONTROL>
+
+Binary flag to enable or disable admission control for the cpupool.
+When enabled (the default), a reservation is rejected if admitting
+it would exceed the cpupool's utilization capacity.
+
 =back
 
 B<EXAMPLE>
@@ -1292,6 +1302,16 @@ e.g., "xl sched-rtds -d vm1 -v 0 -p 100 -b 50 -e 1 -v 3 -p 300 -b 150 -e 0".
 
 To change the parameters of all the VCPUs of a domain, use B<-v all>,
 e.g., "xl sched-rtds -d vm1 -v all -p 500 -b 250 -e 1".
+
+4) Use B<-c CPUPOOL -s> to see whether admission control is enabled
+for a cpupool, and B<-c CPUPOOL -s -a> to change it:
+
+    xl sched-rtds -c pool-rt -s
+    Cpupool pool-rt: sched=RTDS admission-control=enabled
+
+    xl sched-rtds -c pool-rt -s -a 0
+    xl sched-rtds -c pool-rt -s
+    Cpupool pool-rt: sched=RTDS admission-control=disabled
 
 =back
 

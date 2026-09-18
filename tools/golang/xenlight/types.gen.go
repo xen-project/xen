@@ -1231,6 +1231,10 @@ type SchedCredit2Params struct {
 RatelimitUs int
 }
 
+type SchedRtdsParams struct {
+AdmissionControlEnabled bool
+}
+
 type DomainRemusInfo struct {
 Interval int
 AllowUnsafe Defbool

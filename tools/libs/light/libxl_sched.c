@@ -397,6 +397,52 @@ int libxl_sched_credit2_params_set(libxl_ctx *ctx, uint32_t poolid,
     return rc;
 }
 
+int libxl_sched_rtds_params_get(libxl_ctx *ctx, uint32_t poolid,
+                                libxl_sched_rtds_params *scinfo)
+{
+    struct xen_sysctl_rtds_schedule sparam;
+    int r, rc;
+    GC_INIT(ctx);
+
+    r = xc_sched_rtds_params_get(ctx->xch, poolid, &sparam);
+    if (r < 0) {
+        LOGE(ERROR, "getting RTDS scheduler parameters");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    scinfo->admission_control_enabled = sparam.admission_control_enabled;
+
+    rc = 0;
+out:
+    GC_FREE;
+    return rc;
+}
+
+int libxl_sched_rtds_params_set(libxl_ctx *ctx, uint32_t poolid,
+                                libxl_sched_rtds_params *scinfo)
+{
+    struct xen_sysctl_rtds_schedule sparam;
+    int r, rc;
+    GC_INIT(ctx);
+
+    sparam.admission_control_enabled = scinfo->admission_control_enabled;
+
+    r = xc_sched_rtds_params_set(ctx->xch, poolid, &sparam);
+    if (r < 0) {
+        LOGE(ERROR, "Setting RTDS scheduler parameters");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    scinfo->admission_control_enabled = sparam.admission_control_enabled;
+
+    rc = 0;
+out:
+    GC_FREE;
+    return rc;
+}
+
 static int sched_credit2_domain_get(libxl__gc *gc, uint32_t domid,
                                     libxl_domain_sched_params *scinfo)
 {

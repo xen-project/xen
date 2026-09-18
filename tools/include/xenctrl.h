@@ -897,6 +897,12 @@ int xc_sched_rtds_vcpu_get(xc_interface *xch,
                            uint32_t domid,
                            struct xen_domctl_schedparam_vcpu *vcpus,
                            uint32_t num_vcpus);
+int xc_sched_rtds_params_set(xc_interface *xch,
+                             uint32_t cpupool_id,
+                             struct xen_sysctl_rtds_schedule *schedule);
+int xc_sched_rtds_params_get(xc_interface *xch,
+                             uint32_t cpupool_id,
+                             struct xen_sysctl_rtds_schedule *schedule);
 
 int
 xc_sched_arinc653_schedule_set(

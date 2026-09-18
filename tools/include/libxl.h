@@ -230,6 +230,14 @@
 #define LIBXL_HAVE_SCHED_RTDS 1
 
 /*
+ * LIBXL_HAVE_SCHED_RTDS_PARAMS indicates that libxl has the
+ * libxl_sched_rtds_params type, along with library functions
+ * libxl_sched_rtds_params_get/set to get and set pool-wide RTDS
+ * scheduler parameters for a given cpupool.
+ */
+#define LIBXL_HAVE_SCHED_RTDS_PARAMS 1
+
+/*
  * LIBXL_HAVE_SCHED_NULL indicates that the 'null' static scheduler
  * is available.
  */
@@ -2797,6 +2805,10 @@ int libxl_sched_credit2_params_get(libxl_ctx *ctx, uint32_t poolid,
                                    libxl_sched_credit2_params *scinfo);
 int libxl_sched_credit2_params_set(libxl_ctx *ctx, uint32_t poolid,
                                    libxl_sched_credit2_params *scinfo);
+int libxl_sched_rtds_params_get(libxl_ctx *ctx, uint32_t poolid,
+                                libxl_sched_rtds_params *scinfo);
+int libxl_sched_rtds_params_set(libxl_ctx *ctx, uint32_t poolid,
+                                libxl_sched_rtds_params *scinfo);
 
 /* Scheduler Per-domain parameters */
 

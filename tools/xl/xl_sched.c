@@ -246,6 +246,28 @@ static int sched_credit2_pool_output(uint32_t poolid)
     return 0;
 }
 
+static int sched_rtds_params_set(int poolid,
+                                 libxl_sched_rtds_params *scinfo)
+{
+    if (libxl_sched_rtds_params_set(ctx, poolid, scinfo)) {
+        fprintf(stderr, "libxl_sched_rtds_params_set failed.\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int sched_rtds_params_get(int poolid,
+                                 libxl_sched_rtds_params *scinfo)
+{
+    if (libxl_sched_rtds_params_get(ctx, poolid, scinfo)) {
+        fprintf(stderr, "libxl_sched_rtds_params_get failed.\n");
+        return 1;
+    }
+
+    return 0;
+}
+
 static int sched_rtds_domain_output(
     int domid)
 {
@@ -339,10 +361,15 @@ static int sched_rtds_vcpu_output_all(int domid,
 
 static int sched_rtds_pool_output(uint32_t poolid)
 {
-    char *poolname;
+    libxl_sched_rtds_params scparam;
+    char *poolname = libxl_cpupoolid_to_name(ctx, poolid);
 
-    poolname = libxl_cpupoolid_to_name(ctx, poolid);
-    printf("Cpupool %s: sched=RTDS\n", poolname);
+    if (sched_rtds_params_get(poolid, &scparam))
+        printf("Cpupool %s: [sched params unavailable]\n", poolname);
+    else
+        printf("Cpupool %s: sched=RTDS admission-control=%s\n",
+                poolname,
+                scparam.admission_control_enabled ? "enabled" : "disabled");
 
     free(poolname);
     return 0;
@@ -715,6 +742,8 @@ int main_sched_credit2(int argc, char **argv)
  * -d [domid] -v [vcpuid 1] [params] -v [vcpuid 2] [params] ...  :
  * Set per-VCPU params for domain
  * -d [domid] -v all [params]  : Set all per-VCPU params for domain
+ * -c [cpupool] -s  : List pool-wide scheduling parameters for cpupool
+ * -c [cpupool] -s -a [0|1]  : Set admission control for cpupool
  */
 int main_sched_rtds(int argc, char **argv)
 {
@@ -736,7 +765,10 @@ int main_sched_rtds(int argc, char **argv)
     bool opt_b = false;
     bool opt_e = false;
     bool opt_v = false;
+    bool opt_s = false;
+    bool opt_a = false;
     bool opt_all = false; /* output per-dom parameters */
+    bool admission_control = false;
     int opt, i, rc, r;
     static struct option opts[] = {
         {"domain", 1, 0, 'd'},
@@ -745,10 +777,12 @@ int main_sched_rtds(int argc, char **argv)
         {"extratime", 1, 0, 'e'},
         {"vcpuid",1, 0, 'v'},
         {"cpupool", 1, 0, 'c'},
+        {"schedparam", 0, 0, 's'},
+        {"admission", 1, 0, 'a'},
         COMMON_LONG_OPTS
     };
 
-    SWITCH_FOREACH_OPT(opt, "d:p:b:e:v:c", opts, "sched-rtds", 0) {
+    SWITCH_FOREACH_OPT(opt, "d:p:b:e:v:c:a:s", opts, "sched-rtds", 0) {
     case 'd':
         dom = optarg;
         break;
@@ -801,11 +835,29 @@ int main_sched_rtds(int argc, char **argv)
     case 'c':
         cpupool = optarg;
         break;
+    case 's':
+        opt_s = true;
+        break;
+    case 'a':
+        if (strcmp(optarg, "0") && strcmp(optarg, "1"))
+        {
+            fprintf(stderr, "Invalid admission_control value.\n");
+            r = EXIT_FAILURE;
+            goto out;
+        }
+        admission_control = strtol(optarg, NULL, 10);
+        opt_a = true;
+        break;
     }
 
     if (cpupool && (dom || opt_p || opt_b || opt_e || opt_v || opt_all)) {
         fprintf(stderr, "Specifying a cpupool is not allowed with "
                 "other options.\n");
+        r = EXIT_FAILURE;
+        goto out;
+    }
+    if (opt_s && (dom || opt_p || opt_b || opt_e || opt_v || opt_all)) {
+        fprintf(stderr, "-s cannot be combined with domain/VCPU options.\n");
         r = EXIT_FAILURE;
         goto out;
     }
@@ -829,6 +881,46 @@ int main_sched_rtds(int argc, char **argv)
          || p_index != e_index ) {
         fprintf(stderr, "Incorrect number of period, budget and extratime\n");
         r = EXIT_FAILURE;
+        goto out;
+    }
+    if (opt_a && !opt_s) {
+        fprintf(stderr, "-a/--admission requires -s/--schedparam.\n");
+        r = EXIT_FAILURE;
+        goto out;
+    }
+
+    if (opt_s)
+    {
+        libxl_sched_rtds_params scparam;
+        uint32_t poolid = 0;
+
+        if (cpupool) {
+            if (libxl_cpupool_qualifier_to_cpupoolid(ctx, cpupool,
+                                                      &poolid, NULL) ||
+                !libxl_cpupoolid_is_valid(ctx, poolid)) {
+                fprintf(stderr, "Unknown cpupool \'%s\'\n", cpupool);
+                r = EXIT_FAILURE;
+                goto out;
+            }
+        }
+
+        if (!opt_a) { /* output pool-wide scheduling parameters */
+            if (sched_rtds_pool_output(poolid)) {
+                r = EXIT_FAILURE;
+                goto out;
+            }
+        } else { /* set pool-wide scheduling parameters */
+            scparam = (libxl_sched_rtds_params){
+                .admission_control_enabled = admission_control,
+            };
+
+            if (sched_rtds_params_set(poolid, &scparam)) {
+                r = EXIT_FAILURE;
+                goto out;
+            }
+        }
+
+        r = EXIT_SUCCESS;
         goto out;
     }
 

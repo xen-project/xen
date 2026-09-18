@@ -4192,6 +4192,29 @@ func (x *SchedCredit2Params) toC(xc *C.libxl_sched_credit2_params) (err error){x
  return nil
  }
 
+// NewSchedRtdsParams returns an instance of SchedRtdsParams initialized with defaults.
+func NewSchedRtdsParams() (*SchedRtdsParams, error) {
+var (
+x SchedRtdsParams
+xc C.libxl_sched_rtds_params)
+
+C.libxl_sched_rtds_params_init(&xc)
+
+if err := x.fromC(&xc); err != nil {
+return nil, err }
+
+return &x, nil}
+
+func (x *SchedRtdsParams) fromC(xc *C.libxl_sched_rtds_params) error {
+ x.AdmissionControlEnabled = bool(xc.admission_control_enabled)
+
+ return nil}
+
+func (x *SchedRtdsParams) toC(xc *C.libxl_sched_rtds_params) (err error){xc.admission_control_enabled = C.bool(x.AdmissionControlEnabled)
+
+ return nil
+ }
+
 // NewDomainRemusInfo returns an instance of DomainRemusInfo initialized with defaults.
 func NewDomainRemusInfo() (*DomainRemusInfo, error) {
 var (
