@@ -115,6 +115,24 @@
 #define RTDS_MAX_PRIORITY_LEVEL (~0U)
 
 /*
+ * Fixed-point scale for utilization (budget/period)
+ */
+#define RTDS_UTIL_SHIFT     20
+#define RTDS_UTIL_SCALE     (1ULL << RTDS_UTIL_SHIFT)
+
+/*
+ * Largest budget safe to left-shift by RTDS_UTIL_SHIFT without
+ * overflowing 64 bits. Enforced in rt_validate_params().
+ */
+#define RTDS_MAX_BUDGET_BITS  (64 - RTDS_UTIL_SHIFT)
+#define RTDS_MAX_BUDGET       ((1ULL << RTDS_MAX_BUDGET_BITS) - 1)
+
+/*
+ * % of a cpupool's sched_resource capacity admitted units may sum up to.
+ */
+#define RTDS_UTIL_CAP_PCT   100
+
+/*
  * UPDATE_LIMIT_SHIFT: a constant used in rt_update_deadline(). When finding
  * the next deadline, performing addition could be faster if the difference
  * between cur_deadline and now is small. If the difference is bigger than
@@ -195,6 +213,9 @@ struct rt_private {
     struct list_head replq;     /* ordered list of units that need replenishment */
 
     cpumask_t tickled;          /* cpus been tickled */
+
+    /* Sum of admitted units' (budget/period), scaled by RTDS_UTIL_SCALE */
+    uint64_t utilization;
 };
 
 /*
@@ -636,6 +657,54 @@ replq_reinsert(const struct scheduler *ops, struct rt_unit *svc)
 }
 
 /*
+ * budget << RTDS_UTIL_SHIFT can't overflow: rt_validate_params()
+ * caps budget at RTDS_MAX_BUDGET. period == 0 means "no
+ * reservation" (a unit being removed), not an error.
+ */
+static uint64_t
+rt_unit_utilization(s_time_t period, s_time_t budget)
+{
+    if ( period <= 0 )
+        return 0;
+
+    return ((uint64_t)budget << RTDS_UTIL_SHIFT) / (uint64_t)period;
+}
+
+/*
+ * Utilization capacity of the cpupool domain d resides in.
+ */
+static uint64_t
+rt_utilization_cap(const struct domain *d)
+{
+    unsigned int cpus = cpumask_weight(cpupool_domain_master_cpumask(d));
+
+    return (uint64_t)cpus * RTDS_UTIL_SCALE * RTDS_UTIL_CAP_PCT / 100;
+}
+
+/*
+ * Replaces a unit's reservation and updates prv->utilization
+ * to match. Growth that would push utilization over the
+ * cpupool's cap is refused. Removing a unit or shrinking
+ * a unit's reservation always succeed.
+ */
+static bool
+rt_try_set_utilization(struct rt_private *prv, const struct domain *d,
+                       s_time_t old_period, s_time_t old_budget,
+                       s_time_t new_period, s_time_t new_budget)
+{
+    uint64_t old_util = rt_unit_utilization(old_period, old_budget);
+    uint64_t new_util = rt_unit_utilization(new_period, new_budget);
+    uint64_t total    = prv->utilization - old_util + new_util;
+
+    if ( new_util > old_util && total > rt_utilization_cap(d) )
+        return false;
+
+    prv->utilization = total;
+
+    return true;
+}
+
+/*
  * Pick a valid resource for the unit vc
  * Valid resource of an unit is intesection of unit's affinity
  * and available resources
@@ -864,6 +933,7 @@ rt_free_domdata(const struct scheduler *ops, void *data)
 static void * cf_check
 rt_alloc_udata(const struct scheduler *ops, struct sched_unit *unit, void *dd)
 {
+    struct rt_private *prv = rt_priv(ops);
     struct rt_unit *svc;
 
     /* Allocate per-UNIT info */
@@ -881,8 +951,29 @@ rt_alloc_udata(const struct scheduler *ops, struct sched_unit *unit, void *dd)
     __set_bit(__RTDS_extratime, &svc->flags);
     svc->priority_level = 0;
     svc->period = RTDS_DEFAULT_PERIOD;
+
     if ( !is_idle_unit(unit) )
+    {
+        unsigned long flags;
+        bool admitted;
+
         svc->budget = RTDS_DEFAULT_BUDGET;
+
+        spin_lock_irqsave(&prv->lock, flags);
+        admitted = rt_try_set_utilization(prv, unit->domain, 0, 0,
+                                          svc->period, svc->budget);
+        spin_unlock_irqrestore(&prv->lock, flags);
+
+        if ( !admitted )
+        {
+            printk(XENLOG_WARNING
+                   "RTDS: ADMISSION CONTROL: refusing unit %u of d%d,"
+                   " would exceed utilization capacity of the cpupool\n",
+                   unit->unit_id, unit->domain->domain_id);
+            xfree(svc);
+            return NULL;
+        }
+    }
 
     SCHED_STAT_CRANK(unit_alloc);
 
@@ -892,7 +983,18 @@ rt_alloc_udata(const struct scheduler *ops, struct sched_unit *unit, void *dd)
 static void cf_check
 rt_free_udata(const struct scheduler *ops, void *priv)
 {
+    struct rt_private *prv = rt_priv(ops);
     struct rt_unit *svc = priv;
+
+    if ( svc && !is_idle_unit(svc->unit) )
+    {
+        unsigned long flags;
+
+        spin_lock_irqsave(&prv->lock, flags);
+        rt_try_set_utilization(prv, svc->unit->domain,
+                               svc->period, svc->budget, 0, 0);
+        spin_unlock_irqrestore(&prv->lock, flags);
+    }
 
     xfree(svc);
 }
@@ -1389,7 +1491,8 @@ rt_validate_params(const struct xen_domctl_sched_rtds *rtds,
     s_time_t b = MICROSECS(rtds->budget);
 
     if ( p < RTDS_MIN_PERIOD || p > RTDS_MAX_PERIOD ||
-         b < RTDS_MIN_BUDGET || b > p )
+         b < RTDS_MIN_BUDGET || b > p ||
+         b > (s_time_t)RTDS_MAX_BUDGET )
         return -EINVAL;
 
     *period = p;
