@@ -368,17 +368,17 @@ constant expressions are required.\""
 # Series 11
 #
 
--doc_begin="The conversion from a function pointer to unsigned long or (void *) does not lose any information, provided that the target type has enough bits to store it."
+-doc_begin="The conversion from a function pointer to [unsigned] long or (void *) does not lose any information, provided that the target type has enough bits to store it."
 -config=MC3A2.R11.1,casts+={safe,
   "from(type(canonical(__function_pointer_types)))
-   &&to(type(canonical(builtin(unsigned long)||pointer(builtin(void)))))
+   &&to(type(canonical(builtin(long||unsigned long)||pointer(builtin(void)))))
    &&relation(definitely_preserves_value)"
 }
 -doc_end
 
--doc_begin="Conversion from unsigned long or (void *) to a function pointer can restore full information, provided that the source type has enough bits to restore it."
+-doc_begin="Conversion from [unsigned] long or (void *) to a function pointer can restore full information, provided that the source type has enough bits to restore it."
 -config=MC3A2.R11.1,casts+={safe,
-  "from(type(canonical(builtin(unsigned long)||pointer(builtin(void)))))
+  "from(type(canonical(builtin(long||unsigned long)||pointer(builtin(void)))))
    &&to(type(canonical(__function_pointer_types)))
    &&relation(definitely_preserves_value)"
 }
