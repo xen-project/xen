@@ -213,9 +213,25 @@ Basic development tools (git, gcc, make, editors) should not be listed.
 Specialised but deterministic tools may optionally be listed, but their use
 should be clear from other context in the commit message.
 
+Note that an `Assisted-by:` tag relates to the next tag mentioning a
+natural person. So if you used AI to write a patch, the `Assisted-by:` tag
+should be just before your `Signed-off-by:` tag, while if AI was used to
+find an issue the patch is fixing, the `Assisted-by:` tag should be
+before the `Reported-by:` tag naming the reporter of the issue.
+
+The `Assisted-by:` tag can be followed by an optional comment mentioning
+in which part of the process AI was used, e.g.:
+
+    Assisted-by: Chat-GPT # commit message
+
+This allows even to list multiple different AI models used for different
+use cases, including the use of AI for finding an issue and the creating
+a patch for fixing it.
+
 Example:
 
-    Assisted-by: Claude:claude-3-opus
+    Assisted-by: sashiko-bot # finding the issue
+    Assisted-by: Claude:claude-3-opus # patch creation
 
 ### Signed-off-by:
 
