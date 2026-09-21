@@ -208,7 +208,7 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
 /* The constraint may only specify non-call-clobbered registers. */
 #define reset_stack_and_call_ind(fn)                                    \
     ({                                                                  \
-        (void)((fn) == (void (*)(void))NULL);                           \
+        (void)((fn) == (typeof(dom_xen->arch.ctxt_switch->tail))NULL);  \
         switch_stack_and_jump(fn, "INDIRECT_CALL %", "b");              \
     })
 
