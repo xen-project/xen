@@ -2434,32 +2434,11 @@ static struct hvm_function_table __initdata_cf_clobber svm_function_table = {
     },
 };
 
-const struct hvm_function_table * __init start_svm(void)
+static void __init print_svm_features(void)
 {
     bool printed = false;
 
-    svm_host_osvw_reset();
-
-    if ( _svm_cpu_up(true) )
-    {
-        setup_clear_cpu_cap(X86_FEATURE_SVM);
-        printk("SVM: failed to initialise.\n");
-        return NULL;
-    }
-
-    setup_vmcb_dump();
-
-    if ( boot_cpu_data.extended_cpuid_level >= 0x8000000aU )
-        svm_feature_flags = cpuid_edx(0x8000000aU);
-
     printk("SVM: Supported advanced features:\n");
-
-    /* DecodeAssists fast paths assume nextrip is valid for fast rIP update. */
-    if ( !cpu_has_svm_nrips )
-        __clear_bit(SVM_FEATURE_DECODEASSISTS, &svm_feature_flags);
-
-    if ( cpu_has_tsc_ratio )
-        svm_function_table.tsc_scaling.ratio_frac_bits = 32;
 
 #define P(p,s) if ( p ) { printk(" - %s\n", s); printed = 1; }
     P(cpu_has_svm_npt, "Nested Page Tables (NPT)");
@@ -2481,10 +2460,36 @@ const struct hvm_function_table * __init start_svm(void)
 
     if ( !printed )
         printk(" - none\n");
+}
+
+const struct hvm_function_table * __init start_svm(void)
+{
+    svm_host_osvw_reset();
+
+    if ( _svm_cpu_up(true) )
+    {
+        setup_clear_cpu_cap(X86_FEATURE_SVM);
+        printk("SVM: failed to initialise.\n");
+        return NULL;
+    }
+
+    setup_vmcb_dump();
+
+    if ( boot_cpu_data.extended_cpuid_level >= 0x8000000aU )
+        svm_feature_flags = cpuid_edx(0x8000000aU);
+
+    /* DecodeAssists fast paths assume nextrip is valid for fast rIP update. */
+    if ( !cpu_has_svm_nrips )
+        __clear_bit(SVM_FEATURE_DECODEASSISTS, &svm_feature_flags);
+
+    if ( cpu_has_tsc_ratio )
+        svm_function_table.tsc_scaling.ratio_frac_bits = 32;
 
     svm_function_table.caps.hap = cpu_has_svm_npt;
     svm_function_table.caps.hap_superpage_2mb = true;
     svm_function_table.caps.hap_superpage_1gb = cpu_has_page1gb;
+
+    print_svm_features();
 
     return &svm_function_table;
 }
