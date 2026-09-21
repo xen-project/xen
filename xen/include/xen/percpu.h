@@ -36,7 +36,7 @@
 #include <xen/types.h>
 #include <asm/current.h>
 
-#ifndef PARK_OFFLINE_CPUS_VAR
+#if !defined(PARK_OFFLINE_CPUS_VAR) && !defined(park_offline_cpus)
 /*
  * Do we, for platform reasons, need to actually keep CPUs online when we
  * would otherwise prefer them to be off?

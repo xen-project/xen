@@ -25,12 +25,6 @@ DECLARE_PER_CPU(cpumask_var_t, scratch_cpumask);
 DECLARE_PER_CPU(cpumask_var_t, hpet_scratch_cpumask);
 DECLARE_PER_CPU(cpumask_var_t, send_ipi_cpumask);
 
-/*
- * Do we, for platform reasons, need to actually keep CPUs online when we
- * would otherwise prefer them to be off?
- */
-extern bool park_offline_cpus;
-
 void smp_send_nmi_allbutself(void);
 
 void send_IPI_mask(const cpumask_t *mask, int vector);

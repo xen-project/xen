@@ -716,15 +716,8 @@ static int cf_check cpu_callback(
         rc = cpu_bank_alloc(cpu);
         break;
 
-    case CPU_UP_CANCELED:
-    case CPU_DEAD:
-        if ( !park_offline_cpus )
-            cpu_bank_free(cpu);
-        break;
-
     case CPU_REMOVE:
-        if ( park_offline_cpus )
-            cpu_bank_free(cpu);
+        cpu_bank_free(cpu);
         break;
     }
 

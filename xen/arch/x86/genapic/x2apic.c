@@ -181,12 +181,8 @@ static int cf_check update_clusterinfo(
              !cond_alloc_cpumask_var(&per_cpu(scratch_mask, cpu)) )
             err = -ENOMEM;
         break;
-    case CPU_UP_CANCELED:
-    case CPU_DEAD:
+
     case CPU_REMOVE:
-        if ( park_offline_cpus == (action != CPU_REMOVE) ||
-             system_state == SYS_STATE_suspend )
-            break;
         if ( per_cpu(cluster_cpus, cpu) )
         {
             cpumask_clear_cpu(cpu, per_cpu(cluster_cpus, cpu));

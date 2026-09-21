@@ -443,9 +443,6 @@ void __init early_cpu_init(bool verbose)
 	 * here.
 	 */
 
-	if (!(c->vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)))
-		park_offline_cpus = opt_mce;
-
 	/*
 	 * If nominal freq isn't available, use highest, thus causing NOW()
 	 * output to move more slowly.  See preset_tsc_scale().

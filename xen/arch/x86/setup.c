@@ -2144,8 +2144,7 @@ void asmlinkage __init noreturn __start_xen(void)
             /* Set up node_to_cpumask based on cpu_to_node[]. */
             numa_add_cpu(i);
 
-            if ( (park_offline_cpus || num_online_cpus() < max_cpus) &&
-                 !cpu_online(i) )
+            if ( !cpu_online(i) )
             {
                 ret = cpu_up(i);
                 if ( ret != 0 )

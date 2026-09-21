@@ -67,8 +67,6 @@ DEFINE_PER_CPU_READ_MOSTLY(struct stubs, stubs);
 cpumask_t cpu_online_map __read_mostly;
 EXPORT_SYMBOL(cpu_online_map);
 
-bool __read_mostly park_offline_cpus;
-
 unsigned int __read_mostly nr_sockets;
 cpumask_t **__read_mostly socket_cpumask;
 static cpumask_t *secondary_socket_cpumask;
@@ -1151,7 +1149,7 @@ static int cf_check cpu_smpboot_callback(
         break;
     case CPU_UP_CANCELED:
     case CPU_DEAD:
-        cpu_smpboot_free(cpu, !park_offline_cpus);
+        cpu_smpboot_free(cpu, false);
         break;
     case CPU_REMOVE:
         cpu_smpboot_free(cpu, true);

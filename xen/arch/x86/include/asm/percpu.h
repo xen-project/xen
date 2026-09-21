@@ -1,7 +1,7 @@
 #ifndef __X86_PERCPU_H__
 #define __X86_PERCPU_H__
 
-#define PARK_OFFLINE_CPUS_VAR
+#define park_offline_cpus true
 
 /*
  * Force uses of per_cpu() with an invalid area to attempt to access the

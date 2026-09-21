@@ -80,16 +80,12 @@ void __init set_nr_cpu_ids(unsigned int max_cpus)
 	printk(XENLOG_INFO "SMP: Allowing %u CPUs (%d hotplug CPUs)\n",
 	       max_cpus, max_t(int, max_cpus - num_processors, 0));
 
-	if (!park_offline_cpus)
-		tot_cpus = max_cpus;
 	nr_cpu_ids = min(tot_cpus, NR_CPUS + 0u);
 	if (nr_cpu_ids < num_processors)
 	{
 		unaccounted_cpus = true;
-		if (park_offline_cpus)
-			printk(XENLOG_WARNING
-			       "SMP: Cannot bring up %u further CPUs\n",
-			       num_processors - nr_cpu_ids);
+		printk(XENLOG_WARNING "SMP: Cannot bring up %u further CPUs\n",
+		       num_processors - nr_cpu_ids);
 	}
 
 #ifndef nr_cpumask_bits

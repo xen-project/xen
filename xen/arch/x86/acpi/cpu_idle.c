@@ -436,7 +436,7 @@ static void cf_check dump_cx(unsigned char key)
 
         if ( cpu_online(cpu) )
             print_acpi_power(cpu, power);
-        else if ( park_offline_cpus )
+        else
             printk("CPU%u parked in state %u (C%u)\n", cpu,
                    power->last_state ? power->last_state->idx : 1,
                    power->last_state ? power->last_state->type : 1);
@@ -1360,7 +1360,7 @@ long set_cx_pminfo(uint32_t acpi_id, struct xen_processor_power *power)
          * If we've just learned of more available C states, wake the CPU if
          * it's parked, so it can go back to sleep in perhaps a deeper state.
          */
-        if ( park_offline_cpus && apic_id != BAD_APICID )
+        if ( apic_id != BAD_APICID )
         {
             unsigned long flags;
 

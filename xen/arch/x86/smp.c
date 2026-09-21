@@ -92,9 +92,7 @@ void send_IPI_mask(const cpumask_t *mask, int vector)
     if ( system_state > SYS_STATE_smp_boot &&
          !unaccounted_cpus && !disabled_cpus && !cpu_in_hotplug_context() &&
          /* NB: get_cpu_maps lock requires enabled interrupts. */
-         local_irq_is_enabled() && (cpus_locked = get_cpu_maps()) &&
-         (park_offline_cpus ||
-          cpumask_equal(&cpu_online_map, &cpu_present_map)) )
+         local_irq_is_enabled() && (cpus_locked = get_cpu_maps()) )
         cpumask_or(scratch, mask, cpumask_of(smp_processor_id()));
     else
     {
