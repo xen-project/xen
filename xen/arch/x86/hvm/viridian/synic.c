@@ -157,9 +157,14 @@ int viridian_synic_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
         if ( !(viridian_feature_mask(d) & HVMPV_synic) )
             return X86EMUL_EXCEPTION;
 
-        /* Vectors must be in the range 0x10-0xff inclusive */
+        /*
+         * Vectors must be in the range 0x10-0xff inclusive unless the vector
+         * is masked since Windows 11 Hyper-V (26H1) has been seen to write
+         * this MSR to its default value, despite not being a spec compliant
+         * value.
+         */
         new.as_uint64 = val;
-        if ( new.vector < 0x10 )
+        if ( new.vector < 0x10 && !new.masked )
             return X86EMUL_EXCEPTION;
 
         /*
