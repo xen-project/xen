@@ -399,11 +399,21 @@ rt_dump(const struct scheduler *ops)
     const struct rt_unit *svc;
     const struct rt_dom *sdom;
     unsigned long flags;
+    uint64_t cap;
 
     spin_lock_irqsave(&prv->lock, flags);
 
     if ( list_empty(&prv->sdom) )
         goto out;
+
+    cap = (uint64_t)cpumask_weight(ops->cpupool->res_valid) *
+          RTDS_UTIL_SCALE * RTDS_UTIL_CAP_PCT / 100;
+
+    if ( cap )
+        printk("Utilization: %llu%% of capacity\n",
+               (unsigned long long)(prv->utilization * 100 / cap));
+    else
+        printk("Utilization: cpupool has no capacity\n");
 
     runq = rt_runq(ops);
     depletedq = rt_depletedq(ops);
