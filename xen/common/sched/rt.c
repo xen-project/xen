@@ -216,6 +216,8 @@ struct rt_private {
 
     /* Sum of admitted units' (budget/period), scaled by RTDS_UTIL_SCALE */
     uint64_t utilization;
+
+    bool admission_control_enabled; /* on/off flag for admission control. */
 };
 
 /*
@@ -408,6 +410,9 @@ rt_dump(const struct scheduler *ops)
 
     cap = (uint64_t)cpumask_weight(ops->cpupool->res_valid) *
           RTDS_UTIL_SCALE * RTDS_UTIL_CAP_PCT / 100;
+
+    printk("Admission control: %s\n",
+            prv->admission_control_enabled ? "enabled" : "disabled");
 
     if ( cap )
         printk("Utilization: %llu%% of capacity\n",
@@ -694,8 +699,8 @@ rt_utilization_cap(const struct domain *d)
 /*
  * Replaces a unit's reservation and updates prv->utilization
  * to match. Growth that would push utilization over the
- * cpupool's cap is refused. Removing a unit or shrinking
- * a unit's reservation always succeed.
+ * cpupool's cap is refused if admission control is enabled.
+ * Removing a unit or shrinking a unit's reservation always succeed.
  */
 static bool
 rt_try_set_utilization(struct rt_private *prv, const struct domain *d,
@@ -706,7 +711,8 @@ rt_try_set_utilization(struct rt_private *prv, const struct domain *d,
     uint64_t new_util = rt_unit_utilization(new_period, new_budget);
     uint64_t total    = prv->utilization - old_util + new_util;
 
-    if ( new_util > old_util && total > rt_utilization_cap(d) )
+    if ( prv->admission_control_enabled &&
+         new_util > old_util && total > rt_utilization_cap(d) )
         return false;
 
     prv->utilization = total;
@@ -773,6 +779,7 @@ rt_init(struct scheduler *ops)
     INIT_LIST_HEAD(&prv->runq);
     INIT_LIST_HEAD(&prv->depletedq);
     INIT_LIST_HEAD(&prv->replq);
+    prv->admission_control_enabled = true;
 
     ops->sched_data = prv;
     rc = 0;
@@ -1565,8 +1572,14 @@ rt_dom_cntl(
         new_total = prv->utilization - dom_old_util +
                     (uint64_t)nr_units * new_util;
 
-        if ( new_total > prv->utilization && new_total > rt_utilization_cap(d) )
+        if ( prv->admission_control_enabled &&
+             new_total > prv->utilization && new_total > rt_utilization_cap(d) )
         {
+            printk(XENLOG_WARNING
+                   "RTDS: ADMISSION CONTROL: refusing d%d,"
+                   " would exceed utilization capacity of the cpupool\n",
+                   d->domain_id);
+
             spin_unlock_irqrestore(&prv->lock, flags);
             rc = -ENOSPC;
             break;
@@ -1631,6 +1644,11 @@ rt_dom_cntl(
                 if ( !rt_try_set_utilization(prv, d, svc->period, svc->budget,
                                               period, budget) )
                 {
+                    printk(XENLOG_WARNING
+                           "RTDS: ADMISSION CONTROL: refusing vcpu %u of d%d,"
+                           " would exceed utilization capacity of the cpupool\n",
+                           local_sched.vcpuid, d->domain_id);
+
                     spin_unlock_irqrestore(&prv->lock, flags);
                     rc = -ENOSPC;
                     break;
@@ -1690,6 +1708,34 @@ rt_dom_cntl(
 
     return rc;
 }
+
+#ifdef CONFIG_SYSCTL
+static int cf_check
+rt_sys_cntl(const struct scheduler *ops,
+             struct xen_sysctl_scheduler_op *sc)
+{
+    struct xen_sysctl_rtds_schedule *params = &sc->u.sched_rtds;
+    struct rt_private *prv = rt_priv(ops);
+    unsigned long flags;
+
+    switch ( sc->cmd )
+    {
+    case XEN_SYSCTL_SCHEDOP_putinfo:
+        spin_lock_irqsave(&prv->lock, flags);
+        prv->admission_control_enabled = params->admission_control_enabled;
+        spin_unlock_irqrestore(&prv->lock, flags);
+        break;
+
+    case XEN_SYSCTL_SCHEDOP_getinfo:
+        spin_lock_irqsave(&prv->lock, flags);
+        params->admission_control_enabled = prv->admission_control_enabled;
+        spin_unlock_irqrestore(&prv->lock, flags);
+        break;
+    }
+
+    return 0;
+}
+#endif
 
 /*
  * The replenishment timer handler picks units
@@ -1791,6 +1837,9 @@ static const struct sched_ops sched_rtds_def = {
     .remove_unit    = rt_unit_remove,
 
     .adjust         = rt_dom_cntl,
+#ifdef CONFIG_SYSCTL
+    .adjust_global  = rt_sys_cntl,
+#endif
 
     .pick_resource  = rt_res_pick,
     .do_schedule    = rt_schedule,

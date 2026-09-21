@@ -814,6 +814,10 @@ struct xen_sysctl_credit2_schedule {
     uint32_t ratelimit_us;
 };
 
+struct xen_sysctl_rtds_schedule {
+    uint8_t admission_control_enabled;
+};
+
 /* XEN_SYSCTL_scheduler_op */
 /* Set or get info? */
 #define XEN_SYSCTL_SCHEDOP_putinfo 0
@@ -828,6 +832,7 @@ struct xen_sysctl_scheduler_op {
         } sched_arinc653;
         struct xen_sysctl_credit_schedule sched_credit;
         struct xen_sysctl_credit2_schedule sched_credit2;
+        struct xen_sysctl_rtds_schedule sched_rtds;
     } u;
 };
 
