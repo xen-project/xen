@@ -1527,11 +1527,43 @@ rt_dom_cntl(
         op->u.rtds.budget = RTDS_DEFAULT_BUDGET / MICROSECS(1);
         break;
     case XEN_DOMCTL_SCHEDOP_putinfo:
+    {
+        uint64_t dom_old_util = 0, new_util, new_total;
+        unsigned int nr_units = 0;
+
         rc = rt_validate_params(&op->u.rtds, &period, &budget);
         if ( rc )
             break;
 
+        new_util = rt_unit_utilization(period, budget);
+
         spin_lock_irqsave(&prv->lock, flags);
+
+        /*
+         * Same (period, budget) for every unit of d: test and commit
+         * the domain's whole utilization delta atomically, rather
+         * than unit-by-unit, which could spuriously reject an
+         * overall-acceptable change depending on iteration order.
+         */
+        for_each_sched_unit ( d, unit )
+        {
+            svc = rt_unit(unit);
+            dom_old_util += rt_unit_utilization(svc->period, svc->budget);
+            nr_units++;
+        }
+
+        new_total = prv->utilization - dom_old_util +
+                    (uint64_t)nr_units * new_util;
+
+        if ( new_total > prv->utilization && new_total > rt_utilization_cap(d) )
+        {
+            spin_unlock_irqrestore(&prv->lock, flags);
+            rc = -ENOSPC;
+            break;
+        }
+
+        prv->utilization = new_total;
+
         for_each_sched_unit ( d, unit )
         {
             svc = rt_unit(unit);
@@ -1540,6 +1572,7 @@ rt_dom_cntl(
         }
         spin_unlock_irqrestore(&prv->lock, flags);
         break;
+    }
     case XEN_DOMCTL_SCHEDOP_getvcpuinfo:
     case XEN_DOMCTL_SCHEDOP_putvcpuinfo:
         while ( index < op->u.v.nr_vcpus )
@@ -1584,6 +1617,15 @@ rt_dom_cntl(
 
                 spin_lock_irqsave(&prv->lock, flags);
                 svc = rt_unit(d->vcpu[local_sched.vcpuid]->sched_unit);
+
+                if ( !rt_try_set_utilization(prv, d, svc->period, svc->budget,
+                                              period, budget) )
+                {
+                    spin_unlock_irqrestore(&prv->lock, flags);
+                    rc = -ENOSPC;
+                    break;
+                }
+
                 svc->period = period;
                 svc->budget = budget;
                 if ( local_sched.u.rtds.flags & XEN_DOMCTL_SCHEDRT_extra )
