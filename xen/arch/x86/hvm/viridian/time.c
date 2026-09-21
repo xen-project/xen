@@ -223,6 +223,21 @@ static void start_stimer(struct viridian_stimer *vs)
     set_timer(&vs->timer, timeout + NOW());
 }
 
+static bool stimer_direct_mode(const struct vcpu *v,
+                               const union hv_stimer_config *config)
+{
+    return (viridian_feature_mask(v->domain) & HVMPV_stimer_direct) &&
+           config->direct_mode;
+}
+
+static void stimer_deliver_direct(struct vcpu *v, const struct viridian_stimer *vs)
+{
+    struct vlapic *vlapic = vcpu_vlapic(v);
+
+    if ( vlapic_enabled(vlapic) )
+        vlapic_set_irq(vlapic, vs->config.apic_vector, 0);
+}
+
 static void poll_stimer(struct vcpu *v, unsigned int stimerx)
 {
     struct viridian_vcpu *vv = v->arch.hvm.viridian;
@@ -242,9 +257,11 @@ static void poll_stimer(struct vcpu *v, unsigned int stimerx)
     if ( !test_bit(stimerx, &vv->stimer_pending) )
         return;
 
-    if ( !viridian_synic_deliver_timer_msg(v, vs->config.sintx,
-                                           stimerx, vs->expiration,
-                                           time_ref_count(v->domain)) )
+    if ( stimer_direct_mode(v, &vs->config) )
+        stimer_deliver_direct(v, vs);
+    else if ( !viridian_synic_deliver_timer_msg(v, vs->config.sintx,
+                                                stimerx, vs->expiration,
+                                                time_ref_count(v->domain)) )
         return;
 
     clear_bit(stimerx, &vv->stimer_pending);
@@ -361,6 +378,7 @@ int viridian_time_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
     case HV_X64_MSR_STIMER2_CONFIG:
     case HV_X64_MSR_STIMER3_CONFIG:
     {
+        union hv_stimer_config new;
         unsigned int stimerx = (idx - HV_X64_MSR_STIMER0_CONFIG) / 2;
         struct viridian_stimer *vs =
             &array_access_nospec(vv->stimer, stimerx);
@@ -368,11 +386,21 @@ int viridian_time_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
         if ( !(viridian_feature_mask(d) & HVMPV_stimer) )
             return X86EMUL_EXCEPTION;
 
+        new.as_uint64 = val;
+
+        if ( new.reserved_z0 || new.reserved_z1 )
+            return X86EMUL_EXCEPTION;
+
+        if ( stimer_direct_mode(v, &new) ?
+             new.apic_vector < 0x10 : new.apic_vector )
+            return X86EMUL_EXCEPTION;
+
         stop_stimer(vs);
 
         vs->config.as_uint64 = val;
 
-        if ( !vs->config.sintx || !vs->count )
+        if ( (!stimer_direct_mode(v, &vs->config) && !vs->config.sintx) ||
+             !vs->count )
             vs->config.enable = 0;
 
         if ( vs->config.enable )
@@ -583,8 +611,12 @@ void viridian_time_load_vcpu_ctxt(
 
         vs->config.as_uint64 = ctxt->stimer_config_msr[i];
         vs->count = ctxt->stimer_count_msr[i];
-        if ( !vs->config.sintx || !vs->count )
-            /* Reject enabling with a zero sintx or count fields. */
+        if ( (!stimer_direct_mode(v, &vs->config) && !vs->config.sintx) ||
+             !vs->count )
+            /*
+             * Reject enabling with a zero sintx (if not using direct mode) or
+             * zero count field.
+             */
             vs->config.enable = 0;
     }
 }

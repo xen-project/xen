@@ -159,6 +159,10 @@
 #define _HVMPV_cpu_hotplug 12
 #define HVMPV_cpu_hotplug (1 << _HVMPV_cpu_hotplug)
 
+/* Enable STIMER direct mode */
+#define _HVMPV_stimer_direct 13
+#define HVMPV_stimer_direct (1 << _HVMPV_stimer_direct)
+
 #define HVMPV_feature_mask \
         (HVMPV_base_freq | \
          HVMPV_no_freq | \
@@ -172,7 +176,8 @@
          HVMPV_hcall_ipi | \
          HVMPV_ex_processor_masks | \
          HVMPV_no_vp_limit | \
-         HVMPV_cpu_hotplug)
+         HVMPV_cpu_hotplug | \
+         HVMPV_stimer_direct)
 
 #endif
 
