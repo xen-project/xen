@@ -155,6 +155,13 @@ static int construct_vmcb(struct vcpu *v)
             ~(CR_INTERCEPT_CR3_READ|CR_INTERCEPT_CR3_WRITE);
 
         /*
+         * Xen is not interested in changes to the MP and TS bits so use
+         * CR0_SEL_WRITE to avoid unnecessary intercepts.
+         */
+        vmcb->_cr_intercepts &= ~CR_INTERCEPT_CR0_WRITE;
+        vmcb->_general1_intercepts |= GENERAL1_INTERCEPT_CR0_SEL_WRITE;
+
+        /*
          * No point in intercepting INVLPG if we don't have shadow pagetables
          * that need to be fixed up.
          */

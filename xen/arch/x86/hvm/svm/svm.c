@@ -1640,7 +1640,8 @@ static void svm_vmexit_do_cr_access(
 {
     int gp, cr, dir, rc;
 
-    cr = vmcb->exitcode - VMEXIT_CR0_READ;
+    cr = (vmcb->exitcode == VMEXIT_CR0_SEL_WRITE)
+         ? 16 : (vmcb->exitcode - VMEXIT_CR0_READ);
     dir = (cr > 15);
     cr &= 0xf;
     gp = vmcb->ei.mov_cr.gpr;
@@ -2519,7 +2520,10 @@ void asmlinkage svm_vmexit_handler(void)
 
     v->arch.hvm.guest_cr[2] = vmcb_get_cr2(vmcb);
     if ( paging_mode_hap(v->domain) )
+    {
+        v->arch.hvm.guest_cr[0] = vmcb_get_cr0(vmcb);
         v->arch.hvm.guest_cr[3] = v->arch.hvm.hw_cr[3] = vmcb_get_cr3(vmcb);
+    }
 
     if ( nestedhvm_enabled(v->domain) && nestedhvm_vcpu_in_guestmode(v) )
         vcpu_guestmode = 1;
@@ -2883,6 +2887,7 @@ void asmlinkage svm_vmexit_handler(void)
 
     case VMEXIT_CR0_READ ... VMEXIT_CR15_READ:
     case VMEXIT_CR0_WRITE ... VMEXIT_CR15_WRITE:
+    case VMEXIT_CR0_SEL_WRITE:
         if ( cpu_has_svm_decode && vmcb->ei.mov_cr.mov_insn )
             svm_vmexit_do_cr_access(vmcb, regs);
         else if ( !hvm_emulate_one_insn(x86_insn_is_cr_access, "CR access") )
