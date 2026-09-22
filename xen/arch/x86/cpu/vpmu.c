@@ -417,7 +417,7 @@ static int vpmu_arch_initialise(struct vcpu *v)
     {
         if ( vpmu_mode != XENPMU_MODE_OFF )
         {
-            printk(XENLOG_G_WARNING "VPMU: Unknown CPU vendor %d. "
+            printk(XENLOG_G_WARNING "VPMU: Unknown CPU vendor %u. "
                    "Disabling VPMU\n", vendor);
             opt_vpmu_enabled = 0;
             vpmu_mode = XENPMU_MODE_OFF;
@@ -849,7 +849,7 @@ static int __init cf_check vpmu_init(void)
 #endif
 
     default:
-        printk(XENLOG_WARNING "VPMU: Unknown CPU vendor: %d. "
+        printk(XENLOG_WARNING "VPMU: Unknown CPU vendor: %u. "
                "Turning VPMU off.\n", vendor);
         break;
     }
