@@ -33,6 +33,19 @@ final-image-check-y ?= true
 	$(LD) $(XEN_LDFLAGS) -T $(obj)/xen.lds $(filter %.o,$^) \
 	      $(build_id_linker) --strip-debug -o $@
 
+ifneq ($(LAST_LINKING_PASS),2)
+
+.$(TARGET)-syms.2: $(objtree)/prelink.o .$(TARGET)-syms.2.o $(obj)/xen.lds
+	if ! { $(call compare-symbol-tables, .$(TARGET)-syms.1.o, .$(TARGET)-syms.2.o) >/dev/null; }; \
+	then \
+		$(LD) $(XEN_LDFLAGS) -T $(obj)/xen.lds $(filter %.o,$^) \
+		      $(build_id_linker) --strip-debug -o $@; \
+	else \
+		ln -sf .$(TARGET)-syms.1 $@; \
+	fi
+
+endif
+
 .$(TARGET)-syms.$(LAST_LINKING_PASS): $(objtree)/prelink.o \
                                       .$(TARGET)-syms.$(LAST_LINKING_PASS).o \
                                       $(obj)/xen.lds
