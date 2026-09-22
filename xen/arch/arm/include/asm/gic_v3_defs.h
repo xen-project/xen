@@ -63,7 +63,6 @@
 #define GICD_IROUTERnE               (0x8000)
 #define GICD_IROUTERnEN              (0x9FFC)
 
-#ifdef CONFIG_GICV3_ESPI
 #define GICD_TYPER_ESPI_SHIFT        8
 #define GICD_TYPER_ESPI_RANGE_SHIFT  27
 #define GICD_TYPER_ESPI_RANGE_MASK   (0x1F)
@@ -73,7 +72,6 @@
 #define GICD_TYPER_ESPIS_NUM(typer)    \
         (((typer) & GICD_TYPER_ESPI) ? \
         GICD_TYPER_ESPI_RANGE((typer) >> GICD_TYPER_ESPI_RANGE_SHIFT) : 0)
-#endif
 
 /* Common between GICD_PIDR2 and GICR_PIDR2 */
 #define GIC_PIDR2_ARCH_MASK         (0xf0)

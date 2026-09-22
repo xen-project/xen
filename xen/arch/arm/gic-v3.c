@@ -703,17 +703,32 @@ unsigned int gic_number_espis(void)
     return gic_hw_ops->info->nr_espi;
 }
 
+static void __init gicv3_dist_espi_init_aff(uint64_t affinity)
+{
+    unsigned int i;
+
+    for ( i = 0; i < gicv3_info.nr_espi; i++ )
+        writeq_relaxed_non_atomic(affinity, GICD + GICD_IROUTERnE + i * 8);
+}
+#else
+
+static void __init gicv3_dist_espi_init_aff(uint64_t affinity) { }
+#endif
+
 static void __init gicv3_dist_espi_common_init(uint32_t type)
 {
     unsigned int espi_nr, i;
 
     espi_nr = min(1024U, GICD_TYPER_ESPIS_NUM(type));
+#ifdef CONFIG_GICV3_ESPI
     gicv3_info.nr_espi = espi_nr;
+#endif
     /* The GIC HW doesn't support eSPI, so we can leave from here */
-    if ( gicv3_info.nr_espi == 0 )
+    if ( espi_nr == 0 )
         return;
 
-    printk("GICv3: %u eSPI lines\n", gicv3_info.nr_espi);
+    if ( IS_ENABLED(CONFIG_GICV3_ESPI) )
+        printk("GICv3: %u eSPI lines\n", espi_nr);
 
     /* The configuration for eSPIs is similar to that for regular SPIs */
     for ( i = 0; i < espi_nr; i += 16 )
@@ -732,19 +747,6 @@ static void __init gicv3_dist_espi_common_init(uint32_t type)
     for ( i = 0; i < espi_nr; i += 32 )
         writel_relaxed(GENMASK(31, 0), GICD + GICD_IGROUPRnE + (i / 32) * 4);
 }
-
-static void __init gicv3_dist_espi_init_aff(uint64_t affinity)
-{
-    unsigned int i;
-
-    for ( i = 0; i < gicv3_info.nr_espi; i++ )
-        writeq_relaxed_non_atomic(affinity, GICD + GICD_IROUTERnE + i * 8);
-}
-#else
-static void __init gicv3_dist_espi_common_init(uint32_t type) { }
-
-static void __init gicv3_dist_espi_init_aff(uint64_t affinity) { }
-#endif
 
 static void __init gicv3_dist_init(void)
 {
