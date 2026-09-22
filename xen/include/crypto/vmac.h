@@ -69,7 +69,7 @@ typedef u32 aes_int_key[4*(VMAC_KEY_LEN/32+7)];
 	    				    (u8 *)(in), (u8 *)(out))
 #define aes_key_setup(user_key,int_key)                 \
 	    	rijndaelKeySetupEnc((u32 *)(int_key),       \
-	    	                    (u8 *)(user_key), \
+	    	                    (const u8 *)(user_key), \
 	    	                    VMAC_KEY_LEN)
 #endif
 
