@@ -109,29 +109,37 @@ static unsigned long copy_guest(void *buf, uint64_t addr, unsigned long len,
 
 unsigned long raw_copy_to_guest(void *to, const void *from, unsigned int len)
 {
+    struct vcpu *curr = current;
+
     return copy_guest((void *)from, /* COPY_to_guest doesn't modify */
-                      (vaddr_t)to, len, GVA_INFO(current),
+                      (vaddr_t)to, len, GVA_INFO(curr),
                       COPY_to_guest | COPY_linear);
 }
 
 unsigned long raw_copy_to_guest_flush_dcache(void *to, const void *from,
                                              unsigned int len)
 {
+    struct vcpu *curr = current;
+
     return copy_guest((void *)from, /* COPY_to_guest doesn't modify */
-                      (vaddr_t)to, len, GVA_INFO(current),
+                      (vaddr_t)to, len, GVA_INFO(curr),
                       COPY_to_guest | COPY_flush_dcache | COPY_linear);
 }
 
 unsigned long raw_clear_guest(void *to, unsigned int len)
 {
-    return copy_guest(NULL, (vaddr_t)to, len, GVA_INFO(current),
+    struct vcpu *curr = current;
+
+    return copy_guest(NULL, (vaddr_t)to, len, GVA_INFO(curr),
                       COPY_to_guest | COPY_linear);
 }
 
 unsigned long raw_copy_from_guest(void *to, const void __user *from,
                                   unsigned int len)
 {
-    return copy_guest(to, (vaddr_t)from, len, GVA_INFO(current),
+    struct vcpu *curr = current;
+
+    return copy_guest(to, (vaddr_t)from, len, GVA_INFO(curr),
                       COPY_from_guest | COPY_linear);
 }
 
