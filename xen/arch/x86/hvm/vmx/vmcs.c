@@ -1141,7 +1141,7 @@ static int construct_vmcs(struct vcpu *v)
           SECONDARY_EXEC_ENABLE_VM_FUNCTIONS |
           SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS);
 
-    if ( paging_mode_hap(d) )
+    if ( !paging_mode_shadow(d) )
     {
         v->arch.hvm.vmx.exec_control &= ~(CPU_BASED_INVLPG_EXITING |
                                           CPU_BASED_CR3_LOAD_EXITING |
@@ -1203,7 +1203,7 @@ static int construct_vmcs(struct vcpu *v)
         vmx_clear_msr_intercept(v, MSR_IA32_SYSENTER_CS, VMX_MSR_RW);
         vmx_clear_msr_intercept(v, MSR_IA32_SYSENTER_ESP, VMX_MSR_RW);
         vmx_clear_msr_intercept(v, MSR_IA32_SYSENTER_EIP, VMX_MSR_RW);
-        if ( paging_mode_hap(d) && (!is_iommu_enabled(d) || iommu_snoop) )
+        if ( !paging_mode_shadow(d) && (!is_iommu_enabled(d) || iommu_snoop) )
             vmx_clear_msr_intercept(v, MSR_IA32_CR_PAT, VMX_MSR_RW);
         if ( (vmexit_ctl & VM_EXIT_CLEAR_BNDCFGS) &&
              (vmentry_ctl & VM_ENTRY_LOAD_BNDCFGS) )
@@ -1326,8 +1326,8 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(GUEST_DR7, 0);
     __vmwrite(VMCS_LINK_POINTER, ~0UL);
 
-    v->arch.hvm.vmx.exception_bitmap = HVM_TRAP_MASK
-              | (paging_mode_hap(d) ? 0 : (1U << X86_EXC_PF));
+    v->arch.hvm.vmx.exception_bitmap = HVM_TRAP_MASK |
+        (!paging_mode_shadow(d) ? 0 : (1U << X86_EXC_PF));
 
     if ( cpu_has_vmx_notify_vm_exiting )
         __vmwrite(NOTIFY_WINDOW, vm_notify_window);
@@ -1347,7 +1347,7 @@ static int construct_vmcs(struct vcpu *v)
         __vmwrite(TPR_THRESHOLD, 0);
     }
 
-    if ( paging_mode_hap(d) )
+    if ( !paging_mode_shadow(d) )
     {
         struct p2m_domain *p2m = p2m_get_hostp2m(d);
         struct ept_data *ept = &p2m->ept;
@@ -1377,7 +1377,7 @@ static int construct_vmcs(struct vcpu *v)
 
     vmx_vlapic_msr_changed(v);
 
-    if ( opt_l1d_flush && paging_mode_hap(d) )
+    if ( opt_l1d_flush && !paging_mode_shadow(d) )
         rc = vmx_add_msr(v, MSR_FLUSH_CMD, FLUSH_CMD_L1D,
                          VMX_MSR_GUEST_LOADONLY);
 

@@ -143,7 +143,7 @@ static int construct_vmcb(struct vcpu *v)
 
     vmcb->_exception_intercepts = HVM_TRAP_MASK;
 
-    if ( paging_mode_hap(v->domain) )
+    if ( !paging_mode_shadow(v->domain) )
     {
         vmcb_set_np(vmcb, true); /* enable nested paging */
         vmcb->_g_pat = MSR_IA32_CR_PAT_RESET; /* guest PAT */

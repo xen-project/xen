@@ -1707,7 +1707,7 @@ static void cf_check vmx_update_guest_cr(
         if ( paging_mode_shadow(v->domain) )
             hw_cr0_mask |= X86_CR0_WP;
 
-        if ( paging_mode_hap(v->domain) )
+        if ( !paging_mode_shadow(v->domain) )
         {
             /* Manage GUEST_CR3 when CR0.PE=0. */
             uint32_t old_ctls = v->arch.hvm.vmx.exec_control;
@@ -1772,7 +1772,7 @@ static void cf_check vmx_update_guest_cr(
         /* Fallthrough: Changing CR0 can change some bits in real CR4. */
     case 4:
         v->arch.hvm.hw_cr[4] = HVM_CR4_HOST_MASK;
-        if ( paging_mode_hap(v->domain) )
+        if ( !paging_mode_shadow(v->domain) )
             v->arch.hvm.hw_cr[4] &= ~X86_CR4_PAE;
 
         if ( !nestedhvm_vcpu_in_guestmode(v) )
@@ -1792,7 +1792,7 @@ static void cf_check vmx_update_guest_cr(
              * two subtly complicated cases.
              */
 
-            if ( paging_mode_hap(v->domain) )
+            if ( !paging_mode_shadow(v->domain) )
             {
                 /*
                  * On hardware lacking the Unrestricted Guest feature (or with
@@ -1824,7 +1824,7 @@ static void cf_check vmx_update_guest_cr(
          * unconditionally trapping more CR4 bits, at which point the
          * performance benefit of doing this is quite dubious.
          */
-        if ( paging_mode_hap(v->domain) )
+        if ( !paging_mode_shadow(v->domain) )
         {
             /*
              * Update CR4 host mask to only trap when the guest tries to set
@@ -1860,7 +1860,7 @@ static void cf_check vmx_update_guest_cr(
         break;
 
     case 3:
-        if ( paging_mode_hap(v->domain) )
+        if ( !paging_mode_shadow(v->domain) )
         {
             if ( !hvm_paging_enabled(v) && !vmx_unrestricted_guest(v) )
                 v->arch.hvm.hw_cr[3] =
@@ -4190,7 +4190,7 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     hvm_sanitize_regs_fields(regs, !(cs_ar_bytes & X86_SEG_AR_CS_LM_ACTIVE));
 
-    if ( paging_mode_hap(v->domain) )
+    if ( !paging_mode_shadow(v->domain) )
     {
         /*
          * Xen allows the guest to modify some CR4 bits directly, update cached
@@ -4979,7 +4979,7 @@ bool asmlinkage vmx_vmenter_helper(const struct cpu_user_regs *regs)
     if ( unlikely(need_flush) )
         vpid_sync_all();
 
-    if ( paging_mode_hap(curr->domain) )
+    if ( !paging_mode_shadow(curr->domain) )
     {
         struct ept_data *ept = &p2m_get_hostp2m(currd)->ept;
         unsigned int cpu = smp_processor_id();

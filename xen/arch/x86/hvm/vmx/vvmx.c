@@ -2458,7 +2458,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
          */
         if ( vector == X86_EXC_PF )
         {
-            if ( paging_mode_hap(v->domain) )
+            if ( !paging_mode_shadow(v->domain) )
                 nvcpu->nv_vmexit_pending = 1;
         }
         else if ( (intr_info & valid_mask) == valid_mask )

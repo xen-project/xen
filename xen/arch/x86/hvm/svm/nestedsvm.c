@@ -8,7 +8,7 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/svm.h>
 #include <asm/hvm/nestedhvm.h>
-#include <asm/paging.h> /* paging_mode_hap */
+#include <asm/paging.h> /* paging_mode_(hap|shadow)() */
 #include <asm/event.h> /* for local_event_delivery_(en|dis)able */
 #include <asm/p2m.h> /* p2m_get_pagetable, p2m_get_nestedp2m */
 #include <asm/x86_emulate.h>
@@ -243,7 +243,7 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
         /* host nested paging + guest nested paging. */
         /* hvm_set_cr3() below sets v->arch.hvm.guest_cr[3] for us. */
     }
-    else if ( paging_mode_hap(v->domain) )
+    else if ( !paging_mode_shadow(v->domain) )
     {
         /* host nested paging + guest shadow paging. */
         /* hvm_set_cr3() below sets v->arch.hvm.guest_cr[3] for us. */
@@ -525,7 +525,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
         if ( rc != X86EMUL_OKAY )
             gdprintk(XENLOG_ERR, "hvm_set_cr3 failed, rc: %u\n", rc);
     }
-    else if ( paging_mode_hap(v->domain) )
+    else if ( !paging_mode_shadow(v->domain) )
     {
         /* host nested paging + guest shadow paging. */
         vmcb_set_np(n2vmcb, true);
@@ -1033,7 +1033,7 @@ nsvm_vmcb_prepare4vmexit(struct vcpu *v, struct cpu_user_regs *regs)
          * unshadowed guest h_cr3 is kept in ns_vmcb->h_cr3,
          * hence we keep the ns_vmcb->h_cr3 value. */
     }
-    else if ( paging_mode_hap(v->domain) )
+    else if ( !paging_mode_shadow(v->domain) )
     {
         /* host nested paging + guest shadow paging. */
         vmcb_set_np(ns_vmcb, false);
@@ -1260,7 +1260,7 @@ nestedsvm_check_intercepts(struct vcpu *v, struct cpu_user_regs *regs,
             /* host nested paging + guest nested paging */
             return NESTEDHVM_VMEXIT_HOST;
         }
-        if ( paging_mode_hap(v->domain) )
+        if ( !paging_mode_shadow(v->domain) )
         {
             if ( is_intercepted )
                 return NESTEDHVM_VMEXIT_FATALERROR;
@@ -1559,7 +1559,7 @@ void svm_nested_features_on_efer_update(struct vcpu *v)
     if ( nsvm_efer_svm_enabled(v) )
     {
         if ( !vmcb->virt_ext.fields.vloadsave_enable &&
-             paging_mode_hap(v->domain) &&
+             !paging_mode_shadow(v->domain) &&
              cpu_has_svm_vloadsave )
         {
             vmcb->virt_ext.fields.vloadsave_enable = 1;

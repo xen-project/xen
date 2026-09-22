@@ -113,7 +113,8 @@ static void cf_check svm_update_guest_cr(
     switch ( cr )
     {
     case 0:
-        if ( paging_mode_hap(v->domain) )
+        value = v->arch.hvm.guest_cr[0];
+        if ( !paging_mode_shadow(v->domain) )
         {
             uint32_t intercepts = vmcb_get_cr_intercepts(vmcb);
 
@@ -122,9 +123,7 @@ static void cf_check svm_update_guest_cr(
                  monitor_ctrlreg_bitmask(VM_EVENT_X86_CR3) )
                vmcb_set_cr_intercepts(vmcb, intercepts | CR_INTERCEPT_CR3_WRITE);
         }
-
-        value = v->arch.hvm.guest_cr[0];
-        if ( paging_mode_shadow(v->domain) )
+        else
             value |= X86_CR0_PG | X86_CR0_WP;
         vmcb_set_cr0(vmcb, value);
         break;
@@ -148,7 +147,7 @@ static void cf_check svm_update_guest_cr(
         break;
     case 4:
         value = HVM_CR4_HOST_MASK;
-        if ( paging_mode_hap(v->domain) )
+        if ( !paging_mode_shadow(v->domain) )
             value &= ~X86_CR4_PAE;
         value |= v->arch.hvm.guest_cr[4];
 
@@ -418,7 +417,7 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     svm_update_guest_cr(v, 0, 0);
     svm_update_guest_cr(v, 4, 0);
 
-    if ( paging_mode_hap(v->domain) )
+    if ( !paging_mode_shadow(v->domain) )
     {
         vmcb_set_np(vmcb, true);
         vmcb_set_g_pat(vmcb, MSR_IA32_CR_PAT_RESET /* guest PAT */);
@@ -2519,7 +2518,7 @@ void asmlinkage svm_vmexit_handler(void)
         regs, !(vmcb_get_efer(vmcb) & EFER_LMA) || !(vmcb->cs.l));
 
     v->arch.hvm.guest_cr[2] = vmcb_get_cr2(vmcb);
-    if ( paging_mode_hap(v->domain) )
+    if ( !paging_mode_shadow(v->domain) )
     {
         v->arch.hvm.guest_cr[0] = vmcb_get_cr0(vmcb);
         v->arch.hvm.guest_cr[3] = v->arch.hvm.hw_cr[3] = vmcb_get_cr3(vmcb);
