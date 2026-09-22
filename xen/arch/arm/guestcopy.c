@@ -109,14 +109,16 @@ static unsigned long copy_guest(void *buf, uint64_t addr, unsigned long len,
 
 unsigned long raw_copy_to_guest(void *to, const void *from, unsigned int len)
 {
-    return copy_guest((void *)from, (vaddr_t)to, len,
-                      GVA_INFO(current), COPY_to_guest | COPY_linear);
+    return copy_guest((void *)from, /* COPY_to_guest doesn't modify */
+                      (vaddr_t)to, len, GVA_INFO(current),
+                      COPY_to_guest | COPY_linear);
 }
 
 unsigned long raw_copy_to_guest_flush_dcache(void *to, const void *from,
                                              unsigned int len)
 {
-    return copy_guest((void *)from, (vaddr_t)to, len, GVA_INFO(current),
+    return copy_guest((void *)from, /* COPY_to_guest doesn't modify */
+                      (vaddr_t)to, len, GVA_INFO(current),
                       COPY_to_guest | COPY_flush_dcache | COPY_linear);
 }
 

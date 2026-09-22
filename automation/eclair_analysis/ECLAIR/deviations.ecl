@@ -433,6 +433,12 @@ Fixing this violation would require to increase code complexity and lower readab
 -config=MC3A2.R11.8,reports+={safe,"any_area(any_loc(any_exp(macro(^container_of$))))"}
 -doc_end
 
+-doc_begin="Function copy_guest() in xen/arch/arm/guestcopy.c is a double-use
+function, where the parameter needs to not be const because it can be set for
+write or not"
+-config=MC3A2.R11.8,reports+={safe,"any_area(any_loc(text(^.*copy_guest.*COPY_to_guest doesn't modify.*$)))"}
+-doc_end
+
 -doc_begin="Function __hvm_copy in xen/arch/x86/hvm/hvm.c is a double-use
 function, where the parameter needs to not be const because it can be set for
 write or not"
