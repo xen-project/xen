@@ -129,7 +129,9 @@ guest_walk_tables(const struct vcpu *v, struct p2m_domain *p2m,
             guest_l4_table_offset(va) * sizeof(gw->l4e);
     if ( !hvmemul_read_cache(v, l4gpa, &gw->l4e, sizeof(gw->l4e)) )
     {
-        gw->l4e = (guest_l4e_t){ ACCESS_ONCE(l4p[guest_l4_table_offset(va)].l4) };
+        guest_intpte_t l4e = ACCESS_ONCE(l4p[guest_l4_table_offset(va)].l4);
+
+        gw->l4e = (guest_l4e_t){ l4e };
         hvmemul_write_cache(v, l4gpa, &gw->l4e, sizeof(gw->l4e));
     }
     gflags = guest_l4e_get_flags(gw->l4e);
@@ -164,7 +166,9 @@ guest_walk_tables(const struct vcpu *v, struct p2m_domain *p2m,
             guest_l3_table_offset(va) * sizeof(gw->l3e);
     if ( !hvmemul_read_cache(v, l3gpa, &gw->l3e, sizeof(gw->l3e)) )
     {
-        gw->l3e = (guest_l3e_t){ ACCESS_ONCE(l3p[guest_l3_table_offset(va)].l3) };
+        guest_intpte_t l3e = ACCESS_ONCE(l3p[guest_l3_table_offset(va)].l3);
+
+        gw->l3e = (guest_l3e_t){ l3e };
         hvmemul_write_cache(v, l3gpa, &gw->l3e, sizeof(gw->l3e));
     }
     gflags = guest_l3e_get_flags(gw->l3e);
@@ -264,7 +268,9 @@ guest_walk_tables(const struct vcpu *v, struct p2m_domain *p2m,
     l2gpa += guest_l2_table_offset(va) * sizeof(gw->l2e);
     if ( !hvmemul_read_cache(v, l2gpa, &gw->l2e, sizeof(gw->l2e)) )
     {
-        gw->l2e = (guest_l2e_t){ ACCESS_ONCE(l2p[guest_l2_table_offset(va)].l2) };
+        guest_intpte_t l2e = ACCESS_ONCE(l2p[guest_l2_table_offset(va)].l2);
+
+        gw->l2e = (guest_l2e_t){ l2e };
         hvmemul_write_cache(v, l2gpa, &gw->l2e, sizeof(gw->l2e));
     }
 
@@ -353,7 +359,9 @@ guest_walk_tables(const struct vcpu *v, struct p2m_domain *p2m,
             guest_l1_table_offset(va) * sizeof(gw->l1e);
     if ( !hvmemul_read_cache(v, l1gpa, &gw->l1e, sizeof(gw->l1e)) )
     {
-        gw->l1e = (guest_l1e_t){ ACCESS_ONCE(l1p[guest_l1_table_offset(va)].l1) };
+        guest_intpte_t l1e = ACCESS_ONCE(l1p[guest_l1_table_offset(va)].l1);
+
+        gw->l1e = (guest_l1e_t){ l1e };
         hvmemul_write_cache(v, l1gpa, &gw->l1e, sizeof(gw->l1e));
     }
 
