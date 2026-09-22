@@ -1,8 +1,3 @@
-ifeq ($(CONFIG_LIBXC_MINIOS),y)
-# Save/restore of a domain is currently incompatible with a stubdom environment
-override CONFIG_MIGRATE := n
-endif
-
 OBJS-y += xg_private.o
 OBJS-y += xg_domain.o
 OBJS-y += xg_suspend.o
@@ -54,16 +49,6 @@ OBJS-y                 += xg_dom_compat_linux.o
 OBJS-$(CONFIG_X86)     += xg_dom_x86.o
 OBJS-$(CONFIG_X86)     += xg_cpuid_x86.o
 OBJS-$(CONFIG_ARM)     += xg_dom_arm.o
-
-ifeq ($(CONFIG_LIBXC_MINIOS),y)
-OBJS-y                 += xg_dom_decompress_unsafe.o
-OBJS-y                 += xg_dom_decompress_unsafe_bzip2.o
-OBJS-y                 += xg_dom_decompress_unsafe_lz4.o
-OBJS-y                 += xg_dom_decompress_unsafe_lzma.o
-OBJS-y                 += xg_dom_decompress_unsafe_lzo1x.o
-OBJS-y                 += xg_dom_decompress_unsafe_xz.o
-OBJS-y                 += xg_dom_decompress_unsafe_zstd.o
-endif
 
 CFLAGS += -D__XEN_TOOLS__
 CFLAGS += -include $(XEN_ROOT)/tools/config.h
