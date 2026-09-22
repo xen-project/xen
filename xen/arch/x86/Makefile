@@ -183,14 +183,14 @@ ifeq ($(XEN_BUILD_PE),y)
 	$(MKRELOC) $(filter .$(TARGET).efi.%, $^) > $@
 
 .$(TARGET).efi.0s.S:
-	$(objtree)/tools/symbols $(all_symbols) --empty > $@
+	$(objtree)/tools/symbols $(all-symbols-y) --empty > $@
 
 .$(TARGET).efi.1s.S: .$(TARGET).efi.0
 .$(TARGET).efi.2s.S: .$(TARGET).efi.1
 
 .$(TARGET).efi.%s.S:
 	$(NM) -pa --format=sysv $< \
-	  | $(objtree)/tools/symbols $(all_symbols) --sysv --sort \
+	  | $(objtree)/tools/symbols $(all-symbols-y) --sysv --sort \
 	    --source-name=$(TARGET).efi.S \
 	  > $@
 

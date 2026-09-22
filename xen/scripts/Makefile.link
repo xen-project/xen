@@ -3,6 +3,10 @@
 # Helper rules for linking xen-syms
 # ==========================================================================
 
+all-symbols-y :=
+all-symbols-$(CONFIG_LIVEPATCH) += --all-symbols
+all-symbols-$(CONFIG_FAST_SYMBOL_LOOKUP) += --sort-by-name
+
 syms-warn-dup-y := --warn-dup
 syms-warn-dup-$(CONFIG_SUPPRESS_DUPLICATE_SYMBOL_WARNINGS) :=
 syms-warn-dup-$(CONFIG_ENFORCE_UNIQUE_SYMBOLS) := --error-dup
@@ -17,7 +21,7 @@ final-image-check-y ?= true
 	$(call cmd,cc_o_S)
 
 .$(TARGET)-syms.0.S:
-	$(objtree)/tools/symbols $(all_symbols) --empty > $@
+	$(objtree)/tools/symbols $(all-symbols-y) --empty > $@
 
 .$(TARGET)-syms.1.S: .$(TARGET)-syms.0
 .$(TARGET)-syms.2.S: .$(TARGET)-syms.1
@@ -25,7 +29,7 @@ final-image-check-y ?= true
 
 .$(TARGET)-syms.%.S:
 	$(NM) -pa --format=sysv $< \
-	  | $(objtree)/tools/symbols $(all_symbols) --sysv --sort \
+	  | $(objtree)/tools/symbols $(all-symbols-y) --sysv --sort \
 	    $(if $(filter $(LAST_LINKING_PASS),$*), $(syms-warn-dup-y)) \
 	  > $@
 
