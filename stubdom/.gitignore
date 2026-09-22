@@ -23,7 +23,6 @@
 /mk-headers-*
 /newlib-1.*
 /newlib-x86*
-/pciutils-*
 /pkg-config/*
 /polarssl-*
 /tpm_emulator-*

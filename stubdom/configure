@@ -634,8 +634,6 @@ LWIP_VERSION
 LWIP_URL
 NEWLIB_VERSION
 NEWLIB_URL
-LIBPCI_VERSION
-LIBPCI_URL
 ZLIB_VERSION
 ZLIB_URL
 INSTALL_DATA
@@ -725,7 +723,6 @@ LDFLAGS
 LIBS
 CPPFLAGS
 ZLIB_URL
-LIBPCI_URL
 NEWLIB_URL
 LWIP_URL
 GMP_URL
@@ -1376,7 +1373,6 @@ Some influential environment variables:
   CPPFLAGS    (Objective) C/C++ preprocessor flags, e.g. -I<include dir> if
               you have headers in a nonstandard directory <include dir>
   ZLIB_URL    Download url for zlib
-  LIBPCI_URL  Download url for libpci
   NEWLIB_URL  Download url for newlib
   LWIP_URL    Download url for lwip
   GMP_URL     Download url for libgmp
@@ -4033,23 +4029,6 @@ then :
 	ZLIB_URL=\$\(XEN_EXTFILES_URL\)
 fi
 ZLIB_VERSION="1.2.3"
-
-
-
-
-
-if test "x$LIBPCI_URL" = "x"
-then :
-
-	if test "x$extfiles" = "xy"
-then :
-  LIBPCI_URL=\$\(XEN_EXTFILES_URL\)
-else $as_nop
-  LIBPCI_URL="https://mirrors.edge.kernel.org/pub/software/utils/pciutils"
-fi
-
-fi
-LIBPCI_VERSION="2.2.9"
 
 
 

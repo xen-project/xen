@@ -122,33 +122,10 @@ $(ZLIB_STAMPFILE): zlib-$(XEN_TARGET_ARCH) $(NEWLIB_STAMPFILE)
 	  $(MAKE) DESTDIR= libz.a && \
 	  $(MAKE) DESTDIR= install )
 
-##############
-# Cross-libpci
-##############
-
-pciutils-$(LIBPCI_VERSION).tar.bz2:
-	$(FETCHER) $@ $(LIBPCI_URL)/$@
-
-pciutils-$(XEN_TARGET_ARCH): pciutils-$(LIBPCI_VERSION).tar.bz2
-	tar xjf $<
-	mv pciutils-$(LIBPCI_VERSION) $@
-	patch -d $@ -p1 < pciutils.patch
-	touch $@
-
-LIBPCI_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libpci.a
-.PHONY: cross-libpci
-cross-libpci: $(LIBPCI_STAMPFILE)
-$(LIBPCI_STAMPFILE): pciutils-$(XEN_TARGET_ARCH) $(NEWLIB_STAMPFILE) $(ZLIB_STAMPFILE)
-	( cd $< && \
-	  cp ../libpci.config.h lib/config.h && \
-	  chmod u+w lib/config.h && \
-	  echo '#define PCILIB_VERSION "$(LIBPCI_VERSION)"' >> lib/config.h && \
-	  ln -sf ../../libpci.config.mak lib/config.mk && \
-	  $(MAKE) DESTDIR= CC="$(CC) $(TARGET_CPPFLAGS) $(TARGET_CFLAGS) -I$(call realpath,$(MINI_OS)/include)" lib/libpci.a && \
-	  $(INSTALL_DATA) lib/libpci.a $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib/ && \
-	  $(INSTALL_DIR) $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include/pci && \
-	  $(INSTALL_DATA) lib/config.h lib/header.h lib/pci.h lib/types.h $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include/pci/ \
-	)
+#######################################################################
+# There used to be a slightly modified version of pciutils, this is now
+# available under https://github.com/pciutils/pciutils/pull/236
+#######################################################################
 
 ######
 # lwIP
@@ -250,7 +227,7 @@ cross-tpmemu: $(TPMEMU_STAMPFILE)
 #######
 
 .PHONY: $(CROSS_ROOT)
-$(CROSS_ROOT): cross-newlib cross-zlib cross-libpci
+$(CROSS_ROOT): cross-newlib cross-zlib
 
 #######
 # libraries under tools/libs
@@ -477,7 +454,7 @@ clean:
 crossclean: clean
 	rm -fr $(CROSS_ROOT)
 	rm -fr newlib-$(XEN_TARGET_ARCH)
-	rm -fr zlib-$(XEN_TARGET_ARCH) pciutils-$(XEN_TARGET_ARCH)
+	rm -fr zlib-$(XEN_TARGET_ARCH)
 	rm -fr libs-$(XEN_TARGET_ARCH)
 	rm -fr xenstore xenstorepvh
 	rm -fr gmp-$(XEN_TARGET_ARCH)
@@ -502,7 +479,6 @@ downloadclean: patchclean
 	rm -f zlib-$(ZLIB_VERSION).tar.gz
 	rm -f gmp-$(GMP_VERSION).tar.bz2
 	rm -f tpm_emulator-$(TPMEMU_VERSION).tar.gz
-	rm -f pciutils-$(LIBPCI_VERSION).tar.bz2
 	rm -f lwip-$(LWIP_VERSION).tar.gz
 	rm -f polarssl-$(POLARSSL_VERSION)-gpl.tgz
 
