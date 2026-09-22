@@ -11,16 +11,15 @@
  */
 int (strcmp)(const char *cs, const char *ct)
 {
-	unsigned char *csu = (unsigned char *)cs;
-	unsigned char *ctu = (unsigned char *)ct;
-	int res;
+    const unsigned char *csu = (const void *)cs;
+    const unsigned char *ctu = (const void *)ct;
+    int res;
 
-	while (1) {
-		if ((res = *csu - *ctu++) != 0 || !*csu++)
-			break;
-	}
+    for ( ; ; )
+        if ( (res = *csu - *ctu++) != 0 || !*csu++ )
+            break;
 
-	return res;
+    return res;
 }
 
 /*

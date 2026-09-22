@@ -15,12 +15,13 @@
  */
 void *(memcpy)(void *dest, const void *src, size_t n)
 {
-	char *tmp = (char *) dest, *s = (char *) src;
+    char *tmp = dest;
+    const char *s = src;
 
-	while (n--)
-		*tmp++ = *s++;
+    while ( n-- )
+        *tmp++ = *s++;
 
-	return dest;
+    return dest;
 }
 
 /*

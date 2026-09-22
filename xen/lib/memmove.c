@@ -14,21 +14,25 @@
  */
 void *(memmove)(void *dest, const void *src, size_t n)
 {
-	char *tmp, *s;
+    char *tmp;
+    const char *s;
 
-	if (dest <= src) {
-		tmp = (char *) dest;
-		s = (char *) src;
-		while (n--)
-			*tmp++ = *s++;
-	} else {
-		tmp = (char *) dest + n;
-		s = (char *) src + n;
-		while (n--)
-			*--tmp = *--s;
-	}
+    if ( dest <= src )
+    {
+        tmp = dest;
+        s = src;
+        while ( n-- )
+            *tmp++ = *s++;
+    }
+    else
+    {
+        tmp = dest + n;
+        s = src + n;
+        while ( n-- )
+            *--tmp = *--s;
+    }
 
-	return dest;
+    return dest;
 }
 
 /*
