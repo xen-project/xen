@@ -102,26 +102,6 @@ $(NEWLIB_STAMPFILE): mk-headers-$(XEN_TARGET_ARCH) newlib-$(NEWLIB_VERSION)
 	  $(MAKE) DESTDIR= && \
 	  $(MAKE) DESTDIR= install )
 
-############
-# Cross-zlib
-############
-
-zlib-$(ZLIB_VERSION).tar.gz:
-	$(FETCHER) $@ $(ZLIB_URL)/$@
-
-zlib-$(XEN_TARGET_ARCH): zlib-$(ZLIB_VERSION).tar.gz 
-	tar xzf $<
-	mv zlib-$(ZLIB_VERSION) $@
-
-ZLIB_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libz.a
-.PHONY: cross-zlib
-cross-zlib: $(ZLIB_STAMPFILE)
-$(ZLIB_STAMPFILE): zlib-$(XEN_TARGET_ARCH) $(NEWLIB_STAMPFILE)
-	( cd $< && \
-	  CFLAGS="$(TARGET_CPPFLAGS) $(TARGET_CFLAGS)" CC=$(CC) ./configure --prefix=$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf && \
-	  $(MAKE) DESTDIR= libz.a && \
-	  $(MAKE) DESTDIR= install )
-
 #######################################################################
 # There used to be a slightly modified version of pciutils, this is now
 # available under https://github.com/pciutils/pciutils/pull/236
@@ -227,7 +207,7 @@ cross-tpmemu: $(TPMEMU_STAMPFILE)
 #######
 
 .PHONY: $(CROSS_ROOT)
-$(CROSS_ROOT): cross-newlib cross-zlib
+$(CROSS_ROOT): cross-newlib
 
 #######
 # libraries under tools/libs
@@ -454,7 +434,6 @@ clean:
 crossclean: clean
 	rm -fr $(CROSS_ROOT)
 	rm -fr newlib-$(XEN_TARGET_ARCH)
-	rm -fr zlib-$(XEN_TARGET_ARCH)
 	rm -fr libs-$(XEN_TARGET_ARCH)
 	rm -fr xenstore xenstorepvh
 	rm -fr gmp-$(XEN_TARGET_ARCH)
@@ -476,7 +455,6 @@ patchclean: crossclean
 .PHONY: downloadclean
 downloadclean: patchclean
 	rm -f newlib-$(NEWLIB_VERSION).tar.gz
-	rm -f zlib-$(ZLIB_VERSION).tar.gz
 	rm -f gmp-$(GMP_VERSION).tar.bz2
 	rm -f tpm_emulator-$(TPMEMU_VERSION).tar.gz
 	rm -f lwip-$(LWIP_VERSION).tar.gz

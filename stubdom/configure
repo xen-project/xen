@@ -634,8 +634,6 @@ LWIP_VERSION
 LWIP_URL
 NEWLIB_VERSION
 NEWLIB_URL
-ZLIB_VERSION
-ZLIB_URL
 INSTALL_DATA
 INSTALL_SCRIPT
 INSTALL_PROGRAM
@@ -722,7 +720,6 @@ CFLAGS
 LDFLAGS
 LIBS
 CPPFLAGS
-ZLIB_URL
 NEWLIB_URL
 LWIP_URL
 GMP_URL
@@ -1372,7 +1369,6 @@ Some influential environment variables:
   LIBS        libraries to pass to the linker, e.g. -l<library>
   CPPFLAGS    (Objective) C/C++ preprocessor flags, e.g. -I<include dir> if
               you have headers in a nonstandard directory <include dir>
-  ZLIB_URL    Download url for zlib
   NEWLIB_URL  Download url for newlib
   LWIP_URL    Download url for lwip
   GMP_URL     Download url for libgmp
@@ -4021,17 +4017,6 @@ fi
 
 
 # Stubdom libraries version and url setup
-
-
-if test "x$ZLIB_URL" = "x"
-then :
-
-	ZLIB_URL=\$\(XEN_EXTFILES_URL\)
-fi
-ZLIB_VERSION="1.2.3"
-
-
-
 
 
 if test "x$NEWLIB_URL" = "x"
