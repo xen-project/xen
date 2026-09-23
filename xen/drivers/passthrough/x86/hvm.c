@@ -371,7 +371,6 @@ int pt_irq_create_bind(
 
         dest_vcpu_id = hvm_girq_dest_2_vcpu_id(d, dest, dest_mode);
         pirq_dpci->gmsi.dest_vcpu_id = dest_vcpu_id;
-        write_unlock(&d->event_lock);
 
         pirq_dpci->gmsi.posted = false;
         vcpu = (dest_vcpu_id >= 0) ? d->vcpu[dest_vcpu_id] : NULL;
@@ -393,6 +392,7 @@ int pt_irq_create_bind(
 
             if ( rc )
             {
+                write_unlock(&d->event_lock);
                 pt_irq_destroy_bind(d, pt_irq_bind);
                 return rc;
             }
@@ -405,6 +405,7 @@ int pt_irq_create_bind(
 
             if ( !desc )
             {
+                write_unlock(&d->event_lock);
                 pt_irq_destroy_bind(d, pt_irq_bind);
                 return -EINVAL;
             }
@@ -413,6 +414,7 @@ int pt_irq_create_bind(
             spin_unlock_irqrestore(&desc->lock, flags);
         }
 
+        write_unlock(&d->event_lock);
         break;
     }
 
