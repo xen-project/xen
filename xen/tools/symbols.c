@@ -52,7 +52,7 @@ struct sym_entry {
 
 static struct sym_entry *table;
 static unsigned int table_size, table_cnt;
-static unsigned long long _stext, _etext, _sinittext, _einittext, _sextratext, _eextratext;
+static unsigned long long _stext, _etext, _sinittext, _einittext;
 static int all_symbols = 0;
 static int sort_by_name = 0;
 static int map_only = 0;
@@ -148,10 +148,6 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 		_sinittext = s->addr;
 	else if (strcmp(sym, "_einittext") == 0)
 		_einittext = s->addr;
-	else if (strcmp(sym, "_sextratext") == 0)
-		_sextratext = s->addr;
-	else if (strcmp(sym, "_eextratext") == 0)
-		_eextratext = s->addr;
 	else if (toupper((uint8_t)stype) == 'A')
 	{
 		/* Keep these useful absolute symbols */
@@ -210,18 +206,16 @@ static int symbol_valid(struct sym_entry *s)
 	 * and inittext sections are discarded */
 	if (!all_symbols) {
 		if ((s->addr < _stext || s->addr > _etext)
-		    && (s->addr < _sinittext || s->addr > _einittext)
-		    && (s->addr < _sextratext || s->addr > _eextratext))
+		    && (s->addr < _sinittext || s->addr > _einittext))
 			return 0;
 		/* Corner case.  Discard any symbols with the same value as
-		 * _etext _einittext or _eextratext; they can move between pass
-		 * 1 and 2 when the symbols data are added.  If these symbols
-		 * move then they may get dropped in pass 2, which breaks the
+		 * _etext or _einittext; they can move between pass 1 and 2
+		 * when the symbols data are added.  If these symbols move
+		 * then they may get dropped in pass 2, which breaks the
 		 * symbols rules.
 		 */
 		if ((s->addr == _etext && strcmp((char*)s->sym + offset, "_etext")) ||
-		    (s->addr == _einittext && strcmp((char*)s->sym + offset, "_einittext")) ||
-		    (s->addr == _eextratext && strcmp((char*)s->sym + offset, "_eextratext")))
+		    (s->addr == _einittext && strcmp((char*)s->sym + offset, "_einittext")))
 			return 0;
 	}
 
