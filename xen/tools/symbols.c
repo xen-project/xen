@@ -217,6 +217,11 @@ static int symbol_valid(struct sym_entry *s)
 		if ((s->addr == _etext && strcmp((char*)s->sym + offset, "_etext")) ||
 		    (s->addr == _einittext && strcmp((char*)s->sym + offset, "_einittext")))
 			return 0;
+		/* Same for non-text aliases of _sinittext. */
+		if (toupper(*s->sym) != 'T'
+		    && s->addr == _sinittext
+		    && strcmp((const char *)s->sym + offset, "_sinittext"))
+			return 0;
 	}
 
 	/* Exclude symbols which vary between passes. */
