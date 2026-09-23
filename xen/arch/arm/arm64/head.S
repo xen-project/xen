@@ -20,6 +20,8 @@
  * GNU General Public License for more details.
  */
 
+        .file __FILE__
+
 #include <asm/page.h>
 #include <asm/early_printk.h>
 

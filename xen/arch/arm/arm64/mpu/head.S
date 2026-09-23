@@ -3,6 +3,8 @@
  * Start-of-day code for an Armv8-R MPU system.
  */
 
+    .file __FILE__
+
 #include <asm/mpu/regions.inc>
 
 /*

@@ -5,6 +5,8 @@
  * Arm32 MMU specific start-of-day code.
  */
 
+        .file __FILE__
+
 #include <asm/page.h>
 #include <asm/early_printk.h>
 

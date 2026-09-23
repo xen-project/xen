@@ -3,6 +3,8 @@
  * Start-of-day code for an Armv8-R-AArch32 MPU system.
  */
 
+    .file __FILE__
+
 #include <asm/arm32/macros.h>
 #include <asm/arm32/sysregs.h>
 #include <asm/cpregs.h>

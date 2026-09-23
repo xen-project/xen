@@ -91,9 +91,6 @@ include scripts/Makefile.link
 # Suppress orphan section checking for the time being.
 orphan-handling-y :=
 
-# Downgrade duplicate symbol errors to warnings for the time being.
-syms-warn-dup-$(CONFIG_ENFORCE_UNIQUE_SYMBOLS) := --warn-dup
-
 .PHONY: include
 include:
 
