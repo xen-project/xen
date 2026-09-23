@@ -136,9 +136,7 @@
 
 /*! [Begin] no source code translation */
 
-#if defined(__XEN_TOOLS__) && defined(__ia64__)
-#include "ac_ia64_tools.h"
-#elif 1 /*defined(_LINUX) || defined(__linux__)*/
+#if 1 /*defined(_LINUX) || defined(__linux__)*/
 #include "aclinux.h"
 
 #elif defined(_AED_EFI)
