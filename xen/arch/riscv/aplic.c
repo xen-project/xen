@@ -325,9 +325,40 @@ static const hw_irq_controller aplic_xen_irq_type = {
     .set_affinity = aplic_set_irq_affinity,
 };
 
+static unsigned int cf_check aplic_guest_irq_startup(struct irq_desc *desc)
+{
+    BUG_ON("unimplemented");
+}
+
+/*
+ * Shared by ->shutdown(), ->enable(), ->disable() and ->end(), which have
+ * no state.
+ */
+static void cf_check aplic_guest_irq_stub(struct irq_desc *desc)
+{
+    BUG_ON("unimplemented");
+}
+
+static void cf_check aplic_guest_set_irq_affinity(struct irq_desc *desc,
+                                                  const cpumask_t *mask)
+{
+    BUG_ON("unimplemented");
+}
+
+static const hw_irq_controller aplic_guest_irq_type = {
+    .typename     = "aplic-guest",
+    .startup      = aplic_guest_irq_startup,
+    .shutdown     = aplic_guest_irq_stub,
+    .enable       = aplic_guest_irq_stub,
+    .disable      = aplic_guest_irq_stub,
+    .end          = aplic_guest_irq_stub,
+    .set_affinity = aplic_guest_set_irq_affinity,
+};
+
 static const struct intc_hw_operations aplic_ops = {
     .info                = &aplic_info,
     .host_irq_type       = &aplic_xen_irq_type,
+    .guest_irq_type      = &aplic_guest_irq_type,
     .handle_interrupt    = aplic_handle_interrupt,
     .set_irq_type        = aplic_set_irq_type,
 };

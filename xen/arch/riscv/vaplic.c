@@ -113,6 +113,16 @@ int domain_vaplic_init(struct domain *d)
 
     vaplic->regs.domaincfg = APLIC_DOMAINCFG_RO;
 
+    /*
+     * APLIC source 0 is reserved; sources are numbered
+     * 1..guest_aplic_num_sources and used directly as indices into used_irqs.
+     * Size the bitmap to guest_aplic_num_sources + 1 so the highest source has
+     * a valid slot (index 0 stays unused). Without the +1,
+     * vintc_reserve_virq() can't record the top source, so
+     * domain_vintc_deinit() never releases it.
+     */
+    d->arch.vintc->nr_virqs = guest_aplic_num_sources + 1;
+
     return 0;
 }
 
