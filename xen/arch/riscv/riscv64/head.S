@@ -98,6 +98,7 @@ FUNC(turn_on_mmu)
         srli    t1, t1, PAGE_SHIFT
         or      t1, t1, t0
         csrw    CSR_SATP, t1
+        sfence.vma
 
         jr      a0
 END(turn_on_mmu)
