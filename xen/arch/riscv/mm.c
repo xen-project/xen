@@ -181,7 +181,7 @@ static bool __init check_pgtbl_mode_support(struct mmu_desc *mmu_desc,
     bool is_mode_supported = false;
     unsigned int index;
     unsigned int page_table_level = (mmu_desc->num_levels - 1);
-    unsigned level_map_mask = XEN_PT_LEVEL_MAP_MASK(page_table_level);
+    unsigned long level_map_mask = XEN_PT_LEVEL_MAP_MASK(page_table_level);
 
     unsigned long aligned_load_start = load_start & level_map_mask;
     unsigned long aligned_page_size = XEN_PT_LEVEL_SIZE(page_table_level);
