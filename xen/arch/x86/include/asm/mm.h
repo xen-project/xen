@@ -404,9 +404,12 @@ int  get_page_type(struct page_info *page, unsigned long type);
 int  put_page_type_preemptible(struct page_info *page);
 int  get_page_type_preemptible(struct page_info *page, unsigned long type);
 int  put_old_guest_table(struct vcpu *v);
-int  get_page_from_l1e(
-    l1_pgentry_t l1e, struct domain *l1e_owner, struct domain *pg_owner);
 void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner);
+
+#if defined(CONFIG_PV) || defined(CONFIG_SHADOW_PAGING)
+int get_page_from_l1e(
+    l1_pgentry_t l1e, struct domain *l1e_owner, struct domain *pg_owner);
+#endif
 
 static inline struct page_info *get_page_from_mfn(mfn_t mfn, struct domain *d)
 {

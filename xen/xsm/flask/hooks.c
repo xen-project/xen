@@ -1829,10 +1829,12 @@ static int cf_check flask_update_va_mapping(
 
 #endif /* CONFIG_PV */
 
+#if defined(CONFIG_PV) || defined(CONFIG_SHADOW_PAGING)
 static int cf_check flask_priv_mapping(struct domain *d, struct domain *t)
 {
     return domain_has_perm(d, t, SECCLASS_MMU, MMU__TARGET_HACK);
 }
+#endif
 
 static int cf_check flask_pmu_op(struct domain *d, unsigned int op)
 {

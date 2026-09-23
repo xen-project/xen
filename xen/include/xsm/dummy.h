@@ -701,12 +701,14 @@ static XSM_INLINE int xsm_update_va_mapping(
 
 #endif /* CONFIG_PV */
 
+#if defined(CONFIG_PV) || defined(CONFIG_SHADOW_PAGING)
 static XSM_INLINE int xsm_priv_mapping(
     XSM_DEFAULT_ARG struct domain *d, struct domain *t)
 {
     XSM_ASSERT_ACTION(XSM_TARGET);
     return xsm_default_action(action, d, t);
 }
+#endif
 
 static XSM_INLINE int xsm_ioport_permission(
     XSM_DEFAULT_ARG struct domain *d, uint32_t s, uint32_t e, bool allow)

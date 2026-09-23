@@ -141,7 +141,9 @@ XSM_HOOK(int, mmu_update, struct domain *, struct domain *, struct domain *,
 XSM_HOOK(int, mmuext_op, struct domain *, struct domain *)
 XSM_HOOK(int, update_va_mapping, struct domain *, struct domain *, l1_pgentry_t)
 #endif /* CONFIG_PV */
+#if defined(CONFIG_PV) || defined(CONFIG_SHADOW_PAGING)
 XSM_HOOK(int, priv_mapping, struct domain *, struct domain *)
+#endif
 XSM_HOOK(int, ioport_permission, struct domain *, uint32_t, uint32_t, bool)
 XSM_HOOK(int, ioport_mapping, struct domain *, uint32_t, uint32_t, bool)
 XSM_HOOK(int, pmu_op, struct domain *, unsigned int)

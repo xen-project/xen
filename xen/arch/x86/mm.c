@@ -795,6 +795,8 @@ bool is_memory_hole(mfn_t start, mfn_t end)
     return true;
 }
 
+#if defined(CONFIG_PV) || defined(CONFIG_SHADOW_PAGING)
+
 #ifndef NDEBUG
 struct mmio_emul_range_ctxt {
     const struct domain *d;
@@ -1036,6 +1038,8 @@ get_page_from_l1e(
         put_page(page);
     return -EBUSY;
 }
+
+#endif /* CONFIG_PV || CONFIG_SHADOW_PAGING */
 
 /*
  * The following flags are used to specify behavior of various get and
