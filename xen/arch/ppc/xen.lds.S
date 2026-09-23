@@ -107,17 +107,7 @@ SECTIONS
         *(.init.rodata)
         *(.init.rodata.*)
 
-        . = ALIGN(POINTER_ALIGN);
-        __setup_start = .;
-        *(.init.setup)
-        __setup_end = .;
-
-        __initcall_start = .;
-        *(.initcallpresmp.init)
-        __presmp_initcall_end = .;
-        *(.initcall1.init)
-        __initcall_end = .;
-
+        SETUP_DATA
         LOCK_PROFILE_DATA
 
         *(.init.data)

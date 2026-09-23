@@ -179,6 +179,18 @@
        *(.data.schedulers)           \
        __end_schedulers_array = .;
 
+#define SETUP_DATA                   \
+       . = ALIGN(POINTER_ALIGN);     \
+       __setup_start = .;            \
+       *(.init.setup)                \
+       __setup_end = .;              \
+                                     \
+       __initcall_start = .;         \
+       *(.initcallpresmp.init)       \
+       __presmp_initcall_end = .;    \
+       *(.initcall1.init)            \
+       __initcall_end = .;
+
 #ifdef CONFIG_HYPFS
 #define HYPFS_PARAM              \
        . = ALIGN(POINTER_ALIGN); \
