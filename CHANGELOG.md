@@ -23,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
      The only known user was the classic-xen fork of Linux.  This does not
      affect Xen kexec support in the kexec-tools package.
    - The example stubdom "c-stubdom" has been removed.
+   - The grub-pv stubdom has been removed.  A grub-pv stubdom from an older
+     Xen version (e.g. 4.22) will still work with Xen 4.23.
 
 ## [4.22.0](https://xenbits.xenproject.org/gitweb/?p=xen.git;a=shortlog;h=staging) - 2026-07-30
 
