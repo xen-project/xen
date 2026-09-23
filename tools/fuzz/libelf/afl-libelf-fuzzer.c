@@ -33,12 +33,14 @@ int main(int argc, char **argv)
     if ( ferror(fp) )
     {
         perror("fread");
+        fclose(fp);
         exit(-1);
     }
 
     if ( !feof(fp) )
     {
         printf("Input too large\n");
+        fclose(fp);
         exit(-1);
     }
 
