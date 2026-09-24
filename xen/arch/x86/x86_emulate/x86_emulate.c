@@ -2511,8 +2511,8 @@ x86_emulate(
         else
         {
             generate_exception_if(!n, X86_EXC_DE);
-            _regs.al = _regs.al % n;
             _regs.ah = _regs.al / n;
+            _regs.al = _regs.al % n;
         }
         _regs.eflags &= ~(X86_EFLAGS_SF | X86_EFLAGS_ZF | X86_EFLAGS_PF);
         _regs.eflags |= !_regs.al ? X86_EFLAGS_ZF : 0;
