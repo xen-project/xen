@@ -17,6 +17,8 @@
 
 #define PCI_VENDOR_ID_WCHIC              0x1c00
 
+#define PCI_VENDOR_ID_AMAZON             0x1d0f
+
 #define PCI_VENDOR_ID_INTEL              0x8086
 
 #endif /* XEN_PCI_IDS_H */
