@@ -395,7 +395,7 @@ void vmx_pi_hooks_deassign(struct domain *d)
  * when guest changes MSI/MSI-X information.
  */
 static int cf_check vmx_pi_update_irte(const struct vcpu *v,
-                                       const struct pirq *pirq, uint8_t gvec)
+                                       const struct pirq *pirq)
 {
     const struct pi_desc *pi_desc = v ? &v->arch.hvm.vmx.pi_desc : NULL;
     struct irq_desc *desc;
@@ -414,7 +414,7 @@ static int cf_check vmx_pi_update_irte(const struct vcpu *v,
         goto unlock_out;
     }
     msi_desc->pi_desc = pi_desc;
-    msi_desc->gvec = gvec;
+    msi_desc->gvec = pi_desc ? pirq_dpci(pirq)->gmsi.gvec : 0;
     msg = msi_desc->msg;
 
     spin_unlock_irq(&desc->lock);
