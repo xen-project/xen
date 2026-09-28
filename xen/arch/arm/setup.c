@@ -81,6 +81,24 @@ static void __init init_idle_domain(void)
     /* TODO: setup_idle_pagetable(); */
 }
 
+#ifdef CONFIG_BOOT_SELFTEST
+extern const initcall_t __initcall_boot_test_start[],
+    __initcall_boot_test_end[];
+
+void do_init_boottests(void)
+{
+    const initcall_t *call;
+
+    printk("CPU%u: boot self-tests start\n", smp_processor_id());
+
+    for ( call = __initcall_boot_test_start; call < __initcall_boot_test_end;
+          call++ )
+        (*call)();
+
+    printk("CPU%u: boot self-tests done\n", smp_processor_id());
+}
+#endif /* CONFIG_BOOT_SELFTEST */
+
 static const char * __initdata processor_implementers[] = {
     ['A'] = "ARM Limited",
     ['B'] = "Broadcom Corporation",
@@ -470,6 +488,8 @@ void asmlinkage __init noreturn start_xen(unsigned long fdt_paddr)
 #endif
     enable_errata_workarounds();
     enable_cpu_features();
+
+    do_init_boottests();
 
     /* Create initial domain 0. */
     if ( !is_dom0less_mode() )

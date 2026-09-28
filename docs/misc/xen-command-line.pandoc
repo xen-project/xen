@@ -1282,6 +1282,16 @@ available on Intel Panther Lake and Diamond Rapids CPUs, and AMD Zen6 CPUs.
 FRED is fully supported on AMD hardware.  On Intel hardware it is still tech
 preview, and in particular not security supported.
 
+### gic-test (arm)
+> `= <boolean>`
+
+> Default: `false`
+
+Only available when `CONFIG_BOOT_SELFTEST` is enabled.
+
+Run the GIC SGI boot self-tests while each CPU is brought up.  Xen panics if
+an SGI is not delivered; otherwise it carries on booting normally.
+
 ### gnttab
 > `= List of [ max-ver:<integer>, transitive=<bool>, transfer=<bool> ]`
 

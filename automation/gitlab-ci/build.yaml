@@ -420,6 +420,14 @@ alpine-3.24-arm64-gcc-debug:
       CONFIG_UBSAN=y
       CONFIG_UBSAN_FATAL=y
 
+alpine-3.24-arm64-gcc-debug-boot-selftest:
+  extends: .gcc-arm64-build-debug
+  <<: *build-test
+  variables:
+    CONTAINER: alpine:3.24-arm64v8
+    EXTRA_XEN_CONFIG: |
+      CONFIG_BOOT_SELFTEST=y
+
 alpine-3.24-arm64-gcc-randconfig:
   extends: .gcc-arm64-build
   variables:

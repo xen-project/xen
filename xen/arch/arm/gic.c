@@ -330,6 +330,11 @@ static void do_static_sgi(struct cpu_user_regs *regs, enum gic_sgi sgi)
     case GIC_SGI_CALL_FUNCTION:
         smp_call_function_interrupt();
         break;
+#ifdef CONFIG_BOOT_SELFTEST
+    case GIC_SGI_TEST:
+        gic_sgi_test_interrupt();
+        break;
+#endif
     default:
         panic("Unhandled SGI %d on CPU%d\n", sgi, smp_processor_id());
         break;

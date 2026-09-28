@@ -499,6 +499,19 @@ config ARM64_HARDEN_BRANCH_PREDICTOR
 config ARM32_HARDEN_BRANCH_PREDICTOR
     def_bool y if ARM_32 && HARDEN_BRANCH_PREDICTOR
 
+config BOOT_SELFTEST
+	bool "Enable boot self-tests"
+	depends on DEBUG
+	help
+	  This option enables boot self-tests. They are intended to check that
+	  Xen has configured the hardware correctly before bringing up any
+	  domains. A failure is reported by panic(); when the tests pass, Xen
+	  boots normally.
+
+	  Selected at boot with the "gic-test" command line option.
+
+	  If unsure, say N.
+
 source "arch/arm/platforms/Kconfig"
 
 source "common/Kconfig"

@@ -306,6 +306,9 @@ enum gic_sgi {
     GIC_SGI_EVENT_CHECK,
     GIC_SGI_DUMP_STATE,
     GIC_SGI_CALL_FUNCTION,
+#ifdef CONFIG_BOOT_SELFTEST
+    GIC_SGI_TEST,
+#endif
     GIC_SGI_STATIC_MAX,
 };
 
@@ -320,6 +323,11 @@ extern void send_SGI_mask(const cpumask_t *cpumask, enum gic_sgi sgi);
 extern void send_SGI_one(unsigned int cpu, enum gic_sgi sgi);
 extern void send_SGI_self(enum gic_sgi sgi);
 extern void send_SGI_allbutself(enum gic_sgi sgi);
+
+#ifdef CONFIG_BOOT_SELFTEST
+/* Record a GIC_SGI_TEST delivered to this CPU. */
+void gic_sgi_test_interrupt(void);
+#endif
 
 /* print useful debug info */
 extern void gic_dump_info(struct vcpu *v);

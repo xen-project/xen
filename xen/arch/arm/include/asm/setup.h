@@ -48,6 +48,15 @@ void setup_mm(void);
 extern uint32_t hyp_traps_vector[];
 void init_traps(void);
 
+#ifdef CONFIG_BOOT_SELFTEST
+#define __initcallboottest(fn) \
+    static const initcall_t __initcall_##fn __init_call("boottest") = (fn)
+
+void do_init_boottests(void);
+#else
+static inline void do_init_boottests(void) {}
+#endif
+
 int handle_device(struct domain *d, struct dt_device_node *dev, p2m_type_t p2mt,
                   struct rangeset *iomem_ranges, struct rangeset *irq_ranges);
 

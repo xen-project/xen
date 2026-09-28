@@ -30,6 +30,7 @@
 #include <asm/psci.h>
 #include <asm/acpi.h>
 #include <asm/tee/tee.h>
+#include <asm/setup.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef virt_to_mfn
@@ -412,6 +413,8 @@ void asmlinkage noreturn start_secondary(void)
     check_local_cpu_features();
 
     printk(XENLOG_DEBUG "CPU %u booted.\n", smp_processor_id());
+
+    do_init_boottests();
 
     startup_cpu_idle_loop();
 }
