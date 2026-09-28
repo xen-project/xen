@@ -809,18 +809,16 @@ nsvm_vmcb_guest_intercepts_msr(unsigned long *msr_bitmap,
 }
 
 static int
-nsvm_vmcb_guest_intercepts_ioio(paddr_t iopm_pa, uint64_t exitinfo1)
+nsvm_vmcb_guest_intercepts_ioio(struct vmcb_struct *vmcb)
 {
-    unsigned long gfn = iopm_pa >> PAGE_SHIFT;
+    unsigned long gfn = vmcb->_iopm_base_pa >> PAGE_SHIFT;
     unsigned long *io_bitmap;
-    ioio_info_t ioinfo;
     uint16_t port;
     unsigned int size;
     bool intercepted;
 
-    ioinfo.bytes = exitinfo1;
-    port = ioinfo.fields.port;
-    size = ioinfo.fields.sz32 ? 4 : ioinfo.fields.sz16 ? 2 : 1;
+    port = vmcb->ei.io.port;
+    size = vmcb->ei.io.bytes;
 
     switch ( port )
     {
@@ -930,8 +928,7 @@ nsvm_vmcb_guest_intercepts_exitcode(struct vcpu *v,
         if ( !nestedsvm_vmcb_map(v, nv->nv_vvmcxaddr) )
             break;
         ns_vmcb = nv->nv_vvmcx;
-        vmexits = nsvm_vmcb_guest_intercepts_ioio(ns_vmcb->_iopm_base_pa,
-            ns_vmcb->exitinfo1);
+        vmexits = nsvm_vmcb_guest_intercepts_ioio(ns_vmcb);
         if ( vmexits == NESTEDHVM_VMEXIT_HOST )
             return 0;
         break;

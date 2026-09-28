@@ -357,23 +357,6 @@ typedef union
     u64 bytes;
     struct
     {
-        u64 type: 1;
-        u64 rsv0: 1;
-        u64 str:  1;
-        u64 rep:  1;
-        u64 sz8:  1;
-        u64 sz16: 1;
-        u64 sz32: 1;
-        u64 rsv1: 9;
-        u64 port: 16;
-    } fields;
-} ioio_info_t;
-
-typedef union
-{
-    u64 bytes;
-    struct
-    {
         u64 lbr_enable:1;
         u64 vloadsave_enable:1;
     } fields;
