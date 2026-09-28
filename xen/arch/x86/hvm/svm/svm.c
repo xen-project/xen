@@ -498,8 +498,8 @@ static unsigned cf_check int svm_get_interrupt_shadow(struct vcpu *v)
     if ( vmcb->int_stat.intr_shadow )
         intr_shadow |= HVM_INTR_SHADOW_MOV_SS | HVM_INTR_SHADOW_STI;
 
-    if ( vmcb->_vintr.fields.vnmi_enable
-         ? vmcb->_vintr.fields.vnmi_blocking
+    if ( vmcb->_vintr.vnmi_en
+         ? vmcb->_vintr.nmi_blocked
          : (vmcb_get_general1_intercepts(vmcb) & GENERAL1_INTERCEPT_IRET) )
         intr_shadow |= HVM_INTR_SHADOW_NMI;
 
@@ -516,9 +516,9 @@ static void cf_check svm_set_interrupt_shadow(
     vmcb->int_stat.intr_shadow =
         !!(intr_shadow & (HVM_INTR_SHADOW_MOV_SS|HVM_INTR_SHADOW_STI));
 
-    if ( vintr.fields.vnmi_enable )
+    if ( vintr.vnmi_en )
     {
-        vintr.fields.vnmi_blocking = block_nmi;
+        vintr.nmi_blocked = block_nmi;
         vmcb_set_vintr(vmcb, vintr);
     }
     else
@@ -964,8 +964,7 @@ static void noreturn cf_check svm_do_resume(void)
 
         /* Reflect the vlapic's TPR in the hardware vtpr */
         intr = vmcb_get_vintr(vmcb);
-        intr.fields.tpr =
-            (vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xFF) >> 4;
+        intr.tpr = (vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xFF) >> 4;
         vmcb_set_vintr(vmcb, intr);
     }
 
@@ -2547,7 +2546,7 @@ void asmlinkage svm_vmexit_handler(void)
     {
         intr = vmcb_get_vintr(vmcb);
         vlapic_set_reg(vlapic, APIC_TASKPRI,
-                   ((intr.fields.tpr & 0x0F) << 4) |
+                   ((intr.tpr & 0x0F) << 4) |
                    (vlapic_get_reg(vlapic, APIC_TASKPRI) & 0x0F));
     }
 
@@ -2781,7 +2780,7 @@ void asmlinkage svm_vmexit_handler(void)
         u32 general1_intercepts = vmcb_get_general1_intercepts(vmcb);
         intr = vmcb_get_vintr(vmcb);
 
-        intr.fields.irq = 0;
+        intr.intr_pending = false;
         general1_intercepts &= ~GENERAL1_INTERCEPT_VINTR;
 
         vmcb_set_vintr(vmcb, intr);
@@ -3072,8 +3071,7 @@ void asmlinkage svm_vmexit_handler(void)
 
     /* The exit may have updated the TPR: reflect this in the hardware vtpr */
     intr = vmcb_get_vintr(vmcb);
-    intr.fields.tpr =
-        (vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xFF) >> 4;
+    intr.tpr = (vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xFF) >> 4;
     vmcb_set_vintr(vmcb, intr);
 }
 

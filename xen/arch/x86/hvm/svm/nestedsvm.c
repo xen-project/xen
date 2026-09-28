@@ -427,7 +427,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     if ( !clean.tpr )
     {
         n2vmcb->_vintr = ns_vmcb->_vintr;
-        n2vmcb->_vintr.fields.intr_masking = 1;
+        n2vmcb->_vintr.vintr_masking = true;
     }
 
     /* Interrupt state */
@@ -637,7 +637,7 @@ nsvm_vcpu_vmentry(struct vcpu *v, struct cpu_user_regs *regs,
     svm->ns_hap_enabled = vmcb_get_np(ns_vmcb);
 
     /* Remember the V_INTR_MASK in hostflags */
-    svm->ns_hostflags.vintrmask = ns_vmcb->_vintr.fields.intr_masking;
+    svm->ns_hostflags.vintrmask = ns_vmcb->_vintr.vintr_masking;
 
     /* Save l1 guest state (= host state) */
     ret = nsvm_vcpu_hostsave(v, inst_len);
@@ -723,8 +723,8 @@ nsvm_vcpu_vmexit_inject(struct vcpu *v, struct cpu_user_regs *regs,
     struct vmcb_struct *ns_vmcb;
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
 
-    if ( vmcb->_vintr.fields.vgif_enable )
-        vmcb->_vintr.fields.vgif = 0;
+    if ( vmcb->_vintr.vgif_en )
+        vmcb->_vintr.gif = false;
     else
         svm->ns_gif = 0;
 
@@ -979,7 +979,7 @@ nsvm_vmcb_prepare4vmexit(struct vcpu *v, struct cpu_user_regs *regs)
     /* Virtual Interrupts */
     ns_vmcb->_vintr = n2vmcb->_vintr;
     if ( !svm->ns_hostflags.vintrmask )
-        ns_vmcb->_vintr.fields.intr_masking = 0;
+        ns_vmcb->_vintr.vintr_masking = false;
 
     /* Interrupt state */
     ns_vmcb->int_stat = n2vmcb->int_stat;
@@ -1198,8 +1198,8 @@ nestedsvm_vmexit_defer(struct vcpu *v,
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
 
-    if ( vmcb->_vintr.fields.vgif_enable )
-        vmcb->_vintr.fields.vgif = 0;
+    if ( vmcb->_vintr.vgif_en )
+        vmcb->_vintr.gif = false;
     else
         svm->ns_gif = 0;
 
@@ -1461,8 +1461,8 @@ nestedsvm_gif_isset(struct vcpu *v)
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
 
     /* get the vmcb gif value if using vgif */
-    if ( vmcb->_vintr.fields.vgif_enable )
-        return vmcb->_vintr.fields.vgif;
+    if ( vmcb->_vintr.vgif_en )
+        return vmcb->_vintr.gif;
     else
         return svm->ns_gif;
 }
@@ -1509,7 +1509,7 @@ void svm_vmexit_do_clgi(struct cpu_user_regs *regs, struct vcpu *v)
 
     /* After a CLGI no interrupts should come */
     intr = vmcb_get_vintr(vmcb);
-    intr.fields.irq = 0;
+    intr.intr_pending = false;
     general1_intercepts &= ~GENERAL1_INTERCEPT_VINTR;
     vmcb_set_vintr(vmcb, intr);
     vmcb_set_general1_intercepts(vmcb, general1_intercepts);
@@ -1543,12 +1543,11 @@ void svm_nested_features_on_efer_update(struct vcpu *v)
             vmcb_set_general2_intercepts(vmcb, general2_intercepts);
         }
 
-        if ( !vmcb->_vintr.fields.vgif_enable &&
-             cpu_has_svm_vgif )
+        if ( !vmcb->_vintr.vgif_en && cpu_has_svm_vgif )
         {
             vintr = vmcb_get_vintr(vmcb);
-            vintr.fields.vgif = svm->ns_gif;
-            vintr.fields.vgif_enable = 1;
+            vintr.gif = svm->ns_gif;
+            vintr.vgif_en = true;
             vmcb_set_vintr(vmcb, vintr);
             general2_intercepts  = vmcb_get_general2_intercepts(vmcb);
             general2_intercepts &= ~(GENERAL2_INTERCEPT_STGI |
@@ -1567,11 +1566,11 @@ void svm_nested_features_on_efer_update(struct vcpu *v)
             vmcb_set_general2_intercepts(vmcb, general2_intercepts);
         }
 
-        if ( vmcb->_vintr.fields.vgif_enable )
+        if ( vmcb->_vintr.vgif_en )
         {
             vintr = vmcb_get_vintr(vmcb);
-            svm->ns_gif = vintr.fields.vgif;
-            vintr.fields.vgif_enable = 0;
+            svm->ns_gif = vintr.gif;
+            vintr.vgif_en = false;
             vmcb_set_vintr(vmcb, vintr);
             general2_intercepts  = vmcb_get_general2_intercepts(vmcb);
             general2_intercepts |= (GENERAL2_INTERCEPT_STGI |

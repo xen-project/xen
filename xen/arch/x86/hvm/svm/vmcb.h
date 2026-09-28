@@ -328,28 +328,25 @@ typedef union {
     uint64_t raw;
 } intstat_t;
 
-typedef union
-{
-    u64 bytes;
-    struct
-    {
-        u64 tpr:          8;
-        u64 irq:          1;
-        u64 vgif:         1;
-        u64 :             1;
-        u64 vnmi_pending: 1;
-        u64 vnmi_blocking:1;
-        u64 :             3;
-        u64 prio:         4;
-        u64 ign_tpr:      1;
-        u64 rsvd1:        3;
-        u64 intr_masking: 1;
-        u64 vgif_enable:  1;
-        u64 vnmi_enable:  1;
-        u64 :             5;
-        u64 vector:       8;
-        u64 rsvd3:       24;
-    } fields;
+typedef union {
+    struct {          /* Cleanbit.tpr(3),  APM Name */
+        uint8_t tpr;                /* c   V_TPR */
+        bool    intr_pending:1;     /* c   V_IRQ */
+        bool    gif:1;              /*     VGIF */
+        bool    :1;
+        bool    nmi_pending:1;      /* c   V_NMI */
+        bool    nmi_blocked:1;      /* c   V_NMI_MASK */
+        uint8_t :3;
+        uint8_t intr_prio:4;        /* c   V_INTR_PRIO */
+        bool    ign_tpr:1;          /* c   V_IGN_TPR */
+        uint8_t :3;
+        bool    vintr_masking:1;    /* c   V_INTR_MASKING */
+        bool    vgif_en:1;          /*     VGIF_EN */
+        bool    vnmi_en:1;          /*     V_NMI_ENABLE */
+        uint8_t :5;
+        uint8_t vector;             /* c   V_INTR_VECTOR */
+    };
+    uint64_t raw;
 } vintr_t;
 
 typedef union

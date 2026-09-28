@@ -34,9 +34,9 @@ static void svm_inject_nmi(struct vcpu *v)
     uint32_t general1_intercepts;
     intinfo_t event;
 
-    if ( vintr.fields.vnmi_enable )
+    if ( vintr.vnmi_en )
     {
-        vintr.fields.vnmi_pending = true;
+        vintr.nmi_pending = true;
         vmcb_set_vintr(vmcb, vintr);
         return;
     }
@@ -93,7 +93,7 @@ static void svm_enable_intr_window(struct vcpu *v, struct hvm_intack intack)
              */
             ASSERT(gvmcb != NULL);
             intr = vmcb_get_vintr(gvmcb);
-            if ( intr.fields.irq )
+            if ( intr.intr_pending )
                 return;
         }
     }
@@ -122,10 +122,10 @@ static void svm_enable_intr_window(struct vcpu *v, struct hvm_intack intack)
         return;
 
     intr = vmcb_get_vintr(vmcb);
-    intr.fields.irq     = 1;
-    intr.fields.vector  = 0;
-    intr.fields.prio    = intack.vector >> 4;
-    intr.fields.ign_tpr = (intack.source != hvm_intsrc_lapic);
+    intr.intr_pending = true;
+    intr.intr_prio    = intack.vector >> 4;
+    intr.ign_tpr      = (intack.source != hvm_intsrc_lapic);
+    intr.vector       = 0;
     vmcb_set_vintr(vmcb, intr);
     vmcb_set_general1_intercepts(
         vmcb, general1_intercepts | GENERAL1_INTERCEPT_VINTR);
@@ -153,15 +153,14 @@ void asmlinkage svm_intr_assist(void)
         intblk = hvm_interrupt_blocked(v, intack);
 
         /*
-         * When vNMI is active, NMIs can be injected by setting vnmi_pending
+         * When vNMI is active, NMIs can be injected by setting .nmi_pending
          * and hardware will deliver them at the next appropriate opportunity.
          * Consider them not blocked, to avoid trying to open an NMI Window.
          *
          * Correctness here relies on the fact that all vNMI capable hardware
          * has vGIF, and vGIF is always activated when appropriate.
          */
-        if ( intblk == hvm_intblk_nmi_iret &&
-             vmcb->_vintr.fields.vnmi_enable )
+        if ( intblk == hvm_intblk_nmi_iret && vmcb->_vintr.vnmi_en )
             intblk = hvm_intblk_none;
 
         if ( intblk == hvm_intblk_svm_gif )

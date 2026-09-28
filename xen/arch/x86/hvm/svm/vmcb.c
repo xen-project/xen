@@ -105,7 +105,7 @@ static int construct_vmcb(struct vcpu *v)
     vmcb->_iopm_base_pa = __pa(v->domain->arch.hvm.io_bitmap);
 
     /* Virtualise EFLAGS.IF and LAPIC TPR (CR8). */
-    vmcb->_vintr.fields.intr_masking = 1;
+    vmcb->_vintr.vintr_masking = true;
 
     /* Don't need to intercept RDTSC if CPU supports TSC rate scaling */
     if ( v->domain->arch.vtsc && !cpu_has_tsc_ratio )
@@ -192,7 +192,7 @@ static int construct_vmcb(struct vcpu *v)
     if ( default_xen_spec_ctrl == SPEC_CTRL_STIBP )
         v->arch.msrs->spec_ctrl.raw = SPEC_CTRL_STIBP;
 
-    vmcb->_vintr.fields.vnmi_enable = cpu_has_svm_vnmi;
+    vmcb->_vintr.vnmi_en = cpu_has_svm_vnmi;
 
     return 0;
 }
@@ -275,7 +275,7 @@ void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb)
            vmcb_get_iopm_base_pa(vmcb), vmcb_get_msrpm_base_pa(vmcb),
            vmcb_get_tsc_offset(vmcb));
     printk("tlb_control = %#x vintr = %#"PRIx64" int_stat = %#"PRIx64"\n",
-           vmcb->tlb_control, vmcb_get_vintr(vmcb).bytes,
+           vmcb->tlb_control, vmcb_get_vintr(vmcb).raw,
            vmcb->int_stat.raw);
     printk("event_inj %016"PRIx64", valid? %d, ec? %d, type %u, vector %#x\n",
            vmcb->event_inj.raw, vmcb->event_inj.v,
