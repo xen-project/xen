@@ -362,7 +362,7 @@ int main(int argc, char **argv)
         (void)lseek(infd, offset, SEEK_SET);
 
         note_sz = in64_phdr.p_memsz;
-        note_base = in64_phdr.p_vaddr - note_base;
+        note_base = in64_phdr.p_vaddr - note_base + loadbase;
 
         if ( in64_phdr.p_offset < offset ||
              in64_phdr.p_offset + in64_phdr.p_filesz > offset + dat_siz )
