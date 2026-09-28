@@ -77,12 +77,11 @@ struct nestedsvm {
     } ns_vmexit;
 
     union {
-        uint32_t bytes;
         struct {
-            uint32_t rflagsif:1;
-            uint32_t vintrmask:1;
-            uint32_t reserved:30;
-        } fields;
+            bool rflagsif:1;
+            bool vintrmask:1;
+        };
+        uint32_t raw;
     } ns_hostflags;
 };
 

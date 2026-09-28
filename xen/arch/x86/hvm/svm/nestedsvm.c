@@ -151,7 +151,7 @@ int cf_check nsvm_vcpu_reset(struct vcpu *v)
     svm->ns_vmcb_guestcr3 = 0;
     svm->ns_vmcb_hostcr3 = 0;
     svm->ns_asid = 0;
-    svm->ns_hostflags.bytes = 0;
+    svm->ns_hostflags.raw = 0;
     svm->ns_vmexit.exitinfo1 = 0;
     svm->ns_vmexit.exitinfo2 = 0;
 
@@ -182,7 +182,7 @@ static int nsvm_vcpu_hostsave(struct vcpu *v, unsigned int inst_len)
     n1vmcb->_cr4 = v->arch.hvm.guest_cr[4];
 
     /* Remember the host interrupt flag */
-    svm->ns_hostflags.fields.rflagsif = !!(n1vmcb->rflags & X86_EFLAGS_IF);
+    svm->ns_hostflags.rflagsif = n1vmcb->rflags & X86_EFLAGS_IF;
 
     return 0;
 }
@@ -637,7 +637,7 @@ nsvm_vcpu_vmentry(struct vcpu *v, struct cpu_user_regs *regs,
     svm->ns_hap_enabled = vmcb_get_np(ns_vmcb);
 
     /* Remember the V_INTR_MASK in hostflags */
-    svm->ns_hostflags.fields.vintrmask = !!ns_vmcb->_vintr.fields.intr_masking;
+    svm->ns_hostflags.vintrmask = ns_vmcb->_vintr.fields.intr_masking;
 
     /* Save l1 guest state (= host state) */
     ret = nsvm_vcpu_hostsave(v, inst_len);
@@ -978,7 +978,7 @@ nsvm_vmcb_prepare4vmexit(struct vcpu *v, struct cpu_user_regs *regs)
 
     /* Virtual Interrupts */
     ns_vmcb->_vintr = n2vmcb->_vintr;
-    if ( !svm->ns_hostflags.fields.vintrmask )
+    if ( !svm->ns_hostflags.vintrmask )
         ns_vmcb->_vintr.fields.intr_masking = 0;
 
     /* Interrupt state */
@@ -1159,8 +1159,7 @@ enum hvm_intblk cf_check nsvm_intr_blocked(struct vcpu *v)
     {
         struct vmcb_struct *n2vmcb = nv->nv_n2vmcx;
 
-        if ( svm->ns_hostflags.fields.vintrmask &&
-             !svm->ns_hostflags.fields.rflagsif )
+        if ( svm->ns_hostflags.vintrmask && !svm->ns_hostflags.rflagsif )
             return hvm_intblk_rflags_ie;
 
         /* when l1 guest passes its devices through to the l2 guest
