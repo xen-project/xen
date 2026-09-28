@@ -291,7 +291,7 @@ void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb)
            vmcb_get_sev(vmcb)    ? " SEV"    : "",
            vmcb_get_sev_es(vmcb) ? " SEV_ES" : "");
     printk("virtual vmload/vmsave = %d, virt_ext = %#"PRIx64"\n",
-           vmcb->virt_ext.fields.vloadsave_enable, vmcb->virt_ext.bytes);
+           vmcb->virt_ext.vloadsave_en, vmcb->virt_ext.raw);
     printk("cpl = %d efer = %#"PRIx64" star = %#"PRIx64" lstar = %#"PRIx64"\n",
            vmcb_get_cpl(vmcb), vmcb_get_efer(vmcb), vmcb->star, vmcb->lstar);
     printk("CR0 = 0x%016"PRIx64" CR2 = 0x%016"PRIx64"\n",

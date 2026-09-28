@@ -442,8 +442,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     /* Pending Interrupts */
     n2vmcb->event_inj = ns_vmcb->event_inj;
 
-    n2vmcb->virt_ext.bytes =
-        n1vmcb->virt_ext.bytes | ns_vmcb->virt_ext.bytes;
+    n2vmcb->virt_ext.raw = n1vmcb->virt_ext.raw | ns_vmcb->virt_ext.raw;
 
     /*
      * NextRIP is consumed on VMRUN as the return address pushed on the
@@ -1536,10 +1535,9 @@ void svm_nested_features_on_efer_update(struct vcpu *v)
      */
     if ( nsvm_efer_svm_enabled(v) )
     {
-        if ( !vmcb->virt_ext.fields.vloadsave_enable &&
-             cpu_has_svm_vloadsave )
+        if ( !vmcb->virt_ext.vloadsave_en && cpu_has_svm_vloadsave )
         {
-            vmcb->virt_ext.fields.vloadsave_enable = 1;
+            vmcb->virt_ext.vloadsave_en = true;
             general2_intercepts  = vmcb_get_general2_intercepts(vmcb);
             general2_intercepts &= ~(GENERAL2_INTERCEPT_VMLOAD |
                                      GENERAL2_INTERCEPT_VMSAVE);
@@ -1561,9 +1559,9 @@ void svm_nested_features_on_efer_update(struct vcpu *v)
     }
     else
     {
-        if ( vmcb->virt_ext.fields.vloadsave_enable )
+        if ( vmcb->virt_ext.vloadsave_en )
         {
-            vmcb->virt_ext.fields.vloadsave_enable = 0;
+            vmcb->virt_ext.vloadsave_en = false;
             general2_intercepts  = vmcb_get_general2_intercepts(vmcb);
             general2_intercepts |= (GENERAL2_INTERCEPT_VMLOAD |
                                     GENERAL2_INTERCEPT_VMSAVE);

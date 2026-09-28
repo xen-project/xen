@@ -354,12 +354,12 @@ typedef union
 
 typedef union
 {
-    u64 bytes;
     struct
     {
-        u64 lbr_enable:1;
-        u64 vloadsave_enable:1;
-    } fields;
+        bool lbr_en:1;
+        bool vloadsave_en:1;
+    };
+    uint64_t raw;
 } virt_ext_t;
 
 typedef union
