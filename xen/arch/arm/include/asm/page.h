@@ -168,7 +168,7 @@ static inline size_t read_dcache_line_bytes(void)
 static inline int invalidate_dcache_va_range(const void *p, unsigned long size)
 {
     size_t cacheline_mask = dcache_line_bytes - 1;
-    unsigned long idx = 0;
+    unsigned long partial_head;
 
     if ( !size )
         return 0;
@@ -178,23 +178,35 @@ static inline int invalidate_dcache_va_range(const void *p, unsigned long size)
 
     dsb(sy);           /* So the CPU issues all writes to the range */
 
-    if ( (uintptr_t)p & cacheline_mask )
+    /*
+     * A cacheline only partially covered by the region has to be cleaned as
+     * well as invalidated, so that data living outside of the region is not
+     * discarded.
+     */
+    partial_head = (uintptr_t)p & cacheline_mask;
+    if ( partial_head )
     {
-        size -= dcache_line_bytes - ((uintptr_t)p & cacheline_mask);
-        p = (void *)((uintptr_t)p & ~cacheline_mask);
+        unsigned long rem = dcache_line_bytes - partial_head;
+
         asm_inline volatile (
             __clean_and_invalidate_dcache_one(0) :: "r" (p) );
-        p += dcache_line_bytes;
+        p += rem;
+
+        /* The region may end within this cacheline, leaving nothing to do. */
+        if ( __builtin_usubl_overflow(size, rem, &size) )
+            goto done;
     }
 
     for ( ; size >= dcache_line_bytes;
-            idx += dcache_line_bytes, size -= dcache_line_bytes )
-        asm volatile (__invalidate_dcache_one(0) : : "r" (p + idx));
+            p += dcache_line_bytes, size -= dcache_line_bytes )
+        asm_inline volatile (__invalidate_dcache_one(0) : : "r" (p));
 
+    /* Partial tail must be cleaned as well. */
     if ( size > 0 )
         asm_inline volatile (
-            __clean_and_invalidate_dcache_one(0) :: "r" (p + idx) );
+            __clean_and_invalidate_dcache_one(0) :: "r" (p) );
 
+ done:
     dsb(sy);           /* So we know the flushes happen before continuing */
 
     return 0;
