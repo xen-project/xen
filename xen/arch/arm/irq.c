@@ -85,6 +85,12 @@ static int __init init_espi_data(void)
 
 static DEFINE_PER_CPU(irq_desc_t[NR_LOCAL_IRQS], local_irq_desc);
 
+static bool irq_has_desc(unsigned int irq)
+{
+    return irq < NR_IRQS ||
+           (IS_ENABLED(CONFIG_GICV3_ESPI) && is_espi(irq));
+}
+
 struct irq_desc *__irq_to_desc(unsigned int irq)
 {
     if ( irq < NR_LOCAL_IRQS )
@@ -94,6 +100,8 @@ struct irq_desc *__irq_to_desc(unsigned int irq)
     if ( is_espi(irq) )
         return espi_to_desc(irq);
 #endif
+
+    ASSERT(irq_has_desc(irq));
 
     return &irq_desc[irq-NR_LOCAL_IRQS];
 }
@@ -416,6 +424,12 @@ int setup_irq(unsigned int irq, unsigned int irqflags, struct irqaction *new)
     struct irq_desc *desc;
     bool disabled;
 
+    if ( !gic_is_valid_line(irq) )
+    {
+        printk(XENLOG_ERR "Cannot set up IRQ %u: invalid GIC interrupt\n", irq);
+        return -EINVAL;
+    }
+
     desc = irq_to_desc(irq);
 
     spin_lock_irqsave(&desc->lock, flags);
@@ -647,12 +661,20 @@ static bool irq_validate_new_type(unsigned int curr, unsigned int new)
 int irq_set_spi_type(unsigned int spi, unsigned int type)
 {
     unsigned long flags;
-    struct irq_desc *desc = irq_to_desc(spi);
+    struct irq_desc *desc;
     int ret = -EBUSY;
 
-    /* This function should not be used for other than SPIs */
-    if ( spi < NR_LOCAL_IRQS )
+    /*
+     * This function should not be used for other than SPIs.
+     *
+     * The implemented GIC line counts are not available when early
+     * callers configure IRQ types. Check descriptor storage here; setup_irq()
+     * validates the implemented line before the interrupt is used.
+     */
+    if ( spi < NR_LOCAL_IRQS || !irq_has_desc(spi) )
         return -EINVAL;
+
+    desc = irq_to_desc(spi);
 
     spin_lock_irqsave(&desc->lock, flags);
 
