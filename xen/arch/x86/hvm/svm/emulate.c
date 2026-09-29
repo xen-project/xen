@@ -63,7 +63,7 @@ unsigned int svm_get_insn_len(struct vcpu *v, unsigned int instr_enc)
 
     nrip_len = svm_nextrip_insn_length(v);
 
-#ifdef NDEBUG
+#ifndef CONFIG_DEBUG
     if ( nrip_len > MAX_INST_LEN )
         gprintk(XENLOG_WARNING, "NRip reported inst_len %lu\n", nrip_len);
     else if ( nrip_len != 0 )

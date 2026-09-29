@@ -14,17 +14,17 @@
 #include <asm/current.h>
 #include <asm/fixmap.h>
 
-#ifdef NDEBUG
-static inline void
-__attribute__ ((__format__ (__printf__, 1, 2)))
-mm_printk(const char *fmt, ...) {}
-#else
+#ifdef CONFIG_DEBUG
 #define mm_printk(fmt, args...)             \
     do                                      \
     {                                       \
         dprintk(XENLOG_ERR, fmt, ## args);  \
         WARN();                             \
     } while (0)
+#else
+static inline void
+__attribute__ ((__format__ (__printf__, 1, 2)))
+mm_printk(const char *fmt, ...) {}
 #endif
 
 #ifdef CONFIG_ARM_64

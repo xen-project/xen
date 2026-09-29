@@ -148,16 +148,16 @@ static DEFINE_RSPINLOCK(console_lock);
  * Note, in the above algorithm, to disable rate limiting simply make
  * the lower threshold equal to the upper.
  */
-#ifdef NDEBUG
-#define XENLOG_UPPER_THRESHOLD       3 /* Do not print DEBUG  */
-#define XENLOG_LOWER_THRESHOLD       3 /* Always print INFO, ERR and WARNING */
-#define XENLOG_GUEST_UPPER_THRESHOLD 2 /* Do not print INFO and DEBUG  */
-#define XENLOG_GUEST_LOWER_THRESHOLD 0 /* Rate-limit ERR and WARNING   */
-#else
+#ifdef CONFIG_DEBUG
 #define XENLOG_UPPER_THRESHOLD       4 /* Do not discard anything      */
 #define XENLOG_LOWER_THRESHOLD       4 /* Print everything             */
 #define XENLOG_GUEST_UPPER_THRESHOLD 4 /* Do not discard anything      */
 #define XENLOG_GUEST_LOWER_THRESHOLD 4 /* Print everything             */
+#else
+#define XENLOG_UPPER_THRESHOLD       3 /* Do not print DEBUG  */
+#define XENLOG_LOWER_THRESHOLD       3 /* Always print INFO, ERR and WARNING */
+#define XENLOG_GUEST_UPPER_THRESHOLD 2 /* Do not print INFO and DEBUG  */
+#define XENLOG_GUEST_LOWER_THRESHOLD 0 /* Rate-limit ERR and WARNING   */
 #endif
 /*
  * The XENLOG_DEFAULT is the default given to printks that

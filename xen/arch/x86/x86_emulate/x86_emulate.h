@@ -699,7 +699,7 @@ bool cf_check
 x86_insn_is_cr_access(const struct x86_emulate_state *s,
                       const struct x86_emulate_ctxt *ctxt);
 
-#if !defined(__XEN__) || defined(NDEBUG)
+#if !defined(__XEN__) || !defined(CONFIG_DEBUG)
 static inline void x86_emulate_free_state(struct x86_emulate_state *s) {}
 #else
 void x86_emulate_free_state(struct x86_emulate_state *s);

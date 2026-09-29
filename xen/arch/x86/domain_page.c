@@ -68,7 +68,7 @@ void *map_domain_page(mfn_t mfn)
     struct mapcache_vcpu *vcache;
     struct vcpu_maphash_entry *hashent;
 
-#ifdef NDEBUG
+#ifndef CONFIG_DEBUG
     if ( mfn_x(mfn) <= PFN_DOWN(__pa(HYPERVISOR_VIRT_END - 1)) )
         return mfn_to_virt(mfn_x(mfn));
 #endif
@@ -230,7 +230,7 @@ void mapcache_domain_init(struct domain *d)
 
     ASSERT(is_pv_domain(d));
 
-#ifdef NDEBUG
+#ifndef CONFIG_DEBUG
     if ( !mem_hotplug && max_page <= PFN_DOWN(__pa(HYPERVISOR_VIRT_END - 1)) )
         return;
 #endif
@@ -297,7 +297,7 @@ void *map_domain_page_global(mfn_t mfn)
              system_state < SYS_STATE_active) ||
             local_irq_is_enabled()));
 
-#ifdef NDEBUG
+#ifndef CONFIG_DEBUG
     if ( mfn_x(mfn) <= PFN_DOWN(__pa(HYPERVISOR_VIRT_END - 1)) )
         return mfn_to_virt(mfn_x(mfn));
 #endif

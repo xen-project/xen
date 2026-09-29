@@ -333,9 +333,10 @@ void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t l4e);
  * WARNING: This will need to be disabled to run OSes that use the spare PTE
  * bits themselves (e.g., *BSD).
  */
-#ifdef NDEBUG
+#ifndef CONFIG_DEBUG
 #undef _PAGE_GNTTAB
 #endif
+
 #ifndef _PAGE_GNTTAB
 #define _PAGE_GNTTAB   0
 #endif

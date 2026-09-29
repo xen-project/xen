@@ -46,10 +46,10 @@ int remove_xen_ranges(struct rangeset *r);
 
 int cf_check stub_selftest(void);
 
-#ifdef NDEBUG
-# define highmem_start 0
-#else
+#ifdef CONFIG_DEBUG
 extern unsigned long highmem_start;
+#else
+# define highmem_start 0
 #endif
 
 extern unsigned int i8259A_alias_mask;

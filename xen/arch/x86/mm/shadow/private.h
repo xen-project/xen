@@ -31,12 +31,12 @@
 #define SHADOW_AUDIT_ENTRIES_FULL   0x08  /* Check every shadow */
 #define SHADOW_AUDIT_ENTRIES_MFNS   0x10  /* Check gfn-mfn map in shadows */
 
-#ifdef NDEBUG
-#define SHADOW_AUDIT                   0
-#define shadow_audit_enable        false
-#else
+#ifdef CONFIG_DEBUG
 #define SHADOW_AUDIT                0x15  /* Basic audit of all */
 extern bool shadow_audit_enable;
+#else
+#define SHADOW_AUDIT                   0
+#define shadow_audit_enable        false
 #endif
 
 /******************************************************************************
