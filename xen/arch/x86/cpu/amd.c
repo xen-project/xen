@@ -891,7 +891,12 @@ static bool zenbleed_use_chickenbit(void)
         return is_zen2_uarch();
     }
 
-    return (uint8_t)curr_rev >= fixed_rev;
+    /*
+     * Zenbleed can be mitigated by disabling Floating-Point
+     * Mov-Elimination, but this is expensive.  Only do so when we
+     * don't have a fix in microcode.
+     */
+    return (uint8_t)curr_rev < fixed_rev;
 }
 
 void amd_init_de_cfg(const struct cpuinfo_x86 *c)
