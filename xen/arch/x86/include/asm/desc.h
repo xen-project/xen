@@ -6,6 +6,16 @@
 /*
  * Xen reserves a memory page of GDT entries.
  * No guest GDT entries exist beyond the Xen reserved area.
+ *
+ * The page after the reserved area, the last of the GDT's 64k, is the
+ * PV effective root-table window (PV_EFF_ROOT_PT_PAGE, config.h):
+ * beyond the GDT limit Xen loads (LAST_RESERVED_GDT_BYTE), so no
+ * selector reaches it.  Xen uses only a few of the reserved page's
+ * 512 slots, so more Xen descriptors never need another page; if one
+ * were needed regardless, the window would have to move out of the
+ * GDT first (into a per-domain sub-area of its own), as this is the
+ * GDT's last page.  pv_map_eff_root_pt() checks the layout at build
+ * time.
  */
 #define NR_RESERVED_GDT_PAGES   1
 #define NR_RESERVED_GDT_BYTES   (NR_RESERVED_GDT_PAGES * PAGE_SIZE)
