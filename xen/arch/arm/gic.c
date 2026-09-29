@@ -353,6 +353,12 @@ void gic_interrupt(struct cpu_user_regs *regs, int is_fiq)
         /* Reading IRQ will ACK it */
         irq = gic_hw_ops->read_irq();
 
+        /*
+         * Without CONFIG_GICV3_ESPI, there is no IRQ descriptor or
+         * pending_irq storage for eSPIs, so we cannot handle them.
+         */
+        BUG_ON(!IS_ENABLED(CONFIG_GICV3_ESPI) && is_espi(irq));
+
         if ( likely(irq >= GIC_SGI_STATIC_MAX && irq < 1020) || is_espi(irq) )
         {
             isb();

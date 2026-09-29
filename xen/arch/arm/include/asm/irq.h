@@ -66,18 +66,7 @@ static inline bool is_lpi(unsigned int irq)
 
 static inline bool is_espi(unsigned int irq)
 {
-#ifdef CONFIG_GICV3_ESPI
     return irq >= ESPI_BASE_INTID && irq <= ESPI_MAX_INTID;
-#else
-    /*
-     * The function should not be called for eSPIs when CONFIG_GICV3_ESPI is
-     * disabled. Returning false allows the compiler to optimize the code
-     * when the config is disabled, while the assert ensures that out-of-range
-     * array resources are not accessed.
-     */
-    ASSERT(!(irq >= ESPI_BASE_INTID && irq <= ESPI_MAX_INTID));
-    return false;
-#endif
 }
 
 static inline unsigned int espi_intid_to_idx(unsigned int intid)

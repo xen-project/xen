@@ -62,6 +62,14 @@ static inline struct vgic_irq_rank *vgic_get_espi_rank(struct vcpu *v,
     return &v->domain->arch.vgic.ext_shared_irqs[EXT_RANK_NUM2IDX(rank)];
 }
 
+static inline struct pending_irq *espi_to_pending(const struct domain *d,
+                                                  unsigned int irq)
+{
+    unsigned int idx = espi_intid_to_idx(irq) + d->arch.vgic.nr_spis;
+
+    return &d->arch.vgic.pending_irqs[idx];
+}
+
 #else
 static inline bool is_valid_espi_rank(struct domain *d, unsigned int rank)
 {
@@ -74,6 +82,13 @@ static inline bool is_valid_espi_rank(struct domain *d, unsigned int rank)
  */
 static inline struct vgic_irq_rank *vgic_get_espi_rank(struct vcpu *v,
                                                        unsigned int rank)
+{
+    ASSERT_UNREACHABLE();
+    return NULL;
+}
+
+static inline struct pending_irq *espi_to_pending(const struct domain *d,
+                                                  unsigned int irq)
 {
     ASSERT_UNREACHABLE();
     return NULL;
@@ -698,6 +713,7 @@ bool vgic_to_sgi(struct vcpu *v, register_t sgir, enum gic_sgi_mode irqmode,
  * interrupt.
  * This can return NULL if called for an LPI which has been unmapped
  * meanwhile.
+ * This must not be called for an eSPI when CONFIG_GICV3_ESPI is disabled.
  */
 struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq)
 {
@@ -715,22 +731,12 @@ struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq)
 
 struct pending_irq *spi_to_pending(struct domain *d, unsigned int irq)
 {
-    unsigned int idx;
-
     ASSERT(irq >= NR_LOCAL_IRQS);
 
     if ( is_espi(irq) )
-    {
-        unsigned int nr_spis = d->arch.vgic.nr_spis;
+        return espi_to_pending(d, irq);
 
-        idx = espi_intid_to_idx(irq) + nr_spis;
-    }
-    else
-    {
-        idx = irq - NR_LOCAL_IRQS;
-    }
-
-    return &d->arch.vgic.pending_irqs[idx];
+    return &d->arch.vgic.pending_irqs[irq - NR_LOCAL_IRQS];
 }
 
 void vgic_clear_pending_irqs(struct vcpu *v)
