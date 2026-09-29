@@ -80,6 +80,7 @@ void __dummy__(void)
 
 #undef OFFSET_EF
 
+    OFFSET(VCPU_id, struct vcpu, vcpu_id);
     OFFSET(VCPU_processor, struct vcpu, processor);
     OFFSET(VCPU_domain, struct vcpu, domain);
     OFFSET(VCPU_vcpu_info, struct vcpu, vcpu_info_area.map);
