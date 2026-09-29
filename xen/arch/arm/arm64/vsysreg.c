@@ -299,7 +299,22 @@ void do_sysreg(struct cpu_user_regs *regs,
      * to identify the processor features
      */
     GENERATE_TID3_INFO(ID_PFR0_EL1, pfr32, 0)
-    GENERATE_TID3_INFO(ID_PFR1_EL1, pfr32, 1)
+    case HSR_SYSREG_ID_PFR1_EL1:
+    {
+        register_t guest_reg_value = domain_cpuinfo.pfr32.bits[1];
+
+        /*
+         * Preserve the sanitized ID_PFR1_EL1 value when AArch32 EL0
+         * is not supported, as for the other AArch32 ID registers.
+         */
+        if ( cpu_feature64_has_el0_32(&domain_cpuinfo) )
+            guest_reg_value = vreg_id_reg_set_gic_field(guest_reg_value,
+                                                        ID_PFR1_GIC_SHIFT,
+                                                        v->domain);
+
+        return handle_ro_read_val(regs, regidx, hsr.sysreg.read, hsr, 1,
+                                  guest_reg_value);
+    }
     GENERATE_TID3_INFO(ID_PFR2_EL1, pfr32, 2)
 
     case HSR_SYSREG_ID_DFR0_EL1:
@@ -361,6 +376,10 @@ void do_sysreg(struct cpu_user_regs *regs,
             guest_reg_value &= ~mask;
             guest_reg_value |= (sysval << ID_AA64PFR0_SVE_SHIFT) & mask;
         }
+
+        guest_reg_value = vreg_id_reg_set_gic_field(guest_reg_value,
+                                                    ID_AA64PFR0_GIC_SHIFT,
+                                                    v->domain);
 
         return handle_ro_read_val(regs, regidx, hsr.sysreg.read, hsr, 1,
                                   guest_reg_value);

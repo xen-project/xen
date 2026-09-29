@@ -438,15 +438,6 @@
 #define MVFR1_FPDNAN_SHIFT           4
 #define MVFR1_FPFTZ_SHIFT            0
 
-#define ID_PFR1_GIC_SHIFT            28
-#define ID_PFR1_VIRT_FRAC_SHIFT      24
-#define ID_PFR1_SEC_FRAC_SHIFT       20
-#define ID_PFR1_GENTIMER_SHIFT       16
-#define ID_PFR1_VIRTUALIZATION_SHIFT 12
-#define ID_PFR1_MPROGMOD_SHIFT       8
-#define ID_PFR1_SECURITY_SHIFT       4
-#define ID_PFR1_PROGMOD_SHIFT        0
-
 #define MVFR2_FPMISC_SHIFT           4
 #define MVFR2_SIMDMISC_SHIFT         0
 

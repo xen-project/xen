@@ -4,10 +4,32 @@
 #ifndef __ASM_ARM_VREG__
 #define __ASM_ARM_VREG__
 
+#include <xen/bitops.h>
+#include <xen/bug.h>
+#include <xen/sched.h>
+
+#include <asm/gic.h>
+#include <asm/sysregs.h>
+
 typedef bool (*vreg_reg64_fn_t)(struct cpu_user_regs *regs, uint64_t *r,
                                    bool read);
 typedef bool (*vreg_reg_fn_t)(struct cpu_user_regs *regs, register_t *r,
                                    bool read);
+
+#define VREG_ID_REG_GIC_WIDTH 4
+
+static inline register_t vreg_id_reg_set_gic_field(register_t val,
+                                                   unsigned int shift,
+                                                   const struct domain *d)
+{
+    register_t mask = GENMASK(shift + VREG_ID_REG_GIC_WIDTH - 1, shift);
+    enum gic_version vgic_ver = d->arch.vgic.version;
+    register_t id_pfr_gic = vgic_ver == GIC_V3 ? ID_PFR_GIC_V3 : ID_PFR_GIC_NI;
+
+    ASSERT((vgic_ver == GIC_V2) || (vgic_ver == GIC_V3));
+
+    return (val & ~mask) | (id_pfr_gic << shift);
+}
 
 static inline bool vreg_emulate_cp32(struct cpu_user_regs *regs, union hsr hsr,
                                      vreg_reg_fn_t fn)
