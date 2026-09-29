@@ -11,6 +11,7 @@
 #include <xen/lib.h>
 #include <xen/delay.h>
 #include <xen/iocap.h>
+#include <xen/init.h>
 #include <xen/libfdt/libfdt.h>
 #include <xen/mm.h>
 #include <xen/rbtree.h>
@@ -549,10 +550,9 @@ static int gicv3_disable_its(struct host_its *hw_its)
     return -ETIMEDOUT;
 }
 
-static int gicv3_its_init_single_its(struct host_its *hw_its)
+static int __init gicv3_its_prepare_single_its(struct host_its *hw_its)
 {
-    uint64_t reg;
-    int i, ret;
+    int ret;
 
     hw_its->its_base = ioremap_nocache(hw_its->addr, hw_its->size);
     if ( !hw_its->its_base )
@@ -563,6 +563,14 @@ static int gicv3_its_init_single_its(struct host_its *hw_its)
         return ret;
 
     gicv3_its_enable_quirks(hw_its);
+
+    return 0;
+}
+
+static int __init gicv3_its_init_single_its(struct host_its *hw_its)
+{
+    uint64_t reg;
+    int i, ret;
 
     reg = readq_relaxed(hw_its->its_base + GITS_TYPER);
     hw_its->devid_bits = GITS_TYPER_DEVICE_ID_BITS(reg);
@@ -1189,7 +1197,7 @@ static void gicv3_its_acpi_init(void)
 
 #endif
 
-int gicv3_its_init(void)
+int __init gicv3_its_init(unsigned int host_lpi_bits)
 {
     struct host_its *hw_its;
     int ret;
@@ -1199,14 +1207,28 @@ int gicv3_its_init(void)
     else
         gicv3_its_acpi_init();
 
+    if ( list_empty(&host_its_list) )
+        return 0;
+
+    list_for_each_entry(hw_its, &host_its_list, entry)
+    {
+        ret = gicv3_its_prepare_single_its(hw_its);
+        if ( ret )
+            return ret;
+    }
+
+    gicv3_its_validate_quirks();
+
+    ret = gicv3_lpi_init_host_lpis(host_lpi_bits);
+    if ( ret )
+        return ret;
+
     list_for_each_entry(hw_its, &host_its_list, entry)
     {
         ret = gicv3_its_init_single_its(hw_its);
         if ( ret )
             return ret;
     }
-
-    gicv3_its_validate_quirks();
 
     return 0;
 }

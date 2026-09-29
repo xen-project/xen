@@ -2037,20 +2037,9 @@ static int __init gicv3_init(void)
 
     if ( gic_dist_supports_lpis() )
     {
-        res = gicv3_its_init();
+        res = gicv3_its_init(intid_bits);
         if ( res )
-            panic("GICv3: ITS: initialization failed: %d\n", res);
-
-        /*
-         * Host LPI allocation uses ITS-derived memory attributes, so defer it
-         * until after gicv3_its_init() has discovered ITS workarounds.
-         */
-        if ( gicv3_its_host_has_its() )
-        {
-            res = gicv3_lpi_init_host_lpis(intid_bits);
-            if ( res )
-                panic("GICv3: LPI initialization failed: %d\n", res);
-        }
+            panic("GICv3: ITS/LPI initialization failed: %d\n", res);
     }
 
     res = gicv3_cpu_init();
