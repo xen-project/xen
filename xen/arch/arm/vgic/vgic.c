@@ -712,7 +712,7 @@ bool vgic_evtchn_irq_pending(struct vcpu *v)
 
 bool vgic_reserve_virq(struct domain *d, unsigned int virq)
 {
-    if ( virq >= vgic_num_irqs(d) )
+    if ( !vgic_is_valid_line(d, virq) )
         return false;
 
     return !test_and_set_bit(virq, d->arch.vgic.allocated_irqs);
@@ -756,6 +756,9 @@ int vgic_allocate_virq(struct domain *d, bool spi)
 
 void vgic_free_virq(struct domain *d, unsigned int virq)
 {
+    if ( !vgic_is_valid_line(d, virq) )
+        return;
+
     clear_bit(virq, d->arch.vgic.allocated_irqs);
 }
 
