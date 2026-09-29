@@ -9,6 +9,19 @@
 # error "unknown ARM variant"
 #endif
 
+#define ID_PFR1_GIC_SHIFT            28
+#define ID_PFR1_VIRT_FRAC_SHIFT      24
+#define ID_PFR1_SEC_FRAC_SHIFT       20
+#define ID_PFR1_GENTIMER_SHIFT       16
+#define ID_PFR1_VIRTUALIZATION_SHIFT 12
+#define ID_PFR1_MPROGMOD_SHIFT       8
+#define ID_PFR1_SECURITY_SHIFT       4
+#define ID_PFR1_PROGMOD_SHIFT        0
+
+/* GIC field encodings, common to ID_PFR1{,_EL1} and ID_AA64PFR0_EL1 */
+#define ID_PFR_GIC_NI                0x0U
+#define ID_PFR_GIC_V3                0x1U
+
 #ifndef __ASSEMBLER__
 
 #include <asm/alternative.h>
