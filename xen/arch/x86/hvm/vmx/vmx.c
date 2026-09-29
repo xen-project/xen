@@ -4281,26 +4281,30 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
              * We intercept #DB unconditionally to work around CVE-2015-8104 /
              * XSA-156 (guest-kernel induced host DoS).
              *
-             * STI/MovSS shadows block/defer interrupts/exceptions (exact
-             * details are complicated and poorly documented).  Debug
-             * exceptions delayed for any reason are stored in the
-             * PENDING_DBG_EXCEPTIONS field.
+             * Most sources of #DB accumuate status in PENDING_DBG, which are
+             * then dispatched in priority order prior to fetching the next
+             * instruction.  When the #DB intercept triggers, PENDING_DBG is 0
+             * with the status bits having moved into EXIT_QUALIFICATION.
              *
-             * The falling edge of PENDING_DBG causes #DB to be delivered,
-             * resulting in a VMExit, as #DB is intercepted.  The VMCS still
-             * reports blocked-by-STI/MovSS.
+             * At any point if Blocked-by-STI/MovSS are active, extra VMEntry
+             * consistency checks are applied, cross-checking EFLAGS.TF,
+             * PENDING_DBG.BS and DEBUGCTL.BTF.  These consistency checks
+             * apply to Activity-state-HLT too, but Xen doesn't support this.
              *
-             * The VMEntry checks when EFLAGS.TF is set don't like a VMCS in
-             * this state.  Despite a #DB queued in VMENTRY_INTR_INFO, the
-             * state is rejected as DR6.BS isn't pending.  Fix this up.
+             * The VMCS state at the point of #DB intercept does not satisfy
+             * the consistency checks.  In the case that a SingleStep should
+             * be pending, fill PENDING_DBG back in to satisfy the consitency
+             * check.
              */
             if ( unlikely(regs->eflags & X86_EFLAGS_TF) )
             {
-                unsigned long int_info;
+                unsigned long int_info, debugctl;
 
                 __vmread(GUEST_INTERRUPTIBILITY_INFO, &int_info);
+                __vmread(GUEST_IA32_DEBUGCTL, &debugctl);
 
-                if ( int_info & (VMX_INTR_SHADOW_STI | VMX_INTR_SHADOW_MOV_SS) )
+                if ( (int_info & (VMX_INTR_SHADOW_STI | VMX_INTR_SHADOW_MOV_SS)) &&
+                     !(debugctl & IA32_DEBUGCTLMSR_BTF) )
                 {
                     unsigned long pending_dbg;
 
