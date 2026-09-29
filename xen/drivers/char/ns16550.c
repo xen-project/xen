@@ -1990,8 +1990,14 @@ static int __init ns16550_acpi_uart_init(const void *data)
     uart->reg_width = spcr->serial_port.access_width;
 
     /* The trigger/polarity information is not available in spcr. */
-    irq_set_type(spcr->interrupt, IRQ_TYPE_LEVEL_HIGH);
     uart->irq = spcr->interrupt;
+    if ( irq_set_type(spcr->interrupt, IRQ_TYPE_LEVEL_HIGH) )
+    {
+        printk(XENLOG_WARNING
+               "ns16550: unable to configure IRQ %u, using polling\n",
+               spcr->interrupt);
+        uart->irq = 0;
+    }
 
     uart->vuart.base_addr = uart->io_base;
     uart->vuart.size = uart->io_size;

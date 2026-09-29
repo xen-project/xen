@@ -347,6 +347,7 @@ static int __init pl011_acpi_uart_init(const void *data)
 {
     acpi_status status;
     struct acpi_table_spcr *spcr = NULL;
+    unsigned int irq;
     int res;
     bool sbsa;
 
@@ -363,10 +364,17 @@ static int __init pl011_acpi_uart_init(const void *data)
             spcr->interface_type == ACPI_DBG2_SBSA_32);
 
     /* trigger/polarity information is not available in spcr */
-    irq_set_type(spcr->interrupt, IRQ_TYPE_LEVEL_HIGH);
+    irq = spcr->interrupt;
+    if ( irq_set_type(irq, IRQ_TYPE_LEVEL_HIGH) )
+    {
+        printk(XENLOG_WARNING
+               "pl011: unable to configure IRQ %u, using polling\n",
+               irq);
+        irq = 0;
+    }
 
     /* TODO - mmio32 proper handling (for now set to true) */
-    res = pl011_uart_init(spcr->interrupt, spcr->serial_port.address,
+    res = pl011_uart_init(irq, spcr->serial_port.address,
                           PAGE_SIZE, sbsa, true);
     if ( res < 0 )
     {

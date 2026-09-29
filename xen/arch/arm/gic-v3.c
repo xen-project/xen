@@ -1743,15 +1743,18 @@ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
     /* Read from APIC table and fill up the GIC variables */
     if ( !cpu_base_assigned )
     {
+        int rc;
+
+        rc = irq_set_type(processor->vgic_interrupt,
+                          processor->flags & ACPI_MADT_VGIC_IRQ_MODE ?
+                          IRQ_TYPE_EDGE_BOTH : IRQ_TYPE_LEVEL_MASK);
+
+        if ( rc )
+            return rc;
+
         cbase = processor->base_address;
         vbase = processor->gicv_base_address;
         gicv3_info.maintenance_irq = processor->vgic_interrupt;
-
-        if ( processor->flags & ACPI_MADT_VGIC_IRQ_MODE )
-            irq_set_type(gicv3_info.maintenance_irq, IRQ_TYPE_EDGE_BOTH);
-        else
-            irq_set_type(gicv3_info.maintenance_irq, IRQ_TYPE_LEVEL_MASK);
-
         cpu_base_assigned = 1;
     }
     else
