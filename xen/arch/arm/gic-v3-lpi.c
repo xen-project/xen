@@ -7,7 +7,9 @@
  * Copyright (C) 2016,2017 - ARM Ltd
  */
 
+#include <xen/acpi.h>
 #include <xen/cpu.h>
+#include <xen/device_tree.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
@@ -100,6 +102,20 @@ static uint32_t __ro_after_init host_lpi_flags;
 void __init gicv3_lpi_update_host_flags(uint32_t flags)
 {
     host_lpi_flags |= flags;
+}
+
+static void __init gicv3_lpi_collect_fw_attrs(void)
+{
+    /*
+     * A top-level GIC node property describes the Redistributor side of the
+     * LPI path. Do not inherit it into per-ITS policy.
+     */
+    if ( !acpi_disabled ||
+         !dt_property_read_bool(dt_interrupt_controller, "dma-noncoherent") )
+        return;
+
+    gicv3_lpi_update_host_flags(GICV3_QUIRK_MEM_NC_NS);
+    printk("GICv3: Redistributors marked dma-noncoherent\n");
 }
 
 static union host_lpi *gic_get_host_lpi(uint32_t plpi)
@@ -443,13 +459,15 @@ integer_param("max_lpi_bits", max_lpi_bits);
  * to the page with the actual "union host_lpi" entries. Our LPI limit
  * avoids excessive memory usage.
  */
-int gicv3_lpi_init_host_lpis(unsigned int host_lpi_bits)
+int __init gicv3_lpi_init_host_lpis(unsigned int host_lpi_bits)
 {
     unsigned int nr_lpi_ptrs;
     int rc;
 
     /* We rely on the data structure being atomically accessible. */
     BUILD_BUG_ON(sizeof(union host_lpi) > sizeof(unsigned long));
+
+    gicv3_lpi_collect_fw_attrs();
 
     /*
      * An implementation needs to support at least 14 bits of LPI IDs.

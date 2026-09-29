@@ -136,6 +136,21 @@ static const struct its_quirk *__init gicv3_its_find_quirk(
     return NULL;
 }
 
+static void __init gicv3_its_collect_fw_attrs(struct host_its *hw_its)
+{
+    /*
+     * An ITS subnode property describes memory transactions made by that ITS.
+     * Do not inherit it into the global host LPI/Redistributor policy.
+     */
+    if ( !hw_its->dt_node ||
+         !dt_property_read_bool(hw_its->dt_node, "dma-noncoherent") )
+        return;
+
+    hw_its->quirk_flags |= GICV3_QUIRK_MEM_NC_NS;
+    printk("GICv3: ITS @%#"PRIpaddr" marked dma-noncoherent\n",
+           hw_its->addr);
+}
+
 static void __init gicv3_its_collect_quirks(struct host_its *hw_its)
 {
     const struct its_quirk *quirk = gicv3_its_find_quirk(hw_its);
@@ -146,6 +161,8 @@ static void __init gicv3_its_collect_quirks(struct host_its *hw_its)
         gicv3_lpi_update_host_flags(quirk->lpi_flags);
         printk("GICv3: enabling workaround for ITS: %s\n", quirk->desc);
     }
+
+    gicv3_its_collect_fw_attrs(hw_its);
 }
 
 uint64_t gicv3_mem_get_cacheability(uint32_t flags)
