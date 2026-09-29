@@ -510,13 +510,52 @@ void share_xen_page_with_guest(struct page_info *page, struct domain *d,
     nrspin_unlock(&d->page_alloc_lock);
 }
 
+/*
+ * Map @mfn read-only at v's PV_EFF_ROOT_PT() window.  The window lives in
+ * v's per-domain area, so v need not be current; the local flush is for
+ * when it is, with its own page tables loaded.
+ */
+static void pv_map_eff_root_pt(const struct vcpu *v, mfn_t mfn)
+{
+    /*
+     * The window must lie beyond the GDT limit Xen loads, so that no
+     * selector reaches it, and within the GDT's 64k.
+     */
+    BUILD_BUG_ON(PV_EFF_ROOT_PT_OFFSET <= LAST_RESERVED_GDT_BYTE);
+    BUILD_BUG_ON(PV_EFF_ROOT_PT_OFFSET + PAGE_SIZE > GDT_VIRT_SIZE);
+
+    l1e_write(pv_gdt_ptes(v) + PV_EFF_ROOT_PT_PAGE,
+              l1e_from_mfn(mfn, __PAGE_HYPERVISOR_RO));
+    flush_tlb_one_local(PV_EFF_ROOT_PT(v));
+}
+
+/*
+ * Clear the window.  Its lifetime is v->arch.cr3's: make_cr3() writes it
+ * wherever v->arch.cr3 is set, and vcpu_destroy_pagetables() clears it where
+ * v->arch.cr3 is zeroed.  In shadow mode both name a top-level shadow, which
+ * shadow_teardown() releases before that point; nothing uses either once the
+ * vCPU can no longer run.
+ */
+static void pv_unmap_eff_root_pt(const struct vcpu *v)
+{
+    l1e_write(pv_gdt_ptes(v) + PV_EFF_ROOT_PT_PAGE, l1e_empty());
+    flush_tlb_one_local(PV_EFF_ROOT_PT(v));
+}
+
 void make_cr3(struct vcpu *v, mfn_t mfn)
 {
     struct domain *d = v->domain;
 
     v->arch.cr3 = mfn_x(mfn) << PAGE_SHIFT;
-    if ( is_pv_domain(d) && d->arch.pv.pcid )
-        v->arch.cr3 |= get_pcid_bits(v, false);
+
+    if ( is_pv_domain(d) )
+    {
+        if ( d->arch.pv.pcid )
+            v->arch.cr3 |= get_pcid_bits(v, false);
+
+        if ( d->arch.pv.xpti )
+            pv_map_eff_root_pt(v, mfn);
+    }
 }
 
 void write_ptbase(struct vcpu *v)
@@ -3193,6 +3232,8 @@ int vcpu_destroy_pagetables(struct vcpu *v)
         return rc;
 
     v->arch.cr3 = 0;
+    if ( is_pv_domain(v->domain) && v->domain->arch.pv.xpti )
+        pv_unmap_eff_root_pt(v);
 
     /*
      * Get the top-level guest page; either the guest_table itself, for
