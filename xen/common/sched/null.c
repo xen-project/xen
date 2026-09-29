@@ -785,11 +785,13 @@ static void cf_check null_unit_migrate(
     sched_set_res(unit, get_sched_res(new_cpu));
 }
 
-#ifndef NDEBUG
 static inline void null_unit_check(struct sched_unit *unit)
 {
     struct null_unit * const nvc = null_unit(unit);
     struct null_dom * const ndom = unit->domain->sched_priv;
+
+    if ( !IS_ENABLED(CONFIG_DEBUG) )
+        return;
 
     BUG_ON(nvc->unit != unit);
 
@@ -800,10 +802,6 @@ static inline void null_unit_check(struct sched_unit *unit)
 
     SCHED_STAT_CRANK(unit_check);
 }
-#define NULL_UNIT_CHECK(unit)  (null_unit_check(unit))
-#else
-#define NULL_UNIT_CHECK(unit)
-#endif
 
 
 /*
@@ -823,7 +821,7 @@ static void cf_check null_schedule(
     struct null_unit *wvc;
 
     SCHED_STAT_CRANK(schedule);
-    NULL_UNIT_CHECK(current->sched_unit);
+    null_unit_check(current->sched_unit);
 
     if ( unlikely(tb_init_done) )
     {
@@ -940,7 +938,7 @@ static void cf_check null_schedule(
                   !unit_runnable_state(prev->next_task)) )
         prev->next_task = sched_idle_unit(sched_cpu);
 
-    NULL_UNIT_CHECK(prev->next_task);
+    null_unit_check(prev->next_task);
 
     prev->next_task->migrated = false;
 }

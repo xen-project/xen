@@ -2153,12 +2153,14 @@ static void cf_check replenish_domain_budget(void *data)
     set_timer(&sdom->repl_timer, sdom->next_repl);
 }
 
-#ifndef NDEBUG
 static inline void
 csched2_unit_check(const struct sched_unit *unit)
 {
     struct csched2_unit * const svc = csched2_unit(unit);
     struct csched2_dom * const sdom = svc->sdom;
+
+    if ( !IS_ENABLED(CONFIG_DEBUG) )
+        return;
 
     BUG_ON( svc->unit != unit );
     BUG_ON( sdom != csched2_dom(unit->domain) );
@@ -2173,10 +2175,6 @@ csched2_unit_check(const struct sched_unit *unit)
     }
     SCHED_STAT_CRANK(unit_check);
 }
-#define CSCHED2_UNIT_CHECK(unit)  (csched2_unit_check(unit))
-#else
-#define CSCHED2_UNIT_CHECK(unit)
-#endif
 
 static void *cf_check
 csched2_alloc_udata(const struct scheduler *ops, struct sched_unit *unit,
@@ -3244,7 +3242,7 @@ csched2_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
 
     SCHED_STAT_CRANK(unit_insert);
 
-    CSCHED2_UNIT_CHECK(unit);
+    csched2_unit_check(unit);
 }
 
 static void cf_check
@@ -3595,7 +3593,7 @@ static void cf_check csched2_schedule(
     bool migrated = false;
 
     SCHED_STAT_CRANK(schedule);
-    CSCHED2_UNIT_CHECK(currunit);
+    csched2_unit_check(currunit);
 
     BUG_ON(!cpumask_test_cpu(sched_cpu, &csched2_priv(ops)->initialized));
 
@@ -3777,7 +3775,7 @@ static void cf_check csched2_schedule(
     currunit->next_task = snext->unit;
     snext->unit->migrated = migrated;
 
-    CSCHED2_UNIT_CHECK(currunit->next_task);
+    csched2_unit_check(currunit->next_task);
 }
 
 static void

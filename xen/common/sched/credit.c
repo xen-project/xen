@@ -660,12 +660,14 @@ csched_switch_sched(struct scheduler *new_ops, unsigned int cpu,
     return &sr->_lock;
 }
 
-#ifndef NDEBUG
 static inline void
-__csched_unit_check(const struct sched_unit *unit)
+csched_unit_check(const struct sched_unit *unit)
 {
     struct csched_unit * const svc = CSCHED_UNIT(unit);
     struct csched_dom * const sdom = svc->sdom;
+
+    if ( !IS_ENABLED(CONFIG_DEBUG) )
+        return;
 
     BUG_ON( svc->unit != unit );
     BUG_ON( sdom != CSCHED_DOM(unit->domain) );
@@ -681,10 +683,6 @@ __csched_unit_check(const struct sched_unit *unit)
 
     SCHED_STAT_CRANK(unit_check);
 }
-#define CSCHED_UNIT_CHECK(unit)  (__csched_unit_check(unit))
-#else
-#define CSCHED_UNIT_CHECK(unit)
-#endif
 
 /*
  * Delay, in microseconds, between migrations of a UNIT between PCPUs.
@@ -1863,7 +1861,7 @@ static void cf_check csched_schedule(
     bool migrated = false;
 
     SCHED_STAT_CRANK(schedule);
-    CSCHED_UNIT_CHECK(unit);
+    csched_unit_check(unit);
 
     if ( unlikely(tb_init_done) )
     {
@@ -2034,7 +2032,7 @@ out:
         set_timer(&spc->ticker, now + MICROSECS(prv->tick_period_us)
                                 - now % MICROSECS(prv->tick_period_us) );
 
-    CSCHED_UNIT_CHECK(unit->next_task);
+    csched_unit_check(unit->next_task);
 }
 
 static void
