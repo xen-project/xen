@@ -25,12 +25,37 @@
 #include <asm/vgic.h>
 
 
+/*
+ * The allocated_irqs bitmap is compressed: eSPI bits immediately follow
+ * regular IRQ bits, skipping the gap in the INTID space.
+ *
+ *   +-----------+-----------+-------------------+-------------------+
+ *   |   SGIs    |   PPIs    |       SPIs        |       eSPIs       |
+ *   +-----------+-----------+-------------------+-------------------+
+ *   0           16          32                  vgic_num_irqs(d)
+ *
+ * INTID ESPI_BASE_INTID maps to bitmap index vgic_num_irqs(d).
+ * The following idx_to_virq() and virq_to_idx() convert between INTIDs
+ * and bitmap indexes.
+ *
+ * See also the allocated_irqs comment in struct vgic_dist.
+ */
 static inline unsigned int idx_to_virq(struct domain *d, unsigned int idx)
 {
     if ( idx >= vgic_num_irqs(d) )
         return espi_idx_to_intid(idx - vgic_num_irqs(d));
 
     return idx;
+}
+
+static inline unsigned int virq_to_idx(struct domain *d, unsigned int virq)
+{
+    ASSERT(IS_ENABLED(CONFIG_GICV3_ESPI) || !is_espi(virq));
+
+    if ( IS_ENABLED(CONFIG_GICV3_ESPI) && is_espi(virq) )
+        return espi_intid_to_idx(virq) + vgic_num_irqs(d);
+
+    return virq;
 }
 
 bool vgic_is_valid_line(struct domain *d, unsigned int virq)
@@ -854,19 +879,11 @@ bool vgic_emulate(struct cpu_user_regs *regs, union hsr hsr)
 
 bool vgic_reserve_virq(struct domain *d, unsigned int virq)
 {
-    unsigned int idx = virq;
-
     if ( !vgic_is_valid_line(d, virq) )
         return false;
 
-    if ( is_espi(virq) )
-    {
-        unsigned int num_regular_irqs = vgic_num_irqs(d);
-
-        idx = espi_intid_to_idx(virq) + num_regular_irqs;
-    }
-
-    return !test_and_set_bit(idx, d->arch.vgic.allocated_irqs);
+    return !test_and_set_bit(virq_to_idx(d, virq),
+                             d->arch.vgic.allocated_irqs);
 }
 
 int vgic_allocate_virq(struct domain *d, bool spi)
@@ -903,7 +920,10 @@ int vgic_allocate_virq(struct domain *d, bool spi)
 
 void vgic_free_virq(struct domain *d, unsigned int virq)
 {
-    clear_bit(virq, d->arch.vgic.allocated_irqs);
+    if ( !vgic_is_valid_line(d, virq) )
+        return;
+
+    clear_bit(virq_to_idx(d, virq), d->arch.vgic.allocated_irqs);
 }
 
 unsigned int vgic_max_vcpus(unsigned int domctl_vgic_version)
