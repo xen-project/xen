@@ -56,7 +56,7 @@ static inline intpte_t paging_cmpxchg_guest_entry(
  * PTE updates can be done with ordinary writes except:
  *  1. Debug builds get extra checking by using CMPXCHG[8B].
  */
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 #define PTE_UPDATE_WITH_CMPXCHG
 #else
 #undef PTE_UPDATE_WITH_CMPXCHG

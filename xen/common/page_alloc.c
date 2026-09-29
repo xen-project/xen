@@ -436,7 +436,7 @@ mfn_t __init alloc_boot_pages(unsigned long nr_pfns, unsigned long pfn_align)
         if ( pg >= r->e || pg < r->s )
             continue;
 
-#if defined(CONFIG_X86) && !defined(NDEBUG)
+#if defined(CONFIG_X86) && defined(CONFIG_DEBUG)
         /*
          * Filtering pfn_align == 1 since the only allocations using a bigger
          * alignment are the ones used for setting up the frame table chunks.
@@ -2611,7 +2611,7 @@ int assign_pages(
         goto out;
     }
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     {
         unsigned int extra_pages = 0;
 

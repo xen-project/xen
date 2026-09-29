@@ -3202,7 +3202,7 @@ static pagetable_t cf_check sh_update_cr3(struct vcpu *v, bool noflush)
     //// vcpu->arch.guest_table is already set
     ////
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     /* Double-check that the HVM code has sent us a sane guest_table */
     if ( is_hvm_domain(d) )
     {

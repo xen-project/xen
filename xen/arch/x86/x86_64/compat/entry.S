@@ -182,7 +182,7 @@ FUNC(cr4_pv32_restore)
         mov   %rax, (%rcx)
         RET
 0:
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
         /* Check that _all_ of the bits intended to be set actually are. */
         mov   %cr4, %rax
         and   cr4_pv32_mask(%rip), %rax

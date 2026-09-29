@@ -336,7 +336,7 @@ struct x86_emulate_state {
 
     struct stub_exn *stub_exn;
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     /*
      * Track caller of x86_decode_insn() to spot missing as well as
      * premature calls to x86_emulate_free_state().
@@ -347,7 +347,7 @@ struct x86_emulate_state {
 
 static inline void check_state(const struct x86_emulate_state *s)
 {
-#if defined(__XEN__) && !defined(NDEBUG)
+#if defined(__XEN__) && defined(CONFIG_DEBUG)
     ASSERT(s->caller);
 #endif
 }

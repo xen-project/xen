@@ -614,7 +614,7 @@ x86_emulate(
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops);
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 /*
  * In debug builds, wrap x86_emulate() with some assertions about its expected
  * behaviour.

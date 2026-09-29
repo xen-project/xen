@@ -39,7 +39,7 @@ x86_decode_insn(
     if ( unlikely(rc != X86EMUL_OKAY) )
         return ERR_PTR(-rc);
 
-#if defined(__XEN__) && !defined(NDEBUG)
+#if defined(__XEN__) && defined(CONFIG_DEBUG)
     /*
      * While we avoid memory allocation (by use of per-CPU data) above,
      * nevertheless make sure callers properly release the state structure

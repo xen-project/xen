@@ -788,7 +788,7 @@ static void *hvmemul_map_linear_addr(
                               nr_frames)) == NULL )
         goto unhandleable;
 
-#ifndef NDEBUG /* Poision unused mfn[]s with INVALID_MFN. */
+#ifdef CONFIG_DEBUG /* Poision unused mfn[]s with INVALID_MFN. */
     while ( mfn < hvmemul_ctxt->mfn + ARRAY_SIZE(hvmemul_ctxt->mfn) )
     {
         ASSERT(mfn_x(*mfn) == 0);
@@ -805,7 +805,7 @@ static void *hvmemul_map_linear_addr(
     while ( mfn-- > hvmemul_ctxt->mfn )
     {
         put_page(mfn_to_page(*mfn));
-#ifndef NDEBUG /* Clean slot for a subsequent map()'s error checking. */
+#ifdef CONFIG_DEBUG /* Clean slot for a subsequent map()'s error checking. */
         *mfn = _mfn(0);
 #endif
     }
@@ -837,7 +837,7 @@ static void hvmemul_unmap_linear_addr(
         *mfn++ = _mfn(0); /* Clean slot for map()'s error checking. */
     }
 
-#ifndef NDEBUG /* Check (and clean) all unused mfns. */
+#ifdef CONFIG_DEBUG /* Check (and clean) all unused mfns. */
     while ( mfn < hvmemul_ctxt->mfn + ARRAY_SIZE(hvmemul_ctxt->mfn) )
     {
         ASSERT(mfn_eq(*mfn, INVALID_MFN));

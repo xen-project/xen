@@ -99,7 +99,7 @@ boolean_param("noapic", skip_ioapic_setup);
 int8_t __read_mostly xen_cpuidle = -1;
 boolean_param("cpuidle", xen_cpuidle);
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 unsigned long __initdata highmem_start;
 size_param("highmem-start", highmem_start);
 #endif

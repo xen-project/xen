@@ -568,7 +568,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy);
 extern int pagefault_by_memadd(unsigned long addr, struct cpu_user_regs *regs);
 extern int handle_memadd_fault(unsigned long addr, struct cpu_user_regs *regs);
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 
 #define AUDIT_SHADOW_ALREADY_LOCKED ( 1u << 0 )
 #define AUDIT_ERRORS_OK             ( 1u << 1 )

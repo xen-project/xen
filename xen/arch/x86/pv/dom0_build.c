@@ -899,7 +899,7 @@ static int __init dom0_construct(const struct boot_domain *bd)
             else
                 mfn -= PFN_UP(initrd_len);
         }
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 #define REVERSE_START ((v_end - v_start) >> PAGE_SHIFT)
         if ( pfn > REVERSE_START && (vinitrd_start || pfn < initrd_pfn) )
             mfn = alloc_epfn - (pfn - REVERSE_START);
@@ -929,7 +929,7 @@ static int __init dom0_construct(const struct boot_domain *bd)
         }
     }
     BUG_ON(pfn != domain_tot_pages(d));
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     alloc_epfn += PFN_UP(initrd_len) + si->nr_p2m_frames;
 #endif
     while ( pfn < nr_pages )
@@ -943,7 +943,7 @@ static int __init dom0_construct(const struct boot_domain *bd)
         while ( pfn < domain_tot_pages(d) )
         {
             mfn = mfn_x(page_to_mfn(page));
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 #define pfn (nr_pages - 1 - (pfn - (alloc_epfn - alloc_spfn)))
 #endif
             dom0_update_physmap(compat, pfn, mfn, vphysmap_start);

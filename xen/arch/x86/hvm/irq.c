@@ -489,7 +489,7 @@ void hvm_set_callback_via(struct domain *d, uint64_t via)
         if ( is_vcpu_online(v) )
             hvm_assert_evtchn_irq(v);
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     printk(XENLOG_G_INFO "Dom%u callback via changed to ", d->domain_id);
     switch ( via_type )
     {

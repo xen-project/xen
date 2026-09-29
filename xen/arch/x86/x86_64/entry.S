@@ -14,7 +14,7 @@
 
 /* %rsp: struct cpu_user_regs */
 .macro ASSERT_CONTEXT_IS_XEN
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
         testb $3, UREGS_cs(%rsp)
         UNLIKELY_START(nz, ASSERT_XEN_\@)
         ASSERT_FAILED("INTERRUPTED XEN CONTEXT")

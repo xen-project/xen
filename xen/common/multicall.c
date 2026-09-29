@@ -73,7 +73,7 @@ ret_t do_multicall(
          */
         ASSERT_NOT_IN_ATOMIC();
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
         {
             /*
              * Deliberately corrupt the contents of the multicall structure.

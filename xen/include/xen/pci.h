@@ -204,7 +204,7 @@ static always_inline bool pcidevs_trylock(void)
     return lock_evaluate_nospec(pcidevs_trylock_unsafe());
 }
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 /*
  * Check to ensure there will be no changes to the entries in d->pdev_list (but
  * not the contents of each entry).

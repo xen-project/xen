@@ -17,7 +17,7 @@
  * Non-debug builds degrade to a simple typedef and noops for the functions.
  */
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 
 #define TYPE_SAFE(_type, _name)                                         \
     typedef struct { _type _name; } _name##_t;                          \

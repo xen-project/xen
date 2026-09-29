@@ -386,7 +386,7 @@ struct active_grant_entry {
                                 grant.                                */
     grant_ref_t   trans_gref;
     mfn_t         mfn;    /* Machine frame being granted.             */
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     gfn_t         gfn;    /* Guest's idea of the frame being granted. */
 #endif
     spinlock_t    lock;      /* lock to protect access of this entry.
@@ -400,7 +400,7 @@ struct active_grant_entry {
 
 static inline void act_set_gfn(struct active_grant_entry *act, gfn_t gfn)
 {
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     act->gfn = gfn;
 #endif
 }
@@ -4084,12 +4084,12 @@ void grant_table_warn_active_grants(struct domain *d)
         nr_active++;
         if ( nr_active <= WARN_GRANT_MAX )
             printk(XENLOG_G_DEBUG "d%d has active grant %x ("
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
                    "GFN %lx, "
 #endif
                    "MFN: %#"PRI_mfn")\n",
                    d->domain_id, ref,
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
                    gfn_x(act->gfn),
 #endif
                    mfn_x(act->mfn));

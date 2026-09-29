@@ -45,7 +45,7 @@ compat_common_vcpu_op(
 static inline void clobber_regs64(struct cpu_user_regs *regs,
                                   unsigned int nargs)
 {
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     /* Deliberately corrupt used parameter regs. */
     switch ( nargs )
     {
@@ -61,7 +61,7 @@ static inline void clobber_regs64(struct cpu_user_regs *regs,
 static inline void clobber_regs32(struct cpu_user_regs *regs,
                                   unsigned int nargs)
 {
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     /* Deliberately corrupt used parameter regs. */
     switch ( nargs )
     {

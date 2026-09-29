@@ -120,7 +120,7 @@ void *map_domain_page(mfn_t mfn)
     /* If the map fills up, the callers have misbehaved. */
     BUG_ON(i == DOMHEAP_ENTRIES);
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     /* Searching the hash could get slow if the map starts filling up.
      * Cross that bridge when we come to it */
     {

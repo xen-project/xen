@@ -15,7 +15,7 @@
 #include <asm/processor.h>
 #include <asm/p2m.h>
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 #define DBG_LEVEL_0                 (1 << 0)
 #define DBG_LEVEL_1                 (1 << 1)
 #define DBG_LEVEL_2                 (1 << 2)

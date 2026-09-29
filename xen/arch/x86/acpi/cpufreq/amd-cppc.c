@@ -30,7 +30,7 @@
         printk(XENLOG_DEBUG "AMD-CPPC: CPU%u " fmt, cpu, ## args);  \
 })
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 static bool __ro_after_init opt_active_mode;
 #else
 static bool __initdata opt_active_mode;

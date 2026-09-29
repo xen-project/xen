@@ -48,7 +48,7 @@ int pv_emul_read_descriptor(unsigned int sel, const struct vcpu *v,
         *limit = (desc.a & 0xffff) | (desc.b & 0x000f0000);
         if ( desc.b & _SEGMENT_G )
             *limit = ((*limit + 1) << 12) - 1;
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
         if ( sel > 3 )
         {
             unsigned int a, l;

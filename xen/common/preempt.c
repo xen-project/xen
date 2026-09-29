@@ -30,7 +30,7 @@ bool in_atomic(void)
     return preempt_count() || in_irq() || !local_irq_is_enabled();
 }
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 void ASSERT_NOT_IN_ATOMIC(void)
 {
     ASSERT(!preempt_count());

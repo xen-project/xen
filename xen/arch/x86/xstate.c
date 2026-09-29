@@ -448,7 +448,7 @@ void xrstor(struct vcpu *v, uint64_t mask)
         }
         if ( likely(faults == prev_faults) )
             break;
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
         gprintk(XENLOG_WARNING, "fault#%u: mxcsr=%08x\n",
                 faults, ptr->fpu_sse.mxcsr);
         gprintk(XENLOG_WARNING, "xs=%016lx xc=%016lx\n",

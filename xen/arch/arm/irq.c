@@ -290,7 +290,7 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
     spin_lock(&desc->lock);
     desc->handler->ack(desc);
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     if ( !desc->action )
     {
         printk("Unknown %s %#3.3x\n",

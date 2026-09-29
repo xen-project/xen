@@ -20,7 +20,7 @@
 #include <asm/page.h>    /* for pagetable_t */
 
 /* Debugging and auditing of the P2M code? */
-#if !defined(NDEBUG) && defined(CONFIG_HVM)
+#if defined(CONFIG_DEBUG) && defined(CONFIG_HVM)
 #define P2M_AUDIT     1
 #else
 #define P2M_AUDIT     0

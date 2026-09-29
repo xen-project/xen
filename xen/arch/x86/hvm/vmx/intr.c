@@ -330,7 +330,7 @@ void asmlinkage vmx_intr_assist(void)
         */
         if ( pt_vector != -1 )
         {
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
             /*
              * We assert that intack.vector is the highest priority vector for
              * only an interrupt from vlapic can reach this point and the

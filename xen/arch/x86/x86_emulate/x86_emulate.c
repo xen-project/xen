@@ -1344,11 +1344,11 @@ x86_emulate(
 
     if ( ops->validate )
     {
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
         state.caller = __builtin_return_address(0);
 #endif
         rc = ops->validate(&state, ctxt);
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
         state.caller = NULL;
 #endif
         if ( rc == X86EMUL_DONE )
@@ -8702,7 +8702,7 @@ static void __init __maybe_unused build_assertions(void)
     BUILD_BUG_ON(X86_ET_OTHER       != 7);
 }
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 /*
  * In debug builds, wrap x86_emulate() with some assertions about its expected
  * behaviour.

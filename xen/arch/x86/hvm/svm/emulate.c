@@ -23,7 +23,7 @@ static unsigned long svm_nextrip_insn_length(struct vcpu *v)
     if ( !cpu_has_svm_nrips )
         return 0;
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     switch ( vmcb->exitcode )
     {
     case VMEXIT_CR0_READ ... VMEXIT_DR15_WRITE:

@@ -13,7 +13,7 @@
 #include <asm/debugreg.h>
 #include <asm/xstate.h>
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 void x86_emulate_free_state(struct x86_emulate_state *s)
 {
     check_state(s);

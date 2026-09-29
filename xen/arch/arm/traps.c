@@ -1370,7 +1370,7 @@ long dep_physdev_op_compat(XEN_GUEST_HANDLE_PARAM(physdev_op_t) uop)
     return do_deprecated_hypercall();
 }
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
 {
     uint32_t reg;
@@ -1437,7 +1437,7 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, register_t *nr,
                       HYPERCALL_ARG2(regs), HYPERCALL_ARG3(regs),
                       HYPERCALL_ARG4(regs), HYPERCALL_ARG5(regs));
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     if ( !curr->hcall_preempted && HYPERCALL_RESULT_REG(regs) != -ENOSYS )
     {
         /* Deliberately corrupt parameter regs used by this hypercall. */
@@ -2114,7 +2114,7 @@ void asmlinkage do_trap_guest_sync(struct cpu_user_regs *regs)
 
         GUEST_BUG_ON(!regs_mode_is_32bit(regs));
         perfc_incr(trap_hvc32);
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
         if ( (hsr.iss & 0xff00) == 0xff00 )
             return do_debug_trap(regs, hsr.iss & 0x00ff);
 #endif
@@ -2129,7 +2129,7 @@ void asmlinkage do_trap_guest_sync(struct cpu_user_regs *regs)
     case HSR_EC_HVC64:
         GUEST_BUG_ON(regs_mode_is_32bit(regs));
         perfc_incr(trap_hvc64);
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
         if ( (hsr.iss & 0xff00) == 0xff00 )
             return do_debug_trap(regs, hsr.iss & 0x00ff);
 #endif

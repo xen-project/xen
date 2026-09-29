@@ -19,7 +19,7 @@ struct xen_mem_sharing_op;
 #define mem_sharing_enabled(d) ((d)->arch.hvm.mem_sharing.enabled)
 
 /* Auditing of memory sharing code? */
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 #define MEM_SHARING_AUDIT 1
 #else
 #define MEM_SHARING_AUDIT 0

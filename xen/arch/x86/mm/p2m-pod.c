@@ -51,7 +51,7 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
     struct domain *d = p2m->domain;
     mfn_t mfn = page_to_mfn(page);
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     /* Check to make sure this is a contiguous region */
     if ( mfn_x(mfn) & ((1UL << order) - 1) )
     {

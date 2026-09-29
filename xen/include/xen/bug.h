@@ -137,7 +137,7 @@ static void always_inline run_in_exception_handler(bug_fn_t *fn)
     unlikely(ret_warn_on_);             \
 })
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 #define ASSERT(p) \
     do { if ( unlikely(!(p)) ) assert_failed(#p); } while (0)
 #define ASSERT_UNREACHABLE() assert_failed("unreachable")

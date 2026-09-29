@@ -633,7 +633,7 @@ static inline void hvm_sanitize_regs_fields(struct cpu_user_regs *regs,
         regs->rsp = (uint32_t)regs->rsp;
     }
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     regs->error_code = 0xbeef;
     regs->entry_vector = 0xbeef;
     regs->saved_upcall_mask = 0xbf;

@@ -456,7 +456,7 @@ static void *sh_emulate_map_dest(struct vcpu *v, unsigned long vaddr,
     struct domain *d = v->domain;
     void *map;
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     /* We don't emulate user-mode writes to page tables. */
     if ( hvm_get_cpl(v) == 3 )
     {

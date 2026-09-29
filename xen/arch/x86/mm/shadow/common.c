@@ -496,7 +496,7 @@ void shadow_blow_tables_per_domain(struct domain *d)
     }
 }
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 /* Blow all shadows of all shadowed domains: this can be used to cause the
  * guest's pagetables to be re-shadowed if we suspect that the shadows
  * have somehow got out of sync */
@@ -517,7 +517,7 @@ static int __init cf_check shadow_blow_tables_keyhandler_init(void)
     return 0;
 }
 __initcall(shadow_blow_tables_keyhandler_init);
-#endif /* !NDEBUG */
+#endif /* CONFIG_DEBUG */
 
 /* Accessors for the singly-linked list that's used for hash chains */
 static inline struct page_info *

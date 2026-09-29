@@ -41,7 +41,7 @@ register unsigned long current_stack_pointer asm("rsp");
 
 #endif
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 #define ASSERT_INTERRUPT_STATUS(x, msg)         \
         pushf;                                  \
         testb $X86_EFLAGS_IF>>8,1(%rsp);        \
@@ -156,7 +156,7 @@ register unsigned long current_stack_pointer asm("rsp");
         GET_STACK_END(reg);                       \
         movq STACK_CPUINFO_FIELD(current_vcpu)(%r##reg), %r##reg
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 #define ASSERT_NOT_IN_ATOMIC                                             \
     sti; /* sometimes called with interrupts disabled: safe to enable */ \
     call ASSERT_NOT_IN_ATOMIC

@@ -249,7 +249,7 @@ void __init init_frametable(void)
     memset(end_pg, -1, (unsigned long)top_pg - (unsigned long)end_pg);
 }
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 static unsigned int __read_mostly root_pgt_pv_xen_slots
     = ROOT_PAGETABLE_PV_XEN_SLOTS;
 static l4_pgentry_t __read_mostly split_l4e;
@@ -340,7 +340,7 @@ void __init arch_init_memory(void)
 
     brk_free_unused();
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     if ( highmem_start )
     {
         unsigned long split_va = (unsigned long)__va(highmem_start);
@@ -839,7 +839,7 @@ bool is_memory_hole(mfn_t start, mfn_t end)
 
 #if defined(CONFIG_PV) || defined(CONFIG_SHADOW_PAGING)
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 struct mmio_emul_range_ctxt {
     const struct domain *d;
     unsigned long mfn;
@@ -971,7 +971,7 @@ get_page_from_l1e(
         }
         else if ( l1f & _PAGE_RW )
         {
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
             const unsigned long *ro_map;
             unsigned int seg, bdf;
 
@@ -1736,7 +1736,7 @@ void init_xen_l4_slots(l4_pgentry_t *l4t, mfn_t l4mfn,
             l4t[l4_table_offset(PERDOMAIN_VIRT_START)];
 
     /* Slot 261-: text/data/bss, RW M2P, vmap, frametable, directmap. */
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     if ( short_directmap &&
          unlikely(root_pgt_pv_xen_slots < ROOT_PAGETABLE_PV_XEN_SLOTS) )
     {
@@ -2045,7 +2045,7 @@ static int demote_l4_table(struct page_info *page)
 }
 #endif /* CONFIG_PV */
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 /*
  * We must never call _put_page_type() while holding a page_lock() for
  * that page; doing so may cause a deadlock under the right

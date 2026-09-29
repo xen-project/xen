@@ -28,7 +28,7 @@ DECLARE_PER_CPU(unsigned int, __preempt_count);
 
 bool in_atomic(void);
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 void ASSERT_NOT_IN_ATOMIC(void);
 #else
 #define ASSERT_NOT_IN_ATOMIC() ((void)0)

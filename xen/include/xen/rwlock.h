@@ -325,12 +325,12 @@ typedef struct percpu_rwlock percpu_rwlock_t;
 struct percpu_rwlock {
     rwlock_t            rwlock;
     bool                writer_activating;
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     percpu_rwlock_t     **percpu_owner;
 #endif
 };
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
 #define PERCPU_RW_LOCK_UNLOCKED(owner) { RW_LOCK_UNLOCKED, 0, owner }
 static inline void _percpu_rwlock_owner_check(percpu_rwlock_t **per_cpudata,
                                          percpu_rwlock_t *percpu_rwlock)

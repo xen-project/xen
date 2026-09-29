@@ -99,14 +99,14 @@ static always_inline void evtchn_write_lock(struct evtchn *evtchn)
 {
     write_lock(&evtchn->lock);
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     evtchn->old_state = evtchn->state;
 #endif
 }
 
 static inline unsigned int old_state(const struct evtchn *evtchn)
 {
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     return evtchn->old_state;
 #else
     return ECS_RESERVED; /* Just to allow things to build. */

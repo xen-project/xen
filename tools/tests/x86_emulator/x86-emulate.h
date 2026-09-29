@@ -44,6 +44,8 @@
 
 #include <xen-tools/common-macros.h>
 
+#define CONFIG_DEBUG
+
 #define ASSERT assert
 #define ASSERT_UNREACHABLE() assert(!__LINE__)
 

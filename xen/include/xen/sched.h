@@ -102,7 +102,7 @@ struct evtchn
 #define ECS_VIRQ         5 /* Channel is bound to a virtual IRQ line.        */
 #define ECS_IPI          6 /* Channel is bound to a virtual IPI line.        */
     unsigned char state;   /* ECS_* */
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG
     unsigned char old_state; /* State when taking lock in write mode. */
 #endif
     unsigned char xen_consumer:XEN_CONSUMER_BITS; /* Consumer in Xen if != 0 */
