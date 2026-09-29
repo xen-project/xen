@@ -1350,13 +1350,19 @@ map_grant_ref(
 
     grant_read_lock(rgt);
 
-    if ( unlikely(evaluate_nospec((rgt->gt_version == 1) !=
-                                  (status == &shah->flags))) )
+    /*
+     * After a v1 -> v2 change behind our backs "ref" may now be out of
+     * bounds.  While after a v2 -> v1 -> v2 change "ref" would still be
+     * suitably bounded, the underlying status page may have moved.
+     */
+    if ( evaluate_nospec(rgt->gt_version == 1
+                         ? status != &shah->flags
+                         : (ref >= nr_grant_entries(rgt) ||
+                            status != &status_entry(rgt, ref))) )
     {
         /*
-         * After a v1 -> v2 change behind our backs "ref" may now be out of
-         * bounds.  Recalculate it, but only for reserved entries.  Others
-         * will have been cleared anyway by the version change.
+         * Recalculate status, but only for reserved entries.  Others will
+         * have been cleared anyway by the version change(s).
          */
         if ( ref < GNTTAB_NR_RESERVED_ENTRIES )
             status = evaluate_nospec(rgt->gt_version == 1)
