@@ -110,8 +110,9 @@
 #define HOST_ITS_FLUSH_CMD_QUEUE        (1U << 0)
 #define HOST_ITS_USES_PTA               (1U << 1)
 
-#define HOST_ITS_WORKAROUND_NC_NS       (1U << 0)
-#define HOST_ITS_WORKAROUND_32BIT_ADDR  (1U << 1)
+/* GICv3 memory-related quirk flags. */
+#define GICV3_QUIRK_MEM_NC_NS           (1U << 0)
+#define GICV3_QUIRK_MEM_32BIT_ADDR      (1U << 1)
 
 /* We allocate LPIs on the hosts in chunks of 32 to reduce handling overhead. */
 #define LPI_BLOCK                       32U
@@ -128,6 +129,11 @@ struct host_its {
     unsigned int itte_size;
     spinlock_t cmd_lock;
     void *cmd_buf;
+    /*
+     * Workaround flags scoped to this ITS instance, including memory
+     * accessed through GITS_CBASER, GITS_BASER<n> and ITT memory.
+     */
+    uint32_t quirk_flags;
     unsigned int flags;
 };
 
@@ -157,6 +163,7 @@ int gicv3_lpi_init_rdist(void __iomem * rdist_base);
 /* Initialize the host structures for LPIs and the host ITSes. */
 int gicv3_lpi_init_host_lpis(unsigned int host_lpi_bits);
 int gicv3_its_init(unsigned int host_lpi_bits);
+void gicv3_lpi_update_host_flags(uint32_t flags);
 
 /* Store the physical address and ID for each redistributor as read from DT. */
 void gicv3_set_redist_address(paddr_t address, unsigned int redist_id);
@@ -199,10 +206,10 @@ struct pending_irq *gicv3_assign_guest_event(struct domain *d,
 void gicv3_lpi_update_host_entry(uint32_t host_lpi, int domain_id,
                                  uint32_t virt_lpi);
 
-/* ITS quirks handling. */
-uint64_t gicv3_its_get_cacheability(void);
-uint64_t gicv3_its_get_shareability(void);
-unsigned int gicv3_its_get_memflags(void);
+/* ITS/LPI quirks handling. */
+uint64_t gicv3_mem_get_cacheability(uint32_t flags);
+uint64_t gicv3_mem_get_shareability(uint32_t flags);
+unsigned int gicv3_mem_get_alloc_flags(uint32_t flags);
 
 #else
 

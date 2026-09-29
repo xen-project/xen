@@ -8,6 +8,7 @@
  */
 
 #include <xen/cpu.h>
+#include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/param.h>
@@ -78,8 +79,28 @@ struct lpi_redist_data {
 
 static DEFINE_PER_CPU(struct lpi_redist_data, lpi_redist);
 
+/*
+ * Host LPI flags are scoped to shared LPI/Redistributor state, not to an
+ * ITS instance. Arm IHI 0069H.b section 5.1.1 says "LPI configuration is
+ * global". Section 12.11.33 (GICR_PROPBASER) makes mismatched values
+ * UNPREDICTABLE for Redistributors that share an LPI Configuration table
+ * while GICR_CTLR.EnableLPIs == 1. Section 12.11.32 (GICR_PENDBASER)
+ * similarly makes mismatched OuterCache, Shareability or InnerCache values
+ * across Redistributors UNPREDICTABLE while GICR_CTLR.EnableLPIs == 1.
+ *
+ * Keep this policy in the LPI code and accumulate only explicit LPI/RD
+ * restrictions into it. Per-ITS restrictions stay in host_its::quirk_flags
+ * for GITS_CBASER, GITS_BASER<n> and ITT memory.
+ */
+static uint32_t __ro_after_init host_lpi_flags;
+
 #define MAX_NR_HOST_LPIS   (lpi_data.max_host_lpi_ids - LPI_OFFSET)
 #define HOST_LPIS_PER_PAGE      (PAGE_SIZE / sizeof(union host_lpi))
+
+void __init gicv3_lpi_update_host_flags(uint32_t flags)
+{
+    host_lpi_flags |= flags;
+}
 
 static union host_lpi *gic_get_host_lpi(uint32_t plpi)
 {
@@ -228,6 +249,7 @@ static int gicv3_lpi_allocate_pendtable(unsigned int cpu)
 {
     void *pendtable;
     unsigned int order;
+    unsigned int memflags = gicv3_mem_get_alloc_flags(host_lpi_flags);
 
     if ( per_cpu(lpi_redist, cpu).pending_table )
         return -EBUSY;
@@ -239,7 +261,7 @@ static int gicv3_lpi_allocate_pendtable(unsigned int cpu)
      * physically contiguous memory.
      */
     order = get_order_from_bytes(max(lpi_data.max_host_lpi_ids / 8, (unsigned long)SZ_64K));
-    pendtable = alloc_xenheap_pages(order, gicv3_its_get_memflags());
+    pendtable = alloc_xenheap_pages(order, memflags);
     if ( !pendtable )
         return -ENOMEM;
 
@@ -262,6 +284,8 @@ static int gicv3_lpi_set_pendtable(void __iomem *rdist_base)
 {
     const void *pendtable = this_cpu(lpi_redist).pending_table;
     uint64_t val;
+    uint64_t cacheability = gicv3_mem_get_cacheability(host_lpi_flags);
+    uint64_t shareability = gicv3_mem_get_shareability(host_lpi_flags);
 
     /*
      * The memory should have been allocated while preparing the CPU (or
@@ -275,9 +299,10 @@ static int gicv3_lpi_set_pendtable(void __iomem *rdist_base)
 
     ASSERT(!(virt_to_maddr(pendtable) & ~GENMASK(51, 16)));
 
-    val  = gicv3_its_get_cacheability() << GICR_PENDBASER_INNER_CACHEABILITY_SHIFT;
-    val |= GIC_BASER_CACHE_SameAsInner << GICR_PENDBASER_OUTER_CACHEABILITY_SHIFT;
-    val |= gicv3_its_get_shareability() << GICR_PENDBASER_SHAREABILITY_SHIFT;
+    val  = MASK_INSR(cacheability, GICR_PENDBASER_INNER_CACHEABILITY_MASK);
+    val |= MASK_INSR(GIC_BASER_CACHE_SameAsInner,
+                     GICR_PENDBASER_OUTER_CACHEABILITY_MASK);
+    val |= MASK_INSR(shareability, GICR_PENDBASER_SHAREABILITY_MASK);
     val |= GICR_PENDBASER_PTZ;
     val |= virt_to_maddr(pendtable);
 
@@ -304,10 +329,13 @@ static int gicv3_lpi_set_proptable(void __iomem * rdist_base)
 {
     uint64_t reg;
     unsigned int order;
+    uint64_t cacheability = gicv3_mem_get_cacheability(host_lpi_flags);
+    uint64_t shareability = gicv3_mem_get_shareability(host_lpi_flags);
 
-    reg  = gicv3_its_get_cacheability() << GICR_PROPBASER_INNER_CACHEABILITY_SHIFT;
-    reg |= GIC_BASER_CACHE_SameAsInner << GICR_PROPBASER_OUTER_CACHEABILITY_SHIFT;
-    reg |= gicv3_its_get_shareability() << GICR_PROPBASER_SHAREABILITY_SHIFT;
+    reg  = MASK_INSR(cacheability, GICR_PROPBASER_INNER_CACHEABILITY_MASK);
+    reg |= MASK_INSR(GIC_BASER_CACHE_SameAsInner,
+                     GICR_PROPBASER_OUTER_CACHEABILITY_MASK);
+    reg |= MASK_INSR(shareability, GICR_PROPBASER_SHAREABILITY_MASK);
 
     /*
      * The property table is shared across all redistributors, so allocate
@@ -317,9 +345,10 @@ static int gicv3_lpi_set_proptable(void __iomem * rdist_base)
     {
         /* The property table holds one byte per LPI. */
         void *table;
+        unsigned int memflags = gicv3_mem_get_alloc_flags(host_lpi_flags);
 
         order = get_order_from_bytes(max(lpi_data.max_host_lpi_ids, (unsigned long)SZ_4K));
-        table = alloc_xenheap_pages(order, gicv3_its_get_memflags());
+        table = alloc_xenheap_pages(order, memflags);
 
         if ( !table )
             return -ENOMEM;

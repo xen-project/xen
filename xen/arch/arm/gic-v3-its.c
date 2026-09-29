@@ -52,43 +52,40 @@ struct its_device {
     struct pending_irq *pend_irqs;      /* One struct per event */
 };
 
-/*
- * It is unlikely that a platform implements ITSes with different quirks,
- * so assume they all share the same.
- */
 struct its_quirk {
     const char *desc;
-    bool (*init)(struct host_its *hw_its);
     uint32_t iidr;
     uint32_t mask;
+    uint32_t its_flags;
+    /*
+     * lpi_flags are ORed into the global host LPI policy and must only
+     * contain additive restrictions. Non-additive LPI quirks need explicit
+     * handling.
+     */
+    uint32_t lpi_flags;
 };
-
-static uint32_t __ro_after_init its_quirk_flags;
-
-static bool gicv3_its_enable_quirk_gen4(struct host_its *hw_its)
-{
-    its_quirk_flags |= HOST_ITS_WORKAROUND_NC_NS |
-        HOST_ITS_WORKAROUND_32BIT_ADDR;
-
-    return true;
-}
 
 static const struct its_quirk its_quirks[] = {
     {
         .desc	= "R-Car Gen4",
         .iidr	= 0x0201743b,
         .mask	= 0xffffffffU,
-        .init	= gicv3_its_enable_quirk_gen4,
+        .its_flags = GICV3_QUIRK_MEM_NC_NS | GICV3_QUIRK_MEM_32BIT_ADDR,
+        .lpi_flags = GICV3_QUIRK_MEM_NC_NS | GICV3_QUIRK_MEM_32BIT_ADDR,
     },
     {
         /* Sentinel. */
     }
 };
 
-static const struct its_quirk *gicv3_its_find_quirk(uint32_t iidr)
+static const struct its_quirk *__init gicv3_its_find_quirk(uint32_t iidr)
 {
     const struct its_quirk *quirks = its_quirks;
 
+    /*
+     * The first matching quirk wins. More specific quirks must be listed
+     * before broader IIDR-only entries.
+     */
     for ( ; quirks->desc; quirks++ )
     {
         if ( quirks->iidr == (quirks->mask & iidr) )
@@ -98,53 +95,38 @@ static const struct its_quirk *gicv3_its_find_quirk(uint32_t iidr)
     return NULL;
 }
 
-static void gicv3_its_enable_quirks(struct host_its *hw_its)
+static void __init gicv3_its_collect_quirks(struct host_its *hw_its)
 {
     uint32_t iidr = readl_relaxed(hw_its->its_base + GITS_IIDR);
     const struct its_quirk *quirk = gicv3_its_find_quirk(iidr);
 
-    if ( quirk && quirk->init(hw_its) )
-        printk("GICv3: enabling workaround for ITS: %s\n", quirk->desc);
-}
-
-static void gicv3_its_validate_quirks(void)
-{
-    const struct its_quirk *quirk = NULL, *prev = NULL;
-    const struct host_its *hw_its;
-
-    if ( list_empty(&host_its_list) )
-        return;
-
-    hw_its = list_first_entry(&host_its_list, struct host_its, entry);
-    prev = gicv3_its_find_quirk(readl_relaxed(hw_its->its_base + GITS_IIDR));
-
-    list_for_each_entry(hw_its, &host_its_list, entry)
+    if ( quirk )
     {
-        quirk = gicv3_its_find_quirk(readl_relaxed(hw_its->its_base + GITS_IIDR));
-        BUG_ON(quirk != prev);
-        prev = quirk;
+        hw_its->quirk_flags |= quirk->its_flags;
+        gicv3_lpi_update_host_flags(quirk->lpi_flags);
+        printk("GICv3: enabling workaround for ITS: %s\n", quirk->desc);
     }
 }
 
-uint64_t gicv3_its_get_cacheability(void)
+uint64_t gicv3_mem_get_cacheability(uint32_t flags)
 {
-    if ( its_quirk_flags & HOST_ITS_WORKAROUND_NC_NS )
+    if ( flags & GICV3_QUIRK_MEM_NC_NS )
         return GIC_BASER_CACHE_nC;
 
     return GIC_BASER_CACHE_RaWaWb;
 }
 
-uint64_t gicv3_its_get_shareability(void)
+uint64_t gicv3_mem_get_shareability(uint32_t flags)
 {
-    if ( its_quirk_flags & HOST_ITS_WORKAROUND_NC_NS )
+    if ( flags & GICV3_QUIRK_MEM_NC_NS )
         return GIC_BASER_NonShareable;
 
     return GIC_BASER_InnerShareable;
 }
 
-unsigned int gicv3_its_get_memflags(void)
+unsigned int gicv3_mem_get_alloc_flags(uint32_t flags)
 {
-    if ( its_quirk_flags & HOST_ITS_WORKAROUND_32BIT_ADDR )
+    if ( flags & GICV3_QUIRK_MEM_32BIT_ADDR )
         return MEMF_bits(32);
 
     return 0;
@@ -391,13 +373,17 @@ static void *its_map_cbaser(struct host_its *its)
     uint64_t reg;
     unsigned int order;
     void *buffer;
+    uint64_t cacheability = gicv3_mem_get_cacheability(its->quirk_flags);
+    uint64_t shareability = gicv3_mem_get_shareability(its->quirk_flags);
+    unsigned int memflags = gicv3_mem_get_alloc_flags(its->quirk_flags);
 
-    reg  = gicv3_its_get_shareability() << GITS_BASER_SHAREABILITY_SHIFT;
-    reg |= GIC_BASER_CACHE_SameAsInner << GITS_BASER_OUTER_CACHEABILITY_SHIFT;
-    reg |= gicv3_its_get_cacheability() << GITS_BASER_INNER_CACHEABILITY_SHIFT;
+    reg  = MASK_INSR(shareability, GITS_BASER_SHAREABILITY_MASK);
+    reg |= MASK_INSR(GIC_BASER_CACHE_SameAsInner,
+                     GITS_BASER_OUTER_CACHEABILITY_MASK);
+    reg |= MASK_INSR(cacheability, GITS_BASER_INNER_CACHEABILITY_MASK);
 
     order = get_order_from_bytes(max(ITS_CMD_QUEUE_SZ, SZ_64K));
-    buffer = alloc_xenheap_pages(order, gicv3_its_get_memflags());
+    buffer = alloc_xenheap_pages(order, memflags);
     if ( !buffer )
         return NULL;
 
@@ -438,19 +424,41 @@ static void *its_map_cbaser(struct host_its *its)
 /* The ITS BASE registers work with page sizes of 4K, 16K or 64K. */
 #define BASER_PAGE_BITS(sz) ((sz) * 2 + 12)
 
-static int its_map_baser(void __iomem *basereg, uint64_t regc,
-                         unsigned int nr_items)
+static int its_map_baser(const struct host_its *its, void __iomem *basereg,
+                        uint64_t regc)
 {
     uint64_t attr, reg;
     unsigned int entry_size = GITS_BASER_ENTRY_SIZE(regc);
     unsigned int pagesz = 2;    /* try 64K pages first, then go down. */
+    unsigned int nr_items;
     unsigned int table_size;
     unsigned int order;
     void *buffer;
+    uint64_t cacheability = gicv3_mem_get_cacheability(its->quirk_flags);
+    uint64_t shareability = gicv3_mem_get_shareability(its->quirk_flags);
+    unsigned int memflags = gicv3_mem_get_alloc_flags(its->quirk_flags);
 
-    attr  = gicv3_its_get_shareability() << GITS_BASER_SHAREABILITY_SHIFT;
-    attr |= GIC_BASER_CACHE_SameAsInner << GITS_BASER_OUTER_CACHEABILITY_SHIFT;
-    attr |= gicv3_its_get_cacheability() << GITS_BASER_INNER_CACHEABILITY_SHIFT;
+    switch ( MASK_EXTR(regc, GITS_BASER_TYPE_MASK) )
+    {
+    case GITS_BASER_TYPE_DEVICE:
+        nr_items = BIT(its->devid_bits, UL);
+        break;
+    case GITS_BASER_TYPE_COLLECTION:
+        nr_items = num_possible_cpus();
+        break;
+    /* In case this is a GICv4, provide a (dummy) vPE table as well. */
+    case GITS_BASER_TYPE_VCPU:
+        nr_items = 1;
+        break;
+    default:
+        /* Ignore unimplemented and unsupported table types. */
+        return 0;
+    }
+
+    attr  = MASK_INSR(shareability, GITS_BASER_SHAREABILITY_MASK);
+    attr |= MASK_INSR(GIC_BASER_CACHE_SameAsInner,
+                      GITS_BASER_OUTER_CACHEABILITY_MASK);
+    attr |= MASK_INSR(cacheability, GITS_BASER_INNER_CACHEABILITY_MASK);
 
     /*
      * Setup the BASE register with the attributes that we like. Then read
@@ -464,7 +472,7 @@ retry:
     table_size = min(table_size, 256U << BASER_PAGE_BITS(pagesz));
 
     order = get_order_from_bytes(max(table_size, BIT(BASER_PAGE_BITS(pagesz), U)));
-    buffer = alloc_xenheap_pages(order, gicv3_its_get_memflags());
+    buffer = alloc_xenheap_pages(order, memflags);
     if ( !buffer )
         return -ENOMEM;
 
@@ -562,7 +570,7 @@ static int __init gicv3_its_prepare_single_its(struct host_its *hw_its)
     if ( ret )
         return ret;
 
-    gicv3_its_enable_quirks(hw_its);
+    gicv3_its_collect_quirks(hw_its);
 
     return 0;
 }
@@ -583,33 +591,11 @@ static int __init gicv3_its_init_single_its(struct host_its *hw_its)
     for ( i = 0; i < GITS_BASER_NR_REGS; i++ )
     {
         void __iomem *basereg = hw_its->its_base + GITS_BASER0 + i * 8;
-        unsigned int type;
 
         reg = readq_relaxed(basereg);
-        type = (reg & GITS_BASER_TYPE_MASK) >> GITS_BASER_TYPE_SHIFT;
-        switch ( type )
-        {
-        case GITS_BASER_TYPE_NONE:
-            continue;
-        case GITS_BASER_TYPE_DEVICE:
-            ret = its_map_baser(basereg, reg, BIT(hw_its->devid_bits, UL));
-            if ( ret )
-                return ret;
-            break;
-        case GITS_BASER_TYPE_COLLECTION:
-            ret = its_map_baser(basereg, reg, num_possible_cpus());
-            if ( ret )
-                return ret;
-            break;
-        /* In case this is a GICv4, provide a (dummy) vPE table as well. */
-        case GITS_BASER_TYPE_VCPU:
-            ret = its_map_baser(basereg, reg, 1);
-            if ( ret )
-                return ret;
-            break;
-        default:
-            continue;
-        }
+        ret = its_map_baser(hw_its, basereg, reg);
+        if ( ret )
+            return ret;
     }
 
     hw_its->cmd_buf = its_map_cbaser(hw_its);
@@ -738,6 +724,7 @@ int gicv3_its_map_guest_device(struct domain *d,
     struct its_device *dev = NULL;
     struct rb_node **new = &d->arch.vgic.its_devices.rb_node, *parent = NULL;
     int i, ret = -ENOENT;      /* "i" must be signed to check for >= 0 below. */
+    unsigned int memflags;
     unsigned int order;
 
     hw_its = gicv3_its_find_by_doorbell(host_doorbell);
@@ -801,8 +788,9 @@ int gicv3_its_map_guest_device(struct domain *d,
     ret = -ENOMEM;
 
     /* An Interrupt Translation Table needs to be 256-byte aligned. */
+    memflags = gicv3_mem_get_alloc_flags(hw_its->quirk_flags);
     order = get_order_from_bytes(max(nr_events * hw_its->itte_size, 256UL));
-    itt_addr = alloc_xenheap_pages(order, gicv3_its_get_memflags());
+    itt_addr = alloc_xenheap_pages(order, memflags);
     if ( !itt_addr )
         goto out_unlock;
 
@@ -1216,8 +1204,6 @@ int __init gicv3_its_init(unsigned int host_lpi_bits)
         if ( ret )
             return ret;
     }
-
-    gicv3_its_validate_quirks();
 
     ret = gicv3_lpi_init_host_lpis(host_lpi_bits);
     if ( ret )
