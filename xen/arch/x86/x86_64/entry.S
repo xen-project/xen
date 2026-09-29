@@ -170,9 +170,14 @@ FUNC_LOCAL(restore_all_guest)
         movabs $PADDR_MASK & PAGE_MASK, %rsi
         movabs $DIRECTMAP_VIRT_START, %rcx
         and   %rsi, %rdi
-        and   %r9, %rsi
         add   %rcx, %rdi
+
+        /* Effective root page table is mapped at PV_EFF_ROOT_PT(v) */
+        mov   VCPU_id(%rbx), %esi
+        shl   $GDT_LDT_VCPU_VA_SHIFT, %rsi
+        movabs $GDT_LDT_VIRT_START + PV_EFF_ROOT_PT_OFFSET, %rcx
         add   %rcx, %rsi
+
         mov   $ROOT_PAGETABLE_FIRST_XEN_SLOT, %ecx
         mov   root_table_offset(SH_LINEAR_PT_VIRT_START)*8(%rsi), %r8
         mov   %r8, root_table_offset(SH_LINEAR_PT_VIRT_START)*8(%rdi)
