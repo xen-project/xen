@@ -249,11 +249,30 @@ extern unsigned long xen_phys_start;
 #define GDT_LDT_VIRT_START       PERDOMAIN_VIRT_SLOT(0)
 #define GDT_LDT_VIRT_END         (GDT_LDT_VIRT_START + (GDT_LDT_MBYTES << 20))
 
-/* The address of a particular VCPU's GDT or LDT. */
+/*
+ * The address of a particular VCPU's GDT or LDT; each is the architectural
+ * maximum of 64k.
+ */
+#define GDT_VIRT_SIZE        KB(64)
 #define GDT_VIRT_START(v)    \
     (PERDOMAIN_VIRT_START + ((v)->vcpu_id << GDT_LDT_VCPU_VA_SHIFT))
 #define LDT_VIRT_START(v)    \
-    (GDT_VIRT_START(v) + (64*1024))
+    (GDT_VIRT_START(v) + GDT_VIRT_SIZE)
+
+/*
+ * The vCPU's effective root page table, mapped read-only in the last
+ * page of its GDT: the page after Xen's reserved range, beyond the
+ * GDT limit Xen loads (LAST_RESERVED_GDT_BYTE), so no selector can
+ * reach it.  "Effective" is the root page table the vCPU is meant to
+ * run on after any transformation: the guest's own, or its shadow
+ * under shadow paging.  XPTI does not transform it further but copies
+ * from it: the exit path reads the guest-visible L4 slots from here.
+ * Adding a reserved GDT page would mean moving the window out of the
+ * GDT first; pv_map_eff_root_pt() checks the layout at build time.
+ */
+#define PV_EFF_ROOT_PT_PAGE    (FIRST_RESERVED_GDT_PAGE + 1)
+#define PV_EFF_ROOT_PT_OFFSET  (PV_EFF_ROOT_PT_PAGE << PAGE_SHIFT)
+#define PV_EFF_ROOT_PT(v)      (GDT_VIRT_START(v) + PV_EFF_ROOT_PT_OFFSET)
 
 /* map_domain_page() map cache. The second per-domain-mapping sub-area. */
 #define MAPCACHE_VCPU_ENTRIES    (CONFIG_PAGING_LEVELS * CONFIG_PAGING_LEVELS)
