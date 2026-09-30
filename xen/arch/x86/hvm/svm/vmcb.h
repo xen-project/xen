@@ -405,24 +405,24 @@ typedef union
 
 struct vmcb_struct {
     /* Control area */
-    u32 _cr_intercepts;         /* offset 0x00 - cleanbit 0 */
-    u32 _dr_intercepts;         /* offset 0x04 - cleanbit 0 */
-    u32 _exception_intercepts;  /* offset 0x08 - cleanbit 0 */
-    u32 _general1_intercepts;   /* offset 0x0C - cleanbit 0 */
-    u32 _general2_intercepts;   /* offset 0x10 - cleanbit 0 */
-    u32 _general3_intercepts;   /* offset 0x14 - cleanbit 0 */
-    u32 res01[9];
-    u16 _pause_filter_thresh;   /* offset 0x3C - cleanbit 0 */
-    u16 _pause_filter_count;    /* offset 0x3E - cleanbit 0 */
-    u64 _iopm_base_pa;          /* offset 0x40 - cleanbit 1 */
-    u64 _msrpm_base_pa;         /* offset 0x48 - cleanbit 1 */
-    u64 _tsc_offset;            /* offset 0x50 - cleanbit 0 */
-    u32 _asid;                  /* offset 0x58 - cleanbit 2 */
-    u8  tlb_control;            /* offset 0x5C - TLB_CTRL_* */
-    u8  res07[3];
+    uint32_t _cr_intercepts;         /* offset 0x00 - cleanbit 0 */
+    uint32_t _dr_intercepts;         /* offset 0x04 - cleanbit 0 */
+    uint32_t _exception_intercepts;  /* offset 0x08 - cleanbit 0 */
+    uint32_t _general1_intercepts;   /* offset 0x0C - cleanbit 0 */
+    uint32_t _general2_intercepts;   /* offset 0x10 - cleanbit 0 */
+    uint32_t _general3_intercepts;   /* offset 0x14 - cleanbit 0 */
+    uint32_t res01[9];
+    uint16_t _pause_filter_thresh;   /* offset 0x3C - cleanbit 0 */
+    uint16_t _pause_filter_count;    /* offset 0x3E - cleanbit 0 */
+    uint64_t _iopm_base_pa;          /* offset 0x40 - cleanbit 1 */
+    uint64_t _msrpm_base_pa;         /* offset 0x48 - cleanbit 1 */
+    uint64_t _tsc_offset;            /* offset 0x50 - cleanbit 0 */
+    uint32_t _asid;                  /* offset 0x58 - cleanbit 2 */
+    uint8_t  tlb_control;            /* offset 0x5C - TLB_CTRL_* */
+    uint8_t  res07[3];
     vintr_t _vintr;             /* offset 0x60 - cleanbit 3 */
     intstat_t int_stat;         /* offset 0x68 */
-    u64 exitcode;               /* offset 0x70 */
+    uint64_t exitcode;               /* offset 0x70 */
     union {
         struct {
             uint64_t exitinfo1; /* offset 0x78 */
@@ -486,19 +486,19 @@ struct vmcb_struct {
         };
         uint64_t _np_ctrl;
     };
-    u64 res08[2];
+    uint64_t res08[2];
     intinfo_t event_inj;        /* offset 0xA8 */
-    u64 _h_cr3;                 /* offset 0xB0 - cleanbit 4 */
+    uint64_t _h_cr3;            /* offset 0xB0 - cleanbit 4 */
     virt_ext_t virt_ext;        /* offset 0xB8 */
     vmcbcleanbits_t cleanbits;  /* offset 0xC0 */
-    u32 res09;                  /* offset 0xC4 */
-    u64 nextrip;                /* offset 0xC8 */
-    u8  guest_ins_len;          /* offset 0xD0 */
-    u8  guest_ins[15];          /* offset 0xD1 */
-    u64 res10a[8];              /* offset 0xE0 */
-    u16 bus_lock_count;         /* offset 0x120 */
-    u16 res10b[3];              /* offset 0x122 */
-    u64 res10c[91];             /* offset 0x128 pad to save area */
+    uint32_t res09;             /* offset 0xC4 */
+    uint64_t nextrip;           /* offset 0xC8 */
+    uint8_t  guest_ins_len;     /* offset 0xD0 */
+    uint8_t  guest_ins[15];     /* offset 0xD1 */
+    uint64_t res10a[8];         /* offset 0xE0 */
+    uint16_t bus_lock_count;    /* offset 0x120 */
+    uint16_t res10b[3];         /* offset 0x122 */
+    uint64_t res10c[91];        /* offset 0x128 pad to save area */
 
     /* State Save area */
     union {
@@ -516,44 +516,44 @@ struct vmcb_struct {
     struct segment_register ldtr;
     struct segment_register idtr; /* cleanbit 7 */
     struct segment_register tr;
-    u64 res10[5];
-    u8 res11[3];
-    u8 _cpl;                    /* cleanbit 8 */
-    u32 res12;
-    u64 _efer;                  /* offset 0x400 + 0xD0 - cleanbit 5 */
-    u64 res13[14];
-    u64 _cr4;                   /* offset 0x400 + 0x148 - cleanbit 5 */
-    u64 _cr3;                   /* cleanbit 5 */
-    u64 _cr0;                   /* cleanbit 5 */
-    u64 _dr7;                   /* cleanbit 6 */
-    u64 _dr6;                   /* cleanbit 6 */
-    u64 rflags;
-    u64 rip;
-    u64 res14[11];
-    u64 rsp;
-    u64 _msr_s_cet;             /* offset 0x400 + 0x1E0 - cleanbit 12 */
-    u64 _ssp;                   /* offset 0x400 + 0x1E8   | */
-    u64 _msr_isst;              /* offset 0x400 + 0x1F0   v */
-    u64 rax;
-    u64 star;
-    u64 lstar;
-    u64 cstar;
-    u64 sfmask;
-    u64 kerngsbase;
-    u64 sysenter_cs;
-    u64 sysenter_esp;
-    u64 sysenter_eip;
-    u64 _cr2;                   /* cleanbit 9 */
-    u64 res16[4];
-    u64 _g_pat;                 /* cleanbit 4 */
-    u64 _debugctlmsr;           /* cleanbit 10 */
-    u64 _lastbranchfromip;      /* cleanbit 10 */
-    u64 _lastbranchtoip;        /* cleanbit 10 */
-    u64 _lastintfromip;         /* cleanbit 10 */
-    u64 _lastinttoip;           /* cleanbit 10 */
-    u64 res17[9];
-    u64 spec_ctrl;
-    u64 res18[291];
+    uint64_t res10[5];
+    uint8_t res11[3];
+    uint8_t _cpl;               /* cleanbit 8 */
+    uint32_t res12;
+    uint64_t _efer;             /* offset 0x400 + 0xD0 - cleanbit 5 */
+    uint64_t res13[14];
+    uint64_t _cr4;              /* offset 0x400 + 0x148 - cleanbit 5 */
+    uint64_t _cr3;              /* cleanbit 5 */
+    uint64_t _cr0;              /* cleanbit 5 */
+    uint64_t _dr7;              /* cleanbit 6 */
+    uint64_t _dr6;              /* cleanbit 6 */
+    uint64_t rflags;
+    uint64_t rip;
+    uint64_t res14[11];
+    uint64_t rsp;
+    uint64_t _msr_s_cet;        /* offset 0x400 + 0x1E0 - cleanbit 12 */
+    uint64_t _ssp;              /* offset 0x400 + 0x1E8   | */
+    uint64_t _msr_isst;         /* offset 0x400 + 0x1F0   v */
+    uint64_t rax;
+    uint64_t star;
+    uint64_t lstar;
+    uint64_t cstar;
+    uint64_t sfmask;
+    uint64_t kerngsbase;
+    uint64_t sysenter_cs;
+    uint64_t sysenter_esp;
+    uint64_t sysenter_eip;
+    uint64_t _cr2;              /* cleanbit 9 */
+    uint64_t res16[4];
+    uint64_t _g_pat;            /* cleanbit 4 */
+    uint64_t _debugctlmsr;      /* cleanbit 10 */
+    uint64_t _lastbranchfromip; /* cleanbit 10 */
+    uint64_t _lastbranchtoip;   /* cleanbit 10 */
+    uint64_t _lastintfromip;    /* cleanbit 10 */
+    uint64_t _lastinttoip;      /* cleanbit 10 */
+    uint64_t res17[9];
+    uint64_t spec_ctrl;
+    uint64_t res18[291];
 };
 
 struct vmcb_struct *alloc_vmcb(void);
