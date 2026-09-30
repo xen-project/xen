@@ -1079,11 +1079,11 @@ nsvm_vmcb_prepare4vmexit(struct vcpu *v, struct cpu_user_regs *regs)
     ns_vmcb->_cpl = n2vmcb->_cpl;
 
     /* EFER */
-    ns_vmcb->_efer = n2vmcb->_efer;
+    ns_vmcb->_efer = v->arch.hvm.guest_efer;
 
     /* CRn */
-    ns_vmcb->_cr4 = n2vmcb->_cr4;
-    ns_vmcb->_cr0 = n2vmcb->_cr0;
+    ns_vmcb->_cr4 = v->arch.hvm.guest_cr[4];
+    ns_vmcb->_cr0 = v->arch.hvm.guest_cr[0];
 
     /* DRn */
     ns_vmcb->_dr7 = n2vmcb->_dr7;
