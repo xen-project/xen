@@ -201,6 +201,8 @@ static inline void pi_clear_sn(struct pi_desc *pi_desc)
 #define EXIT_REASON_XRSTORS             64
 #define EXIT_REASON_BUS_LOCK            74
 #define EXIT_REASON_NOTIFY              75
+#define EXIT_REASON_SEAMCALL            76
+#define EXIT_REASON_TDCALL              77
 /* Remember to also update VMX_PERF_EXIT_REASON_SIZE! */
 
 /*
