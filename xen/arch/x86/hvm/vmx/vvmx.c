@@ -2053,6 +2053,7 @@ static int nvmx_handle_invvpid(struct cpu_user_regs *regs)
     case INVVPID_INDIVIDUAL_ADDR:
     case INVVPID_SINGLE_CONTEXT:
     case INVVPID_ALL_CONTEXT:
+    case INVVPID_SINGLE_CONTEXT_RETAINING_GLOBAL:
         hvm_asid_flush_vcpu_asid(&vcpu_nestedhvm(current).nv_n2asid);
         break;
     default:
