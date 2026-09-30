@@ -25,7 +25,8 @@ struct e820map {
 
 extern int sanitize_e820_map(struct e820entry *biosmap, unsigned int *pnr_map);
 extern int e820_all_mapped(u64 start, u64 end, unsigned type);
-extern int reserve_e820_ram(struct e820map *map, uint64_t s, uint64_t e);
+extern int __must_check reserve_e820_ram(
+    struct e820map *map, uint64_t s, uint64_t e);
 extern int e820_change_range_type(
     struct e820map *map, uint64_t s, uint64_t e,
     uint32_t orig_type, uint32_t new_type);
