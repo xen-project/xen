@@ -670,7 +670,13 @@ int __init e820_change_range_type(
 /* Set E820_RAM area (@s,@e) as RESERVED in specified e820 map. */
 int __init reserve_e820_ram(struct e820map *map, uint64_t s, uint64_t e)
 {
-    return e820_change_range_type(map, s, e, E820_RAM, E820_RESERVED);
+    int res = e820_change_range_type(map, s, e, E820_RAM, E820_RESERVED);
+
+    if ( !res )
+        printk("Failed to convert E820 RAM %"PRIx64"-%"PRIx64" to RESERVED\n",
+               s, e);
+
+    return res;
 }
 
 unsigned long __init init_e820(const char *str, struct e820map *raw)
