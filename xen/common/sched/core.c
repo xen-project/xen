@@ -1563,20 +1563,20 @@ static long do_poll(const struct sched_poll *sched_poll)
 /* Voluntarily yield the processor for this allocation. */
 long vcpu_yield(void)
 {
-    struct vcpu * v=current;
+    struct vcpu *curr = current;
     spinlock_t *lock;
 
     rcu_read_lock(&sched_res_rculock);
 
-    lock = unit_schedule_lock_irq(v->sched_unit);
-    sched_yield(vcpu_scheduler(v), v->sched_unit);
-    unit_schedule_unlock_irq(lock, v->sched_unit);
+    lock = unit_schedule_lock_irq(curr->sched_unit);
+    sched_yield(vcpu_scheduler(curr), curr->sched_unit);
+    unit_schedule_unlock_irq(lock, curr->sched_unit);
 
     rcu_read_unlock(&sched_res_rculock);
 
     SCHED_STAT_CRANK(vcpu_yield);
 
-    TRACE_TIME(TRC_SCHED_YIELD, current->domain->domain_id, current->vcpu_id);
+    TRACE_TIME(TRC_SCHED_YIELD, curr->domain->domain_id, curr->vcpu_id);
     raise_softirq(SCHEDULE_SOFTIRQ);
     return 0;
 }
@@ -1946,6 +1946,8 @@ typedef long ret_t;
 
 ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
+    struct vcpu *curr = current;
+    struct domain *currd = curr->domain;
     ret_t ret = 0;
 
     switch ( cmd )
@@ -1970,9 +1972,9 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&sched_shutdown, arg, 1) )
             break;
 
-        TRACE_TIME(TRC_SCHED_SHUTDOWN, current->domain->domain_id,
-                   current->vcpu_id, sched_shutdown.reason);
-        ret = domain_shutdown(current->domain, (u8)sched_shutdown.reason);
+        TRACE_TIME(TRC_SCHED_SHUTDOWN, currd->domain_id, curr->vcpu_id,
+                   sched_shutdown.reason);
+        ret = domain_shutdown(currd, sched_shutdown.reason);
 
         break;
     }
@@ -1980,19 +1982,18 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case SCHEDOP_shutdown_code:
     {
         struct sched_shutdown sched_shutdown;
-        struct domain *d = current->domain;
 
         ret = -EFAULT;
         if ( copy_from_guest(&sched_shutdown, arg, 1) )
             break;
 
-        TRACE_TIME(TRC_SCHED_SHUTDOWN_CODE, d->domain_id, current->vcpu_id,
+        TRACE_TIME(TRC_SCHED_SHUTDOWN_CODE, currd->domain_id, curr->vcpu_id,
                    sched_shutdown.reason);
 
-        spin_lock(&d->shutdown_lock);
-        if ( d->shutdown_code == SHUTDOWN_CODE_INVALID )
-            d->shutdown_code = (u8)sched_shutdown.reason;
-        spin_unlock(&d->shutdown_lock);
+        spin_lock(&currd->shutdown_lock);
+        if ( currd->shutdown_code == SHUTDOWN_CODE_INVALID )
+            currd->shutdown_code = (uint8_t)sched_shutdown.reason;
+        spin_unlock(&currd->shutdown_lock);
 
         ret = 0;
         break;
@@ -2025,7 +2026,7 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( d == NULL )
             break;
 
-        ret = xsm_schedop_shutdown(XSM_DM_PRIV, current->domain, d);
+        ret = xsm_schedop_shutdown(XSM_DM_PRIV, currd, d);
         if ( likely(!ret) )
             domain_shutdown(d, sched_remote_shutdown.reason);
 
@@ -2042,8 +2043,7 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&sched_watchdog, arg, 1) )
             break;
 
-        ret = domain_watchdog(
-            current->domain, sched_watchdog.id, sched_watchdog.timeout);
+        ret = domain_watchdog(currd, sched_watchdog.id, sched_watchdog.timeout);
         break;
     }
 
@@ -2053,7 +2053,7 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         unsigned int cpu;
 
         ret = -EPERM;
-        if ( !is_hardware_domain(current->domain) )
+        if ( !is_hardware_domain(currd) )
             break;
 
         ret = -EFAULT;
@@ -2065,7 +2065,7 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
            break;
 
         cpu = sched_pin_override.pcpu < 0 ? NR_CPUS : sched_pin_override.pcpu;
-        ret = vcpu_temporary_affinity(current, cpu, VCPU_AFFINITY_OVERRIDE);
+        ret = vcpu_temporary_affinity(curr, cpu, VCPU_AFFINITY_OVERRIDE);
 
         break;
     }
