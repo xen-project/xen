@@ -4681,6 +4681,8 @@ void asmlinkage vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_MWAIT_INSTRUCTION:
     case EXIT_REASON_MONITOR_INSTRUCTION:
     case EXIT_REASON_GETSEC:
+    case EXIT_REASON_SEAMCALL:
+    case EXIT_REASON_TDCALL:
         /*
          * We should never exit on GETSEC because CR4.SMXE is always 0 when
          * running in guest context, and the CPU checks that before getting
