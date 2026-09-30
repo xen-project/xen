@@ -61,7 +61,8 @@ int pci_mmcfg_read(unsigned int seg, unsigned int bus,
     char __iomem *addr;
 
     /* Why do we have this when nobody checks it. How about a BUG()!? -AK */
-    if (unlikely((bus > 255) || (devfn > 255) || (reg > 4095))) {
+    if (unlikely((bus > 255) || (devfn > 255) ||
+                 (reg + len > PCI_CFG_SPACE_EXP_SIZE))) {
 err:        *value = -1;
         return -EINVAL;
     }
@@ -91,7 +92,8 @@ int pci_mmcfg_write(unsigned int seg, unsigned int bus,
     char __iomem *addr;
 
     /* Why do we have this when nobody checks it. How about a BUG()!? -AK */
-    if (unlikely((bus > 255) || (devfn > 255) || (reg > 4095)))
+    if (unlikely((bus > 255) || (devfn > 255) ||
+                 (reg + len > PCI_CFG_SPACE_EXP_SIZE)))
         return -EINVAL;
 
     addr = pci_dev_base(seg, bus, devfn);
