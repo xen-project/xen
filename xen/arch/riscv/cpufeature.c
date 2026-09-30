@@ -203,6 +203,7 @@ static const struct riscv_isa_ext_entry __initconstrel riscv_isa_ext[] = {
     RISCV_ISA_EXT_ENTRY(svpbmt,         NONE),
 };
 
+/* Keep in sync with docs/misc/riscv/booting.txt. */
 static const struct riscv_isa_ext_data __initconst required_extensions[] = {
     RISCV_ISA_EXT_DATA(i),
     RISCV_ISA_EXT_DATA(m),

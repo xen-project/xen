@@ -1,8 +1,12 @@
 System requirements
 ===================
 
-The following extensions are expected to be supported by a system on which
-Xen is run:
+The following extensions are required by Xen. Xen panics at boot if any of
+them is missing from the riscv,isa property of the CPU nodes:
+- I, M, A, Zicsr, Zifencei:
+  Base ISA Xen is compiled for.
+- C:
+  Required only when Xen is built with CONFIG_RISCV_ISA_C=y.
 - H:
   Provides additional instructions and CSRs that control the new stage of
   address translation and support hosting a guest OS in virtual S-mode
@@ -18,7 +22,19 @@ Xen is run:
 - Zihintpause:
   On a system that doesn't have this extension, cpu_relax() should be
   implemented properly.
-- SVPBMT is mandatory to enable changing the memory attributes of a page.
-  For platforms that do not support SVPBMT, it is necessary to introduce a
+- Svpbmt:
+  Mandatory to enable changing the memory attributes of a page.
+  For platforms that do not support Svpbmt, it is necessary to introduce a
   similar mechanism as described in:
   https://lore.kernel.org/all/20241102000843.1301099-1-samuel.holland@sifive.com/
+
+Note: this list must be kept in sync with required_extensions[] in
+      xen/arch/riscv/cpufeature.c.
+
+Optional extensions
+===================
+
+Other extensions recognised by Xen are listed in riscv_isa_ext[] in
+xen/arch/riscv/cpufeature.c. Xen uses them when present, but they are not
+needed to boot. The second column of that table says whether the extension
+is also exposed to guests.
