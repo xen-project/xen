@@ -19,9 +19,6 @@ them is missing from the riscv,isa property of the CPU nodes:
   a very simple sequence.
   The similar issue occurs with other __builtin_<bitop>, so it is needed to
   provide a generic version of bitops in RISC-V bitops.h
-- Zihintpause:
-  On a system that doesn't have this extension, cpu_relax() should be
-  implemented properly.
 - Svpbmt:
   Mandatory to enable changing the memory attributes of a page.
   For platforms that do not support Svpbmt, it is necessary to introduce a

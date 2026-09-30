@@ -214,7 +214,6 @@ static const struct riscv_isa_ext_data __initconst required_extensions[] = {
     RISCV_ISA_EXT_DATA(h),
     RISCV_ISA_EXT_DATA(zicsr),
     RISCV_ISA_EXT_DATA(zifencei),
-    RISCV_ISA_EXT_DATA(zihintpause),
     RISCV_ISA_EXT_DATA(zbb),
     RISCV_ISA_EXT_DATA(svpbmt),
 };
@@ -663,6 +662,17 @@ void __init riscv_fill_hwcap(void)
          */
         __set_bit(RISCV_ISA_EXT_sstc, riscv_isa);
     }
+
+    /*
+     * Zihintpause isn't mandatory: the encoding used by cpu_relax() is a
+     * HINT which executes as a no-op on hardware without the extension.
+     * Report it, as a platform may provide its own way to hint a spin-wait
+     * loop, which then has to be wired up in cpu_relax().
+     */
+    if ( !riscv_isa_extension_available(NULL, RISCV_ISA_EXT_zihintpause) )
+        printk(XENLOG_WARNING
+               "Zihintpause unavailable: cpu_relax() gives the CPU no hint; "
+               "wire up this platform's pause equivalent in cpu_relax()\n");
 
     for ( i = 0; i < req_extns_amount; i++ )
     {
