@@ -176,6 +176,15 @@ Deviations related to MISRA C:2012 Rules:
        unused 2nd and 3rd parameters to avoid warnings or errors related to them.
      - ECLAIR has been configured to ignore these macros.
 
+   * - R5.5
+     - Clash between the hypfs_alloc_dyndata() function and macro name in the
+       file xen/include/xen/hypfs.h is deliberate. The function is the allocator
+       taking a size in bytes, while the macro is a typed convenience wrapper used
+       by dynamic hypfs nodes to allocate per-request traversal data with the
+       correct size and return type. The implementation explicitly undefines the
+       macro before defining the real function, so the name clash is controlled.
+     - ECLAIR has been configured to ignore this macro.
+
    * - R5.6
      - The type ret_t is deliberately defined multiple times depending on the
        type of guest to service.

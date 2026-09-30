@@ -133,6 +133,10 @@ These macros address differences in argument count during compile-time, effectiv
 -config=MC3A2.R5.5,ignored_macros+="name(update_gnttab_par||parse_gnttab_limit)&&loc(file(^xen/common/grant_table\\.c$))"
 -doc_end
 
+-doc_begin="Clash between hypfs_alloc_dyndata() function and macro name in xen/include/xen/hypfs.h is deliberate."
+-config=MC3A2.R5.5,ignored_macros+="name(hypfs_alloc_dyndata)&&loc(file(^xen/include/xen/hypfs\\.h$))"
+-doc_end
+
 -doc_begin="The type \"ret_t\" is deliberately defined multiple times,
 depending on the guest."
 -config=MC3A2.R5.6,reports+={deliberate,"any_area(any_loc(text(^.*ret_t.*$)))"}

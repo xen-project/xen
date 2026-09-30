@@ -223,6 +223,10 @@ maintainers if you want to suggest a change.
        Clashes between grant table functions and macro names are allowed
        because they are used for discarding unused parameters.
 
+       Clash between hypfs_alloc_dyndata() function and macro name in the
+       file xen/include/xen/hypfs.h is allowed because the macro is a typed
+       convenience wrapper around the size-based allocation function.
+
    * - `Rule 5.6 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_05_06.c>`_
      - Required
      - A typedef name shall be a unique identifier
