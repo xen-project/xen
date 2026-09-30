@@ -229,7 +229,6 @@ const-qualified."
 -doc_end
 
 -doc_begin="The definitions present in this file are meant to generate definitions for asm modules, and are not called by C code. Therefore the absence of prior declarations is safe."
--file_tag+={asm_offsets, "^xen/arch/(arm|x86)/(arm32|arm64|x86_64)/asm-offsets\\.c$"}
 -config=MC3A2.R8.4,reports+={safe, "first_area(any_loc(file(asm_offsets)))"}
 -doc_end
 
@@ -440,13 +439,15 @@ Fixing this violation would require to increase code complexity and lower readab
 -doc_begin="Function copy_guest() in xen/arch/arm/guestcopy.c is a double-use
 function, where the parameter needs to not be const because it can be set for
 write or not"
--config=MC3A2.R11.8,reports+={safe,"any_area(any_loc(text(^.*copy_guest.*COPY_to_guest doesn't modify.*$)))"}
+-file_tag+={arm_guestcopy, "^xen/arch/arm/guestcopy\\.c$"}
+-config=MC3A2.R11.8,reports+={safe,"any_area(any_loc(file(arm_guestcopy)&&text(^.*copy_guest.*COPY_to_guest doesn't modify.*$)))"}
 -doc_end
 
 -doc_begin="Function __hvm_copy in xen/arch/x86/hvm/hvm.c is a double-use
 function, where the parameter needs to not be const because it can be set for
 write or not"
--config=MC3A2.R11.8,reports+={safe,"any_area(any_loc(text(^.*__hvm_copy.*HVMCOPY_to_guest doesn't modify.*$)))"}
+-file_tag+={hvm_guestcopy, "^xen/arch/x86/hvm/hvm\\.c$"}
+-config=MC3A2.R11.8,reports+={safe,"any_area(any_loc(file(hvm_guestcopy)&&text(^.*__hvm_copy.*HVMCOPY_to_guest doesn't modify.*$)))"}
 -doc_end
 
 -doc_begin="This construct is used to check if the type is scalar, and for this purpose the use of 0 as a null pointer constant is deliberate."
