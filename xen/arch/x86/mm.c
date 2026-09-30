@@ -2153,10 +2153,9 @@ static void l3t_unlock(struct page_info *page)
 
 /* Update the L1 entry at pl1e to new value nl1e. */
 static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
-                        mfn_t gl1mfn, unsigned int cmd,
+                        mfn_t gl1mfn, unsigned int update_flags,
                         struct vcpu *pt_vcpu, struct domain *pg_dom)
 {
-    bool preserve_ad = (cmd == MMU_PT_UPDATE_PRESERVE_AD);
     l1_pgentry_t ol1e = l1e_read(pl1e);
     struct domain *pt_dom = pt_vcpu->domain;
     int rc = 0;
@@ -2176,7 +2175,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
         }
 
         /* Translate foreign guest address. */
-        if ( cmd != MMU_PT_UPDATE_NO_TRANSLATE &&
+        if ( !(update_flags & PTE_UPDATE_NO_TRANSLATE) &&
              paging_mode_translate(pg_dom) )
         {
             p2m_type_t p2mt;
@@ -2217,7 +2216,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
         if ( !l1e_has_changed(ol1e, nl1e, ~FASTPATH_FLAG_WHITELIST) )
         {
             rc = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
-                              preserve_ad);
+                              update_flags);
             if ( page )
                 put_page(page);
             return rc ? 0 : -EBUSY;
@@ -2241,7 +2240,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
             put_page(page);
 
         if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
-                                    preserve_ad)) )
+                                    update_flags)) )
         {
             ol1e = nl1e;
             rc = -EBUSY;
@@ -2250,7 +2249,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
     else if ( pv_l1tf_check_l1e(pt_dom, nl1e) )
         return -ERESTART;
     else if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
-                                     preserve_ad)) )
+                                     update_flags)) )
     {
         return -EBUSY;
     }
@@ -2264,7 +2263,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
 static int mod_l2_entry(l2_pgentry_t *pl2e,
                         l2_pgentry_t nl2e,
                         mfn_t mfn,
-                        int preserve_ad,
+                        unsigned int update_flags,
                         struct vcpu *vcpu)
 {
     l2_pgentry_t ol2e;
@@ -2296,7 +2295,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         /* Fast path for sufficiently-similar mappings. */
         if ( !l2e_has_changed(ol2e, nl2e, ~FASTPATH_PDE_FLAG_WHITELIST) )
         {
-            if ( UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, mfn, vcpu, preserve_ad) )
+            if ( UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, mfn, vcpu, update_flags) )
                 return 0;
             return -EBUSY;
         }
@@ -2305,7 +2304,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
             return rc;
 
         if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, mfn, vcpu,
-                                    preserve_ad)) )
+                                    update_flags)) )
         {
             ol2e = nl2e;
             rc = -EBUSY;
@@ -2314,7 +2313,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
     else if ( pv_l1tf_check_l2e(d, nl2e) )
         return -ERESTART;
     else if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, mfn, vcpu,
-                                     preserve_ad)) )
+                                     update_flags)) )
     {
         return -EBUSY;
     }
@@ -2328,7 +2327,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
 static int mod_l3_entry(l3_pgentry_t *pl3e,
                         l3_pgentry_t nl3e,
                         mfn_t mfn,
-                        int preserve_ad,
+                        unsigned int update_flags,
                         struct vcpu *vcpu)
 {
     l3_pgentry_t ol3e;
@@ -2358,7 +2357,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         /* Fast path for sufficiently-similar mappings. */
         if ( !l3e_has_changed(ol3e, nl3e, ~FASTPATH_PDE_FLAG_WHITELIST) )
         {
-            rc = UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, mfn, vcpu, preserve_ad);
+            rc = UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, mfn, vcpu, update_flags);
             return rc ? 0 : -EFAULT;
         }
 
@@ -2368,7 +2367,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         rc = 0;
 
         if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, mfn, vcpu,
-                                    preserve_ad)) )
+                                    update_flags)) )
         {
             ol3e = nl3e;
             rc = -EFAULT;
@@ -2377,7 +2376,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
     else if ( pv_l1tf_check_l3e(d, nl3e) )
         return -ERESTART;
     else if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, mfn, vcpu,
-                                     preserve_ad)) )
+                                     update_flags)) )
     {
         return -EFAULT;
     }
@@ -2390,7 +2389,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
 static int mod_l4_entry(l4_pgentry_t *pl4e,
                         l4_pgentry_t nl4e,
                         mfn_t mfn,
-                        int preserve_ad,
+                        unsigned int update_flags,
                         struct vcpu *vcpu)
 {
     struct domain *d = vcpu->domain;
@@ -2420,7 +2419,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
         /* Fast path for sufficiently-similar mappings. */
         if ( !l4e_has_changed(ol4e, nl4e, ~FASTPATH_PDE_FLAG_WHITELIST) )
         {
-            rc = UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, mfn, vcpu, preserve_ad);
+            rc = UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, mfn, vcpu, update_flags);
             return rc ? 0 : -EFAULT;
         }
 
@@ -2430,7 +2429,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
         rc = 0;
 
         if ( unlikely(!UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, mfn, vcpu,
-                                    preserve_ad)) )
+                                    update_flags)) )
         {
             ol4e = nl4e;
             rc = -EFAULT;
@@ -2439,7 +2438,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
     else if ( pv_l1tf_check_l4e(d, nl4e) )
         return -ERESTART;
     else if ( unlikely(!UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, mfn, vcpu,
-                                     preserve_ad)) )
+                                     update_flags)) )
     {
         return -EFAULT;
     }
@@ -4139,18 +4138,25 @@ long do_mmu_update(
 
             if ( page_lock(page) )
             {
+                unsigned int update_flags = 0;
+
+                if ( cmd == MMU_PT_UPDATE_PRESERVE_AD )
+                     update_flags = PTE_UPDATE_PRESERVE_AD;
+                else if ( cmd == MMU_PT_UPDATE_NO_TRANSLATE )
+                     update_flags = PTE_UPDATE_NO_TRANSLATE;
+
                 switch ( page->u.inuse.type_info & PGT_type_mask )
                 {
                 case PGT_l1_page_table:
                     rc = mod_l1_entry(va, l1e_from_intpte(req.val), mfn,
-                                      cmd, v, pg_owner);
+                                      update_flags, v, pg_owner);
                     break;
 
                 case PGT_l2_page_table:
                     if ( unlikely(pg_owner != pt_owner) )
                         break;
                     rc = mod_l2_entry(va, l2e_from_intpte(req.val), mfn,
-                                      cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
+                                      update_flags, v);
                     if ( !rc )
                         flush_linear_pt = true;
                     break;
@@ -4159,7 +4165,7 @@ long do_mmu_update(
                     if ( unlikely(pg_owner != pt_owner) )
                         break;
                     rc = mod_l3_entry(va, l3e_from_intpte(req.val), mfn,
-                                      cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
+                                      update_flags, v);
                     if ( !rc )
                         flush_linear_pt = true;
                     break;
@@ -4168,7 +4174,7 @@ long do_mmu_update(
                     if ( unlikely(pg_owner != pt_owner) )
                         break;
                     rc = mod_l4_entry(va, l4e_from_intpte(req.val), mfn,
-                                      cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
+                                      update_flags, v);
                     if ( !rc )
                         flush_linear_pt = true;
                     if ( !rc && pt_owner->arch.pv.xpti )

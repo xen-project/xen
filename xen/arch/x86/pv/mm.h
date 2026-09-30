@@ -62,17 +62,20 @@ static inline intpte_t paging_cmpxchg_guest_entry(
 #undef PTE_UPDATE_WITH_CMPXCHG
 #endif
 
+#define PTE_UPDATE_PRESERVE_AD  (1u << 0)
+#define PTE_UPDATE_NO_TRANSLATE (1u << 1)
+
 /*
  * How to write an entry to the guest pagetables.
  * Returns false for failure (pointer not valid), true for success.
  */
 static inline bool update_intpte(intpte_t *p, intpte_t old, intpte_t new,
-                                 mfn_t mfn, struct vcpu *v, bool preserve_ad)
+                                 mfn_t mfn, struct vcpu *v, unsigned int flags)
 {
     bool rv = true;
 
 #ifndef PTE_UPDATE_WITH_CMPXCHG
-    if ( !preserve_ad )
+    if ( !(flags & PTE_UPDATE_PRESERVE_AD) )
         paging_write_guest_entry(v, p, new, mfn);
     else
 #endif
@@ -81,7 +84,7 @@ static inline bool update_intpte(intpte_t *p, intpte_t old, intpte_t new,
         {
             intpte_t _new = new, t;
 
-            if ( preserve_ad )
+            if ( flags & PTE_UPDATE_PRESERVE_AD )
                 _new |= old & (_PAGE_ACCESSED | _PAGE_DIRTY);
 
             t = paging_cmpxchg_guest_entry(v, p, old, _new, mfn);
@@ -102,10 +105,10 @@ static inline bool update_intpte(intpte_t *p, intpte_t old, intpte_t new,
  * Macro that wraps the appropriate type-changes around update_intpte().
  * Arguments are: type, ptr, old, new, mfn, vcpu
  */
-#define UPDATE_ENTRY(_t,_p,_o,_n,_m,_v,_ad)                         \
+#define UPDATE_ENTRY(_t ,_p ,_o ,_n ,_m ,_v , fl)                   \
     update_intpte(&_t ## e_get_intpte(*(_p)),                       \
                   _t ## e_get_intpte(_o), _t ## e_get_intpte(_n),   \
-                  (_m), (_v), (_ad))
+                  _m, _v, fl)
 
 static always_inline l1_pgentry_t adjust_guest_l1e(l1_pgentry_t l1e,
                                                    const struct domain *d)
