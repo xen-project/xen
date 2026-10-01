@@ -56,6 +56,9 @@
 #define LIST_POISON1  ((void *)0x0100100100100100UL)
 #define LIST_POISON2  ((void *)0x0200200200200200UL)
 
+/* Poison unreachable function hooks with a non-canonical value. */
+#define FUNCTION_POISON ((void *)0xDEAD0000DEAD0000UL)
+
 #include <xen/const.h>
 
 #define PML4_ENTRY_BITS  39

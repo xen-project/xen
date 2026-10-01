@@ -813,8 +813,8 @@ static bool emulation_flags_ok(const struct domain *d, uint32_t emflags)
 void __init arch_init_idle_domain(struct domain *d)
 {
     static const struct arch_csw idle_csw = {
-        .from = paravirt_ctxt_switch_from,
-        .to   = paravirt_ctxt_switch_to,
+        .from = FUNCTION_POISON,
+        .to   = FUNCTION_POISON,
         .tail = idle_loop,
     };
 
