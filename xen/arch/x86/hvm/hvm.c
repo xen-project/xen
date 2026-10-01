@@ -4240,10 +4240,22 @@ static int hvm_set_param(struct domain *d, uint32_t index, uint64_t value)
         break;
     case HVM_PARAM_IDENT_PT:
         /*
-         * Only actually required for VT-x lacking unrestricted_guest
-         * capabilities.  Short circuit the pause if possible.
+         * IDENT_PT is needed only for Nehalem-era VT-x, where EPT is
+         * available but Unrestricted Guest is not.
+         *
+         * The identity pagetable is configured by the toolstack or hvmloader,
+         * and the param needs to move in the migration stream in case the VM
+         * lands on an EPT && !Unrestricted system.
+         *
+         * Nothing, besides recording the value, needs to happen other than
+         * for VT-x EPT && !Unrestricted VMs.
+         *
+         * TODO: Unrestricted Guest should be a domain property not a vCPU
+         * property.
          */
-        if ( paging_mode_shadow(d) || !using_vmx() )
+        v = domain_vcpu(d, 0);
+        if ( !using_vmx() || paging_mode_shadow(d) || !v ||
+             vmx_unrestricted_guest(v) )
             break;
 
         /*
