@@ -228,6 +228,8 @@ int pt_irq_create_bind(
     if ( pirq < 0 || pirq >= d->nr_pirqs )
         return -EINVAL;
 
+    ASSERT(local_irq_is_enabled());
+
  restart:
     write_lock(&d->event_lock);
 
@@ -400,8 +402,7 @@ int pt_irq_create_bind(
 
         if ( pt_irq_bind->u.msi.gflags & XEN_DOMCTL_VMSI_X86_UNMASKED )
         {
-            unsigned long flags;
-            struct irq_desc *desc = pirq_spin_lock_irq_desc(info, &flags);
+            struct irq_desc *desc = pirq_spin_lock_irq_desc(info, NULL);
 
             if ( !desc )
             {
@@ -411,7 +412,7 @@ int pt_irq_create_bind(
             }
 
             guest_mask_msi_irq(desc, false);
-            spin_unlock_irqrestore(&desc->lock, flags);
+            spin_unlock_irq(&desc->lock);
         }
 
         write_unlock(&d->event_lock);
@@ -588,6 +589,8 @@ int pt_irq_destroy_bind(
     struct pirq *pirq;
     const char *what = NULL;
 
+    ASSERT(local_irq_is_enabled());
+
     switch ( pt_irq_bind->irq_type )
     {
     case PT_IRQ_TYPE_PCI:
@@ -606,9 +609,7 @@ int pt_irq_destroy_bind(
         break;
     case PT_IRQ_TYPE_MSI:
     {
-        unsigned long flags;
-        struct irq_desc *desc = domain_spin_lock_irq_desc(d, machine_gsi,
-                                                          &flags);
+        struct irq_desc *desc = domain_spin_lock_irq_desc(d, machine_gsi, NULL);
 
         if ( !desc )
             return -EINVAL;
@@ -617,7 +618,7 @@ int pt_irq_destroy_bind(
          * pt_irq_create_bind is consistent across bind/unbinds.
          */
         guest_mask_msi_irq(desc, true);
-        spin_unlock_irqrestore(&desc->lock, flags);
+        spin_unlock_irq(&desc->lock);
         break;
     }
 
