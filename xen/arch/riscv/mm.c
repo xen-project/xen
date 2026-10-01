@@ -140,7 +140,7 @@ static void __init setup_initial_mapping(struct mmu_desc *mmu_desc,
         case 1: /* Level 0 */
             {
                 unsigned long paddr = (page_addr - map_start) + pa_start;
-                unsigned int permissions = PTE_LEAF_DEFAULT;
+                unsigned int pte_flags = PTE_LEAF_DEFAULT;
                 unsigned long addr = is_identity_mapping
                                      ? page_addr : virt_to_maddr(page_addr);
                 pte_t pte_to_be_written;
@@ -149,13 +149,12 @@ static void __init setup_initial_mapping(struct mmu_desc *mmu_desc,
 
                 if ( is_kernel_text(addr) ||
                      is_kernel_inittext(addr) )
-                        permissions =
-                            PTE_EXECUTABLE | PTE_READABLE | PTE_VALID;
+                    pte_flags = PTE_EXECUTABLE | PTE_READABLE | PTE_VALID;
 
                 if ( is_kernel_rodata(addr) )
-                    permissions = PTE_READABLE | PTE_VALID;
+                    pte_flags = PTE_READABLE | PTE_VALID;
 
-                pte_to_be_written = paddr_to_pte(paddr, permissions);
+                pte_to_be_written = paddr_to_pte(paddr, pte_flags);
 
                 if ( !pte_is_valid(pgtbl[index]) )
                     pgtbl[index] = pte_to_be_written;

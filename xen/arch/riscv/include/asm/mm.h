@@ -22,9 +22,10 @@ extern vaddr_t directmap_virt_start;
 #define paddr_to_pfn(pa)  ((unsigned long)((pa) >> PAGE_SHIFT))
 
 static inline pte_t paddr_to_pte(paddr_t paddr,
-                                 unsigned int permissions)
+                                 unsigned int pte_flags)
 {
-    return (pte_t) { .pte = (paddr_to_pfn(paddr) << PTE_PPN_SHIFT) | permissions };
+    return (pte_t) { .pte = (paddr_to_pfn(paddr) << PTE_PPN_SHIFT) |
+                            pte_flags };
 }
 
 static inline paddr_t pte_to_paddr(pte_t pte)

@@ -584,7 +584,7 @@ static inline void p2m_clean_pte(pte_t *p, bool clean_cache)
     p2m_write_pte(p, pte, clean_cache);
 }
 
-static void p2m_set_permission(pte_t *e, p2m_type_t t)
+static void p2m_set_pte_flags(pte_t *e, p2m_type_t t)
 {
     e->pte &= ~PTE_ACCESS_MASK;
 
@@ -676,7 +676,7 @@ static pte_t p2m_pte_from_mfn(mfn_t mfn, p2m_type_t t,
             break;
         }
 
-        p2m_set_permission(&e, t);
+        p2m_set_pte_flags(&e, t);
         p2m_set_type(&e, t, ctx);
     }
     else
