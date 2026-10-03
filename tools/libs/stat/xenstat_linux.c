@@ -322,7 +322,8 @@ int xenstat_collect_networks(xenstat_node * node)
 
 		/* If the device parsed is network bridge and both tx & rx packets are zero, we are most */
 		/* likely using bonding so we alter the configuration for dom0 to have bridge stats */
-		if ((strstr(iface, devBridge) != NULL) &&
+		if ((devBridge[0] != '\0') &&
+		    (strstr(iface, devBridge) != NULL) &&
 		    (strstr(iface, devNoBridge) == NULL) &&
 		    ((domain = xenstat_node_domain(node, 0)) != NULL)) {
 			for (i = 0; i < domain->num_networks; i++) {
