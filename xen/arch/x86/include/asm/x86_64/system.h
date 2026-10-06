@@ -56,7 +56,7 @@ static always_inline __uint128_t cmpxchg16b_local_(
     ASSERT(!((unsigned long)_p & 0xf));                    \
     BUILD_BUG_ON(sizeof(*(o)) != sizeof(__uint128_t));     \
     BUILD_BUG_ON(sizeof(*(n)) != sizeof(__uint128_t));     \
-    __cmpxchg16b(_p, (void *)(o), (void *)(n));            \
+    __cmpxchg16b(_p, (const void *)(o), (const void *)(n));\
 })
 
 #endif /* __X86_64_SYSTEM_H__ */
