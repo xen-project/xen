@@ -118,8 +118,6 @@ static int cf_check do_nmi_crash(
 
     for ( ; ; )
         halt();
-
-    unreachable();
 }
 
 static void nmi_shootdown_cpus(void)
