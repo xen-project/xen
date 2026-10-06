@@ -890,7 +890,6 @@ static void cf_check svm_ctxt_switch_from(struct vcpu *v)
 
 static void cf_check svm_ctxt_switch_to(struct vcpu *v)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     int cpu = smp_processor_id();
 
     /*
@@ -908,7 +907,6 @@ static void cf_check svm_ctxt_switch_to(struct vcpu *v)
 
     svm_restore_dr(v);
 
-    vmcb->cleanbits.raw = 0;
     svm_tsc_ratio_load(v);
 
     if ( cpu_has_msr_tsc_aux )
@@ -953,6 +951,7 @@ static void noreturn cf_check svm_do_resume(void)
         hvm_migrate_pirqs(v);
         /* Migrating to another ASID domain.  Request a new ASID. */
         hvm_asid_flush_vcpu(v);
+        vmcb->cleanbits.raw = 0;
     }
 
     if ( !vcpu_guestmode && !vlapic_hw_disabled(vlapic) )
