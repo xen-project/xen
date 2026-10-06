@@ -401,7 +401,7 @@ void kexec_crash(enum crash_reason reason)
     BUG();
 }
 
-static long cf_check kexec_reboot(void *_image)
+static long noreturn cf_check kexec_reboot(void *_image)
 {
     struct kexec_image *image = _image;
 
@@ -409,9 +409,6 @@ static long cf_check kexec_reboot(void *_image)
 
     kexec_common_shutdown();
     machine_reboot_kexec(image);
-
-    BUG();
-    return 0;
 }
 
 static void cf_check do_crashdump_trigger(unsigned char key)

@@ -48,7 +48,7 @@ int machine_kexec_add_page(struct kexec_image *image, unsigned long vaddr,
 int machine_kexec_load(struct kexec_image *image);
 void machine_kexec_unload(struct kexec_image *image);
 void machine_kexec_reserved(xen_kexec_reserve_t *reservation);
-void machine_reboot_kexec(struct kexec_image *image);
+void noreturn machine_reboot_kexec(struct kexec_image *image);
 void machine_kexec(struct kexec_image *image);
 void kexec_crash(enum crash_reason reason);
 void kexec_crash_save_cpu(void);
