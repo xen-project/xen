@@ -740,7 +740,7 @@ static unsigned int nr_grant_entries(struct grant_table *gt)
     return 0;
 }
 
-static int _set_status_v1(const grant_entry_header_t *shah,
+static int _set_status_v1(grant_entry_header_t *shah,
                           struct domain *rd,
                           struct active_grant_entry *act,
                           int readonly,
@@ -832,7 +832,7 @@ static int _set_status_v2(const grant_entry_header_t *shah,
                           domid_t  ldomid)
 {
     int      rc    = GNTST_okay;
-    uint32_t *raw_shah = (uint32_t *)shah;
+    const uint32_t *raw_shah = (const uint32_t *)shah;
     union grant_combo scombo;
     uint16_t mask  = GTF_type_mask;
 
@@ -909,7 +909,7 @@ done:
 }
 
 
-static int _set_status(const grant_entry_header_t *shah,
+static int _set_status(grant_entry_header_t *shah,
                        grant_status_t *status,
                        struct domain *rd,
                        unsigned int rgt_version,
