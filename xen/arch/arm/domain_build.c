@@ -1881,6 +1881,13 @@ static int __init construct_dom0(struct domain *d)
         warning_add("PLEASE SPECIFY dom0_mem PARAMETER - USING 512M FOR NOW\n");
         dom0_mem = MB(512);
     }
+    else if ( dom0_mem % PAGE_SIZE )
+    {
+        printk(XENLOG_ERR
+               "%pd: specified dom0_mem (%"PRIu64"B) is not a multiple of the page size (%luKB)\n",
+               d, dom0_mem, PAGE_SIZE >> 10);
+        return -EINVAL;
+    }
 
     d->max_pages = dom0_mem >> PAGE_SHIFT;
 

@@ -789,6 +789,14 @@ static int __init construct_domU(struct kernel_info *kinfo,
     }
     kinfo->unassigned_mem = (paddr_t)mem * SZ_1K;
 
+    if ( kinfo->unassigned_mem % PAGE_SIZE )
+    {
+        printk(XENLOG_ERR
+               "%pd: specified \"memory\" (%"PRIu64"KB) is not a multiple of the page size (%luKB)\n",
+               d, mem, PAGE_SIZE >> 10);
+        return -EINVAL;
+    }
+
     rc = domain_p2m_set_allocation(d, mem, node);
     if ( rc != 0 )
         return rc;

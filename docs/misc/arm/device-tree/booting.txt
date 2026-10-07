@@ -155,8 +155,8 @@ with the following properties:
 
 - memory
 
-	A 64-bit integer specifying the amount of kilobytes of RAM to
-    allocate to the guest.
+    A 64-bit integer specifying the amount of kilobytes of RAM to
+    allocate to the guest. Must be a multiple of the page size.
 
 - cpus
 
