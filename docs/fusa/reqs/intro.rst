@@ -34,7 +34,7 @@ them. An implementer can use them to know how to write or understand the Xen
 code.
 
 The requirements are linked using OpenFastTrace
-(https://github.com/itsallcode/openfasttrace/blob/main/doc/user_guide.md).
+(https://openfasttrace.itsallcode.org/user_guide/user_guide.html).
 OpenFastTrace parses through the requirements and generates a traceability
 report.
 
