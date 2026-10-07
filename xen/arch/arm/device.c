@@ -86,7 +86,7 @@ int map_range_to_domain(const struct dt_device_node *dev,
     {
         res = map_regions_p2mt(d,
                                gaddr_to_gfn(addr),
-                               PFN_UP(len),
+                               PFN_UP(addr + len) - PFN_DOWN(addr),
                                maddr_to_mfn(addr),
                                mr_data->p2mt);
 
