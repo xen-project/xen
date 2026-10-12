@@ -6,6 +6,7 @@
 #ifndef ARM_ARCH_CAPABILITIES_H
 #define ARM_ARCH_CAPABILITIES_H
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <xen/sysctl.h>
 
@@ -22,6 +23,26 @@ unsigned int arch_capabilities_arm_sve(unsigned int arch_capabilities)
     return sve_vl * 128U;
 #else
     return 0;
+#endif
+}
+
+static inline
+bool arch_capabilities_arm_gic_v2(unsigned int arch_capabilities)
+{
+#if defined(__arm__) || defined(__aarch64__)
+    return MASK_EXTR(arch_capabilities, XEN_SYSCTL_PHYSCAP_ARM_GIC_V2);
+#else
+    return false;
+#endif
+}
+
+static inline
+bool arch_capabilities_arm_gic_v3(unsigned int arch_capabilities)
+{
+#if defined(__arm__) || defined(__aarch64__)
+    return MASK_EXTR(arch_capabilities, XEN_SYSCTL_PHYSCAP_ARM_GIC_V3);
+#else
+    return false;
 #endif
 }
 

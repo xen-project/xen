@@ -3088,8 +3088,8 @@ GICv2 compatibility mode.
 
 =item B<default>
 
-Emulate the same version as the native GIC hardware used by the host where
-the domain was created.
+Let the toolstack choose the GIC version: GICv3 if the host supports it,
+otherwise GICv2. This is the default when C<gic_version> is not specified.
 
 =back
 

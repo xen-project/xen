@@ -196,9 +196,6 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
     LOG(DEBUG, " - Allocate %u SPIs", config->arch.nr_spis);
 
     switch (d_config->b_info.arch_arm.gic_version) {
-    case LIBXL_GIC_VERSION_DEFAULT:
-        config->arch.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE;
-        break;
     case LIBXL_GIC_VERSION_V2:
         config->arch.gic_version = XEN_DOMCTL_CONFIG_GIC_V2;
         break;
@@ -1794,11 +1791,51 @@ int libxl__arch_domain_build_info_setdefault(libxl__gc *gc,
                                              libxl_domain_build_info *b_info,
                                              const libxl_physinfo *physinfo)
 {
+    bool has_v3 = arch_capabilities_arm_gic_v3(physinfo->arch_capabilities);
+    bool has_v2 = arch_capabilities_arm_gic_v2(physinfo->arch_capabilities);
+
     /* ACPI is disabled by default */
     libxl_defbool_setdefault(&b_info->acpi, false);
 
     /* Trapping of unmapped accesses enabled by default.  */
     libxl_defbool_setdefault(&b_info->trap_unmapped_accesses, true);
+
+    /*
+     * Resolve the GIC version against the host capabilities reported by
+     * XEN_SYSCTL_physinfo. If the user didn't request a specific version, pick
+     * the best one available. Otherwise validate the requested version here,
+     * so a bad request fails early instead of in the hypervisor.
+     */
+    switch (b_info->arch_arm.gic_version) {
+    case LIBXL_GIC_VERSION_DEFAULT:
+        if (has_v3) {
+            b_info->arch_arm.gic_version = LIBXL_GIC_VERSION_V3;
+        } else if (has_v2) {
+            b_info->arch_arm.gic_version = LIBXL_GIC_VERSION_V2;
+        } else {
+            LOG(ERROR, "No supported GIC version found on this host");
+            return ERROR_FAIL;
+        }
+        break;
+
+    case LIBXL_GIC_VERSION_V3:
+        if (!has_v3) {
+            LOG(ERROR, "GICv3 requested but not supported on this host");
+            return ERROR_FAIL;
+        }
+        break;
+
+    case LIBXL_GIC_VERSION_V2:
+        if (!has_v2) {
+            LOG(ERROR, "GICv2 requested but not supported on this host");
+            return ERROR_FAIL;
+        }
+        break;
+
+    default:
+        LOG(ERROR, "Unknown GIC version %d", b_info->arch_arm.gic_version);
+        return ERROR_FAIL;
+    }
 
     /* Sanitise SVE parameter */
     if (b_info->arch_arm.sve_vl) {
