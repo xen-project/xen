@@ -155,9 +155,8 @@ exception Failed_to_connect
 let daemon_open () =
   try
     let sockaddr = Unix.ADDR_UNIX(daemon_socket) in
-    let sock = Unix.socket Unix.PF_UNIX Unix.SOCK_STREAM 0 in
+    let sock = Unix.socket ~cloexec:true Unix.PF_UNIX Unix.SOCK_STREAM 0 in
     Unix.connect sock sockaddr;
-    Unix.set_close_on_exec sock;
     make sock
   with _ -> raise Failed_to_connect
 
@@ -169,8 +168,7 @@ let domain_open () =
     with Unix.Unix_error(_, _, _) ->
       "/proc/xen/xenbus" in
 
-  let fd = Unix.openfile path [ Unix.O_RDWR ] 0o550 in
-  Unix.set_close_on_exec fd;
+  let fd = Unix.openfile path [ Unix.O_RDWR; Unix.O_CLOEXEC ] 0o550 in
   make fd
 
 let close xsh = Xsraw.close xsh.con
