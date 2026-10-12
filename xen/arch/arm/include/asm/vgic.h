@@ -433,6 +433,12 @@ unsigned int vgic_max_vcpus(unsigned int domctl_vgic_version);
 void vgic_v2_setup_hw(paddr_t dbase, paddr_t cbase, paddr_t csize,
                       paddr_t vbase, uint32_t aliased_offset);
 
+#ifdef CONFIG_VGICV2
+bool vgic_v2_hw_enabled(void);
+#else
+static inline bool vgic_v2_hw_enabled(void) { return false; }
+#endif
+
 #ifdef CONFIG_GICV3
 struct rdist_region;
 void vgic_v3_setup_hw(paddr_t dbase,

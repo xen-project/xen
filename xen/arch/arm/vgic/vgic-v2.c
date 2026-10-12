@@ -47,6 +47,11 @@ void __init vgic_v2_setup_hw(paddr_t dbase, paddr_t cbase, paddr_t csize,
     printk("Using the new VGIC implementation.\n");
 }
 
+bool vgic_v2_hw_enabled(void)
+{
+    return gic_v2_hw_data.enabled;
+}
+
 /*
  * transfer the content of the LRs back into the corresponding ap_list:
  * - active bit is transferred as is

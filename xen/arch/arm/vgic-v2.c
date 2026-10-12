@@ -49,6 +49,11 @@ void __init vgic_v2_setup_hw(paddr_t dbase, paddr_t cbase, paddr_t csize,
     vgic_v2_hw.aliased_offset = aliased_offset;
 }
 
+bool vgic_v2_hw_enabled(void)
+{
+    return vgic_v2_hw.enabled;
+}
+
 #define NR_TARGETS_PER_ITARGETSR    4U
 #define NR_BITS_PER_TARGET  (32U / NR_TARGETS_PER_ITARGETSR)
 
