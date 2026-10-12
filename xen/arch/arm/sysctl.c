@@ -15,6 +15,7 @@
 
 #include <asm/arm64/sve.h>
 #include <asm/gic.h>
+#include <asm/time.h>
 #include <asm/vgic.h>
 
 #include <public/sysctl.h>
@@ -25,6 +26,10 @@ void arch_do_physinfo(struct xen_sysctl_physinfo *pi)
 
     pi->arch_capabilities |= MASK_INSR(sve_encode_vl(get_sys_vl_len()),
                                        XEN_SYSCTL_PHYSCAP_ARM_SVE_MASK);
+
+    pi->arm_clock_frequency_hz = timer_clock_frequency_hz;
+    if ( timer_clock_frequency_from_dt )
+        pi->arch_capabilities |= XEN_SYSCTL_PHYSCAP_ARM_TIMER_DT_FREQ;
 
     switch ( gic_hw_version() )
     {

@@ -449,12 +449,9 @@ static value alloc_domaininfo(xc_domaininfo_t * info)
 	tag = 0; /* tag ARM */
 
 	/* xen_arm_arch_domainconfig */
-	arch_config = caml_alloc_tuple(3);
+	arch_config = caml_alloc_tuple(2);
 	Field(arch_config, 0) = Val_int(info->arch_config.gic_version);
 	Field(arch_config, 1) = Val_int(info->arch_config.nr_spis);
-
-	tmp = caml_copy_int32(info->arch_config.clock_frequency);
-	Field(arch_config, 2) = tmp;
 
 #elif defined(__i386__) || defined(__x86_64__)
 

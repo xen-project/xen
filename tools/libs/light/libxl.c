@@ -410,6 +410,7 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
     physinfo->cap_gnttab_v2 =
         !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_gnttab_v2);
     physinfo->arch_capabilities = xcphysinfo.arch_capabilities;
+    physinfo->arm_clock_frequency_hz = xcphysinfo.arm_clock_frequency_hz;
 
     GC_FREE;
     return 0;

@@ -35,7 +35,8 @@ uint64_t __read_mostly boot_count;
  * register-mapped time source in the SoC. */
 unsigned long __read_mostly cpu_khz;  /* CPU clock frequency in kHz. */
 
-uint32_t __read_mostly timer_dt_clock_frequency;
+uint32_t __read_mostly timer_clock_frequency_hz;
+bool __read_mostly timer_clock_frequency_from_dt;
 
 static unsigned int timer_irq[MAX_TIMER_PPI];
 
@@ -130,7 +131,8 @@ static void __init preinit_dt_xen_time(void)
     {
         cpu_khz = DIV_ROUND(rate, 1000);
         validate_timer_frequency();
-        timer_dt_clock_frequency = rate;
+        timer_clock_frequency_hz = rate;
+        timer_clock_frequency_from_dt = true;
     }
 }
 
@@ -146,7 +148,8 @@ void __init preinit_xen_time(void)
 
     if ( !cpu_khz )
     {
-        cpu_khz = DIV_ROUND(READ_SYSREG(CNTFRQ_EL0) & CNTFRQ_MASK, 1000);
+        timer_clock_frequency_hz = READ_SYSREG(CNTFRQ_EL0) & CNTFRQ_MASK;
+        cpu_khz = DIV_ROUND(timer_clock_frequency_hz, 1000);
         validate_timer_frequency();
     }
 

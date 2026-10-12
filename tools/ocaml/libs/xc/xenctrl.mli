@@ -26,7 +26,6 @@ type vcpuinfo = {
 type xen_arm_arch_domainconfig = {
   gic_version: int;
   nr_spis: int;
-  clock_frequency: int32;
 }
 
 type x86_arch_emulation_flags =

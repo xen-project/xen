@@ -108,6 +108,8 @@ struct xen_sysctl_tbuf_op {
 #define XEN_SYSCTL_PHYSCAP_ARM_SVE_MASK  (0x1FU)
 #define XEN_SYSCTL_PHYSCAP_ARM_GIC_V2    (1U << 5)
 #define XEN_SYSCTL_PHYSCAP_ARM_GIC_V3    (1U << 6)
+/* See arm_clock_frequency_hz in struct xen_sysctl_physinfo. */
+#define XEN_SYSCTL_PHYSCAP_ARM_TIMER_DT_FREQ (1U << 7)
 #endif
 
 struct xen_sysctl_physinfo {
@@ -120,7 +122,23 @@ struct xen_sysctl_physinfo {
     uint32_t cpu_khz;
     uint32_t capabilities;/* XEN_SYSCTL_PHYSCAP_??? */
     uint32_t arch_capabilities;/* XEN_SYSCTL_PHYSCAP_{X86,ARM,...}_??? */
-    uint32_t pad;
+
+    /*
+     * ARM only. The timer frequency, in Hz, that Xen is using, taken either
+     * from the host DT timer node's "clock-frequency" property or from a
+     * direct CNTFRQ_EL0 read.
+     *
+     * XEN_SYSCTL_PHYSCAP_ARM_TIMER_DT_FREQ is set in the former case. The host
+     * DT overrides CNTFRQ_EL0 (the usual way a wrong bootloader/firmware value
+     * is corrected), so the toolstack must carry the same override into the
+     * guest's timer node, since CNTFRQ_EL0 cannot be trapped and fixed up per
+     * guest.
+     *
+     * = 0 => Non-ARM. On ARM the frequency is validated at boot and is
+     *        always non-zero.
+     * > 0 => The frequency, in Hz.
+     */
+    uint32_t arm_clock_frequency_hz;
     uint64_aligned_t total_pages;
     uint64_aligned_t free_pages;
     uint64_aligned_t scrub_pages;

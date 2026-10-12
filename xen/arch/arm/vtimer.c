@@ -52,15 +52,13 @@ static void virt_timer_expired(void *data)
     perfc_incr(vtimer_virt_inject);
 }
 
-int domain_vtimer_init(struct domain *d, struct xen_arch_domainconfig *config)
+int domain_vtimer_init(struct domain *d)
 {
     d->arch.virt_timer_base.offset = get_cycles();
     d->arch.virt_timer_base.nanoseconds =
         ticks_to_ns(d->arch.virt_timer_base.offset - boot_count);
     d->time_offset.seconds = d->arch.virt_timer_base.nanoseconds;
     do_div(d->time_offset.seconds, 1000000000);
-
-    config->clock_frequency = timer_dt_clock_frequency;
 
     /*
      * Per the ACPI specification, providing a secure EL1 timer

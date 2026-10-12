@@ -87,10 +87,11 @@ enum timer_ppi
 };
 
 /*
- * Value of "clock-frequency" in the DT timer node if present.
- * 0 means the property doesn't exist.
+ * The timer frequency, in Hz, that Xen ended up using, and whether it came
+ * from the DT "clock-frequency" property rather than CNTFRQ_EL0.
  */
-extern uint32_t timer_dt_clock_frequency;
+extern uint32_t timer_clock_frequency_hz;
+extern bool timer_clock_frequency_from_dt;
 
 /* Get one of the timer IRQ number */
 unsigned int timer_get_irq(enum timer_ppi ppi);

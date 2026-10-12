@@ -46,4 +46,14 @@ bool arch_capabilities_arm_gic_v3(unsigned int arch_capabilities)
 #endif
 }
 
+static inline
+bool arch_capabilities_arm_timer_dt_freq(unsigned int arch_capabilities)
+{
+#if defined(__arm__) || defined(__aarch64__)
+    return MASK_EXTR(arch_capabilities, XEN_SYSCTL_PHYSCAP_ARM_TIMER_DT_FREQ);
+#else
+    return false;
+#endif
+}
+
 #endif /* ARM_ARCH_CAPABILITIES_H */

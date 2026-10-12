@@ -30,9 +30,9 @@
  * fields) don't require a change of the version.
  * Stable ops are NOT covered by XEN_DOMCTL_INTERFACE_VERSION!
  *
- * Last version bump: Xen 4.22
+ * Last version bump: Xen 4.23
  */
-#define XEN_DOMCTL_INTERFACE_VERSION 0x00000018
+#define XEN_DOMCTL_INTERFACE_VERSION 0x00000019
 
 /*
  * NB. xen_domctl.domain is an IN/OUT parameter for this operation.

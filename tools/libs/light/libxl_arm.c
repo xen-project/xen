@@ -252,6 +252,16 @@ int libxl__arch_domain_save_config(libxl__gc *gc,
                                    libxl__domain_build_state *state,
                                    const struct xen_domctl_createdomain *config)
 {
+    libxl_physinfo info;
+    int rc;
+
+    libxl_physinfo_init(&info);
+    rc = libxl_get_physinfo(CTX, &info);
+    if (rc) {
+        LOG(ERROR, "failed to get physinfo");
+        goto out;
+    }
+
     switch (config->arch.gic_version) {
     case XEN_DOMCTL_CONFIG_GIC_V2:
         d_config->b_info.arch_arm.gic_version = LIBXL_GIC_VERSION_V2;
@@ -261,12 +271,25 @@ int libxl__arch_domain_save_config(libxl__gc *gc,
         break;
     default:
         LOG(ERROR, "Unexpected gic version %u", config->arch.gic_version);
-        return ERROR_FAIL;
+        rc = ERROR_FAIL;
+        goto out;
     }
 
-    state->clock_frequency = config->arch.clock_frequency;
+    /*
+     * Pass the timer frequency on to the guest DT only when Xen took it from
+     * the host DT (XEN_SYSCTL_PHYSCAP_ARM_TIMER_DT_FREQ). Otherwise the guest
+     * gets the right value from CNTFRQ_EL0.
+     */
+    if (arch_capabilities_arm_timer_dt_freq(info.arch_capabilities))
+        state->clock_frequency = info.arm_clock_frequency_hz;
+    else
+        state->clock_frequency = 0;
 
-    return 0;
+    rc = 0;
+out:
+    libxl_physinfo_dispose(&info);
+
+    return rc;
 }
 
 int libxl__arch_domain_create(libxl__gc *gc,
