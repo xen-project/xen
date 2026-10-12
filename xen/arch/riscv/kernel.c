@@ -233,6 +233,8 @@ static int __init kernel_image64_probe(struct kernel_info *info,
     info->image.text_offset = le64_to_cpu(image.text_offset);
     info->image.start = 0;
 
+    info->type = DOMAIN_64BIT;
+
     info->load = kernel_image_load;
 
     return 0;
