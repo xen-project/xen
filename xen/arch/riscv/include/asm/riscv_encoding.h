@@ -857,16 +857,18 @@
 #error "Unexpected __riscv_xlen"
 #endif
 
-#define INSN_16BIT_MASK			0x3
-#define INSN_32BIT_MASK			0x1c
+#define INSN_IS_16BIT(insn)	(((insn) & 3) != 3)
+#define INSN_IS_32BIT(insn)	(!INSN_IS_16BIT(insn) && ((insn) & 0x1c) != 0x1c)
 
-#define INSN_IS_16BIT(insn)		\
-	(((insn) & INSN_16BIT_MASK) != INSN_16BIT_MASK)
-#define INSN_IS_32BIT(insn)		\
-	(((insn) & INSN_16BIT_MASK) == INSN_16BIT_MASK && \
-	 ((insn) & INSN_32BIT_MASK) != INSN_32BIT_MASK)
-
-#define INSN_LEN(insn)			(INSN_IS_16BIT(insn) ? 2 : 4)
+/*
+ * Length in bytes of the instruction whose first parcel is @insn: 2 or 4, or
+ * 0 when the encoding is 48 bits or wider. No ratified extension defines an
+ * instruction of such a length, so rather than open-coding a decoder for
+ * encodings which cannot legitimately occur, leave it to the caller to treat
+ * the 0 as an illegal instruction.
+ */
+#define INSN_LEN(insn) \
+	(INSN_IS_16BIT(insn) ? 2 : (INSN_IS_32BIT(insn) ? 4 : 0))
 
 #if __riscv_xlen == 64
 #define LOG_REGBYTES			3
