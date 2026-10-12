@@ -101,8 +101,8 @@ void __init preinit_xen_time(void)
          * A VS-timer interrupt becomes pending whenever the value of
          * (time + htimedelta) is greater than or equal to vstimecmp CSR.
          * Thereby to avoid spurious VS-timer irqs set vstimecmp CSR to
-         * ULONG_MAX.
+         * ~0.
          */
-        csr_write64(CSR_VSTIMECMP, ULONG_MAX);
+        csr_write64(CSR_VSTIMECMP, ~0);
     }
 }
