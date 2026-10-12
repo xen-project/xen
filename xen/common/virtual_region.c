@@ -83,8 +83,8 @@ const struct virtual_region *find_text_region(unsigned long addr)
     rcu_read_lock(&rcu_virtual_region_lock);
     list_for_each_entry_rcu ( iter, &virtual_region_list, list )
     {
-        if ( (void *)addr >= iter->text_start &&
-             (void *)addr <  iter->text_end )
+        if ( addr >= (unsigned long)iter->text_start &&
+             addr <  (unsigned long)iter->text_end )
         {
             region = iter;
             break;
