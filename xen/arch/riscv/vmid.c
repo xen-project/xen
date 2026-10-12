@@ -141,7 +141,7 @@ bool vmid_handle_vmenter(struct vcpu_vmid *vmid)
 
     /* Test if VCPU has valid VMID. */
     if ( read_atomic(&vmid->generation) == data->generation )
-        return 0;
+        return false;
 
     /* If there are no free VMIDs, need to go to a new generation. */
     if ( unlikely(data->next_vmid > data->max_vmid) )
@@ -164,7 +164,7 @@ bool vmid_handle_vmenter(struct vcpu_vmid *vmid)
 
  disabled:
     vmid->vmid = 0;
-    return 0;
+    return true;
 }
 
 /*

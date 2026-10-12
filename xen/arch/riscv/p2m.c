@@ -1584,7 +1584,9 @@ void p2m_handle_vmenter(void)
     /*
      * There is also no need to flush the VS-stage TLB: even if speculation
      * occurs (VSATP + old HGATP were used), it will use the old VMID, which
-     * won't be reused until need_flush is set to true.
+     * won't be reused until need_flush is set to true. When VMIDs aren't
+     * available there is no old VMID to rely on, but then need_flush is set
+     * on every entry, so the flush above covers that case.
      */
 }
 
