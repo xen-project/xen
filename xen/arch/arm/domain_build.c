@@ -26,6 +26,7 @@
 #include <xen/warning.h>
 #include <xen/static-shmem.h>
 #include <asm/device.h>
+#include <asm/gic.h>
 #include <asm/setup.h>
 #include <asm/tee/tee.h>
 #include <asm/pci.h>
@@ -1967,7 +1968,7 @@ void __init create_dom0(void)
     int rc;
 
     /* The vGIC for DOM0 is exactly emulating the hardware GIC */
-    dom0_cfg.arch.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE;
+    dom0_cfg.arch.gic_version = gic_domctl_hw_version();
     dom0_cfg.arch.nr_spis = vgic_def_nr_spis();
     dom0_cfg.arch.tee_type = tee_get_type();
     dom0_cfg.max_vcpus = dom0_max_vcpus();

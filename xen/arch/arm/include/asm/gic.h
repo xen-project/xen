@@ -262,6 +262,12 @@ DECLARE_PER_CPU(uint64_t, lr_mask);
 
 extern enum gic_version gic_hw_version(void);
 
+/*
+ * The XEN_DOMCTL_CONFIG_GIC_* value matching the GIC version actually
+ * present on this host.
+ */
+uint8_t gic_domctl_hw_version(void);
+
 /* Program the IRQ type into the GIC */
 void gic_set_irq_type(struct irq_desc *desc, unsigned int type);
 

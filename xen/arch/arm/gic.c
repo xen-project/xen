@@ -56,6 +56,21 @@ enum gic_version gic_hw_version(void)
    return gic_hw_ops->info->hw_version;
 }
 
+uint8_t gic_domctl_hw_version(void)
+{
+    switch ( gic_hw_version() )
+    {
+    case GIC_V2:
+        return XEN_DOMCTL_CONFIG_GIC_V2;
+
+    case GIC_V3:
+        return XEN_DOMCTL_CONFIG_GIC_V3;
+
+    default:
+        BUG();
+    }
+}
+
 unsigned int gic_number_lines(void)
 {
     return gic_hw_ops->info->nr_lines;

@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Added
 
 ### Removed
+ - On Arm:
+   - XEN_DOMCTL_CONFIG_GIC_NATIVE has been removed. Toolstacks must now
+     explicitly request GIC_V2 or GIC_V3 when creating a domain.
+     Available GIC versions can be queried via XEN_SYSCTL_physinfo.
  - On x86:
    - The kexec "v1" interface, which was declared obsolete in Xen 4.4 (2013).
      The only known user was the classic-xen fork of Linux.  This does not

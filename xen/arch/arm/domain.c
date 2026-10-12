@@ -609,23 +609,18 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
-    /* Fill in the native GIC version, passed back to the toolstack. */
-    if ( config->arch.gic_version == XEN_DOMCTL_CONFIG_GIC_NATIVE )
+    /*
+     * A guest can only use the host's GIC version, except that a GICv3 host
+     * with the GICv2 compatibility mode enabled can also run GICv2 guests.
+     * This mirrors what XEN_SYSCTL_physinfo reports to the toolstack.
+     */
+    if ( config->arch.gic_version != gic_domctl_hw_version() &&
+         !(config->arch.gic_version == XEN_DOMCTL_CONFIG_GIC_V2 &&
+           vgic_v2_hw_enabled()) )
     {
-        switch ( gic_hw_version() )
-        {
-        case GIC_V2:
-            config->arch.gic_version = XEN_DOMCTL_CONFIG_GIC_V2;
-            break;
-
-        case GIC_V3:
-            config->arch.gic_version = XEN_DOMCTL_CONFIG_GIC_V3;
-            break;
-
-        default:
-            ASSERT_UNREACHABLE();
-            return -EINVAL;
-        }
+        dprintk(XENLOG_INFO, "Unsupported GIC version %u\n",
+                config->arch.gic_version);
+        return -EINVAL;
     }
 
     /* max_vcpus depends on the GIC version, and Xen's compiled limit. */
@@ -634,6 +629,7 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
     if ( max_vcpus == 0 )
     {
         dprintk(XENLOG_INFO, "Unsupported GIC version\n");
+        ASSERT_UNREACHABLE();
         return -EINVAL;
     }
 

@@ -23,6 +23,7 @@
 #include <asm/arm64/sve.h>
 #include <asm/domain_build.h>
 #include <asm/firmware/sci.h>
+#include <asm/gic.h>
 #include <asm/grant_table.h>
 #include <asm/setup.h>
 
@@ -368,7 +369,7 @@ int __init arch_parse_dom0less_node(struct dt_device_node *node,
     unsigned int flags = bd->create_flags;
     uint32_t val;
 
-    d_cfg->arch.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE;
+    d_cfg->arch.gic_version = gic_domctl_hw_version();
     d_cfg->flags |= XEN_DOMCTL_CDF_hvm | XEN_DOMCTL_CDF_hap;
 
     if ( domu_dt_sci_parse(node, d_cfg) )
