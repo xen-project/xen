@@ -92,7 +92,8 @@ static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
 #define APPEND_BUFF(b) ({ memcpy(p, b, sizeof(b)); p += sizeof(b); })
 #define APPEND_CALL(f)                                                  \
     ({                                                                  \
-        long disp = (void *)(f) - (stub_va + (p - ctxt->io_emul_stub) + 5); \
+        long disp = (long)(f) -                                         \
+                    ((long)stub_va + (p - ctxt->io_emul_stub) + 5);     \
         BUG_ON((int32_t)disp != disp);                                  \
         *p++ = 0xe8;                                                    \
         *(int32_t *)p = disp; p += 4;                                   \
