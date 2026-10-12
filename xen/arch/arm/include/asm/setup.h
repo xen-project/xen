@@ -40,8 +40,6 @@ int acpi_make_efi_nodes(void *fdt, struct membank tbl_add[]);
 
 void create_dom0(void);
 
-void discard_initial_modules(void);
-
 void init_pdx(void);
 void setup_mm(void);
 

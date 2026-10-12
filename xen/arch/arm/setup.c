@@ -210,39 +210,6 @@ static void __init processor_id(void)
     processor_setup();
 }
 
-void __init discard_initial_modules(void)
-{
-    struct boot_modules *mi = &bootinfo.modules;
-    int i;
-
-    /*
-     * When using static heap feature, don't give boot_modules memory back to
-     * the heap allocator
-     */
-    if ( using_static_heap )
-        goto out;
-
-    for ( i = 0; i < mi->nr_mods; i++ )
-    {
-        paddr_t s = mi->module[i].start;
-        paddr_t e = s + PAGE_ALIGN(mi->module[i].size);
-
-        if ( mi->module[i].kind == BOOTMOD_XEN )
-            continue;
-
-        if ( !mfn_valid(maddr_to_mfn(s)) ||
-             !mfn_valid(maddr_to_mfn(e)) )
-            continue;
-
-        fw_unreserved_regions(s, e, init_domheap_pages, 0);
-    }
-
-    mi->nr_mods = 0;
-
- out:
-    remove_early_mappings();
-}
-
 /* Relocate the FDT in Xen heap */
 static void __init relocate_fdt(const void **dtb_vaddr, size_t dtb_size)
 {
@@ -503,11 +470,9 @@ void asmlinkage __init noreturn start_xen(unsigned long fdt_paddr)
         alloc_static_evtchn();
     }
 
-    /*
-     * This needs to be called **before** heap_init_late() so modules
-     * will be scrubbed (unless suppressed).
-     */
     discard_initial_modules();
+
+    remove_early_mappings();
 
     heap_init_late();
 

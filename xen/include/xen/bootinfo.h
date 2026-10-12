@@ -214,4 +214,12 @@ void fw_unreserved_regions(paddr_t s, paddr_t e,
                            void (*cb)(paddr_t ps, paddr_t pe),
                            unsigned int first);
 
+/*
+ * Return the memory occupied by the boot modules to the heap allocator.
+ *
+ * It needs to be called **before** heap_init_late() so that the released
+ * modules are scrubbed (unless suppressed).
+ */
+void discard_initial_modules(void);
+
 #endif /* XEN_BOOTINFO_H */
