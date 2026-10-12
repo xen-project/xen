@@ -772,10 +772,9 @@ static inline void domain_update_node_affinity(struct domain *d)
 }
 
 /*
- * To be implemented by each architecture, sanity checking the configuration
- * and filling in any appropriate defaults.
+ * To be implemented by each architecture, sanity checking the configuration.
  */
-int arch_sanitise_domain_config(struct xen_domctl_createdomain *config);
+int arch_sanitise_domain_config(const struct xen_domctl_createdomain *config);
 
 /*
  * Create a domain: the configuration is only necessary for real domain

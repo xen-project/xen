@@ -45,7 +45,7 @@ int sci_domain_init(struct domain *d, struct xen_domctl_createdomain *config)
     return cur_mediator->domain_init(d, config);
 }
 
-int sci_domain_sanitise_config(struct xen_domctl_createdomain *config)
+int sci_domain_sanitise_config(const struct xen_domctl_createdomain *config)
 {
     if ( !cur_mediator )
         return 0;

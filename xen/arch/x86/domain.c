@@ -590,7 +590,7 @@ void arch_vcpu_destroy(struct vcpu *v)
         ASSERT_UNREACHABLE();
 }
 
-int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
+int arch_sanitise_domain_config(const struct xen_domctl_createdomain *config)
 {
     bool hvm = config->flags & XEN_DOMCTL_CDF_hvm;
     bool hap = config->flags & XEN_DOMCTL_CDF_hap;
@@ -632,13 +632,6 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
         dprintk(XENLOG_INFO, "Shadow paging requested but not available\n");
         return -EINVAL;
     }
-
-    if ( !hvm )
-        /*
-         * It is only meaningful for XEN_DOMCTL_CDF_oos_off to be clear
-         * for HVM guests.
-         */
-        config->flags |= XEN_DOMCTL_CDF_oos_off;
 
     if ( nested_virt && !hvm_nested_virt_supported() )
     {
@@ -832,6 +825,13 @@ int arch_domain_create(struct domain *d,
     INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
 
     spin_lock_init(&d->arch.e820_lock);
+
+    /*
+     * It is only meaningful for XEN_DOMCTL_CDF_oos_off to be clear for HVM
+     * guests.
+     */
+    if ( !is_hvm_domain(d) )
+        d->options |= XEN_DOMCTL_CDF_oos_off;
 
     if ( d->domain_id && cpu_has_amd_erratum(&boot_cpu_data, AMD_ERRATUM_121) )
     {

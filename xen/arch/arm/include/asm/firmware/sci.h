@@ -32,7 +32,7 @@ struct sci_mediator_ops {
      * it to sanitize domain SCI configuration parameters.
      * Optional.
      */
-    int (*domain_sanitise_config)(struct xen_domctl_createdomain *config);
+    int (*domain_sanitise_config)(const struct xen_domctl_createdomain *config);
 
     /*
      * Called during domain destruction, releases all resources, that
@@ -101,7 +101,7 @@ int sci_domain_init(struct domain *d, struct xen_domctl_createdomain *config);
  * Sanitise domain configuration parameters.
  *
  */
-int sci_domain_sanitise_config(struct xen_domctl_createdomain *config);
+int sci_domain_sanitise_config(const struct xen_domctl_createdomain *config);
 
 /*
  * Destroy SCI domain instance.
@@ -162,7 +162,7 @@ static inline int sci_domain_init(struct domain *d,
 }
 
 static inline int
-sci_domain_sanitise_config(struct xen_domctl_createdomain *config)
+sci_domain_sanitise_config(const struct xen_domctl_createdomain *config)
 {
     if ( config->arch.arm_sci_type != XEN_DOMCTL_CONFIG_ARM_SCI_NONE )
         return -EINVAL;
