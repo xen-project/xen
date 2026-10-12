@@ -393,8 +393,9 @@ bool __init pfn_pdx_compression_setup(paddr_t base)
              (ranges[i - 1].base_pfn + ranges[i - 1].pages) )
             continue;
 
-        ranges[i - 1].pages = ranges[i].base_pfn + ranges[i].pages -
-                              ranges[i - 1].base_pfn;
+        ranges[i - 1].pages = max(ranges[i - 1].pages,
+                                  ranges[i].base_pfn + ranges[i].pages -
+                                  ranges[i - 1].base_pfn);
 
         if ( i + 1 < nr_ranges )
             memmove(&ranges[i], &ranges[i + 1],

@@ -88,6 +88,22 @@ int main(int argc, char **argv)
             .compress = true,
         },
 #endif
+        /* Range contained in a previous one. */
+        {
+            .ranges = {
+                /* Overlapping ranges. */
+                { .start = 0, .end = (1UL << MAX_ORDER) * 2 },
+                { .start = 0, .end = (1UL << MAX_ORDER) * 1 },
+                /* Extra range to force offset compression to be engaged. */
+                { .start = (1UL << MAX_ORDER) * 3,
+                  .end   = (1UL << MAX_ORDER) * 4 },
+            },
+#ifdef CONFIG_PDX_OFFSET_COMPRESSION
+            .compress = true,
+#else
+            .compress = false,
+#endif
+        },
         /* PDX compression, 2 ranges covered by the lower mask. */
         {
             .ranges = {
