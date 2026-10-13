@@ -844,9 +844,15 @@ static void dbc_reset_debug_port(struct dbc *dbc)
     }
 }
 
-static void dbc_enable_dbc(struct dbc *dbc)
+static bool dbc_enable_dbc(struct dbc *dbc)
 {
     struct dbc_reg *reg = dbc->dbc_reg;
+    cycles_t start;
+    /*
+     * Too early for proper time calibration, assume a 5GHz CPU and let it wait
+     * about 1s, with still reasonable timeout on a slower CPU.
+     */
+    cycles_t timeout_ticks = 5UL * 1000 * 1000 * 1000;
 
     wmb();
     writel(readl(&reg->ctrl) | (1U << DBC_CTRL_DCE), &reg->ctrl);
@@ -863,8 +869,12 @@ static void dbc_enable_dbc(struct dbc *dbc)
     writel(readl(&reg->portsc) | (1U << DBC_PSC_PED), &reg->portsc);
     wmb();
 
-    while ( (readl(&reg->ctrl) & (1U << DBC_CTRL_DCR)) == 0 )
+    start = get_cycles();
+    while ( (readl(&reg->ctrl) & (1U << DBC_CTRL_DCR)) == 0 &&
+            get_cycles() - start < timeout_ticks )
         cpu_relax();
+
+    return readl(&reg->ctrl) & (1U << DBC_CTRL_DCR);
 }
 
 static void dbc_disable_dbc(struct dbc *dbc)
@@ -963,7 +973,8 @@ static bool __init dbc_open(struct dbc *dbc)
 
     dbc_init_work_ring(dbc, &dbc->dbc_owork);
     dbc_init_work_ring(dbc, &dbc->dbc_iwork);
-    dbc_enable_dbc(dbc);
+    if ( !dbc_enable_dbc(dbc) )
+        printk(XENLOG_WARNING "Timeout waiting for XHCI console cable\n");
     dbc->open = true;
 
     return true;
@@ -1298,7 +1309,8 @@ static void cf_check dbc_uart_resume(struct serial_port *port)
         return;
     }
 
-    dbc_enable_dbc(dbc);
+    if ( !dbc_enable_dbc(dbc) )
+        printk(XENLOG_WARNING "Timeout waiting for XHCI console cable\n");
     dbc->suspended = false;
     dbc_flush(dbc, &dbc->dbc_oring, &dbc->dbc_owork);
     set_timer(&uart->timer, NOW() + MICROSECS(DBC_POLL_INTERVAL));
