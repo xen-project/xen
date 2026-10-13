@@ -618,12 +618,12 @@ static int __init dom0_construct(const struct boot_domain *bd)
                      (vinitrd_start - v_start) >> PAGE_SHIFT :
                      domain_tot_pages(d);
         initrd_mfn = paddr_to_pfn(initrd->start);
-        mfn = initrd_mfn;
         count = PFN_UP(initrd_len);
 
 #ifdef CONFIG_PV32
         if ( d->arch.pv.physaddr_bitsize &&
-             ((mfn + count - 1) >> (d->arch.pv.physaddr_bitsize - PAGE_SHIFT)) )
+             ((initrd_mfn + count - 1) >>
+              (d->arch.pv.physaddr_bitsize - PAGE_SHIFT)) )
         {
             order = get_order_from_pages(count);
             page = alloc_domheap_pages(d, order, MEMF_no_scrub);
@@ -648,9 +648,8 @@ static int __init dom0_construct(const struct boot_domain *bd)
         else
 #endif
         {
-            while ( count-- )
-                if ( assign_pages(mfn_to_page(_mfn(mfn++)), 1, d, 0) )
-                    BUG();
+            if ( assign_pages(mfn_to_page(_mfn(initrd_mfn)), count, d, 0) )
+                BUG();
             /*
              * We have mapped the initrd directly into dom0, and assigned the
              * pages. Tell the boot_module handling that we've freed it, so the
