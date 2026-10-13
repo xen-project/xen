@@ -49,5 +49,6 @@ void sidtab_hash_eval(struct sidtab *h, char *tag);
 void sidtab_destroy(struct sidtab *s);
 void sidtab_set(struct sidtab *dst, struct sidtab *src);
 void sidtab_shutdown(struct sidtab *s);
+void sidtab_cancel_shutdown(struct sidtab *s);
 
 #endif    /* _SS_SIDTAB_H_ */

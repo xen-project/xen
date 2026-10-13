@@ -1428,6 +1428,7 @@ int security_load_policy(const void *data, size_t len)
     if ( sidtab_map(&sidtab, clone_sid, &newsidtab) )
     {
         rc = -ENOMEM;
+        sidtab_cancel_shutdown(&sidtab);
         goto err;
     }
 

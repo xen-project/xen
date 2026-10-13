@@ -320,3 +320,10 @@ void sidtab_shutdown(struct sidtab *s)
     s->shutdown = 1;
     SIDTAB_UNLOCK(s);
 }
+
+void sidtab_cancel_shutdown(struct sidtab *s)
+{
+    SIDTAB_LOCK(s);
+    s->shutdown = 0;
+    SIDTAB_UNLOCK(s);
+}
