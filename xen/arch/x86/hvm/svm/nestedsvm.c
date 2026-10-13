@@ -460,7 +460,14 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     n2vmcb->virt_ext.bytes =
         n1vmcb->virt_ext.bytes | ns_vmcb->virt_ext.bytes;
 
-    /* NextRIP - only evaluated on #VMEXIT. */
+    /*
+     * NextRIP is consumed on VMRUN as the return address pushed on the
+     * stack for injected soft exceptions/interrupts. Nested virt is only
+     * available on NRIPS-capable hardware and NRIPS is required to be
+     * advertised to L1 (see start_nested_svm), so the L1 hypervisor is
+     * required to keep this field correct.
+     */
+    n2vmcb->nextrip = ns_vmcb->nextrip;
 
     /*
      * VMCB Save State Area
