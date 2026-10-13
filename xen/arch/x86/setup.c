@@ -1007,6 +1007,17 @@ static unsigned int __init copy_bios_e820(struct e820entry *map, unsigned int li
     return n;
 }
 
+static unsigned long __init nr_ram_pages(void)
+{
+    unsigned long nr_pages = 0;
+
+    for ( unsigned int i = 0; i < e820.nr_map; i++ )
+        if ( e820.map[i].type == E820_RAM )
+            nr_pages += e820.map[i].size >> PAGE_SHIFT;
+
+    return nr_pages;
+}
+
 /*
  * Calculate the maximum possible size of the dom0 cmdline.  Pieces of the
  * dom0 cmdline optionally come from the bootloader directly, from Xen's
@@ -1139,7 +1150,7 @@ void asmlinkage __init noreturn __start_xen(void)
     struct cpu_info *info = get_cpu_info(), *bsp_info;
     unsigned int initrdidx, num_parked = 0;
     struct boot_info *bi;
-    unsigned long nr_pages, raw_max_page;
+    unsigned long raw_max_page;
     int i, j, bytes = 0;
     unsigned long eb_start, eb_end;
     bool acpi_boot_table_init_done = false, relocated = false;
@@ -1491,11 +1502,7 @@ void asmlinkage __init noreturn __start_xen(void)
     memcpy(&boot_e820, &e820, sizeof(e820));
 
     /* Early kexec reservation (explicit static start address). */
-    nr_pages = 0;
-    for ( i = 0; i < e820.nr_map; i++ )
-        if ( e820.map[i].type == E820_RAM )
-            nr_pages += e820.map[i].size >> PAGE_SHIFT;
-    set_kexec_crash_area_size((u64)nr_pages << PAGE_SHIFT);
+    set_kexec_crash_area_size(nr_ram_pages() << PAGE_SHIFT);
     kexec_reserve_area();
 
     for ( i = 0; i < bi->nr_modules; i++ )
@@ -1862,14 +1869,10 @@ void asmlinkage __init noreturn __start_xen(void)
                         (unsigned long)__va(__pa(__2M_rodata_end)),
                         PAGE_HYPERVISOR_RO);
 
-    nr_pages = 0;
-    for ( i = 0; i < e820.nr_map; i++ )
-        if ( e820.map[i].type == E820_RAM )
-            nr_pages += e820.map[i].size >> PAGE_SHIFT;
+    total_pages = nr_ram_pages();
     printk("System RAM: %luMB (%lukB)\n",
-           nr_pages >> (20 - PAGE_SHIFT),
-           nr_pages << (PAGE_SHIFT - 10));
-    total_pages = nr_pages;
+           total_pages >> (20 - PAGE_SHIFT),
+           total_pages << (PAGE_SHIFT - 10));
 
     /* Sanity check for unwanted bloat of certain hypercall structures. */
     BUILD_BUG_ON(sizeof_field(struct xen_platform_op, u) !=
