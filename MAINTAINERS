@@ -517,6 +517,7 @@ F:	tools/hotplug/Linux/block-drbd-probe
 
 RISCV
 R:	Alistair Francis <alistair.francis@wdc.com>
+R:	Baptiste Le Duc <baptiste.le-duc@vates.tech>
 R:	Connor Davis <connojdavis@gmail.com>
 R:	Oleksii Kurochko <oleksii.kurochko@gmail.com>
 S:	Supported
