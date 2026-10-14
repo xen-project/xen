@@ -1245,6 +1245,138 @@ static const struct ns16550_config __initconst uart_config[] =
         .dev_id = 0x7adc,
         .param = param_intel_lpss
     },
+    /* Intel Corp. RPL-S LPSS PCI UART #0 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0x7a28,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. RPL-S LPSS PCI UART #1 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0x7a29,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. RPL-S LPSS PCI UART #2 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0x7a5c,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. LNL-M LPSS PCI UART #0 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0xa825,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. LNL-M LPSS PCI UART #1 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0xa826,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. LNL-M LPSS PCI UART #2 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0xa852,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. MTL-P LPSS PCI UART #0 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0x7e25,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. MTL-P LPSS PCI UART #1 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0x7e26,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. MTL-P LPSS PCI UART #2 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0x7e52,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. MTP-S LPSS PCI UART #0 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0x7f28,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. MTP-S LPSS PCI UART #1 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0x7f29,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. MTP-S LPSS PCI UART #2 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0x7f5c,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. MTP-S LPSS PCI UART #3 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0x7f5d,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. NVL-H LPSS PCI UART #0 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0xd325,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. NVL-H LPSS PCI UART #1 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0xd326,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. NVL-H LPSS PCI UART #2 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0xd352,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. PTL-H LPSS PCI UART #0 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0xe325,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. PTL-H LPSS PCI UART #1 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0xe326,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. PTL-H LPSS PCI UART #2 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0xe352,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. PTL-P LPSS PCI UART #0 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0xe425,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. PTL-P LPSS PCI UART #1 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0xe426,
+        .param = param_intel_lpss
+    },
+    /* Intel Corp. PTL-P LPSS PCI UART #2 */
+    {
+        .vendor_id = PCI_VENDOR_ID_INTEL,
+        .dev_id = 0xe452,
+        .param = param_intel_lpss
+    },
     /* WCH CH382 2S1P */
     {
         .vendor_id = PCI_VENDOR_ID_WCHIC,
