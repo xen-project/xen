@@ -20,8 +20,8 @@
 
 static inline struct vcpu *mapcache_current_vcpu(void)
 {
-    struct vcpu *v = this_cpu(pgtable_vcpu);
-    struct vcpu *curr = current;
+    const struct vcpu *v = this_cpu(pgtable_vcpu);
+    const struct vcpu *curr = current;
 
     /*
      * During early boot pgtable_vcpu is not set, callers must handle NULL.
