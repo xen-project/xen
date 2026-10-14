@@ -568,7 +568,8 @@ memcpy_to_guest_ring(const struct domain *d, struct argo_ring_info *ring_info,
 
     offset &= ~PAGE_MASK;
 
-    if ( len + offset > XEN_ARGO_MAX_RING_SIZE )
+    if ( len > XEN_ARGO_MAX_RING_SIZE ||
+         offset > XEN_ARGO_MAX_RING_SIZE - len )
         return -EFAULT;
 
     while ( len )
