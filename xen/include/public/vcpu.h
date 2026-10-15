@@ -233,7 +233,7 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_register_time_memory_area_t);
  * area.  Note that as long as an area is registered by physical address, the
  * linear address based area will not be serviced (updated) by the hypervisor.
  *
- * Note that the area registered via VCPUOP_register_runstate_memory_area will
+ * Note that the area registered via VCPUOP_register_runstate_phys_area will
  * be updated in the same manner as the one registered via virtual address PLUS
  * VMASST_TYPE_runstate_update_flag engaged by the domain.
  *
