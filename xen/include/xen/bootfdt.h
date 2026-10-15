@@ -99,6 +99,22 @@ int device_tree_for_each_node(const void *fdt, int node,
                               device_tree_node_func func,
                               void *data);
 
+struct domain;
+
+/*
+ * device_tree_dump - print a device tree blob in a DTS-like format
+ * @d: domain the device tree was generated for.
+ * @fdt: flat device tree.
+ *
+ * The tree is printed at debug log level and is only meant to be used for
+ * debugging, so it is a no-op unless CONFIG_DEVICE_TREE_DUMP is enabled.
+ */
+#ifdef CONFIG_DEVICE_TREE_DUMP
+void device_tree_dump(const struct domain *d, const void *fdt);
+#else
+static inline void device_tree_dump(const struct domain *d, const void *fdt) {}
+#endif
+
 typedef enum {
     BOOTMOD_XEN,
     BOOTMOD_FDT,

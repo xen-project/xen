@@ -98,6 +98,15 @@ config DEVICE_TREE_DEBUG
 	  logged in the Xen ring buffer.
 	  If unsure, say N here.
 
+config DEVICE_TREE_DUMP
+	bool "Dump generated device trees"
+	depends on DEVICE_TREE_PARSE
+	help
+	  The device tree Xen generates for dom0/hwdom and for each dom0less
+	  domain is printed on the Xen console in a DTS-like format.
+	  The dump is logged at debug level.
+	  If unsure, say N here.
+
 config SCRUB_DEBUG
 	bool "Page scrubbing test"
 	default DEBUG

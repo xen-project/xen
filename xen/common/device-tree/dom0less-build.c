@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
+#include <xen/bootfdt.h>
 #include <xen/bootinfo.h>
 #include <xen/device_tree.h>
 #include <xen/dom0less-build.h>
@@ -586,6 +587,8 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     ret = fdt_finish(kinfo->fdt);
     if ( ret < 0 )
         goto err;
+
+    device_tree_dump(d, kinfo->fdt);
 
     return 0;
 

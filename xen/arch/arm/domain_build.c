@@ -1706,6 +1706,8 @@ static int __init prepare_dtb_hwdom(struct domain *d, struct kernel_info *kinfo)
     if ( ret < 0 )
         goto err;
 
+    device_tree_dump(d, kinfo->fdt);
+
     return 0;
 
   err:
