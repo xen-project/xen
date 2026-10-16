@@ -1574,18 +1574,22 @@ static void __init tsa_sq_l1_calculations(void)
         return;
 
     /*
-     * According to the whitepaper, some Fam1A CPUs (Models 0x00...0x4f,
-     * 0x60...0x7f) are not vulnerable but don't enumerate TSA_{SQ,L1}_NO.  If
-     * we see either enumerated, assume both are correct ...
+     * Zen6 and later are stated not to be vulnerable to the 3 known TSA
+     * variants, and enumerate all TSA_*_NO bits.
+     *
+     * Zen5 is vulnerable to all 3.  It gets VERW_CLEAR with new enough
+     * microcode, which is enumerated in CPUID.
+     *
+     * No synthesis should be performed.
      */
-    if ( cpu_has_tsa_sq_no || cpu_has_tsa_l1_no )
+    if ( boot_cpu_data.x86 > 0x19 )
         return;
 
     /*
-     * ... otherwise, synthesise them.  CPUs other than Fam19 (Zen3/4) are
-     * stated to be not vulnerable.
+     * Zen2 and older are stated not to be vulnerable, and need to synthesise
+     * TSA_SQ/L1_NO.
      */
-    if ( boot_cpu_data.x86 != 0x19 )
+    if ( boot_cpu_data.x86 < 0x19 )
     {
         setup_force_cpu_cap(X86_FEATURE_TSA_SQ_NO);
         setup_force_cpu_cap(X86_FEATURE_TSA_L1_NO);
@@ -1593,7 +1597,7 @@ static void __init tsa_sq_l1_calculations(void)
     }
 
     /*
-     * Fam19 CPUs get VERW_CLEAR with new enough microcode, but must
+     * Zen3 and Zen4 get VERW_CLEAR with new enough microcode, but must
      * synthesise the CPUID bit.
      */
     curr_rev = this_cpu(cpu_sig).rev;
@@ -2361,6 +2365,9 @@ void __init init_speculation_mitigations(void)
      *   Note, these microcode updates were produced before the remediation of
      *   the microcode signature issues, and are included in the firwmare
      *   updates fixing the entrysign vulnerability from ~December 2024.
+     *
+     * - September 2026, for TSA-L1/SQ/Fill.  Introduces VERW side effects on
+     *   Zen5, and enumerates VERW_CLEAR.
      */
     mds_calculations();
     rfds_calculations();

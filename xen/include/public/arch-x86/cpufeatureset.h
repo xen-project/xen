@@ -341,8 +341,8 @@ XEN_CPUFEATURE(RFDS_CLEAR,         16*32+28) /*!A Register File(s) cleared by VE
 XEN_CPUFEATURE(ITS_NO,             16*32+62) /*!A No Indirect Target Selection */
 
 /* AMD-defined CPU features, CPUID level 0x80000021.ecx, word 18 */
-XEN_CPUFEATURE(TSA_SQ_NO,          18*32+ 1) /*A  No Store Queue Transitive Scheduler Attacks */
-XEN_CPUFEATURE(TSA_L1_NO,          18*32+ 2) /*A  No L1D Transitive Scheduler Attacks */
+XEN_CPUFEATURE(TSA_SQ_NO,          18*32+ 1) /*!A No Store Queue Transitive Scheduler Attacks */
+XEN_CPUFEATURE(TSA_L1_NO,          18*32+ 2) /*!A No L1D Transitive Scheduler Attacks */
 
 #endif /* XEN_CPUFEATURE */
 
