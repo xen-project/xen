@@ -489,6 +489,23 @@ static void __init guest_common_max_feature_adjustments(uint32_t *fs)
          * has been around since the 286.
          */
         __set_bit(X86_FEATURE_VERW_CLEAR, fs);
+
+        /*
+         * Between July 2025 and Nov 2026, AMD had said that Zen5 was not
+         * vulnerable to TSA and to synthesise the TSA_SQ/L1_NO bits, but this
+         * statement has been retracted.
+         *
+         * VM's booted during that period on Zen5 CPUs will have seen the
+         * bits.  Tolerate such VMs; they'll be in no worse a position than
+         * prior to Nov 2026.
+         *
+         * Zen6 enumerates TSA_SQ/L1_NO, so there's no change from this logic.
+         */
+        if ( boot_cpu_data.family == 0x1a )
+        {
+            __set_bit(X86_FEATURE_TSA_SQ_NO, fs);
+            __set_bit(X86_FEATURE_TSA_L1_NO, fs);
+        }
         break;
     }
 
@@ -582,6 +599,20 @@ static void __init guest_common_default_feature_adjustments(uint32_t *fs)
          */
         if ( !cpu_has_verw_clear )
             __clear_bit(X86_FEATURE_VERW_CLEAR, fs);
+
+        /*
+         * Between July 2025 and Nov 2026, AMD had said that Zen5 was not
+         * vulnerable to TSA and to synthesise the TSA_SQ/L1_NO bits, but this
+         * statement has been retracted.
+         *
+         * The max policy has these set for migration compatibility, but a VM
+         * should not see them by default if the hardware is affected.
+         */
+        if ( !cpu_has_tsa_sq_no )
+            __clear_bit(X86_FEATURE_TSA_SQ_NO, fs);
+
+        if ( !cpu_has_tsa_l1_no )
+            __clear_bit(X86_FEATURE_TSA_L1_NO, fs);
         break;
     }
 

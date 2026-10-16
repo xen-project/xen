@@ -400,8 +400,8 @@ XEN_CPUFEATURE(PB_OPT_CTRL,        16*32+32) /*   MSR_PB_OPT_CTRL.IBPB_ALT */
 XEN_CPUFEATURE(ITS_NO,             16*32+62) /*!A No Indirect Target Selection */
 
 /* AMD-defined CPU features, CPUID level 0x80000021.ecx, word 18 */
-XEN_CPUFEATURE(TSA_SQ_NO,          18*32+ 1) /*A  No Store Queue Transitive Scheduler Attacks */
-XEN_CPUFEATURE(TSA_L1_NO,          18*32+ 2) /*A  No L1D Transitive Scheduler Attacks */
+XEN_CPUFEATURE(TSA_SQ_NO,          18*32+ 1) /*!A No Store Queue Transitive Scheduler Attacks */
+XEN_CPUFEATURE(TSA_L1_NO,          18*32+ 2) /*!A No L1D Transitive Scheduler Attacks */
 
 #endif /* XEN_CPUFEATURE */
 
