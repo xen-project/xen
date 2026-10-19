@@ -1031,6 +1031,8 @@ int __init make_hypervisor_node(struct domain *d,
     void *fdt = kinfo->fdt;
     struct membanks *ext_regions = NULL;
     unsigned int i, nr_ext_regions;
+    unsigned int gnttab_frames =
+        gnttab_resource_max_frames(d, XENMEM_resource_grant_table_id_shared);
 
     dt_dprintk("Create hypervisor node\n");
 
@@ -1041,6 +1043,14 @@ int __init make_hypervisor_node(struct domain *d,
     if ((addrcells != 1 && addrcells != 2) ||
         (sizecells != 1 && sizecells != 2))
         panic("Cannot cope with this size\n");
+
+    if ( gnttab_frames > PFN_DOWN(kinfo->gnttab_size) )
+    {
+        printk(XENLOG_ERR
+               "%pd: grant frames limit (%u) exceeds the region size (%lu frames)\n",
+               d, gnttab_frames, (unsigned long)PFN_DOWN(kinfo->gnttab_size));
+        return -EINVAL;
+    }
 
     /* See linux Documentation/devicetree/bindings/arm/xen.txt */
     res = fdt_begin_node(fdt, "hypervisor");
@@ -1750,6 +1760,9 @@ void __init evtchn_allocate(struct domain *d)
 static void __init find_gnttab_region(struct domain *d,
                                       struct kernel_info *kinfo)
 {
+    unsigned int gnttab_frames =
+        gnttab_resource_max_frames(d, XENMEM_resource_grant_table_id_shared);
+
     /*
      * The region used by Xen on the memory will never be mapped in DOM0
      * memory layout. Therefore it can be used for the grant table.
@@ -1758,7 +1771,8 @@ static void __init find_gnttab_region(struct domain *d,
      * enough space for a large grant table
      */
     kinfo->gnttab_start = __pa(_stext);
-    kinfo->gnttab_size = gnttab_dom0_frames() << PAGE_SHIFT;
+    kinfo->gnttab_size = min_t(unsigned int, gnttab_frames,
+                               PFN_DOWN(_etext - _stext)) << PAGE_SHIFT;
 
 #ifdef CONFIG_ARM_32
     /*
