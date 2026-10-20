@@ -1139,22 +1139,23 @@ static void svm_emul_swint_injection(struct x86_event *event)
     if ( !(vmcb_get_cr0(vmcb) & X86_CR0_PE) )
         goto raise_exception; /* TODO: support real-mode injection? */
 
+    /*
+     * In vm86 mode, INT $N is subject to IOPL.
+     *
+     * TODO: It is also subject to CR4.VME=1, which would require reading the
+     * TSS Software Interrupt Redirection bitmap.
+     */
+    if ( type == X86_ET_SW_INT &&
+         regs->eflags & X86_EFLAGS_VM &&
+         MASK_EXTR(regs->eflags, X86_EFLAGS_IOPL) != 3 )
+        goto raise_exception;
+
     idte_size   = lm ? 16 : 8;
     idte_offset = trap * idte_size;
 
     /* ICEBP sets the External Event bit despite being an instruction. */
     ec = (trap << 3) | X86_XEC_IDT |
          (type == X86_ET_PRIV_SW_EXC ? X86_XEC_EXT : 0);
-
-    /*
-     * TODO: This does not cover the v8086 mode with CR4.VME case
-     * correctly, but falls on the safe side from the point of view of a
-     * 32bit OS.  Someone with many TUITs can see about reading the TSS
-     * Software Interrupt Redirection bitmap.
-     */
-    if ( (regs->eflags & X86_EFLAGS_VM) &&
-         MASK_EXTR(regs->eflags, X86_EFLAGS_IOPL) != 3 )
-        goto raise_exception;
 
     /*
      * Read all 8/16 bytes so the idtr limit check is applied properly to
