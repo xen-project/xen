@@ -757,6 +757,18 @@ static int __init domain_p2m_set_allocation(struct domain *d, uint64_t mem,
     int rc;
 
     rc = dt_property_read_u32(node, "xen,domain-p2m-mem-mb", &p2m_mem_mb);
+
+    /* No dedicated pool (no limit) for a hardware domain on Arm */
+    if ( IS_ENABLED(CONFIG_ARM) && is_hardware_domain(d) )
+    {
+        if ( !rc )
+            return 0;
+
+        printk(XENLOG_ERR
+               "xen,domain-p2m-mem-mb cannot be specified for a hardware domain\n");
+        return -EINVAL;
+    }
+
     /* If xen,domain-p2m-mem-mb is not specified, use the default value. */
     p2m_pages = rc ?
                 p2m_mem_mb << (20 - PAGE_SHIFT) :

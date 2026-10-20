@@ -61,6 +61,10 @@ static void p2m_free_page(struct domain *d, struct page_info *pg)
 /* Return the size of the pool, in bytes. */
 int arch_get_paging_mempool_size(struct domain *d, uint64_t *size)
 {
+    /* No dedicated pool (no limit) for a hardware domain */
+    if ( is_hardware_domain(d) )
+        return -EOPNOTSUPP;
+
     *size = (uint64_t)ACCESS_ONCE(d->arch.paging.p2m_total_pages) << PAGE_SHIFT;
     return 0;
 }
@@ -69,6 +73,8 @@ int p2m_set_allocation(struct domain *d, unsigned long pages, bool can_preempt)
 {
     struct page_info *pg;
 
+    /* No dedicated pool (no limit) for a hardware domain */
+    ASSERT(!is_hardware_domain(d));
     ASSERT(spin_is_locked(&d->arch.paging.lock));
 
     for ( ; ; )
@@ -119,6 +125,10 @@ int arch_set_paging_mempool_size(struct domain *d, uint64_t size)
     unsigned long pages = size >> PAGE_SHIFT;
     int rc;
 
+    /* No dedicated pool (no limit) for a hardware domain */
+    if ( is_hardware_domain(d) )
+        return -EOPNOTSUPP;
+
     if ( (size & ~PAGE_MASK) ||          /* Non page-sized request? */
          pages != (size >> PAGE_SHIFT) ) /* 32-bit overflow? */
         return -EINVAL;
@@ -133,6 +143,10 @@ int arch_set_paging_mempool_size(struct domain *d, uint64_t size)
 int p2m_teardown_allocation(struct domain *d)
 {
     int ret = 0;
+
+    /* No dedicated pool - nothing to tear down */
+    if ( is_hardware_domain(d) )
+        return 0;
 
     spin_lock(&d->arch.paging.lock);
     if ( d->arch.paging.p2m_total_pages != 0 )

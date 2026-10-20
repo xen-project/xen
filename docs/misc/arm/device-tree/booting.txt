@@ -277,7 +277,9 @@ with the following properties:
     used for the domain P2M pool. This is in-sync with the shadow_memory
     option in xl.cfg. Leaving this field empty in device tree will lead to
     the default size of domain P2M pool, i.e. 1MB per guest vCPU plus 4KB
-    per MB of guest RAM plus 512KB for guest extended regions.
+    per MB of guest RAM plus 512KB for guest extended regions. On Arm, the
+    hardware domain has no dedicated P2M pool, so specifying this property
+    for it makes the domain fail to build.
 
 - max_grant_version
 
