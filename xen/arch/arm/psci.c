@@ -198,6 +198,7 @@ static int __init psci_init_0_2(void)
     {
         printk("Error: Unrecognized PSCI version %u.%u\n",
                PSCI_VERSION_MAJOR(psci_ver), PSCI_VERSION_MINOR(psci_ver));
+        psci_ver = 0;
         return -EOPNOTSUPP;
     }
 
