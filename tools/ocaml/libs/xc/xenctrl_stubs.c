@@ -257,8 +257,34 @@ CAMLprim value stub_xc_domain_create(value xch_val, value wanted_domid, value co
 	arch_domconfig = Field(VAL_ARCH, 0);
 	switch ( Tag_val(VAL_ARCH) )
 	{
-	case 0: /* ARM - nothing to do */
+	case 0: /* ARM */
+#if defined(__arm__) || defined(__aarch64__)
+	{
+		/* Quick & dirty check for ABI changes. */
+		BUILD_BUG_ON(sizeof(cfg) != 72);
+
+		/* Mnemonics for the named fields inside xen_arm_arch_domainconfig */
+#define VAL_GIC_VERSION         Field(arch_domconfig, 0)
+#define VAL_NR_SPIS             Field(arch_domconfig, 1)
+
+		uint8_t gic_version = Long_val(VAL_GIC_VERSION);
+		uint32_t nr_spis = Long_val(VAL_NR_SPIS);
+
+		if ( gic_version != Long_val(VAL_GIC_VERSION) )
+			caml_invalid_argument("gic_version");
+
+		if ( nr_spis != Long_val(VAL_NR_SPIS) )
+			caml_invalid_argument("nr_spis");
+
+		cfg.arch.gic_version = gic_version;
+		cfg.arch.nr_spis = nr_spis;
+
+#undef VAL_NR_SPIS
+#undef VAL_GIC_VERSION
+	}
+#else
 		caml_failwith("Unhandled: ARM");
+#endif
 		break;
 
 	case 1: /* X86 - emulation flags in the block */
