@@ -58,6 +58,11 @@ compat_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
         rc = 0;
         guest_from_compat_handle(v->runstate_guest.compat, area.addr.h);
 
+        /* NULL handle is deregistering the address. */
+        if ( compat_handle_is_null(area.addr.h) )
+            break;
+
+        /* Update the newly-registered runstate area, best-effort. */
         if ( v == current )
         {
             XLAT_vcpu_runstate_info(&info, &v->runstate);
