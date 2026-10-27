@@ -185,8 +185,14 @@ static int __init process_reserved_memory_node(const void *fdt, int node,
                                                u32 size_cells,
                                                void *data)
 {
-    int rc = process_memory_node(fdt, node, name, depth, address_cells,
-                                 size_cells, data);
+    int rc;
+
+    /* Only direct children of /reserved-memory describe memory regions */
+    if ( depth != 1 )
+        return 0;
+
+    rc = process_memory_node(fdt, node, name, depth, address_cells,
+                             size_cells, data);
 
     if ( rc == -ENOSPC )
         panic("Max number of supported reserved-memory regions reached.\n");
