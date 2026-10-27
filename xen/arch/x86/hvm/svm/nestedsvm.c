@@ -309,8 +309,10 @@ static int nsvm_vmrun_permissionmap(struct vcpu *v)
 
     ns_msrpm_ptr = (unsigned long *)svm->ns_cached_msrpm;
 
+    /* VMRUN ignores bits 11:0 of MSRPM_BASE_PA. */
     ret = hvm_copy_from_guest_phys(svm->ns_cached_msrpm,
-                                   ns_vmcb->_msrpm_base_pa, MSRPM_SIZE);
+                                   ns_vmcb->_msrpm_base_pa & PAGE_MASK,
+                                   MSRPM_SIZE);
     if ( ret != HVMTRANS_okay )
     {
         gdprintk(XENLOG_ERR, "hvm_copy_from_guest_phys msrpm %u\n", ret);
