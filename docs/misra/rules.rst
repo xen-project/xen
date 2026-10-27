@@ -435,9 +435,11 @@ maintainers if you want to suggest a change.
        and any other type
      - All conversions to integer types are permitted if the destination
        type has enough bits to hold the entire value. Conversions to bool
-       and void* are permitted. Conversions from 'void noreturn (*)(...)'
-       to 'void (*)(...)' are permitted. Conversions from [unsigned] long
-       or '(void *)' to a function pointer are permitted.
+       and '(void *)' are permitted. Conversions from a noreturn function
+       pointer to a function pointer with noreturn omitted but an otherwise
+       compatible signature are permitted.
+       Conversions from [unsigned] long or '(void *)' to a function pointer
+       are permitted.
        Example::
 
            unsigned long func_addr = (unsigned long)&some_function;

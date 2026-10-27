@@ -394,11 +394,12 @@ constant expressions are required.\""
 }
 -doc_end
 
--doc_begin="The conversion from 'void noreturn (*)(void *)' to 'void (*)(void *)' is safe
-because the semantics of the 'noreturn' attribute do not alter the calling convention or behavior of the resulting code."
+-doc_begin="The conversion from a noreturn function pointer to a function
+pointer with noreturn omitted but an otherwise compatible signature does
+not alter the calling convention."
 -config=MC3A2.R11.1,casts+={safe,
-  "kind(bitcast)&&to(type(pointer(inner(return(builtin(void))&&all_param(1, pointer(builtin(void)))))))&&from(expr(skip(!syntactic(),
-   ref(property(noreturn)))))"} 
+  "kind(bitcast)&&to(type(canonical(__function_pointer_types)))&&from(expr(skip(!syntactic(),
+   ref(property(noreturn)))))&&relation(compatible_deep_unqualified)"}
 -doc_end
 
 -doc_begin="The conversion from a pointer to an incomplete type to unsigned long does not lose any information, provided that the target type has enough bits to store it."

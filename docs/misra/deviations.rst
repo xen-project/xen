@@ -392,10 +392,14 @@ Deviations related to MISRA C:2012 Rules:
      - Tagged as `safe` for ECLAIR.
 
    * - R11.1
-     - The conversion from 'void noreturn (*)(...)' to 'void (*)(...)' is safe
-       because the semantics of the 'noreturn' attribute do not alter the calling
-       convention or behavior of the resulting code, parameters handling remain
-       consistent.
+     - The conversion from a noreturn function pointer to a function pointer
+       with noreturn omitted but an otherwise compatible signature does not
+       alter the calling convention. The callee does not return, so code
+       following a call through the resulting pointer is unreachable. The
+       compiler may delete that unreachable code when it can see that all
+       of the possible callees are noreturn, or it may leave the code in
+       place. Xen's behavior is the same in either case. Code left in place
+       is a tolerated violation of Rule 2.1.
      - Tagged as `safe` for ECLAIR.
 
    * - R11.2
