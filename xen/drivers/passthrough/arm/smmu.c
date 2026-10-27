@@ -825,7 +825,7 @@ static int arm_smmu_dt_add_device_legacy(struct arm_smmu_device *smmu,
 	if ( !dev_is_pci(dev) )
 	{
 		/* Xen: Let Xen know that the device is protected by an SMMU */
-		dt_device_set_protected(dev_node);
+		dt_device_set_protected(dev_node, true);
 	}
 
 	for (i = 0; i < fwspec->num_ids; ++i) {
@@ -862,7 +862,7 @@ static int arm_smmu_dt_remove_device_legacy(struct arm_smmu_device *smmu,
 
 	if ( !dev_is_pci(dev) )
 		/* Protected by dt_host_lock and dtdevs_lock as caller holds these locks. */
-		dev_node->is_protected = false;
+		dt_device_set_protected(dev_node, false);
 
 	kfree(master);
 	return 0;

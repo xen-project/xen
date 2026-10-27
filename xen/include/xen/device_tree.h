@@ -300,9 +300,10 @@ static inline domid_t dt_device_used_by(const struct dt_device_node *device)
     return device->used_by;
 }
 
-static inline void dt_device_set_protected(struct dt_device_node *device)
+static inline void dt_device_set_protected(struct dt_device_node *device,
+                                           bool protected)
 {
-    device->is_protected = true;
+    device->is_protected = protected;
 }
 
 static inline bool dt_device_is_protected(const struct dt_device_node *device)

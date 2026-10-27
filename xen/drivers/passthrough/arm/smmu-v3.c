@@ -1493,6 +1493,63 @@ static int arm_smmu_assign_dev(struct domain *d, u8 devfn, struct device *dev,
 static int arm_smmu_deassign_dev(struct domain *d, uint8_t devfn,
 				 struct device *dev);
 
+static int arm_smmu_remove_device(uint8_t devfn, struct device *dev)
+{
+	struct arm_smmu_master *master;
+	struct iommu_fwspec *fwspec;
+
+	fwspec = dev_iommu_fwspec_get(dev);
+	if ( !fwspec )
+		return -ENODEV;
+
+	master = dev_iommu_priv_get(dev);
+	if ( !master )
+		return -ENODEV;
+
+#ifdef CONFIG_HAS_PCI
+	if ( dev_is_pci(dev) )
+	{
+		struct pci_dev *pdev = dev_to_pci(dev);
+
+		/* Ignore calls for phantom functions */
+		if ( devfn != pdev->devfn )
+			return 0;
+
+		ASSERT(pcidevs_locked());
+
+		if ( arm_smmu_deassign_dev(pdev->domain, devfn, dev) )
+			dev_err(dev, "Removing anyway\n");
+
+		arm_smmu_disable_pasid(master);
+	}
+	else
+#endif
+	{
+		if ( !dt_device_is_protected(dev_to_dt(dev)) )
+		{
+			dev_err(dev, "Not added to SMMUv3\n");
+			return -ENODEV;
+		}
+
+		dt_device_set_protected(dev_to_dt(dev), false);
+		dev_iommu_priv_set(dev, NULL);
+	}
+
+	dev_info(dev, "Removed master device (SMMUv3 %s StreamIds %u)\n",
+		 dev_name(fwspec->iommu_dev), fwspec->num_ids);
+
+	xfree(master);
+
+	/*
+	 * For DT devices the fwspec is freed by iommu subsystem, but for PCI
+	 * devices we need to free it here
+	 */
+	if ( dev_is_pci(dev) )
+		iommu_fwspec_free(dev);
+
+	return 0;
+}
+
 static int arm_smmu_add_device(u8 devfn, struct device *dev)
 {
 	int i, ret;
@@ -1571,7 +1628,7 @@ static int arm_smmu_add_device(u8 devfn, struct device *dev)
 		}
 
 		/* Let Xen know that the master device is protected by an IOMMU. */
-		dt_device_set_protected(dev_to_dt(dev));
+		dt_device_set_protected(dev_to_dt(dev), true);
 	}
 
 	dev_info(dev, "Added master device (SMMUv3 %s StreamIds %u)\n",
@@ -2867,6 +2924,7 @@ static const struct iommu_ops arm_smmu_iommu_ops = {
 	.unmap_page		= arm_iommu_unmap_page,
 	.dt_xlate		= arm_smmu_dt_xlate,
 	.add_device		= arm_smmu_add_device,
+	.remove_device		= arm_smmu_remove_device,
 };
 
 static __init int arm_smmu_dt_init(struct dt_device_node *dev,
