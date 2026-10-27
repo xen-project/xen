@@ -171,7 +171,6 @@ static int __init device_tree_get_meminfo(const void *fdt, int node,
 }
 
 static int __init process_memory_node(const void *fdt, int node,
-                                      const char *name, int depth,
                                       u32 address_cells, u32 size_cells,
                                       struct membanks *mem)
 {
@@ -191,8 +190,7 @@ static int __init process_reserved_memory_node(const void *fdt, int node,
     if ( depth != 1 )
         return 0;
 
-    rc = process_memory_node(fdt, node, name, depth, address_cells,
-                             size_cells, data);
+    rc = process_memory_node(fdt, node, address_cells, size_cells, data);
 
     if ( rc == -ENOSPC )
         panic("Max number of supported reserved-memory regions reached.\n");
@@ -201,9 +199,7 @@ static int __init process_reserved_memory_node(const void *fdt, int node,
     return 0;
 }
 
-static int __init process_reserved_memory(const void *fdt, int node,
-                                          const char *name, int depth,
-                                          u32 address_cells, u32 size_cells)
+static int __init process_reserved_memory(const void *fdt, int node)
 {
     return device_tree_for_each_node(fdt, node,
                                      process_reserved_memory_node,
@@ -279,7 +275,6 @@ static void __init process_multiboot_node(const void *fdt, int node,
 }
 
 static int __init process_chosen_node(const void *fdt, int node,
-                                      const char *name,
                                       u32 address_cells, u32 size_cells)
 {
     const struct fdt_property *prop;
@@ -343,7 +338,6 @@ static int __init process_chosen_node(const void *fdt, int node,
 }
 
 static int __init process_domain_node(const void *fdt, int node,
-                                      const char *name,
                                       u32 address_cells, u32 size_cells)
 {
     const struct fdt_property *prop;
@@ -389,18 +383,17 @@ static int __init early_scan_node(const void *fdt,
      */
     if ( !efi_enabled(EFI_BOOT) &&
          device_tree_is_memory_node(fdt, node, depth) )
-        rc = process_memory_node(fdt, node, name, depth,
-                                 address_cells, size_cells, bootinfo_get_mem());
+        rc = process_memory_node(fdt, node, address_cells, size_cells,
+                                 bootinfo_get_mem());
     else if ( depth == 1 && !dt_node_cmp(name, "reserved-memory") )
-        rc = process_reserved_memory(fdt, node, name, depth,
-                                     address_cells, size_cells);
+        rc = process_reserved_memory(fdt, node);
     else if ( depth <= 3 && (device_tree_node_compatible(fdt, node, "xen,multiboot-module" ) ||
               device_tree_node_compatible(fdt, node, "multiboot,module" )))
         process_multiboot_node(fdt, node, name, address_cells, size_cells);
     else if ( depth == 1 && device_tree_node_matches(fdt, node, "chosen") )
-        rc = process_chosen_node(fdt, node, name, address_cells, size_cells);
+        rc = process_chosen_node(fdt, node, address_cells, size_cells);
     else if ( depth == 2 && device_tree_node_compatible(fdt, node, "xen,domain") )
-        rc = process_domain_node(fdt, node, name, address_cells, size_cells);
+        rc = process_domain_node(fdt, node, address_cells, size_cells);
     else if ( depth <= 3 && device_tree_node_compatible(fdt, node, "xen,domain-shared-memory-v1") )
         rc = process_shm_node(fdt, node, address_cells, size_cells);
 
