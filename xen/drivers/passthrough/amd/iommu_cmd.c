@@ -212,7 +212,7 @@ static void invalidate_iotlb_pages(struct amd_iommu *iommu,
 
     set_field_in_reg_u32(sflag, 0,
                          IOMMU_INV_IOTLB_PAGES_S_FLAG_MASK,
-                         IOMMU_INV_IOTLB_PAGES_S_FLAG_MASK, &entry);
+                         IOMMU_INV_IOTLB_PAGES_S_FLAG_SHIFT, &entry);
 
     set_field_in_reg_u32((u32)addr_lo >> PAGE_SHIFT, entry,
                          IOMMU_INV_IOTLB_PAGES_ADDR_LOW_MASK,
