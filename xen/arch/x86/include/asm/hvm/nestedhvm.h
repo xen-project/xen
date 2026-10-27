@@ -28,11 +28,14 @@ static inline bool nestedhvm_enabled(const struct domain *d)
     return IS_ENABLED(CONFIG_HVM) && (d->options & XEN_DOMCTL_CDF_nested_virt);
 }
 
-/* Nested VCPU */
+static inline bool nestedhvm_vcpu_in_guestmode(const struct vcpu *v)
+{
+    return vcpu_nestedhvm(v).nv_guestmode;
+}
+
 int nestedhvm_vcpu_initialise(struct vcpu *v);
 void nestedhvm_vcpu_destroy(struct vcpu *v);
 void nestedhvm_vcpu_reset(struct vcpu *v);
-bool nestedhvm_vcpu_in_guestmode(struct vcpu *v);
 #define nestedhvm_vcpu_enter_guestmode(v) \
     vcpu_nestedhvm(v).nv_guestmode = 1
 #define nestedhvm_vcpu_exit_guestmode(v)  \

@@ -15,13 +15,6 @@
 
 static unsigned long *shadow_io_bitmap[3];
 
-/* Nested VCPU */
-bool
-nestedhvm_vcpu_in_guestmode(struct vcpu *v)
-{
-    return vcpu_nestedhvm(v).nv_guestmode;
-}
-
 void
 nestedhvm_vcpu_reset(struct vcpu *v)
 {
