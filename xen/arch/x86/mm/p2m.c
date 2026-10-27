@@ -1547,7 +1547,11 @@ p2m_get_nestedp2m_locked(struct vcpu *v)
         p2m_lock(p2m);
 
         if ( p2m->np2m_base == np2m_base )
+        {
+            if ( nv->nv_flushp2m )
+                p2m_flush_table_locked(p2m);
             goto found;
+        }
 
         p2m_unlock(p2m);
     }
