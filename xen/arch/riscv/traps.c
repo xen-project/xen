@@ -195,12 +195,33 @@ void do_trap(struct cpu_user_regs *cpu_regs)
 {
     register_t pc = cpu_regs->sepc;
     unsigned long cause = csr_read(CSR_SCAUSE);
+    bool from_guest = cpu_regs->hstatus & HSTATUS_SPV;
+
+    /*
+     * A synchronous trap taken in Xen context may come from a probing access
+     * like csr_read_safe(), covered by an exception table entry which resumes
+     * execution past the faulting instruction.
+     *
+     * Traps taken from the guest must never be fixed up: sepc is then a guest
+     * address, which the guest could point at an address listed in the
+     * exception table, making Xen act on an entry fully under guest control.
+     *
+     * Interrupts must be excluded too: one taken at an address which happens
+     * to be listed in the exception table would otherwise be "fixed up" as if
+     * the access itself had faulted, silently skipping it.
+     *
+     * Returning early skips check_for_pcpu_work() below, which is correct:
+     * that only runs for traps taken from the guest.
+     */
+    if ( !from_guest && !(cause & CAUSE_IRQ_FLAG) &&
+         fixup_exception(cpu_regs) )
+        return;
 
     switch ( cause )
     {
     case CAUSE_VIRTUAL_SUPERVISOR_ECALL:
         /* CAUSE_VIRTUAL_SUPERVISOR_ECALL should come from VS-mode */
-        BUG_ON(!(cpu_regs->hstatus & HSTATUS_SPV));
+        BUG_ON(!from_guest);
 
         vsbi_handle_ecall(cpu_regs);
         break;
@@ -218,9 +239,6 @@ void do_trap(struct cpu_user_regs *cpu_regs)
 
             break;
         }
-
-        if ( fixup_exception(cpu_regs) )
-            break;
 
         fallthrough;
     default:
@@ -253,7 +271,7 @@ void do_trap(struct cpu_user_regs *cpu_regs)
         break;
     }
 
-    if ( cpu_regs->hstatus & HSTATUS_SPV )
+    if ( from_guest )
         check_for_pcpu_work();
 }
 
