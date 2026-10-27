@@ -20,3 +20,6 @@ accepted_rst="${ECLAIR_PROJECT_ROOT}/docs/misra/rules.rst"
 
 # Generate the list of linker-defined symbols (must be run after a Xen build)
 "${script_dir}/generate-linker-symbols.sh"
+
+# Hide every xen-syms linking pass except LAST_LINKING_PASS.
+"${script_dir}/generate-xen-syms-passes.sh"

@@ -37,7 +37,7 @@ their Standard Library equivalents."
 -doc_begin="Do not analyze intermediate linking artifacts, as they do not differ from their final
 counterparts for the purposes of MISRA C static analysis."
 -file_tag+={xen_efi_tmp, "^xen/\\.xen\\.efi\\.([01]|alt\\..*)$"}
--file_tag+={xen_syms_tmp, "^xen/\\.xen-syms\\.[013]$"}
+-eval_file=xen-syms-passes.ecl
 -frames+={hide, "kind(program)&&target(xen_syms_tmp||xen_efi_tmp)"}
 -doc_end
 
