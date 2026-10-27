@@ -591,35 +591,28 @@ static void p2m_set_pte_flags(pte_t *e, p2m_type_t t)
     e->pte |= PTE_USER;
 
     /*
-     * Two schemes to manage the A and D bits are defined:
-     *   • The Svade extension: when a virtual page is accessed and the A bit
-     *     is clear, or is written and the D bit is clear, a page-fault
-     *     exception is raised.
-     *   • When the Svade extension is not implemented, the following scheme
-     *     applies.
-     *     When a virtual page is accessed and the A bit is clear, the PTE is
-     *     updated to set the A bit. When the virtual page is written and the
-     *     D bit is clear, the PTE is updated to set the D bit. When G-stage
-     *     address translation is in use and is not Bare, the G-stage virtual
-     *     pages may be accessed or written by implicit accesses to VS-level
-     *     memory management data structures, such as page tables.
-     * Thereby to avoid a page-fault in case of Svade is available, it is
-     * necessary to set A and D bits.
+     * A RISC-V implementation can either:
+     * 1) Update the 'A' and 'D' PTE bits in hardware.
+     * 2) Generate a page fault when 'A' and/or 'D' is clear, so that
+     *    software can set them.
      *
-     * TODO: For now, it’s fine to simply set the A/D bits, since OpenSBI
-     *       delegates page faults to a lower privilege mode and so OpenSBI
-     *       isn't expect to handle page-faults occured in lower modes.
-     *       By setting the A/D bits here, page faults that would otherwise
-     *       be generated due to unset A/D bits will not occur in Xen.
+     * (1) needs nothing more as it is handled by hardware. For (2), set 'A'
+     * and 'D' up front: OpenSBI delegates such page faults to a lower
+     * privilege mode, so they would be raised in Xen, which has no handler
+     * for them.
      *
-     *       Currently, Xen on RISC-V does not make use of the information
-     *       that could be obtained from handling such page faults, which
-     *       could otherwise be useful for several use cases such as demand
-     *       paging, cache-flushing optimizations, memory access tracking,etc.
+     * If both Svade and Svadu are advertised and the CPU updates A/D in
+     * hardware, presetting them is harmless.
      *
-     *       To support the more general case and the optimizations mentioned
-     *       above, it would be better to stop setting the A/D bits here and
-     *       instead handle page faults that occur due to unset A/D bits.
+     * TODO: Xen on RISC-V currently makes no use of the information that
+     *       handling such page faults could provide, which would be useful
+     *       for several use cases such as demand paging, cache-flushing
+     *       optimizations, memory access tracking, etc.
+     *
+     *       To support the more general case and the optimizations
+     *       mentioned above, it would be better to stop setting the A/D
+     *       bits here and instead handle the page faults that occur due to
+     *       unset A/D bits.
      */
     if ( riscv_isa_extension_available(NULL, RISCV_ISA_EXT_svade) )
         e->pte |= PTE_ACCESSED | PTE_DIRTY;
