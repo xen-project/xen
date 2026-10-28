@@ -259,3 +259,30 @@ static void __init __constructor test_muldiv64(void)
     if ( res != 0xffffffffffffffffULL )
         panic("muldiv64(), expecting -1ULL, got %#"PRIx64"\n", res);
 }
+
+#include <xen/mm.h>
+
+/* Not really bitops, but here in lieu of any better location */
+static void __init test_order_from_pages(void)
+{
+    CHECK(get_order_from_pages, 1, 0);
+    CHECK(get_order_from_pages, 2, 1);
+    CHECK(get_order_from_pages, 3, 2);
+    CHECK(get_order_from_pages, 4, 2);
+    CHECK(get_order_from_pages, 5, 3);
+    CHECK(get_order_from_pages, 8, 3);
+    CHECK(get_order_from_pages, 9, 4);
+}
+
+static void __init test_order_from_bytes(void)
+{
+    CHECK(get_order_from_bytes, PAGE_SIZE - 1, 0);
+    CHECK(get_order_from_bytes, PAGE_SIZE,     0);
+    CHECK(get_order_from_bytes, PAGE_SIZE + 1, 1);
+}
+
+static void __init __constructor test_orders(void)
+{
+    test_order_from_pages();
+    test_order_from_bytes();
+}

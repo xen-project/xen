@@ -530,26 +530,16 @@ page_list_splice(struct page_list_head *list, struct page_list_head *head)
     list_for_each_entry_safe_reverse(pos, tmp, head, list)
 #endif
 
-static inline unsigned int get_order_from_bytes(paddr_t size)
+static always_inline unsigned int get_order_from_bytes(paddr_t size)
 {
-    unsigned int order;
-
     size = (size - 1) >> PAGE_SHIFT;
-    for ( order = 0; size; order++ )
-        size >>= 1;
 
-    return order;
+    return fls64(size);
 }
 
-static inline unsigned int get_order_from_pages(unsigned long nr_pages)
+static always_inline unsigned int get_order_from_pages(unsigned long nr_pages)
 {
-    unsigned int order;
-
-    nr_pages--;
-    for ( order = 0; nr_pages; order++ )
-        nr_pages >>= 1;
-
-    return order;
+    return flsl(nr_pages - 1);
 }
 
 #ifndef arch_free_heap_page
