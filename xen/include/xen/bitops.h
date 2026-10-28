@@ -389,14 +389,6 @@ extern unsigned long find_first_zero_bit(const unsigned long *addr,
                                          unsigned long size);
 #endif
 
-static inline int get_bitmask_order(unsigned int count)
-{
-    int order;
-    
-    order = fls(count);
-    return order;   /* We could be slightly more clever with -1 here... */
-}
-
 static inline int get_count_order(unsigned int count)
 {
     int order;
