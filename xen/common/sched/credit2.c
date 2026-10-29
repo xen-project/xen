@@ -3514,9 +3514,11 @@ runq_candidate(struct csched2_runqueue_data *rqd,
 
         /*
          * If this is on a different processor, don't pull it unless
-         * its credit is at least CSCHED2_MIGRATE_RESIST higher.
+         * its credit is at least CSCHED2_MIGRATE_RESIST higher, or the
+         * processor was tickled for it.
          */
         if ( sched_unit_master(svc->unit) != cpu
+             && svc->tickled_cpu != cpu
              && snext->credit + CSCHED2_MIGRATE_RESIST > svc->credit )
         {
             SCHED_STAT_CRANK(migrate_resisted);
