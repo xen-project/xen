@@ -2346,6 +2346,7 @@ static int cf_check hvmemul_write_cr(
 
     case 2:
         curr->arch.hvm.guest_cr[2] = val;
+        hvm_update_guest_cr(curr, 2);
         rc = X86EMUL_OKAY;
         break;
 
