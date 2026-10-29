@@ -595,7 +595,7 @@ static int ioreq_server_init(struct ioreq_server *s,
 
     rc = ioreq_server_alloc_rangesets(s, id);
     if ( rc )
-        return rc;
+        goto fail_rangesets;
 
     s->bufioreq_handling = bufioreq_handling;
 
@@ -614,6 +614,7 @@ static int ioreq_server_init(struct ioreq_server *s,
 
     ioreq_server_free_rangesets(s);
 
+ fail_rangesets:
     put_domain(s->emulator);
     return rc;
 }
