@@ -112,6 +112,7 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_t);
  *     VCPU was last scheduled to run.
  *  3. New code wants to prefer VCPUOP_register_runstate_phys_area, and only
  *     fall back to the operation here for backwards compatibility.
+ *  4. Passing a NULL handle will deregister the region.
  * @extra_arg == pointer to vcpu_register_runstate_memory_area structure.
  */
 #define VCPUOP_register_runstate_memory_area 5
