@@ -688,8 +688,6 @@ void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq)
 {
     struct irq_desc *irqd;
     struct msi_desc *msi_desc;
-    struct pci_dev *pdev;
-    struct msixtbl_entry *entry;
 
     ASSERT(rw_is_locked(&d->pci_lock));
     ASSERT(rw_is_write_locked(&d->event_lock));
@@ -702,22 +700,19 @@ void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq)
         return;
 
     msi_desc = irqd->msi_desc;
-    if ( !msi_desc )
-        goto out;
+    if ( msi_desc )
+    {
+        const struct pci_dev *pdev = msi_desc->dev;
+        struct msixtbl_entry *entry;
 
-    pdev = msi_desc->dev;
-
-    list_for_each_entry( entry, &d->arch.hvm.msixtbl_list, list )
-        if ( pdev == entry->pdev )
-            goto found;
-
-out:
-    spin_unlock_irq(&irqd->lock);
-    return;
-
-found:
-    if ( atomic_dec_and_test(&entry->refcnt) )
-        del_msixtbl_entry(entry);
+        list_for_each_entry( entry, &d->arch.hvm.msixtbl_list, list )
+            if ( pdev == entry->pdev )
+            {
+                if ( atomic_dec_and_test(&entry->refcnt) )
+                    del_msixtbl_entry(entry);
+                break;
+            }
+    }
 
     spin_unlock_irq(&irqd->lock);
 }
