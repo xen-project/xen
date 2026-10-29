@@ -901,9 +901,10 @@ p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, unsigned int count
 {
     mfn_t mfns[POD_SWEEP_STRIDE];
     p2m_type_t types[POD_SWEEP_STRIDE];
-    unsigned long *map[POD_SWEEP_STRIDE];
+    unsigned int check = 0;
+    const unsigned long *map;
     struct domain *d = p2m->domain;
-    unsigned int i, j, max_ref = 1;
+    unsigned int j, max_ref = 1;
 
     BUG_ON(count > POD_SWEEP_STRIDE);
 
@@ -911,8 +912,11 @@ p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, unsigned int count
     if ( paging_mode_shadow(d) )
         max_ref++;
 
-    /* First, get the gfn list, translate to mfns, and map the pages. */
-    for ( i = 0; i < count; i++ )
+    /*
+     * First, get the gfn list, translate to mfns, and check for being a
+     * plausible candidate.
+     */
+    for ( unsigned int i = 0; i < count; i++ )
     {
         p2m_access_t a;
 
@@ -921,9 +925,8 @@ p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, unsigned int count
 
         /*
          * If this is ram, and not a pagetable or a special page, and
-         * probably not mapped elsewhere, map it; otherwise, skip.
+         * probably not mapped elsewhere, check it; otherwise, skip.
          */
-        map[i] = NULL;
         if ( p2m_is_ram(types[i]) )
         {
             const struct page_info *pg = mfn_to_page(mfns[i]);
@@ -932,7 +935,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, unsigned int count
                  (pg->count_info & PGC_allocated) &&
                  !(pg->count_info & PGC_shadowed_pt) &&
                  ((pg->count_info & PGC_count_mask) <= max_ref) )
-                map[i] = map_domain_page(mfns[i]);
+                __set_bit(i, &check);
         }
     }
 
@@ -940,20 +943,23 @@ p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, unsigned int count
      * Then, go through and check for zeroed pages, removing write permission
      * for those with zeroes.
      */
-    for ( i = 0; i < count; i++ )
+    for_each_set_bit ( i, check )
     {
-        if ( !map[i] )
-            continue;
-
         /* Quick zero-check */
+        map = map_domain_page(mfns[i]);
         for ( j = 0; j < 16; j++ )
-            if ( *(map[i] + j) != 0 )
-                goto skip;
+            if ( map[j] != 0 )
+                break;
+        unmap_domain_page(map);
 
         /* Try to remove the page, restoring old mapping if it fails. */
-        if ( p2m_set_entry(p2m, gfns[i], INVALID_MFN, PAGE_ORDER_4K,
+        if ( j < 16 ||
+             p2m_set_entry(p2m, gfns[i], INVALID_MFN, PAGE_ORDER_4K,
                            p2m_populate_on_demand, p2m->default_access) )
-            goto skip;
+        {
+            __clear_bit(i, &check);
+            continue;
+        }
 
         /*
          * See if the page was successfully unmapped.  (Allow one refcount
@@ -961,6 +967,8 @@ p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, unsigned int count
          */
         if ( (mfn_to_page(mfns[i])->count_info & PGC_count_mask) > 1 )
         {
+            __clear_bit(i, &check);
+
             /*
              * If the previous p2m_set_entry call succeeded, this one shouldn't
              * be able to fail.  If it does, crashing the domain should be safe.
@@ -970,38 +978,27 @@ p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, unsigned int count
             {
                 ASSERT_UNREACHABLE();
                 domain_crash(d);
-                goto out_unmap;
+                return;
             }
-
-        skip:
-            unmap_domain_page(map[i]);
-            map[i] = NULL;
-
-            continue;
         }
     }
 
     p2m_tlb_flush_sync(p2m);
 
     /* Now check each page for real */
-    for ( i = 0; i < count; i++ )
+    for_each_set_bit ( i, check )
     {
-        if ( !map[i] )
-            continue;
-
-        for ( j = 0; j < (PAGE_SIZE / sizeof(*map[i])); j++ )
-            if ( *(map[i] + j) != 0 )
+        map = map_domain_page(mfns[i]);
+        for ( j = 0; j < (PAGE_SIZE / sizeof(*map)); j++ )
+            if ( map[j] != 0 )
                 break;
-
-        unmap_domain_page(map[i]);
-
-        map[i] = NULL;
+        unmap_domain_page(map);
 
         /*
          * See comment in p2m_pod_zero_check_superpage() re gnttab
          * check timing.
          */
-        if ( j < (PAGE_SIZE / sizeof(*map[i])) )
+        if ( j < (PAGE_SIZE / sizeof(*map)) )
         {
             /*
              * If the previous p2m_set_entry call succeeded, this one shouldn't
@@ -1012,14 +1009,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, unsigned int count
             {
                 ASSERT_UNREACHABLE();
                 domain_crash(d);
- out_unmap:
-                /*
-                 * Something went wrong, probably crashing the domain.  Unmap
-                 * everything and return.
-                 */
-                for ( i = 0; i < count; i++ )
-                    if ( map[i] )
-                        unmap_domain_page(map[i]);
+                return;
             }
         }
         else
