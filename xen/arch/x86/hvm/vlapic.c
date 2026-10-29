@@ -973,8 +973,8 @@ int vlapic_apicv_write(struct vcpu *v, unsigned int offset)
         if ( offset != APIC_SELF_IPI )
             return X86EMUL_UNHANDLEABLE;
 
-        offset = APIC_ICR;
-        val = APIC_DEST_SELF | (val & APIC_VECTOR_MASK);
+        vlapic_ipi(vlapic, APIC_DEST_SELF | (val & APIC_VECTOR_MASK), 0);
+        return X86EMUL_OKAY;
     }
 
     vlapic_reg_write(v, offset, val);
@@ -1050,9 +1050,8 @@ int guest_wrmsr_x2apic(struct vcpu *v, uint32_t msr, uint64_t val)
     case APIC_SELF_IPI:
         if ( val & ~APIC_VECTOR_MASK )
             return X86EMUL_EXCEPTION;
-        offset = APIC_ICR;
-        val = APIC_DEST_SELF | (val & APIC_VECTOR_MASK);
-        break;
+        vlapic_ipi(vlapic, APIC_DEST_SELF | (val & APIC_VECTOR_MASK), 0);
+        return X86EMUL_OKAY;
 
     case APIC_EOI:
     case APIC_ESR:
