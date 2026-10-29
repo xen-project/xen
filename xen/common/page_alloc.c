@@ -2941,7 +2941,7 @@ void unprepare_staticmem_pages(struct page_info *pg, unsigned long nr_mfns,
         if ( need_scrub )
         {
             /* TODO: asynchronous scrubbing for pages of static memory. */
-            scrub_one_page(pg);
+            scrub_one_page(&pg[i]);
         }
 
         pg[i].count_info |= PGC_static;
