@@ -136,7 +136,7 @@ bool handle_pio(uint16_t port, unsigned int size, int dir)
     default:
         gprintk(XENLOG_ERR, "Unexpected PIO status %d, port %#x %s 0x%0*x\n",
                 rc, port, dir == IOREQ_WRITE ? "write" : "read",
-                size * 2, data & ((1u << (size * 8)) - 1));
+                size * 2, data & (UINT32_MAX >> (32 - size * 8)));
         domain_crash(curr->domain);
         return false;
     }
