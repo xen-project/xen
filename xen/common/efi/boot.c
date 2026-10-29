@@ -783,8 +783,13 @@ static bool __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
     {
         file->addr = min(1UL << (32 + PAGE_SHIFT),
                          HYPERVISOR_VIRT_END - DIRECTMAP_VIRT_START);
-        /* For config files allocate an extra byte to put a NUL there. */
-        ret = efi_bs->AllocatePages(AllocateMaxAddress, EfiLoaderData,
+        /*
+         * For config files allocate an extra byte to put a NUL there.  There's
+         * also no constraint on addresses for them.
+         */
+        ret = efi_bs->AllocatePages(file != &cfg ? AllocateMaxAddress
+                                                 : AllocateAnyPages,
+                                    EfiLoaderData,
                                     PFN_UP(size + (file == &cfg)), &file->addr);
     }
     if ( EFI_ERROR(ret) )
@@ -836,7 +841,7 @@ static bool __init read_section(const EFI_LOADED_IMAGE *image,
     if ( file == &cfg && file->size && !iscntrl(file->str[file->size - 1]) )
     {
         EFI_PHYSICAL_ADDRESS addr;
-        EFI_STATUS ret = efi_bs->AllocatePages(AllocateMaxAddress,
+        EFI_STATUS ret = efi_bs->AllocatePages(AllocateAnyPages,
                                                EfiLoaderData,
                                                PFN_UP(file->size + 1), &addr);
 
