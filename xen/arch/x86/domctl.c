@@ -636,9 +636,9 @@ long arch_do_domctl(
             ret = -EPERM;
         else if ( is_iommu_enabled(d) )
         {
-            pcidevs_lock();
+            read_lock(&d->pci_lock);
             ret = pt_irq_create_bind(d, bind);
-            pcidevs_unlock();
+            read_unlock(&d->pci_lock);
 
             if ( ret < 0 )
                 printk(XENLOG_G_ERR "pt_irq_create_bind failed (%ld) for %pd\n",
@@ -670,9 +670,9 @@ long arch_do_domctl(
             ret = -EPERM;
         else if ( is_iommu_enabled(d) )
         {
-            pcidevs_lock();
+            read_lock(&d->pci_lock);
             ret = pt_irq_destroy_bind(d, bind);
-            pcidevs_unlock();
+            read_unlock(&d->pci_lock);
 
             if ( ret < 0 )
                 printk(XENLOG_G_ERR "pt_irq_destroy_bind failed (%ld) for %pd\n",
