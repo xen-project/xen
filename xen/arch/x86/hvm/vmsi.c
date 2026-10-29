@@ -1044,10 +1044,11 @@ void vpci_msix_arch_init_entry(struct vpci_msix_entry *entry)
 
 int vpci_msix_arch_print(const struct vpci_msix *msix)
 {
+    const struct pci_dev *pdev = msix->pdev;
     unsigned int i;
 
-    ASSERT(rw_is_locked(&msix->pdev->domain->pci_lock));
-    ASSERT(spin_is_locked(&msix->pdev->vpci->lock));
+    ASSERT(rw_is_locked(&pdev->domain->pci_lock));
+    ASSERT(spin_is_locked(&pdev->vpci->lock));
 
     for ( i = 0; i < msix->max_entries; i++ )
     {
@@ -1064,9 +1065,7 @@ int vpci_msix_arch_print(const struct vpci_msix *msix)
                entry->masked, entry->arch.pirq);
         if ( i && !(i % 64) )
         {
-            struct pci_dev *pdev = msix->pdev;
-
-            spin_unlock(&msix->pdev->vpci->lock);
+            spin_unlock(&pdev->vpci->lock);
             read_unlock(&pdev->domain->pci_lock);
             process_pending_softirqs();
 
