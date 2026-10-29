@@ -414,8 +414,8 @@ static int __init parse_ivmd_block(const struct acpi_ivrs_memory *ivmd_block)
         exclusion = true;
     else if ( ivmd_block->header.flags & ACPI_IVMD_UNITY )
     {
-        iw = ivmd_block->header.flags & ACPI_IVMD_READ;
-        ir = ivmd_block->header.flags & ACPI_IVMD_WRITE;
+        iw = ivmd_block->header.flags & ACPI_IVMD_WRITE;
+        ir = ivmd_block->header.flags & ACPI_IVMD_READ;
     }
     else
     {
