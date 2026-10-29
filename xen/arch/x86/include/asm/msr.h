@@ -47,7 +47,7 @@ static always_inline uint64_t rdmsr(unsigned int msr)
        val = a__ | ((u64)b__<<32); \
 } while(0)
 
-static inline void wrmsr(unsigned int msr, uint64_t val)
+static always_inline void wrmsr(unsigned int msr, uint64_t val)
 {
     uint32_t lo = val, hi = val >> 32;
 
@@ -56,7 +56,7 @@ static inline void wrmsr(unsigned int msr, uint64_t val)
 #define wrmsrl(msr, val) wrmsr(msr, val)
 
 /* Non-serialising WRMSR, when available.  Falls back to a serialising WRMSR. */
-static inline void wrmsrns(uint32_t msr, uint64_t val)
+static always_inline void wrmsrns(uint32_t msr, uint64_t val)
 {
     uint32_t lo = val, hi = val >> 32;
 
@@ -70,7 +70,7 @@ static inline void wrmsrns(uint32_t msr, uint64_t val)
 }
 
 /* rdmsr with exception handling */
-static inline int rdmsr_safe(unsigned int msr, uint64_t *val)
+static always_inline int rdmsr_safe(unsigned int msr, uint64_t *val)
 {
     uint64_t lo, hi;
 
@@ -111,7 +111,7 @@ static inline int rdmsr_safe(unsigned int msr, uint64_t *val)
 }
 
 /* wrmsr with exception handling */
-static inline int wrmsr_safe(unsigned int msr, uint64_t val)
+static always_inline int wrmsr_safe(unsigned int msr, uint64_t val)
 {
     uint32_t lo = val, hi = val >> 32;
 
