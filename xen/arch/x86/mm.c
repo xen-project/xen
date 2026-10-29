@@ -1085,6 +1085,7 @@ get_page_from_l1e(
  * more information.
  */
 #define PTF_partial_set           (1 << 0)
+#define PTF_recovery              (1 << 1)
 #define PTF_preemptible           (1 << 2)
 #define PTF_defer                 (1 << 3)
 #define PTF_retain_ref_on_restart (1 << 4)
@@ -2842,15 +2843,21 @@ static int _put_page_type(struct page_info *page, unsigned int flags,
          * *not* fully validated, continuing would almost certainly
          * open up a security hole.  An exception to this is during
          * domain destruction, where PGT_validated can be dropped
-         * without dropping a type ref.
+         * without dropping a type ref.  Another exception is on error
+         * paths from _get_page_type(), where the type ref was already
+         * put in place, but PGT_validated isn't set yet (page
+         * validation still pending).
          *
-         * If the latter, do nothing unless type PGT_partial is set.
-         * If it is set, the type count must be 1.
+         * In the domain destruction case, do nothing unless PGT_partial
+         * is set.  If it is set, the type count must be 1.
+         *
+         * In the _get_page_type() error path case operate normally,
+         * again also including the type count sanity check.
          */
-        if ( !(flags & PTF_partial_set) )
+        if ( !(flags & (PTF_partial_set | PTF_recovery)) )
             BUG_ON((x & PGT_partial) ||
                    !((x & PGT_validated) || page_get_owner(page)->is_dying));
-        else if ( !(x & PGT_partial) )
+        else if ( (flags & PTF_partial_set) && !(x & PGT_partial) )
             return 0;
         else
             BUG_ON((x & PGT_count_mask) != 1);
@@ -3127,7 +3134,7 @@ static int _get_page_type(struct page_info *page, unsigned long type,
 
             if ( unlikely(rc) )
             {
-                _put_page_type(page, 0, NULL);
+                _put_page_type(page, PTF_recovery, NULL);
                 goto out;
             }
         }
