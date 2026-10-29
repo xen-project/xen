@@ -239,9 +239,10 @@ int rangeset_remove_range(
             destroy_range(r, t);
         }
 
-        x->s = e + 1;
-        if ( x->s > x->e )
+        if ( x->e <= e )
             destroy_range(r, x);
+        else
+            x->s = e + 1;
     }
 
  out:
