@@ -3059,6 +3059,7 @@ void __init scheduler_init(void)
             printk("scheduler %s misses .%s, dropped\n", \
                    schedulers[i]->opt_name, #f);         \
             schedulers[i] = NULL;                        \
+            continue;                                    \
         }
 
         sched_test_func(init);
