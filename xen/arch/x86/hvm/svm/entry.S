@@ -57,6 +57,37 @@ __UNLIKELY_END(nsvm_hap)
 
         clgi
 
+        /*
+         * Interrupts need enabling prior to VMRUN.  Anywhere after CLGI is
+         * safe.
+         *
+         * On all Zen CPUs to date, VMRUN has a bug and mixes up the host and
+         * guest INTR_SHADOW state.  If there is a VMExit during VMRUN
+         * (e.g. taking NPT_FAULT during event injection), then the host's
+         * INTR_SHADOW gets written back into the VMCB, corrupting guest
+         * state.
+         *
+         * This is believed to go unnoticed for pre-FRED guests (injecting
+         * events cancels INTR_SHADOW), but FRED changes this behaviour to be
+         * able to observe and restore the shadow via the STB field in a FRED
+         * frame.
+         *
+         * In order to fix, arrange for Xen's INTR_SHADOW at the point of
+         * VMRUN to match the guest's INTR_SHADOW.  This way, if a VMExit
+         * occurs, the VMCB is corrupted with the "correct" value.
+         *
+         * Commonly the guest will not be in an INTR_SHADOW.  In this case,
+         * execute STI early to get Xen's INTR_SHADOW over and done with; the
+         * second STI does nothing as INTR_SHADOW only occurs when IF changes
+         * from 0 to 1.  If the guest is in an INTR_SHADOW, skip the early STI
+         * so the late STI does trigger INTR_SHADOW and cover VMRUN.
+         */
+        mov     VCPU_svm_vmcb(%rbx), %rax
+        testb   $1, VMCB_int_stat(%rax)
+        jnz     1f
+        sti
+1:
+
         /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
         /* SPEC_CTRL_EXIT_TO_SVM       Req: b=curr %rsp=regs/cpuinfo, Clob: acd */
         .macro svm_vmentry_spec_ctrl
@@ -73,14 +104,6 @@ __UNLIKELY_END(nsvm_hap)
         .endm
         ALTERNATIVE "", svm_vmentry_spec_ctrl, X86_FEATURE_SC_MSR_HVM
         ALTERNATIVE "", DO_SPEC_CTRL_DIV, X86_FEATURE_SC_DIV
-
-        /*
-         * Set EFLAGS.IF after CLGI covers us from real interrupts, but not
-         * immediately prior to VMRUN.  The VMRUN instruction leaks it's
-         * INTR_SHADOW into guest state if a VMExit occurs before VMRUN
-         * completes (e.g. taking #NPF during event injecting.)
-         */
-        sti
 
         pop  %r15
         pop  %r14
@@ -101,6 +124,7 @@ __UNLIKELY_END(nsvm_hap)
 
         SPEC_CTRL_COND_VERW     /* Req: %rsp=eframe                    Clob: efl */
 
+        sti
         vmrun
 
         SAVE_ALL

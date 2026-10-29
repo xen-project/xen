@@ -21,6 +21,10 @@
 # include "../boot/video.h"
 #endif
 
+#ifdef CONFIG_AMD_SVM
+# include <asm/hvm/svm/vmcb.h>
+#endif
+
 #define DEFINE(_sym, _val)                                                 \
     asm volatile ( "\n.ascii\"==>#define " #_sym " %0 /* " #_val " */<==\""\
                    :: "i" (_val) )
@@ -130,6 +134,11 @@ void __dummy__(void)
     OFFSET(VCPU_nhvm_guestmode, struct vcpu, arch.hvm.nvcpu.nv_guestmode);
     OFFSET(VCPU_nhvm_p2m, struct vcpu, arch.hvm.nvcpu.nv_p2m);
     OFFSET(VCPU_nsvm_hap_enabled, struct vcpu, arch.hvm.nvcpu.u.nsvm.ns_hap_enabled);
+    BLANK();
+#endif
+
+#ifdef CONFIG_AMD_SVM
+    OFFSET(VMCB_int_stat, struct vmcb_struct, int_stat);
     BLANK();
 #endif
 
