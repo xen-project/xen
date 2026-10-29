@@ -39,7 +39,7 @@ static inline void wrmsrl(unsigned int msr, uint64_t val)
 }
 
 /* Non-serialising WRMSR, when available.  Falls back to a serialising WRMSR. */
-static inline void wrmsr_ns(uint32_t msr, uint32_t lo, uint32_t hi)
+static always_inline void wrmsr_ns(uint32_t msr, uint32_t lo, uint32_t hi)
 {
     /*
      * WRMSR is 2 bytes.  WRMSRNS is 3 bytes.  Pad WRMSR with a redundant CS
@@ -67,7 +67,7 @@ static inline void wrmsr_ns(uint32_t msr, uint32_t lo, uint32_t hi)
     rc_; })
 
 /* wrmsr with exception handling */
-static inline int wrmsr_safe(unsigned int msr, uint64_t val)
+static always_inline int wrmsr_safe(unsigned int msr, uint64_t val)
 {
     int rc;
     uint32_t lo, hi;

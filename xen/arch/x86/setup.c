@@ -913,6 +913,11 @@ static void __init noreturn reinit_bsp_stack(void)
 
         wrmsrl(MSR_PL0_SSP,
                (unsigned long)stack + (PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8);
+        /*
+         * There must be no CALL or RET instructions between writing
+         * MSR_S_CET.SHSTK_EN and establishing SSP with SETSSBSY below.
+         * All helpers must be forced inline.
+         */
         wrmsrl(MSR_S_CET, xen_msr_s_cet_value());
         asm volatile ("setssbsy" ::: "memory");
 

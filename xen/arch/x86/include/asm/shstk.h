@@ -15,7 +15,7 @@
  */
 #define SSP_NO_SHSTK 1
 
-static inline unsigned long rdssp(void)
+static always_inline unsigned long rdssp(void)
 {
     unsigned long ssp;
 
@@ -24,7 +24,7 @@ static inline unsigned long rdssp(void)
     return ssp;
 }
 
-static inline void wrss(unsigned long val, unsigned long *ptr)
+static always_inline void wrss(unsigned long val, unsigned long *ptr)
 {
     asm ( "wrssq %[val], %[ptr]"
           : [ptr] "=m" (*ptr)
