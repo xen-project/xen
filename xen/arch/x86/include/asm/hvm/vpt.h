@@ -32,6 +32,7 @@ struct periodic_time {
     u8 irq;
     struct vcpu *vcpu;          /* vcpu timer interrupt delivers to */
     u32 pending_intr_nr;        /* pending timer interrupts */
+    uint64_t generation;        /* distinguish two armings of the same timer */
     u64 period;                 /* frequency in ns */
     s_time_t scheduled;         /* scheduled timer interrupt */
     u64 last_plt_gtime;         /* platform time when last IRQ is injected */
