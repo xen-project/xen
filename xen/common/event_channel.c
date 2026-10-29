@@ -681,6 +681,9 @@ static int evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     int            port = 0, rc;
     unsigned int   pirq = bind->pirq;
 
+    if ( is_hvm_domain(d) && !has_pirq(d) )
+        return -EOPNOTSUPP;
+
     if ( pirq >= d->nr_pirqs )
         return -EINVAL;
 

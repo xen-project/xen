@@ -2814,6 +2814,8 @@ int map_domain_emuirq_pirq(struct domain *d, int pirq, int emuirq)
     if ( !is_hvm_domain(d) )
         return -EINVAL;
 
+    ASSERT(has_pirq(d));
+
     if ( pirq < 0 || pirq >= d->nr_pirqs ||
             emuirq == IRQ_UNBOUND || emuirq >= (int) nr_irqs )
     {
