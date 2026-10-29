@@ -915,6 +915,11 @@ static void __init noreturn reinit_bsp_stack(void)
          */
         local_irq_disable();
 
+        /*
+         * There must be no CALL or RET instructions between writing
+         * MSR_S_CET.SHSTK_EN and establishing SSP with RSTORSSP or SETSSBSY
+         * below.  All helpers must be forced inline.
+         */
         wrmsrl(MSR_S_CET, xen_msr_s_cet_value());
 
         /*
