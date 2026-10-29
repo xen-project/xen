@@ -229,6 +229,7 @@ static int __init pvh_add_mem_range(struct domain *d, uint64_t s, uint64_t e,
         if ( rs == e && d->arch.e820[i].type == type )
         {
             d->arch.e820[i].addr = s;
+            d->arch.e820[i].size += e - s;
             return 0;
         }
 
