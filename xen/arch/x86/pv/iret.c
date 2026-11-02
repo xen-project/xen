@@ -31,8 +31,8 @@ static void async_exception_cleanup(struct vcpu *curr)
     if ( !curr->arch.async_exception_mask )
         return;
 
-    if ( !(curr->arch.async_exception_mask & (curr->arch.async_exception_mask - 1)) )
-        trap = __scanbit(curr->arch.async_exception_mask, VCPU_TRAP_NONE);
+    if ( !multiple_bits_set(curr->arch.async_exception_mask) )
+        trap = ffs(curr->arch.async_exception_mask) - 1;
     else
         for ( trap = VCPU_TRAP_NONE + 1; trap <= VCPU_TRAP_LAST; ++trap )
             if ( (curr->arch.async_exception_mask ^
