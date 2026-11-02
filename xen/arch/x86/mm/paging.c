@@ -932,7 +932,6 @@ void paging_update_nestedmode(struct vcpu *v)
         /* nested-on-nested */
         v->arch.paging.nestedmode = hap_paging_get_mode(v);
     else
-        /* TODO: shadow-on-shadow */
         v->arch.paging.nestedmode = NULL;
     hvm_asid_flush_vcpu(v);
 }

@@ -237,27 +237,10 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
     hvm_update_guest_cr(v, 2);
 
     /* CR3 */
-    /* Nested paging mode */
-    if ( nestedhvm_paging_mode_hap(v) )
-    {
-        /* host nested paging + guest nested paging. */
-        /* hvm_set_cr3() below sets v->arch.hvm.guest_cr[3] for us. */
-    }
-    else if ( !paging_mode_shadow(v->domain) )
-    {
-        /* host nested paging + guest shadow paging. */
-        /* hvm_set_cr3() below sets v->arch.hvm.guest_cr[3] for us. */
-    }
-    else
-    {
-        /* host shadow paging + guest shadow paging. */
+    /* Nested virt requires HAP, so L1 is never in shadow mode. */
+    BUG_ON(paging_mode_shadow(v->domain));
 
-        /* Reset MMU context  -- XXX (hostrestore) not yet working*/
-        if ( !pagetable_is_null(v->arch.guest_table) )
-            put_page(pagetable_get_page(v->arch.guest_table));
-        v->arch.guest_table = pagetable_null();
-        /* hvm_set_cr3() below sets v->arch.hvm.guest_cr[3] for us. */
-    }
+    /* hvm_set_cr3() below sets v->arch.hvm.guest_cr[3] for us. */
     rc = hvm_set_cr3(n1vmcb->_cr3, false, true);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(X86_EXC_GP, 0);
@@ -519,10 +502,13 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     v->arch.hvm.guest_cr[2] = ns_vmcb->_cr2;
     hvm_update_guest_cr(v, 2);
 
+    /* Nested virt requires HAP, so L1 is never in shadow mode. */
+    BUG_ON(paging_mode_shadow(v->domain));
+
     /* Nested paging mode */
     if ( nestedhvm_paging_mode_hap(v) )
     {
-        /* host nested paging + guest nested paging. */
+        /* Nested paging. */
         vmcb_set_np(n2vmcb, true);
 
         nestedsvm_vmcb_set_nestedp2m(v, ns_vmcb, n2vmcb);
@@ -534,13 +520,14 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
         if ( rc != X86EMUL_OKAY )
             gdprintk(XENLOG_ERR, "hvm_set_cr3 failed, rc: %u\n", rc);
     }
-    else if ( !paging_mode_shadow(v->domain) )
+    else
     {
-        /* host nested paging + guest shadow paging. */
+        /* Shadow paging. */
         vmcb_set_np(n2vmcb, true);
         /* Keep h_cr3 as it is. */
         n2vmcb->_h_cr3 = n1vmcb->_h_cr3;
-        /* When l1 guest does shadow paging
+        /*
+         * When l1 guest does shadow paging
          * we assume it intercepts page faults.
          */
         /* hvm_set_cr3() below sets v->arch.hvm.guest_cr[3] for us. */
@@ -549,16 +536,6 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
             hvm_inject_hw_exception(X86_EXC_GP, 0);
         if ( rc != X86EMUL_OKAY )
             gdprintk(XENLOG_ERR, "hvm_set_cr3 failed, rc: %u\n", rc);
-    }
-    else
-    {
-        /* host shadow paging + guest shadow paging. */
-        vmcb_set_np(n2vmcb, false);
-        n2vmcb->_h_cr3 = 0x0;
-
-        /* TODO: Once shadow-shadow paging is in place come back to here
-         * and set host_vmcb->_cr3 to the shadowed shadow table.
-         */
     }
 
     /* DRn */
@@ -1032,35 +1009,35 @@ nsvm_vmcb_prepare4vmexit(struct vcpu *v, struct cpu_user_regs *regs)
 
     ns_vmcb->event_inj.raw = 0;
 
+    /* Nested virt requires HAP, so L1 is never in shadow mode. */
+    BUG_ON(paging_mode_shadow(v->domain));
+
     /* Nested paging mode */
     if ( nestedhvm_paging_mode_hap(v) )
     {
-        /* host nested paging + guest nested paging. */
+        /* Nested paging. */
         vmcb_set_np(ns_vmcb, vmcb_get_np(n2vmcb));
         ns_vmcb->_cr3 = n2vmcb->_cr3;
-        /* The vmcb->h_cr3 is the shadowed h_cr3. The original
+        /*
+         * The vmcb->h_cr3 is the shadowed h_cr3. The original
          * unshadowed guest h_cr3 is kept in ns_vmcb->h_cr3,
-         * hence we keep the ns_vmcb->h_cr3 value. */
-    }
-    else if ( !paging_mode_shadow(v->domain) )
-    {
-        /* host nested paging + guest shadow paging. */
-        vmcb_set_np(ns_vmcb, false);
-        /* Throw h_cr3 away. Guest is not allowed to set it or
-         * it can break out, otherwise (security hole!) */
-        ns_vmcb->_h_cr3 = 0x0;
-        /* Stop intercepting #PF (already done above
-         * by restoring cached intercepts). */
-        ns_vmcb->_cr3 = n2vmcb->_cr3;
+         * hence we keep the ns_vmcb->h_cr3 value.
+         */
     }
     else
     {
-        /* host shadow paging + guest shadow paging. */
+        /* Shadow paging. */
         vmcb_set_np(ns_vmcb, false);
+        /*
+         * Throw h_cr3 away. Guest is not allowed to set it or
+         * it can break out, otherwise (security hole!)
+         */
         ns_vmcb->_h_cr3 = 0x0;
-        /* The vmcb->_cr3 is the shadowed cr3. The original
-         * unshadowed guest cr3 is kept in ns_vmcb->_cr3,
-         * hence we keep the ns_vmcb->_cr3 value. */
+        /*
+         * Stop intercepting #PF (already done above
+         * by restoring cached intercepts).
+         */
+        ns_vmcb->_cr3 = n2vmcb->_cr3;
     }
 
     /* LBR virtualization - keep lbr control as is */
@@ -1262,40 +1239,35 @@ nestedsvm_check_intercepts(struct vcpu *v, struct cpu_user_regs *regs,
         return NESTEDHVM_VMEXIT_HOST;
 
     case VMEXIT_NPF:
+        /* Nested virt requires HAP, so L1 is never in shadow mode. */
+        BUG_ON(paging_mode_shadow(v->domain));
+
         if ( nestedhvm_paging_mode_hap(v) )
         {
+            /* Nested paging. */
             if ( !is_intercepted )
                 return NESTEDHVM_VMEXIT_FATALERROR;
-            /* host nested paging + guest nested paging */
             return NESTEDHVM_VMEXIT_HOST;
         }
-        if ( !paging_mode_shadow(v->domain) )
-        {
-            if ( is_intercepted )
-                return NESTEDHVM_VMEXIT_FATALERROR;
-            /* host nested paging + guest shadow paging */
-            return NESTEDHVM_VMEXIT_HOST;
-        }
-        /* host shadow paging + guest shadow paging */
-        /* Can this happen? */
-        BUG();
+
+        /* Shadow paging. */
+        if ( is_intercepted )
+            return NESTEDHVM_VMEXIT_FATALERROR;
+        return NESTEDHVM_VMEXIT_HOST;
 
     case VMEXIT_EXCEPTION_PF:
-        if ( nestedhvm_paging_mode_hap(v) )
-        {
-            /* host nested paging + guest nested paging */
-            if ( !is_intercepted )
-                /* l1 guest intercepts #PF unnecessarily */
-                return NESTEDHVM_VMEXIT_HOST;
-            /* l2 guest intercepts #PF unnecessarily */
-            return NESTEDHVM_VMEXIT_INJECT;
-        }
-        if ( paging_mode_shadow(v->domain) )
-            /* host shadow paging + guest shadow paging */
-            return NESTEDHVM_VMEXIT_HOST;
+        /* Nested virt requires HAP, so L1 is never in shadow mode. */
+        BUG_ON(paging_mode_shadow(v->domain));
 
-        /* host nested paging + guest shadow paging */
+        /*
+         * Nested paging and L1 doesn't intercept #PF: it is L0's business.
+         * Otherwise (L2 intercepts #PF unnecessarily, or uses shadow
+         * paging) hand it to L1.
+         */
+        if ( nestedhvm_paging_mode_hap(v) && !is_intercepted )
+            return NESTEDHVM_VMEXIT_HOST;
         return NESTEDHVM_VMEXIT_INJECT;
+
     case VMEXIT_VMMCALL:
         /* Always let the guest handle VMMCALL/VMCALL */
         return NESTEDHVM_VMEXIT_INJECT;
@@ -1568,7 +1540,6 @@ void svm_nested_features_on_efer_update(struct vcpu *v)
     if ( nsvm_efer_svm_enabled(v) )
     {
         if ( !vmcb->virt_ext.fields.vloadsave_enable &&
-             !paging_mode_shadow(v->domain) &&
              cpu_has_svm_vloadsave )
         {
             vmcb->virt_ext.fields.vloadsave_enable = 1;
