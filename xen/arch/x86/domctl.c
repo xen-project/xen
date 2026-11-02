@@ -584,7 +584,7 @@ long arch_do_domctl(
         {
         case XEN_DOMCTL_SENDTRIGGER_NMI:
             ret = 0;
-            if ( !test_and_set_bool(v->arch.nmi_pending) )
+            if ( !test_and_set_bool(v->arch.nmi_state.pending) )
                 vcpu_kick(v);
             break;
 

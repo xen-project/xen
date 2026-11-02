@@ -316,7 +316,7 @@ void vpmu_do_interrupt(void)
         vlapic_set_irq(vlapic, vlapic_lvtpc & APIC_VECTOR_MASK, 0);
         break;
     case APIC_DM_NMI:
-        sampling->arch.nmi_pending = true;
+        sampling->arch.nmi_state.pending = true;
         break;
     }
 #endif

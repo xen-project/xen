@@ -356,7 +356,7 @@ static void vlapic_accept_irq(struct vcpu *v, uint32_t icr_low)
         break;
 
     case APIC_DM_NMI:
-        if ( !test_and_set_bool(v->arch.nmi_pending) )
+        if ( !test_and_set_bool(v->arch.nmi_state.pending) )
         {
             bool wake = false;
 

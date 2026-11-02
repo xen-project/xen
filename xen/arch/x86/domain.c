@@ -1684,7 +1684,7 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( !guest_handle_is_null(arg) )
             return -EINVAL;
 
-        if ( !test_and_set_bool(v->arch.nmi_pending) )
+        if ( !test_and_set_bool(v->arch.nmi_state.pending) )
             vcpu_kick(v);
         break;
 

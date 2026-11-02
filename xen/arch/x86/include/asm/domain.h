@@ -47,9 +47,6 @@ unsigned int arch_domain_struct_memflags(void);
 #define nmi_state              async_exception_state(VCPU_TRAP_NMI)
 #define mce_state              async_exception_state(VCPU_TRAP_MCE)
 
-#define nmi_pending            nmi_state.pending
-#define mce_pending            mce_state.pending
-
 struct trap_bounce {
     uint32_t      error_code;
     uint8_t       flags; /* TBF_ */
