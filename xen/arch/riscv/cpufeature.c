@@ -20,6 +20,7 @@
 
 #include <asm/cpufeature.h>
 #include <asm/csr.h>
+#include <asm/fixmap.h>
 
 #ifdef CONFIG_ACPI
 # error "cpufeature.c functions should be updated to support ACPI"
@@ -200,6 +201,7 @@ static const struct riscv_isa_ext_entry __initconstrel riscv_isa_ext[] = {
     RISCV_ISA_EXT_ENTRY(ssaia,          ANY),
     RISCV_ISA_EXT_ENTRY(sstc,           NONE),
     RISCV_ISA_EXT_ENTRY(svade,          NONE),
+    RISCV_ISA_EXT_ENTRY(svadu,          NONE),
     RISCV_ISA_EXT_ENTRY(svpbmt,         NONE),
 };
 
@@ -630,6 +632,51 @@ const char *get_guest_isa_str(void)
     return guest_isa_str;
 }
 
+/*
+ * Probe whether hardware updates the PTE A/D bits by reading through an alias
+ * mapping whose A and D bits are clear. Observing A set, even by a speculative
+ * access, implies Svadu, as Svade only allows A to be set by software.
+ */
+static bool __init probe_hw_ad_update(void)
+{
+    vaddr_t va = FIXMAP_ADDR(FIX_MISC);
+    pte_t *entry = &xen_fixmap[FIX_MISC];
+    bool a_set = false;
+
+    ASSERT(!pte_is_valid(*entry));
+
+    /*
+     * set_fixmap() can't be used, as pt_update_entry() always sets A and D.
+     *
+     * A and D belong to the PTE, not to the page, so a new PTE with A and D
+     * clear can point to any RAM page, whatever its other mappings. Use the
+     * first page of the Xen image, and map it read-only so that Xen can't be
+     * corrupted through this alias.
+     */
+    write_pte(entry, pte_from_mfn(maddr_to_mfn(virt_to_maddr(_start)),
+                                  PTE_VALID | PTE_READABLE));
+    flush_tlb_one_local(va);
+
+    /* Read from the alias, handling page fault */
+    asm_inline goto (
+        "1: lw zero, 0(%[va])\n"
+        ASM_EXTABLE(1b, %l[out])
+        :
+        : [va] "r" (va)
+        : "memory"
+        : out );
+
+    /* Check to see if hardware set A. */
+    RISCV_FENCE(r, r);
+    a_set = read_pte(entry).pte & PTE_ACCESSED;
+
+ out:
+    write_pte(entry, (pte_t){});
+    flush_tlb_one_local(va);
+
+    return a_set;
+}
+
 void __init riscv_fill_hwcap(void)
 {
     unsigned int i;
@@ -673,6 +720,28 @@ void __init riscv_fill_hwcap(void)
         printk(XENLOG_WARNING
                "Zihintpause unavailable: cpu_relax() gives the CPU no hint; "
                "wire up this platform's pause equivalent in cpu_relax()\n");
+
+    /*
+     * The privileged spec allows exactly two schemes for updating the PTE A
+     * and D bits:
+     *  1) hardware sets them on access and on write;
+     *  2) accessing a page whose A and/or D bit is clear raises a page fault,
+     *     so that software can set them (ratified as Svade).
+     *
+     * Every implementation uses one of them, but may predate the extensions
+     * and advertise neither. In that case, trust the hardware probe.
+     */
+    if ( !riscv_isa_extension_available(NULL, RISCV_ISA_EXT_svade) &&
+         !riscv_isa_extension_available(NULL, RISCV_ISA_EXT_svadu) )
+    {
+        bool hw_update = probe_hw_ad_update();
+
+        __set_bit(hw_update ? RISCV_ISA_EXT_svadu : RISCV_ISA_EXT_svade,
+                  riscv_isa);
+        printk(XENLOG_WARNING
+               "Svade/Svadu missing from \"riscv,isa\" - probed as %s\n",
+               hw_update ? "svadu" : "svade");
+    }
 
     for ( i = 0; i < req_extns_amount; i++ )
     {
