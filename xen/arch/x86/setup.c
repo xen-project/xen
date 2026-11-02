@@ -1916,15 +1916,16 @@ void asmlinkage __init noreturn __start_xen(void)
 
     numa_initmem_init(0, raw_max_page);
 
+    if ( !highmem_start )
+        xenheap_max_mfn(virt_to_mfn(HYPERVISOR_VIRT_END - 1));
+
+    end_boot_allocator();
+    system_state = SYS_STATE_boot;
+
     if ( max_page - 1 > virt_to_mfn(HYPERVISOR_VIRT_END - 1) )
     {
         unsigned long lo = virt_to_mfn(HYPERVISOR_VIRT_END - 1);
         uint64_t mask = PAGE_SIZE - 1;
-
-        if ( !highmem_start )
-            xenheap_max_mfn(lo);
-
-        end_boot_allocator();
 
         /* Pass the remaining memory in (lo, max_page) to the allocator. */
         for ( i = 0; i < boot_e820.nr_map; i++ )
@@ -1944,10 +1945,6 @@ void asmlinkage __init noreturn __start_xen(void)
             init_domheap_pages(s, e);
         }
     }
-    else
-        end_boot_allocator();
-
-    system_state = SYS_STATE_boot;
 
     bsp_stack = cpu_alloc_stack(0); /* Needs to know IDT vs FRED */
     if ( !bsp_stack )
