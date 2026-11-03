@@ -901,6 +901,12 @@ int arch_domain_create(struct domain *d,
 
     psr_domain_init(d);
 
+    if ( (d->arch.perdomain_l3_pg = allocate_perdomain_l3(d)) == NULL )
+    {
+        rc = -ENOMEM;
+        goto fail;
+    }
+
     if ( is_hvm_domain(d) )
     {
         if ( (rc = hvm_domain_initialise(d, config)) != 0 )
