@@ -3031,10 +3031,10 @@ static bool_t gnttab_copy_buf_valid(const struct gnttab_copy_ptr *p,
                                     const struct gnttab_copy_buf *b,
                                     bool_t has_gref)
 {
-    if ( !b->virt )
+    if ( !b->virt || b->have_grant != has_gref )
         return 0;
     if ( has_gref )
-        return b->have_grant && p->u.ref == b->ptr.u.ref;
+        return p->u.ref == b->ptr.u.ref;
     return p->u.gmfn == b->ptr.u.gmfn;
 }
 
