@@ -56,7 +56,6 @@
 
 #include "mce.h"
 #include "x86_mca.h"
-#include "mce_amd.h"
 #include "mcaction.h"
 #include "vmce.h"
 
@@ -101,7 +100,7 @@ mc_ec2type(uint16_t errorcode)
     return 0;
 }
 
-bool cf_check mc_amd_recoverable_scan(uint64_t status)
+static bool cf_check mc_amd_recoverable_scan(uint64_t status)
 {
     bool ret = false;
     enum mc_ec_type ectype;
@@ -131,7 +130,8 @@ bool cf_check mc_amd_recoverable_scan(uint64_t status)
     return ret;
 }
 
-bool cf_check mc_amd_addrcheck(uint64_t status, uint64_t misc, int addrtype)
+static bool cf_check mc_amd_addrcheck(uint64_t status, uint64_t misc,
+                                      int addrtype)
 {
     enum mc_ec_type ectype;
     uint16_t errorcode;
