@@ -451,6 +451,14 @@ write or not"
 -config=MC3A2.R11.8,reports+={safe,"any_area(any_loc(file(hvm_guestcopy)&&text(^.*__hvm_copy.*HVMCOPY_to_guest doesn't modify.*$)))"}
 -doc_end
 
+-doc_begin="Functions bsearch(), memchr(), strchr(), strpbrk(), strrchr() and
+strstr() accept a const pointer/object and return a non-const pointer to the
+matched element or byte, matching their standard C library interfaces. The
+casts in these implementations strip const so that a search of a non-const
+object yields a mutable pointer. This use is deemed safe."
+-config=MC3A2.R11.8,reports+={safe,"any_area(any_loc(file(^xen/include/xen/bsearch\\.h$||^xen/lib/(memchr|str+chr|strpbrk|strstr)\\.c$)))"}
+-doc_end
+
 -doc_begin="This construct is used to check if the type is scalar, and for this purpose the use of 0 as a null pointer constant is deliberate."
 -config=MC3A2.R11.9,reports+={deliberate, "any_area(any_loc(any_exp(macro(^__ACCESS_ONCE$))))"
 }

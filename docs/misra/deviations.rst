@@ -440,6 +440,15 @@ Deviations related to MISRA C:2012 Rules:
        readability.
      - Tagged as `safe` for ECLAIR.
 
+   * - R11.8
+     - Functions bsearch(), memchr(), strchr(), strpbrk(), strrchr() and
+       strstr() accept a const pointer/object and return a non-const pointer
+       to the matched element or byte, matching their standard C library
+       interfaces. The casts in these implementations strip const so that a
+       search of a non-const object yields a mutable pointer. This use is
+       deemed safe.
+     - Tagged as `safe` for ECLAIR.
+
    * - R11.9
      - __ACCESS_ONCE uses an integer, which happens to be zero, as a
        compile time check. The typecheck uses a cast. The usage of zero or other

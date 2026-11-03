@@ -475,7 +475,11 @@ maintainers if you want to suggest a change.
    * - `Rule 11.8 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_11_08.c>`_
      - Required
      - A cast shall not remove any const or volatile qualification from the type pointed to by a pointer
-     -
+     - Some standard C library-style functions are inherently double-use,
+       accepting a const argument and returning a non-const pointer into
+       it so that callers searching a non-const object get back a
+       mutable pointer. The casts that implement this are deviated per
+       function.
 
    * - `Rule 11.9 <https://gitlab.com/MISRA/MISRA-C/MISRA-C-2012/Example-Suite/-/blob/master/R_11_09.c>`_
      - Required
