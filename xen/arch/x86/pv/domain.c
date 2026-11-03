@@ -319,12 +319,6 @@ static int pv_create_gdt_ldt_l1tab(struct vcpu *v)
                                     NULL);
 }
 
-static void pv_destroy_gdt_ldt_l1tab(struct vcpu *v)
-{
-    destroy_perdomain_mapping(v->domain, GDT_VIRT_START(v),
-                              1U << GDT_LDT_VCPU_SHIFT);
-}
-
 void pv_vcpu_destroy(struct vcpu *v)
 {
     if ( is_pv_32bit_vcpu(v) )
@@ -333,7 +327,6 @@ void pv_vcpu_destroy(struct vcpu *v)
         release_compat_l4(v);
     }
 
-    pv_destroy_gdt_ldt_l1tab(v);
     XFREE(v->arch.pv.trap_ctxt);
 }
 
@@ -380,9 +373,6 @@ int pv_vcpu_initialise(struct vcpu *v)
 void pv_domain_destroy(struct domain *d)
 {
     pv_l1tf_domain_destroy(d);
-
-    destroy_perdomain_mapping(d, GDT_LDT_VIRT_START,
-                              GDT_LDT_MBYTES << (20 - PAGE_SHIFT));
 
     XFREE(d->arch.pv.cpuidmasks);
 
