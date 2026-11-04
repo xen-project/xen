@@ -104,7 +104,7 @@ struct amd_iommu_dte {
     /* 0 - 63 */
     bool v:1;
     bool tv:1;
-    unsigned int :5;
+    unsigned int rsvd:5;
     unsigned int had:2;
 #define IOMMU_MAX_PT_LEVELS 6
     unsigned int paging_mode:3;
