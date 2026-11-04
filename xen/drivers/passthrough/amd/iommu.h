@@ -54,7 +54,6 @@ typedef struct cmd_entry
 struct table_struct {
     void *buffer;
     unsigned long entries;
-    unsigned long alloc_size;
 };
 
 struct ring_buffer {
