@@ -207,7 +207,7 @@ static void cf_check timer_interrupt(int irq, void *dev_id)
     if ( hpet_legacy_irq_tick() )
         return;
 
-    /* Only for start-of-day interruopt tests in io_apic.c. */
+    /* Only for start-of-day interrupt tests in io_apic.c. */
     pit0_ticks++;
 
     /* Rough hack to allow accurate timers to sort-of-work with no APIC. */
