@@ -33,7 +33,7 @@ void *memcpy(void *dest, const void *src, size_t n);
 void *memmove(void *dest, const void *src, size_t n);
 int memcmp(const void *cs, const void *ct, size_t count);
 void *memchr(const void *s, int c, size_t n);
-void *memchr_inv(const void *s, int c, size_t n);
+const void *memchr_inv(const void *s, int c, size_t n);
 
 #include <asm/string.h>
 
