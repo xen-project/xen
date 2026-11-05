@@ -57,7 +57,7 @@ static inline void *maddr_to_virt(paddr_t ma)
 /**
  * Find the virtual address corresponding to a machine address
  *
- * The directmap covers all conventional memory accesible by the
+ * The directmap covers all conventional memory accessible by the
  * hypervisor. This means it's subject to PDX compression.
  *
  * Note there's an extra offset applied (directmap_base_pdx) on top of the

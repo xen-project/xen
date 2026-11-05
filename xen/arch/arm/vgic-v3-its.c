@@ -1561,7 +1561,7 @@ void vgic_v3_its_free_domain(struct domain *d)
 {
     struct virt_its *pos, *temp;
 
-    /* Cope with unitialized vITS */
+    /* Cope with uninitialized vITS */
     if ( list_head_is_null(&d->arch.vgic.vits_list) )
         return;
 

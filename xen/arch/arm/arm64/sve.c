@@ -131,7 +131,7 @@ void sve_context_free(struct vcpu *v)
     sve_vl_bits = sve_decode_vl(v->domain->arch.sve_vl);
 
     /*
-     * Currenly points to the end of Z0-Z31 memory which is not the start of
+     * Currently points to the end of Z0-Z31 memory which is not the start of
      * the buffer. To be kept in sync with the sve_context_init().
      */
     v->arch.vfp.sve_zreg_ctx_end -=

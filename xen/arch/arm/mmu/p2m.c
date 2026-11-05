@@ -1105,7 +1105,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
          * It is necessary to flush the TLB before writing the new entry
          * to keep coherency when the previous entry was valid.
          *
-         * Although, it could be defered when only the permissions are
+         * Although, it could be deferred when only the permissions are
          * changed (e.g in case of memaccess).
          */
         if ( lpae_is_valid(orig_pte) )

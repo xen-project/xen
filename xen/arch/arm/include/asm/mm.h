@@ -194,7 +194,7 @@ bool flags_has_rwx(unsigned int flags);
 extern void *early_fdt_map(paddr_t fdt_paddr);
 /* Remove early mappings */
 extern void remove_early_mappings(void);
-/* Prepare the memory subystem to bring-up the given secondary CPU */
+/* Prepare the memory subsystem to bring-up the given secondary CPU */
 extern int prepare_secondary_mm(int cpu);
 /* Map a frame table */
 void init_frametable(paddr_t ram_start);
@@ -271,7 +271,7 @@ static inline uint64_t gvirt_to_maddr(vaddr_t va, paddr_t *pa,
 
 /*
  * We define non-underscored wrappers for above conversion functions.
- * These are overriden in various source files while underscored version
+ * These are overridden in various source files while underscored version
  * remain intact.
  */
 #define virt_to_mfn(va)     __virt_to_mfn(va)

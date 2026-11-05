@@ -160,7 +160,7 @@ lpae_t mfn_to_xen_entry(mfn_t mfn, unsigned int attr)
          * Outer Non-cacheable, must have a resultant shareability attribute
          * of Outer Shareable, otherwise shareability is UNPREDICTABLE.
          *
-         * On ARMv8 sharability is ignored and explicitly treated as Outer
+         * On ARMv8 shareability is ignored and explicitly treated as Outer
          * Shareable for Normal Inner Non_cacheable, Outer Non-cacheable.
          */
         e.pt.sh = LPAE_SH_OUTER;
@@ -171,7 +171,7 @@ lpae_t mfn_to_xen_entry(mfn_t mfn, unsigned int attr)
          * Shareability is ignored for non-Normal memory, Outer is as
          * good as anything.
          *
-         * On ARMv8 sharability is ignored and explicitly treated as Outer
+         * On ARMv8 shareability is ignored and explicitly treated as Outer
          * Shareable for any device memory type.
          */
         e.pt.sh = LPAE_SH_OUTER;

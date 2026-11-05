@@ -358,7 +358,7 @@ extern void vgic_check_inflight_irqs_pending(struct vcpu *v,
 /* Maximum number of IRQs supported by vGIC */
 #define VGIC_MAX_IRQS 992U
 
-/* Default number of vGIC SPIs. 32 are substracted to cover local IRQs. */
+/* Default number of vGIC SPIs. 32 are subtracted to cover local IRQs. */
 #define VGIC_DEF_NR_SPIS (min(gic_number_lines(), VGIC_MAX_IRQS) - 32)
 
 static inline unsigned int vgic_def_nr_spis(void)

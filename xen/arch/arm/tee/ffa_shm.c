@@ -482,7 +482,7 @@ static int read_mem_transaction(uint32_t ffa_vers, const void *buf, size_t blen,
 
     /*
      * We're doing a rough check to see that no information is lost when
-     * tranfering the values into a struct ffa_mem_transaction_int below.
+     * transferring the values into a struct ffa_mem_transaction_int below.
      * The fields in struct ffa_mem_transaction_int are wide enough to hold
      * any valid value so being out of range means that something is wrong.
      */

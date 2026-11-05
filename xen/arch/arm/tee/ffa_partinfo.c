@@ -269,7 +269,7 @@ static int32_t ffa_get_vm_partinfo(struct ffa_uuid uuid, uint32_t start_index,
      * Workaround for Linux FF-A Driver not accepting to have its own
      * entry in the list before FF-A v1.2 was supported.
      * This workaround is generally acceptable for other implementations
-     * as the specification was not completely clear on wether or not
+     * as the specification was not completely clear on whether or not
      * the requester endpoint information should be included or not
      */
     if ( ACCESS_ONCE(curr_ctx->guest_vers) >= FFA_VERSION_1_2 )

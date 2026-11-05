@@ -32,7 +32,7 @@ static struct domain __read_mostly *scmi_dom;
 
 /*
  * Check if provided SMC Function Identifier matches the one known by the SCMI
- * layer, as read from DT prop 'arm,smc-id' during initialiation.
+ * layer, as read from DT prop 'arm,smc-id' during initialization.
  */
 static bool scmi_is_valid_smc_id(uint32_t fid)
 {

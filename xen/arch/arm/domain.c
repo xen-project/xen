@@ -1047,7 +1047,7 @@ static int relinquish_memory(struct domain *d, struct page_list_head *list)
  * logically restart work from this point.
  *
  * PROGRESS() markers must not be in the middle of loops. The loop
- * variable isn't preserved accross a continuation.
+ * variable isn't preserved across a continuation.
  *
  * To avoid redundant work, there should be a marker before each
  * function which may return -ERESTART.

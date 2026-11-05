@@ -32,7 +32,7 @@ void domain_vuart_free(struct domain *d);
 static inline int domain_vuart_init(struct domain *d)
 {
     /*
-     * The vUART is unconditionally inialized for the hw domain. So we
+     * The vUART is unconditionally initialized for the hw domain. So we
      * can't return an error.
      */
     return 0;

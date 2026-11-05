@@ -151,7 +151,7 @@
 /*
  * The minimum GICC_BPR is required to be in the range 0-3. We set
  * GICC_BPR to 0 but we must expect that it might be 3. This means we
- * can rely on premption between the following ranges:
+ * can rely on preemption between the following ranges:
  * 0xf0..0xff
  * 0xe0..0xdf
  * 0xc0..0xcf
@@ -162,7 +162,7 @@
  *
  * Priorities within a range will not preempt each other.
  *
- * A GIC must support a mimimum of 16 priority levels.
+ * A GIC must support a minimum of 16 priority levels.
  */
 #define GIC_PRI_LOWEST     0xf0U
 #define GIC_PRI_IRQ        0xa0U

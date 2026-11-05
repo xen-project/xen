@@ -359,7 +359,7 @@ read_as_zero:
 
 read_impl_defined:
     printk(XENLOG_G_DEBUG
-           "%pv: vGICD: RAZ on implemention defined register offset %#08x\n",
+           "%pv: vGICD: RAZ on implementation defined register offset %#08x\n",
            v, gicd_reg);
     *r = 0;
     return 1;

@@ -347,7 +347,7 @@
 #define CONTEXTIDR      p15,0,c13,c0,1  /* Context ID Register */
 #define TPIDRURW        p15,0,c13,c0,2  /* Software Thread ID, User, R/W */
 #define TPIDRURO        p15,0,c13,c0,3  /* Software Thread ID, User, R/O */
-#define TPIDRPRW        p15,0,c13,c0,4  /* Software Thread ID, Priveleged */
+#define TPIDRPRW        p15,0,c13,c0,4  /* Software Thread ID, Privileged */
 #define HTPIDR          p15,4,c13,c0,2  /* HYp Software Thread Id Register */
 
 /* CP15 CR14:  */

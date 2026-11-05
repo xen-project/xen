@@ -142,8 +142,8 @@ typedef uint64_t   UINTN;
 // RUNTIME_CODE - pragma macro for declaring runtime code
 //
 
-#ifndef EFIAPI                  // Forces EFI calling conventions reguardless of compiler options
-        #define EFIAPI          // Substitute expresion to force C calling convention
+#ifndef EFIAPI                  // Forces EFI calling conventions regardless of compiler options
+        #define EFIAPI          // Substitute expression to force C calling convention
 #endif
 
 #define BOOTSERVICE
@@ -163,7 +163,7 @@ typedef uint64_t   UINTN;
 
 
 //
-// When build similiar to FW, then link everything together as
+// When build is similar to FW, then link everything together as
 // one big module.
 //
 

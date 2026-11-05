@@ -21,7 +21,7 @@
  * Unsupported FF-A interfaces:
  * o FFA_MSG_POLL and FFA_MSG_SEND - deprecated in FF-A-1.1-REL0
  * o FFA_MEM_RETRIEVE_* - Used when sharing memory from an SP to a VM
- * o FFA_MEM_DONATE_* and FFA_MEM_LEND_* - Used when tranferring ownership
+ * o FFA_MEM_DONATE_* and FFA_MEM_LEND_* - Used when transferring ownership
  *   or access of a memory region
  * o FFA_MSG_SEND2 and FFA_MSG_WAIT - Used for indirect messaging
  *

@@ -71,7 +71,7 @@ static bool fill_revision(struct cpu_user_regs *regs, uint32_t major,
 static bool fill_function_call_count(struct cpu_user_regs *regs, uint32_t cnt)
 {
     /*
-     * Function call count is retuned as any other return value in register r0
+     * Function call count is returned as any other return value in register r0
      * (ARM DEN 0028B page 17)
      */
     set_user_reg(regs, 0, cnt);
