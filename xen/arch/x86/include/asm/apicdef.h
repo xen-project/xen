@@ -25,7 +25,7 @@
 #define			APIC_ARBPRI_MASK	0xFF
 #define		APIC_PROCPRI	0xA0
 #define		APIC_EOI	0xB0
-#define			APIC_EIO_ACK		0x0		/* Write this to the EOI register */
+#define			APIC_EOI_ACK		0x0		/* Docs say use 0 for future compatibility */
 #define		APIC_RRR	0xC0
 #define		APIC_LDR	0xD0
 #define			APIC_LDR_MASK		(0xFFu<<24)

@@ -155,8 +155,7 @@ void apic_wait_icr_idle(void);
 
 static inline void ack_APIC_irq(void)
 {
-	/* Docs say use 0 for future compatibility */
-	apic_write(APIC_EOI, 0);
+	apic_write(APIC_EOI, APIC_EOI_ACK);
 }
 
 extern int get_maxlvt(void);
