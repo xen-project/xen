@@ -385,28 +385,28 @@ typedef union
 
 struct vmcb_struct {
     /* Control area */
-    uint32_t _cr_intercepts;         /* offset 0x00 - cleanbit 0 */
-    uint32_t _dr_intercepts;         /* offset 0x04 - cleanbit 0 */
-    uint32_t _exception_intercepts;  /* offset 0x08 - cleanbit 0 */
-    uint32_t _general1_intercepts;   /* offset 0x0C - cleanbit 0 */
-    uint32_t _general2_intercepts;   /* offset 0x10 - cleanbit 0 */
-    uint32_t _general3_intercepts;   /* offset 0x14 - cleanbit 0 */
-    uint32_t res01[9];
-    uint16_t _pause_filter_thresh;   /* offset 0x3C - cleanbit 0 */
-    uint16_t _pause_filter_count;    /* offset 0x3E - cleanbit 0 */
-    uint64_t _iopm_base_pa;          /* offset 0x40 - cleanbit 1 */
-    uint64_t _msrpm_base_pa;         /* offset 0x48 - cleanbit 1 */
-    uint64_t _tsc_offset;            /* offset 0x50 - cleanbit 0 */
-    uint32_t _asid;                  /* offset 0x58 - cleanbit 2 */
-    uint8_t  tlb_control;            /* offset 0x5C - TLB_CTRL_* */
+    uint32_t _cr_intercepts;             /* 0x000 - Clean.intercepts(0) */
+    uint32_t _dr_intercepts;             /* 0x004   | */
+    uint32_t _exception_intercepts;      /* 0x008   | */
+    uint32_t _general1_intercepts;       /* 0x00c   | */
+    uint32_t _general2_intercepts;       /* 0x010   | */
+    uint32_t _general3_intercepts;       /* 0x014   | */
+    uint32_t res01[9];                   /* 0x018   | */
+    uint16_t _pause_filter_thresh;       /* 0x03c   | */
+    uint16_t _pause_filter_count;        /* 0x03e   v */
+    uint64_t _iopm_base_pa;              /* 0x040 - Clean.iopm(1) */
+    uint64_t _msrpm_base_pa;             /* 0x048   v */
+    uint64_t _tsc_offset;                /* 0x050 - Clean.intercepts(0) */
+    uint32_t _asid;                      /* 0x058 - Clean.asid(2) */
+    uint8_t  tlb_control;                /* 0x05c - TLB_CTRL_* */
     uint8_t  res07[3];
-    vintr_t _vintr;             /* offset 0x60 - cleanbit 3 */
-    intstat_t int_stat;         /* offset 0x68 */
-    uint64_t exitcode;               /* offset 0x70 */
+    vintr_t _vintr;                      /* 0x060 - Clean.tpr(3) */
+    intstat_t int_stat;                  /* 0x068 */
+    uint64_t exitcode;                   /* 0x070 */
     union {
         struct {
-            uint64_t exitinfo1; /* offset 0x78 */
-            uint64_t exitinfo2; /* offset 0x80 */
+            uint64_t exitinfo1;          /* 0x078 */
+            uint64_t exitinfo2;          /* 0x080 */
         };
         union {
             struct {
@@ -454,8 +454,8 @@ struct vmcb_struct {
             } task_switch;
         } ei;
     };
-    intinfo_t exit_int_info;    /* offset 0x88 */
-    union {                     /* offset 0x90 - cleanbit 4 */
+    intinfo_t exit_int_info;             /* 0x088 */
+    union {                              /* 0x090 - Clean.np(4) */
         struct {
             bool _np        :1;
             bool _sev       :1;
@@ -467,72 +467,72 @@ struct vmcb_struct {
         uint64_t _np_ctrl;
     };
     uint64_t res08[2];
-    intinfo_t event_inj;        /* offset 0xA8 */
-    uint64_t _h_cr3;            /* offset 0xB0 - cleanbit 4 */
-    virt_ext_t virt_ext;        /* offset 0xB8 */
-    vmcbcleanbits_t cleanbits;  /* offset 0xC0 */
-    uint32_t res09;             /* offset 0xC4 */
-    uint64_t nextrip;           /* offset 0xC8 */
-    uint8_t  guest_ins_len;     /* offset 0xD0 */
-    uint8_t  guest_ins[15];     /* offset 0xD1 */
-    uint64_t res10a[8];         /* offset 0xE0 */
-    uint16_t bus_lock_count;    /* offset 0x120 */
-    uint16_t res10b[3];         /* offset 0x122 */
-    uint64_t res10c[91];        /* offset 0x128 pad to save area */
+    intinfo_t event_inj;                 /* 0x0a8 */
+    uint64_t _h_cr3;                     /* 0x0b0 - Clean.np(4) */
+    virt_ext_t virt_ext;                 /* 0x0b8 */
+    vmcbcleanbits_t cleanbits;           /* 0x0c0 */
+    uint32_t :32;
+    uint64_t nextrip;                    /* 0x0c8 */
+    uint8_t  guest_ins_len;              /* 0x0d0 */
+    uint8_t  guest_ins[15];              /* 0x0d1 */
+    uint64_t res10a[8];
+    uint16_t bus_lock_count;             /* 0x120 */
+    uint16_t res10b[3];
+    uint64_t res10c[91];
 
-    /* State Save area */
+    /* State Save area, offset 0x400 */
     union {
         struct segment_register sreg[6];
         struct {
-            struct segment_register es;  /* offset 0x400 - cleanbit 8 */
-            struct segment_register cs;  /* cleanbit 8 */
-            struct segment_register ss;  /* cleanbit 8 */
-            struct segment_register ds;  /* cleanbit 8 */
-            struct segment_register fs;
-            struct segment_register gs;
+            struct segment_register es;  /* 0x400 + 0x000 - Clean.seg(8) */
+            struct segment_register cs;  /* 0x400 + 0x010   | */
+            struct segment_register ss;  /* 0x400 + 0x020   | */
+            struct segment_register ds;  /* 0x400 + 0x030   v */
+            struct segment_register fs;  /* 0x400 + 0x040 */
+            struct segment_register gs;  /* 0x400 + 0x050 */
         };
     };
-    struct segment_register gdtr; /* cleanbit 7 */
-    struct segment_register ldtr;
-    struct segment_register idtr; /* cleanbit 7 */
-    struct segment_register tr;
+    struct segment_register gdtr;        /* 0x400 + 0x060 - Clean.dt(7) */
+    struct segment_register ldtr;        /* 0x400 + 0x070 */
+    struct segment_register idtr;        /* 0x400 + 0x080 - Clean.dt(7) */
+    struct segment_register tr;          /* 0x400 + 0x090 */
     uint64_t res10[5];
     uint8_t res11[3];
-    uint8_t _cpl;               /* cleanbit 8 */
-    uint32_t res12;
-    uint64_t _efer;             /* offset 0x400 + 0xD0 - cleanbit 5 */
+    uint8_t _cpl;                        /* 0x400 + 0x0cb - Clean.seg(8) */
+    uint32_t :32;
+    uint64_t _efer;                      /* 0x400 + 0x0d0 - Clean.cr(5) */
     uint64_t res13[14];
-    uint64_t _cr4;              /* offset 0x400 + 0x148 - cleanbit 5 */
-    uint64_t _cr3;              /* cleanbit 5 */
-    uint64_t _cr0;              /* cleanbit 5 */
-    uint64_t _dr7;              /* cleanbit 6 */
-    uint64_t _dr6;              /* cleanbit 6 */
-    uint64_t rflags;
-    uint64_t rip;
+    uint64_t _cr4;                       /* 0x400 + 0x148 - Clean.cr(5) */
+    uint64_t _cr3;                       /* 0x400 + 0x150   | */
+    uint64_t _cr0;                       /* 0x400 + 0x158   v */
+    uint64_t _dr7;                       /* 0x400 + 0x160 - Clean.dr(6) */
+    uint64_t _dr6;                       /* 0x400 + 0x168   v */
+    uint64_t rflags;                     /* 0x400 + 0x170 */
+    uint64_t rip;                        /* 0x400 + 0x178 */
     uint64_t res14[11];
-    uint64_t rsp;
-    uint64_t _msr_s_cet;        /* offset 0x400 + 0x1E0 - cleanbit 12 */
-    uint64_t _ssp;              /* offset 0x400 + 0x1E8   | */
-    uint64_t _msr_isst;         /* offset 0x400 + 0x1F0   v */
-    uint64_t rax;
-    uint64_t star;
-    uint64_t lstar;
-    uint64_t cstar;
-    uint64_t sfmask;
-    uint64_t kerngsbase;
-    uint64_t sysenter_cs;
-    uint64_t sysenter_esp;
-    uint64_t sysenter_eip;
-    uint64_t _cr2;              /* cleanbit 9 */
+    uint64_t rsp;                        /* 0x400 + 0x1d8 */
+    uint64_t _msr_s_cet;                 /* 0x400 + 0x1e0 - Clean.cet(12) */
+    uint64_t _ssp;                       /* 0x400 + 0x1e8   | */
+    uint64_t _msr_isst;                  /* 0x400 + 0x1f0   v */
+    uint64_t rax;                        /* 0x400 + 0x1f8 */
+    uint64_t star;                       /* 0x400 + 0x200 */
+    uint64_t lstar;                      /* 0x400 + 0x208 */
+    uint64_t cstar;                      /* 0x400 + 0x210 */
+    uint64_t sfmask;                     /* 0x400 + 0x218 */
+    uint64_t kerngsbase;                 /* 0x400 + 0x220 */
+    uint64_t sysenter_cs;                /* 0x400 + 0x228 */
+    uint64_t sysenter_esp;               /* 0x400 + 0x230 */
+    uint64_t sysenter_eip;               /* 0x400 + 0x238 */
+    uint64_t _cr2;                       /* 0x400 + 0x240 - Clean.cr2(9) */
     uint64_t res16[4];
-    uint64_t _g_pat;            /* cleanbit 4 */
-    uint64_t _debugctlmsr;      /* cleanbit 10 */
-    uint64_t _lastbranchfromip; /* cleanbit 10 */
-    uint64_t _lastbranchtoip;   /* cleanbit 10 */
-    uint64_t _lastintfromip;    /* cleanbit 10 */
-    uint64_t _lastinttoip;      /* cleanbit 10 */
+    uint64_t _g_pat;                     /* 0x400 + 0x268 - Clean.np(4) */
+    uint64_t _debugctlmsr;               /* 0x400 + 0x270 - Clean.lbr(10) */
+    uint64_t _lastbranchfromip;          /* 0x400 + 0x278   | */
+    uint64_t _lastbranchtoip;            /* 0x400 + 0x280   | */
+    uint64_t _lastintfromip;             /* 0x400 + 0x288   | */
+    uint64_t _lastinttoip;               /* 0x400 + 0x290   v */
     uint64_t res17[9];
-    uint64_t spec_ctrl;
+    uint64_t spec_ctrl;                  /* 0x400 + 0x2e0 */
     uint64_t res18[291];
 };
 
