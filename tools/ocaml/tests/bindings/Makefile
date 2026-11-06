@@ -10,7 +10,7 @@ OCAMLINCLUDE += \
 	-I $(OCAML_TOPLEVEL)/libs/xc \
 	-I $(OCAML_TOPLEVEL)/libs/eventchn
 
-LIBS = \
+BINDINGSLIBS = \
 	unix.cmxa \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/mmap $(OCAML_TOPLEVEL)/libs/mmap/xenmmap.cmxa \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/eventchn $(OCAML_TOPLEVEL)/libs/eventchn/xeneventchn.cmxa \
@@ -21,7 +21,7 @@ LIBS = \
 PROGRAMS = test-ocaml-bindings
 OCAML_PROGRAM = test-ocaml-bindings
 
-test-ocaml-bindings_LIBS = $(LIBS)
+test-ocaml-bindings_LIBS = $(BINDINGSLIBS)
 test-ocaml-bindings_MLSORTED = $(shell $(OCAMLDEP) -sort $(OBJS:=.ml))
 test-ocaml-bindings_OBJS = $(test-ocaml-bindings_MLSORTED:.ml=)
 
