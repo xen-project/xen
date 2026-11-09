@@ -5,7 +5,7 @@
 #include <xen/notifier.h>
 #include <xen/sched.h>
 
-extern struct acpi_processor_power *processor_powers[];
+extern struct acpi_processor_power **processor_powers;
 
 extern void (*pm_idle_save)(void);
 

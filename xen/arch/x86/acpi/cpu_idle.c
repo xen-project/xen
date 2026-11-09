@@ -44,6 +44,7 @@
 #include <xen/smp.h>
 #include <xen/softirq.h>
 #include <xen/trace.h>
+#include <xen/xvmalloc.h>
 
 #include <asm/apic.h>
 #include <asm/cpuidle.h>
@@ -149,7 +150,7 @@ custom_param("max_cstate", parse_cstate);
 static bool __read_mostly local_apic_timer_c2_ok;
 boolean_param("lapic_timer_c2_ok", local_apic_timer_c2_ok);
 
-struct acpi_processor_power *__read_mostly processor_powers[NR_CPUS];
+struct acpi_processor_power **__read_mostly processor_powers;
 
 /*
  * This field starts out as zero, and can be set to -1 just to signal it has
@@ -447,7 +448,9 @@ static void cf_check dump_cx(unsigned char key)
 
 static int __init cf_check cpu_idle_key_init(void)
 {
-    register_keyhandler('c', dump_cx, "dump ACPI Cx structures", 1);
+    if ( processor_powers )
+        register_keyhandler('c', dump_cx, "dump ACPI Cx structures", 1);
+
     return 0;
 }
 __initcall(cpu_idle_key_init);
@@ -1339,6 +1342,9 @@ long set_cx_pminfo(uint32_t acpi_id, struct xen_processor_power *power)
     if ( vendor_override > 0 )
         return 0;
 
+    if ( !processor_powers )
+        return -ENOMEM;
+
     print_cx_pminfo(acpi_id, power);
 
     cpu_id = get_cpu_id(acpi_id);
@@ -1512,12 +1518,14 @@ static void amd_cpuidle_init(struct acpi_processor_power *power)
 #ifdef CONFIG_PM_STATS
 uint32_t pmstat_get_cx_nr(unsigned int cpu)
 {
-    return processor_powers[cpu] ? processor_powers[cpu]->count : 0;
+    return processor_powers && processor_powers[cpu]
+           ? processor_powers[cpu]->count : 0;
 }
 
 int pmstat_get_cx_stat(unsigned int cpu, struct pm_cx_stat *stat)
 {
-    struct acpi_processor_power *power = processor_powers[cpu];
+    struct acpi_processor_power *power = processor_powers
+                                         ? processor_powers[cpu] : NULL;
     uint64_t idle_usage = 0, idle_res = 0;
     uint64_t last_state_update_tick, current_stime, current_tick;
     uint64_t usage[ACPI_PROCESSOR_MAX_POWER] = { 0 };
@@ -1693,6 +1701,15 @@ static int __init cf_check cpuidle_presmp_init(void)
 
     if ( !xen_cpuidle )
         return 0;
+
+    processor_powers = xvzalloc_array(struct acpi_processor_power *,
+                                      nr_cpu_ids);
+    if ( !processor_powers )
+    {
+        printk("CPUIDLE: disabled - not enough memory\n");
+        xen_cpuidle = 0;
+        return -ENOMEM;
+    }
 
     mwait_idle_init(&cpu_nfb);
     cpu_nfb.notifier_call(&cpu_nfb, CPU_UP_PREPARE, cpu);
