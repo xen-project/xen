@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef ASM__RISCV__SMP_H
-#define ASM__RISCV__SMP_H
+#ifndef RISCV_SMP_H
+#define RISCV_SMP_H
 
 #include <xen/cpumask.h>
 #include <xen/macros.h>
@@ -43,7 +43,7 @@ struct dt_device_node;
 int dt_processor_hartid(const struct dt_device_node *node,
                         unsigned long *hartid);
 
-#endif
+#endif /* RISCV_SMP_H */
 
 /*
  * Local variables:

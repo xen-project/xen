@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef ASM__RISCV__SETUP_H
-#define ASM__RISCV__SETUP_H
+#ifndef RISCV_SETUP_H
+#define RISCV_SETUP_H
 
 #include <xen/types.h>
 
@@ -11,7 +11,7 @@ void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len);
 
 void init_csr_masks(void);
 
-#endif /* ASM__RISCV__SETUP_H */
+#endif /* RISCV_SETUP_H */
 
 /*
  * Local variables:

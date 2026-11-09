@@ -3,8 +3,8 @@
  * Copyright (C) 2015 Regents of the University of California
  */
 
-#ifndef ASM__RISCV__CSR_H
-#define ASM__RISCV__CSR_H
+#ifndef RISCV_CSR_H
+#define RISCV_CSR_H
 
 #include <xen/const.h>
 
@@ -128,4 +128,4 @@ static always_inline bool csr_read_safe(unsigned long csr,
 
 #endif /* __ASSEMBLER__ */
 
-#endif /* ASM__RISCV__CSR_H */
+#endif /* RISCV_CSR_H */

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef ASM__RISCV__PAGE_H
-#define ASM__RISCV__PAGE_H
+#ifndef RISCV_PAGE_H
+#define RISCV_PAGE_H
 
 #ifndef __ASSEMBLER__
 
@@ -253,4 +253,4 @@ pte_t pt_walk(vaddr_t va, unsigned int *pte_level);
 
 #endif /* __ASSEMBLER__ */
 
-#endif /* ASM__RISCV__PAGE_H */
+#endif /* RISCV_PAGE_H */

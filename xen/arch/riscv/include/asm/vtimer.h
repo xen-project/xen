@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef ASM__RISCV__VTIMER_H
-#define ASM__RISCV__VTIMER_H
+#ifndef RISCV_VTIMER_H
+#define RISCV_VTIMER_H
 
 #include <xen/timer.h>
 
@@ -17,4 +17,4 @@ void vtimer_set_timer(struct vtimer *t, uint64_t ticks);
 void vtimer_ctxt_switch_from(struct vcpu *p);
 void vtimer_ctxt_switch_to(struct vcpu *n);
 
-#endif /* ASM__RISCV__VTIMER_H */
+#endif /* RISCV_VTIMER_H */

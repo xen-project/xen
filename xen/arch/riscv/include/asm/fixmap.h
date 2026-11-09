@@ -2,8 +2,8 @@
 /*
  * fixmap.h: compile-time virtual memory allocation
  */
-#ifndef ASM__RISCV__FIXMAP_H
-#define ASM__RISCV__FIXMAP_H
+#ifndef RISCV_FIXMAP_H
+#define RISCV_FIXMAP_H
 
 #include <xen/bug.h>
 #include <xen/page-size.h>
@@ -48,4 +48,4 @@ static inline unsigned int virt_to_fix(vaddr_t vaddr)
 
 #endif /* __ASSEMBLER__ */
 
-#endif /* ASM__RISCV__FIXMAP_H */
+#endif /* RISCV_FIXMAP_H */

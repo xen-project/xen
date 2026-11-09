@@ -7,8 +7,8 @@
  * Copyright (c) Microchip.
  */
 
-#ifndef ASM__RISCV__VAPLIC_H
-#define ASM__RISCV__VAPLIC_H
+#ifndef RISCV_VAPLIC_H
+#define RISCV_VAPLIC_H
 
 #include <xen/kernel.h>
 #include <xen/types.h>
@@ -31,4 +31,4 @@ struct vaplic {
 int domain_vaplic_init(struct domain *d);
 void domain_vaplic_deinit(struct domain *d);
 
-#endif /* ASM__RISCV__VAPLIC_H */
+#endif /* RISCV_VAPLIC_H */

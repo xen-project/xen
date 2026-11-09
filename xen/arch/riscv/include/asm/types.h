@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef ASM__RISCV__TYPES_H
-#define ASM__RISCV__TYPES_H
+#ifndef RISCV_TYPES_H
+#define RISCV_TYPES_H
 
 #if defined(CONFIG_RISCV_32)
 
@@ -25,7 +25,7 @@ typedef u64 register_t;
 
 #endif
 
-#endif /* ASM__RISCV__TYPES_H */
+#endif /* RISCV_TYPES_H */
 /*
  * Local variables:
  * mode: C

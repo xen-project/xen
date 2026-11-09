@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef ASM__RISCV__ASM_EXTABLE_H
-#define ASM__RISCV__ASM_EXTABLE_H
+#ifndef RISCV_EXTABLE_H
+#define RISCV_EXTABLE_H
 
 #ifdef __ASSEMBLER__
 
@@ -55,4 +55,4 @@ bool fixup_exception(struct cpu_user_regs *regs);
 
 #endif /* __ASSEMBLY__ */
 
-#endif /* ASM__RISCV__ASM_EXTABLE_H */
+#endif /* RISCV_EXTABLE_H */

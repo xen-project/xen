@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef ASM__RISCV__TRAPS_H
-#define ASM__RISCV__TRAPS_H
+#ifndef RISCV_TRAPS_H
+#define RISCV_TRAPS_H
 
 #include <asm/processor.h>
 
@@ -13,4 +13,4 @@ void trap_init(void);
 
 #endif /* __ASSEMBLER__ */
 
-#endif /* ASM__RISCV__TRAPS_H */
+#endif /* RISCV_TRAPS_H */

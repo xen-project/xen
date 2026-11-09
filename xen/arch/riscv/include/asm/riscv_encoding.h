@@ -6,8 +6,8 @@
  *   Anup Patel <anup.patel@wdc.com>
  */
 
-#ifndef ASM__RISCV__RISCV_ENCODING_H
-#define ASM__RISCV__RISCV_ENCODING_H
+#ifndef RISCV_RISCV_ENCODING_H
+#define RISCV_RISCV_ENCODING_H
 
 #define _UL(X) _AC(X, UL)
 #define _ULL(X) _AC(X, ULL)
@@ -930,4 +930,4 @@
 
 /* clang-format on */
 
-#endif
+#endif /* RISCV_RISCV_ENCODING_H */

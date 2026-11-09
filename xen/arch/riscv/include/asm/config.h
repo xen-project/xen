@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef ASM__RISCV__CONFIG_H
-#define ASM__RISCV__CONFIG_H
+#ifndef RISCV_CONFIG_H
+#define RISCV_CONFIG_H
 
 #include <xen/const.h>
 #include <xen/page-size.h>
@@ -164,7 +164,7 @@ extern unsigned long phys_offset; /* = load_start - XEN_VIRT_START */
 #error "Define KERNEL_LOAD_ADDR_ALIGNMENT"
 #endif
 
-#endif /* ASM__RISCV__CONFIG_H */
+#endif /* RISCV_CONFIG_H */
 /*
  * Local variables:
  * mode: C

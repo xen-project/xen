@@ -5,8 +5,8 @@
  * (c) 2024 Vates
  */
 
-#ifndef ASM__RISCV__INTERRUPT_CONTOLLER_H
-#define ASM__RISCV__INTERRUPT_CONTOLLER_H
+#ifndef RISCV_INTC_H
+#define RISCV_INTC_H
 
 struct dt_device_node;
 
@@ -91,4 +91,4 @@ void domain_vintc_deinit(struct domain *d);
 
 int vintc_reserve_virq(const struct domain *d, unsigned int virq);
 
-#endif /* ASM__RISCV__INTERRUPT_CONTOLLER_H */
+#endif /* RISCV_INTC_H */

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef ASM__RISCV__DOMAIN_H
-#define ASM__RISCV__DOMAIN_H
+#ifndef RISCV_DOMAIN_H
+#define RISCV_DOMAIN_H
 
 #include <xen/mm.h>
 #include <xen/spinlock.h>
@@ -128,7 +128,7 @@ int vcpu_unset_interrupt(struct vcpu *v, unsigned int irq);
 void vcpu_sync_interrupts(struct vcpu *curr);
 void vcpu_flush_interrupts(struct vcpu *curr);
 
-#endif /* ASM__RISCV__DOMAIN_H */
+#endif /* RISCV_DOMAIN_H */
 
 /*
  * Local variables:

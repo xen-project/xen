@@ -8,8 +8,8 @@
  * Copyright (c) Microchip.
  */
 
-#ifndef ASM_RISCV_APLIC_H
-#define ASM_RISCV_APLIC_H
+#ifndef RISCV_APLIC_H
+#define RISCV_APLIC_H
 
 #include <xen/types.h>
 
@@ -141,4 +141,4 @@ struct aplic_regs {
     uint32_t target[1023];      /* 0x3004 */
 };
 
-#endif /* ASM_RISCV_APLIC_H */
+#endif /* RISCV_APLIC_H */

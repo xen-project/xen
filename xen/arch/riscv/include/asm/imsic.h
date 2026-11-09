@@ -8,8 +8,8 @@
  * (c) Microchip Technology Inc.
  */
 
-#ifndef ASM_RISCV_IMSIC_H
-#define ASM_RISCV_IMSIC_H
+#ifndef RISCV_IMSIC_H
+#define RISCV_IMSIC_H
 
 #include <xen/rwlock.h>
 #include <xen/spinlock.h>
@@ -96,4 +96,4 @@ unsigned int vcpu_guest_file_id(const struct vcpu *v);
 
 int vimsic_make_domu_dt_node(struct kernel_info *kinfo, unsigned int *phandle);
 
-#endif /* ASM_RISCV_IMSIC_H */
+#endif /* RISCV_IMSIC_H */

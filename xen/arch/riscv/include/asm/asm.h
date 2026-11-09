@@ -3,8 +3,8 @@
  * Copyright (C) 2015 Regents of the University of California
  */
 
-#ifndef ASM__RISCV__ASM_H
-#define ASM__RISCV__ASM_H
+#ifndef RISCV_ASM_H
+#define RISCV_ASM_H
 
 #ifdef __ASSEMBLER__
 #include <xen/linkage.h>
@@ -52,4 +52,4 @@
 #error "Unexpected __SIZEOF_SHORT__"
 #endif
 
-#endif /* ASM__RISCV__ASM_H */
+#endif /* RISCV_ASM_H */

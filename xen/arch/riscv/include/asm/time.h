@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef ASM__RISCV__TIME_H
-#define ASM__RISCV__TIME_H
+#ifndef RISCV_TIME_H
+#define RISCV_TIME_H
 
 #include <xen/bug.h>
 #include <xen/muldiv64.h>
@@ -29,7 +29,7 @@ void preinit_xen_time(void);
 
 extern int (* __ro_after_init set_xen_timer)(uint64_t deadline);
 
-#endif /* ASM__RISCV__TIME_H */
+#endif /* RISCV_TIME_H */
 
 /*
  * Local variables:

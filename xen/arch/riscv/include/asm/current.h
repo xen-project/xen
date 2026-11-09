@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#ifndef ASM__RISCV__CURRENT_H
-#define ASM__RISCV__CURRENT_H
+#ifndef RISCV_CURRENT_H
+#define RISCV_CURRENT_H
 
 #include <xen/bug.h>
 #include <xen/cache.h>
@@ -62,4 +62,4 @@ DECLARE_PER_CPU(struct vcpu *, curr_vcpu);
 
 #endif /* __ASSEMBLER__ */
 
-#endif /* ASM__RISCV__CURRENT_H */
+#endif /* RISCV_CURRENT_H */

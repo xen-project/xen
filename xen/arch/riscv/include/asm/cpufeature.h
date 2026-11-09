@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef ASM__RISCV__CPUFEATURE_H
-#define ASM__RISCV__CPUFEATURE_H
+#ifndef RISCV_CPUFEATURE_H
+#define RISCV_CPUFEATURE_H
 
 #ifndef __ASSEMBLER__
 
@@ -57,7 +57,7 @@ bool riscv_isa_extension_available(const unsigned long *isa_bitmap,
 
 #endif /* __ASSEMBLER__ */
 
-#endif /* ASM__RISCV__CPUFEATURE_H */
+#endif /* RISCV_CPUFEATURE_H */
 
 /*
  * Local variables:

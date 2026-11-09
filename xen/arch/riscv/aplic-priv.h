@@ -11,8 +11,8 @@
  * Copyright (c) Vates.
  */
 
-#ifndef ASM_RISCV_APLIC_PRIV_H
-#define ASM_RISCV_APLIC_PRIV_H
+#ifndef RISCV_APLIC_PRIV_H
+#define RISCV_APLIC_PRIV_H
 
 #include <xen/spinlock.h>
 #include <xen/types.h>
@@ -47,4 +47,4 @@ struct aplic_priv {
  */
 extern unsigned int guest_aplic_num_sources;
 
-#endif /* ASM_RISCV_APLIC_PRIV_H */
+#endif /* RISCV_APLIC_PRIV_H */

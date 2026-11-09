@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (C) 2012 Regents of the University of California */
 
-#ifndef ASM__RISCV__BITOPS_H
-#define ASM__RISCV__BITOPS_H
+#ifndef RISCV_BITOPS_H
+#define RISCV_BITOPS_H
 
 #include <asm/system.h>
 
@@ -132,7 +132,7 @@ static inline void clear_bit(int nr, volatile void *p)
 
 #define arch_hweightl(x) __builtin_popcountl(x)
 
-#endif /* ASM__RISCV__BITOPS_H */
+#endif /* RISCV_BITOPS_H */
 
 /*
  * Local variables:

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-#ifndef ASM__RISCV__PMAP_H
-#define ASM__RISCV__PMAP_H
+#ifndef RISCV_PMAP_H
+#define RISCV_PMAP_H
 
 #include <xen/bug.h>
 #include <xen/init.h>
@@ -33,4 +33,4 @@ static inline void __init arch_pmap_unmap(unsigned int slot)
     flush_tlb_one_local(FIXMAP_ADDR(slot));
 }
 
-#endif /* ASM__RISCV__PMAP_H */
+#endif /* RISCV_PMAP_H */

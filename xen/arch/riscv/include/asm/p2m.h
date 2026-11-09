@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef ASM__RISCV__P2M_H
-#define ASM__RISCV__P2M_H
+#ifndef RISCV_P2M_H
+#define RISCV_P2M_H
 
 #include <xen/bitops.h>
 #include <xen/errno.h>
@@ -264,7 +264,7 @@ void p2m_ctxt_switch_from(struct vcpu *p);
 void p2m_ctxt_switch_to(struct vcpu *n);
 void p2m_handle_vmenter(void);
 
-#endif /* ASM__RISCV__P2M_H */
+#endif /* RISCV_P2M_H */
 
 /*
  * Local variables:

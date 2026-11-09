@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef ASM__RISCV__IRQ_H
-#define ASM__RISCV__IRQ_H
+#ifndef RISCV_IRQ_H
+#define RISCV_IRQ_H
 
 #include <xen/bug.h>
 #include <xen/device_tree.h>
@@ -57,7 +57,7 @@ int route_irq_to_guest(struct domain *d, unsigned int virq,
 
 int release_guest_irq(const struct domain *d, unsigned int virq);
 
-#endif /* ASM__RISCV__IRQ_H */
+#endif /* RISCV_IRQ_H */
 
 /*
  * Local variables:

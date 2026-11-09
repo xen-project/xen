@@ -1,5 +1,5 @@
-#ifndef ASM_RISCV_GUEST_LAYOUT_H
-#define ASM_RISCV_GUEST_LAYOUT_H
+#ifndef RISCV_GUEST_LAYOUT_H
+#define RISCV_GUEST_LAYOUT_H
 
 #include <public/xen.h>
 
@@ -44,4 +44,4 @@
 #define GUEST_MAGIC_BASE  _UL(0x79000000)
 #define GUEST_MAGIC_SIZE  _UL(0x00200000)
 
-#endif /* ASM_RISCV_GUEST_LAYOUT_H */
+#endif /* RISCV_GUEST_LAYOUT_H */

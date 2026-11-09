@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef ASM__RISCV__GUEST_ACCESS_H
-#define ASM__RISCV__GUEST_ACCESS_H
+#ifndef RISCV_GUEST_ACCESS_H
+#define RISCV_GUEST_ACCESS_H
 
 #include <xen/types.h>
 
@@ -25,7 +25,7 @@ unsigned long raw_clear_guest(void *to, unsigned int len);
 unsigned long copy_to_guest_phys(struct domain *d, paddr_t gpa, void *buf,
                                  unsigned long len);
 
-#endif /* ASM__RISCV__GUEST_ACCESS_H */
+#endif /* RISCV_GUEST_ACCESS_H */
 /*
  * Local variables:
  * mode: C

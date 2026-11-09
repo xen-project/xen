@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-#ifndef ASM__RISCV__FLUSHTLB_H
-#define ASM__RISCV__FLUSHTLB_H
+#ifndef RISCV_FLUSHTLB_H
+#define RISCV_FLUSHTLB_H
 
 #include <xen/bug.h>
 #include <xen/cpumask.h>
@@ -53,7 +53,7 @@ static inline void arch_flush_tlb_mask(const cpumask_t *mask)
     sbi_remote_hfence_gvma(mask, 0, 0);
 }
 
-#endif /* ASM__RISCV__FLUSHTLB_H */
+#endif /* RISCV_FLUSHTLB_H */
 
 /*
  * Local variables:

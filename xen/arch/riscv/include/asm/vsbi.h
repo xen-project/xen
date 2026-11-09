@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier:  GPL-2.0-only */
 
-#ifndef ASM_RISCV_VSBI_H
-#define ASM_RISCV_VSBI_H
+#ifndef RISCV_VSBI_H
+#define RISCV_VSBI_H
 
 struct cpu_user_regs;
 
@@ -28,4 +28,4 @@ const struct vsbi_ext *vsbi_find_extension(unsigned long eid);
 
 void check_vsbi_ext_ranges(void);
 
-#endif
+#endif /* RISCV_VSBI_H */

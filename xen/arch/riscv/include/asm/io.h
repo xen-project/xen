@@ -35,8 +35,8 @@
  * Copyright (C) 2024 Vates
  */
 
-#ifndef ASM__RISCV__IO_H
-#define ASM__RISCV__IO_H
+#ifndef RISCV_IO_H
+#define RISCV_IO_H
 
 #include <xen/macros.h>
 #include <xen/types.h>
@@ -151,7 +151,7 @@ static inline uint64_t __raw_readq(const volatile void __iomem *addr)
 #define writel(v, c)    ({ __io_bw(); writel_cpu(v, c); __io_aw(); })
 #define writeq(v, c)    ({ __io_bw(); writeq_cpu(v, c); __io_aw(); })
 
-#endif /* ASM__RISCV__IO_H */
+#endif /* RISCV_IO_H */
 
 /*
  * Local variables:
