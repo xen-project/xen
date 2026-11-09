@@ -227,7 +227,7 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
 
     if ( !op || (op->cpuid >= nr_cpu_ids) || !cpu_online(op->cpuid) )
         return -EINVAL;
-    pmpt = processor_pminfo[op->cpuid];
+    pmpt = processor_pminfo ? processor_pminfo[op->cpuid] : NULL;
 
     switch ( op->type & PMSTAT_CATEGORY_MASK )
     {

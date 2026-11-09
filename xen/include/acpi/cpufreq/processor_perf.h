@@ -59,7 +59,7 @@ struct processor_pminfo {
     uint32_t init;
 };
 
-extern struct processor_pminfo *processor_pminfo[NR_CPUS];
+extern struct processor_pminfo **processor_pminfo;
 
 struct px_stat {
     uint8_t total;        /* total Px states */

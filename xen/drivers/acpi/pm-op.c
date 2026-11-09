@@ -104,8 +104,7 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
     pmpt = processor_pminfo[op->cpuid];
     policy = per_cpu(cpufreq_cpu_policy, op->cpuid);
 
-    if ( !pmpt ||
-         ((pmpt->init & XEN_PX_INIT) && !pmpt->perf.states) ||
+    if ( ((pmpt->init & XEN_PX_INIT) && !pmpt->perf.states) ||
          /* Avoid NULL deref of pmpt->perf.states[] */
          ((pmpt->init & XEN_CPPC_INIT) && pmpt->perf.state_count) ||
          !policy || !policy->governor )
@@ -369,7 +368,7 @@ int do_pm_op(struct xen_sysctl_pm_op *op)
 
     if ( op->cpuid >= nr_cpu_ids || !cpu_online(op->cpuid) )
         return -EINVAL;
-    pmpt = processor_pminfo[op->cpuid];
+    pmpt = processor_pminfo ? processor_pminfo[op->cpuid] : NULL;
 
     switch ( op->cmd & PM_PARA_CATEGORY_MASK )
     {

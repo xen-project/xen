@@ -218,7 +218,7 @@ int cpufreq_limit_change(unsigned int cpu)
     struct cpufreq_policy policy;
 
     if (!cpu_online(cpu) || !(data = per_cpu(cpufreq_cpu_policy, cpu)) ||
-        !processor_pminfo[cpu])
+        !processor_pminfo || !processor_pminfo[cpu])
         return -ENODEV;
 
     perf = &processor_pminfo[cpu]->perf;
@@ -273,7 +273,7 @@ int cpufreq_add_cpu(unsigned int cpu)
     unsigned int shared_type;
 
     /* to protect the case when Px was not controlled by xen */
-    if ( !processor_pminfo[cpu] || !cpu_online(cpu) )
+    if ( !processor_pminfo || !processor_pminfo[cpu] || !cpu_online(cpu) )
         return -EINVAL;
 
     if ( !(processor_pminfo[cpu]->init & (XEN_PX_INIT | XEN_CPPC_INIT)) )
@@ -448,7 +448,7 @@ int cpufreq_del_cpu(unsigned int cpu)
     const struct xen_psd_package *domain_info;
 
     /* to protect the case when Px was not controlled by xen */
-    if ( !processor_pminfo[cpu] || !cpu_online(cpu) )
+    if ( !processor_pminfo || !processor_pminfo[cpu] || !cpu_online(cpu) )
         return -EINVAL;
 
     if ( !(processor_pminfo[cpu]->init & (XEN_PX_INIT | XEN_CPPC_INIT)) )
@@ -562,6 +562,9 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *perf)
     int ret = 0, cpu;
     struct processor_pminfo *pmpt;
     struct processor_performance *pxpt;
+
+    if ( !processor_pminfo )
+        return -ENOMEM;
 
     cpu = get_cpu_id(acpi_id);
     if ( cpu < 0 || !perf )
@@ -725,6 +728,9 @@ int set_cppc_pminfo(unsigned int acpi_id,
 {
     int ret = 0, cpu_id;
     struct processor_pminfo *pm_info;
+
+    if ( !processor_pminfo )
+        return -ENOMEM;
 
     cpu_id = get_cpu_id(acpi_id);
     if ( cpu_id < 0 )
@@ -947,6 +953,11 @@ static struct notifier_block cpu_nfb = {
 
 static int __init cf_check cpufreq_presmp_init(void)
 {
+    if ( !processor_pminfo )
+        processor_pminfo = xvzalloc_array(struct processor_pminfo *, nr_cpu_ids);
+    if ( !processor_pminfo )
+        return -ENOMEM;
+
     register_cpu_notifier(&cpu_nfb);
     return 0;
 }
@@ -954,6 +965,11 @@ presmp_initcall(cpufreq_presmp_init);
 
 int __init cpufreq_register_driver(const struct cpufreq_driver *driver_data)
 {
+    if ( !processor_pminfo )
+        processor_pminfo = xvzalloc_array(struct processor_pminfo *, nr_cpu_ids);
+    if ( !processor_pminfo )
+        return -ENOMEM;
+
    if ( !driver_data || !driver_data->init ||
         !driver_data->verify || !driver_data->exit ||
         (!driver_data->target == !driver_data->setpolicy) )

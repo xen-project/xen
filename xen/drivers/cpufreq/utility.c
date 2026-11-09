@@ -32,7 +32,7 @@
 #include <public/sysctl.h>
 
 struct cpufreq_driver __read_mostly cpufreq_driver;
-struct processor_pminfo *__read_mostly processor_pminfo[NR_CPUS];
+struct processor_pminfo **__read_mostly processor_pminfo;
 DEFINE_PER_CPU_READ_MOSTLY(struct cpufreq_policy *, cpufreq_cpu_policy);
 
 /*********************************************************************
