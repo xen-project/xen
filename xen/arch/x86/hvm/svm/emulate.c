@@ -18,7 +18,7 @@
 
 static unsigned long svm_nextrip_insn_length(struct vcpu *v)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
+    struct vmcb *vmcb = v->arch.hvm.svm.vmcb;
 
     if ( !cpu_has_svm_nrips )
         return 0;

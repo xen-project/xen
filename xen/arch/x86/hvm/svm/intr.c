@@ -29,7 +29,7 @@
 
 static void svm_inject_nmi(struct vcpu *v)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
+    struct vmcb *vmcb = v->arch.hvm.svm.vmcb;
     vintr_t vintr = vmcb_get_vintr(vmcb);
     uint32_t general1_intercepts;
     intinfo_t event;
@@ -60,7 +60,7 @@ static void svm_inject_nmi(struct vcpu *v)
 
 static void svm_inject_intr(struct vcpu *v, int vector)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
+    struct vmcb *vmcb = v->arch.hvm.svm.vmcb;
     intinfo_t event;
 
     event.raw = 0;
@@ -74,7 +74,7 @@ static void svm_inject_intr(struct vcpu *v, int vector)
 
 static void svm_enable_intr_window(struct vcpu *v, struct hvm_intack intack)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
+    struct vmcb *vmcb = v->arch.hvm.svm.vmcb;
     uint32_t general1_intercepts = vmcb_get_general1_intercepts(vmcb);
     vintr_t intr;
 
@@ -86,7 +86,7 @@ static void svm_enable_intr_window(struct vcpu *v, struct hvm_intack intack)
 
         if ( nv->nv_vmentry_pending )
         {
-            struct vmcb_struct *gvmcb = nv->nv_vvmcx;
+            struct vmcb *gvmcb = nv->nv_vvmcx;
 
             /* check if l1 guest injects interrupt into l2 guest via vintr.
              * return here or l2 guest looses interrupts, otherwise.
@@ -134,7 +134,7 @@ static void svm_enable_intr_window(struct vcpu *v, struct hvm_intack intack)
 void asmlinkage svm_intr_assist(void)
 {
     struct vcpu *v = current;
-    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
+    struct vmcb *vmcb = v->arch.hvm.svm.vmcb;
     struct hvm_intack intack;
     enum hvm_intblk intblk;
 

@@ -383,7 +383,7 @@ typedef union
 #define IOPM_SIZE   (12 * 1024)
 #define MSRPM_SIZE  (8  * 1024)
 
-struct vmcb_struct {
+struct vmcb {
     /* Control area */
     uint32_t _cr_intercepts;             /* 0x000 - Clean.intercepts(0) */
     uint32_t _dr_intercepts;             /* 0x004   | */
@@ -536,15 +536,15 @@ struct vmcb_struct {
     uint64_t res18[291];
 };
 
-struct vmcb_struct *alloc_vmcb(void);
-void free_vmcb(struct vmcb_struct *vmcb);
+struct vmcb *alloc_vmcb(void);
+void free_vmcb(struct vmcb *vmcb);
 
 int  svm_create_vmcb(struct vcpu *v);
 void svm_destroy_vmcb(struct vcpu *v);
 
 void setup_vmcb_dump(void);
-void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb);
-bool svm_vmcb_isvalid(const char *from, const struct vmcb_struct *vmcb,
+void svm_vmcb_dump(const char *from, const struct vmcb *vmcb);
+bool svm_vmcb_isvalid(const char *from, const struct vmcb *vmcb,
                       const struct vcpu *v, bool verbose);
 
 /*
@@ -553,20 +553,20 @@ bool svm_vmcb_isvalid(const char *from, const struct vmcb_struct *vmcb,
 
 #define VMCB_ACCESSORS_(name, type, cleanbit)     \
 static inline void                                \
-vmcb_set_ ## name(struct vmcb_struct *vmcb,       \
+vmcb_set_ ## name(struct vmcb *vmcb,              \
                   type value)                     \
 {                                                 \
     vmcb->_ ## name = value;                      \
     vmcb->cleanbits.cleanbit = false;             \
 }                                                 \
 static inline type                                \
-vmcb_get_ ## name(const struct vmcb_struct *vmcb) \
+vmcb_get_ ## name(const struct vmcb *vmcb)        \
 {                                                 \
     return vmcb->_ ## name;                       \
 }
 
 #define VMCB_ACCESSORS(name, cleanbit) \
-    VMCB_ACCESSORS_(name, typeof(((struct vmcb_struct){})._ ## name), cleanbit)
+    VMCB_ACCESSORS_(name, typeof(((struct vmcb){})._ ## name), cleanbit)
 
 VMCB_ACCESSORS(cr_intercepts, intercepts)
 VMCB_ACCESSORS(dr_intercepts, intercepts)

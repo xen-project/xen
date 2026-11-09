@@ -165,7 +165,7 @@ static int nsvm_vcpu_hostsave(struct vcpu *v, unsigned int inst_len)
 {
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
-    struct vmcb_struct *n1vmcb;
+    struct vmcb *n1vmcb;
 
     n1vmcb = nv->nv_n1vmcx;
     ASSERT(n1vmcb != NULL);
@@ -190,7 +190,7 @@ static int nsvm_vcpu_hostsave(struct vcpu *v, unsigned int inst_len)
 static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
-    struct vmcb_struct *n1vmcb, *n2vmcb;
+    struct vmcb *n1vmcb, *n2vmcb;
     int rc;
 
     n1vmcb = nv->nv_n1vmcx;
@@ -271,8 +271,8 @@ static int nsvm_vmrun_permissionmap(struct vcpu *v)
     struct svm_vcpu *arch_svm = &v->arch.hvm.svm;
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
-    struct vmcb_struct *ns_vmcb = nv->nv_vvmcx;
-    struct vmcb_struct *host_vmcb = arch_svm->vmcb;
+    struct vmcb *ns_vmcb = nv->nv_vvmcx;
+    struct vmcb *host_vmcb = arch_svm->vmcb;
     unsigned long *ns_msrpm_ptr;
     unsigned int i;
     enum hvm_translation_result ret;
@@ -331,7 +331,7 @@ static int nsvm_vmrun_permissionmap(struct vcpu *v)
 }
 
 static void nestedsvm_vmcb_set_nestedp2m(struct vcpu *v,
-    struct vmcb_struct *vvmcb, struct vmcb_struct *n2vmcb)
+    struct vmcb *vvmcb, struct vmcb *n2vmcb)
 {
     struct p2m_domain *p2m;
 
@@ -350,7 +350,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
-    struct vmcb_struct *ns_vmcb, *n1vmcb, *n2vmcb;
+    struct vmcb *ns_vmcb, *n1vmcb, *n2vmcb;
     vmcbcleanbits_t clean = {};
     int rc;
 
@@ -610,7 +610,7 @@ nsvm_vcpu_vmentry(struct vcpu *v, struct cpu_user_regs *regs,
     int ret;
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
-    struct vmcb_struct *ns_vmcb;
+    struct vmcb *ns_vmcb;
 
     ns_vmcb = nv->nv_vvmcx;
     ASSERT(ns_vmcb != NULL);
@@ -720,8 +720,8 @@ nsvm_vcpu_vmexit_inject(struct vcpu *v, struct cpu_user_regs *regs,
 {
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
-    struct vmcb_struct *ns_vmcb;
-    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
+    struct vmcb *ns_vmcb;
+    struct vmcb *vmcb = v->arch.hvm.svm.vmcb;
 
     if ( vmcb->_vintr.vgif_en )
         vmcb->_vintr.gif = false;
@@ -808,7 +808,7 @@ nsvm_vmcb_guest_intercepts_msr(unsigned long *msr_bitmap,
 }
 
 static int
-nsvm_vmcb_guest_intercepts_ioio(struct vmcb_struct *vmcb)
+nsvm_vmcb_guest_intercepts_ioio(struct vmcb *vmcb)
 {
     unsigned long gfn = vmcb->_iopm_base_pa >> PAGE_SHIFT;
     unsigned long *io_bitmap;
@@ -859,7 +859,7 @@ nsvm_vmcb_guest_intercepts_exitcode(struct vcpu *v,
     uint64_t exit_bits;
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
-    struct vmcb_struct *ns_vmcb = nv->nv_vvmcx;
+    struct vmcb *ns_vmcb = nv->nv_vvmcx;
     enum nestedhvm_vmexits vmexits;
 
     switch ( exitcode )
@@ -948,8 +948,8 @@ nsvm_vmcb_prepare4vmexit(struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
-    struct vmcb_struct *ns_vmcb = nv->nv_vvmcx;
-    struct vmcb_struct *n2vmcb = nv->nv_n2vmcx;
+    struct vmcb *ns_vmcb = nv->nv_vvmcx;
+    struct vmcb *n2vmcb = nv->nv_n2vmcx;
 
     svm_vmsave_pa(nv->nv_n1vmcx_pa);
 
@@ -1157,7 +1157,7 @@ enum hvm_intblk cf_check nsvm_intr_blocked(struct vcpu *v)
 
     if ( nestedhvm_vcpu_in_guestmode(v) )
     {
-        struct vmcb_struct *n2vmcb = nv->nv_n2vmcx;
+        struct vmcb *n2vmcb = nv->nv_n2vmcx;
 
         if ( svm->ns_hostflags.vintrmask && !svm->ns_hostflags.rflagsif )
             return hvm_intblk_rflags_ie;
@@ -1196,7 +1196,7 @@ nestedsvm_vmexit_defer(struct vcpu *v,
     uint64_t exitcode, uint64_t exitinfo1, uint64_t exitinfo2)
 {
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
-    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
+    struct vmcb *vmcb = v->arch.hvm.svm.vmcb;
 
     if ( vmcb->_vintr.vgif_en )
         vmcb->_vintr.gif = false;
@@ -1458,7 +1458,7 @@ bool
 nestedsvm_gif_isset(struct vcpu *v)
 {
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
-    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
+    struct vmcb *vmcb = v->arch.hvm.svm.vmcb;
 
     /* get the vmcb gif value if using vgif */
     if ( vmcb->_vintr.vgif_en )
@@ -1491,7 +1491,7 @@ void svm_vmexit_do_stgi(struct cpu_user_regs *regs, struct vcpu *v)
 
 void svm_vmexit_do_clgi(struct cpu_user_regs *regs, struct vcpu *v)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
+    struct vmcb *vmcb = v->arch.hvm.svm.vmcb;
     unsigned int inst_len;
     uint32_t general1_intercepts = vmcb_get_general1_intercepts(vmcb);
     vintr_t intr;
@@ -1523,7 +1523,7 @@ void svm_vmexit_do_clgi(struct cpu_user_regs *regs, struct vcpu *v)
  */
 void svm_nested_features_on_efer_update(struct vcpu *v)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
+    struct vmcb *vmcb = v->arch.hvm.svm.vmcb;
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
     u32 general2_intercepts;
     vintr_t vintr;

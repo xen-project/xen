@@ -142,7 +142,7 @@ void __dummy__(void)
 #endif
 
 #ifdef CONFIG_AMD_SVM
-    OFFSET(VMCB_int_stat, struct vmcb_struct, int_stat);
+    OFFSET(VMCB_int_stat, struct vmcb, int_stat);
     BLANK();
 #endif
 

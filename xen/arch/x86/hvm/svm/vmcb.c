@@ -23,9 +23,9 @@
 #include "svm.h"
 #include "vmcb.h"
 
-struct vmcb_struct *alloc_vmcb(void)
+struct vmcb *alloc_vmcb(void)
 {
-    struct vmcb_struct *vmcb;
+    struct vmcb *vmcb;
 
     vmcb = alloc_xenheap_page();
     if ( vmcb == NULL )
@@ -38,7 +38,7 @@ struct vmcb_struct *alloc_vmcb(void)
     return vmcb;
 }
 
-void free_vmcb(struct vmcb_struct *vmcb)
+void free_vmcb(struct vmcb *vmcb)
 {
     free_xenheap_page(vmcb);
 }
@@ -47,7 +47,7 @@ void free_vmcb(struct vmcb_struct *vmcb)
 static int construct_vmcb(struct vcpu *v)
 {
     struct svm_vcpu *svm = &v->arch.hvm.svm;
-    struct vmcb_struct *vmcb = svm->vmcb;
+    struct vmcb *vmcb = svm->vmcb;
 
     vmcb->_general1_intercepts =
         GENERAL1_INTERCEPT_INTR        | GENERAL1_INTERCEPT_NMI         |
@@ -250,7 +250,7 @@ static void svm_dump_sel(const char *name, const struct segment_register *s)
            name, s->sel, s->attr, s->limit, s->base);
 }
 
-void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb)
+void svm_vmcb_dump(const char *from, const struct vmcb *vmcb)
 {
     struct vcpu *curr = current;
 
@@ -263,7 +263,7 @@ void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb)
 
     printk("Dumping guest's current state at %s...\n", from);
     printk("Size of VMCB = %zu, paddr = %"PRIpaddr", vaddr = %p\n",
-           sizeof(struct vmcb_struct), virt_to_maddr(vmcb), vmcb);
+           sizeof(struct vmcb), virt_to_maddr(vmcb), vmcb);
 
     printk("cr_intercepts = %#x dr_intercepts = %#x "
            "exception_intercepts = %#x\n",
@@ -328,7 +328,7 @@ void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb)
 }
 
 bool svm_vmcb_isvalid(
-    const char *from, const struct vmcb_struct *vmcb, const struct vcpu *v,
+    const char *from, const struct vmcb *vmcb, const struct vcpu *v,
     bool verbose)
 {
     bool ret = false; /* ok */
@@ -443,7 +443,7 @@ void __init setup_vmcb_dump(void)
 
 static void __init __maybe_unused build_assertions(void)
 {
-    struct vmcb_struct vmcb;
+    struct vmcb vmcb;
 
     /* Build-time check of the VMCB layout. */
     BUILD_BUG_ON(sizeof(vmcb) != PAGE_SIZE);

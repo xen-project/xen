@@ -18,7 +18,7 @@ struct svm_domain {
 };
 
 struct svm_vcpu {
-    struct vmcb_struct *vmcb;
+    struct vmcb *vmcb;
     unsigned long *msrpm;
     uint64_t vmcb_pa;
     int     launch_core;
