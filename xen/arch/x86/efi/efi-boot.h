@@ -736,6 +736,13 @@ static void __init efi_arch_handle_module(const struct file *file,
     place_string(&mb_modules[mbi.mods_count].string, local_name.s);
     mb_modules[mbi.mods_count].mod_start = file->addr >> PAGE_SHIFT;
     mb_modules[mbi.mods_count].mod_end = file->size;
+
+    if ( mb_modules[mbi.mods_count].mod_end != file->size )
+    {
+        PrintStr(name);
+        blexit(L" is too large");
+    }
+
     ++mbi.mods_count;
     efi_bs->FreePool(ptr);
 }
