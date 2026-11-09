@@ -818,7 +818,7 @@ void vgic_inject_irq(struct domain *d, struct vcpu *v, unsigned int virq,
     }
 
     /* vcpu offline */
-    if ( test_bit(_VPF_down, &v->pause_flags) )
+    if ( !is_vcpu_online(v) )
     {
         spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
         return;

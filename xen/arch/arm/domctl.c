@@ -203,7 +203,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     ctxt->ttbr1 = v->arch.ttbr1;
     ctxt->ttbcr = v->arch.ttbcr;
 
-    if ( !test_bit(_VPF_down, &v->pause_flags) )
+    if ( is_vcpu_online(v) )
         ctxt->flags |= VGCF_online;
 }
 

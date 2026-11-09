@@ -404,7 +404,7 @@ int pv_shim_shutdown(uint8_t reason)
         /* Stop the singleshot timer. */
         stop_timer(&v->singleshot_timer);
 
-        if ( test_bit(_VPF_down, &v->pause_flags) )
+        if ( !is_vcpu_online(v) )
             BUG_ON(vcpu_reset(v));
 
         if ( v != current )

@@ -2190,7 +2190,7 @@ long common_vcpu_op(int cmd, struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     case VCPUOP_down:
         for_each_vcpu ( d, v )
-            if ( v->vcpu_id != vcpuid && !test_bit(_VPF_down, &v->pause_flags) )
+            if ( v->vcpu_id != vcpuid && is_vcpu_online(v) )
             {
                rc = 1;
                break;

@@ -85,7 +85,7 @@ static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
     if ( is_64bit_domain(d) && is_thumb )
         return PSCI_INVALID_ADDRESS;
 
-    if ( !test_bit(_VPF_down, &v->pause_flags) )
+    if ( is_vcpu_online(v) )
         return PSCI_ALREADY_ON;
 
     rc = vpsci_build_guest_context(v, entry_point, context_id, &ctxt);
@@ -195,7 +195,7 @@ static int32_t do_psci_0_2_affinity_info(register_t target_affinity,
         v = d->vcpu[vcpuid];
 
         if ( ( ( v->arch.vmpidr & tmask ) == target_affinity )
-                && ( !test_bit(_VPF_down, &v->pause_flags) ) )
+                && is_vcpu_online(v) )
             return PSCI_0_2_AFFINITY_LEVEL_ON;
     }
 

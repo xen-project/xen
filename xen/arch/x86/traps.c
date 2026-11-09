@@ -918,7 +918,7 @@ void vcpu_show_execution_state(struct vcpu *v)
 {
     unsigned long flags = 0;
 
-    if ( test_bit(_VPF_down, &v->pause_flags) )
+    if ( !is_vcpu_online(v) )
     {
         printk("*** %pv is offline ***\n", v);
         return;

@@ -1004,7 +1004,7 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
     void *mapped;
     unsigned long *stack, addr;
 
-    if ( test_bit(_VPF_down, &v->pause_flags) )
+    if ( !is_vcpu_online(v) )
     {
         printk("No stack trace, VCPU offline\n");
         return;
