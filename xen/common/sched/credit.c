@@ -1965,7 +1965,8 @@ static void cf_check csched_schedule(
         dec_nr_runnable(sched_cpu);
     }
 
-    do {
+    for ( ; ; )
+    {
         snext = __runq_elem(runq->next);
 
         /* Tasklet work (which runs in idle UNIT context) overrides all else. */
@@ -1993,7 +1994,12 @@ static void cf_check csched_schedule(
         else
             __runq_remove(snext);
 
-    } while ( !unit_runnable_state(snext->unit) );
+        if ( unit_runnable_state(snext->unit) )
+            break;
+
+        /* Dropped snext is off the runq but still counted: uncount it. */
+        dec_nr_runnable(sched_cpu);
+    }
 
     /*
      * Update idlers mask if necessary. When we're idling, other CPUs
