@@ -261,14 +261,14 @@ static void __init match_isa_ext(const char *name, const char *name_end,
 static int __init riscv_isa_parse_string(const char *isa,
                                          unsigned long *out_bitmap)
 {
-    if ( (isa[0] != 'r') && (isa[1] != 'v') )
+    if ( (isa[0] != 'r') || (isa[1] != 'v') )
         return -EINVAL;
 
 #if defined(CONFIG_RISCV_32)
-    if ( isa[2] != '3' && isa[3] != '2' )
+    if ( (isa[2] != '3') || (isa[3] != '2') )
         return -EINVAL;
 #elif defined(CONFIG_RISCV_64)
-    if ( isa[2] != '6' && isa[3] != '4' )
+    if ( (isa[2] != '6') || (isa[3] != '4') )
         return -EINVAL;
 #else
 # error "unsupported RISC-V bitness"
