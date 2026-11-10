@@ -1175,90 +1175,86 @@ static void fixup_exception_return(struct cpu_user_regs *regs,
                                    unsigned long fixup, unsigned long stub_ra)
 {
 #ifdef CONFIG_XEN_SHSTK
+    unsigned long ssp = rdssp();
+
+    if ( ssp != SSP_NO_SHSTK )
     {
-        unsigned long ssp = rdssp();
+        unsigned long *ptr = _p(regs->entry_ssp);
+        unsigned long primary_shstk =
+            (ssp & ~(STACK_SIZE - 1)) +
+            (PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8;
 
-        if ( ssp != SSP_NO_SHSTK )
+        BUG_ON((regs->entry_ssp ^ primary_shstk) >>
+               (PAGE_SHIFT + STACK_ORDER));
+
+        /*
+         * The shstk currently looks like this:
+         *
+         *   tok  [Supervisor token, == &tok | BUSY, only with FRED inactive]
+         *   ...  [Pointed to by SSP for most exceptions, empty in IST cases]
+         *   %cs  [== regs->cs]
+         *   %rip [== regs->rip]
+         *   SSP  [Pointed to by entry_ssp; Likely points to 3 slots
+         *         higher, above %cs]
+         *   ...  [call tree to this function, likely 2/3 slots]
+         *
+         * and we want to overwrite %rip with fixup.  There are two
+         * complications:
+         *   1) We cant depend on SSP values, because they won't differ by
+         *      3 slots if the exception is taken on an IST stack.
+         *   2) There are synthetic (unrealistic but not impossible)
+         *      scenarios where %rip can end up in the call tree to this
+         *      function, so we can't check against regs->rip alone.
+         *
+         * Check for both regs->rip and regs->cs matching.
+         */
+        BUG_ON(ptr[1] != regs->rip || ptr[2] != regs->cs);
+
+        wrss(fixup, &ptr[1]);
+
+        if ( !stub_ra )
+            goto shstk_done;
+
+        /*
+         * Stub recovery ought to happen only when the outer context
+         * was on the main shadow stack.  We need to also "pop" the
+         * stub's return address from the interrupted context's shadow
+         * stack.  That is,
+         * - if we're still on the main stack, we need to move the
+         *   entire stack (up to and including the exception frame)
+         *   up by one slot, incrementing the original SSP in the
+         *   exception frame,
+         * - if we're on an IST stack, we need to increment the
+         *   original SSP.
+         */
+        BUG_ON((ptr[0] ^ primary_shstk) >> PAGE_SHIFT);
+
+        if ( (ssp ^ primary_shstk) >> PAGE_SHIFT )
         {
-            unsigned long *ptr = _p(regs->entry_ssp);
-            unsigned long primary_shstk =
-                (ssp & ~(STACK_SIZE - 1)) +
-                (PRIMARY_SHSTK_SLOT + 1) * PAGE_SIZE - 8;
-
-            BUG_ON((regs->entry_ssp ^ primary_shstk) >>
-                   (PAGE_SHIFT + STACK_ORDER));
-
             /*
-             * The shstk currently looks like this:
-             *
-             *   tok  [Supervisor token, == &tok | BUSY, only with FRED inactive]
-             *   ...  [Pointed to by SSP for most exceptions, empty in IST cases]
-             *   %cs  [== regs->cs]
-             *   %rip [== regs->rip]
-             *   SSP  [Pointed to by entry_ssp; Likely points to 3 slots
-             *         higher, above %cs]
-             *   ...  [call tree to this function, likely 2/3 slots]
-             *
-             * and we want to overwrite %rip with fixup.  There are two
-             * complications:
-             *   1) We cant depend on SSP values, because they won't differ by
-             *      3 slots if the exception is taken on an IST stack.
-             *   2) There are synthetic (unrealistic but not impossible)
-             *      scenarios where %rip can end up in the call tree to this
-             *      function, so we can't check against regs->rip alone.
-             *
-             * Check for both regs->rip and regs->cs matching.
+             * We're on an IST stack.  First make sure the two return
+             * addresses actually match.  Then increment the interrupted
+             * context's SSP.
              */
-            BUG_ON(ptr[1] != regs->rip || ptr[2] != regs->cs);
-
-            {
-                wrss(fixup, &ptr[1]);
-
-                if ( !stub_ra )
-                    goto shstk_done;
-
-                /*
-                 * Stub recovery ought to happen only when the outer context
-                 * was on the main shadow stack.  We need to also "pop" the
-                 * stub's return address from the interrupted context's shadow
-                 * stack.  That is,
-                 * - if we're still on the main stack, we need to move the
-                 *   entire stack (up to and including the exception frame)
-                 *   up by one slot, incrementing the original SSP in the
-                 *   exception frame,
-                 * - if we're on an IST stack, we need to increment the
-                 *   original SSP.
-                 */
-                BUG_ON((ptr[0] ^ primary_shstk) >> PAGE_SHIFT);
-
-                if ( (ssp ^ primary_shstk) >> PAGE_SHIFT )
-                {
-                    /*
-                     * We're on an IST stack.  First make sure the two return
-                     * addresses actually match.  Then increment the interrupted
-                     * context's SSP.
-                     */
-                    BUG_ON(stub_ra != *(unsigned long*)ptr[0]);
-                    wrss(ptr[0] + 8, &ptr[0]);
-                    goto shstk_done;
-                }
-
-                /* Make sure the two return addresses actually match. */
-                BUG_ON(stub_ra != ptr[3]);
-
-                /* Move exception frame, updating SSP there. */
-                wrss(ptr[2], &ptr[3]); /* %cs */
-                wrss(ptr[1], &ptr[2]); /* %rip */
-                wrss(ptr[0] + 8, &ptr[1]); /* SSP */
-
-                /* Move all newer entries. */
-                while ( ptr-- != _p(ssp) )
-                    wrss(ptr[0], &ptr[1]);
-
-                /* Finally account for our own stack having shifted up. */
-                asm volatile ( "incsspd %0" :: "r" (2) );
-            }
+            BUG_ON(stub_ra != *(unsigned long*)ptr[0]);
+            wrss(ptr[0] + 8, &ptr[0]);
+            goto shstk_done;
         }
+
+        /* Make sure the two return addresses actually match. */
+        BUG_ON(stub_ra != ptr[3]);
+
+        /* Move exception frame, updating SSP there. */
+        wrss(ptr[2], &ptr[3]); /* %cs */
+        wrss(ptr[1], &ptr[2]); /* %rip */
+        wrss(ptr[0] + 8, &ptr[1]); /* SSP */
+
+        /* Move all newer entries. */
+        while ( ptr-- != _p(ssp) )
+            wrss(ptr[0], &ptr[1]);
+
+        /* Finally account for our own stack having shifted up. */
+        asm volatile ( "incsspd %0" :: "r" (2) );
     }
  shstk_done:
 #endif /* CONFIG_XEN_SHSTK */
