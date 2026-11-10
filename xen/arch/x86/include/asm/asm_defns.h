@@ -259,12 +259,19 @@ static always_inline void stac(void)
         xor   %r14d, %r14d
         push  %r15
         xor   %r15d, %r15d
+#ifdef CONFIG_XEN_SHSTK
+        rdsspq %rcx
+        push  %rcx            /* Zero (from above) if CET-SS is not enabled */
+#endif
 .endm
 
 /*
  * POP GPRs from a UREGS_* frame on the stack.  Does not modify flags.
  */
 .macro POP_GPRS skip_rax=0
+#ifdef CONFIG_XEN_SHSTK
+        pop   %rcx
+#endif
         pop   %r15
         pop   %r14
         pop   %r13

@@ -57,6 +57,9 @@ void __dummy__(void)
     OFFSET(UREGS_eflags, struct cpu_user_regs, rflags);
     OFFSET(UREGS_rsp, struct cpu_user_regs, rsp);
     OFFSET(UREGS_ss, struct cpu_user_regs, ss);
+#ifdef CONFIG_XEN_SHSTK
+    OFFSET(UREGS_entry_ssp, struct cpu_user_regs, entry_ssp);
+#endif
     DEFINE(UREGS_kernel_sizeof, sizeof(struct cpu_user_regs));
     BLANK();
 

@@ -11,6 +11,15 @@
  */
 struct cpu_user_regs
 {
+#ifdef CONFIG_XEN_SHSTK
+    /*
+     * This points _at_ the corresponding shadow stack frame; it is _not_ the
+     * outer context's SSP.  That, if the outer context has CET-SS enabled,
+     * is stored in the top slot of the pointed to shadow stack.
+     */
+    uint64_t entry_ssp;
+#endif
+
     union { uint64_t r15;    uint32_t r15d;   uint16_t r15w;  uint8_t r15b; };
     union { uint64_t r14;    uint32_t r14d;   uint16_t r14w;  uint8_t r14b; };
     union { uint64_t r13;    uint32_t r13d;   uint16_t r13w;  uint8_t r13b; };
