@@ -35,7 +35,7 @@ unsigned int __find_next_bit(
     if ( bit != 0 )
     {
         /* Look for a bit in the first word. */
-        set = __scanbit(*p >> bit, BITS_PER_LONG);
+        set = tzcnt(*p >> bit);
         if ( set < BITS_PER_LONG )
             return (offset + set);
         offset += BITS_PER_LONG - bit;
@@ -85,7 +85,7 @@ unsigned int __find_next_zero_bit(
     if ( bit != 0 )
     {
         /* Look for zero in the first word. */
-        set = __scanbit(~*p >> bit, BITS_PER_LONG);
+        set = tzcnt(~*p >> bit);
         if ( set < BITS_PER_LONG )
             return (offset + set);
         offset += BITS_PER_LONG - bit;

@@ -320,18 +320,23 @@ extern unsigned int __find_first_zero_bit(
 extern unsigned int __find_next_zero_bit(
     const unsigned long *addr, unsigned int size, unsigned int offset);
 
-static always_inline unsigned int __scanbit(unsigned long val, unsigned int max)
+/*
+ * Search for the first set bit in @x, returning BITS_PER_LONG if @x was 0.
+ * See arch_ffs() for safety discussions.
+ */
+static always_inline unsigned int tzcnt(unsigned long x)
 {
-    if ( __builtin_constant_p(max) && max == BITS_PER_LONG )
-        alternative_io("bsf %[in],%[out]; cmovz %[max],%k[out]",
-                       "rep; bsf %[in],%[out]",
-                       X86_FEATURE_BMI1,
-                       [out] "=&r" (val),
-                       [in] "r" (val), [max] "r" (max));
-    else
-        asm ( "bsf %1,%0 ; cmovz %2,%k0"
-              : "=&r" (val) : "r" (val), "r" (max) );
-    return (unsigned int)val;
+    unsigned int r;
+
+    /*
+     * The destination register still needs pre-loading for older CPUs which
+     * will execute TZCNT as BSF.
+     */
+    asm ( "tzcnt %[x], %q[r]"
+          : [r] "=r" (r)
+          : [x] "rm" (x), "[r]" (BITS_PER_LONG) );
+
+    return r;
 }
 
 /**
@@ -358,7 +363,7 @@ static always_inline unsigned int __scanbit(unsigned long val, unsigned int max)
     if ( o__ >= s__ )                                                       \
         r__ = s__;                                                          \
     else if ( __builtin_constant_p(size) && s__ <= BITS_PER_LONG )          \
-        r__ = o__ + __scanbit(*a__ >> o__, s__);                            \
+        r__ = o__ + tzcnt(*a__ >> o__);                                     \
     else if ( __builtin_constant_p(off) && !o__ )                           \
         r__ = __find_first_bit(a__, s__);                                   \
     else                                                                    \
@@ -390,7 +395,7 @@ static always_inline unsigned int __scanbit(unsigned long val, unsigned int max)
     if ( o__ >= s__ )                                                       \
         r__ = s__;                                                          \
     else if ( __builtin_constant_p(size) && s__ <= BITS_PER_LONG )          \
-        r__ = o__ + __scanbit(~*a__ >> o__, s__);                           \
+        r__ = o__ + tzcnt(~*a__ >> o__);                                    \
     else if ( __builtin_constant_p(off) && !o__ )                           \
         r__ = __find_first_zero_bit(a__, s__);                              \
     else                                                                    \
