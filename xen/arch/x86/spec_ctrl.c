@@ -1611,7 +1611,7 @@ static void __init tsa_sq_l1_calculations(void)
 static void __init tsa_fill_calculations(void)
 {
     /* TSA is only known to affect AMD processors at this time. */
-    if ( boot_cpu_data.vendor != X86_VENDOR_AMD )
+    if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
         return;
 
     /* If we're virtualised, don't attempt to synthesise anything. */
