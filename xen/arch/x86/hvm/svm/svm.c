@@ -560,12 +560,16 @@ static void cf_check svm_set_interrupt_shadow(
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     bool block_nmi = intr_shadow & HVM_INTR_SHADOW_NMI;
+    vintr_t vintr = vmcb_get_vintr(vmcb);
 
     vmcb->int_stat.intr_shadow =
         !!(intr_shadow & (HVM_INTR_SHADOW_MOV_SS|HVM_INTR_SHADOW_STI));
 
-    if ( vmcb->_vintr.fields.vnmi_enable )
-        vmcb->_vintr.fields.vnmi_blocking = block_nmi;
+    if ( vintr.fields.vnmi_enable )
+    {
+        vintr.fields.vnmi_blocking = block_nmi;
+        vmcb_set_vintr(vmcb, vintr);
+    }
     else
     {
         uint32_t gen1 = vmcb_get_general1_intercepts(vmcb);
