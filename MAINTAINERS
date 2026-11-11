@@ -335,6 +335,13 @@ F:	xen/arch/x86/include/asm/x86_*/efi*.h
 F:	xen/common/efi/
 F:	xen/include/efi/
 
+FUSA (x86)
+M:	Denis Mukhin <dmukhin@ford.com>
+M:	Ayan Kumar Halder <ayan.kumar.halder@amd.com>
+S:	Supported
+F:	docs/fusa/reqs/design-reqs/x86
+F:	docs/fusa/reqs/product-reqs/x86
+
 FUSA
 M:	Stefano Stabellini <sstabellini@kernel.org>
 M:	Bertrand Marquis <bertrand.marquis@arm.com>

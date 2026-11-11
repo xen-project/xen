@@ -1,0 +1,386 @@
+.. SPDX-License-Identifier: CC-BY-4.0
+
+NS16550-compatible UART Emulation
+=================================
+
+The following are the requirements related to NS16550-compatible UART emulated
+and exposed by Xen x86 domains.
+
+Access UART scratch register
+----------------------------
+
+`XenSwdgn~emul_ns16x50_scr~1`
+
+Description:
+Xen shall emulate a scratch register for read/write.
+
+Rationale:
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Access Transmit Holding Register
+--------------------------------
+
+`XenSwdgn~emul_ns16x50_thr~1`
+
+Description:
+Xen shall emulate a transmit holding register.
+
+Rationale:
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Access Line Control Register
+----------------------------
+
+`XenSwdgn~emul_ns16x50_lcr~1`
+
+Description:
+Xen shall emulate a line control register for read/write.
+
+Rationale:
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Access Interrupt Enable Register
+--------------------------------
+
+`XenSwdgn~emul_ns16x50_ier~1`
+
+Description:
+Xen shall emulate an interrupt enable register for read/write.
+
+Rationale:
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Access divisor latch registers to support various baud rates
+------------------------------------------------------------
+
+`XenSwdgn~emul_ns16x50_divisor_latch~1`
+
+Description:
+Xen shall emulate the divisor latch low and divisor latch high registers to
+support baud rates - 50, 75, 110, 134.5, 150, 300, 600, 1200, 1800, 2000,
+2400, 3600, 4800, 7200, 9600, 14400, 19200, 28800, 38400, 57600 and 115200.
+
+Rationale:
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Access Modem Control Register
+-----------------------------
+
+`XenSwdgn~emul_ns16x50_mcr~1`
+
+Description:
+Xen shall emulate a modem control register for read/write.
+
+Rationale:
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Enable and disable the FIFOs
+----------------------------
+
+`XenSwdgn~emul_ns16x50_fcr_enable~1`
+
+Description:
+Xen shall report the FIFO state in the interrupt identification register
+according to the FIFO enable bit of the FIFO control register.
+
+Rationale:
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Select the receiver FIFO trigger level
+--------------------------------------
+
+`XenSwdgn~emul_ns16x50_fcr_trigger_level~1`
+
+Description:
+Xen shall accept a write of any receiver FIFO trigger level to the FIFO
+control register.
+
+Rationale:
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Clear the FIFOs
+---------------
+
+`XenSwdgn~emul_ns16x50_fcr_clear~1`
+
+Description:
+Xen shall discard the buffered data of the receiver and the transmitter FIFOs
+when the corresponding clear bit of the FIFO control register is written.
+
+Rationale:
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Transfer data in loopback mode
+------------------------------
+
+`XenSwdgn~emul_ns16x50_loopback_data~1`
+
+Description:
+Xen shall route a byte written to the transmit holding register back to the
+receiver buffer register when the loopback bit of the modem control register
+is set.
+
+Rationale:
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Report modem status in loopback mode
+------------------------------------
+
+`XenSwdgn~emul_ns16x50_loopback_modem~1`
+
+Description:
+Xen shall reflect the modem control register outputs into the modem status
+register inputs when the loopback bit of the modem control register is set.
+
+Rationale:
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Report no pending interrupt
+---------------------------
+
+`XenSwdgn~emul_ns16x50_iir_no_interrupt~1`
+
+Description:
+Xen shall report no pending interrupt in the interrupt identification register
+when no interrupt reason is enabled in the interrupt enable register.
+
+Rationale:
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Report the transmit holding register empty interrupt reason
+-----------------------------------------------------------
+
+`XenSwdgn~emul_ns16x50_iir_thr~1`
+
+Description:
+Xen shall report the transmit holding register empty interrupt reason in the
+interrupt identification register while that reason is enabled and the
+transmit holding register is empty.
+
+Rationale:
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Report the received data available interrupt reason
+---------------------------------------------------
+
+`XenSwdgn~emul_ns16x50_iir_rda~1`
+
+Description:
+Xen shall report the received data available interrupt reason in the interrupt
+identification register while that reason is enabled and unread data is
+pending in the receiver.
+
+Rationale:
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Report the highest priority interrupt reason
+--------------------------------------------
+
+`XenSwdgn~emul_ns16x50_iir_priority~1`
+
+Description:
+Xen shall report the highest priority pending interrupt reason in the
+interrupt identification register when more than one enabled reason is
+pending.
+
+Rationale:
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Assumption of Use on the Domain
+===============================
+
+Configure the UART for 8 data bits, no parity and 1 stop bit
+------------------------------------------------------------
+
+`XenSwdgn~emul_ns16x50_dom_configure_8n1~1`
+
+Description:
+The domain shall configure the UART for a character format of 8 data bits, no
+parity and 1 stop bit.
+
+Rationale:
+Xen stores the word length, parity and stop bit fields of the line control
+register but does not act on them. A domain which configures any other
+character format observes the 8n1 behaviour regardless.
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Program a non-zero baud rate divisor
+------------------------------------
+
+`XenSwdgn~emul_ns16x50_dom_program_nonzero_divisor~1`
+
+Description:
+The domain shall program a non-zero value into the divisor latch registers
+before transferring data.
+
+Rationale:
+Xen treats a divisor of zero as the serial communication being disabled, and
+discards accesses to the transmit holding register and the receiver buffer
+register while the divisor is zero.
+
+Comments:
+Xen resets the divisor latch registers to a divisor corresponding to 115200
+baud, so a domain which does not program them at all is able to transfer data.
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Clear the divisor latch access bit before transferring data
+-----------------------------------------------------------
+
+`XenSwdgn~emul_ns16x50_dom_clear_dlab~1`
+
+Description:
+The domain shall clear the divisor latch access bit of the line control
+register before accessing the receiver buffer register, the transmit holding
+register or the interrupt enable register.
+
+Rationale:
+The divisor latch registers share their I/O port offsets with the receiver
+buffer register, the transmit holding register and the interrupt enable
+register. Xen discards received characters while the divisor latch access bit
+is set.
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Set the out2 bit of the modem control register to receive interrupts
+--------------------------------------------------------------------
+
+`XenSwdgn~emul_ns16x50_dom_set_out2~1`
+
+Description:
+The domain shall set the out2 bit of the modem control register in order to
+receive UART interrupts.
+
+Rationale:
+On a PC compatible UART the out2 output gates the interrupt line, and Xen
+emulates that gating. A domain which leaves out2 clear does not receive UART
+interrupts irrespective of the contents of the interrupt enable register.
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Access the UART registers with the supported access widths
+-----------------------------------------------------------
+
+`XenSwdgn~emul_ns16x50_dom_access_width~1`
+
+Description:
+The domain shall access the UART registers with an 8-bit access, other than
+the divisor latch registers which may also be accessed with a naturally
+aligned 16-bit access.
+
+Rationale:
+Xen discards an access which is not naturally aligned, which is wider than
+16 bits, or which is a 16-bit access to a register other than the divisor
+latch registers.
+
+Comments:
+A discarded access does not raise an exception in the domain. A read returns
+an all ones value.
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Do not rely on the reserved bits of the UART registers
+-------------------------------------------------------
+
+`XenSwdgn~emul_ns16x50_dom_reserved_bits~1`
+
+Description:
+The domain shall not rely on the value of the reserved bits of the interrupt
+enable register, the modem control register and the FIFO control register.
+
+Rationale:
+Xen discards the reserved bits on a write, so they read as zero.
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
+
+Do not rely on the UART state being preserved across save and restore
+----------------------------------------------------------------------
+
+`XenSwdgn~emul_ns16x50_dom_no_save_restore~1`
+
+Description:
+The domain shall not rely on the state of the UART being preserved across a
+save and restore of the domain.
+
+Rationale:
+Xen does not include the emulated UART state in the domain save image.
+
+Comments:
+
+Covers:
+ - `XenProd~emul_ns16x50~1`
