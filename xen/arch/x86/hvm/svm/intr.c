@@ -30,12 +30,14 @@
 static void svm_inject_nmi(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
-    u32 general1_intercepts = vmcb_get_general1_intercepts(vmcb);
+    vintr_t vintr = vmcb_get_vintr(vmcb);
+    uint32_t general1_intercepts;
     intinfo_t event;
 
-    if ( vmcb->_vintr.fields.vnmi_enable )
+    if ( vintr.fields.vnmi_enable )
     {
-        vmcb->_vintr.fields.vnmi_pending = true;
+        vintr.fields.vnmi_pending = true;
+        vmcb_set_vintr(vmcb, vintr);
         return;
     }
 
@@ -51,6 +53,7 @@ static void svm_inject_nmi(struct vcpu *v)
      * SVM does not virtualise the NMI mask, so we emulate it by intercepting
      * the next IRET and blocking NMI injection until the intercept triggers.
      */
+    general1_intercepts = vmcb_get_general1_intercepts(vmcb);
     vmcb_set_general1_intercepts(
         vmcb, general1_intercepts | GENERAL1_INTERCEPT_IRET);
 }
