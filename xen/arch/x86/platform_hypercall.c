@@ -295,7 +295,7 @@ ret_t do_platform_op(
             ret = __copy_field_to_guest(u_xenpf_op, op, u.add_memtype) ?
                   -EFAULT : 0;
             if ( ret != 0 )
-                mtrr_del_page(ret, 0, 0);
+                mtrr_del_page(op->u.add_memtype.reg, 0, 0);
         }
         break;
 
