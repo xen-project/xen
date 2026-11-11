@@ -30,13 +30,13 @@ static module_t __initdata mb_modules[5];
 
 static void __init edd_put_string(u8 *dst, size_t n, const char *src)
 {
-    while ( n-- && *src )
-       *dst++ = *src++;
+    for ( ; n && *src; --n )
+        *dst++ = *src++;
     if ( *src )
-       PrintErrMesg(L"Internal error populating EDD info",
-                    EFI_BUFFER_TOO_SMALL);
+        PrintErrMesg(L"Internal error populating EDD info",
+                     EFI_BUFFER_TOO_SMALL);
     while ( n-- )
-       *dst++ = ' ';
+        *dst++ = ' ';
 }
 #define edd_put_string(d, s) edd_put_string(d, ARRAY_SIZE(d), s)
 
