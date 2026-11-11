@@ -19,7 +19,8 @@
 
 bool hvm_domain_use_pirq(const struct domain *d, const struct pirq *pirq)
 {
-    return is_hvm_domain(d) && pirq && pirq->arch.hvm.emuirq != IRQ_UNBOUND;
+    ASSERT(is_hvm_domain(d));
+    return has_pirq(d) && pirq && pirq->arch.hvm.emuirq != IRQ_UNBOUND;
 }
 
 /* Must be called with hvm_domain->irq_lock hold */
@@ -382,7 +383,7 @@ int hvm_inject_msi(struct domain *d, uint64_t addr, uint32_t data)
         >> MSI_DATA_TRIGGER_SHIFT;
     uint8_t vector = data & MSI_DATA_VECTOR_MASK;
 
-    if ( !vector )
+    if ( has_pirq(d) && !vector )
     {
         unsigned int pirq = ((addr >> 32) & 0xffffff00U) | dest;
 
