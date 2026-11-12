@@ -477,6 +477,9 @@ static void __init riscv_fill_hwcap_from_isa_string(void)
         if ( !dt_device_type_is_equal(cpu, "cpu") )
             continue;
 
+        if ( !dt_device_is_available(cpu) )
+            continue;
+
         if ( dt_get_cpuid_from_node(cpu, &cpuid) < 0 )
             continue;
 
@@ -517,6 +520,9 @@ static bool __init has_isa_extensions_property(void)
         const char *isa;
 
         if ( !dt_device_type_is_equal(cpu, "cpu") )
+            continue;
+
+        if ( !dt_device_is_available(cpu) )
             continue;
 
         if ( dt_property_read_string(cpu, "riscv,isa-extensions", &isa) )
