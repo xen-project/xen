@@ -837,25 +837,17 @@
 #define INSN_MASK_FENCE_TSO		0xffffffff
 #define INSN_MATCH_FENCE_TSO		0x8330000f
 
-#if __riscv_xlen == 64
+/* 64-bit read for VS-stage address translation (VSXLEN=64) */
+#define INSN_PSEUDO_VS_LOAD64		0x00003000
 
-/* 64-bit read for VS-stage address translation (RV64) */
-#define INSN_PSEUDO_VS_LOAD		0x00003000
+/* 64-bit write for VS-stage address translation (VSXLEN=64) */
+#define INSN_PSEUDO_VS_STORE64		0x00003020
 
-/* 64-bit write for VS-stage address translation (RV64) */
-#define INSN_PSEUDO_VS_STORE	0x00003020
+/* 32-bit read for VS-stage address translation (VSXLEN=32) */
+#define INSN_PSEUDO_VS_LOAD32		0x00002000
 
-#elif __riscv_xlen == 32
-
-/* 32-bit read for VS-stage address translation (RV32) */
-#define INSN_PSEUDO_VS_LOAD		0x00002000
-
-/* 32-bit write for VS-stage address translation (RV32) */
-#define INSN_PSEUDO_VS_STORE	0x00002020
-
-#else
-#error "Unexpected __riscv_xlen"
-#endif
+/* 32-bit write for VS-stage address translation (VSXLEN=32) */
+#define INSN_PSEUDO_VS_STORE32		0x00002020
 
 #define INSN_IS_16BIT(insn)	(((insn) & 3) != 3)
 #define INSN_IS_32BIT(insn)	(!INSN_IS_16BIT(insn) && ((insn) & 0x1c) != 0x1c)
