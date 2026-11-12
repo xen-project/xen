@@ -26,7 +26,7 @@ static inline int mwait_idle_init(struct notifier_block *nfb)
 int cpuidle_init_cpu(unsigned int cpu);
 void cf_check default_dead_idle(void);
 void cf_check acpi_dead_idle(void);
-void play_dead(void);
+void noreturn play_dead(void);
 void trace_exit_reason(u32 *irq_traced);
 void update_idle_stats(struct acpi_processor_power *power,
                        struct acpi_processor_cx *cx,

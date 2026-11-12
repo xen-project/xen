@@ -2163,7 +2163,7 @@ static void __context_switch(void)
     per_cpu(curr_vcpu, cpu) = n;
 }
 
-void context_switch(struct vcpu *prev, struct vcpu *next)
+void noreturn context_switch(struct vcpu *prev, struct vcpu *next)
 {
     unsigned int cpu = smp_processor_id();
     struct cpu_info *info = get_cpu_info();
@@ -2240,7 +2240,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     reset_stack_and_call_ind(nextd->arch.ctxt_switch->tail);
 }
 
-void continue_running(struct vcpu *same)
+void noreturn continue_running(struct vcpu *same)
 {
     reset_stack_and_call_ind(same->domain->arch.ctxt_switch->tail);
 }

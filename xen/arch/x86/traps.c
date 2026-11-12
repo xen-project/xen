@@ -1067,7 +1067,7 @@ const char *vector_name(unsigned int vec)
     return (vec < ARRAY_SIZE(names) && names[vec][0]) ? names[vec] : "???";
 }
 
-void asmlinkage do_double_fault(struct cpu_user_regs *regs)
+void asmlinkage noreturn do_double_fault(struct cpu_user_regs *regs)
 {
     unsigned int cpu;
     struct extra_state state;

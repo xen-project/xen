@@ -326,7 +326,7 @@ static void set_cpu_sibling_map(unsigned int cpu)
     }
 }
 
-void asmlinkage start_secondary(void)
+void asmlinkage noreturn start_secondary(void)
 {
     struct cpu_info *info = get_cpu_info();
     unsigned int cpu = smp_processor_id();
