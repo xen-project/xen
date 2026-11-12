@@ -2198,12 +2198,12 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
 {
     l1_pgentry_t ol1e = l1e_read(pl1e);
     struct domain *pt_dom = pt_vcpu->domain;
-    int rc = 0;
 
     ASSERT(!paging_mode_refcounts(pt_dom));
 
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
     {
+        int rc;
         struct page_info *page = NULL;
         uint32_t disallow = l1_disallow_mask(pt_dom);
 
@@ -2277,16 +2277,14 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
         }
         if ( page )
             put_page(page);
-
-        UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu, update_flags);
     }
     else if ( pv_l1tf_check_l1e(pt_dom, nl1e) )
         return -ERESTART;
-    else
-        UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu, update_flags);
+
+    UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu, update_flags);
 
     put_page_from_l1e(ol1e, pt_dom);
-    return rc;
+    return 0;
 }
 
 
@@ -2301,7 +2299,6 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
     struct domain *d = vcpu->domain;
     struct page_info *l2pg = mfn_to_page(mfn);
     unsigned long type = l2pg->u.inuse.type_info;
-    int rc = 0;
 
     if ( unlikely(!is_guest_l2_slot(d, type, pgentry_ptr_to_slot(pl2e))) )
     {
@@ -2314,6 +2311,8 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
 
     if ( l2e_get_flags(nl2e) & _PAGE_PRESENT )
     {
+        int rc;
+
         if ( unlikely(l2e_get_flags(nl2e) & L2_DISALLOW_MASK) )
         {
             gdprintk(XENLOG_WARNING, "Bad L2 flags %x\n",
@@ -2330,19 +2329,19 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
             return 0;
         }
 
-        if ( unlikely((rc = get_page_from_l2e(nl2e, mfn, d, 0)) < 0) )
+        rc = get_page_from_l2e(nl2e, mfn, d, 0);
+        if ( unlikely(rc < 0) )
             return rc;
-
-        UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, mfn, vcpu, update_flags);
+        ASSERT(rc == 0);
     }
     else if ( pv_l1tf_check_l2e(d, nl2e) )
         return -ERESTART;
-    else
-        UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, mfn, vcpu, update_flags);
+
+    UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, mfn, vcpu, update_flags);
 
     put_page_from_l2e(ol2e, mfn, PTF_defer);
 
-    return rc;
+    return 0;
 }
 
 /* Update the L3 entry at pl3e to new value nl3e. pl3e is within frame mfn. */
@@ -2354,7 +2353,6 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
 {
     l3_pgentry_t ol3e;
     struct domain *d = vcpu->domain;
-    int rc = 0;
 
     /*
      * Disallow updates to final L3 slot. It contains Xen mappings, and it
@@ -2367,6 +2365,8 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
 
     if ( l3e_get_flags(nl3e) & _PAGE_PRESENT )
     {
+        int rc;
+
         if ( unlikely(l3e_get_flags(nl3e) & l3_disallow_mask(d)) )
         {
             gdprintk(XENLOG_WARNING, "Bad L3 flags %x\n",
@@ -2386,17 +2386,15 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         rc = get_page_from_l3e(nl3e, mfn, d, 0);
         if ( unlikely(rc < 0) )
             return rc;
-        rc = 0;
-
-        UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, mfn, vcpu, update_flags);
+        ASSERT(rc == 0);
     }
     else if ( pv_l1tf_check_l3e(d, nl3e) )
         return -ERESTART;
-    else
-        UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, mfn, vcpu, update_flags);
+
+    UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, mfn, vcpu, update_flags);
 
     put_page_from_l3e(ol3e, mfn, PTF_defer);
-    return rc;
+    return 0;
 }
 
 /* Update the L4 entry at pl4e to new value nl4e. pl4e is within frame mfn. */
@@ -2408,7 +2406,6 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
 {
     struct domain *d = vcpu->domain;
     l4_pgentry_t ol4e;
-    int rc = 0;
 
     if ( unlikely(!is_guest_l4_slot(d, pgentry_ptr_to_slot(pl4e))) )
     {
@@ -2421,6 +2418,8 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
 
     if ( l4e_get_flags(nl4e) & _PAGE_PRESENT )
     {
+        int rc;
+
         if ( unlikely(l4e_get_flags(nl4e) & L4_DISALLOW_MASK) )
         {
             gdprintk(XENLOG_WARNING, "Bad L4 flags %x\n",
@@ -2440,17 +2439,15 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
         rc = get_page_from_l4e(nl4e, mfn, d, 0);
         if ( unlikely(rc < 0) )
             return rc;
-        rc = 0;
-
-        UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, mfn, vcpu, update_flags);
+        ASSERT(rc == 0);
     }
     else if ( pv_l1tf_check_l4e(d, nl4e) )
         return -ERESTART;
-    else
-        UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, mfn, vcpu, update_flags);
+
+    UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, mfn, vcpu, update_flags);
 
     put_page_from_l4e(ol4e, mfn, PTF_defer);
-    return rc;
+    return 0;
 }
 #endif /* CONFIG_PV */
 
