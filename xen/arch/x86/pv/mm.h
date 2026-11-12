@@ -64,16 +64,22 @@ static inline intpte_t paging_cmpxchg_guest_entry(
 
 #define PTE_UPDATE_PRESERVE_AD  (1u << 0)
 #define PTE_UPDATE_NO_TRANSLATE (1u << 1)
+#define PTE_UPDATE_SWAP         (1u << 2)
 
 /*
  * How to write an entry to the guest pagetables.
+ * If the SWAP flag is set then does an atomic swap and returns the old PTE
+ * value.
  */
-static inline void update_intpte(intpte_t *p, intpte_t old, intpte_t new,
-                                 mfn_t mfn, struct vcpu *v, unsigned int flags)
+static inline intpte_t update_intpte(intpte_t *p, intpte_t old, intpte_t new,
+                                     mfn_t mfn, struct vcpu *v, unsigned int flags)
 {
 #ifndef PTE_UPDATE_WITH_CMPXCHG
-    if ( !(flags & PTE_UPDATE_PRESERVE_AD) )
+    if ( !(flags & (PTE_UPDATE_PRESERVE_AD|PTE_UPDATE_SWAP)) )
+    {
         paging_write_guest_entry(v, p, new, mfn);
+        return 0;
+    }
     else
 #endif
     {
@@ -95,6 +101,8 @@ static inline void update_intpte(intpte_t *p, intpte_t old, intpte_t new,
             old = t;
         }
     }
+
+    return old;
 }
 
 /*
