@@ -377,7 +377,7 @@ static always_inline void sched_spin_lock_double(
     {
         *flags = _spin_lock_irqsave(lock1);
     }
-    else if ( lock1 < lock2 )
+    else if ( (unsigned long)lock1 < (unsigned long)lock2 )
     {
         *flags = _spin_lock_irqsave(lock1);
         _spin_lock(lock2);
