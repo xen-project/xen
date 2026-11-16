@@ -31,4 +31,7 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC)/tests
 	$(INSTALL_PROG) test-ocaml-bindings $(DESTDIR)$(LIBEXEC)/tests
 
+uninstall:
+	$(RM) -- $(DESTDIR)$(LIBEXEC)/tests/test-ocaml-bindings
+
 include $(OCAML_TOPLEVEL)/Makefile.rules
