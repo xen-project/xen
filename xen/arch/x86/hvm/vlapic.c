@@ -247,10 +247,12 @@ bool vlapic_match_dest(
     switch ( short_hand )
     {
     case APIC_DEST_NOSHORT:
+        /* All ones is a broadcast in either destination mode. */
+        if ( dest == _VLAPIC_ID(target, 0xffffffffU) )
+            return true;
         if ( dest_mode )
             return vlapic_match_logical_addr(target, dest);
-        return (dest == _VLAPIC_ID(target, 0xffffffffU)) ||
-               (dest == VLAPIC_ID(target));
+        return dest == VLAPIC_ID(target);
 
     case APIC_DEST_SELF:
         return (target == source);
