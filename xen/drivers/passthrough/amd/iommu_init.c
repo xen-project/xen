@@ -91,9 +91,8 @@ static void register_iommu_dev_table_in_mmio_space(struct amd_iommu *iommu)
 
     entry = 0;
     iommu_set_addr_lo_to_reg(&entry, addr_lo >> PAGE_SHIFT);
-    set_field_in_reg_u32(ROUNDUP(iommu->dev_table.entries *
-                                 IOMMU_DEV_TABLE_ENTRY_SIZE,
-                                 PAGE_SIZE) - 1,
+    set_field_in_reg_u32(PFN_UP(iommu->dev_table.entries *
+                                IOMMU_DEV_TABLE_ENTRY_SIZE) - 1,
                          entry, IOMMU_DEV_TABLE_SIZE_MASK,
                          IOMMU_DEV_TABLE_SIZE_SHIFT, &entry);
     writel(entry, iommu->mmio_base + IOMMU_DEV_TABLE_BASE_LOW_OFFSET);
