@@ -381,7 +381,7 @@ void cf_check vcpu_imsic_deinit(struct vcpu *v)
 int __init imsic_init(const struct dt_device_node *node)
 {
     int rc;
-    unsigned long reloff, hartid;
+    unsigned long reloff, hartid, nr_slots = 0;
     unsigned int nr_parent_irqs, index, nr_handlers = 0;
     paddr_t base_addr;
     unsigned int nr_mmios;
@@ -415,9 +415,11 @@ int __init imsic_init(const struct dt_device_node *node)
     /* Check MMIO register sets */
     for ( unsigned int i = 0; i < nr_mmios; i++ )
     {
-        unsigned int guest_bits = imsic_cfg.guest_index_bits;
-        unsigned long expected_mmio_size =
-            IMSIC_HART_SIZE(guest_bits) * nr_parent_irqs;
+        /* Address space of one group: BIT(hart_index_bits) hart slots. */
+        unsigned long group_size = BIT(imsic_cfg.guest_index_bits +
+                                       imsic_cfg.hart_index_bits +
+                                       IMSIC_MMIO_PAGE_SHIFT, UL);
+        unsigned long offset;
 
         rc = dt_device_get_address(node, i, &mmios[i].base_addr,
                                    &mmios[i].size);
@@ -429,9 +431,7 @@ int __init imsic_init(const struct dt_device_node *node)
         }
 
         base_addr = mmios[i].base_addr;
-        base_addr &= ~(BIT(guest_bits +
-                           imsic_cfg.hart_index_bits +
-                           IMSIC_MMIO_PAGE_SHIFT, UL) - 1);
+        base_addr &= ~(group_size - 1);
         base_addr &= ~((BIT(imsic_cfg.group_index_bits, UL) - 1) <<
                        imsic_cfg.group_index_shift);
         if ( base_addr != imsic_cfg.base_addr )
@@ -442,14 +442,33 @@ int __init imsic_init(const struct dt_device_node *node)
             goto imsic_init_err;
         }
 
-        if ( mmios[i].size != expected_mmio_size )
+        /* A register set must not run past the end of its group. */
+        offset = mmios[i].base_addr & (group_size - 1);
+        if ( mmios[i].size > group_size - offset )
         {
             rc = -EINVAL;
-            printk(XENLOG_ERR "%s: IMSIC MMIO size is incorrect %ld, expected MMIO size: %ld\n",
-                   node->name, mmios[i].size, expected_mmio_size);
+            printk(XENLOG_ERR
+                   "%s: IMSIC MMIO regset %u (offset %#lx + size %#lx) exceeds group size %#lx\n",
+                   node->name, i, offset, mmios[i].size, group_size);
             goto imsic_init_err;
         }
+
+        /* The last slot may be cut short, see the lookup below. */
+        nr_slots += DIV_ROUND_UP(mmios[i].size,
+                                 IMSIC_HART_SIZE(imsic_cfg.guest_index_bits));
     }
+
+    /*
+     * Parent irq i is given hart slot i, counting slots across the register
+     * sets in order. A slot with no hart behind it therefore shifts every
+     * later irq one slot early, onto the previous hart's interrupt file.
+     * Counting can't tell that from harmless unused slots at the end, hence
+     * only a warning.
+     */
+    if ( nr_slots > nr_parent_irqs )
+        printk(XENLOG_WARNING
+               "%s: %lu hart slots in IMSIC MMIO regsets for %u parent irqs\n",
+               node->name, nr_slots, nr_parent_irqs);
 
     /* Configure handlers for target CPUs */
     for ( unsigned int i = 0; i < nr_parent_irqs; i++ )
