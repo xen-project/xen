@@ -654,11 +654,38 @@ static int __init fdt_property_interrupts(const struct kernel_info *kinfo,
                                           unsigned int num_irq)
 {
     int res;
+    uint32_t intrcells = ARRAY_SIZE(intr[0]);
+    void *val;
+    unsigned int i, stride;
 
-    res = fdt_property(kinfo->fdt, "interrupts",
-                       intr, sizeof(intr[0]) * num_irq);
+    /*
+     * Only the hardware domain preserves the host GIC's #interrupt-cells,
+     * since its device interrupt properties are copied from the host DT;
+     * domUs always use a 3-cell virtual GIC. Any extra cells beyond the
+     * 3-cell specifier, such as the GICv3 PPI affinity partition, are
+     * zero-padded.
+     */
+    if ( is_hardware_domain(kinfo->bd.d) )
+    {
+        const struct dt_device_node *gic = dt_interrupt_controller;
+
+        if ( !dt_property_read_u32(gic, "#interrupt-cells", &intrcells) )
+            return -FDT_ERR_XEN(ENOENT);
+
+        if ( intrcells < ARRAY_SIZE(intr[0]) )
+            return -FDT_ERR_XEN(ERANGE);
+    }
+
+    stride = intrcells * sizeof(intr[0][0]);
+    res = fdt_property_placeholder(kinfo->fdt, "interrupts",
+                                   stride * num_irq, &val);
     if ( res )
         return res;
+
+    memset(val, 0, stride * num_irq);
+
+    for ( i = 0; i < num_irq; i++ )
+        memcpy((uint8_t *)val + i * stride, intr[i], sizeof(intr[0]));
 
     res = fdt_property_cell(kinfo->fdt, "interrupt-parent",
                             kinfo->phandle_intc);
@@ -1320,6 +1347,7 @@ static int __init make_gic_node(const struct domain *d, void *fdt,
     int res = 0;
     const void *addrcells, *sizecells;
     u32 addrcells_len, sizecells_len;
+    uint32_t intrcells;
     const char *name;
 
     /*
@@ -1370,7 +1398,13 @@ static int __init make_gic_node(const struct domain *d, void *fdt,
             return res;
     }
 
-    res = fdt_property_cell(fdt, "#interrupt-cells", 3);
+    if ( !dt_property_read_u32(gic, "#interrupt-cells", &intrcells) )
+        return -FDT_ERR_XEN(ENOENT);
+
+    if ( intrcells < 3 )
+        return -FDT_ERR_XEN(ERANGE);
+
+    res = fdt_property_cell(fdt, "#interrupt-cells", intrcells);
     if ( res )
         return res;
 
