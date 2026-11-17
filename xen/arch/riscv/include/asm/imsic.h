@@ -90,8 +90,8 @@ void imsic_irq_disable(unsigned int hwirq);
 
 void imsic_ids_local_delivery(bool enable);
 
-int vcpu_imsic_init(struct vcpu *v);
-void vcpu_imsic_deinit(struct vcpu *v);
+int cf_check vcpu_imsic_init(struct vcpu *v);
+void cf_check vcpu_imsic_deinit(struct vcpu *v);
 unsigned int vcpu_guest_file_id(const struct vcpu *v);
 
 int vimsic_make_domu_dt_node(struct kernel_info *kinfo, unsigned int *phandle);
