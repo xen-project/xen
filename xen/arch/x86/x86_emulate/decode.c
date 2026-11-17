@@ -650,8 +650,6 @@ decode_onebyte(struct x86_emulate_state *s,
     case 0xc4: /* les */
     case 0xc5: /* lds */
     case 0xce: /* into */
-    case 0xd4: /* aam */
-    case 0xd5: /* aad */
     case 0xd6: /* salc / udb */
         s->not_64bit = true;
         break;
@@ -688,6 +686,17 @@ decode_onebyte(struct x86_emulate_state *s,
         if ( s->op_bytes == 8 ) /* Fetch more bytes to obtain imm64. */
             s->imm1 = ((uint32_t)s->imm1 |
                        ((uint64_t)insn_fetch_type(uint32_t) << 32));
+        break;
+
+    case 0xd4: /* aam */
+    case 0xd5: /* aad */
+        s->not_64bit = true;
+        fallthrough;
+    case 0xc0: case 0xc1: /* Grp2 */
+    case 0xcd: /* int imm8 */
+    case 0xe4 ... 0xe7: /* in/out imm8 */
+        /* The 8-bit immediate is unsigned. */
+        s->imm1 &= 0xff;
         break;
 
     case 0xc8: /* enter imm16,imm8 */
@@ -1796,6 +1805,9 @@ int x86emul_decode(struct x86_emulate_state *s,
         break;
 
     case ext_0f:
+        /* All immediates in this encoding space are unsigned ones. */
+        if ( (d & SrcMask) == SrcImmByte )
+            s->imm1 &= 0xff;
         rc = decode_twobyte(s, ctxt, ops);
         break;
 
@@ -1804,6 +1816,8 @@ int x86emul_decode(struct x86_emulate_state *s,
         break;
 
     case ext_0f3a:
+        /* All immediates in this encoding space are unsigned ones. */
+        s->imm1 &= 0xff;
         d = ext0f3a_table[b].to_mem ? DstMem | SrcReg : DstReg | SrcMem;
         if ( ext0f3a_table[b].two_op )
             d |= TwoOp;
@@ -1814,6 +1828,8 @@ int x86emul_decode(struct x86_emulate_state *s,
         break;
 
     case ext_8f08:
+        /* All immediates in this space can be viewed as unsigned ones. */
+        s->imm1 &= 0xff;
         d = DstReg | SrcMem;
         if ( ext8f08_table[b].two_op )
             d |= TwoOp;
