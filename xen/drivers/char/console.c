@@ -1286,21 +1286,35 @@ bool __printk_ratelimit(unsigned int ratelimit_ms,
                         unsigned int ratelimit_burst)
 {
     static DEFINE_SPINLOCK(ratelimit_lock);
-    static unsigned long toks = 10 * 5 * 1000;
+    static unsigned int toks = UINT_MAX;
     static unsigned long last_msg;
     static unsigned int missed;
+    unsigned int limit;
+    unsigned int elapsed;
     unsigned long flags;
-    unsigned long long now = NOW(); /* ns */
     unsigned long ms;
+    s_time_t now;
 
-    do_div(now, 1000000);
-    ms = (unsigned long)now;
+    if ( !ratelimit_ms || !ratelimit_burst )
+        return true;
+
+    if ( __builtin_umul_overflow(ratelimit_burst, ratelimit_ms, &limit) )
+        limit = UINT_MAX;
+
+    now = NOW(); /* ns */
+    do_div(now, MILLISECS(1));
+    ms = now;
 
     spin_lock_irqsave(&ratelimit_lock, flags);
-    toks += ms - last_msg;
+
+    elapsed = ms - last_msg;
+    if ( toks >= limit || elapsed >= limit - toks )
+        toks = limit;
+    else
+        toks += elapsed;
+
     last_msg = ms;
-    if ( toks > (ratelimit_burst * ratelimit_ms))
-        toks = ratelimit_burst * ratelimit_ms;
+
     if ( toks >= ratelimit_ms )
     {
         unsigned int lost = missed;
