@@ -87,6 +87,7 @@
  * doing the final put_page(), and remove it from the iommu if so.
  */
 
+#include <xen/brk.h>
 #include <xen/domain.h>
 #include <xen/domain_page.h>
 #include <xen/efi.h>
@@ -336,6 +337,8 @@ void __init arch_init_memory(void)
     subarch_init_memory();
 
     efi_init_memory();
+
+    brk_free_unused();
 
 #ifndef NDEBUG
     if ( highmem_start )

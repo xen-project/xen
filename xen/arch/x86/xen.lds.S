@@ -316,12 +316,7 @@ SECTIONS
   LLVM_COV_RW_DATA
 
   DECL_SECTION(.bss) {
-       __bss_start = .;
-       *(.bss.page_aligned*)
-       PERCPU_BSS
-       *(.bss .bss.*)
-       . = ALIGN(POINTER_ALIGN);
-       __bss_end = .;
+       BSS_WITH_BRK
   } PHDR(text)
   _end = . ;
 

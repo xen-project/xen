@@ -15,6 +15,7 @@ config X86
 	select FUNCTION_ALIGNMENT_16B
 	select GENERIC_BUG_FRAME
 	select HAS_ALTERNATIVE
+	select HAS_BRK_ALLOCATOR
 	select HAS_COMPAT
 	select HAS_CPUFREQ
 	select HAS_DIT

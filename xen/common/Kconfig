@@ -118,6 +118,9 @@ config GENERIC_BUG_FRAME
 config HAS_ALTERNATIVE
 	bool
 
+config HAS_BRK_ALLOCATOR
+	bool
+
 config HAS_COMPAT
 	bool
 

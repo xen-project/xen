@@ -221,6 +221,18 @@
        . = ALIGN(SMP_CACHE_BYTES); \
        __per_cpu_data_end = .;     \
 
+#define BSS_WITH_BRK               \
+       __bss_start = .;            \
+       *(.bss.page_aligned*)       \
+       PERCPU_BSS                  \
+       *(.bss .bss.[a-zA-Z0-9_]*)  \
+       . = ALIGN(PAGE_SIZE);       \
+       __brk_start = .;            \
+       *(.bss..brk.page_aligned*)  \
+       *(.bss..brk*)               \
+       . = ALIGN(POINTER_ALIGN);   \
+       __bss_end = .;
+
 #ifdef CONFIG_HAS_VPCI
 #define VPCI_ARRAY               \
        . = ALIGN(POINTER_ALIGN); \

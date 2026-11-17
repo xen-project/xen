@@ -79,6 +79,16 @@ void vprintk(const char *fmt, va_list args)
     }                                           \
 })
 
+#define printk_once_init(fmt, args...)          \
+({                                              \
+    static bool __initdata once_;               \
+    if ( unlikely(!once_) )                     \
+    {                                           \
+        once_ = true;                           \
+        printk(fmt, ## args);                   \
+    }                                           \
+})
+
 extern void guest_printk(const struct domain *d, const char *fmt, ...)
     __attribute__ ((format (printf, 2, 3)));
 extern void noreturn panic(const char *fmt, ...)
