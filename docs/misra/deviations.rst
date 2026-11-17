@@ -65,6 +65,13 @@ Deviations related to MISRA C:2012 Rules:
      - Tagged as `safe` for ECLAIR.
 
    * - R2.1
+     - Some functions are intended to be not referenced.
+       Support for gc-sections in the Xen build is intended to be introduced,
+       so that such functions are discarded from the final binary and this
+       deviation can be removed for them.
+     - Tagged as `deliberate` for ECLAIR.
+
+   * - R2.1
      - Unreachability caused by calls to the following functions or macros is
        deliberate and there is no risk of code being unexpectedly left out.
      - Tagged as `deliberate` for ECLAIR. Such macros are:

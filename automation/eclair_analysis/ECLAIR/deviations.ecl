@@ -8,7 +8,10 @@ Constant expressions and unreachable branches of if and switch statements are ex
 -config=MC3A2.R2.1,+reports={safe,"first_area(^.*incompatible with labeled statement$)"}
 -doc_end
 
--doc_begin="Some functions are intended to be not referenced."
+-doc_begin="Some functions are intended to be not referenced.
+Support for gc-sections in the Xen build is intended to be introduced, so that
+such functions are discarded from the final binary and this deviation can be
+removed for them."
 -config=MC3A2.R2.1,+reports={deliberate,"first_area(^.*is never referenced$)"}
 -doc_end
 
