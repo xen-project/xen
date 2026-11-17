@@ -19,6 +19,7 @@
  * Copyright (c) 2019 Assured Information Security.
  */
 
+#include <xen/brk.h>
 #include <xen/delay.h>
 #include <xen/iommu.h>
 #include <xen/mm.h>
@@ -27,6 +28,7 @@
 #include <xen/serial.h>
 #include <xen/timer.h>
 #include <xen/types.h>
+
 #include <asm/fixmap.h>
 #include <asm/io.h>
 #include <asm/string.h>
@@ -1332,7 +1334,7 @@ static struct uart_driver dbc_uart_driver = {
 };
 
 /* Those are accessed via DMA. */
-struct dbc_dma_bufs {
+struct __aligned(PAGE_SIZE) dbc_dma_bufs {
     struct xhci_trb evt_trb[DBC_TRB_RING_CAP];
     struct xhci_trb out_trb[DBC_TRB_RING_CAP];
     struct xhci_trb in_trb[DBC_TRB_RING_CAP];
@@ -1346,8 +1348,7 @@ struct dbc_dma_bufs {
      * DMA-reachable by the USB controller.
      */
 };
-static struct dbc_dma_bufs __section(".bss.page_aligned") __aligned(PAGE_SIZE)
-    dbc_dma_bufs;
+DEFINE_BRK(xhci, sizeof(struct dbc_dma_bufs));
 
 static int __init cf_check xhci_parse_dbgp(const char *opt_dbgp)
 {
@@ -1424,24 +1425,33 @@ void __init xhci_dbc_uart_init(void)
 {
     struct dbc_uart *uart = &dbc_uart;
     struct dbc *dbc = &uart->dbc;
+    struct dbc_dma_bufs *dma_bufs;
 
     if ( !dbc->enable )
         return;
 
-    dbc->dbc_ctx = &dbc_dma_bufs.ctx;
-    dbc->dbc_erst = &dbc_dma_bufs.erst;
-    dbc->dbc_ering.trb = dbc_dma_bufs.evt_trb;
-    dbc->dbc_oring.trb = dbc_dma_bufs.out_trb;
-    dbc->dbc_iring.trb = dbc_dma_bufs.in_trb;
-    dbc->dbc_owork.buf = dbc_dma_bufs.out_wrk_buf;
-    dbc->dbc_iwork.buf = dbc_dma_bufs.in_wrk_buf;
-    dbc->dbc_str = dbc_dma_bufs.str_buf;
+    dma_bufs = brk_alloc(sizeof(*dma_bufs));
+    if ( !dma_bufs )
+    {
+        dbc->enable = false;
+        printk(XENLOG_ERR "XHCI: not enough BRK space available\n");
+        return;
+    }
+
+    dbc->dbc_ctx = &dma_bufs->ctx;
+    dbc->dbc_erst = &dma_bufs->erst;
+    dbc->dbc_ering.trb = dma_bufs->evt_trb;
+    dbc->dbc_oring.trb = dma_bufs->out_trb;
+    dbc->dbc_iring.trb = dma_bufs->in_trb;
+    dbc->dbc_owork.buf = dma_bufs->out_wrk_buf;
+    dbc->dbc_iwork.buf = dma_bufs->in_wrk_buf;
+    dbc->dbc_str = dma_bufs->str_buf;
 
     if ( dbc_open(dbc) )
     {
         iommu_add_extra_reserved_device_memory(
-                PFN_DOWN(virt_to_maddr(&dbc_dma_bufs)),
-                PFN_UP(sizeof(dbc_dma_bufs)),
+                PFN_DOWN(virt_to_maddr(dma_bufs)),
+                PFN_DOWN(sizeof(*dma_bufs)),
                 uart->dbc.sbdf,
                 "XHCI console");
         serial_register_uart(SERHND_XHCI, &dbc_uart_driver, &dbc_uart);
