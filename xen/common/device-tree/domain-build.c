@@ -2,6 +2,7 @@
 
 #include <xen/bootinfo.h>
 #include <xen/domain-layout.h>
+#include <xen/efi.h>
 #include <xen/fdt-domain-build.h>
 #include <xen/init.h>
 #include <xen/lib.h>
@@ -504,6 +505,42 @@ int __init make_chosen_node(const struct kernel_info *kinfo)
     return res;
 }
 
+static bool __init is_in_host_ram(const struct membank *bank)
+{
+    const struct membanks *ram = bootinfo_get_mem();
+    paddr_t start = bank->start;
+    paddr_t end = start + bank->size;
+    unsigned int i;
+
+    if ( end < start )
+        return false;
+
+    for ( i = 0; i < ram->nr_banks; i++ )
+    {
+        paddr_t ram_start = ram->bank[i].start;
+        paddr_t ram_end = ram_start + ram->bank[i].size;
+
+        if ( start < ram_start )
+            return false;
+
+        if ( end <= ram_end )
+            return true;
+
+        if ( start < ram_end )
+            start = ram_end;
+    }
+
+    return false;
+}
+
+static bool __init skip_memory_bank(const struct membank *bank, bool check_ram)
+{
+    if ( bank->type != MEMBANK_DEFAULT )
+        return true;
+
+    return check_ram && !is_in_host_ram(bank);
+}
+
 int __init make_memory_node(const struct kernel_info *kinfo, int addrcells,
                             int sizecells, const struct membanks *mem)
 {
@@ -513,13 +550,20 @@ int __init make_memory_node(const struct kernel_info *kinfo, int addrcells,
     int nr_cells = 0;
     __be32 reg[DT_MEM_NODE_REG_RANGE_SIZE];
     __be32 *cells;
+    bool check_ram;
 
     if ( mem->nr_banks == 0 )
         return -ENOENT;
 
-    /* find the first memory range that is reserved for device (or firmware) */
+    /*
+     * When booting via EFI, bootinfo_get_mem() only holds usable memory and
+     * excludes reserved regions, so skip the host RAM check in that case.
+     */
+    check_ram = (mem == bootinfo_get_reserved_mem()) && !efi_enabled(EFI_BOOT);
+
+    /* Find the first memory bank to include in the /memory node. */
     for ( i = 0; i < mem->nr_banks &&
-                 (mem->bank[i].type != MEMBANK_DEFAULT); i++ )
+                 skip_memory_bank(&mem->bank[i], check_ram); i++ )
         ;
 
     if ( i == mem->nr_banks )
@@ -541,7 +585,7 @@ int __init make_memory_node(const struct kernel_info *kinfo, int addrcells,
         u64 start = mem->bank[i].start;
         u64 size = mem->bank[i].size;
 
-        if ( mem->bank[i].type != MEMBANK_DEFAULT )
+        if ( skip_memory_bank(&mem->bank[i], check_ram) )
             continue;
 
         nr_cells += reg_size;
