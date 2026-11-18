@@ -532,7 +532,13 @@ static vaddr_t exception_handler64(struct cpu_user_regs *regs, vaddr_t offset)
         base += VECTOR64_LOWER32_BASE;
     else if ( psr_mode(regs->cpsr,PSR_MODE_EL0t) )
         base += VECTOR64_LOWER64_BASE;
-    else /* Otherwise must be from kernel mode */
+    /*
+     * Otherwise must be from kernel mode. The current EL group is chosen by
+     * the stack pointer in use (ARM DDI 0487 M.d D1.4.1).
+     */
+    else if ( psr_mode(regs->cpsr,PSR_MODE_EL1t) )
+        base += VECTOR64_CURRENT_SP0_BASE;
+    else
         base += VECTOR64_CURRENT_SPx_BASE;
 
     return base + offset;
