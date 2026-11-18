@@ -247,8 +247,7 @@ static int its_send_command(struct host_its *hw_its, const void *its_cmd)
 
     memcpy(hw_its->cmd_buf + writep, its_cmd, ITS_CMD_SIZE);
     if ( hw_its->flags & HOST_ITS_FLUSH_CMD_QUEUE )
-        clean_and_invalidate_dcache_va_range(hw_its->cmd_buf + writep,
-                                             ITS_CMD_SIZE);
+        clean_dcache_va_range(hw_its->cmd_buf + writep, ITS_CMD_SIZE);
     else
         dsb(ishst);
 
