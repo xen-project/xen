@@ -756,8 +756,8 @@ long arch_do_domctl(
                     found = 1;
                     break;
                 }
-                if ( fmp + np >= g2m_ioport->mport &&
-                     g2m_ioport->mport + g2m_ioport->np >= fmp )
+                if ( fmp + np > g2m_ioport->mport &&
+                     g2m_ioport->mport + g2m_ioport->np > fmp )
                 {
                     ret = -EBUSY;
                     break;
