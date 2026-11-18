@@ -111,6 +111,12 @@ static inline register_t sign_extend(const struct hsr_dabt dabt, register_t r)
          */
         BUILD_BUG_ON(sizeof(register_t) != sizeof(unsigned long));
         r |= (~0UL) << size;
+
+#ifdef CONFIG_ARM_64
+        /* When loading to W register we should only sign extend to 32-bit */
+        if ( !dabt.sf )
+            r = (uint32_t)r;
+#endif
     }
 
     return r;
