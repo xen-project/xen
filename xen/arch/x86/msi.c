@@ -600,7 +600,6 @@ static int msi_capability_init(struct pci_dev *dev,
     unsigned int i, mpos;
     uint16_t control;
 
-    ASSERT_PDEV_LIST_IS_READ_LOCKED(dev->domain);
     pos = dev->msi_pos;
     if ( !pos )
         return -ENODEV;
@@ -1004,11 +1003,6 @@ static int __pci_enable_msi(struct pci_dev *pdev, struct msi_info *msi,
 {
     struct msi_desc *old_desc;
 
-    if ( !pdev )
-        return -ENODEV;
-
-    ASSERT_PDEV_LIST_IS_READ_LOCKED(pdev->domain);
-
     old_desc = find_msi_entry(pdev, msi->irq, PCI_CAP_ID_MSI);
     if ( old_desc )
     {
@@ -1058,11 +1052,6 @@ static int __pci_enable_msix(struct pci_dev *pdev, struct msi_info *msi,
                              struct msi_desc **desc)
 {
     struct msi_desc *old_desc;
-
-    if ( !pdev )
-        return -ENODEV;
-
-    ASSERT_PDEV_LIST_IS_READ_LOCKED(pdev->domain);
 
     if ( !pdev->msix )
         return -ENODEV;
