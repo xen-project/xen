@@ -201,7 +201,8 @@ static int get_ipa_output_size(struct domain *d, register_t tcr,
          * Return an error on reserved IPA output-sizes and if the IPA
          * output-size is 52bit.
          *
-         * XXX: 52 bit output-size is not supported yet.
+         * XXX: 52 bit output-size is not supported yet. Supporting it also
+         * requires updating the block descriptor check in guest_walk_ld().
          */
         if ( ips > TCR_EL1_IPS_48_BIT )
             return -EFAULT;
@@ -540,6 +541,17 @@ static bool guest_walk_ld(const struct vcpu *v,
      * maps a memory block at level 3 (PTE<1:0> == 01).
      */
     if ( !lpae_is_valid(pte) || !lpae_is_mapping(pte, level) )
+        return false;
+
+    /*
+     * A block descriptor is only supported at level 1 and level 2 with the
+     * 4KB granule, and only at level 2 with the 16KB and 64KB granules (ARM
+     * DDI 0487 M.d D8.3.1.2). The block encoding at any other level generates
+     * a Translation fault (AArch64.BlockDescSupported()).
+     *
+     * This is only valid without 52-bit support (FEAT_LPA, FEAT_LPA2).
+     */
+    if ( level == 0 || (level == 1 && gran != GRANULE_SIZE_INDEX_4K) )
         return false;
 
     /* Make sure that the lower bits of the PTE's base address are zero. */
