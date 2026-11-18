@@ -407,6 +407,15 @@ static bool guest_walk_ld(const struct vcpu *v,
         if ( (input_size > TCR_EL1_IPS_48_BIT_VAL) ||
              (input_size < TCR_EL1_IPS_MIN_VAL) )
             return false;
+
+        /*
+         * The bits of the GVA from the top bit down to the input size must
+         * all be 0 for TTBR0 and all 1 for TTBR1, or the translation faults
+         * (ARM DDI 0487 M.d D8.2.4, AArch64.VAIsOutOfRange()).
+         */
+        mask = GENMASK_ULL(topbit, input_size);
+        if ( (gva & mask) != ((gva & BIT(topbit, ULL)) ? mask : 0) )
+            return false;
     }
     else
     {
