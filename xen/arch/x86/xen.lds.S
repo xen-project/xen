@@ -55,6 +55,7 @@ SECTIONS
 #if !defined(EFI)
   . = __XEN_VIRT_START;
   __image_base__ = .;
+  start_pa = ABSOLUTE(start - __XEN_VIRT_START);
 #else
   . = __image_base__;
   /DISCARD/ : {
@@ -73,8 +74,6 @@ SECTIONS
  */
   __2M_text_start = .;         /* Start of 2M superpages, mapped RX. */
 #endif
-
-  start_pa = ABSOLUTE(start - __XEN_VIRT_START);
 
   . = __XEN_VIRT_START + XEN_IMG_OFFSET;
   _start = .;
