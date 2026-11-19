@@ -1018,6 +1018,7 @@ static int __init inflate(struct gunzip_state *s)
         r = inflate_block(s, &e);
         if (r)
             return r;
+        process_pending_softirqs();
     } while (!e);
 
     /* Undo too much lookahead. The next read will be byte aligned so we

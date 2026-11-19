@@ -3,6 +3,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
+#include <xen/softirq.h>
 
 #define WSIZE           0x80000000U
 
