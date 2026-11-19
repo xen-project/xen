@@ -106,7 +106,10 @@ struct xmem_pool {
     unsigned long used_size;
     unsigned long num_regions;
 
-    /* User provided functions for expanding/shrinking pool */
+    /*
+     * User provided functions for expanding/shrinking pool.  They are
+     * called without the pool lock held, and must not rely on it.
+     */
     xmem_pool_get_memory *get_mem;
     xmem_pool_put_memory *put_mem;
 
@@ -488,17 +491,18 @@ void xmem_pool_free(void *ptr, struct xmem_pool *pool)
 
     if ( (b->prev_hdr == NULL) && ((tmp_b->size & BLOCK_SIZE_MASK) == 0) )
     {
-        pool->put_mem(b);
         pool->num_regions--;
         pool->used_size -= BHDR_OVERHEAD; /* sentinel block header */
-        goto out;
+        spin_unlock(&pool->lock);
+        pool->put_mem(b);
+        return;
     }
 
     INSERT_BLOCK(b, pool, fl, sl);
 
     tmp_b->size |= PREV_FREE;
     tmp_b->prev_hdr = b;
- out:
+
     spin_unlock(&pool->lock);
 }
 
