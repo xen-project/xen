@@ -2156,9 +2156,15 @@ int hvm_set_efer(uint64_t value)
        ((value & EFER_SVME) == 0 ) &&
        ((value ^ v->arch.hvm.guest_efer) & EFER_SVME) )
     {
-        /* Cleared EFER.SVME: Flush all nestedp2m tables */
-        p2m_flush_nestedp2m(v->domain);
-        nestedhvm_vcpu_reset(v);
+        if ( nestedhvm_vcpu_in_guestmode(v) )
+            /* Ignore attempts to clear EFER.SVME from L2 */
+            value |= EFER_SVME;
+        else
+        {
+            /* Cleared EFER.SVME: Flush all nestedp2m tables */
+            p2m_flush_nestedp2m(v->domain);
+            nestedhvm_vcpu_reset(v);
+        }
     }
 
     value |= v->arch.hvm.guest_efer & EFER_LMA;
