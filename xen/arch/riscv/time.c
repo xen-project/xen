@@ -15,7 +15,7 @@ uint64_t __ro_after_init boot_clock_cycles;
 
 static int cf_check sstc_set_xen_timer(uint64_t deadline)
 {
-    csr_write64(CSR_STIMECMP, deadline);
+    csr_write64(STIMECMP, deadline);
 
     return 0;
 }
@@ -103,6 +103,6 @@ void __init preinit_xen_time(void)
          * Thereby to avoid spurious VS-timer irqs set vstimecmp CSR to
          * ~0.
          */
-        csr_write64(CSR_VSTIMECMP, ~0);
+        csr_write64(VSTIMECMP, ~0);
     }
 }

@@ -33,18 +33,14 @@
 })
 
 #ifdef CONFIG_RISCV_32
-#define csr_write64(csr, val)       \
-({                                  \
-    uint64_t v_ = (val);            \
-    csr_write(csr, v_);             \
-    csr_write(csr ## H, v_ >> 32);  \
+#define csr_write64(name, val)              \
+({                                          \
+    uint64_t v_ = (val);                    \
+    csr_write(CSR_ ## name, v_);            \
+    csr_write(CSR_ ## name ## H, v_ >> 32); \
 })
 #else
-#define csr_write64(csr, val)       \
-({                                  \
-    csr_write(csr, val);            \
-    (void)csr ## H;                 \
-})
+#define csr_write64(name, val) csr_write(CSR_ ## name, val)
 #endif
 
 #define csr_swap(csr, val)                                      \
