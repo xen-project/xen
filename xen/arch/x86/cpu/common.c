@@ -341,6 +341,7 @@ void __init early_cpu_init(bool verbose)
 		printk(XENLOG_ERR
 		       "Unrecognised or unsupported CPU vendor '%.12s'\n",
 		       c->x86_vendor_id);
+		break;
 	}
 
 	cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
