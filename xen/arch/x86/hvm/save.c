@@ -139,12 +139,12 @@ int hvm_save_one(struct domain *d, unsigned int typecode, unsigned int instance,
          !hvm_sr_handlers[typecode].save )
         return -EINVAL;
 
-    if ( hvm_sr_handlers[typecode].kind != HVMSR_PER_VCPU )
-        v = d->vcpu[0];
-    else if ( instance >= d->max_vcpus || !d->vcpu[instance] )
+    /* Per-domain records are saved via vCPU 0, absent before max_vcpus. */
+    v = domain_vcpu(d,
+                    hvm_sr_handlers[typecode].kind == HVMSR_PER_VCPU ? instance
+                                                                     : 0);
+    if ( !v )
         return -ENOENT;
-    else
-        v = d->vcpu[instance];
     ctxt.size = hvm_sr_handlers[typecode].size;
     ctxt.data = xmalloc_bytes(ctxt.size);
     if ( !ctxt.data )
@@ -203,7 +203,8 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
     struct hvm_save_end end;
     unsigned int i;
 
-    if ( d->is_dying )
+    /* Per-domain handlers are passed vCPU 0. */
+    if ( d->is_dying || !d->vcpu[0] )
         return -EINVAL;
 
     hdr.magic = HVM_FILE_MAGIC;
@@ -291,7 +292,8 @@ int hvm_load(struct domain *d, bool real, hvm_domain_context_t *h)
     struct hvm_save_descriptor *desc;
     int rc;
 
-    if ( d->is_dying )
+    /* Some per-domain loaders use vCPU 0. */
+    if ( d->is_dying || !d->vcpu[0] )
         return -EINVAL;
 
     /* Get at the save header, which must be first */
