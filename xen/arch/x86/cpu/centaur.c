@@ -21,8 +21,8 @@ static void init_c3(struct cpuinfo_x86 *c)
 	uint64_t msr_content;
 
 	/* Test for Centaur Extended Feature Flags presence */
-	if (cpuid_eax(0xC0000000) >= 0xC0000001) {
-		u32 tmp = cpuid_edx(0xC0000001);
+	if (cpuid_eax(0xC0000000U) >= 0xC0000001U) {
+		uint32_t tmp = cpuid_edx(0xC0000001U);
 
 		/* enable ACE unit, if present and disabled */
 		if ((tmp & (ACE_PRESENT | ACE_ENABLED)) == ACE_PRESENT) {

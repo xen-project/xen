@@ -17,7 +17,7 @@ static void hygon_get_topology(struct cpuinfo_x86 *c)
 	/* Socket ID is ApicId[6] for Hygon processors. */
 	c->phys_proc_id >>= APICID_SOCKET_ID_BIT;
 
-	ebx = cpuid_ebx(0x8000001e);
+	ebx = cpuid_ebx(0x8000001eU);
 	c->x86_num_siblings = ((ebx >> 8) & 0x3) + 1;
 	c->x86_max_cores /= c->x86_num_siblings;
 	c->cpu_core_id = ebx & 0xff;
@@ -66,10 +66,10 @@ static void cf_check init_hygon(struct cpuinfo_x86 *c)
 
 	display_cacheinfo(c);
 
-	if (c->extended_cpuid_level >= 0x80000008)
-		c->x86_max_cores = (cpuid_ecx(0x80000008) & 0xff) + 1;
+	if (c->extended_cpuid_level >= 0x80000008U)
+		c->x86_max_cores = (cpuid_ecx(0x80000008U) & 0xff) + 1;
 
-	if (c->extended_cpuid_level >= 0x80000007) {
+	if (c->extended_cpuid_level >= 0x80000007U) {
 		if (cpu_has(c, X86_FEATURE_ITSC)) {
 			__set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
 			__set_bit(X86_FEATURE_NONSTOP_TSC, c->x86_capability);

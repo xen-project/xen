@@ -58,7 +58,7 @@ static inline int rdmsr_amd_safe(unsigned int msr, unsigned int *lo,
         ".previous\n"
         _ASM_EXTABLE(1b, 3b)
         : "=a" (*lo), "=d" (*hi), "=r" (err)
-        : "c" (msr), "D" (0x9c5a203a), "2" (0), "i" (-EFAULT) );
+        : "c" (msr), "D" (0x9c5a203aU), "2" (0), "i" (-EFAULT) );
 
     return err;
 #endif
@@ -71,7 +71,7 @@ static inline int wrmsr_amd_safe(unsigned int msr, unsigned int lo,
         "1: wrmsr\n\t"
         _ASM_EXTABLE(1b, %l[fault])
         :
-        : "c" (msr), "a" (lo), "d" (hi), "D" (0x9c5a203a)
+        : "c" (msr), "a" (lo), "d" (hi), "D" (0x9c5a203aU)
         :
         : fault );
 
@@ -85,7 +85,7 @@ static void wrmsr_amd(unsigned int msr, uint64_t val)
 {
 	asm volatile("wrmsr" ::
 		     "c" (msr), "a" ((uint32_t)val),
-		     "d" (val >> 32), "D" (0x9c5a203a));
+		     "d" (val >> 32), "D" (0x9c5a203aU));
 }
 
 /*
@@ -263,7 +263,7 @@ static void __init noinline amd_init_levelling(void)
 	if (levelling_caps & LCAP_e1cd) {
 		uint32_t ecx, edx, tmp;
 
-		cpuid(0x80000001, &tmp, &tmp, &ecx, &edx);
+		cpuid(0x80000001U, &tmp, &tmp, &ecx, &edx);
 
 		/* Fast-forward bits - Must be set. */
 		edx |= cpufeat_mask(X86_FEATURE_APIC);
@@ -444,7 +444,7 @@ static void amd_get_topology(struct cpuinfo_x86 *c)
          * distingush the cores.
          */
         cpu = smp_processor_id();
-        bits = (cpuid_ecx(0x80000008) >> 12) & 0xf;
+        bits = (cpuid_ecx(0x80000008U) >> 12) & 0xf;
 
         if (bits == 0) {
                 while ((1 << bits) < c->x86_max_cores)
@@ -459,7 +459,7 @@ static void amd_get_topology(struct cpuinfo_x86 *c)
         if (cpu_has(c, X86_FEATURE_TOPOEXT)) {
                 u32 eax, ebx, ecx, edx;
 
-                cpuid(0x8000001e, &eax, &ebx, &ecx, &edx);
+                cpuid(0x8000001eU, &eax, &ebx, &ecx, &edx);
                 c->x86_num_siblings = ((ebx >> 8) & 0xff) + 1;
 
                 if (c->family < 0x17)
@@ -531,13 +531,13 @@ void amd_process_freq(const struct cpuinfo_x86 *c,
 		 * Make an attempt at determining the node ID, but assume
 		 * symmetric setup (using node 0) if this fails.
 		 */
-		if (c->extended_cpuid_level >= 0x8000001e &&
+		if (c->extended_cpuid_level >= 0x8000001eU &&
 		    cpu_has(c, X86_FEATURE_TOPOEXT)) {
-			node = cpuid_ecx(0x8000001e) & 0xff;
+			node = cpuid_ecx(0x8000001eU) & 0xff;
 			if (node > 7)
 				node = 0;
 		} else if (cpu_has(c, X86_FEATURE_NODEID_MSR)) {
-			rdmsrl(0xC001100C, val);
+			rdmsrl(0xC001100CU, val);
 			node = val & 7;
 		}
 
@@ -549,14 +549,14 @@ void amd_process_freq(const struct cpuinfo_x86 *c,
 		wrmsrl(MSR_AMD64_NB_CFG,
 		       nbcfg | (1ULL << AMD64_NB_CFG_CF8_EXT_ENABLE_BIT));
 #define PCI_ECS_ADDRESS(sbdf, reg) \
-    (0x80000000 | ((sbdf).bdf << 8) | ((reg) & 0xfc) | (((reg) & 0xf00) << 16))
+    (0x80000000U | ((sbdf).bdf << 8) | ((reg) & 0xfc) | (((reg) & 0xf00) << 16))
 
 		for ( ; ; ) {
 			pci_sbdf_t sbdf = PCI_SBDF(0, 0, 0x18 | node, 4);
 
 			switch (pci_conf_read32(sbdf, PCI_VENDOR_ID)) {
 			case 0x00000000:
-			case 0xffffffff:
+			case 0xffffffffU:
 				/* No device at this SBDF. */
 				if (!node)
 					break;
@@ -594,21 +594,21 @@ void amd_process_freq(const struct cpuinfo_x86 *c,
 
 	lo = 0; /* gcc may not recognize the loop having at least 5 iterations */
 	for (h = c->family == 0x10 ? 5 : 8; h--; )
-		if (!rdmsr_safe(0xC0010064 + h, &lo) && (lo >> 63))
+		if (!rdmsr_safe(MSR_K8_PSTATE0 + h, &lo) && (lo >> 63))
 			break;
 	if (!(lo >> 63))
 		return;
 
 	if (idx && idx < h &&
-	    !rdmsr_safe(0xC0010064 + idx, &val) && (val >> 63) &&
-	    !rdmsr_safe(0xC0010064, &hi) && (hi >> 63)) {
+	    !rdmsr_safe(MSR_K8_PSTATE0 + idx, &val) && (val >> 63) &&
+	    !rdmsr_safe(MSR_K8_PSTATE0, &hi) && (hi >> 63)) {
 		if (nom_mhz)
 			*nom_mhz = amd_parse_freq(c->family, val);
 		if (low_mhz)
 			*low_mhz = amd_parse_freq(c->family, lo);
 		if (hi_mhz)
 			*hi_mhz = amd_parse_freq(c->family, hi);
-	} else if (h && !rdmsr_safe(0xC0010064, &hi) && (hi >> 63)) {
+	} else if (h && !rdmsr_safe(MSR_K8_PSTATE0, &hi) && (hi >> 63)) {
 		if (low_mhz)
 			*low_mhz = amd_parse_freq(c->family, lo);
 		if (hi_mhz)
@@ -662,7 +662,7 @@ static bool set_legacy_ssbd(const struct cpuinfo_x86 *c, bool enable)
 	}
 
 	if (bit >= 0) {
-		uint64_t val, mask = 1ull << bit;
+		uint64_t val, mask = 1ULL << bit;
 
 		if (rdmsr_safe(MSR_AMD64_LS_CFG, &val) ||
 		    ({
@@ -728,8 +728,8 @@ bool __init amd_setup_legacy_ssbd(void)
 	 * c->cpu_core_id is sparse on all but the top end CPUs.  Derive
 	 * max_cpus from ApicIdCoreIdSize which will cover any sparseness.
 	 */
-	if (boot_cpu_data.extended_cpuid_level >= 0x80000008) {
-		ssbd_max_cores = 1u << MASK_EXTR(cpuid_ecx(0x80000008), 0xf000);
+	if (boot_cpu_data.extended_cpuid_level >= 0x80000008U) {
+		ssbd_max_cores = 1U << MASK_EXTR(cpuid_ecx(0x80000008U), 0xf000);
 		ssbd_max_cores /= boot_cpu_data.x86_num_siblings;
 	}
 	if (!ssbd_max_cores)
@@ -838,7 +838,7 @@ void __init detect_zen2_null_seg_behaviour(void)
 static void cf_check fam17_disable_c6(void *arg)
 {
 	/* Disable C6 by clearing the CCR{0,1,2}_CC6EN bits. */
-	const uint64_t mask = ~((1ul << 6) | (1ul << 14) | (1ul << 22));
+	const uint64_t mask = ~((1UL << 6) | (1UL << 14) | (1UL << 22));
 	uint64_t val;
 
 	if (!fam17_c6_disabled) {
@@ -1095,8 +1095,8 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 		 * (AMD Erratum #110, docId: 25759).
 		 */
 		__clear_bit(X86_FEATURE_LAHF_LM, c->x86_capability);
-		if (!rdmsr_amd_safe(0xc001100d, &l, &h))
-			wrmsr_amd_safe(0xc001100d, l, h & ~1);
+		if (!rdmsr_amd_safe(0xc001100dU, &l, &h))
+			wrmsr_amd_safe(0xc001100dU, l, h & ~1);
 	}
 
 	/*
@@ -1180,11 +1180,11 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 
 	display_cacheinfo(c);
 
-	if (c->extended_cpuid_level >= 0x80000008) {
-		c->x86_max_cores = (cpuid_ecx(0x80000008) & 0xff) + 1;
+	if (c->extended_cpuid_level >= 0x80000008U) {
+		c->x86_max_cores = (cpuid_ecx(0x80000008U) & 0xff) + 1;
 	}
 
-	if (c->extended_cpuid_level >= 0x80000007) {
+	if (c->extended_cpuid_level >= 0x80000007U) {
 		if (cpu_has(c, X86_FEATURE_ITSC)) {
 			__set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
 			__set_bit(X86_FEATURE_NONSTOP_TSC, c->x86_capability);

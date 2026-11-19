@@ -226,13 +226,13 @@ int get_model_name(struct cpuinfo_x86 *c)
 	unsigned int *v;
 	char *p, *q;
 
-	if (c->extended_cpuid_level < 0x80000004)
+	if (c->extended_cpuid_level < 0x80000004U)
 		return 0;
 
 	v = (unsigned int *) c->x86_model_id;
-	cpuid(0x80000002, &v[0], &v[1], &v[2], &v[3]);
-	cpuid(0x80000003, &v[4], &v[5], &v[6], &v[7]);
-	cpuid(0x80000004, &v[8], &v[9], &v[10], &v[11]);
+	cpuid(0x80000002U, &v[0], &v[1], &v[2], &v[3]);
+	cpuid(0x80000003U, &v[4], &v[5], &v[6], &v[7]);
+	cpuid(0x80000004U, &v[8], &v[9], &v[10], &v[11]);
 	c->x86_model_id[48] = 0;
 
 	/* Intel chips right-justify this string for some dumb reason;
@@ -255,8 +255,8 @@ void display_cacheinfo(struct cpuinfo_x86 *c)
 {
 	unsigned int dummy, ecx, edx, size;
 
-	if (c->extended_cpuid_level >= 0x80000005) {
-		cpuid(0x80000005, &dummy, &dummy, &ecx, &edx);
+	if (c->extended_cpuid_level >= 0x80000005U) {
+		cpuid(0x80000005U, &dummy, &dummy, &ecx, &edx);
 		if ((edx | ecx) >> 24) {
 			if (opt_cpu_info)
 				printk("CPU: L1 I cache %uK (%u bytes/line),"
@@ -266,10 +266,10 @@ void display_cacheinfo(struct cpuinfo_x86 *c)
 		}
 	}
 
-	if (c->extended_cpuid_level < 0x80000006)	/* Some chips just has a large L1. */
+	if (c->extended_cpuid_level < 0x80000006U)	/* Some chips just has a large L1. */
 		return;
 
-	cpuid(0x80000006, &dummy, &dummy, &ecx, &edx);
+	cpuid(0x80000006U, &dummy, &dummy, &ecx, &edx);
 
 	size = ecx >> 16;
 	if (size) {
@@ -413,10 +413,10 @@ void __init early_cpu_init(bool verbose)
 				    &c->x86_capability[FEATURESET_7d1]);
 	}
 
-	eax = cpuid_eax(0x80000000);
-	if ((eax >> 16) == 0x8000 && eax >= 0x80000008) {
-		ebx = eax >= 0x8000001f ? cpuid_ebx(0x8000001f) : 0;
-		eax = cpuid_eax(0x80000008);
+	eax = cpuid_eax(0x80000000U);
+	if ((eax >> 16) == 0x8000 && eax >= 0x80000008U) {
+		ebx = eax >= 0x8000001fU ? cpuid_ebx(0x8000001fU) : 0;
+		eax = cpuid_eax(0x80000008U);
 
 		paddr_bits = eax & 0xff;
 		if (paddr_bits > PADDR_BITS)
@@ -530,7 +530,7 @@ void identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_capability[FEATURESET_1c] = ecx;
 	c->x86_capability[FEATURESET_1d] = edx;
 
-	eax = cpuid_eax(0x80000000);
+	eax = cpuid_eax(0x80000000U);
 	if ((eax >> 16) == 0x8000)
 		c->extended_cpuid_level = eax;
 
@@ -538,8 +538,8 @@ void identify_cpu(struct cpuinfo_x86 *c)
 	 * These AMD-defined flags are out of place, but we need
 	 * them early for the CPUID faulting probe code
 	 */
-	if (c->extended_cpuid_level >= 0x80000021)
-		c->x86_capability[FEATURESET_e21a] = cpuid_eax(0x80000021);
+	if (c->extended_cpuid_level >= 0x80000021U)
+		c->x86_capability[FEATURESET_e21a] = cpuid_eax(0x80000021U);
 
 	if (actual_cpu.c_early_init)
 		alternative_vcall(actual_cpu.c_early_init, c);
@@ -554,19 +554,19 @@ void identify_cpu(struct cpuinfo_x86 *c)
 		c->x86_clflush_size = ((ebx >> 8) & 0xff) * 8;
 
 	/* AMD-defined flags: level 0x80000001 */
-	if (c->extended_cpuid_level >= 0x80000001)
-		cpuid(0x80000001, &tmp, &tmp,
+	if (c->extended_cpuid_level >= 0x80000001U)
+		cpuid(0x80000001U, &tmp, &tmp,
 		      &c->x86_capability[FEATURESET_e1c],
 		      &c->x86_capability[FEATURESET_e1d]);
 
-	if (c->extended_cpuid_level >= 0x80000004)
+	if (c->extended_cpuid_level >= 0x80000004U)
 		get_model_name(c); /* Default name */
-	if (c->extended_cpuid_level >= 0x80000007)
-		c->x86_capability[FEATURESET_e7d] = cpuid_edx(0x80000007);
-	if (c->extended_cpuid_level >= 0x80000008)
-		c->x86_capability[FEATURESET_e8b] = cpuid_ebx(0x80000008);
-	if (c->extended_cpuid_level >= 0x80000021)
-		cpuid(0x80000021,
+	if (c->extended_cpuid_level >= 0x80000007U)
+		c->x86_capability[FEATURESET_e7d] = cpuid_edx(0x80000007U);
+	if (c->extended_cpuid_level >= 0x80000008U)
+		c->x86_capability[FEATURESET_e8b] = cpuid_ebx(0x80000008U);
+	if (c->extended_cpuid_level >= 0x80000021U)
+		cpuid(0x80000021U,
 		      &c->x86_capability[FEATURESET_e21a], &tmp,
 		      &c->x86_capability[FEATURESET_e21c], &tmp);
 
