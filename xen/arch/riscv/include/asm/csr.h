@@ -39,8 +39,30 @@
     csr_write(CSR_ ## name, v_);            \
     csr_write(CSR_ ## name ## H, v_ >> 32); \
 })
+
+/*
+ * The two halves are read by separate instructions, so a CSR which hardware
+ * increments can carry from the low half into the high one in between,
+ * yielding a value the CSR never held. Re-read the high half and retry the
+ * sequence if it changed.
+ *
+ * Only needed for CSRs which change under Xen's feet.
+ */
+#define csr_volatile_read64(name)                            \
+({                                                           \
+    uint32_t lo_, old_, hi_ = csr_read(CSR_ ## name ## H);   \
+                                                             \
+    do {                                                     \
+        old_ = hi_;                                          \
+        lo_ = csr_read(CSR_ ## name);                        \
+    } while ( (hi_ = csr_read(CSR_ ## name ## H)) != old_ ); \
+                                                             \
+    ((uint64_t)hi_ << 32) | lo_;                             \
+})
 #else
 #define csr_write64(name, val) csr_write(CSR_ ## name, val)
+#define csr_read64(name) csr_read(CSR_ ## name)
+#define csr_volatile_read64 csr_read64
 #endif
 
 #define csr_swap(csr, val)                                      \

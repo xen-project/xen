@@ -18,11 +18,11 @@ static inline void force_update_vcpu_system_time(struct vcpu *v)
     BUG_ON("unimplemented");
 }
 
-typedef unsigned long cycles_t;
+typedef uint64_t cycles_t;
 
 static inline cycles_t get_cycles(void)
 {
-    return csr_read(CSR_TIME);
+    return csr_volatile_read64(TIME);
 }
 
 void preinit_xen_time(void);
