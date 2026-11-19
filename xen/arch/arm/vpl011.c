@@ -640,6 +640,7 @@ static void vpl011_notification(struct vcpu *v, unsigned int port)
 int domain_vpl011_init(struct domain *d, struct vpl011_init_info *info)
 {
     int rc;
+    unsigned int virq;
     struct vpl011 *vpl011 = &d->arch.vpl011;
 
     if ( vpl011->backend.dom.ring_buf )
@@ -659,7 +660,7 @@ int domain_vpl011_init(struct domain *d, struct vpl011_init_info *info)
         if ( (uart != NULL) && (vpl011_irq > 0) )
         {
             vpl011->base_addr = uart->base_addr;
-            vpl011->virq = vpl011_irq;
+            virq = vpl011_irq;
         }
         else
         {
@@ -685,7 +686,7 @@ int domain_vpl011_init(struct domain *d, struct vpl011_init_info *info)
     else
     {
         vpl011->base_addr = GUEST_PL011_BASE;
-        vpl011->virq = GUEST_VPL011_SPI;
+        virq = GUEST_VPL011_SPI;
     }
 
     /*
@@ -724,12 +725,12 @@ int domain_vpl011_init(struct domain *d, struct vpl011_init_info *info)
         }
     }
 
-    rc = vgic_reserve_virq(d, vpl011->virq);
-    if ( !rc )
+    if ( !vgic_reserve_virq(d, virq) )
     {
         rc = -EINVAL;
         goto out1;
     }
+    vpl011->virq = virq;
 
     vpl011->uartfr = TXFE | RXFE;
 
