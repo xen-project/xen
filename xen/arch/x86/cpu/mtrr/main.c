@@ -50,9 +50,9 @@
 #define	get_cpu()	smp_processor_id()
 #define put_cpu()	do {} while(0)
 
-u32 __read_mostly num_var_ranges = 0;
+unsigned int __read_mostly num_var_ranges;
 
-unsigned int *__read_mostly usage_table;
+static unsigned int *__read_mostly usage_table;
 static DEFINE_MUTEX(mtrr_mutex);
 
 u64 __read_mostly size_or_mask;

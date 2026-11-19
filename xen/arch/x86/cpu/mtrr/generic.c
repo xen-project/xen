@@ -57,9 +57,9 @@ get_fixed_ranges(mtrr_type * frs)
 bool is_var_mtrr_overlapped(const struct mtrr_state *m)
 {
     unsigned int seg, i;
-    unsigned int num_var_ranges = MASK_EXTR(m->mtrr_cap, MTRRcap_VCNT);
+    unsigned int nr_ranges = MASK_EXTR(m->mtrr_cap, MTRRcap_VCNT);
 
-    for ( i = 0; i < num_var_ranges; i++ )
+    for ( i = 0; i < nr_ranges; i++ )
     {
         uint64_t base1 = m->var_ranges[i].base >> PAGE_SHIFT;
         uint64_t mask1 = m->var_ranges[i].mask >> PAGE_SHIFT;
@@ -67,7 +67,7 @@ bool is_var_mtrr_overlapped(const struct mtrr_state *m)
         if ( !(m->var_ranges[i].mask & MTRR_PHYSMASK_VALID) )
             continue;
 
-        for ( seg = i + 1; seg < num_var_ranges; seg++ )
+        for ( seg = i + 1; seg < nr_ranges; seg++ )
         {
             uint64_t base2 = m->var_ranges[seg].base >> PAGE_SHIFT;
             uint64_t mask2 = m->var_ranges[seg].mask >> PAGE_SHIFT;
