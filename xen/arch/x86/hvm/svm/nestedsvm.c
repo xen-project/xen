@@ -741,8 +741,6 @@ nsvm_vcpu_vmexit_inject(struct vcpu *v, struct cpu_user_regs *regs,
                 ns_vmcb->exit_int_info = ns_vmcb->event_inj;
             break;
         case VMEXIT_EXCEPTION_PF:
-            ns_vmcb->_cr2 = ns_vmcb->ei.exc.cr2;
-            fallthrough;
         case VMEXIT_NPF:
             ns_vmcb->exitinfo2 = svm->ns_vmexit.exitinfo2;
             fallthrough;
