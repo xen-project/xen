@@ -252,10 +252,6 @@ Therefore the absence of prior declarations is safe."
 -config=MC3A2.R8.4,declarations+={safe, "loc(file(asm_defns))&&^current_stack_pointer$"}
 -doc_end
 
--doc_begin="The function apei_(read|check|clear)_mce are dead code and are excluded from non-debug builds, therefore the absence of prior declarations is safe."
--config=MC3A2.R8.4,declarations+={safe, "^apei_(read|check|clear)_mce\\(.*$"}
--doc_end
-
 -doc_begin="asmlinkage is a marker to indicate that the function is only used to interface with asm modules."
 -config=MC3A2.R8.4,declarations+={safe,"loc(text(^(?s).*asmlinkage.*$, -1..0))"}
 -doc_end

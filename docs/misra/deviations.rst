@@ -285,14 +285,6 @@ Deviations related to MISRA C:2012 Rules:
      - Tagged as `safe` for ECLAIR.
 
    * - R8.4
-     - Some functions are excluded from non-debug build, therefore the absence
-       of declaration is safe.
-     - Tagged as `safe` for ECLAIR, such functions are:
-         - apei_read_mce()
-         - apei_check_mce()
-         - apei_clear_mce()
-
-   * - R8.4
      - Given that bsearch and sort are defined with the attribute 'gnu_inline',
        it's deliberate not to have a prior declaration.
        See Section \"6.33.1 Common Function Attributes\" of \"GCC_MANUAL\" for
