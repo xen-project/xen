@@ -533,6 +533,9 @@ static int its_handle_invall(struct virt_its *its, uint64_t *cmdptr)
     vcpu = get_vcpu_from_collection(its, collid);
     spin_unlock(&its->its_lock);
 
+    if ( !vcpu )
+        return -ENOENT;
+
     spin_lock_irqsave(&vcpu->arch.vgic.lock, flags);
     read_lock(&its->d->arch.vgic.pend_lpi_tree_lock);
 
