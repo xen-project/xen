@@ -915,6 +915,10 @@ int gicv3_its_map_guest_device(struct domain *d,
 
     if ( ret )
     {
+        spin_lock(&d->arch.vgic.its_devices_lock);
+        rb_erase(&dev->rbnode, &d->arch.vgic.its_devices);
+        spin_unlock(&d->arch.vgic.its_devices_lock);
+
         /* Clean up all allocated host LPI blocks. */
         for ( ; i >= 0; i-- )
         {
