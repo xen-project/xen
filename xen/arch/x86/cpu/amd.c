@@ -39,7 +39,7 @@ static inline int rdmsr_amd_safe(unsigned int msr, unsigned int *lo,
         "1: rdmsr\n\t"
         _ASM_EXTABLE(1b, %l[fault])
         : "=a" (*lo), "=d" (*hi)
-        : "c" (msr), "D" (0x9c5a203a)
+        : "c" (msr), "D" (0x9c5a203aU)
         :
         : fault );
 
