@@ -574,7 +574,8 @@ p2m_remove_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
         }
     }
 
-    ioreq_request_mapcache_invalidate(p2m->domain);
+    if ( p2m_is_hostp2m(p2m) )
+        ioreq_request_mapcache_invalidate(p2m->domain);
 
     rc = p2m_set_entry(p2m, gfn, INVALID_MFN, page_order, p2m_invalid,
                        p2m->default_access);
