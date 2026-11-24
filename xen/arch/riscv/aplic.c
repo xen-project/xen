@@ -38,6 +38,11 @@ static struct intc_info __ro_after_init aplic_info = {
     .hw_variant = INTC_APLIC,
 };
 
+static bool aplic_msi_mode(void)
+{
+    return readl(&aplic.regs->domaincfg) & APLIC_DOMAINCFG_DM;
+}
+
 static void __init aplic_init_hw_interrupts(void)
 {
     unsigned int i;
@@ -130,7 +135,7 @@ static void cf_check aplic_irq_enable(struct irq_desc *desc)
      *       If APLIC without MSI interrupts is required in the future,
      *       this function will need to be updated accordingly.
      */
-    ASSERT(readl(&aplic.regs->domaincfg) & APLIC_DOMAINCFG_DM);
+    ASSERT(aplic_msi_mode());
 
     ASSERT(spin_is_locked(&desc->lock));
 
@@ -161,7 +166,7 @@ static void cf_check aplic_irq_disable(struct irq_desc *desc)
      *       If APLIC without MSI interrupts is required in the future,
      *       this function will need to be updated accordingly.
      */
-    ASSERT(readl(&aplic.regs->domaincfg) & APLIC_DOMAINCFG_DM);
+    ASSERT(aplic_msi_mode());
 
     ASSERT(spin_is_locked(&desc->lock));
 
