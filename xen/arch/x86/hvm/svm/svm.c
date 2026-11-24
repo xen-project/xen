@@ -2924,9 +2924,14 @@ void asmlinkage svm_vmexit_handler(void)
         break;
 
     case VMEXIT_VMMCALL:
+        if ( vcpu_guestmode )
+        {
+            hvm_inject_hw_exception(X86_EXC_UD, X86_EVENT_NO_EC);
+            break;
+        }
+
         if ( (insn_len = svm_get_insn_len(v, INSTR_VMCALL)) == 0 )
             break;
-        BUG_ON(vcpu_guestmode);
         TRACE(TRC_HVM_VMMCALL, regs->eax);
 
         if ( hvm_hypercall(regs) == HVM_HCALL_completed )

@@ -1261,9 +1261,6 @@ nestedsvm_check_intercepts(struct vcpu *v, struct cpu_user_regs *regs,
             return NESTEDHVM_VMEXIT_HOST;
         return NESTEDHVM_VMEXIT_INJECT;
 
-    case VMEXIT_VMMCALL:
-        /* Always let the guest handle VMMCALL/VMCALL */
-        return NESTEDHVM_VMEXIT_INJECT;
     default:
         break;
     }
