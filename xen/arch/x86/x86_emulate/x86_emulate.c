@@ -5429,6 +5429,7 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0xc3): /* movnti */
         /* Ignore the non-temporal hint for now. */
+        generate_exception_if(ea.type != OP_MEM, X86_EXC_UD);
         vcpu_must_have(sse2);
         dst.val = src.val;
         sfence = true;
