@@ -355,6 +355,26 @@ Deviations related to MISRA C:2012 Rules:
      - Tagged as `safe` for ECLAIR.
 
    * - R10.1
+     - The result of relational, equality and logical negation operators has
+       type int and value 0 or 1 (C99 6.5.8p6, 6.5.9p3, 6.5.3.3p5). An object
+       or function result of type bool has value 0 or 1 too, and it is
+       promoted to int (C99 6.3.1.2, 6.3.1.1p2). Such a value is a
+       well-defined operand of the following operators. Unary + leaves it
+       unchanged. Unary - yields 0 or -1, all bits clear or, in two's
+       complement, all bits set. Binary + and - (and += and -=) count
+       something if the condition holds. \* (and \*=) yields the other operand
+       if the condition holds and 0 otherwise. << and >> (and <<= and >>=)
+       extend that selection to a shift: a Boolean left operand contributes 0
+       or 1, and a Boolean right operand is a shift count of 0 or 1. / and %
+       (and /= and %=) are excluded. A Boolean divisor is 0 when the condition
+       is false, and division or remainder by zero is undefined behavior
+       (C99 6.5.5p5). The relational operators are excluded as well: with
+       0-or-1 operands, whatever they express can be written with the equality
+       and logical operators, which already accept an essentially Boolean
+       operand. Increment and decrement stay under the rule.
+     - Tagged as `safe` for ECLAIR.
+
+   * - R10.1
      - Xen only supports architectures where signed integers are representend
        using two's complement and all the Xen developers are aware of this. For
        this reason, bitwise operations are safe.

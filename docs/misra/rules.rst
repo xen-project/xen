@@ -387,6 +387,10 @@ maintainers if you want to suggest a change.
            compilers' extensions)
          - Implicit conversions to boolean for conditionals (?: if while
            for) and logical operators (! || &&)
+         - Operands of essentially Boolean type (results of relational,
+           equality and logical negation operators, objects and function
+           results of type bool) used only with unary +, -, binary +, -,
+           \*, <<, >>, +=, -=, \*=, <<= and >>=
          - The essential type model allows the constants defined by anonymous
            enums (e.g., enum { A, B, C }) to be used as operands to arithmetic
            operators, as they have a signed essential type.

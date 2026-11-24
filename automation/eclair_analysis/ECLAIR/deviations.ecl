@@ -340,6 +340,15 @@ still non-negative."
 -config=MC3A2.R10.1,etypes+={safe, "stmt(operator(logical)||node(conditional_operator||binary_conditional_operator))", "dst_type(ebool||boolean)"}
 -doc_end
 
+-doc_begin="A 0-or-1 Boolean operand of unary +, -, binary +, -, *, <<, >> and of +=, -=, *=, <<=, >>= is safe. See docs/misra/deviations.rst for the full explanation."
+-config=MC3A2.R10.1,etypes+={safe, "stmt(operator(plus||minus))", "src_type(ebool||boolean)"}
+-config=MC3A2.R10.1,etypes+={safe, "stmt(operator(add||add_assign))", "src_type(ebool||boolean)"}
+-config=MC3A2.R10.1,etypes+={safe, "stmt(operator(sub||sub_assign))", "src_type(ebool||boolean)"}
+-config=MC3A2.R10.1,etypes+={safe, "stmt(operator(mul||mul_assign))", "src_type(ebool||boolean)"}
+-config=MC3A2.R10.1,etypes+={safe, "stmt(operator(shl||shl_assign))", "src_type(ebool||boolean)"}
+-config=MC3A2.R10.1,etypes+={safe, "stmt(operator(shr||shr_assign))", "src_type(ebool||boolean)"}
+-doc_end
+
 -doc_begin="The macro ISOLATE_LSB encapsulates a well-known pattern to obtain
 a mask where only the lowest bit set in the argument is set, if any, for unsigned
 integers arguments on two's complement architectures
