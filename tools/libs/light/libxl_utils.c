@@ -91,16 +91,16 @@ int libxl_name_to_domid(libxl_ctx *ctx, const char *name,
 int libxl_domain_qualifier_to_domid(libxl_ctx *ctx, const char *name,
                                     uint32_t *domid)
 {
-    int i, rv;
-    for (i=0; name[i]; i++) {
-        if (!CTYPE(isdigit, name[i])) {
-            goto nondigit_found;
-        }
-    }
-    *domid = strtoul(name, NULL, 10);
-    return 0;
+    int rv;
 
- nondigit_found:
+    if (CTYPE(isdigit, *name)) {
+        char *end;
+
+        *domid = strtoul(name, &end, 10);
+        if (end != name && !*end)
+            return 0;
+    }
+
     /* this could also check for uuids */
     rv = libxl_name_to_domid(ctx, name, domid);
     return rv;
@@ -108,22 +108,15 @@ int libxl_domain_qualifier_to_domid(libxl_ctx *ctx, const char *name,
 
 static int qualifier_to_id(const char *p, uint32_t *id_r)
 {
-    int i, alldigit;
+    if (CTYPE(isdigit, *p)) {
+        char *end;
 
-    alldigit = 1;
-    for (i = 0; p[i]; i++) {
-        if (!isdigit((uint8_t)p[i])) {
-            alldigit = 0;
-            break;
-        }
+        *id_r = strtoul(p, &end, 10);
+        if (end != p && !*end)
+            return 0;
     }
 
-    if (i > 0 && alldigit) {
-        *id_r = strtoul(p, NULL, 10);
-        return 0;
-    } else {
-        /* check here if it's a uuid and do proper conversion */
-    }
+    /* check here if it's a uuid and do proper conversion */
     return 1;
 }
 
