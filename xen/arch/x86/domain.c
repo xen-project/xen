@@ -517,6 +517,18 @@ int arch_vcpu_create(struct vcpu *v)
 
     if ( !is_idle_domain(d) )
     {
+        BUILD_BUG_ON((MAX_VIRT_CPUS << VCPU_STATE_VA_SHIFT) >
+                     (PERDOMAIN_SLOT_MBYTES << 20));
+        BUILD_BUG_ON(VCPU_STATE_IDX_VMCB >= VCPU_STATE_NR_PAGES);
+        BUILD_BUG_ON(VCPU_STATE_IDX_N2VMCB >= VCPU_STATE_NR_PAGES);
+        BUILD_BUG_ON(VCPU_STATE_IDX_VMX_MSR >= VCPU_STATE_NR_PAGES);
+        /* Page tables only; torn down with the rest of the per-domain area. */
+        rc = create_perdomain_mapping(d, VCPU_STATE_START(v),
+                                      VCPU_STATE_NR_PAGES,
+                                      NIL(l1_pgentry_t *), NULL);
+        if ( rc != 0 )
+            goto fail;
+
         paging_vcpu_init(v);
 
         if ( (rc = vcpu_init_fpu(v)) != 0 )

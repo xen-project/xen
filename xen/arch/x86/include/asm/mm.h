@@ -615,6 +615,8 @@ void populate_perdomain_mapping(const struct vcpu *v, unsigned long va,
                                 unsigned int flags);
 void destroy_perdomain_mapping(const struct vcpu *v, unsigned long va,
                                unsigned int nr);
+void unmap_vcpu_state(const struct vcpu *v, unsigned int idx, unsigned int nr);
+void unmap_vcpu_state_page(const void *va);
 void free_perdomain_mappings(struct domain *d);
 
 void __iomem *ioremap_wc(paddr_t pa, size_t len);

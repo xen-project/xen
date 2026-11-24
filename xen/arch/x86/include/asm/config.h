@@ -158,7 +158,7 @@
 /* Slot 260: per-domain mappings (including map cache). */
 #define PERDOMAIN_VIRT_START    (PML4_ADDR(260))
 #define PERDOMAIN_SLOT_MBYTES   (PML4_ENTRY_BYTES >> (20 + PAGETABLE_ORDER))
-#define PERDOMAIN_SLOTS         3
+#define PERDOMAIN_SLOTS         4
 #define PERDOMAIN_VIRT_SLOT(s)  (PERDOMAIN_VIRT_START + (s) * \
                                  (PERDOMAIN_SLOT_MBYTES << 20))
 /* Slot 4: mirror of per-domain mappings (for compat xlat area accesses). */
@@ -290,6 +290,27 @@ extern unsigned long xen_phys_start;
 #define ARG_XLAT_VA_SHIFT        (2 + PAGE_SHIFT)
 #define ARG_XLAT_START(v)        \
     (ARG_XLAT_VIRT_START + ((v)->vcpu_id << ARG_XLAT_VA_SHIFT))
+
+/*
+ * Per-vCPU state window. The fourth per-domain-mapping sub-area: a small
+ * per-vCPU stride of page slots holding long-lived per-vCPU structures kept
+ * on the domain heap, each mapped once for the life of the vCPU at a fixed
+ * index within the stride.
+ */
+#define VCPU_STATE_SLOT          3
+#define VCPU_STATE_VIRT_START    PERDOMAIN_VIRT_SLOT(VCPU_STATE_SLOT)
+#define VCPU_STATE_ORDER         3
+#define VCPU_STATE_NR_PAGES      (1U << VCPU_STATE_ORDER)
+#define VCPU_STATE_VA_SHIFT      (VCPU_STATE_ORDER + PAGE_SHIFT)
+#define VCPU_STATE_START(v)      \
+    (VCPU_STATE_VIRT_START + ((v)->vcpu_id << VCPU_STATE_VA_SHIFT))
+#define VCPU_STATE_ADDR(v, idx)  \
+    (VCPU_STATE_START(v) + (idx) * PAGE_SIZE)
+/* AMD-specific slots */
+#define VCPU_STATE_IDX_VMCB      0
+#define VCPU_STATE_IDX_N2VMCB    1
+/* Intel-specific slots */
+#define VCPU_STATE_IDX_VMX_MSR   0
 
 #define ELFSIZE 64
 

@@ -6470,6 +6470,48 @@ void destroy_perdomain_mapping(const struct vcpu *v, unsigned long va,
     unmap_domain_page(l3tab);
 }
 
+/*
+ * Take @nr slots of @v's state window, from @idx, out of the per-domain
+ * area, before the caller frees the pages behind them: the pages are the
+ * caller's own, and must not stay mapped once freed.  The window's
+ * translations are usable only on CPUs whose page-tables carry it: those of
+ * any of the domain's vCPUs, all in the domain's dirty mask.
+ */
+void unmap_vcpu_state(const struct vcpu *v, unsigned int idx, unsigned int nr)
+{
+    const struct domain *d = v->domain;
+
+    /* Beyond the stride is the next vCPU's window. */
+    BUG_ON(idx >= VCPU_STATE_NR_PAGES || nr > VCPU_STATE_NR_PAGES - idx);
+
+    destroy_perdomain_mapping(v, VCPU_STATE_ADDR(v, idx), nr);
+
+    flush_tlb_mask(d->dirty_cpumask);
+}
+
+/*
+ * Drop a transient mapping of a page behind a vCPU's state window, and this
+ * CPU's translations of it: at its address, and at its alias in the
+ * per-domain mirror, which every domain but a 64-bit PV one has (flushing
+ * that address there is harmless).  The mapcache does not drop them with
+ * the slot's last mapping: it defers the flush, and CPUs running other vCPUs
+ * of its domain may have cached the slot too.  A directmap address, where
+ * the caller has no mapcache, needs nothing.
+ */
+void unmap_vcpu_state_page(const void *va)
+{
+    unsigned long addr = (unsigned long)va;
+
+    unmap_domain_page(va);
+
+    if ( addr < DIRECTMAP_VIRT_START )
+    {
+        flush_tlb_one_local(addr);
+        flush_tlb_one_local(addr - PERDOMAIN_VIRT_START +
+                            PERDOMAIN_ALT_VIRT_START);
+    }
+}
+
 void free_perdomain_mappings(struct domain *d)
 {
     l3_pgentry_t *l3tab;
