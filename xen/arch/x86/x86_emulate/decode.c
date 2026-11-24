@@ -930,6 +930,8 @@ decode_0f38(struct x86_emulate_state *s,
         s->desc = DstReg | SrcMem | Mov;
         if ( !(ctxt->opcode & 1) )
             s->desc |= ByteOp;
+        if ( s->vex.pfx >= vex_f3 )
+            ctxt->opcode |= MASK_INSR(s->vex.pfx, X86EMUL_OPC_PFX_MASK);
         s->simd_size = simd_none;
         break;
 
