@@ -131,6 +131,7 @@ EFI_LDFLAGS += --major-image-version=$(XEN_VERSION)
 EFI_LDFLAGS += --minor-image-version=$(XEN_SUBVERSION)
 EFI_LDFLAGS += --major-os-version=2 --minor-os-version=0
 EFI_LDFLAGS += --major-subsystem-version=2 --minor-subsystem-version=0
+EFI_LDFLAGS += --nxcompat
 # It seems ld unfortunately can't set a custom timestamp, so add a zero value
 # for the timestamp (option --no-insert-timestamp) if SOURCE_DATE_EPOCH is
 # defined to make reproducible builds possible.
