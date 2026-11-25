@@ -320,7 +320,8 @@ int main(int argc, char **argv)
     while ( in64_ehdr.e_phnum > num_phdrs )
     {
         (void)lseek(infd,
-                    in64_ehdr.e_phoff + in64_ehdr.e_phnum * sizeof(in64_phdr),
+                    in64_ehdr.e_phoff + (in64_ehdr.e_phnum - 1) *
+                                        sizeof(in64_phdr),
                     SEEK_SET);
         do_read(infd, &in64_phdr, sizeof(in64_phdr));
         endianadjust_phdr64(&in64_phdr);
