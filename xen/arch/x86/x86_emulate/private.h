@@ -56,7 +56,7 @@ void BUG(void);
 #define SrcMem      (2<<3) /* Memory operand. */
 #define SrcMem16    (3<<3) /* Memory operand (16-bit). */
 #define SrcImm      (4<<3) /* Immediate operand. */
-#define SrcImmByte  (5<<3) /* 8-bit sign-extended immediate operand. */
+#define SrcImmByte  (5<<3) /* 8-bit immediate operand. */
 #define SrcImm16    (6<<3) /* 16-bit zero-extended immediate operand. */
 #define SrcMask     (7<<3)
 /* Generic ModRM decode. */
