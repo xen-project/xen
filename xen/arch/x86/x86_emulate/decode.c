@@ -683,9 +683,12 @@ decode_onebyte(struct x86_emulate_state *s,
         break;
 
     case 0xb8 ... 0xbf: /* mov imm{16,32,64},r{16,32,64} */
+        if ( s->op_bytes == 2 )
+            break;
+        /* Like the 32-bit register write, the immediate is zero-extended. */
+        s->imm1 &= 0xffffffffU;
         if ( s->op_bytes == 8 ) /* Fetch more bytes to obtain imm64. */
-            s->imm1 = ((uint32_t)s->imm1 |
-                       ((uint64_t)insn_fetch_type(uint32_t) << 32));
+            s->imm1 |= (uint64_t)insn_fetch_type(uint32_t) << 32;
         break;
 
     case 0xd4: /* aam */
@@ -1831,10 +1834,14 @@ int x86emul_decode(struct x86_emulate_state *s,
         s->simd_size = ext8f08_table[b].simd_size;
         break;
 
+    case ext_8f0a:
+        /* All immediates in this encoding space are unsigned ones. */
+        s->imm1 &= 0xffffffffU;
+        break;
+
     case ext_map5:
     case ext_map6:
     case ext_8f09:
-    case ext_8f0a:
         break;
 
     default:
