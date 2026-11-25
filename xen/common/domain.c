@@ -496,7 +496,8 @@ struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
         v->runstate.state_entry_time = NOW();
         set_bit(_VPF_down, &v->pause_flags);
         vcpu_info_reset(v);
-        init_waitqueue_vcpu(v);
+        if ( init_waitqueue_vcpu(v) != 0 )
+            goto fail_wq;
 
         if ( vmtrace_alloc_buffer(v) != 0 )
             goto fail_wq;
