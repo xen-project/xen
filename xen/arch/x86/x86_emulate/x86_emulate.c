@@ -7942,6 +7942,8 @@ x86_emulate(
         *pxop = vex;
         pxop->b = 1;
         pxop->r = 1;
+        if ( !mode_64bit() )
+            pxop->w = 0;
         pxop->reg = 0xf; /* rAX */
         buf[3] = b;
         buf[4] = (modrm & 0x38) | 0x01; /* r/m=(%rCX) */
@@ -8051,6 +8053,8 @@ x86_emulate(
         *pxop = vex;
         pxop->b = 1;
         pxop->r = 1;
+        if ( !mode_64bit() )
+            pxop->w = 0;
         buf[3] = b;
         buf[4] = 0x09; /* reg=rCX r/m=(%rCX) */
         *(uint32_t *)(buf + 5) = imm1;
