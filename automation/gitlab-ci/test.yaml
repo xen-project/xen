@@ -776,6 +776,13 @@ qemu-smoke-x86_64-gcc-efi:
   needs:
     - debian-13-x86_64-gcc-debug
 
+qemu-smoke-x86_64-gcc-efi-uki:
+  extends: .qemu-smoke-x86_64
+  script:
+    - ./automation/scripts/qemu-xtf.sh x86_64-efi-uki pv64 example 2>&1 | tee ${LOGFILE}
+  needs:
+    - debian-13-x86_64-gcc-debug
+
 qemu-xtf-argo-x86_64-gcc-debug:
   extends: .qemu-smoke-x86_64
   variables:

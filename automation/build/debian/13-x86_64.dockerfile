@@ -57,14 +57,25 @@ RUN <<EOF
         # for test phase, qemu-* jobs
         busybox-static
         expect
+        openssl
         ovmf
+        python3-virt-firmware
         qemu-system-x86
+        sbsigntool
 
         # for build-each-commit-gcc
         ccache
     )
 
     apt-get -y --no-install-recommends install "${DEPS[@]}"
+
+    # Strip the password off the snakeoil key to avoid sbsign wanting an
+    # interactive prompt
+    openssl rsa \
+            -in  /usr/share/ovmf/PkKek-1-snakeoil.key \
+            -out /usr/share/ovmf/PkKek-1-snakeoil-nopass.key \
+            -passin pass:snakeoil
+    chmod 644 /usr/share/ovmf/PkKek-1-snakeoil-nopass.key
 
     rm -rf /var/lib/apt/lists*
 EOF
