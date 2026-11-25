@@ -6252,6 +6252,16 @@ void __iomem *__init ioremap_wc(paddr_t pa, size_t len)
     return (void __force __iomem *)(va ? va + offs : NULL);
 }
 
+struct page_info *allocate_perdomain_l3(struct domain *d)
+{
+    struct page_info *pg = alloc_domheap_page(d, MEMF_no_owner);
+
+    if ( pg )
+        clear_domain_page(page_to_mfn(pg));
+
+    return pg;
+}
+
 int create_perdomain_mapping(struct domain *d, unsigned long va,
                              unsigned int nr, l1_pgentry_t **pl1tab,
                              struct page_info **ppg)
@@ -6265,24 +6275,12 @@ int create_perdomain_mapping(struct domain *d, unsigned long va,
     ASSERT(va >= PERDOMAIN_VIRT_START &&
            va < PERDOMAIN_VIRT_SLOT(PERDOMAIN_SLOTS));
 
-    if ( !d->arch.perdomain_l3_pg )
-    {
-        pg = alloc_domheap_page(d, MEMF_no_owner);
-        if ( !pg )
-            return -ENOMEM;
-        l3tab = __map_domain_page(pg);
-        clear_page(l3tab);
-        d->arch.perdomain_l3_pg = pg;
-        if ( !nr )
-        {
-            unmap_domain_page(l3tab);
-            return 0;
-        }
-    }
-    else if ( !nr )
+    BUG_ON(!d->arch.perdomain_l3_pg);
+
+    if ( !nr )
         return 0;
-    else
-        l3tab = __map_domain_page(d->arch.perdomain_l3_pg);
+
+    l3tab = __map_domain_page(d->arch.perdomain_l3_pg);
 
     ASSERT(!l3_table_offset(va ^ (va + nr * PAGE_SIZE - 1)));
 
