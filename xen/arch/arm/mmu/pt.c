@@ -601,14 +601,21 @@ static int xen_pt_update(unsigned long virt,
     unsigned long vfn = virt >> PAGE_SHIFT;
     unsigned long left = nr_mfns;
 
-    /*
-     * For arm32, page-tables are different on each CPUs. Yet, they share
-     * some common mappings. It is assumed that only common mappings
-     * will be modified with this function.
-     *
-     * XXX: Add a check.
-     */
     const mfn_t root = maddr_to_mfn(READ_SYSREG64(TTBR0_EL2));
+
+#ifdef CONFIG_ARM_32
+    /*
+     * Only Arm32 needs this check, as updating the domheap mapping here
+     * would only affect the current CPU. On Arm64, all the CPUs share the
+     * same page-tables.
+     */
+    if ( virt >= DOMHEAP_VIRT_START ||
+         nr_mfns > PFN_DOWN(DOMHEAP_VIRT_START - virt) )
+    {
+        ASSERT_UNREACHABLE();
+        return -EINVAL;
+    }
+#endif
 
     if ( flags_has_rwx(flags) )
     {
