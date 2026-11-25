@@ -2455,7 +2455,8 @@ x86_emulate(
 
     case 0xd4: /* aam */
     case 0xd5: /* aad */
-        n = (uint8_t)src.val;
+        ASSERT(src.val <= 0xff);
+        n = src.val;
         if ( b & 0x01 )
             _regs.ax = (uint8_t)(_regs.al + (_regs.ah * n));
         else
@@ -2511,8 +2512,9 @@ x86_emulate(
     case 0xed: /* in %dx,%eax */
     case 0xee: /* out %al,%dx */
     case 0xef: /* out %eax,%dx */ {
-        unsigned int port = ((b < 0xe8) ? (uint8_t)src.val : _regs.dx);
+        unsigned int port = ((b < 0xe8) ? src.val : _regs.dx);
 
+        ASSERT(b >= 0xe8 || src.val <= 0xff);
         op_bytes = !(b & 1) ? 1 : (op_bytes == 8) ? 4 : op_bytes;
         if ( (rc = ioport_access_check(port, op_bytes, ctxt, ops)) != 0 )
             goto done;
