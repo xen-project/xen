@@ -1139,6 +1139,25 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
+    printf("%-40s", "Testing btrl $0x21,(%edi)...");
+    instr[0] = 0x0f; instr[1] = 0xba; instr[2] = 0x37; instr[3] = 0x21;
+    res[0]      = 0x2233445F;
+    res[1]      = 0x2233445F;
+    regs.eflags = EFLAGS_ALWAYS_SET;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.edi    = (unsigned long)res;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         /* Bit 5 should have no effect. */
+         (res[0] != 0x2233445D) ||
+         (res[1] != 0x2233445F) ||
+         ((regs.eflags & (EFLAGS_ALWAYS_SET | X86_EFLAGS_ZF |
+                          X86_EFLAGS_CF)) !=
+          (EFLAGS_ALWAYS_SET | X86_EFLAGS_CF)) ||
+         (regs.eip != (unsigned long)&instr[4]) )
+        goto fail;
+    printf("okay\n");
+
     printf("%-40s", "Testing btrl %eax,(%edi)...");
     instr[0] = 0x0f; instr[1] = 0xb3; instr[2] = 0x07;
     *res        = 0x2233445F;

@@ -1455,7 +1455,7 @@ x86_emulate(
         }
         break;
     case DstBitBase:
-        if ( ea.type == OP_MEM )
+        if ( ea.type == OP_MEM && (d & SrcMask) != SrcImmByte )
         {
             /*
              * Instructions such as bt can reference an arbitrary offset from
