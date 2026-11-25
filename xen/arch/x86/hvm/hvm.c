@@ -3946,7 +3946,9 @@ enum hvm_intblk hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack)
             return intr;
     }
 
+    /* EFLAGS.IF doesn't mask NMI or #MC. */
     if ( (intack.source != hvm_intsrc_nmi) &&
+         (intack.source != hvm_intsrc_mce) &&
          !(guest_cpu_user_regs()->eflags & X86_EFLAGS_IF) )
         return hvm_intblk_rflags_ie;
 
