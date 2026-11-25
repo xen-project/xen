@@ -178,7 +178,6 @@ static int nsvm_vcpu_hostsave(struct vcpu *v, unsigned int inst_len)
      */
     n1vmcb->_efer = v->arch.hvm.guest_efer;
     n1vmcb->_cr0 = v->arch.hvm.guest_cr[0];
-    n1vmcb->_cr2 = v->arch.hvm.guest_cr[2];
     n1vmcb->_cr4 = v->arch.hvm.guest_cr[4];
 
     /* Remember the host interrupt flag */
@@ -232,8 +231,7 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
     if ( rc != X86EMUL_OKAY )
         gdprintk(XENLOG_ERR, "hvm_set_cr0 failed, rc: %u\n", rc);
 
-    /* CR2 */
-    v->arch.hvm.guest_cr[2] = n1vmcb->_cr2;
+    /* Sync the current CR2 to L1's VMCB */
     hvm_update_guest_cr(v, 2);
 
     /* CR3 */
