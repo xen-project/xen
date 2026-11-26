@@ -18,15 +18,16 @@ static inline unsigned long brk_adjust_start(unsigned long start)
 extern char __brk_start[];
 extern const char __bss_end[];
 
+unsigned long __ro_after_init brk_end;
+
 static unsigned long __initdata allocated;
-static bool __initdata finished;
 
 void *__init brk_alloc(size_t size)
 {
     void *ptr;
     unsigned long alloc = allocated;
 
-    if ( finished )
+    if ( brk_end )
         return NULL;
 
     /* Allocations PAGE_SIZE and up will be page-aligned. */
@@ -52,20 +53,20 @@ void *__init brk_alloc(size_t size)
     return ptr;
 }
 
-unsigned long __init brk_cease(void)
+void __init brk_cease(void)
 {
-    finished = true;
-
     allocated = ROUNDUP(allocated, PAGE_SIZE);
 
-    return (unsigned long)__brk_start + allocated;
+    brk_end = (unsigned long)__brk_start + allocated;
 }
 
 void __init brk_free_unused(void)
 {
-    unsigned long start = brk_cease(), end = (unsigned long)__bss_end;
+    unsigned long start, end = (unsigned long)__bss_end;
 
-    start = brk_adjust_start(start);
+    brk_cease();
+
+    start = brk_adjust_start(brk_end);
 
     if ( start >= end )
         return;

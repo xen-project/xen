@@ -24,8 +24,11 @@
     static char __section(".bss..brk.page_aligned") __aligned(PAGE_SIZE) \
         __used var ## _brk_[size]
 
+/* Set by brk_cease(), and becomes the permanent bound of the Xen image. */
+extern unsigned long brk_end;
+
 void *brk_alloc(size_t size);
-unsigned long brk_cease(void);
+void brk_cease(void);
 void brk_free_unused(void);
 
 #endif /* XEN_BRK_H */
