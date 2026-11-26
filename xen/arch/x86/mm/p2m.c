@@ -1899,9 +1899,11 @@ static int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
 {
     p2m_type_t p2mt, p2mt_prev;
     mfn_t prev_mfn, mfn;
-    struct page_info *page;
+    struct page_info *page, *prev_page = NULL;
     int rc;
     struct domain *fdom;
+
+    ASSERT(!p2m_locked_by_me(p2m_get_hostp2m(tdom)));
 
     if ( !arch_acquire_resource_check(tdom) )
         return -EPERM;
@@ -1942,15 +1944,30 @@ static int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
     mfn = page_to_mfn(page);
 
     /* Remove previously mapped page if it is present. */
-    prev_mfn = get_gfn(tdom, gpfn, &p2mt_prev);
+    prev_mfn = get_gfn_unshare(tdom, gpfn, &p2mt_prev);
+    if ( p2m_is_shared(p2mt_prev) )
+    {
+        rc = -ENOMEM;
+        goto put_both;
+    }
+
     if ( mfn_valid(prev_mfn) )
     {
         if ( is_special_page(mfn_to_page(prev_mfn)) )
             /* Special pages are simply unhooked from this phys slot */
             rc = p2m_remove_page(tdom, _gfn(gpfn), prev_mfn, 0);
         else
+        {
+            prev_page = mfn_to_page(prev_mfn);
+            if ( !get_page(prev_page, tdom) )
+            {
+                prev_page = NULL;
+                rc = -ENXIO;
+                goto put_both;
+            }
             /* Normal domain memory is freed, to avoid leaking memory. */
             rc = guest_remove_page(tdom, gpfn);
+        }
         if ( rc )
             goto put_both;
     }
@@ -1972,6 +1989,9 @@ static int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
      * before us.
      */
     put_gfn(tdom, gpfn);
+
+    if ( prev_page )
+        put_page(prev_page);
 
  put_one:
     put_page(page);
