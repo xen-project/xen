@@ -1330,7 +1330,7 @@ The default value is 2048.
 
 =item B<dtdev=[ "DTDEV_PATH", "DTDEV_PATH", ...]>
 
-Specifies the host device tree nodes to passt hrough to this guest. Each
+Specifies the host device tree nodes to pass through to this guest. Each
 DTDEV_PATH is an absolute path in the device tree.
 
 =item B<ioports=[ "IOPORT_RANGE", "IOPORT_RANGE", ...]>
@@ -1874,8 +1874,8 @@ Possible values are:
 
 =item B<ide>
 
-If thise mode is specified B<xl> adds an emulated IDE controller, which is
-suitable even for older operation systems.
+If this mode is specified B<xl> adds an emulated IDE controller, which is
+suitable even for older operating systems.
 
 =item B<ahci>
 
