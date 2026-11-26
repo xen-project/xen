@@ -120,7 +120,8 @@ struct page_info *paging_alloc_page(struct domain *d)
 
     spin_lock(&d->arch.paging.lock);
     pg = page_list_remove_head(&d->arch.paging.freelist);
-    d->arch.paging.total_pages--;
+    if ( pg )
+        d->arch.paging.total_pages--;
     spin_unlock(&d->arch.paging.lock);
 
     return pg;
