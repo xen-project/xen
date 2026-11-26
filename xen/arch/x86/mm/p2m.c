@@ -2431,12 +2431,14 @@ int xenmem_add_to_physmap_one(
     unsigned long idx,
     gfn_t gpfn)
 {
-    struct page_info *page = NULL;
+    struct page_info *page = NULL, *prev_page = NULL;
     unsigned long gfn = 0 /* gcc ... */, old_gpfn;
     mfn_t prev_mfn;
     int rc = 0;
     mfn_t mfn = INVALID_MFN;
     p2m_type_t p2mt;
+
+    ASSERT(!p2m_locked_by_me(p2m_get_hostp2m(d)));
 
     switch ( space )
     {
@@ -2487,8 +2489,15 @@ int xenmem_add_to_physmap_one(
      * general, for pages which can subsequently be freed this imperative:
      * Upon freeing we wouldn't be able to find other mappings in the P2M
      * (unless we did a brute force search).
+     *
+     * FIXME: remove a shared p2m entry directly, without unsharing first.
      */
-    prev_mfn = get_gfn(d, gfn_x(gpfn), &p2mt);
+    prev_mfn = get_gfn_unshare(d, gfn_x(gpfn), &p2mt);
+    if ( p2m_is_shared(p2mt) )
+    {
+        rc = -ENOMEM;
+        goto put_all;
+    }
 
     /* XENMAPSPACE_gmfn: Check if the MFN is associated with another GFN. */
     old_gpfn = get_gpfn_from_mfn(mfn_x(mfn));
@@ -2508,8 +2517,17 @@ int xenmem_add_to_physmap_one(
             /* Special pages are simply unhooked from this phys slot. */
             rc = p2m_remove_page(d, gpfn, prev_mfn, PAGE_ORDER_4K);
         else if ( !mfn_eq(mfn, prev_mfn) )
+        {
+            prev_page = mfn_to_page(prev_mfn);
+            if ( !get_page(prev_page, d) )
+            {
+                prev_page = NULL;
+                rc = -ENXIO;
+                goto put_all;
+            }
             /* Normal domain memory is freed, to avoid leaking memory. */
             rc = guest_remove_page(d, gfn_x(gpfn));
+        }
     }
 
     /* Unmap from old location, if any. */
@@ -2550,6 +2568,9 @@ int xenmem_add_to_physmap_one(
 
     if ( page )
         put_page(page);
+
+    if ( prev_page )
+        put_page(prev_page);
 
     return rc;
 }
