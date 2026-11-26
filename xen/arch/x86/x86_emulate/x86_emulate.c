@@ -6381,6 +6381,7 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f38, 0x8a)
      ... X86EMUL_OPC(0x0f38, 0x8b): /* movrs */
+        generate_exception_if(!mode_64bit() || ea.type != OP_MEM, X86_EXC_UD);
         vcpu_must_have(movrs);
         dst.val = src.val;
         break;
