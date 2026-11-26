@@ -295,7 +295,7 @@ out:
 
 int guest_remove_page(struct domain *d, unsigned long gmfn)
 {
-    struct page_info *page;
+    struct page_info *page = NULL;
 #ifdef CONFIG_X86
     p2m_type_t p2mt;
 #endif
@@ -416,12 +416,18 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     if ( !rc && !is_domain_direct_mapped(d) )
         put_page_alloc_ref(page);
 
-    put_page(page);
-
 #ifdef CONFIG_X86
  out_put_gfn:
     put_gfn(d, gmfn);
 #endif
+
+    /*
+     * Do the final put page after the p2m flush possibly done when putting the
+     * gfn.  Otherwise we risk freeing the page while there are stale p2m TLB
+     * entries.
+     */
+    if ( page )
+        put_page(page);
 
     /*
      * Filter out -ENOENT return values that aren't a result of an empty p2m
