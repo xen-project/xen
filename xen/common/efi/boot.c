@@ -285,6 +285,17 @@ static char *__init w2s(const union string *str)
     return str->s;
 }
 
+static char *__init _strdup(const char *s)
+{
+    size_t len = strlen(s) + 1;
+    void *ptr;
+
+    if ( efi_bs->AllocatePool(EfiLoaderData, len, &ptr) != EFI_SUCCESS )
+        return NULL;
+
+    return memcpy(ptr, s, len);
+}
+
 static bool __init match_guid(const EFI_GUID *guid1, const EFI_GUID *guid2)
 {
     return guid1->Data1 == guid2->Data1 &&
@@ -1533,6 +1544,7 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
         EFI_FILE_HANDLE dir_handle = NULL;
         EFI_HANDLE gop_handle;
         UINTN depth, cols, rows;
+        bool section_in_cfg = false;
 
         cols = rows = depth = 0;
 
@@ -1574,7 +1586,10 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
         if ( section.w )
             w2s(&section);
         else
+        {
             section.s = get_value(&cfg, "global", "default");
+            section_in_cfg = true;
+        }
 
         for ( ; ; )
         {
@@ -1584,9 +1599,21 @@ void EFIAPI __init noreturn efi_start(EFI_HANDLE ImageHandle,
             name.s = get_value(&cfg, "global", "chain");
             if ( !name.s )
                 break;
+            /*
+             * name.s, and section.s if it was taken from "default=", point
+             * into the buffer freed below.  Copy them before freeing it.
+             */
+            name.w = s2w(&name);
+            if ( section_in_cfg && section.s )
+            {
+                section.s = _strdup(section.s);
+                if ( !section.s )
+                    blexit(L"Unable to allocate string buffer");
+            }
+            section_in_cfg = false;
             free_cfg();
             ensure_dir_handle(loaded_image, &dir_handle, &file_name);
-            if ( !read_file(dir_handle, s2w(&name), &cfg, NULL) )
+            if ( !read_file(dir_handle, name.w, &cfg, NULL) )
             {
                 PrintStr(L"Chained configuration file '");
                 PrintStr(name.w);
