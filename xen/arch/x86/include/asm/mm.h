@@ -313,7 +313,7 @@ struct page_info
     (mfn_valid(mfn) && is_xen_heap_page(mfn_to_page(mfn)))
 #define is_xen_fixed_mfn(mfn)                     \
     (((mfn_to_maddr(mfn)) >= virt_to_maddr((unsigned long)_stext)) && \
-     ((mfn_to_maddr(mfn)) <= virt_to_maddr((unsigned long)__2M_rwdata_end - 1)))
+     (mfn_to_maddr(mfn) <= virt_to_maddr(brk_end - 1)))
 
 #define PRtype_info "016lx"/* should only be used for printk's */
 

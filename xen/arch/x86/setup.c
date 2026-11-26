@@ -1,6 +1,7 @@
 #include <xen/acpi.h>
 #include <xen/alternative-call.h>
 #include <xen/bitops.h>
+#include <xen/brk.h>
 #include <xen/console.h>
 #include <xen/cpu.h>
 #include <xen/cpuidle.h>
@@ -1157,7 +1158,6 @@ void asmlinkage __init noreturn __start_xen(void)
     struct boot_info *bi;
     unsigned long raw_max_page;
     int i, j, bytes = 0;
-    unsigned long eb_start, eb_end;
     bool acpi_boot_table_init_done = false, relocated = false;
     bool vm_init_done = false;
     int ret;
@@ -1523,7 +1523,7 @@ void asmlinkage __init noreturn __start_xen(void)
         /*
          * This needs to remain in sync with remove_xen_ranges() and the
          * respective reserve_e820_ram() invocation below. No need to
-         * query efi_boot_mem_unused() here, though.
+         * query brk_cease() here, though.
          */
         xen->start = virt_to_maddr(_stext);
         xen->size  = __2M_rwdata_end - _stext;
@@ -1667,20 +1667,12 @@ void asmlinkage __init noreturn __start_xen(void)
     if ( !xen_phys_start )
         panic("Not enough memory to relocate Xen\n");
 
-    /* FIXME: Putting a hole in .bss would shatter the large page mapping. */
-    if ( using_2M_mapping() )
-        efi_boot_mem_unused(NULL, NULL);
-
     /* This needs to remain in sync with remove_xen_ranges(). */
-    if ( efi_boot_mem_unused(&eb_start, &eb_end) )
-    {
-        if ( !reserve_e820_ram(&boot_e820, __pa(_stext), __pa(eb_start)) ||
-             !reserve_e820_ram(&boot_e820, __pa(eb_end), __pa(__2M_rwdata_end)) )
-            panic("Failed to reserve Xen in E820\n");
-    }
-    else
-        if ( !reserve_e820_ram(&boot_e820, __pa(_stext), __pa(__2M_rwdata_end)) )
-            panic("Failed to reserve Xen in E820\n");
+    brk_cease();
+    if ( using_2M_mapping() )
+        brk_end = PAGE_ALIGN_2M(brk_end);
+    if ( !reserve_e820_ram(&boot_e820, __pa(_stext), __pa(brk_end)) )
+        panic("Failed to reserve Xen in E820\n");
 
     /* Late kexec reservation (dynamic start address). */
     kexec_reserve_area();
@@ -2274,7 +2266,6 @@ __initcall(init_xen_cap_info);
 
 int __hwdom_init remove_xen_ranges(struct rangeset *r)
 {
-    paddr_t start, end;
     int rc;
 
     /* S3 resume code (and other real mode trampoline code) */
@@ -2296,26 +2287,10 @@ int __hwdom_init remove_xen_ranges(struct rangeset *r)
         return rc;
 
     /* hypervisor .data + .bss */
-    if ( efi_boot_mem_unused(&start, &end) )
-    {
-        ASSERT(__pa(start) >= __pa(&__2M_rwdata_start));
-        rc = rangeset_remove_range(r, PFN_DOWN(__pa(&__2M_rwdata_start)),
-                                   PFN_DOWN(__pa(start) - 1));
-        if ( rc )
-            return rc;
-        ASSERT(__pa(end) <= __pa(&__2M_rwdata_end));
-        rc = rangeset_remove_range(r, PFN_DOWN(__pa(end)),
-                                   PFN_DOWN(__pa(&__2M_rwdata_end) - 1));
-        if ( rc )
-            return rc;
-    }
-    else
-    {
-        rc = rangeset_remove_range(r, PFN_DOWN(__pa(&__2M_rwdata_start)),
-                                   PFN_DOWN(__pa(&__2M_rwdata_end) - 1));
-        if ( rc )
-            return rc;
-    }
+    rc = rangeset_remove_range(r, PFN_DOWN(__pa(&__2M_rwdata_start)),
+                               PFN_DOWN(__pa(brk_end) - 1));
+    if ( rc )
+        return rc;
 
     return 0;
 }

@@ -7,6 +7,7 @@
 #ifndef X86_EFI_EFI_BOOT_H
 #define X86_EFI_EFI_BOOT_H
 
+#include <xen/brk.h>
 #include <xen/vga.h>
 
 #include <asm/boot-helpers.h>
@@ -117,6 +118,18 @@ static void __init relocate_trampoline(unsigned long phys)
         return;
 
     reloc_trampoline64();
+}
+
+DEFINE_BRK(efi, MB(1));
+
+static void *__init ebmalloc(size_t size)
+{
+    void *ptr = brk_alloc(size);
+
+    if ( !ptr )
+        blexit(L"Out of BRK memory\r\n");
+
+    return ptr;
 }
 
 static void __init place_string(u32 *addr, const char *s)

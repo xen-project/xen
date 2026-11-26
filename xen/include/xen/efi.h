@@ -39,7 +39,6 @@ static inline bool efi_enabled(unsigned int feature)
 extern bool efi_secure_boot;
 
 void efi_init_memory(void);
-bool efi_boot_mem_unused(unsigned long *start, unsigned long *end);
 unsigned long efi_get_time(void);
 void efi_reset_system(bool warm);
 #ifndef COMPAT

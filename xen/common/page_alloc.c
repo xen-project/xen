@@ -120,6 +120,7 @@
  *   regions within it.
  */
 
+#include <xen/brk.h>
 #include <xen/domain_page.h>
 #include <xen/event.h>
 #include <xen/init.h>
