@@ -1951,6 +1951,13 @@ static int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
         goto put_both;
     }
 
+    /* Special p2m slots must be cleaned up via special accessors. */
+    if ( p2m_is_special(p2mt_prev) )
+    {
+        rc = -EPERM;
+        goto put_both;
+    }
+
     if ( mfn_valid(prev_mfn) )
     {
         if ( is_special_page(mfn_to_page(prev_mfn)) )
@@ -2093,8 +2100,11 @@ int xenmem_add_to_physmap_one(
         goto put_all;
     }
 
-    /* Remove previously mapped page if it was present. */
-    if ( p2mt == p2m_mmio_direct )
+    /*
+     * Remove previously mapped page if it was present.  Special p2m slots must
+     * be cleaned up via special accessors.
+     */
+    if ( p2m_is_special(p2mt) )
         rc = -EPERM;
     else if ( mfn_valid(prev_mfn) )
     {
