@@ -91,15 +91,38 @@ static int setup_cpu_sibling_map(int cpu)
          !zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)) )
         return -ENOMEM;
 
+    return 0;
+}
+
+static void set_cpu_sibling_map(unsigned int cpu)
+{
+    unsigned int sibling;
+
+    BUG_ON(!per_cpu(cpu_sibling_mask, cpu));
+    BUG_ON(!per_cpu(cpu_core_mask, cpu));
+
     /*
      * Currently we assume there is no multithread and NUMA, so
-     * a CPU is a sibling with itself, and the all possible CPUs
+     * a CPU is a sibling with itself, and the all online CPUs
      * are supposed to belong to the same socket (NUMA node).
      */
     cpumask_set_cpu(cpu, per_cpu(cpu_sibling_mask, cpu));
-    cpumask_copy(per_cpu(cpu_core_mask, cpu), &cpu_possible_map);
+    cpumask_copy(per_cpu(cpu_core_mask, cpu), &cpu_online_map);
+    cpumask_set_cpu(cpu, per_cpu(cpu_core_mask, cpu));
 
-    return 0;
+    for_each_online_cpu(sibling)
+        cpumask_set_cpu(cpu, per_cpu(cpu_core_mask, sibling));
+}
+
+static void remove_siblinginfo(unsigned int cpu)
+{
+    unsigned int sibling;
+
+    for_each_cpu(sibling, per_cpu(cpu_core_mask, cpu))
+        cpumask_clear_cpu(cpu, per_cpu(cpu_core_mask, sibling));
+
+    cpumask_clear(per_cpu(cpu_sibling_mask, cpu));
+    cpumask_clear(per_cpu(cpu_core_mask, cpu));
 }
 
 static void remove_cpu_sibling_map(int cpu)
@@ -314,6 +337,7 @@ smp_prepare_cpus(void)
     if ( rc )
         panic("Unable to allocate CPU sibling/core maps\n");
 
+    set_cpu_sibling_map(0);
 }
 
 /* Boot the current CPU */
@@ -385,6 +409,8 @@ void asmlinkage noreturn start_secondary(void)
 
     set_current(idle_vcpu[cpuid]);
 
+    set_cpu_sibling_map(cpuid);
+
     /* Run local notifiers */
     notify_cpu_starting(cpuid);
     /*
@@ -430,6 +456,8 @@ void __cpu_disable(void)
     local_irq_enable();
     mdelay(1);
     local_irq_disable();
+
+    remove_siblinginfo(cpu);
 
     /* It's now safe to remove this processor from the online map */
     cpumask_clear_cpu(cpu, &cpu_online_map);
